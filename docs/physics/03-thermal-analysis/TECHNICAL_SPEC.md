@@ -81,7 +81,7 @@ plugin, installed in `src/app/plugins.ts`).
 | TR-THM-14 | MUST | Radiation: `*PHYSICAL CONSTANTS, ABSOLUTE ZERO=<0 or -273.15>, STEFAN BOLTZMANN=<σ in the unit system>` whenever any radiation BC exists; `*RADIATE` `Rx` with sink and ε. σ = 5.670 374 419 × 10⁻⁸ W/(m² K⁴) derived from exact SI constants (VC-THM-13). |
 | TR-THM-15 | SHOULD (V1) | Contact conductance: tied `*CONTACT PAIR` (face-to-face) with `*SURFACE INTERACTION`, `*SURFACE BEHAVIOR, PRESSURE-OVERCLOSURE=TIED` and `*GAP CONDUCTANCE` table; CalculiX generates contact springs for tied face-to-face pairs regardless of clearance [R7]. Exact card combination validated against `test/contact7–9.inp` (§9). |
 | TR-THM-16 | COULD (V2) | Phase change: apparent heat capacity c_app(T) = cp + L / (T_l − T_s) on [T_s, T_l] written into the `*SPECIFIC HEAT` table, with an energy check ∫c_app dT = cp ΔT + L to 1e-9; there is no latent-heat card in CalculiX [R7]. |
-| TR-THM-20 | SHOULD (V1) | `compute_view_factors` (§5.4): pure TS contour-integral view factors between tessellated planar facets, aggregated per target face, without obstruction in V1-a and with ray-cast obstruction in V1-b; returns matrix, row sums, method, facet counts. |
+| TR-THM-20 | SHOULD (V1) | `compute_view_factors` (§5.4): pure TS contour-integral view factors between tessellated planar facets, aggregated per target face, without obstruction in V1-a and with ray-cast obstruction in V1-b; returns matrix, row sums, method, facet counts. Above the TS facet cap the same query runs in `llull-compute geomq` (§2.2); the TS code stays the reference and small-case path. |
 | TR-THM-21 | SHOULD (V1) | Cavity radiation deck: `*RADIATE, CAVITY=<≤ 3 chars>` with `RxCR`; open cavity → environment temperature; closed cavity → negative absolute environment temperature, which makes CalculiX scale view factors to 1 [R7]. Cavity names are validated (≤ 3 characters, unique). |
 | TR-THM-30 | MUST | Result reading: the 05 FRD reader returns `NDTEMP` (NT), `FLUX` (HFL) and `RFL` blocks per step/time; the thermal summariser (§5.5) produces `ThermalResultsSummary`; the DAT reader reads `*NODE PRINT` / `*EL PRINT` probe tables (format checked on `oneel8ra.dat.ref`). |
 | TR-THM-31 | MUST | Heat balance (§5.5) computed from RFL on prescribed-temperature nodes, film and radiation face fluxes (recomputed from NT and the BC data), applied fluxes and generation, and stored energy (transient, ∫ρ cp ΔT dV); relative residual reported; tolerance named (default 1e-2, `source: "llull acceptance rule"`, `defaulted: true`). |
@@ -90,6 +90,21 @@ plugin, installed in `src/app/plugins.ts`).
 | TR-THM-50 | MUST | Agent-first result contract: physical constants and the balance tolerance named with source and `defaulted`; no default for h, ε, sink, initial temperature, limits; `unverified` = OR of the 08 / PHY-01 / PHY-15 inputs' flags; `reviewRequired` on every limit row. |
 | TR-THM-51 | MUST | Stable codes of §7.1 on every refusal and check item, with ids or param paths and a remediation. |
 | TR-THM-52 | MUST | `dispose_thermal_limit` verifies a human-held signature through the 09 PLM signing port; an agent caller cannot supply one (AF-34, AF-34a). |
+
+### 2.2 Stack amendment (RS1, 2026-10-18)
+
+Decision [RS1](../../decisions/RS1-native-compute.md) step **RS-6** moves large view-factor computations with obstruction to
+native code. The rest of the pack does not change: the FE path stays Gmsh + bundled CalculiX (05), and CalculiX still
+computes its own cavity view factors in the solve.
+
+| Item | Before | Now |
+| ---- | ---- | --- |
+| Where | `computeViewFactors.ts` (pure TS), one V8 thread | TS below the cap; above it `llull-compute geomq` (crate `llull-geomq` on the shared `llull-bvh`): contour-integral kernel and obstruction ray casting on wgpu, Rust-CPU twin |
+| How core reaches it | — | the same injected batch port as PHY-21 (`GeometryQueryEngine`, PHY-21 TR-FPR-19), method `viewFactorBatch`; the query stays a pure registry command, nothing in `packages/*` imports native code |
+| Facet cap | 400 facets (`THM_FACET_LIMIT`, built) | unchanged on the TS path; native target ~10⁴ facets (target, TBD — measure, VC-THM-64) |
+| Obstruction | centroid-segment test per facet pair | native: same test (used for VC-THM-64) plus an optional multi-ray test per pair (named ray count) |
+| Recorded numbers | TS | Rust-CPU twin or fixed-order GPU reductions (RS1 §2 rule 3); provenance names engine, device, `deterministic` |
+| Reference | `computeViewFactors.ts` + closed forms (VC-THM-09) | unchanged; the native path must match TS (VC-THM-64) |
 
 ## 3. Data model
 
@@ -313,7 +328,8 @@ coincident or touching-edge cases use the closed-form limit (as in pyViewFactor'
 facing away (n_i · (c_j − c_i) ≤ 0 or n_j · (c_i − c_j) ≤ 0) get 0. Face-level factors: F_IJ = Σ_i Σ_j A_i F_ij / A_I.
 Checks returned in `data`: reciprocity max |A_I F_IJ − A_J F_JI| / max(A_I F_IJ), and row sums (closed cavity ⇒ 1 ± 1e-3).
 Obstruction (V1-b): a facet pair is skipped when the segment between centroids hits a third facet (BVH, deterministic
-order). Validation: VC-THM-09 (closed forms proven by quadrature in the generator).
+order). Validation: VC-THM-09 (closed forms proven by quadrature in the generator). Large cases run the same kernel and
+test in `llull-compute geomq` on GPU ray casting (§2.2, VC-THM-64).
 
 ### 5.5 Result summary and heat balance (TR-THM-30, TR-THM-31)
 
@@ -417,7 +433,8 @@ number finite; every limit has a source; quantities parse with the right dimensi
 | ------ | ------ |
 | Steady solve, 50k-node tet10 box with film | ≤ 20 s (TBD: measure, production gate) |
 | Transient, 10k nodes, 200 increments | ≤ 60 s (TBD: measure) |
-| `compute_view_factors`, 2 000 facets, no obstruction | ≤ 2 s in TS (O(n²) edge pairs); obstruction ≤ 10 s |
+| `compute_view_factors`, 2 000 facets, no obstruction | ≤ 2 s in TS (O(n²) edge pairs); obstruction ≤ 10 s (the built TS path caps at 400 facets, §13) |
+| `compute_view_factors` native (`llull-compute geomq`) | ~10⁴ facets with obstruction, wall time recorded — target, TBD measure (VC-THM-64) |
 | FRD with 200 time points | streamed; summary only stored; full field stays in the artifact |
 | Determinism | same plan ⇒ same deck sha256 and same summary JSON (sorted sets, fixed float formatting `%.12g`) |
 
@@ -428,6 +445,7 @@ number finite; every limit has a source; quantities parse with the right dimensi
 | Unit (`tests/unit/physics/thermal/*`) | every command happy / failure / `is pure`; units table; amplitude sampling; face labels; deck sections golden text on a 2-element mesh; summariser on a hand-written FRD; heat balance; analytic checks vs `expected_results.json` | 01, 02, 06–13, 60, 61 |
 | Contract | `toToolSchemas()` snapshot gains the thermal commands; plugin `validate`; extension lookup | — |
 | Golden | the five plans in `validation/plans/` (id-normalised snapshot + replay equality) | 03, 04, 01 |
+| Native (`npm run native:check`; `server/tests` with `llull-compute`) | `llull-geomq` view-factor kernel vs TS on VC-THM-09 geometries and seeded cavities; GPU vs Rust-CPU twin where an adapter exists | 09, 64 |
 | Integration (`server/tests`, needs ccx) | T2/T3/T4 solves, wall, `oneel8ra` re-run and parse, tied contact conductance card check against `test/contact7–9.inp`, cavity (V1) | 01, 03, 04, 05, 14, 30 |
 | Quality gate | `quality:thermal` runs the CLI harness through PHY-00 | all numeric |
 | Agent-first | stale, human gate, unverified propagation, codes | 50, 60–64 |
@@ -443,6 +461,7 @@ Coverage 90/85/90/90 extends to `packages/domain-physics/src/**`.
 | M2 | Deck sections (steady + transient), summariser, heat balance, `thermal_report`, `check_thermal`, `check_temperature_limits`, `dispose_thermal_limit` | M1, 05 M3, 09 signing port | 2 w |
 | M3 | Validation: T2/T3/T4, wall, `oneel8ra`, golden plans, `quality:thermal`, `llull guide` section | M2, PHY-00 runner | 1 w |
 | M4 (V1) | View factors (TS) + cavity deck, contact conductance, h(T) / ε(T) tables, orthotropic k, render_view field | M3, PHY-15 emissivity property | 3 w |
+| RS-6 | Native view factors: `viewFactorBatch` on the PHY-21 port, `llull-compute geomq` kernel + obstruction rays, VC-THM-64 | M4, PHY-21 RS-6 row, RS-0 (`solver/` workspace) | 1 w (share of RS1 RS-6) |
 | V2 | phase change, forced convection network, Nastran thermal, orbital loads hand-off, Joule heating | M4 | — |
 
 Cross-gap: **05 FEA** (pipeline), **08 MAT** / **PHY-01** (k, cp, ρ data), **PHY-15** (emissivity, absorptivity),
@@ -464,11 +483,16 @@ Cross-gap: **05 FEA** (pipeline), **08 MAT** / **PHY-01** (k, cp, ρ data), **PH
 6. **Temperature-limit sources**: llull ships no limit tables (component and qualification limits are proprietary or
    paywalled); confirm this policy matches 03 GDT's "customer fills the rule tables" approach.
 
+7. **Native view-factor obstruction method** (RS1): keep the centroid-segment test only, or add the multi-ray test per facet pair
+   on the GPU as the default above the TS cap? Proposal: centroid test by default (matches TS), multi-ray as an option until
+   VC-THM-64 measures the difference on obstructed cavities.
+
 ## 12. References
 
 - [R1]–[R13]: see [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md) §11 and [`validation/sources.md`](validation/sources.md) (S1–S13).
 - [R7] CalculiX — https://github.com/Dhondtguido/CalculiX/tree/fd588701edd6a92fde06e99b1bdf01f3b0f80f2c (accessed 2026-10)
 - [R12] pyViewFactor — https://pypi.org/project/pyviewfactor/ (accessed 2026-10)
+- [RS1] Native compute programme — [`../../decisions/RS1-native-compute.md`](../../decisions/RS1-native-compute.md) (step RS-6)
 - llull: `.claude/rules/architecture.md` (L1–L10), `.dependency-cruiser.cjs` (rule `plugins-and-kernels-depend-on-core-only`),
   `packages/core/src/model/types.ts`, `packages/mcp/src/toolsets.ts`, `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md`,
   `docs/aerospace/08-materials-standards-libraries/TECHNICAL_SPEC.md`, `docs/physics/README.md`.
@@ -498,7 +522,7 @@ Toolset `analysis`.
   faces, so the command is not `requiresKernel`. Quadrature: closed-form inner integral of ln r along one edge, adaptive 8-point
   Gauss–Legendre on the other (exact for collinear / touching edges). Obstruction uses the centroid-segment test per facet pair
   (refine with `maxFacetSize`). VC-THM-09.d (discs) uses 64-gons and passes within the case tolerance (≈ 1e-3).
-- **Extra codes:** `THM_INPUT_INVALID`, `THM_SURFACE_INVALID`, `THM_FACET_LIMIT` (400 facets, surfaces + blockers; at most 16 blockers and 256 vertices per polygon), `THM_VIEW_FACTOR_ROWSUM` (closed cavity
+- **Extra codes:** `THM_INPUT_INVALID`, `THM_SURFACE_INVALID`, `THM_FACET_LIMIT` (400 facets, surfaces + blockers; at most 16 blockers and 256 vertices per polygon; the TS path keeps this cap, larger cases go to `llull-compute geomq`, §2.2), `THM_VIEW_FACTOR_ROWSUM` (closed cavity
   row sum off by > 1e-3).
 
 **FE milestones M0–M3 and the M4 decks: built (2026-10-16, owner decision).** The minimal 05 FEA slice was built first

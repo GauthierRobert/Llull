@@ -41,7 +41,7 @@ No `galvanic`, `corrosion` or `contact` command exists (`grep -rliw "galvanic\|c
 
 | Id | Pri | Requirement | FR |
 | -- | --- | ----------- | -- |
-| TR-COR-01 | MUST | Broad phase: `entityBoundsInDoc` AABB per solid (instances expanded with `expandInstance`, each child with its world transform and material), inflated by `tolerance`; sort-and-sweep on x; O(N log N + k) | FR-COR-01, 02 |
+| TR-COR-01 | MUST | Broad phase: `entityBoundsInDoc` AABB per solid (instances expanded with `expandInstance`, each child with its world transform and material), inflated by `tolerance`; sort-and-sweep on x; O(N log N + k). Model-scale assemblies may use the native `llull-bvh` broad phase instead (§2.3); the candidate set must be identical | FR-COR-01, 02 |
 | TR-COR-02 | MUST | Narrow phase dispatch: (a) both unrotated `box` ⇒ closed form §5.1; (b) kernel with `proximity` ⇒ exact §5.2; (c) kernel without `proximity` ⇒ interference volume from an `intersect` recipe + `distance` from 01 `faceQuery` samples, contact area `null`, `approximate: true`; (d) no kernel ⇒ AABB result `approximate: true`, kind `possible` | FR-COR-01, 02 |
 | TR-COR-03 | MUST | Classification: `interference` (overlap volume > tol³), `face` (gap ≤ tol and contact area > tol²), `edge`, `vertex`, with `gapMm`, `areaMm2`, `volumeMm3` in document units plus unit suffix | FR-COR-01 |
 | TR-COR-04 | MUST | Fastener stacks yield contacts `fastener↔layer[i]`, `layer[i]↔layer[i+1]`, `washer↔adjacent layer`, `nut↔washer` (or nut↔last layer), tagged `source: "stack"`; geometric duplicates are merged with the stack pair | FR-COR-03 |
@@ -56,6 +56,14 @@ No `galvanic`, `corrosion` or `contact` command exists (`grep -rliw "galvanic\|c
 | TR-COR-13 | MUST | Every item: `code`, `status`, `ruleId`, `ruleGrade`, `source`, `inputs`, `remedies[]`, `unverified`, `reviewRequired: true`, `reviewReason` | FR-COR-12, 17 |
 | TR-COR-14 | MUST | Mutating commands pure, one FeatureStep each, ids step-scoped (`iso-<step>.<k>`), replay-identical | FR-COR-09, 15 |
 | TR-COR-15 | MUST | Human gate: `accept_corrosion_item { itemKey, decision, justification, signature }` verifies a human-held signature through the 09 port; agent callers get `COR_HUMAN_GATE` | FR-COR-17 |
+
+### 2.3 Stack amendment (RS1, 2026-10-18)
+
+Decision [RS1](../../decisions/RS1-native-compute.md) step **RS-6** (medium for this pack) adds one option: for model-scale
+assemblies the `find_contacts` **broad phase** can run on the shared Rust crate `llull-bvh` (`llull-compute geomq`, Rust CPU,
+deterministic build), reached through the same injected batch port as PHY-21 (`GeometryQueryEngine`, PHY-21 TR-FPR-19). Only
+candidate pairs come back. Unchanged: the TS sort-and-sweep stays the default and the reference; the exact phase stays OCC
+(§5.2); closed forms stay TS; nothing in `packages/*` imports native code. Planned check: VC-COR-17.
 
 ## 3. Data model
 
@@ -281,6 +289,7 @@ AF-41/42: offline; mutating commands pure (dry-run).
 | `find_contacts` 1,000 unrotated boxes (closed form) | ≤ 2 s (sweep and prune) |
 | `find_contacts` 200 exact OCC solids, ~400 candidate pairs | ≤ 30 s, cached by recipeKey pair |
 | `check_material_compatibility` on 10⁴ fastener stacks (stack contacts, no geometry) | ≤ 1 s |
+| `find_contacts` broad phase, model-scale assembly on `llull-bvh` (RS1) | size and wall time TBD — measure (VC-COR-17) |
 
 ## 9. Test strategy
 
@@ -303,6 +312,7 @@ AF-41/42: offline; mutating commands pure (dry-run).
 | M4 | kernel proximity port (OCC) | 01 KRN M2/M10 | 4 d |
 | M5 | 889D matrix transcription + review + lookup; SCC table transcription + lookup; HE | human access to the standards; M2 | 5 d (+ reviewer time) |
 | M6 | human-gate acceptance (09 port), CSV report | 09 | 2 d |
+| RS-6 | optional native broad phase on `llull-bvh` through the PHY-21 port, VC-COR-17 | M1, PHY-21 RS-6 row, RS-0 | 2 d (share of RS1 RS-6) |
 
 MVP (M1–M3) ≈ 9 d; V1 (M4–M6) ≈ 11 d.
 
@@ -324,4 +334,5 @@ See FUNCTIONAL_SPEC §11 [R1]–[R15] and `validation/sources.md` [S1]–[S19]. 
 
 - [T1] 01 KRN TECHNICAL_SPEC §5.9 `FaceQueryPort` (kernel interface owner) — `docs/aerospace/01-exact-brep-kernel/TECHNICAL_SPEC.md`
 - [T2] 08 MAT TECHNICAL_SPEC §3.4 `FastenerStack`, §5.3 contact tolerance — `docs/aerospace/08-materials-standards-libraries/TECHNICAL_SPEC.md`
+- [RS1] Native compute programme — [`../../decisions/RS1-native-compute.md`](../../decisions/RS1-native-compute.md) (step RS-6)
 - [T3] Open CASCADE Technology reference (BRepExtrema_DistShapeShape, BRepAlgoAPI_Common, BRepGProp) — https://dev.opencascade.org/doc/refman/html/ (not fetched; class names to verify against the bundled build)

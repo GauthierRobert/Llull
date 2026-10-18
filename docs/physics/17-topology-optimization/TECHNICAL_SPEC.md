@@ -21,7 +21,7 @@ Gap id **TOP** · status: specification · written 2026-10-15 · functional spec
 
 ```
 server/ (host)                              src/app  installDefaultPlugins() + physics plugin "topology"
-  topologyRoutes: topology_solve ✱  ─ spawns bundled CPython op "topopt" (numpy + scipy, permissive) ─ artifact store
+  topologyRoutes: topology_solve ✱  ─ spawns `llull-compute topopt <job-folder>` (Rust + wgpu, RS1; CPU twin) ─ artifact store
         │ dispatch record_topology_result (validated)
         ▼
 packages/domain-physics/src (@phys) ── CadPlugin "topology", toolset "analysis"
@@ -33,8 +33,10 @@ packages/domain-physics/src (@phys) ── CadPlugin "topology", toolset "analys
    topology/grid.ts         voxelisation of the design domain (via kernel tessellation, pure point-in-mesh test)
         ▼ (public core API only, L10 + dependency-cruiser rule): core model/analysis.ts (05 AnalysisCase, FeaTarget),
           PHY-01 resolvePropertyModel for E, nu (no @cae import)
-packages/core/src/lib/topology.ts   pure SIMP/OC/filter reference (small grids, used by tests and by the
-                                    separable-problem check; the production solve runs in the bridge)
+packages/core/src/lib/topology.ts   pure SIMP/OC/filter reference (small 2D grids, used by tests, by the
+                                    separable-problem check and as the native job's oracle; the production solve
+                                    runs in `llull-compute topopt`)
+solver/crates/llull-topopt          SIMP loop (FE solve + density filter + OC) on solver/crates/llull-voxfe (RS1 §2)
 ```
 
 **Placement under the dependency rule** (aligned with PHY-03 TECHNICAL_SPEC §2.1): `.dependency-cruiser.cjs` rule `plugins-and-kernels-depend-on-core-only` forbids `packages/domain-physics` importing 05's `@cae`. The shared analysis data types (`AnalysisCase`, `FeaTarget`, `ResultsSummary`, mesh/result artifact shapes) live in core `model/analysis.ts` (05 TR-FEA-02), and this pack's additions go there too; behaviour that 05 must dispatch (staleness fields, check items) is registered through the core extension port proposed by PHY-03 (`CadPlugin.analysisExtensions`, `AnalysisTypeExtension`). **Proposal A (preferred):** `@phys` + core port, no package imports another package. **Proposal B (fallback):** the discipline lives inside the 05 FEA package (`packages/domain-cae/src/<discipline>/`). Pending README §5.1; everything below is written for A, under B only paths change.
@@ -44,7 +46,8 @@ packages/core/src/lib/topology.ts   pure SIMP/OC/filter reference (small grids, 
 - **L1/L5.** Study set-up and every query are registry commands; the solve is a transport that applies its result via
   `record_topology_result`, validated against the artifact store (05 §4.1 trust model), so an agent cannot inject a
   fabricated optimum.
-- **L2.** `@phys` imports core only (no `@cae`); process and file work in `server/`; deterministic numerics in the bridge op; geometry derivation in pure TS.
+- **L2.** `@phys` imports core only (no `@cae`); process and file work in `server/`; deterministic numerics in the native job (reached only through the `server/`
+  transport, RS1 §2 rule 1); geometry derivation in pure TS.
 - **L3/L4.** Study data lives in the 05 `analysis` slice (`AnalysisCase.topology`); the density field lives in the
   content-addressed artifact store; the iso-surface is regenerated from it.
 - **L8.** The iso-surface entity id is reported by `derivedEntityIds`; `topology/guard.ts` rejects any command that
@@ -60,10 +63,10 @@ packages/core/src/lib/topology.ts   pure SIMP/OC/filter reference (small grids, 
 | -- | --- | ----------- |
 | TR-TOP-01 | MUST | `AnalysisCase.topology?: Record<string, TopologyStudy>` with `topologyOrder`; ids `ts-<step>.<k>` (L8). Plugin `validate` checks ranges (0 < volumeFraction < 1, p ≥ 1, rmin > 0, voxel > 0). |
 | TR-TOP-02 | MUST | Design grid: axis-aligned voxels of size `voxel` over the AABB of the design-domain entities; an element is active iff its centre is inside the domain (ray-parity test on the kernel tessellation); keep-in / keep-out masks from `FeaTarget`s (faces → voxels within one voxel of the face) and from boxes/entities. 2D studies use a plane (`plane: 'XY'\|'XZ'\|'YZ'`, thickness from the extrusion depth). |
-| TR-TOP-03 | MUST | Bridge op `topopt` (bundled CPython, numpy + scipy): Q4 plane-stress (2D) or H8 (3D) elements on the voxel grid, modified SIMP, OC (MVP) or MMA (V1), sensitivity / density filter as a sparse matrix, loads and supports transferred from the 05 targets to the nearest active voxel nodes. Single-threaded BLAS (`OMP_NUM_THREADS=1`) for determinism. |
-| TR-TOP-04 | MUST | Linear solve: sparse direct (scipy `splu` / `factorized`) up to a DOF cap (default 2e5, named), preconditioned CG above (relative tolerance 1e-10 on the residual, stated in the report); 3D above 1e6 DOF refused (`TOP_GRID_TOO_LARGE`). |
+| TR-TOP-03 | MUST | Native job `llull-compute topopt` (crate `llull-topopt` on `llull-voxfe`, RS1): Q4 plane-stress (2D) or H8 (3D) elements on the voxel grid, modified SIMP, OC (MVP) or MMA (V1), sensitivity / density filter applied as a fixed-stencil convolution (no assembled matrix), loads and supports transferred from the 05 targets to the nearest active voxel nodes. wgpu kernels with a Rust-CPU twin (rayon); the recorded field comes from the CPU twin or from GPU kernels with fixed-order reductions (RS1 §2 rule 3), and `solver.deterministic` says which. |
+| TR-TOP-04 | MUST | Linear solve: matrix-free element-by-element mat-vec (`llull-voxfe`), Jacobi-preconditioned CG (M2) then geometric-multigrid-preconditioned CG (M3), relative tolerance 1e-10 on the residual, stated in the report. DOF cap named and set per device from VC-TOP-34 (no fixed number until measured); above it `TOP_GRID_TOO_LARGE`. The pure-TS reference (`@lib/topology.ts`) stays limited to 2D grids. |
 | TR-TOP-05 | MUST | Element stiffness: closed forms of the reference formulation (2D: top88 KE for unit square, scaled by E0·t; 3D: 8-node hexahedron with 2×2×2 Gauss, unit-tested against the 2D/3D patch test and VC-TOP-01). |
-| TR-TOP-06 | MUST | OC update exactly as §5.2 (move, bisection, stop); the pure reference in `@lib/topology.ts` reproduces VC-TOP-03 and VC-TOP-10/11 on small grids in tests. |
+| TR-TOP-06 | MUST | OC update exactly as §5.2 (move, bisection, stop); the pure reference in `@lib/topology.ts` reproduces VC-TOP-03 and VC-TOP-10/11 on small grids in tests; the native job matches it on the 2D benchmark grids (VC-TOP-33). |
 | TR-TOP-07 | MUST | Artifact `TopologyField { grid, density: Float32Array (xPhys), history[], settingsHash, inputHash }` in the 05 `FeArtifactStore`; `record_topology_result` recomputes the summary from the artifact. Resume: the op accepts a starting density artifact. |
 | TR-TOP-08 | MUST | Derived iso-surface: marching cubes (3D) / extruded marching-squares contour (2D) at `threshold` (default 0.5), on xPhys after optional symmetric mirroring; deterministic vertex order; stored as `MeshSolidEntity` with `layerId` `layer-topology`, colour fixed, `concept: true` recorded in the study (not on the entity type). |
 | TR-TOP-09 | MUST | `suggest_rebuild`: marching squares on the section plane through the field (trilinear interpolation for 3D), closed loops oriented CCW (outer) / CW (holes), Douglas–Peucker simplification with `tolerance` (document length unit, default = voxel size, named), minimum loop area filter (default 4 voxel², named); member widths by distance transform along the medial axis at sample points (V1 skeleton). Output in document units, plane-local 2D coordinates plus the plane placement, directly usable as `extrude_profile.profile`. |
@@ -71,6 +74,25 @@ packages/core/src/lib/topology.ts   pure SIMP/OC/filter reference (small grids, 
 | TR-TOP-11 | MUST | Agent-first contract: `settings` named defaults, units in every field, `unverified` OR-ed from the 08 inputs, `concept: true`, `reviewRequired` on rebuild comparisons that feed release, codes §7.1. |
 | TR-TOP-12 | MUST | 09 PLM release hook: the plugin contributes a release check that fails with `TOP_RESULT_NOT_RELEASABLE` when a released item is a topology-derived entity. |
 | TR-TOP-13 | SHOULD (V1) | Shape optimisation: objective gradient w.r.t. document parameters from PHY-18 `parameter_sensitivity` (finite differences through feature-history regeneration), bounded steepest descent / MMA on parameters, each accepted iterate one `set_parameter` step (replayable). |
+
+### 2.1 Stack amendment (RS1, 2026-10-18)
+
+Decision [RS1](../../decisions/RS1-native-compute.md) step **RS-2** moves the SIMP loop from the planned CPython
+numpy / scipy bridge to native code. What changes:
+
+| Item | Before | Now |
+| ---- | ------ | --- |
+| Solver process | bundled CPython op `topopt` (numpy + scipy) | `llull-compute topopt <job-folder>` (crate `llull-topopt` on `llull-voxfe`), job folder in, NDJSON progress out, sha256 result bundle (`llull-protocol`) |
+| FE solve | sparse direct up to 2e5 DOF, PCG above, 3D refused above 1e6 DOF | matrix-free element-by-element mat-vec; Jacobi PCG, then geometric multigrid; no assembled matrix |
+| Device | one CPU thread | wgpu (Vulkan / Metal / DX12) with a Rust-CPU twin for every kernel |
+| DOF cap | 2e5 direct / 1e6 3D | raised; target ≥ 1e7 DOF in 3D on a desktop GPU (target, TBD — measure, VC-TOP-34) |
+| Determinism | single-threaded BLAS | recorded numbers from the CPU twin or fixed-order GPU reductions; GPU-only fast runs say `deterministic: false` |
+| Reference | stdlib generator + `@lib/topology.ts` | unchanged; `@lib/topology.ts` stays the small 2D path and the oracle (VC-TOP-33) |
+| Marching cubes / contours | pure TS | unchanged (may stay TS; RS1 does not move them) |
+| Missing tool | `TOP_TOOL_MISSING` (no numpy / scipy) | `TOP_TOOL_MISSING` when `llull-compute` is absent (generic `NATIVE_TOOL_MISSING`); 2D grids within the TS cap still solve in TS |
+
+Layering is unchanged: the plugin never imports native code; `topology_solve` is a `server/` transport and the result
+enters the document only through `record_topology_result` (RS1 §2 rule 1).
 
 ## 3. Data model
 
@@ -125,7 +147,7 @@ export interface TopologyResultSummary {
   readonly volumeFraction: number; readonly grey: number;
   readonly thresholdedVolume: number; readonly volumeUnit: string; readonly massG?: number;
   readonly history: readonly { it: number; compliance: number; volume: number; change: number }[];   // capped at 1000 rows
-  readonly solver: { readonly op: string; readonly version: string; readonly numpy: string; readonly scipy: string };
+  readonly solver: { readonly job: 'topopt' | 'ts-reference'; readonly version: string; readonly device: 'cpu' | 'gpu'; readonly deterministic: boolean };
   readonly unverified: boolean; readonly unverifiedReasons: readonly string[];
   readonly concept: true;
 }
@@ -150,7 +172,7 @@ Plugin `topology`, toolset `analysis`. ✱ = transport.
 | `suggest_rebuild` | query | `{ studyId, plane?, offset?: number (doc unit), tolerance?: number (doc unit), minLoopArea?: number (doc unit²) }` → `data { plane, placement: { position, rotation }, loops: [{ points: [x,y][], orientation: 'outer'\|'hole', areaMm2 }], widthSamples: [{ at, widthMm }], enclosedFraction }` | @failure stale / missing result → `TOP_RESULT_STALE` / `TOP_RESULT_MISSING` |
 | `compare_to_topology` | query (requiresKernel) | `{ studyId, entityId, iouTarget?: number, complianceRatioTarget?: number }` → `data { iou, volumeRatio, complianceRatio?, targets: { iou: NamedValue, complianceRatio: NamedValue }, status, codes[] }` | read-only |
 | `check_topology` | query | `{ studyId }` → `data { status, items: [{ code, severity, ids[], message, remediation }], reviewRequired }` | AF-20 readiness check |
-| ✱ `topology_solve` | transport | `{ studyId, timeoutS?: number (default 1800), resumeFromLast?: boolean }` | builds the grid, transfers 05 loads/supports and E/ν (E, ν resolved from the 08 record through core PHY-01 `resolvePropertyModel` / 08 preferred values, the same resolution 05's `FeaMaterialView` uses), runs the bridge op with progress per iteration, stores the artifact, dispatches `record_topology_result` |
+| ✱ `topology_solve` | transport | `{ studyId, timeoutS?: number (default 1800), resumeFromLast?: boolean }` | builds the grid, transfers 05 loads/supports and E/ν (E, ν resolved from the 08 record through core PHY-01 `resolvePropertyModel` / 08 preferred values, the same resolution 05's `FeaMaterialView` uses), runs `llull-compute topopt` with progress per iteration, stores the artifact, dispatches `record_topology_result` |
 
 Example description (AF-02) for `create_topology_study`: "Creates a minimum-compliance topology optimization study
 on an existing 05 analysis case. `voxel` is the grid spacing in document length units (e.g. 1 for 1 mm voxels);
@@ -228,14 +250,15 @@ independent). 3D H8: 2×2×2 Gauss integration of Bᵀ D B on a unit cube, scale
 | grey limit | 0.1 | llull choice |
 | IoU target | 0.85 | llull choice (to calibrate on the production scenario, §11) |
 | compliance-ratio target | 1.15 | llull choice (to calibrate) |
-| DOF cap direct solve | 2e5 | llull choice |
+| DOF cap (native job) | per device, TBD — measure (VC-TOP-34) | llull choice after measurement |
+| PCG residual tolerance | 1e-10 relative | llull choice |
 
 ### 5.7 Numerical tolerances
 
 | Item | Value |
 | ---- | ----- |
-| MBB compliance vs generator | 1e-6 relative (bridge uses a different linear solver; generator vs topoptlab agree to 1e-10) |
-| Iteration count | exact for the pure TS reference; ±2 for the bridge (different solver rounding can shift the stop iteration) |
+| MBB compliance vs generator | 1e-6 relative (the native job uses an iterative solver; generator vs topoptlab agree to 1e-10) |
+| Iteration count | exact for the pure TS reference; ±2 for the native job (different solver rounding can shift the stop iteration) |
 | KE entries | 1e-12 relative |
 | Contour simplification | ≤ tolerance (Hausdorff, tested) |
 
@@ -246,13 +269,13 @@ independent). 3D H8: 2×2×2 Gauss integration of Bᵀ D B on a unit cube, scale
 | Study | `analysis.cases[a].topology` in the `.llull` document |
 | Density field | gzip JSON / binary in `FeArtifactStore` (`<sha256>.topo.json.gz`) |
 | Derived mesh | regenerated on load; never written into STEP / release packages (TR-TOP-12) |
-| Export for review | `export_stl` of the derived mesh allowed with a `concept` comment line; VTK image data of the field via the bridge (V1) |
+| Export for review | `export_stl` of the derived mesh allowed with a `concept` comment line; VTK image data of the field via `llull-compute topopt` (V1) |
 
 ## 7. CLI / MCP / UI surfaces
 
 - **CLI**: registry commands as `llull <command>`; `topology_solve` like `fea_solve` (`--progress`, `--timeout`,
   resumable). `llull guide` gains a topology section: units, minimal plan, rebuild recipe, end with `check_topology`.
-- **MCP**: toolset `analysis`; `topology_solve` only where the bridge has numpy/scipy.
+- **MCP**: toolset `analysis`; `topology_solve` only where `llull-compute` is installed (RS1: MCP is being removed; the CLI is the path).
 - **UI**: `src/ui/panels/analysis/TopologyPanel.tsx` (settings, history plot, threshold slider), viewport overlay for
   the field and the rebuild deviation. Review only.
 
@@ -282,8 +305,8 @@ independent). 3D H8: 2×2×2 Gauss integration of Bᵀ D B on a unit cube, scale
 | `TOP_REBUILD_NOT_ANALYSED` | warning | rebuild has no current 05 result | entity id | run 05 on the rebuild |
 | `TOP_INPUT_UNVERIFIED` | warning (not suppressible) | E/ν from an `unverified` 08 value | material | replace with a verified value |
 | `TOP_RESULT_NOT_RELEASABLE` | error | release includes a topology-derived item | entity id | release the rebuilt part instead |
-| `TOP_TOOL_MISSING` | error | bridge lacks numpy/scipy | tool | desktop bundle / install hint |
-| `TOP_SOLVER_FAILED` | error | bridge op error / singular system | log tail | check supports and keep-out regions |
+| `TOP_TOOL_MISSING` | error | `llull-compute` absent and the grid is above the TS reference cap (generic `NATIVE_TOOL_MISSING`) | tool | desktop bundle / install hint, or a coarser 2D grid |
+| `TOP_SOLVER_FAILED` | error | native job error / singular system / PCG not converged | log tail | check supports and keep-out regions |
 | `TOP_SOLVER_TIMEOUT` | error | timeout | study id | coarser voxel, `resumeFromLast` |
 
 ### 7.2 Agent-first compliance
@@ -304,11 +327,12 @@ independent). 3D H8: 2×2×2 Gauss integration of Bᵀ D B on a unit cube, scale
 
 | Budget | Target |
 | ------ | ------ |
-| 2D 60×20 MBB (bridge) | ≤ 10 s total (stdlib generator: ~25 s per run on a laptop, measured 2026-10-15) |
+| 2D 60×20 MBB (native job) | ≤ 10 s total (stdlib generator: ~25 s per run on a laptop, measured 2026-10-15) |
 | 2D 300×100 | ≤ 60 s — TBD measure (VC-TOP-12) |
-| 3D 100k voxels, 100 iterations | ≤ 10 min (PCG + AMG-free Jacobi baseline; V1 multigrid) — TBD measure |
+| 3D 100k voxels, 100 iterations | ≤ 10 min on the CPU twin (Jacobi PCG) — TBD measure |
+| 3D largest grid per device | target ≥ 1e7 DOF on a desktop GPU with geometric multigrid, wall time recorded — TBD measure (VC-TOP-34) |
 | Derived mesh | ≤ 2 s for 100k voxels (marching cubes, TS) |
-| Memory | field ≤ 4 bytes / voxel in the document process; solver in the child process |
+| Memory | field ≤ 4 bytes / voxel in the document process; solver in the `llull-compute` child process (matrix-free: no assembled stiffness) |
 
 ## 9. Test strategy (VC mapping)
 
@@ -317,7 +341,8 @@ independent). 3D H8: 2×2×2 Gauss integration of Bᵀ D B on a unit cube, scale
 | Unit core (`tests/unit/lib/topology.test.ts`) | KE, filter weights, OC separable problem, SIMP scaling, MBB 30×10 and 60×20 with the pure TS reference | 01–04, 10, 11 |
 | Unit plugin (`tests/unit/physics/topology/*`) | every command happy/failure/`is pure`; guard; contours on synthetic fields; compare IoU on known shapes; release hook; unverified propagation | 20–26 |
 | Golden | `validation/plans/top_mbb_60x20.plan.json` once commands exist (study set-up replay) | 21 |
-| Integration (`server/tests`, needs bundled CPython numpy/scipy) | bridge op MBB vs expected; determinism; resume | 10, 11, 27 |
+| Native (`npm run native:check`: `cargo test` in `solver/`) | `llull-voxfe` patch tests, KE, filter, OC; CPU twin vs GPU kernels where an adapter exists (skip logged otherwise); native vs TS reference on the 2D grids | 01–04, 33 |
+| Integration (`server/tests`, needs `llull-compute`; CI uses the CPU twin) | native job MBB vs expected; determinism; resume; scaling measurement | 10, 11, 12, 27, 34 |
 | Quality gate | `npm run quality:physics` runs VC-TOP-10/11 through `run_benchmarks` | 10, 11 |
 | Production gate (V1) | "make the bracket 30 % lighter" agent scenario | 23 |
 
@@ -326,16 +351,17 @@ independent). 3D H8: 2×2×2 Gauss integration of Bᵀ D B on a unit cube, scale
 | M | Content | Depends on | Effort |
 | - | ------- | ---------- | ------ |
 | M1 | Types, plugin skeleton, study commands, pure `@lib/topology.ts` reference, VC 01–04, 10, 11 in unit tests | 05 FEA M1 (AnalysisCase, targets) | 2 w |
-| M2 | Bridge op `topopt` (2D), grid/targets mapping, `topology_solve`, record + artifact, report, derived mesh + guard | M1, 05 M2–M3 (artifact store, bridge), desktop numpy/scipy staging | 3 w |
-| M3 | `suggest_rebuild`, `compare_to_topology`, `check_topology`, release hook, 3D H8 + PCG | M2, 09 PLM release | 3 w |
+| M2 | Native job `llull-compute topopt` (2D Q4, Jacobi PCG, CPU twin first), grid/targets mapping, `topology_solve`, record + artifact, report, derived mesh + guard, VC-TOP-33 | M1, 05 M2–M3 (artifact store), RS-0 (`solver/` workspace, `llull-gpu`, `llull-protocol`, bundling) | 3 w |
+| M3 | `suggest_rebuild`, `compare_to_topology`, `check_topology`, release hook, 3D H8, wgpu kernels, geometric multigrid, VC-TOP-34 | M2, 09 PLM release | 4 w |
 | M4 (V1) | MMA (licence decision), projection, extrusion constraint, min member size, shape optimisation via PHY-18 | PHY-18 M2 | 3 w |
 
 ## 11. Open questions / decisions needed
 
 1. **MMA implementation licence**: mmapy is GPL-3.0; NLopt's Python wheel is listed as MIT on PyPI but NLopt itself
    mixes licences. Port MMA from the published algorithm (Svanberg 1987) into llull, or use NLopt as a separate
-   process? Proposal: own port in V1.
-2. **numpy + scipy in the desktop bundle** (permissive licences, §12 [R8]): size impact on the installer (CadQuery and Gmsh already bundled).
+   process? Proposal: own port in V1, in Rust inside `llull-topopt`.
+2. ~~**numpy + scipy in the desktop bundle**~~: closed by RS1 (2026-10-18); the solve no longer needs them. numpy / scipy stay only
+   for the external topoptlab cross-check (§12 [R8]).
 3. **Calibration of the rebuild targets** (IoU 0.85, compliance ratio 1.15): to be measured on the production scenario
    before they gate anything.
 4. **Paper values**: the Andreassen et al. 2011 PDF and the DTU `top88.m` file were not reachable; the formulation
@@ -345,6 +371,9 @@ independent). 3D H8: 2×2×2 Gauss integration of Bᵀ D B on a unit cube, scale
    the boundary. Proposal: voxels for MVP.
 6. **Shape optimisation via CalculiX** `*SENSITIVITY` (node coordinates) vs parameter finite differences (PHY-18):
    the latter keeps the CAD parametric; CalculiX gives cheaper gradients for many variables. Decide in V2.
+7. **GPU precision and multigrid design** (RS1): whether the GPU kernels store f32 with f64 accumulation or f64 throughout
+   (not all adapters support f64), and the multigrid hierarchy (coarsening of inactive voxels, smoother). Decide on the VC-TOP-33 /
+   34 measurements; until then the CPU twin is the recorded path.
 
 ## 12. References
 
@@ -355,4 +384,5 @@ independent). 3D H8: 2×2×2 Gauss integration of Bᵀ D B on a unit cube, scale
 - [R6] topopt (Python), MIT — https://github.com/zfergus/topopt (commit c3d3bd546327732b72ea3862d0283b324b25422f)
 - [R7] CalculiX manual — https://github.com/Dhondtguido/CalculiX (commit fd588701edd6a92fde06e99b1bdf01f3b0f80f2c), `doc/CalculiX.tex` §*DESIGN VARIABLES
 - [R8] SciPy 1.18.1 (licence text: BSD-style, "Copyright (c) 2001-2002 Enthought, Inc. 2003, SciPy Developers"), NumPy 2.5.4 (PyPI licence expression `BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0`) — https://pypi.org/project/scipy/ , https://pypi.org/project/numpy/ (metadata read; SciPy wheel downloaded for the cross-check)
+- [RS1] Native compute programme — [`../../decisions/RS1-native-compute.md`](../../decisions/RS1-native-compute.md) (step RS-2)
 - llull: `.claude/rules/architecture.md` (L8, L9, L10), `packages/core/src/commands/derivation.ts`, `packages/core/src/plugins/plugin.ts`, `packages/domain-aec/src/shared/derived.ts`, 05 FEA TECHNICAL_SPEC.

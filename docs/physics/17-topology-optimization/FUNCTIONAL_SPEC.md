@@ -16,7 +16,7 @@ Emin) with p = 3, the densities are updated by the optimality-criteria (OC) meth
 rmin removes checkerboards and mesh dependence. The 88-line MATLAB code of Andreassen et al. 2011 is the reference
 formulation that every open implementation copies [R1][R2].
 
-PHY-17 adds an optimization study to a 05 analysis case, a solver transport that runs SIMP in the bundled CPython,
+PHY-17 adds an optimization study to a 05 analysis case, a solver transport that runs SIMP in the native `llull-compute topopt` job ([RS1](../../decisions/RS1-native-compute.md)),
 and a **derived, read-only** result: a density field plus an iso-surface mesh that the derivation guard (L8) protects
 from edits. The agent never ships that mesh as the part: it **rebuilds** a clean parametric part with ordinary llull
 commands (sketch, extrude, fillet, booleans), guided by numeric descriptors (section contours, member widths, volume
@@ -31,7 +31,7 @@ sensitivities.
 | Lightweight brackets and fittings | Commercial topology tools inside FE pre-processors; open codes from DTU (top88, top99) used for teaching and research | Topology optimization inside the CAD document, driven by a CLI agent, with the rebuild and verification loop | [R1], [R3] |
 | Reference formulation | Andreassen et al. 2011: modified SIMP, OC, sensitivity or density filter, MBB benchmark; built on Sigmund's 99-line code | The same formulation, same MBB benchmark pinned in the validation pack | [R1], [R2] |
 | Open-source implementations | topoptlab (GPL-3.0) re-implements top88 and extensions (MMA, projections, AM filter); ToPy (MIT, Python 2 stable); `topopt` (MIT, MMA via NLopt) | llull's own implementation with BSD/MIT dependencies only; the open codes serve as cross-checks | [R4]–[R6] |
-| Solver | CalculiX (bundled by 05) offers sensitivity analysis for **node-coordinate** (shape) and **orientation** design variables (`*DESIGN VARIABLES, TYPE=COORDINATE / ORIENTATION`, `*SENSITIVITY`, `*FEASIBLE DIRECTION`), not density-based topology optimization | Density SIMP in llull's bridge; CalculiX sensitivities considered for shape optimization (V2) and CalculiX for verification of the rebuilt part | [R7] |
+| Solver | CalculiX (bundled by 05) offers sensitivity analysis for **node-coordinate** (shape) and **orientation** design variables (`*DESIGN VARIABLES, TYPE=COORDINATE / ORIENTATION`, `*SENSITIVITY`, `*FEASIBLE DIRECTION`), not density-based topology optimization | Density SIMP in llull's native job (`llull-compute topopt`); CalculiX sensitivities considered for shape optimization (V2) and CalculiX for verification of the rebuilt part | [R7] |
 | Additive manufacturing | Topology results are often printed; overhang filters exist in research codes (topoptlab lists a 2D Langelaar AM filter) | Overhang and minimum-member-size controls as manufacturing constraints (V1/V2) | [R4] |
 
 **Value statements** (sourced only): the method and benchmark are standard and openly documented [R1][R2]; the
@@ -130,8 +130,8 @@ engineer, every `unverified` input, and that the density result is a concept onl
 
 ### 6.2 MCP agent
 
-Same registry commands (toolset `analysis`); `topology_solve` exists only on hosts with the bundled CPython (numpy,
-scipy); otherwise `TOP_TOOL_MISSING` (AF-41).
+Same registry commands (toolset `analysis`); `topology_solve` exists only on hosts with the bundled `llull-compute`
+binary, or for 2D grids small enough for the TS reference; otherwise `TOP_TOOL_MISSING` (AF-41).
 
 ### 6.3 Desktop UI (review surface)
 
@@ -220,9 +220,9 @@ No standard governs topology optimization itself. Relevant alignment:
 | ----------------- | ------ | ---------- |
 | Owners read the density mesh as a finished part | Unsafe parts | Read-only, `concept: true`, never releasable, mandatory rebuild + 05 check |
 | Rebuild from contours needs judgement | Poor parts | Numeric aids, `compare_to_topology` targets, reviewer gate for release |
-| 3D voxel SIMP in Python is slow | Long agent loops | Voxel cap, PCG with multigrid preconditioning (scipy), resumable iterates; V1 unstructured mesh |
+| 3D voxel SIMP is slow in a scripting language | Long agent loops | Native matrix-free solver on the GPU (RS1 RS-2), geometric multigrid, measured voxel cap, resumable iterates; V1 unstructured mesh |
 | Only one implementation (the generator) pins the MBB values | Formula slip undetected | Cross-check against topoptlab (GPL, run outside llull) or the DTU MATLAB code; values B-grade until then |
-| GPL implementations (topoptlab, mmapy) cannot be bundled into llull's bridge process | Licence | Own implementation on numpy/scipy (permissive licences); GPL codes only as external cross-checks |
+| GPL implementations (topoptlab, mmapy) cannot be bundled into llull | Licence | Own implementation in Rust (wgpu, MIT / Apache-2.0); GPL codes only as external cross-checks |
 
 ## 11. References
 

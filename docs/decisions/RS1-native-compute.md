@@ -47,6 +47,9 @@ Rules:
    through an injected port (`GeometryKernel` for `llull-kernel`). Nothing in `packages/*` imports it. Every capability still has
    its pure command(s) in core or a plugin; results come back through validated record commands (05 §4.1 trust model) or as query
    `data`. The document is never written by native code.
+   Synchronous geometric checks (physics 21 clearance / thickness, 03 view factors, 13 contact broad phase) reach native code
+   through one injected port, `GeometryQueryEngine` (PHY-21 TR-FPR-19): default implementation `meshBvh.ts`, native one installed
+   by the host, same pattern as `ctx.kernel` / `ctx.physics`.
 2. **One binary per role, not per feature**: `llull-compute` (jobs) and `llull-kernel` (persistent). 12 CFD's `llull-flow` is
    `llull-compute flow`.
 3. **Determinism (AF-13).** Numbers the document records come from the Rust CPU path, or from GPU kernels whose reductions use a
