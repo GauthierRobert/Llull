@@ -58,8 +58,8 @@
         "sequence": "1001",
         "spec": "CS150",
         "dn": 100,
-        "from": "P-101/N2",
-        "to": "V-101/N1",
+        "from": "P-101:N2",
+        "to": "V-101:N1",
         "designTempC": 60,
         "designPressureBarG": 10
       },
@@ -136,5 +136,6 @@
     },
     { "step": 7, "path": "data.totalPipeMm", "value": 10626, "abs": 0.01, "source": "sum of cuts" },
     { "step": 7, "path": "data.centrelineLengthMm", "value": 11739.044, "abs": 0.01, "source": "12000 - 4 x 2 x 152 + 4 x (pi/2) x 152" }
-  ]
+  ],
+  "nozzleNote": "add_nozzle is 03 EQP's command; its MVP form places shell nozzles by elevation + orientation angle and returns port id '<tag>:<mark>' (e.g. 'V-101:N1'). These plans use an explicit form { position, direction } for generic add_equipment blocks, requested from 03 (TECHNICAL_SPEC open question 9); with a 03 vessel the same port is given as { elevation, orientationDeg, projection }."
 }

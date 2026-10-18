@@ -482,7 +482,7 @@ SC-RTE-08: free space, length = Manhattan 6000, bends = 2 (three axes need three
 | `RTE_PORT_IN_USE`                                                                             | error                      | `route_pipe`                                   | port already connected                                      | route from the run end, or `add_branch`                    |
 | `RTE_INVALID_PORT`                                                                            | error                      | `add_tie_in_point`                             | zero direction, DN ≤ 0                                      | give a unit direction toward the pipe and a DN             |
 | `RTE_DUPLICATE_TAG` / `RTE_DUPLICATE_LINE_NUMBER`                                             | error                      | create commands, check                         | not unique                                                  | choose another tag / sequence                              |
-| `RTE_SPEC_UNKNOWN`                                                                            | error                      | `create_pipeline`                              | spec not loaded                                             | `import_pipe_spec` (01)                                      |
+| `RTE_SPEC_UNKNOWN`                                                                            | error                      | `create_pipeline`                              | spec not loaded                                             | `import_pipe_spec` (01)                                    |
 | `RTE_SPEC_NO_COMPONENT`                                                                       | error                      | derivation                                     | no catalogue row for (type, DN, rating…)                    | add the row to the spec or change size / rating            |
 | `RTE_SPEC_AMBIGUOUS`                                                                          | error                      | derivation                                     | several rows match, no preference                           | set a preference in the spec                               |
 | `RTE_NO_CONNECTION_RULE`                                                                      | error                      | derivation                                     | end-type pair without a rule (e.g. BW–SW)                   | add the rule in the spec or change the end type            |
@@ -571,6 +571,10 @@ Total MVP (M0-M3) ≈ 21 developer-days.
 7. **Toolset size.** `piping` may exceed a comfortable MCP tool count with 01 / 05 commands; split
    `piping-route` / `piping-spec` if needed.
 8. **Nozzle loads.** 07 PST needs nozzle ids on run ends; the `PortRef` already carries them.
+9. **Nozzles on generic equipment.** 03 EQP's `add_nozzle` places shell nozzles by elevation + orientation angle
+   and names ports `<tag>:<mark>` (`V-101:N1`). Pumps and `add_equipment` blocks also need an explicit
+   `{ position, direction }` form, which the RTE plans use; to be agreed with 03. `PortRef.kind: 'nozzle'` resolves
+   either form through `PortSource`.
 
 ## 12. References
 

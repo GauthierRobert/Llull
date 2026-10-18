@@ -1,7 +1,15 @@
 {
   "id": "SC-RTE-02",
   "status": "PROPOSED - not runnable yet. Same prerequisites as SC-RTE-01, plus insert_inline_component (this pack).",
-  "unbuilt": ["add_nozzle", "import_pipe_spec", "create_pipeline", "route_pipe", "insert_inline_component", "check_piping", "piping_takeoff"],
+  "unbuilt": [
+    "add_nozzle",
+    "import_pipe_spec",
+    "create_pipeline",
+    "route_pipe",
+    "insert_inline_component",
+    "check_piping",
+    "piping_takeoff"
+  ],
   "validates": ["VC-RTE-04", "VC-RTE-05"],
   "description": "SC-RTE-01 plus a flanged gate valve (B16.10 CL150 NPS 4, face-to-face 229) centred at z 1800 on the first (vertical) leg, stem horizontal toward -Y. The valve pulls in two WN flanges, two gaskets and two bolt sets. check_piping is given an explicit project limit maxHandwheelCentreHeight 1500 mm above the level, so the valve (handwheel centre at 1800) must be reported.",
   "units": "mm",
@@ -101,5 +109,6 @@
       "abs": 0.01,
       "source": "leg 0 split: (1685.5 - 3) - (1000 + 3 + 76) - 76 = 527.5 ; (2500 - 152) - (1914.5 + 3 + 76) = 354.5"
     }
-  ]
+  ],
+  "nozzleNote": "add_nozzle is 03 EQP's command; its MVP form places shell nozzles by elevation + orientation angle and returns port id '<tag>:<mark>' (e.g. 'V-101:N1'). These plans use an explicit form { position, direction } for generic add_equipment blocks, requested from 03 (TECHNICAL_SPEC open question 9); with a 03 vessel the same port is given as { elevation, orientationDeg, projection }."
 }
