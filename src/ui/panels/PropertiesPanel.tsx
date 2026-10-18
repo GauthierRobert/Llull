@@ -2,14 +2,18 @@
 // with the delta from the stored value.
 
 import { toDegrees, toRadians } from '@lib/angle';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
 import { useSoleSelectedEntity } from '@ui/store/selectionHooks';
 import { deleteSelection, duplicateSelection } from '@ui/actions/selectionActions';
 import { type Entity, is2D } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
-import { PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
+import { type Kpi, KpiStrip, PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { entitiesFocus, sizeLabel } from '@ui/panels/entityFocus';
+import { formatMass, totalMassG } from '@ui/panels/materials/materialUsage';
+import { entityBoundsInDoc } from '@core/geometry/bounds';
 import { AxisFields, CommitInput, PropRow } from './propertyFields';
 import { dimensionRows } from './entityDimensions';
 import { ElementInspector } from './building/ElementInspector';
@@ -52,6 +56,33 @@ function SelectionActions(): React.ReactElement {
   );
 }
 
+/** Headline of the selected entity: overall size (click: highlight it on the model), material, mass. */
+function EntityHeadline({ entity }: { entity: Entity }): React.ReactElement | null {
+  const focusItem = useFocusItem();
+  const units = useStore((s) => s.document.units);
+  const materials = useStore((s) => s.document.materials);
+  const items = useMemo((): Kpi[] => {
+    const doc = useStore.getState().document;
+    const size = sizeLabel(entityBoundsInDoc(doc, entity), units);
+    const material = entity.materialId === undefined ? undefined : materials[entity.materialId];
+    const massG = is2D(entity) ? null : totalMassG(doc, [entity.id]);
+    const kpis: Kpi[] = [];
+    if (size !== '') {
+      kpis.push({
+        key: 'overall',
+        label: 'Overall',
+        value: size,
+        onClick: () =>
+          focusItem(entitiesFocus(doc, { key: `properties:entity:${entity.id}`, label: entity.name ?? entity.id, ids: [entity.id] })),
+      });
+    }
+    if (material !== undefined) kpis.push({ key: 'material', label: 'Material', value: material.name });
+    if (massG !== null) kpis.push({ key: 'mass', label: 'Mass', value: formatMass(massG) });
+    return kpis;
+  }, [entity, units, materials, focusItem]);
+  return <KpiStrip items={items} label="Selection headline" />;
+}
+
 function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const geometryRows = dimensionRows(entity);
@@ -72,6 +103,8 @@ function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
         </div>
         <EntityVisibilityToggle entityId={entity.id} />
       </div>
+
+      <EntityHeadline entity={entity} />
 
       <PanelSection title="Transform">
         <PropRow label="Name">

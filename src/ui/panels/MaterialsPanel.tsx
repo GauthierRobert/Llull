@@ -1,8 +1,12 @@
 // `document.materials` (swatch, name, density): create_material, assign_material to the selection.
 
-import React, { memo, useCallback, useState } from 'react';
+import React, { memo, useCallback, useMemo, useState } from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { useIsFocused } from '@ui/store/focusStore';
+import { entitiesFocus } from '@ui/panels/entityFocus';
+import { entityIdsByMaterial, formatMass, totalMassG } from '@ui/panels/materials/materialUsage';
 import type { Material } from '@core/model/types';
 import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
 import { useDraftSubmit } from '@ui/hooks/useDraftSubmit';
@@ -22,14 +26,41 @@ const MaterialRow = memo(function MaterialRow({
   material,
   isSelected,
   onSelect,
+  entityIds,
 }: {
   material: Material;
+  entityIds: readonly string[];
   isSelected: boolean;
   onSelect: (name: string) => void;
 }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   // A count, not the id array: rows do not re-render on every selection change.
   const selectedCount = useStore((s) => s.document.selection.length);
+  const focusItem = useFocusItem();
+  const focusKey = `materials:material:${material.name}`;
+  const focused = useIsFocused(focusKey);
+  const units = useStore((s) => s.document.units);
+  const entities = useStore((s) => s.document.entities);
+  // Only the mass of a material in use is measured; re-measured when the entities change.
+  const massG = useMemo(
+    () => (entityIds.length === 0 ? null : totalMassG(useStore.getState().document, entityIds)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `entities` is the staleness key of the document read above
+    [entityIds, entities, material.density],
+  );
+  const usage = entityIds.length === 0 ? 'unused' : `${entityIds.length} ${entityIds.length === 1 ? 'object' : 'objects'}`;
+
+  const handleSelect = (): void => {
+    onSelect(material.name);
+    focusItem(
+      entitiesFocus(useStore.getState().document, {
+        key: focusKey,
+        label: `Material ${material.name} — ${usage}${massG === null ? '' : `, ${formatMass(massG)}`}`,
+        color: material.color,
+        ids: entityIds,
+        ...(massG === null ? {} : { note: formatMass(massG) }),
+      }),
+    );
+  };
 
   const handleAssign = (): void => {
     const entityIds = useStore.getState().document.selection;
@@ -39,7 +70,7 @@ const MaterialRow = memo(function MaterialRow({
 
   return (
     <li
-      className={`panel__row material-row${isSelected ? ' panel__row--selected material-row--selected' : ''}`}
+      className={`panel__row material-row${isSelected || focused ? ' panel__row--selected material-row--selected' : ''}`}
       data-testid={`material-row-${material.name}`}
       aria-label={`Material: ${material.name}`}
     >
@@ -47,16 +78,21 @@ const MaterialRow = memo(function MaterialRow({
         type="button"
         className="material-row-btn"
         aria-pressed={isSelected}
-        onClick={() => onSelect(material.name)}
+        onClick={handleSelect}
         aria-label={`Select material ${material.name}`}
-        title={material.name}
+        title={`${material.name} — click to highlight the ${usage === 'unused' ? 'objects (none yet)' : 'objects using it'}`}
       >
         <span className="material-swatch" style={{ background: material.color }} aria-hidden="true" title={material.color} />
         <span className="material-name" title={material.name}>
           {material.name}
+          <span className="material-usage" data-testid={`material-usage-${material.name}`}>
+            {usage}
+            {massG !== null && ` · ${formatMass(massG)}`}
+          </span>
         </span>
-        <span className="material-density" title={`Density: ${material.density}`}>
+        <span className="material-density" title={`Density: ${material.density} g/${units}³`}>
           {formatDensity(material.density)}
+          <span className="material-density-unit"> g/{units}³</span>
         </span>
       </button>
 
@@ -75,6 +111,8 @@ const MaterialRow = memo(function MaterialRow({
     </li>
   );
 });
+
+const NO_ENTITIES: readonly string[] = [];
 
 const EMPTY_FORM = { name: '', density: '', color: '#b0b0b0', metalness: '0.08', roughness: '0.45' };
 
@@ -167,6 +205,12 @@ function CreateMaterialForm(): React.ReactElement {
 export function MaterialsPanel({ className }: { className?: string }): React.ReactElement {
   const materials = useStore((s) => s.document.materials);
   const materialList = Object.values(materials);
+  const documentOrder = useStore((s) => s.document.order);
+  const documentEntities = useStore((s) => s.document.entities);
+  const usageByMaterial = useMemo(
+    () => entityIdsByMaterial({ order: documentOrder, entities: documentEntities }),
+    [documentOrder, documentEntities],
+  );
 
   const [activeMaterialName, setActiveMaterialName] = useState<string | null>(null);
 
@@ -189,6 +233,7 @@ export function MaterialsPanel({ className }: { className?: string }): React.Rea
               key={material.name}
               material={material}
               isSelected={activeMaterialName === material.name}
+              entityIds={usageByMaterial.get(material.name) ?? NO_ENTITIES}
               onSelect={handleMaterialSelect}
             />
           ))}

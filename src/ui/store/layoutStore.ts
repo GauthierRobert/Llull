@@ -21,6 +21,7 @@ const SIDEBAR_TABS = [
   'fasteners',
   'review',
   'analysis',
+  'aero',
 ] as const;
 
 export type SidebarTab = (typeof SIDEBAR_TABS)[number];

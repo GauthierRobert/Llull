@@ -1,6 +1,6 @@
 // `document.parameters` with evaluated values: set_parameter (edit / add), delete_parameter; errors in an aria-live region.
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { Parameter } from '@core/model/types';
@@ -10,17 +10,56 @@ import { CommitInput } from '@ui/panels/propertyFields';
 import { useDraftSubmit } from '@ui/hooks/useDraftSubmit';
 import { isParameterNameValid, parameterDraftOf } from '@ui/panels/parameterRules';
 import { PanelEmpty, PanelHeader, DeleteButton } from '@ui/panels/PanelParts';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { useIsFocused } from '@ui/store/focusStore';
+import { entitiesFocus } from '@ui/panels/entityFocus';
+import { entitiesDrivenBy } from '@ui/panels/parameterDrivenEntities';
 
 function ParameterRow({ param }: { param: Parameter }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
+  const focusItem = useFocusItem();
+  const focusKey = `parameters:parameter:${param.name}`;
+  const focused = useIsFocused(focusKey);
+  const history = useStore((s) => s.document.featureHistory);
+  const drivenIds = useMemo(
+    () => entitiesDrivenBy({ ...useStore.getState().document, featureHistory: history }, [param.name]),
+    [history, param.name],
+  );
+  const driven = drivenIds.length;
 
   const hasError = param.error != null;
 
   return (
-    <li className="panel__row param-row" data-testid={`param-row-${param.name}`} aria-label={`Parameter: ${param.name}`}>
-      <span className="param-name" title={param.name}>
+    <li
+      className={classNames('panel__row param-row', focused && 'panel__row--selected')}
+      data-testid={`param-row-${param.name}`}
+      aria-label={`Parameter: ${param.name}`}
+    >
+      <button
+        type="button"
+        className="param-name param-name-btn"
+        aria-pressed={focused}
+        aria-label={`Highlight objects driven by ${param.name}`}
+        title={
+          driven === 0 ? `${param.name} — drives no objects yet` : `${param.name} — click to highlight the ${driven} objects it drives`
+        }
+        disabled={driven === 0}
+        onClick={() =>
+          focusItem(
+            entitiesFocus(useStore.getState().document, {
+              key: focusKey,
+              label: `${param.name} = ${significantNumber(param.value, 6)} — drives ${driven} ${driven === 1 ? 'object' : 'objects'}`,
+              ids: drivenIds,
+              note: `${param.name} = ${significantNumber(param.value, 6)}`,
+            }),
+          )
+        }
+      >
         {param.name}
-      </span>
+        <span className="param-drives" data-testid={`param-drives-${param.name}`}>
+          {driven === 0 ? '' : `→${driven}`}
+        </span>
+      </button>
 
       <CommitInput
         className={`param-expression-input${hasError ? ' input--error' : ''}`}

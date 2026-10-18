@@ -1,31 +1,62 @@
 // Component library (Insert → insert_instance at the origin) + instance tree (click selects, Explode → explode_instance).
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import { useSelectionSet } from '@ui/store/selectionHooks';
 import type { Component, InstanceEntity } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
+import { useFocusStore, useIsFocused } from '@ui/store/focusStore';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { useDropFocusOnSelectionChange } from '@ui/hooks/useDropFocusOnSelectionChange';
+import { entitiesFocus } from '@ui/panels/entityFocus';
 import { orderedValues } from '@ui/panels/orderedValues';
 
 function ComponentRow({ component }: { component: Component }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
   const entityCount = component.order.length;
+  const focusItem = useFocusItem();
+  const focusKey = `assembly:component:${component.id}`;
+  const focused = useIsFocused(focusKey);
+  const order = useStore((s) => s.document.order);
+  const entities = useStore((s) => s.document.entities);
+  const instanceIds = useMemo(
+    () => order.filter((id) => (entities[id] as InstanceEntity | undefined)?.componentId === component.id),
+    [order, entities, component.id],
+  );
 
   return (
     <li
-      className="panel__row assembly-component-row"
+      className={classNames('panel__row assembly-component-row', focused && 'panel__row--selected')}
       data-testid={`assembly-component-${component.id}`}
       aria-label={`Component: ${component.name}`}
     >
-      <span className="panel__row-icon" aria-hidden="true">
-        <Icon name="cube" size={14} />
-      </span>
-      <span className="panel__row-main" title={component.name}>
-        {component.name}
-      </span>
+      <button
+        type="button"
+        className="building-row-btn"
+        aria-pressed={focused}
+        aria-label={`Highlight instances of ${component.name}`}
+        title={instanceIds.length === 0 ? 'No instances placed yet' : `Highlight its ${instanceIds.length} instances`}
+        disabled={instanceIds.length === 0}
+        onClick={() =>
+          focusItem(
+            entitiesFocus(useStore.getState().document, {
+              key: focusKey,
+              label: `Component ${component.name} — ${instanceIds.length} instances`,
+              ids: instanceIds,
+            }),
+          )
+        }
+      >
+        <span className="panel__row-icon" aria-hidden="true">
+          <Icon name="cube" size={14} />
+        </span>
+        <span className="panel__row-main" title={component.name}>
+          {component.name}
+        </span>
+      </button>
       <span
         className="panel__row-meta"
         title={`${entityCount} ${entityCount === 1 ? 'entity' : 'entities'}`}
@@ -71,7 +102,18 @@ function InstanceRow({
     <li
       className={`panel__row assembly-instance-row${selected ? ' panel__row--selected assembly-instance-row--selected' : ''}`}
       data-testid={`assembly-instance-${instance.id}`}
-      onClick={() => select([instance.id])}
+      onClick={() => {
+        select([instance.id]);
+        useFocusStore
+          .getState()
+          .setFocus(
+            entitiesFocus(useStore.getState().document, {
+              key: `assembly:instance:${instance.id}`,
+              label: `Instance of ${componentName}`,
+              ids: [instance.id],
+            }),
+          );
+      }}
     >
       <span className="panel__row-icon" aria-hidden="true">
         <Icon name="assembly" size={14} />
@@ -108,6 +150,7 @@ export function AssemblyPanel({ className }: { className?: string }): React.Reac
   const instanceList = orderedValues(order, entities).filter((entity): entity is InstanceEntity => entity.kind === 'instance');
 
   const selectionSet = useSelectionSet();
+  useDropFocusOnSelectionChange('assembly:');
 
   return (
     <aside className={classNames('panel assembly-panel', className)} aria-label="Assembly">

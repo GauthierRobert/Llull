@@ -1,0 +1,54 @@
+/* Aerodynamics panel: inputs, air readout, Cp legend. */
+
+.aero__toggle {
+  margin: 0 var(--space-3) var(--space-2);
+}
+
+.aero__inputs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-2);
+}
+
+.aero__pair,
+.aero__vector {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.aero__pair > .field {
+  flex: 1 1 0;
+}
+
+.aero__axis .field__label {
+  flex-basis: 12px;
+}
+
+.aero__note {
+  margin: 0 0 var(--space-2);
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--fg-subtle);
+  overflow-wrap: anywhere;
+}
+
+.aero__legend {
+  padding: var(--space-2) var(--space-3);
+}
+
+.aero__legend-bar {
+  height: 8px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+}
+
+.aero__legend-ends {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+}

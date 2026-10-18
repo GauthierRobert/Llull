@@ -1,7 +1,7 @@
 /** Document-browser tabs (rail order): tab id, label, icon, rail section. Read by the Sidebar and the palette. */
 
 import { getCommand } from '@core/commands/registry';
-import type { CadDocument } from '@core/model/types';
+import { is3D, type CadDocument } from '@core/model/types';
 import type { SidebarTab } from '@ui/store';
 import type { IconName } from '@ui/components/Icon';
 
@@ -104,6 +104,14 @@ export const SIDEBAR_TAB_SPECS: readonly SidebarTabSpec[] = [
     section: 'domain',
     description: 'Finite-element and thermal cases',
   },
+  {
+    tab: 'aero',
+    label: 'Aerodynamics',
+    shortLabel: 'Aero',
+    icon: 'aero',
+    section: 'domain',
+    description: 'Drag, frontal area, airfoil lift and pressure',
+  },
   { tab: 'review', label: 'Review', shortLabel: 'Review', icon: 'review', section: 'domain', description: 'Prototype check findings' },
 ];
 
@@ -123,12 +131,14 @@ export const SIDEBAR_TAB_COUNTS: Readonly<Record<SidebarTab, (doc: CadDocument) 
   manufacturing: (doc) => Object.keys(doc.sheetMetal?.parts ?? {}).length,
   fasteners: (doc) => Object.keys(doc.fasteners?.stacks ?? {}).length,
   analysis: (doc) => doc.analysis?.caseOrder.length ?? 0,
+  aero: (doc) => Object.values(doc.entities).filter(is3D).length,
   review: () => 0,
 };
 
 /** The Review tab appears once prototype checks can run (check_prototype registered) or a result is loaded. */
 export function isSidebarTabAvailable(tab: SidebarTab, reviewLoaded: boolean): boolean {
   if (tab === 'manufacturing') return getCommand('check_sheet_metal') !== undefined;
+  if (tab === 'aero') return getCommand('aero_drag') !== undefined;
   if (tab === 'fasteners') return getCommand('select_fastener') !== undefined;
   return tab !== 'review' || reviewLoaded || getCommand('check_prototype') !== undefined;
 }

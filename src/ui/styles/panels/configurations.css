@@ -101,3 +101,18 @@
 .config-add-row-btn {
   align-self: flex-start;
 }
+
+.config-param-entry--differs .config-param-value {
+  color: var(--warning);
+}
+
+.config-param-differs {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.config-param-entry .building-row-btn {
+  font: inherit;
+}
