@@ -7,8 +7,10 @@ import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import { execute } from '@core/commands/registry';
 import { ListRow, PanelEmpty, PanelHeader, PanelSection, StatusLine } from '@ui/panels/PanelParts';
-import { parseAnalysisList, parseCheck, parseDescribe } from './analysisData';
+import { eigenOf, parseAnalysisList, parseCheck, parseDescribe } from './analysisData';
 import { AnalysisChecks } from './AnalysisChecks';
+import { AnalysisModes } from './AnalysisModes';
+import { AnalysisProbes } from './AnalysisProbes';
 import { AnalysisResults } from './AnalysisResults';
 import { AnalysisSetup } from './AnalysisSetup';
 import { useHostQuery } from './useHostQuery';
@@ -38,6 +40,8 @@ export function AnalysisPanel({ className }: { className?: string }): React.Reac
           check: parseCheck(checked.data),
           checkSummary: checked.summary,
         };
+
+  const eigen = detail?.described == null ? null : eigenOf(detail.described.analysisCase);
 
   return (
     <aside className={classNames('panel', className)} aria-label="Analysis" data-testid="analysis-panel">
@@ -78,6 +82,10 @@ export function AnalysisPanel({ className }: { className?: string }): React.Reac
           </PanelSection>
           <AnalysisSetup analysisCase={detail.described.analysisCase} document={document} />
           <AnalysisChecks check={detail.check} summary={detail.checkSummary} />
+          {eigen !== null && detail.described.state === 'solved' && <AnalysisModes eigen={eigen} />}
+          {detail.described.state === 'solved' && Object.keys(detail.described.analysisCase.probes ?? {}).length > 0 && (
+            <AnalysisProbes analysisId={detail.described.analysisCase.id} refreshKey={document} />
+          )}
           <AnalysisResults key={detail.described.analysisCase.id} analysisCase={detail.described.analysisCase} />
         </>
       )}

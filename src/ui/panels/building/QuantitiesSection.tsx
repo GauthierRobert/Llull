@@ -9,6 +9,7 @@ import { PanelSection } from '@ui/panels/PanelParts';
 import { OptionSelect, PairSelect } from '@ui/panels/OptionSelect';
 import { capitalize } from '@ui/panels/capitalize';
 import { isEstimateData } from '@ui/resultData';
+import { isRecord } from '@lib/isRecord';
 import { parseNumber } from '@ui/numberText';
 
 const UNIT_LABEL: Readonly<Record<string, string>> = { m: 'm', m2: 'm²', m3: 'm³', ea: 'ea', kg: 'kg' };
@@ -81,6 +82,12 @@ function EstimateTable(): React.ReactElement {
     [building, units],
   );
   const estimate = isEstimateData(estimateResult.data) ? estimateResult.data : null;
+  const grossResult = useMemo(
+    () => runQuery('quantity_takeoff'),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [building, units],
+  );
+  const gross = isRecord(grossResult.data) && isRecord(grossResult.data['gross']) ? grossResult.data['gross'] : {};
   const priced = estimate?.lines.filter((line) => line.amount !== null) ?? [];
 
   return (
@@ -107,6 +114,16 @@ function EstimateTable(): React.ReactElement {
                   <td title={line.key}>{line.description}</td>
                   <td className="building-table__number">
                     {line.quantity} {UNIT_LABEL[line.unit] ?? line.unit}
+                    {typeof gross[line.key] === 'number' && (
+                      <span
+                        className="panel__row-meta"
+                        data-testid={`takeoff-gross-${line.key}`}
+                        title="Raw modelled quantity before overlaps are removed"
+                      >
+                        {' '}
+                        (net; gross {String(gross[line.key])})
+                      </span>
+                    )}
                   </td>
                   <td className="building-table__number">{line.amount === null ? '—' : line.amount.toFixed(2)}</td>
                 </tr>

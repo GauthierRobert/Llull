@@ -111,3 +111,55 @@ export function parseRender(data: unknown): RenderView | null {
 }
 
 export const svgDataUrl = (svg: string): string => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+
+interface ProbeSeriesView {
+  readonly probeId: string;
+  readonly name: string;
+  readonly quantity: string;
+  readonly unit: string;
+  readonly points: ReadonlyArray<{ readonly time: number; readonly value: number }>;
+}
+
+export interface ProbeHistoryView {
+  readonly series: readonly ProbeSeriesView[];
+  readonly svg: string | null;
+}
+
+const text = (value: unknown, fallback: string): string => (typeof value === 'string' ? value : fallback);
+
+/** probe_history data; null when the command refused. */
+export function parseProbeHistory(data: unknown): ProbeHistoryView | null {
+  if (!isRecord(data) || !Array.isArray(data['series'])) return null;
+  const series = data['series'].flatMap((entry): ProbeSeriesView[] => {
+    if (!isRecord(entry) || typeof entry['probeId'] !== 'string' || !Array.isArray(entry['points'])) return [];
+    const points = entry['points'].flatMap((point) =>
+      isRecord(point) && typeof point['time'] === 'number' && typeof point['value'] === 'number'
+        ? [{ time: point['time'], value: point['value'] }]
+        : [],
+    );
+    return [
+      {
+        probeId: entry['probeId'],
+        name: text(entry['name'], entry['probeId']),
+        quantity: text(entry['quantity'], ''),
+        unit: text(entry['unit'], ''),
+        points,
+      },
+    ];
+  });
+  return { series, svg: typeof data['svg'] === 'string' ? data['svg'] : null };
+}
+
+export interface EigenView {
+  readonly label: string;
+  readonly unit: string;
+  readonly values: readonly number[];
+}
+
+/** Natural frequencies (modal) or buckling factors (buckling) recorded with the solved results; null for other cases. */
+export function eigenOf(analysisCase: AnalysisCase): EigenView | null {
+  const { results } = analysisCase;
+  if (results?.frequenciesHz !== undefined) return { label: 'Natural frequencies', unit: 'Hz', values: results.frequenciesHz };
+  if (results?.bucklingFactors !== undefined) return { label: 'Buckling factors', unit: '× applied load', values: results.bucklingFactors };
+  return null;
+}

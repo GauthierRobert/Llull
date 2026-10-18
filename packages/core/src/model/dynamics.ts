@@ -67,6 +67,27 @@ interface GearCoupling {
   ratio: number;
 }
 
+/**
+ * Linear point-to-point spring-damper between two bodies (or a body and the ground), a MuJoCo spatial tendon between two attachment
+ * points. Force along the line of the points: F = stiffness · (length - freeLengthM) + damping · d(length)/dt, positive = pulling together.
+ * @invariant bodyA !== bodyB; stiffness > 0, damping >= 0, freeLengthM >= 0; points distinct at the modelled pose
+ */
+export interface PointSpring {
+  readonly id: string;
+  /** Body id or GROUND. */
+  bodyA: string;
+  bodyB: string;
+  /** World points at the pose the bodies are modelled in, document units; each then rides on its body. */
+  pointA: Vec3;
+  pointB: Vec3;
+  /** N/m. */
+  stiffness: number;
+  /** N·s/m. */
+  damping: number;
+  /** m: length at which the force is zero. */
+  freeLengthM: number;
+}
+
 /** One point of a torque curve: shaft speed (rpm) → torque (N·m) at full throttle. */
 export type TorquePoint = readonly [rpm: number, torque: number];
 
@@ -178,6 +199,8 @@ export interface DynamicsModel {
   propellers: Record<string, PropellerLoad>;
   /** Absent in documents saved before PHY-21. */
   cylinders?: Record<string, CylinderPressure>;
+  /** Absent in documents saved before point springs. */
+  springs?: Record<string, PointSpring>;
   solver?: DynamicsSolverSettings;
 }
 

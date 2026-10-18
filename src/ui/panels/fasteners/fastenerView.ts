@@ -39,6 +39,10 @@ export interface BomView {
   readonly standardParts: readonly StandardPartRow[];
   readonly materials: readonly MaterialMassRow[];
   readonly unassignedSolidCount: number;
+  /** Sum of the components' masses (rows with a density only). */
+  readonly totalMassKg: number;
+  /** Component names / ids whose mass is unknown (a solid without a density). */
+  readonly rowsWithoutDensity: readonly string[];
 }
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
@@ -89,6 +93,10 @@ export function parseBom(data: unknown): BomView | null {
       unverified: row['unverified'] === true,
     })),
     unassignedSolidCount: count(data['unassignedSolidCount']),
+    totalMassKg: count(data['totalMassKg']),
+    rowsWithoutDensity: Array.isArray(data['rowsWithoutDensity'])
+      ? data['rowsWithoutDensity'].filter((id): id is string => typeof id === 'string')
+      : [],
   };
 }
 

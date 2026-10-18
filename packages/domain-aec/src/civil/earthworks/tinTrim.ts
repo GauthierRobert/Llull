@@ -11,6 +11,10 @@ type Triangle = readonly [Vec2, Vec2, Vec2];
 type Polygon = Vec3[];
 
 const MIN_AREA = 1e-9;
+/** Cross-product slack (m²) within which a point counts as on a footprint edge, i.e. inside the closed footprint. */
+const EDGE_TOLERANCE = 1e-9;
+/** Clipped contour parts shorter than this (m) are slivers at a footprint corner and dropped. */
+const MIN_PART_LENGTH = 1e-3;
 
 const cross = (a: Vec2, b: Vec2, c: Vec2): number => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
 
@@ -96,7 +100,7 @@ const boxesOverlap = (a: Box, b: Box): boolean => a[0] <= b[2] && b[0] <= a[2] &
 /** TIN mesh with everything under `footprint` removed (triangles are cut along the footprint edges, z preserved). */
 export function trimmedTinMesh(tin: Tin, footprint: ReadonlyArray<Triangle>): { positions: number[]; indices: number[] } {
   if (footprint.length === 0) return tinMesh(tin);
-  const cutters = footprint.map((triangle) => ({ triangle, box: boxOf(triangle) }));
+  const cutters = footprintBoxes(footprint);
   const extent = boxOf(footprint.flat());
   const positions: number[] = [];
   const indices: number[] = [];
@@ -116,6 +120,97 @@ export function trimmedTinMesh(tin: Tin, footprint: ReadonlyArray<Triangle>): { 
     }
   }
   return { positions, indices };
+}
+
+/** Parameter intervals [t0, t1] of the segment a->b that lie inside the convex CCW `triangle`. */
+function insideInterval(a: Vec2, b: Vec2, triangle: Triangle): [number, number] | null {
+  let t0 = 0;
+  let t1 = 1;
+  for (let i = 0; i < 3; i++) {
+    const p = triangle[i] as Vec2;
+    const q = triangle[(i + 1) % 3] as Vec2;
+    const raw = [cross(p, q, a), cross(p, q, b)] as const;
+    const [sa, sb] = raw.map((value) => (Math.abs(value) <= EDGE_TOLERANCE ? 0 : value)) as [number, number];
+    if (sa <= 0 && sb <= 0 && (sa < 0 || sb < 0)) return null;
+    if (sa < 0 || sb < 0) {
+      const t = sa / (sa - sb);
+      if (sa < 0) t0 = Math.max(t0, t);
+      else t1 = Math.min(t1, t);
+    }
+  }
+  return t1 - t0 > 1e-12 ? [t0, t1] : null;
+}
+
+const lerp2 = (a: Vec2, b: Vec2, t: number): Vec2 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+
+/**
+ * Parts of the polyline `line` outside every `footprint` triangle (cut at the boundary, bbox-culled per segment).
+ * @invariant no footprint hit -> `[line]` unchanged (same array); a closed loop cut open is returned as open parts
+ */
+export function clipPolylineOutside(
+  line: ReadonlyArray<Vec2>,
+  footprint: ReadonlyArray<Triangle>,
+  cutters = footprintBoxes(footprint),
+): Vec2[][] {
+  if (cutters.length === 0) return [line.slice()];
+  const extent = boxOf(footprint.flat());
+  const parts: Vec2[][] = [];
+  let current: Vec2[] = [];
+  let clipped = false;
+  const flush = (): void => {
+    if (
+      current.length >= 2 &&
+      current.some((point) => Math.hypot(point[0] - (current[0] as Vec2)[0], point[1] - (current[0] as Vec2)[1]) > MIN_PART_LENGTH)
+    )
+      parts.push(current);
+    current = [];
+  };
+  for (let i = 0; i + 1 < line.length; i++) {
+    const a = line[i] as Vec2;
+    const b = line[i + 1] as Vec2;
+    const box = boxOf([a, b]);
+    const inside: Array<[number, number]> = [];
+    if (boxesOverlap(box, extent)) {
+      for (const cutter of cutters) {
+        if (!boxesOverlap(box, cutter.box)) continue;
+        const interval = insideInterval(a, b, cutter.triangle);
+        if (interval) inside.push(interval);
+      }
+    }
+    inside.sort((x, y) => x[0] - y[0]);
+    let cursor = 0;
+    const outside: Array<[number, number]> = [];
+    for (const [t0, t1] of inside) {
+      if (t0 > cursor) outside.push([cursor, t0]);
+      cursor = Math.max(cursor, t1);
+    }
+    if (cursor < 1) outside.push([cursor, 1]);
+    if (outside.length !== 1 || outside[0]?.[0] !== 0 || outside[0][1] !== 1) clipped = true;
+    for (const [t0, t1] of outside) {
+      if (t0 === 0 && current.length > 0) current.push(t1 === 1 ? b : lerp2(a, b, t1));
+      else {
+        flush();
+        current = [t0 === 0 ? a : lerp2(a, b, t0), t1 === 1 ? b : lerp2(a, b, t1)];
+      }
+      if (t1 < 1) flush();
+    }
+    if (outside.length === 0) flush();
+  }
+  flush();
+  if (!clipped) return [line.slice()];
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+  const closedLoop = line.length > 3 && line[0]?.[0] === line.at(-1)?.[0] && line[0]?.[1] === line.at(-1)?.[1];
+  if (closedLoop && parts.length > 1 && first && last && first[0] === line[0] && last.at(-1) === line.at(-1)) {
+    parts.splice(parts.length - 1, 1);
+    parts[0] = [...last, ...first.slice(1)];
+  }
+  return parts;
+}
+
+/** Triangles with their bounding boxes, for repeated `clipPolylineOutside` calls. */
+export function footprintBoxes(footprint: ReadonlyArray<Triangle>): Array<{ triangle: Triangle; box: Box }> {
+  return footprint.map((triangle) => ({ triangle, box: boxOf(triangle) }));
 }
 
 /** Footprints of every pad graded against `surface`. */

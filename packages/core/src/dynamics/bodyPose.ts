@@ -60,3 +60,13 @@ export function documentAtPose(doc: CadDocument, poses: Readonly<Record<string, 
   }
   return { ...doc, entities };
 }
+
+/** World point rigidly attached to a body: `point` (document units, at the start pose) carried to the body's pose. */
+export function pointAtPose(point: Vec3, pose: BodyPoseAt): Vec3 {
+  const turned = applyMat3(matFromQuaternion(pose.orientation), [
+    point[0] - pose.start[0],
+    point[1] - pose.start[1],
+    point[2] - pose.start[2],
+  ]);
+  return [pose.position[0] + turned[0], pose.position[1] + turned[1], pose.position[2] + turned[2]];
+}

@@ -9,8 +9,10 @@ import { useFeaRender } from './useFeaRender';
 
 const STRUCTURAL_FIELDS = ['von_mises', 'u_mag', 'u_x', 'u_y', 'u_z', 's_xx', 's_yy', 's_zz'] as const;
 const THERMAL_FIELDS = ['temperature', 'heat_flux'] as const;
+const EIGEN_FIELDS = ['mode'] as const;
 const VIEWS = ['iso', 'front', 'back', 'left', 'right', 'top', 'bottom'] as const;
 
+const isEigen = (analysisCase: AnalysisCase): boolean => analysisCase.type === 'modal' || analysisCase.type === 'buckling';
 const isHeat = (analysisCase: AnalysisCase): boolean => analysisCase.type === 'heat_steady' || analysisCase.type === 'heat_transient';
 const loadCasesOf = (analysisCase: AnalysisCase): string[] => [...new Set(Object.values(analysisCase.loads).map((load) => load.loadCase))];
 
@@ -28,11 +30,13 @@ function SolveHint({ analysisId }: { analysisId: string }): React.ReactElement {
 export function AnalysisResults({ analysisCase }: { analysisCase: AnalysisCase }): React.ReactElement {
   const ids = useId();
   const heat = isHeat(analysisCase);
-  const fields = heat ? THERMAL_FIELDS : STRUCTURAL_FIELDS;
-  const loadCases = heat ? [] : loadCasesOf(analysisCase);
+  const eigen = isEigen(analysisCase);
+  const fields = heat ? THERMAL_FIELDS : eigen ? EIGEN_FIELDS : STRUCTURAL_FIELDS;
+  const loadCases = heat || eigen ? [] : loadCasesOf(analysisCase);
   const [field, setField] = useState<string>(fields[0]);
   const [view, setView] = useState<string>('iso');
   const [loadCase, setLoadCase] = useState('');
+  const [mode, setMode] = useState('1');
   const [scale, setScale] = useState('');
   const [full, setFull] = useState(false);
 
@@ -41,6 +45,7 @@ export function AnalysisResults({ analysisCase }: { analysisCase: AnalysisCase }
     analysisId: analysisCase.id,
     field,
     view,
+    ...(eigen && Number.isInteger(Number(mode)) && Number(mode) >= 1 ? { mode: Number(mode) } : {}),
     ...(loadCase !== '' ? { loadCase } : {}),
     ...(Number.isFinite(scaleValue) && scaleValue >= 0 ? { deformationScale: scaleValue } : {}),
   };
@@ -83,7 +88,21 @@ export function AnalysisResults({ analysisCase }: { analysisCase: AnalysisCase }
             </select>
           </label>
         )}
-        {!heat && (
+        {eigen && (
+          <label className="field" htmlFor={`${ids}-mode`}>
+            <span className="field__label">Mode</span>
+            <input
+              id={`${ids}-mode`}
+              type="number"
+              min={1}
+              step={1}
+              data-testid="analysis-mode"
+              value={mode}
+              onChange={(e) => setMode(e.target.value)}
+            />
+          </label>
+        )}
+        {!heat && !eigen && (
           <label className="field" htmlFor={`${ids}-scale`}>
             <span className="field__label">Deform ×</span>
             <input

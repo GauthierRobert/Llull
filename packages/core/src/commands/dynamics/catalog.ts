@@ -10,12 +10,14 @@ import { plotSimulation } from './plot';
 import { renderMotion } from './renderMotion';
 import { engineQuickCheck } from './quickCheck';
 import { simulateMotion } from './simulate';
+import { addSpring } from './springs';
 import { setDynamicsSolver } from './solver';
 
 export const dynamicsCommands = commandCatalog(
   addRigidBody,
   addBodyJoint,
   addGearCoupling,
+  addSpring,
   addMotor,
   addPropeller,
   addCylinderPressure,

@@ -50,6 +50,8 @@ describe('PhysicsSection', () => {
     await waitFor(() => expect(screen.getByTestId('physics-results')).toBeInTheDocument(), { timeout: 20_000 });
     expect(screen.getByTestId('physics-results')).toHaveTextContent(new RegExp(`${jointId}.*rpm`));
     expect(screen.getByTestId('physics-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('physics-energy-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('physics-energy')).toHaveTextContent(/dissipated .* J · (balance error|drift|lossy)/);
     const { result, playing } = useDynamicsPlaybackStore.getState();
     expect(result?.poses?.times.length).toBeGreaterThan(100);
     expect(playing).toBe(true);

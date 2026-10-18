@@ -4,7 +4,7 @@
  * model has no geoms: no contacts, pure multibody dynamics. Loop-closing joints are `connect` equalities (a hinge outside the tree).
  */
 
-import type { SimulationBody, SimulationLoop, SimulationModel } from '@core/dynamics/physicsEngine';
+import type { SimulationBody, SimulationLoop, SimulationModel, SimulationSpring } from '@core/dynamics/physicsEngine';
 import type { Vec3 } from '@core/model/vectors';
 
 const ZERO: Vec3 = [0, 0, 0];
@@ -14,6 +14,25 @@ const ZERO: Vec3 = [0, 0, 0];
  * side (a propeller seen through a reduction); 0.9999 holds the ratio to ~1 % during a violent start and exactly at steady state.
  */
 const GEAR_IMPEDANCE = '0.9999 0.9999 0.001';
+
+/** Name of the tendon of a point spring, and of its two attachment sites (A, B). */
+export const springTendonName = (springId: string): string => `spring:${springId}`;
+const springSiteName = (springId: string, end: 'a' | 'b'): string => `spring:${springId}:${end}`;
+
+/** Attachment sites of the point springs, by the body that carries them ('world' = the ground). */
+function springSites(springs: readonly SimulationSpring[], centers: ReadonlyMap<string, Vec3>): Map<string, string> {
+  const sites = new Map<string, string>();
+  for (const spring of springs)
+    for (const [end, body, point] of [
+      ['a', spring.bodyA, spring.pointA],
+      ['b', spring.bodyB, spring.pointB],
+    ] as const)
+      sites.set(
+        body,
+        `${sites.get(body) ?? ''}<site name="${attribute(springSiteName(spring.id, end))}" pos="${numbers(minus(point, centers.get(body) ?? ZERO))}"/>`,
+      );
+  return sites;
+}
 
 /** Name of the `connect` equality number `index` of a loop (a revolute loop has two pins, a spherical loop one). */
 export const loopEqualityName = (loopId: string, index: number): string => `loop:${loopId}:${index}`;
@@ -66,6 +85,7 @@ function bodyXml(
   parentCenter: Vec3,
   childrenOf: ReadonlyMap<string | null, SimulationBody[]>,
   timestep: number,
+  sites: ReadonlyMap<string, string>,
 ): string {
   const { joint } = body;
   const jointXml =
@@ -74,10 +94,10 @@ function bodyXml(
       : body.fixed
         ? ''
         : '<freejoint/>';
-  const children = (childrenOf.get(body.id) ?? []).map((child) => bodyXml(child, body.centerOfMass, childrenOf, timestep)).join('');
+  const children = (childrenOf.get(body.id) ?? []).map((child) => bodyXml(child, body.centerOfMass, childrenOf, timestep, sites)).join('');
   return (
     `<body name="${attribute(body.id)}" pos="${numbers(minus(body.centerOfMass, parentCenter))}">` +
-    `<inertial pos="0 0 0" mass="${body.mass}" fullinertia="${numbers(body.inertia)}"/>${jointXml}${children}</body>`
+    `<inertial pos="0 0 0" mass="${body.mass}" fullinertia="${numbers(body.inertia)}"/>${jointXml}${sites.get(body.id) ?? ''}${children}</body>`
   );
 }
 
@@ -102,8 +122,17 @@ function servoChain(model: SimulationModel): boolean {
 export function toMjcf(model: SimulationModel, timestep: number): string {
   const childrenOf = new Map<string | null, SimulationBody[]>();
   for (const body of model.bodies) childrenOf.set(body.parentId, [...(childrenOf.get(body.parentId) ?? []), body]);
-  const roots = (childrenOf.get(null) ?? []).map((body) => bodyXml(body, ZERO, childrenOf, timestep)).join('');
   const centers = new Map(model.bodies.map((body) => [body.id, body.centerOfMass] as const));
+  const springs = model.springs ?? [];
+  const sites = springSites(springs, centers);
+  const roots = (childrenOf.get(null) ?? []).map((body) => bodyXml(body, ZERO, childrenOf, timestep, sites)).join('');
+  const tendons = springs
+    .map(
+      (spring) =>
+        `<spatial name="${attribute(springTendonName(spring.id))}" stiffness="${spring.stiffness}" damping="${spring.damping}" springlength="${spring.freeLength}">` +
+        `<site site="${attribute(springSiteName(spring.id, 'a'))}"/><site site="${attribute(springSiteName(spring.id, 'b'))}"/></spatial>`,
+    )
+    .join('');
   const gears = model.gears
     .map(
       (gear) =>
@@ -124,7 +153,7 @@ export function toMjcf(model: SimulationModel, timestep: number): string {
   return (
     '<mujoco model="llull"><compiler angle="radian" inertiafromgeom="false" balanceinertia="true"/>' +
     `<option timestep="${timestep}" integrator="${integrator}"${jacobian} gravity="${numbers(model.gravity)}">${flags}</option>` +
-    `<worldbody>${roots}</worldbody>${gears === '' && loops === '' ? '' : `<equality>${gears}${loops}</equality>`}` +
-    `${servos === '' ? '' : `<actuator>${servos}</actuator>`}</mujoco>`
+    `<worldbody>${sites.get('world') ?? ''}${roots}</worldbody>${gears === '' && loops === '' ? '' : `<equality>${gears}${loops}</equality>`}` +
+    `${tendons === '' ? '' : `<tendon>${tendons}</tendon>`}${servos === '' ? '' : `<actuator>${servos}</actuator>`}</mujoco>`
   );
 }

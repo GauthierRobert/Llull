@@ -4,6 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { useStore, useViewportStore } from '@ui/store';
 import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
 import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
+import * as localQuery from '@ui/services/localQuery';
 import { xy, xyz } from '../helpers/xy';
 
 beforeEach(() => {
@@ -126,6 +127,20 @@ describe('BuildingPanel', () => {
     fireEvent.change(screen.getByTestId('rate-value'), { target: { value: '180' } });
     fireEvent.click(screen.getByRole('button', { name: 'Set rate' }));
     expect(dispatch).toHaveBeenCalledWith('set_cost_rates', { rates: { 'wall.concrete.m3': 180 } });
+  });
+  it('marks lines whose net quantity differs from the gross one', () => {
+    localDispatch('draw_walls', { points: xy(0, 0, 5000, 0) });
+    const actual = localQuery.runQuery;
+    const spy = vi.spyOn(localQuery, 'runQuery');
+    spy.mockImplementation((command, params) => {
+      const result = actual(command, params);
+      return command === 'quantity_takeoff'
+        ? { ...result, data: { ...(result.data as object), gross: { 'wall.concrete.m3': 3.5 } } }
+        : result;
+    });
+    render(<BuildingPanel />);
+    expect(screen.getByTestId('takeoff-gross-wall.concrete.m3')).toHaveTextContent('net; gross 3.5');
+    spy.mockRestore();
   });
   it('export buttons report the exporter summary', () => {
     localDispatch('draw_walls', { points: xy(0, 0, 5000, 0) });

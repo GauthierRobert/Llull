@@ -12,7 +12,7 @@ import { resolveMassProperties } from '../geometry/resolveMassProperties';
 import { resolveDensity, type DensityFallback } from '../geometry/resolveDensity';
 import { combineMassProperties, type InertiaTensor, type MassProperties } from '../geometry/massProperties';
 import { RAD_PER_S_PER_RPM, appliedLoadsFor, speedServoGains } from './forceLaws';
-import type { SimulationBody, SimulationJoint, SimulationLoop, SimulationModel, SimulationServo } from './physicsEngine';
+import type { SimulationBody, SimulationJoint, SimulationLoop, SimulationModel, SimulationServo, SimulationSpring } from './physicsEngine';
 import { prepareCylinders, withCylinderForces, type CylinderRuntime } from './cylinderLoads';
 import { consistentSpeeds } from './mobility';
 import { announcedSpeed } from './timestep';
@@ -251,6 +251,20 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
       },
     ];
   });
+  const missingEnd = Object.values(dynamics.springs ?? {}).flatMap((spring) =>
+    [spring.bodyA, spring.bodyB].filter((end) => end !== GROUND && dynamics.bodies[end] === undefined).map((end) => `${spring.id}: ${end}`),
+  )[0];
+  if (missingEnd !== undefined) return { error: `spring ${missingEnd} is not a rigid body` };
+  const springs: SimulationSpring[] = Object.values(dynamics.springs ?? {}).map((spring) => ({
+    id: spring.id,
+    bodyA: spring.bodyA === GROUND ? 'world' : spring.bodyA,
+    bodyB: spring.bodyB === GROUND ? 'world' : spring.bodyB,
+    pointA: scale3(spring.pointA, metres),
+    pointB: scale3(spring.pointB, metres),
+    stiffness: spring.stiffness,
+    damping: spring.damping,
+    freeLength: spring.freeLengthM,
+  }));
   const bodyOfJoint = Object.fromEntries(Object.values(dynamics.joints).map((joint) => [joint.id, joint.child]));
   const baseLoads = appliedLoadsFor(Object.values(dynamics.motors), Object.values(dynamics.propellers), bodyOfJoint);
   const announcedRpm = announcedSpeed(dynamics) / RAD_PER_S_PER_RPM;
@@ -264,7 +278,16 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
   };
   return {
     cylinders,
-    model: { gravity: dynamics.gravity, bodies, gears: Object.values(dynamics.gears), loops, solver, servos, loads },
+    model: {
+      gravity: dynamics.gravity,
+      bodies,
+      gears: Object.values(dynamics.gears),
+      loops,
+      solver,
+      servos,
+      ...(springs.length > 0 ? { springs } : {}),
+      loads,
+    },
     mass,
     topology,
     settings,

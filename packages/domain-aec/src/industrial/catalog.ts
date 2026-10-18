@@ -26,11 +26,12 @@ import { runwayCheck } from './runway/runwayCheckRun';
 import { checkSteelMembers } from './steelDesign/steelMembersCheck';
 import { addPipeSupport } from './piping/pipeSupports';
 import { checkPipeSupports } from './piping/pipeSupportCheck';
+import { pipeHydraulics } from './piping/pipeHydraulics';
 
 // prettier-ignore
 export const industrialCommands = commandCatalog(
   listSteelProfiles, addSteelMember, updateSteelMember, addGridColumns, addGridBeams, addGridBracing, addFooting, addPanel, addEquipment,
   updateEquipment, addEquipmentOpenings, addPipeRun, addPipeSupport, addCableTray, addBasePlates, addMomentConnections, checkPortalFrames,
   designPortalFrames, checkBracing, foundationCheck, designFootings, exportNcFiles, checkPurlins, designPurlins, exportAnchorPlan,
-  runwayCheck, checkSteelMembers, checkPipeSupports, addCraneRunway, addPortalFrameBuilding, checkClashes,
+  runwayCheck, checkSteelMembers, checkPipeSupports, pipeHydraulics, addCraneRunway, addPortalFrameBuilding, checkClashes,
 );

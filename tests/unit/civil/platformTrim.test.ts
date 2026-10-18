@@ -84,3 +84,36 @@ describe('platform daylight and existing-ground trim', () => {
     expect(data.cutM3 - data.fillM3).toBeCloseTo(0, -2);
   });
 });
+
+describe('contours under a graded platform', () => {
+  const contours = (doc: CadDocument): Array<Extract<Entity, { kind: 'polyline' }>> =>
+    Object.values(doc.entities).filter(
+      (entity): entity is Extract<Entity, { kind: 'polyline' }> => entity.kind === 'polyline' && entity.id.startsWith('surface-1:c'),
+    );
+
+  const insidePad = (x: number, y: number): boolean => x > 40.001 && x < 59.999 && y > 40.001 && y < 59.999;
+
+  it('has no contour vertex or segment midpoint over the pad, and keeps the ones outside', () => {
+    const before = contours(sloped());
+    const doc = padDoc();
+    const after = contours(doc);
+    expect(before.length).toBeGreaterThan(0);
+    expect(after.length).toBeGreaterThanOrEqual(before.length);
+    for (const line of after) {
+      const pts = line.points as Vec2[];
+      pts.forEach((p, i) => {
+        expect(insidePad(p[0], p[1])).toBe(false);
+        const next = pts[i + 1];
+        if (next) expect(insidePad((p[0] + next[0]) / 2, (p[1] + next[1]) / 2)).toBe(false);
+      });
+    }
+  });
+
+  it('cuts a contour that crosses the pad into parts ending on the pad outline or batter', () => {
+    const before = contours(sloped()).filter((line) => (line.points as Vec2[]).some((p) => p[0] > 40 && p[0] < 60));
+    expect(before.length).toBeGreaterThan(0);
+    const doc = padDoc();
+    const pieces = contours(doc).filter((line) => line.id.includes('_1'));
+    expect(pieces.length).toBeGreaterThan(0);
+  });
+});

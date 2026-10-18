@@ -28,6 +28,9 @@ export interface MjData {
   readonly cfrc_int: Float64Array;
   /** [potential, kinetic] J of the state evaluated by the last forward pass (needs the MJCF energy flag). Potential: gravity + joint springs. */
   readonly energy: Float64Array;
+  /** Length m and rate of change m/s of each tendon (point springs). */
+  readonly ten_length: Float64Array;
+  readonly ten_velocity: Float64Array;
   readonly nefc: number;
   readonly efc_type: Int32Array;
   readonly efc_id: Int32Array;
@@ -51,6 +54,7 @@ export interface MujocoModule {
 /** mjtObj values. */
 export const OBJECT_BODY = 1;
 export const OBJECT_JOINT = 3;
+export const OBJECT_TENDON = 18;
 export const OBJECT_EQUALITY = 17;
 /** mjtConstraint: equality rows (connect / joint equalities). */
 export const CONSTRAINT_EQUALITY = 0;

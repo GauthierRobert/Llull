@@ -99,6 +99,25 @@ export interface SimulationLoop {
   readonly halfSpan: number;
 }
 
+/**
+ * Linear spring-damper between two points, each fixed on a body (`'world'` allowed). Force along the line of the points,
+ * F = stiffness · (length - freeLength) + damping · d(length)/dt, positive = pulling together.
+ */
+export interface SimulationSpring {
+  readonly id: string;
+  readonly bodyA: string;
+  readonly bodyB: string;
+  /** World points at t = 0, m. */
+  readonly pointA: Vec3;
+  readonly pointB: Vec3;
+  /** N/m. */
+  readonly stiffness: number;
+  /** N·s/m. */
+  readonly damping: number;
+  /** m. */
+  readonly freeLength: number;
+}
+
 /** Engine-neutral solver settings. */
 interface SimulationSolver {
   readonly integrator: 'rk4' | 'implicitfast';
@@ -115,6 +134,8 @@ export interface SimulationModel {
   readonly loops: readonly SimulationLoop[];
   readonly solver: SimulationSolver;
   readonly servos: readonly SimulationServo[];
+  /** Point springs; absent = none. */
+  readonly springs?: readonly SimulationSpring[];
   /** Force laws, evaluated by the engine at every step (at the step midpoint) from the state. Must be pure. */
   readonly loads: (state: SimulationState) => AppliedLoads;
 }
@@ -167,9 +188,12 @@ export interface SimulationTrace {
   readonly reactionPeaks?: Record<string, { force: StepPeak; moment: StepPeak | null }>;
   /**
    * Per sample, J (needs `options.energy`; omitted by engines that cannot): kinetic energy and potential energy (gravity + joint springs),
-   * the potential referenced to the start pose (zero at the first sample).
+   * the potential referenced to the start pose (zero at the first sample); `appliedWork`: cumulative work J of the applied loads and
+   * servos on the joints (motors, gas pressure, propeller drag, speed governors; zero at the first sample), when the engine reports it.
    */
-  readonly energy?: { readonly kinetic: number[]; readonly potential: number[] };
+  readonly energy?: { readonly kinetic: number[]; readonly potential: number[]; readonly appliedWork?: number[] };
+  /** Per point spring (needs `options.energy`): length m, rate of change m/s and force N (positive = pulling together), per sample. */
+  readonly springs?: Record<string, { length: number[]; velocity: number[]; force: number[] }>;
   /** m: largest loop-constraint violation over every integration step (present when the model has loops). */
   readonly loopResidual?: number;
 }

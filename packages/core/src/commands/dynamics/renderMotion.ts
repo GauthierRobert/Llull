@@ -1,13 +1,16 @@
 /** Looking at a simulated pose without a screen (render_motion): runs simulate_motion and draws the mechanism at chosen times. */
 
+import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { failer, report } from '../noop';
 import { escapeXml } from '../../lib/escapeXml';
 import { clamp } from '../../lib/clamp';
 import type { Vec3 } from '../../model/vectors';
-import { documentAtPose, eulerDegOf, type BodyPoseAt } from '../../dynamics/bodyPose';
+import { documentAtPose, eulerDegOf, pointAtPose, type BodyPoseAt } from '../../dynamics/bodyPose';
 import type { SimulationData } from '../../dynamics/simulationReport';
+import { springSvg } from '../../dynamics/springDrawing';
+import { GROUND } from '../../model/dynamics';
 import { boundsOfPoints, mergeBounds, type Bounds } from '../../geometry/bounds';
 import { computeSceneSnapshot } from '../inspect/scene';
 import type { ViewName } from '../render/camera';
@@ -54,8 +57,22 @@ function posesAt(poses: PosesData, index: number): Record<string, BodyPoseAt> {
   return result;
 }
 
+/** World end points (document units) of every point spring in the pose `poses`: an end rides on its body, a ground end stays. */
+function springEnds(doc: CadDocument, poses: Readonly<Record<string, BodyPoseAt>>): Record<string, { a: Vec3; b: Vec3 }> {
+  const place = (body: string, point: Vec3): Vec3 => {
+    const pose = body === GROUND ? undefined : poses[body];
+    return pose === undefined ? point : pointAtPose(point, pose);
+  };
+  return Object.fromEntries(
+    Object.values(doc.dynamics?.springs ?? {}).map((spring) => [
+      spring.id,
+      { a: place(spring.bodyA, spring.pointA), b: place(spring.bodyB, spring.pointB) },
+    ]),
+  );
+}
+
 /**
- * @affects nothing — read-only; returns data { svg, width, height, view, duration, samples, frames[{ time, bodies{ id: { position, rotationDeg } } }], trace? }
+ * @affects nothing — read-only; returns data { svg, width, height, view, duration, samples, frames[{ time, bodies{ id: { position, rotationDeg } }, springs?{ id: { a, b, length } } }], trace? }
  * @invariant frames are clipped to their cell (empty grid cells stay blank); the input document is never changed: frames render a copy whose rigid-body member entities are moved to the simulated pose
  * @failure no physics engine, no rigid bodies, simulation refused or failed, times outside 0..duration, unknown trace body id, invalid camera -> no-op with the reason
  */
@@ -71,7 +88,8 @@ export const renderMotion = defineCommand({
     'Camera as render_view: `view` or `direction`. Returns data.svg (the grid), data.width/height, and data.frames[{ time, bodies{ bodyId: ' +
     '{ position (centre of mass, document units), rotationDeg (Euler XYZ degrees from the start pose) } } }] to read numbers. Frames show ' +
     "the nearest recorded sample (data.frames[].time is that sample's time). With the CLI, `llull render_motion … --save m.png` rasterizes " +
-    'data.svg. Read-only; needs the physics engine like simulate_motion.',
+    'data.svg. Point springs (add_spring) are drawn as green zig-zag coils between their attachment points, which ride on their bodies ' +
+    '(data.frames[].springs gives the end points and length). Read-only; needs the physics engine like simulate_motion.',
   params: z.object({
     times: z
       .array(z.number().min(0))
@@ -142,10 +160,12 @@ export const renderMotion = defineCommand({
     const wanted = params.times ?? evenTimes(params.frames ?? DEFAULT_FRAMES, duration);
     const indices = wanted.map((time) => nearestSample(poses.times, time));
     const frameDocs = indices.map((index) => documentAtPose(doc, posesAt(poses, index)));
+    const springPoses = indices.map((index) => springEnds(doc, posesAt(poses, index)));
+    const springPoints = springPoses.flatMap((ends) => Object.values(ends).flatMap((end) => [end.a, end.b]));
     const paths = traced.map((id) => (poses.bodies[id]?.position ?? []) as Vec3[]);
     const pathBounds = paths.filter((path) => path.length > 0).map((path) => boundsOfPoints(path));
     const sceneBounds = frameDocs.flatMap((frameDoc) => computeSceneSnapshot(frameDoc).bounds ?? []);
-    const all: Bounds[] = [...sceneBounds, ...pathBounds];
+    const all: Bounds[] = [...sceneBounds, ...pathBounds, ...(springPoints.length > 0 ? [boundsOfPoints(springPoints)] : [])];
     const frame = all.length === 0 ? null : all.reduce(mergeBounds);
 
     const width = clamp(Math.round(params.width ?? 420), 64, 2000);
@@ -176,8 +196,13 @@ export const renderMotion = defineCommand({
             : `<circle cx="${r2(here[0])}" cy="${r2(here[1])}" r="4.5" fill="${color}" stroke="#101020" stroke-width="1.5"/>`;
         return [line, dot];
       });
+      const springs = Object.entries(springPoses[k] ?? {});
+      const coils = springs.map(([, end]) => {
+        const [a, b] = [project(end.a), project(end.b)];
+        return springSvg([a[0], a[1]], [b[0], b[1]]);
+      });
       layers.push(
-        `  <g transform="translate(${x}, ${y + LABEL_HEIGHT})" clip-path="url(#${CELL_CLIP})"><rect width="${width}" height="${height}" fill="none" stroke="#3a3a5a"/>${extractSvgInner(data.svg)}${overlay.join('')}</g>`,
+        `  <g transform="translate(${x}, ${y + LABEL_HEIGHT})" clip-path="url(#${CELL_CLIP})"><rect width="${width}" height="${height}" fill="none" stroke="#3a3a5a"/>${extractSvgInner(data.svg)}${coils.join('')}${overlay.join('')}</g>`,
         `  <text x="${x + 8}" y="${y + 16}" font-family="monospace" font-size="14" fill="#e8e8f4">${escapeXml(formatTime(time))}</text>`,
       );
       return {
@@ -188,6 +213,20 @@ export const renderMotion = defineCommand({
             { position: roundVec(pose.position), rotationDeg: eulerDegOf(pose.orientation) },
           ]),
         ),
+        ...(springs.length > 0
+          ? {
+              springs: Object.fromEntries(
+                springs.map(([id, end]) => [
+                  id,
+                  {
+                    a: roundVec(end.a),
+                    b: roundVec(end.b),
+                    length: round(Math.hypot(end.a[0] - end.b[0], end.a[1] - end.b[1], end.a[2] - end.b[2])),
+                  },
+                ]),
+              ),
+            }
+          : {}),
       };
     });
     const legend = traced.map(

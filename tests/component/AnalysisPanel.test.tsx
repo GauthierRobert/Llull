@@ -6,7 +6,7 @@ import { Sidebar } from '@ui/components/Sidebar';
 import { AnalysisPanel } from '@ui/panels/analysis/AnalysisPanel';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
-const mocks = vi.hoisted(() => ({ svgResult: false }));
+const mocks = vi.hoisted(() => ({ svgResult: false, solved: null as null | 'modal' | 'static' }));
 
 vi.mock('@ui/services/localQuery', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@ui/services/localQuery')>();
@@ -24,6 +24,44 @@ vi.mock('@ui/services/localQuery', async (importOriginal) => {
           resultSet: { label: 'load case LC1', time: 0 },
         };
         return { document: useStore.getState().document, summary: 'render_fea_results: ok', affected: [], data };
+      }
+      if (mocks.solved !== null && command === 'describe_analysis' && params['analysisId'] !== undefined) {
+        const real = actual.runQuery(command, params);
+        const data = real.data as { case: Record<string, unknown> };
+        const results = mocks.solved === 'modal' ? { frequenciesHz: [209.73, 1299.4] } : {};
+        const probes = { p1: { id: 'p1', name: 'tip temperature', quantity: 'temperature', point: [0, 0, 0] } };
+        return { ...real, data: { ...data, state: 'solved', case: { ...data.case, type: mocks.solved, results, probes } } };
+      }
+      if (command === 'probe_history') {
+        const series = [
+          {
+            probeId: 'p1',
+            name: 'tip temperature',
+            quantity: 'temperature',
+            unit: 'C',
+            points: [
+              { time: 0, value: 20 },
+              { time: 10, value: 85.5 },
+            ],
+          },
+          {
+            probeId: 'p2',
+            name: 'wall flux',
+            quantity: 'heat_flux',
+            unit: 'W/m2',
+            points: [
+              { time: 0, value: 5 },
+              { time: 10, value: 2 },
+            ],
+          },
+        ];
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>';
+        return {
+          document: useStore.getState().document,
+          summary: 'probe_history: ok',
+          affected: [],
+          data: { analysisId: 'a', series, svg },
+        };
       }
       return actual.runQuery(command, params);
     },
@@ -56,6 +94,7 @@ describe('AnalysisPanel', () => {
   beforeEach(() => {
     cleanup();
     mocks.svgResult = false;
+    mocks.solved = null;
     useStore.getState().setDocument(createEmptyDocument());
     useLayoutStore.setState({ sidebarTab: 'objects', sidebarOpen: true });
   });
@@ -95,5 +134,27 @@ describe('AnalysisPanel', () => {
     const img = screen.getByTestId('analysis-plot') as HTMLImageElement;
     expect(img.src.startsWith('data:image/svg+xml;charset=utf-8,')).toBe(true);
     expect(screen.getByTestId('analysis-extremes').textContent).toContain('max 123.4567');
+  });
+
+  it('lists the modal frequencies and offers the mode number of the mode-shape plot', () => {
+    seedAnalysis();
+    mocks.solved = 'modal';
+    render(<AnalysisPanel />);
+    const list = screen.getByTestId('analysis-modes');
+    expect(list.textContent).toContain('Mode 1209.73 Hz');
+    expect(list.textContent).toContain('Mode 21299.4 Hz');
+    expect(screen.getByTestId('analysis-mode')).toBeTruthy();
+    expect(screen.queryByTestId('analysis-scale')).toBeNull();
+  });
+
+  it('plots the probe history and tabulates start, end and range of each probe', () => {
+    seedAnalysis();
+    mocks.solved = 'static';
+    render(<AnalysisPanel />);
+    expect((screen.getByTestId('analysis-probe-plot') as HTMLImageElement).src).toContain('data:image/svg+xml');
+    const probes = screen.getByTestId('analysis-probes');
+    expect(probes.textContent).toContain('tip temperature');
+    expect(probes.textContent).toContain('20 → 85.5 (min 20, max 85.5) C');
+    expect(probes.textContent).toContain('heat_flux · 5 → 2');
   });
 });

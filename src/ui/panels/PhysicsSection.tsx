@@ -79,6 +79,17 @@ export function PhysicsSection(): React.ReactElement {
             .map(([id, values]) => ({ id, values: values.map((v) => v * RPM_PER_RAD_S) })),
     [result],
   );
+  const energySeries = useMemo(() => {
+    const energy = result?.series?.energy;
+    return energy === undefined
+      ? []
+      : [
+          { id: 'kinetic', values: energy.kinetic },
+          { id: 'potential', values: energy.potential },
+          { id: 'total', values: energy.total },
+          { id: 'dissipated', values: energy.dissipated },
+        ];
+  }, [result]);
   const priority = useMemo(
     () =>
       result === null ? [] : [...Object.values(result.motors).map((m) => m.joint), ...Object.values(result.propellers).map((p) => p.joint)],
@@ -96,7 +107,7 @@ export function PhysicsSection(): React.ReactElement {
     setBusy(true);
     setStatus(`Simulating ${format(seconds, 2)} s…`);
     const run = await runSimulation(
-      { duration: seconds, detail: 'poses', sampleRate: Math.min(1000, PLAYBACK_SAMPLES / seconds) },
+      { duration: seconds, detail: 'poses', energy: true, sampleRate: Math.min(1000, PLAYBACK_SAMPLES / seconds) },
       setStatus,
     );
     setBusy(false);
@@ -161,27 +172,53 @@ export function PhysicsSection(): React.ReactElement {
       {result !== null && (
         <>
           <ResultTable result={result} />
+          {result.energy !== undefined && (
+            <p className="physics-engine-note" data-testid="physics-energy">
+              Energy: total {format(result.energy.initialTotalJ, 3)} → {format(result.energy.finalTotalJ, 3)} J · dissipated{' '}
+              {format(result.energy.dissipatedJ, 3)} J · {energyCheck(result.energy)}
+            </p>
+          )}
           {result.warnings.length > 0 && <StatusLine text={`⚠ ${result.warnings.join('; ')}`} testId="physics-warnings" />}
           <TimelineDock times={result.series?.times ?? []} idPrefix="physics">
-            {(view) =>
-              speedSeries.length > 0 && (
-                <SeriesChart
-                  xs={view.xs}
-                  xUnit={view.xUnit}
-                  cursor={view.cursor}
-                  onSeek={view.seek}
-                  unit="rpm"
-                  title="Joint speed over simulated time"
-                  testId="physics-chart"
-                  priority={priority}
-                  series={speedSeries}
-                />
-              )
-            }
+            {(view) => (
+              <>
+                {speedSeries.length > 0 && (
+                  <SeriesChart
+                    xs={view.xs}
+                    xUnit={view.xUnit}
+                    cursor={view.cursor}
+                    onSeek={view.seek}
+                    unit="rpm"
+                    title="Joint speed over simulated time"
+                    testId="physics-chart"
+                    priority={priority}
+                    series={speedSeries}
+                  />
+                )}
+                {energySeries.length > 0 && (
+                  <SeriesChart
+                    xs={view.xs}
+                    xUnit={view.xUnit}
+                    cursor={view.cursor}
+                    onSeek={view.seek}
+                    unit="J"
+                    title="Mechanical energy over simulated time"
+                    testId="physics-energy-chart"
+                    series={energySeries}
+                  />
+                )}
+              </>
+            )}
           </TimelineDock>
           <p className="physics-engine-note">{result.engine} · rigid-body dynamics, static propeller model</p>
         </>
       )}
     </PanelSection>
   );
+}
+
+/** Balance closure when the engine reports input work; otherwise total-energy drift, meaningful only for a lossless run. */
+function energyCheck(energy: { maxDeviationFraction: number; dissipatedJ: number; balanceErrorFraction?: number }): string {
+  if (energy.balanceErrorFraction !== undefined) return `balance error ${format(energy.balanceErrorFraction * 100, 2)} %`;
+  return energy.dissipatedJ > 0 ? 'lossy run (no balance reported)' : `drift ${format(energy.maxDeviationFraction * 100, 2)} % of peak`;
 }

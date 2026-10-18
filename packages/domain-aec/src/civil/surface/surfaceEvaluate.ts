@@ -2,7 +2,7 @@
 
 import type { Entity, Vec2 } from '@core/model/types';
 import type { PointGroupObject, SurfaceObject } from '@core/model/civil';
-import { surfaceFootprint, trimmedTinMesh } from '../earthworks/tinTrim';
+import { clipPolylineOutside, footprintBoxes, surfaceFootprint, trimmedTinMesh } from '../earthworks/tinTrim';
 import { civilMesh, civilPoint, civilPolyline, civilText } from '../entities';
 import { contourLevels, tinBounds, traceContour, type Tin } from './tin';
 import { surfaceTin } from './surfaceTin';
@@ -46,31 +46,36 @@ export function drawnInterval(tin: Tin, interval: number): number {
 export function evaluateSurface(context: CivilContext, surface: SurfaceObject): Entity[] {
   const tin = surfaceTin(context.civil, surface);
   if (tin.triangles.length === 0) return [];
-  const entities: Entity[] = [
-    civilMesh(surface, 'tin', `${surface.name} TIN`, 'tin', trimmedTinMesh(tin, surfaceFootprint(context.civil, surface))),
-  ];
+  const footprint = surfaceFootprint(context.civil, surface);
+  const cutters = footprintBoxes(footprint);
+  const entities: Entity[] = [civilMesh(surface, 'tin', `${surface.name} TIN`, 'tin', trimmedTinMesh(tin, footprint))];
   const height = labelHeight(context.doc);
   let lines = 0;
   const interval = drawnInterval(tin, surface.contourInterval);
   contourLevels(tin, interval).forEach((level) => {
     const index = Math.round(level / surface.contourInterval);
     const major = surface.majorEvery > 0 && index % surface.majorEvery === 0;
-    traceContour(tin, level).forEach((line, k) => {
-      if (line.length < 2 || lines >= MAX_CONTOUR_LINES) return;
-      lines += 1;
-      const first = line[0] as Vec2;
-      const last = line[line.length - 1] as Vec2;
-      const closed = line.length > 3 && first[0] === last[0] && first[1] === last[1];
-      const points = closed ? line.slice(0, -1) : line;
-      const part = `c${index}_${k}`;
-      const label = `${surface.name} contour ${elevationLabel(context.doc, level)}`;
-      entities.push(civilPolyline(surface, part, label, major ? 'major' : 'minor', points, closed, level));
-      if (major && line.length >= 4) {
-        const { at, angle } = midpoint(line);
-        entities.push(
-          civilText(surface, `${part}_label`, elevationLabel(context.doc, level), 'major', [at[0], at[1], level], height, angle),
-        );
-      }
+    traceContour(tin, level).forEach((traced, k) => {
+      if (traced.length < 2) return;
+      const parts = clipPolylineOutside(traced, footprint, cutters);
+      const longest = parts.reduce((best, part) => (part.length > best.length ? part : best), parts[0] ?? []);
+      parts.forEach((line, j) => {
+        if (line.length < 2 || lines >= MAX_CONTOUR_LINES) return;
+        lines += 1;
+        const first = line[0] as Vec2;
+        const last = line[line.length - 1] as Vec2;
+        const closed = line.length > 3 && first[0] === last[0] && first[1] === last[1];
+        const points = closed ? line.slice(0, -1) : line;
+        const part = `c${index}_${k}${j === 0 ? '' : `_${j}`}`;
+        const label = `${surface.name} contour ${elevationLabel(context.doc, level)}`;
+        entities.push(civilPolyline(surface, part, label, major ? 'major' : 'minor', points, closed, level));
+        if (major && line === longest && line.length >= 4) {
+          const { at, angle } = midpoint(line);
+          entities.push(
+            civilText(surface, `${part}_label`, elevationLabel(context.doc, level), 'major', [at[0], at[1], level], height, angle),
+          );
+        }
+      });
     });
   });
   return entities;

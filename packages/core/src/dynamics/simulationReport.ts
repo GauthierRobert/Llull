@@ -80,6 +80,11 @@ export interface SimulationData {
   readonly warnings: string[];
   /** Energy balance in J, present when the run recorded energy (simulate_motion `energy: true`, or the model has a joint spring). */
   readonly energy?: EnergyData;
+  /** Point springs (add_spring) of the run: lengths in m, forces in N (positive = pulling the bodies together). */
+  readonly springs?: Record<
+    string,
+    { freeLengthM: number; finalLengthM: number; minLengthM: number; maxLengthM: number; finalForceN: number; peakForceN: number }
+  >;
   readonly series?: {
     readonly times: number[];
     readonly jointVelocity: Record<string, number[]>;
@@ -144,6 +149,28 @@ function gearRatioError(ratio: number, driver: readonly number[], driven: readon
     if (error > worst) [worst, index] = [error, i];
   });
   return { worst, index };
+}
+
+/** Length range and force of every point spring over the run, or null when there is none. */
+function springResults(dynamics: DynamicsModel, trace: SimulationTrace): NonNullable<SimulationData['springs']> | null {
+  const entries = Object.values(dynamics.springs ?? {}).flatMap((spring) => {
+    const recorded = trace.springs?.[spring.id];
+    if (recorded === undefined || recorded.length.length === 0) return [];
+    return [
+      [
+        spring.id,
+        {
+          freeLengthM: spring.freeLengthM,
+          finalLengthM: last(recorded.length),
+          minLengthM: Math.min(...recorded.length),
+          maxLengthM: Math.max(...recorded.length),
+          finalForceN: last(recorded.force),
+          peakForceN: recorded.force.reduce((peak, force) => Math.max(peak, Math.abs(force)), 0),
+        },
+      ] as const,
+    ];
+  });
+  return entries.length === 0 ? null : Object.fromEntries(entries);
 }
 
 /** The structured result of one run (all forces re-evaluated on the samples with the same laws the engine applied). */
@@ -262,6 +289,7 @@ export function simulationData(
     }),
   );
   const balance = energyOf(dynamics, trace);
+  const springs = springResults(dynamics, trace);
   const base = { engine: run.engine, duration: run.duration, timestep: run.timestep, samples: trace.times.length };
   const data: SimulationData = {
     ...base,
@@ -273,6 +301,7 @@ export function simulationData(
     gears,
     warnings,
     ...(balance !== null ? { energy: balance.data } : {}),
+    ...(springs !== null ? { springs } : {}),
   };
   if (run.detail === 'summary') return data;
   const series = {
@@ -346,7 +375,17 @@ export function simulationSummary(data: SimulationData): string {
         `potential ${joules(e.finalPotentialJ)} J relative to the start pose), dissipated by damping and friction ${joules(e.dissipatedJ)} J, ` +
         `largest departure from the initial total ${formatNumber(e.maxDeviationFraction * 100, 3)} % of the peak energy.`,
     );
+    if (e.inputWorkJ !== undefined && (e.inputWorkJ !== 0 || (e.propellerWorkJ ?? 0) !== 0 || e.dissipatedJ > 0))
+      parts.push(
+        `Input work ${joules(e.inputWorkJ)} J (motors, governors, gas pressure), absorbed by propellers ${joules(e.propellerWorkJ ?? 0)} J; ` +
+          `balance initial + input - dissipated - propellers - final = ${joules(e.balanceErrorJ ?? 0)} J (${formatNumber((e.balanceErrorFraction ?? 0) * 100, 3)} %).`,
+      );
   }
+  for (const [id, spring] of Object.entries(data.springs ?? {}))
+    parts.push(
+      `Spring ${id}: length ${formatNumber(spring.minLengthM * 1000, 3)} to ${formatNumber(spring.maxLengthM * 1000, 3)} mm (free ${formatNumber(spring.freeLengthM * 1000, 3)} mm), ` +
+        `force ${formatNumber(spring.finalForceN, 3)} N at the end, peak ${formatNumber(spring.peakForceN, 3)} N.`,
+    );
   if (data.warnings.length > 0) parts.push(`Warnings: ${data.warnings.join('; ')}.`);
   return parts.join(' ');
 }
