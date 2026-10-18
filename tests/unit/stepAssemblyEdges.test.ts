@@ -9,7 +9,7 @@ import { stepTargets } from '@core/commands/brep/stepTargets';
 import { type FakeKernel, type FakeShape, fakeKernel } from '../helpers/fakeKernel';
 
 const captured: { occurrences: readonly StepOccurrence<FakeShape>[] } = { occurrences: [] };
-const assemblyKernel = (spec: { unsupported?: ['scale']; scaleFails?: boolean } = {}): FakeKernel => {
+const assemblyKernel = (spec: { unsupported?: readonly ['scale']; scaleFails?: boolean } = {}): FakeKernel => {
   const kernel = fakeKernel({
     ...(spec.unsupported === undefined ? {} : { unsupported: spec.unsupported }),
     assemblyStep: (occurrences) => {
