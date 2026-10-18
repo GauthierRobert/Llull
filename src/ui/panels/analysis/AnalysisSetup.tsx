@@ -1,26 +1,26 @@
 // Reviewable summary of the recorded set-up of one analysis case: parts, materials, constraints, loads, thermal BCs, mesh, probes.
+// Every row is clickable (highlights the item on the model) and wears the colour it is drawn with there.
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { AnalysisCase } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { PanelSection } from '@ui/panels/PanelParts';
+import { buildSetupItems, loadValueText, type SetupItem } from './analysisItems';
 import { constraintText, factorsText, loadText, stepText, thermalBcText, type NameOf } from './analysisText';
+import { SetupRow } from './SetupRow';
 
-interface SetupItem {
-  readonly key: string;
-  readonly name: string;
+interface RowSpec {
+  readonly item: SetupItem;
+  readonly meta: string;
   readonly detail: string;
 }
 
-function ItemList({ label, items, empty }: { label: string; items: readonly SetupItem[]; empty: string }): React.ReactElement {
-  if (items.length === 0) return <p className="analysis__none">{empty}</p>;
+function ItemList({ label, rows, empty }: { label: string; rows: readonly RowSpec[]; empty: string }): React.ReactElement {
+  if (rows.length === 0) return <p className="analysis__none">{empty}</p>;
   return (
-    <ul className="analysis__items" aria-label={label}>
-      {items.map((item) => (
-        <li key={item.key} className="analysis__item">
-          <span className="analysis__item-name">{item.name}</span>
-          <span className="analysis__item-detail">{item.detail}</span>
-        </li>
+    <ul className="panel__list" aria-label={label}>
+      {rows.map(({ item, meta, detail }) => (
+        <SetupRow key={item.key} item={item} meta={meta} detail={detail} />
       ))}
     </ul>
   );
@@ -33,30 +33,31 @@ interface AnalysisSetupProps {
 
 export function AnalysisSetup({ analysisCase, document }: AnalysisSetupProps): React.ReactElement {
   const nameOf: NameOf = (entityId) => document.entities[entityId]?.name ?? entityId;
-  const parts: SetupItem[] = Object.entries(analysisCase.parts).map(([entityId, idealization]) => {
+  const items = useMemo(() => buildSetupItems(document, analysisCase), [document, analysisCase]);
+  const parts: RowSpec[] = items.parts.map((item) => {
+    const entityId = item.entityIds[0] ?? '';
     const materialId = document.entities[entityId]?.materialId;
     const material = materialId === undefined ? undefined : document.materials[materialId]?.name;
-    return { key: entityId, name: nameOf(entityId), detail: `${idealization.kind} · ${material ?? 'no material'}` };
+    return { item, meta: `${analysisCase.parts[entityId]?.kind ?? 'solid'} · ${material ?? 'no material'}`, detail: '' };
   });
-  const constraints = analysisCase.constraintOrder.flatMap((id) => {
-    const constraint = analysisCase.constraints[id];
-    return constraint === undefined ? [] : [{ key: id, name: constraint.name, detail: constraintText(constraint, nameOf) }];
+  const constraints: RowSpec[] = items.constraints.flatMap((item) => {
+    const constraint = analysisCase.constraints[item.id];
+    return constraint === undefined ? [] : [{ item, meta: constraint.kind, detail: constraintText(constraint, nameOf) }];
   });
-  const loads = analysisCase.loadOrder.flatMap((id) => {
-    const load = analysisCase.loads[id];
-    return load === undefined
-      ? []
-      : [{ key: id, name: load.name, detail: `${loadText(load, nameOf)} · ${load.loadCase} (${load.category})` }];
+  const loads: RowSpec[] = items.loads.flatMap((item) => {
+    const load = analysisCase.loads[item.id];
+    if (load === undefined) return [];
+    const value = loadValueText(load, analysisCase.unitSystem);
+    return [{ item, meta: `${value} · ${load.loadCase}`, detail: `${loadText(load, nameOf)} · ${load.loadCase} (${load.category})` }];
   });
-  const bcs = (analysisCase.thermal?.bcOrder ?? []).flatMap((id) => {
-    const record = analysisCase.thermal?.bcs[id];
-    return record === undefined ? [] : [{ key: id, name: record.name, detail: thermalBcText(record, nameOf) }];
+  const bcs: RowSpec[] = items.thermal.flatMap((item) => {
+    const record = analysisCase.thermal?.bcs[item.id];
+    return record === undefined ? [] : [{ item, meta: item.label, detail: thermalBcText(record, nameOf) }];
   });
-  const probes = Object.entries(analysisCase.probes).map(([id, probe]) => ({
-    key: id,
-    name: probe.name,
-    detail: `${probe.quantity} at [${probe.point.join(', ')}]`,
-  }));
+  const probes: RowSpec[] = items.probes.flatMap((item) => {
+    const probe = analysisCase.probes[item.id];
+    return probe === undefined ? [] : [{ item, meta: probe.quantity, detail: `${probe.quantity} at [${probe.point.join(', ')}]` }];
+  });
   const { mesh, meshSummary } = analysisCase;
   const elements =
     meshSummary === undefined
@@ -68,17 +69,17 @@ export function AnalysisSetup({ analysisCase, document }: AnalysisSetupProps): R
   return (
     <div data-testid="analysis-setup">
       <PanelSection title="Parts" count={parts.length} countLabel={`${parts.length} parts`}>
-        <ItemList label="Parts" items={parts} empty="No parts yet (set_part_idealization)." />
+        <ItemList label="Parts" rows={parts} empty="No parts yet (set_part_idealization)." />
       </PanelSection>
       <PanelSection title="Constraints" count={constraints.length} countLabel={`${constraints.length} constraints`}>
-        <ItemList label="Constraints" items={constraints} empty="No supports." />
+        <ItemList label="Constraints" rows={constraints} empty="No supports." />
       </PanelSection>
       <PanelSection title="Loads" count={loads.length} countLabel={`${loads.length} loads`}>
-        <ItemList label="Loads" items={loads} empty="No loads." />
+        <ItemList label="Loads" rows={loads} empty="No loads." />
       </PanelSection>
       {analysisCase.thermal !== undefined && (
         <PanelSection title="Thermal BCs" count={bcs.length} countLabel={`${bcs.length} thermal boundary conditions`}>
-          <ItemList label="Thermal BCs" items={bcs} empty="No thermal boundary conditions." />
+          <ItemList label="Thermal BCs" rows={bcs} empty="No thermal boundary conditions." />
         </PanelSection>
       )}
       <PanelSection title="Solution" testId="analysis-solution">
@@ -114,7 +115,7 @@ export function AnalysisSetup({ analysisCase, document }: AnalysisSetupProps): R
         </p>
       </PanelSection>
       <PanelSection title="Probes" count={probes.length} countLabel={`${probes.length} probes`} collapsible defaultOpen={probes.length > 0}>
-        <ItemList label="Probes" items={probes} empty="No probes." />
+        <ItemList label="Probes" rows={probes} empty="No probes." />
       </PanelSection>
     </div>
   );

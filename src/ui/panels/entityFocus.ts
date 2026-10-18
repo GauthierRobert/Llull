@@ -6,7 +6,7 @@ import { boundsCenter, entityBoundsInDoc, mergeBounds, type Bounds } from '@core
 import { significantNumber } from '@lib/compactNumber';
 import type { PanelFocus } from '@ui/store/focusStore';
 
-export const DEFAULT_FOCUS_COLOR = '#5b9cff';
+const DEFAULT_FOCUS_COLOR = '#5b9cff';
 
 interface EntitiesFocusSpec {
   key: string;

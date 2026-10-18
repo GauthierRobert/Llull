@@ -7,12 +7,14 @@ import type { CadDocument } from '@core/model/types';
 import type { ProbeQuantity } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
 import { VIEW_DIRECTIONS } from '@core/model/sheet';
+import { toMetres } from '@core/model/units';
 import { bandLevels } from '@lib/isoBands';
 import { significantNumber } from '@lib/compactNumber';
 import { lengthUnitName } from '../decks/units';
 import { axisFrame, CYLINDRICAL_FIELDS, CYLINDRICAL_QUANTITIES, type CylindricalQuantity } from '../results/cylindrical';
 import { magnitude, nodeCoordinates } from '../results/fields';
 import { fieldFaces, type CutPlane } from '../results/fieldFaces';
+import { surfacePayload, SURFACE_CORNER_BUDGET } from '../results/surfacePayload';
 import { fieldPlotSvg, type PlotExtreme } from '../results/fieldPlotSvg';
 import { frameOf, isEigen, isHeat, markersOf, selectStep } from '../results/plotSetup';
 import { QUANTITY_FIELDS, quantityScale, quantityUnit } from '../results/probes';
@@ -90,7 +92,7 @@ export const renderFeaResults = defineCommand({
     'shape normalised to 1 (it has no unit; mode = which mode, 1-based, default 1; the subtitle gives its frequency in Hz or its buckling ' +
     'factor; the shape is drawn deformed with the automatic scale because mode amplitudes are arbitrary); stress fields do not exist for them. To see an interior peak (e.g. under a PCB): cut = { normal, offset } removes the ' +
     'half-space dot(normal, p) > offset of the undeformed model and colours the section face by the field; entityIds plots only those ' +
-    'parts (min / max and the colour range then refer to the plotted parts). Returns data { svg, field, unit, resultSet, min { value, ' +
+    'parts (min / max and the colour range then refer to the plotted parts). With surface: true also data.surface { positions (flat xyz per triangle corner, deformed, document units), values (one per corner), triangles, truncated }. Returns data { svg, field, unit, resultSet, min { value, ' +
     'at }, max { value, at }, deformationScale, levels, trianglesDrawn, entityIds, cut, axis }; save it as PNG with the CLI (--save ' +
     'plot.png). Requires a solved analysis on this machine (fea_mesh then fea_solve). Positions are in the analysis length unit.',
   annotations: { readOnly: true },
@@ -161,6 +163,12 @@ export const renderFeaResults = defineCommand({
     axisDirection: z
       .tuple([z.number(), z.number(), z.number()])
       .describe('s_hoop / s_radial / s_axial / u_radial: axis direction [x, y, z] (any non-zero length). Default [0, 0, 1].')
+      .optional(),
+    surface: z
+      .boolean()
+      .describe(
+        'Also return data.surface { positions, values, triangles, truncated }: the plotted triangles as flat xyz per corner (deformed, in DOCUMENT units) with one field value per corner, so a viewer can paint the contour on the model. Capped at 150000 corners. Default false.',
+      )
       .optional(),
     width: z.number().int().min(320).max(2000).describe('Image width in pixels (320-2000). Default 960.').optional(),
     height: z.number().int().min(240).max(2000).describe('Image height in pixels (240-2000). Default 640.').optional(),
@@ -301,6 +309,7 @@ export const renderFeaResults = defineCommand({
       min: placedAt(min, deformed),
       max: placedAt(max, deformed),
     });
+    const surface = params.surface === true ? surfacePayload(faces, lengthUnit, toMetres(doc, 1), SURFACE_CORNER_BUDGET) : undefined;
     const origin = (node: number): Vec3 => coordinates.get(node) ?? [0, 0, 0];
     return report(
       doc,
@@ -320,6 +329,7 @@ export const renderFeaResults = defineCommand({
         entityIds: params.entityIds ?? null,
         cut: cut === null ? null : { normal: round(cut.normal), offset: cut.offset },
         axis: cylindrical ? { point: round(axis.point), direction: round(axis.direction) } : null,
+        ...(surface === undefined ? {} : { surface }),
       },
     );
   },

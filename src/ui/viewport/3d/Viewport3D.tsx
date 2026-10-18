@@ -27,12 +27,17 @@ import { AdaptiveClipping, CameraReactor, OrbitSettle, sphericalToCartesian } fr
 import { GROUND_PLANE_ROTATION, SceneLighting } from './SceneLighting';
 import { MechanismOverlay } from './MechanismOverlay';
 import { DynamicsLoadsOverlay } from './DynamicsLoadsOverlay';
+import { AeroOverlay } from './aero/AeroOverlay';
+import { StructuralOverlay } from './structural/StructuralOverlay';
+import { FindingsOverlay } from './findings/FindingsOverlay';
 import { useViewportPalette } from '@ui/viewport/viewportPalette';
 import { StoreInvalidator, ViewportStoreInvalidator } from '../StoreInvalidator';
 import { LiveFxCamera } from '../liveFx/LiveFxCamera';
 import { ScreenAnchorOverlay } from '../screenAnchor/ScreenAnchorOverlay';
 import { FocusOverlay } from '../FocusOverlay';
 import { FocusBanner } from '../FocusBanner';
+import { AnalysisOverlay } from './analysis/AnalysisOverlay';
+import { AnalysisLegend } from './analysis/AnalysisLegend';
 import { useFocusStore } from '@ui/store/focusStore';
 
 // Idempotent, StrictMode-safe.
@@ -123,7 +128,11 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <MeasureBBoxWireframe />
         <MechanismOverlay />
         <DynamicsLoadsOverlay />
+        <AeroOverlay />
+        <StructuralOverlay />
+        <FindingsOverlay />
         <DimensionLens />
+        <AnalysisOverlay />
         <FocusOverlay />
       </group>
 
@@ -167,6 +176,7 @@ export function Viewport3D(): React.ReactElement {
 
       <ScreenAnchorOverlay />
       <FocusBanner />
+      <AnalysisLegend />
       <ViewOptionsToggle />
       {viewOptionsOpen && (
         <>

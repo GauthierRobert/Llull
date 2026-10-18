@@ -28,6 +28,7 @@ import { StoreInvalidator } from '../StoreInvalidator';
 import { RenderOriginSyncer } from '../RenderOriginSyncer';
 import { ScreenAnchorOverlay } from '../screenAnchor/ScreenAnchorOverlay';
 import { FocusOverlay } from '../FocusOverlay';
+import { AeroOverlay } from '../3d/aero/AeroOverlay';
 import { FocusBanner } from '../FocusBanner';
 
 /** Reports the ortho camera zoom to the HTML overlay, only when it changes. */
@@ -123,6 +124,7 @@ function SceneContents2D({
         <ModifyPickInteraction activeTool={activeModifyTool} phase={modifyPhase} zoom={zoom} onEntityPick={onEntityPick} />
 
         <MeasureBBoxRect2D />
+        <AeroOverlay />
         <FocusOverlay />
       </group>
     </>

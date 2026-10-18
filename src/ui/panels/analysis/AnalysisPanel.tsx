@@ -1,7 +1,7 @@
 // Analysis (FEA / thermal) browser: the cases an agent set up, their reviewable set-up, readiness checks and result plots.
 // Read-only: everything shown comes from describe_analysis / check_analysis / render_fea_results.
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import '@ui/styles/panels/analysis.css';
 import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
@@ -9,6 +9,10 @@ import { execute } from '@core/commands/registry';
 import { ListRow, PanelEmpty, PanelHeader, PanelSection, StatusLine } from '@ui/panels/PanelParts';
 import { eigenOf, parseAnalysisList, parseCheck, parseDescribe } from './analysisData';
 import { AnalysisChecks } from './AnalysisChecks';
+import { AnalysisKpis } from './AnalysisKpis';
+import { AnalysisOnModel } from './AnalysisOnModel';
+import { buildSetupItems } from './analysisItems';
+import { useAnalysisViewStore } from './analysisViewStore';
 import { AnalysisModes } from './AnalysisModes';
 import { AnalysisProbes } from './AnalysisProbes';
 import { AnalysisResults } from './AnalysisResults';
@@ -19,8 +23,10 @@ const ALL_CASES: Record<string, unknown> = {};
 
 export function AnalysisPanel({ className }: { className?: string }): React.ReactElement {
   const document = useStore((s) => s.document);
-  const [pickedId, setPickedId] = useState<string | null>(null);
-  const [pickedMode, setPickedMode] = useState<{ readonly analysisId: string; readonly mode: number } | null>(null);
+  const pickedId = useAnalysisViewStore((s) => s.analysisId);
+  const setActive = useAnalysisViewStore((s) => s.setActive);
+  const mode = useAnalysisViewStore((s) => s.mode);
+  const setMode = useAnalysisViewStore((s) => s.setMode);
   const analysis = document.analysis;
 
   const local = useMemo(() => parseAnalysisList(execute(document, 'describe_analysis', {}).data), [document]);
@@ -42,7 +48,13 @@ export function AnalysisPanel({ className }: { className?: string }): React.Reac
           checkSummary: checked.summary,
         };
 
-  const mode = pickedMode !== null && pickedMode.analysisId === selectedId ? pickedMode.mode : 1;
+  // The case drawn on the model follows the open case while this panel is open.
+  useEffect(() => setActive(selectedId), [selectedId, setActive]);
+  useEffect(() => () => setActive(null), [setActive]);
+  const items = useMemo(
+    () => (detail?.described == null ? null : buildSetupItems(document, detail.described.analysisCase)),
+    [document, detail?.described],
+  );
   const eigen = detail?.described == null ? null : eigenOf(detail.described.analysisCase);
 
   return (
@@ -67,7 +79,7 @@ export function AnalysisPanel({ className }: { className?: string }): React.Reac
                 selected={item.id === selectedId}
                 current={item.id === selectedId}
                 label={`Open analysis ${item.name}`}
-                onSelect={() => setPickedId(item.id)}
+                onSelect={() => setActive(item.id)}
               >
                 <span className="panel__row-main">{item.name}</span>
                 <span className="panel__row-meta">
@@ -81,6 +93,10 @@ export function AnalysisPanel({ className }: { className?: string }): React.Reac
       {detail !== null && selectedId !== null && detail.described === null && <StatusLine text={detail.describeSummary} />}
       {detail?.described != null && analysis !== undefined && (
         <>
+          {items !== null && (
+            <AnalysisKpis analysisCase={detail.described.analysisCase} state={detail.described.state} check={detail.check} items={items} />
+          )}
+          <AnalysisOnModel thermal={detail.described.analysisCase.thermal !== undefined} solved={detail.described.state === 'solved'} />
           <PanelSection title="Case" hint="Case set-up as recorded in the document.">
             <p className="analysis__line" data-testid="analysis-meta">
               {detail.described.analysisCase.type} · {detail.described.analysisCase.solver} · {detail.described.analysisCase.unitSystem} ·{' '}
@@ -89,23 +105,16 @@ export function AnalysisPanel({ className }: { className?: string }): React.Reac
             {detail.described.problem !== null && <StatusLine text={detail.described.problem} />}
           </PanelSection>
           <AnalysisSetup analysisCase={detail.described.analysisCase} document={document} />
-          <AnalysisChecks check={detail.check} summary={detail.checkSummary} />
-          {eigen !== null && detail.described.state === 'solved' && (
-            <AnalysisModes
-              eigen={eigen}
-              selectedMode={mode}
-              onSelect={(next) => setPickedMode({ analysisId: selectedId ?? '', mode: next })}
+          <AnalysisChecks check={detail.check} summary={detail.checkSummary} partIds={Object.keys(detail.described.analysisCase.parts)} />
+          {eigen !== null && detail.described.state === 'solved' && <AnalysisModes eigen={eigen} selectedMode={mode} onSelect={setMode} />}
+          {detail.described.state === 'solved' && Object.keys(detail.described.analysisCase.probes ?? {}).length > 0 && (
+            <AnalysisProbes
+              analysisId={detail.described.analysisCase.id}
+              refreshKey={document}
+              items={Object.fromEntries((items?.probes ?? []).map((item) => [item.id, item]))}
             />
           )}
-          {detail.described.state === 'solved' && Object.keys(detail.described.analysisCase.probes ?? {}).length > 0 && (
-            <AnalysisProbes analysisId={detail.described.analysisCase.id} refreshKey={document} />
-          )}
-          <AnalysisResults
-            key={detail.described.analysisCase.id}
-            analysisCase={detail.described.analysisCase}
-            mode={mode}
-            onModeChange={(next) => setPickedMode({ analysisId: selectedId ?? '', mode: next })}
-          />
+          <AnalysisResults key={detail.described.analysisCase.id} analysisCase={detail.described.analysisCase} />
         </>
       )}
     </aside>
