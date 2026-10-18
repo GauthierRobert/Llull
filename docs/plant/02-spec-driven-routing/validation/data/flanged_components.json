@@ -1,0 +1,53 @@
+{
+  "title": "Flanged joint and valve dimensions used by the RTE plans (inputs to the spec stub; the 01-piping-specs-catalog pack owns the catalogue)",
+  "unit": "mm",
+  "rows": [
+    {
+      "item": "ASME B16.5 Class 150 weld-neck flange, NPS 4, length through hub Y (raised face 1.6 mm included)",
+      "value": 76,
+      "alt": "74.7 (2.94 in, raised face excluded, one table)",
+      "sources": ["S14", "S15"],
+      "grade": "B",
+      "use": "spec-stub input; expectations are derived from the stub value, not gated on the standard"
+    },
+    {
+      "item": "ASME B16.5 Class 150 weld-neck flange, NPS 6, Y",
+      "value": 89,
+      "alt": "87.4 (3.44 in)",
+      "sources": ["S14", "S15"],
+      "grade": "B",
+      "use": "spec-stub input"
+    },
+    {
+      "item": "ASME B16.5 Class 150 NPS 4 bolting: number of bolt holes",
+      "value": 8,
+      "sources": ["S14", "S15"],
+      "grade": "A",
+      "use": "bolt-set count per flanged joint (studs per set)"
+    },
+    { "item": "ASME B16.5 Class 150 NPS 4 stud diameter", "value": "5/8 in", "sources": ["S15"], "grade": "B", "use": "context" },
+    { "item": "Raised-face height Class 150 / 300", "value": 1.6, "sources": ["S14", "S15"], "grade": "A", "use": "context" },
+    {
+      "item": "ASME B16.10 Class 150 flanged gate valve NPS 4 face-to-face",
+      "value": 229,
+      "sources": ["S16", "S17"],
+      "grade": "A",
+      "use": "spec-stub input, SC-RTE-02"
+    },
+    {
+      "item": "Flat ring gasket thickness (ASME B16.21 common 1/8 in)",
+      "value": 3.0,
+      "sources": [],
+      "grade": "C",
+      "use": "spec-stub INPUT chosen for the plans (named, defaulted: false); never a gate on the standard"
+    },
+    {
+      "item": "ASME B31.3 socket-weld approximate gap before welding (Fig. 328.5.2C)",
+      "value": 1.6,
+      "alt": "1.5 mm in the metric figure",
+      "sources": ["S18"],
+      "grade": "B",
+      "use": "socket-weld cut-back rule, documented default"
+    }
+  ]
+}

@@ -1,0 +1,185 @@
+{
+ "title": "P&ID validation and P&ID-to-3D consistency rules",
+ "note": "Rule names from Autodesk Plant 3D / P&ID help (search extracts, grade B for wording); llull codes are this pack's design",
+ "pidRules": [
+  {
+   "llullCode": "PID_LINE_NON_TERMINATING",
+   "plant3d": "Non-terminating Lines",
+   "definition": "a process line end connects to no component/nozzle/line and carries no end-of-line symbol (vent, drain, blind flange, off-page connector)",
+   "severity": "error",
+   "source": [
+    "S8"
+   ]
+  },
+  {
+   "llullCode": "PID_COMPONENT_UNCONNECTED",
+   "plant3d": "Unconnected Components",
+   "definition": "an inline component or equipment connection point not attached to a line although it appears to be; every attachment point of an inline component must be connected",
+   "severity": "error",
+   "source": [
+    "S8"
+   ]
+  },
+  {
+   "llullCode": "PID_NOZZLE_UNCONNECTED",
+   "plant3d": "Unconnected Components (equipment attachment points)",
+   "definition": "an equipment nozzle without a line; access nozzles (manholes) and nozzles marked spare are reported as info",
+   "severity": "warn",
+   "source": [
+    "S8",
+    "S1"
+   ]
+  },
+  {
+   "llullCode": "PID_EQUIPMENT_UNCONNECTED",
+   "plant3d": "Unconnected Components (tanks / vessels must connect to at least one line)",
+   "definition": "a tank or vessel with no connected line",
+   "severity": "error",
+   "source": [
+    "S8"
+   ]
+  },
+  {
+   "llullCode": "PID_SIZE_MISMATCH",
+   "plant3d": "Size Mismatch",
+   "definition": "nominal size of an inline component differs from the line size at its connection point, with no reducer between",
+   "severity": "error",
+   "source": [
+    "S8"
+   ]
+  },
+  {
+   "llullCode": "PID_SPEC_MISMATCH",
+   "plant3d": "Spec Mismatch",
+   "definition": "piping class of an inline component differs from its line segment (no spec break marked)",
+   "severity": "error",
+   "source": [
+    "S8"
+   ]
+  },
+  {
+   "llullCode": "PID_FLOW_DIRECTION_CONFLICT",
+   "plant3d": "Flow Direction Conflicts",
+   "definition": "two connected segments with opposed flow directions, or a check valve against the segment flow direction",
+   "severity": "error",
+   "source": [
+    "S8"
+   ]
+  },
+  {
+   "llullCode": "PID_OPC_UNRESOLVED",
+   "plant3d": "Unresolved Off-page Connectors",
+   "definition": "an off-page connector without a partner connector on another sheet of the project",
+   "severity": "error",
+   "source": [
+    "S8"
+   ]
+  },
+  {
+   "llullCode": "PID_TAG_DUPLICATE",
+   "plant3d": "(tag uniqueness enforced on assignment)",
+   "definition": "two items share one full tag in the project tag registry",
+   "severity": "error",
+   "source": [
+    "S8"
+   ]
+  },
+  {
+   "llullCode": "PID_SEGMENT_INVALID",
+   "plant3d": null,
+   "definition": "DEXPI segment internal violation: items in a segment are not a single chain from SourceItem to TargetItem (pyDEXPI INTERNAL_VIOLATION / CONNECTION_CONVENTION_VIOLATION / MULTIPLE_NODE_REFERENCE_VIOLATION)",
+   "severity": "error",
+   "source": [
+    "S3",
+    "S4"
+   ]
+  },
+  {
+   "llullCode": "PID_CONTROL_VALVE_NO_ACTUATOR",
+   "plant3d": null,
+   "definition": "an operated / control valve not referenced by an actuating system, or an actuating system with no controlling instrument function",
+   "severity": "warn",
+   "source": [
+    "S1",
+    "S3"
+   ]
+  },
+  {
+   "llullCode": "PID_SAFETY_VALVE_NO_SET_PRESSURE",
+   "plant3d": null,
+   "definition": "a safety / relief valve without SetPressureHigh; reviewRequired because it is a pressure-protection device",
+   "severity": "warn",
+   "source": [
+    "S1",
+    "S3"
+   ]
+  },
+  {
+   "llullCode": "PID_LINE_NUMBER_MISSING",
+   "plant3d": null,
+   "definition": "a piping network system without a line number",
+   "severity": "warn",
+   "source": [
+    "S1"
+   ]
+  }
+ ],
+ "pid3dRules": [
+  {
+   "llullCode": "P3D_UNPLACED",
+   "plant3d": "P&ID item not placed in the 3D model (Validate: P&ID-to-3D)",
+   "definition": "a P&ID equipment, inline component or line with a tag but no 3D object with that tag",
+   "source": [
+    "S9"
+   ]
+  },
+  {
+   "llullCode": "P3D_NOT_IN_PID",
+   "plant3d": "3D object not on the P&ID",
+   "definition": "a tagged 3D equipment / pipe line / valve without a P&ID counterpart",
+   "source": [
+    "S9"
+   ]
+  },
+  {
+   "llullCode": "P3D_SIZE_MISMATCH",
+   "plant3d": "Property mismatch (size)",
+   "definition": "nominal size differs between the P&ID item and its 3D counterpart",
+   "source": [
+    "S9"
+   ]
+  },
+  {
+   "llullCode": "P3D_SPEC_MISMATCH",
+   "plant3d": "Property mismatch (spec)",
+   "definition": "piping class differs between P&ID line and 3D line",
+   "source": [
+    "S9"
+   ]
+  },
+  {
+   "llullCode": "P3D_CONNECTIVITY_MISMATCH",
+   "plant3d": "Connection mismatch",
+   "definition": "the from/to ends (equipment tag + nozzle, or line) of a line differ between P&ID and 3D",
+   "source": [
+    "S9"
+   ]
+  },
+  {
+   "llullCode": "P3D_CLASS_MISMATCH",
+   "plant3d": "Property mismatch (type)",
+   "definition": "item type differs (e.g. P&ID GlobeValve, 3D BallValve)",
+   "source": [
+    "S9"
+   ]
+  },
+  {
+   "llullCode": "P3D_INLINE_ORDER_MISMATCH",
+   "plant3d": "Connection mismatch (inline sequence)",
+   "definition": "inline components along a line appear in a different order in 3D than on the P&ID",
+   "source": [
+    "S9"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,709 @@
+{
+ "pack": "04 PID",
+ "generatedBy": "hand-written index; counts copied from data/dexpi_census.json (computed with python3 -I from the DEXPI files, not by llull)",
+ "cases": [
+  {
+   "id": "VC-PID-01",
+   "proves": [
+    "FR-PID-20",
+    "FR-PID-21",
+    "TR-PID-08",
+    "AF-10"
+   ],
+   "command": "import_dexpi + pid_report kind=counts",
+   "inputs": {
+    "file": "data/dexpi13/C01V04-VER.EX01.xml",
+    "sha256": "a2b172f04e0dcf9a668e158c6dee3b5fd0dd4e9027b572dc39e54470562b809c"
+   },
+   "expected": {
+    "equipmentTopLevel": 5,
+    "equipmentAll": 16,
+    "nozzles": 19,
+    "pipingNetworkSystems": 11,
+    "pipingNetworkSegments": 23,
+    "valves": 11,
+    "processInstrumentationFunctions": 4,
+    "instrumentationLoopFunctions": 4,
+    "actuatingSystems": 3,
+    "processSignalGeneratingFunctions": 3,
+    "informationFlows": 6,
+    "pipeOffPageConnectors": 2,
+    "pipeFlowArrows": 8,
+    "shapeCatalogueEntries": 24,
+    "pipingComponents": 19,
+    "connections": 29
+   },
+   "tolerance": "exact (integers)",
+   "source": "S1 census (data/dexpi_census.json proteus13[0]); 14 keys equal in the independent DEXPI 2.0 encoding S2; PNS 11, actuating systems 3, shapes 24 also asserted by pyDEXPI tests S4",
+   "grade": "A",
+   "plan": "plans/sc-pid-01-import-dexpi-reference.json",
+   "test": "tests/unit/plant/pid/dexpiImport.test.ts"
+  },
+  {
+   "id": "VC-PID-02",
+   "proves": [
+    "FR-PID-22",
+    "TR-PID-09"
+   ],
+   "command": "import_dexpi (DEXPI 2.0 XML)",
+   "inputs": {
+    "file": "data/dexpi20/reference_pid.xml",
+    "sha256": "acd39c74292aef3f6f00581fc78b05814acf2318815abd28c14ebefba12fdd94"
+   },
+   "expected": {
+    "equipmentTopLevel": 5,
+    "equipmentAll": 16,
+    "nozzles": 19,
+    "pipingNetworkSystems": 11,
+    "pipingNetworkSegments": 23,
+    "valves": 11,
+    "processInstrumentationFunctions": 4,
+    "instrumentationLoopFunctions": 4,
+    "actuatingSystems": 3,
+    "processSignalGeneratingFunctions": 3,
+    "informationFlows": 6,
+    "pipeOffPageConnectors": 2,
+    "pipeFlowArrows": 8,
+    "shapeCatalogueEntries": 24
+   },
+   "tolerance": "exact; and pid_report lists row-wise equal to VC-PID-01",
+   "source": "S2 census; cross-encoding check all 14 keys equal",
+   "grade": "A",
+   "plan": "plans/sc-pid-04-dexpi-roundtrip.json",
+   "test": "dexpiImport20.test.ts"
+  },
+  {
+   "id": "VC-PID-03",
+   "proves": [
+    "FR-PID-20",
+    "FR-PID-23"
+   ],
+   "command": "import_dexpi on the 10 smaller DEXPI 1.3 verification examples",
+   "expected": {
+    "C02V03-VER.EX02.xml": {
+     "equipmentTopLevel": 2,
+     "equipmentAll": 6,
+     "nozzles": 9,
+     "pipingNetworkSystems": 4,
+     "pipingNetworkSegments": 9,
+     "pipingComponents": 9,
+     "valves": 3,
+     "processInstrumentationFunctions": 3,
+     "instrumentationLoopFunctions": 0,
+     "actuatingSystems": 0,
+     "informationFlows": 4,
+     "pipeOffPageConnectors": 1,
+     "connections": 13
+    },
+    "C03V04-VER.EX02.xml": {
+     "equipmentTopLevel": 0,
+     "equipmentAll": 0,
+     "nozzles": 0,
+     "pipingNetworkSystems": 3,
+     "pipingNetworkSegments": 5,
+     "pipingComponents": 9,
+     "valves": 2,
+     "processInstrumentationFunctions": 1,
+     "instrumentationLoopFunctions": 0,
+     "actuatingSystems": 1,
+     "informationFlows": 1,
+     "pipeOffPageConnectors": 1,
+     "connections": 6
+    },
+    "E03V01-VER.EX01.xml": {
+     "equipmentTopLevel": 1,
+     "equipmentAll": 2,
+     "nozzles": 1,
+     "pipingNetworkSystems": 0,
+     "pipingNetworkSegments": 0,
+     "pipingComponents": 0,
+     "valves": 0,
+     "processInstrumentationFunctions": 0,
+     "instrumentationLoopFunctions": 0,
+     "actuatingSystems": 0,
+     "informationFlows": 0,
+     "pipeOffPageConnectors": 0,
+     "connections": 0
+    },
+    "E06V01-VER.EX01.xml": {
+     "equipmentTopLevel": 2,
+     "equipmentAll": 2,
+     "nozzles": 6,
+     "pipingNetworkSystems": 1,
+     "pipingNetworkSegments": 1,
+     "pipingComponents": 0,
+     "valves": 0,
+     "processInstrumentationFunctions": 0,
+     "instrumentationLoopFunctions": 0,
+     "actuatingSystems": 0,
+     "informationFlows": 0,
+     "pipeOffPageConnectors": 0,
+     "connections": 1
+    },
+    "I01V01-VER.EX01.xml": {
+     "equipmentTopLevel": 1,
+     "equipmentAll": 1,
+     "nozzles": 1,
+     "pipingNetworkSystems": 1,
+     "pipingNetworkSegments": 1,
+     "pipingComponents": 1,
+     "valves": 0,
+     "processInstrumentationFunctions": 1,
+     "instrumentationLoopFunctions": 1,
+     "actuatingSystems": 0,
+     "informationFlows": 1,
+     "pipeOffPageConnectors": 0,
+     "connections": 1
+    },
+    "I02V01-VER.EX01.xml": {
+     "equipmentTopLevel": 0,
+     "equipmentAll": 0,
+     "nozzles": 0,
+     "pipingNetworkSystems": 1,
+     "pipingNetworkSegments": 1,
+     "pipingComponents": 1,
+     "valves": 1,
+     "processInstrumentationFunctions": 1,
+     "instrumentationLoopFunctions": 1,
+     "actuatingSystems": 1,
+     "informationFlows": 1,
+     "pipeOffPageConnectors": 0,
+     "connections": 0
+    },
+    "I06V01-VER.EX01.xml": {
+     "equipmentTopLevel": 0,
+     "equipmentAll": 0,
+     "nozzles": 0,
+     "pipingNetworkSystems": 1,
+     "pipingNetworkSegments": 1,
+     "pipingComponents": 1,
+     "valves": 1,
+     "processInstrumentationFunctions": 3,
+     "instrumentationLoopFunctions": 3,
+     "actuatingSystems": 1,
+     "informationFlows": 6,
+     "pipeOffPageConnectors": 0,
+     "connections": 0
+    },
+    "P01V01-VER.EX01.xml": {
+     "equipmentTopLevel": 2,
+     "equipmentAll": 2,
+     "nozzles": 2,
+     "pipingNetworkSystems": 1,
+     "pipingNetworkSegments": 1,
+     "pipingComponents": 0,
+     "valves": 0,
+     "processInstrumentationFunctions": 0,
+     "instrumentationLoopFunctions": 0,
+     "actuatingSystems": 0,
+     "informationFlows": 0,
+     "pipeOffPageConnectors": 0,
+     "connections": 1
+    },
+    "P02V01-VER.EX01.xml": {
+     "equipmentTopLevel": 1,
+     "equipmentAll": 1,
+     "nozzles": 1,
+     "pipingNetworkSystems": 1,
+     "pipingNetworkSegments": 1,
+     "pipingComponents": 0,
+     "valves": 0,
+     "processInstrumentationFunctions": 0,
+     "instrumentationLoopFunctions": 0,
+     "actuatingSystems": 0,
+     "informationFlows": 0,
+     "pipeOffPageConnectors": 1,
+     "connections": 1
+    },
+    "P04V01-VER.EX01.xml": {
+     "equipmentTopLevel": 1,
+     "equipmentAll": 1,
+     "nozzles": 2,
+     "pipingNetworkSystems": 2,
+     "pipingNetworkSegments": 2,
+     "pipingComponents": 0,
+     "valves": 0,
+     "processInstrumentationFunctions": 0,
+     "instrumentationLoopFunctions": 0,
+     "actuatingSystems": 0,
+     "informationFlows": 0,
+     "pipeOffPageConnectors": 0,
+     "connections": 2
+    }
+   },
+   "tolerance": "exact",
+   "source": "S1 census",
+   "grade": "A",
+   "test": "dexpiImport.test.ts (table-driven)"
+  },
+  {
+   "id": "VC-PID-04",
+   "proves": [
+    "FR-PID-03",
+    "FR-PID-30",
+    "FR-PID-21"
+   ],
+   "command": "pid_report kind=equipment_list / line_list / instrument_index on C01",
+   "expected": {
+    "equipmentTags": [
+     "H1007",
+     "H1008",
+     "P4711",
+     "P4712",
+     "T4750"
+    ],
+    "lines": [
+     {
+      "lineNumber": "47121",
+      "fluidCode": "MNb",
+      "nominalDiameter": "DN 80",
+      "pipingClass": "75HB13",
+      "segments": 1
+     },
+     {
+      "lineNumber": "47122",
+      "fluidCode": "MNb",
+      "nominalDiameter": "DN 80",
+      "pipingClass": "75HB13",
+      "segments": 1
+     },
+     {
+      "lineNumber": "47123",
+      "fluidCode": "MNb",
+      "nominalDiameter": "DN 80",
+      "pipingClass": "75HB13",
+      "segments": 1
+     },
+     {
+      "lineNumber": "47124",
+      "fluidCode": "MNc",
+      "nominalDiameter": "DN 80",
+      "pipingClass": "75HB13",
+      "segments": 3
+     },
+     {
+      "lineNumber": "47125",
+      "fluidCode": "MNc",
+      "nominalDiameter": "DN 25",
+      "pipingClass": "73HG12",
+      "segments": 2
+     },
+     {
+      "lineNumber": "47126",
+      "fluidCode": "MNc",
+      "nominalDiameter": "DN 50",
+      "pipingClass": "75HB13",
+      "segments": 10
+     },
+     {
+      "lineNumber": "47127",
+      "fluidCode": "MNc",
+      "nominalDiameter": "DN 50",
+      "pipingClass": "75HB13",
+      "segments": 1
+     },
+     {
+      "lineNumber": "47130",
+      "fluidCode": "WKa",
+      "nominalDiameter": "DN 50",
+      "pipingClass": "75HB13",
+      "segments": 1
+     },
+     {
+      "lineNumber": "47131",
+      "fluidCode": "WKb",
+      "nominalDiameter": "DN 50",
+      "pipingClass": "75HB13",
+      "segments": 1
+     },
+     {
+      "lineNumber": "47140",
+      "fluidCode": "QSa",
+      "nominalDiameter": "DN 50",
+      "pipingClass": "75HB13",
+      "segments": 1
+     },
+     {
+      "lineNumber": "47141",
+      "fluidCode": "QSb",
+      "nominalDiameter": "DN 50",
+      "pipingClass": "75HB13",
+      "segments": 1
+     }
+    ],
+    "instrumentTags": [
+     "PI 4712.01",
+     "PICSA 4712.02",
+     "HS 4750.01",
+     "TICSA 4750.03"
+    ]
+   },
+   "tolerance": "exact strings",
+   "source": "S1",
+   "grade": "A",
+   "plan": "plans/sc-pid-01-import-dexpi-reference.json"
+  },
+  {
+   "id": "VC-PID-05",
+   "proves": [
+    "FR-PID-10",
+    "FR-PID-11",
+    "TR-PID-05"
+   ],
+   "command": "import_dexpi -> connectivity graph (pid_report kind=connectivity)",
+   "expected": {
+    "pipingConnections": 23,
+    "informationFlowConnections": 6,
+    "danglingReferences": 0,
+    "nozzlesConnected": 17,
+    "nozzlesUnconnected": [
+     "T4750/N3",
+     "T4750/N8"
+    ],
+    "endpointTypes": {
+     "FromID Nozzle:Nozzle": 8,
+     "FromID PipeOffPageConnector:FlowInPipeOffPageConnector": 1,
+     "FromID PipingComponent:BlindFlange": 2,
+     "FromID PipingComponent:PipeReducer": 1,
+     "FromID PipingComponent:PipeTee": 10,
+     "FromID PipingComponent:SpringLoadedGlobeSafetyValve": 1,
+     "FromID PipingComponent:SwingCheckValve": 1,
+     "FromID ProcessInstrumentationFunction:ProcessInstrumentationFunction": 3,
+     "FromID open": 2,
+     "ToID ActuatingSystemComponent:ControlledActuator": 3,
+     "ToID Nozzle:Nozzle": 9,
+     "ToID PipeOffPageConnector:FlowOutPipeOffPageConnector": 1,
+     "ToID PipingComponent:BallValve": 1,
+     "ToID PipingComponent:BlindFlange": 2,
+     "ToID PipingComponent:PipeReducer": 1,
+     "ToID PipingComponent:PipeTee": 5,
+     "ToID PipingComponent:SpringLoadedGlobeSafetyValve": 1,
+     "ToID PipingComponent:SwingCheckValve": 1,
+     "ToID ProcessInstrumentationFunction:ProcessInstrumentationFunction": 3,
+     "ToID open": 2
+    }
+   },
+   "tolerance": "exact",
+   "source": "S1 via data/scripts/connectivity_proteus.py; 23 = PipingNetworkSegment count; 29 Connection elements = 23 + 6",
+   "grade": "A"
+  },
+  {
+   "id": "VC-PID-06",
+   "proves": [
+    "FR-PID-24",
+    "TR-PID-10",
+    "AF-13"
+   ],
+   "command": "export_dexpi version=1.3 -> import_dexpi -> export_dexpi",
+   "expected": {
+    "censusEqual": "all keys of VC-PID-01 except shapeCatalogueEntries",
+    "secondExportByteIdentical": true
+   },
+   "tolerance": "exact",
+   "source": "determinism + census S1",
+   "grade": "A (closed form: equality)",
+   "plan": "plans/sc-pid-04-dexpi-roundtrip.json"
+  },
+  {
+   "id": "VC-PID-07",
+   "proves": [
+    "FR-PID-25",
+    "TR-PID-10"
+   ],
+   "command": "export_dexpi version=2.0",
+   "expected": {
+    "xsdValid": true,
+    "censusEqual": "dexpi20.counts"
+   },
+   "tolerance": "exact",
+   "source": "S2 DEXPI_XML_Schema.xsd; reference_pid.xml itself validates with xmllint (run 2026-10-18)",
+   "grade": "A"
+  },
+  {
+   "id": "VC-PID-08",
+   "proves": [
+    "FR-PID-30",
+    "FR-PID-31",
+    "TR-PID-12"
+   ],
+   "command": "parse_instrument_tag",
+   "reference": "data/tag_parse_cases.json (16 cases)",
+   "expected": {
+    "FIC-101": {
+     "firstLetter": "F",
+     "meaning": "Flow, flow rate",
+     "functions": [
+      "I Indicate (readout)",
+      "C Control (output)"
+     ],
+     "loop": "101"
+    }
+   },
+   "tolerance": "exact",
+   "source": "ISA 5.1 letters S5/S6 (grade-A rows only); real tags from S1",
+   "grade": "A",
+   "plan": "plans/sc-pid-05-tag-parsing.json"
+  },
+  {
+   "id": "VC-PID-09",
+   "proves": [
+    "FR-PID-40",
+    "TR-PID-14"
+   ],
+   "command": "check_pid on imported C01",
+   "expected": {
+    "PID_SEGMENT_INVALID": 0,
+    "PID_NOZZLE_UNCONNECTED": [
+     "T4750/N3"
+    ],
+    "PID_NOZZLE_UNCONNECTED_ACCESS (info)": [
+     "T4750/N8"
+    ],
+    "otherFindings": "TBD \u2014 measure with check_pid once built; reviewed and frozen as a golden list, not a gate before then"
+   },
+   "tolerance": "exact for the listed codes",
+   "source": "S4 (pyDEXPI test: all C01 segments VALID); S1 connectivity census",
+   "grade": "A"
+  },
+  {
+   "id": "VC-PID-10",
+   "proves": [
+    "FR-PID-40",
+    "FR-PID-41",
+    "AF-11",
+    "AF-20"
+   ],
+   "command": "check_pid after seeded faults",
+   "expected": {
+    "PID_SIZE_MISMATCH": 1,
+    "PID_SPEC_MISMATCH": 1,
+    "PID_LINE_NON_TERMINATING": 1,
+    "PID_FLOW_DIRECTION_CONFLICT": 1,
+    "PID_CONTROL_VALVE_NO_ACTUATOR": 1,
+    "PID_OPC_UNRESOLVED": 1,
+    "clean baseline errors": 1
+   },
+   "tolerance": "exact counts",
+   "source": "by construction; rule names after Autodesk P&ID validation categories S8",
+   "grade": "A (construction)",
+   "plan": "plans/sc-pid-02-author-and-validate.json"
+  },
+  {
+   "id": "VC-PID-11",
+   "proves": [
+    "FR-PID-50",
+    "FR-PID-51",
+    "TR-PID-16"
+   ],
+   "command": "check_pid_3d after seeded mismatches",
+   "expected": {
+    "P3D_UNPLACED": 1,
+    "P3D_NOT_IN_PID": 1,
+    "P3D_SIZE_MISMATCH": 1,
+    "P3D_CONNECTIVITY_MISMATCH": 1,
+    "cleanVariant": "only P3D_UNPLACED for HV-104 until 02-spec-driven-routing provides 3D valves"
+   },
+   "tolerance": "exact counts",
+   "source": "by construction; categories after Plant 3D Validate S9",
+   "grade": "A (construction)",
+   "plan": "plans/sc-pid-03-pid-vs-3d.json"
+  },
+  {
+   "id": "VC-PID-12",
+   "proves": [
+    "FR-PID-60",
+    "FR-PID-61"
+   ],
+   "command": "pid_report kind=line_list / valve_list / instrument_index / equipment_list on C01",
+   "expected": {
+    "lineListRows": 11,
+    "valveListRows": 11,
+    "valveListByClass": {
+     "BallValve": 5,
+     "GlobeValve": 3,
+     "ButterflyValve": 1,
+     "SwingCheckValve": 1,
+     "SpringLoadedGlobeSafetyValve": 1
+    },
+    "instrumentIndexRows": 4,
+    "equipmentListRows": 5,
+    "csvHeaderStable": true
+   },
+   "tolerance": "exact",
+   "source": "S1",
+   "grade": "A"
+  },
+  {
+   "id": "VC-PID-13",
+   "proves": [
+    "FR-PID-12",
+    "FR-PID-13"
+   ],
+   "command": "add_pid_inline / delete_pid_item",
+   "expected": {
+    "insertOneValve": "segment count +1, both new segments keep lineNumber, DN and piping class of the host; valve DN and class default from the line",
+    "deleteValveWithHeal": "segment count back to the original, geometry polyline equal to the pre-insertion route within 1e-9 mm"
+   },
+   "tolerance": "exact / 1e-9 mm",
+   "source": "closed form (topology)",
+   "grade": "A",
+   "plan": "plans/sc-pid-02-author-and-validate.json"
+  },
+  {
+   "id": "VC-PID-14",
+   "proves": [
+    "AF-05",
+    "AF-11",
+    "AF-13"
+   ],
+   "command": "build_project --validate and run of SC-PID-02 twice",
+   "expected": {
+    "validateErrorsForUnknownTag": "PLAN_PARAM_UNRESOLVED or PID_ITEM_NOT_FOUND with step path",
+    "duplicateTagRefusal": "error.code PID_TAG_DUPLICATE with ids and remediation",
+    "sameIdsAndOrderAcrossRuns": true
+   },
+   "tolerance": "exact",
+   "source": "AGENT_FIRST.md",
+   "grade": "A"
+  },
+  {
+   "id": "VC-PID-15",
+   "proves": [
+    "FR-PID-26",
+    "TR-PID-11"
+   ],
+   "command": "import_dexpi on malformed inputs",
+   "expected": {
+    "truncated XML": "DEXPI_PARSE_ERROR, document unchanged",
+    "Connection ToID to a missing ID": "import succeeds, DEXPI_DANGLING_REFERENCE warning listing the ID",
+    "unknown ComponentClass": "item imported as generic class, DEXPI_UNMAPPED_CLASS warning",
+    "root neither PlantModel nor Model": "DEXPI_VERSION_UNSUPPORTED"
+   },
+   "tolerance": "exact codes",
+   "source": "by construction from S1 files (mutated copies made by the test)",
+   "grade": "A (construction)"
+  },
+  {
+   "id": "VC-PID-16",
+   "proves": [
+    "FR-PID-01",
+    "FR-PID-02",
+    "TR-PID-07"
+   ],
+   "command": "list_pid_symbols",
+   "expected": {
+    "everyClassInTheExamplesHasASymbol": [
+     "BallValve",
+     "BlindFlange",
+     "ButterflyValve",
+     "CentrifugalPump",
+     "Chamber",
+     "ColumnPackingsArrangement",
+     "ColumnSection",
+     "Displacer",
+     "Flange",
+     "GlobeValve",
+     "Impeller",
+     "OperatedValve",
+     "PipeFitting",
+     "PipeReducer",
+     "PipeTee",
+     "PlateHeatExchanger",
+     "ProcessColumn",
+     "ReciprocatingPump",
+     "RestrictionOrifice",
+     "SpringLoadedGlobeSafetyValve",
+     "SwingCheckValve",
+     "Tank",
+     "TubeBundle",
+     "TubularHeatExchanger"
+    ],
+    "unmappedOnImportOfAll11Files": 0
+   },
+   "tolerance": "exact",
+   "source": "S1 census",
+   "grade": "A"
+  },
+  {
+   "id": "VC-PID-17",
+   "proves": [
+    "TR-PID-20"
+   ],
+   "command": "import_dexpi C01; check_pid on synthetic 5000-item P&ID",
+   "expected": {
+    "importC01Seconds": "TBD \u2014 measure; budget 1.0 s",
+    "checkPid5000Seconds": "TBD \u2014 measure; budget 1.0 s"
+   },
+   "tolerance": "budget",
+   "source": "performance budget (this pack)",
+   "grade": "n/a"
+  },
+  {
+   "id": "VC-PID-18",
+   "proves": [
+    "FR-PID-01",
+    "FR-PID-02",
+    "FR-PID-62",
+    "AF-22"
+   ],
+   "command": "export_pid_svg on SC-PID-02 with convention ISA-5.1 and ISO-10628-2",
+   "expected": {
+    "oneSymbolGroupPerItem": true,
+    "svgGroupIdsEqualItemIds": true,
+    "instrumentBubbleVariantByLocation": {
+     "field": "circle",
+     "central": "circle with horizontal line",
+     "local_panel": "circle with double line"
+    },
+    "conventionsProduceDifferentEquipmentSymbols": true
+   },
+   "tolerance": "exact structure (ids, element counts)",
+   "source": "closed form over the model; bubble conventions after ISA 5.1 secondary sources S6 (grade B, documentation only)",
+   "grade": "A (structure)"
+  },
+  {
+   "id": "VC-PID-19",
+   "proves": [
+    "FR-PID-70",
+    "FR-PID-71",
+    "FR-PID-42",
+    "AF-31",
+    "AF-32",
+    "AF-33",
+    "AF-34"
+   ],
+   "command": "issue_pid_sheet / accept_pid_finding / check_pid",
+   "expected": {
+    "agentIssueForConstructionWithoutSignature": "refused PID_HUMAN_GATE, sheet status unchanged",
+    "safetyValveWithoutSetPressure": "PID_SAFETY_VALVE_NO_SET_PRESSURE with reviewRequired true",
+    "inlineDnDefaultedFromLine": "attributes flagged defaulted: true in describe_pid_item",
+    "acceptWarnWithReason": "finding moves to accepted, excluded unless includeAccepted"
+   },
+   "tolerance": "exact",
+   "source": "AGENT_FIRST AF-31..34; humanGate (packages/core/src/model/humanGate.ts)",
+   "grade": "A (construction)"
+  },
+  {
+   "id": "VC-PID-20",
+   "proves": [
+    "FR-PID-09",
+    "FR-PID-14",
+    "FR-PID-15",
+    "FR-PID-32",
+    "FR-PID-61"
+   ],
+   "command": "renumber_pid_lines / add_pid_inline class=PipeReducer / spec break / OPC pair / pid_report filter",
+   "expected": {
+    "renumberTwiceSameResult": true,
+    "renumberOrder": "sheet, then y descending, then x ascending",
+    "reducerBetweenDN80andDN50": "no PID_SIZE_MISMATCH",
+    "specBreakBetweenA1andB2": "no PID_SPEC_MISMATCH",
+    "opcPairOnTwoSheets": "no PID_OPC_UNRESOLVED; line list shows OPC:<pairKey> ends",
+    "lineListFilterBySheet": "only rows of that sheet"
+   },
+   "tolerance": "exact",
+   "source": "closed form / construction",
+   "grade": "A (construction)"
+  }
+ ]
+}

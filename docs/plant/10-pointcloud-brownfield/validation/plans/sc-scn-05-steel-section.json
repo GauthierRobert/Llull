@@ -1,0 +1,113 @@
+{
+  "id": "SC-SCN-05",
+  "status": "DRAFT \u2014 not runnable: scan commands and the $fromStep plan binding are unbuilt; add_level / add_steel_member exist",
+  "validates": [
+    "VC-SCN-23"
+  ],
+  "description": "Recognise an existing IPE 300 beam in a scan and create the as-built steel member",
+  "prerequisites": [
+    "llull scan import validation/data/synthetic/stl-a.csv format=xyz sourceUnit=m --json"
+  ],
+  "actions": [
+    {
+      "command": "set_units",
+      "params": {
+        "units": "m"
+      }
+    },
+    {
+      "command": "add_level",
+      "params": {
+        "name": "Ref",
+        "elevation": 0
+      }
+    },
+    {
+      "command": "attach_point_cloud",
+      "params": {
+        "sourceSha256": "5d4c32da98c6634a34426bf1400cdb3e8b0a12aee25abe231b07745958b16427",
+        "name": "beam scan"
+      },
+      "as": "beam"
+    },
+    {
+      "command": "fit_steel_member",
+      "params": {
+        "cloudId": "$beam",
+        "region": {
+          "kind": "box",
+          "min": [
+            4.8,
+            0.9,
+            3.8
+          ],
+          "max": [
+            5.2,
+            3.1,
+            4.2
+          ]
+        },
+        "families": [
+          "IPE",
+          "HEA",
+          "HEB"
+        ]
+      },
+      "as": "fit"
+    },
+    {
+      "command": "commit_asbuilt_extraction",
+      "params": {
+        "extraction": {
+          "$fromStep": "fit",
+          "path": "extractions.0"
+        }
+      },
+      "as": "member"
+    },
+    {
+      "command": "check_point_clouds",
+      "params": {}
+    }
+  ],
+  "expected": [
+    {
+      "step": 3,
+      "path": "candidates[0].profile",
+      "value": "IPE 300",
+      "source": "llull profiles.ts + generator"
+    },
+    {
+      "step": 3,
+      "path": "measured.hMm",
+      "value": 300,
+      "abs": 3,
+      "source": "generator, TOL-ENG"
+    },
+    {
+      "step": 3,
+      "path": "measured.bMm",
+      "value": 150,
+      "abs": 3,
+      "source": "generator, TOL-ENG"
+    },
+    {
+      "step": 3,
+      "path": "axis.direction",
+      "value": [
+        0,
+        1,
+        0
+      ],
+      "maxDeg": 0.2,
+      "source": "generator, TOL-ENG"
+    },
+    {
+      "step": 5,
+      "path": "items[code=SCN_REGISTRATION_UNVERIFIED].ids",
+      "source": "AF-32 (cloud not registered)",
+      "contains": "$member"
+    }
+  ],
+  "planBinding": "{\"$fromStep\": alias, \"path\": ...} binds a value from an earlier query step's data (TR-SCN-03, a build_project extension; not in core yet)"
+}

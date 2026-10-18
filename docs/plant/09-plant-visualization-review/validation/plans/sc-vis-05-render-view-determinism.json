@@ -1,0 +1,127 @@
+{
+  "id": "SC-VIS-05",
+  "validates": [
+    "VC-VIS-30",
+    "VC-VIS-31"
+  ],
+  "status": "PROPOSED. render_view runs today (orthographic, flat Lambert); projection, colourProfileId, sectionBoxId, viewpointId, shading 'review', edges and shadows params are unbuilt (TR-VIS-30..33). The digest field is new (data.svgSha256).",
+  "description": "render_view determinism and review look: the same document and params render byte-identical twice (sha256), a profile switch changes pixels but not geometry, a section box removes what is outside it.",
+  "actions": [
+    {
+      "command": "add_box",
+      "params": {
+        "size": [
+          4000,
+          2000,
+          3000
+        ],
+        "position": [
+          0,
+          0,
+          1500
+        ],
+        "color": "#b0b4b8"
+      },
+      "as": "vessel"
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 110,
+        "height": 8000,
+        "position": [
+          0,
+          1500,
+          2500
+        ],
+        "axis": [
+          1,
+          0,
+          0
+        ]
+      },
+      "as": "pipe"
+    },
+    {
+      "command": "render_view",
+      "params": {
+        "view": "iso",
+        "width": 800,
+        "height": 600,
+        "showGrid": false,
+        "showAxes": false
+      }
+    },
+    {
+      "command": "render_view",
+      "params": {
+        "view": "iso",
+        "width": 800,
+        "height": 600,
+        "showGrid": false,
+        "showAxes": false
+      }
+    },
+    {
+      "command": "render_view",
+      "params": {
+        "view": "iso",
+        "width": 1600,
+        "height": 900,
+        "projection": "perspective",
+        "fovDeg": 45,
+        "shading": "review",
+        "edges": true,
+        "shadows": true,
+        "showGrid": false,
+        "showAxes": false
+      }
+    },
+    {
+      "command": "render_view",
+      "params": {
+        "view": "iso",
+        "width": 1600,
+        "height": 900,
+        "projection": "perspective",
+        "fovDeg": 45,
+        "shading": "review",
+        "edges": true,
+        "shadows": true,
+        "showGrid": false,
+        "showAxes": false
+      }
+    }
+  ],
+  "expected": [
+    {
+      "step": 3,
+      "path": "svgSha256",
+      "equalsStep": 2,
+      "source": "determinism (AF-13)"
+    },
+    {
+      "step": 5,
+      "path": "svgSha256",
+      "equalsStep": 4,
+      "source": "determinism (AF-13)"
+    },
+    {
+      "step": 2,
+      "path": "svgSha256",
+      "value": "TBD - measure with `llull --doc d.llull render_view ... --json | jq -r .data.svgSha256` on the reference build, then pin per renderer version (data.rendererVersion)"
+    },
+    {
+      "step": 4,
+      "path": "svgSha256",
+      "value": "TBD - measure as above"
+    },
+    {
+      "step": 4,
+      "path": "projection",
+      "value": "perspective",
+      "source": "echo"
+    }
+  ],
+  "notes": "Hashes are pinned per (rendererVersion, kernel) and only change with a deliberate renderer bump recorded in the golden snapshot diff (W1 Stop hook)."
+}

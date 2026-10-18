@@ -1,0 +1,28 @@
+{
+  "id": "SC-ISO-07",
+  "validates": ["VC-ISO-02", "VC-ISO-16"],
+  "description": "Deliberately broken inputs: a PCF with a TAB, and a line whose flange has no SKEY, whose last pipe stops 5 mm short of the next fitting and whose single spool is longer than the 12 m shipping limit given by the user. Every problem must come back with its stable code, ids and a remediation.",
+  "status": "UNBUILT - specification scenario",
+  "unbuilt": ["import_pcf", "check_isometric", "set_fabrication_rules"],
+  "harness": {
+    "inline": { "actions[1].params.text": "../data/iso-01-L101-dn100.pcf" },
+    "mutate": [
+      { "action": 1, "replaceLine": 14, "with": "\tEND-POINT 0.0 0.0 3000.0 100 FL" }
+    ]
+  },
+  "actions": [
+    { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },
+    { "command": "import_pcf", "params": { "text": "<data/iso-01-L101-dn100.pcf with TAB on line 14>" } },
+    { "command": "add_pipe_run", "params": { "points": [[0, 0, 1000], [14000, 0, 1000]], "dn": 100, "line": "E-401" } },
+    { "command": "set_fabrication_rules", "params": { "maxSpoolLengthMm": 12000, "maxSpoolWidthMm": 3000, "maxSpoolHeightMm": 3000, "source": "project shipping envelope (user given)" } },
+    { "command": "check_isometric", "params": { "lineId": "E-401" } }
+  ],
+  "expected": [
+    { "step": 1, "path": "error.code", "value": "ISO_PCF_TAB", "source": "no TAB in a PCF (S7)" },
+    { "step": 1, "path": "error.paths", "value": ["line 14"], "source": "AF-11" },
+    { "step": 4, "path": "data.issues[code=ISO_SPOOL_TOO_LARGE].ids", "value": ["E-401-SP01"], "source": "14 m > 12 m" },
+    { "step": 4, "path": "data.issues[code=ISO_OPEN_END]", "value": "present", "source": "both ends of E-401 have no end component" },
+    { "step": 4, "path": "data.ok", "value": false, "source": "errors present" }
+  ],
+  "note": "ISO_DISCONNECTED and ISO_SKEY_MISSING are covered by unit tests on hand-built networks (VC-ISO-16)."
+}

@@ -1,0 +1,71 @@
+{
+  "meta": {
+    "id": "PSC-DATA-MISC",
+    "title": "Closed forms and single values used by the PSC validation cases (valve face-to-face, gaskets, plain-end mass, B31.3 pressure wall, EN 10220 diameters, scopes)"
+  },
+  "massFormula": {
+    "formula": "m [kg/m] = 0.0246615 * (D - t) * t, D = outside diameter mm, t = nominal wall mm (plain-end steel, density 7850 kg/m3: pi * 7850e-6 = 0.02466150)",
+    "sources": {
+      "S16": "Ferrostaal piping supply catalogue (slideshare extract): 'Wpe = 0.0246615 (D - t) * t' for ASME B36.10 pipe",
+      "S17": "Steel & Tube (NZ) piping systems data charts 2013: 'm = (D - t) t x 0.02466', https://steelandtube.co.nz/sites/default/files/catalogues/S%26T_piping_systems_data_charts_2013_bm2_0.pdf"
+    },
+    "grade": "A (two sources, closed form)",
+    "checks": [
+      { "case": "NPS 6 Sch 40", "D": 168.3, "t": 7.11, "massKgPerM": 28.264, "derivation": "0.0246615 * 161.19 * 7.11 = 28.2638" },
+      { "case": "NPS 4 Sch 40", "D": 114.3, "t": 6.02, "massKgPerM": 16.075, "derivation": "0.0246615 * 108.28 * 6.02 = 16.0752" },
+      { "case": "NPS 6 Sch 40 water-filled", "D": 168.3, "t": 7.11, "waterKgPerM": 18.646, "totalKgPerM": 46.909, "derivation": "pi/4 * 0.15408^2 * 1000 = 18.646 (water 1000 kg/m3)" }
+    ]
+  },
+  "b313PressureWall": {
+    "formula": "t = P D / (2 (S E W + P Y)) (ASME B31.3 para. 304.1.2 eq. 3a, valid t < D/6); tm = t + c; nominal >= tm / (1 - 0.125) for a 12.5 % minus mill tolerance",
+    "sources": {
+      "S18": "whatispiping.com 'Pipe thickness calculation per ASME B31.3' worked example (NPS 4, 1200 psig, S 19000 psi, E = W = 1, Y = 0.4, c = 3 mm: t 3.52, tc 6.52, 7.45 mm after mill tolerance)",
+      "S19": "epcland.com B31.3 pressure design articles (equation and Y = 0.4 for ferritic steel below 482 C); Eng-Tips Interpretation 2-11 thread (t excludes mill tolerance and c)"
+    },
+    "grade": "A (closed form, two sources, worked example recomputed)",
+    "check": { "Dmm": 114.3, "Ppsi": 1200, "Spsi": 19000, "E": 1, "W": 1, "Y": 0.4, "cMm": 3, "millTolerance": 0.125, "tMm": 3.5205, "tmMm": 6.5205, "nominalMinMm": 7.452, "derivation": "1200*114.3/(2*(19000+480)) = 3.52053; +3 = 6.52053; /0.875 = 7.45203", "selectedSchedule": { "from": "asme_b36_pipe_schedules.json NPS 4", "answer": "Sch 80 (8.56 mm): smallest B36.10M schedule with wall >= 7.452 mm (Sch 40 6.02 fails; XS 8.56 equal)" } },
+    "note": "S, E, W, Y and c are inputs given explicitly by the spec or the operator (AF-31): llull ships no allowable-stress table in the MVP."
+  },
+  "valveFaceToFace": {
+    "standard": "ASME B16.10, Class 150 flanged raised-face gate valves (short pattern)",
+    "sources": {
+      "S20": "Project Materials 'ASME B16.10 face to face overview', https://blog.projectmaterials.com/quick-answers/valves/asme-b16-10-face-to-face-overview/ (search extract)",
+      "S21": "Wermac 'Face to Face dimensions of flanged valves', https://wermac.org/valves/dim_valves_ff.html (search extract)"
+    },
+    "rows": [
+      { "nps": 2, "class": 150, "type": "gate RF", "faceToFaceMm": 178, "grade": "A" },
+      { "nps": 4, "class": 150, "type": "gate RF", "faceToFaceMm": 229, "grade": "A" },
+      { "nps": 6, "class": 150, "type": "gate RF", "faceToFaceMm": 267, "grade": "A" }
+    ]
+  },
+  "spiralWoundGasket": {
+    "standard": "ASME B16.20 spiral-wound gasket for ASME B16.5 raised-face flanges",
+    "sources": {
+      "S22": "Wermac 'Spiral wound gaskets ASME B16.20' table, https://www.wermac.org/gaskets/dim_gaskets_sw.html (search extract: NPS 4 inner ring 106.4, sealing element OD 149.4, Class 150 outer ring 174.8)",
+      "S23": "Garlock product page, Class 150 NPS 4 spiral wound gasket, inner ring ID 106.43 mm (search extract), https://www.garlock.com/product/l00051004001",
+      "S24": "Second class-150 table (search extract): NPS 4 outer ring 174.8 mm, Class 300 181.1 mm"
+    },
+    "rows": [
+      { "nps": 4, "class": 150, "innerRingIdMm": 106.4, "grade": "A" },
+      { "nps": 4, "class": 150, "sealingElementOdMm": 149.4, "grade": "B" },
+      { "nps": 4, "class": 150, "centeringRingOdMm": 174.8, "grade": "A" },
+      { "nps": 4, "class": 300, "centeringRingOdMm": 181.1, "grade": "B" }
+    ]
+  },
+  "en10220Diameters": {
+    "values": [21.3, 26.9, 33.7, 42.4, 48.3, 60.3, 76.1, 88.9, 114.3, 139.7, 168.3, 219.1, 273.0, 323.9, 355.6, 406.4, 457.0, 508.0, 610.0],
+    "sources": {
+      "S25": "llull packages/domain-aec/src/industrial/piping/pipeSizes.ts (states EN 10220)",
+      "S26": "Sikla 'Rohre (Abmessungen und Gewichte)' DIN EN 10220 welded tube table (search extract lists 21.3..139.7)",
+      "S27": "Project Materials 'EU pipe sizes EN 10220 & EN ISO 1127' (search extract)"
+    },
+    "grade": "A for 21.3..139.7 (two sources); B above",
+    "note": "EN 10220 26.9 / 33.7 / 42.4 / 76.1 / 139.7 differ from ASME B36.10M 26.7 / 33.4 / 42.2 / 73.0 / 141.3 for the same DN: a spec must name its dimensional standard."
+  },
+  "scopes": {
+    "B36.10M": "NPS 1/8 .. 80, carbon / alloy / ferritic stainless wrought steel pipe (projectmaterials 'What is ASME B36.10', SAI Global catalogue)",
+    "B36.19M": "stainless pipe, schedules 5S/10S/40S/80S (tubingchina comparison; SFS store page)",
+    "B16.5": "flanges NPS 1/2 .. 24, Class 150 .. 2500 (Wikipedia 'Flange'; projectmaterials)",
+    "B16.47": "large-diameter flanges NPS 26 .. 60, Series A and B (flange-studbolt-finder dataset meta; Wikipedia 'Flange')"
+  }
+}

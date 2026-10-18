@@ -1,0 +1,42 @@
+{
+ "schema": "IFC4X3_ADD2",
+ "counts": {
+  "IfcPipeSegment": 5,
+  "IfcPipeFitting": 1,
+  "IfcValve": 2,
+  "IfcTank": 1,
+  "IfcPump": 1,
+  "IfcBuildingElementProxy": 0,
+  "IfcDistributionPort": 19,
+  "IfcRelConnectsPorts": 9,
+  "IfcRelNests": 10,
+  "IfcDistributionSystem": 2,
+  "IfcRelAssignsToGroup": 2,
+  "IfcPropertySet": 24,
+  "IfcRelDefinesByProperties": 24,
+  "IfcFacility": 1,
+  "IfcFacilityPartCommon": 1,
+  "IfcSite": 1,
+  "IfcRelContainedInSpatialStructure": 1,
+  "IfcRelAggregates": 3,
+  "IfcCableCarrierSegment": 0,
+  "IfcBuildingStorey": 0
+ },
+ "ports": 19,
+ "portsNestedInElements": 19,
+ "connectedPorts": 18,
+ "openPorts": 1,
+ "predefinedTypes": {
+  "IfcPipeFitting.BEND": 1,
+  "IfcPipeSegment.RIGIDSEGMENT": 5,
+  "IfcPump.ENDSUCTION": 1,
+  "IfcTank.STORAGE": 1,
+  "IfcValve.CHECK": 1,
+  "IfcValve.ISOLATING": 1
+ },
+ "duplicateTags": [],
+ "systemMembers": {
+  "150-P-1001-A1A": 5,
+  "100-P-1002-A1A": 3
+ }
+}

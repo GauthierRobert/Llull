@@ -1,0 +1,64 @@
+{
+  "title": "Minimal pipe spec CS150 used by the RTE plans (stand-in for the 01-piping-specs-catalog format)",
+  "status": "STUB. The real format is defined by 01-piping-specs-catalog; load with `llull import_pipe_spec @spec_stub_cs150.json` (01 command, not built) before the plans. Every dimension below is an INPUT of the plans: expected values are derived from these numbers, and the gating sources are listed per row.",
+  "spec": "CS150",
+  "description": "Carbon steel, ASME B16.5 Class 150 RF, butt-weld fittings ASME B16.9 STD, NPS 2-6 (illustrative subset)",
+  "rating": "CL150",
+  "unit": "mm",
+  "angleToleranceDeg": 1.0,
+  "fittingAngles": [90, 45],
+  "pipe": [
+    { "nps": 2, "dn": 50, "od": 60.3, "wall": 3.91, "ends": "BW", "src": "b36_10m_pipe_dimensions.json" },
+    { "nps": 3, "dn": 80, "od": 88.9, "wall": 5.49, "ends": "BW", "src": "b36_10m_pipe_dimensions.json" },
+    { "nps": 4, "dn": 100, "od": 114.3, "wall": 6.02, "ends": "BW", "src": "b36_10m_pipe_dimensions.json" },
+    { "nps": 6, "dn": 150, "od": 168.3, "wall": 7.11, "ends": "BW", "src": "b36_10m_pipe_dimensions.json" }
+  ],
+  "components": [
+    { "type": "elbow90LR", "nps": 2, "ports": 2, "ends": "BW", "centreToEnd": 76 },
+    { "type": "elbow90LR", "nps": 3, "ports": 2, "ends": "BW", "centreToEnd": 114 },
+    { "type": "elbow90LR", "nps": 4, "ports": 2, "ends": "BW", "centreToEnd": 152 },
+    { "type": "elbow90LR", "nps": 6, "ports": 2, "ends": "BW", "centreToEnd": 229 },
+    { "type": "elbow45LR", "nps": 4, "ports": 2, "ends": "BW", "centreToEnd": 64 },
+    { "type": "tee", "nps": 4, "ports": 3, "ends": "BW", "C": 105, "M": 105 },
+    { "type": "tee", "nps": 6, "ports": 3, "ends": "BW", "C": 143, "M": 143 },
+    { "type": "teeReducing", "nps": "6x4", "ports": 3, "ends": "BW", "C": 143, "M": 130 },
+    { "type": "reducerConcentric", "nps": "6x4", "ports": 2, "ends": "BW", "H": 140 },
+    {
+      "type": "weldolet",
+      "nps": "6x2",
+      "ports": 2,
+      "ends": "BW",
+      "height": null,
+      "heightNote": "TBD - catalogue value from 01 PSC; plans count olets only"
+    },
+    { "type": "flangeWN", "nps": 4, "rating": "CL150", "facing": "RF", "ends": ["BW", "FL"], "Y": 76 },
+    { "type": "flangeWN", "nps": 6, "rating": "CL150", "facing": "RF", "ends": ["BW", "FL"], "Y": 89 },
+    { "type": "gasket", "nps": 4, "rating": "CL150", "thickness": 3.0 },
+    { "type": "gasket", "nps": 6, "rating": "CL150", "thickness": 3.0 },
+    { "type": "boltSet", "nps": 4, "rating": "CL150", "studs": 8, "studDiameter": "5/8 in" },
+    { "type": "valveGate", "nps": 4, "rating": "CL150", "ends": "FL", "faceToFace": 229, "operator": "handwheel" }
+  ],
+  "connectionRules": [
+    { "ends": ["BW", "BW"], "joint": "buttWeld", "gap": 0 },
+    { "ends": ["FL", "FL"], "joint": "flanged", "requires": ["gasket", "boltSet"] }
+  ],
+  "branchTable": {
+    "note": "Illustrative project rule (not a standard): header 6 x branch 6 -> T, 6 x 4 -> RT, 6 x 2 -> W (weldolet); header 4 x branch 4 -> T",
+    "rows": [
+      { "header": 6, "branch": 6, "fitting": "tee" },
+      { "header": 6, "branch": 4, "fitting": "teeReducing" },
+      { "header": 6, "branch": 2, "fitting": "weldolet" },
+      { "header": 4, "branch": 4, "fitting": "tee" }
+    ]
+  },
+  "insulation": {
+    "note": "Illustrative project thickness table (mm) by DN and design temperature band; not from a standard",
+    "material": "mineral wool",
+    "conductivityWmK": 0.0598535265,
+    "rows": [
+      { "dnMax": 100, "tempMaxC": 100, "thickness": 30 },
+      { "dnMax": 100, "tempMaxC": 200, "thickness": 50 },
+      { "dnMax": 150, "tempMaxC": 200, "thickness": 60 }
+    ]
+  }
+}

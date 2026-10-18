@@ -1,0 +1,293 @@
+{
+  "pack": "02 RTE",
+  "generatedBy": "hand-written index; values derived in README 'Derivations' (D1-D9) or quoted from data/*.json; nothing produced by llull",
+  "units": { "length": "mm", "angle": "deg", "heatLoss": "W/m" },
+  "specStub": "data/spec_stub_cs150.json",
+  "cases": [
+    {
+      "id": "VC-RTE-01",
+      "plan": "plans/sc-rte-01-pump-to-vessel.json",
+      "command": "piping_takeoff",
+      "expected": {
+        "cutLengthMm": [1269, 2696, 2696, 1196, 2769],
+        "totalPipeMm": 10626,
+        "closingLeg": { "direction": "+X", "length": 3000 }
+      },
+      "tolerance": { "abs": 0.01 },
+      "reference": "README D1 (stub A 152, Y 76, gasket 3)",
+      "grade": "closed form",
+      "frs": ["FR-RTE-01", "FR-RTE-03", "FR-RTE-09"],
+      "test": "tests/unit/plant/piping/jointStack.test.ts"
+    },
+    {
+      "id": "VC-RTE-02",
+      "plan": "plans/sc-rte-01-pump-to-vessel.json",
+      "command": "piping_takeoff",
+      "expected": {
+        "elbow90LR": 4,
+        "flangeWN": 2,
+        "gasket": 2,
+        "boltSet": 2,
+        "studs": 16,
+        "pipePieces": 5,
+        "buttWelds": 10,
+        "flangedJoints": 2
+      },
+      "tolerance": "exact",
+      "reference": "README D1; B16.5 CL150 NPS 4 8 bolt holes (S14, S15)",
+      "grade": "A",
+      "frs": ["FR-RTE-04", "FR-RTE-06", "FR-RTE-15"]
+    },
+    {
+      "id": "VC-RTE-03",
+      "plan": "plans/sc-rte-01-pump-to-vessel.json",
+      "command": "piping_takeoff",
+      "expected": { "centrelineLengthMm": 11739.044, "elbowArcMm": 238.761 },
+      "tolerance": { "abs": 0.01 },
+      "reference": "README D1",
+      "grade": "closed form",
+      "frs": ["FR-RTE-05", "FR-RTE-15"],
+      "test": "tests/unit/plant/piping/fittings.test.ts"
+    },
+    {
+      "id": "VC-RTE-04",
+      "plan": "plans/sc-rte-02-pump-discharge-gate-valve.json",
+      "command": "insert_inline_component + piping_takeoff",
+      "expected": {
+        "valveFacesZ": [1685.5, 1914.5],
+        "cutLengthMm": [527.5, 354.5, 2696, 2696, 1196, 2769],
+        "flangeWN": 4,
+        "gasket": 4,
+        "boltSet": 4,
+        "buttWelds": 12
+      },
+      "tolerance": { "abs": 0.01 },
+      "reference": "README D2; B16.10 CL150 NPS 4 gate F-F 229 (S16, S17)",
+      "grade": "A",
+      "frs": ["FR-RTE-07"]
+    },
+    {
+      "id": "VC-RTE-05",
+      "plan": "plans/sc-rte-02-pump-discharge-gate-valve.json",
+      "command": "check_piping",
+      "expected": { "code": "RTE_VALVE_OPERATOR_HEIGHT", "status": "warn" },
+      "tolerance": "exact",
+      "reference": "explicit param maxHandwheelCentreHeight 1500 vs 1800",
+      "grade": "closed form",
+      "frs": ["FR-RTE-13", "FR-RTE-18"]
+    },
+    {
+      "id": "VC-RTE-06",
+      "plan": "plans/sc-rte-03-header-branches.json",
+      "command": "add_branch + piping_takeoff",
+      "expected": {
+        "fittings": ["teeReducing", "weldolet"],
+        "headerCutMm": [3857, 5857],
+        "branchDn100CutMm": [1870],
+        "branchDn50CutMm": "TBD - weldolet height from 01 PSC"
+      },
+      "tolerance": { "abs": 0.01 },
+      "reference": "README D3; B16.9 6x6x4 C 143 / M 130 (S9, S12)",
+      "grade": "A",
+      "frs": ["FR-RTE-08", "FR-RTE-09"],
+      "test": "tests/unit/plant/piping/branches.test.ts"
+    },
+    {
+      "id": "VC-RTE-07",
+      "plan": "plans/sc-rte-03-header-branches.json",
+      "command": "piping_connectivity + check_piping",
+      "expected": { "openEnds": 1, "code": "RTE_OPEN_END", "status": "warn" },
+      "tolerance": "exact",
+      "grade": "closed form",
+      "frs": ["FR-RTE-12", "FR-RTE-13"]
+    },
+    {
+      "id": "VC-RTE-08",
+      "plan": "plans/sc-rte-04-gravity-drain-slope.json",
+      "command": "route_pipe",
+      "expected": {
+        "dropMm": 80,
+        "legLengthMm": 8000.39999,
+        "slopeDeg": 0.572939,
+        "turnDeg": 89.427061,
+        "fitting": "elbow90LR",
+        "cutLengthMm": [7924.39999, 844],
+        "withTolerance0p5": "RTE_NO_FITTING_FOR_ANGLE"
+      },
+      "tolerance": { "abs": 1e-6, "cutAbs": 1e-3 },
+      "reference": "README D4",
+      "grade": "closed form",
+      "frs": ["FR-RTE-05", "FR-RTE-10"]
+    },
+    {
+      "id": "VC-RTE-09",
+      "plan": "plans/sc-rte-05-routing-refusals.json#SC-RTE-05e,f,g",
+      "command": "route_pipe",
+      "expected": { "codes": ["RTE_SIZE_MISMATCH", "RTE_RATING_MISMATCH", "RTE_NO_CONNECTION_RULE"], "documentUnchanged": true },
+      "tolerance": "exact",
+      "reference": "vendor behaviour S4, S25",
+      "grade": "A (mechanism)",
+      "frs": ["FR-RTE-06", "FR-RTE-11", "FR-RTE-13"]
+    },
+    {
+      "id": "VC-RTE-10",
+      "plan": "plans/sc-rte-05-routing-refusals.json#SC-RTE-05a,b,c",
+      "command": "route_pipe + check_piping",
+      "expected": {
+        "250": { "code": "RTE_SEGMENT_TOO_SHORT", "cutLengthMm": -54 },
+        "304": { "code": "RTE_FITTING_TO_FITTING", "cutLengthMm": 0 },
+        "340": { "code": "RTE_WELD_SPACING", "cutLengthMm": 36, "minWeldSpacingMm": 50, "defaulted": true }
+      },
+      "tolerance": { "abs": 0.01 },
+      "reference": "README D5; weld spacing rule S22 (project default, not code)",
+      "grade": "closed form",
+      "frs": ["FR-RTE-09", "FR-RTE-13"]
+    },
+    {
+      "id": "VC-RTE-11",
+      "plan": "plans/sc-rte-05-routing-refusals.json#SC-RTE-05d",
+      "command": "route_pipe",
+      "expected": { "code": "RTE_NO_FITTING_FOR_ANGLE", "angleDeg": 60 },
+      "tolerance": { "abs": 1e-4 },
+      "reference": "compass ticks = spec fitting angles (S1)",
+      "grade": "closed form",
+      "frs": ["FR-RTE-05"]
+    },
+    {
+      "id": "VC-RTE-12",
+      "plan": "plans/sc-rte-06-move-with-connected.json",
+      "command": "update_equipment + piping_takeoff",
+      "expected": { "afterPlusX500": [1269, 2696, 2696, 1196, 3269], "afterPlusY500": [1269, 3196, 2696, 1196, 3269], "elbow90LR": 4 },
+      "tolerance": { "abs": 0.01 },
+      "reference": "README D6, TECHNICAL 5.7",
+      "grade": "closed form",
+      "frs": ["FR-RTE-14"],
+      "test": "tests/unit/plant/piping/stretch.test.ts"
+    },
+    {
+      "id": "VC-RTE-13",
+      "plan": "plans/sc-rte-07-insulated-hot-line.json",
+      "command": "create_pipeline + check_clashes",
+      "expected": {
+        "insulationThicknessMm": 50,
+        "lineNumber": "80-HO-4001-CS150-H50",
+        "envelopeDiameterMm": 188.9,
+        "insulationClashes": 1,
+        "clashDepthMm": 24.45
+      },
+      "tolerance": { "envelopeAbs": 1e-9, "depthAbs": 0.5 },
+      "reference": "README D7; OD 88.9 (S5, S6)",
+      "grade": "A + closed form",
+      "frs": ["FR-RTE-02", "FR-RTE-16", "FR-RTE-21"]
+    },
+    {
+      "id": "VC-RTE-14",
+      "plan": "plans/sc-rte-07-insulated-hot-line.json",
+      "command": "line_heat_loss (V1)",
+      "expected": { "heatLossWPerM": 73.12000884, "reviewRequired": true },
+      "tolerance": { "rel": 1e-4 },
+      "reference": "data/insulation_heat_loss.json (S19)",
+      "grade": "A",
+      "frs": ["FR-RTE-23"],
+      "test": "tests/unit/plant/piping/heatLoss.test.ts"
+    },
+    {
+      "id": "VC-RTE-15",
+      "data": "data/b16_9_fitting_dimensions.json",
+      "command": "catalogue consistency (data test)",
+      "expected": { "lr90AMinusRMaxAbsMm": 0.4, "lr45UsesTable": true, "maxBMinusRtanHalfMm": 3.655 },
+      "tolerance": { "abs": 0.5 },
+      "reference": "S7, S8",
+      "grade": "A",
+      "frs": ["FR-RTE-05"],
+      "test": "tests/unit/plant/piping/catalogueConsistency.test.ts"
+    },
+    {
+      "id": "VC-RTE-16",
+      "data": "data/b36_10m_pipe_dimensions.json",
+      "command": "catalogue consistency (data test)",
+      "expected": "OD and STD wall equal llull PIPE_SIZES for DN50-250; DN300 OD within 0.11 mm",
+      "tolerance": { "abs": 0.11 },
+      "reference": "S5, S6",
+      "grade": "A",
+      "frs": ["FR-RTE-04"]
+    },
+    {
+      "id": "VC-RTE-17",
+      "plan": "plans/sc-rte-01-pump-to-vessel.json",
+      "command": "build_project twice",
+      "expected": "identical ids, data and order; golden snapshot piping_pump_to_vessel stable",
+      "tolerance": "exact",
+      "grade": "AF-13",
+      "frs": ["FR-RTE-24"]
+    },
+    {
+      "id": "VC-RTE-18",
+      "plan": "plans/sc-rte-08-auto-route-v2.json",
+      "command": "auto_route_pipe (V2)",
+      "expected": { "centrelineToPiLengthMm": 6000, "bends": 2, "optimal": true },
+      "tolerance": "exact",
+      "reference": "README D8",
+      "grade": "closed form",
+      "frs": ["FR-RTE-22"]
+    },
+    {
+      "id": "VC-RTE-19",
+      "command": "every refusal of TECHNICAL 7",
+      "expected": "stable RTE_* code, ids/paths, remediation, document deep-equal to input",
+      "tolerance": "exact",
+      "grade": "AF-11",
+      "frs": ["FR-RTE-24"],
+      "test": "tests/unit/plant/piping/refusals.test.ts"
+    },
+    {
+      "id": "VC-RTE-20",
+      "plan": "plans/sc-rte-09-legacy-pipe-run-conversion.json",
+      "command": "convert_pipe_run + piping_takeoff",
+      "expected": { "elbow90LR": 2, "cutLengthMm": [3848, 2696, 2348], "buttWelds": 4, "openEnds": 2, "lineNumber": "L-1" },
+      "tolerance": { "abs": 0.01 },
+      "reference": "README D9",
+      "grade": "closed form",
+      "frs": ["FR-RTE-19"]
+    },
+    {
+      "id": "VC-RTE-21",
+      "plan": "plans/sc-rte-01-pump-to-vessel.json",
+      "command": "piping_takeoff + check_piping",
+      "expected": { "unverified": true, "code": "RTE_SPEC_UNVERIFIED" },
+      "tolerance": "exact",
+      "reference": "spec stub status 'stub' (AF-32)",
+      "grade": "AF-32",
+      "frs": ["FR-RTE-26"],
+      "note": "with the stub spec (status stub) RTE_SPEC_UNVERIFIED is the only issue of SC-RTE-01; status warn"
+    },
+    {
+      "id": "VC-RTE-22",
+      "plan": "plans/sc-rte-07-insulated-hot-line.json + set_heat_tracing (V1)",
+      "command": "piping_takeoff",
+      "expected": { "tracedLengthM": 6.0 },
+      "tolerance": { "abs": 1e-6 },
+      "reference": "tracers x (centreline + allowances), explicit inputs",
+      "grade": "closed form",
+      "frs": ["FR-RTE-17"]
+    },
+    {
+      "id": "VC-RTE-23",
+      "plan": "plans/sc-rte-01-pump-to-vessel.json",
+      "command": "mass_properties on an elbow",
+      "expected": { "pappusVolumeMm3": 2449885.612, "ratioRange": [0.97, 1.001], "polygonAreaRatio16": 0.974495 },
+      "tolerance": "range",
+      "reference": "Pappus; regular polygon area",
+      "grade": "closed form",
+      "frs": ["FR-RTE-20"]
+    },
+    {
+      "id": "VC-RTE-24",
+      "plan": "plans/sc-rte-01-pump-to-vessel.json",
+      "command": "IFC (08) / PCF (05) export",
+      "expected": "TBD - measure with the 08 IFC and 05 PCF exporters: counts equal VC-RTE-02",
+      "grade": "TBD",
+      "frs": ["FR-RTE-21", "FR-RTE-25"]
+    }
+  ]
+}

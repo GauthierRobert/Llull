@@ -1,0 +1,484 @@
+{
+ "generator": "gen_synthetic.py",
+ "numpy": "2.5.4",
+ "units": "metres, degrees",
+ "cases": {
+  "CYL-A": {
+   "file": "synthetic/cyl-a.csv",
+   "seed": 101,
+   "dn": 100,
+   "outsideDiameter_mm": 114.3,
+   "radius_m": 0.05715,
+   "axisPoint_m": [
+    1.0,
+    2.0,
+    3.0
+   ],
+   "axisDirection": [
+    0.8,
+    0.6,
+    0.0
+   ],
+   "length_m": 2.0,
+   "inliers": 4000,
+   "outliers": 0,
+   "arcCoverage_deg": [
+    -90,
+    90
+   ],
+   "noiseSigma_m": 0.001,
+   "crlb": {
+    "radiusStd_m": 3.5850843110520144e-05,
+    "axisAngleStd_deg": 0.003104645125854856,
+    "axisPositionStd_m": 7.776646327516304e-05
+   },
+   "tolerance": {
+    "radius_m": 0.0002,
+    "axisAngle_deg": 0.05,
+    "axisPosition_m": 0.001
+   },
+   "expectedDnSnap": 100
+  },
+  "CYL-B": {
+   "file": "synthetic/cyl-b.csv",
+   "seed": 102,
+   "dn": 200,
+   "outsideDiameter_mm": 219.1,
+   "radius_m": 0.10955,
+   "axisPoint_m": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "axisDirection": [
+    0.034899496703,
+    0.0,
+    0.999390827019
+   ],
+   "length_m": 3.0,
+   "inliers": 6000,
+   "outliers": 2000,
+   "arcCoverage_deg": [
+    -180,
+    180
+   ],
+   "noiseSigma_m": 0.002,
+   "crlb": {
+    "radiusStd_m": 2.5833433620230683e-05,
+    "axisAngleStd_deg": 0.003400359768270505,
+    "axisPositionStd_m": 0.00010351257310872039
+   },
+   "tolerance": {
+    "radius_m": 0.0002,
+    "axisAngle_deg": 0.05,
+    "axisPosition_m": 0.001
+   },
+   "expectedDnSnap": 200
+  },
+  "CYL-C": {
+   "file": "synthetic/cyl-c.csv",
+   "seed": 103,
+   "dn": 50,
+   "outsideDiameter_mm": 60.3,
+   "radius_m": 0.03015,
+   "axisPoint_m": [
+    -0.5,
+    0.3,
+    1.2
+   ],
+   "axisDirection": [
+    0.57735026919,
+    0.57735026919,
+    0.57735026919
+   ],
+   "length_m": 1.0,
+   "inliers": 1500,
+   "outliers": 167,
+   "arcCoverage_deg": [
+    -60,
+    60
+   ],
+   "noiseSigma_m": 0.001,
+   "crlb": {
+    "radiusStd_m": 0.00014346079072300634,
+    "axisAngleStd_deg": 0.011094229229916429,
+    "axisPositionStd_m": 0.0002015695036918179
+   },
+   "tolerance": {
+    "radius_m": 0.0007173039536150317,
+    "axisAngle_deg": 0.055471146149582144,
+    "axisPosition_m": 0.0010078475184590895
+   },
+   "expectedDnSnap": 50
+  },
+  "ELB-A": {
+   "file": "synthetic/elb-a.csv",
+   "seed": 201,
+   "radius_m": 0.05715,
+   "bendRadius_m": 0.1524,
+   "bendAngle_deg": 90.0,
+   "segments": [
+    {
+     "start": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "direction": [
+      1,
+      0,
+      0
+     ],
+     "length_m": 1.5
+    },
+    {
+     "start": [
+      1.6524,
+      0.1524,
+      1.0
+     ],
+     "direction": [
+      0,
+      1,
+      0
+     ],
+     "length_m": 1.0
+    }
+   ],
+   "intersectionPoint_m": [
+    1.6524,
+    0.0,
+    1.0
+   ],
+   "noiseSigma_m": 0.001,
+   "tolerance": {
+    "radius_m": 0.001,
+    "bendRadius_m": 0.01,
+    "bendAngle_deg": 1.0,
+    "intersectionPoint_m": 0.005
+   },
+   "note": "tolerances are engineering choices (TOL-ENG) bounded below by the CYL-A CRLB; the bend radius is observable only from the 1500 bend points"
+  },
+  "STL-A": {
+   "file": "synthetic/stl-a.csv",
+   "seed": 301,
+   "profile": "IPE 300",
+   "h_mm": 300,
+   "b_mm": 150,
+   "tw_mm": 7.1,
+   "tf_mm": 10.7,
+   "axisDirection": [
+    0,
+    1,
+    0
+   ],
+   "sectionCentre_m": [
+    5.0,
+    1.0,
+    4.0
+   ],
+   "noiseSigma_m": 0.001,
+   "roll_deg": 0.0,
+   "tolerance": {
+    "h_mm": 3.0,
+    "b_mm": 3.0,
+    "axisAngle_deg": 0.2,
+    "sectionCentre_m": 0.003
+   },
+   "note": "h and b are gated; tw / tf are below 10 sigma of the noise and are reported, not gated. Catalogue neighbours: IPE 270 (270 x 135), IPE 330 (330 x 160), HEA 300 (290 x 300)"
+  },
+  "ICP-A": {
+   "sourceFile": "e57/bunnyInt32.e57",
+   "seed": 401,
+   "targetSubsample": 0.7,
+   "targetNoiseSigma_m": 0.0002,
+   "rotationAxis": [
+    0.303045763366,
+    0.505076272276,
+    0.808122035642
+   ],
+   "rotationAngle_deg": 10.0,
+   "rotationMatrix": [
+    [
+     0.986202959368,
+     -0.138003574895,
+     0.091426124546
+    ],
+    [
+     0.142654262748,
+     0.988683326223,
+     -0.04642242742
+    ],
+    [
+     -0.083985023981,
+     0.058824261696,
+     0.994729220433
+    ]
+   ],
+   "translation_m": [
+    0.05,
+    -0.03,
+    0.02
+   ],
+   "convention": "target = R * source + t; the registration returns the transform that maps source onto target",
+   "tolerance": {
+    "rotation_deg": 0.05,
+    "translation_m": 0.0005,
+    "rmsResidual": "at most the nearest-neighbour RMS of the true transform + 1e-5 m (sampling-limited, not noise-limited)"
+   }
+  },
+  "TGT-A": {
+   "files": [
+    "synthetic/tgt-a-station1.csv",
+    "synthetic/tgt-a-station2.csv"
+   ],
+   "seed": 501,
+   "sphereRadius_m": 0.0725,
+   "noiseSigma_m": 0.0015,
+   "centresStation1_m": [
+    [
+     1.5,
+     -2.0,
+     0.0
+    ],
+    [
+     6.0,
+     0.5,
+     0.2
+    ],
+    [
+     2.0,
+     7.0,
+     1.5
+    ],
+    [
+     -3.0,
+     4.0,
+     0.8
+    ]
+   ],
+   "centresStation2_m": [
+    [
+     -7.182042809,
+     7.916328763,
+     -0.35
+    ],
+    [
+     -2.083645456,
+     7.204749934,
+     -0.15
+    ],
+    [
+     -1.366389846,
+     14.803140842,
+     1.15
+    ],
+    [
+     -7.165012465,
+     15.416309428,
+     0.45
+    ]
+   ],
+   "rotationMatrix_station2_to_station1": [
+    [
+     0.798635510047,
+     -0.601815023152,
+     0.0
+    ],
+    [
+     0.601815023152,
+     0.798635510047,
+     0.0
+    ],
+    [
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "rotationAngle_deg": 37.0,
+   "translation_m": [
+    12.0,
+    -4.0,
+    0.35
+   ],
+   "tolerance": {
+    "sphereCentre_m": 0.002,
+    "rotation_deg": 0.05,
+    "translation_m": 0.003
+   }
+  },
+  "DEV-A": {
+   "file": "synthetic/clh-a.csv",
+   "design": {
+    "kind": "cylinder",
+    "start": [
+     0,
+     -0.025,
+     0
+    ],
+    "end": [
+     2.0,
+     -0.025,
+     0
+    ],
+    "radius_m": 0.10955
+   },
+   "asBuiltOffsetFromDesign_m": [
+    0.0,
+    0.025,
+    0.0
+   ],
+   "expected": {
+    "signedDistanceMax_m": 0.025,
+    "signedDistanceMin_m": -0.025,
+    "fittedAxisOffset_m": 0.025,
+    "pointsBeyond10mm_fraction": 0.7444444444444445,
+    "rmsDistance_m": 0.017648493703962532
+   },
+   "formula": "d(theta) = sqrt(r^2 + D^2 + 2 r D cos(theta)) - r for a point at angle theta on a cylinder of radius r whose axis is offset by D",
+   "tolerance": {
+    "distance_m": 1e-06,
+    "note": "CSV stores 6 decimals (1 um)",
+    "meshSagitta_m_at_64_segments": 0.00013195777272336304
+   }
+  },
+  "CLH-A": {
+   "file": "synthetic/clh-a.csv",
+   "scanned": {
+    "radius_m": 0.10955,
+    "axis": [
+     [
+      0,
+      0,
+      0
+     ],
+     [
+      2.0,
+      0,
+      0
+     ]
+    ]
+   },
+   "designs": [
+    {
+     "designAxisOffset_m": [
+      0.0,
+      0.0,
+      0.15
+     ],
+     "designRadius_m": 0.08415,
+     "requiredClearance_m": 0.075,
+     "minGap_m": -0.0437,
+     "status": "hard",
+     "tolerance_m": 1.7684995617336417e-05
+    },
+    {
+     "designAxisOffset_m": [
+      0.0,
+      0.0,
+      0.25
+     ],
+     "designRadius_m": 0.08415,
+     "requiredClearance_m": 0.075,
+     "minGap_m": 0.05630000000000002,
+     "status": "clearance",
+     "tolerance_m": 1.7684995617336417e-05
+    },
+    {
+     "designAxisOffset_m": [
+      0.0,
+      0.0,
+      0.5
+     ],
+     "designRadius_m": 0.08415,
+     "requiredClearance_m": 0.075,
+     "minGap_m": 0.3063,
+     "status": "clear",
+     "tolerance_m": 1.7684995617336417e-05
+    }
+   ],
+   "formula": "gap = D - r_scan - r_design (parallel cylinders, axis spacing D); sampling error <= r_scan (1 - cos(half angular step))"
+  },
+  "C2M-A": {
+   "mesh": {
+    "positions": [
+     [
+      0,
+      0,
+      0
+     ],
+     [
+      1,
+      0,
+      0
+     ],
+     [
+      1,
+      1,
+      0
+     ],
+     [
+      0,
+      1,
+      0
+     ]
+    ],
+    "triangles": [
+     [
+      0,
+      1,
+      2
+     ],
+     [
+      0,
+      2,
+      3
+     ]
+    ]
+   },
+   "points_m": [
+    [
+     0.25,
+     0.25,
+     0.04
+    ],
+    [
+     0.5,
+     0.5,
+     0.04
+    ],
+    [
+     0.75,
+     0.1,
+     0.04
+    ],
+    [
+     1.3,
+     0.5,
+     0.04
+    ],
+    [
+     0.5,
+     -0.2,
+     -0.03
+    ],
+    [
+     1.3,
+     1.4,
+     0.0
+    ]
+   ],
+   "expectedUnsignedDistance_m": [
+    0.04,
+    0.04,
+    0.04,
+    0.3026549190084311,
+    0.20223748416156687,
+    0.5
+   ],
+   "tolerance_m": 1e-12,
+   "formula": "inside the footprint d = |z|; outside, d = distance to the nearest edge or vertex (Pythagoras)"
+  }
+ }
+}

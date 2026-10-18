@@ -1,0 +1,638 @@
+{
+ "pack": "10 SCN",
+ "what": "E57 (ASTM E2807) reference values: own python reader (tools/e57_own_reader.py, CRC-32C per page) and pye57 0.4.19 / libE57Format agree on every count; libE57Format unit-test assertions quoted where they exist",
+ "files": [
+  {
+   "file": "e57/ColourRepresentation.e57",
+   "source": "S2 3rdParty/las2e57/ (CC0)",
+   "bytes": 9216,
+   "sha256": "cffe21f05e254994fea0d1444b574d160746d0743e515c3837b3721a4d97a5e6",
+   "versionMajor": 1,
+   "versionMinor": 0,
+   "pageSize": 1024,
+   "allPageCrcOk": true,
+   "fileGuid": "6107aa44-6289-4e9c-80bd-f36cc3fbd44b",
+   "data3DCount": 1,
+   "images2DCount": 0,
+   "scans": [
+    {
+     "pointCount": 153,
+     "fields": [
+      "cartesianX",
+      "cartesianY",
+      "cartesianZ",
+      "returnIndex",
+      "returnCount",
+      "pointSourceId",
+      "colorRed",
+      "colorGreen",
+      "colorBlue"
+     ],
+     "rotationWXYZ": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "translation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "localMin": [
+      -0.5,
+      -0.5,
+      -0.5
+     ],
+     "localMax": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "localCentroid": [
+      -0.005869,
+      -0.000843,
+      -0.000229
+     ],
+     "fileFrameCentroid": [
+      -0.005869,
+      -0.000843,
+      -0.000229
+     ]
+    }
+   ],
+   "pye57": "agrees (scan count, point counts)"
+  },
+  {
+   "file": "e57/ColouredCubeDouble.e57",
+   "source": "S2 self/ (CC0)",
+   "bytes": 210944,
+   "sha256": "58e7cfbb3e9cef777c4cd8f52aff2ff704fcf6dd3aea4b420430adaa1cdb978d",
+   "versionMajor": 1,
+   "versionMinor": 0,
+   "pageSize": 1024,
+   "allPageCrcOk": true,
+   "fileGuid": "Coloured Cube File GUID",
+   "data3DCount": 1,
+   "images2DCount": 0,
+   "scans": [
+    {
+     "pointCount": 7680,
+     "fields": [
+      "cartesianX",
+      "cartesianY",
+      "cartesianZ",
+      "colorRed",
+      "colorGreen",
+      "colorBlue"
+     ],
+     "rotationWXYZ": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "translation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "localMin": [
+      -0.5,
+      -0.5,
+      -0.5
+     ],
+     "localMax": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "localCentroid": [
+      -0.006474,
+      0.002326,
+      -0.003983
+     ],
+     "fileFrameCentroid": [
+      -0.006474,
+      0.002326,
+      -0.003983
+     ]
+    }
+   ],
+   "pye57": "agrees (scan count, point counts)"
+  },
+  {
+   "file": "e57/ColouredCubeFloat.e57",
+   "source": "S2 self/ (CC0)",
+   "bytes": 118784,
+   "sha256": "6dbf7972b358bd7dd0864c7893a4aa7b61a339fd6ee27c71b3031f763c977d33",
+   "versionMajor": 1,
+   "versionMinor": 0,
+   "pageSize": 1024,
+   "allPageCrcOk": true,
+   "fileGuid": "Coloured Cube File GUID",
+   "data3DCount": 1,
+   "images2DCount": 0,
+   "scans": [
+    {
+     "pointCount": 7680,
+     "fields": [
+      "cartesianX",
+      "cartesianY",
+      "cartesianZ",
+      "colorRed",
+      "colorGreen",
+      "colorBlue"
+     ],
+     "rotationWXYZ": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "translation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "localMin": [
+      -0.5,
+      -0.5,
+      -0.5
+     ],
+     "localMax": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "localCentroid": [
+      -0.006474,
+      0.002326,
+      -0.003983
+     ],
+     "fileFrameCentroid": [
+      -0.006474,
+      0.002326,
+      -0.003983
+     ]
+    }
+   ],
+   "pye57": "agrees (scan count, point counts)",
+   "libE57FormatTestAssertion": {
+    "pointCount": 7680,
+    "guid": "Coloured Cube File GUID"
+   }
+  },
+  {
+   "file": "e57/ZeroPoints.e57",
+   "source": "S2 self/ (CC0)",
+   "bytes": 2048,
+   "sha256": "d0a44d8b97069cf5c52ca64d2495c5086717faaa4262066abb24c9bf39089051",
+   "versionMajor": 1,
+   "versionMinor": 0,
+   "pageSize": 1024,
+   "allPageCrcOk": true,
+   "fileGuid": "Zero Points GUID",
+   "data3DCount": 1,
+   "images2DCount": 0,
+   "scans": [
+    {
+     "pointCount": 0,
+     "fields": [
+      "cartesianX",
+      "cartesianY",
+      "cartesianZ"
+     ],
+     "rotationWXYZ": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "translation": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "pye57": "agrees (scan count, point counts)",
+   "libE57FormatTestAssertion": {
+    "pointCount": 0,
+    "guid": "Zero Points GUID"
+   }
+  },
+  {
+   "file": "e57/bad-crc.e57",
+   "source": "S2 self/ (CC0)",
+   "bytes": 1024,
+   "sha256": "64d1b03f9459ae2a0aa9b10f5561696c470037ce760ba6e3b1844f9b90c54516",
+   "versionMajor": 1,
+   "versionMinor": 0,
+   "pageSize": 1024,
+   "allPageCrcOk": false,
+   "fileGuid": "File GUID",
+   "data3DCount": 0,
+   "images2DCount": 0,
+   "scans": [],
+   "pye57": {
+    "error": "E57Exception: checksum mismatch, file is corrupted (ErrorBadChecksum)"
+   },
+   "libE57FormatTestAssertion": {
+    "expect": "throws (checksum) unless ChecksumNone"
+   }
+  },
+  {
+   "file": "e57/bunnyDouble.e57",
+   "source": "S2 reference/ (libe57.org Test Data License)",
+   "bytes": 743424,
+   "sha256": "5ec10af7a8b4cf7778d247ea20b2c3058e6488b55ef102ae187373d5cbe8b056",
+   "versionMajor": 1,
+   "versionMinor": 0,
+   "pageSize": 1024,
+   "allPageCrcOk": true,
+   "fileGuid": "{19AA90ED-145E-4B3B-922C-80BC00648844}",
+   "data3DCount": 1,
+   "images2DCount": 0,
+   "scans": [
+    {
+     "pointCount": 30571,
+     "fields": [
+      "cartesianX",
+      "cartesianY",
+      "cartesianZ",
+      "cartesianInvalidState"
+     ],
+     "rotationWXYZ": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "translation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "localMin": [
+      -0.094689,
+      0.040011,
+      -0.061873
+     ],
+     "localMax": [
+      0.061009,
+      0.187321,
+      0.058799
+     ],
+     "localCentroid": [
+      -0.027513,
+      0.103078,
+      0.008644
+     ],
+     "fileFrameCentroid": [
+      -0.027513,
+      0.103078,
+      0.008644
+     ]
+    }
+   ],
+   "pye57": "agrees (scan count, point counts)",
+   "libE57FormatTestAssertion": {
+    "pointCount": 30571,
+    "guid": "{19AA90ED-145E-4B3B-922C-80BC00648844}"
+   }
+  },
+  {
+   "file": "e57/bunnyInt32.e57",
+   "source": "S2 reference/ (libe57.org Test Data License)",
+   "bytes": 374784,
+   "sha256": "6b3696c452a2dd0e325ab30b1ad28a40de87f1a56cd9d8a24ad81389b606c205",
+   "versionMajor": 1,
+   "versionMinor": 0,
+   "pageSize": 1024,
+   "allPageCrcOk": true,
+   "fileGuid": "{991574D2-854C-4CEF-8CB8-D0132E4BCD0A}",
+   "data3DCount": 1,
+   "images2DCount": 0,
+   "scans": [
+    {
+     "pointCount": 30571,
+     "fields": [
+      "cartesianX",
+      "cartesianY",
+      "cartesianZ",
+      "cartesianInvalidState"
+     ],
+     "rotationWXYZ": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "translation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "localMin": [
+      -0.094689,
+      0.040011,
+      -0.061873
+     ],
+     "localMax": [
+      0.061009,
+      0.187321,
+      0.058799
+     ],
+     "localCentroid": [
+      -0.027513,
+      0.103078,
+      0.008644
+     ],
+     "fileFrameCentroid": [
+      -0.027513,
+      0.103078,
+      0.008644
+     ]
+    }
+   ],
+   "pye57": "agrees (scan count, point counts)",
+   "libE57FormatTestAssertion": {
+    "pointCount": 30571,
+    "guid": "{991574D2-854C-4CEF-8CB8-D0132E4BCD0A}"
+   }
+  },
+  {
+   "file": "e57/empty.e57",
+   "source": "S2 self/ (CC0)",
+   "bytes": 1024,
+   "sha256": "ab43ff6ac95d043eb012641ce99cc9281c54b5a50acca365e89d3da0ceea7d58",
+   "versionMajor": 1,
+   "versionMinor": 0,
+   "pageSize": 1024,
+   "allPageCrcOk": true,
+   "fileGuid": "Empty File GUID",
+   "data3DCount": 0,
+   "images2DCount": 0,
+   "scans": [],
+   "pye57": "agrees (scan count, point counts)",
+   "libE57FormatTestAssertion": {
+    "data3DCount": 0,
+    "guid": "Empty File GUID"
+   }
+  },
+  {
+   "file": "e57/testWithNormals.e57",
+   "source": "S3 pye57 tests/test_data (MIT)",
+   "bytes": 3072,
+   "sha256": "7a4ae0baa7f9704e0d3773be567642d412c387adf7b3c6f16dc1b3b2bf73ca1b",
+   "versionMajor": 1,
+   "versionMinor": 0,
+   "pageSize": 1024,
+   "allPageCrcOk": true,
+   "fileGuid": "{e5c56e10-b82b-4960-933f-b47ff881e78e}",
+   "data3DCount": 1,
+   "images2DCount": 0,
+   "scans": [
+    {
+     "pointCount": 2,
+     "fields": [
+      "cartesianX",
+      "cartesianY",
+      "cartesianZ",
+      "normalX",
+      "normalY",
+      "normalZ"
+     ],
+     "rotationWXYZ": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "translation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "localMin": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "localMax": [
+      2.0,
+      0.0,
+      0.0
+     ],
+     "localCentroid": [
+      1.5,
+      0.0,
+      0.0
+     ],
+     "fileFrameCentroid": [
+      1.5,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "pye57": "agrees (scan count, point counts)"
+  },
+  {
+   "file": "e57/translationWithoutRotation.e57",
+   "source": "S3 pye57 tests/test_data (MIT)",
+   "bytes": 3072,
+   "sha256": "72e1a6923f8898841d8d24aa2d7679afc3fe7cc5a40e85c75a8fc993c02476f4",
+   "versionMajor": 1,
+   "versionMinor": 0,
+   "pageSize": 1024,
+   "allPageCrcOk": true,
+   "fileGuid": "{b293dedf-c4cb-436b-9c13-3c36b43353b9}",
+   "data3DCount": 1,
+   "images2DCount": 0,
+   "scans": [
+    {
+     "pointCount": 4,
+     "fields": [
+      "cartesianX",
+      "cartesianY",
+      "cartesianZ"
+     ],
+     "rotationWXYZ": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "translation": [
+      4.0,
+      5.0,
+      6.0
+     ],
+     "localMin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "localMax": [
+      1.0,
+      1.0,
+      0.0
+     ],
+     "localCentroid": [
+      0.5,
+      0.5,
+      0.0
+     ],
+     "fileFrameCentroid": [
+      4.5,
+      5.5,
+      6.0
+     ]
+    }
+   ],
+   "pye57": "agrees (scan count, point counts)"
+  }
+ ],
+ "notRedistributed": [
+  {
+   "file": "test.e57",
+   "url": "https://raw.githubusercontent.com/davidcaron/pye57/master/tests/test_data/test.e57",
+   "note": "not redistributed (13.7 MB); MIT",
+   "bytes": 13723648,
+   "sha256": "9d5ab50157b27cb3eb501b7e3ff8223c1dad03a90d149d7b709b87d5de683bb8",
+   "fileGuid": "{1020728F-27CE-483B-B192-84B17E8CABFB}",
+   "data3DCount": 4,
+   "scans": [
+    {
+     "pointCount": 281300,
+     "fields": [
+      "cartesianX",
+      "cartesianY",
+      "cartesianZ",
+      "intensity",
+      "rowIndex",
+      "columnIndex",
+      "cartesianInvalidState"
+     ],
+     "rotationWXYZ": [
+      0.5270882356413362,
+      0.0,
+      0.0,
+      -0.8498105623305133
+     ],
+     "translation": [
+      301336.23199782986,
+      5042597.2367641805,
+      15.466497953031721
+     ]
+    },
+    {
+     "pointCount": 448052,
+     "fields": [
+      "cartesianX",
+      "cartesianY",
+      "cartesianZ",
+      "intensity",
+      "rowIndex",
+      "columnIndex",
+      "cartesianInvalidState"
+     ],
+     "rotationWXYZ": [
+      0.23131635399853548,
+      0.0,
+      0.0,
+      0.9728785866555107
+     ],
+     "translation": [
+      301354.83581869677,
+      5042595.528603119,
+      15.11749361626406
+     ]
+    },
+    {
+     "pointCount": 42,
+     "fields": [
+      "cartesianX",
+      "cartesianY",
+      "cartesianZ",
+      "intensity",
+      "rowIndex",
+      "columnIndex",
+      "cartesianInvalidState"
+     ],
+     "rotationWXYZ": [
+      0.23131635399853548,
+      0.0,
+      0.0,
+      0.9728785866555107
+     ],
+     "translation": [
+      301354.83581869677,
+      5042595.528603119,
+      15.11749361626406
+     ]
+    },
+    {
+     "pointCount": 100,
+     "fields": [
+      "cartesianX",
+      "cartesianY",
+      "cartesianZ",
+      "intensity",
+      "rowIndex",
+      "columnIndex",
+      "cartesianInvalidState"
+     ],
+     "rotationWXYZ": [
+      0.9999050893328864,
+      0.0,
+      0.0,
+      0.013777239425683938
+     ],
+     "translation": [
+      301323.45644016773,
+      5042601.844017709,
+      15.604027947775444
+     ]
+    }
+   ]
+  },
+  {
+   "file": "testSpherical.e57",
+   "url": "https://raw.githubusercontent.com/davidcaron/pye57/master/tests/test_data/testSpherical.e57",
+   "note": "not redistributed (5.2 MB); MIT",
+   "bytes": 5168128,
+   "sha256": "268b42e69bbbad85703933f24626b97736ec703b0a7c34550dcb6ed0830317e3",
+   "fileGuid": "{9229A6A2-4ECA-4B6B-B892-91FB7BD4B60C}",
+   "data3DCount": 1,
+   "scans": [
+    {
+     "pointCount": 370530,
+     "fields": [
+      "sphericalRange",
+      "sphericalAzimuth",
+      "sphericalElevation",
+      "intensity",
+      "colorRed",
+      "colorGreen",
+      "colorBlue",
+      "sphericalInvalidState"
+     ],
+     "rotationWXYZ": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "translation": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   ]
+  }
+ ]
+}

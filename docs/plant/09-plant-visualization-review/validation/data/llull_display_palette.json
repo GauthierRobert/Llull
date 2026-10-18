@@ -1,0 +1,239 @@
+{
+  "pack": "09 VIS",
+  "status": "PROPOSED default display palette (named default `palette:llull-ral-approx-v1`). NOT a standard value and NEVER a pass/fail gate: no RAL / BS 4800 / ANSI Z535.1 colour has an official sRGB value, several safety colours lie outside sRGB (forum report S14), and the one machine-readable RAL table found (npm ral-colors 1.0.1, MIT, S13) is internally inconsistent: its HEX and rgb fields differ for 14 of the 15 codes below (only RAL 1021 agrees) (e.g. RAL 2003 HEX #FA842B vs rgb 241,120,41). Grade C.",
+  "rule": "displayHex = the `HEX` field of ral-colors 1.0.1 RAL/classic.js for the RAL code named; categories with no RAL code in a source use the RAL code given in `ralChoice` (a llull choice, flagged). Tests assert only that every category resolves to some palette entry and that the result names `palette` and `approximate: true`.",
+  "source": {
+    "package": "ral-colors@1.0.1",
+    "tarballSha256": "6178d08092be36e910ec6f3cc8ff77a0a7fdb17feccac63f2afa08c26ad05a5b",
+    "file": "package/RAL/classic.js",
+    "licence": "MIT (c) 2022 Ibon Eskudero"
+  },
+  "ral": {
+    "1021": {
+      "name": "Colza yellow",
+      "hex": "#F6B600",
+      "rgbField": [
+        246,
+        182,
+        0
+      ]
+    },
+    "2003": {
+      "name": "Pastel orange",
+      "hex": "#FA842B",
+      "rgbField": [
+        241,
+        120,
+        41
+      ]
+    },
+    "3000": {
+      "name": "Flame red",
+      "hex": "#AB2524",
+      "rgbField": [
+        164,
+        40,
+        33
+      ]
+    },
+    "3007": {
+      "name": "Black red",
+      "hex": "#402225",
+      "rgbField": [
+        61,
+        32,
+        34
+      ]
+    },
+    "4001": {
+      "name": "Red lilac",
+      "hex": "#8A5A83",
+      "rgbField": [
+        131,
+        96,
+        131
+      ]
+    },
+    "4008": {
+      "name": "Signal violet",
+      "hex": "#904684",
+      "rgbField": [
+        135,
+        75,
+        131
+      ]
+    },
+    "5015": {
+      "name": "Sky blue",
+      "hex": "#2874B2",
+      "rgbField": [
+        11,
+        123,
+        176
+      ]
+    },
+    "6018": {
+      "name": "Yellow green",
+      "hex": "#48A43F",
+      "rgbField": [
+        89,
+        154,
+        57
+      ]
+    },
+    "7001": {
+      "name": "Silver grey",
+      "hex": "#8F999F",
+      "rgbField": [
+        142,
+        150,
+        157
+      ]
+    },
+    "7004": {
+      "name": "Signal grey",
+      "hex": "#9EA0A1",
+      "rgbField": [
+        155,
+        155,
+        155
+      ]
+    },
+    "8001": {
+      "name": "Ochre brown",
+      "hex": "#9C6B30",
+      "rgbField": [
+        153,
+        99,
+        43
+      ]
+    },
+    "9003": {
+      "name": "Signal white",
+      "hex": "#F4F8F4",
+      "rgbField": [
+        236,
+        236,
+        231
+      ]
+    },
+    "9005": {
+      "name": "Jet black",
+      "hex": "#0A0A0D",
+      "rgbField": [
+        14,
+        14,
+        16
+      ]
+    },
+    "9006": {
+      "name": "White aluminium",
+      "hex": "#A5A8A6",
+      "rgbField": [
+        161,
+        161,
+        160
+      ]
+    },
+    "9010": {
+      "name": "Pure white",
+      "hex": "#F7F9EF",
+      "rgbField": [
+        241,
+        236,
+        225
+      ]
+    }
+  },
+  "namedColourToRal": {
+    "red": {
+      "ral": "3000",
+      "from": "ISO 14726 Table B.1 (S8/S9)"
+    },
+    "orange": {
+      "ral": "2003",
+      "from": "ISO 14726 Table B.1"
+    },
+    "yellow": {
+      "ral": "1021",
+      "from": "ISO 14726 Table B.1"
+    },
+    "brown": {
+      "ral": "8001",
+      "from": "ISO 14726 Table B.1"
+    },
+    "green": {
+      "ral": "6018",
+      "from": "ISO 14726 Table B.1"
+    },
+    "blue": {
+      "ral": "5015",
+      "from": "ISO 14726 Table B.1"
+    },
+    "grey": {
+      "ral": "7001",
+      "from": "ISO 14726 Table B.1"
+    },
+    "gray": {
+      "ral": "7001",
+      "from": "alias of grey"
+    },
+    "silver": {
+      "ral": "9006",
+      "from": "ISO 14726 Table B.1"
+    },
+    "violet": {
+      "ral": "4001",
+      "from": "ISO 14726 Table B.1"
+    },
+    "white": {
+      "ral": "9010",
+      "from": "ISO 14726 Table B.1"
+    },
+    "black": {
+      "ral": "9005",
+      "from": "ISO 14726 Table B.1"
+    },
+    "maroon": {
+      "ral": "3007",
+      "from": "ralChoice: llull choice, RAL not confirmed for ISO MN",
+      "flagged": true
+    },
+    "purple": {
+      "ral": "4008",
+      "from": "ralChoice: llull choice for ASME user-defined purple",
+      "flagged": true
+    },
+    "silver-grey": {
+      "ral": "7004",
+      "from": "ralChoice: llull choice for BS 1710 steam (BS 4800 10 A 03 has no RAL equivalent in a source)",
+      "flagged": true
+    },
+    "light blue": {
+      "ral": "5015",
+      "from": "ralChoice: llull choice for BS 1710 air",
+      "flagged": true
+    },
+    "yellow ochre": {
+      "ral": "1021",
+      "from": "ralChoice (ISO 14726-1:1999 called flammable-gas yellow 'yellow-ochre')",
+      "flagged": true
+    }
+  },
+  "mismatchHexVsRgbField": [
+    "2003",
+    "3000",
+    "3007",
+    "4001",
+    "4008",
+    "5015",
+    "6018",
+    "7001",
+    "7004",
+    "8001",
+    "9003",
+    "9005",
+    "9006",
+    "9010"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "id": "SC-PID-04",
+  "status": "DRAFT — unbuilt commands: import_dexpi, export_dexpi, pid_report. CLI script; each line runs on the named --doc; --save writes data.text to disk.",
+  "validates": ["VC-PID-02", "VC-PID-06", "VC-PID-07"],
+  "description": "Round trip: C01 (Proteus 4.1.1) -> llull -> DEXPI 1.3 Proteus and DEXPI 2.0 XML -> llull, and import of the published DEXPI 2.0.1 encoding of the same reference P&ID. Every census key must be equal across the four documents; a second export must be byte-identical to the first.",
+  "cli": [
+    "llull --doc a.llull import_dexpi file=validation/data/dexpi13/C01V04-VER.EX01.xml --json",
+    "llull --doc a.llull export_dexpi version=1.3 --save out/a13.xml",
+    "llull --doc a.llull export_dexpi version=2.0 --save out/a20.xml",
+    "llull --doc b.llull import_dexpi file=out/a13.xml --json",
+    "llull --doc b.llull export_dexpi version=1.3 --save out/b13.xml",
+    "llull --doc c.llull import_dexpi file=out/a20.xml --json",
+    "llull --doc d.llull import_dexpi file=validation/data/dexpi20/reference_pid.xml --json",
+    "python3 -I validation/data/scripts/census_proteus.py out/a13.xml",
+    "python3 -I validation/data/scripts/census_dexpi20.py out/a20.xml",
+    "cmp out/a13.xml out/b13.xml",
+    "xmllint --noout --schema validation/data/dexpi20/DEXPI_XML_Schema.xsd out/a20.xml"
+  ],
+  "expected": [
+    { "check": "pid_report kind=counts on a, b, c, d", "value": "identical, equal to data/dexpi_census.json proteus13[0].counts for the 14 keys of crossEncodingCheck", "source": "[S1][S2]" },
+    { "check": "census_proteus.py out/a13.xml counts", "value": "equal to proteus13[0].counts except shapeCatalogueEntries (llull writes its own catalogue: reported, not gated)", "source": "[S1]" },
+    { "check": "census_dexpi20.py out/a20.xml counts", "value": "equal to dexpi20.counts", "source": "[S2]" },
+    { "check": "pid_report kind=line_list / valve_list / instrument_index / equipment_list on a and d", "value": "row-wise identical (tags, line numbers, DN, piping class, fluid code)", "source": "[S1][S2]" },
+    { "check": "cmp out/a13.xml out/b13.xml", "value": "exit 0 (export of an import of an export is byte-identical: AF-13)", "source": "determinism requirement" },
+    { "check": "xmllint against DEXPI_XML_Schema.xsd", "value": "valid", "source": "[S2] XSD" }
+  ]
+}

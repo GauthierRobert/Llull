@@ -1,0 +1,19 @@
+{
+  "id": "SC-ISO-06",
+  "validates": ["VC-ISO-15"],
+  "description": "Orthographic piping general-arrangement plan and section of L-101: pipes drawn double-line above the size threshold, line label line-DN-spec, centreline and bottom-of-pipe elevations, flow arrows. Builds on export_plan_sheet / export_elevation_sheet.",
+  "status": "UNBUILT - export_piping_ga is new; the plan and elevation drawings exist today",
+  "unbuilt": ["import_pcf", "export_piping_ga"],
+  "harness": { "inline": { "actions[1].params.text": "../data/iso-01-L101-dn100.pcf" } },
+  "actions": [
+    { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },
+    { "command": "import_pcf", "params": { "text": "<data/iso-01-L101-dn100.pcf>" } },
+    { "command": "export_piping_ga", "params": { "view": "plan", "paper": "A1", "scale": 50, "doubleLineFromDn": 300, "annotate": ["line_label", "cl_elevation", "bop_elevation", "flow_arrow"] } },
+    { "command": "export_piping_ga", "params": { "view": "section", "direction": "south", "cutAt": 2000, "paper": "A1", "scale": 50 } }
+  ],
+  "expected": [
+    { "step": 2, "path": "data.labels[kind=line].text", "value": "L-101-DN100-A1A", "source": "PIPELINE-REFERENCE + bore + PIPING-SPEC" },
+    { "step": 2, "path": "data.labels[kind=cl_elevation][*].text", "value": ["CL EL +3000", "CL EL +1000"], "source": "file coordinates" },
+    { "step": 2, "path": "data.labels[kind=bop_elevation][0].valueMm", "value": 2942.85, "abs": 0.01, "source": "3000 - 114.3 / 2" }
+  ]
+}

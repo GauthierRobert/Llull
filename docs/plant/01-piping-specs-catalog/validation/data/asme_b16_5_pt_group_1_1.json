@@ -1,0 +1,38 @@
+{
+  "meta": {
+    "id": "PSC-DATA-PT11",
+    "title": "ASME B16.5 pressure-temperature ratings, material group 1.1 (e.g. A105 / A216 WCB / A515-70 / A516-70 / A350 LF2), working pressure in bar (gauge)",
+    "standard": "ASME B16.5 Table 2-1.1 (metric ratings in bar). Paywalled: only the values below, quoted by public secondary sources, are used.",
+    "sources": {
+      "S5": "Engineering ToolBox, 'Carbon Steel Flanges - Group 1.1 Pressure and Temperature Ratings', https://www.engineeringtoolbox.com/steel-flanges-pressure-rating-d_49.html (search-engine extract, 2026-10-18)",
+      "S6": "Fike Corporation technical bulletin citing ASME B16.5-2017, https://my.fike.com/phoenix/api/files/download/?did=6411 (search-engine extract, 2026-10-18)",
+      "S7": "Project Materials, 'ASME B16.5 PT Rating Tables Explained' and 'Flange Class 150 vs 300' (285 psig / 740 psig at -20..100 F for group 1.1), https://www.blog.projectmaterials.com/quick-answers/flanges/asme-b16-5-pt-rating-tables/ (search extract)"
+    },
+    "interpolation": "Linear interpolation between tabulated temperatures is permitted (S7 extract; B16.5 para. 2.3 as quoted by secondary sources).",
+    "units": { "temperatureC": "degC (upper bound of the band; the first band is -29..38)", "ratingBar": "bar gauge" }
+  },
+  "rows": [
+    { "class": 150, "temperatureC": 38, "ratingBar": 19.6, "sources": ["S5", "S6"], "grade": "A" },
+    { "class": 150, "temperatureC": 50, "ratingBar": 19.2, "sources": ["S5", "S6"], "grade": "A" },
+    { "class": 150, "temperatureC": 100, "ratingBar": 17.7, "sources": ["S5"], "grade": "B" },
+    { "class": 150, "temperatureC": 150, "ratingBar": 15.8, "sources": ["S5"], "grade": "B" },
+    { "class": 150, "temperatureC": 200, "ratingBar": 13.8, "sources": ["S5"], "grade": "B" },
+    { "class": 300, "temperatureC": 38, "ratingBar": 51.1, "sources": ["S5", "S6"], "grade": "A" },
+    { "class": 300, "temperatureC": 50, "ratingBar": 50.1, "sources": ["S6"], "grade": "B" },
+    { "class": 600, "temperatureC": 38, "ratingBar": 102.1, "sources": ["S6"], "grade": "B" },
+    { "class": 600, "temperatureC": 50, "ratingBar": 100.2, "sources": ["S6"], "grade": "B" },
+    { "class": 900, "temperatureC": 38, "ratingBar": 153.2, "sources": ["S6"], "grade": "B" },
+    { "class": 900, "temperatureC": 50, "ratingBar": 150.4, "sources": ["S6"], "grade": "B" },
+    { "class": 1500, "temperatureC": 38, "ratingBar": 255.3, "sources": ["S6"], "grade": "B" },
+    { "class": 1500, "temperatureC": 50, "ratingBar": 250.6, "sources": ["S6"], "grade": "B" },
+    { "class": 2500, "temperatureC": 38, "ratingBar": 425.5, "sources": ["S6"], "grade": "B" },
+    { "class": 2500, "temperatureC": 50, "ratingBar": 417.7, "sources": ["S6"], "grade": "B" }
+  ],
+  "imperial": [
+    { "class": 150, "temperatureF": 100, "ratingPsig": 285, "sources": ["S5", "S7"], "grade": "A" },
+    { "class": 300, "temperatureF": 100, "ratingPsig": 740, "sources": ["S5", "S7"], "grade": "A" }
+  ],
+  "notInUse": [
+    "Intermediate temperatures for classes >= 300 above 50 C: secondary sources disagree (e.g. Class 300 at 400 F: 635 vs 600 psig) - grade C, never gates."
+  ]
+}

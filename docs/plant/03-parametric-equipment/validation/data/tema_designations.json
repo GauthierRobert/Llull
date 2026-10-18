@@ -1,0 +1,57 @@
+{
+  "title": "TEMA shell-and-tube exchanger type designation and selected TEMA tables (as tabulated by the ht package)",
+  "provenance": "ht 1.2.0 (PyPI sdist ht-1.2.0.tar.gz, sha256 ae117387c4e99a1860d78afd391d24b1a4217cb7495250cd480606e2b7fa2ff5, MIT, C. Bell), ht/hx.py (sha256 ec3d6a9d296328b2754efe250a3019d3ccba03efc04bf613e730a52720d7ca5c), which cites TEMA Standards 9th ed. 2007; designation letters cross-checked with Wikipedia 'Tubular Exchanger Manufacturers Association' and wermac / heat-exchanger-world extracts [S28]",
+  "designation": {
+    "rule": "three letters: front (stationary) head, shell, rear head; e.g. BEM = bonnet, one-pass shell, fixed tubesheet like B; AES = removable channel and cover, one-pass shell, floating head with backing device; AEU = U-tube bundle",
+    "frontHeads": { "A": "Removable Channel and Cover", "B": "Bonnet (Integral Cover)", "C": "Integral With Tubesheet Removable Cover", "N": "Channel Integral With Tubesheet and Removable Cover", "D": "Special High-Pressure Closures" },
+    "shells": { "E": "One-Pass Shell", "F": "Two-Pass Shell with Longitudinal Baffle", "G": "Split Flow", "H": "Double Split Flow", "J": "Divided Flow", "K": "Kettle-Type Reboiler", "X": "Cross Flow" },
+    "rearHeads": { "L": "Fixed Tube Sheet; Like \"A\" Stationary Head", "M": "Fixed Tube Sheet; Like \"B\" Stationary Head", "N": "Fixed Tube Sheet; Like \"C\" Stationary Head", "P": "Outside Packed Floating Head", "S": "Floating Head with Backing Device", "T": "Pull-Through Floating Head", "U": "U-Tube Bundle", "W": "Externally Sealed Floating Tubesheet" },
+    "serviceClasses": { "R": "Refinery", "C": "General", "B": "Chemical" },
+    "sources": ["S27", "S28"],
+    "grade": "A",
+    "cases": [
+      { "input": "BEM", "front": "B", "shell": "E", "rear": "M", "fixedTubesheet": true, "removableBundle": false },
+      { "input": "AES", "front": "A", "shell": "E", "rear": "S", "fixedTubesheet": false, "removableBundle": true },
+      { "input": "AEU", "front": "A", "shell": "E", "rear": "U", "fixedTubesheet": false, "removableBundle": true },
+      { "input": "AKT", "front": "A", "shell": "K", "rear": "T", "fixedTubesheet": false, "removableBundle": true },
+      { "input": "BXZ", "error": "EQP_TEMA_INVALID", "paths": ["temaType.2"] },
+      { "input": "BE", "error": "EQP_TEMA_INVALID", "paths": ["temaType"] }
+    ],
+    "fixedTubesheetRule": "rear head L, M or N = fixed tubesheet (bundle not removable); P, S, T, W = floating head; U = U-tube (removable bundle) [S27, S28]"
+  },
+  "tubeSizes": {
+    "note": "TEMA standard tube OD (in) and BWG gauges; wall thickness from the BWG table (ht quotes engineeringpage.com). Grade B: one secondary tabulation.",
+    "grade": "B",
+    "rows": [
+      { "od_in": 0.75, "od_mm": 19.05, "bwg": 12, "wall_mm": 2.769 },
+      { "od_in": 0.75, "od_mm": 19.05, "bwg": 14, "wall_mm": 2.108 },
+      { "od_in": 0.75, "od_mm": 19.05, "bwg": 16, "wall_mm": 1.651 },
+      { "od_in": 0.75, "od_mm": 19.05, "bwg": 18, "wall_mm": 1.245 },
+      { "od_in": 1.0, "od_mm": 25.4, "bwg": 12, "wall_mm": 2.769 },
+      { "od_in": 1.0, "od_mm": 25.4, "bwg": 14, "wall_mm": 2.108 },
+      { "od_in": 1.0, "od_mm": 25.4, "bwg": 16, "wall_mm": 1.651 },
+      { "od_in": 1.0, "od_mm": 25.4, "bwg": 18, "wall_mm": 1.245 }
+    ]
+  },
+  "shellBundleClearance": {
+    "note": "recommended diametral shell-to-bundle clearance by shell ID (ht shell_clearance, TEMA 9th ed.); V1 bundle sizing only",
+    "grade": "B",
+    "rows_m": [ [0.457, 0.0032], [1.016, 0.0048], [1.397, 0.0064], [1.778, 0.0079], [2.159, 0.0095], ["above", 0.011] ]
+  },
+  "maxUnsupportedTubeSpan": {
+    "note": "TEMA maximum unsupported straight tube span (ht L_unsupported_max, TEMA 9th ed. p 5.4-5); tube OD in, span m. The ht table lists 0.628 in where 0.625 (5/8 in) is meant - transcribed as 0.625 here. V1 check EQP_TUBE_SPAN_EXCEEDED.",
+    "grade": "B",
+    "od_in": [0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0],
+    "steelAndHighAlloy_m": [0.66, 0.889, 1.118, 1.321, 1.524, 1.753, 1.88, 2.235, 2.54, 3.175, 3.175, 3.175],
+    "aluminiumCopperTitanium_m": [0.559, 0.762, 0.965, 1.143, 1.321, 1.524, 1.626, 1.93, 2.21, 2.794, 2.794, 2.794]
+  },
+  "tubeCountReference": {
+    "note": "tube counts for a bundle (V1 tubesheet layout); expected values from ht tests (reference code), methods Phadke (exact count), HEDH, VDI, Perry",
+    "grade": "A (reference-code values; the Phadke 45 deg cases are stated in ht as published examples)",
+    "cases": [
+      { "DBundle_m": 1.184, "Do_m": 0.028, "pitch_m": 0.036, "angleDeg": 45, "Ntp": [1, 2, 4, 6, 8], "Ntubes_Phadkeb": [805, 782, 760, 698, 680] },
+      { "DBundle_m": 1.184, "Do_m": 0.028, "pitch_m": 0.035, "angleDeg": 45, "Ntp": [1, 2, 4, 6, 8], "Ntubes_Phadkeb": [861, 838, 816, 750, 732] },
+      { "DBundle_m": 1.2, "Do_m": 0.025, "pitch_m": 0.03125, "angleDeg": 30, "Ntp": 1, "Ntubes": { "Phadkeb": 1285, "HEDH": 1272, "VDI": 1340, "Perry": 1297 } }
+    ]
+  }
+}

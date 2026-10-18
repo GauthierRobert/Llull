@@ -1,0 +1,1284 @@
+{
+ "source": "computed 2026-10-18 by data/scripts/census_proteus.py, census_dexpi20.py and connectivity_proteus.py (python3 -I, xml.etree, read-only) from the files in data/dexpi13 and data/dexpi20; no llull code involved",
+ "sourceIds": [
+  "S1",
+  "S2",
+  "S3"
+ ],
+ "countingRules": {
+  "scope": "instances only: every element under the PlantModel root except the ShapeCatalogue subtree (shape definitions are not plant items)",
+  "equipmentTopLevel": "Equipment elements that are direct children of PlantModel",
+  "equipmentAll": "all Equipment elements, nested sub-equipment included (Chamber, Impeller, Displacer, TubeBundle)",
+  "valves": "PipingComponent whose ComponentClass contains \"Valve\" (DEXPI 2.0: Plant/Piping.*Valve*)",
+  "informationFlows": "InformationFlow elements (MeasuringLineFunction, SignalConveyingFunction, SignalLineFunction)",
+  "connections": "Connection elements (one per PipingNetworkSegment plus one per InformationFlow)",
+  "danglingConnections": "Connection whose FromID / ToID names no instance ID in the file"
+ },
+ "proteus13": [
+  {
+   "file": "C01V04-VER.EX01.xml",
+   "sha256": "a2b172f04e0dcf9a668e158c6dee3b5fd0dd4e9027b572dc39e54470562b809c",
+   "bytes": 445726,
+   "plantInformation": {
+    "SchemaVersion": "4.1.1",
+    "OriginatingSystem": "P&ID Toolbox",
+    "ApplicationVersion": "1.3.1",
+    "Units": "mm"
+   },
+   "counts": {
+    "equipmentTopLevel": 5,
+    "equipmentAll": 16,
+    "nozzles": 19,
+    "pipingNetworkSystems": 11,
+    "pipingNetworkSegments": 23,
+    "pipingComponents": 19,
+    "valves": 11,
+    "processInstrumentationFunctions": 4,
+    "instrumentationLoopFunctions": 4,
+    "actuatingSystems": 3,
+    "processSignalGeneratingFunctions": 3,
+    "informationFlows": 6,
+    "pipeOffPageConnectors": 2,
+    "pipeFlowArrows": 8,
+    "connections": 29,
+    "danglingConnections": 0,
+    "shapeCatalogueEntries": 24
+   },
+   "equipmentByClass": {
+    "CentrifugalPump": 1,
+    "Chamber": 8,
+    "Displacer": 1,
+    "Impeller": 1,
+    "PlateHeatExchanger": 1,
+    "ReciprocatingPump": 1,
+    "Tank": 1,
+    "TubeBundle": 1,
+    "TubularHeatExchanger": 1
+   },
+   "pipingComponentsByClass": {
+    "BallValve": 5,
+    "BlindFlange": 2,
+    "ButterflyValve": 1,
+    "GlobeValve": 3,
+    "PipeReducer": 1,
+    "PipeTee": 5,
+    "SpringLoadedGlobeSafetyValve": 1,
+    "SwingCheckValve": 1
+   },
+   "informationFlowsByClass": {
+    "MeasuringLineFunction": 3,
+    "SignalConveyingFunction": 3
+   },
+   "equipment": [
+    {
+     "id": "PlateHeatExchanger-1",
+     "class": "PlateHeatExchanger",
+     "tagName": "H1007",
+     "nozzles": 4,
+     "subEquipment": 2
+    },
+    {
+     "id": "TubularHeatExchanger-1",
+     "class": "TubularHeatExchanger",
+     "tagName": "H1008",
+     "nozzles": 4,
+     "subEquipment": 3
+    },
+    {
+     "id": "CentrifugalPump-1",
+     "class": "CentrifugalPump",
+     "tagName": "P4711",
+     "nozzles": 2,
+     "subEquipment": 2
+    },
+    {
+     "id": "ReciprocatingPump-1",
+     "class": "ReciprocatingPump",
+     "tagName": "P4712",
+     "nozzles": 2,
+     "subEquipment": 2
+    },
+    {
+     "id": "Tank-1",
+     "class": "Tank",
+     "tagName": "T4750",
+     "nozzles": 7,
+     "subEquipment": 2
+    }
+   ],
+   "lines": [
+    {
+     "id": "PipingNetworkSystem-1",
+     "lineNumber": "47121",
+     "fluidCode": "MNb",
+     "nominalDiameter": "DN 80",
+     "pipingClass": "75HB13",
+     "segments": 1
+    },
+    {
+     "id": "PipingNetworkSystem-2",
+     "lineNumber": "47122",
+     "fluidCode": "MNb",
+     "nominalDiameter": "DN 80",
+     "pipingClass": "75HB13",
+     "segments": 1
+    },
+    {
+     "id": "PipingNetworkSystem-3",
+     "lineNumber": "47123",
+     "fluidCode": "MNb",
+     "nominalDiameter": "DN 80",
+     "pipingClass": "75HB13",
+     "segments": 1
+    },
+    {
+     "id": "PipingNetworkSystem-4",
+     "lineNumber": "47124",
+     "fluidCode": "MNc",
+     "nominalDiameter": "DN 80",
+     "pipingClass": "75HB13",
+     "segments": 3
+    },
+    {
+     "id": "PipingNetworkSystem-5",
+     "lineNumber": "47125",
+     "fluidCode": "MNc",
+     "nominalDiameter": "DN 25",
+     "pipingClass": "73HG12",
+     "segments": 2
+    },
+    {
+     "id": "PipingNetworkSystem-6",
+     "lineNumber": "47126",
+     "fluidCode": "MNc",
+     "nominalDiameter": "DN 50",
+     "pipingClass": "75HB13",
+     "segments": 10
+    },
+    {
+     "id": "PipingNetworkSystem-7",
+     "lineNumber": "47127",
+     "fluidCode": "MNc",
+     "nominalDiameter": "DN 50",
+     "pipingClass": "75HB13",
+     "segments": 1
+    },
+    {
+     "id": "PipingNetworkSystem-8",
+     "lineNumber": "47130",
+     "fluidCode": "WKa",
+     "nominalDiameter": "DN 50",
+     "pipingClass": "75HB13",
+     "segments": 1
+    },
+    {
+     "id": "PipingNetworkSystem-9",
+     "lineNumber": "47131",
+     "fluidCode": "WKb",
+     "nominalDiameter": "DN 50",
+     "pipingClass": "75HB13",
+     "segments": 1
+    },
+    {
+     "id": "PipingNetworkSystem-10",
+     "lineNumber": "47140",
+     "fluidCode": "QSa",
+     "nominalDiameter": "DN 50",
+     "pipingClass": "75HB13",
+     "segments": 1
+    },
+    {
+     "id": "PipingNetworkSystem-11",
+     "lineNumber": "47141",
+     "fluidCode": "QSb",
+     "nominalDiameter": "DN 50",
+     "pipingClass": "75HB13",
+     "segments": 1
+    }
+   ],
+   "valves": [
+    {
+     "id": "GlobeValve-2",
+     "class": "GlobeValve",
+     "number": "C1"
+    },
+    {
+     "id": "ButterflyValve-1",
+     "class": "ButterflyValve",
+     "number": "C1"
+    },
+    {
+     "id": "SwingCheckValve-1",
+     "class": "SwingCheckValve",
+     "number": "C2"
+    },
+    {
+     "id": "BallValve-1",
+     "class": "BallValve",
+     "number": "C4"
+    },
+    {
+     "id": "SpringLoadedGlobeSafetyValve-1",
+     "class": "SpringLoadedGlobeSafetyValve",
+     "number": null
+    },
+    {
+     "id": "BallValve-2",
+     "class": "BallValve",
+     "number": "C2"
+    },
+    {
+     "id": "BallValve-3",
+     "class": "BallValve",
+     "number": "C5"
+    },
+    {
+     "id": "BallValve-4",
+     "class": "BallValve",
+     "number": "C7"
+    },
+    {
+     "id": "BallValve-5",
+     "class": "BallValve",
+     "number": "C10"
+    },
+    {
+     "id": "GlobeValve-1",
+     "class": "GlobeValve",
+     "number": "C1"
+    },
+    {
+     "id": "GlobeValve-3",
+     "class": "GlobeValve",
+     "number": "C1"
+    }
+   ],
+   "instrumentFunctions": [
+    {
+     "id": "ProcessInstrumentationFunction-1",
+     "category": "P",
+     "functions": "I",
+     "number": "4712.01",
+     "location": "Field"
+    },
+    {
+     "id": "ProcessInstrumentationFunction-2",
+     "category": "P",
+     "functions": "ICSA",
+     "number": "4712.02",
+     "location": "CentralLocation"
+    },
+    {
+     "id": "ProcessInstrumentationFunction-3",
+     "category": "H",
+     "functions": "S",
+     "number": "4750.01",
+     "location": "CentralLocation"
+    },
+    {
+     "id": "ProcessInstrumentationFunction-4",
+     "category": "T",
+     "functions": "ICSA",
+     "number": "4750.03",
+     "location": "CentralLocation"
+    }
+   ],
+   "loops": [
+    "4712.01",
+    "4712.02",
+    "4750.01",
+    "4750.03"
+   ]
+  },
+  {
+   "file": "C02V03-VER.EX02.xml",
+   "sha256": "dfe4323c18d018caa4b28ec789b3dbee21be73c6a07c7cbd0791ceebd322113b",
+   "bytes": 157666,
+   "plantInformation": {
+    "SchemaVersion": "4.1.1",
+    "OriginatingSystem": "DEXPI Test Case",
+    "ApplicationVersion": "1.3.1",
+    "Units": "m"
+   },
+   "counts": {
+    "equipmentTopLevel": 2,
+    "equipmentAll": 6,
+    "nozzles": 9,
+    "pipingNetworkSystems": 4,
+    "pipingNetworkSegments": 9,
+    "pipingComponents": 9,
+    "valves": 3,
+    "processInstrumentationFunctions": 3,
+    "instrumentationLoopFunctions": 0,
+    "actuatingSystems": 0,
+    "processSignalGeneratingFunctions": 2,
+    "informationFlows": 4,
+    "pipeOffPageConnectors": 1,
+    "pipeFlowArrows": 1,
+    "connections": 13,
+    "danglingConnections": 0,
+    "shapeCatalogueEntries": 14
+   },
+   "equipmentByClass": {
+    "Chamber": 1,
+    "ColumnPackingsArrangement": 2,
+    "ColumnSection": 2,
+    "ProcessColumn": 1
+   },
+   "pipingComponentsByClass": {
+    "BlindFlange": 4,
+    "OperatedValve": 3,
+    "PipeReducer": 1,
+    "PipeTee": 1
+   },
+   "informationFlowsByClass": {
+    "MeasuringLineFunction": 2,
+    "SignalConveyingFunction": 2
+   },
+   "equipment": [
+    {
+     "id": "ProcessColumn-1",
+     "class": "ProcessColumn",
+     "tagName": "K 2750",
+     "nozzles": 9,
+     "subEquipment": 2
+    },
+    {
+     "id": "TaggedColumnSection-1",
+     "class": "ColumnSection",
+     "tagName": "KX 2750",
+     "nozzles": 0,
+     "subEquipment": 1
+    }
+   ],
+   "lines": [
+    {
+     "id": "PipingNetworkSystem-1",
+     "lineNumber": "2750.001.6",
+     "fluidCode": "8503",
+     "nominalDiameter": "DN 150",
+     "pipingClass": "10HB25T10B1",
+     "segments": 2
+    },
+    {
+     "id": "PipingNetworkSystem-2",
+     "lineNumber": "*at N3*",
+     "fluidCode": null,
+     "nominalDiameter": "DN 150",
+     "pipingClass": null,
+     "segments": 3
+    },
+    {
+     "id": "PipingNetworkSystem-3",
+     "lineNumber": "*at P3*",
+     "fluidCode": null,
+     "nominalDiameter": "DN 25",
+     "pipingClass": null,
+     "segments": 2
+    },
+    {
+     "id": "PipingNetworkSystem-4",
+     "lineNumber": "*at P4*",
+     "fluidCode": null,
+     "nominalDiameter": "DN 25",
+     "pipingClass": null,
+     "segments": 2
+    }
+   ],
+   "valves": [
+    {
+     "id": "OperatedValve-1",
+     "class": "OperatedValve",
+     "number": "*C2*"
+    },
+    {
+     "id": "OperatedValve-2",
+     "class": "OperatedValve",
+     "number": null
+    },
+    {
+     "id": "OperatedValve-3",
+     "class": "OperatedValve",
+     "number": null
+    }
+   ],
+   "instrumentFunctions": [
+    {
+     "id": "ProcessInstrumentationFunction-1",
+     "category": "P",
+     "functions": "IS\u207aZ\u207aA",
+     "number": "275003",
+     "location": "CentralLocation"
+    },
+    {
+     "id": "ProcessInstrumentationFunction-2",
+     "category": "P",
+     "functions": "I(Z)",
+     "number": "275003A",
+     "location": "CentralLocation"
+    },
+    {
+     "id": "ProcessInstrumentationFunction-3",
+     "category": "P",
+     "functions": "I(Z)",
+     "number": "275003B",
+     "location": "CentralLocation"
+    }
+   ],
+   "loops": []
+  },
+  {
+   "file": "C03V04-VER.EX02.xml",
+   "sha256": "a1c892f3bc21338c2546baf71e10abf11e3653b7cd6956b1a24bcfab0db88f14",
+   "bytes": 68507,
+   "plantInformation": {
+    "SchemaVersion": "4.1.1",
+    "OriginatingSystem": "DEXPI Test Case",
+    "ApplicationVersion": "1.3.1",
+    "Units": "m"
+   },
+   "counts": {
+    "equipmentTopLevel": 0,
+    "equipmentAll": 0,
+    "nozzles": 0,
+    "pipingNetworkSystems": 3,
+    "pipingNetworkSegments": 5,
+    "pipingComponents": 9,
+    "valves": 2,
+    "processInstrumentationFunctions": 1,
+    "instrumentationLoopFunctions": 0,
+    "actuatingSystems": 1,
+    "processSignalGeneratingFunctions": 0,
+    "informationFlows": 1,
+    "pipeOffPageConnectors": 1,
+    "pipeFlowArrows": 1,
+    "connections": 6,
+    "danglingConnections": 0,
+    "shapeCatalogueEntries": 13
+   },
+   "equipmentByClass": {},
+   "pipingComponentsByClass": {
+    "BallValve": 1,
+    "BlindFlange": 1,
+    "Flange": 3,
+    "OperatedValve": 1,
+    "PipeFitting": 1,
+    "PipeReducer": 1,
+    "RestrictionOrifice": 1
+   },
+   "informationFlowsByClass": {
+    "SignalConveyingFunction": 1
+   },
+   "equipment": [],
+   "lines": [
+    {
+     "id": "PipingNetworkSystem-1",
+     "lineNumber": "13L37014A",
+     "fluidCode": "PB",
+     "nominalDiameter": null,
+     "pipingClass": "FD120",
+     "segments": 2
+    },
+    {
+     "id": "PipingNetworkSystem-2",
+     "lineNumber": "13L37007A",
+     "fluidCode": "PB",
+     "nominalDiameter": null,
+     "pipingClass": "FS720",
+     "segments": 1
+    },
+    {
+     "id": "PipingNetworkSystem-3",
+     "lineNumber": "43L37007A",
+     "fluidCode": "VF",
+     "nominalDiameter": null,
+     "pipingClass": "AS7F0",
+     "segments": 2
+    }
+   ],
+   "valves": [
+    {
+     "id": "OperatedValve-1",
+     "class": "OperatedValve",
+     "number": null
+    },
+    {
+     "id": "BallValve-1",
+     "class": "BallValve",
+     "number": null
+    }
+   ],
+   "instrumentFunctions": [
+    {
+     "id": "ProcessInstrumentationFunction-1",
+     "category": "E",
+     "functions": "SV",
+     "number": "3712",
+     "location": "CentralLocation"
+    }
+   ],
+   "loops": []
+  },
+  {
+   "file": "E03V01-VER.EX01.xml",
+   "sha256": "a26bda5dda7d3b8bd6b661a5c2f8803463f94027e97ff142bcd3a0f35b8e1357",
+   "bytes": 3113,
+   "plantInformation": {
+    "SchemaVersion": "4.1.1",
+    "OriginatingSystem": "P&ID Toolbox",
+    "ApplicationVersion": "1.3.1",
+    "Units": "mm"
+   },
+   "counts": {
+    "equipmentTopLevel": 1,
+    "equipmentAll": 2,
+    "nozzles": 1,
+    "pipingNetworkSystems": 0,
+    "pipingNetworkSegments": 0,
+    "pipingComponents": 0,
+    "valves": 0,
+    "processInstrumentationFunctions": 0,
+    "instrumentationLoopFunctions": 0,
+    "actuatingSystems": 0,
+    "processSignalGeneratingFunctions": 0,
+    "informationFlows": 0,
+    "pipeOffPageConnectors": 0,
+    "pipeFlowArrows": 0,
+    "connections": 0,
+    "danglingConnections": 0,
+    "shapeCatalogueEntries": 0
+   },
+   "equipmentByClass": {
+    "CentrifugalPump": 1,
+    "Chamber": 1
+   },
+   "pipingComponentsByClass": {},
+   "informationFlowsByClass": {},
+   "equipment": [
+    {
+     "id": "CentrifugalPump-1",
+     "class": "CentrifugalPump",
+     "tagName": "P-4713",
+     "nozzles": 1,
+     "subEquipment": 1
+    }
+   ],
+   "lines": [],
+   "valves": [],
+   "instrumentFunctions": [],
+   "loops": []
+  },
+  {
+   "file": "E06V01-VER.EX01.xml",
+   "sha256": "2a6b4762cd1c85c9fcf329f885ca368769a84ebd5dbf5966c6a0781bb4038351",
+   "bytes": 6288,
+   "plantInformation": {
+    "SchemaVersion": "4.1.1",
+    "OriginatingSystem": "P&ID Toolbox",
+    "ApplicationVersion": "1.3.1",
+    "Units": "mm"
+   },
+   "counts": {
+    "equipmentTopLevel": 2,
+    "equipmentAll": 2,
+    "nozzles": 6,
+    "pipingNetworkSystems": 1,
+    "pipingNetworkSegments": 1,
+    "pipingComponents": 0,
+    "valves": 0,
+    "processInstrumentationFunctions": 0,
+    "instrumentationLoopFunctions": 0,
+    "actuatingSystems": 0,
+    "processSignalGeneratingFunctions": 0,
+    "informationFlows": 0,
+    "pipeOffPageConnectors": 0,
+    "pipeFlowArrows": 0,
+    "connections": 1,
+    "danglingConnections": 0,
+    "shapeCatalogueEntries": 0
+   },
+   "equipmentByClass": {
+    "CentrifugalPump": 1,
+    "PlateHeatExchanger": 1
+   },
+   "pipingComponentsByClass": {},
+   "informationFlowsByClass": {},
+   "equipment": [
+    {
+     "id": "CentrifugalPump-1",
+     "class": "CentrifugalPump",
+     "tagName": "P-4713",
+     "nozzles": 2,
+     "subEquipment": 0
+    },
+    {
+     "id": "PlateHeatExchanger-1",
+     "class": "PlateHeatExchanger",
+     "tagName": "H-1009",
+     "nozzles": 4,
+     "subEquipment": 0
+    }
+   ],
+   "lines": [
+    {
+     "id": "PipingNetworkSystem-1",
+     "lineNumber": "47132",
+     "fluidCode": "MNb",
+     "nominalDiameter": null,
+     "pipingClass": "75HB13",
+     "segments": 1
+    }
+   ],
+   "valves": [],
+   "instrumentFunctions": [],
+   "loops": []
+  },
+  {
+   "file": "I01V01-VER.EX01.xml",
+   "sha256": "fa9a947c0967f0fb9312eb6793354056d4f6b96e6f11425e924a07169d9b9de2",
+   "bytes": 4918,
+   "plantInformation": {
+    "SchemaVersion": "4.1.1",
+    "OriginatingSystem": "P&ID Toolbox",
+    "ApplicationVersion": "1.3.1",
+    "Units": "mm"
+   },
+   "counts": {
+    "equipmentTopLevel": 1,
+    "equipmentAll": 1,
+    "nozzles": 1,
+    "pipingNetworkSystems": 1,
+    "pipingNetworkSegments": 1,
+    "pipingComponents": 1,
+    "valves": 0,
+    "processInstrumentationFunctions": 1,
+    "instrumentationLoopFunctions": 1,
+    "actuatingSystems": 0,
+    "processSignalGeneratingFunctions": 1,
+    "informationFlows": 1,
+    "pipeOffPageConnectors": 0,
+    "pipeFlowArrows": 0,
+    "connections": 1,
+    "danglingConnections": 0,
+    "shapeCatalogueEntries": 0
+   },
+   "equipmentByClass": {
+    "Tank": 1
+   },
+   "pipingComponentsByClass": {
+    "BlindFlange": 1
+   },
+   "informationFlowsByClass": {
+    "MeasuringLineFunction": 1
+   },
+   "equipment": [
+    {
+     "id": "Tank-1",
+     "class": "Tank",
+     "tagName": "T01",
+     "nozzles": 1,
+     "subEquipment": 0
+    }
+   ],
+   "lines": [
+    {
+     "id": "PipingNetworkSystem-1",
+     "lineNumber": null,
+     "fluidCode": null,
+     "nominalDiameter": null,
+     "pipingClass": null,
+     "segments": 1
+    }
+   ],
+   "valves": [],
+   "instrumentFunctions": [
+    {
+     "id": "ProcessInstrumentationFunction-1",
+     "category": "L",
+     "functions": "I",
+     "number": "01",
+     "location": "CentralLocation"
+    }
+   ],
+   "loops": [
+    "01"
+   ]
+  },
+  {
+   "file": "I02V01-VER.EX01.xml",
+   "sha256": "b3b8c59b7005e44e57ec56b8df407fed4115ee6411988eed4ba040ea834c291d",
+   "bytes": 5106,
+   "plantInformation": {
+    "SchemaVersion": "4.1.1",
+    "OriginatingSystem": "P&ID Toolbox",
+    "ApplicationVersion": "1.3.1",
+    "Units": "mm"
+   },
+   "counts": {
+    "equipmentTopLevel": 0,
+    "equipmentAll": 0,
+    "nozzles": 0,
+    "pipingNetworkSystems": 1,
+    "pipingNetworkSegments": 1,
+    "pipingComponents": 1,
+    "valves": 1,
+    "processInstrumentationFunctions": 1,
+    "instrumentationLoopFunctions": 1,
+    "actuatingSystems": 1,
+    "processSignalGeneratingFunctions": 0,
+    "informationFlows": 1,
+    "pipeOffPageConnectors": 0,
+    "pipeFlowArrows": 0,
+    "connections": 0,
+    "danglingConnections": 0,
+    "shapeCatalogueEntries": 0
+   },
+   "equipmentByClass": {},
+   "pipingComponentsByClass": {
+    "GlobeValve": 1
+   },
+   "informationFlowsByClass": {
+    "SignalLineFunction": 1
+   },
+   "equipment": [],
+   "lines": [
+    {
+     "id": "PipingNetworkSystem-1",
+     "lineNumber": null,
+     "fluidCode": null,
+     "nominalDiameter": null,
+     "pipingClass": null,
+     "segments": 1
+    }
+   ],
+   "valves": [
+    {
+     "id": "GlobeValve-1",
+     "class": "GlobeValve",
+     "number": "HV 02"
+    }
+   ],
+   "instrumentFunctions": [
+    {
+     "id": "ProcessInstrumentationFunction-1",
+     "category": "H",
+     "functions": "C",
+     "number": "02",
+     "location": "CentralLocation"
+    }
+   ],
+   "loops": [
+    "02"
+   ]
+  },
+  {
+   "file": "I06V01-VER.EX01.xml",
+   "sha256": "949b2bcf9bf42b7529171b3f5b3bdd722c5b324640b23ee6af4adc101f2cf79b",
+   "bytes": 12311,
+   "plantInformation": {
+    "SchemaVersion": "4.1.1",
+    "OriginatingSystem": "P&ID Toolbox",
+    "ApplicationVersion": "1.3.1",
+    "Units": "mm"
+   },
+   "counts": {
+    "equipmentTopLevel": 0,
+    "equipmentAll": 0,
+    "nozzles": 0,
+    "pipingNetworkSystems": 1,
+    "pipingNetworkSegments": 1,
+    "pipingComponents": 1,
+    "valves": 1,
+    "processInstrumentationFunctions": 3,
+    "instrumentationLoopFunctions": 3,
+    "actuatingSystems": 1,
+    "processSignalGeneratingFunctions": 1,
+    "informationFlows": 6,
+    "pipeOffPageConnectors": 0,
+    "pipeFlowArrows": 0,
+    "connections": 0,
+    "danglingConnections": 0,
+    "shapeCatalogueEntries": 0
+   },
+   "equipmentByClass": {},
+   "pipingComponentsByClass": {
+    "GlobeValve": 1
+   },
+   "informationFlowsByClass": {
+    "MeasuringLineFunction": 1,
+    "SignalLineFunction": 5
+   },
+   "equipment": [],
+   "lines": [
+    {
+     "id": "PipingNetworkSystem-1",
+     "lineNumber": null,
+     "fluidCode": null,
+     "nominalDiameter": null,
+     "pipingClass": null,
+     "segments": 1
+    }
+   ],
+   "valves": [
+    {
+     "id": "GlobeValve-1",
+     "class": "GlobeValve",
+     "number": null
+    }
+   ],
+   "instrumentFunctions": [
+    {
+     "id": "ProcessInstrumentationFunction-1",
+     "category": "Y",
+     "functions": "CS",
+     "number": "033",
+     "location": "CentralLocation"
+    },
+    {
+     "id": "ProcessInstrumentationFunction-2",
+     "category": "F",
+     "functions": "IC",
+     "number": "032",
+     "location": "CentralLocation"
+    },
+    {
+     "id": "ProcessInstrumentationFunction-3",
+     "category": "U",
+     "functions": "S",
+     "number": "031",
+     "location": "CentralLocation"
+    }
+   ],
+   "loops": [
+    "033",
+    "032",
+    "031"
+   ]
+  },
+  {
+   "file": "P01V01-VER.EX01.xml",
+   "sha256": "1c88ab8aec8ac9d721b454aa9dc1fe669e6efbea871a36e39beeb9a5fdac4076",
+   "bytes": 3684,
+   "plantInformation": {
+    "SchemaVersion": "4.1.1",
+    "OriginatingSystem": "P&ID Toolbox",
+    "ApplicationVersion": "1.3.1",
+    "Units": "mm"
+   },
+   "counts": {
+    "equipmentTopLevel": 2,
+    "equipmentAll": 2,
+    "nozzles": 2,
+    "pipingNetworkSystems": 1,
+    "pipingNetworkSegments": 1,
+    "pipingComponents": 0,
+    "valves": 0,
+    "processInstrumentationFunctions": 0,
+    "instrumentationLoopFunctions": 0,
+    "actuatingSystems": 0,
+    "processSignalGeneratingFunctions": 0,
+    "informationFlows": 0,
+    "pipeOffPageConnectors": 0,
+    "pipeFlowArrows": 0,
+    "connections": 1,
+    "danglingConnections": 0,
+    "shapeCatalogueEntries": 0
+   },
+   "equipmentByClass": {
+    "CentrifugalPump": 1,
+    "PlateHeatExchanger": 1
+   },
+   "pipingComponentsByClass": {},
+   "informationFlowsByClass": {},
+   "equipment": [
+    {
+     "id": "CentrifugalPump-1",
+     "class": "CentrifugalPump",
+     "tagName": "P4712",
+     "nozzles": 1,
+     "subEquipment": 0
+    },
+    {
+     "id": "PlateHeatExchanger-1",
+     "class": "PlateHeatExchanger",
+     "tagName": "H1008",
+     "nozzles": 1,
+     "subEquipment": 0
+    }
+   ],
+   "lines": [
+    {
+     "id": "PipingNetworkSystem-1",
+     "lineNumber": "48122",
+     "fluidCode": "M",
+     "nominalDiameter": null,
+     "pipingClass": "75HB",
+     "segments": 1
+    }
+   ],
+   "valves": [],
+   "instrumentFunctions": [],
+   "loops": []
+  },
+  {
+   "file": "P02V01-VER.EX01.xml",
+   "sha256": "6084e2bbaba4f018551f2db6744fba2976b95a15de172e6cf5f342df009f6611",
+   "bytes": 4259,
+   "plantInformation": {
+    "SchemaVersion": "4.1.1",
+    "OriginatingSystem": "P&ID Toolbox",
+    "ApplicationVersion": "1.3.1",
+    "Units": "mm"
+   },
+   "counts": {
+    "equipmentTopLevel": 1,
+    "equipmentAll": 1,
+    "nozzles": 1,
+    "pipingNetworkSystems": 1,
+    "pipingNetworkSegments": 1,
+    "pipingComponents": 0,
+    "valves": 0,
+    "processInstrumentationFunctions": 0,
+    "instrumentationLoopFunctions": 0,
+    "actuatingSystems": 0,
+    "processSignalGeneratingFunctions": 0,
+    "informationFlows": 0,
+    "pipeOffPageConnectors": 1,
+    "pipeFlowArrows": 0,
+    "connections": 1,
+    "danglingConnections": 0,
+    "shapeCatalogueEntries": 0
+   },
+   "equipmentByClass": {
+    "CentrifugalPump": 1
+   },
+   "pipingComponentsByClass": {},
+   "informationFlowsByClass": {},
+   "equipment": [
+    {
+     "id": "CentrifugalPump-1",
+     "class": "CentrifugalPump",
+     "tagName": "P4712",
+     "nozzles": 1,
+     "subEquipment": 0
+    }
+   ],
+   "lines": [
+    {
+     "id": "PipingNetworkSystem-1",
+     "lineNumber": "48121",
+     "fluidCode": "MNb",
+     "nominalDiameter": null,
+     "pipingClass": "75HB",
+     "segments": 1
+    }
+   ],
+   "valves": [],
+   "instrumentFunctions": [],
+   "loops": []
+  },
+  {
+   "file": "P04V01-VER.EX01.xml",
+   "sha256": "535a01b3433bdceb0128db8369178c156507ee3d3dbdd9786eae5c30d1c9b543",
+   "bytes": 4651,
+   "plantInformation": {
+    "SchemaVersion": "4.1.1",
+    "OriginatingSystem": "P&ID Toolbox",
+    "ApplicationVersion": "1.3.1",
+    "Units": "mm"
+   },
+   "counts": {
+    "equipmentTopLevel": 1,
+    "equipmentAll": 1,
+    "nozzles": 2,
+    "pipingNetworkSystems": 2,
+    "pipingNetworkSegments": 2,
+    "pipingComponents": 0,
+    "valves": 0,
+    "processInstrumentationFunctions": 0,
+    "instrumentationLoopFunctions": 0,
+    "actuatingSystems": 0,
+    "processSignalGeneratingFunctions": 0,
+    "informationFlows": 0,
+    "pipeOffPageConnectors": 0,
+    "pipeFlowArrows": 0,
+    "connections": 2,
+    "danglingConnections": 0,
+    "shapeCatalogueEntries": 0
+   },
+   "equipmentByClass": {
+    "PlateHeatExchanger": 1
+   },
+   "pipingComponentsByClass": {},
+   "informationFlowsByClass": {},
+   "equipment": [
+    {
+     "id": "PlateHeatExchanger-1",
+     "class": "PlateHeatExchanger",
+     "tagName": "H-1008",
+     "nozzles": 2,
+     "subEquipment": 0
+    }
+   ],
+   "lines": [
+    {
+     "id": "PipingNetworkSystem-1",
+     "lineNumber": "47112",
+     "fluidCode": "MNb",
+     "nominalDiameter": null,
+     "pipingClass": "75HB13",
+     "segments": 1
+    },
+    {
+     "id": "PipingNetworkSystem-2",
+     "lineNumber": "10082",
+     "fluidCode": "WKa",
+     "nominalDiameter": null,
+     "pipingClass": "75HB13",
+     "segments": 1
+    }
+   ],
+   "valves": [],
+   "instrumentFunctions": [],
+   "loops": []
+  }
+ ],
+ "dexpi20": {
+  "file": "reference_pid.xml",
+  "sha256": "acd39c74292aef3f6f00581fc78b05814acf2318815abd28c14ebefba12fdd94",
+  "bytes": 1481865,
+  "imports": [
+   {
+    "prefix": "Core",
+    "source": "https://data.dexpi.org/models/2.0.1/Core.xml"
+   },
+   {
+    "prefix": "Plant",
+    "source": "https://data.dexpi.org/models/2.0.1/Plant.xml"
+   }
+  ],
+  "counts": {
+   "equipmentTopLevel": 5,
+   "equipmentAll": 16,
+   "nozzles": 19,
+   "pipingNetworkSystems": 11,
+   "pipingNetworkSegments": 23,
+   "valves": 11,
+   "processInstrumentationFunctions": 4,
+   "instrumentationLoopFunctions": 4,
+   "actuatingSystems": 3,
+   "processSignalGeneratingFunctions": 3,
+   "informationFlows": 6,
+   "pipeOffPageConnectors": 2,
+   "pipeFlowArrows": 8,
+   "shapeCatalogueEntries": 24
+  },
+  "objectTypes": {
+   "Core/Diagram.AttributeRepresentation": 184,
+   "Core/Diagram.Border": 1,
+   "Core/Diagram.ConnectorLine": 35,
+   "Core/Diagram.Diagram": 1,
+   "Core/Diagram.Ellipse": 9,
+   "Core/Diagram.EllipseArc": 6,
+   "Core/Diagram.InsulationSymbol": 1,
+   "Core/Diagram.Label": 1,
+   "Core/Diagram.LiteralText": 55,
+   "Core/Diagram.PipeFlowArrow": 8,
+   "Core/Diagram.PipeSlopeSymbol": 1,
+   "Core/Diagram.PolyLine": 190,
+   "Core/Diagram.RepresentationGroup": 185,
+   "Core/Diagram.Shape": 24,
+   "Core/Diagram.ShapeCatalogue": 1,
+   "Core/Diagram.ShapeUsage": 62,
+   "Core/Diagram.Static": 87,
+   "Core/Diagram.Text": 245,
+   "Core/Diagram.TextTemplate": 137,
+   "Core/EngineeringModel": 1,
+   "Plant/Diagram.ActuatingSystemNumberLabel": 2,
+   "Plant/Diagram.EquipmentBarLabel": 5,
+   "Plant/Diagram.EquipmentTagNameLabel": 5,
+   "Plant/Diagram.FailActionLabel": 3,
+   "Plant/Diagram.InstrumentationNodePosition": 39,
+   "Plant/Diagram.InsulationLabel": 1,
+   "Plant/Diagram.NozzleStandardLabel": 19,
+   "Plant/Diagram.PipingNetworkSegmentLabel": 1,
+   "Plant/Diagram.PipingNetworkSystemLabel": 11,
+   "Plant/Diagram.PipingNodePosition": 65,
+   "Plant/Diagram.PlantMetaData": 1,
+   "Plant/Diagram.ProcessInstrumentationFunctionLabel": 4,
+   "Plant/Diagram.SafetyValveOrFittingLabel": 1,
+   "Plant/Diagram.ValveLabel": 8,
+   "Plant/Instrumentation.ActuatingFunction": 3,
+   "Plant/Instrumentation.ActuatingSystem": 3,
+   "Plant/Instrumentation.ControlledActuator": 3,
+   "Plant/Instrumentation.InstrumentationLoopFunction": 4,
+   "Plant/Instrumentation.MeasuringLineFunction": 3,
+   "Plant/Instrumentation.OperatedValveReference": 3,
+   "Plant/Instrumentation.ProcessInstrumentationFunction": 4,
+   "Plant/Instrumentation.ProcessSignalGeneratingFunction": 3,
+   "Plant/Instrumentation.SignalConveyingFunction": 3,
+   "Plant/Piping.BallValve": 5,
+   "Plant/Piping.BlindFlange": 2,
+   "Plant/Piping.ButterflyValve": 1,
+   "Plant/Piping.DirectPipingConnection": 2,
+   "Plant/Piping.FlowInPipeOffPageConnector": 1,
+   "Plant/Piping.FlowOutPipeOffPageConnector": 1,
+   "Plant/Piping.GlobeValve": 3,
+   "Plant/Piping.Pipe": 29,
+   "Plant/Piping.PipeReducer": 1,
+   "Plant/Piping.PipeTee": 5,
+   "Plant/Piping.PipingNetworkSegment": 23,
+   "Plant/Piping.PipingNetworkSystem": 11,
+   "Plant/Piping.PipingNode": 62,
+   "Plant/Piping.SpringLoadedGlobeSafetyValve": 1,
+   "Plant/Piping.SwingCheckValve": 1,
+   "Plant/PlantModel": 1,
+   "Plant/ProcessEquipment.AccessNozzle": 1,
+   "Plant/ProcessEquipment.CentrifugalPump": 1,
+   "Plant/ProcessEquipment.Chamber": 8,
+   "Plant/ProcessEquipment.Displacer": 1,
+   "Plant/ProcessEquipment.Impeller": 1,
+   "Plant/ProcessEquipment.InstrumentNozzle": 1,
+   "Plant/ProcessEquipment.PlateHeatExchanger": 1,
+   "Plant/ProcessEquipment.ProcessNozzle": 17,
+   "Plant/ProcessEquipment.ReciprocatingPump": 1,
+   "Plant/ProcessEquipment.Tank": 1,
+   "Plant/ProcessEquipment.TubeBundle": 1,
+   "Plant/ProcessEquipment.TubularHeatExchanger": 1
+  },
+  "instrumentFunctions": [
+   {
+    "ProcessInstrumentationFunctionCategory": "P",
+    "ProcessInstrumentationFunctions": "I",
+    "ProcessInstrumentationFunctionNumber": "4712.01"
+   },
+   {
+    "ProcessInstrumentationFunctionCategory": "P",
+    "ProcessInstrumentationFunctions": "ICSA",
+    "ProcessInstrumentationFunctionNumber": "4712.02"
+   },
+   {
+    "ProcessInstrumentationFunctionCategory": "H",
+    "ProcessInstrumentationFunctions": "S",
+    "ProcessInstrumentationFunctionNumber": "4750.01"
+   },
+   {
+    "ProcessInstrumentationFunctionCategory": "T",
+    "ProcessInstrumentationFunctions": "ICSA",
+    "ProcessInstrumentationFunctionNumber": "4750.03"
+   }
+  ]
+ },
+ "crossEncodingCheck": {
+  "claim": "reference_pid.xml (DEXPI 2.0.1 XML) and C01V04-VER.EX01.xml (DEXPI 1.3 / Proteus 4.1.1) encode the same DEXPI reference P&ID",
+  "result": {
+   "equipmentTopLevel": {
+    "proteus13": 5,
+    "dexpi20": 5,
+    "equal": true
+   },
+   "equipmentAll": {
+    "proteus13": 16,
+    "dexpi20": 16,
+    "equal": true
+   },
+   "nozzles": {
+    "proteus13": 19,
+    "dexpi20": 19,
+    "equal": true
+   },
+   "pipingNetworkSystems": {
+    "proteus13": 11,
+    "dexpi20": 11,
+    "equal": true
+   },
+   "pipingNetworkSegments": {
+    "proteus13": 23,
+    "dexpi20": 23,
+    "equal": true
+   },
+   "valves": {
+    "proteus13": 11,
+    "dexpi20": 11,
+    "equal": true
+   },
+   "processInstrumentationFunctions": {
+    "proteus13": 4,
+    "dexpi20": 4,
+    "equal": true
+   },
+   "instrumentationLoopFunctions": {
+    "proteus13": 4,
+    "dexpi20": 4,
+    "equal": true
+   },
+   "actuatingSystems": {
+    "proteus13": 3,
+    "dexpi20": 3,
+    "equal": true
+   },
+   "processSignalGeneratingFunctions": {
+    "proteus13": 3,
+    "dexpi20": 3,
+    "equal": true
+   },
+   "informationFlows": {
+    "proteus13": 6,
+    "dexpi20": 6,
+    "equal": true
+   },
+   "pipeOffPageConnectors": {
+    "proteus13": 2,
+    "dexpi20": 2,
+    "equal": true
+   },
+   "pipeFlowArrows": {
+    "proteus13": 8,
+    "dexpi20": 8,
+    "equal": true
+   },
+   "shapeCatalogueEntries": {
+    "proteus13": 24,
+    "dexpi20": 24,
+    "equal": true
+   }
+  }
+ },
+ "C01connectivity": {
+  "connections": 29,
+  "endpointTypes": {
+   "FromID Nozzle:Nozzle": 8,
+   "FromID PipeOffPageConnector:FlowInPipeOffPageConnector": 1,
+   "FromID PipingComponent:BlindFlange": 2,
+   "FromID PipingComponent:PipeReducer": 1,
+   "FromID PipingComponent:PipeTee": 10,
+   "FromID PipingComponent:SpringLoadedGlobeSafetyValve": 1,
+   "FromID PipingComponent:SwingCheckValve": 1,
+   "FromID ProcessInstrumentationFunction:ProcessInstrumentationFunction": 3,
+   "FromID open": 2,
+   "ToID ActuatingSystemComponent:ControlledActuator": 3,
+   "ToID Nozzle:Nozzle": 9,
+   "ToID PipeOffPageConnector:FlowOutPipeOffPageConnector": 1,
+   "ToID PipingComponent:BallValve": 1,
+   "ToID PipingComponent:BlindFlange": 2,
+   "ToID PipingComponent:PipeReducer": 1,
+   "ToID PipingComponent:PipeTee": 5,
+   "ToID PipingComponent:SpringLoadedGlobeSafetyValve": 1,
+   "ToID PipingComponent:SwingCheckValve": 1,
+   "ToID ProcessInstrumentationFunction:ProcessInstrumentationFunction": 3,
+   "ToID open": 2
+  },
+  "nozzlesTotal": 19,
+  "nozzlesReferencedByConnection": 17,
+  "nozzlesNotReferenced": [
+   "Nozzle-18",
+   "Nozzle-19"
+  ],
+  "segmentChildren": {
+   "PipeOffPageConnector": 2,
+   "CenterLine": 29,
+   "PipingComponent": 19,
+   "PipeFlowArrow": 8
+  }
+ }
+}

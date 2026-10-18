@@ -1,0 +1,75 @@
+{
+ "CYL-A": {
+  "radiusError_m": 3.2017866743706824e-05,
+  "axisAngleError_deg": 0.0018095470095655433,
+  "axisPositionError_m": 0.000130259646573408,
+  "inliers": 3993,
+  "pass": true
+ },
+ "CYL-B": {
+  "radiusError_m": -9.524854682474437e-07,
+  "axisAngleError_deg": 0.0048596096225768095,
+  "axisPositionError_m": 0.00013661103866179788,
+  "inliers": 6006,
+  "pass": true
+ },
+ "CYL-C": {
+  "radiusError_m": -0.00019383119361433832,
+  "axisAngleError_deg": 0.015185151680976349,
+  "axisPositionError_m": 0.00024690591904427494,
+  "inliers": 1496,
+  "pass": true
+ },
+ "ICP-A": {
+  "sourcePoints": 30571,
+  "targetPoints": 21297,
+  "iterations": 45,
+  "rotationError_deg": 0.005429705724895742,
+  "translationError_m": 6.743270272235632e-06,
+  "rmsResidual_m": 0.0005533726848339322,
+  "rmsAtTrueTransform_m": 0.0005535969969869539,
+  "pass": true
+ },
+ "TGT-A": {
+  "maxCentreError_m": 0.0003379507636535334,
+  "rotationError_deg": 0.0017832100407218234,
+  "translationError_m": 0.00026714305388804806,
+  "targetResidualRms_m": 9.458169660779076e-05,
+  "pass": true
+ },
+ "DEV-A": {
+  "max_m": 0.02500000000000001,
+  "min_m": -0.02500000000000001,
+  "rms_m": 0.01764849928106184,
+  "beyond10mm": 0.7444444444444445,
+  "pass": true
+ },
+ "CLH-A": [
+  {
+   "minGap_m": -0.0437,
+   "status": "hard",
+   "pass": true
+  },
+  {
+   "minGap_m": 0.05630000000000002,
+   "status": "clearance",
+   "pass": true
+  },
+  {
+   "minGap_m": 0.3063,
+   "status": "clear",
+   "pass": true
+  }
+ ],
+ "C2M-A": {
+  "distances_m": [
+   0.04,
+   0.04,
+   0.04,
+   0.30265491900843117,
+   0.20223748416156687,
+   0.49999999999999994
+  ],
+  "pass": true
+ }
+}

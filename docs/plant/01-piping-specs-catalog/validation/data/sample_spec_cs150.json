@@ -1,0 +1,45 @@
+{
+  "format": "llull-pipe-spec",
+  "schemaVersion": 1,
+  "id": "CS150-A1",
+  "title": "Carbon steel, ASME Class 150 RF, 3 mm corrosion allowance (illustrative fixture, not a project spec)",
+  "fixtureNote": "Test fixture written for the PSC validation pack. Its structure follows common EPC practice (sizes, schedules by size range, branch table), but it is NOT a sourced spec: only the catalogue values it points to are sourced. Used by plans sc-psc-02..04.",
+  "service": "hydrocarbon process, non-toxic",
+  "dimensionalStandard": "ASME",
+  "rating": { "system": "ASME B16.5", "class": 150, "materialGroup": "1.1" },
+  "materials": { "pipe": "ASTM A106 Gr B", "fittings": "ASTM A234 WPB", "forgings": "ASTM A105", "bolting": "ASTM A193 B7 / A194 2H" },
+  "corrosionAllowance": { "value": 3, "unit": "mm" },
+  "millTolerance": 0.125,
+  "designLimits": { "minTemperatureC": -29, "maxTemperatureC": 200 },
+  "sizeRange": { "fromNps": 0.5, "toNps": 24 },
+  "catalogs": ["llull-open-piping"],
+  "components": [
+    { "id": "P-SW", "type": "pipe", "fromNps": 0.5, "toNps": 1.5, "schedule": "80", "ends": "PE", "catalogRef": "asme-b36.10m" },
+    { "id": "P-BW", "type": "pipe", "fromNps": 2, "toNps": 6, "schedule": "40", "ends": "BE", "catalogRef": "asme-b36.10m" },
+    { "id": "P-BW-L", "type": "pipe", "fromNps": 8, "toNps": 24, "schedule": "STD", "ends": "BE", "catalogRef": "asme-b36.10m" },
+    { "id": "E90-SW", "type": "elbow90", "fromNps": 0.5, "toNps": 1.5, "ends": "SW", "pressureClass": 3000, "catalogRef": "asme-b16.11" },
+    { "id": "E90-LR", "type": "elbow90", "fromNps": 2, "toNps": 24, "radius": "LR", "ends": "BW", "scheduleFromPipe": true, "catalogRef": "asme-b16.9" },
+    { "id": "E45-LR", "type": "elbow45", "fromNps": 2, "toNps": 24, "radius": "LR", "ends": "BW", "scheduleFromPipe": true, "catalogRef": "asme-b16.9" },
+    { "id": "T-BW", "type": "tee", "fromNps": 2, "toNps": 24, "ends": "BW", "scheduleFromPipe": true, "catalogRef": "asme-b16.9" },
+    { "id": "TR-BW", "type": "reducingTee", "fromNps": 2, "toNps": 24, "ends": "BW", "scheduleFromPipe": true, "catalogRef": "asme-b16.9" },
+    { "id": "RC-BW", "type": "reducerConcentric", "fromNps": 2, "toNps": 24, "ends": "BW", "scheduleFromPipe": true, "catalogRef": "asme-b16.9" },
+    { "id": "WOL", "type": "weldolet", "fromNps": 2, "toNps": 24, "branchFromNps": 2, "branchToNps": 4, "catalogRef": "mss-sp-97" },
+    { "id": "SOL", "type": "sockolet", "fromNps": 2, "toNps": 24, "branchFromNps": 0.5, "branchToNps": 1.5, "pressureClass": 3000, "catalogRef": "mss-sp-97" },
+    { "id": "F-WN", "type": "flangeWeldNeck", "fromNps": 2, "toNps": 24, "facing": "RF", "class": 150, "boreFromPipe": true, "catalogRef": "asme-b16.5" },
+    { "id": "G-SW", "type": "gasketSpiralWound", "fromNps": 0.5, "toNps": 24, "class": 150, "rings": "inner+outer", "catalogRef": "asme-b16.20" },
+    { "id": "B-STUD", "type": "boltSet", "fromNps": 0.5, "toNps": 24, "class": 150, "facing": "RF", "catalogRef": "asme-b16.5-bolting" },
+    { "id": "V-GATE", "type": "valveGate", "fromNps": 2, "toNps": 24, "ends": "FL", "facing": "RF", "class": 150, "catalogRef": "asme-b16.10" }
+  ],
+  "branchTable": {
+    "note": "rows = header NPS, columns = branch NPS; T equal tee, RT reducing tee, W weldolet, S sockolet; blank = not allowed",
+    "headers": [2, 4, 6],
+    "branches": [1, 2, 4, 6],
+    "cells": {
+      "2": { "1": "S", "2": "T" },
+      "4": { "1": "S", "2": "W", "4": "T" },
+      "6": { "1": "S", "2": "W", "4": "RT", "6": "T" }
+    }
+  },
+  "status": "draft",
+  "provenance": { "author": "PSC validation pack", "accessed": "2026-10-18" }
+}

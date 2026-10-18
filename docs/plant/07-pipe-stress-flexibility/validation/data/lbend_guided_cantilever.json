@@ -1,0 +1,20 @@
+{
+  "derivation": "closed forms of elastic beam theory (S24 guided-cantilever method; S25 M. W. Kellogg, Design of Piping Systems, 2nd ed., 1956, cited for the method only) evaluated by scripts/closed_forms.py and scripts/lbend_flexibility.py; L-bend solved twice: unit-load flexibility integration and the frame3d stiffness solver (agree to 1e-9 rel)",
+  "section": { "DoMm": 168.3, "tMm": 7.11, "AMm2": 3600.4565, "IMm4": 11716231.2, "ZMm3": 139230.317, "note": "NPS 6 Sch 40, pipe_dimensions_b3610.json" },
+  "material": { "E_MPa": 200000, "poisson": 0.3, "thermalStrain": 0.00225, "note": "inputs of the case, not material claims; 0.00225 = 2.70 in/100 ft (carbon steel 70 -> 400 degF, thermal_expansion_carbon_steel.json)" },
+  "guidedCantilever": {
+    "vc": "VC-PST-06",
+    "inputs": { "legMm": 6000, "lateralDisplacementMm": 50 },
+    "formulas": { "F": "12 E I d / L^3", "M": "6 E I d / L^2", "S": "M / Z = 3 E D d / L^2", "Lmin": "sqrt(3 E D d / SA)" },
+    "expected": { "F_N": 6509.0173, "M_Nmm": 19527052.0, "S_MPa": 140.25, "LminMm_for_SA_206.85": 4940.546 },
+    "tolerance": "1e-6 rel"
+  },
+  "lBendTwoAnchors": {
+    "vc": "VC-PST-12",
+    "geometry": { "A": [0, 0, 0], "B_corner": [6000, 0, 0], "C": [6000, 3000, 0], "units": "mm", "corner": "sharp, no elbow flexibility (k = 1), straight Euler-Bernoulli legs" },
+    "expectedWithAxial": { "reactionAtC_N": [-7872.9914, -2406.9538], "reactionSign": "force exerted by anchor C on the pipe, global x y", "momentMagnitudesNmm": { "C": 14868570.8, "B": 8750403.3, "A": 5691319.6 }, "SmaxMPa": 106.7912, "cornerDisplacementMm": [13.4344, -6.73997] },
+    "expectedBendingOnly": { "reactionAtC_N": [-7908.4561, -2416.4727], "momentMagnitudeCNmm": 14938194.8, "SmaxMPa": 107.2913 },
+    "guidedCantileverApproximation": { "shortLegAbsorbsLongLegMPa": 151.47, "longLegAbsorbsShortLegMPa": 18.934, "note": "conservative vs 106.79 exact: the method ignores leg rotation" },
+    "tolerance": "1e-4 rel on reactions and moments (frame solver), 1e-3 rel on Smax"
+  }
+}

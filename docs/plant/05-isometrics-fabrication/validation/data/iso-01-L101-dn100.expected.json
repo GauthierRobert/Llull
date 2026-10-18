@@ -1,0 +1,339 @@
+{
+  "componentCount": 15,
+  "countsByType": {
+    "FLANGE": 3,
+    "PIPE": 7,
+    "WELD": 1,
+    "ELBOW": 3,
+    "TEE": 1
+  },
+  "pipePieces": 7,
+  "totalPipeLengthMm": 13045.0,
+  "pipeLengthsMm": [
+    2424.0,
+    2348.0,
+    3696.0,
+    1696.0,
+    1848.0,
+    714.0,
+    319.0
+  ],
+  "welds": [
+    {
+      "number": "W1",
+      "kind": "shop",
+      "at": [
+        76.0,
+        0.0,
+        3000.0
+      ],
+      "components": [
+        "1",
+        "2"
+      ]
+    },
+    {
+      "number": "W2",
+      "kind": "field",
+      "at": [
+        2500.0,
+        0.0,
+        3000.0
+      ],
+      "components": [
+        "2",
+        "4"
+      ]
+    },
+    {
+      "number": "W3",
+      "kind": "shop",
+      "at": [
+        4848.0,
+        0.0,
+        3000.0
+      ],
+      "components": [
+        "4",
+        "5"
+      ]
+    },
+    {
+      "number": "W4",
+      "kind": "shop",
+      "at": [
+        5000.0,
+        152.0,
+        3000.0
+      ],
+      "components": [
+        "5",
+        "6"
+      ]
+    },
+    {
+      "number": "W5",
+      "kind": "shop",
+      "at": [
+        5000.0,
+        3848.0,
+        3000.0
+      ],
+      "components": [
+        "6",
+        "7"
+      ]
+    },
+    {
+      "number": "W6",
+      "kind": "shop",
+      "at": [
+        5000.0,
+        4000.0,
+        2848.0
+      ],
+      "components": [
+        "7",
+        "8"
+      ]
+    },
+    {
+      "number": "W7",
+      "kind": "shop",
+      "at": [
+        5000.0,
+        4000.0,
+        1152.0
+      ],
+      "components": [
+        "8",
+        "9"
+      ]
+    },
+    {
+      "number": "W8",
+      "kind": "shop",
+      "at": [
+        5152.0,
+        4000.0,
+        1000.0
+      ],
+      "components": [
+        "9",
+        "10"
+      ]
+    },
+    {
+      "number": "W9",
+      "kind": "shop",
+      "at": [
+        7000.0,
+        4000.0,
+        1000.0
+      ],
+      "components": [
+        "10",
+        "11"
+      ]
+    },
+    {
+      "number": "W10",
+      "kind": "shop",
+      "at": [
+        7210.0,
+        4000.0,
+        1000.0
+      ],
+      "components": [
+        "11",
+        "12"
+      ]
+    },
+    {
+      "number": "W11",
+      "kind": "shop",
+      "at": [
+        7924.0,
+        4000.0,
+        1000.0
+      ],
+      "components": [
+        "12",
+        "13"
+      ]
+    },
+    {
+      "number": "W12",
+      "kind": "shop",
+      "at": [
+        7105.0,
+        4000.0,
+        1105.0
+      ],
+      "components": [
+        "11",
+        "14"
+      ]
+    },
+    {
+      "number": "W13",
+      "kind": "shop",
+      "at": [
+        7105.0,
+        4000.0,
+        1424.0
+      ],
+      "components": [
+        "14",
+        "15"
+      ]
+    }
+  ],
+  "shopWelds": 12,
+  "fieldWelds": 1,
+  "terminals": [
+    {
+      "at": [
+        0.0,
+        0.0,
+        3000.0
+      ],
+      "endType": "FL"
+    },
+    {
+      "at": [
+        8000.0,
+        4000.0,
+        1000.0
+      ],
+      "endType": "FL"
+    },
+    {
+      "at": [
+        7105.0,
+        4000.0,
+        1500.0
+      ],
+      "endType": "FL"
+    }
+  ],
+  "spools": [
+    {
+      "spool": "L-101-SP01",
+      "components": [
+        "1",
+        "2"
+      ]
+    },
+    {
+      "spool": "L-101-SP02",
+      "components": [
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15"
+      ]
+    }
+  ],
+  "cutList": [
+    {
+      "piece": "L-101-SP01-P1",
+      "componentId": "2",
+      "centrelineLengthMm": 2424.0,
+      "cutLengthMm": 2424.0
+    },
+    {
+      "piece": "L-101-SP02-P1",
+      "componentId": "4",
+      "centrelineLengthMm": 2348.0,
+      "cutLengthMm": 2348.0
+    },
+    {
+      "piece": "L-101-SP02-P2",
+      "componentId": "6",
+      "centrelineLengthMm": 3696.0,
+      "cutLengthMm": 3696.0
+    },
+    {
+      "piece": "L-101-SP02-P3",
+      "componentId": "8",
+      "centrelineLengthMm": 1696.0,
+      "cutLengthMm": 1696.0
+    },
+    {
+      "piece": "L-101-SP02-P4",
+      "componentId": "10",
+      "centrelineLengthMm": 1848.0,
+      "cutLengthMm": 1848.0
+    },
+    {
+      "piece": "L-101-SP02-P5",
+      "componentId": "12",
+      "centrelineLengthMm": 714.0,
+      "cutLengthMm": 714.0
+    },
+    {
+      "piece": "L-101-SP02-P6",
+      "componentId": "14",
+      "centrelineLengthMm": 319.0,
+      "cutLengthMm": 319.0
+    }
+  ],
+  "bom": [
+    {
+      "itemCode": "FLWN-100-150",
+      "type": "FLANGE",
+      "quantity": 3.0,
+      "unit": "ea",
+      "description": "FLANGE WN, RF, DN100, CLASS 150, SCH 40 BORE (illustrative description, llull validation sample)"
+    },
+    {
+      "itemCode": "PIPE-100-S40",
+      "type": "PIPE",
+      "quantity": 13.045,
+      "unit": "m",
+      "description": "PIPE, SMLS, DN100, SCH 40, BE (illustrative description, llull validation sample)"
+    },
+    {
+      "itemCode": "ELL90LR-100-S40",
+      "type": "ELBOW",
+      "quantity": 3.0,
+      "unit": "ea",
+      "description": "ELBOW 90 LR, BW, DN100, SCH 40 (illustrative description, llull validation sample)"
+    },
+    {
+      "itemCode": "TEE-100-S40",
+      "type": "TEE",
+      "quantity": 1.0,
+      "unit": "ea",
+      "description": "TEE EQUAL, BW, DN100, SCH 40 (illustrative description, llull validation sample)"
+    }
+  ],
+  "roundTrip": {
+    "modelEqual": true,
+    "analysisEqual": true,
+    "rewrittenEqualsSource": true
+  },
+  "isoAxes": {
+    "east+X": {
+      "angleDeg": -30.0,
+      "scale": 0.816496580928
+    },
+    "north+Y": {
+      "angleDeg": 30.0,
+      "scale": 0.816496580928
+    },
+    "up+Z": {
+      "angleDeg": 90.0,
+      "scale": 0.816496580928
+    }
+  }
+}

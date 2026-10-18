@@ -1,0 +1,180 @@
+{
+ "meta": {
+  "id": "PSC-DATA-LLULL-OD",
+  "title": "llull PIPE_SIZES (packages/domain-aec/src/industrial/piping/pipeSizes.ts) against ASME B36.10M STD (S1)",
+  "finding": "llull mixes EN 10220 outside diameters (26.9, 33.7, 42.4, 76.1, 139.7) with ASME B36.10M STD walls. An ASME NPS 2-1/2 pipe (OD 73.0) or NPS 5 (OD 141.3) is more than OUTSIDE_DIAMETER_TOLERANCE_MM = 1.5 mm from the llull row, so pipeWallThickness() falls back to max(2.5, OD/40) and the weight is wrong. TR-PSC-02 replaces the table with standard-tagged catalogues."
+ },
+ "rows": [
+  {
+   "dn": 15,
+   "nps": 0.5,
+   "llullOdMm": 21.3,
+   "b3610OdMm": 21.3,
+   "deltaOdMm": 0.0,
+   "llullWallMm": 2.77,
+   "b3610StdWallMm": 2.77
+  },
+  {
+   "dn": 20,
+   "nps": 0.75,
+   "llullOdMm": 26.9,
+   "b3610OdMm": 26.7,
+   "deltaOdMm": 0.2,
+   "llullWallMm": 2.87,
+   "b3610StdWallMm": 2.87
+  },
+  {
+   "dn": 25,
+   "nps": 1,
+   "llullOdMm": 33.7,
+   "b3610OdMm": 33.4,
+   "deltaOdMm": 0.3,
+   "llullWallMm": 3.38,
+   "b3610StdWallMm": 3.38
+  },
+  {
+   "dn": 32,
+   "nps": 1.25,
+   "llullOdMm": 42.4,
+   "b3610OdMm": 42.2,
+   "deltaOdMm": 0.2,
+   "llullWallMm": 3.56,
+   "b3610StdWallMm": 3.56
+  },
+  {
+   "dn": 40,
+   "nps": 1.5,
+   "llullOdMm": 48.3,
+   "b3610OdMm": 48.3,
+   "deltaOdMm": 0.0,
+   "llullWallMm": 3.68,
+   "b3610StdWallMm": 3.68
+  },
+  {
+   "dn": 50,
+   "nps": 2,
+   "llullOdMm": 60.3,
+   "b3610OdMm": 60.3,
+   "deltaOdMm": 0.0,
+   "llullWallMm": 3.91,
+   "b3610StdWallMm": 3.91
+  },
+  {
+   "dn": 65,
+   "nps": 2.5,
+   "llullOdMm": 76.1,
+   "b3610OdMm": 73,
+   "deltaOdMm": 3.1,
+   "llullWallMm": 5.16,
+   "b3610StdWallMm": 5.16
+  },
+  {
+   "dn": 80,
+   "nps": 3,
+   "llullOdMm": 88.9,
+   "b3610OdMm": 88.9,
+   "deltaOdMm": 0.0,
+   "llullWallMm": 5.49,
+   "b3610StdWallMm": 5.49
+  },
+  {
+   "dn": 100,
+   "nps": 4,
+   "llullOdMm": 114.3,
+   "b3610OdMm": 114.3,
+   "deltaOdMm": 0.0,
+   "llullWallMm": 6.02,
+   "b3610StdWallMm": 6.02
+  },
+  {
+   "dn": 125,
+   "nps": 5,
+   "llullOdMm": 139.7,
+   "b3610OdMm": 141.3,
+   "deltaOdMm": -1.6,
+   "llullWallMm": 6.55,
+   "b3610StdWallMm": 6.55
+  },
+  {
+   "dn": 150,
+   "nps": 6,
+   "llullOdMm": 168.3,
+   "b3610OdMm": 168.3,
+   "deltaOdMm": 0.0,
+   "llullWallMm": 7.11,
+   "b3610StdWallMm": 7.11
+  },
+  {
+   "dn": 200,
+   "nps": 8,
+   "llullOdMm": 219.1,
+   "b3610OdMm": 219.1,
+   "deltaOdMm": 0.0,
+   "llullWallMm": 8.18,
+   "b3610StdWallMm": 8.18
+  },
+  {
+   "dn": 250,
+   "nps": 10,
+   "llullOdMm": 273,
+   "b3610OdMm": 273,
+   "deltaOdMm": 0,
+   "llullWallMm": 9.27,
+   "b3610StdWallMm": 9.27
+  },
+  {
+   "dn": 300,
+   "nps": 12,
+   "llullOdMm": 323.9,
+   "b3610OdMm": 323.8,
+   "deltaOdMm": 0.1,
+   "llullWallMm": 9.53,
+   "b3610StdWallMm": 9.53
+  },
+  {
+   "dn": 350,
+   "nps": 14,
+   "llullOdMm": 355.6,
+   "b3610OdMm": 355.6,
+   "deltaOdMm": 0.0,
+   "llullWallMm": 9.53,
+   "b3610StdWallMm": 9.53
+  },
+  {
+   "dn": 400,
+   "nps": 16,
+   "llullOdMm": 406.4,
+   "b3610OdMm": 406.4,
+   "deltaOdMm": 0.0,
+   "llullWallMm": 9.53,
+   "b3610StdWallMm": 9.53
+  },
+  {
+   "dn": 450,
+   "nps": 18,
+   "llullOdMm": 457,
+   "b3610OdMm": 457,
+   "deltaOdMm": 0,
+   "llullWallMm": 9.53,
+   "b3610StdWallMm": 9.53
+  },
+  {
+   "dn": 500,
+   "nps": 20,
+   "llullOdMm": 508,
+   "b3610OdMm": 508,
+   "deltaOdMm": 0,
+   "llullWallMm": 9.53,
+   "b3610StdWallMm": 9.53
+  },
+  {
+   "dn": 600,
+   "nps": 24,
+   "llullOdMm": 610,
+   "b3610OdMm": 610,
+   "deltaOdMm": 0,
+   "llullWallMm": 9.53,
+   "b3610StdWallMm": 9.53
+  }
+ ]
+}

@@ -1,0 +1,490 @@
+{
+  "id": "SC-DAT-01",
+  "status": "PROPOSED \u2014 needs the DAT MVP commands (flagged \"unbuilt\": true): define_plant_hierarchy, define_plant_class, set_tag_format, assign_plant_object, set_plant_properties, plant_report, check_plant_data, and the `schema` param of export_ifc. set_units, add_level, add_equipment and add_pipe_run exist today.",
+  "validates": [
+    "VC-DAT-01",
+    "VC-DAT-02",
+    "VC-DAT-03",
+    "VC-DAT-04",
+    "VC-DAT-05",
+    "VC-DAT-10",
+    "VC-DAT-11"
+  ],
+  "description": "Feed tank T-101 and transfer pump P-101 in unit U10 of plant P1, two process lines (150-P-1001-A1A tank -> pump suction, 100-P-1002-A1A pump discharge -> battery limit BL-1). Built with today's add_equipment / add_pipe_run, then classified, tagged and reported; exported to IFC4X3_ADD2. Expected values: data/sc_dat_01_reports_expected.json and data/reference/sc-dat-01-reference.ifc.",
+  "actions": [
+    {
+      "command": "set_units",
+      "params": {
+        "units": "mm"
+      }
+    },
+    {
+      "command": "add_level",
+      "params": {
+        "name": "Grade",
+        "elevation": 0,
+        "height": 6000
+      }
+    },
+    {
+      "command": "define_plant_hierarchy",
+      "unbuilt": true,
+      "params": {
+        "nodes": [
+          {
+            "code": "S1",
+            "kind": "site",
+            "name": "Site 1"
+          },
+          {
+            "code": "P1",
+            "kind": "plant",
+            "name": "Demo plant",
+            "parent": "S1"
+          },
+          {
+            "code": "U10",
+            "kind": "unit",
+            "name": "Feed unit",
+            "parent": "P1",
+            "properties": {
+              "areaNumber": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "define_plant_class",
+      "unbuilt": true,
+      "params": {
+        "name": "Equipment",
+        "abstract": true,
+        "tagFormat": "{classCode}-{area}{seq:2}",
+        "properties": [
+          {
+            "name": "Description",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "OperatingWeight",
+            "type": "mass",
+            "unit": "kg"
+          },
+          {
+            "name": "DesignPressure",
+            "type": "pressure",
+            "unit": "barg",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "command": "define_plant_class",
+      "unbuilt": true,
+      "params": {
+        "name": "Tank",
+        "parent": "Equipment",
+        "classCode": "T",
+        "ifc": {
+          "class": "IfcTank",
+          "predefinedType": "STORAGE"
+        }
+      }
+    },
+    {
+      "command": "define_plant_class",
+      "unbuilt": true,
+      "params": {
+        "name": "CentrifugalPump",
+        "parent": "Equipment",
+        "classCode": "P",
+        "ifc": {
+          "class": "IfcPump",
+          "predefinedType": "ENDSUCTION"
+        }
+      }
+    },
+    {
+      "command": "define_plant_class",
+      "unbuilt": true,
+      "params": {
+        "name": "ProcessLine",
+        "tagFormat": "{nominalSize}-{fluidCode}-{seq:4}-{spec}",
+        "ifc": {
+          "class": "IfcDistributionSystem",
+          "predefinedType": "USERDEFINED",
+          "objectType": "PIPELINE"
+        },
+        "properties": [
+          {
+            "name": "nominalSize",
+            "type": "integer",
+            "required": true
+          },
+          {
+            "name": "fluidCode",
+            "type": "text",
+            "required": true,
+            "pattern": "[A-Z]{1,3}"
+          },
+          {
+            "name": "spec",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "DesignPressure",
+            "type": "pressure",
+            "unit": "barg"
+          }
+        ]
+      }
+    },
+    {
+      "command": "add_equipment",
+      "params": {
+        "name": "Feed tank",
+        "location": [
+          0,
+          0
+        ],
+        "size": [
+          3000,
+          0,
+          4000
+        ],
+        "shape": "vertical_vessel",
+        "weight": 2500,
+        "mark": "T-101"
+      },
+      "as": "tank"
+    },
+    {
+      "command": "add_equipment",
+      "params": {
+        "name": "Transfer pump",
+        "location": [
+          6000,
+          0
+        ],
+        "size": [
+          1000,
+          500,
+          800
+        ],
+        "weight": 450,
+        "mark": "P-101"
+      },
+      "as": "pump"
+    },
+    {
+      "command": "add_pipe_run",
+      "params": {
+        "points": [
+          [
+            1400,
+            0,
+            500
+          ],
+          [
+            3000,
+            0,
+            500
+          ],
+          [
+            3000,
+            0,
+            300
+          ],
+          [
+            5600,
+            0,
+            300
+          ]
+        ],
+        "dn": 150,
+        "line": "150-P-1001-A1A",
+        "from": "T-101",
+        "to": "P-101",
+        "service": "process"
+      },
+      "as": "l1"
+    },
+    {
+      "command": "add_pipe_run",
+      "params": {
+        "points": [
+          [
+            6000,
+            0,
+            700
+          ],
+          [
+            6000,
+            0,
+            3500
+          ],
+          [
+            9000,
+            0,
+            3500
+          ]
+        ],
+        "dn": 100,
+        "line": "100-P-1002-A1A",
+        "from": "P-101",
+        "to": "BL-1",
+        "service": "process"
+      },
+      "as": "l2"
+    },
+    {
+      "command": "assign_plant_object",
+      "unbuilt": true,
+      "params": {
+        "target": "$tank",
+        "className": "Tank",
+        "hierarchy": "U10",
+        "tagFields": {
+          "seq": 1
+        },
+        "properties": {
+          "Description": "Feed tank",
+          "DesignPressure": 3.5
+        }
+      }
+    },
+    {
+      "command": "assign_plant_object",
+      "unbuilt": true,
+      "params": {
+        "target": "$pump",
+        "className": "CentrifugalPump",
+        "hierarchy": "U10",
+        "tagFields": {
+          "seq": 1
+        },
+        "properties": {
+          "Description": "Transfer pump",
+          "DesignPressure": 16
+        }
+      }
+    },
+    {
+      "command": "assign_plant_object",
+      "unbuilt": true,
+      "params": {
+        "target": "$l1",
+        "className": "ProcessLine",
+        "hierarchy": "U10",
+        "tagFields": {
+          "nominalSize": 150,
+          "fluidCode": "P",
+          "seq": 1001,
+          "spec": "A1A"
+        }
+      }
+    },
+    {
+      "command": "assign_plant_object",
+      "unbuilt": true,
+      "params": {
+        "target": "$l2",
+        "className": "ProcessLine",
+        "hierarchy": "U10",
+        "tagFields": {
+          "nominalSize": 100,
+          "fluidCode": "P",
+          "seq": 1002,
+          "spec": "A1A"
+        }
+      }
+    },
+    {
+      "command": "plant_report",
+      "unbuilt": true,
+      "params": {
+        "kind": "line_list"
+      }
+    },
+    {
+      "command": "plant_report",
+      "unbuilt": true,
+      "params": {
+        "kind": "equipment_list"
+      }
+    },
+    {
+      "command": "plant_report",
+      "unbuilt": true,
+      "params": {
+        "kind": "nozzle_schedule"
+      }
+    },
+    {
+      "command": "plant_report",
+      "unbuilt": true,
+      "params": {
+        "kind": "mto",
+        "groupBy": [
+          "spec",
+          "itemType",
+          "nominalSize"
+        ]
+      }
+    },
+    {
+      "command": "plant_report",
+      "unbuilt": true,
+      "params": {
+        "kind": "tag_register"
+      }
+    },
+    {
+      "command": "check_plant_data",
+      "unbuilt": true,
+      "params": {}
+    },
+    {
+      "command": "export_ifc",
+      "params": {
+        "schema": "IFC4X3_ADD2",
+        "timestamp": "2026-10-18T00:00:00"
+      },
+      "note": "`schema` param unbuilt; today export_ifc writes IFC4 only"
+    }
+  ],
+  "expected": [
+    {
+      "step": 11,
+      "path": "tag",
+      "value": "T-101",
+      "source": "closed form, tag_format_cases.json"
+    },
+    {
+      "step": 12,
+      "path": "tag",
+      "value": "P-101",
+      "source": "closed form"
+    },
+    {
+      "step": 13,
+      "path": "tag",
+      "value": "150-P-1001-A1A",
+      "source": "closed form"
+    },
+    {
+      "step": 15,
+      "path": "rows.length",
+      "value": 2,
+      "source": "plan (2 lines)"
+    },
+    {
+      "step": 15,
+      "path": "rowsByTag.150-P-1001-A1A.lengthM",
+      "value": 4.4,
+      "abs": 1e-09,
+      "source": "sum of segment lengths 1600+200+2600 mm"
+    },
+    {
+      "step": 15,
+      "path": "rowsByTag.100-P-1002-A1A.lengthM",
+      "value": 5.8,
+      "abs": 1e-09,
+      "source": "2800+3000 mm"
+    },
+    {
+      "step": 16,
+      "path": "rows.length",
+      "value": 2,
+      "source": "plan"
+    },
+    {
+      "step": 17,
+      "path": "rows.length",
+      "value": 3,
+      "source": "inferred nozzles: T-101 N1, P-101 N1, P-101 N2"
+    },
+    {
+      "step": 18,
+      "path": "rows.length",
+      "value": 4,
+      "source": "DN100 pipe 5.8 m, DN150 pipe 4.4 m, DN100 bend x1, DN150 bend x2"
+    },
+    {
+      "step": 19,
+      "path": "rows.length",
+      "value": 4,
+      "source": "2 equipment + 2 lines"
+    },
+    {
+      "step": 20,
+      "path": "status",
+      "value": "pass",
+      "source": "no duplicate, all formats valid, required properties set; the open end at BL-1 is a declared battery limit (info only)"
+    },
+    {
+      "step": 21,
+      "path": "counts.IfcPipeSegment",
+      "value": 5,
+      "source": "data/reference/sc-dat-01-reference.stats.json"
+    },
+    {
+      "step": 21,
+      "path": "counts.IfcPipeFitting",
+      "value": 3,
+      "source": "idem"
+    },
+    {
+      "step": 21,
+      "path": "counts.IfcTank",
+      "value": 1,
+      "source": "idem"
+    },
+    {
+      "step": 21,
+      "path": "counts.IfcPump",
+      "value": 1,
+      "source": "idem"
+    },
+    {
+      "step": 21,
+      "path": "counts.IfcDistributionPort",
+      "value": 19,
+      "source": "idem"
+    },
+    {
+      "step": 21,
+      "path": "counts.IfcRelConnectsPorts",
+      "value": 9,
+      "source": "idem; one relationship per connection, SOURCE -> SINK"
+    },
+    {
+      "step": 21,
+      "path": "counts.IfcRelNests",
+      "value": 10,
+      "source": "idem"
+    },
+    {
+      "step": 21,
+      "path": "counts.IfcDistributionSystem",
+      "value": 2,
+      "source": "idem"
+    },
+    {
+      "step": 21,
+      "path": "openPorts",
+      "value": 1,
+      "source": "idem (end of 100-P-1002-A1A at BL-1)"
+    },
+    {
+      "step": 21,
+      "path": "schema",
+      "value": "IFC4X3_ADD2",
+      "source": "FILE_SCHEMA"
+    }
+  ]
+}

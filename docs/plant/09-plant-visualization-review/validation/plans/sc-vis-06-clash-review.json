@@ -1,0 +1,110 @@
+{
+  "id": "SC-VIS-06",
+  "validates": [
+    "VC-VIS-40",
+    "VC-VIS-41"
+  ],
+  "status": "PROPOSED. add_equipment, add_pipe_run, check_clashes run today (industrial plugin); create_clash_issues, set_issue_status and check_review are unbuilt (TR-VIS-40..41).",
+  "description": "Clash review: a pipe run passes through a vessel; check_clashes finds one hard clash; create_clash_issues turns every clash into a review issue with an auto-framed viewpoint (section box around the clash, both elements highlighted); re-running is idempotent (same clash key, no duplicate issue).",
+  "actions": [
+    {
+      "command": "add_equipment",
+      "params": {
+        "name": "Drum",
+        "location": [
+          0,
+          0
+        ],
+        "size": [
+          1500,
+          0,
+          3000
+        ],
+        "shape": "vertical_vessel",
+        "mark": "V-101",
+        "clearance": 0
+      }
+    },
+    {
+      "command": "add_pipe_run",
+      "params": {
+        "points": [
+          [
+            -3000,
+            0,
+            1500
+          ],
+          [
+            3000,
+            0,
+            1500
+          ]
+        ],
+        "dn": 100,
+        "line": "P-201",
+        "service": "process"
+      }
+    },
+    {
+      "command": "check_clashes",
+      "params": {}
+    },
+    {
+      "command": "create_clash_issues",
+      "params": {
+        "source": "check_clashes",
+        "margin": 500
+      }
+    },
+    {
+      "command": "create_clash_issues",
+      "params": {
+        "source": "check_clashes",
+        "margin": 500
+      }
+    },
+    {
+      "command": "check_review",
+      "params": {}
+    }
+  ],
+  "expected": [
+    {
+      "step": 2,
+      "path": "clashes.length",
+      "value": 1,
+      "source": "pipe crosses the drum; both ends outside (INDUSTRIAL.md coordination rules)"
+    },
+    {
+      "step": 2,
+      "path": "clashes[0].kind",
+      "value": "hard",
+      "source": "check_clashes"
+    },
+    {
+      "step": 3,
+      "path": "created",
+      "value": 1,
+      "source": "one issue per clash"
+    },
+    {
+      "step": 4,
+      "path": "created",
+      "value": 0,
+      "source": "idempotent on clash key sorted(a,b)+kind"
+    },
+    {
+      "step": 4,
+      "path": "unchanged",
+      "value": 1,
+      "source": "idempotent"
+    },
+    {
+      "step": 5,
+      "path": "issues[?code=='VIS_ISSUE_OPEN'].length",
+      "value": 1,
+      "source": "one open clash issue"
+    }
+  ],
+  "notes": "Clash detection itself belongs to the industrial clash module (and, for routed piping, 02-spec-driven-routing); this pack only adds the review workflow on top of its data."
+}

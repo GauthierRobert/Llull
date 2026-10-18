@@ -1,0 +1,234 @@
+{
+  "id": "SC-VIS-02",
+  "validates": [
+    "VC-VIS-10",
+    "VC-VIS-11"
+  ],
+  "status": "PROPOSED. set_units / add_box run today; save_viewpoint, get_viewpoint, export_bcf_viewpoint, apply_viewpoint, import_bcf_viewpoint are unbuilt (TR-VIS-10..12).",
+  "description": "Viewpoint round trip on the camera of the BCF 3.0 documentation example (orthogonal camera, metres): save in a mm document, read back exactly, export to BCF VisualizationInfo (metres), apply to the document camera (azimuth / polar closed form), re-import from BCF XML and compare.",
+  "actions": [
+    {
+      "command": "set_units",
+      "params": {
+        "units": "mm"
+      }
+    },
+    {
+      "command": "add_box",
+      "params": {
+        "size": [
+          2000,
+          2000,
+          2000
+        ],
+        "position": [
+          0,
+          0,
+          1000
+        ]
+      },
+      "as": "part"
+    },
+    {
+      "command": "save_viewpoint",
+      "params": {
+        "name": "BCF example (orthogonal)",
+        "camera": {
+          "projection": "orthographic",
+          "eye": [
+            18674.638207107782,
+            -19548.05982455614,
+            10538.476791232824
+          ],
+          "direction": [
+            -0.8050867319107056,
+            0.5154458284378052,
+            -0.29351478815078735
+          ],
+          "up": [
+            -0.24719256162643433,
+            0.15826167166233063,
+            0.9559545516967773
+          ],
+          "viewHeight": 9673.289179801941,
+          "aspectRatio": 1.7777777777777777
+        }
+      },
+      "as": "vp"
+    },
+    {
+      "command": "get_viewpoint",
+      "params": {
+        "id": "$vp"
+      }
+    },
+    {
+      "command": "export_bcf_viewpoint",
+      "params": {
+        "id": "$vp"
+      }
+    },
+    {
+      "command": "apply_viewpoint",
+      "params": {
+        "id": "$vp"
+      }
+    },
+    {
+      "command": "import_bcf_viewpoint",
+      "params": {
+        "visualizationInfo": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><VisualizationInfo Guid=\"00000000-0000-4000-8000-000000000902\"><OrthogonalCamera><CameraViewPoint><X>18.674638207107783</X><Y>-19.54805982455614</Y><Z>10.538476791232824</Z></CameraViewPoint><CameraDirection><X>-0.8050867319107056</X><Y>0.5154458284378052</Y><Z>-0.29351478815078735</Z></CameraDirection><CameraUpVector><X>-0.24719256162643433</X><Y>0.15826167166233063</Y><Z>0.9559545516967773</Z></CameraUpVector><ViewToWorldScale>9.673289179801941</ViewToWorldScale><AspectRatio>1.7777777777777777</AspectRatio></OrthogonalCamera></VisualizationInfo>",
+        "name": "re-imported"
+      },
+      "as": "vp2"
+    },
+    {
+      "command": "get_viewpoint",
+      "params": {
+        "id": "$vp2"
+      }
+    }
+  ],
+  "expected": [
+    {
+      "step": 3,
+      "path": "camera.eye[0]",
+      "value": 18674.638207107782,
+      "rel": 1e-12,
+      "source": "input echo (exact storage)"
+    },
+    {
+      "step": 4,
+      "path": "camera.cameraViewPointM[0]",
+      "value": 18.674638207107783,
+      "rel": 1e-12,
+      "source": "BCF 3.0 example viewpoint, metres (data/bcf_3_0/example_viewpoint_orthogonal.bcfv)"
+    },
+    {
+      "step": 7,
+      "path": "camera.eye[0]",
+      "value": 18674.638207107782,
+      "rel": 1e-12,
+      "source": "BCF import, metres x 1000 into a mm document"
+    },
+    {
+      "step": 7,
+      "path": "camera.direction[0]",
+      "value": -0.8050867319107056,
+      "rel": 1e-12,
+      "source": "BCF example"
+    },
+    {
+      "step": 7,
+      "path": "camera.up[0]",
+      "value": -0.24719256162643433,
+      "rel": 1e-12,
+      "source": "BCF example"
+    },
+    {
+      "step": 3,
+      "path": "camera.eye[1]",
+      "value": -19548.05982455614,
+      "rel": 1e-12,
+      "source": "input echo (exact storage)"
+    },
+    {
+      "step": 4,
+      "path": "camera.cameraViewPointM[1]",
+      "value": -19.54805982455614,
+      "rel": 1e-12,
+      "source": "BCF 3.0 example viewpoint, metres (data/bcf_3_0/example_viewpoint_orthogonal.bcfv)"
+    },
+    {
+      "step": 7,
+      "path": "camera.eye[1]",
+      "value": -19548.05982455614,
+      "rel": 1e-12,
+      "source": "BCF import, metres x 1000 into a mm document"
+    },
+    {
+      "step": 7,
+      "path": "camera.direction[1]",
+      "value": 0.5154458284378052,
+      "rel": 1e-12,
+      "source": "BCF example"
+    },
+    {
+      "step": 7,
+      "path": "camera.up[1]",
+      "value": 0.15826167166233063,
+      "rel": 1e-12,
+      "source": "BCF example"
+    },
+    {
+      "step": 3,
+      "path": "camera.eye[2]",
+      "value": 10538.476791232824,
+      "rel": 1e-12,
+      "source": "input echo (exact storage)"
+    },
+    {
+      "step": 4,
+      "path": "camera.cameraViewPointM[2]",
+      "value": 10.538476791232824,
+      "rel": 1e-12,
+      "source": "BCF 3.0 example viewpoint, metres (data/bcf_3_0/example_viewpoint_orthogonal.bcfv)"
+    },
+    {
+      "step": 7,
+      "path": "camera.eye[2]",
+      "value": 10538.476791232824,
+      "rel": 1e-12,
+      "source": "BCF import, metres x 1000 into a mm document"
+    },
+    {
+      "step": 7,
+      "path": "camera.direction[2]",
+      "value": -0.29351478815078735,
+      "rel": 1e-12,
+      "source": "BCF example"
+    },
+    {
+      "step": 7,
+      "path": "camera.up[2]",
+      "value": 0.9559545516967773,
+      "rel": 1e-12,
+      "source": "BCF example"
+    },
+    {
+      "step": 4,
+      "path": "camera.viewToWorldScaleM",
+      "value": 9.673289179801941,
+      "rel": 1e-12,
+      "source": "BCF example"
+    },
+    {
+      "step": 7,
+      "path": "camera.viewHeight",
+      "value": 9673.289179801941,
+      "rel": 1e-12,
+      "source": "BCF ViewToWorldScale (m) x 1000"
+    },
+    {
+      "step": 5,
+      "path": "camera.azimuth",
+      "value": 2.1402772048541396,
+      "abs": 1e-09,
+      "source": "closed form atan2(-dx, -dy) of the BCF direction, llull set_camera convention (data/derive_vis_expected.py)"
+    },
+    {
+      "step": 5,
+      "path": "camera.polar",
+      "value": 1.2728948190113956,
+      "abs": 1e-09,
+      "source": "closed form acos(-dz / |d|)"
+    },
+    {
+      "step": 7,
+      "path": "warnings",
+      "value": [],
+      "source": "|direction| = 0.99999999 and direction . up = -2.8e-8: within the 1e-6 tolerance of VIS_VIEWPOINT_NOT_ORTHONORMAL"
+    }
+  ],
+  "notes": "The XML in step 6 is written for this plan from the numeric camera of the BCF example (facts), not a copy of the CC BY-ND file; the verbatim example is kept in data/bcf_3_0/ and is read by the unit test. apply_viewpoint keeps the document camera target on the view axis at the distance that frames the current scene; only azimuth and polar are asserted."
+}

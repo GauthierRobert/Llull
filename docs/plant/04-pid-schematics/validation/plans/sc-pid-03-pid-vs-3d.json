@@ -1,0 +1,29 @@
+{
+  "id": "SC-PID-03",
+  "status": "DRAFT — unbuilt commands: create_pid_sheet, add_pid_equipment, add_pid_line, add_pid_inline, check_pid_3d. The 3D side uses existing commands add_equipment and add_pipe_run (packages/domain-aec/src/industrial/equipment/equipment.ts). P3D_SPEC_MISMATCH and 3D valves need the 02-spec-driven-routing pipe class attribute and inline components; until then the valve is always P3D_UNPLACED.",
+  "validates": ["VC-PID-11"],
+  "description": "A clean P&ID (T-101 -> P-101, line 100-P-1001-A1 DN100) and a 3D model with four seeded inconsistencies: 3D pipe DN 80, extra 3D equipment E-201, the P&ID valve HV-104 not placed, and the 3D pipe starting at T-102. Expected findings are by construction.",
+  "actions": [
+    { "command": "create_pid_sheet", "params": { "number": "PID-001", "title": "Feed", "size": "A3", "convention": "ISA-5.1" }, "as": "sheet" },
+    { "command": "add_pid_equipment", "params": { "sheet": "$sheet", "class": "Tank", "tag": "T-101", "at": [60, 150], "nozzles": [ { "subTag": "N1", "side": "bottom", "dn": 100 } ] } },
+    { "command": "add_pid_equipment", "params": { "sheet": "$sheet", "class": "CentrifugalPump", "tag": "P-101", "at": [160, 80], "nozzles": [ { "subTag": "N1", "side": "left", "dn": 100 } ] } },
+    { "command": "add_pid_line", "params": { "sheet": "$sheet", "from": { "tag": "T-101", "nozzle": "N1" }, "to": { "tag": "P-101", "nozzle": "N1" }, "lineNumber": "100-P-1001-A1", "dn": 100, "pipingClass": "A1", "fluidCode": "P" }, "as": "suction" },
+    { "command": "add_pid_inline", "params": { "line": "$suction", "at": [100, 80], "class": "BallValve", "tag": "HV-104" } },
+    { "command": "set_units", "params": { "units": "mm" } },
+    { "command": "add_equipment", "params": { "name": "Feed tank", "mark": "T-101", "location": [0, 0], "size": [2000, 0, 3000], "shape": "vertical_vessel" } },
+    { "command": "add_equipment", "params": { "name": "Feed pump", "mark": "P-101", "location": [4000, 0], "size": [1200, 600, 800] } },
+    { "command": "add_equipment", "params": { "name": "Spare skid", "mark": "E-201", "location": [8000, 0], "size": [1000, 1000, 1000] }, "seed": "P3D_NOT_IN_PID" },
+    { "command": "add_pipe_run", "params": { "points": [[0, 1200, 300], [3400, 1200, 300], [3400, 0, 300]], "dn": 80, "line": "100-P-1001-A1", "from": "T-102", "to": "P-101", "service": "process" }, "seed": "P3D_SIZE_MISMATCH + P3D_CONNECTIVITY_MISMATCH" },
+    { "command": "check_pid_3d", "params": {} }
+  ],
+  "expected": [
+    { "step": 10, "path": "data.countsByCode.P3D_UNPLACED", "value": 1, "abs": 0, "source": "HV-104 has no 3D counterpart (by construction)" },
+    { "step": 10, "path": "data.countsByCode.P3D_NOT_IN_PID", "value": 1, "abs": 0, "source": "E-201 (by construction)" },
+    { "step": 10, "path": "data.countsByCode.P3D_SIZE_MISMATCH", "value": 1, "abs": 0, "source": "P&ID DN100 vs 3D DN80 on line 100-P-1001-A1" },
+    { "step": 10, "path": "data.countsByCode.P3D_CONNECTIVITY_MISMATCH", "value": 1, "abs": 0, "source": "P&ID from T-101/N1, 3D from T-102" },
+    { "step": 10, "path": "data.matched.equipment", "value": ["P-101", "T-101"], "source": "tag match" },
+    { "step": 10, "path": "data.matched.lines", "value": ["100-P-1001-A1"], "source": "line-number match" },
+    { "step": 10, "path": "data.summary.reviewRequired", "value": false, "source": "consistency is not a safety verdict" }
+  ],
+  "cleanVariant": "Replace step 9 params by dn 100, from T-101, drop step 8: check_pid_3d must return only P3D_UNPLACED for HV-104 (until 02 RTE provides 3D valves) and nothing else."
+}

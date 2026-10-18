@@ -1,0 +1,1627 @@
+{
+ "source": {
+  "primary": "IFC4X3_ADD2 EXPRESS schema as compiled into IfcOpenShell 0.9.0.post1 (PyPI wheel, LGPL-3.0), queried with ifcopenshell_wrapper.schema_by_name and ifcopenshell.util.pset.get_template(\"IFC4X3\") \u2014 script data/scripts/schema_facts.py",
+  "crossCheck": "buildingSMART/IFC4.3.x-development commit 7256780bd95fcc5b3653e07b3e8ec2f8389c9f3d docs/schemas/**/Types/*.md (CC BY-ND 4.0, development version) \u2014 enumeration sets compared, see enumCrossCheck",
+  "accessed": "2026-10-18"
+ },
+ "enumCrossCheck": {
+  "IfcPipeSegmentTypeEnum": "agree",
+  "IfcPipeFittingTypeEnum": "agree",
+  "IfcValveTypeEnum": "agree",
+  "IfcDistributionSystemEnum": "agree",
+  "IfcFlowDirectionEnum": "agree",
+  "IfcDistributionPortTypeEnum": "agree",
+  "IfcTankTypeEnum": "agree",
+  "IfcPumpTypeEnum": "agree",
+  "IfcHeatExchangerTypeEnum": "agree",
+  "IfcCompressorTypeEnum": "agree"
+ },
+ "enumerations": {
+  "IfcPipeSegmentTypeEnum": [
+   "CULVERT",
+   "FLEXIBLESEGMENT",
+   "GUTTER",
+   "RIGIDSEGMENT",
+   "SPOOL",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ],
+  "IfcPipeFittingTypeEnum": [
+   "BEND",
+   "CONNECTOR",
+   "ENTRY",
+   "EXIT",
+   "JUNCTION",
+   "OBSTRUCTION",
+   "TRANSITION",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ],
+  "IfcValveTypeEnum": [
+   "AIRRELEASE",
+   "ANTIVACUUM",
+   "CHANGEOVER",
+   "CHECK",
+   "COMMISSIONING",
+   "DIVERTING",
+   "DOUBLECHECK",
+   "DOUBLEREGULATING",
+   "DRAWOFFCOCK",
+   "FAUCET",
+   "FLUSHING",
+   "GASCOCK",
+   "GASTAP",
+   "ISOLATING",
+   "MIXING",
+   "PRESSUREREDUCING",
+   "PRESSURERELIEF",
+   "REGULATING",
+   "SAFETYCUTOFF",
+   "STEAMTRAP",
+   "STOPCOCK",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ],
+  "IfcDistributionSystemEnum": [
+   "AIRCONDITIONING",
+   "AUDIOVISUAL",
+   "CATENARY_SYSTEM",
+   "CHEMICAL",
+   "CHILLEDWATER",
+   "COMMUNICATION",
+   "COMPRESSEDAIR",
+   "CONDENSERWATER",
+   "CONTROL",
+   "CONVEYING",
+   "DATA",
+   "DISPOSAL",
+   "DOMESTICCOLDWATER",
+   "DOMESTICHOTWATER",
+   "DRAINAGE",
+   "EARTHING",
+   "ELECTRICAL",
+   "ELECTROACOUSTIC",
+   "EXHAUST",
+   "FIREPROTECTION",
+   "FIXEDTRANSMISSIONNETWORK",
+   "FUEL",
+   "GAS",
+   "HAZARDOUS",
+   "HEATING",
+   "LIGHTING",
+   "LIGHTNINGPROTECTION",
+   "MOBILENETWORK",
+   "MONITORINGSYSTEM",
+   "MUNICIPALSOLIDWASTE",
+   "OIL",
+   "OPERATIONAL",
+   "OPERATIONALTELEPHONYSYSTEM",
+   "OVERHEAD_CONTACTLINE_SYSTEM",
+   "POWERGENERATION",
+   "RAINWATER",
+   "REFRIGERATION",
+   "RETURN_CIRCUIT",
+   "SECURITY",
+   "SEWAGE",
+   "SIGNAL",
+   "STORMWATER",
+   "TELEPHONE",
+   "TV",
+   "VACUUM",
+   "VENT",
+   "VENTILATION",
+   "WASTEWATER",
+   "WATERSUPPLY",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ],
+  "IfcFlowDirectionEnum": [
+   "SINK",
+   "SOURCE",
+   "SOURCEANDSINK",
+   "NOTDEFINED"
+  ],
+  "IfcDistributionPortTypeEnum": [
+   "CABLE",
+   "CABLECARRIER",
+   "DUCT",
+   "PIPE",
+   "WIRELESS",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ],
+  "IfcTankTypeEnum": [
+   "BASIN",
+   "BREAKPRESSURE",
+   "EXPANSION",
+   "FEEDANDEXPANSION",
+   "OILRETENTIONTRAY",
+   "PRESSUREVESSEL",
+   "STORAGE",
+   "VESSEL",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ],
+  "IfcPumpTypeEnum": [
+   "CIRCULATOR",
+   "ENDSUCTION",
+   "SPLITCASE",
+   "SUBMERSIBLEPUMP",
+   "SUMPPUMP",
+   "VERTICALINLINE",
+   "VERTICALTURBINE",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ],
+  "IfcHeatExchangerTypeEnum": [
+   "PLATE",
+   "SHELLANDTUBE",
+   "TURNOUTHEATING",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ],
+  "IfcFlowInstrumentTypeEnum": [
+   "AMMETER",
+   "COMBINED",
+   "FREQUENCYMETER",
+   "PHASEANGLEMETER",
+   "POWERFACTORMETER",
+   "PRESSUREGAUGE",
+   "THERMOMETER",
+   "VOLTMETER",
+   "VOLTMETER_PEAK",
+   "VOLTMETER_RMS",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ],
+  "IfcSensorTypeEnum": [
+   "CO2SENSOR",
+   "CONDUCTANCESENSOR",
+   "CONTACTSENSOR",
+   "COSENSOR",
+   "EARTHQUAKESENSOR",
+   "FIRESENSOR",
+   "FLOWSENSOR",
+   "FOREIGNOBJECTDETECTIONSENSOR",
+   "FROSTSENSOR",
+   "GASSENSOR",
+   "HEATSENSOR",
+   "HUMIDITYSENSOR",
+   "IDENTIFIERSENSOR",
+   "IONCONCENTRATIONSENSOR",
+   "LEVELSENSOR",
+   "LIGHTSENSOR",
+   "MOISTURESENSOR",
+   "MOVEMENTSENSOR",
+   "OBSTACLESENSOR",
+   "PHSENSOR",
+   "PRESSURESENSOR",
+   "RADIATIONSENSOR",
+   "RADIOACTIVITYSENSOR",
+   "RAINSENSOR",
+   "SMOKESENSOR",
+   "SNOWDEPTHSENSOR",
+   "SOUNDSENSOR",
+   "TEMPERATURESENSOR",
+   "TRAINSENSOR",
+   "TURNOUTCLOSURESENSOR",
+   "WHEELSENSOR",
+   "WINDSENSOR",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ],
+  "IfcCompressorTypeEnum": [
+   "BOOSTER",
+   "DYNAMIC",
+   "HERMETIC",
+   "OPENTYPE",
+   "RECIPROCATING",
+   "ROLLINGPISTON",
+   "ROTARY",
+   "ROTARYVANE",
+   "SCROLL",
+   "SEMIHERMETIC",
+   "SINGLESCREW",
+   "SINGLESTAGE",
+   "TROCHOIDAL",
+   "TWINSCREW",
+   "WELDEDSHELLHERMETIC",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ],
+  "IfcFlowMeterTypeEnum": [
+   "ENERGYMETER",
+   "GASMETER",
+   "OILMETER",
+   "WATERMETER",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ],
+  "IfcCableCarrierSegmentTypeEnum": [
+   "CABLEBRACKET",
+   "CABLELADDERSEGMENT",
+   "CABLETRAYSEGMENT",
+   "CABLETRUNKINGSEGMENT",
+   "CATENARYWIRE",
+   "CONDUITSEGMENT",
+   "DROPPER",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ],
+  "IfcBuildingElementProxyTypeEnum": [
+   "COMPLEX",
+   "ELEMENT",
+   "PARTIAL",
+   "PROVISIONFORSPACE",
+   "PROVISIONFORVOID",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ],
+  "IfcFacilityPartCommonTypeEnum": [
+   "ABOVEGROUND",
+   "BELOWGROUND",
+   "JUNCTION",
+   "LEVELCROSSING",
+   "SEGMENT",
+   "SUBSTRUCTURE",
+   "SUPERSTRUCTURE",
+   "TERMINAL",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ],
+  "IfcInterceptorTypeEnum": [
+   "CYCLONIC",
+   "GREASE",
+   "OIL",
+   "PETROL",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ],
+  "IfcActuatorTypeEnum": [
+   "ELECTRICACTUATOR",
+   "HANDOPERATEDACTUATOR",
+   "HYDRAULICACTUATOR",
+   "PNEUMATICACTUATOR",
+   "THERMOSTATICACTUATOR",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ],
+  "IfcControllerTypeEnum": [
+   "FLOATING",
+   "MULTIPOSITION",
+   "PROGRAMMABLE",
+   "PROPORTIONAL",
+   "TWOPOSITION",
+   "USERDEFINED",
+   "NOTDEFINED"
+  ]
+ },
+ "entities": {
+  "IfcPipeSegment": {
+   "supertype": "IfcFlowSegment",
+   "attributes": [
+    {
+     "name": "GlobalId",
+     "type": "<type IfcGloballyUniqueId: <string>>",
+     "optional": false
+    },
+    {
+     "name": "OwnerHistory",
+     "type": "<entity IfcOwnerHistory>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectType",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectPlacement",
+     "type": "<entity IfcObjectPlacement>",
+     "optional": true
+    },
+    {
+     "name": "Representation",
+     "type": "<entity IfcProductRepresentation>",
+     "optional": true
+    },
+    {
+     "name": "Tag",
+     "type": "<type IfcIdentifier: <string>>",
+     "optional": true
+    },
+    {
+     "name": "PredefinedType",
+     "type": "<enumeration IfcPipeSegmentTypeEnum: (CULVERT, FLEXIBLESEGME",
+     "optional": true
+    }
+   ]
+  },
+  "IfcPipeFitting": {
+   "supertype": "IfcFlowFitting",
+   "attributes": [
+    {
+     "name": "GlobalId",
+     "type": "<type IfcGloballyUniqueId: <string>>",
+     "optional": false
+    },
+    {
+     "name": "OwnerHistory",
+     "type": "<entity IfcOwnerHistory>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectType",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectPlacement",
+     "type": "<entity IfcObjectPlacement>",
+     "optional": true
+    },
+    {
+     "name": "Representation",
+     "type": "<entity IfcProductRepresentation>",
+     "optional": true
+    },
+    {
+     "name": "Tag",
+     "type": "<type IfcIdentifier: <string>>",
+     "optional": true
+    },
+    {
+     "name": "PredefinedType",
+     "type": "<enumeration IfcPipeFittingTypeEnum: (BEND, CONNECTOR, ENTRY",
+     "optional": true
+    }
+   ]
+  },
+  "IfcValve": {
+   "supertype": "IfcFlowController",
+   "attributes": [
+    {
+     "name": "GlobalId",
+     "type": "<type IfcGloballyUniqueId: <string>>",
+     "optional": false
+    },
+    {
+     "name": "OwnerHistory",
+     "type": "<entity IfcOwnerHistory>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectType",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectPlacement",
+     "type": "<entity IfcObjectPlacement>",
+     "optional": true
+    },
+    {
+     "name": "Representation",
+     "type": "<entity IfcProductRepresentation>",
+     "optional": true
+    },
+    {
+     "name": "Tag",
+     "type": "<type IfcIdentifier: <string>>",
+     "optional": true
+    },
+    {
+     "name": "PredefinedType",
+     "type": "<enumeration IfcValveTypeEnum: (AIRRELEASE, ANTIVACUUM, CHAN",
+     "optional": true
+    }
+   ]
+  },
+  "IfcDistributionPort": {
+   "supertype": "IfcPort",
+   "attributes": [
+    {
+     "name": "GlobalId",
+     "type": "<type IfcGloballyUniqueId: <string>>",
+     "optional": false
+    },
+    {
+     "name": "OwnerHistory",
+     "type": "<entity IfcOwnerHistory>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectType",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectPlacement",
+     "type": "<entity IfcObjectPlacement>",
+     "optional": true
+    },
+    {
+     "name": "Representation",
+     "type": "<entity IfcProductRepresentation>",
+     "optional": true
+    },
+    {
+     "name": "FlowDirection",
+     "type": "<enumeration IfcFlowDirectionEnum: (SINK, SOURCE, SOURCEANDS",
+     "optional": true
+    },
+    {
+     "name": "PredefinedType",
+     "type": "<enumeration IfcDistributionPortTypeEnum: (CABLE, CABLECARRI",
+     "optional": true
+    },
+    {
+     "name": "SystemType",
+     "type": "<enumeration IfcDistributionSystemEnum: (AIRCONDITIONING, AU",
+     "optional": true
+    }
+   ]
+  },
+  "IfcRelConnectsPorts": {
+   "supertype": "IfcRelConnects",
+   "attributes": [
+    {
+     "name": "GlobalId",
+     "type": "<type IfcGloballyUniqueId: <string>>",
+     "optional": false
+    },
+    {
+     "name": "OwnerHistory",
+     "type": "<entity IfcOwnerHistory>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "RelatingPort",
+     "type": "<entity IfcPort>",
+     "optional": false
+    },
+    {
+     "name": "RelatedPort",
+     "type": "<entity IfcPort>",
+     "optional": false
+    },
+    {
+     "name": "RealizingElement",
+     "type": "<entity IfcElement>",
+     "optional": true
+    }
+   ]
+  },
+  "IfcRelNests": {
+   "supertype": "IfcRelDecomposes",
+   "attributes": [
+    {
+     "name": "GlobalId",
+     "type": "<type IfcGloballyUniqueId: <string>>",
+     "optional": false
+    },
+    {
+     "name": "OwnerHistory",
+     "type": "<entity IfcOwnerHistory>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "RelatingObject",
+     "type": "<entity IfcObjectDefinition>",
+     "optional": false
+    },
+    {
+     "name": "RelatedObjects",
+     "type": "<list [1:?] of <entity IfcObjectDefinition>>",
+     "optional": false
+    }
+   ]
+  },
+  "IfcDistributionSystem": {
+   "supertype": "IfcSystem",
+   "attributes": [
+    {
+     "name": "GlobalId",
+     "type": "<type IfcGloballyUniqueId: <string>>",
+     "optional": false
+    },
+    {
+     "name": "OwnerHistory",
+     "type": "<entity IfcOwnerHistory>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectType",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "LongName",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "PredefinedType",
+     "type": "<enumeration IfcDistributionSystemEnum: (AIRCONDITIONING, AU",
+     "optional": true
+    }
+   ]
+  },
+  "IfcRelAssignsToGroup": {
+   "supertype": "IfcRelAssigns",
+   "attributes": [
+    {
+     "name": "GlobalId",
+     "type": "<type IfcGloballyUniqueId: <string>>",
+     "optional": false
+    },
+    {
+     "name": "OwnerHistory",
+     "type": "<entity IfcOwnerHistory>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "RelatedObjects",
+     "type": "<set [1:?] of <entity IfcObjectDefinition>>",
+     "optional": false
+    },
+    {
+     "name": "RelatedObjectsType",
+     "type": "<type IfcStrippedOptional: <boolean>>",
+     "optional": true
+    },
+    {
+     "name": "RelatingGroup",
+     "type": "<entity IfcGroup>",
+     "optional": false
+    }
+   ]
+  },
+  "IfcRelServicesBuildings": {
+   "supertype": "IfcRelConnects",
+   "attributes": [
+    {
+     "name": "GlobalId",
+     "type": "<type IfcGloballyUniqueId: <string>>",
+     "optional": false
+    },
+    {
+     "name": "OwnerHistory",
+     "type": "<entity IfcOwnerHistory>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "RelatingSystem",
+     "type": "<entity IfcSystem>",
+     "optional": false
+    },
+    {
+     "name": "RelatedBuildings",
+     "type": "<set [1:?] of <entity IfcSpatialElement>>",
+     "optional": false
+    }
+   ]
+  },
+  "IfcTank": {
+   "supertype": "IfcFlowStorageDevice",
+   "attributes": [
+    {
+     "name": "GlobalId",
+     "type": "<type IfcGloballyUniqueId: <string>>",
+     "optional": false
+    },
+    {
+     "name": "OwnerHistory",
+     "type": "<entity IfcOwnerHistory>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectType",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectPlacement",
+     "type": "<entity IfcObjectPlacement>",
+     "optional": true
+    },
+    {
+     "name": "Representation",
+     "type": "<entity IfcProductRepresentation>",
+     "optional": true
+    },
+    {
+     "name": "Tag",
+     "type": "<type IfcIdentifier: <string>>",
+     "optional": true
+    },
+    {
+     "name": "PredefinedType",
+     "type": "<enumeration IfcTankTypeEnum: (BASIN, BREAKPRESSURE, EXPANSI",
+     "optional": true
+    }
+   ]
+  },
+  "IfcPump": {
+   "supertype": "IfcFlowMovingDevice",
+   "attributes": [
+    {
+     "name": "GlobalId",
+     "type": "<type IfcGloballyUniqueId: <string>>",
+     "optional": false
+    },
+    {
+     "name": "OwnerHistory",
+     "type": "<entity IfcOwnerHistory>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectType",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectPlacement",
+     "type": "<entity IfcObjectPlacement>",
+     "optional": true
+    },
+    {
+     "name": "Representation",
+     "type": "<entity IfcProductRepresentation>",
+     "optional": true
+    },
+    {
+     "name": "Tag",
+     "type": "<type IfcIdentifier: <string>>",
+     "optional": true
+    },
+    {
+     "name": "PredefinedType",
+     "type": "<enumeration IfcPumpTypeEnum: (CIRCULATOR, ENDSUCTION, SPLIT",
+     "optional": true
+    }
+   ]
+  },
+  "IfcFacility": {
+   "supertype": "IfcSpatialStructureElement",
+   "attributes": [
+    {
+     "name": "GlobalId",
+     "type": "<type IfcGloballyUniqueId: <string>>",
+     "optional": false
+    },
+    {
+     "name": "OwnerHistory",
+     "type": "<entity IfcOwnerHistory>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectType",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectPlacement",
+     "type": "<entity IfcObjectPlacement>",
+     "optional": true
+    },
+    {
+     "name": "Representation",
+     "type": "<entity IfcProductRepresentation>",
+     "optional": true
+    },
+    {
+     "name": "LongName",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "CompositionType",
+     "type": "<enumeration IfcElementCompositionEnum: (COMPLEX, ELEMENT, P",
+     "optional": true
+    }
+   ]
+  },
+  "IfcFacilityPart": {
+   "supertype": "IfcSpatialStructureElement",
+   "attributes": [
+    {
+     "name": "GlobalId",
+     "type": "<type IfcGloballyUniqueId: <string>>",
+     "optional": false
+    },
+    {
+     "name": "OwnerHistory",
+     "type": "<entity IfcOwnerHistory>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectType",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectPlacement",
+     "type": "<entity IfcObjectPlacement>",
+     "optional": true
+    },
+    {
+     "name": "Representation",
+     "type": "<entity IfcProductRepresentation>",
+     "optional": true
+    },
+    {
+     "name": "LongName",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "CompositionType",
+     "type": "<enumeration IfcElementCompositionEnum: (COMPLEX, ELEMENT, P",
+     "optional": true
+    },
+    {
+     "name": "UsageType",
+     "type": "<enumeration IfcFacilityUsageEnum: (LATERAL, LONGITUDINAL, R",
+     "optional": false
+    }
+   ]
+  },
+  "IfcSite": {
+   "supertype": "IfcSpatialStructureElement",
+   "attributes": [
+    {
+     "name": "GlobalId",
+     "type": "<type IfcGloballyUniqueId: <string>>",
+     "optional": false
+    },
+    {
+     "name": "OwnerHistory",
+     "type": "<entity IfcOwnerHistory>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectType",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectPlacement",
+     "type": "<entity IfcObjectPlacement>",
+     "optional": true
+    },
+    {
+     "name": "Representation",
+     "type": "<entity IfcProductRepresentation>",
+     "optional": true
+    },
+    {
+     "name": "LongName",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "CompositionType",
+     "type": "<enumeration IfcElementCompositionEnum: (COMPLEX, ELEMENT, P",
+     "optional": true
+    },
+    {
+     "name": "RefLatitude",
+     "type": "<type IfcCompoundPlaneAngleMeasure: <list [3:4] of <integer>",
+     "optional": true
+    },
+    {
+     "name": "RefLongitude",
+     "type": "<type IfcCompoundPlaneAngleMeasure: <list [3:4] of <integer>",
+     "optional": true
+    },
+    {
+     "name": "RefElevation",
+     "type": "<type IfcLengthMeasure: <real>>",
+     "optional": true
+    },
+    {
+     "name": "LandTitleNumber",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "SiteAddress",
+     "type": "<entity IfcPostalAddress>",
+     "optional": true
+    }
+   ]
+  },
+  "IfcRelDefinesByProperties": {
+   "supertype": "IfcRelDefines",
+   "attributes": [
+    {
+     "name": "GlobalId",
+     "type": "<type IfcGloballyUniqueId: <string>>",
+     "optional": false
+    },
+    {
+     "name": "OwnerHistory",
+     "type": "<entity IfcOwnerHistory>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "RelatedObjects",
+     "type": "<set [1:?] of <entity IfcObjectDefinition>>",
+     "optional": false
+    },
+    {
+     "name": "RelatingPropertyDefinition",
+     "type": "<select IfcPropertySetDefinitionSelect: (<entity IfcProperty",
+     "optional": false
+    }
+   ]
+  },
+  "IfcFlowInstrument": {
+   "supertype": "IfcDistributionControlElement",
+   "attributes": [
+    {
+     "name": "GlobalId",
+     "type": "<type IfcGloballyUniqueId: <string>>",
+     "optional": false
+    },
+    {
+     "name": "OwnerHistory",
+     "type": "<entity IfcOwnerHistory>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectType",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ObjectPlacement",
+     "type": "<entity IfcObjectPlacement>",
+     "optional": true
+    },
+    {
+     "name": "Representation",
+     "type": "<entity IfcProductRepresentation>",
+     "optional": true
+    },
+    {
+     "name": "Tag",
+     "type": "<type IfcIdentifier: <string>>",
+     "optional": true
+    },
+    {
+     "name": "PredefinedType",
+     "type": "<enumeration IfcFlowInstrumentTypeEnum: (AMMETER, COMBINED, ",
+     "optional": true
+    }
+   ]
+  },
+  "IfcRelAssociatesClassification": {
+   "supertype": "IfcRelAssociates",
+   "attributes": [
+    {
+     "name": "GlobalId",
+     "type": "<type IfcGloballyUniqueId: <string>>",
+     "optional": false
+    },
+    {
+     "name": "OwnerHistory",
+     "type": "<entity IfcOwnerHistory>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "RelatedObjects",
+     "type": "<set [1:?] of <select IfcDefinitionSelect: (<entity IfcObjec",
+     "optional": false
+    },
+    {
+     "name": "RelatingClassification",
+     "type": "<select IfcClassificationSelect: (<entity IfcClassification>",
+     "optional": false
+    }
+   ]
+  },
+  "IfcClassificationReference": {
+   "supertype": "IfcExternalReference",
+   "attributes": [
+    {
+     "name": "Location",
+     "type": "<type IfcURIReference: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Identification",
+     "type": "<type IfcIdentifier: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Name",
+     "type": "<type IfcLabel: <string>>",
+     "optional": true
+    },
+    {
+     "name": "ReferencedSource",
+     "type": "<select IfcClassificationReferenceSelect: (<entity IfcClassi",
+     "optional": true
+    },
+    {
+     "name": "Description",
+     "type": "<type IfcText: <string>>",
+     "optional": true
+    },
+    {
+     "name": "Sort",
+     "type": "<type IfcIdentifier: <string>>",
+     "optional": true
+    }
+   ]
+  }
+ },
+ "subtypes": {
+  "IfcDistributionFlowElement": [
+   "IfcDistributionChamberElement",
+   "IfcEnergyConversionDevice",
+   "IfcFlowController",
+   "IfcFlowFitting",
+   "IfcFlowMovingDevice",
+   "IfcFlowSegment",
+   "IfcFlowStorageDevice",
+   "IfcFlowTerminal",
+   "IfcFlowTreatmentDevice"
+  ],
+  "IfcFlowSegment": [
+   "IfcCableCarrierSegment",
+   "IfcCableSegment",
+   "IfcConveyorSegment",
+   "IfcDuctSegment",
+   "IfcPipeSegment"
+  ],
+  "IfcFlowFitting": [
+   "IfcCableCarrierFitting",
+   "IfcCableFitting",
+   "IfcDuctFitting",
+   "IfcJunctionBox",
+   "IfcPipeFitting"
+  ],
+  "IfcFlowController": [
+   "IfcAirTerminalBox",
+   "IfcDamper",
+   "IfcDistributionBoard",
+   "IfcElectricDistributionBoard",
+   "IfcElectricTimeControl",
+   "IfcFlowMeter",
+   "IfcProtectiveDevice",
+   "IfcSwitchingDevice",
+   "IfcValve"
+  ],
+  "IfcFlowStorageDevice": [
+   "IfcElectricFlowStorageDevice",
+   "IfcTank"
+  ],
+  "IfcFlowMovingDevice": [
+   "IfcCompressor",
+   "IfcFan",
+   "IfcPump"
+  ],
+  "IfcEnergyConversionDevice": [
+   "IfcAirToAirHeatRecovery",
+   "IfcBoiler",
+   "IfcBurner",
+   "IfcChiller",
+   "IfcCoil",
+   "IfcCondenser",
+   "IfcCooledBeam",
+   "IfcCoolingTower",
+   "IfcElectricGenerator",
+   "IfcElectricMotor",
+   "IfcEngine",
+   "IfcEvaporativeCooler",
+   "IfcEvaporator",
+   "IfcHeatExchanger",
+   "IfcHumidifier",
+   "IfcMotorConnection",
+   "IfcSolarDevice",
+   "IfcTransformer",
+   "IfcTubeBundle",
+   "IfcUnitaryEquipment"
+  ],
+  "IfcFlowTerminal": [
+   "IfcAirTerminal",
+   "IfcAudioVisualAppliance",
+   "IfcCommunicationsAppliance",
+   "IfcElectricAppliance",
+   "IfcFireSuppressionTerminal",
+   "IfcLamp",
+   "IfcLightFixture",
+   "IfcLiquidTerminal",
+   "IfcMedicalDevice",
+   "IfcMobileTelecommunicationsAppliance",
+   "IfcOutlet",
+   "IfcSanitaryTerminal",
+   "IfcSignal",
+   "IfcSpaceHeater",
+   "IfcStackTerminal",
+   "IfcWasteTerminal"
+  ],
+  "IfcFlowTreatmentDevice": [
+   "IfcDuctSilencer",
+   "IfcElectricFlowTreatmentDevice",
+   "IfcFilter",
+   "IfcInterceptor"
+  ],
+  "IfcDistributionControlElement": [
+   "IfcActuator",
+   "IfcAlarm",
+   "IfcController",
+   "IfcFlowInstrument",
+   "IfcProtectiveDeviceTrippingUnit",
+   "IfcSensor",
+   "IfcUnitaryControlElement"
+  ],
+  "IfcPort": [
+   "IfcDistributionPort"
+  ]
+ },
+ "propertySetTemplates": {
+  "Pset_PipeSegmentTypeCommon": {
+   "applicable": "IfcPipeSegment,IfcPipeSegmentType",
+   "properties": [
+    {
+     "name": "Reference",
+     "type": "IfcIdentifier"
+    },
+    {
+     "name": "Status",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "WorkingPressure",
+     "type": "IfcPressureMeasure"
+    },
+    {
+     "name": "PressureRange",
+     "type": "IfcPressureMeasure"
+    },
+    {
+     "name": "TemperatureRange",
+     "type": "IfcThermodynamicTemperatureMeasure"
+    },
+    {
+     "name": "NominalDiameter",
+     "type": "IfcPositiveLengthMeasure"
+    },
+    {
+     "name": "InnerDiameter",
+     "type": "IfcPositiveLengthMeasure"
+    },
+    {
+     "name": "OuterDiameter",
+     "type": "IfcPositiveLengthMeasure"
+    },
+    {
+     "name": "Length",
+     "type": "IfcPositiveLengthMeasure"
+    }
+   ]
+  },
+  "Pset_PipeFittingTypeCommon": {
+   "applicable": "IfcPipeFitting,IfcPipeFittingType",
+   "properties": [
+    {
+     "name": "Reference",
+     "type": "IfcIdentifier"
+    },
+    {
+     "name": "Status",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "PressureClass",
+     "type": "IfcPressureMeasure"
+    },
+    {
+     "name": "PressureRange",
+     "type": "IfcPressureMeasure"
+    },
+    {
+     "name": "TemperatureRange",
+     "type": "IfcThermodynamicTemperatureMeasure"
+    },
+    {
+     "name": "FittingLossFactor",
+     "type": "IfcReal"
+    }
+   ]
+  },
+  "Pset_ValveTypeCommon": {
+   "applicable": "IfcValve,IfcValveType",
+   "properties": [
+    {
+     "name": "Reference",
+     "type": "IfcIdentifier"
+    },
+    {
+     "name": "Status",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "ValvePattern",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "ValveOperation",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "ValveMechanism",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "Size",
+     "type": "IfcPositiveLengthMeasure"
+    },
+    {
+     "name": "TestPressure",
+     "type": "IfcPressureMeasure"
+    },
+    {
+     "name": "WorkingPressure",
+     "type": "IfcPressureMeasure"
+    },
+    {
+     "name": "FlowCoefficient",
+     "type": "IfcReal"
+    },
+    {
+     "name": "CloseOffRating",
+     "type": "IfcPressureMeasure"
+    }
+   ]
+  },
+  "Pset_DistributionPortCommon": {
+   "applicable": "IfcDistributionPort",
+   "properties": [
+    {
+     "name": "PortNumber",
+     "type": "IfcInteger"
+    },
+    {
+     "name": "ColourCode",
+     "type": "IfcLabel"
+    }
+   ]
+  },
+  "Pset_DistributionPortTypePipe": {
+   "applicable": "IfcDistributionPort/PIPE",
+   "properties": [
+    {
+     "name": "ConnectionType",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "ConnectionSubtype",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "NominalDiameter",
+     "type": "IfcPositiveLengthMeasure"
+    },
+    {
+     "name": "InnerDiameter",
+     "type": "IfcPositiveLengthMeasure"
+    },
+    {
+     "name": "OuterDiameter",
+     "type": "IfcPositiveLengthMeasure"
+    },
+    {
+     "name": "Temperature",
+     "type": "IfcThermodynamicTemperatureMeasure"
+    },
+    {
+     "name": "VolumetricFlowRate",
+     "type": "IfcVolumetricFlowRateMeasure"
+    },
+    {
+     "name": "MassFlowRate",
+     "type": "IfcMassFlowRateMeasure"
+    },
+    {
+     "name": "FlowCondition",
+     "type": "IfcPositiveRatioMeasure"
+    },
+    {
+     "name": "Velocity",
+     "type": "IfcLinearVelocityMeasure"
+    },
+    {
+     "name": "Pressure",
+     "type": "IfcPressureMeasure"
+    }
+   ]
+  },
+  "Pset_ManufacturerTypeInformation": {
+   "applicable": "IfcElement,IfcElementType",
+   "properties": [
+    {
+     "name": "GlobalTradeItemNumber",
+     "type": "IfcIdentifier"
+    },
+    {
+     "name": "ArticleNumber",
+     "type": "IfcIdentifier"
+    },
+    {
+     "name": "ModelReference",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "ModelLabel",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "Manufacturer",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "ProductionYear",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "AssemblyPlace",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "OperationalDocument",
+     "type": "IfcExternalReference"
+    },
+    {
+     "name": "SafetyDocument",
+     "type": "IfcDocumentReference"
+    },
+    {
+     "name": "PerformanceCertificate",
+     "type": "IfcDocumentReference"
+    }
+   ]
+  },
+  "Pset_TankTypeCommon": {
+   "applicable": "IfcTank,IfcTankType",
+   "properties": [
+    {
+     "name": "Reference",
+     "type": "IfcIdentifier"
+    },
+    {
+     "name": "Status",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "AccessType",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "StorageType",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "NominalLengthOrDiameter",
+     "type": "IfcPositiveLengthMeasure"
+    },
+    {
+     "name": "NominalWidthOrDiameter",
+     "type": "IfcPositiveLengthMeasure"
+    },
+    {
+     "name": "NominalDepth",
+     "type": "IfcNonNegativeLengthMeasure"
+    },
+    {
+     "name": "TankNominalCapacity",
+     "type": "IfcVolumeMeasure"
+    },
+    {
+     "name": "EffectiveCapacity",
+     "type": "IfcVolumeMeasure"
+    },
+    {
+     "name": "OperatingWeight",
+     "type": "IfcMassMeasure"
+    },
+    {
+     "name": "PatternType",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "EndShapeType",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "FirstCurvatureRadius",
+     "type": "IfcPositiveLengthMeasure"
+    },
+    {
+     "name": "SecondCurvatureRadius",
+     "type": "IfcPositiveLengthMeasure"
+    },
+    {
+     "name": "NumberOfSections",
+     "type": "IfcCountMeasure"
+    }
+   ]
+  },
+  "Pset_PumpTypeCommon": {
+   "applicable": "IfcPump,IfcPumpType",
+   "properties": [
+    {
+     "name": "Reference",
+     "type": "IfcIdentifier"
+    },
+    {
+     "name": "Status",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "FlowRateRange",
+     "type": "IfcMassFlowRateMeasure"
+    },
+    {
+     "name": "FlowResistanceRange",
+     "type": "IfcPressureMeasure"
+    },
+    {
+     "name": "ConnectionSize",
+     "type": "IfcPositiveLengthMeasure"
+    },
+    {
+     "name": "TemperatureRange",
+     "type": "IfcThermodynamicTemperatureMeasure"
+    },
+    {
+     "name": "NetPositiveSuctionHead",
+     "type": "IfcPressureMeasure"
+    },
+    {
+     "name": "NominalRotationSpeed",
+     "type": "IfcRotationalFrequencyMeasure"
+    }
+   ]
+  },
+  "Pset_PipeConnectionFlanged": {
+   "applicable": "IfcPipeSegment,IfcPipeSegmentType",
+   "properties": [
+    {
+     "name": "FlangeTable",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "FlangeStandard",
+     "type": "IfcLabel"
+    },
+    {
+     "name": "BoreSize",
+     "type": "IfcPositiveLengthMeasure"
+    },
+    {
+     "name": "FlangeDiameter",
+     "type": "IfcPositiveLengthMeasure"
+    },
+    {
+     "name": "FlangeThickness",
+     "type": "IfcPositiveLengthMeasure"
+    },
+    {
+     "name": "NumberOfBoltholes",
+     "type": "IfcCountMeasure"
+    },
+    {
+     "name": "BoltSize",
+     "type": "IfcPositiveLengthMeasure"
+    },
+    {
+     "name": "BoltholePitch",
+     "type": "IfcPositiveLengthMeasure"
+    }
+   ]
+  },
+  "Pset_DistributionSystemCommon": {
+   "applicable": "IfcDistributionSystem",
+   "properties": [
+    {
+     "name": "Reference",
+     "type": "IfcIdentifier"
+    }
+   ]
+  }
+ },
+ "facts": {
+  "IfcFacilityPart.abstract": true,
+  "IfcFacilityPart.subtypes": [
+   "IfcBridgePart",
+   "IfcFacilityPartCommon",
+   "IfcMarinePart",
+   "IfcRailwayPart",
+   "IfcRoadPart"
+  ],
+  "IfcFacility.subtypes": [
+   "IfcBridge",
+   "IfcBuilding",
+   "IfcMarineFacility",
+   "IfcRailway",
+   "IfcRoad"
+  ],
+  "portConnectivity": "IfcDistributionPort.md (dev docs), Port Connectivity: for port connections between elements RelatingPort = port with FlowDirection SOURCE, RelatedPort = port with FlowDirection SINK; ports nested in their element with IfcRelNests; IfcRelConnectsPorts.NoSelfReference (RelatingPort <> RelatedPort)",
+  "ifcopenshellConnectPortBehaviour": "ifcopenshell.api.system.connect_port (0.9.0) writes a reciprocal pair of IfcRelConnectsPorts per connection (observed: 18 relationships for 9 connections); the llull reference files write one per connection"
+ }
+}

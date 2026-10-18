@@ -1,0 +1,48 @@
+{
+  "title": "ASME B16.9 wrought butt-welding fittings: centre-to-end / end-to-end dimensions used by the routing validation (mm)",
+  "note": "ASME B16.9 is paywalled; values are the metric columns reproduced by several freely published manufacturer / reference tables. The 01-piping-specs-catalog pack owns the full catalogue; this file holds only the rows the RTE plans use. Inch columns: 90 LR A = 1.5 x NPS in. Tolerance on centre-to-end in B16.9 is about +/-2 mm at NPS 5-8 (S9).",
+  "unit": "mm",
+  "elbow90LongRadius_A": [
+    { "nps": 2, "value": 76, "inch": 3.0, "sources": ["S7", "S8"], "grade": "A" },
+    { "nps": 3, "value": 114, "inch": 4.5, "sources": ["S7", "S8"], "grade": "A" },
+    { "nps": 4, "value": 152, "inch": 6.0, "sources": ["S7", "S8", "S9"], "grade": "A" },
+    { "nps": 6, "value": 229, "inch": 9.0, "sources": ["S7", "S8"], "grade": "A" },
+    { "nps": 8, "value": 305, "inch": 12.0, "sources": ["S7", "S8"], "grade": "A" }
+  ],
+  "elbow45LongRadius_B": [
+    { "nps": 2, "value": 35, "inch": 1.38, "sources": ["S7", "S8"], "grade": "A" },
+    { "nps": 3, "value": 51, "inch": 2.0, "sources": ["S7", "S8"], "grade": "A" },
+    { "nps": 4, "value": 64, "inch": 2.5, "sources": ["S7", "S8"], "grade": "A" },
+    { "nps": 6, "value": 95, "inch": 3.75, "sources": ["S7", "S8"], "grade": "A" },
+    { "nps": 8, "value": 127, "inch": 5.0, "sources": ["S7", "S8"], "grade": "A" }
+  ],
+  "teeStraight_C_equals_M": [
+    { "nps": 2, "value": 64, "sources": ["S9", "S10"], "grade": "A" },
+    { "nps": 3, "value": 86, "sources": ["S10", "S11"], "grade": "A" },
+    { "nps": 4, "value": 105, "sources": ["S9", "S10"], "grade": "A" },
+    { "nps": 6, "value": 143, "sources": ["S9", "S10"], "grade": "A" },
+    { "nps": 8, "value": 178, "sources": ["S10", "S11"], "grade": "A" },
+    { "nps": 10, "value": 216, "sources": ["S10", "S11"], "grade": "A" },
+    { "nps": 12, "value": 254, "sources": ["S10", "S11"], "grade": "A" }
+  ],
+  "teeReducing_C_run_M_outlet": [
+    { "nps": "6x6x4", "C": 143, "M": 130, "inch": { "C": 5.62, "M": 5.12 }, "sources": ["S9", "S12"], "grade": "A" }
+  ],
+  "reducerConcentric_H": [
+    { "nps": "3x2", "value": 89, "sources": ["S13"], "grade": "B" },
+    { "nps": "4x3", "value": 102, "sources": ["S13"], "grade": "B" },
+    { "nps": "6x4", "value": 140, "sources": ["S13"], "grade": "B" },
+    { "nps": "8x6", "value": 152, "sources": ["S10", "S13"], "grade": "A" }
+  ],
+  "derivedChecks": {
+    "formula": "LR 90 radius R = 1.5 x NPS x 25.4 mm; 45 deg B is a TABLE value and is not R tan(22.5 deg)",
+    "rows": [
+      { "nps": 2, "R": 76.2, "A_minus_R": -0.2, "RtanHalf45": 31.563, "B_table": 35, "B_minus_RtanHalf": 3.437 },
+      { "nps": 3, "R": 114.3, "A_minus_R": -0.3, "RtanHalf45": 47.345, "B_table": 51, "B_minus_RtanHalf": 3.655 },
+      { "nps": 4, "R": 152.4, "A_minus_R": -0.4, "RtanHalf45": 63.126, "B_table": 64, "B_minus_RtanHalf": 0.874 },
+      { "nps": 6, "R": 228.6, "A_minus_R": 0.4, "RtanHalf45": 94.689, "B_table": 95, "B_minus_RtanHalf": 0.311 },
+      { "nps": 8, "R": 304.8, "A_minus_R": 0.2, "RtanHalf45": 126.252, "B_table": 127, "B_minus_RtanHalf": 0.748 }
+    ],
+    "conclusion": "Routing must read centre-to-end from the catalogue for standard 45 / 90 elbows; R tan(theta/2) applies only to trimmed (cut) elbows, which are flagged non-standard."
+  }
+}

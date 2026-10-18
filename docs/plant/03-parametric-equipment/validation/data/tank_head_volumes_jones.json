@@ -1,0 +1,46 @@
+{
+  "title": "Partial and full liquid volumes of tanks with formed heads (closed forms of D. Jones, 'Calculating Tank Volume')",
+  "sourceIds": ["S1", "S2"],
+  "grade": "A",
+  "provenance": {
+    "formulas": "Jones D., Calculating Tank Volume (2015) [S1], as implemented and cited by fluids 1.3.1 fluids/geometry.py (MIT) [S2]",
+    "values": "expected values copied from fluids 1.3.1 tests/test_geometry.py (sha256 3d154846de058dbcc5d8b88e3a4bd7598b5dd019830bc702c9b2430b045ff83b); the test comments say the h=24/60 (vertical) and h=36/84 (horizontal) rows are the worked examples of [S1]",
+    "independentCheck": "re-implemented from the printed formulas in data/derive_expected.py (no fluids import): every value below is reproduced to <= 1e-12 relative; the horizontal conical case is checked by numerical integration of circular-segment areas (agrees to 1e-9 relative)",
+    "units": "inputs in inches, volumes in US gallons (1 US gal = 231 in^3 exactly); llull tests convert to SI and compare in m^3"
+  },
+  "conventions": {
+    "D": "inside diameter of the cylinder",
+    "L": "cylinder (tangent-to-tangent) length, horizontal tanks only",
+    "a": "head depth (inside) beyond the tangent line; 2:1 ellipsoidal head a = D/4",
+    "f, k": "torispherical dish radius = f*D, knuckle radius = k*D",
+    "h": "liquid level measured from the lowest point of the vessel (vertical: head apex; horizontal: shell bottom)",
+    "vertical": "bottom head only (no top head), as in [S1]"
+  },
+  "cases": [
+    { "id": "J-VE-1", "shape": "vertical, ellipsoidal bottom", "D": 132, "a": 33, "h": 24, "V_gal": 783.3581681678445, "source": "S1 example via S2" },
+    { "id": "J-VE-2", "shape": "vertical, ellipsoidal bottom", "D": 132, "a": 33, "h": 60, "V_gal": 2902.831611916969, "source": "S1 example via S2" },
+    { "id": "J-VE-3", "shape": "vertical, ellipsoidal bottom", "D": 132, "a": 33, "h": 132, "V_gal": 7168.216837590883, "source": "S2" },
+    { "id": "J-VS-1", "shape": "vertical, spherical-cap bottom", "D": 132, "a": 33, "h": 24, "V_gal": 583.6018352850442, "source": "S1 example via S2" },
+    { "id": "J-VS-2", "shape": "vertical, spherical-cap bottom", "D": 132, "a": 33, "h": 60, "V_gal": 2658.4605833627343, "source": "S1 example via S2" },
+    { "id": "J-VS-3", "shape": "vertical, spherical-cap bottom", "D": 132, "a": 33, "h": 132, "V_gal": 6923.845809036648, "source": "S2" },
+    { "id": "J-VC-1", "shape": "vertical, conical bottom", "D": 132, "a": 33, "h": 24, "V_gal": 250.67461381371024, "source": "S1 example via S2" },
+    { "id": "J-VC-2", "shape": "vertical, conical bottom", "D": 132, "a": 33, "h": 60, "V_gal": 2251.175535772343, "source": "S1 example via S2" },
+    { "id": "J-VC-3", "shape": "vertical, conical bottom", "D": 132, "a": 33, "h": 132, "V_gal": 6516.560761446257, "source": "S2" },
+    { "id": "J-VT-1", "shape": "vertical, torispherical bottom (ASME F&D f=1, k=0.06)", "D": 132, "f": 1.0, "k": 0.06, "h": 24, "V_gal": 904.0688283793511, "source": "S1 example via S2" },
+    { "id": "J-VT-2", "shape": "vertical, torispherical bottom (ASME F&D)", "D": 132, "f": 1.0, "k": 0.06, "h": 60, "V_gal": 3036.7614412163075, "source": "S1 example via S2" },
+    { "id": "J-VT-3", "shape": "vertical, torispherical bottom (ASME F&D), level inside the dish", "D": 132, "f": 1.0, "k": 0.06, "h": 1, "V_gal": 1.7906624793188568, "source": "S2" },
+    { "id": "J-VT-4", "shape": "vertical, torispherical bottom (ASME F&D), level inside the knuckle", "D": 132, "f": 1.0, "k": 0.06, "h": 22, "V_gal": 785.587561468186, "source": "S2" },
+    { "id": "J-VT-5", "shape": "vertical, torispherical bottom (ASME F&D)", "D": 132, "f": 1.0, "k": 0.06, "h": 132, "V_gal": 7302.146666890221, "source": "S2" },
+    { "id": "J-HE-1", "shape": "horizontal, two ellipsoidal heads", "D": 108, "L": 156, "a": 42, "h": 36, "V_gal": 2380.9565415578145, "source": "S1 example via S2" },
+    { "id": "J-HE-2", "shape": "horizontal, two ellipsoidal heads", "D": 108, "L": 156, "a": 42, "h": 84, "V_gal": 7103.445235921378, "source": "S1 example via S2" },
+    { "id": "J-HE-3", "shape": "horizontal, two ellipsoidal heads, half full", "D": 108, "L": 156, "a": 42, "h": 54, "V_gal": 4203.695769930696, "source": "S2" },
+    { "id": "J-HE-4", "shape": "horizontal, two ellipsoidal heads, full", "D": 108, "L": 156, "a": 42, "h": 108, "V_gal": 8407.391539861392, "source": "S2" },
+    { "id": "J-HC-1", "shape": "horizontal, two conical heads", "D": 108, "L": 156, "a": 42, "h": 36, "V_gal": 2041.1923581273443, "source": "S1 example via S2" },
+    { "id": "J-HC-2", "shape": "horizontal, two conical heads", "D": 108, "L": 156, "a": 42, "h": 84, "V_gal": 6180.540773905826, "source": "S1 example via S2" },
+    { "id": "J-HC-3", "shape": "horizontal, two conical heads, full", "D": 108, "L": 156, "a": 42, "h": 108, "V_gal": 7296.981336483472, "source": "S2" },
+    { "id": "J-HT-1", "shape": "horizontal, two torispherical heads (ASME F&D)", "D": 108, "L": 156, "f": 1.0, "k": 0.06, "h": 36, "V_gal": 2028.626670842139, "source": "S1 example via S2; numerical integral in S2, V1 gate only" },
+    { "id": "J-HT-2", "shape": "horizontal, two torispherical heads (ASME F&D)", "D": 108, "L": 156, "f": 1.0, "k": 0.06, "h": 84, "V_gal": 5939.897910157917, "source": "S1 example via S2; numerical integral in S2, V1 gate only" },
+    { "id": "J-HT-3", "shape": "horizontal, two torispherical heads (ASME F&D), full", "D": 108, "L": 156, "f": 1.0, "k": 0.06, "h": 108, "V_gal": 7069.994662924554, "source": "S2" }
+  ],
+  "tolerance": { "closedForm": "1e-9 relative", "numericalHorizontalTorispherical": "1e-6 relative (V1)" }
+}

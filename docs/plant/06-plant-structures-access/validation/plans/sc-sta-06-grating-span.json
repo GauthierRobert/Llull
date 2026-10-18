@@ -1,0 +1,125 @@
+{
+  "id": "SC-STA-06",
+  "status": "PROPOSED — list_grating_types, add_grating, check_grating are not built; add_grid_system, add_grid_columns, add_grid_beams exist today",
+  "validates": [
+    "VC-STA-06"
+  ],
+  "description": "Grating panels on IPE200 beams at 900 mm (2'-11.4\") and 1500 mm centres; check_grating reproduces the 19-W-4 table closed form and flags the 1500 mm span as over the 100 psf / 1/4 in pedestrian limit (5.61 ft = 1711 mm)",
+  "actions": [
+    {
+      "command": "set_units",
+      "params": {
+        "units": "mm"
+      }
+    },
+    {
+      "command": "add_level",
+      "params": {
+        "name": "Grade",
+        "elevation": 0,
+        "height": 4000
+      }
+    },
+    {
+      "command": "add_grid_system",
+      "params": {
+        "xSpacings": [
+          609.6,
+          914.4,
+          1800
+        ],
+        "ySpacings": [
+          3000
+        ]
+      }
+    },
+    {
+      "command": "add_grid_columns",
+      "params": {
+        "profile": "HEB200"
+      }
+    },
+    {
+      "command": "add_grid_beams",
+      "params": {
+        "profile": "IPE200",
+        "topOffset": -32
+      }
+    },
+    {
+      "command": "list_grating_types",
+      "params": {
+        "standard": "naamm_mbg_531"
+      }
+    },
+    {
+      "command": "add_grating",
+      "params": {
+        "supportedBy": "beams",
+        "bounds": [
+          [
+            0,
+            0
+          ],
+          [
+            3324,
+            3000
+          ]
+        ],
+        "gratingType": "19-W-4 1-1/4x3/16",
+        "bearingBarDirection": [
+          1,
+          0
+        ],
+        "thickness": 31.75
+      },
+      "as": "gr"
+    },
+    {
+      "command": "check_grating",
+      "params": {
+        "ids": [
+          "$gr"
+        ],
+        "uniformLoadKPa": 4.788,
+        "deflectionLimitMm": 6.35
+      }
+    }
+  ],
+  "expected": [
+    {
+      "step": 5,
+      "path": "data.types[name=19-W-4 1-1/4x3/16].massKgM2",
+      "value": 43.4536,
+      "rel": 0.0001,
+      "source": "8.9 psf (S20/S21)"
+    },
+    {
+      "step": 7,
+      "path": "data.panels[spanMm=609.6].allowableUniformKPa",
+      "value": 70.875,
+      "rel": 0.001,
+      "source": "1480.26 psf x 0.0478803 kPa/psf (closed form, = table 1480 at 2'-0\")"
+    },
+    {
+      "step": 7,
+      "path": "data.panels[spanMm=914.4].allowableUniformKPa",
+      "value": 31.5,
+      "rel": 0.001,
+      "source": "657.89 psf (table 658 at 3'-0\")"
+    },
+    {
+      "step": 7,
+      "path": "data.panels[spanMm=1800].findings[code=STA_GRATING_DEFLECTION].severity",
+      "value": "fail",
+      "source": "1800 mm > 1711.3 mm (67.374 in) max span at 100 psf (4.788 kPa) with deflection <= 1/4 in (6.35 mm)"
+    },
+    {
+      "step": 7,
+      "path": "data.panels[spanMm=914.4].deflectionMm",
+      "value": 0.5176,
+      "rel": 0.001,
+      "source": "5 w L^4 / 384 E I at 100 psf (4.788 kPa) over 36 in: 0.13407 in x 100/657.895 = 0.020379 in = 0.5176 mm"
+    }
+  ]
+}

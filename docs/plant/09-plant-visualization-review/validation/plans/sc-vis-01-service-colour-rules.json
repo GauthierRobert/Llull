@@ -1,0 +1,386 @@
+{
+  "id": "SC-VIS-01",
+  "validates": [
+    "VC-VIS-01",
+    "VC-VIS-02",
+    "VC-VIS-03"
+  ],
+  "status": "PROPOSED. Steps 0-6 (add_pipe_run, industrial plugin) run today; apply_service_colour_scheme, colour_by_rule_report and check_display are unbuilt (TR-VIS-01..04).",
+  "description": "Seven pipe runs with free-text services. An agent maps each service to a scheme category; llull builds an ordered first-match colour profile and reports per line which category, field and letter colour it resolved, plus the unmatched line. Same model, second profile with ISO 14726 main colours: switching profiles changes no geometry.",
+  "actions": [
+    {
+      "command": "add_pipe_run",
+      "params": {
+        "points": [
+          [
+            0,
+            0,
+            3000
+          ],
+          [
+            20000,
+            0,
+            3000
+          ]
+        ],
+        "dn": 100,
+        "line": "CW-101",
+        "service": "cooling water"
+      },
+      "as": "line0"
+    },
+    {
+      "command": "add_pipe_run",
+      "params": {
+        "points": [
+          [
+            0,
+            600,
+            3000
+          ],
+          [
+            20000,
+            600,
+            3000
+          ]
+        ],
+        "dn": 50,
+        "line": "IA-102",
+        "service": "compressed air"
+      },
+      "as": "line1"
+    },
+    {
+      "command": "add_pipe_run",
+      "params": {
+        "points": [
+          [
+            0,
+            1200,
+            3000
+          ],
+          [
+            20000,
+            1200,
+            3000
+          ]
+        ],
+        "dn": 100,
+        "line": "FG-103",
+        "service": "natural gas"
+      },
+      "as": "line2"
+    },
+    {
+      "command": "add_pipe_run",
+      "params": {
+        "points": [
+          [
+            0,
+            1800,
+            3000
+          ],
+          [
+            20000,
+            1800,
+            3000
+          ]
+        ],
+        "dn": 80,
+        "line": "FO-104",
+        "service": "diesel"
+      },
+      "as": "line3"
+    },
+    {
+      "command": "add_pipe_run",
+      "params": {
+        "points": [
+          [
+            0,
+            2400,
+            3000
+          ],
+          [
+            20000,
+            2400,
+            3000
+          ]
+        ],
+        "dn": 50,
+        "line": "CS-105",
+        "service": "caustic soda"
+      },
+      "as": "line4"
+    },
+    {
+      "command": "add_pipe_run",
+      "params": {
+        "points": [
+          [
+            0,
+            3000,
+            3000
+          ],
+          [
+            20000,
+            3000,
+            3000
+          ]
+        ],
+        "dn": 150,
+        "line": "FW-106",
+        "service": "fire water"
+      },
+      "as": "line5"
+    },
+    {
+      "command": "add_pipe_run",
+      "params": {
+        "points": [
+          [
+            0,
+            3600,
+            3000
+          ],
+          [
+            20000,
+            3600,
+            3000
+          ]
+        ],
+        "dn": 50,
+        "line": "N2-107",
+        "service": "nitrogen"
+      },
+      "as": "line6"
+    },
+    {
+      "command": "apply_service_colour_scheme",
+      "params": {
+        "scheme": "asme_a13_1",
+        "profileId": "services-asme",
+        "serviceMap": {
+          "cooling water": "water",
+          "compressed air": "compressed_air",
+          "natural gas": "flammable_oxidizing",
+          "diesel": "combustible",
+          "caustic soda": "toxic_corrosive",
+          "fire water": "fire_quenching"
+        },
+        "activate": true
+      }
+    },
+    {
+      "command": "colour_by_rule_report",
+      "params": {
+        "profileId": "services-asme",
+        "groupBy": "line"
+      }
+    },
+    {
+      "command": "apply_service_colour_scheme",
+      "params": {
+        "scheme": "iso_14726",
+        "profileId": "services-iso",
+        "serviceMap": {
+          "cooling water": "sea water",
+          "compressed air": "non-flammable gases",
+          "natural gas": "flammable gases",
+          "diesel": "fuel",
+          "caustic soda": "acids, alkalis",
+          "fire water": "fire fighting",
+          "nitrogen": "non-flammable gases"
+        }
+      }
+    },
+    {
+      "command": "colour_by_rule_report",
+      "params": {
+        "profileId": "services-iso",
+        "groupBy": "line"
+      }
+    },
+    {
+      "command": "check_display",
+      "params": {}
+    }
+  ],
+  "expected": [
+    {
+      "step": 8,
+      "path": "groups.CW-101.category",
+      "value": "water",
+      "source": "ASME A13.1 rows (data/service_colour_schemes.json, grade A)"
+    },
+    {
+      "step": 8,
+      "path": "groups.CW-101.fieldColour",
+      "value": "green",
+      "source": "ASME A13.1"
+    },
+    {
+      "step": 8,
+      "path": "groups.CW-101.letterColour",
+      "value": "white",
+      "source": "ASME A13.1"
+    },
+    {
+      "step": 8,
+      "path": "groups.IA-102.category",
+      "value": "compressed_air",
+      "source": "ASME A13.1 rows (data/service_colour_schemes.json, grade A)"
+    },
+    {
+      "step": 8,
+      "path": "groups.IA-102.fieldColour",
+      "value": "blue",
+      "source": "ASME A13.1"
+    },
+    {
+      "step": 8,
+      "path": "groups.IA-102.letterColour",
+      "value": "white",
+      "source": "ASME A13.1"
+    },
+    {
+      "step": 8,
+      "path": "groups.FG-103.category",
+      "value": "flammable_oxidizing",
+      "source": "ASME A13.1 rows (data/service_colour_schemes.json, grade A)"
+    },
+    {
+      "step": 8,
+      "path": "groups.FG-103.fieldColour",
+      "value": "yellow",
+      "source": "ASME A13.1"
+    },
+    {
+      "step": 8,
+      "path": "groups.FG-103.letterColour",
+      "value": "black",
+      "source": "ASME A13.1"
+    },
+    {
+      "step": 8,
+      "path": "groups.FO-104.category",
+      "value": "combustible",
+      "source": "ASME A13.1 rows (data/service_colour_schemes.json, grade A)"
+    },
+    {
+      "step": 8,
+      "path": "groups.FO-104.fieldColour",
+      "value": "brown",
+      "source": "ASME A13.1"
+    },
+    {
+      "step": 8,
+      "path": "groups.FO-104.letterColour",
+      "value": "white",
+      "source": "ASME A13.1"
+    },
+    {
+      "step": 8,
+      "path": "groups.CS-105.category",
+      "value": "toxic_corrosive",
+      "source": "ASME A13.1 rows (data/service_colour_schemes.json, grade A)"
+    },
+    {
+      "step": 8,
+      "path": "groups.CS-105.fieldColour",
+      "value": "orange",
+      "source": "ASME A13.1"
+    },
+    {
+      "step": 8,
+      "path": "groups.CS-105.letterColour",
+      "value": "black",
+      "source": "ASME A13.1"
+    },
+    {
+      "step": 8,
+      "path": "groups.FW-106.category",
+      "value": "fire_quenching",
+      "source": "ASME A13.1 rows (data/service_colour_schemes.json, grade A)"
+    },
+    {
+      "step": 8,
+      "path": "groups.FW-106.fieldColour",
+      "value": "red",
+      "source": "ASME A13.1"
+    },
+    {
+      "step": 8,
+      "path": "groups.FW-106.letterColour",
+      "value": "white",
+      "source": "ASME A13.1"
+    },
+    {
+      "step": 8,
+      "path": "groups.N2-107.category",
+      "value": null,
+      "source": "nitrogen not in serviceMap -> unmatched, default colour"
+    },
+    {
+      "step": 8,
+      "path": "warnings[0].code",
+      "value": "VIS_COLOUR_UNMATCHED",
+      "source": "TECHNICAL_SPEC error table"
+    },
+    {
+      "step": 8,
+      "path": "palette.approximate",
+      "value": true,
+      "source": "display hex is a llull choice (data/llull_display_palette.json)"
+    },
+    {
+      "step": 10,
+      "path": "groups.CW-101.mainColour",
+      "value": "green",
+      "source": "ISO 14726:2008 Table 2 (data/service_colour_schemes.json, grade A)"
+    },
+    {
+      "step": 10,
+      "path": "groups.IA-102.mainColour",
+      "value": "grey",
+      "source": "ISO 14726:2008 Table 2 (data/service_colour_schemes.json, grade A)"
+    },
+    {
+      "step": 10,
+      "path": "groups.FG-103.mainColour",
+      "value": "yellow",
+      "source": "ISO 14726:2008 Table 2 (data/service_colour_schemes.json, grade A)"
+    },
+    {
+      "step": 10,
+      "path": "groups.FO-104.mainColour",
+      "value": "brown",
+      "source": "ISO 14726:2008 Table 2 (data/service_colour_schemes.json, grade A)"
+    },
+    {
+      "step": 10,
+      "path": "groups.CS-105.mainColour",
+      "value": "violet",
+      "source": "ISO 14726:2008 Table 2 (data/service_colour_schemes.json, grade A)"
+    },
+    {
+      "step": 10,
+      "path": "groups.FW-106.mainColour",
+      "value": "red",
+      "source": "ISO 14726:2008 Table 2 (data/service_colour_schemes.json, grade A)"
+    },
+    {
+      "step": 10,
+      "path": "groups.N2-107.mainColour",
+      "value": "grey",
+      "source": "ISO 14726:2008 Table 2 (data/service_colour_schemes.json, grade A)"
+    },
+    {
+      "step": 11,
+      "path": "issues[?code=='VIS_COLOUR_UNMATCHED'].ids.length",
+      "value": "= number of derived entities of line N2-107 under the active profile services-asme",
+      "source": "check_display lists unmatched entities"
+    }
+  ],
+  "notes": "Service-to-category mapping is an engineering decision (which hazard class a fluid belongs to) and is therefore an explicit agent input (serviceMap), never guessed by llull from the service string; the result carries reviewRequired: true when the profile is used on a deliverable (AF-33). Colours are compared as names, never as hex."
+}

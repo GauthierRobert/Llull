@@ -1,0 +1,32 @@
+{
+  "id": "SC-PST-05",
+  "validates": ["VC-PST-13", "VC-PST-14", "VC-PST-15", "VC-PST-16"],
+  "description": "V1 rule arithmetic and hand-off: occasional allowable, spring variability, NEMA SM 23 and API 610 component checks with grade-B inputs, then CAESAR II neutral export of SC-PST-01's model (import comparison is reviewer-run)",
+  "unbuilt": ["pipe_stress_allowables (occasional fields)", "spring_variability", "nozzle_load_check", "export_caesar_neutral"],
+  "dependsOn": "SC-PST-01 document for the last step",
+  "actions": [
+    { "command": "pipe_stress_allowables", "params": { "ScMPa": 137.9, "ShMPa": 137.9, "cycles": 7000, "edition": "2018", "sustainedMPa": 80, "occasionalMPa": 60 } },
+    { "command": "spring_variability", "params": { "hotLoadN": 10000, "rateNPerMm": 100, "travelUpMm": 20 } },
+    { "command": "spring_variability", "params": { "hotLoadN": 10000, "rateNPerMm": 100, "travelUpMm": 30 } },
+    { "command": "nozzle_load_check", "params": { "standard": "nema_sm23", "nominalIn": 6, "forceLbf": [500, 0, 0], "momentFtLbf": [0, 1200, 0] } },
+    { "command": "nozzle_load_check", "params": { "standard": "nema_sm23", "nominalIn": 10, "forceLbf": [0, 600, 0], "momentFtLbf": [2000, 0, 0] } },
+    { "command": "nozzle_load_check", "params": { "standard": "api610", "nominalIn": 6, "orientation": "top", "forceLbf": [300, 200, 1500], "momentFtLbf": [0, 0, 0], "table": "<data/nozzle_limits_reference.json api610_table5_nps6_usc>" } },
+    { "command": "export_caesar_neutral", "params": { "modelId": "$stress", "units": "si" } }
+  ],
+  "expected": [
+    { "step": 0, "path": "occasionalRatio", "value": 0.76333, "rel": 0.00001, "source": "(80 + 60) / (1.33 x 137.9); rule B313-OCC grade B" },
+    { "step": 0, "path": "rule.grade", "value": "B", "source": "data/code_rules_b313.json" },
+    { "step": 1, "path": "coldLoadN", "value": 12000, "rel": 0.000001, "source": "P_hot + k d" },
+    { "step": 1, "path": "variability", "value": 0.2, "abs": 0.000001, "source": "k d / P_hot" },
+    { "step": 1, "path": "ok", "value": true, "source": "<= 0.25 named default" },
+    { "step": 2, "path": "error.code", "value": "PST_SPRING_VARIABILITY", "source": "0.30 > 0.25" },
+    { "step": 3, "path": "ratio", "value": 0.9, "rel": 0.000001, "source": "(3 x 500 + 1200) / (500 x 6)" },
+    { "step": 4, "path": "De", "value": 8.6667, "rel": 0.0001, "source": "(16 + 10) / 3" },
+    { "step": 4, "path": "ratio", "value": 0.876923, "rel": 0.000001, "source": "3800 / 4333.33" },
+    { "step": 5, "path": "components[name=Fz].ratio", "value": 1.071429, "rel": 0.000001, "source": "1500 / (2 x 700); top nozzle Fz 700 lbf (grade B input)" },
+    { "step": 5, "path": "error.code", "value": "PST_NOZZLE_OVERLOAD", "source": "component above 2 x Table 5" },
+    { "step": 6, "path": "data.skipped", "value": [], "source": "straight runs and anchors are representable" },
+    { "step": 6, "path": "file.firstLine", "value": "#$ VERSION", "source": "Hexagon CAESAR II guide extract (S27/R12): first section VERSION" }
+  ],
+  "reviewerStep": "VC-PST-16: import the saved .cii in CAESAR II, run the thermal case, compare anchor reactions with SC-PST-01 (2 %) — TBD, measure with CAESAR II"
+}

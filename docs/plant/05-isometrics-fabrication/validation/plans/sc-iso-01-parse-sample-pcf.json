@@ -1,0 +1,35 @@
+{
+  "id": "SC-ISO-01",
+  "validates": ["VC-ISO-01", "VC-ISO-03", "VC-ISO-05", "VC-ISO-06", "VC-ISO-07", "VC-ISO-08", "VC-ISO-09"],
+  "description": "Import the pack's sample PCF (line L-101, DN100: 3 flanges, 7 pipes, 3 elbows, 1 tee, 1 site weld), then read welds, spools, cut list and BOM, and write it back. Run as `llull run sc-iso-01-parse-sample-pcf.json --doc new.llull --json`; the harness inlines the file text.",
+  "status": "UNBUILT - specification scenario",
+  "unbuilt": ["import_pcf", "weld_list", "split_spools", "spool_list", "cut_list", "piping_bom", "export_pcf", "check_isometric"],
+  "harness": { "inline": { "actions[1].params.text": "../data/iso-01-L101-dn100.pcf", "actions[2].params.text": "../data/iso-01-L101-dn100.pcf" } },
+  "actions": [
+    { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },
+    { "command": "import_pcf", "params": { "text": "<data/iso-01-L101-dn100.pcf>", "preview": true } },
+    { "command": "import_pcf", "params": { "text": "<data/iso-01-L101-dn100.pcf>" }, "as": "l101" },
+    { "command": "weld_list", "params": { "lineId": "L-101" } },
+    { "command": "split_spools", "params": { "lineId": "L-101", "breakAt": ["field_welds", "flanged_joints"] } },
+    { "command": "spool_list", "params": { "lineId": "L-101" } },
+    { "command": "cut_list", "params": { "lineId": "L-101", "weldGapMm": 0, "fieldFitAllowanceMm": 0 } },
+    { "command": "cut_list", "params": { "lineId": "L-101", "weldGapMm": 3, "fieldFitAllowanceMm": 0 } },
+    { "command": "piping_bom", "params": { "scope": "line", "lineId": "L-101", "includeBolting": true, "matingFlanges": "assume_in_scope" } },
+    { "command": "export_pcf", "params": { "lineIds": ["L-101"] } },
+    { "command": "check_isometric", "params": { "lineId": "L-101" } }
+  ],
+  "expected": [
+    { "step": 1, "path": "data.componentCount", "value": 15, "source": "file" },
+    { "step": 1, "path": "data.countsByType", "value": { "FLANGE": 3, "PIPE": 7, "WELD": 1, "ELBOW": 3, "TEE": 1 }, "source": "file" },
+    { "step": 1, "path": "data.totalPipeLengthMm", "value": 13045.0, "abs": 1e-6, "source": "sum of PIPE end-point distances" },
+    { "step": 3, "path": "data.welds.length", "value": 13, "source": "reference script" },
+    { "step": 3, "path": "data.welds[number=W2].kind", "value": "field", "source": "SKEY WS = site weld (S6, S13)" },
+    { "step": 5, "path": "data.spools.length", "value": 2, "source": "split at the field weld" },
+    { "step": 6, "path": "data.pieces[*].cutLengthMm", "value": [2424, 2348, 3696, 1696, 1848, 714, 319], "abs": 1e-6, "source": "reference script" },
+    { "step": 7, "path": "data.pieces[*].cutLengthMm", "value": [2421, 2345, 3693, 1693, 1845, 711, 316], "abs": 1e-6, "source": "gap 3 mm: -1.5 mm per welded end" },
+    { "step": 8, "path": "data.rows[itemCode=PIPE-100-S40].quantity", "value": 13.045, "abs": 1e-9, "source": "reference script" },
+    { "step": 8, "path": "data.bolting.studBolts", "value": 24, "source": "3 joints x 8 (B16.5 cl150 NPS4, PSC grade A)" },
+    { "step": 9, "path": "data.files[0].sha256", "value": "56d1b90a4796939e1885c597f20306bc459ec6fa86c583ce0a8e1e5bea81cefd", "source": "canonical writer reproduces the source file" },
+    { "step": 10, "path": "data.ok", "value": true, "source": "no errors on a clean line" }
+  ]
+}

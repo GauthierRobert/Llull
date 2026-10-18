@@ -1,0 +1,25 @@
+{
+  "title": "Heat loss of an insulated pipe per metre: closed form (steady radial conduction in series + outside film) with the ht 1.2.0 reference example",
+  "source": "S19 ht 1.2.0 (PyPI, MIT, Caleb Bell), ht/conduction.py cylindrical_heat_transfer docstring example (Bergman et al., Introduction to Heat Transfer, 6th ed.)",
+  "sdist": {
+    "url": "https://files.pythonhosted.org/packages/86/52/ecd3cfb1d4fcca3563c34b9090a7e78b8b79d8c66f4d715f5f0cdadf5219/ht-1.2.0.tar.gz",
+    "sha256": "ae117387c4e99a1860d78afd391d24b1a4217cb7495250cd480606e2b7fa2ff5",
+    "bytes": 886282,
+    "fileSha256": { "ht/conduction.py": "a2ad8509d4d64997c78f2f7c0c236e8c8bef7c986f9aa08d4d9962dbee5ac1fd" },
+    "licence": "MIT, Copyright (C) 2016 Caleb Bell"
+  },
+  "formula": "Q' = (Ti - To) / [ ln(D1/D0)/(2 pi k_steel) + ln(D2/D1)/(2 pi k_ins) + 1/(h_o pi D2) + 1/(h_i pi D0) ]",
+  "inputs": {
+    "TiK": 453.15,
+    "ToK": 301.15,
+    "hiWm2K": 1e12,
+    "hoWm2K": 22.697193,
+    "insideDiameterM": 0.0779272,
+    "layersThicknessM": [0.0054864, 0.05],
+    "layersConductivityWmK": [56.045, 0.0598535265],
+    "comment": "NPS 3 Sch 40 steel (ID 77.93 mm, wall 5.49 mm) with 50 mm insulation"
+  },
+  "expected": { "heatLossWPerM": 73.12000884069367, "outerDiameterM": 0.1889, "outerSurfaceK": 306.578530147744 },
+  "check": "re-derived independently in the scratchpad from the formula above: 73.12000884 W/m (difference 1e-10); docstring value and own derivation agree",
+  "grade": "A (reference code example + independent closed-form recomputation)"
+}

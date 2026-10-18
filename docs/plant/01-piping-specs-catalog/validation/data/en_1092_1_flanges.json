@@ -1,0 +1,27 @@
+{
+  "meta": {
+    "id": "PSC-DATA-EN1092",
+    "title": "EN 1092-1 steel flanges, PN 16 (connection dimensions), DN15..DN600: flange OD D, bolt circle K, hole diameter L, bolt count",
+    "standard": "EN 1092-1 (CEN), paywalled. Connection dimensions only (D, K, holes, bolts) - identical for flange types 01/05/11 at a given PN/DN.",
+    "sources": {
+      "S13": "dodo FreeCAD workbench tablez/Flange_DIN-PN16.csv (LGPL-3.0, copy in data/dodo_Flange_DIN-PN16.csv). Columns: D = flange OD, d = bore, df = bolt circle, f = hole diameter, t = thickness, n = holes.",
+      "S14": "Wermac 'EN 1092-1 Type 11 weld neck flanges PN16', https://www.wermac.org/din/dim_wn_flg_pn16.html (search extract: DN100 row 220 / 180)",
+      "S15": "Ahlsell product listing, EN 1092-1 Type 11 weld neck PN40 DN100: D 235, K 190, 8 holes 22 mm, thickness 24 (search extract), https://www.ahlsell.se/en/products/heating-and-sanitation/steel-pipes-and-parts/steel-pipe-sections/weld-flange-pn-6-pn-100/1424191"
+    },
+    "units": { "*Mm": "mm" }
+  },
+  "pn16": [
+    { "dn": 50, "dMm": 165, "kMm": 125, "holeMm": 18, "holes": 4, "sources": ["S13"], "grade": "B" },
+    { "dn": 80, "dMm": 200, "kMm": 160, "holeMm": 18, "holes": 8, "sources": ["S13"], "grade": "B" },
+    { "dn": 100, "dMm": 220, "kMm": 180, "holeMm": 18, "holes": 8, "sources": ["S13", "S14"], "grade": "A (D, K); B (holes)" },
+    { "dn": 150, "dMm": 285, "kMm": 240, "holeMm": 22, "holes": 8, "sources": ["S13"], "grade": "B" },
+    { "dn": 200, "dMm": 340, "kMm": 295, "holeMm": 22, "holes": 12, "sources": ["S13"], "grade": "B" }
+  ],
+  "pn40": [
+    { "dn": 100, "dMm": 235, "kMm": 190, "holeMm": 22, "holes": 8, "thicknessMm": 24, "sources": ["S15"], "grade": "B" }
+  ],
+  "notes": [
+    "The full PN16 DN15..DN600 table is in dodo_Flange_DIN-PN16.csv; only the rows above are used by VCs.",
+    "PN16 and PN10 share connection dimensions up to DN150 in common catalogues (not verified here; not used)."
+  ]
+}

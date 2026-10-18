@@ -1,0 +1,222 @@
+{
+  "id": "SC-SCN-02",
+  "status": "DRAFT \u2014 not runnable: scan commands and the $fromStep plan binding are unbuilt; add_level / add_pipe_run exist",
+  "validates": [
+    "VC-SCN-20a",
+    "VC-SCN-20b",
+    "VC-SCN-21",
+    "VC-SCN-22",
+    "VC-SCN-24",
+    "VC-SCN-51"
+  ],
+  "description": "Extract existing DN100 / DN200 pipes and an elbowed DN100 line from synthetic scans, snap to EN 10220 sizes and create as-built pipe runs",
+  "prerequisites": [
+    "llull scan import validation/data/synthetic/cyl-a.csv format=xyz sourceUnit=m --json",
+    "llull scan import validation/data/synthetic/cyl-b.csv format=xyz sourceUnit=m --json",
+    "llull scan import validation/data/synthetic/elb-a.csv format=xyz sourceUnit=m --json"
+  ],
+  "actions": [
+    {
+      "command": "set_units",
+      "params": {
+        "units": "m"
+      }
+    },
+    {
+      "command": "add_level",
+      "params": {
+        "name": "Grade",
+        "elevation": 0
+      }
+    },
+    {
+      "command": "attach_point_cloud",
+      "params": {
+        "sourceSha256": "43c0812cee6f194dbfea984b53b870404bd7b8257c6b9769f9b2320b96cbfe61",
+        "name": "cyl-a"
+      },
+      "as": "a"
+    },
+    {
+      "command": "attach_point_cloud",
+      "params": {
+        "sourceSha256": "70c7707cbe1f36183db83f1e59068d9b533dd1e4dc43d81d45c776ffbb463297",
+        "name": "cyl-b"
+      },
+      "as": "b"
+    },
+    {
+      "command": "attach_point_cloud",
+      "params": {
+        "sourceSha256": "9ebd7457eb3b6f1a23d5abbd7dbb0c8fb0df063e3f003db5077d65cfc08b8adb",
+        "name": "elb-a"
+      },
+      "as": "e"
+    },
+    {
+      "command": "fit_primitive",
+      "params": {
+        "cloudId": "$a",
+        "kind": "cylinder",
+        "region": {
+          "kind": "all"
+        },
+        "noiseSigma": 0.001
+      }
+    },
+    {
+      "command": "extract_pipes",
+      "params": {
+        "cloudId": "$b",
+        "region": {
+          "kind": "all"
+        },
+        "sizeTable": "en10220"
+      },
+      "as": "fitB"
+    },
+    {
+      "command": "commit_asbuilt_extraction",
+      "params": {
+        "extraction": {
+          "$fromStep": "fitB",
+          "path": "extractions.0"
+        },
+        "line": "EX-200-01",
+        "service": "cooling water"
+      },
+      "as": "runB"
+    },
+    {
+      "command": "slice_cloud",
+      "params": {
+        "cloudId": "$b",
+        "origin": [
+          0.0523492,
+          0.0,
+          1.4990862
+        ],
+        "normal": [
+          0.0348995,
+          0.0,
+          0.9993908
+        ],
+        "thickness": 0.02,
+        "fit": "circle"
+      }
+    },
+    {
+      "command": "trace_pipe_centreline",
+      "params": {
+        "cloudId": "$e",
+        "seed": [
+          0.5,
+          0.0,
+          1.0
+        ],
+        "sizeTable": "en10220"
+      },
+      "as": "traceE"
+    },
+    {
+      "command": "commit_asbuilt_extraction",
+      "params": {
+        "extraction": {
+          "$fromStep": "traceE",
+          "path": "extractions.0"
+        },
+        "line": "EX-100-02"
+      },
+      "as": "runE"
+    },
+    {
+      "command": "check_point_clouds",
+      "params": {}
+    }
+  ],
+  "expected": [
+    {
+      "step": 5,
+      "path": "cylinder.radius",
+      "value": 0.05715,
+      "abs": 0.0002,
+      "source": "synthetic truth, 5 x CRLB floor"
+    },
+    {
+      "step": 5,
+      "path": "cylinder.axisAngleErrorTo",
+      "value": [
+        0.8,
+        0.6,
+        0.0
+      ],
+      "maxDeg": 0.05,
+      "source": "synthetic truth"
+    },
+    {
+      "step": 6,
+      "path": "extractions[0].dn",
+      "value": 200,
+      "source": "llull EN 10220 table"
+    },
+    {
+      "step": 6,
+      "path": "extractions[0].radius",
+      "value": 0.10955,
+      "abs": 0.0002,
+      "source": "synthetic truth"
+    },
+    {
+      "step": 8,
+      "path": "circle.radius",
+      "value": 0.10955,
+      "abs": 0.0016,
+      "source": "5 sigma_r, N ~ 40"
+    },
+    {
+      "step": 9,
+      "path": "straights",
+      "value": 2,
+      "source": "generator"
+    },
+    {
+      "step": 9,
+      "path": "bends[0].angleDeg",
+      "value": 90,
+      "abs": 1.0,
+      "source": "generator, TOL-ENG"
+    },
+    {
+      "step": 9,
+      "path": "bends[0].radius",
+      "value": 0.1524,
+      "abs": 0.01,
+      "source": "generator, TOL-ENG"
+    },
+    {
+      "step": 9,
+      "path": "intersectionPoints[0]",
+      "value": [
+        1.6524,
+        0.0,
+        1.0
+      ],
+      "abs": 0.005,
+      "source": "generator, TOL-ENG"
+    },
+    {
+      "step": 11,
+      "path": "items[code=SCN_REGISTRATION_UNVERIFIED].ids",
+      "contains": "$runB",
+      "source": "AF-32 propagation to the created pipe run"
+    },
+    {
+      "step": 7,
+      "path": "created.pipeRuns",
+      "count": 1,
+      "source": "commit creates one add_pipe_run flagged asBuilt"
+    }
+  ],
+  "notes": "Slice origin = CYL-B axis point + 1.5 m along the axis (sin 2 deg = 0.0348995, cos 2 deg = 0.9993908).",
+  "planBinding": "{\"$fromStep\": alias, \"path\": ...} binds a value from an earlier query step's data (TR-SCN-03, a build_project extension; not in core yet)"
+}

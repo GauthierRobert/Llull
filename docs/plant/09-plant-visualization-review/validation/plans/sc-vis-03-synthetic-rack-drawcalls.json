@@ -1,0 +1,670 @@
+{
+  "id": "SC-VIS-03",
+  "validates": [
+    "VC-VIS-20",
+    "VC-VIS-21",
+    "VC-VIS-22",
+    "VC-VIS-23"
+  ],
+  "status": "PROPOSED. Steps 0-6 use existing commands (set_parameter, add_box, add_cylinder, array_linear, set_entity_name) and run today; render_stats (step 7) is unbuilt (TR-VIS-20). Loop iterations: 2 x (4 + 4 x 8) = 72 <= MAX_LOOP_ITERATIONS 1000. Scale with set_parameter n (44 / 437 / 4367 bays): array_linear allows up to MAX_COPIES_PER_COMMAND 10000.",
+  "description": "SYN-RACK-v1 smoke size (n = 8 bays, 1832 components): synthetic pipe rack of 13 repeated prototypes (data/synthetic_pipe_rack_benchmark.json). Checks the component count closed form N(n) = 227 n + 8 floor(n/4), the R-BATCH-v1 draw-call bound (<= 30 opaque model calls, independent of n and of service colours) and the instance bookkeeping (drawn + culled = N).",
+  "actions": [
+    {
+      "command": "set_parameter",
+      "params": {
+        "name": "n",
+        "expression": "8"
+      }
+    },
+    {
+      "command": "add_box",
+      "params": {
+        "size": [
+          254,
+          254,
+          6000
+        ],
+        "position": [
+          0,
+          -3000,
+          3000
+        ]
+      },
+      "as": "colA"
+    },
+    {
+      "command": "array_linear",
+      "params": {
+        "id": "$colA",
+        "count": "=n",
+        "offset": [
+          6000,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": {
+        "size": [
+          254,
+          254,
+          6000
+        ],
+        "position": [
+          0,
+          3000,
+          3000
+        ]
+      },
+      "as": "colB"
+    },
+    {
+      "command": "array_linear",
+      "params": {
+        "id": "$colB",
+        "count": "=n",
+        "offset": [
+          6000,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "command": "add_box",
+      "params": {
+        "size": [
+          254,
+          6000,
+          254
+        ],
+        "position": [
+          0,
+          0,
+          6127
+        ]
+      },
+      "as": "beam"
+    },
+    {
+      "command": "array_linear",
+      "params": {
+        "id": "$beam",
+        "count": "=n",
+        "offset": [
+          6000,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "for": {
+        "var": "j",
+        "from": 0,
+        "to": 3
+      },
+      "actions": [
+        {
+          "command": "add_cylinder",
+          "params": {
+            "radius": 57.15,
+            "height": 6000,
+            "position": [
+              3000,
+              "=-2100+600*j",
+              6411.15
+            ],
+            "axis": [
+              1,
+              0,
+              0
+            ]
+          },
+          "as": "pipe{j}"
+        },
+        {
+          "command": "array_linear",
+          "params": {
+            "id": "$pipe{j}",
+            "count": "=n",
+            "offset": [
+              6000,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "command": "add_box",
+          "params": {
+            "size": [
+              300,
+              150,
+              100
+            ],
+            "position": [
+              0,
+              "=-2100+600*j",
+              6304
+            ]
+          },
+          "as": "shoe{j}"
+        },
+        {
+          "command": "array_linear",
+          "params": {
+            "id": "$shoe{j}",
+            "count": "=n",
+            "offset": [
+              6000,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "command": "add_cylinder",
+          "params": {
+            "radius": 115,
+            "height": 24,
+            "position": [
+              288.0,
+              "=-2100+600*j",
+              6411.15
+            ],
+            "axis": [
+              1,
+              0,
+              0
+            ]
+          },
+          "as": "flA{j}"
+        },
+        {
+          "command": "array_linear",
+          "params": {
+            "id": "$flA{j}",
+            "count": "=n",
+            "offset": [
+              6000,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "command": "add_cylinder",
+          "params": {
+            "radius": 115,
+            "height": 24,
+            "position": [
+              312.0,
+              "=-2100+600*j",
+              6411.15
+            ],
+            "axis": [
+              1,
+              0,
+              0
+            ]
+          },
+          "as": "flB{j}"
+        },
+        {
+          "command": "array_linear",
+          "params": {
+            "id": "$flB{j}",
+            "count": "=n",
+            "offset": [
+              6000,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "for": {
+            "var": "k",
+            "from": 0,
+            "to": 7
+          },
+          "actions": [
+            {
+              "command": "add_cylinder",
+              "params": {
+                "radius": 8,
+                "height": 90,
+                "position": [
+                  300,
+                  "=-2100+600*j+90*cos(2*pi*k/8)",
+                  "=6411.15+90*sin(2*pi*k/8)"
+                ],
+                "axis": [
+                  1,
+                  0,
+                  0
+                ]
+              },
+              "as": "stud{j}_{k}"
+            },
+            {
+              "command": "array_linear",
+              "params": {
+                "id": "$stud{j}_{k}",
+                "count": "=n",
+                "offset": [
+                  6000,
+                  0,
+                  0
+                ]
+              }
+            },
+            {
+              "command": "add_cylinder",
+              "params": {
+                "radius": 13.85,
+                "height": 13,
+                "position": [
+                  269.5,
+                  "=-2100+600*j+90*cos(2*pi*k/8)",
+                  "=6411.15+90*sin(2*pi*k/8)"
+                ],
+                "axis": [
+                  1,
+                  0,
+                  0
+                ]
+              },
+              "as": "nutA{j}_{k}"
+            },
+            {
+              "command": "array_linear",
+              "params": {
+                "id": "$nutA{j}_{k}",
+                "count": "=n",
+                "offset": [
+                  6000,
+                  0,
+                  0
+                ]
+              }
+            },
+            {
+              "command": "add_cylinder",
+              "params": {
+                "radius": 13.85,
+                "height": 13,
+                "position": [
+                  330.5,
+                  "=-2100+600*j+90*cos(2*pi*k/8)",
+                  "=6411.15+90*sin(2*pi*k/8)"
+                ],
+                "axis": [
+                  1,
+                  0,
+                  0
+                ]
+              },
+              "as": "nutB{j}_{k}"
+            },
+            {
+              "command": "array_linear",
+              "params": {
+                "id": "$nutB{j}_{k}",
+                "count": "=n",
+                "offset": [
+                  6000,
+                  0,
+                  0
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "command": "add_box",
+          "params": {
+            "size": [
+              300,
+              230,
+              230
+            ],
+            "position": [
+              22500,
+              "=-2100+600*j",
+              6411.15
+            ]
+          },
+          "as": "valve{j}"
+        },
+        {
+          "command": "array_linear",
+          "params": {
+            "id": "$valve{j}",
+            "count": "=floor(n/4)",
+            "offset": [
+              24000,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "command": "set_entity_name",
+          "params": {
+            "id": "$pipe{j}",
+            "tags": [
+              "synthetic-rack",
+              "dn100"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "for": {
+        "var": "j",
+        "from": 4,
+        "to": 7
+      },
+      "actions": [
+        {
+          "command": "add_cylinder",
+          "params": {
+            "radius": 109.55,
+            "height": 6000,
+            "position": [
+              3000,
+              "=-2100+600*j",
+              6463.55
+            ],
+            "axis": [
+              1,
+              0,
+              0
+            ]
+          },
+          "as": "pipe{j}"
+        },
+        {
+          "command": "array_linear",
+          "params": {
+            "id": "$pipe{j}",
+            "count": "=n",
+            "offset": [
+              6000,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "command": "add_box",
+          "params": {
+            "size": [
+              300,
+              150,
+              100
+            ],
+            "position": [
+              0,
+              "=-2100+600*j",
+              6304
+            ]
+          },
+          "as": "shoe{j}"
+        },
+        {
+          "command": "array_linear",
+          "params": {
+            "id": "$shoe{j}",
+            "count": "=n",
+            "offset": [
+              6000,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "command": "add_cylinder",
+          "params": {
+            "radius": 172.5,
+            "height": 30,
+            "position": [
+              285.0,
+              "=-2100+600*j",
+              6463.55
+            ],
+            "axis": [
+              1,
+              0,
+              0
+            ]
+          },
+          "as": "flA{j}"
+        },
+        {
+          "command": "array_linear",
+          "params": {
+            "id": "$flA{j}",
+            "count": "=n",
+            "offset": [
+              6000,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "command": "add_cylinder",
+          "params": {
+            "radius": 172.5,
+            "height": 30,
+            "position": [
+              315.0,
+              "=-2100+600*j",
+              6463.55
+            ],
+            "axis": [
+              1,
+              0,
+              0
+            ]
+          },
+          "as": "flB{j}"
+        },
+        {
+          "command": "array_linear",
+          "params": {
+            "id": "$flB{j}",
+            "count": "=n",
+            "offset": [
+              6000,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "for": {
+            "var": "k",
+            "from": 0,
+            "to": 7
+          },
+          "actions": [
+            {
+              "command": "add_cylinder",
+              "params": {
+                "radius": 10,
+                "height": 110,
+                "position": [
+                  300,
+                  "=-2100+600*j+140*cos(2*pi*k/8)",
+                  "=6463.55+140*sin(2*pi*k/8)"
+                ],
+                "axis": [
+                  1,
+                  0,
+                  0
+                ]
+              },
+              "as": "stud{j}_{k}"
+            },
+            {
+              "command": "array_linear",
+              "params": {
+                "id": "$stud{j}_{k}",
+                "count": "=n",
+                "offset": [
+                  6000,
+                  0,
+                  0
+                ]
+              }
+            },
+            {
+              "command": "add_cylinder",
+              "params": {
+                "radius": 17.3,
+                "height": 16,
+                "position": [
+                  262.0,
+                  "=-2100+600*j+140*cos(2*pi*k/8)",
+                  "=6463.55+140*sin(2*pi*k/8)"
+                ],
+                "axis": [
+                  1,
+                  0,
+                  0
+                ]
+              },
+              "as": "nutA{j}_{k}"
+            },
+            {
+              "command": "array_linear",
+              "params": {
+                "id": "$nutA{j}_{k}",
+                "count": "=n",
+                "offset": [
+                  6000,
+                  0,
+                  0
+                ]
+              }
+            },
+            {
+              "command": "add_cylinder",
+              "params": {
+                "radius": 17.3,
+                "height": 16,
+                "position": [
+                  338.0,
+                  "=-2100+600*j+140*cos(2*pi*k/8)",
+                  "=6463.55+140*sin(2*pi*k/8)"
+                ],
+                "axis": [
+                  1,
+                  0,
+                  0
+                ]
+              },
+              "as": "nutB{j}_{k}"
+            },
+            {
+              "command": "array_linear",
+              "params": {
+                "id": "$nutB{j}_{k}",
+                "count": "=n",
+                "offset": [
+                  6000,
+                  0,
+                  0
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "command": "add_box",
+          "params": {
+            "size": [
+              420,
+              345,
+              345
+            ],
+            "position": [
+              22500,
+              "=-2100+600*j",
+              6463.55
+            ]
+          },
+          "as": "valve{j}"
+        },
+        {
+          "command": "array_linear",
+          "params": {
+            "id": "$valve{j}",
+            "count": "=floor(n/4)",
+            "offset": [
+              24000,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "command": "set_entity_name",
+          "params": {
+            "id": "$pipe{j}",
+            "tags": [
+              "synthetic-rack",
+              "dn200"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "command": "render_stats",
+      "params": {
+        "view": "iso",
+        "width": 1920,
+        "height": 1080,
+        "projection": "perspective",
+        "fovDeg": 45
+      }
+    }
+  ],
+  "expected": [
+    {
+      "step": 9,
+      "path": "componentCount",
+      "value": 1832,
+      "abs": 0,
+      "source": "closed form N(8) = 227*8 + 8*floor(8/4) (data/derive_vis_expected.py)"
+    },
+    {
+      "step": 9,
+      "path": "opaqueModelCalls",
+      "max": 30,
+      "source": "R-BATCH-v1 bound 2*13 + 4 (data/synthetic_pipe_rack_benchmark.json)"
+    },
+    {
+      "step": 9,
+      "path": "instancesDrawnPlusCulled",
+      "value": 1832,
+      "abs": 0,
+      "source": "bookkeeping invariant"
+    },
+    {
+      "step": 9,
+      "path": "opaqueModelCallsExact",
+      "value": "TBD - pin from the first deterministic run (render_stats is a pure function of document + camera)"
+    }
+  ],
+  "notes": "Plan-level step indices: 0 set_parameter, 1-6 columns and beam, 7 DN100 loop, 8 DN200 loop, 9 render_stats. Synthetic dimensions, not catalogue values. Every pipe is tagged dn100 / dn200 for colour-rule tests; services are assigned by SC-VIS-01, not here, because a box/cylinder carries no service property."
+}

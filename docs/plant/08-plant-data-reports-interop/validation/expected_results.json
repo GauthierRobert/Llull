@@ -1,0 +1,427 @@
+{
+  "pack": "plant 08 DAT",
+  "generatedBy": "hand-written index; every value lives in the data files or plans named here",
+  "cases": [
+    {
+      "id": "VC-DAT-01",
+      "proves": [
+        "FR-DAT-04",
+        "TR-DAT-06",
+        "FR-DAT-01",
+        "FR-DAT-02"
+      ],
+      "command": "assign_plant_object",
+      "reference": "data/tag_format_cases.json generate (9 cases)",
+      "expected": {
+        "T-101": "T-101",
+        "150-P-1001-A1A": "150-P-1001-A1A",
+        "note": "each case: fields -> expectedTag"
+      },
+      "tolerance": "exact string",
+      "source": "closed form (format grammar §5.2)",
+      "grade": "A",
+      "test": "tests/unit/plant/data/tagFormat.test.ts"
+    },
+    {
+      "id": "VC-DAT-02",
+      "proves": [
+        "FR-DAT-04",
+        "FR-DAT-05",
+        "TR-DAT-06",
+        "TR-DAT-07"
+      ],
+      "command": "assign_plant_object, check_plant_data",
+      "reference": "data/tag_format_cases.json validate (13 cases) + uniqueness (3 cases)",
+      "expected": {
+        "invalidCode": "DAT_TAG_FORMAT",
+        "duplicateCode": "DAT_TAG_DUPLICATE",
+        "validCount": 3,
+        "invalidCount": 10
+      },
+      "tolerance": "exact",
+      "source": "closed form",
+      "grade": "A",
+      "test": "tests/unit/plant/data/tagFormat.test.ts"
+    },
+    {
+      "id": "VC-DAT-03",
+      "proves": [
+        "FR-DAT-09",
+        "FR-DAT-08"
+      ],
+      "command": "plant_report kind=line_list",
+      "scenario": "plans/sc-dat-01-tank-pump-mvp.json",
+      "expected": {
+        "rows": 2,
+        "150-P-1001-A1A.lengthM": 4.4,
+        "100-P-1002-A1A.lengthM": 5.8,
+        "150-P-1001-A1A.bends": 2,
+        "100-P-1002-A1A.bends": 1
+      },
+      "tolerance": "rows exact; length 1e-9 m",
+      "source": "sum of segment lengths (data/sc_dat_01_reports_expected.json)",
+      "grade": "A",
+      "test": "tests/unit/plant/data/reports.test.ts"
+    },
+    {
+      "id": "VC-DAT-04",
+      "proves": [
+        "FR-DAT-10",
+        "FR-DAT-11"
+      ],
+      "command": "plant_report kinds equipment_list, nozzle_schedule, valve_list, tag_register",
+      "scenario": "SC-DAT-01, SC-DAT-02",
+      "expected": {
+        "SC-DAT-01": {
+          "equipment_list": 2,
+          "nozzle_schedule": 3,
+          "valve_list": 0,
+          "tag_register": 4
+        },
+        "SC-DAT-02": {
+          "valve_list": 2
+        }
+      },
+      "tolerance": "exact row counts and keys",
+      "source": "plan",
+      "grade": "A",
+      "test": "reports.test.ts"
+    },
+    {
+      "id": "VC-DAT-05",
+      "proves": [
+        "FR-DAT-12"
+      ],
+      "command": "plant_report kind=mto groupBy spec,itemType,nominalSize",
+      "scenario": "SC-DAT-01",
+      "expected": {
+        "pipe DN100 m": 5.8,
+        "pipe DN150 m": 4.4,
+        "bend DN100 ea": 1,
+        "bend DN150 ea": 2,
+        "rows": 4
+      },
+      "tolerance": "1e-9 m; counts exact",
+      "source": "closed form (centreline lengths; bends = points - 2)",
+      "grade": "A",
+      "test": "reports.test.ts"
+    },
+    {
+      "id": "VC-DAT-06",
+      "proves": [
+        "FR-DAT-16",
+        "TR-DAT-20"
+      ],
+      "command": "export_ifc schema=IFC4X3_ADD2",
+      "scenario": "SC-DAT-01, SC-DAT-02",
+      "expected": {
+        "ifcopenshellValidateRulesErrors": 0,
+        "FILE_SCHEMA": "IFC4X3_ADD2"
+      },
+      "tolerance": "exact",
+      "source": "IfcOpenShell 0.9.0 validate --rules [S3]; reference files show a valid target exists",
+      "grade": "A",
+      "test": "tests/production (Python oracle, optional) + tests/unit/plant/exchange/ifc4x3.test.ts (structural checks in TS)"
+    },
+    {
+      "id": "VC-DAT-07",
+      "proves": [
+        "FR-DAT-16",
+        "FR-DAT-17",
+        "TR-DAT-21",
+        "FR-DAT-03"
+      ],
+      "command": "export_ifc schema=IFC4X3_ADD2",
+      "reference": "data/reference/sc-dat-01-reference.stats.json, sc-dat-02-reference.stats.json",
+      "expected": {
+        "SC-DAT-01": {
+          "IfcPipeSegment": 5,
+          "IfcPipeFitting": 3,
+          "IfcTank": 1,
+          "IfcPump": 1,
+          "IfcDistributionSystem": 2,
+          "IfcBuildingElementProxy": 0
+        },
+        "SC-DAT-02": {
+          "IfcPipeSegment": 5,
+          "IfcPipeFitting": 1,
+          "IfcValve": 2,
+          "IfcValve.ISOLATING": 1,
+          "IfcValve.CHECK": 1
+        }
+      },
+      "tolerance": "exact counts and PredefinedType",
+      "source": "reference files (IfcOpenShell-built, valid) + plan",
+      "grade": "A",
+      "test": "ifc4x3.test.ts"
+    },
+    {
+      "id": "VC-DAT-08",
+      "proves": [
+        "FR-DAT-18",
+        "TR-DAT-22"
+      ],
+      "command": "export_ifc schema=IFC4X3_ADD2",
+      "reference": "reference stats + data/reference/sc-dat-02-negative.validate.json",
+      "expected": {
+        "IfcDistributionPort": 19,
+        "IfcRelConnectsPorts": 9,
+        "connections": 9,
+        "IfcRelNests": 10,
+        "portsNested": 19,
+        "openPorts": 1,
+        "everyRelatingPortIsSOURCE": true,
+        "everyRelatedPortIsSINK": true,
+        "negativeFileRuleErrors": [
+          "IfcRelConnectsPorts.NoSelfReference",
+          "IfcValve.CorrectPredefinedType"
+        ]
+      },
+      "tolerance": "exact",
+      "source": "IfcDistributionPort Port Connectivity concept [S2]; IfcRelConnectsPorts.NoSelfReference [S2,S3]",
+      "grade": "A",
+      "test": "ifc4x3.test.ts"
+    },
+    {
+      "id": "VC-DAT-09",
+      "proves": [
+        "FR-DAT-13",
+        "FR-DAT-14",
+        "TR-DAT-15",
+        "TR-DAT-16"
+      ],
+      "command": "export_plant_data, import_plant_data",
+      "scenario": "plans/sc-dat-04-excel-roundtrip.json",
+      "reference": "data/reference/equipment-list-sc-dat-01.xlsx, equipment-list-sc-dat-01-edited.xlsx",
+      "expected": {
+        "exportEqualsFixtureCells": true,
+        "previewChanges": 1,
+        "rejected": [
+          "DAT_IMPORT_READONLY_COLUMN",
+          "DAT_IMPORT_TYPE"
+        ],
+        "previewDocumentChanged": false,
+        "applied": 1,
+        "P-101.OperatingWeightKg": 480
+      },
+      "tolerance": "exact",
+      "source": "fixtures written and read back with openpyxl 3.1.5 [S5]; Plant 3D read-only column behaviour [S7]",
+      "grade": "A",
+      "test": "tests/unit/plant/data/roundTrip.test.ts"
+    },
+    {
+      "id": "VC-DAT-10",
+      "proves": [
+        "FR-DAT-19"
+      ],
+      "command": "export_ifc + IDS check (check_ifc_requirements, V1)",
+      "reference": "data/reference/plant-handover.ids, ids_results.json",
+      "expected": {
+        "SC-DAT-01.failed": 0,
+        "SC-DAT-02.failed": 0,
+        "bsi Infra-Plumbing spec1 applicable/failed": [
+          24,
+          24
+        ]
+      },
+      "tolerance": "exact",
+      "source": "ifctester 0.9.0 run [S4]",
+      "grade": "A",
+      "test": "tests/unit/plant/exchange/ids.test.ts"
+    },
+    {
+      "id": "VC-DAT-11",
+      "proves": [
+        "FR-DAT-20",
+        "TR-DAT-27"
+      ],
+      "command": "export_ifc, plant_report, build_project replay",
+      "scenario": "SC-DAT-01 run twice + replay from featureHistory",
+      "expected": {
+        "ifcTextIdentical": true,
+        "tagsIdentical": true,
+        "reportCsvIdentical": true
+      },
+      "tolerance": "byte-identical",
+      "source": "AF-13 determinism; GlobalId = hash(building uid, object id) as today (ifcStep.ts ifcGuid)",
+      "grade": "A",
+      "test": "tests/golden/plant-data-sc-dat-01"
+    },
+    {
+      "id": "VC-DAT-12",
+      "proves": [
+        "FR-DAT-05",
+        "FR-DAT-06",
+        "FR-DAT-21",
+        "TR-DAT-30"
+      ],
+      "command": "assign_plant_object, check_plant_data",
+      "scenario": "plans/sc-dat-03-data-errors.json",
+      "expected": {
+        "step6": "DAT_TAG_FORMAT",
+        "step8": "DAT_TAG_DUPLICATE",
+        "step9.tag": "P-102",
+        "check.status": "fail",
+        "check.codes": [
+          "DAT_REQUIRED_PROPERTY_MISSING",
+          "DAT_LINE_END_UNRESOLVED"
+        ]
+      },
+      "tolerance": "exact codes, ids, paths",
+      "source": "plan",
+      "grade": "A",
+      "test": "tests/unit/plant/data/check.test.ts"
+    },
+    {
+      "id": "VC-DAT-13",
+      "proves": [
+        "FR-DAT-22"
+      ],
+      "command": "ifc_summary",
+      "scenario": "plans/sc-dat-05-ifc-summary-bsi.json",
+      "reference": "data/reference/bsi_sample_stats.json",
+      "expected": {
+        "Infra-Plumbing": {
+          "schema": "IFC4X3_ADD2",
+          "IfcPipeSegment": 24,
+          "IfcDistributionSystem": 1,
+          "systemMembers": 26,
+          "ports": 0
+        },
+        "Building-Hvac": {
+          "IfcDuctSegment": 1,
+          "IfcAirTerminal": 2,
+          "systemMembers": 3
+        }
+      },
+      "tolerance": "exact",
+      "source": "buildingSMART samples [S1] measured with IfcOpenShell [S3]",
+      "grade": "A",
+      "test": "tests/unit/plant/exchange/ifcSummary.test.ts"
+    },
+    {
+      "id": "VC-DAT-14",
+      "proves": [
+        "FR-DAT-07",
+        "TR-DAT-10",
+        "FR-DAT-02"
+      ],
+      "command": "set_plant_properties",
+      "scenario": "SC-DAT-01 + one batch of 3 edits, one invalid",
+      "expected": {
+        "invalidBatchApplied": 0,
+        "code": "DAT_PROPERTY_TYPE",
+        "validBatchStepCount": 1,
+        "undoRestoresDeepEqual": true,
+        "isPure": true
+      },
+      "tolerance": "exact",
+      "source": "L1/L3 purity contract",
+      "grade": "A",
+      "test": "tests/unit/plant/data/properties.test.ts"
+    },
+    {
+      "id": "VC-DAT-15",
+      "proves": [
+        "FR-DAT-24",
+        "TR-DAT-28"
+      ],
+      "command": "set_deliverable_status",
+      "scenario": "line list rev A: in_work -> issued_for_review (agent ok) -> issued_for_construction (agent refused)",
+      "expected": {
+        "agentIssuedForConstruction": "DAT_HUMAN_GATE",
+        "reviewRequired": true,
+        "humanWithSignature": "accepted"
+      },
+      "tolerance": "exact",
+      "source": "AF-34 / 09 PLM TR-PLM-16",
+      "grade": "A",
+      "test": "tests/unit/plant/data/deliverables.test.ts"
+    },
+    {
+      "id": "VC-DAT-16",
+      "proves": [
+        "FR-DAT-23"
+      ],
+      "command": "export_handover profile=cfihos-subset",
+      "scenario": "SC-DAT-01",
+      "expected": {
+        "tagRegisterRows": 4,
+        "equipmentRegisterRows": 2,
+        "unverified": true
+      },
+      "tolerance": "row counts exact; column names NOT gated (CFIHOS columns grade C)",
+      "source": "plan; CFIHOS [S10] grade C",
+      "grade": "C (columns) / A (row counts)",
+      "test": "tests/unit/plant/exchange/handover.test.ts"
+    },
+    {
+      "id": "VC-DAT-17",
+      "proves": [
+        "TR-DAT-40"
+      ],
+      "command": "plant_report, export_ifc, export_plant_data",
+      "scenario": "synthetic 20 000 tagged objects (2 000 lines x 10 components)",
+      "expected": "TBD — measure with vitest bench on the CI runner; budgets in TECHNICAL_SPEC §8",
+      "tolerance": "budget",
+      "source": "—",
+      "grade": "—",
+      "test": "tests/perf/plantData.bench.ts"
+    },
+    {
+      "id": "VC-DAT-18",
+      "proves": [
+        "FR-DAT-15",
+        "FR-DAT-25",
+        "FR-DAT-26",
+        "TR-DAT-17",
+        "TR-DAT-24"
+      ],
+      "command": "import_tag_list, renumber_tags, set_plant_properties (provenance)",
+      "scenario": "SC-DAT-01 state + CSV 'Tag,Description' with rows P-103, P-104, P-101",
+      "expected": {
+        "import_tag_list": {
+          "reserved": 2,
+          "rejected": [
+            {
+              "tag": "P-101",
+              "code": "DAT_TAG_DUPLICATE"
+            }
+          ]
+        },
+        "unverified": {
+          "set": "DesignPressure of P-101 with provenance agent+unverified",
+          "lineOrEquipmentReportRowFlag": true,
+          "checkFinding": "DAT_VALUE_UNVERIFIED"
+        },
+        "renumber_tags CentrifugalPump hierarchy U10 startSequence 11 step 1": {
+          "P-101": "P-111",
+          "P-103": "P-112",
+          "P-104": "P-113"
+        }
+      },
+      "tolerance": "exact",
+      "source": "closed form: renumber assigns startSequence + k*step in natural tag order (§4 renumber_tags, §5.2); AF-32",
+      "grade": "A",
+      "test": "tests/unit/plant/data/tagList.test.ts"
+    },
+    {
+      "id": "VC-DAT-19",
+      "proves": [
+        "FR-DAT-27",
+        "FR-DAT-13"
+      ],
+      "command": "plant_report kind=custom",
+      "scenario": "SC-DAT-01; columns Tag, OperatingWeight, =OperatingWeight/1000 as 'Weight (t)'",
+      "expected": {
+        "T-101": 2.5,
+        "P-101": 0.45,
+        "rows": 2
+      },
+      "tolerance": "1e-12",
+      "source": "closed form (plan inputs 2500 kg, 450 kg)",
+      "grade": "A",
+      "test": "reports.test.ts"
+    }
+  ]
+}

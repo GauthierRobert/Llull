@@ -1,0 +1,42 @@
+{
+  "title": "Formed-head geometry: standard torispherical proportions, depths, full volumes and surface areas",
+  "sourceIds": ["S1", "S2", "S3", "S4", "S5"],
+  "standardHeadProportions": {
+    "note": "dish radius = f*D, knuckle radius = k*D, D = the diameter the standard refers to (ASME F&D: outside diameter; llull applies it to the diameter the user names and records which one)",
+    "rows": [
+      { "name": "ASME F&D", "f": 1.0, "k": 0.06, "sources": ["S2 (fluids TANK docstring table)", "S5 (Wikipedia 'Head (vessel)': crown radius = OD, knuckle 6 % of OD, ASME minimum)"], "grade": "A" },
+      { "name": "ASME 80/10 F&D", "f": 0.8, "k": 0.1, "sources": ["S2"], "grade": "B" },
+      { "name": "ASME 80/6", "f": 0.8, "k": 0.06, "sources": ["S2"], "grade": "B" },
+      { "name": "DIN 28011 (Kloepper)", "f": 1.0, "k": 0.1, "sources": ["S2", "S5"], "grade": "A" },
+      { "name": "DIN 28013 (Korbbogen)", "f": 0.8, "k": 0.154, "sources": ["S2", "S5"], "grade": "A" },
+      { "name": "2:1 semi-ellipsoidal, torispherical approximation", "f": 0.9, "k": 0.17, "sources": ["S2"], "grade": "B", "use": "documentation only; llull models a true 2:1 ellipsoid (a = D/4)" }
+    ]
+  },
+  "depthCases": [
+    { "id": "H-D-1", "D": 96, "f": 0.9, "k": 0.2, "depth": 25.684268924767125, "source": "S1 example via S2 (a_torispherical docstring and test)", "grade": "A" },
+    { "id": "H-D-2", "D": 108, "f": 1.0, "k": 0.06, "depth": 18.288462280484797, "source": "S2 test", "grade": "A" }
+  ],
+  "fullHeadVolumeD1m": {
+    "derivation": "closed forms of [S1] (vertical head filled to its tangent line) and an independent numerical integration of pi*r(z)^2 over the crown-sphere + knuckle-torus profile (data/derive_expected.py, 200 000 slices); both agree to <= 3e-12 relative",
+    "rows": [
+      { "name": "2:1 ellipsoidal", "depth_m": 0.25, "V_m3": 0.1308996938995747, "closedForm": "pi D^3 / 24" },
+      { "name": "hemispherical", "depth_m": 0.5, "V_m3": 0.2617993877991494, "closedForm": "pi D^3 / 12" },
+      { "name": "ASME F&D (f=1, k=0.06)", "depth_m": 0.16933761370819259, "V_m3": 0.08099900429115166 },
+      { "name": "ASME 80/10 (f=0.8, k=0.1)", "depth_m": 0.22554373534619712, "V_m3": 0.10988396820205228 },
+      { "name": "DIN 28011 (f=1, k=0.1)", "depth_m": 0.19377422517014506, "V_m3": 0.09896599511808336 },
+      { "name": "DIN 28013 (f=0.8, k=0.154)", "depth_m": 0.25447273212056576, "V_m3": 0.13077173352177535 }
+    ],
+    "scaling": "V scales with D^3 and depth with D for a fixed head type",
+    "tolerance": "1e-9 relative"
+  },
+  "surfaceArea": {
+    "rows": [
+      { "id": "H-SA-1", "shape": "ellipsoidal head (sphere limit)", "D": 2, "a": 1, "SA": 6.283185307179586, "source": "S2 test; MathWorld spheroid [S3]", "grade": "A" },
+      { "id": "H-SA-2", "shape": "oblate ellipsoidal head", "D": 2, "a": 0.999, "SA": 6.278996936093318, "source": "S2 test; formula S3", "grade": "A" },
+      { "id": "H-SA-3", "shape": "prolate ellipsoidal head", "D": 2, "a": 1.5, "SA": 8.459109081729984, "source": "S2 test; formula S3 / Jones wetted area [S1]", "grade": "A" },
+      { "id": "H-SA-4", "shape": "torispherical head", "D": 2.54, "f": 1.039370079, "k": 0.062362205, "SA": 6.00394283477063, "source": "Honeywell white paper example via S2 [S4]", "grade": "B" }
+    ],
+    "formulaEllipsoidal": "oblate (a < R): SA = pi R^2 + (pi a^2 / (2 e)) ln((1+e)/(1-e)), e = sqrt(1 - a^2/R^2); prolate (a > R): SA = pi R^2 + (pi a R / e) asin(e), e = sqrt(1 - R^2/a^2); a = R: 2 pi R^2",
+    "tolerance": "1e-9 relative (ellipsoidal), 1e-7 relative (torispherical)"
+  }
+}

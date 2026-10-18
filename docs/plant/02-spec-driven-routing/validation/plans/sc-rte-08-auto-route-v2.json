@@ -1,0 +1,39 @@
+{
+  "id": "SC-RTE-08",
+  "status": "PROPOSED V2 - not runnable. Unbuilt: add_tie_in_point, create_pipeline, auto_route_pipe, check_piping.",
+  "unbuilt": ["add_tie_in_point", "create_pipeline", "auto_route_pipe", "check_piping"],
+  "validates": ["VC-RTE-18"],
+  "description": "Obstacle-free auto route between a port leaving +X at the origin and a port at (3000, 2000, 1000) that the pipe must enter travelling +Z from below (port direction (0,0,-1)). Minimum bends = 2 (three axes need three directions, one bend joins two). Then a box obstacle blocks the straight first leg; the route must stay clash-free and its length can only grow.",
+  "units": "mm",
+  "actions": [
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "AR-1", "position": [0, 0, 0], "direction": [1, 0, 0], "dn": 100, "endType": "BW" },
+      "as": "p1"
+    },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "AR-2", "position": [3000, 2000, 1000], "direction": [0, 0, -1], "dn": 100, "endType": "BW" },
+      "as": "p2"
+    },
+    { "command": "create_pipeline", "params": { "service": "P", "sequence": "8001", "spec": "CS150", "dn": 100 }, "as": "line" },
+    {
+      "command": "auto_route_pipe",
+      "params": { "lineId": "$line", "from": { "portId": "$p1" }, "to": { "portId": "$p2" }, "grid": 50, "bendCost": 1000 },
+      "as": "run"
+    },
+    { "command": "check_piping", "params": { "lineIds": ["$line"] } }
+  ],
+  "expected": [
+    {
+      "step": 3,
+      "path": "data.centrelineToPiLengthMm",
+      "value": 6000,
+      "abs": 1e-6,
+      "source": "Manhattan distance |3000| + |2000| + |1000|"
+    },
+    { "step": 3, "path": "data.bends", "value": 2, "source": "lower bound 2 (3 axes), reached in free space" },
+    { "step": 3, "path": "data.optimal", "value": true },
+    { "step": 4, "path": "data.issues[?code!='RTE_SPEC_UNVERIFIED'].length", "value": 0 }
+  ]
+}
