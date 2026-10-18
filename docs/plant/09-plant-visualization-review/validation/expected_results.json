@@ -576,6 +576,35 @@
       },
       "tolerance": "exact codes",
       "test": "tests/unit/review/errors.test.ts"
+    },
+    {
+      "id": "VC-VIS-60",
+      "proves": [
+        "TR-VIS-26",
+        "TR-VIS-34",
+        "AF-13"
+      ],
+      "command": "render_stats / check_clashes broad phase with ctx.spatialIndex; render_view {renderer: native}",
+      "inputs": {
+        "randomAabbs": 10000,
+        "synRackN": 4367,
+        "synRackComponents": 1000037,
+        "plan": "plans/sc-vis-05-render-view-determinism.json"
+      },
+      "expected": {
+        "bvhIdSetsEqualReference": true,
+        "broadPhasePairsEqualReference": true,
+        "nativeRender": {
+          "svgSha256": "absent",
+          "deterministic": false,
+          "visibleEntityIdsEqualReference": true,
+          "meanPixelDiffToReference": "TBD - measure"
+        },
+        "referenceDigestUnchangedWithRasterPort": true
+      },
+      "tolerance": "exact sets and flags; pixel difference TBD - measure",
+      "source": "RS1 section 2 rules 3 and 4; TECHNICAL_SPEC section 2.A",
+      "test": "server/tests/visNativeParity.test.ts; llull-bvh cargo tests"
     }
   ]
 }

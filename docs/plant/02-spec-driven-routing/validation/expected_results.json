@@ -288,6 +288,22 @@
       "expected": "TBD - measure with the 08 IFC and 05 PCF exporters: counts equal VC-RTE-02",
       "grade": "TBD",
       "frs": ["FR-RTE-21", "FR-RTE-25"]
+    },
+    {
+      "id": "VC-RTE-25",
+      "plan": "plans/sc-rte-08-auto-route-v2.json + small obstacle problems under the TS cap",
+      "command": "route_problem + llull-compute route + auto_route_pipe {solution} (V2, RS1 RS-7)",
+      "expected": {
+        "nativeEqualsTsReference": ["pis", "bends", "costMicrometres", "optimal"],
+        "nativeSolutionAccepted": true,
+        "staleOrObstacleSolution": "RTE_AUTOROUTE_SOLUTION_INVALID, document unchanged",
+        "largeProblem": { "gridMm": 50, "boxM": [100, 100, 30], "maxExpansions": 2000000, "timeS": "TBD - measure (budget <= 5 s, TECHNICAL section 8)" }
+      },
+      "tolerance": "exact (paths, cost, codes); time TBD - measure",
+      "reference": "TECHNICAL_SPEC section 2.A and 5.12: same state, cost and total open-set order; integer-micrometre costs",
+      "grade": "derived",
+      "frs": ["FR-RTE-22"],
+      "test": "server/tests/routeNativeParity.test.ts; llull-route cargo tests"
     }
   ]
 }

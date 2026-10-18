@@ -15,7 +15,10 @@ three places:
 
 All cases run unattended once the commands exist:
 
-- Unit tests read `data/*.json` directly, in the same way as the other packs (`tests/unit/scan/*.test.ts`).
+- Unit tests read `data/*.json` directly, in the same way as the other packs (`tests/unit/scan/*.test.ts`). Readers,
+  octree and numerics live in the Rust crate `llull-cloud` ([RS1](../../../decisions/RS1-native-compute.md), TECHNICAL_SPEC
+  §2.A). Its `cargo test` (part of `npm run native:check`) reads the same files; the TS unit tests run the plugin on a
+  port backed by the crate's WASM build.
 - `server/tests/packReplay10scn.test.ts` imports the files with the host transport (`llull scan import`). It then runs every
   `plans/*.json` through `build_project` and compares the results with `expected_results.json`. This is the same path as
   `llull run plan.json --json` (AF-23).
@@ -72,16 +75,16 @@ python3 -I data/tools/las_own_header.py data/las/*
 
 | VC | What | Reference | Tolerance | Test |
 | -- | ---- | --------- | --------- | ---- |
-| VC-SCN-01 | E57 inventory of 10 files: `data3D` count, `recordCount` per scan, prototype fields, file GUID, version 1.0, page size 1024 | `e57_reference.json`; libE57Format assertions: ColouredCubeFloat 7 680, bunnyDouble / bunnyInt32 30 571, ZeroPoints 0, empty 0 scans [S2] | exact | `scan/e57Reader.test.ts` |
-| VC-SCN-02 | Corrupt page: `bad-crc.e57` is refused with `SCN_E57_CHECKSUM` (page 0 CRC-32C mismatch) and no asset is written | libE57Format throws `ErrorBadChecksum`; our reader finds 1 bad page [S2] | exact code | `e57Reader.test.ts`, server transport test |
-| VC-SCN-03 | Empty clouds: `empty.e57` (0 scans) and `ZeroPoints.e57` (1 scan, 0 points) give `SCN_CLOUD_EMPTY`; nothing is attached | [S2] | exact code | `e57Reader.test.ts` |
-| VC-SCN-04 | Encodings: `bunnyInt32.e57` (ScaledInteger, scale 1e-6) and `bunnyDouble.e57` decode to the same 30 571 points; local bounds [−0.094689, 0.040011, −0.061873]..[0.061009, 0.187321, 0.058799] m, centroid [−0.027513, 0.103078, 0.008644] m | `e57_reference.json` (pye57) | max point difference ≤ 5e-7 m (half the ScaledInteger quantum); bounds and centroid ±1e-6 m | `e57Reader.test.ts` |
-| VC-SCN-05 | Pose: `translationWithoutRotation.e57` (4 points, local centroid [0.5, 0.5, 0], pose translation [4, 5, 6], identity rotation) → file-frame centroid [4.5, 5.5, 6.0]. `ColourRepresentation.e57` exposes `returnIndex`, `returnCount`, `pointSourceId` and colour fields for its 153 points | `e57_reference.json` (pye57 `transform=True`) | 1e-9 m; field list exact | `e57Reader.test.ts` |
-| VC-SCN-06 | LAS / LAZ inventory of 10 files: version, PDRF, compressed flag, record length, VLR / EVLR counts, point count, scale, offset; the decoded point count equals the header count | `las_reference.json` [S4, S5] | exact; scale and offset bit-exact doubles | `scan/lasReader.test.ts` |
-| VC-SCN-07 | LAZ equals LAS: `simple.laz` ≡ `simple.las` (19 dimensions) and `1_4_w_evlr.laz` ≡ `1_4_w_evlr.las` (18 dimensions), every dimension of every point | laspy + lazrs comparison (this pack) | bit-exact | `lasReader.test.ts` (with the LAZ decoder port) |
-| VC-SCN-08 | Inconsistent header: `simple1_3.las` stores bounds in record units (min x −235434519) while the data spans −235434.519..−234935.841. Import warns `SCN_LAS_HEADER_BOUNDS` and uses the bounds recomputed from the data | `las_reference.json` (`headerBoundsMatchData: false`) | recomputed bounds = decoded min / max, exact | `lasReader.test.ts` |
-| VC-SCN-09 | Large coordinates: `test1_4.las` (x ≈ 1.694e6 m, scale 1.1645e-6 m). After import into the octree asset, every coordinate matches laspy within half a quantum | Closed form. Storing int32 relative to the node origin at the source quantum gives error ≤ scale/2. Counter-example (documented): absolute float32 loses up to 0.062 m on this file, measured, because float32 spacing at 2^20..2^21 is 0.125 m | ≤ 0.5 × scale per axis (5.83e-7 m in x) | `scan/octreeAsset.test.ts` |
-| VC-SCN-10 | Octree / LOD invariants on `autzen_trim.laz` (110 000 points): node points sum to 110 000; every node ≤ `maxPointsPerNode`; level spacing halves each level; a query with budget B returns ≤ B points and a coarser level is never skipped; the asset hash is identical on two runs | invariants (closed form) | exact | `octreeAsset.test.ts` |
+| VC-SCN-01 | E57 inventory of 10 files: `data3D` count, `recordCount` per scan, prototype fields, file GUID, version 1.0, page size 1024 | `e57_reference.json`; libE57Format assertions: ColouredCubeFloat 7 680, bunnyDouble / bunnyInt32 30 571, ZeroPoints 0, empty 0 scans [S2] | exact | `llull-cloud` `tests/e57.rs` |
+| VC-SCN-02 | Corrupt page: `bad-crc.e57` is refused with `SCN_E57_CHECKSUM` (page 0 CRC-32C mismatch) and no asset is written | libE57Format throws `ErrorBadChecksum`; our reader finds 1 bad page [S2] | exact code | `tests/e57.rs`, server transport test |
+| VC-SCN-03 | Empty clouds: `empty.e57` (0 scans) and `ZeroPoints.e57` (1 scan, 0 points) give `SCN_CLOUD_EMPTY`; nothing is attached | [S2] | exact code | `tests/e57.rs` |
+| VC-SCN-04 | Encodings: `bunnyInt32.e57` (ScaledInteger, scale 1e-6) and `bunnyDouble.e57` decode to the same 30 571 points; local bounds [−0.094689, 0.040011, −0.061873]..[0.061009, 0.187321, 0.058799] m, centroid [−0.027513, 0.103078, 0.008644] m | `e57_reference.json` (pye57) | max point difference ≤ 5e-7 m (half the ScaledInteger quantum); bounds and centroid ±1e-6 m | `tests/e57.rs` |
+| VC-SCN-05 | Pose: `translationWithoutRotation.e57` (4 points, local centroid [0.5, 0.5, 0], pose translation [4, 5, 6], identity rotation) → file-frame centroid [4.5, 5.5, 6.0]. `ColourRepresentation.e57` exposes `returnIndex`, `returnCount`, `pointSourceId` and colour fields for its 153 points | `e57_reference.json` (pye57 `transform=True`) | 1e-9 m; field list exact | `tests/e57.rs` |
+| VC-SCN-06 | LAS / LAZ inventory of 10 files: version, PDRF, compressed flag, record length, VLR / EVLR counts, point count, scale, offset; the decoded point count equals the header count | `las_reference.json` [S4, S5] | exact; scale and offset bit-exact doubles | `llull-cloud` `tests/las.rs` |
+| VC-SCN-07 | LAZ equals LAS: `simple.laz` ≡ `simple.las` (19 dimensions) and `1_4_w_evlr.laz` ≡ `1_4_w_evlr.las` (18 dimensions), every dimension of every point | laspy + lazrs comparison (this pack) | bit-exact | `tests/las.rs` (native `laz` crate) |
+| VC-SCN-08 | Inconsistent header: `simple1_3.las` stores bounds in record units (min x −235434519) while the data spans −235434.519..−234935.841. Import warns `SCN_LAS_HEADER_BOUNDS` and uses the bounds recomputed from the data | `las_reference.json` (`headerBoundsMatchData: false`) | recomputed bounds = decoded min / max, exact | `tests/las.rs` |
+| VC-SCN-09 | Large coordinates: `test1_4.las` (x ≈ 1.694e6 m, scale 1.1645e-6 m). After import into the octree asset, every coordinate matches laspy within half a quantum | Closed form. Storing int32 relative to the node origin at the source quantum gives error ≤ scale/2. Counter-example (documented): absolute float32 loses up to 0.062 m on this file, measured, because float32 spacing at 2^20..2^21 is 0.125 m | ≤ 0.5 × scale per axis (5.83e-7 m in x) | `llull-cloud` `tests/octree.rs` |
+| VC-SCN-10 | Octree / LOD invariants on `autzen_trim.laz` (110 000 points): node points sum to 110 000; every node ≤ `maxPointsPerNode`; level spacing halves each level; a query with budget B returns ≤ B points and a coarser level is never skipped; the asset hash is identical on two runs | invariants (closed form) | exact | `tests/octree.rs` |
 | VC-SCN-11 | Proprietary formats: `.rcp` / `.rcs` are refused with `SCN_FORMAT_PROPRIETARY` and the remediation "export E57 from ReCap" | policy (FR-SCN-11) | exact code | server transport test |
 | VC-SCN-12 | Snap to a point: `nearest_cloud_point` on `ColouredCubeFloat.e57` from [0.6, 0.6, 0.6] returns record 6606 = [0.4936402, 0.4993396, 0.5] at 0.1773272 m. The second-nearest point is 0.0105 m further away, so the answer is unique | brute force (reference run) | index exact; distance ±1e-6 m | `scan/nearest.test.ts` |
 
@@ -126,6 +129,12 @@ orthogonal residual of S9 [S13]. Floors: radius 0.2 mm, axis angle 0.05°, axis 
 | VC-SCN-51 | Unverified propagation: an extraction from a cloud whose registration has no quality record (`registration.status: "unverified"`) carries `unverified: true`. So does the pipe run created from it, and `check_point_clouds` lists it as a warning | flags present | `scan/checkPointClouds.test.ts` |
 | VC-SCN-52 | A deviation or clash report used for a tie-in carries `reviewRequired: true` with the reason ("tie-in dimensions from a scan — field-verify before fabrication"). The defaulted clash noise threshold (`minPointsInVolume: 10`) is named in `data` with `defaulted: true` | flags present | `asbuiltClash.test.ts` |
 
+### Native vs reference (RS1, TR-SCN-08, TR-SCN-12)
+
+| VC | What | Reference | Tolerance | Test |
+| -- | ---- | --------- | --------- | ---- |
+| VC-SCN-60 | (a) Every algorithm VC (01–12, 20–24, 30–32, 40–43) passes on the native `llull-compute` binary and on the `llull-cloud` WASM build, and both return bit-identical `data` for the same input and seed. (b) GPU clash (M7) on CLH-A gives the same statuses, cluster counts and `minGap` as the CPU path. (c) GPU deviation (M7) on DEV-A: every per-point distance within ε_gpu of the CPU value; the result says `deterministic: false` | (a) the references and tolerances of each VC are unchanged; bit identity is derived: same code, IEEE-754 doubles, `libm`, fixed-order merges (TECHNICAL §2.A). (b) conservative prune + f64 re-evaluation on the CPU (§2.A). (c) ε_gpu from the f32 unit roundoff, fixed at M7 | (a) exact; (b) exact; (c) ε_gpu — TBD — measure | `server/tests/scanNativeParity.test.ts` (skips with a logged reason when the binary is absent; CI always); `solver/crates/llull-cloud/tests/gpu_parity.rs` (CPU twin without an adapter) |
+
 ### FR → VC coverage
 
 | FR | VC |
@@ -142,6 +151,7 @@ orthogonal residual of S9 [S13]. Floors: radius 0.2 mm, axis angle 0.05°, axis 
 | FR-SCN-12 / 13 / 14 / 15 / 16 | 20a–c / 20, 21 / 22 / 23 / 24 |
 | FR-SCN-17 / 18 / 19 | 40, 41, 42 / 41 / 43, 52 |
 | FR-SCN-20 / 21 / 22 | 51 / 02, 03, 08, 11, 32, 50 / 51, 52 |
+| TR-SCN-08, 12 (native vs reference, RS1) | 60 |
 | FR-SCN-23, 24 (COULD, V1) | none yet: E57 round-trip (export then re-import equals `e57_reference.json`) and global registration on ICP-A at 90° are to be added with V1 |
 
 ### Derivations used as expectations
@@ -158,7 +168,8 @@ orthogonal residual of S9 [S13]. Floors: radius 0.2 mm, axis angle 0.05°, axis 
 ### Known limits (documented, not failures)
 
 - Our E57 reader handles only the XML section and the page CRCs. The binary decoding of compressed vectors, including
-  bit-packed ScaledInteger, is checked against pye57. llull's TS reader must implement it in full (TECHNICAL_SPEC §5.1).
+  bit-packed ScaledInteger, is checked against pye57. `llull-cloud` (the `e57` crate plus its own checks) must implement it
+  in full (TECHNICAL_SPEC §5.1).
 - ICP from identity converges on ICP-A because the rotation is 10°. Rotations above about 30° need the coarse step
   (targets, or the FPFH / RANSAC global registration of V1). VC-SCN-32 makes sure a non-converged run is reported, never
   silently accepted.

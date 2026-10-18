@@ -22,7 +22,7 @@ this gap builds on:
 | Pipes | `add_pipe_run` (3D polyline, `dn` → OD from the EN 10220 / ASME B36.10M table, line number, service, level) | `packages/domain-aec/src/industrial/equipment/equipment.ts`, `industrial/piping/pipeSizes.ts` (`PIPE_SIZES`, `OUTSIDE_DIAMETER_TOLERANCE_MM` = 1.5) | Target of pipe extraction; the DN snap reuses the table |
 | Steel | Catalogue (IPE, HEA, HEB, UPN, C, SHS, RHS, CHS, L) and `add_steel_member` | `packages/domain-aec/src/steel/profiles.ts`, `industrial/framing/memberSteelCommands.ts` | Target of steel fit |
 | Clash | `check_clashes`: oriented-box separating-axis test between building elements, hard and clearance | `packages/domain-aec/src/industrial/clash/clash.ts`, `clashBoxes.ts` | Design-vs-design only. Design-vs-scan is new (§5.8) |
-| Plane fit | Least-squares plane of a point set by cyclic Jacobi on the 3 × 3 covariance, deterministic | `packages/domain-cae/src/thermomech/plane.ts` | Same numerical approach for PCA normals; the code lives in another plugin, so a copy or a move to `@lib` is needed (Q7) |
+| Plane fit | Least-squares plane of a point set by cyclic Jacobi on the 3 × 3 covariance, deterministic | `packages/domain-cae/src/thermomech/plane.ts` | Same numerical method for PCA normals. Reference only: normals run in `llull-cloud` (§2.A), so no copy or move is needed (Q7 closed) |
 | Viewport | Floating render origin (`RenderOriginSyncer.tsx`, `3d/floatingOrigin`), axis-aligned clipping plane (`3d/ClippingPlane.tsx`), instanced rendering, nearest snap (`viewport/nearestSnap.ts`) | `src/ui/viewport/**` | Cloud rendering plugs into these; LOD streaming is new |
 | Agent plumbing | `CommandResult.error` (`{code, ids, paths, remediation}`), per-step `data` and `aliases` in `build_project` | `packages/core/src/commands/types.ts`, `commands/project/` | Used as is. A data binding between plan steps is new (TR-SCN-03) |
 
@@ -33,16 +33,19 @@ renderer budget and review redlines (`09-plant-visualization-review`).
 ## 2. Target architecture
 
 ```
- file (.e57 .las .laz .xyz)                                     document (CadDocument)
-   │                                                              scan?: ScanModel  ← references, registrations, extractions
-   ▼                                                                  ▲          (no points)
- server/src/scan/ (host)  ── parse + index (worker_threads) ──┐       │ mutating scan commands (numbers only)
-   scanImport.ts  scanStore.ts  pointCloudPort.ts             │       │
-   uses @pcio readers (pure TS) + LazDecoder (lazrs/laz-perf) │   packages/domain-aec/src/scan/ (plugin "scan", toolset "scan")
-                                                              ▼       │ query commands read points through ctx.pointClouds
-                         ~/.llull/cache/pointcloud/<assetKey>/  ◄─────┘ (PointCloudPort, read-only, keyed by content)
-                           manifest.json  hierarchy.bin  nodes/*.bin
- src/ui/viewport/3d/PointClouds.tsx ── LOD node requests ──► same store (server online / OPFS worker offline)
+ file (.e57 .las .laz .xyz)                                        document (CadDocument)
+   │                                                                 scan?: ScanModel  ← references, registrations, extractions
+   ▼                                                                     ▲          (no points)
+ server/src/scan/ (host)                                                 │ mutating scan commands (numbers only)
+   scanImport.ts ── job ──► llull-compute cloud import                   │
+   scanStore.ts             (solver/crates/llull-cloud: e57, las, laz,   packages/domain-aec/src/scan/ (plugin "scan", toolset "scan")
+   pointCloudPort.ts        mmap, rayon; octree + asset writer)          │ queries read points and run ops through ctx.pointClouds
+     │   └── compute(op) ─► llull-compute cloud <op>  (CPU; GPU = RS-4)  │ (PointCloudPort, read-only, keyed by content)
+     ▼                                                                   │
+ ~/.llull/cache/pointcloud/<assetKey>/  ◄────────────────────────────────┘
+   manifest.json  hierarchy.bin  nodes.bin
+ src/ui/viewport/3d/PointClouds.tsx (three.js Points, octree LOD) ── node requests ──► same store
+   (server online / OPFS + llull-cloud WASM build offline)
 ```
 
 Decisions:
@@ -53,26 +56,28 @@ Decisions:
    paged spatial asset.
 2. **Read-only port in the execution context (TR-SCN-02).** `ExecutionContext.pointClouds?: PointCloudPort | null`
    (L9-style injection; core declares only the interface, in `packages/core/src/model/pointCloud.ts`). Hosts install it:
-   `server/src/scan/pointCloudPort.ts` (Node, synchronous node reads with an LRU cache) and
-   `src/ui/services/pointCloudStore.ts` (browser offline: OPFS + worker, preloaded working set, see Q3). A null port makes
-   every query no-op with `SCN_ASSET_UNAVAILABLE`.
+   `server/src/scan/pointCloudPort.ts` (Node: synchronous node reads with an LRU cache; `compute` runs
+   `llull-compute cloud <op>`, §2.A) and `src/ui/services/pointCloudStore.ts` (browser offline: OPFS + worker + the
+   `llull-cloud` WASM build, preloaded working set, see Q3). A null port makes every query no-op with
+   `SCN_ASSET_UNAVAILABLE`.
 3. **No mutating command reads points (TR-SCN-04).** Heavy work (fit, trace, registration, deviation, clash) is a
    **query**: `data` only, no document change. The agent then commits the numbers it got (`commit_asbuilt_extraction`,
    `apply_registration`), and those params hold every value needed. So feature-history replay (L8) and undo never need the
    asset, and a document travels without its multi-GB scans. The one exception is `attach_point_cloud`, which checks that the
    key exists when a port is present (§4).
-4. **Pure readers in a new package `packages/pointcloud-io` (`@pcio`, TR-SCN-05).** E57 (XML + binary sections + CRC-32C),
-   LAS / LAZ header and records, ASCII. It reads from a `ByteSource` interface. LAZ chunk decoding is an injected
-   `LazDecoder` (lazrs-wasm MIT or laz-perf WASM Apache-2.0, loaded by the host). No `fs`, `fetch` or DOM (L2). The
-   octree builder and asset encoder also live here, as pure functions over typed arrays. `.dependency-cruiser.cjs` and
-   `tsconfig.base.json` get the new package next to `kernel-*` (C4). The rule is extended for the new package, not loosened.
+4. **Native readers and numerics in the Rust crate `llull-cloud` (TR-SCN-05, RS-3, §2.A).** E57 (XML + binary
+   sections + CRC-32C), LAS / LAZ header and records, ASCII, the octree builder and the asset writer, plus kd-tree,
+   normals, RANSAC / LM fits, ICP and distances. It lives in the `solver/` Cargo workspace and runs as
+   `llull-compute cloud <job>`. Nothing in `packages/*` imports it (L2): it is reached only through the `scan_import`
+   transport and `PointCloudPort`. There is no `packages/pointcloud-io` package and no injected `LazDecoder`.
 5. **Domain commands in the `scan` plugin** (`packages/domain-aec/src/scan/`, toolset `scan`, installed in
    `src/app/plugins.ts`; `@mcp/toolsets` gets a `scan` getter). It belongs in AEC because commits compose `add_pipe_run`
-   and `add_steel_member` through `execute` (L10). Algorithms (kd-tree, RANSAC, LM, ICP, octree query, distance) are pure
-   modules in `scan/geometry/`.
+   and `add_steel_member` through `execute` (L10). The plugin keeps validation, entity → analytic primitive / triangle
+   conversion, the DN snap (`PIPE_SIZES`), extraction hashing and the commits. The numerics run in `llull-cloud` behind
+   the port (decision 2).
 6. **Host import transport `scan_import`** (CLI `llull scan import`, MCP host tool, REST `POST /scan/import`). It reads the
-   file, rejects proprietary formats, parses and indexes in a worker, writes the asset atomically (temp dir + rename), and
-   returns `{ sourceSha256, assetKey, manifest }`. The command bus is not involved, because importing does not change the
+   file, rejects proprietary formats, runs `llull-compute cloud import <job-folder>` (NDJSON progress, timeout) to parse and
+   index it, writes the asset atomically (temp dir + rename), and returns `{ sourceSha256, assetKey, manifest }`. The command bus is not involved, because importing does not change the
    document. Desktop: same server. File > Import scan in Electron calls it.
 7. **Kernel not required.** Distances to llull solids use the analytic primitive when the entity is one (cylinder, box,
    sphere, pipe run), otherwise the entity's display tessellation with the sagitta bound reported. Exact B-rep distance
@@ -86,19 +91,75 @@ Technical requirements:
 | TR-SCN-02 | MUST | `PointCloudPort` in `ExecutionContext` (interface in core, implementations in server / ui); null port → `SCN_ASSET_UNAVAILABLE` | VC-SCN-50 |
 | TR-SCN-03 | MUST | `build_project` `$fromStep` data binding (core, shared prerequisite) | SC-SCN-02, 03, 05 |
 | TR-SCN-04 | MUST | No mutating command reads points; replay with the port removed gives identical documents and ids (golden test) | golden |
-| TR-SCN-05 | MUST | `packages/pointcloud-io` pure readers (E57, LAS, ASCII) over `ByteSource`; LAZ through an injected `LazDecoder`; dependency rules extended for the new package | VC-SCN-01..08 |
-| TR-SCN-06 | MUST | Host transport `scan_import` (CLI / MCP / REST) with worker parsing, progress, timeout, proprietary refusal | VC-SCN-02, 03, 11 |
+| TR-SCN-05 | MUST | `llull-cloud` native readers (E57, LAS, LAZ, ASCII) and octree builder, reached only through `scan_import` and `PointCloudPort`; the same crate built to WASM for the browser / no-binary path (≤ 10 M points) | VC-SCN-01..08, 60 |
+| TR-SCN-06 | MUST | Host transport `scan_import` (CLI / MCP / REST) running the `llull-compute cloud import` job, with progress, timeout, proprietary refusal | VC-SCN-02, 03, 11 |
 | TR-SCN-07 | MUST | Lossless int32 coordinates at the source quantum relative to grid-snapped node origins | VC-SCN-09 |
-| TR-SCN-08 | MUST | Seeded RANSAC, canonical point order, deterministic kd-tree; identical results across runs and OSes | VC-SCN-20, 30 |
+| TR-SCN-08 | MUST | Seeded RANSAC, canonical point order, deterministic kd-tree; identical results across runs and OSes (Rust-CPU path, §2.A) | VC-SCN-20, 30, 60 |
 | TR-SCN-09 | MUST | Fit uncertainty (covariance, CRLB at σ̂, coverage) in every fit result | VC-SCN-20 |
 | TR-SCN-10 | MUST | Deviation reports its model error bound; clash reports its sampling bound and named noise threshold | VC-SCN-42, 43, 52 |
 | TR-SCN-11 | SHOULD | Viewport LOD with a hard point budget; parents before children; crop / section as clip planes | VC-SCN-10 (query twin) |
+| TR-SCN-12 | MUST | Native vs reference: native and WASM builds give identical `data`; GPU paths (RS-4) never produce recorded numbers on their own (§2.A) | VC-SCN-60 |
 
-Laws: L1 (every capability is a command; import is a host transport exactly like `fea_import_field`), L2 (readers pure,
-I/O in server / ui), L3 (commands return new docs; queries return the input doc), L4 (no entity built outside commands;
+Laws: L1 (every capability is a command; import is a host transport exactly like `fea_import_field`), L2 (native code
+only behind the host transport and the port; I/O in server / ui), L3 (commands return new docs; queries return the input doc), L4 (no entity built outside commands;
 as-built entities come from `add_pipe_run` / `add_steel_member` via `execute`), L5 (schemas derived from zod), L6 (server
 is a host: store + transport only), L7 (slices commit as ordinary 2D entities), L8 (replay-safe by decision 3), L9
 (injected port), L10 (plugin).
+
+### 2.A Stack amendment (RS1, 2026-10-18)
+
+Decided by the owner in [RS1](../../decisions/RS1-native-compute.md) (programme steps **RS-3** and **RS-4**). It
+replaces the pure-TS readers, the `packages/pointcloud-io` package and the injected `LazDecoder` (lazrs WASM /
+laz-perf) of the first draft.
+
+| Item | Before | Now |
+| ---- | ------ | --- |
+| E57 / LAS / LAZ / ASCII import | pure TS readers in `packages/pointcloud-io` (`@pcio`); LAZ through an injected `LazDecoder`; parsing in `worker_threads` | `llull-compute cloud import` (crate `llull-cloud` in `solver/`): native `e57`, `las` and `laz` (laz-rs) crates, memory-mapped input, rayon over chunks |
+| Octree build, asset writer | pure TS over typed arrays | `llull-cloud`, out of core; same asset layout (§3.1) |
+| kd-tree, PCA normals, RANSAC, LM fits, ICP, batch pipe extraction (V1) | pure TS modules in `scan/geometry/` | `llull-cloud`, run by `llull-compute cloud <op>` behind `PointCloudPort.compute` |
+| Deviation, design-vs-scan clash | pure TS, BVH, parallel | Rust CPU (`llull-cloud` + `llull-bvh`) gives the recorded numbers; GPU (wgpu) is an optional fast path (RS-4, below) |
+| LAZ / COPC writing | blocked: the laz-perf WASM build decodes only (old Q2) | the `laz` crate writes LAZ, so COPC export is possible (V1) |
+| Native E57 (old Q4) | open: libE57Format C++ + Xerces-C as a Node addon | closed: Rust `e57` crate; no C++ addon, no Xerces |
+| Browser / no binary | TS readers, ≤ 10 M points | the same `llull-cloud` compiled to WASM (one thread), ≤ 10 M points per cloud |
+| Viewport | three.js `Points` + octree LOD | unchanged |
+| Gate | Vitest | `npm run native:check` (`cargo test` + `cargo clippy -D warnings`) for the crate; Vitest for the plugin and the host |
+
+Seams (names unchanged; L2, L6, L9):
+
+- **`scan_import`** runs `llull-compute cloud import <job-folder>` (RS1 job folder + NDJSON progress). The job writes
+  the asset to a temp dir and the host renames it into the store. The command bus is not involved.
+- **`PointCloudPort`** gains one method, `compute(assetKey, op)` (§3), for the heavy numerics. The server
+  implementation runs `llull-compute cloud <op>` synchronously, like the `llull-kernel` proxy runs `KernelOps`
+  (timeout, progress). The browser and the no-binary fallback run the WASM build. Query commands keep their names,
+  params and `data` shapes. They still never write the document (decision 3); commits still go through
+  `commit_asbuilt_extraction` and `apply_registration`.
+- **Missing binary.** Clouds ≤ 10 M points fall back to the WASM build. Above that, `NATIVE_TOOL_MISSING` with an
+  install hint (RS1 §2 rule 5).
+
+Determinism (TR-SCN-08, AF-13) is met by the Rust-CPU path:
+
+- seeded xorshift128+ RANSAC, canonical point order (`CloudPoints`), kd-tree with an index tie-break;
+- rayon work is cut into fixed chunks and merged by chunk index, never by completion order, so results do not depend
+  on the thread count;
+- transcendental functions come from the pure-Rust `libm` crate, not the platform C library; no FMA contraction and no
+  `target-cpu=native`. The native builds on each OS and the WASM build therefore give identical bits (VC-SCN-60).
+
+GPU (RS-4, milestone M7, after the MVP):
+
+- `cloud_to_model_deviation` and `check_asbuilt_clash` take `device?: 'cpu' | 'gpu'` (default `'cpu'`). The GPU path
+  is a wgpu compute kernel (`llull-gpu`): analytic primitives (cylinder, box, sphere, pipe-run segments) are evaluated
+  in the shader; tessellated entities go through the `llull-bvh` triangle BVH. Coordinates are sent in f32, relative
+  to each entity's local frame.
+- **Clash.** The GPU pass is a conservative prune: a point is dropped only when its f32 distance exceeds the clearance
+  by more than a bound ε_gpu, derived from the f32 unit roundoff (2⁻²⁴) × the local extent × the operation count and
+  fixed at M7. The kept points are re-evaluated on the CPU in f64, so clusters, gaps and statuses equal the CPU-only
+  result (`deterministic: true`).
+- **Deviation.** The GPU result (per-point colours, quick statistics) carries `device` and `deterministic: false` in
+  provenance (RS1 §2 rule 3). Numbers that a report, a commit or a VC uses come from the Rust-CPU path.
+- Every GPU kernel has a CPU twin, so VC-SCN-40..43 and 60 run in CI without a GPU adapter.
+
+Native vs reference: VC-SCN-60 (validation README). The references are the pack's independent readers, pye57 /
+laspy and `reference_check.py`; their tolerances do not change.
 
 ## 3. Data model
 
@@ -151,7 +212,11 @@ export interface PointCloudPort {                     // ExecutionContext.pointC
   manifest(assetKey: string): CloudManifest | null;
   query(assetKey: string, query: CloudQuery): CloudPoints | null;
   nearest(assetKey: string, point: Vec3, maxDistance: number): { readonly index: number; readonly position: Vec3; readonly distance: number } | null;
+  compute(assetKey: string, op: CloudOp): CloudOpResult | null;   // heavy numerics in llull-cloud (§2.A)
 }
+// CloudOp: one variant per heavy query (fit, extract_pipes, slice, register, deviation, clash), params in metres in the
+// asset frame; design entities travel as analytic primitives or triangles. CloudOpResult is the query's `data` before
+// unit conversion, plus provenance (binary version, device, deterministic).
 
 // document slice (absent until the first scan command), like `civil?`
 export interface ScanModel {
@@ -220,14 +285,15 @@ optional slice. The document version is bumped and the migration is a no-op (abs
 
 Lossless coordinates: the node origin is snapped to the source grid (`offset + k·quantum`), and positions are stored as
 int32 multiples of `quantum`. A LAS source is therefore exact, and any source is within quantum/2 (VC-SCN-09).
-Absolute float32 would lose up to 0.0625 m at x ≈ 1.7e6 m (measured 0.062 m on `test1_4.las`). COPC as the cache format
-is discussed in Q2.
+Absolute float32 would lose up to 0.0625 m at x ≈ 1.7e6 m (measured 0.062 m on `test1_4.las`). The cache keeps this own
+format, so the synchronous port reads it without a LAZ decoder (Q2, settled); COPC is an export written by `llull-cloud`.
 
 ## 4. Commands (toolset `scan`)
 
 Units: params are in **document units** (AF-04) unless named `…Deg`; assets are metres and every command converts. All
 queries are bounded (AF-12) and deterministic (AF-13: canonical point order, seeded RNG with `seed` default 1). Codes are
-in §7.
+in §7. The heavy queries (fits, extraction, slice, registration, deviation, clash) run their numerics through
+`PointCloudPort.compute` (§2.A); the plugin converts units and shapes `data`.
 
 ### 4.1 Mutating (numbers only, replay-safe)
 
@@ -272,7 +338,11 @@ marked DRAFT.
 
 ## 5. Algorithms
 
-### 5.1 E57 reader (`@pcio/e57`)
+### 5.1 E57 reader (`llull-cloud`, on the `e57` crate)
+
+The behaviour below is the contract. `llull-cloud` adds what the crate does not expose (checksum policy, `SCN_*`
+codes); this is checked at M1.
+
 
 - **Physical layer.** A 48-byte header: `ASTM-E57`, `versionMajor`, `versionMinor` (u32), `filePhysicalLength`,
   `xmlPhysicalOffset`, `xmlLogicalLength`, `pageSize` (u64, little-endian). Pages of `pageSize` (1024) bytes each end in
@@ -295,14 +365,14 @@ marked DRAFT.
 - **Invalid points.** `cartesianInvalidState` 2 (no data) is dropped. 1 (direction only) is dropped and counted in the manifest.
 - Cross-check in CI: pye57 (VC-SCN-01..05) and our minimal Python reader (`validation/data/tools/e57_own_reader.py`).
 
-### 5.2 LAS / LAZ reader (`@pcio/las`)
+### 5.2 LAS / LAZ reader (`llull-cloud`, on the `las` and `laz` crates)
 
 - Public header 1.0–1.4 (offsets in `validation/data/tools/las_own_header.py`). The point count comes from the 64-bit
   field for 1.4, else the legacy 32-bit field. PDRF 0–10 record layouts. Extra bytes (VLR 4) are kept as named attributes.
   EVLRs are read for WKT. X = Xrec·scale_x + offset_x.
-- **LAZ.** PDRF with bit 7 set (LASzip convention). The point data are decoded chunk by chunk by the injected
-  `LazDecoder`: lazrs (MIT; Rust → WASM) or laz-perf (Apache-2.0, npm `laz-perf` 0.0.7). The chunk table allows parallel
-  decoding in workers. VC-SCN-07 proves bit equality with the LAS twin.
+- **LAZ.** PDRF with bit 7 set (LASzip convention). The point data are decoded chunk by chunk by the native `laz`
+  crate (laz-rs, the code behind lazrs). The chunk table allows parallel decoding with rayon. VC-SCN-07 proves bit
+  equality with the LAS twin.
 - **Bounds.** Always recomputed from the decoded records. A header that disagrees by more than one quantum gives the
   warning `SCN_LAS_HEADER_BOUNDS`. `simple1_3.las` stores its bounds unscaled.
 
@@ -311,9 +381,11 @@ marked DRAFT.
 - Cubic root = bounds expanded to a cube. A node at level l has spacing s_l = s_0 / 2^l, with s_0 = rootEdge / 128 by
   default. Points are assigned by a counting-sort pass on Morton codes. Each node keeps ≤ `maxPointsPerNode` (default
   20 000) points chosen by grid / Poisson-disk sampling at s_l. The rest go to the children. Leaves keep all their points,
-  so the full set is the union of all nodes (VC-SCN-10).
+  so the full set is the union of all nodes (VC-SCN-10). Sampling is deterministic (no RNG; ties by Morton code, then
+  record index).
 - Out of core: a first pass counts per cell at a coarse level, then a chunked distribution. Memory stays bounded at about
-  1 GB for any input size (Schütz 2020 [R7]).
+  1 GB for any input size (Schütz 2020 [R7]). Input is memory-mapped; chunks run in parallel (rayon) and are merged in
+  Morton order, so the asset bytes do not depend on the thread count.
 - **LOD selection** (viewport and `lod: budget` queries): a priority queue on the projected node size
   w = (node diagonal / distance to the camera) · (screen height / (2 tan(fov/2))). Refine while
   Σ points ≤ budget and w > minimum pixel size. Frustum and crop culling apply. A coarser level is never skipped, so
@@ -324,7 +396,7 @@ marked DRAFT.
 
 - A static kd-tree over the query result (median split, deterministic tie-break by index).
 - Normals by PCA on k = 20 neighbours: the eigenvector of the smallest eigenvalue of the 3 × 3 covariance (cyclic
-  Jacobi, as in `domain-cae/thermomech/plane.ts`). They are oriented toward the scan station when known, otherwise toward
+  Jacobi, the method of `domain-cae/thermomech/plane.ts`, written again in `llull-cloud`). They are oriented toward the scan station when known, otherwise toward
   the region centroid. Curvature λ_min / Σλ is used as a planarity filter.
 
 ### 5.5 Primitive fitting (FR-SCN-12)
@@ -393,12 +465,14 @@ faces, tip-to-tip). tw and tf are reported only when ≥ 10σ, otherwise `null` 
 - **Analytic primitives.** Cylinder (pipe run segments): signed d = ‖(x − c) × a‖ − r for points whose axial projection
   falls inside the segment, else the distance to the end cap. Box: the signed box distance. Sphere: ‖x − c‖ − r. This is
   exact (VC-SCN-41 to 1e-6 with µm-rounded input).
-- **Tessellated.** A BVH over the display triangles, point-to-triangle by Voronoi regions [Ericson §5.1.5], signed by the
-  pseudo-normal. The reported `modelErrorBound` = max over curved faces of the sagitta r(1 − cos(π/n)) (VC-SCN-42).
+- **Tessellated.** A BVH over the display triangles (`llull-bvh`), point-to-triangle by Voronoi regions [Ericson §5.1.5],
+  signed by the pseudo-normal. The reported `modelErrorBound` = max over curved faces of the sagitta r(1 − cos(π/n)) (VC-SCN-42).
 - Only points within `maxDistance` of the entity's bounding box (inflated) are used. Each point is assigned to its nearest
   entity among those selected. Statistics: min, max, mean, RMS, histogram, fraction beyond the threshold.
 - **Pipes.** Re-fit a cylinder to the assigned points and report the axis offset to the design axis (at mid-length) and
   Δr. DEV-A gives an offset of 25 mm.
+- **GPU (RS-4).** `device: 'gpu'` gives per-point colours and quick statistics, marked `deterministic: false`; the
+  recorded numbers come from the CPU path (§2.A).
 - **V2.** M3C2 [R13] for rough surfaces.
 
 ### 5.10 Design-vs-scan clash (FR-SCN-19)
@@ -409,16 +483,17 @@ as-built source extraction (`excludeExtractionsOf`), or of the cloud the entity 
 excluded. A result is reported only when the connected cluster (voxel 2 × spacing, 26-connectivity) has ≥
 `minPointsInVolume` points (default 10, named `defaulted`, AF-31). This avoids noise and stray points (people, rain).
 The minimum gap is min d over the cluster, with sampling bound ≤ spacing/2 reported. Status per entity: worst of its
-clusters. `reviewRequired: true` always, because a "clear" result from a scan is not proof of absence (occlusion), and the
+clusters. With `device: 'gpu'` the point classification starts with the conservative GPU prune of §2.A; the result is
+the same. `reviewRequired: true` always, because a "clear" result from a scan is not proof of absence (occlusion), and the
 summary says so.
 
 ## 6. Interop and persistence
 
 | Format | Direction | Notes |
 | ------ | --------- | ----- |
-| E57 1.0 (ASTM E2807) | import MVP; export V1 | Pure TS reader (§5.1). Export writes one `data3D` per cloud, ScaledInteger at `quantum`, pose identity (registration baked) or the original pose + transform |
-| LAS 1.0–1.4 / LAZ | import MVP | LAZ via injected decoder; WKT / GeoTIFF CRS kept in the manifest; classification kept |
-| COPC 1.0 | import / export V1 | LAZ 1.4 PDRF 6/7/8 + `info` and `hierarchy` VLRs [R6]; readable by PDAL, QGIS and potree-core |
+| E57 1.0 (ASTM E2807) | import MVP; export V1 | Native reader in `llull-cloud` (§5.1); export through the `e57` crate's writer. Export writes one `data3D` per cloud, ScaledInteger at `quantum`, pose identity (registration baked) or the original pose + transform |
+| LAS 1.0–1.4 / LAZ | import MVP | LAZ via the native `laz` crate; WKT / GeoTIFF CRS kept in the manifest; classification kept |
+| COPC 1.0 | import / export V1 | LAZ 1.4 PDRF 6/7/8 + `info` and `hierarchy` VLRs [R6]; written by `llull-compute cloud` with the `laz` encoder; readable by PDAL, QGIS and potree-core. Not the cache format (Q2) |
 | XYZ / PTS / CSV | import MVP | Declared column order and unit; PTS first line = count (checked) |
 | RCP / RCS (ReCap), FLS (Faro), native Leica / Trimble | refused | `SCN_FORMAT_PROPRIETARY` |
 | PLY (binary / ascii) | import V1 | Common from photogrammetry / CloudCompare |
@@ -441,7 +516,7 @@ summary says so.
 
 | TR / FR | AF |
 | ------- | -- |
-| FR-SCN-01..07, 11, TR-SCN-05/06 (import transport) | AF-01 (`llull search scan`), AF-02 (descriptions), AF-40 (`--progress`, cached by asset key), AF-41 (decoders bundled, offline) |
+| FR-SCN-01..07, 11, TR-SCN-05/06 (import transport) | AF-01 (`llull search scan`), AF-02 (descriptions), AF-40 (`--progress`, cached by asset key), AF-41 (`llull-compute` bundled per RS1 §2 rule 5, WASM fallback, offline) |
 | All commands, TR-SCN-03 | AF-04 (units in schema), AF-05 (one plan; `$fromStep`), AF-14 (step `data`) |
 | Queries | AF-10 (`data` with units), AF-12 (bounded, `--save` for CSV / PNG), AF-13 (seeded, canonical order) |
 | FR-SCN-20 `check_point_clouds` | AF-20 |
@@ -460,7 +535,7 @@ summary says so.
 | `SCN_E57_POSE_INVALID` | fail | import | Non-unit quaternion | "Fix the pose in the source, or import with applyStationPoses=false" |
 | `SCN_LAS_HEADER` | fail | import | Bad signature / version / record length | "The file is not LAS 1.0–1.4" |
 | `SCN_LAS_HEADER_BOUNDS` | warn | import | Header bounds disagree with the data | "Bounds were recomputed; no action" |
-| `SCN_LAZ_DECODER_MISSING` | fail | import | No LAZ decoder installed | "Install the desktop app / enable the bundled decoder" |
+| `NATIVE_TOOL_MISSING` | fail | import / queries | `llull-compute` not installed and the cloud is above the WASM fallback cap (10 M points) | "Install the desktop app (it bundles llull-compute), or crop at export" |
 | `SCN_CLOUD_EMPTY` | fail | import / attach | 0 valid points | "Check the export settings (invalid points removed?)" |
 | `SCN_IMPORT_TOO_LARGE` | fail | import | Over the host limit (browser 10 M) | "Use the desktop app or crop at export" |
 | `SCN_ASSET_MISSING` | fail / warn | attach / check | Key not in the store | "Run `llull scan import <file>` on this machine" |
@@ -491,7 +566,7 @@ summary says so.
 
 ## 8. Performance and robustness budgets
 
-| Item | Budget (desktop, 8 cores, NVMe) | Browser offline |
+| Item | Budget (desktop, 8 cores, NVMe, `llull-compute`) | Browser offline / no binary (WASM build) |
 | ---- | ------------------------------- | --------------- |
 | Import + index LAS / E57 uncompressed | ≥ 2 M points/s (100 M in < 60 s parse + < 60 s index) | ≥ 0.5 M points/s, ≤ 10 M points per cloud |
 | Import LAZ | ≥ 1 M points/s (parallel chunks) | ≥ 0.3 M points/s |
@@ -500,8 +575,9 @@ summary says so.
 | Viewport | ≥ 30 fps at a 3 M budget; ≤ 150 ms node fetch p95 | ≥ 30 fps at a 1 M budget |
 | `fit_primitive` cylinder, 50 k points in the region | < 300 ms | < 1 s |
 | ICP 100 k × 100 k, 50 iterations | < 3 s | < 10 s |
-| Deviation 10 M points × 500 entities | < 20 s (BVH, parallel) | n/a (desktop only above 2 M) |
-| Determinism | Same asset key and same results on every run and OS (integer coding, seeded RNG, canonical order) | same |
+| Deviation 10 M points × 500 entities | < 20 s on the Rust-CPU path (BVH, rayon); GPU path (M7) TBD — measure | n/a (desktop only above 2 M) |
+| Design-vs-scan clash 10 M points × 500 entities | CPU TBD — measure; GPU prune + CPU exact (M7) TBD — measure | n/a |
+| Determinism | Same asset key and same results on every run and OS (integer coding, seeded RNG, canonical order, `libm`, fixed-order merges) | same bits as native (VC-SCN-60) |
 
 Robustness: every import writes to a temp dir and renames it atomically. A crash leaves no partial asset. The store
 verifies `manifest.assetKey`. Node blocks carry a CRC32 that is checked on read (a corrupt block reads as missing →
@@ -511,12 +587,13 @@ verifies `manifest.assetKey`. Node blocks carry a CRC32 that is checked on read 
 
 | Layer | Tests | VCs |
 | ----- | ----- | --- |
-| `packages/pointcloud-io` unit | `e57Reader.test.ts` (10 files vs `e57_reference.json`, CRC, empty, encodings, pose), `lasReader.test.ts` (10 files vs `las_reference.json`, LAZ = LAS with the decoder port backed by the bundled WASM, bounds warning), `octreeAsset.test.ts` (lossless quantisation on `test1_4.las`, invariants and determinism on `autzen_trim.laz`) | VC-SCN-01..10 |
-| `scan` plugin unit (`tests/unit/scan/`) | `nearest`, `cylinderFit`, `centreline`, `steelFit`, `slice`, `icp`, `targets`, `deviation`, `asbuiltClash`, `agentCodes`, `checkPointClouds`; an in-memory `PointCloudPort` fixture built from the CSV / E57 files; each command has happy + failure + `is pure` tests (NN-1) | VC-SCN-12, 20..24, 30..32, 40..43, 50..52 |
+| `llull-cloud` (`cargo test`, in `npm run native:check`) | `tests/e57.rs` (10 files vs `e57_reference.json`, CRC, empty, encodings, pose), `tests/las.rs` (10 files vs `las_reference.json`, LAZ = LAS, bounds warning), `tests/octree.rs` (lossless quantisation on `test1_4.las`, invariants and determinism on `autzen_trim.laz`); fits, ICP, deviation and clash on the synthetic CSVs | VC-SCN-01..10, 20..43 (native side) |
+| `scan` plugin unit (`tests/unit/scan/`) | `nearest`, `cylinderFit`, `centreline`, `steelFit`, `slice`, `icp`, `targets`, `deviation`, `asbuiltClash`, `agentCodes`, `checkPointClouds`; a `PointCloudPort` fixture backed by the `llull-cloud` WASM build over the CSV / E57 files (no binary needed); each command has happy + failure + `is pure` tests (NN-1) | VC-SCN-12, 20..24, 30..32, 40..43, 50..52 |
 | Contract | `toToolSchemas()` snapshot gains the `scan` toolset; `scan` document slice validation and migration; the `$fromStep` binding in `build_project` | TR-SCN-03 |
 | Server | `server/tests/scanImport.test.ts` (transport: proprietary refusal, CRC, empty, atomic write, idempotent key); `server/tests/packReplay10scn.test.ts` runs `validation/plans/*.json` | VC-SCN-02, 03, 11, SC-SCN-01..05 |
 | Golden | one plan per regression: attach + commit extraction replays to identical ids **with the port removed** (proves decision 3) | TR-SCN-04 |
-| Coverage | `packages/domain-aec/src/scan/**` and `packages/pointcloud-io/src/**` under the 90/85/90/90 gate | — |
+| Native vs reference | the algorithm VCs on the native binary and on the WASM build, `data` compared bit for bit; GPU vs CPU on CLH-A / DEV-A where an adapter exists (CPU twin otherwise) | VC-SCN-60 |
+| Coverage | `packages/domain-aec/src/scan/**` under the 90/85/90/90 gate; `llull-cloud` gated by `npm run native:check` | — |
 | Reference cross-check (CI, optional job) | `validation/data/tools/reference_check.py` + pye57 / laspy in a venv; fails if the pack's references drift | all A-grade VCs |
 | Production gate | SC-SCN-04 on a real customer tie-in scan with field-measured references (Q6) | — |
 
@@ -524,34 +601,37 @@ verifies `manifest.assetKey`. Node blocks carry a CRC32 that is checked on read 
 
 | Milestone | Content | Depends on | Effort |
 | --------- | ------- | ---------- | ------ |
-| M1 Readers | `@pcio` E57 + LAS + ASCII readers, LAZ decoder port + bundled WASM, VC-SCN-01..08, 11 | — | 3 wk |
-| M2 Asset + port | Octree builder, asset store, `PointCloudPort` (Node), `scan_import` transport + CLI, `attach / describe / query / nearest`, VC-SCN-09, 10, 12 | M1 | 3 wk |
+| M1 Readers | `llull-cloud` E57 + LAS + LAZ + ASCII readers, `llull-compute cloud import`, WASM build, VC-SCN-01..08, 11 | RS-0 (`solver/` workspace) | 3 wk |
+| M2 Asset + port | Native octree builder, asset store, `PointCloudPort` (Node, `compute` proxy), `scan_import` transport + CLI, `attach / describe / query / nearest`, VC-SCN-09, 10, 12 | M1 | 3 wk |
 | M3 Viewport | `PointClouds.tsx` LOD streaming, colour modes, crop / section clip, scan-point snap, Scan panel (read-only) | M2, 09 VIS budgets | 3 wk |
-| M4 Fit + pipes | RANSAC / LM fits, slice, `extract_pipes`, DN snap, `commit_asbuilt_extraction`, `$fromStep` binding (core), VC-SCN-20, 21, 24 | M2, 01 PSC table API | 3 wk |
-| M5 Registration | targets, ICP, records, human gates, VC-SCN-30..32 | M2 | 2 wk |
-| M6 Compare | deviation, design-vs-scan clash, `check_point_clouds`, AF flags, VC-SCN-40..43, 50..52 | M4 | 2 wk |
-| V1 | centreline tracing, steel fit, batch extraction, COPC / E57 export, global registration, OCC exact distance, browser offline store | M4–M6, 02 RTE, 06 STA | 8 wk |
+| M4 Fit + pipes | RANSAC / LM fits in `llull-cloud`, slice, `extract_pipes`, DN snap, `commit_asbuilt_extraction`, `$fromStep` binding (core), VC-SCN-20, 21, 24 | M2, 01 PSC table API | 3 wk |
+| M5 Registration | targets, ICP (`llull-cloud`), records, human gates, VC-SCN-30..32 | M2 | 2 wk |
+| M6 Compare | deviation, design-vs-scan clash (Rust CPU), `check_point_clouds`, AF flags, VC-SCN-40..43, 50..52, 60 (native vs WASM) | M4 | 2 wk |
+| M7 GPU compare (RS-4) | wgpu deviation and clash prune, `device` param, VC-SCN-60 GPU rows | M6, RS-0 `llull-gpu` / `llull-bvh` | 2 wk |
+| V1 | centreline tracing, steel fit, batch extraction (native, parallel), COPC / E57 export (native writers), global registration, OCC exact distance, browser offline store | M4–M6, 02 RTE, 06 STA | 8 wk |
 
-MVP (M1–M6) is about 16 engineer-weeks.
+MVP (M1–M6) is about 16 engineer-weeks. RS1's RS-3 (≈ 6 wk) is the native part of M1, M2, M4 and M5, not extra work; RS-4
+is M7 (2 wk, after the MVP).
 
 ## 11. Open questions / decisions needed
 
 1. **Q1 — Plan data binding.** Adopt `{ "$fromStep", "path" }` in core `build_project` (TR-SCN-03)? It is needed by every
    pack that has a query-then-commit split (FEA, scan, routing). Owner: core.
-2. **Q2 — Cache format.** Own `nodes.bin` (MVP, simplest, lossless int32) or COPC (standard, readable by PDAL / QGIS, but
-   it needs a LAZ *encoder* in the host: laz-perf can encode in C++, but its WASM build exposes decoding only, to be
-   checked). Recommendation: own format in MVP, COPC import / export in V1.
+2. **Q2 — Cache format. Settled (RS1).** The cache stays the own `nodes.bin` (lossless int32, read by the synchronous
+   port without a decoder). The native `laz` crate can encode, so COPC import / export is no longer blocked; it ships
+   in V1.
 3. **Q3 — Synchronous port in the browser.** Commands are synchronous. The browser store must therefore preload the region
    a query touches (the store's `dispatch` awaits `prefetch(region)` before running the command), or offline mode is
-   limited to clouds resident in memory (≤ 10 M points). Decide the UX.
-4. **Q4 — Native E57 reader.** Use libE57Format (BSL-1.0, C++, needs Xerces-C) through a Node addon for speed, or keep the
-   pure TS reader only? Recommendation: TS first (portable, browser-capable). Measure against the M1 throughput budget.
+   limited to clouds resident in memory (≤ 10 M points). The numerics run in the `llull-cloud` WASM build either way.
+   Decide the UX.
+4. **Q4 — Native E57 reader. Settled (RS1).** The Rust `e57` crate in `llull-cloud`; no libE57Format / Xerces-C Node
+   addon. The browser uses the WASM build of the same crate.
 5. **Q5 — Insulation.** Is the insulation thickness per line (from 08 DAT line list) or given per extraction? It affects
    the DN snap.
 6. **Q6 — Real-scan validation set.** No public plant scan with surveyed pipe truth under 5 MB was reachable. The owner
    should supply one anonymised tie-in scan + field measurements for the production gate.
-7. **Q7 — Shared numerics.** Move the cyclic-Jacobi 3 × 3 eigen solver from `domain-cae/thermomech/plane.ts` to `@lib`
-   (both CAE and scan use it), or duplicate it? Moving is a core change (`lib` is allowed for plugins).
+7. **Q7 — Shared numerics. Closed (RS1).** Scan normals run in `llull-cloud`, so the TS solver in
+   `domain-cae/thermomech/plane.ts` stays where it is.
 8. **Q8 — Scan-to-model registration.** Register a cloud to the *design model* (ICP against the tessellated design) for
    plants whose design model is trusted. Useful but risky: it hides real deviations. V1 behind a reviewer gate?
 
@@ -560,7 +640,7 @@ MVP (M1–M6) is about 16 engineer-weeks.
 - [R1] ASTM E2807-11(2019)e1, 3D Imaging Data Exchange, Version 1.0 — ASTM — https://www.astm.org/e2807-11r19e01.html (catalogue page, not reachable; accessed 2026-10)
 - [R2] libE57Format (BSL-1.0) — https://github.com/asmaloney/libE57Format (sources in the pye57 0.4.19 sdist, accessed 2026-10); test data https://github.com/asmaloney/libE57Format-test-data
 - [R3] ASPRS LAS 1.4 R15 — https://github.com/ASPRSorg/LAS, https://lasformat.org (accessed 2026-10)
-- [R4] laspy 2.7.0 (BSD-2), lazrs 0.8.2 (MIT) — https://pypi.org/project/laspy/, https://pypi.org/project/lazrs/ ; laz-perf 0.0.7 (Apache-2.0) — https://www.npmjs.com/package/laz-perf (accessed 2026-10)
+- [R4] laspy 2.7.0 (BSD-2), lazrs 0.8.2 (MIT) — https://pypi.org/project/laspy/, https://pypi.org/project/lazrs/ ; laz-perf 0.0.7 (Apache-2.0) — https://www.npmjs.com/package/laz-perf (accessed 2026-10; no longer planned, RS1)
 - [R5] pye57 0.4.19 (MIT) — https://pypi.org/project/pye57/ (accessed 2026-10)
 - [R6] COPC 1.0 — Hobu, Inc. — https://copc.io (accessed 2026-10)
 - [R7] Potree / PotreeConverter 2.0 (BSD-2) — https://github.com/potree/PotreeConverter; Schütz, Ohrhallinger, Wimmer, Fast Out-of-Core Octree Generation for Massive Point Clouds, CGF 39(7), 2020
@@ -572,4 +652,6 @@ MVP (M1–M6) is about 16 engineer-weeks.
 - [R13] Lague D., Brodu N., Leroux J., M3C2, ISPRS J. Photogramm. 82, 2013
 - [R14] Ericson C., Real-Time Collision Detection, 2005, §5.1.5
 - [R15] Kay S. M., Fundamentals of Statistical Signal Processing: Estimation Theory, 1993, ch. 3 (CRLB)
+- [R16] Rust crates for `llull-cloud`: `e57` https://crates.io/crates/e57, `las` https://crates.io/crates/las, `laz` (laz-rs) https://crates.io/crates/laz, `rayon`, `memmap2`, `libm`, `wgpu` (versions and licences recorded at M1; RS1 §2 rule 7)
+- [R17] RS1 native compute programme — [../../decisions/RS1-native-compute.md](../../decisions/RS1-native-compute.md)
 - llull: `.claude/rules/architecture.md`, `docs/aerospace/AGENT_FIRST.md`, paths in §1

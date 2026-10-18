@@ -49,7 +49,7 @@ How the cases run once the MVP lands (TECHNICAL_SPEC §9):
 | U6  | Brownfield: the drum is moved                                         | orthogonal stretch of the connected line                                   | VC-RTE-12, SC-RTE-06     |
 | U7  | Hot insulated line near steel                                         | insulated envelope in clashes, line number with insulation code, heat loss | VC-RTE-13, 14, SC-RTE-07 |
 | U8  | Old model with polyline pipes                                         | conversion to spec-driven runs                                             | VC-RTE-20, SC-RTE-09     |
-| U9  | Auto-route (V2)                                                       | minimum bends and length in free space                                     | VC-RTE-18, SC-RTE-08     |
+| U9  | Auto-route (V2)                                                       | minimum bends and length in free space                                     | VC-RTE-18, 25, SC-RTE-08 |
 
 ## Validation cases
 
@@ -79,6 +79,7 @@ How the cases run once the MVP lands (TECHNICAL_SPEC §9):
 | VC-RTE-22 | Heat tracing (V1): traced length = tracers × (centreline + Σ allowances); SC-RTE-07 line, 1 tracer, no allowances → 6.000 m                                                        | closed form, explicit inputs                                      | 1e-6 m                                                                       | `takeoff.test.ts`                     | FR-RTE-17             | AF-31        |
 | VC-RTE-23 | Display geometry: SC-RTE-01 elbow solid volume vs Pappus π (OD/2)² · R · π/2 = 2 449 885.6 mm³ (OD 114.3, R 152); 16-segment section gives ratio 0.97450                           | closed form (Pappus; regular-polygon area ratio (n/2π) sin(2π/n)) | ratio in [0.970, 1.001]                                                      | `mass_properties` on the elbow entity | FR-RTE-20             | AF-21, AF-22 |
 | VC-RTE-24 | Export hand-off: `piping_takeoff` counts of SC-RTE-01 equal the IFC `IfcPipeFitting` / `IfcPipeSegment` / `IfcDistributionPort` counts (08) and the PCF component records (05)     | TBD — measure with the 08 / 05 exporters once built               | exact                                                                        | 08 / 05 packs                         | FR-RTE-21, 25         | AF-10        |
+| VC-RTE-25 | Native vs reference (V2, [RS1](../../../decisions/RS1-native-compute.md) RS-7): on SC-RTE-08 and on obstacle problems small enough for the TS cap, `llull-compute route` and the TS A* return identical PIs, bends, integer-µm cost and `optimal`; the native solution passes `auto_route_pipe` validation; a solution with a stale `problemHash` or a leg through an obstacle is refused with `RTE_AUTOROUTE_SOLUTION_INVALID` and the document is unchanged; the 100 × 100 × 30 m / 50 mm problem finishes within 2·10⁶ expansions in ≤ 5 s (time: TBD — measure on the reference machine) | derived: same state, cost and total open-set order, integer costs (TECHNICAL §2.A, §5.12); budget from TECHNICAL §8 | exact (paths, cost, codes); time TBD — measure | `server/tests/routeNativeParity.test.ts`, `llull-route` cargo tests, SC-RTE-08 | FR-RTE-22 | AF-13, AF-40 |
 
 ## Derivations used as expectations
 

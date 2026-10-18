@@ -52,10 +52,12 @@ Status: proposed (2026-10-18). Functional view: [`FUNCTIONAL_SPEC.md`](FUNCTIONA
 packages/core/src/
   model/review.ts            ReviewModel: viewpoints, sectionBoxes, markups, issues, comments, walkthroughs
   model/display.ts           DisplayModel: colourProfiles, activeProfileId, materialClasses
+  model/raster.ts            RasterPort + RasterScene (optional native GPU raster, §2.A)
+  model/spatialIndex.ts      SpatialIndexPort (optional native / WASM BVH queries, §2.A)
   geometry/entityProperties.ts  core property bag (kind, layer, tags, material, name, componentId) + provider port
   geometry/colourRules.ts    pure first-match evaluation (profile × properties → appearance)
   geometry/renderPlan.ts     pure batching / LOD / culling plan (prototype keys, buckets, counts) — used by UI AND render_stats
-  geometry/instanceBvh.ts    pure static BVH over instance AABBs (frustum query, ray query)
+  geometry/instanceBvh.ts    pure static BVH over instance AABBs (frustum query, ray query) — the reference
   geometry/viewpointCamera.ts  viewpoint ⇄ CameraState ⇄ BCF camera conversions
   commands/review/           viewpoints.ts markups.ts issues.ts checkReview.ts clashIssues.ts walkthrough.ts (+ existing intents.ts)
   commands/display/          colourProfiles.ts sectionBoxes.ts colourReport.ts checkDisplay.ts
@@ -93,6 +95,41 @@ How the laws are respected:
   provider registered through `plugins/host.ts`. This adds one optional `CadPlugin` field (§3.4). The change touches
   `packages/core/src/plugins/plugin.ts`, so `cad-reviewer` must approve it.
 
+### 2.A Stack amendment (RS1, 2026-10-18)
+
+Decided by the owner in [RS1](../../decisions/RS1-native-compute.md) (programme steps **RS-5** and **RS-6**). It adds
+two optional native paths. The pure-TS code stays the default and the reference.
+
+| Item | Before | Now |
+| ---- | ------ | --- |
+| Headless `render_view`, `render_walkthrough`, BCF snapshots | pure-TS software raster (`packages/core/src/commands/render/`) only | the TS raster stays the default and the **hash reference**; `renderer: 'native'` draws the same scene on the GPU with `llull-compute raster` (crate `llull-raster`, wgpu offscreen) |
+| Instance BVH, `render_stats` at 10⁶, model-scale clash broad phase | `geometry/instanceBvh.ts` (TS, worker above 10⁴) | `instanceBvh.ts` stays the reference; the shared `llull-bvh` crate is an option: native through `llull-compute geomq` for the CLI, WASM in the viewport worker if the TS build misses 1.5 s at 10⁶ |
+| Viewport | three.js WebGL | unchanged |
+| Gate | Vitest | plus `npm run native:check` (`cargo test` + `cargo clippy -D warnings`) for `llull-raster` and `llull-bvh` |
+
+**Hash rule (TR-VIS-30, RS1 §2 rule 3).** Only the reference renderer produces `svgSha256`. The digest must stay
+identical across runs and machines (per `rendererVersion`, Q6), so it is never computed from GPU pixels. Native mode
+is explicitly **non-hash**: `data` has no `svgSha256`, and carries `renderer: 'native'`, `device`, the binary version
+and `deterministic: false`. Golden tests and SC-VIS-05 use the reference renderer only. An agent that needs a
+reproducible picture (AF-13, AF-22) leaves `renderer` at its default.
+
+**Seams (L2, L9).** Native code is reached only through two optional injected ports. Core declares them; the server
+host installs them.
+
+- `ctx.raster?: RasterPort | null` (`model/raster.ts`): `render(scene: RasterScene): RasterImage | null`. The TS
+  pipeline builds the `RasterScene` (camera, `renderPlan` buckets, colour profile, section box, material classes,
+  sun, edge options); the server runs `llull-compute raster` on it. No port or no binary → `NATIVE_TOOL_MISSING`.
+  There is no silent fallback, so the caller always knows which renderer drew the picture.
+- `ctx.spatialIndex?: SpatialIndexPort | null` (`model/spatialIndex.ts`): frustum queries and broad-phase pairs over
+  instance AABBs. The server runs `llull-compute geomq` (crate `llull-geomq` on `llull-bvh`). Results are id sets
+  sorted ascending, so they must equal `instanceBvh.ts` exactly. `render_stats` and the `check_clashes` broad phase
+  (industrial plugin) use it only above a size threshold fixed at VIS-M7 (TBD — measure). The narrow phase
+  (oriented-box SAT) stays TS. No port → the TS path, with the same result.
+- **Viewport.** `instanceBvh.ts` runs in a worker. If VIS-M7 measures the 10⁶ build above 1.5 s, `llull-bvh` compiled
+  to WASM replaces it in the worker, under the same exact-equality test. The decision is recorded at VIS-M7.
+
+Native vs reference: VC-VIS-60 (validation README).
+
 ### 2.1 Technical requirements
 
 | Id | Pri | Requirement | FR | AF |
@@ -111,13 +148,15 @@ How the laws are respected:
 | TR-VIS-20 | MUST | `geometry/renderPlan.ts` R-BATCH-v1 (§5.2), shared by the viewport and `render_stats` | FR-VIS-12, 13 | AF-21 |
 | TR-VIS-21 | MUST | LOD metric, thresholds `lod:llull-v1`, hysteresis (§5.3) | FR-VIS-12 | — |
 | TR-VIS-22 | MUST | Instance bookkeeping (drawn + culled = N) and GPU byte estimate | FR-VIS-13 | AF-10 |
-| TR-VIS-23 | SHOULD | Static instance BVH (binned SAH) for frustum culling and picking, built in a worker above 10⁴ | FR-VIS-14 | AF-40 |
+| TR-VIS-23 | SHOULD | Static instance BVH (binned SAH) for frustum culling and picking, built in a worker above 10⁴ (`instanceBvh.ts` is the reference) | FR-VIS-14 | AF-40 |
+| TR-VIS-26 | SHOULD | Optional `llull-bvh` path (native `llull-compute geomq` through `ctx.spatialIndex`, or WASM in the viewport worker) returning the same id sets as `instanceBvh.ts` (§2.A) | FR-VIS-13, 14 | AF-13 |
 | TR-VIS-24 | COULD | Hi-Z occlusion, tiled streaming, impostors (V2) | FR-VIS-14 | — |
 | TR-VIS-25 | SHOULD | glTF `EXT_mesh_gpu_instancing` export / import | FR-VIS-19 | AF-12 |
-| TR-VIS-30 | MUST | `render_view` determinism: `svgSha256`, `rendererVersion` | FR-VIS-16 | AF-13, 22 |
+| TR-VIS-30 | MUST | `render_view` determinism on the reference (TS) renderer: `svgSha256`, `rendererVersion` | FR-VIS-16 | AF-13, 22 |
 | TR-VIS-31 | MUST | Perspective projector with perspective-correct depth | FR-VIS-16 | AF-22 |
 | TR-VIS-32 | SHOULD | Review shading: material-class Blinn–Phong, sun shadow, deterministic AO, edges, sky / ground (§5.6) | FR-VIS-15, 16 | AF-22 |
 | TR-VIS-33 | SHOULD | Viewport quality tiers keyed by drawn instances; material classes (§5.6) | FR-VIS-15 | — |
+| TR-VIS-34 | SHOULD | Native GPU raster (`renderer: 'native'`, `llull-compute raster` through `ctx.raster`): non-hash, `deterministic: false`, `device` in `data` (§2.A) | FR-VIS-16, 17 | AF-22, 35 |
 | TR-VIS-40 | MUST | `create_clash_issues` with framing (§5.8) and `clashKey` idempotence | FR-VIS-11 | AF-13 |
 | TR-VIS-41 | MUST | Clash re-run reconciliation: `created`, `unchanged`, `updated` (depth) and `gone` (clash no longer reported) in `data` | FR-VIS-11 | AF-10 |
 | TR-VIS-42 | SHOULD | Walkthrough paths and frame rendering (§5.3) | FR-VIS-17 | AF-22, 40 |
@@ -291,12 +330,12 @@ every refusal sets `CommandResult.error` with a code from §7.
 | `check_review` | query | `includeInfo?` | `{status: pass\|warn\|fail, issues[{code, ids, paths, remediation}], counts}` | read-only (AF-20) |
 | `create_clash_issues` | mutating | `source: 'check_clashes' \| 'check_assembly'`, `sourceParams?`, `margin` (default 500 mm, named), `priority?` | `{created, unchanged, issueIds[]}` | runs the read-only source via `ctx.registry` execute, reads `data.clashes[] {a, b, kind, depth}` · idempotent on `clashKey` · `VIS_CLASH_SOURCE_INVALID` |
 | `create_walkthrough` / `delete_walkthrough` | mutating | `name`, `keys: {viewpointId, seconds > 0}[]` (2..500) | `{id, durationS}` | `VIS_WALKTHROUGH_INVALID` |
-| `render_walkthrough` | query | `id`, `fps` (1..30), `width`, `height`, `maxFrames` (≤ 600) | `{frames, svgSha256[]}`; frames written with `--save dir/` | camera slerp between keys (§5.3) |
-| `export_bcf` | query | `issueIds?`, `version: '3.0' \| '2.1'`, `snapshots?: boolean` | `{bytes, sha256, topics}`; bcfzip via `--save` | metres + degrees · `VIS_BCF_GUID_UNMAPPED` (warn) |
+| `render_walkthrough` | query | `id`, `fps` (1..30), `width`, `height`, `maxFrames` (≤ 600), `renderer?: 'reference' \| 'native'` | `{frames, svgSha256[]}` (reference; native frames carry no digest); frames written with `--save dir/` | camera slerp between keys (§5.3) · `NATIVE_TOOL_MISSING` |
+| `export_bcf` | query | `issueIds?`, `version: '3.0' \| '2.1'`, `snapshots?: boolean`, `snapshotRenderer?: 'reference' \| 'native'` | `{bytes, sha256, topics}`; bcfzip via `--save` | metres + degrees · `VIS_BCF_GUID_UNMAPPED` (warn) |
 | `import_bcf` | mutating | `bcf: base64` (CLI `@file`), `mergePolicy: 'skip' \| 'update'` | `{topics, viewpoints, comments, warnings}` | `VIS_BCF_PARSE`, `VIS_BCF_VERSION` |
 | `export_bcf_viewpoint` / `import_bcf_viewpoint` | query / mutating | `id` / `visualizationInfo: string`, `name` | `{visualizationInfo, camera: {cameraViewPointM, …}}` / `{id}` | single-viewpoint form for tests and plans |
 | `render_stats` | query | `viewpointId?` \| `view` / `direction` / `target`, `projection`, `fovDeg?`, `width`, `height`, `quality?`, `multiDraw?: boolean` (default true) | `{componentCount, buckets[{prototypeKey, lod, instances}], opaqueModelCalls, edgeCalls, shadowCalls, culled{frustum, pixel}, instancesDrawnPlusCulled, triangles, gpuBytesEstimate, planVersion}` | read-only; same `renderPlan` as the viewport |
-| `render_view` (extended) | query | existing + `projection: 'orthographic' \| 'perspective'`, `fovDeg`, `viewpointId`, `colourProfileId`, `sectionBoxId`, `shading: 'flat' \| 'review'`, `edges`, `shadows`, `ambientOcclusion`, `sun?: {azimuthDeg, elevationDeg}`, `background: 'dark' \| 'light' \| css` | existing + `svgSha256`, `rendererVersion`, `projection`, `visibleEntityIds` (bounded), `legend` | deterministic per `rendererVersion` · `VIS_RENDER_BUDGET` when pixels × supersample > 16 M |
+| `render_view` (extended) | query | existing + `projection: 'orthographic' \| 'perspective'`, `fovDeg`, `viewpointId`, `colourProfileId`, `sectionBoxId`, `shading: 'flat' \| 'review'`, `edges`, `shadows`, `ambientOcclusion`, `sun?: {azimuthDeg, elevationDeg}`, `background: 'dark' \| 'light' \| css`, `renderer: 'reference' \| 'native'` (default `'reference'`) | existing + `svgSha256` (reference only), `rendererVersion`, `projection`, `visibleEntityIds` (bounded), `legend`; native adds `renderer`, `device`, `deterministic: false` | deterministic per `rendererVersion` (reference) · `VIS_RENDER_BUDGET` when pixels × supersample > 16 M · `NATIVE_TOOL_MISSING` |
 | `list_service_colour_schemes` (industrial) | query | `scheme?` | rows with `sources[]`, `grade`, `conflict?` | read-only |
 | `apply_service_colour_scheme` (industrial) | mutating | `scheme`, `profileId`, `serviceMap: Record<serviceText, category>`, `property?: 'service'` (default), `activate?`, `markerLetters?: boolean` | `{profileId, mapped, unmapped[], reviewRequired: true}` | builds a `ColourProfile` (one rule per mapped service, ordered by the map) · `VIS_SCHEME_UNKNOWN`, `VIS_SCHEME_CATEGORY_UNKNOWN` |
 | `add_pipe_markers` (industrial) | mutating | `lineIds? \| all`, `scheme: 'asme_a13_1'`, `spacing?` (default 7620 mm, named, grade B), `insulationMm?` | `{markers, perLine}` | decals on pipe segments; legend from §5.7 · `VIS_MARKER_NO_OD`, `VIS_MARKER_BAND_INTERPOLATED` (warn) |
@@ -372,6 +411,8 @@ p = D · H / (2 · d · tan(φ/2))          LOD0 if p ≥ 48 px, LOD1 if 8 ≤ p
 
 - Binned SAH, 16 bins, leaf ≤ 8 instances.
 - Built once per document change in a worker for N > 10⁴; refit on transform-only edits.
+- Native option (RS-6, §2.A): the same queries through `llull-bvh` (CLI: `llull-compute geomq`; viewport: WASM if
+  the TS build misses its target). The id sets must be identical (VC-VIS-60).
 - Query: the 6 frustum planes, then AABB–plane tests top-down. Fully-inside nodes emit their whole range without
   further tests.
 - Cost O(log N + k).
@@ -478,7 +519,12 @@ Server `render_view` with `shading: 'review'`:
 7. Colour profile and section box from the viewpoint or params.
 8. `svgSha256` = sha256 of the final SVG string. `rendererVersion` is bumped on any pixel-affecting change.
 
-Budget: pixels × supersample² ≤ 16 M (1920 × 1080 × 4 = 8.3 M).
+Budget: pixels × supersample² ≤ 16 M (1920 × 1080 × 4 = 8.3 M). The cap applies to both renderers.
+
+Steps 1–8 are the reference renderer (pure TS). With `renderer: 'native'` the TS pipeline still builds the scene
+(camera, buckets, colour profile, section box, material classes, sun); `llull-raster` draws it offscreen on the GPU
+(wgpu) with the same shading model. The result is a picture, not a digest: no `svgSha256`, `deterministic: false`,
+`device` and the binary version in `data` (§2.A).
 
 ### 5.7 ASME A13.1 marker legend (TR-VIS-04)
 
@@ -537,7 +583,8 @@ creation.
   declared in `extensionsUsed`, and in `extensionsRequired` only when `instancing: 'required'`. Without the
   extension the export expands instances as today. `import_gltf` reads the extension
   (`validation/data/gltf_simple_instancing/`).
-- **Snapshots**: `render_view` PNG embedded in the SVG; BCF snapshots use the same raster as PNG.
+- **Snapshots**: `render_view` PNG embedded in the SVG; BCF snapshots use the reference raster as PNG by default (deterministic); `snapshotRenderer: 'native'` uses the GPU
+  path (non-hash, §2.A).
 - **Navisworks**: no NWD / NWF writer (proprietary). Interop goes through BCF (issues, viewpoints) and IFC / glTF
   (geometry).
 
@@ -581,6 +628,7 @@ creation.
 | `VIS_RENDER_BUDGET` | `render_view` | pixels × supersample² > 16 M | lower width / height |
 | `VIS_WALKTHROUGH_INVALID` | walkthrough commands | < 2 keys, seconds ≤ 0, frames > max | — |
 | `VIS_GPU_LIMIT` (UI warn, `render_stats` field) | renderer | batch texture > `MAX_TEXTURE_SIZE` or instance buffer > limit | batch split automatically |
+| `NATIVE_TOOL_MISSING` | `render_view`, `render_walkthrough`, `export_bcf` with the native renderer | no raster port or no `llull-compute` in this host | use `renderer: 'reference'`, or install the desktop app (it bundles `llull-compute`) |
 
 ## 8. Performance and robustness budgets
 
@@ -592,9 +640,9 @@ creation.
 | GPU bytes per instance | 76 (+4 state) InstancedMesh; BatchedMesh 1e6 ≈ 84 MB of textures | three facts T1, T2 |
 | Median frame time at 1920 × 1080, orbit | targets 16.7 ms (10⁴, 10⁵), 33.3 ms (10⁶): **TBD — measure** | 60 / 30 Hz; procedure in `synthetic_pipe_rack_benchmark.json` |
 | Colour profile re-apply, 10⁵ entities, 50 rules | TBD — measure (target < 200 ms, worker) | O(N m) |
-| BVH build 10⁶ instances | TBD — measure (target < 1.5 s in a worker) | binned SAH O(N log N) |
-| `render_view` review 1920 × 1080 | TBD — measure with `llull render_view … --json` timing; hard cap `VIS_RENDER_BUDGET` | 8.3 M samples |
-| `render_stats` 10⁶ instances | TBD — measure (target < 500 ms) | BVH query + bucket counting |
+| BVH build 10⁶ instances | TBD — measure (target < 1.5 s in a worker; if missed, `llull-bvh` WASM, §2.A) | binned SAH O(N log N) |
+| `render_view` review 1920 × 1080 | TBD — measure with `llull render_view … --json` timing, reference and native; hard cap `VIS_RENDER_BUDGET` | 8.3 M samples |
+| `render_stats` 10⁶ instances | TBD — measure (target < 500 ms; TS and `llull-compute geomq`) | BVH query + bucket counting |
 | `check_review` 10⁴ issues | linear, TBD — measure | — |
 | Document bytes / instance | TBD — measure; target ≤ 200 B with instance entities, ≤ 40 B with V2 instance arrays | QUALITY_GATES gate 2 metric |
 
@@ -618,8 +666,9 @@ Robustness:
 | unit (`renderPlan.test.ts`) | N(n), bucket count ≤ 30 at four sizes, colour-invariance, LOD thresholds and hysteresis, drawn + culled = N, BVH query = brute-force query on 10⁴ random AABBs | VC-VIS-20..23 |
 | perf (`tests/perf/plantViewport.perf.ts`, Playwright, not in `npm run check`) | frame-time baselines | VC-VIS-24 |
 | unit (`gltfInstancing.test.ts`) | SimpleInstancing import / export | VC-VIS-25 |
-| golden (`tests/golden/`) | SC-VIS-05 digests pinned per `rendererVersion`; SC-VIS-03 `render_stats` exact numbers pinned after first run | VC-VIS-30..33 |
+| golden (`tests/golden/`) | SC-VIS-05 digests pinned per `rendererVersion` (reference renderer only; native output is never pinned); SC-VIS-03 `render_stats` exact numbers pinned after first run | VC-VIS-30..33 |
 | unit (industrial) | clash issues idempotence and framing | VC-VIS-40, 41 |
+| native vs reference (`server/tests/visNativeParity.test.ts`; `llull-raster` / `llull-bvh` cargo tests in `npm run native:check`) | BVH id sets and broad-phase pairs equal to `instanceBvh.ts`; native render is non-hash and matches the reference scene | VC-VIS-60 |
 | scenario replay | every `validation/plans/*.json` through `build_project` (`server/tests/packReplay09.test.ts`, like packs 07 / 08) | all SC-VIS |
 | component | Review panel / redline tool dispatch the right commands (no geometry maths) | — |
 
@@ -635,8 +684,9 @@ Coverage gate 90/85/90/90 applies to `packages/core/src/{commands,geometry}` and
 | VIS-M4 | `render_view` perspective, viewpoint / profile / section box, review shading (shadow, AO, edges), digests | M1, M2 | 8 d |
 | VIS-M5 | `create_clash_issues`; BCF 3.0 export / import | M2 | 6 d |
 | VIS-M6 | viewport realism tiers (CSM, GTAO, edges), material classes, walk / fly, walkthroughs | M3 | 8 d |
-| VIS-M7 | instance BVH in a worker, glTF instancing, pipe markers | M3 | 7 d |
+| VIS-M7 | instance BVH in a worker, glTF instancing, pipe markers; measure the 10⁶ build; `llull-bvh` WASM / `llull-compute geomq` if the target is missed (RS-6) | M3; RS-0 `llull-bvh` for the native part | 7 d (+ native part inside RS-6) |
 | VIS-M8 (V2) | 10⁶: streaming, Hi-Z occlusion, impostors, instance-array storage; terrain / sky / sun | 08-DAT storage decision | 15 d |
+| VIS-M9 | native GPU raster (RS-5): `ctx.raster`, `llull-compute raster` for `render_view`, walkthroughs and BCF snapshots; VC-VIS-60 | M4; RS-0 | inside RS-5 (4 wk in RS1, shared with aerospace 05) |
 
 Sibling dependencies:
 
@@ -662,9 +712,11 @@ Sibling dependencies:
 5. **Q5. Display hex.** Should the owner be able to pin a corporate palette (e.g. a paint-system RAL list)? This is
    a `define_palette` command (V1) whose palette is named in every report.
 6. **Q6. Determinism scope of `render_view` digests.** Per Node major version, or with an own sin / cos
-   implementation for full portability?
+   implementation for full portability? Only the reference renderer is concerned; the native renderer is non-hash
+   (§2.A).
 7. **Q7. Snapshot in BCF.** Use the `render_view` raster (deterministic), or the viewport canvas (what the human
-   saw)? Proposal: raster by default, canvas when the export runs from the UI.
+   saw)? Proposal: reference raster by default, canvas when the export runs from the UI; the native GPU raster
+   only on request (`snapshotRenderer: 'native'`, non-hash).
 
 ## 12. References
 
@@ -673,3 +725,4 @@ Sibling dependencies:
 - [R17] @react-three/drei 10.7.9 (npm, MIT): `Detailed`, `Instances`, `PerformanceMonitor`, `AdaptiveDpr`, `Bvh`, `Edges` — https://registry.npmjs.org/@react-three/drei/-/drei-10.7.9.tgz (downloaded 2026-10)
 - [R18] ral-colors 1.0.1 (npm, MIT): RAL classic table used only for display approximations — https://registry.npmjs.org/ral-colors/-/ral-colors-1.0.1.tgz (downloaded 2026-10)
 - [R19] llull `docs/QUALITY_GATES.md` (proposed gates 2 and 4) and `docs/INDUSTRIAL.md` (clash coordination).
+- [R20] RS1 native compute programme — [../../decisions/RS1-native-compute.md](../../decisions/RS1-native-compute.md); wgpu https://crates.io/crates/wgpu (version recorded at RS-0)
