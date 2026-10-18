@@ -200,12 +200,18 @@ export function runSolver(doc: CadDocument): { document: CadDocument; residual: 
   /** Build a document with the current working positions and line endpoints applied. */
   function buildDoc(): CadDocument {
     const newEntities: CadDocument['entities'] = {};
+    let changed = false;
     for (const [id, entity] of Object.entries(doc.entities)) {
       const pos = positions.get(id) ?? entity.position;
       const ends = entity.kind === 'line' ? lineEnds.get(id) : undefined;
-      newEntities[id] = ends ? { ...entity, ...ends, position: pos } : { ...entity, position: pos };
+      // An entity the solver did not move keeps its identity (downstream identity caches stay valid).
+      if (ends === undefined && pos === entity.position) newEntities[id] = entity;
+      else {
+        newEntities[id] = ends ? { ...entity, ...ends, position: pos } : { ...entity, position: pos };
+        changed = true;
+      }
     }
-    return { ...doc, entities: newEntities };
+    return { ...doc, entities: changed ? newEntities : doc.entities };
   }
   /** Total squared constraint error of `target` (gradient output discarded). */
   function totalResidual(target: CadDocument): number {

@@ -66,13 +66,21 @@ function placedBrep(entity: MeshSolidEntity, brep: ShapeRecipe): ShapeRecipe {
   return { op: 'place', source: brep, position: entity.position, rotation: entity.rotation };
 }
 
+/** Entities are immutable (commands are pure): one recipe object per entity object keeps `recipeKey`'s memo effective. */
+const recipes = new WeakMap<Entity, ShapeRecipe>();
+const meshRecipes = new WeakMap<Entity, ShapeRecipe>();
+
 /**
  * Exact recipe of a 3D solid entity: a kernel result (`mesh` with `brep`) resumes its construction
  * tree; any other solid is a leaf.
  */
 export function recipeOf(entity: Entity): ShapeRecipe {
-  if (entity.kind === 'mesh' && entity.brep !== undefined) return placedBrep(entity, entity.brep);
-  return { op: 'solid', entity };
+  const cached = recipes.get(entity);
+  if (cached !== undefined) return cached;
+  const recipe: ShapeRecipe =
+    entity.kind === 'mesh' && entity.brep !== undefined ? placedBrep(entity, entity.brep) : { op: 'solid', entity };
+  recipes.set(entity, recipe);
+  return recipe;
 }
 
 /**
@@ -81,9 +89,13 @@ export function recipeOf(entity: Entity): ShapeRecipe {
  */
 export function meshRecipeOf(entity: Entity): ShapeRecipe | null {
   if (entity.kind !== 'mesh' || entity.brep === undefined) return null;
+  const cached = meshRecipes.get(entity);
+  if (cached !== undefined) return cached;
   const plain: MeshSolidEntity = { ...entity };
   delete plain.brep;
-  return { op: 'solid', entity: plain };
+  const recipe: ShapeRecipe = { op: 'solid', entity: plain };
+  meshRecipes.set(entity, recipe);
+  return recipe;
 }
 
 /** Max nesting accepted from a loaded document (a deeper tree is rejected, not evaluated). */

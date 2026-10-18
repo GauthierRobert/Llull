@@ -12,12 +12,17 @@ import type { GeometryKernel } from '../geometry/kernel';
 import { blobText } from '../model/blobs';
 
 const blobsGiven = new WeakMap<GeometryKernel, Set<string>>();
+/** Blob tables (immutable objects) already scanned per kernel: an unchanged table is not re-walked on every execute. */
+const blobTablesFed = new WeakMap<GeometryKernel, WeakSet<object>>();
 
 /** Hand `kernel` every B-rep blob of `doc` it has not been given yet, so `brep` recipe leaves evaluate (TR-KRN-21). */
 function feedBlobs(doc: CadDocument, kernel: GeometryKernel | null): void {
   if (kernel === null || kernel.loadBlob === undefined || doc.blobs === undefined) return;
   let given = blobsGiven.get(kernel);
   if (given === undefined) blobsGiven.set(kernel, (given = new Set()));
+  let fed = blobTablesFed.get(kernel);
+  if (fed === undefined) blobTablesFed.set(kernel, (fed = new WeakSet()));
+  if (fed.has(doc.blobs)) return;
   for (const [sha256, blob] of Object.entries(doc.blobs)) {
     if (given.has(sha256) || blob.mediaType !== 'model/x-occt-brep') continue;
     const text = blobText(blob);
@@ -25,6 +30,7 @@ function feedBlobs(doc: CadDocument, kernel: GeometryKernel | null): void {
     kernel.loadBlob(sha256, text);
     given.add(sha256);
   }
+  fed.add(doc.blobs);
 }
 
 /**

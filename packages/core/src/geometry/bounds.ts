@@ -49,6 +49,17 @@ export function textLocalBounds(e: TextEntity): Bounds {
   return bounds([left, -blockHeight / 2, 0], [left + width, blockHeight / 2, 0]);
 }
 
+const heavyLocalBounds = new WeakMap<Entity, Bounds>();
+
+/** Memoize `compute` per entity object (entities are immutable): mesh vertices / tessellated sweeps are not re-walked per query. */
+function memoLocal(e: Entity, compute: () => Bounds): Bounds {
+  const cached = heavyLocalBounds.get(e);
+  if (cached !== undefined) return cached;
+  const result = compute();
+  heavyLocalBounds.set(e, result);
+  return result;
+}
+
 /** Local-space AABB of a `mesh`: its vertices, which `position` / `rotation` place like any other entity's local geometry. */
 function meshLocalBounds(e: Extract<Entity, { kind: 'mesh' }>): Bounds {
   const p = e.mesh.positions;
@@ -101,7 +112,7 @@ export function localBounds(e: Entity): Bounds {
       return bounds([minX, minY, 0], [maxX, maxY, e.depth]);
     }
     case 'mesh':
-      return meshLocalBounds(e);
+      return memoLocal(e, () => meshLocalBounds(e));
     case 'cone':
       // Base circle in XY; apex at +height in Z.
       return bounds([-e.radius, -e.radius, 0], [e.radius, e.radius, e.height]);
@@ -118,7 +129,7 @@ export function localBounds(e: Entity): Bounds {
     case 'sweep':
     case 'loft':
     case 'subdivision':
-      return sweepLocalBounds(e);
+      return memoLocal(e, () => sweepLocalBounds(e));
     case 'revolution': {
       // Radial extent follows the swept arc (from +X, counter-clockwise); axial extent from the profile.
       const radii = e.profile.map(([r]) => r);
