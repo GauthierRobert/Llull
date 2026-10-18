@@ -1,7 +1,8 @@
 // The solved result painted on the model: a banded blue -> red mesh (the plot's 12-band scale, crisp bands via a nearest-filtered ramp
 // texture sampled by the field value) over the analysed parts, deformed as plotted.
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useGhostStore } from '@ui/store/ghostStore';
 import * as THREE from 'three';
 import { resultColor } from '@lib/isoBands';
 import type { SurfaceView } from '@ui/panels/analysis/surfaceData';
@@ -37,7 +38,14 @@ function surfaceGeometry(surface: SurfaceView): THREE.BufferGeometry {
   return geometry;
 }
 
-export function ResultSurface({ surface }: { surface: SurfaceView }): React.ReactElement {
+/** `partIds`: the analysed solids, ghosted while their result is painted. */
+export function ResultSurface({ surface, partIds }: { surface: SurfaceView; partIds: readonly string[] }): React.ReactElement {
+  const partsKey = partIds.join('|');
+  useEffect(() => {
+    const { setGhosted } = useGhostStore.getState();
+    setGhosted(new Set(partsKey.split('|').filter((id) => id !== '')));
+    return () => setGhosted(new Set());
+  }, [partsKey]);
   const bands = surface.levels.length - 1;
   const geometry = useDisposable(() => surfaceGeometry(surface), [surface]);
   const ramp = useDisposable(() => rampTexture(bands), [bands]);

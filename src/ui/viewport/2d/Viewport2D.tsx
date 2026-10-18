@@ -29,6 +29,10 @@ import { RenderOriginSyncer } from '../RenderOriginSyncer';
 import { ScreenAnchorOverlay } from '../screenAnchor/ScreenAnchorOverlay';
 import { FocusOverlay } from '../FocusOverlay';
 import { AeroOverlay } from '../3d/aero/AeroOverlay';
+import { AnalysisOverlay } from '../3d/analysis/AnalysisOverlay';
+import { AnalysisLegend } from '../3d/analysis/AnalysisLegend';
+import { StructuralOverlay } from '../3d/structural/StructuralOverlay';
+import { FindingsOverlay } from '../3d/findings/FindingsOverlay';
 import { FocusBanner } from '../FocusBanner';
 
 /** Reports the ortho camera zoom to the HTML overlay, only when it changes. */
@@ -125,6 +129,9 @@ function SceneContents2D({
 
         <MeasureBBoxRect2D />
         <AeroOverlay />
+        <AnalysisOverlay />
+        <StructuralOverlay />
+        <FindingsOverlay />
         <FocusOverlay />
       </group>
     </>
@@ -168,6 +175,7 @@ export function Viewport2D(): React.ReactElement {
 
       <ScreenAnchorOverlay />
       <FocusBanner />
+      <AnalysisLegend />
       <ScaleBar zoom={cameraZoom} />
 
       {/* On demand: the modify palette shows once there is something to modify. */}

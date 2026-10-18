@@ -93,7 +93,7 @@ function LegendFeed({ analysisId }: { analysisId: string }): React.ReactElement 
     return (
       <aside className="analysis-legend" data-testid="analysis-legend" aria-label="Result colour legend">
         <h4 className="analysis-legend__title">
-          {title} <span className="analysis-legend__unit">[{range.unit}]</span>
+          {title} <span className="analysis-legend__unit">[{range.unit.replace('degC', '°C').replace('degF', '°F')}]</span>
         </h4>
         <p className="analysis-legend__sub">{surface.resultLabel}</p>
         <Ramp surface={surface} />

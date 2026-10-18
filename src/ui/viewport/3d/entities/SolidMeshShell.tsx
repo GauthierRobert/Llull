@@ -8,6 +8,7 @@ import { displayMetalness } from '../displayMetalness';
 import { useMaterialProps, type PbrMaterial } from '../useMaterialProps';
 import { applyBoxUvs, useFinishTextures } from '../useFinishTextures';
 import { useViewportStore } from '@ui/store';
+import { useGhostStore } from '@ui/store/ghostStore';
 
 export interface SolidSurface {
   roughness: number;
@@ -60,7 +61,8 @@ export function SolidMeshShell({
     };
   }, [geometry, boundsTree]);
 
-  const matProps = useMaterialProps({ color, selected, ...surface, pbrOverride: pbrMaterial });
+  const ghosted = useGhostStore((s) => s.ghostedIds.has(entity.id));
+  const matProps = useMaterialProps({ color, selected, ...surface, pbrOverride: pbrMaterial, ghosted });
   const displayMode = useViewportStore((s) => s.displayMode);
   const finishScale = pbrMaterial?.finish?.scale;
   const textures = useFinishTextures(pbrMaterial);
@@ -68,7 +70,7 @@ export function SolidMeshShell({
   useLayoutEffect(() => {
     if (finishScale !== undefined) applyBoxUvs(geometry, finishScale);
   }, [geometry, finishScale]);
-  const textured = textures !== null && displayMode === 'shaded';
+  const textured = textures !== null && displayMode === 'shaded' && !ghosted;
 
   return (
     <mesh

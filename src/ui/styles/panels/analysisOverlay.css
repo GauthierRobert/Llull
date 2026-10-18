@@ -6,8 +6,8 @@
 
 .analysis-legend {
   position: absolute;
-  bottom: calc(var(--space-3) + 40px);
-  left: var(--space-3);
+  bottom: calc(var(--space-3) + 72px);
+  left: var(--vp-inset-left, var(--space-3));
   z-index: 17;
   display: flex;
   flex-direction: column;

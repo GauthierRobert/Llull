@@ -25,7 +25,9 @@ export function AnalysisOverlay(): React.ReactElement | null {
   const drawn = [...items.constraints, ...items.loads, ...items.thermal, ...items.probes, ...items.extremes];
   return (
     <group name="analysis-overlay">
-      {feed.status === 'ready' && <ResultSurface surface={feed.surface} />}
+      {feed.status === 'ready' && analysisCase !== undefined && (
+        <ResultSurface surface={feed.surface} partIds={Object.keys(analysisCase.parts)} />
+      )}
       {drawn.map((item) => {
         const dimmed = emphasis && focusKey !== item.key;
         return <ItemGlyphs key={item.key} item={item} size={items.size} opacity={dimmed ? DIMMED : 0.95} labelled={!dimmed} />;
