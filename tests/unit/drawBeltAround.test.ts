@@ -79,6 +79,15 @@ describe('draw_belt_around', () => {
         { center: [-405, 200], radius: 26.5 },
       ],
     ],
+    [
+      'the same pulleys listed clockwise',
+      [
+        { center: [-405, 200], radius: 26.5 },
+        { center: [-415, 272], radius: 26.5 },
+        { center: [-407, 339], radius: 30.5 },
+        { center: [0, 269], radius: 105 },
+      ],
+    ],
   ])('%s: the loop wraps the OUTSIDE of every pulley and each run is tangent to both pulleys', (_label, pulleys) => {
     const pts = beltPoly(belt(pulleys, { arcSamples: 24 })).points;
     const hull = (x: number, y: number): number => Math.min(...pulleys.map((q) => Math.hypot(x - q.center[0], y - q.center[1]) - q.radius));

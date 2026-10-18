@@ -46,7 +46,8 @@ function ccwSweep(startAngle: number, endAngle: number): number {
 
 /**
  * @affects creates 1 closed polyline entity tracing the belt/chain centerline
- * @invariant pulleys.length >= 2; each radius > 0; no coincident centers; no pulley inside another
+ * @invariant pulleys.length >= 2; each radius > 0; no coincident centers; no pulley inside another; the loop always runs CCW
+ *   (a clockwise pulley list is reversed)
  * @failure pulleys < 2, non-positive radius, non-finite inputs, coincident centers, pulley-inside-pulley -> no-op, affected:[]
  */
 export const drawBeltAround = defineCommand({
@@ -57,9 +58,9 @@ export const drawBeltAround = defineCommand({
     'For each adjacent pair of pulleys the command computes the external common tangent (open-belt / ' +
     'same-direction rotation convention), then samples the wrap arc on each pulley ' +
     'between the two tangent touch-points. The result is one `polyline` with `closed: true`. ' +
-    'pulleys is an ordered array of {center:[x,y], radius} objects listed COUNTER-CLOCKWISE round the loop (in the work plane); ' +
-    'the belt wraps the outside of each in that order, runs counter-clockwise (polyline order) and closes back to the first. ' +
-    'and closes back to the first. arcSamples controls chord resolution per wrap arc (default 12, minimum 2). ' +
+    'pulleys is an ordered array of {center:[x,y], radius} objects in loop order (a clockwise list is reversed); ' +
+    'the belt wraps the outside of each, runs counter-clockwise in the work plane (polyline order) and closes back to the first. ' +
+    'arcSamples controls chord resolution per wrap arc (default 12, minimum 2). ' +
     'position/rotation place the entity in 3D world space (default [0,0,0]). ' +
     'Fails gracefully (no-op) when: fewer than 2 pulleys, non-positive or non-finite radius, ' +
     'non-finite center coordinates, coincident centers, or any pulley is contained inside another (no external tangent exists).',
@@ -69,7 +70,8 @@ export const drawBeltAround = defineCommand({
       .describe(
         'Ordered list of pulleys the belt wraps around. Each entry is an object ' +
           '{ center: [x, y], radius: number } where center is a 2D point in the work plane and radius is a finite positive number. ' +
-          'The belt wraps them in the given order and closes back to the first. Minimum 2 pulleys.',
+          'Listed in loop order, counter-clockwise round the loop in the work plane (a clockwise list is reversed); the belt wraps ' +
+          'the outside of each and closes back to the first. Minimum 2 pulleys.',
       ),
     arcSamples: z
       .number()
@@ -84,14 +86,14 @@ export const drawBeltAround = defineCommand({
     doc,
     { pulleys: pulleyInput, arcSamples = 12, position = ORIGIN, rotation = ORIGIN, color = DEFAULT_DRAW_COLOR, name },
   ): CommandResult => {
-    const pulleys = pulleyInput as unknown as PulleySpec[];
-    const n = pulleys.length;
+    const listed = pulleyInput as unknown as PulleySpec[];
+    const n = listed.length;
     if (n < 2) return noop(doc, `draw_belt_around: requires at least 2 pulleys (got ${n}).`);
     if (arcSamples < 2 || arcSamples > MAX_CURVE_SAMPLES)
       return noop(doc, `draw_belt_around: arcSamples must be a finite number in [2, ${MAX_CURVE_SAMPLES}] (got ${String(arcSamples)}).`);
     const samplesInt = Math.round(arcSamples);
     for (let i = 0; i < n; i++) {
-      const p = elementAt(pulleys, i);
+      const p = elementAt(listed, i);
       if (p.center.length < 2) return noop(doc, `draw_belt_around: pulley[${i}] center must be a [x, y] array.`);
       const [cx, cy] = p.center;
       if (!Number.isFinite(cx) || !Number.isFinite(cy))
@@ -101,8 +103,8 @@ export const drawBeltAround = defineCommand({
     }
     for (let i = 0; i < n; i++) {
       const ni = (i + 1) % n;
-      const p1 = elementAt(pulleys, i);
-      const p2 = elementAt(pulleys, ni);
+      const p1 = elementAt(listed, i);
+      const p2 = elementAt(listed, ni);
       const d = len2([p2.center[0] - p1.center[0], p2.center[1] - p1.center[1]]);
       if (d === 0) return noop(doc, `draw_belt_around: pulleys[${i}] and pulleys[${ni}] have coincident centers.`);
       if (d < Math.abs(p1.radius - p2.radius))
@@ -111,6 +113,12 @@ export const drawBeltAround = defineCommand({
           `draw_belt_around: pulley[${ni}] is inside pulley[${i}] (d=${compactNumber(d)} < |r1−r2|=${compactNumber(Math.abs(p1.radius - p2.radius))}); no external tangent.`,
         );
     }
+    // Shoelace sign of the centres: a clockwise loop is walked in reverse so the belt always runs counter-clockwise.
+    const signedArea = listed.reduce((sum, { center: [x1, y1] }, i) => {
+      const [x2, y2] = listed[(i + 1) % listed.length]?.center ?? [x1, y1];
+      return sum + x1 * y2 - x2 * y1;
+    }, 0);
+    const pulleys = signedArea < 0 ? [...listed].reverse() : listed;
     // tangentPairs[i] = [outgoing TP on pulleys[i], incoming TP on pulleys[(i+1)%n]]
     const tangentPairs = pulleys.map((pulley, i) => externalTangentPoints(pulley, elementAt(pulleys, (i + 1) % n)));
     const points: Point[] = [];

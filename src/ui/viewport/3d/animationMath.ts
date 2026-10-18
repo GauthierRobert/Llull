@@ -134,18 +134,18 @@ export function createLoopScratch(): LoopScratch {
 }
 
 /**
- * A member at `basePosition` carried `travel` along the loop: `turn` rotates it about its start loop point by the tangent change, then
- * `shift` moves it from that point to the point `travel` further on. @invariant mutates only `turn`, `shift` and `scratch`
+ * A member starting at arc length `start` (its nearest loop point, `nearestLoopDistance`) carried `travel` along the loop: `turn` rotates
+ * it about its start loop point by the tangent change, then `shift` moves it from that point to the point `travel` further on.
+ * @invariant mutates only `turn`, `shift` and `scratch`
  */
 export function writeFollowPathContributions(
   loop: MeasuredLoop,
-  basePosition: Vec3,
+  start: number,
   travel: number,
   turn: AnimationContribution,
   shift: AnimationContribution,
   scratch: LoopScratch,
 ): void {
-  const start = nearestLoopDistance(loop, basePosition);
   writeLoopFrame(loop, start, scratch.startPoint, scratch.startTangent);
   writeLoopFrame(loop, start + travel, scratch.point, scratch.tangent);
   turn.channel = 'rotation';

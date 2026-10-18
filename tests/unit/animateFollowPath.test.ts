@@ -122,7 +122,7 @@ describe('follow_path math', () => {
     const fresh = (): AnimationContribution => ({ channel: 'rotation', axis: new THREE.Vector3(), scalar: 0, pivot: new THREE.Vector3() });
     const turn = fresh();
     const shift = fresh();
-    writeFollowPathContributions(square, base, travel, turn, shift, createLoopScratch());
+    writeFollowPathContributions(square, nearestLoopDistance(square, base), travel, turn, shift, createLoopScratch());
     const pose = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
     composeAnimatedPoseInto(pose, base, [0, 0, 0], [turn, shift], createPoseScratch());
     const heading = new THREE.Vector3(1, 0, 0).applyQuaternion(pose.quaternion);

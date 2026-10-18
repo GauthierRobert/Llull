@@ -96,7 +96,8 @@ function withAnimation(doc: CadDocument, anim: Animation): CadDocument {
 /**
  * @affects creates 1 animation record (not an entity)
  * @invariant targetId must exist in doc.entities or doc.groups; spin needs a finite speed; oscillate needs amplitude > 0 and frequency > 0;
- *   follow_path needs a finite speed and pathId naming a closed 2D curve (sampled to world points at call time)
+ *   follow_path needs a finite speed and pathId naming a closed 2D curve; the loop is captured as world points at call time
+ *   (editing or moving the curve later does not move the animation: run animate again)
  * @failure missing targetId, missing / invalid motion values or an open / missing path -> no-op, affected:[]
  */
 export const animate = defineCommand({
@@ -112,6 +113,7 @@ export const animate = defineCommand({
     "mode 'follow_path' = every member of the target travels round the closed 2D curve pathId at speed document units/s, " +
     'turning with the curve tangent: chain links round a chainring and cassette loop (draw_belt_around), a belt, a conveyor. ' +
     'Each member starts at its nearest point of the loop (place them with pattern_along_path on the same curve). ' +
+    'The loop is captured when animate runs: after editing the curve, stop_animation and animate again. ' +
     "trigger 'auto' runs the animation under the global Play button; 'click' toggles it when the user clicks the part in the viewport.",
   params: z.object({
     targetId: targetIdField,

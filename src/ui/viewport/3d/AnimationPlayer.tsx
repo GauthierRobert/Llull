@@ -18,6 +18,7 @@ import {
   createPoseScratch,
   evaluateAnimationScalar,
   measureLoop,
+  nearestLoopDistance,
   writeFollowPathContributions,
   type AnimatedPose,
   type AnimationContribution,
@@ -63,6 +64,7 @@ function createFrameBuffers(): {
   contributionsByEntity: Map<string, AnimationContribution[]>;
   pool: AnimationContribution[];
   loops: WeakMap<ReadonlyArray<Vec3>, MeasuredLoop>;
+  starts: WeakMap<Vec3, { loop: MeasuredLoop; start: number }>;
 } {
   return {
     pose: { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() },
@@ -71,6 +73,7 @@ function createFrameBuffers(): {
     contributionsByEntity: new Map(),
     pool: [],
     loops: new WeakMap(),
+    starts: new WeakMap(),
   };
 }
 
@@ -106,7 +109,7 @@ export function AnimationPlayer(): null {
     // Keep the demand Canvas alive.
     if (animationPlaying || activeClickAnimationIds.size > 0) invalidate();
 
-    const { pose, scratch, loopScratch, contributionsByEntity, pool, loops } = buffers;
+    const { pose, scratch, loopScratch, contributionsByEntity, pool, loops, starts } = buffers;
     for (const [entityId, parts] of contributionsByEntity) {
       if (parts.length === 0) contributionsByEntity.delete(entityId);
       else parts.length = 0;
@@ -133,7 +136,13 @@ export function AnimationPlayer(): null {
           const turn = (pool[pooled] ??= { channel: 'rotation', axis: new THREE.Vector3(), scalar: 0, pivot: new THREE.Vector3() });
           const shift = (pool[pooled + 1] ??= { channel: 'position', axis: new THREE.Vector3(), scalar: 0, pivot: new THREE.Vector3() });
           pooled += 2;
-          writeFollowPathContributions(loop, member.position, anim.speed * phase, turn, shift, loopScratch);
+          // Commands are pure: a moved member gets a new position array, so the cached start follows it.
+          let cached = starts.get(member.position);
+          if (cached?.loop !== loop) {
+            cached = { loop, start: nearestLoopDistance(loop, member.position) };
+            starts.set(member.position, cached);
+          }
+          writeFollowPathContributions(loop, cached.start, anim.speed * phase, turn, shift, loopScratch);
           addContribution(contributionsByEntity, memberId, turn);
           addContribution(contributionsByEntity, memberId, shift);
         }
