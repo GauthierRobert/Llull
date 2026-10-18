@@ -2,14 +2,13 @@
 // dimensions edited via edit_step_params (the entity stays selected after the replay).
 
 import React, { useState } from 'react';
-import { useFrame } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
 import { useLayoutStore, useStore, useToolStore } from '@ui/store';
 import { useSoleSelectedEntity } from '@ui/store/selectionHooks';
 import { useDispatchThen } from '@ui/hooks/useDispatchThen';
 import { type LensDimension, lensTarget, withDimension } from './lensDimensions';
 import { LensPills } from './LensPills';
+import { ScreenAnchor } from '../screenAnchor/ScreenAnchor';
 
 export function DimensionLens(): React.ReactElement | null {
   const entity = useSoleSelectedEntity();
@@ -20,15 +19,9 @@ export function DimensionLens(): React.ReactElement | null {
   const inspectorOpen = useLayoutStore((s) => s.inspectorOpen);
   const toggleInspector = useLayoutStore((s) => s.toggleInspector);
   const dispatchThen = useDispatchThen();
-  // drei's Html attaches to the canvas parent when it mounts: a lens mounting together with the canvas (a view switch
-  // with a selection) would stay detached, so it waits for the first rendered frame.
-  const [sceneReady, setSceneReady] = useState(false);
-  useFrame(() => {
-    if (!sceneReady) setSceneReady(true);
-  });
   const [refusal, setRefusal] = useState<{ entityId: string; summary: string } | null>(null);
 
-  if (!sceneReady || entity === undefined || drawTool !== 'none') return null;
+  if (entity === undefined || drawTool !== 'none') return null;
   const target = lensTarget(history, entity.id);
 
   const bounds = rotatedEntityBounds(entity);
@@ -48,7 +41,7 @@ export function DimensionLens(): React.ReactElement | null {
   };
 
   return (
-    <Html position={anchor} zIndexRange={[24, 12]} className="lens-anchor">
+    <ScreenAnchor id="dimension-lens" position={anchor} zIndex={24} className="lens-anchor">
       <LensPills
         name={entity.name ?? entity.id}
         kind={entity.kind}
@@ -59,6 +52,6 @@ export function DimensionLens(): React.ReactElement | null {
         refusal={refusal?.entityId === entity.id ? refusal.summary : null}
         onCommit={commit}
       />
-    </Html>
+    </ScreenAnchor>
   );
 }
