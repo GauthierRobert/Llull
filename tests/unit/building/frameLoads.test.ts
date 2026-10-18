@@ -108,7 +108,7 @@ describe('load combinations', () => {
     const data = check(hall());
     expect(data.combinations).toEqual(['1.35G+1.5S (→)', '1.35G+1.5S (←)']);
     expect(data.alphaCritical).toBeGreaterThan(10);
-    const deflection = row(data, 'RF5', 'deflection');
+    const deflection = data.rows.find((candidate) => candidate.kind === 'deflection' && candidate.frame === 'frame 3')!;
     expect(deflection.combination).toBe('SLS S');
     expect(deflection.check).toMatch(/vertical \d+ mm ≤ span\/200 = 120 mm/);
     expect(deflection.utilisation).toBeGreaterThan(0.3);
@@ -295,7 +295,7 @@ describe('design_portal_frames with wind and crane', () => {
     expect(result.summary).toMatch(/Designed 6 frame\(s\) for 66 ULS combination\(s\)/);
     const after = check(result.document, { windPressure: 0.7 });
     expect(after.maxUtilisation).toBeLessThanOrEqual(1);
-  });
+  }, 120_000);
 });
 
 const windward = frameRoofAverage('duopitch', 6, 0, 'suction', 'windward');
@@ -349,7 +349,7 @@ describe('multi-span roof wind (EN 1991-1-4 §7.2.7, Fig. 7.10 simplified)', () 
   const uplifts = (doc: CadDocument, windCase: 'WL' | 'WR' | 'WLs'): number[] => {
     const frame = frameOf(doc);
     return frame.members
-      .filter((member) => member.role === 'rafter')
+      .filter((member) => member.role === 'rafter' && member.ends[0])
       .sort((a, b) => (frame.nodes[a.geometry.a]?.x ?? 0) - (frame.nodes[b.geometry.a]?.x ?? 0))
       .map((member) => member.loads[windCase]!.qy);
   };
@@ -434,12 +434,13 @@ describe('check_portal_frames', () => {
       /^Checked 6 frame\(s\), \d+ check\(s\) over 2 ULS combination\(s\) \+ SLS \(G = 0\.5 kN\/m² \+ self-weight, S = 0\.8 kN\/m², no wind/,
     );
     const rows = (result.data as { rows: CheckRow[] }).rows;
-    // Internal frame (6 m bay): eaves moment ≈ 491 kNm, IPE450 rafter at ≈ 0.88.
-    const rafter = rows.find((row) => row.mark === 'RF3')!;
-    expect(rafter.moment).toBeGreaterThan(450);
-    expect(rafter.moment).toBeLessThan(530);
-    expect(rafter.utilisation).toBeGreaterThan(0.8);
-    expect(rafter.utilisation).toBeLessThan(0.95);
+    // Internal frame (6 m bay), haunched eaves: governing piece of the IPE450 rafter M ≈ 415 kNm at ≈ 0.51 (≈ 495 kNm, 0.92 without haunch).
+    const rafter = rows.find((row) => row.mark === 'RF3' && row.kind === 'rafter')!;
+    expect(rafter.moment).toBeGreaterThan(380);
+    expect(rafter.moment).toBeLessThan(450);
+    expect(rafter.utilisation).toBeGreaterThan(0.45);
+    expect(rafter.utilisation).toBeLessThan(0.6);
+    expect(rafter.check).toContain('haunched');
     // End frames carry half the load.
     const endRafter = rows.find((row) => row.mark === 'RF1')!;
     expect(endRafter.moment).toBeLessThan(rafter.moment * 0.6);

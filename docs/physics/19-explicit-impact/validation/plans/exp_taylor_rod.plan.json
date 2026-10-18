@@ -23,7 +23,6 @@
   "command": "define_material_record",
   "params": {
    "id": "ti_jc_test",
-   "name": "ti_jc_test",
    "designation": "test material E = 110000 MPa",
    "specs": [],
    "licence": "company-proprietary",
@@ -127,8 +126,7 @@
    "density": 0.00443,
    "color": "#9aa0a6",
    "metalness": 1,
-   "roughness": 0.4,
-   "recordId": "ti_jc_test"
+   "roughness": 0.4
   }
  },
  {
@@ -217,7 +215,6 @@
   "command": "set_mesh_controls",
   "params": {
    "analysisId": "$an",
-   "mesher": "gmsh",
    "elementFamily": "hex_dominant",
    "order": 1,
    "globalSize": 0.5

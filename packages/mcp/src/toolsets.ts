@@ -55,7 +55,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   ),
   assembly: words(
     'create_component insert_instance explode_instance bill_of_materials add_joint delete_joint set_joint_value add_drive_relation delete_drive_relation evaluate_motion bake_motion motion_study animate stop_animation ' +
-      'add_rigid_body add_body_joint add_gear_coupling add_motor add_propeller add_cylinder_pressure set_gravity delete_dynamics_item set_dynamics_solver inspect_dynamics simulate_motion plot_simulation',
+      'add_rigid_body add_body_joint add_gear_coupling add_motor add_propeller add_cylinder_pressure set_gravity delete_dynamics_item set_dynamics_solver inspect_dynamics simulate_motion plot_simulation render_motion',
   ),
   materials: words(
     'create_material assign_material define_material_record set_material_property get_material get_material_allowable convert_quantity import_material_library remove_material_library resolve_material_libraries diff_material_libraries set_export_marking check_materials register_material_library ' +

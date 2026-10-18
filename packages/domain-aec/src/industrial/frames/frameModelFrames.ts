@@ -6,6 +6,7 @@ import { elementsOf, levelElementsOf } from '../../building/model';
 import { weightKnPerMetre } from '../../shared/numeric';
 import { findProfile, sectionProperties } from '../../steel/profiles';
 import { E_STEEL } from '../steelDesign/steelDesign';
+import { haunchEndsOf, rafterPieces } from './haunchSection';
 
 import { type CraneRail, craneRailLoads, frameCandidates, frameRoofWind } from './frameLoads';
 import {
@@ -82,7 +83,6 @@ export function framesOf(
     for (const rafter of candidate.rafters) {
       const profile = findProfile(rafter.profile);
       if (!profile) continue;
-      const section = sectionProperties(profile);
       const { x0, z0, x1, z1, flip } = rafterEnds(rafter);
       const length = Math.hypot(x1 - x0, z1 - z0);
       // Roof loads per horizontal length, spread along the rafter.
@@ -90,23 +90,36 @@ export function framesOf(
       const stations = [x0, x1, ...purlins.filter((x) => x > x0 && x < x1)].sort((a, b) => a - b);
       const purlinGap = Math.max(...stations.slice(1).map((x, index) => x - (stations[index] as number)));
       const unbraced = (purlinGap * length) / Math.max(Math.abs(x1 - x0), 1);
-      analysis.push({
-        geometry: { a: nodeAt(x0, z0, free), b: nodeAt(x1, z1, free), E: E_STEEL, A: section.area, I: section.inertia },
-        elementId: rafter.id,
-        role: 'rafter',
-        reversed: flip,
-        ends: [true, true],
-        loads: {
-          G: { qx: 0, qy: -(perLength(loads.deadLoad) + selfWeight(rafter.profile)) },
-          S: { qx: 0, qy: -perLength(loads.snowLoad) },
-          ...Object.fromEntries(
-            windCases.map((windCase) => [
-              windCase.loadCase,
-              { qx: 0, qy: perLength((windCase.internalPressure - roofCpe(rafter, windCase)) * loads.windPressure) },
-            ]),
-          ),
-        },
-        lengths: { major: length, minor: unbraced, lateralTorsional: unbraced },
+      const loadsOf = (haunchWeight: number): CaseLoads => ({
+        G: { qx: 0, qy: -(perLength(loads.deadLoad) + selfWeight(rafter.profile) * (1 + haunchWeight)) },
+        S: { qx: 0, qy: -perLength(loads.snowLoad) },
+        ...Object.fromEntries(
+          windCases.map((windCase) => [
+            windCase.loadCase,
+            { qx: 0, qy: perLength((windCase.internalPressure - roofCpe(rafter, windCase)) * loads.windPressure) },
+          ]),
+        ),
+      });
+      // Haunched ends (eaves / apex connections) are stepped pieces with the inertia of the built-up section; analysis runs left → right.
+      const [startEnd, finishEnd] = haunchEndsOf(building, rafter, mm, (columnId) => {
+        const column = building.elements[columnId];
+        return column?.category === 'member' ? (findProfile(column.profile)?.h ?? 0) : 0;
+      });
+      const pieces = rafterPieces(profile, length, flip ? [finishEnd, startEnd] : [startEnd, finishEnd]);
+      const pointAt = (s: number): [number, number] => [x0 + ((x1 - x0) * s) / length, z0 + ((z1 - z0) * s) / length];
+      pieces.forEach((piece, index) => {
+        const section = sectionProperties(piece.stiffness);
+        const [from, to] = [pointAt(piece.from), pointAt(piece.to)];
+        analysis.push({
+          geometry: { a: nodeAt(from[0], from[1], free), b: nodeAt(to[0], to[1], free), E: E_STEEL, A: section.area, I: section.inertia },
+          elementId: rafter.id,
+          role: 'rafter',
+          reversed: flip,
+          ends: [index === 0, index === pieces.length - 1],
+          loads: loadsOf(0.5 * ((piece.stiffness.h - profile.h) / profile.h)),
+          lengths: { major: length, minor: unbraced, lateralTorsional: unbraced },
+          ...(piece.resistance ? { section: piece.resistance } : {}),
+        });
       });
     }
     const columnTops: { node: number; height: number; elementId: string }[] = [];

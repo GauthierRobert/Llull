@@ -130,7 +130,11 @@
  {
   "command": "set_gravity",
   "params": {
-   "vectorMPerS2": "none"
+   "gravity": [
+    0,
+    0,
+    0
+   ]
   }
  },
  {

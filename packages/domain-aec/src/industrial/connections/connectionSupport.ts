@@ -55,6 +55,21 @@ interface ConnectionSize {
   readonly plateThickness?: number | undefined;
   readonly boltDiameter?: number | undefined;
   readonly haunchLength?: number | undefined;
+  /** Apex haunch length along each rafter (0 / undefined = none). */
+  readonly apexHaunchLength?: number | undefined;
+  /**
+   * Haunch lengths as fractions of the span (the plan length of `rafterSpanShare` rafters, 2 for a duopitch roof); overrides the
+   * absolute lengths.
+   */
+  readonly spanFractions?: { readonly eaves: number; readonly apex: number; readonly rafterSpanShare: 1 | 2 } | undefined;
+}
+
+/** Haunch length along the rafter: span fractions, else the explicit length, else 1/5 of the rafter plan length at the eaves. */
+function haunchLengthOf(kind: MomentJoint['kind'], horizontal: number, size: ConnectionSize): number {
+  if (size.spanFractions) {
+    return (kind === 'eaves' ? size.spanFractions.eaves : size.spanFractions.apex) * horizontal * size.spanFractions.rafterSpanShare;
+  }
+  return kind === 'eaves' ? (size.haunchLength ?? horizontal / 5) : (size.apexHaunchLength ?? 0);
 }
 
 /** Adds a moment connection per joint (no regeneration). */
@@ -80,7 +95,7 @@ export function appendConnections(
       plateThickness: size.plateThickness ?? fromMm(doc, profile.h >= 400 ? 25 : 20),
       boltRows: joint.kind === 'eaves' ? 4 : 3,
       boltDiameter: size.boltDiameter ?? fromMm(doc, 20),
-      haunchLength: joint.kind === 'eaves' ? (size.haunchLength ?? horizontal / 5) : 0,
+      haunchLength: haunchLengthOf(joint.kind, horizontal, size),
       material: 'S355',
     };
   });

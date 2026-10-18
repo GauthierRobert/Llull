@@ -3,7 +3,6 @@
   "command": "define_material_record",
   "params": {
    "id": "dt_test",
-   "name": "dt_test",
    "designation": "damage-tolerance test set (not a material claim)",
    "specs": [],
    "licence": "company-proprietary",

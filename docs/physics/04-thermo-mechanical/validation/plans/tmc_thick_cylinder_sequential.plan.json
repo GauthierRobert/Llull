@@ -35,7 +35,6 @@
   "command": "define_material_record",
   "params": {
    "id": "steel_cyl",
-   "name": "steel_cyl",
    "designation": "validation test material",
    "specs": [],
    "licence": "company-proprietary",
@@ -121,8 +120,7 @@
    "density": 0.0078,
    "color": "#9aa0a6",
    "metalness": 1,
-   "roughness": 0.4,
-   "recordId": "steel_cyl"
+   "roughness": 0.4
   }
  },
  {
@@ -197,7 +195,6 @@
   "command": "set_mesh_controls",
   "params": {
    "analysisId": "$th",
-   "mesher": "gmsh",
    "elementFamily": "tet",
    "order": 2,
    "globalSize": 1.0
@@ -298,7 +295,6 @@
   "command": "set_mesh_controls",
   "params": {
    "analysisId": "$ms",
-   "mesher": "gmsh",
    "elementFamily": "tet",
    "order": 2,
    "globalSize": 1.0
@@ -314,7 +310,17 @@
     0,
     50
    ],
-   "quantity": "stress_hoop"
+   "quantity": "s_hoop",
+   "axisPoint": [
+    0,
+    0,
+    0
+   ],
+   "axisDirection": [
+    0,
+    0,
+    1
+   ]
   }
  },
  {
@@ -327,7 +333,17 @@
     0,
     50
    ],
-   "quantity": "stress_hoop"
+   "quantity": "s_hoop",
+   "axisPoint": [
+    0,
+    0,
+    0
+   ],
+   "axisDirection": [
+    0,
+    0,
+    1
+   ]
   }
  }
 ]

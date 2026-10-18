@@ -26,7 +26,7 @@ Always one call per plan (`llull run plan.json`), not a loop of single calls.
 ## Procedure
 
 1. **Find commands without loading schemas into context.**
-   `llull search fillet edge` → `llull describe fillet_edge` (params, required, enums).
+   `llull search fillet edge` → `llull describe fillet_edge` (params, required, enums; nested objects, records and `one of:` union branches printed recursively; `--json` = raw schema).
    `llull list 3d` for a toolset; `llull toolsets`; `llull guide` for units/axes/id conventions.
 2. **Write the plan as a file** (format: `design-model` skill; aliases `$name`, `=expr`):
    ```json

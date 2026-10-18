@@ -1,6 +1,8 @@
 /** Prescribed-temperature BCs that fix the same mesh nodes to different values (CalculiX silently keeps the last one), or that override film / radiation BCs. */
 
 import type { FeMeshArtifact, ThermalSetup } from '@core/model/analysis';
+import type { DeckRefusal } from '../decks/context';
+import { remediationOf } from './codes';
 import { faceNodes, indexMesh } from './meshGeometry';
 
 export interface BcConflict {
@@ -48,6 +50,20 @@ export function temperatureBcConflicts(thermal: ThermalSetup, mesh: FeMeshArtifa
     }
   });
   return conflicts;
+}
+
+/**
+ * Deck refusal for the first conflicting pair of temperature BCs (shared by the thermal and the coupled deck), or null.
+ * @failure different temperatures on shared mesh nodes -> THM_BC_CONFLICT naming both BC ids
+ */
+export function temperatureConflictRefusal(thermal: ThermalSetup, mesh: FeMeshArtifact): DeckRefusal | null {
+  const conflict = temperatureBcConflicts(thermal, mesh)[0];
+  if (conflict === undefined) return null;
+  return {
+    code: 'THM_BC_CONFLICT',
+    message: `temperature BCs '${conflict.first}' and '${conflict.second}' prescribe different values on ${conflict.sharedNodes} shared node(s), so the deck would be ambiguous (the solver keeps only the last one). ${remediationOf('THM_BC_CONFLICT')}`,
+    ids: [conflict.first, conflict.second],
+  };
 }
 
 /**

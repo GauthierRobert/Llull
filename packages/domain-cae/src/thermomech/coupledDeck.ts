@@ -9,6 +9,7 @@ import { siToSystem } from '@lib/thermalUnits';
 import type { DeckContext, DeckSections } from '../decks/context';
 import { commentText, linesText, num, row } from '../decks/format';
 import { mechanicalStepLines } from '../decks/mechanical';
+import { temperatureConflictRefusal } from '../thermal/bcConflicts';
 import { checkThermalItems } from '../thermal/check';
 import { stefanBoltzmannOf, hasRadiation } from '../thermal/constants';
 import { allBcLines } from '../thermal/deckLoads';
@@ -75,6 +76,8 @@ export function coupledSections(ctx: DeckContext): DeckSections {
   const { thermal } = setup;
   const blocking = checkThermalItems(ctx.doc, ctx.analysisId).find((entry) => entry.severity === 'error');
   if (blocking !== undefined) return refused(blocking.code, blocking.message, blocking.ids);
+  const conflict = temperatureConflictRefusal(thermal, ctx.mesh);
+  if (conflict !== null) return conflict;
   const missing = unsupported(setup);
   if (missing !== null)
     return refused(

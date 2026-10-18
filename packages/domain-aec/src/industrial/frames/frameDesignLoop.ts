@@ -17,6 +17,10 @@ import { checkFrames } from './frameCheckFrames';
 import type { CheckRow } from './frameCheckSolve';
 import type { FrameLoads } from './frameModelTypes';
 import { reseatDependents } from './frameReseat';
+import { tryLongerHaunch } from './haunchDesign';
+
+/** Haunch trials (one frame check each) per sizing run. */
+const MAX_HAUNCH_TRIALS = 3;
 
 /** Largest stiffness gain asked of a column section in one iteration (the loop continues if it was not enough). */
 const MAX_STIFFNESS_STEP = 2.5;
@@ -74,6 +78,7 @@ export function sizeFrames(doc: CadDocument, levelId: string, loads: FrameLoads,
   let swayDriven = false;
   let rafterAssist = false;
   let previous: { utilisation: number; factor: number } | null = null;
+  let haunchTrials = 0;
   const upsized = iterateUpsizing(doc, (current) => {
     const { rows, frames } = checkFrames(current, levelId, loads);
     noFrames = frames === 0;
@@ -115,6 +120,12 @@ export function sizeFrames(doc: CadDocument, levelId: string, loads: FrameLoads,
           }
         }
       }
+    }
+    // A longer eaves haunch is tried before the rafters are up-sized (strength, or sway the rafters limit too).
+    if ((!swayFirst || rafterAssist) && haunchTrials < MAX_HAUNCH_TRIALS) {
+      haunchTrials += 1;
+      const haunch = tryLongerHaunch(current, failing, rows, target, (trial) => checkFrames(trial, levelId, loads).rows);
+      if (haunch) return { ...haunch, progressed: true, limited: false };
     }
     if (!swayFirst) for (const row of failing) addGroup(row.elementId);
     if (groups.size === 0) {

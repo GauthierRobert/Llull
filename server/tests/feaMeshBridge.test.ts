@@ -6,6 +6,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { defaultContext } from '@core/commands/context';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { FeMeshArtifact } from '@core/model/analysis';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
@@ -175,7 +176,7 @@ describe.skipIf(!HAS_GMSH)('bridge op mesh — facesNear on trimmed faces (copla
   it('resolves a point on each of two equal-height boss tops to that boss face only', async (context) => {
     if (occt === null) context.skip();
     const kernel = occt as GeometryKernel;
-    const ctx = { kernel };
+    const ctx = { ...defaultContext(), kernel };
     let current = createEmptyDocument();
     const added: string[] = [];
     for (const [size, position] of [

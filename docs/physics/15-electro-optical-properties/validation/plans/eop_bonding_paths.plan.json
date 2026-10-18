@@ -43,7 +43,6 @@
   "command": "define_material_record",
   "params": {
    "id": "strap_61iacs",
-   "name": "strap_61iacs",
    "designation": "validation test record",
    "productForm": "strap",
    "specs": [],

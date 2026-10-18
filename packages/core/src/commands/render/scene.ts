@@ -98,6 +98,18 @@ export function renderDocument(
     simplifiedEntityIds: fitted.simplifiedEntityIds,
     skippedEntityIds: fitted.skippedEntityIds,
     cutEntityIds,
-    svg: buildSvg(polygons, underlays, cam, orthoHalf, width, height, view, snapshot.entityCount, background, raster ? radius : null),
+    svg: buildSvg(
+      polygons,
+      underlays,
+      cam,
+      orthoHalf,
+      width,
+      height,
+      view,
+      snapshot.entityCount,
+      background,
+      raster ? radius : null,
+      options.caption !== false,
+    ),
   };
 }

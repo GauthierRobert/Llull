@@ -140,7 +140,7 @@ export const updateFeaConstraint = defineCommand({
     const next: AnalysisCase = { ...analysisCase, constraints: { ...analysisCase.constraints, [constraintId]: updated } };
     return changed(
       withCase(doc, next),
-      `update_fea_constraint: '${constraintId}' now ${describeConstraint(updated)} (${updated.name}) in '${analysisId}'.`,
+      `update_fea_constraint: '${constraintId}' now ${describeConstraint(updated)} (${updated.name}) in '${analysisId}'.${target !== undefined ? targetDistanceWarning(doc, target) : ''}`,
       [constraintId],
     );
   },

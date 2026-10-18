@@ -1,10 +1,12 @@
 /** Result probes evaluated from a results artifact (the value at the NEAREST MESH NODE; temperature between nodes is interpolated in its element). */
 
-import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact, ProbeQuantity } from '@core/model/analysis';
+import type { Vec3 } from '@core/model/vectors';
+import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact, ProbeQuantity, ResultProbe } from '@core/model/analysis';
 import { loadCasesOf } from '../decks/context';
 import { lengthUnitName, stressUnitName } from '../decks/units';
 import { magnitude, nodeCoordinates, stepOfLoadCase, vonMises, type ResultStep } from './fields';
 import { systemToSi } from '@lib/thermalUnits';
+import { axisFrame, CYLINDRICAL_FIELDS, CYLINDRICAL_QUANTITIES, type AxisFrame, type CylindricalQuantity } from './cylindrical';
 import { locatePoint, type PointWeights } from './probeInterpolation';
 
 interface ProbeValue {
@@ -29,7 +31,7 @@ export interface ProbeReading {
 }
 
 export const QUANTITY_FIELDS: Readonly<
-  Record<ProbeQuantity, { readonly field: string; readonly scalar: (values: readonly number[]) => number }>
+  Record<Exclude<ProbeQuantity, CylindricalQuantity>, { readonly field: string; readonly scalar: (values: readonly number[]) => number }>
 > = {
   temperature: { field: 'NDTEMP', scalar: (values) => values[0] ?? Number.NaN },
   heat_flux: { field: 'FLUX', scalar: magnitude },
@@ -75,6 +77,29 @@ function nearestNode(
   return [best, best === null ? null : distanceTo(best)];
 }
 
+const isCylindrical = (quantity: ProbeQuantity): boolean => (CYLINDRICAL_QUANTITIES as readonly string[]).includes(quantity);
+
+/**
+ * Axis of a cylindrical probe in analysis units: the stored axisPoint (document units) else the centre of the mesh bounding box, along the
+ * stored axisDirection else +Z. null for a zero direction.
+ */
+function probeAxis(probe: ResultProbe, coordinates: ReadonlyMap<number, Vec3>, lengthToAnalysis: number): AxisFrame | null {
+  const direction = probe.axisDirection ?? [0, 0, 1];
+  if (probe.axisPoint !== undefined) {
+    const [x, y, z] = probe.axisPoint;
+    return axisFrame([x * lengthToAnalysis, y * lengthToAnalysis, z * lengthToAnalysis], direction);
+  }
+  const lo: [number, number, number] = [Infinity, Infinity, Infinity];
+  const hi: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+  for (const at of coordinates.values())
+    for (const i of [0, 1, 2] as const) {
+      lo[i] = Math.min(lo[i], at[i]);
+      hi[i] = Math.max(hi[i], at[i]);
+    }
+  const mid = (i: 0 | 1 | 2): number => (coordinates.size === 0 ? 0 : (lo[i] + hi[i]) / 2);
+  return axisFrame([mid(0), mid(1), mid(2)], direction);
+}
+
 function interpolated(at: PointWeights, field: ResultStep['fields'][string] | undefined): number {
   let sum = 0;
   for (const [node, weight] of at.nodes) {
@@ -103,9 +128,21 @@ export function evaluateProbes(
         const step = stepOfLoadCase(results, index);
         return step === undefined ? [] : [{ loadCase: name, step }];
       });
+  const coordinates = nodeCoordinates(mesh);
   return Object.entries(analysis.probes).map(([probeId, probe]) => {
     const [nodeId, nodeDistance] = nearestNode(mesh, probeId, probe.point, lengthToAnalysis);
-    const { field, scalar } = QUANTITY_FIELDS[probe.quantity];
+    const cylindrical = isCylindrical(probe.quantity);
+    const axis = cylindrical ? probeAxis(probe, coordinates, lengthToAnalysis) : null;
+    const nodeAt = nodeId === null ? undefined : coordinates.get(nodeId);
+    const { field, scalar } = cylindrical
+      ? {
+          field: CYLINDRICAL_FIELDS[probe.quantity as CylindricalQuantity].field,
+          scalar: (values: readonly number[]): number =>
+            axis === null || nodeAt === undefined
+              ? Number.NaN
+              : CYLINDRICAL_FIELDS[probe.quantity as CylindricalQuantity].scalar(values, nodeAt, axis),
+        }
+      : QUANTITY_FIELDS[probe.quantity as keyof typeof QUANTITY_FIELDS];
     const inside =
       probe.quantity === 'temperature' && nodeDistance !== null && nodeDistance > 0
         ? locatePoint(mesh, [probe.point[0] * lengthToAnalysis, probe.point[1] * lengthToAnalysis, probe.point[2] * lengthToAnalysis])

@@ -174,9 +174,11 @@ export const updateFeaLoad = defineCommand({
     const problem = problemOf(doc, analysisCase, updated);
     if (problem !== null) return fail(problem.code, problem.message);
     const next: AnalysisCase = { ...analysisCase, loads: { ...analysisCase.loads, [loadId]: updated } };
-    return changed(withCase(doc, next), `update_fea_load: '${loadId}' (${updated.name}) now ${summarize(updated)} in '${analysisId}'.`, [
-      loadId,
-    ]);
+    return changed(
+      withCase(doc, next),
+      `update_fea_load: '${loadId}' (${updated.name}) now ${summarize(updated)} in '${analysisId}'.${fields.target !== undefined ? targetDistanceWarning(doc, fields.target) : ''}`,
+      [loadId],
+    );
   },
 });
 

@@ -10,6 +10,9 @@ import { filesOfData, saveDataFiles, withoutPayloads, withSaveDefaults } from '.
 import { imageDataUrl, resolveImageRefs } from '../src/cli/imageParams';
 import { listCommands } from '@core/commands/registry';
 import { exchangeToolDefinitions } from '../src/cli/exchange';
+import { paramsLines } from '../src/cli/describeSchema';
+import { runCli, type CliIo } from '../src/cli/main';
+import type { ParamsSchema } from '@core/commands/types';
 
 describe('parseArgv', () => {
   it('splits positionals, value flags, boolean flags and --k=v', () => {
@@ -185,5 +188,86 @@ describe('saveFiles', () => {
       files: [{ content: '<2 chars, saved>', name: 'a' }],
     });
     expect(withoutPayloads(5)).toBe(5);
+  });
+});
+
+describe('describe prints nested structure', () => {
+  const textOf = (name: string): string => describeCommand(name)?.text ?? '';
+
+  it('lists every set_temperature_field source branch with its fields', () => {
+    const text = textOf('set_temperature_field');
+    expect(text).toMatch(/^ {2}one of:$/m);
+    for (const kind of ['uniform', 'expression', 'thermal_result', 'table']) expect(text).toContain(`  - kind:"${kind}"`);
+    expect(text).toMatch(/^ {4}- analysisId \(string, required\)/m);
+    expect(text).toMatch(/^ {4}- csvSha256 \(string, required\)/m);
+    expect(text).toMatch(/^ {6}- unit \(string, required\)/m);
+  });
+
+  it('shows the allowable union of compute_margins', () => {
+    const text = textOf('compute_margins');
+    expect(text).toContain('- allowable ("ftu"|"fty" | object)');
+    expect(text).toMatch(/^ {2}one of:$/m);
+    expect(text).toMatch(/^ {4}- value \(number, required\)/m);
+  });
+
+  it('keeps a simple union on one line (timestepS: "auto" | number)', () => {
+    const text = textOf('set_dynamics_solver');
+    expect(text).toContain('- timestepS ("auto" | number):');
+    expect(text).not.toContain('one of:');
+  });
+
+  it('leaves a simple command unchanged', () => {
+    const lines = textOf('add_box').split('\n');
+    expect(lines).toContain('Params:');
+    expect(lines.filter((line) => line.startsWith(' '))).toEqual([]);
+    expect(textOf('add_box')).toContain('- size (number[], required): [width, height, depth]');
+  });
+
+  it('renders records, discriminated array items, defaults, long enums and the depth cap', () => {
+    const deep = (n: number): Record<string, unknown> =>
+      n === 0 ? { type: 'string' } : { type: 'object', properties: { next: deep(n - 1) } };
+    const schema = {
+      type: 'object',
+      required: ['basis'],
+      properties: {
+        basis: {
+          type: 'object',
+          description: 'By id.',
+          additionalProperties: { type: 'object', properties: { kind: { type: 'string', enum: ['a'] } } },
+        },
+        tags: { type: 'object', additionalProperties: { type: 'number' } },
+        parts: {
+          type: 'array',
+          items: { anyOf: [{ type: 'object', properties: { kind: { const: 'p' }, n: { type: 'number' } } }, { type: 'string' }] },
+        },
+        mode: { type: 'string', enum: Array.from({ length: 20 }, (_, i) => `m${i}`), default: 'm0' },
+        nest: deep(9),
+      },
+    } as unknown as ParamsSchema;
+    const text = paramsLines(schema).join('\n');
+    expect(text).toContain('- basis (record<string, object>, required): By id.');
+    expect(text).toContain('each value:');
+    expect(text).toContain('- kind ("a")');
+    expect(text).toContain('- tags (record<string, number>)');
+    expect(text).toContain('- parts ((kind:"p" | string)[])');
+    expect(text).toContain('  - kind:"p"');
+    expect(text).toContain('…(+8)');
+    expect(text).toContain('default "m0"');
+    expect(text).toContain('…');
+  });
+
+  it('prints the raw schema with --json', async () => {
+    const out: string[] = [];
+    const io: CliIo = {
+      stdout: (t) => out.push(t),
+      stderr: () => undefined,
+      readStdin: () => Promise.resolve(''),
+      env: {},
+      prepareKernel: () => Promise.resolve(),
+      fetchImpl: () => Promise.reject(new Error('offline')),
+    };
+    await runCli(['describe', 'set_temperature_field', '--json'], io);
+    const parsed = JSON.parse(out.join('')) as { params: { properties: { source: { anyOf: unknown[] } } } };
+    expect(parsed.params.properties.source.anyOf).toHaveLength(4);
   });
 });

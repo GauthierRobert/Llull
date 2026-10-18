@@ -7,6 +7,7 @@ import { addCylinderPressure } from './cylinders';
 import { addMotor, addPropeller } from './drives';
 import { inspectDynamics } from './inspect';
 import { plotSimulation } from './plot';
+import { renderMotion } from './renderMotion';
 import { engineQuickCheck } from './quickCheck';
 import { simulateMotion } from './simulate';
 import { setDynamicsSolver } from './solver';
@@ -25,4 +26,5 @@ export const dynamicsCommands = commandCatalog(
   engineQuickCheck,
   simulateMotion,
   plotSimulation,
+  renderMotion,
 );

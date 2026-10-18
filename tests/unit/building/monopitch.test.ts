@@ -157,7 +157,7 @@ describe('monopitch frames and wind', () => {
     expect(skipped).toEqual([]);
     expect(frames).toHaveLength(6);
     const frame = frames[0]!;
-    expect(frame.members.filter((member) => member.role === 'rafter')).toHaveLength(1);
+    expect(new Set(frame.members.filter((member) => member.role === 'rafter').map((member) => member.elementId)).size).toBe(1);
     expect(frame.members.filter((member) => member.role === 'column')).toHaveLength(2);
     const heights = frame.columnTops.map((top) => top.height).sort((a, b) => a - b);
     expect(heights[0]).toBeCloseTo(7000, 6);

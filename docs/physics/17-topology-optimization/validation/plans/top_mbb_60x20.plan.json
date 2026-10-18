@@ -26,7 +26,6 @@
   "command": "define_material_record",
   "params": {
    "id": "topo_unit",
-   "name": "topo_unit",
    "designation": "benchmark material E = 1 MPa, nu = 0.3",
    "specs": [],
    "licence": "company-proprietary",
@@ -84,8 +83,7 @@
    "density": 0.001,
    "color": "#9aa0a6",
    "metalness": 0,
-   "roughness": 0.6,
-   "recordId": "topo_unit"
+   "roughness": 0.6
   }
  },
  {

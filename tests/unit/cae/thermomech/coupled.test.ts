@@ -248,6 +248,33 @@ describe('coupled deck', () => {
     expect(writeInp(base.doc, base.analysisId, missingFaces)).toMatchObject({ code: expect.stringMatching(/FEA_TARGET_UNRESOLVED/) });
   });
 
+  it('refuses two different temperatures on shared nodes with THM_BC_CONFLICT, and accepts equal ones', () => {
+    const base = coupledFixture();
+    const second = (value: number): { doc: CadDocument; mesh: FeMeshArtifact; id: string } => {
+      const added = execute(base.doc, 'add_thermal_bc', {
+        analysisId: base.analysisId,
+        name: 'other',
+        kind: 'temperature',
+        value,
+        unit: 'degC',
+        target: { entityId: base.boxId, facesNear: [[10, 5, 5]] },
+      });
+      const id = added.affected[0] ?? '';
+      const mesh = {
+        ...base.mesh,
+        inputHash: analysisInputHash(added.document, base.analysisId, 'mesh'),
+        nodeSets: { ...base.mesh.nodeSets, [`B_${id}`]: [2, 5] },
+      };
+      return { doc: added.document, mesh, id };
+    };
+    const conflicting = second(80);
+    const refused = writeInp(conflicting.doc, base.analysisId, conflicting.mesh);
+    expect(refused).toMatchObject({ code: 'THM_BC_CONFLICT', ids: [base.bcId, conflicting.id] });
+    expect('message' in refused && refused.message).toContain('delete_thermal_bc');
+    const equal = second(120);
+    expect(writeInp(equal.doc, base.analysisId, equal.mesh)).toHaveProperty('text');
+  });
+
   it('the coupled functions refuse other analysis types', () => {
     const fixture = thermoFixture();
     const ctx = buildDeckContext(fixture.doc, fixture.analysisId, fixture.mesh);

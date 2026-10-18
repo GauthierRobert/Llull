@@ -1,6 +1,6 @@
 [
  {"command": "set_units", "params": {"units": "mm"}},
- {"command": "define_material_record", "params": {"id": "aa6061_t6", "name": "6061-T6 aluminium", "designation": "6061", "temper": "T6", "specs": [], "licence": "public-domain-us-gov", "exportMarking": {"regime": "none"}}},
+ {"command": "define_material_record", "params": {"id": "aa6061_t6", "designation": "6061", "temper": "T6", "specs": [], "licence": "public-domain-us-gov", "exportMarking": {"regime": "none"}}},
  {"command": "define_property_model", "params": {"material": "aa6061_t6", "model": {
    "id": "k.nist", "property": "k", "unit": "W/(m*K)",
    "variables": [{"variable": "T", "unit": "K"}],

@@ -47,7 +47,7 @@ export function checkFrames(
         const member = building.elements[analysis.elementId];
         const forces = result.members[index];
         if (member?.category !== 'member' || !forces) return;
-        const profile = findProfile(member.profile);
+        const profile = analysis.section ?? findProfile(member.profile);
         if (!profile) return;
         const fy = yieldStrength(member.material);
         const resistance = sectionResistance(profile, fy);
@@ -73,17 +73,19 @@ export function checkFrames(
           moment: moment / 1e6,
           shear: shear / 1000,
           utilisation: Math.max(section, buckling.utilisation, shearRatio),
-          check: `${governing} (${member.profile} class ${resistance.sectionClass}, ${member.material}${amplification > 1 ? `, sway ×${amplification.toFixed(2)}` : ''})`,
+          check: `${governing} (${analysis.section && analysis.section.h > (findProfile(member.profile)?.h ?? 0) ? `${member.profile} haunched h${profile.h.toFixed(0)}` : member.profile} class ${resistance.sectionClass}, ${member.material}${amplification > 1 ? `, sway ×${amplification.toFixed(2)}` : ''})`,
         });
       });
       for (const connection of Object.values(building.elements)) {
         if (connection.category !== 'connection') continue;
-        const index = frame.members.findIndex((analysis) => analysis.elementId === connection.rafterId);
+        const rafter = frame.members.find((analysis) => analysis.elementId === connection.rafterId);
+        if (!rafter) continue;
+        // Map the rafter end to the analysis member end (members are analysed left → right); a stepped rafter's end piece holds it.
+        const end = (connection.end === 'start') !== rafter.reversed ? 0 : 1;
+        const index = frame.members.findIndex((analysis) => analysis.elementId === connection.rafterId && analysis.ends[end]);
         const analysis = frame.members[index];
         const forces = result.members[index];
         if (!analysis || !forces) continue;
-        // Map the rafter end to the analysis member end (members are analysed left → right).
-        const end = (connection.end === 'start') !== analysis.reversed ? 0 : 1;
         const moment = forces.moment[end] * amplification;
         const shear = forces.shear[end];
         const list = connectionForces.get(connection.id) ?? [];

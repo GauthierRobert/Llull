@@ -1,6 +1,7 @@
 import { clamp } from '@lib/clamp';
 import type { SteelMemberElement } from '@core/model/building';
 import type { FrameMember, FrameNode } from '@lib/frame2d';
+import type { SteelProfile } from '../../steel/profiles';
 import type { CoefficientSet } from '../common/windCoefficients';
 import { GRAVITY } from '../../shared/numeric';
 
@@ -63,6 +64,8 @@ export interface AnalysisMember {
   /** True for the first / last analysis piece of the element (connection ends). */
   readonly ends: readonly [boolean, boolean];
   readonly loads: CaseLoads;
+  /** Section to check this piece with when it differs from the element's profile (haunched rafter piece); omitted otherwise. */
+  readonly section?: SteelProfile;
   /**
    * Buckling lengths (mm): in-plane system length, out-of-plane flexural length and the spacing of lateral-torsional restraints (purlins /
    * side rails with fly braces to the inner flange).

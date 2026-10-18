@@ -127,6 +127,8 @@ export interface ParamItemSpec {
   properties?: Record<string, ParamSpec>;
   /** For `type: 'object'`: child properties that must be present. */
   required?: readonly string[];
+  /** For a record (`type: 'object'` keyed by any string): the schema of every value (JSON Schema `additionalProperties`). */
+  additionalProperties?: ParamItemSpec;
 }
 
 /** A named parameter: an item spec that must carry a `description`. */

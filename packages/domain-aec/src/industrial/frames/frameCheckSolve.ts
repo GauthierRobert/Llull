@@ -164,6 +164,7 @@ export function solveUltimate(frame: FrameModel, combination: Combination): Ulti
     const [a, b] = [frame.nodes[member.geometry.a], frame.nodes[member.geometry.b]];
     if (member.role !== 'rafter' || !forces || !a || !b) return;
     steep ||= Math.abs(b.y - a.y) > HORNE_MAX_SLOPE * Math.abs(b.x - a.x);
+    if (member.section) return; // haunched pieces: Ncr of the plain rafter governs
     const middle = (a.x + b.x) / 2;
     const span = frame.spans.find(([x0, x1]) => middle >= x0 && middle <= x1);
     const length = span ? span[1] - span[0] : Math.hypot(b.x - a.x, b.y - a.y);

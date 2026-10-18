@@ -28,7 +28,30 @@ export type TemperatureScale = 'degC' | 'K';
 export type LoadCategory = 'limit' | 'ultimate';
 export type Decision = 'accepted' | 'rejected' | 'redesign';
 export type FeElementType = 'C3D4' | 'C3D10' | 'CPS3' | 'CPS6' | 'CPS4' | 'CPS8' | 'S3' | 'S6' | 'S4' | 'S8';
-export type ProbeQuantity = 'temperature' | 'heat_flux' | 'u_mag' | 'u_x' | 'u_y' | 'u_z' | 'von_mises' | 's_xx' | 's_yy' | 's_zz';
+/** A result probe; axisPoint / axisDirection (document units / any non-zero vector) apply to the cylindrical quantities only. */
+export interface ResultProbe {
+  readonly name: string;
+  readonly point: Vec3;
+  readonly quantity: ProbeQuantity;
+  readonly axisPoint?: Vec3;
+  readonly axisDirection?: Vec3;
+}
+
+export type ProbeQuantity =
+  | 'temperature'
+  | 'heat_flux'
+  | 'u_mag'
+  | 'u_x'
+  | 'u_y'
+  | 'u_z'
+  | 'von_mises'
+  | 's_xx'
+  | 's_yy'
+  | 's_zz'
+  | 's_hoop'
+  | 's_radial'
+  | 's_axial'
+  | 'u_radial';
 
 /** Only `solid` is built; the other kinds are 05 backlog and exist so documents stay forward-compatible. */
 export type Idealization =
@@ -335,7 +358,7 @@ export interface AnalysisCase {
   readonly mesh: MeshControls;
   readonly meshSummary?: MeshSummary;
   readonly results?: ResultsSummary;
-  readonly probes: Readonly<Record<string, { readonly name: string; readonly point: Vec3; readonly quantity: ProbeQuantity }>>;
+  readonly probes: Readonly<Record<string, ResultProbe>>;
   readonly view?: {
     readonly field: 'von_mises' | 'u_mag' | 'u_x' | 'u_y' | 'u_z' | 's_xx' | 's_yy' | 's_zz' | 'mode';
     readonly loadCase?: string;

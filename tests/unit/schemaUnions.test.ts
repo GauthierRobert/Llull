@@ -51,3 +51,19 @@ describe('unknown params are named in the summary', () => {
     expect(execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).summary).not.toContain('ignored unknown');
   });
 });
+
+describe('record params publish their value schema', () => {
+  it('emits additionalProperties for a typed record and nothing for a record of unknown', () => {
+    const schema = toParamsSchema(
+      z.object({
+        typed: z.record(z.string(), z.object({ kind: z.enum(['secant', 'instantaneous']).describe('basis') })).describe('typed'),
+        open: z.record(z.string(), z.unknown()).describe('open'),
+      }),
+    );
+    expect(schema.properties['typed']).toMatchObject({
+      type: 'object',
+      additionalProperties: { type: 'object', properties: { kind: { enum: ['secant', 'instantaneous'] } }, required: ['kind'] },
+    });
+    expect(schema.properties['open']?.additionalProperties).toBeUndefined();
+  });
+});

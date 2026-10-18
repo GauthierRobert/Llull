@@ -9,9 +9,8 @@ import { analysisInputHash } from '../hash/inputHash';
 import { ALL_NODES, type DeckContext, type DeckRefusal, type DeckSections } from '../decks/context';
 import { linesText, num, row } from '../decks/format';
 import { absoluteZeroOf, inScale } from './quantities';
-import { temperatureBcConflicts } from './bcConflicts';
+import { temperatureConflictRefusal } from './bcConflicts';
 import { checkThermalItems } from './check';
-import { remediationOf } from './codes';
 import { propertyCards } from './deckMaterial';
 import { allBcLines, cavityLines } from './deckLoads';
 import { contactBlocks } from './deckContact';
@@ -59,13 +58,8 @@ export function thermalSections(ctx: DeckContext): DeckSections {
   if (thermal === undefined) return refusal('THM_CASE_TYPE', `analysis '${ctx.analysisId}' has no thermal set-up`, [ctx.analysisId]);
   const blocking = checkThermalItems(ctx.doc, ctx.analysisId).find((item) => item.severity === 'error' && BLOCKING.has(item.code));
   if (blocking !== undefined) return refusal(blocking.code, blocking.message, blocking.ids);
-  const conflict = temperatureBcConflicts(thermal, ctx.mesh)[0];
-  if (conflict !== undefined)
-    return refusal(
-      'THM_BC_CONFLICT',
-      `temperature BCs '${conflict.first}' and '${conflict.second}' prescribe different values on ${conflict.sharedNodes} shared node(s), so the deck would be ambiguous (the solver keeps only the last one). ${remediationOf('THM_BC_CONFLICT')}`,
-      [conflict.first, conflict.second],
-    );
+  const conflict = temperatureConflictRefusal(thermal, ctx.mesh);
+  if (conflict !== null) return conflict;
   const steady = ctx.analysis.type === 'heat_steady';
   const scale = thermal.temperatureScale;
   const plan = planStep(thermal, steady);

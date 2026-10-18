@@ -140,7 +140,7 @@ function framesOfHall(doc: CadDocument): FrameModel[] {
 /** Roof rafter loads of the first frame, left to right. */
 const rafterLoads = (frame: FrameModel, loadCase: 'WL' | 'WLp' | 'WR' | 'WRp'): number[] =>
   frame.members
-    .filter((member) => member.role === 'rafter')
+    .filter((member) => member.role === 'rafter' && member.ends[0])
     .sort((a, b) => (frame.nodes[a.geometry.a]?.x ?? 0) - (frame.nodes[b.geometry.a]?.x ?? 0))
     .map((member) => member.loads[loadCase]!.qy);
 

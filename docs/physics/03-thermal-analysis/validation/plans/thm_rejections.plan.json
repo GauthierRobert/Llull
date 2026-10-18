@@ -21,7 +21,6 @@
   "command": "define_material_record",
   "params": {
    "id": "k_only",
-   "name": "k_only",
    "designation": "validation test material",
    "specs": [],
    "licence": "company-proprietary",
@@ -51,8 +50,7 @@
    "density": 0.0027,
    "color": "#9aa0a6",
    "metalness": 1,
-   "roughness": 0.4,
-   "recordId": "k_only"
+   "roughness": 0.4
   }
  },
  {

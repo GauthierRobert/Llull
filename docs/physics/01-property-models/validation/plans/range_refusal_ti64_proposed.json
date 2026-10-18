@@ -1,5 +1,5 @@
 [
- {"command": "define_material_record", "params": {"id": "ti6al4v", "name": "Ti-6Al-4V", "designation": "Ti-6Al-4V", "specs": [], "licence": "public-domain-us-gov", "exportMarking": {"regime": "none"}}},
+ {"command": "define_material_record", "params": {"id": "ti6al4v", "designation": "Ti-6Al-4V", "specs": [], "licence": "public-domain-us-gov", "exportMarking": {"regime": "none"}}},
  {"command": "define_property_model", "params": {"material": "ti6al4v", "model": {
    "id": "k.nist", "property": "k", "unit": "W/(m*K)",
    "variables": [{"variable": "T", "unit": "K"}],

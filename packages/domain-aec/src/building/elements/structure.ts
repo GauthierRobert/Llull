@@ -11,6 +11,7 @@ import { getBuilding, isVec2List, nextElementId, nextMark, resolveLevel, toVec2,
 import { noop } from '@core/commands/noop';
 import { duplicateSummary, findTwin, samePoint, sameRing, sameSegment } from '../../shared/duplicates';
 import { commitBuilding } from '../evaluate/evaluateElements';
+import { beamReferenceParam } from './beamReference';
 import { levelIdParam } from '../levelParams';
 
 const concreteMaterialParam = z.string().optional().describe('Material. Default concrete.');
@@ -276,30 +277,33 @@ export const addColumn = defineCommand({
 
 /**
  * @affects creates 1 beam (box on layer S-BEAM)
+ * @invariant stored topOffset is relative to the level top (reference ffl converts by subtracting the level height)
  * @failure zero length / size <= 0 -> no-op
  */
 export const addBeam = defineCommand({
   name: 'add_beam',
   description:
-    'Add a horizontal beam from start to end (plan [x, y]). Its top sits at the top of the level ' +
-    '(elevation + level height) + topOffset — i.e. under the next floor slab by default. Refused if a ' +
+    'Add a horizontal beam from start to end (plan [x, y]). Its top sits at the datum + topOffset; reference "levelTop" ' +
+    '(default) = top of the level (elevation + level height), i.e. under the next floor slab; "ffl" = level elevation. Refused if a ' +
     'beam over the same span (either direction) at the same topOffset already exists on the level.',
   params: z.object({
     start: vec2('Beam axis start [x, y].'),
     end: vec2('Beam axis end [x, y].'),
     width: z.number().optional().describe('Section width, in document units. Default 300 mm.'),
     depth: z.number().optional().describe('Section depth, in document units. Default 500 mm.'),
-    topOffset: z.number().optional().describe('Offset of the beam top from the top of the level, in document units. Default 0.'),
+    topOffset: z.number().optional().describe('Offset of the beam top from the datum chosen by reference, in document units. Default 0.'),
+    reference: beamReferenceParam,
     levelId: levelIdParam,
     material: concreteMaterialParam,
   }),
-  run: (doc, { start, end, width, depth, topOffset = 0, levelId, material }): CommandResult => {
+  run: (doc, { start, end, width, depth, topOffset: requestedOffset = 0, reference = 'levelTop', levelId, material }): CommandResult => {
     if (distance(start, end) <= 0) return noop(doc, 'add_beam failed: start and end must be distinct [x, y] points.');
     const resolvedWidth = width ?? fromMm(doc, 300);
     const resolvedDepth = depth ?? fromMm(doc, 500);
     if (resolvedWidth <= 0 || resolvedDepth <= 0) return noop(doc, 'add_beam failed: width and depth must be > 0.');
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_beam failed: ${resolution.reason}.`);
+    const topOffset = reference === 'ffl' ? requestedOffset - resolution.level.height : requestedOffset;
     const twin = findTwin(
       resolution.building,
       'beam',

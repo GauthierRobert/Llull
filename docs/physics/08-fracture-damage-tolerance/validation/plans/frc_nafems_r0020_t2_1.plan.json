@@ -26,7 +26,6 @@
   "command": "define_material_record",
   "params": {
    "id": "e207",
-   "name": "e207",
    "designation": "NAFEMS R0020 test 2.1 inputs (E 207 GPa, nu 0.3)",
    "specs": [],
    "licence": "company-proprietary",
@@ -70,8 +69,7 @@
    "density": 0.00785,
    "color": "#9aa0a6",
    "metalness": 1,
-   "roughness": 0.4,
-   "recordId": "e207"
+   "roughness": 0.4
   }
  },
  {
@@ -207,7 +205,6 @@
   "command": "set_mesh_controls",
   "params": {
    "analysisId": "$an",
-   "mesher": "gmsh",
    "elementFamily": "quad",
    "order": 2,
    "globalSize": 1,

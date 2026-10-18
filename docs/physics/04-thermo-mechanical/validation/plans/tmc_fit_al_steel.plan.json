@@ -56,7 +56,6 @@
   "command": "define_material_record",
   "params": {
    "id": "al_test",
-   "name": "al_test",
    "designation": "validation test material",
    "specs": [],
    "licence": "company-proprietary",
@@ -97,7 +96,6 @@
   "command": "define_material_record",
   "params": {
    "id": "steel_test",
-   "name": "steel_test",
    "designation": "validation test material",
    "specs": [],
    "licence": "company-proprietary",
@@ -141,8 +139,7 @@
    "density": 0.0027,
    "color": "#9aa0a6",
    "metalness": 1,
-   "roughness": 0.4,
-   "recordId": "al_test"
+   "roughness": 0.4
   }
  },
  {
@@ -161,8 +158,7 @@
    "density": 0.0078,
    "color": "#9aa0a6",
    "metalness": 1,
-   "roughness": 0.4,
-   "recordId": "steel_test"
+   "roughness": 0.4
   }
  },
  {

@@ -163,3 +163,52 @@ describe('target far from the part', () => {
     expect(load.summary).not.toContain('WARNING');
   });
 });
+
+describe('target far from the part in update_* commands', () => {
+  const fixture = thermalFixture();
+  const far = { entityId: fixture.boxId, facesNear: [[0.5, 0.5, 0.85]] };
+  const near = { entityId: fixture.boxId, facesNear: [[0.5, 0.5, 0]] };
+
+  it('update_fea_constraint and update_fea_load warn for a far target, not for a near one or without a target', () => {
+    const fix = must(fixture.doc, 'add_fea_constraint', { analysisId: fixture.analysisId, name: 'fix', kind: 'fixed', target: near });
+    const constraintId = fix.affected[0] ?? '';
+    const moved = must(fix.document, 'update_fea_constraint', { analysisId: fixture.analysisId, constraintId, target: far });
+    expect(moved.summary).toContain('WARNING: 1 target point(s) lie off the part');
+    expect(moved.affected).toEqual([constraintId]);
+    expect(
+      must(fix.document, 'update_fea_constraint', { analysisId: fixture.analysisId, constraintId, target: near }).summary,
+    ).not.toContain('WARNING');
+    expect(
+      must(fix.document, 'update_fea_constraint', { analysisId: fixture.analysisId, constraintId, name: 'renamed' }).summary,
+    ).not.toContain('WARNING');
+    const load = must(fixture.doc, 'add_fea_load', {
+      analysisId: fixture.analysisId,
+      name: 'p',
+      kind: 'pressure',
+      magnitude: 1000,
+      target: near,
+    });
+    const loadId = load.affected[0] ?? '';
+    expect(must(load.document, 'update_fea_load', { analysisId: fixture.analysisId, loadId, target: far }).summary).toContain('WARNING');
+    expect(must(load.document, 'update_fea_load', { analysisId: fixture.analysisId, loadId, magnitude: 5 }).summary).not.toContain(
+      'WARNING',
+    );
+  });
+
+  it('update_thermal_bc warns for a far target', () => {
+    const added = must(fixture.doc, 'add_thermal_bc', {
+      analysisId: fixture.analysisId,
+      name: 'f',
+      kind: 'film',
+      filmCoefficient: { value: 50, unit: 'W/(m^2*K)' },
+      sinkTemperature: { value: 20, unit: 'degC' },
+      source: { citation: 'test' },
+      target: near,
+    });
+    const bcId = added.affected[0] ?? '';
+    expect(must(added.document, 'update_thermal_bc', { analysisId: fixture.analysisId, bcId, target: far }).summary).toContain('WARNING');
+    expect(must(added.document, 'update_thermal_bc', { analysisId: fixture.analysisId, bcId, target: near }).summary).not.toContain(
+      'WARNING',
+    );
+  });
+});

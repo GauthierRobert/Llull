@@ -23,6 +23,8 @@ interface PortalInputs {
   readonly roofType: 'duopitch' | 'monopitch';
   readonly columnBase: 'pinned' | 'fixed';
   readonly profiles: PortalProfiles;
+  /** Haunch lengths as fractions of the span; null = the default eaves haunch of the connections. */
+  readonly haunch: { readonly eaves: number; readonly apex: number } | null;
 }
 
 /** @failure any invalid dimension / profile / combination -> `{ reason }` (full failure summary) */
@@ -67,7 +69,13 @@ export function portalInputs(doc: CadDocument, params: PortalParams): PortalInpu
   const p = profiles as PortalProfiles;
   if (params.crane && !(params.crane.railHeight > 0 && params.crane.railHeight < eave))
     return fail('crane.railHeight must be > 0 and below the eaves.');
+  const { eavesLength = 0.1, apexLength = 0 } = params.haunch ?? {};
+  const fractionOk = (value: number): boolean => Number.isFinite(value) && value >= 0 && value <= 0.25;
+  if (!fractionOk(eavesLength) || !fractionOk(apexLength) || eavesLength + apexLength > 0.4) {
+    return fail('haunch.eavesLength and haunch.apexLength must be fractions of the span in [0, 0.25] with a sum of at most 0.4.');
+  }
   return {
+    haunch: params.haunch ? { eaves: eavesLength, apex: roofType === 'monopitch' ? 0 : apexLength } : null,
     mm,
     origin,
     span,

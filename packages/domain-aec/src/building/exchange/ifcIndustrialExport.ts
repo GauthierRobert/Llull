@@ -206,7 +206,7 @@ export function exportConnection(
   const exported: Exported[] = [];
   for (const solid of solids.filter((candidate) => !candidate.part.startsWith('bolt'))) {
     const { placement: local, body } = solidOf(solid);
-    const haunch = solid.part === 'haunch';
+    const haunch = solid.part.startsWith('haunch');
     const ref = writer.add(
       haunch
         ? `IFCMEMBER('${context.guid(`${connection.id}:${solid.part}`)}',$,${ifcString(`${connection.mark} haunch`)},$,'HAUNCH',${local},${shape(context, [body])},${ifcString(connection.id)},.USERDEFINED.)`

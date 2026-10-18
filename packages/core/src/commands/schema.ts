@@ -90,6 +90,14 @@ function itemSchema(core: z.ZodType): z.ZodType | undefined {
   return (def.element?.def as { type?: string } | undefined)?.type === 'any' ? undefined : def.element;
 }
 
+/** Value schema of a `z.record`, unless it accepts anything (`unknown` / `any` declares nothing to agents). */
+function recordValue(core: z.ZodType): z.ZodType | undefined {
+  const def = core.def as { type: string; valueType?: z.ZodType };
+  if (def.type !== 'record' || def.valueType === undefined) return undefined;
+  const valueKind = (unwrap(def.valueType).core.def as { type?: string }).type;
+  return valueKind === 'unknown' || valueKind === 'any' ? undefined : def.valueType;
+}
+
 function objectShape(core: z.ZodType): Record<string, z.ZodType> | undefined {
   const def = core.def as { type: string; shape?: Record<string, z.ZodType> };
   return def.type === 'object' ? def.shape : undefined;
@@ -150,6 +158,8 @@ function fillStructure(spec: ParamItemSpec, core: z.ZodType): void {
   if (values !== undefined && (core.def as { type: string }).type !== 'tuple') spec.enum = values;
   const item = itemSchema(core);
   if (item) spec.items = toItemSpec(item);
+  const value = recordValue(core);
+  if (value) spec.additionalProperties = toItemSpec(value);
   const shape = objectShape(core);
   if (shape) {
     // `z.object({})` = an open object declared with `properties: {}`; `z.record` emits none.

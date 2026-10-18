@@ -45,6 +45,7 @@ export function buildSvg(
   entityCount: number,
   background: string | null = DEFAULT_BACKGROUND,
   rasterRadius: number | null = null,
+  caption = true,
 ): string {
   const project = makeProjector(cam, orthoHalf, width, height);
   // Painter's algorithm: `depth` grows away from the camera, so draw farthest first so nearer
@@ -68,8 +69,12 @@ export function buildSvg(
         : filled.length === 0
           ? stroked.map((poly) => polygonSvg(poly, project))
           : [rasterLayer([...filled, ...stroked], cam, orthoHalf, width, height, rasterRadius)]),
-      buildAxisTriad(project, cam.target, width, height, orthoHalf),
-      `  <text x="8" y="20" font-family="monospace" font-size="13" fill="#aaaacc">${viewName.toUpperCase()} | ${entityCount} entit${entityCount === 1 ? 'y' : 'ies'}</text>`,
+      ...(caption
+        ? [
+            buildAxisTriad(project, cam.target, width, height, orthoHalf),
+            `  <text x="8" y="20" font-family="monospace" font-size="13" fill="#aaaacc">${viewName.toUpperCase()} | ${entityCount} entit${entityCount === 1 ? 'y' : 'ies'}</text>`,
+          ]
+        : []),
     ],
     background,
   );

@@ -61,6 +61,8 @@ export interface RenderOptions {
   frame?: Bounds | null;
   /** `raster` (default): z-buffered faces embedded as a PNG; `vector`: painter-sorted SVG polygons. */
   mode?: 'raster' | 'vector';
+  /** false: no view caption and axis triad (frames composed by another command, e.g. render_motion). */
+  caption?: boolean;
 }
 
 /** Polygon before depth is computed (all tessellation helpers return this). */

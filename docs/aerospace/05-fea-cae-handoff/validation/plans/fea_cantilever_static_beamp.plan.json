@@ -26,7 +26,6 @@
   "command": "define_material_record",
   "params": {
    "id": "steel_E210",
-   "name": "steel_E210",
    "designation": "test material E = 210000 MPa",
    "specs": [],
    "licence": "company-proprietary",
@@ -84,8 +83,7 @@
    "density": 0.0078,
    "color": "#9aa0a6",
    "metalness": 1,
-   "roughness": 0.4,
-   "recordId": "steel_E210"
+   "roughness": 0.4
   }
  },
  {
@@ -163,7 +161,6 @@
   "command": "set_mesh_controls",
   "params": {
    "analysisId": "$an",
-   "mesher": "gmsh",
    "elementFamily": "tet",
    "order": 2,
    "globalSize": 0.25

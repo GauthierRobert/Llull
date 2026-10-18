@@ -251,15 +251,15 @@ column; tolerances there). `D` = `--doc case.llull.json --kernel occt --json`.
 | - | ----- | ---------- | ----------- | -- |
 | AC-1 | `plans/fea_cantilever_static_beamp.plan.json` | `llull run <plan> D` (`$an` = analysis id from `affected`); `llull fea_mesh analysisId=$an D`; `llull fea_solve analysisId=$an D`; `llull fea_report analysisId=$an D` | probe `tip` `u_y` (mm) within 2 % of VC-FEA-10.a = 0.0877714 mm | VC-FEA-10, 40 |
 | AC-2 | `plans/fea_cantilever_modal_beamf.plan.json` | same with `modes=4`, then `llull fea_report D` | `data.results.frequenciesHz[0]` within 1 % of VC-FEA-11.a = 13096.7 and of the CalculiX ref 13096.03 | VC-FEA-11, 41 |
-| AC-3 | `plans/fea_nafems_le1.plan.json` | run, mesh, solve, `fea_report` | probe `D` `stress_yy` (MPa) within 2 % of 92.7 | VC-FEA-30 |
-| AC-4 | `plans/fea_nafems_le10.plan.json` | run, mesh, solve, `fea_report` | probe `D` `stress_yy` (MPa) within 3 % of −5.38 | VC-FEA-31 |
+| AC-3 | `plans/fea_nafems_le1.plan.json` | run, mesh, solve, `fea_report` | probe `D` `s_yy` (MPa) within 2 % of 92.7 | VC-FEA-30 |
+| AC-4 | `plans/fea_nafems_le10.plan.json` | run, mesh, solve, `fea_report` | probe `D` `s_yy` (MPa) within 3 % of −5.38 | VC-FEA-31 |
 | AC-5 | the four allowable/limit pairs of VC-FEA-20, no factors given | `llull compute_margins analysisId=$an D` | `rows[*].ms` = 0, 0.5, 0, −0.0666667; row 4 `status: "FAIL"`, `code: "FEA_MS_NEGATIVE"`; `data.factors.ultimate` = `{value: 1.5, source: "14 CFR 25.303", defaulted: true}` | VC-FEA-20, 60 |
 | AC-6 | a mesh artifact with one inverted element | `llull fea_export analysisId=$an format=calculix_inp --save x.inp D` | exit 1, `data.code: "FEA_MESH_INVERTED"`, `data.elementIds` non-empty, no file written | VC-FEA-08, 65 |
 | AC-7 | an exported BDF | `fea_export … --save` then pyNastran `read_bdf(xref=True)` | no error, card counts match the mesh, Σ FORCE = applied total | VC-FEA-15 |
 | AC-8 | solved results | `llull set_parameter name=L expression=10 D`; `llull compute_margins analysisId=$an D` | exit 1, `data.code: "FEA_RESULTS_STALE"` | VC-FEA-50 |
 | AC-9 | a 100×60×40 box shelled to 2 mm | `llull extract_midsurface entityId=$box maxThickness=3 D` | `data.areaMm2` = 23 224 ±0.1 %, `data.coverage` = 1 | VC-FEA-03 |
 | AC-10 | the same plan | run from CLI, MCP `build_project` and UI dispatch | same document hash and deck sha256 | VC-FEA-51 |
-| AC-11 | `plans/fea_plate_hole_kirsch.plan.json` | run, mesh, solve, `fea_report` | peak `stress_xx` at the hole within 5 % of 300 MPa | VC-FEA-14 |
+| AC-11 | `plans/fea_plate_hole_kirsch.plan.json` | run, mesh, solve, `fea_report` | peak `s_xx` at the hole within 5 % of 300 MPa | VC-FEA-14 |
 | AC-12 | the desktop installer | `npm --prefix desktop test` | GPL texts and source offers for Gmsh and CalculiX present | VC-FEA-52 |
 | AC-13 | any solved analysis | `llull compute_margins … D` | every row has `reviewRequired: true` and a `reviewReason`; `summary` contains "not approved" | VC-FEA-61 |
 | AC-14 | a negative-MS row | agent calls `llull dispose_margin analysisId=$an rowId=r4 decision=accepted justification="…" D` | exit 1, `data.code: "FEA_HUMAN_GATE"`, document unchanged; `check_analysis` still `fail` | VC-FEA-62, 63 |

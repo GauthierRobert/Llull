@@ -162,7 +162,7 @@ export const updateThermalBc = defineCommand({
     const thermal = { ...found.thermal, bcs: { ...found.thermal.bcs, [updated.id]: updated } };
     return changed(
       withThermal(doc, found, thermal),
-      `update_thermal_bc: '${updated.id}' (${updated.name}) now ${describeBc(bc)} in '${params.analysisId}'.`,
+      `update_thermal_bc: '${updated.id}' (${updated.name}) now ${describeBc(bc)} in '${params.analysisId}'.${params.target !== undefined ? targetDistanceWarning(doc, params.target) : ''}`,
       [updated.id],
     );
   },

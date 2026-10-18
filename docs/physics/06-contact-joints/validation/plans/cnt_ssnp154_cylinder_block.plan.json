@@ -66,7 +66,6 @@
   "command": "define_material_record",
   "params": {
    "id": "cyl_E210",
-   "name": "cyl_E210",
    "designation": "test material",
    "specs": [],
    "licence": "company-proprietary",
@@ -143,15 +142,13 @@
    "density": 0.0078,
    "color": "#9aa0a6",
    "metalness": 1,
-   "roughness": 0.4,
-   "recordId": "cyl_E210"
+   "roughness": 0.4
   }
  },
  {
   "command": "define_material_record",
   "params": {
    "id": "blk_E70",
-   "name": "blk_E70",
    "designation": "test material",
    "specs": [],
    "licence": "company-proprietary",
@@ -228,8 +225,7 @@
    "density": 0.0078,
    "color": "#9aa0a6",
    "metalness": 1,
-   "roughness": 0.4,
-   "recordId": "blk_E70"
+   "roughness": 0.4
   }
  },
  {
@@ -459,7 +455,6 @@
   "command": "set_mesh_controls",
   "params": {
    "analysisId": "$an",
-   "mesher": "gmsh",
    "elementFamily": "hex_dominant",
    "order": 1,
    "globalSize": 5.0,

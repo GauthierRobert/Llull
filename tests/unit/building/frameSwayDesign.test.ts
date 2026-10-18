@@ -66,12 +66,20 @@ describe('stiffness-driven column step', () => {
 
 describe('portal frame sway against the closed-form portal formulas', () => {
   it('matches the fixed-base and pinned-base rail-level sway of the default hall within 1 %', () => {
-    const fixed = railSway(hall({ ...CRANE_HALL, columnBase: 'fixed' }));
+    // The closed forms are for prismatic rafters: no eaves haunch.
+    const prismatic = { ...CRANE_HALL, haunch: { eavesLength: 0 } };
+    const fixed = railSway(hall({ ...prismatic, columnBase: 'fixed' }));
     expect(fixed.solver).toBeGreaterThan(0);
     expect(Math.abs(fixed.solver / fixed.fixed - 1)).toBeLessThan(0.01);
-    const pinned = railSway(hall(CRANE_HALL));
+    const pinned = railSway(hall(prismatic));
     expect(Math.abs(pinned.solver / pinned.pinned - 1)).toBeLessThan(0.01);
     expect(pinned.solver).toBeGreaterThan(3 * fixed.solver);
+  });
+  it('sways less with the default 10 % eaves haunches, which stiffen the eaves joint (stiffer rafter restraint)', () => {
+    const plain = railSway(hall({ ...CRANE_HALL, haunch: { eavesLength: 0 } }));
+    const haunched = railSway(hall(CRANE_HALL));
+    expect(haunched.solver).toBeLessThan(plain.solver);
+    expect(haunched.solver).toBeGreaterThan(0.8 * plain.solver);
   });
 });
 

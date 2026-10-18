@@ -20,12 +20,12 @@ import { caseOf } from '../shared/access';
 import { refuseFe } from '../shared/feCodes';
 import { analysisIdSchema } from '../shared/schemas';
 import { trustedRecord } from '../shared/trust';
-import { QUANTITIES } from './probes';
+import { PROBE_QUANTITIES } from './probes';
 
 const NAME = 'render_fea_results';
 /** Auto deformation: the largest displacement is drawn at this fraction of the model size. */
 const AUTO_DEFORMATION = 0.08;
-const FIELDS = [...QUANTITIES, ...CYLINDRICAL_QUANTITIES] as const;
+const FIELDS = PROBE_QUANTITIES;
 
 const isSteady = (type: string): boolean => type === 'heat_steady';
 
@@ -174,7 +174,7 @@ export const renderFeaResults = defineCommand({
     const cylindrical = (CYLINDRICAL_QUANTITIES as readonly string[]).includes(quantity);
     const { field, scalar } = cylindrical
       ? CYLINDRICAL_FIELDS[quantity as CylindricalQuantity]
-      : QUANTITY_FIELDS[quantity as ProbeQuantity];
+      : QUANTITY_FIELDS[quantity as keyof typeof QUANTITY_FIELDS];
     const values = selected.step.fields[field]?.values;
     if (values === undefined)
       return refuseFe(doc, NAME, 'FEA_FIELD_MISSING', `the ${selected.label} result set has no ${field} field for ${quantity}`, [

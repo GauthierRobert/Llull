@@ -3,7 +3,6 @@
   "command": "define_material_record",
   "params": {
    "id": "mat_test",
-   "name": "mat_test",
    "designation": "fatigue test parameter set (not a material claim)",
    "specs": [],
    "licence": "company-proprietary",
