@@ -124,3 +124,27 @@ export function withoutPayloads(data: unknown): unknown {
     ),
   );
 }
+
+/** Payload strings longer than this are not printed inline (the MCP text cap would cut them silently). */
+const MAX_INLINE_PAYLOAD_CHARS = 20_000;
+
+/**
+ * `data` for text output without --save: file payloads past `MAX_INLINE_PAYLOAD_CHARS` become a
+ * note giving their full size and telling the user to rerun with `--save <path>`.
+ * @pure
+ */
+export function elideLargePayloads(data: unknown): unknown {
+  if (Array.isArray(data)) return data.map(elideLargePayloads);
+  if (!isRecord(data)) return data;
+  const payloadKeys: ReadonlySet<string> = new Set([...BASE64_KEYS, ...TEXT_KEYS]);
+  return Object.fromEntries(
+    Object.entries(data).map(([key, value]) =>
+      payloadKeys.has(key) && typeof value === 'string' && value.length > MAX_INLINE_PAYLOAD_CHARS
+        ? [
+            key,
+            `<${value.length} chars; not shown, rerun with --save <path> to write the full file>`,
+          ]
+        : [key, key === 'files' ? elideLargePayloads(value) : value],
+    ),
+  );
+}
