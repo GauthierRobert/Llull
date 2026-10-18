@@ -186,8 +186,8 @@ cloud is never returned whole (AF-12).
 | ---- | --------------- | ----- |
 | ASTM E2807 (E57 1.0) [R1] | import MVP, export V1 | Paywalled; implemented from the public structure proven by the readers in the pack (validation/sources.md S1, S2) |
 | ASPRS LAS 1.4 R15 [R3] | import MVP | Public specification (lasformat.org) |
-| LAZ (LASzip) [R4] | import MVP via a bundled decoder (lazrs / laz-perf WASM) | De-facto standard; decoders under MIT / Apache-2.0 |
-| COPC 1.0 [R6] | V1 import / export | LAZ 1.4 + octree VLR; candidate internal cache format (TECHNICAL §6, Q2) |
+| LAZ (LASzip) [R4] | import MVP via the native `laz` crate (laz-rs) in the bundled `llull-compute`; WASM build of the same crate in the browser | De-facto standard; crate under MIT / Apache-2.0 (RS1 §2 rule 7) |
+| COPC 1.0 [R6] | V1 import / export | LAZ 1.4 + octree VLR; written natively by `llull-cloud`. The internal cache stays llull's own format (TECHNICAL §3.1, Q2 settled) |
 | ReCap RCP / RCS | refused | Proprietary |
 | EN 10220 / ASME B36.10M OD tables | used for DN snap | Owned by 01-piping-specs-catalog |
 | EN 10365 steel sections | used for profile fit | llull steel catalogue (`packages/domain-aec/src/steel/profiles.ts`) |
@@ -211,7 +211,7 @@ cloud is never returned whole (AF-12).
 | Registration error passes silently into design | Wrong tie-in points | Registration record with residuals; `unverified` propagation; `check_point_clouds` |
 | Memory: 10⁸–10⁹ points | Browser crash | Octree asset out of core; point budget; desktop as primary host; browser limited to smaller clouds (TECHNICAL §8) |
 | E57 complexity (bit-packed compressed vectors, many optional fields) | Incomplete reader | Test files cover ScaledInteger, float, double, spherical, attributes, empty and corrupt cases; pye57 as a cross-check in CI |
-| Licence of decoders and viewers | Distribution risk | Only MIT / BSD / Apache / BSL code is bundled (lazrs MIT, laz-perf Apache-2.0, libE57Format BSL-1.0 if native). CloudCompare (GPL) is used only as an external comparison tool, never linked |
+| Licence of decoders and viewers | Distribution risk | Only MIT / BSD / Apache code is bundled: the Rust `e57`, `las` and `laz` crates in `llull-compute` ([RS1](../../decisions/RS1-native-compute.md) §2 rule 7; no libE57Format addon). CloudCompare (GPL) is used only as an external comparison tool, never linked |
 | Large georeferenced coordinates | cm-level error | Integer coding at the source quantum; floating render origin (existing `RenderOriginSyncer`) |
 | Vendor feature parity expectations (EdgeWise-level automatic extraction) | Over-promise | MVP is one pipe per call; batch extraction in V1 with a review queue |
 

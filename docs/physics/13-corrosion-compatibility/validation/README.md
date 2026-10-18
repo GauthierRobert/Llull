@@ -43,6 +43,7 @@ External facts: [sources.md](sources.md). Derived numbers:
 | VC-COR-14 | `anodicIndex` override 0.80 V vs Cd 0.95 V | ΔV 0.15 = harsh limit ⇒ compatible (≤) | abs 1e-12 | A | FR-COR-16 |
 | VC-COR-15 | Review flags and human gate | `reviewRequired` on every item; agent acceptance ⇒ `COR_HUMAN_GATE` | exact | A | FR-COR-17, 18 |
 | VC-COR-16 | CSV report header | 12 columns | exact | A | FR-COR-19 |
+| VC-COR-17 | Native vs reference broad phase ([RS1](../../../decisions/RS1-native-compute.md) RS-6, planned): `llull-bvh` against the TS sort-and-sweep on seeded box assemblies and one model-scale assembly | identical candidate pair set and identical `find_contacts` output; largest assembly and wall time recorded (TBD — measure) | exact (same inflated AABBs, comparisons only) | — (comparison, not in `expected_results.json`) | FR-COR-01; TR-COR-01 |
 
 FR-COR-20 (environment zones, COULD, V2) gets its VC when the zone model is specified.
 

@@ -6,7 +6,8 @@ every claim is reduced to something an agent can assert from `--json`:
 - colour **category names** taken from cited scheme tables;
 - exact geometry: camera conversions, section-box classification, LOD distances;
 - deterministic counts from the batching rules: draw calls, instances, bytes;
-- byte-identical render digests.
+- byte-identical render digests from the reference (TS) renderer. The optional native GPU renderer
+  ([RS1](../../../decisions/RS1-native-compute.md), TECHNICAL_SPEC §2.A) is non-hash and checked by VC-VIS-60 only.
 
 Sources and grades are in [sources.md](sources.md); the VC index is [expected_results.json](expected_results.json).
 **No expected value was produced by running llull.** Each value is one of:
@@ -76,6 +77,7 @@ Sources and grades are in [sources.md](sources.md); the VC index is [expected_re
 | VC-VIS-40 | Clash → issue idempotence | SC-VIS-06: 1 hard clash → `created` 1, re-run `created` 0 / `unchanged` 1 | exact | `clashIssues.test.ts` |
 | VC-VIS-41 | Clash viewpoint framing | issue viewpoint section box = AABB(a) ∩ AABB(b) expanded by margin 500 on each side (exact arithmetic from the two element AABBs) | 1e-9 | same |
 | VC-VIS-50 | Agent error contract (AF-11) | a wrong plan (unknown profile, min ≥ max box, screen point 1.2, direction ⟂̸ up) returns `VIS_PROFILE_NOT_FOUND`, `VIS_SECTION_BOX_INVALID`, `VIS_MARKUP_INVALID`, `VIS_VIEWPOINT_NOT_ORTHONORMAL` with `paths` and remediation | exact codes | `errors.test.ts` |
+| VC-VIS-60 | Native vs reference (RS1, TR-VIS-26, TR-VIS-34) | (a) `llull-bvh` (native through `llull-compute geomq`, and WASM) frustum and ray queries return the same id sets as `instanceBvh.ts` on 10⁴ random AABBs and on SYN-RACK-v1 at n = 4367 (N = 1 000 037); broad-phase candidate pairs equal the TS pairs. (b) `render_view` with `renderer: 'native'` on SC-VIS-05: same `visibleEntityIds` and image size as the reference, no `svgSha256`, `deterministic: false`; mean per-pixel difference to the reference image **TBD — measure**. (c) The reference digest of VC-VIS-30 is the same with and without a raster port installed | (a) exact sets; (b) sets and flags exact, pixels TBD — measure; (c) exact | `server/tests/visNativeParity.test.ts` (skips with a logged reason when the binary is absent; CI always); `llull-bvh` cargo tests |
 
 ### Derivations used as expectations
 
@@ -100,7 +102,7 @@ Sources and grades are in [sources.md](sources.md); the VC index is [expected_re
 - The display colours are approximations. The HEX and rgb fields of the one RAL table found disagree by up to 29 units
   in one channel (RAL 5015 red channel: 0x28 = 40 vs 11).
 - `render_view` digests depend on the JS engine's `Math` functions. They are pinned per `rendererVersion` and Node
-  major version.
+  major version. Native GPU output is never pinned (non-hash, TECHNICAL_SPEC §2.A).
 
 ## What could not be verified
 

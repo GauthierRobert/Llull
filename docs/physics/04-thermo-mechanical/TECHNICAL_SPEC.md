@@ -54,9 +54,19 @@ by hash), L9 (`fit_at_temperature` reads PMI data only — no kernel; distortion
 | TR-TMC-21 | SHOULD (V1) | Lamé interference pressure (solid or hollow shaft, hub outer diameter given) and hub bore hoop stress per temperature, both elastic; materials' E, ν from 08. |
 | TR-TMC-22 | SHOULD (V1) | Coupled deck: `*COUPLED TEMPERATURE-DISPLACEMENT[, STEADY STATE]` with PHY-03 thermal BCs (DOF 11 boundaries, film, radiation, flux) and 05 mechanical BCs in one step; `*NODE FILE U, NT`, `*EL FILE S, HFL`. |
 | TR-TMC-23 | SHOULD (V1) | Mesh mapping: for each mechanical node, locate the containing thermal element (BVH on element AABBs, deterministic order), interpolate with its shape functions; report `maxMappingDistance`, nodes outside (nearest-face projection, flagged), and a check that the mapped field reproduces the thermal nodal values at coincident nodes to 1e-9. |
+| TR-TMC-24 | SHOULD | RS1 RS-7: above a named node count (set from VC-TMC-10) the `interpolate` mapping runs in `llull-compute post map <job-folder>` (crate `llull-post` on the shared `llull-bvh`, Rust CPU, rayon over target nodes) with the same rules as TR-TMC-23 (lowest containing element index wins, nearest-point projection outside, same report). The server stores the mapped field as an artifact bound to the thermal `resultsHash` and the mechanical mesh hash; the deck writer checks both hashes before writing `*TEMPERATURE`. `thermomech/mapping.ts` stays the reference and the small-mesh path; without the binary it runs at any size (slower). |
 | TR-TMC-30 | MUST | Agent-first contract: reference temperature, spec temperature, load category never defaulted; `unverified` = OR of CTE/E/ν flags; `reviewRequired` on fit rows, distortion comparisons and margins. |
 | TR-TMC-31 | MUST | Stable codes §7.1. |
 | TR-TMC-32 | MUST | `dispose_fit_result` verifies a human signature through the 09 signing port (AF-34a); agents get `TMC_HUMAN_GATE`. |
+
+### 2.1 Stack amendment (RS1, 2026-10-18)
+
+Decision [RS1](../../decisions/RS1-native-compute.md) step **RS-7** (medium, Rust CPU) moves large mesh-to-mesh temperature
+mapping (point location of up to 200k mechanical nodes in the thermal mesh) to `llull-compute post`, using the shared BVH crate
+`llull-bvh` (TR-TMC-24). The TS mapping (`thermomech/mapping.ts`, built 2026-10-17, §14) stays the reference and the small-case
+path; the native result must match it (VC-TMC-10). Nothing in `packages/*` imports native code: the job runs in the `server/`
+solve path and its output is a hash-bound artifact. Gmsh and CalculiX are unchanged. Rust CPU, because the mapped values are
+written into the deck and must be bit-reproducible (RS1 §2 rule 3).
 
 ## 3. Data model
 
@@ -270,7 +280,7 @@ thick cylinder integral form, gradient beam, Lamé, CTE conversion), returned wi
 | `fit_at_temperature`, 100 temperatures | ≤ 5 ms |
 | `*TEMPERATURE` block for 200k nodes | ≤ 1 s to write, deterministic `%.12g` |
 | Expression field, 200k nodes | ≤ 300 ms |
-| Mapping (V1), 200k target nodes on 200k-element source | ≤ 5 s |
+| Mapping (V1), 200k target nodes on 200k-element source | ≤ 5 s (native `llull-compute post map`; the TS path's time at this size TBD — measure, VC-TMC-10) |
 
 ## 9. Test strategy
 
@@ -280,6 +290,7 @@ thick cylinder integral form, gradient beam, Lamé, CTE conversion), returned wi
 | Golden | the four plans in `validation/plans/` | 01, 02, 05, 06 |
 | Integration (ccx) | LE11, restrained bar, sequential thick cylinder, T1 (plane stress per 05 idealization) | 01, 02, 03, 05 |
 | Agent-first | staleness chain, codes, human gate | 50, 60–63 |
+| Native (`npm run native:check`; `server/tests` with `llull-compute`) | `llull-post` mapping vs `thermomech/mapping.ts` on the VC-TMC-05 meshes and a 200k-node case | 10 |
 
 ## 10. Delivery plan
 
@@ -289,6 +300,7 @@ thick cylinder integral form, gradient beam, Lamé, CTE conversion), returned wi
 | M2 | `thermo_static` (uniform / expression / thermal_result same mesh), deck sections, `check_thermo_mechanical`, staleness chain | PHY-03 M2, 05 M3, extension port (PHY-03 M0), `lib/expression` move | 2 w |
 | M3 | `thermal_distortion_report`, validation (LE11, T1, bar, cylinder), golden plans, guide | M2, PHY-00 | 1 w |
 | M4 (V1) | coupled procedure, mesh mapping, Lamé in fits, orthotropic CTE, fit stack-ups at temperature (03 `analyze_stackup`), bimetal FE | M3, 05 bonded meshes, 06 V2 | 3 w |
+| RS-7 | native mapping job on `llull-bvh`, mapped-field artifact, deck hash check, VC-TMC-10 | M4, RS-0 (`solver/` workspace) | 1 w (share of RS1 RS-7) |
 
 ## 11. Open questions / decisions needed
 
@@ -306,6 +318,7 @@ thick cylinder integral form, gradient beam, Lamé, CTE conversion), returned wi
 ## 12. References
 
 - [R1]–[R11]: [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md) §11 and [`validation/sources.md`](validation/sources.md).
+- [RS1] Native compute programme — [`../../decisions/RS1-native-compute.md`](../../decisions/RS1-native-compute.md) (step RS-7)
 - llull: `.claude/rules/architecture.md`, `.dependency-cruiser.cjs`, `packages/core/src/commands/parametric/expression.ts`,
   `docs/aerospace/03-gdt-mbd-pmi/TECHNICAL_SPEC.md`, `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md`,
   `docs/aerospace/08-materials-standards-libraries/TECHNICAL_SPEC.md`, `docs/physics/03-thermal-analysis/TECHNICAL_SPEC.md`.

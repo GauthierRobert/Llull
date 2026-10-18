@@ -117,6 +117,7 @@ analytic surfaces), counts exact; Monte Carlo per the 5σ statistical bounds lis
 | VC-GDT-34 | FR-16 | SU-05 (non-linear h = L sinθ) | linear WC [49.194250265, 50.805749735]; exact corners [49.193113654, 50.804590132]; RSS ±0.757401916; σ 0.252467305 | 1e-9 | derived |
 | VC-GDT-35 | FR-19, TR-12 | FF-01..03 | floating T = 0.6; fixed T = 0.3; hole 6.6–6.9 pos Ø0.3 Ⓜ: 0.3 @MMC, 0.6 @LMC, 0.45 @6.75, VC 6.3 | 1e-12 | derived |
 | VC-GDT-36 | FR-18 | stack with contributor `pmiId: boreSize` | = SU-03; after bore upper 0.025: WC max 0.045 | 1e-9 | derived |
+| VC-GDT-37 (planned, RS-7) | FR-16/17, TR-22 | SU-01..05 with seed 20261015 at N = 2e6 (TS) and N = 2e6 and above (native `stackup_monte_carlo`) | native: identical bits for the same (seed, samples, inputs) at 1 thread and at N threads; native mean / std / P(y<L) / P(y>U) inside the §5.7 item 7 acceptance bounds around the analytic values of VC-GDT-30..34 and around the TS run at the same N; Philox4x32-10 known-answer vectors equal (Random123, [R37] in TECHNICAL_SPEC §12) | bits exact (native rerun); MC 5σ (native vs analytic and vs TS) | derived; native path per [RS1](../../../decisions/RS1-native-compute.md) |
 | VC-GDT-40 | FR-09 | ideal profiles | e.g. sine A=0.8 µm: Ra 0.509295818, Rq 0.565685425, Rku 1.5, Rz 1.6 | 1e-4 µm | closed forms |
 | VC-GDT-50 | FR-29, TR-17 | save/load, undo, golden replay | identical | exact | — |
 | VC-GDT-51 | FR-30 | Manifold kernel | no-op "requires the OCC kernel" | exact | KI5 |
@@ -137,8 +138,8 @@ analytic surfaces), counts exact; Monte Carlo per the 5σ statistical bounds lis
 | FR-GDT-03 | 05 | FR-GDT-13 | 10, 53 | FR-GDT-23 | 08 |
 | FR-GDT-04 | 01, 03 | FR-GDT-14 | 01, 23, 53 | FR-GDT-24 | 09 |
 | FR-GDT-05 | 01, 20 | FR-GDT-15 | 10, 11, 24 | FR-GDT-25 | 25 |
-| FR-GDT-06 | 01, 03, 20 | FR-GDT-16 | 30–34 | FR-GDT-26 | 26 |
-| FR-GDT-07 | 01 | FR-GDT-17 | 33 | FR-GDT-27 | 27 |
+| FR-GDT-06 | 01, 03, 20 | FR-GDT-16 | 30–34, 37 | FR-GDT-26 | 26 |
+| FR-GDT-07 | 01 | FR-GDT-17 | 33, 37 | FR-GDT-27 | 27 |
 | FR-GDT-08 | 06 | FR-GDT-18 | 36 | FR-GDT-28 | 04, 52 |
 | FR-GDT-09 | 01, 40 | FR-GDT-19 | 35 | FR-GDT-29 | 50 |
 | FR-GDT-10 | 05 | FR-GDT-20 | 20, 23, 24 | FR-GDT-30 | 51 |

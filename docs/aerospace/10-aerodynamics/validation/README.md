@@ -60,9 +60,10 @@ and grade C values are never used.
 | VC-AER-30 | *planned* — CdA from a 12 CFD case in `aero_drag`; stale / non-converged case refused | D = ½ρV²·CdA with the recorded `forces.cdAM2` (closed form) | 1e-6 rel; refusal code `AER_CFD_RESULT_UNUSABLE` | `cfdSource.test.ts` |
 | VC-AER-31 | *planned* — Prandtl-Glauert cl vs the 12 CFD Euler solver, NACA 0012, M 0.5, α 2° | cl(M) = cl(0)/√(1 − M²), factor 1.1547 at M 0.5 [S7, Anderson ch. 11] | correction exact to 1e-9; panel+PG vs Euler within 5 % (cross-method, both inviscid) | `compressibility.test.ts`, 12 CFD scenario |
 | VC-AER-32 | *planned* — OpenFOAM / SU2 export of a 12 CFD case, import of external forces and Cp | the 12 CFD case itself | patch names and farfield box exact; re-imported forces equal the file values | `externalExport.test.ts` |
+| VC-AER-33 | *planned* — M3 VLM / 3D panel: native `llull-compute panel` (faer) vs the TS solver on the same lattice, at sizes both can run | the TS solver (reference, RS1 §2 rule 4; [RS1](../../../decisions/RS1-native-compute.md)) | Γ and CL native vs TS: TBD — measure (roundoff × condition number); same inputs → identical native output on rerun | `server/tests/aeroPanelNative.test.ts`, `npm run native:check` |
 
 Planned cases VC-AER-30..32 link this pack to [12 CFD](../../12-cfd-gpu/validation/README.md). They become gates when
-their milestones (TECHNICAL_SPEC §10, M4, M6, M7) are built.
+their milestones (TECHNICAL_SPEC §10, M4, M6, M7) are built. VC-AER-33 (native panel job, RS-7) becomes a gate with M3.
 
 ### Derivations used as expectations
 

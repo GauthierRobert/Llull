@@ -64,7 +64,7 @@
    "fr": [
     "FR-SCN-01"
    ],
-   "test": "tests/unit/scan/e57Reader.test.ts"
+   "test": "solver/crates/llull-cloud/tests/e57.rs"
   },
   {
    "id": "VC-SCN-02",
@@ -141,7 +141,7 @@
    "fr": [
     "FR-SCN-01"
    ],
-   "test": "tests/unit/scan/e57Reader.test.ts"
+   "test": "solver/crates/llull-cloud/tests/e57.rs"
   },
   {
    "id": "VC-SCN-05",
@@ -187,7 +187,7 @@
     "FR-SCN-01",
     "FR-SCN-04"
    ],
-   "test": "tests/unit/scan/e57Reader.test.ts"
+   "test": "solver/crates/llull-cloud/tests/e57.rs"
   },
   {
    "id": "VC-SCN-06",
@@ -361,7 +361,7 @@
    "fr": [
     "FR-SCN-02"
    ],
-   "test": "tests/unit/scan/lasReader.test.ts"
+   "test": "solver/crates/llull-cloud/tests/las.rs"
   },
   {
    "id": "VC-SCN-07",
@@ -390,7 +390,7 @@
    "fr": [
     "FR-SCN-02"
    ],
-   "test": "tests/unit/scan/lasReader.test.ts"
+   "test": "solver/crates/llull-cloud/tests/las.rs"
   },
   {
    "id": "VC-SCN-08",
@@ -429,7 +429,7 @@
     "FR-SCN-02",
     "FR-SCN-21"
    ],
-   "test": "tests/unit/scan/lasReader.test.ts"
+   "test": "solver/crates/llull-cloud/tests/las.rs"
   },
   {
    "id": "VC-SCN-09",
@@ -452,7 +452,7 @@
    "fr": [
     "FR-SCN-05"
    ],
-   "test": "tests/unit/scan/octreeAsset.test.ts"
+   "test": "solver/crates/llull-cloud/tests/octree.rs"
   },
   {
    "id": "VC-SCN-10",
@@ -474,7 +474,7 @@
     "FR-SCN-05",
     "FR-SCN-06"
    ],
-   "test": "tests/unit/scan/octreeAsset.test.ts"
+   "test": "solver/crates/llull-cloud/tests/octree.rs"
   },
   {
    "id": "VC-SCN-11",
@@ -1217,6 +1217,30 @@
     "FR-SCN-22"
    ],
    "test": "tests/unit/scan/asbuiltClash.test.ts"
+  },
+  {
+   "id": "VC-SCN-60",
+   "command": "same plans and unit inputs on the native llull-compute binary, the llull-cloud WASM build and (M7) device: gpu",
+   "expected": {
+    "nativeVsWasm": "bit-identical data for VC-SCN-01..12, 20..24, 30..32, 40..43; each VC still meets its own expected value and tolerance",
+    "gpuClashCLH_A": "same status per spacing (hard / clearance / clear), cluster count and minGap as the CPU path",
+    "gpuDeviationDEV_A": {
+     "maxAbsPointDistanceDiffM": "TBD - measure (bound eps_gpu derived from f32 unit roundoff at M7)",
+     "deterministic": false
+    }
+   },
+   "tolerance": {
+    "nativeVsWasm": "exact",
+    "gpuClash": "exact",
+    "gpuDeviation": "eps_gpu - TBD - measure"
+   },
+   "source": "RS1 section 2 rules 3 and 4; TECHNICAL_SPEC section 2.A (libm, fixed-order merges, conservative GPU prune)",
+   "grade": "derived",
+   "fr": [
+    "TR-SCN-08",
+    "TR-SCN-12"
+   ],
+   "test": "server/tests/scanNativeParity.test.ts; solver/crates/llull-cloud/tests/gpu_parity.rs"
   }
  ]
 }

@@ -82,6 +82,7 @@ bundled CPython (Gmsh) and CalculiX, unless the Gate column says otherwise.
 | VC-FEA-43 | FR-FEA-09 | Run the pinned `simplebeam.inp`. | Tip ux = 0.0922015 (1-element result, not analytic). | 1e-4 rel | (c) | integration |
 | VC-FEA-44 | FR-FEA-04 | Run the pinned `shell1.inp` and `shellf.inp`, then parse. | TBD: values extracted by the M3 parser and frozen. | 1e-4 rel | (c) | integration |
 | VC-FEA-28 | FR-FEA-22; TR-FEA-33 | Call `record_fe_mesh` / `record_fea_results` through `execute` with (i) a hash absent from the artifact store, (ii) a real hash but an edited summary (node count + 1), (iii) the genuine summary. | (i) and (ii) no-op with "artifact not found" / "summary mismatch". (iii) accepted. | exact | — | unit (fake artifact port) |
+| VC-FEA-29 | TR-FEA-92 (planned, RS-5) | VC-FEA-17 plot (VC-FEA-14 result, von Mises, deformation ×100) and one large plot, rendered headless by the TS raster and by `llull-compute raster` (GPU and its CPU twin) at the same size and view. | Same legend, levels, min / max data and SVG frame. Native PNG vs TS PNG: share of differing pixels and max band-index difference within tolerance. `data.raster.engine` names the path; GPU runs carry `deterministic: false`. | pixel tolerance TBD — measure (band edges and silhouettes are where they may differ) | [RS1](../../../decisions/RS1-native-compute.md) | native + server tests |
 | VC-FEA-60 | FR-FEA-31, 37; TR-FEA-90 | `llull compute_margins analysisId=$an --json` on the VC-FEA-20 rows with no factors given. | `data.factors` deep-equals `fea_analytic_expected.json` VC-FEA-60 (`ultimate` 1.5 from 14 CFR 25.303, `defaulted: true`; `yield` 1.0). | exact | (b) [S1, S1a] | unit + CLI |
 | VC-FEA-61 | FR-FEA-18, 32, 37 | Same call. | Every row matches VC-FEA-61 (unit-suffixed `appliedMPa`/`allowableMPa`, `ms`, `status`, `reviewRequired: true` with `reviewReason`, `disposition`). `data.reviewRequired` is true and `summary` contains "not approved". | ms 1e-9 abs; rest exact | (b) | unit + CLI |
 | VC-FEA-62 | FR-FEA-33, 35 | `llull check_analysis analysisId=$an --json` after VC-FEA-61. | `data.status: "fail"`; codes `FEA_MS_NEGATIVE`, `FEA_DISPOSITION_PENDING`, `FEA_MARGINAL_BAND_UNSET`. | exact | — | unit + CLI |
@@ -121,6 +122,8 @@ are asserted too (0 on success, 1 with `data.code` on the refusal cases).
 - `npm run quality` gets a new `quality:fea` step that runs VC-FEA-30/31 and the analytic cases 10–14 on the OCC
   kernel and writes a table like `quality/drawings/README.md`.
 - `npm --prefix desktop test`: VC-FEA-52.
+- `npm run native:check` + `npm --prefix server test`: VC-FEA-29 (RS-5 native raster), skipped with a logged reason when
+  `llull-compute` is missing; the GPU half also skips without an adapter, the CPU twin always runs.
 
 ## Re-generating
 

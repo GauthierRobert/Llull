@@ -72,9 +72,42 @@ packages/domain-aec/src/plant/piping/
   takeoff.ts           counts, cut list, welds, studs
   geometry.ts          RoutedPart -> display entities (tube, torus, cone, flange, valve, insulation)
   heatLoss.ts          V1 line_heat_loss
-  autoRoute/           V2 grid A*
+  autoRoute/           V2: route_problem builder, solution validator, small-grid TS A* (reference, §2.A)
   commands/*.ts        one file per command (≤ 500 lines each)
 ```
+
+### 2.A Stack amendment (RS1, 2026-10-18)
+
+Decided by the owner in [RS1](../../decisions/RS1-native-compute.md) (programme step **RS-7**, medium). It changes
+only the V2 auto-router. `route_pipe`, derivation, `check_piping` and the takeoff stay TypeScript.
+
+| Item | Before | Now |
+| ---- | ------ | --- |
+| V2 search (3D grid A*) | TS in `autoRoute/`, inside `auto_route_pipe` | `llull-compute route` (crate `llull-route`, Rust CPU): sparse / implicit obstacle grid, ≤ 2·10⁶ expansions in ≤ 5 s, candidate routes searched in parallel (rayon) |
+| TS search | the only path | kept as the reference and the small-grid path (expansion cap TBD — measure at V2) |
+| Problem and commit | inside one command | `route_problem` (query, TS) builds the canonical problem; `auto_route_pipe` (mutating, TS) validates a supplied solution and commits it as an ordinary run |
+| `route_pipe`, derivation, checks, takeoff | TS | unchanged |
+| Gate | Vitest | plus `npm run native:check` (`cargo test` + `cargo clippy -D warnings`) for `llull-route` |
+
+Flow (L1, L2, L6). The host transport `auto_route` (CLI `llull route auto lineId=… from=… to=…`) runs `route_problem`,
+writes its `data` to a job folder, runs `llull-compute route <job-folder>` (RS1 job folder + NDJSON progress) and
+dispatches `auto_route_pipe { …, solution }`. Native code never writes the document. Before it commits,
+`auto_route_pipe` checks that:
+
+- `solution.problemHash` equals the hash of the problem rebuilt from the current document (a stale solution is refused);
+- every leg is axis-aligned on the grid, clear of every inflated obstacle box and keep-out, and the path starts and
+  ends with the required port stubs;
+- the reported length, bend count and cost match the PIs.
+
+A failure gives `RTE_AUTOROUTE_SOLUTION_INVALID` with the failing leg in `paths`. A solution from any source (native,
+TS or hand-written) is held to the same rule. Without `solution`, `auto_route_pipe` runs the TS A* under its small cap
+and refuses above it with `RTE_AUTOROUTE_BUDGET` (remediation: run `llull route auto`). A missing binary gives
+`NATIVE_TOOL_MISSING` from the transport (RS1 §2 rule 5).
+
+Determinism (AF-13). Both searches use the same state, cost and total order of the open set (§5.12). Costs are
+quantised to integer micrometres before the search, so both sums are exact integers and both searches expand states
+in the same order. Parallel candidates (arrival directions, rack elevations, multi-line orders) are compared by
+(cost, candidate index), never by finish time. Native vs reference: VC-RTE-25.
 
 ## 3. Data model
 
@@ -282,7 +315,8 @@ documents) unless stated; angles in degrees; temperatures °C; pressure bar g. E
 | `check_piping`            | query         | `{ lineIds?, maxHandwheelCentreHeight?, minWeldSpacing?, include?: string[] }`                                                                                                                                   | `data = { status, issues: [{ code, severity, ids, paths, detail, remediation }], counts, unverified, reviewRequired }`                                                                                                                                                                                                                                                                                                                                                                      |
 | `piping_takeoff`          | query         | `{ runId? , lineId? }`                                                                                                                                                                                           | `data = { counts, parts[], pipePieces[{ id, dn, cutLengthMm, leg }], joints[], totalPipeMm, centrelineLengthMm, legs[], turns[], studs, unverified }`                                                                                                                                                                                                                                                                                                                                       |
 | `line_heat_loss`          | query (V1)    | `{ lineId, fluidTempC, ambientTempC, outsideFilmWm2K, insideFilmWm2K?, steelConductivityWmK, insulationConductivityWmK? }`                                                                                       | `data = { heatLossWPerM, surfaceTempC, provenance, reviewRequired: true }`; every defaulted input named                                                                                                                                                                                                                                                                                                                                                                                     |
-| `auto_route_pipe`         | mutating (V2) | `{ lineId, from, to, grid?, bendCost?, clearance?, preferElevations?, keepOut?: ids[], maxExpansions? }`                                                                                                         | @affects creates 1 ordinary run · @failure `RTE_AUTOROUTE_NO_PATH`, `RTE_AUTOROUTE_BUDGET`                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `route_problem`           | query (V2)    | `{ lineId, from, to, grid?, bendCost?, clearance?, preferElevations?, keepOut?: ids[] }` | `data = { problem, problemHash }`: grid box, cell size, inflated obstacle boxes, keep-outs, port stubs, integer-µm costs (input of `llull-compute route`, §2.A) |
+| `auto_route_pipe`         | mutating (V2) | `{ lineId, from, to, grid?, bendCost?, clearance?, preferElevations?, keepOut?: ids[], maxExpansions?, solution?: { problemHash, pis, lengthMm, bends, cost, optimal, expansions, provenance } }`                                                                                                         | @affects creates 1 ordinary run · @invariant a supplied `solution` is validated against the current problem (§2.A) · @failure `RTE_AUTOROUTE_NO_PATH`, `RTE_AUTOROUTE_BUDGET`, `RTE_AUTOROUTE_SOLUTION_INVALID`                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 Descriptions follow AF-02: what, when, units, refusals, next command (e.g. `route_pipe` → "then run
 `check_piping`; add valves with `insert_inline_component`").
@@ -450,7 +484,11 @@ is the minimum number of turns to reach the target arrival direction from the cu
 still to cover (lower bound ⇒ admissible, A* optimal [S28]). Obstacles = model boxes inflated by
 `OD/2 + t_ins + clearance`; the first and last cells force a straight stub along the port direction of at least
 the flange-set length + one elbow centre-to-end. Ties broken by axis order (+X, −X, +Y, −Y, +Z, −Z) for
-determinism (AF-13). Result path → PIs (collinear merge) → an ordinary `route_pipe` run, so every check applies.
+determinism (AF-13); the open set is ordered by the total key (f, h, x, y, z, incoming axis), so any heap gives the same
+expansion order. Result path → PIs (collinear merge) → an ordinary `route_pipe` run, so every check applies.
+The production search runs natively in `llull-route` (§2.A): obstacles are not rasterised into a dense grid (2.4·10⁹
+cells for 100 × 100 × 30 m at 50 mm); a cell is tested against a BVH of the inflated boxes and visited states live in
+a hash map. The TS search in `autoRoute/` is the same algorithm, used for small grids and as the reference.
 Literature: Lee maze routing [S27], A* [S28], ship engine-room routing [S29][S31], MILP / network flow with bend
 costs [S30][S32], orthogonal visibility graphs [S33] (the latter as a speed-up when the grid is large).
 SC-RTE-08: free space, length = Manhattan 6000, bends = 2 (three axes need three directions).
@@ -506,7 +544,9 @@ SC-RTE-08: free space, length = Manhattan 6000, bends = 2 (three axes need three
 | `RTE_NONSTANDARD_FITTING`                                                                     | warning                    | check                                          | trimmed elbow, pulled bend                                  | reviewer accepts                                           |
 | `RTE_STUB_IN_REVIEW`                                                                          | warning + `reviewRequired` | check                                          | stub-in needs reinforcement check                           | 07 PST                                                     |
 | `RTE_SPEC_UNVERIFIED`                                                                         | warning (cannot be hidden) | check                                          | spec not approved / rows unverified                         | reviewer approves the spec (01)                            |
-| `RTE_AUTOROUTE_NO_PATH` / `RTE_AUTOROUTE_BUDGET`                                              | error                      | `auto_route_pipe`                              | no path / expansion budget hit                              | widen the grid box, lower clearance, add via points        |
+| `RTE_AUTOROUTE_NO_PATH` / `RTE_AUTOROUTE_BUDGET`                                              | error                      | `auto_route_pipe`                              | no path / expansion budget hit                              | widen the grid box, lower clearance, add via points; above the TS cap run `llull route auto` |
+| `RTE_AUTOROUTE_SOLUTION_INVALID` | error | `auto_route_pipe` with `solution` | stale `problemHash`, leg off-grid / through an obstacle or keep-out, or length / bends / cost do not match the PIs | re-run `llull route auto` on the current document |
+| `NATIVE_TOOL_MISSING` | error | `auto_route` transport | `llull-compute` not installed | install the desktop app, or route without `solution` under the TS cap |
 
 ## 8. Performance and robustness budgets
 
@@ -516,7 +556,7 @@ SC-RTE-08: free space, length = Manhattan 6000, bends = 2 (three axes need three
 | Regeneration of 1 000 runs (load)                         | ≤ 1.5 s                                                             |
 | `check_piping` 1 000 lines / 20 000 parts                 | ≤ 2 s (graph O(n α(n)); clash via existing boxes)                   |
 | `piping_takeoff` one line                                 | ≤ 10 ms                                                             |
-| `auto_route_pipe` (V2) 100 m × 100 m × 30 m at 50 mm grid | ≤ 5 s, `maxExpansions` default 2·10⁶, `--timeout` respected (AF-40) |
+| `auto_route_pipe` (V2) 100 m × 100 m × 30 m at 50 mm grid | native `llull-compute route`: ≤ 5 s, `maxExpansions` default 2·10⁶, `--timeout` respected (AF-40); TS reference path: cap and time TBD — measure |
 | Document size                                             | stored intent ≤ 1 kB per run; derived parts never stored            |
 
 Robustness: inputs with NaN / Infinity refused by the guard (`CMD_CORRUPT_RESULT` exists); all comparisons use
@@ -539,6 +579,7 @@ Robustness: inputs with NaN / Infinity refused by the guard (`CMD_CORRUPT_RESULT
 | Contract                                          | toolset `piping` membership, schema snapshot, plugin document extension (validate / restore)    | AF-01                 |
 | Integration `tests/integration/`                  | `update_equipment` → run stretched; undo restores                                               | VC-RTE-12             |
 | Server / CLI `server/tests/`                      | `llull run` on SC-RTE-01 with `--json` assertions                                               | VC-AF-02              |
+| Native vs reference (`server/tests/routeNativeParity.test.ts`; `llull-route` cargo tests in `npm run native:check`) | TS and native searches give identical PIs, bends and cost; tampered solutions refused | VC-RTE-18, 25 |
 
 Coverage gate 90/85/90/90 applies to `packages/domain-aec/src/plant/**`.
 
@@ -551,7 +592,7 @@ Coverage gate 90/85/90/90 applies to `packages/domain-aec/src/plant/**`.
 | M2        | flange sets + connection rules, inline components, reducers, branches (tee / olet), `check_piping` core codes, `piping_connectivity`, `convert_pipe_run`                                                   | M1; 01 PSC lookup (stub until then) | 7 d    |
 | M3        | stretch on equipment / nozzle edits, `edit_route`, slope + adverse slope, insulation envelope in `check_clashes`, line-number template, supports on runs                                                   | M2; 03 EQP nozzles (`PortSource`)   | 6 d    |
 | V1        | socket / threaded engagement, eccentric reducers, trimmed elbows / bends, pockets, valve operators, heat tracing data, `line_heat_loss`, PCF writer hand-off (05), IFC ports (08), exact solids via kernel | M3                                  | 12 d   |
-| V2        | `auto_route_pipe` (grid A\*), rack preference, keep-outs, multi-line ordering                                                                                                                              | V1                                  | 15 d   |
+| V2        | `route_problem`, `auto_route_pipe` (TS grid A\* + solution validation), `llull-compute route` (RS-7), rack preference, keep-outs, multi-line ordering                                                                                                                              | V1; RS-0 (`solver/` workspace)      | 15 d (+ `llull-route` inside RS-7) |
 
 Total MVP (M0-M3) ≈ 21 developer-days.
 
@@ -593,3 +634,4 @@ Total MVP (M0-M3) ≈ 21 developer-days.
 - [R13] Blanco V. et al., Omega 111:102659, 2022; arXiv 2108.00416 [S30]
 - [R14] Stanczak M. et al., ICORES 2020 — https://www.scitepress.org/Papers/2020/89233/ [S32]; Marriott K. et al., Diagrams 2014 [S33]; Wu H. et al., BIT improved A\* [S31]
 - [R15] CADMATIC PCF export; SST CAEPIPE PCF data types — https://www.sstusa.com/docs/users_manual/data_types_from_caepipe.htm (accessed 2026-10) [S26]
+- [R16] RS1 native compute programme — [../../decisions/RS1-native-compute.md](../../decisions/RS1-native-compute.md)

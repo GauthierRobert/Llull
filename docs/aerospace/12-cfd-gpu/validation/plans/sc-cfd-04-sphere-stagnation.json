@@ -1,6 +1,6 @@
 {
   "id": "SC-CFD-04",
-  "status": "draft — the cfd commands and the llull-flow sidecar are specified, not implemented",
+  "status": "draft — the cfd commands and the llull-compute sidecar are specified, not implemented",
   "validates": ["VC-CFD-32", "VC-CFD-33"],
   "description": "Euler flow on a sphere (R = 0.5 m) at Mach 0.8 and Mach 2: stagnation-point Cp against the isentropic and Rayleigh pitot values; bow-shock stand-off reported against Billig (documentation only)",
   "actions": [

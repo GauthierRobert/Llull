@@ -47,6 +47,11 @@ Pack 12 CFD (added 2026-10-18, specs only) follows owner directives that apply t
 (never cloud), **GPU first** (a native Rust + wgpu sidecar; other languages allowed). It takes over the flow-field solvers planned in 10 AER and
 11 FLD; 10 AER keeps its formula-level methods plus three links (CFD drag area, compressibility cross-check, optional OpenFOAM / SU2 export). Its Rust toolchain decision (CFD-D1) was resolved by the best-suited-stack rule (`conventions.md` C7).
 
+Native compute programme [RS1](../decisions/RS1-native-compute.md) (2026-10-18): one Rust workspace `solver/` for the heavy
+workloads across aerospace, physics and plant packs. In this folder it amends 01 KRN (native OCCT 7.9 sidecar instead of the custom
+WASM build), 03 GDT (Monte Carlo above 2e6), 05 FEA (GPU field-plot raster), 10 AER (V1 3D panel / VLM) and 12 CFD (crates in the
+shared workspace).
+
 ## Dependencies and recommended order
 
 ```

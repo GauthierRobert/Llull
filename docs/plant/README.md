@@ -34,19 +34,31 @@ Plant objects are thin:
 | # | Gap | Id | Functional | Technical | Validation | VCs | Plans |
 | - | --- | -- | ---------- | --------- | ---------- | --- | ----- |
 | 01 | Piping specs and component catalogue (ASME B36.10M/19M, B16.9, B16.5 + P-T ratings, B16.20, B16.10, EN 1092-1), branch tables | PSC | [spec](01-piping-specs-catalog/FUNCTIONAL_SPEC.md) | [spec](01-piping-specs-catalog/TECHNICAL_SPEC.md) | [pack](01-piping-specs-catalog/validation/README.md) | 19 | 5 |
-| 02 | Spec-driven 3D routing: ports, auto fittings and flange sets, cut-back, slope, insulation, connectivity, `check_piping` | RTE | [spec](02-spec-driven-routing/FUNCTIONAL_SPEC.md) | [spec](02-spec-driven-routing/TECHNICAL_SPEC.md) | [pack](02-spec-driven-routing/validation/README.md) | 24 | 9 |
+| 02 | Spec-driven 3D routing: ports, auto fittings and flange sets, cut-back, slope, insulation, connectivity, `check_piping` | RTE | [spec](02-spec-driven-routing/FUNCTIONAL_SPEC.md) | [spec](02-spec-driven-routing/TECHNICAL_SPEC.md) | [pack](02-spec-driven-routing/validation/README.md) | 25 | 9 |
 | 03 | Parametric equipment with nozzles: vessels / columns (ASME VIII UG-27/32/99), TEMA exchangers, API 650 tanks, pumps | EQP | [spec](03-parametric-equipment/FUNCTIONAL_SPEC.md) | [spec](03-parametric-equipment/TECHNICAL_SPEC.md) | [pack](03-parametric-equipment/validation/README.md) | 25 | 4 |
 | 04 | P&ID schematics: ISO 10628-2 / ISA 5.1, tags, smart connectivity, DEXPI 1.3 / 2.0, P&ID ↔ 3D check | PID | [spec](04-pid-schematics/FUNCTIONAL_SPEC.md) | [spec](04-pid-schematics/TECHNICAL_SPEC.md) | [pack](04-pid-schematics/validation/README.md) | 20 | 5 |
 | 05 | Isometrics and fabrication: PCF read / write, iso sheets, spools, welds, cut lists, BOM, GA annotation | ISO | [spec](05-isometrics-fabrication/FUNCTIONAL_SPEC.md) | [spec](05-isometrics-fabrication/TECHNICAL_SPEC.md) | [pack](05-isometrics-fabrication/validation/README.md) | 23 | 8 |
 | 06 | Plant structures and access: platforms, gratings, ladders + cages, handrails, steel stairs (ISO 14122, OSHA 1910), pipe-rack generator, fireproofing | STA | [spec](06-plant-structures-access/FUNCTIONAL_SPEC.md) | [spec](06-plant-structures-access/TECHNICAL_SPEC.md) | [pack](06-plant-structures-access/validation/README.md) | 14 | 7 |
 | 07 | Pipe stress and flexibility: 3D pipe-beam solver, ASME B31.3 (sustained / expansion / occasional), SIFs, nozzle loads, CAESAR II hand-off | PST | [spec](07-pipe-stress-flexibility/FUNCTIONAL_SPEC.md) | [spec](07-pipe-stress-flexibility/TECHNICAL_SPEC.md) | [pack](07-pipe-stress-flexibility/validation/README.md) | 19 | 5 |
 | 08 | Plant data, reports and interop: classes, tag registry, hierarchy, lists, MTO, XLSX round trip, IFC 4.3 ADD2 piping with ports, IDS, CFIHOS | DAT | [spec](08-plant-data-reports-interop/FUNCTIONAL_SPEC.md) | [spec](08-plant-data-reports-interop/TECHNICAL_SPEC.md) | [pack](08-plant-data-reports-interop/validation/README.md) | 19 | 5 |
-| 09 | Plant-scale visualization and review: instancing / LOD / BVH culling, service colour schemes (ASME A13.1, ISO 14726), viewpoints, section boxes, BCF issues, review render | VIS | [spec](09-plant-visualization-review/FUNCTIONAL_SPEC.md) | [spec](09-plant-visualization-review/TECHNICAL_SPEC.md) | [pack](09-plant-visualization-review/validation/README.md) | 22 | 6 |
-| 10 | Point clouds and brownfield: E57 / LAS / LAZ, registration (targets, ICP), cylinder / pipe / steel extraction, deviation, as-built clash | SCN | [spec](10-pointcloud-brownfield/FUNCTIONAL_SPEC.md) | [spec](10-pointcloud-brownfield/TECHNICAL_SPEC.md) | [pack](10-pointcloud-brownfield/validation/README.md) | 29 | 5 |
+| 09 | Plant-scale visualization and review: instancing / LOD / BVH culling, service colour schemes (ASME A13.1, ISO 14726), viewpoints, section boxes, BCF issues, review render | VIS | [spec](09-plant-visualization-review/FUNCTIONAL_SPEC.md) | [spec](09-plant-visualization-review/TECHNICAL_SPEC.md) | [pack](09-plant-visualization-review/validation/README.md) | 23 | 6 |
+| 10 | Point clouds and brownfield: E57 / LAS / LAZ, registration (targets, ICP), cylinder / pipe / steel extraction, deviation, as-built clash | SCN | [spec](10-pointcloud-brownfield/FUNCTIONAL_SPEC.md) | [spec](10-pointcloud-brownfield/TECHNICAL_SPEC.md) | [pack](10-pointcloud-brownfield/validation/README.md) | 30 | 5 |
 
-Total: **214 validation cases, 59 scenario plans**. Each pack's `validation/sources.md` grades every source
+Total: **217 validation cases, 59 scenario plans**. Each pack's `validation/sources.md` grades every source
 (A = primary source read, reference code run or two independent sources agree; B = one extract; C = unconfirmed); only
 grade A values and cited closed forms gate.
+
+## Native compute (RS1, 2026-10-18)
+
+The owner-approved programme [RS1](../decisions/RS1-native-compute.md) moves three plant workloads to the Rust
+`solver/` workspace (binary `llull-compute`). Each TECHNICAL_SPEC has a "Stack amendment (RS1)" section and one
+"native vs reference" VC. The other plant packs stay TypeScript (RS1 §4).
+
+| Pack | Step | Native part | Stays as it is |
+| ---- | ---- | ----------- | -------------- |
+| 02 RTE | RS-7 (Rust CPU) | V2 auto-router search: `llull-compute route` (`llull-route`), checked and committed by `auto_route_pipe` | `route_pipe`, derivation, checks, takeoff; TS A* as reference (VC-RTE-25) |
+| 09 VIS | RS-5 (GPU), RS-6 | optional GPU raster `llull-compute raster` (non-hash); `llull-bvh` for 10⁶-instance queries and the clash broad phase | TS raster = the `svgSha256` reference; `instanceBvh.ts`; three.js viewport (VC-VIS-60) |
+| 10 SCN | RS-3 (Rust CPU), RS-4 (GPU) | E57 / LAS / LAZ import, octree, kd-tree, normals, RANSAC, ICP, COPC export, deviation and clash: `llull-compute cloud` (`llull-cloud`) | three.js `Points` viewport; recorded numbers from the Rust-CPU path (VC-SCN-60) |
 
 ## Validation data collected
 
@@ -112,3 +124,4 @@ PID ~40 d, ISO ~30 d, STA ~12 wk, DAT ~6.5 wk, SCN ~16 wk total; PST and VIS in 
 | D8 | **Engineering defaults**: B31.3 edition required or defaulted, friction μ = 0.3, B31J SIF tables import-only, UG-27 corroded radius. | 03, 07 | Make edition and allowable stress required inputs; keep μ as a named default flagged in results. |
 | D9 | **Standards with no free numeric source** (B16.11, MSS SP-97 olets, EN 10253, B16.47, B31.3 allowables, B31J, ISO 14122 hoop spacing, API 2218, CAESAR II neutral file layout): import-only or TBD. | 01, 06, 07 | Licensed import path with `unverified` propagation; never defaulted. |
 | D10 | **OSHA 1910.28 fixed-ladder 2036 retrofit date** is under a proposed repeal (April 2026); final status unknown. | 06 | Rule flagged; re-check before STA M1. |
+| D11 | **Native compute (RS1, decided 2026-10-18).** Heavy work reaches `llull-compute` only through host transports or injected ports; native code never writes the document. Hashes stay on the reference path: 09 `svgSha256` on the TS raster, 10 TR-SCN-08 on the Rust-CPU path (identical on every OS and in its WASM build). Settles 10 Q2 (COPC writing) and Q4 (no libE57Format addon). | 02, 09, 10 | Adopted; see the table above. 02 / 09 / 10 milestones depend on RS-0 (`solver/` workspace) for their native parts. |

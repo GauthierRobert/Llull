@@ -1,6 +1,6 @@
 {
   "id": "SC-CFD-03",
-  "status": "draft \u2014 the cfd commands and the llull-flow sidecar are specified, not implemented",
+  "status": "draft \u2014 the cfd commands and the llull-compute sidecar are specified, not implemented",
   "validates": [
     "VC-CFD-31"
   ],

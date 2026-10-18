@@ -253,6 +253,14 @@ Total: 709 validation cases (630 A, 57 B, 22 C / TBD). Every generator is Python
 only and re-runs byte-identical (`python3 -I <script>` from its `validation/` folder; re-checked by the coordinator).
 PHY-00's harness schema accepts every pack's `expected_results.json` (survey in PHY-00 TECHNICAL_SPEC §6.2).
 
+**Native compute (2026-10-18).** Decision [RS1](../decisions/RS1-native-compute.md) moves the large workloads of eight packs to
+the Rust workspace `solver/` (`llull-compute <job>`): 17 TOP (RS-2, GPU SIMP), 21 FPR and 03 THM (RS-6, GPU clearance,
+wall-thickness rays and view factors), 13 COR (RS-6, `llull-bvh` broad phase), 07 FAT, 09 DYN and 04 TMC (RS-7, Rust-CPU FE
+post-processing) and 19 EXP (RS-8, own explicit solver, V1 / V2). Each of those TECHNICAL_SPECs has a "Stack amendment (RS1)"
+subsection; the TypeScript code stays the reference and small-case path. Each pack also gets one planned "native vs reference"
+VC (VC-TOP-33/34, VC-FPR-37, VC-THM-64, VC-COR-17, VC-FAT-43, VC-DYN-48, VC-TMC-10, VC-EXP-67). They compare two runs, so they
+are not in `expected_results.json` and not in the counts above.
+
 ## 8. Cross-pack findings and decisions (2026-10-15)
 
 ### 8.1 Findings that change §5 / §6.2
