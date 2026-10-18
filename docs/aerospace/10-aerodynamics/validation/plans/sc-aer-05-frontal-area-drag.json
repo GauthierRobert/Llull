@@ -1,0 +1,15 @@
+{
+  "id": "SC-AER-05",
+  "validates": ["VC-AER-02", "VC-AER-04"],
+  "description": "Frontal area of a 0.6 m x 0.4 m box face measured on the model and drag of a flat plate normal to the flow (NASA Glenn Cd 1.28) at 20 m/s, sea level",
+  "actions": [
+    { "command": "set_units", "params": { "units": "m" } },
+    { "command": "add_box", "params": { "size": [0.05, 0.6, 0.4] }, "as": "plate" },
+    { "command": "frontal_area", "params": { "entityIds": ["$plate"] } },
+    { "command": "aero_drag", "params": { "speed": 20, "cd": 1.28, "entityIds": ["$plate"] } }
+  ],
+  "expected": [
+    { "step": 2, "path": "frontalAreaM2", "value": 0.24, "rel": 0.006, "source": "exact 0.6 x 0.4" },
+    { "step": 3, "path": "dragN", "value": 75.264, "rel": 0.006, "source": "D = 1/2 rho V^2 Cd A, Cd 1.28 (NASA GRC)" }
+  ]
+}

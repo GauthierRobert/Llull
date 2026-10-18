@@ -1,0 +1,370 @@
+{
+  "id": "VC-AER-01",
+  "title": "U.S. Standard Atmosphere 1976, -2 to 86 km geometric, every 2 km",
+  "source": "PDAS 'Atmosphere to 86 km by 2 km (SI units)' table (Public Domain Aeronautical Software, Ralph Carmichael), a tabulation of NASA-TM-X-74335 (NOAA/NASA/USAF 1976); transcribed from the test data of the PyPI package fluids 1.3.1 (tests/test_atmosphere.py, MIT, C. Bell), which asserts its USSA76 code against it at rtol 5e-5",
+  "sourceGrade": "A (published table; also reproduced by fluids 1.3.1 and by an independent recomputation from the 1976 defining constants)",
+  "printedPrecision": "5 significant figures (sea-level pressure printed 101320 for 101325)",
+  "acceptance": { "temperatureK_abs": 0.006, "other_rel": 0.0001 },
+  "rows": [
+    {
+      "geometricAltitudeM": -2000.0,
+      "temperatureK": 301.15,
+      "pressurePa": 127780.0,
+      "densityKgM3": 1.4782,
+      "speedOfSoundMS": 347.89,
+      "dynamicViscosityPaS": 1.8515e-5
+    },
+    {
+      "geometricAltitudeM": 0.0,
+      "temperatureK": 288.15,
+      "pressurePa": 101320.0,
+      "densityKgM3": 1.225,
+      "speedOfSoundMS": 340.29,
+      "dynamicViscosityPaS": 1.7894e-5
+    },
+    {
+      "geometricAltitudeM": 2000.0,
+      "temperatureK": 275.15,
+      "pressurePa": 79501.0,
+      "densityKgM3": 1.0066,
+      "speedOfSoundMS": 332.53,
+      "dynamicViscosityPaS": 1.726e-5
+    },
+    {
+      "geometricAltitudeM": 4000.0,
+      "temperatureK": 262.17,
+      "pressurePa": 61660.0,
+      "densityKgM3": 0.81935,
+      "speedOfSoundMS": 324.59,
+      "dynamicViscosityPaS": 1.6612e-5
+    },
+    {
+      "geometricAltitudeM": 6000.0,
+      "temperatureK": 249.19,
+      "pressurePa": 47218.0,
+      "densityKgM3": 0.66011,
+      "speedOfSoundMS": 316.45,
+      "dynamicViscosityPaS": 1.5949e-5
+    },
+    {
+      "geometricAltitudeM": 8000.0,
+      "temperatureK": 236.22,
+      "pressurePa": 35652.0,
+      "densityKgM3": 0.52579,
+      "speedOfSoundMS": 308.11,
+      "dynamicViscosityPaS": 1.5271e-5
+    },
+    {
+      "geometricAltitudeM": 10000.0,
+      "temperatureK": 223.25,
+      "pressurePa": 26500.0,
+      "densityKgM3": 0.41351,
+      "speedOfSoundMS": 299.53,
+      "dynamicViscosityPaS": 1.4577e-5
+    },
+    {
+      "geometricAltitudeM": 12000.0,
+      "temperatureK": 216.65,
+      "pressurePa": 19399.0,
+      "densityKgM3": 0.31194,
+      "speedOfSoundMS": 295.07,
+      "dynamicViscosityPaS": 1.4216e-5
+    },
+    {
+      "geometricAltitudeM": 14000.0,
+      "temperatureK": 216.65,
+      "pressurePa": 14170.0,
+      "densityKgM3": 0.22786,
+      "speedOfSoundMS": 295.07,
+      "dynamicViscosityPaS": 1.4216e-5
+    },
+    {
+      "geometricAltitudeM": 16000.0,
+      "temperatureK": 216.65,
+      "pressurePa": 10353.0,
+      "densityKgM3": 0.16647,
+      "speedOfSoundMS": 295.07,
+      "dynamicViscosityPaS": 1.4216e-5
+    },
+    {
+      "geometricAltitudeM": 18000.0,
+      "temperatureK": 216.65,
+      "pressurePa": 7565.2,
+      "densityKgM3": 0.12165,
+      "speedOfSoundMS": 295.07,
+      "dynamicViscosityPaS": 1.4216e-5
+    },
+    {
+      "geometricAltitudeM": 20000.0,
+      "temperatureK": 216.65,
+      "pressurePa": 5529.3,
+      "densityKgM3": 0.08891,
+      "speedOfSoundMS": 295.07,
+      "dynamicViscosityPaS": 1.4216e-5
+    },
+    {
+      "geometricAltitudeM": 22000.0,
+      "temperatureK": 218.57,
+      "pressurePa": 4047.5,
+      "densityKgM3": 0.06451,
+      "speedOfSoundMS": 296.38,
+      "dynamicViscosityPaS": 1.4322e-5
+    },
+    {
+      "geometricAltitudeM": 24000.0,
+      "temperatureK": 220.56,
+      "pressurePa": 2971.7,
+      "densityKgM3": 0.046938,
+      "speedOfSoundMS": 297.72,
+      "dynamicViscosityPaS": 1.443e-5
+    },
+    {
+      "geometricAltitudeM": 26000.0,
+      "temperatureK": 222.54,
+      "pressurePa": 2188.4,
+      "densityKgM3": 0.034257,
+      "speedOfSoundMS": 299.06,
+      "dynamicViscosityPaS": 1.4538e-5
+    },
+    {
+      "geometricAltitudeM": 28000.0,
+      "temperatureK": 224.53,
+      "pressurePa": 1616.2,
+      "densityKgM3": 0.025076,
+      "speedOfSoundMS": 300.39,
+      "dynamicViscosityPaS": 1.4646e-5
+    },
+    {
+      "geometricAltitudeM": 30000.0,
+      "temperatureK": 226.51,
+      "pressurePa": 1197.0,
+      "densityKgM3": 0.01841,
+      "speedOfSoundMS": 301.71,
+      "dynamicViscosityPaS": 1.4753e-5
+    },
+    {
+      "geometricAltitudeM": 32000.0,
+      "temperatureK": 228.49,
+      "pressurePa": 889.06,
+      "densityKgM3": 0.013555,
+      "speedOfSoundMS": 303.02,
+      "dynamicViscosityPaS": 1.4859e-5
+    },
+    {
+      "geometricAltitudeM": 34000.0,
+      "temperatureK": 233.74,
+      "pressurePa": 663.41,
+      "densityKgM3": 0.0098874,
+      "speedOfSoundMS": 306.49,
+      "dynamicViscosityPaS": 1.514e-5
+    },
+    {
+      "geometricAltitudeM": 36000.0,
+      "temperatureK": 239.28,
+      "pressurePa": 498.52,
+      "densityKgM3": 0.0072579,
+      "speedOfSoundMS": 310.1,
+      "dynamicViscosityPaS": 1.5433e-5
+    },
+    {
+      "geometricAltitudeM": 38000.0,
+      "temperatureK": 244.82,
+      "pressurePa": 377.14,
+      "densityKgM3": 0.0053666,
+      "speedOfSoundMS": 313.67,
+      "dynamicViscosityPaS": 1.5723e-5
+    },
+    {
+      "geometricAltitudeM": 40000.0,
+      "temperatureK": 250.35,
+      "pressurePa": 287.14,
+      "densityKgM3": 0.0039957,
+      "speedOfSoundMS": 317.19,
+      "dynamicViscosityPaS": 1.6009e-5
+    },
+    {
+      "geometricAltitudeM": 42000.0,
+      "temperatureK": 255.88,
+      "pressurePa": 219.97,
+      "densityKgM3": 0.0029948,
+      "speedOfSoundMS": 320.67,
+      "dynamicViscosityPaS": 1.6293e-5
+    },
+    {
+      "geometricAltitudeM": 44000.0,
+      "temperatureK": 261.4,
+      "pressurePa": 169.5,
+      "densityKgM3": 0.0022589,
+      "speedOfSoundMS": 324.12,
+      "dynamicViscosityPaS": 1.6573e-5
+    },
+    {
+      "geometricAltitudeM": 46000.0,
+      "temperatureK": 266.92,
+      "pressurePa": 131.34,
+      "densityKgM3": 0.0017141,
+      "speedOfSoundMS": 327.52,
+      "dynamicViscosityPaS": 1.6851e-5
+    },
+    {
+      "geometricAltitudeM": 48000.0,
+      "temperatureK": 270.65,
+      "pressurePa": 102.3,
+      "densityKgM3": 0.0013167,
+      "speedOfSoundMS": 329.8,
+      "dynamicViscosityPaS": 1.7037e-5
+    },
+    {
+      "geometricAltitudeM": 50000.0,
+      "temperatureK": 270.65,
+      "pressurePa": 79.779,
+      "densityKgM3": 0.0010269,
+      "speedOfSoundMS": 329.8,
+      "dynamicViscosityPaS": 1.7037e-5
+    },
+    {
+      "geometricAltitudeM": 52000.0,
+      "temperatureK": 269.03,
+      "pressurePa": 62.215,
+      "densityKgM3": 0.00080562,
+      "speedOfSoundMS": 328.81,
+      "dynamicViscosityPaS": 1.6956e-5
+    },
+    {
+      "geometricAltitudeM": 54000.0,
+      "temperatureK": 263.52,
+      "pressurePa": 48.338,
+      "densityKgM3": 0.000639,
+      "speedOfSoundMS": 325.43,
+      "dynamicViscosityPaS": 1.668e-5
+    },
+    {
+      "geometricAltitudeM": 56000.0,
+      "temperatureK": 258.02,
+      "pressurePa": 37.362,
+      "densityKgM3": 0.00050445,
+      "speedOfSoundMS": 322.01,
+      "dynamicViscosityPaS": 1.6402e-5
+    },
+    {
+      "geometricAltitudeM": 58000.0,
+      "temperatureK": 252.52,
+      "pressurePa": 28.724,
+      "densityKgM3": 0.00039626,
+      "speedOfSoundMS": 318.56,
+      "dynamicViscosityPaS": 1.6121e-5
+    },
+    {
+      "geometricAltitudeM": 60000.0,
+      "temperatureK": 247.02,
+      "pressurePa": 21.959,
+      "densityKgM3": 0.00030968,
+      "speedOfSoundMS": 315.07,
+      "dynamicViscosityPaS": 1.5837e-5
+    },
+    {
+      "geometricAltitudeM": 62000.0,
+      "temperatureK": 241.53,
+      "pressurePa": 16.689,
+      "densityKgM3": 0.00024071,
+      "speedOfSoundMS": 311.55,
+      "dynamicViscosityPaS": 1.5551e-5
+    },
+    {
+      "geometricAltitudeM": 64000.0,
+      "temperatureK": 236.04,
+      "pressurePa": 12.606,
+      "densityKgM3": 0.00018605,
+      "speedOfSoundMS": 307.99,
+      "dynamicViscosityPaS": 1.5262e-5
+    },
+    {
+      "geometricAltitudeM": 66000.0,
+      "temperatureK": 230.55,
+      "pressurePa": 9.4609,
+      "densityKgM3": 0.00014296,
+      "speedOfSoundMS": 304.39,
+      "dynamicViscosityPaS": 1.497e-5
+    },
+    {
+      "geometricAltitudeM": 68000.0,
+      "temperatureK": 225.07,
+      "pressurePa": 7.0529,
+      "densityKgM3": 0.00010917,
+      "speedOfSoundMS": 300.75,
+      "dynamicViscosityPaS": 1.4675e-5
+    },
+    {
+      "geometricAltitudeM": 70000.0,
+      "temperatureK": 219.58,
+      "pressurePa": 5.2209,
+      "densityKgM3": 8.2829e-5,
+      "speedOfSoundMS": 297.06,
+      "dynamicViscosityPaS": 1.4377e-5
+    },
+    {
+      "geometricAltitudeM": 72000.0,
+      "temperatureK": 214.26,
+      "pressurePa": 3.8363,
+      "densityKgM3": 6.2373e-5,
+      "speedOfSoundMS": 293.44,
+      "dynamicViscosityPaS": 1.4085e-5
+    },
+    {
+      "geometricAltitudeM": 74000.0,
+      "temperatureK": 210.35,
+      "pressurePa": 2.8009,
+      "densityKgM3": 4.6385e-5,
+      "speedOfSoundMS": 290.75,
+      "dynamicViscosityPaS": 1.3868e-5
+    },
+    {
+      "geometricAltitudeM": 76000.0,
+      "temperatureK": 206.45,
+      "pressurePa": 2.0333,
+      "densityKgM3": 3.4311e-5,
+      "speedOfSoundMS": 288.04,
+      "dynamicViscosityPaS": 1.365e-5
+    },
+    {
+      "geometricAltitudeM": 78000.0,
+      "temperatureK": 202.54,
+      "pressurePa": 1.4674,
+      "densityKgM3": 2.5239e-5,
+      "speedOfSoundMS": 285.3,
+      "dynamicViscosityPaS": 1.343e-5
+    },
+    {
+      "geometricAltitudeM": 80000.0,
+      "temperatureK": 198.64,
+      "pressurePa": 1.0525,
+      "densityKgM3": 1.8458e-5,
+      "speedOfSoundMS": 282.54,
+      "dynamicViscosityPaS": 1.3208e-5
+    },
+    {
+      "geometricAltitudeM": 82000.0,
+      "temperatureK": 194.74,
+      "pressurePa": 0.75009,
+      "densityKgM3": 1.3418e-5,
+      "speedOfSoundMS": 279.75,
+      "dynamicViscosityPaS": 1.2985e-5
+    },
+    {
+      "geometricAltitudeM": 84000.0,
+      "temperatureK": 190.84,
+      "pressurePa": 0.53104,
+      "densityKgM3": 9.6939e-6,
+      "speedOfSoundMS": 276.94,
+      "dynamicViscosityPaS": 1.276e-5
+    },
+    {
+      "geometricAltitudeM": 86000.0,
+      "temperatureK": 186.95,
+      "pressurePa": 0.37338,
+      "densityKgM3": 6.9578e-6,
+      "speedOfSoundMS": 274.1,
+      "dynamicViscosityPaS": 1.2533e-5
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "id": "VC-AER-21..23",
+  "title": "Cycling aerodynamics reference values",
+  "martin1998": {
+    "source": "Martin JC, Milliken DL, Cobb JE, McFadden KL, Coggan AR. Validation of a mathematical model for road cycling power. J Appl Biomech 14(3):276-291, 1998. doi:10.1123/jab.14.3.276 (free PDF: University of Utah collections)",
+    "validation": { "rSquared": 0.97, "standardErrorW": 2.7, "grade": "A (abstract, BISp + Semantic Scholar)" },
+    "constants": {
+      "wheelAreaFwM2": { "value": 0.0044, "grade": "A" },
+      "bearingLossW": { "value": "V(91 + 8.7 V)e-3", "grade": "A (Dahn 1991 via Martin)" },
+      "crr": { "value": 0.0032, "grade": "A" },
+      "chainEfficiency": { "value": 0.976, "grade": "B (rouleur 0.0.3 implementation; other reuses 0.975-0.98)" }
+    }
+  },
+  "defraeye2010": {
+    "source": "Defraeye T, Blocken B, Koninckx E, Hespel P, Carmeliet J. Aerodynamic study of different cyclist positions: CFD analysis and full-scale wind-tunnel tests. J Biomech 43:1262-1268, 2010. doi:10.1016/j.jbiomech.2010.01.025 (preprint Lirias KU Leuven)",
+    "grade": "B (two concordant extracts)",
+    "riderPlusBikeCdAM2": { "upright": 0.27, "dropped": 0.243, "timeTrial": 0.211 },
+    "riderOnlyCdAM2": { "upright": 0.193, "dropped": 0.167, "timeTrial": 0.134 },
+    "rider": { "heightM": 1.83, "massKg": 72 }
+  },
+  "blocken2013": {
+    "source": "Blocken B, Defraeye T, Koninckx E, Carmeliet J, Hespel P. CFD simulations of the aerodynamic drag of two drafting cyclists. Computers & Fluids 71:435-445, 2013. doi:10.1016/j.compfluid.2012.11.012",
+    "grade": "A (abstract)",
+    "trailingRiderDragReductionAt1cm": { "upright": 0.271, "dropped": 0.231, "timeTrial": 0.138 },
+    "leadingRiderDragReduction": { "upright": 0.008, "dropped": 0.017, "timeTrial": 0.026 }
+  },
+  "blocken2018peloton": {
+    "source": "Blocken B et al. Aerodynamic drag in cycling pelotons: new insights by CFD simulation and wind tunnel testing. J Wind Eng Ind Aerodyn 179:319-337, 2018 (open access, TU/e repository)",
+    "grade": "A",
+    "midRearDragFractionOfIsolated": [0.05, 0.1]
+  }
+}

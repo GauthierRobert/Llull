@@ -1,0 +1,32 @@
+# Gap 10 AER — Sources
+
+Accessed 2026-10-18. Network limits of the authoring sandbox: only PyPI and npm could be downloaded. NASA NTRS,
+journals and Wikipedia were reached through search-engine extracts only. Each source is graded:
+
+- **A**: the primary source was read, or two or more independent sources agree.
+- **B**: one secondary extract.
+- **C**: the source was located but its numbers are not confirmed. C-grade values are never used as pass / fail
+  gates.
+
+| Id | Source | What was taken | How it was checked | Grade |
+| -- | ------ | -------------- | ------------------ | ----- |
+| S1 | U.S. Standard Atmosphere 1976, NOAA/NASA/USAF, NASA-TM-X-74335, https://ntrs.nasa.gov/citations/19770009539; PDAS "Atmosphere to 86 km by 2 km (SI units)", https://www.pdas.com/atmosdownload.html | defining constants (layers, R*, M0, r0, Sutherland β/S, γ) and the 45-row table | Table transcribed from the test data of `fluids` 1.3.1 (PyPI sdist, MIT, C. Bell, `tests/test_atmosphere.py`), which cites the PDAS table. The constants agree across PDAS, `fluids`, `ambiance` 1.3.1 (ICAO 1993, identical below 80 km) and the base pressures quoted by search extracts (22632.06, 5474.889, 868.0187 Pa). An independent recomputation from the constants matches every row. | A |
+| S2 | UIUC Airfoil Coordinates Database, naca2412.dat (via the 02 SRF pack `naca_uiuc_comparison.json`, sha256 pinned) | NACA ordinates | 02 SRF generator matched UIUC to 1e-7 c; llull's `draw_naca_airfoil` matches that generator's CSV to 1e-7 | A |
+| S3 | Ladson C. L., NASA TM-4074 (1988), https://ntrs.nasa.gov/citations/19880019495 | NACA 0012 tripped, M 0.15, Re 6e6: cl(10°) 1.0586–1.0672, cd0 0.0081, cl(15°) ≈ 1.49 | Quoted by SimFlow, PHengLEI, Altair AcuSolve and arXiv 2301.09443 validation reports; the NASA Turbulence Modeling Resource names it as the reference set | A (cl 10°, cd0); B (cl 15°) |
+| S4 | McCroskey W. J., NASA TM-100019 (1987), https://ntrs.nasa.gov/citations/19880002254 | NACA 0012 lift-slope fit 0.1025 + 0.00485 log10(Re/1e6) /deg | search extracts of the report and DTIC record ADA193182 | A |
+| S5 | Abbott & von Doenhoff, Theory of Wing Sections (Dover), §4.3; NACA Report 824 (https://ntrs.nasa.gov/citations/19930090976) | NACA 2412 thin-airfoil α_L0 −2.077° (−2.07°), measured ≈ −2° | two independent extracts (VT "Aerodynamics and Aircraft Performance" app. A; a worked course problem); the integral is recomputed by the test | A |
+| S6 | Katz J., Plotkin A., Low-Speed Aerodynamics, 2nd ed., §6.6 (Joukowski airfoil); Milne-Thomson, Theoretical Aerodynamics | exact circulation Γ = 4πVR sin(α+β) | closed form, no number taken | A |
+| S7 | Glauert H. (1926), The Elements of Aerofoil and Airscrew Theory, ch. XI; Anderson J. D., Fundamentals of Aerodynamics §5.3; Helmbold (1942) | lifting-line equations; elliptic closed forms | standard closed forms, no number taken | A |
+| S8 | NASA Glenn Research Center, "Shape Effects on Drag", https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/shape-effects-on-drag/ | flat plate normal to the flow Cd 1.28; sphere about 0.47 (subcritical) | NASA page extract + F. M. White, Fluid Mechanics table (via volupe.com) | A |
+| S9 | Schlichting & Gersten, Boundary-Layer Theory; ITTC 1957 | Blasius 1.328/√Re, 0.074/Re^0.2, 0.455/(log Re)^2.58, 0.075/(log Re − 2)² | cross-checked with AeroSandbox 4.2.10 `library/aerodynamics/viscous.py` (PyPI sdist), Purdue / TU Delft / U. Iowa notes | A |
+| S10 | Bassett D. R. Jr, Kyle C. R., Passfield L., Broker J. P., Burke E. R., Comparing cycling world hour records, 1967–1996: modeling with empirical data, Med. Sci. Sports Exerc. 31(11):1665–1676, 1999 | eq. 5, 7, 8 and Table 7 (13 rows) | full text read (PDF print sha256 7e1930c5…22e5); Table 7 and eq. 8 read from the article images; every row recomputed within 1.4 W | A |
+| S11 | Martin J. C., Milliken D. L., Cobb J. E., McFadden K. L., Coggan A. R., Validation of a mathematical model for road cycling power, J. Appl. Biomech. 14(3):276–291, 1998, doi:10.1123/jab.14.3.276 (free PDF, University of Utah collections) | model structure, Fw 0.0044 m², bearing loss 91 + 8.7V mW, Crr 0.0032; R² 0.97, SE 2.7 W | abstract (BISp, Semantic Scholar) + implementation `rouleur` 0.0.3 (PyPI, MIT) + a JSC journal paper quoting the appendix | A (structure, Fw, bearings, Crr); B (E_c 0.976) |
+| S12 | Defraeye T. et al., J. Biomech. 43:1262–1268, 2010, doi:10.1016/j.jbiomech.2010.01.025 (preprint on Lirias KU Leuven) | rider + bike CdA 0.270 / 0.243 / 0.211 m² (upright / dropped / time trial) | two concordant extracts | B |
+| S13 | Blocken B. et al., Computers & Fluids 71:435–445, 2013; J. Wind Eng. Ind. Aerodyn. 179:319–337, 2018 (open access) | drafting reductions 27.1 / 23.1 / 13.8 %; peloton 5–10 % | abstracts | A (documentation only, not a gate) |
+
+## Not verified (not used as gates)
+
+- NACA Report 824 Appendix I v/V table for NACA 0012.
+- Martin 1998 CdA (0.258 m² in `rouleur` defaults only), wheel inertia 0.14 kg·m², tyre radius 0.311 m.
+- Anderson Fig. 5.20 δ values versus taper ratio; experimental AR-6 rectangular-wing lift slopes.
+- Cube Cd (sources conflict: 0.81–1.07).

@@ -1,0 +1,28 @@
+{
+  "id": "SC-AER-04",
+  "validates": ["VC-AER-11", "VC-AER-13"],
+  "description": "Sketch a NACA 2412 section (chord 1000 mm), analyse it, extrude a constant-chord panel, then a 10 m x 1 m rectangular wing by lifting line",
+  "actions": [
+    { "command": "draw_naca_airfoil", "params": { "naca": "2412", "chord": 1000 }, "as": "section" },
+    { "command": "analyze_airfoil", "params": { "entityId": "$section", "alphasDeg": [0, 4] } },
+    { "command": "extrude_profile", "params": { "id": "$section", "depth": 2000 }, "as": "panel" },
+    { "command": "analyze_wing", "params": { "span": 10, "rootChord": 1, "naca": "2412", "alphasDeg": [0, 4] } }
+  ],
+  "expected": [
+    {
+      "step": 3,
+      "path": "section.zeroLiftAngleDeg",
+      "value": -2.077,
+      "abs": 0.001,
+      "source": "thin-airfoil theory NACA 2412 (Abbott & von Doenhoff)"
+    },
+    {
+      "step": 1,
+      "path": "zeroLiftAngleDeg",
+      "value": -2.0,
+      "abs": 0.4,
+      "source": "NACA 2412 measured alpha_L0 about -2 deg (Abbott & von Doenhoff app.)"
+    },
+    { "step": 3, "path": "geometry.aspectRatio", "value": 10, "rel": 1e-9, "source": "b^2/S" }
+  ]
+}

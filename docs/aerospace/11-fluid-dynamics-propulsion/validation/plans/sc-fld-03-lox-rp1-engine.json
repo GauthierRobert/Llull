@@ -1,0 +1,43 @@
+{
+  "id": "SC-FLD-03",
+  "validates": ["VC-FLD-11", "VC-FLD-21"],
+  "description": "F-1-like LOX/RP-1 (70 bar, MR 2.27, eps 16): performance with the NASA CEA chamber state, with a 15 deg conical nozzle (lambda 0.983) and an ideal one",
+  "actions": [
+    {
+      "command": "nozzle_performance",
+      "params": {
+        "chamberPressure": 70,
+        "pressureUnit": "bar",
+        "chamberTemperatureK": 3558.34,
+        "gamma": 1.1507,
+        "molarMass": 22.186,
+        "expansionRatio": 16,
+        "ambientPressure": 1.01325
+      }
+    },
+    {
+      "command": "nozzle_performance",
+      "params": {
+        "chamberPressure": 70,
+        "pressureUnit": "bar",
+        "chamberTemperatureK": 3558.34,
+        "gamma": 1.1507,
+        "molarMass": 22.186,
+        "expansionRatio": 16,
+        "ambientPressure": 1.01325,
+        "divergence": "conical",
+        "halfAngleDeg": 15
+      }
+    },
+    {
+      "command": "design_nozzle",
+      "params": { "throatRadius": 100, "expansionRatio": 16, "shape": "conical", "halfAngleDeg": 15, "wallThickness": 6 }
+    }
+  ],
+  "expected": [
+    { "step": 0, "path": "cStarMS", "value": 1807.53, "rel": 0.005, "source": "NASA CEA" },
+    { "step": 0, "path": "ispS.vacuum", "value": 334.42, "rel": 0.03, "source": "NASA CEA shifting equilibrium" },
+    { "step": 0, "path": "ispS.ambient", "value": 291.73, "rel": 0.03, "source": "NASA CEA shifting equilibrium, pa 1.01325 bar" },
+    { "step": 1, "path": "inputs.divergence.factor", "value": 0.98296, "rel": 0.0001, "source": "(1 + cos 15 deg)/2" }
+  ]
+}

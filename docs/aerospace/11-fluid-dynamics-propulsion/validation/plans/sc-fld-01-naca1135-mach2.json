@@ -1,0 +1,15 @@
+{
+  "id": "SC-FLD-01",
+  "validates": ["VC-FLD-01", "VC-FLD-02", "VC-FLD-03"],
+  "description": "Mach 2 air: isentropic ratios, normal shock and the 10 deg wedge shock (NACA Report 1135 tables)",
+  "actions": [
+    { "command": "compressible_flow", "params": { "relation": "isentropic", "mach": 2 } },
+    { "command": "compressible_flow", "params": { "relation": "normal_shock", "mach": 2 } },
+    { "command": "compressible_flow", "params": { "relation": "oblique_shock", "mach": 2, "deflectionDeg": 10 } }
+  ],
+  "expected": [
+    { "step": 0, "path": "result.areaRatio", "value": 1.6875, "rel": 0.0005, "source": "NACA 1135" },
+    { "step": 1, "path": "result.totalPressureRatio", "value": 0.7209, "rel": 0.0005, "source": "NACA 1135" },
+    { "step": 2, "path": "result.waveAngleDeg", "value": 39.31, "abs": 0.01, "source": "NACA 1135 chart / reproductions" }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "id": "VC-AER-10..14",
+  "title": "Airfoil and wing references",
+  "naca0012_ladson": {
+    "source": "Ladson CL. Effects of independent variation of Mach and Reynolds numbers on the low-speed aerodynamic characteristics of the NACA 0012 airfoil section. NASA TM-4074, 1988 (NTRS 19880019495); tripped data at M 0.15, Re 6e6 as used by the NASA Turbulence Modeling Resource 2D NACA 0012 validation case",
+    "grade": "A for cl(10 deg) and cd0 (several validation reports quote the same runs); B for cl(15 deg)",
+    "points": [
+      { "alphaDeg": 0, "cl": -0.007, "cd": 0.0081 },
+      { "alphaDeg": 10, "clRange": [1.0586, 1.0672], "cd": 0.0119 },
+      { "alphaDeg": 15, "cl": 1.49, "grade": "B" }
+    ]
+  },
+  "naca0012_mccroskey": {
+    "source": "McCroskey WJ. A critical assessment of wind tunnel results for the NACA 0012 airfoil. NASA TM-100019 / AGARD CP-429, 1987 (NTRS 19880002254)",
+    "grade": "A",
+    "liftSlopePerDegFit": "0.1025 + 0.00485 log10(Re/1e6)",
+    "liftSlopePerDegAtRe6e6": 0.10627
+  },
+  "naca2412_thin_airfoil": {
+    "source": "Thin-airfoil theory integral of the NACA 2412 mean line (Abbott & von Doenhoff, Theory of Wing Sections, \u00a74.3; worked in Anderson, Fundamentals of Aerodynamics, example 4.x); experimental alpha_L0 about -2 deg (Abbott & von Doenhoff appendix data via VT Aerodynamics and Aircraft Performance, app. A)",
+    "grade": "A (analytic, two sources quote -2.07 / -2.077 deg)",
+    "zeroLiftAngleDeg": -2.077,
+    "liftSlopePerRad": 6.283185307179586,
+    "experimentalZeroLiftDeg": -2.0
+  },
+  "joukowski": {
+    "source": "Exact potential flow about a Joukowski airfoil by conformal mapping z = zeta + b^2/zeta of a circle of radius R centred at (-mx, my) through zeta = b: Gamma = 4 pi V R sin(alpha + beta), beta = asin(my/R) (Kutta-Joukowski; Katz & Plotkin, Low-Speed Aerodynamics, 2nd ed. \u00a76.6; Milne-Thomson, Theoretical Aerodynamics). cl = 8 pi R sin(alpha+beta)/c with c the mapped chord.",
+    "grade": "A (closed form)",
+    "cases": [
+      { "b": 1, "mx": 0.1, "my": 0.1, "alphaDeg": 0 },
+      { "b": 1, "mx": 0.1, "my": 0.1, "alphaDeg": 5 },
+      { "b": 1, "mx": 0.08, "my": 0, "alphaDeg": 8 }
+    ],
+    "acceptance": {
+      "clRel": 0.01,
+
+      "panelsPerSide": 300,
+      "note": "uniform panels in the circle angle; the cusped trailing edge converges at first order (1.3 % at 150/side, 0.46 % at 300/side, 0.21 % at 600/side for case 2)"
+    }
+  },
+  "lifting_line": {
+    "source": "Prandtl lifting-line theory: elliptic loading gives CL_alpha = a0/(1 + a0/(pi AR)) and CDi = CL^2/(pi AR), e = 1 exactly (Glauert 1926; Anderson \u00a75.3.1). Helmbold 1942 low-AR correction for comparison.",
+    "grade": "A (closed form)",
+    "acceptance": { "rel": 1e-6 }
+  },
+  "skin_friction": {
+    "source": "Blasius 1908 laminar flat plate Cf = 1.328/sqrt(Re); Prandtl-Schlichting 1932 Cf = 0.455/(log10 Re)^2.58; 1/7 power law 0.074/Re^0.2; ITTC-1957 0.075/(log10 Re - 2)^2 (Schlichting, Boundary-Layer Theory; ITTC 1957 proceedings; cross-checked in AeroSandbox 4.2.10 viscous.py)",
+    "grade": "A",
+    "checkValues": [
+      { "re": 1000000.0, "laminar_blasius": 0.001328, "turbulent_prandtl_schlichting": 0.004471, "ittc_1957": 0.004688 },
+      { "re": 10000000.0, "laminar_blasius": 0.00042, "turbulent_prandtl_schlichting": 0.003004, "ittc_1957": 0.003 }
+    ],
+    "acceptance": { "rel": 0.0005 }
+  },
+  "bluff_bodies": {
+    "source": "NASA Glenn Research Center, Beginner's Guide to Aeronautics, 'Shape Effects on Drag' (flat plate normal to the flow Cd 1.28); sphere about 0.47 at Re 1e4-2e5 (F. M. White, Fluid Mechanics, table 7.3)",
+    "grade": "A",
+    "flatPlateNormalCd": 1.28,
+    "sphereSubcriticalCd": 0.47
+  }
+}

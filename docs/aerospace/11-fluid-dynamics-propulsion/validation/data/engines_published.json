@@ -1,0 +1,52 @@
+{
+  "id": "VC-FLD-13..15",
+  "title": "Published engine data (search extracts of manufacturer / NASA pages; grade per row)",
+  "engines": [
+    {
+      "name": "RS-25 (SSME, 109 %)",
+      "chamberPressurePsia": 2994,
+      "mixtureRatio": 6.0,
+      "expansionRatio": 69,
+      "thrustVacuumLbf": 512300,
+      "thrustSeaLevelLbf": 418000,
+      "ispVacuumS": 452.3,
+      "ispSeaLevelS": 366,
+      "sources": ["L3Harris RS-25 engine page", "NASA SLS RS-25 fact sheet (via extracts)", "Wikipedia RS-25"],
+      "grade": "A for thrust/Isp/MR; expansion ratio 69 (current large-throat MCC) vs 77.5 (original) is configuration dependent"
+    },
+    {
+      "name": "F-1",
+      "chamberPressureBar": 70,
+      "mixtureRatio": 2.27,
+      "expansionRatio": 16,
+      "thrustSeaLevelLbf": 1522000,
+      "ispVacuumS": 304,
+      "ispSeaLevelS": 263,
+      "sources": ["Wikipedia F-1", "Astronautix", "NASA NTRS 20030093580"],
+      "grade": "A for thrust/Isp/eps; B for Pc (70 bar vs ~965 psi conflict)"
+    },
+    {
+      "name": "NASA SP-125 A-1 example engine",
+      "propellants": "LOX/RP-1",
+      "chamberPressurePsia": 1000,
+      "mixtureRatio": 2.35,
+      "expansionRatio": 14,
+      "throatAreaIn2": 487,
+      "thrustSeaLevelLbf": 747000,
+      "cStarDeliveredFtS": 5660,
+      "cStarEfficiency": 0.975,
+      "cfVacuum": 1.768,
+      "cfSeaLevel": 1.562,
+      "source": "Huzel DK, Huang DH. Design of Liquid Propellant Rocket Engines. NASA SP-125, 2nd ed. 1971 (NTRS 19710019929), sample calculation for the A-1 stage engine (values transcribed in rocketisp 0.1.13 examples/A-1_Huzel*.py and an OCR of the NTRS scan)",
+      "grade": "B"
+    }
+  ],
+  "acceptance": {
+    "gate": "RS-25 only: ideal (CEA chamber gamma / molar mass at its Pc, MR, eps) vacuum Isp must exceed the published 452.3 s by 0..+6 % (ideal >= real; RS-25 delivers about 96 % of ideal)",
+    "ispVacRelBand": [0.0, 0.06],
+    "notGated": {
+      "F-1": "gas-generator cycle (turbine exhaust dumped into the nozzle extension) and film cooling: delivered Isp about 10 % below an ideal prediction; Pc sources also conflict (70 bar vs ~965 psi)",
+      "SP-125 A-1": "used for the identity C_F,amb = C_F,vac - eps p_a/p_c (1.768 - 14 x 14.696/1000 = 1.562) only; gamma of the book's calculation is not stated"
+    }
+  }
+}

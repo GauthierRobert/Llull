@@ -29,6 +29,8 @@ const TOOLSET_GROUPS = {
   review: 'Review',
   manufacturing: 'Manufacturing',
   fasteners: 'Fasteners',
+  aerodynamics: 'Aerodynamics',
+  fluids: 'Fluids / propulsion',
   exchange: 'Import / export',
   building: 'Building',
   piping: 'Piping',

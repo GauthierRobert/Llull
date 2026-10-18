@@ -1,0 +1,45 @@
+{
+  "id": "VC-FLD-20..22",
+  "title": "Nozzle contour references",
+  "conicalDivergence": {
+    "formula": "lambda = (1 + cos alpha)/2",
+    "source": "Malina 1940; Sutton & Biblarz eq. 3-34; NASA NTRS 19980227347 conical nozzle tests",
+    "grade": "A",
+    "check": { "halfAngleDeg": 15, "lambda": 0.98296 }
+  },
+  "raoThroatArcs": {
+    "upstreamFactor": 1.5,
+    "downstreamFactor": 0.382,
+    "source": "Rao GVR. Exhaust nozzle contour for optimum thrust. Jet Propulsion 28(6), 1958; Huzel & Huang NASA SP-125 Fig. 4-15; reproduced by Newlands (aspirespace) and several design notes",
+    "grade": "A (designer convention)"
+  },
+  "rao80Angles": {
+    "source": "Huzel & Huang NASA SP-125 Fig. 4-16 (80 % bell) as digitised in rocketisp 0.1.13 rocketisp/nozzle/huzel_data.py (PyPI, C. Taylor)",
+    "grade": "B (digitised chart, about +/-0.5 deg)",
+    "points": [
+      { "eps": 5.06, "thetaN": 22.57 },
+      { "eps": 9.93, "thetaN": 25.21 },
+      { "eps": 15.09, "thetaN": 27.41 },
+      { "eps": 20.14, "thetaN": 29.03 },
+      { "eps": 24.97, "thetaN": 30.05 },
+      { "eps": 30.02, "thetaN": 30.79 },
+      { "eps": 40.05, "thetaN": 31.57 },
+      { "eps": 50.18, "thetaN": 32.18 }
+    ],
+    "exitPoints": [
+      { "eps": 5.16, "thetaE": 13.48 },
+      { "eps": 10.22, "thetaE": 10.91 },
+      { "eps": 15.19, "thetaE": 9.71 },
+      { "eps": 20.07, "thetaE": 9.09 },
+      { "eps": 25.0, "thetaE": 8.78 },
+      { "eps": 29.97, "thetaE": 8.56 },
+      { "eps": 40.0, "thetaE": 8.08 },
+      { "eps": 50.2, "thetaE": 7.72 }
+    ]
+  },
+  "summerfield": {
+    "ratio": 0.4,
+    "source": "Summerfield M, Foster CR, Swan WC. Flow separation in overexpanded supersonic exhaust nozzles. Jet Propulsion 24:319, 1954; quoted in NASA TP-1207 (NTRS 19780022611)",
+    "grade": "A (engineering rule; NASA TM X-64890 notes 0.5-0.8 in other tests)"
+  }
+}
