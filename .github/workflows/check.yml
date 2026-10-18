@@ -31,11 +31,14 @@ jobs:
       - run: npm --prefix desktop ci
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      - run: npm run typecheck
-      - run: npm run arch
-      - run: npm run deadcode
-      - run: npm run lint
-      - run: npm run format:check
+      # tsc --incremental, eslint --cache and prettier --cache state (restored after npm ci, which wipes node_modules).
+      - uses: actions/cache@v4
+        with:
+          path: node_modules/.cache
+          key: static-gates-${{ hashFiles('package-lock.json', 'tsconfig*.json', 'eslint.config.js', '.prettierrc*') }}-${{ github.sha }}
+          restore-keys: static-gates-${{ hashFiles('package-lock.json', 'tsconfig*.json', 'eslint.config.js', '.prettierrc*') }}-
+      # typecheck + arch + deadcode + lint + format:check, concurrently (each prints its own block).
+      - run: node scripts/runParallel.mjs typecheck arch deadcode lint format:check
       - run: npm run test:coverage
       - run: npm --prefix server run typecheck
       - run: npm --prefix server test

@@ -3,6 +3,16 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
 import { workspaceAliases } from './workspaceAliases.ts';
 import { serviceWorkerPlugin } from './viteServiceWorker.ts';
+import { ISOLATED_SUITES } from './tests/isolatedSuites.ts';
+
+const testExcludes = [...configDefaults.exclude, '.claude/worktrees/**', 'server/**', 'desktop/**', 'tests/e2e/**', 'tests/pwa/**'];
+const NODE_SUITES = ['tests/unit/**/*.test.ts', 'tests/golden/**/*.test.ts'];
+const DOM_SUITES = [
+  'tests/component/**/*.test.{ts,tsx}',
+  'tests/integration/**/*.test.{ts,tsx}',
+  'tests/production/**/*.test.ts',
+  'tests/unit/**/*.test.tsx',
+];
 
 export default defineConfig(({ command }) => ({
   plugins: [react(), serviceWorkerPlugin(import.meta.dirname)],
@@ -62,7 +72,18 @@ export default defineConfig(({ command }) => ({
     // and contain full repo copies; never scan them for tests.
     // `server/**` has its own node-env vitest config — keep it out of the app
     // (jsdom) suite so the two never cross-contaminate.
-    exclude: [...configDefaults.exclude, '.claude/worktrees/**', 'server/**', 'desktop/**', 'tests/e2e/**', 'tests/pwa/**'],
+    exclude: testExcludes,
+    // `node`: pure command/plugin suites share one module graph per worker (no jsdom, no per-file re-import of
+    // every plugin); tests/setup.ts resets the injected process singletons per file. Files that mock modules,
+    // stub globals, use the DOM or grow the registry keep a fresh jsdom module graph (`isolated`, `dom`).
+    projects: [
+      {
+        extends: true,
+        test: { name: 'node', environment: 'node', isolate: false, include: NODE_SUITES, exclude: [...testExcludes, ...ISOLATED_SUITES] },
+      },
+      { extends: true, test: { name: 'isolated', include: ISOLATED_SUITES } },
+      { extends: true, test: { name: 'dom', include: DOM_SUITES } },
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
