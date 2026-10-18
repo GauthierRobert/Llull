@@ -109,7 +109,7 @@ User stories (each maps to FRs):
 
 | Phase | Content |
 | ----- | ------- |
-| **MVP** | OCC default on desktop (server worker) with visible fallback; current OCCT build (7.9.x line) in the server/worker; tolerance policy + document `modelingTolerance`; `import_step_exact` (exact solids, ShapeFix, sewing of shells, import report, tessellated-only detection); `validate_shape`; result validity gating; exact `mass_properties` with centroid + inertia + part-frame evaluation; kernel provenance in documents; determinism golden set; boolean `fuzzy` option |
+| **MVP** | OCC default on desktop with visible fallback; current OCCT (7.9.x line) as a native kernel process on desktop / server (`llull-kernel`, RS1 [RS1]); tolerance policy + document `modelingTolerance`; `import_step_exact` (exact solids, ShapeFix, sewing of shells, import report, tessellated-only detection); `validate_shape`; result validity gating; exact `mass_properties` with centroid + inertia + part-frame evaluation; kernel provenance in documents; determinism golden set; boolean `fuzzy` option |
 | **V1** | Persistent topological naming (history-based element names) for fillet / chamfer / shell / hole selections and for imported faces; GVP attributes returned by the importer (comparison bands and GVP writing on export are 04 XCH);
 face-query kernel port for 02/03/05/06/07 (FR-KRN-18); assembly mass properties with instances; browser OCC in a Web Worker (web-only use); instancing of arbitrary exact parts in the viewport; cross-version regression gate |
 | **V2** | LOD tessellation ladder and lightweight proxies; streaming / lazy loading of large assemblies; ABC-sample stress tier; JT/glTF lightweight hand-off (with gap XCH); kernel-level parallelism (BOP parallel mode) |
@@ -275,7 +275,7 @@ for local runs.
 | FR-KRN-07 | VC-KRN-08 | TR-KRN-12, TR-KRN-13 |
 | FR-KRN-08 | VC-KRN-01, VC-KRN-02, VC-KRN-03 | TR-KRN-40, TR-KRN-41, TR-KRN-42 |
 | FR-KRN-09 | VC-KRN-09 | TR-KRN-50, TR-KRN-51 |
-| FR-KRN-10 | VC-KRN-10 | TR-KRN-60, TR-KRN-61, TR-KRN-62 |
+| FR-KRN-10 | VC-KRN-10, VC-KRN-25 | TR-KRN-05, TR-KRN-60, TR-KRN-61, TR-KRN-62 |
 | FR-KRN-11 | VC-KRN-12 | TR-KRN-70, TR-KRN-71, TR-KRN-74 |
 | FR-KRN-12 | VC-KRN-03 | TR-KRN-02, TR-KRN-50 |
 | FR-KRN-13 | VC-KRN-14 | TR-KRN-80 |
@@ -328,11 +328,11 @@ Paywalled standards are cited by title only; no clause content is asserted.
 
 | # | Risk / assumption | Impact | Mitigation |
 | - | ----------------- | ------ | ---------- |
-| K1 | A current OCCT WASM build (7.9.x with C++ exceptions) is larger/slower than opencascade.js 1.1.1 | startup time, memory | desktop runs OCC in the server worker (native-speed WASM in Node) or, later, native OCCT via the bundled CPython's OCP; measure (TR-KRN-02) |
-| K2 | Two OCCT versions in one product (WASM kernel vs CadQuery OCP 7.9.3) produce different edge orders | code export/import mismatch | align versions (TR-KRN-61); selection by name/geometry, never by index (KI5 already does mid-point matching) |
+| K1 | The native OCCT 7.9 sidecar (`llull-kernel`, RS1) is a new binary per OS / arch to build, bundle and keep alive | desktop without an exact kernel; packaging effort | one process behind the existing worker-proxy pattern (timeout, recycle); `NATIVE_TOOL_MISSING` → opencascade.js WASM → Manifold fallback with a visible reason; results checked against the OCP 7.9.3 reference (VC-KRN-25); a custom 7.9 WASM build is no longer on the desktop path (TR-KRN-02) |
+| K2 | Two OCCT versions in one product (browser WASM 7.4 vs native 7.9 kernel and CadQuery OCP 7.9.3) produce different edge orders | code export/import mismatch | native kernel and OCP pinned to the same 7.9.x (TR-KRN-61); selection by name/geometry, never by index (KI5 already does mid-point matching) |
 | K3 | Persistent naming is an open research problem; FreeCAD's mitigation is partial [R16] | some edits still break references | explicit broken-reference errors + repair UI; never silent retargeting (FR-KRN-06) |
 | K4 | Document size grows with embedded B-rep blobs for imported parts | large files | content-addressed blobs, compression, external blob store (TECHNICAL_SPEC §6) |
-| K5 | OCC licence LGPL-2.1 with exception [R10] | distribution obligations for a modified build | keep OCCT unmodified or publish patches; dynamic loading of the WASM / shared library |
+| K5 | OCC licence LGPL-2.1 with exception [R10] | distribution obligations for a modified build | keep OCCT unmodified or publish patches; dynamic linking of the shared library in `llull-kernel` (RS1 §2 rule 7), dynamic loading of the browser WASM |
 | K6 | GVP in public files can be wrong (5/11 NIST files disagree) | false alarms | report, never auto-correct; knownIssue ratchet like the quality corpus |
 | K7 | Assumption: desktop UI commands execute on the backend (POST /command), so the browser kernel is a fallback only | if offline local execution is used on desktop, OCC must also be available in the renderer | FR-KRN-02 worker; desktop always has its backend (KI6) |
 | K9 | The operator (agent) and the owner have no engineering judgement (AGENT_FIRST §1) | a faceted, unverified or GVP-mismatched result could be delivered as if exact and approved | codes + `unverified` + `reviewRequired` in `data` (FR-KRN-19..24), human gates for acceptance (FR-KRN-25), check commands at the end of every workflow (FR-KRN-20) |
@@ -366,4 +366,5 @@ Paywalled standards are cited by title only; no clause content is asserted.
 - [R25] Boeing 747 — NASA Glenn Research Center — https://www.grc.nasa.gov/WWW/K-12/aerosim/LessonHS97/Boeing747.html (search summary only, accessed 2026-10)
 - [R26] three.js documentation r170: InstancedMesh, BatchedMesh, LOD — three.js — https://raw.githubusercontent.com/mrdoob/three.js/r170/docs/api/en/objects/InstancedMesh.html (accessed 2026-10)
 - [R29] IEEE-754 spacing computed with Python `math.ulp` — measured (validation/sources.md)
+- [RS1] Native compute programme (owner decision 2026-10-18) — [../../decisions/RS1-native-compute.md](../../decisions/RS1-native-compute.md)
 - llull: `docs/decisions/KI4-occt-spike.md`, `KI5-shape-kernel-boundary.md`, `KI6-desktop-app-cli-first.md`, `quality/corpus.json`, `docs/QUALITY_GATES.md`

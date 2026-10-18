@@ -76,6 +76,7 @@ Tolerances are relative (`rel`) or absolute (`abs`). "Gate" names the automated 
 | VC-KRN-22 | FR-KRN-25, TR-KRN-105 | faceted rib (fillet recipe under Manifold), agent caller | `export_step_ap242 {acceptUnverified: true}` → exit 1, `XCH_HUMAN_GATE` (04 export gate; `KRN_HUMAN_GATE` for a baseline accept), nothing saved; same act from the desktop UI (human caller) proceeds | exact | server unit + desktop test |
 | VC-KRN-23 | FR-KRN-21, FR-KRN-22, TR-KRN-101, TR-KRN-102 | rib; `kernel_info` | `mass_properties` `.data.volumeUnit == "mm³"`, `.data.eps == {value: 1e-9, unit: "relative", source: …, defaulted: true}`, `.data.densitySource` present, `.data.provenance.method == "BRepGProp"`; `kernel_info` `.data.modelingTolerance.linear == {value: 1e-4, unit: "mm", source: "OCCT read.precision.val default", defaulted: true}` | exact | CLI script |
 | VC-KRN-24 | FR-KRN-26, TR-KRN-106 | `nist_ctc_02_asme1_rc.stp` (largest measured read, 0.84 s native) | `import_step_exact … --dry-run --json` → `.changed == false`, document file byte-identical; `--progress` prints the import stages; with `LLULL_OCC_TIMEOUT_MS=1` (or a `--timeout` shorter than the import) → exit 1, nothing saved | exact | CLI script |
+| VC-KRN-25 (planned, RS-1) | FR-KRN-10, TR-KRN-02, TR-KRN-05 | the 10 analytic solids (`occt_crosscheck.json`), the probe cases (`occt_behaviour_probe.json`), the 28 NIST files (`nist_occt_reference.json`) | native `llull-kernel` (OCCT 7.9.x) reproduces the OCP 7.9.3.1 reference: per-NIST-file solids / shells / faces / edges / vertices and `validAsRead` / `validAfterShapeFix` equal, volume / area / centroid / inertia equal to the reference; probe: fuzzy fuse 2 → 1 solids (12 → 10 faces), plate-minus-cylinder signature `1125f7464525c4f6` (7 faces), fillet history 1 generated / 4 modified, inertia error at 70 m as tabulated | counts and validity exact; measures rel 1e-9 / centroid abs 1e-6 mm (VC-KRN-01 tolerances); signature equal if the build is the same 7.9.3 patch, else VC-KRN-10 cross-build mode; read time not compared | quality:kernel + `npm run native:check` |
 
 ### 3.1 CLI form of the validation cases (AF-23)
 
@@ -149,4 +150,6 @@ All formulas are standard closed forms for homogeneous solids.
 4. **GVP disagreements**: 5 of 11 NIST files with GVP disagree with OCCT beyond 1e-4 — exact import must
    report GVP deltas instead of trusting either side (TR-KRN-23).
 5. **Version skew**: llull's in-process OCC is opencascade.js 1.1.1 = OCCT 7.4.0p1 (2020, R11/R12) while the
-   bundled CadQuery uses OCCT 7.9.3 (R13) → TR-KRN-02 / TR-KRN-61.
+   bundled CadQuery uses OCCT 7.9.3 (R13) → TR-KRN-02 / TR-KRN-61. RS1 ([../../../decisions/RS1-native-compute.md](../../../decisions/RS1-native-compute.md),
+   2026-10-18) resolves it with a native OCCT 7.9 kernel process (`llull-kernel`) on desktop; the committed OCP
+   7.9.3 measurements become its reference (VC-KRN-25).

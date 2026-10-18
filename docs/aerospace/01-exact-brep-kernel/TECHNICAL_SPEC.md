@@ -44,12 +44,39 @@ Requirement ids `TR-KRN-nn` are grouped by decade: 0x kernel selection & build, 
             │ +heal node, boolean.fuzzy), kernel.ts     │   provenance; optional ports: importShapes,
             │ (+faceQuery port §5.9)                    │   massProperties, validate, faceQuery
             └───────────────┬───────────────────────────┘
-                            │ KernelOps<S>
-    ┌───────────────────────┴───────────────────────┐
-    │ packages/kernel-occt (OCCT 7.9.x WASM build)   │  server: worker thread (isolatedKernel)
-    │ import/heal/check/gprop/history                │  desktop: same server bundle, LLULL_KERNEL=occt
-    └────────────────────────────────────────────────┘  browser-only: Web Worker proxy (V1)
+                            │ KernelOps<S> (worker protocol: requests by op name, key-only handles, blob resend)
+    ┌───────────────────────┴──────────────────────────┐
+    │ desktop / server (default, RS-1):                  │  server/src: kernel proxy (same pattern as
+    │   solver/bins/llull-kernel — native OCCT 7.9       │  isolatedKernel) → child process over stdio;
+    │   (crate llull-kernel-occt, Rust + cxx)            │  LLULL_KERNEL=occt
+    │   import/heal/check/gprop/history/XCAF             │
+    ├────────────────────────────────────────────────────┤
+    │ browser-only: packages/kernel-occt                 │  Web Worker proxy (V1); opencascade.js 1.1.1
+    │   (opencascade.js WASM, fallback)                  │  (OCCT 7.4) today, newer WASM build optional
+    ├────────────────────────────────────────────────────┤
+    │ packages/kernel-manifold                           │  mesh fallback (no OCC available)
+    └────────────────────────────────────────────────────┘
 ```
+
+### 2.A Stack amendment (RS1, 2026-10-18)
+
+Decided by the owner in [RS1](../../decisions/RS1-native-compute.md) (programme step **RS-1**). It replaces the
+earlier plan of a custom OCCT 7.9 Emscripten WASM build as the desktop kernel.
+
+| Item | Before | Now |
+| ---- | ------ | --- |
+| Desktop / server kernel | OCCT 7.9.x WASM build in the Node worker thread | native OCCT 7.9 in the `llull-kernel` sidecar (`solver/bins/llull-kernel`, crate `llull-kernel-occt`, Rust + cxx bindings) |
+| Protocol | `KernelOps` over the worker message channel | the same `KernelOps` worker protocol over stdio; `server/src` keeps a synchronous proxy like `isolatedKernel.ts` (timeout, recycle, blob resend) |
+| Browser-only path | the same 7.9 WASM build | opencascade.js 1.1.1 (OCCT 7.4) stays as browser fallback; a newer WASM build is optional, low priority |
+| Mesh fallback | Manifold | Manifold (unchanged) |
+| Packaging | WASM in the npm bundle | `desktop/scripts/prepare-native.mjs` builds or fetches `llull-kernel` per OS / arch; missing binary → `NATIVE_TOOL_MISSING`, then the existing fallback chain |
+| Gate | — | `npm run native:check` (`cargo test` + `cargo clippy -D warnings`) |
+
+Why native: OCCT is C++; a native build has C++ exceptions, threads and the full toolkit set (TKDESTEP, TKXCAF)
+without an Emscripten port, no 4 GB wasm32 memory ceiling, and it is the same OCCT minor as the bundled
+CadQuery / OCP 7.9.3 that produced this pack's reference numbers. Why not a Rust B-rep kernel (truck, Fornjot):
+no robust fillets, no shape healing, no STEP AP242 / XCAF reader. Layering is unchanged (L2, L6, L9): the native
+process is reached only through `ctx.kernel`; nothing in `packages/*` imports it.
 
 Laws respected:
 
@@ -84,23 +111,29 @@ Laws respected:
   any other inherited value is ignored and `occt` is used; `desktop/tests` covers both. `server/src/geometryKernel.ts` already falls back to
   Manifold with a warning; the fallback reason is exposed through `kernel_info` and a UI status badge
   (`useKernelStatusStore`). `desktop/tests` asserts the active kernel.
-- **TR-KRN-02 (MUST, MVP)** Replace `opencascade.js@1.1.1` (OCCT 7.4.0p1, 2020) by a **pinned OCCT 7.9.x build**:
-  Emscripten build with WebAssembly exception handling (`-fwasm-exceptions`) so OCC `Standard_Failure` is
-  catchable (removes the `___cxa_*` degraded-module class in `occtKernel.ts`), including the toolkits
-  TKBO/TKBool/TKFillet/TKOffset/TKShHealing/TKXSBase/TKDESTEP (STEP)/TKXCAF/TKMesh and TKTopAlgo
-  (which holds `BRepCheck` and `BRepGProp` [R33]). The binding layer keeps `KernelOps<OccShape>`; `occtTypes.ts` is
-  regenerated. Size / init time / op latency are measured against KI4's baseline (63 MB, 0.8-1 s, 150-180 ms) and
-  recorded in a new decision record (KI7).
+- **TR-KRN-02 (MUST, MVP)** On desktop and server, replace `opencascade.js@1.1.1` (OCCT 7.4.0p1, 2020) by
+  **native OCCT 7.9.x** (pinned) in the `llull-kernel` sidecar (§2.A, RS1): crate `llull-kernel-occt` binds OCCT
+  with cxx and implements the existing `KernelOps` worker protocol (op names, key-only handles, `SHAPE_NOT_CACHED`
+  resend, blobs, `info`, `importShapes`, `massProperties`, `faceQuery.*`) over stdio. OCC `Standard_Failure` is
+  caught in C++ and returned as a protocol error (removes the `___cxa_*` degraded-module class). Toolkits linked:
+  TKBO/TKBool/TKFillet/TKOffset/TKShHealing/TKXSBase/TKDESTEP (STEP)/TKXCAF/TKMesh and TKTopAlgo (which holds
+  `BRepCheck` and `BRepGProp` [R33]). `server/src` gets a proxy with the `isolatedKernel.ts` behaviour (synchronous
+  call, timeout `LLULL_OCC_TIMEOUT_MS`, recycle on failure). Cold start, op latency and memory are measured against
+  KI4's WASM baseline (63 MB, 0.8-1 s, 150-180 ms) and recorded in a decision record (KI7). OCCT is linked
+  dynamically (LGPL-2.1 with exception, RS1 §2 rule 7).
 - **TR-KRN-03 (SHOULD, V1)** Browser-only (web app without backend): OCC in a dedicated Web Worker. Because the
   `GeometryKernel` contract is synchronous and `Atomics.wait` cannot be used on the browser main thread [R32], the
   browser path executes **whole commands** in the worker (worker hosts `execute` + kernel; the main thread
-  receives `CommandResult`) — the same split the desktop already has between renderer and backend (L6).
+  receives `CommandResult`) — the same split the desktop already has between renderer and backend (L6). The
+  browser uses the WASM binding (opencascade.js 1.1.1 today; a newer WASM build is optional, §2.A).
 - **TR-KRN-04 (MUST, MVP)** `kernel_info` read-only command: `{ active: 'occt'|'manifold', occtVersion?, build?,
-wasmBytes?, capabilities: string[], modelingTolerance, isolation: 'worker'|'in-process', fallbackReason? }`.
-- **TR-KRN-05 (SHOULD, V1)** Evaluate a **native OCCT** backend for the desktop through the bundled CPython + OCP
-  (same OCCT 7.9.3 as CadQuery): a `KernelOps` implementation in a child process behind the existing
-  synchronous worker proxy. Decision criterion: ≥ 2× faster on the KRN corpus and identical results within
-  VC tolerances (open question Q1).
+wasmBytes?, capabilities: string[], modelingTolerance, isolation: 'process'|'worker'|'in-process', fallbackReason? }`
+(`process` = the native `llull-kernel` sidecar, §2.A; `wasmBytes` only for a WASM kernel).
+- **TR-KRN-05 (MUST, MVP)** The native kernel SHALL give the same results as the OCP 7.9.3 reference that
+  produced this pack's numbers: counts equal and measures within VC tolerances on the analytic solids, the
+  probe cases and the NIST set (VC-KRN-25). Fallback order on desktop: `llull-kernel` → opencascade.js WASM in
+  the worker → Manifold, each step with a `fallbackReason` in `kernel_info`. (Was: "SHOULD V1, evaluate a native
+  backend via CPython OCP"; superseded by RS1.)
 
 ## 3. Data model
 
@@ -376,8 +409,10 @@ defaulted }`, TR-KRN-102..104).
   the same plate-minus-cylinder cut gives the identical signature twice in one process (7 faces,
   `1125f7464525c4f6`, OCCT 7.9.3).
 - **TR-KRN-61 (MUST, MVP)** Kernel provenance (`kernelSettings.occtVersion`, `build`) written on save and
-  compared on load; the WASM build and the CadQuery/OCP version are pinned to the **same OCCT minor** (7.9.x)
-  in `package.json` / `server/python/requirements.txt` / `desktop/scripts/prepare-python.mjs`.
+  compared on load; the native `llull-kernel` OCCT and the CadQuery/OCP version are pinned to the **same OCCT
+  minor** (7.9.x) in `solver/` (Cargo / build script) / `server/python/requirements.txt` /
+  `desktop/scripts/prepare-native.mjs` / `desktop/scripts/prepare-python.mjs`. The browser WASM kernel (7.4 today)
+  is recorded as a different build, so TR-KRN-62's cross-build tolerance mode applies to it.
 - **TR-KRN-62 (MUST, MVP)** `npm run quality:kernel`: rebuilds the golden plans with kernel results, the KRN
   plans and the KRN STEP set; compares to a committed baseline — same build: signatures equal; other build:
   counts equal and measures within VC-KRN-01 tolerances; drift report per model; baseline updates are reviewed.
@@ -408,7 +443,7 @@ defaulted }`, TR-KRN-102..104).
 - **TR-KRN-80 (SHOULD, V1)** Exact export with assembly structure, names, colours and GVP is **04 XCH's
   `export_step_ap242`** (`STEPCAFControl_Writer`, 04 TR-XCH-01/-06/-07), computing GVP with TR-KRN-40. KRN only
   requires that it exists for the VC-KRN-14 round trip, and that the fixed `/out.step` scratch-path workaround
-  (KI5 gotcha) is removed once the M2 build is verified. `export_step_exact` stays AP214 / flat / no GVP.
+  (KI5 gotcha) is removed once the M2 native kernel is verified. `export_step_exact` stays AP214 / flat / no GVP.
 
 ### 5.9 Face-query port (TR-KRN-90 .. 92) — one optional kernel port for every pack
 
@@ -508,7 +543,7 @@ export interface GeometryKernel {
 }
 ```
 
-OCC classes (union of the consumer packs' lists, to be added to the M2 binding list, TR-KRN-02):
+OCC classes (union of the consumer packs' lists, to be added to the M2 `llull-kernel-occt` cxx bindings, TR-KRN-02):
 `BRepGProp::SurfaceProperties`, `BRepAdaptor_Surface` (`GetType`, `Plane`/`Cylinder`/`Cone`/`Sphere`/`Torus`),
 `BRepTools::UVBounds`, `BRepClass_FaceClassifier` / `BRepTopAdaptor_FClass2d`, `GeomAPI_ProjectPointOnSurf`,
 `BRepLProp_SLProps` (normals, principal curvatures), `BRepExtrema_DistShapeShape`, `TopExp::MapShapesAndAncestors`
@@ -629,25 +664,28 @@ Existing lowercase `check_model` codes (`degenerate_size`, …) stay unchanged; 
 | AF-33, AF-36 | TR-KRN-104; FR-KRN-24; VC-KRN-21                                                                                                                        |
 | AF-34        | TR-KRN-105; FR-KRN-25; VC-KRN-22                                                                                                                        |
 | AF-40, AF-42 | TR-KRN-106; FR-KRN-26; VC-KRN-24                                                                                                                        |
-| AF-41        | desktop OCC + bundled CPython, no network (KI6); `KRN_NO_EXACT_KERNEL` when unavailable                                                                 |
+| AF-41        | desktop OCC (bundled native `llull-kernel`, RS1) + bundled CPython, no network (KI6); `NATIVE_TOOL_MISSING` → WASM / Manifold fallback; `KRN_NO_EXACT_KERNEL` when no exact kernel is available |
 
 ## 8. Performance & robustness budgets
 
 Reference machine for budgets: the desktop CI runner (to be fixed in KI7). Values marked TBD are measured
-once in M2 and then ratcheted.
+once in M2 and then ratcheted. Budgets apply to the native `llull-kernel` sidecar (§2.A). It has no wasm32 4 GB
+address-space ceiling (kernel memory is bounded by the caps below, not by the runtime) and may use OS threads;
+BOP / meshing parallelism stays off by default for determinism (TR-KRN-60, Q8). The browser WASM fallback has no
+budget beyond FR-KRN-02 / VC-KRN-13.
 
 | Operation                                            | Budget                                                                                                | Basis                                                                                                          |
 | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| OCC kernel cold start (desktop worker)               | ≤ 2 s                                                                                                 | KI4: 0.8-1 s for OCCT 7.4 WASM; TBD for 7.9 build                                                              |
+| OCC kernel cold start (desktop `llull-kernel`)       | ≤ 2 s                                                                                                 | KI4: 0.8-1 s for OCCT 7.4 WASM; TBD — measure for the native 7.9 sidecar                                       |
 | Boolean on primitives                                | ≤ 200 ms                                                                                              | KI4: ~180 ms (7.4)                                                                                             |
-| STEP read + heal, ≤ 2 MB / ≤ 700 faces single part   | ≤ 2 s in the worker                                                                                   | measured native OCP 7.9.3 read: 0.01-0.84 s on the 28 NIST files (`nist_occt_reference.json`); WASM factor TBD |
+| STEP read + heal, ≤ 2 MB / ≤ 700 faces single part   | ≤ 2 s in the sidecar                                                                                  | measured native OCP 7.9.3 read: 0.01-0.84 s on the 28 NIST files (`nist_occt_reference.json`); sidecar TBD     |
 | `mass_properties` exact, ≤ 700 faces                 | ≤ 300 ms                                                                                              | TBD measure                                                                                                    |
 | `validate_shape` (no self-intersection), ≤ 700 faces | ≤ 300 ms                                                                                              | TBD measure                                                                                                    |
 | Topology naming overhead per node                    | ≤ 20 % of node evaluation time                                                                        | FreeCAD reports negligible impact (search summary [R16]); TBD measure                                          |
 | Instancing                                           | 10 000 instances of one 300-face part: 1 evaluation, ≤ 1 draw call per LOD/material, ≥ 30 fps         | TBD — display gate                                                                                             |
 | Single OCC call timeout                              | 30 s default (`LLULL_OCC_TIMEOUT_MS`)                                                                 | existing                                                                                                       |
 | Kernel memory                                        | recipe cache eviction (existing) + blob cache cap 1 GB on desktop                                     | TBD                                                                                                            |
-| Robustness                                           | 0 server crashes on the quality corpus in exact mode; every WASM abort recycles the worker (existing) | `isolatedKernel.ts`                                                                                            |
+| Robustness                                           | 0 server crashes on the quality corpus in exact mode; every kernel crash / abort recycles the process | `isolatedKernel.ts` pattern (existing for the worker); same for `llull-kernel`                                 |
 
 ## 9. Test strategy
 
@@ -657,7 +695,8 @@ once in M2 and then ratcheted.
 | Unit (server, real OCC: `server/tests/occt*.test.ts` pattern) | analytic solids and far-box mass properties; fuzzy boolean; commit validity gate; `import_step_exact` on a small committed synthetic STEP; naming grammar on box/fillet/boolean                                                                                     | VC-KRN-01, 02, 08, 09       |
 | Golden (`tests/golden/plans.ts`)                              | KRN plans from `validation/plans/` (aliases, id-normalised snapshots, replay equality); renaming plan expected to fail until V1 (registered as known issue)                                                                                                         | VC-KRN-03, 03b, 07          |
 | Quality gate                                                  | `quality:step` gains `--mode brep` (validity after heal, exact volume vs `quality/step_reference.py`, save/load of blobs) over `quality/corpus.json`; NIST set pinned as a new `aerospace` group (archive URL + sha256, see `validation/README.md`); GVP comparison | VC-KRN-04, 04x, 05, 06      |
-| Kernel regression (new `quality:kernel`)                      | signatures + measures vs baseline; cross-version tolerance mode                                                                                                                                                                                                     | VC-KRN-10                   |
+| Kernel regression (new `quality:kernel`)                      | signatures + measures vs baseline; cross-version tolerance mode; native `llull-kernel` vs the committed OCP 7.9.3 reference files                                                                                                                                    | VC-KRN-10, VC-KRN-25        |
+| Native (`npm run native:check`)                               | `cargo test` + `cargo clippy -D warnings` on `llull-kernel-occt`; protocol round trip per `KernelOps` op                                                                                                                                                            | VC-KRN-25                   |
 | Display gate                                                  | 10 000-instance scene, 70 m station z-fighting screenshot                                                                                                                                                                                                           | VC-KRN-12, TR-KRN-73        |
 | Desktop (`npm --prefix desktop test`)                         | backend env contains `LLULL_KERNEL=occt`; `kernel_info.active === 'occt'`; forced failure → fallback warning                                                                                                                                                        | VC-KRN-11                   |
 | Agent-first (CLI scripts, `--json` + exit codes)              | wrong calls → codes; legacy-material rib → `unverified`; weight-and-balance purpose → `reviewRequired`; agent `acceptUnverified` → `XCH_HUMAN_GATE`, agent baseline accept → `KRN_HUMAN_GATE`; named defaults + provenance; `--dry-run` / `--timeout` on import     | VC-KRN-19 .. 24             |
@@ -670,17 +709,17 @@ Coverage gate (90/85/90/90) applies to new code in `packages/core/src/{commands,
 | Milestone                                                                                                                                 | Content                                                                                                                                                                                                               | TRs                                 | Effort (eng-weeks) | Depends on                                                          |
 | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------------------ | ------------------------------------------------------------------- |
 | M1 OCC default                                                                                                                            | desktop env, `kernel_info`, status badge, provenance fields + migration, faceted flag                                                                                                                                 | 01, 04, 61 (fields), FR-KRN-16      | 1.5                | —                                                                   |
-| M2 Kernel build                                                                                                                           | OCCT 7.9.x WASM with exceptions, regenerated bindings, KI7 decision with measurements, version alignment with OCP                                                                                                     | 02, 61                              | 4-6                | M1                                                                  |
+| M2 Native kernel (RS-1)                                                                                                                   | `llull-kernel` sidecar: crate `llull-kernel-occt` (Rust + cxx, OCCT 7.9.x), `KernelOps` over stdio, `server/src` proxy (timeout, recycle, blob resend), fallback chain, bundling (`prepare-native.mjs`), `native:check`, KI7 measurements, version alignment with OCP | 02, 05, 61                          | 6-8                | M1, RS-0 (`solver/` workspace)                                      |
 | M3 Precision & mass (merged with 04 XCH M1: KRN owns `massProperties`; XCH M1 adds only `geometric_validation_properties` + `lib/step21`) | tolerance policy + command, part-frame mass properties (incl. area, bbox for GVP), inertia/principal, local-frame tessellation, depth precision; one resolver over the dynamics mass engine (TR-KRN-40a)              | 10, 11, 40, 40a, 41, 72, 73         | 3                  | M1 (M2 for exception-safe GProp); **`feat/motion-dynamics` merged** |
 | M4 Exact import (merged with 04 XCH M3: KRN owns the command, reader, blob leaf; XCH M3 adds verify / provenance / product tree on top)   | `importShapes` (STEP; IGES entry point for 04), blobs, `import_step_exact`, healing, classification, report, MCP/CLI wiring, quality `--mode brep`, v3 envelope + migration (§3.1)                                    | 20, 21, 22, 23 (GVP attributes), 24 | 5-7                | M2                                                                  |
 | M5 Robustness                                                                                                                             | commit validity gate, `validate_shape`, fuzzy booleans, argument analysis                                                                                                                                             | 12, 13, 50, 51                      | 2                  | M2                                                                  |
 | M6 Regression                                                                                                                             | signatures, `quality:kernel`, baselines                                                                                                                                                                               | 60, 62                              | 2                  | M4                                                                  |
 | M7 Persistent naming                                                                                                                      | element maps, naming grammar, resolution, UI repair, golden renaming plan green                                                                                                                                       | 30, 31, 32                          | 8-12               | M2, M6                                                              |
 | M8 Assemblies                                                                                                                             | shared definitions, assembly mass properties, instancing of results, LOD (GVP comparison and `export_step_ap242` moved to 04 XCH M2/M3)                                                                               | 42, 70, 71                          | 4-6                | M4, M7 (names for PMI later), 04 XCH M3 (product tree)              |
-| M9 Browser worker / native evaluation                                                                                                     | Web Worker command execution; native OCP kernel spike                                                                                                                                                                 | 03, 05                              | 3-4                | M2                                                                  |
+| M9 Browser worker                                                                                                                         | Web Worker command execution on the WASM binding (opencascade.js 1.1.1; a newer WASM build optional, low priority)                                                                                                     | 03                                  | 2-3                | M2                                                                  |
 | M10 Face-query port                                                                                                                       | `GeometryKernel.faceQuery` (§5.9): faceDetails, faceContains, faceGraph, faceGeometry, projectOnFace, evaluateFace, tessellateFace, faceSamples, edgeSamples, edgeContinuity, distance, bspline (OCC); contract tests | 90, 91, 92                          | 3                  | M2                                                                  |
 
-Total ≈ 35.5-46.5 engineer-weeks (M8 −1 after moving GVP/export to 04; +3 for the face-query port M10, which removes the
+Total ≈ 36.5-48.5 engineer-weeks (RS1: M2 4-6 → 6-8 for the native sidecar, M9 3-4 → 2-3 without the native spike; M8 −1 after moving GVP/export to 04; +3 for the face-query port M10, which removes the
 per-pack kernel work from 02/03/05/06/07). Downstream gaps: 07 FTR (holes/pockets need M4, M7), 03 GDT and 04 XCH (face names
 M7; `massProperties` M3 and `import_step_exact` M4 for XCH M1/M3), 02 / 03 / 05 / 06 / 07 (face-query port M10), 05 FEA (exact faces M4, names M7), 02 SRF (NURBS ops need M2), 09 PLM (provenance M1/M6).
 
@@ -688,14 +727,14 @@ M7; `massProperties` M3 and `import_step_exact` M4 for XCH M1/M3), 02 / 03 / 05 
 
 | #   | Question                      | Options                                                                                                                                                 | Recommendation                                                                                                       |
 | --- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Q1  | Desktop kernel binary         | (a) OCCT 7.9.x WASM in the Node worker (one code path with browser); (b) native OCCT via bundled CPython OCP 7.9.3 child process; (c) native Node addon | (a) for MVP, measure (b) in M9 — (b) is already shipped (KI6) and is the OCCT used to produce this pack's references |
+| Q1  | Desktop kernel binary         | (a) OCCT 7.9.x WASM in the Node worker (one code path with browser); (b) native OCCT via bundled CPython OCP 7.9.3 child process; (c) native Node addon | **Resolved by RS1 (2026-10-18):** native OCCT 7.9 in the Rust `llull-kernel` sidecar (§2.A); WASM for the browser only |
 | Q2  | Default modelling tolerance   | 1e-4 mm (OCCT STEP default) vs 1e-3 mm vs per-document                                                                                                  | 1e-4 mm, user-settable in [1e-7, 1e-2]                                                                               |
 | Q3  | Non-mm documents              | scale at kernel boundary vs store kernel geometry in mm and treat units as display                                                                      | store kernel geometry in mm (OCC is mm-tuned [R1]); decision needed on existing `units` semantics                    |
 | Q4  | Blob storage                  | inline base64 vs gzip container vs sidecar directory                                                                                                    | inline ≤ 1 MB, gzip container above, sidecar for > 512 MB documents                                                  |
 | Q5  | Code export of imported parts | embed blob path in CadQuery code vs emit STEP next to the script                                                                                        | emit the healed BRep file next to the script and load it                                                             |
 | Q6  | Naming grammar compatibility  | own grammar vs FreeCAD-compatible element names                                                                                                         | own grammar, documented; FreeCAD's shows feasibility [R15] but is GPL/LGPL-coupled to its data structures            |
 | Q7  | GVP disagreement policy       | warn vs block                                                                                                                                           | warn; block only on exact-export round trip (production scenario)                                                    |
-| Q8  | Parallel BOP                  | off (determinism) vs on (speed)                                                                                                                         | off by default, on for large assemblies after determinism is proven equal                                            |
+| Q8  | Parallel BOP                  | off (determinism) vs on (speed)                                                                                                                         | off by default, on for large assemblies after determinism is proven equal (native threads available since RS1)       |
 
 ## 12. References
 
@@ -724,6 +763,7 @@ M7; `massProperties` M3 and `import_step_exact` M4 for XCH M1/M3), 02 / 03 / 05 
 - [R29] IEEE-754 spacing — computed with Python `math.ulp` (validation/sources.md)
 - [R31] three.js WebGLRenderer.js r170 — https://raw.githubusercontent.com/mrdoob/three.js/r170/src/renderers/WebGLRenderer.js (accessed 2026-10)
 - [R32] MDN Atomics.wait() — https://raw.githubusercontent.com/mdn/content/main/files/en-us/web/javascript/reference/global_objects/atomics/wait/index.md (accessed 2026-10)
+- [RS1] Native compute programme — [../../decisions/RS1-native-compute.md](../../decisions/RS1-native-compute.md) (owner decision 2026-10-18)
 - [R33] OCCT V7_8_0 toolkit PACKAGES and XCAFDoc / STEPCAFControl / BOPAlgo headers — https://raw.githubusercontent.com/Open-Cascade-SAS/OCCT/V7_8_0/src/TKTopAlgo/PACKAGES (accessed 2026-10)
 - llull code and decisions cited by path in §1 (KI4, KI5, KI6); measured data: `validation/occt_behaviour_probe.json`,
   `validation/occt_crosscheck.json`, `validation/nist_occt_reference.json`, `validation/nist_gvp_vs_occt.json`
@@ -785,7 +825,7 @@ Deviations from the sketch in 5.9:
 
 ### 13.C Kernel provenance, v3 envelope, exact STEP import (M1 + M4 MVP)
 
-Built (lane C of AERO-2). All of it runs on the bundled opencascade.js 1.1.1 (OCCT 7.4.0p1); the 7.9 build of TR-KRN-02 (M2) is not part of this step.
+Built (lane C of AERO-2). All of it runs on the bundled opencascade.js 1.1.1 (OCCT 7.4.0p1); the native 7.9 kernel of TR-KRN-02 (M2, RS-1) is not part of this step.
 
 Built items and where they live:
 
@@ -805,10 +845,10 @@ Tests: `tests/unit/kernelProvenance.test.ts`, `tests/unit/importStepExact.test.t
 
 Deviations from the plan:
 
-- OCCT 7.4.0p1 binding instead of the 7.9 build (M2). No `read.*` statics exist in this build, so the reader runs with its defaults (millimetres, precision from the file); the document tolerance drives ShapeFix and sewing only.
+- OCCT 7.4.0p1 binding instead of the native 7.9 kernel (M2). No `read.*` statics exist in this build, so the reader runs with its defaults (millimetres, precision from the file); the document tolerance drives ShapeFix and sewing only.
 - No XDE product tree: names and colours of the STEP are not read (`name` sets the entity name), no component or instance mapping, no GVP attributes (04 XCH). `STEPCAFControl_Reader` is bound but not used.
 - Replay re-runs the STEP reader from the stored step params (`stepBase64` or `text`) instead of reading the blob only; the blob text is deterministic across two imports of one file in one process (tested). `blobId` and `precisionMode` are not implemented.
 - STEP input must be valid UTF-8 text (Part 21 is ASCII with escapes); anything else is `KRN_STEP_UNREADABLE`.
 - `heal_shape`, `validate_shape` and the `heal` recipe node are not built; `import_step_exact` fails with `KRN_HEAL_FAILED` instead.
 
-Open items: set `LLULL_KERNEL` in the browser-only build (TR-KRN-03), the UI status badge for the fallback reason (`useKernelStatusStore`), `check_model` issues for the mismatch and fallback codes, `quality:kernel` (TR-KRN-62), and the 7.9 build with exception handling.
+Open items: set `LLULL_KERNEL` in the browser-only build (TR-KRN-03), the UI status badge for the fallback reason (`useKernelStatusStore`), `check_model` issues for the mismatch and fallback codes, `quality:kernel` (TR-KRN-62), and the native 7.9 kernel (`llull-kernel`, M2 / RS-1).

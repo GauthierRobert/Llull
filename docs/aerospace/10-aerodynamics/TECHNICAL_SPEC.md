@@ -31,7 +31,7 @@ packages/domain-aero/src/shared/        used by both plugins (10 AER, 11 FLD)
   results.ts             `sig` (data at 10 significant digits), `briefReport` (summary at 6)
 packages/domain-aero/src/aerodynamics/
   naca.ts                NACA 4-digit + 230-series ordinates, camber slope
-  panelMethod.ts         linear-vortex panels (one factorisation for all angles), thin-airfoil integrals
+  panelMethod.ts         linear-vortex panels (one influence build for all angles; LU reuse: TS follow-up, §2.1), thin-airfoil integrals
   airfoilContour.ts      NACA / polyline -> clockwise panel nodes (open-TE detection, 801-point cap)
   liftingLine.ts         Glauert series, wing area
   projectedArea.ts       silhouette rasterisation, wetted area
@@ -41,6 +41,21 @@ packages/domain-aero/src/aerodynamics/
   roadLoadParams.ts      one schema for both models; roadLoadRun.ts / roadLoadBassett.ts runners; roadLoadCommand.ts dispatches
   *Command.ts, airfoilCommands.ts, dragCommands.ts, catalog.ts, plugin.ts, codes.ts
 ```
+
+### 2.1 Stack amendment (RS1, 2026-10-18)
+
+Decided by the owner in [RS1](../../decisions/RS1-native-compute.md) (programme step **RS-7**, medium row).
+
+| Item | Before | Now |
+| ---- | ------ | --- |
+| 2D panel method (`panelMethod.ts`, M1) | TS | unchanged: stays TS (600 panels meet the §8 budget) |
+| M3 vortex lattice and any future 3D panel method | TS (planned) | TS for small N; when N exceeds what TS handles (threshold TBD — measure against the §8 budget), the influence build and the dense LU run in `llull-compute panel <job-folder>` (crate `llull-panel`, faer), reached through a host transport in `server/` (job style, like 05 FEA `fea_solve`); the result returns as query `data` with provenance `{ tool: 'llull-compute panel', version, threads }` |
+| Reference | — | the TS solver stays the small-case path and the test oracle (RS1 §2 rule 4); native vs TS: VC-AER-33 |
+| Missing binary | — | `NATIVE_TOOL_MISSING` with an install hint; the TS path still runs up to its cap |
+
+TS follow-up (small, not RS, RS1 §5): `panelMethod.ts` calls `solveLinear` twice on the same matrix (the α = 0 and
+α = π/2 right-hand sides), so it factorises twice. Factorise once and reuse the LU for both right-hand sides, and store
+the influence matrices in `Float64Array`. VC-AER-10..12 must stay green unchanged.
 
 ## 3. Data model
 
@@ -226,6 +241,7 @@ The CLI (`llull <command> '{…}' --json`), MCP (toolset `aerodynamics`) and the
 | Operation    | Size                            | Time            |
 | ------------ | ------------------------------- | --------------- |
 | panel solve  | 600 panels (dense LU)           | < 0.2 s         |
+| VLM / 3D panel (M3) | N panels, TS below the native threshold, `llull-compute panel` above (§2.1) | TBD — measure   |
 | lifting line | 40 terms                        | < 1 ms          |
 | frontal area | 400 × 400 grid × ~10⁴ triangles | < 0.5 s         |
 | frontal area | 2000 cells                      | grows as cells² |
@@ -245,6 +261,7 @@ The resolution is capped at 2000 cells. All commands are deterministic (AF-13).
 | VC-AER-30     | planned (M6): `cfdSource.test.ts` with a recorded 12 CFD result fixture (fresh, stale, not converged, speed mismatch)                  |
 | VC-AER-31     | planned (M7): `compressibility.test.ts` (Prandtl-Glauert closed form) + a 12 CFD CLI scenario (Euler, extruded NACA 0012)             |
 | VC-AER-32     | planned (M4): `server/tests/cfd/externalExport.test.ts` (case files parsed back; known-result import round trip)                      |
+| VC-AER-33     | planned (M3, RS-7): `llull-panel` `cargo test` (`npm run native:check`) + `server/tests/aeroPanelNative.test.ts` (native vs TS on the same lattice; skipped with a logged reason without the binary) |
 
 The coverage gate on `packages/domain-aero/src/**` is 90/85/90/90 (CLAUDE.md).
 
@@ -254,7 +271,7 @@ The coverage gate on `packages/domain-aero/src/**` is 90/85/90/90 (CLAUDE.md).
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
 | M1        | atmosphere, NACA, panel, lifting line, frontal area, drag, cycling (this spec)                                                                    | **done 2026-10-18**   |
 | M2        | XFOIL hand-off: server transport `xfoil_polar` like `fea_solve`, bundled binary (GPL, decision 5), viscous polar as data                          | todo, ≈ 3 eng-weeks   |
-| M3        | Vortex-lattice (horseshoe VLM) over a wing / tail definition read from lofts; neutral point; drag build-up tables with sources                    | todo, ≈ 4 eng-weeks   |
+| M3        | Vortex-lattice (horseshoe VLM) over a wing / tail definition read from lofts; neutral point; drag build-up tables with sources. Large N: influence build + dense LU in `llull-compute panel` (crate `llull-panel`, faer, RS1 §2.1), VC-AER-33 | todo, ≈ 4 eng-weeks + native job (inside RS-7's 6 w) |
 | M4        | External-solver export / import (`cfd_export_case`, `cfd_import_external`) on the case prepared by 12 CFD; the built-in solvers moved to [12 CFD](../12-cfd-gpu/TECHNICAL_SPEC.md) §10 | todo, ≈ 3 eng-weeks (after 12 CFD M1; was 6–8 before preparation was shared) |
 | M5        | UI: Cp and span-loading plots in the Analysis tab (same pattern as `plot_simulation`)                                                             | todo                  |
 | M6        | `cfdCaseId` drag-area source in `aero_drag` / `road_load_power` (FR-AER-14), VC-AER-30                                                            | todo, ≈ 1 eng-week, after 12 CFD M2 |
@@ -274,7 +291,7 @@ The coverage gate on `packages/domain-aero/src/**` is 90/85/90/90 (CLAUDE.md).
 
 ## 12. References
 
-See FUNCTIONAL_SPEC §11 and [validation/sources.md](validation/sources.md).
+See FUNCTIONAL_SPEC §11 and [validation/sources.md](validation/sources.md). Stack: [RS1 native compute programme](../../decisions/RS1-native-compute.md) (owner decision 2026-10-18).
 
 ## 13. Implementation status (2026-10-18)
 

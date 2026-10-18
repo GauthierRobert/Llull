@@ -67,6 +67,23 @@ src/ui/viewport/3d/PmiLayer.tsx        render PMI on annotation planes (presenta
 | L9 kernel interface | face resolution via `ctx.kernel.topology()`; feature-attaching commands declare `annotations: { requiresKernel: true }` |
 | L10 plugins | none needed; an AEC plugin could reuse `doc.pmi` later |
 
+### 2.3 Stack amendment (RS1, 2026-10-18)
+
+Decided by the owner in [RS1](../../decisions/RS1-native-compute.md) (programme step **RS-7**, medium row).
+
+| Item | Before | Now |
+| ---- | ------ | --- |
+| Monte Carlo ≤ 2e6 samples | `lib/stackup.ts`, pure TS, synchronous | unchanged (TS stays the default, the reference and the only path without native binaries) |
+| Monte Carlo > 2e6 samples | refused (`GDT_STACKUP_SAMPLES_CAP`) | host transport `stackup_monte_carlo` (`server/`, job style like 05 FEA `fea_solve`) runs `llull-compute stats <job-folder>` (crate `llull-stats`, rayon) |
+| Random stream | xoshiro128** (sequential) | TS unchanged; native uses a counter-based generator (Philox4x32-10 [R37]): sample *i* draws from counter *i* under a key derived from `seed`, so the result does not depend on thread count or scheduling |
+| Reductions | sequential loop | fixed-size chunks reduced in chunk-index order (RS1 §2 rule 3), so a native run is bit-reproducible per (seed, samples, inputs) |
+
+The transport returns the same `data` shape as `analyze_stackup` (closed forms still from `lib/stackup.ts`; only the
+`monteCarlo` block comes from the job), with `monteCarlo.prng: 'philox4x32-10'`, `monteCarlo.engine: 'native'` and
+provenance `{ tool: 'llull-compute stats', version, threads, deterministic: true }`. It writes nothing to the
+document (query data, L1/L6). Missing binary → `NATIVE_TOOL_MISSING` with an install hint; `analyze_stackup` up to
+2e6 still works.
+
 ## 3. Data model
 
 ### 3.1 Types (`packages/core/src/model/pmi.ts`)
@@ -256,6 +273,7 @@ pollute the recipe. Toolset `pmi` lists all of the above; `analyze_stackup`, `fa
 | TR-GDT-19 | MUST | Review flag + human gate (FR-GDT-31/32): `review` set from `ctx.caller` on create/edit/import; `accept_pmi_review` refuses agents; `check_pmi` warns `GDT_REVIEW_REQUIRED` per item; gap 09 `release_item` refuses while any PMI item is unreviewed (`PLM_PMI_UNREVIEWED`) |
 | TR-GDT-20 | MUST | Error contract (FR-GDT-33): every refusal returns `data.error = { code, ids?, paths?, remediation }` and the summary starts `<command> rejected: <code>`; codes = §7.2; zone/projected/UZ value checks are done in `run` (not zod `.positive()`), so they get `GDT_ZONE_NON_POSITIVE` instead of the generic invalid-params text |
 | TR-GDT-21 | MUST | Unverified propagation + provenance + named defaults (FR-GDT-34/35): `unverified` on items and stack-up contributors propagates to `analyze_stackup.data.unverified` and `check_pmi` warnings `GDT_UNVERIFIED_INPUT`; `provenance` and `{value, source, defaulted}` on every defaulted numeric |
+| TR-GDT-22 | SHOULD (V1, RS-7) | Monte Carlo above the TS cap (§2.3): `stackup_monte_carlo` transport → `llull-compute stats` (crate `llull-stats`, rayon, Philox4x32-10 counter-based streams, fixed-order reductions); same `data` shape; results bit-identical per (seed, samples, inputs) for any thread count; native vs TS distributions agree within the §5.7 item 7 acceptance bounds (VC-GDT-37); native sample cap TBD — measure against the §8 budget |
 | TR-GDT-18 | MUST | Coverage gate 90/85/90/90 for `commands/pmi/**`, `geometry/pmi*.ts`; `lib/stackup.ts` 100 % lines (pure math) |
 
 ## 5. Kernel / algorithms
@@ -377,7 +395,9 @@ coefficients come out exactly ±1, ½ …; a central difference is **not** accep
    These follow from the clearance geometry (derivation in `validation/generate_stackup_reference.py`).
 
 Budgets: 1e6 samples × 10 contributors < 1.5 s in Node on a 2020 laptop (pure loop, no allocation per
-sample); the command is synchronous and capped.
+sample); the command is synchronous and capped. Above the cap, Monte Carlo runs natively (§2.3, TR-GDT-22): same
+sampling formulas and acceptance bounds, Philox4x32-10 instead of xoshiro128**, so native and TS agree
+statistically (acceptance bounds), not bit for bit — as with the Python reference.
 
 ### 5.8 PMI on drawing sheets (`commands/drawings/pmiPainter.ts`)
 
@@ -536,7 +556,7 @@ same shape inside `errors[]` / `warnings[]`. Codes are part of the public contra
 | `GDT_UNVERIFIED_INPUT` | warn (never hidden) | unresolved/unmapped import, no rule table, typed stack-up contributor | ids / contributor names | "link the contributor to a PMI item or confirm the value with its source" |
 | `GDT_IMPORT_UNMAPPED` | warn | AP242 item with unknown enum kept as note | raw text | "report to llull; check the item manually" |
 | `GDT_STACKUP_EXPRESSION` | refuse | expression parse error / unknown name | `expression` | "use + - * / ( ) and contributor names" |
-| `GDT_STACKUP_SAMPLES_CAP` | refuse | samples > 2e6 | `samples` | "use ≤ 2000000" |
+| `GDT_STACKUP_SAMPLES_CAP` | refuse | samples > 2e6 | `samples` | "use ≤ 2000000, or `llull stackup_monte_carlo` (native, §2.3)" |
 | `GDT_STACKUP_CONTRIBUTOR_UNTOLERANCED` | refuse | `pmiId` contributor without tolerance | contributor | "add a tolerance to the PMI item" |
 | `GDT_STACKUP_SENSITIVITY_CONFLICT` | refuse | both `expression` and `sensitivity` given | contributors | "give either expression or sensitivities" |
 | `GDT_FASTENER_HOLE_LE_FASTENER` | refuse | hole MMC ≤ fastener MMC | `holeMmc` | "no clearance: no positional tolerance is possible" |
@@ -573,6 +593,7 @@ same shape inside `errors[]` / `warnings[]`. Codes are part of the public contra
 | `check_pmi` | ≤ 50 ms for 500 items |
 | `export_sheet_svg` with PMI | ≤ +30 % vs without, A3 sheet, 100 PMI items |
 | `analyze_stackup` | 1e6 samples × 10 contributors ≤ 1.5 s; hard cap 2e6 samples |
+| `stackup_monte_carlo` (native, V1) | samples > 2e6; throughput and native cap TBD — measure with `llull-compute stats` on the reference machine |
 | AP242 import (Python) | NIST FTC 09 (6.1 MB) ≤ 20 s on desktop incl. tessellation |
 | Robustness | no command throws on malformed PMI; every failure is a no-op with a reason (guard + `noop`) |
 
@@ -584,6 +605,7 @@ same shape inside `errors[]` / `warnings[]`. Codes are part of the public contra
 | unit (OCC) | `server/tests/occtPmiFeatures.test.ts` (OCC worker, like `server/tests/occtParametricEdges.test.ts`) | facesNear resolution, ambiguity, replay after resize | VC-GDT-02 |
 | unit | `tests/unit/lib/stackup.test.ts` | `stackup_reference.json` SU-01..05, FF-01..03; uniform CDF; erfc accuracy | VC-GDT-30..35 |
 | unit | `tests/unit/lib/prng.test.ts` | determinism per seed, uniformity (χ² on 1e5 draws, p > 1e-3) | VC-GDT-33 |
+| native (`npm run native:check`) | `solver/crates/llull-stats` `cargo test`; `server/tests/stackupNative.test.ts` (skips with a logged reason without the binary) | Philox known-answer vectors [R37]; same seed → identical bits at 1 and N threads; native vs TS on SU-01..05 within acceptance bounds | VC-GDT-37 |
 | contract | `tests/unit/contract/toolSchemaSnapshot.test.ts` snapshot (`__snapshots__/toolSchemas.json`) | new schemas | VC-GDT-52 |
 | contract | `tests/unit/persistence.test.ts` + `tests/unit/contract/persistenceV2.test.ts` | `pmiValidation` round trip and rejections | VC-GDT-50 |
 | golden | `tests/golden/plans.ts` `kernelPlans.gdt_plate` (from `validation/draft_plan_gdt_plate.json`) | id-normalised snapshot + replay equality | VC-GDT-01, 50 |
@@ -605,10 +627,11 @@ same shape inside `errors[]` / `warnings[]`. Codes are part of the public contra
 | M4 | Sheets: pmiPainter, `pmiMode`, symbols | M2, drawings feature (exists) | 2 |
 | M5 | `lib/stackup.ts`, `lib/prng.ts`, `analyze_stackup`, `fastener_tolerance` | — (parallel) | 1.5 |
 | M6 (V1) | PMI read/write stages + `xcafMapping.ts` + `apply_pmi_set`, quality gate on NIST files, SFA CI | M2; gap 01 KRN (`import_step_exact`, exact attachment); gap 04 XCH (its AP242 PMI transport extension, `export_step_ap242`, XCAF document) | 4 |
+| M5n (V1, RS-7) | `llull-stats` (Philox4x32-10, rayon, fixed-order reductions), `llull-compute stats` job, `stackup_monte_carlo` transport + CLI verb, VC-GDT-37 | M5; RS-0 (`solver/` workspace) | 1.5 |
 | M7 (V1) | composite FCF, datum targets, all-around, ISO 14405 modifiers, PMI-linked stacks | M2, M5 | 2.5 |
 | V2 | graphic PMI, PDF sheets, zone visualisation, TDP bundle, 2D/3D vector loops | M6 | 6+ |
 
-Total MVP (M1–M5) ≈ 11 eng-weeks; V1 ≈ +6.5.
+Total MVP (M1–M5) ≈ 11 eng-weeks; V1 ≈ +8 (incl. M5n 1.5, RS1).
 
 ## 11. Open questions / decisions needed
 
@@ -621,6 +644,7 @@ Total MVP (M1–M5) ≈ 11 eng-weeks; V1 ≈ +6.5.
 | Q-5 | Should PMI be entities (`kind: 'pmi'`) for selection/layers? | No: separate model like drawings; selection via panel; revisit if layer control is required |
 | Q-6 | ASME vs ISO symbol differences in rendering (e.g. datum feature triangle style) | Two glyph sets keyed by `standard`; proportions configurable |
 | Q-7 | Inch documents: surface texture µin under ASME? | `unit` per item; default from `standard` + `doc.units` |
+| Q-9 | Should `lib/prng.ts` also implement Philox4x32-10, so TS and native are bit-equal for N ≤ 2e6? | Not required: VC-GDT-37 compares by acceptance bounds; revisit if a bit-level cross-check is wanted |
 | Q-8 | Which current editions of ISO 5459 and ISO 14405-1 apply (catalogue showed a 2024 ISO 5459 entry and the 2016 ISO 14405-1 as withdrawn)? | Confirm with ISO catalogue before V1 |
 
 ## 12. References
@@ -630,5 +654,7 @@ Total MVP (M1–M5) ≈ 11 eng-weeks; V1 ≈ +6.5.
 - [R28] OCCT STEP translator user guide, GD&T section (quoted via OCCT commit page mirror) — https://git.rbts.co/OpenCascade/occt/commit/a8a3b37c0d5dd416a0f98a031be7a4fc05075e52 ; OCCT tracker #26827 (reading FCF position from STEP) — https://tracker.dev.opencascade.org/view.php?id=26827 (accessed 2026-10)
 - [R29] OpenCascade, aerospace use cases (PMI import from STEP AP242) — https://opencascade.com/use_cases_industry/aerospace (accessed 2026-10)
 - [R30] bldrs-ai/conway, NIST STEP metadata design notes (independent entity counts for nist_ctc_01) — https://github.com/bldrs-ai/conway/blob/main/design/new/step-metadata-nist.md (accessed 2026-10)
+- [R37] J. K. Salmon, M. A. Moraes, R. O. Dror, D. E. Shaw, "Parallel random numbers: as easy as 1, 2, 3", SC '11 (2011), doi:10.1145/2063384.2063405 — Philox counter-based generators (Random123)
+- [RS1] Native compute programme — [../../decisions/RS1-native-compute.md](../../decisions/RS1-native-compute.md) (owner decision 2026-10-18)
 - [R36] usnistgov/SFA source: `sfa-nist.tcl` (expected-PMI coverage logic), `sfa-cl.tcl` (command line) — https://github.com/usnistgov/SFA/tree/master/source (accessed 2026-10)
 - llull internal: `docs/decisions/KI5-shape-kernel-boundary.md`, `docs/decisions/KI6-desktop-app-cli-first.md`, `.claude/rules/architecture.md`.
