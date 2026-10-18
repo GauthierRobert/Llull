@@ -1,31 +1,246 @@
 {
   "id": "SC-DAT-03",
-  "status": "PROPOSED — DAT MVP commands flagged \"unbuilt\".",
-  "validates": ["VC-DAT-12", "VC-DAT-02"],
+  "status": "PROPOSED — DAT MVP commands flagged \"unbuilt\". Run with build_project onError \"continue\" so the refused steps are reported and the plan goes on.",
+  "validates": [
+    "VC-DAT-12",
+    "VC-DAT-02"
+  ],
   "description": "Deliberately wrong data: a hand-typed tag that breaks the class format, a duplicate tag, a line whose `to` names no object, a missing required property. Each refusal / finding must carry its stable code (AF-11).",
+  "onError": "continue",
   "actions": [
-    { "command": "set_units", "params": { "units": "mm" } },
-    { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },
-    { "command": "define_plant_hierarchy", "unbuilt": true, "params": { "nodes": [ { "code": "S1", "kind": "site" }, { "code": "P1", "kind": "plant", "parent": "S1" }, { "code": "U10", "kind": "unit", "parent": "P1", "properties": { "areaNumber": "1" } } ] } },
-    { "command": "load_plant_class_library", "unbuilt": true, "params": { "library": "llull-default-process" } },
-    { "command": "add_equipment", "params": { "name": "Pump A", "location": [0, 0], "size": [1000, 500, 800] }, "as": "pa" },
-    { "command": "add_equipment", "params": { "name": "Pump B", "location": [3000, 0], "size": [1000, 500, 800] }, "as": "pb" },
-    { "command": "assign_plant_object", "unbuilt": true, "params": { "target": "$pa", "className": "CentrifugalPump", "hierarchy": "U10", "tag": "P-1011", "properties": { "Description": "Pump A", "DesignPressure": 10 } }, "note": "explicit tag that breaks {classCode}-{area}{seq:2}" },
-    { "command": "assign_plant_object", "unbuilt": true, "params": { "target": "$pa", "className": "CentrifugalPump", "hierarchy": "U10", "tagFields": { "seq": 1 }, "properties": { "Description": "Pump A", "DesignPressure": 10 } } },
-    { "command": "assign_plant_object", "unbuilt": true, "params": { "target": "$pb", "className": "CentrifugalPump", "hierarchy": "U10", "tag": "P-101", "properties": { "Description": "Pump B" } }, "note": "duplicate of step 7" },
-    { "command": "assign_plant_object", "unbuilt": true, "params": { "target": "$pb", "className": "CentrifugalPump", "hierarchy": "U10", "tagFields": { "seq": 2 }, "properties": { "Description": "Pump B" } }, "note": "accepted, DesignPressure (required) missing" },
-    { "command": "add_pipe_run", "params": { "points": [[500, 0, 400], [2500, 0, 400]], "dn": 50, "line": "50-CWS-0007-B2", "from": "P-101", "to": "E-999" }, "as": "l1" },
-    { "command": "assign_plant_object", "unbuilt": true, "params": { "target": "$l1", "className": "ProcessLine", "hierarchy": "U10", "tagFields": { "nominalSize": 50, "fluidCode": "CWS", "seq": 7, "spec": "B2" } } },
-    { "command": "check_plant_data", "unbuilt": true, "params": {} }
+    {
+      "command": "set_units",
+      "params": {
+        "units": "mm"
+      }
+    },
+    {
+      "command": "add_level",
+      "params": {
+        "name": "Grade",
+        "elevation": 0
+      }
+    },
+    {
+      "command": "define_plant_hierarchy",
+      "unbuilt": true,
+      "params": {
+        "nodes": [
+          {
+            "code": "S1",
+            "kind": "site"
+          },
+          {
+            "code": "P1",
+            "kind": "plant",
+            "parent": "S1"
+          },
+          {
+            "code": "U10",
+            "kind": "unit",
+            "parent": "P1",
+            "properties": {
+              "areaNumber": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "load_plant_class_library",
+      "unbuilt": true,
+      "params": {
+        "library": "llull-default-process"
+      }
+    },
+    {
+      "command": "add_equipment",
+      "params": {
+        "name": "Pump A",
+        "location": [
+          0,
+          0
+        ],
+        "size": [
+          1000,
+          500,
+          800
+        ]
+      },
+      "as": "pa"
+    },
+    {
+      "command": "add_equipment",
+      "params": {
+        "name": "Pump B",
+        "location": [
+          3000,
+          0
+        ],
+        "size": [
+          1000,
+          500,
+          800
+        ]
+      },
+      "as": "pb"
+    },
+    {
+      "command": "assign_plant_object",
+      "unbuilt": true,
+      "params": {
+        "target": "$pa",
+        "className": "CentrifugalPump",
+        "hierarchy": "U10",
+        "tag": "P-1011",
+        "properties": {
+          "Description": "Pump A",
+          "DesignPressure": 10
+        }
+      },
+      "note": "explicit tag that breaks {classCode}-{area}{seq:2}"
+    },
+    {
+      "command": "assign_plant_object",
+      "unbuilt": true,
+      "params": {
+        "target": "$pa",
+        "className": "CentrifugalPump",
+        "hierarchy": "U10",
+        "tagFields": {
+          "seq": 1
+        },
+        "properties": {
+          "Description": "Pump A",
+          "DesignPressure": 10
+        }
+      }
+    },
+    {
+      "command": "assign_plant_object",
+      "unbuilt": true,
+      "params": {
+        "target": "$pb",
+        "className": "CentrifugalPump",
+        "hierarchy": "U10",
+        "tag": "P-101",
+        "properties": {
+          "Description": "Pump B"
+        }
+      },
+      "note": "duplicate of step 7"
+    },
+    {
+      "command": "assign_plant_object",
+      "unbuilt": true,
+      "params": {
+        "target": "$pb",
+        "className": "CentrifugalPump",
+        "hierarchy": "U10",
+        "tagFields": {
+          "seq": 2
+        },
+        "properties": {
+          "Description": "Pump B"
+        }
+      },
+      "note": "accepted, DesignPressure (required) missing"
+    },
+    {
+      "command": "add_pipe_run",
+      "params": {
+        "points": [
+          [
+            500,
+            0,
+            400
+          ],
+          [
+            2500,
+            0,
+            400
+          ]
+        ],
+        "dn": 50,
+        "line": "50-CWS-0007-B2",
+        "from": "P-101",
+        "to": "E-999"
+      },
+      "as": "l1"
+    },
+    {
+      "command": "assign_plant_object",
+      "unbuilt": true,
+      "params": {
+        "target": "$l1",
+        "className": "ProcessLine",
+        "hierarchy": "U10",
+        "tagFields": {
+          "nominalSize": 50,
+          "fluidCode": "CWS",
+          "seq": 7,
+          "spec": "B2"
+        }
+      }
+    },
+    {
+      "command": "check_plant_data",
+      "unbuilt": true,
+      "params": {}
+    }
   ],
   "expected": [
-    { "step": 6, "path": "error.code", "value": "DAT_TAG_FORMAT", "source": "tag_format_cases.json" },
-    { "step": 7, "path": "tag", "value": "P-101", "source": "closed form" },
-    { "step": 8, "path": "error.code", "value": "DAT_TAG_DUPLICATE", "source": "uniqueness rule (TECHNICAL_SPEC §5.3)" },
-    { "step": 9, "path": "tag", "value": "P-102", "source": "closed form" },
-    { "step": 12, "path": "status", "value": "fail", "source": "plan" },
-    { "step": 12, "path": "findings[code=DAT_REQUIRED_PROPERTY_MISSING].ids", "value": ["$pb"], "source": "DesignPressure required on Equipment" },
-    { "step": 12, "path": "findings[code=DAT_LINE_END_UNRESOLVED].paths", "value": ["50-CWS-0007-B2.to"], "source": "E-999 is in no registry and is not a declared battery limit (BL-*)" },
-    { "step": 12, "path": "findings.length", "value": 2, "source": "plan" }
+    {
+      "step": 6,
+      "path": "error.code",
+      "value": "DAT_TAG_FORMAT",
+      "source": "tag_format_cases.json"
+    },
+    {
+      "step": 7,
+      "path": "tag",
+      "value": "P-101",
+      "source": "closed form"
+    },
+    {
+      "step": 8,
+      "path": "error.code",
+      "value": "DAT_TAG_DUPLICATE",
+      "source": "uniqueness rule (TECHNICAL_SPEC §5.3)"
+    },
+    {
+      "step": 9,
+      "path": "tag",
+      "value": "P-102",
+      "source": "closed form"
+    },
+    {
+      "step": 12,
+      "path": "status",
+      "value": "fail",
+      "source": "plan"
+    },
+    {
+      "step": 12,
+      "path": "findings[code=DAT_REQUIRED_PROPERTY_MISSING].ids",
+      "value": [
+        "$pb"
+      ],
+      "source": "DesignPressure required on Equipment"
+    },
+    {
+      "step": 12,
+      "path": "findings[code=DAT_LINE_END_UNRESOLVED].paths",
+      "value": [
+        "50-CWS-0007-B2.to"
+      ],
+      "source": "E-999 is in no registry and is not a declared battery limit (BL-*)"
+    },
+    {
+      "step": 12,
+      "path": "findings.length",
+      "value": 2,
+      "source": "plan"
+    }
   ]
 }

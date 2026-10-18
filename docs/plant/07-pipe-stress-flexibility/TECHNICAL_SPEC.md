@@ -504,4 +504,4 @@ the support loads), 08-plant-data-reports-interop (line list "stress critical" f
 - [R16] Hexagon CAESAR II User's Guide v13 — B31J Methods — https://docs.hexagonppm.com/r/en-US/CAESAR-II-Users-Guide/Version-13/1230689 (search extract, accessed 2026-10)
 - [R17] AVEVA E3D Pipe Stress Interface User Guide 2.1 — https://help.aveva.com/AVEVA_Everything3D/2.1/PSIUG/PSIUG9.08.2.html (search extract, accessed 2026-10)
 - [R18] CADMATIC Plant Modeller — Interfacing to CAESAR II — https://docs.cadmatic.com/plant/Content/Plant%20Modeller/Model/Interfacing%20to%20CAESAR%20II.htm (search result, not fetched; host blocked)
-- Validation sources S1–S25: [`validation/sources.md`](validation/sources.md)
+- Validation sources S1–S27: [`validation/sources.md`](validation/sources.md)

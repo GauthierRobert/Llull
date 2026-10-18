@@ -218,4 +218,4 @@ the model's supports are where `add_pipe_support` put them.
 - [R11] Hexagon Smart 3D Piping — stress analysis workflow with CAESAR II — https://docs.hexagonppm.com/r/en-US/Intergraph-Smart-3D-Piping/13/443779 (search extract, accessed 2026-10)
 - [R12] Hexagon CAESAR II User's Guide — Neutral file interface; Import PCF — https://docs.hexagonppm.com/r/en-US/CAESAR-II-Users-Guide/Version-12/337038 (search extract, accessed 2026-10)
 - [R13] Bezler P., Hartzman M., Reich M., Piping Benchmark Problems, NUREG/CR-1677 Vol. 1, BNL, 1980 — https://digital.library.unt.edu/ark:/67531/metadc1211143/ (located, not read)
-- Validation sources S1–S25: [`validation/sources.md`](validation/sources.md)
+- Validation sources S1–S27: [`validation/sources.md`](validation/sources.md)
