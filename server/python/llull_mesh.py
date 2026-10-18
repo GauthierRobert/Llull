@@ -121,6 +121,21 @@ def _load_step(gmsh, path, scale):
     return {tag: tag for _, tag in gmsh.model.getEntities(2)}
 
 
+def _trimmed_distance(gmsh, dim, tag, point):
+    """Distance from point to the TRIMMED entity (getClosestPoint alone measures the untrimmed plane/cylinder/line)."""
+    closest, parametric = gmsh.model.getClosestPoint(dim, tag, list(point))
+    d = _dist(point, [float(c) for c in closest])
+    try:
+        if gmsh.model.isInside(dim, tag, list(parametric), True) > 0:
+            return d
+    except Exception:  # discrete (STL) entities: the closest point already lies on the mesh
+        return d
+    best = math.inf
+    for bdim, btag in gmsh.model.getBoundary([(dim, tag)], combined=False, oriented=False):
+        best = min(best, _trimmed_distance(gmsh, bdim, abs(btag), point) if bdim >= 1 else _dist(point, gmsh.model.getValue(0, abs(btag), [])))
+    return best if best < math.inf else d
+
+
 def _faces_of(gmsh, region_of, points, key, entity_id):
     """Face regions nearest to each point; residual = the largest point-to-face distance."""
     diag = _dist(gmsh.model.getBoundingBox(-1, -1)[:3], gmsh.model.getBoundingBox(-1, -1)[3:]) or 1.0
@@ -128,8 +143,7 @@ def _faces_of(gmsh, region_of, points, key, entity_id):
     for point in points:
         per_region = {}
         for surface, region in region_of.items():
-            closest, _ = gmsh.model.getClosestPoint(2, surface, list(point))
-            d = _dist(point, [float(c) for c in closest])
+            d = _trimmed_distance(gmsh, 2, surface, point)
             per_region[region] = min(d, per_region.get(region, math.inf))
         ranked = sorted(per_region.items(), key=lambda item: (item[1], item[0]))
         best_region, best = ranked[0]
@@ -153,7 +167,7 @@ def _edges_of(gmsh, points, key, entity_id, curves=None):
     resolved, residual = set(), 0.0
     candidates = [tag for _, tag in gmsh.model.getEntities(1)] if curves is None else sorted(curves)
     for point in points:
-        ranked = sorted((_dist(point, [float(c) for c in gmsh.model.getClosestPoint(1, tag, list(point))[0]]), tag) for tag in candidates)
+        ranked = sorted((_trimmed_distance(gmsh, 1, tag, point), tag) for tag in candidates)
         if not ranked or ranked[0][0] > UNRESOLVED_REL * diag:
             raise MeshError("FEA_TARGET_UNRESOLVED", "target %s: no edge of '%s' near point %s" % (key, entity_id, list(point)))
         if len(ranked) > 1 and ranked[1][0] - ranked[0][0] <= AMBIGUOUS_REL * diag:

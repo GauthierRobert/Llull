@@ -15,7 +15,15 @@ import { caseOf } from '../shared/access';
 import { analysisIdSchema } from '../shared/schemas';
 import { trustedRecord } from '../shared/trust';
 import { checkThermomechItems } from '../thermomech/check';
-import { explicitAllowable, isAllowableRefusal, materialAllowable, type Allowable, type AllowableRefusal } from './allowable';
+import { solvedNodeTemperatures, temperatureWarnings, type NodeTemperatures } from './temperature';
+import {
+  explicitAllowable,
+  isAllowableRefusal,
+  materialAllowable,
+  materialAllowableOver,
+  type Allowable,
+  type AllowableRefusal,
+} from './allowable';
 import { appliedFactor, factorReport, marginOfSafety, statusOf, type CheckKind, type MarginStatus } from './marginMath';
 import { refuseMargins } from './refusal';
 
@@ -111,6 +119,8 @@ interface Context {
   readonly marginalBand: number | undefined;
   readonly groupBy: 'part' | 'target';
   readonly loadCaseFilter: ReadonlySet<string> | undefined;
+  /** thermo_static only: solved temperature of each mesh node; null = the allowable is read at the reference temperature. */
+  readonly temperatures: NodeTemperatures | null;
 }
 
 function unverifiedReasonsOf(context: Context, entityId: string, materialId: string | undefined): string[] {
@@ -126,7 +136,7 @@ function unverifiedReasonsOf(context: Context, entityId: string, materialId: str
 }
 
 /** Allowable for a part and a check, or a refusal. */
-function allowableFor(context: Context, entityId: string, check: CheckKind): Allowable | AllowableRefusal {
+function allowableFor(context: Context, entityId: string, check: CheckKind, nodes: readonly number[]): Allowable | AllowableRefusal {
   const { doc, analysis, allowable } = context;
   if (typeof allowable === 'object') return explicitAllowable(allowable.value, allowable.unit);
   const materialId = Object.hasOwn(doc.entities, entityId) ? doc.entities[entityId]?.materialId : undefined;
@@ -136,7 +146,29 @@ function allowableFor(context: Context, entityId: string, check: CheckKind): All
       code: 'FEA_MATERIAL_NO_ALLOWABLE',
       message: `part '${entityId}' has no material, so no allowable (pass allowable { value, unit })`,
     };
-  return materialAllowable(material, materialId, check === 'ultimate' ? 'Ftu' : 'Fty', propertyTemperatureK(analysis));
+  const property = check === 'ultimate' ? 'Ftu' : 'Fty';
+  const region = context.temperatures?.rangeOf(nodes);
+  return region === undefined || region === null
+    ? materialAllowable(material, materialId, property, propertyTemperatureK(analysis))
+    : materialAllowableOver(material, materialId, property, region);
+}
+
+/** Which temperature the allowable of a thermo_static row was read at, and where that temperature comes from. */
+function temperatureColumns(context: Context, found: Allowable, nodes: readonly number[]): Record<string, unknown> {
+  const region = context.temperatures?.rangeOf(nodes) ?? null;
+  const referenceK = propertyTemperatureK(context.analysis);
+  if (region === null)
+    return {
+      temperatureDependent: found.temperatureDependent,
+      allowableTemperatureK: found.temperatureK ?? referenceK,
+      allowableTemperatureBasis: 'reference temperature (no solved temperature available for this region)',
+    };
+  return {
+    temperatureDependent: found.temperatureDependent,
+    allowableTemperatureK: found.temperatureK ?? region[1],
+    allowableTemperatureRangeK: region,
+    allowableTemperatureBasis: `solved temperature field of the case (${context.temperatures?.description ?? ''}); the lower allowable of the region's coldest and hottest node`,
+  };
 }
 
 function buildRows(
@@ -164,7 +196,7 @@ function buildRows(
       if (applied === null) continue;
       const materialId = Object.hasOwn(context.doc.entities, group.entityId) ? context.doc.entities[group.entityId]?.materialId : undefined;
       for (const check of checksFor(category, context.allowable)) {
-        const found = allowableFor(context, group.entityId, check);
+        const found = allowableFor(context, group.entityId, check, group.nodes);
         if (isAllowableRefusal(found)) return found;
         const factor = appliedFactor(factors, check, category);
         const ms = marginOfSafety(found.valueMpa * perMpa, applied.value, factor);
@@ -182,6 +214,7 @@ function buildRows(
           [`applied${stress === 'psi' ? 'Psi' : stress}`]: applied.value,
           [`allowable${stress === 'psi' ? 'Psi' : stress}`]: found.valueMpa * perMpa,
           allowable: { property: found.property, basis: found.basis, provenance: found.provenance },
+          ...(analysis.type === 'thermo_static' ? temperatureColumns(context, found, group.nodes) : {}),
           factorApplied: factor,
           ms,
           status,
@@ -220,11 +253,12 @@ export const computeMargins = defineCommand({
     'Compute margins of safety of a SOLVED static or thermo_static analysis from its results artifact (never from the document ' +
     'summary): per load case and part (groupBy part) or per constraint / load target (groupBy target), the maximum von Mises stress (or ' +
     'the largest magnitude of s_xx / s_yy / s_zz) over the nodes, against allowables. allowable omitted = both checks from the part ' +
-    'material PHY-01 property models Ftu and Fty, read at the case reference temperature (thermo_static) or 20 degC: on a LIMIT load ' +
+    'material PHY-01 property models Ftu and Fty: for a thermo_static case read at the SOLVED temperature (the lower value at the coldest and hottest node of the part / target, ' +
+    'the temperature used is reported per row as allowableTemperatureK; a constant model or explicit value is flagged FEA_ALLOWABLE_NOT_TEMPERATURE_DEPENDENT, no field FEA_ALLOWABLE_TEMPERATURE_UNKNOWN and then the case reference temperature is used), for a static case at 20 degC: on a LIMIT load ' +
     'case MS_ult = Ftu / (applied x ultimate factor x extras) - 1 and MS_yield = Fty / (applied x yield factor x extras) - 1; on an ' +
     'ULTIMATE load case only MS_ult = Ftu / (applied x extras) - 1. allowable "ftu" / "fty" runs one check; { value, unit, against? } is ' +
     'an explicit allowable for all parts (against ultimate by default; always flagged unverified). The factors come from the case ' +
-    '(create_analysis factors; defaults 1.5 per 14 CFR 25.303 and 1.0) and are listed with source and defaulted. Status: FAIL if MS < 0, ' +
+    '(create_analysis factors, or factor = one number for both; defaults 1.5 per 14 CFR 25.303 and 1.0 apply silently unless the user states a safety factor, so map "SF 2" to factor 2 there) and are listed with source and defaulted. Status: FAIL if MS < 0, ' +
     'MARGINAL only when marginalBand is given and MS < band (no default band), else PASS; FAIL / MARGINAL rows are disposition ' +
     'pending_human. Every row has reviewRequired: true and unverified = OR of the input flags. Peak stresses at point loads, supports and ' +
     're-entrant corners are NOT screened for singularities (singular is always false): judge them yourself. Refused with ' +
@@ -300,6 +334,8 @@ export const computeMargins = defineCommand({
       marginalBand,
       groupBy,
       loadCaseFilter: params.loadCases === undefined ? undefined : new Set(params.loadCases),
+      temperatures:
+        analysis.type === 'thermo_static' ? solvedNodeTemperatures(doc, analysis, trust.meshArtifact, ctx?.feaArtifacts ?? null) : null,
     };
     const built = buildRows(context);
     if ('code' in built) return refuseMargins(doc, built.code, built.message, [analysisId]);
@@ -329,7 +365,10 @@ export const computeMargins = defineCommand({
       rows,
       singularScreening:
         'not performed: peak stresses at point loads, supports and re-entrant corners are not screened (singular is false on every row)',
-      warnings: marginalBand === undefined ? ['FEA_MARGINAL_BAND_UNSET: no marginalBand given, so no row is MARGINAL'] : [],
+      warnings: [
+        ...(marginalBand === undefined ? ['FEA_MARGINAL_BAND_UNSET: no marginalBand given, so no row is MARGINAL'] : []),
+        ...(analysis.type === 'thermo_static' ? temperatureWarnings(context.temperatures, propertyTemperatureK(analysis), rows) : []),
+      ],
       reviewRequired: true,
     };
     const worst =
@@ -338,7 +377,7 @@ export const computeMargins = defineCommand({
         : `min MS ${significantNumber(lowest.ms ?? 0, 4)} (${lowest.status}, ${lowest.rowId} ${String(lowest['loadCase'])}, part ${String(lowest['part'])})`;
     return report(
       doc,
-      `compute_margins: '${analysisId}' ${rows.length} row(s), ${worst}; ${pending} pending a human disposition, ${unverified} unverified; factors ultimate ${factors.ultimate.value}${factors.ultimate.defaulted ? ' (default)' : ''}, yield ${factors.yield.value}${factors.yield.defaulted ? ' (default)' : ''}. Computed by llull, not approved: needs a qualified engineer.`,
+      `compute_margins: '${analysisId}' ${rows.length} row(s), ${worst}; ${pending} pending a human disposition, ${unverified} unverified; factors ultimate ${factors.ultimate.value} (${factors.ultimate.defaulted ? 'DEFAULT 14 CFR 25.303, not set by the user' : 'set via create_analysis'}), yield ${factors.yield.value} (${factors.yield.defaulted ? 'DEFAULT, not set by the user' : 'set via create_analysis'}). Computed by llull, not approved: needs a qualified engineer.`,
       data,
     );
   },

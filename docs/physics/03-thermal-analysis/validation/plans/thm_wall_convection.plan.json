@@ -26,7 +26,6 @@
   "command": "define_material_record",
   "params": {
    "id": "wall_k15",
-   "name": "wall_k15",
    "designation": "validation test material",
    "specs": [],
    "licence": "company-proprietary",
@@ -84,8 +83,7 @@
    "density": 8000000.0,
    "color": "#9aa0a6",
    "metalness": 1,
-   "roughness": 0.4,
-   "recordId": "wall_k15"
+   "roughness": 0.4
   }
  },
  {
@@ -139,6 +137,9 @@
       0
      ]
     ]
+   },
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
    }
   }
  },
@@ -165,6 +166,9 @@
       0.05
      ]
     ]
+   },
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
    }
   }
  },
@@ -172,7 +176,6 @@
   "command": "set_mesh_controls",
   "params": {
    "analysisId": "$an",
-   "mesher": "gmsh",
    "elementFamily": "tet",
    "order": 2,
    "globalSize": 0.05

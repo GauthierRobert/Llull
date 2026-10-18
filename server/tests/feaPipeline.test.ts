@@ -121,6 +121,8 @@ describe.skipIf(!HAS_GMSH || !HAS_CCX)('FE pipeline (gmsh + ccx)', () => {
     const mesh = defaultFeArtifactStore().get(meshHash) as FeMeshArtifact;
     expect(mesh.kind).toBe('fe_mesh');
     expect(mesh.blocks[0]?.type).toBe('C3D10');
+    expect(dataOf(meshed.json)['facetedParts']).toEqual([]);
+    expect(String(meshed.json['summary'])).not.toContain('faceted tessellation');
     expect(currentDoc().analysis?.cases[analysisId]?.meshSummary?.meshHash).toBe(meshHash);
 
     const solved = await cli('fea_solve', `analysisId=${analysisId}`, 'timeoutS=300');
@@ -128,6 +130,10 @@ describe.skipIf(!HAS_GMSH || !HAS_CCX)('FE pipeline (gmsh + ccx)', () => {
     const results = defaultFeArtifactStore().get(String(dataOf(solved.json)['resultsHash'])) as FeResultsArtifact;
     expect(results.kind).toBe('fe_results');
     expect(results.meshHash).toBe(meshHash);
+    const plot = await cli('render_fea_results', `analysisId=${analysisId}`, 'field=s_zz');
+    expect(plot.code, String(plot.json['summary'])).toBe(EXIT_OK);
+    expect(String(dataOf(plot.json)['svg'])).toContain('<svg');
+    expect(Number((dataOf(plot.json)['max'] as { value: number }).value)).toBeGreaterThan(0);
     expect(results.solver).toBe('calculix');
 
     const stress = results.steps.at(-1)?.fields['STRESS'];

@@ -6,6 +6,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { defaultContext } from '@core/commands/context';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { FeMeshArtifact } from '@core/model/analysis';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
@@ -168,6 +169,64 @@ describe.skipIf(!HAS_GMSH)('bridge op mesh — exact STEP geometry (OCC)', () =>
     expectFacesOnSet(reply, 'C_fix');
     const edge = await mesh(request(occt as GeometryKernel, 2, { targets: [{ key: 'C_bad', entityId: ids[0], facesNear: [[5, 0, 0]] }] }));
     expect(edge).toMatchObject({ ok: false, code: 'FEA_TARGET_AMBIGUOUS' });
+  });
+});
+
+describe.skipIf(!HAS_GMSH)('bridge op mesh — facesNear on trimmed faces (coplanar disjoint faces)', () => {
+  it('resolves a point on each of two equal-height boss tops to that boss face only', async (context) => {
+    if (occt === null) context.skip();
+    const kernel = occt as GeometryKernel;
+    const ctx = { ...defaultContext(), kernel };
+    let current = createEmptyDocument();
+    const added: string[] = [];
+    for (const [size, position] of [
+      [
+        [100, 50, 10],
+        [0, 0, 0],
+      ],
+      [
+        [10, 10, 5],
+        [10, 20, 10],
+      ],
+      [
+        [10, 10, 5],
+        [80, 20, 10],
+      ],
+    ] as const) {
+      const step = execute(current, 'add_box', { size, position, anchor: 'min' }, ctx);
+      current = step.document;
+      added.push(step.affected[0] ?? '');
+    }
+    for (const boss of added.slice(1)) {
+      const fused = execute(current, 'boolean', { op: 'union', a: added[0] ?? '', b: boss }, ctx);
+      expect(fused.document).not.toBe(current);
+      current = fused.document;
+      added[0] = fused.affected[0] ?? added[0] ?? '';
+    }
+    const id = added[0] ?? '';
+    const reply = await mesh({
+      parts: [{ entityId: id, geometry: partGeometry(current, id, kernel) }],
+      targets: [
+        { key: 'C_left', entityId: id, facesNear: [[15, 25, 15]] },
+        { key: 'C_right', entityId: id, facesNear: [[85, 25, 15]] },
+      ],
+      controls: { order: 1, globalSize: 6, refinements: [] },
+    });
+    expect(reply.ok, reply.error).toBe(true);
+    const position = new Map(reply.nodes.map((node) => [node[0], node] as const));
+    for (const [key, [x0, x1]] of [
+      ['C_left', [10, 20]],
+      ['C_right', [80, 90]],
+    ] as const) {
+      const set = reply.nodeSets[key] ?? [];
+      expect(set.length, key).toBeGreaterThan(0);
+      for (const node of set) {
+        const [, x = NaN, , z = NaN] = position.get(node) ?? [];
+        expect(z).toBeCloseTo(15, 6);
+        expect(x).toBeGreaterThanOrEqual(x0 - 1e-6);
+        expect(x).toBeLessThanOrEqual(x1 + 1e-6);
+      }
+    }
   });
 });
 

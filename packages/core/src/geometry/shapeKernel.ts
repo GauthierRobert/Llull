@@ -11,7 +11,7 @@
  */
 
 import type { BooleanOp, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/types';
-import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTopology } from './kernel';
+import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTopology, StepAssemblyPart, StepOccurrence } from './kernel';
 import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
 import { recipeKey } from './shapeRecipe';
 import { lowerFeature, needsReach, throughReach } from './featureLowering';
@@ -51,12 +51,15 @@ export interface KernelOps<S> {
   /** Union of `shapes` with the new intersection (joint) edges filleted by `radius`. */
   blend(shapes: readonly S[], radius: number): S | null;
   chamfer(shape: S, edges: readonly number[], distance: number): S | null;
-  shell(shape: S, thickness: number): S | null;
+  /** `openNear`: points, each removing the face of `shape` nearest to it (an open pocket); absent/empty = a sealed cavity. */
+  shell(shape: S, thickness: number, openNear?: readonly Vec3[]): S | null;
   place(shape: S, position: Vec3, rotation: Vec3): S | null;
   scale(shape: S, factor: number): S | null;
   tessellate(shape: S): MeshData | null;
   topology(shape: S): ShapeTopology | null;
   exportStep(shapes: readonly S[]): string | null;
+  /** Optional assembly STEP writer; a kernel without it leaves `GeometryKernel.exportStepAssembly` undefined. */
+  exportStepAssembly?(occurrences: readonly StepOccurrence<S>[]): string | null;
   /** Optional validity / lump report; a kernel without it leaves `GeometryKernel.analyze` undefined. */
   analyze?(shape: S): ShapeAnalysis | null;
   /** Optional exact mass properties at unit density; a kernel without it leaves `GeometryKernel.massProperties` undefined. */
@@ -139,7 +142,7 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
     }
     case 'shell': {
       const source = child(recipe.source);
-      return source === null ? null : ops.shell(source, recipe.thickness);
+      return source === null ? null : ops.shell(source, recipe.thickness, recipe.openNear);
     }
     case 'place': {
       const source = child(recipe.source);
@@ -294,6 +297,7 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
   const loadBlobOps = ops.loadBlob?.bind(ops);
   const loadedBlobs = new Set<string>();
   const importOps = ops.importShapes?.bind(ops);
+  const assemblyOps = ops.exportStepAssembly?.bind(ops);
   const infoOps = ops.info?.bind(ops);
   return {
     ...(faceQuery === undefined ? {} : { faceQuery }),
@@ -308,11 +312,43 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
               ...(distanceOps === undefined ? [] : ['distance']),
               ...(massOps === undefined ? [] : ['massProperties']),
               ...(importOps === undefined ? [] : ['importShapes']),
+              ...(assemblyOps === undefined ? [] : ['exportStepAssembly']),
               ...(faceQuery === undefined ? [] : ['faceQuery']),
               ...(ops.brep === undefined ? [] : ['brepBlobs']),
             ];
             return { ...own, capabilities: [...new Set([...own.capabilities, ...wired])] };
           },
+        }),
+    ...(assemblyOps === undefined
+      ? {}
+      : {
+          exportStepAssembly: (occurrences: readonly StepOccurrence[]): string | null =>
+            call(() => {
+              const parts = new Map<StepAssemblyPart, StepAssemblyPart<S> | null>();
+              const nativePart = (source: StepAssemblyPart): StepAssemblyPart<S> | null => {
+                const known = parts.get(source);
+                if (known !== undefined) return known;
+                parts.set(source, null);
+                const natives = source.shapes.map(nativeOf);
+                if (natives.some((shape) => shape === null)) return null;
+                const children: StepOccurrence<S>[] = [];
+                for (const child of source.children ?? []) {
+                  const part = nativePart(child.part);
+                  if (part === null) return null;
+                  children.push({ ...child, part });
+                }
+                const native: StepAssemblyPart<S> = { shapes: natives as S[], ...(children.length > 0 ? { children } : {}) };
+                parts.set(source, native);
+                return native;
+              };
+              const placed: StepOccurrence<S>[] = [];
+              for (const occurrence of occurrences) {
+                const part = nativePart(occurrence.part);
+                if (part === null) return null;
+                placed.push({ ...occurrence, part });
+              }
+              return assemblyOps(placed);
+            }),
         }),
     ...(importOps === undefined ? {} : { importShapes: (format, text, options) => call(() => importOps(format, text, options)) }),
     ...(loadBlobOps === undefined

@@ -18,6 +18,8 @@ interface ReplayState {
   readonly idMap: ReadonlyMap<string, string>;
   /** The step leading to this state changed nothing (it threw, was rejected, or was a no-op). */
   readonly inert: boolean;
+  /** Why the step leading to this state failed (threw, was rejected, or reported a failed plan); absent when it succeeded. */
+  readonly failure?: string;
 }
 
 export type ReplayCache = LruCache<ReplayState>;

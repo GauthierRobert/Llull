@@ -9,6 +9,7 @@ import { replayHistory, type ReplayStepEvent } from '../commands/history/replay'
 import { buildParamEnv } from '../commands/history/regenerate';
 import { evaluateExpression, extractReferences } from '../commands/parametric/expression';
 import { entityTrianglePositions } from '../geometry/entityTriangles';
+import { expandInstance } from '../geometry/instanceExpansion';
 import { Namer, translateExpression } from './identifiers';
 import type { GeometryKernel } from '../geometry/kernel';
 import { recipeOf } from '../geometry/shapeRecipe';
@@ -146,6 +147,16 @@ function entityFeatures(
   base: (variable: string) => FeatureBase,
   variables: Map<string, string>,
 ): { features: Feature[]; triangles: boolean } {
+  if (entity.kind === 'instance') {
+    const component = doc.components[entity.componentId];
+    const children = component === undefined ? [] : expandInstance(entity, component).filter(is3D);
+    if (children.length > 0) {
+      const lowered = children.map((expanded) => entityFeatures(expanded, doc, undefined, ctx, namer, base, variables));
+      const names = children.flatMap((expanded) => variablesOf(variables, expanded.id));
+      names.forEach((name, k) => variables.set(`${entity.id}#${k}`, name));
+      return { features: lowered.flatMap((item) => item.features), triangles: lowered.some((item) => item.triangles) };
+    }
+  }
   if (entity.kind === 'mesh' && entity.brep !== undefined) {
     const lowered = lowerRecipe(recipeOf(entity), {
       kernel: ctx.kernel,
@@ -255,12 +266,21 @@ function preferredVariable(entity: Entity): string {
   return entity.name !== undefined && entity.name.trim() !== '' ? entity.name : entity.kind;
 }
 
+/** Every program variable of an entity: one per solid of an expanded instance, else the single variable. */
+function variablesOf(variables: ReadonlyMap<string, string>, id: string): string[] {
+  const group: string[] = [];
+  for (let k = 0; variables.has(`${id}#${k}`); k++) group.push(variables.get(`${id}#${k}`) ?? '');
+  const single = variables.get(id);
+  return group.length > 0 ? group : single === undefined ? [] : [single];
+}
+
 function outputsFor(doc: CadDocument, variables: ReadonlyMap<string, string>): ProgramOutput[] {
-  return solids(doc).flatMap((entity): ProgramOutput[] => {
-    const variable = variables.get(entity.id);
-    if (variable === undefined) return [];
-    return [entity.name !== undefined ? { variable, color: entity.color, name: entity.name } : { variable, color: entity.color }];
-  });
+  return solids(doc).flatMap((entity): ProgramOutput[] =>
+    variablesOf(variables, entity.id).map((variable, k, all): ProgramOutput => {
+      const name = entity.name !== undefined && all.length > 1 ? `${entity.name} ${k + 1}` : entity.name;
+      return name !== undefined ? { variable, color: entity.color, name } : { variable, color: entity.color };
+    }),
+  );
 }
 
 function lowerSnapshot(doc: CadDocument, parameters: ProgramParameter[], ctx: LowerContext, namer: Namer, notes: string[]): FeatureProgram {
@@ -298,6 +318,7 @@ function modificationStep(
   if (removed[0] !== sourceId || variable === undefined || result?.kind !== 'mesh') return null;
   const brep = result.brep;
   if (brep === undefined || (brep.op !== 'fillet' && brep.op !== 'chamfer' && brep.op !== 'shell')) return null;
+  if (brep.op === 'shell' && brep.openNear !== undefined && brep.openNear.length > 0) return null;
   variables.delete(sourceId);
   variables.set(result.id, variable);
   const sizeParam = { fillet: 'radius', chamfer: 'distance', shell: 'thickness' }[brep.op];
@@ -349,25 +370,26 @@ function lowerStep(
   if (modification !== null) return [modification];
   const features: Feature[] = [];
   for (const id of removed) {
-    const variable = variables.get(id);
-    if (variable === undefined) continue;
+    const group = variablesOf(variables, id);
+    for (const variable of group) features.push({ ...base(variable), op: 'remove' });
     variables.delete(id);
-    features.push({ ...base(variable), op: 'remove' });
+    group.forEach((_, k) => variables.delete(`${id}#${k}`));
   }
   for (const [previous, current] of changed) {
-    const variable = variables.get(current.id);
+    const group = variablesOf(variables, current.id);
+    const variable = group[0];
     if (variable === undefined) continue;
     const delta = child(event.params, 'delta');
     if (step.name === 'move_entities' && isPureTranslation(previous, current, delta))
-      features.push({ ...base(variable), op: 'translate', delta: term3(delta, child(rawParams, 'delta'), ctx) });
+      for (const member of group) features.push({ ...base(member), op: 'translate', delta: term3(delta, child(rawParams, 'delta'), ctx) });
     else if (geometryEqual(previous, current)) {
-      if (current.name !== undefined && current.name !== previous.name)
+      if (current.name !== undefined && current.name !== previous.name && group.length === 1)
         features.push({ ...base(variable), op: 'label', name: current.name });
     } else {
       // Re-create from the evaluated state; remove first so the old solid does not linger.
-      features.push({ ...base(variable), op: 'remove' });
-      if (current.kind === 'mesh' && current.brep !== undefined) {
-        // A kernel result edited in place (set_thread, ...): rebuild its recipe so feature notes (thread, drill point) survive.
+      for (const member of group) features.push({ ...base(member), op: 'remove' });
+      if ((current.kind === 'mesh' && current.brep !== undefined) || current.kind === 'instance') {
+        // A kernel result edited in place (set_thread, ...) or an instance: rebuild its recipe(s) so feature notes (thread, drill point) survive.
         const lowered = entityFeatures(current, after, rawParams, ctx, namer, base, variables);
         features.push(...lowered.features);
         if (lowered.triangles)

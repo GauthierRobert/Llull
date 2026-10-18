@@ -42,7 +42,11 @@ function densityView(doc: CadDocument, name: string, material: Material): Record
     gPerDocUnit3: resolved.gPerDocUnit3,
     source: resolved.source,
     basis: legacy ? 'unspecified' : (resolved.basis ?? 'unspecified'),
-    provenance: legacy ? 'legacy' : (material.propertyModels?.find((model) => model.id === resolved.modelId)?.provenance ?? null),
+    provenance: legacy
+      ? material.densityUnit === undefined
+        ? 'legacy'
+        : 'stated-unit'
+      : (material.propertyModels?.find((model) => model.id === resolved.modelId)?.provenance ?? null),
     unverified: resolved.unverified,
     unverifiedReasons: resolved.unverifiedReasons,
   };

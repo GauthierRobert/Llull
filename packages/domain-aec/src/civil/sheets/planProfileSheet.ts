@@ -6,6 +6,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
 import { escapeXml } from '@lib/escapeXml';
+import { niceStep } from '@lib/niceStep';
 import { composeSheetSvg, fitScale, MARGIN, northArrow, sheetDrawingArea } from '../../shared/sheetFrame';
 import { n } from '@core/geometry/drawingSvg';
 import { PAPER_MM, type PaperSize } from '@core/model/sheet';
@@ -14,10 +15,10 @@ import { endStation, horizontalElements } from '../alignment/alignmentGeometry';
 import { stationText, getCivil } from '../model';
 import { analyseStations, reportRows, reportStations } from '../road/roadReport';
 import { LONG_SECTION_LEFT, longSectionSvg } from './longSectionSvg';
+import { SVG_UNIT_MM } from '../road/roadSvg';
 import { validateProfile } from '../alignment/profileGeometry';
 
-/** Paper millimetres per long-section SVG unit. */
-const PAPER_PER_UNIT = 0.25;
+const PAPER_PER_UNIT = SVG_UNIT_MM;
 const STRIP_HEIGHT = 42;
 const LONG_SECTION_RIGHT = 40;
 
@@ -44,15 +45,25 @@ export function buildPlanProfileSheet(
   const area = sheetDrawingArea(width, height);
   const startM = toMetres(doc, alignment.startStation);
   const lengthM = toMetres(doc, endStation(alignment)) - startM;
-  const scale =
-    options.scale ??
-    fitScale(lengthM * 1000, 1, { ...area, width: area.width - (LONG_SECTION_LEFT + LONG_SECTION_RIGHT) * PAPER_PER_UNIT });
-  const mmPerMetre = 1000 / scale;
   const rows = reportRows(doc, alignment, analyseStations(doc, civil, alignment, reportStations(alignment, alignment.stationInterval)));
-  const section = longSectionSvg(doc, civil, alignment, rows, options.verticalExaggeration, mmPerMetre / PAPER_PER_UNIT);
-  if (section === null) return `${alignment.name}: the profile has no stations on the alignment.`;
-  const size = sizeOf(section);
+  const widthFit = fitScale(lengthM * 1000, 1, { ...area, width: area.width - (LONG_SECTION_LEFT + LONG_SECTION_RIGHT) * PAPER_PER_UNIT });
   const sectionTop = area.y + STRIP_HEIGHT + 4;
+  const layout = (candidate: number): { section: string | null; size: { width: number; height: number }; fits: boolean } => {
+    const section = longSectionSvg(doc, civil, alignment, rows, options.verticalExaggeration, 1000 / candidate / PAPER_PER_UNIT);
+    const size = section === null ? { width: 0, height: 0 } : sizeOf(section);
+    const fits = size.width * PAPER_PER_UNIT <= area.width && sectionTop + size.height * PAPER_PER_UNIT <= area.y + area.height;
+    return { section, size, fits };
+  };
+  let scale = options.scale ?? widthFit;
+  let placed = layout(scale);
+  // Auto-fit: step to the next 1-2-5 scale until the section (data band included) clears the reserved title-block area.
+  for (let step = 0; options.scale === undefined && !placed.fits && placed.section !== null && step < 12; step++) {
+    scale = niceStep(scale * 1.01);
+    placed = layout(scale);
+  }
+  const { section, size, fits } = placed;
+  if (section === null) return `${alignment.name}: the profile has no stations on the alignment.`;
+  const mmPerMetre = 1000 / scale;
   const stationX = (stationM: number): number => area.x + LONG_SECTION_LEFT * PAPER_PER_UNIT + (stationM - startM) * mmPerMetre;
   const axisY = area.y + 22;
   const halfWidth = alignment.section
@@ -62,7 +73,7 @@ export function buildPlanProfileSheet(
     `<text x="${n(area.x)}" y="${n(area.y + 4)}" font-size="3.2" text-anchor="start">${escapeXml(`PLAN - ${alignment.name}`)}</text>`,
     ...[-halfWidth, halfWidth].map(
       (side) =>
-        `<line class="road-edge" x1="${n(stationX(startM))}" y1="${n(axisY + side)}" x2="${n(stationX(startM + lengthM))}" y2="${n(axisY + side)}" class="thin"/>`,
+        `<line class="road-edge" x1="${n(stationX(startM))}" y1="${n(axisY + side)}" x2="${n(stationX(startM + lengthM))}" y2="${n(axisY + side)}" stroke="#444" stroke-width="0.25"/>`,
     ),
     `<line class="centreline" x1="${n(stationX(startM))}" y1="${n(axisY)}" x2="${n(stationX(startM + lengthM))}" y2="${n(axisY)}" stroke="#d04a4a" stroke-width="0.35"/>`,
   ];
@@ -100,7 +111,5 @@ export function buildPlanProfileSheet(
     body,
     overlays: [northArrow(width - MARGIN - 12, MARGIN + 12)],
   });
-  const fits =
-    area.x + size.width * PAPER_PER_UNIT <= area.x + area.width && sectionTop + size.height * PAPER_PER_UNIT <= area.y + area.height;
   return { text: `${text}\n`, scale, fits };
 }

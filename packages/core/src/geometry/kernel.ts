@@ -89,6 +89,20 @@ export interface ShapeDistance {
   readonly inside: boolean;
 }
 
+/** A STEP product: the solids of one component (or one loose solid), written once and shared by every occurrence that names this object. */
+export interface StepAssemblyPart<S = ShapeHandle> {
+  readonly shapes: readonly S[];
+  /** Sub-assembly: placed uses of other parts inside this one, in component space (written once however often this part is used). */
+  readonly children?: readonly StepOccurrence<S>[];
+}
+
+/** One placed use of a part in the root assembly (STEP NEXT_ASSEMBLY_USAGE_OCCURRENCE); `rotation` radians, then `position`. */
+export interface StepOccurrence<S = ShapeHandle> {
+  readonly part: StepAssemblyPart<S>;
+  readonly position: Vec3;
+  readonly rotation: Vec3;
+}
+
 /**
  * Every operation returns null when it cannot be performed (unsupported op, degenerate geometry, kernel limitation); commands treat null as
  * a no-op. Implementors must not mutate arguments. Exact topology and STEP: OCC only (Manifold is a mesh kernel: `topology` / `exportStep`
@@ -112,6 +126,12 @@ export interface GeometryKernel {
 
   /** ISO 10303-21 (STEP AP214) text of the shapes as exact B-rep solids; null when unsupported. */
   exportStep(shapes: readonly ShapeHandle[]): string | null;
+
+  /**
+   * STEP text with real assembly structure: one root product, one product per distinct `part` object, one occurrence (placed by location,
+   * geometry shared) per entry, in order; a part's `children` are nested occurrences whose locations compose down the tree. Absent / null when the kernel cannot write assemblies.
+   */
+  exportStepAssembly?(occurrences: readonly StepOccurrence[]): string | null;
 
   /** Validity, volume and lumps of a shape; absent or null when the kernel cannot tell (dependent checks report `not_run`). */
   analyze?(shape: ShapeHandle): ShapeAnalysis | null;

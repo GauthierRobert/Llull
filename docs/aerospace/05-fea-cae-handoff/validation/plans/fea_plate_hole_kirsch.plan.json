@@ -48,7 +48,6 @@
   "command": "define_material_record",
   "params": {
    "id": "al_E70",
-   "name": "al_E70",
    "designation": "test material E = 70000 MPa",
    "specs": [],
    "licence": "company-proprietary",
@@ -106,8 +105,7 @@
    "density": 0.0027,
    "color": "#c0c4c8",
    "metalness": 1,
-   "roughness": 0.35,
-   "recordId": "al_E70"
+   "roughness": 0.35
   }
  },
  {
@@ -206,7 +204,6 @@
   "command": "set_mesh_controls",
   "params": {
    "analysisId": "$an",
-   "mesher": "gmsh",
    "elementFamily": "quad",
    "order": 2,
    "globalSize": 5,

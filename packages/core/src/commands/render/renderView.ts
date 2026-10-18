@@ -45,7 +45,7 @@ export const renderView = defineCommand({
     'Choose `view` to orient the render: "iso" (default isometric), "top", "bottom", "front", "back", ' +
     '"left", or "right" (all orthographic). ' +
     'Adjust `width`/`height` (pixels, clamped to [64, 2000], default 800×600) for resolution. ' +
-    'The SVG uses flat Lambertian shading on 3D solids and stroked paths for 2D shapes. ' +
+    'Solids are flat-Lambert shaded and depth-buffered per pixel (mode "raster", default: a PNG inside the SVG, outlines at creases and part boundaries) or drawn as sorted SVG polygons (mode "vector"); 2D shapes are stroked paths. ' +
     'Camera: `zoom` (>1 magnifies), `direction` ([x,y,z] vector from the scene toward the camera, overrides `view`), ' +
     '`target` (point to look at). `title` draws text top-left, `background` sets the image color. ' +
     'Cutaway: `cut` clips solids (triangles are split, not dropped) and draws the section as a hatched cap, ' +
@@ -109,11 +109,18 @@ export const renderView = defineCommand({
       .string()
       .optional()
       .describe('Background CSS color: "#rrggbb", "#rgb", a color name ("white") or rgb()/hsl(). Default "#1a1a2e" (dark navy).'),
+    mode: z
+      .enum(['raster', 'vector'])
+      .optional()
+      .describe(
+        '"raster" (default): solids are depth-buffered per pixel (always correct occlusion, crisp outlines) and embedded as a PNG in the SVG; ' +
+          '"vector": every face is an SVG polygon sorted back to front (editable, but faces can draw through each other in dense scenes).',
+      ),
     maxPolygons: z
       .number()
       .optional()
       .describe(
-        'Polygon budget, clamped to [500, 100000], default 20000. Entities over their fair share are decimated (see data.simplifiedEntityIds); raise it for finer detail at the cost of a larger SVG.',
+        'Polygon budget of vector mode, clamped to [500, 100000], default 20000 (raster mode allows at least 400000). Entities over their fair share are decimated (see data.simplifiedEntityIds); raise it for finer detail at the cost of a larger SVG.',
       ),
     cut: z
       .object({

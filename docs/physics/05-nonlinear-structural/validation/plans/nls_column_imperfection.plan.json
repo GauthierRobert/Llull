@@ -26,7 +26,6 @@
   "command": "define_material_record",
   "params": {
    "id": "el_al_E70",
-   "name": "el_al_E70",
    "designation": "test material",
    "specs": [],
    "licence": "company-proprietary",
@@ -84,8 +83,7 @@
    "density": 0.0078,
    "color": "#9aa0a6",
    "metalness": 1,
-   "roughness": 0.4,
-   "recordId": "el_al_E70"
+   "roughness": 0.4
   }
  },
  {
@@ -192,7 +190,6 @@
   "command": "set_mesh_controls",
   "params": {
    "analysisId": "$bk",
-   "mesher": "gmsh",
    "elementFamily": "hex_dominant",
    "order": 2,
    "globalSize": 2.5
@@ -292,7 +289,6 @@
   "command": "set_mesh_controls",
   "params": {
    "analysisId": "$an",
-   "mesher": "gmsh",
    "elementFamily": "hex_dominant",
    "order": 2,
    "globalSize": 2.5

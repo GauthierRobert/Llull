@@ -65,6 +65,15 @@ describe('PhysicsLoadsSection', () => {
     expect(screen.getByText(/moving 179 N/)).toBeInTheDocument();
   });
 
+  it('mentions a joint spring in the joint detail', () => {
+    const mass = localDispatch('add_box', { size: [100, 100, 100] }).affected[0]!;
+    const body = localDispatch('add_rigid_body', { entityIds: [mass], name: 'mass' }).affected[0]!;
+    const slide = localDispatch('add_body_joint', { kind: 'prismatic', child: body, anchor: [0, 0, 0], axis: [0, 0, 1], stiffness: 500 })
+      .affected[0]!;
+    render(<PhysicsLoadsSection />);
+    expect(screen.getByTestId(`load-${slide}`)).toHaveTextContent('spring 500 N/m');
+  });
+
   it('shows and hides the overlay, a kind of load, and a single load', () => {
     buildPowerplant();
     render(<PhysicsLoadsSection />);

@@ -40,7 +40,7 @@ describe('shapeToolCallContent() — pure shaping', () => {
     // summary block + json block = 2
     expect(shaped.content).toHaveLength(2);
     expect(shaped.content[1]!.text).toMatch(/^```json\n/);
-    expect(shaped.content[1]!.text).toContain('"volume": 8');
+    expect(shaped.content[1]!.text).toContain('"volume":8');
   });
   it('sets structuredContent for record-type data', () => {
     const data = { volume: 8, unit: 'mm³' };

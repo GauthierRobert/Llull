@@ -259,14 +259,21 @@ const center = (shape: ManifoldShape): Vec3 => {
   return [0, 1, 2].map((k) => ((box.min[k] ?? 0) + (box.max[k] ?? 0)) / 2) as unknown as Vec3;
 };
 
-/** `minGap` for the distance, the core BVH on the tessellations for the witness points (bounds centres when out of range). */
+/**
+ * `minGap` saturates at its search length (a gap beyond it comes back as the search length itself), so a saturated result is re-measured
+ * with the core BVH on the tessellations (unbounded); the BVH also gives the witness points (bounds centres when unavailable).
+ */
 function distanceManifolds(a: ManifoldShape, b: ManifoldShape, maxDistance: number): ShapeDistance | null {
   if (a.isEmpty() || b.isEmpty() || a.status() !== 'NoError' || b.status() !== 'NoError') return null;
-  const gap = a.minGap(b, Math.max(maxDistance, 0));
+  const search = Math.max(maxDistance, 0);
+  const minGap = a.minGap(b, search);
   const inside = nested(a, b);
   const [meshA, meshB] = [manifoldToMeshData(a), manifoldToMeshData(b)];
-  const witness =
-    meshA !== null && meshB !== null ? bvhMinDistance(buildMeshBvh(meshA), buildMeshBvh(meshB), Math.max(gap, 0) + 1e-9) : null;
+  const bvhs = meshA !== null && meshB !== null ? [buildMeshBvh(meshA), buildMeshBvh(meshB)] : null;
+  const saturated = !inside && minGap >= search * (1 - 1e-9);
+  const bound = saturated ? Infinity : Math.max(minGap, 0) + 1e-9;
+  const witness = bvhs !== null && bvhs[0] !== undefined && bvhs[1] !== undefined ? bvhMinDistance(bvhs[0], bvhs[1], bound) : null;
+  const gap = saturated && witness !== null ? Math.max(witness.distance, search) : minGap;
   return { distance: inside ? 0 : gap, pointA: witness?.pointA ?? center(a), pointB: witness?.pointB ?? center(b), inside };
 }
 

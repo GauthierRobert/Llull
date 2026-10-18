@@ -1,159 +1,24 @@
 [
- {
-  "command": "set_units",
-  "params": {
-   "units": "mm"
-  }
- },
- {
-  "command": "add_box",
-  "params": {
-   "size": [
-    20,
-    20,
-    20
-   ],
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "anchor": "center"
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_box", "params": { "size": [20, 20, 20], "position": [100, 0, 0], "anchor": "center" }, "as": "mass_box" },
+  { "command": "add_rigid_body", "params": { "entityIds": ["$mass_box"], "id": "mass", "massKg": 1.0 } },
+  {
+    "command": "add_body_joint",
+    "params": {
+      "kind": "prismatic",
+      "child": "mass",
+      "parent": "ground",
+      "anchor": [100, 0, 0],
+      "axis": [1, 0, 0],
+      "stiffness": 1000.0,
+      "damping": 2.0,
+      "springReference": -0.01,
+      "id": "slide"
+    }
   },
-  "as": "ground_box"
- },
- {
-  "command": "create_component",
-  "params": {
-   "name": "ground",
-   "entityIds": [
-    "$ground_box"
-   ],
-   "componentId": "comp_ground"
-  },
-  "as": "ground"
- },
- {
-  "command": "add_box",
-  "params": {
-   "size": [
-    20,
-    20,
-    20
-   ],
-   "position": [
-    100,
-    0,
-    0
-   ],
-   "anchor": "center"
-  },
-  "as": "mass_box"
- },
- {
-  "command": "create_component",
-  "params": {
-   "name": "mass",
-   "entityIds": [
-    "$mass_box"
-   ],
-   "componentId": "comp_mass"
-  },
-  "as": "mass"
- },
- {
-  "command": "add_joint",
-  "params": {
-   "kind": "prismatic",
-   "a": {
-    "instanceId": "$ground"
-   },
-   "b": {
-    "instanceId": "$mass"
-   },
-   "axis": "x",
-   "id": "slide"
+  { "command": "set_gravity", "params": { "gravity": [0, 0, 0] } },
+  {
+    "command": "simulate_motion",
+    "params": { "duration": 1.0, "timestep": 0.0001, "sampleRate": 5000, "detail": "series", "energy": true, "reactions": "off" }
   }
- },
- {
-  "command": "set_ground",
-  "params": {
-   "instanceIds": [
-    "$ground"
-   ]
-  }
- },
- {
-  "command": "set_body_properties",
-  "params": {
-   "instanceId": "$mass",
-   "mass": {
-    "massKg": 1.0,
-    "centroidMm": [
-     100,
-     0,
-     0
-    ],
-    "inertiaKgM2": [
-     [
-      0.0001,
-      0,
-      0
-     ],
-     [
-      0,
-      0.0001,
-      0
-     ],
-     [
-      0,
-      0,
-      0.0001
-     ]
-    ]
-   },
-   "source": {
-    "citation": "VC-RBD-30 test input"
-   }
-  }
- },
- {
-  "command": "add_spring_damper",
-  "params": {
-   "kind": "joint",
-   "jointId": "slide",
-   "stiffnessNPerM": 1000.0,
-   "dampingNsPerM": 2.0,
-   "freeValueMm": 0.0
-  }
- },
- {
-  "command": "set_gravity",
-  "params": {
-   "vectorMPerS2": "none"
-  }
- },
- {
-  "command": "set_initial_conditions",
-  "params": {
-   "jointValues": {
-    "slide": 10.0
-   },
-   "jointRates": {
-    "slide": 0.0
-   }
-  }
- },
- {
-  "command": "dynamics_study",
-  "params": {
-   "durationS": 1.0,
-   "outputStepS": 0.0005,
-   "outputs": {
-    "joints": [
-     "slide"
-    ]
-   }
-  }
- }
 ]

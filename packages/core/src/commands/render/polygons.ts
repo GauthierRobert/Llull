@@ -167,7 +167,7 @@ export function tessellateEntity(e: Entity): PreDepthPolygon[] {
       return tessellate2DSpline(e);
     case 'text':
     case 'dimension':
-      return []; // the viewport renders text and dimensions; render_view SVG does not
+      return []; // drawn by renderScene (annotations.ts): dimension strokes + SVG text on top
     case 'image':
       return []; // drawn by renderScene as an <image> underlay behind every polygon
     case 'instance':

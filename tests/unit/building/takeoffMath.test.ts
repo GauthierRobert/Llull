@@ -82,7 +82,7 @@ describe('takeoff math by hand', () => {
     expect(footingRebarMass(footing(80, 1000), scale)).toBeGreaterThanOrEqual(0);
     expect(footingRebarMass(footing(80, 80), scale)).toBe(0);
   });
-  it('sums stair steps as riser x tread x width x n(n+1)/2', () => {
+  it('measures a waist-slab stair as one prism: stepped top over a sloping soffit, clipped at the base', () => {
     const volume = stairVolume({
       id: 'stair-1',
       category: 'stair',
@@ -95,8 +95,14 @@ describe('takeoff math by hand', () => {
       riserCount: 4,
       riserHeight: 150,
       treadDepth: 300,
+      waistThickness: 100,
       material: 'concrete',
     });
-    expect(volume).toBe(300 * 1000 * 150 * 10);
+    const vertical = (100 * Math.hypot(150, 300)) / 300;
+    const top = 300 * (150 + 300 + 450);
+    const clipAlong = (vertical * 300) / 150;
+    const underside = 0.5 * (900 - clipAlong) * ((900 * 150) / 300 - vertical);
+    expect(volume).toBeCloseTo((top - underside) * 1000, 3);
+    expect(volume).toBeLessThan(0.4 * 300 * 1000 * 150 * 10);
   });
 });

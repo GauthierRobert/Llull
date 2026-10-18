@@ -14,6 +14,10 @@ export interface Allowable {
   readonly basis: string;
   readonly provenance: string;
   readonly unverifiedReasons: readonly string[];
+  /** False for a constant model or an explicit value: the strength does not change with temperature. */
+  readonly temperatureDependent: boolean;
+  /** Temperature [K] the value was evaluated at (the less favourable end of the region), when evaluated. */
+  readonly temperatureK?: number;
 }
 
 export interface AllowableRefusal {
@@ -55,7 +59,26 @@ export function materialAllowable(
     basis: evaluated.basis,
     provenance: `material ${materialId} model ${evaluated.modelId}${cited === '' ? '' : `: ${cited}`}`,
     unverifiedReasons: evaluated.unverifiedReasons.map((reason) => `${property}: ${reason}`),
+    temperatureDependent: model.form.kind !== 'constant',
+    temperatureK,
   };
+}
+
+/**
+ * `property` over a temperature region: the lower of the values at its coldest and hottest temperature (conservative for strength that
+ * falls with heat and for cold-embrittled materials alike).
+ * @failure as `materialAllowable`, at either end of the region
+ */
+export function materialAllowableOver(
+  material: Material,
+  materialId: string,
+  property: AllowableProperty,
+  rangeK: readonly [number, number],
+): Allowable | AllowableRefusal {
+  const ends = [rangeK[0], rangeK[1]].map((temperatureK) => materialAllowable(material, materialId, property, temperatureK));
+  for (const end of ends) if (isAllowableRefusal(end)) return end;
+  const [cold, hot] = ends as [Allowable, Allowable];
+  return hot.valueMpa <= cold.valueMpa ? hot : cold;
 }
 
 /**
@@ -75,5 +98,6 @@ export function explicitAllowable(value: number, unit: string): Allowable | Allo
     basis: 'unspecified',
     provenance: `given by the caller: ${value} ${unit}`,
     unverifiedReasons: ['allowable given by the caller without a material record'],
+    temperatureDependent: false,
   };
 }

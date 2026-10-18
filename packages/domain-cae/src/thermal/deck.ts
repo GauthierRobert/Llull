@@ -9,6 +9,7 @@ import { analysisInputHash } from '../hash/inputHash';
 import { ALL_NODES, type DeckContext, type DeckRefusal, type DeckSections } from '../decks/context';
 import { linesText, num, row } from '../decks/format';
 import { absoluteZeroOf, inScale } from './quantities';
+import { temperatureConflictRefusal } from './bcConflicts';
 import { checkThermalItems } from './check';
 import { propertyCards } from './deckMaterial';
 import { allBcLines, cavityLines } from './deckLoads';
@@ -49,7 +50,7 @@ const BLOCKING = new Set([
 
 /**
  * Initial conditions, amplitudes, physical constants and the `*HEAT TRANSFER` step (loads, output requests) of the case.
- * @failure blocking set-up errors (see `check_thermal`) -> their THM_* code; a BC, cavity face or contact face set that
+ * @failure blocking set-up errors (see `check_thermal`) -> their THM_* code; temperature BCs with different values on shared nodes -> THM_BC_CONFLICT; a BC, cavity face or contact face set that
  *   is not in the mesh -> FEA_TARGET_UNRESOLVED
  */
 export function thermalSections(ctx: DeckContext): DeckSections {
@@ -57,6 +58,8 @@ export function thermalSections(ctx: DeckContext): DeckSections {
   if (thermal === undefined) return refusal('THM_CASE_TYPE', `analysis '${ctx.analysisId}' has no thermal set-up`, [ctx.analysisId]);
   const blocking = checkThermalItems(ctx.doc, ctx.analysisId).find((item) => item.severity === 'error' && BLOCKING.has(item.code));
   if (blocking !== undefined) return refusal(blocking.code, blocking.message, blocking.ids);
+  const conflict = temperatureConflictRefusal(thermal, ctx.mesh);
+  if (conflict !== null) return conflict;
   const steady = ctx.analysis.type === 'heat_steady';
   const scale = thermal.temperatureScale;
   const plan = planStep(thermal, steady);

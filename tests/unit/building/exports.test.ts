@@ -121,6 +121,28 @@ describe('export_dxf', () => {
     expect(data.dxf).toContain('\nLTYPE\n2\nCENTER\n');
     expect(execute(doc, 'export_dxf', { includeDrafting: false }).summary).toMatch(/nothing/);
   });
+  it('exports dimensions as lines and measured text, and says so', () => {
+    let doc = run(createEmptyDocument(), 'draw_polyline', { points: xy(0, 0, 100, 0) });
+    doc = run(doc, 'draw_polyline', { points: xy(0, 60, 100, 60) });
+    doc = run(doc, 'draw_polyline', { points: xy(0, 0, 0, 60) });
+    doc = run(doc, 'draw_arc', { center: [50, 30], radius: 12.5 });
+    doc = run(doc, 'add_dimension', { dimensionKind: 'linear', entityIds: ['line-1.1', 'line-2.1'], offset: 10 });
+    doc = run(doc, 'add_dimension', { dimensionKind: 'aligned', entityIds: ['line-1.1', 'line-3.1'], offset: 5, label: 'REF 60' });
+    doc = run(doc, 'add_dimension', { dimensionKind: 'radial', entityIds: ['circ-4.1'] });
+    doc = run(doc, 'add_dimension', { dimensionKind: 'angular', entityIds: ['line-1.1', 'line-3.1'] });
+    const bare = (execute(run(createEmptyDocument(), 'draw_polyline', { points: xy(0, 0, 100, 0) }), 'export_dxf', {}).data as DxfExport)
+      .entityCount;
+    const result = execute(doc, 'export_dxf', {});
+    const data = result.data as DxfExport;
+    expect(data.dimensions).toBe(4);
+    expect(data.entityCount).toBeGreaterThan(bare + 4 * 2);
+    expect(result.summary).toContain('4 dimension(s) written as lines + text');
+    for (const text of ['60.000', 'REF 60', '12.500']) expect(data.dxf).toContain(`\n1\n${text}\n`);
+    expect(data.dxf).toMatch(/\n1\n90\.0\\U\+00B0\n/);
+    const orphan = structuredClone(doc);
+    delete orphan.entities['line-3.1'];
+    expect((execute(orphan, 'export_dxf', {}).data as DxfExport).dimensions).toBe(2);
+  });
   it('exports drafting-only documents and fails cleanly', () => {
     const drafting = run(createEmptyDocument(), 'draw_polyline', { points: xy(0, 0, 1, 0) });
     const result = execute(drafting, 'export_dxf', {});
@@ -163,6 +185,35 @@ describe('export_plan_sheet', () => {
     expect(fitScale(1e9, 1e9, { x: 0, y: 0, width: 100, height: 100 })).toBe(20_000_000);
     expect(fitScale(1000, 1000, { x: 0, y: 0, width: 100, height: 100 })).toBe(20);
     expect(escapeXml('a&"b')).toBe('a&amp;&quot;b');
+  });
+});
+
+describe('export_plan_sheet dimension chains vs grid bubbles', () => {
+  type Box = [number, number, number, number];
+  const attr = (tag: string, name: string): number => Number(new RegExp(`${name}="(-?[\\d.]+)"`).exec(tag)?.[1]);
+  const overlaps = (a: Box, b: Box): boolean => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+
+  it('keeps every dimension line, extension line and label clear of the bubble circles', () => {
+    let doc = run(createEmptyDocument(), 'add_level', { name: 'L0' });
+    doc = run(doc, 'draw_walls', { points: xy(0, 0, 12000, 0, 12000, 10000, 0, 10000), closed: true });
+    doc = run(doc, 'add_grid_system', { xSpacings: [6000, 6000], ySpacings: [5000, 5000] });
+    const svg = (execute(doc, 'export_plan_sheet', {}).data as PlanSheet).svg;
+    const bubbles = [...svg.matchAll(/<circle [^>]*class="thin"[^>]*\/>/g)].map(([tag]): Box => {
+      const [cx, cy, r] = [attr(tag, 'cx'), attr(tag, 'cy'), attr(tag, 'r')];
+      return [cx - r, cy - r, cx + r, cy + r];
+    });
+    const dims = [...svg.matchAll(/<line [^>]*class="dim"[^>]*\/>/g)].map(([tag]): Box => {
+      const [x1, y1, x2, y2] = ['x1', 'y1', 'x2', 'y2'].map((name) => attr(tag, name)) as Box;
+      return [Math.min(x1, x2), Math.min(y1, y2), Math.max(x1, x2), Math.max(y1, y2)];
+    });
+    const labels = [...svg.matchAll(/<text x="([\d.]+)" y="([\d.]+)" font-size="2.5"[^>]*>(\d+)<\/text>/g)].map(([, x, y, text]): Box => {
+      const half = ((text ?? '').length * 2.5 * 0.6) / 2;
+      return [Number(x) - half, Number(y) - 2.5, Number(x) + half, Number(y)];
+    });
+    expect(bubbles.length).toBe(12);
+    expect(dims.length).toBeGreaterThan(10);
+    expect(labels.length).toBeGreaterThan(3);
+    for (const box of [...dims, ...labels]) for (const bubble of bubbles) expect(overlaps(box, bubble)).toBe(false);
   });
 });
 

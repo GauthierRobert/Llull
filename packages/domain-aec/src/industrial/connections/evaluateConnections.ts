@@ -111,6 +111,57 @@ type ConnectionSolidsArgs = [
   level: BuildingLevel,
 ];
 
+interface RafterDims {
+  readonly h: number;
+  readonly b: number;
+  readonly tw: number;
+  readonly tf: number;
+}
+
+const profileDims = (profile: { h: number; b: number; tw: number; tf: number }, mm: (value: number) => number): RafterDims => ({
+  h: mm(profile.h),
+  b: mm(profile.b),
+  tw: mm(profile.tw),
+  tf: mm(profile.tf),
+});
+
+interface HaunchArgs {
+  readonly frame: SweepFrame;
+  readonly plate: { readonly slope: number };
+  readonly face: Vec3;
+  readonly rafter: RafterDims;
+  readonly length: number;
+  readonly suffix: '' | '-2';
+}
+
+/**
+ * Haunch cut from the rafter section: a triangular web (thickness tw, depth h under the rafter at the end plate, tapering to 0 over
+ * `length`) and the bottom flange (b x tf) along its hypotenuse. The haunch is cut vertically where it meets the vertical end plate.
+ */
+function haunchSolids({ frame, plate, face, rafter, length, suffix }: HaunchArgs): ConnectionSolid[] {
+  const { h, b, tw, tf } = rafter;
+  const tanSlope = plate.slope < 1 ? frame.d[2] / plate.slope : 0;
+  const top: Vec2 = [(-h / 2) * tanSlope, h / 2];
+  const toe: Vec2 = [length, h / 2];
+  const heel: Vec2 = [-(h / 2 + h) * tanSlope, h / 2 + h];
+  const edge: Vec2 = [heel[0] - toe[0], heel[1] - toe[1]];
+  const edgeLength = Math.hypot(edge[0], edge[1]);
+  let normal: Vec2 = [-edge[1] / edgeLength, edge[0] / edgeLength];
+  if (normal[0] * (top[0] - toe[0]) + normal[1] * (top[1] - toe[1]) < 0) normal = [-normal[0], -normal[1]];
+  const inward = (point: Vec2): Vec2 => [point[0] + normal[0] * tf, point[1] + normal[1] * tf];
+  const axes = { x: frame.d, y: scale3(frame.v, -1), along: frame.u };
+  return [
+    { part: `haunch${suffix}`, outline: [top, toe, heel], origin: sub3(face, scale3(frame.u, tw / 2)), ...axes, depth: tw },
+    {
+      part: `haunch${suffix}-flange`,
+      outline: [toe, heel, inward(heel), inward(toe)],
+      origin: sub3(face, scale3(frame.u, b / 2)),
+      ...axes,
+      depth: b,
+    },
+  ];
+}
+
 /** World solids of a moment connection: end plate(s), haunch, bolts (null without its rafter). */
 export function connectionSolids(...args: ConnectionSolidsArgs): ConnectionSolid[] | null {
   const [doc, connection, members, level] = args;
@@ -162,6 +213,7 @@ export function connectionSolids(...args: ConnectionSolidsArgs): ConnectionSolid
     [x1, y1],
     [x0, y1],
   ];
+  let apexFar: ReturnType<typeof into> = null;
   const solids: ConnectionSolid[] = [
     {
       part: 'plate',
@@ -177,6 +229,7 @@ export function connectionSolids(...args: ConnectionSolidsArgs): ConnectionSolid
     const distanceTo = (point: Vec3): number => distance3(point, joint);
     const nearerEnd = distanceTo(atLevel(level, other.start)) <= distanceTo(atLevel(level, other.end)) ? 'start' : 'end';
     const far = into(other, nearerEnd);
+    apexFar = far;
     if (far) {
       solids.push({
         part: 'plate-2',
@@ -190,21 +243,14 @@ export function connectionSolids(...args: ConnectionSolidsArgs): ConnectionSolid
     }
   }
   if (haunchDepth > 0) {
-    // The haunch is cut vertically where it meets the (vertical) end plate.
-    const tanSlope = plate.slope < 1 ? frame.d[2] / plate.slope : 0;
-    solids.push({
-      part: 'haunch',
-      outline: [
-        [(-h / 2) * tanSlope, h / 2],
-        [connection.haunchLength, h / 2],
-        [-(h / 2 + haunchDepth) * tanSlope, h / 2 + haunchDepth],
-      ],
-      origin: sub3(face, scale3(frame.u, b / 2)),
-      x: frame.d,
-      y: scale3(frame.v, -1),
-      along: frame.u,
-      depth: b,
-    });
+    const rafter = profileDims(profile, mm);
+    solids.push(...haunchSolids({ frame, plate, face, rafter, length: connection.haunchLength, suffix: '' }));
+    if (connection.kind === 'apex' && apexFar) {
+      const { frame: farFrame, plate: farPlate, joint: farJoint } = apexFar;
+      solids.push(
+        ...haunchSolids({ frame: farFrame, plate: farPlate, face: farJoint, rafter, length: connection.haunchLength, suffix: '-2' }),
+      );
+    }
   }
   const edge = Math.max(2 * connection.boltDiameter, mm(40));
   const gauge = Math.max(width / 2 - edge, connection.boltDiameter);

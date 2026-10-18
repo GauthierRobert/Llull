@@ -91,3 +91,53 @@ export function elasticConstants(material: Material, name: string, temperatureK:
     ...evalNu.unverifiedReasons.map((reason) => `nu: ${reason}`),
   ]);
 }
+
+/** Step (K) between the temperatures of a temperature-dependent `*ELASTIC` table. */
+const ELASTIC_TABLE_STEP_KELVIN = 10;
+/** Most intervals of an `*ELASTIC` table, whatever the range (a wider range gets a coarser step). */
+const ELASTIC_TABLE_MAX_INTERVALS = 100;
+
+/** Rows of `*ELASTIC`: `[E, nu]` (constant) or `[E, nu, kelvin]` (E, nu tabulated against temperature). */
+interface ElasticTable {
+  readonly rows: readonly (readonly [number, number] | readonly [number, number, number])[];
+  readonly source: string;
+  readonly unverifiedReasons: readonly string[];
+}
+
+/**
+ * E and nu of `material` over [`lowKelvin`, `highKelvin`] (extended to contain `referenceKelvin`): one constant row when neither depends
+ * on temperature, else rows `[E, nu, kelvin]` every 10 K (at most 100 intervals), both ends evaluated first.
+ * @failure any `elasticConstants` refusal at a sampled temperature (e.g. PROP_OUT_OF_RANGE when the field leaves the model validity)
+ */
+export function elasticTable(
+  material: Material,
+  name: string,
+  referenceKelvin: number,
+  lowKelvin: number,
+  highKelvin: number,
+): ElasticTable | ElasticRefusal {
+  const low = Math.min(lowKelvin, referenceKelvin);
+  const high = Math.max(highKelvin, referenceKelvin);
+  const atReference = elasticConstants(material, name, referenceKelvin);
+  if (isElasticRefusal(atReference)) return atReference;
+  const intervals = high - low < 1e-9 ? 0 : Math.min(ELASTIC_TABLE_MAX_INTERVALS, Math.ceil((high - low) / ELASTIC_TABLE_STEP_KELVIN));
+  if (intervals === 0)
+    return { rows: [[atReference.E, atReference.nu]], source: atReference.source, unverifiedReasons: atReference.unverifiedReasons };
+  const samples = Array.from({ length: intervals + 1 }, (_, i) => low + ((high - low) * i) / intervals);
+  const values: { readonly kelvin: number; readonly constants: ElasticConstants }[] = [];
+  for (const kelvin of [low, high, ...samples.slice(1, -1)]) {
+    const constants = elasticConstants(material, name, kelvin);
+    if (isElasticRefusal(constants)) return constants;
+    values.push({ kelvin, constants });
+  }
+  values.sort((a, b) => a.kelvin - b.kelvin);
+  const first = values[0]?.constants ?? atReference;
+  const reasons = [...new Set(values.flatMap(({ constants }) => constants.unverifiedReasons))];
+  if (values.every(({ constants }) => constants.E === first.E && constants.nu === first.nu))
+    return { rows: [[first.E, first.nu]], source: first.source, unverifiedReasons: reasons };
+  return {
+    rows: values.map(({ kelvin, constants }) => [constants.E, constants.nu, kelvin] as const),
+    source: first.source,
+    unverifiedReasons: reasons,
+  };
+}

@@ -3,11 +3,18 @@
  * multibody dynamics: joints are exact (no drift between linked parts), gear couplings are equality constraints.
  */
 
-import type { PhysicsEngine, Quaternion, SimulationModel, SimulationOptions, SimulationTrace } from '@core/dynamics/physicsEngine';
+import type {
+  PhysicsEngine,
+  Quaternion,
+  SimulationModel,
+  SimulationOptions,
+  SimulationTrace,
+  StepPeak,
+} from '@core/dynamics/physicsEngine';
 import type { Vec3 } from '@core/model/vectors';
-import { OBJECT_BODY, OBJECT_JOINT, type MjData, type MjModel, type MujocoModule } from './bindings';
+import { OBJECT_BODY, OBJECT_JOINT, OBJECT_TENDON, type MjData, type MjModel, type MujocoModule } from './bindings';
 import { jointReaction, loopReader, loopSlots, type ReactionSlot } from './constraintForces';
-import { toMjcf } from './mjcf';
+import { springTendonName, toMjcf } from './mjcf';
 
 interface JointSlot {
   readonly id: string;
@@ -75,52 +82,123 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
       bodyOrientation: Object.fromEntries(bodies.map((body) => [body.id, []])),
       servoForce: Object.fromEntries(model.servos.map((servo) => [servo.id, []])),
     };
+    const energy = { kinetic: [] as number[], potential: [] as number[], appliedWork: [] as number[] };
+    const springs = (model.springs ?? []).map((spring) => ({
+      spring,
+      index: lookup(mujoco, mjModel, OBJECT_TENDON, springTendonName(spring.id)),
+    }));
+    const springTrace: Record<string, { length: number[]; velocity: number[]; force: number[] }> = Object.fromEntries(
+      springs.map(({ spring }) => [spring.id, { length: [], velocity: [], force: [] }]),
+    );
+    const servoJoints = model.servos.map((servo) => joints.find((slot) => slot.id === servo.joint));
+    let appliedWork = 0;
     const initialPosition = new Map(joints.map((joint) => [joint.id, data.qpos[joint.qpos] ?? 0]));
     model.servos.forEach((servo, i) => {
       data.ctrl[i] = servo.targetVelocity;
-      // the governor's set-point starts at the joint's start angle
+      // the set-point starts where the servo force is zero at the joint's start state: q + damping · v / stiffness
       const joint = joints.find((slot) => slot.id === servo.joint);
-      data.act[i] = joint === undefined ? 0 : (data.qpos[joint.qpos] ?? 0);
+      data.act[i] =
+        joint === undefined
+          ? 0
+          : (data.qpos[joint.qpos] ?? 0) + (servo.stiffness > 0 ? (servo.damping * (data.qvel[joint.dof] ?? 0)) / servo.stiffness : 0);
     });
-    const record = (): void => {
+    const peaks: Record<string, { force: StepPeak; moment: StepPeak | null }> = {};
+    const keepPeak = (id: string, force: Vec3, moment: Vec3 | null): void => {
+      const [f, m] = [Math.hypot(force[0], force[1], force[2]), moment === null ? 0 : Math.hypot(moment[0], moment[1], moment[2])];
+      const held = peaks[id];
+      const forceUp = held === undefined || f > held.force.value;
+      const momentUp = moment !== null && (held?.moment == null || m > held.moment.value);
+      if (!forceUp && !momentUp) return; // the common case: no allocation per step
+      peaks[id] = {
+        force: forceUp || held === undefined ? { value: f, timeS: data.time } : held.force,
+        moment: moment === null ? null : momentUp || held?.moment == null ? { value: m, timeS: data.time } : held.moment,
+      };
+    };
+    interface Reactions {
+      readonly loops: Vec3[];
+      readonly joints: { force: Vec3; moment: Vec3 }[];
+    }
+    // constraint forces of the current state: forward pass, redundant multipliers removed, then the inverse dynamics that fills cfrc_int
+    const readReactions = (): Reactions => {
+      mujoco.mj_forward(mjModel, data);
+      reader.dropRedundantForces(mjModel, data);
+      mujoco.mj_rnePostConstraint(mjModel, data);
+      const loops = reader.forces(data);
+      const joints = reactionSlots.map((slot) => jointReaction(mjModel, data, slot));
+      loops.forEach((force, i) => keepPeak(model.loops[i]?.id ?? '', force, null));
+      reactionSlots.forEach((slot, i) => keepPeak(slot.jointId, joints[i]?.force ?? [0, 0, 0], joints[i]?.moment ?? [0, 0, 0]));
+      return { loops, joints };
+    };
+    const pushReactions = (read: Reactions): void => {
+      read.loops.forEach((force, i) => loopForce[model.loops[i]?.id ?? '']?.push(force));
+      reactionSlots.forEach((slot, i) => {
+        reaction[slot.jointId]?.force.push(read.joints[i]?.force ?? [0, 0, 0]);
+        reaction[slot.jointId]?.moment.push(read.joints[i]?.moment ?? [0, 0, 0]);
+      });
+    };
+    mujoco.mj_forward(mjModel, data); // actuator forces of the start state, with the set-points above
+    const record = (read?: Reactions): void => {
       trace.times.push(data.time);
       for (const joint of joints) {
         trace.jointPosition[joint.id]?.push((data.qpos[joint.qpos] ?? 0) - (initialPosition.get(joint.id) ?? 0));
         trace.jointVelocity[joint.id]?.push(data.qvel[joint.dof] ?? 0);
       }
       model.servos.forEach((servo, i) => trace.servoForce[servo.id]?.push(data.actuator_force[i] ?? 0));
+      if (options.energy === true) {
+        mujoco.mj_forward(mjModel, data); // energy of the sampled state (mj_step leaves the value of its last stage)
+        energy.potential.push(data.energy[0] ?? 0);
+        energy.kinetic.push(data.energy[1] ?? 0);
+        energy.appliedWork.push(appliedWork);
+        for (const { spring, index } of springs) {
+          const [length, velocity] = [data.ten_length[index] ?? 0, data.ten_velocity[index] ?? 0];
+          const entry = springTrace[spring.id];
+          entry?.length.push(length);
+          entry?.velocity.push(velocity);
+          entry?.force.push(spring.stiffness * (length - spring.freeLength) + spring.damping * velocity);
+        }
+      }
       for (const { id, index } of bodies) {
         const xpos = data.xpos;
         trace.bodyPosition[id]?.push([xpos[3 * index] ?? 0, xpos[3 * index + 1] ?? 0, xpos[3 * index + 2] ?? 0]);
         const start = initialOrientation.get(id) ?? [1, 0, 0, 0];
         trace.bodyOrientation[id]?.push(relativeQuaternion(readQuaternion(data, index), start));
       }
-      if (wantReactions) {
-        // constraint forces of the current state: forward pass, then the inverse dynamics that fills cfrc_int
-        mujoco.mj_forward(mjModel, data);
-        mujoco.mj_rnePostConstraint(mjModel, data);
-        reader.forces(data).forEach((force, i) => loopForce[model.loops[i]?.id ?? '']?.push(force));
-        for (const slot of reactionSlots) {
-          const { force, moment } = jointReaction(mjModel, data, slot);
-          reaction[slot.jointId]?.force.push(force);
-          reaction[slot.jointId]?.moment.push(moment);
-        }
-      }
+      if (wantReactions) pushReactions(read ?? readReactions());
     };
     const steps = Math.round(options.duration / options.timestep);
     const stride = Math.max(1, Math.round(options.sampleInterval / options.timestep));
+    // Reaction peaks are tracked between samples at up to PEAK_RESOLUTION × the sample rate (every step when samples are that close):
+    // a reaction read is a full forward pass, so reading every step would double the cost of the run.
+    const peakStride = Math.max(1, Math.ceil(stride / PEAK_RESOLUTION));
     record();
     let previousVelocity = joints.map((joint) => data.qvel[joint.dof] ?? 0);
     for (let step = 1; step <= steps; step++) {
       previousVelocity = applyLoads(model, data, { joints, bodies, initialPosition, previousVelocity, timestep: options.timestep });
+      const before = options.energy === true ? stepWorkBasis(data, joints, servoJoints) : null;
       mujoco.mj_step(mjModel, data);
+      if (before !== null) appliedWork += stepWork(data, joints, servoJoints, before);
       if (!data.qvel.every(Number.isFinite)) throw new Error(`simulation diverged at t = ${data.time.toFixed(4)} s.`);
       if (slots.length > 0) residual = Math.max(residual, reader.residual(data));
-      if (step % stride === 0 || step === steps) record();
+      const sampled = step % stride === 0 || step === steps;
+      if (wantReactions && (sampled || step % peakStride === 0)) {
+        const read = readReactions();
+        if (sampled) record(read);
+      } else if (sampled) record();
     }
+    const potentialStart = energy.potential[0] ?? 0;
     return {
       ...trace,
-      ...(wantReactions ? { jointReaction: reaction, ...(slots.length > 0 ? { loopForce } : {}) } : {}),
+      ...(options.energy === true
+        ? {
+            energy: {
+              kinetic: energy.kinetic,
+              potential: energy.potential.map((p) => p - potentialStart),
+              appliedWork: energy.appliedWork,
+            },
+            ...(springs.length > 0 ? { springs: springTrace } : {}),
+          }
+        : {}),
+      ...(wantReactions ? { jointReaction: reaction, reactionPeaks: peaks, ...(slots.length > 0 ? { loopForce } : {}) } : {}),
       ...(slots.length > 0 ? { loopResidual: residual } : {}),
     };
   } finally {
@@ -128,6 +206,48 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     mjModel.delete();
   }
 }
+
+interface StepWorkBasis {
+  readonly position: number[];
+  readonly appliedForce: number[];
+  readonly servoForce: number[];
+  readonly servoPosition: number[];
+}
+
+/** State before a step that the work of the applied loads and servos is measured against. */
+function stepWorkBasis(data: MjData, joints: readonly JointSlot[], servoJoints: readonly (JointSlot | undefined)[]): StepWorkBasis {
+  return {
+    position: joints.map((joint) => data.qpos[joint.qpos] ?? 0),
+    appliedForce: joints.map((joint) => data.qfrc_applied[joint.dof] ?? 0),
+    servoForce: servoJoints.map((_, i) => data.actuator_force[i] ?? 0),
+    servoPosition: servoJoints.map((joint) => (joint === undefined ? 0 : (data.qpos[joint.qpos] ?? 0))),
+  };
+}
+
+/**
+ * Work (J) of the step just taken: applied generalised forces are constant over a step, so W = F · dq; a servo's force varies, so the
+ * mean of its value before and after the step times the joint displacement.
+ */
+function stepWork(
+  data: MjData,
+  joints: readonly JointSlot[],
+  servoJoints: readonly (JointSlot | undefined)[],
+  before: StepWorkBasis,
+): number {
+  let work = 0;
+  joints.forEach((joint, i) => {
+    work += (before.appliedForce[i] ?? 0) * ((data.qpos[joint.qpos] ?? 0) - (before.position[i] ?? 0));
+  });
+  servoJoints.forEach((joint, i) => {
+    if (joint === undefined) return;
+    const mean = 0.5 * ((before.servoForce[i] ?? 0) + (data.actuator_force[i] ?? 0));
+    work += mean * ((data.qpos[joint.qpos] ?? 0) - (before.servoPosition[i] ?? 0));
+  });
+  return work;
+}
+
+/** Reaction reads per sample interval when tracking peaks between samples. */
+const PEAK_RESOLUTION = 50;
 
 function jointDof(joints: readonly JointSlot[], id: string): number {
   return joints.find((joint) => joint.id === id)?.dof ?? 0;

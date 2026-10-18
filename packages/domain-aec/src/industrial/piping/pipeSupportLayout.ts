@@ -135,6 +135,6 @@ export function endCarriers(units: ModelUnits, run: PipeRun, runs: ReadonlyArray
  */
 export function carriedByEnds(units: ModelUnits, run: PipeRun): boolean {
   const [start, end] = endCarriers(units, run, pipeRunsOf(units));
-  const limit = pipeSpanLimit(run.element.dn, run.diameterMm);
+  const limit = pipeSpanLimit(run.element.dn, run.diameterMm, run.element.service);
   return start !== null && end !== null && spanCoordinate(run.points, run.lengthMm) / 1000 <= limit.spanM + 1e-9;
 }

@@ -120,7 +120,7 @@ function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
         (element.category === 'room' ? spaces : contained).push(exported.ref);
         productCount += 1;
         if (exported.material === null) continue;
-        byMaterial.set(exported.material, [...(byMaterial.get(exported.material) ?? []), exported.ref]);
+        byMaterial.set(exported.material, [...(byMaterial.get(exported.material) ?? []), exported.ref, ...(exported.parts ?? [])]);
       }
     }
     if (contained.length > 0) {

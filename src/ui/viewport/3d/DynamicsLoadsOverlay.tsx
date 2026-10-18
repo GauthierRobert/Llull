@@ -4,7 +4,7 @@
 
 import React, { useEffect, useMemo } from 'react';
 import { useThree } from '@react-three/fiber';
-import { Html, Line } from '@react-three/drei';
+import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { SimulationData } from '@core/dynamics/simulationReport';
@@ -15,6 +15,7 @@ import { isLoadDrawn, useLoadOverlayStore } from '@ui/store/loadOverlayStore';
 import { LOAD_COLORS, type LoadItem } from '@ui/dynamicsLoads';
 import { useDynamicsLoads } from '@ui/hooks/useDynamicsLoads';
 import { useDisposable } from '../useDisposable';
+import { ProjectedLabel } from './ProjectedLabel';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const RENDER_ORDER = 999;
@@ -61,11 +62,14 @@ function orientation(direction: Vec3): THREE.Quaternion {
 /** Screen-space value pill (DOM): always legible, never hidden by the model, coloured like its glyph. */
 function ValueLabel({ item, position, opacity }: { item: LoadItem; position: Vec3; opacity: number }): React.ReactElement {
   return (
-    <Html position={position} zIndexRange={[18, 8]} style={{ pointerEvents: 'none', opacity }}>
-      <span className="load-label" style={{ borderColor: LOAD_COLORS[item.layer] }} data-testid={`load-label-${item.id}`}>
-        {item.value}
-      </span>
-    </Html>
+    <ProjectedLabel
+      position={position}
+      text={item.value}
+      className="load-label"
+      borderColor={LOAD_COLORS[item.layer]}
+      opacity={opacity}
+      testId={`load-label-${item.id}`}
+    />
   );
 }
 

@@ -90,9 +90,7 @@ describe('create_analysis', () => {
     });
   });
 
-  it('refuses unsupported types, mismatched units, missing reference temperature, bad units and factors', () => {
-    expectRefused(run(empty, 'create_analysis', { name: 'a', analysisType: 'modal' }), empty, 'FEA_ANALYSIS_TYPE_UNSUPPORTED');
-    expectRefused(run(empty, 'create_analysis', { name: 'a', analysisType: 'buckling' }), empty, 'FEA_ANALYSIS_TYPE_UNSUPPORTED');
+  it('refuses mismatched units, missing reference temperature, bad units and factors', () => {
     expectRefused(
       run(empty, 'create_analysis', { name: 'a', analysisType: 'static', unitSystem: 'N-m-kg-s' }),
       empty,

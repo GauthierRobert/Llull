@@ -5,6 +5,7 @@ import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { significantNumber } from '@lib/compactNumber';
 import { buildDeckContext } from '../decks/context';
+import { eigenSummaryText } from '../results/summary';
 import { evaluateProbes } from '../results/probes';
 import { caseOf } from '../shared/access';
 import { refuseFe } from '../shared/feCodes';
@@ -58,7 +59,7 @@ export const feaReport = defineCommand({
       meshRecord === null ? 'no verified mesh' : `${meshRecord.nodes} nodes, ${meshRecord.quality.inverted} inverted`,
       resultsRecord === null
         ? 'no verified results'
-        : `${resultsRecord.loadCases.length} load case(s)${resultsRecord.loadCases.map((lc) => ` ${lc.name} vm ${significantNumber(lc.maxVonMises.value, 6)}`).join(',')}`,
+        : `${resultsRecord.loadCases.length} load case(s)${resultsRecord.loadCases.map((lc) => ` ${lc.name} vm ${significantNumber(lc.maxVonMises.value, 6)}`).join(',')}${eigenSummaryText(resultsRecord)}`,
       `${probes.length} probe(s) evaluated`,
     ];
     return report(doc, `${parts.join('; ')}.`, data);

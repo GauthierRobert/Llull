@@ -10,6 +10,7 @@ import { midpoint } from '../../shared/vec3';
 import { findProfile } from '../../steel/profiles';
 import { atLevel } from '../evaluate';
 import { arcPoints, curvedWallArc, curvedWallBand } from '../../building/geometry/curvedWallGeometry';
+import { stairBlocks, stairPoint } from '../../building/geometry/stairGeometry';
 import { supportShape } from '../piping/supportParts';
 
 /** Oriented box: centre, orthonormal axes and half sizes along them. */
@@ -112,6 +113,17 @@ export function elementBoxes(doc: CadDocument, building: BuildingModel, element:
         };
       });
     }
+    case 'stair': {
+      if (!level) return [];
+      return stairBlocks(element).map((block): OrientedBox => {
+        const [x, y] = stairPoint(element, block.centre[0], block.centre[1]);
+        return {
+          center: [x, y, level.elevation + (block.zBottom + block.zTop) / 2],
+          axes: zRotated(element.angle + block.heading),
+          half: [block.length / 2, block.breadth / 2, (block.zTop - block.zBottom) / 2],
+        };
+      });
+    }
     case 'equipment': {
       if (!level) return [];
       const [length, width, height] = element.size;
@@ -126,7 +138,6 @@ export function elementBoxes(doc: CadDocument, building: BuildingModel, element:
     case 'wall':
     case 'column':
     case 'beam':
-    case 'stair':
       return element.entityIds.flatMap((id) => {
         const entity = doc.entities[id];
         if (entity?.kind === 'box') {

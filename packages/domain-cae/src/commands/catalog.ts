@@ -8,8 +8,10 @@ import { addFeaLoad, deleteFeaLoad, updateFeaLoad } from './loads';
 import { setMeshControls } from './mesh';
 import { setPartIdealization } from './parts';
 import { addResultProbe, deleteResultProbe } from './probes';
+import { probeHistory } from './probeHistory';
 import { recordFeMesh, recordFeaResults } from './record';
 import { feaReport } from './report';
+import { renderFeaResults } from './renderResults';
 
 export const feaCommands = commandCatalog(
   createAnalysis,
@@ -25,8 +27,10 @@ export const feaCommands = commandCatalog(
   setMeshControls,
   addResultProbe,
   deleteResultProbe,
+  probeHistory,
   recordFeMesh,
   recordFeaResults,
   feaReport,
+  renderFeaResults,
   checkAnalysis,
 );

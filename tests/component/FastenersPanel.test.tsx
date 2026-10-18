@@ -94,6 +94,7 @@ describe('FastenersPanel', () => {
     fireEvent.click(screen.getByTestId('bom-run'));
     expect(screen.getByTestId('bom-standard')).toHaveTextContent('NAS6203');
     expect(screen.getByTestId('bom-no-materials')).toBeInTheDocument();
+    expect(screen.getByTestId('bom-total-mass')).toHaveTextContent(/^Total mass [\d.]+ kg/);
     fireEvent.click(screen.getByLabelText(`Delete stack ${stackId}`));
     expect(dispatch).toHaveBeenCalledWith('delete_fastener_stack', { stackIds: [stackId] });
     fireEvent.click(screen.getByTestId('layout-run'));

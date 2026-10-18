@@ -5,8 +5,7 @@
 
 import { type CadDocument, type Component, type Entity, type InstanceEntity, type Vec3, is3D } from '../model/types';
 import { solidTriangles } from './solidTriangles';
-import { isZeroRotation } from '../lib/eulerRotation';
-import { add3 } from '../lib/vec3';
+import { composeEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { instanceToWorld } from './instanceTransform';
 import { scaleGeometry } from './scaleGeometry';
 import { soupIndices } from './meshVolume';
@@ -73,12 +72,8 @@ function expandedId(instanceId: string, sourceEntityId: string): string {
 
 /**
  * Bake an instance into world-space copies of the component's entities (ids `expanded::<instance>::<source>`).
- * Child rotations add the instance's Euler angles (additive, as elsewhere in the command layer).
+ * Child rotations compose with the instance's (`R_world = R_instance · R_child`, intrinsic XYZ Euler), identically to the baked-mesh path.
  * A 3D child the scale cannot resize exactly (`needsMeshBake`) becomes a world-space `mesh`.
- * @invariant rotation semantics differ by path (N-F, tracked): the parametric path ADDS the
- *   instance's Euler angles to the child's (`child.rotation + instance.rotation`), while the
- *   baked-mesh path COMPOSES them (child rotation applied by `solidTriangles`, then the instance
- *   rotation). They agree only when one of the two rotations is zero or both share one axis.
  */
 export function expandInstance(instance: InstanceEntity, component: Component): Entity[] {
   const [sx, sy, sz] = instance.scale ?? UNIT_SCALE;
@@ -95,7 +90,7 @@ export function expandInstance(instance: InstanceEntity, component: Component): 
         ...scaledChild(childEntity, [sx, sy, sz]),
         id: expandedId(instance.id, childEntity.id),
         position: toWorld(childEntity.position),
-        rotation: add3(childEntity.rotation, rot),
+        rotation: composeEulerXYZ(rot, childEntity.rotation),
       } as Entity;
     });
 }

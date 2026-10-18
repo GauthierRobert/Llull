@@ -4,6 +4,7 @@ import type { CadDocument } from '@core/model/types';
 import type { SteelMemberElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
 import { crossGridLines, crossingsOnLine, parseCrossingName } from '@aec/industrial/framing/gridFraming';
+import { findProfile } from '@aec/steel/profiles';
 import { step, twoLevels } from './steelFixtures';
 
 /** Lines A, B along X (y = 0, 6000); 1, 2, 3 along Y (x = 0, 5000, 10000). 6 intersections ... 2 x 3. */
@@ -275,5 +276,69 @@ describe('grid framing geometry', () => {
     expect(parseCrossingName(' A / 1 ')).toEqual(['A', '1']);
     expect(parseCrossingName('A/')).toBeNull();
     expect(parseCrossingName('A/1/2')).toBeNull();
+  });
+});
+
+describe('beam elevation reference (add_beam vs add_grid_beams)', () => {
+  const absoluteTops = (doc: CadDocument): number[] =>
+    Object.values(doc.building?.elements ?? {}).flatMap((element) => {
+      if (element.category === 'beam') {
+        const level = doc.building?.levels[element.levelId];
+        return level ? [level.elevation + level.height + element.topOffset] : [];
+      }
+      if (element.category === 'member' && element.role === 'beam') {
+        const level = doc.building?.levels[element.levelId];
+        return level ? [level.elevation + element.start[2] + (findProfile('IPE400')?.h ?? 0) / 2] : [];
+      }
+      return [];
+    });
+
+  it('both commands put the top at the same elevation for reference ffl and for reference levelTop', () => {
+    for (const reference of ['ffl', 'levelTop'] as const) {
+      let doc = gridded();
+      doc = step(doc, 'add_beam', { start: [0, 0], end: [5000, 0], levelId: 'level-1', topOffset: -100, reference });
+      doc = step(doc, 'add_grid_beams', { profile: 'IPE400', levelId: 'level-1', axes: ['A'], topOffset: -100, reference });
+      const [concrete, steel] = absoluteTops(doc);
+      expect(concrete).toBe(steel);
+      expect(concrete).toBe(reference === 'ffl' ? -100 : 2900);
+    }
+  });
+  it('keeps the legacy defaults: add_beam from level top, add_grid_beams from FFL', () => {
+    let doc = gridded();
+    doc = step(doc, 'add_beam', { start: [0, 0], end: [5000, 0], levelId: 'level-1' });
+    doc = step(doc, 'add_grid_beams', { profile: 'IPE400', levelId: 'level-1', axes: ['A'] });
+    expect(absoluteTops(doc)).toEqual(expect.arrayContaining([3000, 0]));
+  });
+  it('states the resolved top elevation and the reference (marking defaults) in both summaries', () => {
+    const doc = gridded();
+    const beam = execute(doc, 'add_beam', { start: [0, 0], end: [5000, 0], levelId: 'level-1', topOffset: -100 });
+    expect(beam.summary).toContain('top at elevation 2900.000');
+    expect(beam.summary).toContain('reference levelTop (default)');
+    const grid = execute(doc, 'add_grid_beams', {
+      profile: 'IPE400',
+      levelId: 'level-1',
+      axes: ['A'],
+      topOffset: -100,
+      reference: 'levelTop',
+    });
+    expect(grid.summary).toContain('elevation 2900');
+    expect(grid.summary).toContain('reference levelTop + topOffset');
+    expect(grid.summary).not.toContain('(default)');
+    const byDefault = execute(doc, 'add_grid_beams', { profile: 'IPE400', levelId: 'level-1', axes: ['A'] });
+    expect(byDefault.summary).toContain('reference ffl (default)');
+  });
+  it('add_grid_beams duplicate detection honours the reference', () => {
+    let doc = gridded();
+    doc = step(doc, 'add_grid_beams', { profile: 'IPE400', levelId: 'level-1', axes: ['A'], topOffset: -100, reference: 'levelTop' });
+    const again = execute(doc, 'add_grid_beams', {
+      profile: 'IPE400',
+      levelId: 'level-1',
+      axes: ['A'],
+      topOffset: -100,
+      reference: 'levelTop',
+    });
+    expect(again.affected).toEqual([]);
+    const other = execute(doc, 'add_grid_beams', { profile: 'IPE400', levelId: 'level-1', axes: ['A'], topOffset: -100 });
+    expect(other.affected.length).toBeGreaterThan(0);
   });
 });

@@ -4,7 +4,7 @@ import type { CadDocument, Vec2 } from '../../model/types';
 import { MM_PER_UNIT } from '../../model/units';
 import type { DrawingSheet, DrawingView } from '../../model/sheet';
 import { type Bounds, type DerivedView, cuttingLine, deriveView } from './viewDrawing';
-import { type PlacedView, layoutViews } from './layout';
+import { type Area, type PlacedView, layoutViews } from './layout';
 import { composeSheet, sheetArea } from './sheetFrame';
 import { DrawingPainter, n, paperDimension, svgLine, svgText } from '../../geometry/drawingSvg';
 import { escapeXml } from '../../lib/escapeXml';
@@ -42,6 +42,22 @@ interface Drawn {
 const round2 = (value: number): number => Number(value.toFixed(2));
 
 const center = (bounds: Bounds): Vec2 => [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2];
+
+/** Names every view crossing the drawing area, by how far, and the largest standard scale that fits. */
+function overflowWarning(views: ReadonlyArray<SheetViewInfo>, area: Area, scale: number, fittingScale: number): string {
+  const sides = ({ bounds }: SheetViewInfo): string[] =>
+    [
+      [area.x - bounds[0], 'left'],
+      [area.y - bounds[1], 'top'],
+      [bounds[2] - (area.x + area.width), 'right'],
+      [bounds[3] - (area.y + area.height), 'bottom'],
+    ].flatMap(([amount, side]) => ((amount as number) > 0.01 ? [`${round2(amount as number)} mm past the ${side as string} edge`] : []));
+  const over = views.flatMap((view) => (sides(view).length > 0 ? [`${view.label} (${view.id}): ${sides(view).join(', ')}`] : []));
+  return (
+    `views overflow the drawing area at ${scaleText(scale)} — ${over.join('; ')}. ` +
+    (fittingScale === scale ? 'use a larger paper' : `use scale ${scaleText(fittingScale)} (auto-fit) or a larger paper`)
+  );
+}
 
 /** Cutting-plane line (with sight arrows and letters) of every section drawn from `parent`. */
 function cuttingMarks(
@@ -128,10 +144,12 @@ export function renderSheet(doc: CadDocument, sheet: DrawingSheet, options: { re
     }
   }
   const area = sheetArea(sheet.paper);
-  const layout = layoutViews(
-    drawn.map(({ view, derived }) => ({ view, size: [derived.bounds[2] - derived.bounds[0], derived.bounds[3] - derived.bounds[1]] })),
-    { angle: sheet.projectionAngle, area, mmPerUnit: MM_PER_UNIT[doc.units], scale: sheet.scale, margin: options.showDimensions ? 18 : 4 },
-  );
+  const items = drawn.map(({ view, derived }) => ({
+    view,
+    size: [derived.bounds[2] - derived.bounds[0], derived.bounds[3] - derived.bounds[1]] as Vec2,
+  }));
+  const layoutOptions = { angle: sheet.projectionAngle, area, mmPerUnit: MM_PER_UNIT[doc.units], margin: options.showDimensions ? 18 : 4 };
+  const layout = layoutViews(items, { ...layoutOptions, scale: sheet.scale });
   const defs: string[] = [];
   const groups: string[] = [];
   const views: SheetViewInfo[] = [];
@@ -188,5 +206,6 @@ export function renderSheet(doc: CadDocument, sheet: DrawingSheet, options: { re
       bounds[2] <= area.x + area.width + 0.01 &&
       bounds[3] <= area.y + area.height + 0.01,
   );
+  if (!fits) warnings.push(overflowWarning(views, area, layout.scale, layoutViews(items, { ...layoutOptions, scale: undefined }).scale));
   return { svg: composeSheet(sheet, layout.scale, groups.join('\n'), defs.join('')), scale: layout.scale, views, skipped, warnings, fits };
 }

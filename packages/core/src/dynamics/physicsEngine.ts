@@ -18,6 +18,10 @@ export interface SimulationJoint {
   readonly axis: Vec3;
   readonly damping: number;
   readonly friction: number;
+  /** N·m/rad or N/m; 0 / absent = no spring. */
+  readonly stiffness?: number;
+  /** Joint coordinate (rad or m, from the start pose) where the spring is relaxed. */
+  readonly springReference?: number;
   readonly initialVelocity: number;
 }
 
@@ -95,6 +99,25 @@ export interface SimulationLoop {
   readonly halfSpan: number;
 }
 
+/**
+ * Linear spring-damper between two points, each fixed on a body (`'world'` allowed). Force along the line of the points,
+ * F = stiffness · (length - freeLength) + damping · d(length)/dt, positive = pulling together.
+ */
+export interface SimulationSpring {
+  readonly id: string;
+  readonly bodyA: string;
+  readonly bodyB: string;
+  /** World points at t = 0, m. */
+  readonly pointA: Vec3;
+  readonly pointB: Vec3;
+  /** N/m. */
+  readonly stiffness: number;
+  /** N·s/m. */
+  readonly damping: number;
+  /** m. */
+  readonly freeLength: number;
+}
+
 /** Engine-neutral solver settings. */
 interface SimulationSolver {
   readonly integrator: 'rk4' | 'implicitfast';
@@ -111,6 +134,8 @@ export interface SimulationModel {
   readonly loops: readonly SimulationLoop[];
   readonly solver: SimulationSolver;
   readonly servos: readonly SimulationServo[];
+  /** Point springs; absent = none. */
+  readonly springs?: readonly SimulationSpring[];
   /** Force laws, evaluated by the engine at every step (at the step midpoint) from the state. Must be pure. */
   readonly loads: (state: SimulationState) => AppliedLoads;
 }
@@ -124,10 +149,18 @@ export interface SimulationOptions {
   readonly sampleInterval: number;
   /** Record joint reactions and loop forces at every sample (costs one extra pass per sample). Default false. */
   readonly reactions?: boolean;
+  /** Record kinetic and potential energy at every sample. Default false. */
+  readonly energy?: boolean;
 }
 
 /** Unit quaternion [w, x, y, z]. */
 export type Quaternion = readonly [number, number, number, number];
+
+/** Largest magnitude seen, and when. */
+export interface StepPeak {
+  readonly value: number;
+  readonly timeS: number;
+}
 
 /** Sampled motion; every series has one value per entry of `times`. */
 export interface SimulationTrace {
@@ -147,6 +180,20 @@ export interface SimulationTrace {
    * world axes, N and N·m, per sample (needs `options.reactions`). Omitted by engines that cannot report reactions.
    */
   readonly jointReaction?: Record<string, { force: Vec3[]; moment: Vec3[] }>;
+  /**
+   * Largest |force| (N) and |moment| (N·m, tree joints only) of every loop / tree joint, read between the recorded samples too (every
+   * integration step, or at least 50 times per sample interval when samples are further apart; needs `options.reactions`; omitted by
+   * engines that cannot). Sampling can miss a sharp peak; this resolves it.
+   */
+  readonly reactionPeaks?: Record<string, { force: StepPeak; moment: StepPeak | null }>;
+  /**
+   * Per sample, J (needs `options.energy`; omitted by engines that cannot): kinetic energy and potential energy (gravity + joint springs),
+   * the potential referenced to the start pose (zero at the first sample); `appliedWork`: cumulative work J of the applied loads and
+   * servos on the joints (motors, gas pressure, propeller drag, speed governors; zero at the first sample), when the engine reports it.
+   */
+  readonly energy?: { readonly kinetic: number[]; readonly potential: number[]; readonly appliedWork?: number[] };
+  /** Per point spring (needs `options.energy`): length m, rate of change m/s and force N (positive = pulling together), per sample. */
+  readonly springs?: Record<string, { length: number[]; velocity: number[]; force: number[] }>;
   /** m: largest loop-constraint violation over every integration step (present when the model has loops). */
   readonly loopResidual?: number;
 }

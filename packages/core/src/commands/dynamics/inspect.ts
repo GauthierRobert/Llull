@@ -30,7 +30,7 @@ export const inspectDynamics = defineCommand({
   annotations: { readOnly: true },
   description:
     'List the physics model: every rigid body with its computed mass (kg), centre of mass (document units) and moment of inertia about ' +
-    'its joint axis (kg·m²) and the densities used (densitySources, densityDefaulted: true when the steel default filled in, with a DYN_DENSITY_DEFAULTED warning; unverified), plus joints, gear couplings, motors, propellers and cylinder pressures, and any problem that would stop ' +
+    'its joint axis (kg·m², revolute joints; a prismatic joint reports translatingMassKg instead: the body plus the bodies it carries) and the densities used (densitySources, densityDefaulted: true when the steel default filled in, with a DYN_DENSITY_DEFAULTED warning; unverified), plus joints, gear couplings, motors, propellers and cylinder pressures, and any problem that would stop ' +
     'simulate_motion. With mobility true (default) it also reports the closed-loop structure: data.topology { tree: spanning-tree ' +
     'joints rooted at the ground, loops: joints that close loops, flipped: tree joints whose declared parent/child sense is reversed }, ' +
     'data.mobility { gruebler: 6·bodies − joint constraints; rank: numerical rank of the loop-constraint Jacobian at the start pose; ' +
@@ -60,6 +60,10 @@ export const inspectDynamics = defineCommand({
                     iyy * axis[1] ** 2 +
                     izz * axis[2] ** 2 +
                     2 * (ixy * axis[0] * axis[1] + ixz * axis[0] * axis[2] + iyz * axis[1] * axis[2]);
+              const prismatic = body.joint?.kind === 'prismatic';
+              const carried = (id: string): number =>
+                (built.model.bodies.find((candidate) => candidate.id === id)?.mass ?? 0) +
+                built.model.bodies.filter((child) => child.parentId === id).reduce((sum, child) => sum + carried(child.id), 0);
               const offset = body.joint === null ? 0 : distanceToAxis(body.centerOfMass, body.joint.anchor, body.joint.axis);
               const density = built.mass[body.id];
               if (density?.densityDefaulted === true)
@@ -73,7 +77,9 @@ export const inspectDynamics = defineCommand({
                   fixed: body.fixed,
                   joint: body.joint?.id ?? null,
                   // parallel axis: about the joint axis, not the centre of mass
-                  inertiaAboutJointAxis: aboutAxis === null ? null : aboutAxis + body.mass * offset * offset,
+                  inertiaAboutJointAxis: aboutAxis === null || prismatic ? null : aboutAxis + body.mass * offset * offset,
+                  // a prismatic joint moves mass, not inertia: the body plus everything it carries
+                  translatingMassKg: prismatic ? carried(body.id) : null,
                   densitySources: density?.densitySources ?? [],
                   densityDefaulted: density?.densityDefaulted ?? false,
                   unverified: (density?.unverifiedReasons.length ?? 0) > 0,
@@ -124,7 +130,9 @@ export const inspectDynamics = defineCommand({
         `${id}${body.name !== null ? ` (${body.name})` : ''}: ${body.massKg.toPrecision(4)} kg` +
         (body.inertiaAboutJointAxis !== null
           ? `, I = ${body.inertiaAboutJointAxis.toPrecision(4)} kg·m² about joint ${body.joint ?? ''}`
-          : '') +
+          : body.translatingMassKg !== null
+            ? `, translating mass ${body.translatingMassKg.toPrecision(4)} kg along joint ${body.joint ?? ''}`
+            : '') +
         (body.fixed ? ', fixed' : ''),
     );
     const counts =

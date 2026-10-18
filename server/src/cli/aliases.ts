@@ -24,7 +24,14 @@ export function planAliases(data: unknown): PlanAliases | null {
   if (!isRecord(data) || data['failedAt'] != null || !isRecord(data['aliases'])) return null;
   const scene = data['scene'];
   if (!isRecord(scene) || !Array.isArray(scene['entities'])) return null;
-  const present = new Set(scene['entities'].map((entity) => (isRecord(entity) ? String(entity['id']) : '')));
+  const present = new Set(
+    ['entities', 'groups', 'layers'].flatMap((key) => {
+      const rows = scene[key];
+      return Array.isArray(rows) ? rows.map((row) => (isRecord(row) ? String(row['id']) : '')) : [];
+    }),
+  );
+  // A plugin element ("slab-1", "stair-1") owns scene entities "<id>:<part>" but is not one itself: still alive while a part is.
+  for (const id of [...present]) if (id.includes(':')) present.add(id.slice(0, id.indexOf(':')));
   const aliases: Record<string, string[]> = {};
   const consumed: string[] = [];
   for (const [alias, ids] of Object.entries(data['aliases'])) {
@@ -39,7 +46,10 @@ export function aliasLine(found: PlanAliases): string | null {
   const bound = Object.entries(found.aliases).map(([alias, ids]) => `${alias}=${ids.join('+')}`);
   const parts = [
     ...(bound.length > 0 ? [`Aliases: ${bound.join(', ')}`] : []),
-    ...(found.consumed.length > 0 ? [`Consumed: ${found.consumed.join(', ')}`] : []),
+    // The scene lists entities/groups/layers only: a sheet, load or analysis id is absent without being consumed.
+    ...(found.consumed.length > 0
+      ? [`Not in the final scene: ${found.consumed.join(', ')} (consumed by a later step, or not a scene entity such as a sheet)`]
+      : []),
   ];
   return parts.length > 0 ? parts.join('\n') : null;
 }

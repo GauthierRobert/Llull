@@ -43,7 +43,6 @@
   "command": "define_material_record",
   "params": {
    "id": "am_test_E200_nu0",
-   "name": "am_test_E200_nu0",
    "designation": "test material",
    "specs": [],
    "licence": "company-proprietary",
@@ -120,8 +119,7 @@
    "density": 0.0078,
    "color": "#9aa0a6",
    "metalness": 1,
-   "roughness": 0.4,
-   "recordId": "am_test_E200_nu0"
+   "roughness": 0.4
   }
  },
  {
@@ -262,7 +260,6 @@
   "command": "set_mesh_controls",
   "params": {
    "analysisId": "$an",
-   "mesher": "gmsh",
    "elementFamily": "hex_dominant",
    "order": 2,
    "globalSize": 0.2

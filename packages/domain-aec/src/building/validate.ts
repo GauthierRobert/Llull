@@ -10,6 +10,30 @@ import { parseWallLayers } from './elements/wallLayers';
 import { isVec2 } from './model';
 import { EQUIPMENT_SHAPES } from '../industrial/equipment/equipmentShape';
 
+/** Problems with the optional landing fields of a stair (landingAt, landingLength, shape, turn, flightGap). */
+function stairLandingErrors(key: string, stair: Record<string, unknown>): string[] {
+  const errors: string[] = [];
+  const { landingAt, landingLength, shape, turn, flightGap } = stair;
+  const risers = typeof stair['riserCount'] === 'number' ? stair['riserCount'] : 0;
+  if (
+    landingAt !== undefined &&
+    !(typeof landingAt === 'number' && Number.isInteger(landingAt) && landingAt >= 2 && landingAt <= risers - 2)
+  ) {
+    errors.push(`building element ${key}: landingAt must be an integer from 2 to riserCount - 2`);
+  }
+  if (landingLength !== undefined && !isPositiveNumber(landingLength))
+    errors.push(`building element ${key}: landingLength must be a number > 0`);
+  if (shape !== undefined && shape !== 'straight' && shape !== 'quarter_turn' && shape !== 'half_turn') {
+    errors.push(`building element ${key}: shape must be straight, quarter_turn or half_turn`);
+  }
+  if (turn !== undefined && turn !== 'left' && turn !== 'right') errors.push(`building element ${key}: turn must be left or right`);
+  if (flightGap !== undefined && !(isFiniteNumber(flightGap) && flightGap >= 0))
+    errors.push(`building element ${key}: flightGap must be a number >= 0`);
+  if (shape !== undefined && shape !== 'straight' && landingAt === undefined)
+    errors.push(`building element ${key}: a ${String(shape)} stair needs landingAt`);
+  return errors;
+}
+
 /** Numeric fields each category must carry (finite numbers). */
 // prettier-ignore
 const NUMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
@@ -160,6 +184,10 @@ function elementErrors(key: string, element: unknown, levels: Record<string, unk
       errors.push(`building element ${key}: riserCount must be an integer >= 1`);
     }
   }
+  if (category === 'stair' && element['waistThickness'] !== undefined && !isPositiveNumber(element['waistThickness'])) {
+    errors.push(`building element ${key}: waistThickness must be a number > 0`);
+  }
+  if (category === 'stair') errors.push(...stairLandingErrors(key, element));
   for (const field of POINTS[category] ?? []) {
     if (!isPoint(element[field])) errors.push(`building element ${key}: ${field} must be [x, y]`);
   }

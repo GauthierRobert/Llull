@@ -22,7 +22,6 @@
   "command": "define_material_record",
   "params": {
    "id": "bolt_E200",
-   "name": "bolt_E200",
    "designation": "test material",
    "specs": [],
    "licence": "company-proprietary",
@@ -99,8 +98,7 @@
    "density": 0.0078,
    "color": "#9aa0a6",
    "metalness": 1,
-   "roughness": 0.4,
-   "recordId": "bolt_E200"
+   "roughness": 0.4
   }
  },
  {
@@ -232,7 +230,6 @@
   "command": "set_mesh_controls",
   "params": {
    "analysisId": "$an",
-   "mesher": "gmsh",
    "elementFamily": "tet",
    "order": 1,
    "globalSize": 1.0

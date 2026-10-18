@@ -26,7 +26,7 @@ Always one call per plan (`llull run plan.json`), not a loop of single calls.
 ## Procedure
 
 1. **Find commands without loading schemas into context.**
-   `llull search fillet edge` → `llull describe fillet_edge` (params, required, enums).
+   `llull search fillet edge` → `llull describe fillet_edge` (params, required, enums; nested objects, records and `one of:` union branches printed recursively; `--json` = raw schema).
    `llull list 3d` for a toolset; `llull toolsets`; `llull guide` for units/axes/id conventions.
 2. **Write the plan as a file** (format: `design-model` skill; aliases `$name`, `=expr`):
    ```json
@@ -62,42 +62,21 @@ Always one call per plan (`llull run plan.json`), not a loop of single calls.
    (`for: {var, from, to, step}` also works; max 1000 iterations.) Then
    `llull set_parameter name=n expression=9 --doc part.llull.json` regenerates 9 pistons.
    `--validate` reports issues by path (`step 2 › iter 3 › step 0`).
-   **Loops / parameters:** don't generate long plans in a script. Use nestable loops and `=expr`
-   (functions `sin cos sqrt min max floor round ...`, `pi`, loop var `i`); aliases interpolate:
-   ```json
-   [
-     { "command": "set_parameter", "params": { "name": "n", "expression": "7" } },
-     { "command": "set_parameter", "params": { "name": "r", "expression": "50" } },
-     {
-       "repeat": { "count": "=n", "as": "i" },
-       "actions": [
-         {
-           "command": "add_cylinder",
-           "as": "piston{i}",
-           "params": {
-             "radius": 4,
-             "height": 30,
-             "position": ["=r*cos(2*pi*i/n)", "=r*sin(2*pi*i/n)", 80]
-           }
-         }
-       ]
-     }
-   ]
-   ```
-   (`for: {var, from, to, step}` also works; max 1000 iterations.) Then
-   `llull set_parameter name=n expression=9 --doc part.llull.json` regenerates 9 pistons.
-   `--validate` reports issues by path (`step 2 › iter 3 › step 0`).
 3. **Validate, then apply** (aborts and rolls back on the first failing step):
    `llull run plan.json --validate --app` → fix issues → `llull run plan.json --app`
    (or `--doc part.llull` instead of `--app`).
    The report prints one line per step with the ids it created.
-   **With `--app`, end with `llull fit_view --app`**: the camera is document state and is NOT
-   refit by a plan (nor by `clear_document`), so a part much smaller than what was framed before
-   shows as a speck, or sits hidden inside earlier geometry. Run `llull describe_scene --app` first:
+   **Camera:** it is document state; `llull run` frames it after a plan that built geometry
+   without setting it (`fit_view direction=current`; `--no-fit` keeps it). Single `llull <cmd>`
+   edits do not refit: end those with `llull fit_view --app`. Run `llull describe_scene --app` first:
    if the open document already has entities, ask the user before building into it or clearing it.
 4. **Inspect / measure** (read-only, never written): `llull describe_scene`,
-   `llull mass_properties entityId=mesh-4.1`, `llull check_model`.
-5. **Look at it**: `llull render_view view=iso --save view.png --app` then read the PNG.
+   `llull mass_properties entityId=mesh-4.1`, `llull check_model`. FEA / thermal results:
+   `llull render_fea_results analysisId=an-… field=von_mises --save plot.png` (read-only contour plot).
+5. **Look at it**: `llull render_view view=iso --save view.png --app` then read the PNG. FEA contour:
+   `llull render_fea_results analysisId=an-… field=von_mises --save plot.png`. Saved SVG/PNG, DXF
+   (`export_flat_pattern_dxf --save part.dxf`), IFC and `.glb` (binary chosen from the extension) all work.
+   `run --validate` warns when a plan uses fillet/chamfer/shell: run those with `--kernel occt`.
 6. **Exchange (Python/CadQuery bundled in the desktop app)**: `llull import_step file=supplier.step --app`,
    `llull export_step --save out/part.step --app` (exact B-rep), `llull import_dwg file=site.dwg
 target=drawing` (needs a DWG converter). `llull list exchange` shows them all.

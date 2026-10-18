@@ -7,6 +7,7 @@
 
 import type { Vec3 } from './vectors';
 import type { Quantity } from './quantity';
+import type { DurabilityModel } from './durability';
 
 /** Same structural id as `types.ts` `EntityId` (not imported: types.ts imports this module). */
 type EntityId = string;
@@ -28,7 +29,30 @@ export type TemperatureScale = 'degC' | 'K';
 export type LoadCategory = 'limit' | 'ultimate';
 export type Decision = 'accepted' | 'rejected' | 'redesign';
 export type FeElementType = 'C3D4' | 'C3D10' | 'CPS3' | 'CPS6' | 'CPS4' | 'CPS8' | 'S3' | 'S6' | 'S4' | 'S8';
-export type ProbeQuantity = 'temperature' | 'heat_flux' | 'u_mag' | 'u_x' | 'u_y' | 'u_z' | 'von_mises' | 's_xx' | 's_yy' | 's_zz';
+/** A result probe; axisPoint / axisDirection (document units / any non-zero vector) apply to the cylindrical quantities only. */
+export interface ResultProbe {
+  readonly name: string;
+  readonly point: Vec3;
+  readonly quantity: ProbeQuantity;
+  readonly axisPoint?: Vec3;
+  readonly axisDirection?: Vec3;
+}
+
+export type ProbeQuantity =
+  | 'temperature'
+  | 'heat_flux'
+  | 'u_mag'
+  | 'u_x'
+  | 'u_y'
+  | 'u_z'
+  | 'von_mises'
+  | 's_xx'
+  | 's_yy'
+  | 's_zz'
+  | 's_hoop'
+  | 's_radial'
+  | 's_axial'
+  | 'u_radial';
 
 /** Only `solid` is built; the other kinds are 05 backlog and exist so documents stay forward-compatible. */
 export type Idealization =
@@ -125,7 +149,15 @@ export interface ThermalResultsSummary {
   readonly minT: { value: number; at: Vec3; entityId: EntityId; timeS: number };
   readonly maxHeatFluxW_m2: { value: number; at: Vec3; timeS: number };
   readonly bcHeatFlowsW: ReadonlyArray<{ bcId: string; timeS: number; valueW: number }>;
-  readonly heatBalance: { inW: number; outW: number; storedW: number; residualRel: number; timeS: number };
+  readonly heatBalance: {
+    inW: number;
+    outW: number;
+    storedW: number;
+    residualRel: number;
+    timeS: number;
+    /** Transient only: spread of the residual between two quadratures of the BC flows over the last output interval (coarse outputs). */
+    samplingRel?: number;
+  };
   readonly probes: ReadonlyArray<{ probeId: string; series: ReadonlyArray<readonly [timeS: number, T: number]> }>;
   readonly propertyRangeExceeded: ReadonlyArray<{
     material: string;
@@ -327,7 +359,7 @@ export interface AnalysisCase {
   readonly mesh: MeshControls;
   readonly meshSummary?: MeshSummary;
   readonly results?: ResultsSummary;
-  readonly probes: Readonly<Record<string, { readonly name: string; readonly point: Vec3; readonly quantity: ProbeQuantity }>>;
+  readonly probes: Readonly<Record<string, ResultProbe>>;
   readonly view?: {
     readonly field: 'von_mises' | 'u_mag' | 'u_x' | 'u_y' | 'u_z' | 's_xx' | 's_yy' | 's_zz' | 'mode';
     readonly loadCase?: string;
@@ -344,6 +376,8 @@ export interface AnalysisModel {
   readonly cases: Readonly<Record<string, AnalysisCase>>;
   readonly caseOrder: readonly string[];
   readonly fitDispositions?: FitDispositions;
+  /** Absent until the first durability command (`define_load_history`, `define_crack`; plugin `cae`, PHY-07 / PHY-08). */
+  readonly durability?: DurabilityModel;
 }
 
 /** Mesh artifact (JSON, no typed arrays); stored by the host under `sha256Hex(canonicalJson(artifact))`. */
@@ -362,6 +396,8 @@ export interface FeMeshArtifact {
   readonly nodeSets: Readonly<Record<string, readonly number[]>>;
   readonly faceSets: Readonly<Record<string, readonly (readonly [elementId: number, face: number])[]>>;
   readonly targets: Readonly<Record<string, { readonly residual: number }>>;
+  /** Parts meshed from a faceted tessellation that has curved faces (polygons, not B-rep): stresses at curved features are off by several %. */
+  readonly facetedParts?: readonly EntityId[];
 }
 
 export interface FeResultsArtifact {

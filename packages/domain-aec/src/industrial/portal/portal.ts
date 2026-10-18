@@ -105,12 +105,16 @@ export const addPortalFrameBuilding = defineCommand({
     'along Y (columns + pitched rafters spanning X; several spans side by side with spans: [...]), gable posts, purlins and side rails, X-bracing in the ' +
     'end bays (roof and walls), pad footings under every column, roof / wall / gable cladding, a ground ' +
     'slab and optionally an overhead crane runway on brackets. All sizes in document units, roofPitch in ' +
-    'degrees. Defaults: 24 m span, 48 m long, 6 m bays, 7 m eaves, 6° roof, HEA400 columns, IPE450 rafters.',
+    'degrees. Eaves haunches (10 % of the span by default; haunch option: eavesLength / apexLength as span fractions) are part of the ' +
+    'frame analysis. Defaults: 24 m span, 48 m long, 6 m bays, 7 m eaves, 6° roof, HEA400 columns, IPE450 rafters. ' +
+    'The defaults are a starting model, not a design: the standard end-plate connections (M20) fail check_portal_frames on a 24 m hall under ' +
+    'snow, and a crane (10 t, rail 6 m) with pinned bases fails the rail-level sway limit h/400 — run design_portal_frames (sizes bolts, ' +
+    "sections and, when sway governs, fixes the column bases) or set columnBase: 'fixed' before checking.",
   params: portalFrameParams,
   run: (doc, params): CommandResult => {
     const inputs = portalInputs(doc, params);
     if ('reason' in inputs) return noop(doc, inputs.reason);
-    const { mm, origin, profiles: p, columnBase } = inputs;
+    const { mm, origin, profiles: p, columnBase, haunch } = inputs;
     const { span, spanCount, hallLength, targetBay, eave } = inputs;
     const { pitchDegrees, purlinSpacing, railSpacing, roofType } = inputs;
     const resolution = resolveLevel(doc, getBuilding(doc), params.levelId);
@@ -168,7 +172,7 @@ export const addPortalFrameBuilding = defineCommand({
         building,
         levelId,
         findMomentJoints(building, levelId, new Set(membersAdded.ids), mm(10)),
-        {},
+        haunch ? { spanFractions: { ...haunch, rafterSpanShare: monopitch ? 1 : 2 } } : {},
       );
       building = connections.building;
       ids.push(...connections.ids);

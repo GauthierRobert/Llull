@@ -9,6 +9,7 @@ import { analysisInputHash } from '../hash/inputHash';
 import { feRemediation } from '../shared/feCodes';
 import { cavityNameProblem } from '../shared/names';
 import { analysisIdSchema } from '../shared/schemas';
+import { temperatureBcConflicts, temperatureOverridesFlows } from './bcConflicts';
 import { trustedRecord } from '../shared/trust';
 import { isProblem, thermalCaseOf, type ThermalCase } from './access';
 import { tableProblem } from './amplitude';
@@ -162,7 +163,7 @@ function resultItems(analysisCase: AnalysisCase, doc: CadDocument, verified: Res
       item(
         'THM_HEAT_BALANCE',
         'warning',
-        `heat balance residual ${balance.residualRel} exceeds ${HEAT_BALANCE_TOLERANCE.value} (in ${balance.inW} W, out ${balance.outW} W, stored ${balance.storedW} W at t=${balance.timeS} s)`,
+        `heat balance residual ${balance.residualRel} exceeds ${HEAT_BALANCE_TOLERANCE.value}${(balance.samplingRel ?? 0) > HEAT_BALANCE_TOLERANCE.value ? ` (the output interval is too coarse to resolve it: sampling spread ${balance.samplingRel ?? 0}; write results at every increment with set_thermal_step outputEveryS)` : ''} (in ${balance.inW} W, out ${balance.outW} W, stored ${balance.storedW} W ${analysisCase.type === 'heat_steady' ? 'at steady state' : `at t=${balance.timeS} s`})`,
         [analysisCase.id],
       ),
     );
@@ -204,7 +205,7 @@ export const checkThermal = defineCommand({
     'Check a heat_steady / heat_transient analysis before the solve and after it: data { status: pass | warn | fail, items [{ code, severity, ' +
     'ids, path?, message, remediation }], state, reviewRequired: true }; post-solve items need the recorded thermal summary to match its ' +
     'artifact (FEA_SUMMARY_MISMATCH, state untrusted, when it does not). Errors (THM_NO_HEAT_PATH, THM_INITIAL_TEMPERATURE_MISSING, ' +
-    'THM_MATERIAL_NO_K / NO_CP, THM_EMISSIVITY_INVALID, THM_SOURCE_REQUIRED, THM_STEP_INVALID, ...) must be fixed before fea_solve; warnings ' +
+    'THM_MATERIAL_NO_K / NO_CP, THM_EMISSIVITY_INVALID, THM_BC_CONFLICT (error: different temperatures on shared nodes, fea_solve refuses; warning: a temperature BC overrides a film / radiation BC), THM_SOURCE_REQUIRED, THM_STEP_INVALID, ...) must be fixed before fea_solve; warnings ' +
     'include THM_MATERIAL_UNVERIFIED, THM_HEAT_BALANCE (residual above the named 1e-2: do not report the result as final) and ' +
     'THM_PROPERTY_OUT_OF_RANGE. End every thermal job with this check.',
   annotations: { readOnly: true },
@@ -228,6 +229,24 @@ export const checkThermal = defineCommand({
       analysisCase.results.inputHash !== analysisInputHash(doc, analysisId, 'full')
     )
       items.push(item('FEA_RESULTS_STALE', 'error', 'the recorded results were computed for other inputs', [analysisId]));
+    for (const conflict of trust.meshArtifact === null ? [] : temperatureBcConflicts(found.thermal, trust.meshArtifact))
+      items.push(
+        item(
+          'THM_BC_CONFLICT',
+          'error',
+          `temperature BCs '${conflict.first}' and '${conflict.second}' prescribe different values on ${conflict.sharedNodes} shared node(s): the solver keeps only the last one; the solve is refused until one is removed`,
+          [conflict.first, conflict.second],
+        ),
+      );
+    for (const override of trust.meshArtifact === null ? [] : temperatureOverridesFlows(found.thermal, trust.meshArtifact))
+      items.push(
+        item(
+          'THM_BC_CONFLICT',
+          'warning',
+          `temperature BC '${override.temperature}' and ${override.kind} BC '${override.flow}' share ${override.sharedNodes} node(s): the temperature BC overrides the ${override.kind} there; the ${override.kind}'s heat flow is not applied`,
+          [override.flow, override.temperature],
+        ),
+      );
     if (trust.state === 'untrusted')
       items.push(
         item('FEA_SUMMARY_MISMATCH', 'error', trust.problem?.message ?? 'a recorded summary differs from its artifact', [analysisId]),

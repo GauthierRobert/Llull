@@ -136,7 +136,7 @@ export interface DynamicsStudyDef {
 export interface MechanismModel {
   readonly mode: { readonly kind: 'spatial' } | { readonly kind: 'planar'; readonly planeNormal: 'x' | 'y' | 'z' };
   readonly ground: readonly string[];                         // instance ids fixed in space
-  readonly gravity?: { readonly vectorMPerS2: Vec3 } | 'none';  // absent = unset -> RBD_GRAVITY_UNSET
+  readonly gravity: Vec3;  // m/s², default [0, 0, -9.81]; [0, 0, 0] = weightless (as built: set_gravity { gravity })
   readonly bodies: Readonly<Record<string, BodySpec>>;
   readonly jointGeometry: Readonly<Record<string, JointGeometry>>;
   readonly forceElements: Readonly<Record<string, ForceElement>>; readonly forceElementOrder: readonly string[];
@@ -178,7 +178,7 @@ Plugin `physics-mechanism`, toolset `analysis` (open question 4). Mutating comma
 | ---- | ---- | ------------- | ---- |
 | `set_body_properties` | mutating | `{ instanceId, mass: 'geometry' \| { massKg, centroidMm, inertiaKgM2 }, source? }` | @affects mechanism.bodies · @invariant instance exists; massKg ≥ 0; inertia symmetric, positive semi-definite, triangle inequalities on principal moments · @failure `RBD_INSTANCE_UNKNOWN`, `RBD_INERTIA_INVALID` |
 | `set_ground` | mutating | `{ instanceIds: string[] }` | @invariant ≥ 1 existing instance · @failure `RBD_INSTANCE_UNKNOWN` |
-| `set_gravity` | mutating | `{ vectorMPerS2: [x, y, z] \| 'none' }` | @invariant finite · named in results |
+| `set_gravity` | mutating | `{ gravity: [x, y, z] }` (m/s²; `[0, 0, 0]` = weightless) | @invariant finite · named in results |
 | `set_mechanism_mode` | mutating | `{ mode: 'spatial' \| 'planar', planeNormal? }` | @invariant planar joints' axes ∥ planeNormal (revolute) or ⟂ (prismatic) · @failure `RBD_PLANAR_AXIS_MISMATCH` |
 | `set_joint_geometry` | mutating | `{ jointId, pivotMm, axis? }` | @failure `RBD_JOINT_UNKNOWN` |
 | `add_spring_damper` | mutating | `{ kind: 'translational', a, b, stiffnessNPerM, dampingNsPerM, freeLengthMm?, preloadN?, source? } \| { kind: 'joint', jointId, stiffness…, damping…, freeValueMm \| freeValueRad, preload? }` | @affects forceElements (id `fe-<step>.<k>`) · @invariant stiffness, damping ≥ 0 · @failure `RBD_SPRING_INVALID` |
@@ -328,7 +328,7 @@ spring-mass-damper closed form; slider-crank x = r cos θ + √(l² − r² sin�
 | `RBD_MASS_UNVERIFIED` | warning (not suppressible) | density / geometry flagged unverified (08 / 01 KRN) | instance id | replace with a verified record |
 | `RBD_INERTIA_INVALID` | error | not symmetric / not PSD / triangle inequality | param path | correct the tensor |
 | `RBD_GROUND_MISSING` | error | no ground instance | — | `set_ground` |
-| `RBD_GRAVITY_UNSET` | error | gravity not set | — | `set_gravity vectorMPerS2=[0,0,-9.80665]` or `'none'` |
+| `RBD_GRAVITY_UNSET` | error | gravity not set | — | `set_gravity gravity=[0,0,-9.80665]` (or `[0,0,0]` for none) |
 | `RBD_PIVOT_DEFAULTED` | warning | joint without `set_joint_geometry` | joint id | set the pivot (the anchor origin is used) |
 | `RBD_PLANAR_AXIS_MISMATCH` | error | joint axis incompatible with the plane | joint id | fix axis or use spatial mode |
 | `RBD_REDUNDANT_CONSTRAINTS` | warning | m − r > 0 | joint ids | planar mode or replace joints (e.g. spherical) |

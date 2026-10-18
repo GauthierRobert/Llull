@@ -312,15 +312,18 @@ describe('alignment_report', () => {
           horizontal: Array<{ ok: boolean; minRadiusM: number }>;
           vertical: Array<{ ok: boolean }>;
           failures: string[];
+          warnings: string[];
           assumptions: string;
         };
       }
     ).checks;
-    expect(checks.horizontal[0]?.minRadiusM).toBeCloseTo(6400 / (127 * 0.21), 1);
+    expect(checks.horizontal[0]?.minRadiusM).toBeCloseTo(6400 / (127 * 0.14), 1);
     expect(checks.horizontal[0]?.ok).toBe(false);
     expect(checks.vertical[0]?.ok).toBe(false);
     expect(checks.failures.some((f) => f.includes('Grade break'))).toBe(true);
-    expect(checks.assumptions).toContain('e = 0.07');
+    expect(checks.assumptions).toContain('e = 0 ');
+    expect(result.summary).toContain('WARNING: Superelevation is not set');
+    expect(checks.warnings).toHaveLength(1);
     expect(result.summary).toContain('failure(s)');
     const gentle = execute(profile.document, 'alignment_report', { alignmentId: id, designSpeedKmh: 20 });
     expect((gentle.data as { checks: { horizontal: Array<{ ok: boolean }> } }).checks.horizontal[0]?.ok).toBe(true);
@@ -328,6 +331,15 @@ describe('alignment_report', () => {
     expect(fast.summary).toContain('200 km/h');
     const ok = designed(101);
     expect(execute(ok.doc, 'alignment_report', { alignmentId: ok.id, designSpeedKmh: 50 }).summary).toContain('all checks pass');
+  });
+  it('uses the set_superelevation rate, with no warning, once superelevation is set', () => {
+    const { doc, id } = withAlignment(surveyedDocument(flat(100), 21, 20), { points: xy(50, 100, 250, 100, 250, 300), radii: [100] });
+    const banked = execute(doc, 'set_superelevation', { alignmentId: id, maxRate: 0.07 }).document;
+    const result = execute(banked, 'alignment_report', { alignmentId: id, designSpeedKmh: 60 });
+    const checks = (result.data as { checks: { horizontal: Array<{ minRadiusM: number }>; warnings: string[] } }).checks;
+    expect(checks.horizontal[0]?.minRadiusM).toBeCloseTo(3600 / (127 * 0.24), 1);
+    expect(checks.warnings).toEqual([]);
+    expect(result.summary).not.toContain('WARNING');
   });
   it('refuses unknown alignments, bad intervals, bad speeds', () => {
     const { doc, id } = designed(101);

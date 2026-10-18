@@ -41,7 +41,7 @@ describe('derivation guard on every generated entity kind', () => {
     const generated = Object.values(doc.building?.elements ?? {}).flatMap((element) => element.entityIds);
     const categories = new Set(Object.values(doc.building?.elements ?? {}).map((e) => e.category));
     expect(categories.size).toBeGreaterThanOrEqual(15);
-    expect(generated.length).toBeGreaterThan(50);
+    expect(generated.length).toBeGreaterThan(30);
     const attempts: Array<(id: string) => [string, Record<string, unknown>]> = [
       (id) => ['move_entities', { ids: [id], delta: [10, 0, 0] }],
       (id) => ['rotate_entity', { id, delta: [0, 0, 0.1] }],

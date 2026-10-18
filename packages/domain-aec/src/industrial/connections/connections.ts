@@ -26,7 +26,7 @@ export function connectionMass(doc: Pick<CadDocument, 'units'>, building: Buildi
   const plates = solids
     .filter((solid) => solid.part.startsWith('plate'))
     .reduce((sum, solid) => sum + Math.abs(polygonArea(solid.outline)) * solid.depth, 0);
-  const metres = connection.haunchLength / fromMm(doc, 1000);
+  const metres = (connection.haunchLength * (connection.kind === 'apex' ? 2 : 1)) / fromMm(doc, 1000);
   return cubicMetres(plates) * STEEL_DENSITY_KG_PER_M3 + (metres * profile.massPerMetre) / 2;
 }
 
@@ -47,12 +47,16 @@ export const addMomentConnections = defineCommand({
     plateThickness: z.number().optional().describe('End plate thickness, in document units. Default 20 / 25 mm.'),
     boltDiameter: z.number().optional().describe('Bolt diameter, in document units. Default 20 mm (M20).'),
     haunchLength: z.number().optional().describe('Eaves haunch length along the rafter. Default 1/5 of its plan length.'),
+    apexHaunchLength: z
+      .number()
+      .optional()
+      .describe('Apex haunch length along each of the two rafters meeting at the ridge, in document units. Default none.'),
   }),
   run: (doc, params): CommandResult => {
-    const { plateThickness, boltDiameter, haunchLength } = params;
+    const { plateThickness, boltDiameter, haunchLength, apexHaunchLength } = params;
     const positive = (value: number | undefined): boolean => value === undefined || value > 0;
-    if (!positive(plateThickness) || !positive(boltDiameter) || !positive(haunchLength)) {
-      return noop(doc, 'add_moment_connections failed: plateThickness, boltDiameter and haunchLength must be > 0.');
+    if (!positive(plateThickness) || !positive(boltDiameter) || !positive(haunchLength) || !positive(apexHaunchLength)) {
+      return noop(doc, 'add_moment_connections failed: plateThickness, boltDiameter, haunchLength and apexHaunchLength must be > 0.');
     }
     const building = getBuilding(doc);
     const unknownLevel = unknownLevelFailure(doc, 'add_moment_connections', params.levelId);
@@ -62,7 +66,7 @@ export const addMomentConnections = defineCommand({
     if (joints.length === 0) {
       return noop(doc, 'add_moment_connections failed: no unconnected rafter-to-column or rafter-to-rafter joint found.');
     }
-    const added = appendConnections(doc, building, levelId, joints, { plateThickness, boltDiameter, haunchLength });
+    const added = appendConnections(doc, building, levelId, joints, { plateThickness, boltDiameter, haunchLength, apexHaunchLength });
     const connections = added.ids.map((id) => added.building.elements[id] as MomentConnectionElement);
     const eaves = connections.filter((connection) => connection.kind === 'eaves').length;
     const bolts = connections.reduce((sum, connection) => sum + 2 * connection.boltRows, 0);
@@ -127,8 +131,8 @@ export function connectionWelds(
   const plates = connection.kind === 'apex' ? 2 : 1;
   const haunch = toMm(doc, connection.haunchLength);
   // Haunch: web to rafter flange both sides, haunch flange + web to the end plate.
-  const haunchWeb = haunch > 0 ? 2 * haunch + 2 * profile.h : 0;
-  const haunchFlange = haunch > 0 ? 2 * profile.b : 0;
+  const haunchWeb = haunch > 0 ? plates * (2 * haunch + 2 * profile.h) : 0;
+  const haunchFlange = haunch > 0 ? plates * 2 * profile.b : 0;
   const flangeLength = plates * flanges + haunchFlange;
   const webLength = plates * web + haunchWeb;
   const metal = (flangeThroat ** 2 * flangeLength + webThroat ** 2 * webLength) * STEEL_DENSITY_KG_PER_M3 * 1e-9;

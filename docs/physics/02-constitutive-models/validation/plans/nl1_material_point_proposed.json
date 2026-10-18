@@ -3,7 +3,6 @@
   "command": "define_material_record",
   "params": {
    "id": "nl1_steel",
-   "name": "NAFEMS NL1 test material",
    "designation": "NL1",
    "specs": [],
    "licence": "public-domain-us-gov",

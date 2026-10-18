@@ -52,6 +52,41 @@ const cubicMetresPerUnit3 = (doc: Pick<CadDocument, 'units'>): number => toMetre
 export const kgPerM3FromDocDensity = (doc: Pick<CadDocument, 'units'>, gPerDocUnit3: number): number =>
   gPerDocUnit3 / 1000 / cubicMetresPerUnit3(doc);
 
+/** Plausible density of a solid or liquid, g/cm³ (hydrogen-free foams excepted); `explicitUnit` lowers the floor to aerogel/foam density. */
+const PLAUSIBLE_G_PER_CM3 = { min: 0.01, minExplicit: 0.0005, max: 25 } as const;
+
+/** One line with the density in g/cm³ and kg/m³, e.g. `7.85 g/cm³ (7850 kg/m³)`. */
+export function describeDensity(doc: Pick<CadDocument, 'units'>, gPerDocUnit3: number): string {
+  const kgPerM3 = kgPerM3FromDocDensity(doc, gPerDocUnit3);
+  return `${Number((kgPerM3 / 1000).toPrecision(6))} g/cm³ (${Number(kgPerM3.toPrecision(6))} kg/m³)`;
+}
+
+/**
+ * Warning text when a density in g/(document unit)³ is implausible for matter (outside 0.01-25 g/cm³; 0.0005-25 when the unit was named
+ * explicitly), naming the likely intended unit (the document unit's value read as kg/m³, g/cm³ or kg/mm³ that lands in range); else null.
+ */
+export function densityPlausibilityWarning(doc: Pick<CadDocument, 'units'>, gPerDocUnit3: number, explicitUnit: boolean): string | null {
+  if (!(gPerDocUnit3 > 0) || !Number.isFinite(gPerDocUnit3)) return null;
+  const gPerCm3 = kgPerM3FromDocDensity(doc, gPerDocUnit3) / 1000;
+  if (gPerCm3 >= (explicitUnit ? PLAUSIBLE_G_PER_CM3.minExplicit : PLAUSIBLE_G_PER_CM3.min) && gPerCm3 <= PLAUSIBLE_G_PER_CM3.max)
+    return null;
+  const candidates = [
+    { unit: 'kg/m^3', gPerCm3: gPerDocUnit3 / 1000 },
+    { unit: 'g/cm^3', gPerCm3: gPerDocUnit3 },
+    { unit: 'lb/ft^3', gPerCm3: gPerDocUnit3 * 0.0160185 },
+    { unit: 'lb/in^3', gPerCm3: gPerDocUnit3 * 27.6799 },
+  ].filter((c) => c.gPerCm3 >= PLAUSIBLE_G_PER_CM3.min && c.gPerCm3 <= PLAUSIBLE_G_PER_CM3.max);
+  const guess = candidates[0];
+  const hint =
+    guess === undefined
+      ? 'check the unit (pass densityUnit, e.g. "kg/m^3" or "g/cm^3")'
+      : `did you mean ${gPerDocUnit3} ${guess.unit.replace('^3', '³')}? pass densityUnit "${guess.unit}"`;
+  return (
+    `density ${gPerDocUnit3} g/${doc.units}³ = ${Number(gPerCm3.toPrecision(6))} g/cm³ (${Number((gPerCm3 * 1000).toPrecision(6))} kg/m³) ` +
+    `is implausible for matter; ${hint}`
+  );
+}
+
 const resolved = (
   doc: Pick<CadDocument, 'units'>,
   kgPerM3: number,
@@ -123,11 +158,18 @@ export function resolveDensity(
       doc,
       kgPerM3FromDocDensity(doc, material.density),
       {
-        source: `material '${materialId}' density (legacy, g/${doc.units}³)`,
+        source:
+          material.densityUnit === undefined
+            ? `material '${materialId}' density (given without a source, g/${doc.units}³)`
+            : `material '${materialId}' density (given in ${material.densityUnit}, no source; stored as g/${doc.units}³)`,
         materialId,
         defaulted: false,
         unverified: true,
-        unverifiedReasons: ['provenance legacy'],
+        unverifiedReasons: [
+          material.densityUnit === undefined
+            ? 'density given without a source (unverified)'
+            : `density given in ${material.densityUnit} without a source (unverified)`,
+        ],
       },
       material.density,
     );

@@ -8,6 +8,10 @@ import type { Vec3 } from '../model/vectors';
 import { RAD_PER_S_PER_RPM, motorForce, propellerOutput } from './forceLaws';
 import type { Quaternion, SimulationTrace } from './physicsEngine';
 import type { BodyMassDistribution } from './simulationModel';
+import { warnJams } from './jamDetection';
+import { findPeriod, tailMean, type Period } from './periodicity';
+import { energyOf, type EnergyData, type EnergySeries } from './energyReport';
+import { speedTrend, trendWarning } from './speedTrend';
 
 export type SimulationDetail = 'summary' | 'series' | 'poses';
 
@@ -34,6 +38,23 @@ interface JointResult {
   readonly settledAfter: number | null;
   /** Speed changed by less than 0.5 % over the last 10 % of the run. */
   readonly steady: boolean;
+  /** Not steady but repeating: the last two cycles of the speed match (a pendulum, an oscillating arm, a crank with speed ripple). */
+  readonly periodic?: true;
+  /** Seconds per cycle, when periodic. */
+  readonly periodS?: number;
+  /** Mean speed over the last full cycle (rad/s or m/s), when periodic. */
+  readonly cycleMeanVelocity?: number;
+  /** Revolute only, when periodic. */
+  readonly cycleMeanRpm?: number;
+}
+
+/** Final state of a body that no joint carries (free fall, thrown): document units and m/s. */
+interface FreeBodyResult {
+  readonly finalPosition: Vec3;
+  /** m/s, last two samples. */
+  readonly finalVelocity: Vec3;
+  /** m/s. */
+  readonly speed: number;
 }
 
 export interface SimulationData {
@@ -43,7 +64,12 @@ export interface SimulationData {
   readonly samples: number;
   readonly bodies: Record<string, { name?: string; massKg: number; centerOfMass: Vec3 }>;
   readonly joints: Record<string, JointResult>;
-  readonly motors: Record<string, { joint: string; torque: number; power: number }>;
+  /** torque / power are the values at the end; cycleMean* are averages over the last full cycle when the torque or speed repeats. */
+  readonly motors: Record<
+    string,
+    { joint: string; torque: number; power: number; cycleMeanTorque?: number; cycleMeanPower?: number; periodS?: number }
+  >;
+  readonly freeBodies?: Record<string, FreeBodyResult>;
   /** tipMach: helical tip Mach number at the end (static: tip speed / 340.3 m/s); figureOfMerit: Ct^1.5 / (Cp·sqrt(π/2)). */
   readonly propellers: Record<
     string,
@@ -52,6 +78,13 @@ export interface SimulationData {
   /** measuredRatio = driven / driver speed at the end; maxRatioError over all samples with motion. */
   readonly gears: Record<string, { ratio: number; measuredRatio: number | null; maxRatioError: number }>;
   readonly warnings: string[];
+  /** Energy balance in J, present when the run recorded energy (simulate_motion `energy: true`, or the model has a joint spring). */
+  readonly energy?: EnergyData;
+  /** Point springs (add_spring) of the run: lengths in m, forces in N (positive = pulling the bodies together). */
+  readonly springs?: Record<
+    string,
+    { freeLengthM: number; finalLengthM: number; minLengthM: number; maxLengthM: number; finalForceN: number; peakForceN: number }
+  >;
   readonly series?: {
     readonly times: number[];
     readonly jointVelocity: Record<string, number[]>;
@@ -59,6 +92,8 @@ export interface SimulationData {
     readonly motorTorque: Record<string, number[]>;
     readonly propellerThrust: Record<string, number[]>;
     readonly propellerPower: Record<string, number[]>;
+    /** Per sample, J (with `energy`). */
+    readonly energy?: EnergySeries;
   };
   /** Body centre of mass (document units) and rotation from the start pose, per sample. */
   readonly poses?: { readonly times: number[]; readonly bodies: Record<string, { position: Vec3[]; orientation: Quaternion[] }> };
@@ -79,8 +114,12 @@ function jointResult(
   const band = Math.max(Math.abs(final) * SETTLE_BAND, 1e-6);
   let settleIndex = velocity.length - 1;
   while (settleIndex > 0 && Math.abs((velocity[settleIndex - 1] ?? 0) - final) <= band) settleIndex--;
-  const tailStart = velocity[Math.floor(velocity.length * 0.9)] ?? final;
-  const steady = Math.abs(final - tailStart) <= Math.max(Math.abs(final) * 0.005, 1e-6);
+  // steady = the whole last 10 % stays in a 0.5 % band (comparing two samples reads a periodic signal sampled in phase as steady)
+  const tail = velocity.slice(Math.floor(velocity.length * 0.9));
+  const tailSpread = tail.reduce((spread, v) => Math.max(spread, Math.abs(v - final)), 0);
+  const steady = tailSpread <= Math.max(Math.abs(final) * 0.005, 1e-6);
+  const period = steady ? null : findPeriod(velocity, times);
+  const cycleMean = period === null ? null : tailMean(velocity, period.windowSamples);
   return {
     kind,
     finalVelocity: final,
@@ -89,6 +128,14 @@ function jointResult(
     finalPosition: last(position),
     settledAfter: steady ? (times[settleIndex] ?? null) : null,
     steady,
+    ...(period !== null && cycleMean !== null
+      ? {
+          periodic: true as const,
+          periodS: period.periodS,
+          cycleMeanVelocity: cycleMean,
+          ...(kind === 'revolute' ? { cycleMeanRpm: cycleMean / RAD_PER_S_PER_RPM } : {}),
+        }
+      : {}),
   };
 }
 
@@ -102,6 +149,28 @@ function gearRatioError(ratio: number, driver: readonly number[], driven: readon
     if (error > worst) [worst, index] = [error, i];
   });
   return { worst, index };
+}
+
+/** Length range and force of every point spring over the run, or null when there is none. */
+function springResults(dynamics: DynamicsModel, trace: SimulationTrace): NonNullable<SimulationData['springs']> | null {
+  const entries = Object.values(dynamics.springs ?? {}).flatMap((spring) => {
+    const recorded = trace.springs?.[spring.id];
+    if (recorded === undefined || recorded.length.length === 0) return [];
+    return [
+      [
+        spring.id,
+        {
+          freeLengthM: spring.freeLengthM,
+          finalLengthM: last(recorded.length),
+          minLengthM: Math.min(...recorded.length),
+          maxLengthM: Math.max(...recorded.length),
+          finalForceN: last(recorded.force),
+          peakForceN: recorded.force.reduce((peak, force) => Math.max(peak, Math.abs(force)), 0),
+        },
+      ] as const,
+    ];
+  });
+  return entries.length === 0 ? null : Object.fromEntries(entries);
 }
 
 /** The structured result of one run (all forces re-evaluated on the samples with the same laws the engine applied). */
@@ -121,8 +190,7 @@ export function simulationData(
     ),
   );
   for (const [id, result] of Object.entries(joints))
-    if (!result.steady && result.peakVelocity > 1e-6)
-      warnings.push(`joint '${id}' is still accelerating at the end: simulate longer for its steady speed`);
+    if (!result.steady && !result.periodic && result.peakVelocity > 1e-6) warnings.push(trendWarning(id, speedTrend(velocityOf(id))));
   const motorTorque = Object.fromEntries(
     Object.values(dynamics.motors).map((m) => [
       m.id,
@@ -131,8 +199,49 @@ export function simulationData(
   );
   const motors = Object.fromEntries(
     Object.values(dynamics.motors).map((m) => {
-      const torque = last(seriesOf(motorTorque, m.id));
-      return [m.id, { joint: m.joint, torque, power: torque * last(velocityOf(m.joint)) }];
+      const [torques, speeds] = [seriesOf(motorTorque, m.id), velocityOf(m.joint)];
+      const torque = last(torques);
+      const period: Period | null = findPeriod(torques, trace.times) ?? findPeriod(speeds, trace.times);
+      const cycle =
+        period === null
+          ? {}
+          : {
+              periodS: period.periodS,
+              cycleMeanTorque: tailMean(torques, period.windowSamples),
+              cycleMeanPower: tailMean(
+                torques.map((t, i) => t * (speeds[i] ?? 0)),
+                period.windowSamples,
+              ),
+            };
+      return [m.id, { joint: m.joint, torque, power: torque * last(speeds), ...cycle }];
+    }),
+  );
+  warnJams(dynamics, trace, motorTorque, warnings);
+  const freeCarried = new Set(Object.values(dynamics.joints).map((joint) => joint.child));
+  const freeBodies = Object.fromEntries(
+    Object.values(dynamics.bodies).flatMap((body) => {
+      const track = seriesOf(trace.bodyPosition, body.id);
+      const [end, before] = [track[track.length - 1], track[track.length - 2]];
+      if (body.fixed || freeCarried.has(body.id) || end === undefined) return [];
+      const [t0, t1] = [trace.times[track.length - 1] ?? 0, trace.times[track.length - 2] ?? 0];
+      const dt = t0 - t1;
+      const older = track[track.length - 3];
+      // backward difference of second order (uniform samples) so a falling body's speed is the end value, not the last interval's mean
+      const velocity = (before === undefined || dt <= 0
+        ? [0, 0, 0]
+        : end.map((c, k) =>
+            older === undefined ? (c - (before[k] ?? c)) / dt : (3 * c - 4 * (before[k] ?? c) + (older[k] ?? c)) / (2 * dt),
+          )) as unknown as Vec3;
+      return [
+        [
+          body.id,
+          {
+            finalPosition: end.map((c) => c / run.metresPerUnit) as unknown as Vec3,
+            finalVelocity: velocity,
+            speed: Math.hypot(velocity[0], velocity[1], velocity[2]),
+          },
+        ] as const,
+      ];
     }),
   );
   const outputs = Object.fromEntries(
@@ -179,8 +288,21 @@ export function simulationData(
       return [id, { ...(name !== undefined ? { name } : {}), massKg: props.mass, centerOfMass }];
     }),
   );
+  const balance = energyOf(dynamics, trace);
+  const springs = springResults(dynamics, trace);
   const base = { engine: run.engine, duration: run.duration, timestep: run.timestep, samples: trace.times.length };
-  const data: SimulationData = { ...base, bodies, joints, motors, propellers, gears, warnings };
+  const data: SimulationData = {
+    ...base,
+    bodies,
+    joints,
+    motors,
+    ...(Object.keys(freeBodies).length > 0 ? { freeBodies } : {}),
+    propellers,
+    gears,
+    warnings,
+    ...(balance !== null ? { energy: balance.data } : {}),
+    ...(springs !== null ? { springs } : {}),
+  };
   if (run.detail === 'summary') return data;
   const series = {
     times: trace.times,
@@ -189,6 +311,7 @@ export function simulationData(
     motorTorque,
     propellerThrust: Object.fromEntries(Object.entries(outputs).map(([id, o]) => [id, o.map((x) => x.thrust)])),
     propellerPower: Object.fromEntries(Object.entries(outputs).map(([id, o]) => [id, o.map((x) => x.power)])),
+    ...(balance !== null ? { energy: balance.series } : {}),
   };
   if (run.detail === 'series') return { ...data, series };
   const poses = {
@@ -212,12 +335,31 @@ const formatNumber = (value: number, digits: number): string => value.toLocaleSt
 export function simulationSummary(data: SimulationData): string {
   const parts = [`simulate_motion: ${formatNumber(data.duration, 3)} s with ${data.engine}.`];
   for (const [id, joint] of Object.entries(data.joints)) {
-    const speed = joint.finalRpm !== undefined ? `${formatNumber(joint.finalRpm, 1)} rpm` : `${formatNumber(joint.finalVelocity, 4)} m/s`;
-    const settled = joint.steady ? `steady after ${formatNumber(joint.settledAfter ?? 0, 2)} s` : 'not yet steady';
-    parts.push(`Joint ${id}: ${speed} (${settled}).`);
+    const unit = joint.finalRpm !== undefined ? 'rpm' : 'm/s';
+    const show = (rpm: number | undefined, velocity: number): string =>
+      rpm !== undefined ? `${formatNumber(rpm, 1)} rpm` : `${formatNumber(velocity, 4)} ${unit}`;
+    if (joint.periodic && joint.periodS !== undefined)
+      parts.push(
+        `Joint ${id}: periodic, period ${formatNumber(joint.periodS, 3)} s, cycle-mean ${show(joint.cycleMeanRpm, joint.cycleMeanVelocity ?? 0)}, ` +
+          `peak ${show(joint.kind === 'revolute' ? joint.peakVelocity / RAD_PER_S_PER_RPM : undefined, joint.peakVelocity)}, travel ${formatNumber(joint.finalPosition, 4)} ${joint.kind === 'revolute' ? 'rad' : 'm'} at the end.`,
+      );
+    else {
+      const settled = joint.steady ? `steady after ${formatNumber(joint.settledAfter ?? 0, 2)} s` : 'not yet steady';
+      parts.push(`Joint ${id}: ${show(joint.finalRpm, joint.finalVelocity)} (${settled}).`);
+    }
   }
   for (const [id, motor] of Object.entries(data.motors))
-    parts.push(`Motor ${id}: ${formatNumber(motor.torque, 1)} N·m, ${formatNumber(motor.power / 1000, 2)} kW.`);
+    parts.push(
+      motor.cycleMeanTorque !== undefined && motor.cycleMeanPower !== undefined
+        ? `Motor ${id}: cycle-mean ${formatNumber(motor.cycleMeanTorque, 1)} N·m, ${formatNumber(motor.cycleMeanPower / 1000, 2)} kW ` +
+            `(period ${formatNumber(motor.periodS ?? 0, 3)} s; at the end ${formatNumber(motor.torque, 1)} N·m).`
+        : `Motor ${id}: ${formatNumber(motor.torque, 1)} N·m, ${formatNumber(motor.power / 1000, 2)} kW.`,
+    );
+  for (const [id, body] of Object.entries(data.freeBodies ?? {}))
+    parts.push(
+      `Body ${id}: free, ends at [${body.finalPosition.map((c) => formatNumber(c, 2)).join(', ')}] with velocity ` +
+        `[${body.finalVelocity.map((c) => formatNumber(c, 3)).join(', ')}] m/s (speed ${formatNumber(body.speed, 3)} m/s).`,
+    );
   for (const [id, prop] of Object.entries(data.propellers))
     parts.push(
       `Propeller ${id}: ${formatNumber(prop.rpm, 1)} rpm, thrust ${formatNumber(prop.thrust, 1)} N, ` +
@@ -225,6 +367,25 @@ export function simulationSummary(data: SimulationData): string {
     );
   for (const [id, gear] of Object.entries(data.gears))
     parts.push(`Gear ${id}: ratio ${formatNumber(gear.ratio, 4)} held within ${formatNumber(gear.maxRatioError * 100, 3)} %.`);
+  if (data.energy !== undefined) {
+    const e = data.energy;
+    const joules = (value: number): string => formatNumber(Math.abs(value) < 1e-9 ? 0 : value, 4);
+    parts.push(
+      `Energy: total ${joules(e.initialTotalJ)} -> ${joules(e.finalTotalJ)} J (end: kinetic ${joules(e.finalKineticJ)}, ` +
+        `potential ${joules(e.finalPotentialJ)} J relative to the start pose), dissipated by damping and friction ${joules(e.dissipatedJ)} J, ` +
+        `largest departure from the initial total ${formatNumber(e.maxDeviationFraction * 100, 3)} % of the peak energy.`,
+    );
+    if (e.inputWorkJ !== undefined && (e.inputWorkJ !== 0 || (e.propellerWorkJ ?? 0) !== 0 || e.dissipatedJ > 0))
+      parts.push(
+        `Input work ${joules(e.inputWorkJ)} J (motors, governors, gas pressure), absorbed by propellers ${joules(e.propellerWorkJ ?? 0)} J; ` +
+          `balance initial + input - dissipated - propellers - final = ${joules(e.balanceErrorJ ?? 0)} J (${formatNumber((e.balanceErrorFraction ?? 0) * 100, 3)} %).`,
+      );
+  }
+  for (const [id, spring] of Object.entries(data.springs ?? {}))
+    parts.push(
+      `Spring ${id}: length ${formatNumber(spring.minLengthM * 1000, 3)} to ${formatNumber(spring.maxLengthM * 1000, 3)} mm (free ${formatNumber(spring.freeLengthM * 1000, 3)} mm), ` +
+        `force ${formatNumber(spring.finalForceN, 3)} N at the end, peak ${formatNumber(spring.peakForceN, 3)} N.`,
+    );
   if (data.warnings.length > 0) parts.push(`Warnings: ${data.warnings.join('; ')}.`);
   return parts.join(' ');
 }

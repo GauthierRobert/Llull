@@ -252,7 +252,7 @@ def agent_first_cases(materials: dict, catalog: dict) -> list[dict]:
          "geometry": "box_100x50x10_mm",
          "expected": [mass_case("density_typical_matweb", typ, rho_typ), mass_case("density_ams4045_supplier", sup, rho_sup),
                       {"densitySource": "legacy Material.density 0.00785 g/mm^3 (10 mm cube)", "massG": 7.85,
-                       "unverified": True, "unverifiedReasons": ["provenance legacy"]}],
+                       "unverified": True, "unverifiedReasons": ["density given without a source (unverified)"]}],
          "check_materials": {"code": "MAT_VALUE_UNVERIFIED", "severity": "warning"},
          "tolerance": {"relative": 1e-6},
          "derivation": "mass = V * rho (as VC-MAT-04); unverified iff basis in typical/supplier_unstated/unspecified or provenance legacy (TR-MAT-50)"},

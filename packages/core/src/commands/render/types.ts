@@ -59,6 +59,10 @@ export interface RenderOptions {
   maxPolygons?: number;
   /** Bounds to frame instead of the rendered subset's own (keeps multi-pass layers aligned). */
   frame?: Bounds | null;
+  /** `raster` (default): z-buffered faces embedded as a PNG; `vector`: painter-sorted SVG polygons. */
+  mode?: 'raster' | 'vector';
+  /** false: no view caption and axis triad (frames composed by another command, e.g. render_motion). */
+  caption?: boolean;
 }
 
 /** Polygon before depth is computed (all tessellation helpers return this). */
@@ -74,6 +78,10 @@ export interface PreDepthPolygon {
   loops?: Vec3[][];
   /** Decimation ratio (original / kept polygons) of the owning entity; gaps are bridged by a stroke. */
   inflate?: number;
+  /** A piece of a larger face split for depth sorting: drawn without an outline so the cuts do not show. */
+  seamless?: boolean;
+  /** Id of the entity the face belongs to (depth splitting only splits faces another entity can overlap). */
+  owner?: string;
 }
 
 /** A flat polygon of world-space 3D points, with associated color, normal, and camera depth. */

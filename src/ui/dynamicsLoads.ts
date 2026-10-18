@@ -137,6 +137,7 @@ function jointDetail(joint: DynamicJoint): string {
     `damping ${formatQuantity(joint.damping)} ${revolute ? 'N·m·s/rad' : 'N·s/m'}`,
     `friction ${formatQuantity(joint.friction)} ${revolute ? 'N·m' : 'N'}`,
   ];
+  if (joint.stiffness !== undefined) parts.push(`spring ${formatQuantity(joint.stiffness)} ${revolute ? 'N·m/rad' : 'N/m'}`);
   if (joint.initialVelocity !== 0) parts.push(`starts at ${speed}`);
   return parts.join(' · ');
 }

@@ -19,11 +19,11 @@ function objectParams(name: string, path: string, node: SchemaNode): Array<[stri
 
 describe('nested parameter schemas', () => {
   const all = listCommands().flatMap((command) => objectParams(command.name, '', command.paramsSchema as unknown as SchemaNode));
-  it('declare the required fields of every object parameter (patch objects are all-optional)', () => {
+  it('declare the required fields of every object parameter (patch and factor bags are all-optional)', () => {
     const missing = all
       .filter(([path, node]) => (path.includes('.') || path.includes('[]') ? !node.required : false))
       .map(([path]) => path)
-      .filter((path) => !/\.patch$/.test(path));
+      .filter((path) => !/\.(patch|factors)$/.test(path));
     expect(missing).toEqual([]);
   });
   it('only require fields that exist', () => {

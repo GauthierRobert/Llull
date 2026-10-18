@@ -12,6 +12,7 @@ The same commands run in the browser (WASM loaded on the first Simulate), in the
 | `add_rigid_body`                                          | entities that move as one part; mass / centre of mass / full inertia tensor from their geometry (material density, else `density` kg/m³, default steel); `massKg` rescales; `fixed` welds to ground                                                                                                                                     |
 | `add_body_joint`                                          | revolute (shaft, hinge, crank pin), prismatic (piston) or spherical (ball pin, loop closure only) joint to `ground` or a parent body, anchor in document units, damping, dry friction, initial speed. A body may be the child of several joints: closed loops (see below)                                                               |
 | `add_gear_coupling`                                       | rigid ratio between two joints (spur, belt, planetary), enforced as a near-rigid constraint                                                                                                                                                                                                                                             |
+| `add_spring`                                              | point-to-point spring-damper between two bodies (or a body and the ground): world attachment points, stiffness N/m, damping N·s/m, free length (default the distance at the modelled pose) or preload; a MuJoCo spatial tendon                                                                                                          |
 | `add_motor`                                               | `torque_curve` engine (N·m vs rpm × throttle) or `speed` governor (holds rpm, max torque)                                                                                                                                                                                                                                               |
 | `add_propeller`                                           | static-thrust propeller: T = Ct·ρ·n²·D⁴, P = Cp·ρ·n³·D⁵, Q = P/(2πn)                                                                                                                                                                                                                                                                    |
 | `add_cylinder_pressure`                                   | gas pressure on a piston (prismatic joint) driven by a crank: `table`, `wiebe` (exact IMEP calibration) or `single_zone` (Woschni heat loss) model, four- or two-stroke; crank radius, rod length and TDC read from the joints                                                                                                          |
@@ -25,6 +26,32 @@ the motion in the 3D view (play / scrub / slow motion down to 1/100).
 
 Engine layout: `packages/core/src/dynamics/` (engine contract, doc → model, force laws, report),
 `packages/physics-mujoco/` (MJCF generation + stepping), `packages/core/src/geometry/{massProperties,entityMassProperties}.ts`.
+
+### Springs, energy and unsettled-run warnings
+
+`add_body_joint` takes `stiffness` (N·m/rad revolute, N/m prismatic; 1 N/mm = 1000 N/m) and `springReference` (rad or m from the modelled
+pose, default 0) and maps them to MuJoCo `stiffness` / `springref`; a spring needs a tree joint (a loop-closing joint has no coordinate:
+`simulate_motion` refuses it) and spherical joints take none. `simulate_motion energy: true` (automatic when a joint has a spring) adds
+`data.energy` (kinetic, potential = gravity + springs relative to the start pose, total, energy dissipated by joint damping / friction,
+largest departure of the total from its start value) and with `detail: "series"` `data.series.energy`; `plot_simulation` draws it as the
+`energy` quantity. Checks: mass on a prismatic spring T = 2π√(m/k) to 5e-9; torsional oscillator and spring + gravity pendulum < 0.5 %;
+undamped 30 deg pendulum total-energy drift 1e-13 of the peak; damped flywheel KE = ½I(ω0e^(-ct/I))² < 0.2 % and the loss equals the
+dissipated energy (0.01 %). An unsettled joint is reported by direction: "still accelerating", "still decelerating", "oscillates with an
+amplitude still decaying / growing", or neutrally "not yet steady".
+
+`add_spring` joins two attachment points (world coordinates at the modelled pose, document units; each then rides on its body) with
+F = k·(L - L0) + c·dL/dt along the line of the points (spatial tendon between two sites); L0 = `freeLengthMm`, else the distance minus
+`preloadN`/k, else the distance. It works with any joint arrangement (rocker, four-bar link, free body). Its energy is in the potential
+energy, its damper in `dissipatedJ`, and `data.springs` gives length range and force per spring. `delete_dynamics_item` removes it (also
+when either body goes). `render_motion` draws each spring as a green zig-zag between the moving attachment points and lists them in
+`data.frames[].springs`. Checks (`tests/unit/dynamicsSprings.test.ts`): mass on a spring to the ground T = 2π√(m/k) to 1e-9, static
+deflection m·g/k exact, undamped energy drift 3e-9 (mass), < 0.5 % (rocker), 2e-5 (four-bar with a coupler spring).
+
+Energy balance: `data.energy` also reports `inputWorkJ` (work of motors, speed governors and cylinder gas pressure, ∫τ·dθ per step from
+the engine's applied forces and servo forces, plus the propellers' absorbed work), `propellerWorkJ` (∫Q|ω|dt, carried away by the air) and
+`balanceErrorJ` = initial + input - dissipated - propellers - final (and `balanceErrorFraction`). Flywheel with a flat torque curve and
+viscous damping to steady state: balance error 4e-10 relative; speed governor 3e-6; torque-curve motor + propeller < 1 %. Not counted:
+the work of propeller thrust on a body that translates.
 
 ## Recipe (agent or CLI): engine → reduction gear → propeller
 

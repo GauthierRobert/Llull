@@ -11,6 +11,13 @@ export const PLOT_LEFT = 90;
 export const PLOT_TOP = 60;
 export const PLOT_ROW_HEIGHT = 16;
 export const PLOT_MAX_WIDTH = 1000;
+/** Paper millimetres per SVG user unit of the road / drainage drawings (used to turn px per metre into a 1:N scale). */
+export const SVG_UNIT_MM = 0.25;
+
+/** Scale denominator N of 1:N for a drawing at `pxPerMetre` SVG units per real metre. */
+export function scaleDenominator(pxPerMetre: number): number {
+  return Math.round(1000 / (pxPerMetre * SVG_UNIT_MM));
+}
 
 export interface TextStyle {
   readonly size?: number;
@@ -77,6 +84,12 @@ export function pushLevelGrid(
     body.push(svgLine([left, y(z)], [left + plotWidth, y(z)], '#e2e2e2'));
     body.push(svgText(left - 6, y(z) + 3, z.toFixed(2), { anchor: 'end', size: 9 }));
   }
+}
+
+/** Text anchor of a table-band cell: the first / last column hug the plot edges so they never run over the row labels or the margin. */
+export function bandAnchor(index: number, count: number): 'start' | 'middle' | 'end' {
+  if (count > 1 && index === 0) return 'start';
+  return count > 1 && index === count - 1 ? 'end' : 'middle';
 }
 
 /** Table-band row labels (left of the plot) and row separators, appended to `body`. */

@@ -9,7 +9,7 @@ import type { ExecutionContext } from '../types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { kernelRefusal } from '../kernelRefusal';
-import { replayHistory } from './replay';
+import { noteReplayFailure, replayFailureError, replayFailuresNote, replayHistory, type ReplayFailure } from './replay';
 import { unresolvedExpressionsNote } from './replayStep';
 import { changed, noop } from '../noop';
 import { clamp } from '../../lib/clamp';
@@ -35,7 +35,9 @@ function regenerateWith(
   let inertReason = 'its params are invalid for that command';
   const warnings: string[] = [];
   const brokenDependents: FeatureStep[] = [];
+  const failures: ReplayFailure[] = [];
   const replayed = replayHistory(doc, newHistory, context.registry, warnings, (event) => {
+    noteReplayFailure(failures, event);
     if (!event.inert) return;
     if (event.step.id === mustApplyStepId) {
       inertStep = event.step;
@@ -58,7 +60,15 @@ function regenerateWith(
     brokenDependents.length > 0
       ? ` Warning: ${brokenDependents.length} step(s) no longer change the document (a referenced entity or input is gone): ${brokenDependents.map((step) => `${step.id} (${step.name})`).join(', ')}.`
       : '';
-  return changed(regenerated, `${command}: ${done(`${count} ${count === 1 ? 'entity' : 'entities'}`)}${brokenNote}`, regenerated.order);
+  const error = replayFailureError(failures);
+  return {
+    ...changed(
+      regenerated,
+      `${command}: ${done(`${count} ${count === 1 ? 'entity' : 'entities'}`)}${brokenNote}${replayFailuresNote(failures)}`,
+      regenerated.order,
+    ),
+    ...(error ? { error } : {}),
+  };
 }
 
 /** Locate `stepId`, let `edit` build the new history (or a no-op message), then regenerate. */
@@ -99,13 +109,18 @@ export const replayHistoryCommand = defineCommand({
     const warnings: string[] = [];
     const refused = kernelRefusal(doc, doc.featureHistory, context);
     if (refused !== null) return noop(doc, `replay_history: ${refused}`);
-    const regenerated = replayHistory(doc, doc.featureHistory, context.registry, warnings);
+    const failures: ReplayFailure[] = [];
+    const regenerated = replayHistory(doc, doc.featureHistory, context.registry, warnings, (event) => noteReplayFailure(failures, event));
     const count = Object.keys(regenerated.entities).length;
-    return changed(
-      regenerated,
-      `replay_history: replayed ${doc.featureHistory.length} step(s); ${count} ${count === 1 ? 'entity' : 'entities'} in document.${unresolvedExpressionsNote(warnings)}`,
-      regenerated.order,
-    );
+    const error = replayFailureError(failures);
+    return {
+      ...changed(
+        regenerated,
+        `replay_history: replayed ${doc.featureHistory.length} step(s); ${count} ${count === 1 ? 'entity' : 'entities'} in document.${unresolvedExpressionsNote(warnings)}${replayFailuresNote(failures)}`,
+        regenerated.order,
+      ),
+      ...(error ? { error } : {}),
+    };
   },
 });
 

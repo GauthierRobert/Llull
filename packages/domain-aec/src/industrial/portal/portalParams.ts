@@ -35,6 +35,27 @@ export const portalFrameParams = z.object({
   railSpacing: z.number().optional().describe('Vertical, in document units. Default 1800 mm.'),
   footings: z.boolean().optional().describe('Pad footings under columns. Default true.'),
   connections: z.boolean().optional().describe('Bolted end-plate moment connections (haunched eaves, apex). Default true.'),
+  haunch: z
+    .object({
+      eavesLength: z
+        .number()
+        .describe(
+          'Eaves haunch length along the rafter as a FRACTION OF THE SPAN, 0–0.25 (e.g. 0.1 = 10 % of the span; the haunch is cut from the ' +
+            'rafter section, depth = rafter depth at the column face so the section there is about twice the rafter depth). 0 = no eaves haunch.',
+        ),
+      apexLength: z
+        .number()
+        .optional()
+        .describe(
+          'Apex haunch length on each rafter at the ridge, as a fraction of the span, 0–0.25 (duopitch only; the same cut-from-the-section ' +
+            'haunch under both rafters). Default 0 = none. eavesLength + apexLength must not exceed 0.4.',
+        ),
+    })
+    .optional()
+    .describe(
+      'Rafter haunches of the moment connections (needs connections). The frame analysis (check_portal_frames / design_portal_frames) models ' +
+        'them as stepped segments with the increased inertia and section modulus of the built-up section. Omitted: eaves haunch of 10 % of the span, no apex haunch.',
+    ),
   basePlates: z.boolean().optional().describe('Base plates with 4 M24 anchor bolts under every column. Default true.'),
   columnBase: z
     .enum(['pinned', 'fixed'])

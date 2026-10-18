@@ -6,10 +6,13 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { booleanFlag, missingValueFlag, paramsSource, parseArgv, stringFlag } from '../src/cli/argv';
 import { describeCommand, listCatalog, searchCatalog, shortDescription, suggestNames, toolsetCounts } from '../src/cli/catalog';
-import { filesOfData, saveDataFiles, withoutPayloads } from '../src/cli/saveFiles';
+import { filesOfData, saveDataFiles, withoutPayloads, withSaveDefaults } from '../src/cli/saveFiles';
 import { imageDataUrl, resolveImageRefs } from '../src/cli/imageParams';
 import { listCommands } from '@core/commands/registry';
 import { exchangeToolDefinitions } from '../src/cli/exchange';
+import { paramsLines } from '../src/cli/describeSchema';
+import { runCli, type CliIo } from '../src/cli/main';
+import type { ParamsSchema } from '@core/commands/types';
 
 describe('parseArgv', () => {
   it('splits positionals, value flags, boolean flags and --k=v', () => {
@@ -147,10 +150,38 @@ describe('saveFiles', () => {
         .toString(),
     ).toBe('PNG');
     expect(() => saveDataFiles({ count: 1 }, path.join(root, 'x.png'))).toThrow(/no data.svg/);
-    expect(() => saveDataFiles({ svg: 'not svg', text: 'x' }, path.join(root, 'bad.png'))).toThrow(/no data.svg that rasterizes/);
+    const [fallback] = saveDataFiles({ svg: 'not svg', text: 'x' }, path.join(root, 'bad.png'));
+    expect(fallback?.path).toBe(path.join(root, 'bad.svg'));
+    expect(fallback?.note).toMatch(/rasterizing the svg failed .*saved the \.svg instead/);
+    expect(readFileSync(fallback?.path ?? '', 'utf8')).toBe('not svg');
     expect(existsSync(path.join(root, 'bad.png'))).toBe(false);
     expect(() => saveDataFiles({ count: 1 }, path.join(root, 'x.txt'))).toThrow(/no file payload/);
     expect(existsSync(path.join(root, 'x.txt'))).toBe(false);
+  });
+
+  it('saves dxf / ifc / step text payloads and civil svg held in data.text (also to .png)', () => {
+    const root = dir();
+    const [dxf] = saveDataFiles({ partId: 'p', filename: 'p_flat.dxf', dxf: '0\nSECTION' }, path.join(root, 'part.dxf'));
+    expect(readFileSync(dxf?.path ?? '', 'utf8')).toBe('0\nSECTION');
+    expect(filesOfData({ dxf: 'D', filename: 'a.dxf' })[0]?.name).toBe('a.dxf');
+    expect(filesOfData({ ifc: 'ISO-10303-21;' })).toHaveLength(1);
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>';
+    const [png] = saveDataFiles({ text: svg, fileName: 'civil.svg' }, path.join(root, 'civil.png'));
+    expect(
+      readFileSync(png?.path ?? '')
+        .subarray(1, 4)
+        .toString(),
+    ).toBe('PNG');
+    expect(() => saveDataFiles({ text: 'LandXML' }, path.join(root, 'land.png'))).toThrow(/no data.svg/);
+  });
+
+  it('picks export_gltf binary from the --save extension unless the caller set it', () => {
+    expect(withSaveDefaults('export_gltf', { entityIds: ['a'] }, 'x.glb')).toEqual({ entityIds: ['a'], binary: true });
+    expect(withSaveDefaults('export_gltf', {}, 'x.GLTF')).toEqual({ binary: false });
+    expect(withSaveDefaults('export_gltf', { binary: false }, 'x.glb')).toEqual({ binary: false });
+    expect(withSaveDefaults('export_gltf', {}, 'x.bin')).toEqual({});
+    expect(withSaveDefaults('export_gltf', {}, undefined)).toEqual({});
+    expect(withSaveDefaults('export_stl', {}, 'x.glb')).toEqual({});
   });
 
   it('replaces payloads with size markers, recursing into files[]', () => {
@@ -160,5 +191,86 @@ describe('saveFiles', () => {
       files: [{ content: '<2 chars, saved>', name: 'a' }],
     });
     expect(withoutPayloads(5)).toBe(5);
+  });
+});
+
+describe('describe prints nested structure', () => {
+  const textOf = (name: string): string => describeCommand(name)?.text ?? '';
+
+  it('lists every set_temperature_field source branch with its fields', () => {
+    const text = textOf('set_temperature_field');
+    expect(text).toMatch(/^ {2}one of:$/m);
+    for (const kind of ['uniform', 'expression', 'thermal_result', 'table']) expect(text).toContain(`  - kind:"${kind}"`);
+    expect(text).toMatch(/^ {4}- analysisId \(string, required\)/m);
+    expect(text).toMatch(/^ {4}- csvSha256 \(string, required\)/m);
+    expect(text).toMatch(/^ {6}- unit \(string, required\)/m);
+  });
+
+  it('shows the allowable union of compute_margins', () => {
+    const text = textOf('compute_margins');
+    expect(text).toContain('- allowable ("ftu"|"fty" | object)');
+    expect(text).toMatch(/^ {2}one of:$/m);
+    expect(text).toMatch(/^ {4}- value \(number, required\)/m);
+  });
+
+  it('keeps a simple union on one line (timestepS: "auto" | number)', () => {
+    const text = textOf('set_dynamics_solver');
+    expect(text).toContain('- timestepS ("auto" | number):');
+    expect(text).not.toContain('one of:');
+  });
+
+  it('leaves a simple command unchanged', () => {
+    const lines = textOf('add_box').split('\n');
+    expect(lines).toContain('Params:');
+    expect(lines.filter((line) => line.startsWith(' '))).toEqual([]);
+    expect(textOf('add_box')).toContain('- size (number[], required): [width, height, depth]');
+  });
+
+  it('renders records, discriminated array items, defaults, long enums and the depth cap', () => {
+    const deep = (n: number): Record<string, unknown> =>
+      n === 0 ? { type: 'string' } : { type: 'object', properties: { next: deep(n - 1) } };
+    const schema = {
+      type: 'object',
+      required: ['basis'],
+      properties: {
+        basis: {
+          type: 'object',
+          description: 'By id.',
+          additionalProperties: { type: 'object', properties: { kind: { type: 'string', enum: ['a'] } } },
+        },
+        tags: { type: 'object', additionalProperties: { type: 'number' } },
+        parts: {
+          type: 'array',
+          items: { anyOf: [{ type: 'object', properties: { kind: { const: 'p' }, n: { type: 'number' } } }, { type: 'string' }] },
+        },
+        mode: { type: 'string', enum: Array.from({ length: 20 }, (_, i) => `m${i}`), default: 'm0' },
+        nest: deep(9),
+      },
+    } as unknown as ParamsSchema;
+    const text = paramsLines(schema).join('\n');
+    expect(text).toContain('- basis (record<string, object>, required): By id.');
+    expect(text).toContain('each value:');
+    expect(text).toContain('- kind ("a")');
+    expect(text).toContain('- tags (record<string, number>)');
+    expect(text).toContain('- parts ((kind:"p" | string)[])');
+    expect(text).toContain('  - kind:"p"');
+    expect(text).toContain('…(+8)');
+    expect(text).toContain('default "m0"');
+    expect(text).toContain('…');
+  });
+
+  it('prints the raw schema with --json', async () => {
+    const out: string[] = [];
+    const io: CliIo = {
+      stdout: (t) => out.push(t),
+      stderr: () => undefined,
+      readStdin: () => Promise.resolve(''),
+      env: {},
+      prepareKernel: () => Promise.resolve(),
+      fetchImpl: () => Promise.reject(new Error('offline')),
+    };
+    await runCli(['describe', 'set_temperature_field', '--json'], io);
+    const parsed = JSON.parse(out.join('')) as { params: { properties: { source: { anyOf: unknown[] } } } };
+    expect(parsed.params.properties.source.anyOf).toHaveLength(4);
   });
 });

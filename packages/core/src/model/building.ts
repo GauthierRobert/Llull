@@ -142,7 +142,10 @@ export interface BeamElement extends LevelElementBase {
   material: string;
 }
 
-/** A straight-run stair rising from its level. `angle` is the run direction (radians, CCW from +X). */
+/** Plan layout of a stair with an intermediate landing: one straight run, an L (quarter turn) or a dog-leg U (half turn). */
+export type StairShape = 'straight' | 'quarter_turn' | 'half_turn';
+
+/** A stair rising from its level; its first flight runs along `angle` (radians, CCW from +X). */
 export interface StairElement extends LevelElementBase {
   readonly category: 'stair';
   start: Vec2;
@@ -151,6 +154,18 @@ export interface StairElement extends LevelElementBase {
   riserCount: number;
   riserHeight: number;
   treadDepth: number;
+  /** Thickness of the sloping waist slab under the steps, perpendicular to the flight. Absent = the riser height. */
+  waistThickness?: number;
+  /** Risers climbed before the intermediate landing (2 to riserCount - 2). Absent = no landing, one uninterrupted flight. */
+  landingAt?: number;
+  /** Landing depth along the first flight's direction. Absent = the stair width. */
+  landingLength?: number;
+  /** Plan layout of the flights around the landing. Absent = straight. */
+  shape?: StairShape;
+  /** Side the second flight departs to (quarter_turn, half_turn). Absent = left. */
+  turn?: 'left' | 'right';
+  /** half_turn only: clear gap between the two flights. Absent = 0. */
+  flightGap?: number;
   material: string;
 }
 

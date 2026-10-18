@@ -6,41 +6,11 @@
  */
 
 import { clamp } from '@lib/clamp';
+import { conversation, type McpPromptDescriptor, type McpPromptResult, type PromptTemplate } from './promptTypes';
+import { WORKFLOW_TEMPLATES } from './workflowPrompts';
 
-interface McpPromptMessage {
-  role: 'user' | 'assistant';
-  content: { type: 'text'; text: string };
-}
-
-interface McpPromptArgument {
-  name: string;
-  description: string;
-  required: boolean;
-}
-
-interface McpPromptDescriptor {
-  name: string;
-  description: string;
-  arguments?: McpPromptArgument[];
-}
-
-interface McpPromptResult {
-  description: string;
-  messages: McpPromptMessage[];
-}
-
-interface PromptTemplate {
-  descriptor: McpPromptDescriptor;
-  buildMessages: (args: Record<string, string>) => McpPromptMessage[];
-}
-
-/** Every template is one user request answered by one assistant plan. */
-function conversation(userText: string, assistantText: string): McpPromptMessage[] {
-  return [
-    { role: 'user', content: { type: 'text', text: userText } },
-    { role: 'assistant', content: { type: 'text', text: assistantText } },
-  ];
-}
+/** Float noise out of derived coordinates (2.4000000000000004 -> 2.4). */
+const round = (value: number): number => Math.round(value * 1e6) / 1e6;
 
 /**
  * @prompt model_bracket
@@ -70,19 +40,19 @@ const modelBracket: PromptTemplate = {
     const h = Number(height);
     const t = Number(thickness);
     const n = clamp(Math.round(Number(hole_count)), 1, 4);
-    const holeRadius = Math.max(t * 0.4, 2);
-    const holeDepth = t + 2; // punch fully through
+    const holeRadius = round(Math.max(t * 0.4, 2));
+    const holeDepth = round(t + 2); // punch fully through
 
     // Hole centers are evenly spaced along the width. a boolean subtract consumes BOTH operands and
     // returns a NEW mesh, so the subtracts chain: body → body_0 → body_1 → … → body_${n - 1}.
     const holeActions: string[] = [];
     for (let i = 0; i < n; i++) {
-      const cx = n === 1 ? w / 2 : (w / (n + 1)) * (i + 1);
+      const cx = n === 1 ? round(w / 2) : round((w / (n + 1)) * (i + 1));
       const holeSketchAlias = `hole_sketch_${i}`;
       const holeSolidAlias = `hole_solid_${i}`;
       const bodyIn = i === 0 ? 'body' : `body_${i - 1}`;
       holeActions.push(
-        `    { "command": "draw_arc",       "params": { "center": [${cx}, ${h / 2}], "radius": ${holeRadius} }, "as": "${holeSketchAlias}" },`,
+        `    { "command": "draw_arc",       "params": { "center": [${cx}, ${round(h / 2)}], "radius": ${holeRadius} }, "as": "${holeSketchAlias}" },`,
         `    { "command": "extrude_profile", "params": { "id": "$${holeSketchAlias}", "depth": ${holeDepth} }, "as": "${holeSolidAlias}" },`,
         `    { "command": "boolean",        "params": { "op": "subtract", "a": "$${bodyIn}", "b": "$${holeSolidAlias}" }, "as": "body_${i}" },`,
       );
@@ -428,6 +398,7 @@ const TEMPLATES: ReadonlyArray<PromptTemplate> = [
   designFactory,
   designSite,
   designSheetBracket,
+  ...WORKFLOW_TEMPLATES,
 ];
 
 export function listMcpPrompts(): McpPromptDescriptor[] {

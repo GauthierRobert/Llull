@@ -3,6 +3,8 @@
  * embed textures in glTF exports.
  */
 
+import { deflateRaw } from './deflate';
+
 const CRC_TABLE = ((): Uint32Array => {
   const table = new Uint32Array(256);
   for (let n = 0; n < 256; n++) {
@@ -61,22 +63,42 @@ function storedZlib(raw: Uint8Array): Uint8Array {
   return out;
 }
 
+/** zlib stream of `raw` compressed with `deflateRaw`. */
+function deflatedZlib(raw: Uint8Array): Uint8Array {
+  const body = deflateRaw(raw);
+  const out = new Uint8Array(2 + body.length + 4);
+  out[0] = 0x78;
+  out[1] = 0x01;
+  out.set(body, 2);
+  new DataView(out.buffer).setUint32(2 + body.length, adler32(raw));
+  return out;
+}
+
 /**
- * PNG bytes of a `width` × `height` RGBA image (`rgba.length === width * height * 4`).
+ * PNG bytes of a `width` × `height` RGBA image (`rgba.length === width * height * 4`). `compress` filters every row with "Up" and deflates
+ * it (renders shrink ~20-50×); without it the rows are stored as is.
  * @invariant width, height >= 1
  */
-export function encodePng(width: number, height: number, rgba: Uint8Array): Uint8Array {
+export function encodePng(width: number, height: number, rgba: Uint8Array, compress = false): Uint8Array {
   const header = new Uint8Array(13);
   const view = new DataView(header.buffer);
   view.setUint32(0, width);
   view.setUint32(4, height);
   header.set([8, 6, 0, 0, 0], 8);
-  const raw = new Uint8Array(height * (width * 4 + 1));
-  for (let y = 0; y < height; y++) raw.set(rgba.subarray(y * width * 4, (y + 1) * width * 4), y * (width * 4 + 1) + 1);
+  const stride = width * 4;
+  const raw = new Uint8Array(height * (stride + 1));
+  for (let y = 0; y < height; y++) {
+    const row = y * (stride + 1);
+    if (!compress || y === 0) raw.set(rgba.subarray(y * stride, (y + 1) * stride), row + 1);
+    else {
+      raw[row] = 2;
+      for (let x = 0; x < stride; x++) raw[row + 1 + x] = ((rgba[y * stride + x] ?? 0) - (rgba[(y - 1) * stride + x] ?? 0)) & 0xff;
+    }
+  }
   const parts = [
     new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     chunk('IHDR', header),
-    chunk('IDAT', storedZlib(raw)),
+    chunk('IDAT', compress ? deflatedZlib(raw) : storedZlib(raw)),
     chunk('IEND', new Uint8Array(0)),
   ];
   const png = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));

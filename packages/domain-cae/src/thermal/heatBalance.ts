@@ -12,6 +12,15 @@ import { enthalpyFunction, nodalEnergy, type Enthalpy } from './storedEnergy';
 
 type Step = FeResultsArtifact['steps'][number];
 
+/**
+ * Mean of a flow over an output interval from its end values: the logarithmic mean when both ends have the same sign (exact for the
+ * exponential relaxation of a linear thermal system, so coarse output intervals do not read as an imbalance), else the trapezoid.
+ */
+function intervalMean(start: number, end: number): number {
+  if (start === end || start * end <= 0) return (start + end) / 2;
+  return (end - start) / Math.log(end / start);
+}
+
 /** Nodal accessor of the first component of `name` in `step`; NaN where the node has no value. */
 export function nodal(step: Step, name: string): (node: number) => number {
   const field = Object.hasOwn(step.fields, name) ? step.fields[name] : undefined;
@@ -103,10 +112,22 @@ export function flowsAndBalance(
     if (k === steps.length - 1 && before != null && now != null && dt > 0)
       storedW = systemToSi('power', (total(now) - total(before)) / dt, unitSystem);
   });
-  const lastRow = rows[rows.length - 1] ?? [];
-  const inW = lastRow.filter((v) => v > 0).reduce((a, b) => a + b, 0);
-  const outW = -lastRow.filter((v) => v < 0).reduce((a, b) => a + b, 0);
+  // Transient: storedW is the mean rate over the last output interval. CalculiX's backward Euler makes it equal the END flows when results
+  // are written at every increment; over coarser outputs it lies between those and the interval mean. Both are evaluated: the smaller
+  // residual is reported (the balance CAN close) and their spread (samplingRel) says how coarse outputs blur it.
+  const finalRow = rows[rows.length - 1] ?? [];
+  const previousRow = steady || steps.length < 2 ? undefined : rows[rows.length - 2];
+  const residualOf = (row: readonly number[]): { inW: number; outW: number; residualRel: number } => {
+    const inW = row.filter((v) => v > 0).reduce((a, b) => a + b, 0);
+    const outW = -row.filter((v) => v < 0).reduce((a, b) => a + b, 0);
+    return { inW, outW, residualRel: Math.abs(inW - outW - storedW) / Math.max(inW, outW, 1e-30) };
+  };
+  const atEnd = residualOf(finalRow);
+  const meanOverInterval =
+    previousRow === undefined ? atEnd : residualOf(finalRow.map((value, i) => intervalMean(previousRow[i] ?? value, value)));
+  const { inW, outW, residualRel } = meanOverInterval.residualRel < atEnd.residualRel ? meanOverInterval : atEnd;
+  const sampling = previousRow === undefined ? undefined : Math.abs(atEnd.residualRel - meanOverInterval.residualRel);
   const last = steps[steps.length - 1];
-  const residualRel = Math.abs(inW - outW - storedW) / Math.max(inW, outW, 1e-30);
-  return { flows, balance: { inW, outW, storedW, residualRel, timeS: last === undefined ? 0 : timeOf(last) } };
+  const timeS = last === undefined ? 0 : timeOf(last);
+  return { flows, balance: { inW, outW, storedW, residualRel, timeS, ...(sampling === undefined ? {} : { samplingRel: sampling }) } };
 }

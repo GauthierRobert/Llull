@@ -5,7 +5,7 @@
 import type { CadDocument, FeatureStep, Parameter } from '../../model/types';
 import { extractReferences } from '../parametric/expression';
 import { stringLeaves } from './regenerate';
-import { replayHistory } from './replay';
+import { noteReplayFailure, replayHistory, type ReplayFailure } from './replay';
 import { currentContext } from '../context';
 import type { ExecutionContext } from '../types';
 import { kernelRefusal } from '../kernelRefusal';
@@ -68,18 +68,19 @@ export function stepsReading(
 /**
  * After a parameter-table edit (`before` → `after`), regenerate the model when any step reads a changed parameter. Unchanged history
  * prefixes come from the replay cache, so only the steps from the first dependent onward re-run.
- * @returns the regenerated document and the number of dependent steps (0 → `after` untouched)
+ * @returns the regenerated document, the number of dependent steps (0 → `after` untouched) and the steps whose replay failed
  * @failure dependents need the geometry kernel and none is available -> `refusal` set, `after` returned unregenerated (the caller no-ops)
  */
 export function regenerateParameterDependents(
   before: CadDocument,
   after: CadDocument,
   ctx: ExecutionContext = currentContext(),
-): { document: CadDocument; dependentSteps: number; refusal?: string } {
+): { document: CadDocument; dependentSteps: number; refusal?: string; failures: ReplayFailure[] } {
   const dependents = stepsReading(after.featureHistory, changedParameters(before.parameters, after.parameters), after);
-  if (dependents.length === 0) return { document: after, dependentSteps: 0 };
+  if (dependents.length === 0) return { document: after, dependentSteps: 0, failures: [] };
   const refusal = kernelRefusal(after, after.featureHistory, ctx);
-  if (refusal !== null) return { document: after, dependentSteps: dependents.length, refusal };
-  const regenerated = replayHistory(after, after.featureHistory, ctx.registry);
-  return { document: regenerated, dependentSteps: dependents.length };
+  if (refusal !== null) return { document: after, dependentSteps: dependents.length, refusal, failures: [] };
+  const failures: ReplayFailure[] = [];
+  const regenerated = replayHistory(after, after.featureHistory, ctx.registry, undefined, (event) => noteReplayFailure(failures, event));
+  return { document: regenerated, dependentSteps: dependents.length, failures };
 }

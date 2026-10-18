@@ -1,15 +1,19 @@
 /** Result probes evaluated from a results artifact (the value at the NEAREST MESH NODE; temperature between nodes is interpolated in its element). */
 
-import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact, ProbeQuantity } from '@core/model/analysis';
+import type { Vec3 } from '@core/model/vectors';
+import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact, ProbeQuantity, ResultProbe } from '@core/model/analysis';
 import { loadCasesOf } from '../decks/context';
 import { lengthUnitName, stressUnitName } from '../decks/units';
 import { magnitude, nodeCoordinates, stepOfLoadCase, vonMises, type ResultStep } from './fields';
+import { systemToSi } from '@lib/thermalUnits';
+import { axisFrame, CYLINDRICAL_FIELDS, CYLINDRICAL_QUANTITIES, type AxisFrame, type CylindricalQuantity } from './cylindrical';
 import { locatePoint, type PointWeights } from './probeInterpolation';
 
 interface ProbeValue {
   /** Load case name (static / thermo_static) or null for a time series (heat_*). */
   readonly loadCase: string | null;
   readonly step: number;
+  /** seconds; 0 for heat_steady (steady state has no time, agrees with the thermal summary) */
   readonly time: number;
   /** null when the field was not written in that result set. */
   readonly value: number | null;
@@ -26,7 +30,9 @@ export interface ProbeReading {
   readonly values: readonly ProbeValue[];
 }
 
-const FIELD: Readonly<Record<ProbeQuantity, { readonly field: string; readonly scalar: (values: readonly number[]) => number }>> = {
+export const QUANTITY_FIELDS: Readonly<
+  Record<Exclude<ProbeQuantity, CylindricalQuantity>, { readonly field: string; readonly scalar: (values: readonly number[]) => number }>
+> = {
   temperature: { field: 'NDTEMP', scalar: (values) => values[0] ?? Number.NaN },
   heat_flux: { field: 'FLUX', scalar: magnitude },
   u_mag: { field: 'DISP', scalar: magnitude },
@@ -39,9 +45,13 @@ const FIELD: Readonly<Record<ProbeQuantity, { readonly field: string; readonly s
   s_zz: { field: 'STRESS', scalar: (values) => values[2] ?? Number.NaN },
 };
 
-function unitOf(analysis: AnalysisCase, quantity: ProbeQuantity): string {
+/** Factor from the solver's value of `quantity` to the value in quantityUnit (heat flux: system units -> W/m^2; others 1). */
+export const quantityScale = (analysis: AnalysisCase, quantity: ProbeQuantity): number =>
+  quantity === 'heat_flux' ? systemToSi('flux', 1, analysis.unitSystem) : 1;
+
+export function quantityUnit(analysis: AnalysisCase, quantity: ProbeQuantity): string {
   if (quantity === 'temperature') return analysis.thermal?.temperatureScale ?? analysis.thermomech?.temperatureScale ?? 'degC';
-  if (quantity === 'heat_flux') return `heat flux (${analysis.unitSystem})`;
+  if (quantity === 'heat_flux') return 'W/m^2';
   return quantity.startsWith('u_') ? lengthUnitName(analysis.unitSystem) : stressUnitName(analysis.unitSystem);
 }
 
@@ -67,6 +77,29 @@ function nearestNode(
   return [best, best === null ? null : distanceTo(best)];
 }
 
+const isCylindrical = (quantity: ProbeQuantity): boolean => (CYLINDRICAL_QUANTITIES as readonly string[]).includes(quantity);
+
+/**
+ * Axis of a cylindrical probe in analysis units: the stored axisPoint (document units) else the centre of the mesh bounding box, along the
+ * stored axisDirection else +Z. null for a zero direction.
+ */
+function probeAxis(probe: ResultProbe, coordinates: ReadonlyMap<number, Vec3>, lengthToAnalysis: number): AxisFrame | null {
+  const direction = probe.axisDirection ?? [0, 0, 1];
+  if (probe.axisPoint !== undefined) {
+    const [x, y, z] = probe.axisPoint;
+    return axisFrame([x * lengthToAnalysis, y * lengthToAnalysis, z * lengthToAnalysis], direction);
+  }
+  const lo: [number, number, number] = [Infinity, Infinity, Infinity];
+  const hi: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+  for (const at of coordinates.values())
+    for (const i of [0, 1, 2] as const) {
+      lo[i] = Math.min(lo[i], at[i]);
+      hi[i] = Math.max(hi[i], at[i]);
+    }
+  const mid = (i: 0 | 1 | 2): number => (coordinates.size === 0 ? 0 : (lo[i] + hi[i]) / 2);
+  return axisFrame([mid(0), mid(1), mid(2)], direction);
+}
+
 function interpolated(at: PointWeights, field: ResultStep['fields'][string] | undefined): number {
   let sum = 0;
   for (const [node, weight] of at.nodes) {
@@ -88,6 +121,7 @@ export function evaluateProbes(
   results: FeResultsArtifact,
   lengthToAnalysis: number,
 ): ProbeReading[] {
+  if (analysis.type === 'modal' || analysis.type === 'buckling') return [];
   const heat = analysis.type === 'heat_steady' || analysis.type === 'heat_transient';
   const sets: { loadCase: string | null; step: ResultStep }[] = heat
     ? results.steps.map((step) => ({ loadCase: null, step }))
@@ -95,9 +129,21 @@ export function evaluateProbes(
         const step = stepOfLoadCase(results, index);
         return step === undefined ? [] : [{ loadCase: name, step }];
       });
+  const coordinates = nodeCoordinates(mesh);
   return Object.entries(analysis.probes).map(([probeId, probe]) => {
     const [nodeId, nodeDistance] = nearestNode(mesh, probeId, probe.point, lengthToAnalysis);
-    const { field, scalar } = FIELD[probe.quantity];
+    const cylindrical = isCylindrical(probe.quantity);
+    const axis = cylindrical ? probeAxis(probe, coordinates, lengthToAnalysis) : null;
+    const nodeAt = nodeId === null ? undefined : coordinates.get(nodeId);
+    const { field, scalar } = cylindrical
+      ? {
+          field: CYLINDRICAL_FIELDS[probe.quantity as CylindricalQuantity].field,
+          scalar: (values: readonly number[]): number =>
+            axis === null || nodeAt === undefined
+              ? Number.NaN
+              : CYLINDRICAL_FIELDS[probe.quantity as CylindricalQuantity].scalar(values, nodeAt, axis),
+        }
+      : QUANTITY_FIELDS[probe.quantity as keyof typeof QUANTITY_FIELDS];
     const inside =
       probe.quantity === 'temperature' && nodeDistance !== null && nodeDistance > 0
         ? locatePoint(mesh, [probe.point[0] * lengthToAnalysis, probe.point[1] * lengthToAnalysis, probe.point[2] * lengthToAnalysis])
@@ -106,13 +152,23 @@ export function evaluateProbes(
       probeId,
       name: probe.name,
       quantity: probe.quantity,
-      unit: unitOf(analysis, probe.quantity),
+      unit: quantityUnit(analysis, probe.quantity),
       nodeId,
       nodeDistance,
       values: sets.map(({ loadCase, step }) => {
         const values = nodeId === null ? undefined : step.fields[field]?.values[String(nodeId)];
-        const value = inside !== null ? interpolated(inside, step.fields[field]) : values === undefined ? Number.NaN : scalar(values);
-        return { loadCase, step: step.step, time: step.time, value: Number.isFinite(value) ? value : null };
+        const value =
+          inside !== null
+            ? interpolated(inside, step.fields[field])
+            : values === undefined
+              ? Number.NaN
+              : scalar(values) * quantityScale(analysis, probe.quantity);
+        return {
+          loadCase,
+          step: step.step,
+          time: heat && analysis.type === 'heat_steady' ? 0 : step.time,
+          value: Number.isFinite(value) ? value : null,
+        };
       }),
     };
   });

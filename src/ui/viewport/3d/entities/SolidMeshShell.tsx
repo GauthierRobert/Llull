@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect } from 'react';
 import * as THREE from 'three';
 import type { BaseEntity } from '@core/model/types';
 import { selectOnClick } from '@ui/viewport/selectClick';
+import { displayMetalness } from '../displayMetalness';
 import { useMaterialProps, type PbrMaterial } from '../useMaterialProps';
 import { applyBoxUvs, useFinishTextures } from '../useFinishTextures';
 import { useViewportStore } from '@ui/store';
@@ -85,7 +86,7 @@ export function SolidMeshShell({
           {...matProps}
           color="#ffffff"
           roughness={1}
-          metalness={1}
+          metalness={displayMetalness(1)}
           map={textures.map}
           normalMap={textures.normalMap}
           normalScale={new THREE.Vector2(textures.normalScale, textures.normalScale)}

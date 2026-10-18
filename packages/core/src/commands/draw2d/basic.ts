@@ -113,7 +113,8 @@ export const drawRectangle = defineCommand({
   description:
     'Draw an axis-aligned rectangle in the local 2D work plane. ' +
     'The origin is at the lower-left corner; width extends along +X, height along +Y. ' +
-    'position places the work-plane origin in 3D space. Both width and height must be > 0.',
+    'position places the work-plane origin in 3D space. Both width and height must be > 0. ' +
+    'Drawn on the XY plane (parallel to z = position[2]); a profile for add_sheet_cutout on a flange must lie in the flange plane, so for flanges give add_sheet_cutout circle/polygon world points instead.',
   params: z.object({
     width: z.number().describe('Width of the rectangle along the local X axis. Must be greater than 0.'),
     height: z.number().describe('Height of the rectangle along the local Y axis. Must be greater than 0.'),

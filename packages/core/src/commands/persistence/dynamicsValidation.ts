@@ -30,9 +30,12 @@ const jointProblem: Check = (joint) =>
         ? 'anchor, axis and anchorOnChild must be [x, y, z] finite numbers'
         : !isNonNegative(joint['damping']) || !isNonNegative(joint['friction']) || !isFiniteNumber(joint['initialVelocity'])
           ? 'damping, friction must be >= 0 and initialVelocity finite'
-          : joint['kind'] === 'spherical' && (joint['damping'] !== 0 || joint['friction'] !== 0 || joint['initialVelocity'] !== 0)
-            ? 'a spherical joint has damping = friction = initialVelocity = 0'
-            : null;
+          : !isOptional(joint['stiffness'], isNonNegative) || !isOptional(joint['springReference'], isFiniteNumber)
+            ? 'stiffness must be >= 0 and springReference finite'
+            : joint['kind'] === 'spherical' &&
+                (joint['damping'] !== 0 || joint['friction'] !== 0 || joint['initialVelocity'] !== 0 || joint['stiffness'] !== undefined)
+              ? 'a spherical joint has damping = friction = initialVelocity = 0 and no spring'
+              : null;
 
 const gearProblem: Check = (gear) =>
   typeof gear['driver'] !== 'string' || typeof gear['driven'] !== 'string'
@@ -128,6 +131,15 @@ const cylinderProblem: Check = (cylinder) => {
   return "model.kind must be 'table', 'wiebe' or 'single_zone'";
 };
 
+const springProblem: Check = (spring) =>
+  typeof spring['bodyA'] !== 'string' || typeof spring['bodyB'] !== 'string' || spring['bodyA'] === spring['bodyB']
+    ? 'bodyA and bodyB must be two different body ids (or ground)'
+    : !isVec3(spring['pointA']) || !isVec3(spring['pointB'])
+      ? 'pointA and pointB must be [x, y, z] finite numbers'
+      : !isPositive(spring['stiffness']) || !isNonNegative(spring['damping']) || !isNonNegative(spring['freeLengthM'])
+        ? 'stiffness must be > 0, damping and freeLengthM >= 0'
+        : null;
+
 const solverProblem = (solver: unknown): string | null => {
   if (solver === undefined) return null;
   if (!isRecord(solver)) return 'solver must be an object';
@@ -160,7 +172,11 @@ export function dynamicsProblems(value: unknown): string[] {
   const errors: string[] = [];
   const solverError = solverProblem(value['solver']);
   if (solverError !== null) errors.push(`dynamics.solver: ${solverError}`);
-  const tables = value['cylinders'] === undefined ? TABLES : [...TABLES, ['cylinders', cylinderProblem] as const];
+  const tables = [
+    ...TABLES,
+    ...(value['cylinders'] === undefined ? [] : [['cylinders', cylinderProblem] as const]),
+    ...(value['springs'] === undefined ? [] : [['springs', springProblem] as const]),
+  ];
   for (const [table, check] of tables) {
     const records = value[table];
     if (!isRecord(records)) {

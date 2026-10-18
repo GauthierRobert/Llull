@@ -26,7 +26,6 @@
   "command": "define_material_record",
   "params": {
    "id": "white_paint_test",
-   "name": "white_paint_test",
    "designation": "validation test record",
    "productForm": "coating",
    "specs": [],

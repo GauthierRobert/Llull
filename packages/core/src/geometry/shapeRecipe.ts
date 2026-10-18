@@ -46,7 +46,7 @@ function keyText(recipe: ShapeRecipe): string {
     case 'blend':
       return `blend(${recipe.sources.map(recipeKey).join(',')},${recipe.radius})`;
     case 'shell':
-      return `shell(${recipeKey(recipe.source)},${recipe.thickness})`;
+      return `shell(${recipeKey(recipe.source)},${recipe.thickness}${recipe.openNear === undefined ? '' : `,open[${recipe.openNear.map((point) => point.join(',')).join(';')}]`})`;
     case 'place':
       return `place(${recipeKey(recipe.source)},${recipe.position.join(',')},${recipe.rotation.join(',')})`;
     case 'scale':
@@ -95,6 +95,10 @@ export type LeafValidator = (entity: Record<string, unknown>) => string | null;
 const isIndexArray = (v: unknown, vertexCount: number): boolean =>
   Array.isArray(v) && v.every((i) => Number.isInteger(i) && (i as number) >= 0 && (i as number) < vertexCount);
 
+/** Absent, or a list of finite [x, y, z] points. */
+const isPointList = (v: unknown): boolean =>
+  v === undefined || (Array.isArray(v) && v.every((p) => Array.isArray(p) && p.length === 3 && p.every(isFiniteNumber)));
+
 /** A leaf must be a 3D solid (not an instance); a mesh leaf needs well-formed triangle arrays. */
 function leafError(entity: Record<string, unknown>, validateLeaf: LeafValidator): string | null {
   const kind = entity['kind'];
@@ -127,6 +131,7 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
       if (!isFiniteNumber(node['size']) || node['size'] <= 0) return `${String(node['op'])}: size must be > 0`;
       const sizeEnd = node['sizeEnd'];
       if (sizeEnd !== undefined && (!isFiniteNumber(sizeEnd) || sizeEnd <= 0)) return `${String(node['op'])}: sizeEnd must be > 0`;
+      if (!isPointList(node['near'])) return `${String(node['op'])}: near must be a list of finite [x, y, z] points`;
       return child(node['source']);
     }
     case 'blend': {
@@ -141,6 +146,7 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
     }
     case 'shell':
       if (!isFiniteNumber(node['thickness']) || node['thickness'] <= 0) return 'shell: thickness must be > 0';
+      if (!isPointList(node['openNear'])) return 'shell: openNear must be a list of finite [x, y, z] points';
       return child(node['source']);
     case 'place':
       if (!isVec3(node['position']) || !isVec3(node['rotation'])) return 'place: position and rotation must be finite Vec3';

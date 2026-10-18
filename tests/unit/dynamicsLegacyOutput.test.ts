@@ -1,6 +1,8 @@
 /**
  * FR-FPR-19: a model without closed loops or cylinder pressure must give byte-identical `simulate_motion` data. The hashes below were taken
  * from the output BEFORE PHY-21 slice B changed the dynamics layer; a change here is a regression unless the owner accepts a new baseline.
+ * Accepted rebaseline (geared model only): its joints decelerate under propeller drag and the unsettled-joint warning now says "still
+ * decelerating (speed X % lower ...)" instead of the misleading "still accelerating"; the numbers are unchanged.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
@@ -65,7 +67,7 @@ describe('simulate_motion output of models without loops or cylinders (FR-FPR-19
       hashOf(doc, { duration: 2 }),
       hashOf(doc, { duration: 2, detail: 'series', sampleRate: 20 }),
       hashOf(doc, { duration: 1, detail: 'poses', sampleRate: 10, timestep: 0.0005 }),
-    ]).toEqual(['c0c797254ae76540', '384fdc0af65fbb51', 'ba737fce807481b0']);
+    ]).toEqual(['54107e68b34d638a', '5f9c9ea95b27eeaf', '2bed07da2c4f72b0']);
   });
 
   it('speed-governed flywheel', () => {

@@ -9,6 +9,7 @@ import { commitBuilding } from '../../building/evaluate/evaluateElements';
 import { findProfile } from '../../steel/profiles';
 import { appendMembers, baseFixitySchema, jointFixitySchema, profileSummary, type MemberSpec } from '../common/memberSupport';
 import { crossGridLines, crossingsOnLine, gridLinesOf, parseCrossingName, samePlanPoint, unknownLabels } from './gridFraming';
+import { beamReferenceParam } from '../../building/elements/beamReference';
 import { levelIdParam } from '../../building/levelParams';
 
 const materialField = z.string().optional().describe('Steel grade. Default S355.');
@@ -204,7 +205,7 @@ export const addGridColumns = defineCommand({
 
 /**
  * @affects creates one beam member per bay between consecutive intersections on each grid line
- * @invariant beam axis z = topOffset - section depth / 2 relative to the level FFL
+ * @invariant beam axis z = topOffset - section depth / 2 relative to the level FFL (+ level height when reference is levelTop)
  * @failure no grid / unknown profile, axis, level / nothing to frame -> no-op
  */
 export const addGridBeams = defineCommand({
@@ -212,7 +213,7 @@ export const addGridBeams = defineCommand({
   description:
     'Frame beams along the structural grid (add_grid_line): along every listed grid line, one beam per ' +
     'bay between consecutive intersections with the other lines (so it frames column to column when ' +
-    'add_grid_columns was run first). The beam top sits at the level FFL + topOffset. Bays that already ' +
+    'add_grid_columns was run first). The beam top sits at the level FFL + topOffset (reference "ffl", default) or at the level top (FFL + level height) + topOffset (reference "levelTop"). Bays that already ' +
     'hold a beam with the same end points and a top of steel within 100 mm are skipped (any section). Mark SB, role beam.',
   params: z.object({
     profile: z.string().describe('Catalogue section name, e.g. "IPE400" (list_steel_profiles).'),
@@ -224,6 +225,7 @@ export const addGridBeams = defineCommand({
       .describe(
         'Top of steel relative to the level FFL, in DOCUMENT UNITS (not necessarily mm). Default 0 (top of steel at FFL); negative puts it below the FFL, e.g. minus the grating thickness.',
       ),
+    reference: beamReferenceParam,
     startJoint: jointFixitySchema.optional().describe('Joint at each beam start: "pinned" (default) or "rigid" (moment connection).'),
     endJoint: jointFixitySchema.optional().describe('Joint at each beam end: "pinned" (default) or "rigid".'),
     material: materialField,
@@ -232,7 +234,9 @@ export const addGridBeams = defineCommand({
     withSetup(doc, 'add_grid_beams', params, (prepared, tool) => {
       const { building, lines, tolerance } = prepared;
       const section = findProfile(params.profile);
-      const z = (params.topOffset ?? 0) - fromMm(doc, section?.h ?? 0) / 2;
+      const reference = params.reference ?? 'ffl';
+      const topFromFfl = (params.topOffset ?? 0) + (reference === 'levelTop' ? prepared.height : 0);
+      const z = topFromFfl - fromMm(doc, section?.h ?? 0) / 2;
       const existing = elementsOf(building, 'member').filter((member) => member.role === 'beam' && member.levelId === prepared.levelId);
       const at = (p: Vec3, q: Vec2): boolean => samePlanPoint([p[0], p[1]], q, tolerance);
       // A bay holds a beam already when one spans it with its top of steel within 100 mm, whatever its
@@ -251,7 +255,7 @@ export const addGridBeams = defineCommand({
           if (!from || !to) continue;
           const duplicate = existing.some(
             (m) =>
-              Math.abs(topOfSteel(m) - (params.topOffset ?? 0)) <= sameTopTolerance &&
+              Math.abs(topOfSteel(m) - topFromFfl) <= sameTopTolerance &&
               ((at(m.start, from) && at(m.end, to)) || (at(m.start, to) && at(m.end, from))),
           );
           if (duplicate) {
@@ -287,7 +291,9 @@ export const addGridBeams = defineCommand({
         skipped,
         () =>
           `Added ${specs.length} beams ${profileText(params.profile)} along ${targets.length} grid line(s) on level "${prepared.levelName}", ` +
-          `top of steel ${lengthText(doc, params.topOffset ?? 0)} from FFL, total length ${lengthText(doc, length)}, ${kg.toFixed(0)} kg; skipped ${skipped} existing.`,
+          `top of steel ${lengthText(doc, topFromFfl)} from FFL = elevation ${lengthText(doc, prepared.elevation + topFromFfl)} ` +
+          `(reference ${reference}${params.reference === undefined ? ' (default)' : ''} + topOffset ${lengthText(doc, params.topOffset ?? 0)}; ` +
+          `FFL ${lengthText(doc, prepared.elevation)}, level top ${lengthText(doc, prepared.elevation + prepared.height)}), total length ${lengthText(doc, length)}, ${kg.toFixed(0)} kg; skipped ${skipped} existing.`,
       );
     }),
 });

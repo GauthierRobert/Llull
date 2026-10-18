@@ -115,7 +115,11 @@ export function SheetViewer(): React.ReactElement | null {
             className="chip chip--warning"
             role="status"
             data-testid="sheet-fits-warning"
-            title="Views overflow the drawing area; use a smaller scale or larger paper."
+            title={
+              exported.warnings.length > 0
+                ? exported.warnings.join(' ')
+                : 'Views overflow the drawing area; use a smaller scale or larger paper.'
+            }
           >
             Views overflow the sheet
           </span>

@@ -61,7 +61,7 @@ describe('validation plans through llull run (build_project)', () => {
     expect(plan?.code, plan?.stdout.slice(0, 400)).toBe(0);
     const mass = stepData(plan, 'mass_properties');
     expect(relative(mass['massG'], massRow('VC-MAT-04/box_100x50x10_mm/aa7075_t6/density_typical')['mass_g'] as number)).toBeLessThan(1e-6);
-    expect(mass).toMatchObject({ unverified: true, unverifiedReasons: ['provenance legacy'] });
+    expect(mass).toMatchObject({ unverified: true, unverifiedReasons: ['density given without a source (unverified)'] });
   });
 
   it('mass_ti_cylinder: 69.56719 g with the preferred 0.160 lb/in3 entry as densitySource; both densities are listed by get_material (VC-MAT-02, 04 c)', async () => {
@@ -252,7 +252,7 @@ describe('VC-MAT-22 through the CLI: unverified flag in mass_properties and chec
       if (row['massLb'] !== undefined) expect(relative(data['massLb'], row['massLb'])).toBeLessThan(1e-6);
       expect(data).toMatchObject({ unverified: true, unverifiedReasons: row['unverifiedReasons'] });
       const sourceId = (row['densitySource'] as string).split('.').at(-1) as string;
-      expect(String(data['densitySource'])).toContain(kind === 'legacy' ? "material 'steel' density (legacy" : sourceId);
+      expect(String(data['densitySource'])).toContain(kind === 'legacy' ? "material 'steel' density (given without a source" : sourceId);
       const check = await cliCall(session, ['check_materials']);
       expect(check.code).toBe(0);
       const items = dataOf(check)['items'] as Array<{ code: string; severity: string; remediation: string }>;

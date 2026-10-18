@@ -5,7 +5,8 @@ import type { WallExtent } from '../geometry/wallExtent';
 import { curvedBandBetween, curvedWallArc, curvedWallExtent, tangentWall } from '../geometry/curvedWallGeometry';
 import { type Context, extrusion, ifcReal, ifcString, placement, scaledPolygonProfile, rectangleProfile, shape } from './ifcStep';
 
-export type Exported = { readonly ref: string; readonly material: string | null };
+/** An exported product; `parts` are sub-elements aggregated under it (they get the same material, not a storey containment). */
+export type Exported = { readonly ref: string; readonly material: string | null; readonly parts?: ReadonlyArray<string> };
 
 function addWall(context: Context, wall: WallElement | CurvedWallElement, local: string, profile: string): string {
   const body = shape(context, [extrusion(context, profile, context.mm(wall.height))]);

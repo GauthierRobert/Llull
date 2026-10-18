@@ -4,7 +4,7 @@
  * model has no geoms: no contacts, pure multibody dynamics. Loop-closing joints are `connect` equalities (a hinge outside the tree).
  */
 
-import type { SimulationBody, SimulationLoop, SimulationModel } from '@core/dynamics/physicsEngine';
+import type { SimulationBody, SimulationLoop, SimulationModel, SimulationSpring } from '@core/dynamics/physicsEngine';
 import type { Vec3 } from '@core/model/vectors';
 
 const ZERO: Vec3 = [0, 0, 0];
@@ -14,6 +14,25 @@ const ZERO: Vec3 = [0, 0, 0];
  * side (a propeller seen through a reduction); 0.9999 holds the ratio to ~1 % during a violent start and exactly at steady state.
  */
 const GEAR_IMPEDANCE = '0.9999 0.9999 0.001';
+
+/** Name of the tendon of a point spring, and of its two attachment sites (A, B). */
+export const springTendonName = (springId: string): string => `spring:${springId}`;
+const springSiteName = (springId: string, end: 'a' | 'b'): string => `spring:${springId}:${end}`;
+
+/** Attachment sites of the point springs, by the body that carries them ('world' = the ground). */
+function springSites(springs: readonly SimulationSpring[], centers: ReadonlyMap<string, Vec3>): Map<string, string> {
+  const sites = new Map<string, string>();
+  for (const spring of springs)
+    for (const [end, body, point] of [
+      ['a', spring.bodyA, spring.pointA],
+      ['b', spring.bodyB, spring.pointB],
+    ] as const)
+      sites.set(
+        body,
+        `${sites.get(body) ?? ''}<site name="${attribute(springSiteName(spring.id, end))}" pos="${numbers(minus(point, centers.get(body) ?? ZERO))}"/>`,
+      );
+  return sites;
+}
 
 /** Name of the `connect` equality number `index` of a loop (a revolute loop has two pins, a spherical loop one). */
 export const loopEqualityName = (loopId: string, index: number): string => `loop:${loopId}:${index}`;
@@ -55,19 +74,42 @@ function loopXml(loop: SimulationLoop, centers: ReadonlyMap<string, Vec3>, model
     .join('');
 }
 
-function bodyXml(body: SimulationBody, parentCenter: Vec3, childrenOf: ReadonlyMap<string | null, SimulationBody[]>): string {
+/**
+ * Dry friction as a near-rigid velocity constraint: MuJoCo's default soft friction row (impedance 0.9) lets a body creep at a speed
+ * proportional to the unbalanced pull; impedance 0.9999 with the stiffest stable reference (2 · timestep) holds it to ~1e-6 m/s.
+ */
+const FRICTION_IMPEDANCE = '0.9999 0.9999 0.001';
+
+function bodyXml(
+  body: SimulationBody,
+  parentCenter: Vec3,
+  childrenOf: ReadonlyMap<string | null, SimulationBody[]>,
+  timestep: number,
+  sites: ReadonlyMap<string, string>,
+): string {
   const { joint } = body;
   const jointXml =
     joint !== null
-      ? `<joint name="${attribute(joint.id)}" type="${joint.kind === 'revolute' ? 'hinge' : 'slide'}" pos="${numbers(minus(joint.anchor, body.centerOfMass))}" axis="${numbers(joint.axis)}" damping="${joint.damping}" frictionloss="${joint.friction}"/>`
+      ? `<joint name="${attribute(joint.id)}" type="${joint.kind === 'revolute' ? 'hinge' : 'slide'}" pos="${numbers(minus(joint.anchor, body.centerOfMass))}" axis="${numbers(joint.axis)}" damping="${joint.damping}" frictionloss="${joint.friction}"${joint.stiffness !== undefined && joint.stiffness > 0 ? ` stiffness="${joint.stiffness}" springref="${joint.springReference ?? 0}"` : ''}${joint.friction > 0 ? ` solreffriction="${2 * timestep} 1" solimpfriction="${FRICTION_IMPEDANCE}"` : ''}/>`
       : body.fixed
         ? ''
         : '<freejoint/>';
-  const children = (childrenOf.get(body.id) ?? []).map((child) => bodyXml(child, body.centerOfMass, childrenOf)).join('');
+  const children = (childrenOf.get(body.id) ?? []).map((child) => bodyXml(child, body.centerOfMass, childrenOf, timestep, sites)).join('');
   return (
     `<body name="${attribute(body.id)}" pos="${numbers(minus(body.centerOfMass, parentCenter))}">` +
-    `<inertial pos="0 0 0" mass="${body.mass}" fullinertia="${numbers(body.inertia)}"/>${jointXml}${children}</body>`
+    `<inertial pos="0 0 0" mass="${body.mass}" fullinertia="${numbers(body.inertia)}"/>${jointXml}${sites.get(body.id) ?? ''}${children}</body>`
   );
+}
+
+/**
+ * Servos on an open kinematic chain (a robot arm: a jointed body hanging from a jointed body, no loops or gears). The servo damping acts
+ * explicitly in RK4 and the chain's mass matrix is near-singular (links nearly rigid against each other), so the per-joint gains that are
+ * stable alone chatter at the step rate (torque pinned at +-maxForce, aliased speeds); the implicit-in-velocity integrator is stable.
+ */
+function servoChain(model: SimulationModel): boolean {
+  if (model.servos.length === 0 || model.loops.length > 0 || model.gears.length > 0) return false;
+  const jointed = new Set(model.bodies.flatMap((body) => (body.joint === null ? [] : [body.id])));
+  return model.bodies.some((body) => body.joint !== null && body.parentId !== null && jointed.has(body.parentId));
 }
 
 /**
@@ -80,8 +122,17 @@ function bodyXml(body: SimulationBody, parentCenter: Vec3, childrenOf: ReadonlyM
 export function toMjcf(model: SimulationModel, timestep: number): string {
   const childrenOf = new Map<string | null, SimulationBody[]>();
   for (const body of model.bodies) childrenOf.set(body.parentId, [...(childrenOf.get(body.parentId) ?? []), body]);
-  const roots = (childrenOf.get(null) ?? []).map((body) => bodyXml(body, ZERO, childrenOf)).join('');
   const centers = new Map(model.bodies.map((body) => [body.id, body.centerOfMass] as const));
+  const springs = model.springs ?? [];
+  const sites = springSites(springs, centers);
+  const roots = (childrenOf.get(null) ?? []).map((body) => bodyXml(body, ZERO, childrenOf, timestep, sites)).join('');
+  const tendons = springs
+    .map(
+      (spring) =>
+        `<spatial name="${attribute(springTendonName(spring.id))}" stiffness="${spring.stiffness}" damping="${spring.damping}" springlength="${spring.freeLength}">` +
+        `<site site="${attribute(springSiteName(spring.id, 'a'))}"/><site site="${attribute(springSiteName(spring.id, 'b'))}"/></spatial>`,
+    )
+    .join('');
   const gears = model.gears
     .map(
       (gear) =>
@@ -96,12 +147,13 @@ export function toMjcf(model: SimulationModel, timestep: number): string {
         `actrange="-1e12 1e12" forcelimited="true" forcerange="${-servo.maxForce} ${servo.maxForce}"/>`,
     )
     .join('');
-  const integrator = model.solver.integrator === 'implicitfast' ? 'implicitfast' : 'RK4';
-  const flags = model.loops.length > 0 ? '<flag diagexact="enable"/>' : '';
+  const integrator = model.solver.integrator === 'implicitfast' || servoChain(model) ? 'implicitfast' : 'RK4';
+  const flags = `<flag${model.loops.length > 0 ? ' diagexact="enable"' : ''} energy="enable"/>`;
+  const jacobian = model.loops.length > 0 ? ' jacobian="dense"' : '';
   return (
     '<mujoco model="llull"><compiler angle="radian" inertiafromgeom="false" balanceinertia="true"/>' +
-    `<option timestep="${timestep}" integrator="${integrator}" gravity="${numbers(model.gravity)}">${flags}</option>` +
-    `<worldbody>${roots}</worldbody>${gears === '' && loops === '' ? '' : `<equality>${gears}${loops}</equality>`}` +
-    `${servos === '' ? '' : `<actuator>${servos}</actuator>`}</mujoco>`
+    `<option timestep="${timestep}" integrator="${integrator}"${jacobian} gravity="${numbers(model.gravity)}">${flags}</option>` +
+    `<worldbody>${sites.get('world') ?? ''}${roots}</worldbody>${gears === '' && loops === '' ? '' : `<equality>${gears}${loops}</equality>`}` +
+    `${tendons === '' ? '' : `<tendon>${tendons}</tendon>`}${servos === '' ? '' : `<actuator>${servos}</actuator>`}</mujoco>`
   );
 }

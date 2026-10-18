@@ -13,28 +13,42 @@ import { toCsv } from '../../shared/csv';
 const TAKEOFF_COLUMNS = ['Key', 'Description', 'Quantity', 'Unit'];
 const UNIT_LABEL = { m: 'm', m2: 'm²', m3: 'm³', ea: 'ea', kg: 'kg' } as const;
 
-/** @affects none; data = { lines: TakeoffLine[], csv } */
+/** @affects none; data = { lines: TakeoffLine[], gross: Record<key, number>, csv } */
 export const quantityTakeoff = defineCommand({
   name: 'quantity_takeoff',
   annotations: { readOnly: true, idempotent: true },
   description:
     'Read-only bill of quantities of the building model, metric: wall length / net face area / volume, slab area / volume, column and ' +
     'beam volume, stair volume, door and window counts and areas, room floor area — grouped by category and material. Each line has a ' +
-    'key like "wall.concrete.m3" used by estimate_cost. data.csv is spreadsheet-ready.',
+    'key like "wall.concrete.m3" used by estimate_cost. data.csv is spreadsheet-ready. Column and beam volumes are NET (measured once ' +
+    'where members meet: slab > column > beam — columns run to the slab soffit, beams are measured below the slab soffit and between ' +
+    'column faces; beam length stays centre-to-centre); data.gross maps the key of each line whose raw modelled volume differs to that ' +
+    'gross quantity.',
   params: z.object({}),
   run: (doc): CommandResult => {
     const lines = computeTakeoff(doc);
+    const grossLines = computeTakeoff(doc, 'gross');
+    const gross: Record<string, number> = {};
+    for (const line of grossLines) {
+      if (lines.find((net) => net.key === line.key)?.quantity !== line.quantity) gross[line.key] = line.quantity;
+    }
     const csv = toCsv(
       TAKEOFF_COLUMNS,
       lines.map((line) => [line.key, line.description, line.quantity, UNIT_LABEL[line.unit]]),
     );
     if (lines.length === 0) {
-      return report(doc, 'Quantity takeoff: the building model is empty (add walls, slabs, columns…).', { lines, csv });
+      return report(doc, 'Quantity takeoff: the building model is empty (add walls, slabs, columns…).', { lines, gross, csv });
     }
     const highlights = lines
       .filter((line) => line.unit === 'm3' || line.unit === 'ea' || line.unit === 'kg')
       .map((line) => `${line.description.split(' — ')[0]}: ${line.quantity} ${UNIT_LABEL[line.unit]}`);
-    return report(doc, `Quantity takeoff (${lines.length} lines). ${highlights.join('; ')}.`, { lines, csv });
+    const note =
+      Object.keys(gross).length > 0
+        ? ` Net measurement (slab > column > beam, overlaps counted once); gross differs for: ${Object.entries(gross)
+            .map(([key, quantity]) => `${key} ${quantity}`)
+            .join(', ')} (data.gross).`
+        : '';
+    return report(doc, `Quantity takeoff (${lines.length} lines). ${highlights.join('; ')}.${note}`, { lines, gross, csv });
   },
 });
 
@@ -49,7 +63,7 @@ export const buildingSchedule = defineCommand({
     'Read-only schedule table (like Revit schedules) for one element category: wall, door, window, room, slab, column, beam, stair, ' +
     'member (steel cut list), footing, panel, equipment, pipe (line list), tray, plate, connection or support (pipe supports: mark, ' +
     'line, pipe, type, steel it bears on, position, hanger rod length, attached / UNATTACHED) — one row per element with mark, level, ' +
-    'dimensions, material and quantities. data.csv is spreadsheet-ready.',
+    'dimensions, material and quantities. Column and beam rows give the NET volume (same rule as quantity_takeoff: slab > column > beam, overlaps counted once) in "Volume (m³)" and the raw prism in "Gross volume (m³)". data.csv is spreadsheet-ready.',
   params: z.object({ kind: z.enum(SCHEDULE_KINDS).describe('Which schedule to produce.') }),
   run: (doc, { kind }): CommandResult => {
     const schedule = buildSchedule(doc, kind);

@@ -9,7 +9,7 @@ import type { Vec3 } from '../model/vectors';
 import { cylinderState, type CylinderRuntime } from './cylinderLoads';
 import { cycleLength } from './pressureCurve';
 import type { Quaternion, SimulationTrace } from './physicsEngine';
-import { childForceSeries, peakOf, type Peak } from './reactions';
+import { childForceSeries, peakOf, withStepPeak, type Peak } from './reactions';
 import { inertiaAboutAxis, type BodyMassDistribution } from './simulationModel';
 import { sliderRate } from './slider';
 import type { Topology } from './topology';
@@ -165,11 +165,17 @@ function derivedLoads(runtime: CylinderRuntime, input: EngineInput, angleDeg: re
     return [length > 0 ? dot3(f, d) / length : 0, 0, 0];
   });
   return {
-    wristPinN: peakOf(wrist, trace.times, angleDeg),
+    // joint forces also take the every-step peak (sampling can step over it); the projections exist only at the samples
+    wristPinN: withStepPeak(peakOf(wrist, trace.times, angleDeg), trace.reactionPeaks?.[layout.wristJoint]?.force, trace.times, angleDeg),
     rodAxialN: peakOf(axial, trace.times, angleDeg),
     sideThrustN: peakOf(lateral, trace.times, angleDeg),
-    crankPinN: peakOf(pin, trace.times, angleDeg),
-    mainBearingN: peakOf(bearing, trace.times, angleDeg),
+    crankPinN: withStepPeak(peakOf(pin, trace.times, angleDeg), trace.reactionPeaks?.[layout.crankPinJoint]?.force, trace.times, angleDeg),
+    mainBearingN: withStepPeak(
+      peakOf(bearing, trace.times, angleDeg),
+      trace.reactionPeaks?.[layout.crankJoint]?.force,
+      trace.times,
+      angleDeg,
+    ),
   };
 }
 

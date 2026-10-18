@@ -7,8 +7,8 @@ import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { significantNumber } from '@lib/compactNumber';
 import { analysisInputHash } from '../hash/inputHash';
-import { stressUnitName } from '../decks/units';
-import { meshSummary, resultsSummary } from '../results/summary';
+import { stressUnitName, lengthUnitName } from '../decks/units';
+import { eigenSummaryText, meshSummary, resultsSummary } from '../results/summary';
 import { caseOf, withCase } from '../shared/access';
 import { refuseFe } from '../shared/feCodes';
 import { analysisIdSchema } from '../shared/schemas';
@@ -35,7 +35,8 @@ function withoutResults(analysisCase: AnalysisCase): AnalysisCase {
  *   summary recomputed from it (trust model, 05 §4.1); WITHOUT it (no port, not in the store: replay on another machine) the summary is
  *   kept flagged `verified: false` - state `missing`, never read by any query
  * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; sha256 or summary differs -> FEA_SUMMARY_MISMATCH; artifact built for other inputs ->
- *   FEA_INPUT_STALE; summary without a text inputHash when the artifact is unavailable -> FEA_SUMMARY_MISMATCH (all refusals, unchanged doc)
+ *   (refusal); built for other inputs -> recorded as is, the case reads stale; summary without a text inputHash when the artifact is
+ *   unavailable -> FEA_SUMMARY_MISMATCH (all refusals, unchanged doc)
  */
 export const recordFeMesh = defineCommand({
   name: 'record_fe_mesh',
@@ -43,7 +44,7 @@ export const recordFeMesh = defineCommand({
     'Record the summary of a finite-element mesh built by the host (fea_mesh transport) on an analysis. Not for hand use: the summary is ' +
     're-derived from the stored mesh artifact and refused unless it matches exactly, so numbers cannot be invented. Clears recorded results. ' +
     'Refused with FEA_ARTIFACT_NOT_FOUND when the artifact store does not hold the mesh, FEA_SUMMARY_MISMATCH when the summary differs, ' +
-    'FEA_INPUT_STALE when the analysis changed since the mesh was built.',
+    'A mesh built for other inputs (the analysis or geometry changed since, e.g. on regeneration) is recorded STALE, not refused.',
   params: z.object({
     analysisId: analysisIdSchema,
     summary: z.looseObject({ meshHash: z.string().describe('sha256 of the canonical mesh artifact JSON.') }).describe(summaryNote),
@@ -72,7 +73,11 @@ export const recordFeMesh = defineCommand({
         summary.meshHash,
       ]);
     if (fetched.artifact.inputHash !== analysisInputHash(doc, analysisId, 'mesh'))
-      return fail('FEA_INPUT_STALE', `the mesh was built for other inputs than the current analysis '${analysisId}'`);
+      return changed(
+        withCase(doc, { ...withoutResults(analysisCase), meshSummary: expected }),
+        `record_fe_mesh: '${analysisId}' mesh ${summary.meshHash.slice(0, 12)} recorded STALE: it was built for other inputs than the current analysis (e.g. the geometry was regenerated); re-run fea_mesh then fea_solve.`,
+        [analysisId],
+      );
     return changed(
       withCase(doc, { ...withoutResults(analysisCase), meshSummary: expected }),
       `record_fe_mesh: '${analysisId}' meshed — ${expected.nodes} nodes, ${Object.entries(expected.elements)
@@ -89,7 +94,7 @@ export const recordFeMesh = defineCommand({
  *   artifact is unavailable); additionally the case has a recorded mesh, the results were computed on exactly that mesh (results.meshHash)
  *   and for the current full input hash; summarised against the recorded mesh artifact
  * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; sha256 or summary differs -> FEA_SUMMARY_MISMATCH; no recorded mesh or other meshHash ->
- *   FEA_MESH_MISMATCH; other inputs -> FEA_INPUT_STALE
+ *   FEA_MESH_MISMATCH; other inputs -> recorded as is (the case reads stale; its results are withheld until re-solved)
  */
 export const recordFeaResults = defineCommand({
   name: 'record_fea_results',
@@ -97,7 +102,7 @@ export const recordFeaResults = defineCommand({
     'Record the summary of solver results produced by the host (fea_solve transport) on an analysis that has a recorded mesh. Not for hand ' +
     'use: the summary is re-derived from the stored results artifact and refused unless it matches exactly. Refused with ' +
     'FEA_ARTIFACT_NOT_FOUND (artifact absent), FEA_SUMMARY_MISMATCH, FEA_MESH_MISMATCH (results not computed on the recorded mesh, or no ' +
-    'mesh recorded) or FEA_INPUT_STALE (analysis changed since the solve).',
+    'mesh recorded); results computed for other inputs are recorded STALE (re-run fea_mesh then fea_solve).',
   params: z.object({
     analysisId: analysisIdSchema,
     summary: z.looseObject({ resultsHash: z.string().describe('sha256 of the canonical results artifact JSON.') }).describe(summaryNote),
@@ -129,6 +134,12 @@ export const recordFeaResults = defineCommand({
         `the results were computed on mesh ${results.meshHash}, the recorded mesh is ${recordedMesh.meshHash}`,
         [analysisId, results.meshHash],
       );
+    if (results.inputHash !== analysisInputHash(doc, analysisId, 'full'))
+      return changed(
+        withCase(doc, { ...analysisCase, results: summary as unknown as ResultsSummary }),
+        `record_fea_results: '${analysisId}' results ${summary.resultsHash.slice(0, 12)} recorded STALE: they were computed for other inputs than the current analysis (e.g. the geometry was regenerated); re-run fea_mesh then fea_solve.`,
+        [analysisId],
+      );
     const mesh = fetchArtifact(ctx?.feaArtifacts, recordedMesh.meshHash, 'fe_mesh');
     if ('code' in mesh)
       return mesh.code === 'FEA_ARTIFACT_NOT_FOUND' ? keepUnverified() : fail(mesh.code, mesh.message, [analysisId, recordedMesh.meshHash]);
@@ -139,18 +150,16 @@ export const recordFeaResults = defineCommand({
         analysisId,
         summary.resultsHash,
       ]);
-    if (results.inputHash !== analysisInputHash(doc, analysisId, 'full'))
-      return fail('FEA_INPUT_STALE', `the results were computed for other inputs than the current analysis '${analysisId}'`);
     return changed(
       withCase(doc, { ...analysisCase, results: expected }),
       `record_fea_results: '${analysisId}' solved — ${expected.loadCases.length} load case(s)${expected.loadCases
         .map(
           (lc) =>
-            `; ${lc.name}: max von Mises ${significantNumber(lc.maxVonMises.value, 6)} ${stressUnitName(expected.units)}, max displacement ${significantNumber(lc.maxDisplacement.value, 6)}`,
+            `; ${lc.name}: max von Mises ${significantNumber(lc.maxVonMises.value, 6)} ${stressUnitName(expected.units)}, max displacement ${significantNumber(lc.maxDisplacement.value, 6)} ${lengthUnitName(expected.units)}`,
         )
         .join(
           '',
-        )}${expected.thermal === undefined ? '' : `; thermal: ${expected.thermal.times.length} time(s)`} (${expected.solver} ${expected.solverVersion}).`,
+        )}${eigenSummaryText(expected)}${expected.thermal === undefined ? '' : analysisCase.type === 'heat_steady' ? '; thermal: steady state' : `; thermal: ${expected.thermal.times.length} time(s)`} (${expected.solver} ${expected.solverVersion}).`,
       [analysisId],
     );
   },

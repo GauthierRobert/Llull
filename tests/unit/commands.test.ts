@@ -431,13 +431,13 @@ type RenderData = {
   bounds: unknown;
   camera: { position: number[]; target: number[]; up: number[] };
 };
-const render = (doc: CadDocument, p: object = {}): RenderData => execute(doc, 'render_view', p).data as RenderData;
+const render = (doc: CadDocument, p: object = {}): RenderData => execute(doc, 'render_view', { mode: 'vector', ...p }).data as RenderData;
 const chain = (...steps: Array<[string, object]>): CadDocument => steps.reduce((doc, [name, p]) => run(doc, name, p), empty());
 
 describe('render_view', () => {
   it('empty doc: valid 800×600 iso SVG, entityCount 0, bounds null, pure', () => {
     const doc = empty();
-    const r = execute(doc, 'render_view', {});
+    const r = execute(doc, 'render_view', { mode: 'vector' });
     expectNoOp(r, doc, '0 entit');
     expect(r.summary).toContain('800×600');
     expect(r.data).toMatchObject({ entityCount: 0, bounds: null, view: 'iso', width: 800, height: 600 });
@@ -447,7 +447,7 @@ describe('render_view', () => {
 
   it('a box: polygons, bounds, camera, every view distinct, pure', () => {
     const doc = chain(['add_box', { size: [2, 2, 2], position: [0, 0, 0] }]);
-    const r = execute(doc, 'render_view', { view: 'iso' });
+    const r = execute(doc, 'render_view', { mode: 'vector', view: 'iso' });
     const data = r.data as RenderData;
     expect([data.entityCount, data.bounds === null]).toEqual([1, false]);
     expect(data.svg).toContain('<polygon');
@@ -457,8 +457,8 @@ describe('render_view', () => {
     expect(svgs[0]).not.toBe(svgs[2]);
     expect(svgs[6]).not.toBe(svgs[0]);
     for (const svg of svgs) expect(svg).toContain('<svg');
-    expectPure(doc, () => execute(doc, 'render_view', { view: 'iso' }));
-    expectNoOp(execute(doc, 'render_view', { view: 'top' }), doc);
+    expectPure(doc, () => execute(doc, 'render_view', { mode: 'vector', view: 'iso' }));
+    expectNoOp(execute(doc, 'render_view', { mode: 'vector', view: 'top' }), doc);
   });
 
   it('view names, size clamps, camera per axis view, invalid view rejected', () => {
@@ -476,7 +476,7 @@ describe('render_view', () => {
     }
     const cams = (['top', 'bottom', 'front', 'back', 'left', 'right'] as const).map((view) => JSON.stringify(render(doc, { view }).camera));
     expect(new Set(cams).size).toBe(6);
-    const bad = execute(doc, 'render_view', { view: 'diagonal' });
+    const bad = execute(doc, 'render_view', { mode: 'vector', view: 'diagonal' });
     expectNoOp(bad, doc, 'render_view rejected: invalid params');
     expect(bad.data).toBeUndefined();
     expect(toToolSchemas().find((s) => s.name === 'render_view')?.input_schema.required).toEqual([]);
@@ -536,7 +536,7 @@ describe('render_view', () => {
     ['arc with endAngle < startAngle', [['draw_arc', { center: [0, 0], radius: 2, startAngle: 3, endAngle: 1 }]], 'front', '<polyline'],
   ])('renders %s', (_, steps, view, element, count) => {
     const doc = chain(...steps);
-    const r = execute(doc, 'render_view', { view });
+    const r = execute(doc, 'render_view', { mode: 'vector', view });
     const data = r.data as RenderData;
     expectNoOp(r, doc);
     expect(data.svg).toContain('<svg');
@@ -1104,6 +1104,14 @@ describe('materials', () => {
     expect(again.document.materials['steel']!.density).toBe(0.008);
     expect(again.summary).toContain('replaced');
     expectPure(doc, () => execute(doc, 'create_material', STEEL));
+  });
+
+  it('create_material defaults the visual properties: neutral grey, or the replaced material values', () => {
+    const plain = execute(empty(), 'create_material', { name: 'pla', density: 0.00124 });
+    expect(plain.document.materials['pla']).toMatchObject({ color: '#b0b0b0', metalness: 0, roughness: 0.5 });
+    const steel = run(empty(), 'create_material', STEEL);
+    const denser = execute(steel, 'create_material', { name: 'steel', density: 0.0079 });
+    expect(denser.document.materials['steel']).toMatchObject({ density: 0.0079, color: '#808080', metalness: 0.9, roughness: 0.3 });
   });
 
   it.each<[object, string?]>([

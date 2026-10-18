@@ -45,6 +45,18 @@ const margins = (bar: MarginBar, params: Record<string, unknown> = {}, doc = bar
 
 const dataOf = (result: ReturnType<typeof execute>): Margins => result.data as Margins;
 
+describe('compute_margins factor provenance in the summary', () => {
+  it('states the factors in use and whether they are the DEFAULT or were set via create_analysis', () => {
+    const defaulted = margins(marginBar());
+    expect(defaulted.summary).toContain(
+      'factors ultimate 1.5 (DEFAULT 14 CFR 25.303, not set by the user), yield 1 (DEFAULT, not set by the user)',
+    );
+    const set = margins(marginBar({ factors: { ultimate: 2, yield: 2, extra: [] } }));
+    expect(set.summary).toContain('factors ultimate 2 (set via create_analysis), yield 2 (set via create_analysis)');
+    expect(dataOf(set).factors.ultimate.defaulted).toBe(false);
+  });
+});
+
 describe('compute_margins', () => {
   it('computes ultimate and yield margins of a limit load case from the artifact, with named factors and review flags', () => {
     const bar = marginBar();

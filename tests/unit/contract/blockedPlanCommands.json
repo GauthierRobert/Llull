@@ -1,0 +1,233 @@
+{
+  "_comment": "Plans under docs/**/validation referencing commands that are not registered yet (plan path -> sorted names). Remove entries as commands get built; never add one without a board note. Regenerate: UPDATE_BLOCKED_PLANS=1 npx vitest run tests/unit/contract/validationPlanCommands.test.ts",
+  "blocked": {
+    "docs/aerospace/02-advanced-surfacing/validation/plans/target_naca0012_trap_wing.json": [
+      "airfoil_from_naca",
+      "create_wing",
+      "wing_properties"
+    ],
+    "docs/aerospace/02-advanced-surfacing/validation/plans/target_sears_haack_conic_fuselage.json": ["loft_fuselage", "set_aircraft_frame"],
+    "docs/aerospace/02-advanced-surfacing/validation/plans/target_torus_surface_analysis.json": [
+      "analyze_draft",
+      "analyze_surface_curvature"
+    ],
+    "docs/aerospace/02-advanced-surfacing/validation/plans/target_tr1208_wing.json": [
+      "airfoil_from_naca",
+      "create_wing",
+      "wing_properties"
+    ],
+    "docs/aerospace/03-gdt-mbd-pmi/validation/draft_plan_gdt_plate.json": [
+      "add_datum_feature",
+      "add_geometric_tolerance",
+      "add_size_dimension",
+      "add_surface_texture",
+      "check_pmi",
+      "create_saved_view",
+      "export_step_ap242",
+      "set_pmi_standard"
+    ],
+    "docs/aerospace/03-gdt-mbd-pmi/validation/draft_plan_gdt_rejections.json": ["add_datum_feature", "add_geometric_tolerance"],
+    "docs/aerospace/03-gdt-mbd-pmi/validation/draft_plan_stackup_su01.json": ["analyze_stackup"],
+    "docs/aerospace/06-composites/validation/plans/cmp-cone-flat-pattern.json": [
+      "add_ply",
+      "create_composite_part",
+      "create_lamina_material",
+      "define_rosette",
+      "export_flat_patterns_dxf"
+    ],
+    "docs/aerospace/06-composites/validation/plans/cmp-flat-panel-zones.json": [
+      "analyze_laminate",
+      "check_laminate_rules",
+      "check_layup",
+      "core_sample",
+      "create_composite_part",
+      "create_lamina_material",
+      "define_rosette",
+      "define_zone",
+      "export_flat_patterns_dxf",
+      "export_ply_book",
+      "generate_plies_from_zones",
+      "set_ply_drop_rules"
+    ],
+    "docs/aerospace/06-composites/validation/plans/cmp-hemisphere-drape.json": [
+      "add_ply",
+      "check_layup",
+      "check_producibility",
+      "create_composite_part",
+      "create_lamina_material",
+      "define_rosette",
+      "export_flat_patterns_dxf"
+    ],
+    "docs/aerospace/09-plm-configuration-traceability/validation/plans/plm_release_eco_revB.plan.json": [
+      "create_change_order",
+      "create_change_request",
+      "plm_status",
+      "release_item",
+      "resolve_effectivity",
+      "revise_item",
+      "set_item_identity",
+      "submit_for_review"
+    ],
+    "docs/aerospace/09-plm-configuration-traceability/validation/scenarios/S1_release_eco_revB.json": [
+      "checkpoint_iteration",
+      "create_change_order",
+      "create_change_request",
+      "plm_diff",
+      "release_item",
+      "resolve_effectivity",
+      "revise_item",
+      "set_item_identity",
+      "submit_for_review",
+      "verify_release"
+    ],
+    "docs/aerospace/09-plm-configuration-traceability/validation/scenarios/S2_lifecycle_guards.json": [
+      "record_signature",
+      "reject_review",
+      "release_item",
+      "revise_item",
+      "set_lifecycle_state",
+      "verify_release"
+    ],
+    "docs/aerospace/09-plm-configuration-traceability/validation/scenarios/S3_baseline_bom_fai.json": [
+      "assign_characteristic_ids",
+      "compare_baselines",
+      "create_baseline",
+      "engineering_bom",
+      "fai_report_skeleton",
+      "record_as_built"
+    ],
+    "docs/physics/04-thermo-mechanical/validation/plans/tmc_fit_al_steel.plan.json": ["add_size_dimension", "set_pmi_standard"],
+    "docs/physics/05-nonlinear-structural/validation/plans/nls_cantilever_plastic_collapse.plan.json": [
+      "add_analysis_step",
+      "add_curve_probe",
+      "set_nonlinear_controls",
+      "set_part_constitutive_set"
+    ],
+    "docs/physics/05-nonlinear-structural/validation/plans/nls_column_imperfection.plan.json": [
+      "add_analysis_step",
+      "add_curve_probe",
+      "add_imperfection",
+      "set_nonlinear_controls"
+    ],
+    "docs/physics/05-nonlinear-structural/validation/plans/nls_thick_cylinder.plan.json": [
+      "add_analysis_step",
+      "add_curve_probe",
+      "set_nonlinear_controls",
+      "set_part_constitutive_set"
+    ],
+    "docs/physics/06-contact-joints/validation/plans/cnt_pretension_bar.plan.json": [
+      "add_analysis_step",
+      "add_bolt_pretension",
+      "add_curve_probe",
+      "set_nonlinear_controls"
+    ],
+    "docs/physics/06-contact-joints/validation/plans/cnt_ssnp154_cylinder_block.plan.json": [
+      "add_analysis_step",
+      "add_contact_pair",
+      "set_nonlinear_controls"
+    ],
+    "docs/physics/09-structural-dynamics/validation/plans/dyn_beamdy8_ssd.plan.json": ["set_dynamic_damping", "set_frequency_sweep"],
+    "docs/physics/09-structural-dynamics/validation/plans/dyn_cantilever_random_gevs.plan.json": [
+      "define_vibration_spectrum",
+      "set_base_excitation",
+      "set_dynamic_damping",
+      "set_frequency_sweep"
+    ],
+    "docs/physics/09-structural-dynamics/validation/plans/dyn_quick_checks.plan.json": [
+      "damping_coefficients",
+      "define_vibration_spectrum",
+      "psd_rms",
+      "sdof_response",
+      "shock_response_spectrum"
+    ],
+    "docs/physics/11-creep-viscoelasticity/validation/plans/crp_bar_relaxation.plan.json": ["set_creep_step"],
+    "docs/physics/11-creep-viscoelasticity/validation/plans/crp_beam_stationary_bending.plan.json": ["set_creep_step"],
+    "docs/physics/11-creep-viscoelasticity/validation/plans/crp_norton_unit_cube.plan.json": ["set_creep_step"],
+    "docs/physics/11-creep-viscoelasticity/validation/plans/crp_thick_cylinder_stationary.plan.json": ["set_creep_step"],
+    "docs/physics/12-material-selection/validation/plans/compare_bracket_materials_proposed.json": [
+      "check_material_selection",
+      "compare_materials"
+    ],
+    "docs/physics/12-material-selection/validation/plans/substitute_block_ti_proposed.json": ["substitute_material"],
+    "docs/physics/13-corrosion-compatibility/validation/plans/galvanic_plate_check_proposed.json": [
+      "check_material_compatibility",
+      "declare_isolation",
+      "find_contacts",
+      "set_service_environment"
+    ],
+    "docs/physics/14-moisture-outgassing/validation/plans/ao_erosion_proposed.json": ["ao_erosion"],
+    "docs/physics/14-moisture-outgassing/validation/plans/moisture_uptake_proposed.json": ["hygro_strain", "moisture_uptake"],
+    "docs/physics/14-moisture-outgassing/validation/plans/outgassing_check_proposed.json": [
+      "check_space_environment",
+      "set_mission_environment"
+    ],
+    "docs/physics/15-electro-optical-properties/validation/plans/eop_bonding_paths.plan.json": ["check_bonding", "define_bond_path"],
+    "docs/physics/15-electro-optical-properties/validation/plans/eop_radiator_coating.plan.json": [
+      "assign_surface_coating",
+      "check_surface_properties",
+      "optical_balance"
+    ],
+    "docs/physics/16-process-physics/validation/plans/prc_am_layered_beam.plan.json": [
+      "add_release_step",
+      "am_build_setup",
+      "set_inherent_strain"
+    ],
+    "docs/physics/17-topology-optimization/validation/plans/top_mbb_60x20.plan.json": ["create_topology_study", "set_topology_settings"],
+    "docs/physics/17-topology-optimization/validation/plans/top_mbb_60x20_density.plan.json": [
+      "create_topology_study",
+      "set_topology_settings"
+    ],
+    "docs/physics/17-topology-optimization/validation/plans/top_rejection_keepin_budget.plan.json": [
+      "create_topology_study",
+      "set_topology_regions"
+    ],
+    "docs/physics/18-probabilistic-sensitivity/validation/plans/prb_box_mass.plan.json": [
+      "define_limit_state",
+      "define_random_variable",
+      "define_response",
+      "parameter_sensitivity",
+      "propagate_uncertainty"
+    ],
+    "docs/physics/18-probabilistic-sensitivity/validation/plans/prb_ishigami_sobol.plan.json": [
+      "define_limit_state",
+      "define_random_variable",
+      "sensitivity_indices"
+    ],
+    "docs/physics/18-probabilistic-sensitivity/validation/plans/prb_linear_r_minus_s.plan.json": [
+      "define_limit_state",
+      "define_random_variable",
+      "propagate_uncertainty",
+      "reliability_form"
+    ],
+    "docs/physics/18-probabilistic-sensitivity/validation/plans/prb_rejections.plan.json": ["define_random_variable", "set_correlation"],
+    "docs/physics/19-explicit-impact/validation/plans/exp_bar_rigid_wall.plan.json": [
+      "add_rigid_wall",
+      "add_time_history",
+      "set_explicit_controls",
+      "set_initial_velocity"
+    ],
+    "docs/physics/19-explicit-impact/validation/plans/exp_bird_rigid_plate.plan.json": [
+      "add_rigid_wall",
+      "add_time_history",
+      "set_explicit_controls",
+      "set_initial_velocity"
+    ],
+    "docs/physics/19-explicit-impact/validation/plans/exp_drop_box.plan.json": [
+      "add_rigid_wall",
+      "add_time_history",
+      "set_explicit_controls"
+    ],
+    "docs/physics/19-explicit-impact/validation/plans/exp_taylor_rod.plan.json": [
+      "add_rigid_wall",
+      "set_explicit_controls",
+      "set_initial_velocity"
+    ],
+    "docs/physics/20-vibroacoustics/validation/plans/vac_flat_spectrum_handoff.plan.json": [
+      "acoustic_spectrum_report",
+      "check_acoustic_handoff",
+      "convert_acoustic_spectrum",
+      "define_acoustic_exposure",
+      "define_acoustic_spectrum"
+    ]
+  }
+}

@@ -5,9 +5,12 @@
 
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { operandRecipe } from '@core/commands/brep/kernelShape';
+import { isCurvedPart } from './curvedFaces';
 import { is3D, type CadDocument, type MeshData } from '@core/model/types';
 
-export type PartGeometry = { readonly kind: 'step'; readonly stepBase64: string } | { readonly kind: 'stl'; readonly stlBase64: string };
+export type PartGeometry =
+  | { readonly kind: 'step'; readonly stepBase64: string }
+  | { readonly kind: 'stl'; readonly stlBase64: string; readonly curved: boolean };
 
 export interface GeometryFailure {
   readonly code: 'FEA_PART_INVALID' | 'FEA_KERNEL_REQUIRED';
@@ -51,10 +54,12 @@ export function partGeometry(doc: CadDocument, entityId: string, kernel: Geometr
     const step = kernel.exportStep([shape]);
     if (step !== null) return { kind: 'step', stepBase64: Buffer.from(step, 'utf8').toString('base64') };
     const mesh = kernel.tessellate(shape);
-    if (mesh !== null && mesh.indices.length > 0) return { kind: 'stl', stlBase64: binaryStl(mesh).toString('base64') };
+    if (mesh !== null && mesh.indices.length > 0)
+      return { kind: 'stl', stlBase64: binaryStl(mesh).toString('base64'), curved: isCurvedPart(entity, mesh) };
   }
   const stored = storedMesh(doc, entityId);
-  if (stored !== null && stored.indices.length > 0) return { kind: 'stl', stlBase64: binaryStl(stored).toString('base64') };
+  if (stored !== null && stored.indices.length > 0)
+    return { kind: 'stl', stlBase64: binaryStl(stored).toString('base64'), curved: isCurvedPart(entity, stored) };
   return {
     code: 'FEA_KERNEL_REQUIRED',
     message: `no geometry kernel could build '${entityId}' (kind '${entity.kind}'); start the server with LLULL_KERNEL=manifold or occt`,

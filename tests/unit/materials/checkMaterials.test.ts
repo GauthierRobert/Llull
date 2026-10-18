@@ -82,7 +82,7 @@ describe('VC-MAT-22: unverified values reach mass_properties and check_materials
     const doc = step(mmDocument(), 'create_material', { name: 'steel', density: 0.00785, color: '#aaaaaa', metalness: 1, roughness: 0.4 });
     const added = call(doc, 'add_box', { size: [10, 10, 10] });
     const withBox = step(added.document, 'assign_material', { materialName: 'steel', entityIds: [added.affected[0] ?? ''] });
-    check(withBox, added.affected[0] ?? '', rows[2] as Vc22Row, "material 'steel' density (legacy");
+    check(withBox, added.affected[0] ?? '', rows[2] as Vc22Row, "material 'steel' density (given without a source");
     expect(items(withBox)[0]?.message).toContain('bare number');
   });
 });

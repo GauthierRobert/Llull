@@ -6,6 +6,7 @@ import type { CadDocument } from '@core/model/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
+import { elasticConstants, isElasticRefusal } from '../decks/elastic';
 import { caseOf } from '../shared/access';
 import { trustedRecord } from '../shared/trust';
 import { checkThermalItems } from '../thermal/check';
@@ -23,13 +24,13 @@ export interface ThermomechCheckItem {
   readonly remediation: string;
 }
 
-const item = (code: string, severity: 'error' | 'warning', message: string, ids: readonly string[]): ThermomechCheckItem => ({
-  code,
-  severity,
-  message,
-  ids,
-  remediation: remediationOf(code),
-});
+const item = (
+  code: string,
+  severity: 'error' | 'warning',
+  message: string,
+  ids: readonly string[],
+  remediation: string = remediationOf(code),
+): ThermomechCheckItem => ({ code, severity, message, ids, remediation });
 
 /** Warning when interpolation had to project nodes outside the thermal mesh; an error when the mapping itself fails. Needs the artifacts. */
 function mappingItems(
@@ -92,6 +93,66 @@ function fieldItems(
       ];
 }
 
+/** Field temperature range (K) when it is known without solving: a uniform value, or the nodal range over the recorded mesh. */
+function fieldRangeKelvin(
+  doc: CadDocument,
+  analysisCase: AnalysisCase,
+  setup: ThermoMechSetup,
+  artifacts: FeArtifactPort | null,
+): readonly [low: number, high: number] | null {
+  const { field } = setup;
+  if (field === undefined) return null;
+  if (field.kind === 'uniform') {
+    const value = temperatureIn(field.value, setup.temperatureScale);
+    return value === null || !Number.isFinite(value)
+      ? null
+      : [kelvinOf(value, setup.temperatureScale), kelvinOf(value, setup.temperatureScale)];
+  }
+  const hash = analysisCase.meshSummary?.meshHash;
+  const mesh = hash === undefined ? null : (artifacts?.get(hash) ?? null);
+  if (mesh?.kind !== 'fe_mesh') return null;
+  const resolved = resolveTemperatureField(doc, analysisCase.id, mesh, artifacts);
+  return resolved.ok ? [kelvinOf(resolved.min, setup.temperatureScale), kelvinOf(resolved.max, setup.temperatureScale)] : null;
+}
+
+/** Field span (K) above which a constant E / nu is flagged. */
+const ELASTIC_SPAN_WARNING_KELVIN = 50;
+
+/** One warning per material whose E and nu are constant while the field (with the reference) spans more than 50 K. */
+function elasticItems(
+  doc: CadDocument,
+  analysisCase: AnalysisCase,
+  setup: ThermoMechSetup,
+  referenceKelvin: number,
+  artifacts: FeArtifactPort | null,
+): ThermomechCheckItem[] {
+  const range = fieldRangeKelvin(doc, analysisCase, setup, artifacts);
+  if (range === null) return [];
+  const low = Math.min(range[0], referenceKelvin);
+  const high = Math.max(range[1], referenceKelvin);
+  if (high - low <= ELASTIC_SPAN_WARNING_KELVIN) return [];
+  const items: ThermomechCheckItem[] = [];
+  const seen = new Set<string>();
+  for (const entityId of Object.keys(analysisCase.parts)) {
+    const materialId = Object.hasOwn(doc.entities, entityId) ? doc.entities[entityId]?.materialId : undefined;
+    const material = materialId !== undefined && Object.hasOwn(doc.materials, materialId) ? doc.materials[materialId] : undefined;
+    if (materialId === undefined || material === undefined || seen.has(materialId)) continue;
+    seen.add(materialId);
+    const atLow = elasticConstants(material, materialId, low);
+    const atHigh = elasticConstants(material, materialId, high);
+    if (isElasticRefusal(atLow) || isElasticRefusal(atHigh) || atLow.E !== atHigh.E || atLow.nu !== atHigh.nu) continue;
+    items.push(
+      item(
+        'TMC_ELASTIC_NOT_TEMPERATURE_DEPENDENT',
+        'warning',
+        `material '${materialId}' has a constant E = ${atLow.E} MPa and nu = ${atLow.nu} but the temperature field spans ${Math.round(high - low)} K (${Math.round(low - 273.15)} to ${Math.round(high - 273.15)} degC): thermal stress is E(T) alpha dT, so a hot part with a room-temperature E reads high (typically 5 to 15 % for metals at 400 degC)`,
+        [materialId, entityId],
+      ),
+    );
+  }
+  return items;
+}
+
 function partItems(doc: CadDocument, analysisCase: AnalysisCase, setup: ThermoMechSetup, referenceKelvin: number): ThermomechCheckItem[] {
   const items: ThermomechCheckItem[] = [];
   for (const entityId of Object.keys(analysisCase.parts)) {
@@ -103,12 +164,12 @@ function partItems(doc: CadDocument, analysisCase: AnalysisCase, setup: ThermoMe
     }
     const provider = providerFor(doc, setup, materialId, 'material');
     if (isCteRefusal(provider)) {
-      items.push(item(provider.code, 'error', provider.reason, [materialId, entityId]));
+      items.push(item(provider.code, 'error', provider.reason, [materialId, entityId], provider.remediation));
       continue;
     }
     const probe = provider.strainAt(referenceKelvin + REFERENCE_PROBE_KELVIN, referenceKelvin);
     if (isCteRefusal(probe)) {
-      items.push(item(probe.code, 'error', `at the reference temperature: ${probe.reason}`, [materialId, entityId]));
+      items.push(item(probe.code, 'error', `at the reference temperature: ${probe.reason}`, [materialId, entityId], probe.remediation));
       continue;
     }
     const reasons = [...probe.unverifiedReasons, ...elasticUnverifiedReasons(doc, materialId)];
@@ -156,12 +217,14 @@ export function checkThermomechItems(doc: CadDocument, analysisId: string, artif
   else items.push(...fieldItems(doc, analysisCase, setup, artifacts));
   if (reference !== null && Number.isFinite(reference))
     items.push(...partItems(doc, analysisCase, setup, kelvinOf(reference, setup.temperatureScale)));
+  if (!coupled && reference !== null && Number.isFinite(reference))
+    items.push(...elasticItems(doc, analysisCase, setup, kelvinOf(reference, setup.temperatureScale), artifacts));
   if (!analysisCase.loadOrder.some((id) => analysisCase.loads[id]?.loadCase === setup.loadCaseName))
     items.push(
       item(
         'TMC_THERMAL_CATEGORY_UNSET',
         'warning',
-        `load case '${setup.loadCaseName}' has no load carrying a limit / ultimate category: margins on it are refused until one is set (add_fea_load with loadCase and category)`,
+        `load case '${setup.loadCaseName}' has no load carrying a limit / ultimate category: compute_margins treats it as a LIMIT case (yield and ultimate factors both apply); set the category with add_fea_load if the programme rule says ultimate`,
         [analysisId],
       ),
     );

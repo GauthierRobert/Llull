@@ -238,7 +238,8 @@ describe('mass_properties payload', () => {
   it('failure paths are no-ops: missing entity, 2D shape, bad about', () => {
     const { doc, id } = boxDoc([0, 0, 0]);
     expectNoOp(execute(doc, 'mass_properties', { entityId: 'nope' }), doc, 'not found');
-    const circle = execute(doc, 'draw_circle', { center: [0, 0], radius: 3 });
+    const circle = execute(doc, 'draw_arc', { center: [0, 0], radius: 3 });
+    expect(circle.affected).toHaveLength(1);
     expect(execute(circle.document, 'mass_properties', { entityId: circle.affected[0] ?? '' }).data).toBeUndefined();
     const bad = execute(doc, 'mass_properties', { entityId: id, about: [1, 2] });
     expect(bad.affected).toEqual([]);

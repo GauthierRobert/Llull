@@ -58,7 +58,7 @@ PointEntity      'point'
 EllipseEntity    'ellipse'    center: Vec2; radiusX; radiusY
 SplineEntity     'spline'     points: Vec2[]; closed
 TextEntity       'text'       content; height; anchor?
-DimensionEntity  'dimension'  dimensionKind: 'linear'|'aligned'|'radial'|'angular'; entityIds; offset?; precision?; label?
+DimensionEntity  'dimension'  dimensionKind: 'linear'|'aligned'|'radial'|'diameter'|'angular'; entityIds; offset?; precision?; tolerance?; label?
 ImageEntity      'image'      dataUrl (png/jpeg base64); pixelWidth/Height; width/height (units, lower-left at position); opacity; locked — raster underlay, pixel (0,0) = top-left (geometry/imageUnderlay.ts)
 // CurveSegment<P> (model/curve.ts): {type:'line', points:[a,b]} | {type:'arc', points:[start,through,end]} | {type:'bezier', points:[p0,p1,p2,p3]}
 // Assembly

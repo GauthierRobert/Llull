@@ -6,14 +6,18 @@ import { addBodyJoint, addGearCoupling } from './connections';
 import { addCylinderPressure } from './cylinders';
 import { addMotor, addPropeller } from './drives';
 import { inspectDynamics } from './inspect';
+import { plotSimulation } from './plot';
+import { renderMotion } from './renderMotion';
 import { engineQuickCheck } from './quickCheck';
 import { simulateMotion } from './simulate';
+import { addSpring } from './springs';
 import { setDynamicsSolver } from './solver';
 
 export const dynamicsCommands = commandCatalog(
   addRigidBody,
   addBodyJoint,
   addGearCoupling,
+  addSpring,
   addMotor,
   addPropeller,
   addCylinderPressure,
@@ -23,4 +27,6 @@ export const dynamicsCommands = commandCatalog(
   inspectDynamics,
   engineQuickCheck,
   simulateMotion,
+  plotSimulation,
+  renderMotion,
 );

@@ -432,3 +432,35 @@ describe('emitters', () => {
     expect(emitFreeCad(rotated)).toContain('rotation=(90, (a) * 180 / math.pi, (h) * 180 / math.pi)');
   });
 });
+
+describe('instances in the feature program (export_step with assemblies)', () => {
+  const assembly = (): CadDocument => {
+    let doc = execute(createEmptyDocument(), 'add_box', { size: [4, 4, 4] }).document;
+    doc = execute(doc, 'add_cylinder', { radius: 1, height: 8, position: [10, 0, 0] }).document;
+    doc = execute(doc, 'create_component', { name: 'Pair', entityIds: [...doc.order] }).document;
+    const componentId = Object.keys(doc.components)[0]!;
+    doc = execute(doc, 'insert_instance', { componentId, position: [0, 20, 0] }).document;
+    return doc;
+  };
+
+  it('expands each instance into its component solids as analytic shapes (no triangle mesh), one output per solid', () => {
+    const doc = assembly();
+    const lowered = program(doc);
+    const shapes = lowered.features.flatMap((f) => (f.op === 'solid' ? [f.shape.kind] : []));
+    expect(shapes).not.toContain('mesh');
+    expect(shapes.filter((kind) => kind === 'box').length).toBeGreaterThanOrEqual(2);
+    expect(shapes.filter((kind) => kind === 'cylinder').length).toBeGreaterThanOrEqual(2);
+    expect(lowered.outputs).toHaveLength(4);
+    expect(lowered.notes.filter((note) => note.includes('triangle mesh'))).toEqual([]);
+  });
+
+  it('moving an instance after creation removes and re-creates all of its solids', () => {
+    let doc = assembly();
+    const instanceId = doc.order.find((id) => doc.entities[id]?.kind === 'instance')!;
+    doc = execute(doc, 'move_entities', { ids: [instanceId], delta: [1, 0, 0] }).document;
+    const lowered = program(doc);
+    expect(lowered.source).toBe('history');
+    expect(lowered.outputs).toHaveLength(4);
+    expect(lowered.features.some((f) => f.op === 'solid' && f.shape.kind === 'mesh')).toBe(false);
+  });
+});

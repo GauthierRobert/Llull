@@ -65,7 +65,7 @@ export const selectFastener = defineCommand({
 });
 
 /**
- * @affects plates (replaced by their cut meshes, material/name/tags carried over), components (one per part number, created once), instances (fastener, washers, nut), fasteners.stacks
+ * @affects plates (cut in place: same id and order slot, mesh replaced, material/name/tags carried over), components (one per part number, created once), instances (fastener, washers, nut), fasteners.stacks
  * @invariant one feature step; ids step-scoped (fst-<step>.<k>); undo restores the document exactly
  * @failure selection not ok, hole diameter unknown, kernel cut fails, stack given as a bare number -> unchanged document with a coded error
  */
@@ -110,7 +110,7 @@ export const insertFastenerStack = defineCommand({
       ...changed(
         placed.document,
         `Inserted fastener stack ${stack.id}: ${brief(outcome)}${stack.nut ? ` + ${stack.nut.partNumber}` : ''} through ${stack.layers.length} layer(s), stack ${outcome.data['stackIn'] as number} in, hole ${mode === 'none' ? 'not cut' : `Ø${diameter.toPrecision(5)} ${doc.units}`}; ` +
-          `${placed.affected.length} entities created/replaced.${warnings.length > 0 ? ` ${warnings.length} warning(s).` : ''}`,
+          `${placed.affected.length} entities created/modified.${warnings.length > 0 ? ` ${warnings.length} warning(s).` : ''}`,
         [...placed.affected],
       ),
       data: { stackId: stack.id, stack, selection: outcome.data, warnings },

@@ -1,6 +1,7 @@
 /** The safety wrapper `execute` sees around every registered command. */
 
-import type { CommandDefinition, CommandResult, ParamsSchema } from './types';
+import type { CadDocument } from '../model/types';
+import type { CommandDefinition, CommandResult, ExecutionContext, ParamsSchema } from './types';
 import { isReservedKey } from '../lib/reservedKey';
 import { formatIssues, issuePaths } from './schema';
 import { derivationViolation } from './derivation';
@@ -43,7 +44,8 @@ function hasPrototypeIdKey(value: unknown, keyHint = '', depth = 0): boolean {
   return Object.entries(value).some(([k, v]) => hasPrototypeIdKey(v, k, depth + 1));
 }
 
-const INVALID_PARAMS_FIX = 'Fix the params at `paths`; `llull describe <command>` shows the schema.';
+const INVALID_PARAMS_FIX =
+  'Fix the params at `paths`; the schema of the command is in the tool list / `search_tools` (CLI: `llull describe <command>`).';
 
 const POSITION_CONTRACT = ' Format [x, y, z]; [x, y] is accepted and placed at z=0.';
 
@@ -55,6 +57,17 @@ function describePositionContract(schema: ParamsSchema): ParamsSchema {
     ...schema,
     properties: { ...schema.properties, position: { ...position, description: position.description + POSITION_CONTRACT } },
   };
+}
+
+const MAX_KNOWN_LISTED = 14;
+
+/** " Note: ignored unknown param(s): a, b (known: …)." for top-level keys the command does not declare; empty when none. */
+function unknownParamsNote(schema: ParamsSchema, params: object): string {
+  const known = Object.keys(schema.properties);
+  const unknown = Object.keys(params).filter((key) => !known.includes(key));
+  if (unknown.length === 0) return '';
+  const listed = known.slice(0, MAX_KNOWN_LISTED).join(', ') + (known.length > MAX_KNOWN_LISTED ? ', …' : '');
+  return ` Note: ignored unknown param(s): ${unknown.join(', ')} (known: ${known.length > 0 ? listed : 'none'}).`;
 }
 
 /** Log `message` with the error's stack and return its message for the agent-facing summary. */
@@ -74,6 +87,7 @@ export function corruptionReason(entity: unknown): string | null {
  * @failure run throws (warned with stack), id-like params equal an Object.prototype key
  * (would alias entity-bag lookups), or affected entities contain NaN/Infinity/undefined vector
  * components or a non-Vec3 position -> no-op, affected:[]
+ * @invariant top-level param keys the schema does not declare are tolerated but named in the summary ("ignored unknown param(s)")
  * @invariant non-object params are coerced to {} so field destructuring cannot throw;
  * a 2-number `position` is padded to [x, y, 0]; free-text params are never rejected
  */
@@ -82,58 +96,65 @@ export function guardCommand(def: CommandDefinition<unknown>): CommandDefinition
     ...def,
     paramsSchema: describePositionContract(def.paramsSchema),
     run: (doc, params, ctx): CommandResult => {
-      const safeParams = padPlanarPosition(typeof params === 'object' && params !== null ? params : {});
-      if (hasPrototypeIdKey(safeParams))
-        return rejection(
-          doc,
-          `${def.name} rejected: an id param is a reserved JavaScript property name (e.g. constructor, __proto__, toString). Use a different id.`,
-          commandError('CMD_RESERVED_ID', 'Use an id that is not a JavaScript property name (constructor, __proto__, toString, …).'),
-        );
-      if (def.paramsValidator) {
-        let checked: ReturnType<typeof def.paramsValidator.safeParse>;
-        try {
-          checked = def.paramsValidator.safeParse(safeParams, { reportInput: true });
-        } catch (error) {
-          const reason = warnAndDescribe(`command '${def.name}' params validation threw:`, error);
-          return rejection(doc, `${def.name} rejected: invalid params — ${reason}`, commandError('CMD_INVALID_PARAMS', INVALID_PARAMS_FIX));
-        }
-        if (!checked.success)
-          return rejection(
-            doc,
-            `${def.name} rejected: invalid params — ${formatIssues(checked.error)}. Document unchanged.`,
-            commandError('CMD_INVALID_PARAMS', INVALID_PARAMS_FIX, [], issuePaths(checked.error)),
-          );
-      }
-      let result: CommandResult;
-      try {
-        result = def.run(doc, safeParams, ctx);
-      } catch (error) {
-        const reason = warnAndDescribe(`command '${def.name}' threw:`, error);
-        return rejection(
-          doc,
-          `${def.name} failed: ${reason}; document unchanged.`,
-          commandError('CMD_THREW', 'An internal error; simplify the input or report the summary as a bug.'),
-        );
-      }
-      const violation = derivationViolation(pluginGuards(), def.name, doc, result.document);
-      if (violation !== null)
-        return rejection(
-          doc,
-          violation,
-          commandError('CMD_DERIVED_GEOMETRY', 'Edit the domain object that derives this geometry instead of the derived entities.'),
-        );
-      if (result.document !== doc) {
-        for (const id of result.affected) {
-          const reason = corruptionReason(result.document.entities[id]);
-          if (reason !== null)
-            return rejection(
-              doc,
-              `${def.name} rejected: result for ${id} contains ${reason}. Document unchanged.`,
-              commandError('CMD_CORRUPT_RESULT', 'Check the numeric params (sizes, positions) for extreme or degenerate values.', [id]),
-            );
-        }
-      }
-      return result;
+      const result = checkedRun(def, doc, params, ctx);
+      const note = unknownParamsNote(def.paramsSchema, typeof params === 'object' && params !== null ? params : {});
+      return note === '' ? result : { ...result, summary: result.summary + note };
     },
   };
+}
+
+/** Validation + run + result checks of one guarded call (see `guardCommand`). */
+function checkedRun(def: CommandDefinition<unknown>, doc: CadDocument, params: unknown, ctx: ExecutionContext | undefined): CommandResult {
+  const safeParams = padPlanarPosition(typeof params === 'object' && params !== null ? params : {});
+  if (hasPrototypeIdKey(safeParams))
+    return rejection(
+      doc,
+      `${def.name} rejected: an id param is a reserved JavaScript property name (e.g. constructor, __proto__, toString). Use a different id.`,
+      commandError('CMD_RESERVED_ID', 'Use an id that is not a JavaScript property name (constructor, __proto__, toString, …).'),
+    );
+  if (def.paramsValidator) {
+    let checked: ReturnType<typeof def.paramsValidator.safeParse>;
+    try {
+      checked = def.paramsValidator.safeParse(safeParams, { reportInput: true });
+    } catch (error) {
+      const reason = warnAndDescribe(`command '${def.name}' params validation threw:`, error);
+      return rejection(doc, `${def.name} rejected: invalid params — ${reason}`, commandError('CMD_INVALID_PARAMS', INVALID_PARAMS_FIX));
+    }
+    if (!checked.success)
+      return rejection(
+        doc,
+        `${def.name} rejected: invalid params — ${formatIssues(checked.error)}. Document unchanged.`,
+        commandError('CMD_INVALID_PARAMS', INVALID_PARAMS_FIX, [], issuePaths(checked.error)),
+      );
+  }
+  let result: CommandResult;
+  try {
+    result = def.run(doc, safeParams, ctx);
+  } catch (error) {
+    const reason = warnAndDescribe(`command '${def.name}' threw:`, error);
+    return rejection(
+      doc,
+      `${def.name} failed: ${reason}; document unchanged.`,
+      commandError('CMD_THREW', 'An internal error; simplify the input or report the summary as a bug.'),
+    );
+  }
+  const violation = derivationViolation(pluginGuards(), def.name, doc, result.document);
+  if (violation !== null)
+    return rejection(
+      doc,
+      violation,
+      commandError('CMD_DERIVED_GEOMETRY', 'Edit the domain object that derives this geometry instead of the derived entities.'),
+    );
+  if (result.document !== doc) {
+    for (const id of result.affected) {
+      const reason = corruptionReason(result.document.entities[id]);
+      if (reason !== null)
+        return rejection(
+          doc,
+          `${def.name} rejected: result for ${id} contains ${reason}. Document unchanged.`,
+          commandError('CMD_CORRUPT_RESULT', 'Check the numeric params (sizes, positions) for extreme or degenerate values.', [id]),
+        );
+    }
+  }
+  return result;
 }

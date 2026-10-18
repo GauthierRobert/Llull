@@ -50,6 +50,8 @@ describe('PhysicsSection', () => {
     await waitFor(() => expect(screen.getByTestId('physics-results')).toBeInTheDocument(), { timeout: 20_000 });
     expect(screen.getByTestId('physics-results')).toHaveTextContent(new RegExp(`${jointId}.*rpm`));
     expect(screen.getByTestId('physics-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('physics-energy-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('physics-energy')).toHaveTextContent(/dissipated .* J · (balance error|drift|lossy)/);
     const { result, playing } = useDynamicsPlaybackStore.getState();
     expect(result?.poses?.times.length).toBeGreaterThan(100);
     expect(playing).toBe(true);
@@ -61,6 +63,18 @@ describe('PhysicsSection', () => {
     expect(useDynamicsPlaybackStore.getState().speed).toBe(0.01);
     fireEvent.click(screen.getByTestId('physics-clear'));
     expect(useDynamicsPlaybackStore.getState().result).toBeNull();
+  });
+
+  it('mentions the static propeller model only when the model has a propeller', async () => {
+    const arm = localDispatch('add_box', { size: [300, 20, 20] }).affected[0]!;
+    const bodyId = localDispatch('add_rigid_body', { entityIds: [arm], name: 'pendulum' }).affected[0]!;
+    localDispatch('add_body_joint', { kind: 'revolute', child: bodyId, anchor: [0, 10, 10], axis: [0, 1, 0] });
+    render(<PhysicsSection />);
+    fireEvent.change(screen.getByTestId('physics-duration'), { target: { value: '1' } });
+    fireEvent.click(screen.getByTestId('physics-simulate'));
+    await waitFor(() => expect(screen.getByTestId('physics-engine-note')).toBeInTheDocument(), { timeout: 20_000 });
+    expect(screen.getByTestId('physics-engine-note')).not.toHaveTextContent(/propeller/);
+    expect(screen.getByTestId('physics-energy')).not.toHaveTextContent(/-0(?![.\d])/);
   });
 
   it('online, runs simulate_motion on the server (the served CSP blocks in-page MuJoCo) and plays its result', async () => {

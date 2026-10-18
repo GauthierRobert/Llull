@@ -5,7 +5,8 @@ import { defineCommand, z } from '../schema';
 import { commandError, failer, rejection, report } from '../noop';
 import { currentContext } from '../context';
 import { toMetres } from '../../model/units';
-import { buildSimulationModel, solverSettingsOf } from '../../dynamics/simulationModel';
+import { buildSimulationModel, solverSettingsOf, type BuiltSimulation } from '../../dynamics/simulationModel';
+import type { SimulationTrace } from '../../dynamics/physicsEngine';
 import { simulationData, simulationSummary } from '../../dynamics/simulationReport';
 import { PILOT_DURATION, PILOT_TIMESTEP, resolveTimestep } from '../../dynamics/timestep';
 import { buildTopology, isRefusal } from '../../dynamics/topology';
@@ -16,10 +17,21 @@ import { errorMessage } from '../../lib/errorMessage';
 import { dynamicsOf } from './bodies';
 import { openLoopGaps } from './inspect';
 
+/** Default samples per turn of the fastest announced joint (10 deg), and the floor below which a warning says the motion aliases. */
+const SAMPLES_PER_TURN = 36;
+const MIN_SAMPLES_PER_TURN = 8;
+
 /** Upper bound on integration steps of one run (keeps a call interactive). */
 const MAX_STEPS = 1_000_000;
 /** Upper bound on recorded samples (keeps results small enough for MCP and the viewport). */
 const MAX_SAMPLES = 6001;
+/** Most halvings of the auto timestep after a failed loop-residual gate, and the smallest step they may reach (s). */
+const MAX_HALVINGS = 5;
+const MIN_STEP = 1e-5;
+
+type Attempt =
+  | { readonly timestep: number; readonly error: string }
+  | { readonly timestep: number; readonly built: BuiltSimulation; readonly trace: SimulationTrace; readonly sampleInterval: number };
 
 /**
  * @affects nothing — read-only; returns { ...SimulationData, loops?, reactions?, engineReport? } in data
@@ -35,7 +47,7 @@ export const simulateMotion = defineCommand({
     'engine (MuJoCo) and report what happens: final speed of every joint (rpm), when it settled, engine torque and power, propeller ' +
     'thrust / torque / absorbed power, and measured gear ratios (a self-check). Gravity applies (set_gravity). Read-only. ' +
     'detail "summary" (default) = numbers only; "series" adds per-sample time series (speeds, positions, torques, thrust, power) for ' +
-    'plotting; "poses" also adds every body\'s pose per sample (for playback). Warnings flag a run that has not settled. ' +
+    'plotting; `energy: true` adds the kinetic / potential / total / dissipated energy balance (J; automatic when a joint or add_spring has a spring) with the work put in by motors / governors / gas pressure (inputWorkJ), the work absorbed by propellers and balanceErrorJ (initial + input - dissipated - propellers - final, ~0), and data.springs (length range and force per add_spring); "poses" also adds every body\'s pose per sample (for playback). Warnings flag a run that has not settled. ' +
     'Typical: duration 10 s, timestep 0.001 s (use 0.0002 s for fast, light parts). ' +
     'Closed loops (slider-crank, four-bar): before integrating, the start pose is checked and a loop open by more than 1 µm is refused ' +
     '(FPR_LOOP_OPEN, nothing is run or snapped); with loops the default timestep is the "auto" rule min(1 ms, 0.5 deg of crank at the ' +
@@ -58,12 +70,24 @@ export const simulateMotion = defineCommand({
       .max(0.01)
       .optional()
       .describe('Integration step in seconds. Default 0.001 (loops or cylinders: the "auto" rule or the stored solver setting).'),
-    sampleRate: z.number().positive().optional().describe('Recorded samples per second. Default 50.'),
+    sampleRate: z
+      .number()
+      .positive()
+      .optional()
+      .describe(
+        'Recorded samples per second. Default 50, raised for loop mechanisms to 36 per turn of the crank so periodic motion is not aliased; engines: one per crank degree. At most 6001 samples per run.',
+      ),
     detail: z.enum(['summary', 'series', 'poses']).optional().describe('"summary" (default), "series" or "poses".'),
     reactions: z
       .enum(['off', 'peaks', 'series'])
       .optional()
       .describe('Joint / loop reaction forces: "off", "peaks" (default when the mechanism has loops), "series" (adds every sample).'),
+    energy: z
+      .boolean()
+      .optional()
+      .describe(
+        'Add the energy balance: data.energy (kinetic, potential = gravity + joint springs relative to the start pose, total, energy dissipated by joint damping / friction, largest departure of the total from its initial value as a fraction of the peak energy) and, with detail "series", data.series.energy per sample. Also inputWorkJ (work of motors, speed governors and cylinder gas pressure), propellerWorkJ (absorbed by propellers) and balanceErrorJ = initial total + input - dissipated - propellers - final total (zero when every energy flow is counted). Default false, except true when a joint or an add_spring has a spring. A lossless mechanism keeps its total constant (conservation check); damping makes it decay by data.energy.dissipatedJ.',
+      ),
     crankAxis: z
       .string()
       .optional()
@@ -117,22 +141,56 @@ export const simulateMotion = defineCommand({
       }
     };
     const resolved = resolveTimestep(dynamics, settings, params.timestep, structured, pilotPeak);
-    const timestep = resolved.timestep;
-    if (duration / timestep > MAX_STEPS)
-      return fail(`duration / timestep is over ${MAX_STEPS.toLocaleString('en-US')} steps; raise the timestep`);
-    // engines: one sample per degree of crank at the top speed unless the call sets a rate
+    // engines: one sample per degree of crank at the top speed; otherwise 50 Hz, or 36 samples per turn of the fastest announced joint
+    // (sampling a 3000 rpm crank at 50 Hz sees the same phase every turn: the motion would alias into a false "steady")
     const degreeInterval = resolved.maxSpeed > 0 ? Math.PI / 180 / resolved.maxSpeed : 1 / 50;
-    const defaultInterval = hasCylinders ? degreeInterval : 1 / 50;
-    const sampleInterval = Math.max(
-      timestep,
-      params.sampleRate !== undefined ? 1 / params.sampleRate : defaultInterval,
-      duration / (MAX_SAMPLES - 1),
-    );
-    const built = buildSimulationModel(doc, timestep, kernel);
-    if ('error' in built) return fail(built.error);
+    const turnInterval = resolved.maxSpeed > 0 ? (2 * Math.PI) / SAMPLES_PER_TURN / resolved.maxSpeed : Infinity;
+    const defaultInterval = hasCylinders ? degreeInterval : Math.min(1 / 50, turnInterval);
+    const withEnergy =
+      params.energy ??
+      (Object.values(dynamics.joints).some((joint) => joint.stiffness !== undefined) || Object.keys(dynamics.springs ?? {}).length > 0);
     const mode: ReactionMode = params.reactions ?? (structured ? 'peaks' : 'off');
+    const attemptAt = (step: number): Attempt => {
+      if (duration / step > MAX_STEPS)
+        return { timestep: step, error: `duration / timestep is over ${MAX_STEPS.toLocaleString('en-US')} steps; raise the timestep` };
+      const interval = params.sampleRate !== undefined ? 1 / params.sampleRate : defaultInterval;
+      // the engine samples every whole number of steps: round the cap UP to one so the run never exceeds MAX_SAMPLES
+      const capInterval = duration / (MAX_SAMPLES - 1);
+      const sampleInterval =
+        capInterval > Math.max(step, interval) ? Math.ceil(capInterval / step - 1e-9) * step : Math.max(step, interval);
+      const model = buildSimulationModel(doc, step, kernel);
+      if ('error' in model) return { timestep: step, error: model.error };
+      try {
+        const options = {
+          duration,
+          timestep: step,
+          sampleInterval,
+          ...(mode !== 'off' ? { reactions: true } : {}),
+          ...(withEnergy ? { energy: true } : {}),
+        };
+        return { timestep: step, built: model, trace: engine.simulate(model.model, options), sampleInterval };
+      } catch (error) {
+        return { timestep: step, error: `the physics engine rejected the model: ${errorMessage(error)}` };
+      }
+    };
+    // the auto rule only sees speed and geometry: a light slow loop can still miss the residual gate, so halve the step and retry
+    const adaptive = params.timestep === undefined && structured && settings.timestepS === 'auto';
+    const failsGate = (attempt: Attempt): boolean =>
+      'error' in attempt ||
+      residualTier(attempt.trace.loopResidual ?? 0, settings.loopResidualPassM, settings.loopResidualFailM) === 'fail';
+    let attempt = attemptAt(resolved.timestep);
+    let halvings = 0;
+    while (adaptive && failsGate(attempt) && halvings < MAX_HALVINGS && attempt.timestep / 2 >= MIN_STEP) {
+      const next = attemptAt(attempt.timestep / 2);
+      if ('error' in next && next.error.includes('steps; raise')) break;
+      attempt = next;
+      halvings++;
+    }
+    if ('error' in attempt) return fail(attempt.error);
     try {
-      const trace = engine.simulate(built.model, { duration, timestep, sampleInterval, ...(mode !== 'off' ? { reactions: true } : {}) });
+      const { trace, built, timestep } = attempt;
+      const basis =
+        halvings > 0 ? `${resolved.basis}; halved ${halvings}x from ${resolved.timestep} s after the loop residual failed` : resolved.basis;
       const base = simulationData(dynamics, built.mass, trace, {
         engine: engine.name,
         duration,
@@ -143,6 +201,18 @@ export const simulateMotion = defineCommand({
       const residual = trace.loopResidual ?? 0;
       const tier = residualTier(residual, settings.loopResidualPassM, settings.loopResidualFailM);
       const warnings = [...base.warnings];
+      if (halvings > 0)
+        warnings.push(
+          `timestep halved ${halvings}x by the auto rule: ${resolved.timestep} s left the loop residual above the fail tier, ${timestep} s is used`,
+        );
+      if (params.sampleRate !== undefined && attempt.sampleInterval > 1 / params.sampleRate + 1e-12)
+        warnings.push(
+          `sampleRate ${params.sampleRate} Hz was reduced to ${(1 / attempt.sampleInterval).toPrecision(4)} Hz (at most ${MAX_SAMPLES} samples per run, and never finer than the timestep ${timestep} s)`,
+        );
+      if (resolved.maxSpeed > 0 && attempt.sampleInterval * resolved.maxSpeed > (2 * Math.PI) / MIN_SAMPLES_PER_TURN)
+        warnings.push(
+          `FPR_SAMPLING_ALIASED: ${((2 * Math.PI) / (attempt.sampleInterval * resolved.maxSpeed)).toPrecision(3)} samples per turn of the fastest joint (< ${MIN_SAMPLES_PER_TURN}): periodic motion aliases (it can read as steady); raise sampleRate or shorten duration`,
+        );
       if (structured && tier !== 'pass')
         warnings.push(
           `FPR_LOOP_DRIFT (${tier}): loop residual ${(residual * 1e6).toPrecision(3)} µm; ` +
@@ -183,7 +253,7 @@ export const simulateMotion = defineCommand({
                 solver: {
                   integrator: settings.integrator,
                   timestepS: timestep,
-                  timestepBasis: resolved.basis,
+                  timestepBasis: basis,
                   loopTimeConstantS: built.model.solver.loopTimeConstant,
                   loopTimeConstantSteps: settings.loopTimeConstantSteps,
                   loopImpedance: settings.loopImpedance,

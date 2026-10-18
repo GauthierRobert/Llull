@@ -26,7 +26,6 @@
   "command": "define_material_record",
   "params": {
    "id": "nafems_t4",
-   "name": "nafems_t4",
    "designation": "validation test material",
    "specs": [],
    "licence": "company-proprietary",
@@ -84,8 +83,7 @@
    "density": 7850000.0,
    "color": "#9aa0a6",
    "metalness": 1,
-   "roughness": 0.4,
-   "recordId": "nafems_t4"
+   "roughness": 0.4
   }
  },
  {
@@ -159,6 +157,9 @@
       0.005
      ]
     ]
+   },
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
    }
   }
  },
@@ -185,6 +186,9 @@
       0.005
      ]
     ]
+   },
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
    }
   }
  },
@@ -192,7 +196,6 @@
   "command": "set_mesh_controls",
   "params": {
    "analysisId": "$an",
-   "mesher": "gmsh",
    "elementFamily": "hex_dominant",
    "order": 2,
    "globalSize": 0.02

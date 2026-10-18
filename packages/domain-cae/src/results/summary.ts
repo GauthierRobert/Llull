@@ -3,6 +3,7 @@
 import type { FeMeshArtifact, FeResultsArtifact, MeshSummary, ResultsSummary } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
+import { significantNumber } from '@lib/compactNumber';
 import { loadCasesOf } from '../decks/context';
 import { caseOf } from '../shared/access';
 import { thermalResultsSummary } from '../thermal/summary';
@@ -30,10 +31,27 @@ export function meshSummary(mesh: FeMeshArtifact, meshHash: string): MeshSummary
   };
 }
 
+/** `; frequencies 209.73, 1299.4 Hz` / `; buckling factors 3.2 (x applied load)` for a modal / buckling summary, else ''. */
+export function eigenSummaryText(summary: ResultsSummary): string {
+  const list = (values: readonly number[]): string => values.map((value) => significantNumber(value, 6)).join(', ');
+  if (summary.frequenciesHz !== undefined)
+    return `; ${summary.frequenciesHz.length} natural frequencies: ${list(summary.frequenciesHz)} Hz`;
+  if (summary.bucklingFactors !== undefined)
+    return `; ${summary.bucklingFactors.length} buckling factor(s) (multiples of the applied load): ${list(summary.bucklingFactors)}`;
+  return '';
+}
+
+/** Column `index` of the rows of the `.dat` table whose title starts with `title`, in mode order. */
+function eigenColumn(results: FeResultsArtifact, title: string, index: number): number[] {
+  const table = results.dat?.tables.find((candidate) => candidate.title.startsWith(title));
+  return (table?.rows ?? []).map((row) => row[index] ?? Number.NaN).filter(Number.isFinite);
+}
+
 /**
  * Summary of a results artifact. Static and thermo_static: per load case (CalculiX step n = load case n, `loadCasesOf` order) the maximum
  * von Mises stress and the maximum displacement magnitude, each with its node position (analysis units) and, for stress, the owning
- * entity; a load case whose step lacks DISP or STRESS is omitted. heat_*: `thermal` from the thermal lane, no load cases.
+ * entity; a load case whose step lacks DISP or STRESS is omitted. modal: `frequenciesHz` (ascending); buckling: `bucklingFactors` (multiples
+ * of the applied reference load); both without load cases. heat_*: `thermal` from the thermal lane, no load cases.
  * @invariant deterministic and pure; an unknown analysis gives no load cases
  */
 export function resultsSummary(
@@ -54,6 +72,8 @@ export function resultsSummary(
   if (analysis === undefined) return { ...base, loadCases: [] };
   if (analysis.type === 'heat_steady' || analysis.type === 'heat_transient')
     return { ...base, loadCases: [], thermal: thermalResultsSummary(doc, analysisId, mesh, results) };
+  if (analysis.type === 'modal') return { ...base, loadCases: [], frequenciesHz: eigenColumn(results, 'eigenvalues', 3) };
+  if (analysis.type === 'buckling') return { ...base, loadCases: [], bucklingFactors: eigenColumn(results, 'buckling factors', 1) };
   const coordinates = nodeCoordinates(mesh);
   const entities = nodeEntities(mesh);
   const at = (node: number): Vec3 => coordinates.get(node) ?? [0, 0, 0];

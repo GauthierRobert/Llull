@@ -43,7 +43,6 @@
   "command": "define_material_record",
   "params": {
    "id": "plate_cu",
-   "name": "plate_cu",
    "designation": "validation test material",
    "specs": [],
    "licence": "company-proprietary",
@@ -101,8 +100,7 @@
    "density": 8900000.0,
    "color": "#b87333",
    "metalness": 1,
-   "roughness": 0.4,
-   "recordId": "plate_cu"
+   "roughness": 0.4
   }
  },
  {
@@ -188,7 +186,7 @@
    "analysisId": "$an",
    "name": "C01",
    "environmentTemperature": {
-    "value": 0.0,
+    "value": 3.0,
     "unit": "K"
    },
    "faces": [
@@ -225,7 +223,6 @@
   "command": "set_mesh_controls",
   "params": {
    "analysisId": "$an",
-   "mesher": "gmsh",
    "elementFamily": "hex_dominant",
    "order": 1,
    "globalSize": 0.05

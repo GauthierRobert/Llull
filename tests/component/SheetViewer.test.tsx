@@ -45,6 +45,14 @@ describe('SheetViewer', () => {
     expect(screen.getByTestId('sheet-fits-warning')).toBeTruthy();
   });
 
+  it('shows the real overflow warning in the overflow chip tooltip', () => {
+    const sheetId = openSheet({ scale: 0.01 });
+    const real = runQuery('export_sheet_svg', { sheetId });
+    expect((real.data as { warnings: string[] }).warnings.length).toBeGreaterThan(0);
+    render(<SheetViewer />);
+    expect(screen.getByTestId('sheet-fits-warning').getAttribute('title')).toBe((real.data as { warnings: string[] }).warnings.join(' '));
+  });
+
   it('lists export warnings as text when present and nothing when absent', () => {
     const sheetId = openSheet();
     const real = runQuery('export_sheet_svg', { sheetId });

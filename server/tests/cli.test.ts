@@ -4,12 +4,13 @@
  */
 
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setGeometryKernel } from '@core/geometry/kernel';
+import { createEmptyDocument } from '@core/model/types';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { ctxWith, docWith, inchDocument, ok, sampleCatalogFile } from '../../tests/unit/aero/fasteners/fixtures';
@@ -97,6 +98,8 @@ describe('llull CLI — discovery', () => {
   it('rejects unknown subcommands, toolsets and commands with hints (exit 2)', async () => {
     const cases: [string[], RegExp][] = [
       [['frobnicate'], /unknown subcommand/],
+      [['draw_circle'], /unknown subcommand "draw_circle"\. Did you mean: draw_arc/],
+      [['draw_arcc'], /unknown subcommand "draw_arcc"\. Did you mean: draw_arc/],
       [['list', 'nope'], /unknown toolset/],
       [['describe', 'add_bx'], /Did you mean: .*add_box/],
       [['describe'], /needs a command name/],
@@ -216,13 +219,38 @@ describe('llull CLI — local document', () => {
     ];
     const text = capture({ stdin: JSON.stringify(plan) });
     expect(await runCli(['run', '-', ...docFlag()], text.io)).toBe(EXIT_OK);
-    expect(text.out[0]).toMatch(/\nAliases: part=mesh-3\.1\nConsumed: body, hole$/);
+    expect(text.out[0]).toMatch(/\nAliases: part=mesh-3\.1\nNot in the final scene: body, hole /);
 
     const json = capture({ stdin: JSON.stringify(plan) });
     await runCli(['run', '-', '--json', '--force', ...docFlag()], json.io);
     const report = JSON.parse(json.out[0] ?? '') as { aliases: Record<string, string[]>; consumedAliases: string[] };
     expect(report.aliases).toEqual({ part: expect.any(Array) });
     expect(report.consumedAliases).toEqual(['body', 'hole']);
+  });
+
+  it('reports the element id of a building element alias, so it can be passed to follow-up commands', async () => {
+    const plan = [
+      { command: 'add_level', params: { name: 'L0' } },
+      { command: 'add_level', params: { name: 'L1' } },
+      {
+        command: 'add_slab',
+        params: {
+          boundary: [
+            [0, 0],
+            [8000, 0],
+            [8000, 6000],
+            [0, 6000],
+          ],
+          levelId: 'level-2',
+        },
+        as: 'floor',
+      },
+      { command: 'add_stair', params: { start: [1000, 1000], levelId: 'level-1' }, as: 'stair' },
+      { command: 'add_slab_opening', params: { slabId: '$floor', stairId: '$stair' } },
+    ];
+    const text = capture({ stdin: JSON.stringify(plan) });
+    expect(await runCli(['run', '-', ...docFlag()], text.io)).toBe(EXIT_OK);
+    expect(text.out[0]).toContain('Aliases: floor=slab-1+slab-1:body, stair=stair-1+stair-1:flight');
   });
 
   it('reports loop aliases and per-step refusal codes in --json', async () => {
@@ -280,6 +308,29 @@ describe('llull CLI — local document', () => {
     expect(nothing.err.join('\n')).toMatch(/no file payload/);
   });
 
+  it('export_gltf --save x.glb writes a binary GLB, x.gltf the JSON form', async () => {
+    await runCli(['exec', 'add_box', 'size=[5,5,5]', ...docFlag()], capture().io);
+    const glb = path.join(workDir, 'm.glb');
+    expect(await runCli(['exec', 'export_gltf', '--save', glb, ...docFlag()], capture().io)).toBe(EXIT_OK);
+    expect(readFileSync(glb).subarray(0, 4).toString()).toBe('glTF');
+    const gltf = path.join(workDir, 'm.gltf');
+    expect(await runCli(['exec', 'export_gltf', '--save', gltf, ...docFlag()], capture().io)).toBe(EXIT_OK);
+    expect(JSON.parse(readFileSync(gltf, 'utf8'))).toHaveProperty('asset');
+  });
+
+  it('--validate warns when a plan needs a kernel the selected one lacks', async () => {
+    const plan = JSON.stringify([
+      { command: 'add_box', params: { size: [5, 5, 5] }, as: 'b' },
+      { command: 'fillet_edge', params: { entityId: '$b' } },
+    ]);
+    const manifold = capture({ stdin: plan });
+    await runCli(['run', '-', '--validate', ...docFlag()], manifold.io);
+    expect(manifold.out.join('\n')).toMatch(/warning: .*fillet_edge.*--kernel occt/);
+    const occt = capture({ stdin: plan });
+    await runCli(['run', '-', '--validate', '--kernel', 'occt', ...docFlag()], occt.io);
+    expect(occt.out.join('\n')).not.toMatch(/warning:/);
+  });
+
   it('--quiet prints nothing on success but still prints errors', async () => {
     const ok = capture();
     await runCli(['add_box', 'size=[1,1,1]', '--quiet', ...docFlag()], ok.io);
@@ -310,6 +361,30 @@ describe('llull CLI — local document', () => {
     const fresh = capture();
     await runCli(['undo', '--doc', path.join(workDir, 'other.json')], fresh.io);
     expect(fresh.out[0]).toMatch(/Nothing to undo/);
+  });
+});
+
+describe('llull CLI — plans frame the camera', () => {
+  const cameraOf = (): unknown => deserializeDocument(readFileSync(docPath, 'utf8')).camera;
+  const plan = (actions: unknown[]): string => {
+    const planPath = path.join(workDir, 'frame.json');
+    writeFileSync(planPath, JSON.stringify(actions));
+    return planPath;
+  };
+
+  it('fits the view after a plan that built geometry without touching the camera, unless --no-fit or the plan sets it', async () => {
+    const box = [{ command: 'add_box', params: { size: [2000, 1000, 500], position: [5000, 0, 0] } }];
+    const fitted = capture();
+    expect(await runCli(['run', plan(box), ...docFlag()], fitted.io)).toBe(EXIT_OK);
+    expect(fitted.out.join('\n')).toContain('Camera framed on the model');
+    expect(cameraOf()).not.toEqual(createEmptyDocument().camera);
+    rmSync(docPath, { force: true });
+    expect(await runCli(['run', plan(box), '--no-fit', ...docFlag()], capture().io)).toBe(EXIT_OK);
+    expect(cameraOf()).toEqual(createEmptyDocument().camera);
+    rmSync(docPath, { force: true });
+    const own = [...box, { command: 'set_camera', params: { distance: 123 } }];
+    expect(await runCli(['run', plan(own), ...docFlag()], capture().io)).toBe(EXIT_OK);
+    expect((cameraOf() as { distance: number }).distance).toBe(123);
   });
 });
 

@@ -27,6 +27,10 @@ export function BomSections(): React.ReactElement {
               <span aria-hidden="true">◌</span> The model changed. Refresh to update.
             </p>
           )}
+          <p className="panel__row-meta" data-testid="bom-total-mass">
+            Total mass {view.totalMassKg} kg
+            {view.rowsWithoutDensity.length > 0 && ` · no density for ${view.rowsWithoutDensity.join(', ')} (excluded)`}
+          </p>
           <h4 className="mfg__subhead">Standard parts</h4>
           {view.standardParts.length === 0 ? (
             <p className="panel__row-meta" data-testid="bom-no-standard">

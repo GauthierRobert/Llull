@@ -39,6 +39,7 @@ function bridgeFailure(message: string): FeaToolResult {
 function meshArtifact(
   response: MeshBridgeResponse,
   request: { unitSystem: FeMeshArtifact['unitSystem']; inputHash: string },
+  facetedParts: readonly string[],
 ): FeMeshArtifact | null {
   const { nodes, blocks, nodeSets, faceSets, targets } = response;
   if (!Array.isArray(nodes) || !Array.isArray(blocks) || !isRecord(nodeSets) || !isRecord(faceSets) || !isRecord(targets)) return null;
@@ -53,6 +54,7 @@ function meshArtifact(
     nodeSets: nodeSets as FeMeshArtifact['nodeSets'],
     faceSets: faceSets as FeMeshArtifact['faceSets'],
     targets: targets as FeMeshArtifact['targets'],
+    ...(facetedParts.length > 0 ? { facetedParts } : {}),
   };
 }
 
@@ -100,10 +102,22 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
       ? bridgeFailure(message)
       : feaFailure('fea_mesh', response.code, message, [analysisId]);
   }
-  const mesh = meshArtifact(response, request);
+  const faceted = parts
+    .filter(
+      (part) =>
+        (part.geometry as { kind?: string; curved?: boolean }).kind === 'stl' && (part.geometry as { curved?: boolean }).curved === true,
+    )
+    .map((part) => part.entityId);
+  const mesh = meshArtifact(response, request, faceted);
   if (mesh === null) return feaFailure('fea_mesh', 'FEA_MESH_FAILED', 'the mesher returned a malformed mesh');
   const meshHash = deps.store.put(mesh);
   const recorded = host.applyCommand('record_fe_mesh', { analysisId, summary: deps.hooks.meshSummary(mesh, meshHash) });
+  const facetedNote =
+    faceted.length === 0
+      ? ''
+      : ` WARNING: ${faceted.join(', ')} meshed from a faceted tessellation (no exact B-rep with this kernel): curved faces are polygons, ` +
+        'so stresses at curved features are off by several % (either sign) and facesNear targets snap to facets; for stress results re-run ' +
+        'with the OCC kernel (--kernel occt or LLULL_KERNEL=occt).';
   const counts = mesh.blocks.reduce<Record<string, number>>(
     (all, block) => ({ ...all, [block.type]: (all[block.type] ?? 0) + block.elements.length }),
     {},
@@ -111,9 +125,9 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
   return {
     summary: `fea_mesh: ${mesh.nodes.length} nodes, ${Object.entries(counts)
       .map(([type, n]) => `${n} ${type}`)
-      .join(', ')} (${mesh.mesher} ${mesh.mesherVersion}). ${recorded.summary}`,
+      .join(', ')} (${mesh.mesher} ${mesh.mesherVersion}). ${recorded.summary}${facetedNote}`,
     affected: recorded.affected,
     isError: recorded.isError,
-    data: { meshHash, nodes: mesh.nodes.length, elements: counts, targets: Object.keys(mesh.nodeSets).length },
+    data: { meshHash, nodes: mesh.nodes.length, elements: counts, targets: Object.keys(mesh.nodeSets).length, facetedParts: faceted },
   };
 }

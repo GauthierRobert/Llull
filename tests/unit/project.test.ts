@@ -741,3 +741,21 @@ describe('build_project completion summary counts plan steps, not expanded comma
     expect(result.summary).toContain('Plan complete: 1/2 plan step(s) ok (4 commands executed)');
   });
 });
+
+describe('build_project aliases of building elements', () => {
+  it('binds the element id first, so `as` on add_slab / add_stair feeds add_slab_opening', () => {
+    const { data, result } = build([
+      { command: 'add_level', params: { name: 'L0' } },
+      { command: 'add_level', params: { name: 'L1' } },
+      { command: 'add_slab', params: { boundary: xy(0, 0, 8000, 0, 8000, 6000, 0, 6000), levelId: 'level-2' }, as: 'floor' },
+      { command: 'add_stair', params: { start: [1000, 1000], levelId: 'level-1' }, as: 'stair' },
+      { command: 'add_slab_opening', params: { slabId: '$floor', stairId: '$stair' } },
+    ]);
+    const aliases = (data as BuildData & { aliases: Record<string, string[]> }).aliases;
+    expect(data.ok).toBe(true);
+    expect(aliases['floor']?.[0]).toBe('slab-1');
+    expect(aliases['stair']?.[0]).toBe('stair-1');
+    expect(aliases['stair']).toContain('stair-1:flight');
+    expect(result.document.building?.elements['slab-1']).toMatchObject({ openings: [expect.any(Array)] });
+  });
+});

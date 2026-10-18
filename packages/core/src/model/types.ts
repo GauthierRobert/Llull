@@ -332,12 +332,12 @@ export interface TextEntity extends BaseEntity {
 }
 
 /**
- * Associative dimension; `entityIds` required count by `dimensionKind`: linear/aligned 2 (line or point), radial 1 (circle/arc/ellipse),
- * angular 3 (vertex point + 2 lines, or 3 points). Dangling refs are flagged by check_model.
+ * Associative dimension; `entityIds` required count by `dimensionKind`: linear/aligned 2 (line or point), radial/diameter 1
+ * (circle/arc/ellipse), angular 3 (vertex point + 2 lines, or 3 points) or 2 (two lines; the vertex is their intersection). Dangling refs are flagged by check_model.
  */
 export interface DimensionEntity extends BaseEntity {
   readonly kind: 'dimension';
-  dimensionKind: 'linear' | 'aligned' | 'radial' | 'angular';
+  dimensionKind: 'linear' | 'aligned' | 'radial' | 'diameter' | 'angular';
   entityIds: readonly string[];
   /** Perpendicular distance from measured geometry to the dimension line. Default 5. */
   offset?: number;
@@ -345,6 +345,8 @@ export interface DimensionEntity extends BaseEntity {
   precision?: number;
   /** Replaces the computed value text. */
   label?: string;
+  /** Drawn after the computed value, e.g. '±0.1', '+0.05/-0.02' or 'H7'. Ignored when `label` is set. */
+  tolerance?: string;
 }
 
 /**
@@ -700,6 +702,8 @@ export interface DocumentBlob {
 export interface Material {
   readonly name: string;
   density: number;
+  /** Unit `density` was given in at creation (create_material `densityUnit`); absent = given directly in g/(document unit)³. Still no source. */
+  readonly densityUnit?: string;
   /** Aerospace material record (08 MAT M2): designation, specs, licence, export marking, library origin. Absent on a legacy material. */
   readonly record?: MaterialRecordInfo;
   color: string;
@@ -784,7 +788,8 @@ export type ShapeRecipe =
   | { readonly op: 'boolean'; readonly boolean: BooleanOp; readonly a: ShapeRecipe; readonly b: ShapeRecipe }
   /**
    * `edges`: 0-based indices into the source's unique edges (`ShapeTopology.edges`); [] = all. `sizeEnd` (fillet only): radius at each
-   * edge's end, varying linearly from `size` at its start.
+   * edge's end, varying linearly from `size` at its start. `near`: the mid point of each selected edge at creation (document frame), so code
+   * generators can pick the same edges by position when the kernel's edge indices are unavailable; kernels ignore it.
    */
   | {
       readonly op: 'fillet' | 'chamfer';
@@ -792,10 +797,12 @@ export type ShapeRecipe =
       readonly edges: readonly number[];
       readonly size: number;
       readonly sizeEnd?: number;
+      readonly near?: readonly Vec3[];
     }
   /** One-piece union of `sources` with every new intersection (joint) edge filleted by `radius`. */
   | { readonly op: 'blend'; readonly sources: readonly ShapeRecipe[]; readonly radius: number }
-  | { readonly op: 'shell'; readonly source: ShapeRecipe; readonly thickness: number }
+  /** `openNear`: points, each picking the face of the source nearest to it to remove (an open pocket); absent = a sealed internal cavity. */
+  | { readonly op: 'shell'; readonly source: ShapeRecipe; readonly thickness: number; readonly openNear?: readonly Vec3[] }
   /** Rotate (M = Rx·Ry·Rz, radians) then translate. */
   | { readonly op: 'place'; readonly source: ShapeRecipe; readonly position: Vec3; readonly rotation: Vec3 }
   /** Uniform scale about the world origin. */

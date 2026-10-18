@@ -41,6 +41,13 @@ describe('labelStep', () => {
     expect(labeled).toContain("PRODUCT('Shaft''s','Shaft''s','',(#356))");
     expect(labeled).not.toContain('Open CASCADE STEP translator 7.4');
   });
+  it('labels a later export of the same process, whose translator numbering does not restart at 1', () => {
+    const later = KERNEL_STEP.replace(/translator 7\.4 1/g, 'translator 7.4 3').replace(/translator 7\.4 2/g, 'translator 7.4 4');
+    const relabeled = labelStep(later, [{ name: 'Bearing 1' }, { name: 'Shaft' }]);
+    expect(relabeled).toContain("PRODUCT('Bearing 1','Bearing 1','',(#8))");
+    expect(relabeled).toContain("PRODUCT('Shaft','Shaft','',(#356))");
+    expect(relabeled).not.toContain('Open CASCADE STEP translator 7.4');
+  });
   it('names the solids, not the placement axis', () => {
     for (const s of [
       "#15 = MANIFOLD_SOLID_BREP('Bearing 1',#16);",
@@ -101,6 +108,33 @@ describe('export_step_exact labels', () => {
     expect(step).toContain("PRODUCT('Housing','Housing','Pump',(#8))");
     expect(step).toContain(`PRODUCT('${second}','${second}','Pump',(#356))`);
     expect(step.match(/COLOUR_RGB/g)).toHaveLength(2);
+  });
+});
+
+describe('export_step_exact instance labels', () => {
+  it('names instance solids after the component names, never internal ids', () => {
+    let doc = createEmptyDocument();
+    for (const name of ['M6 bolt', 'Plate']) {
+      const box = execute(doc, 'add_box', { size: [1, 1, 1] });
+      doc = execute(box.document, 'create_component', { name, entityIds: box.affected }).document;
+    }
+    const ctx = { ...defaultContext(), kernel: fakeKernel({ step: KERNEL_STEP }) };
+    const step = (execute(doc, 'export_step_exact', {}, ctx).data as { step: string }).step;
+    expect(step).toContain("PRODUCT('M6 bolt/M6 bolt','M6 bolt/M6 bolt'");
+    expect(step).toContain("PRODUCT('Plate/Plate','Plate/Plate'");
+    expect(step).not.toContain('expanded::');
+    expect(step).not.toContain('instance-');
+  });
+
+  it('gives instances of one component distinct product names', () => {
+    const box = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
+    let doc = execute(box.document, 'create_component', { name: 'Tie rod M10', entityIds: box.affected }).document;
+    const componentId = Object.keys(doc.components)[0]!;
+    doc = execute(doc, 'insert_instance', { componentId, position: [5, 0, 0] }).document;
+    const ctx = { ...defaultContext(), kernel: fakeKernel({ step: KERNEL_STEP }) };
+    const step = (execute(doc, 'export_step_exact', {}, ctx).data as { step: string }).step;
+    expect(step).toContain("PRODUCT('Tie rod M10 1/Tie rod M10',");
+    expect(step).toContain("PRODUCT('Tie rod M10 2/Tie rod M10',");
   });
 });
 

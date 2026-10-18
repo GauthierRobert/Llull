@@ -3,14 +3,17 @@
  * straight from the kernel shapes.
  */
 
-import { type CadDocument, type Entity, type Vec3, is3D } from '../../model/types';
+import { type Vec3, is3D } from '../../model/types';
 import type { ShapeHandle, ShapeTopology } from '../../geometry/kernel';
 import type { CommandResult } from '../types';
 import { confirmExportControlled, defineCommand, z } from '../schema';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
 import { operandRecipe } from './kernelShape';
-import { labelStep, type StepLabel } from './stepLabels';
+import { labelStep } from './stepLabels';
+import { labelStepAssembly } from './stepAssemblyLabels';
+import { planStepAssembly } from './stepAssembly';
+import { stepLabels, stepTargets } from './stepTargets';
 import { exportRefusal, noop, report } from '../noop';
 import { fixedNumber } from '../../lib/compactNumber';
 
@@ -75,30 +78,8 @@ export interface ExportStepExactData {
   readonly solidCount: number;
   readonly entityIds: readonly string[];
   readonly skipped: readonly string[];
-}
-
-/** Product name (entity name, else id), group name as description, and color of each solid. */
-function stepLabels(doc: CadDocument, solids: readonly Entity[]): StepLabel[] {
-  const groups = Object.values(doc.groups);
-  return solids.map((entity) => {
-    const group = groups.find((candidate) => candidate.memberIds.includes(entity.id));
-    return { name: entity.name ?? entity.id, color: entity.color, ...(group !== undefined ? { description: group.name } : {}) };
-  });
-}
-
-/** Ids of the exportable solids in `entityIds` (or the whole document), plus the ids skipped and why. */
-function stepTargets(doc: CadDocument, entityIds: readonly string[] | undefined): { solids: Entity[]; skipped: string[] } {
-  const ids = entityIds !== undefined && entityIds.length > 0 ? entityIds : doc.order;
-  const solids: Entity[] = [];
-  const skipped: string[] = [];
-  for (const id of ids) {
-    const entity = doc.entities[id];
-    if (entity === undefined) skipped.push(`${id} (not found)`);
-    else if (entity.kind === 'instance') skipped.push(`${id} (instance)`);
-    else if (is3D(entity)) solids.push(entity);
-    else if (entityIds !== undefined && entityIds.length > 0) skipped.push(`${id} (2D)`);
-  }
-  return { solids, skipped };
+  /** Present when the file has assembly structure: STEP products (one per component / loose solid) and placed occurrences. */
+  readonly assembly?: { readonly products: number; readonly occurrences: number };
 }
 
 /**
@@ -118,8 +99,12 @@ export const exportStepExact = defineCommand({
     '(use export_step via the Python bridge, or export_stl, instead). ' +
     'Each solid becomes one STEP product named after its entity (set_entity_name, else the id; the group ' +
     'name goes in the product description) and carries its entity color as a surface style. ' +
-    'Returns data: { format, step (the file text), solidCount, entityIds, skipped }. Instances are skipped ' +
-    '(explode_instance first). Does not modify the document.',
+    'Returns data: { format, step (the file text), solidCount, entityIds, skipped, assembly? }. When the selection holds component instances ' +
+    '(assembly parts, fasteners) the file has real assembly structure: one root product, ONE product per component (its solids written once) ' +
+    'and one NEXT_ASSEMBLY_USAGE_OCCURRENCE per instance with its placement, named after the instance (instances sharing a name get a numeric ' +
+    'suffix (Name 1, Name 2) so every occurrence name is unique); data.assembly = { products, occurrences }. Instances with a scale other than 1, ' +
+    'or whose rotations do not compose exactly, are written as their own product of world-space solids named <instance>/<part>. ' +
+    'Requires a kernel that writes assemblies (OCC); otherwise the flat list of world-space solids is written. Does not modify the document.',
   params: z.object({
     entityIds: z
       .array(z.string())
@@ -133,8 +118,25 @@ export const exportStepExact = defineCommand({
     if (refused !== null) return refused;
     const kernel = (ctx ?? currentContext()).kernel;
     if (!kernel) return noop(doc, kernelUnavailable('export_step_exact'));
-    const { solids, skipped } = stepTargets(doc, entityIds);
+    const { solids, skipped, entries } = stepTargets(doc, entityIds);
     if (solids.length === 0) return noop(doc, 'export_step_exact: no 3D solids to export.');
+    if (kernel.exportStepAssembly !== undefined && entries.some((entry) => entry.kind === 'instance')) {
+      const plan = planStepAssembly(doc, entries, kernel);
+      if ('failed' in plan) return noop(doc, `export_step_exact: the kernel could not build ${plan.failed}; nothing exported.`);
+      const assemblyStep = kernel.exportStepAssembly(plan.occurrences);
+      if (assemblyStep === null) return noop(doc, `export_step_exact: the kernel could not write the assembly; nothing exported.`);
+      const exported = solids.map((entity) => entity.id);
+      const step = labelStepAssembly(assemblyStep, plan.labels);
+      const assembly = { products: plan.partCount, occurrences: plan.occurrences.length };
+      const data: ExportStepExactData = { format: 'step', step, solidCount: solids.length, entityIds: exported, skipped, assembly };
+      return report(
+        doc,
+        `export_step_exact: ${solids.length} exact solid(s) (${exported.join(', ')}) → STEP AP214 assembly, ${assembly.products} product(s), ` +
+          `${assembly.occurrences} occurrence(s), ${step.length} bytes` +
+          (skipped.length > 0 ? `; skipped ${skipped.join(', ')}.` : '.'),
+        data,
+      );
+    }
     const shapes: ShapeHandle[] = [];
     for (const entity of solids) {
       const shape = kernel.evaluate(operandRecipe(kernel, entity));

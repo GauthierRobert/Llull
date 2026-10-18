@@ -19,11 +19,17 @@ import {
   stairVolume,
   wallQuantities,
 } from './takeoffBasics';
+import { netConcreteVolumes } from './netConcrete';
 import { routeLength } from '../../industrial/piping/routeSupport';
 
-/** Bill of quantities grouped by category × material × unit. */
-export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
+/**
+ * Bill of quantities grouped by category × material × unit. `net` (default) measures concrete columns and beams once where they
+ * overlap: slab > column > beam (columns to the slab soffit, beams below the slab soffit and between column faces); `gross` is the
+ * raw modelled prism volume.
+ */
+export function computeTakeoff(doc: CadDocument, measure: 'net' | 'gross' = 'net'): TakeoffLine[] {
   const building = getBuilding(doc);
+  const net = measure === 'net' ? netConcreteVolumes(building) : null;
   const scale = scaleFor(doc);
   const takeoff = new TakeoffAccumulator();
   const addWall = (material: string, rows: Parameters<TakeoffAccumulator['add']>[3]): void =>
@@ -70,14 +76,14 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
   for (const column of elementsOf(building, 'column')) {
     takeoff.add('column', column.material, `Columns, ${column.material}`, [
       ['ea', 'count', 1],
-      ['m3', 'volume', scale.volume(columnSectionArea(column) * column.height)],
+      ['m3', 'volume', scale.volume(net?.column.get(column.id) ?? columnSectionArea(column) * column.height)],
     ]);
   }
   for (const beam of elementsOf(building, 'beam')) {
     const span = distance(beam.start, beam.end);
     takeoff.add('beam', beam.material, `Beams, ${beam.material}`, [
       ['m', 'length', scale.length(span)],
-      ['m3', 'volume', scale.volume(span * beam.width * beam.depth)],
+      ['m3', 'volume', scale.volume(net?.beam.get(beam.id) ?? span * beam.width * beam.depth)],
     ]);
   }
   for (const stair of elementsOf(building, 'stair')) {

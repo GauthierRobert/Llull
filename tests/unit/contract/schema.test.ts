@@ -60,7 +60,7 @@ describe('toParamsSchema', () => {
     expect(schema.properties['kind']?.enum).toEqual(['box']);
     expect(schema.properties['side']?.enum).toEqual(['left', 'right']);
     expect(schema.properties['level']).toMatchObject({ type: 'number', enum: [1, 2] });
-    expect(schema.properties['either']).toEqual({ type: 'number', description: 'Either' });
+    expect(schema.properties['either']).toEqual({ anyOf: [{ type: 'number' }, { type: 'string' }], description: 'Either' });
     expect(schema.properties['position']).toEqual({ type: 'array', description: 'Position', items: { type: 'number' } });
     expect(schema.properties['points']?.items).toEqual({ type: 'array', items: { type: 'number' } });
     expect(schema.properties['bag']).toEqual({ type: 'object', description: 'Bag' });

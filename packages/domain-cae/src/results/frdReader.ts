@@ -11,6 +11,8 @@ const VALUE_WIDTH = 12;
 const VALUES_START = 13;
 
 interface ResultSet {
+  /** Result set number written after `100CL` (101, 102, ...): the modes of an eigenvalue step share their step and increment. */
+  counter: number;
   step: number;
   increment: number;
   time: number;
@@ -25,7 +27,7 @@ const cell = (line: string, index: number): number =>
  * Parse the nodal result blocks of a CalculiX FRD file. One entry per result set (`100CL`): `step` is the CalculiX step number
  * (`1PSTEP`, one per load case / `*STEP`), `time` the cumulative total time, `fields` keyed by block name (`DISP`, `STRESS`, `TOSTRAIN`,
  * `NDTEMP`, `FLUX`, `RFL`, ...) with the data component names as CalculiX writes them (derived `ALL` entries are skipped) and the values by
- * node id. Node (`2C`) and element (`3C`) blocks are skipped; the `ERROR` block is dropped. Transient files give one entry per written increment.
+ * node id. Node (`2C`) and element (`3C`) blocks are skipped; the `ERROR` block is dropped. Transient files give one entry per written increment; modal / buckling files give one entry per mode (same `step`), `time` = frequency in Hz (modal) or the buckling factor, after a `time` 0 reference set for buckling.
  * @failure unreadable lines are ignored, never thrown; text without result blocks -> []
  */
 export function parseFrd(text: string): Steps {
@@ -44,9 +46,10 @@ export function parseFrd(text: string): Steps {
       const time = Number.parseFloat(line.slice(at + 5, at + 17));
       const step = pending?.step ?? 1;
       const increment = pending?.increment ?? 1;
-      current = sets.find((set) => set.step === step && set.increment === increment) ?? null;
+      const counter = Number.parseInt(line.slice(at, at + 5), 10) || 0;
+      current = sets.find((set) => set.counter === counter && set.step === step && set.increment === increment) ?? null;
       if (current === null) {
-        current = { step, increment, time: Number.isFinite(time) ? time : 0, fields: {} };
+        current = { counter, step, increment, time: Number.isFinite(time) ? time : 0, fields: {} };
         sets.push(current);
       }
     } else if (tag === ' -4  ' && current !== null) {

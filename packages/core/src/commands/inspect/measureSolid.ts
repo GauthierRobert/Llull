@@ -7,7 +7,13 @@ import type { Bounds } from '../../geometry/bounds';
 import { formatLength } from '../document/units';
 import { childVolume, solidVolume } from './solidVolume';
 import { commandError, noop, report } from '../noop';
-import { kgPerM3FromDocDensity, resolveDensity, type DensityFallback } from '../../geometry/resolveDensity';
+import {
+  densityPlausibilityWarning,
+  describeDensity,
+  kgPerM3FromDocDensity,
+  resolveDensity,
+  type DensityFallback,
+} from '../../geometry/resolveDensity';
 import { convertValue, isUnitFailure } from '../../lib/quantity';
 import { resolveMassProperties, type ResolvedMass } from '../../geometry/resolveMassProperties';
 import { currentContext } from '../context';
@@ -43,7 +49,7 @@ export const measureBoundingBox = defineCommand({
     '(b) useSelection:true — combined AABB of the current document selection; ' +
     '(c) no params (or useSelection:false) — combined AABB of the entire document. ' +
     'Returns data: { min:[x,y,z], max:[x,y,z], size:[w,h,d] }. Does not modify the document. ' +
-    'Note: entity rotation is NOT applied to bounds (axis-aligned approximation).',
+    'Entity rotation and the sweep angle of a partly turned profile are applied (the AABB wraps the actual geometry).',
   params: z.object({
     entityId: z.string().optional().describe('Id of the entity whose bounding box to compute. Takes precedence over useSelection.'),
     useSelection: z
@@ -95,6 +101,8 @@ interface MassPropertiesData extends Partial<MassDetail> {
   provenance?: MassProvenance;
   reviewRequired?: ReviewRequired;
   warnings?: MassWarning[];
+  /** Implausible-density warning (probably a wrong density unit); absent when the density is plausible. */
+  densityWarnings?: string[];
   /** g/(document unit)³ (the legacy `Material.density` unit); the mean over the parts of an instance. */
   density?: number;
   densityUnit?: string;
@@ -385,11 +393,18 @@ export const massProperties = defineCommand({
       unverifiedReasons,
     };
     const flag = data.unverified === true ? ` Unverified density (${unverifiedReasons.join('; ')}).` : '';
+    const namedUnit = e.materialId !== undefined && doc.materials[e.materialId]?.densityUnit !== undefined;
+    const densityWarning = densityPlausibilityWarning(
+      doc,
+      meanDensity,
+      namedUnit || (typeof density === 'object' && e.materialId === undefined),
+    );
+    const densityNote = densityWarning === null ? '' : ` WARNING: ${densityWarning}; the mass is probably wrong.`;
     return report(
       doc,
-      `Mass of ${e.kind === 'instance' ? 'assembly ' : ''}${entityId}: volume=${shown} ${volumeUnit}${note}, density=${meanDensity} g/${doc.units}³ (${data.densitySource}), ` +
-        `mass=${massUnit === 'g' ? mass.toFixed(doc.displayPrecision) : mass.toPrecision(7)} ${massUnit}.${flag}${centroidNote}${approval}`,
-      data,
+      `Mass of ${e.kind === 'instance' ? 'assembly ' : ''}${entityId}: volume=${shown} ${volumeUnit}${note}, density=${meanDensity} g/${doc.units}³ = ${describeDensity(doc, meanDensity)} (${data.densitySource}), ` +
+        `mass=${massUnit === 'g' ? mass.toFixed(doc.displayPrecision) : mass.toPrecision(7)} ${massUnit}.${flag}${densityNote}${centroidNote}${approval}`,
+      { ...data, ...(densityWarning === null ? {} : { densityWarnings: [densityWarning] }) },
     );
   },
 });

@@ -75,6 +75,27 @@ describe('MCP tool discovery (default core-only exposure)', () => {
     notify.mockRestore();
   });
 
+  it('enable_toolset { tools } lists just those tools, callable once enabled', async () => {
+    const sessionId = await openCoreSession();
+    const result = (await coreRpc(sessionId, 'tools/call', { name: 'enable_toolset', arguments: { tools: ['add_box'] } })) as {
+      isError?: boolean;
+    };
+    expect(result.isError).toBe(false);
+    const names = await listNames(sessionId);
+    expect(names).toContain('add_box');
+    expect(names).not.toContain('add_sphere');
+    const added = (await coreRpc(sessionId, 'tools/call', { name: 'add_box', arguments: { size: [1, 1, 1] } })) as { isError?: boolean };
+    expect(added.isError).toBe(false);
+  });
+
+  it('a tools/list with every toolset still equals the registry plus MCP-layer tools', async () => {
+    const sessionId = await openCoreSession();
+    await coreRpc(sessionId, 'tools/call', { name: 'enable_toolset', arguments: { toolset: 'all' } });
+    const names = await listNames(sessionId);
+    expect(names).toContain('pipe_hydraulics');
+    expect(new Set(names).size).toBe(names.length);
+  });
+
   it('enable_toolset with an unknown toolset is an error listing the valid ones', async () => {
     const result = (await coreRpc(await openCoreSession(), 'tools/call', { name: 'enable_toolset', arguments: { toolset: 'bogus' } })) as {
       isError?: boolean;

@@ -67,11 +67,11 @@ describe('add_slab_opening / delete_slab_opening', () => {
     expect(body?.kind).toBe('mesh');
     expect(result.document.entities['slab-1:body']?.kind).toBe('extrusion');
     const slab = result.document.building!.elements['slab-2'];
-    // 18 risers × 280 run + 2 × 100 margin, 1000 width + 2 × 100.
-    expect(slab?.category === 'slab' && slab.openings?.[0]).toEqual(xy(900, 400, 6140, 400, 6140, 1600, 900, 1600));
+    // 17 treads (18 risers) × 280 run + 2 × 100 margin, 1000 width + 2 × 100.
+    expect(slab?.category === 'slab' && slab.openings?.[0]).toEqual(xy(900, 400, 5860, 400, 5860, 1600, 900, 1600));
     const lines = (execute(result.document, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
     const area = lines.find((line) => line.key === 'slab-floor.concrete.m2')!.quantity;
-    expect(area).toBeCloseTo(160 - 5.24 * 1.2);
+    expect(area).toBeCloseTo(160 - 4.96 * 1.2);
     const plan = buildPlanDrawing(result.document, 'level-2')!;
     expect(plan.primitives.filter((p) => p.type === 'line' && p.layer === 'S-SLAB')).toHaveLength(2);
     const ifc = (execute(result.document, 'export_ifc', {}).data as IfcExport).ifc;

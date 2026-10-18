@@ -15,7 +15,6 @@ import { fromMm, toMetres } from '@core/model/units';
 import { planAreaM2 } from '../../shared/planArea';
 import { gridBubbleCenters } from '../geometry/gridGeometry';
 import { doorSwing, openingsOf, pointAlong, wallExtent, wallFrame, wallPieces } from '../geometry/wallGeometry';
-import { stairPoint } from '../geometry/stairGeometry';
 import { layerBoundaries } from '../elements/wallLayers';
 import { DIMENSION_LAYER, type PlanSource, annotationText, band, isCut, layerName, thinLine } from './planModel';
 import type { DrawingPrimitive } from '@core/model/drawing';
@@ -71,6 +70,8 @@ export function wallPrimitives(building: BuildingModel, wall: WallElement, cutHe
   return primitives;
 }
 
+const GRID_BUBBLE_RADIUS_MM = 400;
+
 /** Dimension text in millimetres (construction convention). */
 export function dimensionLabel(doc: PlanSource, value: number): string {
   return String(Math.round(toMetres(doc, value) * 1000));
@@ -80,54 +81,44 @@ function dimension(a: Vec2, b: Vec2, offset: number, label: string): DrawingPrim
   return { type: 'dimension', layer: DIMENSION_LAYER, style: 'annotation', a, b, offset, label };
 }
 
-/** Overall wall extents + grid spacing chains. */
+/** Outer edge of the grid bubble ring per side ([minX, minY, maxX, maxY]), or null without grids. */
+function bubbleRing(doc: PlanSource, grids: ReadonlyArray<GridElement>): [number, number, number, number] | null {
+  const radius = fromMm(doc, GRID_BUBBLE_RADIUS_MM);
+  const circles = grids.flatMap((grid) => gridBubbleCenters(grid, radius));
+  if (circles.length === 0) return null;
+  const extent = pointsExtent(circles);
+  return [extent.minX - radius, extent.minY - radius, extent.maxX + radius, extent.maxY + radius];
+}
+
+/** Overall wall extents + grid spacing chains; all chains are anchored outside the grid bubble ring so they never cross a bubble. */
 export function dimensionPrimitives(doc: PlanSource, building: BuildingModel, walls: ReadonlyArray<WallElement>): DrawingPrimitive[] {
   const primitives: DrawingPrimitive[] = [];
   const gap = fromMm(doc, 1200);
+  const grids = Object.values(building.elements).filter((element) => element.category === 'grid');
+  const ring = bubbleRing(doc, grids);
+  const clear = fromMm(doc, 200);
   if (walls.length > 0) {
     const half = Math.max(...walls.map((wall) => wall.thickness)) / 2;
     const extent = pointsExtent(walls.flatMap((wall) => [wall.start, wall.end]));
     const [minX, minY, maxX, maxY] = [extent.minX - half, extent.minY - half, extent.maxX + half, extent.maxY + half];
-    primitives.push(dimension([minX, minY], [maxX, minY], gap, dimensionLabel(doc, maxX - minX)));
-    primitives.push(dimension([minX, maxY], [minX, minY], gap, dimensionLabel(doc, maxY - minY)));
+    const [baseX, baseY] = ring ? [Math.min(minX, ring[0] - clear), Math.min(minY, ring[1] - clear)] : [minX, minY];
+    primitives.push(dimension([minX, baseY], [maxX, baseY], gap, dimensionLabel(doc, maxX - minX)));
+    primitives.push(dimension([baseX, maxY], [baseX, minY], gap, dimensionLabel(doc, maxY - minY)));
   }
-  const grids = Object.values(building.elements).filter((element) => element.category === 'grid');
   const numbered = grids.filter((grid) => Math.abs(grid.start[0] - grid.end[0]) < 1e-9).sort((a, b) => a.start[0] - b.start[0]);
   const lettered = grids.filter((grid) => Math.abs(grid.start[1] - grid.end[1]) < 1e-9).sort((a, b) => a.start[1] - b.start[1]);
   for (let index = 0; index + 1 < numbered.length; index++) {
     const [a, b] = [numbered[index], numbered[index + 1]];
     if (!a || !b) continue;
-    const top = Math.max(a.start[1], a.end[1], b.start[1], b.end[1]);
+    const top = Math.max(a.start[1], a.end[1], b.start[1], b.end[1], ring ? ring[3] + clear : -Infinity);
     primitives.push(dimension([b.start[0], top], [a.start[0], top], gap / 2, dimensionLabel(doc, b.start[0] - a.start[0])));
   }
   for (let index = 0; index + 1 < lettered.length; index++) {
     const [a, b] = [lettered[index], lettered[index + 1]];
     if (!a || !b) continue;
-    const right = Math.max(a.start[0], a.end[0], b.start[0], b.end[0]);
+    const right = Math.max(a.start[0], a.end[0], b.start[0], b.end[0], ring ? ring[2] + clear : -Infinity);
     primitives.push(dimension([right, a.start[1]], [right, b.start[1]], gap / 2, dimensionLabel(doc, b.start[1] - a.start[1])));
   }
-  return primitives;
-}
-
-export function stairPrimitives(
-  doc: PlanSource,
-  stair: Extract<BuildingModel['elements'][string], { category: 'stair' }>,
-): DrawingPrimitive[] {
-  const half = stair.width / 2;
-  const at = (along: number, across: number): Vec2 => stairPoint(stair, along, across);
-  const run = stair.riserCount * stair.treadDepth;
-  const layer = layerName('stair');
-  const primitives: DrawingPrimitive[] = [
-    { type: 'polygon', layer, style: 'thin', points: [at(0, -half), at(run, -half), at(run, half), at(0, half)] },
-  ];
-  for (let index = 1; index < stair.riserCount; index++) {
-    const along = index * stair.treadDepth;
-    primitives.push(thinLine(layer, at(along, -half), at(along, half)));
-  }
-  primitives.push(
-    { type: 'polyline', layer, style: 'thin', points: [at(stair.treadDepth / 2, 0), at(run - stair.treadDepth / 2, 0)] },
-    annotationText(layer, at(-fromMm(doc, 400), 0), fromMm(doc, 200), `UP ${stair.riserCount}R`),
-  );
   return primitives;
 }
 
@@ -191,7 +182,7 @@ export function roomPrimitives(doc: PlanSource, room: RoomElement): DrawingPrimi
 
 /** Axis line with a labelled bubble at each end. */
 export function gridPrimitives(doc: PlanSource, grid: GridElement): DrawingPrimitive[] {
-  const bubbleRadius = fromMm(doc, 400);
+  const bubbleRadius = fromMm(doc, GRID_BUBBLE_RADIUS_MM);
   const layer = layerName('grid');
   // Grid lines are chain lines (ISO 128 type 04), like every axis.
   const primitives: DrawingPrimitive[] = [{ type: 'line', layer, style: 'center', a: grid.start, b: grid.end }];

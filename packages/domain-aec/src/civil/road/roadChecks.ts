@@ -1,7 +1,7 @@
 /**
  * Design-speed checks for a road alignment: minimum horizontal radius and minimum vertical curve K (crest / sag), from simple AASHTO-style
- * tables. Assumptions: R = V^2 / (127 (e + f)) with superelevation e = 0.07 and the side-friction f below; With a superelevation design e
- * is its maxRate and each curve's required e = V^2/(127 R) - f must not exceed it. A spiral must be at least Ls = V^3/(46.656 C R)
+ * tables. Assumptions: R = V^2 / (127 (e + f)) with superelevation e = the maxRate of set_superelevation, or 0 (normal crown, flagged by a warning) when none is set, and the side-friction
+ * f below; each curve's required e = V^2/(127 R) - f must not exceed it. A spiral must be at least Ls = V^3/(46.656 C R)
  * (Barnett, comfort criterion with lateral jerk C = 0.6 m/s^3, V in km/h, R and Ls in m). K = stopping-sight-distance based minimum for the
  * next table speed >= the design speed; a grade change above 0.5 % needs a vertical curve.
  */
@@ -13,7 +13,6 @@ import { validateProfile, verticalCurves } from '../alignment/profileGeometry';
 import { stationText } from '../model';
 import { toMetres } from '@core/model/units';
 
-export const MAX_SUPERELEVATION = 0.07;
 /** Comfort criterion: rate of change of lateral acceleration (m/s^3). */
 export const LATERAL_JERK = 0.6;
 
@@ -53,13 +52,16 @@ export interface DesignChecks {
     readonly ok: boolean;
   }>;
   readonly failures: string[];
+  /** Non-failing caveats, e.g. superelevation unset so e = 0 was assumed. */
+  readonly warnings: string[];
 }
 
 export function designChecks(doc: CadDocument, alignment: AlignmentObject, designSpeedKmh: number): DesignChecks {
   const [, friction, crestK, sagK] = rowFor(designSpeedKmh);
-  const maxRate = alignment.superelevation?.maxRate ?? MAX_SUPERELEVATION;
+  const maxRate = alignment.superelevation?.maxRate ?? 0;
   const minRadius = (designSpeedKmh * designSpeedKmh) / (127 * (maxRate + friction));
   const failures: string[] = [];
+  const warnings: string[] = [];
   const horizontal = horizontalElements(alignment).flatMap((element) => {
     if (element.kind !== 'arc') return [];
     const radiusM = toMetres(doc, element.radius);
@@ -82,6 +84,11 @@ export function designChecks(doc: CadDocument, alignment: AlignmentObject, desig
       },
     ];
   });
+  if (alignment.superelevation === undefined && horizontal.length > 0) {
+    warnings.push(
+      'Superelevation is not set (set_superelevation): the curve radius checks assume e = 0 (normal crown); a banked design would allow smaller radii.',
+    );
+  }
   const spirals = horizontalElements(alignment).flatMap((element) => {
     if (element.kind !== 'spiral') return [];
     const radiusM = toMetres(doc, Number.isFinite(element.radiusEnd) ? element.radiusEnd : element.radiusStart);
@@ -134,5 +141,6 @@ export function designChecks(doc: CadDocument, alignment: AlignmentObject, desig
     spirals,
     vertical,
     failures,
+    warnings,
   };
 }

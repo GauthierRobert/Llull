@@ -2,6 +2,7 @@
 
 export interface MjModel {
   readonly njnt: number;
+  readonly nv: number;
   readonly jnt_qposadr: Int32Array;
   readonly jnt_dofadr: Int32Array;
   readonly body_rootid: Int32Array;
@@ -25,11 +26,18 @@ export interface MjData {
   readonly subtree_com: Float64Array;
   /** Interaction force of each body with its parent after `mj_rnePostConstraint`: [torque(3), force(3)] about the root subtree COM. */
   readonly cfrc_int: Float64Array;
+  /** [potential, kinetic] J of the state evaluated by the last forward pass (needs the MJCF energy flag). Potential: gravity + joint springs. */
+  readonly energy: Float64Array;
+  /** Length m and rate of change m/s of each tendon (point springs). */
+  readonly ten_length: Float64Array;
+  readonly ten_velocity: Float64Array;
   readonly nefc: number;
   readonly efc_type: Int32Array;
   readonly efc_id: Int32Array;
   readonly efc_force: Float64Array;
   readonly efc_pos: Float64Array;
+  /** Constraint Jacobian, row-major nefc x nv (dense: the MJCF sets jacobian="dense"). */
+  readonly efc_J: Float64Array;
   delete(): void;
 }
 
@@ -46,6 +54,7 @@ export interface MujocoModule {
 /** mjtObj values. */
 export const OBJECT_BODY = 1;
 export const OBJECT_JOINT = 3;
+export const OBJECT_TENDON = 18;
 export const OBJECT_EQUALITY = 17;
 /** mjtConstraint: equality rows (connect / joint equalities). */
 export const CONSTRAINT_EQUALITY = 0;

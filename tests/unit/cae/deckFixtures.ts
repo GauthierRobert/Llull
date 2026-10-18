@@ -57,7 +57,7 @@ export const X2_NODES = [2, 4, 6, 8];
 
 export interface BarOptions {
   readonly material?: 'set' | 'models' | 'none' | 'bad_nu';
-  readonly analysisType?: 'static' | 'thermo_static';
+  readonly analysisType?: 'static' | 'thermo_static' | 'modal' | 'buckling';
   readonly supports?: boolean;
 }
 

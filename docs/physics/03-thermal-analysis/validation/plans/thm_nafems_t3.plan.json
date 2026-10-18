@@ -26,7 +26,6 @@
   "command": "define_material_record",
   "params": {
    "id": "nafems_t3",
-   "name": "nafems_t3",
    "designation": "validation test material",
    "specs": [],
    "licence": "company-proprietary",
@@ -84,8 +83,7 @@
    "density": 7200000.0,
    "color": "#9aa0a6",
    "metalness": 1,
-   "roughness": 0.4,
-   "recordId": "nafems_t3"
+   "roughness": 0.4
   }
  },
  {
@@ -192,7 +190,6 @@
   "command": "set_mesh_controls",
   "params": {
    "analysisId": "$an",
-   "mesher": "gmsh",
    "elementFamily": "hex_dominant",
    "order": 2,
    "globalSize": 0.005

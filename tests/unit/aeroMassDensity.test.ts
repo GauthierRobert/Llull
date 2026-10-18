@@ -76,8 +76,27 @@ describe('AERO-1 / 08 M1: one density resolver, unit-correct mass', () => {
     const { doc, id } = part('mm', ['add_box', { size: [10, 10, 10] }], 'steel', 0.00785);
     const data = massOf(doc, id);
     expect(data.massG).toBeCloseTo(7.85, 12);
-    expect(data).toMatchObject({ mass: data.massG, unit: 'g', massUnit: 'g', unverified: true, unverifiedReasons: ['provenance legacy'] });
-    expect(data.densitySource).toContain("material 'steel' density (legacy");
+    expect(data).toMatchObject({
+      mass: data.massG,
+      unit: 'g',
+      massUnit: 'g',
+      unverified: true,
+      unverifiedReasons: ['density given without a source (unverified)'],
+    });
+    expect(data.densitySource).toContain("material 'steel' density (given without a source");
+  });
+
+  it('a density given with an explicit unit is recorded with that unit: unverified (no source) but not "legacy"', () => {
+    let doc = run(createEmptyDocument(), 'set_units', { units: 'mm' });
+    const added = execute(doc, 'add_box', { size: [10, 10, 10] });
+    const id = added.affected[0] ?? '';
+    doc = run(added.document, 'create_material', { name: 'steel', density: 7.85, densityUnit: 'g/cm^3' });
+    doc = run(doc, 'assign_material', { materialName: 'steel', entityIds: [id] });
+    expect(doc.materials['steel']?.densityUnit).toBe('g/cm^3');
+    const data = massOf(doc, id);
+    expect(data.massG).toBeCloseTo(7.85, 9);
+    expect(data).toMatchObject({ unverified: true, unverifiedReasons: ['density given in g/cm^3 without a source (unverified)'] });
+    expect(JSON.stringify(data)).not.toContain('legacy');
   });
 
   it('VC-MAT-04 a/b/c: a PHY-01 density model wins over the legacy density, with its basis in the unverified reasons', () => {

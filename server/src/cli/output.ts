@@ -20,6 +20,8 @@ export interface PrintableResult extends CommandOutcome {
   readonly saved?: readonly SavedFile[];
   /** `run` only: the plan's `as` aliases that survive in the final document. */
   readonly planAliases?: PlanAliases;
+  /** `run --validate` only: advisory warnings that do not fail the dry run. */
+  readonly warnings?: readonly string[];
 }
 
 /** The full result as one JSON object (`--json`). */
@@ -32,12 +34,13 @@ export function resultJson(result: PrintableResult): string {
     ...(result.data !== undefined ? { data: result.data } : {}),
     ...(result.error !== undefined ? { error: result.error } : {}),
     ...(result.saved !== undefined ? { saved: result.saved } : {}),
+    ...(result.warnings !== undefined ? { warnings: result.warnings } : {}),
     ...(result.planAliases !== undefined ? { aliases: result.planAliases.aliases, consumedAliases: result.planAliases.consumed } : {}),
   });
 }
 
 function savedLines(saved: readonly SavedFile[] | undefined): string[] {
-  return (saved ?? []).map((file) => `Saved ${file.path} (${file.bytes} bytes)`);
+  return (saved ?? []).map((file) => `Saved ${file.path} (${file.bytes} bytes)${file.note === undefined ? '' : ` -- ${file.note}`}`);
 }
 
 /** Summary, affected ids and the data block, as an MCP agent would read them. */
@@ -78,6 +81,7 @@ export function planText(result: PrintableResult): string {
     result.summary,
     ...data['steps'].map(stepLine).filter((line): line is string => line !== null),
     ...issues,
+    ...(result.warnings ?? []).map((warning) => `  warning: ${warning}`),
     ...(aliases ? [aliases] : []),
   ].join('\n');
 }

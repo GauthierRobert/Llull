@@ -65,9 +65,21 @@ describe('bill_of_materials standardParts', () => {
       name: 'plain',
       entityIds: ['box-1.1'],
     });
-    expect(Object.keys(data(plain.doc)).sort()).toEqual(['distinctComponents', 'rows', 'totalInstances']);
+    expect(Object.keys(data(plain.doc)).sort()).toEqual([
+      'distinctComponents',
+      'rows',
+      'rowsWithoutDensity',
+      'totalInstances',
+      'totalMassKg',
+    ]);
     const doc = withPart(createEmptyDocument(), { family: 'F', partNumber: 'PN-1' }, 1, 'c1');
-    expect(Object.keys(data(doc, { includeStandardParts: false })).sort()).toEqual(['distinctComponents', 'rows', 'totalInstances']);
+    expect(Object.keys(data(doc, { includeStandardParts: false })).sort()).toEqual([
+      'distinctComponents',
+      'rows',
+      'rowsWithoutDensity',
+      'totalInstances',
+      'totalMassKg',
+    ]);
     expect((data(doc)['standardParts'] as Array<Record<string, unknown>>)[0]).toEqual({
       partNumber: 'PN-1',
       family: 'F',
@@ -77,8 +89,10 @@ describe('bill_of_materials standardParts', () => {
     expect(Object.keys(data(createEmptyDocument(), { includeStandardParts: true })).sort()).toEqual([
       'distinctComponents',
       'rows',
+      'rowsWithoutDensity',
       'standardParts',
       'totalInstances',
+      'totalMassKg',
     ]);
   });
 });
@@ -108,7 +122,7 @@ describe('bill_of_materials materials', () => {
     expect(steel?.['totalVolume']).toBeCloseTo(volume, 6);
     expect(steel?.['totalMass']).toBeCloseTo(volume * 0.00785, 6);
     expect(steel?.['totalMassKg']).toBeCloseTo((volume * 0.00785) / 1000, 9);
-    expect(steel?.['unverifiedReasons']).toEqual(['provenance legacy']);
+    expect(steel?.['unverifiedReasons']).toEqual(['density given without a source (unverified)']);
     expect(String(steel?.['densitySource'])).toContain('steel');
     expect(result['unassignedSolidCount']).toBe(1);
     expect(execute(steelBlocks(), 'bill_of_materials', { includeMaterials: true }).summary).toContain('steel');

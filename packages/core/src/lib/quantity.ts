@@ -165,12 +165,19 @@ const parseTokens = (tokens: readonly string[]): Term | null => {
   return result !== null && position === tokens.length ? result : null;
 };
 
+/** Reads the shorthand exponents `m3`, `cm²`, `s2` as `m^3`, `cm^2`, `s^2`; a number's own `1e5` is left alone. */
+const withCarets = (text: string): string =>
+  text
+    .replace(/²/g, '^2')
+    .replace(/³/g, '^3')
+    .replace(/(?<![\d.])([A-Za-zµμ]+)(\d+)(?![\d.])/g, '$1^$2');
+
 /** Parse a unit; an absolute temperature (`degC`, `degF`) alone keeps its affine offset. */
 export function parseUnit(text: string): ParsedUnit | UnitFailure {
   const trimmed = text.trim();
   const whole = UNITS[trimmed];
   if (whole !== undefined) return { scale: whole.scale, offset: whole.offset ?? 0, dimension: whole.dimension };
-  const tokens = tokenize(trimmed);
+  const tokens = tokenize(withCarets(trimmed));
   const term = tokens === null || tokens.length === 0 ? null : parseTokens(tokens);
   if (term === null || !Number.isFinite(term.scale) || !(term.scale > 0)) {
     return { code: 'MAT_UNIT_INVALID', message: `unit '${text}' is not understood (e.g. 'MPa', 'W/(m*K)', 'J/(kg*K)', 'degC', '1e-5')` };

@@ -25,14 +25,28 @@ export interface Trust {
   readonly problem: TrustProblem | null;
 }
 
-/** Top-level keys whose values differ between two summaries. */
+/** Derived diagnostics re-computed on every read whose formula evolves between versions (the mesh `quality`): never compared. */
+const DIAGNOSTIC_KEYS: ReadonlySet<string> = new Set(['quality']);
+
+/** Top-level keys whose values differ between two summaries (derived diagnostics excluded, so older recorded ones stay trusted). */
 export const differingKeys = (given: object, expected: object): string[] => {
   const left = new Map(Object.entries(given));
   const right = new Map(Object.entries(expected));
   return [...new Set([...left.keys(), ...right.keys()])]
+    .filter((key) => !DIAGNOSTIC_KEYS.has(key))
     .filter((key) => canonicalJson(left.get(key)) !== canonicalJson(right.get(key)))
     .sort();
 };
+
+/**
+ * The heat balance is a diagnostic re-derived from the artifact on every read (what readers show is the recomputed summary), and its
+ * quadrature evolves between versions: it is left out of the comparison so results recorded by an older summariser stay trusted.
+ */
+function withoutHeatBalance(summary: ResultsSummary): object {
+  if (summary.thermal === undefined) return summary;
+  const thermal = Object.fromEntries(Object.entries(summary.thermal).filter(([key]) => key !== 'heatBalance'));
+  return { ...summary, thermal };
+}
 
 const artifactHashes = new WeakMap<object, string>();
 
@@ -126,7 +140,7 @@ export function trustedRecord(doc: CadDocument, analysisCase: AnalysisCase, port
       ),
     );
   const results = resultsSummary(doc, analysisCase.id, meshFetched.artifact, resultsFetched.artifact, resultsRecord.resultsHash);
-  const resultsDiff = differingKeys(resultsRecord, results);
+  const resultsDiff = differingKeys(withoutHeatBalance(resultsRecord), withoutHeatBalance(results));
   if (resultsDiff.length > 0)
     return nothing(
       'untrusted',

@@ -1,6 +1,7 @@
 /** Value validation of a raw `analysis` slice (persistence rejects the file when this returns errors). */
 
 import { isRecord } from '@lib/isRecord';
+import { durabilityErrors } from './validateDurability';
 
 const TYPES = ['static', 'modal', 'buckling', 'heat_steady', 'heat_transient', 'thermo_static', 'coupled_temperature_displacement'];
 const UNIT_SYSTEMS = ['N-mm-t-s', 'N-m-kg-s', 'lbf-in-slinch-s'];
@@ -8,7 +9,22 @@ const CONSTRAINT_KINDS = ['fixed', 'pinned', 'symmetry', 'displacement'];
 const LOAD_KINDS = ['force', 'pressure', 'gravity', 'moment'];
 const CATEGORIES = ['limit', 'ultimate'];
 const SCALES = ['degC', 'K'];
-const QUANTITIES = ['temperature', 'heat_flux', 'u_mag', 'u_x', 'u_y', 'u_z', 'von_mises', 's_xx', 's_yy', 's_zz'];
+const QUANTITIES = [
+  'temperature',
+  'heat_flux',
+  'u_mag',
+  'u_x',
+  'u_y',
+  'u_z',
+  'von_mises',
+  's_xx',
+  's_yy',
+  's_zz',
+  's_hoop',
+  's_radial',
+  's_axial',
+  'u_radial',
+];
 const IDEALIZATION_KINDS = ['solid', 'plane_stress', 'shell', 'beam'];
 
 const isVec3 = (value: unknown): boolean =>
@@ -128,6 +144,12 @@ function checkCase(scope: Scope, id: string, analysisCase: Record<string, unknow
     for (const [pid, probe] of Object.entries(probes))
       if (!isRecord(probe) || !isVec3(probe['point']) || !oneOf(QUANTITIES, probe['quantity']))
         errors.push(`${where}: probe '${pid}' is malformed`);
+      else if (
+        (probe['axisPoint'] !== undefined && !isVec3(probe['axisPoint'])) ||
+        (probe['axisDirection'] !== undefined &&
+          !(isVec3(probe['axisDirection']) && (probe['axisDirection'] as number[]).some((c) => c !== 0)))
+      )
+        errors.push(`${where}: probe '${pid}' has a malformed axis`);
   const heat = analysisCase['type'] === 'heat_steady' || analysisCase['type'] === 'heat_transient';
   if (heat !== (analysisCase['thermal'] !== undefined))
     errors.push(`${where}: a thermal set-up is required for heat_* cases and only for them`);
@@ -161,5 +183,5 @@ export function analysisErrors(raw: Record<string, unknown>): string[] {
   scope.errors.push(...paths.map((path) => `${path} is not a finite number`));
   const order = analysis['caseOrder'] as unknown[];
   checkBag(scope, 'analysis.cases', analysis['cases'], order, (id, analysisCase) => checkCase(scope, id, analysisCase));
-  return scope.errors;
+  return [...scope.errors, ...durabilityErrors(raw)];
 }

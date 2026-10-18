@@ -15,8 +15,9 @@ const RAD_PER_S_PER_RPM = (2 * Math.PI) / 60;
  * @affects adds 1 joint to doc.dynamics (affected: [jointId])
  * @invariant child is an existing non-fixed body (it may already have other joints: closed loops); parent is GROUND or another body;
  *            axis non-zero (revolute, prismatic); spherical joints carry no damping, friction or initial speed; the joint graph keeps a
- *            valid spanning tree (dynamics/topology.ts)
- * @failure unknown / fixed child, unknown parent, zero axis, taken id, spherical with damping / friction / speed, FPR_LOOP_PRISMATIC
+ *            valid spanning tree (dynamics/topology.ts);
+ *            stiffness >= 0 (spring force = -stiffness · (q - springReference), q measured from the modelled pose)
+ * @failure unknown / fixed child, unknown parent, zero axis, taken id, spherical with damping / friction / spring / speed, FPR_LOOP_PRISMATIC
  *          (a prismatic joint would have to close a loop) -> no-op; a spherical joint alone on its body is accepted but FPR_SPHERICAL_TREE
  *          blocks simulate_motion until the body has a revolute or prismatic joint
  */
@@ -36,7 +37,10 @@ export const addBodyJoint = defineCommand({
     'FPR_SPHERICAL_TREE (reported by inspect_dynamics / simulate_motion while a spherical joint is the only connection of its body: declare the revolute or prismatic joint too, in any order). The loop must be closed at the start pose: every joint has one anchor, so the pose of the bodies is the pose ' +
     'you modelled; give `anchorOnChild` only to state where the pin sits on the child body when it differs (the distance is the loop ' +
     'gap; above 1 µm simulate_motion refuses with FPR_LOOP_OPEN). Optional: damping (viscous, N·m·s/rad), friction (dry, N·m), ' +
-    'initialRpm / initialVelocity (speed at t = 0). Returns the joint id in affected[0].',
+    'initialRpm / initialVelocity (speed at t = 0). SPRING: `stiffness` makes the joint a spring (torsional N·m/rad for revolute, linear ' +
+    'N/m for prismatic; 1 N/mm = 1000 N/m, 1 N·m/deg = 57.2958 N·m/rad) that is relaxed at `springReference` (rad or m, measured from the pose ' +
+    'the joint is modelled in; default 0 = relaxed at the start pose). Mass-spring: prismatic joint + stiffness k, period 2π·sqrt(m/k). ' +
+    'Spring energy counts in the potential energy of simulate_motion (energy: true). A spring needs a tree joint (not a loop-closing one). Returns the joint id in affected[0].',
   params: z.object({
     kind: z
       .enum(['revolute', 'prismatic', 'spherical'])
@@ -51,6 +55,17 @@ export const addBodyJoint = defineCommand({
     ).optional(),
     damping: z.number().min(0).optional().describe('Viscous damping: N·m·s/rad (revolute) or N·s/m (prismatic). Default 0.'),
     friction: z.number().min(0).optional().describe('Dry friction: N·m (revolute) or N (prismatic). Default 0.'),
+    stiffness: z
+      .number()
+      .min(0)
+      .optional()
+      .describe('Spring stiffness: N·m/rad (revolute) or N/m (prismatic; 1 N/mm = 1000 N/m). Default 0 = no spring. Not for spherical.'),
+    springReference: z
+      .number()
+      .optional()
+      .describe(
+        'Joint coordinate where the spring is relaxed: rad (revolute) or metres (prismatic), measured from the pose the joint is modelled in. Default 0.',
+      ),
     initialRpm: z.number().optional().describe('Revolute only: speed at t = 0 in rpm (overrides initialVelocity).'),
     initialVelocity: z.number().optional().describe('Speed at t = 0: rad/s (revolute) or m/s (prismatic). Default 0.'),
     id: z.string().optional().describe('Optional explicit joint id.'),
@@ -70,6 +85,9 @@ export const addBodyJoint = defineCommand({
     const requestedSpeed = params.initialRpm !== undefined || (params.initialVelocity ?? 0) !== 0;
     if (spherical && ((params.damping ?? 0) !== 0 || (params.friction ?? 0) !== 0 || requestedSpeed))
       return fail('a spherical joint has no damping, friction or initial speed (put them on the tree joints)');
+    if (spherical && (params.stiffness !== undefined || params.springReference !== undefined))
+      return fail('a spherical joint has no spring (put stiffness on a revolute or prismatic tree joint)');
+    if (params.springReference !== undefined && (params.stiffness ?? 0) === 0) return fail('springReference needs a stiffness > 0');
     const jointId = idOrNext(params.id, 'bjoint');
     if (dynamicsIdTaken(dynamics, jointId)) return fail(`id '${jointId}' is already used`);
     const initialVelocity =
@@ -84,6 +102,8 @@ export const addBodyJoint = defineCommand({
       ...(params.anchorOnChild !== undefined ? { anchorOnChild: params.anchorOnChild } : {}),
       damping: params.damping ?? 0,
       friction: params.friction ?? 0,
+      ...((params.stiffness ?? 0) > 0 ? { stiffness: params.stiffness ?? 0 } : {}),
+      ...((params.stiffness ?? 0) > 0 && (params.springReference ?? 0) !== 0 ? { springReference: params.springReference ?? 0 } : {}),
       initialVelocity,
     };
     const next = { ...dynamics, joints: { ...dynamics.joints, [jointId]: joint } };
@@ -104,9 +124,13 @@ export const addBodyJoint = defineCommand({
     const sense = spherical
       ? `ball pin at [${params.anchor.join(', ')}]`
       : `axis [${axis.join(', ')}] through [${params.anchor.join(', ')}]`;
+    const spring =
+      joint.stiffness === undefined
+        ? ''
+        : `, spring ${joint.stiffness} ${params.kind === 'revolute' ? 'N·m/rad' : 'N/m'} relaxed at ${joint.springReference ?? 0} ${params.kind === 'revolute' ? 'rad' : 'm'}`;
     return changed(
       withDynamics(doc, next),
-      `add_body_joint: ${params.kind} '${jointId}' — '${child.id}' on '${parent}', ${sense}; ${role}.`,
+      `add_body_joint: ${params.kind} '${jointId}' — '${child.id}' on '${parent}', ${sense}${spring}; ${role}.`,
       [jointId],
     );
   },

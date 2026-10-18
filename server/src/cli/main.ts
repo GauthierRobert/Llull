@@ -12,15 +12,17 @@ import { planAliases } from './aliases';
 import { planText, resultJson, resultText, type PrintableResult } from './output';
 import { createStepObserver, type StepObserver } from './progress';
 import { resolveImageRefs } from './imageParams';
-import { saveDataFiles, withoutPayloads } from './saveFiles';
+import { saveDataFiles, withoutPayloads, withSaveDefaults } from './saveFiles';
 import { llullHome, readDesktopDiscovery } from './desktopDiscovery';
 import { exchangeTool, takesFileParam, withFileContent } from './exchange';
 import type { CommandOutcome } from '@mcp/restProtocol';
 import { isHealthy } from '../restClient';
-import { outcomeIsFailure } from '@mcp/commandOutcome';
+import { withFailureStatus } from '@mcp/commandOutcome';
 import { exchangeOptionsWithDwg } from '../dwgConvert';
 import type { ExchangeOptions } from '../pythonExchange';
 import { USAGE } from './usage';
+import { parseKernelChoice } from '@core/geometry/kernelChoice';
+import { planKernelWarnings } from './planKernelWarning';
 import { benchmarkCli } from './benchmarks';
 
 export interface CliIo {
@@ -35,7 +37,7 @@ export interface CliIo {
   readonly stderrIsTty?: boolean; // stream per-step progress without `--progress`
 }
 
-/** 1 = the command failed or changed nothing (`withOutcome`); 2 = bad usage / unreadable input. */
+/** 1 = the command failed or changed nothing (`withFailureStatus`); 2 = bad usage / unreadable input. */
 export const EXIT_OK = 0;
 export const EXIT_COMMAND_ERROR = 1;
 export const EXIT_USAGE = 2;
@@ -159,6 +161,11 @@ async function rawParamsOf(name: string, tokens: readonly string[], io: CliIo): 
   }
 }
 
+function unknownSubcommandMessage(name: string): string {
+  const hints = suggestNames(name);
+  return `unknown subcommand "${name}".${hints.length > 0 ? ` Did you mean: ${hints.join(', ')}?` : ''} See: llull help`;
+}
+
 function unknownCommand(name: string): never {
   const hints = suggestNames(name);
   throw new UsageError(
@@ -194,20 +201,46 @@ function printEntries(entries: readonly CatalogEntry[], args: ParsedArgv, io: Cl
   return EXIT_OK;
 }
 
-const withOutcome = (name: string, result: CommandOutcome): CommandOutcome =>
-  !result.isError && outcomeIsFailure(name, result) ? { ...result, isError: true } : result;
-
 async function runExec(args: ParsedArgv, io: CliIo): Promise<number> {
   const [, name, ...rest] = args.positionals;
   if (name === undefined) throw new UsageError('exec needs a command name: llull exec <command> [params]');
   const isExchange = exchangeTool(name) !== undefined;
   if (getCommand(name) === undefined && !isExchange) unknownCommand(name);
   const raw = await paramsOf(name, rest, io);
-  const params = asUsage(() => (takesFileParam(name) ? withFileContent(name, raw) : raw));
+  const params = asUsage(() => withSaveDefaults(name, takesFileParam(name) ? withFileContent(name, raw) : raw, stringFlag(args, 'save')));
   const observer = observerOf(args, io);
   const backend = await backendOf(args, io, observer);
   const result = isExchange ? await backend.exchange(name, params) : await backend.run(name, params);
-  return finish(withTimeout(observer, withOutcome(name, result)), args, io);
+  return finish(withTimeout(observer, withFailureStatus(name, result)), args, io);
+}
+
+const CAMERA_COMMANDS = new Set(['fit_view', 'set_camera']);
+
+/** Command names of a plan, loop bodies included. */
+function planCommands(actions: readonly unknown[], into = new Set<string>()): Set<string> {
+  for (const action of actions) {
+    if (!isRecord(action)) continue;
+    if (typeof action['command'] === 'string') into.add(action['command']);
+    if (Array.isArray(action['actions'])) planCommands(action['actions'], into);
+  }
+  return into;
+}
+
+/**
+ * The camera is document state that a plan does not move: after a plan that built something and never set the camera itself, frame the
+ * model (fit_view, current angle) so the app and later renders do not open on a speck or inside the part. Skipped by --no-fit,
+ * --validate, --dry-run and a failed plan.
+ */
+async function frameAfterPlan(
+  args: ParsedArgv,
+  actions: readonly unknown[],
+  result: CommandOutcome,
+  backend: CliBackend,
+): Promise<boolean> {
+  if (result.isError || booleanFlag(args, 'no-fit') || booleanFlag(args, 'validate') || booleanFlag(args, 'dry-run')) return false;
+  if (!result.changed || [...planCommands(actions)].some((name) => CAMERA_COMMANDS.has(name))) return false;
+  const fitted = await backend.run('fit_view', { direction: 'current' });
+  return !fitted.isError;
 }
 
 async function runPlan(args: ParsedArgv, io: CliIo): Promise<number> {
@@ -224,9 +257,20 @@ async function runPlan(args: ParsedArgv, io: CliIo): Promise<number> {
   };
   const observer = observerOf(args, io);
   const backend = await backendOf(args, io, observer);
-  const result = withTimeout(observer, withOutcome('build_project', await backend.run('build_project', params)));
+  const result = withTimeout(observer, withFailureStatus('build_project', await backend.run('build_project', params)));
+  const framed = await frameAfterPlan(args, base['actions'], result, backend);
   const found = planAliases(result.data);
-  return finish(found === null ? result : { ...result, planAliases: found }, args, io, planText);
+  const warnings =
+    booleanFlag(args, 'validate') && serverOf(args, io) === undefined
+      ? planKernelWarnings(params, parseKernelChoice(stringFlag(args, 'kernel') ?? io.env['LLULL_KERNEL']))
+      : [];
+  const printable: PrintableResult = {
+    ...result,
+    ...(found !== null ? { planAliases: found } : {}),
+    ...(warnings.length > 0 ? { warnings } : {}),
+    ...(framed ? { summary: `${result.summary} Camera framed on the model (fit_view; --no-fit to keep it).` } : {}),
+  };
+  return finish(printable, args, io, planText);
 }
 
 function runNew(args: ParsedArgv, io: CliIo): number {
@@ -350,7 +394,7 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
         // `llull add_box width=10` is `llull exec add_box width=10`.
         if (getCommand(subcommand) !== undefined || exchangeTool(subcommand) !== undefined)
           return await runExec(parseArgv(['exec', ...argv]), io);
-        throw new UsageError(`unknown subcommand "${subcommand}"; see: llull help`);
+        throw new UsageError(unknownSubcommandMessage(subcommand));
     }
   } catch (error) {
     if (!(error instanceof UsageError)) throw error;

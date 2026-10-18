@@ -32,7 +32,9 @@ const specKey = (check: string, configuration: string | undefined): string =>
   check === 'view_factor' ? `view_factor:${configuration ?? ''}` : check;
 
 const inputDoc = (spec: CheckSpec): string =>
-  spec.inputs.length === 0 ? 'no inputs' : spec.inputs.map((i) => `${i.name} (${i.describe}; ${i.kind})`).join(', ');
+  spec.inputs.length === 0
+    ? 'no inputs'
+    : spec.inputs.map((i) => `${i.name}${i.optional === true ? '?' : ''} (${i.describe}; ${i.kind})`).join(', ');
 
 const CATALOG_TEXT = Object.entries(CHECK_SPECS)
   .map(([key, spec]) => `${key.replace(':', ' / ')}: ${inputDoc(spec)}`)
@@ -78,10 +80,10 @@ export const thermalAnalyticCheck = defineCommand({
   description:
     'Evaluate a textbook closed-form heat-transfer solution, used as the reference a thermal model must reproduce. Pure and read-only. ' +
     'check: plane_wall (flux q in W/m^2, surface temperatures, heat-balance residual), slab_generation (centre temperature), semi_infinite ' +
-    '(erf profile after a surface step), lumped (sphere; returns validity { Bi, ok } with Bi < 0.1), fin (pin-fin efficiency), parallel_plates ' +
+    '(erf profile after a surface step), lumped (any body via V and As, or sphere d; returns validity { Bi, ok } with Bi < 0.1), fin (efficiency; with Tb and Tinf also heat rate Q adiabatic / convective-tip / corrected-length and tip temperature), parallel_plates ' +
     '(grey infinite plates, W/m^2), view_factor (needs configuration), stefan (Neumann one-phase melting: root lambda, front position, Stefan ' +
     'number), stefan_boltzmann (sigma from the exact SI constants, no inputs), interface (two slabs with a contact conductance). ' +
-    'inputs maps each input name to { value, unit }; dimensionless inputs use unit "1". Inputs per check: ' +
+    'inputs maps each input name (names marked ? are optional) to { value, unit }; dimensionless inputs use unit "1". Inputs per check: ' +
     CATALOG_TEXT +
     '. Returns data { value, unit, outputs{name:{value,unit}}, formula, inputs, validity?, physicalConstants? }; temperature results use the unit of the first ' +
     'temperature input; radiation checks report sigma and absolute zero as named defaults. unitSystem (N-m-kg-s, N-mm-t-s, lbf-in-slinch-s) adds ' +
@@ -116,7 +118,7 @@ export const thermalAnalyticCheck = defineCommand({
     }
     const known = new Set(spec.inputs.map((i) => i.name));
     const extra = Object.keys(params.inputs).filter((name) => !known.has(name));
-    const missing = spec.inputs.filter((i) => !Object.hasOwn(params.inputs, i.name)).map((i) => i.name);
+    const missing = spec.inputs.filter((i) => i.optional !== true && !Object.hasOwn(params.inputs, i.name)).map((i) => i.name);
     if (extra.length > 0 || missing.length > 0) {
       const why = [
         missing.length > 0 ? `missing inputs ${missing.join(', ')}` : '',
@@ -129,6 +131,7 @@ export const thermalAnalyticCheck = defineCommand({
     const values: Record<string, number> = {};
     let temperatureUnit: string | undefined;
     for (const item of spec.inputs) {
+      if (!Object.hasOwn(params.inputs, item.name)) continue;
       const given = params.inputs[item.name] as { value: number; unit: string };
       const path = `inputs.${item.name}`;
       const converted = toSi(item.kind, given);

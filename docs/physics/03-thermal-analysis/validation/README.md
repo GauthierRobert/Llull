@@ -27,7 +27,7 @@ Tolerances are llull acceptance choices, justified per case below; no source cla
 | `sources.md` | register | Sources, access mode, grade, findings |
 
 Plans use existing commands (`set_units`, `add_box`, `create_material`, `assign_material`), the **proposed** 08 MAT
-commands (`define_material_record`, `set_material_property`, `create_material` + `recordId`), the **proposed** 05 commands
+commands (`define_material_record`, `set_material_property`, `create_material` with `name` = the record id), the **proposed** 05 commands
 (`create_analysis`, `set_part_idealization`, `set_mesh_controls`, `add_result_probe`) and the thermal commands of
 TECHNICAL_SPEC §4. They are drafts until those commands exist. `create_material.density` is in g per (document unit)³,
 as today's command defines it (so 7.2e6 g/m³ for 7200 kg/m³ in a metre document); the 08 record carries the SI value.
