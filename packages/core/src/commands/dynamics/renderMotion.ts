@@ -87,8 +87,8 @@ export const renderMotion = defineCommand({
     'path of the named rigid bodies (e.g. the coupler or the end-effector) over all samples, with a dot at the current position. ' +
     'Camera as render_view: `view` or `direction`. Returns data.svg (the grid), data.width/height, and data.frames[{ time, bodies{ bodyId: ' +
     '{ position (centre of mass, document units), rotationDeg (Euler XYZ degrees from the start pose) } } }] to read numbers. Frames show ' +
-    "the nearest recorded sample (data.frames[].time is that sample's time). With the CLI, `llull render_motion … --save m.png` rasterizes " +
-    'data.svg. Point springs (add_spring) are drawn as green zig-zag coils between their attachment points, which ride on their bodies ' +
+    "the nearest recorded sample (data.frames[].time is that sample's time). With the CLI, `llull render_motion … --save m.png` writes a PNG " +
+    'rasterized from data.svg (--save m.svg writes the SVG itself; if rasterizing fails the .svg is saved instead and the CLI reply shows data.svg as a short placeholder). Point springs (add_spring) are drawn as green zig-zag coils between their attachment points, which ride on their bodies ' +
     '(data.frames[].springs gives the end points and length). Read-only; needs the physics engine like simulate_motion.',
   params: z.object({
     times: z
@@ -242,7 +242,7 @@ export const renderMotion = defineCommand({
     return report(
       doc,
       `render_motion: ${frames.length} frame(s) of ${Object.keys(frames[0]?.bodies ?? {}).length} body/bodies at ${times.join(', ')} (${view} view, ${sim.samples} samples over ${duration} s)` +
-        `${traced.length > 0 ? `; trace of ${traced.join(', ')}` : ''}. Save the image with --save m.png (rasterizes data.svg).`,
+        `${traced.length > 0 ? `; trace of ${traced.join(', ')}` : ''}. CLI: --save m.png writes the PNG, --save m.svg the SVG (both from data.svg).`,
       {
         svg,
         width: totalWidth,
