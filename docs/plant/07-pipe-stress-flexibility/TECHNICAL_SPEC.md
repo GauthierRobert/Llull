@@ -212,7 +212,7 @@ release (AF-33, AF-35).
 | `update_stress_model` / `delete_stress_model` | mutating | `modelId`, partial fields | edits / removes; clears approval | `PST_MODEL_NOT_FOUND` |
 | `set_pipe_operating_conditions` | mutating | `modelId`, `target`, `installTempC`, `temperatures[]` (°C), `pressures[]` (bar g), `fluidDensityKgM3`, `insulation`, `cycles`, `materialId`, `wallMm`, `corrosionAllowanceMm`, `millTolerancePct` | replaces the conditions of the target | `PST_MODEL_NOT_FOUND`, `PST_MATERIAL_NOT_FOUND`, `PST_PARAM_INVALID` |
 | `import_pipe_material_data` | mutating | `materialId`, `designation`, `rows: [{ tempC, ShMPa, EGPa, meanCtePerK \| growthMmPerM }]`, `SMYSMPa`, `SMTSMPa`, `source`, `licence`, `confirmation?` | writes PHY-01 table models on `doc.materials[materialId]`; `unverified` unless a human signature clears it | `PST_TABLE_INVALID` (non-monotonic T, gaps), `PST_HUMAN_GATE` (only for the `verified` flag) |
-| `set_stress_load_cases` | mutating | `modelId`, `cases[]` \| `preset: "b31.3-default"`, `wind?`, `seismic?` (V1) | replaces load cases | `PST_LOADCASE_INVALID` (unknown primitive, cycle in combinations) |
+| `set_stress_load_cases` | mutating | `modelId`, `cases[]` \| `preset: "b31.3-default"`, `forces?[{ name: "F1", at: { pipeId, atMm }, forceN: [x,y,z], momentNm?: [x,y,z] }]`, `displacements?[{ name: "D1", restraintId, uMm, rotDeg? }]`, `wind?`, `seismic?` (V1) | replaces load cases | `PST_LOADCASE_INVALID` (unknown primitive, cycle in combinations) |
 | `add_stress_restraint` / `delete_stress_restraint` | mutating | `modelId`, `at`, `kind`, `direction`, `oneWay`, `gapMm`, `stiffnessNPerMm`, `friction` | adds / removes an extra restraint | `PST_POINT_OFF_PIPE`, `PST_PARAM_INVALID` |
 | `set_sif_override` | mutating | `modelId`, `component` (pipe + atMm), `ii`, `io`, `it`, `ia`, `k`, `source` | B31J or test values, `unverified` until signed | `PST_PARAM_INVALID` |
 | `analyze_pipe_stress` | query | `modelId`, `cases?[]`, `nodes?[]`, `include?: ('displacements'\|'reactions'\|'forces'\|'stresses')[]`, `cursor?` | `CaseResult[]`, governing summary, model stats (nodes, elements, DOF), iterations per case, `inputHash`, `provenance` | `PST_MODEL_NOT_FOUND`, `PST_UNSTABLE`, `PST_DISCONNECTED`, `PST_MATERIAL_NO_DATA`, `PST_TEMPERATURE_OUT_OF_TABLE`, `PST_NONLINEAR_NOT_CONVERGED`, `PST_WALL_UNKNOWN` |
@@ -223,6 +223,8 @@ release (AF-33, AF-35).
 | `pipe_sif` | query | `component: elbow\|bend\|welding_tee\|unreinforced_tee\|reinforced_tee\|weldolet\|sweepolet\|reducer\|butt_weld`, `odMm`, `wallMm`, `bendRadiusMm?`, `padMm?`, `rule` (`B31.3-2018`, `B31.1`, `user`) | `h`, `k`, `ii`, `io`, `formula`, `grade` | `PST_SIF_EDITION` (B31.3 ≥ 2020 without user values), `PST_PARAM_INVALID` |
 | `pipe_stress_allowables` | query | `ScMPa`, `ShMPa` \| `materialId`+`tempC`+`installTempC`, `cycles`, `edition`, `SLMPa?`, `ferrousLowStrength?` | `f` (raw, capped, floored), `SA1aMPa`, `SA1bMPa`, `occasionalMPa` | `PST_PARAM_INVALID` |
 | `guided_cantilever` | query | `legMm`, `displacementMm`, `odMm`, `wallMm`, `EMPa`, `SAMPa?` | `forceN`, `momentNmm`, `stressMPa`, `minLegMm` | `PST_PARAM_INVALID` |
+| `spring_variability` | query | `hotLoadN`, `rateNPerMm`, `travelUpMm` (signed), `maxVariability?` (default 0.25, named) | `coldLoadN`, `variability`, `ok`, rule + grade | `PST_PARAM_INVALID` |
+| `nozzle_load_check` | query | `standard: nema_sm23\|api610\|api617\|user`, `nominalIn`, `forceN`/`forceLbf` [x,y,z], `momentNm`/`momentFtLbf` [x,y,z], `table?` (api610 / user values), `orientation?: top\|side\|end` | per-component and resultant ratios, `De`, governing ratio, rule + grade | `PST_NOZZLE_LIMIT_MISSING`, `PST_PARAM_INVALID` |
 | `select_spring_hangers` (V1) | mutating | `modelId`, `restraintIds[]`, `springTableId`, `maxVariability` (default 0.25, 0.15 near rotating equipment) | writes `SpringSelection` (size, rate, hot / cold load, travel, variability) | `PST_SPRING_NO_SIZE`, `PST_SPRING_VARIABILITY`, `PST_SPRING_TABLE_MISSING` |
 | `import_spring_table` (V1) | mutating | vendor sizes `[{ size, minN, maxN, rateNPerMm, travelMm, series }]`, `source` | document data | `PST_TABLE_INVALID` |
 | `set_nozzle_load_limit` (V1) | mutating | `modelId`, `nozzle` (03 EQP id) \| `restraintId`, `standard: api610\|nema_sm23\|api617\|api661\|user`, `table?`, `nominalIn` | stores check definition | `PST_NOZZLE_NOT_FOUND`, `PST_PARAM_INVALID` |
@@ -254,7 +256,8 @@ export const analyzePipeStress = defineCommand({ name: 'analyze_pipe_stress', an
 2. Each interior polyline vertex is a bend: deflection θ = acos(d1·d2); radius R1 = `elbowRadiusFactor` × nominal
    size (DN in mm × 1.5 for long radius) unless 02 RTE / 01 PSC gives the fitting. The bend replaces the corner by an
    arc tangent to both legs; near, mid and far nodes are created (CAESAR II convention), legs shortened by
-   R1 tan(θ/2). A corner whose legs are shorter than R1 tan(θ/2) ⇒ `PST_BEND_TOO_TIGHT`.
+   R1 tan(θ/2). A corner whose legs are shorter than R1 tan(θ/2) ⇒ `PST_BEND_TOO_TIGHT`. `elbowRadiusFactor: 0` keeps a
+   sharp corner (k = 1, i = 1, a mitre-free idealisation used by the closed-form validation cases; flagged in provenance).
 3. Straight legs are split at supports, branches, and so no element exceeds `maxElementLengthMm`.
 4. Supports map by `supportMapping` (defaults below, each named in `provenance`): anchor → all 6 DOF; shoe → one-way
    +Z (rest) with friction μ in the plane; guide → rest + lateral restraint (gap `gapMm`, default 0) perpendicular to
@@ -381,7 +384,8 @@ components and resultants.
 
 ### 5.10 Quick checks (TR-PST-10)
 
-Closed forms with no model: thermal growth ΔL = ᾱ ΔT L; guided cantilever F = 12EIΔ/L³, M = 6EIΔ/L²,
+Closed forms with no model (`thermal_growth`, `guided_cantilever`, `pipe_sif`, `pipe_stress_allowables`,
+`spring_variability`, `nozzle_load_check`): thermal growth ΔL = ᾱ ΔT L; spring P_cold = P_hot + k d, V = |k d| / P_hot; guided cantilever F = 12EIΔ/L³, M = 6EIΔ/L²,
 S = 3 E Do Δ / L², L_min = √(3 E Do Δ / S_A) (M. W. Kellogg method, grade A as beam theory); SIF table §5.7;
 allowables §5.6.
 
