@@ -4,7 +4,7 @@
 import React, { useCallback } from 'react';
 import { getCommand } from '@core/commands/registry';
 import { classNames } from '@ui/classNames';
-import { PanelEmpty, PanelHeader, PanelSection, StatusLine } from '@ui/panels/PanelParts';
+import { KpiStrip, PanelEmpty, PanelHeader, PanelSection, StatusLine } from '@ui/panels/PanelParts';
 import { CHECK_COMMAND, runPrototypeCheck } from '@ui/services/prototypeCheck';
 import { useStore } from '@ui/store';
 import { ReadinessChecklist } from './ReadinessChecklist';
@@ -14,9 +14,12 @@ import { StatusMark } from './StatusMark';
 import { buildChecklist, overallStatus } from './checklist';
 import { findFinding, flattenFindings } from './findings';
 import { isReviewStale, useReviewStore } from './reviewStore';
-import { parsePrototypeReview } from './reviewTypes';
+import { parsePrototypeReview, type CheckResult, type CheckStatus } from './reviewTypes';
 
 const DISPOSITION_COMMAND = 'set_review_disposition';
+
+const countOf = (checks: readonly CheckResult[], status: CheckStatus): number =>
+  flattenFindings(checks).filter(({ item }) => item.status === status).length;
 
 function useRunChecks(): () => void {
   const document = useStore((s) => s.document);
@@ -43,6 +46,7 @@ export function ReviewPanel({ className }: { className?: string }): React.ReactE
   const busy = useReviewStore((s) => s.busy);
   const status = useReviewStore((s) => s.status);
   const explainKey = useReviewStore((s) => s.explainKey);
+  const markersShown = useReviewStore((s) => s.markersShown);
   const entities = useStore((s) => s.document.entities);
   const dynamics = useStore((s) => s.document.dynamics);
   const dispatch = useStore((s) => s.dispatch);
@@ -93,6 +97,33 @@ export function ReviewPanel({ className }: { className?: string }): React.ReactE
               {result.ownerSummary}
             </p>
           )}
+          <KpiStrip
+            label="Review summary"
+            items={[
+              {
+                key: 'review-fail',
+                label: 'Failing',
+                value: String(countOf(checks, 'fail')),
+                tone: countOf(checks, 'fail') > 0 ? 'bad' : 'ok',
+              },
+              {
+                key: 'review-warn',
+                label: 'Warnings',
+                value: String(countOf(checks, 'warn')),
+                tone: countOf(checks, 'warn') > 0 ? 'warn' : 'ok',
+              },
+              { key: 'review-pass', label: 'Passing', value: String(countOf(checks, 'pass')), tone: 'ok' },
+            ]}
+          />
+          <label className="loads-check review-panel__markers">
+            <input
+              type="checkbox"
+              checked={markersShown}
+              onChange={(event) => useReviewStore.getState().setMarkersShown(event.target.checked)}
+              data-testid="review-markers-shown"
+            />
+            Mark findings on the model
+          </label>
           <PanelSection title="Readiness" testId="review-readiness">
             <ReadinessChecklist rows={buildChecklist(checks, stale)} onExplain={useReviewStore.getState().openExplain} />
           </PanelSection>

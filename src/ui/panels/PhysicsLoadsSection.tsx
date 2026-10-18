@@ -9,6 +9,8 @@ import { isLoadDrawn, useLoadOverlayStore } from '@ui/store/loadOverlayStore';
 import { useDynamicsLoads } from '@ui/hooks/useDynamicsLoads';
 import { LOAD_COLORS, LOAD_LAYERS, LOAD_LAYER_LABELS, formatQuantity, type LoadItem, type LoadLayer } from '@ui/dynamicsLoads';
 import { IconButton, PanelSection } from '@ui/panels/PanelParts';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { loadFocus } from '@ui/panels/mechanismFocus';
 
 function Swatch({ layer }: { layer: LoadLayer }): React.ReactElement {
   return <span className="loads-swatch" style={{ background: LOAD_COLORS[layer] }} aria-hidden="true" />;
@@ -18,6 +20,8 @@ function LoadRow({ item }: { item: LoadItem }): React.ReactElement {
   const overlay = useLoadOverlayStore();
   const drawn = isLoadDrawn(overlay, item);
   const focused = overlay.focusedId === item.id;
+  const focusItem = useFocusItem();
+  const document = useStore((s) => s.document);
   return (
     <li
       className={classNames('panel__row loads-row', focused && 'panel__row--selected', !drawn && 'loads-row--hidden')}
@@ -27,8 +31,11 @@ function LoadRow({ item }: { item: LoadItem }): React.ReactElement {
         type="button"
         className="loads-row__main"
         aria-pressed={focused}
-        title="Emphasise in the 3D view"
-        onClick={() => overlay.focus(focused ? null : item.id)}
+        title="Show on the model: parts, force glyph and value"
+        onClick={() => {
+          overlay.focus(focused ? null : item.id);
+          focusItem(loadFocus(document, item));
+        }}
       >
         <span className="loads-row__line">
           <Swatch layer={item.layer} />

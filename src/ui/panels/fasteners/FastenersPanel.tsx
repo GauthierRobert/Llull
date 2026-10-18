@@ -3,7 +3,9 @@
 
 import React, { useState } from 'react';
 import { classNames } from '@ui/classNames';
-import { PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
+import { KpiStrip, ListRow, PanelEmpty, PanelHeader, PanelSection, StatusChip } from '@ui/panels/PanelParts';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { useFocusStore } from '@ui/store/focusStore';
 import { ProvenancePopover } from '@ui/panels/ProvenancePopover';
 import { useReadOnlyQuery } from '@ui/panels/useReadOnlyQuery';
 import { licenceText } from '@ui/panels/materials/materialRecordView';
@@ -11,11 +13,15 @@ import { useStore } from '@ui/store';
 import { BomSections } from './BomSections';
 import { parseLayout } from './fastenerView';
 import { InsertFastenerDialog } from './InsertFastenerDialog';
+import { FASTENER_COLOR, layoutFindingFocus, stackFocus } from './fastenerFocus';
 
 export function FastenersPanel({ className }: { className?: string }): React.ReactElement {
   const catalogs = useStore((s) => s.document.fasteners?.catalogs);
   const stacks = useStore((s) => s.document.fasteners?.stacks);
   const dispatch = useStore((s) => s.dispatch);
+  const document = useStore((s) => s.document);
+  const focusItem = useFocusItem();
+  const focusKey = useFocusStore((s) => s.focus?.key);
   const [inserting, setInserting] = useState(false);
   const layout = useReadOnlyQuery('check_fastener_layout', parseLayout);
   const families = Object.values(catalogs ?? {});
@@ -34,6 +40,23 @@ export function FastenersPanel({ className }: { className?: string }): React.Rea
           Insert…
         </button>
       </PanelHeader>
+      <KpiStrip
+        label="Fastener summary"
+        items={[
+          { key: 'stacks', label: 'Stacks', value: String(stackList.length) },
+          ...(layout.view === null
+            ? []
+            : [
+                {
+                  key: 'layout',
+                  label: 'Layout',
+                  value: layout.view.status,
+                  tone:
+                    layout.view.status === 'fail' ? ('bad' as const) : layout.view.status === 'warn' ? ('warn' as const) : ('ok' as const),
+                },
+              ]),
+        ]}
+      />
       {families.length === 0 ? (
         <PanelEmpty
           icon="cube"
@@ -68,20 +91,29 @@ export function FastenersPanel({ className }: { className?: string }): React.Rea
           <>
             <ul className="panel__list" aria-label="Fastener stacks">
               {stackList.map((stack) => (
-                <li key={stack.id} className="panel__row" data-testid={`stack-${stack.id}`}>
+                <ListRow
+                  key={stack.id}
+                  testId={`stack-${stack.id}`}
+                  buttonTestId={`stack-focus-${stack.id}`}
+                  swatch={FASTENER_COLOR}
+                  selected={focusKey === stackFocus(stack).key}
+                  onSelect={() => focusItem(stackFocus(stack))}
+                  actions={
+                    <button
+                      type="button"
+                      className="btn btn--sm btn--ghost"
+                      onClick={() => dispatch('delete_fastener_stack', { stackIds: [stack.id] })}
+                      aria-label={`Delete stack ${stack.id}`}
+                    >
+                      Delete
+                    </button>
+                  }
+                >
                   <strong>{stack.fastener.partNumber}</strong>
                   <span className="panel__row-meta">
-                    {stack.id} · {stack.layers.length} layer(s)
+                    -{stack.fastener.diameterDash} · {stack.id} · {stack.layers.length} layer(s)
                   </span>
-                  <button
-                    type="button"
-                    className="btn btn--sm btn--ghost"
-                    onClick={() => dispatch('delete_fastener_stack', { stackIds: [stack.id] })}
-                    aria-label={`Delete stack ${stack.id}`}
-                  >
-                    Delete
-                  </button>
-                </li>
+                </ListRow>
               ))}
             </ul>
             <button type="button" className="btn btn--sm" onClick={() => layout.run({})} data-testid="layout-run">
@@ -96,6 +128,25 @@ export function FastenersPanel({ className }: { className?: string }): React.Rea
                   </span>
                 ))}
               </p>
+            )}
+            {layout.view !== null && layout.view.items.length > 0 && (
+              <ul className="panel__list" aria-label="Layout findings">
+                {layout.view.items.map((finding) => {
+                  const focus = layoutFindingFocus(document, finding);
+                  return (
+                    <ListRow
+                      key={focus.key}
+                      buttonTestId="layout-finding"
+                      swatch={focus.color}
+                      selected={focusKey === focus.key}
+                      onSelect={() => focusItem(focus)}
+                    >
+                      <StatusChip tone={finding.severity === 'error' ? 'bad' : 'warn'} text={finding.code} />
+                      <span className="panel__row-main">{finding.message}</span>
+                    </ListRow>
+                  );
+                })}
+              </ul>
             )}
           </>
         )}

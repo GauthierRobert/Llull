@@ -3,7 +3,11 @@
 // reads "fail (accepted)": it is recorded, never a pass.
 
 import React, { useState } from 'react';
+import { useStore } from '@ui/store';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { useIsFocused } from '@ui/store/focusStore';
 import { StatusMark } from './StatusMark';
+import { findingFocus } from './findingLocations';
 import { formatThreshold, headlineValue, itemStatusLabel } from './checklist';
 import { filterFindings, flattenFindings, groupFindings, reviewerStatusOf, sortFindings, type Finding } from './findings';
 import { useReviewStore } from './reviewStore';
@@ -49,13 +53,27 @@ function FindingRow({ finding, editable, onDisposition, onExplain }: FindingRowP
   const status = reviewerStatusOf(item);
   const value = headlineValue(item);
   const threshold = formatThreshold(item);
+  const document = useStore((s) => s.document);
+  const focusItem = useFocusItem();
+  const focus = findingFocus(document, finding);
+  const focused = useIsFocused(focus.key);
   return (
-    <li className="finding" data-testid={`finding-${item.findingKey}`}>
+    <li className={focused ? 'finding finding--focused' : 'finding'} data-testid={`finding-${item.findingKey}`}>
       <div className="finding__head">
         <StatusMark status={item.status} label={itemStatusLabel(item)} />
         <code className="finding__code">{item.code}</code>
         {item.disposition?.by === 'agent' && <span className="finding__badge">agent</span>}
         {item.disposition?.stale === true && <span className="finding__badge finding__badge--stale">stale</span>}
+        <button
+          type="button"
+          className="checklist-row__explain"
+          aria-pressed={focused}
+          title="Show this finding on the model"
+          data-testid={`finding-show-${item.findingKey}`}
+          onClick={() => focusItem(focus)}
+        >
+          Show
+        </button>
         <button type="button" className="checklist-row__explain" onClick={() => onExplain(item.findingKey)}>
           Explain
         </button>

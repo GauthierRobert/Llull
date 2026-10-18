@@ -11,11 +11,15 @@ import { FeatureTableSection } from './FeatureTableSection';
 import { FlatPatternSection } from './FlatPatternSection';
 import { FtrFindingsSection } from './FtrFindingsSection';
 import { HoleForm } from './HoleForm';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { partFocus } from './mfgFocus';
 
 export function ManufacturingPanel({ className }: { className?: string }): React.ReactElement {
   const sheetParts = useStore((s) => s.document.sheetMetal?.parts);
   const entities = useStore((s) => s.document.entities);
   const order = useStore((s) => s.document.order);
+  const document = useStore((s) => s.document);
+  const focusItem = useFocusItem();
   const [chosen, setChosen] = useState('');
   const sheetIds = Object.keys(sheetParts ?? {});
   const machinedIds = order.filter((id) => {
@@ -38,6 +42,15 @@ export function ManufacturingPanel({ className }: { className?: string }): React
         <>
           <div className="mfg__part">
             <LabeledSelect label="Part" value={partId} options={options} onChange={setChosen} testId="mfg-part" />
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              title="Highlight this part on the model"
+              data-testid="mfg-part-show"
+              onClick={() => focusItem(partFocus(document, partId, `part:${partId}`, partId))}
+            >
+              Show
+            </button>
           </div>
           {isSheet && <FlatPatternSection key={`flat-${partId}`} partId={partId} />}
           <FtrFindingsSection key={`check-${partId}`} partId={partId} command={isSheet ? 'check_sheet_metal' : 'check_machining'} />

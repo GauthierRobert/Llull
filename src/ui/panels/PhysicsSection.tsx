@@ -8,7 +8,10 @@ import { runSimulation } from '@ui/services/simulationRun';
 import { execute } from '@core/commands/registry';
 import type { SimulationData } from '@core/dynamics/simulationReport';
 import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
-import { PanelEmpty, PanelSection, StatusLine } from '@ui/panels/PanelParts';
+import { ListRow, PanelEmpty, PanelSection, StatusLine } from '@ui/panels/PanelParts';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { useFocusStore } from '@ui/store/focusStore';
+import { bodyFocus } from '@ui/panels/mechanismFocus';
 import { parseNumber } from '@ui/numberText';
 import { SeriesChart } from './SeriesChart';
 import { TimelineDock } from '@ui/components/TimelineDock';
@@ -104,6 +107,8 @@ export function PhysicsSection(): React.ReactElement {
   // inspect_dynamics reads the whole document (entities, materials, units): recompute whenever it changes
   const inspect = useMemo(() => (document.dynamics === undefined ? null : execute(document, 'inspect_dynamics', {}).data), [document]);
   const bodyCount = Object.keys(dynamics?.bodies ?? {}).length;
+  const focusItem = useFocusItem();
+  const focusKey = useFocusStore((state) => state.focus?.key);
 
   const simulate = async (): Promise<void> => {
     const seconds = parseNumber(duration) ?? 5;
@@ -138,13 +143,20 @@ export function PhysicsSection(): React.ReactElement {
     <PanelSection collapsible title="Physics" count={bodyCount} countLabel={`${bodyCount} bodies`} testId="mechanisms-section-physics">
       <ul className="panel__list" aria-label="Rigid bodies">
         {Object.entries(bodies).map(([id, body]) => (
-          <li key={id} className="panel__row" data-testid={`physics-body-${id}`}>
+          <ListRow
+            key={id}
+            testId={`physics-body-${id}`}
+            buttonTestId={`physics-body-focus-${id}`}
+            swatch="#ff9100"
+            selected={focusKey === `mechanisms:body:${id}`}
+            onSelect={() => focusItem(bodyFocus(document, id, `${body.name ?? id} · ${format(body.massKg, 3)} kg`))}
+          >
             <span className="panel__row-main">{body.name ?? id}</span>
             <span className="panel__row-meta">
               {format(body.massKg, 3)} kg{body.fixed ? ' · fixed' : ''}
               {body.inertiaAboutJointAxis !== null ? ` · I ${body.inertiaAboutJointAxis.toPrecision(3)} kg·m²` : ''}
             </span>
-          </li>
+          </ListRow>
         ))}
       </ul>
       {problems.length > 0 && <StatusLine text={problems.join('; ')} testId="physics-problems" />}

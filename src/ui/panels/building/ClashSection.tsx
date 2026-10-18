@@ -6,7 +6,10 @@ import { runQuery } from '@ui/services/localQuery';
 import type { Clash } from '@aec/industrial/clash/clash';
 import { toMetres } from '@core/model/units';
 import type { BuildingModel } from '@core/model/building';
-import { ListRow, PanelSection, StatusLine } from '@ui/panels/PanelParts';
+import { KpiStrip, ListRow, PanelSection, StatusChip, StatusLine } from '@ui/panels/PanelParts';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { useFocusStore } from '@ui/store/focusStore';
+import { clashFocus } from './structuralFocus';
 import { isClashData } from '@ui/resultData';
 
 interface ClashReport {
@@ -19,7 +22,9 @@ interface ClashReport {
 export function ClashSection(): React.ReactElement {
   const building = useStore((s) => s.document.building);
   const units = useStore((s) => s.document.units);
-  const select = useStore((s) => s.select);
+  const document = useStore((s) => s.document);
+  const focusItem = useFocusItem();
+  const focusKey = useFocusStore((s) => s.focus?.key);
   const [computed, setReport] = useState<ClashReport | null>(null);
   const report = computed !== null && computed.building === building ? computed : null;
 
@@ -32,7 +37,6 @@ export function ClashSection(): React.ReactElement {
   const millimetres = (depth: number): number => Math.round(toMetres({ units }, depth) * 1000);
   const elements = building?.elements ?? {};
   const markOf = (id: string): string => elements[id]?.mark ?? id;
-  const entitiesOf = (clash: Clash): string[] => [...(elements[clash.a]?.entityIds ?? []), ...(elements[clash.b]?.entityIds ?? [])];
 
   return (
     <PanelSection
@@ -57,17 +61,53 @@ export function ClashSection(): React.ReactElement {
             testId="clash-summary"
           />
           {report.clashes.length > 0 && (
-            <ul className="panel__list" aria-label="Clashes">
-              {report.clashes.map((clash) => (
-                <ListRow key={`${clash.kind}:${clash.a}:${clash.b}`} buttonTestId="clash-row" onSelect={() => select(entitiesOf(clash))}>
-                  <span className="chip">{clash.kind === 'hard' ? 'Hard' : 'Clearance'}</span>
-                  <span className="panel__row-main">
-                    {markOf(clash.a)} × {markOf(clash.b)}
-                  </span>
-                  <span className="panel__row-meta">{millimetres(clash.depth)} mm</span>
-                </ListRow>
-              ))}
-            </ul>
+            <>
+              <KpiStrip
+                label="Clash summary"
+                items={[
+                  {
+                    key: 'hard',
+                    label: 'Hard clashes',
+                    value: String(report.clashes.filter((clash) => clash.kind === 'hard').length),
+                    tone: 'bad',
+                  },
+                  {
+                    key: 'clearance',
+                    label: 'Clearance',
+                    value: String(report.clashes.filter((clash) => clash.kind === 'clearance').length),
+                    tone: 'warn',
+                  },
+                ]}
+              />
+              <ul className="panel__list" aria-label="Clashes">
+                {report.clashes.map((clash) => {
+                  const key = `${clash.kind}:${clash.a}:${clash.b}`;
+                  const focus = clashFocus(
+                    document,
+                    key,
+                    `${markOf(clash.a)} × ${markOf(clash.b)}`,
+                    `${millimetres(clash.depth)} mm`,
+                    clash.a,
+                    clash.b,
+                  );
+                  return (
+                    <ListRow
+                      key={key}
+                      buttonTestId="clash-row"
+                      swatch={clash.kind === 'hard' ? '#ff4d4f' : '#ffb300'}
+                      selected={focusKey === focus.key}
+                      onSelect={() => focusItem(focus)}
+                    >
+                      <StatusChip tone={clash.kind === 'hard' ? 'bad' : 'warn'} text={clash.kind === 'hard' ? 'Hard' : 'Clearance'} />
+                      <span className="panel__row-main">
+                        {markOf(clash.a)} × {markOf(clash.b)}
+                      </span>
+                      <span className="panel__row-meta">{millimetres(clash.depth)} mm</span>
+                    </ListRow>
+                  );
+                })}
+              </ul>
+            </>
           )}
         </>
       )}

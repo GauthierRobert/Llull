@@ -2,7 +2,7 @@
 // bend table, a provenance popover and the review banner. Drawing it into the document and the DXF are commands (materialize / export).
 
 import React, { useMemo } from 'react';
-import { PanelSection } from '@ui/panels/PanelParts';
+import { KpiStrip, PanelSection } from '@ui/panels/PanelParts';
 import { ProvenancePopover } from '@ui/panels/ProvenancePopover';
 import { ReviewBanner } from '@ui/panels/ReviewBanner';
 import { useReadOnlyQuery } from '@ui/panels/useReadOnlyQuery';
@@ -80,6 +80,14 @@ export function FlatPatternSection({ partId }: { partId: string }): React.ReactE
             </p>
           )}
           <ReviewBanner {...(view.reviewReason === undefined ? {} : { reason: view.reviewReason })} unverified={view.unverified} />
+          <KpiStrip
+            label="Flat pattern summary"
+            items={[
+              { key: 'flat-size', label: 'Blank', value: `${fmt(view.extents[0])} × ${fmt(view.extents[1])}`, sub: view.unit },
+              { key: 'flat-area', label: 'Area', value: fmt(view.area), sub: view.unit === '' ? '' : `${view.unit}²` },
+              { key: 'flat-bends', label: 'Bends', value: String(view.bends.length) },
+            ]}
+          />
           <OutlinePreview view={view} />
           <p className="mfg__figures" data-testid="flat-figures">
             {fmt(view.extents[0])} × {fmt(view.extents[1])} {view.unit} · area {fmt(view.area)} · {view.bends.length} bend(s)
