@@ -17,6 +17,18 @@ function verdict(state: string, check: CheckView | null): { tone: StatusTone; te
   return { tone: 'info', text: check === null ? state : 'Ready to solve' };
 }
 
+/** The first blocking check in plain words, so "set-up incomplete" always says what to do next. */
+function NextStep({ check }: { check: CheckView | null }): React.ReactElement | null {
+  const first = check?.items.find((item) => item.severity === 'error') ?? check?.items[0];
+  if (first === undefined) return null;
+  return (
+    <p className="analysis__next" data-testid="analysis-next-step">
+      <strong>{first.severity === 'error' ? 'To fix:' : 'Check:'}</strong> {first.message}
+      {check !== null && check.items.length > 1 ? ` (+${check.items.length - 1} more in Checks)` : ''}
+    </p>
+  );
+}
+
 const residualTone = (relative: number): StatusTone => (relative < 0.01 ? 'ok' : relative < 0.05 ? 'warn' : 'bad');
 
 function resultKpis(analysisCase: AnalysisCase, items: SetupItems, focus: (item: SetupItem) => void): Kpi[] {
@@ -87,6 +99,7 @@ export function AnalysisKpis({ analysisCase, state, check, items }: AnalysisKpis
   return (
     <div className="analysis__headline" data-testid="analysis-headline">
       <StatusChip tone={tone} text={text} testId="analysis-state-chip" />
+      {state !== 'solved' && <NextStep check={check} />}
       <KpiStrip label="Key results" items={resultKpis(analysisCase, items, focus)} />
     </div>
   );

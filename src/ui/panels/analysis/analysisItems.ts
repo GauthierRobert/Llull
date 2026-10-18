@@ -83,7 +83,9 @@ export interface SetupItems {
 
 const MAX_POINTS = 6;
 
-const unitText = (unit: string): string => (unit === 'degC' ? '°C' : unit === 'degF' ? '°F' : unit);
+/** Unit text as an engineer writes it: degC → °C, m^2 → m², (m^2*K) → (m²·K). */
+const unitText = (unit: string): string =>
+  unit === 'degC' ? '°C' : unit === 'degF' ? '°F' : unit.replaceAll('^2', '²').replaceAll('^3', '³').replaceAll('*', '·');
 const quantityText = (q: { readonly value: number; readonly unit: string }): string => `${formatSignificant(q.value)} ${unitText(q.unit)}`;
 const norm = (v: readonly number[]): number => Math.hypot(v[0] ?? 0, v[1] ?? 0, v[2] ?? 0);
 const unit3 = (v: readonly number[]): Vec3 | null => {

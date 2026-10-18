@@ -27,9 +27,13 @@ export function SetupRow({ item, meta, detail, testId }: SetupRowProps): React.R
       {...(testId !== undefined ? { testId } : {})}
       onSelect={() => focus(item)}
     >
-      <span className="panel__row-main">{item.name}</span>
-      <span className="panel__row-meta">{meta}</span>
-      {detail !== undefined && <span className="analysis__item-detail">{detail}</span>}
+      <span className="analysis__row-text">
+        <span className="analysis__row-line">
+          <span className="panel__row-main">{item.name}</span>
+          <span className="panel__row-meta">{meta}</span>
+        </span>
+        {detail !== undefined && <span className="analysis__item-detail">{detail}</span>}
+      </span>
     </ListRow>
   );
 }
