@@ -137,7 +137,9 @@ describe('MuJoCo physics engine', () => {
       bodies: [rotor('wheel', [0, 0, 1], 10, inertia)],
       gears: [],
       ...tree,
-      servos: [{ id: 'drive', joint: 'wheel-hinge', targetVelocity: 10, ...speedServoGains(inertia, timestep), maxForce: 1e9 }],
+      servos: [
+        { id: 'drive', joint: 'wheel-hinge', targetVelocity: 10, stiffness: inertia * 250 ** 2, damping: 2 * inertia * 250, maxForce: 1e9 },
+      ],
       loads: noLoads,
     };
     const trace = engine.simulate(model, { duration: 0.1, timestep, sampleInterval: timestep });
@@ -165,6 +167,21 @@ describe('MuJoCo physics engine', () => {
     expect(Math.max(...(trace.servoForce['drive'] ?? []).map(Math.abs))).toBeCloseTo(2, 6);
     expect(Math.max(...omega)).toBeLessThan(target * 1.001);
     expect(last(omega)).toBeCloseTo(target, 6);
+  });
+
+  it('anti-windup holds in the negative sense: target -10 rad/s from rest never goes below -10.01 and settles at -10', () => {
+    const [timestep, inertia, target] = [0.001, 0.5, -10];
+    const model: SimulationModel = {
+      gravity: [0, 0, 0],
+      bodies: [rotor('wheel', [0, 0, 1], 10, inertia)],
+      gears: [],
+      ...tree,
+      servos: [{ id: 'drive', joint: 'wheel-hinge', targetVelocity: target, ...speedServoGains(inertia, timestep), maxForce: 2 }],
+      loads: noLoads,
+    };
+    const omega = engine.simulate(model, { duration: 12, timestep, sampleInterval: 0.01 }).jointVelocity['wheel-hinge'] ?? [];
+    expect(Math.min(...omega)).toBeGreaterThan(-10.01);
+    expect(last(omega)).toBeCloseTo(-10, 6);
   });
 
   it('rejects a model MuJoCo cannot compile', () => {

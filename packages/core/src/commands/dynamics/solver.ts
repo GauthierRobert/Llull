@@ -21,7 +21,7 @@ export const setDynamicsSolver = defineCommand({
     'timestepS: seconds, or "auto" (default) = min(1 ms, 0.5 deg of crank at the top speed). integrator: "rk4" (default) or ' +
     '"implicitfast". loopTimeConstantSteps (>= 2, default 2): the loop constraints relax over this many timesteps; 2 is the stiffest ' +
     'stable value and keeps light links (rods of a few grams) closed, but resolves the closure so coarsely that a slider-crank torque (0.5 kg piston, 5 g rod) is ' +
-    '0.7 % off: with links of 5 g or more use 8 (0.03 %) to 16 (0.01 %) when torque accuracy matters and check data.loops.tier stays "pass". loopImpedance (0 < d <= 0.9999, default 0.9999): closer to 1 = stiffer loop. loopResidualPassM (default 1e-6 m = ' +
+    '0.7 % off: when crank torque accuracy matters use 8 (0.03 %) to 16 (0.01 %), and check data.loops.tier stays "pass". loopImpedance (0 < d <= 0.9999, default 0.9999): closer to 1 = stiffer loop. loopResidualPassM (default 1e-6 m = ' +
     '1 µm, 5 % of a 0.020 mm pin clearance) and loopResidualFailM (default 1e-5 m): residual tiers. timestepSensitivityGate ' +
     '(default 0.01): reserved for the half-timestep check. Only the given fields change. Next: ' +
     'simulate_motion and read data.loops.',

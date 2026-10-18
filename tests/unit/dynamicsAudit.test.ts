@@ -75,7 +75,9 @@ describe('reaction peaks cover every integration step (audit 3)', () => {
 
 describe('auto timestep recovers a light slow loop (audit 4)', () => {
   it('halves the step until the four-bar loop residual passes, and says so', () => {
-    const data = simulate(build(lightFourBarActions), { duration: 1 }) as Data & {
+    // a soft loop (impedance 0.5): the governor sized from the crank's own inertia (ENG-3) no longer kicks the default loop past 1 um at 1 ms
+    const soft = { command: 'set_dynamics_solver', params: { loopImpedance: 0.5 } };
+    const data = simulate(build([soft, ...lightFourBarActions]), { duration: 1 }) as Data & {
       loops: { tier: string; residualM: number; solver: { timestepS: number; timestepBasis: string } };
     };
     expect(data.loops.tier).not.toBe('fail');

@@ -38,8 +38,8 @@ physical case, all documented in `server/tests/packReplay10.test.ts`:
   engine used to be 0.33 % / 0.53 % low at 60 / 90 deg against the massless values. Causes, in order of size: (1) the 5 g rod, +0.7 %
   of the torque missing from the reference; (2) the loop closure relaxing over 2 steps (the default), which the integrator resolves
   badly: +0.73 % at 2 steps, 0.12 % at 4, 0.03 % at 8, 0.01 % at 16, a function of steps only (not of the step size); (3) the speed
-  servo's finite stiffness: its ripple times the crank inertia is an error torque, 0.15 % at 1 / (8 dt), 0.04 % at 1 / (4 dt); (4) the
-  servo force was read after `mj_step`, i.e. at the last RK4 stage (a predicted state), up to 0.3 % off. Left: 3.3e-4 / 4.9e-4.
+  servo's finite stiffness: its ripple times the crank inertia is an error torque, 0.15 % at 1 / (8 dt), 0.04 % at 1 / (4 dt), 0.015 % at 1 / (2 dt); the gains are sized from the crank's own inertia, the only bound that holds for any loop (a locked subtree overestimates the loop-reflected inertia and RK4 diverges); (4) the
+  servo force was read after `mj_step`, i.e. at the last RK4 stage (a predicted state), up to 0.3 % off. Left: 1.4e-4 / 1.9e-4.
 - The Coulomb friction is MuJoCo's near-rigid soft constraint (impedance 0.9999): rest position -1.9335004 mm (1.9e-7 relative),
   last turning point 2.1e-4 relative late; no creep after the stop.
 - Not replayed (no engine counterpart): the Andrews squeezer (VC-RBD-01…04), VC-RBD-41 and VC-RBD-50…58 (error codes, `check_mechanism`,
@@ -48,7 +48,7 @@ physical case, all documented in `server/tests/packReplay10.test.ts`:
 Measured against `expected_results.json` (`server/tests/packReplay10.test.ts`, relative error / tolerance used): periods of the
 pendulum 8.3e-8 / 1e-5; pivot tension 5e-9…1.3e-7 / 1e-6; compound pendulum 2.6e-13 and 5.3e-8 / 1e-6; spring-mass-damper
 x(0.5 s), x(1 s), decrement 3e-12…3e-11 / 1e-6; slider-crank x(90°) 2.3e-7, v(90°) 1.8e-6 (1e-5), a(0), a(90°) 2.7e-4, 6.5e-5 (1e-3),
-torque 3.3e-4, 4.9e-4 (6e-4); Coulomb stop time 2.1e-4 (1e-3), rest 1.9e-7 (1e-5).
+torque 1.4e-4, 1.9e-4 (3e-4); Coulomb stop time 2.1e-4 (1e-3), rest 1.9e-7 (1e-5).
 
 ## Real use cases
 

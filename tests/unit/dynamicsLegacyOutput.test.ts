@@ -3,12 +3,11 @@
  * from the output BEFORE PHY-21 slice B changed the dynamics layer; a change here is a regression unless the owner accepts a new baseline.
  * Accepted rebaseline (geared model only): its joints decelerate under propeller drag and the unsettled-joint warning now says "still
  * decelerating (speed X % lower ...)" instead of the misleading "still accelerating"; the numbers are unchanged.
- * Accepted rebaseline (speed-governed flywheel only, ENG-3): the governor is twice as stiff (natural frequency 1 / (4 dt) instead of
+ * Accepted rebaseline (speed-governed flywheel only, ENG-3): the governor is four times as stiff (natural frequency 1 / (2 dt) instead of
  * 1 / (8 dt)), its torque is read at the sampled state instead of at the last RK4 stage, and its set-point cannot lead the joint by more
- * than maxTorque allows (anti-windup). Hash cd62962de5d04058 -> d2c19ebddcb7f2a9. Spin-up at 50 samples/s: speed at the first sample
- * 111.95 -> 139.96 rad/s, first torque sample 99.37 -> 79.37 N m (the governor is out of saturation sooner), peak speed 157.0796 ->
- * 157.0796 rad/s (no overshoot; without the anti-windup it was 160.50), final position 154.566 -> 155.351 rad (the speed is reached
- * earlier), settling time unchanged in kind; the final speed 157.0796 rad/s is unchanged.
+ * than maxTorque allows (anti-windup). Hash cd62962de5d04058 -> a2e9a2593ea063b7. Spin-up at 50 samples/s: speed at the first sample
+ * 111.95 -> 149.83 rad/s, first torque sample 99.37 -> 68.57 N m (the governor leaves saturation sooner), peak speed 157.0796 -> 157.0796
+ * rad/s (no overshoot), final position 154.566 -> 155.501 rad (the speed is reached earlier); the final speed 157.0796 rad/s is unchanged.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
@@ -77,7 +76,7 @@ describe('simulate_motion output of models without loops or cylinders (FR-FPR-19
   });
 
   it('speed-governed flywheel', () => {
-    expect(hashOf(governed(), { duration: 1, detail: 'series' })).toBe('d2c19ebddcb7f2a9');
+    expect(hashOf(governed(), { duration: 1, detail: 'series' })).toBe('a2e9a2593ea063b7');
   });
 
   it('is deterministic run to run', () => {

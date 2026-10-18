@@ -28,13 +28,15 @@ type TorqueMotor = Extract<Motor, { kind: 'torque_curve' }>;
 
 /**
  * Gains of a speed motor's governor, a critically damped servo on the angle that advances at the target speed (so the steady speed error
- * is zero whatever the load below maxTorque): natural frequency 1 / (4 · timestep) (omega_n · dt = 0.25, a tenth of the RK4 stability
- * limit), scaled by the inertia it drives. stiffness N·m/rad, damping N·m·s/rad. The servo lags the ideal ramp by torque / stiffness, so
- * the speed ripple it leaves times the driven inertia is an error torque proportional to 1 / stiffness: doubling the natural frequency (1 / 8 to 1 / 4 timesteps)
- * cut the crank torque error of the pack-10 slider-crank from about 0.15 % to 0.04 %.
+ * is zero whatever the load below maxTorque): natural frequency 1 / (2 · timestep), i.e. omega_n · dt = 0.5, scaled by `jointInertia`.
+ * stiffness N·m/rad, damping N·m·s/rad. Stability holds only if `jointInertia` does not exceed the smallest effective inertia the servo
+ * sees (kp / I_eff · dt^2 = (omega_n · dt)^2 · I / I_eff, and RK4 is stable on the real axis up to about 2.79): with I at most I_eff the
+ * fastest pole is omega_n · dt = 0.5, a margin of 5.6; an inertia that overestimates it by rho multiplies the pole by about 2 rho. The
+ * servo lags the ideal ramp by torque / stiffness and the speed ripple times the inertia is an error torque proportional to
+ * 1 / stiffness: 1 / (8 dt) -> 1 / (4 dt) -> 1 / (2 dt) took the pack-10 slider-crank torque error from 0.15 % to 0.04 % to 0.015 %.
  */
 export function speedServoGains(jointInertia: number, timestep: number): { stiffness: number; damping: number } {
-  const naturalFrequency = 1 / (4 * timestep);
+  const naturalFrequency = 1 / (2 * timestep);
   return { stiffness: jointInertia * naturalFrequency ** 2, damping: 2 * jointInertia * naturalFrequency };
 }
 

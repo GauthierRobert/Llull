@@ -41,9 +41,9 @@ const ENGINE = {
   /**
    * crank torque of the governed slider-crank against the closed form of the SAME model (5 g rod with its inertia, see rodCrankTorque).
    * What is left is the finite stiffness of the speed servo (its ripple times the 0.084 kg m^2 crank is an error torque) and of the loop
-   * closure (16 steps, plan): measured 3.3e-4 and 4.9e-4 at 60 and 90 deg.
+   * closure (16 steps, plan): measured 1.4e-4 and 1.9e-4 at 60 and 90 deg.
    */
-  crankTorque: 6e-4,
+  crankTorque: 3e-4,
   /** a(theta) is the difference of the sampled velocity (1e-3 covers the start-up transient of the speed servo) */
   pistonAcceleration: 1e-3,
   /** piston stroke and speed follow the crank angle; the speed servo lags it by about 1e-5 rad */

@@ -55,6 +55,11 @@ interface SimulationGear {
 /**
  * Speed governor on a joint, integrated by the engine itself: a servo on the joint position chasing a set-point that advances at
  * `targetVelocity`, force = clamp(stiffness · (setpoint − q) − damping · v, ±maxForce). Zero steady speed error below maxForce.
+ * Anti-windup (an engine must match it): when `targetVelocity` is not 0, after every step the set-point is limited to
+ * q + damping · v / stiffness ± maxForce / stiffness, the window in which the unclamped force stays within ±maxForce. The angle lost while
+ * saturated is NOT caught up afterwards (the servo governs speed, so a saturated spin-up does not overshoot the target). A hold
+ * (`targetVelocity` 0) is exempt: its set-point is the position to return to, and a hold that cannot keep it stays pinned at maxForce.
+ * The gains are sized for the engine's explicit step: stiffness / (smallest effective inertia) · dt² must stay well below 8.
  */
 export interface SimulationServo {
   readonly id: string;
