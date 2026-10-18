@@ -5,6 +5,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop, report } from '@core/commands/noop';
 import { isPositiveNumber } from '@lib/isFiniteNumber';
+import { dot3, len3, sub3 } from '@lib/vec3';
 import { GRAVITY, round } from '../../shared/numeric';
 import { modelUnits } from '../steelDesign/steelMemberBars';
 import { pipeRunOf } from './pipeSupportLayout';
@@ -90,9 +91,9 @@ export const pipeHydraulics = defineCommand({
     const bends = run.points.slice(1, -1).flatMap((point, index) => {
       const before = run.points[index] as typeof point;
       const after = run.points[index + 2] as typeof point;
-      const a = [point[0] - before[0], point[1] - before[1], point[2] - before[2]];
-      const b = [after[0] - point[0], after[1] - point[1], after[2] - point[2]];
-      const cosine = (a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!) / (Math.hypot(...a) * Math.hypot(...b));
+      const a = sub3(point, before);
+      const b = sub3(after, point);
+      const cosine = dot3(a, b) / (len3(a) * len3(b));
       const degrees = (Math.acos(Math.max(-1, Math.min(1, cosine))) * 180) / Math.PI;
       return degrees < MIN_BEND_DEGREES
         ? []
