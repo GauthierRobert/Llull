@@ -2,8 +2,7 @@
 
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
-import { roundSignificant } from '@lib/significant';
-import { briefReport } from '../aerodynamics/brief';
+import { briefReport, sig } from '../shared/results';
 import { refuseFluid } from './codes';
 import {
   isentropicState,
@@ -18,7 +17,6 @@ import { normalShock, obliqueShockFromDeflection, obliqueShockFromWaveAngle } fr
 import { fannoState, rayleighState } from './ductFlow';
 
 const RAD = Math.PI / 180;
-const sig = (value: number): number => roundSignificant(value, 10);
 const rounded = <T extends object>(record: T): T =>
   Object.fromEntries(Object.entries(record).map(([key, value]) => [key, typeof value === 'number' ? sig(value) : value])) as T;
 

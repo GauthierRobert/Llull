@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 import type { SheetMetalRule } from '@core/model/sheetMetal';
-import { RULE, apply, expectRefusal, ok } from './helpers';
+import { RULE } from './helpers';
+import { apply, expectRefusal, ok } from '../../../helpers/commandAssertions';
 
 const empty = createEmptyDocument();
 const rowOf = (extra: Record<string, unknown> = {}): Record<string, unknown> => ({

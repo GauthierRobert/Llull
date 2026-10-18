@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import refs from '../../../../docs/aerospace/10-aerodynamics/validation/data/airfoil_wing_references.json';
-import { data, expectRefusal } from '../sheetmetal/helpers';
+import { data, expectRefusal } from '../../../helpers/commandAssertions';
 
 interface Wing {
   geometry: { area: number; aspectRatio: number; taperRatio: number | null; meanChord: number };

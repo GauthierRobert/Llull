@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
-import { apply, bracket, expectRefusal, ok } from './helpers';
+import { bracket } from './helpers';
+import { apply, expectRefusal, ok } from '../../../helpers/commandAssertions';
 
 describe('materialize_flat_pattern', () => {
   it('draws the outline, cutouts and bend lines as plain 2D entities on FLAT layers', () => {

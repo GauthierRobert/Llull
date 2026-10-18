@@ -2,12 +2,9 @@
 
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
-import { roundSignificant } from '@lib/significant';
-import { briefReport } from '../aerodynamics/brief';
+import { briefReport, sig } from '../shared/results';
 import { refuseFluid } from './codes';
 import { STANDARD_GRAVITY } from './rocketNozzle';
-
-const sig = (value: number): number => roundSignificant(value, 10);
 
 /**
  * @affects none; data = { deltaVMS, massRatio, exhaustVelocityMS, propellantMassKg, finalMassKg, burnTimeS?, massFlowKgS?, provenance }

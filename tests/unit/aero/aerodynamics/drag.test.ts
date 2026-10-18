@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import refs from '../../../../docs/aerospace/10-aerodynamics/validation/data/airfoil_wing_references.json';
-import { data, expectRefusal, ok } from '../sheetmetal/helpers';
+import { data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 
 interface Area {
   frontalAreaM2: number;

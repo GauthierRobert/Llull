@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import contour from '../../../../docs/aerospace/11-fluid-dynamics-propulsion/validation/data/nozzle_contour_references.json';
 import { raoAngles } from '@aero/fluids/designNozzleCommand';
-import { data, expectRefusal, ok } from '../sheetmetal/helpers';
+import { data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 
 interface Design {
   id: string;

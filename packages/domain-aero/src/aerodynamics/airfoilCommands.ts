@@ -4,15 +4,13 @@ import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
 import { execute } from '@core/commands/registry';
-import { roundSignificant } from '@lib/significant';
-import { briefReport } from './brief';
+import { briefReport, sig } from '../shared/results';
 import { nacaOrdinates, parseNaca } from './naca';
 import { refuseAero } from './codes';
 import { nacaContour, polylineContour } from './airfoilContour';
 import { solveVortexPanels, thinAirfoil } from './panelMethod';
 
 const RAD = Math.PI / 180;
-const sig = (value: number): number => roundSignificant(value, 10);
 const MIN_PANELS = 20;
 const MAX_PANELS = 400;
 

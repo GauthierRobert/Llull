@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
-import { data, expectRefusal, ok } from './sheetmetal/helpers';
+import { data, expectRefusal, ok } from '../../helpers/commandAssertions';
 
 const doc = createEmptyDocument();
 

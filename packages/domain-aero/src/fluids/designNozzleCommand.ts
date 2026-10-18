@@ -3,14 +3,12 @@
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
-import { briefNumbers } from '../aerodynamics/brief';
+import { briefNumbers, sig } from '../shared/results';
 import { execute } from '@core/commands/registry';
-import { roundSignificant } from '@lib/significant';
 import { refuseFluid } from './codes';
 import { nozzleContour, wallSection, type ContourSpec } from './nozzleContour';
 
 const RAD = Math.PI / 180;
-const sig = (value: number): number => roundSignificant(value, 10);
 
 /** 80 % bell initial angle θn (deg) vs ε, Huzel & Huang (NASA SP-125) Fig. 4-16 as digitised in rocketisp 0.1.13 `huzel_data.py`. */
 const RAO_80_ENTRANCE: ReadonlyArray<readonly [number, number]> = [

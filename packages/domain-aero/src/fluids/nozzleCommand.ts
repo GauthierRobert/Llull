@@ -2,17 +2,15 @@
 
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
-import { roundSignificant } from '@lib/significant';
-import { briefReport } from '../aerodynamics/brief';
+import { briefReport, sig } from '../shared/results';
 import { refuseFluid } from './codes';
 import { pressureUnitParam, toPascal, PRESSURE_UNITS } from './pressure';
 import { conicalDivergenceFactor, expansionRatioForPressure, idealNozzle, STANDARD_GRAVITY, UNIVERSAL_GAS_CONSTANT } from './rocketNozzle';
 import { characteristicVelocity, momentumThrustCoefficient } from './rocketNozzle';
 import { isentropicState } from './isentropic';
-import { resolveAirState, isAirState } from '../aerodynamics/airState';
+import { resolveAirState, isAirState } from '../shared/airState';
 
 const RAD = Math.PI / 180;
-const sig = (value: number): number => roundSignificant(value, 10);
 /** Summerfield criterion: flow separates when the exit pressure falls below ≈ 0.4 of ambient (Summerfield, Foster & Swan 1954). */
 export const SUMMERFIELD_RATIO = 0.4;
 

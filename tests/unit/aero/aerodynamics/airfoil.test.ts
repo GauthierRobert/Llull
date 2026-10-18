@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type PolylineEntity } from '@core/model/types';
 import refs from '../../../../docs/aerospace/10-aerodynamics/validation/data/airfoil_wing_references.json';
 import { readFileSync } from 'node:fs';
-import { data, expectRefusal, ok } from '../sheetmetal/helpers';
+import { data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 
 interface Polar {
   polar: Array<{ alphaDeg: number; cl: number; clCirculation: number; cm: number; cdPressure: number }>;

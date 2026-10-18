@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
-import { apply, bracket, data, expectRefusal, ok } from './helpers';
+import { bracket } from './helpers';
+import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 
 interface DxfEntity {
   type: string;

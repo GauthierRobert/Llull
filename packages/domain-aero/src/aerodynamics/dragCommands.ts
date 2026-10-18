@@ -2,36 +2,15 @@
 
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
-import type { Vec3 } from '@core/model/types';
-import { roundSignificant } from '@lib/significant';
-import { briefReport } from './brief';
+import { briefReport, sig } from '../shared/results';
 import { refuseAero } from './codes';
-import { DEFAULT_FLOW_DIRECTION, DEFAULT_RESOLUTION, geometryArea } from './geometryArea';
-import { airStateParams, isAirState, resolveAirState } from './airState';
-import { speedParam, toMetresPerSecond } from './speed';
+import { flowParams, geometryArea } from './geometryArea';
+import { airStateParams, isAirState, resolveAirState } from '../shared/airState';
+import { speedParam, toMetresPerSecond } from '../shared/speed';
 import { FRICTION_MODELS, FRICTION_RANGE, skinFrictionCoefficient, type FrictionModel } from './skinFriction';
 
-const sig = (value: number): number => roundSignificant(value, 10);
 /** Below this Reynolds number every friction law is invalid (ITTC-1957 has its pole at Re 100). */
 const MIN_FRICTION_REYNOLDS = 1e3;
-
-const flowParams = {
-  flowDirection: z
-    .array(z.number())
-    .length(3)
-    .optional()
-    .describe('Direction the air moves relative to the body [x, y, z] (any length, not zero). Default [1, 0, 0]: a body moving along -x.'),
-  resolution: z
-    .number()
-    .int()
-    .optional()
-    .describe('Silhouette grid cells along its larger extent, 50..2000. Default 400 (area error ~ ±0.5 %).'),
-};
-
-const directionOf = (raw: readonly number[] | undefined): Vec3 | null => {
-  const direction = (raw ?? DEFAULT_FLOW_DIRECTION) as Vec3;
-  return direction.every(Number.isFinite) && Math.hypot(...direction) > 0 ? direction : null;
-};
 
 /**
  * @affects none; data = { ids, flowDirection, frontalAreaM2, uncertaintyM2, wettedAreaM2, lengthM, extentsM, cellSizeM, unitScale }
@@ -48,20 +27,9 @@ export const frontalArea = defineCommand({
     'direction [1, 0, 0]. Use for a cyclist + bike model, a fuselage, a car or any assembly; then aero_drag { cd, entityIds } or cycling_power.',
   params: z.object({ entityIds: z.array(z.string()).min(1).describe('Ids of the 3D solids / instances to project.'), ...flowParams }),
   run: (doc, params): CommandResult => {
-    const direction = directionOf(params.flowDirection);
-    const resolution = params.resolution ?? DEFAULT_RESOLUTION;
-    if (direction === null || !(resolution >= 50 && resolution <= 2000))
-      return refuseAero(
-        doc,
-        'frontal_area',
-        'AER_PARAM_INVALID',
-        'flowDirection must be a non-zero vector and resolution within 50..2000',
-        [],
-        ['flowDirection'],
-      );
-    const measured = geometryArea(doc, params.entityIds, direction, resolution);
-    if (!measured.ok) return refuseAero(doc, 'frontal_area', measured.code, measured.message, measured.ids, ['entityIds']);
-    const { area } = measured;
+    const measured = geometryArea(doc, params.entityIds, params.flowDirection, params.resolution);
+    if (!measured.ok) return refuseAero(doc, 'frontal_area', measured.code, measured.message, measured.ids, [measured.path]);
+    const { area, direction } = measured;
     const data = {
       ids: measured.ids,
       flowDirection: direction,
@@ -133,12 +101,8 @@ export const aeroDrag = defineCommand({
     if (!isAirState(air)) return fail(air.code, air.message, ['altitudeM']);
     let measured: { frontal: number; wetted: number; uncertainty: number } | undefined;
     if (params.entityIds !== undefined) {
-      const direction = directionOf(params.flowDirection);
-      const resolution = params.resolution ?? DEFAULT_RESOLUTION;
-      if (direction === null || !(resolution >= 50 && resolution <= 2000))
-        return fail('AER_PARAM_INVALID', 'flowDirection must be a non-zero vector and resolution within 50..2000', ['flowDirection']);
-      const result = geometryArea(doc, params.entityIds, direction, resolution);
-      if (!result.ok) return fail(result.code, result.message, ['entityIds'], [...result.ids]);
+      const result = geometryArea(doc, params.entityIds, params.flowDirection, params.resolution);
+      if (!result.ok) return fail(result.code, result.message, [result.path], [...result.ids]);
       measured = { frontal: result.area.area, wetted: result.area.wettedArea, uncertainty: result.area.uncertainty };
     }
     const cdA = params.cdA ?? (params.cd as number) * (params.referenceAreaM2 ?? (measured as NonNullable<typeof measured>).frontal);

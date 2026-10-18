@@ -2,17 +2,15 @@
 
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
-import { roundSignificant } from '@lib/significant';
-import { briefReport } from './brief';
+import { briefReport, sig } from '../shared/results';
 import { refuseAero } from './codes';
 import { solveLiftingLine, wingArea, type WingGeometry } from './liftingLine';
 import { parseNaca } from './naca';
 import { thinAirfoil } from './panelMethod';
-import { airStateParams, isAirState, resolveAirState } from './airState';
-import { speedParam, toMetresPerSecond } from './speed';
+import { airStateParams, isAirState, resolveAirState } from '../shared/airState';
+import { speedParam, toMetresPerSecond } from '../shared/speed';
 
 const RAD = Math.PI / 180;
-const sig = (value: number): number => roundSignificant(value, 10);
 
 /** Helmbold's low-aspect-ratio lift slope a0 / (√(1 + (a0/πA)²) + a0/πA) (per rad). */
 export const helmboldLiftSlope = (a0: number, aspectRatio: number): number => {

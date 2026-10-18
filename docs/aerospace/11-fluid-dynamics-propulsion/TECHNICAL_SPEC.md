@@ -16,7 +16,7 @@ Companion of [FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md). Laws: `.claude/rules/arch
 - Pure maths: `isentropic.ts`, `shocks.ts`, `ductFlow.ts`, `rocketNozzle.ts` and `nozzleContour.ts`. There are
   four commands. `design_nozzle` is the only mutating one, and it composes `revolve_profile` through `execute`
   (L10).
-- The ambient pressure for an altitude comes from the 10 AER air state (`../aerodynamics/airState`), which is in
+- The ambient pressure for an altitude comes from the 10 AER air state (`../shared/airState`), which is in
   the same package.
 - No kernel and no host process are needed. The V1 CEA hand-off would be a server transport (as `fea_solve` is),
   never a plugin import (L6).

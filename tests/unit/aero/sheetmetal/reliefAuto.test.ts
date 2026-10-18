@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { SheetMetalPart } from '@core/model/sheetMetal';
 import type { FtrCheckData } from '@core/model/manufacturing';
-import { type BuiltPart, apply, data, expectRefusal, meshVolume, ok } from './helpers';
+import { type BuiltPart, meshVolume } from './helpers';
+import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { plate } from './plates';
 
 interface Named {

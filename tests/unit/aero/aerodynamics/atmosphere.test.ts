@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import table from '../../../../docs/aerospace/10-aerodynamics/validation/data/us1976_pdas_table.json';
-import { data, expectRefusal } from '../sheetmetal/helpers';
+import { data, expectRefusal } from '../../../helpers/commandAssertions';
 
 interface Atmosphere {
   temperatureK: number;

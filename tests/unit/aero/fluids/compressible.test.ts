@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import table from '../../../../docs/aerospace/11-fluid-dynamics-propulsion/validation/data/compressible_naca1135.json';
-import { data, expectRefusal } from '../sheetmetal/helpers';
+import { data, expectRefusal } from '../../../helpers/commandAssertions';
 
 interface Flow {
   result: Record<string, number>;

@@ -3,7 +3,8 @@ import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { derivedEntityIds } from '@core/plugins/host';
-import { apply, bracket, data, folded, meshVolume, ok } from './helpers';
+import { bracket, folded, meshVolume } from './helpers';
+import { apply, data, ok } from '../../../helpers/commandAssertions';
 
 describe('persistence of sheet-metal parts', () => {
   it('omits the derived folded solid from the file and re-derives it on load', () => {

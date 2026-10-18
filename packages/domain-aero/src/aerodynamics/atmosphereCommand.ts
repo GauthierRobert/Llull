@@ -2,15 +2,13 @@
 
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
-import { roundSignificant } from '@lib/significant';
-import { briefReport } from './brief';
-import { atmosphereAt, geometricOf, geopotentialOf, MAX_GEOPOTENTIAL_M, MIN_GEOMETRIC_M, US1976 } from './atmosphere';
+import { briefReport, sig } from '../shared/results';
+import { atmosphereAt, geometricOf, geopotentialOf, MAX_GEOPOTENTIAL_M, MIN_GEOMETRIC_M, US1976 } from '../shared/atmosphere';
 import { refuseAero } from './codes';
-import { MIN_TEMPERATURE_K } from './airState';
-import { SPEED_UNITS, speedParam, toMetresPerSecond } from './speed';
+import { MIN_TEMPERATURE_K } from '../shared/airState';
+import { SPEED_UNITS, speedParam, toMetresPerSecond } from '../shared/speed';
 
 const FT = 0.3048;
-const sig = (value: number): number => roundSignificant(value, 10);
 
 /**
  * @affects none; data = { altitude { geometricM, geopotentialM, layer }, temperatureK, pressurePa, densityKgM3, speedOfSoundMS, dynamicViscosityPaS, kinematicViscosityM2S, gravityMS2, ratios, flow?, provenance }

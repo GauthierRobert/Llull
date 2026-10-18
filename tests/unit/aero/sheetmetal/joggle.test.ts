@@ -3,7 +3,8 @@ import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import expected from '../../../../docs/aerospace/07-sheet-metal-machined-features/validation/data/expected_flat_pattern.json';
 import expectedParts from '../../../../docs/aerospace/07-sheet-metal-machined-features/validation/data/expected_test_parts.json';
-import { apply, data, expectRefusal, meshBounds, meshVolume, ok } from './helpers';
+import { meshBounds, meshVolume } from './helpers';
+import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 
 interface FlatData {
   extents: [number, number];

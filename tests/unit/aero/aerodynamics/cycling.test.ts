@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import table from '../../../../docs/aerospace/10-aerodynamics/validation/data/bassett1999_table7.json';
 import refs from '../../../../docs/aerospace/10-aerodynamics/validation/data/cycling_references.json';
-import { data, expectRefusal, ok } from '../sheetmetal/helpers';
+import { data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 
 interface Cycling {
   speedMS: number;

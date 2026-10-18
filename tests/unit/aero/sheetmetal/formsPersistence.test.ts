@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { sheetMetalErrors } from '@aero/sheetmetal/validate';
-import { apply, folded, meshVolume } from './helpers';
+import { folded, meshVolume } from './helpers';
+import { apply } from '../../../helpers/commandAssertions';
 import { plate } from './plates';
 
 type Json = Record<string, unknown>;

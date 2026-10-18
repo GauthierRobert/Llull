@@ -1,7 +1,8 @@
 import { createEmptyDocument } from '@core/model/types';
 import type { BeadForm } from '@core/model/sheetMetal';
 import { beadAreaChange, beadGeometry } from '@aero/sheetmetal/formGeometry';
-import { RULE, type BuiltPart, apply, ok, ruleParams } from './helpers';
+import { RULE, type BuiltPart, ruleParams } from './helpers';
+import { apply, ok } from '../../../helpers/commandAssertions';
 
 /** A bare sheet-metal base of width x height at the origin (side up) under `RULE` overridden by `rule`. */
 export function plate(width: number, height: number, rule: Record<string, unknown> = {}): BuiltPart {

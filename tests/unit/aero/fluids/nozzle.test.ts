@@ -3,7 +3,7 @@ import { createEmptyDocument } from '@core/model/types';
 import cea from '../../../../docs/aerospace/11-fluid-dynamics-propulsion/validation/data/nasa_cea_reference.json';
 import engines from '../../../../docs/aerospace/11-fluid-dynamics-propulsion/validation/data/engines_published.json';
 import contour from '../../../../docs/aerospace/11-fluid-dynamics-propulsion/validation/data/nozzle_contour_references.json';
-import { data, expectRefusal } from '../sheetmetal/helpers';
+import { data, expectRefusal } from '../../../helpers/commandAssertions';
 
 interface Nozzle {
   cStarMS: number;

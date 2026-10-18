@@ -20,22 +20,25 @@ Companion of [FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md). Laws: `.claude/rules/arch
 - Pure maths lives in the plugin: no React, DOM or network (L2). The commands are read-only queries (L1), except
   `draw_naca_airfoil`, which composes `draw_polyline` through `execute` (L10).
 - No kernel is needed (L9). The frontal area works on display triangles, so it works on both kernels.
-- The air state (`airState.ts`) is shared with the `fluids` plugin (11 FLD) for the ambient pressure. Both plugins
-  are in the same package, so no cross-package import is added.
+- The atmosphere, air state, speed units and result helpers live in `domain-aero/src/shared/`, which both
+  plugins import. Neither plugin imports the other's modules.
 
 ```
-packages/domain-aero/src/aerodynamics/
+packages/domain-aero/src/shared/        used by both plugins (10 AER, 11 FLD)
   atmosphere.ts          US 1976 layers, Sutherland, geopotential conversion
-  airState.ts            altitude | density -> ρ, μ, a, p (shared by commands and fluids)
+  airState.ts            altitude | density -> ρ, μ, a, p; ISA offset floor
   speed.ts               speed + unit -> m/s
+  results.ts             `sig` (data at 10 significant digits), `briefReport` (summary at 6)
+packages/domain-aero/src/aerodynamics/
   naca.ts                NACA 4-digit + 230-series ordinates, camber slope
-  panelMethod.ts         linear-vortex panels (Kuethe & Chow), thin-airfoil integrals
-  airfoilContour.ts      NACA / polyline -> clockwise panel nodes (open-TE detection)
+  panelMethod.ts         linear-vortex panels (one factorisation for all angles), thin-airfoil integrals
+  airfoilContour.ts      NACA / polyline -> clockwise panel nodes (open-TE detection, 801-point cap)
   liftingLine.ts         Glauert series, wing area
   projectedArea.ts       silhouette rasterisation, wetted area
-  geometryArea.ts        entity ids -> metres -> projected area
+  geometryArea.ts        entity ids + flowParams -> metres -> projected area (one validation for 3 commands)
   skinFriction.ts        Cf correlations + validity ranges
-  cycling.ts             Martin 1998, Bassett 1999
+  cycling.ts             Martin 1998, Bassett 1999 formulas
+  cyclingParams.ts       one schema for both models; cyclingMartin.ts / cyclingBassett.ts runners; cyclingCommand.ts dispatches
   *Command.ts, airfoilCommands.ts, dragCommands.ts, catalog.ts, plugin.ts, codes.ts
 ```
 
