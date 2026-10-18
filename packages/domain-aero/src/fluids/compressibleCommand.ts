@@ -122,7 +122,7 @@ export const compressibleFlow = defineCommand({
         let shock;
         if (params.waveAngleDeg !== undefined) {
           const machAngle = Math.asin(1 / mach) / RAD;
-          if (!(params.waveAngleDeg >= machAngle && params.waveAngleDeg <= 90))
+          if (!(params.waveAngleDeg >= machAngle - 1e-9 && params.waveAngleDeg <= 90))
             return fail('FLD_PARAM_INVALID', `waveAngleDeg must be within ${sig(machAngle)}..90`, 'waveAngleDeg');
           shock = obliqueShockFromWaveAngle(mach, params.waveAngleDeg * RAD, gamma);
         } else {

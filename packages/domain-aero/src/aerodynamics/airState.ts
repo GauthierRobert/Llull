@@ -3,6 +3,9 @@
 import { z } from '@core/commands/schema';
 import { atmosphereAt, geopotentialOf, MAX_GEOPOTENTIAL_M, MIN_GEOMETRIC_M, sutherlandViscosity, US1976 } from './atmosphere';
 
+/** Lowest air temperature accepted after an ISA offset (K): below it the gas model is meaningless. */
+export const MIN_TEMPERATURE_K = 100;
+
 export const airStateParams = {
   altitudeM: z
     .number()
@@ -44,8 +47,8 @@ interface AirStateInput {
  */
 export function resolveAirState(input: AirStateInput): AirState | { readonly code: string; readonly message: string } {
   const offset = input.temperatureOffsetK ?? 0;
-  if (!Number.isFinite(offset) || 288.15 + offset <= 0)
-    return { code: 'AER_PARAM_INVALID', message: 'temperatureOffsetK must be finite and keep T > 0 K' };
+  if (!Number.isFinite(offset) || US1976.seaLevelTemperatureK + offset <= MIN_TEMPERATURE_K)
+    return { code: 'AER_PARAM_INVALID', message: `temperatureOffsetK must be finite and keep T above ${MIN_TEMPERATURE_K} K` };
   if (input.densityKgM3 !== undefined) {
     if (input.altitudeM !== undefined) return { code: 'AER_AIR_STATE_CONFLICT', message: 'altitudeM and densityKgM3 both given' };
     if (!(input.densityKgM3 > 0) || (input.viscosityPaS !== undefined && !(input.viscosityPaS > 0)))
@@ -69,6 +72,11 @@ export function resolveAirState(input: AirStateInput): AirState | { readonly cod
   if (!(altitude >= MIN_GEOMETRIC_M && geopotential <= MAX_GEOPOTENTIAL_M + 0.1))
     return { code: 'AER_ALTITUDE_OUT_OF_RANGE', message: `altitude ${altitude} m is outside -5000..86000 m` };
   const state = atmosphereAt(Math.min(geopotential, MAX_GEOPOTENTIAL_M), offset);
+  if (!(state.temperatureK > MIN_TEMPERATURE_K))
+    return {
+      code: 'AER_PARAM_INVALID',
+      message: `temperatureOffsetK ${offset} gives ${state.temperatureK.toFixed(1)} K at the altitude (floor ${MIN_TEMPERATURE_K} K)`,
+    };
   return {
     densityKgM3: state.densityKgM3,
     viscosityPaS: state.dynamicViscosityPaS,

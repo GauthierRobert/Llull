@@ -18,10 +18,15 @@ export interface PanelSolution {
 }
 
 /**
- * Solve the flow at angle of attack `alpha` (rad) about a closed contour given clockwise (lower TE -> LE -> upper TE), chord along x.
+ * Solve the flow at each angle of attack in `alphas` (rad) about a closed contour given clockwise (lower TE -> LE -> upper TE), chord along x.
+ * @invariant the influence matrix is built and solved once: γ(α) = cos α γ(0) + sin α γ(π/2) (the boundary condition is linear in α)
  * @failure singular influence matrix -> null
  */
-export function solveVortexPanels(nodes: ReadonlyArray<readonly [number, number]>, alpha: number, momentX: number): PanelSolution | null {
+export function solveVortexPanels(
+  nodes: ReadonlyArray<readonly [number, number]>,
+  alphas: readonly number[],
+  momentX: number,
+): PanelSolution[] | null {
   const m = nodes.length - 1;
   const node = (j: number): readonly [number, number] => nodes[j] as readonly [number, number];
   const xs = Array.from({ length: m }, (_, i) => (node(i)[0] + node(i + 1)[0]) / 2);
@@ -67,39 +72,47 @@ export function solveVortexPanels(nodes: ReadonlyArray<readonly [number, number]
   const kutta = an[m] as number[];
   kutta[0] = 1;
   kutta[m] = 1;
-  const rhs = [...angles.map((theta) => Math.sin(theta - alpha)), 0];
-  const gamma = solveLinear(an, rhs);
-  if (gamma === null || gamma.some((value) => !Number.isFinite(value))) return null;
-  const surface = Array.from({ length: m }, (_, i) => {
-    const tangential = (at[i] as number[]).reduce(
-      (sum, coefficient, j) => sum + coefficient * (gamma[j] as number),
-      Math.cos((angles[i] as number) - alpha),
-    );
-    return { x: xs[i] as number, y: ys[i] as number, velocityRatio: tangential, cp: 1 - tangential * tangential };
-  });
-  let fx = 0;
-  let fy = 0;
-  let moment = 0;
-  surface.forEach((point, i) => {
-    const theta = angles[i] as number;
-    const s = lengths[i] as number;
-    const dFx = point.cp * Math.sin(theta) * s;
-    const dFy = -point.cp * Math.cos(theta) * s;
-    fx += dFx;
-    fy += dFy;
-    moment -= (point.x - momentX) * dFy - point.y * dFx;
-  });
+  const atZero = solveLinear(an, [...angles.map((theta) => Math.sin(theta)), 0]);
+  const atRight = solveLinear(an, [...angles.map((theta) => -Math.cos(theta)), 0]);
+  if (atZero === null || atRight === null || [...atZero, ...atRight].some((value) => !Number.isFinite(value))) return null;
   const xMax = Math.max(...nodes.map(([x]) => x));
   const xMin = Math.min(...nodes.map(([x]) => x));
   const chord = xMax - xMin;
-  const circulation = lengths.reduce((sum, s, j) => sum + (((gamma[j] as number) + (gamma[j + 1] as number)) / 2) * s, 0) * 2 * Math.PI;
-  return {
-    cl: (fy * Math.cos(alpha) - fx * Math.sin(alpha)) / chord,
-    clCirculation: (2 * circulation) / chord,
-    cm: moment / (chord * chord),
-    cdPressure: (fx * Math.cos(alpha) + fy * Math.sin(alpha)) / chord,
-    surface,
+  const panelForces = (gamma: readonly number[], alpha: number): PanelSolution => {
+    const surface = Array.from({ length: m }, (_, i) => {
+      const tangential = (at[i] as number[]).reduce(
+        (sum, coefficient, j) => sum + coefficient * (gamma[j] as number),
+        Math.cos((angles[i] as number) - alpha),
+      );
+      return { x: xs[i] as number, y: ys[i] as number, velocityRatio: tangential, cp: 1 - tangential * tangential };
+    });
+    let fx = 0;
+    let fy = 0;
+    let moment = 0;
+    surface.forEach((point, i) => {
+      const theta = angles[i] as number;
+      const s = lengths[i] as number;
+      const dFx = point.cp * Math.sin(theta) * s;
+      const dFy = -point.cp * Math.cos(theta) * s;
+      fx += dFx;
+      fy += dFy;
+      moment -= (point.x - momentX) * dFy - point.y * dFx;
+    });
+    const circulation = lengths.reduce((sum, s, j) => sum + (((gamma[j] as number) + (gamma[j + 1] as number)) / 2) * s, 0) * 2 * Math.PI;
+    return {
+      cl: (fy * Math.cos(alpha) - fx * Math.sin(alpha)) / chord,
+      clCirculation: (2 * circulation) / chord,
+      cm: moment / (chord * chord),
+      cdPressure: (fx * Math.cos(alpha) + fy * Math.sin(alpha)) / chord,
+      surface,
+    };
   };
+  return alphas.map((alpha) =>
+    panelForces(
+      atZero.map((value, j) => Math.cos(alpha) * value + Math.sin(alpha) * (atRight[j] as number)),
+      alpha,
+    ),
+  );
 }
 
 export interface ThinAirfoil {

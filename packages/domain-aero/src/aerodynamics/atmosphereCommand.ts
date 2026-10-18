@@ -6,6 +6,7 @@ import { roundSignificant } from '@lib/significant';
 import { briefReport } from './brief';
 import { atmosphereAt, geometricOf, geopotentialOf, MAX_GEOPOTENTIAL_M, MIN_GEOMETRIC_M, US1976 } from './atmosphere';
 import { refuseAero } from './codes';
+import { MIN_TEMPERATURE_K } from './airState';
 import { SPEED_UNITS, speedParam, toMetresPerSecond } from './speed';
 
 const FT = 0.3048;
@@ -56,7 +57,7 @@ export const standardAtmosphere = defineCommand({
         [],
         ['altitude'],
       );
-    if (!Number.isFinite(offset) || US1976.seaLevelTemperatureK + offset <= 100)
+    if (!Number.isFinite(offset) || US1976.seaLevelTemperatureK + offset <= MIN_TEMPERATURE_K)
       return refuseAero(
         doc,
         'standard_atmosphere',
@@ -72,6 +73,15 @@ export const standardAtmosphere = defineCommand({
     if (speed !== undefined && !(speed >= 0))
       return refuseAero(doc, 'standard_atmosphere', 'AER_PARAM_INVALID', 'speed must be >= 0', [], ['speed']);
     const state = atmosphereAt(Math.min(geopotential, MAX_GEOPOTENTIAL_M), offset);
+    if (!(state.temperatureK > MIN_TEMPERATURE_K))
+      return refuseAero(
+        doc,
+        'standard_atmosphere',
+        'AER_PARAM_INVALID',
+        `temperatureOffsetK ${offset} gives ${state.temperatureK.toFixed(1)} K at this altitude (floor ${MIN_TEMPERATURE_K} K)`,
+        [],
+        ['temperatureOffsetK'],
+      );
     const sea = atmosphereAt(0);
     const flow =
       speed === undefined

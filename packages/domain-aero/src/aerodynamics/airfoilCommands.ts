@@ -108,10 +108,15 @@ export const analyzeAirfoil = defineCommand({
         ? nacaContour(params.naca, perSide, params.closedTrailingEdge ?? true)
         : polylineContour(doc, params.entityId as string);
     if (typeof contour === 'string') return fail('AER_AIRFOIL_INVALID', contour, [params.naca !== undefined ? 'naca' : 'entityId']);
-    const solutions = alphas.map((alphaDeg) => ({ alphaDeg, solution: solveVortexPanels(contour.nodes, alphaDeg * RAD, reference) }));
-    if (solutions.some(({ solution }) => solution === null)) return fail('AER_SOLVER_FAILED', 'singular panel influence matrix');
+    const solved = solveVortexPanels(
+      contour.nodes,
+      alphas.map((alphaDeg) => alphaDeg * RAD),
+      reference,
+    );
+    if (solved === null) return fail('AER_SOLVER_FAILED', 'singular panel influence matrix');
+    const solutions = alphas.map((alphaDeg, index) => ({ alphaDeg, solution: solved[index] as NonNullable<(typeof solved)[number]> }));
     const polar = solutions.map(({ alphaDeg, solution }) => {
-      const s = solution as NonNullable<typeof solution>;
+      const s = solution;
       return { alphaDeg, cl: sig(s.cl), clCirculation: sig(s.clCirculation), cm: sig(s.cm), cdPressure: sig(s.cdPressure) };
     });
     const fit = liftFit(polar);
@@ -144,7 +149,7 @@ export const analyzeAirfoil = defineCommand({
         ? {
             surface: solutions.map(({ alphaDeg, solution }) => ({
               alphaDeg,
-              points: (solution as NonNullable<typeof solution>).surface.map((point) => ({
+              points: solution.surface.map((point) => ({
                 x: sig(point.x),
                 y: sig(point.y),
                 cp: sig(point.cp),

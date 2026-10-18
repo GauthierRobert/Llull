@@ -3,6 +3,9 @@
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { nacaOrdinates, parseNaca, type NacaSection } from './naca';
 
+/** Largest polyline accepted as panels (the dense solve is O(n³)): 2 × 400 per side + 1. */
+export const MAX_CONTOUR_POINTS = 801;
+
 export interface AirfoilContour {
   readonly label: string;
   /** Clockwise nodes from the lower trailing edge round to the upper one (repeated first node when the TE is sharp), chord-normalised; an open TE stays open. */
@@ -34,6 +37,8 @@ export function polylineContour(doc: CadDocument, entityId: string): AirfoilCont
   const entity = doc.entities[entityId];
   if (entity?.kind !== 'polyline' || !entity.closed || entity.points.length < 8)
     return `'${entityId}' is not a closed 2D polyline of at least 8 points (draw_naca_airfoil or draw_polyline closed:true)`;
+  if (entity.points.length > MAX_CONTOUR_POINTS)
+    return `'${entityId}' has ${entity.points.length} points; at most ${MAX_CONTOUR_POINTS} panels are solved (redraw it with fewer points)`;
   const raw = entity.points.filter((point, index, all) => {
     const next = all[(index + 1) % all.length] as Vec2;
     return Math.hypot(next[0] - point[0], next[1] - point[1]) > 1e-12;

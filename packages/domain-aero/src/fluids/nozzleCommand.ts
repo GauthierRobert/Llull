@@ -110,6 +110,7 @@ export const nozzlePerformance = defineCommand({
       pa = air.pressurePa;
       ambientSource = air.source;
     }
+    if (pa >= pc) return fail('FLD_EXPANSION_INVALID', 'the ambient pressure must be below the chamber pressure', 'ambientPressure');
     const sizing = [params.throatDiameterM, params.throatAreaM2, params.thrustN].filter((value) => value !== undefined);
     if (sizing.length > 1)
       return fail('FLD_INPUT_CONFLICT', 'give at most one of throatDiameterM, throatAreaM2, thrustN', 'throatDiameterM');
@@ -142,6 +143,8 @@ export const nozzlePerformance = defineCommand({
     else if (pa > 0 && result.exitPressurePa < pa)
       warnings.push(`over-expanded (p_e/p_a ${sig(pressureRatio)}): thrust is below the optimum at this ambient.`);
     if (params.ambientPressure === undefined && params.altitudeM === undefined) warnings.push('ambient defaulted to vacuum (p_a = 0).');
+    if (!(result.thrustCoefficient > 0))
+      warnings.push(`no net thrust at this ambient pressure (C_F ${sig(result.thrustCoefficient)}): ambient Isp is null.`);
     warnings.push(
       'Ideal 1D flow with one constant γ: with the CEA chamber γ the Isp is within ~3 % of shifting equilibrium, a frozen-composition expansion gives 4-6 % less; real engines deliver less still (RS-25: 452.3 s vs ~473 s ideal).',
     );
@@ -176,7 +179,7 @@ export const nozzlePerformance = defineCommand({
         ),
       },
       thrustCoefficient: { vacuum: sig(result.thrustCoefficientVacuum), ambient: sig(result.thrustCoefficient) },
-      ispS: { vacuum: sig(result.ispVacuumS), ambient: sig(result.ispS) },
+      ispS: { vacuum: sig(result.ispVacuumS), ambient: result.thrustCoefficient > 0 ? sig(result.ispS) : null },
       effectiveExhaustVelocityMS: { vacuum: sig(result.ispVacuumS * STANDARD_GRAVITY), ambient: sig(result.ispS * STANDARD_GRAVITY) },
       optimumExpansionRatio: result.optimumExpansionRatio === null ? null : sig(result.optimumExpansionRatio),
       expansionState:

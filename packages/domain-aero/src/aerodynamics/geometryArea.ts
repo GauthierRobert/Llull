@@ -5,6 +5,7 @@ import { is3D } from '@core/model/types';
 import { entityToTriangles } from '@core/geometry/entityTriangles';
 import { toMetres } from '@core/model/units';
 import { projectedArea, type ProjectedArea } from './projectedArea';
+import type { Triangle } from '@core/geometry/triangles';
 
 export const DEFAULT_FLOW_DIRECTION: Vec3 = [1, 0, 0];
 export const DEFAULT_RESOLUTION = 400;
@@ -22,9 +23,8 @@ export function geometryArea(doc: CadDocument, ids: readonly string[], direction
     const entity = doc.entities[id];
     return entity !== undefined && is3D(entity) ? entityToTriangles(entity, doc) : [];
   });
-  const metric = triangles.map(
-    (triangle) => triangle.map((point) => [point[0] * scale, point[1] * scale, point[2] * scale] as Vec3) as unknown as typeof triangle,
-  );
+  const toMetric = (point: Vec3): Vec3 => [point[0] * scale, point[1] * scale, point[2] * scale];
+  const metric = triangles.map(([a, b, c]): Triangle => [toMetric(a), toMetric(b), toMetric(c)]);
   const area = projectedArea(metric, direction, resolution);
   if (area === null)
     return { ok: false, code: 'AER_NO_GEOMETRY', message: 'the entities have no 3D surface (2D sketches only?)', ids: [...ids] };

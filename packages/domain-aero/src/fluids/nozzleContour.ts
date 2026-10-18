@@ -70,7 +70,12 @@ export function nozzleContour(spec: ContourSpec): Contour | string {
   const coneRun = (chamberRadius - arcStart.radius) / Math.tan(spec.convergentHalfAngle);
   const convergentStart = arcStart.axial - coneRun;
   const inlet: ContourPoint[] = [
-    ...(spec.chamberLength > 0 ? [{ axial: convergentStart - spec.chamberLength, radius: chamberRadius, angle: 0 }] : []),
+    ...(spec.chamberLength > 0
+      ? [
+          { axial: convergentStart - spec.chamberLength, radius: chamberRadius, angle: 0 },
+          { axial: convergentStart, radius: chamberRadius, angle: 0 },
+        ]
+      : []),
     { axial: convergentStart, radius: chamberRadius, angle: -spec.convergentHalfAngle },
   ];
   const convergent = [...inlet, ...[...upstream].reverse()];

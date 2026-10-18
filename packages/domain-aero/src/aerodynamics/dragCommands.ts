@@ -12,6 +12,8 @@ import { speedParam, toMetresPerSecond } from './speed';
 import { FRICTION_MODELS, FRICTION_RANGE, skinFrictionCoefficient, type FrictionModel } from './skinFriction';
 
 const sig = (value: number): number => roundSignificant(value, 10);
+/** Below this Reynolds number every friction law is invalid (ITTC-1957 has its pole at Re 100). */
+const MIN_FRICTION_REYNOLDS = 1e3;
 
 const flowParams = {
   flowDirection: z
@@ -98,7 +100,8 @@ export const aeroDrag = defineCommand({
     'wetted area of entityIds) and `lengthM` (Reynolds length) adds Cf·q·S_wet. Cd is never defaulted: take it from tests or references ' +
     '(flat plate normal to flow 1.28, sphere ~0.47 at Re 1e4-2e5).',
   params: z.object({
-    ...speedParam,
+    speed: z.number().describe('Air speed in speedUnit, >= 0. Required.'),
+    speedUnit: speedParam.speedUnit,
     cdA: z.number().optional().describe('Drag area CdA in m², > 0.'),
     cd: z.number().optional().describe('Drag coefficient Cd (> 0) on referenceAreaM2 or on the frontal area of entityIds.'),
     referenceAreaM2: z.number().optional().describe('Reference area in m², > 0 (with cd).'),
@@ -115,7 +118,6 @@ export const aeroDrag = defineCommand({
   run: (doc, params): CommandResult => {
     const fail = (code: string, message: string, paths: string[] = [], ids: string[] = []): CommandResult =>
       refuseAero(doc, 'aero_drag', code, message, ids, paths);
-    if (params.speed === undefined) return fail('AER_PARAM_INVALID', 'speed is required', ['speed']);
     const speed = toMetresPerSecond(params.speed, params.speedUnit ?? 'm/s');
     if (!(speed >= 0)) return fail('AER_PARAM_INVALID', 'speed must be >= 0', ['speed']);
     const sources = [params.cdA !== undefined, params.referenceAreaM2 !== undefined, params.entityIds !== undefined].filter(Boolean).length;
@@ -149,8 +151,14 @@ export const aeroDrag = defineCommand({
       const wetted = params.wettedAreaM2 ?? measured?.wetted;
       if (wetted === undefined || reynolds === undefined || !(reynolds > 1))
         return fail('AER_PARAM_INVALID', 'skin friction needs lengthM, speed > 0 and wettedAreaM2 (or entityIds)', ['frictionModel']);
-      const cf = skinFrictionCoefficient(params.frictionModel, reynolds);
       const [low, high] = FRICTION_RANGE[params.frictionModel];
+      if (reynolds < MIN_FRICTION_REYNOLDS)
+        return fail(
+          'AER_PARAM_INVALID',
+          `Re ${sig(reynolds)} is below ${MIN_FRICTION_REYNOLDS}: no flat-plate correlation applies (check speed and lengthM)`,
+          ['lengthM'],
+        );
+      const cf = skinFrictionCoefficient(params.frictionModel, reynolds);
       if (reynolds < low || reynolds > high)
         warnings.push(`Re ${sig(reynolds)} is outside the ${params.frictionModel} range ${low}..${high}.`);
       friction = {

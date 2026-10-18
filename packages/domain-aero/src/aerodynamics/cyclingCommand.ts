@@ -20,6 +20,8 @@ import {
 } from './cycling';
 
 const sig = (value: number): number => roundSignificant(value, 10);
+/** Sea-level density of the 1976 standard (kg/m³): Kd = ρ / ρ0 when bassett_1999 gets densityKgM3. */
+const SEA_LEVEL_DENSITY = 1.225;
 
 /**
  * @affects none; data = { model, speedMS, speedKmh, powerW, breakdown, distance1hKm, inputs (each with defaulted), warnings, provenance }
@@ -36,7 +38,7 @@ export const cyclingPower = defineCommand({
     'of a rider + bike model), `crr` (default 0.0032), `gradePercent`, `headwindMS` (+ head / - tail), wheel area Fw 0.0044 m², chain ' +
     'efficiency 0.976, bearing loss 91 + 8.7·V mW; air from altitudeM (standard atmosphere) or densityKgM3. model `bassett_1999` ' +
     '(velodrome hour records; Bassett et al. 1999 eq. 8): `riderHeightM`, `riderMassKg`, bike 10 kg, aerodynamic factor `k1` (or the ' +
-    'density ratio of `altitudeM` × position / bike / clothing / helmet factors), frontal area from height and mass. Returns the power ' +
+    'density ratio of `altitudeM` (or `densityKgM3` / 1.225) × position / bike / clothing / helmet factors), frontal area from height and mass. Returns the power ' +
     'breakdown (aero, rolling, bearings, gravity), speed, and the 1-hour distance; every defaulted input is flagged.',
   params: z.object({
     model: z.enum(['martin_1998', 'bassett_1999']).optional().describe('martin_1998 (default, road) or bassett_1999 (track hour record).'),
@@ -91,8 +93,22 @@ export const cyclingPower = defineCommand({
       const { riderHeightM: height, riderMassKg: mass } = params;
       if (height === undefined || mass === undefined || !(height >= 1.4 && height <= 2.2) || !(mass >= 40 && mass <= 120))
         return fail('AER_PARAM_INVALID', 'bassett_1999 needs riderHeightM 1.4..2.2 m and riderMassKg 40..120 kg', ['riderHeightM']);
+      if (params.temperatureOffsetK !== undefined || params.viscosityPaS !== undefined)
+        return fail('AER_PARAM_INVALID', 'bassett_1999 uses altitudeM (eq. 5 density ratio) or densityKgM3 only', ['temperatureOffsetK']);
+      if (params.altitudeM !== undefined && params.densityKgM3 !== undefined)
+        return fail('AER_AIR_STATE_CONFLICT', 'altitudeM and densityKgM3 both given', ['altitudeM']);
+      if (
+        (params.altitudeM !== undefined && !(params.altitudeM >= -500 && params.altitudeM <= 5000)) ||
+        (params.densityKgM3 !== undefined && !(params.densityKgM3 > 0))
+      )
+        return fail('AER_PARAM_INVALID', 'bassett_1999 altitudeM must be within -500..5000 m and densityKgM3 > 0', ['altitudeM']);
       const factors = {
-        kd: params.altitudeM === undefined ? 1 : bassettDensityRatio(params.altitudeM),
+        kd:
+          params.densityKgM3 !== undefined
+            ? params.densityKgM3 / SEA_LEVEL_DENSITY
+            : params.altitudeM === undefined
+              ? 1
+              : bassettDensityRatio(params.altitudeM),
         kpo: params.positionFactor ?? 1,
         kb: params.bikeFactor ?? 1,
         kc: params.clothingFactor ?? 1,
@@ -124,7 +140,15 @@ export const cyclingPower = defineCommand({
           frontalAreaM2: sig(bassettFrontalArea(height, mass)),
           k1: {
             value: sig(k1),
-            defaulted: params.k1 === undefined && params.altitudeM === undefined && params.positionFactor === undefined,
+            defaulted: [
+              params.k1,
+              params.altitudeM,
+              params.densityKgM3,
+              params.positionFactor,
+              params.bikeFactor,
+              params.clothingFactor,
+              params.helmetFactor,
+            ].every((value) => value === undefined),
             factors,
           },
           trackFactor: { value: k, defaulted: params.trackFactor === undefined },

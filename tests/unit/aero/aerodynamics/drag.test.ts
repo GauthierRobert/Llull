@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
+import { execute } from '@core/commands/registry';
 import refs from '../../../../docs/aerospace/10-aerodynamics/validation/data/airfoil_wing_references.json';
 import { data, expectRefusal, ok } from '../sheetmetal/helpers';
 
@@ -90,7 +91,14 @@ describe('frontal_area + aero_drag (VC-AER-02..05)', () => {
   });
 
   it('refuses conflicting or invalid inputs', () => {
-    expectRefusal(empty, 'aero_drag', { cdA: 1 }, 'AER_PARAM_INVALID', 'speed');
+    expect(execute(empty, 'aero_drag', { cdA: 1 }).error?.code).toBe('CMD_INVALID_PARAMS');
+    expectRefusal(
+      empty,
+      'aero_drag',
+      { speed: 0.0015, cdA: 1, frictionModel: 'ittc_1957', wettedAreaM2: 1, lengthM: 1 },
+      'AER_PARAM_INVALID',
+      'lengthM',
+    );
     expectRefusal(empty, 'aero_drag', { speed: 10 }, 'AER_AREA_SOURCE_CONFLICT');
     expectRefusal(empty, 'aero_drag', { speed: 10, cdA: 1, cd: 1 }, 'AER_AREA_SOURCE_CONFLICT');
     expectRefusal(empty, 'aero_drag', { speed: 10, cdA: 1, referenceAreaM2: 1 }, 'AER_AREA_SOURCE_CONFLICT');
