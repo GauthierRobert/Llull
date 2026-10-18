@@ -7,16 +7,30 @@ import { fractureCommands } from './fracture/catalog';
 import { analysisReferenceGuard, durabilityReferenceGuard } from './guard';
 import { marginCommands } from './margins/catalog';
 import { analysisErrors } from './model/validate';
+import { reliabilityCommands } from './reliability/catalog';
+import { reliabilityErrors } from './reliability/model';
 import { thermalCommands } from './thermal/catalog';
 import { thermomechCommands } from './thermomech/catalog';
 
 /** The analysis slice is pure definition data: nothing is derived, nothing is restored. */
-const analysisDocument: DocumentExtension = { validate: analysisErrors, derivedEntityIds: () => new Set<string>(), restore: (raw) => raw };
+const analysisDocument: DocumentExtension = {
+  validate: (raw) => [...analysisErrors(raw), ...reliabilityErrors(raw)],
+  derivedEntityIds: () => new Set<string>(),
+  restore: (raw) => raw,
+};
 
 export const caePlugin: CadPlugin = {
   name: 'cae',
   toolset: 'analysis',
-  commands: [...feaCommands, ...marginCommands, ...thermalCommands, ...thermomechCommands, ...fatigueCommands, ...fractureCommands],
+  commands: [
+    ...feaCommands,
+    ...marginCommands,
+    ...thermalCommands,
+    ...thermomechCommands,
+    ...fatigueCommands,
+    ...fractureCommands,
+    ...reliabilityCommands,
+  ],
   guards: [analysisReferenceGuard, durabilityReferenceGuard],
   document: analysisDocument,
 };

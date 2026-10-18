@@ -44,7 +44,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-1) var(--space-3);
 }
 
 .physics-run__duration {
@@ -67,7 +67,7 @@
 
 .physics-results th,
 .physics-results td {
-  padding: 2px var(--space-2);
+  padding: 2px var(--space-3);
   text-align: left;
   font-weight: var(--weight-medium);
 }
@@ -82,7 +82,7 @@
 }
 
 .series-chart {
-  margin: var(--space-1) var(--space-2);
+  margin: var(--space-1) var(--space-3);
 }
 
 .series-chart svg {
@@ -154,7 +154,7 @@
   flex-wrap: wrap;
   gap: var(--space-1);
   margin: 0;
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-1) var(--space-3);
   list-style: none;
 }
 
@@ -192,7 +192,7 @@
 }
 
 .physics-engine-note {
-  margin: var(--space-1) var(--space-2);
+  margin: var(--space-1) var(--space-3);
   font-size: var(--text-xs);
   color: var(--fg-muted);
 }

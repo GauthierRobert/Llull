@@ -4,12 +4,12 @@
 
 import { memo, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { hasActiveLiveFx, RIPPLE_MS, useLiveFxStore } from '@ui/store/liveFxStore';
 import { easeOutCubic, ghostMatrix, ghostOpacity, progressAt } from './liveFxMath';
 import { hologramize, setOpacity } from './materialFx';
 import { toneColor, toneHex } from './liveFxTones';
+import { ScreenAnchor } from '../screenAnchor/ScreenAnchor';
 import type { LiveBadge, LiveGhost, LiveRipple } from './planLiveFx';
 
 /** Draws the previous version of an entity (the view's own render branch); null = no ghost in this view. */
@@ -104,12 +104,12 @@ function RippleView({ ripple }: { ripple: LiveRipple }): React.ReactElement {
 function BadgeView({ badge }: { badge: LiveBadge }): React.ReactElement {
   const style = useMemo(() => ({ '--live-fx-accent': toneHex(badge.source) }) as React.CSSProperties, [badge.source]);
   return (
-    <Html position={badge.anchor} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
+    <ScreenAnchor id={`live-badge-${badge.key}`} position={badge.anchor} center zIndex={20}>
       <div className="live-fx-badge" style={style} data-source={badge.source}>
         <span className="live-fx-badge__dot" aria-hidden="true" />
         {badge.label}
       </div>
-    </Html>
+    </ScreenAnchor>
   );
 }
 

@@ -93,7 +93,7 @@ function section(markdown, heading) {
 function markdownFiles(dir) {
   const out = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === 'work') continue;
+    if (entry.name === 'work' || entry.name === 'worktrees') continue;
     const path = join(dir, entry.name);
     if (entry.isDirectory()) out.push(...markdownFiles(path));
     else if (entry.name.endsWith('.md')) out.push(path);
