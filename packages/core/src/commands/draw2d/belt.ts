@@ -19,8 +19,8 @@ import type { Vec2 as Point } from '../../model/vectors';
 type PulleySpec = { center: [number, number]; radius: number };
 
 /**
- * The two external tangent points of a pair of circles (same-side, "open belt" convention): [tp1, tp2] on `p1` and `p2`, on the CCW outer
- * envelope side (angle = θ + π/2 + α, α = asin((r1−r2)/d)).
+ * The two external tangent points of a pair of circles (same-side, "open belt" convention): [tp1, tp2] on `p1` and `p2`, on the right of
+ * the p1 → p2 run, i.e. the outer side of a CCW loop (normal angle = θ − π/2 + α, α = asin((r1−r2)/d)).
  * @invariant centers distinct and neither circle inside the other (checked by the caller)
  */
 function externalTangentPoints(p1: PulleySpec, p2: PulleySpec): readonly [Point, Point] {
@@ -30,7 +30,7 @@ function externalTangentPoints(p1: PulleySpec, p2: PulleySpec): readonly [Point,
   const dy = c2y - c1y;
   const d = len2([dx, dy]);
   const alpha = Math.asin((p1.radius - p2.radius) / d);
-  const angle = Math.atan2(dy, dx) + Math.PI / 2 + alpha;
+  const angle = Math.atan2(dy, dx) - Math.PI / 2 + alpha;
   return [
     [c1x + p1.radius * Math.cos(angle), c1y + p1.radius * Math.sin(angle)],
     [c2x + p2.radius * Math.cos(angle), c2y + p2.radius * Math.sin(angle)],
@@ -55,9 +55,10 @@ export const drawBeltAround = defineCommand({
     'Compute the closed centerline of a belt or chain wrapping ≥2 circular pulleys/sprockets ' +
     'and emit it as a single closed polyline entity. ' +
     'For each adjacent pair of pulleys the command computes the external common tangent (open-belt / ' +
-    'same-direction rotation convention, CCW outer envelope), then samples the wrap arc on each pulley ' +
+    'same-direction rotation convention), then samples the wrap arc on each pulley ' +
     'between the two tangent touch-points. The result is one `polyline` with `closed: true`. ' +
-    'pulleys is an ordered array of {center:[x,y], radius} objects; the belt wraps them in that order ' +
+    'pulleys is an ordered array of {center:[x,y], radius} objects listed COUNTER-CLOCKWISE round the loop (in the work plane); ' +
+    'the belt wraps the outside of each in that order, runs counter-clockwise (polyline order) and closes back to the first. ' +
     'and closes back to the first. arcSamples controls chord resolution per wrap arc (default 12, minimum 2). ' +
     'position/rotation place the entity in 3D world space (default [0,0,0]). ' +
     'Fails gracefully (no-op) when: fewer than 2 pulleys, non-positive or non-finite radius, ' +

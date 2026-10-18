@@ -42,7 +42,8 @@ describe('draw_belt_around', () => {
   });
   it('2 different-radius pulleys: first polyline point is the outgoing TP on pulley 0', () => {
     const [r1, r2, cx2, cy2, d] = [5, 3, 20, 0, 20];
-    const expectedAngle = 0 + Math.PI / 2 + Math.asin((r1 - r2) / d);
+    // outer tangent on the right of the 0 -> 1 run (CCW loop): normal at -(π/2 - asin((r1 - r2) / d))
+    const expectedAngle = 0 - Math.PI / 2 + Math.asin((r1 - r2) / d);
     const pts = beltPoly(
       belt(
         [
@@ -59,6 +60,40 @@ describe('draw_belt_around', () => {
     for (const pt of [pts[1]!, pts[2]!]) {
       expect(Math.sqrt((pt[0] - cx2) ** 2 + (pt[1] - cy2) ** 2)).toBeCloseTo(r2, 9);
     }
+  });
+  it.each<[string, Pulley[]]>([
+    ['2 equal pulleys', TWO_EQUAL],
+    [
+      '2 different pulleys',
+      [
+        { center: [0, 0], radius: 10 },
+        { center: [100, 0], radius: 5 },
+      ],
+    ],
+    [
+      'chainring, cog, derailleur pulleys (CCW)',
+      [
+        { center: [0, 269], radius: 105 },
+        { center: [-407, 339], radius: 30.5 },
+        { center: [-415, 272], radius: 26.5 },
+        { center: [-405, 200], radius: 26.5 },
+      ],
+    ],
+  ])('%s: the loop wraps the OUTSIDE of every pulley and each run is tangent to both pulleys', (_label, pulleys) => {
+    const pts = beltPoly(belt(pulleys, { arcSamples: 24 })).points;
+    const hull = (x: number, y: number): number => Math.min(...pulleys.map((q) => Math.hypot(x - q.center[0], y - q.center[1]) - q.radius));
+    // every belt point is on or outside every pulley (never cuts through one)
+    for (const [x, y] of pts) expect(hull(x, y)).toBeGreaterThan(-1e-6);
+    // the belt length is the convex outer envelope: perimeter of its polygon equals the reported length within chord error
+    const perimeter = pts.reduce(
+      (sum, p, i) => sum + Math.hypot(pts[(i + 1) % pts.length]![0] - p[0], pts[(i + 1) % pts.length]![1] - p[1]),
+      0,
+    );
+    const reported = Number(/length ≈ ([\d.]+)/.exec(belt(pulleys, { arcSamples: 24 }).summary)?.[1]);
+    expect(perimeter).toBeCloseTo(reported, 0);
+    // counter-clockwise loop (positive shoelace area)
+    const area = pts.reduce((sum, p, i) => sum + p[0] * pts[(i + 1) % pts.length]![1] - pts[(i + 1) % pts.length]![0] * p[1], 0);
+    expect(area).toBeGreaterThan(0);
   });
   it('2 different-radius pulleys: summary reports a positive length', () => {
     const result = belt(
