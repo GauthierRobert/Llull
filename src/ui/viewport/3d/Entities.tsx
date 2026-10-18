@@ -15,6 +15,7 @@ import { Shape2DRenderer } from '../2d/Shape2DRenderer';
 import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
 import { useGhostStore } from '@ui/store/ghostStore';
+import { useTintStore } from '@ui/store/tintStore';
 import { GridAnnotations3D } from './GridAnnotations3D';
 import { GRID_LAYER_NAME } from './gridAnnotations';
 import { expandInstance } from '@core/geometry/instanceExpansion';
@@ -121,6 +122,7 @@ export function Entities(): React.ReactElement {
   const transitions = useTransitioningIds();
   // Ghosted solids (a painted FEA result stands in for them) also take the per-entity path: their own see-through material.
   const ghosted = useGhostStore((s) => s.ghostedIds);
+  const tints = useTintStore((s) => s.tints);
 
   const handleSelect = useCallback(
     (id: EntityId, additive: boolean): void => {
@@ -157,20 +159,30 @@ export function Entities(): React.ReactElement {
     () =>
       groupEntitiesForInstancing(
         visibleEntities.filter(
-          (entity) => !animatedIds.has(entity.id) && !hasFinish(entity) && !transitions.has(entity.id) && !ghosted.has(entity.id),
+          (entity) =>
+            !animatedIds.has(entity.id) &&
+            !hasFinish(entity) &&
+            !transitions.has(entity.id) &&
+            !ghosted.has(entity.id) &&
+            !tints.has(entity.id),
         ),
         materials,
       ),
-    [visibleEntities, animatedIds, materials, hasFinish, transitions, ghosted],
+    [visibleEntities, animatedIds, materials, hasFinish, transitions, ghosted, tints],
   );
   const nonBatchableEntities = useMemo(
     () =>
       visibleEntities.filter(
         (entity) =>
-          (!isBatchable(entity) || animatedIds.has(entity.id) || hasFinish(entity) || transitions.has(entity.id)) &&
+          (!isBatchable(entity) ||
+            animatedIds.has(entity.id) ||
+            hasFinish(entity) ||
+            transitions.has(entity.id) ||
+            ghosted.has(entity.id) ||
+            tints.has(entity.id)) &&
           layers[entity.layerId]?.name !== GRID_LAYER_NAME,
       ),
-    [visibleEntities, animatedIds, layers, hasFinish, transitions],
+    [visibleEntities, animatedIds, layers, hasFinish, transitions, ghosted, tints],
   );
 
   return (

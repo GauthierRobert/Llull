@@ -130,7 +130,7 @@ function SceneContents2D({
         <MeasureBBoxRect2D />
         <AeroOverlay />
         <AnalysisOverlay />
-        <StructuralOverlay />
+        <StructuralOverlay hulls />
         <FindingsOverlay />
         <FocusOverlay />
       </group>

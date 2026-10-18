@@ -9,6 +9,7 @@ import { useMaterialProps, type PbrMaterial } from '../useMaterialProps';
 import { applyBoxUvs, useFinishTextures } from '../useFinishTextures';
 import { useViewportStore } from '@ui/store';
 import { useGhostStore } from '@ui/store/ghostStore';
+import { useTintStore } from '@ui/store/tintStore';
 
 export interface SolidSurface {
   roughness: number;
@@ -62,7 +63,14 @@ export function SolidMeshShell({
   }, [geometry, boundsTree]);
 
   const ghosted = useGhostStore((s) => s.ghostedIds.has(entity.id));
-  const matProps = useMaterialProps({ color, selected, ...surface, pbrOverride: pbrMaterial, ghosted });
+  const tint = useTintStore((s) => s.tints.get(entity.id));
+  const matProps = useMaterialProps({
+    color: tint ?? color,
+    selected,
+    ...surface,
+    pbrOverride: tint === undefined ? pbrMaterial : undefined,
+    ghosted,
+  });
   const displayMode = useViewportStore((s) => s.displayMode);
   const finishScale = pbrMaterial?.finish?.scale;
   const textures = useFinishTextures(pbrMaterial);
@@ -70,7 +78,7 @@ export function SolidMeshShell({
   useLayoutEffect(() => {
     if (finishScale !== undefined) applyBoxUvs(geometry, finishScale);
   }, [geometry, finishScale]);
-  const textured = textures !== null && displayMode === 'shaded' && !ghosted;
+  const textured = textures !== null && displayMode === 'shaded' && !ghosted && tint === undefined;
 
   return (
     <mesh
@@ -103,6 +111,8 @@ export function SolidMeshShell({
         />
       ) : (
         <meshStandardMaterial
+          // transparent / depthWrite only take effect on a fresh material: rebuild it when the ghost state flips
+          key={ghosted ? 'ghost' : 'solid'}
           {...matProps}
           side={doubleSided ? THREE.DoubleSide : matProps.side}
           polygonOffset

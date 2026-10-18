@@ -23,9 +23,16 @@ export const utilisationColor = (utilisation: number, ok = true): string => UTIL
 
 /** The rows of a check as overlay marks (rows whose element has no geometry are dropped). */
 export function toUtilisationMarks(rows: readonly ReportRow[], building: BuildingModel | undefined): UtilisationMark[] {
-  return rows.flatMap((row): UtilisationMark[] => {
+  // One mark per element, carrying its worst row (a member checked for several effects is coloured by the governing one).
+  const byElement = new Map<string, UtilisationMark>();
+  for (const row of rows) {
     const entityIds = building?.elements[row.elementId]?.entityIds ?? [];
-    if (entityIds.length === 0) return [];
-    return [{ key: row.key, entityIds, utilisation: row.utilisation, failing: isFailing(row), label: row.label }];
-  });
+    if (entityIds.length === 0) continue;
+    const mark = { key: row.key, entityIds, utilisation: row.utilisation, failing: isFailing(row), label: row.label };
+    const known = byElement.get(row.elementId);
+    if (known === undefined || mark.utilisation > known.utilisation || (mark.failing && !known.failing))
+      byElement.set(row.elementId, { ...mark, failing: mark.failing || (known?.failing ?? false) });
+    else if (mark.failing) byElement.set(row.elementId, { ...known, failing: true });
+  }
+  return [...byElement.values()];
 }

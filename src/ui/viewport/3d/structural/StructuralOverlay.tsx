@@ -1,5 +1,6 @@
-// Colours the members of the last structural check on the model by utilisation (green < 0.7, amber < 1, red ≥ 1): a translucent
-// hull and outline over each member, "UR 1.12" pills on the worst ones. Inside the floating-origin group; toggled in Building › Structural check.
+// Colours the members of the last structural check on the model by utilisation (green < 0.7, amber < 1, red ≥ 1): in 3D the members'
+// own solids take the colour (tintStore — exact for diagonals); the 2D plan draws a translucent hull per member. "UR 1.12" pills on the
+// worst ones. Inside the floating-origin group; toggled in Building › Structural check.
 
 import React, { useEffect, useMemo } from 'react';
 import { useThree } from '@react-three/fiber';
@@ -8,8 +9,10 @@ import { boundsCenter, entityBoundsInDoc, type Bounds } from '@core/geometry/bou
 import type { Vec3 } from '@core/model/types';
 import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { useGhostStore } from '@ui/store/ghostStore';
+import { useTintStore } from '@ui/store/tintStore';
 import { useStructuralOverlayStore, type UtilisationMark } from '@ui/store/structuralOverlayStore';
 import { utilisationColor } from '@ui/panels/building/utilisationColor';
+import { CLADDING_LAYER_NAME } from '@ui/panels/building/claddingLayer';
 import { useDisposable } from '../../useDisposable';
 import { ProjectedLabel } from '../ProjectedLabel';
 
@@ -44,14 +47,15 @@ function MemberHull({ bounds, color }: { bounds: Bounds; color: string }): React
   );
 }
 
-export function StructuralOverlay(): React.ReactElement | null {
+/** `hulls`: draw a box per member (the 2D plan, whose members are not solids); 3D tints the member solids instead. */
+export function StructuralOverlay({ hulls = false }: { hulls?: boolean }): React.ReactElement | null {
   const document = useDocumentWithoutSelection();
   const shown = useStructuralOverlayStore((s) => s.shown);
   const marks = useStructuralOverlayStore((s) => s.marks);
   const invalidate = useThree((state) => state.invalidate);
   useEffect(() => invalidate(), [shown, marks, document, invalidate]);
   // See through the envelope (cladding, slabs, everything not checked) so the coloured members read at a glance.
-  const building = document.building;
+  const { building, layers, entities } = document;
   useEffect(() => {
     const { setGhosted } = useGhostStore.getState();
     if (!shown || marks.length === 0 || building === undefined) {
@@ -60,9 +64,23 @@ export function StructuralOverlay(): React.ReactElement | null {
     }
     const checked = new Set(marks.flatMap((mark) => mark.entityIds));
     const others = Object.values(building.elements).flatMap((element) => element.entityIds.filter((id) => !checked.has(id)));
-    setGhosted('structural', new Set(others));
+    // The generated envelope sits on its own layer, outside the element lists.
+    const claddingLayerIds = new Set(Object.values(layers).flatMap((layer) => (layer.name === CLADDING_LAYER_NAME ? [layer.id] : [])));
+    const cladding = Object.values(entities).flatMap((entity) => (claddingLayerIds.has(entity.layerId) ? [entity.id] : []));
+    setGhosted('structural', new Set([...others, ...cladding]));
     return () => setGhosted('structural', new Set());
-  }, [shown, marks, building]);
+  }, [shown, marks, building, layers, entities]);
+  useEffect(() => {
+    const { setTints } = useTintStore.getState();
+    if (hulls || !shown) {
+      setTints(new Map());
+      return;
+    }
+    setTints(
+      new Map(marks.flatMap((mark) => mark.entityIds.map((id) => [id, utilisationColor(mark.utilisation, !mark.failing)] as const))),
+    );
+    return () => setTints(new Map());
+  }, [hulls, shown, marks]);
 
   const drawn = useMemo(
     () =>
@@ -101,9 +119,7 @@ export function StructuralOverlay(): React.ReactElement | null {
         const position = worst.has(mark.key) ? labelPosition(boxes) : null;
         return (
           <React.Fragment key={mark.key}>
-            {boxes.map((bounds, index) => (
-              <MemberHull key={index} bounds={bounds} color={color} />
-            ))}
+            {hulls && boxes.map((bounds, index) => <MemberHull key={index} bounds={bounds} color={color} />)}
             {position !== null && (
               <ProjectedLabel
                 position={position}

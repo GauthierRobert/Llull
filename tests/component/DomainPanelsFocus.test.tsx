@@ -53,6 +53,25 @@ describe('utilisation colouring (pure)', () => {
   });
 });
 
+describe('utilisation marks (pure)', () => {
+  it('one mark per element, coloured by its governing (worst) row', () => {
+    const building = { elements: { a: { entityIds: ['e1'] }, b: { entityIds: ['e2'] } } } as never;
+    const row = (key: string, elementId: string, utilisation: number): ReportRow => ({
+      key,
+      elementId,
+      label: key,
+      utilisation,
+      ok: true,
+      detail: '',
+    });
+    const marks = toUtilisationMarks([row('0', 'a', 0.4), row('1', 'a', 0.9), row('2', 'b', 0.2)], building);
+    expect(marks.map((mark) => [mark.entityIds[0], mark.utilisation])).toEqual([
+      ['e1', 0.9],
+      ['e2', 0.2],
+    ]);
+  });
+});
+
 describe('Building: structural and clash rows highlight on the model', () => {
   it('colours the checked members, shows the KPI strip and focuses a member with its UR', () => {
     localDispatch('add_portal_frame_building', {});

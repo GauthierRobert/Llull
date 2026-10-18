@@ -12,12 +12,14 @@ import { useIsFocused } from '@ui/store/focusStore';
 import { useStructuralOverlayStore } from '@ui/store/structuralOverlayStore';
 import { memberFocus } from './structuralFocus';
 import { UTILISATION_COLORS, UTILISATION_LEGEND, toUtilisationMarks, utilisationBand, utilisationColor } from './utilisationColor';
-import { isFailing, toWarnings, worstRows, type ReportRow } from './structuralReport';
+import { allRows, isFailing, toWarnings, worstRows, type ReportRow } from './structuralReport';
 import { LabeledInput } from '@ui/panels/LabeledInput';
 
 interface Report {
   readonly summary: string;
   readonly rows: ReadonlyArray<ReportRow>;
+  /** Every row: the KPIs and the model colouring (rows is the worst few the list shows). */
+  readonly all: ReadonlyArray<ReportRow>;
   readonly warnings: ReadonlyArray<string>;
   readonly building: BuildingModel | undefined;
 }
@@ -99,14 +101,20 @@ export function StructuralSection(): React.ReactElement {
   const report = computed !== null && computed.building === building ? computed : null;
   const setMarks = useStructuralOverlayStore((s) => s.setMarks);
   useEffect(() => {
-    setMarks(report === null ? [] : toUtilisationMarks(report.rows, building));
+    setMarks(report === null ? [] : toUtilisationMarks(report.all, building));
   }, [report, building, setMarks]);
   useEffect(() => () => setMarks([]), [setMarks]);
   const loads = { deadLoad: Number(deadLoad), snowLoad: Number(snowLoad), windPressure: Number(windPressure) };
 
   const runCheck = (command: CheckCommand): void => {
     const result = runQuery(command, loadsFromModel.has(command) ? {} : loads);
-    setReport({ summary: result.summary, rows: worstRows(result.data), warnings: toWarnings(result.data), building });
+    setReport({
+      summary: result.summary,
+      rows: worstRows(result.data),
+      all: allRows(result.data),
+      warnings: toWarnings(result.data),
+      building,
+    });
   };
 
   return (
@@ -173,7 +181,7 @@ export function StructuralSection(): React.ReactElement {
       </div>
       {report !== null && (
         <>
-          <KpiStrip items={utilisationKpis(report.rows)} label="Structural summary" />
+          <KpiStrip items={utilisationKpis(report.all)} label="Structural summary" />
           {report.rows.some(isFailing) && (
             <p className="building-subhead" role="note" data-testid="frame-check-next-step">
               Some members fail: use Auto-size above to up-size them, then verify again.

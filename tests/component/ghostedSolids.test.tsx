@@ -26,3 +26,17 @@ describe('ghosted solids (a painted FEA result stands in for the part)', () => {
     expect(useGhostStore.getState().ghostedIds.size).toBe(0);
   });
 });
+
+describe('tinted solids (members coloured by utilisation on their real geometry)', () => {
+  it('keeps one shared empty map when cleared and returns the colour per entity', async () => {
+    const { useTintStore } = await import('@ui/store/tintStore');
+    act(() => useTintStore.getState().setTints(new Map([['member-1', '#ff4d4f']])));
+    expect(useTintStore.getState().tints.get('member-1')).toBe('#ff4d4f');
+    const { result } = renderHook(() =>
+      useMaterialProps({ color: useTintStore.getState().tints.get('member-1') ?? '#888', selected: false }),
+    );
+    expect(result.current.color).toBe('#ff4d4f');
+    act(() => useTintStore.getState().setTints(new Map()));
+    expect(useTintStore.getState().tints.size).toBe(0);
+  });
+});
