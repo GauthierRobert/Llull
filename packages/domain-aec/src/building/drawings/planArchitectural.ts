@@ -15,7 +15,6 @@ import { fromMm, toMetres } from '@core/model/units';
 import { planAreaM2 } from '../../shared/planArea';
 import { gridBubbleCenters } from '../geometry/gridGeometry';
 import { doorSwing, openingsOf, pointAlong, wallExtent, wallFrame, wallPieces } from '../geometry/wallGeometry';
-import { stairPoint } from '../geometry/stairGeometry';
 import { layerBoundaries } from '../elements/wallLayers';
 import { DIMENSION_LAYER, type PlanSource, annotationText, band, isCut, layerName, thinLine } from './planModel';
 import type { DrawingPrimitive } from '@core/model/drawing';
@@ -120,28 +119,6 @@ export function dimensionPrimitives(doc: PlanSource, building: BuildingModel, wa
     const right = Math.max(a.start[0], a.end[0], b.start[0], b.end[0], ring ? ring[2] + clear : -Infinity);
     primitives.push(dimension([right, a.start[1]], [right, b.start[1]], gap / 2, dimensionLabel(doc, b.start[1] - a.start[1])));
   }
-  return primitives;
-}
-
-export function stairPrimitives(
-  doc: PlanSource,
-  stair: Extract<BuildingModel['elements'][string], { category: 'stair' }>,
-): DrawingPrimitive[] {
-  const half = stair.width / 2;
-  const at = (along: number, across: number): Vec2 => stairPoint(stair, along, across);
-  const run = (stair.riserCount - 1) * stair.treadDepth;
-  const layer = layerName('stair');
-  const primitives: DrawingPrimitive[] = [
-    { type: 'polygon', layer, style: 'thin', points: [at(0, -half), at(run, -half), at(run, half), at(0, half)] },
-  ];
-  for (let index = 1; index < stair.riserCount - 1; index++) {
-    const along = index * stair.treadDepth;
-    primitives.push(thinLine(layer, at(along, -half), at(along, half)));
-  }
-  primitives.push(
-    { type: 'polyline', layer, style: 'thin', points: [at(stair.treadDepth / 2, 0), at(run - stair.treadDepth / 2, 0)] },
-    annotationText(layer, at(-fromMm(doc, 400), 0), fromMm(doc, 200), `UP ${stair.riserCount}R`),
-  );
   return primitives;
 }
 

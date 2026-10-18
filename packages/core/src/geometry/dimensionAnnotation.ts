@@ -10,6 +10,8 @@ import { planeToWorld } from './workPlane';
 export const DEFAULT_DIMENSION_OFFSET = 5;
 const DEFAULT_ARROW_SIZE = 0.3;
 const ANGULAR_ARC_SEGMENTS = 32;
+/** Default angular arc radius as a fraction of the shorter arm. */
+const ANGULAR_ARC_ARM_FRACTION = 0.4;
 const EPSILON = 1e-9;
 
 type DimensionSegment = readonly [Vec2, Vec2];
@@ -19,6 +21,8 @@ export interface DimensionDrawing {
   value: number;
   /** Label anchor (centre of the text). */
   textAt: Vec2;
+  /** Unit direction of the dimension line (tangent of the arc, leader for radial): labels slide along it when they collide. */
+  direction: Vec2;
   /** Every stroke: extension lines, dimension line / arc, arrowheads. */
   segments: DimensionSegment[];
   /** Elevation of the construction (z of the first reference). */
@@ -58,7 +62,7 @@ function arrowhead(tip: Vec2, dx: number, dy: number, size: number): DimensionSe
 function linearDrawing(a: Vec2, b: Vec2, offset: number, aligned: boolean, size: number): Omit<DimensionDrawing, 'z'> {
   const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
   const length = Math.hypot(dx, dy);
-  if (length < EPSILON) return { value: 0, textAt: [a[0], a[1] + offset], segments: [] };
+  if (length < EPSILON) return { value: 0, textAt: [a[0], a[1] + offset], direction: [1, 0], segments: [] };
   const vertical = !aligned && Math.abs(dy) > Math.abs(dx);
   const [perpX, perpY] = [-dy / length, dx / length];
   const [dimA, dimB]: [Vec2, Vec2] = aligned
@@ -79,6 +83,7 @@ function linearDrawing(a: Vec2, b: Vec2, offset: number, aligned: boolean, size:
   return {
     value: aligned ? length : vertical ? Math.abs(dy) : Math.abs(dx),
     textAt: [(dimA[0] + dimB[0]) / 2, (dimA[1] + dimB[1]) / 2],
+    direction: [dirX / Math.hypot(dirX, dirY), dirY / Math.hypot(dirX, dirY)],
     segments: [[a, dimA], [b, dimB], [dimA, dimB], ...arrowhead(dimA, -dirX, -dirY, size), ...arrowhead(dimB, dirX, dirY, size)],
   };
 }
@@ -94,6 +99,7 @@ function radialDrawing(ref: Radial, offset: number, diameter: boolean, size: num
   return {
     value: diameter ? radius * 2 : radius,
     textAt: [cx + ux * radius * 1.15, cy + uy * radius * 1.15],
+    direction: [ux, uy],
     segments: [[diameter ? far : [cx, cy], rim], ...arrowhead(rim, ux, uy, size), ...(diameter ? arrowhead(far, -ux, -uy, size) : [])],
   };
 }
@@ -108,13 +114,17 @@ function angularDrawing(vertex: Vec2, armA: Vec2, armB: Vec2, offset: number): O
   const swapped = sweep > Math.PI;
   const startAngle = swapped ? angleB : angleA;
   const minorSweep = swapped ? Math.PI * 2 - sweep : sweep;
-  const radius = offset > 0 ? offset : DEFAULT_DIMENSION_OFFSET;
+  // the default offset means "unspecified": size the arc to the shorter arm so it stays legible at any drawing scale
+  const shorterArm = Math.min(Math.hypot(armA[0] - vx, armA[1] - vy), Math.hypot(armB[0] - vx, armB[1] - vy));
+  const radius =
+    offset > 0 && offset !== DEFAULT_DIMENSION_OFFSET ? offset : Math.max(DEFAULT_DIMENSION_OFFSET, shorterArm * ANGULAR_ARC_ARM_FRACTION);
   const onArc = (angle: number): Vec2 => [vx + Math.cos(angle) * radius, vy + Math.sin(angle) * radius];
   const arc = Array.from({ length: ANGULAR_ARC_SEGMENTS + 1 }, (_, i) => onArc(startAngle + (minorSweep * i) / ANGULAR_ARC_SEGMENTS));
   const midAngle = startAngle + minorSweep / 2;
   return {
     value: (minorSweep * 180) / Math.PI,
     textAt: [vx + Math.cos(midAngle) * radius * 1.4, vy + Math.sin(midAngle) * radius * 1.4],
+    direction: [-Math.sin(midAngle), Math.cos(midAngle)],
     segments: [
       ...arc.slice(1).map((end, i): DimensionSegment => [arc[i] as Vec2, end]),
       [vertex, onArc(startAngle)],

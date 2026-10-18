@@ -1,6 +1,7 @@
 /** Value validation of a raw `analysis` slice (persistence rejects the file when this returns errors). */
 
 import { isRecord } from '@lib/isRecord';
+import { durabilityErrors } from './validateDurability';
 
 const TYPES = ['static', 'modal', 'buckling', 'heat_steady', 'heat_transient', 'thermo_static', 'coupled_temperature_displacement'];
 const UNIT_SYSTEMS = ['N-mm-t-s', 'N-m-kg-s', 'lbf-in-slinch-s'];
@@ -182,5 +183,5 @@ export function analysisErrors(raw: Record<string, unknown>): string[] {
   scope.errors.push(...paths.map((path) => `${path} is not a finite number`));
   const order = analysis['caseOrder'] as unknown[];
   checkBag(scope, 'analysis.cases', analysis['cases'], order, (id, analysisCase) => checkCase(scope, id, analysisCase));
-  return scope.errors;
+  return [...scope.errors, ...durabilityErrors(raw)];
 }

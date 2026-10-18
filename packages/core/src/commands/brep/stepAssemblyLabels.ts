@@ -10,8 +10,14 @@ import { REPRESENTATION_PATTERN, type StepLabel, addColors, geometryItems, rgbOf
 /** What to stamp on the assembly: one entry per distinct part and one per occurrence (in kernel input order). */
 export interface AssemblyStepLabels {
   readonly rootName: string;
-  readonly parts: readonly { readonly name: string; readonly description?: string; readonly solids: readonly StepLabel[] }[];
-  readonly occurrences: readonly { readonly name: string; readonly part: number }[];
+  readonly parts: readonly {
+    readonly name: string;
+    readonly description?: string;
+    readonly solids: readonly StepLabel[];
+    /** Uses of other parts inside this one (sub-assembly), in kernel input order. */
+    readonly occurrences?: readonly NestedOccurrence[];
+  }[];
+  readonly occurrences: readonly NestedOccurrence[];
 }
 
 const NAUO_PATTERN = /#(\d+) = NEXT_ASSEMBLY_USAGE_OCCURRENCE\('[^']*','[^']*','[^']*',#(\d+),#(\d+),\$\);/g;
@@ -65,6 +71,18 @@ function renameOccurrence(step: string, nauo: Nauo, name: string): string {
   return step.replace(new RegExp(`(#${nauo.id} = NEXT_ASSEMBLY_USAGE_OCCURRENCE\\()'[^']*','[^']*'`), `$1'${stepString(name)}',''`);
 }
 
+/** The occurrences nested inside one part (a sub-assembly), in the order the kernel was given them (after the part's own solids). */
+export interface NestedOccurrence {
+  readonly name: string;
+  readonly part: number;
+}
+
+/** Number of NAUOs hanging under a part: none for a lone solid (stored in the part itself), else one per solid plus one per nested use. */
+function innerCount(part: AssemblyStepLabels['parts'][number]): number {
+  const nested = part.occurrences?.length ?? 0;
+  return part.solids.length === 1 && nested === 0 ? 0 : part.solids.length + nested;
+}
+
 export function labelStepAssembly(step: string, labels: AssemblyStepLabels): string {
   const all: Nauo[] = [...step.matchAll(NAUO_PATTERN)].map((match) => ({
     id: match[1] ?? '',
@@ -77,16 +95,28 @@ export function labelStepAssembly(step: string, labels: AssemblyStepLabels): str
   if (roots.length !== 1 || root === undefined) return step;
   const placed = all.filter((nauo) => nauo.parent === root);
   if (placed.length !== labels.occurrences.length) return step;
+  // walk the occurrence tree: every use of a part must resolve to the same product definition, at every depth
   const definitionOfPart = new Map<number, string>();
-  for (const [index, nauo] of placed.entries()) {
-    const part = labels.occurrences[index]?.part;
-    if (part === undefined || (definitionOfPart.get(part) ?? nauo.child) !== nauo.child) return step;
-    definitionOfPart.set(part, nauo.child);
-  }
+  const names: { nauo: Nauo; name: string }[] = [];
+  const walk = (uses: readonly Nauo[], used: readonly NestedOccurrence[]): boolean => {
+    for (const [index, nauo] of uses.entries()) {
+      const part = used[index]?.part;
+      if (part === undefined || (definitionOfPart.get(part) ?? nauo.child) !== nauo.child) return false;
+      names.push({ nauo, name: used[index]?.name ?? '' });
+      if (definitionOfPart.has(part)) continue;
+      definitionOfPart.set(part, nauo.child);
+      const spec = labels.parts[part];
+      const nested = spec?.occurrences ?? [];
+      if (spec === undefined || nested.length === 0) continue;
+      const inner = all.filter((candidate) => candidate.parent === nauo.child);
+      if (inner.length !== innerCount(spec)) continue;
+      if (!walk(inner.slice(spec.solids.length), nested)) return false;
+    }
+    return true;
+  };
+  if (!walk(placed, labels.occurrences)) return step;
   let named = step;
-  placed.forEach((nauo, index) => {
-    named = renameOccurrence(named, nauo, labels.occurrences[index]?.name ?? '');
-  });
+  for (const { nauo, name } of names) named = renameOccurrence(named, nauo, name);
   const rootProduct = productOf(named, root);
   if (rootProduct !== null) named = renameProduct(named, rootProduct, labels.rootName, '');
   const styled: { items: string[]; rgb: [number, number, number] }[] = [];
@@ -97,12 +127,12 @@ export function labelStepAssembly(step: string, labels: AssemblyStepLabels): str
     if (part === undefined || product === null) continue;
     named = renameProduct(named, product, part.name, part.description ?? '');
     const inner = all.filter((nauo) => nauo.parent === definition);
+    if (inner.length !== innerCount(part)) continue;
     // one solid stays inside the part's own representation; several are written as one sub-product each (in input order)
     const targets =
       inner.length === 0
         ? [{ definition, solid: part.solids[0] }]
-        : inner.map((nauo, k) => ({ definition: nauo.child, solid: part.solids[k], nauo }));
-    if (inner.length === 0 ? part.solids.length !== 1 : inner.length !== part.solids.length) continue;
+        : inner.slice(0, part.solids.length).map((nauo, k) => ({ definition: nauo.child, solid: part.solids[k], nauo }));
     for (const target of targets) {
       if (target.solid === undefined) continue;
       if ('nauo' in target) {

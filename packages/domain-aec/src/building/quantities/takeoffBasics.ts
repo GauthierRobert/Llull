@@ -4,7 +4,7 @@ import { polygonArea } from '@lib/polygon';
 import { toMetres } from '@core/model/units';
 import { round } from '../../shared/numeric';
 import { builtExtent, openingsOf } from '../geometry/wallGeometry';
-import { stairFlightVolume } from '../geometry/stairGeometry';
+import { stairConcreteVolume } from '../geometry/stairGeometry';
 
 type TakeoffUnit = 'm' | 'm2' | 'm3' | 'ea' | 'kg';
 
@@ -56,7 +56,7 @@ export function columnSectionArea(column: Extract<BuildingElement, { category: '
 }
 
 export function stairVolume(stair: Extract<BuildingElement, { category: 'stair' }>): number {
-  return stairFlightVolume(stair);
+  return stairConcreteVolume(stair);
 }
 
 const REBAR_KG_PER_M3 = 7850;

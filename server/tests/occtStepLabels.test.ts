@@ -110,6 +110,44 @@ describe('occt export_step_exact labels', () => {
     expect(imported.affected.length).toBeGreaterThan(0);
   }, 120_000);
 
+  it('writes a nested sub-assembly once with composed locations and re-imports the same solids', () => {
+    let doc = execute(createEmptyDocument(), 'add_box', { size: [10, 10, 4] }).document;
+    doc = execute(doc, 'add_cylinder', { radius: 2, height: 20, position: [0, 0, -12] }).document;
+    const [head, shank] = doc.order;
+    doc = execute(doc, 'set_entity_name', { id: head ?? '', name: 'Head' }).document;
+    doc = execute(doc, 'set_entity_name', { id: shank ?? '', name: 'Shank' }).document;
+    doc = execute(doc, 'create_component', { name: 'Bolt', entityIds: [head ?? '', shank ?? ''] }).document;
+    const bolt = Object.keys(doc.components)[0] ?? '';
+    const firstBolt = doc.order.find((id) => doc.entities[id]?.kind === 'instance') ?? '';
+    const secondBolt = execute(doc, 'insert_instance', { componentId: bolt, position: [30, 0, 0] });
+    doc = execute(secondBolt.document, 'create_component', { name: 'Pair', entityIds: [firstBolt, ...secondBolt.affected] }).document;
+    const pair = Object.keys(doc.components).find((id) => id !== bolt) ?? '';
+    doc = execute(doc, 'insert_instance', { componentId: pair, position: [0, 60, 0], rotation: [0.4, 0.5, 0.6458] }).document;
+    doc = execute(doc, 'insert_instance', { componentId: pair, position: [0, 120, 0] }).document;
+
+    const ctx = { ...defaultContext(), kernel: kernels.occt };
+    const exported = execute(doc, 'export_step_exact', {}, ctx);
+    const step = (exported.data as { step: string }).step;
+    expect(exported.data).toMatchObject({ assembly: { products: 2, occurrences: 3 } });
+    // 3 uses of Pair + 2 uses of Bolt inside Pair + the 2 solids inside Bolt
+    expect(step.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE\(/g)).toHaveLength(7);
+    expect(step.match(/PRODUCT\('Bolt'/g)).toHaveLength(1);
+    expect(step.match(/PRODUCT\('Pair'/g)).toHaveLength(1);
+    expect(step.match(/MANIFOLD_SOLID_BREP\(/g)).toHaveLength(2);
+    for (const name of ['Pair 1', 'Pair 2', 'Pair 3', 'Bolt 1', 'Bolt 2'])
+      expect(step).toContain(`NEXT_ASSEMBLY_USAGE_OCCURRENCE('${name}'`);
+
+    const imported = execute(createEmptyDocument(), 'import_step_exact', { text: step }, ctx);
+    expect(imported.affected).toHaveLength(12);
+    const volume = (document: typeof doc, id: string): number => {
+      const measured = execute(document, 'mass_properties', { entityId: id }, ctx).data as { volume: number };
+      return measured.volume;
+    };
+    const original = doc.order.filter((id) => doc.entities[id]?.kind === 'instance').reduce((sum, id) => sum + volume(doc, id), 0);
+    const reimported = imported.affected.reduce((sum, id) => sum + volume(imported.document, id), 0);
+    expect(Math.abs(reimported - original)).toBeLessThan(original * 1e-4);
+  }, 180_000);
+
   it('keeps the flat list when no instance is exported', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'add_box', { size: [10, 10, 10] }).document;

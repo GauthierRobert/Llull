@@ -227,11 +227,15 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
   const exportStepAssembly = (occurrences: readonly StepOccurrence[]): string | null => {
     const withShapes = (map: (shape: ShapeHandle) => ShapeHandle): StepOccurrence[] => {
       const parts = new Map<StepOccurrence['part'], StepOccurrence['part']>();
-      return occurrences.map((occurrence) => {
-        const part = parts.get(occurrence.part) ?? { shapes: occurrence.part.shapes.map(map) };
-        parts.set(occurrence.part, part);
-        return { ...occurrence, part };
-      });
+      const mapPart = (source: StepOccurrence['part']): StepOccurrence['part'] => {
+        const known = parts.get(source);
+        if (known !== undefined) return known;
+        const children = source.children?.map((child) => ({ ...child, part: mapPart(child.part) }));
+        const part = { shapes: source.shapes.map(map), ...(children === undefined ? {} : { children }) };
+        parts.set(source, part);
+        return part;
+      };
+      return occurrences.map((occurrence) => ({ ...occurrence, part: mapPart(occurrence.part) }));
     };
     const reply = exchange('exportStepAssembly', [withShapes(keyOnlyHandle)]);
     if (reply?.error?.startsWith(SHAPE_NOT_CACHED) !== true) return (reply?.result ?? null) as string | null;

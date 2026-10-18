@@ -11,13 +11,13 @@ const step = (doc: CadDocument, kernel: FakeKernel | null): ReturnType<typeof ex
   execute(doc, 'export_step_exact', {}, { ...defaultContext(), kernel });
 
 /** Kernel STEP text for a root with `nauos` placed uses (part index each) over `parts` single-solid products, plus optional inner NAUOs. */
-function fakeText(placed: readonly number[], innerSolids: Record<number, number> = {}): string {
+function fakeText(placed: readonly number[], innerSolids: Record<number, number> = {}, nested: Record<number, number[]> = {}): string {
   const lines: string[] = [
     "#11 = AXIS2_PLACEMENT_3D('',#1,#2,#3);",
     "#7 = PRODUCT('Open CASCADE STEP translator 7.4 1','Open CASCADE STEP translator 7.4 1','',(#8));",
   ];
   lines.push("#6 = PRODUCT_DEFINITION_FORMATION('','',#7);", "#5 = PRODUCT_DEFINITION('design','',#6,#9);");
-  const partCount = Math.max(...placed) + 1;
+  const partCount = Math.max(...placed, ...Object.values(nested).flat()) + 1;
   let next = 100;
   const definitions: number[] = [];
   for (let part = 0; part < partCount; part += 1) {
@@ -55,6 +55,12 @@ function fakeText(placed: readonly number[], innerSolids: Record<number, number>
         `#${nauo} = NEXT_ASSEMBLY_USAGE_OCCURRENCE('${k}','','',#${definitions[Number(part)]},#${definition},$);`,
       );
     }
+  }
+  for (const [part, uses] of Object.entries(nested)) {
+    uses.forEach((child, k) => {
+      lines.push(`#${next}${k} = NEXT_ASSEMBLY_USAGE_OCCURRENCE('n${k}','','',#${definitions[Number(part)]},#${definitions[child]},$);`);
+    });
+    next += 1;
   }
   placed.forEach((part, k) => lines.push(`#${next + k} = NEXT_ASSEMBLY_USAGE_OCCURRENCE('${k + 7}','','',#5,#${definitions[part]},$);`));
   return `DATA;\n${lines.join('\n')}\nENDSEC;`;
@@ -127,7 +133,7 @@ describe('export_step_exact assembly', () => {
     expect(captured.occurrences[1]?.rotation[2]).not.toBe(0);
   });
 
-  it('writes a rotated instance of a rotated child as a baked part (Euler angles do not compose)', () => {
+  it('places a rotated instance of a rotated child by location (any rotation is a location, no Euler addition)', () => {
     let doc = execute(createEmptyDocument(), 'add_box', { size: [4, 4, 4], rotation: [0, 0, 30] }).document;
     doc = execute(doc, 'create_component', { name: 'Skew', entityIds: [...doc.order] }).document;
     const componentId = Object.keys(doc.components)[0] ?? '';
@@ -137,8 +143,72 @@ describe('export_step_exact assembly', () => {
       assemblyKernel(() => null),
     );
     const [first, second] = captured.occurrences;
-    expect(first?.part).not.toBe(second?.part);
-    expect(second?.rotation).toEqual([0, 0, 0]);
+    expect(first?.part).toBe(second?.part);
+    expect(second?.rotation).toEqual([90, 0, 0]);
+  });
+
+  it('names a baked scaled instance after its component and scale', () => {
+    const result = step(
+      rodsAndPlate(2, { scale: [2, 1, 1] }),
+      assemblyKernel(() => fakeText([0, 1, 2])),
+    );
+    const text = (result.data as { step: string }).step;
+    // × is written as the STEP escape \X2\00D7\X0\\
+    const times = '\\X2\\00D7\\X0\\';
+    expect(text).toContain(`PRODUCT('Rod (scaled ${times}2${times}1${times}1)'`);
+    const uniform = step(
+      rodsAndPlate(2, { scale: [1.5, 1.5, 1.5] }),
+      assemblyKernel(() => fakeText([0, 1, 2])),
+    );
+    expect((uniform.data as { step: string }).step).toContain(`PRODUCT('Rod (scaled ${times}1.5)'`);
+  });
+
+  it('writes a sub-assembly once: a component of two instances used three times shares its nested part', () => {
+    let doc = execute(createEmptyDocument(), 'add_box', { size: [4, 4, 4], name: 'Bolt body' }).document;
+    doc = execute(doc, 'create_component', { name: 'Bolt', entityIds: [...doc.order] }).document;
+    const bolt = Object.keys(doc.components)[0] ?? '';
+    const first = Object.keys(doc.entities).find((id) => doc.entities[id]?.kind === 'instance') ?? '';
+    const second = execute(doc, 'insert_instance', { componentId: bolt, position: [10, 0, 0], rotation: [0.2, 0.3, 0.4] });
+    doc = execute(second.document, 'create_component', { name: 'Pair', entityIds: [first, ...second.affected] }).document;
+    const pair = Object.keys(doc.components).find((id) => id !== bolt) ?? '';
+    for (const rotation of [
+      [0, 0, 0],
+      [0.4, 0.5, 0.6458],
+    ])
+      doc = execute(doc, 'insert_instance', { componentId: pair, rotation }).document;
+    const result = step(
+      doc,
+      assemblyKernel(() => fakeText([1, 1, 1], {}, { 1: [0, 0] })),
+    );
+    const [use1, use2, use3] = captured.occurrences;
+    expect(use1?.part).toBe(use2?.part);
+    expect(use2?.part).toBe(use3?.part);
+    const children = use1?.part.children ?? [];
+    expect(children).toHaveLength(2);
+    expect(children[0]?.part).toBe(children[1]?.part);
+    expect(children[1]?.position).toEqual([10, 0, 0]);
+    expect(children[1]?.rotation).toEqual([0.2, 0.3, 0.4]);
+    expect(use3?.rotation).toEqual([0.4, 0.5, 0.6458]);
+    expect(result.data).toMatchObject({ assembly: { products: 2, occurrences: 3 } });
+    const text = (result.data as { step: string }).step;
+    expect(text).toContain("PRODUCT('Pair','Pair'");
+    expect(text).toContain("PRODUCT('Bolt','Bolt'");
+    for (const name of ['Pair 1', 'Pair 2', 'Pair 3', 'Bolt 1', 'Bolt 2'])
+      expect(text).toContain(`NEXT_ASSEMBLY_USAGE_OCCURRENCE('${name}'`);
+  });
+
+  it('bakes a component whose nested instance is scaled, and one that instances itself', () => {
+    let doc = execute(createEmptyDocument(), 'add_box', { size: [4, 4, 4] }).document;
+    doc = execute(doc, 'create_component', { name: 'Bolt', entityIds: [...doc.order] }).document;
+    const bolt = Object.keys(doc.components)[0] ?? '';
+    const scaled = execute(doc, 'insert_instance', { componentId: bolt, scale: [2, 2, 2] });
+    doc = execute(scaled.document, 'create_component', { name: 'Big', entityIds: scaled.affected }).document;
+    step(
+      doc,
+      assemblyKernel(() => null),
+    );
+    expect(captured.occurrences[0]?.part.children).toBeUndefined();
+    expect(captured.occurrences[0]?.position).toEqual([0, 0, 0]);
   });
 
   it('names the solids of a multi-solid component as sub-products', () => {
@@ -170,6 +240,25 @@ describe('export_step_exact assembly', () => {
     const result = step(rodsAndPlate(2), fakeKernel({ step: 'FLAT' }));
     expect((result.data as { assembly?: unknown }).assembly).toBeUndefined();
     expect((result.data as { step: string }).step).toBe('FLAT');
+  });
+});
+
+describe('kernel assembly wrapper', () => {
+  const identity = { position: [0, 0, 0], rotation: [0, 0, 0] } as const;
+
+  it('hands nested parts to the writer once each, and refuses a part nested in itself', () => {
+    const kernel = assemblyKernel(() => 'TEXT');
+    const solid = kernel.evaluate({ op: 'solid', entity: { ...createEmptyDocument().entities, id: 'x' } as never });
+    expect(solid).not.toBeNull();
+    const inner = { shapes: [solid as never] };
+    const outer = { shapes: [], children: [{ part: inner, ...identity }] };
+    expect(kernel.exportStepAssembly?.([{ part: outer, ...identity }])).toBe('TEXT');
+    const handed = captured.occurrences[0]?.part.children?.[0]?.part;
+    expect(handed).toBeDefined();
+    expect(handed).not.toBe(inner);
+    const loop: { shapes: never[]; children: StepOccurrence[] } = { shapes: [], children: [] };
+    loop.children.push({ part: loop, ...identity });
+    expect(kernel.exportStepAssembly?.([{ part: loop, ...identity }])).toBeNull();
   });
 });
 

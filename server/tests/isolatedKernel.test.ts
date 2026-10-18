@@ -68,6 +68,27 @@ describe('isolated OCC kernel', () => {
     expect(count(kernel.exportStepAssembly?.(uses))).toBe(3);
   }, 180_000);
 
+  it('writes a nested assembly through the worker: the inner part is one product shared by every outer use', () => {
+    const kernel = make();
+    const shape = kernel.evaluate(leaf(box(2)));
+    expect(shape).not.toBeNull();
+    const identity = { position: [0, 0, 0] as [number, number, number], rotation: [0, 0, 0] as [number, number, number] };
+    const inner = { shapes: [shape!] };
+    const outer = {
+      shapes: [],
+      children: [
+        { part: inner, ...identity },
+        { part: inner, ...identity, position: [5, 0, 0] as [number, number, number] },
+      ],
+    };
+    const text = kernel.exportStepAssembly?.([
+      { part: outer, ...identity },
+      { part: outer, ...identity, position: [0, 9, 0] as [number, number, number] },
+    ]);
+    expect(text?.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE\(/g)).toHaveLength(4);
+    expect(text?.match(/MANIFOLD_SOLID_BREP\(/g)).toHaveLength(1);
+  }, 180_000);
+
   it('survives a forced abort: null result, process alive, worker respawned', () => {
     const kernel = make();
     expect(meshOf(kernel, box(2))).not.toBeNull();

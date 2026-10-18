@@ -1,6 +1,6 @@
 import type { BuildingElement, BuildingLevel, SlabElement } from '@core/model/building';
 import { wallFrame } from '../geometry/wallGeometry';
-import { stairTreads } from '../geometry/stairGeometry';
+import { exportStair } from './ifcStairExport';
 import {
   type Context,
   extrusion,
@@ -61,23 +61,12 @@ export function exportOther(
       );
       return { ref, material: element.material };
     }
-    case 'stair': {
-      const local = placement(context, storeyPlacement, mm(element.start[0]), mm(element.start[1]), 0, element.angle);
-      const steps: string[] = [];
-      for (const tread of stairTreads(element)) {
-        const profile = rectangleProfile(
-          context,
-          [mm((tread.alongStart + tread.alongEnd) / 2), 0],
-          mm(element.treadDepth),
-          mm(element.width),
-        );
-        steps.push(extrusion(context, profile, mm(tread.zTop - tread.zBottom), 0, 0, mm(tread.zBottom)));
-      }
-      const ref = writer.add(
-        `IFCSTAIR('${guid}',$,${ifcString(element.mark)},$,$,${local},${shape(context, steps)},${ifcString(element.id)},.STRAIGHT_RUN_STAIR.)`,
+    case 'stair':
+      return exportStair(
+        context,
+        element,
+        placement(context, storeyPlacement, mm(element.start[0]), mm(element.start[1]), 0, element.angle),
       );
-      return { ref, material: element.material };
-    }
     case 'room': {
       const local = placement(context, storeyPlacement, 0, 0, 0);
       const profile = scaledPolygonProfile(context, element.boundary);

@@ -1,7 +1,7 @@
 /** Slabs, columns, beams and stairs. */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
-import type { BeamElement, BuildingModel, ColumnElement, SlabElement, StairElement, WallElement } from '@core/model/building';
+import type { BeamElement, BuildingModel, ColumnElement, SlabElement, StairElement, StairShape, WallElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { distance, isValidPolygon, offsetPolygon } from '@lib/polygon';
@@ -342,33 +342,135 @@ export const addBeam = defineCommand({
 });
 
 const MAX_RISERS = 200;
+const STAIR_HEADROOM_MM = 2000;
+
+type StairLanding = Pick<StairElement, 'landingAt' | 'landingLength' | 'shape' | 'turn' | 'flightGap'>;
 
 /**
- * @affects creates riserCount - 1 step blocks on a waist slab on layer A-FLOR-STRS
- * @failure invalid start / riserCount < 2 / sizes <= 0 -> no-op
+ * Landing fields of a new stair from the raw params.
+ * @returns the fields to store ({} = no landing), or a refusal reason
+ */
+function resolveStairLanding(
+  doc: CadDocument,
+  count: number,
+  width: number,
+  params: {
+    landingAt?: number | undefined;
+    landingLength?: number | undefined;
+    shape?: StairShape | undefined;
+    turn?: 'left' | 'right' | undefined;
+    flightGap?: number | undefined;
+  },
+): { landing: StairLanding } | { reason: string } {
+  const { landingAt, landingLength, shape = 'straight', turn, flightGap } = params;
+  if (landingAt === undefined && shape === 'straight') {
+    const given = ['landingLength', 'turn', 'flightGap'].filter((name) => params[name as 'turn'] !== undefined);
+    return given.length > 0
+      ? { reason: `${given.join(', ')} need a landing: pass landingAt or shape quarter_turn / half_turn` }
+      : { landing: {} };
+  }
+  if (count < 4) return { reason: `a landing needs at least 4 risers (each flight keeps a tread); riserCount is ${count}` };
+  const at = landingAt ?? Math.min(Math.max(Math.floor(count / 2), 2), count - 2);
+  if (!Number.isInteger(at) || at < 2 || at > count - 2)
+    return { reason: `landingAt must be an integer from 2 to ${count - 2} (riserCount ${count} - 2), got ${at}` };
+  const length = landingLength ?? width;
+  const gap = flightGap ?? fromMm(doc, 100);
+  if (!(length > 0)) return { reason: 'landingLength must be > 0' };
+  if (!(gap >= 0)) return { reason: 'flightGap must be >= 0' };
+  return {
+    landing: {
+      landingAt: at,
+      landingLength: length,
+      shape,
+      ...(shape === 'straight' ? {} : { turn: turn ?? 'left' }),
+      ...(shape === 'half_turn' ? { flightGap: gap } : {}),
+    },
+  };
+}
+
+/** Warnings and the headroom note of a landing. */
+function landingNotes(doc: CadDocument, stair: StairElement, levelHeight: number): string {
+  if (stair.landingAt === undefined) return '';
+  const length = stair.landingLength ?? stair.width;
+  const notes: string[] = [];
+  if (length < stair.width) {
+    notes.push(
+      `WARNING: landing length ${length} is shorter than the stair width ${stair.width}; a landing should be at least as deep as the flight is wide`,
+    );
+  }
+  const landingTop = stair.landingAt * stair.riserHeight;
+  const clearMm = toMm(doc, levelHeight - landingTop);
+  notes.push(
+    `landing top at ${Number(landingTop.toPrecision(5))} (${stair.landingAt} risers), ${clearMm.toFixed(0)} mm below the floor above` +
+      `${clearMm < STAIR_HEADROOM_MM ? ` (under the ${STAIR_HEADROOM_MM} mm headroom wherever that floor is not cut)` : ''}; keep ${STAIR_HEADROOM_MM} mm clear above every tread and the landing, ` +
+      'cut the well with add_slab_opening { stairId } (it covers all flights and the landing)',
+  );
+  return ` Landing: ${notes.join('. ')}.`;
+}
+
+/**
+ * @affects creates riserCount - 1 step blocks on a waist slab on layer A-FLOR-STRS (two flights + a landing slab with landingAt / shape)
+ * @failure invalid start / riserCount < 2 / sizes <= 0 / landing outside 2..riserCount-2 -> no-op
  */
 export const addStair = defineCommand({
   name: 'add_stair',
   description:
-    'Add a straight-run reinforced-concrete-style stair climbing one full level, modelled as a waist slab (sloping slab, waistThickness) with the steps on top; the last riser lands on the upper floor, so N risers give N-1 treads and the run is (N-1) x tread. Riser count defaults to the level height ÷ 175 mm (rounded up), so risers are ' +
-    'equal; tread default 280 mm. Landings are NOT modelled: the flight is one uninterrupted straight run and the last riser arrives on the upper floor, and every stair rises from the base of its level, so a half-landing / dog-leg cannot be composed from two stairs; use riserCount for a partial flight and model a landing separately (add_slab). The summary reports the Blondel rule (2R + G, comfortable between 600 and 650 mm). Refused above 200 ' +
-    'risers or if a stair with the same start and angle already exists on the level.',
+    'Add a reinforced-concrete-style stair climbing one full level, modelled as a waist slab (sloping slab, waistThickness) with the steps on top; the last riser lands on the upper floor, so N risers give N-1 treads (N-2 treads + the landing when a landing is used) and every stair rises from the base of its level. ' +
+    'Riser count defaults to the level height ÷ 175 mm (rounded up), so risers are equal; tread default 280 mm. By default it is ONE straight flight of N-1 treads, run (N-1) x tread. ' +
+    'INTERMEDIATE LANDING: pass landingAt (riser number after which a horizontal landing slab, as thick as the waist, sits; integer 2 to N-2) and/or shape. shape "straight" (default) puts the landing in line between two flights; ' +
+    '"quarter_turn" is an L: the second flight leaves sideways from the far end of the landing; "half_turn" is a dog-leg: the second flight doubles back beside the first, flightGap apart (default 100 mm), sharing the landing. ' +
+    'turn "left" (default) or "right" is the side the second flight goes to (quarter_turn, half_turn). Shapes quarter_turn / half_turn without landingAt put the landing at half the risers. landingLength is the landing depth along the first flight (default = width). ' +
+    'The start point and angle are those of the FIRST flight (middle of its first riser); the second flight is placed from the landing, and the stair is one element (one id, one mark, one takeoff line; flights and landing are separate entities stair-1:flight-1, :flight-2, :landing). ' +
+    'The summary reports the Blondel rule (2R + G, comfortable between 600 and 650 mm) and, for a landing, a WARNING when landingLength < width plus the headroom between the landing and the floor above; add_slab_opening { stairId } cuts a well covering every flight and the landing. ' +
+    'Refused above 200 risers, with a landing on fewer than 4 risers, or if a stair with the same start and angle already exists on the level.',
   params: z.object({
-    start: vec2('Plan point [x, y] at the middle of the first riser.'),
-    angle: z.number().optional().describe('Run direction in radians, counter-clockwise from +X. Default 0 (climbs toward +X).'),
-    width: z.number().optional().describe('Stair width, in document units. Default 1000 mm.'),
-    riserCount: z.number().optional().describe('Number of risers (integer, 2 to 200). Default: level height ÷ 175 mm, rounded up.'),
+    start: vec2('Plan point [x, y] at the middle of the first riser of the first flight.'),
+    angle: z
+      .number()
+      .optional()
+      .describe('Run direction of the first flight in radians, counter-clockwise from +X. Default 0 (climbs toward +X).'),
+    width: z.number().optional().describe('Stair width (each flight), in document units. Default 1000 mm.'),
+    riserCount: z
+      .number()
+      .optional()
+      .describe('Total number of risers over both flights (integer, 2 to 200). Default: level height ÷ 175 mm, rounded up.'),
     treadDepth: z.number().optional().describe('Tread (going) depth, in document units. Default 280 mm.'),
     waistThickness: z
       .number()
       .optional()
       .describe(
-        'Thickness of the sloping waist slab under the steps, perpendicular to the flight, in document units (> 0). Default 175 mm.',
+        'Thickness of the sloping waist slab under the steps, perpendicular to the flight, in document units (> 0). Also the thickness of the landing slab. Default 175 mm.',
       ),
+    landingAt: z
+      .number()
+      .optional()
+      .describe(
+        'Number of risers climbed before the intermediate landing (integer, 2 to riserCount - 2): flight 1 has landingAt risers, the last one arriving on the landing; flight 2 the remaining ones. Omit for no landing (unless shape is quarter_turn / half_turn, which default it to half the risers).',
+      ),
+    landingLength: z
+      .number()
+      .optional()
+      .describe(
+        'Landing depth along the first flight direction, in document units (> 0). Default = stair width. Below the width gives a warning. Needs a landing.',
+      ),
+    shape: z
+      .enum(['straight', 'quarter_turn', 'half_turn'])
+      .optional()
+      .describe(
+        'Plan layout around the landing: "straight" (default, in line), "quarter_turn" (L, 90 degrees) or "half_turn" (dog-leg, 180 degrees, two flights side by side).',
+      ),
+    turn: z
+      .enum(['left', 'right'])
+      .optional()
+      .describe('Side the second flight departs to for quarter_turn / half_turn, seen walking up the first flight. Default left.'),
+    flightGap: z
+      .number()
+      .optional()
+      .describe('half_turn only: clear gap between the two flights, in document units (>= 0). Default 100 mm.'),
     levelId: levelIdParam,
     material: concreteMaterialParam,
   }),
-  run: (doc, { start, angle = 0, width, riserCount, treadDepth, waistThickness, levelId, material }): CommandResult => {
+  run: (doc, { start, angle = 0, width, riserCount, treadDepth, waistThickness, levelId, material, ...landingParams }): CommandResult => {
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_stair failed: ${resolution.reason}.`);
     const levelHeight = resolution.level.height;
@@ -376,7 +478,7 @@ export const addStair = defineCommand({
     const resolvedWidth = width ?? fromMm(doc, 1000);
     const resolvedTread = treadDepth ?? fromMm(doc, 280);
     const resolvedWaist = waistThickness ?? fromMm(doc, 175);
-    if (!Number.isInteger(count) || count < 2 || resolvedWidth <= 0 || resolvedTread <= 0 || !(resolvedWaist > 0)) {
+    if (!Number.isInteger(count) || count < 2 || !(resolvedWidth > 0) || !(resolvedTread > 0) || !(resolvedWaist > 0)) {
       return noop(doc, 'add_stair failed: riserCount must be an integer ≥ 2, width, treadDepth and waistThickness > 0.');
     }
     if (count > MAX_RISERS) {
@@ -385,6 +487,8 @@ export const addStair = defineCommand({
         `add_stair failed: ${count} risers exceed the limit of ${MAX_RISERS}; the level is ${levelHeight} ${doc.units} high — pass a smaller riserCount for a partial flight or stack stairs.`,
       );
     }
+    const landing = resolveStairLanding(doc, count, resolvedWidth, landingParams);
+    if ('reason' in landing) return noop(doc, `add_stair failed: ${landing.reason}.`);
     const riserHeight = levelHeight / count;
     const stairTwin = findTwin(
       resolution.building,
@@ -406,16 +510,23 @@ export const addStair = defineCommand({
       riserHeight,
       treadDepth: resolvedTread,
       waistThickness: resolvedWaist,
+      ...landing.landing,
       material: material?.trim() || 'concrete',
     };
     const blondelMm = toMm(doc, 2 * riserHeight + resolvedTread);
+    const treads = count - (stair.landingAt === undefined ? 1 : 2);
+    const layout =
+      stair.landingAt === undefined
+        ? ''
+        : `, ${stair.shape ?? 'straight'}${stair.turn ? ` ${stair.turn}` : ''} landing after riser ${stair.landingAt} (flights of ${stair.landingAt} + ${count - stair.landingAt} risers)`;
     return commitBuilding(
       doc,
       withElement(resolution.building, stair),
       [stair.id],
       `Added stair ${stair.mark} (${stair.id}): ${count} risers of ${Number(riserHeight.toPrecision(4))}, tread ${resolvedTread}, ` +
-        `${count - 1} treads, run ${((count - 1) * resolvedTread).toFixed(1)} ${doc.units}, waist slab ${resolvedWaist}; 2R+G = ${blondelMm.toFixed(0)} mm` +
-        `${blondelMm < 600 || blondelMm > 650 ? ' (outside the 600–650 mm comfort range)' : ''}.`,
+        `${treads} treads${layout}, run ${(treads * resolvedTread).toFixed(1)} ${doc.units}, waist slab ${resolvedWaist}; 2R+G = ${blondelMm.toFixed(0)} mm` +
+        `${blondelMm < 600 || blondelMm > 650 ? ' (outside the 600–650 mm comfort range)' : ''}.` +
+        landingNotes(doc, stair, levelHeight),
       { elementId: stair.id },
     );
   },

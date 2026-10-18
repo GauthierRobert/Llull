@@ -2,7 +2,7 @@
 
 import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, EquipmentElement, SlabElement, StairElement } from '@core/model/building';
-import { stairPoint, stairTreads } from '../../building/geometry/stairGeometry';
+import { blockPoint, stairBlocks, stairPoint } from '../../building/geometry/stairGeometry';
 import { pointInPolygon, rotatePoint2 } from '@lib/polygon';
 
 /** Footprint samples per side (corners, edges and interior of the equipment's plan rectangle). */
@@ -87,12 +87,16 @@ export function stairSlabCrossings(
   const level = building.levels[stair.levelId];
   if (!level) return [];
   const base = level.elevation;
-  const treads = stairTreads(stair).map((tread) => ({
-    top: base + tread.zTop,
+  const treads = stairBlocks(stair).map((block) => ({
+    top: base + block.zTop,
     points: Array.from({ length: TREAD_SAMPLES * TREAD_SAMPLES }, (_, index): Vec2 => {
       const [i, j] = [index % TREAD_SAMPLES, Math.floor(index / TREAD_SAMPLES)];
-      const along = tread.alongStart + (tread.alongEnd - tread.alongStart) * (0.1 + (0.8 * i) / (TREAD_SAMPLES - 1));
-      return stairPoint(stair, along, stair.width * 0.999 * (j / (TREAD_SAMPLES - 1) - 0.5));
+      const [along, across] = [
+        block.length * (0.1 + (0.8 * i) / (TREAD_SAMPLES - 1) - 0.5),
+        block.breadth * 0.999 * (j / (TREAD_SAMPLES - 1) - 0.5),
+      ];
+      const [x, y] = blockPoint(block, along, across);
+      return stairPoint(stair, x, y);
     }),
   }));
   const crossings: Array<{ slab: SlabElement; depth: number }> = [];

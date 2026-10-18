@@ -167,7 +167,7 @@
  {
   "command": "compute_residual_strength",
   "params": {
-   "crackId": "$cr",
+   "caseId": "$cg",
    "sizes": [
     {
      "value": 10,

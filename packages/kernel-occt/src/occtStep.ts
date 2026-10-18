@@ -58,26 +58,38 @@ export function writeStepAssembly(api: OccApi, occurrences: readonly StepOccurre
   const owned: OccHandle[] = [builder];
   const writer = new api.STEPControl_Writer_1() as StepWriter;
   try {
-    const compoundOf = new Map<StepAssemblyPart<OccShape>, Compound>();
-    for (const { part } of occurrences) {
-      if (compoundOf.has(part)) continue;
-      const compound = new api.TopoDS_Compound() as Compound;
-      owned.push(compound);
-      builder.MakeCompound(compound);
-      for (const shape of part.shapes) builder.Add(compound, shape);
-      compoundOf.set(part, compound);
-    }
+    const compoundOf = new Map<StepAssemblyPart<OccShape>, Compound | null>();
+    // a location composes with the ones inside the part (TopLoc_Location product), so a nested part is written once
+    const place = (reference: Compound, { position, rotation }: StepOccurrence<OccShape>): Compound => {
+      const transform = placementTransform(api, rotation, position);
+      const location = new api.TopLoc_Location_2(transform) as OccHandle;
+      const moved = reference.Moved(location);
+      owned.push(moved, location, transform);
+      return moved as Compound;
+    };
+    const compound = (part: StepAssemblyPart<OccShape>): Compound | null => {
+      const known = compoundOf.get(part);
+      if (known !== undefined) return known;
+      compoundOf.set(part, null);
+      const made = new api.TopoDS_Compound() as Compound;
+      owned.push(made);
+      builder.MakeCompound(made);
+      for (const shape of part.shapes) builder.Add(made, shape);
+      for (const child of part.children ?? []) {
+        const inner = compound(child.part);
+        if (inner === null) return null;
+        builder.Add(made, place(inner, child));
+      }
+      compoundOf.set(part, made);
+      return made;
+    };
     const root = new api.TopoDS_Compound() as Compound;
     owned.push(root);
     builder.MakeCompound(root);
-    for (const { part, position, rotation } of occurrences) {
-      const prototype = compoundOf.get(part);
-      if (prototype === undefined) return null;
-      const transform = placementTransform(api, rotation, position);
-      const location = new api.TopLoc_Location_2(transform) as OccHandle;
-      const reference = prototype.Moved(location);
-      builder.Add(root, reference);
-      owned.push(reference, location, transform);
+    for (const occurrence of occurrences) {
+      const prototype = compound(occurrence.part);
+      if (prototype === null) return null;
+      builder.Add(root, place(prototype, occurrence));
     }
     if (writer.Transfer(root, api.STEPControl_StepModelType.STEPControl_AsIs, true) !== api.IFSelect_ReturnStatus.IFSelect_RetDone)
       return null;

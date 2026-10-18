@@ -10,7 +10,7 @@ import { midpoint } from '../../shared/vec3';
 import { findProfile } from '../../steel/profiles';
 import { atLevel } from '../evaluate';
 import { arcPoints, curvedWallArc, curvedWallBand } from '../../building/geometry/curvedWallGeometry';
-import { stairPoint, stairTreads } from '../../building/geometry/stairGeometry';
+import { stairBlocks, stairPoint } from '../../building/geometry/stairGeometry';
 import { supportShape } from '../piping/supportParts';
 
 /** Oriented box: centre, orthonormal axes and half sizes along them. */
@@ -115,12 +115,12 @@ export function elementBoxes(doc: CadDocument, building: BuildingModel, element:
     }
     case 'stair': {
       if (!level) return [];
-      return stairTreads(element).map((tread): OrientedBox => {
-        const [x, y] = stairPoint(element, (tread.alongStart + tread.alongEnd) / 2, 0);
+      return stairBlocks(element).map((block): OrientedBox => {
+        const [x, y] = stairPoint(element, block.centre[0], block.centre[1]);
         return {
-          center: [x, y, level.elevation + (tread.zBottom + tread.zTop) / 2],
-          axes: zRotated(element.angle),
-          half: [element.treadDepth / 2, element.width / 2, (tread.zTop - tread.zBottom) / 2],
+          center: [x, y, level.elevation + (block.zBottom + block.zTop) / 2],
+          axes: zRotated(element.angle + block.heading),
+          half: [block.length / 2, block.breadth / 2, (block.zTop - block.zBottom) / 2],
         };
       });
     }

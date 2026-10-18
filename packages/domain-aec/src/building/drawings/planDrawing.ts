@@ -11,9 +11,9 @@ import {
   gridPrimitives,
   roomPrimitives,
   slabPrimitives,
-  stairPrimitives,
   wallPrimitives,
 } from './planArchitectural';
+import { stairPrimitives } from './planStairs';
 import { crossingColumnPrimitives, industrialPrimitives } from './planIndustrial';
 import { supportPrimitives } from './planSupports';
 

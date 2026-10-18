@@ -92,6 +92,8 @@ export interface ShapeDistance {
 /** A STEP product: the solids of one component (or one loose solid), written once and shared by every occurrence that names this object. */
 export interface StepAssemblyPart<S = ShapeHandle> {
   readonly shapes: readonly S[];
+  /** Sub-assembly: placed uses of other parts inside this one, in component space (written once however often this part is used). */
+  readonly children?: readonly StepOccurrence<S>[];
 }
 
 /** One placed use of a part in the root assembly (STEP NEXT_ASSEMBLY_USAGE_OCCURRENCE); `rotation` radians, then `position`. */
@@ -127,7 +129,7 @@ export interface GeometryKernel {
 
   /**
    * STEP text with real assembly structure: one root product, one product per distinct `part` object, one occurrence (placed by location,
-   * geometry shared) per entry, in order. Absent / null when the kernel cannot write assemblies.
+   * geometry shared) per entry, in order; a part's `children` are nested occurrences whose locations compose down the tree. Absent / null when the kernel cannot write assemblies.
    */
   exportStepAssembly?(occurrences: readonly StepOccurrence[]): string | null;
 

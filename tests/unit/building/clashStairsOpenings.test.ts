@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { execute, getCommand } from '@core/commands/registry';
+import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { xy } from '../../helpers/xy';
 
@@ -150,12 +150,5 @@ describe('door / window openings overlapping columns', () => {
     expect(slid.summary).toContain('WARNING');
     const above = execute(doc, 'add_window', { wallId: 'wall-1', offset: 6000, width: 1200 });
     expect(above.summary).not.toContain('WARNING');
-  });
-});
-
-describe('add_stair landings', () => {
-  it('states that landings are not modelled', () => {
-    const description = getCommand('add_stair')?.description ?? '';
-    expect(description).toMatch(/Landings are NOT modelled/);
   });
 });

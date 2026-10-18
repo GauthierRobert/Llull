@@ -7,6 +7,7 @@
 
 import type { Vec3 } from './vectors';
 import type { Quantity } from './quantity';
+import type { DurabilityModel } from './durability';
 
 /** Same structural id as `types.ts` `EntityId` (not imported: types.ts imports this module). */
 type EntityId = string;
@@ -375,6 +376,8 @@ export interface AnalysisModel {
   readonly cases: Readonly<Record<string, AnalysisCase>>;
   readonly caseOrder: readonly string[];
   readonly fitDispositions?: FitDispositions;
+  /** Absent until the first durability command (`define_load_history`, `define_crack`; plugin `cae`, PHY-07 / PHY-08). */
+  readonly durability?: DurabilityModel;
 }
 
 /** Mesh artifact (JSON, no typed arrays); stored by the host under `sha256Hex(canonicalJson(artifact))`. */

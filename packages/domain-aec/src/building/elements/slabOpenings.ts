@@ -10,15 +10,15 @@ import { planAreaM2 } from '../../shared/planArea';
 import { getBuilding, isVec2List, toVec2, withElement } from '../model';
 import { noop } from '@core/commands/noop';
 import { commitBuilding } from '../evaluate/evaluateElements';
-import { stairPoint } from '../geometry/stairGeometry';
+import { stairExtent, stairPoint } from '../geometry/stairGeometry';
 import { triangulatePolygon } from '@lib/triangulate';
 import { pointsDiagonal } from '@lib/extent';
 
-/** Plan footprint of a stair run, grown by `margin` on every side. */
+/** Plan footprint of the whole stair (every flight and the landing: their bounding rectangle), grown by `margin` on every side. */
 function stairFootprint(stair: StairElement, margin: number): Vec2[] {
-  const half = stair.width / 2 + margin;
-  const run = (stair.riserCount - 1) * stair.treadDepth + margin;
-  return [stairPoint(stair, -margin, -half), stairPoint(stair, run, -half), stairPoint(stair, run, half), stairPoint(stair, -margin, half)];
+  const { minAlong, maxAlong, minAcross, maxAcross } = stairExtent(stair);
+  const [a0, a1, c0, c1] = [minAlong - margin, maxAlong + margin, minAcross - margin, maxAcross + margin];
+  return [stairPoint(stair, a0, c0), stairPoint(stair, a1, c0), stairPoint(stair, a1, c1), stairPoint(stair, a0, c1)];
 }
 
 function edges(polygon: ReadonlyArray<Vec2>): Array<[Vec2, Vec2]> {

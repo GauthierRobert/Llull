@@ -1,367 +1,43 @@
 [
- {
-  "command": "set_units",
-  "params": {
-   "units": "mm"
-  }
- },
- {
-  "command": "add_box",
-  "params": {
-   "size": [
-    20,
-    20,
-    20
-   ],
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "anchor": "center"
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_box", "params": { "size": [50, 8, 8], "position": [25, 0, 0], "anchor": "center" }, "as": "crank_box" },
+  { "command": "add_box", "params": { "size": [200, 8, 8], "position": [150, 0, 0], "anchor": "center" }, "as": "rod_box" },
+  { "command": "add_box", "params": { "size": [20, 20, 20], "position": [250, 0, 0], "anchor": "center" }, "as": "piston_box" },
+  { "command": "add_rigid_body", "params": { "entityIds": ["$crank_box"], "id": "crank", "massKg": 100.0 } },
+  { "command": "add_rigid_body", "params": { "entityIds": ["$rod_box"], "id": "rod", "massKg": 0.005 } },
+  { "command": "add_rigid_body", "params": { "entityIds": ["$piston_box"], "id": "piston", "massKg": 0.5 } },
+  {
+    "command": "add_body_joint",
+    "params": { "kind": "prismatic", "child": "piston", "parent": "ground", "anchor": [250, 0, 0], "axis": [1, 0, 0], "id": "j_slide" }
   },
-  "as": "ground_box"
- },
- {
-  "command": "create_component",
-  "params": {
-   "name": "ground",
-   "entityIds": [
-    "$ground_box"
-   ],
-   "componentId": "comp_ground"
+  {
+    "command": "add_body_joint",
+    "params": {
+      "kind": "revolute",
+      "child": "crank",
+      "parent": "ground",
+      "anchor": [0, 0, 0],
+      "axis": [0, 1, 0],
+      "initialVelocity": 100.0,
+      "id": "j_crank"
+    }
   },
-  "as": "ground"
- },
- {
-  "command": "add_box",
-  "params": {
-   "size": [
-    50,
-    8,
-    8
-   ],
-   "position": [
-    25,
-    0,
-    0
-   ],
-   "anchor": "center"
+  {
+    "command": "add_body_joint",
+    "params": { "kind": "revolute", "child": "rod", "parent": "crank", "anchor": [50, 0, 0], "axis": [0, 1, 0], "id": "j_crankpin" }
   },
-  "as": "crank_box"
- },
- {
-  "command": "create_component",
-  "params": {
-   "name": "crank",
-   "entityIds": [
-    "$crank_box"
-   ],
-   "componentId": "comp_crank"
+  {
+    "command": "add_body_joint",
+    "params": { "kind": "spherical", "child": "piston", "parent": "rod", "anchor": [250, 0, 0], "id": "j_wristpin" }
   },
-  "as": "crank"
- },
- {
-  "command": "add_box",
-  "params": {
-   "size": [
-    200,
-    8,
-    8
-   ],
-   "position": [
-    150,
-    0,
-    0
-   ],
-   "anchor": "center"
+  {
+    "command": "add_motor",
+    "params": { "joint": "j_crank", "kind": "speed", "rpm": 954.929658551, "maxTorque": 1000000.0, "id": "drive" }
   },
-  "as": "rod_box"
- },
- {
-  "command": "create_component",
-  "params": {
-   "name": "rod",
-   "entityIds": [
-    "$rod_box"
-   ],
-   "componentId": "comp_rod"
-  },
-  "as": "rod"
- },
- {
-  "command": "add_box",
-  "params": {
-   "size": [
-    20,
-    20,
-    20
-   ],
-   "position": [
-    250,
-    0,
-    0
-   ],
-   "anchor": "center"
-  },
-  "as": "piston_box"
- },
- {
-  "command": "create_component",
-  "params": {
-   "name": "piston",
-   "entityIds": [
-    "$piston_box"
-   ],
-   "componentId": "comp_piston"
-  },
-  "as": "piston"
- },
- {
-  "command": "add_joint",
-  "params": {
-   "kind": "revolute",
-   "a": {
-    "instanceId": "$ground"
-   },
-   "b": {
-    "instanceId": "$crank"
-   },
-   "axis": "y",
-   "id": "j_crank"
+  { "command": "set_gravity", "params": { "gravity": [0, 0, 0] } },
+  { "command": "inspect_dynamics", "params": {} },
+  {
+    "command": "simulate_motion",
+    "params": { "duration": 0.0628318530718, "timestep": 2e-5, "sampleRate": 50000, "detail": "series", "reactions": "off" }
   }
- },
- {
-  "command": "add_joint",
-  "params": {
-   "kind": "revolute",
-   "a": {
-    "instanceId": "$crank"
-   },
-   "b": {
-    "instanceId": "$rod"
-   },
-   "axis": "y",
-   "id": "j_crankpin"
-  }
- },
- {
-  "command": "add_joint",
-  "params": {
-   "kind": "revolute",
-   "a": {
-    "instanceId": "$rod"
-   },
-   "b": {
-    "instanceId": "$piston"
-   },
-   "axis": "y",
-   "id": "j_wristpin"
-  }
- },
- {
-  "command": "add_joint",
-  "params": {
-   "kind": "prismatic",
-   "a": {
-    "instanceId": "$ground"
-   },
-   "b": {
-    "instanceId": "$piston"
-   },
-   "axis": "x",
-   "id": "j_slide"
-  }
- },
- {
-  "command": "set_joint_geometry",
-  "params": {
-   "jointId": "j_crank",
-   "pivotMm": [
-    0,
-    0,
-    0
-   ]
-  }
- },
- {
-  "command": "set_joint_geometry",
-  "params": {
-   "jointId": "j_crankpin",
-   "pivotMm": [
-    50,
-    0,
-    0
-   ]
-  }
- },
- {
-  "command": "set_joint_geometry",
-  "params": {
-   "jointId": "j_wristpin",
-   "pivotMm": [
-    250,
-    0,
-    0
-   ]
-  }
- },
- {
-  "command": "set_ground",
-  "params": {
-   "instanceIds": [
-    "$ground"
-   ]
-  }
- },
- {
-  "command": "set_mechanism_mode",
-  "params": {
-   "mode": "planar",
-   "planeNormal": "y"
-  }
- },
- {
-  "command": "set_body_properties",
-  "params": {
-   "instanceId": "$crank",
-   "mass": {
-    "massKg": 0.0,
-    "centroidMm": [
-     25,
-     0,
-     0
-    ],
-    "inertiaKgM2": [
-     [
-      0,
-      0,
-      0
-     ],
-     [
-      0,
-      0,
-      0
-     ],
-     [
-      0,
-      0,
-      0
-     ]
-    ]
-   },
-   "source": {
-    "citation": "VC-RBD-21 test input: massless crank"
-   }
-  }
- },
- {
-  "command": "set_body_properties",
-  "params": {
-   "instanceId": "$rod",
-   "mass": {
-    "massKg": 0.0,
-    "centroidMm": [
-     150,
-     0,
-     0
-    ],
-    "inertiaKgM2": [
-     [
-      0,
-      0,
-      0
-     ],
-     [
-      0,
-      0,
-      0
-     ],
-     [
-      0,
-      0,
-      0
-     ]
-    ]
-   },
-   "source": {
-    "citation": "VC-RBD-21 test input: massless rod"
-   }
-  }
- },
- {
-  "command": "set_body_properties",
-  "params": {
-   "instanceId": "$piston",
-   "mass": {
-    "massKg": 0.5,
-    "centroidMm": [
-     250,
-     0,
-     0
-    ],
-    "inertiaKgM2": [
-     [
-      1e-06,
-      0,
-      0
-     ],
-     [
-      0,
-      1e-06,
-      0
-     ],
-     [
-      0,
-      0,
-      1e-06
-     ]
-    ]
-   },
-   "source": {
-    "citation": "VC-RBD-21 test input: 0.5 kg piston"
-   }
-  }
- },
- {
-  "command": "set_gravity",
-  "params": {
-   "gravity": [
-    0,
-    0,
-    0
-   ]
-  }
- },
- {
-  "command": "add_joint_actuator",
-  "params": {
-   "jointId": "j_crank",
-   "mode": "velocity",
-   "profile": {
-    "kind": "constant",
-    "value": 100.0
-   },
-   "unit": "rad/s"
-  }
- },
- {
-  "command": "check_mechanism",
-  "params": {}
- },
- {
-  "command": "dynamics_study",
-  "params": {
-   "durationS": 0.0628318530718,
-   "outputStepS": 0.0001,
-   "outputs": {
-    "joints": [
-     "j_slide"
-    ],
-    "actuators": [
-     "j_crank"
-    ]
-   }
-  }
- }
 ]

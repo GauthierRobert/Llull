@@ -324,16 +324,27 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
       : {
           exportStepAssembly: (occurrences: readonly StepOccurrence[]): string | null =>
             call(() => {
-              const parts = new Map<StepAssemblyPart, StepAssemblyPart<S>>();
+              const parts = new Map<StepAssemblyPart, StepAssemblyPart<S> | null>();
+              const nativePart = (source: StepAssemblyPart): StepAssemblyPart<S> | null => {
+                const known = parts.get(source);
+                if (known !== undefined) return known;
+                parts.set(source, null);
+                const natives = source.shapes.map(nativeOf);
+                if (natives.some((shape) => shape === null)) return null;
+                const children: StepOccurrence<S>[] = [];
+                for (const child of source.children ?? []) {
+                  const part = nativePart(child.part);
+                  if (part === null) return null;
+                  children.push({ ...child, part });
+                }
+                const native: StepAssemblyPart<S> = { shapes: natives as S[], ...(children.length > 0 ? { children } : {}) };
+                parts.set(source, native);
+                return native;
+              };
               const placed: StepOccurrence<S>[] = [];
               for (const occurrence of occurrences) {
-                let part = parts.get(occurrence.part);
-                if (part === undefined) {
-                  const natives = occurrence.part.shapes.map(nativeOf);
-                  if (natives.some((shape) => shape === null)) return null;
-                  part = { shapes: natives as S[] };
-                  parts.set(occurrence.part, part);
-                }
+                const part = nativePart(occurrence.part);
+                if (part === null) return null;
                 placed.push({ ...occurrence, part });
               }
               return assemblyOps(placed);
