@@ -93,4 +93,30 @@ describe('aerodynamics / fluids review regressions', () => {
     expect(contour[1]?.axial).toBeCloseTo(contour[2]?.axial as number, 9);
     expect(contour[2]?.angleDeg).toBeCloseTo(-30, 9);
   });
+
+  it('nozzle_performance flags only the inputs really left to their defaults', () => {
+    const base = { chamberPressure: 70, pressureUnit: 'bar', chamberTemperatureK: 3500, gamma: 1.2, molarMass: 22, expansionRatio: 10 };
+    type Inputs = {
+      inputs: { divergence: { defaulted: boolean }; cStarEfficiency: { defaulted: boolean }; ambient: { defaulted: boolean } };
+    };
+    const implicit = data<Inputs>(doc, 'nozzle_performance', base).inputs;
+    expect([implicit.divergence.defaulted, implicit.cStarEfficiency.defaulted, implicit.ambient.defaulted]).toEqual([true, true, true]);
+    const explicit = data<Inputs>(doc, 'nozzle_performance', {
+      ...base,
+      divergence: 'ideal',
+      cStarEfficiency: 1,
+      ambientPressure: 0,
+    }).inputs;
+    expect([explicit.divergence.defaulted, explicit.cStarEfficiency.defaulted, explicit.ambient.defaulted]).toEqual([false, false, false]);
+  });
+
+  it('aero_drag adds the unrounded friction drag to the pressure drag', () => {
+    const result = data<{
+      dragN: number;
+      pressureDragN: number;
+      friction: { cf: number; wettedAreaM2: number };
+      dynamicPressurePa: number;
+    }>(doc, 'aero_drag', { speed: 30, cdA: 0.3, frictionModel: 'turbulent_prandtl_schlichting', wettedAreaM2: 7, lengthM: 4 });
+    expect(result.dragN).toBeCloseTo(result.pressureDragN + result.friction.cf * result.dynamicPressurePa * 7, 6);
+  });
 });

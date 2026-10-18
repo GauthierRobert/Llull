@@ -4,7 +4,8 @@ import { commandCatalog } from '@core/commands/schema';
 import { standardAtmosphere } from './atmosphereCommand';
 import { analyzeAirfoil, drawNacaAirfoil } from './airfoilCommands';
 import { analyzeWing } from './wingCommand';
-import { aeroDrag, frontalArea } from './dragCommands';
+import { frontalArea } from './frontalAreaCommand';
+import { aeroDrag } from './aeroDragCommand';
 import { cyclingPower } from './cyclingCommand';
 
 export const aerodynamicsCommands = commandCatalog(
