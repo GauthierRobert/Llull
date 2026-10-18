@@ -47,15 +47,15 @@ sections, a polar cache) would be a plugin `DocumentExtension`. It is not needed
 
 ## 4. Commands (toolset `aerodynamics`)
 
-| Name | Kind | Params (sketch) | data | Failure codes |
-| ---- | ---- | --------------- | ---- | ------------- |
-| `standard_atmosphere` | query | `altitude`, `altitudeUnit m\|ft\|km`, `altitudeType geometric\|geopotential`, `temperatureOffsetK`, `speed`+`speedUnit`, `referenceLengthM` | T, p, ρ, a, μ, ν, g, ratios, flow {Mach, q, EAS, Re}, provenance | `AER_ALTITUDE_OUT_OF_RANGE`, `AER_PARAM_INVALID` |
-| `draw_naca_airfoil` | mutating (composes `draw_polyline`) | `naca`, `chord`, `pointsPerSide`, `closedTrailingEdge`, `incidenceDeg`, `position` | — (1 polyline) | `AER_AIRFOIL_INVALID`, `AER_PARAM_INVALID` |
-| `analyze_airfoil` | query | `naca` \| `entityId`, `alphasDeg[]`, `panelsPerSide`, `momentReference`, `includeSurface` | polar [{α, cl, clCirculation, cm, cdPressure}], liftSlope, zeroLiftAngle, thinAirfoil, surface Cp | `AER_AIRFOIL_SOURCE_CONFLICT`, `AER_AIRFOIL_INVALID`, `AER_PARAM_INVALID`, `AER_SOLVER_FAILED` |
-| `analyze_wing` | query | `span`, `rootChord`, `tipChord`, `planform`, `twistDeg`, `naca` \| `sectionLiftSlopePerRad`+`zeroLiftAngleDeg`, `alphasDeg[]`, `terms`, speed + air state | geometry {S, AR, λ, c̄}, polar [{CL, CDi, e, lift N, Di N}], CL_α, Helmbold CL_α, stations | `AER_PARAM_INVALID`, `AER_AIRFOIL_INVALID`, `AER_SOLVER_FAILED`, air-state codes |
-| `frontal_area` | query | `entityIds[]`, `flowDirection`, `resolution` | frontal m² ± uncertainty, wetted m², length m, extents | `AER_ENTITY_NOT_FOUND`, `AER_NO_GEOMETRY`, `AER_PARAM_INVALID` |
-| `aero_drag` | query | speed, `cdA` \| `cd`+`referenceAreaM2` \| `cd`+`entityIds`, `frictionModel`+`wettedAreaM2`+`lengthM`, air state | drag N, power W, q, Mach, Re, friction {Cf, N}, warnings | `AER_AREA_SOURCE_CONFLICT`, `AER_PARAM_INVALID`, geometry and air-state codes |
-| `cycling_power` | query | `model martin_1998\|bassett_1999`, `speed` \| `powerW`; martin: `massKg`, `cdA` \| `cd`+`entityIds`, `crr`, `gradePercent`, `headwindMS`, `wheelAreaM2`, `chainEfficiency`, `bearingLosses`; bassett: `riderHeightM`, `riderMassKg`, `bikeMassKg`, `k1` \| factors, `trackFactor` | speed, power, breakdown, 1 h distance, inputs with `defaulted` | `AER_SPEED_SOURCE_CONFLICT`, `AER_AREA_SOURCE_CONFLICT`, `AER_NO_EQUILIBRIUM`, `AER_PARAM_INVALID` |
+| Name                  | Kind                                | Params (sketch)                                                                                                                                                                                                                                                                   | data                                                                                              | Failure codes                                                                                      |
+| --------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `standard_atmosphere` | query                               | `altitude`, `altitudeUnit m\|ft\|km`, `altitudeType geometric\|geopotential`, `temperatureOffsetK`, `speed`+`speedUnit`, `referenceLengthM`                                                                                                                                       | T, p, ρ, a, μ, ν, g, ratios, flow {Mach, q, EAS, Re}, provenance                                  | `AER_ALTITUDE_OUT_OF_RANGE`, `AER_PARAM_INVALID`                                                   |
+| `draw_naca_airfoil`   | mutating (composes `draw_polyline`) | `naca`, `chord`, `pointsPerSide`, `closedTrailingEdge`, `incidenceDeg`, `position`                                                                                                                                                                                                | — (1 polyline)                                                                                    | `AER_AIRFOIL_INVALID`, `AER_PARAM_INVALID`                                                         |
+| `analyze_airfoil`     | query                               | `naca` \| `entityId`, `alphasDeg[]`, `panelsPerSide`, `momentReference`, `includeSurface`                                                                                                                                                                                         | polar [{α, cl, clCirculation, cm, cdPressure}], liftSlope, zeroLiftAngle, thinAirfoil, surface Cp | `AER_AIRFOIL_SOURCE_CONFLICT`, `AER_AIRFOIL_INVALID`, `AER_PARAM_INVALID`, `AER_SOLVER_FAILED`     |
+| `analyze_wing`        | query                               | `span`, `rootChord`, `tipChord`, `planform`, `twistDeg`, `naca` \| `sectionLiftSlopePerRad`+`zeroLiftAngleDeg`, `alphasDeg[]`, `terms`, speed + air state                                                                                                                         | geometry {S, AR, λ, c̄}, polar [{CL, CDi, e, lift N, Di N}], CL*α, Helmbold CL*α, stations         | `AER_PARAM_INVALID`, `AER_AIRFOIL_INVALID`, `AER_SOLVER_FAILED`, air-state codes                   |
+| `frontal_area`        | query                               | `entityIds[]`, `flowDirection`, `resolution`                                                                                                                                                                                                                                      | frontal m² ± uncertainty, wetted m², length m, extents                                            | `AER_ENTITY_NOT_FOUND`, `AER_NO_GEOMETRY`, `AER_PARAM_INVALID`                                     |
+| `aero_drag`           | query                               | speed, `cdA` \| `cd`+`referenceAreaM2` \| `cd`+`entityIds`, `frictionModel`+`wettedAreaM2`+`lengthM`, air state                                                                                                                                                                   | drag N, power W, q, Mach, Re, friction {Cf, N}, warnings                                          | `AER_AREA_SOURCE_CONFLICT`, `AER_PARAM_INVALID`, geometry and air-state codes                      |
+| `cycling_power`       | query                               | `model martin_1998\|bassett_1999`, `speed` \| `powerW`; martin: `massKg`, `cdA` \| `cd`+`entityIds`, `crr`, `gradePercent`, `headwindMS`, `wheelAreaM2`, `chainEfficiency`, `bearingLosses`; bassett: `riderHeightM`, `riderMassKg`, `bikeMassKg`, `k1` \| factors, `trackFactor` | speed, power, breakdown, 1 h distance, inputs with `defaulted`                                    | `AER_SPEED_SOURCE_CONFLICT`, `AER_AREA_SOURCE_CONFLICT`, `AER_NO_EQUILIBRIUM`, `AER_PARAM_INVALID` |
 
 Every command carries `@affects / @invariant / @failure` tags in its source (C2).
 
@@ -66,7 +66,7 @@ Every command carries `@affects / @invariant / @failure` tags in its source (C2)
 The seven geopotential layers of the 1976 standard, with these constants: base heights 0, 11, 20, 32, 47, 51,
 71 km′; lapse rates −6.5, 0, +1, +2.8, 0, −2.8, −2.0 K/km′; T0 288.15 K; p0 101 325 Pa; g0 9.80665;
 R* 8314.32 J/(kmol·K); M0 28.9644; r0 6 356 766 m. Each base pressure is integrated once at module load:
-p = pb (Tb/T)^(g0 M0/(R* L)) in a gradient layer, and pb exp(−g0 M0 ΔH/(R* Tb)) in an isothermal one.
+p = pb (Tb/T)^(g0 M0/(R* L)) in a gradient layer, and pb exp(−g0 M0 ΔH/(R\* Tb)) in an isothermal one.
 
 Derived properties:
 
@@ -96,7 +96,7 @@ from unverified constants.
 This is the linear-strength vortex method of Kuethe & Chow (program VORTEX). For m panels:
 
 - The m+1 node strengths γ'_j = γ_j/(2πV∞) solve m normal-flow conditions plus the Kutta condition
-  γ'_1 + γ'_{m+1} = 0.
+  γ'\_1 + γ'_{m+1} = 0.
 - The influence coefficients C_n1, C_n2, C_t1 and C_t2 are the closed forms of the reference.
 - Cp = 1 − (V_t/V∞)².
 
@@ -183,52 +183,52 @@ The CLI (`llull <command> '{…}' --json`), MCP (toolset `aerodynamics`) and the
 "Aerodynamics") all expose the same commands. The stable codes are listed below. Their remediation strings are in
 `codes.ts`.
 
-| Code | Meaning |
-| ---- | ------- |
-| AER_PARAM_INVALID | a value outside its documented range |
-| AER_ALTITUDE_OUT_OF_RANGE | outside −5..86 km geometric |
-| AER_AIR_STATE_CONFLICT | altitude and density both given |
-| AER_AIRFOIL_INVALID | unsupported NACA designation or not a closed polyline |
-| AER_AIRFOIL_SOURCE_CONFLICT | both or neither of naca / entityId |
-| AER_ENTITY_NOT_FOUND / AER_NO_GEOMETRY | bad ids / only 2D entities |
-| AER_SOLVER_FAILED | singular panel or lifting-line system |
-| AER_AREA_SOURCE_CONFLICT | ambiguous drag area |
-| AER_SPEED_SOURCE_CONFLICT | both or neither of speed / power |
-| AER_NO_EQUILIBRIUM | no steady speed ≤ 40 m/s for the power |
+| Code                                   | Meaning                                               |
+| -------------------------------------- | ----------------------------------------------------- |
+| AER_PARAM_INVALID                      | a value outside its documented range                  |
+| AER_ALTITUDE_OUT_OF_RANGE              | outside −5..86 km geometric                           |
+| AER_AIR_STATE_CONFLICT                 | altitude and density both given                       |
+| AER_AIRFOIL_INVALID                    | unsupported NACA designation or not a closed polyline |
+| AER_AIRFOIL_SOURCE_CONFLICT            | both or neither of naca / entityId                    |
+| AER_ENTITY_NOT_FOUND / AER_NO_GEOMETRY | bad ids / only 2D entities                            |
+| AER_SOLVER_FAILED                      | singular panel or lifting-line system                 |
+| AER_AREA_SOURCE_CONFLICT               | ambiguous drag area                                   |
+| AER_SPEED_SOURCE_CONFLICT              | both or neither of speed / power                      |
+| AER_NO_EQUILIBRIUM                     | no steady speed ≤ 40 m/s for the power                |
 
 ## 8. Performance budgets
 
-| Operation | Size | Time |
-| --------- | ---- | ---- |
-| panel solve | 600 panels (dense LU) | < 0.2 s |
-| lifting line | 40 terms | < 1 ms |
-| frontal area | 400 × 400 grid × ~10⁴ triangles | < 0.5 s |
-| frontal area | 2000 cells | grows as cells² |
+| Operation    | Size                            | Time            |
+| ------------ | ------------------------------- | --------------- |
+| panel solve  | 600 panels (dense LU)           | < 0.2 s         |
+| lifting line | 40 terms                        | < 1 ms          |
+| frontal area | 400 × 400 grid × ~10⁴ triangles | < 0.5 s         |
+| frontal area | 2000 cells                      | grows as cells² |
 
 The resolution is capped at 2000 cells. All commands are deterministic (AF-13).
 
 ## 9. Test strategy
 
-| VC | Test |
-| -- | ---- |
-| VC-AER-01 | `tests/unit/aero/aerodynamics/atmosphere.test.ts` (45 PDAS rows) |
-| VC-AER-02..05 | `drag.test.ts` (box, sphere, union, drag, Cf check values) |
-| VC-AER-10..12 | `airfoil.test.ts` (Joukowski exact, NACA 2412, NACA 0012 vs Ladson / McCroskey, convergence, UIUC-validated ordinates) |
-| VC-AER-13 | `wing.test.ts` (elliptic exact, rectangular, taper, washout, forces) |
-| VC-AER-20..23 | `cycling.test.ts` (Bassett Table 7, Martin closed forms, Defraeye ranking) |
+| VC            | Test                                                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| VC-AER-01     | `tests/unit/aero/aerodynamics/atmosphere.test.ts` (45 PDAS rows)                                                                      |
+| VC-AER-02..05 | `drag.test.ts` (box, sphere, union, drag, Cf check values)                                                                            |
+| VC-AER-10..12 | `airfoil.test.ts` (Joukowski exact, NACA 2412, NACA 0012 vs Ladson / McCroskey, convergence, UIUC-validated ordinates)                |
+| VC-AER-13     | `wing.test.ts` (elliptic exact, rectangular, taper, washout, forces)                                                                  |
+| VC-AER-20..23 | `cycling.test.ts` (Bassett Table 7, Martin closed forms, Defraeye ranking)                                                            |
 | SC-AER-01..05 | `tests/unit/aero/scenarioPlans.test.ts` runs every plan in `validation/plans/` through `build_project` and checks its `expected` rows |
 
 The coverage gate on `packages/domain-aero/src/**` is 90/85/90/90 (CLAUDE.md).
 
 ## 10. Delivery plan
 
-| Milestone | Content | State |
-| --------- | ------- | ----- |
-| M1 | atmosphere, NACA, panel, lifting line, frontal area, drag, cycling (this spec) | **done 2026-10-18** |
-| M2 | XFOIL hand-off: server transport `xfoil_polar` like `fea_solve`, bundled binary (GPL, decision 5), viscous polar as data | todo, ≈ 3 eng-weeks |
-| M3 | Vortex-lattice (horseshoe VLM) over a wing / tail definition read from lofts; neutral point; drag build-up tables with sources | todo, ≈ 4 eng-weeks |
-| M4 | CFD hand-off (OpenFOAM `simpleFoam` / SU2 case writer from a watertight body + farfield; forces and surface Cp import as 05-style result records) | todo, ≈ 6–8 eng-weeks |
-| M5 | UI: Cp and span-loading plots in the Analysis tab (same pattern as `plot_simulation`) | todo |
+| Milestone | Content                                                                                                                                           | State                 |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| M1        | atmosphere, NACA, panel, lifting line, frontal area, drag, cycling (this spec)                                                                    | **done 2026-10-18**   |
+| M2        | XFOIL hand-off: server transport `xfoil_polar` like `fea_solve`, bundled binary (GPL, decision 5), viscous polar as data                          | todo, ≈ 3 eng-weeks   |
+| M3        | Vortex-lattice (horseshoe VLM) over a wing / tail definition read from lofts; neutral point; drag build-up tables with sources                    | todo, ≈ 4 eng-weeks   |
+| M4        | CFD hand-off (OpenFOAM `simpleFoam` / SU2 case writer from a watertight body + farfield; forces and surface Cp import as 05-style result records) | todo, ≈ 6–8 eng-weeks |
+| M5        | UI: Cp and span-loading plots in the Analysis tab (same pattern as `plot_simulation`)                                                             | todo                  |
 
 ## 11. Open questions
 

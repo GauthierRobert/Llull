@@ -35,7 +35,13 @@
       { "eps": 29.97, "thetaE": 8.56 },
       { "eps": 40.0, "thetaE": 8.08 },
       { "eps": 50.2, "thetaE": 7.72 }
-    ]
+    ],
+    "secondSource": {
+      "source": "Rocket nozzles: 75 years of research and development, Sadhana (Indian Academy of Sciences) 46:76, 2021, https://www.ias.ac.in/public/Volumes/sadh/046/00/0076.pdf (Fig. 7: 15 deg cone vs 80 % and 60 % bells at eps 25)",
+      "exitAngleDegAtEps25": { "bell80": 8.5, "bell60": 11 },
+      "agreement": "digitised chart 8.78 deg at eps 25: 0.28 deg, inside the +/-0.5 deg chart reading accuracy",
+      "grade": "A for theta_e(25) (two independent sources within 0.3 deg)"
+    }
   },
   "summerfield": {
     "ratio": 0.4,

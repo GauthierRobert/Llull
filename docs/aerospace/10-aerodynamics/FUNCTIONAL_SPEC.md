@@ -18,14 +18,14 @@ published data. CFD (RANS / LES) is out of scope for the MVP. It is planned as a
 
 ## 2. Aerospace and sport context
 
-| Domain | Typical question | Tool used today | What llull adds |
-| ------ | ---------------- | --------------- | --------------- |
-| Light aircraft / UAV conceptual design | wing area and aspect ratio for a stall speed; induced drag; tip loading with washout | XFLR5, OpenVSP VSPAERO, spreadsheets with Raymer / Anderson formulas | the same lifting-line and panel results on the CAD section and planform, scriptable by an agent |
-| Launcher / sounding rocket | air density, Mach and dynamic pressure along a trajectory (max-q) | US Standard Atmosphere tables, RASAero | `standard_atmosphere` with Mach / q / Reynolds in one call |
-| Wind-tunnel and test preparation | Reynolds number of a model, blockage area | hand calculation | `standard_atmosphere`, `frontal_area` on the model |
-| Road cycling / triathlon | watts saved by a position or a helmet, speed at a given power on a climb | Martin 1998 power model in spreadsheets, field "virtual elevation" tests | `cycling_power` (Martin 1998) with CdA typed in or measured on a rider + bike model |
-| Track hour record | power needed for a distance, effect of altitude | Bassett et al. 1999 model | `cycling_power model bassett_1999`, reproducing the published table |
-| Automotive / wind loads | drag force and power at speed | Cd × A from catalogues | `aero_drag` with the frontal area measured on the model |
+| Domain                                 | Typical question                                                                     | Tool used today                                                          | What llull adds                                                                                 |
+| -------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Light aircraft / UAV conceptual design | wing area and aspect ratio for a stall speed; induced drag; tip loading with washout | XFLR5, OpenVSP VSPAERO, spreadsheets with Raymer / Anderson formulas     | the same lifting-line and panel results on the CAD section and planform, scriptable by an agent |
+| Launcher / sounding rocket             | air density, Mach and dynamic pressure along a trajectory (max-q)                    | US Standard Atmosphere tables, RASAero                                   | `standard_atmosphere` with Mach / q / Reynolds in one call                                      |
+| Wind-tunnel and test preparation       | Reynolds number of a model, blockage area                                            | hand calculation                                                         | `standard_atmosphere`, `frontal_area` on the model                                              |
+| Road cycling / triathlon               | watts saved by a position or a helmet, speed at a given power on a climb             | Martin 1998 power model in spreadsheets, field "virtual elevation" tests | `cycling_power` (Martin 1998) with CdA typed in or measured on a rider + bike model             |
+| Track hour record                      | power needed for a distance, effect of altitude                                      | Bassett et al. 1999 model                                                | `cycling_power model bassett_1999`, reproducing the published table                             |
+| Automotive / wind loads                | drag force and power at speed                                                        | Cd × A from catalogues                                                   | `aero_drag` with the frontal area measured on the model                                         |
 
 ## 3. Personas and user stories
 
@@ -54,30 +54,30 @@ User stories:
 
 ## 4. Scope
 
-| Phase | Content |
-| ----- | ------- |
+| Phase           | Content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **MVP (built)** | US Standard Atmosphere 1976 to 86 km (+ ISA ΔT), flow quantities (Mach, q, EAS, Re); NACA 4-digit + 230-series 5-digit sections into the sketch; inviscid linear-vortex panel method (cl, cm, Cp) + thin-airfoil theory; Prandtl lifting line (trapezoidal / elliptical, linear twist) + Helmbold check; frontal / wetted area of solids along a flow direction; drag and power from CdA, Cd·A or the model, flat-plate skin friction (4 correlations); cycling power (Martin 1998 road, Bassett 1999 track) |
-| V1 | Viscous section polars via an XFOIL hand-off (host transport like CalculiX, bundled binary, GPL) or a built-in integral boundary layer; drag build-up (form factors, interference) with sourced tables; vortex-lattice method for swept / multi-surface configurations; stability derivatives (neutral point, static margin); drafting / drafting-line positions in cycling from Blocken et al. |
-| V2 | CFD hand-off: export a watertight surface and a farfield box to OpenFOAM or SU2 (case files), import forces and surface Cp as result fields (05 FEA result pattern); compressible corrections (Prandtl-Glauert / Kármán-Tsien); propeller blade-element momentum theory |
-| Out of scope | A built-in Navier-Stokes solver, aeroelasticity / flutter (physics PHY "not in this list"), certification load cases |
+| V1              | Viscous section polars via an XFOIL hand-off (host transport like CalculiX, bundled binary, GPL) or a built-in integral boundary layer; drag build-up (form factors, interference) with sourced tables; vortex-lattice method for swept / multi-surface configurations; stability derivatives (neutral point, static margin); drafting / drafting-line positions in cycling from Blocken et al.                                                                                                              |
+| V2              | CFD hand-off: export a watertight surface and a farfield box to OpenFOAM or SU2 (case files), import forces and surface Cp as result fields (05 FEA result pattern); compressible corrections (Prandtl-Glauert / Kármán-Tsien); propeller blade-element momentum theory                                                                                                                                                                                                                                      |
+| Out of scope    | A built-in Navier-Stokes solver, aeroelasticity / flutter (physics PHY "not in this list"), certification load cases                                                                                                                                                                                                                                                                                                                                                                                         |
 
 ## 5. Functional requirements
 
-| Id | Priority | Requirement | Rationale | Source |
-| -- | -------- | ----------- | --------- | ------ |
-| FR-AER-01 | MUST | Air properties of the U.S. Standard Atmosphere 1976 (T, p, ρ, a, μ, ν, g) from −5 to 86 km, geometric or geopotential altitude, m / ft / km, with an ISA+ΔT option | every aerodynamic and propulsion result needs ρ, μ, a, p | NASA-TM-X-74335 [R1] |
-| FR-AER-02 | MUST | Flow quantities for a speed: Mach, dynamic pressure, equivalent airspeed, Reynolds number per metre or for a reference length | sizing, test planning, max-q | [R1] |
-| FR-AER-03 | MUST | Generate NACA 4-digit and 230-series sections as 2D sketch geometry (chord, incidence, open / closed TE) usable by extrude / loft | wings and blades start from a section | NACA Report 824 [R2] |
-| FR-AER-04 | MUST | Inviscid section analysis of a NACA designation or any closed sketch polyline: cl, cm about a chosen point, Cp distribution, lift slope and zero-lift angle; thin-airfoil zero-lift angle and cm c/4 for NACA camber lines | section choice, incidence, pitching moment | Kuethe & Chow [R5], Abbott & von Doenhoff [R2] |
-| FR-AER-05 | MUST | Finite-wing analysis by lifting line: CL, CDi, span efficiency, lift slope, spanwise cl and loading for trapezoidal / elliptical planforms with linear twist; lift and induced drag in N with an air state | wing sizing, induced drag, tip stall tendency | Glauert [R6], Anderson [R7] |
-| FR-AER-06 | MUST | Frontal (projected) area of solids along any flow direction, overlaps counted once, plus wetted area and body length, with an uncertainty | Cd reference area from the CAD model, not a guess | — |
-| FR-AER-07 | MUST | Drag force and power from CdA, Cd + area, or Cd + measured frontal area; optional flat-plate skin friction (Blasius, 1/7 power, Prandtl-Schlichting, ITTC-1957); Cd never defaulted | drag budgets, wind loads | [R8], [R9] |
-| FR-AER-08 | MUST | Cycling power ↔ speed: Martin et al. 1998 road model (aero incl. wheel rotation, rolling, bearings, gravity, drivetrain, wind, grade) and Bassett et al. 1999 track model (frontal area from height and mass, K1 factors, altitude density ratio) | the sports use case of this gap | [R10], [R11] |
-| FR-AER-09 | MUST | Every result names its model, formulas and sources; every defaulted input is flagged (`defaulted: true`); warnings state what is not modelled (stall, viscosity, compressibility) | AF-31, AF-35 | [AGENT_FIRST] |
-| FR-AER-10 | MUST | Refusals carry stable `AER_*` codes with ids / paths and a one-line remediation | AF-11 | — |
-| FR-AER-11 | SHOULD | Viscous polars (cd, cl_max) by XFOIL hand-off | profile drag and stall | V1 |
-| FR-AER-12 | SHOULD | Vortex-lattice method for swept wings, tails and canards; neutral point | configuration studies | V1 |
-| FR-AER-13 | COULD | CFD hand-off to OpenFOAM / SU2 with result import | detailed design | V2 |
+| Id        | Priority | Requirement                                                                                                                                                                                                                                       | Rationale                                                | Source                                         |
+| --------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------- |
+| FR-AER-01 | MUST     | Air properties of the U.S. Standard Atmosphere 1976 (T, p, ρ, a, μ, ν, g) from −5 to 86 km, geometric or geopotential altitude, m / ft / km, with an ISA+ΔT option                                                                                | every aerodynamic and propulsion result needs ρ, μ, a, p | NASA-TM-X-74335 [R1]                           |
+| FR-AER-02 | MUST     | Flow quantities for a speed: Mach, dynamic pressure, equivalent airspeed, Reynolds number per metre or for a reference length                                                                                                                     | sizing, test planning, max-q                             | [R1]                                           |
+| FR-AER-03 | MUST     | Generate NACA 4-digit and 230-series sections as 2D sketch geometry (chord, incidence, open / closed TE) usable by extrude / loft                                                                                                                 | wings and blades start from a section                    | NACA Report 824 [R2]                           |
+| FR-AER-04 | MUST     | Inviscid section analysis of a NACA designation or any closed sketch polyline: cl, cm about a chosen point, Cp distribution, lift slope and zero-lift angle; thin-airfoil zero-lift angle and cm c/4 for NACA camber lines                        | section choice, incidence, pitching moment               | Kuethe & Chow [R5], Abbott & von Doenhoff [R2] |
+| FR-AER-05 | MUST     | Finite-wing analysis by lifting line: CL, CDi, span efficiency, lift slope, spanwise cl and loading for trapezoidal / elliptical planforms with linear twist; lift and induced drag in N with an air state                                        | wing sizing, induced drag, tip stall tendency            | Glauert [R6], Anderson [R7]                    |
+| FR-AER-06 | MUST     | Frontal (projected) area of solids along any flow direction, overlaps counted once, plus wetted area and body length, with an uncertainty                                                                                                         | Cd reference area from the CAD model, not a guess        | —                                              |
+| FR-AER-07 | MUST     | Drag force and power from CdA, Cd + area, or Cd + measured frontal area; optional flat-plate skin friction (Blasius, 1/7 power, Prandtl-Schlichting, ITTC-1957); Cd never defaulted                                                               | drag budgets, wind loads                                 | [R8], [R9]                                     |
+| FR-AER-08 | MUST     | Cycling power ↔ speed: Martin et al. 1998 road model (aero incl. wheel rotation, rolling, bearings, gravity, drivetrain, wind, grade) and Bassett et al. 1999 track model (frontal area from height and mass, K1 factors, altitude density ratio) | the sports use case of this gap                          | [R10], [R11]                                   |
+| FR-AER-09 | MUST     | Every result names its model, formulas and sources; every defaulted input is flagged (`defaulted: true`); warnings state what is not modelled (stall, viscosity, compressibility)                                                                 | AF-31, AF-35                                             | [AGENT_FIRST]                                  |
+| FR-AER-10 | MUST     | Refusals carry stable `AER_*` codes with ids / paths and a one-line remediation                                                                                                                                                                   | AF-11                                                    | —                                              |
+| FR-AER-11 | SHOULD   | Viscous polars (cd, cl_max) by XFOIL hand-off                                                                                                                                                                                                     | profile drag and stall                                   | V1                                             |
+| FR-AER-12 | SHOULD   | Vortex-lattice method for swept wings, tails and canards; neutral point                                                                                                                                                                           | configuration studies                                    | V1                                             |
+| FR-AER-13 | COULD    | CFD hand-off to OpenFOAM / SU2 with result import                                                                                                                                                                                                 | detailed design                                          | V2                                             |
 
 ## 6. Workflows
 
@@ -88,7 +88,10 @@ CLI first (`llull-cli` skill). Typical plan:
   { "command": "draw_naca_airfoil", "params": { "naca": "2412", "chord": 1000 }, "as": "section" },
   { "command": "analyze_airfoil", "params": { "entityId": "$section", "alphasDeg": [0, 4] } },
   { "command": "extrude_profile", "params": { "id": "$section", "depth": 2000 }, "as": "panel" },
-  { "command": "analyze_wing", "params": { "span": 10, "rootChord": 1, "naca": "2412", "alphasDeg": [0, 4], "speed": 50, "altitudeM": 1500 } }
+  {
+    "command": "analyze_wing",
+    "params": { "span": 10, "rootChord": 1, "naca": "2412", "alphasDeg": [0, 4], "speed": 50, "altitudeM": 1500 }
+  }
 ]
 ```
 
@@ -98,17 +101,17 @@ under "Aerodynamics". A plot surface for Cp and span loading is a V1 item.
 
 ## 7. Acceptance criteria
 
-| Given | When | Then | VC |
-| ----- | ---- | ---- | -- |
-| the PDAS USSA76 table, −2..86 km by 2 km | `standard_atmosphere` at each altitude | T within 0.006 K, p / ρ / a / μ within 1e-4 relative | VC-AER-01 |
-| a box 1000 × 600 × 400 mm and a sphere r 0.5 m | `frontal_area` | 0.24 m² within the uncertainty; πr² within the tessellation bound (−1.5 %..+0.1 %) | VC-AER-02/03 |
-| D = ½ρV²CdA and the four skin-friction correlations | `aero_drag` | exact to 1e-6; Cf within 5e-4 of the check values | VC-AER-04/05 |
-| three Joukowski airfoils with exact potential-flow lift | `analyze_airfoil` on the polyline | cl within 1 % (300 panels / side) | VC-AER-10 |
-| NACA 2412 | `analyze_airfoil` | thin-airfoil α_L0 = −2.077°; panel α_L0 within 0.4° of the measured −2° | VC-AER-11 |
-| NACA 0012 | `analyze_airfoil` | inviscid lift slope 5–15 % above McCroskey's 0.1063 /deg (the documented viscous reduction) | VC-AER-12 |
-| an elliptical wing | `analyze_wing` | e = 1, CL_α = a0/(1 + a0/πAR), CDi = CL²/πAR within 1e-6 | VC-AER-13 |
-| the 13 rows of Bassett et al. 1999 Table 7 | `cycling_power bassett_1999` | power within 2 W of the published value (Boardman 1996: the paper's model value 452 W) | VC-AER-20 |
-| Martin 1998 terms | `cycling_power` | each term equals its closed form; speed ↔ power round trip | VC-AER-21/22 |
+| Given                                                   | When                                   | Then                                                                                        | VC           |
+| ------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------- | ------------ |
+| the PDAS USSA76 table, −2..86 km by 2 km                | `standard_atmosphere` at each altitude | T within 0.006 K, p / ρ / a / μ within 1e-4 relative                                        | VC-AER-01    |
+| a box 1000 × 600 × 400 mm and a sphere r 0.5 m          | `frontal_area`                         | 0.24 m² within the uncertainty; πr² within the tessellation bound (−1.5 %..+0.1 %)          | VC-AER-02/03 |
+| D = ½ρV²CdA and the four skin-friction correlations     | `aero_drag`                            | exact to 1e-6; Cf within 5e-4 of the check values                                           | VC-AER-04/05 |
+| three Joukowski airfoils with exact potential-flow lift | `analyze_airfoil` on the polyline      | cl within 1 % (300 panels / side)                                                           | VC-AER-10    |
+| NACA 2412                                               | `analyze_airfoil`                      | thin-airfoil α_L0 = −2.077°; panel α_L0 within 0.4° of the measured −2°                     | VC-AER-11    |
+| NACA 0012                                               | `analyze_airfoil`                      | inviscid lift slope 5–15 % above McCroskey's 0.1063 /deg (the documented viscous reduction) | VC-AER-12    |
+| an elliptical wing                                      | `analyze_wing`                         | e = 1, CL_α = a0/(1 + a0/πAR), CDi = CL²/πAR within 1e-6                                    | VC-AER-13    |
+| the 13 rows of Bassett et al. 1999 Table 7              | `cycling_power bassett_1999`           | power within 2 W of the published value (Boardman 1996: the paper's model value 452 W)      | VC-AER-20    |
+| Martin 1998 terms                                       | `cycling_power`                        | each term equals its closed form; speed ↔ power round trip                                  | VC-AER-21/22 |
 
 ## 8. Standards and regulatory alignment
 

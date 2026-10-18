@@ -1,142 +1,109 @@
 {
- "pack": "10 AER",
- "generatedBy": "hand-written index; every value lives in the data files or plans named here",
- "cases": [
-  {
-   "id": "VC-AER-01",
-   "command": "standard_atmosphere",
-   "reference": "data/us1976_pdas_table.json (45 rows)",
-   "tolerance": "T 0.006 K abs; p, rho, a, mu 1e-4 rel",
-   "test": "tests/unit/aero/aerodynamics/atmosphere.test.ts"
-  },
-  {
-   "id": "VC-AER-02",
-   "command": "frontal_area",
-   "inputs": {
-    "box_mm": [
-     1000,
-     600,
-     400
-    ]
-   },
-   "expected": {
-    "alongX_m2": 0.24,
-    "alongZ_m2": 0.6,
-    "wetted_m2": 2.48,
-    "length_m": 1.0
-   },
-   "tolerance": "reported uncertainty / 1e-3",
-   "source": "exact geometry",
-   "test": "tests/unit/aero/aerodynamics/drag.test.ts"
-  },
-  {
-   "id": "VC-AER-03",
-   "command": "frontal_area",
-   "inputs": {
-    "sphere_radius_m": 0.5
-   },
-   "expected": {
-    "area_m2": 0.7853981634
-   },
-   "tolerance": "-1.5 %..+0.1 %",
-   "source": "pi r^2",
-   "test": "drag.test.ts"
-  },
-  {
-   "id": "VC-AER-04",
-   "command": "aero_drag",
-   "inputs": {
-    "speed_ms": 10,
-    "cd": 1.28,
-    "area_m2": 1,
-    "rho": 1.225
-   },
-   "expected": {
-    "drag_N": 78.4,
-    "power_W": 784
-   },
-   "tolerance": "1e-6 rel",
-   "source": "D = 1/2 rho V^2 Cd A; Cd 1.28 NASA GRC",
-   "test": "drag.test.ts"
-  },
-  {
-   "id": "VC-AER-05",
-   "command": "aero_drag",
-   "reference": "data/airfoil_wing_references.json skin_friction.checkValues",
-   "tolerance": "5e-4 rel",
-   "test": "drag.test.ts"
-  },
-  {
-   "id": "VC-AER-10",
-   "command": "analyze_airfoil",
-   "reference": "data/airfoil_wing_references.json joukowski",
-   "tolerance": "1 % of cl (300 panels/side)",
-   "test": "airfoil.test.ts"
-  },
-  {
-   "id": "VC-AER-11",
-   "command": "analyze_airfoil",
-   "expected": {
-    "naca2412_thinAirfoil_zeroLiftDeg": -2.077,
-    "naca2412_measured_zeroLiftDeg": -2.0
-   },
-   "tolerance": "1e-3 deg / 0.4 deg",
-   "test": "airfoil.test.ts"
-  },
-  {
-   "id": "VC-AER-12",
-   "command": "analyze_airfoil",
-   "expected": {
-    "naca0012_liftSlope_inviscid_over_measured": [
-     1.05,
-     1.15
-    ]
-   },
-   "reference": "Ladson TM-4074, McCroskey TM-100019",
-   "test": "airfoil.test.ts"
-  },
-  {
-   "id": "VC-AER-13",
-   "command": "analyze_wing",
-   "expected": {
-    "elliptic_e": 1
-   },
-   "tolerance": "1e-6 rel on CL_alpha and CDi closed forms",
-   "test": "wing.test.ts"
-  },
-  {
-   "id": "VC-AER-14",
-   "command": "draw_naca_airfoil",
-   "reference": "../02-advanced-surfacing/validation/data/naca_2412_selig_81.csv",
-   "tolerance": "1e-7 chord",
-   "test": "airfoil.test.ts"
-  },
-  {
-   "id": "VC-AER-20",
-   "command": "cycling_power (bassett_1999)",
-   "reference": "data/bassett1999_table7.json",
-   "tolerance": "2 W",
-   "test": "cycling.test.ts"
-  },
-  {
-   "id": "VC-AER-21",
-   "command": "cycling_power (martin_1998)",
-   "expected": "each term equals its closed form",
-   "test": "cycling.test.ts"
-  },
-  {
-   "id": "VC-AER-22",
-   "command": "cycling_power",
-   "reference": "data/cycling_references.json defraeye2010",
-   "expected": "P(upright) > P(dropped) > P(time trial); inverse speed round trip 1e-4 km/h",
-   "test": "cycling.test.ts"
-  },
-  {
-   "id": "VC-AER-23",
-   "command": "cycling_power",
-   "expected": "grade, wind, altitude effects; CdA from model area",
-   "test": "cycling.test.ts"
-  }
- ],
- "scenarios": "plans/sc-aer-0*.json (tests/unit/aero/scenarioPlans.test.ts)"
+  "pack": "10 AER",
+  "generatedBy": "hand-written index; every value lives in the data files or plans named here",
+  "cases": [
+    {
+      "id": "VC-AER-01",
+      "command": "standard_atmosphere",
+      "reference": "data/us1976_pdas_table.json (45 rows)",
+      "tolerance": "T 0.006 K abs; p, rho, a, mu 1e-4 rel",
+      "test": "tests/unit/aero/aerodynamics/atmosphere.test.ts"
+    },
+    {
+      "id": "VC-AER-02",
+      "command": "frontal_area",
+      "inputs": { "box_mm": [1000, 600, 400] },
+      "expected": { "alongX_m2": 0.24, "alongZ_m2": 0.6, "wetted_m2": 2.48, "length_m": 1.0 },
+      "tolerance": "reported uncertainty / 1e-3",
+      "source": "exact geometry",
+      "test": "tests/unit/aero/aerodynamics/drag.test.ts"
+    },
+    {
+      "id": "VC-AER-03",
+      "command": "frontal_area",
+      "inputs": { "sphere_radius_m": 0.5 },
+      "expected": { "area_m2": 0.7853981634 },
+      "tolerance": "-1.5 %..+0.1 %",
+      "source": "pi r^2",
+      "test": "drag.test.ts"
+    },
+    {
+      "id": "VC-AER-04",
+      "command": "aero_drag",
+      "inputs": { "speed_ms": 10, "cd": 1.28, "area_m2": 1, "rho": 1.225 },
+      "expected": { "drag_N": 78.4, "power_W": 784 },
+      "tolerance": "1e-6 rel",
+      "source": "D = 1/2 rho V^2 Cd A; Cd 1.28 NASA GRC",
+      "test": "drag.test.ts"
+    },
+    {
+      "id": "VC-AER-05",
+      "command": "aero_drag",
+      "reference": "data/airfoil_wing_references.json skin_friction.checkValues",
+      "tolerance": "5e-4 rel",
+      "test": "drag.test.ts"
+    },
+    {
+      "id": "VC-AER-10",
+      "command": "analyze_airfoil",
+      "reference": "data/airfoil_wing_references.json joukowski",
+      "tolerance": "1 % of cl (300 panels/side)",
+      "test": "airfoil.test.ts"
+    },
+    {
+      "id": "VC-AER-11",
+      "command": "analyze_airfoil",
+      "expected": { "naca2412_thinAirfoil_zeroLiftDeg": -2.077, "naca2412_measured_zeroLiftDeg": -2.0 },
+      "tolerance": "1e-3 deg / 0.4 deg",
+      "test": "airfoil.test.ts"
+    },
+    {
+      "id": "VC-AER-12",
+      "command": "analyze_airfoil",
+      "expected": { "naca0012_liftSlope_inviscid_over_measured": [1.05, 1.15] },
+      "reference": "Ladson TM-4074, McCroskey TM-100019",
+      "test": "airfoil.test.ts"
+    },
+    {
+      "id": "VC-AER-13",
+      "command": "analyze_wing",
+      "expected": { "elliptic_e": 1 },
+      "tolerance": "1e-6 rel on CL_alpha and CDi closed forms",
+      "test": "wing.test.ts"
+    },
+    {
+      "id": "VC-AER-14",
+      "command": "draw_naca_airfoil",
+      "reference": "../02-advanced-surfacing/validation/data/naca_2412_selig_81.csv",
+      "tolerance": "1e-7 chord",
+      "test": "airfoil.test.ts"
+    },
+    {
+      "id": "VC-AER-20",
+      "command": "cycling_power (bassett_1999)",
+      "reference": "data/bassett1999_table7.json",
+      "tolerance": "2 W",
+      "test": "cycling.test.ts"
+    },
+    {
+      "id": "VC-AER-21",
+      "command": "cycling_power (martin_1998)",
+      "expected": "each term equals its closed form",
+      "test": "cycling.test.ts"
+    },
+    {
+      "id": "VC-AER-22",
+      "command": "cycling_power",
+      "reference": "data/cycling_references.json defraeye2010",
+      "expected": "P(upright) > P(dropped) > P(time trial); inverse speed round trip 1e-4 km/h",
+      "test": "cycling.test.ts"
+    },
+    {
+      "id": "VC-AER-23",
+      "command": "cycling_power",
+      "expected": "grade, wind, altitude effects; CdA from model area",
+      "test": "cycling.test.ts"
+    }
+  ],
+  "scenarios": "plans/sc-aer-0*.json (tests/unit/aero/scenarioPlans.test.ts)"
 }

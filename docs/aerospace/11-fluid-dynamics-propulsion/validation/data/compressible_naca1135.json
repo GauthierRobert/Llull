@@ -1,7 +1,7 @@
 {
   "id": "VC-FLD-01..06",
   "title": "Compressible-flow relations, gamma 1.4 (NACA Report 1135 tables)",
-  "source": "Ames Research Staff. Equations, tables, and charts for compressible flow. NACA Report 1135, 1953 (NTRS 19930091059; NASA-hosted PDF www.nasa.gov/wp-content/uploads/2023/03/equations-tables-charts-compressibleflow-report-1135.pdf). Values are printed to 4 significant figures in the report tables; the rows below were confirmed against independent reproductions of those tables (search extracts) and recomputed from the report's closed-form equations.",
+  "source": "Ames Research Staff. Equations, tables, and charts for compressible flow. NACA Report 1135, 1953 (NTRS 19930091059; NASA-hosted PDF www.nasa.gov/wp-content/uploads/2023/03/equations-tables-charts-compressibleflow-report-1135.pdf). Values are printed to 4 significant figures in the report tables; the rows below were confirmed against independent reproductions of those tables (search extracts) and recomputed from the report's closed-form equations. Rows graded A are confirmed by two independent sources: printed tables (Cengel & Cimbala appendix tables A-13..A-16, IIT Delhi gas tables, reproductions of NACA 1135) and/or the independent open-source implementation pygasflow 1.4.1 (PyPI), whose outputs (shockwave_solver, fanno_solver, rayleigh_solver) agree with every value below to all printed digits.",
   "acceptance": { "rel": 0.0005, "angleAbsDeg": 0.01 },
   "cases": [
     {
@@ -15,21 +15,21 @@
         "areaRatio": 1.6875,
         "prandtlMeyerDeg": 26.38
       },
-      "grade": "A"
+      "grade": "A (NACA 1135 reproductions + Cengel & Cimbala A-13)"
     },
     {
       "id": "VC-FLD-01b",
       "relation": "isentropic",
       "mach": 0.5,
       "expect": { "pressureRatio": 0.843, "temperatureRatio": 0.9524, "areaRatio": 1.3398 },
-      "grade": "B"
+      "grade": "A (Cengel & Cimbala A-13 + IIT Delhi isentropic table)"
     },
     {
       "id": "VC-FLD-01c",
       "relation": "isentropic",
       "mach": 3,
       "expect": { "pressureRatio": 0.02722, "temperatureRatio": 0.3571, "areaRatio": 4.2346, "prandtlMeyerDeg": 49.76 },
-      "grade": "A for nu, B otherwise"
+      "grade": "A (Cengel & Cimbala A-13; nu: two extracts)"
     },
     {
       "id": "VC-FLD-01d",
@@ -52,14 +52,14 @@
       "relation": "normal_shock",
       "mach": 2,
       "expect": { "mach2": 0.5774, "pressureRatio": 4.5, "densityRatio": 2.6667, "temperatureRatio": 1.6875, "totalPressureRatio": 0.7209 },
-      "grade": "A"
+      "grade": "A (NACA 1135 reproductions + pygasflow docs)"
     },
     {
       "id": "VC-FLD-02b",
       "relation": "normal_shock",
       "mach": 3,
       "expect": { "mach2": 0.4752, "pressureRatio": 10.333, "totalPressureRatio": 0.3283 },
-      "grade": "B"
+      "grade": "A (pygasflow 1.4.1 docstring table + closed form)"
     },
     {
       "id": "VC-FLD-03a",
@@ -68,7 +68,7 @@
       "deflectionDeg": 10,
       "branch": "weak",
       "expect": { "waveAngleDeg": 39.31, "mach2": 1.6405, "pressureRatio": 1.7066, "maxDeflectionDeg": 22.97 },
-      "grade": "A-"
+      "grade": "A (extract + pygasflow)"
     },
     {
       "id": "VC-FLD-03b",
@@ -77,23 +77,35 @@
       "deflectionDeg": 10,
       "branch": "weak",
       "expect": { "waveAngleDeg": 27.38 },
-      "grade": "B"
+      "grade": "A (pygasflow 1.4.1 oblique solver 27.3827 deg + closed form)"
     },
     {
       "id": "VC-FLD-04",
       "relation": "fanno",
       "mach": 2,
       "expect": { "temperatureRatio": 0.6667, "pressureRatio": 0.4082, "totalPressureRatio": 1.6875, "frictionParameter": 0.305 },
-      "grade": "B"
+      "grade": "A (pygasflow + gas-dynamics 0.4.2 docstrings: 0.3049965, 0.40825, 1.6875; search extract 0.304997)"
     },
-    { "id": "VC-FLD-04b", "relation": "fanno", "mach": 0.5, "expect": { "frictionParameter": 1.0691 }, "grade": "B" },
+    {
+      "id": "VC-FLD-04b",
+      "relation": "fanno",
+      "mach": 0.5,
+      "expect": { "frictionParameter": 1.0691 },
+      "grade": "A (pygasflow 1.0690603 + closed form)"
+    },
     {
       "id": "VC-FLD-05",
       "relation": "rayleigh",
       "mach": 2,
       "expect": { "pressureRatio": 0.3636, "temperatureRatio": 0.5289, "totalTemperatureRatio": 0.7934, "totalPressureRatio": 1.5031 },
-      "grade": "B"
+      "grade": "A (pygasflow + gas-dynamics docstrings 1.5030960, 0.7933884)"
     },
-    { "id": "VC-FLD-05b", "relation": "rayleigh", "mach": 0.5, "expect": { "totalTemperatureRatio": 0.6914 }, "grade": "B" }
+    {
+      "id": "VC-FLD-05b",
+      "relation": "rayleigh",
+      "mach": 0.5,
+      "expect": { "totalTemperatureRatio": 0.6914 },
+      "grade": "A (pygasflow 0.6913580 + closed form)"
+    }
   ]
 }

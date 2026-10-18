@@ -24,11 +24,11 @@ chemistry is not re-implemented.
 
 ## 2. Context and value
 
-| Who | Today | With llull |
-| --- | ----- | ---------- |
+| Who                                    | Today                                                           | With llull                                                                                                             |
+| -------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | Student / NewSpace small launcher team | NASA CEA + RPA + spreadsheets, then a CAD revolve drawn by hand | CEA chamber state → `nozzle_performance` → `design_nozzle` (solid) → `mass_properties` → `rocket_delta_v`, in one plan |
-| Propulsion engineer (concept) | Sutton & Biblarz relations in scripts; Rao charts read by hand | the same relations with every assumption and source in `data`; chart angles from the digitised Huzel & Huang curve |
-| Wind tunnel / inlet design | NACA 1135 tables | `compressible_flow` with inverses (A/A* → M, ν → M, θ → β) |
+| Propulsion engineer (concept)          | Sutton & Biblarz relations in scripts; Rao charts read by hand  | the same relations with every assumption and source in `data`; chart angles from the digitised Huzel & Huang curve     |
+| Wind tunnel / inlet design             | NACA 1135 tables                                                | `compressible_flow` with inverses (A/A\* → M, ν → M, θ → β)                                                            |
 
 ## 3. Personas and user stories
 
@@ -41,35 +41,46 @@ chemistry is not re-implemented.
 
 ## 4. Scope
 
-| Phase | Content |
-| ----- | ------- |
-| **MVP (built)** | isentropic, normal / oblique shock, Prandtl-Meyer, Fanno, Rayleigh (any γ); ideal rocket c*, C_F, Isp (vacuum / ambient / altitude), sizing by thrust or throat; conical divergence λ; Summerfield separation warning; nozzle wall solid (conical / 80 % Rao bell with chart angles, or any bell with given angles); Tsiolkovsky Δv and burn time |
-| V1 | Kinetic / boundary-layer / two-phase loss factors with sourced correlations; method of characteristics (MOC) minimum-length and TOP contours; regenerative-cooling channel geometry and a Bartz heat-flux estimate; CEA hand-off (bundled NASA `cea` Python package as a host transport, like CalculiX) so the chamber state is computed, not typed |
-| V2 | Axisymmetric / 2D CFD hand-off (SU2 / OpenFOAM `rhoCentralFoam`) for nozzle flow, separation and plume; trajectory integration with drag (uses 10 AER) |
-| Out of scope | Built-in chemical equilibrium, combustion instability, turbomachinery, solid-motor grain regression |
+| Phase           | Content                                                                                                                                                                                                                                                                                                                                             |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **MVP (built)** | isentropic, normal / oblique shock, Prandtl-Meyer, Fanno, Rayleigh (any γ); ideal rocket c\*, C_F, Isp (vacuum / ambient / altitude), sizing by thrust or throat; conical divergence λ; Summerfield separation warning; nozzle wall solid (conical / 80 % Rao bell with chart angles, or any bell with given angles); Tsiolkovsky Δv and burn time  |
+| V1              | Kinetic / boundary-layer / two-phase loss factors with sourced correlations; method of characteristics (MOC) minimum-length and TOP contours; regenerative-cooling channel geometry and a Bartz heat-flux estimate; CEA hand-off (bundled NASA `cea` Python package as a host transport, like CalculiX) so the chamber state is computed, not typed |
+| V2              | Axisymmetric / 2D CFD hand-off (SU2 / OpenFOAM `rhoCentralFoam`) for nozzle flow, separation and plume; trajectory integration with drag (uses 10 AER)                                                                                                                                                                                              |
+| Out of scope    | Built-in chemical equilibrium, combustion instability, turbomachinery, solid-motor grain regression                                                                                                                                                                                                                                                 |
 
 ## 5. Functional requirements
 
-| Id | Priority | Requirement | Source |
-| -- | -------- | ----------- | ------ |
-| FR-FLD-01 | MUST | Compressible relations for any 1 < γ < 2, with inverses: isentropic from M, A/A* (subsonic / supersonic branch), p/p0, T/T0 or ν; normal shock; oblique shock from θ (weak / strong, detachment detected) or β; Fanno; Rayleigh | NACA Report 1135 [R1] |
-| FR-FLD-02 | MUST | Ideal rocket performance from p_c, T_c, γ, molar mass and ε or p_e: c*, exit M / p / T / v, C_F and Isp in vacuum and at an ambient pressure or an altitude (standard atmosphere, 10 AER) | Sutton & Biblarz [R2], NASA SP-125 [R3] |
-| FR-FLD-03 | MUST | Sizing: throat area or diameter, or a thrust target in vacuum or at ambient → mass flow, thrust, exit diameter | [R2] |
-| FR-FLD-04 | MUST | Losses: conical divergence factor λ = (1 + cos α)/2, a given divergence factor, a c* efficiency; never applied silently (defaulted flags) | [R2], [R6] |
-| FR-FLD-05 | MUST | Warn on over-expansion and on likely flow separation (Summerfield p_e < 0.4 p_a); name the optimum expansion ratio for the ambient | [R7] |
-| FR-FLD-06 | MUST | Nozzle wall as a CAD solid of revolution: chamber, conical convergent, Rao throat arcs (1.5 R_t / 0.382 R_t), conical or parabolic bell (length fraction of the 15° cone, θn / θe), wall thickness; lengths, radii and contour in `data` | Rao [R4], Huzel & Huang [R3] |
-| FR-FLD-07 | MUST | Rocket equation Δv, mass ratio, burn time; inverse propellant mass for a Δv | Tsiolkovsky |
-| FR-FLD-08 | MUST | Stable `FLD_*` refusal codes, provenance (formulas + sources) and named defaults in every result | AF-11, AF-31, AF-35 |
-| FR-FLD-09 | SHOULD | CEA hand-off for the chamber state | V1 |
-| FR-FLD-10 | SHOULD | MOC contour; regen cooling and Bartz heat flux | V1 |
-| FR-FLD-11 | COULD | Nozzle / plume CFD hand-off | V2 |
+| Id        | Priority | Requirement                                                                                                                                                                                                                              | Source                                  |
+| --------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| FR-FLD-01 | MUST     | Compressible relations for any 1 < γ < 2, with inverses: isentropic from M, A/A\* (subsonic / supersonic branch), p/p0, T/T0 or ν; normal shock; oblique shock from θ (weak / strong, detachment detected) or β; Fanno; Rayleigh         | NACA Report 1135 [R1]                   |
+| FR-FLD-02 | MUST     | Ideal rocket performance from p_c, T_c, γ, molar mass and ε or p_e: c\*, exit M / p / T / v, C_F and Isp in vacuum and at an ambient pressure or an altitude (standard atmosphere, 10 AER)                                               | Sutton & Biblarz [R2], NASA SP-125 [R3] |
+| FR-FLD-03 | MUST     | Sizing: throat area or diameter, or a thrust target in vacuum or at ambient → mass flow, thrust, exit diameter                                                                                                                           | [R2]                                    |
+| FR-FLD-04 | MUST     | Losses: conical divergence factor λ = (1 + cos α)/2, a given divergence factor, a c\* efficiency; never applied silently (defaulted flags)                                                                                               | [R2], [R6]                              |
+| FR-FLD-05 | MUST     | Warn on over-expansion and on likely flow separation (Summerfield p_e < 0.4 p_a); name the optimum expansion ratio for the ambient                                                                                                       | [R7]                                    |
+| FR-FLD-06 | MUST     | Nozzle wall as a CAD solid of revolution: chamber, conical convergent, Rao throat arcs (1.5 R_t / 0.382 R_t), conical or parabolic bell (length fraction of the 15° cone, θn / θe), wall thickness; lengths, radii and contour in `data` | Rao [R4], Huzel & Huang [R3]            |
+| FR-FLD-07 | MUST     | Rocket equation Δv, mass ratio, burn time; inverse propellant mass for a Δv                                                                                                                                                              | Tsiolkovsky                             |
+| FR-FLD-08 | MUST     | Stable `FLD_*` refusal codes, provenance (formulas + sources) and named defaults in every result                                                                                                                                         | AF-11, AF-31, AF-35                     |
+| FR-FLD-09 | SHOULD   | CEA hand-off for the chamber state                                                                                                                                                                                                       | V1                                      |
+| FR-FLD-10 | SHOULD   | MOC contour; regen cooling and Bartz heat flux                                                                                                                                                                                           | V1                                      |
+| FR-FLD-11 | COULD    | Nozzle / plume CFD hand-off                                                                                                                                                                                                              | V2                                      |
 
 ## 6. Workflows
 
 ```json
 [
-  { "command": "nozzle_performance", "params": { "chamberPressure": 70, "pressureUnit": "bar", "chamberTemperatureK": 3558.34,
-      "gamma": 1.1507, "molarMass": 22.186, "expansionRatio": 16, "altitudeM": 0, "thrustN": 1000000 } },
+  {
+    "command": "nozzle_performance",
+    "params": {
+      "chamberPressure": 70,
+      "pressureUnit": "bar",
+      "chamberTemperatureK": 3558.34,
+      "gamma": 1.1507,
+      "molarMass": 22.186,
+      "expansionRatio": 16,
+      "altitudeM": 0,
+      "thrustN": 1000000
+    }
+  },
   { "command": "design_nozzle", "params": { "throatRadius": 100, "expansionRatio": 16, "wallThickness": 6 }, "as": "nozzle" },
   { "command": "mass_properties", "params": { "entityId": "$nozzle" } },
   { "command": "rocket_delta_v", "params": { "ispS": 330, "initialMassKg": 30000, "propellantMassKg": 24000, "thrustN": 1000000 } }
@@ -82,15 +93,15 @@ propulsion", and the nozzle solid is shown in the viewport.
 
 ## 7. Acceptance criteria
 
-| Given | When | Then | VC |
-| ----- | ---- | ---- | -- |
-| NACA 1135 table rows (13 cases, γ 1.4) | `compressible_flow` | ratios within 5e-4, angles within 0.01° | VC-FLD-01..05 |
-| NASA CEA chamber states (RP-1311 Ex. 8, LOX/LH2 206 bar, LOX/RP-1 70 bar) | `nozzle_performance` | c* within 0.5 %, throat T within 1.5 %, Isp (vac and sea level) within 3 % of shifting equilibrium | VC-FLD-10/11 |
-| RS-25 published 452.3 s | same with the CEA state at 2994 psia, ε 69 | ideal ≥ published, ≤ +6 %; separation warning at sea level | VC-FLD-13 |
-| SP-125 A-1 (ε 14, 1000 psia, 14.696 psi) | `nozzle_performance` | C_F,vac − C_F,SL = 0.206 (book 1.768 − 1.562) within 1e-3 | VC-FLD-14 |
-| λ = (1 + cos 15°)/2 | conical | 0.98296 | VC-FLD-21 |
-| an 80 % bell, ε 25 | `design_nozzle` | (R_e/R_t)² = 25, length 0.8 L15, θn within 0.2° and θe within 0.05° of the chart, wall volume = Pappus within 0.2 % | VC-FLD-20/22 |
-| Δv closed form | `rocket_delta_v` | exact | VC-FLD-30 |
+| Given                                                                     | When                                       | Then                                                                                                                | VC            |
+| ------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------- |
+| NACA 1135 table rows (13 cases, γ 1.4)                                    | `compressible_flow`                        | ratios within 5e-4, angles within 0.01°                                                                             | VC-FLD-01..05 |
+| NASA CEA chamber states (RP-1311 Ex. 8, LOX/LH2 206 bar, LOX/RP-1 70 bar) | `nozzle_performance`                       | c\* within 0.5 %, throat T within 1.5 %, Isp (vac and sea level) within 3 % of shifting equilibrium                 | VC-FLD-10/11  |
+| RS-25 published 452.3 s                                                   | same with the CEA state at 2994 psia, ε 69 | ideal ≥ published, ≤ +6 %; separation warning at sea level                                                          | VC-FLD-13     |
+| SP-125 A-1 (ε 14, 1000 psia, 14.696 psi)                                  | `nozzle_performance`                       | C_F,vac − C_F,SL = 0.206 (book 1.768 − 1.562) within 1e-3                                                           | VC-FLD-14     |
+| λ = (1 + cos 15°)/2                                                       | conical                                    | 0.98296                                                                                                             | VC-FLD-21     |
+| an 80 % bell, ε 25                                                        | `design_nozzle`                            | (R_e/R_t)² = 25, length 0.8 L15, θn within 0.2° and θe within 0.05° of the chart, wall volume = Pappus within 0.2 % | VC-FLD-20/22  |
+| Δv closed form                                                            | `rocket_delta_v`                           | exact                                                                                                               | VC-FLD-30     |
 
 ## 8. Standards and regulation
 
@@ -105,7 +116,7 @@ document, as for any other part.
 
 ## 10. Risks and assumptions
 
-- **One constant γ.** With CEA's chamber γ and molar mass, c* is exact to 0.02 % and Isp is within about 3 % of
+- **One constant γ.** With CEA's chamber γ and molar mass, c\* is exact to 0.02 % and Isp is within about 3 % of
   shifting equilibrium. A frozen-composition expansion gives 4–6 % less. Real engines deliver less again: RS-25
   delivers 452.3 s, while this ideal model gives about 473 s for its chamber state.
 - **Rao angles** are a digitised chart (±0.5°), covering only the 80 % bell for ε 5–50. Outside that range the

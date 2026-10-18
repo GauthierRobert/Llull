@@ -29,12 +29,12 @@ history (L8), so editing its params regenerates the solid.
 
 ## 4. Commands (toolset `fluids`)
 
-| Name | Kind | Params | data | Codes |
-| ---- | ---- | ------ | ---- | ----- |
-| `compressible_flow` | query | `relation isentropic\|normal_shock\|oblique_shock\|fanno\|rayleigh`, `gamma`, `mach` \| `areaRatio`+`branch` \| `pressureRatio` \| `temperatureRatio` \| `prandtlMeyerDeg`, `deflectionDeg`+`branch` \| `waveAngleDeg` | `result` (all ratios, M2, β, θmax, ν, μ, 4fL*/D, …), provenance | `FLD_PARAM_INVALID`, `FLD_INPUT_CONFLICT`, `FLD_MACH_RANGE`, `FLD_SHOCK_DETACHED` |
-| `nozzle_performance` | query | `chamberPressure`, `pressureUnit` (required), `chamberTemperatureK`, `gamma`, `molarMass`, `expansionRatio` \| `exitPressure`, `divergence ideal\|conical\|factor` (+`halfAngleDeg` / `divergenceFactor`), `cStarEfficiency`, `ambientPressure` \| `altitudeM`, `throatDiameterM` \| `throatAreaM2` \| `thrustN`+`thrustAt` | c*, exit {M, p, T, v}, throat {T, p}, C_F {vac, amb}, Isp {vac, amb}, c, optimum ε, expansion state, sizing {D_t, D_e, ṁ, F}, warnings, provenance | `FLD_PARAM_INVALID`, `FLD_INPUT_CONFLICT`, `FLD_EXPANSION_INVALID` |
-| `design_nozzle` | mutating (composes `revolve_profile`) | `throatRadius`, `expansionRatio`, `contractionRatio`, `chamberLength`, `convergentHalfAngleDeg`, `shape conical\|bell`, `halfAngleDeg`, `lengthFraction`, `entranceAngleDeg`, `exitAngleDeg`, `wallThickness`, `position`, `segments`, `includeContour` | id, R_e, R_c, (R_e/R_t)², convergent / divergent / total length, L15, exit angle, contour (opt.), defaulted | `FLD_PARAM_INVALID`, `FLD_CONTOUR_INVALID` |
-| `rocket_delta_v` | query | `ispS`, `initialMassKg`, `propellantMassKg` \| `finalMassKg` \| `targetDeltaVMS`, `thrustN` | Δv, mass ratio, c, m_p, m_f, ṁ, burn time, T/W | `FLD_PARAM_INVALID`, `FLD_INPUT_CONFLICT` |
+| Name                 | Kind                                  | Params                                                                                                                                                                                                                                                                                                                      | data                                                                                                                                                | Codes                                                                             |
+| -------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `compressible_flow`  | query                                 | `relation isentropic\|normal_shock\|oblique_shock\|fanno\|rayleigh`, `gamma`, `mach` \| `areaRatio`+`branch` \| `pressureRatio` \| `temperatureRatio` \| `prandtlMeyerDeg`, `deflectionDeg`+`branch` \| `waveAngleDeg`                                                                                                      | `result` (all ratios, M2, β, θmax, ν, μ, 4fL\*/D, …), provenance                                                                                    | `FLD_PARAM_INVALID`, `FLD_INPUT_CONFLICT`, `FLD_MACH_RANGE`, `FLD_SHOCK_DETACHED` |
+| `nozzle_performance` | query                                 | `chamberPressure`, `pressureUnit` (required), `chamberTemperatureK`, `gamma`, `molarMass`, `expansionRatio` \| `exitPressure`, `divergence ideal\|conical\|factor` (+`halfAngleDeg` / `divergenceFactor`), `cStarEfficiency`, `ambientPressure` \| `altitudeM`, `throatDiameterM` \| `throatAreaM2` \| `thrustN`+`thrustAt` | c\*, exit {M, p, T, v}, throat {T, p}, C_F {vac, amb}, Isp {vac, amb}, c, optimum ε, expansion state, sizing {D_t, D_e, ṁ, F}, warnings, provenance | `FLD_PARAM_INVALID`, `FLD_INPUT_CONFLICT`, `FLD_EXPANSION_INVALID`                |
+| `design_nozzle`      | mutating (composes `revolve_profile`) | `throatRadius`, `expansionRatio`, `contractionRatio`, `chamberLength`, `convergentHalfAngleDeg`, `shape conical\|bell`, `halfAngleDeg`, `lengthFraction`, `entranceAngleDeg`, `exitAngleDeg`, `wallThickness`, `position`, `segments`, `includeContour`                                                                     | id, R_e, R_c, (R_e/R_t)², convergent / divergent / total length, L15, exit angle, contour (opt.), defaulted                                         | `FLD_PARAM_INVALID`, `FLD_CONTOUR_INVALID`                                        |
+| `rocket_delta_v`     | query                                 | `ispS`, `initialMassKg`, `propellantMassKg` \| `finalMassKg` \| `targetDeltaVMS`, `thrustN`                                                                                                                                                                                                                                 | Δv, mass ratio, c, m_p, m_f, ṁ, burn time, T/W                                                                                                      | `FLD_PARAM_INVALID`, `FLD_INPUT_CONFLICT`                                         |
 
 Pressure units are `Pa`, `kPa`, `MPa`, `bar`, `atm` and `psi`. The unit is required, never inferred (AF-04).
 
@@ -48,10 +48,10 @@ These are the NACA 1135 closed forms for a calorically perfect gas.
 
 - T0/T = 1 + (γ−1)M²/2
 - p/p0 = (T/T0)^(γ/(γ−1))
-- A/A* = (1/M)[(2/(γ+1))(1 + (γ−1)M²/2)]^((γ+1)/(2(γ−1)))
+- A/A\* = (1/M)[(2/(γ+1))(1 + (γ−1)M²/2)]^((γ+1)/(2(γ−1)))
 - ν = √((γ+1)/(γ−1)) atan √((γ−1)(M²−1)/(γ+1)) − atan √(M²−1)
 
-The p/p0 and T/T0 inverses are closed form. The A/A* and ν inverses use bisection (200 steps) on the monotone
+The p/p0 and T/T0 inverses are closed form. The A/A\* and ν inverses use bisection (200 steps) on the monotone
 branch.
 
 **Normal shock:**
@@ -70,13 +70,13 @@ branch.
 
 **Fanno:**
 
-- 4f̄L*/D = (1 − M²)/(γM²) + ((γ+1)/(2γ)) ln((γ+1)M²/(2 + (γ−1)M²))
+- 4f̄L\*/D = (1 − M²)/(γM²) + ((γ+1)/(2γ)) ln((γ+1)M²/(2 + (γ−1)M²))
 - p/p*, T/T*, p0/p0* and V/V* follow from the same relations.
 
 **Rayleigh:**
 
-- p/p* = (1+γ)/(1+γM²)
-- T0/T0* = 2(γ+1)M²(1 + (γ−1)M²/2)/(1+γM²)²
+- p/p\* = (1+γ)/(1+γM²)
+- T0/T0\* = 2(γ+1)M²(1 + (γ−1)M²/2)/(1+γM²)²
 
 ### 5.2 Ideal rocket (TR-FLD-02..05)
 
@@ -89,9 +89,9 @@ throat is sonic. R = R_u/M, with R_u = 8314.462618 J/(kmol·K).
 - C_F,vac = λ Γ √(2γ/(γ−1) (1 − (p_e/p_c)^((γ−1)/γ))) + ε p_e/p_c
 - C_F = C_F,vac − ε p_a/p_c
 - F = C_F p_c A_t
-- ṁ = p_c A_t / c*
-- Isp = F/(ṁ g0) = c* C_F/g0, with g0 = 9.80665
-- v_e = c* × (momentum part of C_F)
+- ṁ = p_c A_t / c\*
+- Isp = F/(ṁ g0) = c\* C_F/g0, with g0 = 9.80665
+- v_e = c\* × (momentum part of C_F)
 - Optimum ε: the value with p_e = p_a
 - Conical divergence: λ = (1 + cos α)/2
 
@@ -136,14 +136,14 @@ input deck (`.inp`) writer and output parser in the server transport.
 
 ## 7. Error codes
 
-| Code | Meaning |
-| ---- | ------- |
-| FLD_PARAM_INVALID | value outside its documented range |
-| FLD_INPUT_CONFLICT | alternative inputs both given or both missing |
-| FLD_MACH_RANGE | Mach outside the relation's domain (e.g. a shock with M ≤ 1) |
-| FLD_SHOCK_DETACHED | θ above θmax for M |
-| FLD_EXPANSION_INVALID | ε ≤ 1 or p_e ≥ p_throat |
-| FLD_CONTOUR_INVALID | the contour cannot close (contraction too small for the arcs, bell angles do not fit) |
+| Code                  | Meaning                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------- |
+| FLD_PARAM_INVALID     | value outside its documented range                                                    |
+| FLD_INPUT_CONFLICT    | alternative inputs both given or both missing                                         |
+| FLD_MACH_RANGE        | Mach outside the relation's domain (e.g. a shock with M ≤ 1)                          |
+| FLD_SHOCK_DETACHED    | θ above θmax for M                                                                    |
+| FLD_EXPANSION_INVALID | ε ≤ 1 or p_e ≥ p_throat                                                               |
+| FLD_CONTOUR_INVALID   | the contour cannot close (contraction too small for the arcs, bell angles do not fit) |
 
 ## 8. Performance
 
@@ -152,23 +152,23 @@ tessellation. Results are deterministic.
 
 ## 9. Test strategy
 
-| VC | Test |
-| -- | ---- |
-| VC-FLD-01..05 | `tests/unit/aero/fluids/compressible.test.ts` (13 table rows + inverses + refusals) |
-| VC-FLD-10..15 | `tests/unit/aero/fluids/nozzle.test.ts` (CEA RP-1311 Ex. 8, two CEA engine cases, RS-25, SP-125 A-1 identity, λ, sizing, refusals) |
+| VC            | Test                                                                                                                                |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| VC-FLD-01..05 | `tests/unit/aero/fluids/compressible.test.ts` (13 table rows + inverses + refusals)                                                 |
+| VC-FLD-10..15 | `tests/unit/aero/fluids/nozzle.test.ts` (CEA RP-1311 Ex. 8, two CEA engine cases, RS-25, SP-125 A-1 identity, λ, sizing, refusals)  |
 | VC-FLD-20..22 | `tests/unit/aero/fluids/designNozzle.test.ts` (bell ε 25, chart lookup, conical + Pappus volume, explicit angles, refusals, purity) |
-| VC-FLD-30 | same file, `rocket_delta_v` |
-| SC-FLD-01..03 | `tests/unit/aero/scenarioPlans.test.ts` |
+| VC-FLD-30     | same file, `rocket_delta_v`                                                                                                         |
+| SC-FLD-01..03 | `tests/unit/aero/scenarioPlans.test.ts`                                                                                             |
 
 ## 10. Delivery plan
 
-| Milestone | Content | State |
-| --------- | ------- | ----- |
-| M1 | compressible relations, ideal nozzle, contour solid, Δv | **done 2026-10-18** |
-| M2 | CEA hand-off: server transport `cea_equilibrium` running the bundled NASA `cea` Python package (Apache-2.0, PyPI) in the desktop's CPython; chamber state + frozen / equilibrium Isp as data | ≈ 2 eng-weeks |
-| M3 | Method of characteristics (minimum-length and Rao TOP), loss correlations (kinetic, boundary layer) from SP-8120 with sources | ≈ 4 eng-weeks |
-| M4 | Regenerative cooling: channel geometry on the wall solid, Bartz h_g, coolant ΔT / Δp (reuses pipe_hydraulics friction), hand-off to PHY-03 thermal | ≈ 4 eng-weeks |
-| M5 | Nozzle / plume CFD hand-off (SU2 / OpenFOAM) | ≈ 6 eng-weeks |
+| Milestone | Content                                                                                                                                                                                      | State               |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| M1        | compressible relations, ideal nozzle, contour solid, Δv                                                                                                                                      | **done 2026-10-18** |
+| M2        | CEA hand-off: server transport `cea_equilibrium` running the bundled NASA `cea` Python package (Apache-2.0, PyPI) in the desktop's CPython; chamber state + frozen / equilibrium Isp as data | ≈ 2 eng-weeks       |
+| M3        | Method of characteristics (minimum-length and Rao TOP), loss correlations (kinetic, boundary layer) from SP-8120 with sources                                                                | ≈ 4 eng-weeks       |
+| M4        | Regenerative cooling: channel geometry on the wall solid, Bartz h_g, coolant ΔT / Δp (reuses pipe_hydraulics friction), hand-off to PHY-03 thermal                                           | ≈ 4 eng-weeks       |
+| M5        | Nozzle / plume CFD hand-off (SU2 / OpenFOAM)                                                                                                                                                 | ≈ 6 eng-weeks       |
 
 ## 11. Open questions
 

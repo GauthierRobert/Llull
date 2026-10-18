@@ -40,6 +40,8 @@ describe('design_nozzle (VC-FLD-20..22)', () => {
     const chart = contour.rao80Angles.points.find((point) => point.eps === 24.97) as { thetaN: number };
     expect(Math.abs(divergent.reduce((max, point) => Math.max(max, point.angleDeg), 0) - chart.thetaN)).toBeLessThan(0.2);
     expect((result.contour.at(-1) as Design['contour'][0]).angleDeg).toBeCloseTo(8.78, 1);
+    const second = contour.rao80Angles.secondSource.exitAngleDegAtEps25.bell80;
+    expect(Math.abs((result.contour.at(-1) as Design['contour'][0]).angleDeg - second)).toBeLessThan(0.5);
     expect(result.defaulted.join(' ')).toContain('Huzel');
   });
 
