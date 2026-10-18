@@ -4,7 +4,7 @@
  */
 
 import { toRadians } from '@lib/angle';
-import type { CadDocument, Vec2 } from '@core/model/types';
+import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import type { CivilModel, CivilObject, SiteCalibration } from '@core/model/civil';
 
 export type CoordinateFrame = 'local' | 'grid';
@@ -49,7 +49,8 @@ function gridObject(calibration: SiteCalibration, object: CivilObject): CivilObj
         ...object,
         points: object.points.map((point) => {
           const [x, y] = move([point.position[0], point.position[1]]);
-          return { ...point, position: [x, y, point.position[2]] };
+          const position: Vec3 = [x, y, point.position[2]];
+          return { ...point, position };
         }),
       };
     case 'surface':
