@@ -313,3 +313,8 @@
 .review-panel__markers {
   padding: var(--space-1) var(--space-3);
 }
+
+.finding__title {
+  font-weight: 600;
+  color: var(--fg);
+}

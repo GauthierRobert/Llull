@@ -8,6 +8,7 @@ import type { PanelFocus } from '@ui/store/focusStore';
 import { STATUS_GLYPH } from './checklist';
 import type { Finding } from './findings';
 import type { CheckStatus } from './reviewTypes';
+import { findingTitle } from './checklist';
 
 export const SEVERITY_COLORS: Readonly<Record<CheckStatus, string>> = {
   fail: '#ff4d4f',
@@ -50,12 +51,13 @@ export function findingLocation(doc: CadDocument, { item }: Finding): FindingLoc
 
 export function findingFocus(doc: CadDocument, finding: Finding): PanelFocus {
   const location = findingLocation(doc, finding);
-  const label = `${STATUS_GLYPH[location.status]} ${location.code}`;
+  const title = `${STATUS_GLYPH[location.status]} ${findingTitle(location.code)}`;
+  const label = `${title} (${location.code})`;
   return {
     key: `review:finding:${location.findingKey}`,
     label,
     color: SEVERITY_COLORS[location.status],
     entityIds: [...location.entityIds],
-    markers: location.position === null ? [] : [{ position: location.position, label }],
+    markers: location.position === null ? [] : [{ position: location.position, label: title }],
   };
 }

@@ -8,7 +8,7 @@ import { useFocusItem } from '@ui/hooks/useFocusItem';
 import { useIsFocused } from '@ui/store/focusStore';
 import { StatusMark } from './StatusMark';
 import { findingFocus } from './findingLocations';
-import { formatThreshold, headlineValue, itemStatusLabel } from './checklist';
+import { findingTitle, formatThreshold, headlineValue, itemStatusLabel } from './checklist';
 import { filterFindings, flattenFindings, groupFindings, reviewerStatusOf, sortFindings, type Finding } from './findings';
 import { useReviewStore } from './reviewStore';
 import {
@@ -61,6 +61,7 @@ function FindingRow({ finding, editable, onDisposition, onExplain }: FindingRowP
     <li className={focused ? 'finding finding--focused' : 'finding'} data-testid={`finding-${item.findingKey}`}>
       <div className="finding__head">
         <StatusMark status={item.status} label={itemStatusLabel(item)} />
+        <span className="finding__title">{findingTitle(item.code)}</span>
         <code className="finding__code">{item.code}</code>
         {item.disposition?.by === 'agent' && <span className="finding__badge">agent</span>}
         {item.disposition?.stale === true && <span className="finding__badge finding__badge--stale">stale</span>}

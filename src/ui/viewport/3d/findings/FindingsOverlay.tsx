@@ -8,6 +8,7 @@ import { flattenFindings } from '@ui/panels/review/findings';
 import { SEVERITY_COLORS, findingLocation } from '@ui/panels/review/findingLocations';
 import { STATUS_GLYPH } from '@ui/panels/review/checklist';
 import { ProjectedLabel } from '../ProjectedLabel';
+import { findingTitle } from '@ui/panels/review/checklist';
 
 /** Badges drawn at most (the list holds the rest). */
 const MAX_BADGES = 60;
@@ -35,7 +36,7 @@ export function FindingsOverlay(): React.ReactElement | null {
           <ProjectedLabel
             key={badge.findingKey}
             position={badge.position}
-            text={`${STATUS_GLYPH[badge.status]} ${badge.code}`}
+            text={`${STATUS_GLYPH[badge.status]} ${findingTitle(badge.code)}`}
             className="load-label"
             borderColor={SEVERITY_COLORS[badge.status]}
             opacity={0.95}

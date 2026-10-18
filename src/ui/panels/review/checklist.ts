@@ -168,3 +168,31 @@ export function formatThreshold(item: CheckItem): string | null {
   if (t === undefined) return null;
   return `limit ${formatNumber(t.value)} ${t.unit} (${t.source}, grade ${t.grade}${t.defaulted ? ', default' : ''})`;
 }
+
+/** Plain-language title of a finding code, for badges and highlights on the model. */
+const FINDING_TITLES: Readonly<Record<string, string>> = {
+  FPR_PART_INVALID: 'Invalid solid',
+  FPR_PART_EMPTY: 'Empty part',
+  FPR_PART_DISCONNECTED: 'Part in pieces',
+  FPR_PART_SHEET: 'Open surface, not a solid',
+  FPR_PAIR_HARD: 'Parts overlap',
+  FPR_PAIR_CONTAINED: 'Part inside another',
+  FPR_PAIR_TOUCH: 'Parts touch',
+  FPR_PAIR_CLEARANCE: 'Too close',
+  FPR_PAIR_ALLOWED: 'Overlap allowed',
+  FPR_WALL_THIN: 'Wall too thin',
+  FPR_PART_FLOATING: 'Floating part',
+  FPR_PART_RESTING_ONLY: 'Only resting, not fixed',
+  FPR_JOINT_NOT_REALISED: 'Joint not realised',
+  FPR_MASS_DEFAULTED: 'Mass assumed',
+  FPR_UNREALISTIC: 'Unrealistic input',
+  FPR_OUTSIDE_VALIDATED_RANGE: 'Outside validated range',
+  FPR_REFERENCE_MISMATCH: 'Differs from reference',
+  FPR_CALIBRATION_FAILED: 'Calibration failed',
+  FPR_NO_LOSSES: 'No losses modelled',
+};
+
+/** The title of `code`, else the checklist row it belongs to, else the code itself. */
+export function findingTitle(code: string): string {
+  return FINDING_TITLES[code] ?? ROW_SPECS.find((spec) => spec.codes?.includes(code))?.label ?? code;
+}
