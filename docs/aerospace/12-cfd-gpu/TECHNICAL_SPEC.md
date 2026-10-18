@@ -398,8 +398,8 @@ MVP (M1–M5): about 22 eng-weeks. M3 also gives FEA its first 3D result overlay
 
 ## 11. Open questions / decisions needed
 
-1. **Rust toolchain in the repo.** A top-level `solver/flow/` Cargo workspace adds `cargo` to CI and to the desktop build. Needs owner
-   approval (CLAUDE.md "STACK (fixed)").
+1. **Rust toolchain in the repo** — *resolved 2026-10-18*: the owner made the stack non-fixed ("always use the best-suited
+   stack", `conventions.md` C7). `solver/flow/` is a Cargo workspace; CI and the desktop build gain `cargo`.
 2. **FEA port location.** `FeaToolsPort` lives in `packages/mcp`; when MCP is removed it must move to `server/` (transport types) and
    core (`FeArtifactPort` already is). This pack uses the target location from the start.
 3. **One artifact store for FEA and CFD.** Proposed: generalise `ctx.feaArtifacts` into a store with namespaces (`fea/`, `cfd/`), or

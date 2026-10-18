@@ -7,13 +7,14 @@ MCP-first **2D + 3D** CAD web app (AutoCAD-like): 2D drafting + 3D solids in one
 **Never mutate the document outside a command.** UI and MCP both call `execute(doc, name, params)`.
 One registered command = one UI action + one MCP tool. Editing entities in a component/server = bug.
 
-## STACK (fixed; no alternatives without user approval)
+## STACK (current; pick the best-suited stack per task — rule C7)
 
 React 19 + TS strict + Vite · three.js + r3f + drei (3D perspective; 2D = same scene, ortho top-down) ·
 Zustand (one store, `dispatch`) · zod v4 (one schema per command → TS type + MCP JSON Schema + validation) ·
 kernels Manifold (default) / OpenCascade.js behind `GeometryKernel` · Vitest + Testing Library ·
 ESLint flat + Prettier + knip · Express (optional MCP host + live doc) · Electron `desktop/` + bundled CPython/CadQuery ·
 agents: local = `llull` CLI (`--app` drives desktop), cloud = MCP `/mcp`.
+Not fixed: use the best-suited language / library for each task (e.g. Rust + wgpu for GPU solvers) — `conventions.md` C7.
 
 ## LAYER MAP (npm workspaces `packages/*`; web app + `server/` at root)
 
