@@ -45,7 +45,8 @@ packages/domain-aero/src/aerodynamics/
 ## 3. Data model
 
 No new document data. All commands are queries, and `draw_naca_airfoil` creates a standard `polyline` entity, so
-the document version and migrations are unchanged. A future persistent "aero model" (wing definition with
+the document version and migrations are unchanged. FR-AER-14 reads the 12 CFD document slice (`cfd.results`,
+`model/cfd.ts`) read-only; it adds no data of its own. A future persistent "aero model" (wing definition with
 sections, a polar cache) would be a plugin `DocumentExtension`. It is not needed for the MVP.
 
 ## 4. Commands (toolset `aerodynamics`)
@@ -177,8 +178,28 @@ P = K(0.00953 M_t V + 0.00775 V² + K1 A_f 0.007551 V³), with V in km/h.
 
 ## 6. Interop and persistence
 
-No new file format. Plans in `validation/plans/*.json` are standard `build_project` actions. A Cp / polar CSV
-export and the XFOIL / OpenFOAM hand-off are V1 / V2 items (§10).
+No new file format in the MVP. Plans in `validation/plans/*.json` are standard `build_project` actions. A Cp /
+polar CSV export and the XFOIL hand-off are V1 items (§10).
+
+**Link to 12 CFD (FR-AER-14).** `aero_drag` and `road_load_power` get a third drag-area source, `cfdCaseId`,
+mutually exclusive with `cdA` and `cd` + area (`AER_AREA_SOURCE_CONFLICT` as today). The command reads
+`doc.cfd.results[caseId]`: it refuses `AER_CFD_RESULT_UNUSABLE` when the result is missing, stale (case or geometry
+hash changed) or `converged: false`, and otherwise uses `forces.cdAM2`. The CFD free stream must match the requested
+speed within 1 %, or the command warns that CdA is being reused at another Reynolds number. The result `provenance`
+names the case, its `resultsHash`, solver and resolution, and an `unverified` CFD result stays `unverified`.
+
+**External-solver export (FR-AER-13, V2).** A host transport `cfd_export_case` (12 CFD `server/src/cfd/`, local
+files only) takes the surface and domain from `cfd_prepare`, so watertightness, patches and domain sizing are
+checked once, by 12 CFD. It writes:
+
+- OpenFOAM: `constant/triSurface/body.stl` (one solid per boundary tag), `system/blockMeshDict` (the farfield box),
+  `system/snappyHexMeshDict`, `0/` fields from the free stream, `simpleFoam` (low speed) or `rhoCentralFoam`
+  (compressible) controls;
+- SU2: a Gmsh volume mesh (bundled Python Gmsh, as in 05 FEA) and a `.cfg` with the markers and free stream.
+
+`cfd_import_external` reads the external forces and surface Cp (OpenFOAM `forces` function object and surface
+sampling; SU2 `history.csv` and `surface_flow.csv`), stores them in the 12 CFD result store, and records them with
+`record_cfd_results` and `solver: 'external'` in provenance. External solvers are never bundled or started by llull.
 
 ## 7. Surfaces and error codes
 
@@ -198,6 +219,7 @@ The CLI (`llull <command> '{…}' --json`), MCP (toolset `aerodynamics`) and the
 | AER_AREA_SOURCE_CONFLICT               | ambiguous drag area                                   |
 | AER_SPEED_SOURCE_CONFLICT              | both or neither of speed / power                      |
 | AER_NO_EQUILIBRIUM                     | no steady speed ≤ 100 m/s for the power               |
+| AER_CFD_RESULT_UNUSABLE (planned)      | the 12 CFD case has no result, or it is stale or not converged |
 
 ## 8. Performance budgets
 
@@ -220,6 +242,9 @@ The resolution is capped at 2000 cells. All commands are deterministic (AF-13).
 | VC-AER-13     | `wing.test.ts` (elliptic exact, rectangular, taper, washout, forces)                                                                  |
 | VC-AER-20..23 | `roadLoad.test.ts` (Bassett Table 7, Martin closed forms, Defraeye ranking)                                                           |
 | SC-AER-01..05 | `tests/unit/aero/scenarioPlans.test.ts` runs every plan in `validation/plans/` through `build_project` and checks its `expected` rows |
+| VC-AER-30     | planned (M6): `cfdSource.test.ts` with a recorded 12 CFD result fixture (fresh, stale, not converged, speed mismatch)                  |
+| VC-AER-31     | planned (M7): `compressibility.test.ts` (Prandtl-Glauert closed form) + a 12 CFD CLI scenario (Euler, extruded NACA 0012)             |
+| VC-AER-32     | planned (M4): `server/tests/cfd/externalExport.test.ts` (case files parsed back; known-result import round trip)                      |
 
 The coverage gate on `packages/domain-aero/src/**` is 90/85/90/90 (CLAUDE.md).
 
@@ -230,8 +255,10 @@ The coverage gate on `packages/domain-aero/src/**` is 90/85/90/90 (CLAUDE.md).
 | M1        | atmosphere, NACA, panel, lifting line, frontal area, drag, cycling (this spec)                                                                    | **done 2026-10-18**   |
 | M2        | XFOIL hand-off: server transport `xfoil_polar` like `fea_solve`, bundled binary (GPL, decision 5), viscous polar as data                          | todo, ≈ 3 eng-weeks   |
 | M3        | Vortex-lattice (horseshoe VLM) over a wing / tail definition read from lofts; neutral point; drag build-up tables with sources                    | todo, ≈ 4 eng-weeks   |
-| M4        | CFD hand-off (OpenFOAM `simpleFoam` / SU2 case writer from a watertight body + farfield; forces and surface Cp import as 05-style result records) | todo, ≈ 6–8 eng-weeks |
+| M4        | External-solver export / import (`cfd_export_case`, `cfd_import_external`) on the case prepared by 12 CFD; the built-in solvers moved to [12 CFD](../12-cfd-gpu/TECHNICAL_SPEC.md) §10 | todo, ≈ 3 eng-weeks (after 12 CFD M1; was 6–8 before preparation was shared) |
 | M5        | UI: Cp and span-loading plots in the Analysis tab (same pattern as `plot_simulation`)                                                             | todo                  |
+| M6        | `cfdCaseId` drag-area source in `aero_drag` / `road_load_power` (FR-AER-14), VC-AER-30                                                            | todo, ≈ 1 eng-week, after 12 CFD M2 |
+| M7        | Prandtl-Glauert / Kármán-Tsien corrections and the cross-check against the 12 CFD Euler solver (FR-AER-15), VC-AER-31                             | todo, ≈ 1 eng-week, after 12 CFD M4 |
 
 ## 11. Open questions
 
@@ -240,6 +267,10 @@ The coverage gate on `packages/domain-aero/src/**` is 90/85/90/90 (CLAUDE.md).
    the section-ring fix of 02 SRF (24-point resampling).
 3. Should rider CdA presets (Defraeye 2010) be shipped as a sourced table? They are B-grade, and a choice for the
    owner. They are kept as documentation only for now.
+4. When the 12 CFD free stream and the `aero_drag` speed differ, should CdA be reused with a warning (proposed) or
+   refused? Reynolds effects on CdA are small for bluff bodies above the drag crisis but not for streamlined ones.
+5. Is the external-solver export (M4) still wanted now that llull has its own solvers (12 CFD)? It serves users who
+   already run OpenFOAM / SU2 locally and want a second opinion; it is COULD and can be dropped without affecting 12 CFD.
 
 ## 12. References
 

@@ -1,0 +1,190 @@
+{
+  "id": "SC-CFD-03",
+  "status": "draft \u2014 the cfd commands and the llull-flow sidecar are specified, not implemented",
+  "validates": [
+    "VC-CFD-31"
+  ],
+  "description": "Supersonic flow over a symmetric 10 deg half-angle wedge (chord 1 m, span 1 m). Case m2: Mach 2 at alpha 0 (both faces deflect 10 deg). Case m3: Mach 3 at alpha 5 deg, so the lower face deflects 15 deg. Shock angle and surface Cp are read at mid-span y = 0.5, x <= 0.5, which the Mach cones from the tips do not reach (downstream Mach 1.64 -> mu 37.6 deg -> tip influence reaches y = 0.38 at x = 0.5; Mach 3 case: 0.25).",
+  "actions": [
+    {
+      "command": "set_units",
+      "params": {
+        "units": "m"
+      }
+    },
+    {
+      "command": "import_mesh",
+      "params": {
+        "bodies": [
+          {
+            "name": "wedge 10 deg half-angle",
+            "positions": [
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              1,
+              0,
+              0.17632698070846498,
+              1,
+              1,
+              0.17632698070846498,
+              1,
+              0,
+              -0.17632698070846498,
+              1,
+              1,
+              -0.17632698070846498
+            ],
+            "indices": [
+              0,
+              2,
+              3,
+              0,
+              3,
+              1,
+              0,
+              1,
+              5,
+              0,
+              5,
+              4,
+              2,
+              4,
+              5,
+              2,
+              5,
+              3,
+              0,
+              4,
+              2,
+              1,
+              3,
+              5
+            ]
+          }
+        ]
+      },
+      "as": "wedge"
+    },
+    {
+      "command": "cfd_create_case",
+      "params": {
+        "id": "m2",
+        "entityIds": [
+          "$wedge"
+        ],
+        "regime": "compressible",
+        "freestream": {
+          "mach": 2.0,
+          "air": {
+            "densityKgM3": 1.225,
+            "temperatureK": 288.15,
+            "viscosityPaS": 1.789e-05
+          },
+          "alphaDeg": 0,
+          "betaDeg": 0
+        },
+        "reference": {
+          "areaM2": 1,
+          "lengthM": 1,
+          "momentPointM": [
+            0,
+            0.5,
+            0
+          ]
+        },
+        "domain": {
+          "rule": "external_aero"
+        },
+        "ground": {
+          "enabled": false,
+          "moving": false
+        },
+        "quality": "standard"
+      }
+    },
+    {
+      "command": "cfd_create_case",
+      "params": {
+        "id": "m3",
+        "entityIds": [
+          "$wedge"
+        ],
+        "regime": "compressible",
+        "freestream": {
+          "mach": 3.0,
+          "air": {
+            "densityKgM3": 1.225,
+            "temperatureK": 288.15,
+            "viscosityPaS": 1.789e-05
+          },
+          "alphaDeg": 5,
+          "betaDeg": 0
+        },
+        "reference": {
+          "areaM2": 1,
+          "lengthM": 1,
+          "momentPointM": [
+            0,
+            0.5,
+            0
+          ]
+        },
+        "domain": {
+          "rule": "external_aero"
+        },
+        "ground": {
+          "enabled": false,
+          "moving": false
+        },
+        "quality": "standard"
+      }
+    }
+  ],
+  "cli": [
+    "llull cfd_solve caseId=m2 --timeout 1800 --file $DOC",
+    "llull cfd_probe caseId=m2 points='[[0.25,0.5,0.0442],[0.5,0.5,0.0882]]' --json --file $DOC > m2_wall.json",
+    "llull cfd_report caseId=m2 include='[\"peaks\",\"convergence\"]' --json --file $DOC > m2.json",
+    "llull cfd_solve caseId=m3 --timeout 1800 --file $DOC",
+    "llull cfd_report caseId=m3 --json --file $DOC > m3.json"
+  ],
+  "expected": [
+    {
+      "file": "m2.json",
+      "path": "converged",
+      "value": true
+    },
+    {
+      "file": "m2_wall.json",
+      "path": "probes[*].cp",
+      "value": 0.2523495014,
+      "rel": 0.02,
+      "source": "oblique shock, NACA 1135, M 2, 10 deg (data/analytic_references.json obliqueShock)"
+    },
+    {
+      "file": "m2.json",
+      "path": "shockAngleDegAtMidSpan",
+      "value": 39.31393184,
+      "abs": 0.5,
+      "source": "theta-beta-M weak branch; also 11 FLD compressible_naca1135.json (39.31)"
+    },
+    {
+      "file": "m3.json",
+      "path": "lowerSurfaceCpAtMidSpan",
+      "value": 0.2891368764,
+      "rel": 0.02,
+      "source": "oblique shock, M 3, 15 deg"
+    },
+    {
+      "file": "m3.json",
+      "path": "lowerShockAngleDegAtMidSpan",
+      "value": 32.24040018,
+      "abs": 0.5,
+      "source": "theta-beta-M weak branch"
+    }
+  ],
+  "notes": "shockAngleDegAtMidSpan / lowerSurfaceCpAtMidSpan are measured by the scenario driver from a cfd_slice at y = 0.5 (pressure jump location fitted by least squares), not fields of cfd_report; the driver is part of M4."
+}

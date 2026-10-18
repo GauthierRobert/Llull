@@ -1,0 +1,29 @@
+{
+  "id": "SC-CFD-04",
+  "status": "draft — the cfd commands and the llull-flow sidecar are specified, not implemented",
+  "validates": ["VC-CFD-32", "VC-CFD-33"],
+  "description": "Euler flow on a sphere (R = 0.5 m) at Mach 0.8 and Mach 2: stagnation-point Cp against the isentropic and Rayleigh pitot values; bow-shock stand-off reported against Billig (documentation only)",
+  "actions": [
+    { "command": "set_units", "params": { "units": "m" } },
+    { "command": "add_sphere", "params": { "radius": 0.5 }, "as": "ball" },
+    {
+      "command": "cfd_create_case",
+      "params": { "id": "m08", "entityIds": ["$ball"], "regime": "compressible", "freestream": { "mach": 0.8, "altitudeM": 0, "alphaDeg": 0, "betaDeg": 0 }, "reference": { "areaM2": 0.7853981634, "lengthM": 1, "momentPointM": [0, 0, 0] }, "domain": { "rule": "external_aero" }, "ground": { "enabled": false, "moving": false }, "quality": "standard" }
+    },
+    {
+      "command": "cfd_create_case",
+      "params": { "id": "m2", "entityIds": ["$ball"], "regime": "compressible", "freestream": { "mach": 2, "altitudeM": 0, "alphaDeg": 0, "betaDeg": 0 }, "reference": { "areaM2": 0.7853981634, "lengthM": 1, "momentPointM": [0, 0, 0] }, "domain": { "rule": "external_aero" }, "ground": { "enabled": false, "moving": false }, "quality": "standard" }
+    }
+  ],
+  "cli": [
+    "llull cfd_solve caseId=m08 --timeout 1800 --file $DOC",
+    "llull cfd_report caseId=m08 include='[\"peaks\"]' --json --file $DOC > m08.json",
+    "llull cfd_solve caseId=m2 --timeout 1800 --file $DOC",
+    "llull cfd_report caseId=m2 include='[\"peaks\"]' --json --file $DOC > m2.json"
+  ],
+  "expected": [
+    { "file": "m08.json", "path": "peaks[field=cp].max", "value": 1.170401807, "rel": 0.02, "source": "isentropic stagnation, M 0.8 (data/analytic_references.json stagnation)" },
+    { "file": "m2.json", "path": "peaks[field=cp].max", "value": 1.65730029, "rel": 0.02, "source": "Rayleigh pitot formula, M 2 (NACA 1135)" },
+    { "file": "m2.json", "path": "shockStandoffOverR", "value": 0.321451, "rel": 0.15, "gate": false, "source": "Billig 1967 (grade B, documentation)" }
+  ]
+}

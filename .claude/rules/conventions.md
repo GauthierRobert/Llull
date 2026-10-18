@@ -46,3 +46,13 @@ PostToolUse hook formats each edited file; never hand-format or fight it.
 - No dead code, unused exports (`npm run deadcode`, knip), or `console.log` (`console.warn`/`error`
   allowed). Export only what another module imports.
 - Minimal, uniform diffs: smallest change that does the job, matching surrounding style.
+
+## C7 — Best-suited stack (owner rule 2026-10-18)
+
+- The stack is **not fixed**. For every task use the language, library or tool best suited to it (performance,
+  quality, maintenance), e.g. Rust + wgpu for GPU solvers, native code for heavy numerics. No owner approval is
+  needed to add one; record the choice and why in the task's spec or `docs/decisions/`.
+- The architecture laws still hold: non-TS code lives in its own workspace (e.g. `solver/<name>/`) or behind an
+  injected port / host transport (L2, L6, L9), is bundled for offline desktop use (AF-41), and ships with its
+  own tests in `npm run check` or a documented gate.
+- Prefer what the repo already uses when it is as good; do not switch a working part only to change technology.

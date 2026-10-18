@@ -168,7 +168,7 @@ tessellation. Results are deterministic.
 | M2        | CEA hand-off: server transport `cea_equilibrium` running the bundled NASA `cea` Python package (Apache-2.0, PyPI) in the desktop's CPython; chamber state + frozen / equilibrium Isp as data | ≈ 2 eng-weeks       |
 | M3        | Method of characteristics (minimum-length and Rao TOP), loss correlations (kinetic, boundary layer) from SP-8120 with sources                                                                | ≈ 4 eng-weeks       |
 | M4        | Regenerative cooling: channel geometry on the wall solid, Bartz h_g, coolant ΔT / Δp (reuses pipe_hydraulics friction), hand-off to PHY-03 thermal                                           | ≈ 4 eng-weeks       |
-| M5        | Nozzle / plume CFD hand-off (SU2 / OpenFOAM)                                                                                                                                                 | ≈ 6 eng-weeks       |
+| M5        | Nozzle / plume CFD: delivered by [12 CFD](../12-cfd-gpu/TECHNICAL_SPEC.md) V2 (internal / jet flows on the local GPU Euler solver)                                                          | see 12 CFD          |
 
 ## 11. Open questions
 
