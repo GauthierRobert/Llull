@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { writeInp } from '@cae/decks/inpWriter';
-import { BAR_NODES, X0_NODES, X2_NODES, barDocument, barMesh, mustRun } from '../deckFixtures';
+import { BAR_NODES, X0_NODES, X2_NODES, barDocument, barMesh, mustRun } from './deckFixtures';
 
 /** A symmetry constraint on both end faces of a slice (the thick-cylinder plan: "plane strain by symmetric ends") is two parallel planes. */
 describe('symmetry constraint on two parallel planes', () => {
