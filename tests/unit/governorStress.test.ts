@@ -59,9 +59,18 @@ describe('slider-crank governor with the default solver', () => {
   });
 
   it('a motor on the crank pin (the rod turns relative to a moving crank) tracks its target with loop tier pass', () => {
-    const data = simulate(sliderActions({ crank: 0.01, rod: 2, piston: 2 }, 'j_crankpin', -RPM), { duration: 0.2 });
+    const data = simulate(sliderActions({ crank: 0.01, rod: 2, piston: 2 }, 'j_crankpin', -RPM), {
+      duration: 0.2,
+      detail: 'series',
+      sampleRate: 5000,
+    });
     expect(data.loops?.tier).toBe('pass');
     expect(Math.abs((data.joints['j_crankpin']?.finalRpm ?? 0) / -RPM - 1)).toBeLessThan(1e-3);
+    const pin = data.series?.jointVelocity['j_crankpin'] ?? [];
+    const times = data.series?.times ?? [];
+    const settled = pin.filter((_, k) => (times[k] ?? 0) >= 0.05);
+    expect(settled.length).toBeGreaterThan(100);
+    for (const speed of settled) expect(Math.abs(Math.abs(speed) / 100 - 1)).toBeLessThan(0.01);
   });
 });
 
@@ -92,5 +101,34 @@ describe('governor of a geared arm carrying a free disk (locked inertia over-sta
     const data = simulate(gearedFreeDisk(diskKg), { duration: 1 });
     expect(Math.abs((data.joints['jArm']?.finalRpm ?? 0) / 60 - 1)).toBeLessThan(1e-3);
     expect(Math.abs((data.joints['jW']?.finalRpm ?? 0) / -60 - 1)).toBeLessThan(1e-3);
+  });
+});
+
+/** A light 1 kg disk on a joint with dry friction (the friction row sticks the joint rigid: it must not enter the measured inertia). */
+function frictionDisk(frictionNm: number, rpm: number, maxTorque: number, initialVelocity = 0): Action[] {
+  return [
+    { command: 'set_units', params: { units: 'mm' } },
+    { command: 'add_box', params: { size: [100, 100, 10], position: [0, 0, 0], anchor: 'center' }, as: 'd' },
+    { command: 'add_rigid_body', params: { entityIds: ['$d'], id: 'd', massKg: 1 } },
+    {
+      command: 'add_body_joint',
+      params: { kind: 'revolute', child: 'd', anchor: [0, 0, 0], axis: [0, 0, 1], id: 'j', friction: frictionNm, initialVelocity },
+    },
+    { command: 'add_motor', params: { joint: 'j', kind: 'speed', rpm, maxTorque, id: 'm' } },
+    { command: 'set_gravity', params: { gravity: [0, 0, 0] } },
+  ];
+}
+
+describe('governor of a joint with dry friction', () => {
+  it('spin-up from rest through the stuck state: peak speed at most 1.01 x the 600 rpm target, settles on it', () => {
+    const data = simulate(frictionDisk(5, 600, 1e6), { duration: 0.5, detail: 'series', sampleRate: 1000 });
+    expect(peak(data, 'j')).toBeLessThanOrEqual(1.01 * 600 * ((2 * Math.PI) / 60));
+    expect(Math.abs((data.joints['j']?.finalRpm ?? 0) / 600 - 1)).toBeLessThan(1e-3);
+  });
+
+  it('stick to slip reversal: spinning at +10 rad/s commanded to -60 rpm passes through rest and settles on the target without ringing', () => {
+    const data = simulate(frictionDisk(5, -60, 1e6, 10), { duration: 0.5, detail: 'series', sampleRate: 1000 });
+    expect(peak(data, 'j')).toBeLessThanOrEqual(1.01 * 10);
+    expect(Math.abs((data.joints['j']?.finalRpm ?? 0) / -60 - 1)).toBeLessThan(1e-3);
   });
 });

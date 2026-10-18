@@ -9,6 +9,8 @@ export interface MjModel {
   /** Actuator gain / bias parameters, 10 per actuator (intvelocity: gain [kp], bias [0, -kp, -kv]). */
   readonly actuator_gainprm: Float64Array;
   readonly actuator_biasprm: Float64Array;
+  /** Dry-friction limit of each DOF (an inequality constraint row while it is above 0). */
+  readonly dof_frictionloss: Float64Array;
   delete(): void;
 }
 

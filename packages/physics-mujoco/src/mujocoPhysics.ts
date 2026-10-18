@@ -101,19 +101,16 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     );
     let appliedWork = 0;
     const initialPosition = new Map(joints.map((joint) => [joint.id, data.qpos[joint.qpos] ?? 0]));
-    schedule.update();
     model.servos.forEach((servo, i) => {
       data.ctrl[i] = servo.targetVelocity;
-      // the set-point starts where the servo force is zero at the joint's start state: q + damping · v / stiffness
+      // the set-point starts where the servo force is zero at the joint's start state: q + damping · v / stiffness, which is q + 2 v / wn
+      // for a scheduled servo whatever the inertia (kv / kp = 2 / wn), so it does not wait for the first measurement
       const joint = joints.find((slot) => slot.id === servo.joint);
-      data.act[i] =
-        joint === undefined
-          ? 0
-          : (data.qpos[joint.qpos] ?? 0) +
-            ((schedule.gains[i]?.stiffness ?? 0) > 0
-              ? ((schedule.gains[i]?.damping ?? 0) * (data.qvel[joint.dof] ?? 0)) / (schedule.gains[i]?.stiffness ?? 1)
-              : 0);
+      const lead =
+        (servo.naturalFrequency ?? 0) > 0 ? 2 / (servo.naturalFrequency ?? 1) : servo.stiffness > 0 ? servo.damping / servo.stiffness : 0;
+      data.act[i] = joint === undefined ? 0 : (data.qpos[joint.qpos] ?? 0) + lead * (data.qvel[joint.dof] ?? 0);
     });
+    schedule.update();
     const peaks: Record<string, { force: StepPeak; moment: StepPeak | null }> = {};
     const keepPeak = (id: string, force: Vec3, moment: Vec3 | null): void => {
       const [f, m] = [Math.hypot(force[0], force[1], force[2]), moment === null ? 0 : Math.hypot(moment[0], moment[1], moment[2])];

@@ -6,7 +6,15 @@
  * e^T M_c^-1 e = 1 / I_eff, with M_c^-1 = M^-1 - M^-1 J^T (J M^-1 J^T)^-1 J M^-1 the inverse mass matrix projected on the equality
  * constraints, so two forward passes give it: I_eff = 1 / (qacc[dof](F + 1) - qacc[dof](F)). The gains are then kp = I_eff · wn^2 and
  * kv = 2 I_eff · wn with wn the model's `naturalFrequency`, which pins the servo pole at wn · dt for every configuration.
+ * Dry friction is left out of the measurement (its limits are zeroed for the two passes and restored): a stuck joint is an inequality row
+ * that, at the 0.9999 impedance, holds the DOF rigidly and reads as an inertia up to 10^4 times the true one, and a row toggling between
+ * stick and slip would swing the gains by the same factor in one step. What friction does to the dynamics it does through the force, not
+ * through the pole the explicit step has to resolve. The measured inertia is capped at CAP times the static (locked) inertia of the model
+ * as a last guard against any other row that switches (a contact-like limit).
  */
+
+/** Largest measured inertia, as a multiple of the model's static inertia stiffness / wn^2. */
+const CAP = 10;
 
 import type { SimulationModel } from '@core/dynamics/physicsEngine';
 import type { MjData, MjModel, MujocoModule } from './bindings';
@@ -42,6 +50,9 @@ export function createServoSchedule(
   };
   const update = (): void => {
     if (!scheduled.includes(true)) return;
+    const frictionloss = mjModel.dof_frictionloss;
+    const restoreFriction = Float64Array.from(frictionloss);
+    frictionloss.fill(0);
     mujoco.mj_forward(mjModel, data);
     const rest = model.servos.map((_, i) => data.qacc[dofs[i] ?? 0] ?? 0);
     model.servos.forEach((servo, i) => {
@@ -54,11 +65,13 @@ export function createServoSchedule(
       data.qfrc_applied[dof] = held;
       const response = (data.qacc[dof] ?? 0) - (rest[i] ?? 0);
       if (!(response > 0) || !Number.isFinite(response)) return;
-      const [inertia, wn] = [1 / response, servo.naturalFrequency ?? 0];
+      const wn = servo.naturalFrequency ?? 0;
+      const inertia = Math.min(1 / response, (CAP * servo.stiffness) / (wn * wn));
       gain.stiffness = inertia * wn * wn;
       gain.damping = 2 * inertia * wn;
       write(i);
     });
+    frictionloss.set(restoreFriction);
   };
   return { gains, update };
 }
