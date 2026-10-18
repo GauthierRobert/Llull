@@ -468,8 +468,8 @@ export interface Parameter {
 /** Declarative movement clips: the document declares motion, the viewport evaluates it per frame (no physics). */
 export type AnimationChannel = 'rotation' | 'position';
 
-/** 'spin' = constant velocity; 'oscillate' = sinusoidal back-and-forth. */
-export type AnimationMode = 'spin' | 'oscillate';
+/** 'spin' = constant velocity; 'oscillate' = sinusoidal back-and-forth; 'follow_path' = members travel round a closed loop (chain, belt). */
+export type AnimationMode = 'spin' | 'oscillate' | 'follow_path';
 
 export interface Animation {
   readonly id: string;
@@ -480,7 +480,7 @@ export interface Animation {
   /** Rotation axle or translation direction; the player normalizes it. */
   axis: Vec3;
   mode: AnimationMode;
-  /** spin only: rad/s (rotation) or units/s (position). */
+  /** spin: rad/s (rotation) or units/s (position); follow_path: units/s along the loop. */
   speed: number;
   /** oscillate only: radians (rotation) or units (position). */
   amplitude: number;
@@ -488,6 +488,8 @@ export interface Animation {
   frequency: number;
   /** rotation only: world-space pivot; defaults to the target's position. */
   pivot?: Vec3;
+  /** follow_path only: world-space vertices of the closed loop (last joins first); each member starts at its nearest loop point. */
+  path?: Vec3[];
   /** 'auto' runs under global Play; 'click' toggles on click. */
   trigger: 'auto' | 'click';
 }

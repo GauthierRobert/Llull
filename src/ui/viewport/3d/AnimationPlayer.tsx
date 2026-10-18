@@ -14,10 +14,14 @@ import type { Animation, CadDocument, Vec3 } from '@core/model/types';
 import { ORIGIN } from '@lib/vec3';
 import {
   composeAnimatedPoseInto,
+  createLoopScratch,
   createPoseScratch,
   evaluateAnimationScalar,
+  measureLoop,
+  writeFollowPathContributions,
   type AnimatedPose,
   type AnimationContribution,
+  type MeasuredLoop,
 } from './animationMath';
 import { SceneObjectCache } from './sceneObjectCache';
 
@@ -55,15 +59,25 @@ function writePivot(target: THREE.Vector3, anim: Animation, memberIds: string[],
 function createFrameBuffers(): {
   pose: AnimatedPose;
   scratch: ReturnType<typeof createPoseScratch>;
+  loopScratch: ReturnType<typeof createLoopScratch>;
   contributionsByEntity: Map<string, AnimationContribution[]>;
   pool: AnimationContribution[];
+  loops: WeakMap<ReadonlyArray<Vec3>, MeasuredLoop>;
 } {
   return {
     pose: { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() },
     scratch: createPoseScratch(),
+    loopScratch: createLoopScratch(),
     contributionsByEntity: new Map(),
     pool: [],
+    loops: new WeakMap(),
   };
+}
+
+function addContribution(contributionsByEntity: Map<string, AnimationContribution[]>, memberId: string, part: AnimationContribution): void {
+  const parts = contributionsByEntity.get(memberId);
+  if (parts) parts.push(part);
+  else contributionsByEntity.set(memberId, [part]);
 }
 
 export function AnimationPlayer(): null {
@@ -92,7 +106,7 @@ export function AnimationPlayer(): null {
     // Keep the demand Canvas alive.
     if (animationPlaying || activeClickAnimationIds.size > 0) invalidate();
 
-    const { pose, scratch, contributionsByEntity, pool } = buffers;
+    const { pose, scratch, loopScratch, contributionsByEntity, pool, loops } = buffers;
     for (const [entityId, parts] of contributionsByEntity) {
       if (parts.length === 0) contributionsByEntity.delete(entityId);
       else parts.length = 0;
@@ -109,6 +123,23 @@ export function AnimationPlayer(): null {
       const memberIds = anim.targetKind === 'entity' ? [anim.targetId] : (groups[anim.targetId]?.memberIds ?? []);
       if (memberIds.length === 0) continue;
 
+      if (anim.mode === 'follow_path') {
+        if (anim.path === undefined) continue;
+        const loop = loops.get(anim.path) ?? measureLoop(anim.path);
+        loops.set(anim.path, loop);
+        for (const memberId of memberIds) {
+          const member = entities[memberId];
+          if (!member) continue;
+          const turn = (pool[pooled] ??= { channel: 'rotation', axis: new THREE.Vector3(), scalar: 0, pivot: new THREE.Vector3() });
+          const shift = (pool[pooled + 1] ??= { channel: 'position', axis: new THREE.Vector3(), scalar: 0, pivot: new THREE.Vector3() });
+          pooled += 2;
+          writeFollowPathContributions(loop, member.position, anim.speed * phase, turn, shift, loopScratch);
+          addContribution(contributionsByEntity, memberId, turn);
+          addContribution(contributionsByEntity, memberId, shift);
+        }
+        continue;
+      }
+
       const contribution = (pool[pooled] ??= { channel: anim.channel, axis: new THREE.Vector3(), scalar: 0, pivot: new THREE.Vector3() });
       pooled += 1;
       contribution.channel = anim.channel;
@@ -116,10 +147,7 @@ export function AnimationPlayer(): null {
       writeUnitAxis(contribution.axis, anim.axis);
       if (anim.channel === 'rotation') writePivot(contribution.pivot, anim, memberIds, entities);
       for (const memberId of memberIds) {
-        if (!entities[memberId]) continue;
-        const parts = contributionsByEntity.get(memberId);
-        if (parts) parts.push(contribution);
-        else contributionsByEntity.set(memberId, [contribution]);
+        if (entities[memberId]) addContribution(contributionsByEntity, memberId, contribution);
       }
     }
 

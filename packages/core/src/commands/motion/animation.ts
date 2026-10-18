@@ -8,6 +8,8 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { nextId } from '../../lib/id';
 import { noop, report } from '../noop';
+import { sketchPath } from '../solids/sketchCurves';
+import { isClosedChain, sampleChain } from '../../geometry/curveSegments';
 
 /**
  * Resolve `targetId` to its kind: 'group' if found in doc.groups, 'entity' if found in doc.entities, or null when absent (caller must
@@ -43,6 +45,14 @@ const triggerField = z
       "'click' toggles the animation on/off when the user clicks the animated part in the viewport.",
   );
 
+/** World vertices of the closed sketch curve `pathId` (a chain / belt loop), or why it cannot be followed. */
+function closedLoopPoints(doc: CadDocument, pathId: string): Vec3[] | string {
+  const segments = sketchPath(doc, pathId);
+  if (typeof segments === 'string') return segments;
+  if (!isClosedChain(segments)) return `path "${pathId}" is not a closed loop`;
+  return sampleChain(segments, true);
+}
+
 /** Raw (possibly malformed) target/channel/axis/trigger/pivot inputs of an animate call. */
 interface AnimationInput {
   readonly targetId: string;
@@ -56,21 +66,25 @@ interface AnimationInput {
 /** A fresh animation (new id) from raw inputs; unknown channel/trigger fall back to rotation/auto. */
 function buildAnimation(
   input: AnimationInput,
-  motion: { mode: 'spin'; speed: number } | { mode: 'oscillate'; amplitude: number; frequency: number },
+  motion:
+    | { mode: 'spin'; speed: number }
+    | { mode: 'oscillate'; amplitude: number; frequency: number }
+    | { mode: 'follow_path'; speed: number; path: Vec3[] },
 ): Animation {
   const { pivot } = input;
   return {
     id: nextId('anim'),
     targetId: input.targetId,
     targetKind: input.targetKind,
-    channel: input.channel === 'position' ? 'position' : 'rotation',
+    channel: input.channel === 'position' || motion.mode === 'follow_path' ? 'position' : 'rotation',
     axis: toAxis(input.axis),
     mode: motion.mode,
-    speed: motion.mode === 'spin' ? motion.speed : 0,
+    speed: motion.mode === 'oscillate' ? 0 : motion.speed,
     amplitude: motion.mode === 'oscillate' ? motion.amplitude : 0,
     frequency: motion.mode === 'oscillate' ? motion.frequency : 0,
     trigger: input.trigger === 'click' ? 'click' : 'auto',
     ...(pivot && pivot.length >= 3 ? { pivot: [pivot[0] ?? 0, pivot[1] ?? 0, pivot[2] ?? 0] as Vec3 } : {}),
+    ...(motion.mode === 'follow_path' ? { path: motion.path } : {}),
   };
 }
 
@@ -81,8 +95,9 @@ function withAnimation(doc: CadDocument, anim: Animation): CadDocument {
 
 /**
  * @affects creates 1 animation record (not an entity)
- * @invariant targetId must exist in doc.entities or doc.groups; spin needs a finite speed; oscillate needs amplitude > 0 and frequency > 0
- * @failure missing targetId or missing / invalid motion values -> no-op, affected:[]
+ * @invariant targetId must exist in doc.entities or doc.groups; spin needs a finite speed; oscillate needs amplitude > 0 and frequency > 0;
+ *   follow_path needs a finite speed and pathId naming a closed 2D curve (sampled to world points at call time)
+ * @failure missing targetId, missing / invalid motion values or an open / missing path -> no-op, affected:[]
  */
 export const animate = defineCommand({
   name: 'animate',
@@ -94,18 +109,29 @@ export const animate = defineCommand({
     'displacement (radians for rotation, document units for position) and frequency is in Hz; both must be > 0. ' +
     'axis is the world-space direction vector ([0,1,0] = Y axis); it need not be unit-length — the viewport normalizes it. ' +
     'pivot is the world-space rotation pivot point; when omitted, the player defaults to the target entity/group position. ' +
+    "mode 'follow_path' = every member of the target travels round the closed 2D curve pathId at speed document units/s, " +
+    'turning with the curve tangent: chain links round a chainring and cassette loop (draw_belt_around), a belt, a conveyor. ' +
+    'Each member starts at its nearest point of the loop (place them with pattern_along_path on the same curve). ' +
     "trigger 'auto' runs the animation under the global Play button; 'click' toggles it when the user clicks the part in the viewport.",
   params: z.object({
     targetId: targetIdField,
     mode: z
-      .enum(['spin', 'oscillate'])
-      .describe("'spin' = constant velocity (give speed); 'oscillate' = back-and-forth sine motion (give amplitude and frequency)."),
+      .enum(['spin', 'oscillate', 'follow_path'])
+      .describe(
+        "'spin' = constant velocity (give speed); 'oscillate' = back-and-forth sine motion (give amplitude and frequency); " +
+          "'follow_path' = travel round a closed curve (give pathId and speed).",
+      ),
     speed: z
       .number()
       .optional()
       .describe(
-        'spin: constant velocity, rad/s for the rotation channel (e.g. 6.283 ≈ 1 rev/s) or document units/s for the position channel.',
+        'spin: constant velocity, rad/s for the rotation channel (e.g. 6.283 ≈ 1 rev/s) or document units/s for the position channel. ' +
+          'follow_path: document units/s along the loop (positive = the curve direction).',
       ),
+    pathId: z
+      .string()
+      .optional()
+      .describe('follow_path: id of a CLOSED 2D curve (polyline from draw_belt_around, circle, closed spline, rectangle) to travel round.'),
     amplitude: z
       .number()
       .optional()
@@ -129,10 +155,22 @@ export const animate = defineCommand({
     pivot: pivotField,
     trigger: triggerField,
   }),
-  run: (doc, { targetId, mode, speed, amplitude, frequency, axis, channel, pivot, trigger }): CommandResult => {
+  run: (doc, { targetId, mode, speed, amplitude, frequency, axis, channel, pivot, trigger, pathId }): CommandResult => {
     const targetKind = resolveTargetKind(doc, targetId);
     if (targetKind === null) return noop(doc, `animate: no entity or group ${targetId}.`);
     const input = { targetId, targetKind, axis, channel, trigger, pivot };
+    if (mode === 'follow_path') {
+      if (speed === undefined || !Number.isFinite(speed))
+        return noop(doc, `animate: follow_path needs a finite speed; ${targetId} unchanged.`);
+      if (pathId === undefined) return noop(doc, `animate: follow_path needs pathId; ${targetId} unchanged.`);
+      const path = closedLoopPoints(doc, pathId);
+      if (typeof path === 'string') return noop(doc, `animate: ${path}; ${targetId} unchanged.`);
+      const anim = buildAnimation(input, { mode, speed, path });
+      return report(
+        withAnimation(doc, anim),
+        `Follow path ${anim.id}: ${targetKind} ${targetId} travels round ${pathId} (${path.length} vertices) at ${speed.toFixed(3)} units/s (${anim.trigger}).`,
+      );
+    }
     if (mode === 'spin') {
       if (speed === undefined || !Number.isFinite(speed)) return noop(doc, `animate: spin needs a finite speed; ${targetId} unchanged.`);
       const anim = buildAnimation(input, { mode, speed });

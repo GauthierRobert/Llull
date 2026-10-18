@@ -18,12 +18,17 @@ export function validateAnimationValue(key: string, v: unknown): string | null {
   if (typeof v['id'] !== 'string' || typeof v['targetId'] !== 'string') return bad('id and targetId must be strings');
   if (v['targetKind'] !== 'entity' && v['targetKind'] !== 'group') return bad("targetKind must be 'entity' or 'group'");
   if (v['channel'] !== 'rotation' && v['channel'] !== 'position') return bad("channel must be 'rotation' or 'position'");
-  if (v['mode'] !== 'spin' && v['mode'] !== 'oscillate') return bad("mode must be 'spin' or 'oscillate'");
+  if (v['mode'] !== 'spin' && v['mode'] !== 'oscillate' && v['mode'] !== 'follow_path')
+    return bad("mode must be 'spin', 'oscillate' or 'follow_path'");
   if (v['trigger'] !== 'auto' && v['trigger'] !== 'click') return bad("trigger must be 'auto' or 'click'");
   if (!isVec3(v['axis'])) return bad('axis must be [x, y, z] of finite numbers');
   if (!['speed', 'amplitude', 'frequency'].every((field) => isFiniteNumber(v[field])))
     return bad('speed, amplitude, frequency must be finite');
-  return v['pivot'] === undefined || isVec3(v['pivot']) ? null : bad('pivot must be [x, y, z] of finite numbers');
+  if (v['pivot'] !== undefined && !isVec3(v['pivot'])) return bad('pivot must be [x, y, z] of finite numbers');
+  const path = v['path'];
+  if (path !== undefined && !(Array.isArray(path) && path.length >= 2 && path.every(isVec3)))
+    return bad('path must be >= 2 [x, y, z] points');
+  return v['mode'] === 'follow_path' && path === undefined ? bad('follow_path needs a path') : null;
 }
 
 /** First problem of a saved configuration, or null. */
