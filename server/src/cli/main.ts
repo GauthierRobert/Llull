@@ -161,6 +161,11 @@ async function rawParamsOf(name: string, tokens: readonly string[], io: CliIo): 
   }
 }
 
+function unknownSubcommandMessage(name: string): string {
+  const hints = suggestNames(name);
+  return `unknown subcommand "${name}".${hints.length > 0 ? ` Did you mean: ${hints.join(', ')}?` : ''} See: llull help`;
+}
+
 function unknownCommand(name: string): never {
   const hints = suggestNames(name);
   throw new UsageError(
@@ -392,7 +397,7 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
         // `llull add_box width=10` is `llull exec add_box width=10`.
         if (getCommand(subcommand) !== undefined || exchangeTool(subcommand) !== undefined)
           return await runExec(parseArgv(['exec', ...argv]), io);
-        throw new UsageError(`unknown subcommand "${subcommand}"; see: llull help`);
+        throw new UsageError(unknownSubcommandMessage(subcommand));
     }
   } catch (error) {
     if (!(error instanceof UsageError)) throw error;

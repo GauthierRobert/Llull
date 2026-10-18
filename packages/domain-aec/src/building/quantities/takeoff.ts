@@ -63,7 +63,7 @@ export const buildingSchedule = defineCommand({
     'Read-only schedule table (like Revit schedules) for one element category: wall, door, window, room, slab, column, beam, stair, ' +
     'member (steel cut list), footing, panel, equipment, pipe (line list), tray, plate, connection or support (pipe supports: mark, ' +
     'line, pipe, type, steel it bears on, position, hanger rod length, attached / UNATTACHED) — one row per element with mark, level, ' +
-    'dimensions, material and quantities. data.csv is spreadsheet-ready.',
+    'dimensions, material and quantities. Column and beam rows give the NET volume (same rule as quantity_takeoff: slab > column > beam, overlaps counted once) in "Volume (m³)" and the raw prism in "Gross volume (m³)". data.csv is spreadsheet-ready.',
   params: z.object({ kind: z.enum(SCHEDULE_KINDS).describe('Which schedule to produce.') }),
   run: (doc, { kind }): CommandResult => {
     const schedule = buildSchedule(doc, kind);

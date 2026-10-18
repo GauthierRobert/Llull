@@ -8,6 +8,7 @@ import { is3D } from '@core/model/types';
 import { GLYPH_WIDTH_RATIO, textLocalBounds } from '@core/geometry/bounds';
 import { closedShapeArea } from '@core/geometry/shapeArea';
 import { underlayCorners } from '@core/geometry/imageUnderlay';
+import { dimensionText } from '@core/geometry/dimensionAnnotation';
 import { DEFAULT_OFFSET, dimensionDrawing } from './entities/dimensionGeometry';
 import { nearestOnArc } from './snapping/geometry';
 import { currentSectionCutDepth } from './sectionCut';
@@ -151,11 +152,7 @@ export function dimensionLabelBox(document: CadDocument, dimension: DimensionEnt
   if (drawing === null) return null;
   drawing.lines?.geometry.dispose();
   (drawing.lines?.material as THREE.Material | undefined)?.dispose();
-  const text =
-    dimension.label ||
-    (dimension.dimensionKind === 'angular'
-      ? `${drawing.value.toFixed(1)}°`
-      : drawing.value.toFixed(dimension.precision ?? document.displayPrecision));
+  const text = dimensionText(dimension, drawing.value, document.displayPrecision);
   return {
     center: [dimension.position[0] + drawing.textX, dimension.position[1] + drawing.textY],
     halfWidth: (text.length * DIMENSION_LABEL_HEIGHT * GLYPH_WIDTH_RATIO) / 2,

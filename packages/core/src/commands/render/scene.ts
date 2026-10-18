@@ -6,6 +6,8 @@ import type { PreDepthPolygon, Polygon3D, RenderOptions, RenderViewData } from '
 import { type ViewName, cameraForView, cameraBasis, projectPoint } from './camera';
 import { tessellateEntity } from './polygons';
 import { DEFAULT_BACKGROUND, buildSvg } from './svg';
+import { appendAnnotationText, dimensionStrokes } from './annotations';
+import { makeProjector } from './camera';
 import { MAX_POLYGONS, applyBudget, type EntityPolygons } from './budget';
 import { cutEntityPolygons, unitPlanes } from './clip';
 import { splitForDepth } from './depthSplit';
@@ -54,11 +56,16 @@ export function renderDocument(
   const planes = cut ? unitPlanes(cut) : [];
   const cutIds = cut?.entityIds ? new Set(cut.entityIds) : null;
   const tolerance = Math.max(radius, 1e-6) * 1e-6;
+  const worldPerPx = orthoHalf / ((Math.min(width, height) / 2) * 0.9);
+  const backgroundOption = options.background === undefined ? DEFAULT_BACKGROUND : options.background;
   const cutEntityIds: string[] = [];
   const items: EntityPolygons[] = [];
   for (const e of orderedEntities(doc)) {
     const id = e.id;
-    let polygons: PreDepthPolygon[] = drawableEntities(doc, e).flatMap((drawable) => tessellateEntity(withMaterialColor(doc, drawable)));
+    let polygons: PreDepthPolygon[] = drawableEntities(doc, e).flatMap((drawable) => [
+      ...tessellateEntity(withMaterialColor(doc, drawable)),
+      ...dimensionStrokes(doc, drawable, worldPerPx, backgroundOption),
+    ]);
     if (cut && (cutIds === null || cutIds.has(id))) {
       const result = cutEntityPolygons(polygons, cut, planes, tolerance);
       polygons = result.polygons;
@@ -82,7 +89,7 @@ export function renderDocument(
       : projectPoint(centroid3(p.verts), cam, basis)[2];
     return { ...p, depth };
   });
-  const background = options.background === undefined ? DEFAULT_BACKGROUND : options.background;
+  const background = backgroundOption;
   // Underlays are never capped by MAX_POLYGONS: they are one <image> each, painted first.
   const underlays = orderedEntities(doc).flatMap((e) => drawableEntities(doc, e).filter((d): d is ImageEntity => d.kind === 'image'));
   return {
@@ -98,18 +105,25 @@ export function renderDocument(
     simplifiedEntityIds: fitted.simplifiedEntityIds,
     skippedEntityIds: fitted.skippedEntityIds,
     cutEntityIds,
-    svg: buildSvg(
-      polygons,
-      underlays,
-      cam,
-      orthoHalf,
-      width,
-      height,
-      view,
-      snapshot.entityCount,
+    svg: appendAnnotationText(
+      buildSvg(
+        polygons,
+        underlays,
+        cam,
+        orthoHalf,
+        width,
+        height,
+        view,
+        snapshot.entityCount,
+        background,
+        raster ? radius : null,
+        options.caption !== false,
+      ),
+      doc,
+      orderedEntities(doc).flatMap((e) => drawableEntities(doc, e)),
+      makeProjector(cam, orthoHalf, width, height),
+      worldPerPx,
       background,
-      raster ? radius : null,
-      options.caption !== false,
     ),
   };
 }

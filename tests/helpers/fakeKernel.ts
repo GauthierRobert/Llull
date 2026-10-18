@@ -3,7 +3,7 @@
  * native ops, so commands exercise recipes, caching and handles without WASM.
  */
 import { afterEach, beforeEach } from 'vitest';
-import { setGeometryKernel, type GeometryKernel, type ShapeTopology } from '@core/geometry/kernel';
+import { setGeometryKernel, type GeometryKernel, type ShapeTopology, type StepOccurrence } from '@core/geometry/kernel';
 import type { MeshData } from '@core/model/types';
 import type { BooleanOp, ShapeRecipe } from '@core/model/types';
 import { kernelFromOps, type CachingKernel } from '@core/geometry/shapeKernel';
@@ -16,7 +16,7 @@ export const TETRA: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]
 const TRIANGLE: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
 
 /** Native fake shape: the mesh it tessellates to, and the entity of a leaf. */
-interface FakeShape {
+export interface FakeShape {
   readonly mesh: MeshData;
   readonly entity?: Entity;
 }
@@ -31,6 +31,8 @@ export interface FakeKernelSpec {
   readonly shell?: MeshData | null;
   readonly topology?: ShapeTopology | null;
   readonly step?: string | null;
+  /** Assembly STEP writer over the fake natives (absent: the kernel cannot write assemblies). */
+  readonly assemblyStep?: (occurrences: readonly StepOccurrence<FakeShape>[]) => string | null;
   /** Recipe ops this kernel lacks entirely (Manifold: fillet, chamfer, shell). */
   readonly unsupported?: ReadonlyArray<ShapeRecipe['op']>;
 }
@@ -81,6 +83,9 @@ export function fakeKernel(spec: FakeKernelSpec = {}): FakeKernel {
     tessellate: (native) => native.mesh,
     topology: () => spec.topology ?? null,
     exportStep: () => spec.step ?? null,
+    ...(spec.assemblyStep === undefined
+      ? {}
+      : { exportStepAssembly: (occurrences: readonly StepOccurrence<FakeShape>[]) => spec.assemblyStep?.(occurrences) ?? null }),
     release: () => undefined,
   });
   return Object.assign(kernel, { calls });

@@ -52,6 +52,22 @@ describe('isolated OCC kernel', () => {
     expect(kernel.topology(handle!)?.faces).toHaveLength(7);
   }, 180_000);
 
+  it('writes an assembly STEP through the worker: one shared part, one occurrence per use, also after a restart', () => {
+    const kernel = make();
+    const shape = kernel.evaluate(leaf(box(2)));
+    expect(shape).not.toBeNull();
+    const part = { shapes: [shape!] };
+    const uses = [0, 10, 20].map((x) => ({
+      part,
+      position: [x, 0, 0] as [number, number, number],
+      rotation: [0, 0, 0] as [number, number, number],
+    }));
+    const count = (text: string | null | undefined): number => text?.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE\(/g)?.length ?? 0;
+    expect(count(kernel.exportStepAssembly?.(uses))).toBe(3);
+    kernel.forceFailure('__abort');
+    expect(count(kernel.exportStepAssembly?.(uses))).toBe(3);
+  }, 180_000);
+
   it('survives a forced abort: null result, process alive, worker respawned', () => {
     const kernel = make();
     expect(meshOf(kernel, box(2))).not.toBeNull();

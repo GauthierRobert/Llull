@@ -264,10 +264,10 @@ function textProblem(v: Record<string, unknown>): string | null {
     : "anchor must be 'left' | 'center' | 'right'";
 }
 
-const DIMENSION_KINDS: ReadonlySet<unknown> = new Set(['linear', 'aligned', 'radial', 'angular']);
+const DIMENSION_KINDS: ReadonlySet<unknown> = new Set(['linear', 'aligned', 'radial', 'diameter', 'angular']);
 
 function dimensionProblem(v: Record<string, unknown>): string | null {
-  if (!DIMENSION_KINDS.has(v['dimensionKind'])) return "dimensionKind must be 'linear' | 'aligned' | 'radial' | 'angular'";
+  if (!DIMENSION_KINDS.has(v['dimensionKind'])) return "dimensionKind must be 'linear' | 'aligned' | 'radial' | 'diameter' | 'angular'";
   const ids = v['entityIds'];
   if (!Array.isArray(ids) || ids.length > 3 || !ids.every((x) => typeof x === 'string'))
     return 'entityIds must be up to 3 entity id strings';
@@ -278,6 +278,7 @@ function dimensionProblem(v: Record<string, unknown>): string | null {
     !(Number.isInteger(precision) && (precision as number) >= 0 && (precision as number) <= MAX_DISPLAY_PRECISION)
   )
     return `precision must be an integer 0..${MAX_DISPLAY_PRECISION}`;
+  if (v['tolerance'] !== undefined && typeof v['tolerance'] !== 'string') return 'tolerance must be a string';
   return v['label'] === undefined || typeof v['label'] === 'string' ? null : 'label must be a string';
 }
 

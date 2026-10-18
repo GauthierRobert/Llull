@@ -50,8 +50,10 @@ export interface StepReport {
   affected: string[];
   /** Why a failed step failed (`ok: false` only): the command's own `CommandError`, else a `PLAN_*` / `CMD_NO_EFFECT` code. */
   error?: CommandError;
-  /** A read-only step's answer (its `CommandResult.data`), so a script reads query results without re-running them. */
+  /** A step's answer (its `CommandResult.data`), so a script reads query results without re-running them. */
   data?: unknown;
+  /** A mutating step's `data` (e.g. add_platform cut/fill) is kept when <= 4000 JSON chars; larger is dropped and its size reported here. */
+  dataOmittedChars?: number;
 }
 
 export interface BuildProjectData {

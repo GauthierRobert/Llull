@@ -14,6 +14,8 @@ import { modelUnits, collectSteelBars } from '../steelDesign/steelMemberBars';
 import { nearestOnRoute, pointAtArc, routeLength } from './routeSupport';
 import { SAME_SUPPORT_DISTANCE, endCarriers, pipeRunsOf, supportStations, supportsOfPipe, type PipeRun } from './pipeSupportLayout';
 import { autoSupportArcs, isPlaceable } from './pipeSupportPlacement';
+import { spanWarnings, steelCrossingArcs } from './pipeSupportSnap';
+import { pipeSpanLimit } from './pipeSpans';
 import { PLAN_TOLERANCE, REACH, attachmentFields, clean, isRiserPoint, resolveBearing } from './pipeSupportAttach';
 
 const SUPPORT_TYPES = ['shoe', 'hanger', 'guide', 'anchor'] as const;
@@ -63,7 +65,8 @@ export const addPipeSupport = defineCommand({
       .describe(
         'Maximum distance between supports along the pipe, document units, > 0: supports are auto-placed along ' +
           'the pipe (also near free ends and bends); refused when pipe length / spacing exceeds 500 supports on a run. ' +
-          'Give this OR `at`. Existing supports are kept and counted.',
+          'Give this OR `at`. Existing supports are kept and counted. Where the pipe crosses steel the supports go on that steel and this ' +
+          'is the maximum allowed span (see `snapToSteel`, default on).',
       ),
     type: z
       .enum(SUPPORT_TYPES)
@@ -92,13 +95,24 @@ export const addPipeSupport = defineCommand({
       .describe(
         'Plan distance allowed beyond half the member width between the support and the member axis, document units, ≥ 0. Default 100 mm.',
       ),
+    snapToSteel: z
+      .boolean()
+      .optional()
+      .describe(
+        'With `spacing`: put the supports where the pipe crosses steel (one at each beam / member the centreline passes over or under, ' +
+          'bearing on it) and treat `spacing` as the MAXIMUM allowed span between supports: no support is added away from steel, and the ' +
+          'summary (data.spanWarnings) warns about every span longer than `spacing` or than the pipe-size table span, and every free end ' +
+          'overhanging by more than half the spacing. A member running alongside the pipe is not a crossing. Pipes crossing no steel ' +
+          'fall back to plain spacing placement (unattached supports, warned). Default true; false = plain spacing placement only. ' +
+          'Ignored with `at`.',
+      ),
     snapDistance: z
       .number()
       .optional()
       .describe('Largest distance from an `at` point to the pipe centreline, document units, > 0. Default 500 mm.'),
   }),
   run: (doc, params): CommandResult => {
-    const { pipeId, line, at, spacing, memberId, type = 'shoe' } = params;
+    const { pipeId, line, at, spacing, memberId, type = 'shoe', snapToSteel = true } = params;
     const fail = failedWith(doc, 'add_pipe_support');
     if ((pipeId === undefined) === (line === undefined)) return fail('give exactly one of pipeId or line.');
     if ((at === undefined) === (spacing === undefined)) return fail('give exactly one of at (list of points) or spacing.');
@@ -136,6 +150,7 @@ export const addPipeSupport = defineCommand({
     if (memberId !== undefined && !explicit) return fail(`memberId '${memberId}' is not a steel member.`);
     const wanted: Array<{ run: PipeRun; arc: number }> = [];
     const skipped: string[] = [];
+    const snappedRuns = new Map<string, PipeRun>();
     if (at !== undefined) {
       for (const raw of at) {
         const point = raw.length === 3 ? toVec3(raw) : null;
@@ -160,6 +175,14 @@ export const addPipeSupport = defineCommand({
     } else {
       for (const run of targets) {
         const existing = supportStations(units, run, supportsOfPipe(units, run.element.id)).map((station) => station.arc);
+        const crossings = snapToSteel ? steelCrossingArcs(run, bars, type, limits, explicit) : [];
+        if (crossings.length > 0) {
+          snappedRuns.set(run.element.id, run);
+          for (const arc of crossings)
+            if (existing.every((other) => Math.abs(other - arc) >= SAME_SUPPORT_DISTANCE)) wanted.push({ run, arc });
+          continue;
+        }
+        if (snapToSteel) skipped.push(`${run.element.mark}: crosses no steel, placed by spacing only`);
         const arcs = autoSupportArcs(run, endCarriers(units, run, runs), existing, (spacing as number) / unit);
         for (const arc of arcs) wanted.push({ run, arc });
       }
@@ -198,6 +221,16 @@ export const addPipeSupport = defineCommand({
     if (created.length === 0) return fail(`no support could be placed${skipped.length > 0 ? ` (${skipped.join('; ')})` : ''}.`);
     const document = regenerateBuilding(doc, next);
     const unattached = created.filter((support) => support.memberId === null);
+    const after = { ...units, building: next };
+    const spanIssues = [...snappedRuns.values()].flatMap((run) =>
+      spanWarnings(
+        run,
+        supportStations(after, run, supportsOfPipe(after, run.element.id)).map((station) => station.arc),
+        endCarriers(after, run, runs),
+        (spacing as number) / unit,
+        pipeSpanLimit(run.element.dn, run.diameterMm, run.element.service).spanM * 1000,
+      ),
+    );
     const marks = created.map((support) => support.mark);
     const pipeMarks = [...new Set(created.map((support) => building.elements[support.pipeId]?.mark))];
     return {
@@ -208,6 +241,7 @@ export const addPipeSupport = defineCommand({
         (unattached.length > 0
           ? `; WARNING ${unattached.length} unattached (no steel member ${below ? 'below or beside' : 'above'} the pipe within reach): ${unattached.map((support) => support.mark).join(', ')}`
           : '') +
+        (spanIssues.length > 0 ? `; WARNING ${spanIssues.join('; ')}` : '') +
         (skipped.length > 0 ? `; skipped ${skipped.length}: ${skipped.join('; ')}` : '') +
         '.',
       affected: elementAffected(
@@ -227,6 +261,7 @@ export const addPipeSupport = defineCommand({
           standoff: support.standoff ?? 0,
         })),
         unattached: unattached.map((support) => support.id),
+        spanWarnings: spanIssues,
         skipped,
       },
     };

@@ -1,10 +1,12 @@
 /** CLI discovery (list, search, describe, toolsets): projections of the registry + exchange tools, never a hand list (L5). */
 import { getCommand, listCommands } from '@core/commands/registry';
 import type { CommandDefinition, ParamsSchema } from '@core/commands/types';
+import { similarNames } from '@lib/similarNames';
+import { suggestCommandNames } from '@core/commands/project/unknownCommandHint';
 import { paramsLines } from './describeSchema';
 import type { McpToolDefinition } from '@mcp/tools';
 import { exchangeTool, exchangeToolDefinitions } from './exchange';
-import { TOOLSET_NAMES, closestToolNames, searchTools, toolsetOf, type ToolsetName } from '@mcp/index';
+import { TOOLSET_NAMES, searchTools, toolsetOf, type ToolsetName } from '@mcp/index';
 
 const SHORT_DESCRIPTION_CHARS = 110;
 
@@ -90,9 +92,10 @@ export function toolsetCounts(): { toolset: ToolsetName; commands: number }[] {
   return TOOLSET_NAMES.map((toolset) => ({ toolset, commands: entries.filter((entry) => entry.toolset === toolset).length }));
 }
 
-/** Typo hints for an unknown command name: registry commands only. */
+/** "Did you mean" names (max 3) for an unknown command: registry commands (retired names point at their replacement) + exchange tools. */
 export function suggestNames(name: string): string[] {
-  return closestToolNames(name, 6).filter((candidate) => toolNamed(candidate) !== undefined);
+  const exchange = exchangeToolDefinitions().map((tool) => tool.name);
+  return [...new Set([...suggestCommandNames(name), ...similarNames(name, exchange, 3)])].slice(0, 3);
 }
 
 /** The full contract of one tool, as text (agents) or a JSON-ready record. */

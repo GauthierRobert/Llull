@@ -12,6 +12,7 @@ import { supportSchedule } from '../../industrial/piping/supportSchedule';
 import { type ConnectionWelds, connectionMass, connectionWelds } from '../../industrial/connections/connections';
 import { columnSectionArea, scaleFor, slabNetArea, stairVolume, wallQuantities } from './takeoffBasics';
 import { memberLength, memberMass, panelArea } from './takeoffCompute';
+import { netConcreteVolumes } from './netConcrete';
 import { routeLength } from '../../industrial/piping/routeSupport';
 
 export const SCHEDULE_KINDS = [
@@ -62,6 +63,7 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
   const building = getBuilding(doc);
   const scale = scaleFor(doc);
   const unit = doc.units;
+  const net = netConcreteVolumes(building);
   switch (kind) {
     case 'wall': {
       // Curved-wall volumes are rounded to 2 decimals (straight walls: 3), as shipped.
@@ -153,7 +155,7 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
       };
     case 'column':
       return {
-        columns: ['Mark', 'Level', 'Shape', `Section (${unit})`, `Height (${unit})`, 'Material', 'Volume (m³)'],
+        columns: ['Mark', 'Level', 'Shape', `Section (${unit})`, `Height (${unit})`, 'Material', 'Volume (m³)', 'Gross volume (m³)'],
         rows: elementsOf(building, 'column').map((column) => [
           column.mark,
           levelName(building, column.levelId),
@@ -161,12 +163,13 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
           column.shape === 'circular' ? `Ø${column.width}` : `${column.width}×${column.depth}`,
           column.height,
           column.material,
+          round(scale.volume(net.column.get(column.id) ?? columnSectionArea(column) * column.height), 3),
           round(scale.volume(columnSectionArea(column) * column.height), 3),
         ]),
       };
     case 'beam':
       return {
-        columns: ['Mark', 'Level', `Span (${unit})`, `Section (${unit})`, 'Material', 'Volume (m³)'],
+        columns: ['Mark', 'Level', `Span (${unit})`, `Section (${unit})`, 'Material', 'Volume (m³)', 'Gross volume (m³)'],
         rows: elementsOf(building, 'beam').map((beam) => {
           const span = distance(beam.start, beam.end);
           return [
@@ -175,6 +178,7 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
             round(span, 3),
             `${beam.width}×${beam.depth}`,
             beam.material,
+            round(scale.volume(net.beam.get(beam.id) ?? span * beam.width * beam.depth), 3),
             round(scale.volume(span * beam.width * beam.depth), 3),
           ];
         }),

@@ -19,7 +19,7 @@ export interface StepLabel {
 }
 
 const PRODUCT_PATTERN = /PRODUCT\('Open CASCADE STEP translator [\d.]+ (\d+)',\s*'Open CASCADE STEP translator [\d.]+ \1',''/g;
-const REPRESENTATION_PATTERN =
+export const REPRESENTATION_PATTERN =
   /#(\d+) = (?:ADVANCED_BREP_SHAPE_REPRESENTATION|MANIFOLD_SURFACE_SHAPE_REPRESENTATION|SHAPE_REPRESENTATION)\('',\(([^)]*)\),(#\d+)\);/g;
 
 /** STEP string literal body: quotes and backslashes doubled, non-ASCII as \X2\…\X0\, no control characters. */
@@ -43,7 +43,7 @@ export function stepString(text: string): string {
   return out;
 }
 
-function rgbOf(hex: string | undefined): [number, number, number] | null {
+export function rgbOf(hex: string | undefined): [number, number, number] | null {
   const rgb = isHexColor(hex) ? parseHexRgb(hex) : null;
   if (rgb === null) return null;
   const [r, g, b] = rgb.map((c) => Math.round((c / 255) * 1000) / 1000) as [number, number, number];
@@ -51,7 +51,7 @@ function rgbOf(hex: string | undefined): [number, number, number] | null {
 }
 
 /** `#id` numbers of the representation items that are solids/surfaces (not the placement axis). */
-function geometryItems(step: string, itemList: string): string[] {
+export function geometryItems(step: string, itemList: string): string[] {
   return itemList
     .split(',')
     .map((ref) => ref.trim())
@@ -65,7 +65,7 @@ function named(statement: string, label: StepLabel): string {
 }
 
 /** Append a color chain per distinct color and one STYLED_ITEM per labeled solid. */
-function addColors(step: string, styled: readonly { items: string[]; rgb: [number, number, number] }[], context: string): string {
+export function addColors(step: string, styled: readonly { items: string[]; rgb: [number, number, number] }[], context: string): string {
   const end = step.lastIndexOf('ENDSEC;');
   if (end < 0 || styled.length === 0) return step;
   let next = Math.max(...[...step.matchAll(/^#(\d+) = /gm)].map((m) => Number(m[1]))) + 1;

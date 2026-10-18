@@ -81,3 +81,28 @@ describe('quantity_takeoff net concrete', () => {
     expect((empty.data as { gross: Record<string, number> }).gross).toEqual({});
   });
 });
+
+describe('building_schedule net concrete', () => {
+  const rows = (doc: CadDocument, kind: 'column' | 'beam'): unknown[][] =>
+    (execute(doc, 'building_schedule', { kind }).data as { rows: unknown[][] }).rows;
+
+  it('column and beam rows carry the net volume and the gross prism, matching quantity_takeoff', () => {
+    const doc = bay(true);
+    const columns = rows(doc, 'column');
+    const beams = rows(doc, 'beam');
+    expect(columns.map((row) => row[6])).toEqual([0.448, 0.448]);
+    expect(columns.map((row) => row[7])).toEqual([0.48, 0.48]);
+    expect(beams[0]?.[5]).toBeCloseTo(0.504, 3);
+    expect(beams[0]?.[6]).toBeCloseTo(0.9, 3);
+    const total = columns.reduce((sum, row) => sum + Number(row[6]), 0);
+    const lines = (execute(doc, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
+    expect(total).toBeCloseTo(quantity(lines, 'column.concrete.m3'), 3);
+  });
+
+  it('equals gross where members do not overlap and states the rule in the description', () => {
+    const doc = run(run(createEmptyDocument(), 'add_level', { name: 'L0' }), 'add_column', { location: [0, 0], width: 400, depth: 400 });
+    const [row] = rows(doc, 'column');
+    expect(row?.[6]).toBe(row?.[7]);
+    expect(execute(doc, 'building_schedule', { kind: 'room' }).summary).toMatch(/schedule/);
+  });
+});

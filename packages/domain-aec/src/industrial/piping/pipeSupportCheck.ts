@@ -44,6 +44,8 @@ export interface PipeSupportRow {
   /** Supports that bear on steel (the pipe's own, else the beams it rests on). */
   readonly supports: number;
   readonly unattached: number;
+  /** Supports bearing on no steel: where they sit (arc length from the pipe start, m). They carry nothing. */
+  readonly unattachedSupports: ReadonlyArray<{ readonly id: string; readonly mark: string; readonly type: string; readonly atM: number }>;
   readonly basis: 'supports' | 'resting' | 'nozzles' | 'none';
   readonly endCarriers: readonly [EndCarrier | null, EndCarrier | null];
   /** One verdict per riser (steep run of at least 0.5 m); `ok` includes them. */
@@ -74,9 +76,12 @@ function rowOf(
   const unattached = stations.filter((station) => !station.attached);
   const weightBearing = weightSupportsOf(units, run).length > 0;
   const explicitArcs = stations.filter((station) => station.attached && !isLateralOnly(station)).map((station) => station.arc);
+  const everyArc = stations.filter((station) => !isLateralOnly(station)).map((station) => station.arc);
+  const allUnattached = weightBearing && explicitArcs.length === 0 && everyArc.length > 0;
   const resting = weightBearing ? [] : restingArcs(units, element, beams);
-  const arcs = (weightBearing ? explicitArcs : resting).sort((a, b) => a - b);
+  const arcs = (allUnattached ? everyArc : weightBearing ? explicitArcs : resting).sort((a, b) => a - b);
   const carriers = endCarriers(units, run, runs);
+  const supported = allUnattached ? [] : arcs;
   const basis: PipeSupportRow['basis'] = weightBearing
     ? 'supports'
     : resting.length > 0
@@ -93,8 +98,11 @@ function rowOf(
   const overhang = { start: carriers[0] ? null : (spans[0] ?? length), end: carriers[1] ? null : length - (spans.at(-1) ?? 0) };
   const issues: string[] = [];
   const notes: string[] = [];
-  if (arcs.length === 0 && carriers[0] === null && carriers[1] === null) {
+  if (supported.length === 0 && carriers[0] === null && carriers[1] === null) {
     issues.push(`no support: ${shown(length)} m of pipe rest on nothing`);
+  }
+  if (allUnattached) {
+    notes.push(`every support is unattached: spans and overhangs are measured between the unattached supports (they carry nothing)`);
   }
   if (largest / 1000 > allowed + 1e-9) {
     issues.push(`span ${shown(largest)} m exceeds ${allowed.toFixed(2)} m allowed for DN${limit.dn} (table ${limit.spanM} m)`);
@@ -137,8 +145,14 @@ function rowOf(
       start: overhang.start === null ? null : roundedMetres(overhang.start),
       end: overhang.end === null ? null : roundedMetres(overhang.end),
     },
-    supports: arcs.length,
+    supports: supported.length,
     unattached: unattached.length,
+    unattachedSupports: unattached.map((station) => ({
+      id: station.id,
+      mark: station.mark,
+      type: station.type,
+      atM: roundedMetres(spanCoordinate(run.points, station.arc)),
+    })),
     basis,
     endCarriers: carriers,
     risers,
@@ -162,7 +176,8 @@ export const checkPipeSupports = defineCommand({
     "DN250 6.7 m, DN300 7.0 m …). Uses the pipe's add_pipe_support supports (only those bearing on steel count), else the beams it " +
     'rests on. Ends inside equipment (nozzle) or on another pipe are carried; a free end needs a support within overhangRatio × allowed ' +
     'span. Returns data.pipes: one row per pipe { id, mark, line, dn, lengthM, maxSpanM (table), allowedSpanM (table × spanFactor), ' +
-    'largestSpanM (actual), overhangM, supports, unattached, basis ("supports" | "resting" | "nozzles" | "none"), risers, ok, issues, ' +
+    'largestSpanM (actual; when every support is unattached, measured between them), overhangM, supports, unattached, unattachedSupports ' +
+    '[{ id, mark, type, atM }], basis ("supports" | "resting" | "nozzles" | "none"), risers, ok, issues, ' +
     'notes }; data.ok is true only when every pipe passes. RISERS (runs ≥ 0.5 m steeper than 44° from horizontal) are checked too: ' +
     'risers[] = { fromZM, toZM, lengthM, guides, maxGuideSpacingM, allowedSpacingM, weightKn, weightBy ("carried end" | "clamp" | "elbow ' +
     'support" | null), ok, issues }; they need lateral guides (add_pipe_support type "guide" at a point on the riser, bracketed to steel ' +

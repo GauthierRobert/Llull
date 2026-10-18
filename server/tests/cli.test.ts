@@ -98,6 +98,8 @@ describe('llull CLI — discovery', () => {
   it('rejects unknown subcommands, toolsets and commands with hints (exit 2)', async () => {
     const cases: [string[], RegExp][] = [
       [['frobnicate'], /unknown subcommand/],
+      [['draw_circle'], /unknown subcommand "draw_circle"\. Did you mean: draw_arc/],
+      [['draw_arcc'], /unknown subcommand "draw_arcc"\. Did you mean: draw_arc/],
       [['list', 'nope'], /unknown toolset/],
       [['describe', 'add_bx'], /Did you mean: .*add_box/],
       [['describe'], /needs a command name/],

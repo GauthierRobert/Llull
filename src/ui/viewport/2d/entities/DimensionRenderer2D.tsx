@@ -13,13 +13,14 @@ import { TEXT_FONT_URL } from '@ui/viewport/textFont';
 import { SELECTION_COLOR } from '@ui/viewport/viewportPalette';
 import { useMinScreenSize } from '../useMinScreenSize';
 import { PlacedLineObject } from './PlacedLineObject';
+import { dimensionText } from '@core/geometry/dimensionAnnotation';
 import { DEFAULT_OFFSET, dimensionDrawing } from './dimensionGeometry';
 
 const DIM_LINE_COLOR = '#333333';
 const TEXT_HEIGHT = 0.5;
 
 export function DimensionRenderer2D({ entity, selected }: { entity: DimensionEntity; selected: boolean }): React.ReactElement | null {
-  const { dimensionKind, entityIds, offset: rawOffset, precision, label, color, position } = entity;
+  const { dimensionKind, entityIds, offset: rawOffset, color, position } = entity;
   const offset = rawOffset ?? DEFAULT_OFFSET;
   const textRef = useRef<THREE.Group>(null);
   useMinScreenSize(textRef, TEXT_HEIGHT);
@@ -35,8 +36,7 @@ export function DimensionRenderer2D({ entity, selected }: { entity: DimensionEnt
   );
   if (!drawing) return null;
 
-  const displayText =
-    label || (dimensionKind === 'angular' ? `${drawing.value.toFixed(1)}°` : drawing.value.toFixed(precision ?? displayPrecision));
+  const displayText = dimensionText(entity, drawing.value, displayPrecision);
 
   return (
     <group position={[position[0], position[1], position[2]]}>

@@ -2,8 +2,9 @@
 
 import type { Entity, Vec2 } from '@core/model/types';
 import type { PointGroupObject, SurfaceObject } from '@core/model/civil';
+import { surfaceFootprint, trimmedTinMesh } from '../earthworks/tinTrim';
 import { civilMesh, civilPoint, civilPolyline, civilText } from '../entities';
-import { contourLevels, tinBounds, tinMesh, traceContour, type Tin } from './tin';
+import { contourLevels, tinBounds, traceContour, type Tin } from './tin';
 import { surfaceTin } from './surfaceTin';
 import { labelHeight, type CivilContext } from '../context';
 import { toMetres } from '@core/model/units';
@@ -45,7 +46,9 @@ export function drawnInterval(tin: Tin, interval: number): number {
 export function evaluateSurface(context: CivilContext, surface: SurfaceObject): Entity[] {
   const tin = surfaceTin(context.civil, surface);
   if (tin.triangles.length === 0) return [];
-  const entities: Entity[] = [civilMesh(surface, 'tin', `${surface.name} TIN`, 'tin', tinMesh(tin))];
+  const entities: Entity[] = [
+    civilMesh(surface, 'tin', `${surface.name} TIN`, 'tin', trimmedTinMesh(tin, surfaceFootprint(context.civil, surface))),
+  ];
   const height = labelHeight(context.doc);
   let lines = 0;
   const interval = drawnInterval(tin, surface.contourInterval);

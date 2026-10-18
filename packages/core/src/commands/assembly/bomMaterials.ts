@@ -32,6 +32,11 @@ interface Accumulator {
   methods: Set<'closed_form' | 'exact' | 'mesh'>;
 }
 
+/** Counts solids met while walking an instance that carry no material (their mass is unknown). */
+interface Unassigned {
+  count: number;
+}
+
 const MAX_NESTING = 8;
 
 function add(accumulators: Map<string, Accumulator>, materialId: string, volume: number, method: 'closed_form' | 'exact' | 'mesh'): void {
@@ -49,14 +54,18 @@ function collectInstance(
   ctx: ExecutionContext | undefined,
   accumulators: Map<string, Accumulator>,
   depth: number,
+  unassigned?: Unassigned,
 ): void {
   const component = doc.components[instance.componentId];
   if (component === undefined || depth > MAX_NESTING) return;
   for (const baked of expandInstance(instance, component)) {
     const materialId = baked.materialId ?? instance.materialId ?? inherited;
-    if (baked.kind === 'instance') collectInstance(doc, baked, materialId, ctx, accumulators, depth + 1);
-    else if (materialId !== undefined && is3D(baked))
-      add(accumulators, materialId, childVolume(doc, baked, ctx), baked.kind === 'mesh' ? 'mesh' : 'closed_form');
+    if (baked.kind === 'instance') collectInstance(doc, baked, materialId, ctx, accumulators, depth + 1, unassigned);
+    else if (is3D(baked)) {
+      if (materialId !== undefined)
+        add(accumulators, materialId, childVolume(doc, baked, ctx), baked.kind === 'mesh' ? 'mesh' : 'closed_form');
+      else if (unassigned !== undefined) unassigned.count += 1;
+    }
   }
 }
 
@@ -117,4 +126,41 @@ export function materialRows(doc: CadDocument, ctx: ExecutionContext | undefined
 export function unassignedSolidCount(doc: CadDocument): number {
   return Object.values(doc.entities).filter((entity) => entity.kind !== 'instance' && is3D(entity) && entity.materialId === undefined)
     .length;
+}
+
+/** Mass of one instance (all its solids, instance scale applied): kg when every solid has a resolvable density, else null with the reason. */
+export interface InstanceMass {
+  readonly massKg: number | null;
+  readonly unverified: boolean;
+  readonly sources: readonly string[];
+  readonly reason?: string;
+}
+
+/**
+ * @invariant null mass when any solid has no material, a material has no resolvable density, or the instance has no solids
+ */
+export function instanceMass(doc: CadDocument, instance: InstanceEntity, ctx: ExecutionContext | undefined): InstanceMass {
+  const accumulators = new Map<string, Accumulator>();
+  const unassigned: Unassigned = { count: 0 };
+  collectInstance(doc, instance, instance.materialId, ctx, accumulators, 0, unassigned);
+  if (accumulators.size === 0 && unassigned.count === 0) return { massKg: null, unverified: false, sources: [], reason: 'no solids' };
+  if (unassigned.count > 0)
+    return { massKg: null, unverified: false, sources: [], reason: `${unassigned.count} solid(s) without a material` };
+  let massKg = 0;
+  let unverified = false;
+  const sources: string[] = [];
+  for (const [materialId, found] of accumulators) {
+    const density = resolveDensity(doc, materialId);
+    if (density === null || !density.available)
+      return {
+        massKg: null,
+        unverified: false,
+        sources: [],
+        reason: density === null ? `material '${materialId}' is not defined` : density.reason,
+      };
+    massKg += (found.volume * density.gPerDocUnit3) / 1000;
+    unverified ||= density.unverified;
+    sources.push(density.source);
+  }
+  return { massKg, unverified, sources };
 }

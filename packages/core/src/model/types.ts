@@ -332,12 +332,12 @@ export interface TextEntity extends BaseEntity {
 }
 
 /**
- * Associative dimension; `entityIds` required count by `dimensionKind`: linear/aligned 2 (line or point), radial 1 (circle/arc/ellipse),
- * angular 3 (vertex point + 2 lines, or 3 points). Dangling refs are flagged by check_model.
+ * Associative dimension; `entityIds` required count by `dimensionKind`: linear/aligned 2 (line or point), radial/diameter 1
+ * (circle/arc/ellipse), angular 3 (vertex point + 2 lines, or 3 points) or 2 (two lines; the vertex is their intersection). Dangling refs are flagged by check_model.
  */
 export interface DimensionEntity extends BaseEntity {
   readonly kind: 'dimension';
-  dimensionKind: 'linear' | 'aligned' | 'radial' | 'angular';
+  dimensionKind: 'linear' | 'aligned' | 'radial' | 'diameter' | 'angular';
   entityIds: readonly string[];
   /** Perpendicular distance from measured geometry to the dimension line. Default 5. */
   offset?: number;
@@ -345,6 +345,8 @@ export interface DimensionEntity extends BaseEntity {
   precision?: number;
   /** Replaces the computed value text. */
   label?: string;
+  /** Drawn after the computed value, e.g. '±0.1', '+0.05/-0.02' or 'H7'. Ignored when `label` is set. */
+  tolerance?: string;
 }
 
 /**

@@ -362,9 +362,16 @@ describe('bill_of_materials with standard parts (VC-MAT-11)', () => {
   it('keeps the legacy rows unchanged and omits the sections that were not asked for', () => {
     const { doc, stacks } = twoStacks();
     const withParts = dataOf(execute(doc, 'bill_of_materials', {}));
-    expect(Object.keys(withParts).sort()).toEqual(['distinctComponents', 'rows', 'standardParts', 'totalInstances']);
+    expect(Object.keys(withParts).sort()).toEqual([
+      'distinctComponents',
+      'rows',
+      'rowsWithoutDensity',
+      'standardParts',
+      'totalInstances',
+      'totalMassKg',
+    ]);
     const without = dataOf(execute(doc, 'bill_of_materials', { includeStandardParts: false }));
-    expect(Object.keys(without).sort()).toEqual(['distinctComponents', 'rows', 'totalInstances']);
+    expect(Object.keys(without).sort()).toEqual(['distinctComponents', 'rows', 'rowsWithoutDensity', 'totalInstances', 'totalMassKg']);
     expect(without['rows']).toEqual(withParts['rows']);
     expect(stacks).toHaveLength(2);
   });

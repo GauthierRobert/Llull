@@ -11,7 +11,7 @@
  */
 
 import type { BooleanOp, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/types';
-import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTopology } from './kernel';
+import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTopology, StepAssemblyPart, StepOccurrence } from './kernel';
 import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
 import { recipeKey } from './shapeRecipe';
 import { lowerFeature, needsReach, throughReach } from './featureLowering';
@@ -58,6 +58,8 @@ export interface KernelOps<S> {
   tessellate(shape: S): MeshData | null;
   topology(shape: S): ShapeTopology | null;
   exportStep(shapes: readonly S[]): string | null;
+  /** Optional assembly STEP writer; a kernel without it leaves `GeometryKernel.exportStepAssembly` undefined. */
+  exportStepAssembly?(occurrences: readonly StepOccurrence<S>[]): string | null;
   /** Optional validity / lump report; a kernel without it leaves `GeometryKernel.analyze` undefined. */
   analyze?(shape: S): ShapeAnalysis | null;
   /** Optional exact mass properties at unit density; a kernel without it leaves `GeometryKernel.massProperties` undefined. */
@@ -295,6 +297,7 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
   const loadBlobOps = ops.loadBlob?.bind(ops);
   const loadedBlobs = new Set<string>();
   const importOps = ops.importShapes?.bind(ops);
+  const assemblyOps = ops.exportStepAssembly?.bind(ops);
   const infoOps = ops.info?.bind(ops);
   return {
     ...(faceQuery === undefined ? {} : { faceQuery }),
@@ -309,11 +312,32 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
               ...(distanceOps === undefined ? [] : ['distance']),
               ...(massOps === undefined ? [] : ['massProperties']),
               ...(importOps === undefined ? [] : ['importShapes']),
+              ...(assemblyOps === undefined ? [] : ['exportStepAssembly']),
               ...(faceQuery === undefined ? [] : ['faceQuery']),
               ...(ops.brep === undefined ? [] : ['brepBlobs']),
             ];
             return { ...own, capabilities: [...new Set([...own.capabilities, ...wired])] };
           },
+        }),
+    ...(assemblyOps === undefined
+      ? {}
+      : {
+          exportStepAssembly: (occurrences: readonly StepOccurrence[]): string | null =>
+            call(() => {
+              const parts = new Map<StepAssemblyPart, StepAssemblyPart<S>>();
+              const placed: StepOccurrence<S>[] = [];
+              for (const occurrence of occurrences) {
+                let part = parts.get(occurrence.part);
+                if (part === undefined) {
+                  const natives = occurrence.part.shapes.map(nativeOf);
+                  if (natives.some((shape) => shape === null)) return null;
+                  part = { shapes: natives as S[] };
+                  parts.set(occurrence.part, part);
+                }
+                placed.push({ ...occurrence, part });
+              }
+              return assemblyOps(placed);
+            }),
         }),
     ...(importOps === undefined ? {} : { importShapes: (format, text, options) => call(() => importOps(format, text, options)) }),
     ...(loadBlobOps === undefined

@@ -7,7 +7,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { MessageChannel, Worker, receiveMessageOnPort, type MessagePort } from 'node:worker_threads';
-import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle } from '@core/geometry/kernel';
+import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, StepOccurrence } from '@core/geometry/kernel';
 import type { ExactMassProperties, ImportShapesResult, KernelInfo } from '@core/geometry/kernelPorts';
 import { errorMessage } from '@lib/errorMessage';
 import { handleOf, keyOnlyHandle, SHAPE_NOT_CACHED } from '@core/geometry/shapeKernel';
@@ -223,6 +223,21 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     return call(op, pack(handles));
   };
 
+  /** Assembly STEP: parts keep their object identity through the structured clone, so one part stays one product. */
+  const exportStepAssembly = (occurrences: readonly StepOccurrence[]): string | null => {
+    const withShapes = (map: (shape: ShapeHandle) => ShapeHandle): StepOccurrence[] => {
+      const parts = new Map<StepOccurrence['part'], StepOccurrence['part']>();
+      return occurrences.map((occurrence) => {
+        const part = parts.get(occurrence.part) ?? { shapes: occurrence.part.shapes.map(map) };
+        parts.set(occurrence.part, part);
+        return { ...occurrence, part };
+      });
+    };
+    const reply = exchange('exportStepAssembly', [withShapes(keyOnlyHandle)]);
+    if (reply?.error?.startsWith(SHAPE_NOT_CACHED) !== true) return (reply?.result ?? null) as string | null;
+    return call('exportStepAssembly', [withShapes((shape) => shape)]) as string | null;
+  };
+
   const faceQuery = Object.fromEntries(
     FACE_QUERY_METHODS.map((method) => [
       method,
@@ -238,6 +253,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     tessellate: (shape) => shapeCall('tessellate', [shape], false) as ReturnType<GeometryKernel['tessellate']>,
     topology: (shape) => shapeCall('topology', [shape], false) as ReturnType<GeometryKernel['topology']>,
     exportStep: (shapes) => shapeCall('exportStep', shapes, true) as ReturnType<GeometryKernel['exportStep']>,
+    exportStepAssembly,
     analyze: (shape) => shapeCall('analyze', [shape], false) as ShapeAnalysis | null,
     massProperties: (shape) => shapeCall('massProperties', [shape], false) as ExactMassProperties | null,
     distance: (a, b, maxDistance) => shapeCall('distance', [a, b], false, [maxDistance]) as ShapeDistance | null,

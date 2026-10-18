@@ -351,7 +351,7 @@ export const addStair = defineCommand({
   name: 'add_stair',
   description:
     'Add a straight-run reinforced-concrete-style stair climbing one full level, modelled as a waist slab (sloping slab, waistThickness) with the steps on top; the last riser lands on the upper floor, so N risers give N-1 treads and the run is (N-1) x tread. Riser count defaults to the level height ÷ 175 mm (rounded up), so risers are ' +
-    'equal; tread default 280 mm. The summary reports the Blondel rule (2R + G, comfortable between 600 and 650 mm). Refused above 200 ' +
+    'equal; tread default 280 mm. Landings are NOT modelled: the flight is one uninterrupted straight run and the last riser arrives on the upper floor, and every stair rises from the base of its level, so a half-landing / dog-leg cannot be composed from two stairs; use riserCount for a partial flight and model a landing separately (add_slab). The summary reports the Blondel rule (2R + G, comfortable between 600 and 650 mm). Refused above 200 ' +
     'risers or if a stair with the same start and angle already exists on the level.',
   params: z.object({
     start: vec2('Plan point [x, y] at the middle of the first riser.'),

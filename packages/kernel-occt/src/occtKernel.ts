@@ -17,7 +17,7 @@ import { nearestOn } from './occtFaceDistance';
 import { exactMassProperties } from './occtMass';
 import { nativeFeature } from './occtFeatures';
 import { inheritThreadMark, isThreadBearing } from './occtThreadMark';
-import { writeStep } from './occtStep';
+import { writeStep, writeStepAssembly } from './occtStep';
 import { occtFaceQueryOps } from './occtFaceQuery';
 import { importStepShapes, readBrepText } from './occtImport';
 import { release, withOwned } from '@core/geometry/nativeObject';
@@ -385,6 +385,7 @@ export function occtOps(api: OccApi, nativeFeatures = true): KernelOps<OccShape>
     tessellate: (shape) => guarded('fragile', () => extractMeshData(api, shape)),
     topology: (shape) => guarded('fragile', () => shapeTopology(api, shape)),
     exportStep: (shapes) => guarded('fragile', () => writeStep(api, shapes)),
+    exportStepAssembly: (occurrences) => guarded('fragile', () => writeStepAssembly(api, occurrences)),
     analyze: (shape) => guarded('fragile', () => analyzeShape(api, shape)),
     massProperties: (shape) => guarded('fragile', () => exactMassProperties(api, shape)),
     distance: (a, b) => guarded('fragile', () => shapeDistance(api, a, b)),
