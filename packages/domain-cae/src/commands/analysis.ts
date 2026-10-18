@@ -213,7 +213,7 @@ export const createAnalysis = defineCommand({
     const scaleNote = thermalUse ? `, temperatureScale ${scale}${temperatureScale === undefined ? ' (default)' : ''}` : '';
     return changed(
       withCase(doc, analysisCase),
-      `create_analysis: '${id}' (${name}) — ${type}, calculix, ${unitSystem}${modesNote}${scaleNote}; ${factorNote}; mesh default tet order ${mesh.order} globalSize ${plain(mesh.globalSize)} ${doc.units}; no parts yet (next: set_part_idealization).`,
+      `create_analysis: '${id}' (${name}) — ${type}, calculix, ${unitSystem}${modesNote}${scaleNote}; ${isThermal(type) && !stated ? '' : `${factorNote}; `}mesh default tet order ${mesh.order} globalSize ${plain(mesh.globalSize)} ${doc.units}; no parts yet (next: set_part_idealization).`,
       [id],
     );
   },

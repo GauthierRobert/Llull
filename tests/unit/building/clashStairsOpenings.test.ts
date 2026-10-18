@@ -59,11 +59,11 @@ describe('check_clashes: stairs through slabs', () => {
 });
 
 describe('stair geometry: waist slab', () => {
-  it('N risers give N-1 treads and far less concrete than solid blocks to the floor', () => {
+  it('N risers give one flight prism and far less concrete than solid blocks to the floor', () => {
     const doc = run(createEmptyDocument(), 'add_level', { name: 'L0', height: 3500 });
     const added = execute(doc, 'add_stair', { start: [0, 0], width: 1200, riserCount: 20, treadDepth: 280 });
-    const steps = Object.keys(added.document.entities).filter((id) => id.includes(':step-'));
-    expect(steps).toHaveLength(19);
+    const flights = Object.keys(added.document.entities).filter((id) => id.startsWith('stair-'));
+    expect(flights).toEqual(['stair-1:flight']);
     const takeoff = execute(added.document, 'quantity_takeoff', {}).data as { lines: Array<{ key: string; quantity: number }> };
     const volume = takeoff.lines.find((line) => line.key.startsWith('stair') && line.key.endsWith('m3'))?.quantity ?? 0;
     expect(volume).toBeGreaterThan(1.5);
@@ -75,6 +75,46 @@ describe('stair geometry: waist slab', () => {
     ).lines.find((line) => line.key.startsWith('stair') && line.key.endsWith('m3'))?.quantity;
     expect(heavyVolume).toBeGreaterThan(volume);
     expect(execute(thick, 'add_stair', { start: [0, 0], waistThickness: 0 }).affected).toEqual([]);
+  });
+});
+
+describe('stair flight prism', () => {
+  it('is one watertight mesh whose volume equals the takeoff volume and whose underside slopes at the waist thickness', () => {
+    const doc = run(createEmptyDocument(), 'add_level', { name: 'L0', height: 3500 });
+    const added = run(doc, 'add_stair', {
+      start: [0, 0],
+      angle: Math.PI / 2,
+      width: 1200,
+      riserCount: 20,
+      treadDepth: 280,
+      waistThickness: 175,
+    });
+    const flight = added.entities['stair-1:flight'];
+    if (flight?.kind !== 'mesh') throw new Error('flight is not a mesh');
+    const { positions, indices } = flight.mesh;
+    let volume = 0;
+    for (let i = 0; i < indices.length; i += 3) {
+      const [a, b, c] = [0, 1, 2].map((k) =>
+        positions.slice((indices[i + k] as number) * 3, (indices[i + k] as number) * 3 + 3),
+      ) as number[][];
+      volume +=
+        (a![0]! * (b![1]! * c![2]! - b![2]! * c![1]!) -
+          a![1]! * (b![0]! * c![2]! - b![2]! * c![0]!) +
+          a![2]! * (b![0]! * c![1]! - b![1]! * c![0]!)) /
+        6;
+    }
+    const takeoff = (execute(added, 'quantity_takeoff', {}).data as { lines: Array<{ key: string; quantity: number }> }).lines;
+    const stairVolume = takeoff.find((line) => line.key === 'stair.concrete.m3')?.quantity ?? 0;
+    expect(volume / 1e9).toBeCloseTo(stairVolume, 2);
+    // hand calc: rise 3500/20 = 175, going 280, 19 treads; waist line z = x*0.625 - V, V = 175*hypot(175,280)/280
+    const vertical = (175 * Math.hypot(175, 280)) / 280;
+    const length = 19 * 280;
+    const top = 280 * 175 * ((19 * 20) / 2);
+    const clip = (vertical * 280) / 175;
+    const under = 0.5 * (length - clip) * ((length * 175) / 280 - vertical);
+    expect(stairVolume).toBeCloseTo(((top - under) * 1200) / 1e9, 3);
+    const xs = Array.from({ length: positions.length / 3 }, (_, k) => positions[k * 3 + 1] as number);
+    expect(Math.max(...xs)).toBeCloseTo(19 * 280, 3);
   });
 });
 

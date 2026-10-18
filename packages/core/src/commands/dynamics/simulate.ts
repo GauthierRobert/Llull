@@ -47,7 +47,7 @@ export const simulateMotion = defineCommand({
     'engine (MuJoCo) and report what happens: final speed of every joint (rpm), when it settled, engine torque and power, propeller ' +
     'thrust / torque / absorbed power, and measured gear ratios (a self-check). Gravity applies (set_gravity). Read-only. ' +
     'detail "summary" (default) = numbers only; "series" adds per-sample time series (speeds, positions, torques, thrust, power) for ' +
-    'plotting; "poses" also adds every body\'s pose per sample (for playback). Warnings flag a run that has not settled. ' +
+    'plotting; `energy: true` adds the kinetic / potential / total / dissipated energy balance (J; automatic when a joint has a spring); "poses" also adds every body\'s pose per sample (for playback). Warnings flag a run that has not settled. ' +
     'Typical: duration 10 s, timestep 0.001 s (use 0.0002 s for fast, light parts). ' +
     'Closed loops (slider-crank, four-bar): before integrating, the start pose is checked and a loop open by more than 1 µm is refused ' +
     '(FPR_LOOP_OPEN, nothing is run or snapped); with loops the default timestep is the "auto" rule min(1 ms, 0.5 deg of crank at the ' +
@@ -82,6 +82,12 @@ export const simulateMotion = defineCommand({
       .enum(['off', 'peaks', 'series'])
       .optional()
       .describe('Joint / loop reaction forces: "off", "peaks" (default when the mechanism has loops), "series" (adds every sample).'),
+    energy: z
+      .boolean()
+      .optional()
+      .describe(
+        'Add the energy balance: data.energy (kinetic, potential = gravity + joint springs relative to the start pose, total, energy dissipated by joint damping / friction, largest departure of the total from its initial value as a fraction of the peak energy) and, with detail "series", data.series.energy per sample. Default false, except true when a joint has a spring (stiffness). A lossless mechanism keeps its total constant (conservation check); damping makes it decay by data.energy.dissipatedJ.',
+      ),
     crankAxis: z
       .string()
       .optional()
@@ -140,6 +146,7 @@ export const simulateMotion = defineCommand({
     const degreeInterval = resolved.maxSpeed > 0 ? Math.PI / 180 / resolved.maxSpeed : 1 / 50;
     const turnInterval = resolved.maxSpeed > 0 ? (2 * Math.PI) / SAMPLES_PER_TURN / resolved.maxSpeed : Infinity;
     const defaultInterval = hasCylinders ? degreeInterval : Math.min(1 / 50, turnInterval);
+    const withEnergy = params.energy ?? Object.values(dynamics.joints).some((joint) => joint.stiffness !== undefined);
     const mode: ReactionMode = params.reactions ?? (structured ? 'peaks' : 'off');
     const attemptAt = (step: number): Attempt => {
       if (duration / step > MAX_STEPS)
@@ -152,7 +159,13 @@ export const simulateMotion = defineCommand({
       const model = buildSimulationModel(doc, step, kernel);
       if ('error' in model) return { timestep: step, error: model.error };
       try {
-        const options = { duration, timestep: step, sampleInterval, ...(mode !== 'off' ? { reactions: true } : {}) };
+        const options = {
+          duration,
+          timestep: step,
+          sampleInterval,
+          ...(mode !== 'off' ? { reactions: true } : {}),
+          ...(withEnergy ? { energy: true } : {}),
+        };
         return { timestep: step, built: model, trace: engine.simulate(model.model, options), sampleInterval };
       } catch (error) {
         return { timestep: step, error: `the physics engine rejected the model: ${errorMessage(error)}` };

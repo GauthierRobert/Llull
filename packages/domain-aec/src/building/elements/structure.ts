@@ -296,7 +296,11 @@ export const addBeam = defineCommand({
     levelId: levelIdParam,
     material: concreteMaterialParam,
   }),
-  run: (doc, { start, end, width, depth, topOffset: requestedOffset = 0, reference = 'levelTop', levelId, material }): CommandResult => {
+  run: (
+    doc,
+    { start, end, width, depth, topOffset: requestedOffset = 0, reference: requestedReference, levelId, material },
+  ): CommandResult => {
+    const reference = requestedReference ?? 'levelTop';
     if (distance(start, end) <= 0) return noop(doc, 'add_beam failed: start and end must be distinct [x, y] points.');
     const resolvedWidth = width ?? fromMm(doc, 300);
     const resolvedDepth = depth ?? fromMm(doc, 500);
@@ -328,7 +332,10 @@ export const addBeam = defineCommand({
       doc,
       withElement(resolution.building, beam),
       [beam.id],
-      `Added beam ${beam.mark} (${beam.id}) ${resolvedWidth}×${resolvedDepth}, span ${distance(start, end).toFixed(3)} ${doc.units}.`,
+      `Added beam ${beam.mark} (${beam.id}) ${resolvedWidth}×${resolvedDepth}, span ${distance(start, end).toFixed(3)} ${doc.units}; ` +
+        `top at elevation ${(resolution.level.elevation + resolution.level.height + topOffset).toFixed(3)} ${doc.units} ` +
+        `= reference ${reference}${requestedReference === undefined ? ' (default)' : ''} ${requestedOffset.toFixed(3)} on level "${resolution.level.name}" ` +
+        `(FFL ${resolution.level.elevation.toFixed(3)}, level top ${(resolution.level.elevation + resolution.level.height).toFixed(3)}).`,
       { elementId: beam.id },
     );
   },

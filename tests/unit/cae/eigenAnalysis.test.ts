@@ -76,6 +76,10 @@ describe('create_analysis modal / buckling / factors', () => {
     expect(caseIn(buckling.document, buckling.affected[0] ?? '').modes).toBe(2);
     expect(buckling.summary).toContain('2 mode(s)');
     expect(run(empty, 'create_analysis', { name: 's', analysisType: 'static' }).summary).not.toContain('mode(s)');
+    for (const analysisType of ['heat_steady', 'heat_transient'])
+      expect(run(empty, 'create_analysis', { name: 'h', analysisType }).summary).not.toContain('safety factors');
+    for (const analysisType of ['static', 'modal'])
+      expect(run(empty, 'create_analysis', { name: 's', analysisType }).summary).toContain('DEFAULT 14 CFR 25.303');
   });
 
   it('refuses modes on other types and outside 1..100', () => {

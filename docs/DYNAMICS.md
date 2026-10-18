@@ -26,6 +26,18 @@ the motion in the 3D view (play / scrub / slow motion down to 1/100).
 Engine layout: `packages/core/src/dynamics/` (engine contract, doc → model, force laws, report),
 `packages/physics-mujoco/` (MJCF generation + stepping), `packages/core/src/geometry/{massProperties,entityMassProperties}.ts`.
 
+### Springs, energy and unsettled-run warnings
+
+`add_body_joint` takes `stiffness` (N·m/rad revolute, N/m prismatic; 1 N/mm = 1000 N/m) and `springReference` (rad or m from the modelled
+pose, default 0) and maps them to MuJoCo `stiffness` / `springref`; a spring needs a tree joint (a loop-closing joint has no coordinate:
+`simulate_motion` refuses it) and spherical joints take none. `simulate_motion energy: true` (automatic when a joint has a spring) adds
+`data.energy` (kinetic, potential = gravity + springs relative to the start pose, total, energy dissipated by joint damping / friction,
+largest departure of the total from its start value) and with `detail: "series"` `data.series.energy`; `plot_simulation` draws it as the
+`energy` quantity. Checks: mass on a prismatic spring T = 2π√(m/k) to 5e-9; torsional oscillator and spring + gravity pendulum < 0.5 %;
+undamped 30 deg pendulum total-energy drift 1e-13 of the peak; damped flywheel KE = ½I(ω0e^(-ct/I))² < 0.2 % and the loss equals the
+dissipated energy (0.01 %). An unsettled joint is reported by direction: "still accelerating", "still decelerating", "oscillates with an
+amplitude still decaying / growing", or neutrally "not yet steady".
+
 ## Recipe (agent or CLI): engine → reduction gear → propeller
 
 ```jsonc

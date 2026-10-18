@@ -30,6 +30,8 @@ export function planAliases(data: unknown): PlanAliases | null {
       return Array.isArray(rows) ? rows.map((row) => (isRecord(row) ? String(row['id']) : '')) : [];
     }),
   );
+  // A plugin element ("slab-1", "stair-1") owns scene entities "<id>:<part>" but is not one itself: still alive while a part is.
+  for (const id of [...present]) if (id.includes(':')) present.add(id.slice(0, id.indexOf(':')));
   const aliases: Record<string, string[]> = {};
   const consumed: string[] = [];
   for (const [alias, ids] of Object.entries(data['aliases'])) {

@@ -39,10 +39,9 @@ export const exportSheetSvg = defineCommand({
         ? ` Skipped ${rendered.skipped.length} view(s): ${rendered.skipped.map((s) => `${s.id} (${s.reason})`).join('; ')}.`
         : '';
     const warned = rendered.warnings.length > 0 ? ` WARNING: ${rendered.warnings.join('; ')}.` : '';
-    const overflow = rendered.fits ? '' : ' WARNING: views overflow the drawing area; use a smaller scale or larger paper.';
     return report(
       doc,
-      `Exported sheet ${sheet.id} ("${sheet.name}"): ${rendered.views.length} view(s) at ${scaleText(rendered.scale)}, ${sheet.paper}, ${rendered.svg.length} chars.${notes}${overflow}${warned}`,
+      `Exported sheet ${sheet.id} ("${sheet.name}"): ${rendered.views.length} view(s) at ${scaleText(rendered.scale)}, ${sheet.paper}, ${rendered.svg.length} chars.${notes}${warned}`,
       {
         svg: rendered.svg,
         sheetId: sheet.id,

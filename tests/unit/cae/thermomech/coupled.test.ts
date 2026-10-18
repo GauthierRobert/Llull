@@ -35,10 +35,25 @@ interface CoupledFixture {
   readonly fixId: string;
 }
 
-function coupledFixture(options: { bc?: boolean; withK?: boolean } = {}): CoupledFixture {
+function coupledFixture(
+  options: { bc?: boolean; withK?: boolean; eTable?: { points: number[][]; validity: number[] } } = {},
+): CoupledFixture {
   const base = thermoFixture({ field: null });
   let doc: CadDocument = base.doc;
-  doc = mustRun(doc, 'define_property_model', { material: 'mat', model: constant('E', 'E', 'GPa', 210) });
+  const eModel =
+    options.eTable === undefined
+      ? constant('E', 'E', 'GPa', 210)
+      : {
+          id: 'E.tab',
+          property: 'E',
+          unit: 'MPa',
+          variables: [{ variable: 'T', unit: 'K' }],
+          form: { kind: 'table1d', variable: 'T', points: options.eTable.points, interpolation: 'linear' },
+          validity: [{ variable: 'T', unit: 'K', data: options.eTable.validity }],
+          basis: 'company',
+          source: { citation: 'synthetic test fixture' },
+        };
+  doc = mustRun(doc, 'define_property_model', { material: 'mat', model: eModel });
   doc = mustRun(doc, 'define_property_model', { material: 'mat', model: constant('nu', 'nu', '1', 0.3) });
   if (options.withK !== false) doc = mustRun(doc, 'define_property_model', { material: 'mat', model: constant('k', 'k', 'W/(m*K)', 50) });
   const created = execute(doc, 'create_analysis', {
@@ -192,6 +207,41 @@ describe('coupled_temperature_displacement set-up', () => {
     const second = plain.analysis.cases[analysisId];
     if (second !== undefined) delete second.thermomech;
     expect(analysisErrors(plain as never).join('; ')).toContain('thermomech set-up is required for thermo_static and coupled cases');
+  });
+});
+
+describe('coupled deck *ELASTIC follows E(T)', () => {
+  const eTable = {
+    points: [
+      [250, 215000],
+      [293.15, 210000],
+      [450, 190000],
+    ],
+    validity: [250, 450],
+  };
+  it('writes E, nu, T rows over the T_ref .. BC temperature range (20 .. 120 degC) for an E(T) table', () => {
+    const { doc, analysisId, mesh } = coupledFixture({ eTable });
+    const text = textOf(writeInp(doc, analysisId, mesh));
+    const block = text.slice(text.indexOf('*ELASTIC'), text.indexOf('*DENSITY')).split('\n');
+    const rows = block
+      .slice(1)
+      .filter((line) => line !== '')
+      .map((line) => line.split(', ').map(Number));
+    expect(block[0]).toBe('*ELASTIC');
+    expect(rows[0]).toEqual([210000, 0.3, 20]);
+    expect(rows.at(-1)?.[2]).toBe(120);
+    expect(rows.at(-1)?.[0]).toBeCloseTo(210000 - (20000 * (393.15 - 293.15)) / (450 - 293.15), 3);
+    expect(rows.every((row) => row.length === 3)).toBe(true);
+    expect(text).toContain('E, nu tabulated against temperature (degC)');
+  });
+  it('keeps a constant *ELASTIC row for a temperature-independent E', () => {
+    const { doc, analysisId, mesh } = coupledFixture();
+    expect(textOf(writeInp(doc, analysisId, mesh))).toContain('*ELASTIC\n210000, 0.3\n');
+  });
+  it('refuses PROP_OUT_OF_RANGE when the BC temperature leaves the validity range of E(T)', () => {
+    const { doc, analysisId, mesh } = coupledFixture({ eTable: { ...eTable, validity: [250, 350] } });
+    const written = writeInp(doc, analysisId, mesh);
+    expect(written).toMatchObject({ code: 'PROP_OUT_OF_RANGE' });
   });
 });
 

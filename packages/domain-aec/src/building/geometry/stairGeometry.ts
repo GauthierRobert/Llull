@@ -2,6 +2,7 @@
 
 import type { StairElement } from '@core/model/building';
 import type { Vec2 } from '@core/model/types';
+import { polygonArea } from '@lib/polygon';
 
 /** Plan point `along` the run from the stair start and `across` it (left of travel positive). */
 export function stairPoint(stair: StairElement, along: number, across: number): Vec2 {
@@ -37,4 +38,35 @@ export function stairTreads(stair: StairElement): StairTread[] {
     zBottom: Math.max(0, (index + 0.5) * rise - verticalWaist),
     zTop: (index + 1) * rise,
   }));
+}
+
+/**
+ * Side profile (along the run, height above the stair base) of the whole flight as ONE solid: stepped top, and an underside that is the
+ * sloping waist slab. The waist line runs parallel to the pitch and passes `waistThickness` (perpendicular) below the step roots
+ * (z = along * rise / going); it is clipped by the base level.
+ * @returns counter-clockwise outline; empty when there is no tread
+ */
+export function stairProfile(stair: StairElement): Vec2[] {
+  const { riserHeight: rise, treadDepth: going, riserCount } = stair;
+  const treads = Math.max(riserCount - 1, 0);
+  if (treads === 0) return [];
+  const length = treads * going;
+  const verticalWaist = (waistOf(stair) * Math.hypot(rise, going)) / going;
+  const soffitAt = (along: number): number => (along * rise) / going - verticalWaist;
+  const clampAlong = Math.min(length, (verticalWaist * going) / rise);
+  const outline: Vec2[] = [[0, 0]];
+  if (clampAlong > 0) outline.push([clampAlong, 0]);
+  if (clampAlong < length) outline.push([length, soffitAt(length)]);
+  outline.push([length, treads * rise]);
+  for (let tread = treads - 1; tread >= 0; tread--) {
+    outline.push([tread * going, (tread + 1) * rise]);
+    if (tread > 0) outline.push([tread * going, tread * rise]);
+  }
+  return outline;
+}
+
+/** Concrete volume of the flight (document units³): profile area times width. */
+export function stairFlightVolume(stair: StairElement): number {
+  const outline = stairProfile(stair);
+  return polygonArea(outline) * stair.width;
 }

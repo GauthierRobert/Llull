@@ -35,7 +35,7 @@ import { curvedBandBetween } from '../geometry/curvedWallGeometry';
 import { gridBubbleCenters } from '../geometry/gridGeometry';
 import { doorSwing, openingsOf, pointAlong, wallExtent, wallFrame, wallPieces } from '../geometry/wallGeometry';
 import type { WallExtent } from '../geometry/wallExtent';
-import { stairPoint, stairTreads } from '../geometry/stairGeometry';
+import { stairProfile } from '../geometry/stairGeometry';
 
 export type EvaluationContext = { readonly doc: CadDocument; readonly building: BuildingModel };
 
@@ -162,17 +162,14 @@ export function evaluateBeam(beam: BeamElement, level: BuildingLevel): Entity[] 
 }
 
 export function evaluateStair(stair: StairElement, level: BuildingLevel): Entity[] {
+  const stub = { part: 'flight', label: `Stair ${stair.mark}` };
   const color = colorForMaterial(stair.material, '#b4b2aa');
-  return stairTreads(stair).map((tread, index) =>
-    orientedBox(
-      stair,
-      { part: `step-${index}`, label: `Stair ${stair.mark} step ${index + 1}` },
-      [...stairPoint(stair, (tread.alongStart + tread.alongEnd) / 2, 0), level.elevation + (tread.zBottom + tread.zTop) / 2],
-      stair.angle,
-      [stair.treadDepth, stair.width, tread.zTop - tread.zBottom],
-      color,
-    ),
-  );
+  const [cos, sin] = [Math.cos(stair.angle), Math.sin(stair.angle)];
+  const mesh = prismMesh(stairProfile(stair), [], ([along, height], side) => {
+    const across = side === 0 ? stair.width / 2 : -stair.width / 2;
+    return [stair.start[0] + cos * along - sin * across, stair.start[1] + sin * along + cos * across, level.elevation + height];
+  });
+  return mesh ? [meshEntity(stair, stub, mesh, color)] : [];
 }
 
 export function evaluateRoom(context: EvaluationContext, room: RoomElement, level: BuildingLevel): Entity[] {

@@ -18,6 +18,10 @@ export interface SimulationJoint {
   readonly axis: Vec3;
   readonly damping: number;
   readonly friction: number;
+  /** N·m/rad or N/m; 0 / absent = no spring. */
+  readonly stiffness?: number;
+  /** Joint coordinate (rad or m, from the start pose) where the spring is relaxed. */
+  readonly springReference?: number;
   readonly initialVelocity: number;
 }
 
@@ -124,6 +128,8 @@ export interface SimulationOptions {
   readonly sampleInterval: number;
   /** Record joint reactions and loop forces at every sample (costs one extra pass per sample). Default false. */
   readonly reactions?: boolean;
+  /** Record kinetic and potential energy at every sample. Default false. */
+  readonly energy?: boolean;
 }
 
 /** Unit quaternion [w, x, y, z]. */
@@ -159,6 +165,11 @@ export interface SimulationTrace {
    * engines that cannot). Sampling can miss a sharp peak; this resolves it.
    */
   readonly reactionPeaks?: Record<string, { force: StepPeak; moment: StepPeak | null }>;
+  /**
+   * Per sample, J (needs `options.energy`; omitted by engines that cannot): kinetic energy and potential energy (gravity + joint springs),
+   * the potential referenced to the start pose (zero at the first sample).
+   */
+  readonly energy?: { readonly kinetic: number[]; readonly potential: number[] };
   /** m: largest loop-constraint violation over every integration step (present when the model has loops). */
   readonly loopResidual?: number;
 }

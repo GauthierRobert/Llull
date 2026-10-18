@@ -26,6 +26,8 @@ export interface MjData {
   readonly subtree_com: Float64Array;
   /** Interaction force of each body with its parent after `mj_rnePostConstraint`: [torque(3), force(3)] about the root subtree COM. */
   readonly cfrc_int: Float64Array;
+  /** [potential, kinetic] J of the state evaluated by the last forward pass (needs the MJCF energy flag). Potential: gravity + joint springs. */
+  readonly energy: Float64Array;
   readonly nefc: number;
   readonly efc_type: Int32Array;
   readonly efc_id: Int32Array;

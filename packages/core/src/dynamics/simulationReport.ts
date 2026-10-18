@@ -10,6 +10,8 @@ import type { Quaternion, SimulationTrace } from './physicsEngine';
 import type { BodyMassDistribution } from './simulationModel';
 import { warnJams } from './jamDetection';
 import { findPeriod, tailMean, type Period } from './periodicity';
+import { energyOf, type EnergyData, type EnergySeries } from './energyReport';
+import { speedTrend, trendWarning } from './speedTrend';
 
 export type SimulationDetail = 'summary' | 'series' | 'poses';
 
@@ -76,6 +78,8 @@ export interface SimulationData {
   /** measuredRatio = driven / driver speed at the end; maxRatioError over all samples with motion. */
   readonly gears: Record<string, { ratio: number; measuredRatio: number | null; maxRatioError: number }>;
   readonly warnings: string[];
+  /** Energy balance in J, present when the run recorded energy (simulate_motion `energy: true`, or the model has a joint spring). */
+  readonly energy?: EnergyData;
   readonly series?: {
     readonly times: number[];
     readonly jointVelocity: Record<string, number[]>;
@@ -83,6 +87,8 @@ export interface SimulationData {
     readonly motorTorque: Record<string, number[]>;
     readonly propellerThrust: Record<string, number[]>;
     readonly propellerPower: Record<string, number[]>;
+    /** Per sample, J (with `energy`). */
+    readonly energy?: EnergySeries;
   };
   /** Body centre of mass (document units) and rotation from the start pose, per sample. */
   readonly poses?: { readonly times: number[]; readonly bodies: Record<string, { position: Vec3[]; orientation: Quaternion[] }> };
@@ -157,8 +163,7 @@ export function simulationData(
     ),
   );
   for (const [id, result] of Object.entries(joints))
-    if (!result.steady && !result.periodic && result.peakVelocity > 1e-6)
-      warnings.push(`joint '${id}' is still accelerating at the end: simulate longer for its steady speed`);
+    if (!result.steady && !result.periodic && result.peakVelocity > 1e-6) warnings.push(trendWarning(id, speedTrend(velocityOf(id))));
   const motorTorque = Object.fromEntries(
     Object.values(dynamics.motors).map((m) => [
       m.id,
@@ -256,6 +261,7 @@ export function simulationData(
       return [id, { ...(name !== undefined ? { name } : {}), massKg: props.mass, centerOfMass }];
     }),
   );
+  const balance = energyOf(dynamics, trace);
   const base = { engine: run.engine, duration: run.duration, timestep: run.timestep, samples: trace.times.length };
   const data: SimulationData = {
     ...base,
@@ -266,6 +272,7 @@ export function simulationData(
     propellers,
     gears,
     warnings,
+    ...(balance !== null ? { energy: balance.data } : {}),
   };
   if (run.detail === 'summary') return data;
   const series = {
@@ -275,6 +282,7 @@ export function simulationData(
     motorTorque,
     propellerThrust: Object.fromEntries(Object.entries(outputs).map(([id, o]) => [id, o.map((x) => x.thrust)])),
     propellerPower: Object.fromEntries(Object.entries(outputs).map(([id, o]) => [id, o.map((x) => x.power)])),
+    ...(balance !== null ? { energy: balance.series } : {}),
   };
   if (run.detail === 'series') return { ...data, series };
   const poses = {
@@ -330,6 +338,15 @@ export function simulationSummary(data: SimulationData): string {
     );
   for (const [id, gear] of Object.entries(data.gears))
     parts.push(`Gear ${id}: ratio ${formatNumber(gear.ratio, 4)} held within ${formatNumber(gear.maxRatioError * 100, 3)} %.`);
+  if (data.energy !== undefined) {
+    const e = data.energy;
+    const joules = (value: number): string => formatNumber(Math.abs(value) < 1e-9 ? 0 : value, 4);
+    parts.push(
+      `Energy: total ${joules(e.initialTotalJ)} -> ${joules(e.finalTotalJ)} J (end: kinetic ${joules(e.finalKineticJ)}, ` +
+        `potential ${joules(e.finalPotentialJ)} J relative to the start pose), dissipated by damping and friction ${joules(e.dissipatedJ)} J, ` +
+        `largest departure from the initial total ${formatNumber(e.maxDeviationFraction * 100, 3)} % of the peak energy.`,
+    );
+  }
   if (data.warnings.length > 0) parts.push(`Warnings: ${data.warnings.join('; ')}.`);
   return parts.join(' ');
 }

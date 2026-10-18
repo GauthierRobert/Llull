@@ -82,7 +82,7 @@ describe('takeoff math by hand', () => {
     expect(footingRebarMass(footing(80, 1000), scale)).toBeGreaterThanOrEqual(0);
     expect(footingRebarMass(footing(80, 80), scale)).toBe(0);
   });
-  it('sums a waist-slab stair: N-1 treads from the tread top down to the soffit at mid-tread', () => {
+  it('measures a waist-slab stair as one prism: stepped top over a sloping soffit, clipped at the base', () => {
     const volume = stairVolume({
       id: 'stair-1',
       category: 'stair',
@@ -99,8 +99,10 @@ describe('takeoff math by hand', () => {
       material: 'concrete',
     });
     const vertical = (100 * Math.hypot(150, 300)) / 300;
-    const heights = [150, 300 - (225 - vertical), 450 - (375 - vertical)];
-    expect(volume).toBeCloseTo(300 * 1000 * heights.reduce((a, b) => a + b, 0), 3);
+    const top = 300 * (150 + 300 + 450);
+    const clipAlong = (vertical * 300) / 150;
+    const underside = 0.5 * (900 - clipAlong) * ((900 * 150) / 300 - vertical);
+    expect(volume).toBeCloseTo((top - underside) * 1000, 3);
     expect(volume).toBeLessThan(0.4 * 300 * 1000 * 150 * 10);
   });
 });

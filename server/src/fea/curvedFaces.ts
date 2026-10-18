@@ -2,9 +2,12 @@
  * Curved-face detection on a triangle mesh: coplanar triangles are merged into planar regions; regions that meet at a shallow dihedral angle
  * (a polygonal approximation of a smooth surface) are linked, and a link-connected group of four or more regions is a curved face.
  * A box, a prism or a chamfer-free plate has none; a cylinder, sphere, cone, torus, fillet or sweep has.
+ * The construction recipe is the exact signal (`isCurvedPart`): a coarse polygonal cylinder (36 degrees per facet or more) is curved by its
+ * recipe even though no dihedral heuristic can tell it from a prism; the dihedral heuristic is the fallback for recipe-less meshes.
  */
 
-import type { MeshData } from '@core/model/types';
+import { recipeOf } from '@core/geometry/shapeRecipe';
+import type { Entity, MeshData, ShapeRecipe, SolidKind } from '@core/model/types';
 
 /** Dihedral angle (degrees) below which two adjacent triangles are one planar region. */
 const COPLANAR_DEGREES = 0.5;
@@ -12,6 +15,44 @@ const COPLANAR_DEGREES = 0.5;
 const SMOOTH_DEGREES = 35;
 /** Regions a smooth group needs to be a curved face (three links); a single chamfer joins only three. */
 const MIN_REGIONS = 4;
+
+/** Solid kinds whose surface is smooth by construction (a box, wedge, pyramid or plain extrusion is not; an extruded prism is ambiguous). */
+const CURVED_KINDS: ReadonlySet<SolidKind> = new Set<SolidKind>([
+  'cylinder',
+  'sphere',
+  'cone',
+  'torus',
+  'revolution',
+  'sweep',
+  'loft',
+  'subdivision',
+]);
+
+/** True when the recipe tree contains a smooth-by-construction solid, a fillet or a blend. */
+function recipeCurved(recipe: ShapeRecipe): boolean {
+  switch (recipe.op) {
+    case 'solid':
+      return CURVED_KINDS.has(recipe.entity.kind as SolidKind);
+    case 'boolean':
+      return recipeCurved(recipe.a) || recipeCurved(recipe.b);
+    case 'fillet':
+    case 'blend':
+      return true;
+    case 'chamfer':
+    case 'shell':
+    case 'place':
+    case 'scale':
+    case 'feature':
+      return recipeCurved(recipe.source);
+    default:
+      return false;
+  }
+}
+
+/** True when the part is curved: its construction recipe says so, else (a plain mesh, an extrusion, an import) the triangles do. */
+export function isCurvedPart(entity: Entity, mesh: MeshData): boolean {
+  return recipeCurved(recipeOf(entity)) || hasCurvedFaces(mesh);
+}
 
 type Vec = readonly [number, number, number];
 
@@ -41,7 +82,7 @@ class DisjointSet {
 }
 
 /** True when the triangle mesh has at least one curved (polygonally approximated) face. */
-export function hasCurvedFaces(mesh: MeshData): boolean {
+function hasCurvedFaces(mesh: MeshData): boolean {
   const triangles = Math.floor(mesh.indices.length / 3);
   if (triangles < MIN_REGIONS) return false;
   const lo = [Infinity, Infinity, Infinity];

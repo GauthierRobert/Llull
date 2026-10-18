@@ -11,7 +11,7 @@ import { bendGeometry, bottomOffset } from '../frames';
 import { withFoldedSolid } from '../fold';
 import { EPS, moveEdgeInward } from '../geometry2d';
 import { legFlat, childBends, flatOf, nextNodeId, parentBend, withModel, withNodes, withPart } from '../graph';
-import { refitBends } from '../flangeTrim';
+import { refitBends, trimWithCornerReliefs } from '../flangeTrim';
 import { pickEdge } from '../pick';
 import { bendEnd } from '../reliefGeometry';
 import { applyRelief, isReliefFailure, reliefData } from '../reliefOps';
@@ -119,7 +119,15 @@ export function applyFlange(doc: CadDocument, command: string, params: FlangePar
       'Use position material_outside on flanges (edge flanges of a flange).',
       { ids: [part.id, flat.id], paths: ['position'] },
     );
-  const outline = trim > 0 ? moveEdgeInward(flat.outline, hit.index, trim) : [...flat.outline];
+  const reliefTrim = trim > 0 ? trimWithCornerReliefs(part, flat, hit.index, trim) : null;
+  if (typeof reliefTrim === 'string')
+    return fail(
+      'FTR_PARAM_INVALID',
+      `position ${position} cannot trim ${flat.id} by ${fixed(trim)}: ${reliefTrim}`,
+      'Use a smaller flange setback, a smaller corner relief size, or position material_outside.',
+      { ids: [part.id, flat.id], paths: ['position'] },
+    );
+  const outline = reliefTrim !== null ? reliefTrim.outline : trim > 0 ? moveEdgeInward(flat.outline, hit.index, trim) : [...flat.outline];
   if (outline === null) {
     const neighbours = [(hit.index + flat.outline.length - 1) % flat.outline.length, (hit.index + 1) % flat.outline.length].map((i) => {
       const [from, to] = [flat.outline[i] as Vec2, flat.outline[(i + 1) % flat.outline.length] as Vec2];
@@ -132,7 +140,7 @@ export function applyFlange(doc: CadDocument, command: string, params: FlangePar
         ? `the picked edge of ${flat.id} cannot be moved inward by ${fixed(trim)}: a neighbouring outline edge is only ${fixed(Math.min(...neighbours))} long (a corner-relief notch or step at its end, not longer than the trim), so moving the edge would collapse it`
         : `the flat ${flat.id} is too small to trim by ${fixed(trim)}`,
       parallel
-        ? 'Add the material_inside flanges BEFORE add_corner_relief (a relief notch next to the edge blocks the trim), or use position material_outside.'
+        ? 'Reduce the corner-relief size, or use position material_outside.'
         : 'Enlarge the profile or use position material_outside.',
       { ids: [part.id, flat.id], paths: ['position'] },
     );
@@ -194,6 +202,7 @@ export function applyFlange(doc: CadDocument, command: string, params: FlangePar
   const bendId = nextNodeId(part, 'b');
   const nodes: SheetNode[] = [
     { ...flat, outline },
+    ...(reliefTrim?.nodes ?? []),
     ...refit.nodes,
     legFlat(flatId, width, leg, geometry.child),
     { id: bendId, type: 'bend', from: flat.id, to: flatId, lineInFrom: [p, qEnd], angle: signed, insideRadius: R },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { layoutViews, type LayoutItem } from '@core/commands/drawings/layout';
+import { layoutViews, type LayoutItem, type PlacedView } from '@core/commands/drawings/layout';
 import type { DrawingView } from '@core/model/sheet';
 import { fitPaperOrientation } from '@aec/shared/sheetFrame';
 import type { PlanSheet } from '@aec/building/drawings/sheet';
@@ -91,5 +91,55 @@ describe('export_plan_sheet orientation', () => {
     const fixed = execute(hall(30_000, 65_000), 'export_plan_sheet', { scale: 500 }).data as PlanSheet;
     expect(fixed).toMatchObject({ orientation: 'landscape', scale: 500 });
     expect(fixed.svg).toContain('width="420mm" height="297mm"');
+  });
+});
+
+describe('sheet layout: section beside its parent, floating isometric', () => {
+  const sectionOf = (parentViewId: string): DrawingView => ({ ...section, section: { offset: 0, parentViewId } });
+
+  it('puts a section to the right of its parent when there is no free grid slot', () => {
+    const items: LayoutItem[] = [
+      { view: projection('front'), size: [90, 100] },
+      { view: sectionOf('front'), size: [90, 100] },
+    ];
+    const { placed } = layoutViews(items, options);
+    const [front, extra] = [placed[0]!, placed[1]!];
+    expect(extra.center[1]).toBeCloseTo(front.center[1], 5);
+    expect(extra.center[0]).toBeGreaterThan(front.center[0] + front.width / 2);
+  });
+
+  it('keeps the section below when beside would overflow the paper', () => {
+    const items: LayoutItem[] = [
+      { view: projection('front'), size: [300, 100] },
+      { view: sectionOf('front'), size: [300, 100] },
+    ];
+    const { placed } = layoutViews(items, { ...options, scale: 1 });
+    expect(placed[1]!.center[1]).toBeGreaterThan(placed[0]!.center[1]);
+    expect(placed[1]!.center[0]).toBeCloseTo(placed[0]!.center[0], 5);
+  });
+
+  const tall: LayoutItem[] = [
+    { view: projection('front'), size: [90, 560] },
+    { view: projection('top'), size: [99, 99] },
+    { view: projection('iso'), size: [127, 495] },
+    { view: sectionOf('front'), size: [90, 560] },
+  ];
+
+  it('auto-scale lets the isometric view float beside the front row: 555 mm part on A3 gets 1:5, not 1:10', () => {
+    const layout = layoutViews(tall, options);
+    expect(layout.scale).toBe(5);
+    const [front, , iso, extra] = layout.placed as [PlacedView, PlacedView, PlacedView, PlacedView];
+    expect(iso.center[1]).toBeCloseTo(front.center[1], 0);
+    expect(extra.center[1]).toBeCloseTo(front.center[1], 5);
+    for (const view of layout.placed) {
+      expect(view.center[1] - view.height / 2).toBeGreaterThanOrEqual(options.area.y);
+      expect(view.center[1] + view.height / 2).toBeLessThanOrEqual(options.area.y + options.area.height);
+    }
+    expect(layoutViews(tall, { ...options, scale: 2.5 }).scale).toBe(2.5);
+  });
+
+  it('a fixed scale that only fits with the floating isometric view uses it', () => {
+    const { placed } = layoutViews(tall, { ...options, scale: 5 });
+    for (const view of placed) expect(view.center[1] + view.height / 2).toBeLessThanOrEqual(options.area.y + options.area.height);
   });
 });

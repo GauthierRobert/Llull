@@ -9,7 +9,7 @@ import type { SimulationData } from '../../dynamics/simulationReport';
 import type { ReactionsData } from '../../dynamics/reactions';
 import { simulateMotion } from './simulate';
 
-const QUANTITIES = ['joint_angle', 'joint_velocity', 'motor_torque', 'motor_power', 'reaction_force'] as const;
+const QUANTITIES = ['joint_angle', 'joint_velocity', 'motor_torque', 'motor_power', 'reaction_force', 'energy'] as const;
 type Quantity = (typeof QUANTITIES)[number];
 
 /** Points a plot asks for when sampleRate is not given. */
@@ -79,6 +79,16 @@ function panelsOf(quantity: Quantity, data: RunData, wanted: ReadonlySet<string>
             return { label: id, values: values.map((torque, i) => (torque * (speed[i] ?? 0)) / 1000) };
           }),
       );
+    case 'energy': {
+      const energy = series.energy;
+      if (energy === undefined) return [];
+      return make('Mechanical energy', 'J', [
+        { label: 'kinetic', values: energy.kinetic },
+        { label: 'potential', values: energy.potential },
+        { label: 'total', values: energy.total },
+        { label: 'dissipated', values: energy.dissipated },
+      ]);
+    }
     case 'reaction_force': {
       const shown = data.reactions?.series;
       if (shown === undefined) return [];
@@ -108,7 +118,8 @@ export const plotSimulation = defineCommand({
     'unit, grid, legend), data.width, data.panels (per series: min, max, final value, in the panel unit) and a one-line summary. ' +
     '`quantities` picks the panels: "joint_angle" (deg for revolute joints, mm for prismatic ones, from the start pose), ' +
     '"joint_velocity" (rpm / m/s), "motor_torque" (N·m), "motor_power" (kW), "reaction_force" (magnitude per tree joint and loop, N; ' +
-    'runs the reaction pass, slower). `joints` restricts the series to those joint (or motor) ids. Default: joint_velocity of every ' +
+    'runs the reaction pass, slower), "energy" (J: kinetic, potential = gravity + joint springs relative to the start pose, total, and ' +
+    'cumulative energy dissipated by damping / friction: a flat total = conservation, a falling one = decay). `joints` restricts the series to those joint (or motor) ids. Default: joint_velocity of every ' +
     'joint. Closed loops and cylinders use the same timestep rules as simulate_motion. With the CLI, `llull plot_simulation … --save plot.png` ' +
     'rasterizes data.svg. Read-only; needs the physics engine like simulate_motion.',
   params: z.object({
@@ -116,7 +127,9 @@ export const plotSimulation = defineCommand({
       .array(z.enum(QUANTITIES))
       .min(1)
       .optional()
-      .describe('Panels to draw: joint_angle, joint_velocity, motor_torque, motor_power, reaction_force. Default ["joint_velocity"].'),
+      .describe(
+        'Panels to draw: joint_angle, joint_velocity, motor_torque, motor_power, reaction_force, energy. Default ["joint_velocity"].',
+      ),
     joints: z
       .array(z.string())
       .optional()
@@ -147,6 +160,7 @@ export const plotSimulation = defineCommand({
         sampleRate,
         detail: 'series',
         reactions: quantities.includes('reaction_force') ? 'series' : 'off',
+        ...(quantities.includes('energy') ? { energy: true } : {}),
         ...(params.timestep !== undefined ? { timestep: params.timestep } : {}),
       },
       ctx,

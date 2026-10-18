@@ -83,6 +83,35 @@ describe('check_assembly pairs (VC-FPR-01…04)', () => {
     expect(codes(s.check())).not.toContain('FPR_PAIR_CLEARANCE');
   });
 
+  it('ring with a 20 mm radial gap to a pin whose bounds overlap is no touch (minGap saturation)', () => {
+    const s = scene();
+    s.run('revolve_profile', {
+      profile: [
+        [30, 0],
+        [40, 0],
+        [40, 50],
+        [30, 50],
+      ],
+    });
+    s.run('add_cylinder', { radius: 10, height: 50, position: [0, 0, 25] });
+    const data = s.check();
+    expect(codes(data)).not.toContain('FPR_PAIR_TOUCH');
+    const warned = itemOf(s.check({ clearanceMm: 25 }), 'FPR_PAIR_CLEARANCE');
+    expect(warned.values['minDistanceMm']).toBeCloseTo(20, 0);
+  });
+
+  it('a gap of 6.5 mm between bounds-overlapping parts is not a touch and a 0.0005 mm gap still is', () => {
+    const s = scene();
+    s.run('add_box', cube([0, 0, 0], 20));
+    s.run('add_box', cube([26.5, 0, 0], 20));
+    expect(codes(s.check())).not.toContain('FPR_PAIR_TOUCH');
+    expect(itemOf(s.check({ clearanceMm: 10 }), 'FPR_PAIR_CLEARANCE').values['minDistanceMm']).toBeCloseTo(6.5, 6);
+    const t = scene();
+    t.run('add_box', cube([0, 0, 0], 20));
+    t.run('add_box', cube([20.0005, 0, 0], 20));
+    expect(codes(t.check())).toContain('FPR_PAIR_TOUCH');
+  });
+
   it('VC-04: a 10 mm cube centred in a 30 mm cube is containment, 1000 mm3', () => {
     const s = scene();
     s.run('add_box', cube([0, 0, 0], 30));

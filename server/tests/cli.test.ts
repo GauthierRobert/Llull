@@ -226,6 +226,31 @@ describe('llull CLI — local document', () => {
     expect(report.consumedAliases).toEqual(['body', 'hole']);
   });
 
+  it('reports the element id of a building element alias, so it can be passed to follow-up commands', async () => {
+    const plan = [
+      { command: 'add_level', params: { name: 'L0' } },
+      { command: 'add_level', params: { name: 'L1' } },
+      {
+        command: 'add_slab',
+        params: {
+          boundary: [
+            [0, 0],
+            [8000, 0],
+            [8000, 6000],
+            [0, 6000],
+          ],
+          levelId: 'level-2',
+        },
+        as: 'floor',
+      },
+      { command: 'add_stair', params: { start: [1000, 1000], levelId: 'level-1' }, as: 'stair' },
+      { command: 'add_slab_opening', params: { slabId: '$floor', stairId: '$stair' } },
+    ];
+    const text = capture({ stdin: JSON.stringify(plan) });
+    expect(await runCli(['run', '-', ...docFlag()], text.io)).toBe(EXIT_OK);
+    expect(text.out[0]).toContain('Aliases: floor=slab-1+slab-1:body, stair=stair-1+stair-1:flight');
+  });
+
   it('reports loop aliases and per-step refusal codes in --json', async () => {
     const plan = [
       { repeat: { count: 2 }, actions: [{ command: 'add_sphere', params: { radius: 1 }, as: 'ball{i}' }] },

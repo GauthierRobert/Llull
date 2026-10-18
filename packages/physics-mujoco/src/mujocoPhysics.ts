@@ -82,6 +82,7 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
       bodyOrientation: Object.fromEntries(bodies.map((body) => [body.id, []])),
       servoForce: Object.fromEntries(model.servos.map((servo) => [servo.id, []])),
     };
+    const energy = { kinetic: [] as number[], potential: [] as number[] };
     const initialPosition = new Map(joints.map((joint) => [joint.id, data.qpos[joint.qpos] ?? 0]));
     model.servos.forEach((servo, i) => {
       data.ctrl[i] = servo.targetVelocity;
@@ -134,6 +135,11 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
         trace.jointVelocity[joint.id]?.push(data.qvel[joint.dof] ?? 0);
       }
       model.servos.forEach((servo, i) => trace.servoForce[servo.id]?.push(data.actuator_force[i] ?? 0));
+      if (options.energy === true) {
+        mujoco.mj_forward(mjModel, data); // energy of the sampled state (mj_step leaves the value of its last stage)
+        energy.potential.push(data.energy[0] ?? 0);
+        energy.kinetic.push(data.energy[1] ?? 0);
+      }
       for (const { id, index } of bodies) {
         const xpos = data.xpos;
         trace.bodyPosition[id]?.push([xpos[3 * index] ?? 0, xpos[3 * index + 1] ?? 0, xpos[3 * index + 2] ?? 0]);
@@ -160,8 +166,12 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
         if (sampled) record(read);
       } else if (sampled) record();
     }
+    const potentialStart = energy.potential[0] ?? 0;
     return {
       ...trace,
+      ...(options.energy === true
+        ? { energy: { kinetic: energy.kinetic, potential: energy.potential.map((p) => p - potentialStart) } }
+        : {}),
       ...(wantReactions ? { jointReaction: reaction, reactionPeaks: peaks, ...(slots.length > 0 ? { loopForce } : {}) } : {}),
       ...(slots.length > 0 ? { loopResidual: residual } : {}),
     };

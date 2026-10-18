@@ -234,7 +234,8 @@ export const addGridBeams = defineCommand({
     withSetup(doc, 'add_grid_beams', params, (prepared, tool) => {
       const { building, lines, tolerance } = prepared;
       const section = findProfile(params.profile);
-      const topFromFfl = (params.topOffset ?? 0) + (params.reference === 'levelTop' ? prepared.height : 0);
+      const reference = params.reference ?? 'ffl';
+      const topFromFfl = (params.topOffset ?? 0) + (reference === 'levelTop' ? prepared.height : 0);
       const z = topFromFfl - fromMm(doc, section?.h ?? 0) / 2;
       const existing = elementsOf(building, 'member').filter((member) => member.role === 'beam' && member.levelId === prepared.levelId);
       const at = (p: Vec3, q: Vec2): boolean => samePlanPoint([p[0], p[1]], q, tolerance);
@@ -290,7 +291,9 @@ export const addGridBeams = defineCommand({
         skipped,
         () =>
           `Added ${specs.length} beams ${profileText(params.profile)} along ${targets.length} grid line(s) on level "${prepared.levelName}", ` +
-          `top of steel ${lengthText(doc, topFromFfl)} from FFL, total length ${lengthText(doc, length)}, ${kg.toFixed(0)} kg; skipped ${skipped} existing.`,
+          `top of steel ${lengthText(doc, topFromFfl)} from FFL = elevation ${lengthText(doc, prepared.elevation + topFromFfl)} ` +
+          `(reference ${reference}${params.reference === undefined ? ' (default)' : ''} + topOffset ${lengthText(doc, params.topOffset ?? 0)}; ` +
+          `FFL ${lengthText(doc, prepared.elevation)}, level top ${lengthText(doc, prepared.elevation + prepared.height)}), total length ${lengthText(doc, length)}, ${kg.toFixed(0)} kg; skipped ${skipped} existing.`,
       );
     }),
 });

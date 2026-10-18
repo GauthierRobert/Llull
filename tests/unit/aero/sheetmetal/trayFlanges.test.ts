@@ -84,19 +84,60 @@ describe('four material_inside flanges (tray dimensioned by its outside)', () =>
 });
 
 describe('corner relief before material_inside flanges', () => {
-  it('names the real cause (parallel notch edge) and the remedy', () => {
+  const CORNERS: Array<[number, number, number]> = [
+    [0, 0, 0],
+    [200, 0, 0],
+    [200, 150, 0],
+    [0, 150, 0],
+  ];
+  const SIZE = RULE.insideRadius + RULE.thickness;
+
+  function relievedTray(): { doc: CadDocument; part: string; before: CadDocument } {
     const { doc: plain, part } = base();
-    const doc = apply(plain, 'add_corner_relief', { id: part, corner: { near: [0, 0, 0] } });
+    const relieved = CORNERS.reduce((next, near) => apply(next, 'add_corner_relief', { id: part, corner: { near } }), plain);
+    return { doc: FLANGE_EDGES.reduce((next, near) => flange(next, part, near), relieved), part, before: relieved };
+  }
+
+  it('accepts all four flanges and folds to the outside dimensions', () => {
+    const { doc, part } = relievedTray();
+    const { min, max } = meshBounds(doc, part);
+    expect([max[0] - min[0], max[1] - min[1], max[2] - min[2]]).toEqual([
+      expect.closeTo(200, 6),
+      expect.closeTo(150, 6),
+      expect.closeTo(50, 6),
+    ]);
+  });
+
+  it('keeps the four notches in the flat pattern with the same extents as the unrelieved tray', () => {
+    const { doc, part } = relievedTray();
+    const flat = data<FlatData & { outline?: unknown[] }>(doc, 'flat_pattern', { id: part });
+    const plain = data<FlatData>(tray().doc, 'flat_pattern', { id: part });
+    expect(flat.bends).toHaveLength(4);
+    expect(flat.extents[0]).toBeCloseTo(plain.extents[0], 6);
+    expect(flat.extents[1]).toBeCloseTo(plain.extents[1], 6);
+    const model = (doc.sheetMetal?.parts ?? {})[part];
+    const nodes = Object.values(model?.nodes ?? {});
+    const root = nodes.find((node) => node.type === 'flat');
+    expect(root?.type === 'flat' ? root.outline : []).toHaveLength(4 * 3);
+    const reliefs = nodes.filter((node) => node.type === 'corner_relief');
+    expect(reliefs).toHaveLength(4);
+    for (const node of reliefs) expect(node.type === 'corner_relief' && node.size).toBeCloseTo(SIZE, 9);
+  });
+
+  it('is pure and refuses a relief too large to survive the trim with a specific message', () => {
+    const { doc: plain, part } = base();
+    const doc = apply(plain, 'add_corner_relief', { id: part, corner: { near: [0, 0, 0] }, size: 140 });
+    const snapshot = JSON.stringify(doc);
+    const first = flange(doc, part, [170, 0, 0]);
     const result = expectRefusal(
-      doc,
+      first,
       'add_flange',
-      { id: part, edge: { near: [100, 0, 0] }, angle: 90, length: 50, lengthReference: 'outside_mold_line', position: 'material_inside' },
+      { id: part, edge: { near: [170, 150, 0] }, angle: 90, length: 50, lengthReference: 'outside_mold_line', position: 'material_inside' },
       'FTR_PARAM_INVALID',
       'position',
     );
-    expect(result.summary).not.toContain('too small');
-    expect(result.summary).toContain('corner-relief notch');
-    expect(result.error?.remediation).toContain('BEFORE add_corner_relief');
+    expect(result.summary).toContain('no longer fits');
+    expect(JSON.stringify(doc)).toBe(snapshot);
   });
 });
 

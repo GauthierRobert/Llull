@@ -42,7 +42,8 @@ describe('quantity_takeoff', () => {
     expect(line(lines, 'window.glass.ea').quantity).toBe(2);
     expect(line(lines, 'slab-floor.concrete.m2').quantity).toBeCloseTo(80);
     expect(line(lines, 'column.concrete.m3').quantity).toBeCloseTo(0.27);
-    expect(line(lines, 'beam.concrete.m3').quantity).toBeCloseTo(1.5);
+    // 10 m × 0.3 × 0.5 gross, minus the 0.3 × 0.3 × 0.5 joint with the column
+    expect(line(lines, 'beam.concrete.m3').quantity).toBeCloseTo(1.455);
     expect(line(lines, 'stair.concrete.ea').quantity).toBe(1);
     expect(line(lines, 'room.floor.m2').quantity).toBeCloseTo(9.7 * 7.7);
     expect(result.summary).toMatch(/Walls, concrete: 30\.969 m³/);

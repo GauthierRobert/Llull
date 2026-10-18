@@ -102,49 +102,78 @@ interface Arranged {
   readonly centers: Map<Sized, Vec2>;
 }
 
+interface Cell {
+  readonly sized: Sized;
+  readonly col: number;
+  readonly row: number;
+}
+
+interface ArrangeOptions {
+  readonly angle: ProjectionAngle;
+  /** Paper space available: a view is only placed beside its parent (new column) when the result still fits. */
+  readonly limit?: { readonly width: number; readonly height: number };
+  /** The isometric view is placed like a section (any free slot, else beside the front row) instead of owning a grid cell. */
+  readonly floatingIso?: boolean;
+}
+
 const sum = (values: ReadonlyArray<number>): number => values.reduce((total, value) => total + value + GAP, -GAP);
 
-function arrange(auto: ReadonlyArray<Sized>, angle: ProjectionAngle): Arranged {
+/** Sorted distinct column / row indexes of `cells` and the size (max box) of each. */
+function measure(cells: ReadonlyArray<Cell>): { cols: number[]; rows: number[]; colWidths: number[]; rowHeights: number[] } {
+  const cols = [...new Set(cells.map((cell) => cell.col))].sort((a, b) => a - b);
+  const rows = [...new Set(cells.map((cell) => cell.row))].sort((a, b) => a - b);
+  const colWidths = cols.map((col) => Math.max(...cells.filter((cell) => cell.col === col).map((cell) => cell.sized.boxWidth)));
+  const rowHeights = rows.map((row) => Math.max(...cells.filter((cell) => cell.row === row).map((cell) => cell.sized.boxHeight)));
+  return { cols, rows, colWidths, rowHeights };
+}
+
+const fitsLimit = (cells: ReadonlyArray<Cell>, limit: ArrangeOptions['limit']): boolean => {
+  if (!limit) return true;
+  const { colWidths, rowHeights } = measure(cells);
+  return sum(colWidths) <= limit.width && sum(rowHeights) <= limit.height;
+};
+
+function arrange(auto: ReadonlyArray<Sized>, { angle, limit, floatingIso = false }: ArrangeOptions): Arranged {
   const grid = new Map<string, Sized>();
   const extras: Sized[] = [];
   for (const sized of auto) {
-    const direction = sized.item.view.kind === 'projection' ? sized.item.view.direction : undefined;
+    const { view } = sized.item;
+    const direction = view.kind === 'projection' && !(floatingIso && view.direction === 'iso') ? view.direction : undefined;
     const key = direction === undefined ? undefined : cellOf(direction, angle).join(',');
     if (key === undefined || grid.has(key)) extras.push(sized);
     else grid.set(key, sized);
   }
-  const cells = [...grid.entries()].map(([key, sized]) => ({ sized, col: Number(key.split(',')[0]), row: Number(key.split(',')[1]) }));
+  const cells: Cell[] = [...grid.entries()].map(([key, sized]) => ({
+    sized,
+    col: Number(key.split(',')[0]),
+    row: Number(key.split(',')[1]),
+  }));
   const gridKeys = new Set(grid.keys());
-  const cols = [...new Set(cells.map((cell) => cell.col))].sort((a, b) => a - b);
-  const rows = [...new Set(cells.map((cell) => cell.row))].sort((a, b) => a - b);
-  const sizeOf = (
-    indexes: number[],
-    pick: (cell: (typeof cells)[number]) => number,
-    of: (cell: (typeof cells)[number]) => number,
-  ): number[] => indexes.map((index) => Math.max(...cells.filter((cell) => of(cell) === index).map(pick)));
-  const colWidths = sizeOf(
-    cols,
-    (cell) => cell.sized.boxWidth,
-    (cell) => cell.col,
-  );
-  const rowHeights = sizeOf(
-    rows,
-    (cell) => cell.sized.boxHeight,
-    (cell) => cell.row,
-  );
-  const free = cols
-    .flatMap((col, c) => rows.map((row, r) => ({ col, row, c, r })))
+  const initial = measure(cells);
+  const free = initial.cols
+    .flatMap((col, c) => initial.rows.map((row, r) => ({ col, row, c, r })))
     .filter((slot) => !gridKeys.has(`${slot.col},${slot.row}`))
     .sort((a, b) => Math.abs(a.col) + Math.abs(a.row) - Math.abs(b.col) - Math.abs(b.row) || a.row - b.row || a.col - b.col);
-  for (const sized of extras.filter((extra) => extra.item.view.kind !== 'projection')) {
+  const placeable = (extra: Sized): boolean =>
+    extra.item.view.kind !== 'projection' || (floatingIso && extra.item.view.direction === 'iso');
+  for (const sized of extras.filter(placeable)) {
     const index = free.findIndex(
-      (slot) => sized.boxWidth <= (colWidths[slot.c] as number) && sized.boxHeight <= (rowHeights[slot.r] as number),
+      (slot) => sized.boxWidth <= (initial.colWidths[slot.c] as number) && sized.boxHeight <= (initial.rowHeights[slot.r] as number),
     );
-    if (index < 0) continue;
-    const [slot] = free.splice(index, 1);
-    cells.push({ sized, col: (slot as { col: number }).col, row: (slot as { row: number }).row });
+    if (index >= 0) {
+      const [slot] = free.splice(index, 1);
+      cells.push({ sized, col: (slot as { col: number }).col, row: (slot as { row: number }).row });
+      extras.splice(extras.indexOf(sized), 1);
+      continue;
+    }
+    const parentId = sized.item.view.section?.parentViewId ?? sized.item.view.detail?.parentViewId;
+    const parentRow = cells.find((cell) => cell.sized.item.view.id === parentId)?.row ?? 0;
+    const beside: Cell = { sized, col: Math.max(-1, ...cells.map((cell) => cell.col)) + 1, row: cells.length > 0 ? parentRow : 0 };
+    if (cells.length === 0 || !fitsLimit([...cells, beside], limit)) continue;
+    cells.push(beside);
     extras.splice(extras.indexOf(sized), 1);
   }
+  const { cols, rows, colWidths, rowHeights } = measure(cells);
   const gridWidth = cells.length > 0 ? sum(colWidths) : 0;
   const gridHeight = cells.length > 0 ? sum(rowHeights) : 0;
   const extrasWidth = extras.length > 0 ? sum(extras.map((sized) => sized.boxWidth)) : 0;
@@ -176,12 +205,33 @@ const sizeViews = (items: ReadonlyArray<LayoutItem>, scale: number, { mmPerUnit,
 
 const isAuto = (item: LayoutItem): boolean => item.view.position === undefined;
 
-/** Largest standard scale at which every auto-placed view fits `area`. */
-function fitDenominator(items: ReadonlyArray<LayoutItem>, options: LayoutOptions): number {
+interface Fit {
+  readonly denominator: number;
+  readonly floatingIso: boolean;
+}
+
+const arrangeOptions = (options: LayoutOptions, floatingIso: boolean): ArrangeOptions => ({
+  angle: options.angle,
+  limit: { width: options.area.width, height: options.area.height },
+  floatingIso,
+});
+
+/** A given scale: the isometric view floats only when the grid overflows and floating fits. */
+function fixedFit(items: ReadonlyArray<LayoutItem>, scale: number, options: LayoutOptions): Fit {
   const auto = items.filter(isAuto);
-  if (auto.length === 0) return 1;
-  const fits = (candidate: number): { ok: boolean; ratio: number } => {
-    const { width, height } = arrange(sizeViews(auto, candidate, options), options.angle);
+  const overflows = (floatingIso: boolean): boolean => {
+    const { width, height } = arrange(sizeViews(auto, scale, options), arrangeOptions(options, floatingIso));
+    return width > options.area.width || height > options.area.height;
+  };
+  return { denominator: scale, floatingIso: auto.length > 0 && overflows(false) && !overflows(true) };
+}
+
+/** Largest standard scale at which every auto-placed view fits `area`; the isometric view may float to make a larger scale fit. */
+function fitDenominator(items: ReadonlyArray<LayoutItem>, options: LayoutOptions): Fit {
+  const auto = items.filter(isAuto);
+  if (auto.length === 0) return { denominator: 1, floatingIso: false };
+  const fits = (candidate: number, floatingIso: boolean): { ok: boolean; ratio: number } => {
+    const { width, height } = arrange(sizeViews(auto, candidate, options), arrangeOptions(options, floatingIso));
     return {
       ok: width <= options.area.width && height <= options.area.height,
       ratio: Math.max(width / options.area.width, height / options.area.height),
@@ -189,22 +239,24 @@ function fitDenominator(items: ReadonlyArray<LayoutItem>, options: LayoutOptions
   };
   let last = 1;
   for (const candidate of STANDARD_SCALES) {
-    const { ok, ratio } = fits(candidate);
-    if (ok) return candidate;
+    const { ok, ratio } = fits(candidate, false);
+    if (ok) return { denominator: candidate, floatingIso: false };
+    if (fits(candidate, true).ok) return { denominator: candidate, floatingIso: true };
     last = candidate * ratio;
   }
   let candidate = niceStep(last);
-  for (let attempt = 0; attempt < 60 && !fits(candidate).ok; attempt++) candidate = niceStep(candidate * 1.01);
-  return candidate;
+  for (let attempt = 0; attempt < 60 && !fits(candidate, false).ok; attempt++) candidate = niceStep(candidate * 1.01);
+  return { denominator: candidate, floatingIso: false };
 }
 
 /** Places `items` on the paper `area` (centred); views with a `position` keep it. @pure */
 export function layoutViews(items: ReadonlyArray<LayoutItem>, options: LayoutOptions): Layout {
-  const scale = options.scale ?? fitDenominator(items, options);
+  const fit = options.scale === undefined ? fitDenominator(items, options) : fixedFit(items, options.scale, options);
+  const scale = fit.denominator;
   const sized = sizeViews(items, scale, options);
   const { width, height, centers } = arrange(
     sized.filter((entry) => isAuto(entry.item)),
-    options.angle,
+    arrangeOptions(options, fit.floatingIso),
   );
   const [x0, y0] = [options.area.x + (options.area.width - width) / 2, options.area.y + (options.area.height - height) / 2];
   const placed = sized.map((entry): PlacedView => {

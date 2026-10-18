@@ -30,9 +30,12 @@ const jointProblem: Check = (joint) =>
         ? 'anchor, axis and anchorOnChild must be [x, y, z] finite numbers'
         : !isNonNegative(joint['damping']) || !isNonNegative(joint['friction']) || !isFiniteNumber(joint['initialVelocity'])
           ? 'damping, friction must be >= 0 and initialVelocity finite'
-          : joint['kind'] === 'spherical' && (joint['damping'] !== 0 || joint['friction'] !== 0 || joint['initialVelocity'] !== 0)
-            ? 'a spherical joint has damping = friction = initialVelocity = 0'
-            : null;
+          : !isOptional(joint['stiffness'], isNonNegative) || !isOptional(joint['springReference'], isFiniteNumber)
+            ? 'stiffness must be >= 0 and springReference finite'
+            : joint['kind'] === 'spherical' &&
+                (joint['damping'] !== 0 || joint['friction'] !== 0 || joint['initialVelocity'] !== 0 || joint['stiffness'] !== undefined)
+              ? 'a spherical joint has damping = friction = initialVelocity = 0 and no spring'
+              : null;
 
 const gearProblem: Check = (gear) =>
   typeof gear['driver'] !== 'string' || typeof gear['driven'] !== 'string'

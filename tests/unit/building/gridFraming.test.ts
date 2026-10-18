@@ -309,6 +309,24 @@ describe('beam elevation reference (add_beam vs add_grid_beams)', () => {
     doc = step(doc, 'add_grid_beams', { profile: 'IPE400', levelId: 'level-1', axes: ['A'] });
     expect(absoluteTops(doc)).toEqual(expect.arrayContaining([3000, 0]));
   });
+  it('states the resolved top elevation and the reference (marking defaults) in both summaries', () => {
+    const doc = gridded();
+    const beam = execute(doc, 'add_beam', { start: [0, 0], end: [5000, 0], levelId: 'level-1', topOffset: -100 });
+    expect(beam.summary).toContain('top at elevation 2900.000');
+    expect(beam.summary).toContain('reference levelTop (default)');
+    const grid = execute(doc, 'add_grid_beams', {
+      profile: 'IPE400',
+      levelId: 'level-1',
+      axes: ['A'],
+      topOffset: -100,
+      reference: 'levelTop',
+    });
+    expect(grid.summary).toContain('elevation 2900');
+    expect(grid.summary).toContain('reference levelTop + topOffset');
+    expect(grid.summary).not.toContain('(default)');
+    const byDefault = execute(doc, 'add_grid_beams', { profile: 'IPE400', levelId: 'level-1', axes: ['A'] });
+    expect(byDefault.summary).toContain('reference ffl (default)');
+  });
   it('add_grid_beams duplicate detection honours the reference', () => {
     let doc = gridded();
     doc = step(doc, 'add_grid_beams', { profile: 'IPE400', levelId: 'level-1', axes: ['A'], topOffset: -100, reference: 'levelTop' });

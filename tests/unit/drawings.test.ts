@@ -15,6 +15,7 @@ interface Exported {
   paper: string;
   scale: number;
   fits: boolean;
+  warnings: string[];
   views: Array<{ id: string; label: string; kind: string; scale: number; scaleText: string; bounds: number[] }>;
   skipped: Array<{ id: string; reason: string }>;
 }
@@ -113,6 +114,10 @@ describe('export_sheet_svg (acceptance)', () => {
     expect(exportSheet(fixed, sheetId).scale).toBe(1000);
     const huge = exportSheet(run(doc, 'update_sheet', { sheetId, scale: 0.1 }), sheetId);
     expect(huge.fits).toBe(false);
+    expect(huge.warnings).toHaveLength(1);
+    expect(huge.warnings[0]).toMatch(
+      /overflow the drawing area at 10:1 — .*FRONT.* mm past the (left|top|right|bottom) edge.*use scale 1:/,
+    );
     expect(execute(run(doc, 'update_sheet', { sheetId, scale: 0.1 }), 'export_sheet_svg', { sheetId }).summary).toContain('WARNING');
   });
 

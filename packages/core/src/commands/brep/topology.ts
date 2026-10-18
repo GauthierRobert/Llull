@@ -109,11 +109,21 @@ function stepTargets(doc: CadDocument, entityIds: readonly string[] | undefined)
   const ids = entityIds !== undefined && entityIds.length > 0 ? entityIds : doc.order;
   const solids: Entity[] = [];
   const skipped: string[] = [];
+  const baseOf = (instance: InstanceEntity): string => instance.name ?? doc.components[instance.componentId]?.name ?? 'instance';
+  const bases = ids.flatMap((id) => {
+    const entity = doc.entities[id];
+    return entity?.kind === 'instance' ? [baseOf(entity)] : [];
+  });
+  const seen = new Map<string, number>();
   for (const id of ids) {
     const entity = doc.entities[id];
     if (entity === undefined) skipped.push(`${id} (not found)`);
     else if (entity.kind === 'instance') {
-      const parts = instanceSolids(doc, entity, entity.name ?? doc.components[entity.componentId]?.name ?? 'instance', 0);
+      const base = baseOf(entity);
+      const ordinal = (seen.get(base) ?? 0) + 1;
+      seen.set(base, ordinal);
+      const label = bases.filter((candidate) => candidate === base).length > 1 ? `${base} ${ordinal}` : base;
+      const parts = instanceSolids(doc, entity, label, 0);
       if (parts.length === 0) skipped.push(`${id} (instance without solids)`);
       solids.push(...parts);
     } else if (is3D(entity)) solids.push(entity);
@@ -140,7 +150,7 @@ export const exportStepExact = defineCommand({
     'Each solid becomes one STEP product named after its entity (set_entity_name, else the id; the group ' +
     'name goes in the product description) and carries its entity color as a surface style. ' +
     'Returns data: { format, step (the file text), solidCount, entityIds, skipped }. Component instances (assembly parts, ' +
-    'fasteners) are exported as their solids in world space, named <instance>/<part>. Does not modify the document.',
+    'fasteners) are exported as their solids in world space, named <instance>/<part> (instances sharing a name get a numeric suffix (Name 1, Name 2) so every product name is unique). Does not modify the document.',
   params: z.object({
     entityIds: z
       .array(z.string())

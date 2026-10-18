@@ -125,6 +125,17 @@ describe('export_step_exact instance labels', () => {
     expect(step).not.toContain('expanded::');
     expect(step).not.toContain('instance-');
   });
+
+  it('gives instances of one component distinct product names', () => {
+    const box = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
+    let doc = execute(box.document, 'create_component', { name: 'Tie rod M10', entityIds: box.affected }).document;
+    const componentId = Object.keys(doc.components)[0]!;
+    doc = execute(doc, 'insert_instance', { componentId, position: [5, 0, 0] }).document;
+    const ctx = { ...defaultContext(), kernel: fakeKernel({ step: KERNEL_STEP }) };
+    const step = (execute(doc, 'export_step_exact', {}, ctx).data as { step: string }).step;
+    expect(step).toContain("PRODUCT('Tie rod M10 1/Tie rod M10',");
+    expect(step).toContain("PRODUCT('Tie rod M10 2/Tie rod M10',");
+  });
 });
 
 describe('withMonotonicStepCounter', () => {

@@ -23,6 +23,7 @@ const DEFAULT_FRAMES = 4;
 const MAX_COLUMNS = 4;
 const TRACE_COLORS = ['#ffd24a', '#4ad8ff', '#ff6fa8', '#8dff6f'] as const;
 const LABEL_HEIGHT = 22;
+const CELL_CLIP = 'motion-cell';
 
 const formatTime = (time: number): string => `t = ${+time.toFixed(3)} s`;
 const round = (value: number): number => Math.round(value * 1e6) / 1e6;
@@ -55,7 +56,7 @@ function posesAt(poses: PosesData, index: number): Record<string, BodyPoseAt> {
 
 /**
  * @affects nothing — read-only; returns data { svg, width, height, view, duration, samples, frames[{ time, bodies{ id: { position, rotationDeg } } }], trace? }
- * @invariant the input document is never changed: frames render a copy whose rigid-body member entities are moved to the simulated pose
+ * @invariant frames are clipped to their cell (empty grid cells stay blank); the input document is never changed: frames render a copy whose rigid-body member entities are moved to the simulated pose
  * @failure no physics engine, no rigid bodies, simulation refused or failed, times outside 0..duration, unknown trace body id, invalid camera -> no-op with the reason
  */
 export const renderMotion = defineCommand({
@@ -176,7 +177,7 @@ export const renderMotion = defineCommand({
         return [line, dot];
       });
       layers.push(
-        `  <g transform="translate(${x}, ${y + LABEL_HEIGHT})"><rect width="${width}" height="${height}" fill="none" stroke="#3a3a5a"/>${extractSvgInner(data.svg)}${overlay.join('')}</g>`,
+        `  <g transform="translate(${x}, ${y + LABEL_HEIGHT})" clip-path="url(#${CELL_CLIP})"><rect width="${width}" height="${height}" fill="none" stroke="#3a3a5a"/>${extractSvgInner(data.svg)}${overlay.join('')}</g>`,
         `  <text x="${x + 8}" y="${y + 16}" font-family="monospace" font-size="14" fill="#e8e8f4">${escapeXml(formatTime(time))}</text>`,
       );
       return {
@@ -195,7 +196,9 @@ export const renderMotion = defineCommand({
     );
     const totalWidth = width * columns;
     const totalHeight = cellHeight * rows;
-    const svg = svgDocument(totalWidth, totalHeight, [...layers, ...legend]);
+    // each frame is clipped to its own cell: the scene's ground grid extends past the frame and would otherwise draw into the cells below
+    const clip = `  <defs><clipPath id="${CELL_CLIP}"><rect width="${width}" height="${height}"/></clipPath></defs>`;
+    const svg = svgDocument(totalWidth, totalHeight, [clip, ...layers, ...legend]);
     const times = frames.map((f) => formatTime(f.time).slice(4));
     return report(
       doc,

@@ -70,7 +70,7 @@ function bodyXml(
   const { joint } = body;
   const jointXml =
     joint !== null
-      ? `<joint name="${attribute(joint.id)}" type="${joint.kind === 'revolute' ? 'hinge' : 'slide'}" pos="${numbers(minus(joint.anchor, body.centerOfMass))}" axis="${numbers(joint.axis)}" damping="${joint.damping}" frictionloss="${joint.friction}"${joint.friction > 0 ? ` solreffriction="${2 * timestep} 1" solimpfriction="${FRICTION_IMPEDANCE}"` : ''}/>`
+      ? `<joint name="${attribute(joint.id)}" type="${joint.kind === 'revolute' ? 'hinge' : 'slide'}" pos="${numbers(minus(joint.anchor, body.centerOfMass))}" axis="${numbers(joint.axis)}" damping="${joint.damping}" frictionloss="${joint.friction}"${joint.stiffness !== undefined && joint.stiffness > 0 ? ` stiffness="${joint.stiffness}" springref="${joint.springReference ?? 0}"` : ''}${joint.friction > 0 ? ` solreffriction="${2 * timestep} 1" solimpfriction="${FRICTION_IMPEDANCE}"` : ''}/>`
       : body.fixed
         ? ''
         : '<freejoint/>';
@@ -119,7 +119,7 @@ export function toMjcf(model: SimulationModel, timestep: number): string {
     )
     .join('');
   const integrator = model.solver.integrator === 'implicitfast' || servoChain(model) ? 'implicitfast' : 'RK4';
-  const flags = model.loops.length > 0 ? '<flag diagexact="enable"/>' : '';
+  const flags = `<flag${model.loops.length > 0 ? ' diagexact="enable"' : ''} energy="enable"/>`;
   const jacobian = model.loops.length > 0 ? ' jacobian="dense"' : '';
   return (
     '<mujoco model="llull"><compiler angle="radian" inertiafromgeom="false" balanceinertia="true"/>' +

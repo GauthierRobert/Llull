@@ -98,7 +98,7 @@ describe('add_beam / add_stair', () => {
     const stair = result.document.building!.elements['stair-1']!;
     expect(stair).toMatchObject({ riserCount: 18 });
     expect(stair.category === 'stair' && stair.riserHeight).toBeCloseTo(166.67, 1);
-    expect(result.affected).toHaveLength(18);
+    expect(result.affected).toEqual(['stair-1', 'stair-1:flight']);
     expect(stair).toMatchObject({ waistThickness: 175 });
     expect(result.summary).toContain('17 treads');
     expect(result.summary).toMatch(/2R\+G = 613 mm\./);
