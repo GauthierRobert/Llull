@@ -1,16 +1,17 @@
 /**
- * Assembly plan for `export_step_exact`: a component whose instances are unit-scale placements becomes ONE shared STEP part (any rotation
- * is a location, composed as a gp_Trsf product by the kernel), with an occurrence per instance. A component that itself holds unit-scale
- * instances becomes a sub-assembly: its nested occurrences name the nested component's part, so a component used at several depths is
- * written once. STEP locations cannot scale: every other entry (loose solid, scaled instance) is its own part with a single identity
- * occurrence, built from the same baked solids the flat export writes.
+ * Assembly plan for `export_step_exact`: a component becomes ONE shared STEP part per uniform scale (scale 1 = the component itself; any
+ * rotation is a location composed by the kernel; a uniform scale is a kernel `scale` of the part's solids, so every instance with that
+ * scale reuses the part). A component's nested instances become sub-assembly occurrences naming the nested part (scales multiply, nested
+ * positions scale with the parent), so a component used at several depths is written once. STEP locations cannot express a non-uniform or
+ * mirrored scale (or a reference cycle): exactly that instance is baked into world/parent-space solids - a loose part for a top-level
+ * instance, extra solids of the parent part for a nested one - never the surrounding component.
  */
 
-import { type CadDocument, type Component, type Entity, type InstanceEntity, is3D } from '../../model/types';
+import { type CadDocument, type Component, type Entity, type InstanceEntity, type Vec3, is3D } from '../../model/types';
 import type { GeometryKernel, ShapeHandle, StepAssemblyPart, StepOccurrence } from '../../geometry/kernel';
 import { operandRecipe } from './kernelShape';
 import type { AssemblyStepLabels, NestedOccurrence } from './stepAssemblyLabels';
-import { type StepEntry, stepLabels } from './stepTargets';
+import { MAX_INSTANCE_DEPTH, type StepEntry, instanceSolids, stepLabels } from './stepTargets';
 
 export interface StepAssemblyPlan {
   readonly occurrences: StepOccurrence[];
@@ -21,12 +22,20 @@ export interface StepAssemblyPlan {
 
 const ORIGIN: [number, number, number] = [0, 0, 0];
 
-/** Sub-assemblies nested deeper than this are baked (guards against reference cycles). */
-const MAX_NESTING = 4;
-
 type PartLabels = AssemblyStepLabels['parts'][number];
 
 const isUnitScale = (instance: InstanceEntity): boolean => (instance.scale ?? [1, 1, 1]).every((factor) => factor === 1);
+
+/** The single positive factor of an equal-per-axis scale (1 when unscaled), else null (non-uniform or mirrored: only baked geometry fits). */
+function uniformScale(instance: InstanceEntity): number | null {
+  const [sx, sy, sz] = instance.scale ?? [1, 1, 1];
+  return sx === sy && sy === sz && sx > 0 ? sx : null;
+}
+
+/** One significant-digit rounding for every scale factor, so cache keys and scale recipes agree (3 x 0.1 = 0.3). */
+const roundFactor = (factor: number): number => Number(factor.toPrecision(12));
+
+const scalePosition = (position: Vec3, factor: number): Vec3 => [position[0] * factor, position[1] * factor, position[2] * factor];
 
 const factorText = (factor: number): string => String(Number(factor.toFixed(4)));
 
@@ -52,56 +61,96 @@ export function planStepAssembly(
   const labeled: NestedOccurrence[] = [];
   const sharedOf = new Map<string, { part: StepAssemblyPart; index: number }>();
 
-  const build = (solids: readonly Entity[]): ShapeHandle[] | { failed: string } => {
+  const scalable = kernel.supports('scale');
+
+  /**
+   * Shapes of `solids` in component space, scaled about the component origin by `factor` (a uniform scale is a kernel op, not a location).
+   * `unscalable` marks a failure that only the kernel's scale op caused (the unscaled shape builds), so the caller may bake instead.
+   */
+  const build = (solids: readonly Entity[], factor = 1): ShapeHandle[] | { failed: string; unscalable: boolean } => {
     const shapes: ShapeHandle[] = [];
     for (const entity of solids) {
-      const shape = kernel.evaluate(operandRecipe(kernel, entity));
-      if (shape === null) return { failed: `'${entity.id}' (kind '${entity.kind}')` };
+      const recipe = operandRecipe(kernel, entity);
+      const shape = kernel.evaluate(factor === 1 ? recipe : { op: 'scale', source: recipe, factor });
+      if (shape === null) {
+        const unscalable = factor !== 1 && kernel.evaluate(recipe) !== null;
+        return { failed: `'${entity.id}' (kind '${entity.kind}')`, unscalable };
+      }
       shapes.push(shape);
     }
     return shapes;
   };
 
-  /** Whether every instance below `component` can be a pure location (so the component can be one shared part). */
-  const isRigid = (component: Component, trail: readonly string[]): boolean => {
-    const children = exportableChildren(component);
-    const path = [...trail, component.id];
-    if (children.length === 0 || path.length > MAX_NESTING) return false;
-    return children.every((child) => {
-      if (child.kind !== 'instance') return true;
-      const inner = doc.components[child.componentId];
-      return inner !== undefined && isUnitScale(child) && !path.includes(inner.id) && isRigid(inner, path);
-    });
+  /** The uniform positive scale of an instance a part can carry (1 = none), or null when only baked geometry can express it. */
+  const carriedScale = (instance: InstanceEntity): number | null => {
+    const factor = uniformScale(instance);
+    return factor !== null && (factor === 1 || scalable) ? roundFactor(factor) : null;
   };
 
-  /** The shared part of a rigid component (built once, with its sub-assembly), or its failure. */
-  const sharedPart = (component: Component): { part: StepAssemblyPart; index: number } | { failed: string } => {
-    const known = sharedOf.get(component.id);
+  /**
+   * The shared part of `component` at uniform `factor` (built once per component and factor, with its sub-assembly), a failure, or null
+   * when the component cannot be one part (nothing exportable, or the kernel refuses to scale it): the caller bakes it instead.
+   * A nested instance that a location cannot carry (non-uniform / mirrored scale, cycle, depth) is baked into this part only.
+   */
+  const sharedPart = (
+    component: Component,
+    factor: number,
+    trail: readonly string[],
+  ): { part: StepAssemblyPart; index: number } | { failed: string } | null => {
+    const key = `${component.id}@${factor}`;
+    const known = sharedOf.get(key);
     if (known !== undefined) return known;
+    const mark = parts.length;
+    const path = [...trail, component.id];
+    const solids: Entity[] = [];
     const children = exportableChildren(component);
-    const solids = children.filter((child) => child.kind !== 'instance');
-    const shapes = build(solids);
-    if ('failed' in shapes) return shapes;
+    const uses: { child: InstanceEntity; base: string; shared: { part: StepAssemblyPart; index: number } | null }[] = [];
+    for (const child of children) {
+      if (child.kind !== 'instance') {
+        solids.push(child);
+        continue;
+      }
+      const inner = doc.components[child.componentId];
+      const innerFactor = carriedScale(child);
+      const rigid = inner !== undefined && innerFactor !== null && !path.includes(inner.id) && path.length < MAX_INSTANCE_DEPTH;
+      const shared = rigid ? sharedPart(inner, roundFactor(factor * innerFactor), path) : null;
+      if (shared !== null && 'failed' in shared) return shared;
+      uses.push({ child, base: child.name ?? inner?.name ?? 'instance', shared });
+    }
     const nested: StepOccurrence[] = [];
     const nestedLabels: NestedOccurrence[] = [];
-    const used = children.filter((child): child is InstanceEntity => child.kind === 'instance');
-    for (const instance of used) {
-      const inner = doc.components[instance.componentId];
-      if (inner === undefined) continue;
-      const shared = sharedPart(inner);
-      if ('failed' in shared) return shared;
-      const base = instance.name ?? inner.name;
-      const twins = used.filter((other) => (other.name ?? doc.components[other.componentId]?.name) === base);
-      nested.push({ part: shared.part, position: instance.position, rotation: instance.rotation });
-      nestedLabels.push({ name: twins.length > 1 ? `${base} ${twins.indexOf(instance) + 1}` : base, part: shared.index });
+    const baked: Entity[] = [];
+    for (const use of uses) {
+      const twins = uses.filter((other) => other.base === use.base && (other.shared === null) === (use.shared === null));
+      const label = twins.length > 1 ? `${use.base} ${twins.indexOf(use) + 1}` : use.base;
+      if (use.shared === null) baked.push(...instanceSolids(doc, use.child, label, path.length));
+      else {
+        nested.push({ part: use.shared.part, position: scalePosition(use.child.position, factor), rotation: use.child.rotation });
+        nestedLabels.push({ name: label, part: use.shared.index });
+      }
     }
-    const labels = solids.map((child, index) => ({
-      name: child.name ?? (children.length === 1 ? component.name : `${component.name} part ${index + 1}`),
-      color: child.color,
-    }));
-    parts.push({ name: component.name, solids: labels, ...(nestedLabels.length > 0 ? { occurrences: nestedLabels } : {}) });
+    if (solids.length + baked.length + nested.length === 0) return null;
+    const shapes = build([...solids, ...baked], factor);
+    if ('failed' in shapes) {
+      if (!shapes.unscalable) return shapes;
+      parts.length = mark;
+      for (const [other, made] of sharedOf) if (made.index >= mark) sharedOf.delete(other);
+      return null;
+    }
+    const labels = [
+      ...solids.map((child, index) => ({
+        name: child.name ?? (children.length === 1 ? component.name : `${component.name} part ${index + 1}`),
+        color: child.color,
+      })),
+      ...stepLabels(doc, baked),
+    ];
+    parts.push({
+      name: factor === 1 ? component.name : scaledName(component.name, [factor]),
+      solids: labels,
+      ...(nestedLabels.length > 0 ? { occurrences: nestedLabels } : {}),
+    });
     const made = { part: { shapes, ...(nested.length > 0 ? { children: nested } : {}) }, index: parts.length - 1 };
-    sharedOf.set(component.id, made);
+    sharedOf.set(key, made);
     return made;
   };
 
@@ -120,8 +169,9 @@ export function planStepAssembly(
       continue;
     }
     const component = doc.components[entry.instance.componentId];
-    if (component !== undefined && isUnitScale(entry.instance) && isRigid(component, [])) {
-      const shared = sharedPart(component);
+    const factor = carriedScale(entry.instance);
+    const shared = component !== undefined && factor !== null ? sharedPart(component, factor, []) : null;
+    if (shared !== null) {
       if ('failed' in shared) return shared;
       labeled.push({ name: entry.label, part: shared.index });
       occurrences.push({ part: shared.part, position: entry.instance.position, rotation: entry.instance.rotation });

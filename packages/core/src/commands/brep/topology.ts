@@ -13,7 +13,7 @@ import { operandRecipe } from './kernelShape';
 import { labelStep } from './stepLabels';
 import { labelStepAssembly } from './stepAssemblyLabels';
 import { planStepAssembly } from './stepAssembly';
-import { stepLabels, stepTargets } from './stepTargets';
+import { type StepEntry, stepLabels, stepTargets } from './stepTargets';
 import { exportRefusal, noop, report } from '../noop';
 import { fixedNumber } from '../../lib/compactNumber';
 
@@ -72,6 +72,11 @@ export const inspectTopology = defineCommand({
   },
 });
 
+/** The user entity ids behind the exported entries (a loose solid, or the instance whose solids were expanded), each once. */
+const exportedIds = (entries: readonly StepEntry[]): string[] => [
+  ...new Set(entries.map((entry) => (entry.kind === 'solid' ? entry.entity.id : entry.instance.id))),
+];
+
 export interface ExportStepExactData {
   readonly format: 'step';
   readonly step: string;
@@ -99,11 +104,11 @@ export const exportStepExact = defineCommand({
     '(use export_step via the Python bridge, or export_stl, instead). ' +
     'Each solid becomes one STEP product named after its entity (set_entity_name, else the id; the group ' +
     'name goes in the product description) and carries its entity color as a surface style. ' +
-    'Returns data: { format, step (the file text), solidCount, entityIds, skipped, assembly? }. When the selection holds component instances ' +
+    'Returns data: { format, step (the file text), solidCount (the expanded solids written), entityIds (the selected loose-solid / instance ids written, each once; never internal expanded ids), skipped, assembly? }. When the selection holds component instances ' +
     '(assembly parts, fasteners) the file has real assembly structure: one root product, ONE product per component (its solids written once) ' +
     'and one NEXT_ASSEMBLY_USAGE_OCCURRENCE per instance with its placement, named after the instance (instances sharing a name get a numeric ' +
-    'suffix (Name 1, Name 2) so every occurrence name is unique); data.assembly = { products, occurrences }. Instances with a scale other than 1, ' +
-    'or whose rotations do not compose exactly, are written as their own product of world-space solids named <instance>/<part>. ' +
+    'suffix (Name 1, Name 2) so every occurrence name is unique); data.assembly = { products, occurrences }. Instances with a uniform scale share one scaled product per scale; ' +
+    'only a non-uniform or mirrored scale is written as its own product of world-space solids named <instance>/<part> (inside a component, just that nested instance). ' +
     'Requires a kernel that writes assemblies (OCC); otherwise the flat list of world-space solids is written. Does not modify the document.',
   params: z.object({
     entityIds: z
@@ -125,13 +130,13 @@ export const exportStepExact = defineCommand({
       if ('failed' in plan) return noop(doc, `export_step_exact: the kernel could not build ${plan.failed}; nothing exported.`);
       const assemblyStep = kernel.exportStepAssembly(plan.occurrences);
       if (assemblyStep === null) return noop(doc, `export_step_exact: the kernel could not write the assembly; nothing exported.`);
-      const exported = solids.map((entity) => entity.id);
+      const exported = exportedIds(entries);
       const step = labelStepAssembly(assemblyStep, plan.labels);
       const assembly = { products: plan.partCount, occurrences: plan.occurrences.length };
       const data: ExportStepExactData = { format: 'step', step, solidCount: solids.length, entityIds: exported, skipped, assembly };
       return report(
         doc,
-        `export_step_exact: ${solids.length} exact solid(s) (${exported.join(', ')}) → STEP AP214 assembly, ${assembly.products} product(s), ` +
+        `export_step_exact: ${solids.length} exact solid(s) from ${exported.join(', ')} → STEP AP214 assembly, ${assembly.products} product(s), ` +
           `${assembly.occurrences} occurrence(s), ${step.length} bytes` +
           (skipped.length > 0 ? `; skipped ${skipped.join(', ')}.` : '.'),
         data,
@@ -147,11 +152,11 @@ export const exportStepExact = defineCommand({
     const exactStep = kernel.exportStep(shapes);
     const step = exactStep === null ? null : labelStep(exactStep, stepLabels(doc, solids));
     if (step === null) return noop(doc, `export_step_exact: this kernel cannot write exact STEP; use ${OCC_HINT}.`);
-    const exported = solids.map((entity) => entity.id);
+    const exported = exportedIds(entries);
     const data: ExportStepExactData = { format: 'step', step, solidCount: solids.length, entityIds: exported, skipped };
     return report(
       doc,
-      `export_step_exact: ${solids.length} exact solid(s) (${exported.join(', ')}) → STEP AP214, ${step.length} bytes` +
+      `export_step_exact: ${solids.length} exact solid(s) from ${exported.join(', ')} → STEP AP214, ${step.length} bytes` +
         (skipped.length > 0 ? `; skipped ${skipped.join(', ')}.` : '.'),
       data,
     );
