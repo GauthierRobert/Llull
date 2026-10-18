@@ -46,12 +46,35 @@ export interface Selected {
   readonly label: string;
 }
 
+export const isEigen = (analysis: AnalysisCase): boolean => analysis.type === 'modal' || analysis.type === 'buckling';
+
+/** Result sets of the modes of a modal (all) / buckling (all but the zero-factor reference set) analysis, in mode order. */
+const modeSteps = (analysis: AnalysisCase, results: FeResultsArtifact): ResultStep[] =>
+  analysis.type === 'buckling' ? results.steps.filter((step) => step.time > 0) : [...results.steps];
+
+/** Result set of mode `mode` (1-based, default 1) of a modal / buckling analysis, labelled with its frequency / buckling factor. */
+function selectMode(analysis: AnalysisCase, results: FeResultsArtifact, mode: number | undefined): Selected | string {
+  const steps = modeSteps(analysis, results);
+  const index = (mode ?? 1) - 1;
+  const step = steps[index];
+  if (step === undefined) return `no mode ${mode ?? 1} (the results hold ${steps.length} mode(s))`;
+  return {
+    step,
+    label:
+      analysis.type === 'modal'
+        ? `mode ${index + 1}, f = ${significantNumber(step.time, 6)} Hz`
+        : `mode ${index + 1}, buckling factor ${significantNumber(step.time, 6)}`,
+  };
+}
+
 export function selectStep(
   analysis: AnalysisCase,
   results: FeResultsArtifact,
   loadCase: string | undefined,
   time: number | undefined,
+  mode?: number,
 ): Selected | string {
+  if (isEigen(analysis)) return selectMode(analysis, results, mode);
   if (isHeat(analysis)) {
     if (results.steps.length === 0) return 'the results hold no result set';
     const step =

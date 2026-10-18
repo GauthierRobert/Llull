@@ -121,8 +121,8 @@ describe.skipIf(!HAS_GMSH || !HAS_CCX)('FE pipeline (gmsh + ccx)', () => {
     const mesh = defaultFeArtifactStore().get(meshHash) as FeMeshArtifact;
     expect(mesh.kind).toBe('fe_mesh');
     expect(mesh.blocks[0]?.type).toBe('C3D10');
-    expect(dataOf(meshed.json)['facetedParts']).toEqual(mesh.blocks.map((block) => block.entityId));
-    expect(String(meshed.json['summary'])).toContain('faceted tessellation');
+    expect(dataOf(meshed.json)['facetedParts']).toEqual([]);
+    expect(String(meshed.json['summary'])).not.toContain('faceted tessellation');
     expect(currentDoc().analysis?.cases[analysisId]?.meshSummary?.meshHash).toBe(meshHash);
 
     const solved = await cli('fea_solve', `analysisId=${analysisId}`, 'timeoutS=300');

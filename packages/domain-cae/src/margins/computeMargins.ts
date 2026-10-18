@@ -258,7 +258,7 @@ export const computeMargins = defineCommand({
     'case MS_ult = Ftu / (applied x ultimate factor x extras) - 1 and MS_yield = Fty / (applied x yield factor x extras) - 1; on an ' +
     'ULTIMATE load case only MS_ult = Ftu / (applied x extras) - 1. allowable "ftu" / "fty" runs one check; { value, unit, against? } is ' +
     'an explicit allowable for all parts (against ultimate by default; always flagged unverified). The factors come from the case ' +
-    '(create_analysis factors; defaults 1.5 per 14 CFR 25.303 and 1.0) and are listed with source and defaulted. Status: FAIL if MS < 0, ' +
+    '(create_analysis factors, or factor = one number for both; defaults 1.5 per 14 CFR 25.303 and 1.0 apply silently unless the user states a safety factor, so map "SF 2" to factor 2 there) and are listed with source and defaulted. Status: FAIL if MS < 0, ' +
     'MARGINAL only when marginalBand is given and MS < band (no default band), else PASS; FAIL / MARGINAL rows are disposition ' +
     'pending_human. Every row has reviewRequired: true and unverified = OR of the input flags. Peak stresses at point loads, supports and ' +
     're-entrant corners are NOT screened for singularities (singular is always false): judge them yourself. Refused with ' +
@@ -377,7 +377,7 @@ export const computeMargins = defineCommand({
         : `min MS ${significantNumber(lowest.ms ?? 0, 4)} (${lowest.status}, ${lowest.rowId} ${String(lowest['loadCase'])}, part ${String(lowest['part'])})`;
     return report(
       doc,
-      `compute_margins: '${analysisId}' ${rows.length} row(s), ${worst}; ${pending} pending a human disposition, ${unverified} unverified; factors ultimate ${factors.ultimate.value}${factors.ultimate.defaulted ? ' (default)' : ''}, yield ${factors.yield.value}${factors.yield.defaulted ? ' (default)' : ''}. Computed by llull, not approved: needs a qualified engineer.`,
+      `compute_margins: '${analysisId}' ${rows.length} row(s), ${worst}; ${pending} pending a human disposition, ${unverified} unverified; factors ultimate ${factors.ultimate.value} (${factors.ultimate.defaulted ? 'DEFAULT 14 CFR 25.303, not set by the user' : 'set via create_analysis'}), yield ${factors.yield.value} (${factors.yield.defaulted ? 'DEFAULT, not set by the user' : 'set via create_analysis'}). Computed by llull, not approved: needs a qualified engineer.`,
       data,
     );
   },

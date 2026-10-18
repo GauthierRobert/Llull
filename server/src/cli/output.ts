@@ -40,7 +40,7 @@ export function resultJson(result: PrintableResult): string {
 }
 
 function savedLines(saved: readonly SavedFile[] | undefined): string[] {
-  return (saved ?? []).map((file) => `Saved ${file.path} (${file.bytes} bytes)`);
+  return (saved ?? []).map((file) => `Saved ${file.path} (${file.bytes} bytes)${file.note === undefined ? '' : ` -- ${file.note}`}`);
 }
 
 /** Summary, affected ids and the data block, as an MCP agent would read them. */

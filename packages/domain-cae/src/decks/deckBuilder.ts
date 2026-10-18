@@ -1,4 +1,4 @@
-/** INP assembly (05 §5.6, FE_PIPELINE_DESIGN §5): model block + materials + sections + the steps of the analysis type. */
+/** INP assembly (05 §5.6, FE_PIPELINE_DESIGN §5; modal `*FREQUENCY`, buckling `*BUCKLE`): model block + materials + sections + the steps of the analysis type. */
 
 import type { FeArtifactPort, FeMeshArtifact } from '@core/model/analysis';
 import { EXPORT_REMEDIATION, exportGate } from '@core/model/exportGate';
@@ -9,6 +9,7 @@ import { analysisInputHash } from '../hash/inputHash';
 import { ALL_ELEMENTS, ALL_NODES, buildDeckContext, isDeckRefusal, type DeckContext, type DeckRefusal, type DeckSections } from './context';
 import type { MaterialCardWriter } from './constitutive';
 import { commentText, idLines, linesText, row } from './format';
+import { bucklingSteps, modalStep } from './eigen';
 import { mechanicalMaterialLines, staticStep } from './mechanical';
 
 /** The discipline functions of the thermal and thermo-mechanical lanes (FE_PIPELINE_DESIGN §5 table). */
@@ -68,8 +69,6 @@ function precheck(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact, ct
       `the document uses ${gate.marking.regime}-marked material(s) ${gate.ids.join(', ')}; no deck was written (${EXPORT_REMEDIATION.MAT_EXPORT_CONTROLLED})`,
       gate.ids,
     );
-  if (analysis.type === 'modal' || analysis.type === 'buckling')
-    return refuse('FEA_ANALYSIS_TYPE_UNSUPPORTED', `analysis type '${analysis.type}' has no deck writer`, [analysisId]);
   if (mesh.kind !== 'fe_mesh') return refuse('FEA_ARTIFACT_NOT_FOUND', 'the mesh artifact is not an fe_mesh', [analysisId]);
   if (mesh.inputHash !== analysisInputHash(doc, analysisId, 'mesh'))
     return refuse('FEA_MESH_STALE', `the mesh was built for other inputs than the current analysis '${analysisId}'`, [analysisId]);
@@ -129,7 +128,7 @@ function modelBlock(ctx: DeckContext): string[] {
  * Deterministic CalculiX deck of `analysisId` over `mesh`, with the discipline functions in `disciplines`.
  * @invariant byte-identical for identical inputs; header `** llull analysis <name> units <us> inputHash <h> meshHash <m>`
  * @failure the document uses ITAR / EAR material records -> MAT_EXPORT_CONTROLLED (a deck leaves the machine; no confirmation path here)
- * @failure unknown analysis / unsupported type -> FEA_ANALYSIS_NOT_FOUND / FEA_ANALYSIS_TYPE_UNSUPPORTED; mesh of other inputs -> FEA_MESH_STALE;
+ * @failure unknown analysis / -> FEA_ANALYSIS_NOT_FOUND; mesh of other inputs -> FEA_MESH_STALE;
  *   part without elements or with non-tet elements -> FEA_PART_INVALID; no material -> FEA_MATERIAL_MISSING; static / thermo_static / coupled without a
  *   constraint -> FEA_NO_CONSTRAINTS; plus every refusal of the mechanical and discipline functions
  */
@@ -177,9 +176,13 @@ export function buildInp(
     ? disciplines.heat.sections(ctx)
     : analysis.type === 'static'
       ? staticStep(ctx)
-      : analysis.type === 'coupled_temperature_displacement'
-        ? disciplines.coupled.sections(ctx)
-        : disciplines.thermomech.sections(ctx);
+      : analysis.type === 'modal'
+        ? modalStep(ctx)
+        : analysis.type === 'buckling'
+          ? bucklingSteps(ctx)
+          : analysis.type === 'coupled_temperature_displacement'
+            ? disciplines.coupled.sections(ctx)
+            : disciplines.thermomech.sections(ctx);
   if (isDeckRefusal(steps)) return steps;
   return { text: `${linesText(lines)}${steps.text === '' || steps.text.endsWith('\n') ? steps.text : `${steps.text}\n`}` };
 }

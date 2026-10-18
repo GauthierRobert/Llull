@@ -102,6 +102,16 @@ function artifactItems(doc: CadDocument, analysis: AnalysisCase, trust: Trust): 
     );
   else if (trust.mesh.quality.inverted > 0)
     items.push(item('FEA_MESH_INVERTED', 'error', `${trust.mesh.quality.inverted} inverted element(s) (scaled Jacobian <= 0)`, [id]));
+  const faceted = trust.meshArtifact?.facetedParts ?? [];
+  if (faceted.length > 0)
+    items.push(
+      item(
+        'FEA_FACETED_GEOMETRY',
+        'warning',
+        `${faceted.join(', ')} meshed from a faceted tessellation (no exact B-rep): curved faces are polygons, so stresses at curved features are off by several % (either sign)`,
+        [id, ...faceted],
+      ),
+    );
   const results = analysis.results;
   if (results === undefined) return [...items, item('FEA_RESULTS_MISSING', 'error', 'no recorded results', [id])];
   if (results.verified !== false && results.inputHash !== analysisInputHash(doc, id, 'full'))

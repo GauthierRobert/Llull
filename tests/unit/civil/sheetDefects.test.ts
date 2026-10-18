@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CadDocument } from '@core/model/types';
+import { createEmptyDocument, type CadDocument, type TextEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { surveyedDocument } from './fixtures';
 
@@ -88,5 +88,64 @@ describe('civil SVG exports', () => {
     expect(svg).toContain('fill="#2a9d5c" fill-opacity');
     expect(svg).toContain('Cut (ground above design)');
     expect(svg).toContain('Fill (ground below design)');
+  });
+
+  it('plan-profile sheet keeps the long section clear of the title block and scale bar', () => {
+    const base = surveyedDocument((x) => 100 + x / 10, 21, 20);
+    const aligned = execute(base, 'add_alignment', {
+      points: [
+        [50, 200],
+        [250, 200],
+      ],
+      surfaceId: 'surface-1',
+    });
+    const id = (aligned.data as { alignmentId: string }).alignmentId;
+    const profile = execute(aligned.document, 'set_alignment_profile', {
+      alignmentId: id,
+      pvis: [
+        { station: 0, elevation: 102 },
+        { station: 200, elevation: 128 },
+      ],
+    });
+    const svg = svgOf(profile.document, 'export_plan_profile_sheet', { alignmentId: id });
+    const num = (tag: string, name: string): number => Number(new RegExp(`${name}="([\\d.]+)"`).exec(tag)?.[1]);
+    const section = /<svg class="long-section"[^>]*>/.exec(svg)?.[0] ?? '';
+    const block = /<g id="title-block"><rect[^>]*>/.exec(svg)?.[0] ?? '';
+    const bar = [...(/<g id="scale-bar">.*?<\/g>/s.exec(svg)?.[0] ?? '').matchAll(/<rect[^>]*>/g)].map((m) => m[0]);
+    const box = (tag: string): number[] => [
+      num(tag, 'x'),
+      num(tag, 'y'),
+      num(tag, 'x') + num(tag, 'width'),
+      num(tag, 'y') + num(tag, 'height'),
+    ];
+    const apart = (a: number[], b: number[]): boolean =>
+      (a[2] ?? 0) <= (b[0] ?? 0) || (b[2] ?? 0) <= (a[0] ?? 0) || (a[3] ?? 0) <= (b[1] ?? 0) || (b[3] ?? 0) <= (a[1] ?? 0);
+    const sectionBox = box(section.replace('<svg ', '<rect '));
+    expect(bar.length).toBe(5);
+    expect(apart(sectionBox, box(block))).toBe(true);
+    for (const rect of bar) expect(apart(sectionBox, box(rect))).toBe(true);
+  });
+
+  it('civil plan sheet keeps pipe labels readable whatever the pipe direction', () => {
+    let doc = execute(execute(createEmptyDocument(), 'set_units', { units: 'm' }).document, 'add_manhole', {
+      location: [100, 0],
+      invertElevation: 98,
+      rimElevation: 100,
+    }).document;
+    doc = execute(doc, 'add_manhole', { location: [0, 0], invertElevation: 97, rimElevation: 100 }).document;
+    doc = execute(doc, 'add_pipe', { fromId: 'manhole-1', toId: 'manhole-2' }).document;
+    const label = doc.entities['pipe-1:label'];
+    expect(label?.kind === 'text' && label.rotation[2]).toBeCloseTo(0, 9);
+    const rotated = {
+      ...doc,
+      entities: {
+        ...doc.entities,
+        'pipe-1:label': { ...(label as TextEntity), rotation: [0, 0, Math.PI * 0.75] as [number, number, number] },
+      },
+    };
+    const svg = svgOf(rotated, 'export_civil_plan_sheet', {});
+    const angle = Number(/class="civil-text"[^>]*transform="rotate\((-?[\d.]+)/.exec(svg)?.[1]);
+    expect(angle).toBeGreaterThan(-90);
+    expect(angle).toBeLessThanOrEqual(90);
   });
 });

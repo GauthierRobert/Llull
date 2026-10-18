@@ -182,9 +182,16 @@ describe('add_flange options', () => {
     );
   });
 
-  it('refuses to trim a flat that already has bends and a trim that does not fit', () => {
+  it('trims a flat that already has a bend, but refuses to trim a flange and a trim that does not fit', () => {
     const { doc, part } = bracket();
-    expectRefusal(doc, 'add_flange', { id: part, ...flange({ position: 'material_inside' }) }, 'FTR_PARAM_INVALID', 'position');
+    expect(ok(doc, 'add_flange', { id: part, ...flange({ position: 'material_inside' }) }).affected).toEqual([part]);
+    expectRefusal(
+      doc,
+      'add_flange',
+      { id: part, ...flange({ edge: { near: [39.2, 25, 30] }, position: 'material_inside' }) },
+      'FTR_PARAM_INVALID',
+      'position',
+    );
     const small = bracket({}, false);
     expectRefusal(
       small.doc,

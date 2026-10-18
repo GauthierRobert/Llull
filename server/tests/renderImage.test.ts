@@ -50,6 +50,18 @@ describe('rasterizeSvg on content that aborts resvg', () => {
     expect(sanitizeSvgForResvg(OFFSCREEN_GROUP)).toContain('<g stroke-opacity="0.18" fill-opacity="0.18" stroke="#88aacc"');
   });
 
+  it('rewrites opacity on any element (off-canvas <line opacity>) and rasterizes it', () => {
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#123"/>' +
+      '<line x1="-2430" y1="2551" x2="-2430" y2="-1951" stroke="#cc4444" opacity="0.35"/></svg>';
+    expect(sanitizeSvgForResvg(svg)).toContain(
+      '<line x1="-2430" y1="2551" x2="-2430" y2="-1951" stroke="#cc4444" stroke-opacity="0.35" fill-opacity="0.35"/>',
+    );
+    expect(isPng(rasterizeSvg(svg)!)).toBe(true);
+    const image = '<svg xmlns="http://www.w3.org/2000/svg"><image width="1" height="1" opacity="0.5" href="x"/></svg>';
+    expect(sanitizeSvgForResvg(image)).toBe(image);
+  });
+
   it('leaves svg without group opacity untouched', () => {
     expect(sanitizeSvgForResvg(VALID_SVG)).toBe(VALID_SVG);
   });

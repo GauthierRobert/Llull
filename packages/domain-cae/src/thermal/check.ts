@@ -163,7 +163,7 @@ function resultItems(analysisCase: AnalysisCase, doc: CadDocument, verified: Res
       item(
         'THM_HEAT_BALANCE',
         'warning',
-        `heat balance residual ${balance.residualRel} exceeds ${HEAT_BALANCE_TOLERANCE.value}${(balance.samplingRel ?? 0) > HEAT_BALANCE_TOLERANCE.value ? ` (the output interval is too coarse to resolve it: sampling spread ${balance.samplingRel ?? 0}; write results at every increment with set_thermal_step outputEveryS)` : ''} (in ${balance.inW} W, out ${balance.outW} W, stored ${balance.storedW} W at t=${balance.timeS} s)`,
+        `heat balance residual ${balance.residualRel} exceeds ${HEAT_BALANCE_TOLERANCE.value}${(balance.samplingRel ?? 0) > HEAT_BALANCE_TOLERANCE.value ? ` (the output interval is too coarse to resolve it: sampling spread ${balance.samplingRel ?? 0}; write results at every increment with set_thermal_step outputEveryS)` : ''} (in ${balance.inW} W, out ${balance.outW} W, stored ${balance.storedW} W ${analysisCase.type === 'heat_steady' ? 'at steady state' : `at t=${balance.timeS} s`})`,
         [analysisCase.id],
       ),
     );

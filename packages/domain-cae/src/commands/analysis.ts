@@ -26,6 +26,8 @@ const ANALYSIS_TYPES = [
 ] as const;
 const BUILT: ReadonlySet<AnalysisType> = new Set([
   'static',
+  'modal',
+  'buckling',
   'heat_steady',
   'heat_transient',
   'thermo_static',
@@ -63,7 +65,7 @@ const plain = (value: number): string => String(Math.round(value * 1e6) / 1e6);
  * @affects doc.analysis.cases (adds 1 case; affected: [analysisId])
  * @invariant ids `an-<step>.<k>`; unitSystem follows the document unit; heat_* cases get an empty ThermalSetup, thermo_static a ThermoMechSetup
  *   and a coupled case a ThermoMechSetup holding an empty ThermalSetup (no default reference temperature); defaults are named in the summary
- * @failure modal / buckling type -> FEA_ANALYSIS_TYPE_UNSUPPORTED; explicit unitSystem != document unit -> FEA_UNITS_MISMATCH;
+ * @failure factor and factors together or factor < 1 -> FEA_FACTOR_INVALID; modes on another type -> FEA_PARAM_NOT_APPLICABLE; modes outside 1..100 -> FEA_PARAM_INVALID; explicit unitSystem != document unit -> FEA_UNITS_MISMATCH;
  *   thermo_static / coupled without referenceTemperature -> TMC_REFERENCE_TEMPERATURE_MISSING; bad temperature unit -> THM_UNITS_MISMATCH;
  *   factor < 1 -> FEA_FACTOR_INVALID; temperature params on a type that has no use for them -> FEA_PARAM_NOT_APPLICABLE (all refusals, unchanged doc)
  */
@@ -74,8 +76,12 @@ export const createAnalysis = defineCommand({
     'structural), heat_steady / heat_transient (thermal conduction, convection, radiation) or thermo_static (structural response to a ' +
     'temperature field; REQUIRES referenceTemperature, the stress-free temperature, no default) or coupled_temperature_displacement ' +
     '(steady-state heat conduction and thermal stress solved together: thermal boundary conditions with add_thermal_bc, mechanical ones with ' +
-    'add_fea_constraint / add_fea_load, REQUIRES referenceTemperature; the temperature field is solved, not set). modal and buckling cases ' +
-    'are not built and are refused. unitSystem follows the document unit (mm: N-mm-t-s, m: N-m-kg-s, in: lbf-in-slinch-s) and a different one is ' +
+    'add_fea_constraint / add_fea_load, REQUIRES referenceTemperature; the temperature field is solved, not set), modal (free-vibration natural ' +
+    'frequencies and mode shapes with `modes`; needs constraints and a material density, loads are ignored; results.frequenciesHz) or buckling ' +
+    '(linear eigenvalue buckling of the FIRST load case as reference load, `modes` factors; the critical load is factor x the applied load; ' +
+    'results.bucklingFactors; needs constraints and a load). SAFETY FACTORS: without `factors`/`factor` the aerospace defaults apply ' +
+    '(ultimate 1.5 per 14 CFR 25.303, yield 1.0) and the summary says so; when the user states a safety factor (e.g. "SF 2") pass `factor: 2` ' +
+    '(one number applied to both ultimate and yield) or `factors` { ultimate, yield } - compute_margins applies exactly these. unitSystem follows the document unit (mm: N-mm-t-s, m: N-m-kg-s, in: lbf-in-slinch-s) and a different one is ' +
     'refused. The case starts with the default mesh (tet, quadratic, 10 mm) and no parts: next set_part_idealization, then ' +
     'add_fea_constraint / add_fea_load (or the thermal commands), set_mesh_controls, and the host runs fea_mesh then fea_solve. ' +
     'describe_analysis shows the case at any time.',
@@ -83,9 +89,7 @@ export const createAnalysis = defineCommand({
     name: z.string().min(1).describe('Display name of the analysis, e.g. "bracket under 500 N".'),
     analysisType: z
       .enum(ANALYSIS_TYPES)
-      .describe(
-        'static | heat_steady | heat_transient | thermo_static | coupled_temperature_displacement (modal and buckling are refused).',
-      ),
+      .describe('static | heat_steady | heat_transient | thermo_static | coupled_temperature_displacement | modal | buckling.'),
     solver: z.enum(['calculix']).optional().describe('Solver; only calculix is built (default).'),
     unitSystem: z
       .enum(['N-mm-t-s', 'N-m-kg-s', 'lbf-in-slinch-s'])
@@ -109,6 +113,19 @@ export const createAnalysis = defineCommand({
     factors: factorsSchema
       .optional()
       .describe('Safety factors; omit for the defaults (ultimate 1.5, yield 1.0, no extra). When given, state both ultimate and yield.'),
+    factor: z
+      .number()
+      .optional()
+      .describe(
+        'Shorthand for the user-stated safety factor: ONE number >= 1 applied to both ultimate and yield (e.g. 2 for "SF 2"). Use factors instead for different values or extra factors; giving both is refused.',
+      ),
+    modes: z
+      .number()
+      .int()
+      .optional()
+      .describe(
+        'modal / buckling only: number of modes (natural frequencies) or buckling factors to extract, 1 to 100. Default 6 (modal) or 3 (buckling).',
+      ),
   }),
   run: (doc, params): CommandResult => {
     const fail = (code: string, message: string, ids: readonly string[] = [], paths: readonly string[] = []): CommandResult =>
@@ -141,12 +158,24 @@ export const createAnalysis = defineCommand({
     if (caseNameProblem !== null) return fail('FEA_LOAD_INVALID', caseNameProblem, [], ['loadCaseName']);
     const factorError = params.factors === undefined ? null : factorProblem(params.factors);
     if (factorError !== null) return fail('FEA_FACTOR_INVALID', factorError, [], ['factors']);
+    if (params.factor !== undefined && params.factors !== undefined)
+      return fail('FEA_FACTOR_INVALID', 'give either factor (one number) or factors { ultimate, yield }, not both', [], ['factor']);
+    if (params.factor !== undefined && !(params.factor >= 1))
+      return fail('FEA_FACTOR_INVALID', `factor ${params.factor} must be a number >= 1`, [], ['factor']);
+    const eigen = type === 'modal' || type === 'buckling';
+    if (params.modes !== undefined && !eigen)
+      return fail('FEA_PARAM_NOT_APPLICABLE', `modes applies to modal and buckling analyses only, not ${type}`, [], ['modes']);
+    if (params.modes !== undefined && !(params.modes >= 1 && params.modes <= 100))
+      return fail('FEA_PARAM_INVALID', `modes ${params.modes} must be an integer from 1 to 100`, [], ['modes']);
 
     const scale = temperatureScale ?? 'degC';
     const factors: FactorSet =
-      params.factors === undefined
-        ? DEFAULT_FACTORS
-        : { ultimate: params.factors.ultimate, yield: params.factors.yield, extra: params.factors.extra ?? [] };
+      params.factor !== undefined
+        ? { ultimate: params.factor, yield: params.factor, extra: [] }
+        : params.factors === undefined
+          ? DEFAULT_FACTORS
+          : { ultimate: params.factors.ultimate, yield: params.factors.yield, extra: params.factors.extra ?? [] };
+    const modes = params.modes ?? (type === 'modal' ? 6 : type === 'buckling' ? 3 : undefined);
     const thermomech: ThermoMechSetup | undefined =
       hasThermoMech(type) && referenceTemperature !== undefined
         ? {
@@ -164,6 +193,7 @@ export const createAnalysis = defineCommand({
       type,
       solver: 'calculix',
       unitSystem,
+      ...(modes !== undefined ? { modes } : {}),
       factors,
       parts: {},
       constraints: {},
@@ -176,10 +206,14 @@ export const createAnalysis = defineCommand({
       ...(isThermal(type) ? { thermal: emptyThermalSetup(scale) } : {}),
       ...(thermomech !== undefined ? { thermomech } : {}),
     };
+    const stated = params.factor !== undefined || params.factors !== undefined;
+    const extraNote = factors.extra.length > 0 ? ` + ${factors.extra.length} extra` : '';
+    const factorNote = `safety factors ultimate ${plain(factors.ultimate)}, yield ${plain(factors.yield)}${extraNote} (${stated ? 'set by the caller' : 'DEFAULT 14 CFR 25.303 - pass factor/factors if the user states another safety factor'})`;
+    const modesNote = modes === undefined ? '' : `, ${modes} mode(s)`;
     const scaleNote = thermalUse ? `, temperatureScale ${scale}${temperatureScale === undefined ? ' (default)' : ''}` : '';
     return changed(
       withCase(doc, analysisCase),
-      `create_analysis: '${id}' (${name}) — ${type}, calculix, ${unitSystem}${scaleNote}; mesh default tet order ${mesh.order} globalSize ${plain(mesh.globalSize)} ${doc.units}; no parts yet (next: set_part_idealization).`,
+      `create_analysis: '${id}' (${name}) — ${type}, calculix, ${unitSystem}${modesNote}${scaleNote}; ${factorNote}; mesh default tet order ${mesh.order} globalSize ${plain(mesh.globalSize)} ${doc.units}; no parts yet (next: set_part_idealization).`,
       [id],
     );
   },

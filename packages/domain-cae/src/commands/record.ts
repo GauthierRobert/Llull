@@ -8,7 +8,7 @@ import type { CommandResult } from '@core/commands/types';
 import { significantNumber } from '@lib/compactNumber';
 import { analysisInputHash } from '../hash/inputHash';
 import { stressUnitName, lengthUnitName } from '../decks/units';
-import { meshSummary, resultsSummary } from '../results/summary';
+import { eigenSummaryText, meshSummary, resultsSummary } from '../results/summary';
 import { caseOf, withCase } from '../shared/access';
 import { refuseFe } from '../shared/feCodes';
 import { analysisIdSchema } from '../shared/schemas';
@@ -159,7 +159,7 @@ export const recordFeaResults = defineCommand({
         )
         .join(
           '',
-        )}${expected.thermal === undefined ? '' : `; thermal: ${expected.thermal.times.length} time(s)`} (${expected.solver} ${expected.solverVersion}).`,
+        )}${eigenSummaryText(expected)}${expected.thermal === undefined ? '' : analysisCase.type === 'heat_steady' ? '; thermal: steady state' : `; thermal: ${expected.thermal.times.length} time(s)`} (${expected.solver} ${expected.solverVersion}).`,
       [analysisId],
     );
   },

@@ -3,7 +3,9 @@
 import type { FeaConstraint } from '@core/model/analysis';
 import { ALL_ELEMENTS, isDeckRefusal, loadCasesOf, type DeckContext, type DeckRefusal, type DeckSections } from './context';
 import { densityToAnalysis, stressPerMpa } from './units';
-import { elasticConstants, isElasticRefusal, propertyTemperatureK } from './elastic';
+import { elasticConstants, elasticTable, isElasticRefusal, propertyTemperatureK } from './elastic';
+import { resolveTemperatureField, thermomechOf } from '../thermomech/field';
+import { fromKelvin, kelvinOf } from '../thermomech/units';
 import { commentText, linesText, num, row } from './format';
 
 const DOF_NUMBER = { ux: 1, uy: 2, uz: 3 } as const;
@@ -13,16 +15,40 @@ const refusal = (code: string, message: string, ids: readonly string[] = []): De
 /**
  * `*ELASTIC` and `*DENSITY` cards (no `*MATERIAL` line) of the material of `entityId`, in the case unit system. E and nu come from the
  * default constitutive set (`elastic_isotropic`) else the PHY-01 property models `E`, `nu`, read at the reference temperature (thermo_static)
- * or 20 degC; density is `Material.density` (g per cubic document unit) converted to the unit system.
+ * or 20 degC (thermo_static: a table `E, nu, T` over the temperature range of the field when E or nu depend on temperature); density is `Material.density` (g per cubic document unit) converted to the unit system.
  * @failure no material -> FEA_MATERIAL_MISSING; no E / nu -> FEA_MATERIAL_NO_ELASTIC; invalid E / nu -> FEA_PROPERTY_INVALID
  */
 export function mechanicalMaterialLines(ctx: DeckContext, entityId: string): DeckSections {
   const material = ctx.materialOf(entityId);
   if (material === null) return refusal('FEA_MATERIAL_MISSING', `part '${entityId}' has no material`, [entityId]);
-  const elastic = elasticConstants(material, ctx.materialId(entityId) ?? '', propertyTemperatureK(ctx.analysis));
-  if (isElasticRefusal(elastic)) return refusal(elastic.code, elastic.message, [entityId]);
+  const name = ctx.materialId(entityId) ?? '';
+  const referenceKelvin = propertyTemperatureK(ctx.analysis);
   const density = densityToAnalysis(material.density, ctx.doc.units, ctx.unitSystem);
-  return { text: linesText(['*ELASTIC', row(elastic.E * stressPerMpa(ctx.unitSystem), elastic.nu), '*DENSITY', row(density)]) };
+  const setup = ctx.analysis.type === 'thermo_static' ? thermomechOf(ctx.analysis) : undefined;
+  const field = setup === undefined ? undefined : resolveTemperatureField(ctx.doc, ctx.analysisId, ctx.mesh, ctx.artifacts);
+  if (setup === undefined || field === undefined || !field.ok) {
+    const elastic = elasticConstants(material, name, referenceKelvin);
+    if (isElasticRefusal(elastic)) return refusal(elastic.code, elastic.message, [entityId]);
+    return { text: linesText(['*ELASTIC', row(elastic.E * stressPerMpa(ctx.unitSystem), elastic.nu), '*DENSITY', row(density)]) };
+  }
+  const scale = setup.temperatureScale;
+  const table = elasticTable(material, name, referenceKelvin, kelvinOf(field.min, scale), kelvinOf(field.max, scale));
+  if ('code' in table) return refusal(table.code, table.message, [entityId]);
+  const factor = stressPerMpa(ctx.unitSystem);
+  const dependent = table.rows.length > 1;
+  return {
+    text: linesText([
+      ...(dependent
+        ? [
+            `** E, nu tabulated against temperature (${scale}) over the field range ${num(field.min)} to ${num(field.max)}: ${commentText(table.source)}`,
+          ]
+        : []),
+      '*ELASTIC',
+      ...table.rows.map(([E, nu, kelvin]) => (kelvin === undefined ? row(E * factor, nu) : row(E * factor, nu, fromKelvin(kelvin, scale)))),
+      '*DENSITY',
+      row(density),
+    ]),
+  };
 }
 
 /** Axis (0|1|2) a node set is flat in, or null when it is not an axis-aligned plane. */
@@ -83,6 +109,19 @@ const byNumbers = (a: readonly number[], b: readonly number[]): number => {
   return 0;
 };
 
+/** Data lines of every constraint of the case (the `*BOUNDARY` body), or the refusal of the first unresolved one. */
+export function boundaryData(ctx: DeckContext): string[] | DeckRefusal {
+  const boundary: string[] = [];
+  for (const id of ctx.analysis.constraintOrder) {
+    const constraint = ctx.analysis.constraints[id];
+    if (constraint === undefined) continue;
+    const lines = constraintLines(ctx, constraint);
+    if (!Array.isArray(lines)) return lines;
+    boundary.push(...lines);
+  }
+  return boundary;
+}
+
 /**
  * Mechanical `*BOUNDARY, OP=NEW` / `*CLOAD, OP=NEW` / `*DLOAD, OP=NEW` lines for one step.
  * Force: the vector is the TOTAL load split equally over the nodes of the target (`distribution: 'total'`), or applied at every node
@@ -94,14 +133,8 @@ const byNumbers = (a: readonly number[], b: readonly number[]): number => {
  *   -> FEA_CONSTRAINT_INVALID
  */
 export function mechanicalStepLines(ctx: DeckContext, loadCase?: string): DeckSections {
-  const boundary: string[] = [];
-  for (const id of ctx.analysis.constraintOrder) {
-    const constraint = ctx.analysis.constraints[id];
-    if (constraint === undefined) continue;
-    const lines = constraintLines(ctx, constraint);
-    if (!Array.isArray(lines)) return lines;
-    boundary.push(...lines);
-  }
+  const boundary = boundaryData(ctx);
+  if (!Array.isArray(boundary)) return boundary;
   const forces = new Map<string, readonly [node: number, dof: number, value: number]>();
   const pressures = new Map<string, readonly [element: number, face: number, value: number]>();
   const gravity = [0, 0, 0];

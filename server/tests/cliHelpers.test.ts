@@ -150,7 +150,10 @@ describe('saveFiles', () => {
         .toString(),
     ).toBe('PNG');
     expect(() => saveDataFiles({ count: 1 }, path.join(root, 'x.png'))).toThrow(/no data.svg/);
-    expect(() => saveDataFiles({ svg: 'not svg', text: 'x' }, path.join(root, 'bad.png'))).toThrow(/no data.svg that rasterizes/);
+    const [fallback] = saveDataFiles({ svg: 'not svg', text: 'x' }, path.join(root, 'bad.png'));
+    expect(fallback?.path).toBe(path.join(root, 'bad.svg'));
+    expect(fallback?.note).toMatch(/rasterizing the svg failed .*saved the \.svg instead/);
+    expect(readFileSync(fallback?.path ?? '', 'utf8')).toBe('not svg');
     expect(existsSync(path.join(root, 'bad.png'))).toBe(false);
     expect(() => saveDataFiles({ count: 1 }, path.join(root, 'x.txt'))).toThrow(/no file payload/);
     expect(existsSync(path.join(root, 'x.txt'))).toBe(false);

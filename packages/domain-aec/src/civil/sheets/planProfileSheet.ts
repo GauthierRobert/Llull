@@ -6,6 +6,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
 import { escapeXml } from '@lib/escapeXml';
+import { niceStep } from '@lib/niceStep';
 import { composeSheetSvg, fitScale, MARGIN, northArrow, sheetDrawingArea } from '../../shared/sheetFrame';
 import { n } from '@core/geometry/drawingSvg';
 import { PAPER_MM, type PaperSize } from '@core/model/sheet';
@@ -44,15 +45,25 @@ export function buildPlanProfileSheet(
   const area = sheetDrawingArea(width, height);
   const startM = toMetres(doc, alignment.startStation);
   const lengthM = toMetres(doc, endStation(alignment)) - startM;
-  const scale =
-    options.scale ??
-    fitScale(lengthM * 1000, 1, { ...area, width: area.width - (LONG_SECTION_LEFT + LONG_SECTION_RIGHT) * PAPER_PER_UNIT });
-  const mmPerMetre = 1000 / scale;
   const rows = reportRows(doc, alignment, analyseStations(doc, civil, alignment, reportStations(alignment, alignment.stationInterval)));
-  const section = longSectionSvg(doc, civil, alignment, rows, options.verticalExaggeration, mmPerMetre / PAPER_PER_UNIT);
-  if (section === null) return `${alignment.name}: the profile has no stations on the alignment.`;
-  const size = sizeOf(section);
+  const widthFit = fitScale(lengthM * 1000, 1, { ...area, width: area.width - (LONG_SECTION_LEFT + LONG_SECTION_RIGHT) * PAPER_PER_UNIT });
   const sectionTop = area.y + STRIP_HEIGHT + 4;
+  const layout = (candidate: number): { section: string | null; size: { width: number; height: number }; fits: boolean } => {
+    const section = longSectionSvg(doc, civil, alignment, rows, options.verticalExaggeration, 1000 / candidate / PAPER_PER_UNIT);
+    const size = section === null ? { width: 0, height: 0 } : sizeOf(section);
+    const fits = size.width * PAPER_PER_UNIT <= area.width && sectionTop + size.height * PAPER_PER_UNIT <= area.y + area.height;
+    return { section, size, fits };
+  };
+  let scale = options.scale ?? widthFit;
+  let placed = layout(scale);
+  // Auto-fit: step to the next 1-2-5 scale until the section (data band included) clears the reserved title-block area.
+  for (let step = 0; options.scale === undefined && !placed.fits && placed.section !== null && step < 12; step++) {
+    scale = niceStep(scale * 1.01);
+    placed = layout(scale);
+  }
+  const { section, size, fits } = placed;
+  if (section === null) return `${alignment.name}: the profile has no stations on the alignment.`;
+  const mmPerMetre = 1000 / scale;
   const stationX = (stationM: number): number => area.x + LONG_SECTION_LEFT * PAPER_PER_UNIT + (stationM - startM) * mmPerMetre;
   const axisY = area.y + 22;
   const halfWidth = alignment.section
@@ -100,7 +111,5 @@ export function buildPlanProfileSheet(
     body,
     overlays: [northArrow(width - MARGIN - 12, MARGIN + 12)],
   });
-  const fits =
-    area.x + size.width * PAPER_PER_UNIT <= area.x + area.width && sectionTop + size.height * PAPER_PER_UNIT <= area.y + area.height;
   return { text: `${text}\n`, scale, fits };
 }

@@ -140,8 +140,12 @@ export function buildCivilPlanSheet(doc: CadDocument, options: CivilSheetOptions
         counts.points++;
       } else if (entity.kind === 'text') {
         const size = clamp(entity.height * perUnit, 1.8, 5);
-        const turn = toDegrees(-entity.rotation[2]);
-        const anchor = entity.anchor === 'left' ? 'start' : entity.anchor === 'right' ? 'end' : 'middle';
+        const raw = (((toDegrees(-entity.rotation[2]) % 360) + 540) % 360) - 180;
+        const flipped = raw > 90 || raw <= -90;
+        const turn = flipped ? raw - Math.sign(raw) * 180 : raw;
+        const left = flipped ? 'end' : 'start';
+        const right = flipped ? 'start' : 'end';
+        const anchor = entity.anchor === 'left' ? left : entity.anchor === 'right' ? right : 'middle';
         markup =
           `<text class="civil-text" x="${n(x)}" y="${n(y)}" font-size="${n(size)}" text-anchor="${anchor}" fill="${escapeXml(color)}"` +
           `${turn !== 0 ? ` transform="rotate(${n(turn)} ${n(x)} ${n(y)})"` : ''}>${escapeXml(entity.content)}</text>`;

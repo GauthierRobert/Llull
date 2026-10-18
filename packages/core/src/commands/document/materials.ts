@@ -180,6 +180,7 @@ export const createMaterial = defineCommand({
     const material: Material = {
       name,
       density,
+      ...(densityUnit !== undefined ? { densityUnit } : {}),
       color,
       metalness,
       roughness,

@@ -14,7 +14,7 @@ import { axisFrame, CYLINDRICAL_FIELDS, CYLINDRICAL_QUANTITIES, type Cylindrical
 import { magnitude, nodeCoordinates } from '../results/fields';
 import { fieldFaces, type CutPlane } from '../results/fieldFaces';
 import { fieldPlotSvg, type PlotExtreme } from '../results/fieldPlotSvg';
-import { frameOf, isHeat, markersOf, selectStep } from '../results/plotSetup';
+import { frameOf, isEigen, isHeat, markersOf, selectStep } from '../results/plotSetup';
 import { QUANTITY_FIELDS, quantityScale, quantityUnit } from '../results/probes';
 import { caseOf } from '../shared/access';
 import { refuseFe } from '../shared/feCodes';
@@ -25,7 +25,7 @@ import { PROBE_QUANTITIES } from './probes';
 const NAME = 'render_fea_results';
 /** Auto deformation: the largest displacement is drawn at this fraction of the model size. */
 const AUTO_DEFORMATION = 0.08;
-const FIELDS = PROBE_QUANTITIES;
+const FIELDS = [...PROBE_QUANTITIES, 'mode'] as const;
 
 const isSteady = (type: string): boolean => type === 'heat_steady';
 
@@ -86,7 +86,9 @@ export const renderFeaResults = defineCommand({
     'subtitle) over a faint silhouette of the undeformed part. field: von_mises (default for static / thermo-mechanical), u_mag, u_x, ' +
     'u_y, u_z, s_xx, s_yy, s_zz, temperature (default for heat_*), heat_flux, and cylindrical components about an axis (axisPoint + ' +
     'axisDirection, default: the z axis through the centre of the plotted parts bounding box; a quarter / half model needs the real axis ' +
-    'point): s_hoop, s_radial, s_axial, u_radial. To see an interior peak (e.g. under a PCB): cut = { normal, offset } removes the ' +
+    'point): s_hoop, s_radial, s_axial, u_radial. modal / buckling cases: field mode (default) colours the displacement magnitude of the mode ' +
+    'shape normalised to 1 (it has no unit; mode = which mode, 1-based, default 1; the subtitle gives its frequency in Hz or its buckling ' +
+    'factor; the shape is drawn deformed with the automatic scale because mode amplitudes are arbitrary); stress fields do not exist for them. To see an interior peak (e.g. under a PCB): cut = { normal, offset } removes the ' +
     'half-space dot(normal, p) > offset of the undeformed model and colours the section face by the field; entityIds plots only those ' +
     'parts (min / max and the colour range then refer to the plotted parts). Returns data { svg, field, unit, resultSet, min { value, ' +
     'at }, max { value, at }, deformationScale, levels, trianglesDrawn, entityIds, cut, axis }; save it as PNG with the CLI (--save ' +
@@ -94,7 +96,16 @@ export const renderFeaResults = defineCommand({
   annotations: { readOnly: true },
   params: z.object({
     analysisId: analysisIdSchema,
-    field: z.enum(FIELDS).describe('Field to colour by. Default: temperature for heat_steady / heat_transient, else von_mises.').optional(),
+    field: z
+      .enum(FIELDS)
+      .describe('Field to colour by. Default: temperature for heat_steady / heat_transient, mode for modal / buckling, else von_mises.')
+      .optional(),
+    mode: z
+      .number()
+      .int()
+      .min(1)
+      .describe('modal / buckling only: mode number to plot (1 = lowest frequency / smallest buckling factor). Default 1.')
+      .optional(),
     loadCase: z.string().describe('Load case name of a static / thermo-mechanical case. Default: the first load case.').optional(),
     time: z.number().describe('heat_transient: plot the result set nearest this time (s). Default: the last result set.').optional(),
     view: z.enum(VIEW_DIRECTIONS).describe('Viewing direction (orthographic). Default "iso" (from +X, -Y, +Z).').optional(),
@@ -168,18 +179,27 @@ export const renderFeaResults = defineCommand({
         `analysis '${analysisId}' has no verified results (state ${trust.state}${trust.problem === null ? '' : `: ${trust.problem.message}`})`,
         [analysisId],
       );
-    const selected = selectStep(analysis, results, params.loadCase, params.time);
+    const eigen = isEigen(analysis);
+    if (params.mode !== undefined && !eigen)
+      return invalid(doc, `mode applies to modal / buckling analyses only, not ${analysis.type}`, 'mode');
+    const quantity: (typeof FIELDS)[number] = params.field ?? (isHeat(analysis) ? 'temperature' : eigen ? 'mode' : 'von_mises');
+    if (quantity === 'mode' && !eigen) return invalid(doc, `field 'mode' needs a modal / buckling analysis, not ${analysis.type}`, 'field');
+    const selected = selectStep(analysis, results, params.loadCase, params.time, params.mode);
     if (typeof selected === 'string') return refuseFe(doc, NAME, 'FEA_RESULTS_MISSING', selected, [analysisId]);
-    const quantity: (typeof FIELDS)[number] = params.field ?? (isHeat(analysis) ? 'temperature' : 'von_mises');
     const cylindrical = (CYLINDRICAL_QUANTITIES as readonly string[]).includes(quantity);
-    const { field, scalar } = cylindrical
-      ? CYLINDRICAL_FIELDS[quantity as CylindricalQuantity]
-      : QUANTITY_FIELDS[quantity as keyof typeof QUANTITY_FIELDS];
+    const { field, scalar: baseScalar } =
+      quantity === 'mode'
+        ? QUANTITY_FIELDS.u_mag
+        : cylindrical
+          ? CYLINDRICAL_FIELDS[quantity as CylindricalQuantity]
+          : QUANTITY_FIELDS[quantity as keyof typeof QUANTITY_FIELDS];
     const values = selected.step.fields[field]?.values;
     if (values === undefined)
       return refuseFe(doc, NAME, 'FEA_FIELD_MISSING', `the ${selected.label} result set has no ${field} field for ${quantity}`, [
         analysisId,
       ]);
+    const peak = quantity === 'mode' ? Math.max(...Object.values(values).map(magnitude), Number.MIN_VALUE) : 1;
+    const scalar: typeof baseScalar = (entry, at, axisFrameValue) => baseScalar(entry, at, axisFrameValue) / peak;
     const coordinates = nodeCoordinates(mesh);
     const meshEntities = [...new Set(mesh.blocks.map((block) => block.entityId))];
     const unknown = (params.entityIds ?? []).filter((id) => !meshEntities.includes(id));
@@ -219,7 +239,7 @@ export const renderFeaResults = defineCommand({
       return at !== undefined && (cut === null || cut.normal[0] * at[0] + cut.normal[1] * at[1] + cut.normal[2] * at[2] <= cut.offset);
     };
     const plotted = new Set([...partNodes].filter(kept));
-    const factor = cylindrical ? 1 : quantityScale(analysis, quantity as ProbeQuantity);
+    const factor = cylindrical || quantity === 'mode' ? 1 : quantityScale(analysis, quantity as ProbeQuantity);
     const value = (node: number): number | undefined => {
       const entry = values[String(node)];
       const at = coordinates.get(node);
@@ -243,7 +263,10 @@ export const renderFeaResults = defineCommand({
       return refuseFe(doc, NAME, 'FEA_FIELD_MISSING', `no plottable ${quantity} values on the solid skin`, [analysisId]);
     const [low, high] = params.range ?? [min.value, max.value];
     const levels = bandLevels(Math.min(low, high), Math.max(low, high), params.bands ?? 12);
-    const unit = quantityUnit(analysis, quantity === 'u_radial' ? 'u_x' : cylindrical ? 's_xx' : (quantity as ProbeQuantity));
+    const unit =
+      quantity === 'mode'
+        ? 'normalised |u|'
+        : quantityUnit(analysis, quantity === 'u_radial' ? 'u_x' : cylindrical ? 's_xx' : (quantity as ProbeQuantity));
     const lengthUnit = lengthUnitName(analysis.unitSystem);
     const round = (p: readonly number[]): Vec3 => [
       Number(significantNumber(p[0] ?? 0, 6)),
@@ -252,7 +275,9 @@ export const renderFeaResults = defineCommand({
     ];
     const deformationText =
       scale > 0
-        ? `deformation ×${significantNumber(scale, 3)} (max |u| ${significantNumber(maxDisplacement, 4)} ${lengthUnit})`
+        ? eigen
+          ? `mode shape drawn ×${significantNumber(scale, 3)} (amplitude arbitrary)`
+          : `deformation ×${significantNumber(scale, 3)} (max |u| ${significantNumber(maxDisplacement, 4)} ${lengthUnit})`
         : 'undeformed';
     const axisText = cylindrical ? `axis [${round(axis.direction).join(', ')}] through [${round(axis.point).join(', ')}]` : '';
     const sectionText = cut === null ? '' : `cut ${round(cut.normal).join(', ')} · p <= ${significantNumber(cut.offset, 6)}`;

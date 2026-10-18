@@ -23,12 +23,15 @@ const RASTER_TIMEOUT_MS = 60_000;
 const RASTER_MAX_BUFFER = 256 * 1024 * 1024;
 
 /**
- * resvg 2.6 aborts the whole process (Rust panic, "failed to initiate panic") on a `<g opacity>` layer whose
- * content lies entirely outside the canvas — e.g. the ground grid of a zoomed-in `render_view`. Group opacity
- * on such a group is equivalent to fill/stroke-opacity on its (non-overlapping) strokes, which resvg renders safely.
+ * resvg 2.6 aborts the whole process (Rust panic, "failed to initiate panic") on an element with `opacity` whose
+ * content lies entirely outside the canvas — e.g. the ground grid of a zoomed-in `render_view`. On shapes and groups of
+ * non-overlapping strokes, `opacity` equals fill/stroke-opacity, which resvg renders safely. `<image>` and the root keep theirs.
  */
 export function sanitizeSvgForResvg(svg: string): string {
-  return svg.replace(/<g\b([^>]*?)\sopacity="([0-9.]+)"([^>]*)>/g, '<g$1 stroke-opacity="$2" fill-opacity="$2"$3>');
+  return svg.replace(
+    /<(?!image\b|svg\b)([a-zA-Z]+)\b([^>]*?)\sopacity="([0-9.]+)"([^>]*)>/g,
+    '<$1$2 stroke-opacity="$3" fill-opacity="$3"$4>',
+  );
 }
 
 const RENDER_SCRIPT =

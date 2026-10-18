@@ -86,8 +86,8 @@ function fan(polygon: readonly FieldVertex[]): (readonly [FieldVertex, FieldVert
 }
 
 /** The plane section of a linear tet as a polygon (3 or 4 vertices), or null when the plane misses it. */
-function sectionOf(tet: readonly FieldVertex[], cut: CutPlane): FieldVertex[] | null {
-  const distance = tet.map((vertex) => dot(cut.normal, vertex.u) - cut.offset);
+function sectionOf(tet: readonly FieldVertex[], cut: CutPlane, snap: number): FieldVertex[] | null {
+  const distance = tet.map((vertex) => snapped(dot(cut.normal, vertex.u) - cut.offset, snap));
   const removed = [0, 1, 2, 3].filter((index) => (distance[index] ?? 0) > 0);
   const kept = [0, 1, 2, 3].filter((index) => (distance[index] ?? 0) <= 0);
   if (removed.length === 0 || kept.length === 0) return null;
@@ -113,13 +113,34 @@ function sectionOf(tet: readonly FieldVertex[], cut: CutPlane): FieldVertex[] | 
   return polygon.length === order.length ? polygon : null;
 }
 
-const normalOfU = (a: FieldVertex, b: FieldVertex, c: FieldVertex): Vec3 => {
-  const [u, v]: [Vec3, Vec3] = [
-    [b.u[0] - a.u[0], b.u[1] - a.u[1], b.u[2] - a.u[2]],
-    [c.u[0] - a.u[0], c.u[1] - a.u[1], c.u[2] - a.u[2]],
-  ];
-  return [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+/** A distance within `snap` of the plane is exactly on it, so every tet sharing a node on the plane classifies that node the same way. */
+const snapped = (distance: number, snap: number): number => (Math.abs(distance) <= snap ? 0 : distance);
+
+/** Area vector of a polygon (Newell): robust when its first corners coincide or are collinear, unlike the cross product of two edges. */
+const areaVectorOfU = (polygon: readonly FieldVertex[]): Vec3 => {
+  const sum: [number, number, number] = [0, 0, 0];
+  polygon.forEach((current, index) => {
+    const next = polygon[(index + 1) % polygon.length] ?? current;
+    sum[0] += (current.u[1] - next.u[1]) * (current.u[2] + next.u[2]);
+    sum[1] += (current.u[2] - next.u[2]) * (current.u[0] + next.u[0]);
+    sum[2] += (current.u[0] - next.u[0]) * (current.u[1] + next.u[1]);
+  });
+  return sum;
 };
+
+/** Diagonal of the bounding box of the node coordinates (0 for no node). */
+function modelSize(coordinates: ReadonlyMap<number, Vec3>): number {
+  const low = [Infinity, Infinity, Infinity];
+  const high = [-Infinity, -Infinity, -Infinity];
+  for (const at of coordinates.values())
+    for (const axis of [0, 1, 2] as const) {
+      low[axis] = Math.min(low[axis] ?? Infinity, at[axis]);
+      high[axis] = Math.max(high[axis] ?? -Infinity, at[axis]);
+    }
+  return coordinates.size === 0
+    ? 0
+    : Math.hypot((high[0] ?? 0) - (low[0] ?? 0), (high[1] ?? 0) - (low[1] ?? 0), (high[2] ?? 0) - (low[2] ?? 0));
+}
 
 /**
  * Faces to draw: skin triangles of the selected parts (kept side of the cut), and, with a cut, one section face per crossed tet.
@@ -140,7 +161,9 @@ export function fieldFaces(input: FaceInput): FieldFace[] {
     return made;
   };
   const faces: FieldFace[] = [];
-  const distance = (vertex: FieldVertex): number => (cut === null ? 0 : dot(cut.normal, vertex.u) - cut.offset);
+  const snap = 1e-7 * modelSize(coordinates);
+  const minArea = 1e-12 * modelSize(coordinates) ** 2;
+  const distance = (vertex: FieldVertex): number => (cut === null ? 0 : snapped(dot(cut.normal, vertex.u) - cut.offset, snap));
   for (const { nodes, entityId } of meshSkinOwned(selected, coordinates)) {
     const corners = nodes.map(vertexOf);
     if (corners.some((vertex) => vertex === null)) continue;
@@ -157,11 +180,13 @@ export function fieldFaces(input: FaceInput): FieldFace[] {
       for (const quad of complete ? subTets : [[0, 1, 2, 3] as const]) {
         const tet = quad.map((index) => vertexOf(nodes[index] ?? -1));
         if (tet.some((vertex) => vertex === null)) continue;
-        const polygon = sectionOf(tet as FieldVertex[], cut);
-        const [a, b, c] = polygon ?? [];
-        if (polygon === null || a === undefined || b === undefined || c === undefined) continue;
-        const ordered = dot(normalOfU(a, b, c), cut.normal) < 0 ? [...polygon].reverse() : polygon;
-        for (const corner of fan(ordered)) faces.push({ corners: corner, entityId: block.entityId, cap: true });
+        const polygon = sectionOf(tet as FieldVertex[], cut, snap);
+        if (polygon === null) continue;
+        const area = areaVectorOfU(polygon);
+        const along = dot(area, cut.normal);
+        if (!(Math.abs(along) > minArea)) continue;
+        for (const corner of fan(along < 0 ? [...polygon].reverse() : polygon))
+          faces.push({ corners: corner, entityId: block.entityId, cap: true });
       }
     }
   }

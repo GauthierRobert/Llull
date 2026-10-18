@@ -94,8 +94,11 @@ const MAX_INSTANCE_DEPTH = 4;
 function instanceSolids(doc: CadDocument, instance: InstanceEntity, label: string, depth: number): Entity[] {
   const component = doc.components[instance.componentId];
   if (component === undefined || depth >= MAX_INSTANCE_DEPTH) return [];
-  return expandInstance(instance, component).flatMap((child): Entity[] => {
-    const name = `${label}/${child.name ?? child.id}`;
+  const children = expandInstance(instance, component);
+  return children.flatMap((child, index): Entity[] => {
+    const nestedComponent = child.kind === 'instance' ? doc.components[child.componentId] : undefined;
+    const fallback = nestedComponent?.name ?? (children.length === 1 ? component.name : `${component.name} ${index + 1}`);
+    const name = `${label}/${child.name ?? fallback}`;
     if (child.kind === 'instance') return instanceSolids(doc, child, name, depth + 1);
     return is3D(child) ? [{ ...child, name }] : [];
   });
@@ -110,7 +113,7 @@ function stepTargets(doc: CadDocument, entityIds: readonly string[] | undefined)
     const entity = doc.entities[id];
     if (entity === undefined) skipped.push(`${id} (not found)`);
     else if (entity.kind === 'instance') {
-      const parts = instanceSolids(doc, entity, entity.name ?? entity.id, 0);
+      const parts = instanceSolids(doc, entity, entity.name ?? doc.components[entity.componentId]?.name ?? 'instance', 0);
       if (parts.length === 0) skipped.push(`${id} (instance without solids)`);
       solids.push(...parts);
     } else if (is3D(entity)) solids.push(entity);

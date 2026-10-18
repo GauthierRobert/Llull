@@ -31,6 +31,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'replace the typical / unstated CTE, E or nu by a verified, sourced define_property_model value; results stay flagged until then',
   TMC_PROPERTY_OUT_OF_RANGE:
     'define the CTE / E / nu model over the temperatures reached (define_property_model with a validity range covering the reference and field temperatures)',
+  TMC_ELASTIC_NOT_TEMPERATURE_DEPENDENT:
+    'define_property_model for E (and nu) against T over the temperatures reached (table1d or polynomial with a validity range covering the field); the deck then writes *ELASTIC rows E, nu, T',
   TMC_THERMAL_CATEGORY_UNSET:
     'add_fea_load with loadCase set to the thermal load case name and category limit or ultimate, per the programme rule',
   TMC_COUPLED_UNSUPPORTED:

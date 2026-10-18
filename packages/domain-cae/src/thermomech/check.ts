@@ -6,6 +6,7 @@ import type { CadDocument } from '@core/model/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
+import { elasticConstants, isElasticRefusal } from '../decks/elastic';
 import { caseOf } from '../shared/access';
 import { trustedRecord } from '../shared/trust';
 import { checkThermalItems } from '../thermal/check';
@@ -92,6 +93,66 @@ function fieldItems(
       ];
 }
 
+/** Field temperature range (K) when it is known without solving: a uniform value, or the nodal range over the recorded mesh. */
+function fieldRangeKelvin(
+  doc: CadDocument,
+  analysisCase: AnalysisCase,
+  setup: ThermoMechSetup,
+  artifacts: FeArtifactPort | null,
+): readonly [low: number, high: number] | null {
+  const { field } = setup;
+  if (field === undefined) return null;
+  if (field.kind === 'uniform') {
+    const value = temperatureIn(field.value, setup.temperatureScale);
+    return value === null || !Number.isFinite(value)
+      ? null
+      : [kelvinOf(value, setup.temperatureScale), kelvinOf(value, setup.temperatureScale)];
+  }
+  const hash = analysisCase.meshSummary?.meshHash;
+  const mesh = hash === undefined ? null : (artifacts?.get(hash) ?? null);
+  if (mesh?.kind !== 'fe_mesh') return null;
+  const resolved = resolveTemperatureField(doc, analysisCase.id, mesh, artifacts);
+  return resolved.ok ? [kelvinOf(resolved.min, setup.temperatureScale), kelvinOf(resolved.max, setup.temperatureScale)] : null;
+}
+
+/** Field span (K) above which a constant E / nu is flagged. */
+const ELASTIC_SPAN_WARNING_KELVIN = 50;
+
+/** One warning per material whose E and nu are constant while the field (with the reference) spans more than 50 K. */
+function elasticItems(
+  doc: CadDocument,
+  analysisCase: AnalysisCase,
+  setup: ThermoMechSetup,
+  referenceKelvin: number,
+  artifacts: FeArtifactPort | null,
+): ThermomechCheckItem[] {
+  const range = fieldRangeKelvin(doc, analysisCase, setup, artifacts);
+  if (range === null) return [];
+  const low = Math.min(range[0], referenceKelvin);
+  const high = Math.max(range[1], referenceKelvin);
+  if (high - low <= ELASTIC_SPAN_WARNING_KELVIN) return [];
+  const items: ThermomechCheckItem[] = [];
+  const seen = new Set<string>();
+  for (const entityId of Object.keys(analysisCase.parts)) {
+    const materialId = Object.hasOwn(doc.entities, entityId) ? doc.entities[entityId]?.materialId : undefined;
+    const material = materialId !== undefined && Object.hasOwn(doc.materials, materialId) ? doc.materials[materialId] : undefined;
+    if (materialId === undefined || material === undefined || seen.has(materialId)) continue;
+    seen.add(materialId);
+    const atLow = elasticConstants(material, materialId, low);
+    const atHigh = elasticConstants(material, materialId, high);
+    if (isElasticRefusal(atLow) || isElasticRefusal(atHigh) || atLow.E !== atHigh.E || atLow.nu !== atHigh.nu) continue;
+    items.push(
+      item(
+        'TMC_ELASTIC_NOT_TEMPERATURE_DEPENDENT',
+        'warning',
+        `material '${materialId}' has a constant E = ${atLow.E} MPa and nu = ${atLow.nu} but the temperature field spans ${Math.round(high - low)} K (${Math.round(low - 273.15)} to ${Math.round(high - 273.15)} degC): thermal stress is E(T) alpha dT, so a hot part with a room-temperature E reads high (typically 5 to 15 % for metals at 400 degC)`,
+        [materialId, entityId],
+      ),
+    );
+  }
+  return items;
+}
+
 function partItems(doc: CadDocument, analysisCase: AnalysisCase, setup: ThermoMechSetup, referenceKelvin: number): ThermomechCheckItem[] {
   const items: ThermomechCheckItem[] = [];
   for (const entityId of Object.keys(analysisCase.parts)) {
@@ -156,6 +217,8 @@ export function checkThermomechItems(doc: CadDocument, analysisId: string, artif
   else items.push(...fieldItems(doc, analysisCase, setup, artifacts));
   if (reference !== null && Number.isFinite(reference))
     items.push(...partItems(doc, analysisCase, setup, kelvinOf(reference, setup.temperatureScale)));
+  if (!coupled && reference !== null && Number.isFinite(reference))
+    items.push(...elasticItems(doc, analysisCase, setup, kelvinOf(reference, setup.temperatureScale), artifacts));
   if (!analysisCase.loadOrder.some((id) => analysisCase.loads[id]?.loadCase === setup.loadCaseName))
     items.push(
       item(

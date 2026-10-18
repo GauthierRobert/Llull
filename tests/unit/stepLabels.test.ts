@@ -111,6 +111,22 @@ describe('export_step_exact labels', () => {
   });
 });
 
+describe('export_step_exact instance labels', () => {
+  it('names instance solids after the component names, never internal ids', () => {
+    let doc = createEmptyDocument();
+    for (const name of ['M6 bolt', 'Plate']) {
+      const box = execute(doc, 'add_box', { size: [1, 1, 1] });
+      doc = execute(box.document, 'create_component', { name, entityIds: box.affected }).document;
+    }
+    const ctx = { ...defaultContext(), kernel: fakeKernel({ step: KERNEL_STEP }) };
+    const step = (execute(doc, 'export_step_exact', {}, ctx).data as { step: string }).step;
+    expect(step).toContain("PRODUCT('M6 bolt/M6 bolt','M6 bolt/M6 bolt'");
+    expect(step).toContain("PRODUCT('Plate/Plate','Plate/Plate'");
+    expect(step).not.toContain('expanded::');
+    expect(step).not.toContain('instance-');
+  });
+});
+
 describe('withMonotonicStepCounter', () => {
   const at = (nextStepNumber: number): CadDocument => ({ ...createEmptyDocument(), nextStepNumber });
   it('raises the restored counter to the current one', () => {

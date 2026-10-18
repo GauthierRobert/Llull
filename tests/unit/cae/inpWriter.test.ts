@@ -4,7 +4,7 @@ import type { CadDocument } from '@core/model/types';
 import { buildInp, type DisciplineTable } from '@cae/decks/deckBuilder';
 import { buildDeckContext, loadCasesOf, safeName } from '@cae/decks/context';
 import { writeInp } from '@cae/decks/inpWriter';
-import { caseOf, withCase } from '@cae/shared/access';
+import { caseOf } from '@cae/shared/access';
 import { X0_NODES, barDocument, barMesh, mustRun } from './deckFixtures';
 
 const supportSets = (constraints: Record<string, string>): Record<string, number[]> => ({
@@ -103,12 +103,10 @@ describe('writeInp refusals', () => {
     return 'code' in written ? written.code : undefined;
   };
 
-  it('refuses an unknown analysis, an unsupported type and a mesh of other inputs or units', () => {
+  it('refuses an unknown analysis and a mesh of other inputs or units', () => {
     const bar = barDocument();
     const mesh = barMesh(bar.doc, bar.analysisId, bar.boxId, supportSets(bar.constraints));
     expect(code(bar.doc, 'nope', mesh)).toBe('FEA_ANALYSIS_NOT_FOUND');
-    const modal = withCase(bar.doc, { ...caseOf(bar.doc, bar.analysisId)!, type: 'modal' });
-    expect(code(modal, bar.analysisId, mesh)).toBe('FEA_ANALYSIS_TYPE_UNSUPPORTED');
     const remeshed = mustRun(bar.doc, 'set_mesh_controls', { analysisId: bar.analysisId, globalSize: 3 });
     expect(code(remeshed, bar.analysisId, mesh)).toBe('FEA_MESH_STALE');
     expect(code(bar.doc, bar.analysisId, { ...mesh, unitSystem: 'N-m-kg-s' })).toBe('FEA_UNITS_MISMATCH');

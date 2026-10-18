@@ -121,6 +121,7 @@ export function evaluateProbes(
   results: FeResultsArtifact,
   lengthToAnalysis: number,
 ): ProbeReading[] {
+  if (analysis.type === 'modal' || analysis.type === 'buckling') return [];
   const heat = analysis.type === 'heat_steady' || analysis.type === 'heat_transient';
   const sets: { loadCase: string | null; step: ResultStep }[] = heat
     ? results.steps.map((step) => ({ loadCase: null, step }))

@@ -41,13 +41,16 @@ export function filesOfData(data: unknown): OutputFile[] {
   return (Array.isArray(many) ? many.filter(isRecord) : [data]).map(fileOfRecord).filter((file): file is OutputFile => file !== null);
 }
 
-/** PNG of `data.svg` (sized by `data.width`); null without svg or on failure. */
-function pngOfData(data: unknown): OutputFile | null {
-  if (!isRecord(data)) return null;
+/** The svg markup of `data` (data.svg, or civil sheets' svg held in data.text), or undefined. */
+function svgOfData(data: unknown): string | undefined {
+  if (!isRecord(data)) return undefined;
   const text = nonEmptyString(data['text']);
-  const svg = nonEmptyString(data['svg']) ?? (text?.trimStart().startsWith('<svg') === true ? text : undefined); // civil sheets: svg in data.text
-  if (svg === undefined) return null;
-  const base64 = rasterizeSvg(svg, typeof data['width'] === 'number' ? data['width'] : undefined);
+  return nonEmptyString(data['svg']) ?? (text?.trimStart().startsWith('<svg') === true ? text : undefined);
+}
+
+/** PNG of `svg` (sized by `data.width`); null on rasterization failure. */
+function pngOfSvg(svg: string, data: unknown): OutputFile | null {
+  const base64 = rasterizeSvg(svg, isRecord(data) && typeof data['width'] === 'number' ? data['width'] : undefined);
   return base64 === null ? null : { name: null, bytes: Buffer.from(base64, 'base64') };
 }
 
@@ -65,6 +68,8 @@ export function withSaveDefaults(name: string, params: unknown, save: string | u
 export interface SavedFile {
   readonly path: string;
   readonly bytes: number;
+  /** Set when the file differs from what was asked (e.g. the .svg saved because the .png could not be rasterized). */
+  readonly note?: string;
 }
 
 /**
@@ -73,12 +78,26 @@ export interface SavedFile {
  */
 export function saveDataFiles(data: unknown, target: string): SavedFile[] {
   const wantsPng = path.extname(target).toLowerCase() === '.png';
-  const png = wantsPng ? pngOfData(data) : null;
+  const svg = wantsPng ? svgOfData(data) : undefined;
+  const png = svg !== undefined ? pngOfSvg(svg, data) : null;
+  if (svg !== undefined && png === null) {
+    const svgPath = target.replace(/\.png$/i, '.svg');
+    fs.mkdirSync(path.dirname(path.resolve(svgPath)), { recursive: true });
+    const bytes = Buffer.from(svg, 'utf8');
+    fs.writeFileSync(svgPath, bytes);
+    return [
+      {
+        path: svgPath,
+        bytes: bytes.length,
+        note: `rasterizing the svg failed (resvg could not render it); saved the .svg instead of ${target}`,
+      },
+    ];
+  }
   const files = wantsPng ? (png !== null ? [png] : []) : filesOfData(data); // never svg text into a .png
   if (files.length === 0) {
     throw new Error(
       wantsPng
-        ? 'the result has no data.svg that rasterizes (use render_view or a sheet export for --save *.png).'
+        ? 'the result has no data.svg (use render_view or a sheet export for --save *.png).'
         : 'the result carries no file payload to save (no data.files / text / dxf / svg / base64 field).',
     );
   }

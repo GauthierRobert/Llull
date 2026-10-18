@@ -67,6 +67,14 @@ export function pipeLabel(context: CivilContext, pipe: PipeObject, planLength: n
   return `Ø${Math.round(toMm(context.doc, pipe.diameter))} ${pipe.material} ${slope.toFixed(2)} %`;
 }
 
+/** Text angle (rad) of a pipe running along (dx, dy), flipped by 180 degrees when it would read upside down: result in (-pi/2, pi/2]. @pure */
+export function readableAngle(dx: number, dy: number): number {
+  const angle = Math.atan2(dy, dx);
+  if (angle > Math.PI / 2 + 1e-9) return angle - Math.PI;
+  if (angle <= -Math.PI / 2 + 1e-9) return angle + Math.PI;
+  return angle;
+}
+
 export function evaluatePipe(context: CivilContext, pipe: PipeObject): Entity[] {
   const from = civilObject(context.civil, pipe.fromId, 'manhole');
   const to = civilObject(context.civil, pipe.toId, 'manhole');
@@ -87,7 +95,7 @@ export function evaluatePipe(context: CivilContext, pipe: PipeObject): Entity[] 
       'annotation',
       middle,
       labelHeight(context.doc),
-      Math.atan2(dy, dx),
+      readableAngle(dx, dy),
     ),
   ];
 }

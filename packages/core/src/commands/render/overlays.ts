@@ -68,15 +68,48 @@ function groundGridLines(project: Projector, data: RenderViewData, axisLength: n
   const iMax = Math.ceil(ext / gridStep);
   const ticks = Array.from({ length: iMax - iMin + 1 }, (_, n) => (iMin + n) * gridStep);
   const [low, high] = [iMin * gridStep, iMax * gridStep];
-  const line = (from: [number, number, number], to: [number, number, number], attributes = ''): string =>
-    `    ${svgLine(project(from), project(to), attributes)}`;
+  const line = (from: [number, number, number], to: [number, number, number], attributes = ''): string[] => {
+    const clipped = clipSegmentToCanvas(project(from), project(to), data.width, data.height);
+    return clipped === null ? [] : [`    ${svgLine(clipped[0], clipped[1], attributes)}`];
+  };
   return [
     `  <g id="ground-grid" opacity="0.18" stroke="#88aacc" stroke-width="0.8" stroke-linecap="round">`,
-    ...ticks.map((x) => line([x, low, 0], [x, high, 0])), // parallel to Y
-    ...ticks.map((y) => line([low, y, 0], [high, y, 0])), // parallel to X
-    line([-ext, 0, 0], [ext, 0, 0], 'stroke="#cc4444" opacity="0.35"'),
-    line([0, -ext, 0], [0, ext, 0], 'stroke="#44bb44" opacity="0.35"'),
+    ...ticks.flatMap((x) => line([x, low, 0], [x, high, 0])), // parallel to Y
+    ...ticks.flatMap((y) => line([low, y, 0], [high, y, 0])), // parallel to X
+    ...line([-ext, 0, 0], [ext, 0, 0], 'stroke="#cc4444" opacity="0.35"'),
+    ...line([0, -ext, 0], [0, ext, 0], 'stroke="#44bb44" opacity="0.35"'),
     `  </g>`,
+  ];
+}
+
+/** Liang-Barsky clip of a screen segment to the canvas (plus a 1 px margin); null when it lies entirely outside. */
+function clipSegmentToCanvas(
+  from: readonly [number, number],
+  to: readonly [number, number],
+  width: number,
+  height: number,
+): [[number, number], [number, number]] | null {
+  const [dx, dy] = [to[0] - from[0], to[1] - from[1]];
+  let [t0, t1] = [0, 1];
+  const edges: [number, number][] = [
+    [-dx, from[0] + 1],
+    [dx, width + 1 - from[0]],
+    [-dy, from[1] + 1],
+    [dy, height + 1 - from[1]],
+  ];
+  for (const [p, q] of edges) {
+    if (p === 0) {
+      if (q < 0) return null;
+      continue;
+    }
+    const t = q / p;
+    if (p < 0) t0 = Math.max(t0, t);
+    else t1 = Math.min(t1, t);
+    if (t0 > t1) return null;
+  }
+  return [
+    [from[0] + t0 * dx, from[1] + t0 * dy],
+    [from[0] + t1 * dx, from[1] + t1 * dy],
   ];
 }
 
@@ -123,12 +156,15 @@ function appendAxesAndGrid(svgString: string, data: RenderViewData, units: strin
   const orthoHalf = data.orthoHalf;
   const project = makeProjector(camera, orthoHalf, width, height);
   const axisLength = Math.max(orthoHalf * 0.2, 0.5);
-  return appendBeforeClose(
-    svgString,
-    [
-      '  <!-- world-frame overlay -->',
-      ...(showGrid ? groundGridLines(project, data, axisLength) : []),
-      ...(showAxes ? worldAxesLines(project, data, units, axisLength) : []),
-    ].join('\n'),
-  );
+  // The grid goes UNDER the full-canvas raster layer (transparent where nothing is drawn) so solids occlude it.
+  const rasterTag = `<image x="0" y="0" width="${width}" height="${height}" href="data:image/png`;
+  const rasterAt = svgString.lastIndexOf(rasterTag);
+  const grid = showGrid ? ['  <!-- ground grid -->', ...groundGridLines(project, data, axisLength)].join('\n') : '';
+  const underRaster = grid !== '' && rasterAt !== -1;
+  const base = underRaster ? `${svgString.slice(0, rasterAt).replace(/ *$/, '')}${grid}\n  ${svgString.slice(rasterAt)}` : svgString;
+  const top = [
+    ...(grid !== '' && !underRaster ? [grid] : []),
+    ...(showAxes ? ['  <!-- world-frame overlay -->', ...worldAxesLines(project, data, units, axisLength)] : []),
+  ];
+  return top.length === 0 ? base : appendBeforeClose(base, top.join('\n'));
 }

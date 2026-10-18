@@ -62,6 +62,26 @@ describe('render_view raster mode (default)', () => {
     expect(image.pixel(2, 2)[3]).toBe(0);
   });
 
+  it('draws the ground grid under the raster layer (solids occlude it) and keeps every grid line on the canvas when zoomed in', () => {
+    let doc = createEmptyDocument();
+    doc = run(doc, 'add_box', { size: [1000, 1000, 1000], position: [5000, 5000, 500] });
+    const svg = (execute(doc, 'render_view', { zoom: 5, target: [5000, 5000, 1000], width: 400, height: 300 }).data as { svg: string }).svg;
+    const gridAt = svg.indexOf('id="ground-grid"');
+    expect(gridAt).toBeGreaterThan(-1);
+    expect(gridAt).toBeLessThan(svg.indexOf('<image'));
+    const grid = svg.slice(gridAt, svg.indexOf('</g>', gridAt));
+    for (const [, x1, y1, x2, y2] of grid.matchAll(/<line x1="(-?[\d.]+)" y1="(-?[\d.]+)" x2="(-?[\d.]+)" y2="(-?[\d.]+)"/g))
+      for (const [value, limit] of [
+        [x1, 400],
+        [x2, 400],
+        [y1, 300],
+        [y2, 300],
+      ] as const) {
+        expect(Number(value)).toBeGreaterThanOrEqual(-1.01);
+        expect(Number(value)).toBeLessThanOrEqual(limit + 1.01);
+      }
+  });
+
   it('paints a solid in its assigned material colour, as the viewport does', () => {
     let doc = createEmptyDocument();
     const added = execute(doc, 'add_box', { size: [10, 10, 10], color: '#0000ff' });

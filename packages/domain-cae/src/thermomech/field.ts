@@ -273,7 +273,7 @@ function thermalResultField(
   const sourceScale = source?.thermal?.temperatureScale ?? 'degC';
   const affine = affineBetween(sourceScale, scale);
   if (affine === null) return refusal('TMC_FIELD_SOURCE_INVALID', `cannot convert ${sourceScale} to ${scale}`, ids);
-  const label = `thermal_result ${field.analysisId} step ${step.step} t=${step.time} s (results ${resultsHash.slice(0, 12)})`;
+  const label = `thermal_result ${field.analysisId} step ${step.step} ${source?.type === 'heat_steady' ? 'steady state' : `t=${step.time} s`} (results ${resultsHash.slice(0, 12)})`;
   if (interpolate) {
     const mapped = mapThermalField(artifact, nodal.values, affine, mesh, artifacts, ids);
     if (!mapped.ok) return mapped;

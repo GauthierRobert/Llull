@@ -123,11 +123,18 @@ export function resolveDensity(
       doc,
       kgPerM3FromDocDensity(doc, material.density),
       {
-        source: `material '${materialId}' density (legacy, g/${doc.units}³)`,
+        source:
+          material.densityUnit === undefined
+            ? `material '${materialId}' density (given without a source, g/${doc.units}³)`
+            : `material '${materialId}' density (given in ${material.densityUnit}, no source; stored as g/${doc.units}³)`,
         materialId,
         defaulted: false,
         unverified: true,
-        unverifiedReasons: ['provenance legacy'],
+        unverifiedReasons: [
+          material.densityUnit === undefined
+            ? 'density given without a source (unverified)'
+            : `density given in ${material.densityUnit} without a source (unverified)`,
+        ],
       },
       material.density,
     );

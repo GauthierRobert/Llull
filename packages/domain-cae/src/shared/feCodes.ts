@@ -12,6 +12,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   FEA_MESH_MISMATCH: 'record the mesh the results were computed on (fea_mesh then fea_solve), then record the results',
   FEA_MESH_MISSING: 'run fea_mesh',
   FEA_MESH_STALE: 'run fea_mesh',
+  FEA_FACETED_GEOMETRY:
+    'for stress at holes / fillets / curved faces use the OCC kernel (--kernel occt or LLULL_KERNEL=occt) so the mesh follows the exact B-rep, then re-run fea_mesh',
   FEA_MESH_INVERTED: 'refine the mesh (set_mesh_controls globalSize / refinements) or change order, then run fea_mesh',
   FEA_RESULTS_MISSING: 'run fea_solve',
   FEA_RESULTS_STALE: 'run fea_mesh then fea_solve',
@@ -32,7 +34,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   FEA_DECK_NAME_COLLISION:
     'rename the entity or target so the sanitised set names differ (letters, digits and underscores only), then run fea_mesh',
   FEA_UNITS_MISMATCH: 'mesh and analysis disagree on the unit system: re-run fea_mesh',
-  FEA_ANALYSIS_TYPE_UNSUPPORTED: 'use static, heat_steady, heat_transient, thermo_static or coupled_temperature_displacement',
+  FEA_ANALYSIS_TYPE_UNSUPPORTED:
+    'use static, modal, buckling, heat_steady, heat_transient, thermo_static or coupled_temperature_displacement',
 };
 
 /** Remediation text registered for a 05 code ("see the command description" when unknown). */

@@ -393,6 +393,8 @@ export interface FeMeshArtifact {
   readonly nodeSets: Readonly<Record<string, readonly number[]>>;
   readonly faceSets: Readonly<Record<string, readonly (readonly [elementId: number, face: number])[]>>;
   readonly targets: Readonly<Record<string, { readonly residual: number }>>;
+  /** Parts meshed from a faceted tessellation that has curved faces (polygons, not B-rep): stresses at curved features are off by several %. */
+  readonly facetedParts?: readonly EntityId[];
 }
 
 export interface FeResultsArtifact {
