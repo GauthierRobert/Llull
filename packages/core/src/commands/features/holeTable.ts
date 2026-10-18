@@ -6,6 +6,7 @@ import type { HoleKind } from '../../model/features';
 import { type MachinedHole, authoredFeatures } from '../../geometry/featureInstances';
 import { drillTipHeight } from '../../lib/holeMath';
 import { recipeOf } from '../../geometry/shapeRecipe';
+import { entityLocalToWorld } from '../../geometry/entityFrame';
 import { worldToFrame } from '../../geometry/featureFrame';
 import { dot3 } from '../../lib/vec3';
 import type { CommandResult } from '../types';
@@ -26,7 +27,7 @@ export interface HoleRow {
   /** Distance from the datum down the face (the datum is the top-left corner: y grows downwards), document length units. */
   readonly y: number;
   readonly face: Vec3;
-  /** Hole centre on its face in the part's own (mesh) coordinates, document length units: where a viewer marks it. */
+  /** Hole centre on its face in WORLD coordinates (the part's placement applied), document length units: where a viewer marks it. */
   readonly at: Vec3;
   readonly subtype: HoleKind;
   readonly diameter: number;
@@ -84,7 +85,7 @@ export const holeTable = defineCommand({
     'top-left corner of its face (x along the face, y downwards, document length units), kind (simple, counterbore, countersink, counterdrill), ' +
     'diameter, countersink diameter / included angle in degrees / depth, counterbore diameter / depth, blind depth or through, drill point ' +
     'angle with its source (a drill point that was not given is reported as defaulted, 118 degrees, source R8) and tip height, and the ' +
-    'cosmetic thread. Holes come from add_hole, or are recognised from the B-rep of an imported solid when the kernel is exact (without a kernel only authored holes are listed, otherwise FTR_NEEDS_EXACT_KERNEL). Rows are ' +
+    'cosmetic thread, and at = the hole centre [x, y, z] in world coordinates (to mark it on the model). Holes come from add_hole, or are recognised from the B-rep of an imported solid when the kernel is exact (without a kernel only authored holes are listed, otherwise FTR_NEEDS_EXACT_KERNEL). Rows are ' +
     'sorted by face, then y, then x. Pass origin to measure from another datum of the face frame. Lengths in the document length unit, ' +
     'angles in degrees. The table is returned in data = { origin, rows } plus the unit, provenance and reviewRequired (computed by llull, not approved).',
   params: z.object({
@@ -152,7 +153,7 @@ export const holeTable = defineCommand({
         x,
         y,
         face: hole.frame.normal.map(rounded) as unknown as Vec3,
-        at: hole.position.map(rounded) as unknown as Vec3,
+        at: (part.source === 'authored' ? entityLocalToWorld(entity, hole.position) : hole.position).map(rounded) as unknown as Vec3,
         subtype: hole.kind,
         diameter: hole.diameter,
         ...(hole.cskDiameter === undefined ? {} : { cskDiameter: hole.cskDiameter }),

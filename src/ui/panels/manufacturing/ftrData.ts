@@ -52,7 +52,7 @@ export interface HoleRowView {
   readonly y: number;
   readonly kind: string;
   readonly diameter: number;
-  /** Hole centre in part coordinates (hole_table `at`), when reported. */
+  /** Hole centre in world coordinates (hole_table `at`), when reported. */
   readonly at?: readonly [number, number, number];
   readonly cskAngleDeg?: number;
   readonly cskDiameter?: number;

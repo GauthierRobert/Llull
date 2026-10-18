@@ -38,9 +38,8 @@ const SCHEDULES = [
 const TAKEOFF_COLOR = '#26a69a';
 
 /** A takeoff line's item: a button highlighting the elements of its category on the model (plain text when none is modelled). */
-function TakeoffItem({ lineKey, description }: { lineKey: string; description: string }): React.ReactElement {
+function TakeoffItem({ lineKey, category, description }: { lineKey: string; category: string; description: string }): React.ReactElement {
   const focusItem = useFocusItem();
-  const category = lineKey.split('.')[0] ?? '';
   const ids = useStore((s) =>
     Object.values(s.document.building?.elements ?? {})
       .filter((element) => element.category === category)
@@ -149,7 +148,7 @@ function EstimateTable(): React.ReactElement {
               {estimate.lines.map((line) => (
                 <tr key={line.key} data-testid={`takeoff-${line.key}`}>
                   <td title={line.key}>
-                    <TakeoffItem lineKey={line.key} description={line.description} />
+                    <TakeoffItem lineKey={line.key} category={line.category} description={line.description} />
                   </td>
                   <td className="building-table__number">
                     {line.quantity} {UNIT_LABEL[line.unit] ?? line.unit}

@@ -57,9 +57,9 @@ describe('every list row with a place on the model highlights it', () => {
     expect(focus()?.markers[0]?.position[0]).toBeCloseTo(33.6);
   });
 
-  it('a feature-table hole beacons its centre (part coordinates + part position)', () => {
+  it('a feature-table hole beacons its centre (hole_table reports it in world coordinates)', () => {
     const id = localDispatch('add_box', { size: [10, 10, 10], position: [100, 0, 0] }).affected[0]!;
-    const hole = holeFocus(useStore.getState().document, id, 'H1 · Ø4', [1, 2, 5]);
+    const hole = holeFocus(useStore.getState().document, id, 'H1 · Ø4', [101, 2, 5]);
     expect(hole.markers).toEqual([{ position: [101, 2, 5], label: 'H1 · Ø4' }]);
     expect(hole.entityIds).toEqual([id]);
   });

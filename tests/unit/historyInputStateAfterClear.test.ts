@@ -24,4 +24,12 @@ describe('replay keeps the parameter table through a recorded clear_document', (
     expect(Object.keys(replayed.document.configurations)).toEqual(['large']);
     expect(replayed.document.parameters['w']?.expression).toBe('60');
   });
+
+  it('recipes survive the replay too', () => {
+    const boxed = execute(withParameter, 'add_box', { size: [2, 2, 2] }).document;
+    const saved = execute(boxed, 'save_recipe', { name: 'cube' }).document;
+    expect(Object.keys(saved.recipes)).toEqual(['cube']);
+    const replayed = execute(saved, 'replay_history', {});
+    expect(Object.keys(replayed.document.recipes)).toEqual(['cube']);
+  });
 });

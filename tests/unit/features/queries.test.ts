@@ -151,6 +151,24 @@ describe('hole_table', () => {
     expect(table.unverified).toBe(false);
   });
 
+  it('reports each hole centre in world coordinates, following the part when it moves', () => {
+    const stock = plate();
+    const drilled = execute(stock.doc, 'add_hole', {
+      target: stock.id,
+      face: TOP,
+      points: [[10, 10]],
+      hole: { kind: 'simple', diameter: 4 },
+      extent: { kind: 'blind', depth: 5, drillPointAngle: 135 },
+    });
+    const id = idOf(drilled);
+    const before = dataOf<HoleTableData>(execute(drilled.document, 'hole_table', { id })).rows[0]?.at;
+    const moved = execute(drilled.document, 'move_entities', { ids: [id], delta: [100, 0, 5] });
+    const after = dataOf<HoleTableData>(execute(moved.document, 'hole_table', { id })).rows[0]?.at;
+    expect(after?.[0]).toBeCloseTo((before?.[0] ?? 0) + 100, 6);
+    expect(after?.[1]).toBeCloseTo(before?.[1] ?? 0, 6);
+    expect(after?.[2]).toBeCloseTo((before?.[2] ?? 0) + 5, 6);
+  });
+
   it('an entity without holes has no rows; a missing id is refused', () => {
     const { doc, id } = plate();
     const empty = execute(doc, 'hole_table', { id });

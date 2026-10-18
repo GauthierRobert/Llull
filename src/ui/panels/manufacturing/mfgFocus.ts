@@ -74,12 +74,7 @@ export function partFocus(
   return { key: `manufacturing:${key}`, label, color, entityIds: entity === undefined ? [] : [partId], markers };
 }
 
-/** A hole of the feature table: the part selected, a beacon at the hole centre (part coordinates, translated like featurePoints). */
+/** A hole of the feature table: the part selected, a beacon at the hole centre (`hole_table` reports it in world coordinates). */
 export function holeFocus(doc: CadDocument, partId: string, label: string, at: Vec3): PanelFocus {
-  const entity = doc.entities[partId];
-  const placed = entity === undefined || entity.rotation.some((angle) => angle !== 0) ? null : entity.position;
-  const fallback = partFocus(doc, partId, `hole:${label}`, label, HOLE_COLOR);
-  if (placed === null) return fallback;
-  const position: Vec3 = [at[0] + placed[0], at[1] + placed[1], at[2] + placed[2]];
-  return { ...fallback, markers: [{ position, label }] };
+  return { ...partFocus(doc, partId, `hole:${label}`, label, HOLE_COLOR), markers: [{ position: at, label }] };
 }

@@ -182,10 +182,10 @@ export function replayHistory(
       failure = failureOf(result);
       if (tracking && cache) parameterFingerprint = tracking.wasRead(result ? result.document : doc) ? inputFingerprint : undefined;
       if (result) doc = { ...(tracking ? tracking.restore(result.document) : result.document), featureHistory: history };
-      // Input state (L8: only metaHistory commands write the parameter table and configurations) survives every recorded step, so a
-      // replayed clear_document cannot erase parameters defined after it.
-      if (doc.parameters !== before.parameters || doc.configurations !== before.configurations)
-        doc = { ...doc, parameters: before.parameters, configurations: before.configurations };
+      // Input state (L8: only metaHistory commands write the parameter table, configurations and recipes) survives every recorded step,
+      // so a replayed clear_document cannot erase what was defined after it.
+      if (doc.parameters !== before.parameters || doc.configurations !== before.configurations || doc.recipes !== before.recipes)
+        doc = { ...doc, parameters: before.parameters, configurations: before.configurations, recipes: before.recipes };
       const mintedUid = uidBefore === undefined ? doc.building?.uid : undefined;
       if (mintedUid === undefined) {
         const state = {

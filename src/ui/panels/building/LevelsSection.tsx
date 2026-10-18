@@ -36,7 +36,7 @@ function LevelRow({ level, active, units, levels }: LevelRowProps): React.ReactE
       focusItem(
         entitiesFocus(doc, {
           key: `building:level:${level.id}`,
-          label: `${/^level\b/i.test(level.name) ? '' : 'Level '}${level.name} (+${level.elevation} ${units})`,
+          label: `${/^level\b/i.test(level.name) ? '' : 'Level '}${level.name} (${level.elevation >= 0 ? '+' : ''}${level.elevation} ${units})`,
           color: LEVEL_COLOR,
           ids,
         }),
