@@ -98,9 +98,9 @@ describe('fea_solve convergence of a nonlinear_static case', () => {
   });
 
   it.each([
-    ['*ERROR in nonlingeo: increment size smaller than minimum', 'NLS_INCREMENT_TOO_SMALL'],
-    ['*ERROR: too many increments needed', 'NLS_MAX_INCREMENTS'],
-    ['*ERROR: too many attempts made for this increment', 'NLS_NOT_CONVERGED'],
+    [' divergence; the increment size is decreased to 1.25e-01\n *ERROR: increment size smaller than minimum', 'NLS_INCREMENT_TOO_SMALL'],
+    [' *ERROR in nonlingeo: max. # of increments reached', 'NLS_MAX_INCREMENTS'],
+    [' *ERROR: too many cutbacks', 'NLS_NOT_CONVERGED'],
     ['*ERROR in readinput: unknown keyword', 'FEA_SOLVER_FAILED'],
   ])('maps the stop "%s" to %s and keeps the convergence reached so far', async (log, code) => {
     const { result, seen } = await solve('nonlinear_static', { exitCode: 1, log });
@@ -116,9 +116,9 @@ describe('fea_solve convergence of a nonlinear_static case', () => {
     expect(solved.seen[0]).not.toHaveProperty('convergence');
     expect(solved.result.summary).not.toContain('increment(s)');
     expect(solved.result.data).not.toHaveProperty('convergence');
-    const failed = await solve('static', { exitCode: 1, log: '*ERROR: increment size smaller than minimum' });
+    const failed = await solve('static', { exitCode: 1, log: ' *ERROR: increment size smaller than minimum' });
     expect(failed.result.summary).toContain('FEA_SOLVER_FAILED');
     expect(failed.result.summary).not.toContain(' after ');
-    expect(failed.result.data).toEqual({ code: 'FEA_SOLVER_FAILED', log: '*ERROR: increment size smaller than minimum' });
+    expect(failed.result.data).toEqual({ code: 'FEA_SOLVER_FAILED', log: ' *ERROR: increment size smaller than minimum' });
   });
 });

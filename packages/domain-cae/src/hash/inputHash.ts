@@ -1,6 +1,6 @@
 /** Input hash of an analysis (05 TR-FEA-06): equal hashes <=> the same set-up on the same geometry and materials. */
 
-import type { AnalysisCase, ThermalSetup } from '@core/model/analysis';
+import type { AnalysisCase, NonlinearSettings, ThermalSetup } from '@core/model/analysis';
 import type { CadDocument, Entity, Material } from '@core/model/types';
 import { geometryKey } from '@core/geometry/shapeRecipe';
 import { canonicalJson } from '@lib/canonicalJson';
@@ -78,6 +78,21 @@ function withoutDispositions(thermal: ThermalSetup | undefined): Omit<ThermalSet
   return rest;
 }
 
+/** Display names of steps and curve probes are presentation: renaming never makes results stale. */
+function withoutNames(
+  nonlinear: NonlinearSettings,
+): Omit<NonlinearSettings, 'steps' | 'probes'> & { readonly steps: Record<string, unknown>; readonly probes: Record<string, unknown> } {
+  const strip = <T extends { readonly name: string }>(bag: Readonly<Record<string, T>>): Record<string, unknown> =>
+    Object.fromEntries(
+      Object.entries(bag).map(([id, entry]) => {
+        const { name, ...rest } = entry;
+        void name;
+        return [id, rest];
+      }),
+    );
+  return { ...nonlinear, steps: strip(nonlinear.steps), probes: strip(nonlinear.probes) };
+}
+
 const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string, unknown> => ({
   ...meshInputs(doc, analysisCase),
   type: analysisCase.type,
@@ -94,7 +109,7 @@ const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string
       ? null
       : { ...analysisCase.thermomech, thermal: withoutDispositions(analysisCase.thermomech.thermal) },
   sourceResultsHash: sourceResultsHash(doc, analysisCase),
-  ...(analysisCase.nonlinear !== undefined ? { nonlinear: analysisCase.nonlinear } : {}),
+  ...(analysisCase.nonlinear !== undefined ? { nonlinear: withoutNames(analysisCase.nonlinear) } : {}),
 });
 
 /**

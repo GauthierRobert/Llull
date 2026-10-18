@@ -6,7 +6,8 @@ import { isDeckRefusal, safeName, type DeckContext, type DeckRefusal, type DeckS
 import { commentText, linesText, num, row } from '../decks/format';
 import { mechanicalStepLines } from '../decks/mechanical';
 import { partSetId } from '../decks/constitutive';
-import { CONVERGENCE_KEYS } from './controlsCommand';
+import { FIELD_KEYS, TIME_KEYS, nonlinearValueProblems } from './shape';
+import { hyperelasticParts } from './settings';
 import { multiplierHistory } from './history';
 
 const DOF_NUMBER = { ux: 1, uy: 2, uz: 3 } as const;
@@ -23,6 +24,15 @@ function problem(ctx: DeckContext, nonlinear: NonlinearSettings): DeckRefusal | 
   const id = ctx.analysisId;
   if (nonlinear.nlgeom === undefined)
     return refuse('NLS_NLGEOM_UNSET', `analysis '${id}' has no nlgeom: call set_nonlinear_controls`, [id]);
+  const invalid = nonlinearValueProblems(nonlinear, 'nonlinear')[0];
+  if (invalid !== undefined) return refuse('NLS_CONTROL_INVALID', invalid, [id]);
+  const hyper = nonlinear.nlgeom ? [] : hyperelasticParts(ctx.doc, ctx.analysis, nonlinear.constitutiveSets);
+  if (hyper.length > 0)
+    return refuse(
+      'NLS_CONTROL_INVALID',
+      `nlgeom is false but part(s) ${hyper.join(', ')} use a hyperelastic set (CalculiX forces NLGEOM)`,
+      [id, ...hyper],
+    );
   if (nonlinear.stepOrder.length === 0) return refuse('NLS_NO_STEPS', `analysis '${id}' has no step: add_analysis_step`, [id]);
   const setOfMaterial = new Map<string, string | undefined>();
   for (const entityId of Object.keys(ctx.analysis.parts)) {
@@ -30,6 +40,10 @@ function problem(ctx: DeckContext, nonlinear: NonlinearSettings): DeckRefusal | 
     const materialId = ctx.materialId(entityId);
     if (material === null || materialId === undefined) continue;
     const chosen = partSetId(ctx, entityId, material.defaultConstitutiveSet);
+    if (Object.hasOwn(nonlinear.constitutiveSets, entityId) && findSet(material.constitutiveSets, chosen) === undefined)
+      return refuse('NLS_MATERIAL_MODEL_MISSING', `part '${entityId}': constitutive set '${chosen}' no longer exists on '${materialId}'`, [
+        entityId,
+      ]);
     if (setOfMaterial.has(materialId) && setOfMaterial.get(materialId) !== chosen)
       return refuse('NLS_MATERIAL_SET_CONFLICT', `parts sharing material '${materialId}' select different constitutive sets`, [entityId]);
     setOfMaterial.set(materialId, chosen);
@@ -81,9 +95,9 @@ function controlLines(preset: ConvergencePreset): string[] {
     return row(...cells);
   };
   const lines: string[] = [];
-  if (preset.field !== undefined) lines.push('*CONTROLS, PARAMETERS=FIELD', line(CONVERGENCE_KEYS.field, preset.field));
+  if (preset.field !== undefined) lines.push('*CONTROLS, PARAMETERS=FIELD', line(FIELD_KEYS, preset.field));
   if (preset.timeIncrementation !== undefined)
-    lines.push('*CONTROLS, PARAMETERS=TIME INCREMENTATION', line(CONVERGENCE_KEYS.timeIncrementation, preset.timeIncrementation));
+    lines.push('*CONTROLS, PARAMETERS=TIME INCREMENTATION', line(TIME_KEYS, preset.timeIncrementation));
   return lines;
 }
 
@@ -99,6 +113,16 @@ function frequency(nonlinear: NonlinearSettings, step: AnalysisStep): string {
       : outputIncrements.every;
   return every <= 1 ? '' : `, FREQUENCY=${every}`;
 }
+
+/** Identity of what a step drives: displacement steps on the same target and dof continue it (the value ramps), anything else is a different drive. */
+const driveOf = (step: AnalysisStep | undefined): string | null =>
+  step?.control.kind === 'displacement' ? JSON.stringify([step.control.target, step.control.dof]) : null;
+
+/** A displacement drive persists into later steps: when the next step drives something else (or nothing) the constraints are restated with OP=NEW. */
+const needsReset = (previous: AnalysisStep | undefined, step: AnalysisStep): boolean => {
+  const before = driveOf(previous);
+  return before !== null && before !== driveOf(step);
+};
 
 const amplitudeName = (step: AnalysisStep): string => `A_${safeName(step.id)}`;
 
@@ -147,7 +171,7 @@ export function nonlinearSteps(ctx: DeckContext): DeckSections {
     const mechanical = mechanicalStepLines(ctx, undefined, {
       scale: (load) => end[load.loadCase] ?? 0,
       parameters: step.amplitude === 'step' ? `, AMPLITUDE=${amplitudeName(step)}` : '',
-      boundary: index === 0,
+      boundary: index === 0 || needsReset(steps[index - 1], step),
     });
     if (isDeckRefusal(mechanical)) return mechanical;
     const rate = frequency(nonlinear, step);

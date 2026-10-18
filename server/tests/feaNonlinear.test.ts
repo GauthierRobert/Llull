@@ -157,6 +157,37 @@ const PRESSURE_PLAN = [
   },
 ];
 
+const RELEASE_PLAN = [
+  ...setUp('release'),
+  {
+    command: 'add_fea_load',
+    params: { analysisId: '$an', name: 'p_top', kind: 'pressure', loadCase: 'LC1', category: 'limit', target: TOP, magnitude: 1 },
+  },
+  { command: 'set_nonlinear_controls', params: { analysisId: '$an', nlgeom: false, outputIncrements: 'all' } },
+  {
+    command: 'add_analysis_step',
+    params: {
+      analysisId: '$an',
+      name: 'drive',
+      multipliers: {},
+      control: { kind: 'displacement', target: TOP, dof: 'uz', value: 0.02, ...INCREMENTS },
+    },
+  },
+  {
+    command: 'add_analysis_step',
+    params: { analysisId: '$an', name: 'release', multipliers: { LC1: 0 }, control: { kind: 'load', ...INCREMENTS } },
+  },
+  {
+    command: 'add_curve_probe',
+    params: {
+      analysisId: '$an',
+      name: 'release_curve',
+      load: { kind: 'reaction', constraintId: 'root', component: 'z' },
+      displacement: { point: [5, 5, LENGTH], dof: 'uz' },
+    },
+  },
+];
+
 let work = '';
 let docPath = '';
 
@@ -250,6 +281,18 @@ describe.skipIf(!HAS_GMSH || !HAS_CCX)('nonlinear static pipeline (gmsh + ccx)',
     expect(state.results?.nonlinear?.steps).toHaveLength(2);
     expect(state.results?.nonlinear?.curves[0]).toMatchObject({ name: 'pull_curve', peakLoad: expect.any(Number) });
     expect(state.results?.nonlinear?.maxPeeq?.value).toBeGreaterThan(0.005);
+  }, 300_000);
+
+  it('a displacement drive does not leak into a later load step: the released bar returns to zero displacement and reaction', async () => {
+    const { results } = await solvePlan(RELEASE_PLAN, 'release');
+    const [curve] = extractCurves(analysisOf(), results);
+    const drive = curve?.time.findIndex((time) => Math.abs(time - 1) < 1e-9) ?? -1;
+    expect(drive).toBeGreaterThan(0);
+    expect(Math.abs(curve?.displacement[drive] ?? 0)).toBeCloseTo(0.02, 9);
+    expect(Math.abs(curve?.load[drive] ?? 0)).toBeGreaterThan(1000);
+    expect(curve?.time.at(-1)).toBeCloseTo(2, 9);
+    expect(Math.abs(curve?.displacement.at(-1) ?? 1)).toBeLessThan(1e-6);
+    expect(Math.abs(curve?.load.at(-1) ?? 1)).toBeLessThan(1);
   }, 300_000);
 
   it('loads the bar by pressure inside the elastic range: displacement = p L / E and the load axis is the ramped multiplier', async () => {

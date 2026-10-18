@@ -4,6 +4,8 @@ import type { AnalysisCase } from '@core/model/analysis';
 import { findSet } from '@core/model/materialLaws/combination';
 import type { CadDocument } from '@core/model/types';
 import { nlsRemediation } from './codes';
+import { hyperelasticParts } from './settings';
+import { nonlinearValueProblems } from './shape';
 
 export interface NonlinearCheckItem {
   readonly code: string;
@@ -40,14 +42,25 @@ export function checkNonlinearItems(doc: CadDocument, analysis: AnalysisCase): N
   for (const entityId of Object.keys(analysis.parts)) {
     const materialId = doc.entities[entityId]?.materialId;
     const material = materialId !== undefined && Object.hasOwn(doc.materials, materialId) ? doc.materials[materialId] : undefined;
-    const selected = Object.hasOwn(nonlinear.constitutiveSets, entityId)
-      ? nonlinear.constitutiveSets[entityId]
-      : material?.defaultConstitutiveSet;
-    if (material !== undefined && findSet(material.constitutiveSets, selected) === undefined)
+    const selected = Object.hasOwn(nonlinear.constitutiveSets, entityId) ? nonlinear.constitutiveSets[entityId] : undefined;
+    // a part without a selection keeps the elastic cards of its material (record default set or property models), which the deck accepts
+    if (material !== undefined && selected !== undefined && findSet(material.constitutiveSets, selected) === undefined)
       items.push(
-        item('NLS_MATERIAL_MODEL_MISSING', `part '${entityId}': no constitutive set selected or defined on '${materialId}'`, [entityId]),
+        item('NLS_MATERIAL_MODEL_MISSING', `part '${entityId}': constitutive set '${selected}' does not exist on '${materialId}'`, [
+          entityId,
+        ]),
       );
   }
+  const invalid = nonlinearValueProblems(nonlinear, 'nonlinear')[0];
+  if (invalid !== undefined) items.push(item('NLS_CONTROL_INVALID', invalid, [id]));
+  const hyper = nonlinear.nlgeom === false ? hyperelasticParts(doc, analysis, nonlinear.constitutiveSets) : [];
+  if (hyper.length > 0)
+    items.push(
+      item('NLS_CONTROL_INVALID', `nlgeom is false but part(s) ${hyper.join(', ')} use a hyperelastic set (CalculiX forces NLGEOM)`, [
+        id,
+        ...hyper,
+      ]),
+    );
   for (const probeId of nonlinear.probeOrder) {
     const load = nonlinear.probes[probeId]?.load;
     const missing =

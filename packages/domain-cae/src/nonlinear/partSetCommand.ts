@@ -68,6 +68,12 @@ export const setPartConstitutiveSet = defineCommand({
         ['constitutiveSetId'],
       );
     const nonlinear = nonlinearOf(analysis);
+    if (nonlinear.nlgeom === false && set.hyperelastic !== undefined)
+      return fail(
+        'NLS_CONTROL_INVALID',
+        `set '${setId}' has a hyperelastic law, which CalculiX only runs with NLGEOM: call set_nonlinear_controls nlgeom=true first`,
+        ['constitutiveSetId'],
+      );
     const next = { ...nonlinear, constitutiveSets: { ...nonlinear.constitutiveSets, [entityId]: setId } };
     const behaviours = SET_SLOTS.filter((slot) => set[slot] !== undefined).join(' + ');
     return changed(

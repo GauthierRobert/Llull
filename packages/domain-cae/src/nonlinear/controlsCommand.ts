@@ -6,45 +6,27 @@ import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { analysisIdSchema } from '../shared/schemas';
 import { refuseNls } from './codes';
-import { isRefusal, nonlinearCase, nonlinearOf, withNonlinear } from './settings';
-
-const FIELD_KEYS = ['Rn', 'Cn', 'q0', 'qu', 'Rp', 'eps', 'Ceps', 'Rl'] as const;
-const TIME_KEYS = ['I0', 'IR', 'IP', 'IC', 'IL', 'IG', 'IS', 'IA', 'IJ', 'IT'] as const;
+import { convergenceValueProblems } from './shape';
+import { hyperelasticParts, isRefusal, nonlinearCase, nonlinearOf, withNonlinear } from './settings';
 
 const FIELD_TEXT =
   'custom only: *CONTROLS PARAMETERS=FIELD tolerances, key -> number > 0; unlisted keys keep the CalculiX default. Keys: ' +
   'Rn (largest residual force relative to the average force, default 0.005), Cn (largest correction relative to the largest incremental ' +
   'solution, 0.02), q0 and qu (force thresholds below which a residual is zero, automatic), Rp (residual tolerance of the 2nd check, 0.02), ' +
   'eps (correction tolerance of the 2nd check, 1e-5), Ceps (largest correction at a node with a low residual, 0.001), Rl (line-search ' +
-  'residual tolerance, 0.01).';
+  'residual tolerance, 1e-8).';
 const TIME_TEXT =
-  'custom only: *CONTROLS PARAMETERS=TIME INCREMENTATION values, key -> number > 0; unlisted keys keep the CalculiX default. Keys: ' +
+  'custom only: *CONTROLS PARAMETERS=TIME INCREMENTATION values, key -> integer > 0; unlisted keys keep the CalculiX default. Keys: ' +
   'I0 (iterations before a stagnating residual may be accepted, 4), IR (iterations before the convergence rate is checked, 8), IP (iterations ' +
   'before the looser tolerance applies, 9), IC (iterations after which divergence is assumed, 16), IL (iterations beyond which the next ' +
   'increment shrinks, 10), IG (iterations below which it grows, 4), IS (iterations of the cutback test, 12), IA (maximum cutbacks of an ' +
   'increment, 5), IJ (iterations between Jacobian updates, 6), IT (maximum iterations per increment, 200).';
 
-/** The keys of `values` that are not in `allowed`. */
-const unknownKeys = (values: Readonly<Record<string, number>> | undefined, allowed: readonly string[]): string[] =>
-  Object.keys(values ?? {}).filter((key) => !allowed.includes(key));
-
-/** Problem text for a convergence request, or null. Positive finite numbers only; ccx_default carries no values. */
-function convergenceProblem(preset: ConvergencePreset): string | null {
-  const values = [...Object.values(preset.field ?? {}), ...Object.values(preset.timeIncrementation ?? {})];
-  if (preset.name === 'ccx_default' && values.length > 0)
-    return "convergence 'ccx_default' takes no values: use name 'custom' to set field / timeIncrementation";
-  if (preset.name === 'custom' && values.length === 0)
-    return "convergence 'custom' needs at least one value in field or timeIncrementation";
-  return values.every((value) => Number.isFinite(value) && value > 0) ? null : 'every custom convergence value must be a finite number > 0';
-}
-
-export const CONVERGENCE_KEYS = { field: FIELD_KEYS, timeIncrementation: TIME_KEYS } as const;
-
 /**
  * @affects doc.analysis.cases[analysisId].nonlinear (created on the first call: nlgeom, convergence, outputIncrements; affected: [analysisId])
  * @invariant nlgeom is always explicit; setting again replaces the three settings and keeps steps, probes and constitutive sets
  * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; case not nonlinear_static -> NLS_CASE_NOT_NONLINEAR; custom value <= 0, custom without
- *   values, values on ccx_default or every < 1 -> NLS_CONTROL_INVALID (refusals, unchanged doc)
+ *   values, values on ccx_default or every < 1 -> NLS_CONTROL_INVALID (refusals, unchanged doc); nlgeom false with a hyperelastic part -> NLS_CONTROL_INVALID
  */
 export const setNonlinearControls = defineCommand({
   name: 'set_nonlinear_controls',
@@ -60,7 +42,9 @@ export const setNonlinearControls = defineCommand({
     analysisId: analysisIdSchema,
     nlgeom: z
       .boolean()
-      .describe('true = geometric nonlinearity (large displacements, *STEP NLGEOM); false = small displacements. Always state it.'),
+      .describe(
+        'true = geometric nonlinearity (large displacements, *STEP NLGEOM); false = small displacements (refused when a part uses a hyperelastic set: CalculiX forces NLGEOM for those). Always state it.',
+      ),
     convergence: z
       .object({
         name: z.enum(['ccx_default', 'custom']).describe('ccx_default = CalculiX defaults (no *CONTROLS); custom = the values below.'),
@@ -85,18 +69,9 @@ export const setNonlinearControls = defineCommand({
             ...(convergence.field !== undefined ? { field: convergence.field } : {}),
             ...(convergence.timeIncrementation !== undefined ? { timeIncrementation: convergence.timeIncrementation } : {}),
           };
-    const unknown = [...unknownKeys(convergence?.field, FIELD_KEYS), ...unknownKeys(convergence?.timeIncrementation, TIME_KEYS)];
-    if (unknown.length > 0)
-      return refuseNls(
-        doc,
-        'set_nonlinear_controls',
-        'NLS_CONTROL_INVALID',
-        `unknown convergence key(s) ${unknown.join(', ')}: field takes ${FIELD_KEYS.join(', ')}; timeIncrementation takes ${TIME_KEYS.join(', ')}`,
-        [analysisId],
-        ['convergence'],
-      );
-    const problem = convergenceProblem(preset);
-    if (problem !== null) return refuseNls(doc, 'set_nonlinear_controls', 'NLS_CONTROL_INVALID', problem, [analysisId], ['convergence']);
+    const problem = convergenceValueProblems(preset, 'convergence')[0];
+    if (problem !== undefined)
+      return refuseNls(doc, 'set_nonlinear_controls', 'NLS_CONTROL_INVALID', problem, [analysisId], ['convergence']);
     if (typeof outputIncrements === 'object' && !(outputIncrements.every >= 1))
       return refuseNls(
         doc,
@@ -105,6 +80,16 @@ export const setNonlinearControls = defineCommand({
         'outputIncrements.every must be an integer >= 1',
         [analysisId],
         ['outputIncrements'],
+      );
+    const hyper = nlgeom ? [] : hyperelasticParts(doc, found.analysis, nonlinearOf(found.analysis).constitutiveSets);
+    if (hyper.length > 0)
+      return refuseNls(
+        doc,
+        'set_nonlinear_controls',
+        'NLS_CONTROL_INVALID',
+        `nlgeom false is not possible: part(s) ${hyper.join(', ')} use a hyperelastic set and CalculiX switches NLGEOM on for those`,
+        [analysisId, ...hyper],
+        ['nlgeom'],
       );
     const next: NonlinearSettings = { ...nonlinearOf(found.analysis), nlgeom, convergence: preset, outputIncrements };
     const output = typeof outputIncrements === 'string' ? outputIncrements : `every ${outputIncrements.every}`;

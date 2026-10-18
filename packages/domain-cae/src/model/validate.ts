@@ -1,6 +1,7 @@
 /** Value validation of a raw `analysis` slice (persistence rejects the file when this returns errors). */
 
 import { isRecord } from '@lib/isRecord';
+import { nonlinearValueProblems } from '../nonlinear/shape';
 import { durabilityErrors } from './validateDurability';
 
 const TYPES = [
@@ -127,8 +128,7 @@ function checkNonlinear(scope: Scope, analysisCase: Record<string, unknown>, whe
   if (analysisCase['type'] !== 'nonlinear_static')
     return void scope.errors.push(`${where}: only nonlinear_static cases carry nonlinear settings`);
   if (!isRecord(nonlinear)) return void scope.errors.push(`${where}: expected a settings record`);
-  if (nonlinear['nlgeom'] !== undefined && typeof nonlinear['nlgeom'] !== 'boolean')
-    scope.errors.push(`${where}: nlgeom must be true or false`);
+  scope.errors.push(...nonlinearValueProblems(nonlinear, where));
   checkBag(scope, `${where}.steps`, nonlinear['steps'], nonlinear['stepOrder'], (id, step) => {
     const control = step['control'];
     if (!isRecord(control) || !oneOf(['load', 'displacement', 'arc_length'], control['kind']))

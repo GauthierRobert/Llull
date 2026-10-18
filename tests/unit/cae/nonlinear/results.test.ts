@@ -85,11 +85,22 @@ describe('solver log readers', () => {
     expect(parseSta('nothing here\n')).toEqual([]);
   });
 
-  it('classifies the three stop reasons and leaves other failures unclassified', () => {
-    expect(classifyNonlinearStop('*ERROR in nonlingeo: increment size smaller than minimum')).toBe('NLS_INCREMENT_TOO_SMALL');
-    expect(classifyNonlinearStop(' *ERROR: too many increments needed')).toBe('NLS_MAX_INCREMENTS');
-    expect(classifyNonlinearStop(' *ERROR: too many attempts made for this increment')).toBe('NLS_NOT_CONVERGED');
+  it('classifies the three stop reasons from the real ccx 2.21 error lines and leaves other failures unclassified', () => {
+    expect(
+      classifyNonlinearStop(' divergence; the increment size is decreased to 1.25e-01\n\n *ERROR: increment size smaller than minimum\n'),
+    ).toBe('NLS_INCREMENT_TOO_SMALL');
+    expect(classifyNonlinearStop(' *ERROR in nonlingeo: max. # of increments reached\n')).toBe('NLS_MAX_INCREMENTS');
+    expect(classifyNonlinearStop(' *ERROR: too many cutbacks\n')).toBe('NLS_NOT_CONVERGED');
+    expect(classifyNonlinearStop(' *ERROR: too many iterations needed\n')).toBe('NLS_NOT_CONVERGED');
+    expect(classifyNonlinearStop(' *ERROR: solution seems to diverge; please try\n')).toBe('NLS_NOT_CONVERGED');
     expect(classifyNonlinearStop('*ERROR reading input deck')).toBeNull();
+  });
+
+  it('does not mistake the lines of a normal run with cutbacks for a stop', () => {
+    const normal =
+      ' no convergence\n divergence; the increment size is decreased to 1.250000e-01\n the increment is reattempted\n convergence\n';
+    expect(classifyNonlinearStop(normal)).toBeNull();
+    expect(classifyNonlinearStop(`${normal} *ERROR in readinput: bad keyword\n`)).toBeNull();
   });
 });
 

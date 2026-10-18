@@ -26,12 +26,13 @@ export function parseSta(text: string): FeConvergenceRow[] {
 export type NonlinearStopCode = 'NLS_NOT_CONVERGED' | 'NLS_INCREMENT_TOO_SMALL' | 'NLS_MAX_INCREMENTS';
 
 /**
- * Stop code of a CalculiX log that ended in `*ERROR`: increment below the minimum, `INC` reached, or no convergence after the cutbacks; null
- * when the log shows none of them (a plain solver failure).
+ * Stop code of a CalculiX log that ended in an `*ERROR` line (strings of ccx 2.21, checked against real runs and the binary): increment below
+ * the minimum, `INC` reached, or no convergence after the cutbacks / iterations. Only `*ERROR` lines count: a normal run prints "no
+ * convergence" and "divergence; the increment size is decreased" for every cut back increment. Null for any other failure.
  */
 export function classifyNonlinearStop(log: string): NonlinearStopCode | null {
-  if (/increment size smaller than minimum/i.test(log)) return 'NLS_INCREMENT_TOO_SMALL';
-  if (/too many increments|max\.?\s*#?\s*of increments|maximum number of increments/i.test(log)) return 'NLS_MAX_INCREMENTS';
-  if (/too many attempts|no convergence|did not converge|diverg/i.test(log)) return 'NLS_NOT_CONVERGED';
+  if (/\*ERROR[^\n]*increment size smaller than minimum/i.test(log)) return 'NLS_INCREMENT_TOO_SMALL';
+  if (/\*ERROR[^\n]*max\. # of increments reached/i.test(log)) return 'NLS_MAX_INCREMENTS';
+  if (/\*ERROR[^\n]*(too many cutbacks|too many iterations needed|solution seems to diverge)/i.test(log)) return 'NLS_NOT_CONVERGED';
   return null;
 }

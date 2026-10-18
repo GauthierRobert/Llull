@@ -1,6 +1,7 @@
 /** Read/replace helpers for the `nonlinear` slice of a case (pure). */
 
 import type { AnalysisCase, NonlinearSettings } from '@core/model/analysis';
+import { findSet } from '@core/model/materialLaws/combination';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { caseOf, withCase } from '../shared/access';
@@ -43,3 +44,16 @@ export function nonlinearCase(doc: CadDocument, command: string, analysisId: str
 }
 
 export const isRefusal = (value: { readonly analysis: AnalysisCase } | CommandResult): value is CommandResult => 'summary' in value;
+
+/**
+ * Parts whose selected constitutive set (the case selection, else the material default) has a hyperelastic law. CalculiX turns NLGEOM on for
+ * hyperelastic materials whatever the step says, so a case that states nlgeom false cannot use them.
+ */
+export function hyperelasticParts(doc: CadDocument, analysis: AnalysisCase, selections: Readonly<Record<string, string>> = {}): string[] {
+  return Object.keys(analysis.parts).filter((entityId) => {
+    const materialId = doc.entities[entityId]?.materialId;
+    const material = materialId !== undefined && Object.hasOwn(doc.materials, materialId) ? doc.materials[materialId] : undefined;
+    const chosen = Object.hasOwn(selections, entityId) ? selections[entityId] : material?.defaultConstitutiveSet;
+    return findSet(material?.constitutiveSets, chosen)?.hyperelastic !== undefined;
+  });
+}

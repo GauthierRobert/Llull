@@ -102,7 +102,9 @@ describe.skipIf(!HAS_GMSH || !HAS_CCX)('PHY-05 validation plans with ccx', () =>
     const { curve } = await replay('nls_cantilever_plastic_collapse');
     const peak = Math.max(...curve.load.map(Math.abs));
     // pack tolerance 3 % was written for the hex_dominant mesh and "revisit after the first run": quadratic tets at 5 mm give +4.1 % (root fixity and shear)
-    expect(Math.abs(peak / 500 - 1)).toBeLessThan(0.06);
+    // one-sided: tets are stiffer than the hex reference, so the collapse load is never below the analytic M_p / L
+    expect(peak).toBeGreaterThanOrEqual(500);
+    expect(peak).toBeLessThanOrEqual(530);
   }, 900_000);
 
   it('VC-NLS-30.b: the thick cylinder carries 166 MPa and the bore moves far past first yield', async () => {
