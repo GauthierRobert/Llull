@@ -148,7 +148,7 @@ export function describeValueKey(key: string): { label: string; unit: string } {
   return { label, unit: suffix?.[1] ?? '' };
 }
 
-const formatNumber = (value: number): string => (Number.isInteger(value) ? String(value) : value.toPrecision(3).replace(/\.?0+$/, ''));
+const formatNumber = (value: number): string => (Number.isInteger(value) ? String(value) : String(Number(value.toPrecision(3))));
 
 export function formatValue(key: string, value: number): string {
   const { unit } = describeValueKey(key);

@@ -140,7 +140,7 @@ export function isSidebarTabAvailable(tab: SidebarTab, reviewLoaded: boolean): b
   if (tab === 'manufacturing') return getCommand('check_sheet_metal') !== undefined;
   if (tab === 'aero') return getCommand('aero_drag') !== undefined;
   if (tab === 'fasteners') return getCommand('select_fastener') !== undefined;
-  return tab !== 'review' || reviewLoaded || getCommand('check_prototype') !== undefined;
+  return tab !== 'review' || reviewLoaded || getCommand('check_prototype') !== undefined || getCommand('check_assembly') !== undefined;
 }
 
 interface RailContext {

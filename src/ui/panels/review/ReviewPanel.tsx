@@ -5,7 +5,7 @@ import React, { useCallback } from 'react';
 import { getCommand } from '@core/commands/registry';
 import { classNames } from '@ui/classNames';
 import { KpiStrip, PanelEmpty, PanelHeader, PanelSection, StatusLine } from '@ui/panels/PanelParts';
-import { CHECK_COMMAND, runPrototypeCheck } from '@ui/services/prototypeCheck';
+import { CHECK_COMMAND, reviewCheckCommand, runPrototypeCheck } from '@ui/services/prototypeCheck';
 import { useStore } from '@ui/store';
 import { ReadinessChecklist } from './ReadinessChecklist';
 import { FindingsList, type DispositionChange } from './FindingsList';
@@ -51,7 +51,8 @@ export function ReviewPanel({ className }: { className?: string }): React.ReactE
   const dynamics = useStore((s) => s.document.dynamics);
   const dispatch = useStore((s) => s.dispatch);
   const run = useRunChecks();
-  const canCheck = getCommand(CHECK_COMMAND) !== undefined;
+  const checkCommand = reviewCheckCommand();
+  const canCheck = checkCommand !== null;
   const canDispose = getCommand(DISPOSITION_COMMAND) !== undefined;
   const stale = isReviewStale(source, { entities, dynamics });
 
@@ -74,6 +75,11 @@ export function ReviewPanel({ className }: { className?: string }): React.ReactE
         {!canCheck && (
           <p className="panel__row-meta" data-testid="review-unavailable">
             Prototype checks are not available yet.
+          </p>
+        )}
+        {canCheck && checkCommand !== CHECK_COMMAND && (
+          <p className="panel__row-meta" data-testid="review-assembly-only">
+            Runs the buildability check (solids, overlaps, floating parts, walls); motion and dynamics checks read “not run” here.
           </p>
         )}
       </div>

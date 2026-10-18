@@ -52,6 +52,8 @@ export interface HoleRowView {
   readonly y: number;
   readonly kind: string;
   readonly diameter: number;
+  /** Hole centre in part coordinates (hole_table `at`), when reported. */
+  readonly at?: readonly [number, number, number];
   readonly cskAngleDeg?: number;
   readonly cskDiameter?: number;
   readonly depth: string;
@@ -149,12 +151,16 @@ export function parseHoleRows(data: unknown): HoleRowView[] | null {
   if (!isRecord(data) || !Array.isArray(data['rows'])) return null;
   return data['rows'].filter(isRecord).map((row): HoleRowView => {
     const [angle, cskDiameter, depth, thread] = [num(row['cskAngleDeg']), num(row['cskDiameter']), num(row['depth']), str(row['thread'])];
+    const raw: unknown[] = Array.isArray(row['at']) ? row['at'] : [];
+    const [ax, ay, az] = raw;
+    const at = typeof ax === 'number' && typeof ay === 'number' && typeof az === 'number' ? ([ax, ay, az] as const) : null;
     return {
       label: str(row['label']) ?? '',
       x: num(row['x']) ?? 0,
       y: num(row['y']) ?? 0,
       kind: str(row['subtype']) ?? 'simple',
       diameter: num(row['diameter']) ?? 0,
+      ...(at === null ? {} : { at }),
       ...(angle === undefined ? {} : { cskAngleDeg: angle }),
       ...(cskDiameter === undefined ? {} : { cskDiameter }),
       depth: row['through'] === true ? 'through' : depth === undefined ? '' : String(depth),

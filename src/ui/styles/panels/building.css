@@ -144,3 +144,17 @@
   flex-basis: 100%;
   gap: var(--space-3);
 }
+
+.takeoff-item {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--accent-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.takeoff-item:hover {
+  text-decoration: underline;
+}

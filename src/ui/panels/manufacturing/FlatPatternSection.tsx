@@ -10,6 +10,8 @@ import { downloadQuery } from '@ui/services/localQuery';
 import { significantNumber } from '@lib/compactNumber';
 import { useStore } from '@ui/store';
 import { parseFlatPattern, type FlatPatternView } from './ftrData';
+import { BEND_COLOR, partFocus } from './mfgFocus';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
 
 const SVG_SIZE = 160;
 const fmt = (value: number): string => significantNumber(value, 5);
@@ -39,6 +41,7 @@ function OutlinePreview({ view }: { view: FlatPatternView }): React.ReactElement
 export function FlatPatternSection({ partId }: { partId: string }): React.ReactElement {
   const flat = useReadOnlyQuery('flat_pattern', parseFlatPattern);
   const dispatch = useStore((s) => s.dispatch);
+  const focusItem = useFocusItem();
   const shown = flat.view !== null;
   const toggle = (): void => (shown ? flat.clear() : flat.run({ id: partId }));
   const view = flat.view;
@@ -107,7 +110,28 @@ export function FlatPatternSection({ partId }: { partId: string }): React.ReactE
               <tbody>
                 {view.bends.map((bend) => (
                   <tr key={bend.id}>
-                    <th scope="row">{bend.id}</th>
+                    <th scope="row">
+                      <button
+                        type="button"
+                        className="takeoff-item"
+                        title="Show this bend on the model"
+                        data-testid={`bend-show-${bend.id}`}
+                        onClick={() =>
+                          focusItem(
+                            partFocus(
+                              useStore.getState().document,
+                              partId,
+                              `bend:${bend.id}`,
+                              `Bend ${bend.id} · ${bend.angleDeg}° R${bend.insideRadius}`,
+                              BEND_COLOR,
+                              [bend.id],
+                            ),
+                          )
+                        }
+                      >
+                        {bend.id}
+                      </button>
+                    </th>
                     <td>{bend.angleDeg}</td>
                     <td>{bend.insideRadius}</td>
                     <td>{bend.direction}</td>

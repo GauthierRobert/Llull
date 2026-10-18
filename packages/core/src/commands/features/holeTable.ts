@@ -26,6 +26,8 @@ export interface HoleRow {
   /** Distance from the datum down the face (the datum is the top-left corner: y grows downwards), document length units. */
   readonly y: number;
   readonly face: Vec3;
+  /** Hole centre on its face in the part's own (mesh) coordinates, document length units: where a viewer marks it. */
+  readonly at: Vec3;
   readonly subtype: HoleKind;
   readonly diameter: number;
   readonly cskDiameter?: number;
@@ -150,6 +152,7 @@ export const holeTable = defineCommand({
         x,
         y,
         face: hole.frame.normal.map(rounded) as unknown as Vec3,
+        at: hole.position.map(rounded) as unknown as Vec3,
         subtype: hole.kind,
         diameter: hole.diameter,
         ...(hole.cskDiameter === undefined ? {} : { cskDiameter: hole.cskDiameter }),

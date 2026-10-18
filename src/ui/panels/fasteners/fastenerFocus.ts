@@ -44,3 +44,27 @@ export function layoutFindingFocus(
     markers: stacks.map((stack) => ({ position: stack.axis.origin, label: finding.message || finding.code })),
   };
 }
+
+/** A BOM standard-part row: every placed instance of that part number (fastener, washer or nut), one beacon each on its stack axis. */
+export function bomPartFocus(doc: CadDocument, partNumber: string): PanelFocus {
+  const stacks = Object.values(doc.fasteners?.stacks ?? {});
+  const instances: string[] = [];
+  const positions: FastenerStack['axis']['origin'][] = [];
+  for (const stack of stacks) {
+    const parts = [
+      { id: stack.fastener.instanceId, partNumber: stack.fastener.partNumber },
+      ...stack.washers.map((washer) => ({ id: washer.instanceId, partNumber: washer.partNumber })),
+      ...(stack.nut === undefined ? [] : [{ id: stack.nut.instanceId, partNumber: stack.nut.partNumber }]),
+    ].filter((part) => part.partNumber === partNumber);
+    if (parts.length === 0) continue;
+    instances.push(...parts.map((part) => part.id));
+    positions.push(stack.axis.origin);
+  }
+  return {
+    key: `fasteners:bom:${partNumber}`,
+    label: `${partNumber} × ${instances.length}`,
+    color: FASTENER_COLOR,
+    entityIds: instances.filter((id) => doc.entities[id] !== undefined),
+    markers: positions.map((position, index) => (index === 0 ? { position, label: partNumber } : { position })),
+  };
+}

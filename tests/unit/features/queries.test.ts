@@ -144,6 +144,9 @@ describe('hole_table', () => {
     });
     const table = dataOf<HoleTableData>(execute(drilled.document, 'hole_table', { id: idOf(drilled), origin: [0, 0] }));
     expect(table.rows[0]).toMatchObject({ x: 10, y: -10 });
+    // the hole centre on the top face, part coordinates (where the panel beacons it)
+    expect(table.rows[0]?.at[2]).toBeCloseTo(10, 6);
+    expect(Math.hypot((table.rows[0]?.at[0] ?? 0) - 10, (table.rows[0]?.at[1] ?? 0) - 10)).toBeLessThan(1e-6);
     expect(table.rows[0]?.drillPointAngle).toMatchObject({ value: 135, defaulted: false, verification: 'verified' });
     expect(table.unverified).toBe(false);
   });

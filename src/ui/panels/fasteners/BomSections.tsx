@@ -4,9 +4,14 @@ import React from 'react';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { useReadOnlyQuery } from '@ui/panels/useReadOnlyQuery';
 import { parseBom } from './fastenerView';
+import { bomPartFocus } from './fastenerFocus';
+import { useStore } from '@ui/store';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { entitiesFocus } from '@ui/panels/entityFocus';
 
 export function BomSections(): React.ReactElement {
   const bom = useReadOnlyQuery('bill_of_materials', parseBom);
+  const focusItem = useFocusItem();
   const view = bom.view;
   return (
     <PanelSection title="Bill of materials" testId="fastener-bom">
@@ -48,7 +53,17 @@ export function BomSections(): React.ReactElement {
               <tbody>
                 {view.standardParts.map((row) => (
                   <tr key={row.partNumber}>
-                    <th scope="row">{row.partNumber}</th>
+                    <th scope="row">
+                      <button
+                        type="button"
+                        className="takeoff-item"
+                        title="Show every placed one on the model"
+                        data-testid={`bom-show-${row.partNumber}`}
+                        onClick={() => focusItem(bomPartFocus(useStore.getState().document, row.partNumber))}
+                      >
+                        {row.partNumber}
+                      </button>
+                    </th>
                     <td>{row.count}</td>
                     <td>
                       {row.mass === '' ? '—' : row.mass}
@@ -76,7 +91,28 @@ export function BomSections(): React.ReactElement {
               <tbody>
                 {view.materials.map((row) => (
                   <tr key={row.materialId}>
-                    <th scope="row">{row.materialId}</th>
+                    <th scope="row">
+                      <button
+                        type="button"
+                        className="takeoff-item"
+                        title="Show the solids of this material on the model"
+                        data-testid={`bom-material-show-${row.materialId}`}
+                        onClick={() => {
+                          const doc = useStore.getState().document;
+                          const ids = doc.order.filter((id) => doc.entities[id]?.materialId === row.materialId);
+                          focusItem(
+                            entitiesFocus(doc, {
+                              key: `fasteners:bom-material:${row.materialId}`,
+                              label: `${row.materialId} · ${row.massKg} kg`,
+                              color: doc.materials[row.materialId]?.color,
+                              ids,
+                            }),
+                          );
+                        }}
+                      >
+                        {row.materialId}
+                      </button>
+                    </th>
                     <td>{row.solidCount}</td>
                     <td>
                       {row.massKg}

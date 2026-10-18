@@ -9,6 +9,8 @@ import type { PanelFocus } from '@ui/store/focusStore';
 
 export const FINDING_COLORS = { fail: '#ff4d4f', warn: '#ffb300', info: '#40c4ff' } as const;
 const PART_COLOR = '#40c4ff';
+const HOLE_COLOR = '#ff6e40';
+export const BEND_COLOR = '#b388ff';
 
 interface Frame {
   readonly origin: Vec3;
@@ -70,4 +72,14 @@ export function partFocus(
         ? onFeatures.map((position) => ({ position, label }))
         : [{ position: boundsCenter(entityBoundsInDoc(doc, entity)), label }];
   return { key: `manufacturing:${key}`, label, color, entityIds: entity === undefined ? [] : [partId], markers };
+}
+
+/** A hole of the feature table: the part selected, a beacon at the hole centre (part coordinates, translated like featurePoints). */
+export function holeFocus(doc: CadDocument, partId: string, label: string, at: Vec3): PanelFocus {
+  const entity = doc.entities[partId];
+  const placed = entity === undefined || entity.rotation.some((angle) => angle !== 0) ? null : entity.position;
+  const fallback = partFocus(doc, partId, `hole:${label}`, label, HOLE_COLOR);
+  if (placed === null) return fallback;
+  const position: Vec3 = [at[0] + placed[0], at[1] + placed[1], at[2] + placed[2]];
+  return { ...fallback, markers: [{ position, label }] };
 }
