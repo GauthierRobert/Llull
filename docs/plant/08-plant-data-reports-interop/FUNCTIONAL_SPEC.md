@@ -161,6 +161,9 @@ The same commands appear in a `plant` toolset (shared with the sibling plant gap
 | AC-13 | the bSI `Infra-Plumbing.ifc` | `ifc_summary` | `IFC4X3_ADD2`, 24 `IfcPipeSegment`, 1 system of 26 members, 0 ports | VC-DAT-13 |
 | AC-14 | an agent caller | `set_deliverable_status issued_for_construction` | refused `DAT_HUMAN_GATE`; a human with a valid signature succeeds | VC-DAT-15 |
 | AC-15 | plan SC-DAT-01 | `export_handover profile cfihos-subset` | tag register 4 rows, equipment register 2 rows, `unverified: true` | VC-DAT-16 |
+| AC-16 | SC-DAT-01 and a client tag list P-103, P-104, P-101 | `import_tag_list`, then `renumber_tags` from 11 | 2 reserved, P-101 refused `DAT_TAG_DUPLICATE`; mapping P-101 → P-111, P-103 → P-112, P-104 → P-113 | VC-DAT-18 |
+| AC-17 | a design pressure entered by the agent with `unverified` provenance | `plant_report equipment_list`, `check_plant_data` | the row carries `unverified: true`; the check lists `DAT_VALUE_UNVERIFIED` | VC-DAT-18 |
+| AC-18 | SC-DAT-01 | custom report with column `=OperatingWeight/1000` | T-101 2.5, P-101 0.45 | VC-DAT-19 |
 
 ## 8. Standards and formats
 
@@ -179,7 +182,7 @@ The same commands appear in a `plant` toolset (shared with the sibling plant gap
 
 | KPI | Target |
 | --- | ------ |
-| Validation cases passing | 16 of 17 VCs gated (VC-DAT-17 measured) |
+| Validation cases passing | 18 of 19 VCs gated (VC-DAT-17 measured) |
 | IFC 4.3 exports of the plans with 0 validator errors | 100 % |
 | Proxies (`IfcBuildingElementProxy`) in an export of the default class library | 0 for equipment, lines, valves, fittings; pipe supports until a mapping is decided (open question) |
 | Agent steps from "model built" to "line list + equipment list + IFC delivered and checked" | ≤ 6 CLI calls |

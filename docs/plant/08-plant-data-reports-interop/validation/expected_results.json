@@ -6,7 +6,9 @@
       "id": "VC-DAT-01",
       "proves": [
         "FR-DAT-04",
-        "TR-DAT-06"
+        "TR-DAT-06",
+        "FR-DAT-01",
+        "FR-DAT-02"
       ],
       "command": "assign_plant_object",
       "reference": "data/tag_format_cases.json generate (9 cases)",
@@ -16,7 +18,7 @@
         "note": "each case: fields -> expectedTag"
       },
       "tolerance": "exact string",
-      "source": "closed form (format grammar \u00a75.2)",
+      "source": "closed form (format grammar §5.2)",
       "grade": "A",
       "test": "tests/unit/plant/data/tagFormat.test.ts"
     },
@@ -126,7 +128,8 @@
       "proves": [
         "FR-DAT-16",
         "FR-DAT-17",
-        "TR-DAT-21"
+        "TR-DAT-21",
+        "FR-DAT-03"
       ],
       "command": "export_ifc schema=IFC4X3_ADD2",
       "reference": "data/reference/sc-dat-01-reference.stats.json, sc-dat-02-reference.stats.json",
@@ -230,7 +233,7 @@
       "id": "VC-DAT-11",
       "proves": [
         "FR-DAT-20",
-        "TR-DAT-24"
+        "TR-DAT-27"
       ],
       "command": "export_ifc, plant_report, build_project replay",
       "scenario": "SC-DAT-01 run twice + replay from featureHistory",
@@ -300,7 +303,8 @@
       "id": "VC-DAT-14",
       "proves": [
         "FR-DAT-07",
-        "TR-DAT-10"
+        "TR-DAT-10",
+        "FR-DAT-02"
       ],
       "command": "set_plant_properties",
       "scenario": "SC-DAT-01 + one batch of 3 edits, one invalid",
@@ -358,11 +362,66 @@
       ],
       "command": "plant_report, export_ifc, export_plant_data",
       "scenario": "synthetic 20 000 tagged objects (2 000 lines x 10 components)",
-      "expected": "TBD \u2014 measure with vitest bench on the CI runner; budgets in TECHNICAL_SPEC \u00a78",
+      "expected": "TBD — measure with vitest bench on the CI runner; budgets in TECHNICAL_SPEC §8",
       "tolerance": "budget",
-      "source": "\u2014",
-      "grade": "\u2014",
+      "source": "—",
+      "grade": "—",
       "test": "tests/perf/plantData.bench.ts"
+    },
+    {
+      "id": "VC-DAT-18",
+      "proves": [
+        "FR-DAT-15",
+        "FR-DAT-25",
+        "FR-DAT-26",
+        "TR-DAT-17",
+        "TR-DAT-24"
+      ],
+      "command": "import_tag_list, renumber_tags, set_plant_properties (provenance)",
+      "scenario": "SC-DAT-01 state + CSV 'Tag,Description' with rows P-103, P-104, P-101",
+      "expected": {
+        "import_tag_list": {
+          "reserved": 2,
+          "rejected": [
+            {
+              "tag": "P-101",
+              "code": "DAT_TAG_DUPLICATE"
+            }
+          ]
+        },
+        "unverified": {
+          "set": "DesignPressure of P-101 with provenance agent+unverified",
+          "lineOrEquipmentReportRowFlag": true,
+          "checkFinding": "DAT_VALUE_UNVERIFIED"
+        },
+        "renumber_tags CentrifugalPump hierarchy U10 startSequence 11 step 1": {
+          "P-101": "P-111",
+          "P-103": "P-112",
+          "P-104": "P-113"
+        }
+      },
+      "tolerance": "exact",
+      "source": "closed form: renumber assigns startSequence + k*step in natural tag order (§4 renumber_tags, §5.2); AF-32",
+      "grade": "A",
+      "test": "tests/unit/plant/data/tagList.test.ts"
+    },
+    {
+      "id": "VC-DAT-19",
+      "proves": [
+        "FR-DAT-27",
+        "FR-DAT-13"
+      ],
+      "command": "plant_report kind=custom",
+      "scenario": "SC-DAT-01; columns Tag, OperatingWeight, =OperatingWeight/1000 as 'Weight (t)'",
+      "expected": {
+        "T-101": 2.5,
+        "P-101": 0.45,
+        "rows": 2
+      },
+      "tolerance": "1e-12",
+      "source": "closed form (plan inputs 2500 kg, 450 kg)",
+      "grade": "A",
+      "test": "reports.test.ts"
     }
   ]
 }

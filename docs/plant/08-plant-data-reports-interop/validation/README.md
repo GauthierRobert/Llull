@@ -79,6 +79,8 @@ numbers.
 | VC-DAT-14 | Data Manager edits are atomic commands: an invalid batch applies nothing (`DAT_PROPERTY_TYPE`), a valid batch is one feature step, undo restores a deep-equal document, `is pure` | L1 / L3 | exact | A | `properties.test.ts` |
 | VC-DAT-15 | Deliverable status: an agent can issue for review but not for construction (`DAT_HUMAN_GATE`), the result carries `reviewRequired` | AF-34, 09 PLM | exact | A | `deliverables.test.ts` |
 | VC-DAT-16 | CFIHOS-like handover export: tag register 4 rows, equipment register 2 rows, `unverified: true` | plan; CFIHOS columns grade C | row counts exact | C / A | `handover.test.ts` |
+| VC-DAT-18 | Tag-list import (2 reserved, 1 `DAT_TAG_DUPLICATE`), `renumber_tags` from 11 (P-101 → P-111, P-103 → P-112, P-104 → P-113), `unverified` provenance flagged in reports and `check_plant_data` | closed form, AF-32 | exact | closed form | `tagList.test.ts` |
+| VC-DAT-19 | Custom report column `=OperatingWeight/1000`: T-101 2.5 t, P-101 0.45 t | plan inputs | 1e-12 | closed form | `reports.test.ts` |
 | VC-DAT-17 | Performance on 20 000 tagged objects | — | TBD — measure with `vitest bench` | — | `plantData.bench.ts` |
 
 ## Acceptance scripts (AF-23)
