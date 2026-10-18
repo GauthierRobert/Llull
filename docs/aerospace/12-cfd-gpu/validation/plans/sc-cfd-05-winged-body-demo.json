@@ -1,0 +1,163 @@
+{
+  "id": "SC-CFD-05",
+  "status": "draft \u2014 the cfd commands and the llull-flow sidecar are specified, not implemented",
+  "validates": [
+    "VC-CFD-40",
+    "VC-CFD-53"
+  ],
+  "description": "End-to-end demo of the owner's reference image: a cone-cylinder body with a delta-like wing at Mach 2, 2 deg angle of attack. No literature gate (the shape is not a published case); gates are convergence, the undisturbed free stream ahead of the nose, the CLI workflow, and a saved picture with surface Mach and streamlines.",
+  "actions": [
+    {
+      "command": "set_units",
+      "params": {
+        "units": "m"
+      }
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 0.4,
+        "height": 6,
+        "position": [
+          0,
+          0,
+          3
+        ]
+      },
+      "as": "fuselage"
+    },
+    {
+      "command": "add_cone",
+      "params": {
+        "radius": 0.4,
+        "height": 1.6,
+        "position": [
+          0,
+          0,
+          6
+        ]
+      },
+      "as": "nose"
+    },
+    {
+      "command": "add_box",
+      "params": {
+        "size": [
+          5,
+          0.08,
+          2.4
+        ],
+        "position": [
+          0,
+          0,
+          1.6
+        ]
+      },
+      "as": "wing"
+    },
+    {
+      "command": "add_box",
+      "params": {
+        "size": [
+          0.08,
+          1.4,
+          1.2
+        ],
+        "position": [
+          0,
+          1.0,
+          0.8
+        ]
+      },
+      "as": "fin"
+    },
+    {
+      "command": "cfd_create_case",
+      "params": {
+        "id": "demo",
+        "entityIds": [
+          "$fuselage",
+          "$nose",
+          "$wing",
+          "$fin"
+        ],
+        "regime": "compressible",
+        "freestream": {
+          "mach": 2,
+          "altitudeM": 20000,
+          "alphaDeg": 2,
+          "betaDeg": 0
+        },
+        "flowAxis": [
+          0,
+          0,
+          -1
+        ],
+        "upAxis": [
+          0,
+          1,
+          0
+        ],
+        "reference": {
+          "areaM2": 12,
+          "lengthM": 7.6,
+          "momentPointM": [
+            0,
+            0,
+            3
+          ]
+        },
+        "domain": {
+          "rule": "external_aero"
+        },
+        "ground": {
+          "enabled": false,
+          "moving": false
+        },
+        "quality": "draft"
+      }
+    },
+    {
+      "command": "cfd_prepare",
+      "params": {
+        "caseId": "demo"
+      }
+    }
+  ],
+  "cli": [
+    "llull cfd_solve caseId=demo --progress --timeout 1800 --file $DOC",
+    "llull cfd_probe caseId=demo points='[[0,0,9.5]]' --json --file $DOC > upstream.json",
+    "llull cfd_streamlines caseId=demo rake='{\"kind\":\"plane\",\"origin\":[-3,-0.5,9],\"u\":[6,0,0],\"v\":[0,1.5,0],\"count\":[32,6]}' --file $DOC",
+    "llull cfd_report caseId=demo --json --file $DOC > demo.json",
+    "llull render_view overlay=cfd:demo:mach --save demo_mach.png --file $DOC"
+  ],
+  "expected": [
+    {
+      "step": 6,
+      "path": "checks[status=fail]",
+      "count": 0,
+      "source": "the unioned body is watertight"
+    },
+    {
+      "file": "demo.json",
+      "path": "converged",
+      "value": true
+    },
+    {
+      "file": "upstream.json",
+      "path": "probes[0].mach",
+      "value": 2,
+      "rel": 0.001,
+      "source": "supersonic flow is undisturbed upstream of the bow shock"
+    },
+    {
+      "file": "demo.json",
+      "path": "streamlineSets[0].lines",
+      "value": 192
+    },
+    {
+      "file": "demo_mach.png",
+      "exists": true
+    }
+  ]
+}

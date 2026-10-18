@@ -36,11 +36,16 @@ in [`AGENT_FIRST.md`](AGENT_FIRST.md) and override any UI-first wording in the p
 | 09 | Configuration management, revisions, effectivity, FAI, traceability, export control | PLM | [spec](09-plm-configuration-traceability/FUNCTIONAL_SPEC.md) | [spec](09-plm-configuration-traceability/TECHNICAL_SPEC.md) | [pack](09-plm-configuration-traceability/validation/README.md) |
 | 10 | Aerodynamics: standard atmosphere, airfoils (panel / thin airfoil), wings (lifting line), drag and frontal area, cycling power | AER | [spec](10-aerodynamics/FUNCTIONAL_SPEC.md) | [spec](10-aerodynamics/TECHNICAL_SPEC.md) | [pack](10-aerodynamics/validation/README.md) |
 | 11 | Fluid dynamics and rocket propulsion: compressible flow (NACA 1135), ideal nozzle performance, nozzle contour solid, rocket equation | FLD | [spec](11-fluid-dynamics-propulsion/FUNCTIONAL_SPEC.md) | [spec](11-fluid-dynamics-propulsion/TECHNICAL_SPEC.md) | [pack](11-fluid-dynamics-propulsion/validation/README.md) |
+| 12 | Local GPU flow simulation (CFD): geometry preparation, LBM (low speed) and Euler cut-cell (compressible) solvers on the local GPU, streamlines and surface fields, CLI only | CFD | [spec](12-cfd-gpu/FUNCTIONAL_SPEC.md) | [spec](12-cfd-gpu/TECHNICAL_SPEC.md) | [pack](12-cfd-gpu/validation/README.md) |
 
 Packs 10 AER and 11 FLD (added 2026-10-18) are built at MVP level with their specs: plugins `aerodynamics` and `fluids` in
 `packages/domain-aero`, every validation case automated against published or NASA reference-code data (see each pack's
 `validation/sources.md`). They depend on nothing above; 02 SRF lofts and 05 FEA are their natural follow-ups (wing geometry,
 nozzle thermal / stress).
+
+Pack 12 CFD (added 2026-10-18, specs only) follows owner directives that apply to it: **CLI only** (MCP will be removed), **local only**
+(never cloud), **GPU first** (a native Rust + wgpu sidecar; other languages allowed). It replaces the OpenFOAM / SU2 hand-off items of
+10 AER (FR-AER-13, M4) and 11 FLD (FR-FLD-11, M5). Its open decision CFD-D1 (Rust toolchain in the repo) is on the board.
 
 ## Dependencies and recommended order
 

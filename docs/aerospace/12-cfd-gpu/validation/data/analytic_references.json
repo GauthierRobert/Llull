@@ -1,0 +1,226 @@
+{
+  "pack": "12 CFD",
+  "generatedBy": "derive_references.py (closed forms only)",
+  "gamma": 1.4,
+  "sod": {
+    "id": "VC-CFD-30",
+    "model": "Sod (1978) initial data, exact Riemann solution (Toro 2009, ch. 4), gamma 1.4",
+    "initial": {
+      "left": {
+        "rho": 1.0,
+        "u": 0.0,
+        "p": 1.0
+      },
+      "right": {
+        "rho": 0.125,
+        "u": 0.0,
+        "p": 0.1
+      },
+      "x0": 0.5
+    },
+    "star": {
+      "p": 0.3031301781,
+      "u": 0.92745262,
+      "rhoLeft": 0.4263194282,
+      "rhoRight": 0.2655737117
+    },
+    "waves": {
+      "shockSpeed": 1.752155732,
+      "rarefactionHeadSpeed": -1.183215957,
+      "rarefactionTailSpeed": -0.07027281256,
+      "contactSpeed": 0.92745262
+    },
+    "positionsAtT02": {
+      "rarefactionHead": 0.2633568087,
+      "rarefactionTail": 0.4859454375,
+      "contact": 0.685490524,
+      "shock": 0.8504311464
+    }
+  },
+  "obliqueShock": {
+    "id": "VC-CFD-31",
+    "model": "theta-beta-M relation, weak branch (NACA 1135)",
+    "cases": [
+      {
+        "mach": 2.0,
+        "wedgeHalfAngleDeg": 10.0,
+        "shockAngleDeg": 39.31393184,
+        "pressureRatio": 1.706578604,
+        "densityRatio": 1.458425613,
+        "downstreamMach": 1.640522229,
+        "surfaceCp": 0.2523495014
+      },
+      {
+        "mach": 3.0,
+        "wedgeHalfAngleDeg": 15.0,
+        "shockAngleDeg": 32.24040018,
+        "pressureRatio": 2.821562321,
+        "densityRatio": 2.03244882,
+        "downstreamMach": 2.254902312,
+        "surfaceCp": 0.2891368764
+      }
+    ]
+  },
+  "stagnation": {
+    "id": "VC-CFD-32",
+    "model": "Rayleigh pitot formula (supersonic) / isentropic stagnation (subsonic), NACA 1135",
+    "supersonic": [
+      {
+        "mach": 2.0,
+        "pitotPressureRatio": 5.640440813,
+        "stagnationCp": 1.65730029
+      },
+      {
+        "mach": 2.5,
+        "pitotPressureRatio": 8.52613589,
+        "stagnationCp": 1.720259632
+      }
+    ],
+    "subsonic": [
+      {
+        "mach": 0.3,
+        "stagnationPressureRatio": 1.064430286,
+        "stagnationCp": 1.022702955
+      },
+      {
+        "mach": 0.8,
+        "stagnationPressureRatio": 1.52434001,
+        "stagnationCp": 1.170401807
+      }
+    ]
+  },
+  "sphereDrag": {
+    "id": "VC-CFD-21",
+    "model": "Cd = 24/Re (1 + 0.15 Re^0.687), Schiller & Naumann (1933), Re < 800",
+    "rows": [
+      {
+        "re": 20,
+        "cd": 2.60955
+      },
+      {
+        "re": 50,
+        "cd": 1.5381
+      },
+      {
+        "re": 100,
+        "cd": 1.09173
+      },
+      {
+        "re": 200,
+        "cd": 0.805615
+      }
+    ]
+  },
+  "poiseuille": {
+    "id": "VC-CFD-20",
+    "model": "u(y) = 4 Umax y (H - y) / H^2, dp/dx = -8 mu Umax / H^2, wall shear 4 mu Umax / H",
+    "meanOverMax": 0.6666666667,
+    "pressureGradientCoefficient": 8.0,
+    "wallShearCoefficient": 4.0
+  },
+  "taylorGreen": {
+    "id": "VC-CFD-22",
+    "model": "u = U0 sin(kx) cos(ky) F(t), v = -U0 cos(kx) sin(ky) F(t), F = exp(-2 nu k^2 t)",
+    "case": {
+      "nu": 0.01,
+      "k": 6.283185307,
+      "t": 1.0
+    },
+    "amplitudeRatio": 0.4540407387,
+    "kineticEnergyRatio": 0.2061529924
+  },
+  "sphereStreamlines": {
+    "id": "VC-CFD-40",
+    "model": "psi = 1/2 U r^2 sin^2(theta) (1 - R^3/r^3), axisymmetric potential flow, R = 1, U = 1",
+    "seeds": [
+      {
+        "seed": [
+          -10.0,
+          0.25,
+          0.0
+        ],
+        "psi": 0.03121877927,
+        "yAtXPlus10": 0.25,
+        "yAtX0": 1.020809577
+      },
+      {
+        "seed": [
+          -10.0,
+          0.5,
+          0.0
+        ],
+        "psi": 0.1248754673,
+        "yAtXPlus10": 0.5,
+        "yAtX0": 1.083073865
+      },
+      {
+        "seed": [
+          -10.0,
+          1.0,
+          0.0
+        ],
+        "psi": 0.4995074073,
+        "yAtXPlus10": 1.0,
+        "yAtX0": 1.324411914
+      },
+      {
+        "seed": [
+          -10.0,
+          1.5,
+          0.0
+        ],
+        "psi": 1.123911928,
+        "yAtXPlus10": 1.5,
+        "yAtX0": 1.685556235
+      }
+    ]
+  },
+  "voxelSphere": {
+    "id": "VC-CFD-10",
+    "model": "|V_vox - V| <= A_surface * (sqrt(3)/2) h",
+    "rows": [
+      {
+        "cellsPerRadius": 16,
+        "relativeVolumeBound": 0.16238
+      },
+      {
+        "cellsPerRadius": 32,
+        "relativeVolumeBound": 0.0811899
+      },
+      {
+        "cellsPerRadius": 64,
+        "relativeVolumeBound": 0.0405949
+      }
+    ]
+  },
+  "blockage": {
+    "id": "VC-CFD-12",
+    "model": "blockage = frontal area / tunnel cross-section; domain 5H lateral, 5H above, 5H upstream, 15H downstream",
+    "case": {
+      "buildingB": 1.0,
+      "buildingH": 2.0,
+      "tunnelWidth": 21.0,
+      "tunnelHeight": 12.0
+    },
+    "blockageRatio": 0.007936507937,
+    "limit": 0.03
+  },
+  "shockStandoff": {
+    "id": "VC-CFD-33",
+    "model": "Billig (1967) sphere: delta/R = 0.143 exp(3.24/M^2), gamma 1.4 (grade B: documentation band, not a gate)",
+    "rows": [
+      {
+        "mach": 2.0,
+        "deltaOverR": 0.321451
+      },
+      {
+        "mach": 2.5,
+        "deltaOverR": 0.240145
+      },
+      {
+        "mach": 3.0,
+        "deltaOverR": 0.204966
+      }
+    ]
+  }
+}

@@ -1,0 +1,419 @@
+{
+  "pack": "12 CFD",
+  "generatedBy": "hand-written index; every value lives in the data files or plans named here",
+  "cases": [
+    {
+      "id": "VC-CFD-10",
+      "command": "cfd_prepare",
+      "reference": "data/analytic_references.json voxelSphere",
+      "tolerance": "|V_vox - V| / V <= derived bound (0.162 / 0.0812 / 0.0406 at 16 / 32 / 64 cells per radius) and decreasing with h",
+      "grade": "closed form",
+      "proves": [
+        "FR-CFD-01",
+        "TR-CFD-10"
+      ],
+      "test": "tests/unit/aero/cfd/prepare.test.ts; plans/sc-cfd-01-prepare-checks.json"
+    },
+    {
+      "id": "VC-CFD-11",
+      "command": "cfd_prepare",
+      "inputs": {
+        "openBox": "unit box without its top face",
+        "overlap": "two boxes 1 m sharing 0.5 m"
+      },
+      "expected": {
+        "openEdges": 4,
+        "status": "fail",
+        "code": "CFD_GEOMETRY_NOT_WATERTIGHT",
+        "unionVolumeM3": 1.5,
+        "unionInternalFaces": 0
+      },
+      "tolerance": "exact counts; volume 1e-9 rel",
+      "grade": "closed form",
+      "proves": [
+        "FR-CFD-01",
+        "FR-CFD-33"
+      ],
+      "test": "prepare.test.ts; sc-cfd-01"
+    },
+    {
+      "id": "VC-CFD-12",
+      "command": "cfd_prepare",
+      "reference": "data/analytic_references.json blockage",
+      "expected": {
+        "domainTopM": 12,
+        "blockageRatio": 0.007936507937
+      },
+      "tolerance": "1e-9 abs / 1e-6 rel",
+      "grade": "closed form of the COST 732 / AIJ rules (rules grade B)",
+      "proves": [
+        "FR-CFD-04"
+      ],
+      "test": "prepare.test.ts; sc-cfd-01"
+    },
+    {
+      "id": "VC-CFD-13",
+      "command": "cfd_prepare + cfd_solve",
+      "inputs": {
+        "case": "sphere Re 100, external_aero domain at 1x and 1.5x the default extents"
+      },
+      "expected": {
+        "cdChange": "< 1 %"
+      },
+      "tolerance": "relative change of cd between the two domains < 1 %",
+      "grade": "self-consistency (justifies the named aero domain defaults)",
+      "proves": [
+        "FR-CFD-04"
+      ],
+      "test": "server/tests/cfd/domainSensitivity.test.ts"
+    },
+    {
+      "id": "VC-CFD-14",
+      "command": "cfd_prepare",
+      "expected": {
+        "geometryHash": "identical after save / load and after build_project replay"
+      },
+      "tolerance": "exact",
+      "grade": "determinism (AF-13)",
+      "proves": [
+        "FR-CFD-32"
+      ],
+      "test": "prepare.test.ts"
+    },
+    {
+      "id": "VC-CFD-15",
+      "command": "cfd_prepare",
+      "inputs": {
+        "body": "1 m box with a 2 mm through hole (add_hole)",
+        "cellsPerReferenceLength": 100
+      },
+      "expected": {
+        "code": "CFD_SMALL_FEATURE",
+        "sizeM": 0.002,
+        "status": "warn"
+      },
+      "tolerance": "feature found with size within h = 10 mm",
+      "grade": "behaviour",
+      "proves": [
+        "FR-CFD-02"
+      ],
+      "test": "prepare.test.ts"
+    },
+    {
+      "id": "VC-CFD-16",
+      "command": "cfd_set_boundary + cfd_create_case",
+      "inputs": {
+        "tags": "inlet on a cylinder end cap entity; replay through build_project",
+        "forced": "solver lbm at Mach 0.5"
+      },
+      "expected": {
+        "tagsAfterReplay": "identical",
+        "code": "CFD_REGIME_MISMATCH"
+      },
+      "tolerance": "exact",
+      "grade": "behaviour",
+      "proves": [
+        "FR-CFD-03",
+        "FR-CFD-06"
+      ],
+      "test": "caseCommands.test.ts"
+    },
+    {
+      "id": "VC-CFD-20",
+      "command": "llull-flow lbm",
+      "reference": "data/analytic_references.json poiseuille",
+      "tolerance": "L2 profile error falls with observed order >= 1.8 over 16 / 32 / 64 cells across the channel (check_convergence)",
+      "grade": "exact solution",
+      "proves": [
+        "FR-CFD-11",
+        "FR-CFD-36"
+      ],
+      "test": "solver/flow/crates/flow-lbm/tests/poiseuille.rs"
+    },
+    {
+      "id": "VC-CFD-21",
+      "command": "cfd_solve (lbm)",
+      "reference": "data/analytic_references.json sphereDrag",
+      "tolerance": "cd within 10 % at Re 20 / 50 / 100 / 200, 32 cells per diameter",
+      "grade": "A for the formula (OpenFOAM source + arXiv quote); acceptance band set by llull for a staircase wall",
+      "proves": [
+        "FR-CFD-11",
+        "FR-CFD-20",
+        "FR-CFD-36"
+      ],
+      "test": "flow-lbm/tests/sphere.rs; plans/sc-cfd-02-sphere-lbm.json"
+    },
+    {
+      "id": "VC-CFD-22",
+      "command": "llull-flow lbm",
+      "reference": "data/analytic_references.json taylorGreen",
+      "tolerance": "amplitude ratio within 1 % at 64 x 64 (quasi-2D, periodic)",
+      "grade": "exact solution",
+      "proves": [
+        "FR-CFD-11"
+      ],
+      "test": "flow-lbm/tests/taylor_green.rs"
+    },
+    {
+      "id": "VC-CFD-23",
+      "command": "cfd_solve (lbm)",
+      "reference": "data/literature_benchmarks.json VC-CFD-23",
+      "tolerance": "planned: cd within 3 %",
+      "grade": "B \u2014 not a gate until pinned",
+      "proves": [
+        "FR-CFD-11"
+      ],
+      "test": "M5"
+    },
+    {
+      "id": "VC-CFD-24",
+      "command": "cfd_solve (lbm) + cfd_probe",
+      "reference": "data/literature_benchmarks.json VC-CFD-24",
+      "tolerance": "planned: AIJ hit rate",
+      "grade": "TBD \u2014 not a gate until pinned",
+      "proves": [
+        "FR-CFD-23",
+        "FR-CFD-35"
+      ],
+      "test": "M5"
+    },
+    {
+      "id": "VC-CFD-25",
+      "command": "llull-flow lbm",
+      "reference": "data/literature_benchmarks.json VC-CFD-25",
+      "tolerance": "planned: 2 % of the Ghia table",
+      "grade": "TBD \u2014 not a gate until pinned",
+      "proves": [
+        "FR-CFD-11"
+      ],
+      "test": "M5"
+    },
+    {
+      "id": "VC-CFD-26",
+      "command": "cfd_solve device=gpu vs device=cpu",
+      "tolerance": "fields 1e-4 rel (max over cells, normalised by the field range); forces 1e-5 rel",
+      "grade": "self-consistency (CPU path is the reference implementation)",
+      "proves": [
+        "FR-CFD-12"
+      ],
+      "test": "flow-gpu/tests/equivalence.rs; sc-cfd-02"
+    },
+    {
+      "id": "VC-CFD-30",
+      "command": "llull-flow euler (1D tube)",
+      "reference": "data/analytic_references.json sod",
+      "tolerance": "rarefaction head / tail, contact and shock positions at t = 0.2 within 2 cells at 400 cells; L1 density error falls with observed order >= 0.6 over 100 / 200 / 400",
+      "grade": "exact Riemann solution",
+      "proves": [
+        "FR-CFD-10"
+      ],
+      "test": "flow-euler/tests/sod.rs"
+    },
+    {
+      "id": "VC-CFD-31",
+      "command": "cfd_solve (euler)",
+      "reference": "data/analytic_references.json obliqueShock",
+      "tolerance": "shock angle 0.5 deg abs; surface Cp 2 % rel at mid-span",
+      "grade": "closed form (NACA 1135), cross-checked with 11 FLD data",
+      "proves": [
+        "FR-CFD-10",
+        "FR-CFD-21"
+      ],
+      "test": "plans/sc-cfd-03-wedge-supersonic.json"
+    },
+    {
+      "id": "VC-CFD-32",
+      "command": "cfd_solve (euler)",
+      "reference": "data/analytic_references.json stagnation",
+      "tolerance": "stagnation Cp 2 % rel at Mach 0.3 / 0.8 (isentropic) and 2 / 2.5 (Rayleigh pitot)",
+      "grade": "closed form (NACA 1135)",
+      "proves": [
+        "FR-CFD-10",
+        "FR-CFD-21"
+      ],
+      "test": "plans/sc-cfd-04-sphere-stagnation.json"
+    },
+    {
+      "id": "VC-CFD-33",
+      "command": "cfd_solve (euler)",
+      "reference": "data/analytic_references.json shockStandoff",
+      "tolerance": "documentation band 15 %",
+      "grade": "B \u2014 reported, not gated",
+      "proves": [
+        "FR-CFD-10"
+      ],
+      "test": "sc-cfd-04"
+    },
+    {
+      "id": "VC-CFD-34",
+      "command": "cfd_solve (euler)",
+      "reference": "data/literature_benchmarks.json VC-CFD-34",
+      "tolerance": "planned: shock position 3 % chord, Cp 0.05",
+      "grade": "TBD \u2014 not a gate until pinned",
+      "proves": [
+        "FR-CFD-10",
+        "FR-CFD-37"
+      ],
+      "test": "M5"
+    },
+    {
+      "id": "VC-CFD-35",
+      "command": "cfd_solve (euler)",
+      "inputs": {
+        "case": "sphere, Mach 0.3, three resolutions"
+      },
+      "expected": {
+        "entropyDeviation": "max |s - s_inf| decreases with refinement"
+      },
+      "tolerance": "observed order >= 0.8 (lib/convergence)",
+      "grade": "verification metric (exact value 0 in smooth inviscid flow)",
+      "proves": [
+        "FR-CFD-10",
+        "FR-CFD-31"
+      ],
+      "test": "flow-euler/tests/entropy.rs"
+    },
+    {
+      "id": "VC-CFD-40",
+      "command": "cfd_streamlines",
+      "reference": "data/analytic_references.json sphereStreamlines",
+      "tolerance": "stream function drift < 1e-4 relative along each line; y at x = 0 within 1e-3 R; y at x = +10 back to the seed within 1e-3 R (field sampled at h = 0.05 R)",
+      "grade": "exact solution",
+      "proves": [
+        "FR-CFD-22"
+      ],
+      "test": "flow-core/tests/streamlines.rs; sc-cfd-05"
+    },
+    {
+      "id": "VC-CFD-41",
+      "command": "cfd_report (surface fields)",
+      "inputs": {
+        "field": "p = x sampled on the grid"
+      },
+      "tolerance": "vertex values within h x |grad p|",
+      "grade": "exact (linear field)",
+      "proves": [
+        "FR-CFD-21"
+      ],
+      "test": "flow-core/tests/surface_map.rs"
+    },
+    {
+      "id": "VC-CFD-42",
+      "command": "cfd_solve (lbm)",
+      "inputs": {
+        "case": "sphere Re 100"
+      },
+      "tolerance": "momentum-exchange drag vs surface pressure + shear integration within 2 %",
+      "grade": "self-consistency",
+      "proves": [
+        "FR-CFD-20"
+      ],
+      "test": "flow-lbm/tests/forces.rs"
+    },
+    {
+      "id": "VC-CFD-43",
+      "command": "CfdOverlay",
+      "tolerance": "legend min / max / unit equal the result peaks; colour of a vertex equals resultColor(value)",
+      "grade": "exact",
+      "proves": [
+        "FR-CFD-24"
+      ],
+      "test": "tests/component/CfdOverlay.test.tsx"
+    },
+    {
+      "id": "VC-CFD-50",
+      "command": "cfd_solve",
+      "inputs": {
+        "case": "resolution needing more memory than the reported adapter"
+      },
+      "expected": {
+        "code": "CFD_MEMORY_EXCEEDED",
+        "allocated": false,
+        "largestFittingCellsPerReferenceLength": "> 0"
+      },
+      "tolerance": "exact",
+      "grade": "behaviour",
+      "proves": [
+        "FR-CFD-05"
+      ],
+      "test": "server/tests/cfd/memory.test.ts"
+    },
+    {
+      "id": "VC-CFD-51",
+      "command": "cfd_solve device=auto, no adapter",
+      "expected": {
+        "warning": "CFD_GPU_UNAVAILABLE",
+        "backend": "cpu"
+      },
+      "tolerance": "results equal VC-CFD-26",
+      "grade": "behaviour",
+      "proves": [
+        "FR-CFD-12"
+      ],
+      "test": "server/tests/cfd/fallback.test.ts"
+    },
+    {
+      "id": "VC-CFD-52",
+      "command": "cfd_report after move_entity",
+      "expected": {
+        "stale": true,
+        "code": "CFD_RESULT_STALE"
+      },
+      "tolerance": "exact",
+      "grade": "behaviour",
+      "proves": [
+        "FR-CFD-32"
+      ],
+      "test": "server/tests/cfd/stale.test.ts"
+    },
+    {
+      "id": "VC-CFD-53",
+      "command": "CLI end to end",
+      "expected": {
+        "converged": true,
+        "pngWritten": true,
+        "upstreamMach": 2
+      },
+      "tolerance": "upstream Mach 1e-3 rel",
+      "grade": "behaviour + exact (undisturbed supersonic free stream)",
+      "proves": [
+        "FR-CFD-24",
+        "FR-CFD-34"
+      ],
+      "test": "plans/sc-cfd-05-winged-body-demo.json"
+    },
+    {
+      "id": "VC-CFD-54",
+      "command": "npm run quality:cfd",
+      "expected": {
+        "mlups": "TBD \u2014 measure",
+        "draftCaseMinutes": "TBD \u2014 measure"
+      },
+      "tolerance": "targets in TECHNICAL_SPEC \u00a78; logged, regression > 20 % fails",
+      "grade": "TBD \u2014 measure on the reference machines",
+      "proves": [
+        "FR-CFD-12"
+      ],
+      "test": "M5"
+    },
+    {
+      "id": "VC-CFD-55",
+      "command": "cfd_solve",
+      "inputs": {
+        "case": "sphere Re 100 with a step limit of 100"
+      },
+      "expected": {
+        "converged": false,
+        "code": "CFD_NOT_CONVERGED",
+        "recorded": true
+      },
+      "tolerance": "exact",
+      "grade": "behaviour",
+      "proves": [
+        "FR-CFD-30",
+        "FR-CFD-34"
+      ],
+      "test": "server/tests/cfd/convergence.test.ts"
+    }
+  ]
+}

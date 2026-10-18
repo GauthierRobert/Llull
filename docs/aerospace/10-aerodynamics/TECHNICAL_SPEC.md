@@ -178,7 +178,7 @@ P = K(0.00953 M_t V + 0.00775 V² + K1 A_f 0.007551 V³), with V in km/h.
 ## 6. Interop and persistence
 
 No new file format. Plans in `validation/plans/*.json` are standard `build_project` actions. A Cp / polar CSV
-export and the XFOIL / OpenFOAM hand-off are V1 / V2 items (§10).
+export and the XFOIL hand-off are V1 items (§10). Flow-field CFD is specified in [12 CFD](../12-cfd-gpu/TECHNICAL_SPEC.md).
 
 ## 7. Surfaces and error codes
 
@@ -230,7 +230,7 @@ The coverage gate on `packages/domain-aero/src/**` is 90/85/90/90 (CLAUDE.md).
 | M1        | atmosphere, NACA, panel, lifting line, frontal area, drag, cycling (this spec)                                                                    | **done 2026-10-18**   |
 | M2        | XFOIL hand-off: server transport `xfoil_polar` like `fea_solve`, bundled binary (GPL, decision 5), viscous polar as data                          | todo, ≈ 3 eng-weeks   |
 | M3        | Vortex-lattice (horseshoe VLM) over a wing / tail definition read from lofts; neutral point; drag build-up tables with sources                    | todo, ≈ 4 eng-weeks   |
-| M4        | CFD hand-off (OpenFOAM `simpleFoam` / SU2 case writer from a watertight body + farfield; forces and surface Cp import as 05-style result records) | todo, ≈ 6–8 eng-weeks |
+| M4        | moved to [12 CFD](../12-cfd-gpu/TECHNICAL_SPEC.md) §10 (local GPU LBM + Euler cut-cell solvers, CLI only; replaces the OpenFOAM / SU2 hand-off) | see 12 CFD            |
 | M5        | UI: Cp and span-loading plots in the Analysis tab (same pattern as `plot_simulation`)                                                             | todo                  |
 
 ## 11. Open questions

@@ -1,0 +1,59 @@
+{
+  "pack": "12 CFD",
+  "title": "Literature benchmarks: grade B or TBD. None of these is a pass / fail gate until its primary data is pinned (sha256) in this folder.",
+  "cases": [
+    {
+      "id": "VC-CFD-23",
+      "name": "DFG flow around a cylinder, 2D-1 steady, Re 20 (Schäfer & Turek 1996)",
+      "definition": {
+        "channel": "[0, 2.2] x [0, 0.41] m",
+        "cylinderRadiusM": 0.05,
+        "inflow": "parabolic, max 0.3 m/s",
+        "kinematicViscosityM2S": 0.001,
+        "note": "geometry and inflow from the FEATFLOW benchmark page as quoted by search extracts; run quasi-2D (one cell, periodic in z)"
+      },
+      "reference": { "cd": 5.5795, "cl": 0.0107 },
+      "grade": "B",
+      "provenance": "cd 5.5795 quoted by FEATool docs (citing Nabh 1998, John & Matthies 2001); cd 5.5800 / cl 0.0107 quoted as the Turek reference by an LBM study (search extracts 2026-10-18). Primary FEATFLOW page not reachable from the sandbox.",
+      "plannedAcceptance": "cd within 3 %, cl sign and order of magnitude; gate after the FEATFLOW reference table is pinned",
+      "status": "TBD — pin FEATFLOW dfg_benchmark1_re20 reference values"
+    },
+    {
+      "id": "VC-CFD-24",
+      "name": "AIJ pedestrian-wind benchmark, single building 1:1:2 (case A)",
+      "reference": null,
+      "grade": "TBD",
+      "provenance": "AIJ guidebook (Tominaga et al. 2008); case data said to be distributed through the AIJ / Open CAE Society of Japan (AIJ-PWEAB). Not downloaded.",
+      "plannedAcceptance": "speed ratio at 0.0125H above ground at the published measurement points; hit rate as defined in the AIJ guidebook",
+      "status": "TBD — download and pin the case A wind-tunnel data"
+    },
+    {
+      "id": "VC-CFD-25",
+      "name": "Lid-driven cavity, Re 100 and 1000 (Ghia, Ghia & Shin 1982, J. Comput. Phys. 48:387-411)",
+      "reference": null,
+      "grade": "TBD",
+      "provenance": "Table I centreline velocities; values not read from a primary copy in this sandbox, so none are transcribed here.",
+      "plannedAcceptance": "u on the vertical centreline and v on the horizontal centreline within 2 % of the table range",
+      "status": "TBD — transcribe Table I from the paper and pin it"
+    },
+    {
+      "id": "VC-CFD-33",
+      "name": "Bow-shock stand-off distance on a sphere (Billig 1967)",
+      "reference": "data/analytic_references.json shockStandoff",
+      "grade": "B",
+      "provenance": "delta/R = 0.143 exp(3.24/M^2), gamma 1.4, as cited by arXiv 2604.00953; one secondary source",
+      "plannedAcceptance": "documentation band +-15 %; reported, not gated",
+      "status": "documentation"
+    },
+    {
+      "id": "VC-CFD-34",
+      "name": "ONERA M6 wing, Euler, Mach 0.8395, alpha 3.06 deg (Schmitt & Charpin, AGARD AR-138, 1979)",
+      "definition": { "mach": 0.8395, "alphaDeg": 3.06, "reynolds": 11.72e6, "note": "Reynolds unused by Euler; conditions quoted by two secondary sources (11.72e6 vs 11.76e6)" },
+      "reference": null,
+      "grade": "B (conditions) / TBD (Cp data)",
+      "provenance": "NASA NPARC Alliance validation archive hosts AR-138 Cp at 7 span stations (https://www.grc.nasa.gov/WWW/wind/valid/m6wing/m6wing.html), not reachable from the sandbox",
+      "plannedAcceptance": "shock position on stations 2-6 within 3 % chord; Cp within 0.05 away from the shock (Euler vs experiment, documented viscous bias)",
+      "status": "TBD — download and pin the NPARC Cp files"
+    }
+  ]
+}

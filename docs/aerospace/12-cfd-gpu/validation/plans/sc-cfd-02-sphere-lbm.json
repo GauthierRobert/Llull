@@ -1,0 +1,25 @@
+{
+  "id": "SC-CFD-02",
+  "status": "draft — the cfd commands and the llull-flow sidecar are specified, not implemented",
+  "validates": ["VC-CFD-21", "VC-CFD-26"],
+  "description": "Low-speed flow past a sphere at Re 100 (D = 1 m, U = 1 m/s, nu = 0.01 m2/s): drag coefficient against the Schiller-Naumann correlation, on the GPU and on the CPU backend",
+  "actions": [
+    { "command": "set_units", "params": { "units": "m" } },
+    { "command": "add_sphere", "params": { "radius": 0.5 }, "as": "ball" },
+    {
+      "command": "cfd_create_case",
+      "params": { "id": "re100", "entityIds": ["$ball"], "regime": "low_speed", "freestream": { "speedMS": 1, "air": { "densityKgM3": 1, "temperatureK": 288.15, "viscosityPaS": 0.01 }, "alphaDeg": 0, "betaDeg": 0 }, "reference": { "areaM2": 0.7853981634, "lengthM": 1, "momentPointM": [0, 0, 0] }, "domain": { "rule": "external_aero" }, "ground": { "enabled": false, "moving": false }, "quality": "draft", "cellsPerReferenceLength": 32 }
+    }
+  ],
+  "cli": [
+    "llull cfd_solve caseId=re100 device=gpu --timeout 1800 --file $DOC",
+    "llull cfd_report caseId=re100 --json --file $DOC > gpu.json",
+    "llull cfd_solve caseId=re100 device=cpu --timeout 7200 --file $DOC",
+    "llull cfd_report caseId=re100 --json --file $DOC > cpu.json"
+  ],
+  "expected": [
+    { "file": "gpu.json", "path": "converged", "value": true },
+    { "file": "gpu.json", "path": "forces.cd", "value": 1.09173, "rel": 0.1, "source": "Schiller & Naumann (1933), Re 100 (data/analytic_references.json sphereDrag)" },
+    { "file": "cpu.json", "path": "forces.cd", "compareTo": "gpu.json:forces.cd", "rel": 1e-5, "source": "VC-CFD-26 GPU / CPU equivalence" }
+  ]
+}
