@@ -320,3 +320,8 @@
   white-space: nowrap;
   color: var(--fg);
 }
+
+.review-panel__hint {
+  font-family: var(--font-sans);
+  white-space: normal;
+}

@@ -1,6 +1,7 @@
 // check_prototype for the Review tab (read-only query: kernel + physics). Online it runs on the server (same reason as simulationRun:
 // the served app's CSP blocks the in-page MuJoCo load); offline it runs in the page. Where check_prototype is not registered, the tab
-// runs check_assembly (the same check-result envelope, kernel only) and wraps it as a review whose other checks read "not run".
+// runs the individual checks that are (check_assembly, check_mechanism, check_motion_clearance — each returns one check-result
+// envelope) and wraps them as one review; a check no command provides reads "not run".
 
 import { getCommand } from '@core/commands/registry';
 import { ensurePhysicsEngine } from '@app/physics';
@@ -10,16 +11,23 @@ import { postCommand, ServerCommandError } from '@ui/store/serverCommands';
 
 export const CHECK_COMMAND = 'check_prototype';
 const ASSEMBLY_COMMAND = 'check_assembly';
+/** Single-check commands composed into a review when check_prototype is absent, in checklist order. */
+const PART_COMMANDS = [ASSEMBLY_COMMAND, 'check_mechanism', 'check_motion_clearance'] as const;
 
-/** The command the Review tab runs: check_prototype, else check_assembly, else none. */
+/** The single checks the Review tab will run (check_prototype absent). */
+const CHECK_TITLES: Readonly<Record<string, string>> = {
+  assembly: 'Buildability',
+  mechanism: 'Mechanism',
+  motion_clearance: 'Motion clearance',
+};
+
+/** The single checks the Review tab will run (check_prototype absent). */
+export const availableParts = (): string[] => PART_COMMANDS.filter((name) => getCommand(name) !== undefined);
+
+/** The command the Review tab runs: check_prototype, else check_assembly (+ the other single checks), else none. */
 export function reviewCheckCommand(): string | null {
   if (getCommand(CHECK_COMMAND) !== undefined) return CHECK_COMMAND;
   return getCommand(ASSEMBLY_COMMAND) !== undefined ? ASSEMBLY_COMMAND : null;
-}
-
-/** check_assembly's single check result as a review envelope (the other three checks are absent: the checklist shows them not run). */
-function asReview(data: unknown, summary: string): unknown {
-  return data === undefined || data === null ? data : { checks: [data], ownerSummary: summary };
 }
 
 interface PrototypeCheckRun {
@@ -37,14 +45,28 @@ async function runOnServer(command: string, params: Record<string, unknown>): Pr
   }
 }
 
-async function runAssemblyCheck(params: Record<string, unknown>): Promise<PrototypeCheckRun> {
-  const run =
-    useStore.getState().liveStatus === 'connected' ? await runOnServer(ASSEMBLY_COMMAND, params) : runQuery(ASSEMBLY_COMMAND, params);
-  return { summary: run.summary, data: asReview(run.data, run.summary) };
+const isEnvelope = (data: unknown): boolean => typeof data === 'object' && data !== null && 'check' in data && 'items' in data;
+
+/** Runs every available single check and wraps the envelopes as one review (a failed run is reported, the others still count). */
+async function runSingleChecks(params: Record<string, unknown>): Promise<PrototypeCheckRun> {
+  const online = useStore.getState().liveStatus === 'connected';
+  const runs = await Promise.all(
+    availableParts().map((name) => (online ? runOnServer(name, params) : Promise.resolve(runQuery(name, params)))),
+  );
+  const checks = runs.flatMap((run) => (isEnvelope(run.data) ? [run.data] : []));
+  const summary = runs.map((run) => run.summary).join(' ');
+  // The owner reads one line per check (verdict), not the agents' long summaries.
+  const ownerSummary = checks
+    .map(
+      (check) =>
+        `${CHECK_TITLES[String((check as { check: unknown }).check)] ?? 'Check'}: ${String((check as { status: unknown }).status)}`,
+    )
+    .join(' · ');
+  return { summary, data: checks.length === 0 ? undefined : { checks, ownerSummary } };
 }
 
 export async function runPrototypeCheck(params: Record<string, unknown>, onStatus: (status: string) => void): Promise<PrototypeCheckRun> {
-  if (reviewCheckCommand() === ASSEMBLY_COMMAND) return runAssemblyCheck(params);
+  if (reviewCheckCommand() === ASSEMBLY_COMMAND) return runSingleChecks(params);
   if (useStore.getState().liveStatus === 'connected') return runOnServer(CHECK_COMMAND, params);
   onStatus('Loading the physics engine…');
   if (!(await ensurePhysicsEngine())) return { summary: 'The physics engine could not be loaded (see the console).', data: undefined };

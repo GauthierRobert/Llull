@@ -5,7 +5,7 @@ import React, { useCallback } from 'react';
 import { getCommand } from '@core/commands/registry';
 import { classNames } from '@ui/classNames';
 import { KpiStrip, PanelEmpty, PanelHeader, PanelSection, StatusLine } from '@ui/panels/PanelParts';
-import { CHECK_COMMAND, reviewCheckCommand, runPrototypeCheck } from '@ui/services/prototypeCheck';
+import { availableParts, CHECK_COMMAND, reviewCheckCommand, runPrototypeCheck } from '@ui/services/prototypeCheck';
 import { useStore } from '@ui/store';
 import { ReadinessChecklist } from './ReadinessChecklist';
 import { FindingsList, type DispositionChange } from './FindingsList';
@@ -38,6 +38,22 @@ function useRunChecks(): () => void {
       setBusy(false);
     });
   }, [document]);
+}
+
+const PART_LABELS: Readonly<Record<string, string>> = {
+  check_assembly: 'buildability (solids, overlaps, floating parts, walls)',
+  check_mechanism: 'mechanism mobility (DOF)',
+  check_motion_clearance: 'clearance in motion',
+};
+
+/** "Runs the buildability check …; dynamics reads “not run” here." for the checks this app can run. */
+function partsText(parts: readonly string[]): string {
+  const missing = [
+    ...(parts.includes('check_mechanism') ? [] : ['mechanism']),
+    ...(parts.includes('check_motion_clearance') ? [] : ['motion clearance']),
+    'dynamics',
+  ];
+  return `Runs ${parts.map((name) => PART_LABELS[name] ?? name).join(', ')}; ${missing.join(', ')} ${missing.length === 1 ? 'reads' : 'read'} “not run” here.`;
 }
 
 export function ReviewPanel({ className }: { className?: string }): React.ReactElement {
@@ -78,8 +94,8 @@ export function ReviewPanel({ className }: { className?: string }): React.ReactE
           </p>
         )}
         {canCheck && checkCommand !== CHECK_COMMAND && (
-          <p className="panel__row-meta" data-testid="review-assembly-only">
-            Runs the buildability check (solids, overlaps, floating parts, walls); motion and dynamics checks read “not run” here.
+          <p className="panel__row-meta review-panel__hint" data-testid="review-assembly-only">
+            {partsText(availableParts())}
           </p>
         )}
       </div>

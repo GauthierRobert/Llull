@@ -39,7 +39,7 @@ describe('ReviewPanel without check_prototype', () => {
     const dispatch = vi.spyOn(useStore.getState(), 'dispatch');
     render(<ReviewPanel />);
     expect(screen.queryByTestId('review-unavailable')).toBeNull();
-    expect(screen.getByTestId('review-assembly-only')).toHaveTextContent('buildability check');
+    expect(screen.getByTestId('review-assembly-only')).toHaveTextContent(/Runs buildability.*dynamics/);
     expect(screen.getByTestId('review-run')).toBeEnabled();
     fireEvent.click(screen.getByTestId('review-run'));
     await waitFor(() => expect(useReviewStore.getState().busy).toBe(false));
