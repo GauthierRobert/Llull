@@ -70,11 +70,7 @@ describe('large text exports through the CLI', () => {
     expect(elideLargePayloads(small)).toEqual({
       step: 'ISO-10303-21;',
       note: small.note,
-      files: [
-        {
-          content: `<${big.length} chars; not shown, rerun with --save <path> to write the full file>`,
-        },
-      ],
+      files: [{ content: `<${big.length} chars; not shown, rerun with --save <path> to write the full file>` }],
     });
     expect(withoutPayloads({ step: 'abc' })).toEqual({ step: '<3 chars, saved>' });
   });

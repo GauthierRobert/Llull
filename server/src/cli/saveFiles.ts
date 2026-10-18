@@ -140,10 +140,7 @@ export function elideLargePayloads(data: unknown): unknown {
   return Object.fromEntries(
     Object.entries(data).map(([key, value]) =>
       payloadKeys.has(key) && typeof value === 'string' && value.length > MAX_INLINE_PAYLOAD_CHARS
-        ? [
-            key,
-            `<${value.length} chars; not shown, rerun with --save <path> to write the full file>`,
-          ]
+        ? [key, `<${value.length} chars; not shown, rerun with --save <path> to write the full file>`]
         : [key, key === 'files' ? elideLargePayloads(value) : value],
     ),
   );
