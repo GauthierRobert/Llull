@@ -1,9 +1,8 @@
-// Bottom bar: live / syncing / sync-failed, last summary, entity + selection counts, units.
+// Bottom bar: live / connecting / offline, last summary, entity + selection counts, units.
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useStore } from '@ui/store';
 import { useKernelStatusStore } from '@ui/store/kernelStatus';
-import { fetchLicenseLabel } from '@ui/services/serverFiles';
 
 function StatusItem({
   label,
@@ -24,26 +23,11 @@ function StatusItem({
 
 function LiveIndicator(): React.ReactElement {
   const liveStatus = useStore((s) => s.liveStatus);
-  const syncState = useStore((s) => s.syncState);
-  const hasUnsynced = useStore((s) => s.hasUnsyncedLocalEdits);
 
-  const label =
-    liveStatus === 'connected'
-      ? syncState === 'failed'
-        ? 'Sync failed — retrying'
-        : syncState === 'syncing' || hasUnsynced
-          ? 'Syncing…'
-          : 'Live'
-      : liveStatus === 'connecting'
-        ? 'Connecting…'
-        : 'Offline (local)';
+  const label = liveStatus === 'connected' ? 'Live' : liveStatus === 'connecting' ? 'Connecting…' : 'Offline (local)';
 
   return (
-    <span
-      className={`live-indicator live-indicator--${liveStatus}`}
-      aria-label={`MCP stream: ${label}`}
-      title={`MCP live stream: ${label}`}
-    >
+    <span className={`live-indicator live-indicator--${liveStatus}`} aria-label={`Live sync: ${label}`} title={`Live sync: ${label}`}>
       <span className="live-indicator__dot" aria-hidden="true" />
       {label}
     </span>
@@ -62,32 +46,6 @@ function KernelIndicator(): React.ReactElement | null {
     <span className={`status-summary status-kernel status-kernel--${status}`} role={status === 'failed' ? 'alert' : 'status'} title={label}>
       {label}
     </span>
-  );
-}
-
-/** License mode from the public `GET /license`; renders nothing offline / on any failure. */
-function LicenseBadge(): React.ReactElement | null {
-  const liveStatus = useStore((s) => s.liveStatus);
-  const [license, setLicense] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (liveStatus !== 'connected') {
-      setLicense(null);
-      return;
-    }
-    const controller = new AbortController();
-    void fetchLicenseLabel(controller.signal).then((label) => {
-      if (!controller.signal.aborted && label !== null) setLicense(label);
-    });
-    return () => controller.abort();
-  }, [liveStatus]);
-
-  if (license === null) return null;
-  return (
-    <>
-      <StatusItem label="License" value={license} />
-      <span className="status-divider" aria-hidden="true" />
-    </>
   );
 }
 
@@ -121,7 +79,6 @@ export function StatusBar(): React.ReactElement {
         )}
       </div>
       <div className="status-bar-bottom__right">
-        <LicenseBadge />
         <StatusItem label="Entities" value={entityLabel} aria-label={`Entities: ${entityLabel}`} />
         <span className="status-divider" aria-hidden="true" />
         <StatusItem label="Selection" value={selectionLabel} aria-label={`Selection: ${selectionLabel}`} />

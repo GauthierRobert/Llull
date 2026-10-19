@@ -118,7 +118,7 @@ AI control — there is no in-app AI bridge): the `llull` CLI since LC1 (the MCP
 - [x] Replay prefix cache; parameter edits regenerate only dependent steps; kernel memoization
 - [x] Derivation guards; saved files omit plugin-derived geometry (llull-document v2)
 - [ ] Kernel (boolean / fillet) mesh results as a derived cache, not stored in files
-- [x] Command-log live sync (`/live`), offline outbox; UI bridge retired
+- [x] Command-log live sync (`/live`); UI bridge retired (the offline outbox was removed in LC1 step 6)
 - [x] Plugins (building, industrial); npm workspaces; MCP tool discovery (`search_tools` / `enable_toolset`)
 - [x] Every source file under 500 code lines
 - [ ] History-based undo (MG5.4)

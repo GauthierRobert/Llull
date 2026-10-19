@@ -189,8 +189,9 @@ The UI keeps the document in a single Zustand store (`src/ui/store`). `dispatch(
 
 - **online** — sends the command to the server, which runs it on the shared live
   document; the result comes back over the `/live` stream;
-- **offline** — runs `execute` locally, keeps an undo snapshot, and queues the command
-  in an outbox that is replayed to the server on reconnect.
+- **backend unreachable** (not started yet, restarting) — runs `execute` in the renderer and keeps an
+  undo snapshot; nothing is queued, and the backend's snapshot replaces the local document when it
+  connects (the status bar says so; the autosave copy keeps the local work recoverable).
 
 The live stream carries the **command log**, not document diffs: each event is
 `{ seq, name, params, stateHash }`. Clients re-run the command with the same `execute`
@@ -257,7 +258,7 @@ The agent edits the same document the UI does because it is calling the same
   resulting documents (ids normalized) with stored snapshots, plus checks that replaying
   the history reproduces them. Any behaviour change shows up here.
 - **Integration tests** exercise `store.dispatch` end-to-end (command → store → undo,
-  sync, outbox).
+  sync, local fallback).
 - **Component tests** (Testing Library) cover panels and param-gathering, not
   geometry math. **E2E tests** (Playwright) drive the real app.
 

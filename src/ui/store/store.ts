@@ -1,22 +1,28 @@
 /**
  * The single Zustand store; every change goes through `execute`. ONLINE (onlineMode): dispatch POSTs /command, /live
- * events re-run on `liveBase` or hydrate snapshots. LOCAL (localMode) while disconnected, syncing or holding unsynced
- * edits: run locally, queued in `localOutbox` (outbox). Connectivity is set ONLY by the SSE hook (`setLiveStatus`).
+ * events re-run on `liveBase` or hydrate snapshots. LOCAL (localMode) while the backend is unreachable: run locally; the
+ * next snapshot replaces the local document. Connectivity is set ONLY by the SSE hook (`setLiveStatus`).
  */
 
 import { create } from 'zustand';
 import { type CadDocument, type EntityId, createEmptyDocument } from '@core/model/types';
-import { flushOutbox, onSseDisconnected, resetSyncBookkeeping, withLocalSelection } from './outbox';
-import { isLocalMode, refuseDuringSync, runLocally, stepLocalHistory } from './localMode';
+import { isLocalMode, runLocally, stepLocalHistory } from './localMode';
 import { postDispatch, postHistoryStep } from './onlineMode';
 import type { CadStoreState, DispatchOptions, LiveStatus } from './storeTypes';
 import { type LiveCommandEvent, type LiveSnapshotEvent, applyLiveCommand } from '@protocol/liveSync';
 import { reuseUnchanged } from './reuseUnchanged';
 import { toggledInList } from '@ui/toggleMember';
 
+/** Selection survives a document replacement, minus ids that no longer exist. */
+const withLocalSelection = (doc: CadDocument, selection: readonly EntityId[]): CadDocument => ({
+  ...doc,
+  selection: selection.filter((id) => id in doc.entities),
+});
+
+const REPLACED_LOCAL_EDITS = 'Backend reconnected: edits made while it was offline were replaced by its document.';
+
 export const useStore = create<CadStoreState>()((set, get) => {
   const stepHistory = (direction: 'undo' | 'redo'): void => {
-    if (refuseDuringSync(set, get)) return;
     if (isLocalMode(get())) stepLocalHistory(set, get, direction);
     else postHistoryStep(set, get, direction);
   };
@@ -30,14 +36,9 @@ export const useStore = create<CadStoreState>()((set, get) => {
     canRedo: false,
     renderOrigin: [0, 0, 0],
     liveStatus: 'connecting',
-    hasUnsyncedLocalEdits: false,
-    localEditCounter: 0,
-    syncState: 'idle',
     sseEverConnected: false,
     localUndoStack: [],
     localRedoStack: [],
-    localOutbox: [],
-    localRedoOutbox: [],
     liveBase: createEmptyDocument(),
     liveSeq: -1,
     liveEpoch: null,
@@ -48,20 +49,7 @@ export const useStore = create<CadStoreState>()((set, get) => {
     },
 
     setDocument(doc: CadDocument): void {
-      resetSyncBookkeeping();
-      set({
-        hasUnsyncedLocalEdits: false,
-        localEditCounter: 0,
-        syncState: 'idle',
-        document: doc,
-        lastSummary: null,
-        canUndo: false,
-        canRedo: false,
-        localUndoStack: [],
-        localRedoStack: [],
-        localOutbox: [],
-        localRedoOutbox: [],
-      });
+      set({ document: doc, lastSummary: null, canUndo: false, canRedo: false, localUndoStack: [], localRedoStack: [] });
     },
 
     undo: () => stepHistory('undo'),
@@ -88,10 +76,6 @@ export const useStore = create<CadStoreState>()((set, get) => {
     },
 
     hydrateLiveDocument(snapshot: LiveSnapshotEvent): void {
-      if (get().hasUnsyncedLocalEdits) {
-        flushOutbox(set, get);
-        return;
-      }
       const { liveEpoch, liveSeq } = get();
       if (snapshot.epoch === liveEpoch && snapshot.seq < liveSeq) return; // stale resync response
       const adopted = reuseUnchanged(get().liveBase, snapshot.document);
@@ -102,12 +86,12 @@ export const useStore = create<CadStoreState>()((set, get) => {
         document: withLocalSelection(reuseUnchanged(get().document, adopted), get().document.selection),
         localUndoStack: [],
         localRedoStack: [],
+        ...(get().localUndoStack.length > 0 ? { lastSummary: REPLACED_LOCAL_EDITS } : {}),
       });
     },
 
     applyLiveCommand(event: LiveCommandEvent): boolean {
       const state = get();
-      if (state.hasUnsyncedLocalEdits) return true; // the post-flush snapshot supersedes it
       if (event.epoch === state.liveEpoch && event.seq <= state.liveSeq) return true; // already applied
       if (event.epoch !== state.liveEpoch) return false; // server restarted (or no snapshot yet)
       const applied = applyLiveCommand(state.liveBase, state.liveSeq, event);
@@ -118,11 +102,6 @@ export const useStore = create<CadStoreState>()((set, get) => {
 
     setLiveStatus(status: LiveStatus): void {
       set(status === 'connected' ? { liveStatus: status, sseEverConnected: true } : { liveStatus: status });
-      if (status === 'disconnected') {
-        onSseDisconnected(set, get);
-      } else if (status === 'connected' && get().hasUnsyncedLocalEdits) {
-        flushOutbox(set, get);
-      }
     },
   };
 });

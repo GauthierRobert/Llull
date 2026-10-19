@@ -7,8 +7,6 @@ export interface LastMeasure {
   data: unknown;
 }
 
-type SyncState = 'idle' | 'syncing' | 'failed';
-
 export type LiveStatus = 'connecting' | 'connected' | 'disconnected';
 
 interface DispatchResult {
@@ -25,8 +23,6 @@ export interface DispatchOptions {
   quiet?: boolean;
   /** Local mode: fold into the previous undo step (automatic follow-ups such as framing) so one Undo reverts both. */
   coalesce?: boolean;
-  /** Local mode: never replayed to the server (autosave restore: a stale copy must not replace the live document); inherited by a coalesced follow-up. */
-  localOnly?: boolean;
 }
 
 export interface CadStoreState {
@@ -39,27 +35,17 @@ export interface CadStoreState {
   canUndo: boolean;
   canRedo: boolean;
   liveStatus: LiveStatus;
-  /** Local (offline) edits the server has not received. */
-  hasUnsyncedLocalEdits: boolean;
-  /** Bumped per local command / local undo-redo step, never by selection. */
-  localEditCounter: number;
-  /** 'syncing' = offline→online push pending/in flight, 'failed' = awaiting retry. */
-  syncState: SyncState;
   /** Distinguishes first connect from reconnect. */
   sseEverConnected: boolean;
   /** Oldest first, bounded by LOCAL_HISTORY_LIMIT. */
   localUndoStack: CadDocument[];
   localRedoStack: CadDocument[];
-  /** Local mutating commands, in order, that turned the last server state into the current local document. */
-  localOutbox: OutboxCommand[];
-  /** Undone offline entries (most recent last); re-queued by local redo. */
-  localRedoOutbox: OutboxCommand[];
   /** Client copy of the server document at log position `liveSeq` (-1 before the first snapshot). */
   liveBase: CadDocument;
   liveSeq: number;
   /** Server process epoch of `liveSeq`; seqs compare only within one epoch. */
   liveEpoch: string | null;
-  /** POST /command online, local `execute` offline. */
+  /** POST /command while the backend is reachable, local `execute` while it is not. */
   dispatch(name: string, params?: unknown, options?: DispatchOptions): void;
   /** Replace wholesale (load / reset). */
   setDocument(doc: CadDocument): void;
@@ -85,16 +71,3 @@ export interface CadStoreState {
 
 export type StoreSet = (partial: Partial<CadStoreState> | ((state: CadStoreState) => Partial<CadStoreState>)) => void;
 export type StoreGet = () => CadStoreState;
-
-export interface OutboxCommand {
-  /** Idempotency key: the flush acks by it and sends it as `commandId`. */
-  readonly commandId: string;
-  readonly name: string;
-  readonly params: unknown;
-  /** Ids the local run produced; zipped with the server's `affected` to remap later entries. */
-  readonly affected: readonly string[];
-  /** Part of the previous entry's undo step (`coalesce`): undo / redo move them together. */
-  readonly coalesced?: boolean;
-  /** Never sent (autosave restore + follow-ups): the server document stays the truth. */
-  readonly localOnly?: boolean;
-}

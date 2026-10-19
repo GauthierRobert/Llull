@@ -1,5 +1,5 @@
 // Fetch helpers of the server command bus. The new document arrives over the /live SSE stream, never in the
-// response body (L1). Network failure / non-ok status → ServerCommandError (offline policy: store.ts).
+// response body (L1). Network failure / non-ok status → ServerCommandError (local fallback: onlineMode.ts).
 
 import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
 import { errorMessage } from '@lib/errorMessage';
@@ -20,26 +20,6 @@ export class ServerCommandError extends Error {
     this.status = status;
     this.name = 'ServerCommandError';
   }
-}
-
-const httpStatusOf = (err: unknown): number | undefined =>
-  err instanceof ServerCommandError && err.kind === 'http' ? err.status : undefined;
-
-/** Statuses that refuse ONE command (bad params, too large, unprocessable). */
-const COMMAND_REFUSAL_STATUSES: ReadonlySet<number> = new Set([400, 413, 422]);
-/** Statuses that refuse the REQUEST itself (server/src/security.ts: token, origin, route). */
-const CONNECTION_REFUSAL_STATUSES: ReadonlySet<number> = new Set([401, 403, 404]);
-
-/** Refused this one command, retrying cannot fix it: drop it. Anything else (connection refusals, 408, 429, 5xx, network) keeps it. */
-export function isCommandRefusal(err: unknown): err is ServerCommandError {
-  const status = httpStatusOf(err);
-  return status !== undefined && COMMAND_REFUSAL_STATUSES.has(status);
-}
-
-/** Refused whatever the command (auth, origin, missing route): stop syncing, keep queued edits, never adopt the server snapshot over them. */
-export function isConnectionRefusal(err: unknown): err is ServerCommandError {
-  const status = httpStatusOf(err);
-  return status !== undefined && CONNECTION_REFUSAL_STATUSES.has(status);
 }
 
 /** GET `path`, or POST `postBody` as JSON. */

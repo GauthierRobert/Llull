@@ -82,7 +82,7 @@ describe('useAutosave', () => {
     vi.useFakeTimers();
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     useStore.getState().setDocument(createEmptyDocument());
-    useStore.setState({ liveStatus: 'disconnected', lastSummary: null, liveSeq: -1, hasUnsyncedLocalEdits: false, localOutbox: [] });
+    useStore.setState({ liveStatus: 'disconnected', lastSummary: null, liveSeq: -1 });
     useSessionStore.setState({ dirty: false, restoredAt: null, pendingLocalCopy: null });
   });
   afterEach(() => {
@@ -224,20 +224,6 @@ describe('useAutosave', () => {
         }),
     );
     expect(useSessionStore.getState().pendingLocalCopy).toBeNull();
-  });
-  it('clears the record once the outbox is replayed and acknowledged', () => {
-    const storage = fakeStorage();
-    render(<Harness storage={storage} />);
-    act(() => useStore.getState().dispatch('add_box', { size: [1, 1, 1] }));
-    act(() => {
-      vi.advanceTimersByTime(AUTOSAVE_DELAY_MS + 10);
-    });
-    expect(readAutosave(storage)).not.toBeNull();
-    const entry = { name: 'add_box', params: {}, affected: [], commandId: 'c1' };
-    act(() => useStore.setState({ hasUnsyncedLocalEdits: true, localOutbox: [entry] }));
-    act(() => useStore.setState({ liveStatus: 'connected', liveSeq: 1 }));
-    act(() => useStore.setState({ hasUnsyncedLocalEdits: false, localOutbox: [] }));
-    expect(readAutosave(storage)).toBeNull();
   });
   it('shows a status message while autosave is paused by a pending local copy', () => {
     useStore.setState({ liveStatus: 'connected', liveSeq: 0 });

@@ -13,7 +13,6 @@ function resetStore(): void {
     canUndo: false,
     canRedo: false,
     liveStatus: 'connecting',
-    hasUnsyncedLocalEdits: false,
     localUndoStack: [],
     localRedoStack: [],
   });

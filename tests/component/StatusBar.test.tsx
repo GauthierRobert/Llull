@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { useKernelStatusStore } from '@ui/store/kernelStatus';
@@ -27,17 +27,17 @@ describe('StatusBar — live indicator', () => {
   it('shows "Live" when liveStatus is connected', () => {
     useStore.setState({ liveStatus: 'connected' });
     render(<StatusBar />);
-    expect(screen.getByLabelText(/mcp stream: live/i)).toBeDefined();
+    expect(screen.getByLabelText(/live sync: live/i)).toBeDefined();
   });
   it('shows "Offline (local)" when liveStatus is disconnected', () => {
     useStore.setState({ liveStatus: 'disconnected' });
     render(<StatusBar />);
-    expect(screen.getByLabelText(/mcp stream: offline \(local\)/i)).toBeDefined();
+    expect(screen.getByLabelText(/live sync: offline \(local\)/i)).toBeDefined();
   });
   it('shows "Connecting" text when liveStatus is connecting', () => {
     useStore.setState({ liveStatus: 'connecting' });
     render(<StatusBar />);
-    expect(screen.getByLabelText(/mcp stream: connecting/i)).toBeDefined();
+    expect(screen.getByLabelText(/live sync: connecting/i)).toBeDefined();
   });
 });
 
@@ -143,22 +143,6 @@ describe('StatusBar — entity count', () => {
     createBox();
     render(<StatusBar />);
     expect(screen.getByLabelText('Entities: 2')).toBeDefined();
-  });
-});
-
-describe('StatusBar — license mode', () => {
-  beforeEach(resetStore);
-  it('shows the license label from GET /license when connected', async () => {
-    const fetchMock = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ mode: 'evaluation', label: 'Evaluation — 3 users' }))));
-    vi.stubGlobal('fetch', fetchMock);
-    useStore.setState({ liveStatus: 'connected' });
-    render(<StatusBar />);
-    expect(await screen.findByLabelText('License: Evaluation — 3 users')).toBeInTheDocument();
-    vi.unstubAllGlobals();
-  });
-  it('shows nothing in offline local mode', () => {
-    render(<StatusBar />);
-    expect(screen.queryByLabelText(/^License:/)).not.toBeInTheDocument();
   });
 });
 

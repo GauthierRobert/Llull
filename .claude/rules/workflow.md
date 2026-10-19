@@ -26,7 +26,7 @@ answer it (add the test, or state why none is needed / why the snapshot diff is 
 | `tests/unit/` | command layer + plugins (`building/**`); coverage gate 90/85/90/90 |
 | `tests/unit/contract/` | schema derivation, `toToolSchemas()` snapshot, ctx, plugins, guards, persistence, live sync |
 | `tests/golden/` | `build_project` plans → id-normalized snapshots + replay equality; one plan per regression |
-| `tests/integration/` | `store.dispatch` end-to-end (undo, live sync, outbox) |
+| `tests/integration/` | `store.dispatch` end-to-end (undo, live sync, local fallback) |
 | `tests/component/` | panels & param-gathering (Testing Library), never geometry math |
 | `tests/e2e/`, `server/tests/` | Playwright (`npm run test:e2e`); server + CLI (`npm --prefix server test`) |
 | `desktop/tests/` | desktop app without Electron: real backend, File ops, CLI `--app` (`npm --prefix desktop test`) |
