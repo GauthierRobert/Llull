@@ -87,14 +87,48 @@ describe('native kernel router', () => {
   });
 
   it('falls back with the original request when the sidecar answers NATIVE_UNSUPPORTED or dies', async () => {
-    const fillet = { op: 'fillet', source: cube, edges: [0], size: 0.1 } as const;
-    const unsupported = harness(() => ({ result: null, error: "NATIVE_UNSUPPORTED: recipe op 'fillet'" }));
-    expect(await unsupported.router.route({ op: 'evaluate', args: [fillet] })).toEqual({ result: 'wasm:evaluate' });
-    expect(unsupported.fallbackCalls).toEqual([{ op: 'evaluate', args: [fillet] }]);
-    expect(unsupported.warnings[0]).toContain("recipe op 'fillet'");
+    const blob = { op: 'brep', blob: 'a'.repeat(64), format: 'occt-brep-v1' } as const;
+    const unsupported = harness(() => ({ result: null, error: "NATIVE_UNSUPPORTED: recipe op 'brep'" }));
+    expect(await unsupported.router.route({ op: 'evaluate', args: [blob] })).toEqual({ result: 'wasm:evaluate' });
+    expect(unsupported.fallbackCalls).toEqual([{ op: 'evaluate', args: [blob] }]);
+    expect(unsupported.warnings[0]).toContain("recipe op 'brep'");
 
     const died = harness(() => ({ result: null, error: 'NATIVE_DIED: killed by SIGSEGV' }));
     expect(await died.router.route({ op: 'tessellate', args: [{ key: 'k' }] })).toEqual({ result: 'wasm:tessellate' });
+  });
+
+  it('keeps fillet and chamfer on WASM without asking the sidecar (edge indices wait for native topology)', async () => {
+    const h = harness(() => ({ result: { key: 'k' } }));
+    const fillet = { op: 'fillet', source: cube, edges: [0], size: 0.1 } as const;
+    expect(await h.router.route({ op: 'evaluate', args: [fillet] })).toEqual({ result: 'wasm:evaluate' });
+    expect(await h.router.route({ op: 'massProperties', args: [{ key: 'k', recipe: { ...fillet, op: 'chamfer' } }] })).toEqual({
+      result: 'wasm:massProperties',
+    });
+    expect(h.nativeCalls).toHaveLength(0);
+    expect(h.warnings[0]).toContain('fillet: edge indices wait for native topology');
+  });
+
+  it('lowers a through-all hole on the host: the source mesh from the sidecar, then a featureCut node', async () => {
+    const mesh = {
+      encoding: 'base64-le',
+      positions: Buffer.from(new Float64Array([0, 0, 0, 0, 0, 1, 1, 1, 1]).buffer).toString('base64'),
+      indices: Buffer.from(new Uint32Array([0, 1, 2]).buffer).toString('base64'),
+    };
+    const h = harness((op, args) => ({ result: op === 'tessellate' ? mesh : { key: (args[0] as { key: string }).key } }));
+    const hole = {
+      op: 'feature',
+      feature: 'hole',
+      source: cube,
+      frame: { origin: [0.5, 0.5, 1], normal: [0, 0, 1], xDir: [1, 0, 0] },
+      points: [[0, 0]],
+      hole: { kind: 'simple', diameter: 0.2 },
+      extent: { kind: 'through_all' },
+    };
+    await h.router.route({ op: 'evaluate', args: [hole] });
+    expect(h.nativeCalls.map((call) => call.op)).toEqual(['tessellate', 'evaluate']);
+    const sent = (h.nativeCalls[1]!.args[0] as { recipe: Record<string, unknown> }).recipe;
+    expect(sent).toMatchObject({ op: 'featureCut', mode: 'subtract', source: cube, holes: { normal: [0, 0, 1] } });
+    expect(sent['tool']).toMatchObject({ op: 'solid', entity: { kind: 'revolution' } });
   });
 
   it('passes other native errors through (refusal or resend request), without falling back', async () => {

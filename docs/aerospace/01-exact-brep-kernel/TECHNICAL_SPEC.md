@@ -874,8 +874,33 @@ Built (opt-in, `LLULL_KERNEL=occt-native`; the desktop default stays `occt` = WA
   any non-JSON line). stdin is read on its own thread: with `--exit-on-eof` (what the server passes) the process exits as soon
   as the host closes the pipe, even mid-operation, so a hung OCCT call never outlives a killed worker.
 - **Native ops.** `info`, `evaluate`, `tessellate`, `massProperties`, `analyze`, `exportStep`. Recipe nodes `solid`,
-  `boolean`, `place`, `scale`; solid kinds box, cylinder, sphere, cone, torus, wedge, polygon extrusion, polygon revolution,
-  triangle mesh (sewn), and pyramid (the host sends its triangles, as the WASM kernel sews them).
+  `boolean`, `place`, `scale`, `fillet`, `chamfer`, `blend`, `shell` (sealed and open) and `feature` (as `featureCut`, below);
+  solid kinds box, cylinder, sphere, cone, torus, wedge, extrusion and revolution (polygon or exact arc / Bézier profile), triangle
+  mesh (sewn; modelled-thread groove tools included), pyramid (the host sends its triangles, as the WASM kernel sews them), loft,
+  sweep (constant section and variable stations) and subdivision (B-spline patches, triangles at level 0 or on a patch failure).
+- **Second slice: feature nodes and freeform kinds.** C++ in `cpp/features.{hxx,cxx}` behind a second cxx bridge
+  (`src/features.rs`, reusing the facade's opaque `Shape`), evaluated by `src/recipe/nodes.rs`; `build.rs` compiles every
+  `cpp/*.cxx` and links `TKFeat`. Each builder is the `packages/kernel-occt` one with its parameters: `BRepFilletAPI_MakeFillet`
+  (`ChFi3d_Rational`, constant or linear radius) / `MakeChamfer` on unique edges in explorer order (`TopExp::MapShapes`, the
+  `uniqueSubShapes` rule; out-of-range index → refusal; `BRepCheck` validity), blend = one multi-argument `BRepAlgoAPI_Fuse` whose
+  non-degenerate section edges still on the result are filleted, sealed shell = `MakeOffsetShape::PerformByJoin(−t, 1e-4, Skin,
+  Arc)` cut from the solid (a bare offset shell closed by `ShapeFix_Solid`), open shell = `MakeThickSolidByJoin(−t, 1e-3)` on the
+  faces nearest each point (`BRepExtrema_DistShapeShape`), curve chains = `MakeEdge` (line) / `GC_MakeArcOfCircle` / 4-pole
+  `Geom_BezierCurve` → `MakeWire` → `MakeFace(wire, OnlyPlane)`, loft and variable sweep = `ThruSections(solid, ruled, 1e-6)`
+  without compatibility check, sweep = `MakePipe(spine, section, GeomFill_IsCorrectedFrenet)`, subdivision = Coons
+  `GeomFill_BSplineCurves` on the unit-square placeholders with the 16 poles set, `MakeFace(1e-7)`, sewing at span × 1e-7, one
+  shell. The pure TypeScript geometry those builders read is computed by the host with the same core helpers and sent with the
+  leaf (`server/src/native/kernelLeaves.ts`): oriented, lifted curve chains, Catmull-Rom ring curves, sweep frames and station
+  rings, subdivision patches plus the fallback triangles. A `feature` node is lowered on the host
+  (`server/src/native/kernelFeatures.ts`): the through reach from the sidecar's own display mesh of the source, `lowerFeature`,
+  and the BRepFeat inputs of `occtFeatures.ts` (one `BRepFeat_MakeRevol` cut per hole position up to 8 positions without a
+  modelled thread; `BRepFeat_MakePrism` of the outline from the supporting planar face for a pocket without islands); the sidecar
+  tries the BRepFeat cut (valid → unified) and otherwise builds source op lowered tool. A thread-bearing operand skips
+  UnifySameDomain, like the WASM thread mark.
+- **Still routed to WASM by the host** (`kernelFeatures.ts` gate): `fillet`, `chamfer` and a pocket with a floor fillet. The
+  sidecar builds fillet / chamfer and the parity suite shows the same results for the same edge indices (box, cylinder and a
+  boolean result), but their indices come from `topology`, still a WASM op: they switch on with native `topology` (removing them
+  from the gate is the whole change). `brep` leaves stay on WASM (no native blob store yet).
 - **Server proxy.** `server/src/nativeKernel.ts` + worker entry `server/src/nativeKernelWorker.ts`, driven by the unchanged
   `isolatedKernel.ts` (synchronous call, `LLULL_OCC_TIMEOUT_MS`, recycle, blob resend; new option `workerData`). Pure parts in
   `server/src/native/`: `kernelProtocol.ts` (framing, mesh decoding, recipe rewrites: `evaluate` as a handle, pyramid as
@@ -896,6 +921,15 @@ Built (opt-in, `LLULL_KERNEL=occt-native`; the desktop default stays `occt` = WA
   mesh volume within 6 % of the exact one and 3 % of the WASM mesh; `analyze` validity / closure / lumps equal; STEP solid count
   equal; refusals equal; plus the proxy end to end (fillet and topology served by WASM on a native session, abort recovery).
   It skips with a logged reason without the binary; `LLULL_REQUIRE_NATIVE_KERNEL=1` (CI) makes that a failure.
+  `nativeKernelFeatureParity` (second slice, 41 cases): curved extrusions and revolutions (all three axes, clockwise input),
+  smooth and ruled lofts, tube / profile / variable sweeps, smooth, creased and faceted subdivision solids, sealed and open shells,
+  blends, holes (BRepFeat and the 12-position lowering, counterbore, countersink, blind drill), pockets (BRepFeat, through,
+  island lowering), a rib, a modelled M6x1 thread (1997 faces, no unify), fillet / chamfer edge numbering on boxes, a cylinder and
+  a boolean result, plus the proxy end to end. Measured worst relative deviations (native vs WASM): volume 8.9e-12 and inertia
+  7.0e-12 (blend of a plate and a post: the 7.8 and 7.4 rolling-ball surfaces differ in the last digits), area 7.2e-10 (profile
+  sweep along a Bézier); fillets ≤ 1.1e-12; curves, lofts, subdivision, shells and features ≤ 3e-16 in volume; face counts
+  (ADVANCED_FACE of each STEP export), validity and lump counts equal in every case.
+  `nativeKernelLeaves` (always run) covers the host payloads and the feature gate.
 - **Gates.** `LLULL_NATIVE_KERNEL=1 npm run native:check` (fmt, clippy `-D warnings`, tests on the whole workspace). CI job
   `native-kernel` (`.github/workflows/check.yml`): OCCT install cached per version, then native:check, release build and the
   parity suite. ESLint ignores `solver/target/**` (the cmake tree writes `compiler_depend.ts` files).
@@ -924,14 +958,17 @@ Deviations and decisions to confirm:
   (TR-KRN-04 names it); adding it is a one-line core change.
 - `occtVersion` is the sidecar's (7.8.1) although ops it lacks run on 7.4.0p1; `build` names both engines. Documents stamped by
   `import_step_exact` (a WASM op) on this kernel record 7.8.1.
-- Fillet and chamfer stay on WASM in this slice: their edge indices come from `topology`, which is still WASM, and the explorer
-  order of 7.8 and 7.4 may differ on boolean results. They move with native `topology`.
+- Fillet and chamfer stay on WASM: their edge indices come from `topology`, which is still WASM. The parity suite finds the same
+  explorer numbering on the cases it covers (boolean results included); they move with native `topology`.
+- The pure TypeScript geometry of curved profiles, lofts, sweeps, subdivision patches and feature lowering stays in TypeScript and
+  is sent with the recipe (one implementation, no Rust port to drift); the sidecar therefore needs the llull host for those
+  recipes. A through feature's reach comes from the native display mesh (the WASM kernel reads its own mesh): the tool overshoot
+  differs by the mesh tolerance, the cut result does not.
 - A closed solid whose display mesh comes out open is re-meshed finer (0.02 / 0.2 rad) for every solid, not only freeform-heavy
   or thread-bearing ones as in `occtMesh.ts`; still open → null.
 - Exceptions are refusals (null result, `NATIVE_OCC_FAILURE` logged), not WASM fallbacks.
 
 Pending (rest of M2): native `topology`, `faceQuery.*`, `distance`, `exportStepAssembly`, `importShapes` (STEP read + heal) and
-`brep` blobs; fillet, chamfer, blend, shell and native `feature` nodes; exact curved profiles, loft, sweep, subdivision and
-thread tools; the OCCT 7.9 bump and dynamic linking; bundling in `desktop/scripts/prepare-native.mjs` (not created yet) and
+`brep` blobs; routing fillet, chamfer and floor-filleted pockets natively once `topology` is native; the OCCT 7.9 bump and dynamic linking; bundling in `desktop/scripts/prepare-native.mjs` (not created yet) and
 macOS / Windows builds; the full VC-KRN-25 suite against the OCP 7.9.3 reference files (probe cases, NIST set); the KI7 decision
 record; then the desktop default flip to the native kernel.

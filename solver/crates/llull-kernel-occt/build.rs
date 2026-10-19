@@ -16,6 +16,7 @@ const OCCT_LIBS: &[&str] = &[
     "TKDE",
     "TKXSBase",
     "TKMesh",
+    "TKFeat",
     "TKOffset",
     "TKFillet",
     "TKBool",
@@ -32,6 +33,9 @@ const OCCT_LIBS: &[&str] = &[
     "TKMath",
     "TKernel",
 ];
+
+/// Rust modules holding a `#[cxx::bridge]`.
+const BRIDGES: [&str; 2] = ["src/lib.rs", "src/features.rs"];
 
 fn occt_root() -> PathBuf {
     println!("cargo:rerun-if-env-changed=LLULL_OCCT_DIR");
@@ -63,15 +67,22 @@ fn main() {
         println!("cargo:rustc-link-lib=dylib=advapi32");
     }
 
-    cxx_build::bridge("src/lib.rs")
-        .file("cpp/facade.cxx")
+    // Every C++ source of the facade (cpp/*.cxx), sorted so the build is reproducible.
+    let mut sources: Vec<PathBuf> =
+        std::fs::read_dir("cpp").map(|entries| entries.filter_map(Result::ok).map(|entry| entry.path()).collect()).unwrap_or_default();
+    sources.retain(|path| path.extension().is_some_and(|extension| extension == "cxx"));
+    sources.sort();
+
+    cxx_build::bridges(BRIDGES)
+        .files(&sources)
         .include(&include_dir)
         .std("c++17")
         .define("_USE_MATH_DEFINES", None)
         .flag_if_supported("-w")
         .compile("llull-kernel-occt-facade");
 
-    for path in ["src/lib.rs", "cpp/facade.hxx", "cpp/facade.cxx"] {
+    println!("cargo:rerun-if-changed=cpp");
+    for path in BRIDGES {
         println!("cargo:rerun-if-changed={path}");
     }
 }

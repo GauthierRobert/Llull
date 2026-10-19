@@ -2,9 +2,11 @@
 //! recipe walk of `packages/core/src/geometry/shapeKernel.ts`. Sub-recipes are cached by the sha256 of their canonical JSON (serde_json
 //! maps are sorted), so an unchanged prefix of the feature tree is built once.
 //!
-//! Native today: recipe ops `solid`, `boolean`, `place`, `scale`; solid kinds box, cylinder, sphere, cone, torus, wedge, polygon
-//! extrusion, polygon revolution and triangle mesh. Anything else is [`EvalError::Unsupported`]: the host evaluates that recipe with
-//! the WASM kernel instead. Fillet / chamfer stay unsupported until `topology` is native, because their edge indices come from it.
+//! Native: recipe ops `solid`, `boolean`, `place`, `scale`, `fillet`, `chamfer`, `blend`, `shell` and `featureCut` (a `feature`
+//! node the host lowered, see [`nodes`]); solid kinds box, cylinder, sphere, cone, torus, wedge, extrusion and revolution (polygon
+//! or exact curve chain), triangle mesh (thread groove tools included), loft, sweep and subdivision. Anything else is
+//! [`EvalError::Unsupported`]: the host evaluates that recipe with the WASM kernel instead. The host still routes fillet / chamfer
+//! to WASM until native `topology` numbers edges like the WASM kernel (their indices come from it).
 
 use crate::lru::Lru;
 use crate::{BooleanOp, Built, Shape};
@@ -12,8 +14,11 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::rc::Rc;
 
-pub const RECIPE_OPS: [&str; 4] = ["solid", "boolean", "place", "scale"];
-pub const SOLID_KINDS: [&str; 9] = ["box", "cylinder", "sphere", "cone", "torus", "wedge", "extrusion", "revolution", "mesh"];
+mod nodes;
+
+pub const RECIPE_OPS: [&str; 9] = ["solid", "boolean", "place", "scale", "fillet", "chamfer", "blend", "shell", "featureCut"];
+pub const SOLID_KINDS: [&str; 12] =
+    ["box", "cylinder", "sphere", "cone", "torus", "wedge", "extrusion", "revolution", "mesh", "loft", "sweep", "subdivision"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EvalError {
@@ -170,12 +175,16 @@ fn wedge_solid(entity: &Value) -> Evaluated {
 
 fn extruded_profile(entity: &Value) -> Evaluated {
     if has(entity, "curves") {
-        return Err(EvalError::Unsupported("extrusion with exact curves".to_string()));
+        return Err(EvalError::Unsupported("extrusion with exact curves the host did not chain".to_string()));
     }
     let Some(profile) = polygon2(entity, "profile") else { return refused() };
     let depth = number(entity, "depth").unwrap_or(f64::NAN);
     if !is_valid_polygon(&profile) || !positive(depth) {
         return refused();
+    }
+    if let Some(face) = nodes::profile_chain_face(entity) {
+        let Some(face) = face.map_err(EvalError::Failure)? else { return refused() };
+        return nodes::prism(face, depth, entity);
     }
     let polygon = flat(counter_clockwise(&profile).into_iter().map(|[x, y]| [x, y, 0.0]));
     place_entity(shape_of(crate::make_prism(&polygon, [0.0, 0.0, depth]))?, entity, [0.0; 3])
@@ -183,7 +192,7 @@ fn extruded_profile(entity: &Value) -> Evaluated {
 
 fn revolved_profile(entity: &Value) -> Evaluated {
     if has(entity, "curves") {
-        return Err(EvalError::Unsupported("revolution with exact curves".to_string()));
+        return Err(EvalError::Unsupported("revolution with exact curves the host did not chain".to_string()));
     }
     let Some(profile) = polygon2(entity, "profile") else { return refused() };
     let angle = number(entity, "angle").unwrap_or(f64::NAN);
@@ -193,6 +202,15 @@ fn revolved_profile(entity: &Value) -> Evaluated {
         return refused();
     }
     let frame = revolution_axis_index(axis);
+    let sweep_axis = match frame {
+        2 => [0.0, 0.0, 1.0],
+        1 => [0.0, -1.0, 0.0],
+        _ => [1.0, 0.0, 0.0],
+    };
+    if let Some(face) = nodes::profile_chain_face(entity) {
+        let Some(face) = face.map_err(EvalError::Failure)? else { return refused() };
+        return nodes::revolution(face, sweep_axis, angle, entity);
+    }
     // The profile's winding must agree with the sweep direction or the solid comes out inside-out (occtShapes.ts revolvedProfile).
     let mut ordered = counter_clockwise(&profile);
     if frame != 1 {
@@ -203,19 +221,11 @@ fn revolved_profile(entity: &Value) -> Evaluated {
         1 => [radial, axial, 0.0],
         _ => [axial, radial, 0.0],
     };
-    let sweep_axis = match frame {
-        2 => [0.0, 0.0, 1.0],
-        1 => [0.0, -1.0, 0.0],
-        _ => [1.0, 0.0, 0.0],
-    };
     let polygon = flat(ordered.into_iter().map(place));
     place_entity(shape_of(crate::make_revolution(&polygon, sweep_axis, angle))?, entity, [0.0; 3])
 }
 
 fn mesh_solid(entity: &Value) -> Evaluated {
-    if entity.get("threadTool").and_then(Value::as_bool) == Some(true) {
-        return Err(EvalError::Unsupported("modelled-thread groove tool".to_string()));
-    }
     let mesh = entity.get("mesh");
     let read = |field: &str| mesh.and_then(|inner| inner.get(field)).and_then(Value::as_array);
     let (Some(positions), Some(indices)) = (read("positions"), read("indices")) else { return refused() };
@@ -241,6 +251,9 @@ fn solid(entity: &Value) -> Evaluated {
         "extrusion" => extruded_profile(entity),
         "revolution" => revolved_profile(entity),
         "mesh" => mesh_solid(entity),
+        "loft" => nodes::loft(entity),
+        "sweep" => nodes::sweep(entity),
+        "subdivision" => nodes::subdivision(entity),
         other => Err(EvalError::Unsupported(format!("solid kind '{other}'"))),
     }
 }
@@ -302,7 +315,9 @@ impl Evaluator {
                 let Some(operation) = recipe.get("boolean").and_then(Value::as_str).and_then(boolean_op) else { return refused() };
                 let Some(a) = self.child(recipe, "a")? else { return refused() };
                 let Some(b) = self.child(recipe, "b")? else { return refused() };
-                shape_of(crate::boolean(operation, &a, &b, true))
+                // A modelled-thread operand skips UnifySameDomain, like the WASM kernel (occtThreadMark.ts).
+                let threaded = ["a", "b"].iter().filter_map(|field| recipe.get(field)).any(nodes::thread_bearing);
+                shape_of(crate::boolean(operation, &a, &b, !threaded))
             }
             "place" => {
                 let Some(source) = self.child(recipe, "source")? else { return refused() };
@@ -317,6 +332,11 @@ impl Evaluator {
                 }
                 shape_of(crate::scaled(&source, factor))
             }
+            "fillet" => self.round(recipe, false),
+            "chamfer" => self.round(recipe, true),
+            "blend" => self.blend(recipe),
+            "shell" => self.shell(recipe),
+            "featureCut" => self.feature_cut(recipe),
             other => Err(EvalError::Unsupported(format!("recipe op '{other}'"))),
         }
     }
@@ -390,9 +410,9 @@ mod tests {
     fn bad_sizes_are_refused_and_unknown_ops_are_unsupported() {
         let mut evaluator = Evaluator::new(4);
         assert_eq!(evaluator.evaluate(&leaf(entity("sphere", json!({ "radius": -1 })))).map(|shape| shape.is_none()), Ok(true));
-        let fillet = json!({ "op": "fillet", "source": leaf(entity("box", json!({ "size": [1, 1, 1] }))), "edges": [], "size": 0.1 });
-        assert_eq!(evaluator.evaluate(&fillet).err(), Some(EvalError::Unsupported("recipe op 'fillet'".to_string())));
-        assert!(matches!(evaluator.evaluate(&leaf(entity("loft", json!({})))), Err(EvalError::Unsupported(_))));
+        let feature = json!({ "op": "feature", "source": leaf(entity("box", json!({ "size": [1, 1, 1] }))) });
+        assert_eq!(evaluator.evaluate(&feature).err(), Some(EvalError::Unsupported("recipe op 'feature'".to_string())));
+        assert!(matches!(evaluator.evaluate(&leaf(entity("text3d", json!({})))), Err(EvalError::Unsupported(_))));
         let curved = entity("extrusion", json!({ "profile": [[0, 0], [1, 0], [0, 1]], "depth": 1, "curves": [] }));
         assert!(matches!(evaluator.evaluate(&leaf(curved)), Err(EvalError::Unsupported(_))));
     }
