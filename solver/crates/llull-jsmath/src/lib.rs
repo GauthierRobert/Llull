@@ -1,7 +1,7 @@
 //! Bit-exact twins of the V8 `Math` functions used by the TypeScript references that native jobs must reproduce (RS1 §2 rule 4).
 //!
 //! The platform `f64::powf` / `log10` (glibc) differ from V8 in the last bit for several percent of the inputs, so a native port of a
-//! TypeScript formula would not be bit-identical. `pow`, `log` and `log10` transliterate V8's `src/base/ieee754.cc` (fdlibm 5.3);
+//! TypeScript formula would not be bit-identical. `pow`, `exp`, `log` and `log10` transliterate V8's `src/base/ieee754.cc` (fdlibm 5.3);
 //! `hypot` is V8's Kahan-compensated `Math.hypot`; `round` is ECMAScript `Math.round`.
 //!
 //! fdlibm notice (kept as its licence requires): Copyright (C) 1993-2004 by Sun Microsystems, Inc. All rights reserved.
@@ -96,6 +96,88 @@ pub fn hypot(values: &[f64]) -> f64 {
         sum = preliminary;
     }
     sum.sqrt() * max
+}
+
+/// V8 `Math.exp` (fdlibm `__ieee754_exp`, V8 `base::ieee754::exp`).
+#[allow(clippy::excessive_precision)]
+pub fn exp(mut x: f64) -> f64 {
+    const HALF: [f64; 2] = [0.5, -0.5];
+    const HUGE: f64 = 1.0e+300;
+    const O_THRESHOLD: f64 = 7.09782712893383973096e+02;
+    const U_THRESHOLD: f64 = -7.45133219101941108420e+02;
+    const LN2_HI: [f64; 2] = [6.93147180369123816490e-01, -6.93147180369123816490e-01];
+    const LN2_LO: [f64; 2] = [1.90821492927058770002e-10, -1.90821492927058770002e-10];
+    const INV_LN2: f64 = std::f64::consts::LOG2_E; // fdlibm invln2 = 1.44269504088896338700e+00, the same double
+    const P1: f64 = 1.66666666666666019037e-01;
+    const P2: f64 = -2.77777777770155933842e-03;
+    const P3: f64 = 6.61375632143793436117e-05;
+    const P4: f64 = -1.65339022054652515390e-06;
+    const P5: f64 = 4.13813679705723846039e-08;
+    const TWO_M1000: f64 = 9.33263618503218878990e-302;
+    const TWO_1023: f64 = 8.988465674311579539e307;
+
+    let mut hx = high(x) as u32;
+    let xsb = (hx >> 31) as usize;
+    hx &= 0x7fff_ffff;
+
+    if hx >= 0x4086_2E42 {
+        if hx >= 0x7ff0_0000 {
+            if ((hx & 0x000f_ffff) | low(x)) != 0 {
+                return x + x;
+            }
+            return if xsb == 0 { x } else { 0.0 };
+        }
+        if x > O_THRESHOLD {
+            return f64::INFINITY;
+        }
+        if x < U_THRESHOLD {
+            return 0.0;
+        }
+    }
+
+    let mut hi = 0.0;
+    let mut lo = 0.0;
+    let k: i32 = if hx > 0x3fd6_2e42 {
+        let k = if hx < 0x3FF0_A2B2 {
+            // V8 special-cases exp(1) to return E (the reduction below gets its last bit wrong).
+            if x == 1.0 {
+                return std::f64::consts::E;
+            }
+            hi = x - LN2_HI[xsb];
+            lo = LN2_LO[xsb];
+            1 - (xsb as i32) - (xsb as i32)
+        } else {
+            let k = (INV_LN2 * x + HALF[xsb]) as i32;
+            let t = f64::from(k);
+            hi = x - t * LN2_HI[0];
+            lo = t * LN2_LO[0];
+            k
+        };
+        x = hi - lo;
+        k
+    } else if hx < 0x3e30_0000 {
+        if HUGE + x > 1.0 {
+            return 1.0 + x;
+        }
+        0
+    } else {
+        0
+    };
+
+    let t = x * x;
+    let twopk = if k >= -1021 { with_high(0.0, 0x3ff0_0000 + (k << 20)) } else { with_high(0.0, 0x3ff0_0000 + ((k + 1000) << 20)) };
+    let c = x - t * (P1 + t * (P2 + t * (P3 + t * (P4 + t * P5))));
+    if k == 0 {
+        return 1.0 - ((x * c) / (c - 2.0) - x);
+    }
+    let y = 1.0 - ((lo - (x * c) / (2.0 - c)) - hi);
+    if k >= -1021 {
+        if k == 1024 {
+            return y * 2.0 * TWO_1023;
+        }
+        return y * twopk;
+    }
+    y * twopk * TWO_M1000
 }
 
 /// V8 `Math.log` (fdlibm `__ieee754_log`).

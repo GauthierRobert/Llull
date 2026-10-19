@@ -1,7 +1,7 @@
 //! Fatigue life mathematics, a faithful port of `packages/domain-cae/src/fatigue/lifeMath.ts` (TR-FAT-10..13). Units: MPa. Every
 //! `Math.pow` / `Math.log10` goes through `llull_jsmath`, so the numbers are bit-identical to the TypeScript reference.
 
-use llull_jsmath::{log10, pow};
+use llull_jsmath::{exp, log, log10, pow};
 use serde::Deserialize;
 
 /// `Math.max(a, b)`: NaN when either is NaN (f64::max would drop it).
@@ -124,7 +124,7 @@ pub fn stress_life(curve: &StressLifeCurve, amplitude: f64) -> Option<CurveLife>
                     return Some(CurveLife { cycles: f64::INFINITY, extrapolated: false });
                 }
             }
-            let cycles = pow(amplitude / sigma_f, 1.0 / b) / 2.0;
+            let cycles = exp(log(amplitude / sigma_f) * (1.0 / b)) / 2.0;
             Some(CurveLife { cycles, extrapolated: outside_range(cycles, *tested_life_range) })
         }
         StressLifeCurve::SnPowerLaw { s_d, k, k2, n_d, tested_life_range } => {
@@ -140,7 +140,7 @@ pub fn stress_life(curve: &StressLifeCurve, amplitude: f64) -> Option<CurveLife>
                     None => {}
                 }
             }
-            let cycles = n_d * pow(amplitude / s_d, -exponent);
+            let cycles = n_d * exp(log(amplitude / s_d) * -exponent);
             Some(CurveLife { cycles, extrapolated: outside_range(cycles, *tested_life_range) })
         }
         StressLifeCurve::SnTable { points } => table_life(points, amplitude),
@@ -359,7 +359,8 @@ mod tests {
             tested_life_range: None,
         };
         assert_eq!(stress_life(&cutoff, 50.0).unwrap().cycles, f64::INFINITY);
-        assert_eq!(stress_life(&cutoff, 200.0).unwrap().cycles, 2e6 / 8.0);
+        // exp(ln(2) * -3) instead of 2 ** -3: equal to round-off (the TS formula is the same, so native stays bit-identical).
+        assert!((stress_life(&cutoff, 200.0).unwrap().cycles / (2e6 / 8.0) - 1.0).abs() < 1e-14);
         let table = StressLifeCurve::SnTable { points: vec![[1e3, 400.0], [1e6, 100.0]] };
         assert!(!stress_life(&table, 200.0).unwrap().extrapolated);
         assert!(stress_life(&table, 50.0).unwrap().extrapolated);

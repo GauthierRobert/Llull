@@ -51,7 +51,16 @@ function jsmathCases(): Record<string, number[][]> {
   );
   log10.push([5e-324, Math.log10(5e-324)], [1, 0]);
   round.push([0.49999999999999994, 0], [-2.5, -2], [2.5, 3]);
-  return { pow, log10, hypot, round };
+  // exp, also as the S-N life exp(ln(x) * k) of lifeMath.ts (k = 1 / b of a Basquin curve, x = amplitude / sigma'f).
+  const exp: number[][] = [];
+  const expRandom = seeded(4711);
+  for (let i = 0; i < 400; i += 1) {
+    const z = (expRandom() - 0.5) * 80;
+    const lifeArgument = Math.log(expRandom() * 3 + 1e-6) * (1 / -(0.05 + expRandom() * 0.1));
+    exp.push([z, Math.exp(z)], [z / 64, Math.exp(z / 64)], [lifeArgument, Math.exp(lifeArgument)]);
+  }
+  for (const z of [0, -0, 1e-9, -1e-9, 0.3, 0.5, 1, 709.7, 709.78, -745, -708.5, -720, -740]) exp.push([z, Math.exp(z)]);
+  return { pow, log10, hypot, round, exp };
 }
 
 function rainflowCases(): unknown[] {

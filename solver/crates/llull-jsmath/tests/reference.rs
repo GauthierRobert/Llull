@@ -18,6 +18,15 @@ fn pow_matches_v8_bit_for_bit() {
 }
 
 #[test]
+fn exp_matches_v8_bit_for_bit() {
+    let rows = cases("exp");
+    assert!(rows.len() > 1000);
+    for row in rows {
+        assert_eq!(llull_jsmath::exp(row[0]).to_bits(), row[1].to_bits(), "exp({})", row[0]);
+    }
+}
+
+#[test]
 fn log10_matches_v8_bit_for_bit() {
     for row in cases("log10") {
         assert_eq!(llull_jsmath::log10(row[0]).to_bits(), row[1].to_bits(), "log10({})", row[0]);
