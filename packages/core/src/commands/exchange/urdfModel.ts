@@ -43,7 +43,7 @@ export interface UrdfTree {
 
 interface Candidate {
   readonly id: string;
-  readonly kind: 'revolute' | 'prismatic' | 'spherical';
+  readonly kind: 'revolute' | 'prismatic' | 'fixed' | 'spherical';
   readonly parent: string;
   readonly child: string;
   readonly anchor: Vec3;
@@ -58,7 +58,21 @@ interface RawModel {
   readonly candidates: readonly Candidate[];
   /** Bodies welded to the world with their anchor (fixed dynamics bodies, assembly roots). */
   readonly fixedAt: ReadonlyMap<string, Vec3>;
+  /** Joints of a kind URDF cannot express, with the reason. */
+  readonly skipped: readonly string[];
 }
+
+/** URDF joint for an assembly joint kind; null = no URDF equivalent (2+ DOF or a cam). */
+const URDF_KIND_OF: Readonly<Record<string, Candidate['kind'] | null>> = {
+  revolute: 'revolute',
+  prismatic: 'prismatic',
+  rigid: 'fixed',
+  cylindrical: null,
+  pin_slot: null,
+  planar: null,
+  ball: null,
+  cam: null,
+};
 
 const unit = (v: Vec3): Vec3 => {
   const length = Math.hypot(v[0], v[1], v[2]);
@@ -83,6 +97,7 @@ function fromDynamics(doc: CadDocument): RawModel | null {
       friction: j.friction,
     })),
     fixedAt: new Map(bodies.filter((b) => b.fixed).map((b): [string, Vec3] => [b.id, [0, 0, 0]])),
+    skipped: [],
   };
 }
 
@@ -92,7 +107,12 @@ function fromAssembly(doc: CadDocument): RawModel | null {
   const instanceIds = [...new Set(joints.flatMap((j) => [j.a.instanceId, j.b.instanceId]))].filter(
     (id) => doc.entities[id]?.kind === 'instance',
   );
-  const usable = joints.filter((j) => instanceIds.includes(j.a.instanceId) && instanceIds.includes(j.b.instanceId));
+  const skipped = joints
+    .filter((j) => (URDF_KIND_OF[j.kind] ?? null) === null)
+    .map((j) => `joint '${j.id}' is ${j.kind}: URDF has no single joint for it, left out.`);
+  const usable = joints.filter(
+    (j) => (URDF_KIND_OF[j.kind] ?? null) !== null && instanceIds.includes(j.a.instanceId) && instanceIds.includes(j.b.instanceId),
+  );
   const children = new Set(usable.map((j) => j.b.instanceId));
   const fixedAt = new Map(
     instanceIds.filter((id) => !children.has(id)).map((id): [string, Vec3] => [id, doc.entities[id]?.position ?? [0, 0, 0]]),
@@ -105,7 +125,7 @@ function fromAssembly(doc: CadDocument): RawModel | null {
     }),
     candidates: usable.map((j) => ({
       id: j.id,
-      kind: j.kind,
+      kind: URDF_KIND_OF[j.kind] ?? 'fixed',
       parent: j.a.instanceId,
       child: j.b.instanceId,
       anchor: doc.entities[j.a.instanceId]?.position ?? [0, 0, 0],
@@ -114,6 +134,7 @@ function fromAssembly(doc: CadDocument): RawModel | null {
       friction: 0,
     })),
     fixedAt,
+    skipped,
   };
 }
 
@@ -147,7 +168,7 @@ export function buildUrdfTree(doc: CadDocument, source: 'auto' | 'dynamics' | 'a
             : 'the document has neither dynamics bodies nor assembly joints (add_rigid_body + add_body_joint, or instances + add_joint)',
     };
   const names = uniqueNames(raw.bodies);
-  const notes: string[] = [];
+  const notes: string[] = [...raw.skipped];
   const treeJointOf = new Map<string, Candidate>();
   for (const joint of raw.candidates) {
     if (joint.kind === 'spherical') {
@@ -172,7 +193,7 @@ export function buildUrdfTree(doc: CadDocument, source: 'auto' | 'dynamics' | 'a
   for (const root of roots) {
     const treeJoint = treeJointOf.get(root.id);
     if (treeJoint !== undefined)
-      attach(root.id, { ...treeJoint, type: treeJoint.kind as 'revolute' | 'prismatic', parent: WORLD, child: link(root.id) });
+      attach(root.id, { ...treeJoint, type: treeJoint.kind as UrdfJointType, parent: WORLD, child: link(root.id) });
     else {
       const anchor = raw.fixedAt.get(root.id);
       attach(root.id, {
@@ -192,7 +213,7 @@ export function buildUrdfTree(doc: CadDocument, source: 'auto' | 'dynamics' | 'a
     progress = false;
     for (const [childId, joint] of treeJointOf) {
       if (placed.has(childId) || !placed.has(joint.parent)) continue;
-      attach(childId, { ...joint, type: joint.kind as 'revolute' | 'prismatic', parent: link(joint.parent), child: link(childId) });
+      attach(childId, { ...joint, type: joint.kind as UrdfJointType, parent: link(joint.parent), child: link(childId) });
       progress = true;
     }
   }

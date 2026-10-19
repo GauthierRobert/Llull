@@ -15,6 +15,7 @@ import { prototypeProblems } from './prototypeValidation';
 import { kernelSliceProblems } from './kernelValidation';
 import { validateCamera, validateLayer, validateEntityValue, validateMaterialValue, validateParameterValue } from './guards';
 import { materialLibraryProblems } from './materialRecordValidation';
+import { mechanismProblems } from './mechanismValidation';
 
 const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set(CONSTRAINT_KINDS);
 
@@ -122,6 +123,8 @@ const PROTOTYPE_KEYED_RECORDS = [
   'constraints',
   'joints',
   'driveRelations',
+  'contactSets',
+  'explodedViews',
 ] as const;
 
 /** Commands that rewrite or replay `featureHistory`; recorded as a step they would re-enter replay. Other legacy meta/read-only steps replay inertly. */
@@ -252,5 +255,6 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
   errors.push(...kernelSliceProblems(v));
   for (const extension of documentExtensions()) errors.push(...extension.validate(v));
   validateSection(v['driveRelations'], validateDriveRelationValue);
+  errors.push(...mechanismProblems(v));
   return errors;
 }

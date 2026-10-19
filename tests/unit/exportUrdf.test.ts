@@ -151,6 +151,17 @@ describe('export_urdf from the assembly', () => {
     expect(joints(urdf).map((j) => j.type)).toEqual(['fixed', 'continuous', 'prismatic']);
     expect(joints(urdf)[2]?.xyz).toBe('0.01 0 0');
   });
+
+  it('writes a rigid joint as fixed and lists kinds URDF cannot express in notes', () => {
+    let doc = assembly();
+    const [first, second, third] = [...new Set(Object.values(doc.joints).flatMap((j) => [j.a.instanceId, j.b.instanceId]))];
+    doc = execute(doc, 'delete_joint', { id: Object.keys(doc.joints)[1] }).document;
+    doc = run(doc, 'add_joint', { kind: 'rigid', a: { instanceId: second }, b: { instanceId: third }, axis: 'x' });
+    doc = run(doc, 'add_joint', { kind: 'ball', a: { instanceId: first }, b: { instanceId: third }, axis: 'z' });
+    const { data, urdf } = exportUrdf(doc);
+    expect(joints(urdf).map((j) => j.type)).toEqual(['fixed', 'continuous', 'fixed']);
+    expect(data.notes.join(' ')).toMatch(/is ball: URDF has no single joint for it/);
+  });
 });
 
 describe('export_urdf edge cases', () => {
