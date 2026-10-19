@@ -3,55 +3,32 @@
  * a roof, columns behind a wall and touching parts never draw through each other as they can with the painter's sort. Faces are filled
  * even-odd per scanline (section caps with holes included) at 2× supersampling, outlined where the normal, the depth or the entity
  * changes, then averaged down and embedded in the SVG as a compressed PNG; empty pixels stay transparent so the ground grid shows only
- * where nothing covers it.
+ * where nothing covers it. `rasterScenePixels` is the reference per-pixel stage (the hash path); the native CPU twin in `llull-raster`
+ * reproduces it bit for bit, and a host's `ctx.raster` may replace it (a picture, never a digest).
  */
 
-import type { Vec3 } from '../../model/types';
+import type { RasterScene } from '../../model/raster';
 import { encodePng } from '../../lib/png';
 import { uint8ArrayToBase64 } from '../../lib/base64';
-import { type Camera, cameraBasis, makeProjector, projectPoint } from './camera';
+import type { Camera } from './camera';
 import type { Polygon3D } from './types';
+import { prepareRasterScene } from './rasterScene';
 
-const SUPERSAMPLE = 2;
-const LIGHT: Vec3 = (() => {
-  const v: Vec3 = [0.6, -0.8, 1.0];
-  const length = Math.hypot(...v);
-  return [v[0] / length, v[1] / length, v[2] / length];
-})();
-const AMBIENT = 0.35;
-/** cos of the normal change that draws an outline (≈ 25°). */
-const CREASE_COS = Math.cos((25 * Math.PI) / 180);
+/** Replaces the reference per-pixel stage (a host's native raster); returns the logical RGBA image. */
+export type PixelStage = (scene: RasterScene) => Uint8Array;
 
-function rgbOf(color: string): [number, number, number] {
-  const hex = color.replace('#', '');
-  if (/^[0-9a-fA-F]{6}$/.test(hex)) return [0, 2, 4].map((i) => parseInt(hex.substring(i, i + 2), 16)) as [number, number, number];
-  const rgb = /rgba?\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(color);
-  return rgb ? [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])] : [176, 176, 176];
-}
-
-/** One drawn face: what a pixel that shows it needs (one table entry per face, one index per pixel keeps memory low). */
-interface Face {
-  readonly color: readonly [number, number, number];
-  readonly normal: Vec3;
-  readonly owner: number;
-  readonly hatch: boolean;
-  /** A 2D stroke: depth-tested against the solids but never outlined. */
-  readonly line?: true;
+interface ScreenPoint {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
 }
 
 interface Buffers {
   readonly width: number;
   readonly height: number;
   readonly depth: Float32Array;
-  /** Index into `faces` of the face a pixel shows, -1 = empty. */
+  /** Index of the face a pixel shows, -1 = empty. */
   readonly face: Int32Array;
-  readonly faces: Face[];
-}
-
-interface ScreenPoint {
-  readonly x: number;
-  readonly y: number;
-  readonly z: number;
 }
 
 /** Depth as an affine function of the screen position (orthographic view of a planar face), or null for an edge-on face. */
@@ -75,8 +52,8 @@ function depthPlane(points: readonly ScreenPoint[]): ((x: number, y: number) => 
   return (x, y) => a.z + dzdx * (x - a.x) + dzdy * (y - a.y);
 }
 
-/** Even-odd scanline fill of `loops` with a depth test; nearer pixels take the index of `face`. */
-function fill(buffers: Buffers, loops: readonly (readonly ScreenPoint[])[], face: Face): void {
+/** Even-odd scanline fill of `loops` with a depth test; nearer pixels take `faceIndex`. */
+function fill(buffers: Buffers, loops: readonly (readonly ScreenPoint[])[], faceIndex: number): void {
   const all = loops.flat();
   const depthAt = depthPlane(all);
   if (depthAt === null) return;
@@ -84,9 +61,6 @@ function fill(buffers: Buffers, loops: readonly (readonly ScreenPoint[])[], face
   for (const p of all) [top, bottom] = [Math.min(top, p.y), Math.max(bottom, p.y)];
   const y0 = Math.max(0, Math.ceil(top - 0.5));
   const y1 = Math.min(buffers.height - 1, Math.floor(bottom - 0.5));
-  if (y0 > y1) return;
-  const faceIndex = buffers.faces.length;
-  buffers.faces.push(face);
   const crossings: number[] = [];
   for (let y = y0; y <= y1; y += 1) {
     const sy = y + 0.5;
@@ -137,20 +111,26 @@ function strokeSegment(buffers: Buffers, a: ScreenPoint, b: ScreenPoint, faceInd
   }
 }
 
+const value = (array: Float64Array, index: number): number => array[index] ?? 0;
+
 /** Darkens pixels on a crease, a depth jump or an entity boundary (and the silhouette against the background). */
-function outline(buffers: Buffers, depthJump: number): Uint8Array {
-  const { width, height, depth, face, faces } = buffers;
+function outline(scene: RasterScene, buffers: Buffers): Uint8Array {
+  const { width, height, depth, face } = buffers;
+  const { faces, creaseCos, depthJump } = scene;
+  const linear = scene.projection === 'perspective' ? (z: number): number => -1 / z : (z: number): number => z;
   const edge = new Uint8Array(width * height);
+  const isLine = (f: number): boolean => f >= 0 && (value(faces, f * 8 + 7) & 2) !== 0;
   const differs = (a: number, b: number): boolean => {
-    const faceA = faces[face[a] ?? -1];
-    const faceB = faces[face[b] ?? -1];
-    if (faceA?.line === true || faceB?.line === true) return false;
-    if (faceA === undefined || faceB === undefined) return faceA !== faceB;
-    if (faceA === faceB) return false;
-    if (faceA.owner !== faceB.owner) return true;
-    if (Math.abs((depth[a] ?? 0) - (depth[b] ?? 0)) > depthJump) return true;
-    const cos = faceA.normal[0] * faceB.normal[0] + faceA.normal[1] * faceB.normal[1] + faceA.normal[2] * faceB.normal[2];
-    return cos < CREASE_COS;
+    const fa = face[a] ?? -1;
+    const fb = face[b] ?? -1;
+    if (isLine(fa) || isLine(fb)) return false;
+    if (fa < 0 || fb < 0) return fa !== fb;
+    if (fa === fb) return false;
+    if (value(faces, fa * 8 + 6) !== value(faces, fb * 8 + 6)) return true;
+    if (Math.abs(linear(depth[a] ?? 0) - linear(depth[b] ?? 0)) > depthJump) return true;
+    let cos = 0;
+    for (let k = 3; k < 6; k += 1) cos += value(faces, fa * 8 + k) * value(faces, fb * 8 + k);
+    return cos < creaseCos;
   };
   for (let y = 0; y < height; y += 1)
     for (let x = 0; x < width; x += 1) {
@@ -160,74 +140,31 @@ function outline(buffers: Buffers, depthJump: number): Uint8Array {
   return edge;
 }
 
-/** Above this many output pixels the render is not supersampled (memory and time stay bounded at 2000 × 2000). */
-const SUPERSAMPLE_MAX_PIXELS = 1_200_000;
-
-/**
- * The polygons drawn as an `<image>` element (PNG data URL) covering the `width` × `height` canvas, or '' when there is nothing to fill
- * (a pure 2D drawing stays vector). Strokes are depth-tested against the solids, so a sketch behind a part is hidden by it.
- * @pure
- */
-export function rasterLayer(
-  polygons: readonly Polygon3D[],
-  cam: Camera,
-  orthoHalf: number,
-  width: number,
-  height: number,
-  sceneRadius: number,
-): string {
-  const filled = polygons.filter((p) => !p.stroke);
-  if (filled.length === 0) return '';
-  const strokes = polygons.filter((p) => p.stroke);
-  const samples = width * height > SUPERSAMPLE_MAX_PIXELS ? 1 : SUPERSAMPLE;
+/** The reference per-pixel stage: RGBA of the logical image (the TypeScript renderer, deterministic, the hash path). @pure */
+export function rasterScenePixels(scene: RasterScene): Uint8Array {
+  const { width, height, samples, faces, fills, loops, points, strokes } = scene;
   const w = width * samples;
   const h = height * samples;
-  const project = makeProjector(cam, orthoHalf, w, h);
-  const basis = cameraBasis(cam);
-  const buffers: Buffers = {
-    width: w,
-    height: h,
-    depth: new Float32Array(w * h).fill(Infinity),
-    face: new Int32Array(w * h).fill(-1),
-    faces: [],
-  };
-  const owners = new Map<string, number>();
-  const toScreen = (p: Vec3): ScreenPoint => {
-    const [x, y] = project(p);
-    return { x, y, z: projectPoint(p, cam, basis)[2] };
-  };
-  for (const polygon of filled) {
-    const ownerKey = polygon.owner ?? '';
-    const owner = owners.get(ownerKey) ?? owners.size;
-    owners.set(ownerKey, owner);
-    const [r, g, b] = rgbOf(polygon.color);
-    if (polygon.loops !== undefined) {
-      const cap: [number, number, number] = [r * 0.55 + 255 * 0.45, g * 0.55 + 255 * 0.45, b * 0.55 + 255 * 0.45];
-      fill(
-        buffers,
-        polygon.loops.map((loop) => loop.map(toScreen)),
-        { color: cap, normal: polygon.normal, owner, hatch: true },
-      );
-      continue;
+  const buffers: Buffers = { width: w, height: h, depth: new Float32Array(w * h).fill(Infinity), face: new Int32Array(w * h).fill(-1) };
+  const point = (index: number): ScreenPoint => ({
+    x: value(points, index * 3),
+    y: value(points, index * 3 + 1),
+    z: value(points, index * 3 + 2),
+  });
+  for (let f = 0; f < fills.length / 3; f += 1) {
+    const [firstLoop, loopCount] = [value(fills, f * 3 + 1), value(fills, f * 3 + 2)];
+    const screenLoops: ScreenPoint[][] = [];
+    for (let l = firstLoop; l < firstLoop + loopCount; l += 1) {
+      const [first, count] = [value(loops, l * 2), value(loops, l * 2 + 1)];
+      screenLoops.push(Array.from({ length: count }, (_, k) => point(first + k)));
     }
-    const [nx, ny, nz] = polygon.normal;
-    const facingAway = nx * basis.fwd[0] + ny * basis.fwd[1] + nz * basis.fwd[2] > 0;
-    const facing: Vec3 = facingAway ? [-nx, -ny, -nz] : polygon.normal;
-    const diffuse = Math.max(0, facing[0] * LIGHT[0] + facing[1] * LIGHT[1] + facing[2] * LIGHT[2]);
-    const factor = AMBIENT + (1 - AMBIENT) * diffuse;
-    fill(buffers, [polygon.verts.map(toScreen)], { color: [r * factor, g * factor, b * factor], normal: facing, owner, hatch: false });
+    fill(buffers, screenLoops, value(fills, f * 3));
   }
-  for (const stroke of strokes) {
-    const faceIndex = buffers.faces.length;
-    buffers.faces.push({ color: rgbOf(stroke.color), normal: [0, 0, 1], owner: -1, hatch: false, line: true });
-    const points = stroke.verts.map(toScreen);
-    for (let i = 0; i + 1 < points.length; i += 1) {
-      const a = points[i];
-      const b = points[i + 1];
-      if (a !== undefined && b !== undefined) strokeSegment(buffers, a, b, faceIndex, 0.75 * samples, sceneRadius * 0.002);
-    }
+  for (let s = 0; s < strokes.length / 9; s += 1) {
+    const at = (k: number): number => value(strokes, s * 9 + k);
+    strokeSegment(buffers, { x: at(1), y: at(2), z: at(3) }, { x: at(4), y: at(5), z: at(6) }, at(0), at(7), at(8));
   }
-  const edges = outline(buffers, sceneRadius * 0.01);
+  const edges = outline(scene, buffers);
   const rgba = new Uint8Array(width * height * 4);
   for (let y = 0; y < height; y += 1)
     for (let x = 0; x < width; x += 1) {
@@ -237,12 +174,14 @@ export function rasterLayer(
           const sx = x * samples + dx;
           const sy = y * samples + dy;
           const index = sy * w + sx;
-          const face = buffers.faces[buffers.face[index] ?? -1];
-          if (face === undefined && edges[index] !== 1) continue;
-          const shadeBy = (edges[index] === 1 ? 0.35 : 1) * (face?.hatch === true && (sx + sy) % (6 * samples) < samples ? 0.6 : 1);
-          r += face === undefined ? 20 : face.color[0] * shadeBy;
-          g += face === undefined ? 20 : face.color[1] * shadeBy;
-          b += face === undefined ? 30 : face.color[2] * shadeBy;
+          const f = buffers.face[index] ?? -1;
+          const edge = edges[index] === 1;
+          if (f < 0 && !edge) continue;
+          const hatch = f >= 0 && (value(faces, f * 8 + 7) & 1) !== 0;
+          const shadeBy = (edge ? 0.35 : 1) * (hatch && (sx + sy) % (6 * samples) < samples ? 0.6 : 1);
+          r += f < 0 ? 20 : value(faces, f * 8) * shadeBy;
+          g += f < 0 ? 20 : value(faces, f * 8 + 1) * shadeBy;
+          b += f < 0 ? 30 : value(faces, f * 8 + 2) * shadeBy;
           a += 255;
         }
       const covered = a / 255;
@@ -253,6 +192,29 @@ export function rasterLayer(
       rgba[out + 2] = Math.round(b / covered);
       rgba[out + 3] = Math.round(a / (samples * samples));
     }
+  return rgba;
+}
+
+/** `<image>` element (PNG data URL) of a `width` × `height` RGBA image covering the canvas. */
+export function rasterImageSvg(width: number, height: number, rgba: Uint8Array): string {
   const png = encodePng(width, height, rgba, true);
   return `  <image x="0" y="0" width="${width}" height="${height}" href="data:image/png;base64,${uint8ArrayToBase64(png)}"/>`;
+}
+
+/**
+ * The polygons drawn as an `<image>` element covering the `width` × `height` canvas, or '' when there is nothing to fill (a pure 2D drawing
+ * stays vector). Strokes are depth-tested against the solids, so a sketch behind a part is hidden by it. `pixels` replaces the reference
+ * per-pixel stage.
+ */
+export function rasterLayer(
+  polygons: readonly Polygon3D[],
+  cam: Camera,
+  orthoHalf: number,
+  width: number,
+  height: number,
+  sceneRadius: number,
+  pixels: PixelStage = rasterScenePixels,
+): string {
+  const scene = prepareRasterScene(polygons, cam, orthoHalf, width, height, sceneRadius);
+  return scene === null ? '' : rasterImageSvg(width, height, pixels(scene));
 }

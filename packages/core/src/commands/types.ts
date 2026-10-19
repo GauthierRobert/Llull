@@ -9,6 +9,7 @@ import type { PhysicsEngine } from '../dynamics/physicsEngine';
 import type { GeometryQueryEngine } from '../geometry/geometryQueries';
 import type { FeArtifactPort, HumanSignaturePort } from '../model/analysis';
 import type { MaterialLibrary } from '../model/materialLibrary';
+import type { RasterPort } from '../model/raster';
 import type { IdSource } from '../lib/id';
 import type { ReplayCache } from './history/replayCache';
 import type { ZodType } from 'zod';
@@ -182,6 +183,8 @@ export interface ExecutionContext {
   readonly humanSignature?: HumanSignaturePort | null;
   /** Material library files of this machine (`import_material_library` by reference, `resolve_material_libraries`); null/absent = none. */
   readonly libraries?: MaterialLibraryProvider | null;
+  /** Native offscreen raster (`renderer: 'native'`, plant 09 VIS-M9 / RS-5); null/absent = NATIVE_TOOL_MISSING. */
+  readonly raster?: RasterPort | null;
   /** Mints every id the command creates. */
   readonly ids: IdSource;
   /** Resolves command names for commands that run other commands. */

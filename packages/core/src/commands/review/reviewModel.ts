@@ -14,6 +14,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   VIS_ISSUE_INVALID: 'give a non-empty title',
   VIS_ISSUE_NOT_FOUND: 'create one with create_review_issue',
   VIS_RENDER_BUDGET: 'lower width / height / fps or the frame count',
+  VIS_RENDER_INVALID: 'perspective and native renders are raster-only; perspective takes no turntable / isolate / section',
   NATIVE_TOOL_MISSING:
     "use renderer 'reference' (the default), or run in the llull CLI / desktop app with llull-compute built (cargo build --release in solver/)",
   NATIVE_JOB_FAILED: "retry with renderer 'reference'; the job log is in the summary",
