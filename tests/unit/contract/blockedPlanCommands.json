@@ -537,8 +537,7 @@
       "apply_viewpoint",
       "export_bcf_viewpoint",
       "get_viewpoint",
-      "import_bcf_viewpoint",
-      "save_viewpoint"
+      "import_bcf_viewpoint"
     ],
     "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-03-synthetic-rack-drawcalls.json": [
       "render_stats"
@@ -547,8 +546,6 @@
       "add_markup",
       "add_review_comment",
       "check_review",
-      "create_review_issue",
-      "save_viewpoint",
       "section_box_report",
       "set_issue_status",
       "set_section_box"
