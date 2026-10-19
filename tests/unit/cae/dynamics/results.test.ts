@@ -95,7 +95,12 @@ describe('random_response summary (VC-DYN-21 on exact EB modal data)', () => {
     expect(items(changed)).toContain('DYN_RESULTS_STALE');
     const strict = mustRun(ready.doc, 'set_dynamic_basis', { analysisId, modalTruncationThreshold: 0.95, fMaxHz: 1000 });
     const resolved = solvedRandom(strict, analysisId, ready.boxId);
-    expect(items(resolved.doc, resolved.ctx)).toEqual(['DYN_SPECTRUM_UNVERIFIED', 'DYN_BAND_ABOVE_MODES', 'DYN_MODAL_TRUNCATION', 'DYN_REVIEW_PENDING']);
+    expect(items(resolved.doc, resolved.ctx)).toEqual([
+      'DYN_SPECTRUM_UNVERIFIED',
+      'DYN_BAND_ABOVE_MODES',
+      'DYN_MODAL_TRUNCATION',
+      'DYN_REVIEW_PENDING',
+    ]);
     expect(summaryOf(resolved.doc, analysisId).modesKept).toBe(1);
   });
 

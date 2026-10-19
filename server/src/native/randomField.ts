@@ -1,6 +1,6 @@
 /**
  * fea_solve post-step of a random_response case (PHY-09 TR-DYN-44, RS1 RS-7): the nodal rms field (modes x frequencies x nodes x
- * components) runs in `llull-compute post random` when the binary is installed, else in the TypeScript reference within the §8 budget
+ * components) runs in `llull-compute post random` when the binary is installed, else in the TypeScript reference within the Â§8 budget
  * (TS_NODAL_WORK_LIMIT), else the solve is refused with DYN_POST_TOO_LARGE before CalculiX starts. The pure @cae builder writes the job
  * and attaches the field to the results artifact (`nodalRms`); record_fea_results then recomputes the summary (nodal maxima) from it.
  * Environment: LLULL_NATIVE_RANDOM_MIN_NODES  node count from which the native job is used when installed (default 0 = always).
@@ -71,7 +71,7 @@ async function runNative(input: RandomFieldInput, runner: ComputeRunner, env: No
 export function randomPostStep(runner: ComputeRunner, env: NodeJS.ProcessEnv = process.env): RandomPostStep {
   const configured = env['LLULL_NATIVE_RANDOM_MIN_NODES'];
   const minNodes = configured === undefined || configured === '0' ? 0 : positiveInteger(configured, 0);
-  const useNative = (nodes: number): boolean => runner.binary !== null && nodes >= minNodes;
+  const nativeFor = (nodes: number): boolean => runner.binary !== null && nodes >= minNodes;
   return {
     precheck(doc, analysisId, mesh) {
       const modes = doc.analysis?.cases[analysisId]?.modes ?? 0;
@@ -84,7 +84,7 @@ export function randomPostStep(runner: ComputeRunner, env: NodeJS.ProcessEnv = p
       const started = Date.now();
       const { nodeCount, modes } = input.job;
       let native: Float64Array | PostFailure | null = null;
-      if (useNative(nodeCount)) native = await runNative(input, runner, env);
+      if (nativeFor(nodeCount)) native = await runNative(input, runner, env);
       if (native !== null && !isPostProblem(native)) {
         const attached = withNodalRms(results, input, native, 'native-cpu', NATIVE_SOLVER, await runner.version());
         if (typeof attached === 'string') return { code: 'NATIVE_PROTOCOL', message: attached };
