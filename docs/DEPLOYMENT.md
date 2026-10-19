@@ -34,7 +34,7 @@ file. Procedure: the `llull-cli` skill; reference: `node server/bin/llull.cjs he
 ## 3. Security of the local backend
 
 - The backend binds `127.0.0.1` only; a non-loopback `HOST` refuses to start.
-- The desktop app mints a random per-launch token (`MCP_AUTH_TOKEN`, `LLULL_REQUIRE_TOKEN_FOR_REST=true`) and
+- The desktop app mints a random per-launch token (`LLULL_AUTH_TOKEN`, `LLULL_REQUIRE_TOKEN_FOR_REST=true`) and
   writes it, owner-only, to `~/.llull/desktop.json` for the CLI. Every REST call needs it as
   `Authorization: Bearer <token>`; the SSE stream takes a single-use 30 s `?ticket=` minted by
   `POST /live/ticket`. Other local processes and websites cannot reach the document.

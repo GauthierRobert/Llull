@@ -28,10 +28,10 @@ describe('TopBar — agent pill', () => {
   beforeEach(() => {
     resetStore();
   });
-  it('shows "claude-mcp" text when liveStatus is connected', () => {
+  it('shows "live" text when liveStatus is connected', () => {
     useStore.setState({ liveStatus: 'connected' });
     render(<TopBar />);
-    expect(screen.getByText('claude-mcp')).toBeDefined();
+    expect(screen.getByText('live')).toBeDefined();
   });
   it('shows "connecting…" text when liveStatus is connecting', () => {
     useStore.setState({ liveStatus: 'connecting' });
@@ -46,13 +46,13 @@ describe('TopBar — agent pill', () => {
   it('has agent-pill--connected class when connected', () => {
     useStore.setState({ liveStatus: 'connected' });
     render(<TopBar />);
-    const pill = screen.getByLabelText(/mcp agent: connected/i);
+    const pill = screen.getByLabelText(/live sync: connected/i);
     expect(pill.className).toContain('agent-pill--connected');
   });
   it('has accessible label reflecting connected status', () => {
     useStore.setState({ liveStatus: 'connected' });
     render(<TopBar />);
-    expect(screen.getByLabelText('MCP agent: connected')).toBeDefined();
+    expect(screen.getByLabelText('Live sync: connected')).toBeDefined();
   });
 });
 
@@ -121,12 +121,10 @@ describe('TopBar — dock toggles and actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show properties panel' }));
     expect(useLayoutStore.getState().inspectorOpen).toBe(true);
   });
-  it('exposes Connect agent directly, and Open / Save in the More menu', () => {
+  it('exposes Open / Save in the More menu', () => {
     render(<TopBar />);
-    expect(screen.getByRole('button', { name: /^connect agent/i })).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'More' }));
     expect(screen.getByRole('button', { name: /open project/i })).toBeDefined();
     expect(screen.getByRole('button', { name: /save project/i })).toBeDefined();
-    expect(screen.getByRole('button', { name: /^connect agent/i })).toBeDefined();
   });
 });

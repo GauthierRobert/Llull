@@ -54,7 +54,7 @@ export function backendOrigin(port: number): string {
 export function backendEnv(input: BackendEnvInput): Record<string, string> {
   const inherited = Object.fromEntries(
     Object.entries(input.baseEnv).filter(
-      (entry): entry is [string, string] => entry[1] !== undefined && !entry[0].startsWith('LLULL_') && entry[0] !== 'MCP_AUTH_TOKEN',
+      (entry): entry is [string, string] => entry[1] !== undefined && !entry[0].startsWith('LLULL_') && entry[0] !== 'LLULL_AUTH_TOKEN',
     ),
   );
   return {
@@ -62,7 +62,7 @@ export function backendEnv(input: BackendEnvInput): Record<string, string> {
     NODE_ENV: 'production',
     HOST: '127.0.0.1',
     PORT: String(input.port),
-    MCP_AUTH_TOKEN: input.token,
+    LLULL_AUTH_TOKEN: input.token,
     LLULL_REQUIRE_TOKEN_FOR_REST: 'true',
     LLULL_ALLOWED_ORIGINS: backendOrigin(input.port),
     LLULL_STATIC_DIR: input.layout.webDir,

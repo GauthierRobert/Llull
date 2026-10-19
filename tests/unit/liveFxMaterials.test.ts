@@ -44,7 +44,7 @@ describe('GlowTracker', () => {
 describe('hologramize', () => {
   it('swaps in translucent, unpickable clones and leaves the originals untouched', () => {
     const { root, solid } = scene();
-    const clones = hologramize(root, toneColor('mcp'));
+    const clones = hologramize(root, toneColor('rest'));
     expect(clones).toHaveLength(2);
     const mesh = root.children[0] as THREE.Mesh;
     expect(mesh.material).not.toBe(solid);
@@ -60,7 +60,7 @@ describe('hologramize', () => {
 
 describe('liveFxTones', () => {
   it('gives each origin its own accent and softens local edits', () => {
-    expect(toneHex('cli')).not.toBe(toneHex('mcp'));
+    expect(toneHex('cli')).not.toBe(toneHex('rest'));
     expect(toneColor('rest')).toBe(toneColor('rest'));
     expect(toneStrength('local')).toBeLessThan(toneStrength('cli'));
   });

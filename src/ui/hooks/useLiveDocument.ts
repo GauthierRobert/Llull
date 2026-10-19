@@ -14,7 +14,7 @@ import { isOwnCommandId, markLiveOrigin } from '@ui/store/liveOrigin';
 const RETRY_BASE_MS = 1000;
 const RETRY_MAX_MS = 30000;
 
-export function useMcpLiveDocument(): void {
+export function useLiveDocument(): void {
   const hydrateLiveDocument = useStore((s) => s.hydrateLiveDocument);
   const applyLiveCommand = useStore((s) => s.applyLiveCommand);
   const setLiveStatus = useStore((s) => s.setLiveStatus);
@@ -107,16 +107,7 @@ export function useMcpLiveDocument(): void {
         } catch {
           return; // Malformed JSON from server — ignore, stay connected.
         }
-        markLiveOrigin(
-          isOwnCommandId(event.commandId)
-            ? null
-            : {
-                kind: 'remote',
-                name: event.name,
-                source: event.source ?? 'rest',
-                ...(event.userName !== undefined ? { userName: event.userName } : {}),
-              },
-        );
+        markLiveOrigin(isOwnCommandId(event.commandId) ? null : { kind: 'remote', name: event.name, source: event.source ?? 'rest' });
         const applied = applyLiveCommand(event);
         markLiveOrigin(null);
         if (applied) return;

@@ -244,19 +244,13 @@
   border-radius: 9px;
 }
 
-.topbar .mcp-connect-trigger {
-  height: 34px;
-  border-radius: 9px;
-}
-
 .project-io {
   display: inline-flex;
   align-items: center;
   gap: 2px;
 }
 
-.project-io__btn,
-.mcp-connect-trigger {
+.project-io__btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -284,20 +278,6 @@
 .project-io__btn:hover {
   background: var(--surface-2);
   color: var(--fg);
-}
-
-/* Primary action */
-.mcp-connect-trigger {
-  margin-left: var(--space-1);
-  background: var(--dock-bg);
-  color: var(--accent-fg);
-  box-shadow:
-    var(--shadow-sm),
-    inset 0 1px 0 oklch(1 0 0 / 0.15);
-}
-
-.mcp-connect-trigger:hover {
-  background: var(--accent-hover);
 }
 
 /* ==== Sidebar — icon rail + browser panel ==== */
@@ -670,18 +650,13 @@ button.rail-more__item:hover {
   .file-crumbs,
   .brand-wordmark,
   .agent-pill,
-  .topbar__sep,
-  .mcp-connect-trigger span {
+  .topbar__sep {
     display: none;
   }
 
   .topbar__right {
     overflow-x: auto;
     scrollbar-width: none;
-  }
-
-  .mcp-connect-trigger {
-    padding: 0 8px;
   }
 
   .project-io__select {

@@ -117,9 +117,9 @@ describe('planLiveFx', () => {
     const framed = { ...run(doc, 'add_sphere', { radius: 1 }).doc, camera: { ...doc.camera, distance: 99 } };
     expect(planLiveFx(doc, framed, REMOTE, 0, 1).refocus).toBe(false);
   });
-  it('labels sources with the named user when known', () => {
-    expect(liveSourceLabel('mcp')).toBe('MCP agent');
-    expect(liveSourceLabel('rest', 'Ed')).toBe('Ed · API');
+  it('labels each live source', () => {
+    expect(liveSourceLabel('cli')).toBe('CLI');
+    expect(liveSourceLabel('rest')).toBe('API');
   });
 });
 

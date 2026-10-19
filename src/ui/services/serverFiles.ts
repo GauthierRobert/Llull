@@ -1,8 +1,8 @@
-// REST file/metadata calls to the optional server (STEP export, DWG import, license); wire shapes from @protocol/restProtocol.
+// REST file/metadata calls to the optional server (STEP export, DWG import); wire shapes from @protocol/restProtocol.
 // Never throws: every failure becomes a user-facing message.
 
 import type { DocumentUnit } from '@core/model/types';
-import type { DwgImportResponseBody, DwgImportTarget, ErrorResponseBody, LicenseResponseBody } from '@protocol/restProtocol';
+import type { DwgImportResponseBody, DwgImportTarget, ErrorResponseBody } from '@protocol/restProtocol';
 import { fileStem } from '@ui/chosenFile';
 import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
 
@@ -41,17 +41,5 @@ export async function uploadDwg(file: File, target: DwgImportTarget, unit: Docum
     return reply.summary ?? 'DWG imported.';
   } catch {
     return `DWG import needs the llull server at ${SERVER_BASE} (offline), with a DWG converter installed.`;
-  }
-}
-
-/** null offline / on any failure. */
-export async function fetchLicenseLabel(signal?: AbortSignal): Promise<string | null> {
-  try {
-    const response = await fetch(`${SERVER_BASE}/license`, signal ? { signal } : {});
-    if (!response.ok) return null;
-    const body = (await response.json()) as Partial<LicenseResponseBody>;
-    return typeof body.label === 'string' ? body.label : null;
-  } catch {
-    return null;
   }
 }

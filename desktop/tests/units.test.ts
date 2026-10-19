@@ -53,13 +53,13 @@ describe('backendEnv', () => {
       token: 'tok',
       layout,
       userDataDir: '/u',
-      baseEnv: { PATH: '/bin', LLULL_KERNEL: 'occt', MCP_AUTH_TOKEN: 'leak', EMPTY: undefined },
+      baseEnv: { PATH: '/bin', LLULL_KERNEL: 'occt', LLULL_AUTH_TOKEN: 'leak', EMPTY: undefined },
     });
     expect(env).toMatchObject({
       PATH: '/bin',
       HOST: '127.0.0.1',
       PORT: '4000',
-      MCP_AUTH_TOKEN: 'tok',
+      LLULL_AUTH_TOKEN: 'tok',
       LLULL_REQUIRE_TOKEN_FOR_REST: 'true',
       LLULL_ALLOWED_ORIGINS: 'http://127.0.0.1:4000',
       LLULL_STATIC_DIR: path.join('/r', 'web'),

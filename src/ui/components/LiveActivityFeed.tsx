@@ -1,4 +1,4 @@
-// Viewport overlay: the last commands remote callers (MCP agent, CLI, API) applied to the live document, newest first,
+// Viewport overlay: the last commands remote callers (CLI, API) applied to the live document, newest first,
 // each fading out on its own, plus the switch for the live-edit animations.
 
 import { useEffect } from 'react';
@@ -23,7 +23,7 @@ function ActivityRow({ entry }: { entry: LiveActivity }): React.ReactElement {
   return (
     <li className="live-activity__row" style={style} data-source={entry.source}>
       <span className="live-activity__dot" aria-hidden="true" />
-      <span className="live-activity__who">{liveSourceLabel(entry.source, entry.userName)}</span>
+      <span className="live-activity__who">{liveSourceLabel(entry.source)}</span>
       <code className="live-activity__name">{entry.name}</code>
       <span className="live-activity__counts">{changeCounts(entry)}</span>
     </li>

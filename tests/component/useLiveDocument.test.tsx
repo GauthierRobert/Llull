@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, act } from '@testing-library/react';
 import { useStore } from '@ui/store';
-import { useMcpLiveDocument } from '@ui/hooks/useMcpLiveDocument';
+import { useLiveDocument } from '@ui/hooks/useLiveDocument';
 
 class FakeEventSource {
   static instances: FakeEventSource[] = [];
@@ -22,11 +22,11 @@ class FakeEventSource {
 }
 
 function Harness(): null {
-  useMcpLiveDocument();
+  useLiveDocument();
   return null;
 }
 
-describe('useMcpLiveDocument', () => {
+describe('useLiveDocument', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     FakeEventSource.instances = [];

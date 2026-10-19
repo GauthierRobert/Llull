@@ -133,7 +133,6 @@ kbd {
 /* Popover card: dialogs and the palette toast. */
 .palette,
 .palette-toast,
-.mcp-connect,
 .shortcuts-dialog {
   background: var(--surface-popover);
   border: 1px solid var(--border-strong);

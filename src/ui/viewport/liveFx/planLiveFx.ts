@@ -7,7 +7,7 @@ import type { LiveCommandSource } from '@protocol/liveSync';
 
 /** Where a document change came from: a broadcast command of someone else, a server snapshot, or this client. */
 export type LiveFxOrigin =
-  | { readonly kind: 'remote'; readonly name: string; readonly source: LiveCommandSource; readonly userName?: string }
+  | { readonly kind: 'remote'; readonly name: string; readonly source: LiveCommandSource }
   | { readonly kind: 'snapshot' }
   | { readonly kind: 'local' };
 
@@ -62,7 +62,6 @@ export interface LiveActivity {
   readonly key: string;
   readonly name: string;
   readonly source: LiveCommandSource;
-  readonly userName?: string;
   readonly created: number;
   readonly modified: number;
   readonly removed: number;
@@ -141,10 +140,10 @@ function pivotOf(entity: Entity, b: Bounds | null): Vec3 {
 const samePose = (a: Entity, b: Entity): boolean =>
   a.position.every((value, axis) => value === b.position[axis]) && a.rotation.every((value, axis) => value === b.rotation[axis]);
 
-const sourceLabel: Record<LiveCommandSource, string> = { mcp: 'MCP agent', cli: 'CLI', rest: 'API' };
+const sourceLabel: Record<LiveCommandSource, string> = { cli: 'CLI', rest: 'API' };
 
-export function liveSourceLabel(source: LiveCommandSource, userName?: string): string {
-  return userName === undefined ? sourceLabel[source] : `${userName} · ${sourceLabel[source]}`;
+export function liveSourceLabel(source: LiveCommandSource): string {
+  return sourceLabel[source];
 }
 
 /** Staggered start: a 50-entity plan builds up as a cascade instead of popping in at once. */
@@ -159,7 +158,6 @@ function activityFor(origin: LiveFxOrigin, diff: EntityDiff, nowMs: number, seq:
     key: `activity-${seq}`,
     name: origin.name,
     source: origin.source,
-    ...(origin.userName !== undefined ? { userName: origin.userName } : {}),
     created: diff.created.length,
     modified: diff.modified.length,
     removed: diff.removed.length,
@@ -265,7 +263,7 @@ function badgeFor(origin: LiveFxOrigin, focus: Bounds | null, nowMs: number, seq
   const anchor: Vec3 = [(box.min[0] + box.max[0]) / 2, (box.min[1] + box.max[1]) / 2, box.max[2]];
   return {
     key: `badge-${seq}`,
-    label: `${liveSourceLabel(origin.source, origin.userName)} · ${origin.name}`,
+    label: `${liveSourceLabel(origin.source)} · ${origin.name}`,
     source: origin.source,
     anchor,
     startMs: nowMs,

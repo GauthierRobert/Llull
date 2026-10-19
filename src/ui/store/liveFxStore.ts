@@ -1,5 +1,5 @@
 // Render-only live-edit effects (never in the CadDocument): the transitions, ghosts, ripples and badges planned for each
-// document change, plus the activity feed of remote (CLI / MCP / API) commands. Fed by useLiveFx; drawn by viewport/liveFx.
+// document change, plus the activity feed of remote (CLI / API) commands. Fed by useLiveFx; drawn by viewport/liveFx.
 
 import { create } from 'zustand';
 import type { EntityId } from '@core/model/types';

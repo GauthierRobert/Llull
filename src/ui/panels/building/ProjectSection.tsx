@@ -56,7 +56,7 @@ function ProjectForm({ project }: { project: ProjectInfo }): React.ReactElement 
 
 export function ProjectSection(): React.ReactElement {
   const project = useStore((s) => s.document.building?.project) ?? NEW_PROJECT;
-  // Remount the form when the stored project changes (load / undo / MCP edit).
+  // Remount the form when the stored project changes (load / undo / CLI edit).
   return (
     <PanelSection title="Project" collapsible testId="building-project">
       <ProjectForm key={contentKey(project)} project={project} />

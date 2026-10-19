@@ -14,7 +14,7 @@ import { guardMutation, hasValidBearer, isLoopbackAddress, isLocalPeer, checkBin
 import { createAutosaver } from '../src/autosave';
 import { createEmptyDocument } from '@core/model/types';
 
-const ENV_KEYS = ['MCP_AUTH_TOKEN', 'LLULL_REQUIRE_TOKEN_FOR_REST'];
+const ENV_KEYS = ['LLULL_AUTH_TOKEN', 'LLULL_REQUIRE_TOKEN_FOR_REST'];
 afterEach(() => {
   for (const key of ENV_KEYS) delete process.env[key];
 });
@@ -74,19 +74,19 @@ describe('hasValidBearer', () => {
 
 describe('guardMutation vs remote peers', () => {
   it('rejects a forged allowed Origin from a non-loopback peer without a token', () => {
-    process.env['MCP_AUTH_TOKEN'] = 'secret';
+    process.env['LLULL_AUTH_TOKEN'] = 'secret';
     const result = runGuard(fakeReq({ origin: 'http://localhost:5173' }, '203.0.113.9'));
     expect(result).toEqual({ status: 401, nextCalled: false });
   });
 
   it('allows a non-loopback peer with a valid bearer', () => {
-    process.env['MCP_AUTH_TOKEN'] = 'secret';
+    process.env['LLULL_AUTH_TOKEN'] = 'secret';
     const result = runGuard(fakeReq({ authorization: 'Bearer secret' }, '203.0.113.9'));
     expect(result.nextCalled).toBe(true);
   });
 
   it('still allows a loopback browser with an allowed Origin', () => {
-    process.env['MCP_AUTH_TOKEN'] = 'secret';
+    process.env['LLULL_AUTH_TOKEN'] = 'secret';
     const result = runGuard(fakeReq({ origin: 'http://localhost:5173' }, '::ffff:127.0.0.1'));
     expect(result.nextCalled).toBe(true);
   });
@@ -126,7 +126,7 @@ describe('browser mutation guard (/command)', () => {
   });
 
   it('uses the shared bearer verifier (case-insensitive scheme)', async () => {
-    process.env['MCP_AUTH_TOKEN'] = 'secret';
+    process.env['LLULL_AUTH_TOKEN'] = 'secret';
     const ok = await request(app).post('/command').set('Authorization', 'bearer secret').send({ name: 'describe_scene', params: {} });
     expect(ok.status).toBe(200);
     const bad = await request(app).post('/command').set('Authorization', 'Bearer nope').send({ name: 'describe_scene', params: {} });

@@ -15,10 +15,9 @@ import { withoutPrivateValues } from '@core/commands/materials/libraryRecords';
 import { hashText } from '@lib/hash';
 
 /**
- * Who sent a broadcast command: the REST API (the UI, scripts) or the `llull` CLI. `mcp` is legacy (the MCP host was removed,
- * LC1 step 4); it stays in the union until the UI drops its label.
+ * Who sent a broadcast command: the REST API (the UI, scripts) or the `llull` CLI.
  */
-export type LiveCommandSource = 'rest' | 'mcp' | 'cli';
+export type LiveCommandSource = 'rest' | 'cli';
 
 /** SSE `command` event: one mutating command, applied server-side as number `seq`. */
 export interface LiveCommandEvent {
@@ -29,9 +28,6 @@ export interface LiveCommandEvent {
   readonly params: unknown;
   /** `documentHash` of the server document after the command. */
   readonly stateHash: string;
-  /** Legacy, never emitted since LC1 step 3 removed named users; kept until the UI stops reading it. */
-  readonly userId?: string;
-  readonly userName?: string;
   /** Channel the command came in on; clients use it to label remote edits. */
   readonly source?: LiveCommandSource;
   /** The sender's idempotency key, echoed so a client can recognise its own commands. */

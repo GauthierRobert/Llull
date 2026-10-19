@@ -1,6 +1,6 @@
 /**
  * HTTP hardening of the local backend: loopback-only bind, origin/host allowlists, the per-launch token guard, rate limits,
- * JSON errors. The token (`MCP_AUTH_TOKEN`, set by the desktop app per launch) keeps other local processes and websites
+ * JSON errors. The token (`LLULL_AUTH_TOKEN`, set by the desktop app per launch) keeps other local processes and websites
  * away from the document; there are no named users or roles (LC1: one local backend per machine).
  */
 import crypto from 'crypto';
@@ -94,7 +94,7 @@ export function hostAllowlist(): RequestHandler {
 
 /**
  * Guard for /command, /undo, /redo, /exchange, /import. The Origin allowlist is CSRF protection ONLY, never authentication:
- *   1. valid `Authorization: Bearer <MCP_AUTH_TOKEN>`              -> allow
+ *   1. valid `Authorization: Bearer <LLULL_AUTH_TOKEN>`              -> allow
  *   2. `LLULL_REQUIRE_TOKEN_FOR_REST=true` and a token is set       -> 401
  *   3. token set and peer is NOT loopback (or came via a proxy)     -> 401 (Origin is not trusted)
  *   4. `Origin` header present and not in the allowlist             -> 403 (blocks CSRF from other sites)
@@ -129,7 +129,7 @@ export function guardTicketIssue(): RequestHandler {
 
 function buildGuard(isRead: boolean): RequestHandler {
   return (req, res, next) => {
-    const token = process.env['MCP_AUTH_TOKEN'];
+    const token = process.env['LLULL_AUTH_TOKEN'];
     if (!token && isRead) {
       const refusal = crossSiteRefusal(req);
       if (refusal === null) next();

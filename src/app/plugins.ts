@@ -1,4 +1,4 @@
-// Composition root of the default domain plugins (app, MCP server, test setup): the only place that knows the domains.
+// Composition root of the default domain plugins (app, backend, CLI, test setup): the only place that knows the domains.
 
 import { installPlugin } from '@core/plugins/host';
 import { buildingPlugin, civilPlugin, industrialPlugin } from '@aec/index';

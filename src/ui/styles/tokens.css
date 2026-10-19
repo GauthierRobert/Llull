@@ -41,7 +41,7 @@
   --warning-soft: oklch(0.8 0.145 75 / 0.14);
   --danger: oklch(0.68 0.19 25);
   --danger-soft: oklch(0.68 0.19 25 / 0.14);
-  --agent: oklch(0.74 0.13 50); /* Claude / MCP agent activity (warm) */
+  --agent: oklch(0.74 0.13 50); /* live-sync / remote activity (warm) */
   --agent-soft: oklch(0.74 0.13 50 / 0.14);
 
   /* ---- Categories: Okabe-Ito colour-blind-safe palette (charts, series, finding types). Order = series order. ---- */

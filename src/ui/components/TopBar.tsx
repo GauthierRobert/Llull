@@ -1,4 +1,4 @@
-// Header: browser-panel toggle, brand, breadcrumbs (project › selection); agent status, Connect agent and the More menu
+// Header: browser-panel toggle, brand, breadcrumbs (project › selection); live-sync status and the More menu
 // (file, export, theme, properties). The command palette trigger lives in the command bar.
 
 import React from 'react';
@@ -7,14 +7,13 @@ import { type LiveStatus, useLayoutStore, useStore } from '@ui/store';
 import { useSessionStore } from '@ui/store/sessionStore';
 import { projectNameOf } from '@ui/components/projectName';
 import { Icon } from '@ui/components/Icon';
-import { McpConnectButton } from '@ui/components/McpConnect';
 import { MoreMenu } from '@ui/components/MoreMenu';
 
 function AgentPill({ status }: { status: LiveStatus }): React.ReactElement {
   const isConnected = status === 'connected';
   const isConnecting = status === 'connecting';
 
-  const label = `MCP agent: ${status}`;
+  const label = `Live sync: ${status}`;
 
   return (
     <div
@@ -23,7 +22,7 @@ function AgentPill({ status }: { status: LiveStatus }): React.ReactElement {
       title={label}
     >
       <span className="agent-pill__dot" aria-hidden="true" />
-      <span className="agent-pill__text">{isConnected ? 'claude-mcp' : isConnecting ? 'connecting…' : 'offline'}</span>
+      <span className="agent-pill__text">{isConnected ? 'live' : isConnecting ? 'connecting…' : 'offline'}</span>
     </div>
   );
 }
@@ -102,7 +101,6 @@ export function TopBar(): React.ReactElement {
 
       <div className="topbar__right">
         <AgentPill status={liveStatus} />
-        <McpConnectButton />
         <MoreMenu />
       </div>
     </header>

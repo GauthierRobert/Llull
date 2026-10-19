@@ -6,7 +6,7 @@
  *   POST /exchange         `exchangeRoutes.ts` (STEP / DWG / CadQuery exchange tools for the CLI)
  *
  * Env: PORT (3001), HOST (127.0.0.1; loopback only: the backend is local, one per machine, LC1), LLULL_BODY_LIMIT (2mb),
- * MCP_AUTH_TOKEN (the desktop app's per-launch token) plus the vars in server/README.md.
+ * LLULL_AUTH_TOKEN (the desktop app's per-launch token) plus the vars in server/README.md.
  */
 
 import './plugins'; // must stay first: installs domain plugins before liveDocument loads
