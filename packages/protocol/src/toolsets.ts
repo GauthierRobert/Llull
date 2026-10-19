@@ -33,7 +33,7 @@ export type ToolsetName = (typeof TOOLSET_NAMES)[number];
 const words = (list: string): readonly string[] => list.split(' ');
 
 const ANALYSIS_CORE_TOOLS = words(
-  'check_assembly check_mechanism check_motion_clearance check_dynamics engine_quick_check check_convergence compare_to_expected thermal_analytic_check compute_view_factors fit_at_temperature thermal_stress_check fea_mesh fea_solve fea_export fea_import_field topology_solve',
+  'check_assembly check_mechanism check_motion_clearance check_dynamics engine_quick_check compare_to_reference check_timestep_convergence check_convergence compare_to_expected thermal_analytic_check compute_view_factors fit_at_temperature thermal_stress_check fea_mesh fea_solve fea_export fea_import_field topology_solve',
 );
 
 /** Core part-modelling features (07 FTR §4.1); the sheet-metal plugin adds its commands to the same toolset. */
@@ -61,7 +61,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   ),
   assembly: words(
     'create_component insert_instance explode_instance bill_of_materials add_joint delete_joint set_joint_value add_drive_relation delete_drive_relation evaluate_motion bake_motion motion_study animate stop_animation ' +
-      'add_rigid_body add_body_joint add_gear_coupling add_spring add_motor add_propeller add_cylinder_pressure set_gravity delete_dynamics_item set_dynamics_solver inspect_dynamics simulate_motion plot_simulation render_motion',
+      'add_rigid_body add_body_joint add_gear_coupling add_spring add_motor add_propeller add_cylinder_pressure set_engine_losses add_reference_data set_gravity delete_dynamics_item set_dynamics_solver inspect_dynamics simulate_motion plot_simulation render_motion',
   ),
   materials: words(
     'create_material assign_material define_material_record set_material_property get_material get_material_allowable convert_quantity import_material_library remove_material_library resolve_material_libraries diff_material_libraries set_export_marking check_materials register_material_library ' +

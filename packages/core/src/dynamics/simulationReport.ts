@@ -252,6 +252,10 @@ export function simulationData(
       const omega = last(velocityOf(p.joint));
       const end = propellerOutput(p, omega);
       const tipMach = (Math.abs(omega) * p.diameter) / 2 / SPEED_OF_SOUND;
+      if (end.outsideTable === true)
+        warnings.push(
+          `FPR_OUTSIDE_VALIDATED_RANGE: propeller '${p.id}' runs at J = ${(end.advanceRatio ?? 0).toFixed(3)}, beyond its table (last J ${Math.max(...(p.table?.points.map((point) => point[0]) ?? [0]))}): the coefficients are held at the last point`,
+        );
       const figureOfMerit = p.powerCoefficient > 0 ? p.thrustCoefficient ** 1.5 / (p.powerCoefficient * Math.sqrt(Math.PI / 2)) : null;
       if (tipMach > MAX_TIP_MACH)
         warnings.push(

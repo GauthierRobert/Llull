@@ -38,8 +38,9 @@ export const checkDynamics = defineCommand({
     'engine; without it they are not_run, never pass): FPR_LOOP_DRIFT (loop-closure residual, pass <= 1 um, warn <= 10 um, fail above), ' +
     'FPR_ENERGY_CLOSURE (cylinder engines: gas work against the pressure model, gate 0.5 % = fail; otherwise the energy balance of the run, ' +
     'over 0.5 % = warn), FPR_TIMESTEP_SENSITIVE (the run is repeated at half the timestep; warn when the final speed or position of a joint ' +
-    `changes by more than ${TIMESTEP_GATE.value * 100} %). With no rigid bodies the result is not_run (FPR_NO_MOTION). Not implemented, so ` +
-    'never reported: FPR_REFERENCE_MISMATCH, FPR_CALIBRATION_FAILED (no reference data in the document), FPR_OUTSIDE_VALIDATED_RANGE. ' +
+    `changes by more than ${TIMESTEP_GATE.value * 100} %). With no rigid bodies the result is not_run (FPR_NO_MOTION). Reported by their own ` +
+    "commands, not here: FPR_REFERENCE_MISMATCH and FPR_OUTSIDE_VALIDATED_RANGE (compare_to_reference), the engine's brake-torque and wrist-pin " +
+    'timestep sensitivity (check_timestep_convergence), FPR_CALIBRATION_FAILED (add_cylinder_pressure calibrate_brake). ' +
     'Approximate: all thresholds are llull named defaults (grade C), the timestep test compares only final joint states, and a run shorter ' +
     'than the motion cycle can hide drift. Read-only. Next: fix warnings, then check_prototype. Computed by llull, not approved: a ' +
     'qualified engineer must review.',

@@ -50,6 +50,8 @@ interface SimulationGear {
   readonly driver: string;
   readonly driven: string;
   readonly ratio: number;
+  /** Mesh efficiency in (0, 1]: (1 - efficiency) of the transmitted torque is lost on the driven joint. Absent = ideal. */
+  readonly efficiency?: number;
 }
 
 /**

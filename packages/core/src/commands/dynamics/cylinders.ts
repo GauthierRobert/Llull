@@ -11,15 +11,37 @@ import { defineCommand, z } from '../schema';
 import { idOrNext } from '../entity/explicitId';
 import { changed, commandError, failer, rejection } from '../noop';
 import { dynamicsIdTaken, dynamicsOf, withDynamics } from './bodies';
+import { calibrateCylinder } from './engine/calibrateCylinder';
 
 /** ISA sea-level pressure, Pa (named default of ambientPressurePa). */
 const SEA_LEVEL_PRESSURE = 101_325;
 
 const heatSchema = z.object({
   kind: z
-    .enum(['per_cycle_J', 'target_imep_Pa', 'table_vs_rpm'])
+    .enum(['per_cycle_J', 'target_imep_Pa', 'table_vs_rpm', 'calibrate_brake'])
     .describe(
-      '"per_cycle_J": heat released per cycle (wiebe, single_zone); "target_imep_Pa": calibrate to this net IMEP (wiebe only); "table_vs_rpm": heat per cycle vs rpm (single_zone only).',
+      '"per_cycle_J": heat released per cycle (wiebe, single_zone); "target_imep_Pa": calibrate to this net IMEP (wiebe only); "table_vs_rpm": heat per cycle vs rpm (single_zone only); ' +
+        '"calibrate_brake": (single_zone only) solve the heat per cycle so that the BRAKE torque (indicated minus the friction of set_engine_losses, which must exist on the crank first) ' +
+        'meets `brake` at each named rpm; stored as a heat-vs-rpm table with those rpm marked calibrated (every other speed is a prediction, not validation evidence).',
+    ),
+  brake: z
+    .array(
+      z.object({
+        rpm: z.number().positive().describe('Crank speed, rpm.'),
+        brakeTorqueNm: z.number().positive().describe('Mean BRAKE torque of the WHOLE engine at that speed, N·m.'),
+      }),
+    )
+    .optional()
+    .describe(
+      'calibrate_brake: calibration points (default practice: the rated point only; keep the rest as hold-out for compare_to_reference).',
+    ),
+  cylinderCount: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      'calibrate_brake: number of identical cylinders sharing the engine brake torque (this cylinder delivers 1 / count of it). Default 1.',
     ),
   value: z
     .number()
@@ -83,9 +105,7 @@ const modelSchema = z.object({
   intakeTempK: z.number().positive().optional().describe('single_zone: charge temperature at intake closing, K (e.g. 330).'),
   heat: heatSchema
     .optional()
-    .describe(
-      'wiebe: per_cycle_J or target_imep_Pa. single_zone: per_cycle_J or table_vs_rpm (calibration to a brake target needs engine losses and is not offered yet).',
-    ),
+    .describe('wiebe: per_cycle_J or target_imep_Pa. single_zone: per_cycle_J, table_vs_rpm or calibrate_brake (brake + cylinderCount).'),
   burn: burnSchema.optional().describe('single_zone: Wiebe burn phasing.'),
   woschni: woschniSchema
     .optional()
@@ -135,7 +155,13 @@ function storedModel(input: ModelInput): CylinderPressure['model'] | { error: st
   if (heat?.kind === 'per_cycle_J' && heat.value !== undefined) storedHeat = { kind: 'per_cycle_J', value: heat.value };
   else if (heat?.kind === 'table_vs_rpm' && heat.points !== undefined && heat.points.length > 0)
     storedHeat = { kind: 'table_vs_rpm', points: heat.points };
-  else return { error: 'single_zone needs heat { kind: "per_cycle_J", value } or { kind: "table_vs_rpm", points }' };
+  else if (heat?.kind === 'calibrate_brake' && heat.brake !== undefined && heat.brake.length > 0)
+    storedHeat = { kind: 'per_cycle_J', value: 1 }; // placeholder: replaced by the calibration in `run`
+  else
+    return {
+      error:
+        'single_zone needs heat { kind: "per_cycle_J", value }, { kind: "table_vs_rpm", points } or { kind: "calibrate_brake", brake: [{ rpm, brakeTorqueNm }] }',
+    };
   const rpmExponent = burn.rpmExponent ?? DEFAULT_RPM_EXPONENT;
   const common = { durationDeg: burn.durationDeg, a: burn.a, m: burn.m, rpmExponent };
   return {
@@ -152,10 +178,10 @@ function storedModel(input: ModelInput): CylinderPressure['model'] | { error: st
 /**
  * @affects adds 1 cylinder pressure to doc.dynamics.cylinders (affected: [cylinderId], step-scoped id cyl-<step>.<k>)
  * @invariant piston prismatic and crank revolute (both tree joints), at most one pressure per piston; bore > 0; compression ratio > 1;
- *            firingOffsetDeg a multiple of 360; the pressure table covers the cycle; calibrate_brake is NOT offered (it needs the
- *            engine-loss model of a later slice) and is absent from the schema rather than stubbed
+ *            firingOffsetDeg a multiple of 360; the pressure table covers the cycle; calibrate_brake (single_zone) stores a heat-vs-rpm
+ *            table with the calibrated rpm recorded
  * @failure unknown / wrong-kind joints, a loop-closing piston or crank, a second pressure on a piston, missing model fields,
- *          FPR_PRESSURE_TABLE_GAP, FPR_IMEP_UNREACHABLE, taken id -> no-op
+ *          FPR_PRESSURE_TABLE_GAP, FPR_IMEP_UNREACHABLE, FPR_NO_LOSSES / FPR_CALIBRATION_FAILED (calibrate_brake), taken id -> no-op
  */
 export const addCylinderPressure = defineCommand({
   name: 'add_cylinder_pressure',
@@ -174,8 +200,9 @@ export const addCylinderPressure = defineCommand({
     'per cycle OR calibrated exactly to a net `target_imep_Pa` (FPR_IMEP_UNREACHABLE when it is below the unfired loop). n_c, n_e and ' +
     'intakePressurePa are required, no defaults. "single_zone" = first law with Wiebe burn (ca50Deg 8-10 for MBT, or fixed startDeg; ' +
     'durationDeg about 35 at 3000 rpm), Woschni wall heat loss (give all six `woschni` constants, or omit the object for 3.26 / 2.28 / 6.18 / ' +
-    '0.00324, exponent -0.53, wall 450 K, which are then stored), charge at intake closing (intakePressurePa, intakeTempK), heat per cycle or per rpm (calibration to a ' +
-    'brake torque needs engine losses and is not available yet). Returns the cylinder id (cyl-<step>.<k>) in affected[0]; the summary ' +
+    '0.00324, exponent -0.53, wall 450 K, which are then stored), charge at intake closing (intakePressurePa, intakeTempK), heat per cycle, per rpm, or calibrated to a ' +
+    'BRAKE torque (heat kind "calibrate_brake" with `brake` [{ rpm, brakeTorqueNm }] and `cylinderCount`: needs set_engine_losses on the crank first, ' +
+    'else FPR_NO_LOSSES; secant iteration to 0.1 %, FPR_CALIBRATION_FAILED if not reached; calibrated speeds are marked, all others are predictions). Returns the cylinder id (cyl-<step>.<k>) in affected[0]; the summary ' +
     'gives geometry, peak pressure and IMEP. Next: simulate_motion (reactions peaks, data.engineReport), or engine_quick_check for a ' +
     'sanity check without simulation.',
   params: z.object({
@@ -222,7 +249,7 @@ export const addCylinderPressure = defineCommand({
     }
     const cylinderId = idOrNext(params.id, 'cyl');
     if (dynamicsIdTaken(dynamics, cylinderId)) return fail(`id '${cylinderId}' is already used`);
-    const cylinder: CylinderPressure = {
+    let cylinder: CylinderPressure = {
       id: cylinderId,
       piston: piston.id,
       crank: crank.id,
@@ -237,6 +264,13 @@ export const addCylinderPressure = defineCommand({
     const problem = modelProblem(cylinder);
     if (problem !== null) return fail(problem);
     const topology = buildTopology(dynamics);
+    const heatInput = params.model.heat;
+    const calibration =
+      heatInput?.kind === 'calibrate_brake' && heatInput.brake !== undefined
+        ? { brake: heatInput.brake, cylinderCount: heatInput.cylinderCount ?? 1 }
+        : undefined;
+    let calibrationText = '';
+    if (calibration !== undefined && isRefusal(topology)) return fail(`brake calibration needs a valid mechanism: ${topology.error}`);
     let geometryText = 'geometry not checked yet (declare the rod and wrist joints; it is read at simulate_motion)';
     if (!isRefusal(topology)) {
       if (!topology.tree.some((entry) => entry.joint.id === piston.id) || !topology.tree.some((entry) => entry.joint.id === crank.id))
@@ -244,7 +278,31 @@ export const addCylinderPressure = defineCommand({
           `the piston and crank joints must be tree joints, but '${topology.loops.find((l) => l.id === piston.id || l.id === crank.id)?.id ?? piston.id}' closes a loop`,
         );
       const layout = engineLayout(dynamics, topology, cylinder, toMetres(doc, 1));
+      if ('error' in layout && calibration !== undefined)
+        return fail(`brake calibration needs the mechanism geometry: ${layout.error} (declare the rod and wrist joints first)`);
       if (!('error' in layout)) {
+        if (calibration !== undefined && cylinder.model.kind === 'single_zone') {
+          const result = calibrateCylinder(
+            { ...cylinder, model: cylinder.model },
+            layout,
+            dynamics,
+            calibration.brake,
+            calibration.cylinderCount,
+          );
+          if ('error' in result)
+            return rejection(
+              doc,
+              `add_cylinder_pressure: ${result.code} — ${result.error}; no-op.`,
+              commandError(result.code, result.error, [piston.id, crank.id]),
+            );
+          cylinder = { ...cylinder, model: result.model };
+          calibrationText = ` Calibrated to brake torque: ${result.points
+            .map(
+              (point) =>
+                `${point.rpm} rpm → ${point.heatJ.toPrecision(5)} J/cycle (IMEP ${(point.imepPa / 1e5).toPrecision(4)} bar - FMEP ${(point.fmepPa / 1e5).toPrecision(3)} bar = BMEP ${(point.bmepPa / 1e5).toPrecision(4)} bar, peak ${(point.peakPa / 1e5).toPrecision(4)} bar, ${point.iterations} iterations)`,
+            )
+            .join('; ')}. origin calibrated at those speeds only.`;
+        }
         const curve = pressureCurve(cylinder, layout, 1000);
         if ('error' in curve)
           return rejection(
@@ -262,7 +320,7 @@ export const addCylinderPressure = defineCommand({
     const unverified = model.source === undefined ? ' Unverified: no source given for the pressure data.' : '';
     return changed(
       withDynamics(doc, { ...dynamics, cylinders: { ...(dynamics.cylinders ?? {}), [cylinderId]: cylinder } }),
-      `add_cylinder_pressure: '${cylinderId}' — ${model.kind} ${cycle} on piston '${piston.id}', crank '${crank.id}', bore ${params.boreMm} mm, CR ${params.compressionRatio}; ${geometryText}.${unverified}`,
+      `add_cylinder_pressure: '${cylinderId}' — ${model.kind} ${cycle} on piston '${piston.id}', crank '${crank.id}', bore ${params.boreMm} mm, CR ${params.compressionRatio}; ${geometryText}.${calibrationText}${unverified}`,
       [cylinderId],
     );
   },

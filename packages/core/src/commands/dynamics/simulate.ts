@@ -13,6 +13,8 @@ import { buildTopology, isRefusal } from '../../dynamics/topology';
 import { analyseMobility } from '../../dynamics/mobility';
 import { reactionsData, residualTier, type ReactionMode } from '../../dynamics/reactions';
 import { cycleAngleSeries, engineData } from '../../dynamics/engineReport';
+import { realismData } from '../../dynamics/engine/engineRealism';
+import { idealGearWarnings } from '../../dynamics/engine/gearLoss';
 import { errorMessage } from '../../lib/errorMessage';
 import { dynamicsOf } from './bodies';
 import { openLoopGaps } from './inspect';
@@ -61,15 +63,24 @@ export const simulateMotion = defineCommand({
     'cycle: torque against crank angle per cylinder and total (detail series), mean torque (N·m), indicated power (kW), IMEP and peak ' +
     'pressure per cylinder, cycle-energy closure (gate 0.5 %, FPR_ENERGY_CLOSURE), speed ripple against the analytic ΔE/(I·ω²), and ' +
     'the peak wrist-pin, rod, side-thrust, crank-pin and main-bearing forces. Simulate at least one full cycle (two crank turns for a ' +
-    'four-stroke) after the speed has settled. Next: read data.loops.tier first, then data.engineReport and data.reactions.',
+    'four-stroke) after the speed has settled. data.engineReport.realism (FR-FPR-70 / 71 / 73 / 76): with set_engine_losses, BRAKE torque and power ' +
+    '(indicated minus friction), BMEP = IMEP - FMEP and mechanical efficiency (losses{}, with a governor-torque cross-check); per cylinder the ' +
+    'reciprocating mass and primary / secondary inertia-force amplitudes against the gas peak (reciprocating[]); an accuracy{} statement for every ' +
+    'scalar (band or null = "± ?", basis, origin input / calibrated / predicted / verification, validationLevel 0-4, warnings; a value at a speed the ' +
+    'heat release was calibrated at is "calibrated", not validation evidence); plausibility[] (FPR_UNREALISTIC: peak-pressure angle and CA50 vs MBT, ' +
+    'mechanical efficiency, Rotax-class propeller inertia / torque, reciprocating mass on the default density). A gear with efficiency (add_gear_coupling) ' +
+    'loses (1 - efficiency) of its torque on the driven shaft; a propeller with a Ct / Cp table and airspeed follows J = V/(nD). ' +
+    'Next: read data.loops.tier first, then data.engineReport and data.reactions.',
   params: z.object({
     duration: z.number().positive().max(600).optional().describe('Simulated seconds. Default 5.'),
     timestep: z
       .number()
-      .min(1e-5)
+      .min(5e-6)
       .max(0.01)
       .optional()
-      .describe('Integration step in seconds. Default 0.001 (loops or cylinders: the "auto" rule or the stored solver setting).'),
+      .describe(
+        'Integration step in seconds, at least 5e-6 (half of the smallest auto step, so a timestep-halving check can always run). Default 0.001 (loops or cylinders: the "auto" rule or the stored solver setting).',
+      ),
     sampleRate: z
       .number()
       .positive()
@@ -235,7 +246,19 @@ export const simulateMotion = defineCommand({
         metresPerUnit: metres,
         series: (params.detail ?? 'summary') !== 'summary' || mode === 'series',
       });
-      if (engineReport !== null) warnings.push(...engineReport.warnings);
+      const realism =
+        engineReport === null
+          ? null
+          : realismData({
+              dynamics,
+              runtimes: built.cylinders,
+              trace,
+              mass: built.mass,
+              report: engineReport,
+              propellerTorqueNm: Object.fromEntries(Object.entries(base.propellers).map(([id, output]) => [id, output.torque])),
+              metresPerUnit: metres,
+            });
+      if (engineReport !== null) warnings.push(...engineReport.warnings, ...(realism?.warnings ?? []), ...idealGearWarnings(dynamics));
       const data = {
         ...base,
         warnings,
@@ -262,14 +285,18 @@ export const simulateMotion = defineCommand({
             }
           : {}),
         ...(reactions !== null ? { reactions } : {}),
-        ...(engineReport !== null ? { engineReport } : {}),
+        ...(engineReport !== null ? { engineReport: { ...engineReport, ...(realism !== null ? { realism } : {}) } } : {}),
       };
+      const brakeText =
+        realism?.losses == null
+          ? ''
+          : ` Brake: ${realism.losses.brakeTorqueNm.toFixed(2)} N·m (${realism.losses.brakePowerKW.toFixed(2)} kW, BMEP ${realism.losses.bmepBar.toFixed(3)} bar = IMEP ${realism.losses.imepBar.toFixed(3)} - FMEP ${realism.losses.fmepBar.toFixed(3)}), mechanical efficiency ${(realism.losses.mechanicalEfficiency * 100).toFixed(1)} %.`;
       const loopText = structured ? ` Loops: residual ${(residual * 1e6).toPrecision(3)} µm (${tier}), timestep ${timestep} s.` : '';
       const engineText =
         engineReport?.meanTorqueNm != null
           ? ` Engine ${engineReport.crankJoint}: mean torque ${engineReport.meanTorqueNm.toFixed(2)} N·m, indicated ${(engineReport.indicatedPowerKW ?? 0).toFixed(2)} kW at ${(engineReport.lastCycle?.meanRpm ?? 0).toFixed(0)} rpm, energy closure ${engineReport.energyClosure?.ratio == null ? 'not evaluated' : `${(engineReport.energyClosure.ratio * 100).toFixed(3)} %`}, speed ripple ${((engineReport.speedRipple?.measured ?? 0) * 100).toFixed(3)} %.`
           : '';
-      return report(doc, simulationSummary(data) + loopText + engineText, data);
+      return report(doc, simulationSummary(data) + loopText + engineText + brakeText, data);
     } catch (error) {
       return fail(`the physics engine rejected the model: ${errorMessage(error)}`);
     }

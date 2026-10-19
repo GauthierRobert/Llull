@@ -366,6 +366,7 @@ function onlyGovernorLoads(dynamics: DynamicsModel, governorId: string | undefin
     Object.values(dynamics.motors).every((motor) => motor.id === governorId) &&
     Object.keys(dynamics.propellers).length === 0 &&
     Object.keys(dynamics.gears).length === 0 &&
+    Object.keys(dynamics.losses ?? {}).length === 0 &&
     Object.values(dynamics.joints).every((joint) => joint.damping === 0 && joint.friction === 0)
   );
 }

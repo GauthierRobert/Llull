@@ -29,6 +29,7 @@ export function dynamicsIdTaken(dynamics: DynamicsModel, id: string): boolean {
     dynamics.motors,
     dynamics.propellers,
     dynamics.cylinders ?? {},
+    dynamics.losses ?? {},
     dynamics.springs ?? {},
   ].some((table) => idTaken(table, id));
 }
@@ -116,7 +117,7 @@ export const deleteDynamicsItem = defineCommand({
   annotations: { destructive: true },
   description:
     'Remove a rigid body, joint, gear coupling, motor, propeller, cylinder pressure or point spring (add_spring) from the physics model by id. Cascades: a body ' +
-    'takes its joints and springs with it; a joint takes the gears, motors, propellers and cylinder pressures on it. Entities (geometry) are never deleted.',
+    'takes its joints and springs with it; a joint takes the gears, motors, propellers, cylinder pressures and engine losses (set_engine_losses) on it. Entities (geometry) are never deleted.',
   params: z.object({ id: z.string().describe('Id of the body / joint / gear / motor / propeller / cylinder / spring to remove.') }),
   run: (doc, { id }): CommandResult => {
     const dynamics = dynamicsOf(doc);
@@ -135,11 +136,12 @@ export const deleteDynamicsItem = defineCommand({
       ...(dynamics.cylinders === undefined
         ? {}
         : { cylinders: keep(dynamics.cylinders, (key, cyl) => key === id || goneJoint(cyl.piston) || goneJoint(cyl.crank)) }),
+      ...(dynamics.losses === undefined ? {} : { losses: keep(dynamics.losses, (key, loss) => key === id || goneJoint(loss.crank)) }),
       ...(dynamics.springs === undefined
         ? {}
         : { springs: keep(dynamics.springs, (key, spring) => key === id || spring.bodyA === id || spring.bodyB === id) }),
     };
-    const removed = (['bodies', 'joints', 'gears', 'motors', 'propellers', 'cylinders', 'springs'] as const)
+    const removed = (['bodies', 'joints', 'gears', 'motors', 'propellers', 'cylinders', 'losses', 'springs'] as const)
       .map((table) => Object.keys(dynamics[table] ?? {}).length - Object.keys(next[table] ?? {}).length)
       .reduce((a, b) => a + b, 0);
     return report(

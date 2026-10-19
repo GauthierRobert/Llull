@@ -707,6 +707,10 @@ export interface Material {
   density: number;
   /** Unit `density` was given in at creation (create_material `densityUnit`); absent = given directly in g/(document unit)³. Still no source. */
   readonly densityUnit?: string;
+  /** Where the density comes from (FR-FPR-73): a material with a source is not reported as unsourced by the dynamics mass. */
+  readonly source?: string;
+  /** Quality of `source`: A measured / verified, B published datasheet, C reconstructed or unchecked. */
+  readonly grade?: 'A' | 'B' | 'C';
   /** Aerospace material record (08 MAT M2): designation, specs, licence, export marking, library origin. Absent on a legacy material. */
   readonly record?: MaterialRecordInfo;
   color: string;

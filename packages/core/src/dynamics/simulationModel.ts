@@ -14,6 +14,7 @@ import { combineMassProperties, type InertiaTensor, type MassProperties } from '
 import { RAD_PER_S_PER_RPM, appliedLoadsFor, speedServoGains } from './forceLaws';
 import type { SimulationBody, SimulationJoint, SimulationLoop, SimulationModel, SimulationServo, SimulationSpring } from './physicsEngine';
 import { prepareCylinders, withCylinderForces, type CylinderRuntime } from './cylinderLoads';
+import { withEngineLosses } from './engine/engineLosses';
 import { consistentSpeeds } from './mobility';
 import { announcedSpeed } from './timestep';
 import type { CurveCode } from './pressureCurve';
@@ -63,8 +64,11 @@ export function bodyMassProperties(
       refused ??= { error: `${density.code}: body '${body.id}': ${density.reason}` };
       return 0;
     }
-    sources.add(density.source);
-    for (const reason of density.unverifiedReasons) reasons.add(reason);
+    const material = density.materialId === undefined ? undefined : doc.materials[density.materialId];
+    const sourced = material?.source !== undefined && density.modelId === undefined;
+    sources.add(sourced ? `material '${density.materialId}' density, source: ${material?.source}` : density.source);
+    // a material that names its source (FR-FPR-73 catalogue) is not "given without a source"
+    for (const reason of density.unverifiedReasons) if (!sourced) reasons.add(reason);
     defaulted ||= density.defaulted;
     return density.materialId === undefined ? density.kgPerM3 * unitVolume : density.gPerDocUnit3 / 1000;
   };
@@ -270,7 +274,8 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
   const announcedRpm = announcedSpeed(dynamics) / RAD_PER_S_PER_RPM;
   const cylinders = prepareCylinders(dynamics, topology, metres, announcedRpm > 0 ? announcedRpm : undefined);
   if ('error' in cylinders) return cylinders;
-  const loads = cylinders.length > 0 ? withCylinderForces(baseLoads, cylinders) : baseLoads;
+  const gasLoads = cylinders.length > 0 ? withCylinderForces(baseLoads, cylinders) : baseLoads;
+  const loads = withEngineLosses(gasLoads, Object.values(dynamics.losses ?? {}), cylinders);
   const solver = {
     integrator: settings.integrator,
     loopTimeConstant: settings.loopTimeConstantSteps * timestep,

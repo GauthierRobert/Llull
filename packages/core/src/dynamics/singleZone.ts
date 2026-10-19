@@ -1,8 +1,8 @@
 /**
  * Single-zone cylinder pressure (FR-FPR-72, TR-FPR-16): first law for the trapped charge with a Wiebe heat release and Woschni wall heat
  * transfer, RK4 on the 0.1 deg grid, evaluated for one operating speed. Gas exchange (180..540 deg of a four-stroke cycle) is prescribed
- * at ambient / intake pressure like the Wiebe model. Heat release is given per cycle or per rpm; calibration to a brake target needs the
- * engine-loss model of a later slice and is not offered.
+ * at ambient / intake pressure like the Wiebe model. Heat release is given per cycle or per rpm; the brake calibration that fills the per-rpm
+ * table is `engine/brakeCalibration.ts` (secant iteration on the heat, friction included).
  *
  *   dp/dpsi = -k (p / V) dV/dpsi + ((k - 1) / V) (dQin/dpsi - dQloss/dpsi),   dQloss/dpsi = h A_w (T - T_w) / omega
  *   h = c1 B^-0.2 (p / kPa)^0.8 T^tempExponent w^0.8,   w = c2 S_p + c3 (V_d T_r / (p_r V_r)) (p - p_motored)

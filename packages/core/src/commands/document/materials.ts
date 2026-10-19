@@ -14,6 +14,7 @@ import { changed, commandError, noop, report } from '../noop';
 import { convertValue, isUnitFailure } from '../../lib/quantity';
 import { refuseMaterial } from '../materials/refusal';
 import { describeDensity, densityPlausibilityWarning, kgPerM3FromDocDensity } from '../../geometry/resolveDensity';
+import { sourcedMaterial } from '../../dynamics/engine/sourcedMaterials';
 
 const DEFAULT_COLOR = '#b0b0b0';
 
@@ -219,7 +220,8 @@ export const assignMaterial = defineCommand({
   name: 'assign_material',
   description:
     'Assign a named material to one or more entities. ' +
-    'The material must already exist in the document (create it first with create_material). ' +
+    'The material must already exist in the document (create it first with create_material), or be one of the sourced catalogue names ' +
+    '"al_4032" (piston alloy, 2680 kg/m³ [Smiths datasheet]) and "steel_4340" (7850 kg/m³ [AISI 4340 sheet]), which are created with their cited source and grade on first use. ' +
     "Once assigned, mass_properties uses the material's density for that entity " +
     '(mass = volume × material.density), overriding the caller-supplied density param. ' +
     'The material may be a record (define_material_record or a library record: use its id); an unresolved private record can be assigned, ' +
@@ -244,7 +246,9 @@ export const assignMaterial = defineCommand({
   annotations: { idempotent: true },
   run: (doc, { materialName, entityIds }): CommandResult => {
     if (materialName.trim() === '') return noop(doc, 'assign_material failed: materialName must be a non-empty string.');
-    if (!doc.materials[materialName]) {
+    const catalogued = Object.hasOwn(doc.materials, materialName) ? null : sourcedMaterial(doc, materialName);
+    const materials = catalogued === null ? doc.materials : { ...doc.materials, [materialName]: catalogued };
+    if (!Object.hasOwn(materials, materialName)) {
       const available = Object.keys(doc.materials);
       const hint =
         available.length > 0 ? ` Available materials: ${available.join(', ')}.` : ' No materials defined yet — call create_material first.';
@@ -265,10 +269,12 @@ export const assignMaterial = defineCommand({
     }
     if (assigned.length === 0)
       return noop(doc, `assign_material '${materialName}': no valid entity ids found — missing: ${missing.join(', ')}.`);
-    const newDoc: CadDocument = { ...doc, entities: updatedEntities };
+    const newDoc: CadDocument = { ...doc, materials, entities: updatedEntities };
     const parts: string[] = [
       `assign_material '${materialName}': assigned to ${assigned.length} ${assigned.length === 1 ? 'entity' : 'entities'} (${assigned.join(', ')}).`,
     ];
+    if (catalogued !== null)
+      parts.push(`Created '${materialName}' from the sourced catalogue (grade ${catalogued.grade}): ${catalogued.source}.`);
     if (missing.length > 0) parts.push(`Missing ids skipped: ${missing.join(', ')}.`);
     return changed(newDoc, parts.join(' '), assigned);
   },

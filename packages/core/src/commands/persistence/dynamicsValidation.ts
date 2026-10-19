@@ -4,6 +4,7 @@ import { isRecord } from '../../lib/isRecord';
 import { isStringArray } from '../../lib/isStringArray';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isReservedKey } from '../../lib/reservedKey';
+import { gearExtrasProblem, lossesProblem, propellerExtrasProblem } from '../dynamics/engine/engineValidation';
 
 const isVec3 = (value: unknown): boolean => Array.isArray(value) && value.length === 3 && value.every(isFiniteNumber);
 const isNonNegative = (value: unknown): boolean => isFiniteNumber(value) && value >= 0;
@@ -42,7 +43,7 @@ const gearProblem: Check = (gear) =>
     ? 'driver and driven must be joint ids'
     : !isFiniteNumber(gear['ratio']) || gear['ratio'] === 0
       ? 'ratio must be a finite non-zero number'
-      : null;
+      : gearExtrasProblem(gear);
 
 const isCurve = (value: unknown): boolean =>
   Array.isArray(value) &&
@@ -67,7 +68,7 @@ const propellerProblem: Check = (propeller) =>
         ? 'thrust / power coefficients must be >= 0'
         : !isVec3(propeller['thrustDirection'])
           ? 'thrustDirection must be [x, y, z]'
-          : null;
+          : propellerExtrasProblem(propeller);
 
 const isPoints = (value: unknown, minimum: number): boolean =>
   Array.isArray(value) &&
@@ -175,6 +176,7 @@ export function dynamicsProblems(value: unknown): string[] {
   const tables = [
     ...TABLES,
     ...(value['cylinders'] === undefined ? [] : [['cylinders', cylinderProblem] as const]),
+    ...(value['losses'] === undefined ? [] : [['losses', lossesProblem] as const]),
     ...(value['springs'] === undefined ? [] : [['springs', springProblem] as const]),
   ];
   for (const [table, check] of tables) {
