@@ -26,7 +26,7 @@ export function navigationDecision(target: string, appOrigin: string): Navigatio
  * needs none beyond writing to the clipboard; everything else is denied instead of Electron's
  * grant-all default.
  */
-const ALLOWED_PERMISSIONS: ReadonlySet<string> = new Set(['clipboard-sanitized-write']);
+const ALLOWED_PERMISSIONS: ReadonlySet<string> = new Set(['clipboard-sanitized-write', 'hid']);
 
 export function permissionAllowed(permission: string, requestingUrl: string, appOrigin: string): boolean {
   return ALLOWED_PERMISSIONS.has(permission) && originOf(requestingUrl) === appOrigin;

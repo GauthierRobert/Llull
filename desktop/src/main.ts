@@ -12,6 +12,7 @@ import { createDocumentSession, type DocumentSession } from './documents';
 import { DEFAULT_SAVE_NAME, DOCUMENT_EXTENSIONS, DOCUMENT_FILE_PATTERN } from '@protocol/documentFiles';
 import { desktopLayout } from './layout';
 import { agentHelpText, menuTemplate } from './menu';
+import { type HidDeviceInfo, hidDevicePermitted, pickSpaceMouse } from './hid';
 import { navigationDecision, permissionAllowed } from './navigation';
 
 const FILE_FILTERS = [
@@ -193,6 +194,14 @@ function createWindow(url: string): BrowserWindow {
   created.webContents.session.setPermissionCheckHandler((_contents, permission, requestingOrigin) =>
     permissionAllowed(permission, requestingOrigin, origin),
   );
+  // 3D mouse: WebHID is allowed for 3Dconnexion devices only; the picker auto-selects one (no OS-style chooser needed).
+  created.webContents.session.setDevicePermissionHandler((details) =>
+    hidDevicePermitted({ deviceType: details.deviceType, origin: details.origin, device: details.device as HidDeviceInfo }, origin),
+  );
+  created.webContents.session.on('select-hid-device', (event, details, callback) => {
+    event.preventDefault();
+    callback(pickSpaceMouse(details.deviceList) || undefined);
+  });
   created.on('close', interceptQuit);
   void created.loadURL(`${url}/#token=${token}`);
   return created;
