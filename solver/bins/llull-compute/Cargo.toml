@@ -1,0 +1,13 @@
+[package]
+name = "llull-compute"
+description = "llull native job binary: `llull-compute <job> <job-folder>` (RS1 §2)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+llull-protocol = { path = "../../crates/llull-protocol" }
+
+[lints]
+workspace = true

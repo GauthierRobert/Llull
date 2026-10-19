@@ -1,0 +1,27 @@
+# llull native compute workspace (docs/decisions/RS1-native-compute.md).
+[workspace]
+resolver = "2"
+members = ["crates/*", "bins/*"]
+# The OCCT kernel builds OpenCascade from source (slow first build); `npm run native:check` skips it unless LLULL_NATIVE_KERNEL=1.
+default-members = ["crates/llull-protocol", "bins/llull-compute"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

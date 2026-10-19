@@ -20,3 +20,6 @@ __pycache__
 *.pem
 server/users.json
 server/audit.jsonl*
+
+# Rust native workspace (RS1)
+solver/target

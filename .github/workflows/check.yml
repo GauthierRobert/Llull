@@ -12,6 +12,23 @@ permissions:
   contents: read
 
 jobs:
+  # Rust workspace solver/ (docs/decisions/RS1-native-compute.md): fmt + clippy -D warnings + tests of the default members.
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            solver/target
+          key: native-${{ runner.os }}-${{ hashFiles('solver/Cargo.lock', 'solver/**/Cargo.toml') }}
+          restore-keys: native-${{ runner.os }}-
+      - run: rustup component add rustfmt clippy
+      - run: node scripts/nativeCheck.mjs
+
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 30
