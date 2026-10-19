@@ -114,7 +114,9 @@ describe.skipIf(nativeKernelBinary === null)('native vs WASM STEP import + heali
 
   it('refuses what the WASM kernel refuses, with the same error codes', async () => {
     const tessellated = 'ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\n#1=TESSELLATED_SHAPE_REPRESENTATION($,$,$);\nENDSEC;\nEND-ISO-10303-21;\n';
-    for (const text of ['not a step file', tessellated]) {
+    // A well-formed AP242 tessellated solid: OCCT 7.9 transfers it (a face with a triangulation and no surface), 7.4 does not.
+    const tetrahedron = readFileSync(path.join(__dirname, 'fixtures', 'tessellated-tetrahedron.stp'), 'utf8');
+    for (const text of ['not a step file', tessellated, tetrahedron]) {
       const native = (await harness.native('importShapes', ['step', text, OPTIONS])) as { error: string };
       const wasm = harness.wasm().importShapes!('step', text, OPTIONS) as { error: string };
       expect(native.error).toBe(wasm.error);

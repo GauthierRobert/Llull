@@ -130,6 +130,30 @@ fn step_assemblies_share_parts_and_refuse_cycles() {
     assert_eq!(export_step_assembly(&cyclic, &uses).unwrap(), None);
 }
 
+/// AP242 tessellated tetrahedron (TESSELLATED_SOLID of one TRIANGULATED_FACE): OCCT 7.9 transfers it as a solid whose face has
+/// a triangulation and no surface, which is not an exact B-rep.
+const TESSELLATED_STEP: &str = "ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION((''),'2;1');\nFILE_NAME('tet.stp','',(''),(''),'','','');
+FILE_SCHEMA(('AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 1 1 4 }'));\nENDSEC;\nDATA;
+#1=APPLICATION_CONTEXT('managed model based 3d engineering');
+#2=APPLICATION_PROTOCOL_DEFINITION('international standard','ap242_managed_model_based_3d_engineering',2011,#1);
+#3=PRODUCT_CONTEXT('',#1,'mechanical');\n#4=PRODUCT('tet','tet','',(#3));\n#5=PRODUCT_DEFINITION_FORMATION('','',#4);
+#6=PRODUCT_DEFINITION_CONTEXT('part definition',#1,'design');\n#7=PRODUCT_DEFINITION('design','',#5,#6);
+#8=PRODUCT_DEFINITION_SHAPE('','',#7);\n#9=(LENGTH_UNIT()NAMED_UNIT(*)SI_UNIT(.MILLI.,.METRE.));
+#10=(NAMED_UNIT(*)PLANE_ANGLE_UNIT()SI_UNIT($,.RADIAN.));\n#11=(NAMED_UNIT(*)SI_UNIT($,.STERADIAN.)SOLID_ANGLE_UNIT());
+#12=UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-07),#9,'distance_accuracy_value','');
+#13=(GEOMETRIC_REPRESENTATION_CONTEXT(3)GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((#12))GLOBAL_UNIT_ASSIGNED_CONTEXT((#9,#10,#11))REPRESENTATION_CONTEXT('',''));
+#14=COORDINATES_LIST('',4,((0.,0.,0.),(10.,0.,0.),(0.,10.,0.),(0.,0.,10.)));
+#15=TRIANGULATED_FACE('',#14,4,(),$,(1,2,3,4),((1,3,2),(1,2,4),(2,3,4),(1,4,3)));
+#16=TESSELLATED_SOLID('',(#15),$);\n#17=TESSELLATED_SHAPE_REPRESENTATION('',(#16),#13);\n#18=SHAPE_DEFINITION_REPRESENTATION(#8,#17);
+ENDSEC;\nEND-ISO-10303-21;\n";
+
+#[test]
+fn refuses_tessellated_only_step_as_tessellated_only() {
+    let options = ImportOptions { precision: 1e-4, max_tolerance: 0.1, heal: true, sew: true };
+    let imported = import_step(TESSELLATED_STEP, options).unwrap();
+    assert_eq!(imported["error"], json!("tessellated_only"), "{imported}");
+}
+
 #[test]
 fn imports_its_own_step_export() {
     let text = crate::export_step(&[&unit_box()]).unwrap().unwrap();
