@@ -679,6 +679,7 @@ dependencies = [
  "e57",
  "las",
  "libm",
+ "llull-bvh",
  "llull-protocol",
  "rayon",
  "serde",

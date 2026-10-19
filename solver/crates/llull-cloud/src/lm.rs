@@ -111,7 +111,9 @@ mod tests {
         let ys: Vec<f64> = xs.iter().map(|x| 2.0 * x + 1.0 + if (*x as i32) % 2 == 0 { 0.1 } else { -0.1 }).collect();
         let f = |q: &[f64]| xs.iter().zip(&ys).map(|(x, y)| q[0] * x + q[1] - y).collect::<Vec<f64>>();
         let fit = minimise(&f, &[0.0, 0.0], 50);
-        assert!((fit.params[0] - 2.0).abs() < 1e-3 && (fit.params[1] - 1.0).abs() < 2e-2);
+        // Exact least squares: slope 2 + cov(x, e) / var(x) = 2 − 0.05 / 33.25, intercept 1 + 9.5 · 0.05 / 33.25.
+        assert!((fit.params[0] - (2.0 - 0.05 / 33.25)).abs() < 1e-9, "{:?}", fit.params);
+        assert!((fit.params[1] - (1.0 + 9.5 * 0.05 / 33.25)).abs() < 1e-9, "{:?}", fit.params);
         let cov = fit.covariance.unwrap();
         assert!(cov[0][0] > 0.0 && cov[1][1] > cov[0][0]);
     }

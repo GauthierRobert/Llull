@@ -141,6 +141,11 @@ fn refine(points: &[Vec3], model: &Cylinder) -> (Cylinder, crate::lm::LmResult, 
     (build(&fit.params), fit, (u, w))
 }
 
+/// LM refinement of `start` on all `points` (no RANSAC, no re-selection): the deviation report's refit of a design pipe (§5.9).
+pub fn refine_cylinder(points: &[Vec3], start: &Cylinder) -> Cylinder {
+    refine(points, start).0
+}
+
 /// Fits one cylinder to `points` (document frame, metres).
 /// @failure < 30 points -> SCN_FIT_TOO_FEW_POINTS; no model with ≥ 20 % inliers -> SCN_FIT_NO_MODEL
 pub fn fit(points: &[Vec3], settings: &FitSettings) -> CloudResult<CylinderFit> {

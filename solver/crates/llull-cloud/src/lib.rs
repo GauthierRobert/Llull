@@ -9,6 +9,8 @@
 
 pub mod asset;
 pub mod cloud;
+pub mod compare;
+pub mod distance;
 pub mod error;
 pub mod fit;
 pub mod job;

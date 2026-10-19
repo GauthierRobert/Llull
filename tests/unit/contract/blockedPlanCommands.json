@@ -557,22 +557,10 @@
       "check_review",
       "create_clash_issues"
     ],
-    "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-01-import-e57-las.json": [
-      "check_point_clouds"
-    ],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-02-pipe-extraction.json": [
-      "check_point_clouds",
       "trace_pipe_centreline"
     ],
-    "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-03-registration.json": [
-      "check_point_clouds"
-    ],
-    "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-04-deviation-clash.json": [
-      "check_asbuilt_clash",
-      "cloud_to_model_deviation"
-    ],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-05-steel-section.json": [
-      "check_point_clouds",
       "fit_steel_member"
     ]
   }

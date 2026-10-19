@@ -10,6 +10,7 @@ publish.workspace = true
 e57 = "0.11"
 las = { version = "0.11", features = ["laz"] }
 libm = "0.2"
+llull-bvh = { path = "../llull-bvh" }
 llull-protocol = { path = "../llull-protocol" }
 rayon.workspace = true
 serde.workspace = true

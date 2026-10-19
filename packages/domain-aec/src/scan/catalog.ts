@@ -9,6 +9,8 @@ import { computeRegistration } from './registrationQuery';
 import { extractPipes, fitPrimitive } from './fitCommands';
 import { sliceCloud } from './sliceCommand';
 import { acceptAsbuiltExtraction, commitAsbuiltExtraction } from './extractionCommands';
+import { checkAsbuiltClash, cloudToModelDeviation } from './compareCommands';
+import { checkPointClouds } from './checkCommand';
 
 export const scanCommands = commandCatalog(
   attachPointCloud,
@@ -29,4 +31,7 @@ export const scanCommands = commandCatalog(
   extractPipes,
   commitAsbuiltExtraction,
   acceptAsbuiltExtraction,
+  cloudToModelDeviation,
+  checkAsbuiltClash,
+  checkPointClouds,
 );

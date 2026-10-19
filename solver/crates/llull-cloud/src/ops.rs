@@ -12,6 +12,8 @@
 //! Errors: `SCN_*` codes of the op, `SCN_ASSET_MISSING`, `SCN_QUERY_LIMIT` (a region above `maxPoints`), `NATIVE_JOB_INPUT`.
 
 use crate::cloud::Vec3;
+use crate::compare::{clash, deviation, ClashSettings, DeviationSettings};
+use crate::distance::{Entity, EntitySpec};
 use crate::error::{CloudError, CloudResult};
 use crate::fit::{self, FitSettings};
 use crate::job::read_json;
@@ -213,6 +215,46 @@ fn run_kind(job: &OpJob) -> CloudResult<Value> {
             let points = clouds[0].points(&params.region, max_points)?;
             let result = slice(&points, &params).ok_or_else(|| CloudError::input("params.normal must not be zero"))?;
             Ok(serde_json::to_value(result).unwrap_or(Value::Null))
+        }
+        "deviation" | "clash" => {
+            let clouds = open(&job.clouds, 1)?;
+            let specs: Vec<EntitySpec> = param(p, "entities")?;
+            let entities: Vec<Entity> = specs.iter().map(Entity::prepare).collect();
+            if entities.is_empty() || entities.iter().any(|e| !e.low.iter().all(|v| v.is_finite())) {
+                return Err(CloudError::input("params.entities needs at least one entity with a primitive"));
+            }
+            let reach: f64 = if job.kind == "deviation" {
+                param(p, "maxDistance")?
+            } else {
+                let clearance: f64 = param(p, "clearance")?;
+                clearance.max(optional(p, "searchDistance", 1.0)?)
+            };
+            let (mut low, mut high) = ([f64::INFINITY; 3], [f64::NEG_INFINITY; 3]);
+            for e in &entities {
+                for a in 0..3 {
+                    low[a] = low[a].min(e.low[a] - reach);
+                    high[a] = high[a].max(e.high[a] + reach);
+                }
+            }
+            let points = clouds[0].points(&Region::Box { min: low, max: high }, max_points)?;
+            if job.kind == "deviation" {
+                let settings = DeviationSettings {
+                    max_distance: reach,
+                    threshold: param(p, "threshold")?,
+                    signed: optional(p, "signed", true)?,
+                    bins: optional(p, "histogramBins", 20)?,
+                };
+                let stats = deviation(&points, &entities, &settings);
+                return Ok(json!({ "entities": stats, "pointsInRange": points.len() }));
+            }
+            let settings = ClashSettings {
+                clearance: param(p, "clearance")?,
+                min_points: optional(p, "minPointsInVolume", 10)?,
+                search_distance: optional(p, "searchDistance", 1.0)?,
+            };
+            let exclude: Vec<Option<f64>> = optional(p, "exclude", vec![None; entities.len()])?;
+            let (results, spacing) = clash(&points, &entities, &exclude, &settings);
+            Ok(json!({ "results": results, "spacing": spacing, "samplingBound": spacing / 2.0, "pointsInRange": points.len() }))
         }
         other => Err(CloudError::input(format!("unknown op kind '{other}'"))),
     }

@@ -91,6 +91,86 @@ describe('scan extraction on llull-compute', () => {
   });
 });
 
+describe('scan comparison on llull-compute', () => {
+  native('DEV-A deviation (VC-SCN-41, 42) and CLH-A clash (VC-SCN-43, 52) on pipe runs', async () => {
+    const dev = TRUTH['DEV-A'] as { expected: Record<string, number>; tolerance: { meshSagitta_m_at_64_segments: number } };
+    const { doc: withCloud, cloudId } = await attach(metres(), 'synthetic/clh-a.csv');
+    const designed = execute(
+      withCloud,
+      'add_pipe_run',
+      {
+        points: [
+          [0, -0.025, 0],
+          [2, -0.025, 0],
+        ],
+        dn: 200,
+        diameter: 0.2191,
+      },
+      ctx,
+    );
+    const pipeId = designed.affected[0];
+    const analytic = execute(
+      designed.document,
+      'cloud_to_model_deviation',
+      { cloudId, entityIds: [pipeId], maxDistance: 0.1, threshold: 0.01 },
+      ctx,
+    );
+    expect(analytic.rejected, analytic.summary).toBeUndefined();
+    const row = (analytic.data as { results: Record<string, number>[] }).results[0] ?? {};
+    expect(Math.abs((row['max'] ?? 0) - (dev.expected['signedDistanceMax_m'] ?? 0))).toBeLessThanOrEqual(1e-6);
+    expect(Math.abs((row['min'] ?? 0) - (dev.expected['signedDistanceMin_m'] ?? 0))).toBeLessThanOrEqual(1e-6);
+    expect(Math.abs((row['rms'] ?? 0) - (dev.expected['rmsDistance_m'] ?? 0))).toBeLessThanOrEqual(1e-6);
+    expect(row['fractionBeyondThreshold']).toBe(dev.expected['pointsBeyond10mm_fraction']);
+    expect(Math.abs((row['fittedAxisOffset'] ?? 0) - 0.025)).toBeLessThanOrEqual(1e-5);
+    const meshed = execute(
+      designed.document,
+      'cloud_to_model_deviation',
+      { cloudId, entityIds: [pipeId], model: 'tessellated', segments: 64, maxDistance: 0.1, threshold: 0.01 },
+      ctx,
+    );
+    const meshRow = (meshed.data as { results: Record<string, number>[] }).results[0] ?? {};
+    const bound = dev.tolerance.meshSagitta_m_at_64_segments;
+    expect(meshRow['modelErrorBound']).toBeCloseTo(bound, 12);
+    expect(Math.abs((meshRow['max'] ?? 0) - (row['max'] ?? 0))).toBeLessThanOrEqual(bound);
+    expect(Math.abs((meshRow['min'] ?? 0) - (row['min'] ?? 0))).toBeLessThanOrEqual(bound);
+
+    const clh = TRUTH['CLH-A'] as { designs: { designAxisOffset_m: number[]; minGap_m: number; status: string; tolerance_m: number }[] };
+    let doc = withCloud;
+    const ids: string[] = [];
+    for (const design of clh.designs) {
+      const [, , z] = design.designAxisOffset_m;
+      const added = execute(
+        doc,
+        'add_pipe_run',
+        {
+          points: [
+            [0, 0, z],
+            [2, 0, z],
+          ],
+          dn: 150,
+          diameter: 0.1683,
+        },
+        ctx,
+      );
+      doc = added.document;
+      ids.push(added.affected[0] ?? '');
+    }
+    const clash = execute(doc, 'check_asbuilt_clash', { cloudId, entityIds: ids, clearance: 0.075 }, ctx);
+    const data = clash.data as {
+      results: { status: string; minGap: number }[];
+      reviewRequired: { value: boolean };
+      minPointsInVolume: { defaulted: boolean };
+    };
+    data.results.forEach((result, i) => {
+      const design = clh.designs[i];
+      expect(result.status).toBe(design?.status);
+      expect(Math.abs(result.minGap - (design?.minGap_m ?? 0))).toBeLessThanOrEqual(design?.tolerance_m ?? 0);
+    });
+    expect(data.reviewRequired.value).toBe(true);
+    expect(data.minPointsInVolume.defaulted).toBe(true);
+  });
+});
+
 describe('scan registration on llull-compute', () => {
   native('registers TGT-A by sphere targets and places the moving station (VC-SCN-31)', async () => {
     const truth = TRUTH['TGT-A'] as {
