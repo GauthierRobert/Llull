@@ -595,3 +595,60 @@ Same numbering as FUNCTIONAL_SPEC §11 ([R1]–[R27]); additionally:
   `src/ModelingAlgorithms/TKTopAlgo/BRepBuilderAPI/BRepBuilderAPI_Sewing.hxx` — https://github.com/Open-Cascade-SAS/OCCT (accessed 2026-10)
 - [R13] opencascade.js v1.1.1 — README "Current OCCT version: V7_4_0p1"; `dist/Supported APIs.md` (binding status per class) — https://github.com/donalffons/opencascade.js/tree/v1.1.1 ; npm metadata (latest 1.1.1, published 2020-09-27, LGPL-2.1-only) — https://registry.npmjs.org/opencascade.js (accessed 2026-10)
 - llull internal: `docs/decisions/KI5-shape-kernel-boundary.md`, `docs/decisions/KI6-desktop-app-cli-first.md`, `.claude/rules/architecture.md`.
+
+## 13. Implementation status (AERO-5, 2026-10-19)
+
+Built: **M0, M1, M2, M3** (M4 and later are not started). Everything below is automated (`tests/unit/surface/`, `tests/unit/aero/surfacing/`,
+`tests/golden/` plans `surface_nurbs_curves`, `aero_naca_trap_wing`, `aero_tr1208`).
+
+### 13.1 What exists
+
+| Piece | Where | Notes |
+| --- | --- | --- |
+| NURBS math (TR-SRF-01) | `packages/core/src/lib/nurbs/` (`basis`, `knotVector`, `evaluate`, `edit`, `interpolate`, `conic`, `curvature`, `integrate`, `bandSolve`) | A2.1–A2.3, A4.2 rational derivatives, A5.1 knot insertion, degree elevation (collocation at the Greville points of the raised knot vector, exact to about 1e-13), global interpolation A9.1 with optional end tangents (banded LU with pivoting; 10 000 points in about a second), conics, curvature / torsion / dκ/ds, Gauss–Legendre arc length and area integrals |
+| Entity kind `nurbs_curve` (TR-SRF-02) | `model/types.ts` (`NurbsCurveEntity`), `model/curveKinds.ts` (`CURVE_KINDS`, `isCurve3D`), `geometry/nurbsCurve.ts`, `commands/persistence/nurbsGuard.ts`; render branches `src/ui/viewport/3d/entities/NurbsCurveLine.tsx` (3D and 2D views) and the `render_view` stroke | bounds, scale, `find_entities`, save / load validation; codegen and the Manifold kernel treat it as "no solid" |
+| Core commands (`commands/surface/`) | `create_nurbs_curve`, `interpolate_curve`, `create_conic`, `edit_nurbs` (move_pole, set_weight, insert_knot, elevate_degree, reverse), `inspect_nurbs`, `analyze_curve_curvature` | stable `SRF_*` refusal codes with param paths; listed in toolset `3d` |
+| Loft v3 (TR-SRF-03) | `LoftEntity.sections`; `geometry/sectionChain.ts` (Bézier extraction + closing edge, dense ring fallback); `loft_sections` accepts `nurbs_curve` ids; `server/src/native/kernelLeaves.ts` `loftChains` sends the exact chains to the native kernel instead of the 24-point Catmull-Rom rings | the `SECTION_RING_POINTS` resampling no longer applies to NURBS sections (it still applies to sketches and inline sections) |
+| `AeroModel` + plugin `surfacing` (TR-SRF-05) | `model/aero.ts`, `CadDocument.aero`, `packages/domain-aero/src/surfacing/` (toolset `aerodynamics`) | `doc.aero.{airfoils,wings}` validated on load (`aeroDocument`) |
+| Airfoils (TR-SRF-04) | `airfoil_from_naca`, `import_airfoil` (Selig / Lednicer text, sha256, normalisation, self-intersection and TE-gap checks), `airfoil_properties` | NACA 4-digit and the 230 5-digit mean line; cubic centripetal interpolation through every ordinate |
+| Wings | `create_wing` (sections or planform, sweep at a chord fraction, dihedral, twist about the twist axis, mirror), `wing_properties` | wing id = id of the right-half loft solid |
+
+### 13.2 Validation cases automated
+
+| VC | Result |
+| --- | --- |
+| VC-SRF-01, 02 | `airfoil_from_naca` curves pass through all 161 ordinates of `data/naca_{0012,0012_closed_te,2412,23012}_selig_81.csv` within 1e-7 chord (the pinned UIUC files are not vendored, D7; the pack's own CSVs are the reference); the 0012 curve stays within 2e-6 chord of the analytic section between the ordinates |
+| VC-SRF-03, 04 | Selig and Lednicer parsing, chord normalisation of a rotated / scaled / translated file, raw points + sha256 kept; the UIUC files themselves are not fetched (no fixture script) |
+| VC-SRF-05 (curve part), 06 | circle κ = 1/R, y = x³ inflection dκ/ds = 6 (planar and generic form), helix κ and τ closed forms |
+| VC-SRF-07 | conic weights and shoulder points vs `data/conic_cases.json`, exact unit quarter circle |
+| VC-SRF-08 | knot insertion, degree elevation, interpolation: shape change < 1e-12 (insertion) / 1e-11 (elevation), interpolation residual < 1e-12 |
+| VC-SRF-09 | NACA 0012: tMax 0.1200345 at 0.2998, TE 0.00252, r_LE 0.015653 (limit 0.015867 ± 5e-4), area 0.08221 |
+| VC-SRF-10 | `plans/target_tr1208_wing.json` runs unchanged: area 2024.35 in², MAC 16.670 in, AR 8.000, yMAC 27.792 |
+| VC-SRF-11 | `plans/target_naca0012_trap_wing.json` runs unchanged: half-wing volume 0.959117 m³ (formula path of `wing_properties`, 1e-4 rel) and the plan's `mass_properties` step (mesh fallback of the exact loft) within 0.5 % |
+| VC-SRF-28 | sweep 0 → 30° of a constant-chord wing: area unchanged, LE / c/4 / TE sweep 30° |
+| VC-SRF-31 (partly) | `AERO_NACA_DESIGNATION_UNKNOWN`, `AERO_SPAN_NOT_INCREASING`, `AERO_AIRFOIL_TE_GAP`, plus the other codes of §7.1 that belong to built commands |
+| VC-SRF-32 (partly) | `unverified` / UNVERIFIED on imported airfoils without a pinned hash, propagated to `airfoil_properties` and `wing_properties` |
+| VC-SRF-19 | `is pure` per command, tool-schema snapshot updated, golden plans with replay equality |
+
+### 13.3 Decisions and deviations from this spec
+
+| Item | Decision |
+| --- | --- |
+| D1 | `isCurve3D` built; **`isSheet` is not**: no sheet kind exists yet (`nurbs_surface` and open lofts are M5), a predicate without a user would be dead code. Solid-only commands already ignore curves (no triangles, no volume) |
+| D2 | as proposed: algorithms in `lib/nurbs`, entity-aware wrappers in `geometry/nurbsCurve.ts` and `geometry/sectionChain.ts`. `NurbsCurveData` lives in `lib/nurbs/types.ts` (lib may not import model); there is no `model/nurbs.ts` |
+| D3 | persistence stays at v3, no bump: the new kind is registered in the persistence kind set and older readers already reject unknown kinds |
+| D6 | raw airfoil points are stored, capped at 2000 points (the spec said 10 000) |
+| D8 | only the 230 mean line is enabled (transcription of the other constants from TM 4741 is still TBD) |
+| `periodic` | curves are clamped and non-periodic (`NurbsCurveData` has no `periodic` flag); a closed curve repeats its end pole |
+| toolsets | no new `surface` / `aero` toolset: every new toolset needs a design-language example (`tests/unit/design/examples.test.ts`), so the surface commands are listed in `3d` and the plugin in `aerodynamics` |
+| derived entities | the airfoil curve and the wing lofts are ordinary saved entities referenced by `doc.aero` (the pattern of the `fasteners` plugin), not read-only re-derived geometry: there is no derivation guard and no `edit_wing` yet, so editing a loft by hand leaves `doc.aero` stale |
+| `airfoil_from_naca` | `trailingEdge` defaults to `open`; `points` is the total odd count (161 = 81 stations per surface); no `chord` / `plane` params (the curve is chord 1 at `position`, the wing scales it); the fit is the cubic centripetal interpolation of the generated ordinates, not the "densify to 401 then approximate to 1e-7" scheme (`approximate_curve` is not built) |
+| `create_wing` | `tip` accepts only `flat` (open / round tips need the kernel sheet ops of M5); `mirror` creates the left half as a second solid, not fused; every airfoil of a wing needs the same `points` count and trailing-edge type (`AERO_SECTIONS_INCOMPATIBLE`), because the exact skin needs equal edge counts; no guides or end conditions; `wing_properties` has no `wettedArea` (needs the kernel) |
+| wing id | `create_wing` returns the right-half solid id as the wing id, so the same `$wing` alias works for `mass_properties` and `wing_properties` in the pack plans |
+| `loft_sections` | exact sections need degree 1..3 non-rational curves with equal span counts; sections are not re-aligned (the start of each curve is its seam) |
+| camber | `airfoil_properties.camberMax` is measured against the section frame's x axis (the NACA definition: 0.0200 for 2412), not against the LE–TE chord line |
+
+### 13.4 Not built, and why
+
+- **Rust side and kernel tests.** `kernelLeaves.ts` sends `chains` built from the exact sections (cubic Bézier spans + a line for an open trailing edge) through the existing `loft` payload, so the sidecar needs no change; but nothing was run against the real `llull-kernel` (no `cargo` and no binary in the agent's worktree). The `server/tests/` integration tests for VC-SRF-11 (OCC volume 0.959117) and VC-SRF-22 (section fidelity) are therefore **not written**; they are the first thing to add when the binary is available. The legacy WASM `kernel-occt` path still skins `rings`.
+- M4 (`analyze_surface_curvature`, `check_continuity`, `measure_deviation`, `analyze_draft`, overlays), M5 (surface toolkit, Gordon, `nurbs_surface`, `isSheet`), M6 (`loft_fuselage`, `set_aircraft_frame`), M7, `approximate_curve`, `surface_from_points`, `check_surface_quality` and waivers, `import_openvsp_wing`, `edit_wing`, the UIUC fixture fetch script (VC-SRF-03/04 on the real files), the CRM quality gate (VC-SRF-12) and the code-export lowering of lofts with exact sections (VC-SRF-30).

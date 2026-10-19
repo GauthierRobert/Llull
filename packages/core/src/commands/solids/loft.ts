@@ -7,6 +7,7 @@ import { centroid3, distance3, dot3, sub3 } from '../../lib/vec3';
 import { newEntity } from '../entity/newEntity';
 import { DEFAULT_SOLID_COLOR, commitSolid, existingLayerOrDefault, solidStyleFields, explicitIdTaken } from './shared';
 import { sketchLoop } from './sketchCurves';
+import { allNurbsCurves, exactLoft } from './loftExact';
 import { type SectionSpec, sectionSpecFields, specPolygon } from './sectionSpecs';
 import { alignRing, resampleRing } from '../../geometry/sectionRing';
 import { ringNormal } from '../../geometry/skin';
@@ -86,7 +87,10 @@ export const loftSections = defineCommand({
     'an XY-plane section), and one of radius, radiusX+radiusY, section points or sectionId). ' +
     'Sections are resampled to the same point count and aligned so the surface does not twist; ' +
     'ruled: false (default) blends smoothly through all sections, ruled: true joins neighbours with ' +
-    'straight lines. Kept exact for the OCC kernel and STEP export (B-spline skin through the sections).',
+    'straight lines. Kept exact for the OCC kernel and STEP export (B-spline skin through the sections). ' +
+    'EXACT SECTIONS: when sectionIds are all nurbs_curve entities (create_nurbs_curve, interpolate_curve, airfoil_from_naca ...) every section ' +
+    'is lofted as the curve it is - not resampled to 24 points, a sharp trailing edge stays sharp - and a straight edge closes an open ' +
+    'curve; all curves need degree 1..3, no weights, the same number of knot spans and the same start point/orientation convention.',
   params: z.object({
     sectionIds: z
       .array(z.string())
@@ -108,6 +112,8 @@ export const loftSections = defineCommand({
   run: (doc, { sectionIds, sections, ruled = false, layerId, color = DEFAULT_SOLID_COLOR, id: explicitId }): CommandResult => {
     const fail = failer(doc, 'loft_sections');
     if (explicitIdTaken(doc, explicitId)) return fail(`entity id "${explicitId}" already exists`);
+    if (sectionIds !== undefined && sections === undefined && allNurbsCurves(doc, sectionIds))
+      return exactLoft(doc, sectionIds, ruled, { layerId, color, id: explicitId }, MAX_LOFT_SECTIONS);
     const placed = placedSections(doc, sectionIds, sections);
     if (typeof placed === 'string') return fail(placed);
     const world = loftRingsOf(placed);

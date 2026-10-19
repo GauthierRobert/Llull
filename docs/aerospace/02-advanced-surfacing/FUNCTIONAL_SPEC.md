@@ -1,6 +1,6 @@
 # SRF — Advanced freeform surfacing & aerodynamic geometry — Functional specification
 
-Gap id: **SRF** · Folder: `docs/aerospace/02-advanced-surfacing/` · Status: specification only (2026-10-15) ·
+Gap id: **SRF** · Folder: `docs/aerospace/02-advanced-surfacing/` · Status: specification (2026-10-15); M0–M3 built, see TECHNICAL_SPEC §13 ·
 Depends on: **01 KRN** (exact B-rep on desktop OCC, persistent naming) · Feeds: **06 CMP** (ply surfaces),
 **05 FEA** (mid-surfaces), **04 XCH** (B-spline faces in STEP AP242).
 

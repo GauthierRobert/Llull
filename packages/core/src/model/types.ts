@@ -11,10 +11,14 @@ import type { DynamicsModel } from './dynamics';
 import type { PrototypeModel } from './prototype';
 import type { CurveSegment } from './curve';
 import type { FastenerModel, PartRef } from './fasteners';
+import type { AeroModel } from './aero';
+import type { DocumentKernelSettings } from './documentKernelSettings';
 import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary';
 import type { ReliabilityModel } from './probabilistic';
 import type { SheetMetalModel } from './sheetMetal';
 import type { FeatureParams } from './features';
+import type { NurbsCurveData } from '../lib/nurbs/types';
+import type { CurveKind } from './curveKinds';
 
 /** Re-exported: every model consumer reads its vectors from here. */
 export type { Vec2, Vec3 };
@@ -60,7 +64,7 @@ export const SHAPE2D_KINDS = [
 
 export type Shape2DKind = (typeof SHAPE2D_KINDS)[number];
 
-export type EntityKind = SolidKind | Shape2DKind | 'instance';
+export type EntityKind = SolidKind | Shape2DKind | CurveKind | 'instance';
 
 export interface BaseEntity {
   readonly id: EntityId;
@@ -249,6 +253,12 @@ export interface LoftEntity extends BaseEntity {
   readonly kind: 'loft';
   rings: ReadonlyArray<ReadonlyArray<Vec3>>;
   ruled: boolean;
+  /**
+   * Exact sections (loft v3, local to `position`): one open cubic curve per section, closed by a straight edge when its ends differ. The
+   * exact kernel skins them unresampled; `rings` is then only the dense display / Manifold fallback sampled from them.
+   * @invariant one per ring; equal Bézier span counts and closing-edge status
+   */
+  sections?: ReadonlyArray<NurbsCurveData>;
 }
 
 /**
@@ -319,6 +329,16 @@ export interface SplineEntity extends BaseEntity {
   /** Minimum 2 points. */
   points: ReadonlyArray<Vec2>;
   closed: boolean;
+}
+
+/**
+ * Clamped NURBS curve in 3D; poles are local to `position` / `rotation`.
+ * @invariant `nurbsViolation(curve) === null`
+ * @see create_nurbs_curve, interpolate_curve, create_conic, edit_nurbs
+ */
+export interface NurbsCurveEntity extends BaseEntity {
+  readonly kind: 'nurbs_curve';
+  curve: NurbsCurveData;
 }
 
 /** Annotation anchored at `position`. */
@@ -405,6 +425,7 @@ export type Entity =
   | PointEntity
   | EllipseEntity
   | SplineEntity
+  | NurbsCurveEntity
   | TextEntity
   | DimensionEntity
   | ImageEntity
@@ -661,28 +682,15 @@ export interface CadDocument {
   materialLibraries?: Record<string, MaterialLibraryEntry>;
   /** Absent until the first fastener command (plugin `fasteners`, 08 MAT M5). */
   fasteners?: FastenerModel;
+  /** Absent until the first airfoil or wing command (plugin `surfacing`, 02 SRF). */
+  aero?: AeroModel;
   /** Absent until the first sheet-metal command (plugin `sheetmetal`, 07 FTR M3). */
   sheetMetal?: SheetMetalModel;
   /** Absent until the first probabilistic command (`define_random_variable`; plugin `cae`, PHY-18). */
   probabilistic?: ReliabilityModel;
 }
 
-/** Kernel provenance and modelling tolerance of a document (aerospace 01 KRN, TR-KRN-11/61). */
-export interface DocumentKernelSettings {
-  readonly kernel: 'occt' | 'manifold';
-  /** e.g. "7.4.0p1"; stamped on save from the active kernel. */
-  readonly occtVersion?: string;
-  /** Binary identity of the kernel, e.g. "llull-kernel@0.1.0". */
-  readonly build?: string;
-  readonly modelingTolerance: {
-    /** mm; default 1e-4; range [1e-7, 1e-2]. Heal / sew / import precision. */
-    readonly linear: number;
-    /** rad; default 1e-9. */
-    readonly angular: number;
-    /** mm; default 0.01. Sub-shape tolerances above it raise KRN_IMPORT_TOLERANCE_HIGH. */
-    readonly maxImportTolerance: number;
-  };
-}
+export type { DocumentKernelSettings };
 
 /**
  * Content-addressed payload referenced by `brep` recipe leaves.

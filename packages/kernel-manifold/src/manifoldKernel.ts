@@ -15,6 +15,7 @@ import type { ShapeAnalysis, ShapeDistance } from '@core/geometry/kernel';
 import { buildMeshBvh, bvhMinDistance } from '@core/geometry/meshBvh';
 import { kernelFromOps, type CachingKernel, type KernelOps } from '@core/geometry/shapeKernel';
 import { type Entity, createEmptyDocument, is2D } from '@core/model/types';
+import { isCurve3D } from '@core/model/curveKinds';
 import { orientOutward, soupIndices } from '@core/geometry/meshVolume';
 import { entityTrianglePositions } from '@core/geometry/entityTriangles';
 import { toCounterClockwise } from '@lib/polygon';
@@ -168,7 +169,7 @@ function primitiveOf(m: ManifoldModule, entity: PrimitiveEntity): ManifoldShape 
 }
 
 function entityToManifold(m: ManifoldModule, entity: Entity): ManifoldShape | null {
-  if (is2D(entity)) return null;
+  if (is2D(entity) || isCurve3D(entity)) return null;
   switch (entity.kind) {
     case 'mesh':
       return weldedManifold(m, entity.mesh.positions, entity.mesh.indices, entity);
