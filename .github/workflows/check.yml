@@ -81,6 +81,53 @@ jobs:
       - run: node desktop/scripts/prepare-native.mjs
       - run: ldd desktop/build/native/llull-kernel && ! ldd desktop/build/native/llull-kernel | grep 'not found'
 
+  # The desktop native bundle on macOS and Windows: OCCT 7.9.2 shared (cached per OS), llull-compute + llull-kernel, prepare-native.mjs
+  # (which runs both bundled binaries with --version), then the native kernel parity suite against the bundle itself.
+  native-bundle:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    env:
+      LLULL_OCCT_DIR: ${{ github.workspace }}/occt-7.9.2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - uses: actions/cache@v4
+        id: occt
+        with:
+          path: occt-7.9.2
+          key: occt-7.9.2-f6e272b6-${{ runner.os }}-${{ hashFiles('solver/scripts/build-occt.mjs') }}
+      - name: Build OCCT 7.9.2 shared (cache miss only)
+        if: steps.occt.outputs.cache-hit != 'true'
+        run: node solver/scripts/build-occt.mjs
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: native-bundle-${{ runner.os }}-${{ hashFiles('solver/Cargo.lock', 'solver/rust-toolchain.toml') }}
+      - run: rustup toolchain install
+        working-directory: solver
+      - run: node desktop/scripts/prepare-native.mjs
+      - run: npm ci
+      - run: npm --prefix server ci
+      - run: npx vitest run --config vitest.config.mts tests/nativeKernelParity.test.ts tests/nativeKernel.test.ts tests/nativeBinary.test.ts
+        working-directory: server
+        env:
+          LLULL_REQUIRE_NATIVE_KERNEL: '1'
+          LLULL_NATIVE_DIR: ${{ github.workspace }}/desktop/build/native
+
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 30
