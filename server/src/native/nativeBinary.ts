@@ -12,8 +12,15 @@ export type NativeBinary = 'llull-compute' | 'llull-kernel';
 
 const OVERRIDE_VARIABLE: Readonly<Record<NativeBinary, string>> = { 'llull-compute': 'LLULL_COMPUTE', 'llull-kernel': 'LLULL_KERNEL_BIN' };
 
-/** Repo root seen from `server/src/native` (source) or `server/dist/native` (build): two levels above `server/`. */
-const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
+/**
+ * Repo root: the nearest ancestor holding `solver/Cargo.toml`, whether this module runs from `server/src/native` (source),
+ * `server/dist/native` (build) or inside the CLI bundle `server/dist/llull-cli.cjs`; else two levels above `server/` (packaged app).
+ */
+const REPO_ROOT = ((): string => {
+  for (let dir = path.dirname(__dirname); dir !== path.dirname(dir); dir = path.dirname(dir))
+    if (existsSync(path.join(dir, 'solver', 'Cargo.toml'))) return dir;
+  return path.resolve(__dirname, '..', '..', '..');
+})();
 
 function executableName(binary: NativeBinary, platform: NodeJS.Platform): string {
   return platform === 'win32' ? `${binary}.exe` : binary;
