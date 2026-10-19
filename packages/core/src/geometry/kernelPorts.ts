@@ -15,7 +15,8 @@ export interface KernelInfo {
   readonly build?: string;
   /** Optional capabilities present: 'topology', 'analyze', 'distance', 'massProperties', 'importShapes', 'faceQuery', 'brepBlobs', 'exportStep'. */
   readonly capabilities: readonly string[];
-  readonly isolation?: 'worker' | 'in-process';
+  /** How the host runs the kernel: a worker thread, the host process itself, or a separate OS process (native sidecar, RS-1). */
+  readonly isolation?: 'worker' | 'in-process' | 'process';
   /** Set when the exact kernel failed to start and a fallback kernel is active. */
   readonly fallbackReason?: string;
 }
