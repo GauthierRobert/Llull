@@ -6,7 +6,10 @@
       "create_wing",
       "wing_properties"
     ],
-    "docs/aerospace/02-advanced-surfacing/validation/plans/target_sears_haack_conic_fuselage.json": ["loft_fuselage", "set_aircraft_frame"],
+    "docs/aerospace/02-advanced-surfacing/validation/plans/target_sears_haack_conic_fuselage.json": [
+      "loft_fuselage",
+      "set_aircraft_frame"
+    ],
     "docs/aerospace/02-advanced-surfacing/validation/plans/target_torus_surface_analysis.json": [
       "analyze_draft",
       "analyze_surface_curvature"
@@ -26,8 +29,13 @@
       "export_step_ap242",
       "set_pmi_standard"
     ],
-    "docs/aerospace/03-gdt-mbd-pmi/validation/draft_plan_gdt_rejections.json": ["add_datum_feature", "add_geometric_tolerance"],
-    "docs/aerospace/03-gdt-mbd-pmi/validation/draft_plan_stackup_su01.json": ["analyze_stackup"],
+    "docs/aerospace/03-gdt-mbd-pmi/validation/draft_plan_gdt_rejections.json": [
+      "add_datum_feature",
+      "add_geometric_tolerance"
+    ],
+    "docs/aerospace/03-gdt-mbd-pmi/validation/draft_plan_stackup_su01.json": [
+      "analyze_stackup"
+    ],
     "docs/aerospace/06-composites/validation/plans/cmp-cone-flat-pattern.json": [
       "add_ply",
       "create_composite_part",
@@ -96,11 +104,40 @@
       "fai_report_skeleton",
       "record_as_built"
     ],
-    "docs/physics/04-thermo-mechanical/validation/plans/tmc_fit_al_steel.plan.json": ["add_size_dimension", "set_pmi_standard"],
-    "docs/physics/05-nonlinear-structural/validation/plans/nls_column_imperfection.plan.json": ["add_imperfection"],
-    "docs/physics/06-contact-joints/validation/plans/cnt_pretension_bar.plan.json": ["add_bolt_pretension"],
-    "docs/physics/06-contact-joints/validation/plans/cnt_ssnp154_cylinder_block.plan.json": ["add_contact_pair"],
-    "docs/physics/09-structural-dynamics/validation/plans/dyn_beamdy8_ssd.plan.json": ["set_dynamic_damping", "set_frequency_sweep"],
+    "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-01-prepare-checks.json": [
+      "cfd_create_case",
+      "cfd_prepare"
+    ],
+    "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-02-sphere-lbm.json": [
+      "cfd_create_case"
+    ],
+    "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-03-wedge-supersonic.json": [
+      "cfd_create_case"
+    ],
+    "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-04-sphere-stagnation.json": [
+      "cfd_create_case"
+    ],
+    "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-05-winged-body-demo.json": [
+      "cfd_create_case",
+      "cfd_prepare"
+    ],
+    "docs/physics/04-thermo-mechanical/validation/plans/tmc_fit_al_steel.plan.json": [
+      "add_size_dimension",
+      "set_pmi_standard"
+    ],
+    "docs/physics/05-nonlinear-structural/validation/plans/nls_column_imperfection.plan.json": [
+      "add_imperfection"
+    ],
+    "docs/physics/06-contact-joints/validation/plans/cnt_pretension_bar.plan.json": [
+      "add_bolt_pretension"
+    ],
+    "docs/physics/06-contact-joints/validation/plans/cnt_ssnp154_cylinder_block.plan.json": [
+      "add_contact_pair"
+    ],
+    "docs/physics/09-structural-dynamics/validation/plans/dyn_beamdy8_ssd.plan.json": [
+      "set_dynamic_damping",
+      "set_frequency_sweep"
+    ],
     "docs/physics/09-structural-dynamics/validation/plans/dyn_cantilever_random_gevs.plan.json": [
       "define_vibration_spectrum",
       "set_base_excitation",
@@ -114,28 +151,46 @@
       "sdof_response",
       "shock_response_spectrum"
     ],
-    "docs/physics/11-creep-viscoelasticity/validation/plans/crp_bar_relaxation.plan.json": ["set_creep_step"],
-    "docs/physics/11-creep-viscoelasticity/validation/plans/crp_beam_stationary_bending.plan.json": ["set_creep_step"],
-    "docs/physics/11-creep-viscoelasticity/validation/plans/crp_norton_unit_cube.plan.json": ["set_creep_step"],
-    "docs/physics/11-creep-viscoelasticity/validation/plans/crp_thick_cylinder_stationary.plan.json": ["set_creep_step"],
+    "docs/physics/11-creep-viscoelasticity/validation/plans/crp_bar_relaxation.plan.json": [
+      "set_creep_step"
+    ],
+    "docs/physics/11-creep-viscoelasticity/validation/plans/crp_beam_stationary_bending.plan.json": [
+      "set_creep_step"
+    ],
+    "docs/physics/11-creep-viscoelasticity/validation/plans/crp_norton_unit_cube.plan.json": [
+      "set_creep_step"
+    ],
+    "docs/physics/11-creep-viscoelasticity/validation/plans/crp_thick_cylinder_stationary.plan.json": [
+      "set_creep_step"
+    ],
     "docs/physics/12-material-selection/validation/plans/compare_bracket_materials_proposed.json": [
       "check_material_selection",
       "compare_materials"
     ],
-    "docs/physics/12-material-selection/validation/plans/substitute_block_ti_proposed.json": ["substitute_material"],
+    "docs/physics/12-material-selection/validation/plans/substitute_block_ti_proposed.json": [
+      "substitute_material"
+    ],
     "docs/physics/13-corrosion-compatibility/validation/plans/galvanic_plate_check_proposed.json": [
       "check_material_compatibility",
       "declare_isolation",
       "find_contacts",
       "set_service_environment"
     ],
-    "docs/physics/14-moisture-outgassing/validation/plans/ao_erosion_proposed.json": ["ao_erosion"],
-    "docs/physics/14-moisture-outgassing/validation/plans/moisture_uptake_proposed.json": ["hygro_strain", "moisture_uptake"],
+    "docs/physics/14-moisture-outgassing/validation/plans/ao_erosion_proposed.json": [
+      "ao_erosion"
+    ],
+    "docs/physics/14-moisture-outgassing/validation/plans/moisture_uptake_proposed.json": [
+      "hygro_strain",
+      "moisture_uptake"
+    ],
     "docs/physics/14-moisture-outgassing/validation/plans/outgassing_check_proposed.json": [
       "check_space_environment",
       "set_mission_environment"
     ],
-    "docs/physics/15-electro-optical-properties/validation/plans/eop_bonding_paths.plan.json": ["check_bonding", "define_bond_path"],
+    "docs/physics/15-electro-optical-properties/validation/plans/eop_bonding_paths.plan.json": [
+      "check_bonding",
+      "define_bond_path"
+    ],
     "docs/physics/15-electro-optical-properties/validation/plans/eop_radiator_coating.plan.json": [
       "assign_surface_coating",
       "check_surface_properties",
@@ -146,7 +201,10 @@
       "am_build_setup",
       "set_inherent_strain"
     ],
-    "docs/physics/17-topology-optimization/validation/plans/top_mbb_60x20.plan.json": ["create_topology_study", "set_topology_settings"],
+    "docs/physics/17-topology-optimization/validation/plans/top_mbb_60x20.plan.json": [
+      "create_topology_study",
+      "set_topology_settings"
+    ],
     "docs/physics/17-topology-optimization/validation/plans/top_mbb_60x20_density.plan.json": [
       "create_topology_study",
       "set_topology_settings"
@@ -155,8 +213,13 @@
       "create_topology_study",
       "set_topology_regions"
     ],
-    "docs/physics/18-probabilistic-sensitivity/validation/plans/prb_box_mass.plan.json": ["define_response", "parameter_sensitivity"],
-    "docs/physics/18-probabilistic-sensitivity/validation/plans/prb_ishigami_sobol.plan.json": ["sensitivity_indices"],
+    "docs/physics/18-probabilistic-sensitivity/validation/plans/prb_box_mass.plan.json": [
+      "define_response",
+      "parameter_sensitivity"
+    ],
+    "docs/physics/18-probabilistic-sensitivity/validation/plans/prb_ishigami_sobol.plan.json": [
+      "sensitivity_indices"
+    ],
     "docs/physics/19-explicit-impact/validation/plans/exp_bar_rigid_wall.plan.json": [
       "add_rigid_wall",
       "add_time_history",
@@ -185,6 +248,359 @@
       "convert_acoustic_spectrum",
       "define_acoustic_exposure",
       "define_acoustic_spectrum"
+    ],
+    "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-01-catalog-lookup-mass.json": [
+      "lookup_piping_component",
+      "pipe_section_properties"
+    ],
+    "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-02-spec-resolution.json": [
+      "import_pipe_spec",
+      "resolve_branch",
+      "resolve_spec_component"
+    ],
+    "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-03-design-conditions.json": [
+      "check_pipe_spec",
+      "import_pipe_spec",
+      "pipe_wall_check",
+      "pt_rating"
+    ],
+    "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-04-spec-driven-pipe-run.json": [
+      "approve_pipe_spec",
+      "check_pipe_spec",
+      "import_pipe_spec",
+      "pipe_section_properties"
+    ],
+    "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-05-catalog-import-checks.json": [
+      "check_pipe_spec",
+      "check_piping_catalog",
+      "export_pipe_spec",
+      "import_pipe_spec",
+      "import_piping_catalog",
+      "lookup_piping_component"
+    ],
+    "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-01-pump-to-vessel.json": [
+      "add_nozzle",
+      "check_piping",
+      "create_pipeline",
+      "piping_takeoff",
+      "route_pipe"
+    ],
+    "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-02-pump-discharge-gate-valve.json": [
+      "add_nozzle",
+      "check_piping",
+      "create_pipeline",
+      "insert_inline_component",
+      "piping_takeoff",
+      "route_pipe"
+    ],
+    "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-03-header-branches.json": [
+      "add_branch",
+      "add_tie_in_point",
+      "check_piping",
+      "create_pipeline",
+      "piping_connectivity",
+      "piping_takeoff",
+      "route_pipe"
+    ],
+    "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-04-gravity-drain-slope.json": [
+      "add_tie_in_point",
+      "check_piping",
+      "create_pipeline",
+      "piping_takeoff",
+      "route_pipe"
+    ],
+    "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-05-routing-refusals.json": [
+      "add_nozzle",
+      "add_tie_in_point",
+      "check_piping",
+      "create_pipeline",
+      "route_pipe"
+    ],
+    "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-06-move-with-connected.json": [
+      "piping_takeoff"
+    ],
+    "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-07-insulated-hot-line.json": [
+      "add_tie_in_point",
+      "create_pipeline",
+      "line_heat_loss",
+      "route_pipe"
+    ],
+    "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-08-auto-route-v2.json": [
+      "add_tie_in_point",
+      "auto_route_pipe",
+      "check_piping",
+      "create_pipeline"
+    ],
+    "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-09-legacy-pipe-run-conversion.json": [
+      "check_piping",
+      "convert_pipe_run",
+      "piping_takeoff"
+    ],
+    "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-01-vertical-vessel-skirt.json": [
+      "add_nozzle",
+      "add_vessel",
+      "check_equipment",
+      "equipment_datasheet",
+      "equipment_ports",
+      "equipment_weights",
+      "vessel_thickness",
+      "vessel_volume"
+    ],
+    "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-02-horizontal-drum-saddles.json": [
+      "add_nozzle",
+      "add_vessel",
+      "check_equipment",
+      "equipment_ports",
+      "equipment_weights",
+      "update_equipment_parameters",
+      "vessel_thickness",
+      "vessel_volume"
+    ],
+    "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-03-bem-exchanger.json": [
+      "add_heat_exchanger",
+      "add_nozzle",
+      "check_equipment",
+      "equipment_ports",
+      "vessel_volume"
+    ],
+    "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-04-api650-tank.json": [
+      "add_storage_tank",
+      "check_equipment",
+      "tank_shell_thickness",
+      "vessel_volume"
+    ],
+    "docs/plant/04-pid-schematics/validation/plans/sc-pid-01-import-dexpi-reference.json": [
+      "check_pid",
+      "import_dexpi",
+      "pid_report"
+    ],
+    "docs/plant/04-pid-schematics/validation/plans/sc-pid-02-author-and-validate.json": [
+      "add_pid_actuating_system",
+      "add_pid_equipment",
+      "add_pid_inline",
+      "add_pid_instrument",
+      "add_pid_line",
+      "add_pid_signal_line",
+      "check_pid",
+      "create_pid_sheet",
+      "pid_report"
+    ],
+    "docs/plant/04-pid-schematics/validation/plans/sc-pid-03-pid-vs-3d.json": [
+      "add_pid_equipment",
+      "add_pid_inline",
+      "add_pid_line",
+      "check_pid_3d",
+      "create_pid_sheet"
+    ],
+    "docs/plant/04-pid-schematics/validation/plans/sc-pid-05-tag-parsing.json": [
+      "parse_instrument_tag"
+    ],
+    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-01-parse-sample-pcf.json": [
+      "check_isometric",
+      "cut_list",
+      "export_pcf",
+      "import_pcf",
+      "piping_bom",
+      "split_spools",
+      "spool_list",
+      "weld_list"
+    ],
+    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-02-route-to-pcf-roundtrip.json": [
+      "add_branch",
+      "add_end_flange",
+      "add_field_weld",
+      "export_pcf",
+      "import_pcf",
+      "import_pipe_spec",
+      "piping_bom"
+    ],
+    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-03-isometric-sheet.json": [
+      "export_isometric",
+      "import_pcf"
+    ],
+    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-04-sloped-line.json": [
+      "export_isometric"
+    ],
+    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-05-sheet-split.json": [
+      "add_field_weld",
+      "define_isometric",
+      "export_isometric"
+    ],
+    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-06-piping-ga.json": [
+      "export_piping_ga",
+      "import_pcf"
+    ],
+    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-07-check-errors.json": [
+      "check_isometric",
+      "import_pcf",
+      "set_fabrication_rules"
+    ],
+    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-08-supports-skew.json": [
+      "export_isometric",
+      "export_pcf"
+    ],
+    "docs/plant/06-plant-structures-access/validation/plans/sc-sta-01-caged-ladder.json": [
+      "add_ladder",
+      "check_access"
+    ],
+    "docs/plant/06-plant-structures-access/validation/plans/sc-sta-02-steel-stair.json": [
+      "add_steel_stair",
+      "check_access"
+    ],
+    "docs/plant/06-plant-structures-access/validation/plans/sc-sta-03-vessel-circular-platform.json": [
+      "add_circular_platform",
+      "check_access",
+      "platform_takeoff"
+    ],
+    "docs/plant/06-plant-structures-access/validation/plans/sc-sta-04-pipe-rack.json": [
+      "add_pipe_rack"
+    ],
+    "docs/plant/06-plant-structures-access/validation/plans/sc-sta-05-access-negative.json": [
+      "add_ladder",
+      "add_railing",
+      "check_access"
+    ],
+    "docs/plant/06-plant-structures-access/validation/plans/sc-sta-06-grating-span.json": [
+      "add_grating",
+      "check_grating",
+      "list_grating_types"
+    ],
+    "docs/plant/06-plant-structures-access/validation/plans/sc-sta-07-valve-reachability.json": [
+      "add_circular_platform",
+      "add_ladder",
+      "check_reachability"
+    ],
+    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-01-lbend-two-anchors.json": [
+      "add_stress_restraint",
+      "analyze_pipe_stress",
+      "check_pipe_stress",
+      "create_stress_model",
+      "import_pipe_material_data",
+      "set_pipe_operating_conditions",
+      "set_stress_load_cases"
+    ],
+    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-02-psi-3d-benchmark.json": [
+      "add_stress_restraint",
+      "analyze_pipe_stress",
+      "create_stress_model",
+      "import_pipe_material_data",
+      "set_pipe_operating_conditions",
+      "set_stress_load_cases"
+    ],
+    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-03-quick-checks.json": [
+      "guided_cantilever",
+      "pipe_sif",
+      "pipe_stress_allowables",
+      "thermal_growth"
+    ],
+    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-04-supports-guardrails.json": [
+      "add_stress_restraint",
+      "analyze_pipe_stress",
+      "approve_pipe_stress",
+      "check_pipe_stress",
+      "create_stress_model",
+      "import_pipe_material_data",
+      "record_pipe_stress_results",
+      "set_pipe_operating_conditions",
+      "set_stress_load_cases"
+    ],
+    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-05-springs-nozzles-export.json": [
+      "export_caesar_neutral",
+      "nozzle_load_check",
+      "pipe_stress_allowables",
+      "spring_variability"
+    ],
+    "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-01-tank-pump-mvp.json": [
+      "assign_plant_object",
+      "check_plant_data",
+      "define_plant_class",
+      "define_plant_hierarchy",
+      "plant_report"
+    ],
+    "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-02-inline-valves-v1.json": [
+      "add_nozzle",
+      "check_plant_data",
+      "define_plant_hierarchy",
+      "insert_inline_component",
+      "load_plant_class_library",
+      "plant_report",
+      "route_pipe"
+    ],
+    "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-03-data-errors.json": [
+      "assign_plant_object",
+      "check_plant_data",
+      "define_plant_hierarchy",
+      "load_plant_class_library"
+    ],
+    "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-04-excel-roundtrip.json": [
+      "export_plant_data",
+      "import_plant_data",
+      "plant_report"
+    ],
+    "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-05-ifc-summary-bsi.json": [
+      "ifc_summary"
+    ],
+    "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-01-service-colour-rules.json": [
+      "apply_service_colour_scheme",
+      "check_display",
+      "colour_by_rule_report"
+    ],
+    "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-02-viewpoint-bcf-roundtrip.json": [
+      "apply_viewpoint",
+      "export_bcf_viewpoint",
+      "get_viewpoint",
+      "import_bcf_viewpoint",
+      "save_viewpoint"
+    ],
+    "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-03-synthetic-rack-drawcalls.json": [
+      "render_stats"
+    ],
+    "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-04-section-box-markup-issue.json": [
+      "add_markup",
+      "add_review_comment",
+      "check_review",
+      "create_review_issue",
+      "save_viewpoint",
+      "section_box_report",
+      "set_issue_status",
+      "set_section_box"
+    ],
+    "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-06-clash-review.json": [
+      "check_review",
+      "create_clash_issues"
+    ],
+    "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-01-import-e57-las.json": [
+      "attach_point_cloud",
+      "check_point_clouds",
+      "describe_point_cloud",
+      "nearest_cloud_point",
+      "query_cloud_points"
+    ],
+    "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-02-pipe-extraction.json": [
+      "attach_point_cloud",
+      "check_point_clouds",
+      "commit_asbuilt_extraction",
+      "extract_pipes",
+      "fit_primitive",
+      "slice_cloud",
+      "trace_pipe_centreline"
+    ],
+    "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-03-registration.json": [
+      "apply_registration",
+      "attach_point_cloud",
+      "check_point_clouds",
+      "compute_registration"
+    ],
+    "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-04-deviation-clash.json": [
+      "attach_point_cloud",
+      "check_asbuilt_clash",
+      "cloud_to_model_deviation"
+    ],
+    "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-05-steel-section.json": [
+      "attach_point_cloud",
+      "check_point_clouds",
+      "commit_asbuilt_extraction",
+      "fit_steel_member"
     ]
   }
 }
