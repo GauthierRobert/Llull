@@ -4,7 +4,7 @@
 import { GROUND, type DynamicsModel } from '@core/model/dynamics';
 import { isRecord } from '@lib/isRecord';
 
-export type EdgeKind = 'tree' | 'loop' | 'gear';
+type EdgeKind = 'tree' | 'loop' | 'gear';
 
 export interface GraphNode {
   readonly id: string;
@@ -35,7 +35,7 @@ export interface MechanismGraphModel {
   readonly redundant: number;
 }
 
-export const GRAPH_WIDTH = 260;
+const GRAPH_WIDTH = 260;
 const LAYER_HEIGHT = 56;
 const MARGIN = 24;
 
