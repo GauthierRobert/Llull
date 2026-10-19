@@ -49,7 +49,7 @@ describe('attach_point_cloud', () => {
     const result = execute(createEmptyDocument(), 'attach_point_cloud', { assetKey: KEY_B });
     expect(result.affected).toHaveLength(1);
     expect(result.summary).toContain('not checked');
-    expect(result.document.scan?.clouds[result.affected[0] ?? '']?.name).toBe('cloud');
+    expect(result.document.scan?.clouds[result.affected[0] ?? '']?.name).toBe('scan bbbbbbbb');
   });
 
   it('places a grid cloud through the site calibration', () => {

@@ -30,7 +30,8 @@ function gridPlacement(doc: CadDocument): Mat4 | null {
 /**
  * @affects adds 1 CloudReference to doc.scan (affected: [cloudId]); no entity
  * @invariant no point is copied into the document; the id is step-scoped (`cloud-<step>.<k>`); without a port the reference is still
- *   recorded (replay without the asset gives the same document)
+ *   recorded, and nothing stored depends on the port (name, sourceSha256, display come from params), so replay without the asset gives
+ *   the same document (TR-SCN-04)
  * @failure bad key -> SCN_PARAM_INVALID; key unknown to an installed port -> SCN_ASSET_MISSING; asset already attached ->
  *   SCN_CLOUD_DUPLICATE; grid without a site calibration -> SCN_CRS_NO_CALIBRATION; non-affine transform -> SCN_PARAM_INVALID
  */
@@ -76,13 +77,13 @@ export const attachPointCloud = defineCommand({
     const id = nextId('cloud');
     const reference: CloudReference = {
       id,
-      name: name?.trim() || manifest?.sourceName || 'cloud',
+      name: name?.trim() || `scan ${assetKey.slice(0, 8)}`,
       assetKey,
-      sourceSha256: sourceSha256 ?? manifest?.sourceSha256 ?? '',
+      sourceSha256: sourceSha256 ?? '',
       placement,
       transform: placed,
       registrationId: null,
-      display: { visible: true, colorBy: manifest?.attributes.includes('rgb') === true ? 'rgb' : 'elevation', pointSize: 2 },
+      display: { visible: true, colorBy: 'rgb', pointSize: 2 },
     };
     const scan = scanOf(doc);
     const facts =

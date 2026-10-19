@@ -13,10 +13,12 @@
 
 use crate::cloud::Vec3;
 use crate::error::{CloudError, CloudResult};
+use crate::fit::{self, FitSettings};
 use crate::job::read_json;
 use crate::kdtree::KdTree;
 use crate::linalg::{self, Mat4};
 use crate::register::{icp, register_targets, IcpMethod, TargetPair};
+use crate::slice::{slice, SliceParams};
 use crate::store::Asset;
 use llull_protocol::{sha256_hex, Output};
 use serde::Deserialize;
@@ -149,7 +151,7 @@ fn optional<T: for<'de> Deserialize<'de>>(params: &Value, name: &str, default: T
 
 fn run_kind(job: &OpJob) -> CloudResult<Value> {
     let p = &job.params;
-    let max_points: usize = optional(p, "maxPoints", DEFAULT_OP_MAX_POINTS)?;
+    let max_points: usize = optional(p, "maxLoadPoints", DEFAULT_OP_MAX_POINTS)?;
     match job.kind.as_str() {
         "register_targets" => {
             let clouds = open(&job.clouds, 2)?;
@@ -177,7 +179,60 @@ fn run_kind(job: &OpJob) -> CloudResult<Value> {
             let result = icp(&KdTree::build(&fixed_points), &moving, &mat4(&initial)?, method, max_iterations, trim_ratio);
             Ok(serde_json::to_value(result).unwrap_or(Value::Null))
         }
+        "fit" | "extract_pipes" => {
+            let clouds = open(&job.clouds, 1)?;
+            let region: Region = optional(p, "region", Region::All)?;
+            let points = clouds[0].points(&region, max_points)?;
+            let settings = FitSettings {
+                noise_sigma: optional(p, "noiseSigma", None)?,
+                distance_threshold: optional(p, "distanceThreshold", None)?,
+                normal_threshold_deg: optional(p, "normalThresholdDeg", 20.0)?,
+                seed: optional(p, "seed", 1)?,
+                min_radius: optional(p, "minRadius", FitSettings::default().min_radius)?,
+                max_radius: optional(p, "maxRadius", FitSettings::default().max_radius)?,
+            };
+            if job.kind == "extract_pipes" {
+                return extract_pipes(&points, &settings);
+            }
+            let kind: String = param(p, "kind")?;
+            let value = match kind.as_str() {
+                "cylinder" => serde_json::to_value(fit::cylinder::fit(&points, &settings)?),
+                "plane" => serde_json::to_value(fit::plane::fit(&points, &settings)?),
+                "sphere" => serde_json::to_value(fit::sphere::fit(&points, &settings)?),
+                other => return Err(CloudError::input(format!("params.kind '{other}' is not plane, cylinder or sphere"))),
+            };
+            let mut value = value.unwrap_or(Value::Null);
+            if let Value::Object(map) = &mut value {
+                map.insert("kind".into(), json!(kind));
+            }
+            Ok(value)
+        }
+        "slice" => {
+            let clouds = open(&job.clouds, 1)?;
+            let params: SliceParams = serde_json::from_value(p.clone()).map_err(|e| CloudError::input(format!("params: {e}")))?;
+            let points = clouds[0].points(&params.region, max_points)?;
+            let result = slice(&points, &params).ok_or_else(|| CloudError::input("params.normal must not be zero"))?;
+            Ok(serde_json::to_value(result).unwrap_or(Value::Null))
+        }
         other => Err(CloudError::input(format!("unknown op kind '{other}'"))),
+    }
+}
+
+/// `extract_pipes` (§5.6): one cylinder per call (MVP), accepted when its radius is within [minRadius, maxRadius], else listed in
+/// `rejected` with the reason. The DN snap and the commit are the plugin's (the size table lives there).
+fn extract_pipes(points: &[Vec3], settings: &FitSettings) -> CloudResult<Value> {
+    match fit::cylinder::fit(points, settings) {
+        Ok(found) if found.radius >= settings.min_radius && found.radius <= settings.max_radius => {
+            Ok(json!({ "extractions": [found], "rejected": [] }))
+        }
+        Ok(found) => Ok(json!({
+            "extractions": [],
+            "rejected": [{ "reason": format!("radius {:.6} m outside [{}, {}] m", found.radius, settings.min_radius, settings.max_radius), "fit": found }]
+        })),
+        Err(error) if error.code == "SCN_FIT_NO_MODEL" => {
+            Ok(json!({ "extractions": [], "rejected": [{ "reason": error.message, "code": error.code }] }))
+        }
+        Err(error) => Err(error),
     }
 }
 

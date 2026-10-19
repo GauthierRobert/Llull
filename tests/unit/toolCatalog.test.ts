@@ -140,6 +140,9 @@ const allToolNames = [
   ...buildLibraryToolDefinitions().map((tool) => tool.name),
   // server-side native transport listed in the analysis toolset (server/src/native/tools.ts; covered by server/tests/topologySolve.test.ts)
   'topology_solve',
+  // point-cloud host transports listed in the scan toolset (server/src/scan/scanTools.ts; covered by server/tests/scanImport.test.ts)
+  'scan_import',
+  'scan_list',
 ];
 
 describe('TOOLSETS', () => {

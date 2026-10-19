@@ -6,6 +6,9 @@ import { describePointCloud, measureCloud, nearestCloudPoint, queryCloudPoints }
 import { attachPointCloud, detachPointCloud, updatePointCloud } from './referenceCommands';
 import { acceptRegistration, applyRegistration, markRegistrationSupplied } from './registrationCommands';
 import { computeRegistration } from './registrationQuery';
+import { extractPipes, fitPrimitive } from './fitCommands';
+import { sliceCloud } from './sliceCommand';
+import { acceptAsbuiltExtraction, commitAsbuiltExtraction } from './extractionCommands';
 
 export const scanCommands = commandCatalog(
   attachPointCloud,
@@ -21,4 +24,9 @@ export const scanCommands = commandCatalog(
   applyRegistration,
   markRegistrationSupplied,
   acceptRegistration,
+  sliceCloud,
+  fitPrimitive,
+  extractPipes,
+  commitAsbuiltExtraction,
+  acceptAsbuiltExtraction,
 );

@@ -10,6 +10,7 @@
 pub mod asset;
 pub mod cloud;
 pub mod error;
+pub mod fit;
 pub mod job;
 pub mod kdtree;
 pub mod linalg;
@@ -20,4 +21,5 @@ pub mod octree;
 pub mod ops;
 pub mod read;
 pub mod register;
+pub mod slice;
 pub mod store;

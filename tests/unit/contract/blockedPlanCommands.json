@@ -562,10 +562,6 @@
     ],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-02-pipe-extraction.json": [
       "check_point_clouds",
-      "commit_asbuilt_extraction",
-      "extract_pipes",
-      "fit_primitive",
-      "slice_cloud",
       "trace_pipe_centreline"
     ],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-03-registration.json": [
@@ -577,7 +573,6 @@
     ],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-05-steel-section.json": [
       "check_point_clouds",
-      "commit_asbuilt_extraction",
       "fit_steel_member"
     ]
   }
