@@ -1,0 +1,14 @@
+{
+  "id": "37-prism-negative-coords",
+  "family": "prism",
+  "description": "triangle in negative quadrant extruded 7",
+  "source": "analytic",
+  "formula": "V = A_polygon * depth (shoelace); centroid = polygon centroid, depth/2; A = 2 A_polygon + perimeter * depth",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 56,
+  "area": 106.60990337,
+  "centroid": [-3, -3.66666666667, 3.5],
+  "bbox": { "min": [-5, -5, 0], "max": [-1, -1, 7] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

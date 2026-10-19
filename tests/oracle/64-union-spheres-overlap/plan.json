@@ -1,0 +1,7 @@
+{
+  "actions": [
+    { "command": "add_sphere", "params": { "radius": 2 }, "as": "a" },
+    { "command": "add_sphere", "params": { "radius": 2, "position": [3, 0, 0] }, "as": "b" },
+    { "command": "boolean", "params": { "op": "union", "a": "$a", "b": "$b" } }
+  ]
+}

@@ -1,0 +1,1 @@
+{ "actions": [{ "command": "add_pyramid", "params": { "baseWidth": 2, "baseDepth": 3, "height": 4 } }] }

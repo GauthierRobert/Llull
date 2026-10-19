@@ -1,0 +1,15 @@
+{
+  "id": "12-cylinder-axis-x",
+  "family": "primitive",
+  "description": "cylinder r=2 h=6 with its axis along +X",
+  "source": "analytic",
+  "formula": "V = pi r^2 h; A = 2 pi r (r+h)",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 75.3982236862,
+  "area": 100.530964915,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-3, -2, -2], "max": [3, 2, 2] },
+  "faces": 3,
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

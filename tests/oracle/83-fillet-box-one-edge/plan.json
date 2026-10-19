@@ -1,0 +1,6 @@
+{
+  "actions": [
+    { "command": "add_box", "params": { "size": [10, 10, 10] }, "as": "a" },
+    { "command": "fillet_edge", "params": { "id": "$a", "edgesNear": [[5, 5, 0]], "radius": 1 } }
+  ]
+}

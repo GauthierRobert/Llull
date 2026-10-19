@@ -1,0 +1,19 @@
+{
+  "id": "57-subtract-hole-through-box",
+  "family": "boolean",
+  "description": "box 20x20x10 drilled by a vertical cylinder r=4",
+  "source": "analytic",
+  "formula": "V = abc - pi r^2 h; A = 2(ab+bc+ca) - 2 pi r^2 + 2 pi r h",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 3497.34517543,
+  "area": 1750.79644737,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-10, -10, -5], "max": [10, 10, 5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": 0.0028075996757635567,
+    "area": 0.004772674064054437,
+    "reason": "inscribed n-gon cross-section of the cylinder (n from the kernel default circle resolution): loss <= k (1 - cos(pi/n)) of the feature share"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "id": "93-shell-sphere-sealed",
+  "family": "shell",
+  "description": "sphere R=5 with a sealed cavity of R=4",
+  "source": "analytic",
+  "formula": "V = 4/3 pi (R^3 - (R-t)^3); A = 4 pi (R^2 + (R-t)^2)",
+  "kernels": ["occt"],
+  "bodies": 1,
+  "volume": 255.516202492,
+  "area": 515.221195189,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-5, -5, -5], "max": [5, 5, 5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

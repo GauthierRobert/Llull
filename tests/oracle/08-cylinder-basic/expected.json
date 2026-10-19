@@ -1,0 +1,15 @@
+{
+  "id": "08-cylinder-basic",
+  "family": "primitive",
+  "description": "cylinder r=2 h=5",
+  "source": "analytic",
+  "formula": "V = pi r^2 h; A = 2 pi r (r+h)",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 62.8318530718,
+  "area": 87.9645943005,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-2, -2, -2.5], "max": [2, 2, 2.5] },
+  "faces": 3,
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

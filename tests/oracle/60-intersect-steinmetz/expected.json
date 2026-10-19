@@ -1,0 +1,19 @@
+{
+  "id": "60-intersect-steinmetz",
+  "family": "boolean",
+  "description": "two perpendicular cylinders r=3 intersect in a Steinmetz solid",
+  "source": "analytic",
+  "formula": "V = 16 r^3 / 3; A = 16 r^2",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 144,
+  "area": 144,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-3, -3, -3], "max": [3, 3, 3] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": 0.03793497821458669,
+    "area": 0.02562331880972446,
+    "reason": "inscribed n-gon cross-section of the cylinder (n from the kernel default circle resolution): loss <= k (1 - cos(pi/n)) of the feature share"
+  }
+}

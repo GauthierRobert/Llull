@@ -1,0 +1,14 @@
+{
+  "id": "36-prism-concave-star",
+  "family": "prism",
+  "description": "concave 8-vertex star extruded 2",
+  "source": "analytic",
+  "formula": "V = A_polygon * depth (shoelace); centroid = polygon centroid, depth/2; A = 2 A_polygon + perimeter * depth",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 32,
+  "area": 82.5964425627,
+  "centroid": [0, 0, 1],
+  "bbox": { "min": [-4, -4, 0], "max": [4, 4, 2] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

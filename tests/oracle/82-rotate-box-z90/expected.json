@@ -1,0 +1,14 @@
+{
+  "id": "82-rotate-box-z90",
+  "family": "transform",
+  "description": "box 2x3x4 rotated a quarter turn about Z",
+  "source": "analytic",
+  "formula": "bbox extents swap",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 24,
+  "area": 52,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-1.5, -1, -2], "max": [1.5, 1, 2] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

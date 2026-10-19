@@ -1,0 +1,14 @@
+{
+  "id": "53-subtract-disjoint",
+  "family": "boolean",
+  "description": "subtracting a distant box leaves A unchanged",
+  "source": "analytic",
+  "formula": "V = V(A)",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 24,
+  "area": 52,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-1, -1.5, -2], "max": [1, 1.5, 2] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

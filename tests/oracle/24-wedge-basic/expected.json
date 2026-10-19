@@ -1,0 +1,14 @@
+{
+  "id": "24-wedge-basic",
+  "family": "primitive",
+  "description": "wedge 2x3x4 at the origin (min anchor)",
+  "source": "analytic",
+  "formula": "V = whd/2; centroid (w/2, h/3, d/3) from the min corner",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 12,
+  "area": 36,
+  "centroid": [1, 1, 1.33333333333],
+  "bbox": { "min": [0, 0, 0], "max": [2, 3, 4] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

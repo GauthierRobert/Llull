@@ -1,0 +1,19 @@
+{
+  "id": "64-union-spheres-overlap",
+  "family": "boolean",
+  "description": "two spheres r=2, centres 3 apart",
+  "source": "analytic",
+  "formula": "V = 2 (4/3 pi r^3) - pi (4r + d)(2r - d)^2 / 12; A = 2 (4 pi r^2) - 2 (2 pi r h), h = r - d/2",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 64.1408500108,
+  "area": 87.9645943005,
+  "centroid": [1.5, 0, 0],
+  "bbox": { "min": [-2, -2, -2], "max": [5, 2, 2] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": 0.031,
+    "area": 0.031,
+    "reason": "sphere tessellated at 32 segments: volume loss <= 3 % of the sphere share (measured about 2 %)"
+  }
+}

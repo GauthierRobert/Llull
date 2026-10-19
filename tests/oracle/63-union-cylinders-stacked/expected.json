@@ -1,0 +1,19 @@
+{
+  "id": "63-union-cylinders-stacked",
+  "family": "boolean",
+  "description": "cylinder r=3 h=4 under a cylinder r=2 h=3 sharing a face",
+  "source": "analytic",
+  "formula": "V = pi (9*4 + 4*3)",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 150.796447372,
+  "area": null,
+  "centroid": [0, 0, 2.875],
+  "bbox": { "min": [-3, -3, 0], "max": [3, 3, 7] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": 0.02562331880972446,
+    "area": null,
+    "reason": "inscribed n-gon cross-section of the cylinder (n from the kernel default circle resolution): loss <= k (1 - cos(pi/n)) of the feature share"
+  }
+}
