@@ -5,6 +5,7 @@
 //! OCCT's `Standard_Failure` included, comes back as an `Err` (see the `trycatch` override in `facade.hxx`).
 //! [`recipe`] evaluates llull `ShapeRecipe` JSON on top of it.
 
+pub mod features;
 pub mod lru;
 pub mod mesh;
 pub mod recipe;

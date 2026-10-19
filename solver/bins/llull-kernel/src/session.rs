@@ -256,9 +256,9 @@ mod tests {
     fn unsupported_ops_and_recipes_name_the_gap() {
         let mut session = Session::new();
         assert_eq!(call(&mut session, "topology", json!([]))["error"], json!("NATIVE_UNSUPPORTED: op 'topology'"));
-        let fillet = json!({ "op": "fillet", "source": box_recipe(1.0), "edges": [], "size": 0.1 });
-        let reply = call(&mut session, "evaluate", json!([{ "key": "f", "recipe": fillet }]));
-        assert_eq!(reply["error"], json!("NATIVE_UNSUPPORTED: recipe op 'fillet'"));
+        let feature = json!({ "op": "feature", "source": box_recipe(1.0) });
+        let reply = call(&mut session, "evaluate", json!([{ "key": "f", "recipe": feature }]));
+        assert_eq!(reply["error"], json!("NATIVE_UNSUPPORTED: recipe op 'feature'"));
         assert_eq!(call(&mut session, "tessellate", json!([{ "key": "f" }]))["error"], reply["error"]);
     }
 
