@@ -98,7 +98,7 @@ User stories:
 | ----- | -------- |
 | **MVP** | `MaterialModel` + constitutive sets on the 08 record; elastic iso / ortho / transversely isotropic / aniso with stability; J2 plasticity (perfect, linear with explicit modulus kind, multilinear, Voce) + linear kinematic; Ramberg-Osgood (deformation theory); hyperelastic Neo-Hooke, Mooney-Rivlin, polynomial N ≤ 3, reduced polynomial / Yeoh, Ogden N ≤ 3, Arruda-Boyce with Drucker scan; `check_material_models`; `material_point_response` (small-strain J2 strain / stress / mixed control; hyperelastic incompressible homogeneous modes); CalculiX writers for these |
 | **V1** | Chaboche (multi-backstress Armstrong-Frederick), combined hardening; Prony viscoelasticity + WLF / Arrhenius shift (driver + Nastran where supported); Norton / Garofalo creep in the driver (constant stress, relaxation); Johnson-Cook and Cowper-Symonds definitions + driver; `fit_material_model` (linear forms: polynomial hyperelastic, Prony with fixed τ, multilinear from curves, Ramberg-Osgood); Nastran writers (`MAT1`, `MAT9`, `MATS1`/`TABLES1`, `MATHE`) |
-| **V2** | Non-linear fits (Ogden, Arruda-Boyce, Chaboche, Voce, Garofalo) by Levenberg-Marquardt; compressible hyperelastic general deformation in the driver; Hill-48 anisotropic yield; optional MFront/MTest backend for laws outside the built-in set (host transport, licence §8) |
+| **V2 (built, M7)** | Non-linear fits (Ogden, Arruda-Boyce, Chaboche, Voce, Garofalo) by Levenberg-Marquardt; compressible hyperelastic general deformation in the driver; Hill-48 anisotropic yield; optional MFront/MTest backend for laws outside the built-in set (host transport, licence §8) |
 
 **Out of scope.** FE analyses with these laws (PHY-05 nonlinear, PHY-11 creep, PHY-19 explicit own the
 `AnalysisType`s and solver runs); damage and failure laws (J-C failure, fatigue, fracture: PHY-07, 08, 19 add them
@@ -132,7 +132,7 @@ elasticity and references 06 for plies); statistical allowables (08 V3).
 | FR-MATL-21 | MUST | Composite plies stay in 06 CMP (`LaminaMaterial`); a solid orthotropic model may reference the 06 lamina it was derived from, but neither pack copies the other's data. | No duplicate material systems | 06 TECHNICAL_SPEC Q2 |
 | FR-MATL-22 | MUST | Material-model edits are pure commands in feature history; fits and driver runs are read-only queries; private-library models never serialize (08 TR-MAT-31). | L1, L3, L8 | — |
 | FR-MATL-24 | MUST | The same `MaterialModel` union hosts the **durability variants** whose fields are specified by their consumer packs: PHY-07 fatigue `sn_basquin`, `sn_power_law`, `sn_table`, `sn_equivalent_stress`, `en_coffin_manson`, `cyclic_ramberg_osgood`, `haigh_table`; PHY-08 fracture `da_dn_paris`, `da_dn_walker`, `da_dn_forman`, `da_dn_nasgro`, `da_dn_table`, `fracture_toughness`. They are attached with the same `add_material_model` command, share basis / provenance / private-library / unverified rules, and are not members of constitutive sets (fatigue and fracture analyses reference them by model id). | One material-data system for every pack (README §6.2) | PHY-07 / PHY-08 TECHNICAL_SPEC §3.1 |
-| FR-MATL-23 | COULD | Optional MFront/MTest backend (V2) for laws outside the built-in set, as a host transport with a bundled executable, reported missing with a stable code when absent. | Extensibility without writing integrators | R10; licence §8 |
+| FR-MATL-23 | COULD | Optional MFront/MTest backend (V2) for laws outside the built-in set, as a host transport (`mtest_run`) over a **user-installed**, never bundled executable (OQ-MATL-05), reported missing with a stable code (`MFRONT_TOOL_MISSING`) when absent. **Built (M7).** | Extensibility without writing integrators | R10; licence §8 |
 
 ## 6. Workflows
 
@@ -204,7 +204,7 @@ acceptance of a fitted law is a human gate.
   targets [R3][R4][R7].
 - **Licences of optional backends.** TFEL/MFront: GPL (since 2023 with a linking exception allowing proprietary
   applications to link the TFEL and MFront-generated libraries) or CeCILL-A [R10]. CalculiX: GPL v2 (bundled by 05
-  as a separate executable). llull ships MFront, if at all, as a separate executable (V2, legal review).
+  as a separate executable). llull does NOT ship MFront (decision 2026-10-19, OQ-MATL-05): it is a separate executable the user installs; llull only detects and runs it.
 
 ## 9. KPIs / success metrics
 

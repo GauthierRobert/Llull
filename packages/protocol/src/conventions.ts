@@ -227,4 +227,19 @@ A topology result is a concept shape computed by llull, never a released design:
   \`extrude_profile\` + \`boolean\` subtract, \`fillet_edge\` on sharp corners → analyse the rebuild → \`compare_to_topology\` (IoU against the optimum).
 - **Finish.** \`check_topology\` with \`rebuildEntityIds\` (and \`release\` for ids about to be released: iso-surfaces are TOP_RESULT_NOT_RELEASABLE).
   Any change to the study, the analysis or the geometry makes the result stale (TOP_RESULT_STALE): solve again.
+
+## 10. Material laws (toolsets materials, material-lab)
+
+Laws are data on a document material (\`create_material\` name), never in the solver. Every fit and result is unverified until a source and a reviewer exist.
+
+- **Define.** \`add_material_model\` (elastic, j2_plasticity, hill48_plasticity, ramberg_osgood, hyper_* neo_hooke / mooney_rivlin / polynomial / yeoh / ogden / arruda_boyce,
+  visco_prony, creep, rate; durability laws too) states HOW it is written (Ogden \`convention\`, Ramberg-Osgood \`form\`, curve \`inputMeasure\`, \`modulusKind\`, Hill
+  \`form\`): none is defaulted. \`define_constitutive_set\` combines models; \`check_material_models\` lists readiness.
+- **Fit.** \`fit_material_model\` returns a model, never edits the document: linear laws by exact QR, hyper_ogden / hyper_arruda_boyce / visco_prony with free times /
+  ramberg_osgood form true_stress / j2_voce / j2_chaboche / creep_garofalo by Levenberg-Marquardt (\`start\`, \`bounds\`; data.convergence has iterations, cost,
+  Jacobian conditioning). Refusals: MATL_FIT_DID_NOT_CONVERGE, MATL_FIT_ILL_CONDITIONED, MATL_FIT_START_INVALID. Pass data.model / validity / fit to \`add_material_model\`.
+- **Drive.** \`material_point_response\` (small strain: elastic, J2, Hill, Prony, creep; finite: incompressible modes or compressible general paths with D1 > 0).
+  \`export_material_cards\` writes CalculiX / Nastran cards and refuses laws they cannot represent (MATL_EXPORT_UNSUPPORTED).
+- **MFront (optional).** The CLI tool mtest_run (not a registry command) runs an MTest script on a behaviour outside this set. MFront is NOT bundled: install it yourself, set LLULL_MTEST (and LLULL_MFRONT
+  to compile) and LLULL_ALLOW_CODE_EXECUTION=1; absent tools answer MFRONT_TOOL_MISSING with the reason. \`llull mtest_run probe=true\` reports what was found.
 `;

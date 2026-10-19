@@ -154,10 +154,7 @@ function pronyFit(doc: CadDocument, params: FitParams): NonlinearParts | Command
     control(params),
   );
   if (isLawFailure(fit)) return failed(doc, fit);
-  return finish(fit, {
-    stability: { note: 'Prony weights g_i > 0 and Σ g_i < 1 hold; relaxation times were fitted' },
-    residualUnit: '1',
-  });
+  return finish(fit, { stability: { note: 'Prony weights g_i > 0 and Σ g_i < 1 hold; relaxation times were fitted' }, residualUnit: '1' });
 }
 
 function rambergFit(doc: CadDocument, params: FitParams): NonlinearParts | CommandResult {
@@ -178,10 +175,7 @@ function rambergFit(doc: CadDocument, params: FitParams): NonlinearParts | Comma
   // rows are [total strain, true stress]: stressRows returned [x, MPa]
   const fit = fitRambergOsgoodTrue(data.rows, E, nu.value, sigma0, data.weight, control(params));
   if (isLawFailure(fit)) return failed(doc, fit);
-  return finish(fit, {
-    stability: { note: 'monotonic deformation theory: valid for proportional loading only' },
-    residualUnit: '1',
-  });
+  return finish(fit, { stability: { note: 'monotonic deformation theory: valid for proportional loading only' }, residualUnit: '1' });
 }
 
 function hardeningFit(doc: CadDocument, params: FitParams): NonlinearParts | CommandResult {

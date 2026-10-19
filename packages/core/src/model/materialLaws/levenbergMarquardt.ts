@@ -64,7 +64,7 @@ const gram = (j: readonly (readonly number[])[], n: number): number[][] =>
   Array.from({ length: n }, (_, a) => Array.from({ length: n }, (_, b) => j.reduce((sum, row) => sum + (row[a] ?? 0) * (row[b] ?? 0), 0)));
 
 /** Condition estimate max|R_ii|/min|R_ii| of the column-equilibrated Jacobian (Householder QR); Infinity when rank deficient. */
-export function scaledConditionNumber(j: readonly (readonly number[])[]): number {
+function scaledConditionNumber(j: readonly (readonly number[])[]): number {
   return solveLeastSquares(j, new Array<number>(j.length).fill(0)).conditionEstimate;
 }
 

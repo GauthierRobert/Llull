@@ -378,7 +378,11 @@ describe('Voce, Chaboche and Garofalo fits (VC-MATL-23)', () => {
   });
 
   it('flags a free activation energy fitted from one temperature: Q is not identified and ends on its bound', () => {
-    const rows = [40, 60, 80, 100, 140, 160].map((s) => [s, 900, 2e-4 * Math.sinh(0.02 * s) ** 4.5 * Math.exp(-250000 / (8.314462618 * 900))]);
+    const rows = [40, 60, 80, 100, 140, 160].map((s) => [
+      s,
+      900,
+      2e-4 * Math.sinh(0.02 * s) ** 4.5 * Math.exp(-250000 / (8.314462618 * 900)),
+    ]);
     const test = { mode: 'creep_rate', rows, xMeasure: 'stress', yMeasure: 'creep_rate', units: { x: 'MPa', T: 'K', y: '1/s' } };
     const data = fit({ kind: 'creep_garofalo', tests: [test] });
     expect(data.convergence.parameters.find((p) => p.name === 'activationEnergy')?.atBound).toBe(true);

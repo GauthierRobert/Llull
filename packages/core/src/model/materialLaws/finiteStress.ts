@@ -38,7 +38,7 @@ export const identity3 = (): Mat3 => [
   [0, 0, 1],
 ];
 
-export function determinant3(m: readonly (readonly number[])[]): number {
+function determinant3(m: readonly (readonly number[])[]): number {
   return (
     at(m, 0, 0) * (at(m, 1, 1) * at(m, 2, 2) - at(m, 1, 2) * at(m, 2, 1)) -
     at(m, 0, 1) * (at(m, 1, 0) * at(m, 2, 2) - at(m, 1, 2) * at(m, 2, 0)) +
