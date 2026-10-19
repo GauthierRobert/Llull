@@ -107,7 +107,7 @@ const norm = (values: readonly number[]): number => Math.sqrt(values.reduce((sum
  * Fit by Levenberg-Marquardt.
  * @param starts deterministic candidate starts in physical units (spec order), tried in order unless `control.start` is given
  * @param residuals weighted residual vector r(p) in physical units, or null when the parameters are invalid
- * @failure bad start / bounds -> MATL_FIT_START_INVALID; no converged run -> MATL_FIT_DID_NOT_CONVERGE; condition > 1e12 -> MATL_FIT_ILL_CONDITIONED
+ * @failure bad start / bounds -> MATL_FIT_START_INVALID; no converged run -> MATL_FIT_DID_NOT_CONVERGE; condition > 1e8 -> MATL_FIT_ILL_CONDITIONED
  */
 export function searchFit(
   specs: readonly ParamSpec[],

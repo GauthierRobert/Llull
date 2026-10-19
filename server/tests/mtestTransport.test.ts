@@ -4,11 +4,12 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { exchangeToolDefinitions } from '../src/cli/exchange';
-import { mfrontTools, spawnRunner, toolEnvironment, type ProcessResult, type ProcessRunner } from '../src/mfront/mtestProcess';
+import { mfrontTools, spawnRunner, toolEnvironment, type ProcessRunner } from '../src/mfront/mtestProcess';
+import type { ProcessResult } from '../src/processRunner';
 import { MAX_RESULT_ROWS, parseMtestResult } from '../src/mfront/mtestResult';
 import { runMtestTool } from '../src/mfront/mtestTool';
 import { runNativeTool } from '../src/native/tools';
@@ -52,6 +53,20 @@ describe('detection', () => {
     );
     expect(tools).toMatchObject({ reason: null });
     expect(tools.mtest?.replaceAll('\\', '/')).toMatch(/\/a\/mtest$/);
+  });
+
+  it('ignores .bat / .cmd wrappers on Windows and reports them as unsupported', () => {
+    const tools = mfrontTools(
+      { PATH: '/tfel/bin', PATHEXT: '.CMD;.BAT;.EXE' },
+      exists(['/tfel/bin/mtest.cmd', '/tfel/bin/mfront.bat']),
+      'win32',
+    );
+    expect(tools.mtest).toBeNull();
+    expect(tools.mfront).toBeNull();
+    expect(tools.reason).toContain('unsupported');
+    const configured = mfrontTools({ LLULL_MTEST: 'C:/t/mtest.bat' }, () => true, 'win32');
+    expect(configured.mtest).toBeNull();
+    expect(configured.reason).toContain('wrapper');
   });
 
   it('falls back to the PATH and honours PATHEXT on Windows', () => {
@@ -125,6 +140,23 @@ describe('mtest_run', () => {
     const result = await runMtestTool({ mtest: 'x' }, { env: {}, tools: FOUND, runner: fakeRunner(() => ok, calls) });
     expect(result.error?.code).toBe('MFRONT_CODE_EXECUTION_DISABLED');
     expect(calls).toHaveLength(0);
+  });
+
+  it('uses the library the build actually produced in src/', async () => {
+    const calls: Call[] = [];
+    const ext = process.platform === 'win32' ? 'dll' : process.platform === 'darwin' ? 'dylib' : 'so';
+    const runner = fakeRunner(async (call) => {
+      if (call.executable === FOUND.mfront) {
+        await mkdir(path.join(call.cwd, 'src'));
+        await writeFile(path.join(call.cwd, 'src', `Norton.${ext}`), '');
+      } else await writeFile(path.join(call.cwd, 'job.res'), RES);
+      return ok;
+    }, calls);
+    await runMtestTool(
+      { mtest: "@Behaviour<generic> '{{library}}' 'Norton';", mfront: { name: 'Norton', source: 's', library: 'Norton' } },
+      { env: ALLOWED, tools: FOUND, runner },
+    );
+    expect(calls[1]?.script).toBe(`@Behaviour<generic> 'src/Norton.${ext}' 'Norton';`);
   });
 
   it('refuses bad params without running anything', async () => {

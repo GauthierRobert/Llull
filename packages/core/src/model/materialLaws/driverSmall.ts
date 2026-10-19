@@ -1,6 +1,6 @@
 /**
  * Small-strain material-point driver (PHY-02 §5.3): N equal increments per step, strain targets imposed directly, stress targets found by a
- * global Newton on the stress residuals with a finite-difference tangent. Elasticity alone or with ONE of J2 plasticity, Prony viscoelasticity
+ * global Newton on the stress residuals with a finite-difference tangent. Elasticity alone or with ONE of J2 / Hill-48 plasticity,Prony viscoelasticity
  * or creep.
  */
 

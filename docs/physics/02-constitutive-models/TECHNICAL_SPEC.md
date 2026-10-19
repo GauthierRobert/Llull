@@ -353,7 +353,7 @@ stretches (descending), `nominalStress = P11`, `volumeRatio J`.
 - **Non-linear** (V2, built — `fitSearch.ts`, `levenbergMarquardt.ts`, `fitHyperNonlinear.ts`, `fitLawsNonlinear.ts`): Levenberg-Marquardt with Marquardt diagonal scaling
   (`(JᵀJ + λ diag(JᵀJ)) δ = −Jᵀr`), central-difference Jacobian, steps projected on the box bounds, λ0 = 1e-3, ×10 on a rejected step, ÷10 on an accepted
   one, stop on relative cost change < 1e-12 (or ½‖r‖² < 1e-30, or no descent after 40 damping increases = numerical stationary point) or 500 iterations
-  (`MATL_FIT_DID_NOT_CONVERGE`). Variable projection: for fixed exponents / locking stretch / relaxation times the linear parameters are solved by QR to start each run.
+  (`MATL_FIT_DID_NOT_CONVERGE`); a Jacobian probe with no residuals (non-finite model value) stops with `invalid_probe` and is NOT converged. Variable projection: for fixed exponents / locking stretch / relaxation times the linear parameters are solved by QR to start each run.
   Deterministic multi-start from a fixed grid in a fixed order (Ogden α ∈ {−2, 1, 2, 3, 5}, all N-subsets in lexicographic order; Arruda-Boyce λm ∈ {1.5, 2, 3, 5, 10, 30};
   Prony τ log-spaced over the data range at three spreads; Ramberg-Osgood n ∈ {2, 3, 5, 10, 20, 40}; Voce b ∈ {1, 5, 20, 100}/ε_max; Chaboche γ ∈ {1, 10, 100, 1000};
   Garofalo n × α × Q grids); `start` (every parameter, by name) replaces the list; best converged run by cost, ties by lower parameter norm. `bounds` per parameter name

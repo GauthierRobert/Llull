@@ -28,7 +28,7 @@ const TOOL_NONLINEAR = 'llull fit_material_model (Levenberg-Marquardt, Marquardt
  * @affects nothing — read-only; data { model, fit: FitRecord, validity, basis, residualsPerTest[], stability, convergence?, defaults[], warnings[] }
  * @invariant deterministic (QR without pivoting; Levenberg-Marquardt from a fixed start list); the returned model is accepted unchanged by
  *   add_material_model; the fit never attaches itself
- * @failure rows ≤ parameters -> MATL_FIT_INSUFFICIENT_DATA; condition > 1e12 -> MATL_FIT_ILL_CONDITIONED; no convergence ->
+ * @failure rows ≤ parameters -> MATL_FIT_INSUFFICIENT_DATA; condition > 1e12 QR / 1e8 LM -> MATL_FIT_ILL_CONDITIONED; no convergence ->
  *   MATL_FIT_DID_NOT_CONVERGE; bad start / bounds -> MATL_FIT_START_INVALID; Prony weights invalid -> MATL_PRONY_INVALID; bad rows / units ->
  *   MATL_LAW_PARAMS_INVALID; single hyperelastic mode -> warning MATL_FIT_INSUFFICIENT_MODES
  */
