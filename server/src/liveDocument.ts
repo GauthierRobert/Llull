@@ -11,6 +11,7 @@ import { errorMessage } from '@lib/errorMessage';
 import { withoutConfirmations } from '@lib/withoutConfirmations';
 import { type LiveCommandEvent, type LiveCommandSource, type LiveSnapshotEvent, documentHash } from '@protocol/liveSync';
 import { isTestRun, positiveInteger } from './env';
+import { logLiveCommand, rebaseCommandLog } from './liveCommandLog';
 
 const AUTOSAVE_PATH = process.env['LLULL_AUTOSAVE_PATH'] ?? path.resolve(__dirname, '..', '.autosave.json');
 
@@ -68,6 +69,7 @@ export function closeAllSubscribers(): void {
 }
 
 let _liveDoc: CadDocument = loadAutosave();
+rebaseCommandLog(_liveDoc);
 
 let _seq = 0; // changes since process start
 const _epoch: string = randomUUID(); // `_seq` restarts on restart, so clients compare `(epoch, seq)`
@@ -139,6 +141,8 @@ export function setLiveDoc(next: CadDocument, command?: LiveCommand): void {
   _liveDoc = next;
   _seq += 1;
   if (AUTOSAVE_ENABLED) autosaver.schedule(next);
+  if (command === undefined) rebaseCommandLog(next);
+  else logLiveCommand(next, command.name, command.params);
   if (command === undefined) {
     if (_subscribers.size === 0) return;
     broadcast('snapshot', getLiveSnapshot());
@@ -167,6 +171,7 @@ export function subscribeLive(res: Response): () => void {
 /** @internal tests only: replace without broadcasting */
 export function _resetLiveDoc(doc?: CadDocument): void {
   _liveDoc = doc ?? createEmptyDocument();
+  rebaseCommandLog(_liveDoc);
 }
 
 export function liveSubscriberCount(): number {
