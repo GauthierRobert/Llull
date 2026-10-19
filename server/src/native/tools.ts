@@ -4,6 +4,7 @@
  *   fatigue_field  FE fatigue case -> llull-compute post fatigue (every node) -> FatigueField artifact -> compute_fatigue
  *   fea_map_field  thermo_static interpolate field -> llull-compute post map -> mapped-field artifact (read by the fea_solve deck)
  *   fea_render     render_fea_results with the pixel raster in llull-compute raster (raster=auto|ts|cpu|gpu)
+ *   auto_route     route_problem -> llull-compute route (plant 02 RTE V2 A*) -> auto_route_pipe { solution } (validated, then committed)
  */
 
 import type { ToolDefinition } from '@protocol/tools';
@@ -18,6 +19,7 @@ import { runFatigueField, type NativeDeps } from './fatigueField';
 import { runMapField } from './mapField';
 import { DEFAULT_TOPOLOGY_TIMEOUT_S, runTopologySolve, type TopologySolveOptions } from './topologySolve';
 import { runFeaRender } from './renderField';
+import { DEFAULT_AUTO_ROUTE_TIMEOUT_S, NATIVE_EXPANSIONS_CEILING, NATIVE_MAX_EXPANSIONS, runAutoRoute } from './autoRoute';
 
 const TIMEOUT = {
   type: 'number' as const,
@@ -66,7 +68,37 @@ export function nativeToolDefinitions(): ToolDefinition[] {
     },
     renderToolDefinition(),
     topologyToolDefinition(),
+    autoRouteToolDefinition(),
   ];
+}
+
+/** auto_route: the params of route_problem plus the transport's own (read from the registry, so both stay one schema). */
+function autoRouteToolDefinition(): ToolDefinition {
+  const schema = getCommand('route_problem')?.paramsSchema ?? { type: 'object' as const, properties: {}, required: [] };
+  return {
+    name: 'auto_route',
+    description:
+      'Auto-route a pipe line between two ports with the native router (llull-compute route, plant 02 RTE V2): route_problem builds the ' +
+      'lattice problem from the document, the native sparse 3D A* searches it (up to maxExpansions, default 2e6) and auto_route_pipe validates ' +
+      'the solution against the current document (problem hash, legs, clearance, length / bends / cost) and adds the pipe run. Same params as ' +
+      'route_problem / auto_route_pipe. data = auto_route_pipe data + native { version, elapsedMs }. Errors: route_problem refusals, ' +
+      'RTE_AUTOROUTE_NO_PATH, RTE_AUTOROUTE_BUDGET, RTE_AUTOROUTE_SOLUTION_INVALID, NATIVE_TOOL_MISSING (then auto_route_pipe alone runs the ' +
+      'TypeScript search on small grids), NATIVE_TIMEOUT.',
+    inputSchema: {
+      ...schema,
+      properties: {
+        ...schema.properties,
+        timeoutS: { ...TIMEOUT, description: `Wall-clock limit of the native job in seconds (default ${DEFAULT_AUTO_ROUTE_TIMEOUT_S}).` },
+        maxExpansions: {
+          type: 'integer',
+          minimum: 1,
+          maximum: NATIVE_EXPANSIONS_CEILING,
+          description: `Native expansion budget (default ${NATIVE_MAX_EXPANSIONS}); above it RTE_AUTOROUTE_BUDGET.`,
+        },
+      },
+    },
+    annotations: {},
+  };
 }
 
 /** fea_render: the params of render_fea_results plus `raster` (read from the registry, so both stay one schema). */
@@ -124,7 +156,7 @@ function topologyToolDefinition(): ToolDefinition {
   };
 }
 
-const NAMES: ReadonlySet<string> = new Set(['fatigue_field', 'fea_map_field', 'fea_render', 'topology_solve']);
+const NAMES: ReadonlySet<string> = new Set(['fatigue_field', 'fea_map_field', 'fea_render', 'topology_solve', 'auto_route']);
 
 export const isNativeTool = (name: string): boolean => NAMES.has(name);
 
@@ -161,6 +193,16 @@ export async function runNativeTool(
     return { ...result, changed: host.getDoc() !== before };
   }
   const timeout = typeof args['timeoutS'] === 'number' && Number.isFinite(args['timeoutS']) ? { timeoutS: args['timeoutS'] } : {};
+  if (name === 'auto_route') {
+    const maxExpansions = args['maxExpansions'];
+    const options = {
+      ...timeout,
+      ...(typeof maxExpansions === 'number' && Number.isInteger(maxExpansions) && maxExpansions > 0 ? { maxExpansions } : {}),
+    };
+    const before = host.getDoc();
+    const result = await runAutoRoute(args, options, host, deps);
+    return { ...result, changed: host.getDoc() !== before };
+  }
   if (name === 'fatigue_field') {
     const caseId = nonEmptyString(args['caseId']);
     if (caseId === undefined) return failure('fatigue_field: caseId is required.');

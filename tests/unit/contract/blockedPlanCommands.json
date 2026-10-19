@@ -269,55 +269,42 @@
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-01-pump-to-vessel.json": [
       "add_nozzle",
       "check_piping",
-      "create_pipeline",
       "piping_takeoff",
       "route_pipe"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-02-pump-discharge-gate-valve.json": [
       "add_nozzle",
       "check_piping",
-      "create_pipeline",
       "insert_inline_component",
       "piping_takeoff",
       "route_pipe"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-03-header-branches.json": [
       "add_branch",
-      "add_tie_in_point",
       "check_piping",
-      "create_pipeline",
       "piping_connectivity",
       "piping_takeoff",
       "route_pipe"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-04-gravity-drain-slope.json": [
-      "add_tie_in_point",
       "check_piping",
-      "create_pipeline",
       "piping_takeoff",
       "route_pipe"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-05-routing-refusals.json": [
       "add_nozzle",
-      "add_tie_in_point",
       "check_piping",
-      "create_pipeline",
       "route_pipe"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-06-move-with-connected.json": [
       "piping_takeoff"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-07-insulated-hot-line.json": [
-      "add_tie_in_point",
-      "create_pipeline",
       "line_heat_loss",
       "route_pipe"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-08-auto-route-v2.json": [
-      "add_tie_in_point",
-      "auto_route_pipe",
-      "check_piping",
-      "create_pipeline"
+      "check_piping"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-09-legacy-pipe-run-conversion.json": [
       "check_piping",

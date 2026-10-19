@@ -1,7 +1,7 @@
 {
   "id": "SC-RTE-08",
-  "status": "PROPOSED V2 - not runnable. Unbuilt: add_tie_in_point, create_pipeline, auto_route_pipe, check_piping.",
-  "unbuilt": ["add_tie_in_point", "create_pipeline", "auto_route_pipe", "check_piping"],
+  "status": "V2 built 2026-10-19 (TECHNICAL_SPEC section 13): steps 0-3 run and give the expected step-3 data (tests/unit/plant/piping/autoRoute.test.ts, server/tests/routeNativeParity.test.ts). Unbuilt: check_piping (step 4).",
+  "unbuilt": ["check_piping"],
   "validates": ["VC-RTE-18"],
   "description": "Obstacle-free auto route between a port leaving +X at the origin and a port at (3000, 2000, 1000) that the pipe must enter travelling +Z from below (port direction (0,0,-1)). Minimum bends = 2 (three axes need three directions, one bend joins two). Then a box obstacle blocks the straight first leg; the route must stay clash-free and its length can only grow.",
   "units": "mm",

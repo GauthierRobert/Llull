@@ -14,6 +14,7 @@ import type { FastenerModel, PartRef } from './fasteners';
 import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary';
 import type { ReliabilityModel } from './probabilistic';
 import type { SheetMetalModel } from './sheetMetal';
+import type { PlantModel } from './plant';
 import type { FeatureParams } from './features';
 
 /** Re-exported: every model consumer reads its vectors from here. */
@@ -665,6 +666,8 @@ export interface CadDocument {
   sheetMetal?: SheetMetalModel;
   /** Absent until the first probabilistic command (`define_random_variable`; plugin `cae`, PHY-18). */
   probabilistic?: ReliabilityModel;
+  /** Absent until the first plant command (plugin `piping`, plant 02 RTE: `add_tie_in_point`, `create_pipeline`). */
+  plant?: PlantModel;
 }
 
 /** Kernel provenance and modelling tolerance of a document (aerospace 01 KRN, TR-KRN-11/61). */

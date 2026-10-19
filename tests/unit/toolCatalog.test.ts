@@ -140,6 +140,8 @@ const allToolNames = [
   ...buildLibraryToolDefinitions().map((tool) => tool.name),
   // server-side native transport listed in the analysis toolset (server/src/native/tools.ts; covered by server/tests/topologySolve.test.ts)
   'topology_solve',
+  // server-side native transport listed in the piping toolset (server/src/native/autoRoute.ts; covered by server/tests/routeNativeParity.test.ts)
+  'auto_route',
 ];
 
 describe('TOOLSETS', () => {
