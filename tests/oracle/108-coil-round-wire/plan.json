@@ -1,0 +1,1 @@
+{ "actions": [{ "command": "add_coil", "params": { "radius": 10, "pitch": 5, "turns": 6, "sectionRadius": 1 } }] }

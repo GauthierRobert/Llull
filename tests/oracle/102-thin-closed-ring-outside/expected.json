@@ -1,0 +1,14 @@
+{
+  "id": "102-thin-closed-ring-outside",
+  "family": "thin",
+  "description": "closed 20x10 rectangle with a 2 wall growing outside, extruded 4",
+  "source": "analytic",
+  "formula": "outer 24x14 at (-2,-2), inner = the profile: V = (336 - 200) 4; A_surf = 2 (336 - 200) + (76 + 60) 4",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 544,
+  "area": 816,
+  "centroid": [10, 5, 2],
+  "bbox": { "min": [-2, -2, 0], "max": [22, 12, 4] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

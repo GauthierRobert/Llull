@@ -45,7 +45,7 @@ export function addCase(out, c) {
     centroid: c.centroid === false ? null : round3(c.p.c),
     bbox: c.p.min === null ? null : { min: round3(c.p.min), max: round3(c.p.max) },
     ...(c.faces === undefined ? {} : { faces: c.faces }),
-    tolerance: { volume: 1e-3, area: 1e-3, centroid: 1e-3, bbox: 1e-3 },
+    tolerance: { volume: 1e-3, area: 1e-3, centroid: 1e-3, bbox: 1e-3, ...c.tolerance },
     ...(c.mesh === undefined ? {} : { meshTolerance: c.mesh }),
     ...(c.stepRoundTrip === false ? { stepRoundTrip: false } : {}),
     ...(c.knownFailure === undefined ? {} : { knownFailure: c.knownFailure }),

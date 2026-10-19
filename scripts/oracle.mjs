@@ -25,7 +25,8 @@ const load = (kernel) => {
 const results = { manifold: load('manifold'), occt: load('occt') };
 const expectedById = new Map(
   readdirSync(path.join(root, 'tests', 'oracle'), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && /^\d\d-/.test(entry.name))
+    .filter((entry) => entry.isDirectory() && /^\d{2,3}-/.test(entry.name))
+    .sort((a, b) => Number.parseInt(a.name, 10) - Number.parseInt(b.name, 10))
     .map((entry) => [entry.name, JSON.parse(readFileSync(path.join(root, 'tests', 'oracle', entry.name, 'expected.json'), 'utf8'))]),
 );
 const rowOf = (kernel, id) => results[kernel]?.rows.find((row) => row.id === id);
