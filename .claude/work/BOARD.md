@@ -48,10 +48,10 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - `[BLOCKED]` **VNV-M3** Convergence studies + `check_verification`: `docs/physics/00-vv-harness/`. _deps: FEA artifact store, AERO-4 (09 PLM signing)_
 - `[TODO]` **VNV-M4** Time-step/order refinement, least-squares order, UI: `docs/physics/00-vv-harness/`. _deps: VNV-M3_
 - `[BLOCKED]` **PROP-M6** Seed NIST property library: `docs/physics/01-property-models/` (OQ-PROP-03, needs trc.nist.gov access). _deps: —_
-- `[WIP]` **MATL-M7** LM fits, compressible hyperelastic, Hill-48, MFront (OQ-MATL-05): `docs/physics/02-constitutive-models/`. _deps: —_
-- `[TODO]` **TMC-M4b** Transient coupled step, orthotropic CTE, fit stack-ups, bimetal FE: `docs/physics/04-thermo-mechanical/`. _deps: —_
-- `[WIP]` **FPR-E** Realism: accuracy envelope, losses, brake calibration, gear efficiency, propeller table: `docs/physics/21-functional-prototype/`. _deps: —_
-- `[TODO]` **FPR-D** Review tab wiring + `check_prototype` + dispositions: same spec. _deps: FPR-E_
+- `[REVIEW]` **MATL-M7** LM fits, compressible hyperelastic, Hill-48, MFront (OQ-MATL-05): `docs/physics/02-constitutive-models/`. _deps: —_
+- `[WIP]` **TMC-M4b** Transient coupled step, orthotropic CTE, fit stack-ups, bimetal FE: `docs/physics/04-thermo-mechanical/`. _deps: —_
+- `[REVIEW]` **FPR-E** Realism: accuracy envelope, losses, brake calibration, gear efficiency, propeller table: `docs/physics/21-functional-prototype/`. _deps: —_
+- `[WIP]` **FPR-D** Review tab wiring + `check_prototype` + dispositions: same spec. _deps: FPR-E_
 - `[TODO]` **FPR-MJ** MuJoCo 3.14.0 → 3.16.0, re-run VC-FPR-10…17: same spec §11 Q7. _deps: —_
 - Plant packs `docs/plant/` (10 packs, specs only): first fix `pipeSizes.ts` ASME/EN mix (README D1), settle D2, then PSC + EQP M1.
 
