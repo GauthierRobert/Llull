@@ -4,7 +4,7 @@ import { isRecord } from '../../lib/isRecord';
 import { isStringArray } from '../../lib/isStringArray';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isReservedKey } from '../../lib/reservedKey';
-import { gearExtrasProblem, lossesProblem, propellerExtrasProblem } from '../dynamics/engine/engineValidation';
+import { gearExtrasProblem, lossesProblem, propellerExtrasProblem } from './engineValidation';
 
 const isVec3 = (value: unknown): boolean => Array.isArray(value) && value.length === 3 && value.every(isFiniteNumber);
 const isNonNegative = (value: unknown): boolean => isFiniteNumber(value) && value >= 0;
@@ -109,6 +109,9 @@ const singleZoneProblem = (model: Record<string, unknown>): string | null => {
     return 'single_zone woschni needs c1, c2Closed, c2Exchange, wallTempK > 0 and c3 >= 0, tempExponent';
   if (!isPositive(model['intakePressurePa']) || !isPositive(model['intakeTempK']))
     return 'single_zone needs intakePressurePa and intakeTempK > 0';
+  const calibrated = model['calibratedRpm'];
+  if (calibrated !== undefined && (!Array.isArray(calibrated) || !calibrated.every((rpm) => isPositive(rpm))))
+    return 'single_zone calibratedRpm must be an array of finite numbers > 0';
   const heatOk =
     isRecord(heat) &&
     (heat['kind'] === 'per_cycle_J' ? isPositive(heat['value']) : heat['kind'] === 'table_vs_rpm' && isPoints(heat['points'], 1));

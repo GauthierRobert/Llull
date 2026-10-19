@@ -336,6 +336,11 @@ export function validateMaterialValue(name: string, v: unknown): string | null {
   const isUnit = (x: unknown): boolean => isFiniteNumber(x) && x >= 0 && x <= 1;
   if (!isUnit(metalness)) return `material '${name}': metalness must be a finite number in [0, 1], got ${String(metalness)}`;
   if (!isUnit(roughness)) return `material '${name}': roughness must be a finite number in [0, 1], got ${String(roughness)}`;
+  const source = v['source'];
+  if (source !== undefined && (typeof source !== 'string' || source.trim().length === 0))
+    return `material '${name}': source must be a non-empty string`;
+  const grade = v['grade'];
+  if (grade !== undefined && grade !== 'A' && grade !== 'B' && grade !== 'C') return `material '${name}': grade must be 'A', 'B' or 'C'`;
   if (v['propertyModels'] !== undefined) {
     const models = storedModelsProblem(name, v['propertyModels'], formHash);
     if (models !== null) return models;
