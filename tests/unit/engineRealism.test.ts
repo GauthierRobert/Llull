@@ -10,17 +10,21 @@ import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { EngineLosses, PropellerLoad } from '@core/model/dynamics';
 import { type ReferenceData } from '@core/model/prototype';
-import { accuracy, bandText, combineContributions } from '@core/dynamics/engine/accuracy';
+import { accuracy, bandText, combineContributions } from '@core/dynamics/accuracy';
 import { fmepAt, fmepBand, ownsCylinder } from '@core/dynamics/engine/engineLosses';
-import { advanceRatio, pchipAt, propellerCoefficients } from '@core/dynamics/engine/propellerTable';
+import { advanceRatio, pchipAt, propellerCoefficients } from '@core/dynamics/propellerTable';
 import { propellerOutput } from '@core/dynamics/forceLaws';
 import { combustionOrigin } from '@core/dynamics/engine/combustionOrigin';
 import { comparePoint, summariseComparison } from '@core/dynamics/engine/referenceComparison';
 import { REFERENCE_PRESET_NAMES, REFERENCE_PRESETS } from '@core/dynamics/engine/referencePresets';
 import { isRotaxReduction, outsideBand } from '@core/dynamics/engine/plausibility';
-import { idealGearWarnings } from '@core/dynamics/engine/gearLoss';
-import { sourcedMaterial } from '@core/dynamics/engine/sourcedMaterials';
-import { bodyMassProperties } from '@core/dynamics/simulationModel';
+import { idealGearWarnings } from '@core/dynamics/gearLoss';
+import { sourcedMaterial } from '@core/commands/document/sourcedMaterials';
+import { bodyMassProperties, buildSimulationModel } from '@core/dynamics/simulationModel';
+import { setEngineLossLaw } from '@core/dynamics/engineLossHook';
+import { realismOf, setRealismLaw } from '@core/commands/dynamics/realismHook';
+import { installEngineLaws } from '@core/commands/dynamics/engine/hooks';
+import { validateMaterialValue } from '@core/commands/persistence/guards';
 import { residualTier } from '@core/dynamics/reactions';
 import { dynamicsProblems } from '@core/commands/persistence/dynamicsValidation';
 import { prototypeProblems } from '@core/commands/persistence/prototypeValidation';
@@ -889,6 +893,51 @@ describe('load validation of the new slices', () => {
     expect(prototypeProblems({ intents: {}, grounded: [], references: 'x' })[0]).toMatch(/references must be an object/);
     expect(prototypeProblems({ intents: {}, grounded: [], references: { a: { id: 'b' } } })[0]).toMatch(/whose id is 'a'/);
     expect(prototypeProblems({ intents: {}, grounded: [], references: JSON.parse('{"__proto__": {}}') as object })[0]).toMatch(/reserved/);
+  });
+
+  it('rejects a calibratedRpm that is not an array of positive numbers (a string used to load and crash engine_quick_check)', () => {
+    const breakCylinder = (value: unknown): string[] => {
+      const copy = structuredClone(doc.dynamics) as unknown as { cylinders: Record<string, { model: Record<string, unknown> }> };
+      const cylinder = Object.values(copy.cylinders)[0];
+      if (cylinder === undefined) throw new Error('no cylinder');
+      cylinder.model['calibratedRpm'] = value;
+      return dynamicsProblems(copy);
+    };
+    expect(breakCylinder([5800])).toEqual([]);
+    expect(breakCylinder('5800')[0]).toMatch(/calibratedRpm must be an array of finite numbers > 0/);
+    expect(breakCylinder([0])[0]).toMatch(/calibratedRpm/);
+    expect(breakCylinder([Number.NaN])[0]).toMatch(/calibratedRpm/);
+  });
+
+  it('rejects a material source that is empty and a grade outside A / B / C', () => {
+    const base = { name: 'm', density: 2.68, color: '#cccccc', metalness: 0.5, roughness: 0.5 };
+    expect(validateMaterialValue('m', { ...base, source: 'E-R32', grade: 'B' })).toBeNull();
+    expect(validateMaterialValue('m', { ...base, source: '' })).toMatch(/source must be a non-empty string/);
+    expect(validateMaterialValue('m', { ...base, source: 3 })).toMatch(/source must be a non-empty string/);
+    expect(validateMaterialValue('m', { ...base, grade: 'D' })).toMatch(/grade must be 'A', 'B' or 'C'/);
+  });
+});
+
+describe('engine injection points (spec 11 Q3)', () => {
+  it('a model with losses is refused when no engine friction law is installed, never run lossless', () => {
+    const { doc } = calibratedEngine();
+    setEngineLossLaw(null);
+    try {
+      const built = buildSimulationModel(doc, 1e-4);
+      expect('error' in built && built.error).toMatch(/no engine friction law is installed/);
+    } finally {
+      installEngineLaws();
+    }
+    expect('error' in buildSimulationModel(doc, 1e-4)).toBe(false);
+  });
+
+  it('without a realism law the realism block is absent', () => {
+    setRealismLaw(null);
+    try {
+      expect(realismOf({} as unknown as Parameters<typeof realismOf>[0])).toBeNull();
+    } finally {
+      installEngineLaws();
+    }
   });
 });
 

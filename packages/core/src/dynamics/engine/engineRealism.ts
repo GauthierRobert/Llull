@@ -21,7 +21,7 @@ import {
   outsideBand,
   type PlausibilityFinding,
 } from './plausibility';
-import { accuracy, combineContributions, RIGID_BODY_WARNING, type Accuracy, type AccuracyBand } from './accuracy';
+import { accuracy, combineContributions, RIGID_BODY_WARNING, type Accuracy, type AccuracyBand } from '../accuracy';
 import { combustionOrigin } from './combustionOrigin';
 import { fmepAt, fmepBand, ownsCylinder } from './engineLosses';
 import { elementAt } from '../../lib/elementAt';

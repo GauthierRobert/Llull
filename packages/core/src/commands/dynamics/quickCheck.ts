@@ -10,7 +10,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { failer, report } from '../noop';
 import { dynamicsOf } from './bodies';
-import { accuracy, RIGID_BODY_WARNING, type Accuracy } from '../../dynamics/engine/accuracy';
+import { accuracy, RIGID_BODY_WARNING, type Accuracy } from '../../dynamics/accuracy';
 import { quickBrake } from '../../dynamics/engine/quickBrake';
 
 const DEFAULT_ANGLES = [0, 30, 60, 90, 120, 150, 180];

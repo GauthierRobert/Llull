@@ -3,7 +3,7 @@
 import type { DynamicsModel } from '../../../model/dynamics';
 import type { ReferenceData, ReferencePoint } from '../../../model/prototype';
 import { comparePoint, summariseComparison, type PointComparison } from '../../../dynamics/engine/referenceComparison';
-import type { AccuracyBand } from '../../../dynamics/engine/accuracy';
+import type { AccuracyBand } from '../../../dynamics/accuracy';
 import type { CommandResult } from '../../types';
 import { defineCommand, z } from '../../schema';
 import { codedRejection, failer, report } from '../../noop';

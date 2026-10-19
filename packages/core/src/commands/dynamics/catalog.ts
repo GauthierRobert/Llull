@@ -18,6 +18,10 @@ import { engineQuickCheck } from './quickCheck';
 import { simulateMotion } from './simulate';
 import { addSpring } from './springs';
 import { setDynamicsSolver } from './solver';
+import { installEngineLaws } from './engine/hooks';
+
+// the catalog is the composition point of the engine folder (spec 11 Q3): generic dynamics reads the laws through injection points only
+installEngineLaws();
 
 export const dynamicsCommands = commandCatalog(
   addRigidBody,

@@ -8,7 +8,7 @@
 import type { EngineLosses } from '../../model/dynamics';
 import type { AppliedLoads, SimulationState } from '../physicsEngine';
 import { cylinderState, type CylinderRuntime } from '../cylinderLoads';
-import type { AccuracyBand } from './accuracy';
+import type { AccuracyBand } from '../accuracy';
 
 /** Speed below which the loss torque is smoothed (named, TR-FPR-15), rad/s. */
 const FRICTION_SMOOTHING_RAD_S = 1;

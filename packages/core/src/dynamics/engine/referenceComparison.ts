@@ -6,7 +6,7 @@
  */
 
 import type { ReferenceData, ReferencePoint, ReferenceQuantity } from '../../model/prototype';
-import { accuracy, type Accuracy, type AccuracyBand, type ValidationLevel } from './accuracy';
+import { accuracy, type Accuracy, type AccuracyBand, type ValidationLevel } from '../accuracy';
 
 const REFERENCE_UNITS: Readonly<Record<ReferenceQuantity, string>> = {
   brake_torque_Nm: 'N·m',

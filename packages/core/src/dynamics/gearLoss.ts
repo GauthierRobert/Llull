@@ -4,7 +4,7 @@
  * speed the driven shaft carries T_in / ratio_speed * efficiency (121 N·m through 51/21 at 0.99: 290.92 N·m, VC-FPR-27).
  */
 
-import type { DynamicsModel } from '../../model/dynamics';
+import type { DynamicsModel } from '../model/dynamics';
 
 /** Typical mesh efficiency of a real spur gear pair [E-R21], quoted in messages (never applied silently). */
 const TYPICAL_MESH_EFFICIENCY = 0.99;

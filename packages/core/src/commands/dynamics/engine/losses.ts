@@ -2,7 +2,7 @@
 
 import type { EngineLosses } from '../../../model/dynamics';
 import { fmepBand } from '../../../dynamics/engine/engineLosses';
-import { bandText } from '../../../dynamics/engine/accuracy';
+import { bandText } from '../../../dynamics/accuracy';
 import type { CommandResult } from '../../types';
 import { defineCommand, z } from '../../schema';
 import { idOrNext } from '../../entity/explicitId';

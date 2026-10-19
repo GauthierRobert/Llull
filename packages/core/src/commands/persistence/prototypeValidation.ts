@@ -1,12 +1,13 @@
-/** Load-time validation of the optional `prototype` field (interference intents, grounded parts). */
+/** Load-time validation of the optional `prototype` field (interference intents, grounded parts, references, dispositions). */
 
 import { isRecord } from '../../lib/isRecord';
 import { isStringArray } from '../../lib/isStringArray';
 import { isReservedKey } from '../../lib/reservedKey';
-import { INTENT_KINDS } from '../../model/prototype';
-import { referencesProblems } from '../dynamics/engine/engineValidation';
+import { DISPOSITION_STATUSES, INTENT_KINDS, REVIEW_CHECKS } from '../../model/prototype';
+import { referencesProblems } from './engineValidation';
 
 const KINDS: readonly string[] = INTENT_KINDS;
+const STATUSES: readonly string[] = DISPOSITION_STATUSES;
 
 function intentProblem(id: string, intent: unknown): string | null {
   if (!isRecord(intent) || intent['id'] !== id) return `prototype.intents['${id}'] must be an object whose id is '${id}'`;
@@ -22,6 +23,36 @@ function intentProblem(id: string, intent: unknown): string | null {
   return null;
 }
 
+/** True when `key` reads `<check>:<code>:<ids>` with a known review check and a non-empty code. */
+export const isFindingKey = (key: string): boolean => {
+  const [check, code, ...rest] = key.split(':');
+  return REVIEW_CHECKS.some((name) => name === check) && code !== undefined && code.length > 0 && rest.length > 0;
+};
+
+function dispositionProblem(key: string, disposition: unknown): string | null {
+  const at = `prototype.dispositions['${key}']`;
+  if (!isRecord(disposition) || disposition['findingKey'] !== key) return `${at} must be an object whose findingKey is '${key}'`;
+  if (!isFindingKey(key)) return `${at}: the key must read <check>:<code>:<ids> with check one of ${REVIEW_CHECKS.join(', ')}`;
+  if (typeof disposition['status'] !== 'string' || !STATUSES.includes(disposition['status']))
+    return `${at}: status must be one of ${STATUSES.join(', ')}`;
+  if (typeof disposition['comment'] !== 'string') return `${at}: comment must be a string`;
+  if (typeof disposition['inputsHash'] !== 'string' || disposition['inputsHash'].length === 0)
+    return `${at}: inputsHash must be a non-empty string`;
+  if (disposition['by'] !== 'agent' && disposition['by'] !== 'human') return `${at}: by must be 'agent' or 'human'`;
+  return null;
+}
+
+function dispositionsProblems(value: unknown): string[] {
+  if (value === undefined) return [];
+  if (!isRecord(value)) return ['prototype.dispositions must be an object keyed by finding key'];
+  return Object.entries(value).flatMap(([key, disposition]) => {
+    const problem = isReservedKey(key)
+      ? `prototype.dispositions: key '${key}' is a reserved JavaScript property name`
+      : dispositionProblem(key, disposition);
+    return problem === null ? [] : [problem];
+  });
+}
+
 /** Problems of the optional `prototype` field of a raw document (absent is valid). */
 export function prototypeProblems(value: unknown): string[] {
   if (value === undefined) return [];
@@ -33,6 +64,6 @@ export function prototypeProblems(value: unknown): string[] {
     if (problem !== null) errors.push(problem);
   }
   if (new Set(value['grounded']).size !== value['grounded'].length) errors.push('prototype.grounded contains duplicate ids');
-  errors.push(...referencesProblems(value['references']));
+  errors.push(...referencesProblems(value['references']), ...dispositionsProblems(value['dispositions']));
   return errors;
 }

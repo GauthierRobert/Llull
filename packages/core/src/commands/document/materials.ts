@@ -14,7 +14,7 @@ import { changed, commandError, noop, report } from '../noop';
 import { convertValue, isUnitFailure } from '../../lib/quantity';
 import { refuseMaterial } from '../materials/refusal';
 import { describeDensity, densityPlausibilityWarning, kgPerM3FromDocDensity } from '../../geometry/resolveDensity';
-import { sourcedMaterial } from '../../dynamics/engine/sourcedMaterials';
+import { sourcedMaterial } from './sourcedMaterials';
 
 const DEFAULT_COLOR = '#b0b0b0';
 

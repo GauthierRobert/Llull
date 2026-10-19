@@ -4,7 +4,7 @@
  */
 
 import type { CylinderPressure, EngineLosses } from '../../model/dynamics';
-import { accuracy, combineContributions, RIGID_BODY_WARNING, type Accuracy } from './accuracy';
+import { accuracy, combineContributions, RIGID_BODY_WARNING, type Accuracy } from '../accuracy';
 import { combustionOrigin } from './combustionOrigin';
 import { fmepAt, fmepBand } from './engineLosses';
 
