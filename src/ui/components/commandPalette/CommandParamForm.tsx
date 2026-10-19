@@ -1,9 +1,12 @@
 // Generated param form for one registry command (ids pre-filled from the selection); destructive commands warn and
 // use a danger Run. Submit parses + dispatches; Escape / Back returns to the list.
 
-import React, { useId, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { CommandDefinition } from '@core/commands/types';
 import { useStore } from '@ui/store';
+import { usePreviewStore } from '@ui/store/previewStore';
+import { isPreviewable } from '@ui/preview/previewable';
+import { usePreviewController } from '@ui/preview/usePreviewController';
 import { Icon } from '@ui/components/Icon';
 import { fieldsFromSchema, humanizeName, initialValues, matchTypeahead, parseFormValues, valuesFromParams } from './paramForm';
 import type { FormField, FormValues } from './paramForm';
@@ -20,6 +23,8 @@ interface CommandParamFormProps {
   backLabel?: string;
   /** Last submit's refusal / result. */
   statusMessage?: string | null;
+  /** Show a live ghost of the result in the viewport while the params are valid (never dispatches). */
+  preview?: boolean;
 }
 
 const PLACEHOLDERS: Readonly<Record<FormField['kind'], string>> = {
@@ -121,6 +126,7 @@ export function CommandParamForm({
   submitLabel = 'Run',
   backLabel = 'Back to commands',
   statusMessage = null,
+  preview = false,
 }: CommandParamFormProps): React.ReactElement {
   const fields = useMemo(() => fieldsFromSchema(command.paramsSchema), [command]);
   const [values, setValues] = useState<FormValues>(() =>
@@ -128,11 +134,24 @@ export function CommandParamForm({
   );
   const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
   const baseId = useId();
+  const previewing = preview && isPreviewable(command, fields);
+  const controller = usePreviewController();
+  const previewOutcome = usePreviewStore((s) => s.outcome);
+
+  // External sync: ghost follows the typed params; invalid / incomplete params clear it.
+  useEffect(() => {
+    if (!previewing) return;
+    const parsed = parseFormValues(fields, values);
+    if (parsed.ok) controller.request(command.name, parsed.params);
+    else controller.cancel();
+  }, [previewing, fields, values, command.name, controller]);
 
   const submit = (): void => {
     const result = parseFormValues(fields, values);
-    if (result.ok) onSubmit(result.params);
-    else setErrors(result.errors);
+    if (result.ok) {
+      controller.cancel();
+      onSubmit(result.params);
+    } else setErrors(result.errors);
   };
 
   const requiredCount = fields.filter((f) => f.required).length;
@@ -219,6 +238,12 @@ export function CommandParamForm({
             );
           })}
         </div>
+      )}
+
+      {previewing && previewOutcome !== null && (
+        <p className={`palette-form__preview${previewOutcome.ok ? '' : ' palette-form__preview--refused'}`} role="status">
+          <strong>{previewOutcome.ok ? 'Preview' : 'Preview unavailable'}</strong> {previewOutcome.summary}
+        </p>
       )}
 
       {statusMessage !== null && (

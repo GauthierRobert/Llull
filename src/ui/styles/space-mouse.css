@@ -1,0 +1,103 @@
+/* ---- 3D mouse chip + settings ------------------------------------------------ */
+
+.space-mouse {
+  position: absolute;
+  left: var(--space-3, 12px);
+  bottom: 52px;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.space-mouse__chip {
+  padding: 4px 12px;
+  border: 1px solid var(--border-float);
+  border-radius: var(--radius-full);
+  background: var(--surface-float);
+  backdrop-filter: blur(10px);
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.space-mouse__chip--on {
+  color: var(--accent-text);
+}
+
+.space-mouse__panel {
+  display: grid;
+  gap: 8px;
+  width: 280px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-float);
+  border-radius: var(--radius);
+  background: var(--surface-popover);
+  box-shadow: var(--shadow-float);
+  font-size: var(--text-sm);
+  color: var(--fg);
+}
+
+.space-mouse__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.space-mouse__status .btn {
+  margin-left: auto;
+}
+
+.space-mouse__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fg-muted);
+}
+
+.space-mouse__dot--connected {
+  background: var(--accent);
+}
+
+.space-mouse__dot--error {
+  background: var(--danger);
+}
+
+.space-mouse__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-xs);
+}
+
+.space-mouse__group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.space-mouse__group legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+.space-mouse__check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+}
+
+.space-mouse__slider {
+  display: grid;
+  grid-template-columns: 90px 1fr 36px;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-xs);
+}

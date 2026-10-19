@@ -23,6 +23,7 @@ import type { PbrMaterial } from './useMaterialProps';
 import { useTransitioningIds } from '@ui/store/transitioningIds';
 import { LiveTransitionGroup } from '../liveFx/LiveTransitionGroup';
 import { type GhostRenderer, LiveFxLayer } from '../liveFx/LiveFxLayer';
+import { PreviewLayer, type RenderPreviewEntity } from './preview/PreviewLayer';
 
 /** Expands an instance; every sub-mesh click selects the INSTANCE id so it moves as a unit. */
 function InstanceEntityRenderer({
@@ -105,6 +106,11 @@ const renderGhost3D: GhostRenderer = (ghost) => (
     onSelect={noopSelect}
     components={ghost.entity.kind === 'instance' ? ghost.document.components : undefined}
   />
+);
+
+/** A dry-run result entity, drawn by its normal render branch (the layer then swaps in translucent materials). */
+const renderPreviewEntity: RenderPreviewEntity = (entity) => (
+  <EntityRenderer key={entity.id} entity={entity} selected={false} onSelect={noopSelect} />
 );
 
 export function Entities(): React.ReactElement {
@@ -205,6 +211,7 @@ export function Entities(): React.ReactElement {
       ))}
 
       <LiveFxLayer renderGhost={renderGhost3D} />
+      <PreviewLayer renderEntity={renderPreviewEntity} />
     </group>
   );
 }
