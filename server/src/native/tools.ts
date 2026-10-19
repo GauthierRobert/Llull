@@ -4,6 +4,7 @@
  *   fatigue_field  FE fatigue case -> llull-compute post fatigue (every node) -> FatigueField artifact -> compute_fatigue
  *   fea_map_field  thermo_static interpolate field -> llull-compute post map -> mapped-field artifact (read by the fea_solve deck)
  *   fea_render     render_fea_results with the pixel raster in llull-compute raster (raster=auto|ts|cpu|gpu)
+ *   mtest_run      optional user-installed MFront / MTest (not llull-compute): runs an MTest script, returns its result table
  */
 
 import type { ToolDefinition } from '@protocol/tools';
@@ -18,6 +19,7 @@ import { runFatigueField, type NativeDeps } from './fatigueField';
 import { runMapField } from './mapField';
 import { DEFAULT_TOPOLOGY_TIMEOUT_S, runTopologySolve, type TopologySolveOptions } from './topologySolve';
 import { runFeaRender } from './renderField';
+import { MTEST_TOOL, mtestToolDefinition, runMtestTool } from '../mfront/mtestTool';
 
 const TIMEOUT = {
   type: 'number' as const,
@@ -66,6 +68,7 @@ export function nativeToolDefinitions(): ToolDefinition[] {
     },
     renderToolDefinition(),
     topologyToolDefinition(),
+    mtestToolDefinition(),
   ];
 }
 
@@ -124,7 +127,7 @@ function topologyToolDefinition(): ToolDefinition {
   };
 }
 
-const NAMES: ReadonlySet<string> = new Set(['fatigue_field', 'fea_map_field', 'fea_render', 'topology_solve']);
+const NAMES: ReadonlySet<string> = new Set(['fatigue_field', 'fea_map_field', 'fea_render', 'topology_solve', MTEST_TOOL]);
 
 export const isNativeTool = (name: string): boolean => NAMES.has(name);
 
@@ -145,6 +148,7 @@ export async function runNativeTool(
   deps: NativeDeps = defaultDeps(process.env, host.onProgress),
 ): Promise<CommandOutcome | null> {
   if (!isNativeTool(name)) return null;
+  if (name === MTEST_TOOL) return runMtestTool(params);
   if (name === 'fea_render') return { ...(await runFeaRender(params, host, deps)), changed: false };
   const args = isRecord(params) ? params : {};
   if (name === 'topology_solve') {
