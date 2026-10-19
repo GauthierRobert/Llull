@@ -26,6 +26,21 @@ async function prepareKernel(): Promise<void> {
   await Promise.all([installGeometryKernel(), installPhysicsEngine()]);
 }
 
+/** A handle still open this long after the run (a kernel worker, a wasm instance) no longer delays the exit. */
+const FORCED_EXIT_MS = 10_000;
+
+/**
+ * Ends the process by letting the event loop drain, not with an immediate `process.exit`: a natural exit waits for V8's
+ * background tasks, while `process.exit` tears the platform down under them. On Windows (Node 24) a background wasm
+ * compile (fetch's llhttp after an `--app` / `--server` call) then posts to a closed libuv handle and the process aborts
+ * with `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` (src\win\async.c). The unref'd timer only fires when
+ * something still holds the loop open.
+ */
+function exitWhenDrained(code: number): void {
+  process.exitCode = code;
+  setTimeout(() => process.exit(code), FORCED_EXIT_MS).unref();
+}
+
 runCli(process.argv.slice(2), {
   stdout: (text) => process.stdout.write(`${text}\n`),
   stderr: (text) => process.stderr.write(`${text}\n`),
@@ -34,12 +49,8 @@ runCli(process.argv.slice(2), {
   prepareKernel,
   stderrIsTty: process.stderr.isTTY === true,
 })
-  .then((code) => {
-    // Kernel workers / wasm handles would otherwise keep the process alive.
-    process.exitCode = code;
-    process.stdout.write('', () => process.exit(code));
-  })
+  .then((code) => exitWhenDrained(code))
   .catch((error: unknown) => {
     process.stderr.write(`llull: internal error: ${String(error)}\n`);
-    process.exit(1);
+    exitWhenDrained(1);
   });
