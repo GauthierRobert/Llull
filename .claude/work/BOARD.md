@@ -11,6 +11,8 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - Lanes own disjoint write scopes (`.claude/rules/workflow.md` W5); one task per lane at a time, up to 4 lanes + Lane 5 review.
 
 ## NOW (auto-updated by the skill)
+- 2026-10-19 — integration branch `feat/eng-depth`: wave 1 WIP = FEA-REST part 1 (modal, buckling, dispose_margin, analytic_check), AERO-5 02 SRF (M0–M3),
+  MATL-M7, FPR-E. Next: TMC-M4b, FEA-REST part 2 (BDF/OP2/VTU, face map), 06 CMP, then FEA-REST part 3 (shells, UI), FPR-D.
 - 2026-10-19 — branch `ccr-d5e76715-intlyp`: LC1 done (steps 1–6: native kernel default everywhere, opencascade.js retired, no outbox),
   RS-1 done (macOS bundle deferred by the owner), RS-2 done (native SIMP topology optimisation + plugin `topology` + `topology_solve` + UI panel).
   Next: CFD-M1, then RS-3.
@@ -41,14 +43,14 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## Aerospace + physics (spec = the linked pack)
 - `[TODO]` **AERO-4** Supply chain: 03 GDT, 04 XCH (AP242), 09 PLM (`HumanSignaturePort`, `dispose_*`): `docs/aerospace/README.md`. _deps: —_
-- `[TODO]` **AERO-5** Engineering depth: 05 FEA-REST, 02 SRF, 06 CMP: `docs/aerospace/README.md`. _deps: —_
-- `[TODO]` **FEA-REST** Modal/buckling/shell/margins rest, BDF/OP2, face map, UI: `docs/aerospace/05-fea-cae-handoff/` §10. _deps: —_
+- `[WIP]` **AERO-5** Engineering depth: 05 FEA-REST, 02 SRF, 06 CMP: `docs/aerospace/README.md`. _deps: —_
+- `[WIP]` **FEA-REST** Modal/buckling/shell/margins rest, BDF/OP2, face map, UI: `docs/aerospace/05-fea-cae-handoff/` §10. _deps: —_
 - `[BLOCKED]` **VNV-M3** Convergence studies + `check_verification`: `docs/physics/00-vv-harness/`. _deps: FEA artifact store, AERO-4 (09 PLM signing)_
 - `[TODO]` **VNV-M4** Time-step/order refinement, least-squares order, UI: `docs/physics/00-vv-harness/`. _deps: VNV-M3_
 - `[BLOCKED]` **PROP-M6** Seed NIST property library: `docs/physics/01-property-models/` (OQ-PROP-03, needs trc.nist.gov access). _deps: —_
-- `[TODO]` **MATL-M7** LM fits, compressible hyperelastic, Hill-48, MFront (OQ-MATL-05): `docs/physics/02-constitutive-models/`. _deps: —_
+- `[WIP]` **MATL-M7** LM fits, compressible hyperelastic, Hill-48, MFront (OQ-MATL-05): `docs/physics/02-constitutive-models/`. _deps: —_
 - `[TODO]` **TMC-M4b** Transient coupled step, orthotropic CTE, fit stack-ups, bimetal FE: `docs/physics/04-thermo-mechanical/`. _deps: —_
-- `[TODO]` **FPR-E** Realism: accuracy envelope, losses, brake calibration, gear efficiency, propeller table: `docs/physics/21-functional-prototype/`. _deps: —_
+- `[WIP]` **FPR-E** Realism: accuracy envelope, losses, brake calibration, gear efficiency, propeller table: `docs/physics/21-functional-prototype/`. _deps: —_
 - `[TODO]` **FPR-D** Review tab wiring + `check_prototype` + dispositions: same spec. _deps: FPR-E_
 - `[TODO]` **FPR-MJ** MuJoCo 3.14.0 → 3.16.0, re-run VC-FPR-10…17: same spec §11 Q7. _deps: —_
 - Plant packs `docs/plant/` (10 packs, specs only): first fix `pipeSizes.ts` ASME/EN mix (README D1), settle D2, then PSC + EQP M1.
