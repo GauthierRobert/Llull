@@ -1,11 +1,11 @@
 /** compute_margins (05 §5.8, AF-31..36): margins of safety from the TRUSTED results artifact of a static / thermo_static analysis. */
 
-import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact, LoadCategory } from '@core/model/analysis';
+import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact, HumanSignaturePort, LoadCategory } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
-import type { CommandResult } from '@core/commands/types';
+import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { significantNumber } from '@lib/compactNumber';
 import { loadCasesOf } from '../decks/context';
 import { elasticConstants, isElasticRefusal, propertyTemperatureK } from '../decks/elastic';
@@ -25,6 +25,7 @@ import {
   type AllowableRefusal,
 } from './allowable';
 import { appliedFactor, factorReport, marginOfSafety, statusOf, type CheckKind, type MarginStatus } from './marginMath';
+import { dispositionOf } from './disposition';
 import { refuseMargins } from './refusal';
 
 const CRITERIA = ['von_mises', 's_xx', 's_yy', 's_zz'] as const;
@@ -99,7 +100,7 @@ function appliedOver(
   return maxOverNodes({ values: subset }, scalar);
 }
 
-interface MarginRow {
+export interface MarginRow {
   readonly rowId: string;
   readonly ms: number | null;
   readonly status: MarginStatus;
@@ -119,6 +120,8 @@ interface Context {
   readonly marginalBand: number | undefined;
   readonly groupBy: 'part' | 'target';
   readonly loadCaseFilter: ReadonlySet<string> | undefined;
+  /** Signing port that re-verifies stored dispositions (null: none counts). */
+  readonly port: HumanSignaturePort | null;
   /** thermo_static only: solved temperature of each mesh node; null = the allowable is read at the reference temperature. */
   readonly temperatures: NodeTemperatures | null;
 }
@@ -203,8 +206,11 @@ function buildRows(
         const status = statusOf(ms, marginalBand);
         const reasons = [...new Set([...found.unverifiedReasons, ...unverifiedReasonsOf(context, group.entityId, materialId)])];
         const at: Vec3 = coordinates.get(applied.node) ?? [0, 0, 0];
+        const rowKey = [name, group.entityId, group.region, check, criterion].join('|');
+        const decided = dispositionOf(analysis, { rowKey, status, ms }, context.port, analysis.results?.resultsHash ?? '');
         rows.push({
           rowId: `r${rows.length + 1}`,
+          rowKey,
           part: group.entityId,
           region: group.region,
           loadCase: name,
@@ -231,7 +237,10 @@ function buildRows(
           unverifiedReasons: reasons,
           reviewRequired: true,
           reviewReason: 'margin of safety supports a structural substantiation decision',
-          disposition: status === 'PASS' ? 'none' : 'pending_human',
+          disposition: decided.disposition,
+          statusLabel: decided.statusLabel,
+          ...(decided.record !== undefined ? { dispositionRecord: decided.record } : {}),
+          ...(decided.note !== undefined ? { dispositionNote: decided.note } : {}),
         });
       }
     }
@@ -239,10 +248,137 @@ function buildRows(
   return { rows };
 }
 
+/** Parameters that choose which margin table is computed (shared by compute_margins and dispose_margin, so a row id means the same row in both). */
+export const marginQueryShape = {
+  criterion: z
+    .enum(CRITERIA)
+    .optional()
+    .describe('Applied stress: von_mises (default) or the largest magnitude of the normal component s_xx, s_yy or s_zz.'),
+  allowable: allowableSchema
+    .optional()
+    .describe('"ftu" (ultimate check), "fty" (yield check), or { value, unit, against? }. Omit for both checks from the material models.'),
+  groupBy: z
+    .enum(['part', 'target'])
+    .optional()
+    .describe('part (default): one row per part; target: per constraint / load node set and part.'),
+  loadCases: z.array(z.string()).optional().describe('Load case names to include (default: all load cases of the analysis).'),
+  marginalBand: z
+    .number()
+    .optional()
+    .describe('MS value below which a passing row is MARGINAL (>= 0, in MS units). No default: without it no row is marginal.'),
+};
+
+export type MarginQuery = z.output<z.ZodObject<typeof marginQueryShape>>;
+
+export interface MarginTable {
+  readonly analysis: AnalysisCase;
+  readonly rows: readonly MarginRow[];
+  readonly summary: string;
+  readonly data: Record<string, unknown>;
+}
+
+export interface MarginRefusal {
+  readonly code: string;
+  readonly message: string;
+  readonly ids: readonly string[];
+}
+
+/**
+ * The margin table of `analysisId` for `query` (what `compute_margins` returns), or the refusal; shared with `dispose_margin` and `check_analysis`.
+ * @failure see `computeMargins`
+ */
+export function marginTable(
+  doc: CadDocument,
+  analysisId: string,
+  query: MarginQuery,
+  ctx: ExecutionContext | undefined,
+): MarginTable | MarginRefusal {
+  const { groupBy = 'part', marginalBand } = query;
+  const criterion = query.criterion ?? 'von_mises';
+  const refuse = (code: string, message: string): MarginRefusal => ({ code, message, ids: [analysisId] });
+  const analysis = caseOf(doc, analysisId);
+  if (analysis === undefined) return refuse('FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`);
+  if (analysis.type !== 'static' && analysis.type !== 'thermo_static')
+    return refuse('FEA_ANALYSIS_TYPE_UNSUPPORTED', `margins need structural results; '${analysisId}' is ${analysis.type}`);
+  if (marginalBand !== undefined && !(Number.isFinite(marginalBand) && marginalBand >= 0))
+    return refuse('FEA_MARGIN_PARAM_INVALID', `marginalBand ${marginalBand} must be a finite number >= 0`);
+  const known = loadCasesOf(analysis).map((entry) => entry.name);
+  const unknown = (query.loadCases ?? []).filter((name) => !known.includes(name));
+  if (unknown.length > 0)
+    return refuse('FEA_MARGIN_PARAM_INVALID', `unknown load case(s) ${unknown.join(', ')}; the analysis has ${known.join(', ')}`);
+  const trust = trustedRecord(doc, analysis, ctx?.feaArtifacts);
+  if (trust.state === 'stale' && analysis.results !== undefined)
+    return refuse('FEA_RESULTS_STALE', `the results of '${analysisId}' predate a change of its inputs`);
+  if (trust.state === 'untrusted')
+    return refuse(
+      trust.problem?.code ?? 'FEA_SUMMARY_MISMATCH',
+      trust.problem?.message ?? 'the recorded summary differs from its artifact',
+    );
+  if (trust.resultsArtifact === null || trust.meshArtifact === null)
+    return refuse(
+      'FEA_RESULTS_MISSING',
+      `analysis '${analysisId}' has no verified results (${trust.problem?.message ?? `state ${trust.state}`})`,
+    );
+  const context: Context = {
+    doc,
+    analysis,
+    mesh: trust.meshArtifact,
+    results: trust.resultsArtifact,
+    criterion,
+    allowable: query.allowable,
+    marginalBand,
+    groupBy,
+    loadCaseFilter: query.loadCases === undefined ? undefined : new Set(query.loadCases),
+    port: ctx?.humanSignature ?? null,
+    temperatures:
+      analysis.type === 'thermo_static' ? solvedNodeTemperatures(doc, analysis, trust.meshArtifact, ctx?.feaArtifacts ?? null) : null,
+  };
+  const built = buildRows(context);
+  if ('code' in built) return refuse(built.code, built.message);
+  const { rows } = built;
+  if (rows.length === 0)
+    return refuse(
+      'FEA_MARGIN_PARAM_INVALID',
+      'no margin row to compute (yield checks need a limit load case, and the groups need stress values)',
+    );
+  const finite = rows.filter((row) => row.ms !== null);
+  const lowest = finite.reduce<MarginRow | null>((best, row) => (best === null || (row.ms ?? 0) < (best.ms ?? 0) ? row : best), null);
+  const pending = rows.filter((row) => row.disposition === 'pending_human').length;
+  const decided = rows.filter((row) => row.status !== 'PASS' && row.disposition !== 'pending_human').length;
+  const unverified = rows.filter((row) => row['unverified'] === true).length;
+  const factors = factorReport(analysis);
+  const data = {
+    analysisId,
+    unitSystem: analysis.unitSystem,
+    resultsHash: analysis.results?.resultsHash ?? '',
+    criterion,
+    groupBy,
+    marginalBand: marginalBand ?? null,
+    minMs: lowest?.ms ?? null,
+    minMsRow: lowest?.rowId ?? null,
+    factors,
+    rows,
+    singularScreening:
+      'not performed: peak stresses at point loads, supports and re-entrant corners are not screened (singular is false on every row)',
+    warnings: [
+      ...(marginalBand === undefined ? ['FEA_MARGINAL_BAND_UNSET: no marginalBand given, so no row is MARGINAL'] : []),
+      ...(analysis.type === 'thermo_static' ? temperatureWarnings(context.temperatures, propertyTemperatureK(analysis), rows) : []),
+    ],
+    reviewRequired: true,
+  };
+  const worst =
+    lowest === null
+      ? 'no finite margin'
+      : `min MS ${significantNumber(lowest.ms ?? 0, 4)} (${String(lowest['statusLabel'])}, ${lowest.rowId} ${String(lowest['loadCase'])}, part ${String(lowest['part'])})`;
+  const summary = `compute_margins: '${analysisId}' ${rows.length} row(s), ${worst}; ${pending} pending a human disposition${decided > 0 ? `, ${decided} dispositioned by a human (status unchanged)` : ''}, ${unverified} unverified; factors ultimate ${factors.ultimate.value} (${factors.ultimate.defaulted ? 'DEFAULT 14 CFR 25.303, not set by the user' : 'set via create_analysis'}), yield ${factors.yield.value} (${factors.yield.defaulted ? 'DEFAULT, not set by the user' : 'set via create_analysis'}). Computed by llull, not approved: needs a qualified engineer.`;
+  return { analysis, rows, summary, data };
+}
+
 /**
  * @invariant read-only; every number comes from the results artifact re-verified by `trustedRecord` (05 §4.1); every factor is named with
  *   source + defaulted (AF-31); every row has reviewRequired: true (AF-33), unverified = OR of the allowable, E/nu (and CTE) flags (AF-32);
- *   FAIL / MARGINAL rows are disposition pending_human (no dispose_margin is built); singular zones are NOT screened (every row singular: false)
+ *   FAIL / MARGINAL rows are disposition pending_human until dispose_margin records a human decision whose signature still verifies (the status
+ *   never changes: statusLabel reads `FAIL (accepted)`); every row has a stable rowKey; singular zones are NOT screened (every row singular: false)
  * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; not static / thermo_static -> FEA_ANALYSIS_TYPE_UNSUPPORTED; stale results ->
  *   FEA_RESULTS_STALE; no verified results -> FEA_RESULTS_MISSING; recorded summary differs from its artifact -> FEA_SUMMARY_MISMATCH;
  *   no allowable -> FEA_MATERIAL_NO_ALLOWABLE; bad load case / band / yield on ultimate-only cases -> FEA_MARGIN_PARAM_INVALID (refusals)
@@ -260,125 +396,17 @@ export const computeMargins = defineCommand({
     'an explicit allowable for all parts (against ultimate by default; always flagged unverified). The factors come from the case ' +
     '(create_analysis factors, or factor = one number for both; defaults 1.5 per 14 CFR 25.303 and 1.0 apply silently unless the user states a safety factor, so map "SF 2" to factor 2 there) and are listed with source and defaulted. Status: FAIL if MS < 0, ' +
     'MARGINAL only when marginalBand is given and MS < band (no default band), else PASS; FAIL / MARGINAL rows are disposition ' +
-    'pending_human. Every row has reviewRequired: true and unverified = OR of the input flags. Peak stresses at point loads, supports and ' +
+    'pending_human until a qualified human records dispose_margin (an agent cannot: FEA_HUMAN_GATE); a disposition never changes the status ' +
+    '(statusLabel "FAIL (accepted)") and every row has a stable rowKey. Every row has reviewRequired: true and unverified = OR of the input flags. Peak stresses at point loads, supports and ' +
     're-entrant corners are NOT screened for singularities (singular is always false): judge them yourself. Refused with ' +
     'FEA_RESULTS_STALE when inputs changed since the solve (run fea_mesh and fea_solve), FEA_RESULTS_MISSING without a verified results ' +
     'artifact, FEA_MATERIAL_NO_ALLOWABLE when a part has no Ftu / Fty for the check and no explicit allowable. Values are in the analysis ' +
     'unit system (N-mm-t-s: MPa, mm) and field names carry the unit.',
   annotations: { readOnly: true },
-  params: z.object({
-    analysisId: analysisIdSchema,
-    criterion: z
-      .enum(CRITERIA)
-      .optional()
-      .describe('Applied stress: von_mises (default) or the largest magnitude of the normal component s_xx, s_yy or s_zz.'),
-    allowable: allowableSchema
-      .optional()
-      .describe(
-        '"ftu" (ultimate check), "fty" (yield check), or { value, unit, against? }. Omit for both checks from the material models.',
-      ),
-    groupBy: z
-      .enum(['part', 'target'])
-      .optional()
-      .describe('part (default): one row per part; target: per constraint / load node set and part.'),
-    loadCases: z.array(z.string()).optional().describe('Load case names to include (default: all load cases of the analysis).'),
-    marginalBand: z
-      .number()
-      .optional()
-      .describe('MS value below which a passing row is MARGINAL (>= 0, in MS units). No default: without it no row is marginal.'),
-  }),
+  params: z.object({ analysisId: analysisIdSchema, ...marginQueryShape }),
   run: (doc, params, ctx): CommandResult => {
-    const { analysisId, groupBy = 'part', marginalBand } = params;
-    const criterion = params.criterion ?? 'von_mises';
-    const analysis = caseOf(doc, analysisId);
-    if (analysis === undefined) return refuseMargins(doc, 'FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`, [analysisId]);
-    if (analysis.type !== 'static' && analysis.type !== 'thermo_static')
-      return refuseMargins(doc, 'FEA_ANALYSIS_TYPE_UNSUPPORTED', `margins need structural results; '${analysisId}' is ${analysis.type}`, [
-        analysisId,
-      ]);
-    if (marginalBand !== undefined && !(Number.isFinite(marginalBand) && marginalBand >= 0))
-      return refuseMargins(doc, 'FEA_MARGIN_PARAM_INVALID', `marginalBand ${marginalBand} must be a finite number >= 0`, [analysisId]);
-    const known = loadCasesOf(analysis).map((entry) => entry.name);
-    const unknown = (params.loadCases ?? []).filter((name) => !known.includes(name));
-    if (unknown.length > 0)
-      return refuseMargins(
-        doc,
-        'FEA_MARGIN_PARAM_INVALID',
-        `unknown load case(s) ${unknown.join(', ')}; the analysis has ${known.join(', ')}`,
-        [analysisId],
-      );
-    const trust = trustedRecord(doc, analysis, ctx?.feaArtifacts);
-    if (trust.state === 'stale' && analysis.results !== undefined)
-      return refuseMargins(doc, 'FEA_RESULTS_STALE', `the results of '${analysisId}' predate a change of its inputs`, [analysisId]);
-    if (trust.state === 'untrusted')
-      return refuseMargins(
-        doc,
-        trust.problem?.code ?? 'FEA_SUMMARY_MISMATCH',
-        trust.problem?.message ?? 'the recorded summary differs from its artifact',
-        [analysisId],
-      );
-    if (trust.resultsArtifact === null || trust.meshArtifact === null)
-      return refuseMargins(
-        doc,
-        'FEA_RESULTS_MISSING',
-        `analysis '${analysisId}' has no verified results (${trust.problem?.message ?? `state ${trust.state}`})`,
-        [analysisId],
-      );
-    const context: Context = {
-      doc,
-      analysis,
-      mesh: trust.meshArtifact,
-      results: trust.resultsArtifact,
-      criterion,
-      allowable: params.allowable,
-      marginalBand,
-      groupBy,
-      loadCaseFilter: params.loadCases === undefined ? undefined : new Set(params.loadCases),
-      temperatures:
-        analysis.type === 'thermo_static' ? solvedNodeTemperatures(doc, analysis, trust.meshArtifact, ctx?.feaArtifacts ?? null) : null,
-    };
-    const built = buildRows(context);
-    if ('code' in built) return refuseMargins(doc, built.code, built.message, [analysisId]);
-    const { rows } = built;
-    if (rows.length === 0)
-      return refuseMargins(
-        doc,
-        'FEA_MARGIN_PARAM_INVALID',
-        'no margin row to compute (yield checks need a limit load case, and the groups need stress values)',
-        [analysisId],
-      );
-    const finite = rows.filter((row) => row.ms !== null);
-    const lowest = finite.reduce<MarginRow | null>((best, row) => (best === null || (row.ms ?? 0) < (best.ms ?? 0) ? row : best), null);
-    const pending = rows.filter((row) => row.disposition === 'pending_human').length;
-    const unverified = rows.filter((row) => row['unverified'] === true).length;
-    const factors = factorReport(analysis);
-    const data = {
-      analysisId,
-      unitSystem: analysis.unitSystem,
-      resultsHash: analysis.results?.resultsHash ?? '',
-      criterion,
-      groupBy,
-      marginalBand: marginalBand ?? null,
-      minMs: lowest?.ms ?? null,
-      minMsRow: lowest?.rowId ?? null,
-      factors,
-      rows,
-      singularScreening:
-        'not performed: peak stresses at point loads, supports and re-entrant corners are not screened (singular is false on every row)',
-      warnings: [
-        ...(marginalBand === undefined ? ['FEA_MARGINAL_BAND_UNSET: no marginalBand given, so no row is MARGINAL'] : []),
-        ...(analysis.type === 'thermo_static' ? temperatureWarnings(context.temperatures, propertyTemperatureK(analysis), rows) : []),
-      ],
-      reviewRequired: true,
-    };
-    const worst =
-      lowest === null
-        ? 'no finite margin'
-        : `min MS ${significantNumber(lowest.ms ?? 0, 4)} (${lowest.status}, ${lowest.rowId} ${String(lowest['loadCase'])}, part ${String(lowest['part'])})`;
-    return report(
-      doc,
-      `compute_margins: '${analysisId}' ${rows.length} row(s), ${worst}; ${pending} pending a human disposition, ${unverified} unverified; factors ultimate ${factors.ultimate.value} (${factors.ultimate.defaulted ? 'DEFAULT 14 CFR 25.303, not set by the user' : 'set via create_analysis'}), yield ${factors.yield.value} (${factors.yield.defaulted ? 'DEFAULT, not set by the user' : 'set via create_analysis'}). Computed by llull, not approved: needs a qualified engineer.`,
-      data,
-    );
+    const { analysisId, ...query } = params;
+    const table = marginTable(doc, analysisId, query, ctx);
+    return 'code' in table ? refuseMargins(doc, table.code, table.message, table.ids) : report(doc, table.summary, table.data);
   },
 });

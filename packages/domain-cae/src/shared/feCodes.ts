@@ -38,6 +38,12 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   FEA_UNITS_MISMATCH: 'mesh and analysis disagree on the unit system: re-run fea_mesh',
   FEA_ANALYSIS_TYPE_UNSUPPORTED:
     'use static, modal, buckling, heat_steady, heat_transient, thermo_static or coupled_temperature_displacement',
+  FEA_MS_NEGATIVE:
+    'redesign (thicker section, stiffer load path, better material); only a qualified reviewer can disposition a negative margin (dispose_margin)',
+  FEA_MS_MARGINAL: 'a qualified reviewer dispositions marginal rows (dispose_margin) or the part is strengthened',
+  FEA_MARGINAL_BAND_UNSET: 'ask the owner / company rule for a marginal band and pass marginalBand to compute_margins',
+  FEA_DISPOSITION_PENDING:
+    'hand the FAIL / MARGINAL rows to the qualified reviewer, who dispositions them with dispose_margin in the desktop app',
   FEA_UNDERCONSTRAINED:
     'add supports that remove all six rigid-body motions (a fixed face, or three non-collinear points holding six dofs); modal analyses of a free model report rigid-body modes at 0 Hz',
   FEA_MESH_ADEQUACY:

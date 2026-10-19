@@ -8,6 +8,7 @@ import { resolveTemperatureField, thermomechOf } from '../thermomech/field';
 import { fromKelvin, kelvinOf } from '../thermomech/units';
 import { caseTemperatureRange } from '../thermal/material';
 import { commentText, linesText, num, row } from './format';
+import { consistentWeights, momentForces } from './loadDistribution';
 
 const DOF_NUMBER = { ux: 1, uy: 2, uz: 3 } as const;
 
@@ -165,8 +166,9 @@ export interface StepLoadOptions {
 
 /**
  * Mechanical `*BOUNDARY, OP=NEW` / `*CLOAD, OP=NEW` / `*DLOAD, OP=NEW` lines for one step.
- * Force: the vector is the TOTAL load split equally over the nodes of the target (`distribution: 'total'`), or applied at every node
- * (`'per_node'`); contributions to one node and dof are summed. Pressure: `P<face>` per (element, face) of the target's face set,
+ * Force: the vector is the TOTAL load, consistent with the face integration when the target has faces (a linear face gives each corner A / 3, a quadratic face its
+ * mid-edge nodes A / 3) and split equally over the target nodes otherwise (edges, points), or applied at every node (`'per_node'`); moment: a statically equivalent nodal force
+ * couple on the target nodes (`loadDistribution.momentForces`); contributions to one node and dof are summed. Pressure: `P<face>` per (element, face) of the target's face set,
  * positive into the material. Gravity: acceleration vector on every element (`GRAV`, magnitude and unit direction). All of them
  * are restated with `OP=NEW` in each step, so load cases do not accumulate.
  * @param loadCase only the loads of this load case; without it every load of the case is written (thermo_static uses a single step)
@@ -194,11 +196,25 @@ export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options
     } else if (load.kind === 'force' && load.vector !== undefined) {
       const nodes = Object.hasOwn(ctx.mesh.nodeSets, key) ? (ctx.mesh.nodeSets[key] ?? []) : [];
       if (nodes.length === 0) return refusal('FEA_TARGET_UNRESOLVED', `force '${id}' (${load.name}) has no nodes in the mesh`, [id]);
-      const share = (load.distribution === 'per_node' ? 1 : 1 / nodes.length) * factor;
-      for (const node of nodes)
+      const weights = load.distribution === 'per_node' ? null : consistentWeights(ctx, key);
+      const shares: [number, number][] =
+        weights !== null
+          ? [...weights]
+          : nodes.map((node) => [node, load.distribution === 'per_node' ? 1 : 1 / nodes.length] as [number, number]);
+      for (const [node, share] of shares)
         load.vector.forEach((component, axis) => {
           const mapKey = `${node}:${axis + 1}`;
-          forces.set(mapKey, [node, axis + 1, (forces.get(mapKey)?.[2] ?? 0) + component * share]);
+          forces.set(mapKey, [node, axis + 1, (forces.get(mapKey)?.[2] ?? 0) + component * share * factor]);
+        });
+    } else if (load.kind === 'moment' && load.vector !== undefined) {
+      const nodes = Object.hasOwn(ctx.mesh.nodeSets, key) ? (ctx.mesh.nodeSets[key] ?? []) : [];
+      if (nodes.length === 0) return refusal('FEA_TARGET_UNRESOLVED', `moment '${id}' (${load.name}) has no nodes in the mesh`, [id]);
+      const couple = momentForces(ctx.mesh, nodes, load.vector);
+      if ('refusal' in couple) return refusal('FEA_LOAD_INVALID', `moment '${id}' (${load.name}): ${couple.refusal}`, [id]);
+      for (const [node, force] of couple.forces)
+        force.forEach((component, axis) => {
+          const mapKey = `${node}:${axis + 1}`;
+          forces.set(mapKey, [node, axis + 1, (forces.get(mapKey)?.[2] ?? 0) + component * factor]);
         });
     } else if (load.kind === 'pressure' && load.magnitude !== undefined) {
       const faces = ctx.faces(key);

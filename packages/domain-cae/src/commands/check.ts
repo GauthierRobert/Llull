@@ -13,6 +13,7 @@ import { analysisIdSchema } from '../shared/schemas';
 import { trustedRecord, type Trust } from '../shared/trust';
 import { analysisInputHash } from '../hash/inputHash';
 import { checkNonlinearItems } from '../nonlinear/check';
+import { marginItems } from '../margins/checkItems';
 import { structureItems } from './checkStructure';
 import { checkThermalItems } from '../thermal/check';
 import { checkThermomechItems } from '../thermomech/check';
@@ -157,6 +158,7 @@ export const checkAnalysis = defineCommand({
     'recorded and not stale or inverted, results recorded and not stale, and every recorded summary matching its artifact in the artifact ' +
     'store (a differing one is FEA_SUMMARY_MISMATCH, state untrusted; no store or artifact is FEA_MESH_MISSING / FEA_RESULTS_MISSING, state ' +
     'missing). Run it before fea_mesh / fea_solve (readiness) and after the solve. ' +
+    'Modal / buckling: supports, rigid-body modes, buckling-factor guards; any structural case: supports that remove all six rigid-body motions (FEA_UNDERCONSTRAINED) and mesh adequacy (FEA_MESH_ADEQUACY); solved static / thermo_static cases with allowables: the margin rows (FEA_MS_NEGATIVE, FEA_MS_MARGINAL, FEA_MARGINAL_BAND_UNSET, FEA_DISPOSITION_PENDING). ' +
     'It is not a certification: reviewRequired is always true and a qualified person must review the model, mesh and results.',
   annotations: { readOnly: true },
   params: z.object({ analysisId: analysisIdSchema }),
@@ -177,6 +179,9 @@ export const checkAnalysis = defineCommand({
       ...setupItems(analysis),
       ...disciplines,
       ...structureItems(doc, analysis, trust),
+      ...(trust.state === 'solved' && (analysis.type === 'static' || analysis.type === 'thermo_static')
+        ? marginItems(doc, analysisId, ctx)
+        : []),
       ...artifactItems(doc, analysis, trust),
     ];
     const errors = items.filter((entry) => entry.severity === 'error').length;

@@ -206,7 +206,19 @@ describe('FEA loads', () => {
     expectRefused(run(doc, 'add_fea_load', { ...base, kind: 'gravity' }), doc, 'FEA_LOAD_INVALID');
     expectRefused(run(doc, 'add_fea_load', { ...base, kind: 'gravity', vector: [0, 0, -1], target }), doc, 'FEA_LOAD_INVALID');
     expectRefused(run(doc, 'add_fea_load', { ...base, kind: 'gravity', vector: [0, 0, -1], loadCase: ' ' }), doc, 'FEA_LOAD_INVALID');
-    expect(run(doc, 'add_fea_load', { ...base, kind: 'moment', vector: [0, 0, 1], target }).summary).toContain('invalid params');
+    expectRefused(run(doc, 'add_fea_load', { ...base, kind: 'moment', target }), doc, 'FEA_LOAD_INVALID');
+    expectRefused(run(doc, 'add_fea_load', { ...base, kind: 'moment', vector: [0, 0, 0], target }), doc, 'FEA_LOAD_INVALID');
+    expectRefused(
+      run(doc, 'add_fea_load', {
+        ...base,
+        kind: 'moment',
+        vector: [0, 0, 1],
+        target: { entityId: target.entityId, pointsNear: [[0, 0, 0]] },
+      }),
+      doc,
+      'FEA_LOAD_INVALID',
+    );
+    expectRefused(run(doc, 'add_fea_load', { ...base, kind: 'moment', vector: [0, 0, 1], magnitude: 2, target }), doc, 'FEA_LOAD_INVALID');
   });
 
   it('updates and deletes loads', () => {
@@ -256,19 +268,5 @@ describe('FEA loads', () => {
     expectRefused(run(withLoad, 'update_fea_load', { analysisId, loadId, vector: [0, 0, 0] }), withLoad, 'FEA_LOAD_INVALID');
     expectRefused(run(withLoad, 'delete_fea_load', { analysisId: 'x', loadId }), withLoad, 'FEA_ANALYSIS_NOT_FOUND');
     expectRefused(run(withLoad, 'delete_fea_load', { analysisId, loadId: 'nope' }), withLoad, 'FEA_LOAD_NOT_FOUND');
-    const moment = {
-      ...withLoad,
-      analysis: {
-        ...withLoad.analysis!,
-        cases: {
-          ...withLoad.analysis!.cases,
-          [analysisId]: {
-            ...caseIn(withLoad, analysisId),
-            loads: { [loadId]: { ...caseIn(withLoad, analysisId).loads[loadId]!, kind: 'moment' as const } },
-          },
-        },
-      },
-    };
-    expectRefused(run(moment, 'update_fea_load', { analysisId, loadId, name: 'n' }), moment, 'FEA_LOAD_INVALID');
   });
 });
