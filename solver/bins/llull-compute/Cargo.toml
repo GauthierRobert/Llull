@@ -10,10 +10,12 @@ publish.workspace = true
 llull-post = { path = "../../crates/llull-post" }
 llull-protocol = { path = "../../crates/llull-protocol" }
 llull-raster = { path = "../../crates/llull-raster" }
+llull-topopt = { path = "../../crates/llull-topopt", default-features = false }
 
 [features]
-# wgpu offscreen raster (`llull-compute raster` with engine "gpu"); off by default, the CPU twin answers without it.
-gpu = ["llull-raster/gpu"]
+# wgpu paths: offscreen raster (`llull-compute raster` with engine "gpu") and the topopt GPU solves (settings.device "gpu" / "auto").
+# Off by default (keeps the release build short); without it the CPU twins answer and a GPU request reports a warning.
+gpu = ["llull-raster/gpu", "llull-topopt/gpu"]
 
 [lints]
 workspace = true

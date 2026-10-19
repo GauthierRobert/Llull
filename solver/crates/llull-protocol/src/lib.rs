@@ -11,10 +11,26 @@ use std::io::Write;
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Event<'a> {
-    Progress { step: u64, total: u64, message: &'a str },
-    Warning { code: &'a str, message: &'a str },
-    Done { ok: bool, outputs: Vec<Output> },
-    Error { code: &'a str, message: &'a str },
+    /// `detail` (optional) adds job-specific fields to the same JSON object, e.g. `it`, `compliance`, `volume`, `change`.
+    Progress {
+        step: u64,
+        total: u64,
+        message: &'a str,
+        #[serde(flatten, skip_serializing_if = "Option::is_none")]
+        detail: Option<serde_json::Map<String, serde_json::Value>>,
+    },
+    Warning {
+        code: &'a str,
+        message: &'a str,
+    },
+    Done {
+        ok: bool,
+        outputs: Vec<Output>,
+    },
+    Error {
+        code: &'a str,
+        message: &'a str,
+    },
 }
 
 /// A result file with its content hash, so the host can store it content-addressed.
@@ -43,11 +59,21 @@ mod tests {
     #[test]
     fn emits_one_line_per_event() {
         let mut buffer = Vec::new();
-        emit(&mut buffer, &Event::Progress { step: 1, total: 2, message: "half" }).unwrap();
+        emit(&mut buffer, &Event::Progress { step: 1, total: 2, message: "half", detail: None }).unwrap();
+        let mut detail = serde_json::Map::new();
+        detail.insert("it".to_string(), serde_json::json!(1));
+        emit(&mut buffer, &Event::Progress { step: 1, total: 2, message: "it", detail: Some(detail) }).unwrap();
         emit(&mut buffer, &Event::Done { ok: true, outputs: vec![] }).unwrap();
         let text = String::from_utf8(buffer).unwrap();
         let lines: Vec<&str> = text.lines().collect();
-        assert_eq!(lines, [r#"{"type":"progress","step":1,"total":2,"message":"half"}"#, r#"{"type":"done","ok":true,"outputs":[]}"#]);
+        assert_eq!(
+            lines,
+            [
+                r#"{"type":"progress","step":1,"total":2,"message":"half"}"#,
+                r#"{"type":"progress","step":1,"total":2,"message":"it","it":1}"#,
+                r#"{"type":"done","ok":true,"outputs":[]}"#
+            ]
+        );
     }
 
     #[test]
