@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { MeshData } from '@core/model/types';
-import { isClosedMesh, openEdgeCount } from '@kernel-occt/meshClosure';
+import { isClosedMesh, openEdgeCount } from '@core/geometry/meshClosure';
 import { xyz } from '../helpers/xy';
 
 /** A closed tetrahedron, each face with its own three vertices (as OCC emits faces). */

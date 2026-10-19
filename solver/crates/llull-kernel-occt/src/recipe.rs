@@ -1,12 +1,12 @@
-//! `ShapeRecipe` JSON (`packages/core/src/model/types.ts`) -> OCCT shape, mirroring `packages/kernel-occt/src/occtShapes.ts` and the
+//! `ShapeRecipe` JSON (`packages/core/src/model/types.ts`) -> OCCT shape, mirroring the shape builders of the retired opencascade.js kernel (packages/kernel-occt, removed by LC1 step 5) and the
 //! recipe walk of `packages/core/src/geometry/shapeKernel.ts`. Sub-recipes are cached by the sha256 of their canonical JSON (serde_json
 //! maps are sorted), so an unchanged prefix of the feature tree is built once.
 //!
 //! Native: recipe ops `solid`, `boolean`, `place`, `scale`, `brep` (a document blob loaded with [`Evaluator::load_blob`]), `fillet`,
 //! `chamfer`, `blend`, `shell` and `featureCut` (a `feature` node the host lowered, see [`nodes`]); solid kinds box, cylinder, sphere,
 //! cone, torus, wedge, extrusion and revolution (polygon or exact curve chain), triangle mesh (thread groove tools included), loft,
-//! sweep and subdivision. Anything else is [`EvalError::Unsupported`]: the host evaluates that recipe with the WASM kernel instead.
-//! Fillet / chamfer edge indices come from `topology`, which numbers edges like the WASM kernel (unique sub-shapes in explorer order).
+//! sweep and subdivision. Anything else is [`EvalError::Unsupported`]: the host answers that recipe as refused.
+//! Fillet / chamfer edge indices come from `topology`, which numbers the unique sub-shapes in explorer order.
 
 use crate::lru::Lru;
 use crate::{BooleanOp, Built, Shape};
@@ -15,6 +15,7 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::rc::Rc;
 
+mod floor;
 mod nodes;
 
 pub const RECIPE_OPS: [&str; 10] = ["solid", "boolean", "place", "scale", "brep", "fillet", "chamfer", "blend", "shell", "featureCut"];
@@ -25,7 +26,7 @@ pub const SOLID_KINDS: [&str; 12] =
 pub enum EvalError {
     /// Not implemented natively (a capability gap): the host falls back to another kernel.
     Unsupported(String),
-    /// OCCT threw while building: the recipe is refused (cached as null, like the WASM kernel's refusals).
+    /// OCCT threw while building: the recipe is refused (cached as null, like any refusal).
     Failure(String),
 }
 
@@ -119,7 +120,7 @@ fn place_entity(shape: Option<Rc<Shape>>, entity: &Value, anchor_shift: [f64; 3]
     shape_of(crate::placed(&shape, rotation, position, anchor_shift))
 }
 
-/// `value > 0`, false for NaN (a missing field reads as NaN, like `undefined > 0` in the WASM kernel).
+/// `value > 0`, false for NaN (a missing field reads as NaN, like `undefined > 0` in TypeScript).
 fn positive(value: f64) -> bool {
     value > 0.0
 }
@@ -335,7 +336,7 @@ impl Evaluator {
                 let Some(operation) = recipe.get("boolean").and_then(Value::as_str).and_then(boolean_op) else { return refused() };
                 let Some(a) = self.child(recipe, "a")? else { return refused() };
                 let Some(b) = self.child(recipe, "b")? else { return refused() };
-                // A modelled-thread operand skips UnifySameDomain, like the WASM kernel (occtThreadMark.ts).
+                // A modelled-thread operand skips UnifySameDomain, (occtThreadMark.ts of the retired kernel).
                 let threaded = ["a", "b"].iter().filter_map(|field| recipe.get(field)).any(nodes::thread_bearing);
                 shape_of(crate::boolean(operation, &a, &b, !threaded))
             }

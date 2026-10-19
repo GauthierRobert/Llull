@@ -13,7 +13,7 @@ import type { CurveSegment } from '@core/model/curve';
 import type { ShapeRecipe, Vec2, Vec3 } from '@core/model/types';
 import { sampleProfile } from '@core/geometry/curveSegments';
 import { booleanRecipe, box, leaf } from './kernelTestSupport';
-import { entity } from './nativeParitySupport';
+import { entity } from './nativeKernelCorpus';
 import {
   faceSignature,
   nativeKernelBinary,

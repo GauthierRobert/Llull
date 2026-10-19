@@ -204,7 +204,7 @@
     "expected": "volume 55978.529153 mm³ (OCC reference build rel err 1.2e-15); native vs lowered equal",
     "tolerance": "1e-6 rel",
     "measured": "plan on OCC: 55978.52915279594 mm3 (rel 3.6e-12 vs 55978.529153); native = lowered to 1e-9",
-    "tests": ["server/tests/packReplay07.test.ts", "server/tests/occtFeatures.test.ts", "server/tests/occtNativeFeatures.test.ts"]
+    "tests": ["server/tests/packReplay07.test.ts", "server/tests/occtFeatures.test.ts", "server/tests/nativeKernelFeatureCuts.test.ts"]
   },
   "VC-FTR-26": {
     "status": "pass",

@@ -1,13 +1,32 @@
 /** Shape-kernel shorthands for the live-kernel tests: entity -> leaf recipe -> display mesh. */
 
-import { beforeAll, expect } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
-import { createNodeOcctKernel } from '../src/occtNode';
+import { createNativeKernel } from '../src/nativeKernel';
+import type { IsolatedKernel } from '../src/isolatedKernel';
+import { nativeBinaryPath, nativeInstallHint } from '../src/native/nativeBinary';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { MeshData } from '@core/model/types';
 import type { BooleanOp, ShapeRecipe } from '@core/model/types';
 import type { Entity, Vec3 } from '@core/model/types';
 import { meshBounds } from '../../tests/helpers/meshBounds';
+
+/** The native `llull-kernel` binary (`cargo build --release -p llull-kernel` in solver/, or LLULL_KERNEL_BIN / LLULL_NATIVE_DIR), or null. */
+export const nativeKernelBinary = nativeBinaryPath('llull-kernel');
+// CI's native-kernel job builds the binary first: there a missing binary is a failure, not a skip.
+if (nativeKernelBinary === null && process.env['LLULL_REQUIRE_NATIVE_KERNEL'] === '1') throw new Error(nativeInstallHint('llull-kernel'));
+if (nativeKernelBinary === null) console.warn(`[native kernel tests] skipped: ${nativeInstallHint('llull-kernel')}`);
+
+/** `describe` for suites that run the real native kernel: skipped (with the reason logged above) when the binary is not built. */
+export const describeNative: typeof describe = describe.skipIf(nativeKernelBinary === null) as typeof describe;
+
+/** A started native kernel (the sidecar behind its synchronous worker proxy). Dispose it when done (or let the process exit). */
+export function createNativeTestKernel(options: { readonly testHooks?: boolean; readonly callTimeoutMs?: number } = {}): IsolatedKernel {
+  if (nativeKernelBinary === null) throw new Error(nativeInstallHint('llull-kernel'));
+  const kernel = createNativeKernel(nativeKernelBinary, { callTimeoutMs: 120_000, ...options });
+  if (!kernel.start()) throw new Error('the native kernel did not start');
+  return kernel;
+}
 
 export const leaf = (entity: Entity): ShapeRecipe => ({ op: 'solid', entity });
 
@@ -53,13 +72,15 @@ export function volume(mesh: MeshData): number {
   return sum;
 }
 
-/** Both live kernels, filled in `beforeAll` (the WASM load is slow); read them inside tests. */
-export function liveKernels(): { occt: GeometryKernel; manifold: GeometryKernel } {
-  const kernels = {} as { occt: GeometryKernel; manifold: GeometryKernel };
+/** The native OCC kernel (`occt`) and Manifold, filled in `beforeAll`; read them inside tests. */
+export function liveKernels(): { occt: IsolatedKernel; manifold: GeometryKernel } {
+  const kernels = {} as { occt: IsolatedKernel; manifold: GeometryKernel };
   beforeAll(async () => {
-    kernels.occt = await createNodeOcctKernel();
+    if (nativeKernelBinary === null) return;
+    kernels.occt = createNativeTestKernel();
     kernels.manifold = await createManifoldKernel();
   }, 120_000);
+  afterAll(() => kernels.occt?.dispose());
   return kernels;
 }
 
@@ -72,7 +93,7 @@ export function expectBoundsClose(a: MeshData, b: MeshData, tolerance: number): 
   }
 }
 
-/** `entity op cutter` by OpenCascade has Manifold's volume within -8% / +8%. */
+/** The exact volume of `entity op cutter` on the native OCC kernel is within -8% / +8% of Manifold's (faceted) one. */
 export function expectBooleanAgrees(
   kernels: { occt: GeometryKernel; manifold: GeometryKernel },
   op: BooleanOp,
@@ -80,12 +101,13 @@ export function expectBooleanAgrees(
   cutter: Entity,
   label?: string,
 ): void {
-  const fromOcct = booleanMesh(kernels.occt, op, entity, cutter);
+  const shape = kernels.occt.evaluate(booleanRecipe(op, entity, cutter));
+  const exact = shape === null ? undefined : kernels.occt.massProperties?.(shape)?.volume;
   const fromManifold = booleanMesh(kernels.manifold, op, entity, cutter);
-  expect(fromOcct, label).not.toBeNull();
+  expect(exact, label).toBeDefined();
   expect(fromManifold, label).not.toBeNull();
-  expect(volume(fromOcct!) / volume(fromManifold!)).toBeGreaterThan(0.92);
-  expect(volume(fromOcct!) / volume(fromManifold!)).toBeLessThan(1.08);
+  expect(exact! / volume(fromManifold!), label).toBeGreaterThan(0.92);
+  expect(exact! / volume(fromManifold!), label).toBeLessThan(1.08);
 }
 
 /** `[label, position, rotation]` placements shared by the OpenCascade-vs-Manifold comparisons. */

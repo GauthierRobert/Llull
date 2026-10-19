@@ -1,44 +1,32 @@
 /**
- * `GeometryKernel` running OCC in a worker thread behind a SYNCHRONOUS call (post, `Atomics.wait`,
+ * `GeometryKernel` running the native OCC kernel in a worker thread behind a SYNCHRONOUS call (post, `Atomics.wait`,
  * `receiveMessageOnPort`). An abort, hang or failed start kills only the worker; the next call respawns it.
  * @invariant handles cross the thread as plain data (they carry their recipe): a recycled worker's successor rebuilds them
  * @failure worker died / timed out / failed to start -> null result + console.warn, never a throw
  */
-import { existsSync } from 'node:fs';
-import path from 'node:path';
 import { MessageChannel, Worker, receiveMessageOnPort, type MessagePort } from 'node:worker_threads';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, StepOccurrence } from '@core/geometry/kernel';
 import type { ExactMassProperties, ImportShapesResult, KernelInfo } from '@core/geometry/kernelPorts';
 import { errorMessage } from '@lib/errorMessage';
 import { handleOf, keyOnlyHandle, SHAPE_NOT_CACHED } from '@core/geometry/shapeKernel';
 import type { FaceQueryPort } from '@core/geometry/kernelPorts';
-import { STATUS_DIED, STATUS_READY, STATUS_REPLY, type KernelOperation, type KernelReply, type TestHook } from './occtWorkerProtocol';
+import { STATUS_DIED, STATUS_READY, STATUS_REPLY, type KernelOperation, type KernelReply, type TestHook } from './kernelWorkerProtocol';
 
 export interface IsolatedKernelOptions {
-  readonly entry?: string; // default occtWorker.ts/.js next to this module
+  readonly entry: string; // worker entry (nativeKernelWorker.ts/.js)
   readonly execArgv?: readonly string[];
   readonly callTimeoutMs?: number; // default 60 000
-  readonly startTimeoutMs?: number; // WASM load, default 60 000
+  readonly startTimeoutMs?: number; // sidecar start, default 60 000
   readonly testHooks?: boolean; // enables `__abort` / `__hang`
-  readonly workerData?: Readonly<Record<string, unknown>>; // extra entry inputs (the native kernel worker's binary path)
+  readonly workerData?: Readonly<Record<string, unknown>>; // extra entry inputs (the sidecar binary path)
 }
 
 export interface IsolatedKernel extends GeometryKernel {
   crashCount(): number; // worker died or was killed mid-call
-  recycleCount(): number; // replaced after a degrading native exception
   forceFailure(hook: TestHook): void;
   /** Spawn the worker now (idempotent); false + warning when it cannot start. */
   start(): boolean;
   dispose(): void;
-}
-
-/** Path of the worker entry next to this module, or null when not shipped (bundled build). */
-export function defaultWorkerEntry(): string | null {
-  for (const extension of ['.ts', '.js']) {
-    const candidate = path.join(__dirname, `occtWorker${extension}`);
-    if (existsSync(candidate)) return candidate;
-  }
-  return null;
 }
 
 /**
@@ -64,7 +52,7 @@ interface LiveWorker {
   readonly worker: Worker;
   readonly port: MessagePort;
   readonly status: Int32Array;
-  ready: boolean; // false while the WASM still loads in the background
+  ready: boolean; // false until the worker reports its sidecar started
   readonly blobsSent: Set<string>; // document B-rep blobs this worker already holds
 }
 
@@ -90,15 +78,13 @@ const FACE_QUERY_METHODS = [
   'bspline',
 ] as const satisfies readonly (keyof FaceQueryPort)[];
 
-export function createIsolatedKernel(options: IsolatedKernelOptions = {}): IsolatedKernel {
-  const entry = options.entry ?? defaultWorkerEntry();
-  if (entry === null) throw new Error('OCC worker entry not found next to the server modules');
+export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKernel {
+  const { entry } = options;
   const execArgv = options.execArgv !== undefined ? [...options.execArgv] : entry.endsWith('.ts') ? ['--require', 'tsx/cjs'] : undefined;
   const callTimeoutMs = options.callTimeoutMs ?? 60_000;
   const startTimeoutMs = options.startTimeoutMs ?? 60_000;
   let live: LiveWorker | null = null;
   let crashes = 0;
-  let recycles = 0;
   /** Every document blob the host loaded, kept to re-send to a worker that was recycled or restarted. */
   const blobs = new Map<string, string>();
   let describedAs: KernelInfo | null = null;
@@ -176,10 +162,6 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
       const reply = receiveMessageOnPort(port)?.message as KernelReply | undefined;
       Atomics.compareExchange(status, 0, STATUS_REPLY, 0); // idle; a death since the reply stays flagged
       if (reply?.error !== undefined && !reply.error.startsWith(SHAPE_NOT_CACHED)) console.warn(`[occt] ${op} failed: ${reply.error}`);
-      if (reply?.recycle === true) {
-        recycles++;
-        recycle(); // a degraded module is replaced; the next call gets a fresh, pre-loaded one
-      }
       return reply ?? null;
     }
     crashes++;
@@ -269,7 +251,6 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
       return describedAs ?? { capabilities: [] };
     },
     crashCount: () => crashes,
-    recycleCount: () => recycles,
     forceFailure: (hook) => void call(hook, []),
     start: () => {
       try {

@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel, type ShapeTopology } from '@core/geometry/kernel';
-import { createNodeOcctKernel } from '../src/occtNode';
+import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 import { createPythonExchangePort } from '../src/pythonExchange';
 import { BRIDGE_SCRIPT, CADQUERY_PYTHON, probePython } from './exchangeTestSupport';
 
@@ -43,12 +43,12 @@ function filletedBlock(): { doc: CadDocument; id: string } {
   return { doc: filleted.document, id: filleted.affected[0]! };
 }
 
-describe.skipIf(!hasCadQuery)('exact recipes through CadQuery', () => {
+describe.skipIf(!hasCadQuery || nativeKernelBinary === null)('exact recipes through CadQuery', () => {
   let doc: CadDocument;
   let code: string;
 
   beforeAll(async () => {
-    setGeometryKernel(await createNodeOcctKernel());
+    setGeometryKernel(createNativeTestKernel());
     doc = filletedBlock().doc;
     code = (execute(doc, 'export_code', { language: 'cadquery' }).data as { text: string }).text;
   }, 180_000);

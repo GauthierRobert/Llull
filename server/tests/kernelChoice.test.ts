@@ -4,6 +4,7 @@ import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 import { getActiveKernelName, installGeometryKernel, occtCallTimeoutMs } from '../src/geometryKernel';
+import { nativeKernelBinary } from './kernelTestSupport';
 
 afterEach(() => {
   delete process.env['LLULL_KERNEL'];
@@ -29,25 +30,29 @@ describe('LLULL_KERNEL', () => {
     expect(getGeometryKernel()).not.toBeNull();
   });
 
-  it('occt loads OpenCascade under Node and fillet_edge runs through the injected context', async () => {
-    process.env['LLULL_KERNEL'] = 'occt';
-    expect(await installGeometryKernel()).toBe(true);
-    expect(getActiveKernelName()).toBe('occt');
+  it.skipIf(nativeKernelBinary === null)(
+    'occt-native starts the native kernel and fillet_edge runs through the injected context',
+    async () => {
+      process.env['LLULL_KERNEL'] = 'occt-native';
+      expect(await installGeometryKernel()).toBe(true);
+      expect(getActiveKernelName()).toBe('occt');
 
-    const base = execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
-    const params = { id: base.affected[0]!, radius: 0.2 };
-    const first = execute(base.document, 'fillet_edge', params, defaultContext());
-    const second = execute(base.document, 'fillet_edge', params, defaultContext());
+      const base = execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
+      const params = { id: base.affected[0]!, radius: 0.2 };
+      const first = execute(base.document, 'fillet_edge', params, defaultContext());
+      const second = execute(base.document, 'fillet_edge', params, defaultContext());
 
-    expect(first.affected).toHaveLength(1);
-    const entity = first.document.entities[first.affected[0]!];
-    const again = second.document.entities[second.affected[0]!];
-    expect(entity?.kind).toBe('mesh');
-    expect(again).toMatchObject({ kind: 'mesh', mesh: expect.anything() });
-    expect(JSON.stringify(again && 'mesh' in again ? again.mesh : null)).toBe(
-      JSON.stringify(entity && 'mesh' in entity ? entity.mesh : null),
-    );
-  }, 60_000);
+      expect(first.affected).toHaveLength(1);
+      const entity = first.document.entities[first.affected[0]!];
+      const again = second.document.entities[second.affected[0]!];
+      expect(entity?.kind).toBe('mesh');
+      expect(again).toMatchObject({ kind: 'mesh', mesh: expect.anything() });
+      expect(JSON.stringify(again && 'mesh' in again ? again.mesh : null)).toBe(
+        JSON.stringify(entity && 'mesh' in entity ? entity.mesh : null),
+      );
+    },
+    60_000,
+  );
 });
 
 describe('kernel_info through the composition root (TR-KRN-04)', () => {
@@ -67,34 +72,22 @@ describe('kernel_info through the composition root (TR-KRN-04)', () => {
     expect(infoOf()).toMatchObject({ active: 'manifold', fallbackReason: 'NATIVE_TOOL_MISSING: injected' });
   });
 
-  it('occt: reports OCCT 7.4.0p1, its ports and how it is isolated', async () => {
-    process.env['LLULL_KERNEL'] = 'occt';
-    process.env['LLULL_OCC_ISOLATION'] = 'off';
-    try {
+  it.skipIf(nativeKernelBinary === null)(
+    'the native kernel reports OCCT 7.9.2, its ports and that it runs in its own process',
+    async () => {
+      process.env['LLULL_KERNEL'] = 'occt-native';
       await installGeometryKernel();
-    } finally {
-      delete process.env['LLULL_OCC_ISOLATION'];
-    }
-    expect(infoOf()).toMatchObject({ active: 'occt', occtVersion: '7.4.0p1', isolation: 'in-process' });
-    expect(infoOf()['capabilities']).toEqual(expect.arrayContaining(['importShapes', 'brepBlobs']));
-  }, 60_000);
+      expect(infoOf()).toMatchObject({ active: 'occt', occtVersion: '7.9.2', isolation: 'process' });
+      expect(infoOf()['capabilities']).toEqual(expect.arrayContaining(['importShapes', 'brepBlobs']));
+    },
+    60_000,
+  );
 
-  it('a failed OCC start falls back to Manifold and kernel_info says why (KRN_KERNEL_FALLBACK)', async () => {
-    vi.resetModules();
-    vi.doMock('../src/occtNode', () => ({ createNodeOcctKernel: () => Promise.reject(new Error('wasm missing')) }));
-    process.env['LLULL_KERNEL'] = 'occt';
-    process.env['LLULL_OCC_ISOLATION'] = 'off';
-    let data: { active: string; fallbackReason: string; issues: Array<{ code: string }> };
-    try {
-      const { installGeometryKernel: install } = await import('../src/geometryKernel');
-      await install();
-      const fresh = (await import('@core/geometry/kernel')).getGeometryKernel(); // vi.resetModules gave this graph its own singleton
-      data = execute(createEmptyDocument(), 'kernel_info', {}, { ...defaultContext(), kernel: fresh }).data as typeof data;
-    } finally {
-      delete process.env['LLULL_OCC_ISOLATION'];
-      vi.doUnmock('../src/occtNode');
-    }
-    expect(data).toMatchObject({ active: 'manifold', fallbackReason: 'wasm missing' });
+  it('a failed native start falls back to Manifold and kernel_info says why (KRN_KERNEL_FALLBACK)', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    await installGeometryKernel({ env: { LLULL_KERNEL: 'occt-native' }, startNative: () => ({ reason: 'sidecar did not start' }) });
+    const data = infoOf() as { active: string; fallbackReason: string; issues: Array<{ code: string }> };
+    expect(data).toMatchObject({ active: 'manifold', fallbackReason: 'sidecar did not start' });
     expect(data.issues.map((issue) => issue.code)).toContain('KRN_KERNEL_FALLBACK');
   });
 });

@@ -26,7 +26,6 @@
     "../packages/domain-cae/src",
     "../packages/domain-aero/src",
     "../packages/kernel-manifold/src",
-    "../packages/kernel-occt/src",
     "../packages/physics-mujoco/src",
     "../src/app"
   ],

@@ -38,7 +38,7 @@ solver/                         one Cargo workspace (sibling of server/ and desk
   crates/llull-explicit         physics 19 explicit dynamics (V1 / V2)
   crates/llull-kernel-occt      native OCCT 7.9 bindings (cxx) implementing the existing KernelOps worker protocol
   bins/llull-compute            job binary: `llull-compute <job> <job-folder>` (flow, topopt, cloud, raster, geomq, post, route, stats, panel, explicit)
-  bins/llull-kernel             long-lived kernel process speaking KernelOps over stdio (replaces the OCCT WASM worker on desktop)
+  bins/llull-kernel             long-lived kernel process speaking KernelOps over stdio (replaced the OCCT WASM worker, which LC1 step 5 deleted)
 ```
 
 Rules:
@@ -75,7 +75,7 @@ Rules:
 | Step | Content | Packs (amended specs) | Fit | Replaces / supersedes |
 | ---- | ------- | --------------------- | --- | --------------------- |
 | **RS-0** | `solver/` workspace, `llull-gpu`, `llull-protocol`, `llull-bvh`, bundling, `native:check`; first job = 12 CFD M2 | 12 CFD | — | 12 CFD's standalone `solver/flow/` |
-| **RS-1** | Native OCCT 7.9 kernel sidecar `llull-kernel` behind `KernelOps`; WASM build kept only for the browser path | aerospace 01 KRN (carries 02, 04, 07, 08) | native CPU | 01 KRN M2 custom OCCT 7.9 Emscripten build (board AERO-2-M2) |
+| **RS-1** (done 2026-10-19; WASM build retired by LC1 step 5; macOS bundle deferred by the owner) | Native OCCT 7.9 kernel sidecar `llull-kernel` behind `KernelOps` | aerospace 01 KRN (carries 02, 04, 07, 08) | native CPU | 01 KRN M2 custom OCCT 7.9 Emscripten build (board AERO-2-M2) |
 | **RS-2** | GPU SIMP topology optimisation on `llull-voxfe` | physics 17 TOP | GPU | 17's CPython numpy / scipy bridge |
 | **RS-3** | Point-cloud import, octree, ICP, RANSAC, normals, fits | plant 10 SCN | Rust CPU | 10's TS readers + lazrs-wasm / laz-perf + libE57 question (Q4); unlocks COPC writing (Q2) |
 | **RS-4** | Scan-vs-design deviation and as-built clash | plant 10 SCN | GPU + CPU final numbers | 10's pure-TS deviation |

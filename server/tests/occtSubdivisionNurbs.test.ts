@@ -5,13 +5,13 @@
  * planar.
  */
 
-import { describe, it, expect } from 'vitest';
+import { it, expect } from 'vitest';
 import type { Entity, SubdivisionEntity, Vec3 } from '@core/model/types';
 import { boxCage, cylinderCage, subdivisionTriangles } from '@core/geometry/subdivision';
 import { subdivisionPatches } from '@core/geometry/subdivisionPatches';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { booleanRecipe, box, common, leaf, liveKernels } from './kernelTestSupport';
+import { booleanRecipe, box, common, leaf, liveKernels, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
 
@@ -39,7 +39,7 @@ function topologyOf(entity: Entity): NonNullable<ReturnType<typeof kernels.occt.
   return topology as NonNullable<typeof topology>;
 }
 
-describe('occt exact subdivision solids', () => {
+describeNative('occt exact subdivision solids', () => {
   const blob = subdivision(boxCage([4, 3, 5], [2, 1, 1]), 2);
 
   it('sews one B-spline face per refined quad into a solid at the limit volume', () => {

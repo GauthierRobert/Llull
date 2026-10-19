@@ -14,7 +14,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { createEmptyDocument, is3D, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
-import { createNodeOcctKernel } from '../../src/occtNode';
+import { createNativeTestKernel } from '../kernelTestSupport';
 
 const DIR = path.resolve(__dirname, '../../../quality/drawings');
 
@@ -31,7 +31,7 @@ interface DrawingPart {
 
 const manifest = JSON.parse(readFileSync(path.join(DIR, 'manifest.json'), 'utf8')) as { readonly parts: readonly DrawingPart[] };
 
-beforeAll(async () => setGeometryKernel(await createNodeOcctKernel()), 120_000);
+beforeAll(async () => setGeometryKernel(createNativeTestKernel()), 120_000);
 
 function build(id: string): CadDocument {
   const actions: unknown = JSON.parse(readFileSync(path.join(DIR, 'plans', `${id}.json`), 'utf8'));

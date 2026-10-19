@@ -4,7 +4,7 @@
  * agree within chord tolerance, not exactly.
  */
 
-import { describe, it, expect } from 'vitest';
+import { it, expect } from 'vitest';
 import type { Entity, Vec3 } from '@core/model/types';
 import {
   ALL_AXES_PLACEMENT,
@@ -19,6 +19,7 @@ import {
   liveKernels,
   meshOf,
   volume,
+  describeNative,
 } from './kernelTestSupport';
 
 const cylinder = (position: Vec3, rotation: Vec3): Entity =>
@@ -43,7 +44,7 @@ const shapes: Array<[string, (position: Vec3, rotation: Vec3) => Entity, number]
   ['cone', cone, (Math.PI * 2.5 * 2.5 * 5) / 3],
 ];
 
-describe.each(shapes)('occt %s', (name, make, analyticVolume) => {
+describeNative.each(shapes)('occt %s', (name, make, analyticVolume) => {
   it.each(placements)('tessellates like Manifold (%s)', (_label, position, rotation) => {
     const entity = make(position, rotation);
     const { fromOcct, fromManifold } = bothMeshes(kernels, entity, name);
@@ -67,7 +68,7 @@ describe.each(shapes)('occt %s', (name, make, analyticVolume) => {
 
 // Native OCC torus (exact surface). Manifold's torus is a coarser polygon, so volumes are compared
 // to the analytic value for OCC and to Manifold within the chord tolerance of that polygon.
-describe('occt torus', () => {
+describeNative('occt torus', () => {
   const torus = (position: Vec3, rotation: Vec3): Entity =>
     ({ id: 't', kind: 'torus', position, rotation, ringRadius: 3, tubeRadius: 1, ...common }) as Entity;
   const analyticVolume = 2 * Math.PI ** 2 * 3 * 1 ** 2;

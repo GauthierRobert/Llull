@@ -38,8 +38,8 @@ Delegate in parallel when large: Lane 1 (`command-author`) model→codegen, Lane
   each kernel's native maker below must handle the kind.
 - `packages/kernel-manifold/src/manifoldKernel.ts` `primitiveOf` / `entityToManifold` (or the
   welded `entityToTriangles` group).
-- `packages/kernel-occt/src/occtShapes.ts` `entityToOccShape` is an if-chain that falls through to
-  `revolvedPrimitive` — handle explicitly (exact maker) or add to `TRIANGULATED_KINDS`.
+- Native OCCT: `server/src/native/kernelLeaves.ts` / `kernelProtocol.ts` `asNativeLeaf` (host side: send exact inputs or triangles) and
+  `solver/crates/llull-kernel-occt/src/recipe.rs` `solid_leaf` (a kind it does not know answers `NATIVE_UNSUPPORTED`, i.e. refused).
 
 ## 5. Codegen & exchange (3D expected; 2D export)
 - ⚠ `codegen/program.ts` `ShapeSpec` member (then ⚠ `openscad.ts` `shapeSource`, ⚠ `pythonCalls.ts`
@@ -65,7 +65,7 @@ Delegate in parallel when large: Lane 1 (`command-author`) model→codegen, Lane
 - Golden: add a plan in `tests/golden/plans.ts` exercising the kind; generate its snapshot.
 - Tool-schema snapshot: regenerate (`npx vitest run tests/unit/contract -u`) and review the diff.
 - Component: mesh/renderer test (`NewSolidMeshes.test.tsx`, `DimensionRenderer2D.test.tsx`).
-- Server (OCCT): `server/tests/occtPrimitives.test.ts` or `occtTessellatedKinds.test.ts`.
+- Server (native OCCT, real binary): `server/tests/occtPrimitives.test.ts` or `occtTessellatedKinds.test.ts`; closed-form corpus `server/tests/nativeKernelCorpus.ts`.
 
 ## Done
 `npm run check` + `npm --prefix server test` green; kind renders in both views (`verify-llull`);

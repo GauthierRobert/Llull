@@ -1,6 +1,6 @@
 /**
  * The native kernel proxy end to end through its worker, with a scripted stand-in for `llull-kernel` (fixtures/fakeKernel.cjs), so it
- * runs without a Rust build: native ops answered by the sidecar, the rest by the WASM OCC kernel, the selection and its fallbacks.
+ * runs without a Rust build: native ops answered by the sidecar, what it lacks refused, the selection and its Manifold fallback.
  */
 
 import { chmodSync } from 'node:fs';
@@ -27,25 +27,22 @@ afterEach(() => {
 const cube = leaf(box([0, 0, 0], [2, 2, 2]));
 
 describe.skipIf(process.platform === 'win32')('native kernel proxy (scripted sidecar)', () => {
-  it('answers native ops through the sidecar and the rest through the WASM kernel, also after a worker crash', () => {
+  it('answers native ops through the sidecar and refuses the rest, also after a worker crash', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const kernel = createNativeKernel(FAKE, { testHooks: true });
     kernels.push(kernel);
     expect(kernel.start()).toBe(true);
     expect(meshOf(kernel, cube)?.indices).toHaveLength(36);
 
-    const rounded = kernel.evaluate({ op: 'fillet', source: cube, edges: [0], size: 0.2 });
-    expect(rounded).not.toBeNull();
-    expect(kernel.topology(rounded!)?.faces).toHaveLength(7);
-    expect(meshOf(kernel, { op: 'fillet', source: cube, edges: [0], size: 0.2 })?.indices.length).toBeGreaterThan(36);
+    expect(kernel.evaluate({ op: 'fillet', source: cube, edges: [0], size: 0.2 }), 'the scripted sidecar only builds boxes').toBeNull();
+    const handle = kernel.evaluate(cube);
+    expect(kernel.topology(handle!), 'an op the sidecar lacks').toBeNull();
 
     const info = kernel.info?.();
     expect(info?.occtVersion).toBe('7.9.2');
-    expect(info?.build).toContain('llull-kernel@fake');
-    expect(info?.build).toContain('opencascade.js');
-    expect(info?.capabilities).toContain('topology');
+    expect(info?.build).toBe('llull-kernel@fake (OCCT 7.9.2, native)');
+    expect(info?.capabilities).toContain('exportStep');
 
-    const handle = kernel.evaluate(cube);
     kernel.forceFailure('__abort');
     expect(kernel.crashCount()).toBe(1);
     expect(kernel.tessellate(handle!)?.indices).toHaveLength(36); // key-only, not cached by the new sidecar: resent with its recipe
@@ -77,16 +74,22 @@ describe('LLULL_KERNEL=occt-native', () => {
     120_000,
   );
 
-  it('falls back to the WASM OCC kernel and says why in kernel_info', async () => {
+  it('falls back to Manifold and says why in kernel_info', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     process.env['LLULL_KERNEL'] = 'occt-native';
     process.env['LLULL_KERNEL_BIN'] = path.join(__dirname, 'no-such-llull-kernel');
     expect(await installGeometryKernel()).toBe(true);
-    expect(getActiveKernelName()).toBe('occt');
-    const info = getGeometryKernel()?.info?.();
-    expect(info?.fallbackReason).toMatch(/^NATIVE_TOOL_MISSING/);
-    expect(info?.build).toBe('opencascade.js@1.1.1');
+    expect(getActiveKernelName()).toBe('manifold');
+    expect(getGeometryKernel()?.info?.().fallbackReason).toMatch(/^NATIVE_TOOL_MISSING/);
   }, 120_000);
+
+  it('the retired LLULL_KERNEL=occt (WASM) value selects the native kernel like any other value but manifold', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const startNative = vi.fn(() => ({ reason: 'asked' }));
+    expect(await installGeometryKernel({ env: { LLULL_KERNEL: 'occt' }, startNative })).toBe(true);
+    expect(startNative).toHaveBeenCalledTimes(1);
+    expect(getActiveKernelName()).toBe('manifold');
+  });
 });
 
 describe('LLULL_KERNEL unset: the native kernel is the default (LC1 step 1, KI7)', () => {

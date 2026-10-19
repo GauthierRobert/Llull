@@ -26,18 +26,18 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { FeMeshArtifact } from '@core/model/analysis';
 import { isRecord } from '@lib/isRecord';
-import { createNodeOcctKernel } from '../src/occtNode';
+import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
 import { dataOf, expectCase, planPath, Workspace, type Session } from './feaThermomechSupport';
 
-const READY = HAS_GMSH && HAS_CCX;
+const READY = HAS_GMSH && HAS_CCX && nativeKernelBinary !== null;
 let workspace: Workspace;
 let occtReady = false;
 
 beforeAll(async () => {
   workspace = new Workspace();
   try {
-    setGeometryKernel(await createNodeOcctKernel());
+    setGeometryKernel(createNativeTestKernel());
     occtReady = true;
   } catch {
     occtReady = false;

@@ -166,7 +166,7 @@ pub fn scaled(shape: &Shape, factor: f64) -> Built {
     built(ffi::scaled(inner(shape)?, factor))
 }
 
-/// `a op b`, then (when `unify`) ShapeUpgrade_UnifySameDomain like the WASM kernel.
+/// `a op b`, then (when `unify`) ShapeUpgrade_UnifySameDomain (face merging keeps indices stable).
 pub fn boolean(op: BooleanOp, a: &Shape, b: &Shape, unify: bool) -> Built {
     let code = match op {
         BooleanOp::Union => 0,

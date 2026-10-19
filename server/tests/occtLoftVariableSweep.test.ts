@@ -4,11 +4,11 @@
  * bounds within the tessellation / blending tolerance.
  */
 
-import { describe, it, expect } from 'vitest';
+import { it, expect } from 'vitest';
 import type { CadDocument, Entity } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { box, booleanMesh, expectBoundsClose, liveKernels, meshOf, volume } from './kernelTestSupport';
+import { box, booleanMesh, expectBoundsClose, liveKernels, meshOf, volume, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
 const empty = createEmptyDocument();
@@ -37,7 +37,7 @@ function agree(entity: Entity, tolerance: number): { occt: number; manifold: num
   return { occt: o, manifold: m };
 }
 
-describe('loft_sections on the live kernels', () => {
+describeNative('loft_sections on the live kernels', () => {
   it('a ruled loft between two circles is a frustum', () => {
     const cone = created(empty, 'loft_sections', {
       sections: [
@@ -74,7 +74,7 @@ describe('loft_sections on the live kernels', () => {
   });
 });
 
-describe('variable-section sweep on the live kernels', () => {
+describeNative('variable-section sweep on the live kernels', () => {
   it('tapers and flattens a tube along a bent path', () => {
     const tube = created(empty, 'sweep_profile', {
       path: [
@@ -96,7 +96,7 @@ describe('variable-section sweep on the live kernels', () => {
   });
 });
 
-describe('closed-path sweeps on the live kernels', () => {
+describeNative('closed-path sweeps on the live kernels', () => {
   it('a hollow ring along a circle sketch is one exact solid with the Pappus volume', () => {
     const doc = execute(empty, 'draw_arc', { center: [0, 0], radius: 30 }).document;
     const ring = created(doc, 'sweep_profile', { pathId: doc.order[0], radius: 4, innerRadius: 3 });

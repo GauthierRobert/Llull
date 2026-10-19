@@ -9,9 +9,10 @@ import path from 'node:path';
 import { afterAll, beforeAll, expect } from 'vitest';
 import type { ShapeRecipe } from '@core/model/types';
 import { sha256Hex } from '@lib/sha256';
-import { nativeArgs } from '../src/native/kernelProtocol';
+import { decodeMesh, nativeArgs } from '../src/native/kernelProtocol';
 import { createKernelSession, spawnKernelChild, type NativeKernelSession } from '../src/native/kernelSession';
-import { handleOf, nativeKernelBinary } from './nativeParitySupport';
+import { nativeKernelBinary } from './kernelTestSupport';
+import { handleOf } from './nativeKernelCorpus';
 
 export { nativeKernelBinary };
 
@@ -32,7 +33,7 @@ function harnessOver(open: () => NativeKernelSession): NativeReferenceHarness {
   const call = async (op: string, args: readonly unknown[]): Promise<unknown> => {
     const reply = await open().request(op, nativeArgs(op, args));
     expect(reply.error, `${op} error`).toBeUndefined();
-    return reply.result;
+    return op === 'tessellate' ? decodeMesh(reply.result) : reply.result;
   };
   return {
     call,

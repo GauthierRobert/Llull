@@ -3,7 +3,7 @@
  * are valid boolean operands, placed like the other kernel, and degenerate input is rejected.
  */
 
-import { describe, it, expect } from 'vitest';
+import { it, expect } from 'vitest';
 import type { Entity, Vec3 } from '@core/model/types';
 import type { MeshData } from '@core/model/types';
 import {
@@ -19,6 +19,7 @@ import {
   liveKernels,
   meshOf,
   volume,
+  describeNative,
 } from './kernelTestSupport';
 
 type Profile = Array<[number, number]>;
@@ -41,7 +42,7 @@ const kernels = liveKernels();
 
 const placements: Placement[] = [ORIGIN_PLACEMENT, TRANSLATED_PLACEMENT, ALL_AXES_PLACEMENT];
 
-describe.each([
+describeNative.each([
   ['counter-clockwise', L_SHAPE],
   ['clockwise', [...L_SHAPE].reverse()],
 ] as Array<[string, Profile]>)('occt extrusion (%s profile)', (_name, profile) => {
@@ -66,7 +67,7 @@ describe.each([
   });
 });
 
-describe('occt extrusion rejects bad input', () => {
+describeNative('occt extrusion rejects bad input', () => {
   it.each([
     [
       'fewer than three points',
@@ -91,7 +92,7 @@ describe('occt extrusion rejects bad input', () => {
   });
 });
 
-describe('occt mesh operands', () => {
+describeNative('occt mesh operands', () => {
   it('a mesh solid behaves like the box it was tessellated from', () => {
     const source = box([0, 0, 0], [4, 4, 4]);
     const cube = meshOf(kernels.manifold, source)!;

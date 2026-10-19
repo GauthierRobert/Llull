@@ -1,5 +1,5 @@
-// Face-query port (01 §5.9) of the native kernel, mirroring packages/kernel-occt/src/occtFaceQuery.ts and occtFaceGraph.ts call for
-// call (same OCC algorithms, same sample grids, same arithmetic order) so both kernels answer the same numbers. Index rule: queries.hxx.
+// Face-query port (01 §5.9) of the native kernel, following occtFaceQuery.ts and occtFaceGraph.ts of the retired opencascade.js kernel
+// (same OCC algorithms, same sample grids, same arithmetic order). Index rule: queries.hxx.
 #include <algorithm>
 #include <set>
 #include <stdexcept>

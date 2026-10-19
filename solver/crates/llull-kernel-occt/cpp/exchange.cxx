@@ -1,5 +1,5 @@
 // Exchange half of the native query facade: STEP assemblies (occtStep.ts writeStepAssembly), B-rep blobs (occtImport.ts readBrepText /
-// brepText) and STEP import + healing (occtImport.ts importStepShapes, TR-KRN-20..24), mirroring the WASM kernel step for step so
+// brepText) and STEP import + healing (occtImport.ts importStepShapes, TR-KRN-20..24), following the retired opencascade.js kernel step for step so
 // both report the same census, solids, faces and healing actions.
 #include <sstream>
 #include <stdexcept>
@@ -104,7 +104,7 @@ std::unique_ptr<Shape> read_brep(rust::Str text) {
 
 namespace {
 
-// BRepTools text in the legacy V1 format ('occt-brep-v1' blobs), which every OCCT reader (7.4 WASM included) accepts.
+// BRepTools text in the legacy V1 format ('occt-brep-v1' blobs), which every OCCT reader accepts.
 std::string brep_text(const TopoDS_Shape &shape) {
   std::ostringstream stream;
   BRepTools::Write(shape, stream, Standard_False, Standard_False, TopTools_FormatVersion_VERSION_1);
@@ -136,7 +136,7 @@ int free_edge_count(const TopoDS_Shape &shape, double tolerance) {
 }
 
 // AP242 tessellated geometry (TRIANGULATED_FACE, COMPLEX_TRIANGULATED_FACE, read by OCCT >= 7.6) becomes faces holding a
-// Poly_Triangulation and no surface: not an exact B-rep, so such a solid or shell is skipped (the 7.4 WASM reader never transfers it).
+// Poly_Triangulation and no surface: not an exact B-rep, so such a solid or shell is skipped (the retired 7.4 reader never transferred it).
 bool is_tessellated(const TopoDS_Shape &shape) {
   const auto faces = distinct(shape, TopAbs_FACE);
   for (int i = 1; i <= faces.Extent(); ++i) {

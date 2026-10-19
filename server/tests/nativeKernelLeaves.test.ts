@@ -193,10 +193,18 @@ describe('native feature lowering', () => {
     expect(Math.min(...profile.filter((_, k) => k % 3 === 2))).toBeLessThan(-1);
   });
 
-  it('keeps floor-filleted pockets on WASM and sends fillets / chamfers native (native topology numbers their edges)', async () => {
-    expect(await prepareFeatures('massProperties', [{ key: 'k', recipe: pocket({ floorFillet: 0.1 }) }], meshes(slab))).toMatchObject({
-      unsupported: expect.stringContaining('NATIVE_UNSUPPORTED'),
-    });
+  it('sends the floor-selection inputs of a floor-filleted pocket, and fillets / chamfers native', async () => {
+    const filleted = pocket({ floorFillet: 0.1 });
+    const prepared = await prepareFeatures('massProperties', [{ key: 'k', recipe: filleted }], meshes(slab));
+    if (!('features' in prepared)) throw new Error('floor-filleted pocket should lower natively');
+    const cut = nativeRecipe(filleted, prepared.features) as unknown as { floorFillet: Record<string, unknown> };
+    expect(cut.floorFillet).toMatchObject({ radius: 0.1, floorDepth: 0.5, origin: [0, 0, 1], normal: [0, 0, 1], xDir: [1, 0, 0] });
+    expect(cut.floorFillet['outlines']).toHaveLength(1);
+    const plain = nativeRecipe(
+      pocket({}),
+      ((await prepareFeatures('massProperties', [{ key: 'k', recipe: pocket({}) }], meshes(slab))) as { features: never }).features,
+    );
+    expect(plain).not.toHaveProperty('floorFillet');
     const source = leaf(box([0, 0, 0], [1, 1, 1]));
     for (const recipe of [
       { op: 'fillet', source, edges: [], size: 0.1 },

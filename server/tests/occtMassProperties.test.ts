@@ -1,11 +1,11 @@
 /** Live OpenCascade: exact `massProperties` (TR-KRN-40/41, VC-KRN-02) against closed forms, also at 70 m, and through `mass_properties`. */
-import { describe, expect, it } from 'vitest';
+import { expect, it } from 'vitest';
 import type { Entity, Vec3 } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import type { ExactMassProperties } from '@core/geometry/kernelPorts';
-import { liveKernels } from './kernelTestSupport';
+import { liveKernels, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
 
@@ -18,7 +18,7 @@ const massOf = (entity: Entity): ExactMassProperties | null => {
 };
 const relative = (actual: number, expected: number): number => Math.abs(actual - expected) / Math.abs(expected);
 
-describe('occt exact mass properties', () => {
+describeNative('occt exact mass properties', () => {
   it('box 100x50x20: volume, area, centroid and centroidal inertia match the closed forms to 1e-12', () => {
     const props = massOf(shape('box', { position: [0, 0, 0], size: [100, 50, 20] }));
     expect(props).not.toBeNull();

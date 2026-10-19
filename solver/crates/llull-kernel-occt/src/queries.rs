@@ -1,9 +1,9 @@
 //! Query and exchange operations of the native kernel (`cpp/queries.hxx`): exact topology, the face-query port (01 §5.9), distances,
-//! STEP assemblies, STEP import + healing and B-rep blobs. The C++ side answers each query as JSON text in the WASM kernel's result
-//! shape (`packages/kernel-occt`), parsed here once; `Value::Null` is the WASM kernel's null.
+//! STEP assemblies, STEP import + healing and B-rep blobs. The C++ side answers each query as JSON text in the result shape of
+//! `GeometryKernel` (`@core/geometry/kernel`), parsed here once; `Value::Null` is a null result.
 //!
 //! Index rule (topology, face queries, fillet / chamfer edges): index k = the k-th distinct sub-shape (`IsSame`) in `TopExp_Explorer`
-//! order, i.e. `TopExp::MapShapes` order, the same numbering as `uniqueSubShapes` in `packages/kernel-occt/src/occtTopology.ts`.
+//! order, i.e. `TopExp::MapShapes` order, the numbering the host and the core commands rely on (`uniqueSubShapes` of the retired kernel).
 
 use crate::{inner, occt, OcctResult, Shape};
 use serde_json::Value;
@@ -46,7 +46,7 @@ fn parsed(text: Result<String, cxx::Exception>) -> OcctResult<Value> {
     serde_json::from_str(&text).map_err(|error| format!("query facade answered unreadable JSON: {error}"))
 }
 
-/// A face / edge index as the facade takes it; `None` (the WASM kernel's null) for a negative, fractional or huge index.
+/// A face / edge index as the facade takes it; `None` (a null result) for a negative, fractional or huge index.
 fn index(value: f64) -> Option<i32> {
     (value.fract() == 0.0 && (0.0..=f64::from(i32::MAX)).contains(&value)).then_some(value as i32)
 }

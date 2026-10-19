@@ -3,6 +3,8 @@
 Gap id **KRN** · status: specification (no implementation) · written 2026-10-15 ·
 technical counterpart: [TECHNICAL_SPEC.md](TECHNICAL_SPEC.md) · validation: [validation/README.md](validation/README.md)
 
+> **Amendment 2026-10-19 (LC1 step 5).** The opencascade.js WASM kernel (`packages/kernel-occt`, OCCT 7.4.0p1) is retired: the native `llull-kernel` (OCCT 7.9.2, `solver/`) is the only exact kernel, with Manifold as the mesh kernel and the fallback when the binary is missing. Passages below that describe opencascade.js, the browser worker or the per-op WASM fallback record the state at the time they were written (see `docs/decisions/LC1-local-only.md`, KI7, RS1).
+
 ## 1. Summary
 
 Aerospace parts are defined, toleranced, machined, inspected and certified from an **exact boundary

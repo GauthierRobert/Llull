@@ -1,15 +1,15 @@
 /** Live OpenCascade: a nested, scaled assembly exports as shared products (not one baked product per instance) and re-imports faithfully. */
 
-import { describe, it, expect } from 'vitest';
+import { it, expect } from 'vitest';
 import { createEmptyDocument, type CadDocument, type Vec3 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import type { CommandResult } from '@core/commands/types';
-import { liveKernels } from './kernelTestSupport';
+import { liveKernels, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
 
-describe('occt export_step_exact nested scaled assembly', () => {
+describeNative('occt export_step_exact nested scaled assembly', () => {
   it('shares the scaled sub-part across instances, bakes only the non-uniform instance, and re-imports at the same volumes and centroids', () => {
     const ctx = { ...defaultContext(), kernel: kernels.occt };
     const run = (doc: CadDocument, name: string, params: Record<string, unknown>): CommandResult => {
