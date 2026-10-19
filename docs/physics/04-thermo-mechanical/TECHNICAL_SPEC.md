@@ -452,3 +452,27 @@ Measured (global size 0.2 mm, order 2, ring refinement size = thickness h; "raw"
 
 The remaining +0.4 MPa is the finite plate (the free edges add about 50 (a/W)^2 = 0.5 MPa, W = 10 mm: the pack notes it); the sequence is converged to 0.1 MPa. All three cases
 pass the 2 % judge on both suite meshes, and are also judged analytically by `thermal_stress_check inclusion`.
+
+## 15. RS-7 native mapping (2026-10-19)
+
+**Built: TR-TMC-24.** `llull-compute post map` (crate `solver/crates/llull-post`, `map.rs`, on the shared `solver/crates/llull-bvh`) maps a
+thermal result onto the mechanical mesh with the rules of `thermomech/mapping.ts`: same tree (median split on the widest axis, centre then index
+order), same branch-and-bound visit order and TIE rule, same shape functions and report; target nodes in parallel (rayon), report reduced in node
+order.
+
+| Item | Where |
+| ---- | ----- |
+| Request (thermal results hash, step, scale conversion, thermal mesh hash, hash of the mechanical mesh nodes) and job buffers; the `fe_results` artifact (`solver: 'llull-compute post map'`, field `MAPPED` = T, element, distance per node) bound to the request key and the target nodes hash; the reader | `packages/domain-cae/src/thermomech/mappedField.ts` |
+| The deck (`resolveTemperatureField`) uses a bound native artifact (description says `native llull-compute post map`), else maps in TS; the report of both paths comes from the shared `mappingReport` | `thermomech/field.ts`, `thermomech/mapping.ts` |
+| `fea_map_field` transport, and the `fea_solve` pre-step from `LLULL_NATIVE_MAP_MIN_NODES` target nodes (default 20 000; 0 = always; never fails the solve) | `server/src/native/mapField.ts`, `server/src/fea/{feaSolve,transports}.ts` |
+
+**Fix found on the way:** `mapNodalField` and the field check spread every node into `Math.min(...)` / `Math.max(...)`: above ≈ 120k nodes V8
+throws `RangeError: Maximum call stack size exceeded`, so the TS mapping could not run at the §8 size. Both are loops now (same numbers).
+
+**VC-TMC-10.** Element per node, distance, temperature, outside count, `maxMappingDistance` and coincident error are bit-identical (not only
+1e-9) on C3D4 / C3D10 sources, offset (partly outside) and coincident targets (`solver/crates/llull-post/tests/reference.rs`) and end to end
+with the binary (`server/tests/nativeTransports.test.ts`). Measured (4 vCPU): 202 776 target nodes on a 201 600-element source: TS 30.0 s,
+native 1.44 s (1.64 s with job I/O) — §8 budget (≤ 5 s) met; building the request in TS (node hash, value map) takes 3.4 s at that size.
+
+**Deviation:** the artifact is bound to the hash of the mechanical mesh NODES (ids + coordinates, all the mapping reads), not to the canonical
+mesh artifact hash: the canonical hash of a 200k-node mesh costs 8 s in TS, the node hash 0.4–3 s.

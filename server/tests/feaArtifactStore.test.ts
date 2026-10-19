@@ -79,6 +79,20 @@ describe('FeArtifactStore', () => {
     writeFileSync(path.join(dir, `${otherHash}.json.gz`), gzipSync(JSON.stringify(other)));
     expect(store.get(otherHash)).toBeNull();
   });
+
+  it('finds a derived artifact under an input-hash alias, still content-verified (RS1 RS-7)', () => {
+    const store = createFeArtifactStore(dir);
+    const hash = store.put({ ...results, solver: 'llull-compute post fatigue' });
+    const key = sha256Hex('input of the job');
+    expect(store.get(key)).toBeNull();
+    store.alias(key, hash);
+    expect(store.get(key)?.kind).toBe('fe_results');
+    writeFileSync(path.join(dir, `${key}.ref`), 'not-a-hash');
+    expect(store.get(key)).toBeNull();
+    store.alias(key, sha256Hex('nothing stored here'));
+    expect(store.get(key)).toBeNull();
+    expect(() => store.alias('bad', hash)).toThrow(/sha256/);
+  });
 });
 
 describe('feaCacheDir / serverContext', () => {

@@ -408,3 +408,38 @@ for access method and grade. Native compute programme: [RS1](../../decisions/RS1
 `packages/core/src/plugins/plugin.ts`, `packages/mcp/src/toolsets.ts`, `packages/core/src/commands/project/types.ts`,
 `packages/domain-aec/src/industrial/runway/*`, `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md`,
 `docs/aerospace/08-materials-standards-libraries/TECHNICAL_SPEC.md`, `docs/aerospace/09-plm-configuration-traceability/TECHNICAL_SPEC.md`.
+
+## 13. Implementation status — RS-7 native fatigue field (2026-10-19)
+
+**Built:** TR-FAT-41 and the FE hot-spot ranking of §5.6 step 4 on the all-node path (the TS pre-selection path of §5.6 is still not built:
+without a field an FE case is refused with `FAT_RESULTS_MISSING`, as before).
+
+| Item | Where |
+| ---- | ----- |
+| FE stress histories: superposition σ(t) = Σ s_k(t) σ_k (load-factor histories, `mapping[].loadCase`), signed von Mises / max principal / component, principal stresses by cyclic Jacobi (square roots only, so bit-reproducible) | `packages/domain-cae/src/fatigue/feStress.ts` |
+| Job builder (trusted 05 results, STRESS per load case in MPa, resolved curve / mean inputs), the TS reference of the field, the `FatigueField` artifact and its reader | `fatigue/feField.ts` |
+| Hot spots: the `locations.count` nodes of largest damage (static failures first, ties by mesh node order); every row recomputed by the TS code and checked against the native damage (`FAT_NATIVE_MISMATCH`, 1e-12 rel) | `fatigue/feHotspots.ts`, `compute_fatigue` / `check_fatigue` |
+| `llull-compute post fatigue` (rayon over nodes, results at fixed node indices) | `solver/crates/llull-post` (`rainflow.rs`, `life.rs`, `damage.rs`, `stress.rs`, `fatigue.rs`) |
+| V8-exact `Math.pow` / `log10` / `hypot` / `round` (glibc differs from V8 in the last bit for ~5–10 % of `pow` inputs) | `solver/crates/llull-jsmath` |
+| `fatigue_field` transport (CLI, local document): job folder, NATIVE_TOOL_MISSING, artifact stored content-addressed and aliased under `fatigueInputHash`, then `compute_fatigue`; `verify=true` runs the TS reference on every node | `server/src/native/{computeJob,fatigueField,tools}.ts`, `server/src/fea/artifactStore.ts` (`alias`) |
+
+**Artifact.** No new core artifact kind (core is unchanged): a `FatigueField` is an `fe_results` artifact (`solver: 'llull-compute post fatigue'`,
+`inputHash = fatigueInputHash`, `meshHash` of the results, one field `FATIGUE` with components `D, CYCLES, SEQA, FLAGS` per node). The store
+reaches it under `fatigueInputHash` (`<key>.ref` -> content hash, content re-verified); `compute_fatigue` checks kind, solver, input hash, mesh
+hash and a finite row for every node. `fatigueInputHash` = sha256 of {results hash, mesh hash, node ids, histories × scale, measure, counting,
+resolved curve / mean inputs / Ftu / modifiers / notch}: scatter, damage limit, marginal band and required life are NOT in it (they do not change
+the damage per block), so `lifePerNode` is derived on read (`damageLimit / D`) and a factor change does not need a new native run.
+
+**VC-FAT-43.** Bit-identical, not 1e-12: cycles, damage, cycle count, largest equivalent amplitude and flags of every node equal the TS reference
+in eight variants (Basquin / power law / table, Goodman / Gerber formula / Walker / Morrow / Soderberg / SWT, notch, 3-pt / 4-pt / repeating,
+gate) — `solver/crates/llull-post/tests/reference.rs` on fixtures written by `tests/unit/native/nativeReference.test.ts`, and end to end with the
+real binary in `server/tests/nativeTransports.test.ts` (`verify: identical`); results do not depend on the thread count.
+
+**Measured (4 vCPU container, release build):** 51 612 nodes × 2 load cases × 10 000 steps, signed von Mises, Basquin + Goodman: TS reference
+64 ms per node (≈ 55 min for all nodes, extrapolated from 300 nodes), native 149 s (≈ 22× wall, ≈ 11× per core). 5 376 nodes: 14.2 s native
+vs 326 s TS. The §8 target (≤ 10 s) is not met on this machine: the per-step principal-stress Jacobi is ≈ 85 % of the native time (rainflow 5 %,
+damage 9 %). Job input build in TS: 8.9 s for 51k nodes (artifact trust re-hash).
+
+**Deviations / open:** hot spots are not spaced (§5.6 "one per part, ≥ 2 element lengths apart") and 05 singular zones are not excluded
+(05 has no singular-zone data); no proportionality check (`FAT_NONPROPORTIONAL`); only `load_factor` series drive FE cases; the transport runs on
+local documents (`llull --doc`), not yet through `POST /exchange` (`--app` / `--server`).

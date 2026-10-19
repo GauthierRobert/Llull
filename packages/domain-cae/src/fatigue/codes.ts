@@ -20,7 +20,10 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'check the mapping (existing histories, scale finite), requiredLife (> 0; flights / hours need blocksPerUnit) and the notch',
   FAT_SCATTER_FACTOR_UNSET: 'set_fatigue_factors scatter={value, source} (ask the owner; llull has no default)',
   FAT_RESULTS_MISSING:
-    'FE hot-spot stress extraction is not built: define the stress directly with a stress-kind history and no analysisId',
+    'solve the analysis (fea_mesh, fea_solve), then run the fatigue_field transport (llull fatigue_field caseId=...; needs llull-compute); or use a stress-kind history and no analysisId',
+  FAT_RESULTS_STALE: 'the analysis inputs changed since its solve: run fea_solve again, then fatigue_field',
+  FAT_FIELD_INVALID: 'run fatigue_field again: the stored field does not match this case input, mesh or node set',
+  FAT_NATIVE_MISMATCH: 'report it: the native fatigue field disagrees with the TypeScript reference at a hot spot',
   FAT_PARAMS_INVALID: 'follow the command description (amplitude and strainAmplitude are exclusive; units are stresses)',
   FAT_SOLVER_NO_CONVERGENCE: 'check the strain-life parameters (b, c < 0; epsF, sigmaF > 0)',
 };

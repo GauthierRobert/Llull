@@ -3,7 +3,14 @@
 resolver = "2"
 members = ["crates/*", "bins/*"]
 # The OCCT kernel builds OpenCascade from source (slow first build); `npm run native:check` skips it unless LLULL_NATIVE_KERNEL=1.
-default-members = ["crates/llull-protocol", "bins/llull-compute"]
+default-members = [
+  "crates/llull-protocol",
+  "crates/llull-jsmath",
+  "crates/llull-bvh",
+  "crates/llull-post",
+  "crates/llull-raster",
+  "bins/llull-compute",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -13,7 +20,9 @@ publish = false
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# float_roundtrip: parse JSON numbers exactly as JavaScript prints them (native results must match the TypeScript bit for bit).
+serde_json = { version = "1", features = ["float_roundtrip"] }
+rayon = "1"
 sha2 = "0.10"
 
 [workspace.lints.rust]
