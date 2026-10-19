@@ -98,7 +98,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   },
   /** Industrial pipe runs, supports, cable trays and hydraulics (industrial plugin) plus the plant piping plugin (02 RTE). */
   get piping(): readonly string[] {
-    return [...pluginToolNames('building').filter((name) => PIPING_TOOLS.includes(name)), ...pluginToolNames('piping')];
+    return [...pluginToolNames('building').filter((name) => PIPING_TOOLS.includes(name)), ...pluginToolNames('piping'), 'auto_route'];
   },
   /** Contributed by the installed civil (site / terrain / roads / drainage) plugin. */
   get civil(): readonly string[] {

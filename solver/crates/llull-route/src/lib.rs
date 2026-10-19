@@ -5,10 +5,11 @@
 //! A* as the TypeScript reference `searchRoute` (state = cell + incoming axis, straight move 1 cell, turn = `minLegCells` cells,
 //! open set totally ordered by (f, h, i, j, k, axis), re-expansion only on a strictly smaller g), so both return the same bends,
 //! cost and expansion count (VC-RTE-25). Obstacles are never rasterised: a move is tested against an integer AABB tree
-//! ([`obstacles::ObstacleTree`]) and visited states live in a hash map, so a 100 m x 100 m x 30 m box at 50 mm costs only what
+//! ([`obstacles::ObstacleTree`]) and visited states live in sparse pages ([`states::States`]), so a 100 m x 100 m x 30 m box at 50 mm costs only what
 //! the search touches. The document is never written here: `auto_route_pipe` validates and commits the result.
 
 pub mod job;
 pub mod obstacles;
 pub mod problem;
 pub mod search;
+pub mod states;

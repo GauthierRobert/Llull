@@ -54,8 +54,9 @@ pub struct RouteProblem {
     pub obstacles: Vec<ObstacleBox>,
 }
 
-/// Largest lattice extent per axis (cells): keeps every state key below 2^53, like the TypeScript number keys.
-pub const MAX_CELLS_PER_AXIS: i64 = 1 << 20;
+/// Largest number of lattice states (cells x 6 axes): the TypeScript reference keys are exact numbers only up to 2^53 - 1, and
+/// `route_problem` refuses larger boxes with the same limit.
+pub const MAX_STATES: i64 = (1 << 53) - 1;
 
 impl RouteProblem {
     /// World point (µm) of a lattice cell.
@@ -80,8 +81,12 @@ impl RouteProblem {
             return Err("axes are 0..5 (+X, -X, +Y, -Y, +Z, -Z)".to_string());
         }
         let size = self.size();
-        if size.iter().any(|&n| !(1..=MAX_CELLS_PER_AXIS).contains(&n)) {
-            return Err(format!("bounds must span 1..={MAX_CELLS_PER_AXIS} cells per axis"));
+        if size.iter().any(|&n| n < 1) {
+            return Err("bounds must span at least one cell per axis".to_string());
+        }
+        let states = size.iter().try_fold(6i64, |total, &n| total.checked_mul(n));
+        if states.is_none_or(|states| states > MAX_STATES) {
+            return Err(format!("the grid box holds more than {MAX_STATES} lattice states (the TypeScript reference limit, 2^53 - 1)"));
         }
         let inside = |c: &Int3| (0..3).all(|d| c[d] >= self.bounds.min[d] && c[d] <= self.bounds.max[d]);
         if !inside(&[0, 0, 0]) || !inside(&self.goal.cell) {

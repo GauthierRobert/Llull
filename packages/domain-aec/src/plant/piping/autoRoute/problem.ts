@@ -163,7 +163,9 @@ function collectObstacles(
   (request.keepOutBoxes ?? []).forEach((box, index) => {
     const id = `keepOutBox#${index}`;
     keepOut.add(id);
-    obstacles.push(inflate(id, box.min, box.max, radius));
+    const lower: Vec3 = [Math.min(box.min[0], box.max[0]), Math.min(box.min[1], box.max[1]), Math.min(box.min[2], box.max[2])];
+    const upper: Vec3 = [Math.max(box.min[0], box.max[0]), Math.max(box.min[1], box.max[1]), Math.max(box.min[2], box.max[2])];
+    obstacles.push(inflate(id, lower, upper, radius));
   });
   return { obstacles, keepOutIds: keepOut };
 }
@@ -231,8 +233,16 @@ export function buildRouteProblem(doc: CadDocument, request: RouteRequest): Buil
   const radius = (pipeOutsideDiameter(line.dn) ?? 0) / 2 + (line.insulation?.thicknessMm ?? 0) + pick('clearance');
   const collected = collectObstacles(doc, piping, radius, request);
   if ('ok' in collected) return collected;
-  const lo = bounds.min.map((v, dim) => (originUm[dim] as number) + v * cellUm);
-  const hi = bounds.max.map((v, dim) => (originUm[dim] as number) + v * cellUm);
+  const states = bounds.max.reduce((total, max, dim) => total * (max - (bounds.min[dim] as number) + 1), 6);
+  if (states > Number.MAX_SAFE_INTEGER)
+    return refusal(
+      'RTE_AUTOROUTE_BUDGET',
+      `the grid box holds ${states} lattice states (limit 2^53): use a coarser grid or a smaller gridMargin`,
+      ['gridMargin'],
+    );
+  // Obstacles touching the lattice box or either port stub (the stubs end outside the box when gridMargin is small).
+  const lo = bounds.min.map((v, dim) => Math.min((originUm[dim] as number) + v * cellUm, fromUm[dim] as number, toPointUm[dim] as number));
+  const hi = bounds.max.map((v, dim) => Math.max((originUm[dim] as number) + v * cellUm, fromUm[dim] as number, toPointUm[dim] as number));
   const relevant = collected.obstacles.filter((box) =>
     box.min.every((min, dim) => min <= (hi[dim] as number) && (box.max[dim] as number) >= (lo[dim] as number)),
   );

@@ -3,9 +3,9 @@
 
 use crate::obstacles::ObstacleTree;
 use crate::problem::{Int3, RouteProblem, AXIS_VECTORS};
+use crate::states::States;
 use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashMap};
-use std::hash::{BuildHasherDefault, Hasher};
+use std::collections::BinaryHeap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Found {
@@ -21,26 +21,6 @@ pub enum Outcome {
     NoPath { expansions: u64 },
     Budget { expansions: u64 },
 }
-
-/// Multiplicative hash of the dense integer state keys (no SipHash: keys are not attacker-controlled).
-#[derive(Default)]
-struct KeyHasher(u64);
-
-impl Hasher for KeyHasher {
-    fn finish(&self) -> u64 {
-        self.0
-    }
-    fn write(&mut self, bytes: &[u8]) {
-        for &byte in bytes {
-            self.write_u64(u64::from(byte));
-        }
-    }
-    fn write_u64(&mut self, value: u64) {
-        self.0 = (self.0.rotate_left(5) ^ value).wrapping_mul(0x517c_c1b7_2722_0a95);
-    }
-}
-
-type StateMap = HashMap<u64, (i64, u64), BuildHasherDefault<KeyHasher>>;
 
 /// Open-set entry (f, h, i, j, k, axis, g), popped smallest first; g follows from (f, h) for a given state.
 type OpenEntry = Reverse<(i64, i64, i64, i64, i64, u8, i64)>;
@@ -79,11 +59,11 @@ pub fn search(p: &RouteProblem, max_expansions: u64, progress: &mut dyn FnMut(u6
         ((((c[0] - min[0]) * size[1] + (c[1] - min[1])) * size[2] + (c[2] - min[2])) * 6 + i64::from(axis)) as u64
     };
     let inside = |c: &Int3| (0..3).all(|d| c[d] >= p.bounds.min[d] && c[d] <= p.bounds.max[d]);
-    let mut best: StateMap = HashMap::default();
+    let mut best = States::new(min, size);
     let mut heap: BinaryHeap<OpenEntry> = BinaryHeap::new();
     let start_axis = p.from.axis;
     let start_key = key(&[0, 0, 0], start_axis);
-    best.insert(start_key, (0, start_key));
+    best.improve(&[0, 0, 0], start_axis, 0, start_key);
     let h0 = heuristic(p, &[0, 0, 0], start_axis);
     heap.push(Reverse((h0, h0, 0, 0, 0, start_axis, 0)));
     let goal_key = key(&p.goal.cell, p.goal.axis);
@@ -91,7 +71,7 @@ pub fn search(p: &RouteProblem, max_expansions: u64, progress: &mut dyn FnMut(u6
     while let Some(Reverse((_, _, i, j, k, axis, g))) = heap.pop() {
         let here_cell = [i, j, k];
         let here_key = key(&here_cell, axis);
-        if best.get(&here_key).map(|entry| entry.0) != Some(g) {
+        if best.get(&here_cell, axis).map(|entry| entry.0) != Some(g) {
             continue;
         }
         if here_key == goal_key {
@@ -116,11 +96,9 @@ pub fn search(p: &RouteProblem, max_expansions: u64, progress: &mut dyn FnMut(u6
                 continue;
             }
             let ng = g + move_cost(p, step, next, k) + if next == axis { 0 } else { p.bend_cost_um };
-            let next_key = key(&cell, next);
-            if best.get(&next_key).is_some_and(|entry| entry.0 <= ng) {
+            if !best.improve(&cell, next, ng, here_key) {
                 continue;
             }
-            best.insert(next_key, (ng, here_key));
             let h = heuristic(p, &cell, next);
             heap.push(Reverse((ng + h, h, cell[0], cell[1], cell[2], next, ng)));
         }
@@ -128,7 +106,7 @@ pub fn search(p: &RouteProblem, max_expansions: u64, progress: &mut dyn FnMut(u6
     Outcome::NoPath { expansions }
 }
 
-fn unwind(best: &StateMap, goal_key: u64, start_key: u64, min: &Int3, size: &Int3) -> Vec<Int3> {
+fn unwind(best: &States, goal_key: u64, start_key: u64, min: &Int3, size: &Int3) -> Vec<Int3> {
     let decode = |key: u64| -> (Int3, u64) {
         let axis = key % 6;
         let mut rest = (key / 6) as i64;
@@ -141,7 +119,8 @@ fn unwind(best: &StateMap, goal_key: u64, start_key: u64, min: &Int3, size: &Int
     let mut states = vec![decode(goal_key)];
     let mut key = goal_key;
     while key != start_key {
-        key = best.get(&key).map_or(start_key, |entry| entry.1);
+        let (cell, axis) = decode(key);
+        key = best.get(&cell, axis as u8).map_or(start_key, |entry| entry.1);
         states.push(decode(key));
     }
     states.reverse();

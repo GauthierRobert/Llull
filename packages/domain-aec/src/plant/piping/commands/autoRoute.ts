@@ -3,6 +3,7 @@ import type { CommandResult } from '@core/commands/types';
 import { changed, report } from '@core/commands/noop';
 import type { CadDocument } from '@core/model/types';
 import type { PipeRun } from '@core/model/plant';
+import type { Vec3 } from '@core/model/vectors';
 import { nextId } from '@lib/id';
 import { buildRouteProblem, type BuiltProblem, type RouteRequest } from '../autoRoute/problem';
 import { searchRoute } from '../autoRoute/search';
@@ -56,9 +57,13 @@ const solutionSchema = z
     lengthMm: z.number().describe('Port-to-port centreline-to-PI length, mm.'),
     bends: z.number().int().min(0).describe('Number of bends (= pis.length).'),
     cost: z.number().int().min(0).describe('Integer µm cost: lattice length + bends x bendCost + elevation penalties.'),
-    optimal: z.boolean().describe('True when the search proved the route minimal.'),
-    expansions: z.number().int().min(0).describe('States the search expanded.'),
-    engine: z.string().describe("Who produced it: 'llull-route' (native), 'ts' or a name for a hand-written route."),
+    optimal: z.boolean().describe('Caller-asserted (recorded as given): true when the search proved the route minimal.'),
+    expansions: z.number().int().min(0).describe('Caller-asserted (recorded as given): states the search expanded.'),
+    engine: z
+      .string()
+      .describe(
+        "Caller-asserted source (recorded as given): 'llull-route' (set by llull auto_route), 'ts' or a name for a hand-written route.",
+      ),
   })
   .describe('A solution of route_problem (from llull auto_route); validated before it is committed.');
 
@@ -88,9 +93,7 @@ export const autoRoutePipe = defineCommand({
     const { problem, problemHash } = result;
     let solution: RouteSolution;
     if (params.solution !== undefined) {
-      const check = checkSolution(problem, problemHash, params.solution);
-      if (!check.ok) return refuse(doc, 'auto_route_pipe', 'RTE_AUTOROUTE_SOLUTION_INVALID', check.reason, [params.lineId], [check.path]);
-      solution = params.solution;
+      solution = { ...params.solution, pis: params.solution.pis.map((p) => p.map((v) => Math.round(v * 1000) / 1000) as unknown as Vec3) };
     } else {
       const cap = params.maxExpansions ?? TS_MAX_EXPANSIONS;
       if (cap > TS_MAX_EXPANSIONS)
@@ -123,6 +126,9 @@ export const autoRoutePipe = defineCommand({
         );
       solution = solutionFromSearch(problem, problemHash, search, 'ts');
     }
+    // Every route, the in-process search's included, passes the same check before it is committed (PIs snapped to whole µm).
+    const check = checkSolution(problem, problemHash, solution);
+    if (!check.ok) return refuse(doc, 'auto_route_pipe', 'RTE_AUTOROUTE_SOLUTION_INVALID', check.reason, [params.lineId], [check.path]);
     const piping = getPiping(doc);
     const id = nextId('run');
     const run: PipeRun = {

@@ -124,18 +124,21 @@ describe('route_problem', () => {
     );
   });
 
-  it.each([
+  it.each<[string, Record<string, unknown>, string]>([
     ['RTE_UNKNOWN_LINE', { lineId: 'line-nope' }, 'lineId'],
     ['RTE_UNKNOWN_PORT', { from: { portId: 'tie-nope' } }, 'from.portId'],
     ['RTE_PORT_DIRECTION', { from: { point: [0, 0, 0], direction: [1, 1, 0] } }, 'from'],
     ['RTE_UNKNOWN_KEEPOUT', { keepOut: ['box-nope'] }, 'keepOut'],
     ['RTE_AUTOROUTE_NO_PATH', { grid: 70 }, 'grid'],
+    ['RTE_AUTOROUTE_BUDGET', { grid: 0.01, gridMargin: 100000 }, 'gridMargin'],
+    ['RTE_AUTOROUTE_NO_PATH', { gridMargin: 0, keepOutBoxes: [{ min: [90, 0, 0], max: [92, 0, 0] }] }, 'from'],
+    ['RTE_AUTOROUTE_NO_PATH', { gridMargin: 0, keepOutBoxes: [{ min: [92, 0, 0], max: [90, 0, 0] }] }, 'from'],
     ['RTE_SPEC_NO_COMPONENT', { elbowCentreToEnd: undefined, lineId: 'dn65' }, 'elbowCentreToEnd'],
   ])('refuses %s', (code, extra, path) => {
     const s = scenario();
     let doc = s.doc;
     let overrides: Record<string, unknown> = extra;
-    if (extra.lineId === 'dn65') {
+    if (extra['lineId'] === 'dn65') {
       const created = ok(doc, 'create_pipeline', { service: 'P', sequence: '8002', spec: 'CS150', dn: 65 });
       doc = created.document;
       overrides = {
@@ -201,6 +204,7 @@ describe('auto_route_pipe with a supplied solution (VC-RTE-25 validation half)',
     ...sol,
     pis: (sol['pis'] as Vec3[]).map((p, i) => (i === 0 ? [p[0], p[1] + 10, p[2]] : p)),
   });
+  const withPis = (sol: Solution, pis: Vec3[]): Solution => ({ ...sol, pis, bends: pis.length });
   const collinear = (sol: Solution): Solution => {
     const pis = sol['pis'] as Vec3[];
     const first = pis[0] as Vec3;
@@ -214,6 +218,36 @@ describe('auto_route_pipe with a supplied solution (VC-RTE-25 validation half)',
     ['an off-axis PI', shiftFirst, 'solution.pis.0'],
     ['a missing PI', (sol: Solution): Solution => ({ ...sol, pis: (sol['pis'] as Vec3[]).slice(1), bends: 1 }), 'solution.pis.0'],
     ['an unmerged collinear PI', collinear, 'solution.pis.0'],
+    [
+      'a leg too short for two elbows',
+      (sol: Solution): Solution =>
+        withPis(sol, [
+          [2950, 0, 0],
+          [2950, 2000, 0],
+          [3000, 2000, 0],
+        ]),
+      'solution.pis.1',
+    ],
+    [
+      'a reversed leg',
+      (sol: Solution): Solution =>
+        withPis(sol, [
+          [3000, 0, 0],
+          [3000, 2000, 0],
+          [3000, 1000, 0],
+        ]),
+      'solution.pis.1',
+    ],
+    [
+      'a PI outside the grid box',
+      (sol: Solution): Solution =>
+        withPis(sol, [
+          [3000, 0, 0],
+          [3000, 0, -3000],
+          [3000, 2000, -3000],
+        ]),
+      'solution.pis',
+    ],
   ])('refuses %s with RTE_AUTOROUTE_SOLUTION_INVALID and leaves the document unchanged', (_label, tamper, path) => {
     const { s, routed } = routedOnce();
     expectRefusal(s.doc, 'auto_route_pipe', { ...params(s), solution: tamper(solutionOf(routed)) }, 'RTE_AUTOROUTE_SOLUTION_INVALID', path);
@@ -259,7 +293,13 @@ describe('auto_route_pipe search limits and preferences', () => {
   it('refuses RTE_AUTOROUTE_NO_PATH when a keep-out wall closes the grid box', () => {
     const s = scenario();
     const wall = { min: [1500, -5000, -5000], max: [1510, 5000, 5000] };
-    expectRefusal(s.doc, 'auto_route_pipe', params(s, { grid: 100, gridMargin: 100, keepOutBoxes: [wall] }), 'RTE_AUTOROUTE_NO_PATH', 'gridMargin');
+    expectRefusal(
+      s.doc,
+      'auto_route_pipe',
+      params(s, { grid: 100, gridMargin: 100, keepOutBoxes: [wall] }),
+      'RTE_AUTOROUTE_NO_PATH',
+      'gridMargin',
+    );
   });
 
   it('runs horizontal pipe on a preferred rack elevation', () => {

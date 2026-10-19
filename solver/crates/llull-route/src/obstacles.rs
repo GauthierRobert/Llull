@@ -70,8 +70,12 @@ impl ObstacleTree {
         if self.nodes.is_empty() {
             return false;
         }
-        let mut stack = vec![0usize];
-        while let Some(index) = stack.pop() {
+        // Fixed stack (no allocation per query): depth is log2(boxes / LEAF_SIZE) + 1, far below 64.
+        let mut stack = [0usize; 64];
+        let mut depth = 1;
+        while depth > 0 {
+            depth -= 1;
+            let index = stack[depth];
             let node = &self.nodes[index];
             // Closed-box reject: a box that does not even touch the segment's bounding box cannot be entered.
             if (0..3).any(|d| a[d].max(b[d]) < node.min[d] || a[d].min(b[d]) > node.max[d]) {
@@ -86,8 +90,9 @@ impl ObstacleTree {
                     return true;
                 }
             } else {
-                stack.push(node.left);
-                stack.push(node.left + 1);
+                stack[depth] = node.left;
+                stack[depth + 1] = node.left + 1;
+                depth += 2;
             }
         }
         false

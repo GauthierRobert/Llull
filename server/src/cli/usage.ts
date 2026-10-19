@@ -34,6 +34,10 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
                               record_topology_result  [timeoutS=1800 resumeFromLast=true device=cpu|gpu|auto]; --progress prints one
                               line per iteration; without llull-compute only 2D studies up to 2000 voxels (TypeScript), else
                               TOP_TOOL_MISSING; then: topology_report studyId=ID, check_topology studyId=ID
+  auto_route lineId=ID from='{"portId":"tie-1.1"}' to='{"portId":"tie-2.1"}' [route_problem params]
+                              native llull-compute pipe auto-routing (plant 02 RTE V2), committed by auto_route_pipe after
+                              validation  [timeoutS=60 maxExpansions=2000000]; without llull-compute: NATIVE_TOOL_MISSING
+                              (auto_route_pipe alone runs the TypeScript search up to 200000 expansions)
   register_material_library file=LIB.llull-matlib.json   copy a material library into $LLULL_LIBRARIES_DIR (~/.llull/libraries); then
                               import_material_library libraryId=ID version=V sha256=H, and resolve_material_libraries after a load
   run <plan.json | ->         build_project: an actions array or { actions, onError }
