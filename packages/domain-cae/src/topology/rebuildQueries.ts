@@ -6,12 +6,15 @@ import type { CadDocument } from '@core/model/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
+import { toMm } from '@core/model/units';
 import { significantNumber } from '@lib/compactNumber';
 import { refuseTopology } from './codes';
 import { COMPLIANCE_RATIO_TARGET, IOU_TARGET, MIN_LOOP_AREA_VOXELS } from './defaults';
 import { symmetrise } from './derive';
 import { findStudy } from './model';
+import { rebuildCompliance } from './rebuildCompliance';
 import { compareRebuild, contoursOf, mm2PerUnit2, placementOf, sectionOf } from './rebuild';
+import { widthSamples } from './widthSamples';
 import { studyIdSchema } from './schemas';
 import { trustedTopology, type TrustedTopology } from './trust';
 
@@ -52,6 +55,7 @@ const isRefusal = (value: unknown): value is CommandResult => typeof value === '
 /**
  * @invariant read-only; contours are closed loops of the density field at `threshold`, outer loops counter-clockwise, holes clockwise, simplified
  *   (Douglas-Peucker) to within `tolerance` and without loops smaller than `minLoopArea`; points are the plane-local [x, y] of `extrude_profile`
+ *   `widthSamples` = medial-axis nodes of the thresholded section with width = 2 x distance to the void
  * @failure unknown study -> TOP_STUDY_NOT_FOUND; stale -> TOP_RESULT_STALE; unsolved / missing -> TOP_RESULT_MISSING; plane other than a 2D study's
  *   own -> TOP_SETUP_INVALID (rejected no-ops)
  */
@@ -64,7 +68,7 @@ export const suggestRebuild = defineCommand({
     'subtract, round sharp re-entrant corners with fillet_edge, analyse the rebuilt part (05), then compare_to_topology. A 2D study uses its own ' +
     'plane; for a 3D study give `plane` (XY | XZ | YZ) and `offset`, the coordinate of the section along the plane normal (default the middle of ' +
     'the grid). Loops are in document units; `tolerance` (default one voxel) is the largest deviation of the simplification, `minLoopArea` ' +
-    '(default 4 voxel^2, document units^2) drops specks (counted in droppedLoops). The loops are a suggestion from a concept result, to be reviewed.',
+    '(default 4 voxel^2, document units^2) drops specks (counted in droppedLoops). widthSamples lists member widths on the medial axis of the section: { at: plane-local [x, y], width (document units), widthMm }, widest first, from an exact distance transform. The loops are a suggestion from a concept result, to be reviewed.',
   params: z.object({
     studyId: studyIdSchema,
     plane: z.enum(['XY', 'XZ', 'YZ']).optional().describe('Section plane of a 3D study (default XY). A 2D study uses its own plane.'),
@@ -107,8 +111,15 @@ export const suggestRebuild = defineCommand({
         areaMm2: round(Math.abs(contour.area) * factor),
       })),
       droppedLoops: dropped,
-      widthSamples: [],
-      widthSamplesNote: 'member width samples (medial axis) are planned (V1); read the widths from the loops',
+      widthSamples: widthSamples(
+        section,
+        study.settings.threshold.value,
+        exact.map((contour) => contour.points),
+      ).map((sample) => ({
+        at: [round(sample.at[0]), round(sample.at[1])],
+        width: round(sample.width),
+        widthMm: round(sample.width * toMm(doc, 1)),
+      })),
       enclosedFraction: section.domainArea > 0 ? (outer - holes) / section.domainArea : 0,
       threshold: study.settings.threshold.value,
       tolerance,
@@ -129,7 +140,8 @@ const target = (given: number | undefined, fallback: NamedValue): NamedValue =>
 
 /**
  * @invariant read-only; IoU = |A and B| / |A or B| of the rebuilt voxels A (inside the solid and the design domain) and the thresholded field B on the
- *   study grid; the compliance ratio needs a current 05 result of the rebuild and is not computed in this version (null, TOP_REBUILD_NOT_ANALYSED)
+ *   study grid; compliance ratio = F^T u of the rebuild (current, artifact-verified 05 static result, force loads) / compliance of the optimum, both in N*mm;
+ *   without such a result the ratio is null with complianceStatus.reason (TOP_REBUILD_NOT_ANALYSED); a ratio above complianceRatioTarget is TOP_REBUILD_DEVIATION
  * @failure unknown study / entity not a solid / stale or missing result -> a coded rejected no-op
  */
 export const compareToTopology = defineCommand({
@@ -138,9 +150,12 @@ export const compareToTopology = defineCommand({
   description:
     'Compare a rebuilt solid with the optimum of a solved topology study: both are voxelised on the study grid; iou = shared voxels / union voxels of ' +
     'the rebuilt solid (inside the design domain) and the optimum (density at or above the threshold), volumeRatio = rebuilt / optimum volume. ' +
-    'status is pass when iou reaches iouTarget (default 0.85, a llull choice still to be calibrated), fail (TOP_REBUILD_DEVIATION) otherwise; ' +
-    'complianceRatio is not computed yet and the code TOP_REBUILD_NOT_ANALYSED says to analyse the rebuild with the 05 analysis. The result is ' +
-    'a review aid: reviewRequired is always true.',
+    'complianceRatio = F^T u of the rebuild / compliance of the optimum (both in N*mm), from the current 05 static results of an analysis that has ' +
+    'the solid as a part (nodal force loads; the recorded results must verify against their artifacts and not be stale); it is null with ' +
+    'complianceStatus.reason and the code TOP_REBUILD_NOT_ANALYSED when there is no such result (analyse the rebuild with 05, then compare again). ' +
+    'status is pass when iou reaches iouTarget (default 0.85, a llull choice still to be calibrated) and the compliance ratio is within ' +
+    'complianceRatioTarget (default 1.15); fail (TOP_REBUILD_DEVIATION) when either is missed; warn when the compliance ratio is unavailable. ' +
+    'The result is a review aid: reviewRequired is always true.',
   params: z.object({
     studyId: studyIdSchema,
     entityId: z
@@ -150,7 +165,7 @@ export const compareToTopology = defineCommand({
     complianceRatioTarget: z
       .number()
       .optional()
-      .describe('Allowed rebuild / optimum compliance ratio, >= 1. Default 1.15 (llull choice). Reported only.'),
+      .describe('Allowed rebuild / optimum compliance ratio, >= 1. Default 1.15 (llull choice).'),
   }),
   run: (doc, params, ctx): CommandResult => {
     const solved = solvedStudy(doc, 'compare_to_topology', params.studyId, ctx?.feaArtifacts);
@@ -164,22 +179,53 @@ export const compareToTopology = defineCommand({
     const comparison = compareRebuild(doc, study, trusted.artifact, trusted.field, params.entityId);
     if (typeof comparison === 'string')
       return refuseTopology(doc, 'compare_to_topology', 'TOP_DOMAIN_INVALID', comparison, [params.entityId]);
-    const passed = comparison.iou >= iouTarget.value;
-    const codes = [...(passed ? [] : ['TOP_REBUILD_DEVIATION']), 'TOP_REBUILD_NOT_ANALYSED'];
+    const complianceTarget = target(params.complianceRatioTarget, COMPLIANCE_RATIO_TARGET);
+    if (!(complianceTarget.value >= 1) || !Number.isFinite(complianceTarget.value))
+      return refuseTopology(
+        doc,
+        'compare_to_topology',
+        'TOP_SETUP_INVALID',
+        `complianceRatioTarget ${complianceTarget.value} must be a finite number >= 1`,
+        [params.studyId],
+      );
+    const compliance = rebuildCompliance(
+      doc,
+      study,
+      trusted.artifact.compliance,
+      Object.keys(trusted.artifact.perLoadCase),
+      params.entityId,
+      ctx?.feaArtifacts,
+    );
+    const iouPassed = comparison.iou >= iouTarget.value;
+    const compliancePassed = compliance.available && compliance.ratio <= complianceTarget.value;
+    const codes = [
+      ...(iouPassed && (!compliance.available || compliancePassed) ? [] : ['TOP_REBUILD_DEVIATION']),
+      ...(compliance.available ? [] : ['TOP_REBUILD_NOT_ANALYSED']),
+    ];
+    const status = !iouPassed || (compliance.available && !compliancePassed) ? 'fail' : compliance.available ? 'pass' : 'warn';
     const data = {
       iou: comparison.iou,
       volumeRatio: comparison.volumeRatio,
-      complianceRatio: null,
+      complianceRatio: compliance.available ? compliance.ratio : null,
+      complianceStatus: compliance.available
+        ? {
+            available: true,
+            analysisId: compliance.analysisId,
+            rebuildCompliance: compliance.rebuildNmm,
+            optimumCompliance: compliance.optimumNmm,
+            unit: 'N*mm',
+          }
+        : { available: false, code: compliance.code, reason: compliance.reason, message: compliance.message },
       rebuildVoxels: comparison.rebuildVoxels,
       optimumVoxels: comparison.optimumVoxels,
-      targets: { iou: iouTarget, complianceRatio: target(params.complianceRatioTarget, COMPLIANCE_RATIO_TARGET) },
-      status: passed ? 'warn' : 'fail',
+      targets: { iou: iouTarget, complianceRatio: complianceTarget },
+      status,
       codes,
       reviewRequired: true,
     };
     return report(
       doc,
-      `compare_to_topology: ${params.entityId} vs ${params.studyId} — iou ${significantNumber(comparison.iou, 4)} (target ${iouTarget.value}), volume ratio ${comparison.volumeRatio === null ? 'n/a' : significantNumber(comparison.volumeRatio, 4)}; ${passed ? 'IoU target reached' : 'TOP_REBUILD_DEVIATION'}; compliance ratio not computed (TOP_REBUILD_NOT_ANALYSED); review required.`,
+      `compare_to_topology: ${params.entityId} vs ${params.studyId} — iou ${significantNumber(comparison.iou, 4)} (target ${iouTarget.value}), volume ratio ${comparison.volumeRatio === null ? 'n/a' : significantNumber(comparison.volumeRatio, 4)}; ${iouPassed ? 'IoU target reached' : 'IoU below target'}; ${compliance.available ? `compliance ratio ${significantNumber(compliance.ratio, 4)} (target ${complianceTarget.value}, analysis ${compliance.analysisId})${compliancePassed ? '' : ' TOP_REBUILD_DEVIATION'}` : `compliance ratio unavailable (TOP_REBUILD_NOT_ANALYSED: ${compliance.message})`}${codes.includes('TOP_REBUILD_DEVIATION') ? '; TOP_REBUILD_DEVIATION' : ''}; review required.`,
       data,
     );
   },

@@ -6,10 +6,11 @@ import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { item, REVIEW_NOTE, statusOfItems, type Item } from '../fatigue/items';
 import { REMEDIATION, refuseTopology } from './codes';
-import { IOU_TARGET } from './defaults';
+import { COMPLIANCE_RATIO_TARGET, IOU_TARGET } from './defaults';
 import { buildTopologyJob } from './job';
 import { findStudy } from './model';
 import { compareRebuild } from './rebuild';
+import { rebuildCompliance } from './rebuildCompliance';
 import { studyIdSchema } from './schemas';
 import { trustedTopology } from './trust';
 import { topologyDocument } from './guard';
@@ -30,7 +31,7 @@ export const checkTopology = defineCommand({
     'TOP_TARGET_UNMAPPED, TOP_LOAD_OUTSIDE_DOMAIN, TOP_REGION_OUTSIDE_DOMAIN, TOP_KEEPIN_EXCEEDS_BUDGET, TOP_GRID_TOO_LARGE), TOP_FILTER_TOO_SMALL, ' +
     'result state (TOP_RESULT_MISSING, TOP_RESULT_STALE), TOP_NOT_CONVERGED, TOP_GREY_HIGH, TOP_INPUT_UNVERIFIED (material values not verified), ' +
     'and the rebuild: TOP_REBUILD_MISSING when no `rebuildEntityIds` are given for a solved study, TOP_REBUILD_DEVIATION (IoU below the 0.85 target) ' +
-    'and TOP_REBUILD_NOT_ANALYSED for each rebuilt solid you pass. `release` lists entity ids about to be released or exported: a topology iso-surface ' +
+    'and, for each rebuilt solid you pass, the compliance ratio F^T u / optimum from its current 05 static result (TOP_REBUILD_DEVIATION above 1.15, TOP_REBUILD_NOT_ANALYSED when there is no such result). `release` lists entity ids about to be released or exported: a topology iso-surface ' +
     'among them is TOP_RESULT_NOT_RELEASABLE (release the rebuilt part instead). status is fail on any error / fail item, warn on a warning, else pass; ' +
     'reviewRequired is always true (concept result).',
   params: z.object({
@@ -109,11 +110,25 @@ export const checkTopology = defineCommand({
         else {
           if (comparison.iou < IOU_TARGET.value)
             items.push(entry('TOP_REBUILD_DEVIATION', 'fail', `IoU ${comparison.iou} is below the target ${IOU_TARGET.value}`, [entityId]));
-          items.push(
-            entry('TOP_REBUILD_NOT_ANALYSED', 'warning', `the compliance of '${entityId}' is not compared (analyse the rebuild with 05)`, [
-              entityId,
-            ]),
+          const compliance = rebuildCompliance(
+            doc,
+            study,
+            trusted.artifact.compliance,
+            Object.keys(trusted.artifact.perLoadCase),
+            entityId,
+            ctx?.feaArtifacts,
           );
+          if (!compliance.available)
+            items.push(entry('TOP_REBUILD_NOT_ANALYSED', 'warning', `the compliance of '${entityId}' is not compared: ${compliance.message}`, [entityId]));
+          else if (compliance.ratio > COMPLIANCE_RATIO_TARGET.value)
+            items.push(
+              entry(
+                'TOP_REBUILD_DEVIATION',
+                'fail',
+                `compliance ratio ${compliance.ratio} of '${entityId}' exceeds the target ${COMPLIANCE_RATIO_TARGET.value}`,
+                [entityId],
+              ),
+            );
         }
       }
     }

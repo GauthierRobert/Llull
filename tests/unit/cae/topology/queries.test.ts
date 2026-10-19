@@ -53,7 +53,7 @@ describe('suggest_rebuild', () => {
     const thresholdedFraction = (summary?.thresholdedVolume ?? 0) / (1200 * 1);
     expect(Math.abs(rebuild.enclosedFraction - thresholdedFraction)).toBeLessThanOrEqual(0.02);
     expect(rebuild.placement).toMatchObject({ position: [0, 0, 0], rotation: [0, 0, 0], extrusion: '+z', depth: 1 });
-    expect(rebuild.widthSamples).toEqual([]);
+    expect(rebuild.widthSamples.length).toBeGreaterThan(0);
     expect(data(result)['concept']).toBe(true);
   });
 
