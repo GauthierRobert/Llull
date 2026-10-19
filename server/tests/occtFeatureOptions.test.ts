@@ -3,7 +3,7 @@
  * with exact closed forms, and recognised holes turned into add_hole steps that rebuild the imported volume (VC-FTR-32).
  */
 
-import { describe, expect, it, afterAll } from 'vitest';
+import { expect, it, afterAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { execute } from '@core/commands/registry';
@@ -14,7 +14,7 @@ import { recipeOf } from '@core/geometry/shapeRecipe';
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
 import { pocketRemovedVolume } from '@lib/holeMath';
 import { createEmptyDocument, type CadDocument, type Entity } from '@core/model/types';
-import { liveKernels } from './kernelTestSupport';
+import { liveKernels, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
 afterAll(() => setGeometryKernel(null));
@@ -37,7 +37,7 @@ function block(size: [number, number, number], position: [number, number, number
   return { doc: result.document, id: idOf(result) };
 }
 
-describe('add_rib on the live OCC kernel (VC-FTR-33)', () => {
+describeNative('add_rib on the live OCC kernel (VC-FTR-33)', () => {
   const addRib = (
     kernel: GeometryKernel,
     stock: { doc: CadDocument; id: string },
@@ -132,7 +132,7 @@ describe('add_rib on the live OCC kernel (VC-FTR-33)', () => {
   }, 120_000);
 });
 
-describe('hole and pocket options on the live OCC kernel', () => {
+describeNative('hole and pocket options on the live OCC kernel', () => {
   const ctx = (): ExecutionContext => ctxOf(kernels.occt);
 
   it('counterdrill removes bore + counterbore + cone exactly', () => {
@@ -219,7 +219,7 @@ describe('hole and pocket options on the live OCC kernel', () => {
   }, 180_000);
 });
 
-describe('VC-FTR-32: recognised holes rebuilt with add_hole steps', () => {
+describeNative('VC-FTR-32: recognised holes rebuilt with add_hole steps', () => {
   const importPart = (file: string): { doc: CadDocument; id: string } => {
     const text = readFileSync(path.join(PACK, file), 'utf8');
     const imported = execute(createEmptyDocument(), 'import_step_exact', { text, fileName: file }, ctxOf(kernels.occt));

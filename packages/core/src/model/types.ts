@@ -672,7 +672,7 @@ export interface DocumentKernelSettings {
   readonly kernel: 'occt' | 'manifold';
   /** e.g. "7.4.0p1"; stamped on save from the active kernel. */
   readonly occtVersion?: string;
-  /** Binary identity of the kernel, e.g. "opencascade.js@1.1.1". */
+  /** Binary identity of the kernel, e.g. "llull-kernel@0.1.0". */
   readonly build?: string;
   readonly modelingTolerance: {
     /** mm; default 1e-4; range [1e-7, 1e-2]. Heal / sew / import precision. */

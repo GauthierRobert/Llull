@@ -1,10 +1,12 @@
 # KI4 — OpenCascade.js Kernel Spike: Adopt vs Defer
 
+**Status 2026-10-19:** the opencascade.js kernel adopted by this spike was retired by LC1 step 5; the exact kernel is the native `llull-kernel` (KI7).
+
 **Date:** 2026-05-26
 **Author:** mcp-engineer (Lane 4, Batch 13)
 **Package:** `opencascade.js@1.1.1`
 **Spike file:** `src/ui/geometry/occtKernel.ts` (historical; the kernel now lives in `packages/kernel-occt/src/`)
-**Test file:** `tests/unit/occtKernel.test.ts`
+**Test file:** `tests/unit/occtKernel.test.ts` (deleted with the kernel, LC1 step 5)
 
 ---
 

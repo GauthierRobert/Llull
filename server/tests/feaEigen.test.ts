@@ -11,15 +11,15 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { isRecord } from '@lib/isRecord';
-import { createNodeOcctKernel } from '../src/occtNode';
+import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
 import { dataOf, Workspace, type Session } from './feaThermomechSupport';
 
-const READY = HAS_GMSH && HAS_CCX;
+const READY = HAS_GMSH && HAS_CCX && nativeKernelBinary !== null;
 let workspace: Workspace;
 beforeAll(async () => {
   workspace = new Workspace();
-  if (READY) setGeometryKernel(await createNodeOcctKernel());
+  if (READY) setGeometryKernel(createNativeTestKernel());
 }, 120_000);
 afterAll(() => {
   setGeometryKernel(null);

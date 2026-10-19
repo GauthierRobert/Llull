@@ -10,7 +10,7 @@ import { CENSUS, fakeExactKernel, importedSolid } from '../../helpers/fakeExactK
 
 afterEach(() => setGeometryKernel(null));
 
-const OCC = { occtVersion: '7.4.0p1', build: 'opencascade.js@1.1.1', capabilities: ['brepBlobs'] } as const;
+const OCC = { occtVersion: '7.9.2', build: 'llull-kernel@0.1.0', capabilities: ['brepBlobs'] } as const;
 
 function importedDocument(): CadDocument {
   const fake = fakeExactKernel({ imported: { solids: [importedSolid({ brep: 'CASCADE Topology V1 box' })], census: CENSUS, skipped: [] } });

@@ -1,12 +1,12 @@
 /** Live OpenCascade: PHY-21 `analyze` / `distance` (VC-FPR-01…05) and cylinder / plane face axes (TR-FPR-02, VC-FPR-09 inputs). */
-import { describe, expect, it } from 'vitest';
+import { expect, it } from 'vitest';
 import type { Entity } from '@core/model/types';
 import { cube, kernelAnalysisCases } from '../../tests/helpers/kernelAnalysisCases';
-import { liveKernels } from './kernelTestSupport';
+import { liveKernels, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
 
-describe('occt analyze and distance', () => {
+describeNative('occt analyze and distance', () => {
   kernelAnalysisCases(() => kernels.occt, 'occt');
 
   it('cylinder faces expose axis, radius and pin / bore convexity; planes expose outward normals', () => {

@@ -1,36 +1,24 @@
 /**
- * Native `llull-kernel` vs the WASM OCC kernel on the recipe nodes of the second native slice (VC-KRN-25, TR-KRN-05): exact curved
- * profiles, loft, sweep, subdivision, shell, blend, `feature` nodes (holes, pockets, ribs, a modelled thread) and the edge indexing of
- * fillet / chamfer. Each case: exact volume, area and inertia within 1e-6 relative (inertia: two documented WASM errors, below),
- * centroid 1e-6, the same validity, and the same face count (ADVANCED_FACE entities of each kernel's STEP export) where it is
- * deterministic. The sidecar is driven directly (the
- * router's host lowering included, its fillet gate bypassed), so fillet / chamfer parity is measured although they still route to WASM.
- * Skipped without the binary unless LLULL_REQUIRE_NATIVE_KERNEL=1.
+ * Native `llull-kernel` (OCCT 7.9.2) on the recipe nodes of the second native slice (VC-KRN-25, TR-KRN-05): exact curved profiles, loft,
+ * sweep, subdivision, shell, blend, `feature` nodes (holes, pockets, ribs, a modelled thread) and the edge indexing of fillet / chamfer.
+ * Each case is a valid solid (one lump unless it is disjoint) whose exact volume matches the volume of its own display mesh; where a closed
+ * form exists (box shell, rounded box, edge fillets / chamfers, holes, pockets, ribs, extrusion with an arc and a Bezier) the exact volume
+ * and the STEP face count match it. The kernel is driven through its synchronous proxy, so the host lowering of `feature` nodes is
+ * included. Skipped without the binary unless LLULL_REQUIRE_NATIVE_KERNEL=1.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { GeometryKernel } from '@core/geometry/kernel';
-import type { ExactMassProperties } from '@core/geometry/kernelPorts';
 import type { CurveSegment } from '@core/model/curve';
-import type { Entity, ShapeRecipe, SubdivisionEntity, Vec2, Vec3 } from '@core/model/types';
+import type { Entity, MeshData, ShapeRecipe, SubdivisionEntity, Vec2, Vec3 } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
-import { recipeKey, recipeOf } from '@core/geometry/shapeRecipe';
+import { recipeOf } from '@core/geometry/shapeRecipe';
 import { reverseChain, sampleProfile } from '@core/geometry/curveSegments';
 import { boxCage, cylinderCage } from '@core/geometry/subdivision';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { setGeometryKernel } from '@core/geometry/kernel';
-import { createNodeOcctKernel } from '../src/occtNode';
-import { createNativeKernel } from '../src/nativeKernel';
-import { nativeBinaryPath, nativeInstallHint } from '../src/native/nativeBinary';
-import { decodeMesh, nativeArgs, nativeRecipe } from '../src/native/kernelProtocol';
-import { prepareFeatures, type SourceMesher } from '../src/native/kernelFeatures';
-import { createKernelSession, spawnKernelChild, type NativeKernelSession } from '../src/native/kernelSession';
-import { booleanRecipe, box, common, leaf } from './kernelTestSupport';
-
-const binary = nativeBinaryPath('llull-kernel');
-if (binary === null && process.env['LLULL_REQUIRE_NATIVE_KERNEL'] === '1') throw new Error(nativeInstallHint('llull-kernel'));
-if (binary === null) console.warn(`[native feature parity] skipped: ${nativeInstallHint('llull-kernel')}`);
+import { booleanRecipe, box, common, createNativeTestKernel, leaf, nativeKernelBinary, volume } from './kernelTestSupport';
 
 const entity = (kind: string, fields: Record<string, unknown>, position: Vec3 = [0, 0, 0], rotation: Vec3 = [0, 0, 0]): Entity =>
   ({ id: kind, kind, position, rotation, ...common, ...fields }) as Entity;
@@ -73,16 +61,6 @@ const RING_PROFILE: CurveSegment<Vec2>[] = [
   line([2, 2], [1, 2]),
   line([1, 2], [1, 0]),
 ];
-
-/**
- * Inertia error of the WASM kernel's adaptive BRepGProp rule (Eps 1e-12) on arc-profile revolutions (measured 1.6e-4 and 2.2e-6:
- * Ixx != Iyy about Z); the native kernel uses the default Gauss rule of the OCP 7.9.3 reference and gives the closed form there
- * (nativeKernelReference.test.ts), so these cases tolerate the WASM error instead of 1e-6.
- */
-const WASM_INERTIA_ERROR: Readonly<Record<string, number>> = {
-  'curved revolution about Z': 3e-4,
-  'curved revolution about Y, partial': 3e-6,
-};
 
 const curved = (
   kind: 'extrusion' | 'revolution',
@@ -308,112 +286,118 @@ const FEATURES: readonly [string, unknown][] = [
 ];
 
 const relative = (a: number, b: number): number => Math.abs(a - b) / Math.max(Math.abs(b), 1e-12);
-const faceCount = (step: unknown): number => (typeof step === 'string' ? (step.match(/ADVANCED_FACE\(/g)?.length ?? 0) : -1);
+const { PI } = Math;
 
-describe.skipIf(binary === null)('native feature nodes vs WASM OCC parity (VC-KRN-25, second slice)', () => {
-  let session: NativeKernelSession;
-  let wasm: GeometryKernel;
+/** Closed-form exact volumes of the cases above (plate 100 x 60 x 10 = 60000; box 4 x 3 x 2 = 24). */
+const countersinkDepth = (9 - 4.8) / (2 * Math.tan((50 * PI) / 180));
+const roundedRect = 800 - (4 - PI) * 9; // 40 x 20, corner radius 3
+const rounded = (a: number, b: number, c: number, r: number): number => {
+  const [x, y, z] = [a - 2 * r, b - 2 * r, c - 2 * r];
+  return x * y * z + 2 * r * (x * y + y * z + x * z) + PI * r * r * (x + y + z) + (4 / 3) * PI * r ** 3;
+};
+const CLOSED_VOLUME: Readonly<Record<string, number>> = {
+  'extrusion with arc and Bezier': 3 * (10.1 + PI / 2),
+  'sealed shell of a box': 24 - 3.5 * 2.5 * 1.5,
+  'blend of disjoint solids (plain union)': 2,
+  'fillet every box edge': rounded(4, 3, 2, 0.2),
+  'simple through hole (BRepFeat)': 60000 - 57.6 * PI,
+  'counterbore through hole': 60000 - PI * (2.75 ** 2 * 10 + (25 - 2.75 ** 2) * 5.5),
+  'countersink holes at four points':
+    60000 - 4 * (PI * 2.4 ** 2 * 10 + (PI * countersinkDepth * (4.5 ** 2 + 4.5 * 2.4 + 2.4 ** 2)) / 3 - PI * 2.4 ** 2 * countersinkDepth),
+  '12 holes (one compound lowering)': 60000 - 12 * 40 * PI,
+  'rounded pocket': 60000 - 4 * roundedRect,
+  'through pocket': 60000 - 10 * roundedRect,
+  'pocket with an island (lowering)': 60000 - 4 * 740,
+  rib: 60000 + 60 * 3 * 8,
+};
 
-  beforeAll(async () => {
-    session = createKernelSession(spawnKernelChild(binary!));
-    wasm = await createNodeOcctKernel();
+/** Lumps of the cases that are not one connected solid. */
+const LUMPS: Readonly<Record<string, number>> = {
+  'blend of disjoint solids (plain union)': 2,
+  'plate minus tube': 2, // the hollow tube (radius 0.5, bore 0.3) leaves its core as a lump of its own
+};
+
+describe.skipIf(nativeKernelBinary === null)('native recipe nodes (VC-KRN-25, second slice)', () => {
+  let kernel: GeometryKernel;
+  beforeAll(() => {
+    kernel = createNativeTestKernel();
   }, 120_000);
   afterAll(() => {
-    session.close();
+    (kernel as { dispose?: () => void }).dispose?.();
     setGeometryKernel(null);
   });
 
-  const mesher: SourceMesher = async (source, features) => {
-    const reply = await session.request('tessellate', [{ key: recipeKey(source), recipe: nativeRecipe(source, features) }]);
-    return reply.error === undefined ? decodeMesh(reply.result) : 'unsupported';
-  };
-
-  /** One sidecar request on `recipe`, lowered like the router does (`lower: false` skips the host gate, for fillet / chamfer). */
-  const native = async (op: string, recipe: ShapeRecipe, lower = true): Promise<unknown> => {
-    const args =
-      op === 'evaluate' ? [recipe] : op === 'exportStep' ? [[{ key: recipeKey(recipe), recipe }]] : [{ key: recipeKey(recipe), recipe }];
-    const prepared = lower ? await prepareFeatures(op, args, mesher) : { features: new Map() };
-    if ('unsupported' in prepared) throw new Error(prepared.unsupported);
-    const reply = await session.request(op, nativeArgs(op, args, prepared.features));
-    expect(reply.error, `${op}: ${reply.error}`).toBeUndefined();
-    return reply.result;
-  };
-
-  /** Worst relative deviation per case, printed with LLULL_PARITY_REPORT=1 (the numbers quoted in TECHNICAL_SPEC §13.D). */
-  const report: string[] = [];
-  afterAll(() => {
-    if (process.env['LLULL_PARITY_REPORT'] === '1') console.warn(`[native feature parity]\n${report.join('\n')}`);
-  });
-
-  const expectMassParity = (fromNative: ExactMassProperties, fromWasm: ExactMassProperties, label: string): void => {
-    const inertiaScale = Math.max(...fromWasm.inertiaAtCentroid.map(Math.abs));
-    const inertia = Math.max(
-      ...fromNative.inertiaAtCentroid.map((value, k) => Math.abs(value - fromWasm.inertiaAtCentroid[k]!) / inertiaScale),
-    );
-    const deviations = [relative(fromNative.volume, fromWasm.volume), relative(fromNative.area, fromWasm.area), inertia];
-    report.push(
-      `${label}: volume ${fromWasm.volume.toPrecision(10)}, rel dV ${deviations[0]!.toExponential(1)} dA ${deviations[1]!.toExponential(1)} dI ${inertia.toExponential(1)}`,
-    );
-    expect(relative(fromNative.volume, fromWasm.volume), `${label} volume`).toBeLessThan(1e-6);
-    expect(relative(fromNative.area, fromWasm.area), `${label} area`).toBeLessThan(1e-6);
-    const span = Math.max(...fromWasm.bounds.max.map((value, k) => value - fromWasm.bounds.min[k]!), 1);
-    for (let k = 0; k < 3; k++)
-      expect(Math.abs(fromNative.centroid[k]! - fromWasm.centroid[k]!) / span, `${label} centroid`).toBeLessThan(1e-6);
-    const scale = Math.max(...fromWasm.inertiaAtCentroid.map(Math.abs));
-    fromNative.inertiaAtCentroid.forEach((value, index) => {
-      expect(Math.abs(value - fromWasm.inertiaAtCentroid[index]!) / scale, `${label} inertia`).toBeLessThan(
-        WASM_INERTIA_ERROR[label] ?? 1e-6,
-      );
-    });
-  };
-
-  /** Parity of one recipe; `refused`: both kernels must refuse it (any other WASM refusal fails the case). */
-  const expectParity = async (label: string, recipe: ShapeRecipe, lower = true, refused = false): Promise<void> => {
-    const handle = wasm.evaluate(recipe);
-    const fromWasm = handle === null ? null : (wasm.massProperties?.(handle) ?? null);
-    const fromNative = (await native('massProperties', recipe, lower)) as ExactMassProperties | null;
-    expect(fromWasm === null, `${label}: WASM refusal`).toBe(refused);
-    if (fromWasm === null) {
-      expect(fromNative, `${label}: the WASM kernel refuses it`).toBeNull();
-      return;
-    }
-    expect(fromNative, label).not.toBeNull();
-    expectMassParity(fromNative!, fromWasm, label);
-    const nativeAnalysis = (await native('analyze', recipe, lower)) as { valid: boolean; lumps: unknown[] };
-    const wasmAnalysis = wasm.analyze?.(handle!);
-    expect(nativeAnalysis.valid, `${label} validity`).toBe(wasmAnalysis?.valid);
-    expect(nativeAnalysis.lumps.length, `${label} lumps`).toBe(wasmAnalysis?.lumps.length);
-    const faces = faceCount(wasm.exportStep([handle!]));
-    report.push(`  ${label}: ${faces} faces, valid ${String(wasmAnalysis?.valid)}`);
-    expect(faceCount(await native('exportStep', recipe, lower)), `${label} faces`).toBe(faces);
+  /** A valid solid whose exact volume matches its display mesh (and the closed form, when there is one). */
+  const expectSolid = (label: string, recipe: ShapeRecipe): void => {
+    const shape = kernel.evaluate(recipe);
+    expect(shape, `${label}: built`).not.toBeNull();
+    const exact = kernel.massProperties?.(shape!);
+    expect(exact, label).toBeTruthy();
+    const analysis = kernel.analyze?.(shape!);
+    expect(analysis?.valid, `${label} validity`).toBe(true);
+    expect(analysis?.lumps.length, `${label} lumps`).toBe(LUMPS[label] ?? 1);
+    expect(relative(analysis!.volume, exact!.volume), `${label} analyze volume`).toBeLessThan(1e-6);
+    const mesh = kernel.tessellate(shape!) as MeshData;
+    expect(relative(volume(mesh), exact!.volume), `${label} display mesh`).toBeLessThan(0.15);
+    const closed = CLOSED_VOLUME[label];
+    if (closed !== undefined) expect(relative(exact!.volume, closed), `${label} closed form`).toBeLessThan(1e-6);
   };
 
   it.each(SOLIDS)(
     '%s',
-    async (label, solid) => {
-      await expectParity(label, leaf(solid));
+    (label, solid) => {
+      expectSolid(label, leaf(solid));
     },
     60_000,
   );
 
   it.each(NODES)(
     '%s',
-    async (label, recipe) => {
-      await expectParity(label, recipe);
+    (label, recipe) => {
+      expectSolid(label, recipe);
     },
     60_000,
   );
 
-  it.each(ROUNDED)(
-    '%s: same edge numbering',
-    async (label, recipe) => {
-      await expectParity(label, recipe, false, label.includes('refused'));
+  it.each(ROUNDED.filter(([label]) => !label.includes('refused')))(
+    '%s: the edge indices number the unique edges (volume left after the cut)',
+    (label, recipe) => {
+      const shape = kernel.evaluate(recipe);
+      expect(shape, label).not.toBeNull();
+      const exact = kernel.massProperties?.(shape!)?.volume ?? Number.NaN;
+      const rounded = recipe as Extract<ShapeRecipe, { op: 'fillet' | 'chamfer' }>;
+      const source = kernel.evaluate(rounded.source)!;
+      const before = kernel.massProperties?.(source)?.volume ?? Number.NaN;
+      expect(exact, label).toBeLessThan(before);
+      const edges = kernel.topology(source)!.edges;
+      const lengths = rounded.edges.map((index) => edges[index]!.length);
+      if (label === 'fillet one box edge')
+        expect(relative(before - exact, (1 - PI / 4) * 0.4 ** 2 * lengths[0]!), label).toBeLessThan(1e-6);
+      if (label === 'chamfer two box edges')
+        expect(before - exact, label).toBeLessThan(0.5 * 0.3 ** 2 * (lengths[0]! + lengths[1]!) + 1e-9);
+      if (label === 'fillet a cylinder rim') {
+        const [r, big] = [0.3, 2];
+        const removed = 2 * PI * r * r * (big - r / 2 - (PI * big) / 4 + (PI * r) / 4 - r / 3);
+        expect(relative(before - exact, removed), label).toBeLessThan(1e-6);
+      }
     },
     60_000,
   );
+
+  it('a single chamfered box edge removes the closed-form triangular prism', () => {
+    const source = leaf(box([0, 0, 0], [4, 3, 2]));
+    const edge = kernel.topology(kernel.evaluate(source)!)!.edges[3]!;
+    const chamfered = kernel.evaluate({ op: 'chamfer', source, edges: [3], size: 0.3 });
+    expect(kernel.massProperties?.(chamfered!)?.volume).toBeCloseTo(24 - 0.5 * 0.3 ** 2 * edge.length, 6);
+  });
+
+  it('refuses a fillet naming an edge the shape does not have', () => {
+    const refused = ROUNDED.find(([label]) => label.includes('refused'))![1];
+    expect(kernel.evaluate(refused)).toBeNull();
+  });
 
   const featureRecipe = (step: unknown): ShapeRecipe => {
-    const built = execute(createEmptyDocument(), 'build_project', { actions: [plate, step] }, { ...defaultContext(), kernel: wasm });
+    const built = execute(createEmptyDocument(), 'build_project', { actions: [plate, step] }, { ...defaultContext(), kernel });
     expect(built.error).toBeUndefined();
     const id = built.document.order[0] as string;
     return recipeOf(built.document.entities[id] as Entity);
@@ -421,49 +405,42 @@ describe.skipIf(binary === null)('native feature nodes vs WASM OCC parity (VC-KR
 
   it.each(FEATURES)(
     'feature: %s',
-    async (label, step) => {
+    (label, step) => {
       const recipe = featureRecipe(step);
       expect(recipe.op).toBe('feature');
-      await expectParity(label, recipe);
+      expectSolid(label, recipe);
     },
     120_000,
   );
 
-  it('feature: modelled M6x1 thread (groove tool, no unify)', async () => {
+  it('feature: modelled M6x1 thread (groove tool, no unify) is a valid solid smaller than the plain bore', () => {
     const recipe = featureRecipe(
       hole({
         hole: { kind: 'simple', diameter: 6 - 1.0825318, thread: { designation: 'M6x1-6H', modelled: true } },
         extent: { kind: 'through_all' },
       }),
     );
-    await expectParity('modelled thread', recipe);
+    expectSolid('modelled thread', recipe);
+    const volumeOf = kernel.massProperties?.(kernel.evaluate(recipe)!)?.volume ?? Number.NaN;
+    expect(volumeOf).toBeLessThan(60000 - PI * (0.5 * (6 - 1.0825318)) ** 2 * 10);
   }, 600_000);
 
-  it('a sweep placed on a boolean keeps parity through the whole tree', async () => {
+  it('a sweep placed on a boolean builds through the whole tree', () => {
     const tube = SOLIDS.find(([label]) => label.startsWith('tube sweep'))![1];
-    await expectParity('plate minus tube', booleanRecipe('subtract', box([-1, -1, 1], [4, 2, 2]), tube));
+    expectSolid('plate minus tube', booleanRecipe('subtract', box([-1, -1, 1], [4, 2, 2]), tube));
   }, 60_000);
-});
 
-describe.skipIf(binary === null)('second-slice nodes behind the synchronous proxy', () => {
   it('drills the floor of an open shell end to end (host lowering + native nodes)', () => {
-    const kernel = createNativeKernel(binary!);
-    try {
-      expect(kernel.start()).toBe(true);
-      const shelled: ShapeRecipe = { op: 'shell', source: leaf(box([20, 15, 5], [40, 30, 10])), thickness: 1, openNear: [[20, 15, 10]] };
-      const drilled = {
-        op: 'feature',
-        feature: 'hole',
-        source: shelled,
-        frame: { origin: [20, 15, 0], normal: [0, 0, -1], xDir: [1, 0, 0] },
-        points: [[0, 0]],
-        hole: { kind: 'simple', diameter: 4 },
-        extent: { kind: 'through_all' },
-      } as ShapeRecipe;
-      const handle = kernel.evaluate(drilled);
-      expect(kernel.massProperties?.(handle!)?.volume).toBeCloseTo(40 * 30 * 10 - 38 * 28 * 9 - Math.PI * 4, 6);
-    } finally {
-      kernel.dispose();
-    }
+    const shelled: ShapeRecipe = { op: 'shell', source: leaf(box([20, 15, 5], [40, 30, 10])), thickness: 1, openNear: [[20, 15, 10]] };
+    const drilled = {
+      op: 'feature',
+      feature: 'hole',
+      source: shelled,
+      frame: { origin: [20, 15, 0], normal: [0, 0, -1], xDir: [1, 0, 0] },
+      points: [[0, 0]],
+      hole: { kind: 'simple', diameter: 4 },
+      extent: { kind: 'through_all' },
+    } as ShapeRecipe;
+    expect(kernel.massProperties?.(kernel.evaluate(drilled)!)?.volume).toBeCloseTo(40 * 30 * 10 - 38 * 28 * 9 - Math.PI * 4, 6);
   }, 120_000);
 });

@@ -1,16 +1,16 @@
 /** Live OpenCascade: a nested, obliquely rotated assembly exported to STEP re-imports at the same world centroid as the viewport path. */
 
-import { describe, it, expect } from 'vitest';
+import { it, expect } from 'vitest';
 import { createEmptyDocument, type Vec3 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { applyEulerXYZ } from '@lib/eulerRotation';
-import { liveKernels } from './kernelTestSupport';
+import { liveKernels, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
 const ORIGIN: Vec3 = [0, 0, 0];
 
-describe('occt export_step_exact nested oblique rotations', () => {
+describeNative('occt export_step_exact nested oblique rotations', () => {
   it('re-imports each box at the world centroid mass_properties reports (relative error < 1e-6)', () => {
     const box = execute(createEmptyDocument(), 'add_box', { size: [2, 3, 4], position: [5, 1, -2], rotation: [0.3, 0, 0] });
     const a = execute(box.document, 'create_component', { name: 'A', entityIds: [box.affected[0]!], componentId: 'comp-a' });

@@ -1,6 +1,5 @@
-//! Feature recipe nodes and freeform solid kinds, mirroring `packages/kernel-occt/src/occtKernel.ts` (fillet, chamfer, blend,
-//! shell), `occtCurves.ts` / `occtPatches.ts` (curved profiles, loft, sweep, subdivision) and the `feature` walk of
-//! `packages/core/src/geometry/shapeKernel.ts` with `occtFeatures.ts`.
+//! Feature recipe nodes and freeform solid kinds, following the retired opencascade.js kernel (fillet, chamfer, blend,
+//! shell, curved profiles, loft, sweep, subdivision) and the `feature` walk of `packages/core/src/geometry/shapeKernel.ts`.
 //!
 //! The pure TypeScript geometry those builders read (oriented curve chains, Catmull-Rom ring curves, sweep frames, subdivision
 //! patches, feature lowering and hole profiles) is computed by the host, which sends it ready to build

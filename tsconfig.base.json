@@ -8,7 +8,6 @@
       "@cae/*": ["./packages/domain-cae/src/*"],
       "@aero/*": ["./packages/domain-aero/src/*"],
       "@kernel-manifold/*": ["./packages/kernel-manifold/src/*"],
-      "@kernel-occt/*": ["./packages/kernel-occt/src/*"],
       "@physics-mujoco/*": ["./packages/physics-mujoco/src/*"],
       "@ui/*": ["./src/ui/*"],
       "@app/*": ["./src/app/*"],

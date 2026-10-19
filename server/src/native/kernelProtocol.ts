@@ -1,7 +1,7 @@
 /**
  * Wire vocabulary of the native `llull-kernel` sidecar (RS-1; Rust side: solver/bins/llull-kernel/src/session.rs). One JSON object per
  * line both ways: request `{ id, op, args }`, reply `{ id, result, error? }`. Ops and argument shapes are the `KernelOps` worker protocol
- * (`occtWorkerProtocol.ts`) with three rewrites made here: `evaluate` takes a handle `{ key, recipe }` instead of a bare recipe (the
+ * (`kernelWorkerProtocol.ts`) with three rewrites made here: `evaluate` takes a handle `{ key, recipe }` instead of a bare recipe (the
  * sidecar caches by the host's recipe key), `exportStepAssembly` takes `{ parts, occurrences }` with parts by index (JSON has no object
  * identity), and `tessellate` answers base64 little-endian arrays (decoded by `decodeMesh`).
  * @invariant pure: no process, no I/O
@@ -14,7 +14,7 @@ import { createEmptyDocument } from '@core/model/types';
 import { entityTrianglePositions } from '@core/geometry/entityTriangles';
 import { orientOutward } from '@core/geometry/meshVolume';
 import { recipeKey } from '@core/geometry/shapeRecipe';
-import { clearTangentContact } from '@kernel-occt/tangentGuard';
+import { clearTangentContact } from '@core/geometry/tangentGuard';
 import { nativeLeaf } from './kernelLeaves';
 
 /** The op or recipe node is not native yet: the host answers it with the WASM kernel. */

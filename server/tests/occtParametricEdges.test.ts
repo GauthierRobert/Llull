@@ -3,13 +3,13 @@
  * edit — the feature history keeps the point, and replay re-resolves it on the regenerated B-rep.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { it, expect, beforeAll, afterAll } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel, type ShapeTopology } from '@core/geometry/kernel';
-import { createNodeOcctKernel } from '../src/occtNode';
+import { createNativeTestKernel, describeNative } from './kernelTestSupport';
 
-beforeAll(async () => setGeometryKernel(await createNodeOcctKernel()), 120_000);
+beforeAll(async () => setGeometryKernel(createNativeTestKernel()), 120_000);
 afterAll(() => setGeometryKernel(null));
 
 function apply(doc: CadDocument, name: string, params: unknown): CadDocument {
@@ -26,7 +26,7 @@ const topologyOf = (doc: CadDocument): ShapeTopology => {
 /** Volume a fillet of radius r removes along a straight edge of length l. */
 const filletLoss = (r: number, l: number): number => (r * r - (Math.PI * r * r) / 4) * l;
 
-describe('occt fillet by location across a parametric edit', () => {
+describeNative('occt fillet by location across a parametric edit', () => {
   it('re-selects the top front edge after the box step is widened', () => {
     let doc = apply(createEmptyDocument(), 'add_box', { size: [40, 20, 10] });
     const [box] = doc.order;
@@ -42,7 +42,7 @@ describe('occt fillet by location across a parametric edit', () => {
   });
 });
 
-describe('occt booleans merge same-domain faces', () => {
+describeNative('occt booleans merge same-domain faces', () => {
   it('a union of a plate and an upright flush with its side is one face per side', () => {
     // Plate 60×20×10 and an upright 20×20×40 standing on its left end, flush with three sides.
     let doc = apply(createEmptyDocument(), 'add_box', { size: [60, 20, 10], anchor: 'min', position: [0, 0, 0] });

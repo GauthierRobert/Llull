@@ -3,7 +3,7 @@
  * by position. Pure; used to refuse an OCC solid whose display mesh came out holed.
  */
 
-import type { MeshData } from '@core/model/types';
+import type { MeshData } from '../model/types';
 
 /** Weld grid: 1e-5 document units. */
 const GRID = 1e5;

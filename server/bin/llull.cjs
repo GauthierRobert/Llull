@@ -10,8 +10,8 @@ const path = require('path');
 
 const serverDir = path.resolve(__dirname, '..');
 const outfile = path.join(serverDir, 'dist', 'llull-cli.cjs');
-/** The OCC worker the CLI's isolated kernel loads (`dist/occtWorker.js`, next to the bundle); rebuilt too, or a stale worker would run old kernel code. */
-const workerFile = path.join(serverDir, 'dist', 'occtWorker.js');
+/** The native kernel worker the CLI's isolated kernel loads (`dist/nativeKernelWorker.js`, next to the bundle); rebuilt too, or a stale worker would run old kernel code. */
+const workerFile = path.join(serverDir, 'dist', 'nativeKernelWorker.js');
 
 function isFresh(target) {
   try {
@@ -43,6 +43,6 @@ function bundle(entry, target) {
   fs.renameSync(temporary, target);
 }
 
-if (!isFresh(workerFile)) bundle(path.join('src', 'occtWorker.ts'), workerFile);
+if (!isFresh(workerFile)) bundle(path.join('src', 'nativeKernelWorker.ts'), workerFile);
 if (!isFresh(outfile)) bundle(path.join('src', 'cli', 'bin.ts'), outfile);
 require(outfile);

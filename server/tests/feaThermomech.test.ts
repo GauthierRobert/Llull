@@ -8,17 +8,17 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { EXIT_COMMAND_ERROR } from '../src/cli/main';
-import { createNodeOcctKernel } from '../src/occtNode';
+import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
 import { isRecord } from '@lib/isRecord';
 import { dataOf, expectCase, planPath, Workspace } from './feaThermomechSupport';
 
-const READY = HAS_GMSH && HAS_CCX;
+const READY = HAS_GMSH && HAS_CCX && nativeKernelBinary !== null;
 let workspace: Workspace;
 
 beforeAll(async () => {
   workspace = new Workspace();
-  if (READY) setGeometryKernel(await createNodeOcctKernel());
+  if (READY) setGeometryKernel(createNativeTestKernel());
 }, 120_000);
 
 afterAll(() => {

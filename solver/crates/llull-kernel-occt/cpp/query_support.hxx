@@ -1,5 +1,5 @@
 // Helpers shared by the query translation units (queries.cxx, face_queries.cxx): the sub-shape numbering rule (see queries.hxx),
-// surface / curve classification and the surface evaluators of packages/kernel-occt/src/occtFaceSurface.ts.
+// surface / curve classification and the surface evaluators of occtFaceSurface.ts of the retired opencascade.js kernel.
 #pragma once
 
 #include <array>

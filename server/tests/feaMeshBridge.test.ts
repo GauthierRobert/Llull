@@ -13,6 +13,7 @@ import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { callBridge } from '../src/pythonExchange';
 import { partGeometry } from '../src/fea/feaGeometry';
 import { BRIDGE, HAS_GMSH, PYTHON } from './feaTestSupport';
+import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 
 interface MeshReply {
   ok: boolean;
@@ -46,12 +47,7 @@ beforeAll(async () => {
   }
   doc = current;
   manifold = await createManifoldKernel();
-  try {
-    const { createNodeOcctKernel } = await import('../src/occtNode');
-    occt = await createNodeOcctKernel();
-  } catch {
-    occt = null;
-  }
+  occt = nativeKernelBinary === null ? null : createNativeTestKernel();
 }, 120_000);
 
 async function mesh(request: Record<string, unknown>): Promise<MeshReply> {

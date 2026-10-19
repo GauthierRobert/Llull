@@ -5,12 +5,12 @@
  * tessellation, so both agree within chord tolerance.
  */
 
-import { describe, it, expect } from 'vitest';
+import { it, expect } from 'vitest';
 import type { CadDocument, Entity } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
 import type { ShapeTopology } from '@core/geometry/kernel';
 import { execute } from '@core/commands/registry';
-import { booleanMesh, box, common, expectBoundsClose, liveKernels, meshOf, volume } from './kernelTestSupport';
+import { booleanMesh, box, common, expectBoundsClose, liveKernels, meshOf, volume, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
 
@@ -60,7 +60,7 @@ const L_PATH = [
   [20, 15, 10],
 ];
 
-describe('sweep_profile on the live kernels', () => {
+describeNative('sweep_profile on the live kernels', () => {
   it('round pipe along a bent path: exact pipe wall 2π r L, meshes match π r² L', () => {
     const pipe = created(empty, 'sweep_profile', { path: L_PATH, radius: 1.5, bendRadius: 5 });
     const exact = (
@@ -115,7 +115,7 @@ describe('sweep_profile on the live kernels', () => {
   });
 });
 
-describe('sweep section roll', () => {
+describeNative('sweep section roll', () => {
   it('OCC and the shared tessellation carry a flat section the same way on a non-planar path', () => {
     const strap = created(empty, 'sweep_profile', {
       path: [
@@ -138,7 +138,7 @@ describe('sweep section roll', () => {
   });
 });
 
-describe('exact profile curves on the live OCC kernel', () => {
+describeNative('exact profile curves on the live OCC kernel', () => {
   it('extrude_profile of a circle builds a true cylinder face (STEP has CIRCLE)', () => {
     const doc = sketch({ id: 'c', kind: 'circle', center: [0, 0], radius: 5 });
     const ext = created(doc, 'extrude_profile', { id: 'c', depth: 4 });

@@ -1,19 +1,16 @@
 /** Live OpenCascade: check_assembly on exact B-reps (VC-FPR-01, 02, 09) and the worker-isolated kernel's analyze / distance. */
-import { afterAll, describe, expect, it } from 'vitest';
+import { expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { CheckResult } from '@core/model/checkResult';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { cube } from '../../tests/helpers/kernelAnalysisCases';
-import { createIsolatedKernel } from '../src/isolatedKernel';
-import { liveKernels } from './kernelTestSupport';
+import { liveKernels, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
-const isolated = createIsolatedKernel();
-afterAll(() => isolated.dispose());
 
-describe('check_assembly on OCC', () => {
+describeNative('check_assembly on OCC', () => {
   const ctx = (): ExecutionContext => ({ ...defaultContext(), kernel: kernels.occt });
   const run = (doc: CadDocument, name: string, params: Record<string, unknown>): CommandResult => {
     const result = execute(doc, name, params, ctx());
@@ -75,14 +72,14 @@ describe('check_assembly on OCC', () => {
   });
 });
 
-describe('worker-isolated OCC kernel', () => {
+describeNative('worker-isolated OCC kernel', () => {
   it('relays analyze and distance with their extra arguments', () => {
-    expect(isolated.name).toBe('occt');
+    expect(kernels.occt.name).toBe('occt');
     const [a, b] = [
-      isolated.evaluate({ op: 'solid', entity: cube('a', [0, 0, 0], 20) }),
-      isolated.evaluate({ op: 'solid', entity: cube('b', [20.5, 0, 0], 20) }),
+      kernels.occt.evaluate({ op: 'solid', entity: cube('a', [0, 0, 0], 20) }),
+      kernels.occt.evaluate({ op: 'solid', entity: cube('b', [20.5, 0, 0], 20) }),
     ];
-    expect(isolated.analyze?.(a!)?.volume).toBeCloseTo(8000, 3);
-    expect(isolated.distance?.(a!, b!, 1)?.distance).toBeCloseTo(0.5, 6);
+    expect(kernels.occt.analyze?.(a!)?.volume).toBeCloseTo(8000, 3);
+    expect(kernels.occt.distance?.(a!, b!, 1)?.distance).toBeCloseTo(0.5, 6);
   }, 120_000);
 });

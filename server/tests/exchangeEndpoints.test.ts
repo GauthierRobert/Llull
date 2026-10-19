@@ -10,6 +10,7 @@ import { describe, it, expect, afterEach, afterAll, beforeAll, vi } from 'vitest
 import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 import request from 'supertest';
 import type { Express } from 'express';
 import { BUILD123D_PYTHON, CADQUERY_PYTHON, parseBuffer, probePython } from './exchangeTestSupport';
@@ -29,6 +30,7 @@ async function loadServer(env: Record<string, string | undefined>): Promise<Load
   vi.resetModules();
   const keys = ['LLULL_PYTHON', 'LLULL_PYTHON_BUILD123D', 'LLULL_ALLOW_CODE_EXECUTION', 'LLULL_EXCHANGE_DIR'];
   for (const key of keys) vi.stubEnv(key, env[key]);
+  vi.stubEnv('LLULL_KERNEL', 'manifold'); // these tests are about the Python bridge: no exact kernel unless a test installs one
   const { app } = await import('../src/index');
   const bus = await import('../src/commandBus');
   const live = await import('../src/liveDocument');
@@ -122,18 +124,21 @@ describe('GET /export/step without Python', () => {
     expect(res.body.error).toMatch(/LLULL_PYTHON/);
   });
 
-  it('falls back to the exact OCC kernel: a STEP solid with analytic faces', async () => {
-    const server = await loadServer({ LLULL_PYTHON: 'off' });
-    const { setGeometryKernel } = await import('@core/geometry/kernel');
-    const { createNodeOcctKernel } = await import('../src/occtNode');
-    setGeometryKernel(await createNodeOcctKernel());
-    server.applyCommand('add_cylinder', { radius: 2, height: 5 });
-    const res = await request(server.app).get('/export/step?name=part');
-    expect(res.status).toBe(200);
-    expect(res.headers['content-disposition']).toContain('part.step');
-    expect(res.text).toMatch(/^ISO-10303-21;/);
-    expect(res.text).toMatch(/CYLINDRICAL_SURFACE/);
-  }, 120_000);
+  it.skipIf(nativeKernelBinary === null)(
+    'falls back to the exact OCC kernel: a STEP solid with analytic faces',
+    async () => {
+      const server = await loadServer({ LLULL_PYTHON: 'off' });
+      const { setGeometryKernel } = await import('@core/geometry/kernel');
+      setGeometryKernel(createNativeTestKernel());
+      server.applyCommand('add_cylinder', { radius: 2, height: 5 });
+      const res = await request(server.app).get('/export/step?name=part');
+      expect(res.status).toBe(200);
+      expect(res.headers['content-disposition']).toContain('part.step');
+      expect(res.text).toMatch(/^ISO-10303-21;/);
+      expect(res.text).toMatch(/CYLINDRICAL_SURFACE/);
+    },
+    120_000,
+  );
 
   it('returns a graceful 500 when the configured python cannot start', async () => {
     const server = await loadServer({ LLULL_PYTHON: '/nonexistent/python-xyz' });

@@ -49,7 +49,7 @@ npm run dev            # renderer dev server http://localhost:5173 (run in backg
 
 ## 5. AI / CLI changes
 Run the change through the CLI (`llull-cli` skill): `llull exec <tool> …` or `llull run plan.json` on a `--doc` file
-(`LLULL_KERNEL=occt` for B-rep), or `--app` against the open desktop app, and confirm it mutates the document, returns a
+(the native `llull-kernel` is the default; `LLULL_KERNEL=manifold` for the mesh kernel), or `--app` against the open desktop app, and confirm it mutates the document, returns a
 sensible `summary`, and (with `--app`) the UI follows over `/live`.
 
 ## Report

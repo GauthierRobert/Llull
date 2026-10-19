@@ -3,14 +3,13 @@
  * checked against closed-form volumes; the sewn-mesh leaf stays a working fallback.
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { it, expect, beforeAll } from 'vitest';
 import type { Entity } from '@core/model/types';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { MeshData } from '@core/model/types';
 import type { ShapeRecipe } from '@core/model/types';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
-import { createNodeOcctKernel } from '../src/occtNode';
-import { leaf, meshOf, volume } from './kernelTestSupport';
+import { leaf, meshOf, volume, createNativeTestKernel, describeNative } from './kernelTestSupport';
 
 const cubeEntity = (size: number): Entity =>
   ({
@@ -41,11 +40,11 @@ const chamfer = (source: ShapeRecipe, edges: number[], size: number): ShapeRecip
 let occt: GeometryKernel;
 let cubeMesh: MeshData;
 beforeAll(async () => {
-  occt = await createNodeOcctKernel();
+  occt = createNativeTestKernel();
   cubeMesh = meshOf(await createManifoldKernel(), cubeEntity(4))!;
 }, 120_000);
 
-describe('occt shell', () => {
+describeNative('occt shell', () => {
   it('hollows an exact cube: volume is the solid minus its inward offset', () => {
     const hollow = meshOf(occt, shell(cube, 0.5));
     expect(hollow).not.toBeNull();
@@ -81,7 +80,7 @@ describe('occt shell', () => {
   });
 });
 
-describe('occt chamfer / fillet on true B-rep edges', () => {
+describeNative('occt chamfer / fillet on true B-rep edges', () => {
   it('a cube has exactly 12 straight edges and 6 planar faces (no triangle diagonals)', () => {
     const topology = occt.topology(occt.evaluate(cube)!);
     expect(topology?.edges).toHaveLength(12);

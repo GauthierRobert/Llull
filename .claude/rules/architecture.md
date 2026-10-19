@@ -70,7 +70,8 @@ guards) and re-derived on load. Keep it incremental — do NOT break the `Comman
 ## L9 — The geometry kernel is an injected interface
 
 three.js renders; it is NOT a CAD kernel. `GeometryKernel` (`@core/geometry/kernel`) is
-implemented by `packages/kernel-manifold` (default) and `packages/kernel-occt`. Commands read it
+implemented by `packages/kernel-manifold` (in-process mesh kernel) and, for exact B-rep, by the native `llull-kernel` sidecar
+(`solver/`, OCCT 7.9, reached through `server/src/nativeKernel.ts`; no TS package, no WASM OCC). Commands read it
 ONLY from `ctx.kernel` and declare `annotations: { requiresKernel: true }`. The boundary is a SHAPE,
 not a mesh: commands pass a `ShapeRecipe` and get an opaque `ShapeHandle`; meshes only come OUT.
 Installing a kernel is the composition root's job, never a command's. Rigid-body physics follows the same pattern:

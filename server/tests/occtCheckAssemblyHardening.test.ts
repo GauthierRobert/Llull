@@ -1,11 +1,11 @@
 /** Live OpenCascade: containment inside a compound part and contact with curved parts (review fixes to check_assembly). */
-import { describe, expect, it } from 'vitest';
+import { expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import type { CheckResult } from '@core/model/checkResult';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
-import { liveKernels } from './kernelTestSupport';
+import { liveKernels, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
 const ctx = (): ExecutionContext => ({ ...defaultContext(), kernel: kernels.occt });
@@ -23,7 +23,7 @@ function builder(): { run: (name: string, params: Record<string, unknown>) => st
   };
 }
 
-describe('check_assembly on OCC, review fixes', () => {
+describeNative('check_assembly on OCC, review fixes', () => {
   it('a small box fully inside one solid of a compound frame, without contact, is FPR_PAIR_CONTAINED', () => {
     const b = builder();
     const big = b.run('add_box', { size: [40, 40, 40], position: [0, 0, 0] });

@@ -10,10 +10,10 @@ import { fakeExactKernel } from '../helpers/fakeExactKernel';
 
 const ctxOf = (kernel: GeometryKernel | null): ExecutionContext => ({ ...defaultContext(), kernel });
 const OCC_INFO = {
-  occtVersion: '7.4.0p1',
-  build: 'opencascade.js@1.1.1',
+  occtVersion: '7.9.2',
+  build: 'llull-kernel@0.1.0',
   capabilities: ['topology', 'importShapes'],
-  isolation: 'worker',
+  isolation: 'process',
 } as const;
 const settings = (extra: Partial<DocumentKernelSettings> = {}): DocumentKernelSettings => ({
   kernel: 'occt',
@@ -43,20 +43,15 @@ describe('kernel_info', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'kernel_info', {}, ctxOf(fakeExactKernel({ info: OCC_INFO }).kernel));
     const data = result.data as InfoData;
-    expect(data).toMatchObject({ active: 'occt', occtVersion: '7.4.0p1', build: 'opencascade.js@1.1.1', isolation: 'worker' });
+    expect(data).toMatchObject({ active: 'occt', occtVersion: '7.9.2', build: 'llull-kernel@0.1.0', isolation: 'process' });
     expect(data.capabilities).toEqual(expect.arrayContaining(['topology', 'importShapes']));
     expect(data.modelingTolerance.linear).toMatchObject({ value: 1e-4, unit: 'mm', defaulted: true });
     expect(data.modelingTolerance.angular).toMatchObject({ value: 1e-9, unit: 'rad', defaulted: true });
     expect(data.modelingTolerance.maxImportTolerance).toMatchObject({ value: 0.01, unit: 'mm', defaulted: true });
     expect(data.issues).toEqual([]);
-    expect(result.summary).toContain('OCCT 7.4.0p1');
+    expect(result.summary).toContain('OCCT 7.9.2');
     expect(result.document).toBe(doc);
     expect(result.affected).toEqual([]);
-  });
-
-  it('reports a native sidecar kernel isolated in its own process', () => {
-    const native = fakeExactKernel({ info: { ...OCC_INFO, occtVersion: '7.9.2', build: 'llull-kernel', isolation: 'process' } }).kernel;
-    expect(infoOf(createEmptyDocument(), native)).toMatchObject({ active: 'occt', occtVersion: '7.9.2', isolation: 'process' });
   });
 
   it('reports a Manifold kernel and no kernel at all', () => {
@@ -89,7 +84,7 @@ describe('kernel_info', () => {
     const data = infoOf(older, occ);
     expect(data.issues.map((issue) => issue.code)).toEqual(['KRN_KERNEL_MISMATCH']);
     expect(data.issues[0]?.severity).toBe('warn');
-    const sameVersion = { ...createEmptyDocument(), kernelSettings: settings({ occtVersion: '7.4.0p1' }) };
+    const sameVersion = { ...createEmptyDocument(), kernelSettings: settings({ occtVersion: '7.9.2' }) };
     expect(infoOf(sameVersion, occ).issues).toEqual([]);
     const otherKernel = { ...createEmptyDocument(), kernelSettings: settings({ kernel: 'manifold' }) };
     expect(infoOf(otherKernel, occ).issues.map((issue) => issue.code)).toEqual(['KRN_KERNEL_MISMATCH']);
@@ -112,10 +107,10 @@ describe('set_modeling_tolerance', () => {
   });
 
   it('keeps an existing provenance stamp', () => {
-    const stamped = { ...createEmptyDocument(), kernelSettings: settings({ occtVersion: '7.4.0p1', build: 'b' }) };
+    const stamped = { ...createEmptyDocument(), kernelSettings: settings({ occtVersion: '7.9.2', build: 'b' }) };
     const result = run(stamped, { angular: 1e-8 });
     expect(result.document.kernelSettings).toMatchObject({
-      occtVersion: '7.4.0p1',
+      occtVersion: '7.9.2',
       build: 'b',
       modelingTolerance: { angular: 1e-8, linear: 1e-4 },
     });

@@ -4,7 +4,7 @@
  *
  *   build/native/llull-compute[.exe]   jobs (fatigue/map post-processing, field raster) — built WITH the `gpu` feature: the raster job
  *                                      draws with wgpu when an adapter exists and falls back to the bit-exact CPU twin otherwise
- *   build/native/llull-kernel[.exe]    native OCCT kernel sidecar (opt-in: LLULL_KERNEL=occt-native; the default stays the WASM OCC)
+ *   build/native/llull-kernel[.exe]    native OCCT kernel sidecar (the exact kernel: LLULL_KERNEL=occt-native is the desktop default, KI7)
  *   build/native/occt/lib/             shared OCCT toolkits, LGPL-2.1 dynamic linking (Linux .so.<maj>.<min>, macOS .<maj>.<min>.dylib;
  *                                      Windows: the DLLs sit next to the executables instead, where the loader looks)
  *   build/native/licenses/             OCCT LGPL-2.1 + exception + source/relink notice, fdlibm/V8 notice, Rust crate licences

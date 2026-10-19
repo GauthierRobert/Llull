@@ -43,7 +43,7 @@ official mass; `npm run quality:drawings` replays them).
 - **Trim, don't build**: extrude the main outline full width, then `boolean` op `intersect` with one
   trim prism per other view (rounded ends, tapers, top-view corner radii). Avoid coplanar
   boolean junctions (overlap tools by ≥ 0.5; build multi-section lofts as one solid).
-- **Fillets**: OCC (`--kernel occt`), `fillet_edge edgesNear` = any point on the edge (use the
+- **Fillets**: OCC (the native kernel, the default), `fillet_edge edgesNear` = any point on the edge (use the
   mid point from `inspect_topology`). OCC propagates along tangent chains, so for "R…, N
   PLACES" corners in a view prefer a rounded-rectangle prism intersect. A concave fillet against a
   cylinder or a corner where several blends meet is fragile: llull refuses it with a reason —

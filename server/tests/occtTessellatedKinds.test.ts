@@ -4,13 +4,12 @@
  * count).
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { it, expect, beforeAll } from 'vitest';
 import type { Entity, Vec3 } from '@core/model/types';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { MeshData } from '@core/model/types';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
-import { createNodeOcctKernel } from '../src/occtNode';
-import { common, booleanMesh, booleanRecipe, box, leaf, meshOf, volume } from './kernelTestSupport';
+import { common, booleanMesh, booleanRecipe, box, leaf, meshOf, volume, createNativeTestKernel, describeNative } from './kernelTestSupport';
 
 const at = (position: Vec3, rotation: Vec3): Pick<Entity, 'position' | 'rotation' | 'layerId' | 'color'> => ({
   position,
@@ -45,11 +44,11 @@ const shapes: Array<[string, (position: Vec3, rotation: Vec3) => Entity]> = [
 let occt: GeometryKernel;
 let manifold: GeometryKernel;
 beforeAll(async () => {
-  occt = await createNodeOcctKernel();
+  occt = createNativeTestKernel();
   manifold = await createManifoldKernel();
 }, 120_000);
 
-describe.each(shapes)('occt %s', (name, make) => {
+describeNative.each(shapes)('occt %s', (name, make) => {
   it.each([
     ['origin', [0, 0, 0], [0, 0, 0]],
     ['moved and turned', [2, -1, 3], [0.3, -0.4, 0.9]],
@@ -77,7 +76,7 @@ describe.each(shapes)('occt %s', (name, make) => {
 
 // Revolution is built exactly (MakeRevol) in llull's frame for the dominant axis component:
 // every axis, a partial sweep and either profile winding must give the Manifold solid.
-describe('occt revolution frames', () => {
+describeNative('occt revolution frames', () => {
   const ring: Array<[number, number]> = [
     [1, 0.5],
     [2.5, 0.5],

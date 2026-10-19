@@ -11,9 +11,9 @@ import type { MeshData, ShapeRecipe, Vec3 } from '../model/types';
 import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
 import type { FaceSurface, ShapeHandle } from './kernelTypes';
 
-export type { FaceSurface, ShapeHandle };
+export type { ShapeHandle };
 
-export type EdgeCurve = 'line' | 'circle' | 'ellipse' | 'bspline' | 'other';
+type EdgeCurve = 'line' | 'circle' | 'ellipse' | 'bspline' | 'other';
 
 /** One unique edge; `index` is what `fillet_edge` / `chamfer_edge` `edgeIndices` select. */
 export interface ShapeEdge {

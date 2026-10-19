@@ -3,11 +3,11 @@
  * kernel writes (the product names and solid ids the kernel would otherwise number itself).
  */
 
-import { describe, it, expect } from 'vitest';
+import { it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
-import { liveKernels } from './kernelTestSupport';
+import { liveKernels, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
 
@@ -24,7 +24,7 @@ function placementX(step: string, name: string): number {
   return Number(x);
 }
 
-describe('occt export_step_exact labels', () => {
+describeNative('occt export_step_exact labels', () => {
   it('names products after entities and styles them with the entity color', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'add_box', { size: [10, 10, 10], color: '#ff0000' }).document;

@@ -1,11 +1,11 @@
 // Query and exchange facade of the llull native kernel (RS-1): exact topology, the face-query port (01 §5.9), shape distance, STEP
 // assembly export, STEP import + healing and B-rep blobs. Each function mirrors one packages/kernel-occt module (named at its
-// definition) and answers JSON text ("null" = the WASM kernel's null), parsed once by Rust (src/queries.rs).
+// definition) and answers JSON text ("null" = a null result), parsed once by Rust (src/queries.rs).
 //
 // Index rule (topology, faceQuery, fillet / chamfer edge selection): face / edge / vertex index k is the k-th distinct sub-shape in
 // TopExp_Explorer order, distinct meaning TopoDS_Shape::IsSame (same TShape and location, any orientation), keeping the first
 // occurrence and its orientation. That is exactly TopExp::MapShapes into a TopTools_IndexedMapOfShape (index k + 1), and exactly
-// `uniqueSubShapes` of packages/kernel-occt/src/occtTopology.ts, so both kernels number the same B-rep the same way.
+// `uniqueSubShapes` of the retired opencascade.js kernel, the numbering the core commands rely on.
 #pragma once
 
 #include <memory>

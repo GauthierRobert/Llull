@@ -1,6 +1,6 @@
 /**
- * The OCC kernel runs in a worker thread: a forced WASM-style abort (Emscripten `process.exit`) or
- * a hang kills only the worker, the call returns null, and the next call respawns it.
+ * The native OCC kernel runs behind a worker thread proxy: a forced abort or a hang kills only the worker (and with it the sidecar), the
+ * call returns null, and the next call respawns it; the real binary serves the ops, fixture workers script the protocol corner cases.
  */
 
 import { rmSync } from 'node:fs';
@@ -9,8 +9,9 @@ import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { Entity } from '@core/model/types';
 import { createIsolatedKernel, type IsolatedKernel } from '../src/isolatedKernel';
+import { createNativeKernel } from '../src/nativeKernel';
 import { handleOf } from '@core/geometry/shapeKernel';
-import { booleanMesh, leaf, meshOf } from './kernelTestSupport';
+import { booleanMesh, leaf, meshOf, nativeKernelBinary } from './kernelTestSupport';
 
 const box = (size: number): Entity =>
   ({
@@ -25,14 +26,14 @@ const box = (size: number): Entity =>
 
 const kernels: IsolatedKernel[] = [];
 const make = (callTimeoutMs?: number): IsolatedKernel => {
-  const kernel = createIsolatedKernel({ testHooks: true, ...(callTimeoutMs !== undefined ? { callTimeoutMs } : {}) });
+  const kernel = createNativeKernel(nativeKernelBinary!, { testHooks: true, ...(callTimeoutMs !== undefined ? { callTimeoutMs } : {}) });
   kernels.push(kernel);
   return kernel;
 };
 
 afterAll(() => kernels.forEach((kernel) => kernel.dispose()));
 
-describe('isolated OCC kernel', () => {
+describe.skipIf(nativeKernelBinary === null)('isolated native kernel (real binary)', () => {
   it('tessellates and runs booleans through the worker', () => {
     const kernel = make();
     expect(meshOf(kernel, box(2))?.indices).toHaveLength(36);
@@ -108,60 +109,12 @@ describe('isolated OCC kernel', () => {
     expect(meshOf(kernel, box(2))).not.toBeNull();
   }, 180_000);
 
-  it('replaces a worker whose OCC call failed natively, so later calls are not poisoned', () => {
-    // A cone apex exactly on a box face makes OCC fail; without a restart the module then returns
-    // spurious nulls for the next several (even trivial) calls.
-    const kernel = make();
-    const cone = (height: number): Entity =>
-      ({
-        id: 'k',
-        kind: 'cone',
-        radius: 1,
-        height,
-        position: [0, 0, -3],
-        rotation: [0, 0, 0],
-        layerId: 'layer-default',
-        color: '#888888',
-      }) as Entity;
-    const floor = { ...box(8), position: [0, 0, -4] } as Entity;
-    booleanMesh(kernel, 'union', cone(3), floor);
-    booleanMesh(kernel, 'intersect', cone(3), floor);
-    expect(kernel.recycleCount()).toBeGreaterThanOrEqual(1);
-    for (let attempt = 0; attempt < 3; attempt++) {
-      expect(meshOf(kernel, box(2)), 'tessellate').not.toBeNull();
-      expect(booleanMesh(kernel, 'union', cone(2.99), floor), 'union').not.toBeNull();
-      expect(booleanMesh(kernel, 'intersect', cone(2.99), floor), 'intersect').not.toBeNull();
-    }
-  }, 180_000);
-
-  it('does not recycle the worker for a graceful refusal such as an oversized fillet', () => {
+  it('keeps the worker for a graceful refusal such as an oversized fillet', () => {
     const kernel = make();
     expect(meshOf(kernel, box(10))).not.toBeNull();
     expect(kernel.evaluate({ op: 'fillet', source: leaf(box(10)), edges: [], size: 50 })).toBeNull();
-    expect(kernel.recycleCount()).toBe(0);
     expect(kernel.crashCount()).toBe(0);
     expect(meshOf(kernel, box(2))).not.toBeNull();
-  }, 120_000);
-
-  it('reloads a recycled worker in the background so the next call is not slow', async () => {
-    const kernel = make();
-    const cone = {
-      id: 'k',
-      kind: 'cone',
-      radius: 1,
-      height: 3,
-      position: [0, 0, -3],
-      rotation: [0, 0, 0],
-      layerId: 'layer-default',
-      color: '#888888',
-    } as Entity;
-    const floor = { ...box(8), position: [0, 0, -4] } as Entity;
-    booleanMesh(kernel, 'union', cone, floor);
-    expect(kernel.recycleCount()).toBe(1);
-    await new Promise((resolve) => setTimeout(resolve, 15_000)); // the replacement loads meanwhile
-    const started = Date.now();
-    expect(meshOf(kernel, box(2))).not.toBeNull();
-    expect(Date.now() - started).toBeLessThan(1_000);
   }, 120_000);
 
   describe('a worker that dies while idle', () => {
@@ -187,7 +140,9 @@ describe('isolated OCC kernel', () => {
       expect(Date.now() - started).toBeLessThan(15_000);
     }, 120_000);
   });
+});
 
+describe('kernel worker proxy (fixture workers)', () => {
   it('a worker that exits with an unconsumed REPLY wakes the server as DIED, not at the timeout', () => {
     const kernel = createIsolatedKernel({
       entry: path.join(__dirname, 'fixtures', 'replyThenExitWorker.cjs'),

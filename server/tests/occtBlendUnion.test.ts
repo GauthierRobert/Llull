@@ -4,17 +4,17 @@
  * the Manifold kernel refuses blends gracefully.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { it, expect, beforeAll, afterAll } from 'vitest';
 import { type CadDocument, type MeshSolidEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { type GeometryKernel, setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
-import { createNodeOcctKernel } from '../src/occtNode';
+import { createNativeTestKernel, describeNative } from './kernelTestSupport';
 
 let occt: GeometryKernel;
 
 beforeAll(async () => {
-  occt = await createNodeOcctKernel();
+  occt = createNativeTestKernel();
   setGeometryKernel(occt);
 }, 120_000);
 afterAll(() => setGeometryKernel(null));
@@ -61,7 +61,7 @@ function solidsAndVolume(doc: CadDocument, id: string): { solids: number; volume
   return { solids: topology?.solids ?? 0, volume: topology?.volume ?? 0 };
 }
 
-describe('blend_union on the live OCC kernel', () => {
+describeNative('blend_union on the live OCC kernel', () => {
   it('welds the frame junction into one solid with filleted joints', () => {
     const doc = frameJunction();
     const plain = execute(doc, 'boolean', { op: 'union', a: doc.order[0], b: doc.order[1] });

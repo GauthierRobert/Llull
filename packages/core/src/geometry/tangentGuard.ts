@@ -6,7 +6,7 @@
  * degenerate case.
  */
 
-import type { Entity, Vec3 } from '@core/model/types';
+import type { Entity, Vec3 } from '../model/types';
 
 /** Relative size of the gap opened between a tangent sphere and a box face. */
 export const TANGENT_GAP = 1e-5;

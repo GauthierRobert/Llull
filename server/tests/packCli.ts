@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
-import { createNodeOcctKernel } from '../src/occtNode';
+import { createNativeTestKernel } from './kernelTestSupport';
 import { runCli, type CliIo } from '../src/cli/main';
 
 /** Every `approx` assertion checked so far; `LLULL_PACK_MEASURE=<file>` makes packReplay07 write them (the numbers behind RESULTS.json). */
@@ -56,10 +56,10 @@ export interface CliCall {
   readonly ms: number;
 }
 
-let kernels: { manifold: GeometryKernel; occt: GeometryKernel } | null = null;
+const kernels: { manifold?: GeometryKernel; occt?: GeometryKernel } = {};
 async function kernelFor(name: 'manifold' | 'occt'): Promise<GeometryKernel> {
-  kernels ??= { manifold: await createManifoldKernel(), occt: await createNodeOcctKernel() };
-  return kernels[name];
+  if (name === 'manifold') return (kernels.manifold ??= await createManifoldKernel());
+  return (kernels.occt ??= createNativeTestKernel());
 }
 
 /** Shell-like split of a pack CLI line: single / double quotes group, a trailing `# comment` is dropped. */
