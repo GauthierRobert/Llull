@@ -10,6 +10,9 @@ default-members = [
   "crates/llull-bvh",
   "crates/llull-post",
   "crates/llull-raster",
+  "crates/llull-gpu",
+  "crates/llull-voxfe",
+  "crates/llull-topopt",
   "bins/llull-compute",
 ]
 
@@ -25,12 +28,24 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 rayon = "1"
 sha2 = "0.10"
+wgpu = { version = "25", default-features = false, features = ["wgsl", "vulkan", "metal", "dx12"] }
+pollster = "0.4"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
+
+# The voxel FE / SIMP tests solve real benchmark grids (MBB 60x20, 3D cantilevers): optimise those crates in test builds too.
+[profile.dev.package.llull-voxfe]
+opt-level = 3
+
+[profile.dev.package.llull-topopt]
+opt-level = 3
+
+[profile.dev.package.llull-gpu]
+opt-level = 3
 
 [profile.release]
 lto = "thin"

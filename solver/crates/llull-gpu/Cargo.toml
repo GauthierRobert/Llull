@@ -1,0 +1,20 @@
+[package]
+name = "llull-gpu"
+description = "Shared GPU plumbing of the llull native jobs (RS1 §2): wgpu device selection, buffer helpers, fixed-order reductions with CPU twins"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+# wgpu device selection, buffers and the GPU fixed-order dot. Without it only the CPU fixed-order reductions exist.
+wgpu = ["dep:wgpu", "dep:pollster"]
+
+[dependencies]
+rayon.workspace = true
+wgpu = { workspace = true, optional = true }
+pollster = { workspace = true, optional = true }
+
+[lints]
+workspace = true

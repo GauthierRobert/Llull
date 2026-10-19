@@ -374,6 +374,9 @@ independent). 3D H8: 2×2×2 Gauss integration of Bᵀ D B on a unit cube, scale
 7. **GPU precision and multigrid design** (RS1): whether the GPU kernels store f32 with f64 accumulation or f64 throughout
    (not all adapters support f64), and the multigrid hierarchy (coarsening of inactive voxels, smoother). Decide on the VC-TOP-33 /
    34 measurements; until then the CPU twin is the recorded path.
+   **Decided 2026-10-19 (RS-2 as built, §13):** the f64 Rust-CPU twin is the recorded path (`deterministic: true`); the GPU stores
+   and computes in f32 (no f64 requirement on adapters) inside f64 iterative refinement on the CPU, as the exploration path
+   (`deterministic: false`). Multigrid: CPU only (V-cycle, element-scale averaging, damped Jacobi), §13.3.
 
 ## 12. References
 
@@ -386,3 +389,83 @@ independent). 3D H8: 2×2×2 Gauss integration of Bᵀ D B on a unit cube, scale
 - [R8] SciPy 1.18.1 (licence text: BSD-style, "Copyright (c) 2001-2002 Enthought, Inc. 2003, SciPy Developers"), NumPy 2.5.4 (PyPI licence expression `BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0`) — https://pypi.org/project/scipy/ , https://pypi.org/project/numpy/ (metadata read; SciPy wheel downloaded for the cross-check)
 - [RS1] Native compute programme — [`../../decisions/RS1-native-compute.md`](../../decisions/RS1-native-compute.md) (step RS-2)
 - llull: `.claude/rules/architecture.md` (L8, L9, L10), `packages/core/src/commands/derivation.ts`, `packages/core/src/plugins/plugin.ts`, `packages/domain-aec/src/shared/derived.ts`, 05 FEA TECHNICAL_SPEC.
+
+## 13. As built: native job `llull-compute topopt` (RS-2, 2026-10-19)
+
+Crates (RS1 §2): `solver/crates/llull-gpu` (wgpu device selection shared with `llull-raster`, buffer helpers, fixed-order
+reductions with CPU twins), `solver/crates/llull-voxfe` (matrix-free voxel FE), `solver/crates/llull-topopt` (SIMP loop + job).
+All three are workspace default-members, so `npm run native:check` (fmt, clippy `-D warnings`, test) covers them. The wgpu kernels
+are behind cargo features (`llull-voxfe/gpu`, `llull-topopt/gpu`, on by default in the crates so the GPU tests compile and run in
+`native:check`; `llull-compute --features gpu` for the binary, off by default like the raster GPU path, which keeps
+`cargo build --profile compute -p llull-compute` free of wgpu, ~75 s on 4 cores).
+
+### 13.1 Job contract
+
+The authoritative schema is the module doc of `solver/crates/llull-topopt/src/job.rs`; summary:
+
+| File | Direction | Content |
+| ---- | --------- | ------- |
+| `job.json` | in | `version: 1`, `dimension: 2\|3`, `grid {nx, ny, nz?, voxel}`, `material {e0, nu}`, `thickness` (2D), `volumeFraction`, optional mask files `active` / `keepIn` / `keepOut` (u8 per voxel), `fixed [{node:[i,j(,k)], dofs:[c…]}]` + optional `fixedDofs` (u8 per DOF), `loadCases [{name, weight, loads:[{node, force}], forces?: f64 file}]`, `settings {penal, eminRatio, move, changeTol, maxIterations, filter {kind, radius (voxels)}, device cpu\|gpu\|auto, solver multigrid\|jacobi, pcgTolerance, pcgMaxIterations, ocTolerance}` (all optional, §5.6 defaults), optional `startDesign` (f64 x per voxel), optional `dofCap` |
+| `field.bin` | out | xPhys, little-endian f32 per voxel, voxel index `i + nx(j + ny k)` (x fastest, y up), inactive = 0 |
+| `design.f64` | out | design variables x, little-endian f64 (resume input: a resumed run continues bit for bit) |
+| `result.json` | out | `version`, `status`, `iterations`, `compliance` (final xPhys, weighted), `lastIterationCompliance` (top88's printed value), `perLoadCase`, `volumeFraction`, `grey`, `history [{it, compliance, volume, change}]` (every iteration; the host caps at 1000 rows), `device`, `deterministic`, `precision`, `adapter?`, `solver {kind, tolerance, pcgIterations}`, `grid {dimension, nx, ny, nz, voxel, elements, active, keepIn, keepOut, dofs}`, `settings` (resolved), `field`, `design`, `fieldSha256`, `warnings [{code, message}]` |
+
+Events on stdout (`llull-protocol` NDJSON): one `progress` per iteration carrying `it`, `compliance`, `volume`, `change` next to
+`step` / `total` / `message`; `warning` `TOP_GPU_FALLBACK`; `done` with `outputs [{path, sha256}]`; or `error` with
+`NATIVE_JOB_IO`, `NATIVE_JOB_INPUT`, `TOP_GRID_TOO_LARGE`, `TOP_SOLVER_FAILED`. Inactive voxels are removed (§5.4), keep-in /
+keep-out are pinned in x and xPhys, the volume budget counts keep-in (`Σ xPhys ≤ volumeFraction · active`). Units are not
+converted (consistent units: MPa, mm, N → N·mm).
+
+### 13.2 Numerics
+
+- Elements: top88 Q4 KE (closed form, VC-TOP-01 to 1e-12) scaled by E·t; H8 by 2×2×2 Gauss scaled by E·h (diagonal
+  `(2−3ν)/(9(1+ν)(1−2ν))`, coupling `1/(24(1+ν)(1−2ν))`, six rigid modes, tested to 1e-12 / 1e-14).
+- Mat-vec: element products `s_e KE u_e`, then a node-centric gather in fixed local-node order (no atomics): bit-identical for
+  any thread count (tested 1 / 3 / 4 threads). The WGSL kernel computes the same sums in the same order per node in f32.
+- PCG: relative residual 1e-10, zero initial guess every solve (so resume is exact); dots via fixed-chunk reductions.
+  `TOP_SOLVER_FAILED` on pᵀKp ≤ 0 (singular: unsupported body), non-finite values or `pcgMaxIterations` (default 10 000).
+- Filters as fixed-stencil convolutions (half-width ⌈rmin⌉ − 1), OC exactly as §5.2 with `ocTolerance` 1e-3.
+
+### 13.3 Multigrid
+
+Geometric V-cycle as the PCG preconditioner (default `solver: multigrid`): axes halved (rounded up) per level; coarse voxel scale =
+mean of the 2^d children (inactive or out-of-grid children count 0) × the element-matrix geometric factor (2 per level in 3D,
+1 in 2D); a coarse voxel is active iff any child is; bilinear / trilinear prolongation, restriction = its transpose; a coarse DOF is
+fixed when a fine fixed DOF of the same component lies in its support; damped Jacobi smoother (2 pre + 2 post, ω = 4/(3·1.1·λ̂),
+λ̂ from 10 power iterations on D⁻¹K); coarsest level ≤ 256 free DOFs factored densely (Cholesky). On the test 3D cantilever
+(24×12×12, a soft layer at 1e-3) multigrid PCG needs 44 iterations against 337 for Jacobi PCG (tested: < 1/3).
+
+### 13.4 Validation as run (`cargo test` in `solver/`)
+
+| VC | Result |
+| -- | ------ |
+| VC-TOP-01 / 02 / 03 | KE, filter weights, separable OC (bisection 1e-12: x = [0.2, 0.4, 0.6, 0.8] to 1e-6; at the production 1e-3: 6e-4 relative) |
+| VC-TOP-04 | 30×10 solid compliance 123.069351174 (1e-9, Jacobi and multigrid) and c(0.5)/c(1) (1e-8), also through the job's first iteration |
+| VC-TOP-10 | MBB 60×20 sensitivity filter: 94 iterations (exact), last-iteration compliance 203.192457640 (Δ 3e-12 rel), final 203.182593257, volume 0.4999701, grey 0.1741755; density digits vs `mbb_60x20_sensitivity.txt` |
+| VC-TOP-11 | density filter: 127 iterations (exact), 218.803221066 (Δ 1e-11 rel), final 218.815227558, grey 0.2683235; digits vs `mbb_60x20_density.txt` |
+| VC-TOP-27 (crate level) | two runs and 1 / 3 / 4 threads: identical `field.bin`, `design.f64`, `result.json` bytes |
+| VC-TOP-31 (crate level) | resume from iterate 12 (`design.f64` → `startDesign`) = uninterrupted 30-iteration run, bit for bit |
+| VC-TOP-33 (GPU part) | GPU vs CPU twin on lavapipe (software Vulkan): mat-vec 6e-8 / 8e-8 relative (2D / 3D), vector ops and fixed-order dot 1e-6, f32 PCG + f64 refinement to 1e-12, topopt `device: gpu` compliance within 1e-6 of the CPU run. Skips with the logged reason where no adapter exists. |
+
+### 13.5 Measurements (VC-TOP-12, VC-TOP-34; 2026-10-19)
+
+Machine: 4-core x86-64 cloud container, 15 GB RAM, **shared with a concurrent OCCT build** during the runs (times are pessimistic;
+re-measure on an idle desktop). Binary: `cargo build --profile compute`; bench: `cargo test --release -p llull-topopt --test scaling
+-- --ignored --nocapture` (3D cantilever `2n × n × n`, density filter rmin 1.5, volume fraction 0.3, multigrid PCG 1e-10).
+
+| Case | Device | DOFs | Result |
+| ---- | ------ | ---- | ------ |
+| MBB 60×20 sensitivity (VC-TOP-10) | CPU | 2 562 | 3.3 s total, 94 iterations (budget ≤ 10 s: met) |
+| MBB 60×20 density (VC-TOP-11) | CPU | 2 562 | 4.8 s total, 127 iterations |
+| MBB 300×100 sensitivity (VC-TOP-12) | CPU | 60 802 | 300 iterations (cap reached, change > 0.01) in 496 s; compliance 189.4953 final, 189.5127 last iteration (budget ≤ 60 s: **not met** under contention; grade TBD until re-measured) |
+| cantilever 20×10×10 | CPU | 7 623 | 0.18 s / iteration, 28 PCG iterations / solve |
+| cantilever 40×20×20 | CPU | 54 243 | 1.8 s / iteration, 33 |
+| cantilever 60×30×30 | CPU | 175 863 | 7.7 s / iteration, 36 |
+| cantilever 80×40×40 (128k voxels) | CPU | 408 483 | 18.8 s / iteration, 38 → 100 iterations ≈ 31 min (budget "100k voxels ≤ 10 min": **not met** on this machine) |
+| one solve, cantilever 120×60×60 with a soft layer | CPU | 1 350 723 | mat-vec 0.18 s, MG build 2.2 s (6 levels), MG-PCG 117 iterations in 131 s |
+| cantilever 20×10×10 / 40×20×20 | GPU (lavapipe, software) | 7 623 / 54 243 | 5.7 s / 62 s per iteration (f32 Jacobi PCG, 580 / 1 130 inner iterations per solve): correctness only, not a speed figure |
+
+Caps set from these numbers (`solver/crates/llull-topopt/src/job.rs`): **CPU 1.5e6 DOF** (`device: cpu`; largest solve measured,
+about 1 h per 100 iterations extrapolated), **GPU 1e7 DOF provisional** (`device: gpu | auto`; no hardware adapter measured, and the
+GPU path has no multigrid yet, so its iteration counts are Jacobi's). `job.json` `dofCap` overrides. Next: measure on a desktop GPU,
+port the V-cycle to the GPU kernels, MMA (V1).

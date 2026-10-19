@@ -1,0 +1,19 @@
+[package]
+name = "llull-voxfe"
+description = "Matrix-free voxel finite elements (Q4 plane stress, H8) with Jacobi / geometric-multigrid PCG, Rust CPU twin + wgpu kernels (RS1 §2)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = ["gpu"]
+# wgpu kernels (mat-vec, vector ops, fixed-order dot, f32 Jacobi PCG). The f64 CPU twin is always built and is the recorded path.
+gpu = ["llull-gpu/wgpu"]
+
+[dependencies]
+llull-gpu = { path = "../llull-gpu" }
+rayon.workspace = true
+
+[lints]
+workspace = true
