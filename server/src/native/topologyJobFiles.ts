@@ -19,7 +19,7 @@ import { f64Bytes } from './computeJob';
 export type TopologyDevice = 'cpu' | 'gpu' | 'auto';
 
 /** DOF count of the grid (2D: two per node of the single layer). */
-export function dofCount(job: TopologyJob): number {
+function dofCount(job: TopologyJob): number {
   const { nx, ny, nz } = job.grid;
   return job.dimension * (nx + 1) * (ny + 1) * (job.dimension === 2 ? 1 : nz + 1);
 }

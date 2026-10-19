@@ -27,7 +27,7 @@ export const convertToSheetMetal = defineCommand({
     'Convert an exact solid (an imported STEP from import_step_exact, or any solid with a B-rep under the OCC kernel) into a sheet-metal part so flat_pattern, check_sheet_metal and export_flat_pattern_dxf work on it. ' +
     'The thickness T is measured from the face graph (parallel planes one T apart, coaxial bend cylinders R and R + T); `rule` (create_sheet_metal_rule) supplies the explicit K-factor and design thresholds and must have the same thickness. ' +
     'stationaryFace is a world point on one planar skin face: that face is the fixed reference of the unfolding (material lies behind it). Lengths are in the document length unit. ' +
-    'Refusals: FTR_NEEDS_EXACT_KERNEL (use --kernel occt and import_step_exact), FTR_RULE_NOT_FOUND, FTR_FACE_NOT_FOUND, FTR_FACE_NOT_PLANAR, FTR_NON_DEVELOPABLE (cone / torus / spline faces), ' +
+    'Refusals: FTR_NEEDS_EXACT_KERNEL (use --kernel occt-native and import_step_exact), FTR_RULE_NOT_FOUND, FTR_FACE_NOT_FOUND, FTR_FACE_NOT_PLANAR, FTR_NON_DEVELOPABLE (cone / torus / spline faces), ' +
     'FTR_NOT_SHEET_METAL (non-constant thickness or non-cylindrical bend: model it as a machined part). Joggles are recognised. Next: flat_pattern, check_sheet_metal.',
   annotations: { requiresKernel: true },
   params: z.object({
@@ -47,7 +47,7 @@ export const convertToSheetMetal = defineCommand({
     const rule = model.rules[ruleName];
     if (rule === undefined)
       return fail('FTR_RULE_NOT_FOUND', `no rule "${ruleName}"`, 'Create it with create_sheet_metal_rule first.', { paths: ['rule'] });
-    const exact = 'run with --kernel occt; for imported parts use import_step_exact';
+    const exact = 'run with --kernel occt-native; for imported parts use import_step_exact';
     const kernel = ctx?.kernel ?? null;
     if (kernel === null || kernel.faceQuery === undefined || (entity.kind === 'mesh' && entity.brep === undefined))
       return fail('FTR_NEEDS_EXACT_KERNEL', `solid ${id} has no exact B-rep or the kernel has no face-query port`, `Rerun ${exact}.`, {

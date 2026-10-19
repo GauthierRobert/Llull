@@ -16,7 +16,7 @@ const DOM_SUITES = [
 export default defineConfig(({ command }) => ({
   plugins: [react()],
   // Serve .wasm files with the correct MIME type so WebAssembly.instantiateStreaming
-  // succeeds in the browser (manifold-3d, opencascade.js). Vite dev-server otherwise
+  // succeeds in the browser (manifold-3d). Vite dev-server otherwise
   // serves them as application/octet-stream which browsers reject for streaming compile.
   assetsInclude: ['**/*.wasm'],
   // Pre-bundling moves manifold-3d into node_modules/.vite/deps/, where emscripten's sibling

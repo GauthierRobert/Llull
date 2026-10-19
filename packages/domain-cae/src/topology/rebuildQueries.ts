@@ -162,10 +162,7 @@ export const compareToTopology = defineCommand({
       .string()
       .describe('Id of the rebuilt 3D solid (e.g. the extrusion made from the suggest_rebuild loops, after boolean and fillets).'),
     iouTarget: z.number().optional().describe('Required IoU in (0, 1]. Default 0.85 (llull choice, to be calibrated).'),
-    complianceRatioTarget: z
-      .number()
-      .optional()
-      .describe('Allowed rebuild / optimum compliance ratio, >= 1. Default 1.15 (llull choice).'),
+    complianceRatioTarget: z.number().optional().describe('Allowed rebuild / optimum compliance ratio, >= 1. Default 1.15 (llull choice).'),
   }),
   run: (doc, params, ctx): CommandResult => {
     const solved = solvedStudy(doc, 'compare_to_topology', params.studyId, ctx?.feaArtifacts);

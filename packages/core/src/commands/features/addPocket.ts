@@ -176,7 +176,7 @@ export const addPocket = defineCommand({
       return fail(
         'FTR_NEEDS_EXACT_KERNEL',
         'a floor fillet needs an exact kernel',
-        'rerun with --kernel occt, or use floorFillet 0',
+        'rerun with --kernel occt-native, or use floorFillet 0',
         'floorFillet',
       );
     const vertices = rawVertices(outline);

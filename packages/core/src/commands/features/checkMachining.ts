@@ -116,7 +116,7 @@ export const checkMachining = defineCommand({
         'check_machining',
         'FTR_NEEDS_EXACT_KERNEL',
         'no kernel is available',
-        'rerun with --kernel occt, or pass thickness',
+        'rerun with --kernel occt-native, or pass thickness',
         [id],
       );
     const recipe = operandRecipe(kernel, entity);
@@ -133,7 +133,7 @@ export const checkMachining = defineCommand({
         'check_machining',
         'FTR_NEEDS_EXACT_KERNEL',
         'the local thickness cannot be measured without a buildable solid',
-        'rerun with --kernel occt, or pass thickness',
+        'rerun with --kernel occt-native, or pass thickness',
         [id],
         ['thickness'],
       );

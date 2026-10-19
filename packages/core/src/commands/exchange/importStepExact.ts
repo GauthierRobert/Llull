@@ -93,7 +93,7 @@ function run(doc: CadDocument, params: Params, ctx: ExecutionContext | undefined
     return refuse(
       doc,
       'KRN_NO_EXACT_KERNEL',
-      'run on the desktop backend or with --kernel occt',
+      'run on the desktop backend or with --kernel occt-native',
       'the active kernel has no exact STEP import (kernel_info shows it)',
     );
   const text = stepText(params);

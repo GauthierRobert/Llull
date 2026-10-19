@@ -13,7 +13,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   FEA_MESH_MISSING: 'run fea_mesh',
   FEA_MESH_STALE: 'run fea_mesh',
   FEA_FACETED_GEOMETRY:
-    'for stress at holes / fillets / curved faces use the OCC kernel (--kernel occt or LLULL_KERNEL=occt) so the mesh follows the exact B-rep, then re-run fea_mesh',
+    'for stress at holes / fillets / curved faces use the OCC kernel (--kernel occt-native or LLULL_KERNEL=occt-native) so the mesh follows the exact B-rep, then re-run fea_mesh',
   FEA_MESH_INVERTED: 'refine the mesh (set_mesh_controls globalSize / refinements) or change order, then run fea_mesh',
   FEA_RESULTS_MISSING: 'run fea_solve',
   FEA_RESULTS_STALE: 'run fea_mesh then fea_solve',

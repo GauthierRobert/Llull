@@ -6,7 +6,7 @@ import { useStore } from '@ui/store';
 import { postExchange, ServerCommandError } from '@ui/store/serverCommands';
 import { errorMessage } from '@lib/errorMessage';
 
-export type TopologySolveState =
+type TopologySolveState =
   | { readonly status: 'idle' }
   | { readonly status: 'running'; readonly elapsedS: number }
   | { readonly status: 'done'; readonly summary: string }

@@ -196,7 +196,7 @@ interface StepFile {
   readonly savedTo?: string;
 }
 
-const NO_STEP_BACKEND = 'STEP export needs the Python bridge (LLULL_PYTHON is off) or the exact OCC kernel (LLULL_KERNEL=occt).';
+const NO_STEP_BACKEND = 'STEP export needs the Python bridge (LLULL_PYTHON is off) or the exact OCC kernel (LLULL_KERNEL=occt-native).';
 
 /** Without the Python bridge the exact kernel writes the STEP (`export_step_exact`). */
 function exportStepExact(getDoc: () => CadDocument, name?: string, confirmation?: unknown): StepFile | { error: string } {

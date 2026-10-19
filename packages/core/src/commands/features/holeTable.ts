@@ -114,7 +114,7 @@ export const holeTable = defineCommand({
         'hole_table',
         'FTR_NEEDS_EXACT_KERNEL',
         'no kernel is available and the part has no authored holes, so its holes cannot be recognised',
-        'rerun with --kernel occt; for imported parts use import_step_exact',
+        'rerun with --kernel occt-native; for imported parts use import_step_exact',
         [id],
       );
     const part =

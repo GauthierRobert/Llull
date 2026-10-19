@@ -117,7 +117,7 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
       ? ''
       : ` WARNING: ${faceted.join(', ')} meshed from a faceted tessellation (no exact B-rep with this kernel): curved faces are polygons, ` +
         'so stresses at curved features are off by several % (either sign) and facesNear targets snap to facets; for stress results re-run ' +
-        'with the OCC kernel (--kernel occt or LLULL_KERNEL=occt).';
+        'with the OCC kernel (--kernel occt-native or LLULL_KERNEL=occt-native).';
   const counts = mesh.blocks.reduce<Record<string, number>>(
     (all, block) => ({ ...all, [block.type]: (all[block.type] ?? 0) + block.elements.length }),
     {},

@@ -48,7 +48,7 @@ export function execute(doc: CadDocument, commandName: string, params: unknown, 
     return rejection(
       doc,
       kernelUnavailable(commandName),
-      commandError('CMD_KERNEL_UNAVAILABLE', 'Retry once the geometry kernel has loaded, or run with `--kernel occt`.'),
+      commandError('CMD_KERNEL_UNAVAILABLE', 'Retry once the geometry kernel has loaded, or run with `--kernel occt-native`.'),
     );
   feedBlobs(doc, ctx.kernel);
   const recordsStep = annotations?.readOnly !== true && annotations?.metaHistory !== true && annotations?.session !== true;

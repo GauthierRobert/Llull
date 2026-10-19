@@ -35,7 +35,7 @@ export interface JobRun {
   readonly elapsedMs: number;
 }
 
-export type ProgressSink = (event: Readonly<Record<string, unknown>>) => void;
+type ProgressSink = (event: Readonly<Record<string, unknown>>) => void;
 
 export interface ComputeRunner {
   /** Absolute path of `llull-compute`, or null when it is not installed. */

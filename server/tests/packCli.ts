@@ -257,7 +257,7 @@ const writeTemp = (session: Session, name: string, content: string): string => {
 };
 
 let paramFileCounter = 0;
-/** One registry command through the CLI with its params in a `@file` (JSON); `flags` follow it (e.g. `--kernel occt`). */
+/** One registry command through the CLI with its params in a `@file` (JSON); `flags` follow it (e.g. `--kernel occt-native`). */
 export async function cliExec(session: Session, name: string, params: unknown, flags: readonly string[] = []): Promise<CliCall> {
   const file = writeTemp(session, `params-${paramFileCounter++}.json`, JSON.stringify(params));
   return cliCall(session, [name, `@${file}`, ...flags]);

@@ -84,7 +84,7 @@ export function solidRecognition(
         input === 'no_port'
           ? 'this kernel has no face-query port (no exact B-rep)'
           : 'the kernel could not build the face graph of this solid',
-        'rerun with --kernel occt; for imported parts use import_step_exact',
+        'rerun with --kernel occt-native; for imported parts use import_step_exact',
         [id],
       ),
     };

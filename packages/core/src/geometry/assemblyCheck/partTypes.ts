@@ -31,4 +31,4 @@ export interface CheckTolerances {
 }
 
 export const KERNEL_REMEDIATION =
-  'Use a kernel that implements analyze/distance (Manifold or OCC); joint realisation needs exact faces (LLULL_KERNEL=occt).';
+  'Use a kernel that implements analyze/distance (Manifold or OCC); joint realisation needs exact faces (LLULL_KERNEL=occt-native).';

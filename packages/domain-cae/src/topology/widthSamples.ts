@@ -10,7 +10,7 @@ export interface WidthSample {
 }
 
 /** Cap on the samples returned (largest members first). */
-export const MAX_WIDTH_SAMPLES = 200;
+const MAX_WIDTH_SAMPLES = 200;
 
 const FAR = 1e20;
 
@@ -48,7 +48,10 @@ function transformLine(f: Float64Array, n: number): Float64Array {
 export function distanceToVoid(inside: Uint8Array, cols: number, rows: number): Float64Array {
   const grid = Float64Array.from(inside, (flag) => (flag === 1 ? FAR : 0));
   for (let i = 0; i < cols; i += 1) {
-    const column = transformLine(Float64Array.from({ length: rows }, (_, j) => get(grid, i + cols * j)), rows);
+    const column = transformLine(
+      Float64Array.from({ length: rows }, (_, j) => get(grid, i + cols * j)),
+      rows,
+    );
     for (let j = 0; j < rows; j += 1) grid[i + cols * j] = get(column, j);
   }
   for (let j = 0; j < rows; j += 1) {

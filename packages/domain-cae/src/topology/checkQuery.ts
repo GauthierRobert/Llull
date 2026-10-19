@@ -119,7 +119,11 @@ export const checkTopology = defineCommand({
             ctx?.feaArtifacts,
           );
           if (!compliance.available)
-            items.push(entry('TOP_REBUILD_NOT_ANALYSED', 'warning', `the compliance of '${entityId}' is not compared: ${compliance.message}`, [entityId]));
+            items.push(
+              entry('TOP_REBUILD_NOT_ANALYSED', 'warning', `the compliance of '${entityId}' is not compared: ${compliance.message}`, [
+                entityId,
+              ]),
+            );
           else if (compliance.ratio > COMPLIANCE_RATIO_TARGET.value)
             items.push(
               entry(
