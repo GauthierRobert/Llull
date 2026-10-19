@@ -50,8 +50,8 @@ const ISO_COARSE_PITCH_MM: ReadonlyMap<number, number> = new Map([
   [18, 2.5],
   [20, 2.5],
 ]);
-export const ISO_METRIC_MIN_MM = 3;
-export const ISO_METRIC_MAX_MM = 20;
+const ISO_METRIC_MIN_MM = 3;
+const ISO_METRIC_MAX_MM = 20;
 /** H of the ISO 68-1 fundamental triangle per unit pitch: sqrt(3) / 2. */
 const H_PER_PITCH = Math.sqrt(3) / 2;
 
