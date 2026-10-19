@@ -6,6 +6,8 @@
 //! The mat-vec shader mirrors [`crate::operator::Operator::apply`] term for term (same node-centric gather, same order), so
 //! GPU and CPU differ only by f32 rounding (test: ~1e-6 relative).
 
+use crate::gpu_multigrid::GpuMultigrid;
+use crate::multigrid::Multigrid;
 use crate::operator::Operator;
 use crate::pcg::inverse_diagonal;
 use llull_gpu::buffers::{dispatch_dims, f32_bytes, read_f32, storage_f32, u32_bytes, uniform, zeroed_f32};
@@ -15,7 +17,7 @@ use llull_gpu::reduce::dot;
 use llull_gpu::wgpu;
 
 const MATVEC: &str = r"
-struct Grid { nnx: u32, nny: u32, nnz: u32, nx: u32, ny: u32, nz: u32, dim: u32, nodes: u32, groups_x: u32, p0: u32, p1: u32, p2: u32 };
+struct Grid { nnx: u32, nny: u32, nnz: u32, nx: u32, ny: u32, nz: u32, dim: u32, nodes: u32, groups_x: u32, stride: u32, p1: u32, p2: u32 };
 @group(0) @binding(0) var<uniform> g: Grid;
 @group(0) @binding(1) var<storage, read> ke: array<f32>;
 @group(0) @binding(2) var<storage, read> scale: array<f32>;
@@ -42,15 +44,17 @@ fn matvec(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_index
     let ej = j - OY[a];
     let ek = k - OZ[a];
     if (ei >= g.nx || ej >= g.ny || ek >= g.nz) { continue; }
-    let s = scale[ei + g.nx * (ej + g.ny * ek)];
+    let e = ei + g.nx * (ej + g.ny * ek);
+    let s = scale[e];
     if (s == 0.0) { continue; }
+    let base = e * g.stride;
     for (var c = 0u; c < g.dim; c = c + 1u) {
       let row = (a * g.dim + c) * nd;
       var sum = 0.0;
       for (var b = 0u; b < npe; b = b + 1u) {
         let nb = (ei + OX[b]) + g.nnx * ((ej + OY[b]) + g.nny * (ek + OZ[b]));
         for (var q = 0u; q < g.dim; q = q + 1u) {
-          sum = sum + ke[row + b * g.dim + q] * u[nb * g.dim + q];
+          sum = sum + ke[base + row + b * g.dim + q] * u[nb * g.dim + q];
         }
       }
       acc[c] = acc[c] + s * sum;
@@ -112,8 +116,9 @@ pub struct GpuSolve {
     pub relative_residual: f64,
 }
 
-/// The GPU copy of an [`Operator`] (f32) with its kernels.
+/// The GPU copy of an [`Operator`] (f32) with its kernels, and optionally a multigrid V-cycle as the PCG preconditioner.
 pub struct GpuOperator {
+    multigrid: Option<GpuMultigrid>,
     gpu: Gpu,
     dofs: usize,
     nodes: u32,
@@ -163,7 +168,20 @@ impl GpuOperator {
             entries: &[uniform_entry(0), storage_entry(1, true), storage_entry(2, true), storage_entry(3, false)],
         });
         let vector = ["axpy", "xpay", "mul"].map(|entry| compute_pipeline(&gpu, VECTOR, entry, &vector_layout));
-        GpuOperator { gpu, dofs: g.dofs(), nodes, grid_params, ke, scale, mask, matvec_layout, matvec, vector_layout, vector }
+        GpuOperator {
+            multigrid: None,
+            gpu,
+            dofs: g.dofs(),
+            nodes,
+            grid_params,
+            ke,
+            scale,
+            mask,
+            matvec_layout,
+            matvec,
+            vector_layout,
+            vector,
+        }
     }
 
     /// The adapter description (`name (backend, type)`).
@@ -210,14 +228,39 @@ impl GpuOperator {
 
     /// Records `y = K u` (masked).
     pub fn encode_matvec(&self, encoder: &mut wgpu::CommandEncoder, u: &wgpu::Buffer, y: &wgpu::Buffer) {
+        self.encode_matvec_on([&self.grid_params, &self.ke, &self.scale, &self.mask], self.nodes, encoder, u, y);
+    }
+
+    /// Records `y = K u` of a multigrid level from its [`GpuOperator::level_matvec_buffers`].
+    pub(crate) fn encode_matvec_with(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        buffers: &[wgpu::Buffer; 4],
+        nodes: u32,
+        u: &wgpu::Buffer,
+        y: &wgpu::Buffer,
+    ) {
+        let [params, matrices, scale, mask] = buffers;
+        self.encode_matvec_on([params, matrices, scale, mask], nodes, encoder, u, y);
+    }
+
+    fn encode_matvec_on(
+        &self,
+        buffers: [&wgpu::Buffer; 4],
+        nodes: u32,
+        encoder: &mut wgpu::CommandEncoder,
+        u: &wgpu::Buffer,
+        y: &wgpu::Buffer,
+    ) {
+        let [params, matrices, scale, mask] = buffers;
         let bind = self.gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("voxfe matvec"),
             layout: &self.matvec_layout,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: self.grid_params.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 1, resource: self.ke.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 2, resource: self.scale.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 3, resource: self.mask.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 0, resource: params.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 1, resource: matrices.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 2, resource: scale.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 3, resource: mask.as_entire_binding() },
                 wgpu::BindGroupEntry { binding: 4, resource: u.as_entire_binding() },
                 wgpu::BindGroupEntry { binding: 5, resource: y.as_entire_binding() },
             ],
@@ -225,8 +268,53 @@ impl GpuOperator {
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("voxfe matvec"), timestamp_writes: None });
         pass.set_pipeline(&self.matvec);
         pass.set_bind_group(0, &bind, &[]);
-        let (x, y) = dispatch_dims(self.nodes.div_ceil(64));
+        let (x, y) = dispatch_dims(nodes.div_ceil(64));
         pass.dispatch_workgroups(x, y, 1);
+    }
+
+    /// Mat-vec buffers of a multigrid level with one `stride`-long matrix per element (`[params, matrices, scale, mask]`;
+    /// `scale` is 1 for an element with stiffness, 0 otherwise).
+    pub(crate) fn level_matvec_buffers(
+        &self,
+        grid: &crate::grid::Grid,
+        stride: usize,
+        matrices: &[f32],
+        scale: &[f32],
+        free: &[bool],
+    ) -> [wgpu::Buffer; 4] {
+        let [nnx, nny, nnz] = grid.node_dims();
+        let nodes = grid.nodes() as u32;
+        let (groups_x, _) = dispatch_dims(nodes.div_ceil(64));
+        let mut words: Vec<u32> = [nnx, nny, nnz, grid.nx, grid.ny, grid.nz, grid.dim].map(|v| v as u32).to_vec();
+        words.extend([nodes, groups_x, stride as u32, 0, 0]);
+        let mask: Vec<f32> = free.iter().map(|&f| if f { 1.0 } else { 0.0 }).collect();
+        [
+            uniform(&self.gpu, "mg level grid", &u32_bytes(&words)),
+            storage_f32(&self.gpu, "mg level matrices", matrices),
+            storage_f32(&self.gpu, "mg level scale", scale),
+            storage_f32(&self.gpu, "mg level mask", &mask),
+        ]
+    }
+
+    pub(crate) fn gpu(&self) -> &Gpu {
+        &self.gpu
+    }
+
+    /// The free-DOF mask of the fine level (1 / 0).
+    pub(crate) fn mask(&self) -> &wgpu::Buffer {
+        &self.mask
+    }
+
+    /// Uses a V-cycle of `mg` (whose fine level is this operator, with the same scales) as the preconditioner of
+    /// [`GpuOperator::pcg_f32`] from now on; call again after the scales change (the GPU buffers are rewritten in place).
+    pub fn set_multigrid(&mut self, mg: &Multigrid<f32>) {
+        match self.multigrid.take() {
+            Some(existing) => {
+                existing.upload(self, mg);
+                self.multigrid = Some(existing);
+            }
+            None => self.multigrid = Some(GpuMultigrid::new(self, mg)),
+        }
     }
 
     /// Records one element-wise kernel; `scalar` comes from [`GpuOperator::scalar`]. `y` must differ from `a` and `b`.
@@ -295,7 +383,22 @@ impl GpuOperator {
         self.read(&gy)
     }
 
-    /// Jacobi PCG in f32 on the GPU: stops at ‖r‖/‖b‖ ≤ `tolerance` or after `max_iterations` (returning the residual
+    /// `z = M⁻¹ r`: one multigrid V-cycle when a hierarchy is set, else Jacobi (`dinv ⊙ r`).
+    fn encode_precondition(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        unit: &wgpu::Buffer,
+        dinv: &wgpu::Buffer,
+        r: &wgpu::Buffer,
+        z: &wgpu::Buffer,
+    ) {
+        match &self.multigrid {
+            Some(multigrid) => multigrid.encode(self, encoder, r, z),
+            None => self.encode_vector(encoder, VectorOp::Mul, unit, dinv, r, z),
+        }
+    }
+
+    /// PCG in f32 on the GPU (V-cycle preconditioner after [`GpuOperator::set_multigrid`], else Jacobi): stops at ‖r‖/‖b‖ ≤ `tolerance` or after `max_iterations` (returning the residual
     /// reached). `inverse_diagonal` is 1/diag(K) on the free DOFs. Errors on breakdown or non-finite values.
     pub fn pcg_f32(&self, inverse_diagonal: &[f64], b: &[f64], tolerance: f64, max_iterations: usize) -> Result<GpuSolve, String> {
         let b_norm = dot(b, b).sqrt();
@@ -307,7 +410,7 @@ impl GpuOperator {
         let (pq_dot, rr_dot, rz_dot) = (self.dot_kernel(), self.dot_kernel(), self.dot_kernel());
         let (alpha, minus_alpha, beta, unit) = (self.scalar(0.0), self.scalar(0.0), self.scalar(0.0), self.scalar(1.0));
         let mut encoder = self.encoder();
-        self.encode_vector(&mut encoder, VectorOp::Mul, &unit, &dinv, &r, &z);
+        self.encode_precondition(&mut encoder, &unit, &dinv, &r, &z);
         self.encode_vector(&mut encoder, VectorOp::Xpay, &beta, &z, &z, &p);
         rz_dot.encode(&self.gpu, &mut encoder, &r, &z);
         self.submit(encoder);
@@ -337,7 +440,7 @@ impl GpuOperator {
             self.encode_vector(&mut encoder, VectorOp::Axpy, &alpha, &p, &p, &x);
             self.encode_vector(&mut encoder, VectorOp::Axpy, &minus_alpha, &q, &q, &r);
             rr_dot.encode(&self.gpu, &mut encoder, &r, &r);
-            self.encode_vector(&mut encoder, VectorOp::Mul, &unit, &dinv, &r, &z);
+            self.encode_precondition(&mut encoder, &unit, &dinv, &r, &z);
             rz_dot.encode(&self.gpu, &mut encoder, &r, &z);
             self.submit(encoder);
             residual = rr_dot.resolve(&self.gpu)?.max(0.0).sqrt() / b_norm;

@@ -4,7 +4,7 @@
 
 use crate::operator::Operator;
 use crate::MIN_LEN;
-use llull_gpu::reduce::dot;
+use llull_gpu::reduce::{dot, CHUNK};
 use rayon::prelude::*;
 use std::fmt;
 
@@ -68,8 +68,25 @@ impl fmt::Display for SolveError {
     }
 }
 
-fn axpy(alpha: f64, x: &[f64], y: &mut [f64]) {
-    y.par_iter_mut().with_min_len(MIN_LEN).zip(x).for_each(|(y, x)| *y += alpha * x);
+/// `x += α p`, `r −= α q` and `r · r` in one pass: the same element operations, and the same fixed-order chunked sum as
+/// [`dot`], as the separate steps.
+fn update(alpha: f64, p: &[f64], q: &[f64], x: &mut [f64], r: &mut [f64]) -> f64 {
+    let partials: Vec<f64> = x
+        .par_chunks_mut(CHUNK)
+        .zip(r.par_chunks_mut(CHUNK))
+        .zip(p.par_chunks(CHUNK))
+        .zip(q.par_chunks(CHUNK))
+        .map(|(((x, r), p), q)| {
+            let mut sum = 0.0;
+            for (((x, r), p), q) in x.iter_mut().zip(r.iter_mut()).zip(p).zip(q) {
+                *x += alpha * p;
+                *r += -alpha * q;
+                sum += *r * *r;
+            }
+            sum
+        })
+        .collect();
+    partials.iter().fold(0.0, |acc, v| acc + v)
 }
 
 /// Solves `K x = b` on the free DOFs, starting from `x` (masked first). `b` is masked internally.
@@ -111,9 +128,7 @@ pub fn pcg(
             return Err(SolveError::Breakdown { iteration, relative_residual: residual });
         }
         let alpha = rz / pq;
-        axpy(alpha, &p, x);
-        axpy(-alpha, &q, &mut r);
-        residual = dot(&r, &r).sqrt() / b_norm;
+        residual = update(alpha, &p, &q, x, &mut r).sqrt() / b_norm;
         if !residual.is_finite() {
             return Err(SolveError::NonFinite { iteration });
         }

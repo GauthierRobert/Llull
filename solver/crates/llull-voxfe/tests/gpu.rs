@@ -7,6 +7,7 @@ use llull_gpu::device::acquire;
 use llull_gpu::reduce::dot;
 use llull_voxfe::gpu::{refine, GpuOperator, VectorOp};
 use llull_voxfe::ke::element_matrix;
+use llull_voxfe::multigrid::{Multigrid, MultigridSettings};
 use llull_voxfe::pcg::inverse_diagonal;
 use llull_voxfe::{solve, Grid, Operator, SolverKind};
 
@@ -104,4 +105,42 @@ fn gpu_pcg_and_f64_refinement_match_the_cpu_solve() {
     let error = relative(&refined, &reference);
     eprintln!("refined: {stats:?}, error {error:.2e}");
     assert!(stats.relative_residual <= 1e-10 && error < 1e-7, "refined error {error:e}");
+}
+
+#[test]
+fn gpu_multigrid_v_cycle_preconditions_the_f32_pcg() {
+    let Some(gpu) = gpu_or_skip() else { return };
+    let mut gpu = Some(gpu);
+    for grid in [Grid::new_2d(40, 24), Grid::new_3d(16, 8, 8)] {
+        let op = operator(grid);
+        let mut b = vec![0.0; grid.dofs()];
+        for k in 0..grid.node_dims()[2] {
+            b[grid.node(grid.nx, 0, k) * grid.dim + 1] = -1.0;
+        }
+        let mut reference = vec![0.0; b.len()];
+        solve(&op, SolverKind::Multigrid, &b, &mut reference, 1e-10, 10_000).unwrap();
+        let mut device = GpuOperator::new(gpu.take().unwrap_or_else(|| acquire("llull-voxfe test").unwrap()), &op);
+        let jacobi = device.pcg_f32(&inverse_diagonal(&op), &b, 1e-4, 20_000).unwrap();
+        let hierarchy = Multigrid::<f32>::new(&op, MultigridSettings::default());
+        device.set_multigrid(&hierarchy);
+        let multigrid = device.pcg_f32(&inverse_diagonal(&op), &b, 1e-4, 20_000).unwrap();
+        eprintln!("{}D f32 GPU PCG to 1e-4: Jacobi {} iterations, V-cycle {}", grid.dim, jacobi.iterations, multigrid.iterations);
+        assert!(multigrid.relative_residual <= 1e-4 && multigrid.iterations * 4 < jacobi.iterations);
+        let mut refined = vec![0.0; b.len()];
+        let stats = refine(&device, &op, &b, &mut refined, 1e-10, 1e-4, 5_000).unwrap();
+        let error = relative(&refined, &reference);
+        eprintln!("V-cycle refinement: {stats:?}, error {error:.2e}");
+        assert!(stats.relative_residual <= 1e-10 && error < 1e-7, "refined error {error:e}");
+        // new scales: the hierarchy is updated and uploaded in place and still preconditions
+        let doubled: Vec<f64> = op.scale().iter().map(|s| s * 2.0).collect();
+        let rescaled = Operator::new(grid, op.ke().to_vec(), doubled, op.fixed().to_vec());
+        let mut updated = hierarchy;
+        updated.update(&rescaled);
+        device.set_scale(rescaled.scale());
+        device.set_multigrid(&updated);
+        let mut halved = vec![0.0; b.len()];
+        refine(&device, &rescaled, &b, &mut halved, 1e-10, 1e-4, 5_000).unwrap();
+        let doubled_back: Vec<f64> = halved.iter().map(|u| 2.0 * u).collect();
+        assert!(relative(&doubled_back, &reference) < 1e-7);
+    }
 }

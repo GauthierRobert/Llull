@@ -12,17 +12,24 @@
 //! and is the exploration path (`deterministic: false`); llull-topopt wraps it in f64 iterative refinement on the CPU so its
 //! answers still meet the 1e-10 residual.
 
+pub mod galerkin;
 pub mod grid;
 pub mod ke;
+pub mod level;
 pub mod multigrid;
 pub mod operator;
 pub mod pcg;
+pub mod real;
+pub mod scatter;
+pub mod transfer;
 
 #[cfg(feature = "gpu")]
 pub mod gpu;
+#[cfg(feature = "gpu")]
+pub mod gpu_multigrid;
 
 /// Smallest slice a rayon task gets in the element-wise loops (smaller grids run inline on the calling worker).
-pub const MIN_LEN: usize = 4096;
+pub const MIN_LEN: usize = 1024;
 
 pub use grid::Grid;
 pub use operator::Operator;
@@ -47,7 +54,7 @@ pub fn solve(
     match kind {
         SolverKind::Jacobi => pcg::pcg(op, &pcg::Jacobi::new(op), b, x, tolerance, max_iterations),
         SolverKind::Multigrid => {
-            let mg = multigrid::Multigrid::new(op, multigrid::MultigridSettings::default());
+            let mg = multigrid::Multigrid::<f64>::new(op, multigrid::MultigridSettings::default());
             pcg::pcg(op, &mg, b, x, tolerance, max_iterations)
         }
     }

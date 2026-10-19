@@ -39,7 +39,10 @@ fn run(dir: &Path, job: &str) -> (Value, Vec<f32>, Vec<u8>) {
     std::fs::write(dir.join("job.json"), job).unwrap();
     let mut events = Vec::new();
     let outputs = llull_topopt::job::run(dir, &mut events).unwrap_or_else(|e| panic!("{}: {}", e.code, e.message));
-    assert_eq!(outputs.iter().map(|o| o.path.as_str()).collect::<Vec<_>>(), ["field.bin", "design.f64", "result.json"]);
+    assert_eq!(
+        outputs.iter().map(|o| o.path.as_str()).collect::<Vec<_>>(),
+        ["field.bin", "design.f64", "displacements.f64", "result.json"]
+    );
     let result: Value = serde_json::from_slice(&std::fs::read(dir.join("result.json")).unwrap()).unwrap();
     let field: Vec<f32> =
         std::fs::read(dir.join("field.bin")).unwrap().chunks_exact(4).map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect();
@@ -129,7 +132,7 @@ fn two_runs_and_thread_counts_give_identical_bytes() {
         let dir = folder(name);
         rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap().install(|| run(&dir, &job));
         let read = |f: &str| std::fs::read(dir.join(f)).unwrap();
-        let out = (read("field.bin"), read("design.f64"), read("result.json"));
+        let out = (read("field.bin"), read("design.f64"), read("displacements.f64"), read("result.json"));
         let _ = std::fs::remove_dir_all(dir);
         out
     };
@@ -142,16 +145,23 @@ fn two_runs_and_thread_counts_give_identical_bytes() {
 #[test]
 fn a_resumed_run_continues_bit_for_bit() {
     let full = folder("resume-full");
-    run(&full, &mbb_job(30, 10, "density", r#","maxIterations":30"#));
+    let (complete, _, _) = run(&full, &mbb_job(30, 10, "density", r#","maxIterations":30"#));
     let part = folder("resume-part");
     run(&part, &mbb_job(30, 10, "density", r#","maxIterations":12"#));
     std::fs::copy(part.join("design.f64"), part.join("start.f64")).unwrap();
-    let resumed =
-        mbb_job(30, 10, "density", r#","maxIterations":18"#).replacen(r#""version":1,"#, r#""version":1,"startDesign":"start.f64","#, 1);
-    let (result, _, _) = run(&part, &resumed);
+    std::fs::copy(part.join("displacements.f64"), part.join("start_u.f64")).unwrap();
+    let resumed = |files: &str| {
+        mbb_job(30, 10, "density", r#","maxIterations":18"#).replacen(r#""version":1,"#, &format!(r#""version":1,{files}"#), 1)
+    };
+    let (result, _, _) = run(&part, &resumed(r#""startDesign":"start.f64","startDisplacements":"start_u.f64","#));
     assert_eq!(result["iterations"], 18);
-    assert_eq!(std::fs::read(full.join("design.f64")).unwrap(), std::fs::read(part.join("design.f64")).unwrap());
-    assert_eq!(std::fs::read(full.join("field.bin")).unwrap(), std::fs::read(part.join("field.bin")).unwrap());
+    for file in ["design.f64", "field.bin", "displacements.f64"] {
+        assert_eq!(std::fs::read(full.join(file)).unwrap(), std::fs::read(part.join(file)).unwrap(), "{file}");
+    }
+    // without the warm start the solves start from zero: the same answer to the PCG tolerance, not bit for bit
+    let (cold, _, _) = run(&part, &resumed(r#""startDesign":"start.f64","#));
+    let (a, b) = (complete["compliance"].as_f64().unwrap(), cold["compliance"].as_f64().unwrap());
+    assert!((a - b).abs() / a < 1e-6, "{a} vs {b}");
     let _ = std::fs::remove_dir_all(full);
     let _ = std::fs::remove_dir_all(part);
 }

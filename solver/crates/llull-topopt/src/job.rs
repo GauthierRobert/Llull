@@ -22,6 +22,7 @@
 //!     "device": "cpu", "solver": "multigrid", "pcgTolerance": 1e-10, "pcgMaxIterations": 10000, "ocTolerance": 1e-3
 //!   },
 //!   "startDesign": "start.f64",
+//!   "startDisplacements": "start_u.f64",
 //!   "dofCap": 3000000
 //! }
 //! ```
@@ -44,7 +45,10 @@
 //!   `sensitivity | density`, `filter.radius` = rmin **in voxels** (> 0), `device` `cpu | gpu | auto`, `solver`
 //!   `multigrid | jacobi` (PCG preconditioner), `pcgTolerance` (relative residual), `pcgMaxIterations`, `ocTolerance`.
 //! - `startDesign` (optional): design variables x to resume from, little-endian f64 per voxel (a previous run's
-//!   `design.f64`); xPhys is recomputed from it, so a resumed run continues the interrupted one bit for bit.
+//!   `design.f64`); xPhys is recomputed from it.
+//! - `startDisplacements` (optional): the warm start of the first solves, little-endian f64, load cases × DOFs in
+//!   `loadCases` order (a previous run's `displacements.f64`; zero when absent). With both start files a resumed run
+//!   continues the interrupted one bit for bit; with `startDesign` alone it continues it to the PCG tolerance.
 //! - `dofCap` (optional): overrides the per-device DOF cap ([`CPU_DOF_CAP`], [`GPU_DOF_CAP`]); above it the job fails with
 //!   `TOP_GRID_TOO_LARGE` before allocating. The DOF count is `dim · (nx+1)(ny+1)(nz+1)` (3D) / `2 (nx+1)(ny+1)` (2D).
 //!
@@ -59,17 +63,18 @@
 //!
 //! - `field.bin`: xPhys as little-endian f32, one per voxel in voxel order (inactive voxels 0).
 //! - `design.f64`: the design variables x as little-endian f64 (pass it back as `startDesign` to resume).
+//! - `displacements.f64`: per load case (in `loadCases` order) the displacements of the last iteration's solve, which every
+//!   solve starts from (warm start), little-endian f64, load cases × DOFs (pass it back as `startDisplacements`).
 //! - `result.json`: [`ResultFile`] (camelCase): `version`, `status` (`converged | max_iterations`), `iterations`,
 //!   `compliance` (weighted, of the final xPhys), `lastIterationCompliance` (the last history row, top88's printed value),
 //!   `perLoadCase` (name → unweighted compliance of the final xPhys), `volumeFraction` (Σ xPhys / active voxels), `grey`
 //!   (mean 4x(1−x) over active voxels), `history` (every iteration: `it`, `compliance`, `volume`, `change`), `device`
 //!   (`cpu | gpu`, what solved), `deterministic` (true for the CPU twin), `precision` (`f64` | `f32-gpu+f64-refinement`),
-//!   `adapter` (GPU only), `solver`, `grid`, `settings` (resolved, with defaults), `field`, `design`, `fieldSha256`,
-//!   `warnings`. For the CPU twin `field.bin`, `design.f64` and `result.json` are byte-identical across runs and thread
-//!   counts.
+//!   `adapter` (GPU only), `solver`, `grid`, `settings` (resolved, with defaults), `field`, `design`, `displacements`,
+//!   `fieldSha256`, `warnings`. For the CPU twin every output is byte-identical across runs and thread counts.
 
 use crate::filter::FilterKind;
-use crate::simp::{optimise, Device, Engine, HistoryRow, LoadCase, Problem, Settings, TopError, Voxel};
+use crate::simp::{optimise, Device, Engine, HistoryRow, LoadCase, Problem, Settings, Start, TopError, Voxel};
 use llull_protocol::{emit, sha256_hex, Event, Output};
 use llull_voxfe::{Grid, SolverKind};
 use serde::{Deserialize, Serialize};
@@ -224,6 +229,7 @@ pub struct JobFile {
     #[serde(default)]
     pub settings: SettingsSpec,
     pub start_design: Option<String>,
+    pub start_displacements: Option<String>,
     pub dof_cap: Option<usize>,
 }
 
@@ -308,6 +314,7 @@ pub struct ResultFile {
     pub settings: SettingsSpec,
     pub field: FileInfo,
     pub design: FileInfo,
+    pub displacements: FileInfo,
     pub field_sha256: String,
     pub warnings: Vec<WarningEntry>,
 }
@@ -386,8 +393,15 @@ pub fn grid_of(job: &JobFile) -> Result<Grid, TopError> {
     }
 }
 
-/// Builds the problem, settings and optional start design from a parsed job.
-pub fn problem_of(folder: &Path, job: &JobFile) -> Result<(Problem, Settings, Option<Vec<f64>>), TopError> {
+/// The optional start files of a job: design variables and warm-start displacements.
+#[derive(Debug, Clone, Default)]
+pub struct StartFiles {
+    pub design: Option<Vec<f64>>,
+    pub displacements: Option<Vec<f64>>,
+}
+
+/// Builds the problem, settings and optional start files from a parsed job.
+pub fn problem_of(folder: &Path, job: &JobFile) -> Result<(Problem, Settings, StartFiles), TopError> {
     let grid = grid_of(job)?;
     let (n, dofs, dim) = (grid.elements(), grid.dofs(), grid.dim);
     let active = read_mask(folder, &job.active, n)?.unwrap_or_else(|| vec![true; n]);
@@ -469,11 +483,15 @@ pub fn problem_of(folder: &Path, job: &JobFile) -> Result<(Problem, Settings, Op
         voxel: job.grid.voxel,
         volume_fraction: job.volume_fraction,
     };
-    let start = match &job.start_design {
+    let design = match &job.start_design {
         Some(name) => Some(read_f64s(folder, name, n)?),
         None => None,
     };
-    Ok((problem, settings, start))
+    let displacements = match &job.start_displacements {
+        Some(name) => Some(read_f64s(folder, name, dofs * problem.load_cases.len())?),
+        None => None,
+    };
+    Ok((problem, settings, StartFiles { design, displacements }))
 }
 
 fn write(folder: &Path, name: &str, bytes: &[u8]) -> Result<Output, TopError> {
@@ -506,7 +524,8 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, TopError>
         let worker = scope.spawn(|| {
             let sender = sender;
             rayon::scope(|_| {
-                optimise(&problem, &settings, start.as_deref(), &mut |row| {
+                let start = Start { design: start.design.as_deref(), displacements: start.displacements.as_deref() };
+                optimise(&problem, &settings, start, &mut |row| {
                     let _ = sender.send(*row);
                 })
             })
@@ -532,6 +551,7 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, TopError>
     }
     let field: Vec<u8> = outcome.x_phys.iter().flat_map(|&v| (v as f32).to_le_bytes()).collect();
     let design: Vec<u8> = outcome.x.iter().flat_map(|v| v.to_le_bytes()).collect();
+    let displacements: Vec<u8> = outcome.displacements.iter().flatten().flat_map(|v| v.to_le_bytes()).collect();
     let n = problem.grid.elements();
     let count = |kind: Voxel| problem.voxels.iter().filter(|&&v| v == kind).count();
     let result = ResultFile {
@@ -568,10 +588,16 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, TopError>
         settings: job.settings,
         field: FileInfo { path: "field.bin", format: "f32le", length: n },
         design: FileInfo { path: "design.f64", format: "f64le", length: n },
+        displacements: FileInfo { path: "displacements.f64", format: "f64le", length: displacements.len() / 8 },
         field_sha256: sha256_hex(&field),
         warnings,
     };
     let mut json = serde_json::to_vec_pretty(&result).map_err(|error| input(format!("result.json: {error}")))?;
     json.push(b'\n');
-    Ok(vec![write(folder, "field.bin", &field)?, write(folder, "design.f64", &design)?, write(folder, "result.json", &json)?])
+    Ok(vec![
+        write(folder, "field.bin", &field)?,
+        write(folder, "design.f64", &design)?,
+        write(folder, "displacements.f64", &displacements)?,
+        write(folder, "result.json", &json)?,
+    ])
 }

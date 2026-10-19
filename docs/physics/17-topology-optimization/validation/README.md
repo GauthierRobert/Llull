@@ -51,7 +51,7 @@ have no fixed value and are not in `expected_results.json` until the generator e
 | VC-TOP-04 | FR-TOP-03 | 30×10 MBB, uniform x = 1 and x = 0.5 | c(1) = 123.069351174; c(0.5)/c(1) = 7.99999994398 = 1/(Emin + 0.5³(1 − Emin)) | 1e-9 / 1e-8 rel | (b) exact solve | A | unit |
 | VC-TOP-10 | FR-TOP-02, 03, 08, 09 | `plans/top_mbb_60x20.plan.json`, sensitivity filter | compliance at last iteration 203.192457639 (topoptlab 203.19245763914194); final-design compliance 203.182593258; volume 0.499970090278 (topoptlab 0.49997009027820527); iterations 94; grey 0.174175545817 | 1e-6 rel; 1e-6; 1e-3 abs; ±2 (native job) / exact (TS reference); 1e-4 abs | (b) + S3 run | A (b, d), B (a, c, e) | unit (TS reference) + integration (native job) + quality |
 | VC-TOP-11 | same | `plans/top_mbb_60x20_density.plan.json`, density filter | compliance at last iteration 218.803221064 (topoptlab 218.80322107077228); final-design 218.815227557; volume 0.499980636009; iterations 127; grey 0.268323476248 | as VC-TOP-10 | (b) + S3 run | A (b), B (rest) | same |
-| VC-TOP-12 | FR-TOP-02; budgets | 300×100 MBB | first run 2026-10-19: 300 iterations without reaching change ≤ 0.01, compliance 189.4953 (TECHNICAL_SPEC §13.5); budget re-measure **TBD** | — | TBD | TBD | integration |
+| VC-TOP-12 | FR-TOP-02; budgets | 300×100 MBB, top88 settings (sensitivity filter, rmin 1.5, `maxIterations` 300) | stops at the 300-iteration cap (change 0.11): expected, the same loop converges only at iteration 373 (cross-check below); last-iteration compliance 189.512724, final 189.495340; native job 52 s on 4 cores (2026-10-19, after the RS-2 performance pass; 280 s before it, same machine and load; TECHNICAL_SPEC §13.5): budget ≤ 60 s met | iteration-300 compliance vs the scipy port: 1e-6 rel (measured 6e-11) | (b) scipy port, run once | B | integration |
 | VC-TOP-20 | FR-TOP-07 | `move_entities` on the derived mesh | `TOP_DERIVED_READ_ONLY`, doc unchanged | exact | — | A | unit |
 | VC-TOP-21 | FR-TOP-14 | solved study, then `set_parameter` changing the domain | `TOP_RESULT_STALE` from `check_topology` and `suggest_rebuild` | exact | — | A | golden |
 | VC-TOP-22 | FR-TOP-10 | `suggest_rebuild` on VC-TOP-10 | closed loops; enclosed fraction within 0.02 of the thresholded fraction | 0.02 | (b) | A | unit |
@@ -61,7 +61,7 @@ have no fixed value and are not in `expected_results.json` until the generator e
 | VC-TOP-26 | FR-TOP-15; TR-TOP-12 | 09 release including the derived mesh | `TOP_RESULT_NOT_RELEASABLE` | exact | — | A | unit |
 | VC-TOP-27 | FR-TOP-18 | two identical solves | identical fieldHash and report | exact | — | A | integration |
 | VC-TOP-33 | TR-TOP-03, 04, 06 | native vs TS reference: `llull-compute topopt` (CPU twin, and GPU where an adapter exists) against `@lib/topology.ts` on the 2D benchmark grids (MBB 30×10, 60×20, both filters) | same final compliance, volume and iteration count as the TS reference | CPU twin: compliance 1e-6 rel and iterations ±2 (as VC-TOP-10, derived from the PCG residual tolerance 1e-10); GPU: TBD — measure | (b) comparison | A once run (planned) | native + integration |
-| VC-TOP-34 | TR-TOP-04; budgets | 3D cantilever voxel grids of increasing size, 100 iterations, CPU twin and GPU | largest grid per device and wall time; target ≥ 1e7 DOF on a desktop GPU | CPU twin measured 2026-10-19 (TECHNICAL_SPEC §13.5, cap 1.5e6 DOF); desktop GPU **TBD — measure** | TBD | TBD | integration |
+| VC-TOP-34 | TR-TOP-04; budgets | 3D cantilever voxel grids of increasing size, 100 iterations, CPU twin and GPU | largest grid per device and wall time; target ≥ 1e7 DOF on a desktop GPU | CPU twin re-measured 2026-10-19 after the RS-2 performance pass: 74×37×37 (101 306 voxels, 324 900 DOF), 100 iterations in 157 s (budget "100k voxels ≤ 10 min" met); scaling table and cap (1.5e6 DOF) in TECHNICAL_SPEC §13.5; GPU V-cycle checked on lavapipe only; desktop GPU **TBD — measure** | — | (b) measurement | B (CPU twin) / TBD (GPU) | integration |
 
 Note on the reference problem: the MBB setup is the top88 default call `top88(60, 20, 0.5, 3, 1.5, ft)` as transcribed
 by topoptlab (`mbb_2d`: unit load at DOF 2, ux = 0 on the left edge, uy = 0 at the last DOF). The paper's own printed
@@ -74,6 +74,13 @@ SciPy 1.18.1 wheel; optional imports that MBB does not use (matplotlib, mmapy, c
 sympy) were stubbed; called `main(nelx=60, nely=20, volfrac=0.5, rmin=1.5, ft=0|1, optimizer="oc", bcs=mbb_2d)` and
 read the returned objective. topoptlab's `ft=0` is the sensitivity filter and `ft=1` the density filter (its own
 numbering differs from top88's 1/2).
+
+VC-TOP-12 (2026-10-19): the stdlib generator is too slow for 300×100 (its banded Cholesky costs about 2.5 GFLOP per solve in
+pure Python), so the same top88 loop was ported to numpy + scipy (`splu` sparse direct solve; element / DOF numbering, KE,
+filter, OC bisection and stopping rule exactly as `generate_top_reference.py`, which it reproduces on 60×20: 94 iterations,
+203.1924576393) in a scratch venv (NumPy 2.5.3, SciPy 1.18.1) and run once to 2000 iterations: compliance 189.512724 at
+iteration 300 (change 0.1106), first `change ≤ 0.01` at iteration 373 (change 0.0082, compliance 189.456260). The design
+oscillates (change 0.03–0.2 between iterations 100 and 350), so the 300-iteration cap of the native job is expected to be hit.
 
 ## Requirement coverage supplement
 
