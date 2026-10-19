@@ -1,5 +1,6 @@
 /** Domain model — the single source of truth for a CAD document; changed only by commands. */
 
+import { isCurve3D } from './curveKinds';
 import type { PropertyModel } from './propertyModel';
 import type { ConstitutiveSet, MaterialModel } from './materialModel';
 import type { Vec2, Vec3 } from './vectors';
@@ -437,8 +438,9 @@ export function is2D(e: Entity): e is Extract<Entity, { kind: Shape2DKind }> {
   return SHAPE2D_KIND_SET.has(e.kind);
 }
 
+/** True for solids, meshes, instances and images; false for planar shapes and 3D curves (no volume, no kernel leaf). */
 export function is3D(e: Entity): boolean {
-  return !SHAPE2D_KIND_SET.has(e.kind);
+  return !SHAPE2D_KIND_SET.has(e.kind) && !isCurve3D(e);
 }
 
 export interface Layer {
