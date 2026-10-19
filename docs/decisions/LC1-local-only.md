@@ -62,6 +62,13 @@ Binding text: `CLAUDE.md` § PRODUCT DIRECTIVE. Related: RS1 (native compute), K
    plant feature specs still mention MCP as written at the time.
 5. **Retire the WASM kernels** once the native kernel has been the desktop default for a release: `packages/kernel-occt` (opencascade.js),
    then decide on Manifold (still useful as an in-process mesh kernel for tests and for commands that need no exact B-rep).
+   Decision: keep `packages/kernel-manifold` (in-process mesh kernel for tests, the renderer and the fallback when `llull-kernel` is missing).
+   - [ ] Blocked 2026-10-19, not started: the native kernel still answers a `pocket` with `floorFillet > 0` through the WASM kernel
+     (`server/src/native/kernelFeatures.ts` `gatedReason`: the floor edges are found on `topology`, which the host lowers only
+     for `featureCut`), and the native router / worker, `server/src/{occtNode,occtWorker,occtWorkerProtocol}.ts`, `@kernel-occt/tangentGuard`
+     (used by `native/kernelProtocol.ts`), `meshClosure` and the native-vs-WASM parity suites (`nativeKernel*Parity`, `occtNativeFeatures`)
+     depend on it. Port the floor fillet to the native path (host-side `topology` then `fillet` recipe, or in `llull-kernel-occt`), move
+     `tangentGuard` / `meshClosure` into `packages/core/src/geometry`, then delete the WASM kernel and its ~35 `server/tests/occt*` suites.
 6. **Simplify for one local backend**: outbox / live-sync paths that only existed for remote or flaky connections; bundle size budgets
    that only mattered for web download.
 
