@@ -12,6 +12,7 @@ import type { PrototypeModel } from './prototype';
 import type { CurveSegment } from './curve';
 import type { FastenerModel, PartRef } from './fasteners';
 import type { AeroModel } from './aero';
+import type { CompositesModel } from './composites';
 import type { DocumentKernelSettings } from './documentKernelSettings';
 import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary';
 import type { ReliabilityModel } from './probabilistic';
@@ -684,6 +685,8 @@ export interface CadDocument {
   fasteners?: FastenerModel;
   /** Absent until the first airfoil or wing command (plugin `surfacing`, 02 SRF). */
   aero?: AeroModel;
+  /** Absent until the first composites command (plugin composites, 06 CMP). */
+  composites?: CompositesModel;
   /** Absent until the first sheet-metal command (plugin `sheetmetal`, 07 FTR M3). */
   sheetMetal?: SheetMetalModel;
   /** Absent until the first probabilistic command (`define_random_variable`; plugin `cae`, PHY-18). */
