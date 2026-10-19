@@ -1,5 +1,5 @@
 /**
- * Native `llull-kernel` (OCCT 7.8.1) vs the WASM OCC kernel (opencascade.js, OCCT 7.4) on the ops the sidecar implements — the first
+ * Native `llull-kernel` (OCCT 7.9.2) vs the WASM OCC kernel (opencascade.js, OCCT 7.4) on the ops the sidecar implements — the first
  * slice of VC-KRN-25 (01 KRN TR-KRN-05): primitives, booleans, transforms, exact mass properties, analysis, tessellation sanity and
  * STEP. Runs when the binary is built (`cargo build --release -p llull-kernel` in solver/, or LLULL_KERNEL_BIN / LLULL_NATIVE_DIR);
  * otherwise skipped with the reason logged.
@@ -195,7 +195,7 @@ describe.skipIf(binary === null)('native llull-kernel behind the synchronous pro
       expect(isClosedMesh(kernel.tessellate(drilled!))).toBe(true);
       const rounded = kernel.evaluate({ op: 'fillet', source: leaf(plate), edges: [0], size: 0.3 });
       expect(kernel.topology(rounded!)?.faces).toHaveLength(7);
-      expect(kernel.info?.()).toMatchObject({ occtVersion: '7.8.1', build: expect.stringContaining('llull-kernel@') });
+      expect(kernel.info?.()).toMatchObject({ occtVersion: '7.9.2', build: expect.stringContaining('llull-kernel@') });
       kernel.forceFailure('__abort');
       expect(kernel.massProperties?.(drilled!)?.volume).toBeGreaterThan(0);
     } finally {

@@ -43,7 +43,7 @@ function resolve(handle) {
 function answer({ op, args }) {
   if (op === 'info')
     return {
-      result: { occtVersion: '7.8.1', build: 'llull-kernel@fake', capabilities: ['exportStep'], ops: ['info', 'evaluate', 'tessellate'] },
+      result: { occtVersion: '7.9.2', build: 'llull-kernel@fake', capabilities: ['exportStep'], ops: ['info', 'evaluate', 'tessellate'] },
     };
   if (op !== 'evaluate' && op !== 'tessellate') return { result: null, error: `NATIVE_UNSUPPORTED: op '${op}'` };
   const { shape, error } = resolve(args[0]);

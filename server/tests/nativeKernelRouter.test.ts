@@ -8,7 +8,7 @@ import type { NativeInfo } from '../src/native/kernelProtocol';
 import { box, leaf } from './kernelTestSupport';
 
 const NATIVE: NativeInfo = {
-  occtVersion: '7.8.1',
+  occtVersion: '7.9.2',
   build: 'llull-kernel@0.1.0',
   capabilities: ['analyze', 'massProperties'],
   ops: ['info', 'evaluate', 'tessellate', 'massProperties'],
@@ -107,8 +107,8 @@ describe('native kernel router', () => {
     const h = harness(() => ({ result: null }));
     const { result } = await h.router.route({ op: 'info', args: [] });
     expect(result).toEqual({
-      occtVersion: '7.8.1',
-      build: 'llull-kernel@0.1.0 (OCCT 7.8.1, native) + opencascade.js@1.1.1 for ops it lacks',
+      occtVersion: '7.9.2',
+      build: 'llull-kernel@0.1.0 (OCCT 7.9.2, native) + opencascade.js@1.1.1 for ops it lacks',
       capabilities: ['topology', 'analyze', 'massProperties'],
     });
   });

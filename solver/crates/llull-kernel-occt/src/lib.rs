@@ -1,4 +1,4 @@
-//! OCCT 7.8.1 (static, from `occt-sys`) behind a narrow cxx facade (`cpp/facade.{hxx,cxx}`) for the native llull kernel (RS-1).
+//! OCCT 7.9.2 (shared, from `solver/scripts/build-occt.mjs`, linked dynamically) behind a narrow cxx facade (`cpp/*.{hxx,cxx}`) for the native llull kernel (RS-1).
 //!
 //! The facade is coarse on purpose: Rust never touches OCCT classes, only opaque shapes and a dozen operations that mirror
 //! `packages/kernel-occt` (the opencascade.js kernel), so both kernels build the same B-rep for the same recipe. Every C++ throw,
@@ -106,7 +106,7 @@ pub fn init_runtime() {
     ffi::init_runtime();
 }
 
-/// OCC_VERSION_COMPLETE of the linked OCCT, e.g. "7.8.1".
+/// OCC_VERSION_COMPLETE of the linked OCCT, e.g. "7.9.2".
 pub fn occt_version() -> String {
     ffi::occt_version()
 }
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn reports_the_linked_occt_version() {
-        assert_eq!(occt_version(), "7.8.1");
+        assert_eq!(occt_version(), "7.9.2");
     }
 
     #[test]

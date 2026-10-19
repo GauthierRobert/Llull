@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
  * Gate for the Rust workspace `solver/` (docs/decisions/RS1-native-compute.md): cargo fmt --check, clippy -D warnings, test.
- * Skips with a notice when cargo is not installed (CI always has it). The OCCT kernel crates build OpenCascade from source,
- * so they run only with LLULL_NATIVE_KERNEL=1 (otherwise the workspace default-members are checked).
+ * Skips with a notice when cargo is not installed (CI always has it). The OCCT kernel crates link a shared OpenCascade built by
+ * solver/scripts/build-occt.mjs (LLULL_OCCT_DIR or its default prefix), so they run only with LLULL_NATIVE_KERNEL=1 (otherwise the
+ * workspace default-members are checked).
  */
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
