@@ -7,7 +7,7 @@
 
 import type { MeshData, Vec3 } from '../../model/types';
 import { add3, cross3, dot3, len3, scale3, sub3 } from '../../lib/vec3';
-import { buildMeshBvh, bvhRayCast } from '../meshBvh';
+import { type GeometryQueryEngine, type MeshRay, resolveGeometryQueries } from '../geometryQueries';
 
 export interface ThicknessReport {
   /** Thinnest sample (document units). */
@@ -73,7 +73,13 @@ function distanceToSegment(point: Vec3, { a, b }: Edge): number {
  * @param cornerExclusion document units; 0 disables the exclusion
  * @param clusterRadius document units; samples closer than this to a cluster's first sample join it
  */
-export function measureThickness(mesh: MeshData, rays: number, cornerExclusion: number, clusterRadius: number): ThicknessReport | null {
+export function measureThickness(
+  mesh: MeshData,
+  rays: number,
+  cornerExclusion: number,
+  clusterRadius: number,
+  engine?: GeometryQueryEngine | null,
+): ThicknessReport | null {
   const triangleCount = Math.floor(mesh.indices.length / 3);
   if (triangleCount === 0 || rays <= 0) return null;
   const vertex = (i: number): Vec3 => [mesh.positions[i * 3] ?? 0, mesh.positions[i * 3 + 1] ?? 0, mesh.positions[i * 3 + 2] ?? 0];
@@ -85,11 +91,20 @@ export function measureThickness(mesh: MeshData, rays: number, cornerExclusion: 
   areas.reduce((sum, area, t) => (cumulative[t] = sum + area), 0);
   const total = cumulative[triangleCount - 1] ?? 0;
   if (!(total > 0)) return null;
-  const bvh = buildMeshBvh(mesh);
-  const diagonal = len3(sub3(bvh.max, bvh.min));
+  const lows = [Infinity, Infinity, Infinity];
+  const highs = [-Infinity, -Infinity, -Infinity];
+  for (const triangle of corners) {
+    for (const corner of triangle) {
+      for (let axis = 0; axis < 3; axis++) {
+        lows[axis] = Math.min(lows[axis] ?? Infinity, corner?.[axis] ?? Infinity);
+        highs[axis] = Math.max(highs[axis] ?? -Infinity, corner?.[axis] ?? -Infinity);
+      }
+    }
+  }
+  const diagonal = len3(sub3(highs as unknown as Vec3, lows as unknown as Vec3));
   const edges = cornerExclusion > 0 ? sharpEdges(corners, normals) : [];
   const exclude = cornerExclusion > 0 && edges.length > 0 && edges.length <= MAX_EDGES_FOR_EXCLUSION;
-  const found: Array<{ point: Vec3; thickness: number }> = [];
+  const samples: Array<{ point: Vec3; ray: MeshRay }> = [];
   let excluded = 0;
   for (let i = 1; i <= rays; i++) {
     const target = halton(i, 2) * total;
@@ -109,9 +124,18 @@ export function measureThickness(mesh: MeshData, rays: number, cornerExclusion: 
       continue;
     }
     const inward = scale3(normals[low] as Vec3, -1);
-    const hit = bvhRayCast(bvh, point, inward, Infinity, START_OFFSET_RELATIVE * diagonal);
-    if (hit !== null) found.push({ point, thickness: hit.t });
+    samples.push({ point, ray: { origin: point, direction: inward, tMin: START_OFFSET_RELATIVE * diagonal } });
   }
+  const hits = resolveGeometryQueries(engine).rayCastBatch(
+    mesh,
+    samples.map((sample) => sample.ray),
+    Infinity,
+  );
+  const found: Array<{ point: Vec3; thickness: number }> = [];
+  samples.forEach((sample, k) => {
+    const hit = hits[k];
+    if (hit !== null && hit !== undefined) found.push({ point: sample.point, thickness: hit.t });
+  });
   if (found.length === 0) return null;
   const sorted = [...found].sort(
     (p, q) => p.thickness - q.thickness || p.point[0] - q.point[0] || p.point[1] - q.point[1] || p.point[2] - q.point[2],

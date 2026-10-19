@@ -7,6 +7,7 @@
  */
 
 import { getGeometryKernel } from '../geometry/kernel';
+import { getGeometryQueryEngine } from '../geometry/geometryQueries';
 import { getPhysicsEngine } from '../dynamics/physicsEngine';
 import { getMaterialLibraryProvider } from './libraryPort';
 import { type ReplayCache, createReplayCache } from './history/replayCache';
@@ -38,6 +39,7 @@ export function defaultContext(): ExecutionContext {
   return {
     kernel,
     physics: getPhysicsEngine(),
+    geometryQueries: getGeometryQueryEngine(),
     libraries: getMaterialLibraryProvider(),
     ids: counterIdSource,
     registry: getCommand,
