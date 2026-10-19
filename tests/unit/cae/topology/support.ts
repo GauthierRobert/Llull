@@ -1,5 +1,6 @@
 /** Shared fixtures of the PHY-17 topology tests: the MBB validation plan, an in-memory artifact store and the host-transport steps. */
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
@@ -10,7 +11,7 @@ import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { buildTopologyJob, runTopologyReference, type TopologyJob } from '@cae/index';
 
-const PACK = 'docs/physics/17-topology-optimization/validation';
+const PACK = path.resolve(__dirname, '../../../../docs/physics/17-topology-optimization/validation');
 
 export interface PlanAction {
   command: string;

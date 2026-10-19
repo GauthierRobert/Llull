@@ -2,8 +2,9 @@
  * Bundle the native binaries (docs/decisions/RS1-native-compute.md) into build/native (shipped as resources/native; the desktop
  * backend gets LLULL_NATIVE_DIR only when it exists):
  *
- *   build/native/llull-compute[.exe]   jobs (fatigue/map post-processing, field raster) — built WITH the `gpu` feature: the raster job
- *                                      draws with wgpu when an adapter exists and falls back to the bit-exact CPU twin otherwise
+ *   build/native/llull-compute[.exe]   jobs (fatigue/map post-processing, field raster, topology optimisation `topopt`) — built WITH the
+ *                                      `gpu` feature: raster and topopt use wgpu when an adapter exists and fall back to the bit-exact
+ *                                      CPU twin otherwise (topology_solve device cpu is the default)
  *   build/native/llull-kernel[.exe]    native OCCT kernel sidecar (opt-in: LLULL_KERNEL=occt-native; the default stays the WASM OCC)
  *   build/native/occt/lib/             shared OCCT toolkits, LGPL-2.1 dynamic linking (Linux .so.<maj>.<min>, macOS .<maj>.<min>.dylib;
  *                                      Windows: the DLLs sit next to the executables instead, where the loader looks)

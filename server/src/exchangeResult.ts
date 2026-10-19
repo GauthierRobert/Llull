@@ -58,12 +58,14 @@ export interface ExchangeHost {
   readonly getDoc: () => CadDocument;
   /** Runs a registry command on the host's document (command bus, or a local tracked document). */
   readonly applyCommand: (name: string, params: unknown) => ExchangeCommandResult;
+  /** One line per solver iteration of a native job (the CLI's `--progress`); absent on the server. */
+  readonly onProgress?: (line: string) => void;
 }
 
 /**
  * Run an exchange tool and answer the command-bus shape plus `changed` (the host document was
  * replaced). null = `name` is not an exchange tool. The one wiring of ports + host for REST and CLI:
- * the native transports (fatigue_field, fea_map_field, fea_render: `native/tools.ts`) run here too,
+ * the native transports (fatigue_field, fea_map_field, fea_render, topology_solve: `native/tools.ts`) run here too,
  * so a local `--doc`, `--app` and `--server` (`POST /exchange`) reach the same handlers.
  */
 export async function runExchangeTool(
