@@ -310,6 +310,39 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'add_joint', params: { kind: 'revolute', a: { instanceId: '$ia' }, b: { instanceId: '$ib' }, axis: 'z' }, as: 'j' },
     { command: 'set_joint_value', params: { id: '$j', value: 0.5 } },
   ],
+  mechanism_four_bar_exploded: [
+    ...CUBE_COMPONENT,
+    cubeInstance(0, 'ground'),
+    { command: 'insert_instance', params: { componentId: 'comp-cube', position: [0, 3, 0] }, as: 'crank' },
+    { command: 'insert_instance', params: { componentId: 'comp-cube', position: [4, 3, 0] }, as: 'coupler' },
+    { command: 'insert_instance', params: { componentId: 'comp-cube', position: [4, 0, 0] }, as: 'rocker' },
+    {
+      command: 'add_joint',
+      params: { kind: 'revolute', a: { instanceId: '$ground' }, b: { instanceId: '$crank' }, axis: 'z', pivot: [0, 0, 0] },
+      as: 'drive',
+    },
+    {
+      command: 'add_joint',
+      params: { kind: 'revolute', a: { instanceId: '$crank' }, b: { instanceId: '$coupler' }, axis: 'z', pivot: [0, 3, 0], passive: true },
+    },
+    {
+      command: 'add_joint',
+      params: { kind: 'revolute', a: { instanceId: '$coupler' }, b: { instanceId: '$rocker' }, axis: 'z', pivot: [4, 3, 0], passive: true },
+    },
+    {
+      command: 'add_joint',
+      params: { kind: 'revolute', a: { instanceId: '$ground' }, b: { instanceId: '$rocker' }, axis: 'z', pivot: [4, 0, 0], passive: true },
+    },
+    { command: 'set_joint_value', params: { id: '$drive', value: 0.5 } },
+    { command: 'bake_motion', params: {} },
+    { command: 'create_contact_set', params: { name: 'links', pairs: [['$crank', '$rocker']] } },
+    {
+      command: 'create_exploded_view',
+      params: { name: 'service', auto: { axis: 'z', spacing: 10, order: ['$ground', '$crank', '$coupler', '$rocker'] } },
+      as: 'view',
+    },
+    { command: 'set_active_exploded_view', params: { id: '$view', step: 2 } },
+  ],
   gears_spur_and_belt: [
     { command: 'add_spur_gear', params: { module: 2, teeth: 20, faceWidth: 5 } },
     { command: 'add_spur_gear', params: { module: 2, teeth: 30, faceWidth: 5, position: [50, 0, 0], name: 'big' } },

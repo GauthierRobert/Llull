@@ -3,7 +3,7 @@
 // `trigger:'click'` animations (directly or via a group).
 
 import { memo, useCallback, useMemo } from 'react';
-import type { CadDocument, Entity, EntityId, InstanceEntity, SolidKind } from '@core/model/types';
+import type { CadDocument, Entity, EntityId, InstanceEntity, SolidKind, Vec3 } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
 import { useSelectionSet } from '@ui/store/selectionHooks';
 import { animatedEntityIds, dynamicEntityIds, findClickAnimationsForEntity } from './animationClickHelpers';
@@ -19,6 +19,7 @@ import { useTintStore } from '@ui/store/tintStore';
 import { GridAnnotations3D } from './GridAnnotations3D';
 import { GRID_LAYER_NAME } from './gridAnnotations';
 import { expandInstance } from '@core/geometry/instanceExpansion';
+import { activeExplodeOffsets } from '@core/geometry/explodedOffsets';
 import type { PbrMaterial } from './useMaterialProps';
 import { useTransitioningIds } from '@ui/store/transitioningIds';
 import { LiveTransitionGroup } from '../liveFx/LiveTransitionGroup';
@@ -146,11 +147,21 @@ export function Entities(): React.ReactElement {
     [select, toggleSelection, toggleClickAnimation],
   );
 
+  // Active exploded view: drawn positions are shifted here (render transform only; the document placements are untouched).
+  const { explodedViews, activeExplodedView } = document;
+  const explodeOffsets = useMemo(() => activeExplodeOffsets(explodedViews, activeExplodedView), [explodedViews, activeExplodedView]);
+
   const visibleEntities = useMemo(() => {
     return order
       .map((id) => entities[id])
-      .filter((entity): entity is Entity => entity !== undefined && isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds));
-  }, [order, entities, layers, hiddenLayerIds, hiddenEntityIds]);
+      .filter((entity): entity is Entity => entity !== undefined && isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds))
+      .map((entity) => {
+        const shift = explodeOffsets.get(entity.id);
+        return shift === undefined
+          ? entity
+          : { ...entity, position: [entity.position[0] + shift[0], entity.position[1] + shift[1], entity.position[2] + shift[2]] as Vec3 };
+      });
+  }, [order, entities, layers, hiddenLayerIds, hiddenEntityIds, explodeOffsets]);
 
   const hasFinish = useCallback(
     (entity: Entity): boolean =>

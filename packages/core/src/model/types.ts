@@ -3,6 +3,9 @@
 import type { PropertyModel } from './propertyModel';
 import type { ConstitutiveSet, MaterialModel } from './materialModel';
 import type { Vec2, Vec3 } from './vectors';
+import type { ActiveExplodedView, ContactSet, ExplodedView, Joint } from './joints';
+
+export type { Joint, JointKind, JointMateRef } from './joints';
 import type { BuildingModel } from './building';
 import type { CivilModel } from './civil';
 import type { AnalysisModel } from './analysis';
@@ -577,31 +580,6 @@ export type Constraint =
   | (ConstraintBase<'symmetric'> & ConstraintAxis)
   | (ConstraintBase<DimensionConstraintKind> & ConstraintTarget);
 
-/** An InstanceEntity and the frame of it a joint attaches to. */
-export interface JointMateRef {
-  readonly instanceId: string;
-  /** Default 'origin'. */
-  readonly frame?: 'origin' | 'axis-x' | 'axis-y' | 'axis-z';
-}
-
-interface JointBase<K extends string> {
-  readonly id: string;
-  readonly kind: K;
-  readonly a: JointMateRef;
-  readonly b: JointMateRef;
-  /** 'x'|'y'|'z' shorthand or a unit Vec3. */
-  axis: 'x' | 'y' | 'z' | Vec3;
-}
-
-/**
- * Instance `b` moves relative to `a`: revolute rotates by `angle` (radians) about `axis`, prismatic slides by `displacement` (document
- * units) along it.
- * @see add_joint, set_joint_value, evaluate_motion, bake_motion
- */
-export type Joint = (JointBase<'revolute'> & { angle: number }) | (JointBase<'prismatic'> & { displacement: number });
-
-export type JointKind = Joint['kind'];
-
 /**
  * Couples joints: `driven = driver * ratio + offset` (gears, belts, linkages).
  * @invariant driver and driven exist in doc.joints, driver !== driven, drive graph is acyclic
@@ -681,6 +659,12 @@ export interface CadDocument {
   sheetMetal?: SheetMetalModel;
   /** Absent until the first probabilistic command (`define_random_variable`; plugin `cae`, PHY-18). */
   probabilistic?: ReliabilityModel;
+  /** Absent until the first `create_contact_set`. */
+  contactSets?: Record<string, ContactSet>;
+  /** Absent until the first `create_exploded_view`; display-only offsets, never moves real placements. */
+  explodedViews?: Record<string, ExplodedView>;
+  /** Exploded view the viewport draws; absent = none. */
+  activeExplodedView?: ActiveExplodedView;
 }
 
 /** Kernel provenance and modelling tolerance of a document (aerospace 01 KRN, TR-KRN-11/61). */

@@ -1,11 +1,10 @@
-import type { CadDocument, Vec3 } from '../../model/types';
+import type { Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { instanceBoundsFromDoc } from '../../geometry/bounds';
-import type { Bounds } from '../../geometry/bounds';
 import { evaluateMotionInternal } from './jointsKinematics';
+import { findContactStop, type ContactStop } from './contactStop';
+import { boundsAtStep, detectInterferences, sweepOverrides } from './interference';
 import { noop, report } from '../noop';
-import { elementAt } from '../../lib/elementAt';
 
 /** One sweep sample: the applied value, resolved joint values and instance transforms by id. */
 interface MotionStep {
@@ -14,6 +13,8 @@ interface MotionStep {
   instancePositions: Record<string, Vec3>;
   instanceRotations: Record<string, Vec3>;
   resolvedJoints: Record<string, number>;
+  /** Present when the joints form a closed loop: whether it closes at this sample. */
+  loopClosed?: boolean;
 }
 
 /** A pair of instance ids that overlap (AABB interference) at a given step. */
@@ -27,45 +28,8 @@ export interface MotionStudyData {
   steps: MotionStep[];
   interferences: InterferencePair[];
   summary: { totalSteps: number; framesWithInterference: number };
-}
-
-/** Overlap depth below this fraction of the larger box diagonal is contact, not interference. */
-const CONTACT_TOLERANCE = 1e-6;
-
-/** World AABB per instance id with each instance posed (position AND rotation) as at the step. @pure */
-function boundsAtStep(doc: CadDocument, step: Pick<MotionStep, 'instancePositions' | 'instanceRotations'>): Record<string, Bounds> {
-  const result: Record<string, Bounds> = {};
-  for (const id of Object.keys(doc.entities)) {
-    const entity = doc.entities[id];
-    if (!entity || entity.kind !== 'instance') continue;
-    result[id] = instanceBoundsFromDoc(
-      { ...entity, position: step.instancePositions[id] ?? entity.position, rotation: step.instanceRotations[id] ?? entity.rotation },
-      doc,
-    );
-  }
-  return result;
-}
-
-const diagonal = ({ min, max }: Bounds): number => Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
-
-/** The boxes overlap by more than the contact tolerance on every axis (touching faces do not count). */
-function interferes(a: Bounds, b: Bounds): boolean {
-  const tolerance = CONTACT_TOLERANCE * Math.max(diagonal(a), diagonal(b));
-  return [0, 1, 2].every((axis) => Math.min(a.max[axis] ?? 0, b.max[axis] ?? 0) - Math.max(a.min[axis] ?? 0, b.min[axis] ?? 0) > tolerance);
-}
-
-/** Every overlapping pair of instance AABBs. @pure */
-function detectInterferences(bounds: Record<string, Bounds>): [string, string][] {
-  const entries = Object.entries(bounds);
-  const pairs: [string, string][] = [];
-  for (let i = 0; i < entries.length; i++) {
-    for (let j = i + 1; j < entries.length; j++) {
-      const [idA, boundsA] = elementAt(entries, i);
-      const [idB, boundsB] = elementAt(entries, j);
-      if (interferes(boundsA, boundsB)) pairs.push([idA, idB]);
-    }
-  }
-  return pairs;
+  /** Present when a contact set was given. */
+  contact?: ContactStop;
 }
 
 /**
@@ -130,8 +94,15 @@ export const motionStudy = defineCommand({
         'When true, run a lightweight AABB overlap pass on every pair of InstanceEntity objects at each step. ' +
           'Colliding pairs are recorded in the returned interferences array. Default: false.',
       ),
+    contactSetId: z
+      .string()
+      .optional()
+      .describe(
+        'Id of a contact set (create_contact_set). The sweep ends at the first value where a pair of the set touches (bisected to 1e-9 of the range) ' +
+          'or an unsolved loop stops closing; data.contact reports { stopped, stopValue, reason, pair }.',
+      ),
   }),
-  run: (doc, { mode, target, start, end, steps, interferenceCheck }): CommandResult => {
+  run: (doc, { mode, target, start, end, steps, interferenceCheck, contactSetId }): CommandResult => {
     if (target.length === 0) return noop(doc, 'motion_study: "target" must be a non-empty string.');
     const emptyStudy = { steps: [], interferences: [], summary: { totalSteps: 0, framesWithInterference: 0 } } satisfies MotionStudyData;
     if (start === end)
@@ -148,26 +119,31 @@ export const motionStudy = defineCommand({
       if (typeof param.value !== 'number' || !Number.isFinite(param.value))
         return noop(doc, `motion_study: parameter '${target}' is not numeric (value: ${String(param.value)}).`);
     }
+    const contactSet = contactSetId === undefined ? undefined : doc.contactSets?.[contactSetId];
+    if (contactSetId !== undefined && contactSet === undefined)
+      return noop(doc, `motion_study: contact set '${contactSetId}' does not exist (create_contact_set).`);
+    const stop =
+      contactSet === undefined
+        ? undefined
+        : findContactStop(doc, { mode, target, from: start, to: end }, contactSet.pairs, 400, 1e-9 * Math.abs(end - start));
+    const last = stop?.stopped === true ? stop.stopValue : end;
     const motionSteps: MotionStep[] = [];
     const allInterferences: InterferencePair[] = [];
     const stepsWithInterference = new Set<number>();
+    let guess: Record<string, readonly number[]> = {};
     for (let k = 0; k < clampedSteps; k++) {
-      const sweepValue = start + ((end - start) * k) / (clampedSteps - 1);
-      let baseValues: Record<string, number>;
-      if (mode === 'joint') baseValues = { [target]: sweepValue };
-      else {
-        // Joints whose stored value equals the parameter's current value follow the sweep;
-        // the rest keep their stored value (drive relations propagate in evaluateMotionInternal).
-        const currentParamValue = doc.parameters[target]?.value ?? 0;
-        baseValues = {};
-        for (const [jid, joint] of Object.entries(doc.joints)) {
-          const rawValue = joint.kind === 'revolute' ? joint.angle : joint.displacement;
-          const stored = typeof rawValue === 'number' ? rawValue : 0;
-          baseValues[jid] = currentParamValue !== 0 && stored === currentParamValue ? sweepValue : stored;
-        }
-      }
-      const { instancePositions, instanceRotations, resolvedJoints } = evaluateMotionInternal(doc, baseValues);
-      motionSteps.push({ stepIndex: k, sweepValue, instancePositions, instanceRotations, resolvedJoints });
+      const sweepValue = start + ((last - start) * k) / (clampedSteps - 1);
+      const evaluated = evaluateMotionInternal(doc, sweepOverrides(doc, mode, target, sweepValue), guess);
+      const { instancePositions, instanceRotations, resolvedJoints } = evaluated;
+      if (evaluated.loop !== undefined && evaluated.loop.closed) guess = evaluated.loop.passive;
+      motionSteps.push({
+        stepIndex: k,
+        sweepValue,
+        instancePositions,
+        instanceRotations,
+        resolvedJoints,
+        ...(evaluated.loop === undefined ? {} : { loopClosed: evaluated.loop.closed }),
+      });
       if (interferenceCheck === true) {
         const bounds = boundsAtStep(doc, { instancePositions, instanceRotations });
         const pairs = detectInterferences(bounds);
@@ -183,10 +159,17 @@ export const motionStudy = defineCommand({
       (interferenceCheck === true
         ? `${allInterferences.length} interference pair(s) across ${framesWithInterference} frame(s).`
         : 'Interference check disabled.');
-    return report(doc, summaryText, {
+    const contactNote =
+      stop === undefined
+        ? ''
+        : stop.stopped
+          ? ` Motion stops at ${stop.stopValue} (${stop.reason === 'loop_open' ? 'the loop cannot close beyond it' : `first contact ${stop.pair?.join(' / ')}`}).`
+          : ' No contact in the range.';
+    return report(doc, summaryText + contactNote, {
       steps: motionSteps,
       interferences: allInterferences,
       summary: { totalSteps: clampedSteps, framesWithInterference },
+      ...(stop === undefined ? {} : { contact: stop }),
     } satisfies MotionStudyData);
   },
 });

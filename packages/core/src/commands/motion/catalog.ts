@@ -2,7 +2,10 @@
 
 import { commandCatalog } from '../schema';
 import { animate, stopAnimation } from './animation';
-import { addJoint, deleteJoint, setJointValue } from './jointsEdit';
+import { addJoint } from './addJoint';
+import { deleteJoint, setJointValue } from './jointsEdit';
+import { createContactSet, deleteContactSet } from './contactSets';
+import { driveJointTo } from './driveJoint';
 import { addDriveRelation, deleteDriveRelation, evaluateMotion, bakeMotion } from './jointsDrive';
 import { motionStudy } from './motionStudy';
 
@@ -17,4 +20,7 @@ export const motionCommands = commandCatalog(
   evaluateMotion,
   bakeMotion,
   motionStudy,
+  createContactSet,
+  deleteContactSet,
+  driveJointTo,
 );

@@ -60,7 +60,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'replay_history set_step_suppressed edit_step_params reorder_step delete_step insert_step create_configuration activate_configuration add_constraint delete_constraint update_constraint solve_constraints save_recipe instantiate_recipe',
   ),
   assembly: words(
-    'create_component insert_instance explode_instance bill_of_materials add_joint delete_joint set_joint_value add_drive_relation delete_drive_relation evaluate_motion bake_motion motion_study animate stop_animation ' +
+    'create_component insert_instance explode_instance bill_of_materials add_joint delete_joint set_joint_value add_drive_relation delete_drive_relation evaluate_motion bake_motion motion_study create_contact_set delete_contact_set drive_joint_to create_exploded_view set_active_exploded_view delete_exploded_view animate stop_animation ' +
       'add_rigid_body add_body_joint add_gear_coupling add_spring add_motor add_propeller add_cylinder_pressure set_gravity delete_dynamics_item set_dynamics_solver inspect_dynamics simulate_motion plot_simulation render_motion',
   ),
   materials: words(

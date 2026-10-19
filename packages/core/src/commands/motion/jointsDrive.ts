@@ -101,7 +101,8 @@ export const evaluateMotion = defineCommand({
     "Then each joint is applied: revolute rotates instance b around instance a's origin along the axis; " +
     "prismatic translates instance b along the axis from instance a's origin. " +
     'Returns the document unchanged with affected:[] and data: { resolvedJoints: Record<jointId, number>, ' +
-    '  instancePositions: Record<instanceId, Vec3>,   instanceRotations: Record<instanceId, Vec3> }. ' +
+    '  resolvedValues: Record<jointId, number[]> (all DOFs),   instancePositions: Record<instanceId, Vec3>,   instanceRotations: Record<instanceId, Vec3>,   ' +
+    '  loop?: { closed, residual, message, loops, passive } when joints form a closed loop (passive joints are solved; closed=false means it cannot close) }. ' +
     'Call bake_motion to permanently apply these transforms to the document.',
   params: z.object({}),
   run: (doc, _params): CommandResult => {
@@ -113,7 +114,8 @@ export const evaluateMotion = defineCommand({
       });
     const motion = evaluateMotionInternal(doc);
     const [jointCount, movedCount] = [Object.keys(motion.resolvedJoints).length, Object.keys(motion.instancePositions).length];
-    return report(doc, `evaluate_motion: evaluated ${jointCount} joint(s), ${movedCount} instance(s) would move.`, motion);
+    const loopNote = motion.loop === undefined ? '' : ` Loop: ${motion.loop.message}.`;
+    return report(doc, `evaluate_motion: evaluated ${jointCount} joint(s), ${movedCount} instance(s) would move.${loopNote}`, motion);
   },
 });
 
@@ -131,11 +133,14 @@ export const bakeMotion = defineCommand({
     'Drive relations are walked in topological order; each joint is then applied to instance b. ' +
     "Revolute joint: rotates instance b around instance a's origin along the axis by the joint angle. " +
     "Prismatic joint: translates instance b along the axis from instance a's origin by the displacement. " +
+    'Closed loops with passive joints are solved first; when the loop cannot close (e.g. a four-bar past its Grashof limit) the command refuses and the document is unchanged. ' +
     'Returns the updated document with affected[] listing all modified instance ids.',
   params: z.object({}),
   run: (doc, _params): CommandResult => {
     if (Object.keys(doc.joints).length === 0) return noop(doc, 'bake_motion: no joints defined. Nothing to bake.');
-    const { resolvedJoints, instancePositions, instanceRotations } = evaluateMotionInternal(doc);
+    const { resolvedJoints, instancePositions, instanceRotations, loop } = evaluateMotionInternal(doc);
+    if (loop !== undefined && !loop.closed && Object.keys(loop.passive).length > 0)
+      return noop(doc, `bake_motion: refused — ${loop.message}. Drive value(s) or limits must change; the document is unchanged.`);
     const movedIds = Object.keys(instancePositions);
     if (movedIds.length === 0)
       return report(doc, 'bake_motion: joints exist but no instance positions changed (all instanceIds may be missing).');

@@ -72,7 +72,11 @@ export function constraintFocus(doc: CadDocument, constraint: Constraint): Panel
 
 export function jointFocus(doc: CadDocument, joint: Joint): PanelFocus {
   const revolute = joint.kind === 'revolute';
-  const value = revolute ? `${((joint.angle * 180) / Math.PI).toFixed(1)}°` : `${joint.displacement} ${doc.units}`;
+  const value = revolute
+    ? `${((joint.angle * 180) / Math.PI).toFixed(1)}°`
+    : joint.kind === 'prismatic'
+      ? `${joint.displacement} ${doc.units}`
+      : `[${joint.values.map((v) => +v.toFixed(4)).join(', ')}]`;
   return {
     key: `mechanisms:joint:${joint.id}`,
     label: `${joint.kind} joint`,

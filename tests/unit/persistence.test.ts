@@ -330,6 +330,7 @@ describe('validateDocumentValues section guards', () => {
   });
   it('accepts well-formed joints, constraints, drive relations and recipes', () => {
     expect(withSection('joints', { j1: joint })).toEqual([]);
+    expect(withSection('joints', { j3: { ...joint, id: 'j3', kind: 'planar', values: [0, 1, 2] } })).toEqual([]);
     expect(withSection('joints', { j2: { ...joint, id: 'j2', kind: 'prismatic', axis: [1, 0, 0], displacement: 2 } })).toEqual([]);
     expect(
       withSection('constraints', {
@@ -341,7 +342,8 @@ describe('validateDocumentValues section guards', () => {
   });
   it.each([
     ['joint is not an object', 'joints', { j1: 5 }, 'is not an object'],
-    ['joint kind unknown', 'joints', { j1: { ...joint, kind: 'ball' } }, "unknown kind 'ball'"],
+    ['ball joint values missing', 'joints', { j1: { ...joint, kind: 'ball' } }, 'values must be an array of finite numbers'],
+    ['joint kind unknown', 'joints', { j1: { ...joint, kind: 'gear' } }, "unknown kind 'gear'"],
     ['joint mate ref missing', 'joints', { j1: { ...joint, a: 3 } }, 'a must be an object'],
     ['joint mate instanceId empty', 'joints', { j1: { ...joint, b: { instanceId: '' } } }, 'b.instanceId must be a non-empty string'],
     ['joint mate frame invalid', 'joints', { j1: { ...joint, a: { instanceId: 'i', frame: 'diagonal' } } }, 'a.frame must be'],

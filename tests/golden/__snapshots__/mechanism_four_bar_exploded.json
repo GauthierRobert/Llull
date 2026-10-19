@@ -1,0 +1,279 @@
+{
+  "format": "llull-document",
+  "version": 3,
+  "document": {
+    "entities": {
+      "#1": {
+        "id": "#1",
+        "kind": "instance",
+        "componentId": "#2",
+        "position": [0,0,0],
+        "rotation": [0,0,0],
+        "layerId": "#3",
+        "color": "#c8553d"
+      },
+      "#4": {
+        "id": "#4",
+        "kind": "instance",
+        "componentId": "#2",
+        "position": [0,0,0],
+        "rotation": [0,0,0],
+        "scale": [1,1,1],
+        "layerId": "#3",
+        "color": "#c8553d"
+      },
+      "#5": {
+        "id": "#5",
+        "kind": "instance",
+        "componentId": "#2",
+        "position": [-1.43827662,2.63274769,0],
+        "rotation": [0,0,0.5],
+        "scale": [1,1,1],
+        "layerId": "#3",
+        "color": "#c8553d"
+      },
+      "#6": {
+        "id": "#6",
+        "kind": "instance",
+        "componentId": "#2",
+        "position": [2.56172338,2.63274769,0],
+        "rotation": [0,0,1.44328993e-15],
+        "scale": [1,1,1],
+        "layerId": "#3",
+        "color": "#c8553d"
+      },
+      "#7": {
+        "id": "#7",
+        "kind": "instance",
+        "componentId": "#2",
+        "position": [4,1.77635684e-15,0],
+        "rotation": [0,0,0.5],
+        "scale": [1,1,1],
+        "layerId": "#3",
+        "color": "#c8553d"
+      }
+    },
+    "order": [
+      "#1",
+      "#4",
+      "#5",
+      "#6",
+      "#7"
+    ],
+    "layers": {
+      "#3": {
+        "id": "#3",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#3"
+    ],
+    "selection": [],
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {},
+    "animations": {},
+    "featureHistory": [
+      {
+        "id": "#8",
+        "name": "add_box",
+        "params": {"size":[1,1,1]},
+        "suppressed": false,
+        "affected": ["#9"]
+      },
+      {
+        "id": "#10",
+        "name": "create_component",
+        "params": {"name":"Cube","entityIds":["#9"],"componentId":"#2"},
+        "suppressed": false,
+        "affected": ["#1"]
+      },
+      {
+        "id": "#11",
+        "name": "insert_instance",
+        "params": {"componentId":"#2","position":[0,0,0]},
+        "suppressed": false,
+        "affected": ["#4"]
+      },
+      {
+        "id": "#12",
+        "name": "insert_instance",
+        "params": {"componentId":"#2","position":[0,3,0]},
+        "suppressed": false,
+        "affected": ["#5"]
+      },
+      {
+        "id": "#13",
+        "name": "insert_instance",
+        "params": {"componentId":"#2","position":[4,3,0]},
+        "suppressed": false,
+        "affected": ["#6"]
+      },
+      {
+        "id": "#14",
+        "name": "insert_instance",
+        "params": {"componentId":"#2","position":[4,0,0]},
+        "suppressed": false,
+        "affected": ["#7"]
+      },
+      {
+        "id": "#15",
+        "name": "add_joint",
+        "params": {"kind":"revolute","a":{"instanceId":"#4"},"b":{"instanceId":"#5"},"axis":"z","pivot":[0,0,0]},
+        "suppressed": false,
+        "affected": ["#16"]
+      },
+      {
+        "id": "#17",
+        "name": "add_joint",
+        "params": {"kind":"revolute","a":{"instanceId":"#5"},"b":{"instanceId":"#6"},"axis":"z","pivot":[0,3,0],"passive":true},
+        "suppressed": false,
+        "affected": ["#18"]
+      },
+      {
+        "id": "#19",
+        "name": "add_joint",
+        "params": {"kind":"revolute","a":{"instanceId":"#6"},"b":{"instanceId":"#7"},"axis":"z","pivot":[4,3,0],"passive":true},
+        "suppressed": false,
+        "affected": ["#20"]
+      },
+      {
+        "id": "#21",
+        "name": "add_joint",
+        "params": {"kind":"revolute","a":{"instanceId":"#4"},"b":{"instanceId":"#7"},"axis":"z","pivot":[4,0,0],"passive":true},
+        "suppressed": false,
+        "affected": ["#22"]
+      },
+      {
+        "id": "#23",
+        "name": "set_joint_value",
+        "params": {"id":"#16","value":0.5},
+        "suppressed": false,
+        "affected": ["#16"]
+      },
+      {
+        "id": "#24",
+        "name": "bake_motion",
+        "params": {},
+        "suppressed": false,
+        "affected": ["#5","#6","#7"]
+      },
+      {
+        "id": "#25",
+        "name": "create_contact_set",
+        "params": {"name":"links","pairs":[["#5","#7"]]},
+        "suppressed": false,
+        "affected": ["#26"]
+      },
+      {
+        "id": "#27",
+        "name": "create_exploded_view",
+        "params": {"name":"service","auto":{"axis":"z","spacing":10,"order":["#4","#5","#6","#7"]}},
+        "suppressed": false,
+        "affected": ["#28"]
+      },
+      {
+        "id": "#29",
+        "name": "set_active_exploded_view",
+        "params": {"id":"#28","step":2},
+        "suppressed": false,
+        "affected": ["#28"]
+      }
+    ],
+    "configurations": {},
+    "materials": {},
+    "recipes": {},
+    "components": {
+      "#2": {
+        "id": "#2",
+        "name": "Cube",
+        "entities": {"#9":{"id":"#9","kind":"box","size":[1,1,1],"position":[0,0,0],"rotation":[0,0,0],"layerId":"#3","color":"#6b8f9c"}},
+        "order": ["#9"]
+      }
+    },
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {
+      "#16": {
+        "id": "#16",
+        "kind": "revolute",
+        "a": {"instanceId":"#4"},
+        "b": {"instanceId":"#5"},
+        "axis": "z",
+        "pivot": [0,0,0],
+        "angle": 0.5
+      },
+      "#18": {
+        "id": "#18",
+        "kind": "revolute",
+        "a": {"instanceId":"#5"},
+        "b": {"instanceId":"#6"},
+        "axis": "z",
+        "pivot": [0,3,0],
+        "passive": true,
+        "angle": 0
+      },
+      "#20": {
+        "id": "#20",
+        "kind": "revolute",
+        "a": {"instanceId":"#6"},
+        "b": {"instanceId":"#7"},
+        "axis": "z",
+        "pivot": [4,3,0],
+        "passive": true,
+        "angle": 0
+      },
+      "#22": {
+        "id": "#22",
+        "kind": "revolute",
+        "a": {"instanceId":"#4"},
+        "b": {"instanceId":"#7"},
+        "axis": "z",
+        "pivot": [4,0,0],
+        "passive": true,
+        "angle": 0
+      }
+    },
+    "jointOrder": [
+      "#16",
+      "#18",
+      "#20",
+      "#22"
+    ],
+    "driveRelations": {},
+    "driveRelationOrder": [],
+    "nextStepNumber": 16,
+    "contactSets": {
+      "#26": {
+        "id": "#26",
+        "name": "links",
+        "pairs": [["#5","#7"]]
+      }
+    },
+    "explodedViews": {
+      "#28": {
+        "id": "#28",
+        "name": "service",
+        "offsets": [{"target":"#5","vector":[0,0,10],"step":1},{"target":"#6","vector":[0,0,20],"step":2},{"target":"#7","vector":[0,0,30],"step":3}]
+      }
+    },
+    "activeExplodedView": {
+      "id": "#28",
+      "step": 2
+    }
+  }
+}
