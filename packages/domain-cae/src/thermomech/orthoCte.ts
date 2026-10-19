@@ -26,7 +26,7 @@ const directionsWithModels = (material: Material | undefined): readonly Property
 export const isOrthotropicCte = (material: Material | undefined): boolean => directionsWithModels(material).length > 0;
 
 /** The directions 1 / 2 / 3 of an orthotropic CTE that have no CTE model (empty when complete or isotropic). */
-export const missingOrthoDirections = (material: Material | undefined): readonly PropertyDirection[] => {
+const missingOrthoDirections = (material: Material | undefined): readonly PropertyDirection[] => {
   const have = directionsWithModels(material);
   return have.length === 0 ? [] : ORTHO_DIRECTIONS.filter((direction) => !have.includes(direction));
 };
@@ -44,7 +44,7 @@ export function incompleteOrthoRefusal(material: Material | undefined, materialI
       };
 }
 
-export interface OrthotropicExpansion {
+interface OrthotropicExpansion {
   /** `[a1, a2, a3]` (all directions constant) or `[a1, a2, a3, T]` rows on the temperature grid, T in the case scale. */
   readonly rows: readonly (readonly number[])[];
   readonly directions: readonly [SecantExpansion, SecantExpansion, SecantExpansion];
@@ -56,7 +56,7 @@ export interface OrthotropicExpansion {
  * @invariant a direction with a constant CTE repeats its value on the grid of the others
  * @failure a direction missing -> TMC_CTE_ORTHO_INCOMPLETE; TMC_CTE_BASIS_UNKNOWN / TMC_PROPERTY_OUT_OF_RANGE / PHY-01 codes of a direction
  */
-export function orthotropicExpansion(
+function orthotropicExpansion(
   doc: CadDocument,
   setup: ThermoMechSetup,
   materialId: string,

@@ -1,0 +1,116 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_box", "params": { "size": [50, 1, 0.5], "position": [0, 0, 0], "anchor": "min" }, "as": "lower" },
+  { "command": "add_box", "params": { "size": [50, 1, 0.5], "position": [0, 0, 0.5], "anchor": "min" }, "as": "upper" },
+  {
+    "command": "create_material",
+    "params": { "name": "bm_lower", "density": 0.0078, "color": "#9aa0a6", "metalness": 1, "roughness": 0.4 }
+  },
+  {
+    "command": "add_material_model",
+    "params": {
+      "material": "bm_lower",
+      "id": "elastic",
+      "model": { "kind": "elastic_isotropic", "E": { "value": 200, "unit": "GPa" }, "nu": { "value": 0.3, "unit": "1" } },
+      "basis": "company",
+      "source": { "citation": "test input of this validation case (not a material claim)" }
+    }
+  },
+  {
+    "command": "define_constitutive_set",
+    "params": { "material": "bm_lower", "set": { "id": "set", "elastic": "elastic" }, "makeDefault": true }
+  },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "bm_lower",
+      "model": {
+        "id": "strain",
+        "property": "thermalStrain",
+        "unit": "1",
+        "variables": [{ "variable": "T", "unit": "K" }],
+        "form": { "kind": "polynomial", "variable": "T", "coefficients": [0, 1.2e-5], "origin": 293.15 },
+        "validity": [{ "variable": "T", "unit": "K", "data": [200, 600] }],
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  {
+    "command": "create_material",
+    "params": { "name": "bm_upper", "density": 0.0078, "color": "#c48a4a", "metalness": 1, "roughness": 0.4 }
+  },
+  {
+    "command": "add_material_model",
+    "params": {
+      "material": "bm_upper",
+      "id": "elastic",
+      "model": { "kind": "elastic_isotropic", "E": { "value": 100, "unit": "GPa" }, "nu": { "value": 0.3, "unit": "1" } },
+      "basis": "company",
+      "source": { "citation": "test input of this validation case (not a material claim)" }
+    }
+  },
+  {
+    "command": "define_constitutive_set",
+    "params": { "material": "bm_upper", "set": { "id": "set", "elastic": "elastic" }, "makeDefault": true }
+  },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "bm_upper",
+      "model": {
+        "id": "strain",
+        "property": "thermalStrain",
+        "unit": "1",
+        "variables": [{ "variable": "T", "unit": "K" }],
+        "form": { "kind": "polynomial", "variable": "T", "coefficients": [0, 1.9e-5], "origin": 293.15 },
+        "validity": [{ "variable": "T", "unit": "K", "data": [200, 600] }],
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  { "command": "assign_material", "params": { "materialName": "bm_lower", "entityIds": ["$lower"] } },
+  { "command": "assign_material", "params": { "materialName": "bm_upper", "entityIds": ["$upper"] } },
+  {
+    "command": "create_analysis",
+    "params": {
+      "name": "bimetal_cantilever",
+      "analysisType": "thermo_static",
+      "unitSystem": "N-mm-t-s",
+      "solver": "calculix",
+      "referenceTemperature": { "value": 20.0, "unit": "degC" }
+    },
+    "as": "an"
+  },
+  { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$lower", "idealization": "solid" } },
+  { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$upper", "idealization": "solid" } },
+  {
+    "command": "set_temperature_field",
+    "params": { "analysisId": "$an", "source": { "kind": "uniform", "value": { "value": 120.0, "unit": "degC" } } }
+  },
+  {
+    "command": "add_fea_constraint",
+    "params": {
+      "analysisId": "$an",
+      "name": "clamp_lower",
+      "kind": "fixed",
+      "target": { "entityId": "$lower", "facesNear": [[0, 0.5, 0.25]] }
+    }
+  },
+  {
+    "command": "add_fea_constraint",
+    "params": {
+      "analysisId": "$an",
+      "name": "clamp_upper",
+      "kind": "fixed",
+      "target": { "entityId": "$upper", "facesNear": [[0, 0.5, 0.75]] }
+    }
+  },
+  {
+    "command": "set_mesh_controls",
+    "params": { "analysisId": "$an", "mesher": "gmsh", "elementFamily": "tet", "order": 2, "globalSize": 0.25, "bonding": "conformal" }
+  },
+  { "command": "add_result_probe", "params": { "analysisId": "$an", "name": "tip_y0", "point": [50, 0, 0.5], "quantity": "u_z" } },
+  { "command": "add_result_probe", "params": { "analysisId": "$an", "name": "tip_y1", "point": [50, 1, 0.5], "quantity": "u_z" } }
+]
