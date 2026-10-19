@@ -3,10 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
-import type { HumanSignaturePort } from '@core/model/analysis';
+import type { Disposition, HumanSignaturePort } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
 import { marginDispositionPayload } from '@cae/margins/disposition';
+import { withCase } from '@cae/shared/access';
 import { caseIn } from './helpers';
 import { mustRun } from './deckFixtures';
 import { marginBar, type MarginBar } from './marginsFixtures';
@@ -134,15 +135,9 @@ describe('dispose_margin: a valid human signature', () => {
     expect(noPort).toMatchObject({ disposition: 'pending_human', statusLabel: 'FAIL (pending human disposition)' });
     expect(noPort.dispositionNote).toContain('no signing port');
     const stored = caseIn(accepted.document, bar.analysisId).dispositions[failRow.rowKey];
-    const withDisposition = (patch: Record<string, unknown>): CadDocument => {
+    const withDisposition = (patch: Partial<Disposition>): CadDocument => {
       const analysis = caseIn(accepted.document, bar.analysisId);
-      return {
-        ...accepted.document,
-        analysis: {
-          cases: { [bar.analysisId]: { ...analysis, dispositions: { [failRow.rowKey]: { ...(stored as object), ...patch } } } },
-          caseOrder: [bar.analysisId],
-        },
-      } as CadDocument;
+      return withCase(accepted.document, { ...analysis, dispositions: { [failRow.rowKey]: { ...(stored as Disposition), ...patch } } });
     };
     const resolved = rowsOf(computed(withDisposition({ resultsHash: 'other-results' }), humanContext()))[0] as Row;
     expect(resolved.dispositionNote).toContain('re-solved');

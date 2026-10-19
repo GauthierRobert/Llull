@@ -27,15 +27,14 @@ const describeRow = (row: MarginRow): string =>
 /**
  * Margin items of a static / thermo_static case with verified results and margins computable from the material strengths with the DEFAULT
  * query (no explicit allowable, no band): FEA_MS_NEGATIVE (error, always, even after a disposition: a FAIL never becomes a pass),
- * FEA_MS_MARGINAL (none without a band), FEA_MARGINAL_BAND_UNSET (warning), FEA_DISPOSITION_PENDING (warning for FAIL / MARGINAL rows without a
- * valid human disposition). Empty when no margin can be computed (stale, unverified, no allowable): the other checks name those problems.
+ * FEA_MARGINAL_BAND_UNSET (warning; without a band no row is MARGINAL, so FEA_MS_MARGINAL is a code of compute_margins rows only),
+ * FEA_DISPOSITION_PENDING (warning for FAIL rows without a valid human disposition). Empty when no margin can be computed (stale, unverified, no allowable): the other checks name those problems.
  */
 export function marginItems(doc: CadDocument, analysisId: string, ctx: ExecutionContext | undefined): MarginCheckItem[] {
   const table = marginTable(doc, analysisId, {}, ctx);
   if ('code' in table) return [];
   const items: MarginCheckItem[] = [];
   const failed = table.rows.filter((row) => row.status === 'FAIL');
-  const marginal = table.rows.filter((row) => row.status === 'MARGINAL');
   const pending = table.rows.filter((row) => row.disposition === 'pending_human');
   if (failed.length > 0)
     items.push(
@@ -43,15 +42,6 @@ export function marginItems(doc: CadDocument, analysisId: string, ctx: Execution
         analysisId,
         ...failed.map((row) => row.rowId),
       ]),
-    );
-  if (marginal.length > 0)
-    items.push(
-      item(
-        'FEA_MS_MARGINAL',
-        'warning',
-        `${marginal.length} margin row(s) inside the marginal band: ${marginal.map(describeRow).join('; ')}`,
-        [analysisId, ...marginal.map((row) => row.rowId)],
-      ),
     );
   items.push(
     item('FEA_MARGINAL_BAND_UNSET', 'warning', 'no marginalBand is stated, so no row can be MARGINAL: ask the owner for a band', [
@@ -63,7 +53,7 @@ export function marginItems(doc: CadDocument, analysisId: string, ctx: Execution
       item(
         'FEA_DISPOSITION_PENDING',
         'warning',
-        `${pending.length} FAIL / MARGINAL row(s) wait for a human disposition: ${pending.map(describeRow).join('; ')}`,
+        `${pending.length} FAIL row(s) wait for a human disposition: ${pending.map(describeRow).join('; ')}`,
         [analysisId, ...pending.map((row) => row.rowId)],
       ),
     );

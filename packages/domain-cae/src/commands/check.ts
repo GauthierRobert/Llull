@@ -158,7 +158,7 @@ export const checkAnalysis = defineCommand({
     'recorded and not stale or inverted, results recorded and not stale, and every recorded summary matching its artifact in the artifact ' +
     'store (a differing one is FEA_SUMMARY_MISMATCH, state untrusted; no store or artifact is FEA_MESH_MISSING / FEA_RESULTS_MISSING, state ' +
     'missing). Run it before fea_mesh / fea_solve (readiness) and after the solve. ' +
-    'Modal / buckling: supports, rigid-body modes, buckling-factor guards; any structural case: supports that remove all six rigid-body motions (FEA_UNDERCONSTRAINED) and mesh adequacy (FEA_MESH_ADEQUACY); solved static / thermo_static cases with allowables: the margin rows (FEA_MS_NEGATIVE, FEA_MS_MARGINAL, FEA_MARGINAL_BAND_UNSET, FEA_DISPOSITION_PENDING). ' +
+    'Modal / buckling: supports, rigid-body modes, buckling-factor guards; any structural case: supports that remove all six rigid-body motions (FEA_UNDERCONSTRAINED) and mesh adequacy (FEA_MESH_ADEQUACY); solved static / thermo_static cases with allowables: the margin rows (FEA_MS_NEGATIVE, FEA_MARGINAL_BAND_UNSET, FEA_DISPOSITION_PENDING). ' +
     'It is not a certification: reviewRequired is always true and a qualified person must review the model, mesh and results.',
   annotations: { readOnly: true },
   params: z.object({ analysisId: analysisIdSchema }),

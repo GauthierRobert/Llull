@@ -700,7 +700,8 @@ server process (no ticket cancel yet).
 - **`check_analysis` additions.** `FEA_UNDERCONSTRAINED` from the mesh artifact: the restrained (node, dof) rows of every support are projected on the six rigid-body motions of each part
   (rank by Gram-Schmidt: a fixed face 6, a fixed point 3, a fixed edge 5; parts that share mesh nodes under conformal bonding form one group); `FEA_MESH_ADEQUACY` when fewer than 2 element edges fit across the thinnest bounding-box side of a
   part (bounding box over the mean tet edge: a heuristic, VC-FEA-09); margin items for a solved static / thermo_static case with allowables: `FEA_MS_NEGATIVE` (error, also after
-  a disposition: a FAIL never becomes a pass), `FEA_MS_MARGINAL`, `FEA_MARGINAL_BAND_UNSET` (warning, VC-FEA-62) and `FEA_DISPOSITION_PENDING`. Because of the last two a solved
+  a disposition: a FAIL never becomes a pass), `FEA_MARGINAL_BAND_UNSET` (warning, VC-FEA-62) and `FEA_DISPOSITION_PENDING` (the check runs the default query without a band, so
+  `FEA_MS_MARGINAL` stays a code of `compute_margins` rows). Because of the last two a solved
   case with allowables reads `warn` at best until a band is stated.
 - **`dispose_margin`** (registry command, human gate, `margins/disposeMargin.ts`). `{ analysisId, rowId, decision: accepted | rejected | redesign, justification, signature?, + the
   compute_margins query (criterion, allowable, groupBy, loadCases, marginalBand) }`: the query reproduces the table the reviewer saw, because `rN` depends on it. Every

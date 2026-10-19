@@ -121,6 +121,57 @@ describe('momentForces: a statically equivalent couple', () => {
     achieved.forEach((component, axis) => expect(component).toBeCloseTo(moment[axis] ?? 0, 7));
   });
 
+  it.each([
+    [
+      'a plane tilted 45 degrees about z',
+      [
+        [0, 0, 0],
+        [1, 1, 0],
+        [2, 2, 0],
+        [0, 0, 1],
+        [1, 1, 1],
+        [2, 2, 1],
+        [1, 1, 0.5],
+      ],
+      [3, -2, 5],
+    ],
+    [
+      'a scattered 3D cloud (full-rank inertia, off-diagonal terms)',
+      [
+        [0, 0, 0],
+        [2, 0.3, 0.1],
+        [0.4, 1.7, 0.2],
+        [0.9, 0.5, 1.6],
+        [1.8, 1.9, 1.1],
+        [0.2, 0.8, 0.9],
+      ],
+      [10, -20, 5],
+    ],
+    [
+      'a plane normal to (1, 2, 3)',
+      [
+        [2, -1, 0],
+        [-1, 1, 0],
+        [3, 0, -1],
+        [-4, 2, 2],
+        [0.5, 0.25, -0.5],
+      ],
+      [-7, 4, 1],
+    ],
+  ] as const)('%s: the Jacobi inversion keeps the resultant at zero and the moment exact', (_name, coordinates, moment) => {
+    const nodes = coordinates.map((point, index): FeMeshArtifact['nodes'][number] => [index + 1, point[0], point[1], point[2]]);
+    const forces = momentForces(
+      mesh(nodes),
+      nodes.map((node) => node[0]),
+      moment,
+    );
+    expect('forces' in forces).toBe(true);
+    if (!('forces' in forces)) return;
+    const { force, moment: achieved } = resultant(forces.forces, nodes);
+    force.forEach((component) => expect(component).toBeCloseTo(0, 9));
+    achieved.forEach((component, axis) => expect(component).toBeCloseTo(moment[axis] ?? 0, 7));
+  });
+
   it('refuses one node, collinear nodes (moment about their line) and unknown nodes; a perpendicular moment on collinear nodes is carried', () => {
     expect(momentForces(mesh(plate), [1], [1, 0, 0])).toMatchObject({ refusal: expect.stringContaining('at least 2 nodes') });
     expect(momentForces(mesh(plate), [1, 99], [1, 0, 0])).toMatchObject({ refusal: expect.stringContaining('found 1') });
