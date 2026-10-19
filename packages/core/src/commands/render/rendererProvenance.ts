@@ -6,7 +6,7 @@
 
 import type { RasterPort, RasterScene } from '../../model/raster';
 import { sha256Hex } from '../../lib/sha256';
-import type { PixelStage } from './raster';
+import type { PixelStage } from './types';
 
 /** Bump when the reference raster's pixels change for the same inputs (pins `svgSha256` goldens, Q6). */
 export const REFERENCE_RENDERER_VERSION = 'llull-ts-raster/1';

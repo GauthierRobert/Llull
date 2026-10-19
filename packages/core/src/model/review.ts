@@ -4,7 +4,9 @@
  * reserved for later VIS milestones; they arrive as optional fields, so documents saved now load unchanged.
  */
 
-import type { EntityId, Vec3 } from './types';
+import type { Vec3 } from './vectors';
+
+type EntityId = string;
 
 /**
  * A BCF camera. `direction` and `up` are unit and orthogonal (normalised on save).
@@ -23,7 +25,7 @@ export interface Viewpoint {
   camera: ViewpointCamera;
 }
 
-export interface WalkthroughKey {
+interface WalkthroughKey {
   readonly viewpointId: string;
   /** Seconds from this key to the next one (> 0; the last key's value is ignored). */
   readonly seconds: number;
@@ -37,7 +39,7 @@ export interface Walkthrough {
 }
 
 export const ISSUE_PRIORITIES = ['low', 'normal', 'high', 'critical'] as const;
-export type IssuePriority = (typeof ISSUE_PRIORITIES)[number];
+type IssuePriority = (typeof ISSUE_PRIORITIES)[number];
 
 /** A review topic (BCF Topic); status transitions arrive with VIS-M3, so every issue is created `open`. */
 export interface ReviewIssue {

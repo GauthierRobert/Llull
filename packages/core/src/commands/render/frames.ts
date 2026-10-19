@@ -11,7 +11,8 @@ import { boundsCenter } from '../../geometry/bounds';
 import { ORIGIN } from '../../lib/vec3';
 import type { ViewpointCamera } from '../../model/review';
 import { computeSceneSnapshot } from '../inspect/scene';
-import { type PixelStage, rasterScenePixels } from './raster';
+import { rasterScenePixels } from './raster';
+import type { PixelStage } from './types';
 import { renderDocument } from './scene';
 import { viewpointView } from './viewSetup';
 

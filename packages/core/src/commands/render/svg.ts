@@ -1,9 +1,9 @@
 import type { ImageEntity, Vec3 } from '../../model/types';
-import { type Polygon3D } from './types';
+import type { PixelStage, Polygon3D } from './types';
 import { add3, dot3, scale3 } from '../../lib/vec3';
 import { type Camera, type Projector, cameraBasis, makeProjector, shade } from './camera';
 import { underlaySvg } from './underlays';
-import { type PixelStage, rasterLayer } from './raster';
+import { rasterLayer } from './raster';
 
 /** Raster mode of buildSvg: the scene radius (outline / bias scale) and an optional replacement of the reference per-pixel stage. */
 export interface RasterSettings {

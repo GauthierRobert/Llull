@@ -11,11 +11,8 @@ import type { RasterScene } from '../../model/raster';
 import { encodePng } from '../../lib/png';
 import { uint8ArrayToBase64 } from '../../lib/base64';
 import type { Camera } from './camera';
-import type { Polygon3D } from './types';
+import type { PixelStage, Polygon3D } from './types';
 import { prepareRasterScene } from './rasterScene';
-
-/** Replaces the reference per-pixel stage (a host's native raster); returns the logical RGBA image. */
-export type PixelStage = (scene: RasterScene) => Uint8Array;
 
 interface ScreenPoint {
   readonly x: number;
