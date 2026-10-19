@@ -13,7 +13,7 @@ import {
   type PropertyEvaluationRefused,
   type PropertyRecord,
 } from './propertyModelEval';
-import type { PropertyModel } from './propertyModel';
+import type { PropertyDirection, PropertyModel } from './propertyModel';
 import type { Material } from './types';
 
 export interface CteRefusal {
@@ -169,22 +169,25 @@ function cteModelProvider(record: PropertyRecord, model: PropertyModel, basis: C
  * Provider for one material of the document.
  * @failure MAT_RECORD_NOT_FOUND; TMC_MATERIAL_NO_CTE (no thermalStrain / cte model); TMC_CTE_BASIS_UNKNOWN (cte model, basis unstated);
  *   PHY-01 ambiguity codes (several unpreferred models)
+ * @param direction material direction of an orthotropic CTE (models with that `direction` only); absent = the models of any direction
  */
 export function materialCteProvider(
   materials: Readonly<Record<string, Material>>,
   name: string,
   basis: CteBasis,
   path: string,
+  direction?: PropertyDirection,
 ): CteProvider | CteRefusal {
   const material = Object.hasOwn(materials, name) ? materials[name] : undefined;
   if (material === undefined) {
     return { code: 'MAT_RECORD_NOT_FOUND', reason: `no material '${name}'`, remediation: 'create_material first', path };
   }
   const record: PropertyRecord = { name, ...(material.propertyModels !== undefined ? { propertyModels: material.propertyModels } : {}) };
-  const strain = resolvePropertyModel(record, { property: 'thermalStrain' });
+  const directed = direction === undefined ? {} : { direction };
+  const strain = resolvePropertyModel(record, { property: 'thermalStrain', ...directed });
   if (!isRefused(strain)) return thermalStrainProvider(record, strain, path);
   if ((strain.candidates ?? []).length > 0) return wrap(strain, path);
-  const cte = resolvePropertyModel(record, { property: 'cte' });
+  const cte = resolvePropertyModel(record, { property: 'cte', ...directed });
   if (isRefused(cte)) {
     return (cte.candidates ?? []).length > 0
       ? wrap(cte, path)

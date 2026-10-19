@@ -15,7 +15,7 @@ import { propertyCards } from './deckMaterial';
 import { allBcLines, cavityLines } from './deckLoads';
 import { contactBlocks } from './deckContact';
 import { filmSinkBlocks } from './deckFilmSink';
-import { amplitudeName } from './deckNames';
+import { amplitudeLines } from './deckAmplitude';
 import { planStep } from './deckStep';
 import { hasRadiation, stefanBoltzmannOf } from './constants';
 import { partVolumes, indexMesh } from './meshGeometry';
@@ -76,12 +76,7 @@ export function thermalSections(ctx: DeckContext): DeckSections {
   lines.push(...plan.timePoints);
   if (thermal.initialTemperature !== undefined)
     lines.push('*INITIAL CONDITIONS, TYPE=TEMPERATURE', row(ALL_NODES, inScale(thermal.initialTemperature, scale)));
-  const used = [...new Set(thermal.bcOrder.map((id) => thermal.bcs[id]?.amplitude).filter((id): id is string => id !== undefined))].sort();
-  for (const id of used) {
-    const points = thermal.amplitudes[id]?.points ?? [];
-    lines.push(`*AMPLITUDE, NAME=${amplitudeName(id)}`);
-    for (let i = 0; i < points.length; i += 4) lines.push(row(...points.slice(i, i + 4).flat()));
-  }
+  lines.push(...amplitudeLines(thermal));
   for (const contact of Object.values(thermal.contacts)) {
     const block = contactBlocks(ctx, contact);
     if ('code' in block) return block;

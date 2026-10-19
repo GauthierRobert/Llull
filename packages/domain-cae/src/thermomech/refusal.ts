@@ -35,8 +35,27 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'define_property_model for E (and nu) against T over the temperatures reached (table1d or polynomial with a validity range covering the field); the deck then writes *ELASTIC rows E, nu, T',
   TMC_THERMAL_CATEGORY_UNSET:
     'add_fea_load with loadCase set to the thermal load case name and category limit or ultimate, per the programme rule',
+  TMC_CTE_ORTHO_ELASTIC_ISOTROPIC:
+    'review the result: only the CTE is orthotropic (E and nu come from the 05 isotropic elastic cards); stiffness anisotropy is not modelled',
+  TMC_TRANSIENT_START_DEFAULTED:
+    'set_initial_temperature { analysisId, value, unit } if the body does not start at the reference temperature',
+  TMC_TRANSIENT_PREHEAT:
+    'review the start state: the pre-heating step makes the thermal stress of reference -> start temperature; use the reference temperature as the start temperature for a stress-free start',
+  TMC_SPEC_TEMPERATURE_MISSING:
+    'give the temperature the drawing limits apply at, e.g. specTemperature = { value: 20, unit: "degC" } (there is no default)',
+  TMC_STACKUP_INVALID: 'give 1 to 50 uniquely named contributors and consistent spec limits (lowerSpecLimit <= upperSpecLimit)',
+  TMC_STACKUP_WC_EXCEEDED:
+    'the worst case leaves the spec limits while the RSS stays inside: tighten tolerances or accept the statistical risk through a qualified review',
+  TMC_STACKUP_OUT_OF_SPEC:
+    'the gap leaves the spec limits even in RSS: change materials, tolerances or the spec limits; hand the row to a human reviewer',
+  TMC_CTE_ORTHO_INCOMPLETE:
+    'define_property_model with property cte (or thermalStrain) for every missing direction 1 / 2 / 3, or remove the direction from the models for an isotropic CTE',
+  TMC_ORIENTATION_REQUIRED:
+    'set_material_orientation { analysisId, entityId, axis1, axis2 } with the material directions in the document frame, or un-rotate the part',
+  TMC_ORIENTATION_INVALID:
+    'give an analysis part id and two non-zero, non-parallel vectors axis1 / axis2 (or neither, to remove the orientation)',
   TMC_COUPLED_UNSUPPORTED:
-    'remove the cavity radiation, thermal contacts, amplitudes and h(T) tables from the coupled case, or run a heat_* case then a thermo_static case',
+    'remove the cavity radiation, thermal contacts and h(T) tables (and, for a steady-state step, the amplitudes: set_thermal_step endTimeS makes the case transient) from the coupled case, or run a heat_* case then a thermo_static case',
 };
 
 /** `codedRejection` with the remediation registered for `code`; document unchanged. */

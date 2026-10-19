@@ -4,6 +4,7 @@ import type { FeArtifactPort, FeMeshArtifact } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { thermalMaterialCards, thermalSections } from '../thermal/deck';
 import { coupledMaterialCards, coupledSections } from '../thermomech/coupledDeck';
+import { orientationBlock } from '../thermomech/orientation';
 import { thermomechMaterialCards, thermomechSections } from '../thermomech/deck';
 import { constitutiveMaterialCards } from './constitutive';
 import { buildInp, type DisciplineTable, type InpResult } from './deckBuilder';
@@ -12,6 +13,7 @@ const DISCIPLINES: DisciplineTable = {
   materialCardWriter: constitutiveMaterialCards,
   heat: { materialCards: thermalMaterialCards, sections: thermalSections },
   thermomech: { materialCards: thermomechMaterialCards, sections: thermomechSections },
+  orientation: orientationBlock,
   coupled: { materialCards: coupledMaterialCards, sections: coupledSections },
 };
 

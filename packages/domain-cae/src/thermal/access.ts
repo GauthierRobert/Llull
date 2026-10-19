@@ -50,6 +50,11 @@ export function thermalCaseOf(doc: CadDocument, analysisId: string): ThermalCase
   return { analysisCase, thermal };
 }
 
+/** True for a heat_transient case and for a coupled_temperature_displacement case with a time period (`step.endTimeS`, PHY-04 M4b). */
+export const isTransientCase = (analysisCase: AnalysisCase): boolean =>
+  analysisCase.type === 'heat_transient' ||
+  (analysisCase.type === 'coupled_temperature_displacement' && analysisCase.thermomech?.thermal?.step.endTimeS !== undefined);
+
 export const isProblem = (value: ThermalCase | Problem): value is Problem => 'code' in value;
 
 /** `doc` with the thermal set-up of the case replaced. */

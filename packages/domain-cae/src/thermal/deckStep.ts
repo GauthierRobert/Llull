@@ -43,8 +43,12 @@ function everyTimes(every: number, end: number): number[] | null {
  * multiples of `outputEveryS`), which makes ccx land exactly on each requested time; with no request every increment is written.
  * @failure more than 20000 result times -> null
  */
-export function planStep(thermal: ThermalSetup, steady: boolean): StepPlan | null {
-  if (steady) return { timePoints: [], output: '', stepLines: ['*STEP, INC=200', '*HEAT TRANSFER, STEADY STATE', row(1, 1)], notes: [] };
+export function planStep(
+  thermal: ThermalSetup,
+  steady: boolean,
+  procedure: 'HEAT TRANSFER' | 'COUPLED TEMPERATURE-DISPLACEMENT' = 'HEAT TRANSFER',
+): StepPlan | null {
+  if (steady) return { timePoints: [], output: '', stepLines: ['*STEP, INC=200', `*${procedure}, STEADY STATE`, row(1, 1)], notes: [] };
   const step = thermal.step;
   const end = step.endTimeS ?? 0;
   const notes: string[] = [];
@@ -67,7 +71,7 @@ export function planStep(thermal: ThermalSetup, steady: boolean): StepPlan | nul
   }
   const deltmx = step.maxTemperatureChangePerIncrement;
   const heat = [
-    '*HEAT TRANSFER',
+    `*${procedure}`,
     fixed ? 'DIRECT' : null,
     deltmx !== undefined ? `DELTMX=${num(siOf('temperatureDifference', deltmx))}` : null,
   ];

@@ -8,6 +8,7 @@ import { loadCasesOf } from '../decks/context';
 import { caseOf } from '../shared/access';
 import { nonlinearSummary } from '../nonlinear/summary';
 import { thermalResultsSummary } from '../thermal/summary';
+import { transientResults } from '../thermomech/transientSummary';
 import { maxOverNodes, magnitude, nodeCoordinates, nodeEntities, stepOfLoadCase, vonMises } from './fields';
 import { meshQuality } from './meshQuality';
 
@@ -76,6 +77,8 @@ export function resultsSummary(
   if (analysis.type === 'nonlinear_static') return { ...base, ...nonlinearSummary(analysis, mesh, results) };
   if (analysis.type === 'modal') return { ...base, loadCases: [], frequenciesHz: eigenColumn(results, 'eigenvalues', 3) };
   if (analysis.type === 'buckling') return { ...base, loadCases: [], bucklingFactors: eigenColumn(results, 'buckling factors', 1) };
+  const transient = transientResults(analysis, mesh, results);
+  if (transient !== undefined) return { ...base, loadCases: transient.loadCases, thermomechTransient: transient.summary };
   const coordinates = nodeCoordinates(mesh);
   const entities = nodeEntities(mesh);
   const at = (node: number): Vec3 => coordinates.get(node) ?? [0, 0, 0];

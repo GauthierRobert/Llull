@@ -3,6 +3,7 @@
 import type { CteBasisSpec, TemperatureScale, ThermoMechSetup } from '@core/model/analysis';
 import { isCteRefusal, materialCteProvider, type CteBasis, type CteProvider, type CteRefusal } from '@core/model/materialCte';
 import { modelUnverifiedReasons, resolvePropertyModel, isRefused } from '@core/model/propertyModelEval';
+import type { PropertyDirection } from '@core/model/propertyModel';
 import type { CadDocument } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
@@ -34,17 +35,24 @@ export interface SecantExpansion {
 }
 
 /** The thermalStrain model when present, else the cte model: the one `materialCteProvider` reads. */
-function sourceModelSha(doc: CadDocument, materialId: string): string {
+function sourceModelSha(doc: CadDocument, materialId: string, direction?: PropertyDirection): string {
   const material = Object.hasOwn(doc.materials, materialId) ? doc.materials[materialId] : undefined;
   const record = { name: materialId, ...(material?.propertyModels !== undefined ? { propertyModels: material.propertyModels } : {}) };
-  const strain = resolvePropertyModel(record, { property: 'thermalStrain' });
-  const model = isRefused(strain) ? resolvePropertyModel(record, { property: 'cte' }) : strain;
+  const directed = direction === undefined ? {} : { direction };
+  const strain = resolvePropertyModel(record, { property: 'thermalStrain', ...directed });
+  const model = isRefused(strain) ? resolvePropertyModel(record, { property: 'cte', ...directed }) : strain;
   return isRefused(model) ? '' : sha256Hex(canonicalJson(model));
 }
 
 /** Provider of the material of `materialId` for this case, or a refusal (TMC_MATERIAL_NO_CTE, TMC_CTE_BASIS_UNKNOWN, PHY-01 codes). */
-export function providerFor(doc: CadDocument, setup: ThermoMechSetup, materialId: string, path: string): CteProvider | CteRefusal {
-  return materialCteProvider(doc.materials, materialId, cteBasisOf(setup, materialId), path);
+export function providerFor(
+  doc: CadDocument,
+  setup: ThermoMechSetup,
+  materialId: string,
+  path: string,
+  direction?: PropertyDirection,
+): CteProvider | CteRefusal {
+  return materialCteProvider(doc.materials, materialId, cteBasisOf(setup, materialId), path, direction);
 }
 
 /**
@@ -61,6 +69,7 @@ export function secantExpansion(
   lowKelvin: number,
   highKelvin: number,
   scale: TemperatureScale,
+  direction?: PropertyDirection,
 ): SecantExpansion | CteRefusal {
   const low = Math.min(lowKelvin, referenceKelvin);
   const high = Math.max(highKelvin, referenceKelvin);
@@ -101,7 +110,7 @@ export function secantExpansion(
   );
   const first = alphas[0] ?? 0;
   const constant = alphas.every((alpha) => Math.abs(alpha - first) <= 1e-10 * Math.abs(first));
-  const base = { provider, unverifiedReasons: [...reasons], modelSha256: sourceModelSha(doc, materialId) };
+  const base = { provider, unverifiedReasons: [...reasons], modelSha256: sourceModelSha(doc, materialId, direction) };
   if (constant) return { ...base, rows: [[alphas[extreme] ?? first]] };
   return { ...base, rows: samples.map((kelvin, i) => [alphas[i] ?? first, fromKelvin(kelvin, scale)] as const) };
 }

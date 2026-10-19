@@ -104,7 +104,7 @@ const stepSchema = {
 export const setThermalStep = defineCommand({
   name: 'set_thermal_step',
   description:
-    'Set the time stepping of a heat_transient analysis (a heat_steady case needs none): endTimeS, initialIncrementS, minIncrementS, ' +
+    'Set the time stepping of a heat_transient analysis (a heat_steady case needs none) or make a coupled_temperature_displacement analysis transient (giving endTimeS turns its steady-state step into a transient one; the case needs set_initial_temperature or a field for a start state, cp and density on the materials, and the thermal BC amplitudes drive it): endTimeS, initialIncrementS, minIncrementS, ' +
     'maxIncrementS, fixedIncrements (constant increments), maxTemperatureChangePerIncrement (DELTMX, K) and the result times ' +
     '(outputTimesS or outputEveryS; with fixedIncrements only outputEveryS, a multiple of the increment). Times are in seconds. Only the ' +
     'given fields change. A transient also needs set_initial_temperature and cp + density on the materials.',
@@ -116,7 +116,10 @@ export const setThermalStep = defineCommand({
     if (isProblem(found)) return fail(found);
     const given = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)) as ThermalStep;
     const step: ThermalStep = { ...found.thermal.step, ...given };
-    const bad = stepProblem(step, found.analysisCase.type === 'heat_transient');
+    const transient =
+      found.analysisCase.type === 'heat_transient' ||
+      (found.analysisCase.type === 'coupled_temperature_displacement' && Object.keys(step).length > 0);
+    const bad = stepProblem(step, transient);
     if (bad !== null) return fail(problem('THM_STEP_INVALID', bad, [analysisId], Object.keys(given)));
     const text = Object.entries(step)
       .map(([key, value]) => `${key}=${JSON.stringify(value)}`)

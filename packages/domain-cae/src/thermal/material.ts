@@ -7,7 +7,7 @@ import { baseEvaluatorOf, evaluatePropertyModel, resolvePropertyModel, type Prop
 import { curveOf, SOLVER_TABLE_REL_TOL, tabulateModel } from '@core/model/propertyTabulate';
 import { convertValue, isUnitFailure } from '@lib/quantity';
 import { siToSystem, siUnitOf, type ThermalKind } from '@lib/thermalUnits';
-import { problem, type Problem, type ThermalCase } from './access';
+import { isTransientCase, problem, type Problem, type ThermalCase } from './access';
 import { amplitudeRange } from './amplitudeRange';
 import { inScale } from './quantities';
 
@@ -301,9 +301,9 @@ export function partMaterials(doc: CadDocument, analysisCase: AnalysisCase): Par
     });
 }
 
-/** Properties a case needs: k always; cp and density for a transient. */
+/** Properties a case needs: k always; cp and density for a transient (a coupled transient takes its density from the 05 mechanical material). */
 export const propertiesNeeded = (analysisCase: AnalysisCase): readonly ThermalProperty[] =>
-  analysisCase.type === 'heat_transient' ? ['k', 'cp', 'density'] : ['k'];
+  analysisCase.type === 'heat_transient' ? ['k', 'cp', 'density'] : isTransientCase(analysisCase) ? ['k', 'cp'] : ['k'];
 
 /** Table of `material` (id `materialId`) for `property` over the temperatures the case `found` reaches. */
 export function casePropertyTable(

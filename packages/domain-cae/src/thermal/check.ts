@@ -11,7 +11,7 @@ import { cavityNameProblem } from '../shared/names';
 import { analysisIdSchema } from '../shared/schemas';
 import { temperatureBcConflicts, temperatureOverridesFlows } from './bcConflicts';
 import { trustedRecord } from '../shared/trust';
-import { isProblem, thermalCaseOf, type ThermalCase } from './access';
+import { isProblem, isTransientCase, thermalCaseOf, type ThermalCase } from './access';
 import { tableProblem } from './amplitude';
 import { recordProblem } from './bcModel';
 import { refuseThermal, remediationOf } from './codes';
@@ -84,8 +84,8 @@ function setupItems(doc: CadDocument, found: ThermalCase): ThermalCheckItem[] {
   const { analysisCase, thermal } = found;
   const id = analysisCase.id;
   const items: ThermalCheckItem[] = [];
-  if (analysisCase.type === 'heat_transient') {
-    if (thermal.initialTemperature === undefined)
+  if (isTransientCase(analysisCase)) {
+    if (analysisCase.type === 'heat_transient' && thermal.initialTemperature === undefined)
       items.push(item('THM_INITIAL_TEMPERATURE_MISSING', 'error', 'a transient case needs an initial temperature', [id]));
     if (thermal.step.endTimeS === undefined)
       items.push(item('THM_STEP_INVALID', 'error', 'a transient case needs step.endTimeS', [id], 'step.endTimeS'));
