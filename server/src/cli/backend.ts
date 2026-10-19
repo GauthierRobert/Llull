@@ -84,7 +84,13 @@ export function createLocalBackend(docPath: string, options: LocalOptions): CliB
   return {
     target: docPath,
     run: (name, params) => Promise.resolve(runCommand(name, params)),
-    exchange: (name, params) => runLocalExchange(name, params, { options: options.exchangeOptions(), getDoc: currentDoc, runCommand }),
+    exchange: (name, params) =>
+      runLocalExchange(name, params, {
+        options: options.exchangeOptions(),
+        getDoc: currentDoc,
+        runCommand,
+        ...(options.observer !== undefined ? { onProgress: options.observer.note } : {}),
+      }),
     undo: () => swapWithBackup('undo'),
     redo: () => swapWithBackup('redo'),
   };

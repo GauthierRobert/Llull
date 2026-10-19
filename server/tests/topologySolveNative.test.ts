@@ -1,0 +1,110 @@
+/**
+ * topology_solve end to end with the real `llull-compute` (cargo build --profile compute -p llull-compute in solver/); skipped with a logged reason
+ * when it is absent. The MBB 60 x 20 study of the PHY-17 validation plan, set up through commands (E = 1 MPa, nu = 0.3, unit load, half beam:
+ * symmetry-left ux = 0 and a roller at the bottom right), is VC-TOP-10 (top88 sensitivity filter): last-iteration compliance 203.19245764, and
+ * VC-TOP-27 determinism (same field hash twice).
+ */
+
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { execute } from '@core/commands/registry';
+import { defaultContext } from '@core/commands/context';
+import type { FeTopologyArtifact, TopologyStudy } from '@core/model/topology';
+import type { FeaHost } from '@protocol/index';
+import { createFeArtifactStore, type FeArtifactCache } from '../src/fea/artifactStore';
+import { createComputeRunner } from '../src/native/computeJob';
+import { nativeBinaryPath } from '../src/native/nativeBinary';
+import { runTopologySolve } from '../src/native/topologySolve';
+import { mbbModel, studyOf } from '../../tests/unit/cae/topology/support';
+
+const BINARY = nativeBinaryPath('llull-compute');
+if (BINARY === null)
+  console.warn('topologySolveNative: llull-compute not built (cargo build --profile compute -p llull-compute in solver/): skipped');
+const native = BINARY === null ? it.skip : it;
+
+let dir = '';
+let store: FeArtifactCache;
+beforeAll(() => {
+  dir = mkdtempSync(path.join(tmpdir(), 'llull-topology-native-'));
+  store = createFeArtifactStore(dir);
+});
+afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+describe('topology_solve with the real llull-compute', () => {
+  native(
+    'solves the MBB 60 x 20 benchmark (VC-TOP-10) and is deterministic (VC-TOP-27)',
+    async () => {
+      const model = mbbModel();
+      const lines: string[] = [];
+      const solveOnce = async (): Promise<{ hash: string; study: TopologyStudy; artifact: FeTopologyArtifact }> => {
+        let doc = model.doc;
+        const host: FeaHost = {
+          getDoc: () => doc,
+          applyCommand: (name, params) => {
+            const result = execute(doc, name, params, { ...defaultContext(), feaArtifacts: store });
+            if (result.rejected !== true) doc = result.document;
+            return { summary: result.summary, affected: result.affected, isError: result.rejected === true, data: result.data };
+          },
+        };
+        const runner = createComputeRunner({}, BINARY);
+        const result = await runTopologySolve(model.studyId, { timeoutS: 300 }, host, {
+          store,
+          runner,
+          onProgress: (line) => lines.push(line),
+        });
+        expect(result.isError, result.summary).toBe(false);
+        const hash = (result.data as { fieldHash: string }).fieldHash;
+        return { hash, study: studyOf(doc, model.analysisId, model.studyId), artifact: store.get(hash) as FeTopologyArtifact };
+      };
+      const first = await solveOnce();
+      const { artifact } = first;
+      expect(artifact.solver).toMatchObject({ job: 'topopt', device: 'cpu', deterministic: true });
+      expect(artifact.iterations).toBe(94);
+      expect(artifact.status).toBe('converged');
+      const last = artifact.history.at(-1)?.compliance ?? 0;
+      expect(Math.abs(last - 203.19245764) / 203.19245764).toBeLessThan(1e-6);
+      expect(Math.abs(artifact.compliance - 203.182593257) / 203.182593257).toBeLessThan(1e-6);
+      expect(first.study.result).toMatchObject({ fieldHash: first.hash, iterations: 94, solver: { job: 'topopt' } });
+      expect(first.study.result?.volumeFraction).toBeCloseTo(0.4999701, 6);
+      expect(lines).toHaveLength(94);
+      expect(lines[0]).toContain('iteration 1/300');
+      const second = await solveOnce();
+      expect(second.hash).toBe(first.hash);
+    },
+    120_000,
+  );
+  native(
+    'resumeFromLast continues a finished run bit for bit (VC-TOP-31)',
+    async () => {
+      const solve = async (maxIterations: number, resumeFromLast: boolean): Promise<FeTopologyArtifact> => {
+        const model = mbbModel({ maxIterations });
+        let doc = model.doc;
+        const host: FeaHost = {
+          getDoc: () => doc,
+          applyCommand: (name, params) => {
+            const result = execute(doc, name, params, { ...defaultContext(), feaArtifacts: store });
+            if (result.rejected !== true) doc = result.document;
+            return { summary: result.summary, affected: result.affected, isError: result.rejected === true, data: result.data };
+          },
+        };
+        const result = await runTopologySolve(model.studyId, { resumeFromLast, timeoutS: 300 }, host, {
+          store,
+          runner: createComputeRunner({}, BINARY),
+        });
+        expect(result.isError, result.summary).toBe(false);
+        return store.get((result.data as { fieldHash: string }).fieldHash) as FeTopologyArtifact;
+      };
+      const whole = await solve(30, false);
+      await solve(12, false);
+      const resumed = await solve(30, true);
+      expect(whole.iterations).toBe(30);
+      expect(resumed.iterations).toBe(30);
+      expect(resumed.xPhys).toBe(whole.xPhys);
+      expect(resumed.compliance).toBe(whole.compliance);
+      expect(resumed.history.at(-1)).toEqual(whole.history.at(-1));
+    },
+    120_000,
+  );
+});

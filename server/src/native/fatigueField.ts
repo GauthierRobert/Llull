@@ -18,6 +18,8 @@ export interface NativeDeps {
   readonly store: FeArtifactCache;
   readonly runner: ComputeRunner;
   readonly env?: NodeJS.ProcessEnv;
+  /** One human-readable line per solver iteration (topology_solve; the CLI prints it with `--progress`). */
+  readonly onProgress?: (line: string) => void;
 }
 
 export interface FatigueFieldOptions {

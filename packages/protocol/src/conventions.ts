@@ -217,8 +217,10 @@ A topology result is a concept shape computed by llull, never a released design:
   \`add_fea_load\` (force loads only) → \`create_topology_study\` (\`voxel\` and lengths in document units, \`volumeFraction\` 0.7 = 30 % lighter,
   dimension 2 = plate layout on a plane, 3 = voxel solid) → optional \`set_topology_regions\` (keepIn bosses and interfaces, keepOut clearances;
   load and support layers are protected by default) and \`set_topology_settings\` (named defaults: penal 3, move 0.2, filter radius 1.5 voxels).
-- **Solve.** The host runs the topology_solve transport (native \`llull-compute topopt\`; 2D grids up to 2000 voxels also solve in TypeScript) and
-  stores the result with \`record_topology_result\`. Never write a result by hand: the numbers are recomputed from the stored field.
+- **Solve.** \`llull topology_solve studyId=ID --progress\` (\`timeoutS\` default 1800, \`resumeFromLast=true\` continues the last finished run,
+  \`device=cpu|gpu|auto\`) runs the native \`llull-compute topopt\` (2D studies up to 2000 voxels also solve in TypeScript when it is missing; else
+  TOP_TOOL_MISSING) and records the result with \`record_topology_result\`. Never write a result by hand: the numbers are recomputed from the stored field.
+  Units are the analysis unit system (E in its stress unit, forces in its force unit, compliance in force x length).
   \`topology_report\` shows state (unsolved | solved | stale | missing | untrusted), compliance, volume fraction, grey level.
 - **Rebuild.** The derived solid on layer layer-topology is read-only (TOP_DERIVED_READ_ONLY). \`suggest_rebuild\` gives closed loops (outer
   counter-clockwise, holes clockwise) → \`extrude_profile\` (profile = the points, placement from the answer) for the outer loop, each hole with

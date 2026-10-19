@@ -34,6 +34,8 @@ export interface StepObserver {
   readonly onStep: (event: PlanStepEvent) => void;
   /** `data` of a plan report with `durationMs` added to each step that ran. */
   withDurations(data: unknown): unknown;
+  /** A line from a long native job (solver iteration): printed with `--progress` (or a terminal), dropped otherwise. */
+  note(line: string): void;
   /** Set when the deadline stopped the run. */
   timeout(): TimeoutStop | undefined;
 }
@@ -83,6 +85,9 @@ export function createStepObserver(options: StepObserverOptions): StepObserver {
         return durationMs === undefined || !isRecord(step) ? step : { ...step, durationMs };
       });
       return { ...data, steps };
+    },
+    note: (line) => {
+      if (progress) print(line);
     },
     timeout: () => stopped,
   };
