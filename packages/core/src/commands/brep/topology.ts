@@ -11,6 +11,7 @@ import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
 import { operandRecipe } from './kernelShape';
 import { labelStep } from './stepLabels';
+import { retargetStepSchema } from './stepSchema';
 import { labelStepAssembly } from './stepAssemblyLabels';
 import { planStepAssembly } from './stepAssembly';
 import { type StepEntry, stepLabels, stepTargets } from './stepTargets';
@@ -98,7 +99,7 @@ export const exportStepExact = defineCommand({
   name: 'export_step_exact',
   annotations: { readOnly: true, requiresKernel: true },
   description:
-    "Export 3D solids to STEP (AP214, ISO 10303-21) directly from the geometry kernel's exact B-rep: primitives, " +
+    "Export 3D solids to STEP (AP214 by default, AP242 with schema ap242; ISO 10303-21) directly from the geometry kernel's exact B-rep: primitives, " +
     'booleans, fillets, chamfers and shells are written as true analytic/NURBS faces, not triangles. ' +
     `No Python needed. Requires ${OCC_HINT}; the default Manifold kernel gracefully no-ops ` +
     '(use export_step via the Python bridge, or export_stl, instead). ' +
@@ -115,10 +116,18 @@ export const exportStepExact = defineCommand({
       .array(z.string())
       .optional()
       .describe('Ids of the 3D solids to export. Omit or pass [] to export every 3D solid of the document.'),
+    schema: z
+      .enum(['ap214', 'ap242'])
+      .optional()
+      .describe(
+        'STEP application protocol declared in the file: "ap214" (default, AUTOMOTIVE_DESIGN) or "ap242" (managed model based 3D engineering, the current edition read by CAD/PLM tools). Geometry, names, colours and assembly structure are identical.',
+      ),
     confirmExportControlled,
   }),
   run: (doc, params, ctx): CommandResult => {
     const { entityIds } = params;
+    const schema = params.schema ?? 'ap214';
+    const protocol = schema === 'ap242' ? 'AP242' : 'AP214';
     const refused = exportRefusal(doc, 'export_step_exact', 'step', params.confirmExportControlled, ctx);
     if (refused !== null) return refused;
     const kernel = (ctx ?? currentContext()).kernel;
@@ -131,12 +140,12 @@ export const exportStepExact = defineCommand({
       const assemblyStep = kernel.exportStepAssembly(plan.occurrences);
       if (assemblyStep === null) return noop(doc, `export_step_exact: the kernel could not write the assembly; nothing exported.`);
       const exported = exportedIds(entries);
-      const step = labelStepAssembly(assemblyStep, plan.labels);
+      const step = retargetStepSchema(labelStepAssembly(assemblyStep, plan.labels), schema);
       const assembly = { products: plan.partCount, occurrences: plan.occurrences.length };
       const data: ExportStepExactData = { format: 'step', step, solidCount: solids.length, entityIds: exported, skipped, assembly };
       return report(
         doc,
-        `export_step_exact: ${solids.length} exact solid(s) from ${exported.join(', ')} → STEP AP214 assembly, ${assembly.products} product(s), ` +
+        `export_step_exact: ${solids.length} exact solid(s) from ${exported.join(', ')} → STEP ${protocol} assembly, ${assembly.products} product(s), ` +
           `${assembly.occurrences} occurrence(s), ${step.length} bytes` +
           (skipped.length > 0 ? `; skipped ${skipped.join(', ')}.` : '.'),
         data,
@@ -150,13 +159,13 @@ export const exportStepExact = defineCommand({
       shapes.push(shape);
     }
     const exactStep = kernel.exportStep(shapes);
-    const step = exactStep === null ? null : labelStep(exactStep, stepLabels(doc, solids));
+    const step = exactStep === null ? null : retargetStepSchema(labelStep(exactStep, stepLabels(doc, solids)), schema);
     if (step === null) return noop(doc, `export_step_exact: this kernel cannot write exact STEP; use ${OCC_HINT}.`);
     const exported = exportedIds(entries);
     const data: ExportStepExactData = { format: 'step', step, solidCount: solids.length, entityIds: exported, skipped };
     return report(
       doc,
-      `export_step_exact: ${solids.length} exact solid(s) from ${exported.join(', ')} → STEP AP214, ${step.length} bytes` +
+      `export_step_exact: ${solids.length} exact solid(s) from ${exported.join(', ')} → STEP ${protocol}, ${step.length} bytes` +
         (skipped.length > 0 ? `; skipped ${skipped.join(', ')}.` : '.'),
       data,
     );

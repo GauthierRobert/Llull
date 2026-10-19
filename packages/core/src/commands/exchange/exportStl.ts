@@ -11,7 +11,7 @@ import { facetNormal } from '../../geometry/tessellation';
 
 const formatVec3 = (v: Vec3): string => v.join(' ');
 
-function buildAsciiStl(tris: Triangle[], solidName: string): string {
+export function buildAsciiStl(tris: Triangle[], solidName: string): string {
   return asciiSolidBlock(tris, solidName).join('\n');
 }
 

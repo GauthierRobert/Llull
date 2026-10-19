@@ -97,7 +97,7 @@ export function installKernelPerTest(kernel: GeometryKernel): void {
   afterEach(() => setGeometryKernel(null));
 }
 
-/** A fake kernel whose solids, booleans, fillets and chamfers are all `TRIANGLE`. */
+/** A fake kernel whose solids, fillets and chamfers are `TRIANGLE` and whose booleans are a closed `TETRA` (a boolean result must enclose volume). */
 export function triangleKernel(): FakeKernel {
-  return fakeKernel({ solid: TRIANGLE, boolean: TRIANGLE, fillet: TRIANGLE, chamfer: TRIANGLE });
+  return fakeKernel({ solid: TRIANGLE, boolean: TETRA, fillet: TRIANGLE, chamfer: TRIANGLE });
 }

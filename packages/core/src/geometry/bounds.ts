@@ -189,11 +189,45 @@ function localEntityCorners(e: Entity): Vec3[] {
 }
 
 /**
+ * Tight world AABB of a rotated cylinder / cone / sphere / torus from closed-form extents: a circle of radius r whose axis has world
+ * component n_i on axis i spans r·sqrt(1-n_i²) there. Undefined for other kinds (they use the rotated local-corner hull).
+ */
+function analyticOrientedBounds(e: Entity): Bounds | undefined {
+  if (e.kind !== 'cylinder' && e.kind !== 'cone' && e.kind !== 'sphere' && e.kind !== 'torus') return undefined;
+  const axis = applyEulerXYZ([0, 0, 1], ORIGIN, e.rotation);
+  const extent = (i: 0 | 1 | 2): [number, number] => {
+    const n = axis[i];
+    const spread = Math.sqrt(Math.max(0, 1 - n * n));
+    switch (e.kind) {
+      case 'cylinder': {
+        const half = (e.height / 2) * Math.abs(n) + e.radius * spread;
+        return [-half, half];
+      }
+      case 'cone': {
+        const rim = e.radius * spread;
+        return [Math.min(-rim, e.height * n), Math.max(rim, e.height * n)];
+      }
+      case 'sphere':
+        return [-e.radius, e.radius];
+      default: {
+        const half = e.ringRadius * spread + e.tubeRadius;
+        return [-half, half];
+      }
+    }
+  };
+  const [x, y, z] = [extent(0), extent(1), extent(2)];
+  const p = e.position;
+  return { min: [p[0] + x[0], p[1] + y[0], p[2] + z[0]], max: [p[0] + x[1], p[1] + y[1], p[2] + z[1]], oriented: true };
+}
+
+/**
  * World AABB of one entity with `rotation` applied about `position` (three.js Rx·Ry·Rz). Zero rotation equals `entityBounds`; otherwise the
  * result wraps the rotated local geometry and carries `oriented:true`.
  */
 export function orientedEntityBounds(e: Entity): Bounds {
   if (isZeroRotation(e.rotation)) return entityBounds(e);
+  const analytic = analyticOrientedBounds(e);
+  if (analytic) return analytic;
   const rotated = localEntityCorners(e).map((local) =>
     applyEulerXYZ([e.position[0] + local[0], e.position[1] + local[1], e.position[2] + local[2]], e.position, e.rotation),
   );

@@ -4,16 +4,34 @@
   "description": "six cylinders r=0.5 h=2 on a circle of radius 5",
   "source": "analytic",
   "formula": "bodies = n; V = n pi r^2 h; centroid on the axis",
-  "kernels": ["manifold", "occt"],
+  "kernels": [
+    "manifold",
+    "occt"
+  ],
   "bodies": 6,
   "volume": 9.42477796077,
   "area": 47.1238898038,
-  "centroid": [0, 0, 0],
-  "bbox": { "min": [-5.5, -4.83012701892, -1], "max": [5.5, 4.83012701892, 1] },
-  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
-  "knownFailure": {
-    "fields": ["bbox"],
-    "measured": { "bboxY": [-5.013139720814415, 5.013139720814413] },
-    "diagnosis": "measure_bounding_box returns the AABB of the rotated local box (entityBoundsInDoc), not the tight box of the rotated cylinder: 0.5 sin60 + 0.5 cos60 + 5 sin60 = 5.013 instead of 5 sin60 + 0.5 = 4.830 for a cylinder turned 60 degrees about Z"
+  "centroid": [
+    0,
+    0,
+    0
+  ],
+  "bbox": {
+    "min": [
+      -5.5,
+      -4.83012701892,
+      -1
+    ],
+    "max": [
+      5.5,
+      4.83012701892,
+      1
+    ]
+  },
+  "tolerance": {
+    "volume": 0.001,
+    "area": 0.001,
+    "centroid": 0.001,
+    "bbox": 0.001
   }
 }
