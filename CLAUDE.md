@@ -43,6 +43,7 @@ packages/protocol/src/    @protocol  host protocol over the registry: liveSync �
 packages/domain-aec/src/  @aec   plugins `<domain>/{catalog,plugin}.ts`: building/ industrial/<discipline>/ civil/<topic>/ steel/ shared/
 packages/domain-cae/src/  @cae   plugin `cae` (toolset analysis): 05 FEA set-up, decks, results, thermal/ thermomech/ margins/
 packages/domain-aero/src/ @aero  plugins `sheetmetal` (toolset manufacturing, 07 FTR) and `fasteners` (toolset fasteners, 08 MAT)
+packages/design-lang/src/ @design  plugin `design`: `.lld` text designs (one recipe step, re-run on regeneration); removable — docs/DESIGN_LANGUAGE.md
 packages/kernel-{manifold,occt}/src/   GeometryKernel impls
 packages/physics-mujoco/src/           PhysicsEngine impl (MuJoCo WASM) — rigid-body dynamics, docs/DYNAMICS.md
 src/app/                  @app   composition root: installDefaultPlugins()

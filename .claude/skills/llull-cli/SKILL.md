@@ -93,6 +93,8 @@ target=drawing` (needs a DWG converter). `llull list exchange` shows them all.
 - One JSON object: `'{"size":[1,2,3]}'` · a file: `@params.json` · stdin: `-`.
 - A value `@img:scan.png` is read as a PNG/JPEG data URL: trace a drawing with
   `llull add_image_underlay dataUrl=@img:scan.png`, then `calibrate_underlay` and `image_to_world`.
+- A value `@text:part.lld` is read as the file's UTF-8 text: `llull apply_design source=@text:part.lld` (a `.lld` design,
+  see the design-model skill; `check_design` gates on its checks, `export_design --save part.lld` writes it back).
 - `llull <command> …` is shorthand for `llull exec <command> …`.
 
 ## Flags

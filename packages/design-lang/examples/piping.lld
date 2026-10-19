@@ -1,0 +1,16 @@
+# Cooling-water line on a small pipe rack: IPE200 cross-beams every 4 m, a DN100 run with shoes on the steel, a cable tray alongside
+design cw_rack units=m
+param L = 14
+param s = 3.5            # rack bay
+param zb = 3           # beam axis elevation
+add_level rack name="Pipe rack" elevation=0 height=4
+for i in 0..L/s {
+  add_steel_member beam{i} profile=IPE200 start=[i*s,-1,zb] end=[i*s,1,zb] role=beam levelId=rack
+}
+add_pipe_run cw points=[[0,0,zb+0.1+0.05715],[L,0,zb+0.1+0.05715],[L,1,zb+0.1+0.05715]] dn=100 line="CW-101" service="cooling water" from="BL-1" to="EQ1" levelId=rack
+add_pipe_support shoes line="CW-101" spacing=s type=shoe
+add_cable_tray tray points=[[0,-0.6,zb+0.13],[L,-0.6,zb+0.13]] width=0.3 height=0.06 system=power levelId=rack
+check check_pipe_supports path=ok expect == true
+check pipe_hydraulics pipeId=cw flowM3h=40 path=velocityMS expect ~= 1.35 ± 5%
+check building_schedule kind=pipe path=rows.length expect == 1
+check bbox of=tray expect ~= [L,0.3,0.06] ± 2%

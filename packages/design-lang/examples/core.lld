@@ -1,0 +1,25 @@
+# Workbench frame: a top on four legs with a lower shelf, placed, grouped and layered with core commands
+design workbench units=mm
+param w = 1200
+param d = 600
+param h = 850
+param leg = 60
+param t = 30
+
+add_layer frame name="Frame"
+add_box top size=[w, d, t] anchor=min position=[0, 0, h-t] color="#b5835a"
+for i in 0..1 {
+  add_box leg{i} size=[leg, leg, h-t] anchor=min position=[i*(w-leg), 0, 0]
+  array_linear row{i} id=leg{i} count=2 offset=[0, d-leg, 0]
+}
+add_box shelf size=[w-2*leg, d-2*leg, 20] anchor=min position=[0, 0, 150]
+align _ targetIds=[shelf] edge=center-x referenceId=top
+align _ targetIds=[shelf] edge=center-y referenceId=top
+set_entity_layer _ entityId=top layerId=frame
+set_entity_name _ id=top name="Bench top" tags=[worktop]
+group_entities bench ids=[top, leg0, row0, leg1, row1, shelf] name="Workbench"
+
+check bbox of=top expect == [w, d, t]
+check min of=shelf expect == [leg, leg, 150]
+check find_entities kind=box path=count expect == 6
+check check_model path=issues expect == []

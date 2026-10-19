@@ -11,7 +11,7 @@ import { describeCommand, listCatalog, searchCatalog, suggestNames, toolsetCount
 import { planAliases } from './aliases';
 import { planText, resultJson, resultText, type PrintableResult } from './output';
 import { createStepObserver, type StepObserver } from './progress';
-import { resolveImageRefs } from './imageParams';
+import { resolveFileRefs } from './fileParams';
 import { saveDataFiles, withoutPayloads, withSaveDefaults } from './saveFiles';
 import { llullHome, readDesktopDiscovery } from './desktopDiscovery';
 import { exchangeTool, takesFileParam, withFileContent } from './exchange';
@@ -141,10 +141,10 @@ function stringParamKeys(name: string): ReadonlySet<string> {
   );
 }
 
-/** Params of `name`, with `@img:<path>` values loaded as image data URLs. */
+/** Params of `name`, with `@img:<path>` values loaded as image data URLs and `@text:<path>` values as file text. */
 async function paramsOf(name: string, tokens: readonly string[], io: CliIo): Promise<unknown> {
   const params = await rawParamsOf(name, tokens, io);
-  return asUsage(() => resolveImageRefs(params, (source) => asUsage(() => fs.readFileSync(source), `cannot read ${source}: `)));
+  return asUsage(() => resolveFileRefs(params, (source) => asUsage(() => fs.readFileSync(source), `cannot read ${source}: `)));
 }
 
 async function rawParamsOf(name: string, tokens: readonly string[], io: CliIo): Promise<unknown> {

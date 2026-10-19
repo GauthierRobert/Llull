@@ -35,6 +35,7 @@ const TOOLSET_GROUPS = {
   building: 'Building',
   piping: 'Piping',
   civil: 'Civil / site',
+  design: 'Design (.lld)',
 } as const satisfies Record<ToolsetName, string>;
 
 const OTHER_COMMANDS_GROUP = 'Other commands' as const;

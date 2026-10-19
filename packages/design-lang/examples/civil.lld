@@ -1,0 +1,14 @@
+# Small industrial plot: survey points -> terrain TIN, a graded building pad near earthworks balance, and a two-manhole storm drain
+design plot_grading units=m
+param fl = 101.9       # finished pad level
+import_survey_points survey name="Topo 2026" points=[{"x":0,"y":0,"z":100},{"x":20,"y":0,"z":101},{"x":40,"y":0,"z":102},{"x":60,"y":0,"z":103},{"x":0,"y":20,"z":100.4},{"x":20,"y":20,"z":101.4},{"x":40,"y":20,"z":102.4},{"x":60,"y":20,"z":103.4},{"x":0,"y":40,"z":100.8},{"x":20,"y":40,"z":101.8},{"x":40,"y":40,"z":102.8},{"x":60,"y":40,"z":103.8}]
+create_surface eg name="Existing ground" contourInterval=0.5
+add_platform pad surfaceId=eg boundary=[[15,10],[45,10],[45,30],[15,30]] elevation=fl cutSlope=1.5 fillSlope=2
+add_manhole mh1 location=[50,35] invertElevation=101.7 surfaceId=eg catchmentAreaHa=0.5 name="MH1"
+add_manhole mh2 location=[10,35] invertElevation=99.7 surfaceId=eg name="OUT1"
+add_pipe p1 fromId=mh1 toId=mh2 diameter=0.3 material=PVC
+check surface_report surfaceId=eg path=meanElevationM expect ~= 101.9
+check platform_earthworks platformId=pad path=padAreaM2 expect ~= 600
+check platform_earthworks platformId=pad path=netM3 expect ~= 0 ± 15
+check check_drainage_network path=failures.length expect == 0
+check check_drainage_network path=pipes.0.slopePct expect ~= 5

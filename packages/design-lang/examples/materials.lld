@@ -1,0 +1,18 @@
+# Aluminium mounting plate: a sourced 6061-T6 material library entry, assigned to the part, with mass and allowables read back
+design mounting_plate units=mm
+param w = 120mm
+param d = 80mm
+param t = 8mm
+
+add_box plate size=[w, d, t] position=[0, 0, t/2]
+
+create_material _ name=al6061 density=2.70 densityUnit=g/cm^3 color="#b8c0c8" metalness=0.8 roughness=0.35
+set_material_property _ material=al6061 property=E value=68.9 unit=GPa basis=typical source.citation="MMPDS-17" source.locator="Table 3.6.2.0(b1)"
+set_material_property _ material=al6061 property=Fty value=35 unit=ksi basis=A direction=L source.citation="MMPDS-17" source.locator="Table 3.6.2.0(b1)"
+set_material_property _ material=al6061 property=cte value=23.6e-6 unit=1/K basis=typical source.citation="MMPDS-17" source.locator="Table 3.6.2.0(b1)"
+assign_material _ materialName=al6061 entityIds=[plate]
+
+check mass of=plate expect ~= 2.70e-3*w*d*t g
+check get_material_allowable material=al6061 property=Fty basis=A direction=L unit=MPa path=value expect ~= 241.3
+check convert_quantity value=35 from=ksi to=MPa path=value expect ~= 241.3
+check evaluate_property material=al6061 property=E at.T.value=20 at.T.unit=degC outputUnit=GPa allowConstant=true path=value expect == 68.9

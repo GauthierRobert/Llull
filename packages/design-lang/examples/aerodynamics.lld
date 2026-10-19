@@ -1,0 +1,15 @@
+# Small UAV wing panel: NACA 2412 section extruded to a constant-chord wing, with section, wing and drag analyses
+design uav_wing units=mm
+param chord = 200
+param span = 1200
+param cruise = 20      # m/s
+param cd0 = 0.02       # profile drag coefficient on the frontal area (assumed)
+draw_naca_airfoil root naca="2412" chord=chord pointsPerSide=60
+extrude_profile wing id=root depth=span axis=[0,1,0] color="#4a7bb7"
+check bbox of=wing expect ~= [chord,span,0.12*chord] ± 2%
+check analyze_airfoil entityId=root alphasDeg=[0,5] path=zeroLiftAngleDeg expect ~= -2.15 ± 0.05
+check analyze_wing span=span/1000 rootChord=chord/1000 naca="2412" alphasDeg=[0,5] speed=cruise path=geometry.aspectRatio expect == span/chord
+check analyze_wing span=span/1000 rootChord=chord/1000 naca="2412" alphasDeg=[0,5] speed=cruise path=polar.1.liftN expect >= 30
+check frontal_area entityIds=[wing] path=frontalAreaM2 expect ~= 0.12*chord*span/1e6 ± 3%
+check standard_atmosphere altitude=0 path=densityKgM3 expect ~= 1.225
+check aero_drag speed=cruise cd=cd0 entityIds=[wing] path=dragN expect ~= 0.5*1.225*cruise*cruise*cd0*0.12*chord*span/1e6 ± 3%

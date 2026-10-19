@@ -1,0 +1,11 @@
+# Upper-stage kerolox thrust chamber: 80 % bell nozzle as a CAD solid, sized and checked with 1D isentropic performance
+design kerolox_chamber units=mm
+param rt = 12          # throat radius
+param eps = 12         # expansion ratio Ae/At
+param wall = 3
+design_nozzle nozzle throatRadius=rt expansionRatio=eps contractionRatio=4 chamberLength=60 shape=bell lengthFraction=0.8 wallThickness=wall
+check measure_bounding_box entityId=nozzle path=size.0 expect ~= 2*(rt*sqrt(eps)+wall) ± 1mm
+check nozzle_performance chamberPressure=40 pressureUnit=bar chamberTemperatureK=3500 gamma=1.2 molarMass=22 expansionRatio=eps throatDiameterM=2*rt/1000 path=sizing.exitDiameterM expect ~= 2*rt*sqrt(eps)/1000
+check nozzle_performance chamberPressure=40 pressureUnit=bar chamberTemperatureK=3500 gamma=1.2 molarMass=22 expansionRatio=eps throatDiameterM=2*rt/1000 path=ispS.vacuum expect ~= 319.1
+check compressible_flow relation=isentropic areaRatio=eps branch=supersonic gamma=1.2 path=result.mach expect ~= 3.405
+check rocket_delta_v ispS=319 initialMassKg=50 propellantMassKg=30 path=deltaVMS expect >= 2800

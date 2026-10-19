@@ -1,0 +1,23 @@
+# Door hinge: a fixed plate and a swinging leaf made into components, opened by a revolute joint, plus a spare leaf as a physics body
+design hinge units=mm
+param t = 4mm
+param leaf = 60mm
+param open = 0.6
+
+add_box plate_body size=[40, leaf, t] position=[-20, 0, t/2]
+add_box leaf_body size=[40, leaf, t] position=[20, 0, t/2]
+create_component plate name="Fixed plate" entityIds=[plate_body] componentId=plate_c
+create_component leaf_part name="Leaf" entityIds=[leaf_body] componentId=leaf_c
+insert_instance spare componentId=leaf_c position=[100, 0, 0]
+
+add_joint pin kind=revolute a.instanceId=plate b.instanceId=leaf_part axis=y
+set_joint_value _ id=pin value=open
+
+# the spare leaf swings on a damped pin under gravity
+add_rigid_body spare_rb entityIds=[spare] name=spare_leaf density=7850
+add_body_joint spare_pin kind=revolute child=spare_rb anchor=[80, 0, 0] axis=[0, 1, 0] damping=0.02
+
+check dof expect == 1
+check bill_of_materials path=rows.length expect == 2
+check bbox of=spare expect == [40, leaf, t]
+check inspect_dynamics path=mobility.dof expect == 1
