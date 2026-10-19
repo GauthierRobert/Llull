@@ -71,21 +71,26 @@ export function calibrateBrakePoint(
   if ('error' in start) return start;
   const next = evaluate(q1);
   if ('error' in next) return next;
+  const within = (trial: Trial): boolean => Math.abs(trial.f) <= CALIBRATION_TOLERANCE * targetBmep;
+  for (const trial of [start, next]) if (within(trial)) return { ...trial.point, iterations: 1 };
   let [first, second]: [Trial, Trial] = [start, next];
+  let best: Trial = Math.abs(start.f) < Math.abs(next.f) ? start : next;
   for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
-    if (Math.abs(second.f) <= CALIBRATION_TOLERANCE * targetBmep) return { ...second.point, iterations: iteration };
     const slope = (second.f - first.f) / (q1 - q0);
     if (!(Math.abs(slope) > 0) || !Number.isFinite(slope)) break;
     const proposed: number = q1 - second.f / slope;
     const heat = proposed > 0 ? proposed : q1 / 2;
     const evaluated = evaluate(heat);
     if ('error' in evaluated) return evaluated;
+    // every trial is checked as soon as it is evaluated, the last one included
+    if (within(evaluated)) return { ...evaluated.point, iterations: iteration + 1 };
+    if (Math.abs(evaluated.f) < Math.abs(best.f)) best = evaluated;
     [q0, q1, first, second] = [q1, heat, second, evaluated];
   }
   return {
     code: 'FPR_CALIBRATION_FAILED',
     error:
-      `brake target ${point.brakeTorqueNm} N·m at ${point.rpm} rpm not reached: best ${(((second.point.bmepPa * geometry.displacementM3) / cycleRad) * cylinderCount).toFixed(3)} N·m ` +
-      `after ${MAX_ITERATIONS} iterations (heat ${second.point.heatJ.toPrecision(5)} J per cycle)`,
+      `brake target ${point.brakeTorqueNm} N·m at ${point.rpm} rpm not reached: best ${(((best.point.bmepPa * geometry.displacementM3) / cycleRad) * cylinderCount).toFixed(3)} N·m ` +
+      `after ${MAX_ITERATIONS} iterations (heat ${best.point.heatJ.toPrecision(5)} J per cycle)`,
   };
 }

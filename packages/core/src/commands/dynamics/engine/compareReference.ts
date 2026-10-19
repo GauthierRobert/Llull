@@ -227,7 +227,9 @@ export const compareToReference = defineCommand({
         notRun(entry, `${reference.quantity} is not modelled (no fuel model)`);
         continue;
       }
-      const comparison = comparePoint({ reference, point, simulated, numericalRel, inputBand });
+      // U_num comes from halving at a governed brake point: it does not describe a free-equilibrium rpm (listed missing there)
+      const pointNumerical = reference.quantity in BRAKE_KEYS ? numericalRel : null;
+      const comparison = comparePoint({ reference, point, simulated, numericalRel: pointNumerical, inputBand });
       comparisons.push(comparison);
       const where = point.rpm === undefined ? '' : `@${point.rpm}`;
       items.push(

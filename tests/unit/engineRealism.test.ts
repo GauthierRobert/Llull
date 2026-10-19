@@ -11,7 +11,7 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { EngineLosses, PropellerLoad } from '@core/model/dynamics';
 import { type ReferenceData } from '@core/model/prototype';
 import { accuracy, bandText, combineContributions } from '@core/dynamics/accuracy';
-import { fmepAt, fmepBand, ownsCylinder } from '@core/dynamics/engine/engineLosses';
+import { efficiencyBand, fmepAt, fmepBand, frictionOrigin, lossBands, ownsCylinder } from '@core/dynamics/engine/engineLosses';
 import { advanceRatio, pchipAt, propellerCoefficients } from '@core/dynamics/propellerTable';
 import { propellerOutput } from '@core/dynamics/forceLaws';
 import { combustionOrigin } from '@core/dynamics/engine/combustionOrigin';
@@ -949,5 +949,58 @@ describe('loop residual tiers (VC-FPR-35)', () => {
     expect(residualTier(0.5e-6, pass ?? 0, fail ?? 0)).toBe('pass');
     expect(residualTier(5e-6, pass ?? 0, fail ?? 0)).toBe('warn');
     expect(residualTier(20e-6, pass ?? 0, fail ?? 0)).toBe('fail');
+  });
+});
+
+describe('FPR-E review fixes: bands, efficiency, negative FMEP', () => {
+  it('at a calibration speed the brake band is the calibration tolerance and the indicated band adds the friction band (RSS)', () => {
+    const calibrated = lossBands({
+      calibrated: true,
+      calibrationBand: 1e-3,
+      gasBand: { rel: 1e-3 },
+      frictionBand: { rel: 0.13 },
+      indicated: 140,
+      friction: 20,
+      brake: 120,
+    });
+    expect(calibrated.brake).toEqual({ rel: 1e-3 });
+    expect(calibrated.indicated).toEqual({ rel: expect.closeTo(Math.hypot(1e-3 * 120, 0.13 * 20) / 140, 12) as number });
+    const predicted = lossBands({
+      calibrated: false,
+      calibrationBand: 1e-3,
+      gasBand: null,
+      frictionBand: { rel: 0.13 },
+      indicated: 140,
+      friction: 20,
+      brake: 120,
+    });
+    expect(predicted).toEqual({ indicated: null, brake: null });
+  });
+
+  it('the mechanical-efficiency band is rel(FMEP) (FMEP / IMEP) / eta; a table friction states none', () => {
+    const band = efficiencyBand({ rel: 0.13 }, 2e5, 12e5);
+    const eta = 1 - 2 / 12;
+    expect(band).toEqual({ rel: (0.13 * (2 / 12)) / eta });
+    expect(efficiencyBand(null, 2e5, 12e5)).toBeNull();
+    expect(efficiencyBand({ rel: 0.1 }, 0, 12e5)).toBeNull();
+    expect(
+      frictionOrigin({ id: 'l', crank: 'c', cylinders: [], oilTempFactor: 1, model: { kind: 'fmep_table', points: [], source: 's' } }),
+    ).toBe('input');
+  });
+
+  it('a Chen-Flynn FMEP below zero is clamped to 0 and flagged; constants negative at rest are refused', () => {
+    const losses: EngineLosses = {
+      id: 'l',
+      crank: 'c',
+      cylinders: [],
+      oilTempFactor: 1,
+      model: { kind: 'chen_flynn', aPa: 1000, bRatio: 0, cPaPerRpm: -1, dPaPerRpm2: 0, source: 's' },
+    };
+    expect(fmepAt(losses, 5000, 1e5)).toEqual({ pa: 0, outsideRange: false, clamped: true });
+    expect(fmepAt(losses, 100, 1e5).clamped).toBe(false);
+    const plain = sliderCrank({ rMm: 30.5, lMm: 130 }).doc;
+    const refused = execute(plain, 'set_engine_losses', { crank: 'crank_j', model: { ...CHEN_FLYNN, aPa: -1e5, bRatio: 0.1 } });
+    expect(refused.affected).toEqual([]);
+    expect(refused.summary).toMatch(/negative FMEP .* at 0 rpm and 1 bar/);
   });
 });

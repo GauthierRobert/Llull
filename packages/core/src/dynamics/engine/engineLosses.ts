@@ -8,7 +8,7 @@
 import type { EngineLosses } from '../../model/dynamics';
 import type { AppliedLoads, SimulationState } from '../physicsEngine';
 import { cylinderState, type CylinderRuntime } from '../cylinderLoads';
-import type { AccuracyBand } from '../accuracy';
+import { combineContributions, type AccuracyBand, type AccuracyOrigin } from '../accuracy';
 
 /** Speed below which the loss torque is smoothed (named, TR-FPR-15), rad/s. */
 const FRICTION_SMOOTHING_RAD_S = 1;
@@ -20,16 +20,18 @@ export interface FmepValue {
   readonly pa: number;
   /** The speed lies outside a tabulated FMEP range (FPR_OUTSIDE_VALIDATED_RANGE). */
   readonly outsideRange: boolean;
+  /** The fit gave a negative FMEP, clamped to 0 (chen_flynn constants outside their physical range). */
+  readonly clamped?: boolean;
 }
 
 /** FMEP of `losses` at `rpm` and absolute peak cylinder pressure `peakPa`. */
 export function fmepAt(losses: EngineLosses, rpm: number, peakPa: number): FmepValue {
   const { model } = losses;
-  if (model.kind === 'chen_flynn')
-    return {
-      pa: losses.oilTempFactor * (model.aPa + model.bRatio * peakPa + model.cPaPerRpm * rpm + model.dPaPerRpm2 * rpm * rpm),
-      outsideRange: false,
-    };
+  if (model.kind === 'chen_flynn') {
+    const raw = losses.oilTempFactor * (model.aPa + model.bRatio * peakPa + model.cPaPerRpm * rpm + model.dPaPerRpm2 * rpm * rpm);
+    // a negative FMEP would DRIVE the crank (eta_m > 1): clamped at 0 and reported
+    return { pa: Math.max(0, raw), outsideRange: false, clamped: raw < 0 };
+  }
   const points = [...model.points].sort((a, b) => a[0] - b[0]);
   const first = points[0];
   const last = points[points.length - 1];
@@ -39,6 +41,62 @@ export function fmepAt(losses: EngineLosses, rpm: number, peakPa: number): FmepV
   const upper = points.findIndex((point) => point[0] >= rpm);
   const [a, b] = [points[upper - 1] ?? first, points[upper] ?? last];
   return { pa: losses.oilTempFactor * (a[1] + ((b[1] - a[1]) * (rpm - a[0])) / (b[0] - a[0])), outsideRange: false };
+}
+
+/** A friction table is given input; a Chen-Flynn evaluation is a prediction of the fit. */
+export const frictionOrigin = (losses: EngineLosses): AccuracyOrigin => (losses.model.kind === 'fmep_table' ? 'input' : 'predicted');
+
+export interface LossBandInput {
+  /** The run is at a speed the heat release was calibrated at (to the BRAKE target within `calibrationBand`). */
+  readonly calibrated: boolean;
+  readonly calibrationBand: number;
+  /** Band of the gas side away from a calibration speed. */
+  readonly gasBand: AccuracyBand;
+  readonly frictionBand: AccuracyBand;
+  /** Indicated, friction and brake torque (or any quantities in the same ratio), indicated = brake + friction. */
+  readonly indicated: number;
+  readonly friction: number;
+  readonly brake: number;
+}
+
+/**
+ * Bands of the indicated and brake values. At a calibration speed the brake value is the calibrated one (its band is the calibration
+ * tolerance) and the indicated value = brake + friction inherits both by root-sum-square; elsewhere the gas side carries `gasBand` and the
+ * brake value = indicated - friction combines both.
+ */
+export function lossBands(input: LossBandInput): { indicated: AccuracyBand; brake: AccuracyBand } {
+  const { calibrated, frictionBand, indicated, friction, brake } = input;
+  if (calibrated) {
+    const brakeBand = { rel: input.calibrationBand };
+    return {
+      brake: brakeBand,
+      indicated: combineContributions(
+        [
+          { band: brakeBand, value: brake },
+          { band: frictionBand, value: friction },
+        ],
+        indicated,
+      ),
+    };
+  }
+  return {
+    indicated: input.gasBand,
+    brake: combineContributions(
+      [
+        { band: input.gasBand, value: indicated },
+        { band: frictionBand, value: friction },
+      ],
+      brake,
+    ),
+  };
+}
+
+/** Relative band of the mechanical efficiency eta = 1 - FMEP / IMEP from the friction band alone: rel(FMEP) (FMEP / IMEP) / eta. */
+export function efficiencyBand(frictionBand: AccuracyBand, fmepPa: number, imepPa: number): AccuracyBand {
+  const efficiency = imepPa > 0 ? (imepPa - fmepPa) / imepPa : 0;
+  if (frictionBand === null || efficiency <= 0 || fmepPa === 0) return null;
+  const relative = 'rel' in frictionBand ? frictionBand.rel : Math.abs(frictionBand.abs / fmepPa);
+  return { rel: (relative * (fmepPa / imepPa)) / efficiency };
 }
 
 /** The stated accuracy of the friction model (FR-FPR-71): Chen-Flynn 13 % mean [E-R10]; a user table states none. */

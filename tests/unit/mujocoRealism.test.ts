@@ -195,13 +195,16 @@ describe('calibrated brake torque and friction on the run (VC-FPR-15, TR-FPR-15)
     expect(entries['peakReactionForces']?.band).toBeNull();
     expect(entries['fmepBar']?.band).toEqual({ rel: 0.13 });
     expect(entries['energyClosure']?.origin).toBe('verification');
-    // the brake band combines the 0.1 % calibration with the 13 % friction band on the friction share only
-    const brake = entries['brakeTorqueNm']?.band;
+    // at the calibration speed the BRAKE value is the calibrated one (0.1 %); the indicated value = brake + friction adds the 13 % band
+    const indicated = entries['meanTorqueNm']?.band;
     const losses = realism?.losses;
-    if (brake === null || brake === undefined || !('rel' in brake) || losses === undefined || losses === null)
-      throw new Error('no brake band');
-    const expected = Math.hypot(0.001 * losses.indicatedTorqueNm, 0.13 * losses.frictionTorqueNm) / losses.brakeTorqueNm;
-    expect(brake.rel).toBeCloseTo(expected, 9);
+    if (indicated === null || indicated === undefined || !('rel' in indicated) || losses === undefined || losses === null)
+      throw new Error('no indicated band');
+    expect(entries['brakeTorqueNm']?.band).toEqual({ rel: 0.001 });
+    const expected = Math.hypot(0.001 * losses.brakeTorqueNm, 0.13 * losses.frictionTorqueNm) / losses.indicatedTorqueNm;
+    expect(indicated.rel).toBeCloseTo(expected, 9);
+    const eta = entries['mechanicalEfficiency']?.band;
+    expect(eta).toEqual({ rel: expect.closeTo((0.13 * (losses.fmepBar / losses.imepBar)) / losses.mechanicalEfficiency, 9) as number });
   });
 
   it('reports the reciprocating mass and the inertia against the gas load per cylinder (FR-FPR-73)', () => {
@@ -619,6 +622,11 @@ describe('free equilibrium against a propeller (static_rpm, propeller_rpm; VC-FP
     expect(point?.simulated ?? 0).toBeLessThan(5900);
     expect(point?.span).toEqual({ min: 5100, max: 5800 });
     expect(point?.status).toBe(point?.error === 0 ? 'pass' : 'fail');
+    // the brake-torque halving change says nothing about a free-equilibrium rpm: U_num is listed missing there
+    expect((point as unknown as { uncertainty: { numerical: number | null; missing: string[] } }).uncertainty.numerical).toBeNull();
+    expect((point as unknown as { uncertainty: { missing: string[] } }).uncertainty.missing.some((term) => term.startsWith('U_num'))).toBe(
+      true,
+    );
     const narrow = execute(doc, 'add_reference_data', {
       quantity: 'static_rpm',
       points: [{ value: 7000, min: 6900, max: 7100 }],
