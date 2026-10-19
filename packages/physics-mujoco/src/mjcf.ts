@@ -149,7 +149,7 @@ export function toMjcf(model: SimulationModel, timestep: number): string {
     .join('');
   const integrator = model.solver.integrator === 'implicitfast' || servoChain(model) ? 'implicitfast' : 'RK4';
   const flags = `<flag${model.loops.length > 0 ? ' diagexact="enable"' : ''} energy="enable"/>`;
-  const jacobian = model.loops.length > 0 ? ' jacobian="dense"' : '';
+  const jacobian = model.loops.length > 0 || model.gears.some((gear) => (gear.efficiency ?? 1) < 1) ? ' jacobian="dense"' : '';
   return (
     '<mujoco model="llull"><compiler angle="radian" inertiafromgeom="false" balanceinertia="true"/>' +
     `<option timestep="${timestep}" integrator="${integrator}"${jacobian} gravity="${numbers(model.gravity)}">${flags}</option>` +

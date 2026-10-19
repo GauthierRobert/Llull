@@ -6,6 +6,7 @@
 import type { Motor, PropellerLoad, TorquePoint } from '../model/dynamics';
 import type { Vec3 } from '../model/vectors';
 import type { AppliedLoads, SimulationState } from './physicsEngine';
+import { propellerCoefficients } from './engine/propellerTable';
 
 export const RAD_PER_S_PER_RPM = (2 * Math.PI) / 60;
 
@@ -51,14 +52,26 @@ export interface PropellerOutput {
   readonly torque: number;
   /** W absorbed from the shaft. */
   readonly power: number;
+  /** Present when the coefficients came from the C_T(J), C_P(J) table (J > 0): the advance ratio and whether it lies beyond the table. */
+  readonly advanceRatio?: number;
+  readonly outsideTable?: boolean;
 }
 
-/** Static propeller law at shaft speed `omega` (rad/s): T = Ct·ρ·n²·D⁴, P = Cp·ρ·|n|³·D⁵, Q = P/(2π|n|) = Cp·ρ·n²·D⁵/(2π). */
+/**
+ * Propeller law at shaft speed `omega` (rad/s): T = Ct·ρ·n²·D⁴, P = Cp·ρ·|n|³·D⁵, Q = P/(2π|n|) = Cp·ρ·n²·D⁵/(2π). Ct, Cp are the static pair,
+ * or the table values at J = V / (n D) when the propeller has a table and an airspeed (FR-FPR-75).
+ */
 export function propellerOutput(propeller: PropellerLoad, omega: number): PropellerOutput {
   const n = omega / (2 * Math.PI);
   const { airDensity: rho, diameter: d } = propeller;
-  const torque = (propeller.powerCoefficient * rho * n * n * d ** 5) / (2 * Math.PI);
-  return { thrust: propeller.thrustCoefficient * rho * n * n * d ** 4, torque, power: torque * Math.abs(omega) };
+  const coefficients = propellerCoefficients(propeller, omega);
+  const torque = (coefficients.powerCoefficient * rho * n * n * d ** 5) / (2 * Math.PI);
+  return {
+    thrust: coefficients.thrustCoefficient * rho * n * n * d ** 4,
+    torque,
+    power: torque * Math.abs(omega),
+    ...(coefficients.tabulated ? { advanceRatio: coefficients.advanceRatio, outsideTable: coefficients.outsideTable } : {}),
+  };
 }
 
 function unit(v: Vec3): Vec3 {

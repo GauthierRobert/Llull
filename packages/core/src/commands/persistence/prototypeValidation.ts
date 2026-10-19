@@ -4,6 +4,7 @@ import { isRecord } from '../../lib/isRecord';
 import { isStringArray } from '../../lib/isStringArray';
 import { isReservedKey } from '../../lib/reservedKey';
 import { INTENT_KINDS } from '../../model/prototype';
+import { referencesProblems } from '../dynamics/engine/engineValidation';
 
 const KINDS: readonly string[] = INTENT_KINDS;
 
@@ -32,5 +33,6 @@ export function prototypeProblems(value: unknown): string[] {
     if (problem !== null) errors.push(problem);
   }
   if (new Set(value['grounded']).size !== value['grounded'].length) errors.push('prototype.grounded contains duplicate ids');
+  errors.push(...referencesProblems(value['references']));
   return errors;
 }

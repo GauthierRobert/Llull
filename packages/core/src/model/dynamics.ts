@@ -65,6 +65,10 @@ interface GearCoupling {
   driver: string;
   driven: string;
   ratio: number;
+  /** Mesh efficiency in (0, 1] (FR-FPR-74): the share of the transmitted power that reaches the driven shaft. Absent = ideal (1). */
+  efficiency?: number;
+  /** Tooth counts [driver, driven] the ratio was derived from; `ratio` stays authoritative. */
+  teeth?: readonly [driver: number, driven: number];
 }
 
 /**
@@ -115,6 +119,20 @@ export interface PropellerLoad {
   airDensity: number;
   /** World direction the thrust pushes the propeller (pulls the aircraft). */
   thrustDirection: Vec3;
+  /** Forward speed of the air relative to the propeller, m/s (>= 0, default 0 = static): J = V / (n D). Read only with `table`. */
+  airspeedMps?: number;
+  /** C_T(J), C_P(J) table (FR-FPR-75): replaces the static coefficients when J > 0; PCHIP between points, J strictly increasing from 0. */
+  table?: PropellerTable;
+  /** Moment of inertia of the propeller about its shaft, kg·m², when it is not a rigid body of the model (reported and plausibility-checked). */
+  inertiaKgM2?: number;
+}
+
+/** Measured propeller coefficients against advance ratio J = V / (n D), with where they come from. */
+interface PropellerTable {
+  /** [J, C_T, C_P] with strictly increasing J. */
+  points: (readonly [advanceRatio: number, thrustCoefficient: number, powerCoefficient: number])[];
+  source: string;
+  grade: 'A' | 'B' | 'C';
 }
 
 /**
@@ -158,8 +176,27 @@ export interface CylinderPressure {
         intakePressurePa: number;
         intakeTempK: number;
         heat: { kind: 'per_cycle_J'; value: number } | { kind: 'table_vs_rpm'; points: (readonly [rpm: number, joulesPerCycle: number])[] };
+        /** rpm values whose heat release was calibrated to a brake target (`origin: calibrated` there only; every other speed is a prediction). */
+        calibratedRpm?: number[];
         source?: string;
       };
+}
+
+/**
+ * Mechanical losses of an engine crank (FR-FPR-71), reported as FMEP and applied as a torque against the rotation of `crank`.
+ * `component` (PNH / Sandoval-Heywood) is NOT implemented: its equations are unchecked against a primary source (TECHNICAL_SPEC 11 Q8).
+ * @invariant crank revolute; every listed cylinder is on that crank; every model has a source; oilTempFactor > 0
+ */
+export interface EngineLosses {
+  readonly id: string;
+  crank: string;
+  /** Cylinder pressure ids whose displacement and peak pressure the friction reads; empty = every cylinder pressure on `crank`. */
+  cylinders: string[];
+  model:
+    | { kind: 'chen_flynn'; aPa: number; bRatio: number; cPaPerRpm: number; dPaPerRpm2: number; source: string }
+    | { kind: 'fmep_table'; points: (readonly [rpm: number, fmepPa: number])[]; source: string };
+  /** Multiplier on the FMEP, 1 = hot oil; cold about 2.1 [E-R9]. */
+  oilTempFactor: number;
 }
 
 /** Engine-neutral solver settings of loop-closed mechanisms (absent in the document = these defaults). */
@@ -199,6 +236,8 @@ export interface DynamicsModel {
   propellers: Record<string, PropellerLoad>;
   /** Absent in documents saved before PHY-21. */
   cylinders?: Record<string, CylinderPressure>;
+  /** Absent in documents saved before the realism slice (FPR M3b). */
+  losses?: Record<string, EngineLosses>;
   /** Absent in documents saved before point springs. */
   springs?: Record<string, PointSpring>;
   solver?: DynamicsSolverSettings;

@@ -14,6 +14,7 @@ import type {
 import type { Vec3 } from '@core/model/vectors';
 import { OBJECT_BODY, OBJECT_JOINT, OBJECT_TENDON, type MjData, type MjModel, type MujocoModule } from './bindings';
 import { jointReaction, loopReader, loopSlots, type ReactionSlot } from './constraintForces';
+import { addGearLoss, gearLossSlots } from './gearLoss';
 import { springTendonName, toMjcf } from './mjcf';
 import { createServoSchedule } from './servoSchedule';
 
@@ -91,6 +92,7 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     const springTrace: Record<string, { length: number[]; velocity: number[]; force: number[] }> = Object.fromEntries(
       springs.map(({ spring }) => [spring.id, { length: [], velocity: [], force: [] }]),
     );
+    const gearLoss = gearLossSlots(mujoco, mjModel, model, (id) => joints.find((slot) => slot.id === id)?.dof);
     const servoJoints = model.servos.map((servo) => joints.find((slot) => slot.id === servo.joint));
     const schedule = createServoSchedule(
       mujoco,
@@ -184,7 +186,9 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     record();
     let previousVelocity = joints.map((joint) => data.qvel[joint.dof] ?? 0);
     for (let step = 1; step <= steps; step++) {
+      if (gearLoss.length > 0) mujoco.mj_forward(mjModel, data); // constraint forces of the current state
       previousVelocity = applyLoads(model, data, { joints, bodies, initialPosition, previousVelocity, timestep: options.timestep });
+      if (gearLoss.length > 0) addGearLoss(mjModel, data, gearLoss);
       schedule.update();
       const before = options.energy === true ? stepWorkBasis(data, joints, servoJoints) : null;
       mujoco.mj_step(mjModel, data);

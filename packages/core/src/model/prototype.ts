@@ -24,7 +24,48 @@ export interface InterferenceIntent {
   declaredBy: DeclaredBy;
 }
 
+export const REFERENCE_QUANTITIES = [
+  'brake_torque_Nm',
+  'brake_power_kW',
+  'bmep_bar',
+  'static_rpm',
+  'propeller_rpm',
+  'bsfc_g_per_kWh',
+] as const;
+export type ReferenceQuantity = (typeof REFERENCE_QUANTITIES)[number];
+
+/** One datum of a reference curve: `value`, or a `min`..`max` window (static rpm), at `rpm` when the quantity depends on speed. */
+export interface ReferencePoint {
+  rpm?: number;
+  value: number;
+  min?: number;
+  max?: number;
+  /** Reading / measurement uncertainty of `value` in the quantity's unit (digitised graphs: the reading error). */
+  uncertainty?: number;
+}
+
+/**
+ * Measured or datasheet data to validate against (FR-FPR-77).
+ * @invariant points non-empty, every value finite, source non-empty, bandRel > 0, calibrationRpm subset of the point rpms
+ */
+export interface ReferenceData {
+  readonly id: string;
+  quantity: ReferenceQuantity;
+  condition: { throttle: 'full' | 'propeller_curve'; altitudeM: number; note?: string };
+  points: ReferencePoint[];
+  source: string;
+  grade: 'A' | 'B' | 'C';
+  /** Read off a graph (the uncertainty is then the reading error). */
+  digitised: boolean;
+  /** Points used for calibration: they have `origin: calibrated` and never count as pass evidence. */
+  calibrationRpm: number[];
+  /** Relative band of a pass, default 0.05 [E-R20]. */
+  bandRel: number;
+}
+
 export interface PrototypeModel {
+  /** Reference data keyed by id (`compare_to_reference`); absent = none. */
+  references?: Record<string, ReferenceData>;
   /** Keyed by intent id (`fit-<step>.<k>`). */
   intents: Record<string, InterferenceIntent>;
   /** Entity / instance ids treated as attached to the world, in the order they were marked. */
