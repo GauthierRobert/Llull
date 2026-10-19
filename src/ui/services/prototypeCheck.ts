@@ -13,13 +13,17 @@ export const CHECK_COMMAND = 'check_prototype';
 const ASSEMBLY_COMMAND = 'check_assembly';
 /** Single-check commands composed into a review when check_prototype is absent, in checklist order. */
 const MOTION_COMMAND = 'check_motion_clearance';
-const PART_COMMANDS = [ASSEMBLY_COMMAND, 'check_mechanism', MOTION_COMMAND] as const;
+const DYNAMICS_COMMAND = 'check_dynamics';
+const PART_COMMANDS = [ASSEMBLY_COMMAND, 'check_mechanism', MOTION_COMMAND, DYNAMICS_COMMAND] as const;
+/** Single checks that simulate the mechanism (they need the physics engine). */
+const SIMULATING = new Set<string>([MOTION_COMMAND, DYNAMICS_COMMAND]);
 
 /** The single checks the Review tab will run (check_prototype absent). */
 const CHECK_TITLES: Readonly<Record<string, string>> = {
   assembly: 'Buildability',
   mechanism: 'Mechanism',
   motion_clearance: 'Motion clearance',
+  dynamics: 'Dynamics',
 };
 
 /** The single checks the Review tab will run (check_prototype absent). */
@@ -51,8 +55,8 @@ const isEnvelope = (data: unknown): boolean => typeof data === 'object' && data 
 /** Runs every available single check and wraps the envelopes as one review (a failed run is reported, the others still count). */
 async function runSingleChecks(params: Record<string, unknown>, onStatus: (status: string) => void): Promise<PrototypeCheckRun> {
   const online = useStore.getState().liveStatus === 'connected';
-  // check_motion_clearance simulates the mechanism: offline it needs the in-page physics engine first.
-  if (!online && availableParts().includes(MOTION_COMMAND)) {
+  // check_motion_clearance / check_dynamics simulate the mechanism: offline they need the in-page physics engine first.
+  if (!online && availableParts().some((name) => SIMULATING.has(name))) {
     onStatus('Loading the physics engine…');
     await ensurePhysicsEngine();
   }

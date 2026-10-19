@@ -200,6 +200,14 @@ const FINDING_TITLES: Readonly<Record<string, string>> = {
   FPR_MOTION_ALLOWED: 'Contact allowed',
   FPR_MOTION_UNDERSAMPLED: 'Motion undersampled',
   FPR_NO_MOTION: 'Nothing moves to check',
+  FPR_LOOP_PRISMATIC: 'Prismatic joint inside a loop',
+  FPR_LOOP_OPEN: 'Loop does not close',
+  FPR_REDUNDANT_CONSTRAINT: 'Redundant constraint',
+  FPR_LOOP_DRIFT: 'Loop drifts open in the run',
+  FPR_ENERGY_CLOSURE: 'Energy does not balance',
+  FPR_TIMESTEP_SENSITIVE: 'Result depends on the timestep',
+  FPR_SPHERICAL_TREE: 'Spherical joint chain unsupported',
+  FPR_JOINT_DANGLING: 'Joint connects nothing',
 };
 
 /** The title of `code`, else the checklist row it belongs to, else the code itself. */

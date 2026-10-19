@@ -1,12 +1,12 @@
-/** Review-tab envelope shared by check_mechanism / check_motion_clearance (same shape as check_assembly's CheckResult, other `check` names). */
+/** Review-tab envelope shared by check_mechanism / check_motion_clearance / check_dynamics (same shape as check_assembly's CheckResult, other `check` names). */
 
-import { type CheckStatus, findingKey, worstStatus } from '../../model/checkResult';
+import { type CheckStatus, type CheckThreshold, findingKey, worstStatus } from '../../model/checkResult';
 import type { Vec3 } from '../../model/vectors';
 import { hashText } from '../../lib/hash';
 import { canonicalJson } from '../../lib/canonicalJson';
 import { roundDeep } from '../../lib/significant';
 
-export type ReviewCheckName = 'mechanism' | 'motion_clearance';
+export type ReviewCheckName = 'mechanism' | 'motion_clearance' | 'dynamics';
 
 export interface ReviewItem {
   readonly code: string;
@@ -14,6 +14,7 @@ export interface ReviewItem {
   readonly ids: readonly string[];
   readonly findingKey: string;
   readonly values: Readonly<Record<string, number>>;
+  readonly threshold?: CheckThreshold;
   readonly witness?: { readonly pointsMm: readonly Vec3[]; readonly crankDeg?: number };
   readonly remediation: string;
   readonly unverified?: boolean;
@@ -24,7 +25,12 @@ export interface ReviewResult {
   readonly check: ReviewCheckName;
   readonly status: CheckStatus;
   readonly items: readonly ReviewItem[];
-  readonly provenance: { readonly method: string; readonly tolerances: Readonly<Record<string, number>>; readonly params: unknown };
+  readonly provenance: {
+    readonly method: string;
+    readonly engine?: string;
+    readonly tolerances: Readonly<Record<string, number>>;
+    readonly params: unknown;
+  };
   readonly inputsHash: string;
   readonly unverified: boolean;
   readonly reviewRequired: true;
