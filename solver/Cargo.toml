@@ -16,6 +16,7 @@ default-members = [
   "crates/llull-route",
   "crates/llull-stats",
   "crates/llull-panel",
+  "crates/llull-explicit",
   "bins/llull-compute",
 ]
 
@@ -52,6 +53,10 @@ opt-level = 3
 
 # The router tests run the 2e6-expansion budget problem (VC-RTE-25).
 [profile.dev.package.llull-route]
+opt-level = 3
+
+# The explicit benchmarks integrate tens of thousands of cycles (bar wave, drop).
+[profile.dev.package.llull-explicit]
 opt-level = 3
 
 [profile.release]

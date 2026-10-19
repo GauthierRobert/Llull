@@ -1,6 +1,6 @@
 # PHY-19: High strain rate, impact and explicit dynamics (external solver hand-off) — technical specification
 
-Gap id **EXP** · status: specification · written 2026-10-15 · functional spec: [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md)
+Gap id **EXP** · status: specification; RS-8a built 2026-10-19 (§13) · written 2026-10-15 · functional spec: [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md)
 · validation: [`validation/README.md`](validation/README.md) · sources: [`validation/sources.md`](validation/sources.md)
 
 Placement follows [`../README.md`](../README.md) §6.2 and is a **proposal** pending decision §5.1 there. The
@@ -414,12 +414,12 @@ MVP ≈ 7.5 w. RS-8 ≈ 16+ w (RS1 estimate), outside the MVP.
 6. **EOS / substitute-bird model** as a PHY-02 law kind (`hydrodynamic_eos`): PHY-02 owner to accept; bird density and EOS
    values need a primary source (Wilbeck reports not reached [R14]).
 7. **J–C constants**: a human extracts Lesuer / Kay tables with locators [R9]; until then no constants in any public library.
-8. **Hourglass default** 0.10 is a rule of thumb [R13]: keep it as a named default or require it explicitly?
+8. **Hourglass default** 0.10 is a rule of thumb [R13]: keep it as a named default or require it explicitly? **Decided 2026-10-19 (§13.2):** kept as a named default (`defaulted: true`, source S13), the only energy-check limit with a default.
 9. **Results artifact size** for large animation sets: cap and down-sampling policy (05 cap 512 MB).
 
 10. **Own solver formulations (RS1 RS-8).** Which published hex8 hourglass formulation, tet4 variant and contact algorithm
     to implement, and which open benchmarks prove each (the V&V cost)? To decide before RS-8a; no formulation is coded from
-    memory.
+    memory. **Decided 2026-10-19 (§13.1)** for RS-8a (hex8, tet4, laws, walls, step); contact is deferred to RS-8c.
 
 ## 12. References
 
@@ -437,3 +437,129 @@ MVP ≈ 7.5 w. RS-8 ≈ 16+ w (RS1 estimate), outside the MVP.
 - Others ([R5], [R11], [R12]): [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md) §11 and [`validation/sources.md`](validation/sources.md).
 - [RS1] Native compute programme — [`../../decisions/RS1-native-compute.md`](../../decisions/RS1-native-compute.md) (step RS-8)
 - L1 llull: `.claude/rules/architecture.md`, `.claude/context/command-layer.md`, `packages/core/src/model/types.ts`, `packages/mcp/src/toolsets.ts`, `server/src/childProcesses.ts`, `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md`.
+
+## 13. As built: RS1 RS-8a (2026-10-19)
+
+RS-8a is built: the minimal PHY-19 slice it needs (data model, set-up commands, record and queries, `explicit_run` transport) and the
+crate `llull-explicit` behind `llull-compute explicit`. The OpenCourant / Radioss hand-off (M2–M4) is **not** built: `FeSolver` carries
+`opencourant` for forward compatibility and `create_analysis` refuses it with `EXP_SOLVER_UNSUPPORTED`.
+
+### 13.1 Decision Q10: formulations and their sources
+
+Rule followed: no formulation was coded from memory. Each row names the source that was read (accessed 2026-10-19, PDFs downloaded and
+read as text). Sources:
+
+- [E1] Sierra/SolidMechanics 4.50 Theory Manual, SAND2018-10680, Sandia National Laboratories, September 2018:
+  https://www.osti.gov/servlets/purl/1475099.
+- [E2] LS-DYNA Theory Manual R14 (LSTC / Ansys, 2023):
+  https://ansyshelp.ansys.com/public/Views/Secured/Doc_Assets/Release/v242/LS-DYNA_Manual_Theory_R14.pdf.
+- [E3] LS-DYNA Keyword User's Manual Vol. I R14 (same path, `LS-DYNA_Manual_Volume_I_R14.pdf`).
+- [E4] LS-DYNA Keyword User's Manual Vol. II R14 (`LS-DYNA_Manual_Volume_II_R14.pdf`).
+
+Caveat: the LS-DYNA R14 PDFs lose many math glyphs in text extraction. Equation numbers, prose, tables, defaults and operator structure
+were read; single symbols were restored from the standard form and checked by the tests of §13.4. [E1] extracted cleanly.
+
+| Item | As coded | Source (locator) |
+| ---- | -------- | ---------------- |
+| Time integration | `a^n = M⁻¹(F_ext − F_int)`, `v^{n+½} = v^{n−½} + ½(Δt^{n−½} + Δt^{n+½}) a^n`, `x^{n+1} = x^n + Δt^{n+½} v^{n+½}`; start-up `Δt^{−½} = 0` | [E1] §12.3 Eqs. 12.8–12.11; same scheme [E2] §27.2 Eqs. 27.6–27.10 |
+| Mass | lumped row-sum `m_I = ρ∫N_I dV`: 2×2×2 Gauss for hex8 (exact for the trilinear map), `ρV/4` for tet4 | row-sum lumping as named in TR-EXP-71; quadrature exactness is tested |
+| hex8 gradient | mean-strain `B_iI = ∫N_I,i dV` in closed form; nodal permutations Table 15.2; `V = (1/3) Σ x_I B_xI` | [E1] §15.1.2 Eq. 15.21, Table 15.2, Eq. 15.12 (after Flanagan & Belytschko 1981, IJNME 17:679–706) |
+| hex8 node order | 1–4 bottom face counter-clockwise, 5–8 above | [E2] Fig. 4.1 |
+| Hourglass | Flanagan–Belytschko viscous (LS-DYNA type 2): `γ_α = Γ_α − (1/V)(Γ_α·x_i)B_i`, `g_iα = v_iI γ_αI`, `f_iI = −a_h g_iα γ_αI`, `a_h = Q_hg ρ V^{2/3} c / 4`; dissipated power `a_h Σ g²` is the hourglass energy | [E2] §4.3 Table 4 (Γ), Eqs. 4.49, 4.53, 4.55; default `Q_hg` 0.10 and the 0.15 caution: [E3] *HOURGLASS |
+| tet4 | constant strain, one point: `B_I = V∇N_I` from edge cross products | [E2] §4.6 Eq. 4.102 (shape functions); gradient algebra checked by the identity `Σ x_iI B_jI = V δ_ij` in the tests |
+| Stress update | hypoelastic, Jaumann rotation first (`r_ij = (σ_ip ω_pj + σ_jp ω_pi)Δt`), then `Δσ = Δt(λ tr D I + 2μD)` with D and ω at the mid-step configuration | [E2] §21.1 Eqs. 21.3–21.7 |
+| Plasticity | J2 radial return: trial deviator, `σ̄* = √(3/2 s*:s*)`, `σ̄* − 3GΔε_p = σ_y(ε_p + Δε_p, Δε_p/Δt)` solved by bisection (the residual decreases strictly), `s = (σ_y/σ̄*) s*` | [E2] §22.3 Eqs. 22.3.14–22.3.16 (Krieg & Key 1976, cited there) |
+| Johnson–Cook strength | `σ_y = (A + Bε_pⁿ)(1 + C ln max(ε̇_p/ε̇_0, 1))`, plastic strain rate (LS-DYNA VP = 1); isothermal at the transition temperature (T* = 0) in RS-8a | [E2] §22.15 Eq. 22.15.1, [E4] *MAT_015; rate clamp TR-EXP-20 (llull convention: the clamp is not in the extractable [E2]/[E4] text) |
+| Johnson–Cook failure, erosion (RS-8b) | `ε_f = max([D1 + D2 exp(D3 σ*)][1 + D4 ln max(ε̇_p/ε̇_0, 1)], EFMIN = 1e-6)`, σ* = mean stress / von Mises after the return (tension positive, the 1985 convention of the validation generator; LS-DYNA takes |D3| with its own pressure sign); `D += Δε_p/ε_f`; at `D ≥ 1` the element carries no stress, no hourglass or bulk force and leaves the step computation; its nodes keep their mass | [E2] §22.15 Eqs. 22.15.2–22.15.4; EFMIN [E4] *MAT_015; T* = 0 (isothermal) |
+| Stable step | element eigenvalue bound: `ω²_max = λ_max((1/V) C^½ H C^½)`, `H = Σ_I B_I B_Iᵀ / m_I` (6×6 Mandel; cyclic Jacobi); effective length `h = 2c/ω`; `Δt_e = h / (Q + √(Q² + c²))`, `Q = C_lin c + C_quad h |ε̇_kk|` for `ε̇_kk < 0`; `Δt = α min Δt_e`, α default 0.90 | [E1] §12.3.1 Eqs. 12.13–12.16 ("the maximum element eigenvalue is an upper bound on the maximum global eigenvalue", `ω = 2c/h`); [E2] §25.1 Eqs. 25.1–25.3; [E3] *CONTROL_TIMESTEP TSSFAC 0.90 |
+| Bulk viscosity | `q = ρ l (C_quad l ε̇_kk² − C_lin c ε̇_kk)` for `ε̇_kk < 0`, `l = V^{1/3}`, added to the pressure in the momentum and energy equations; defaults quadratic 1.5, linear 0.06 | [E2] §24.2 Eq. 24.15; [E3] *CONTROL_BULK_VISCOSITY (Q1 = 1.5 quadratic, Q2 = 0.06 linear) |
+| Rigid wall | stonewall: a node whose next position crosses the plane while moving into it loses its normal velocity (frictionless) | [E2] §29.15 Eqs. 29.100–29.102 |
+| Wall force, wall energy | force = removed normal momentum per step, averaged over each history interval; wall energy `½ m (v_pred·n)(v^{n−½}·n)` = work of that reaction over the central-difference step, so a node resting on the wall dissipates nothing | **derived** here from momentum and work, not quoted ([E2] says only that the stonewall energy is reported) |
+| Mass scaling (selective) | per element at t = 0: density × `(Δt_target / (α Δt_e))²` where the element step is short (the step scales with √ρ) | TR-EXP-31 intent; the quick check keeps the spec's `ρ' = M Δt² / L_e²` estimate |
+
+**Deviation from [E2] §25.1, measured.** `L_e = V/A_max` (hex8) with α = 0.9 is not a bound for elements with free faces. A free 3 × 2 × 1
+hex plate grew from round-off by about 1.5× per cycle with no viscosity and no hourglass control. The element eigenvalue bound of [E1]
+replaces it; the free-plate test (`rigid_translation_and_spin_are_stress_free`) now stays at round-off. Q still uses LS-DYNA Eq. 25.3,
+whose linear term switches on fully for any negative trace (round-off included): a conservative 6 % shorter step on undeformed meshes.
+
+**Not verified from the primary papers** (paywalled; the rows above rely on [E1]/[E2], which cite them): Flanagan & Belytschko 1981 and
+1984; Johnson & Cook 1983 / 1985; Krieg & Key 1976; Hughes & Winget 1980; Belytschko–Liu–Moran (2000); MacNeal & Harder 1985. FB's
+stiffness hourglass form (LS-DYNA types 4 / 5) and its eigenvalue estimate were therefore not built.
+
+**Tet4 variant.** Constant strain only. Volumetric locking of tet4 in nearly incompressible plastic flow is a known limit. Hex8 is
+llull's own mesh for impact (structured_hex); tet4 reads the 05 Gmsh mesh.
+
+**Contact (RS-8c).** Not decided and not built. Candidates to pin from [E2] §23 (penalty node-to-surface) when RS-8c starts.
+
+### 13.2 Decision Q8: hourglass limit
+
+`explicit_energy_check` keeps the 0.10 hourglass / internal limit as a **named default** (`{value: 0.1, source: 'S13 rule of thumb',
+defaulted: true}`), which the caller can override. It is the only limit with a default: energy-error and added-mass limits stay without
+default and warn `EXP_ENERGY_LIMIT_UNSET` (FR-EXP-22). The hourglass *coefficient* (`Q_hg`) is a separate named default, 0.10 from [E3],
+set by `set_explicit_controls`.
+
+Known effect: after a body separates, the internal energy falls toward zero, so the hourglass ratio can exceed 0.10 late in a run
+(validation bar at ν = 0.3: 0.49 at the end) even though the hourglass energy is 0.2 % of the initial energy. The check then warns;
+the reviewer reads the history.
+
+### 13.3 As built: data, commands, transport, job
+
+| Piece | Where | Notes |
+| ----- | ----- | ----- |
+| `AnalysisType` `explicit_dynamics`, `FeSolver` `llull_explicit` / `opencourant` | `packages/core/src/model/analysis.ts` | `opencourant` is refused (`EXP_SOLVER_UNSUPPORTED`) |
+| `ExplicitSpec`, `ExplicitResultsSummary`, `FeExplicitArtifact` | `packages/core/src/model/explicit.ts` | spec on `AnalysisCase.explicit`; results on `explicit.results`, not 05 `ResultsSummary` |
+| Plugin `explicit` (toolset `analysis`) | `packages/domain-cae/src/explicit/` | `set_explicit_controls`, `set_initial_velocity`, `add_rigid_wall`, `delete_rigid_wall`, `set_johnson_cook_failure` (D1–D5 + source per material, no default), `record_explicit_results`, `explicit_report`, `explicit_energy_check`, `explicit_quick_check` |
+| Laws | `explicit/laws.ts` | E, ν from 05 `elasticConstants`; Johnson–Cook from the default PHY-02 constitutive set (`j2_plasticity` + `johnson_cook` isotropic + optional `rate_johnson_cook`); other plastic laws `EXP_MATERIAL_UNSUPPORTED` |
+| Mesh | `explicit/mesh.ts` | `structured_hex {size}` on unrotated boxes (llull grid, hex8), or `fea_mesh` (C3D4 of the 05 artifact, tet4); other blocks `EXP_MESH_UNSUPPORTED` |
+| Trust | `explicit/trust.ts`, `record.ts` | 05 §4.1 model: summary recomputed from the artifact; input hash `explicitInputHash` (parts, laws, spec, mesh hash) |
+| Transport `explicit_run {analysisId, timeoutS?, device?}` | `server/src/native/explicitRun.ts`, `explicitJobFiles.ts`, registered in `tools.ts` | `EXP_TOOL_MISSING` (+ `NATIVE_TOOL_MISSING`) without the binary; `EXP_RUN_TIMEOUT`, `EXP_SOLVER_FAILED` |
+| Solver | `solver/crates/llull-explicit` (`hex8`, `tet4`, `stability`, `material`, `solver`, `job`) | `llull-compute explicit <folder>`; contract in `job.rs` |
+
+Not built from §3 / §4: `imposedMotions`, `contacts`, `timeHistories` / `add_time_history` (energies and wall forces are always written),
+`set_explicit_scenario`, moving walls, wall friction, `check_explicit`, the deck writers and readers, `explicit_import_results`,
+`explicit_result_field`. The validation plans still use `solver: opencourant` and `add_time_history`; they stay drafts until M2–M4.
+
+**Job contract** (`job.rs`). Input: `job.json` + little-endian arrays (`nodes.f64`, `hex8.u32`, `tet4.u32`, `elmat.u32`, `velocity.f64`),
+consistent units. Output: `result.json` (termination, cycles, final time, minimum step, masses, energy rows
+`[t, kinetic, internal, hourglass, wall, externalWork]`, wall force histories) and `fields.f64` (per element: von Mises, plastic strain,
+failed flag, centroid). Events: one `progress` per percent of the end time; `EXP_GPU_FALLBACK` warning for a GPU request.
+
+**Determinism (RS1 §2 rule 3).** Element work runs in parallel (rayon); every assembly and energy sum runs in element order, so outputs are
+bit-identical across runs and thread counts (tested with 1 thread vs the pool). Records come from this CPU path (`device: cpu`,
+`deterministic: true`).
+
+**Codes added to §7.1:** `EXP_CONTROLS_MISSING`, `EXP_PARAM_INVALID`, `EXP_RIGID_WALL_NOT_FOUND`, `EXP_MATERIAL_UNSUPPORTED`,
+`EXP_MESH_UNSUPPORTED`, `EXP_MESH_MISSING`, `EXP_RESULTS_MISSING`, `EXP_RESULT_STALE`, `EXP_ARTIFACT_NOT_FOUND`, `EXP_SUMMARY_MISMATCH`,
+`EXP_SOLVER_FAILED`, `EXP_GPU_FALLBACK` (warning).
+
+### 13.4 Verification (RS-8a)
+
+Measured 2026-10-19, Rust CPU path. Closed form: ρc₀vA = 39 623 N, 2L/c₀ = 79.246 µs.
+
+| VC | Test | Measured | Tolerance |
+| -- | ---- | -------- | --------- |
+| VC-EXP-67a (bar, ν = 0, hex8 2 × 2 × 80) | `benchmarks.rs` `vc_exp_67a_elastic_bar_on_a_rigid_wall_nu_zero` | plateau 39 643 N (+0.05 %); contact 79.28 µs (+0.05 %); rebound 10 m/s; max \|energy error\| 0.51 % | 3 %; 3 %; 3 %; 2 % |
+| VC-EXP-67a (plan bar, ν = 0.3) | `vc_exp_67a_validation_plan_bar_nu_0_3_within_the_pack_tolerance`; server `explicitRunNative.test.ts` (commands → `explicit_run` → record → report, 4 × 4 × 80) | plateau 39 646 N (+0.06 %); contact 80.26 µs (+1.3 %); energy error 0.43 % | VC-EXP-50: 3 % / 3 % |
+| VC-EXP-67a (tet4, ν = 0, Kuhn split) | `tet4_bar_matches_the_closed_form` | plateau 39 644 N (+0.05 %); contact 79.17 µs (−0.10 %) | 5 % |
+| VC-EXP-67b (drop) | `vc_exp_67b_free_fall_reaches_the_floor_at_the_closed_form_time_and_speed` (10 mm drop) | v_z = √(2gh) within 0.5 %; kinetic energy = gravity work to 1e-6 | VC-EXP-51: 0.5 % |
+| Patch / objectivity | `rigid_translation_and_spin_are_stress_free`; hex8 identities (`Σ x_iI B_jI = V δ_ij`, `γ_α·x_i = 0`, unit-cube `B = ±¼`) | translation at round-off; 1 mrad spin < 0.5 MPa (E θ²/2 = 0.1 MPa) | — |
+| Plasticity | `johnson_cook_bar_yields_at_the_wall_and_caps_the_elastic_wave`; `radial_return_lands_on_the_johnson_cook_surface` | von Mises ≤ flow stress everywhere; plastic only near the wall | 1e-9 rel |
+| Failure / erosion (RS-8b, TR-EXP-21) | `material.rs` `johnson_cook_damage_erodes_when_the_plastic_strain_reaches_the_failure_strain` (erodes at ε_p = D1 when D2 = 0; VC-EXP-21.a ε_f = 1.74690296571 at 1/3); `johnson_cook_failure_erodes_the_elements_at_the_wall_and_the_run_continues`; server `explicitRunNative.test.ts` (100 m/s, `failedElements` > 0) | as stated | 1e-9 |
+| Mass scaling | `selective_mass_scaling_raises_every_element_to_the_target_step` | 4× step → 15× added mass, step = target | 1e-9 |
+| Determinism | `runs_are_bit_identical_across_repeats_and_thread_counts`; server test (same artifact hash twice) | bit-identical | exact |
+| Job contract | `tests/job.rs` | outputs hashed, events, refusals | exact |
+| VC-EXP-10/11/12/20/21 | `tests/unit/cae/explicit/quickCheck.test.ts` (`explicit_quick_check`) | generator values | 1e-9 |
+
+Test material constants are synthetic (validation pack inputs, Q7): no Johnson–Cook constants are published in any library.
+
+### 13.5 Remaining (RS-8b, RS-8c)
+
+- **RS-8b:**
+  - wgpu kernels for element forces and the nodal update, with fixed-order reductions and GPU-vs-CPU-twin tests. Not started. On the
+    2026-10-19 build machine the wgpu crates do not link (no MSVC `link.exe`; the GNU toolchain lacks `dlltool` for `windows-sys`
+    raw-dylib). `llull-voxfe` / `llull-topopt` tests fail there for the same reason.
+  - Johnson–Cook failure and erosion: **built 2026-10-19** on the CPU path (`set_johnson_cook_failure`, §13.1). Moving D1–D5 into a
+    PHY-02 failure law kind is open.
+  - Temperature (adiabatic heating) for T*.
+- **RS-8c:** penalty contact on `llull-bvh`, self contact, friction, shells.
+- **Hand-off MVP (M2–M4):** deck writers, readers, OpenCourant run, import (unchanged plan).

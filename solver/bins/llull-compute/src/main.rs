@@ -2,7 +2,8 @@
 //! Jobs: `post fatigue|map|random <folder>` (crate `llull-post`), `raster <folder>` (crate `llull-raster`), `topopt <folder>` (crate
 //! `llull-topopt`, PHY-17 SIMP; one `progress` event per iteration, contract in `llull_topopt::job`), `route <folder>` (crate
 //! `llull-route`, plant 02 RTE V2 auto-router; contract in `llull_route::job`), `stats <folder>` (crate `llull-stats`,
-//! GDT stack-up Monte Carlo, contract in `llull_stats`), `panel <folder>` (crate `llull-panel`, AER vortex-lattice influence + LU, faer).
+//! GDT stack-up Monte Carlo, contract in `llull_stats`), `panel <folder>` (crate `llull-panel`, AER vortex-lattice influence + LU, faer),
+//! `explicit <folder>` (crate `llull-explicit`, PHY-19 RS-8a; contract in `llull_explicit::job`).
 //! An unknown job ends with an `error`
 //! event and exit code 2. The raster job reports a `warning` event when it was asked for the GPU but drew with the CPU twin.
 
@@ -13,7 +14,7 @@ use std::path::Path;
 use std::process::ExitCode;
 
 const USAGE: &str =
-    "usage: llull-compute post <fatigue|map|random> <job-folder> | llull-compute raster <job-folder> | llull-compute topopt <job-folder> | llull-compute stats <job-folder> | llull-compute panel <job-folder> | llull-compute route <job-folder>";
+    "usage: llull-compute post <fatigue|map|random> <job-folder> | llull-compute raster <job-folder> | llull-compute topopt <job-folder> | llull-compute stats <job-folder> | llull-compute panel <job-folder> | llull-compute route <job-folder> | llull-compute explicit <job-folder>";
 
 fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Output>, (String, String)> {
     match (job, rest) {
@@ -38,7 +39,10 @@ fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Outpu
         ("route", [folder, ..]) => llull_route::job::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
         ("stats", [folder, ..]) => llull_stats::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
         ("panel", [folder, ..]) => llull_panel::run(Path::new(folder)).map_err(|error| (error.code.to_string(), error.message)),
-        ("post" | "raster" | "topopt" | "route" | "stats" | "panel", _) => Err(("NATIVE_USAGE".to_string(), USAGE.to_string())),
+        ("explicit", [folder, ..]) => {
+            llull_explicit::job::run_job(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message))
+        }
+        ("post" | "raster" | "topopt" | "route" | "stats" | "panel" | "explicit", _) => Err(("NATIVE_USAGE".to_string(), USAGE.to_string())),
         _ => Err(("NATIVE_JOB_UNKNOWN".to_string(), format!("unknown job '{job}'"))),
     }
 }

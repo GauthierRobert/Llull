@@ -7,6 +7,7 @@
  *   auto_route     route_problem -> llull-compute route (plant 02 RTE V2 A*) -> auto_route_pipe { solution } (validated, then committed)
  *   stackup_monte_carlo  analyze_stackup with the Monte Carlo above the TS cap in llull-compute stats (GDT TR-GDT-22)
  *   vortex_lattice_solve analyze_vortex_lattice with the influence build + dense LU in llull-compute panel (AER M3)
+ *   explicit_run   explicit_dynamics case -> llull-compute explicit -> fe_explicit artifact -> record_explicit_results (PHY-19 RS-8)
  */
 
 import type { ToolDefinition } from '@protocol/tools';
@@ -24,6 +25,7 @@ import { runFeaRender } from './renderField';
 import { DEFAULT_AUTO_ROUTE_TIMEOUT_S, NATIVE_EXPANSIONS_CEILING, NATIVE_MAX_EXPANSIONS, runAutoRoute } from './autoRoute';
 import { runStackupTool, stackupToolDefinition } from './stackupMonteCarlo';
 import { runVortexLatticeTool, vortexLatticeToolDefinition } from './vortexLattice';
+import { DEFAULT_EXPLICIT_TIMEOUT_S, runExplicitRun, type ExplicitRunOptions } from './explicitRun';
 
 const TIMEOUT = {
   type: 'number' as const,
@@ -75,6 +77,7 @@ export function nativeToolDefinitions(): ToolDefinition[] {
     autoRouteToolDefinition(),
     stackupToolDefinition(),
     vortexLatticeToolDefinition(),
+    explicitToolDefinition(),
   ];
 }
 
@@ -170,7 +173,37 @@ const NAMES: ReadonlySet<string> = new Set([
   'stackup_monte_carlo',
   'vortex_lattice_solve',
   'auto_route',
+  'explicit_run',
 ]);
+/** explicit_run: the transport of the explicit plugin (PHY-19 RS-8); the case itself is set up with the explicit commands. */
+function explicitToolDefinition(): ToolDefinition {
+  return {
+    name: 'explicit_run',
+    description:
+      'Run an explicit_dynamics case (create_analysis analysisType=explicit_dynamics, set_part_idealization, set_explicit_controls, set_initial_velocity, ' +
+      'add_rigid_wall) in the native llull-compute explicit solver (central difference, lumped mass, hex8 with Flanagan-Belytschko hourglass ' +
+      'control, tet4, elastic or Johnson-Cook plasticity, planar rigid walls; progress with --progress) and record the result with ' +
+      'record_explicit_results (fe_explicit artifact; numbers are recomputed from it). Read it with explicit_report and explicit_energy_check. ' +
+      'Screening only: review required, never certification evidence. Errors: EXP_TOOL_MISSING (no llull-compute), EXP_SOLVER_FAILED, ' +
+      'EXP_RUN_TIMEOUT and the set-up codes (EXP_NO_EXCITATION, EXP_MESH_UNSUPPORTED, EXP_MATERIAL_INCOMPLETE, ...).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        analysisId: { type: 'string', description: 'Id of the explicit_dynamics analysis (affected[0] of create_analysis).' },
+        timeoutS: { ...TIMEOUT, description: `Wall-clock limit of the native job in seconds (default ${DEFAULT_EXPLICIT_TIMEOUT_S}).` },
+        device: {
+          type: 'string',
+          enum: ['cpu', 'gpu', 'auto'],
+          description:
+            'cpu (default, deterministic Rust CPU path), gpu or auto (a GPU build of llull-compute; else the CPU twin with a warning).',
+        },
+      },
+      required: ['analysisId'],
+    },
+    annotations: { idempotentHint: true },
+  };
+}
+
 
 export const isNativeTool = (name: string): boolean => NAMES.has(name);
 
@@ -217,6 +250,15 @@ export async function runNativeTool(
     };
     const before = host.getDoc();
     const result = await runAutoRoute(args, options, host, deps);
+    return { ...result, changed: host.getDoc() !== before };
+  }
+  if (name === 'explicit_run') {
+    const analysisId = nonEmptyString(args['analysisId']);
+    if (analysisId === undefined) return failure('explicit_run: analysisId is required.');
+    const device = args['device'];
+    const options: ExplicitRunOptions = { ...timeout, ...(device === 'cpu' || device === 'gpu' || device === 'auto' ? { device } : {}) };
+    const before = host.getDoc();
+    const result = await runExplicitRun(analysisId, options, host, deps);
     return { ...result, changed: host.getDoc() !== before };
   }
   if (name === 'fatigue_field') {

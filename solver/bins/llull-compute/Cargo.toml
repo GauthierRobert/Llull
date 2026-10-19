@@ -14,6 +14,7 @@ llull-route = { path = "../../crates/llull-route" }
 llull-topopt = { path = "../../crates/llull-topopt", default-features = false }
 llull-stats = { path = "../../crates/llull-stats" }
 llull-panel = { path = "../../crates/llull-panel" }
+llull-explicit = { path = "../../crates/llull-explicit" }
 
 [features]
 # wgpu paths: offscreen raster (`llull-compute raster` with engine "gpu") and the topopt GPU solves (settings.device "gpu" / "auto").

@@ -189,26 +189,13 @@
       "sensitivity_indices"
     ],
     "docs/physics/19-explicit-impact/validation/plans/exp_bar_rigid_wall.plan.json": [
-      "add_rigid_wall",
-      "add_time_history",
-      "set_explicit_controls",
-      "set_initial_velocity"
+      "add_time_history"
     ],
     "docs/physics/19-explicit-impact/validation/plans/exp_bird_rigid_plate.plan.json": [
-      "add_rigid_wall",
-      "add_time_history",
-      "set_explicit_controls",
-      "set_initial_velocity"
+      "add_time_history"
     ],
     "docs/physics/19-explicit-impact/validation/plans/exp_drop_box.plan.json": [
-      "add_rigid_wall",
-      "add_time_history",
-      "set_explicit_controls"
-    ],
-    "docs/physics/19-explicit-impact/validation/plans/exp_taylor_rod.plan.json": [
-      "add_rigid_wall",
-      "set_explicit_controls",
-      "set_initial_velocity"
+      "add_time_history"
     ],
     "docs/physics/20-vibroacoustics/validation/plans/vac_flat_spectrum_handoff.plan.json": [
       "acoustic_spectrum_report",
