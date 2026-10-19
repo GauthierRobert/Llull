@@ -1,6 +1,6 @@
 # PHY-09: Structural dynamics beyond modal — technical specification
 
-Gap id **DYN** · status: specification · written 2026-10-15 · functional spec: [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md)
+Gap id **DYN** · status: M1–M3 + RS-7 built 2026-10-19 (§13 as built) · written 2026-10-15 · functional spec: [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md)
 · validation: [`validation/README.md`](validation/README.md) · sources: [`validation/sources.md`](validation/sources.md)
 
 ## 1. Current state in llull
@@ -475,6 +475,9 @@ Total MVP ≈ 9 weeks of one engineer-equivalent agent lane (Lane 1 core/plugin 
 1. **AnalysisType extension point.** 05 declares a closed union; this pack needs plugins to add members. Proposal:
    05 keeps `AnalysisType` as a string union in `@cae` plus a plugin-contributed registry of extra types (and
    validation of `create_analysis` against it). Needs the 05 owner's agreement.
+   **Decided (2026-10-19, as built):** the placement-erratum fallback — the discipline lives inside the 05 package (`packages/domain-cae`,
+   plugin `cae`), like PHY-03/04/05/07; `frequency_response` and `random_response` are members of the core `AnalysisType` union
+   (`transient_dynamic` waits for M5). No extension registry was needed.
 2. **Frequency-dependent loss factor.** PHY-01 property models can carry η(T); a dependence on frequency would need a
    `frequency` variable in PHY-01's `PropertyVariable` set (owner PHY-01). MVP evaluates η at the case temperature only.
 3. **GEVS / NASA-STD-7001 values** must be read from the primary documents by a human before the library entries
@@ -490,6 +493,7 @@ Total MVP ≈ 9 weeks of one engineer-equivalent agent lane (Lane 1 core/plugin 
 
 8. **Native field outputs (RS1).** Should the `llull-post` job also produce the stress ASD per node for PHY-07 spectral
    fatigue (M5), or only rms fields? Proposal: rms fields in RS-7, ASD export with M5.
+   **Decided (2026-10-19, as built):** rms fields only in RS-7 (12 components per node, §13); the per-node stress ASD export stays with M5.
 
 ## 12. References
 
@@ -507,3 +511,82 @@ Total MVP ≈ 9 weeks of one engineer-equivalent agent lane (Lane 1 core/plugin 
 - [R14] Altair OS-V:0440 — https://help.altair.com/hwsolvers/os/topics/solvers/os/cantilevered_tapered_membrane_fv32_r.htm (accessed 2026-10, search)
 - [R15] Miranda, Ferencz, Hughes 1989 (HHT implementation reference of CalculiX) — as cited by [R1]
 - llull: `.claude/rules/architecture.md`, `.claude/context/command-layer.md`, `../../aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md`, `../00-vv-harness/TECHNICAL_SPEC.md`, `../README.md`
+
+## 13. As built — M1, M2, M3 and RS-7 (2026-10-19)
+
+**Placement.** Open question 1 fallback: everything lives in the 05 package (`packages/domain-cae/src/dynamics/`, plugin `cae`, toolset
+`analysis`), data types in `packages/core/src/model/structuralDynamics.ts`: `AnalysisCase.dynamics` (`CaseDynamics`), the library
+`AnalysisModel.vibration` (spectra, time histories, equivalent-load provenance; the spec's `CadDocument.physics.dynamics`),
+`ResultsSummary.dynamics` (`DynamicSummary`) and `FeResultsArtifact.nodalRms`. `AnalysisType` gains `frequency_response` and `random_response`;
+`ProbeQuantity` gains `a_x/y/z` and `u_x/y/z_rel`; `propertyCatalog` gains `structuralLossFactor` (owner PHY-09).
+
+| Item | Where |
+| ---- | ----- |
+| SDOF FRFs, half-power, Miles, exact white-noise integrals (§5.1) | `dynamics/math/sdof.ts` |
+| PSD log-log segments, band clipping (§5.3) | `dynamics/math/psd.ts` |
+| Smallwood SRS, half-sine and sampled histories (§5.5) | `dynamics/math/srs.ts` |
+| Rayleigh from ratios, zeta per mode, damping terms of D_j (§5.2) | `dynamics/math/damping.ts` |
+| Gaussian exceedance, named 3-sigma peak factor (TR-DYN-42) | `dynamics/math/gaussian.ts` |
+| Adaptive grid + Simpson, modal quadratic forms, nodal rms reference (§5.4, TR-DYN-40) | `dynamics/math/randomResponse.ts` |
+| Set-up / library / quick-check / report commands | `dynamics/{setupCommands,libraryCommands,quickChecks,srsCommand,check,reportCommands}.ts` |
+| Deck: constraints in model data, `*AMPLITUDE A_BASE`, `*FREQUENCY, STORAGE=YES`, `*STEADY STATE DYNAMICS`, `*MODAL DAMPING`, `*BASE MOTION`, `*DAMPING,STRUCTURAL=eta` (§5.6) | `dynamics/deck.ts` (+ one `DisciplineTable.dynamics` row in `decks/deckBuilder.ts`) |
+| DAT tables: participation, effective modal mass, total effective mass, fraction of totals, modal coordinates per SSD frequency (TR-DYN-31) | `results/datReader.ts` (`DAT_TITLES`), `dynamics/results/modalData.ts` |
+| FRD complex output: DISP + DISPI / STRESS + STRESSI per SSD frequency (block names read in CalculiX `frd.c` at the pinned commit) | `dynamics/results/modalData.ts` (`steadyStatePoints`) |
+| Summary recomputed from the artifact by `record_fea_results` and every trusted read | `dynamics/summary.ts` (called from `results/summary.ts`) |
+| Nodal rms field: job builder, TS reference, artifact field | `dynamics/nodalField.ts` |
+| `llull-compute post random` (RS-7) | `solver/crates/llull-post/src/random.rs` |
+| fea_solve post-step: native when installed, TS within budget, else `DYN_POST_TOO_LARGE` before CalculiX | `server/src/native/randomField.ts`, `server/src/fea/feaSolve.ts` (`randomPost`) |
+
+**Commands as built** (names that differ from §4 are marked): `set_dynamic_damping`, `set_frequency_sweep`, `set_base_excitation`
+(acceleration only; `kind` accepted for the plans), **`set_dynamic_basis`** (new: modes, fMaxHz, modalTruncationThreshold),
+`define_vibration_spectrum`, **`delete_vibration_spectrum`**, **`define_time_history`** / **`delete_time_history`** (PHY-07 owns
+`define_load_history`), **`describe_vibration_library`**, `sdof_response`, `psd_rms`, `damping_coefficients`, `shock_response_spectrum`,
+`dynamic_report`, `equivalent_static_load_case`, **`check_structural_dynamics`** (the rigid-body `check_dynamics` of
+`core/commands/dynamics` owns that name). `create_analysis` takes the two types with `modes` or `fMaxHz` (`DYN_BASIS_MISSING` without
+either; `fMaxHz` alone extracts 100 modes and keeps those up to fMaxHz — CalculiX computes the requested count, not a range, manual
+`*FREQUENCY`). `add_result_probe` refuses quantities of the wrong case type (`DYN_PROBE_QUANTITY`).
+
+**Result of record and conventions.** random_response: llull's transfer functions on the adaptive grid are the answer; the steady-state step
+is the CalculiX cross-check at 1 g (it writes only probe prints, no full-field FRD). frequency_response: CalculiX's complex steady-state output
+is the answer (peaks, phase, nearest mode, half-power Q by linear interpolation between output points). Relative motion is damped (textbook,
+generator of VC-DYN-21). Finding recorded in a test: with `*BASE MOTION` and Rayleigh alpha, CalculiX applies alpha M to the ABSOLUTE base
+velocity — its beamdy10bm modal coordinates equal -G (1 - i alpha / w) / D to 2e-6 over all nine points, -G / D misses by > 5 %. llull keeps
+the relative-damping convention; the CalculiX cross-check of a Rayleigh base-motion case therefore differs by that factor (modal damping
+ratios are unaffected).
+
+**Nodal field (RS-7, TR-DYN-44).** 12 components per node (u_x/y/z_rel, a_x/y/z, s_xx..s_zx when the frequency step wrote S), units
+length / g / stress. The contraction is reorganised as quadratic forms: A_jl = sum_k w_k Re(g_jk conj g_lk) is built once (K x J^2), then each
+node and component costs J^2 — mathematically the modes x frequencies x nodes contraction of §5.4 with the same grid, FRFs and Simpson rule,
+only the summation order changed (so the TS reference uses the same order). Only `+ - * /` and `sqrt` (the grid with its `Math.pow` is built
+in TypeScript and passed as data), so the native field is **bit-identical** to the TypeScript one, not just within 1e-10. Stored in the
+results artifact (`nodalRms { engine, solver, gridPoints, components, units, values }`), so `record_fea_results` recomputes `nodalMax` from it
+and the trust model is unchanged. The summary's probes use the same forms plus an f^2-weighted set (zero up-crossing rate) and a halved-grid
+check (`DYN_PSD_GRID_NOT_CONVERGED` in `unverifiedReasons` above 1e-4).
+
+**Validation as built.**
+
+| VC | Status | Evidence |
+| -- | ------ | -------- |
+| 01–05, 07–11, 13, 14 | pass (stated tolerances) | `tests/unit/cae/dynamics/math.test.ts`, `quickChecks.test.ts` (plan `dyn_quick_checks` through the registry) |
+| 06 | pass (max deviation 3.9e-7 ≤ 2e-6) | `math.test.ts` |
+| 12 | not built (residual-flexibility share; the effective-mass bookkeeping is tested instead) | — |
+| 17 | pass (9 SSD headings for n = 5, m = 1) | `deck.test.ts` (synthetic CalculiX-layout DAT) |
+| 21 | pass at 1e-6 (not only 5 %) on exact Euler-Bernoulli modal data recorded through `record_fea_results`; the FE run needs ccx + Gmsh (absent here) | `results.test.ts`, `server/tests/dynamicsRandomField.test.ts` |
+| 22 | reader pass on the quoted fractions (synthetic table body) | `deck.test.ts` |
+| 31 (partial) | pass: base-motion convention vs beamdy10bm modal coordinates (above) | `math.test.ts` |
+| 40, 41, 42 (5 of 7 codes; `DYN_BASE_ACCEL_TRANSIENT` waits for transients, M5), 43, 45 | pass | `setup.test.ts`, `deck.test.ts`, `report.test.ts`, `server/tests/dynamicsRandomField.test.ts` |
+| 44 | not built: 05 `dispose_margin` does not exist yet | — |
+| 47 | pass (`*DAMPING,STRUCTURAL=0.02`, refusal without the property, zeta_eq = eta / 2) | `deck.test.ts`, `math.test.ts` |
+| 48 | pass, bit-identical: crate fixtures (EB strip + seeded viscous / structural bases, any thread count) and end to end through fea_solve | `solver/crates/llull-post/tests/random_reference.rs`, `tests/unit/native/dynamicsReference.test.ts`, `server/tests/dynamicsRandomField.test.ts` |
+| 15, 20, 30, 32 | not run: CalculiX and Gmsh are not installed on the build machine (integration gate) | — |
+
+**Measured (Windows laptop, `compute` profile, GNU toolchain, 2026-10-19):** 20 000 nodes x 60 modes x 12 components: TypeScript reference
+1.32 s, `llull-compute post random` 0.44 s including the 86 MB job folder I/O (bit-identical); 29 547 nodes x 6 modes: TS 0.15 s, native 0.31 s
+(spawn and I/O dominate). The quadratic-form rewrite makes the TypeScript path meet the §8 budget well beyond 50k nodes for typical mode counts,
+so the native job is the large-mesh / many-mode path: `TS_NODAL_WORK_LIMIT` = 4e9 multiply-adds (≈ 6 s TS) is the refusal threshold without the
+binary. fea_solve uses the native job whenever it is installed (`LLULL_NATIVE_RANDOM_MIN_NODES` raises the threshold).
+
+**Not built (M4 / M5 / V1):** transient_dynamic and `set_transient_controls` / `assign_load_history`, `export_response_psd`, Nastran SOL 111/112,
+`post ssd` (a frequency-response nodal envelope; CalculiX already writes the complex field), the stress-ASD export, PHY-10 joint histories,
+the human gate on dispositions (`DYN_HUMAN_GATE`, needs 05 `dispose_margin`). The spec's MCP prompt `random_vibration_quick_check` is the
+`llull guide` section 10 (MCP was removed, LC1).

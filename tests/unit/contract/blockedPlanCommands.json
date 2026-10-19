@@ -131,23 +131,6 @@
     "docs/physics/06-contact-joints/validation/plans/cnt_ssnp154_cylinder_block.plan.json": [
       "add_contact_pair"
     ],
-    "docs/physics/09-structural-dynamics/validation/plans/dyn_beamdy8_ssd.plan.json": [
-      "set_dynamic_damping",
-      "set_frequency_sweep"
-    ],
-    "docs/physics/09-structural-dynamics/validation/plans/dyn_cantilever_random_gevs.plan.json": [
-      "define_vibration_spectrum",
-      "set_base_excitation",
-      "set_dynamic_damping",
-      "set_frequency_sweep"
-    ],
-    "docs/physics/09-structural-dynamics/validation/plans/dyn_quick_checks.plan.json": [
-      "damping_coefficients",
-      "define_vibration_spectrum",
-      "psd_rms",
-      "sdof_response",
-      "shock_response_spectrum"
-    ],
     "docs/physics/11-creep-viscoelasticity/validation/plans/crp_bar_relaxation.plan.json": [
       "set_creep_step"
     ],

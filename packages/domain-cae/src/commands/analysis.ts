@@ -14,6 +14,7 @@ import { loadCaseNameProblem } from '../shared/names';
 import { DEFAULT_FACTORS, defaultMeshControls, emptyThermalSetup, unitSystemOf } from '../shared/defaults';
 import { analysisIdSchema, quantitySchema } from '../shared/schemas';
 import { temperatureProblem } from '../shared/quantity';
+import { isDynamicType } from '../dynamics/quantities';
 
 const ANALYSIS_TYPES = [
   'static',
@@ -24,6 +25,8 @@ const ANALYSIS_TYPES = [
   'buckling',
   'coupled_temperature_displacement',
   'nonlinear_static',
+  'frequency_response',
+  'random_response',
 ] as const;
 const BUILT: ReadonlySet<AnalysisType> = new Set([
   'static',
@@ -34,7 +37,11 @@ const BUILT: ReadonlySet<AnalysisType> = new Set([
   'thermo_static',
   'coupled_temperature_displacement',
   'nonlinear_static',
+  'frequency_response',
+  'random_response',
 ]);
+/** Modes extracted for a dynamic case given only fMaxHz (the 05 cap); only the modes up to fMaxHz are used. */
+const DYNAMIC_MODES_FOR_FMAX = 100;
 const isThermal = (type: AnalysisType): boolean => type === 'heat_steady' || type === 'heat_transient';
 /** Types that carry a ThermoMechSetup (stress-free reference temperature). */
 const hasThermoMech = (type: AnalysisType): boolean => type === 'thermo_static' || type === 'coupled_temperature_displacement';
@@ -81,7 +88,7 @@ export const createAnalysis = defineCommand({
     'add_fea_constraint / add_fea_load, REQUIRES referenceTemperature; the temperature field is solved, not set), modal (free-vibration natural ' +
     'frequencies and mode shapes with `modes`; needs constraints and a material density, loads are ignored; results.frequenciesHz) or buckling ' +
     '(linear eigenvalue buckling of the FIRST load case as reference load, `modes` factors; the critical load is factor x the applied load; ' +
-    'results.bucklingFactors; needs constraints and a load) or nonlinear_static (plasticity and/or large displacement with load or displacement steps: set it up with set_nonlinear_controls, set_part_constitutive_set, add_analysis_step and add_curve_probe; results.nonlinear). SAFETY FACTORS: without `factors`/`factor` the aerospace defaults apply ' +
+    'results.bucklingFactors; needs constraints and a load) or nonlinear_static (plasticity and/or large displacement with load or displacement steps: set it up with set_nonlinear_controls, set_part_constitutive_set, add_analysis_step and add_curve_probe; results.nonlinear) or frequency_response (harmonic steady-state response to loads or a base acceleration, CalculiX *STEADY STATE DYNAMICS over the modes) or random_response (response to a base acceleration ASD by modal superposition: rms, 3-sigma peaks, nodal rms field); both need modes or fMaxHz, then set_dynamic_damping, set_frequency_sweep and set_base_excitation (check_structural_dynamics lists what is missing). SAFETY FACTORS: without `factors`/`factor` the aerospace defaults apply ' +
     '(ultimate 1.5 per 14 CFR 25.303, yield 1.0) and the summary says so; when the user states a safety factor (e.g. "SF 2") pass `factor: 2` ' +
     '(one number applied to both ultimate and yield) or `factors` { ultimate, yield } - compute_margins applies exactly these. unitSystem follows the document unit (mm: N-mm-t-s, m: N-m-kg-s, in: lbf-in-slinch-s) and a different one is ' +
     'refused. The case starts with the default mesh (tet, quadratic, 10 mm) and no parts: next set_part_idealization, then ' +
@@ -92,7 +99,7 @@ export const createAnalysis = defineCommand({
     analysisType: z
       .enum(ANALYSIS_TYPES)
       .describe(
-        'static | heat_steady | heat_transient | thermo_static | coupled_temperature_displacement | modal | buckling | nonlinear_static.',
+        'static | heat_steady | heat_transient | thermo_static | coupled_temperature_displacement | modal | buckling | nonlinear_static | frequency_response | random_response.',
       ),
     solver: z.enum(['calculix']).optional().describe('Solver; only calculix is built (default).'),
     unitSystem: z
@@ -128,7 +135,13 @@ export const createAnalysis = defineCommand({
       .int()
       .optional()
       .describe(
-        'modal / buckling only: number of modes (natural frequencies) or buckling factors to extract, 1 to 100. Default 6 (modal) or 3 (buckling).',
+        'modal / buckling / frequency_response / random_response: number of modes (natural frequencies) or buckling factors to extract, 1 to 100. Default 6 (modal) or 3 (buckling); dynamic cases have no default (give modes or fMaxHz).',
+      ),
+    fMaxHz: z
+      .number()
+      .optional()
+      .describe(
+        'frequency_response / random_response only: highest frequency of interest in Hz; modes above it are not used. Without modes, 100 modes are extracted.',
       ),
   }),
   run: (doc, params): CommandResult => {
@@ -166,9 +179,16 @@ export const createAnalysis = defineCommand({
       return fail('FEA_FACTOR_INVALID', 'give either factor (one number) or factors { ultimate, yield }, not both', [], ['factor']);
     if (params.factor !== undefined && !(params.factor >= 1))
       return fail('FEA_FACTOR_INVALID', `factor ${params.factor} must be a number >= 1`, [], ['factor']);
-    const eigen = type === 'modal' || type === 'buckling';
+    const dynamic = isDynamicType(type);
+    const eigen = type === 'modal' || type === 'buckling' || dynamic;
     if (params.modes !== undefined && !eigen)
-      return fail('FEA_PARAM_NOT_APPLICABLE', `modes applies to modal and buckling analyses only, not ${type}`, [], ['modes']);
+      return fail('FEA_PARAM_NOT_APPLICABLE', `modes applies to modal, buckling and dynamic analyses only, not ${type}`, [], ['modes']);
+    if (params.fMaxHz !== undefined && !dynamic)
+      return fail('FEA_PARAM_NOT_APPLICABLE', `fMaxHz applies to frequency_response and random_response only, not ${type}`, [], ['fMaxHz']);
+    if (dynamic && params.modes === undefined && params.fMaxHz === undefined)
+      return fail('DYN_BASIS_MISSING', `a ${type} analysis needs modes or fMaxHz (the modal basis has no default)`, [], ['modes']);
+    if (params.fMaxHz !== undefined && !(params.fMaxHz > 0 && Number.isFinite(params.fMaxHz)))
+      return fail('FEA_PARAM_INVALID', `fMaxHz ${params.fMaxHz} must be > 0`, [], ['fMaxHz']);
     if (params.modes !== undefined && !(params.modes >= 1 && params.modes <= 100))
       return fail('FEA_PARAM_INVALID', `modes ${params.modes} must be an integer from 1 to 100`, [], ['modes']);
 
@@ -179,7 +199,7 @@ export const createAnalysis = defineCommand({
         : params.factors === undefined
           ? DEFAULT_FACTORS
           : { ultimate: params.factors.ultimate, yield: params.factors.yield, extra: params.factors.extra ?? [] };
-    const modes = params.modes ?? (type === 'modal' ? 6 : type === 'buckling' ? 3 : undefined);
+    const modes = params.modes ?? (type === 'modal' ? 6 : type === 'buckling' ? 3 : dynamic ? DYNAMIC_MODES_FOR_FMAX : undefined);
     const thermomech: ThermoMechSetup | undefined =
       hasThermoMech(type) && referenceTemperature !== undefined
         ? {
@@ -209,6 +229,7 @@ export const createAnalysis = defineCommand({
       dispositions: {},
       ...(isThermal(type) ? { thermal: emptyThermalSetup(scale) } : {}),
       ...(thermomech !== undefined ? { thermomech } : {}),
+      ...(dynamic ? { dynamics: { basis: params.fMaxHz !== undefined ? { fMaxHz: params.fMaxHz } : {} } } : {}),
     };
     const stated = params.factor !== undefined || params.factors !== undefined;
     const extraNote = factors.extra.length > 0 ? ` + ${factors.extra.length} extra` : '';

@@ -1,5 +1,5 @@
 //! `llull-compute <job> [<task>] <job-folder>`: dispatches one job (RS1 §2). `llull-compute --version` prints the version.
-//! Jobs: `post fatigue|map <folder>` (crate `llull-post`), `raster <folder>` (crate `llull-raster`), `topopt <folder>` (crate
+//! Jobs: `post fatigue|map|random <folder>` (crate `llull-post`), `raster <folder>` (crate `llull-raster`), `topopt <folder>` (crate
 //! `llull-topopt`, PHY-17 SIMP; one `progress` event per iteration, contract in `llull_topopt::job`), `route <folder>` (crate
 //! `llull-route`, plant 02 RTE V2 auto-router; contract in `llull_route::job`), `stats <folder>` (crate `llull-stats`,
 //! GDT stack-up Monte Carlo, contract in `llull_stats`), `panel <folder>` (crate `llull-panel`, AER vortex-lattice influence + LU, faer).
@@ -13,7 +13,7 @@ use std::path::Path;
 use std::process::ExitCode;
 
 const USAGE: &str =
-    "usage: llull-compute post <fatigue|map> <job-folder> | llull-compute raster <job-folder> | llull-compute topopt <job-folder> | llull-compute stats <job-folder> | llull-compute panel <job-folder> | llull-compute route <job-folder>";
+    "usage: llull-compute post <fatigue|map|random> <job-folder> | llull-compute raster <job-folder> | llull-compute topopt <job-folder> | llull-compute stats <job-folder> | llull-compute panel <job-folder> | llull-compute route <job-folder>";
 
 fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Output>, (String, String)> {
     match (job, rest) {

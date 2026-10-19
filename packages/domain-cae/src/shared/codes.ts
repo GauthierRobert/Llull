@@ -8,6 +8,10 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'use static, heat_steady, heat_transient, thermo_static or coupled_temperature_displacement (modal and buckling are not built)',
   FEA_ANALYSIS_IN_USE: 'delete or re-point the analyses that read this one first',
   FEA_PARAM_NOT_APPLICABLE: 'drop the parameter or choose an analysisType that uses it',
+  FEA_PARAM_INVALID: 'correct the value to the range given in the parameter description',
+  DYN_BASIS_MISSING: 'pass modes (1-100, e.g. enough to pass 1.5 x the top of the excitation band) or fMaxHz',
+  DYN_PROBE_QUANTITY:
+    'random_response probes read a_x/y/z, u_x/y/z_rel, s_xx/yy/zz; frequency_response probes u_x/y/z, s_xx/yy/zz; other cases no dynamic quantity',
   FEA_UNITS_MISMATCH: 'drop unitSystem (it follows the document unit) or fix the quantity unit',
   FEA_FACTOR_INVALID: 'every factor must be >= 1 and every extra factor needs a non-empty justification',
   FEA_PART_NOT_IN_ANALYSIS: 'add the entity first with set_part_idealization',
