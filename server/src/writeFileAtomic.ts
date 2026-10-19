@@ -27,9 +27,28 @@ export function renameWithRetry(from: string, to: string): void {
       fs.renameSync(from, to);
       return;
     } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code ?? '';
-      if (attempt >= RENAME_ATTEMPTS || !TRANSIENT_RENAME_CODES.has(code)) throw error;
+      if (attempt >= RENAME_ATTEMPTS || !isTransient(error)) throw error;
       sleepSync(10 * attempt);
+    }
+  }
+}
+
+const isTransient = (error: unknown): boolean => TRANSIENT_RENAME_CODES.has((error as NodeJS.ErrnoException).code ?? '');
+const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Async `renameWithRetry` (never blocks the event loop): `stillWanted()` is checked right before each attempt, with no await between
+ * the check and the synchronous rename, so a newer synchronous write can never be overtaken. Resolves false when no longer wanted.
+ */
+async function renameWithRetryAsync(from: string, to: string, stillWanted: () => boolean): Promise<boolean> {
+  for (let attempt = 1; ; attempt++) {
+    if (!stillWanted()) return false;
+    try {
+      fs.renameSync(from, to);
+      return true;
+    } catch (error) {
+      if (attempt >= RENAME_ATTEMPTS || !isTransient(error)) throw error;
+      await delay(10 * attempt);
     }
   }
 }
@@ -89,9 +108,43 @@ function backupCurrent(filePath: string): void {
  * Move an already written + fsynced `temporary` into place at `filePath`, keeping the replaced file as `<file>.bak`.
  * @failure the backup or the rename fails -> throws; `filePath` still holds the old version
  */
-export function replaceKeepingBackup(temporary: string, filePath: string): void {
+function replaceKeepingBackup(temporary: string, filePath: string): void {
   backupCurrent(filePath);
   renameWithRetry(temporary, filePath);
+}
+
+/**
+ * `replaceKeepingBackup` for an async writer (the debounced autosave): no blocking backoff, and every step is abandoned once
+ * `stillWanted()` turns false (a newer synchronous write landed). Resolves false when abandoned; the caller removes `temporary`.
+ * @failure the backup or the rename fails -> rejects; `filePath` still holds the old version
+ */
+export async function replaceKeepingBackupAsync(temporary: string, filePath: string, stillWanted: () => boolean): Promise<boolean> {
+  if (!stillWanted()) return false;
+  if (fs.existsSync(filePath)) {
+    const staged = `${filePath}.${process.pid}.async.bak.tmp`;
+    await fs.promises.rm(staged, { force: true });
+    try {
+      try {
+        await fs.promises.link(filePath, staged);
+      } catch {
+        await fs.promises.copyFile(filePath, staged);
+        const handle = await fs.promises.open(staged, 'r+');
+        try {
+          await handle.sync();
+        } finally {
+          await handle.close();
+        }
+      }
+      if (!(await renameWithRetryAsync(staged, `${filePath}.bak`, stillWanted))) {
+        await fs.promises.rm(staged, { force: true });
+        return false;
+      }
+    } catch (error) {
+      await fs.promises.rm(staged, { force: true });
+      throw error;
+    }
+  }
+  return renameWithRetryAsync(temporary, filePath, stillWanted);
 }
 
 /** `writeFileAtomic`, keeping the replaced file as `<file>.bak` (document saves). */
@@ -116,7 +169,7 @@ function processIsAlive(pid: number): boolean {
   }
 }
 
-/** A process killed mid-save leaves `<file>.<pid>.tmp` / `<file>.<pid>.bak.tmp`: never read; removed once that process is gone. */
+/** A process killed mid-save leaves `<file>.<pid>.tmp`, `.bak.tmp`, `.async.bak.tmp` or (llull undo) `.swap`: removed once that process is gone. */
 function removeOrphanedTemporaries(filePath: string): void {
   const prefix = `${path.basename(filePath)}.`;
   let names: string[];
@@ -127,7 +180,7 @@ function removeOrphanedTemporaries(filePath: string): void {
   }
   for (const name of names) {
     if (!name.startsWith(prefix)) continue;
-    const match = /^(\d+)\.(?:bak\.)?tmp$/.exec(name.slice(prefix.length));
+    const match = /^(\d+)\.(?:(?:async\.)?bak\.tmp|tmp|swap)$/.exec(name.slice(prefix.length));
     const pid = Number(match?.[1]);
     if (match !== null && pid !== process.pid && !processIsAlive(pid)) fs.rmSync(path.join(path.dirname(filePath), name), { force: true });
   }

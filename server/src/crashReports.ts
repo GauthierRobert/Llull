@@ -89,11 +89,32 @@ export function crashReportsDir(env: Env, platform?: NodeJS.Platform, home?: str
   return path.join(userDataDir(env, platform, home), 'llull', 'crashes');
 }
 
-/** `text` with the user's home directory (a user name, usually) replaced by `~`. */
-export function redactHome(text: string, home: string = os.homedir()): string {
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * `text` with the user's home directory (a user name, usually) replaced by `~`: both slash spellings, JSON-escaped backslashes and the
+ * URL-encoded form (file:/// URLs, `%20` for a space); case-insensitive on Windows (`c:\users\…` = `C:\Users\…`).
+ */
+export function redactHome(text: string, home: string = os.homedir(), platform: NodeJS.Platform = process.platform): string {
   if (home.length < 2) return text;
-  const variants = new Set([home, home.replace(/\\/g, '/'), home.replace(/\//g, '\\')]);
-  return [...variants].reduce((current, variant) => current.split(variant).join('~'), text);
+  const forward = home.replace(/\\/g, '/');
+  const back = home.replace(/\//g, '\\');
+  const variants = [...new Set([back.replace(/\\/g, '\\\\'), back, forward, encodeURI(forward), encodeURI(back)])].sort(
+    (a, b) => b.length - a.length,
+  );
+  const pattern = new RegExp(variants.map(escapeRegExp).join('|'), platform === 'win32' ? 'gi' : 'g');
+  return text.replace(pattern, '~');
+}
+
+const MAX_REDACTION_DEPTH = 256;
+
+/** Every string inside `value` (keys included) passed through `redactHome`; deeper than any params a command accepts -> a marker. */
+function redactStrings(value: unknown, depth = 0): unknown {
+  if (typeof value === 'string') return redactHome(value);
+  if (value === null || typeof value !== 'object') return value;
+  if (depth > MAX_REDACTION_DEPTH) return '[nested too deep]';
+  if (Array.isArray(value)) return value.map((item) => redactStrings(item, depth + 1));
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [redactHome(key), redactStrings(item, depth + 1)]));
 }
 
 function errorText(error: unknown): string {
@@ -164,7 +185,8 @@ export function writeCrashReport(input: CrashReportInput, options: WriteOptions)
     write('error.txt', `${text}\n`);
     if (input.documentJson !== undefined) write('document.llull.json', input.documentJson);
     if (input.baseDocumentJson !== undefined) write('base.llull.json', input.baseDocumentJson);
-    if (input.commandLog !== undefined) write('commands.json', `${JSON.stringify(input.commandLog, null, 1)}\n`);
+    // Command params carry local paths (import/export file names): redacted like the error.
+    if (input.commandLog !== undefined) write('commands.json', `${JSON.stringify(redactStrings(input.commandLog), null, 1)}\n`);
     const meta: CrashMeta = {
       schema: 1,
       id,

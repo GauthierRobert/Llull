@@ -4,7 +4,7 @@ import fs from 'fs';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { renameWithRetry, writeFileAtomic, writeFileKeepingBackup } from '../src/writeFileAtomic';
+import { renameWithRetry, replaceKeepingBackupAsync, writeFileAtomic, writeFileKeepingBackup } from '../src/writeFileAtomic';
 
 let dir = '';
 let file = '';
@@ -56,8 +56,10 @@ describe('writeFileKeepingBackup', () => {
   it('removes temps orphaned by a dead process, keeps those of live ones', () => {
     const orphan = path.join(dir, 'doc.llull.json.999999999.tmp');
     const orphanBackup = path.join(dir, 'doc.llull.json.999999999.bak.tmp');
+    const orphanSwap = path.join(dir, 'doc.llull.json.999999998.swap');
+    const orphanAsync = path.join(dir, 'doc.llull.json.999999997.async.bak.tmp');
     const live = path.join(dir, `doc.llull.json.${process.ppid}.tmp`);
-    for (const name of [orphan, orphanBackup, live]) writeFileSync(name, 'partial');
+    for (const name of [orphan, orphanBackup, orphanSwap, orphanAsync, live]) writeFileSync(name, 'partial');
     writeFileKeepingBackup(file, 'one');
     expect(readdirSync(dir).sort()).toEqual(['doc.llull.json', path.basename(live)]);
   });
@@ -88,6 +90,41 @@ describe('renameWithRetry', () => {
     expect(calls).toBe(1);
     expect(() => renameWithRetry('a', 'b')).toThrow('EBUSY');
     expect(calls).toBe(9);
+  });
+});
+
+describe('replaceKeepingBackupAsync', () => {
+  it('keeps .bak, and retries a transient rename without blocking the event loop', async () => {
+    writeFileKeepingBackup(file, 'one');
+    writeFileSync(`${file}.tmp-new`, 'two');
+    const realRename = fs.renameSync.bind(fs);
+    let failures = 0;
+    vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+      if (String(to) === file && failures < 3) {
+        failures++;
+        throw errno('EBUSY');
+      }
+      realRename(from, to);
+    });
+    const atomicsWait = vi.spyOn(Atomics, 'wait');
+    let ticks = 0;
+    const ticker = setInterval(() => ticks++, 1);
+    expect(await replaceKeepingBackupAsync(`${file}.tmp-new`, file, () => true)).toBe(true);
+    clearInterval(ticker);
+    expect(failures).toBe(3);
+    expect(atomicsWait).not.toHaveBeenCalled();
+    expect(ticks).toBeGreaterThan(0);
+    expect(readFileSync(file, 'utf8')).toBe('two');
+    expect(readFileSync(`${file}.bak`, 'utf8')).toBe('one');
+  });
+
+  it('abandons once no longer wanted (a newer synchronous write landed), touching neither file nor .bak', async () => {
+    writeFileKeepingBackup(file, 'one');
+    writeFileKeepingBackup(file, 'two');
+    writeFileSync(`${file}.tmp-old`, 'stale');
+    expect(await replaceKeepingBackupAsync(`${file}.tmp-old`, file, () => false)).toBe(false);
+    expect(readFileSync(file, 'utf8')).toBe('two');
+    expect(readFileSync(`${file}.bak`, 'utf8')).toBe('one');
   });
 });
 

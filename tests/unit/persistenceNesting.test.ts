@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { serializeDocument } from '@core/commands/persistence/serialization';
+import { exceedsNestingDepth } from '@core/commands/persistence/nestingDepth';
 
 const withNestedField = (depth: number): string =>
   serializeDocument(createEmptyDocument()).replace('"document":{', `"document":{"extra":${'['.repeat(depth)}1${']'.repeat(depth)},`);
@@ -23,5 +24,32 @@ describe('load_document nesting depth', () => {
     const result = execute(createEmptyDocument(), 'load_document', { json: withNestedField(900) });
     expect(result.summary).toMatch(/^Loaded document/);
     expect(() => serializeDocument(result.document)).not.toThrow();
+  });
+});
+
+describe('exceedsNestingDepth', () => {
+  const nestedObjects = (depth: number): unknown => JSON.parse('{"a":'.repeat(depth) + '1' + '}'.repeat(depth));
+
+  it('counts arrays and objects alike, at and past the limit', () => {
+    expect(exceedsNestingDepth(nestedObjects(10), 10)).toBe(false);
+    expect(exceedsNestingDepth(nestedObjects(11), 10)).toBe(true);
+    expect(exceedsNestingDepth([[[1]], { b: [{ c: [2] }] }], 5)).toBe(false);
+    expect(exceedsNestingDepth([[[1]], { b: [{ c: [2] }] }], 4)).toBe(true);
+    expect(exceedsNestingDepth(JSON.parse('{"__proto__":[[[[1]]]]}'), 4)).toBe(true);
+    expect(exceedsNestingDepth(42, 0)).toBe(false);
+  });
+
+  it('a large mesh document costs a small fraction of its JSON.parse (number arrays are never pushed)', () => {
+    const vertices = 1_000_000;
+    const positions = Array.from({ length: vertices * 3 }, (_, index) => index * 0.001);
+    const indices = Array.from({ length: vertices * 3 }, (_, index) => index % vertices);
+    const text = JSON.stringify({ document: { entities: { mesh1: { id: 'mesh1', kind: 'mesh', mesh: { positions, indices } } } } });
+    let started = performance.now();
+    const parsed: unknown = JSON.parse(text);
+    const parseMs = performance.now() - started;
+    started = performance.now();
+    expect(exceedsNestingDepth(parsed, 1000)).toBe(false);
+    const scanMs = performance.now() - started;
+    expect(scanMs).toBeLessThan(Math.max(parseMs / 2, 50));
   });
 });

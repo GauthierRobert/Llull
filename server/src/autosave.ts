@@ -10,7 +10,7 @@
  */
 
 import fs from 'fs';
-import { replaceKeepingBackup, writeFileKeepingBackup } from './writeFileAtomic';
+import { replaceKeepingBackupAsync, writeFileKeepingBackup } from './writeFileAtomic';
 import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
 import type { CadDocument } from '@core/model/types';
@@ -66,14 +66,16 @@ export function createAutosaver(options: AutosaverOptions): Autosaver {
     try {
       await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
       await fs.promises.writeFile(asyncTemporary, text, 'utf8');
-      const handle = await fs.promises.open(asyncTemporary, 'r+');
-      try {
-        await handle.sync();
-      } finally {
-        await handle.close();
+      const stillWanted = (): boolean => generation === syncWrites; // a synchronous write since supersedes this one
+      if (stillWanted()) {
+        const handle = await fs.promises.open(asyncTemporary, 'r+');
+        try {
+          await handle.sync();
+        } finally {
+          await handle.close();
+        }
       }
-      if (generation === syncWrites) replaceKeepingBackup(asyncTemporary, filePath);
-      else await fs.promises.rm(asyncTemporary, { force: true });
+      if (!(await replaceKeepingBackupAsync(asyncTemporary, filePath, stillWanted))) await fs.promises.rm(asyncTemporary, { force: true });
     } catch (err) {
       console.warn(`[autosave] write failed: ${errorMessage(err)}`);
       // Kept for the shutdown flush (a newer edit supersedes it); no immediate retry, which would spin on a full disk.

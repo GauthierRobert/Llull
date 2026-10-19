@@ -11,6 +11,7 @@ import { runLocalExchange } from './exchange';
 import { requestJson, type FetchLike } from '../restClient';
 import { serverContext } from '../fea/context';
 import { readDocumentFile, writeDocumentFile } from '../documentFile';
+import { renameWithRetry } from '../writeFileAtomic';
 
 export interface CliBackend {
   readonly target: string; // document path or server URL
@@ -70,8 +71,8 @@ export function createLocalBackend(docPath: string, options: LocalOptions): CliB
       const parked = `${docPath}.${process.pid}.swap`;
       const hasCurrent = fs.existsSync(docPath);
       if (hasCurrent) fs.copyFileSync(docPath, parked);
-      fs.renameSync(backup, docPath);
-      if (hasCurrent) fs.renameSync(parked, backup);
+      renameWithRetry(backup, docPath);
+      if (hasCurrent) renameWithRetry(parked, backup);
     }
     return Promise.resolve({
       summary: `${label}: swapped ${docPath} with its previous version (${path.basename(backup)}).`,
