@@ -26,7 +26,8 @@ test('survey -> terrain -> LandXML in the Civil / Site panel', async ({ page }) 
   }
   await page.getByLabel('Survey unit').selectOption('m');
   await page.getByLabel('Survey points text').fill(survey());
-  await page.getByRole('button', { name: 'Import points' }).click();
+  // The submit button previews the pasted line count (header + 11 × 11 points).
+  await page.getByRole('button', { name: 'Import 122 lines' }).click();
   await expect(page.getByText('121 points')).toBeVisible();
   await page.getByRole('button', { name: 'Create surface' }).click();
   await expect(page.getByText(/121 points, 200 triangles, 10000 m²/)).toBeVisible();
