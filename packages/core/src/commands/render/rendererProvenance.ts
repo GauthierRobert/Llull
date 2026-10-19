@@ -54,7 +54,15 @@ export function nativeRun(port: RasterPort, engine: 'gpu' | 'cpu'): NativeRun {
     };
     return image.rgba;
   };
-  return { pixels, result: () => failure ?? provenance ?? { code: 'NATIVE_JOB_FAILED', message: 'the native raster drew no frame' } };
+  return {
+    pixels,
+    result: () =>
+      failure ??
+      provenance ?? {
+        code: 'NATIVE_JOB_FAILED',
+        message: 'nothing to rasterise natively (no solid or sketch in view): use the reference renderer',
+      },
+  };
 }
 
 /** `data` fields of a reference render: its digest and renderer version. */
