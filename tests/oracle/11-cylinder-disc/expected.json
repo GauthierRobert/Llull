@@ -1,0 +1,15 @@
+{
+  "id": "11-cylinder-disc",
+  "family": "primitive",
+  "description": "thin disc r=10 h=0.5",
+  "source": "analytic",
+  "formula": "V = pi r^2 h; A = 2 pi r (r+h)",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 157.079632679,
+  "area": 659.734457254,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-10, -10, -0.25], "max": [10, 10, 0.25] },
+  "faces": 3,
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

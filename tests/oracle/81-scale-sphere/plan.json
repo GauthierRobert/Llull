@@ -1,0 +1,6 @@
+{
+  "actions": [
+    { "command": "add_sphere", "params": { "radius": 2 }, "as": "a" },
+    { "command": "scale_entity", "params": { "id": "$a", "factor": 0.5 } }
+  ]
+}

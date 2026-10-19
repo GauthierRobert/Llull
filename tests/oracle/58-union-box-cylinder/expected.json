@@ -1,0 +1,19 @@
+{
+  "id": "58-union-box-cylinder",
+  "family": "boolean",
+  "description": "box 10-cube pierced and extended by a vertical cylinder r=3 h=20",
+  "source": "analytic",
+  "formula": "V = 1000 + pi r^2 (20 - 10); A = 600 - 2 pi r^2 + 2 pi r 10 + 2 pi r^2",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 1282.74333882,
+  "area": 788.495559215,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-5, -5, -10], "max": [5, 5, 10] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": 0.009618161583403562,
+    "area": 0.007155829702431115,
+    "reason": "inscribed n-gon cross-section of the cylinder (n from the kernel default circle resolution): loss <= k (1 - cos(pi/n)) of the feature share"
+  }
+}

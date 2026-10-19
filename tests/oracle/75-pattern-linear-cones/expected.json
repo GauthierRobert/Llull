@@ -1,0 +1,15 @@
+{
+  "id": "75-pattern-linear-cones",
+  "family": "pattern",
+  "description": "four cones in a row along Y",
+  "source": "analytic",
+  "formula": "bodies = n; V = n V1",
+  "kernels": ["manifold", "occt"],
+  "bodies": 4,
+  "volume": 8.37758040957,
+  "area": 40.6656295385,
+  "centroid": [0, 7.5, 0.5],
+  "bbox": { "min": [-1, -1, 0], "max": [1, 16, 2] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": { "volume": null, "area": 0.03, "reason": "area of a cone is summed over display triangles" }
+}

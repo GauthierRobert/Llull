@@ -1,0 +1,19 @@
+{
+  "id": "65-subtract-sphere-cap",
+  "family": "boolean",
+  "description": "sphere r=3 with the cap above z=1 sliced off by a box",
+  "source": "analytic",
+  "formula": "V = 4/3 pi r^3 - pi h^2 (3r - h)/3, h = 2; A = 4 pi r^2 - 2 pi r h + pi (r^2 - (r-h)^2)",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 83.7758040957,
+  "area": 100.530964915,
+  "centroid": [0, 0, -0.6],
+  "bbox": { "min": [-3, -3, -3], "max": [3, 3, 1] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": 0.031,
+    "area": 0.031,
+    "reason": "sphere tessellated at 32 segments: volume loss <= 3 % of the sphere share (measured about 2 %)"
+  }
+}

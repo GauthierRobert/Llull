@@ -1,0 +1,14 @@
+{
+  "id": "55-subtract-groove",
+  "family": "boolean",
+  "description": "plate 20x10x4 with a 4-wide groove 1 deep",
+  "source": "analytic",
+  "formula": "V = 800 - 40; A = 640 - 40 + 40 + 20 - 8 (the groove also notches both end faces)",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 760,
+  "area": 652,
+  "centroid": [0, 0, -0.0789473684211],
+  "bbox": { "min": [-10, -5, -2], "max": [10, 5, 2] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

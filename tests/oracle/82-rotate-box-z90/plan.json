@@ -1,0 +1,6 @@
+{
+  "actions": [
+    { "command": "add_box", "params": { "size": [2, 3, 4] }, "as": "a" },
+    { "command": "rotate_entity", "params": { "id": "$a", "delta": [0, 0, 1.5707963267948966] } }
+  ]
+}

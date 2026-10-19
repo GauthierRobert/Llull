@@ -1,0 +1,6 @@
+{
+  "actions": [
+    { "command": "add_cone", "params": { "radius": 1, "height": 2 }, "as": "a" },
+    { "command": "array_linear", "params": { "id": "$a", "count": 4, "offset": [0, 5, 0] } }
+  ]
+}

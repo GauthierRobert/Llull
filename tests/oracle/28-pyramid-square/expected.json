@@ -1,0 +1,14 @@
+{
+  "id": "28-pyramid-square",
+  "family": "primitive",
+  "description": "square pyramid 5x5x5",
+  "source": "analytic",
+  "formula": "V = w d h / 3; centroid at h/4 above the base",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 41.6666666667,
+  "area": 80.9016994375,
+  "centroid": [0, 0, 1.25],
+  "bbox": { "min": [-2.5, -2.5, 0], "max": [2.5, 2.5, 5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

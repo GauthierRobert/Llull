@@ -1,0 +1,16 @@
+{
+  "actions": [
+    {
+      "command": "revolve_profile",
+      "params": {
+        "profile": [
+          [1, 0],
+          [3, 0],
+          [2, 2],
+          [1, 2]
+        ],
+        "segments": 64
+      }
+    }
+  ]
+}

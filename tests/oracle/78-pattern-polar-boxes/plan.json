@@ -1,0 +1,6 @@
+{
+  "actions": [
+    { "command": "add_box", "params": { "size": [2, 1, 1], "position": [4, 0, 0] }, "as": "a" },
+    { "command": "array_polar", "params": { "id": "$a", "count": 4, "center": [0, 0, 0] } }
+  ]
+}

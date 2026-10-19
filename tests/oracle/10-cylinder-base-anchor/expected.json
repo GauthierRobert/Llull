@@ -1,0 +1,15 @@
+{
+  "id": "10-cylinder-base-anchor",
+  "family": "primitive",
+  "description": "cylinder anchored at its base centre",
+  "source": "analytic",
+  "formula": "V = pi r^2 h; A = 2 pi r (r+h)",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 62.8318530718,
+  "area": 87.9645943005,
+  "centroid": [0, 0, 5.5],
+  "bbox": { "min": [-2, -2, 3], "max": [2, 2, 8] },
+  "faces": 3,
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "72-hole-blind-drill-point",
+  "family": "hole",
+  "description": "blind hole d=4 depth 2 plus a 118 degree drill point",
+  "source": "analytic",
+  "formula": "V = pi r^2 depth + pi r^2 (r / tan(59 deg)) / 3",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 1569.83350062,
+  "area": 1147.22671825,
+  "centroid": [0, 0, -0.0150464668387],
+  "bbox": { "min": [-10, -10, -2], "max": [10, 10, 2] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": 0.0017384742733104169,
+    "area": 0.012528831758061743,
+    "reason": "bore tessellated as an inscribed n-gon (n from the kernel default circle resolution): loss <= k (1 - cos(pi/n)) of the removed share"
+  }
+}

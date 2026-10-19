@@ -1,0 +1,19 @@
+{
+  "id": "43-revolve-hollow-tube",
+  "family": "revolve",
+  "description": "tube profile (1..2, 0..5) revolved",
+  "source": "analytic",
+  "formula": "Pappus-Guldin: V = 2 pi xbar A; lateral area = sum of 2 pi r_mid L",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 47.1238898038,
+  "area": 113.097335529,
+  "centroid": [0, 0, 2.5],
+  "bbox": { "min": [-2, -2, 0], "max": [2, 2, 5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": null,
+    "area": 0.02,
+    "reason": "area of a revolved curved face is summed over display triangles; the volume is closed-form"
+  }
+}

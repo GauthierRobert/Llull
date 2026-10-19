@@ -1,0 +1,14 @@
+{
+  "id": "06-box-rot-z90",
+  "family": "primitive",
+  "description": "box 2x3x4 turned 90 degrees about Z: X and Y extents swap",
+  "source": "analytic",
+  "formula": "bbox of a rotated box",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 24,
+  "area": 52,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-1.5, -1, -2], "max": [1.5, 1, 2] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

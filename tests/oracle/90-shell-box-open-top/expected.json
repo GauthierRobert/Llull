@@ -1,0 +1,14 @@
+{
+  "id": "90-shell-box-open-top",
+  "family": "shell",
+  "description": "10-cube hollowed to 1 mm walls, top face removed",
+  "source": "analytic",
+  "formula": "V = abc - (a-2t)(b-2t)(c-t)",
+  "kernels": ["occt"],
+  "bodies": 1,
+  "volume": 424,
+  "area": 888,
+  "centroid": [0, 0, -0.679245283019],
+  "bbox": { "min": [-5, -5, -5], "max": [5, 5, 5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}
