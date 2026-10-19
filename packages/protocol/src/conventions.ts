@@ -233,7 +233,7 @@ A topology result is a concept shape computed by llull, never a released design:
 Laws are data on a document material (\`create_material\` name), never in the solver. Every fit and result is unverified until a source and a reviewer exist.
 
 - **Define.** \`add_material_model\` (elastic, j2_plasticity, hill48_plasticity, ramberg_osgood, hyper_* neo_hooke / mooney_rivlin / polynomial / yeoh / ogden / arruda_boyce,
-  visco_prony, creep, rate; durability laws too) states HOW it is written (Ogden \`convention\`, Ramberg-Osgood \`form\`, curve \`inputMeasure\`, \`modulusKind\`, Hill
+  visco_prony, creep, rate; durability laws too) states HOW it is written (Ogden convention, Ramberg-Osgood \`form\`, curve inputMeasure, modulusKind, Hill
   \`form\`): none is defaulted. \`define_constitutive_set\` combines models; \`check_material_models\` lists readiness.
 - **Fit.** \`fit_material_model\` returns a model, never edits the document: linear laws by exact QR, hyper_ogden / hyper_arruda_boyce / visco_prony with free times /
   ramberg_osgood form true_stress / j2_voce / j2_chaboche / creep_garofalo by Levenberg-Marquardt (\`start\`, \`bounds\`; data.convergence has iterations, cost,
