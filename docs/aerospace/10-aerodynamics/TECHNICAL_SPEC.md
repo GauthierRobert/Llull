@@ -349,3 +349,8 @@ LU 0.55 s), 5000 panels 4.4 s (0.48 s, 3.1 s), 10 000 panels 23.4 s (2.0 s, 17.7
 
 **Not built (M3 remainder / later):** sideslip and lateral derivatives, a wake aligned with the free stream, ground effect, viscous
 section polars inside the VLM (XFOIL, M2), the 3D source–doublet panel method.
+
+**Review follow-ups (2026-10-19).** A surface whose leading edges all lie on y = 0 (a fin) or on both sides of it (a full-span
+definition or loft) is not mirrored by default (`mirror: true` on it is refused, `AER_SURFACE_INVALID`): mirroring would lay the
+image onto the surface (singular or near-singular system). `llull-compute panel` also returns the O(n²) Trefftz-plane velocities
+(`trefftz.f64`, bit-identical to the TS `trefftzBasis` for the same Γ, crate fixture), so the host thread only does O(n) work per angle.

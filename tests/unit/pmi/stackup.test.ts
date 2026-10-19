@@ -86,6 +86,12 @@ describe('stack-up math (lib/stackup)', () => {
         { lo: 0, width: 1 },
       ]),
     ).toBeCloseTo(0.125, 15);
+    // A width 1e-9 of the other: a point mass at its centre, so the CDF is the wide uniform shifted by 0.5e-9 (no cancellation noise).
+    const mixed = uniformSumCdf(1e-6, [
+      { lo: 0, width: 1 },
+      { lo: 0, width: 1e-9 },
+    ]) as number;
+    expect(Math.abs(mixed - (1e-6 - 0.5e-9)) / (1e-6 - 0.5e-9)).toBeLessThan(1e-9);
     expect(uniformSumCdf(5, [{ lo: 0, width: 0 }])).toBe(1);
     expect(uniformSumCdf(-1, [{ lo: 0, width: 0 }])).toBe(0);
     expect(uniformSumCdf(0, new Array(13).fill({ lo: 0, width: 1 }))).toBeNull();
@@ -248,12 +254,18 @@ describe('analyze_stackup refusals', () => {
     [{ contributors: one, expression: 'A' }, 'GDT_STACKUP_SENSITIVITY_CONFLICT', 'expression'],
     [{ contributors: [{ name: 'A', nominal: 1, upper: 0, lower: 0 }] }, 'GDT_STACKUP_SENSITIVITY_CONFLICT', 'expression'],
     [{ contributors: [{ name: 'A', nominal: 1, upper: 0, lower: 0 }], expression: 'A + B' }, 'GDT_STACKUP_EXPRESSION', 'expression'],
-    [{ contributors: one, samples: 2_000_001 }, 'GDT_STACKUP_SAMPLES_CAP', 'samples'],
-    [{ contributors: one, samples: 10 }, 'GDT_STACKUP_SAMPLES_CAP', 'samples'],
-    [{ contributors: one, sigmaPerHalfTolerance: 0 }, 'GDT_STACKUP_CONTRIBUTOR_INVALID', 'sigmaPerHalfTolerance'],
-    [{ contributors: one, seed: -1 }, 'GDT_STACKUP_CONTRIBUTOR_INVALID', 'seed'],
+    [{ contributors: one, methods: ['monteCarlo'], samples: 2_000_001 }, 'GDT_STACKUP_SAMPLES_CAP', 'samples'],
+    [{ contributors: one, methods: ['rss', 'monteCarlo'], samples: 10 }, 'GDT_STACKUP_SAMPLES_CAP', 'samples'],
+    [{ contributors: one, sigmaPerHalfTolerance: 0 }, 'GDT_STACKUP_PARAM_INVALID', 'sigmaPerHalfTolerance'],
+    [{ contributors: one, seed: -1 }, 'GDT_STACKUP_PARAM_INVALID', 'seed'],
   ])('%j -> %s', (params, code, path) => {
     expectRefusal(doc, 'analyze_stackup', params, code, path);
+  });
+
+  it('samples is only checked when Monte Carlo is requested', () => {
+    const result = data<Stack>(doc, 'analyze_stackup', { contributors: one, samples: 10 });
+    expect(result.monteCarlo).toBeUndefined();
+    expect(result.rss.halfTolerance).toBeCloseTo(0.1, 15);
   });
 
   it('a non-finite sample refuses with GDT_STACKUP_NON_FINITE', () => {

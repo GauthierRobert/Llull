@@ -1,6 +1,8 @@
 //! Horseshoe vortex-lattice influence build: the operations of `packages/domain-aero/src/aerodynamics/vlmKernel.ts` in the same order, so
 //! the matrix is bit-identical to the TypeScript one (only `+ − × ÷` and `sqrt`).
 
+use rayon::prelude::*;
+
 /// f64 per panel: Ax Ay Az Bx By Bz Cx Cy Cz nx ny nz.
 pub const PANEL_STRIDE: usize = 12;
 const FOUR_PI: f64 = 4.0 * std::f64::consts::PI;
@@ -50,6 +52,49 @@ pub fn influence_row(panels: &[f64], i: usize, row: &mut [f64]) {
         let [u, v, w] = horseshoe(&panels[j * PANEL_STRIDE..(j + 1) * PANEL_STRIDE], px, py, pz);
         *value = u * nx + v * ny + w * nz;
     }
+}
+
+/// Trefftz-plane wake velocity (v, w) at (y, z) of every trailing leg pair for circulations `gamma` (the TS `trefftzVelocity`).
+fn trefftz_velocity(panels: &[f64], gamma: &[f64], y: f64, z: f64) -> (f64, f64) {
+    let (mut v, mut w) = (0.0, 0.0);
+    for (p, g) in panels.chunks_exact(PANEL_STRIDE).zip(gamma) {
+        let g = g / (2.0 * std::f64::consts::PI);
+        let (dby, dbz, day, daz) = (y - p[4], z - p[5], y - p[1], z - p[2]);
+        let rb = dby * dby + dbz * dbz;
+        let ra = day * day + daz * daz;
+        if rb > 0.0 {
+            v -= g * dbz / rb;
+            w += g * dby / rb;
+        }
+        if ra > 0.0 {
+            v += g * daz / ra;
+            w -= g * day / ra;
+        }
+    }
+    (v, w)
+}
+
+/// Trefftz velocities at every bound-vortex midpoint for Γx and Γz (the TS `trefftzBasis` layout: v0 w0 v1 w1 … for Γx, then for Γz).
+pub fn trefftz_basis(panels: &[f64], gamma_x: &[f64], gamma_z: &[f64]) -> Vec<f64> {
+    let n = panels.len() / PANEL_STRIDE;
+    let rows: Vec<[f64; 4]> = (0..n)
+        .into_par_iter()
+        .map(|i| {
+            let p = &panels[i * PANEL_STRIDE..(i + 1) * PANEL_STRIDE];
+            let (y, z) = ((p[1] + p[4]) / 2.0, (p[2] + p[5]) / 2.0);
+            let (xv, xw) = trefftz_velocity(panels, gamma_x, y, z);
+            let (zv, zw) = trefftz_velocity(panels, gamma_z, y, z);
+            [xv, xw, zv, zw]
+        })
+        .collect();
+    let mut out = vec![0.0; 4 * n];
+    for (i, [xv, xw, zv, zw]) in rows.into_iter().enumerate() {
+        out[2 * i] = xv;
+        out[2 * i + 1] = xw;
+        out[2 * n + 2 * i] = zv;
+        out[2 * n + 2 * i + 1] = zw;
+    }
+    out
 }
 
 /// Right-hand sides −V·n for the free streams x̂ and ẑ.

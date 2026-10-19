@@ -100,15 +100,22 @@ export async function runVortexLatticeSolve(
     { 'job.json': JSON.stringify({ panels: n }), 'panels.f64': f64Bytes(model.lattice.panels) },
     async (folder) => {
       const run = await deps.runner.run(['panel'], folder, seconds * 1000);
-      if (!run.ok) return { run, gamma: null, report: null };
+      if (!run.ok) return { run, gamma: null, wake: null, report: null };
       const gamma = f64Values(await readOutput(folder, run, 'gamma.f64'));
+      const wake = f64Values(await readOutput(folder, run, 'trefftz.f64'));
       const report: unknown = JSON.parse((await readOutput(folder, run, 'solve.json')).toString('utf8'));
-      return { run, gamma, report };
+      return { run, gamma, wake, report };
     },
     deps.env,
-  ).catch((error: unknown) => ({ run: null, gamma: null, report: null, error: error instanceof Error ? error.message : String(error) }));
+  ).catch((error: unknown) => ({
+    run: null,
+    gamma: null,
+    wake: null,
+    report: null,
+    error: error instanceof Error ? error.message : String(error),
+  }));
   if (outcome.run === null) return feaFailure(TOOL, 'NATIVE_PROTOCOL', 'error' in outcome ? outcome.error : 'job folder failure');
-  const { run, gamma, report } = outcome;
+  const { run, gamma, wake, report } = outcome;
   if (gamma === null) {
     const hint =
       run.code === 'NATIVE_TOOL_MISSING' ? ` analyze_vortex_lattice still solves up to ${VLM_TS_PANEL_CAP} panels in TypeScript.` : '';
@@ -117,7 +124,7 @@ export async function runVortexLatticeSolve(
       data: { code: run.code, log: run.log.slice(-4000) },
     };
   }
-  if (gamma.length !== 2 * n || !isRecord(report))
+  if (gamma.length !== 2 * n || wake === null || wake.length !== 4 * n || !isRecord(report))
     return feaFailure(TOOL, 'NATIVE_PROTOCOL', `gamma.f64 holds ${gamma.length} values, ${2 * n} expected`);
   const solver = {
     engine: 'native' as const,
@@ -130,7 +137,10 @@ export async function runVortexLatticeSolve(
     residualZ: report['residualZ'],
     elapsedMs: run.elapsedMs,
   };
-  const data = vortexLatticeData(model, { gammaX: gamma.subarray(0, n), gammaZ: gamma.subarray(n) }, solver);
+  const data = vortexLatticeData(model, { gammaX: gamma.subarray(0, n), gammaZ: gamma.subarray(n) }, solver, {
+    vX: wake.subarray(0, 2 * n),
+    vZ: wake.subarray(2 * n),
+  });
   const checked = options.verify === true ? verification(model, gamma) : undefined;
   const np = data['neutralPoint'] as { x: number; staticMargin: number };
   return {

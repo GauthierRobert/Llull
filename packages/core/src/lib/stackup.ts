@@ -52,14 +52,17 @@ export const erfc = (x: number): number => (x >= 0 ? erfcPositive(x) : 2 - erfcP
 export const normalCdf = (z: number): number => 0.5 * erfc(-z / Math.SQRT2);
 
 /**
- * P(Σ U_i ≤ x) for independent U_i uniform on [lo_i, lo_i + w_i] (generalised Irwin–Hall, inclusion–exclusion), n ≤ 12.
+ * P(Σ U_i ≤ x) for independent U_i uniform on [lo_i, lo_i + w_i] (generalised Irwin–Hall, inclusion–exclusion), n ≤ 12. A width below
+ * 1e-6 of the largest is taken as a point mass at its centre: the alternating r^n sums would lose more digits to it (review finding) than
+ * the point mass costs, which is at most (narrow width) × (density of the other terms) ≤ 1e-6 × (n-term density × largest width).
  * @failure more than 12 terms -> null
  */
 export function uniformSumCdf(x: number, terms: readonly { readonly lo: number; readonly width: number }[]): number | null {
   const n = terms.length;
   if (n > UNIFORM_CDF_MAX) return null;
-  const widths = terms.filter((t) => t.width > 0);
-  const shift = terms.reduce((sum, t) => sum + t.lo, 0);
+  const narrow = 1e-6 * Math.max(0, ...terms.map((t) => t.width));
+  const widths = terms.filter((t) => t.width > narrow);
+  const shift = terms.reduce((sum, t) => sum + (t.width > narrow ? t.lo : t.lo + t.width / 2), 0);
   if (widths.length === 0) return x >= shift ? 1 : 0;
   let factorial = 1;
   for (let k = 2; k <= widths.length; k += 1) factorial *= k;

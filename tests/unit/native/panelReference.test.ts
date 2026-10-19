@@ -1,6 +1,6 @@
 /**
  * TypeScript reference of the native vortex-lattice solve (VC-AER-33 at crate level, RS1 §2 rule 4): a wing + tail lattice, its influence
- * matrix and the basis circulations, written to solver/crates/llull-panel/tests/fixtures/lattice.json. `cargo test` must rebuild the
+ * matrix, the basis circulations and their Trefftz-plane velocities, written to solver/crates/llull-panel/tests/fixtures/lattice.json. `cargo test` must rebuild the
  * influence matrix bit for bit and solve to Γ within the VC-AER-33 tolerance. Regenerate with LLULL_WRITE_NATIVE_FIXTURES=1.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { influenceMatrix, solveBasis } from '@aero/aerodynamics/vlmKernel';
 import { isVlmRefusal, resolveVortexLattice, type VortexLatticeParams } from '@aero/aerodynamics/vlmModel';
+import { trefftzBasis } from '@aero/aerodynamics/vlmLoads';
 
 const FIXTURE = path.resolve(__dirname, '../../../solver/crates/llull-panel/tests/fixtures/lattice.json');
 const WRITE = process.env['LLULL_WRITE_NATIVE_FIXTURES'] === '1';
@@ -51,6 +52,7 @@ describe('vortex-lattice native reference fixture (TS = oracle)', () => {
       influence: [...influenceMatrix(panels)],
       gammaX: [...(basis?.gammaX ?? [])],
       gammaZ: [...(basis?.gammaZ ?? [])],
+      trefftz: basis === null ? [] : (({ vX, vZ }) => [...vX, ...vZ])(trefftzBasis(model.lattice, basis)),
     };
     expect(fixture.gammaX).toHaveLength(56);
     const text = `${JSON.stringify(fixture)}\n`;

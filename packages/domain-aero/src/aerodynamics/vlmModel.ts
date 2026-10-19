@@ -10,7 +10,7 @@ import { parseNaca } from './naca';
 import { thinAirfoil } from './panelMethod';
 import { panelCount } from './vlmKernel';
 import { buildLattice, loftSections, type Lattice, type LatticeSection, type LatticeSurface } from './vlmLattice';
-import { alphaLoads, stability, stripLoading, trefftzBasis, type LatticeBasis, type LatticeReference } from './vlmLoads';
+import { alphaLoads, stability, stripLoading, trefftzBasis, type LatticeBasis, type LatticeReference, type TrefftzBasis } from './vlmLoads';
 
 /** Largest lattice the TypeScript path solves (dense LU, measured ≈ 1.2 s at this size on the reference laptop; above: the native transport). */
 export const VLM_TS_PANEL_CAP = 1000;
@@ -41,7 +41,12 @@ export const vortexLatticeParams = z.object({
           )
           .optional()
           .describe('Explicit sections root to tip (alternative to loftId), at least 2.'),
-        mirror: z.boolean().optional().describe('Add the mirror image about y = 0 (a half wing given root to tip). Default true.'),
+        mirror: z
+          .boolean()
+          .optional()
+          .describe(
+            'Add the mirror image about y = 0 (a half wing given root to tip). Default true, except false for a surface on y = 0 (fin) or one already spanning both sides (full-span loft).',
+          ),
         spanwisePanels: z.number().int().optional().describe('Spanwise panels per side, 1..200. Default 12.'),
         chordwisePanels: z.number().int().optional().describe('Chordwise panels, 1..50. Default 4.'),
         spacing: z.enum(['cosine', 'uniform']).optional().describe('Spanwise spacing: cosine (default, clustered at the tips) or uniform.'),
@@ -83,7 +88,19 @@ export const isVlmRefusal = (value: VortexLatticeModel | VlmRefusal): value is V
 
 type SurfaceParams = VortexLatticeParams['surfaces'][number];
 
-function surfaceOf(doc: CadDocument, surface: SurfaceParams, path: string): LatticeSurface | VlmRefusal {
+interface ResolvedSurface {
+  readonly surface: LatticeSurface;
+  readonly zeroLiftRad: number;
+}
+
+/** Leading edges all on y = 0 (a fin) or on both sides of it (a full-span definition): mirroring would overlap the surface. */
+function onOrAcrossSymmetryPlane(sections: readonly LatticeSection[], spanLength: number): boolean {
+  const tolerance = 1e-9 * spanLength;
+  const ys = sections.map((s) => s.leadingEdge[1]);
+  return ys.every((y) => Math.abs(y) <= tolerance) || (Math.min(...ys) < -tolerance && Math.max(...ys) > tolerance);
+}
+
+function surfaceOf(doc: CadDocument, surface: SurfaceParams, path: string): ResolvedSurface | VlmRefusal {
   const spanwise = surface.spanwisePanels ?? 12;
   const chordwise = surface.chordwisePanels ?? 4;
   if (!(spanwise >= 1 && spanwise <= 200)) return refusal('AER_PARAM_INVALID', 'spanwisePanels must be 1..200', [`${path}.spanwisePanels`]);
@@ -118,13 +135,21 @@ function surfaceOf(doc: CadDocument, surface: SurfaceParams, path: string): Latt
     return sum + Math.hypot(s.leadingEdge[1] - a[1], s.leadingEdge[2] - a[2]);
   }, 0);
   if (!(spanLength > 0)) return refusal('AER_SURFACE_INVALID', 'the sections have no spanwise extent (y / z)', [path]);
+  const unmirrorable = onOrAcrossSymmetryPlane(sections, spanLength);
+  if (unmirrorable && surface.mirror === true)
+    return refusal('AER_SURFACE_INVALID', 'a surface on y = 0 (fin) or spanning both sides of it cannot be mirrored: mirror false', [
+      `${path}.mirror`,
+    ]);
   return {
-    name: surface.name,
-    sections,
-    mirror: surface.mirror ?? true,
-    spanwisePanels: spanwise,
-    chordwisePanels: chordwise,
-    spacing: surface.spacing ?? 'cosine',
+    surface: {
+      name: surface.name,
+      sections,
+      mirror: surface.mirror ?? !unmirrorable,
+      spanwisePanels: spanwise,
+      chordwisePanels: chordwise,
+      spacing: surface.spacing ?? 'cosine',
+    },
+    zeroLiftRad: zeroLift,
   };
 }
 
@@ -138,10 +163,12 @@ export function resolveVortexLattice(doc: CadDocument, params: VortexLatticePara
   if (alphasDeg.length === 0 || alphasDeg.length > 31 || alphasDeg.some((a) => !(Math.abs(a) <= 20)))
     return refusal('AER_PARAM_INVALID', 'alphasDeg needs 1..31 angles within -20..20 degrees', ['alphasDeg']);
   const surfaces: LatticeSurface[] = [];
+  const zeroLifts: number[] = [];
   for (const [index, surface] of params.surfaces.entries()) {
     const built = surfaceOf(doc, surface, `surfaces.${index}`);
     if ('code' in built) return built;
-    surfaces.push(built);
+    surfaces.push(built.surface);
+    zeroLifts.push(built.zeroLiftRad);
   }
   const panels = surfaces.reduce((sum, s) => sum + s.spanwisePanels * s.chordwisePanels * (s.mirror ? 2 : 1), 0);
   if (panels > panelCap) return refusal('AER_LATTICE_TOO_LARGE', `${panels} panels exceed the cap of ${panelCap}`, ['surfaces']);
@@ -163,8 +190,8 @@ export function resolveVortexLattice(doc: CadDocument, params: VortexLatticePara
     },
     alphas: alphasDeg.map((a) => a * RAD),
     names: surfaces.map((s) => s.name),
-    zeroLift: params.surfaces.map((s) => ({
-      valueDeg: s.zeroLiftAngleDeg ?? (s.naca === undefined ? 0 : thinAirfoilZeroLiftDeg(s.naca)),
+    zeroLift: params.surfaces.map((s, i) => ({
+      valueDeg: (zeroLifts[i] as number) / RAD,
       source:
         s.zeroLiftAngleDeg !== undefined
           ? 'given'
@@ -175,20 +202,23 @@ export function resolveVortexLattice(doc: CadDocument, params: VortexLatticePara
   };
 }
 
-const thinAirfoilZeroLiftDeg = (naca: string): number => {
-  const section = parseNaca(naca);
-  return typeof section === 'string' ? 0 : thinAirfoil((x) => section.camber(x).slope).zeroLiftAngle / RAD;
-};
-
 export interface SolveProvenance {
   readonly engine: 'ts' | 'native';
   readonly [key: string]: unknown;
 }
 
-/** The `data` of analyze_vortex_lattice / vortex_lattice_solve from the basis circulations. */
-export function vortexLatticeData(model: VortexLatticeModel, basis: LatticeBasis, solver: SolveProvenance): Record<string, unknown> {
+/**
+ * The `data` of analyze_vortex_lattice / vortex_lattice_solve from the basis circulations; `wake` = the Trefftz-plane velocities when the
+ * native job computed them (O(n²), kept off the host thread for large lattices), else computed here.
+ */
+export function vortexLatticeData(
+  model: VortexLatticeModel,
+  basis: LatticeBasis,
+  solver: SolveProvenance,
+  wake?: TrefftzBasis,
+): Record<string, unknown> {
   const { lattice, reference } = model;
-  const trefftz = trefftzBasis(lattice, basis);
+  const trefftz = wake ?? trefftzBasis(lattice, basis);
   const aspectRatio = (reference.span * reference.span) / reference.area;
   const polar = model.alphas.map((alpha) => {
     const loads = alphaLoads(lattice, basis, trefftz, reference, alpha);
@@ -255,4 +285,3 @@ export function vortexLatticeData(model: VortexLatticeModel, basis: LatticeBasis
     },
   };
 }
-

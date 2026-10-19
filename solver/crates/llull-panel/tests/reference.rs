@@ -1,6 +1,7 @@
 //! VC-AER-33 at crate level: the influence matrix equals the TypeScript one bit for bit, and the faer LU solves to the TypeScript Γ within
 //! round-off (fixture written by `tests/unit/native/panelReference.test.ts`); a rerun gives identical bits.
 
+use llull_panel::kernel::trefftz_basis;
 use llull_panel::{influence_matrix, run, solve};
 use serde_json::Value;
 
@@ -20,6 +21,17 @@ fn the_influence_matrix_is_bit_identical_to_typescript() {
     let expected = numbers(&fixture["influence"]);
     assert_eq!(matrix.len(), expected.len());
     for (k, (a, b)) in matrix.iter().zip(&expected).enumerate() {
+        assert_eq!(a.to_bits(), b.to_bits(), "entry {k}: {a} vs {b}");
+    }
+}
+
+#[test]
+fn trefftz_velocities_are_bit_identical_to_typescript_for_the_same_circulations() {
+    let fixture = fixture();
+    let wake = trefftz_basis(&numbers(&fixture["panels"]), &numbers(&fixture["gammaX"]), &numbers(&fixture["gammaZ"]));
+    let expected = numbers(&fixture["trefftz"]);
+    assert_eq!(wake.len(), expected.len());
+    for (k, (a, b)) in wake.iter().zip(&expected).enumerate() {
         assert_eq!(a.to_bits(), b.to_bits(), "entry {k}: {a} vs {b}");
     }
 }
@@ -49,7 +61,8 @@ fn the_job_writes_gamma_and_refuses_bad_input() {
     std::fs::write(dir.join("panels.f64"), &bytes).unwrap();
     std::fs::write(dir.join("job.json"), format!("{{\"panels\":{}}}", panels.len() / 12)).unwrap();
     let outputs = run(&dir).unwrap();
-    assert_eq!(outputs.iter().map(|o| o.path.as_str()).collect::<Vec<_>>(), ["gamma.f64", "solve.json"]);
+    assert_eq!(outputs.iter().map(|o| o.path.as_str()).collect::<Vec<_>>(), ["gamma.f64", "trefftz.f64", "solve.json"]);
+    assert_eq!(std::fs::read(dir.join("trefftz.f64")).unwrap().len(), panels.len() / 12 * 4 * 8);
     assert_eq!(std::fs::read(dir.join("gamma.f64")).unwrap().len(), panels.len() / 12 * 2 * 8);
 
     std::fs::write(dir.join("job.json"), "{\"panels\":3}").unwrap();

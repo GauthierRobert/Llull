@@ -130,6 +130,56 @@ describe('VC-AER-36: neutral point and static margin', () => {
   });
 });
 
+describe('surfaces on or across the symmetry plane (review finding)', () => {
+  const fin = (incidenceDeg: number): unknown => ({
+    name: 'fin',
+    sections: [
+      { leadingEdge: [4.4, 0, 0], chord: 0.9, incidenceDeg },
+      { leadingEdge: [4.9, 0, 1.2], chord: 0.5, incidenceDeg },
+    ],
+    spanwisePanels: 6,
+    chordwisePanels: 2,
+  });
+  const htail = { name: 'htail', ...(rectangle(3, 0.6, 4.5, 0) as object), spanwisePanels: 6, chordwisePanels: 2 };
+
+  it.each([0, 3])('a fin on y = 0 (incidence %d°) is not mirrored by default and solves', (incidence) => {
+    const vlm = data<Vlm>(doc, 'analyze_vortex_lattice', { surfaces: [htail, fin(incidence)], alphasDeg: [0, 4] });
+    expect(vlm.lattice.panels).toBe(24 + 12);
+    expect(vlm.polar[1]?.surfaces[0]?.cl).toBeGreaterThan(0);
+    expect(Math.abs(vlm.polar[1]?.surfaces[1]?.cl as number)).toBeLessThan(incidence === 0 ? 1e-9 : 1e-3);
+    expect(Number.isFinite(vlm.neutralPoint.x)).toBe(true);
+  });
+
+  it('mirror: true on a fin is refused; a full-span surface equals the mirrored half wing', () => {
+    expectRefusal(
+      doc,
+      'analyze_vortex_lattice',
+      { surfaces: [{ ...(fin(0) as object), mirror: true }] },
+      'AER_SURFACE_INVALID',
+      'surfaces.0.mirror',
+    );
+    const half = data<Vlm>(doc, 'analyze_vortex_lattice', {
+      surfaces: [{ name: 'w', ...(rectangle(8) as object), spanwisePanels: 8, chordwisePanels: 2, spacing: 'uniform' }],
+    });
+    const full = data<Vlm>(doc, 'analyze_vortex_lattice', {
+      surfaces: [
+        {
+          name: 'w',
+          sections: [
+            { leadingEdge: [0, -4, 0], chord: 1 },
+            { leadingEdge: [0, 4, 0], chord: 1 },
+          ],
+          spanwisePanels: 16,
+          chordwisePanels: 2,
+          spacing: 'uniform',
+        },
+      ],
+    });
+    expect(full.lattice.panels).toBe(32);
+    expect(full.liftSlopePerRad).toBeCloseTo(half.liftSlopePerRad, 10);
+  });
+});
+
 describe('analyze_vortex_lattice behaviour', () => {
   it('camber from naca: CL is 0 at the zero-lift angle', () => {
     const vlm = data<Vlm>(doc, 'analyze_vortex_lattice', {
@@ -243,13 +293,7 @@ describe('analyze_vortex_lattice behaviour', () => {
     const boxed = ok(doc, 'add_box', { size: [1, 1, 1] });
     const withBox = boxed.document;
     const b1 = boxed.affected[0];
-    expectRefusal(
-      withBox,
-      'analyze_vortex_lattice',
-      { surfaces: [{ name: 'w', loftId: b1 }] },
-      'AER_SURFACE_INVALID',
-      'surfaces.0.loftId',
-    );
+    expectRefusal(withBox, 'analyze_vortex_lattice', { surfaces: [{ name: 'w', loftId: b1 }] }, 'AER_SURFACE_INVALID', 'surfaces.0.loftId');
   });
 });
 

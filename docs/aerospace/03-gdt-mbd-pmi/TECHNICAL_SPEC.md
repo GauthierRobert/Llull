@@ -701,3 +701,7 @@ max, pBelowLowerLimit?, pAboveUpperLimit?, acceptance, provenance? }`, `sigmaPer
 **Measured (Windows laptop, 22 hardware threads, shared with other jobs, 2026-10-19):** `analyze_stackup` 1e6 samples × 10 contributors
 in 1.40 s in Vitest (§8 budget 1.5 s). `llull-compute stats` release build, 1e8 samples: 5 contributors 3.0 s, 10 contributors 5.6 s on
 all threads, 64 s on one thread (≈ 25× the TS throughput with all threads, 2.2× per thread).
+
+**Review follow-ups (2026-10-19).** `GDT_STACKUP_PARAM_INVALID` (new code) for a bad `sigmaPerHalfTolerance` or `seed`; `samples` is only
+checked when `methods` contains `monteCarlo`; the uniform-sum CDF treats a width below 1e-6 of the largest as a point mass at its
+centre (the inclusion–exclusion sum cancels badly for very unequal widths).

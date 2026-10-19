@@ -134,12 +134,13 @@ export function resolveStackup(params: StackupParams, samplesCap: number): Stack
   } else program = linearProgram(list.map((c) => c.sensitivity as number));
   const k = params.sigmaPerHalfTolerance ?? DEFAULT_SIGMA_PER_HALF_TOLERANCE;
   if (!(k > 0 && Number.isFinite(k)))
-    return refusal('GDT_STACKUP_CONTRIBUTOR_INVALID', 'sigmaPerHalfTolerance must be > 0', ['sigmaPerHalfTolerance']);
+    return refusal('GDT_STACKUP_PARAM_INVALID', 'sigmaPerHalfTolerance must be > 0', ['sigmaPerHalfTolerance']);
   const samples = params.samples ?? STACKUP_DEFAULT_SAMPLES;
-  if (samples < 1000 || samples > samplesCap)
+  const methods = new Set(params.methods ?? (['worstCase', 'rss'] as const));
+  if (methods.has('monteCarlo') && (samples < 1000 || samples > samplesCap))
     return refusal('GDT_STACKUP_SAMPLES_CAP', `samples ${samples} outside 1000..${samplesCap}`, ['samples']);
   const seed = params.seed ?? DEFAULT_SEED;
-  if (seed < 0 || seed > Number.MAX_SAFE_INTEGER) return refusal('GDT_STACKUP_CONTRIBUTOR_INVALID', 'seed must be 0..2^53-1', ['seed']);
+  if (seed < 0 || seed > Number.MAX_SAFE_INTEGER) return refusal('GDT_STACKUP_PARAM_INVALID', 'seed must be 0..2^53-1', ['seed']);
   return {
     params,
     contributors: list.map((c) => ({ ...c, distribution: c.distribution ?? 'normal' })),
@@ -147,7 +148,7 @@ export function resolveStackup(params: StackupParams, samplesCap: number): Stack
     linear: !given,
     sensitivitySource: given ? 'autodiff' : 'given',
     sigmaPerHalfTolerance: k,
-    methods: new Set(params.methods ?? ['worstCase', 'rss']),
+    methods,
     samples,
     seed,
   };

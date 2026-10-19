@@ -1,15 +1,17 @@
 //! Vortex-lattice solve of `llull-compute panel` (aerospace 10 AER M3, RS1 RS-7): influence build (bit-identical to the TypeScript
 //! `vlmKernel.ts`, rows in parallel) and a dense LU with partial pivoting (faer) solving the two basis right-hand sides (free streams
-//! x̂ and ẑ; Γ(α) = cos α Γx + sin α Γz). The host computes the loads from Γ in TypeScript, as for its own solve.
+//! x̂ and ẑ; Γ(α) = cos α Γx + sin α Γz), plus the O(n²) Trefftz-plane wake velocities of both bases. The host computes the loads in
+//! TypeScript from them, as for its own solve.
 //!
 //! Job folder: `job.json` = `{ "panels": n }`, `panels.f64` = n × 12 little-endian f64 (`kernel` layout). Outputs: `gamma.f64` (Γx then
-//! Γz, 2n f64) and `solve.json` = `{ panels, threads, buildMs, factorMs, residualX, residualZ }` (relative residuals ‖AΓ − b‖∞ / ‖b‖∞).
+//! Γz, 2n f64), `trefftz.f64` (4n f64, the TS `trefftzBasis` layout) and `solve.json` = `{ panels, threads, buildMs, factorMs,
+//! residualX, residualZ }` (relative residuals ‖AΓ − b‖∞ / ‖b‖∞).
 
 pub mod kernel;
 
 use faer::linalg::solvers::Solve;
 use faer::Mat;
-use kernel::{basis_rhs, influence_row, PANEL_STRIDE};
+use kernel::{basis_rhs, influence_row, trefftz_basis, PANEL_STRIDE};
 use llull_protocol::{sha256_hex, Output};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -137,7 +139,8 @@ pub fn run(folder: &Path) -> Result<Vec<Output>, JobError> {
     let gamma: Vec<u8> = gamma_x.iter().chain(&gamma_z).flat_map(|v| v.to_le_bytes()).collect();
     let report_bytes = serde_json::to_vec(&report).map_err(|error| input_error(error.to_string()))?;
     let mut outputs = Vec::new();
-    for (name, content) in [("gamma.f64", gamma), ("solve.json", report_bytes)] {
+    let wake: Vec<u8> = trefftz_basis(&panels, &gamma_x, &gamma_z).iter().flat_map(|v| v.to_le_bytes()).collect();
+    for (name, content) in [("gamma.f64", gamma), ("trefftz.f64", wake), ("solve.json", report_bytes)] {
         let path = folder.join(name);
         fs::write(&path, &content).map_err(|error| io_error(&path, &error))?;
         outputs.push(Output { path: name.to_string(), sha256: sha256_hex(&content) });
