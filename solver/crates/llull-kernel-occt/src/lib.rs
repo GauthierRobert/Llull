@@ -223,6 +223,23 @@ mod tests {
     }
 
     #[test]
+    fn torus_inertia_matches_the_closed_form() {
+        // VC-KRN-25: BRepGProp's adaptive (Eps) volume rule drifts on toroidal faces (3e-11 here, 2e-6 and Ixx != Iyy on the NIST
+        // FTC-11 ring) while reporting ~1e-15; the default Gauss rule of the OCP 7.9.3 reference gives the closed form.
+        let (big, small) = (40.0_f64, 8.0_f64);
+        let mass = mass_properties(&make_torus(big, small).unwrap().unwrap()).unwrap();
+        let volume = 2.0 * std::f64::consts::PI.powi(2) * big * small * small;
+        let izz = volume * (big * big + 0.75 * small * small);
+        let ixx = volume * (big * big / 2.0 + 0.625 * small * small);
+        let relative = |value: f64, expected: f64| (value - expected).abs() / expected;
+        assert!(relative(mass.volume, volume) < 1e-13, "volume {}", mass.volume);
+        for (value, expected) in [(mass.inertia[0], ixx), (mass.inertia[1], ixx), (mass.inertia[2], izz)] {
+            assert!(relative(value, expected) < 1e-13, "inertia {value} vs {expected}");
+        }
+        assert!(mass.rel_error.is_nan(), "the Gauss rule reports no error estimate");
+    }
+
+    #[test]
     fn empty_input_is_refused_and_bad_arguments_throw() {
         assert!(matches!(make_sewn_solid(&[], &[]), Ok(None)));
         assert!(make_prism(&[0.0, 0.0, 0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0]).is_err(), "a two-point polygon is an invalid argument");

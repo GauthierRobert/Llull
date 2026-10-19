@@ -1,8 +1,9 @@
 /**
  * Native `llull-kernel` vs the WASM OCC kernel on the recipe nodes of the second native slice (VC-KRN-25, TR-KRN-05): exact curved
  * profiles, loft, sweep, subdivision, shell, blend, `feature` nodes (holes, pockets, ribs, a modelled thread) and the edge indexing of
- * fillet / chamfer. Each case: exact volume, area and inertia within 1e-6 relative, centroid 1e-6, the same validity, and the same
- * face count (ADVANCED_FACE entities of each kernel's STEP export) where it is deterministic. The sidecar is driven directly (the
+ * fillet / chamfer. Each case: exact volume, area and inertia within 1e-6 relative (inertia: two documented WASM errors, below),
+ * centroid 1e-6, the same validity, and the same face count (ADVANCED_FACE entities of each kernel's STEP export) where it is
+ * deterministic. The sidecar is driven directly (the
  * router's host lowering included, its fillet gate bypassed), so fillet / chamfer parity is measured although they still route to WASM.
  * Skipped without the binary unless LLULL_REQUIRE_NATIVE_KERNEL=1.
  */
@@ -72,6 +73,16 @@ const RING_PROFILE: CurveSegment<Vec2>[] = [
   line([2, 2], [1, 2]),
   line([1, 2], [1, 0]),
 ];
+
+/**
+ * Inertia error of the WASM kernel's adaptive BRepGProp rule (Eps 1e-12) on arc-profile revolutions (measured 1.6e-4 and 2.2e-6:
+ * Ixx != Iyy about Z); the native kernel uses the default Gauss rule of the OCP 7.9.3 reference and gives the closed form there
+ * (nativeKernelReference.test.ts), so these cases tolerate the WASM error instead of 1e-6.
+ */
+const WASM_INERTIA_ERROR: Readonly<Record<string, number>> = {
+  'curved revolution about Z': 3e-4,
+  'curved revolution about Y, partial': 3e-6,
+};
 
 const curved = (
   kind: 'extrusion' | 'revolution',
@@ -350,7 +361,9 @@ describe.skipIf(binary === null)('native feature nodes vs WASM OCC parity (VC-KR
       expect(Math.abs(fromNative.centroid[k]! - fromWasm.centroid[k]!) / span, `${label} centroid`).toBeLessThan(1e-6);
     const scale = Math.max(...fromWasm.inertiaAtCentroid.map(Math.abs));
     fromNative.inertiaAtCentroid.forEach((value, index) => {
-      expect(Math.abs(value - fromWasm.inertiaAtCentroid[index]!) / scale, `${label} inertia`).toBeLessThan(1e-6);
+      expect(Math.abs(value - fromWasm.inertiaAtCentroid[index]!) / scale, `${label} inertia`).toBeLessThan(
+        WASM_INERTIA_ERROR[label] ?? 1e-6,
+      );
     });
   };
 

@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 
@@ -291,7 +292,10 @@ MassOut mass_properties(const Shape &shape) {
   GProp_GProps volume;
   GProp_GProps surface;
   MassOut out;
-  out.rel_error = BRepGProp::VolumeProperties(local, volume, 1e-12, Standard_True, Standard_False);
+  // Default (Gauss) rule, as the OCP 7.9.3 reference of VC-KRN-25: the adaptive Eps rule drifts on toroidal and some freeform faces
+  // (up to 1.6e-6 relative volume, Ixx != Iyy on a symmetric ring, on the NIST corpus) while its error estimate stays near 1e-15.
+  BRepGProp::VolumeProperties(local, volume, Standard_True, Standard_False, Standard_False);
+  out.rel_error = std::numeric_limits<double>::quiet_NaN();
   BRepGProp::SurfaceProperties(local, surface, Standard_False, Standard_False);
   const double signed_volume = volume.Mass();
   out.volume = std::fabs(signed_volume);
