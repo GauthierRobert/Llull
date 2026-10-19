@@ -2,10 +2,9 @@ import { defineConfig, configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
 import { workspaceAliases } from './workspaceAliases.ts';
-import { serviceWorkerPlugin } from './viteServiceWorker.ts';
 import { ISOLATED_SUITES } from './tests/isolatedSuites.ts';
 
-const testExcludes = [...configDefaults.exclude, '.claude/worktrees/**', 'server/**', 'desktop/**', 'tests/e2e/**', 'tests/pwa/**'];
+const testExcludes = [...configDefaults.exclude, '.claude/worktrees/**', 'server/**', 'desktop/**', 'tests/e2e/**'];
 const NODE_SUITES = ['tests/unit/**/*.test.ts', 'tests/golden/**/*.test.ts'];
 const DOM_SUITES = [
   'tests/component/**/*.test.{ts,tsx}',
@@ -15,7 +14,7 @@ const DOM_SUITES = [
 ];
 
 export default defineConfig(({ command }) => ({
-  plugins: [react(), serviceWorkerPlugin(import.meta.dirname)],
+  plugins: [react()],
   // Serve .wasm files with the correct MIME type so WebAssembly.instantiateStreaming
   // succeeds in the browser (manifold-3d, opencascade.js). Vite dev-server otherwise
   // serves them as application/octet-stream which browsers reject for streaming compile.

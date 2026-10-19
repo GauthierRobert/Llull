@@ -1,7 +1,12 @@
-# On-prem deployment
+# On-prem deployment (legacy — being removed)
 
-llull runs fully offline in the browser. For a team, deploy the optional server: one shared live
-document, MCP host for agents, named users with roles, a per-user audit trail and an offline license.
+> **Legacy.** llull is CLI + local only ([LC1](decisions/LC1-local-only.md)): install the desktop app
+> ([desktop/README.md](../desktop/README.md)) and drive it with the `llull` CLI. There is no browser
+> build to host any more (LC1 step 2). The shared on-prem server below (Docker image, named users,
+> licence) is removed in LC1 step 3; do not extend it.
+
+The optional server hosts one shared live document, MCP for agents, named users with roles, a
+per-user audit trail and an offline license.
 
 ## 1. Install
 
@@ -26,8 +31,7 @@ in [server/README.md](../server/README.md#environment-variables).
 
 The image ships no Python/CadQuery (`LLULL_PYTHON=off`): STEP import and CadQuery code exchange
 answer "disabled". STEP export still works with `LLULL_KERNEL=occt` (OpenCascade writes it). For
-STEP import use the desktop app, or extend the image with a CadQuery Python and set `LLULL_PYTHON`. Never build a public image with `VITE_LLULL_API_TOKEN`: it is baked
-into the JavaScript every visitor downloads.
+STEP import use the desktop app, or extend the image with a CadQuery Python and set `LLULL_PYTHON`.
 
 Without Docker: `npm ci && npm --prefix server ci && npm run build && npm --prefix server run build`,
 then `LLULL_STATIC_DIR=$PWD/dist HOST=0.0.0.0 LLULL_USERS_FILE=... node server/dist/index.js`.
@@ -137,11 +141,3 @@ git pull && docker compose up -d --build
 Volumes are kept. The autosave is versioned and migrated on load; an unreadable one is moved aside
 as `autosave.json.unreadable-<ts>` and the server starts empty (restore from backup). Roll back by
 checking out the previous tag and rebuilding.
-
-Browsers pick the new web app up through its service worker (production builds only). Each build
-emits `sw.js` with a fresh version; open tabs show "A new version of llull is ready" and switch
-when the user clicks Reload, so a drawing in progress is never interrupted. What it caches is fixed
-by `serviceWorker/config.json`: the app shell (`index.html` and the hashed JS/CSS chunks, without
-the OpenCascade bundle or WASM) is precached per build, `/assets/` files are cache-first, and every
-server route (`/command`, `/live`, `/mcp`, exports, imports, `/license`, `/admin`) and `/samples`
-always go to the network. Activating a build deletes the previous build's cache.

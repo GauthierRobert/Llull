@@ -78,8 +78,8 @@ export const fooThing = defineCommand({
 - Prefer deriving evaluated geometry from the document rather than storing it (L8).
 - `requiresKernel` command with `ctx.kernel === null` ⇒ "kernel not available" summary; replay
   refuses rather than silently dropping geometry.
-- Kernel choice (`@core/geometry/kernelChoice`): browser `?kernel=occt`, server
-  `LLULL_KERNEL=manifold|occt`; installed in `src/main.tsx` / `server/src/geometryKernel.ts`.
+- Kernel choice (`@core/geometry/kernelChoice`): backend + CLI `LLULL_KERNEL=manifold|occt|occt-native`, installed in
+  `server/src/geometryKernel.ts`; the desktop renderer installs Manifold in `src/main.tsx` (no URL switch, LC1).
 
 ## Plugins (L10, as built)
 

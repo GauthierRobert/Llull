@@ -40,7 +40,7 @@ backed by the server's Python bridge).
    `toolset` via `pluginToolNames`; core commands are listed in `toolsets.ts`.
 
 ## Live document & sync
-- All MCP sessions and the browser share ONE document (`liveDocument.ts`). A tool call runs
+- All MCP sessions and the desktop UI share ONE document (`liveDocument.ts`). A tool call runs
   `execute` on it and appends to the command log.
 - `/live` SSE: `command` `{ seq, name, params, stateHash }` per mutation, `snapshot`
   `{ seq, stateHash, document }` on connect / undo / redo / bulk replace; `GET /live/snapshot`

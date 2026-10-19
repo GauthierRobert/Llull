@@ -24,7 +24,6 @@
     "native:check": "node scripts/nativeCheck.mjs",
     "format:check": "prettier --check --cache \"**/*.{ts,tsx,mts,mjs,cjs,js}\"",
     "test:e2e": "playwright test",
-    "test:pwa": "playwright test -c playwright.pwa.config.ts",
     "quality:fetch": "node quality/fetchCorpus.mjs",
     "quality:step": "npm --prefix server run quality:step",
     "quality:drawings": "npm --prefix server run quality:drawings",

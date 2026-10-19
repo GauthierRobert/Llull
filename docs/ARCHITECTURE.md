@@ -110,7 +110,7 @@ The dependency laws are executable. `npm run arch` (part of `npm run check`) run
   `registry`); composing another command goes through `execute`;
 - MCP never depends on a plugin or a concrete kernel; `lib` is a leaf; `model` imports only
   itself and `lib`; `geometry` never reaches up into commands;
-- the web app and the server never import each other.
+- the UI renderer and the server never import each other.
 
 A contract test (`tests/unit/contract/catalogs.test.ts`) checks that every exported command
 definition is registered, so a command missing from its catalog fails the build. CI
@@ -123,7 +123,7 @@ See `docs/decisions/AR1-modular-command-layer.md` for the reasoning.
 A domain such as building or industrial design extends the core through a plugin: a
 name, the MCP toolset its commands belong to, the commands themselves, optional
 _derivation guards_, and an optional document extension. The composition root installs
-the default plugins at start-up in the browser, the server and the test setup. The
+the default plugins at start-up in the UI renderer, the server, the CLI and the test setup. The
 registry is the core commands plus every installed plugin's commands.
 
 Derivation guards protect generated geometry: the building plugin regenerates walls,
@@ -174,8 +174,11 @@ document opened under Manifold) the stored triangles are used instead. See
 Commands that need a kernel declare it; while none is loaded they refuse with an explicit
 message instead of silently doing nothing.
 
-The browser (`?kernel=occt`) and the server (`LLULL_KERNEL=occt`) use the same kernel
-choice, so a command produces the same result whichever surface called it.
+The local backend and the CLI pick the kernel with `LLULL_KERNEL` (`@core/geometry/kernelChoice`), so a command
+produces the same result whichever of them ran it. The desktop renderer installs Manifold in-process
+(`src/main.tsx`) for the commands it runs itself (offline mode, read-only queries, live replay); when the backend
+runs another kernel, a replay hash mismatch falls back to a snapshot fetch. The renderer's WASM kernel is retired
+in LC1 step 5 (`docs/decisions/LC1-local-only.md`).
 
 ## State management and sync
 
@@ -190,10 +193,10 @@ The live stream carries the **command log**, not document diffs: each event is
 `{ seq, name, params, stateHash }`. Clients re-run the command with the same `execute`
 and compare the resulting state hash; a missed event or a mismatch triggers a full
 snapshot fetch (`GET /live/snapshot`). Deterministic ids and the shared kernel choice are
-what make this replay exact. Every MCP session and every browser tab therefore edits one
+what make this replay exact. Every agent session and every open window therefore edits one
 document.
 
-Events also carry `source` (`mcp` | `cli` | `rest`) and the sender's `commandId`. The browser
+Events also carry `source` (`mcp` | `cli` | `rest`) and the sender's `commandId`. The UI
 uses them only for presentation: it diffs each new document against the previous one
 (`src/ui/viewport/liveFx/planLiveFx.ts`) and animates the change — new entities grow with a
 ripple, remotely moved ones travel from their old pose, reshaped / removed ones leave a fading
@@ -201,18 +204,18 @@ hologram, and a badge plus an activity feed say who did it (`CLI · add_box`). I
 (recognised by `commandId`) get only a subtle glow. Because the plan comes from the entity diff,
 every command — present or future — is animated with no per-tool code.
 
-## Why the backend is optional
+## The local backend
 
-Everything — model, commands, rendering — runs in the browser. A backend is
-only required for:
+llull is CLI + local only (`docs/decisions/LC1-local-only.md`): there is no browser or cloud
+deployment. The React UI is rendered by the Electron desktop app (`desktop/`), which starts one
+local backend (`server/`) on loopback and loads the UI from it. The backend:
 
-- **MCP host:** MCP is a running process exposing tools over a transport, so it
-  cannot live inside a static site. The Express server serves `/mcp`, forwarding
-  every tool call to the same command registry the UI uses.
-- **Shared live document:** the server holds the document that agents and browser
-  tabs edit together, with autosave.
+- holds the **shared live document** that the desktop window and agents (the `llull` CLI with
+  `--app`) edit together, with autosave;
+- runs the commands that need native or Python tools (exact STEP, CadQuery, native compute);
+- forwards every call to the same command registry the UI uses — it adds no business logic.
 
-It is an optional add-on; llull is fully usable offline without it.
+The CLI without `--app` runs `execute` in-process on a document file. Nothing needs the network.
 
 ## Data flow of an AI edit (via MCP)
 
@@ -232,7 +235,7 @@ For each call: execute("add_box", params) on the shared live document
 Server broadcasts { seq, name, params, stateHash } on /live
         │
         ▼
-Browser re-runs the command, checks the hash → React-Three-Fiber re-renders
+Desktop UI re-runs the command, checks the hash → React-Three-Fiber re-renders
 ```
 
 The agent edits the same document the UI does because it is calling the same
