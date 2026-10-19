@@ -483,6 +483,78 @@ export const plans: Record<string, GoldenAction[]> = {
       as: 'wing',
     },
     { command: 'wing_properties', params: { id: '$wing' } },
+  fea_modal_cantilever: [
+    { command: 'set_units', params: { units: 'mm' } },
+    { command: 'add_box', params: { size: [200, 10, 10], position: [0, 0, 0], anchor: 'min' }, as: 'bar' },
+    { command: 'create_material', params: { name: 'steel', density: 0.0078 } },
+    {
+      command: 'add_material_model',
+      params: {
+        material: 'steel',
+        id: 'elastic',
+        model: { kind: 'elastic_isotropic', E: { value: 210, unit: 'GPa' }, nu: { value: 0.3, unit: '1' } },
+        basis: 'company',
+        source: { citation: 'golden test input' },
+      },
+    },
+    { command: 'define_constitutive_set', params: { material: 'steel', set: { id: 'set', elastic: 'elastic' }, makeDefault: true } },
+    { command: 'assign_material', params: { materialName: 'steel', entityIds: ['$bar'] } },
+    {
+      command: 'create_analysis',
+      params: { name: 'modes', analysisType: 'modal', modes: 4, frequencyRangeHz: { min: 50, max: 5000 } },
+      as: 'an',
+    },
+    { command: 'set_part_idealization', params: { analysisId: '$an', entityId: '$bar' } },
+    {
+      command: 'add_fea_constraint',
+      params: { analysisId: '$an', name: 'root', kind: 'fixed', target: { entityId: '$bar', facesNear: [[0, 5, 5]] } },
+    },
+    { command: 'set_mesh_controls', params: { analysisId: '$an', elementFamily: 'tet', order: 2, globalSize: 4 } },
+  ],
+  fea_buckling_column_moment: [
+    { command: 'set_units', params: { units: 'mm' } },
+    { command: 'add_box', params: { size: [300, 10, 10], position: [0, 0, 0], anchor: 'min' }, as: 'bar' },
+    { command: 'create_material', params: { name: 'steel', density: 0.0078 } },
+    {
+      command: 'add_material_model',
+      params: {
+        material: 'steel',
+        id: 'elastic',
+        model: { kind: 'elastic_isotropic', E: { value: 210, unit: 'GPa' }, nu: { value: 0.3, unit: '1' } },
+        basis: 'company',
+        source: { citation: 'golden test input' },
+      },
+    },
+    { command: 'define_constitutive_set', params: { material: 'steel', set: { id: 'set', elastic: 'elastic' }, makeDefault: true } },
+    { command: 'assign_material', params: { materialName: 'steel', entityIds: ['$bar'] } },
+    { command: 'create_analysis', params: { name: 'column', analysisType: 'buckling', modes: 2 }, as: 'an' },
+    { command: 'set_part_idealization', params: { analysisId: '$an', entityId: '$bar' } },
+    {
+      command: 'add_fea_constraint',
+      params: { analysisId: '$an', name: 'root', kind: 'fixed', target: { entityId: '$bar', facesNear: [[0, 5, 5]] } },
+    },
+    {
+      command: 'add_fea_load',
+      params: {
+        analysisId: '$an',
+        name: 'axial',
+        kind: 'force',
+        vector: [-1000, 0, 0],
+        target: { entityId: '$bar', facesNear: [[300, 5, 5]] },
+      },
+    },
+    {
+      command: 'add_fea_load',
+      params: {
+        analysisId: '$an',
+        name: 'tip torque',
+        kind: 'moment',
+        loadCase: 'LC2',
+        vector: [0, 0, 500],
+        target: { entityId: '$bar', facesNear: [[300, 5, 5]] },
+      },
+    },
+    { command: 'set_mesh_controls', params: { analysisId: '$an', elementFamily: 'tet', order: 2, globalSize: 4 } },
   ],
 };
 

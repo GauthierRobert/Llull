@@ -42,6 +42,11 @@ them into a git-ignored cache and checks their hashes.
 
 ## Validation cases
 
+Automated so far (2026-10-19, FEA-REST part 1; the table below keeps its original wording): VC-FEA-07 (`tests/unit/cae/verdict.test.ts`, against
+`mesh_quality_reference.json`), the closed forms of VC-FEA-10 / 11 / 12 / 13 / 14 (`tests/unit/cae/analyticCheck.test.ts`, against `fea_analytic_expected.json`),
+VC-FEA-62 / 63 (`tests/unit/cae/disposeMargin.test.ts`: check codes, the human gate), VC-FEA-09 as the `FEA_MESH_ADEQUACY` warning (`eigenChecks.test.ts`) and the modal /
+buckling readers on hand-built `.dat` fixtures. The real-solver legs (VC-FEA-11 / 12 against ccx, 41, 42) live in `server/tests/feaEigen.test.ts` and skip without `ccx` / Gmsh.
+
 Status: **P** = proposed (no implementation yet). Every case runs on the **desktop OCC kernel**, with the
 bundled CPython (Gmsh) and CalculiX, unless the Gate column says otherwise.
 

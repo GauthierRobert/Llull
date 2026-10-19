@@ -87,6 +87,16 @@ describe.skipIf(!READY)('modal and buckling analyses', () => {
     expect(frequencies[0]).toBeLessThan(beam * 1.02);
     expect(Math.abs((frequencies[1] ?? 0) / (frequencies[0] ?? 1) - 1)).toBeLessThan(0.01);
     expect(summary).toContain('natural frequencies');
+    const eigen = dataOf(json)['eigen'];
+    expect(isRecord(eigen) && eigen['kind']).toBe('modal');
+    expect(isRecord(eigen) && eigen['rigidBodyModes']).toBe(0);
+    const closedForm = await session.cli(
+      'analytic_check',
+      'check=cantilever_frequency',
+      `inputs={"E_MPa":${E},"rho_t_per_mm3":7.8e-9,"b_mm":${SIDE},"h_mm":${SIDE},"L_mm":${length}}`,
+      `compare={"quantity":"frequency_weak_axis_Hz","value":${String(frequencies[0])},"toleranceRel":0.02}`,
+    );
+    expect(dataOf(closedForm.json)['comparison']).toMatchObject({ withinTolerance: true });
     const plot = await session.cli('render_fea_results', `analysisId=${analysisId}`, 'mode=3');
     expect(plot.code).toBe(0);
     expect(String(plot.json['summary'])).toContain('mode 3');
@@ -112,6 +122,14 @@ describe.skipIf(!READY)('modal and buckling analyses', () => {
     expect(factors).toHaveLength(2);
     expect((factors[0] ?? 0) * 1000).toBeGreaterThan(critical * 0.97);
     expect((factors[0] ?? 0) * 1000).toBeLessThan(critical * 1.03);
+    expect(dataOf(json)['eigen']).toMatchObject({ kind: 'buckling', criticalMode: 1 });
+    const column = await session.cli(
+      'analytic_check',
+      'check=euler_column',
+      `inputs={"L_mm":${length},"E_MPa":${E},"b_mm":${SIDE},"h_mm":${SIDE},"K":2}`,
+      `compare={"quantity":"critical_load_N","value":${(factors[0] ?? 0) * 1000},"toleranceRel":0.03}`,
+    );
+    expect(dataOf(column.json)['comparison']).toMatchObject({ withinTolerance: true });
     const plot = await session.cli('render_fea_results', `analysisId=${analysisId}`, 'mode=1');
     expect(String(plot.json['summary'])).toContain('buckling factor');
   }, 180_000);

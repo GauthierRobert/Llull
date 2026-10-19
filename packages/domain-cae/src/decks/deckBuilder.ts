@@ -102,7 +102,7 @@ function precheck(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact, ct
   }
   const collision = nameCollision(ctx);
   if (collision !== null) return collision;
-  const structural = analysis.type !== 'heat_steady' && analysis.type !== 'heat_transient';
+  const structural = analysis.type !== 'heat_steady' && analysis.type !== 'heat_transient' && analysis.type !== 'modal';
   if (structural && analysis.constraintOrder.length === 0)
     return refuse('FEA_NO_CONSTRAINTS', `analysis '${analysisId}' has no constraint: the stiffness matrix would be singular`, [analysisId]);
   return null;
@@ -130,7 +130,7 @@ function modelBlock(ctx: DeckContext): string[] {
  * @invariant byte-identical for identical inputs; header `** llull analysis <name> units <us> inputHash <h> meshHash <m>`
  * @failure the document uses ITAR / EAR material records -> MAT_EXPORT_CONTROLLED (a deck leaves the machine; no confirmation path here)
  * @failure unknown analysis / -> FEA_ANALYSIS_NOT_FOUND; mesh of other inputs -> FEA_MESH_STALE;
- *   part without elements or with non-tet elements -> FEA_PART_INVALID; no material -> FEA_MATERIAL_MISSING; static / thermo_static / coupled without a
+ *   part without elements or with non-tet elements -> FEA_PART_INVALID; no material -> FEA_MATERIAL_MISSING; static / thermo_static / coupled / buckling without a
  *   constraint -> FEA_NO_CONSTRAINTS; plus every refusal of the mechanical and discipline functions
  */
 export function buildInp(

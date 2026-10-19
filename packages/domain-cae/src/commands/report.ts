@@ -5,6 +5,7 @@ import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { significantNumber } from '@lib/compactNumber';
 import { buildDeckContext } from '../decks/context';
+import { eigenNote, eigenReport } from '../results/eigenReport';
 import { eigenSummaryText } from '../results/summary';
 import { evaluateProbes } from '../results/probes';
 import { caseOf } from '../shared/access';
@@ -24,7 +25,9 @@ export const feaReport = defineCommand({
   description:
     'Read the finite-element status of an analysis: data { state: unmeshed | meshed | solved | stale | missing | untrusted, unitSystem, ' +
     'mesh (node and element counts, quality, warnings), results (per load case max von Mises and max displacement with positions and units, ' +
-    'or the thermal summary), problem { code, message } | null, probes [{ probeId, quantity, unit, nodeId, nodeDistance, values per load ' +
+    'or the thermal summary), eigen (modal: modes [{ mode, frequencyHz, participation, effectiveMass, effectiveMassFraction }], totalEffectiveMass, ' +
+    'cumulativeMassFraction, massUnit, rigidBodyModes; buckling: factors, criticalFactor, criticalMode, negativeFactors; null for other types), ' +
+    'problem { code, message } | null, probes [{ probeId, quantity, unit, nodeId, nodeDistance, values per load ' +
     'case or time }] }. Numbers are recomputed from the artifact store, never read from the document: "missing" = an artifact is not ' +
     'available on this machine (or no artifact store; re-run fea_mesh / fea_solve) and "untrusted" = the recorded summary differs from its ' +
     'artifact (FEA_SUMMARY_MISMATCH); in both cases mesh and results are null. Probe values are read at the nearest mesh node (no ' +
@@ -39,12 +42,14 @@ export const feaReport = defineCommand({
     const { state, mesh: meshRecord, results: resultsRecord, meshArtifact: mesh, resultsArtifact: results } = trust;
     const lengthToAnalysis = mesh === null ? 1 : (buildDeckContext(doc, analysisId, mesh)?.lengthToAnalysis ?? 1);
     const probes = mesh !== null && results !== null ? evaluateProbes(analysisCase, mesh, results, lengthToAnalysis) : [];
+    const eigen = results === null ? null : eigenReport(analysisCase, results);
     const data = {
       analysisId,
       state,
       unitSystem: analysisCase.unitSystem,
       mesh: meshRecord,
       results: resultsRecord,
+      eigen,
       problem: trust.problem,
       probes,
       probesNote:
@@ -59,7 +64,7 @@ export const feaReport = defineCommand({
       meshRecord === null ? 'no verified mesh' : `${meshRecord.nodes} nodes, ${meshRecord.quality.inverted} inverted`,
       resultsRecord === null
         ? 'no verified results'
-        : `${resultsRecord.loadCases.length} load case(s)${resultsRecord.loadCases.map((lc) => ` ${lc.name} vm ${significantNumber(lc.maxVonMises.value, 6)}`).join(',')}${eigenSummaryText(resultsRecord)}`,
+        : `${resultsRecord.loadCases.length} load case(s)${resultsRecord.loadCases.map((lc) => ` ${lc.name} vm ${significantNumber(lc.maxVonMises.value, 6)}`).join(',')}${eigenSummaryText(resultsRecord)}${eigen === null || eigenNote(eigen) === '' ? '' : `; ${eigenNote(eigen)}`}`,
       `${probes.length} probe(s) evaluated`,
     ];
     return report(doc, `${parts.join('; ')}.`, data);

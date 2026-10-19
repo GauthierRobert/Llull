@@ -1,6 +1,7 @@
 /** CAE plugin: analysis set-up (05), thermal (PHY-03), thermo-mechanical (PHY-04) and nonlinear static (PHY-05) commands under the `analysis` toolset. */
 
 import type { CadPlugin, DocumentExtension } from '@core/plugins/plugin';
+import { analyticCommands } from './analytic/catalog';
 import { feaCommands } from './commands/catalog';
 import { fatigueCommands } from './fatigue/catalog';
 import { fractureCommands } from './fracture/catalog';
@@ -25,6 +26,7 @@ export const caePlugin: CadPlugin = {
   toolset: 'analysis',
   commands: [
     ...feaCommands,
+    ...analyticCommands,
     ...marginCommands,
     ...thermalCommands,
     ...thermomechCommands,

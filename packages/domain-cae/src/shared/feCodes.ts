@@ -38,6 +38,28 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   FEA_UNITS_MISMATCH: 'mesh and analysis disagree on the unit system: re-run fea_mesh',
   FEA_ANALYSIS_TYPE_UNSUPPORTED:
     'use static, modal, buckling, heat_steady, heat_transient, thermo_static or coupled_temperature_displacement',
+  FEA_MS_NEGATIVE:
+    'redesign (thicker section, stiffer load path, better material); only a qualified reviewer can disposition a negative margin (dispose_margin)',
+  FEA_MS_MARGINAL: 'a qualified reviewer dispositions marginal rows (dispose_margin) or the part is strengthened',
+  FEA_MARGINAL_BAND_UNSET: 'ask the owner / company rule for a marginal band and pass marginalBand to compute_margins',
+  FEA_DISPOSITION_PENDING:
+    'hand the FAIL / MARGINAL rows to the qualified reviewer, who dispositions them with dispose_margin in the desktop app',
+  FEA_UNDERCONSTRAINED:
+    'add supports that remove all six rigid-body motions (a fixed face, or three non-collinear points holding six dofs); modal analyses of a free model report rigid-body modes at 0 Hz',
+  FEA_MESH_ADEQUACY:
+    'reduce the global mesh size or add a refinement so that at least 2 (better 3-4) elements span the thinnest dimension, then run fea_mesh',
+  FEA_LOADS_IGNORED: 'delete the loads, or use a static analysis for the response to them; a modal analysis only needs supports and mass',
+  FEA_BUCKLING_LOAD_CASE_IGNORED:
+    'keep one load case in a buckling analysis (the first one is the reference) or create one buckling analysis per case',
+  FEA_RIGID_BODY_MODES:
+    'the lowest modes are rigid-body motions: add supports (or ignore the first modes of a free-free model deliberately)',
+  FEA_BUCKLING_NEAR_ZERO:
+    'a buckling factor of 0 means a singular model or no load: check the supports and the reference load, then re-solve',
+  FEA_BUCKLING_NEGATIVE_FACTOR:
+    'a negative factor buckles under the reversed load; for a one-directional load use the lowest positive factor',
+  FEA_BUCKLING_NO_POSITIVE: 'reverse the load direction (tension only does not buckle) or check that the load acts on the supported model',
+  FEA_BUCKLING_BELOW_APPLIED:
+    'the applied load exceeds the linear buckling load: stiffen the part or reduce the load; linear buckling is an upper bound (imperfections lower it), a qualified engineer must review',
 };
 
 /** Remediation text registered for a 05 code ("see the command description" when unknown). */

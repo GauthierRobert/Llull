@@ -110,8 +110,8 @@ describe('searchTools ranking regression table', () => {
     expect(ranked('pressure drop', 2)[0]).toBe('pipe_hydraulics');
   });
 
-  it('does not rank natural-frequency queries onto animation or surface tools above the analysis tools', () => {
-    expect(ranked('natural frequency', 2)).toEqual(['create_analysis', 'render_fea_results']);
+  it('does not rank natural-frequency queries onto animation or surface tools above the analysis tools (fea_report documents the frequencies since data.eigen)', () => {
+    expect(ranked('natural frequency', 2)).toEqual(['create_analysis', 'fea_report']);
   });
 });
 

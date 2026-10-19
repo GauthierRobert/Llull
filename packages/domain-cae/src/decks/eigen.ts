@@ -9,6 +9,15 @@ const DEFAULT_MODES = 6;
 
 const modesOf = (ctx: DeckContext): number => Math.max(1, Math.round(ctx.analysis.modes ?? DEFAULT_MODES));
 
+/** Data line of `*FREQUENCY`: `n`, or `n, [min], [max]` for a band (cycles/time = Hz). */
+function frequencyLine(ctx: DeckContext): string {
+  const band = ctx.analysis.frequencyRangeHz;
+  if (band === undefined) return num(modesOf(ctx));
+  const fields = [num(modesOf(ctx)), band.min === undefined ? '' : num(band.min)];
+  if (band.max !== undefined) fields.push(num(band.max));
+  return fields.join(', ');
+}
+
 /**
  * Modal step: `*FREQUENCY, <n>`, the constraints (loads are not part of a free vibration), eigenvectors in the `.frd` (`U`) and the
  * eigenvalue table in the `.dat` (CalculiX writes it for every `*FREQUENCY` step).
@@ -18,7 +27,7 @@ const modesOf = (ctx: DeckContext): number => Math.max(1, Math.round(ctx.analysi
 export function modalStep(ctx: DeckContext): DeckSections {
   const boundary = boundaryData(ctx);
   if (!Array.isArray(boundary)) return boundary;
-  const lines = ['** modal analysis', '*STEP', '*FREQUENCY', num(modesOf(ctx))];
+  const lines = ['** modal analysis', '*STEP', '*FREQUENCY', frequencyLine(ctx)];
   if (boundary.length > 0) lines.push('*BOUNDARY', ...boundary);
   lines.push('*NODE FILE', 'U', '*END STEP');
   return { text: linesText(lines) };

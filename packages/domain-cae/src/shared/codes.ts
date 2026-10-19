@@ -5,7 +5,7 @@ import { tableRejection } from '@core/commands/noop';
 const REMEDIATION: Readonly<Record<string, string>> = {
   FEA_ANALYSIS_NOT_FOUND: 'list the analyses with describe_analysis (no analysisId), or create one with create_analysis',
   FEA_ANALYSIS_TYPE_UNSUPPORTED:
-    'use static, heat_steady, heat_transient, thermo_static or coupled_temperature_displacement (modal and buckling are not built)',
+    'use static, modal, buckling, heat_steady, heat_transient, thermo_static, coupled_temperature_displacement or nonlinear_static',
   FEA_ANALYSIS_IN_USE: 'delete or re-point the analyses that read this one first',
   FEA_PARAM_NOT_APPLICABLE: 'drop the parameter or choose an analysisType that uses it',
   FEA_UNITS_MISMATCH: 'drop unitSystem (it follows the document unit) or fix the quantity unit',

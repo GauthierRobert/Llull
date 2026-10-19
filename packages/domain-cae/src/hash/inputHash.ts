@@ -98,6 +98,7 @@ const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string
   type: analysisCase.type,
   solver: analysisCase.solver,
   modes: analysisCase.modes ?? null,
+  ...(analysisCase.frequencyRangeHz !== undefined ? { frequencyRangeHz: analysisCase.frequencyRangeHz } : {}),
   factors: analysisCase.factors,
   materials: materialsUsed(doc, analysisCase),
   constraints: analysisCase.constraintOrder.map((id) => analysisCase.constraints[id]),

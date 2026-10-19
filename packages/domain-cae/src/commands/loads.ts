@@ -13,7 +13,7 @@ import { loadCaseNameProblem } from '../shared/names';
 import { analysisIdSchema } from '../shared/schemas';
 import { feaTargetSchema, targetDistanceWarning, targetProblem, toTarget, type FeaTargetInput } from '../shared/target';
 
-type LoadKind = 'force' | 'pressure' | 'gravity';
+type LoadKind = 'force' | 'pressure' | 'gravity' | 'moment';
 interface LoadFields {
   readonly target?: FeaTargetInput | undefined;
   readonly vector?: Vec3 | undefined;
@@ -25,14 +25,21 @@ const RELEVANT: Readonly<Record<LoadKind, readonly (keyof LoadFields)[]>> = {
   force: ['target', 'vector', 'distribution'],
   pressure: ['target', 'magnitude'],
   gravity: ['vector'],
+  moment: ['target', 'vector'],
 };
 
 const UNITS_NOTE =
   'in the case unitSystem: N-mm-t-s -> N, MPa, mm/s^2 (9.81 m/s^2 = 9810); N-m-kg-s -> N, Pa, m/s^2; lbf-in-slinch-s -> lbf, psi, in/s^2';
 
 const loadFieldsSchema = {
-  target: feaTargetSchema.optional().describe('force / pressure: the faces (edges, points for force) the load acts on. Not for gravity.'),
-  vector: vec3(`force / gravity: direction and magnitude [x, y, z] (${UNITS_NOTE}). Not for pressure.`).optional(),
+  target: feaTargetSchema
+    .optional()
+    .describe(
+      'force / pressure / moment: the faces (edges, points for force) the load acts on. A moment needs a face, an edge or at least three points. Not for gravity.',
+    ),
+  vector: vec3(
+    `force / gravity: direction and magnitude [x, y, z]; moment: the moment vector [mx, my, mz] by the right-hand rule in force x length of the unit system (N-mm-t-s: N.mm, N-m-kg-s: N.m, lbf-in-slinch-s: lbf.in) (${UNITS_NOTE}). Not for pressure.`,
+  ).optional(),
   magnitude: z
     .number()
     .optional()
@@ -60,8 +67,18 @@ function problemOf(doc: CadDocument, analysisCase: AnalysisCase, load: FeaLoad):
   if (load.target === undefined) return invalid(`${load.kind} needs a target`);
   const target = targetProblem(doc, analysisCase, load.target);
   if (target !== null) return target;
-  if (load.kind === 'force' && (load.vector === undefined || !load.vector.every(Number.isFinite) || load.vector.every((c) => c === 0)))
-    return invalid('force needs a non-zero finite vector');
+  if (
+    (load.kind === 'force' || load.kind === 'moment') &&
+    (load.vector === undefined || !load.vector.every(Number.isFinite) || load.vector.every((c) => c === 0))
+  )
+    return invalid(`${load.kind} needs a non-zero finite vector`);
+  if (
+    load.kind === 'moment' &&
+    (load.target.facesNear?.length ?? 0) === 0 &&
+    (load.target.edgesNear?.length ?? 0) === 0 &&
+    (load.target.pointsNear?.length ?? 0) < 3
+  )
+    return invalid('a moment needs a face (facesNear), an edge (edgesNear) or at least three pointsNear: it is carried by several nodes');
   if (load.kind === 'pressure' && (load.magnitude === undefined || !Number.isFinite(load.magnitude) || load.magnitude === 0))
     return invalid('pressure needs a non-zero finite magnitude');
   return null;
@@ -75,7 +92,7 @@ const summarize = (load: FeaLoad): string => {
 /**
  * @affects doc.analysis.cases[analysisId].loads (adds 1 load, id `fl-<step>.<k>`; affected: [loadId])
  * @invariant stores only the fields the kind uses; category defaults to limit and loadCase to LC1 (named in the summary)
- * @failure unknown analysis, bad target / vector / magnitude, parameter not used by the kind, moment -> refusal, unchanged doc
+ * @failure unknown analysis, bad target / vector / magnitude, parameter not used by the kind, a moment on a single point -> refusal, unchanged doc
  */
 export const addFeaLoad = defineCommand({
   name: 'add_fea_load',
@@ -84,11 +101,11 @@ export const addFeaLoad = defineCommand({
     '"total" spreads it, "per_node" applies it at each node), pressure (magnitude normal to the target faces, positive = into the ' +
     'material) or gravity (acceleration vector, no target). Magnitudes are in the unit system of the analysis (see describe_analysis, ' +
     'case.unitSystem; N-mm-t-s: N, MPa and gravity 9810 mm/s^2). loadCase groups loads solved together; category limit | ultimate ' +
-    'drives later margin factors. Moments are not built. The target is given as points near the topology (see add_fea_constraint).',
+    'drives later margin factors. A moment (kind moment, vector = [mx, my, mz]) is applied as a statically equivalent couple of nodal forces on the target face / edge nodes, not as a rigid coupling. The target is given as points near the topology (see add_fea_constraint).',
   params: z.object({
     analysisId: analysisIdSchema,
     name: z.string().min(1).describe('Display name, e.g. "tip load".'),
-    kind: z.enum(['force', 'pressure', 'gravity']).describe('Load type.'),
+    kind: z.enum(['force', 'pressure', 'gravity', 'moment']).describe('Load type.'),
     loadCase: z
       .string()
       .optional()
@@ -157,7 +174,6 @@ export const updateFeaLoad = defineCommand({
     if (analysisCase === undefined) return fail('FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`, [analysisId], ['analysisId']);
     const existing = Object.hasOwn(analysisCase.loads, loadId) ? analysisCase.loads[loadId] : undefined;
     if (existing === undefined) return fail('FEA_LOAD_NOT_FOUND', `no load '${loadId}' in '${analysisId}'`);
-    if (existing.kind === 'moment') return fail('FEA_LOAD_INVALID', 'moment loads are not built');
     const unused = irrelevantParams(existing.kind, fields);
     if (unused.length > 0)
       return fail('FEA_LOAD_INVALID', `${unused.join(', ')} do not apply to a ${existing.kind} load`, undefined, unused);

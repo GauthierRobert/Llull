@@ -610,7 +610,7 @@ Coverage 90/85/90/90 extends to `packages/domain-cae/src/**` (CLAUDE.md non-nego
 | M7 (V1, RS-5) | `llull-compute raster` field-plot job (crate `llull-raster`, shared with plant 09 VIS), CLI selection + provenance, VC-FEA-29 | M3; RS-0 (`solver/` workspace); RS-5 renderer | 1 w (the renderer itself is costed in RS-5) |
 | V2 | beams (CBAR/B32), composites (06 CMP → PCOMP / `*SHELL SECTION, COMPOSITE`), tied contact, user Nastran/MYSTRAN runner | 06 CMP, 08 MAT | — |
 
-**Status (2026-10-17):** the static-solid part of M1–M3 is built (§13) as the minimal slice for PHY-03 / PHY-04: data model, plugin `cae`, Gmsh mesh op, artifact store, INP writer, ccx solve, FRD/DAT readers, record commands, margins. The remaining items (face map, Verdict port, modal / buckling, M4 prompt + golden plans, M5, M6) form **FEA-REST**, in step **AERO-5** of the aerospace story (`../README.md`). The face map needs the 01 `FaceQueryPort` (AERO-2). The `FeaMaterialView` over 08 records needs 08 M2 (AERO-3); until then the decks read PHY-01 / PHY-02 models on `Material`.
+**Status (2026-10-17):** the static-solid part of M1–M3 is built (§13) as the minimal slice for PHY-03 / PHY-04: data model, plugin `cae`, Gmsh mesh op, artifact store, INP writer, ccx solve, FRD/DAT readers, record commands, margins. The remaining items (face map, M4 prompt + golden plans, M5, M6) form **FEA-REST** (part 1, 2026-10-19: modal / buckling hardening, `dispose_margin`, `analytic_check`, moment loads, consistent forces and the Verdict port, see §13), in step **AERO-5** of the aerospace story (`../README.md`). The face map needs the 01 `FaceQueryPort` (AERO-2). The `FeaMaterialView` over 08 records needs 08 M2 (AERO-3); until then the decks read PHY-01 / PHY-02 models on `Material`.
 
 Cross-gap: **08 MAT** owns the material record (E, ν, G, density, allowables with basis and provenance); FEA M1 depends on 08 M1–M2. **01 KRN** supplies stable
 exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results with the revision.
@@ -651,7 +651,7 @@ exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results w
 - [RS1] Native compute programme — [../../decisions/RS1-native-compute.md](../../decisions/RS1-native-compute.md) (owner decision 2026-10-18)
 - L1 llull: `.claude/rules/architecture.md`, `docs/decisions/KI5-shape-kernel-boundary.md`, `docs/decisions/KI6-desktop-app-cli-first.md`, `packages/core/src/geometry/kernel.ts`, `server/src/pythonExchange.ts`.
 
-## 13. Implementation status (2026-10-16)
+## 13. Implementation status (2026-10-19)
 
 **Built: a minimal slice**, driven by physics packs PHY-03 / PHY-04 (owner decision; design `docs/physics/FE_PIPELINE_DESIGN.md`).
 
@@ -670,13 +670,67 @@ benchmarks.
 **Deviations:** targets are resolved by the mesher (closest Gmsh surface / node to the given points), not by the TR-FEA-32 face map,
 because the 01 face-query port (`faceDetails`) does not exist; without STEP (Manifold) the mesher rebuilds the geometry from the
 tessellation (`classifySurfaces` 40°), so faces are crease regions; `edgesNear` works with STEP only; `intersectPlane` is ignored.
-Forces are split equally over the target nodes (not area-consistent). Probes use the nearest node (temperature: element interpolation).
-Mesh quality reports Gmsh-independent tet scaled Jacobian and edge ratio only. Case lengths are in document units, loads in the case unit
-system. The FE tools run synchronously in the server process (no ticket cancel yet).
+Forces on edges / points are split equally over the target nodes (faces: area-consistent since 2026-10-19, see below). Probes use the nearest node
+(temperature: element interpolation). Case lengths are in document units, loads in the case unit system. The FE tools run synchronously in the
+server process (no ticket cancel yet).
 
-**Not built (05 backlog):** modal, buckling, shells / plane stress / beams, midsurface, defeature, moment loads, Nastran BDF, OP2,
-`dispose_margin`, `analytic_check`, `set_result_view`, `fea_import_results`, `fea_result_field`, the full Verdict
-quality port, UI panels, `.llullz` result bundling.
+**Not built (05 backlog):** shells / plane stress / beams, midsurface, defeature, Nastran BDF, OP2, `set_result_view`, `fea_import_results`,
+`fea_result_field`, VTU, the face map (TR-FEA-32), `*DISTRIBUTING COUPLING` / RBE3 remote loads, UI panels, `.llullz` result bundling. Modal, buckling,
+`dispose_margin`, `analytic_check`, moment loads, area-consistent forces and the full Verdict port are built (FEA-REST part 1, below).
+
+**FEA-REST part 1 (2026-10-19): modal, buckling, human gate, analytic checks, loads, quality.**
+
+- **Modal** (`analysisType: 'modal'`; first built in the round-5 audit, hardened here). `create_analysis { modes (default 6, 1..100), frequencyRangeHz?: { min?, max? } }`;
+  the deck writes `*FREQUENCY` with the data line `n` or `n, [min], [max]` (band in Hz = CalculiX cycles/time), the constraints (loads are ignored: warning
+  `FEA_LOADS_IGNORED`) and `*NODE FILE U`. A modal case WITHOUT supports is written (free-free; `check_analysis` warns `FEA_UNDERCONSTRAINED`, the first six modes are
+  rigid-body). Not run against a real `ccx` (none is installed on the dev machine): a solver refusal of a singular free model would surface as `FEA_SOLVER_FAILED`.
+  Readers: the `.dat` eigenvalue table gives `frequenciesHz`; the participation-factor, effective-modal-mass and total-effective-mass tables
+  (`P A R T I C I P A T I O N  F A C T O R S`, `E F F E C T I V E  M O D A L  M A S S`, `T O T A L  E F F E C T I V E  M A S S`, translations x / y / z) are parsed
+  tolerantly into `dat.tables`; their exact layout was hand-built from the CalculiX documentation and must be confirmed against a real run (a heading without rows is
+  dropped). The mode shapes are the `.frd` result sets (`render_fea_results mode=n`). `fea_report` returns `data.eigen`
+  `{ kind: 'modal', modes [{ mode, frequencyHz, participation?, effectiveMass?, effectiveMassFraction? }], totalEffectiveMass, cumulativeMassFraction, massUnit, rigidBodyModes }`,
+  recomputed from the verified artifact (it is not part of the trusted summary, so records made earlier stay trusted); the `describe_analysis` and `fea_report` summaries list the
+  frequencies. Rigid-body modes = frequency <= max(1e-3 Hz, 1e-4 x the highest extracted frequency) (a llull heuristic).
+- **Buckling** (`analysisType: 'buckling'`). One `*BUCKLE` step with the constraints and the loads of the FIRST load case as the reference (deviation from "after a static
+  preload": no `*STATIC` pre-stress step is written; a second load case is ignored and flagged `FEA_BUCKLING_LOAD_CASE_IGNORED`). Factors come from the `.dat`
+  (`bucklingFactors`, multiples of the applied load); `data.eigen { kind: 'buckling', factors, criticalFactor (smallest factor above 1e-3), criticalMode, negativeFactors,
+  nearZeroFactors }`. Guards in `check_analysis`: `FEA_NO_CONSTRAINTS` / `FEA_NO_LOADS`, `FEA_BUCKLING_NEAR_ZERO` and `FEA_BUCKLING_NO_POSITIVE` (errors),
+  `FEA_BUCKLING_NEGATIVE_FACTOR` and `FEA_BUCKLING_BELOW_APPLIED` (factor < 1: the applied load exceeds the linear buckling load; warnings). Linear buckling is an upper bound
+  (no imperfections): the summary says so and `reviewRequired` is always true.
+- **`check_analysis` additions.** `FEA_UNDERCONSTRAINED` from the mesh artifact: the restrained (node, dof) rows of every support are projected on the six rigid-body motions of each part
+  (rank by Gram-Schmidt: a fixed face 6, a fixed point 3, a fixed edge 5; parts that share mesh nodes under conformal bonding form one group); `FEA_MESH_ADEQUACY` when fewer than 2 element edges fit across the thinnest bounding-box side of a
+  part (bounding box over the mean tet edge: a heuristic, VC-FEA-09); margin items for a solved static / thermo_static case with allowables: `FEA_MS_NEGATIVE` (error, also after
+  a disposition: a FAIL never becomes a pass), `FEA_MARGINAL_BAND_UNSET` (warning, VC-FEA-62) and `FEA_DISPOSITION_PENDING` (the check runs the default query without a band, so
+  `FEA_MS_MARGINAL` stays a code of `compute_margins` rows). Because of the last two a solved
+  case with allowables reads `warn` at best until a band is stated.
+- **`dispose_margin`** (registry command, human gate, `margins/disposeMargin.ts`). `{ analysisId, rowId, decision: accepted | rejected | redesign, justification, signature?, + the
+  compute_margins query (criterion, allowable, groupBy, loadCases, marginalBand) }`: the query reproduces the table the reviewer saw, because `rN` depends on it. Every
+  row carries a stable `rowKey` = `loadCase|part|region|check|criterion`; the disposition is stored under it in `AnalysisCase.dispositions` with decision,
+  justification, `resultsHash`, signer, signatureId and the verified signature. The signature is verified through `ctx.humanSignature` over
+  sha256 of the canonical JSON of `{ kind: 'margin_disposition', analysisId, rowKey, status, ms, decision, justification, resultsHash }`. No port, no signature or a signature
+  that does not verify gives `FEA_HUMAN_GATE` with the document unchanged (VC-FEA-63: an agent always lands there); other refusals: `FEA_ANALYSIS_NOT_FOUND`, `FEA_PARAM_INVALID` (empty justification),
+  `FEA_RESULTS_STALE` / `FEA_RESULTS_MISSING`, `FEA_MARGIN_ROW_NOT_FOUND`, `FEA_MARGIN_PARAM_INVALID` (a PASS row). A stored disposition is a claim: `compute_margins` honours it only
+  while it binds to the current results hash and its signature still verifies over the row as computed now; otherwise the row stays `pending_human` with a
+  `dispositionNote`. It never changes `status`: the row reads `statusLabel: 'FAIL (accepted)'`, `disposition: accepted` and carries `dispositionRecord`. Case dispositions are not part of the input hash.
+- **`analytic_check`** (registry query, pure, `analytic/`). `{ check, inputs, compare?: { quantity, value, toleranceRel? } }` with checks `cantilever` (tip deflection EB and
+  Timoshenko, root moment and stress, stiffness; VC-FEA-10), `cantilever_frequency` (n-th clamped-free bending frequency, weak and strong axis; VC-FEA-11), `ss_beam` (central point
+  and / or uniform load), `euler_column` (`K` stated, no default; VC-FEA-12), `ss_plate_buckling` (k(a/b), half waves, sigma_cr; VC-FEA-13), `kirsch_kt` (Kt = 3, transverse profile and
+  hoop stress; VC-FEA-14). Rectangular sections, N-mm-t-s units in the key suffix; every result has its unit and formula, and the data lists assumptions and sources (AF-35);
+  `compare` returns the relative difference and, with a tolerance, `withinTolerance`. The values are asserted against `validation/fea_analytic_expected.json` in `tests/unit/cae/analyticCheck.test.ts`.
+- **Moment loads.** `add_fea_load kind: 'moment'` (`vector` = [mx, my, mz] in force x length of the unit system, `target` a face, an edge or at least three points).
+  Deviation from the spec (`*DISTRIBUTING COUPLING` / RBE3 with a reference node): the deck applies a statically equivalent couple of `*CLOAD` nodal forces
+  `F_i = omega x d_i` (`decks/loadDistribution.ts`; zero resultant force, the exact moment about any point), because the CalculiX keyword syntax could not be checked against a
+  real run here. `referencePoint` is not used (a pure couple has none); a moment about the line of collinear nodes, or on fewer than 2 nodes, is refused with `FEA_LOAD_INVALID`. The face is
+  not constrained (no rigid coupling), so stresses near the patch differ from an RBE3 / rigid coupling within the St-Venant zone.
+- **Area-consistent forces.** A `total` force on a target that has faces in the mesh artifact (`faceSets` of `L_<id>`) is split by face integration: a linear face gives each corner
+  A / 3, a quadratic face its three mid-edge nodes A / 3 and the corners nothing (corner-triangle area for curved faces). Targets of edges or points (no faces) and `per_node` are unchanged.
+- **Verdict quality** (`results/verdict.ts`, `results/meshQuality.ts`). Tet scaled Jacobian, tet aspect ratio (`Lmax / (2 sqrt(6) r_in)`), tet edge ratio (a llull screen, above 3), triangle minimum
+  angle, quad aspect ratio, scaled Jacobian, skew and warpage on corner nodes, against the Verdict ranges of §5.5. Warpage is reported in the histogram only
+  (open question 10) and never counts as outside. `inverted` counts tets and quads with SJ <= 0 and zero-area triangles (the export / solve gate). Checked against `validation/mesh_quality_reference.json`
+  (VC-FEA-07). The solid-tet deck still refuses 2D element types; the 2D metrics are ready for the shell / plane-stress part. The quality summary stays a diagnostic outside the trust comparison.
+- **Tests.** `tests/unit/cae/{verdict,eigenChecks,disposeMargin,analyticCheck,loadDistribution}.test.ts`, golden plans `fea_modal_cantilever` and `fea_buckling_column_moment`,
+  `server/tests/feaEigen.test.ts` (real Gmsh + ccx, skipped without them; it now also cross-checks `data.eigen` and `analytic_check`). Not run on this machine (no `ccx` / `gmsh`): VC-FEA-11 / 12 / 41 / 42 against
+  a real solver, the free-free modal deck, the participation-table layout and the `*FREQUENCY n, min, max` band.
 
 **Review fixes (2026-10-17), documented behaviour changes:**
 
@@ -724,7 +778,7 @@ marginalBand, minMs, minMsRow, factors, rows, singularScreening, warnings, revie
   anything else is `defaulted: false`, source `create_analysis factors`; extras keep their justification). thermo_static results are one limit load case named
   `loadCaseName`.
 - **Status.** FAIL if MS < 0 (`FEA_MS_NEGATIVE`), MARGINAL only when `marginalBand` is given and MS < band (`FEA_MS_MARGINAL`; no default, warning
-  `FEA_MARGINAL_BAND_UNSET` in `data.warnings`), else PASS. FAIL / MARGINAL rows are `disposition: pending_human` (`dispose_margin` is not built); every row has
+  `FEA_MARGINAL_BAND_UNSET` in `data.warnings`), else PASS. FAIL / MARGINAL rows are `disposition: pending_human` until `dispose_margin` records a verified human decision (the status never changes; every row has a stable `rowKey`); every row has
   `reviewRequired: true`; `unverified` = OR of the allowable's PHY-01 flags, the E / nu flags (and, for thermo_static, the CTE flags of `check_thermo_mechanical`).
 - **Singular zones are not screened.** Every row has `singular: false` and `data.singularScreening` says so; peak stresses at point loads, supports and re-entrant
   corners must be judged by the reader (a node in a constraint set is visible with `groupBy target`).

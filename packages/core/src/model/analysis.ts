@@ -444,6 +444,8 @@ export interface AnalysisCase {
   readonly solver: FeSolver;
   readonly unitSystem: UnitSystem;
   readonly modes?: number;
+  /** modal only: restrict the extracted modes to this frequency range in Hz (`*FREQUENCY` data line `modes, min, max`); absent = the lowest `modes`. */
+  readonly frequencyRangeHz?: { readonly min?: number; readonly max?: number };
   readonly factors: FactorSet;
   readonly parts: Readonly<Record<EntityId, Idealization>>;
   readonly constraints: Readonly<Record<string, FeaConstraint>>;
