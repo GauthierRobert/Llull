@@ -610,7 +610,7 @@ Coverage 90/85/90/90 extends to `packages/domain-cae/src/**` (CLAUDE.md non-nego
 | M7 (V1, RS-5) | `llull-compute raster` field-plot job (crate `llull-raster`, shared with plant 09 VIS), CLI selection + provenance, VC-FEA-29 | M3; RS-0 (`solver/` workspace); RS-5 renderer | 1 w (the renderer itself is costed in RS-5) |
 | V2 | beams (CBAR/B32), composites (06 CMP → PCOMP / `*SHELL SECTION, COMPOSITE`), tied contact, user Nastran/MYSTRAN runner | 06 CMP, 08 MAT | — |
 
-**Status (2026-10-17):** the static-solid part of M1–M3 is built (§13) as the minimal slice for PHY-03 / PHY-04: data model, plugin `cae`, Gmsh mesh op, artifact store, INP writer, ccx solve, FRD/DAT readers, record commands, margins. The remaining items (face map, M4 prompt + golden plans, M5, M6) form **FEA-REST** (part 1, 2026-10-19: modal / buckling hardening, `dispose_margin`, `analytic_check`, moment loads, consistent forces and the Verdict port, see §13), in step **AERO-5** of the aerospace story (`../README.md`). The face map needs the 01 `FaceQueryPort` (AERO-2). The `FeaMaterialView` over 08 records needs 08 M2 (AERO-3); until then the decks read PHY-01 / PHY-02 models on `Material`.
+**Status (2026-10-17):** the static-solid part of M1–M3 is built (§13) as the minimal slice for PHY-03 / PHY-04: data model, plugin `cae`, Gmsh mesh op, artifact store, INP writer, ccx solve, FRD/DAT readers, record commands, margins. The remaining items (face map, M4 prompt + golden plans, M5, M6) form **FEA-REST** (part 1, 2026-10-19: modal / buckling hardening, `dispose_margin`, `analytic_check`, moment loads, consistent forces and a Verdict subset (the metrics listed in §13), see §13), in step **AERO-5** of the aerospace story (`../README.md`). The face map needs the 01 `FaceQueryPort` (AERO-2). The `FeaMaterialView` over 08 records needs 08 M2 (AERO-3); until then the decks read PHY-01 / PHY-02 models on `Material`.
 
 Cross-gap: **08 MAT** owns the material record (E, ν, G, density, allowables with basis and provenance); FEA M1 depends on 08 M1–M2. **01 KRN** supplies stable
 exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results with the revision.
@@ -676,7 +676,7 @@ server process (no ticket cancel yet).
 
 **Not built (05 backlog):** shells / plane stress / beams, midsurface, defeature, Nastran BDF, OP2, `set_result_view`, `fea_import_results`,
 `fea_result_field`, VTU, the face map (TR-FEA-32), `*DISTRIBUTING COUPLING` / RBE3 remote loads, UI panels, `.llullz` result bundling. Modal, buckling,
-`dispose_margin`, `analytic_check`, moment loads, area-consistent forces and the full Verdict port are built (FEA-REST part 1, below).
+`dispose_margin`, `analytic_check`, moment loads, area-consistent forces and a Verdict subset (the metrics listed under "Verdict quality" below) are built (FEA-REST part 1, below).
 
 **FEA-REST part 1 (2026-10-19): modal, buckling, human gate, analytic checks, loads, quality.**
 

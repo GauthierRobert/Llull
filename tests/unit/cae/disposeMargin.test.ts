@@ -6,6 +6,7 @@ import type { ExecutionContext } from '@core/commands/types';
 import type { Disposition, HumanSignaturePort } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
+import { analysisInputHash } from '@cae/hash/inputHash';
 import { marginDispositionPayload } from '@cae/margins/disposition';
 import { withCase } from '@cae/shared/access';
 import { caseIn } from './helpers';
@@ -42,7 +43,7 @@ function signatureFor(b: MarginBar, row: Row, decision: string, justification: s
   return {
     payload: marginDispositionPayload(
       b.analysisId,
-      { rowKey: row.rowKey, status: row.status, ms: row.ms },
+      { rowKey: row.rowKey, status: row.status, ms: row.ms, inputHash: analysisInputHash(b.recorded, b.analysisId, 'full') },
       decision,
       justification,
       resultsHash,
@@ -102,7 +103,7 @@ describe('dispose_margin: a valid human signature', () => {
 
   it('records the disposition by stable row key with signer and results hash, and reports it', () => {
     expect(accepted.rejected).not.toBe(true);
-    expect(accepted.affected).toEqual([failRow.rowKey]);
+    expect(accepted.affected).toEqual([bar.analysisId]);
     expect(accepted.summary).toContain(`FAIL accepted by ${SIGNER}`);
     expect(accepted.summary).toContain('the status stays FAIL');
     const stored = caseIn(accepted.document, bar.analysisId).dispositions[failRow.rowKey];
@@ -227,5 +228,28 @@ describe('check_analysis margin items (VC-FEA-62)', () => {
     const bare = marginBar({ ftu: null, fty: null });
     const silent = execute(bare.recorded, 'check_analysis', { analysisId: bare.analysisId }, bare.ctx);
     expect((silent.data as { items: { code: string }[] }).items.map((entry) => entry.code)).toEqual(['FEA_MESH_ADEQUACY']);
+  });
+});
+
+describe('the signed payload names the model set-up', () => {
+  it('a signature made over the same row but another analysis input hash (another document) does not verify', () => {
+    const failRow = rowsOf(computed(bar.recorded, bar.ctx))[0] as Row;
+    const justification = 'tested to 1.8 x limit';
+    const resultsHash = caseIn(bar.recorded, bar.analysisId).results?.resultsHash ?? '';
+    const foreign = marginDispositionPayload(
+      bar.analysisId,
+      { rowKey: failRow.rowKey, status: failRow.status, ms: failRow.ms, inputHash: 'another-document-input-hash' },
+      'accepted',
+      justification,
+      resultsHash,
+    );
+    const result = execute(
+      bar.recorded,
+      'dispose_margin',
+      { analysisId: bar.analysisId, rowId: failRow.rowId, decision: 'accepted', justification, signature: { payload: foreign } },
+      humanContext(),
+    );
+    expect(result.summary).toContain('FEA_HUMAN_GATE');
+    expect(result.document).toBe(bar.recorded);
   });
 });

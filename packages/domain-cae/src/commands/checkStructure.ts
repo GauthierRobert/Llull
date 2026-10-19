@@ -138,7 +138,9 @@ function meshItems(doc: CadDocument, analysis: AnalysisCase, trust: Trust): Stru
         item(
           'FEA_MESH_ADEQUACY',
           'warning',
-          `part '${part.entityId}': about ${Number(part.elementsAcross.toPrecision(2))} element edge(s) across its thinnest dimension (${Number(part.thinnestExtent.toPrecision(4))} ${analysis.unitSystem.split('-')[1] ?? ''} over a mean edge of ${Number(part.meanEdge.toPrecision(4))}); bending is under-resolved`,
+          `part '${part.entityId}': about ${Number(part.elementsAcross.toPrecision(2))} element edge(s) across its thinnest bounding-box dimension (${Number(part.thinnestExtent.toPrecision(4))} ${analysis.unitSystem.split('-')[1] ?? ''} over a mean edge of ${Number(part.meanEdge.toPrecision(4))}); ` +
+            (heat ? 'the temperature gradient across that dimension is under-resolved' : 'bending is under-resolved') +
+            '. Heuristic: the axis-aligned bounding box can miss a thin wall of a rotated or curved part and flag a thick, slender one',
           [part.entityId],
         ),
       );

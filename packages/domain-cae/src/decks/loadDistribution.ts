@@ -35,7 +35,8 @@ function elementIndex(mesh: FeMeshArtifact): Map<number, { readonly type: string
 /**
  * Consistent nodal shares of a uniform traction over the faces of `targetKey` (they sum to 1): a linear triangle gives each corner A / 3, a quadratic one
  * gives its three mid-edge nodes A / 3 each and the corners nothing (the exact result of integrating the shape functions). The face area is the area of
- * the corner triangle. Null when the target has no faces or a face cannot be resolved (the caller then splits equally over the target nodes).
+ * the corner triangle. Null when the target has no faces, a face cannot be resolved, or the target also holds nodes that are not on its faces (a target
+ * mixing facesNear with pointsNear / edgesNear): the caller then splits equally over ALL target nodes.
  */
 export function consistentWeights(ctx: DeckContext, targetKey: string): ReadonlyMap<number, number> | null {
   const faces = ctx.faces(targetKey);
@@ -43,6 +44,7 @@ export function consistentWeights(ctx: DeckContext, targetKey: string): Readonly
   const position = new Map<number, Vec3>(ctx.mesh.nodes.map((node) => [node[0], [node[1], node[2], node[3]]]));
   const elements = elementIndex(ctx.mesh);
   const shares = new Map<number, number>();
+  const faceNodes = new Set<number>();
   let total = 0;
   for (const [elementId, label] of faces) {
     const element = elements.get(elementId);
@@ -56,6 +58,7 @@ export function consistentWeights(ctx: DeckContext, targetKey: string): Readonly
       element.type === 'C3D10'
         ? [midOf(corners[0], corners[1]), midOf(corners[1], corners[2]), midOf(corners[2], corners[0])]
         : [corners[0], corners[1], corners[2]];
+    for (const slot of [...corners, ...(element.type === 'C3D10' ? carriers : [])]) faceNodes.add(element.nodes[slot] ?? -1);
     for (const slot of carriers) {
       const node = element.nodes[slot];
       if (node === undefined) return null;
@@ -64,6 +67,8 @@ export function consistentWeights(ctx: DeckContext, targetKey: string): Readonly
     total += area;
   }
   if (!(total > 0)) return null;
+  const targetNodes = Object.hasOwn(ctx.mesh.nodeSets, targetKey) ? (ctx.mesh.nodeSets[targetKey] ?? []) : [];
+  if (targetNodes.some((node) => !faceNodes.has(node))) return null;
   return new Map([...shares].map(([node, share]) => [node, share / total]));
 }
 

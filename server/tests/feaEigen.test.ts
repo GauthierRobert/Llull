@@ -90,6 +90,10 @@ describe.skipIf(!READY)('modal and buckling analyses', () => {
     const eigen = dataOf(json)['eigen'];
     expect(isRecord(eigen) && eigen['kind']).toBe('modal');
     expect(isRecord(eigen) && eigen['rigidBodyModes']).toBe(0);
+    // ccx prints six components per participation row: a layout this reader cannot parse would drop the table, so assert it is present.
+    const modes = isRecord(eigen) && Array.isArray(eigen['modes']) ? eigen['modes'] : [];
+    expect(isRecord(modes[0]) && Array.isArray(modes[0]['participation'])).toBe(true);
+    expect(isRecord(eigen) && eigen['warnings']).toEqual([]);
     const closedForm = await session.cli(
       'analytic_check',
       'check=cantilever_frequency',

@@ -22,6 +22,9 @@ const EIGEN_HEAD = `
                            (RAD/TIME)      (CYCLES/TIME     (RAD/TIME)
 `;
 
+/** ccx (arpack.f) prints six components per row: x / y / z translation, then x / y / z rotation (zero here: the bar fixtures are translational). */
+const ROTATIONS = [0, 0, 0] as const;
+
 const row = (mode: number, ...values: number[]): string =>
   `${String(mode).padStart(7)}${values.map((value) => value.toExponential(7).toUpperCase().padStart(16)).join('')}`;
 
@@ -42,27 +45,27 @@ export function modalDat(
       '',
       '     P A R T I C I P A T I O N   F A C T O R S',
       '',
-      ' MODE NO.       X-COMPONENT       Y-COMPONENT       Z-COMPONENT',
+      ' MODE NO.       X-COMPONENT       Y-COMPONENT       Z-COMPONENT       X-ROTATION        Y-ROTATION        Z-ROTATION',
       '',
     );
-    participation.forEach((values, index) => lines.push(row(index + 1, ...values)));
+    participation.forEach((values, index) => lines.push(row(index + 1, ...values, ...ROTATIONS)));
   }
   if (effective !== undefined) {
     lines.push(
       '',
       '     E F F E C T I V E   M O D A L   M A S S',
       '',
-      ' MODE NO.       X-COMPONENT       Y-COMPONENT       Z-COMPONENT',
+      ' MODE NO.       X-COMPONENT       Y-COMPONENT       Z-COMPONENT       X-ROTATION        Y-ROTATION        Z-ROTATION',
       '',
     );
-    effective.forEach((values, index) => lines.push(row(index + 1, ...values)));
+    effective.forEach((values, index) => lines.push(row(index + 1, ...values, ...ROTATIONS)));
   }
   if (total !== undefined)
     lines.push(
       '',
       '     T O T A L   E F F E C T I V E   M A S S',
       '',
-      `${' '.repeat(7)}${total.map((value) => value.toExponential(7).toUpperCase().padStart(16)).join('')}`,
+      `${' '.repeat(7)}${[...total, ...ROTATIONS].map((value) => value.toExponential(7).toUpperCase().padStart(16)).join('')}`,
     );
   return `${lines.join('\n')}\n`;
 }

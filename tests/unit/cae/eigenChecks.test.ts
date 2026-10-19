@@ -46,13 +46,22 @@ describe('modal mass tables of the .dat', () => {
       'effective modal mass',
       'total effective mass',
     ]);
-    expect(dat.tables[1]?.rows[2]).toEqual([3, 0.2, 0, 0.5]);
-    expect(dat.tables[3]?.rows).toEqual([[1, 1, 1]]);
+    expect(dat.tables[1]?.rows[2]).toEqual([3, 0.2, 0, 0.5, 0, 0, 0]);
+    expect(dat.tables[3]?.rows).toEqual([[1, 1, 1, 0, 0, 0]]);
   });
 
-  it('a heading without rows under it is dropped (the eigenvalue table is kept)', () => {
+  it('a heading without rows under it is dropped with a warning (the eigenvalue table is kept)', () => {
     const bare = parseDat(`${modalDat([100])}\n     P A R T I C I P A T I O N   F A C T O R S\n`);
     expect(bare.tables.map((table) => table.title.split(' (')[0])).toEqual(['eigenvalues']);
+    expect(bare.warnings?.[0]).toContain("'participation factors' is present but no row of it could be read");
+  });
+
+  it('rows of six components (x / y / z translation and rotation) are read; a row with fewer than the translations is not', () => {
+    const six = parseDat(
+      `${modalDat([100])}\n     P A R T I C I P A T I O N   F A C T O R S\n\n 1 1.0E+00 2.0E+00 3.0E+00 4.0E+00 5.0E+00 6.0E+00\n 2 1.0E+00 2.0E+00\n`,
+    );
+    expect(six.tables[1]?.rows).toEqual([[1, 1, 2, 3, 4, 5, 6]]);
+    expect(six.warnings).toBeUndefined();
   });
 });
 
@@ -65,18 +74,17 @@ describe('eigenReport', () => {
     expect(report.modes.map((mode) => mode.frequencyHz)).toEqual([100, 200, 300]);
     expect(report.modes[0]?.participation).toEqual([0.9, 0, 0]);
     expect(report.modes[2]?.effectiveMass).toEqual([0.1, 0, 0.2]);
-    expect(report.modes[2]?.effectiveMassFraction).toEqual([0.1, 0, 0.2]);
+    expect(report.modes[2]?.fractionOfExtractedSum).toEqual([0.1, 0, 0.2]);
     expect(report.totalEffectiveMass).toEqual([1, 1, 1]);
-    expect(report.cumulativeMassFraction?.map((share) => Number(share.toFixed(6)))).toEqual([0.5, 0.3, 0.2]);
     expect(report.massUnit).toBe('tonne');
     expect(report.rigidBodyModes).toBe(0);
-    expect(eigenNote(report)).toContain('mass participation x/y/z 50% / 30% / 20%');
+    expect(eigenNote(report)).toContain('extracted modes carry x/y/z 50% / 30% / 20%');
   });
 
   it('modal without mass tables keeps the frequencies only; rigid-body modes are counted from the frequencies', () => {
     const bare = eigenCase({ type: 'modal', dat: modalDat([0.0004, 0.0005, 1200, 3400]) });
     const report = eigenReport(caseIn(bare.recorded, bare.bar.analysisId), bare.results as FeResultsArtifact);
-    expect(report).toMatchObject({ kind: 'modal', totalEffectiveMass: null, cumulativeMassFraction: null, rigidBodyModes: 2 });
+    expect(report).toMatchObject({ kind: 'modal', totalEffectiveMass: null, rigidBodyModes: 2 });
     if (report?.kind === 'modal') {
       expect(report.modes[0]).not.toHaveProperty('participation');
       expect(eigenNote(report)).toContain('2 rigid-body mode(s)');

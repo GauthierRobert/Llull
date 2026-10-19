@@ -25,8 +25,8 @@ export const feaReport = defineCommand({
   description:
     'Read the finite-element status of an analysis: data { state: unmeshed | meshed | solved | stale | missing | untrusted, unitSystem, ' +
     'mesh (node and element counts, quality, warnings), results (per load case max von Mises and max displacement with positions and units, ' +
-    'or the thermal summary), eigen (modal: modes [{ mode, frequencyHz, participation, effectiveMass, effectiveMassFraction }], totalEffectiveMass, ' +
-    'cumulativeMassFraction, massUnit, rigidBodyModes; buckling: factors, criticalFactor, criticalMode, negativeFactors; null for other types), ' +
+    'or the thermal summary), eigen (modal: modes [{ mode, frequencyHz, participation, effectiveMass, fractionOfExtractedSum }], totalEffectiveMass, ' +
+    'massUnit, rigidBodyModes, warnings; buckling: factors, criticalFactor, criticalMode, negativeFactors; null for other types), ' +
     'problem { code, message } | null, probes [{ probeId, quantity, unit, nodeId, nodeDistance, values per load ' +
     'case or time }] }. Numbers are recomputed from the artifact store, never read from the document: "missing" = an artifact is not ' +
     'available on this machine (or no artifact store; re-run fea_mesh / fea_solve) and "untrusted" = the recorded summary differs from its ' +

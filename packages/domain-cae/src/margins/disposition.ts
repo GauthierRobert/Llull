@@ -13,6 +13,8 @@ export interface DispositionSubject {
   readonly rowKey: string;
   readonly status: string;
   readonly ms: number | null;
+  /** Full analysis input hash (TR-FEA-06): binds the signature to this model's set-up, so it cannot be replayed into another document whose artifacts are byte-identical. */
+  readonly inputHash: string;
 }
 
 /** SHA-256 the human signs: the decision on one margin row of one set of results. */
@@ -30,6 +32,7 @@ export const marginDispositionPayload = (
       rowKey: subject.rowKey,
       status: subject.status,
       ms: subject.ms,
+      inputHash: subject.inputHash,
       decision,
       justification,
       resultsHash,

@@ -25,6 +25,7 @@ import {
   type AllowableRefusal,
 } from './allowable';
 import { appliedFactor, factorReport, marginOfSafety, statusOf, type CheckKind, type MarginStatus } from './marginMath';
+import { analysisInputHash } from '../hash/inputHash';
 import { dispositionOf } from './disposition';
 import { refuseMargins } from './refusal';
 
@@ -207,7 +208,12 @@ function buildRows(
         const reasons = [...new Set([...found.unverifiedReasons, ...unverifiedReasonsOf(context, group.entityId, materialId)])];
         const at: Vec3 = coordinates.get(applied.node) ?? [0, 0, 0];
         const rowKey = [name, group.entityId, group.region, check, criterion].join('|');
-        const decided = dispositionOf(analysis, { rowKey, status, ms }, context.port, analysis.results?.resultsHash ?? '');
+        const decided = dispositionOf(
+          analysis,
+          { rowKey, status, ms, inputHash: analysisInputHash(context.doc, analysis.id, 'full') },
+          context.port,
+          analysis.results?.resultsHash ?? '',
+        );
         rows.push({
           rowId: `r${rows.length + 1}`,
           rowKey,

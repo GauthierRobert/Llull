@@ -9,12 +9,17 @@ const DEFAULT_MODES = 6;
 
 const modesOf = (ctx: DeckContext): number => Math.max(1, Math.round(ctx.analysis.modes ?? DEFAULT_MODES));
 
-/** Data line of `*FREQUENCY`: `n`, or `n, [min], [max]` for a band (cycles/time = Hz). */
+/** Lower bound (Hz) written for a case without supports: the stiffness matrix is singular, so the eigenproblem is shifted below zero. A llull choice, not verified against a real ccx run. */
+const FREE_FREE_LOWER_BOUND_HZ = -1;
+
+/** Data line of `*FREQUENCY`: `n`, or `n, [min], [max]` for a band (cycles/time = Hz); a supportless case without a stated minimum gets a small negative one. */
 function frequencyLine(ctx: DeckContext): string {
   const band = ctx.analysis.frequencyRangeHz;
-  if (band === undefined) return num(modesOf(ctx));
-  const fields = [num(modesOf(ctx)), band.min === undefined ? '' : num(band.min)];
-  if (band.max !== undefined) fields.push(num(band.max));
+  const free = ctx.analysis.constraintOrder.length === 0;
+  if (band === undefined && !free) return num(modesOf(ctx));
+  const minimum = band?.min ?? (free ? FREE_FREE_LOWER_BOUND_HZ : undefined);
+  const fields = [num(modesOf(ctx)), minimum === undefined ? '' : num(minimum)];
+  if (band?.max !== undefined) fields.push(num(band.max));
   return fields.join(', ');
 }
 
