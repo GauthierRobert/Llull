@@ -87,7 +87,11 @@ function pruneDanglingAero(raw: Record<string, unknown>): Record<string, unknown
     const sectionsOk = wing['sections'].every((s) => !isRecord(s) || !isText(s['airfoilId']) || Object.hasOwn(airfoils, s['airfoilId']));
     if (entityIds.length > 0 && sectionsOk) wings[key] = entityIds.length === wing['entityIds'].length ? wing : { ...wing, entityIds };
   }
-  return { ...raw, aero: { ...slice, airfoils, wings } };
+  const unchanged =
+    Object.keys(airfoils).length === Object.keys(slice['airfoils']).length &&
+    Object.keys(wings).length === Object.keys(slice['wings']).length &&
+    Object.entries(wings).every(([key, wing]) => wing === (slice['wings'] as Record<string, unknown>)[key]);
+  return unchanged ? raw : { ...raw, aero: { ...slice, airfoils, wings } };
 }
 
 export const aeroDocument: DocumentExtension = {

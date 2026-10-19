@@ -7,6 +7,8 @@ import { integrateCurve } from '@lib/nurbs/integrate';
 
 export interface AirfoilMetrics {
   readonly chord: number;
+  /** Leading-edge point (minimum x) in the curve's own coordinates, before chord normalisation. */
+  readonly leadingEdge: readonly [number, number];
   readonly tMax: number;
   readonly xTMax: number;
   /** Signed: positive when the mean line lies above the chord line. */
@@ -118,6 +120,7 @@ export function airfoilMetrics(curve: NurbsCurveData): AirfoilMetrics | string {
     -(integrateCurve(curve, first, last, (p, d) => p[1] * p[1] * d[0]) + dx * (end[1] ** 2 + end[1] * dy + (dy * dy) / 3)) / 2;
   return {
     chord,
+    leadingEdge: [le[0], le[1]],
     tMax: heights(fT).thickness / chord,
     xTMax: fT,
     camberMax: heights(fC).camber / chord,

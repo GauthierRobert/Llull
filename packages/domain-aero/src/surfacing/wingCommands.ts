@@ -13,7 +13,7 @@ import { aeroOf, withWing } from './aeroState';
 import { refuseAero } from './codes';
 import { airfoilMetrics } from './airfoilMetrics';
 import { resolvePlanform } from './planform';
-import { placeSection, wingStations, type WingStation } from './wingGeometry';
+import { placeSection, unitChordSection, wingStations, type WingStation } from './wingGeometry';
 import { wingMetrics } from './wingMetrics';
 
 const MAX_SECTIONS = 40;
@@ -203,8 +203,23 @@ export const createWing = defineCommand({
       return refuse('AERO_AIRFOIL_NOT_FOUND', `the curve of airfoil "${defs[gone]?.airfoilId}" was deleted`, `sections.${gone}.airfoilId`, [
         defs[gone]?.airfoilId ?? '',
       ]);
-    const unit = curves as NurbsCurveData[];
+    const normalised = (curves as NurbsCurveData[]).map(unitChordSection);
+    const notSection = normalised.findIndex((curve) => typeof curve === 'string');
+    if (notSection >= 0)
+      return refuse(
+        'AERO_PARAM_INVALID',
+        `airfoil "${defs[notSection]?.airfoilId}": ${normalised[notSection] as string}`,
+        `sections.${notSection}.airfoilId`,
+      );
+    const unit = normalised as NurbsCurveData[];
     const reference = unit[0] as NurbsCurveData;
+    const inexact = unit.findIndex((curve) => sectionChain(curve) === null);
+    if (inexact >= 0)
+      return refuse(
+        'AERO_SECTIONS_INCOMPATIBLE',
+        `the curve of airfoil "${defs[inexact]?.airfoilId}" (section ${inexact}) is rational or above degree 3: the exact wing skin needs degree 1..3 non-rational airfoil curves`,
+        `sections.${inexact}.airfoilId`,
+      );
     const incompatible = unit.findIndex((curve) => {
       const [chain, base] = [sectionChain(curve), sectionChain(reference)];
       return chain === null || base === null || chain.length !== base.length || hasClosingEdge(curve) !== hasClosingEdge(reference);
