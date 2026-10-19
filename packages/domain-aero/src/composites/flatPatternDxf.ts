@@ -1,8 +1,8 @@
 /** export_flat_patterns_dxf: ply flat patterns of plane, cylinder and cone tool faces as an R12 DXF in millimetres (FR-CMP-43, FR-CMP-50, VC-CMP-14..16). */
 
-import { defineCommand, z } from '@core/commands/schema';
+import { confirmExportControlled, defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
-import { report } from '@core/commands/noop';
+import { exportRefusal, report } from '@core/commands/noop';
 import { MM_PER_UNIT } from '@core/model/units';
 import type { Vec2 } from '@core/model/types';
 import { DxfWriter, assembleDxf, dxfLayerName } from '@lib/dxfWriter';
@@ -40,8 +40,15 @@ export const exportFlatPatternsDxf = defineCommand({
       .describe('Label fields to write: name, orientation, sequence, material; default all four.')
       .optional(),
     allowance: z.number().describe('Trim allowance added around every outline, document length units; default 0; must be >= 0.').optional(),
+    confirmExportControlled,
   }),
-  run: (doc, { part: partRef, plies: selection, labels = [...LABEL_FIELDS], allowance = 0 }): CommandResult => {
+  run: (
+    doc,
+    { part: partRef, plies: selection, labels = [...LABEL_FIELDS], allowance = 0, confirmExportControlled: confirmation },
+    ctx,
+  ): CommandResult => {
+    const refused = exportRefusal(doc, 'export_flat_patterns_dxf', 'data', confirmation, ctx);
+    if (refused !== null) return refused;
     const model = compositesOf(doc);
     const part = findPart(model, partRef);
     if (part === null) return refuseCmp(doc, 'export_flat_patterns_dxf', 'CMP_REF_MISSING', `no part '${partRef}'`, [], ['params.part']);
