@@ -14,7 +14,7 @@ import { meshSummary, resultsSummary } from '@cae/results/summary';
 import { barDocument, barMesh, hashOf, portOf, X0_NODES, type Bar } from './deckFixtures';
 import { gridMesh } from './gridMesh';
 
-export const EIGEN_HEAD = `
+const EIGEN_HEAD = `
      E I G E N V A L U E   O U T P U T
 
  MODE NO    EIGENVALUE                       FREQUENCY

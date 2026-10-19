@@ -14,14 +14,14 @@ export interface InputSpec {
   readonly integer?: true;
 }
 
-export interface AnalyticResult {
+interface AnalyticResult {
   readonly name: string;
   readonly value: number;
   readonly unit: string;
   readonly formula: string;
 }
 
-export interface Evaluation {
+interface Evaluation {
   readonly results: readonly AnalyticResult[];
   readonly assumptions: readonly string[];
   readonly sources: readonly string[];

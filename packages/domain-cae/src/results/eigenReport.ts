@@ -3,7 +3,7 @@
 import type { AnalysisCase, FeResultsArtifact, UnitSystem } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
 
-export interface ModalMode {
+interface ModalMode {
   readonly mode: number;
   readonly frequencyHz: number;
   /** Modal participation factor per global axis (CalculiX `.dat`), when the solver printed it. */
