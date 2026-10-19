@@ -597,7 +597,7 @@ Open: live sync still broadcasts raw params (a `confirmation` signature), the de
 | M4 seed library mechanism: `npm run seed:materials` (`--check`) builds `packages/domain-aero/data/seed.llull-matlib.json` and `sources.lock.json` from the `verified` entries of `validation/materials_dataset.json` only (MatWeb S10/S12 excluded, OQ-MAT-06); installed with `import_material_library`; VC-MAT-18 CI test | `scripts/build-seed-library.mjs`, `tests/unit/materials/seedLibrary.test.ts` |
 | TR-MAT-32: `licensed-no-redistribution` values redacted (`redacted: true`, basis / locator kept) for non-loopback MCP and REST callers | `packages/mcp/src/redactLicensed.ts`, `server/tests/licensedRedaction.test.ts` |
 | Confirmation signatures never stored or broadcast (feature steps, plan steps and loops, live `command` events) | `lib/withoutConfirmations.ts`, `server/tests/liveConfirmationRedaction.test.ts` |
-| Browser `ctx.libraries` provider over IndexedDB (immutable `id@version`), installed in `src/main.tsx` through the core port `commands/libraryPort.ts` | `src/ui/services/browserLibraries.ts` |
+| ~~Browser `ctx.libraries` provider over IndexedDB~~ removed in LC1 step 6 (nothing in the renderer registered libraries; the backend's `~/.llull/libraries/` provider is the only one) | core port `commands/libraryPort.ts` |
 | VC-MAT-17: 10⁴ instances of 3 part numbers — `bill_of_materials` ≈ 110 ms, `mass_properties` ≈ 0.5 s, ≈ 349 B per instance | `tests/unit/aero/fastenerScale.test.ts` |
 | UI: Materials record inspector (basis / direction filter, provenance), library list with licence and marking badges; Fasteners tab (catalogue, live `select_fastener` preview, insert, layout check, BOM sections) | `src/ui/panels/{materials,fasteners}/` |
 
