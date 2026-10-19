@@ -15,6 +15,7 @@ import { type BodyPoseAt, documentAtPose, pointAtPose } from '../../dynamics/bod
 import { STATIC_POSE, type PoseTrack, isMoving, poseAt, relativeTransform, travelBound } from '../../dynamics/motionPoses';
 import { collectParts } from '../inspect/assemblyParts';
 import { intentOf } from '../inspect/assemblyGraph';
+import { bisectEdge, goldenMinimum } from './motionRefine';
 
 /** Most substeps between two recorded samples (pose interpolation against tunnelling). */
 const MAX_SUBSTEPS = 16;
@@ -237,25 +238,53 @@ function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart, budget: Budget): 
   const state: { best: Closest | null; bound: number; open: Interval | null } = { best: null, bound: Infinity, open: null };
   const intervals: Interval[] = [];
   let evaluations = 0;
-  const evaluate = (u: number): number => {
+  const closestAt = (u: number, bound: number): Closest | null => {
     evaluations++;
     budget.evaluations--;
     const poseA = poseOf(plan, a, u);
-    const hit = bvhMinDistance(a.bvh, b.bvh, state.bound, relativeTransform(poseA, poseOf(plan, b, u)));
+    const hit = bvhMinDistance(a.bvh, b.bvh, bound, relativeTransform(poseA, poseOf(plan, b, u)));
+    return hit === null
+      ? null
+      : { distance: hit.distance, moment: momentAt(plan, u), witness: [pointAtPose(hit.pointA, poseA), pointAtPose(hit.pointB, poseA)] };
+  };
+  const inContact = (u: number): boolean => (closestAt(u, plan.eps)?.distance ?? Infinity) <= plan.eps;
+  let previous: { u: number; contact: boolean } | null = null;
+  const evaluate = (u: number): number => {
+    const hit = closestAt(u, state.bound);
     const moment = momentAt(plan, u);
     if (hit !== null && (state.best === null || hit.distance < state.best.distance)) {
-      state.best = { distance: hit.distance, moment, witness: [pointAtPose(hit.pointA, poseA), pointAtPose(hit.pointB, poseA)] };
+      state.best = hit;
       state.bound = Math.max(hit.distance, lowBound);
     }
-    if (hit !== null && hit.distance <= plan.eps) {
+    const contact = hit !== null && hit.distance <= plan.eps;
+    if (contact) {
       if (state.open === null) {
-        state.open = { from: moment, to: moment, evaluations: 0, kind: 'unknown', volume: null, depth: null, worst: null };
+        const from = previous === null || previous.contact ? moment : momentAt(plan, bisectEdge(inContact, previous.u, u));
+        state.open = { from, to: moment, evaluations: 0, kind: 'unknown', volume: null, depth: null, worst: null };
         intervals.push(state.open);
       }
       state.open.to = moment;
       state.open.evaluations++;
-    } else state.open = null;
+    } else {
+      if (state.open !== null && previous !== null) state.open.to = momentAt(plan, bisectEdge(inContact, u, previous.u));
+      state.open = null;
+    }
+    previous = { u, contact };
     return hit?.distance ?? state.bound;
+  };
+  /** The closest approach between samples: golden-section search within one sample of the best sampled moment. */
+  const refineClosest = (): void => {
+    const best = state.best;
+    if (best === null || best.distance <= plan.eps) return;
+    const bound = 2 * best.distance + plan.eps;
+    const last = plan.times.length - 1;
+    const found = goldenMinimum(
+      (u) => closestAt(u, bound)?.distance ?? Infinity,
+      Math.max(0, best.moment.u - 1),
+      Math.min(last, best.moment.u + 1),
+      { u: best.moment.u, value: best.distance },
+    );
+    if (found.u !== best.moment.u) state.best = closestAt(found.u, bound) ?? best;
   };
   let undersampled = false;
   let maxStep = 0;
@@ -273,6 +302,7 @@ function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart, budget: Budget): 
     if (stepSize > Math.min(a.thin, b.thin) && nearest < stepSize) undersampled = true;
     if (budget.evaluations < 0) return { best: state.best, intervals, undersampled, evaluations, maxStepMm: 0, exhausted: true };
   }
+  refineClosest();
   const used = classify(plan, a, b, intervals, budget.classified);
   budget.classified -= used;
   return { best: state.best, intervals, undersampled, evaluations, maxStepMm: maxStep * plan.mmPerUnit, exhausted: false };

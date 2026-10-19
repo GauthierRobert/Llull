@@ -1,11 +1,13 @@
 /**
  * Body poses along a simulated run for the motion-clearance check (PHY-21 TR-FPR-10): interpolation between samples, motion
  * detection, travel bounds and the rigid transform that carries one start-pose mesh into another's frame.
- * @invariant pure; poses between two samples are lerp (centre of mass) and slerp (orientation)
+ * @invariant pure; poses between two samples follow the screw motion between them (exact for a rotation about a fixed axis; a pure
+ *   translation is a lerp) with slerp orientation
  */
 
 import type { Vec3 } from '../model/vectors';
-import { applyMat3, mulMat3, type Mat3 } from '../lib/axisRotation';
+import { applyMat3, matFromAxisAngle, mulMat3, type Mat3 } from '../lib/axisRotation';
+import { add3, cross3, dot3, lerp3, scale3, sub3 } from '../lib/vec3';
 import type { RigidTransform } from '../geometry/meshBvh';
 import { type BodyPoseAt, matFromQuaternion } from './bodyPose';
 import type { Quaternion } from './physicsEngine';
@@ -34,7 +36,39 @@ function slerp(a: Quaternion, b: Quaternion, fraction: number): Quaternion {
   return [(q[0] ?? 0) / norm, (q[1] ?? 0) / norm, (q[2] ?? 0) / norm, (q[3] ?? 0) / norm];
 }
 
-/** Pose of a body at sample `index` plus `fraction` (0..1) of the way to the next sample. */
+/** Rotation (world) carrying orientation `a` to `b`: axis (unit) and angle in [0, pi]; null when they are the same. */
+function relativeRotation(a: Quaternion, b: Quaternion): { axis: Vec3; angle: number } | null {
+  // b * conj(a)
+  const [aw, ax, ay, az] = [a[0], -a[1], -a[2], -a[3]];
+  const [bw, bx, by, bz] = b;
+  const w = bw * aw - bx * ax - by * ay - bz * az;
+  const v: Vec3 = [bw * ax + bx * aw + by * az - bz * ay, bw * ay - bx * az + by * aw + bz * ax, bw * az + bx * ay - by * ax + bz * aw];
+  const sign = w < 0 ? -1 : 1;
+  const sine = Math.hypot(...v);
+  if (sine < 1e-12) return null;
+  return { axis: [(v[0] * sign) / sine, (v[1] * sign) / sine, (v[2] * sign) / sine], angle: 2 * Math.atan2(sine, w * sign) };
+}
+
+/**
+ * Centre of mass a `fraction` of the way along the screw motion from (here, a) to (next, b): exact for a body turning about a fixed axis
+ * (a crank), where a straight lerp of the centre would cut the chord of its arc.
+ */
+function screwPosition(here: Vec3, next: Vec3, a: Quaternion, b: Quaternion, fraction: number): Vec3 {
+  const lerped = lerp3(here, next, fraction);
+  const rotation = relativeRotation(a, b);
+  if (rotation === null || rotation.angle < 1e-9) return lerped;
+  const { axis, angle } = rotation;
+  const turn = matFromAxisAngle(axis, angle);
+  const step = sub3(next, applyMat3(turn, here));
+  const along = scale3(axis, dot3(axis, step));
+  const across = sub3(step, along);
+  // fixed point of the planar part: (I - R) c = across, c in the plane normal to the axis
+  const centre = add3(scale3(across, 0.5), scale3(cross3(axis, across), 0.5 / Math.tan(angle / 2)));
+  const partial = applyMat3(matFromAxisAngle(axis, angle * fraction), sub3(here, centre));
+  return add3(add3(partial, centre), scale3(along, fraction));
+}
+
+/** Pose of a body at sample `index` plus `fraction` (0..1) of the way to the next sample (screw interpolation, slerp orientation). */
 export function poseAt(track: PoseTrack, index: number, fraction: number): BodyPoseAt {
   const start = track.position[0] ?? [0, 0, 0];
   const here = track.position[index] ?? start;
@@ -42,15 +76,7 @@ export function poseAt(track: PoseTrack, index: number, fraction: number): BodyP
   if (fraction <= 0 || index + 1 >= track.position.length) return { start, position: here, orientation: hereQ };
   const next = track.position[index + 1] ?? here;
   const nextQ = track.orientation[index + 1] ?? hereQ;
-  return {
-    start,
-    position: [
-      here[0] + (next[0] - here[0]) * fraction,
-      here[1] + (next[1] - here[1]) * fraction,
-      here[2] + (next[2] - here[2]) * fraction,
-    ],
-    orientation: slerp(hereQ, nextQ, fraction),
-  };
+  return { start, position: screwPosition(here, next, hereQ, nextQ, fraction), orientation: slerp(hereQ, nextQ, fraction) };
 }
 
 /** Whether the body leaves its start pose at any sample. */

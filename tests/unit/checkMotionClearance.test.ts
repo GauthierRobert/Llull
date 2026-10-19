@@ -227,6 +227,46 @@ describe('check_motion_clearance on a rotating arm', () => {
   });
 });
 
+describe('check_motion_clearance against the analytic bar (validation/README §3, VC-FPR-18 / 19)', () => {
+  /** Bar x in [0, 100], y and z in [-5, 5] mm spinning about +Z at 60 rpm; a long fixed block whose near face is at x = faceX. */
+  function barScene(faceX: number): CadDocument {
+    const bar = step(createEmptyDocument(), 'add_box', { size: [100, 10, 10], position: [50, 0, 0] });
+    const block = step(bar.doc, 'add_box', { size: [20, 400, 40], position: [faceX + 10, 0, 0] });
+    let doc = step(block.doc, 'add_rigid_body', { id: 'bar_body', entityIds: [bar.id], massKg: 1 }).doc;
+    doc = step(doc, 'add_body_joint', {
+      id: 'bar_j',
+      kind: 'revolute',
+      child: 'bar_body',
+      anchor: [0, 0, 0],
+      axis: [0, 0, 1],
+      initialRpm: 60,
+    }).doc;
+    return doc;
+  }
+  const run = (doc: CadDocument): Data =>
+    execute(doc, 'check_motion_clearance', { crankAxis: 'bar_j', duration: 1, sampleRate: 360 }, ctxOf()).data as Data;
+  /** Signed angle in (-180, 180]. */
+  const signed = (deg: number): number => (deg > 180 ? deg - 360 : deg);
+
+  it('VC-FPR-18: min clearance 4.87508 mm at +-2.8624 deg (face at x = 105 mm)', () => {
+    const data = run(barScene(105));
+    expect(data.status).toBe('pass');
+    expect(data.minClearance?.mm).toBeCloseTo(4.8750780275, 3);
+    expect(Math.abs(Math.abs(signed(data.minClearance?.crankDeg ?? 0)) - 2.86240522611)).toBeLessThan(0.05);
+  });
+
+  it('VC-FPR-19: contact on [-21.2735, +21.2735] deg (face at x = 95 mm), edges bisected to the spec tolerance', () => {
+    const data = run(barScene(95));
+    const intervals = data.pairs[0]?.collisions ?? [];
+    expect(intervals).toHaveLength(2);
+    const [first, second] = intervals;
+    expect(first?.kind).toBe('interference');
+    expect(first?.startTimeS).toBe(0);
+    expect(Math.abs((first?.endCrankDeg ?? 0) - 21.2735271276)).toBeLessThan(0.05);
+    expect(Math.abs(signed(second?.startCrankDeg ?? 0) + 21.2735271276)).toBeLessThan(0.05);
+  });
+});
+
 describe('check_motion_clearance on a slider-crank', () => {
   /** Wrist pin x at crank angle `deg` from TDC: r cos t + sqrt(l^2 - r^2 sin^2 t). */
   const wristX = (r: number, l: number, deg: number): number => {
