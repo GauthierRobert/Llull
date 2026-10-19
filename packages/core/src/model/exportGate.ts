@@ -10,7 +10,7 @@ import { isControlledMarking, markingRank, type ExportMarking } from './material
 import { materialsInUse } from './materialsInUse';
 import type { CadDocument } from './types';
 
-export type ExportTarget = 'step' | 'gltf' | 'stl' | 'obj' | 'code' | 'save' | 'share' | 'sheet' | 'deck' | 'data';
+export type ExportTarget = 'step' | 'gltf' | 'stl' | 'obj' | '3mf' | 'urdf' | 'code' | 'save' | 'share' | 'sheet' | 'deck' | 'data';
 
 interface MarkedItem {
   readonly kind: 'record' | 'library';
