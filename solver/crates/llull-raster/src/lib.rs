@@ -9,6 +9,10 @@
 pub mod cpu;
 #[cfg(feature = "gpu")]
 pub mod gpu;
+pub mod scene;
+pub mod scene_cpu;
+#[cfg(feature = "gpu")]
+pub mod scene_gpu;
 
 use llull_protocol::{sha256_hex, Output};
 use serde::Deserialize;
@@ -81,11 +85,11 @@ pub struct RasterError {
     pub message: String,
 }
 
-fn input_error(message: String) -> RasterError {
+pub(crate) fn input_error(message: String) -> RasterError {
     RasterError { code: "NATIVE_JOB_INPUT", message }
 }
 
-fn read_f64(path: &Path) -> Result<Vec<f64>, RasterError> {
+pub(crate) fn read_f64(path: &Path) -> Result<Vec<f64>, RasterError> {
     let bytes = fs::read(path).map_err(|error| RasterError { code: "NATIVE_JOB_IO", message: format!("{}: {error}", path.display()) })?;
     if !bytes.len().is_multiple_of(8) {
         return Err(input_error(format!("{} is not a whole number of f64 values", path.display())));
@@ -175,8 +179,15 @@ fn gpu_or_fallback(prepared: &Prepared) -> (Vec<u8>, Vec<f32>, Produced) {
     (rgba, depth, Produced::CpuFallback { reason: "llull-compute was built without the gpu feature".to_string() })
 }
 
-/// Runs `llull-compute raster <folder>`: writes `rgba.bin` and `depth.f32` and says which engine drew them.
+/// Runs `llull-compute raster <folder>`: a field plot (writes `rgba.bin` and `depth.f32`) or, with `"kind": "scene"` in `job.json`, a
+/// render scene (`scene::run`, writes `rgba.bin`); says which engine drew it.
 pub fn run(folder: &Path) -> Result<(Vec<Output>, Produced), RasterError> {
+    let text = fs::read_to_string(folder.join("job.json"))
+        .map_err(|error| RasterError { code: "NATIVE_JOB_IO", message: format!("job.json: {error}") })?;
+    let kind: serde_json::Value = serde_json::from_str(&text).map_err(|error| input_error(format!("job.json: {error}")))?;
+    if kind.get("kind").and_then(serde_json::Value::as_str) == Some("scene") {
+        return scene::run(folder, &text);
+    }
     let (prepared, engine) = read_job(folder)?;
     let (rgba, depth, produced) = render(&prepared, engine);
     let depth_bytes: Vec<u8> = depth.iter().flat_map(|v| v.to_le_bytes()).collect();
