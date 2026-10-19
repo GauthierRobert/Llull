@@ -2,6 +2,8 @@
 
 import { commandCatalog } from '../schema';
 import { addHole } from './addHole';
+import { addTappedHole } from './addTappedHole';
+import { addExternalThread } from './addExternalThread';
 import { addPocket } from './addPocket';
 import { addRib } from './addRib';
 import { setThread } from './setThread';
@@ -12,6 +14,8 @@ import { holesFromRecognition } from './holesFromRecognition';
 
 export const featuresCommands = commandCatalog(
   addHole,
+  addTappedHole,
+  addExternalThread,
   addPocket,
   addRib,
   setThread,

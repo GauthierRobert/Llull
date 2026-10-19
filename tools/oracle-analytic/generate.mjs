@@ -8,6 +8,7 @@ import { booleanCases } from './casesBooleans.mjs';
 import { featureCases } from './casesFeatures.mjs';
 import { featureDepthCases } from './casesFeatureDepth.mjs';
 import { filletDepthCases } from './casesFilletDepth.mjs';
+import { threadCases } from './casesThreads.mjs';
 import { primitiveCases } from './casesPrimitives.mjs';
 import { sheetMetalCases } from './casesSheetMetal.mjs';
 import { profileCases } from './casesProfiles.mjs';
@@ -23,6 +24,7 @@ for (const build of [
   sheetMetalCases,
   featureDepthCases,
   filletDepthCases,
+  threadCases,
 ])
   build(cases);
 
