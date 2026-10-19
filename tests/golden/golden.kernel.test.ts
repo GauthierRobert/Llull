@@ -27,4 +27,14 @@ describe('golden replay corpus (Manifold kernel)', () => {
     expect(result.document).toBe(doc);
     expect(result.summary).toContain('is empty');
   });
+
+  // SC-Q2 action matrix: boxes that only touch within 4e-16 leave a flat 4-triangle sheet, which is not a solid.
+  it('an intersect that leaves a zero-thickness sheet is a no-op', () => {
+    let doc = execute(createEmptyDocument(), 'add_box', { size: [10, 0.3, 3], position: [0, 0, 1.5] }).document;
+    doc = execute(doc, 'add_box', { size: [10.3, 8.3, 0.2], position: [0, 4, 3.1] }).document;
+    const [a, b] = doc.order as [string, string];
+    const result = execute(doc, 'boolean', { op: 'intersect', a, b });
+    expect(result.affected).toEqual([]);
+    expect(result.document).toBe(doc);
+  });
 });

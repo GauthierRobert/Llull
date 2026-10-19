@@ -152,7 +152,7 @@
 | Command | Description | Flags |
 | ------- | ----------- | ----- |
 | `activate_configuration` | Apply a named configuration to the document: set each parameter listed in the configuration to its expression value, re-evaluate the parameter table in topolog… |  |
-| `add_constraint` | Add a geometric or dimensional constraint between two entity references. |  |
+| `add_constraint` | Add a geometric or dimensional constraint between sketch entities (lines, arcs, circles; other entities act as points at their position). |  |
 | `create_configuration` | Define or replace a named configuration (design-table variant). |  |
 | `delete_constraint` | Remove a constraint from the document by its id. |  |
 | `delete_step` | Permanently remove a feature history step by its stepId from featureHistory, then regenerate the document. |  |
@@ -163,7 +163,7 @@
 | `replay_history` | Recompute the document from scratch by replaying all non-suppressed steps in featureHistory in order. |  |
 | `save_recipe` | Snapshot the current featureHistory into a named recipe stored in the document. |  |
 | `set_step_suppressed` | Toggle the suppressed flag of a feature history step by its stepId. |  |
-| `solve_constraints` | Run the constraint solver and update entity positions so that all declared constraints are satisfied. |  |
+| `solve_constraints` | Run the constraint solver (constructive pass on fixed points and dimension chains, then damped Levenberg-Marquardt) and update entity geometry so that all decl… |  |
 | `update_constraint` | Update a mutable field of an existing constraint. |  |
 
 ## assembly

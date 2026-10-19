@@ -56,20 +56,17 @@ ran completely and merges the others, and keeps the other kernel's column.
 
 ## Current counts (Manifold column, full mode)
 
-164 designs (149 build, 15 need the native kernel: their plan fillets or shells), 4800 actions.
+165 designs (15 of them need the native kernel: their plan fillets or shells), 4821 actions.
 
 | outcome       | count |
 | ------------- | ----- |
-| `ok`          | 2772  |
-| `refused`     | 1336  |
+| `ok`          | 2793  |
+| `refused`     | 1340  |
 | `unsupported` | 688   |
-| `error`       | 4     |
+| `error`       | 0     |
 
 The `native OCCT` column is empty until the binary is built on a machine that blesses it.
 
 ## Findings (quarantined in `knownErrors`)
 
-- `golden/building_shell_from_primitives`: `boolean intersect` of `box-N.1` (N = 2..5) with `box-6.1` creates a 4-triangle zero-volume mesh
-  entity instead of refusing. Reproduction: a box `size [10, 0.3, 3]` at `[0, 0, 1.5]` (z 0..3) and a box `size [10.3, 8.3, 0.2]` at
-  `[0, 4, 3.1]` (z 3.0000000000000004..3.2): they touch within rounding, the intersection is a flat sheet, `boolean` reports
-  "merged ... into mesh" with a zero-volume result. Exactly face-touching boxes are refused correctly ("no usable mesh").
+None. The former finding (a `boolean intersect` of boxes that touch within rounding left a flat zero-volume sheet) is fixed: `boolean` refuses any result that is flat or encloses no volume (`tests/golden/golden.kernel.test.ts`).
