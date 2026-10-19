@@ -7,9 +7,9 @@ export const DYNAMIC_PROBE_QUANTITIES = ['a_x', 'a_y', 'a_z', 'u_x_rel', 'u_y_re
 export type DynamicProbeQuantity = (typeof DYNAMIC_PROBE_QUANTITIES)[number];
 
 /** Quantities a random_response probe can read: rms by modal superposition (stress components from the modal stresses). */
-export const RANDOM_PROBE_QUANTITIES: readonly ProbeQuantity[] = [...DYNAMIC_PROBE_QUANTITIES, 's_xx', 's_yy', 's_zz'];
+const RANDOM_PROBE_QUANTITIES: readonly ProbeQuantity[] = [...DYNAMIC_PROBE_QUANTITIES, 's_xx', 's_yy', 's_zz'];
 /** Quantities a frequency_response probe can read: complex components of the CalculiX steady-state output. */
-export const FREQUENCY_PROBE_QUANTITIES: readonly ProbeQuantity[] = ['u_x', 'u_y', 'u_z', 's_xx', 's_yy', 's_zz'];
+const FREQUENCY_PROBE_QUANTITIES: readonly ProbeQuantity[] = ['u_x', 'u_y', 'u_z', 's_xx', 's_yy', 's_zz'];
 
 export const isDynamicType = (type: AnalysisType): type is 'frequency_response' | 'random_response' =>
   type === 'frequency_response' || type === 'random_response';

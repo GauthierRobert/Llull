@@ -31,6 +31,31 @@ function modeShape(betaL: number, u: number): number {
   return Math.cosh(bx) - Math.cos(bx) - s * (Math.sinh(bx) - Math.sin(bx));
 }
 
+/** Unnormalised curvature d^2 phi / du^2 / betaL^2 at u = x / L. */
+function modeCurvature(betaL: number, u: number): number {
+  const s = (Math.cosh(betaL) + Math.cos(betaL)) / (Math.sinh(betaL) + Math.sin(betaL));
+  const bx = betaL * u;
+  return Math.cosh(bx) + Math.cos(bx) - s * (Math.sinh(bx) + Math.sin(bx));
+}
+
+export interface EbModeField {
+  /** Normalised deflection at u = x / L. */
+  readonly shape: (u: number) => number;
+  /** Bending stress sigma_xx at u and height z above the bottom face (neutral axis at h / 2), per unit modal coordinate. */
+  readonly stress: (u: number, z: number) => number;
+}
+
+/** Deflection and stress fields of mode `index` (0-based) with the generator normalisation. */
+export function ebField(index: number): EbModeField {
+  const betaL = clampedFreeRoot(index + 1);
+  const scale = 1 / Math.sqrt(simpson((u) => modeShape(betaL, u) ** 2, 0, 1, 4000));
+  const beta = betaL / EB.L;
+  return {
+    shape: (u) => modeShape(betaL, u) * scale,
+    stress: (u, z) => EB.E * (z - EB.h / 2) * beta * beta * modeCurvature(betaL, u) * scale,
+  };
+}
+
 export interface EbMode {
   readonly fHz: number;
   readonly omega: number;

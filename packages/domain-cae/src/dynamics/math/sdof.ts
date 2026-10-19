@@ -12,7 +12,6 @@ export interface ComplexValue {
 }
 
 const magnitudeOf = (value: ComplexValue): number => Math.hypot(value.re, value.im);
-const phaseDegOf = (value: ComplexValue): number => (Math.atan2(value.im, value.re) * 180) / Math.PI;
 
 /** 1 / (a + i b). */
 export function reciprocal(re: number, im: number): ComplexValue {
@@ -31,7 +30,6 @@ export function transmissibility(r: number, zeta: number): ComplexValue {
 }
 
 export const frfMagnitude = magnitudeOf;
-export const frfPhaseDeg = phaseDegOf;
 
 /** Peak of |k H|: r = sqrt(1 - 2 zeta^2), |kH|max = 1 / (2 zeta sqrt(1 - zeta^2)); null above zeta = 1/sqrt(2) (no resonant peak). */
 export function receptancePeak(zeta: number): { readonly r: number; readonly amplification: number } | null {

@@ -7,9 +7,9 @@
 
 import type { Vec3 } from './vectors';
 
-export type DynamicAnalysisType = 'frequency_response' | 'random_response';
+type DynamicAnalysisType = 'frequency_response' | 'random_response';
 
-export type SourceGrade = 'A' | 'B' | 'C';
+type SourceGrade = 'A' | 'B' | 'C';
 
 export interface DynamicSource {
   readonly citation: string;
@@ -39,7 +39,7 @@ export type DampingModel =
   | { readonly model: 'structural_material'; readonly propertyName: 'structuralLossFactor' };
 
 /** CalculiX `*STEADY STATE DYNAMICS` second line: fMin, fMax, data points n per interval, bias. */
-export interface FrequencySweep {
+interface FrequencySweep {
   readonly fMinHz: number;
   readonly fMaxHz: number;
   readonly pointsPerInterval: number;

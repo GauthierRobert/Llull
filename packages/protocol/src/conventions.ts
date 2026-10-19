@@ -227,4 +227,20 @@ A topology result is a concept shape computed by llull, never a released design:
   \`extrude_profile\` + \`boolean\` subtract, \`fillet_edge\` on sharp corners → analyse the rebuild → \`compare_to_topology\` (IoU against the optimum).
 - **Finish.** \`check_topology\` with \`rebuildEntityIds\` (and \`release\` for ids about to be released: iso-surfaces are TOP_RESULT_NOT_RELEASABLE).
   Any change to the study, the analysis or the geometry makes the result stale (TOP_RESULT_STALE): solve again.
+
+## 10. Structural dynamics: frequency and random response (toolset analysis, PHY-09)
+
+g = 9.80665 m/s^2; ASD levels in g^2/Hz; frequencies in Hz. There is NO default damping and no default modal truncation rule; the 3-sigma
+peak factor is a named default stated in every result; Miles' equation is a quick check, never the answer of record.
+
+- **Quick checks first (no solver).** \`define_vibration_spectrum\` (points + source, or library gevs_component_qual / gevs_component_accept: grade B,
+  results stay unverified) → \`psd_rms\` (grms) → \`sdof_response\` (fnHz + zeta or Q: exact rms and Miles beside it) → \`damping_coefficients\`
+  (Rayleigh alpha / beta from two ratios) → \`shock_response_spectrum\` (half-sine or sampled history, Q).
+- **Random vibration plan.** \`create_analysis\` analysisType random_response with modes (enough to pass 1.5 x the top of the band) →
+  \`set_part_idealization\` → \`add_fea_constraint\` fixed on the base faces → \`set_dynamic_damping\` (cited) → \`set_base_excitation\` (direction +
+  spectrum) → \`set_frequency_sweep\` → \`add_result_probe\` (a_x/y/z in g, u_x/y/z_rel, s_xx/yy/zz) → \`check_structural_dynamics\` (no error) →
+  the fea_mesh and fea_solve transports (modes by CalculiX, response by llull; the nodal rms field runs in llull-compute when installed) →
+  \`dynamic_report\` → \`equivalent_static_load_case\` into a static case → \`compute_margins\` → \`check_structural_dynamics\`.
+  frequency_response: same set-up with loads or \`set_base_excitation\` amplitudeG; \`dynamic_report\` gives the peaks and half-power Q.
+- Report results as "computed by llull, not approved": every dynamic result carries reviewRequired and its unverified reasons.
 `;

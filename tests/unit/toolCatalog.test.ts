@@ -111,7 +111,8 @@ describe('searchTools ranking regression table', () => {
   });
 
   it('does not rank natural-frequency queries onto animation or surface tools above the analysis tools', () => {
-    expect(ranked('natural frequency', 2)).toEqual(['create_analysis', 'render_fea_results']);
+    // sdof_response (PHY-09 quick check: natural frequency fnHz) is an analysis tool too.
+    expect(ranked('natural frequency', 2)).toEqual(['create_analysis', 'sdof_response']);
   });
 });
 

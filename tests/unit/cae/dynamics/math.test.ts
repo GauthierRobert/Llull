@@ -132,6 +132,39 @@ describe('CalculiX beamdy8 modal coordinate (VC-DYN-06)', () => {
   });
 });
 
+describe('CalculiX base-motion convention (beamdy10bm cross-check, VC-DYN-31 partial)', () => {
+  // beamdy10bm.dat.ref (S2, pinned sha256 0d467abd...): *BASE MOTION, DOF=1, unit acceleration, Rayleigh alpha 5000; mode 1 modal coordinate
+  // (Re, Im) per output frequency, and the mode-1 x participation factor of the same mesh (beamdy8 / beamdy10bm frequency step).
+  const GAMMA_1X = 0.2389804e-3;
+  const W1 = 0.8228479e5;
+  const ALPHA = 5000;
+  const Q1: [number, number, number][] = [
+    [0.12e5, -0.191883e-12, 0.8121054e-13],
+    [0.1211305531535e5, -0.2067592e-12, 0.9647696e-13],
+    [0.1254801552883e5, -0.2733395e-12, 0.2215348e-12],
+    [0.1298297574231e5, -0.121407e-12, 0.5512731e-12],
+    [0.1309603105766e5, 0.3529581e-13, 0.5808617e-12],
+    [0.1318927521633e5, 0.160718e-12, 0.5392243e-12],
+    [0.1354801552883e5, 0.2937041e-12, 0.2334121e-12],
+    [0.1390675584133e5, 0.2266066e-12, 0.9873015e-13],
+    [0.14e5, 0.2100703e-12, 0.8150076e-13],
+  ];
+  const deviation = (absoluteDamping: boolean): number =>
+    Math.max(
+      ...Q1.map(([f, re, im]) => {
+        const w = 2 * Math.PI * f;
+        const g = reciprocal(W1 * W1 - w * w, ALPHA * w);
+        const factor = absoluteDamping ? { re: 1, im: -ALPHA / w } : { re: 1, im: 0 };
+        const q = { re: -GAMMA_1X * (factor.re * g.re - factor.im * g.im), im: -GAMMA_1X * (factor.re * g.im + factor.im * g.re) };
+        return Math.hypot(q.re - re, q.im - im) / Math.hypot(re, im);
+      }),
+    );
+  it('q1 = -G (1 - i alpha / w) / D: CalculiX applies alpha M to the absolute base velocity; llull damps the relative motion', () => {
+    expect(deviation(true)).toBeLessThan(2e-6);
+    expect(deviation(false)).toBeGreaterThan(0.05);
+  });
+});
+
 describe('random vibration of an SDOF (VC-DYN-07, 08, 11) and the Gaussian peak (09)', () => {
   it('Miles, exact white-noise acceleration and relative displacement', () => {
     const [miles, exact] = values('VC-DYN-07');

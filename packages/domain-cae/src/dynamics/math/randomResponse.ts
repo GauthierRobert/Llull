@@ -14,9 +14,9 @@
 import { asdAt, type AsdPoint } from './psd';
 
 /** Base log-spaced grid density and the refinement around each kept mode (§5.4). */
-export const POINTS_PER_DECADE = 200;
-export const MODE_WINDOW_HALF_WIDTH_ZETAS = 5;
-export const MODE_WINDOW_INTERVALS = 40;
+const POINTS_PER_DECADE = 200;
+const MODE_WINDOW_HALF_WIDTH_ZETAS = 5;
+const MODE_WINDOW_INTERVALS = 40;
 export const GRID_CONVERGENCE_TOLERANCE = 1e-4;
 
 export interface ModalBasis {

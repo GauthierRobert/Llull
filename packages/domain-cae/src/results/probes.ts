@@ -59,7 +59,7 @@ export function quantityUnit(analysis: AnalysisCase, quantity: ProbeQuantity): s
   return quantity.startsWith('u_') ? lengthUnitName(analysis.unitSystem) : stressUnitName(analysis.unitSystem);
 }
 
-function nearestNode(
+export function nearestNode(
   mesh: FeMeshArtifact,
   probeId: string,
   point: readonly [number, number, number],

@@ -44,7 +44,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   DYN_PARAM_NOT_APPLICABLE: 'drop the parameter: it does not apply to this kind of input',
 };
 
-export const dynRemediation = (code: string): string => REMEDIATION[code] ?? feRemediation(code);
+const dynRemediation = (code: string): string => REMEDIATION[code] ?? feRemediation(code);
 
 /** Refusal with the remediation of `code` (DYN_* here, FEA_* set-up codes from the shared table). */
 export function refuseDyn(

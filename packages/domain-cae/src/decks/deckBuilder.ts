@@ -12,6 +12,7 @@ import { commentText, idLines, linesText, row } from './format';
 import { bucklingSteps, modalStep } from './eigen';
 import { mechanicalMaterialLines, staticStep } from './mechanical';
 import { nonlinearSteps } from '../nonlinear/deck';
+import { isDynamicType } from '../dynamics/quantities';
 
 /** The discipline functions of the thermal and thermo-mechanical lanes (FE_PIPELINE_DESIGN §5 table). */
 export interface DisciplineTable {
@@ -26,6 +27,11 @@ export interface DisciplineTable {
     readonly sections: (ctx: DeckContext) => DeckSections;
   };
   readonly coupled: {
+    readonly materialCards: (ctx: DeckContext, entityId: string) => DeckSections;
+    readonly sections: (ctx: DeckContext) => DeckSections;
+  };
+  /** PHY-09 frequency_response / random_response. */
+  readonly dynamics: {
     readonly materialCards: (ctx: DeckContext, entityId: string) => DeckSections;
     readonly sections: (ctx: DeckContext) => DeckSections;
   };
@@ -162,6 +168,7 @@ export function buildInp(
           ...(constitutive === null ? [mechanicalMaterialLines(ctx, entityId)] : []),
           ...(analysis.type === 'thermo_static' ? [disciplines.thermomech.materialCards(ctx, entityId)] : []),
           ...(analysis.type === 'coupled_temperature_displacement' ? [disciplines.coupled.materialCards(ctx, entityId)] : []),
+          ...(isDynamicType(analysis.type) ? [disciplines.dynamics.materialCards(ctx, entityId)] : []),
         ];
     lines.push(`** material ${name} = '${commentText(ctx.materialId(entityId) ?? '', 80)}'`);
     if (constitutive === null) lines.push(`*MATERIAL, NAME=${name}`);
@@ -175,17 +182,19 @@ export function buildInp(
     lines.push(`*SOLID SECTION, ELSET=${ctx.elset(entityId)}, MATERIAL=${ctx.materialName(entityId)}`);
   const steps = heat
     ? disciplines.heat.sections(ctx)
-    : analysis.type === 'static'
-      ? staticStep(ctx)
-      : analysis.type === 'nonlinear_static'
-        ? nonlinearSteps(ctx)
-        : analysis.type === 'modal'
-          ? modalStep(ctx)
-          : analysis.type === 'buckling'
-            ? bucklingSteps(ctx)
-            : analysis.type === 'coupled_temperature_displacement'
-              ? disciplines.coupled.sections(ctx)
-              : disciplines.thermomech.sections(ctx);
+    : isDynamicType(analysis.type)
+      ? disciplines.dynamics.sections(ctx)
+      : analysis.type === 'static'
+        ? staticStep(ctx)
+        : analysis.type === 'nonlinear_static'
+          ? nonlinearSteps(ctx)
+          : analysis.type === 'modal'
+            ? modalStep(ctx)
+            : analysis.type === 'buckling'
+              ? bucklingSteps(ctx)
+              : analysis.type === 'coupled_temperature_displacement'
+                ? disciplines.coupled.sections(ctx)
+                : disciplines.thermomech.sections(ctx);
   if (isDeckRefusal(steps)) return steps;
   return { text: `${linesText(lines)}${steps.text === '' || steps.text.endsWith('\n') ? steps.text : `${steps.text}\n`}` };
 }

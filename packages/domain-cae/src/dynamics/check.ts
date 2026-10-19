@@ -16,7 +16,7 @@ import { hasBaseConstraint } from './setupCommands';
 import { dynamicCaseOf, spectrumOf, type DynamicCase } from './store';
 
 /** Excitation band top must stay below this multiple of the highest kept mode (AF-30 rule held as data). */
-export const BAND_TO_MODE_RATIO = 1.5;
+const BAND_TO_MODE_RATIO = 1.5;
 
 const n = (value: number): string => significantNumber(value, 6);
 
@@ -93,7 +93,7 @@ function resultItems(analysisCase: AnalysisCase, summary: DynamicSummary): Dynam
 }
 
 /** Every check item of the case (set-up, then state, then post-solve items when the results verify). */
-export function dynamicCheckItems(doc: CadDocument, found: DynamicCase, port: FeArtifactPort | null | undefined): DynamicCheckItem[] {
+function dynamicCheckItems(doc: CadDocument, found: DynamicCase, port: FeArtifactPort | null | undefined): DynamicCheckItem[] {
   const items = setupItems(doc, found);
   const trust = trustedRecord(doc, found.analysisCase, port);
   if (trust.state === 'stale')
