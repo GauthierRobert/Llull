@@ -11,12 +11,14 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - Lanes own disjoint write scopes (`.claude/rules/workflow.md` W5); one task per lane at a time, up to 4 lanes + Lane 5 review.
 
 ## NOW (auto-updated by the skill)
-- 2026-10-19 — branch `ccr-3aa83840-8a8z82`, PR #89: RS-1 native OCCT kernel (all ops, desktop bundle, macOS/Windows CI) in review;
-  LC1 steps 1–4 in progress (native default flip, browser build, cloud host, MCP). Next: LC1 step 6, then RS-2 / CFD-M1.
+- 2026-10-19 — branch `ccr-d5e76715-intlyp`: LC1 done (steps 1–6: native kernel default everywhere, opencascade.js retired, no outbox),
+  RS-1 done (macOS bundle deferred by the owner), RS-2 done (native SIMP topology optimisation + plugin `topology` + `topology_solve` + UI panel).
+  Next: CFD-M1, then RS-3.
 
 ## Priority
-- `[WIP]` **LC** CLI + local only — LC1 steps 1–6 (step 5 after one release on the native default): `docs/decisions/LC1-local-only.md`. _deps: —_
-- `[WIP]` **RS** Native compute (Rust + wgpu, native OCCT) RS-1 → RS-8: `docs/decisions/RS1-native-compute.md`. Open in RS-1: VC-KRN-25 vs OCP 7.9.3, default flip, Windows bundle (macOS deferred). _deps: —_
+- `[TODO]` **RS** Native compute RS-3 → RS-8 (RS-1, RS-2 done): `docs/decisions/RS1-native-compute.md`. Next RS-3 point clouds. _deps: —_
+- `[TODO]` **TOP-V1** Topology V1 (PHY-17 §10 M4): MMA, projection, extrusion / min member size, `min_volume`, pressure / gravity loads in the
+  mapping and the compliance ratio, a timeout checkpoint (`deadlineS`) so a killed run resumes, VC-TOP-34 on a hardware GPU (GPU cap): `docs/physics/17-topology-optimization/TECHNICAL_SPEC.md` §13–§14. _deps: —_
 - `[TODO]` **CFD-M1** `cfd` slice, case commands, `cfd_prepare`, `check_cfd`: `docs/aerospace/12-cfd-gpu/TECHNICAL_SPEC.md` §10. _deps: —_
 - `[TODO]` **CFD-M2** `llull-compute flow` (LBM, wgpu), `cfd_solve` transport, records: same spec §10. _deps: CFD-M1_
 

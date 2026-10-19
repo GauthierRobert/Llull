@@ -1,6 +1,7 @@
 # LC1 — CLI + local only (no browser, no cloud)
 
 Status: decided 2026-10-19 by the owner: "remove the browser part entirely; it will work on CLI and local only; optimize for that".
+**Done 2026-10-19**: steps 1–6 below are complete (the step-5 "one release on the native default" wait was waived by the owner's goal to finish LC1).
 Binding text: `CLAUDE.md` § PRODUCT DIRECTIVE. Related: RS1 (native compute), KI6 (desktop + CLI first), the 12 CFD directives
 (CLI only, local only, MCP being removed).
 

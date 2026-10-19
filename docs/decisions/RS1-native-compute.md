@@ -76,7 +76,7 @@ Rules:
 | ---- | ------- | --------------------- | --- | --------------------- |
 | **RS-0** | `solver/` workspace, `llull-gpu`, `llull-protocol`, `llull-bvh`, bundling, `native:check`; first job = 12 CFD M2 | 12 CFD | — | 12 CFD's standalone `solver/flow/` |
 | **RS-1** (done 2026-10-19; WASM build retired by LC1 step 5; macOS bundle deferred by the owner) | Native OCCT 7.9 kernel sidecar `llull-kernel` behind `KernelOps` | aerospace 01 KRN (carries 02, 04, 07, 08) | native CPU | 01 KRN M2 custom OCCT 7.9 Emscripten build (board AERO-2-M2) |
-| **RS-2** | GPU SIMP topology optimisation on `llull-voxfe` | physics 17 TOP | GPU | 17's CPython numpy / scipy bridge |
+| **RS-2** (done 2026-10-19: `llull-gpu`, `llull-voxfe`, `llull-topopt`, `llull-compute topopt`, `topology_solve`, plugin `topology`; GPU 1e7 DOF cap provisional until measured on a hardware GPU, VC-TOP-34) | GPU SIMP topology optimisation on `llull-voxfe` | physics 17 TOP | GPU | 17's CPython numpy / scipy bridge |
 | **RS-3** | Point-cloud import, octree, ICP, RANSAC, normals, fits | plant 10 SCN | Rust CPU | 10's TS readers + lazrs-wasm / laz-perf + libE57 question (Q4); unlocks COPC writing (Q2) |
 | **RS-4** | Scan-vs-design deviation and as-built clash | plant 10 SCN | GPU + CPU final numbers | 10's pure-TS deviation |
 | **RS-5** | Offscreen renderer for headless `render_view`, walkthroughs, BCF snapshots, CAE field plots | plant 09 VIS, aerospace 05 FEA (`fieldRaster.ts`) | GPU | the pure-TS software rasterisers as the default fast path (they stay the hash reference) |
