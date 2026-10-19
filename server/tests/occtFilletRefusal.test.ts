@@ -7,13 +7,13 @@
 
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { it, expect, beforeAll, afterAll } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
-import { createNodeOcctKernel } from '../src/occtNode';
+import { createNativeTestKernel, describeNative } from './kernelTestSupport';
 
-beforeAll(async () => setGeometryKernel(await createNodeOcctKernel()), 120_000);
+beforeAll(async () => setGeometryKernel(createNativeTestKernel()), 120_000);
 afterAll(() => setGeometryKernel(null));
 
 const plan = (name: string): unknown[] => JSON.parse(readFileSync(path.join(__dirname, 'fixtures', 'fillets', name), 'utf8')) as unknown[];
@@ -23,7 +23,7 @@ function runUntilFillet(actions: unknown[]): ReturnType<typeof execute> {
   return execute(createEmptyDocument(), 'build_project', { actions: actions.slice(0, filletAt + 1) });
 }
 
-describe('occt fillet results are checked before they are committed', () => {
+describeNative('occt fillet results are checked before they are committed', () => {
   it('refuses an invalid blend against a tangent boss (no hang downstream)', () => {
     const result = runUntilFillet(plan('tangent-boss-fillet.json'));
     expect(result.summary).toMatch(/could not round these edges into a valid solid/);

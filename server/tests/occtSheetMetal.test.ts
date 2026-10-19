@@ -3,7 +3,7 @@
  * convert_to_sheet_metal rebuilds the committed bracket and joggle strip from their STEP B-reps (VC-FTR-18, 19).
  */
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { execute } from '@core/commands/registry';
@@ -11,7 +11,7 @@ import { defaultContext } from '@core/commands/context';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import { liveKernels } from './kernelTestSupport';
+import { liveKernels, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
 afterAll(() => setGeometryKernel(null));
@@ -62,7 +62,7 @@ function importPart(kernel: GeometryKernel, file: string): { doc: CadDocument; s
   return { doc: imported.document, solid: imported.affected[0] as string };
 }
 
-describe('native bracket on OCC (VC-FTR-06, 08)', () => {
+describeNative('native bracket on OCC (VC-FTR-06, 08)', () => {
   it('folds to the exact analytic volume 5279.716754 mm3', () => {
     const { doc, part } = bracket(kernels.occt, 0.5);
     expect(Math.abs(volumeOf(kernels.occt, doc, part) / 5279.716754404115 - 1)).toBeLessThan(1e-6);
@@ -106,7 +106,7 @@ describe('native bracket on OCC (VC-FTR-06, 08)', () => {
   });
 });
 
-describe('convert_to_sheet_metal on OCC (VC-FTR-18, VC-FTR-19)', () => {
+describeNative('convert_to_sheet_metal on OCC (VC-FTR-18, VC-FTR-19)', () => {
   const converted = (file: string, rule: Record<string, unknown>, near: number[]): { doc: CadDocument; part: string; summary: string } => {
     const { doc, solid } = importPart(kernels.occt, file);
     const withRule = run(kernels.occt, doc, 'create_sheet_metal_rule', rule).document;

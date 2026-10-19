@@ -167,7 +167,7 @@ export function CommandParamForm({
             {command.description}
           </p>
         </div>
-        <code className="palette-form__tool" title="MCP tool name">
+        <code className="palette-form__tool" title="Command (CLI tool) name">
           {command.name}
         </code>
       </header>

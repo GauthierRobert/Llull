@@ -10,7 +10,6 @@ export const ISOLATED_SUITES: readonly string[] = [
   'tests/unit/historyWithoutRegistry.test.ts',
   'tests/unit/layoutStore.test.ts',
   'tests/unit/manifoldKernelLeaks.test.ts',
-  'tests/unit/occtKernel.test.ts',
   'tests/unit/projectStepData.test.ts',
   'tests/unit/serverConfig.test.ts',
   'tests/unit/serverFiles.test.ts',

@@ -4,24 +4,23 @@
  * gap first, so every operation returns a mesh that agrees with Manifold.
  */
 
-import { describe, it, expect } from 'vitest';
+import { it, expect } from 'vitest';
 import type { Entity, Vec3 } from '@core/model/types';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
-import { createNodeOcctKernel } from '../src/occtNode';
-import { common, booleanMesh, volume } from './kernelTestSupport';
+import { common, booleanMesh, volume, createNativeTestKernel, describeNative } from './kernelTestSupport';
 
 const sphere = (rotation: Vec3): Entity => ({ id: 's', kind: 'sphere', position: [1, 1, 0], rotation, radius: 3, ...common }) as Entity;
 // Top face at z = 3 touches the sphere (centre z = 0, r = 3) at a single point.
 const tangentBox: Entity = { id: 'b', kind: 'box', position: [2, 1, 1], rotation: [0, 0, 0], size: [5, 3, 4], ...common } as Entity;
 
-describe.each([
+describeNative.each([
   ['axis-aligned', [0, 0, 0]],
   ['rotated', [0.4, 0.2, 0.7]],
 ] as Array<[string, Vec3]>)('occt sphere tangent to a box face (%s sphere)', (_name, rotation) => {
   it.each(['union', 'subtract', 'intersect'] as const)(
     '%s returns a mesh that agrees with Manifold',
     async (op) => {
-      const occt = await createNodeOcctKernel();
+      const occt = createNativeTestKernel();
       const manifold = await createManifoldKernel();
       const fromOcct = booleanMesh(occt, op, sphere(rotation), tangentBox);
       const fromManifold = booleanMesh(manifold, op, sphere(rotation), tangentBox);

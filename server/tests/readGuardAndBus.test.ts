@@ -14,7 +14,7 @@ import { _resetHistory, applyCommand, canUndo, undo } from '../src/commandBus';
 import type { Response } from 'express';
 
 const TOKEN = 'secret-token';
-const ENV_KEYS = ['MCP_AUTH_TOKEN', 'LLULL_REQUIRE_TOKEN_FOR_REST'];
+const ENV_KEYS = ['LLULL_AUTH_TOKEN', 'LLULL_REQUIRE_TOKEN_FOR_REST'];
 
 beforeEach(() => {
   _resetLiveDoc();
@@ -31,7 +31,7 @@ describe('guardRead', () => {
   });
 
   it('with a token: rejects bare loopback requests and ?access_token=, accepts bearer', async () => {
-    process.env['MCP_AUTH_TOKEN'] = TOKEN;
+    process.env['LLULL_AUTH_TOKEN'] = TOKEN;
     expect((await request(app).get('/live/snapshot')).status).toBe(401);
     expect((await request(app).get('/export/stl')).status).toBe(401);
     expect((await request(app).get('/live')).status).toBe(401);
@@ -42,7 +42,7 @@ describe('guardRead', () => {
   });
 
   it('with a token: the local UI (allowed Origin, loopback) still reads', async () => {
-    process.env['MCP_AUTH_TOKEN'] = TOKEN;
+    process.env['LLULL_AUTH_TOKEN'] = TOKEN;
     const res = await request(app).get('/live/snapshot').set('Origin', 'http://localhost:5173');
     expect(res.status).toBe(200);
     const foreign = await request(app).get('/live/snapshot').set('Origin', 'https://evil.example');
@@ -50,7 +50,7 @@ describe('guardRead', () => {
   });
 
   it('with a token: a proxied request (X-Forwarded-For / Forwarded) is not trusted as loopback', async () => {
-    process.env['MCP_AUTH_TOKEN'] = TOKEN;
+    process.env['LLULL_AUTH_TOKEN'] = TOKEN;
     const origin = 'http://localhost:5173';
     const xff = await request(app).get('/live/snapshot').set('Origin', origin).set('X-Forwarded-For', '203.0.113.9');
     expect(xff.status).toBe(401);

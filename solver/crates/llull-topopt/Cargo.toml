@@ -1,0 +1,23 @@
+[package]
+name = "llull-topopt"
+description = "PHY-17 SIMP topology optimisation on llull-voxfe: filters, OC, multi-load-case loop, the `llull-compute topopt` job (RS1 RS-2)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = ["gpu"]
+# device "gpu": the llull-voxfe wgpu kernels (f32, deterministic: false). Without it a GPU request runs the CPU twin with a warning.
+gpu = ["llull-voxfe/gpu"]
+
+[dependencies]
+llull-gpu = { path = "../llull-gpu" }
+llull-protocol = { path = "../llull-protocol" }
+llull-voxfe = { path = "../llull-voxfe", default-features = false }
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

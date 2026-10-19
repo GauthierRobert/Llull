@@ -4,10 +4,10 @@
  * and a fillet along a merged edge are unchanged.
  */
 
-import { describe, expect, it, afterAll } from 'vitest';
+import { expect, it, afterAll } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { Entity, ShapeRecipe } from '@core/model/types';
-import { booleanRecipe, box, common, leaf, liveKernels } from './kernelTestSupport';
+import { booleanRecipe, box, common, leaf, liveKernels, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
 afterAll(() => setGeometryKernel(null));
@@ -34,7 +34,7 @@ function holedPlate(): ShapeRecipe {
   return booleanRecipe('subtract', box([100, 100, 5], [200, 200, 10]), union(tools));
 }
 
-describe('occt unify after booleans of ordinary parts', () => {
+describeNative('occt unify after booleans of ordinary parts', () => {
   it('merges the coplanar faces of a >600-face result and a fillet on a merged edge index rounds the whole edge', () => {
     const occt = kernels.occt;
     const plate = occt.evaluate(holedPlate());

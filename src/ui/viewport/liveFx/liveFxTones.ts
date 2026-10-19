@@ -1,9 +1,9 @@
-// Accent colour per change origin: an MCP agent glows warm (the --agent token), the CLI cyan, the REST API amber, this client's own edits blue.
+// Accent colour per change origin: the CLI glows cyan, the REST API amber, this client's own edits blue.
 
 import * as THREE from 'three';
 import type { LiveFxTone } from './planLiveFx';
 
-const TONE_HEX: Record<LiveFxTone, string> = { mcp: '#f0904a', cli: '#22d3ee', rest: '#f59e0b', snapshot: '#38bdf8', local: '#3b82f6' };
+const TONE_HEX: Record<LiveFxTone, string> = { cli: '#22d3ee', rest: '#f59e0b', snapshot: '#38bdf8', local: '#3b82f6' };
 
 const TONE_COLOR = new Map<LiveFxTone, THREE.Color>();
 

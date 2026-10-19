@@ -7,7 +7,7 @@
 import path from 'path';
 
 export interface DesktopLayout {
-  /** Built web app (Vite `dist/`, built with VITE_LLULL_SERVER_URL=same-origin). */
+  /** Built web app (Vite `dist/`; served by the backend, so the renderer uses the page origin). */
   readonly webDir: string;
   /** Server bundle entry (`server/dist/index.js`). */
   readonly serverEntry: string;

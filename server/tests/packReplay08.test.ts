@@ -15,6 +15,7 @@ import { app } from '../src/index';
 import { _resetLiveDoc } from '../src/liveDocument';
 import { _resetHistory, applyCommand } from '../src/commandBus';
 import { libraryFile } from '../../tests/unit/materials/support';
+import { describeNative, nativeKernelBinary } from './kernelTestSupport';
 import { REPO_ROOT, cliCall, cliExec, cliPlan, newSession, runPlan, type CliCall, type Session } from './packCli';
 
 afterAll(() => setGeometryKernel(null));
@@ -95,7 +96,7 @@ describe('validation plans through llull run (build_project)', () => {
     expect(errorOf(second).code).toBe('MAT_PREFERRED_CONFLICT');
   });
 
-  it(
+  it.skipIf(nativeKernelBinary === null)(
     'VC-MAT-04 d: 100 x 100 x 5 mm plate with a D10 hole, 2024-T3 at 2.78 g/cm3: 137.9083 g (exact 1e-6 on OCC, mesh 5e-3 on Manifold)',
     async () => {
       const row = massRow('VC-MAT-04/plate_100x100x5_hole_d10_mm');
@@ -130,7 +131,7 @@ describe('validation plans through llull run (build_project)', () => {
   );
 });
 
-describe('VC-MAT-10 / 11 on OCC: the NAS6203 stack plan', () => {
+describeNative('VC-MAT-10 / 11 on OCC: the NAS6203 stack plan', () => {
   const catalogParams = (): { catalog: unknown } => ({
     catalog: JSON.parse(readFileSync(path.join(REPO_ROOT, PACK, 'fastener_catalog_llull.json'), 'utf8')),
   });
@@ -473,7 +474,7 @@ describe('VC-MAT-15 / 25 through the CLI (local file and live backend): export-c
     ]);
   };
 
-  it(
+  it.skipIf(nativeKernelBinary === null)(
     '(a) the CLI agent: export_step_exact --save is refused (MAT_EXPORT_CONTROLLED), an agent confirmation is MAT_HUMAN_GATE, nothing is saved',
     async () => {
       const session = newSession();
@@ -494,7 +495,7 @@ describe('VC-MAT-15 / 25 through the CLI (local file and live backend): export-c
     SLOW,
   );
 
-  it(
+  it.skipIf(nativeKernelBinary === null)(
     'an unmarked document exports as before',
     async () => {
       const session = newSession();

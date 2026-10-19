@@ -1,4 +1,4 @@
-// Palette catalog: app actions + EVERY registry command (L5), so all MCP-exposed commands are reachable from the UI.
+// Palette catalog: app actions + EVERY registry command (L5), so all registered commands are reachable from the UI.
 
 import type { CommandDefinition } from '@core/commands/types';
 import { listCommands } from '@core/commands/registry';
@@ -15,7 +15,7 @@ import { TOOLSET_NAMES, type ToolsetName, toolsetOf } from '@protocol/toolsets';
 import { fuzzyScore } from './fuzzyMatch';
 import { humanizeName } from './paramForm';
 
-/** Registry commands are grouped by their MCP toolset, so a search result says what area it belongs to. */
+/** Registry commands are grouped by their toolset, so a search result says what area it belongs to. */
 const TOOLSET_GROUPS = {
   core: 'Model',
   '2d': '2D drafting',

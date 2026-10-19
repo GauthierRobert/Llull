@@ -16,7 +16,7 @@ import { operandRecipe } from '@core/commands/brep/kernelShape';
 import { lengthToleranceOf, recognitionOf } from '@core/commands/features/recognition';
 import { buildModel } from '@core/geometry/recognition/model';
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
-import { createNodeOcctKernel } from '../../src/occtNode';
+import { createNativeTestKernel } from '../kernelTestSupport';
 import { REPO_ROOT, checkAssertion, newSession, runCliLines, type PackCase } from '../packCli';
 
 const CORPUS_DIR = path.resolve(__dirname, '../../../.cache/quality-corpus');
@@ -32,7 +32,7 @@ const CASES = [
 
 let kernel: GeometryKernel;
 beforeAll(async () => {
-  kernel = await createNodeOcctKernel();
+  kernel = createNativeTestKernel();
 }, 120_000);
 afterAll(() => setGeometryKernel(null));
 

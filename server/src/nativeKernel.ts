@@ -1,18 +1,14 @@
 /**
- * The native OCC kernel (RS-1, opt-in `LLULL_KERNEL=occt-native`): `GeometryKernel` over the `llull-kernel` sidecar, through the same
- * synchronous worker proxy as the WASM kernel (`isolatedKernel.ts`: timeout, recycle, blob resend). Ops the sidecar does not implement
- * yet are answered per op by the WASM OCC kernel inside the same worker (`native/kernelRouter.ts`).
+ * The native OCC kernel (RS-1, KI7): `GeometryKernel` over the `llull-kernel` sidecar, through a synchronous worker proxy
+ * (`isolatedKernel.ts`: timeout, restart, blob resend).
  * @failure binary missing -> `NATIVE_TOOL_MISSING` reason with the install hint; worker or sidecar not starting -> a reason; the caller
- *   falls back to the WASM kernel
+ *   falls back to Manifold
  */
 
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { createIsolatedKernel, type IsolatedKernel } from './isolatedKernel';
 import { nativeBinaryPath, nativeInstallHint } from './native/nativeBinary';
-
-/** `LLULL_KERNEL` value selecting the native kernel. */
-export const NATIVE_KERNEL_CHOICE = 'occt-native';
 
 /** Path of the worker entry next to this module (source `.ts` or bundled `.js`), or null when not shipped. */
 function nativeKernelWorkerEntry(): string | null {

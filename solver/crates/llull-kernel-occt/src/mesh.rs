@@ -1,11 +1,11 @@
-//! Display mesh of a shape, with the closure policy of `packages/kernel-occt/src/occtMesh.ts`: a closed solid whose triangulation
+//! Display mesh of a shape, with the closure policy of the retired opencascade.js kernel (occtMesh.ts): a closed solid whose triangulation
 //! comes out open (a face without triangles, a seam gap) is meshed again finer, then refused rather than shown holed.
-//! Deviation from the WASM kernel: the finer retry runs for every open solid, not only freeform-heavy or thread-bearing ones.
+//! Deviation from that policy: the finer retry runs for every open solid, not only freeform-heavy or thread-bearing ones.
 
 use crate::{tessellate, MeshOut, OcctResult, Shape};
 use std::collections::HashMap;
 
-/// Display deflections: linear (document units), angular (radians) — the WASM kernel's values.
+/// Display deflections: linear (document units), angular (radians) — the retired kernel's values.
 pub const DISPLAY_DEFLECTION: (f64, f64) = (0.1, 0.5);
 /// Retry deflections for a closed solid whose display mesh is open.
 pub const FINE_DEFLECTION: (f64, f64) = (0.02, 0.2);

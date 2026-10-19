@@ -14,7 +14,7 @@ import { setGeometryKernel, type ShapeTopology } from '@core/geometry/kernel';
 import { cylinderCage } from '@core/geometry/subdivision';
 import { subdivisionPatches } from '@core/geometry/subdivisionPatches';
 import { SUBDIVISION_PY } from '@core/codegen/pythonSubdivision';
-import { createNodeOcctKernel } from '../src/occtNode';
+import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 import { createPythonExchangePort } from '../src/pythonExchange';
 import { BRIDGE_SCRIPT, CADQUERY_PYTHON, probePython } from './exchangeTestSupport';
 
@@ -67,7 +67,7 @@ describe.skipIf(!hasPython)('exported subdivision code', () => {
   });
 });
 
-describe.skipIf(!hasCadQuery)('subdivision solids through CadQuery', () => {
+describe.skipIf(!hasCadQuery || nativeKernelBinary === null)('subdivision solids through CadQuery', () => {
   const port = createPythonExchangePort({
     python: CADQUERY_PYTHON,
     build123dPython: CADQUERY_PYTHON,
@@ -79,7 +79,7 @@ describe.skipIf(!hasCadQuery)('subdivision solids through CadQuery', () => {
   let code: string;
 
   beforeAll(async () => {
-    setGeometryKernel(await createNodeOcctKernel());
+    setGeometryKernel(createNativeTestKernel());
     const cage = creasedCage();
     doc = execute(createEmptyDocument(), 'add_subdivision_solid', {
       vertices: cage.vertices,

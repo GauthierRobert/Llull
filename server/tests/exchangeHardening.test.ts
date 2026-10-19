@@ -31,7 +31,7 @@ describe('bridgeEnvironment', () => {
       LC_ALL: 'C',
       PYTHONPATH: '/opt/py',
       VIRTUAL_ENV: '/venv',
-      MCP_AUTH_TOKEN: 'secret',
+      LLULL_AUTH_TOKEN: 'secret',
       ANTHROPIC_API_KEY: 'sk-secret',
       AWS_SECRET_ACCESS_KEY: 'x',
     });

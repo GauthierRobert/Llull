@@ -3,7 +3,7 @@
  * analytic removed volume of the basic ISO 68-1 internal profile: minor-diameter cylinder + groove area x helix length (Pappus).
  */
 
-import { describe, expect, it, afterAll } from 'vitest';
+import { expect, it, afterAll } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import type { ExecutionContext } from '@core/commands/types';
@@ -11,7 +11,7 @@ import { recipeOf } from '@core/geometry/shapeRecipe';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { internalThreadForm, internalThreadRemovedVolume } from '@lib/threadForm';
 import { createEmptyDocument, type CadDocument, type Entity } from '@core/model/types';
-import { liveKernels } from './kernelTestSupport';
+import { liveKernels, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
 afterAll(() => setGeometryKernel(null));
@@ -52,7 +52,7 @@ function measure(doc: CadDocument, id: string): { volume: number; topologyVolume
   };
 }
 
-describe('modelled thread on the live OCC kernel (VC-FTR-36)', () => {
+describeNative('modelled thread on the live OCC kernel (VC-FTR-36)', () => {
   it('M6x1 through a 10 mm plate: valid solid, groove volume = analytic groove area x helix length', () => {
     const result = plateWithThread({ designation: 'M6x1-6H', modelled: true });
     expect(result.error).toBeUndefined();

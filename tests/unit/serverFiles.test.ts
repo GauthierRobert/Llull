@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fetchLicenseLabel, fetchStepExport, uploadDwg } from '@ui/services/serverFiles';
+import { fetchStepExport, uploadDwg } from '@ui/services/serverFiles';
 
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -44,15 +44,5 @@ describe('serverFiles', () => {
     expect(await uploadDwg(file, 'drawing', 'mm')).toBe('DWG imported.');
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('refused')));
     expect(await uploadDwg(file, 'drawing', 'mm')).toMatch(/needs the llull server/);
-  });
-  it('fetchLicenseLabel returns the label, or null on any failure', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ label: 'Evaluation' })));
-    expect(await fetchLicenseLabel()).toBe('Evaluation');
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ label: 3 })));
-    expect(await fetchLicenseLabel()).toBeNull();
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({}, 500)));
-    expect(await fetchLicenseLabel()).toBeNull();
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('refused')));
-    expect(await fetchLicenseLabel()).toBeNull();
   });
 });

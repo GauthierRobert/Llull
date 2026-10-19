@@ -1,10 +1,10 @@
-/** Live OpenCascade: a `.lld` anchor on a composite solid picks the real planar face (inspect_faces), where a bounding-box side would miss. */
-import { describe, expect, it } from 'vitest';
+/** Live native OCC kernel (llull-kernel; skipped with a logged reason without the binary): a `.lld` anchor on a composite solid picks the real planar face (inspect_faces), where a bounding-box side would miss. */
+import { expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
 import { createEmptyDocument } from '@core/model/types';
-import { liveKernels } from './kernelTestSupport';
+import { describeNative, liveKernels } from './kernelTestSupport';
 
 const kernels = liveKernels();
 const ctx = (kernel: 'occt' | 'manifold'): ExecutionContext => ({ ...defaultContext(), kernel: kernels[kernel] });
@@ -16,7 +16,7 @@ add_hole bore target=body face=body.top points=[[0, 25]] pointsFrame=world_xy ho
 check volume of=bore expect ~= 100*60*10 + 100*10*50 - pi*4*20 ± 0.1%
 `;
 
-describe('design anchors on the exact kernel', () => {
+describeNative('design anchors on the exact kernel', () => {
   it('body.top of an L-shaped union is the top of the wall (exact face), and the check passes', () => {
     const r = execute(createEmptyDocument(), 'apply_design', { source: L_SHAPE }, ctx('occt'));
     expect(r.error).toBeUndefined();

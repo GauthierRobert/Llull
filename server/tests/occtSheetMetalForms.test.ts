@@ -3,7 +3,7 @@
  * faces) and their volumes match the closed forms: relief VC-FTR-12, flanged hole VC-FTR-13, bead VC-FTR-14, hem VC-FTR-15.
  */
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
@@ -12,7 +12,7 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { BeadForm, FlangedHoleForm } from '@core/model/sheetMetal';
 import { lipVolume } from '@aero/sheetmetal/formGeometry';
 import { beadVolumeChange } from '../../tests/unit/aero/sheetmetal/plates';
-import { liveKernels } from './kernelTestSupport';
+import { liveKernels, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
 afterAll(() => setGeometryKernel(null));
@@ -47,7 +47,7 @@ function plate(width: number, height: number, rule: Record<string, unknown>): { 
 
 const T = 1.6;
 
-describe('relief on add_flange (VC-FTR-12)', () => {
+describeNative('relief on add_flange (VC-FTR-12)', () => {
   it('removes exactly width x depth x T: ratio 0.5 gives 0.8 x (R + T) = 0.8 x 6.4 mm', () => {
     const { doc, part } = plate(33.6, 50, { relief: { type: 'rectangular', widthRatio: 0.5 } });
     const flange = {
@@ -70,7 +70,7 @@ describe('relief on add_flange (VC-FTR-12)', () => {
   });
 });
 
-describe('flanged hole (VC-FTR-13)', () => {
+describeNative('flanged hole (VC-FTR-13)', () => {
   it('is a valid solid whose volume is plate - disc + lip, with the flat cut diameter flagged approximate', () => {
     const { doc, part } = plate(100, 80, {});
     const base = volumeOf(doc, part);
@@ -107,7 +107,7 @@ describe('flanged hole (VC-FTR-13)', () => {
   });
 });
 
-describe('bead (VC-FTR-14)', () => {
+describeNative('bead (VC-FTR-14)', () => {
   it('R 3, depth 2, length 60 on a 1.0 mm flat: valid solid with the exact arch volume; flat pattern excludes it', () => {
     const { doc, part } = plate(100, 60, { name: 'AL1', thickness: 1, insideRadius: 3 });
     const base = volumeOf(doc, part);
@@ -146,7 +146,7 @@ describe('bead (VC-FTR-14)', () => {
   });
 });
 
-describe('hem (VC-FTR-15)', () => {
+describeNative('hem (VC-FTR-15)', () => {
   it('closed and open hems fold to the exact volume', () => {
     const { doc, part } = plate(40, 30, {});
     const closed = run(doc, 'add_hem', { id: part, edge: { near: [40, 15, 0] }, hemType: 'closed', length: 10 });
@@ -162,7 +162,7 @@ describe('hem (VC-FTR-15)', () => {
 
 const VOLUMES: Record<string, number> = { L: 3475.030052642468, Z: 3638.0601052849365, 'Z-return': 4127.490157927407 };
 
-describe('contour flange (VC-FTR-15)', () => {
+describeNative('contour flange (VC-FTR-15)', () => {
   it.each([
     ['L', 'bottom', [[0, 30]]],
     [

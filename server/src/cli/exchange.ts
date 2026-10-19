@@ -1,6 +1,6 @@
 /**
  * The exchange tools (export_step, import_step, import_dwg, import_code), the FE tools (fea_mesh, fea_solve, fea_export, fea_import_field) and
- * the native transports (fatigue_field, fea_map_field, fea_render: `server/src/native/tools.ts`, run by `runExchangeTool`) in the
+ * the native transports (fatigue_field, fea_map_field, fea_render, topology_solve: `server/src/native/tools.ts`, run by `runExchangeTool`) in the
  * `llull` CLI. They are not registry commands — Python / DWG / solver I/O sits behind ports — so the CLI runs their `@protocol` handlers: in-process for a local --doc (document changes via `execute`), `POST /exchange`
  * for --app / --server. `file=<path>` reads a local file into the tool's content parameter.
  */
@@ -64,11 +64,17 @@ interface LocalExchangeContext {
   readonly getDoc: () => CadDocument;
   /** Runs a registry command on the local document (tracks + saves it like any CLI command). */
   readonly runCommand: (name: string, params: unknown) => CommandOutcome;
+  /** Prints one solver progress line (`--progress`). */
+  readonly onProgress?: (line: string) => void;
 }
 
 /** Run an exchange tool (native transports included) in-process against a local document. */
 export async function runLocalExchange(name: string, params: unknown, context: LocalExchangeContext): Promise<CommandOutcome> {
-  const outcome = await runExchangeTool(name, params, context.options, { getDoc: context.getDoc, applyCommand: context.runCommand });
+  const outcome = await runExchangeTool(name, params, context.options, {
+    getDoc: context.getDoc,
+    applyCommand: context.runCommand,
+    ...(context.onProgress !== undefined ? { onProgress: context.onProgress } : {}),
+  });
   if (outcome === null) throw new Error(`${name} is not an exchange tool.`);
   return outcome;
 }

@@ -1,12 +1,12 @@
-//! Feature recipe nodes and freeform solid kinds, mirroring `packages/kernel-occt/src/occtKernel.ts` (fillet, chamfer, blend,
-//! shell), `occtCurves.ts` / `occtPatches.ts` (curved profiles, loft, sweep, subdivision) and the `feature` walk of
-//! `packages/core/src/geometry/shapeKernel.ts` with `occtFeatures.ts`.
+//! Feature recipe nodes and freeform solid kinds, following the retired opencascade.js kernel (fillet, chamfer, blend,
+//! shell, curved profiles, loft, sweep, subdivision) and the `feature` walk of `packages/core/src/geometry/shapeKernel.ts`.
 //!
 //! The pure TypeScript geometry those builders read (oriented curve chains, Catmull-Rom ring curves, sweep frames, subdivision
 //! patches, feature lowering and hole profiles) is computed by the host, which sends it ready to build
 //! (`server/src/native/kernelLeaves.ts`, `kernelFeatures.ts`); this side runs the same OCCT algorithms on it.
 //! Encoded chain: per segment a type code (0 line, 1 arc, 2 cubic Bezier), then its 2 / 3 / 4 xyz points.
 
+use super::floor::floor_edge_indices;
 use super::{number, place_entity, positive, refused, shape_of, vec3, EvalError, Evaluated, Evaluator};
 use crate::features;
 use crate::{BooleanOp, Shape};
@@ -153,8 +153,21 @@ impl Evaluator {
     }
 
     /// `featureCut`: a `feature` node lowered by the host. The native BRepFeat cut first (`occtFeatures.ts`), valid and unified;
-    /// otherwise `source` op the lowered tool. `tool: null` = the lowering refused the node.
+    /// otherwise `source` op the lowered tool. `tool: null` = the lowering refused the node. A pocket `floorFillet` then rounds the floor
+    /// edges found on the cut's topology (`floor.rs`); no such edge = refused.
     pub(super) fn feature_cut(&mut self, recipe: &Value) -> Evaluated {
+        let Some(cut) = self.cut_feature(recipe)? else { return refused() };
+        let Some(floor) = recipe.get("floorFillet") else { return Ok(Some(cut)) };
+        let radius = number(floor, "radius").unwrap_or(f64::NAN);
+        let topology = crate::queries::topology(&cut).map_err(EvalError::Failure)?;
+        let Some(edges) = floor_edge_indices(&topology, floor).filter(|edges| !edges.is_empty()) else { return refused() };
+        if !positive(radius) {
+            return refused();
+        }
+        shape_of(features::fillet(&cut, &edges, radius, None))
+    }
+
+    fn cut_feature(&mut self, recipe: &Value) -> Evaluated {
         let Some(source) = self.child(recipe, "source")? else { return refused() };
         let Some(tool_recipe) = recipe.get("tool").filter(|tool| !tool.is_null()) else { return refused() };
         let source_threaded = recipe.get("source").is_some_and(thread_bearing);
@@ -226,6 +239,29 @@ mod tests {
         });
         let expected = 8.0 - std::f64::consts::PI * 0.0625 * 2.0;
         assert!((volume(evaluator.evaluate(&drilled)) - expected).abs() < 1e-9, "the BRepFeat revolution, not the tool");
+    }
+
+    #[test]
+    fn a_pocket_floor_fillet_adds_the_concave_fillet_material() {
+        let mut evaluator = Evaluator::new(16);
+        let source =
+            json!({ "op": "solid", "entity": { "kind": "box", "size": [10, 10, 2], "position": [0, 0, 0], "rotation": [0, 0, 0] } });
+        let tool = json!({ "op": "solid", "entity": { "kind": "cylinder", "radius": 2, "height": 2, "position": [0, 0, 1], "rotation": [0, 0, 0] } });
+        let half = |from: [f64; 2], through: [f64; 2], to: [f64; 2]| json!({ "type": "arc", "points": [from, through, to] });
+        let floor = |radius: f64| {
+            json!({
+                "radius": radius, "floorDepth": 1, "origin": [0, 0, 1], "normal": [0, 0, 1], "xDir": [1, 0, 0],
+                "outlines": [[half([2.0, 0.0], [0.0, 2.0], [-2.0, 0.0]), half([-2.0, 0.0], [0.0, -2.0], [2.0, 0.0])]],
+            })
+        };
+        let pocket = |floor: Value| json!({ "op": "featureCut", "mode": "subtract", "source": source, "tool": tool, "floorFillet": floor });
+        let (pi, r, big_r) = (std::f64::consts::PI, 0.5, 2.0);
+        let material = 2.0 * pi * (r * r * (big_r - r / 2.0) - pi * r * r / 4.0 * (big_r - r) - r.powi(3) / 3.0);
+        let expected = 200.0 - 4.0 * pi + material;
+        assert!((volume(evaluator.evaluate(&pocket(floor(r)))) - expected).abs() < 1e-6, "Pappus volume of the floor fillet");
+        let nowhere =
+            json!({ "radius": r, "floorDepth": 0.25, "origin": [0, 0, 1], "normal": [0, 0, 1], "xDir": [1, 0, 0], "outlines": [] });
+        assert!(evaluator.evaluate(&pocket(nowhere)).unwrap().is_none(), "no floor edge = refused");
     }
 
     #[test]

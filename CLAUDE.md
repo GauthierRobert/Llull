@@ -21,7 +21,7 @@ One registered command = one UI action + one CLI tool. Editing entities in a com
 
 React 19 + TS strict + Vite · three.js + r3f + drei (3D perspective; 2D = same scene, ortho top-down) ·
 Zustand (one store, `dispatch`) · zod v4 (one schema per command → TS type + tool JSON Schema + validation) ·
-kernels behind `GeometryKernel`: native OCCT sidecar `llull-kernel` (target), OpenCascade.js / Manifold WASM (legacy) ·
+kernels behind `GeometryKernel`: native OCCT sidecar `llull-kernel` (the exact kernel) and Manifold WASM (in-process mesh kernel: renderer, tests, fallback) ·
 Rust workspace `solver/` (`llull-compute`, `llull-kernel`) · Vitest + Testing Library · ESLint flat + Prettier + knip ·
 Express local backend (live doc, CLI host) · Electron `desktop/` + bundled CPython/CadQuery + native binaries ·
 agents: `llull` CLI only (`--app` drives the desktop app); no MCP server.
@@ -44,7 +44,7 @@ packages/domain-aec/src/  @aec   plugins `<domain>/{catalog,plugin}.ts`: buildin
 packages/domain-cae/src/  @cae   plugin `cae` (toolset analysis): 05 FEA set-up, decks, results, thermal/ thermomech/ margins/
 packages/domain-aero/src/ @aero  plugins `sheetmetal` (toolset manufacturing, 07 FTR) and `fasteners` (toolset fasteners, 08 MAT)
 packages/design-lang/src/ @design  plugin `design`: `.lld` text designs (one recipe step, re-run on regeneration); removable — docs/DESIGN_LANGUAGE.md
-packages/kernel-{manifold,occt}/src/   GeometryKernel impls
+packages/kernel-manifold/src/          GeometryKernel impl (mesh); the exact B-rep kernel is the native sidecar in solver/ (no TS package)
 packages/physics-mujoco/src/           PhysicsEngine impl (MuJoCo WASM) — rigid-body dynamics, docs/DYNAMICS.md
 src/app/                  @app   composition root: installDefaultPlugins()
 src/ui/                   @ui    React: presentation + param-gathering ONLY

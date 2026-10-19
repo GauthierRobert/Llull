@@ -2,12 +2,11 @@
  * TR-KRN-92: the face-query port of the live OCC kernel against closed forms, one analytic fixture per surface type
  * (plane = box, cylinder, cone, sphere, torus). B-spline faces: `bspline` / `tessellateFace` are not implemented (null), see TECHNICAL_SPEC §13.B.
  */
-import { afterAll, describe, expect, it } from 'vitest';
+import { expect, it } from 'vitest';
 import type { GeometryKernel, ShapeHandle } from '@core/geometry/kernel';
 import type { FaceDetail, FaceQueryPort } from '@core/geometry/kernelPorts';
 import type { Entity, ShapeRecipe, Vec3 } from '@core/model/types';
-import { createIsolatedKernel } from '../src/isolatedKernel';
-import { liveKernels } from './kernelTestSupport';
+import { liveKernels, describeNative } from './kernelTestSupport';
 
 const common = { layerId: 'layer-default', color: '#888888', rotation: [0, 0, 0] as Vec3, position: [0, 0, 0] as Vec3 };
 const solid = (fields: Record<string, unknown>): ShapeRecipe => ({ op: 'solid', entity: { id: 's', ...common, ...fields } as Entity });
@@ -44,7 +43,7 @@ const faceOf = (details: readonly FaceDetail[], surface: string, near?: Vec3): F
 const close = (actual: readonly number[], expected: readonly number[], digits = 8): void =>
   expected.forEach((value, k) => expect(actual[k] ?? Number.NaN).toBeCloseTo(value, digits));
 
-describe('occt face query: plane (box 10 x 20 x 30)', () => {
+describeNative('occt face query: plane (box 10 x 20 x 30)', () => {
   it('faceDetails: area, centroid, outward normal, samples inside the face', () => {
     const details = detailsOf(BOX);
     expect(details).toHaveLength(6);
@@ -154,7 +153,7 @@ describe('occt face query: plane (box 10 x 20 x 30)', () => {
   });
 });
 
-describe('occt face query: cylinder (r 5, h 20)', () => {
+describeNative('occt face query: cylinder (r 5, h 20)', () => {
   const lateral = (): FaceDetail => faceOf(detailsOf(CYLINDER), 'cylinder');
 
   it('faceDetails: lateral area, axis, radius; faceGraph keeps the seam smooth', () => {
@@ -205,7 +204,7 @@ describe('occt face query: cylinder (r 5, h 20)', () => {
   });
 });
 
-describe('occt face query: cone (r 4, h 10)', () => {
+describeNative('occt face query: cone (r 4, h 10)', () => {
   it('faceSamples: k1 = 0, k2 = cos(a) / rho; surface parameters carry the semi angle', () => {
     const shape = shapeOf(CONE);
     const face = faceOf(detailsOf(CONE), 'cone');
@@ -225,7 +224,7 @@ describe('occt face query: cone (r 4, h 10)', () => {
   });
 });
 
-describe('occt face query: sphere (r 7)', () => {
+describeNative('occt face query: sphere (r 7)', () => {
   it('faceDetails: area 4 pi r2, centre, radius; samples on the sphere', () => {
     const face = faceOf(detailsOf(SPHERE), 'sphere');
     expect(face.area).toBeCloseTo(4 * Math.PI * 49, 5);
@@ -262,7 +261,7 @@ describe('occt face query: sphere (r 7)', () => {
   });
 });
 
-describe('occt face query: torus (R 10, r 3)', () => {
+describeNative('occt face query: torus (R 10, r 3)', () => {
   it('faceDetails: area 4 pi2 R r, minor radius, axis', () => {
     const face = faceOf(detailsOf(TORUS), 'torus');
     expect(face.area).toBeCloseTo(4 * Math.PI * Math.PI * 10 * 3, 4);
@@ -289,7 +288,7 @@ describe('occt face query: torus (R 10, r 3)', () => {
   });
 });
 
-describe('occt face query: unsupported and out-of-range requests', () => {
+describeNative('occt face query: unsupported and out-of-range requests', () => {
   it('returns null (never throws) for unimplemented methods and bad indices', () => {
     const shape = shapeOf(BOX);
     expect(port().tessellateFace(shape, 0, 0.1)).toBeNull();
@@ -309,13 +308,10 @@ describe('occt face query: unsupported and out-of-range requests', () => {
   });
 });
 
-describe('face query through the isolated worker kernel', () => {
-  const isolated = createIsolatedKernel();
-  afterAll(() => isolated.dispose());
-
+describeNative('face query through the isolated worker kernel', () => {
   it('forwards every method with key-only handles and returns the same answers', () => {
-    const shape = shapeOf(BOX, isolated);
-    const query = isolated.faceQuery as FaceQueryPort;
+    const shape = shapeOf(BOX, kernels.occt);
+    const query = kernels.occt.faceQuery as FaceQueryPort;
     const details = query.faceDetails(shape, { samples: 4 });
     expect(details).toHaveLength(6);
     expect(details?.[0]?.samples).toHaveLength(4);

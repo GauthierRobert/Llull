@@ -7,18 +7,18 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { EXIT_OK } from '../src/cli/main';
-import { createNodeOcctKernel } from '../src/occtNode';
+import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { isRecord } from '@lib/isRecord';
 import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
 import { dataOf, expectCase, planPath, Workspace } from './feaThermomechSupport';
 
-const READY = HAS_GMSH && HAS_CCX;
+const READY = HAS_GMSH && HAS_CCX && nativeKernelBinary !== null;
 let workspace: Workspace;
 
 beforeAll(async () => {
   workspace = new Workspace();
-  setGeometryKernel(READY ? await createNodeOcctKernel() : await createManifoldKernel());
+  setGeometryKernel(READY ? createNativeTestKernel() : await createManifoldKernel());
 }, 120_000);
 
 afterAll(() => {

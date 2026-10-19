@@ -6,8 +6,8 @@ import { documentHash } from '@protocol/liveSync';
 import { useStore } from '@ui/store';
 import { useLiveFxStore } from '@ui/store/liveFxStore';
 import { consumeLiveOrigin, isOwnCommandId, markLiveOrigin } from '@ui/store/liveOrigin';
-import { newCommandId } from '@ui/store/outbox';
-import { useMcpLiveDocument } from '@ui/hooks/useMcpLiveDocument';
+import { newCommandId } from '@ui/store/liveOrigin';
+import { useLiveDocument } from '@ui/hooks/useLiveDocument';
 import { useLiveFx } from '@ui/hooks/useLiveFx';
 import { LiveActivityFeed } from '@ui/components/LiveActivityFeed';
 import { planLiveFx } from '@ui/viewport/liveFx/planLiveFx';
@@ -30,7 +30,7 @@ class FakeEventSource {
 }
 
 function Harness(): React.ReactElement {
-  useMcpLiveDocument();
+  useLiveDocument();
   useLiveFx();
   return <LiveActivityFeed />;
 }
@@ -45,13 +45,7 @@ describe('live-edit effects', () => {
   beforeEach(() => {
     FakeEventSource.instances = [];
     vi.stubGlobal('EventSource', FakeEventSource);
-    useStore.setState({
-      document: createEmptyDocument(),
-      liveBase: createEmptyDocument(),
-      liveSeq: -1,
-      liveEpoch: null,
-      hasUnsyncedLocalEdits: false,
-    });
+    useStore.setState({ document: createEmptyDocument(), liveBase: createEmptyDocument(), liveSeq: -1, liveEpoch: null });
     resetLiveFx();
   });
   afterEach(() => {
@@ -96,12 +90,12 @@ describe('live-edit effects', () => {
   it('turns animations off from the feed but keeps listing remote edits', () => {
     render(<Harness />);
     const source = connectWithSnapshot();
-    act(() => source.emit('command', commandEvent({ source: 'mcp' })));
+    act(() => source.emit('command', commandEvent({ source: 'cli' })));
     fireEvent.click(screen.getByRole('button', { name: /FX on/ }));
     expect(useLiveFxStore.getState().transitions.size).toBe(0);
-    act(() => source.emit('command', commandEvent({ source: 'mcp' })));
+    act(() => source.emit('command', commandEvent({ source: 'cli' })));
     expect(useLiveFxStore.getState().transitions.size).toBe(0);
-    expect(screen.getAllByText('MCP agent')).toHaveLength(2);
+    expect(screen.getAllByText('CLI')).toHaveLength(2);
     expect(screen.getByRole('button', { name: /FX off/ }).getAttribute('aria-pressed')).toBe('false');
   });
 });
@@ -114,7 +108,7 @@ describe('liveFxStore', () => {
     const result = execute(empty, 'add_box', BOX);
     const removed = execute(result.document, 'delete_entities', { ids: result.affected });
     const store = useLiveFxStore.getState();
-    store.apply(planLiveFx(empty, result.document, { kind: 'remote', name: 'add_box', source: 'mcp' }, 0, 1));
+    store.apply(planLiveFx(empty, result.document, { kind: 'remote', name: 'add_box', source: 'cli' }, 0, 1));
     store.apply(planLiveFx(result.document, removed.document, { kind: 'local' }, 0, 2));
     let state = useLiveFxStore.getState();
     expect(state.transitions.size).toBe(0); // the removal ghost replaced the creation transition

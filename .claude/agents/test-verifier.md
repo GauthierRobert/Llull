@@ -22,7 +22,7 @@ Rules are already in context (workflow W3 = test map). Read `.claude/context/com
   plugins, persistence v2, live sync. `tests/golden/` — id-normalized `build_project` snapshots +
   replay equality; never blanket-update (`-u`) without confirming the change is intended.
 - `tests/integration/` — `store.dispatch` end-to-end: command → store swap → undo/redo,
-  live sync, offline outbox. `server/tests/` — `npm --prefix server test`.
+  live sync, local fallback. `server/tests/` — `npm --prefix server test`.
 - Component tests (Testing Library) — panels & param-gathering only; NOT geometry math.
 
 ## Principles

@@ -4,7 +4,7 @@
     ".": {
       "entry": [
         "server/src/index.ts",
-        "server/src/occtWorker.ts",
+        "server/src/nativeKernelWorker.ts",
         "server/src/cli/bin.ts",
         "server/tests/**/*.ts",
         "desktop/src/main.ts",

@@ -602,6 +602,16 @@ dependencies = [
  "llull-post",
  "llull-protocol",
  "llull-raster",
+ "llull-topopt",
+]
+
+[[package]]
+name = "llull-gpu"
+version = "0.1.0"
+dependencies = [
+ "pollster",
+ "rayon",
+ "wgpu",
 ]
 
 [[package]]
@@ -655,13 +665,33 @@ dependencies = [
 name = "llull-raster"
 version = "0.1.0"
 dependencies = [
+ "llull-gpu",
  "llull-jsmath",
  "llull-protocol",
- "pollster",
  "rayon",
  "serde",
  "serde_json",
  "wgpu",
+]
+
+[[package]]
+name = "llull-topopt"
+version = "0.1.0"
+dependencies = [
+ "llull-gpu",
+ "llull-protocol",
+ "llull-voxfe",
+ "rayon",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "llull-voxfe"
+version = "0.1.0"
+dependencies = [
+ "llull-gpu",
+ "rayon",
 ]
 
 [[package]]

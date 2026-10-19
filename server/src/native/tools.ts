@@ -16,6 +16,7 @@ import { defaultFeArtifactStore } from '../fea/artifactStore';
 import { createComputeRunner } from './computeJob';
 import { runFatigueField, type NativeDeps } from './fatigueField';
 import { runMapField } from './mapField';
+import { DEFAULT_TOPOLOGY_TIMEOUT_S, runTopologySolve, type TopologySolveOptions } from './topologySolve';
 import { runFeaRender } from './renderField';
 
 const TIMEOUT = {
@@ -64,6 +65,7 @@ export function nativeToolDefinitions(): ToolDefinition[] {
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
     renderToolDefinition(),
+    topologyToolDefinition(),
   ];
 }
 
@@ -89,12 +91,45 @@ function renderToolDefinition(): ToolDefinition {
   };
 }
 
-const NAMES: ReadonlySet<string> = new Set(['fatigue_field', 'fea_map_field', 'fea_render']);
+/** topology_solve: the transport of the topology plugin (PHY-17); the study itself is built with the topology commands. */
+function topologyToolDefinition(): ToolDefinition {
+  return {
+    name: 'topology_solve',
+    description:
+      'Solve a topology optimization study (create_topology_study, set_topology_regions): builds the voxel grid, maps the 05 loads and supports, ' +
+      'runs the native llull-compute SIMP optimiser (progress per iteration with --progress) and records the result with record_topology_result ' +
+      '(density field artifact, derived read-only iso-surface on layer layer-topology; numbers are recomputed from the artifact). Concept shape, ' +
+      'never a released design: rebuild with suggest_rebuild and finish with check_topology. Without llull-compute a 2D study up to 2000 voxels ' +
+      'runs the TypeScript reference; anything larger is TOP_TOOL_MISSING. resumeFromLast continues the last finished run of the study ' +
+      '(e.g. after raising maxIterations: the cap counts the iterations already done). Errors: TOP_SOLVER_FAILED, TOP_GRID_TOO_LARGE, TOP_SOLVER_TIMEOUT, TOP_RESULT_STALE.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        studyId: { type: 'string', description: 'Id of the topology study (affected[0] of create_topology_study).' },
+        timeoutS: { ...TIMEOUT, description: `Wall-clock limit of the native job in seconds (default ${DEFAULT_TOPOLOGY_TIMEOUT_S}).` },
+        resumeFromLast: {
+          type: 'boolean',
+          description:
+            'Continue the last finished run of this study from its saved design (same inputs; settings such as maxIterations may change).',
+        },
+        device: {
+          type: 'string',
+          enum: ['cpu', 'gpu', 'auto'],
+          description: 'cpu (default, deterministic), gpu or auto (a GPU build of llull-compute; else TOP_GPU_FALLBACK).',
+        },
+      },
+      required: ['studyId'],
+    },
+    annotations: { idempotentHint: true },
+  };
+}
+
+const NAMES: ReadonlySet<string> = new Set(['fatigue_field', 'fea_map_field', 'fea_render', 'topology_solve']);
 
 export const isNativeTool = (name: string): boolean => NAMES.has(name);
 
-function defaultDeps(env: NodeJS.ProcessEnv): NativeDeps {
-  return { store: defaultFeArtifactStore(), runner: createComputeRunner(env), env };
+function defaultDeps(env: NodeJS.ProcessEnv, onProgress?: (line: string) => void): NativeDeps {
+  return { store: defaultFeArtifactStore(), runner: createComputeRunner(env), env, ...(onProgress !== undefined ? { onProgress } : {}) };
 }
 
 const failure = (summary: string): CommandOutcome => ({ summary, affected: [], isError: true, changed: false });
@@ -106,12 +141,25 @@ const failure = (summary: string): CommandOutcome => ({ summary, affected: [], i
 export async function runNativeTool(
   name: string,
   params: unknown,
-  host: FeaHost,
-  deps: NativeDeps = defaultDeps(process.env),
+  host: FeaHost & { readonly onProgress?: (line: string) => void },
+  deps: NativeDeps = defaultDeps(process.env, host.onProgress),
 ): Promise<CommandOutcome | null> {
   if (!isNativeTool(name)) return null;
   if (name === 'fea_render') return { ...(await runFeaRender(params, host, deps)), changed: false };
   const args = isRecord(params) ? params : {};
+  if (name === 'topology_solve') {
+    const studyId = nonEmptyString(args['studyId']);
+    if (studyId === undefined) return failure('topology_solve: studyId is required.');
+    const device = args['device'];
+    const options: TopologySolveOptions = {
+      ...(typeof args['timeoutS'] === 'number' && Number.isFinite(args['timeoutS']) ? { timeoutS: args['timeoutS'] } : {}),
+      ...(args['resumeFromLast'] === true ? { resumeFromLast: true } : {}),
+      ...(device === 'cpu' || device === 'gpu' || device === 'auto' ? { device } : {}),
+    };
+    const before = host.getDoc();
+    const result = await runTopologySolve(studyId, options, host, deps);
+    return { ...result, changed: host.getDoc() !== before };
+  }
   const timeout = typeof args['timeoutS'] === 'number' && Number.isFinite(args['timeoutS']) ? { timeoutS: args['timeoutS'] } : {};
   if (name === 'fatigue_field') {
     const caseId = nonEmptyString(args['caseId']);

@@ -12,7 +12,7 @@ import { contentSecurityPolicy } from '../src/security';
 import { liveSubscriberCount } from '../src/liveDocument';
 import { convertDwgLimited } from '../src/dwgConvert';
 
-const ENV_KEYS = ['MCP_AUTH_TOKEN', 'LLULL_LIVE_MAX_PER_CLIENT', 'LLULL_PYTHON_QUEUE_MAX'];
+const ENV_KEYS = ['LLULL_AUTH_TOKEN', 'LLULL_LIVE_MAX_PER_CLIENT', 'LLULL_PYTHON_QUEUE_MAX'];
 afterEach(() => {
   for (const key of ENV_KEYS) delete process.env[key];
 });

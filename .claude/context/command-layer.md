@@ -172,7 +172,7 @@ No id-counter reset exists; tests rely on step-scoped determinism.
 ## How the surfaces consume this (do not bypass)
 
 - UI: `store.dispatch(name, params)` → online `POST /command` (server `execute`, result arrives on
-  `/live`) or offline local `execute` + outbox → swap doc → undo snapshot.
+  `/live`) or, while the backend is unreachable, local `execute` → swap doc → undo snapshot (no outbox: LC1 step 6).
 - CLI (`server/src/cli` + `packages/protocol`): `llull list / search / describe` read `toToolSchemas()` (`buildCommandTools()`);
   `llull exec` / `run` call `execute` in-process on a document file, or `POST /command` on the local backend, which runs
   `execute` on the shared live document and broadcasts a `command` event.

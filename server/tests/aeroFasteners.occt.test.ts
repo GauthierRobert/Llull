@@ -1,11 +1,11 @@
 /** Live OpenCascade: insert_fastener_stack cuts an EXACT hole (VC-MAT-10, rel 1e-6) and bill_of_materials reports exact material mass (VC-MAT-11). */
-import { describe, expect, it } from 'vitest';
+import { expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import type { FastenerStack } from '@core/model/fasteners';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
-import { liveKernels } from './kernelTestSupport';
+import { describeNative, liveKernels } from './kernelTestSupport';
 
 const kernels = liveKernels();
 const ctx = (): ExecutionContext => ({ ...defaultContext(), kernel: kernels.occt });
@@ -36,7 +36,7 @@ const catalog = {
   ],
 };
 
-describe('fastener stack on the exact OpenCascade kernel', () => {
+describeNative('fastener stack on the exact OpenCascade kernel', () => {
   const run = (doc: CadDocument, name: string, params: Record<string, unknown>): CommandResult => {
     const result = execute(doc, name, params, ctx());
     expect(result.rejected, result.summary).toBeUndefined();

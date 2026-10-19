@@ -1,6 +1,6 @@
 # KI7 — The native OCCT kernel is the desktop default
 
-Status: accepted (2026-10-19). Completes the desktop part of RS1 (native OCCT kernel); the measurements TR-KRN-02 asks for are below.
+Status: accepted (2026-10-19); amended 2026-10-19 (LC1 step 5: the WASM kernel is gone, see "Amendment"). Completes the desktop part of RS1 (native OCCT kernel); the measurements TR-KRN-02 asks for are below.
 
 ## Problem
 
@@ -19,8 +19,8 @@ until it reproduced the OCP 7.9.3 numbers of the 01 KRN validation pack (TR-KRN-
 - Two native defects found by the suite and fixed with tests: the adaptive mass integration (also used by the WASM kernel) drifted up
   to 2.7e-4 in inertia on curved faces — the native kernel now uses the reference's default Gauss rule; and AP242 tessellated-only
   files, which OCCT 7.9 transfers as surface-less faces, are refused as `tessellated_only` like on 7.4.
-- The existing native suites (`server/tests/native*`, 248 tests incl. the native vs WASM parity cases) stay green; where they now differ (inertia of two curved revolutions) the native
-  value is the closed form and the WASM value is the documented error.
+- The existing native suites (`server/tests/native*`, 248 tests incl. the native vs WASM parity cases) stayed green; where they differed (inertia of two curved revolutions) the native
+  value was the closed form and the WASM value the documented error. (Those parity cases now assert closed forms, see "Amendment".)
 - Cost measured in RS1 (4-core Xeon, Linux, §13.D): cold start 12 ms / 9 MB RSS vs 1.73 s / +371 MB for the WASM module; box
   tessellate / mass 1.7 / 1.8 ms vs 9.2 / 9.6 ms; NIST CTC-01 import 636 ms vs 4230 ms; bundle 66 MB (OCCT 59 MB).
 
@@ -32,7 +32,26 @@ until it reproduced the OCP 7.9.3 numbers of the 01 KRN validation pack (TR-KRN-
 - The fallback chain is unchanged and stays visible: an op the sidecar lacks or a sidecar death is answered by the WASM kernel in the
   same worker (logged once per op), a missing binary gives `NATIVE_TOOL_MISSING` then WASM then Manifold, each with
   `kernel_info.fallbackReason`.
-- Server, CLI and browser defaults are unchanged (`LLULL_KERNEL` unset → their current default); `occt-native` stays opt-in there.
+- Server and CLI (LC1 step 1, 2026-10-19): `LLULL_KERNEL` unset installs the native kernel when `llull-kernel` is found (same discovery as
+  the desktop: `LLULL_KERNEL_BIN`, `LLULL_NATIVE_DIR`, `solver/target/release`; `server/src/geometryKernel.ts`), else Manifold with one
+  `console.warn` and `kernel_info.fallbackReason` (`GET /health` reports the active kernel). `LLULL_KERNEL=manifold` stays a diagnostic
+  override; `occt-native` is the explicit form (falls back to the WASM kernel); `occt` is the legacy WASM kernel. Tests inject the discovery
+  (`installGeometryKernel({ env, startNative })`) and need no binary.
+
+## Amendment (LC1 step 5, 2026-10-19): the WASM kernel is retired
+
+- `packages/kernel-occt` (opencascade.js 1.1.1, OCCT 7.4.0p1), its worker (`occtWorker.ts`, `occtNode.ts`) and the per-op fallback of the native
+  worker (`native/kernelRouter.ts` now only translates and forwards) are deleted. The last native-only gap, the pocket floor fillet, runs in the sidecar
+  (`recipe/floor.rs`: the unique edges on the floor plane and on the outline / island curves, in explorer order, then the fillet).
+- `LLULL_KERNEL`: only `manifold` is special (diagnostic override). Unset, `occt-native` and any other value (the retired `occt` included) install the
+  native kernel when `llull-kernel` is found, else Manifold with one warning and `kernel_info.fallbackReason`. The desktop passes `occt-native`
+  (`desktopKernel`) whether or not the bundle holds the binary: a bundle without `llull-kernel` now falls through to Manifold plus the warning, as the
+  server does. An op or recipe the sidecar refuses (`NATIVE_UNSUPPORTED`) is answered as a refusal (null), a sidecar death during a call as null,
+  and the next call respawns the sidecar.
+- Decisions that named the WASM kernel as the fallback below ("falls back to the WASM kernel", "`occt` is the legacy WASM kernel") are superseded.
+- Tests: the former native-vs-WASM parity suites assert closed forms (`nativeKernelCorpus.ts`, `nativeKernelPrimitives` / `Queries` / `Exchange` /
+  `Features` / `FeatureCuts`, `nativeKernelFloorFillet`) and the other `server/tests/occt*` suites run against the real binary (skipped with a logged
+  reason without it; `LLULL_REQUIRE_NATIVE_KERNEL=1`, set in CI, makes a missing binary a failure).
 
 ## Consequences
 
@@ -46,8 +65,7 @@ until it reproduced the OCP 7.9.3 numbers of the 01 KRN validation pack (TR-KRN-
 
 ## To confirm / follow-ups
 
-- Align `packages/kernel-occt/src/occtMass.ts` (WASM, browser and fallback) on the Gauss rule, then drop the two WASM inertia
-  tolerances in `nativeKernelFeatureParity.test.ts`.
+- (Done by LC1 step 5: the WASM mass integration and its two inertia tolerances are gone with the kernel.)
 - Fuzzy booleans (TR-KRN-12) to run the last probe case (fuzzy 2e-5: 2 → 1 solids).
 - B-rep text blobs that read back invalid (NIST stc_07 e3, both kernels): full-precision or binary blob format (TR-KRN-21).
 - Re-triage VC-KRN-04x at solid level: 4 of its 5 "GVP disagreements" come from loose faces measured with the solid.

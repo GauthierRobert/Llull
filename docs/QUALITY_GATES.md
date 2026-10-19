@@ -178,9 +178,8 @@ two gates above.
 | 6 | **Kernel parity** | `kernelPlans` under Manifold and OCCT: volume and bbox agree within 0.5 % | L9 promises one kernel interface; nothing checks the two agree |
 | 7 | **Malformed input** | truncated / corrupted STEP, JSON, oversized files → a graceful `summary`, unchanged document, no page error | import is an attack and crash surface |
 | 8 | **Command fuzzing** | property-based (fast-check) params for every registered command: never throws, never mutates the input, `summary` non-empty | L3 purity and the graceful no-op contract, over all commands, not only the hand-written cases |
-| 9 | **MCP task success** | scripted agent scenarios (bracket, enclosure, gearbox) through `/mcp`; `check_model` clean and measured dimensions match the brief | MCP is the product's defining surface |
+| 9 | **CLI task success** | scripted agent scenarios (bracket, enclosure, gearbox) through the `llull` CLI; `check_model` clean and measured dimensions match the brief | the CLI is the product's agent surface |
 | 10 | **Accessibility** | axe-core on every panel, 0 serious violations; keyboard-only open / fit / export flow | R10 |
-| 11 | **Bundle budget** | `vite build` gzip size per chunk; fail on +10 % | first load on the web |
 
 Gates 1–4 can reuse this corpus and the Playwright harness as they are. A nightly CI job running
 `npm run quality` (the repo has no CI workflow yet) is what turns these from tools into gates.

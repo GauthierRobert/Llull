@@ -35,10 +35,13 @@ export interface JobRun {
   readonly elapsedMs: number;
 }
 
+type ProgressSink = (event: Readonly<Record<string, unknown>>) => void;
+
 export interface ComputeRunner {
   /** Absolute path of `llull-compute`, or null when it is not installed. */
   readonly binary: string | null;
-  run(args: readonly string[], folder: string, timeoutMs: number): Promise<JobRun>;
+  /** `onProgress` receives every `progress` event (parsed NDJSON record) while the job runs. */
+  run(args: readonly string[], folder: string, timeoutMs: number, onProgress?: ProgressSink): Promise<JobRun>;
   /** "0.1.0" from `llull-compute --version`, or "unknown". */
   version(): Promise<string>;
 }
@@ -63,7 +66,14 @@ function outputsOf(value: unknown): JobOutput[] | null {
   return outputs;
 }
 
-function execute(binary: string, args: readonly string[], cwd: string, timeoutMs: number, env: NodeJS.ProcessEnv): Promise<JobRun> {
+function execute(
+  binary: string,
+  args: readonly string[],
+  cwd: string,
+  timeoutMs: number,
+  env: NodeJS.ProcessEnv,
+  onProgress?: ProgressSink,
+): Promise<JobRun> {
   const started = Date.now();
   return new Promise((resolve) => {
     const child = trackChild(spawn(binary, [...args], { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] }));
@@ -82,7 +92,8 @@ function execute(binary: string, args: readonly string[], cwd: string, timeoutMs
         return;
       }
       if (!isRecord(event)) return;
-      if (event['type'] === 'warning') warnings.push({ code: String(event['code']), message: String(event['message']) });
+      if (event['type'] === 'progress') onProgress?.(event);
+      else if (event['type'] === 'warning') warnings.push({ code: String(event['code']), message: String(event['message']) });
       else if (event['type'] === 'error')
         terminal = { ok: false, outputs: [], code: String(event['code']), message: String(event['message']) };
       else if (event['type'] === 'done') {
@@ -141,8 +152,8 @@ export function createComputeRunner(
   let version: string | null = null;
   return {
     binary,
-    run: (args, folder, timeoutMs) =>
-      binary === null ? Promise.resolve(missing()) : execute(binary, [...args, folder], folder, timeoutMs, env),
+    run: (args, folder, timeoutMs, onProgress) =>
+      binary === null ? Promise.resolve(missing()) : execute(binary, [...args, folder], folder, timeoutMs, env, onProgress),
     async version() {
       if (version !== null) return version;
       if (binary === null) return 'unknown';

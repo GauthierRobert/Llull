@@ -3,6 +3,8 @@
 Gap id **KRN** · status: specification (no implementation) · written 2026-10-15 ·
 functional counterpart: [FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md) · validation: [validation/README.md](validation/README.md)
 
+> **Amendment 2026-10-19 (LC1 step 5).** The opencascade.js WASM kernel (`packages/kernel-occt`, OCCT 7.4.0p1) is retired: the native `llull-kernel` (OCCT 7.9.2, `solver/`) is the only exact kernel, with Manifold as the mesh kernel and the fallback when the binary is missing. Passages below that describe opencascade.js, the browser worker or the per-op WASM fallback record the state at the time they were written (see `docs/decisions/LC1-local-only.md`, KI7, RS1).
+
 Requirement ids `TR-KRN-nn` are grouped by decade: 0x kernel selection & build, 1x tolerance policy & booleans,
 2x STEP → exact B-rep & healing, 3x persistent naming, 4x mass properties, 5x validity, 6x determinism,
 7x large assemblies & display, 8x export, 9x face-query port, 10x agent-first (codes, units, defaults, unverified, review, human gates, loop).
@@ -132,8 +134,8 @@ wasmBytes?, capabilities: string[], modelingTolerance, isolation: 'process'|'wor
 (`process` = the native `llull-kernel` sidecar, §2.A; `wasmBytes` only for a WASM kernel).
 - **TR-KRN-05 (MUST, MVP)** The native kernel SHALL give the same results as the OCP 7.9.3 reference that
   produced this pack's numbers: counts equal and measures within VC tolerances on the analytic solids, the
-  probe cases and the NIST set (VC-KRN-25). Fallback order on desktop: `llull-kernel` → opencascade.js WASM in
-  the worker → Manifold, each step with a `fallbackReason` in `kernel_info`. (Was: "SHOULD V1, evaluate a native
+  probe cases and the NIST set (VC-KRN-25). Fallback order on desktop: `llull-kernel` → Manifold, with a `fallbackReason` in `kernel_info`
+  (the opencascade.js WASM step was removed in LC1 step 5). (Was: "SHOULD V1, evaluate a native
   backend via CPython OCP"; superseded by RS1.) **Status 2026-10-19: VC-KRN-25 passed** on OCCT 7.9.2 (§13.D, validation/README.md §6);
   the desktop default is the native kernel when bundled (KI7).
 
@@ -952,7 +954,7 @@ KI7):
 - **Tests.** Rust: 24 unit tests (facade, closure check, LRU, recipe evaluation, session protocol). Server, always run:
   `nativeKernelProtocol`, `nativeKernelSession` (fake process), `nativeKernelRouter` (fake session and fallback),
   `nativeKernel` (the real worker path against a scripted sidecar, `fixtures/fakeKernel.cjs`: native and fallback ops, crash
-  recovery, a sidecar that does not speak, NATIVE_TOOL_MISSING fallback). With the binary built: `nativeKernelParity` (VC-KRN-25
+  recovery, a sidecar that does not speak, NATIVE_TOOL_MISSING fallback). With the binary built (since LC1 step 5 the parity suites below are `nativeKernelPrimitives` / `nativeKernelFeatures` / `nativeKernelQueries` / `nativeKernelExchange` / `nativeKernelFeatureCuts` / `nativeKernelFloorFillet`, asserting closed forms and B-rep invariants instead of WASM values; the numbers below are the original native-vs-WASM measurements): `nativeKernelParity` (VC-KRN-25
   slice): 11 primitives (translated, rotated about all axes), 4 boolean recipes (union, subtract, intersect, nested + place +
   scale): volume, area and inertia within 1e-6 relative, centroid 1e-6, bounds 1e-3 of the WASM kernel; display meshes closed,
   mesh volume within 6 % of the exact one and 3 % of the WASM mesh; `analyze` validity / closure / lumps equal; STEP solid count

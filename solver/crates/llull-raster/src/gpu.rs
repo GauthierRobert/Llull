@@ -176,24 +176,16 @@ fn words(bytes: &[u8]) -> impl Iterator<Item = [u8; 4]> + '_ {
 
 /// RGBA, depth and the adapter name, or why the GPU could not be used.
 pub fn raster_pixels(p: &Prepared) -> Result<(Vec<u8>, Vec<f32>, String), String> {
-    let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
-    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-        power_preference: wgpu::PowerPreference::HighPerformance,
-        force_fallback_adapter: false,
-        compatible_surface: None,
-    }))
-    .map_err(|error| format!("no GPU adapter ({error})"))?;
-    let info = adapter.get_info();
-    let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
-        .map_err(|error| format!("no GPU device ({error})"))?;
+    let gpu = llull_gpu::device::acquire("llull-raster")?;
+    let (device, queue) = (&gpu.device, &gpu.queue);
     let (w, h) = ((p.width * p.samples) as u32, (p.height * p.samples) as u32);
     let module = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: None, source: wgpu::ShaderSource::Wgsl(SHADER.into()) });
     let formats = [wgpu::TextureFormat::R32Sint, wgpu::TextureFormat::R32Float, wgpu::TextureFormat::R32Float];
-    let main = pipeline(&device, &module, "fs", &formats, true);
-    let ghost_pipeline = pipeline(&device, &module, "ghost", &[wgpu::TextureFormat::R32Uint], false);
-    let targets: Vec<wgpu::Texture> = formats.iter().map(|&format| target(&device, w, h, format)).collect();
-    let ghost_target = target(&device, w, h, wgpu::TextureFormat::R32Uint);
-    let depth_target = target(&device, w, h, wgpu::TextureFormat::Depth32Float);
+    let main = pipeline(device, &module, "fs", &formats, true);
+    let ghost_pipeline = pipeline(device, &module, "ghost", &[wgpu::TextureFormat::R32Uint], false);
+    let targets: Vec<wgpu::Texture> = formats.iter().map(|&format| target(device, w, h, format)).collect();
+    let ghost_target = target(device, w, h, wgpu::TextureFormat::R32Uint);
+    let depth_target = target(device, w, h, wgpu::TextureFormat::Depth32Float);
     let views: Vec<wgpu::TextureView> = targets.iter().map(|t| t.create_view(&wgpu::TextureViewDescriptor::default())).collect();
     let ghost_view = ghost_target.create_view(&wgpu::TextureViewDescriptor::default());
     let depth_view = depth_target.create_view(&wgpu::TextureViewDescriptor::default());
@@ -261,10 +253,10 @@ pub fn raster_pixels(p: &Prepared) -> Result<(Vec<u8>, Vec<f32>, String), String
         }
     }
     queue.submit([encoder.finish()]);
-    let ids = read_back(&device, &queue, &targets[0], w, h)?;
-    let values = read_back(&device, &queue, &targets[1], w, h)?;
-    let depths = read_back(&device, &queue, &targets[2], w, h)?;
-    let covered = read_back(&device, &queue, &ghost_target, w, h)?;
+    let ids = read_back(device, queue, &targets[0], w, h)?;
+    let values = read_back(device, queue, &targets[1], w, h)?;
+    let depths = read_back(device, queue, &targets[2], w, h)?;
+    let covered = read_back(device, queue, &ghost_target, w, h)?;
     let triangle: Vec<i64> = words(&ids).map(|b| i64::from(i32::from_le_bytes(b))).collect();
     let buffers = ZBuffer {
         depth: words(&depths).zip(&triangle).map(|(b, &id)| if id < 0 { f32::NEG_INFINITY } else { f32::from_le_bytes(b) }).collect(),
@@ -273,5 +265,5 @@ pub fn raster_pixels(p: &Prepared) -> Result<(Vec<u8>, Vec<f32>, String), String
         triangle,
     };
     let rgba = resolve(p, &buffers);
-    Ok((rgba, buffers.depth, format!("{} ({:?})", info.name, info.backend)))
+    Ok((rgba, buffers.depth, gpu.adapter.clone()))
 }

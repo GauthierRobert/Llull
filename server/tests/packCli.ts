@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
-import { createNodeOcctKernel } from '../src/occtNode';
+import { createNativeTestKernel } from './kernelTestSupport';
 import { runCli, type CliIo } from '../src/cli/main';
 
 /** Every `approx` assertion checked so far; `LLULL_PACK_MEASURE=<file>` makes packReplay07 write them (the numbers behind RESULTS.json). */
@@ -56,10 +56,10 @@ export interface CliCall {
   readonly ms: number;
 }
 
-let kernels: { manifold: GeometryKernel; occt: GeometryKernel } | null = null;
+const kernels: { manifold?: GeometryKernel; occt?: GeometryKernel } = {};
 async function kernelFor(name: 'manifold' | 'occt'): Promise<GeometryKernel> {
-  kernels ??= { manifold: await createManifoldKernel(), occt: await createNodeOcctKernel() };
-  return kernels[name];
+  if (name === 'manifold') return (kernels.manifold ??= await createManifoldKernel());
+  return (kernels.occt ??= createNativeTestKernel());
 }
 
 /** Shell-like split of a pack CLI line: single / double quotes group, a trailing `# comment` is dropped. */
@@ -257,7 +257,7 @@ const writeTemp = (session: Session, name: string, content: string): string => {
 };
 
 let paramFileCounter = 0;
-/** One registry command through the CLI with its params in a `@file` (JSON); `flags` follow it (e.g. `--kernel occt`). */
+/** One registry command through the CLI with its params in a `@file` (JSON); `flags` follow it (e.g. `--kernel occt-native`). */
 export async function cliExec(session: Session, name: string, params: unknown, flags: readonly string[] = []): Promise<CliCall> {
   const file = writeTemp(session, `params-${paramFileCounter++}.json`, JSON.stringify(params));
   return cliCall(session, [name, `@${file}`, ...flags]);

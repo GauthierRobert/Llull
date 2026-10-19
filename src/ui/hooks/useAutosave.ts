@@ -1,7 +1,7 @@
 /**
  * Debounced autosave (1.5 s, and on pagehide / hidden), startup restore and unsaved-changes tracking (beforeunload,
- * TopBar). Restore runs once the connection attempt is decided (failed, or connected AND first snapshot hydrated) with an empty document: `load_document` with `localOnly`,
- * so a later flush never replaces the shared server document. With a live server (or an already edited document) an unsaved
+ * TopBar). Restore runs once the connection attempt is decided (failed, or connected AND first snapshot hydrated) with an empty document (`load_document`, run locally;
+ * the backend's snapshot replaces it once it connects). With a live server (or an already edited document) an unsaved
  * record that differs is NOT applied: it becomes `pendingLocalCopy` (RestoredBanner) and is never overwritten until chosen.
  * With a live server nothing is saved/marked. A failed write clears the record and shows a status message.
  */
@@ -25,7 +25,6 @@ export function useAutosave(storage: KeyValueStorage | null = browserStorage()):
   useEffect(() => {
     let restoreDecided = false;
     let pending = false;
-    let hadSyncableOfflineEdits = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const flush = (): void => {
@@ -70,7 +69,6 @@ export function useAutosave(storage: KeyValueStorage | null = browserStorage()):
         { json: record.json },
         {
           quiet: true,
-          localOnly: true,
           onResult: ({ changed }) => {
             if (!changed) {
               console.warn('llull: autosave could not be restored; discarding it');
@@ -92,15 +90,6 @@ export function useAutosave(storage: KeyValueStorage | null = browserStorage()):
 
     const unsubscribe = useStore.subscribe((state, previous) => {
       if (!restoreDecided && restoreDecidable(state)) restoreOnce();
-      if (state.hasUnsyncedLocalEdits && state.localOutbox.some((entry) => entry.localOnly !== true)) hadSyncableOfflineEdits = true;
-      if (previous.hasUnsyncedLocalEdits && !state.hasUnsyncedLocalEdits && state.liveStatus === 'connected' && hadSyncableOfflineEdits) {
-        // The outbox was replayed and acknowledged: the offline work now lives on the server, so the copy is stale.
-        hadSyncableOfflineEdits = false;
-        pending = false;
-        if (timer !== null) clearTimeout(timer);
-        timer = null;
-        if (storage !== null && useSessionStore.getState().pendingLocalCopy === null) clearAutosave(storage);
-      }
       const changed =
         state.document.entities !== previous.document.entities ||
         state.document.building !== previous.document.building ||

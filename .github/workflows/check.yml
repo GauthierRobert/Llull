@@ -31,7 +31,8 @@ jobs:
         working-directory: solver
       - run: node scripts/nativeCheck.mjs
 
-  # Native OCCT kernel (RS-1): crate llull-kernel-occt + bin llull-kernel (clippy, cargo test), the native-vs-WASM parity suite, then
+  # Native OCCT kernel (RS-1): crate llull-kernel-occt + bin llull-kernel (clippy, cargo test), every server suite that runs the real kernel
+  # (closed-form expectations; the WASM kernel is retired, LC1 step 5), then
   # the desktop native bundle. OCCT 7.9.2 is built SHARED by solver/scripts/build-occt.mjs (pinned source + sha256, ~60 min on 4 cores)
   # into an install prefix cached by version + source sha + recipe; warm runs reuse it through LLULL_OCCT_DIR and take a few minutes.
   native-kernel:
@@ -73,7 +74,7 @@ jobs:
         working-directory: solver
       - run: npm ci
       - run: npm --prefix server ci
-      - run: npx vitest run --config vitest.config.mts tests/nativeKernelParity.test.ts tests/nativeKernel.test.ts
+      - run: npm test
         working-directory: server
         env:
           LLULL_REQUIRE_NATIVE_KERNEL: '1'
@@ -122,7 +123,7 @@ jobs:
       - run: node desktop/scripts/prepare-native.mjs
       - run: npm ci
       - run: npm --prefix server ci
-      - run: npx vitest run --config vitest.config.mts tests/nativeKernelParity.test.ts tests/nativeKernel.test.ts tests/nativeBinary.test.ts
+      - run: npx vitest run --config vitest.config.mts tests/nativeKernelPrimitives.test.ts tests/nativeKernel.test.ts tests/nativeBinary.test.ts
         working-directory: server
         env:
           LLULL_REQUIRE_NATIVE_KERNEL: '1'

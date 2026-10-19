@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Entity, Vec3 } from '@core/model/types';
-import { clearTangentContact, TANGENT_GAP } from '@kernel-occt/tangentGuard';
+import { clearTangentContact, TANGENT_GAP } from '@core/geometry/tangentGuard';
 
 const common = { layerId: 'layer-default', color: '#888888' };
 const sphere = (position: Vec3, radius: number): Entity =>

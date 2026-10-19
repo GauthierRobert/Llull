@@ -18,8 +18,6 @@ interface BackendEnvInput {
   readonly baseEnv: Readonly<Record<string, string | undefined>>;
   /** The native binaries bundle when it is present (`nativeBundleDir`), else null: the backend then uses its TypeScript paths. */
   readonly nativeDir?: string | null;
-  /** The bundle holds `llull-kernel` (`hasNativeKernel`): the default kernel is then the native OCCT 7.9 sidecar (KI7). */
-  readonly nativeKernel?: boolean;
 }
 
 const NATIVE_BINARIES = ['llull-compute', 'llull-kernel'] as const;
@@ -30,18 +28,13 @@ export function nativeBundleDir(dir: string, platform: NodeJS.Platform, exists: 
   return NATIVE_BINARIES.some((binary) => exists(path.join(dir, `${binary}${suffix}`))) ? dir : null;
 }
 
-/** True when `dir` holds the native kernel binary `llull-kernel` (a bundle may ship `llull-compute` only: LLULL_NATIVE_KERNEL=0). */
-export function hasNativeKernel(dir: string | null, platform: NodeJS.Platform, exists: (file: string) => boolean): boolean {
-  return dir !== null && exists(path.join(dir, platform === 'win32' ? 'llull-kernel.exe' : 'llull-kernel'));
-}
-
 /**
- * The backend's kernel (TR-KRN-01, KI7): the native OCCT 7.9 sidecar when bundled, else the WASM OCC kernel. An inherited
- * LLULL_KERNEL=manifold or occt (the WASM kernel) is a diagnostic override; any other inherited value is ignored.
+ * The backend's kernel (TR-KRN-01, KI7): the native OCCT 7.9 sidecar, which the backend finds in the bundle (`LLULL_NATIVE_DIR`) and, when
+ * it is missing, replaces with Manifold plus a logged warning (the server's own fallback). An inherited LLULL_KERNEL=manifold is a
+ * diagnostic override; any other inherited value is ignored.
  */
-export function desktopKernel(inherited: string | undefined, nativeKernel: boolean): 'manifold' | 'occt' | 'occt-native' {
-  if (inherited === 'manifold' || inherited === 'occt') return inherited;
-  return nativeKernel ? 'occt-native' : 'occt';
+export function desktopKernel(inherited: string | undefined): 'manifold' | 'occt-native' {
+  return inherited === 'manifold' ? 'manifold' : 'occt-native';
 }
 
 /** Big documents are opened with one `load_document` call; the server default is 2 MB. */
@@ -54,7 +47,7 @@ export function backendOrigin(port: number): string {
 export function backendEnv(input: BackendEnvInput): Record<string, string> {
   const inherited = Object.fromEntries(
     Object.entries(input.baseEnv).filter(
-      (entry): entry is [string, string] => entry[1] !== undefined && !entry[0].startsWith('LLULL_') && entry[0] !== 'MCP_AUTH_TOKEN',
+      (entry): entry is [string, string] => entry[1] !== undefined && !entry[0].startsWith('LLULL_') && entry[0] !== 'LLULL_AUTH_TOKEN',
     ),
   );
   return {
@@ -62,7 +55,7 @@ export function backendEnv(input: BackendEnvInput): Record<string, string> {
     NODE_ENV: 'production',
     HOST: '127.0.0.1',
     PORT: String(input.port),
-    MCP_AUTH_TOKEN: input.token,
+    LLULL_AUTH_TOKEN: input.token,
     LLULL_REQUIRE_TOKEN_FOR_REST: 'true',
     LLULL_ALLOWED_ORIGINS: backendOrigin(input.port),
     LLULL_STATIC_DIR: input.layout.webDir,
@@ -71,11 +64,8 @@ export function backendEnv(input: BackendEnvInput): Record<string, string> {
     LLULL_PYTHON: input.layout.python,
     // Native compute jobs and the native kernel binary, only when bundled.
     ...(input.nativeDir === undefined || input.nativeDir === null ? {} : { LLULL_NATIVE_DIR: input.nativeDir }),
-    // An exact OCC kernel is the desktop default (TR-KRN-01): native when bundled (VC-KRN-25 passed, KI7), else WASM.
-    LLULL_KERNEL: desktopKernel(
-      input.baseEnv['LLULL_KERNEL'],
-      input.nativeDir !== undefined && input.nativeDir !== null && input.nativeKernel === true,
-    ),
+    // The native OCC kernel is the desktop default (TR-KRN-01, KI7); a bundle without llull-kernel falls back to Manifold with a warning.
+    LLULL_KERNEL: desktopKernel(input.baseEnv['LLULL_KERNEL']),
     // import_code runs arbitrary Python: off unless the user launched the app with it set to 1.
     ...(input.baseEnv['LLULL_ALLOW_CODE_EXECUTION'] === '1' ? { LLULL_ALLOW_CODE_EXECUTION: '1' } : {}),
   };

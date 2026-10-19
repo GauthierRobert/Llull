@@ -18,7 +18,7 @@ import { createAutosaver } from '../src/autosave';
 import { createEmptyDocument } from '@core/model/types';
 import * as registry from '@core/commands/registry';
 
-const ENV_KEYS = ['MCP_AUTH_TOKEN', 'LLULL_ALLOWED_ORIGINS', 'LLULL_REQUIRE_TOKEN_FOR_REST', 'LLULL_REST_RATE_LIMIT_MAX'];
+const ENV_KEYS = ['LLULL_AUTH_TOKEN', 'LLULL_ALLOWED_ORIGINS', 'LLULL_REQUIRE_TOKEN_FOR_REST', 'LLULL_REST_RATE_LIMIT_MAX'];
 beforeEach(() => {
   _resetLiveDoc();
   _resetHistory();
@@ -113,7 +113,7 @@ describe('mutation guard (/command, /undo, /redo)', () => {
   });
 
   it('with a token: allowed Origin passes, bare client gets 401, bearer passes', async () => {
-    process.env['MCP_AUTH_TOKEN'] = 's3cret';
+    process.env['LLULL_AUTH_TOKEN'] = 's3cret';
     expect((await request(app).post('/command').set('Origin', 'http://localhost:5173').send(body)).status).toBe(200);
     expect((await request(app).post('/command').send(body)).status).toBe(401);
     expect((await request(app).post('/command').set('Authorization', 'Bearer wrong').send(body)).status).toBe(401);
@@ -121,14 +121,14 @@ describe('mutation guard (/command, /undo, /redo)', () => {
   });
 
   it('strict mode requires the bearer even from an allowed Origin; foreign Origin + bearer passes', async () => {
-    process.env['MCP_AUTH_TOKEN'] = 's3cret';
+    process.env['LLULL_AUTH_TOKEN'] = 's3cret';
     process.env['LLULL_REQUIRE_TOKEN_FOR_REST'] = 'true';
     expect((await request(app).post('/command').set('Origin', 'http://localhost:5173').send(body)).status).toBe(401);
     expect((await request(app).post('/undo').set('Authorization', 'Bearer s3cret')).status).toBe(200);
   });
 
   it('does not guard read routes', async () => {
-    process.env['MCP_AUTH_TOKEN'] = 's3cret';
+    process.env['LLULL_AUTH_TOKEN'] = 's3cret';
     expect((await request(app).get('/health')).status).toBe(200);
   });
 

@@ -1,5 +1,5 @@
-// OCCT side of the llull native kernel facade. Each maker mirrors packages/kernel-occt (opencascade.js) so the native and the WASM
-// kernels build the same B-rep for the same recipe (VC-KRN-25 parity): same builders, same placement order, same post-boolean unify.
+// OCCT side of the llull native kernel facade. Each maker follows the builders of the retired opencascade.js kernel (VC-KRN-25): same
+// builders, same placement order, same post-boolean unify.
 #include "llull-kernel-occt/cpp/facade.hxx"
 
 #include <cmath>
@@ -230,7 +230,7 @@ std::unique_ptr<Shape> boolean_op(const Shape &a, const Shape &b, int32_t operat
   }
   if (!unify) return wrap(result);
   try {
-    // Same as the WASM kernel: merge the faces a boolean split so face / edge indices stay stable for later fillets.
+    // Merge the faces a boolean split so face / edge indices stay stable for later fillets.
     ShapeUpgrade_UnifySameDomain unifier(result, Standard_True, Standard_True, Standard_False);
     unifier.AllowInternalEdges(Standard_False);
     unifier.Build();

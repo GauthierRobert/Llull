@@ -4,7 +4,7 @@
  * with a floor fillet (VC-FTR-27), the parametric thickness (VC-FTR-30), and recognised again from the STEP file (VC-FTR-17, 20, 34).
  */
 
-import { describe, expect, it, afterAll } from 'vitest';
+import { expect, it, afterAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { execute } from '@core/commands/registry';
@@ -17,7 +17,7 @@ import { createEmptyDocument, type CadDocument, type Entity, type MeshSolidEntit
 import type { FtrCheckData } from '@core/model/manufacturing';
 import type { RecognizeData } from '@core/commands/features/recognizeFeatures';
 import type { HoleTableData } from '@core/commands/features/holeTable';
-import { liveKernels } from './kernelTestSupport';
+import { liveKernels, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
 afterAll(() => setGeometryKernel(null));
@@ -120,7 +120,7 @@ function removedVolume(t: number): number {
   return 4 * csk + 2 * cbore + pocket + blind;
 }
 
-describe('add_hole / add_pocket on the live OCC kernel', () => {
+describeNative('add_hole / add_pocket on the live OCC kernel', () => {
   it('VC-FTR-25: the machined plate plan has the pack volume 55978.529153 and exact analytic volume', () => {
     const doc = buildPlate(kernels.occt);
     const volume = volumeOf(kernels.occt, doc, only(doc));
@@ -246,7 +246,7 @@ interface ExpectedPlate {
   }>;
 }
 
-describe('add_hole performance budget (07 TR §8)', () => {
+describeNative('add_hole performance budget (07 TR §8)', () => {
   it('100 positions are cut by one compound tool in a few seconds, with the exact volume', () => {
     const plate = execute(createEmptyDocument(), 'add_box', { size: [200, 200, 10], position: [0, 0, 0], anchor: 'min' });
     const points = Array.from({ length: 100 }, (_, i) => [10 + (i % 10) * 20, 10 + Math.floor(i / 10) * 20]);
@@ -270,7 +270,7 @@ describe('add_hole performance budget (07 TR §8)', () => {
   }, 120_000);
 });
 
-describe('recognize_features on the live OCC kernel', () => {
+describeNative('recognize_features on the live OCC kernel', () => {
   const expected = (JSON.parse(readFileSync(path.join(PACK, 'data/expected_feature_recognition.json'), 'utf8')) as ExpectedPlate).cases[0]!
     .expected;
   const around = (value: number | undefined, target: number, tol = 1e-4): void =>

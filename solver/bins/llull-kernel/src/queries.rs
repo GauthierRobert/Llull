@@ -1,9 +1,9 @@
 //! Query and exchange ops of the session (`KernelOps` names): `topology`, `distance`, every `faceQuery.<method>`,
 //! `exportStepAssembly`, `importShapes` and `loadBlob`. Arguments arrive as the worker protocol sends them (handles rewritten by
-//! `server/src/native/kernelProtocol.ts`); results have the WASM kernel's shapes (`packages/kernel-occt`).
+//! `server/src/native/kernelProtocol.ts`); results have the `GeometryKernel` shapes (`@core/geometry/kernel`).
 //!
-//! `faceQuery.tessellateFace`, `edgeSamples`, `edgeContinuity` and `bspline` answer null, as the WASM kernel does (its
-//! opencascade.js build lacks the bindings): answering here keeps the WASM module unloaded for a call whose answer is known.
+//! `faceQuery.tessellateFace`, `edgeSamples`, `edgeContinuity` and `bspline` answer null (the retired opencascade.js
+//! build lacked the bindings, and no caller reads them yet).
 
 use crate::session::{Reply, Session, BAD_REQUEST, OCC_FAILURE};
 use llull_kernel_occt::queries::{self, AssemblyPart, ImportOptions, PartUse, UvRequest};

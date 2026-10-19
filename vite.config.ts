@@ -16,7 +16,7 @@ const DOM_SUITES = [
 export default defineConfig(({ command }) => ({
   plugins: [react()],
   // Serve .wasm files with the correct MIME type so WebAssembly.instantiateStreaming
-  // succeeds in the browser (manifold-3d, opencascade.js). Vite dev-server otherwise
+  // succeeds in the browser (manifold-3d). Vite dev-server otherwise
   // serves them as application/octet-stream which browsers reject for streaming compile.
   assetsInclude: ['**/*.wasm'],
   // Pre-bundling moves manifold-3d into node_modules/.vite/deps/, where emscripten's sibling
@@ -33,8 +33,7 @@ export default defineConfig(({ command }) => ({
             { name: 'vendor-react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 2 },
             { name: 'vendor-r3f', test: /node_modules[\\/](@react-three|postprocessing)[\\/]/, priority: 1 },
             { name: 'vendor-three', test: /node_modules[\\/](three|three-stdlib|three-mesh-bvh)[\\/]/, priority: 3 },
-            // The registry needs every plugin at startup, so these load eagerly; separate chunks
-            // keep them cached across UI-only deploys and keep each chunk under the warning limit.
+            // The registry needs every plugin at startup, so these load eagerly; separate chunks keep each under the warning limit.
             { name: 'llull-core', test: /packages[\\/]core[\\/]src[\\/]/, priority: 1 },
             { name: 'llull-cae', test: /packages[\\/]domain-cae[\\/]src[\\/]/, priority: 1 },
             { name: 'llull-aero', test: /packages[\\/]domain-aero[\\/]src[\\/]/, priority: 1 },
@@ -44,17 +43,9 @@ export default defineConfig(({ command }) => ({
       },
     },
   },
-  server: {
-    headers: {
-      // Required for SharedArrayBuffer / COOP-COEP if needed; harmless otherwise.
-      // application/wasm is set by Vite's built-in mime map when assetsInclude covers .wasm.
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-    },
-  },
   resolve: {
     alias: {
-      // manifold-3d's Node-only branch imports node:module; stub it for browser bundles only
+      // manifold-3d's Node-only branch imports node:module; stub it for the renderer bundle only
       // (the vitest/node run keeps the real module).
       ...(command === 'build' ? { 'node:module': resolve(import.meta.dirname, 'src/ui/geometry/nodeModuleStub.ts') } : {}),
       ...workspaceAliases(),

@@ -9,7 +9,7 @@ publish.workspace = true
 [features]
 default = []
 # wgpu offscreen path (a picture: not bit-identical); without an adapter the CPU twin answers with a logged reason.
-gpu = ["dep:wgpu", "dep:pollster"]
+gpu = ["dep:wgpu", "dep:llull-gpu", "llull-gpu/wgpu"]
 
 [dependencies]
 llull-jsmath = { path = "../llull-jsmath" }
@@ -17,8 +17,8 @@ llull-protocol = { path = "../llull-protocol" }
 rayon.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-wgpu = { version = "25", optional = true, default-features = false, features = ["wgsl", "vulkan", "metal", "dx12"] }
-pollster = { version = "0.4", optional = true }
+llull-gpu = { path = "../llull-gpu", optional = true }
+wgpu = { workspace = true, optional = true }
 
 [lints]
 workspace = true

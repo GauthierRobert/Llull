@@ -21,7 +21,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   FAST_AXIS_ANGLE: 'Angled or countersunk fasteners are out of scope: align axis with the face normal.',
   FAST_HOLE_DIAMETER_UNKNOWN:
     'Give holeDiameter { value, unit }, or import the size hole diameter (holeDiameter) into the catalogue, or use holeMode "none".',
-  FAST_KERNEL_REQUIRED: 'Install a geometry kernel (--kernel occt on the desktop) or use holeMode "none".',
+  FAST_KERNEL_REQUIRED: 'Install a geometry kernel (--kernel occt-native on the desktop) or use holeMode "none".',
   FAST_HOLE_CUT_FAILED:
     'The kernel could not cut the hole; check the plates are closed 3D solids (not instances) and the hole is inside them.',
   FAST_EDGE_DISTANCE: 'Move the row away from the plate edge, or pass allowViolations to accept the warning.',

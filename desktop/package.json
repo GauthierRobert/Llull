@@ -6,7 +6,7 @@
   "type": "commonjs",
   "main": "dist/main.js",
   "scripts": {
-    "build:web": "cd .. && cross-env VITE_LLULL_SERVER_URL=same-origin npm run build",
+    "build:web": "npm --prefix .. run build",
     "build:server": "npm --prefix ../server run build",
     "build:main": "node scripts/build-main.mjs",
     "build": "npm run build:web && npm run build:server && npm run build:main",
@@ -20,7 +20,6 @@
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
-    "cross-env": "^7.0.3",
     "electron": "^38.8.6",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",

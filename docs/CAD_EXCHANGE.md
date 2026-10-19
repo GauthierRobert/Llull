@@ -104,7 +104,7 @@ LLULL_PYTHON=python3 npm --prefix server run dev   # python3 is the default
 Each bridge process runs with these limits:
 
 - **Environment:** it gets an allow-listed environment (`PATH`, `HOME`, locale, `PYTHON*`,
-  virtualenv/conda variables). Server secrets such as the desktop app's token (`MCP_AUTH_TOKEN`) never reach it.
+  virtualenv/conda variables). Server secrets such as the desktop app's token (`LLULL_AUTH_TOKEN`) never reach it.
 - **Concurrency:** at most two bridge processes run at once. The rest wait in a queue.
 - **Output:** a response may be at most 128 MB.
 - **Paths:** `path` arguments are checked again after following symbolic links. A link inside

@@ -14,9 +14,8 @@ import { deserializeDocument, serializeDocument } from '@core/commands/persisten
 import { recipeOf } from '@core/geometry/shapeRecipe';
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
 import { createEmptyDocument, type CadDocument, type Entity, type MeshSolidEntity, type Vec3 } from '@core/model/types';
-import { createNodeOcctKernel } from '../src/occtNode';
 import { EXIT_OK, runCli } from '../src/cli/main';
-import { liveKernels } from './kernelTestSupport';
+import { liveKernels, createNativeTestKernel, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
 afterAll(() => setGeometryKernel(null));
@@ -67,7 +66,7 @@ const importStep = (
   doc = createEmptyDocument(),
 ): CommandResult => execute(doc, 'import_step_exact', { text, ...params }, ctxOf(kernel));
 
-describe('import_step_exact on the live OCC kernel', () => {
+describeNative('import_step_exact on the live OCC kernel', () => {
   it('describes itself (kernel_info) with the importShapes and brepBlobs ports', () => {
     const info = execute(createEmptyDocument(), 'kernel_info', {}, ctxOf(kernels.occt)).data as {
       active: string;
@@ -75,7 +74,7 @@ describe('import_step_exact on the live OCC kernel', () => {
       build: string;
       capabilities: string[];
     };
-    expect(info).toMatchObject({ active: 'occt', occtVersion: '7.4.0p1', build: 'opencascade.js@1.1.1' });
+    expect(info).toMatchObject({ active: 'occt', occtVersion: '7.9.2', build: expect.stringContaining('llull-kernel@') });
     expect(info.capabilities).toEqual(expect.arrayContaining(['importShapes', 'brepBlobs', 'topology']));
   });
 
@@ -111,9 +110,9 @@ describe('import_step_exact on the live OCC kernel', () => {
     const shas = Object.keys(imported.document.blobs ?? {}).sort();
     expect(shas).toHaveLength(3);
     const text = serializeDocument(imported.document);
-    expect(JSON.parse(text)).toMatchObject({ version: 3, document: { kernelSettings: { kernel: 'occt', occtVersion: '7.4.0p1' } } });
+    expect(JSON.parse(text)).toMatchObject({ version: 3, document: { kernelSettings: { kernel: 'occt', occtVersion: '7.9.2' } } });
 
-    const fresh = await createNodeOcctKernel();
+    const fresh = createNativeTestKernel();
     const loaded = deserializeDocument(text);
     const touched = execute(loaded, 'describe_scene', {}, ctxOf(fresh));
     expect(touched.rejected).toBeUndefined();

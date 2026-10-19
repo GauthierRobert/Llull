@@ -138,6 +138,8 @@ const allToolNames = [
   ...buildExchangeToolDefinitions().map((tool) => tool.name),
   ...buildFeaToolDefinitions().map((tool) => tool.name),
   ...buildLibraryToolDefinitions().map((tool) => tool.name),
+  // server-side native transport listed in the analysis toolset (server/src/native/tools.ts; covered by server/tests/topologySolve.test.ts)
+  'topology_solve',
 ];
 
 describe('TOOLSETS', () => {

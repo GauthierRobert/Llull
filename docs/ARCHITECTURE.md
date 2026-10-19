@@ -48,7 +48,6 @@ packages/protocol        host protocol: live sync, REST bodies, CLI tool definit
                          library), toolsets, tool search, result shaping
 packages/domain-aec      building (AEC/BIM), industrial-steel and civil plugins
 packages/kernel-manifold Manifold mesh kernel (default)
-packages/kernel-occt     OpenCascade B-rep kernel
 src/app                  composition root: installs the default plugins
 src/ui                   React UI: viewport, panels, store
 server/                  Express local backend (live document, exchange, exports) + the `llull` CLI
@@ -156,14 +155,15 @@ between steps never need rewriting. On top of that:
 ## Geometry kernel
 
 three.js renders meshes; it is not a CAD kernel. Booleans, fillets, chamfers and shells go
-through a `GeometryKernel` interface with two implementations: Manifold (default, small, mesh
-only) and OpenCascade (exact B-rep, large WebAssembly). Commands receive the kernel through
-their execution context.
+through a `GeometryKernel` interface with two implementations: the native `llull-kernel` sidecar (exact OpenCascade 7.9 B-rep, the
+default of the backend, the CLI and the desktop app; `solver/crates/llull-kernel-occt`, reached through `server/src/nativeKernel.ts`) and
+Manifold (small, mesh only: the renderer's in-process kernel, tests, and the fallback when the sidecar binary is missing). The
+opencascade.js WASM kernel was retired (LC1 step 5). Commands receive the kernel through their execution context.
 
 The kernel boundary is a shape, not a mesh. A command describes what it wants as a
 `ShapeRecipe` — a serializable construction tree (primitive leaves, then boolean, fillet,
 chamfer, shell, placement and scale nodes, plus `feature` nodes — holes and pockets cut into a face, lowered to one compound boolean tool by `geometry/featureLowering`) — and the kernel evaluates it to an opaque,
-kernel-owned `ShapeHandle` (a TopoDS_Shape under OpenCascade). The kernel caches its native
+kernel-owned `ShapeHandle` (a TopoDS_Shape inside the sidecar). The kernel caches its native
 shapes by the recipe's content hash, so an unchanged prefix of the feature tree is never
 rebuilt; a handle carries its recipe, so a shape evicted from the cache, or lost with a
 restarted worker, is simply rebuilt. Meshes only come out of the kernel, for display and mesh
@@ -177,11 +177,10 @@ document opened under Manifold) the stored triangles are used instead. See
 Commands that need a kernel declare it; while none is loaded they refuse with an explicit
 message instead of silently doing nothing.
 
-The local backend and the CLI pick the kernel with `LLULL_KERNEL` (`@core/geometry/kernelChoice`), so a command
+The local backend and the CLI pick the kernel with `LLULL_KERNEL` (`server/src/geometryKernel.ts`: the native sidecar unless `manifold`), so a command
 produces the same result whichever of them ran it. The desktop renderer installs Manifold in-process
 (`src/main.tsx`) for the commands it runs itself (offline mode, read-only queries, live replay); when the backend
-runs another kernel, a replay hash mismatch falls back to a snapshot fetch. The renderer's WASM kernel is retired
-in LC1 step 5 (`docs/decisions/LC1-local-only.md`).
+runs another kernel, a replay hash mismatch falls back to a snapshot fetch (`docs/decisions/LC1-local-only.md`).
 
 ## State management and sync
 
@@ -189,8 +188,9 @@ The UI keeps the document in a single Zustand store (`src/ui/store`). `dispatch(
 
 - **online** — sends the command to the server, which runs it on the shared live
   document; the result comes back over the `/live` stream;
-- **offline** — runs `execute` locally, keeps an undo snapshot, and queues the command
-  in an outbox that is replayed to the server on reconnect.
+- **backend unreachable** (not started yet, restarting) — runs `execute` in the renderer and keeps an
+  undo snapshot; nothing is queued, and the backend's snapshot replaces the local document when it
+  connects (the status bar says so; the autosave copy keeps the local work recoverable).
 
 The live stream carries the **command log**, not document diffs: each event is
 `{ seq, name, params, stateHash }`. Clients re-run the command with the same `execute`
@@ -257,7 +257,7 @@ The agent edits the same document the UI does because it is calling the same
   resulting documents (ids normalized) with stored snapshots, plus checks that replaying
   the history reproduces them. Any behaviour change shows up here.
 - **Integration tests** exercise `store.dispatch` end-to-end (command → store → undo,
-  sync, outbox).
+  sync, local fallback).
 - **Component tests** (Testing Library) cover panels and param-gathering, not
   geometry math. **E2E tests** (Playwright) drive the real app.
 

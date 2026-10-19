@@ -1,8 +1,8 @@
-// Composition root of the default domain plugins (app, MCP server, test setup): the only place that knows the domains.
+// Composition root of the default domain plugins (app, backend, CLI, test setup): the only place that knows the domains.
 
 import { installPlugin } from '@core/plugins/host';
 import { buildingPlugin, civilPlugin, industrialPlugin } from '@aec/index';
-import { caePlugin } from '@cae/index';
+import { caePlugin, topologyPlugin } from '@cae/index';
 import { aerodynamicsPlugin, fastenersPlugin, fluidsPlugin, sheetMetalPlugin } from '@aero/index';
 import { designPlugin } from '@design/index';
 
@@ -12,6 +12,7 @@ export function installDefaultPlugins(): void {
   installPlugin(industrialPlugin);
   installPlugin(civilPlugin);
   installPlugin(caePlugin);
+  installPlugin(topologyPlugin);
   installPlugin(sheetMetalPlugin);
   installPlugin(fastenersPlugin);
   installPlugin(aerodynamicsPlugin);

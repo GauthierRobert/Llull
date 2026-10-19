@@ -12,10 +12,9 @@ paths:
   `{ seq, name, params, stateHash, source?, commandId? }` and `snapshot` `{ seq, stateHash, document }` events. Clients
   re-run each command with `execute` and check `stateHash`; a seq gap or hash mismatch ⇒
   `GET /live/snapshot`. No document-diff channel, no UI bridge.
-- Offline: the UI queues commands in an outbox (client `commandId` per entry, acked by id) and
-  replays them on reconnect, remapping ids the server minted differently. `POST /command` is
-  idempotent per `commandId`; events carry a server `epoch` so `(epoch, seq)` orders resyncs
-  across restarts.
+- While the backend is unreachable the UI runs `execute` locally (undo snapshots, no outbox, no replay); the next
+  snapshot replaces the local document (LC1 step 6). `POST /command` is idempotent per `commandId`; events carry
+  a server `epoch` so `(epoch, seq)` orders resyncs across restarts. `source` is `rest` | `cli`.
 - Agents use the `llull` CLI (no MCP server): `--doc` runs `execute` in-process on a file, `--app` / `--server` send
   `POST /command` / `POST /exchange` to the local backend. Toolsets (`@protocol/toolsets`) are a listing view
   (`llull list <toolset>`, UI palette); every tool stays callable. Tool schemas come only from `toToolSchemas()`.

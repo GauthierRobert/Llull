@@ -6,7 +6,7 @@ installable offline app. Rationale: [`docs/decisions/KI6-desktop-app-cli-first.m
 ```
 Electron main (src/main.ts: wiring only)
   ├─ utilityProcess: server/dist/index.js on 127.0.0.1:<stable port>, per-launch token
-  │     serves the web app (built with VITE_LLULL_SERVER_URL=same-origin), /command, /live, /export
+  │     serves the web app (the renderer uses the page origin), /command, /live, /export
   │     LLULL_PYTHON = resources/python (CadQuery: import_step / export_step;
   │     import_code runs arbitrary Python: only when the app is launched with LLULL_ALLOW_CODE_EXECUTION=1)
   │     LLULL_NATIVE_DIR = resources/native, only when bundled (llull-compute jobs; llull-kernel)
@@ -21,7 +21,7 @@ Electron main (src/main.ts: wiring only)
 
 ```bash
 npm install && npm --prefix server install && npm --prefix desktop install
-npm --prefix desktop run build    # web (same-origin) + server bundle + main process
+npm --prefix desktop run build    # renderer bundle + server bundle + main process
 npm --prefix desktop start        # Electron; LLULL_PYTHON=python3 to use a system CadQuery
 npm --prefix desktop test         # Electron-free: real backend + File ops + CLI --app
 npm --prefix desktop run typecheck
@@ -40,15 +40,15 @@ npm --prefix desktop run dist     # build → stage:server → prepare:python �
 - `prepare:python` downloads python-build-standalone (pinned in the script; override with
   `LLULL_PYTHON_STANDALONE_URL`, verify with `LLULL_PYTHON_STANDALONE_SHA256`, or point
   `LLULL_PYTHON_STANDALONE_DIR` at an extracted tree), runs `pip install -r
-  server/python/requirements.txt`, and fails unless the bridge probe reports CadQuery.
+server/python/requirements.txt`, and fails unless the bridge probe reports CadQuery.
 - `prepare:native` (needs Rust; RS1) builds `llull-compute` (with the `gpu` feature: wgpu raster, CPU-twin fallback) and
   `llull-kernel` into `build/cargo-target`, builds or reuses the shared OCCT 7.9.2 (`solver/scripts/build-occt.mjs`, about an
   hour the first time; or `LLULL_OCCT_DIR`), and stages `build/native/{llull-compute,llull-kernel,occt/lib/*,licenses/}`
   (Windows: the OCCT DLLs next to the executables). `LLULL_NATIVE_PREBUILT_DIR` takes prebuilt binaries, `LLULL_NATIVE_GPU=0`
   drops wgpu, `LLULL_NATIVE_KERNEL=0` ships `llull-compute` only. With `llull-kernel` in the bundle the app runs the native kernel
   (`LLULL_KERNEL=occt-native`, [KI7](../docs/decisions/KI7-native-kernel-default.md): it passed the VC-KRN-25 reference suite);
-  without it (`LLULL_NATIVE_KERNEL=0`) the WASM OCC kernel (`LLULL_KERNEL=occt`). Launch with
-  `LLULL_KERNEL=occt` to compare against the WASM kernel.
+  without it (`LLULL_NATIVE_KERNEL=0`) the backend logs a warning and runs Manifold (the WASM OCC kernel is retired, LC1 step 5). Launch with
+  `LLULL_KERNEL=manifold` to compare against the mesh kernel.
   Linux and Windows (DLL staging) are exercised in CI (`native-kernel`, `native-bundle`); macOS (`@loader_path` rpath, dylib install names) is deferred.
 - Output in `desktop/release/`: dmg/zip (macOS), nsis (Windows), AppImage/deb (Linux). `.llull`
   files open in the app.

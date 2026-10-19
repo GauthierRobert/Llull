@@ -199,7 +199,7 @@ reviewRequired. Never present them as released; say what a qualified person must
   up_to_next, up_to_face or blind with a 118° point reported as defaulted; face picked by \`face.near\`),
   \`add_pocket\` (islands, \`upToFace\`, \`open\`), \`add_rib\`, \`set_thread\` (cosmetic),
   \`hole_table\`, \`check_machining\` (thresholds are data with a source; missing ones are skipped and
-  listed). \`recognize_features\` needs an exact kernel (\`--kernel occt\`); imported parts come from
+  listed). \`recognize_features\` needs an exact kernel (\`--kernel occt-native\`); imported parts come from
   \`import_step_exact\`; \`holes_from_recognition\` turns their holes into \`add_hole\` plan steps.
 - **Sheet metal.** \`sheet_metal_calc\` (no part; K-factor explicit, or mode faa_empirical) →
   \`create_sheet_metal_rule\` (material, thickness, inside radius, K; no defaults) →
@@ -208,4 +208,23 @@ reviewRequired. Never present them as released; say what a qualified person must
   \`add_hem\` / \`add_joggle\` / \`add_sheet_cutout\` / \`add_relief\` / \`add_corner_relief\` / \`add_flanged_hole\` / \`add_bead\` →
   \`check_sheet_metal\` → \`flat_pattern\` → \`export_flat_pattern_dxf --save blank.dxf\`. Existing exact
   solids: \`convert_to_sheet_metal\`. Waivers stay FTR_WAIVER_NOT_APPROVED until a human approval exists.
+
+## 9. Topology optimization (toolset analysis)
+
+A topology result is a concept shape computed by llull, never a released design: say what an engineer must check.
+
+- **Set-up.** \`create_analysis\` (static) → \`set_part_idealization\` (the solid, one material with E and nu) → \`add_fea_constraint\` +
+  \`add_fea_load\` (force loads only) → \`create_topology_study\` (\`voxel\` and lengths in document units, \`volumeFraction\` 0.7 = 30 % lighter,
+  dimension 2 = plate layout on a plane, 3 = voxel solid) → optional \`set_topology_regions\` (keepIn bosses and interfaces, keepOut clearances;
+  load and support layers are protected by default) and \`set_topology_settings\` (named defaults: penal 3, move 0.2, filter radius 1.5 voxels).
+- **Solve.** \`llull topology_solve studyId=ID --progress\` (\`timeoutS\` default 1800, \`resumeFromLast=true\` continues the last finished run,
+  \`device=cpu|gpu|auto\`) runs the native \`llull-compute topopt\` (2D studies up to 2000 voxels also solve in TypeScript when it is missing; else
+  TOP_TOOL_MISSING) and records the result with \`record_topology_result\`. Never write a result by hand: the numbers are recomputed from the stored field.
+  Units are the analysis unit system (E in its stress unit, forces in its force unit, compliance in force x length).
+  \`topology_report\` shows state (unsolved | solved | stale | missing | untrusted), compliance, volume fraction, grey level.
+- **Rebuild.** The derived solid on layer layer-topology is read-only (TOP_DERIVED_READ_ONLY). \`suggest_rebuild\` gives closed loops (outer
+  counter-clockwise, holes clockwise) → \`extrude_profile\` (profile = the points, placement from the answer) for the outer loop, each hole with
+  \`extrude_profile\` + \`boolean\` subtract, \`fillet_edge\` on sharp corners → analyse the rebuild → \`compare_to_topology\` (IoU against the optimum).
+- **Finish.** \`check_topology\` with \`rebuildEntityIds\` (and \`release\` for ids about to be released: iso-surfaces are TOP_RESULT_NOT_RELEASABLE).
+  Any change to the study, the analysis or the geometry makes the result stale (TOP_RESULT_STALE): solve again.
 `;

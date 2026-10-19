@@ -30,6 +30,10 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
                               (fea_solve does it itself from $LLULL_NATIVE_MAP_MIN_NODES nodes)
   fea_render analysisId=ID [render_fea_results params] raster=auto|ts|cpu|gpu --save plot.png
                               the same plot with the pixel raster in llull-compute (cpu = bit-identical twin, gpu = picture)
+  topology_solve studyId=ID   native llull-compute topology optimization of a study (create_topology_study), recorded with
+                              record_topology_result  [timeoutS=1800 resumeFromLast=true device=cpu|gpu|auto]; --progress prints one
+                              line per iteration; without llull-compute only 2D studies up to 2000 voxels (TypeScript), else
+                              TOP_TOOL_MISSING; then: topology_report studyId=ID, check_topology studyId=ID
   register_material_library file=LIB.llull-matlib.json   copy a material library into $LLULL_LIBRARIES_DIR (~/.llull/libraries); then
                               import_material_library libraryId=ID version=V sha256=H, and resolve_material_libraries after a load
   run <plan.json | ->         build_project: an actions array or { actions, onError }
@@ -59,7 +63,8 @@ Flags
   --timeout SEC               stop a whole run after SEC seconds: exit 1 with a clear message, nothing
                               saved. Local: checked between plan steps, a hard kill 5 s later for a
                               step that never ends; --server: per-request limit (default 120 s)
-  --kernel manifold|occt      geometry kernel for local runs (default manifold; $LLULL_KERNEL)
+  --kernel manifold|occt-native  geometry kernel for local runs (default: the native llull-kernel when found, else
+                              Manifold with a warning; $LLULL_KERNEL; manifold is a diagnostic override)
 
 Exit codes: 0 ok · 1 the command failed, a plan step failed, or a change command changed
 nothing · 2 bad usage or unreadable input`;

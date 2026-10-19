@@ -45,18 +45,6 @@ export interface ErrorResponseBody {
   readonly error: string;
 }
 
-/** Body of the public `GET /license`. */
-export interface LicenseResponseBody {
-  readonly mode: 'licensed' | 'evaluation';
-  readonly customer: string | null;
-  readonly seats: number;
-  readonly expires: string | null;
-  /** Short text for the UI status bar / banner. */
-  readonly label: string;
-  readonly evaluation: boolean;
-  readonly warning?: string;
-}
-
 /** Target document layer of `POST /import/dwg?target=…`. */
 export type DwgImportTarget = 'drawing' | 'survey';
 

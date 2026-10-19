@@ -3,7 +3,7 @@ import type React from 'react';
 const CONTROL_SELECTOR = 'button,input,select,textarea,[tabindex]:not([tabindex="-1"])';
 
 interface FocusTrapOptions {
-  /** Also treat `a[href]` links as focusable (MCP connect dialog); the palette has none. */
+  /** Also treat `a[href]` links as focusable; the palette has none. */
   readonly links?: boolean;
 }
 

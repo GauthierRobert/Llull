@@ -15,7 +15,7 @@ beforeEach(() => {
   _resetLiveDoc();
 });
 afterEach(() => {
-  delete process.env['MCP_AUTH_TOKEN'];
+  delete process.env['LLULL_AUTH_TOKEN'];
   vi.restoreAllMocks();
 });
 
@@ -28,7 +28,7 @@ const mint = async (token = TOKEN): Promise<string> => {
 
 describe('POST /live/ticket (shared token)', () => {
   beforeEach(() => {
-    process.env['MCP_AUTH_TOKEN'] = TOKEN;
+    process.env['LLULL_AUTH_TOKEN'] = TOKEN;
   });
 
   it('issues only with valid header auth', async () => {

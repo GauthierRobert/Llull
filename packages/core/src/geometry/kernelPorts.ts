@@ -11,7 +11,7 @@ import type { InertiaTensor } from './massProperties';
 /** What the active kernel is (TR-KRN-04); the composition root may add `isolation` / `fallbackReason`. */
 export interface KernelInfo {
   readonly occtVersion?: string;
-  /** Binary identity, e.g. "opencascade.js@1.1.1". */
+  /** Binary identity, e.g. "llull-kernel@0.1.0". */
   readonly build?: string;
   /** Optional capabilities present: 'topology', 'analyze', 'distance', 'massProperties', 'importShapes', 'faceQuery', 'brepBlobs', 'exportStep'. */
   readonly capabilities: readonly string[];

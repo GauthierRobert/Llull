@@ -18,7 +18,7 @@ import { HintBar } from '@ui/components/HintBar';
 import { ShortcutsDialog } from '@ui/components/ShortcutsDialog';
 import { CommandPalette } from '@ui/components/commandPalette/CommandPalette';
 import { PaletteResultToast } from '@ui/components/commandPalette/PaletteResultToast';
-import { useMcpLiveDocument } from '@ui/hooks/useMcpLiveDocument';
+import { useLiveDocument } from '@ui/hooks/useLiveDocument';
 import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
 import { useAutoFrame } from '@ui/hooks/useAutoFrame';
 import { useAutosave } from '@ui/hooks/useAutosave';
@@ -40,7 +40,7 @@ export function App(): React.ReactElement {
   // Properties float in on demand, and only while something is selected.
   const showInspector = inspectorOpen && hasSelection;
 
-  useMcpLiveDocument();
+  useLiveDocument();
   useKeyboardShortcuts();
   useAutoFrame();
   useAutosave();

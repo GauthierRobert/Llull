@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it, afterAll } from 'vitest';
+import { describeNative, nativeKernelBinary } from './kernelTestSupport';
 import { readFileSync, existsSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { setGeometryKernel } from '@core/geometry/kernel';
@@ -74,7 +75,9 @@ const COVERS = [
 ];
 
 describe('pack 07 — expected_results.json replayed through llull --json', () => {
-  it.each(plain.map((c) => [`${c.vc} ${c.case}`, c] as const))(
+  // The cases replay plans that name `--kernel occt` (the exact kernel): they need the native binary.
+  const itNative = it.skipIf(nativeKernelBinary === null);
+  itNative.each(plain.map((c) => [`${c.vc} ${c.case}`, c] as const))(
     '%s',
     async (label, packCase) => {
       await replayCase(packCase, label);
@@ -83,7 +86,7 @@ describe('pack 07 — expected_results.json replayed through llull --json', () =
   );
 
   for (const parent of withSubcases) {
-    it.each((parent.subcases ?? []).map((c) => [`${parent.vc} ${c.id ?? ''}`, { ...parent, ...c, subcases: undefined }] as const))(
+    itNative.each((parent.subcases ?? []).map((c) => [`${parent.vc} ${c.id ?? ''}`, { ...parent, ...c, subcases: undefined }] as const))(
       '%s',
       async (label, packCase) => {
         expect(packCase.assert?.length, `${label} has assertions`).toBeGreaterThan(0);
@@ -146,7 +149,7 @@ describe('VC-FTR-44 — discoverable commands, units stated, data units echoed',
     expect(missing).toEqual([]);
   });
 
-  it('a calc result echoes lengthUnit and angleUnit', async () => {
+  it.skipIf(nativeKernelBinary === null)('a calc result echoes lengthUnit and angleUnit', async () => {
     const sub = subs.find((s) => s.id === 'echo') as PackCase;
     await replayCase(sub, 'VC-FTR-44 echo');
   });
@@ -156,7 +159,7 @@ describe('VC-FTR-45 — plan --validate, broken plan, --dry-run, render_view --s
   const subs = pack.cases.find((c) => c.vc === 'VC-FTR-45')?.subcases ?? [];
   const sub = (id: string): PackCase => subs.find((s) => s.id === id) as PackCase;
 
-  it('validate ok: the bracket plan validates without touching the document', async () => {
+  it.skipIf(nativeKernelBinary === null)('validate ok: the bracket plan validates without touching the document', async () => {
     const session = newSession();
     const [line] = sub('validate ok').cli ?? [];
     const words = (line ?? '').split(' ').slice(1);
@@ -166,7 +169,7 @@ describe('VC-FTR-45 — plan --validate, broken plan, --dry-run, render_view --s
     expect(existsSync(session.doc)).toBe(false);
   });
 
-  it('a broken plan names step 0 and the offending parameter', async () => {
+  it.skipIf(nativeKernelBinary === null)('a broken plan names step 0 and the offending parameter', async () => {
     const broken = sub('validate names step and param');
     const session = newSession();
     await runPlan(session, broken);
@@ -177,7 +180,7 @@ describe('VC-FTR-45 — plan --validate, broken plan, --dry-run, render_view --s
     for (const assertion of broken.assert ?? []) checkAssertion(session, assertion, 'VC-FTR-45 broken plan');
   });
 
-  it(
+  it.skipIf(nativeKernelBinary === null)(
     '--dry-run leaves the document file byte-identical',
     async () => {
       const dry = sub('dry run leaves the file unchanged');
@@ -195,7 +198,7 @@ describe('VC-FTR-45 — plan --validate, broken plan, --dry-run, render_view --s
     SLOW,
   );
 
-  it(
+  it.skipIf(nativeKernelBinary === null)(
     'render_view --save writes a PNG next to the document',
     async () => {
       const render = sub('render');
@@ -214,7 +217,7 @@ describe('VC-FTR-45 — plan --validate, broken plan, --dry-run, render_view --s
   );
 });
 
-describe('validation plans/*.json run through build_project today', () => {
+describeNative('validation plans/*.json run through build_project today', () => {
   const planFile = (name: string): string => path.join(PACK, 'plans', name);
   const kernelRun = async (
     name: string,

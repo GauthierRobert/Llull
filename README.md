@@ -44,7 +44,7 @@ office? Click **Civil site starter** on the empty app for a complete sample site
 | 3D viewport    | three.js + @react-three/fiber + drei     | Mature, declarative Three.js |
 | State          | Zustand                                  | One store, no boilerplate, easy to drive externally |
 | Schemas        | zod                                      | One schema per command: TS type, tool JSON Schema (`llull describe`) and runtime validation |
-| Geometry kernel| Manifold (default) / OpenCascade.js      | Booleans and fillets behind one interface |
+| Geometry kernel| Native OCCT `llull-kernel` (default) / Manifold | Booleans and fillets behind one interface |
 | Tests          | Vitest + Testing Library + Playwright    | Fast, Vite-native |
 | Lint / format  | ESLint + Prettier                        | Consistent, enforced by `npm run check` |
 | Local backend  | Node + Express                           | The desktop app's live document, exchange (STEP / DWG / CadQuery), exports; the `llull` CLI |
@@ -83,7 +83,7 @@ npm --prefix desktop run dist      # installable app: renderer + local backend +
 
 - Requires Node >= 22.12. The desktop app starts its own backend on `127.0.0.1` with a per-launch
   token and serves the renderer from it; nothing listens on another interface.
-- Kernel: the backend and the CLI pick it with `LLULL_KERNEL` (`manifold`, `occt`, `occt-native`);
+- Kernel: the backend and the CLI pick it with `LLULL_KERNEL` (unset or `occt-native`: the native OCCT `llull-kernel`, falling back to Manifold with a warning; `manifold`);
   the renderer runs Manifold in-process for the commands it executes itself.
 - Packaging, signing and the CLI hand-off: [`desktop/README.md`](desktop/README.md). Backend env
   reference: [`server/README.md`](server/README.md).
@@ -115,7 +115,7 @@ packages/                # npm workspaces — framework-agnostic, no React / DOM
   protocol/src/          # host protocol: live sync, REST bodies, CLI tools, toolsets, tool search
   domain-aec/src/        # building (BIM) and industrial plugins
   kernel-manifold/src/   # Manifold geometry kernel (default)
-  kernel-occt/src/       # OpenCascade geometry kernel
+  # (the exact OpenCascade kernel is the native llull-kernel sidecar in solver/)
 src/
   app/                   # composition root: installs the default plugins
   ui/                    # React: viewport, panels, store (rendered by the desktop app)

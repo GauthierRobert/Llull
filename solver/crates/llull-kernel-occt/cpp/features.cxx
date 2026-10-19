@@ -254,7 +254,7 @@ std::unique_ptr<Shape> round_edges(const TopoDS_Shape &shape, rust::Slice<const 
     try {
       add(maker, TopoDS::Edge(current));
     } catch (const Standard_Failure &) {
-      // degenerate or seam edge (the WASM kernel skips it the same way)
+      // degenerate or seam edge: skipped
     }
   }
   maker.Build();
