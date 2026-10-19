@@ -53,17 +53,20 @@ enum Batch {
 
 type Pt = [f64; 3];
 
-/// True for one loop whose turn direction never changes (a fan then covers it exactly once).
+/// True for one simple convex loop: the turn direction never changes and the turns add up to one revolution (a star polygon turns
+/// the same way but twice round, and its fan would fill the centre the even-odd rule leaves empty). A fan then covers it exactly once.
 fn convex(ring: &[Pt]) -> bool {
     let n = ring.len();
-    let (mut positive, mut negative) = (false, false);
+    let (mut positive, mut negative, mut turning) = (false, false, 0.0f64);
     for i in 0..n {
         let (a, b, c) = (ring[i], ring[(i + 1) % n], ring[(i + 2) % n]);
-        let cross = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+        let (ux, uy, vx, vy) = (b[0] - a[0], b[1] - a[1], c[0] - b[0], c[1] - b[1]);
+        let cross = ux * vy - uy * vx;
         positive |= cross > 1e-12;
         negative |= cross < -1e-12;
+        turning += cross.atan2(ux * vx + uy * vy);
     }
-    !(positive && negative)
+    !(positive && negative) && (turning.abs() - std::f64::consts::TAU).abs() < 1e-6
 }
 
 /// Vertices (fans of every loop) and the draw batches, in fill order.
@@ -262,4 +265,24 @@ pub fn raster_pixels(scene: &Scene) -> Result<(Vec<u8>, String), String> {
     let (mut buffers, adapter) = fill_gpu(scene)?;
     draw_strokes(scene, &mut buffers);
     Ok((resolve(scene, &buffers), adapter))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::convex;
+
+    #[test]
+    fn star_polygons_are_not_convex() {
+        let square = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]];
+        assert!(convex(&square));
+        let star: Vec<[f64; 3]> = (0..5)
+            .map(|k| {
+                let angle = f64::from(k * 2) * std::f64::consts::TAU / 5.0;
+                [angle.cos(), angle.sin(), 0.0]
+            })
+            .collect();
+        assert!(!convex(&star));
+        let notch = [[0.0, 0.0, 0.0], [2.0, 0.0, 0.0], [1.0, 0.5, 0.0], [2.0, 1.0, 0.0], [0.0, 1.0, 0.0]];
+        assert!(!convex(&notch));
+    }
 }

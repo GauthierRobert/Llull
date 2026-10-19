@@ -72,7 +72,7 @@ export function buildSvg(
       ...(perspective ? [] : [buildGroundGrid(project, cam.target, orthoHalf), ...underlays.map((image) => underlaySvg(image, project))]),
       ...(raster === null
         ? [...filled, ...stroked].map((poly) => polygonSvg(poly, project))
-        : filled.length === 0 && !perspective
+        : filled.length === 0 && !perspective && raster.pixels === undefined
           ? stroked.map((poly) => polygonSvg(poly, project))
           : [rasterLayer([...filled, ...stroked], cam, orthoHalf, width, height, raster.radius, raster.pixels)]),
       ...(caption

@@ -98,7 +98,7 @@ function perspective(cam: Camera, fovDeg: number, w: number, h: number, near: nu
 
 /**
  * The raster scene of `polygons` seen by `cam` (orthographic with `orthoHalf`, perspective when `cam.fovDeg` is set), or null when there
- * is no filled polygon (a pure 2D drawing stays vector).
+ * is nothing to draw. The caller decides whether a strokes-only drawing is rasterised (perspective, frames, native) or stays vector.
  */
 export function prepareRasterScene(
   polygons: readonly Polygon3D[],
@@ -109,7 +109,7 @@ export function prepareRasterScene(
   sceneRadius: number,
 ): RasterScene | null {
   const filled = polygons.filter((p) => !p.stroke);
-  if (filled.length === 0 && (cam.fovDeg === undefined || polygons.length === 0)) return null;
+  if (polygons.length === 0) return null;
   const samples = width * height > SUPERSAMPLE_MAX_PIXELS ? 1 : SUPERSAMPLE;
   const [w, h] = [width * samples, height * samples];
   const projection =

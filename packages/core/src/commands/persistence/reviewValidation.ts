@@ -38,13 +38,25 @@ const viewpointProblem = (entry: Record<string, unknown>): string | null =>
 function walkthroughProblem(entry: Record<string, unknown>, viewpoints: Record<string, unknown>): string | null {
   const keys = entry['keys'];
   if (!Array.isArray(keys) || keys.length < 2) return 'keys must list at least 2 viewpoints';
+  const projections = new Set<unknown>();
   for (const key of keys) {
     if (!isRecord(key) || typeof key['viewpointId'] !== 'string' || !Object.hasOwn(viewpoints, key['viewpointId']))
       return 'every key must reference a known viewpointId';
-    if (typeof key['seconds'] !== 'number' || !(key['seconds'] > 0)) return 'every key needs seconds > 0';
+    if (typeof key['seconds'] !== 'number' || !(key['seconds'] > 0) || !Number.isFinite(key['seconds']))
+      return 'every key needs finite seconds > 0';
+    const viewpoint = viewpoints[key['viewpointId']];
+    projections.add(isRecord(viewpoint) && isRecord(viewpoint['camera']) ? viewpoint['camera']['projection'] : undefined);
   }
-  return null;
+  return projections.size > 1 ? 'keys mix perspective and orthographic viewpoints' : null;
 }
+
+/** The largest numeric suffix of review ids (`vp-3`, `wt-7`, `iss-12`), 0 when none. */
+function largestNumber(ids: readonly string[]): number {
+  return ids.reduce((largest, id) => Math.max(largest, Number(/-(\d+)$/.exec(id)?.[1] ?? 0)), 0);
+}
+
+const duplicateIn = (name: string, ids: readonly string[]): string | null =>
+  new Set(ids).size === ids.length ? null : `review.${name} lists an id twice`;
 
 function issueProblem(entry: Record<string, unknown>, viewpoints: Record<string, unknown>): string | null {
   if (typeof entry['guid'] !== 'string' || typeof entry['title'] !== 'string') return 'guid and title must be strings';
@@ -68,7 +80,14 @@ export function reviewProblems(value: unknown): string[] {
   )
     return ['review must be { viewpoints, viewpointOrder, walkthroughs, issues, issueOrder, nextNumber }'];
   const viewpoints = value['viewpoints'];
+  const ids = [...Object.keys(viewpoints), ...Object.keys(value['walkthroughs']), ...Object.keys(value['issues'])];
+  const next = value['nextNumber'];
   const problems: (string | null)[] = [
+    typeof next === 'number' && Number.isInteger(next) && next > largestNumber(ids)
+      ? null
+      : 'review.nextNumber must be an integer above every review id number',
+    duplicateIn('viewpointOrder', value['viewpointOrder']),
+    duplicateIn('issueOrder', value['issueOrder']),
     ...Object.entries(viewpoints).map(([id, entry]) => entryProblem('viewpoints', id, entry, viewpointProblem)),
     ...Object.entries(value['walkthroughs']).map(([id, entry]) =>
       entryProblem('walkthroughs', id, entry, (e) => walkthroughProblem(e, viewpoints)),

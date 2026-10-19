@@ -97,10 +97,10 @@ export function createNativeRasterPort(binary: string, env: NodeJS.ProcessEnv = 
           windowsHide: true,
         });
         if (run.error !== undefined) {
-          const timedOut = (run.error as NodeJS.ErrnoException).code === 'ETIMEDOUT';
-          return timedOut
-            ? failure('NATIVE_TIMEOUT', `llull-compute raster timed out after ${FRAME_TIMEOUT_MS} ms`)
-            : failure('NATIVE_TOOL_MISSING', `cannot run ${binary}: ${run.error.message}`);
+          const code = (run.error as NodeJS.ErrnoException).code;
+          if (code === 'ETIMEDOUT') return failure('NATIVE_TIMEOUT', `llull-compute raster timed out after ${FRAME_TIMEOUT_MS} ms`);
+          if (code === 'ENOENT' || code === 'EACCES') return failure('NATIVE_TOOL_MISSING', `cannot run ${binary}: ${run.error.message}`);
+          return failure('NATIVE_PROTOCOL', `llull-compute raster failed: ${run.error.message}`);
         }
         const events = eventsOf(run.stdout ?? '');
         if (events.error !== undefined) return failure(events.error.code, events.error.message);

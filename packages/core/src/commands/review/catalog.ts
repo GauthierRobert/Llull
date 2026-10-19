@@ -5,7 +5,7 @@ import { setPartGrounded } from './grounding';
 import { allowInterference, removeInterferenceIntent } from './intents';
 import { deleteViewpoint, listViewpoints, saveViewpoint } from './viewpoints';
 import { createWalkthrough, deleteWalkthrough } from './walkthroughs';
-import { createReviewIssue } from './issues';
+import { createReviewIssue, deleteReviewIssue } from './issues';
 
 export const reviewCommands = commandCatalog(
   allowInterference,
@@ -17,4 +17,5 @@ export const reviewCommands = commandCatalog(
   createWalkthrough,
   deleteWalkthrough,
   createReviewIssue,
+  deleteReviewIssue,
 );

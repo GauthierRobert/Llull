@@ -11,6 +11,7 @@
  *   $env:PATH = "<rustup>\toolchains\1.97.0-x86_64-pc-windows-gnu\lib\rustlib\x86_64-pc-windows-gnu\bin\self-contained;$env:PATH"
  *   $env:RUSTFLAGS = "-C dlltool=<repo>\solver\scripts\dlltool-shim\dlltool.cmd"
  */
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const args = process.argv.slice(2);
@@ -18,8 +19,11 @@ const value = (flag) => args[args.indexOf(flag) + 1];
 const def = readFileSync(value('-d'), 'utf8');
 const dll = value('-D');
 const out = value('-l');
-const prefix = args.includes('--temp-prefix') ? value('--temp-prefix') : dll;
-const tag = dll.replace(/[^A-Za-z0-9]/g, '_');
+// Every generated library gets its own head / tail and member names: several crates import the same DLL, and a shared head would leave
+// one library's IAT entries outside any import descriptor (unresolved at load).
+const unique = createHash('sha256').update(out).digest('hex').slice(0, 10);
+const prefix = `${args.includes('--temp-prefix') ? value('--temp-prefix') : dll}_${unique}`;
+const tag = `${dll.replace(/[^A-Za-z0-9]/g, '_')}_${unique}`;
 
 const exports = [];
 let inExports = false;

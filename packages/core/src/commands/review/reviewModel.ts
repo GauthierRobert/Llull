@@ -7,7 +7,7 @@ import { tableRejection } from '../noop';
 const REMEDIATION: Readonly<Record<string, string>> = {
   VIS_CAMERA_INVALID: 'give finite eye / direction / up, up not parallel to direction, fovDeg in (0, 180) or viewHeight > 0',
   VIS_VIEWPOINT_NOT_FOUND: 'list the viewpoints with list_viewpoints',
-  VIS_VIEWPOINT_IN_USE: 'delete the walkthroughs / issues that reference the viewpoint first',
+  VIS_VIEWPOINT_IN_USE: 'delete the walkthroughs (delete_walkthrough) / issues (delete_review_issue) that reference the viewpoint first',
   VIS_WALKTHROUGH_INVALID: 'give 2..500 keys of one projection with seconds > 0, and fps × duration within maxFrames',
   VIS_WALKTHROUGH_NOT_FOUND: 'create one with create_walkthrough',
   VIS_ENTITY_NOT_FOUND: 'pass ids from list_entities',

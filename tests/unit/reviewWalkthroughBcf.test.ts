@@ -251,3 +251,73 @@ describe('export_bcf', () => {
     expect(JSON.stringify(doc)).toBe(before);
   });
 });
+
+describe('review fixes (cad-reviewer)', () => {
+  it('draws sketch-only orthographic walkthrough frames (strokes are rasterised, not dropped)', () => {
+    let doc = execute(createEmptyDocument(), 'draw_polyline', {
+      points: [
+        [-20, 0],
+        [20, 0],
+        [20, 10],
+      ],
+    }).document;
+    const camera = { projection: 'orthographic', eye: [0, 0, 50], direction: [0, 0, -1], up: [0, 1, 0], viewHeight: 50 };
+    doc = execute(doc, 'save_viewpoint', { name: 'a', camera }).document;
+    doc = execute(doc, 'save_viewpoint', { name: 'b', camera: { ...camera, eye: [5, 0, 50] } }).document;
+    doc = execute(doc, 'create_walkthrough', {
+      name: 'w',
+      keys: [
+        { viewpointId: 'vp-1', seconds: 1 },
+        { viewpointId: 'vp-2', seconds: 1 },
+      ],
+    }).document;
+    const data = execute(doc, 'render_walkthrough', { id: 'wt-3', fps: 1, width: 64, height: 64 }).data as Frames;
+    const blank = execute(createEmptyDocument(), 'save_viewpoint', { name: 'e', camera }).document;
+    const empty = execute(execute(blank, 'save_viewpoint', { name: 'f', camera }).document, 'create_walkthrough', {
+      name: 'w',
+      keys: [
+        { viewpointId: 'vp-1', seconds: 1 },
+        { viewpointId: 'vp-2', seconds: 1 },
+      ],
+    }).document;
+    const emptyData = execute(empty, 'render_walkthrough', { id: 'wt-3', fps: 1, width: 64, height: 64 }).data as Frames;
+    expect(data.files[0]?.base64).not.toBe(emptyData.files[0]?.base64);
+    const native = execute(
+      doc,
+      'render_walkthrough',
+      { id: 'wt-3', fps: 1, width: 64, height: 64, renderer: 'native' },
+      { ...defaultContext(), raster: fakePort() },
+    );
+    expect(native.error).toBeUndefined();
+    expect((native.data as Frames).files).toEqual(data.files);
+  });
+
+  it('de-duplicates issue viewpoints / entities and exported issues, so archive entries stay unique', () => {
+    let doc = reviewed();
+    const box = doc.order[0] ?? '';
+    doc = execute(doc, 'create_review_issue', { title: 't', viewpointIds: ['vp-1', 'vp-1'], entityIds: [box, box] }).document;
+    expect(doc.review?.issues['iss-6']).toMatchObject({ viewpointIds: ['vp-1'], entityIds: [box] });
+    const data = execute(doc, 'export_bcf', { issueIds: ['iss-6', 'iss-6'], snapshots: false }).data as Bcf;
+    expect(data).toMatchObject({ topics: 1, viewpoints: 1 });
+    const names = [...unzip(Buffer.from(data.base64, 'base64')).keys()];
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('exports only entities that still exist', () => {
+    let doc = withIssues();
+    doc = execute(doc, 'delete_entities', { ids: [doc.order[0]] }).document;
+    const data = execute(doc, 'export_bcf', { snapshots: false }).data as Bcf;
+    expect(data.warnings).toEqual([]);
+  });
+
+  it('delete_review_issue removes an issue, then the viewpoint can be deleted; unknown ids are refused', () => {
+    const doc = withIssues();
+    const deleted = execute(doc, 'delete_review_issue', { id: 'iss-7' });
+    expect(deleted.affected).toEqual(['iss-7']);
+    expect(deleted.document.review?.issueOrder).toEqual(['iss-6']);
+    expect(execute(doc, 'delete_review_issue', { id: 'iss-1' }).error?.code).toBe('VIS_ISSUE_NOT_FOUND');
+    const before = JSON.stringify(doc);
+    execute(doc, 'delete_review_issue', { id: 'iss-6' });
+    expect(JSON.stringify(doc)).toBe(before);
+  });
+});

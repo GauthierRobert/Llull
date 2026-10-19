@@ -227,7 +227,7 @@ describe('review persistence validation', () => {
       'camera needs eye, direction and up',
       'keys must list at least 2 viewpoints',
       'every key must reference a known viewpointId',
-      'every key needs seconds > 0',
+      'every key needs finite seconds > 0',
       "viewpoint 'vp-9' does not exist",
       'labels, viewpointIds and entityIds must be string arrays',
       'guid and title must be strings',
@@ -285,5 +285,52 @@ describe('viewpoint camera maths', () => {
   it('name UUIDs are deterministic version-8 UUIDs', () => {
     expect(nameUuid('a')).toBe(nameUuid('a'));
     expect(nameUuid('a')).not.toBe(nameUuid('b'));
+  });
+});
+
+describe('review load validation (counters, projections, order)', () => {
+  it('refuses a stale nextNumber, duplicate order entries and mixed or infinite walkthrough keys', () => {
+    let doc = execute(withViewpoints(), 'save_viewpoint', { name: 'plan', camera: ORTHO }).document;
+    doc = execute(doc, 'create_walkthrough', {
+      name: 'w',
+      keys: [
+        { viewpointId: 'vp-1', seconds: 1 },
+        { viewpointId: 'vp-2', seconds: 1 },
+      ],
+    }).document;
+    const review = JSON.parse(JSON.stringify(doc.review)) as Record<string, unknown> & { walkthroughs: Record<string, unknown> };
+    expect(reviewProblems(review)).toEqual([]);
+    const problems = reviewProblems({
+      ...review,
+      nextNumber: 2,
+      viewpointOrder: ['vp-1', 'vp-1'],
+      walkthroughs: {
+        ...review.walkthroughs,
+        mixed: {
+          id: 'mixed',
+          keys: [
+            { viewpointId: 'vp-1', seconds: 1 },
+            { viewpointId: 'vp-3', seconds: 1 },
+          ],
+        },
+        inf: {
+          id: 'inf',
+          keys: [
+            { viewpointId: 'vp-1', seconds: Infinity },
+            { viewpointId: 'vp-2', seconds: 1 },
+          ],
+        },
+      },
+    });
+    for (const fragment of [
+      'nextNumber must be an integer above',
+      'viewpointOrder lists an id twice',
+      'mix perspective and orthographic',
+      'finite seconds',
+    ])
+      expect(
+        problems.some((problem) => problem.includes(fragment)),
+        fragment,
+      ).toBe(true);
   });
 });

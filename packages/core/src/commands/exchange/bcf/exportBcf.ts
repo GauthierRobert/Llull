@@ -60,11 +60,12 @@ export const exportBcf = defineCommand({
     if (!ISO_DATE_TIME.test(created))
       return fail('VIS_BCF_INVALID', `creationDate "${created}" is not an ISO 8601 date-time`, [], ['creationDate']);
     const review = reviewOf(doc);
-    const ids = params.issueIds ?? review.issueOrder;
+    const ids = [...new Set(params.issueIds ?? review.issueOrder)];
     const missing = ids.filter((id) => review.issues[id] === undefined);
     if (missing.length > 0) return fail('VIS_ISSUE_NOT_FOUND', `unknown issue(s) ${missing.join(', ')}`, missing, ['issueIds']);
     if (ids.length === 0) return fail('VIS_ISSUE_NOT_FOUND', 'the document has no review issue to export');
     const issues = ids.map((id) => review.issues[id]).filter((issue): issue is ReviewIssue => issue !== undefined);
+    const present = (entityIds: readonly string[]): string[] => entityIds.filter((id) => doc.entities[id] !== undefined);
     const native = params.snapshotRenderer === 'native' && params.snapshots !== false ? (ctx?.raster ?? null) : undefined;
     if (native === null)
       return fail('NATIVE_TOOL_MISSING', 'no native raster (llull-compute) is installed in this host', [], ['snapshotRenderer']);
@@ -79,11 +80,11 @@ export const exportBcf = defineCommand({
     let viewpointCount = 0;
     for (const issue of issues) {
       const markupViews: MarkupViewpoint[] = [];
-      for (const viewpointId of issue.viewpointIds) {
+      for (const viewpointId of new Set(issue.viewpointIds)) {
         const viewpoint = review.viewpoints[viewpointId];
         if (viewpoint === undefined) continue;
         const guid = nameUuid(`llull-bcf-viewpoint|${issue.guid}|${viewpoint.guid}`);
-        const visinfo = bcfVisualizationXml(doc, guid, viewpoint.camera, width / height, issue.entityIds);
+        const visinfo = bcfVisualizationXml(doc, guid, viewpoint.camera, width / height, present(issue.entityIds));
         entries.push({ name: `${issue.guid}/${guid}.bcfv`, bytes: encoder.encode(visinfo) });
         viewpointCount += 1;
         if (params.snapshots === false) {
@@ -109,7 +110,7 @@ export const exportBcf = defineCommand({
     const outcome = run?.result();
     if (outcome !== undefined && 'code' in outcome) return fail(outcome.code, outcome.message, [], ['snapshotRenderer']);
     const archive = zipStore(entries);
-    const unmapped = [...new Set(issues.flatMap((issue) => issue.entityIds))];
+    const unmapped = [...new Set(issues.flatMap((issue) => present(issue.entityIds)))];
     const warnings = unmapped.length === 0 ? [] : [{ code: 'VIS_BCF_GUID_UNMAPPED', ids: unmapped }];
     const provenance =
       outcome !== undefined && !('code' in outcome)

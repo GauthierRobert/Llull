@@ -32,8 +32,8 @@ export const createReviewIssue = defineCommand({
     const title = params.title.trim();
     if (title.length === 0) return reviewRejection(doc, 'create_review_issue', 'VIS_ISSUE_INVALID', 'title is empty', [], ['title']);
     const review = reviewOf(doc);
-    const viewpointIds = params.viewpointIds ?? [];
-    const entityIds = params.entityIds ?? [];
+    const viewpointIds = [...new Set(params.viewpointIds ?? [])];
+    const entityIds = [...new Set(params.entityIds ?? [])];
     const missingViews = viewpointIds.filter((id) => review.viewpoints[id] === undefined);
     if (missingViews.length > 0)
       return reviewRejection(
@@ -68,5 +68,26 @@ export const createReviewIssue = defineCommand({
     const document = { ...doc, review: { ...next, issues: { ...next.issues, [id]: issue }, issueOrder: [...next.issueOrder, id] } };
     const result = changed(document, `Opened issue ${id} "${title}" (${issue.priority}, ${viewpointIds.length} viewpoint(s)).`, [id]);
     return { ...result, data: { id, guid: issue.guid } };
+  },
+});
+
+/**
+ * @affects removes 1 issue from doc.review (affected: [id]); metaHistory
+ * @failure unknown id -> VIS_ISSUE_NOT_FOUND
+ */
+export const deleteReviewIssue = defineCommand({
+  name: 'delete_review_issue',
+  description:
+    'Delete a review issue (iss-<n>); its viewpoints stay (delete_viewpoint is allowed once no issue or walkthrough uses them). ' +
+    'Unknown id: VIS_ISSUE_NOT_FOUND. Does not add a feature step.',
+  annotations: { metaHistory: true, destructive: true },
+  params: z.object({ id: z.string().describe('Issue id, e.g. "iss-4".') }),
+  run: (doc, { id }): CommandResult => {
+    const review = reviewOf(doc);
+    if (review.issues[id] === undefined)
+      return reviewRejection(doc, 'delete_review_issue', 'VIS_ISSUE_NOT_FOUND', `no issue '${id}'`, [id]);
+    const issues = Object.fromEntries(Object.entries(review.issues).filter(([key]) => key !== id));
+    const document = { ...doc, review: { ...review, issues, issueOrder: review.issueOrder.filter((key) => key !== id) } };
+    return changed(document, `Deleted issue ${id}.`, [id]);
   },
 });
