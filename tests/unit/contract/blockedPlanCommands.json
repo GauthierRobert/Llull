@@ -201,18 +201,6 @@
       "am_build_setup",
       "set_inherent_strain"
     ],
-    "docs/physics/17-topology-optimization/validation/plans/top_mbb_60x20.plan.json": [
-      "create_topology_study",
-      "set_topology_settings"
-    ],
-    "docs/physics/17-topology-optimization/validation/plans/top_mbb_60x20_density.plan.json": [
-      "create_topology_study",
-      "set_topology_settings"
-    ],
-    "docs/physics/17-topology-optimization/validation/plans/top_rejection_keepin_budget.plan.json": [
-      "create_topology_study",
-      "set_topology_regions"
-    ],
     "docs/physics/18-probabilistic-sensitivity/validation/plans/prb_box_mass.plan.json": [
       "define_response",
       "parameter_sensitivity"

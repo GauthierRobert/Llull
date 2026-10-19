@@ -4,6 +4,7 @@
  */
 
 import type { AnalysisCase, FeArtifactPort, FeMeshArtifact, FeResultsArtifact, MeshSummary, ResultsSummary } from '@core/model/analysis';
+import type { FeTopologyArtifact } from '@core/model/topology';
 import type { CadDocument } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
@@ -51,7 +52,7 @@ function withoutHeatBalance(summary: ResultsSummary): object {
 const artifactHashes = new WeakMap<object, string>();
 
 /** sha256 of the canonical JSON of an artifact, computed once per artifact object. */
-function hashOfArtifact(artifact: FeMeshArtifact | FeResultsArtifact): string {
+function hashOfArtifact(artifact: FeMeshArtifact | FeResultsArtifact | FeTopologyArtifact): string {
   let hash = artifactHashes.get(artifact);
   if (hash === undefined) {
     hash = sha256Hex(canonicalJson(artifact));
@@ -66,11 +67,11 @@ export type Fetched<T> = { readonly artifact: T } | { readonly code: string; rea
  * The artifact of `hash` from the port.
  * @failure no port / not in the store / other kind -> FEA_ARTIFACT_NOT_FOUND; content not hashing to `hash` -> FEA_SUMMARY_MISMATCH
  */
-export function fetchArtifact<K extends 'fe_mesh' | 'fe_results'>(
+export function fetchArtifact<K extends 'fe_mesh' | 'fe_results' | 'fe_topology'>(
   port: FeArtifactPort | null | undefined,
   hash: string,
   kind: K,
-): Fetched<Extract<FeMeshArtifact | FeResultsArtifact, { kind: K }>> {
+): Fetched<Extract<FeMeshArtifact | FeResultsArtifact | FeTopologyArtifact, { kind: K }>> {
   const found = port?.get(hash) ?? null;
   if (found === null || found.kind !== kind)
     return {
@@ -78,7 +79,7 @@ export function fetchArtifact<K extends 'fe_mesh' | 'fe_results'>(
       message: port ? `no ${kind} artifact for hash ${hash}` : `no artifact store available for ${kind} ${hash}`,
     };
   if (hashOfArtifact(found) !== hash) return { code: 'FEA_SUMMARY_MISMATCH', message: `the sha256 of the ${kind} artifact is not ${hash}` };
-  return { artifact: found as Extract<FeMeshArtifact | FeResultsArtifact, { kind: K }> };
+  return { artifact: found as Extract<FeMeshArtifact | FeResultsArtifact | FeTopologyArtifact, { kind: K }> };
 }
 
 const nothing = (state: AnalysisState, problem: TrustProblem | null): Trust => ({
