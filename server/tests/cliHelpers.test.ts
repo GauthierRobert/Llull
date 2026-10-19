@@ -99,7 +99,7 @@ describe('catalog', () => {
     expect(toolsetCounts().reduce((sum, c) => sum + c.commands, 0)).toBe(all.length);
   });
 
-  it('searches registry commands only (no MCP-only discovery tools)', () => {
+  it('searches the catalog (the removed search_tools meta-tool is gone)', () => {
     const hits = searchCatalog('fillet edge', 5);
     expect(hits[0]?.name).toBe('fillet_edge');
     expect(searchCatalog('search tools toolset', 20).map((h) => h.name)).not.toContain('search_tools');

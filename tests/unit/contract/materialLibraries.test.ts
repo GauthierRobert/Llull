@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute, getCommand, listCommands, toToolSchemas } from '@core/commands/registry';
-import { TOOLSETS, toolsetOf } from '@mcp/toolsets';
-import { buildAllMcpTools } from '@mcp/discovery';
+import { TOOLSETS, toolsetOf } from '@protocol/toolsets';
+import { buildAllTools } from '@protocol/discovery';
 import { createEmptyDocument } from '@core/model/types';
-import { applyLibraryToolCall, buildLibraryToolDefinitions, type MaterialLibraryStorePort } from '@mcp/libraryTools';
+import { applyLibraryToolCall, buildLibraryToolDefinitions, type MaterialLibraryStorePort } from '@protocol/libraryTools';
 import { hashOf, libraryFile } from '../materials/support';
 
 const NEW_COMMANDS = [
@@ -64,9 +64,9 @@ describe('08 MAT M2 / M3 contract', () => {
     expect(resolved.document.nextStepNumber).toBe(imported.document.nextStepNumber);
   });
 
-  it('register_material_library is an MCP tool of the materials toolset', () => {
+  it('register_material_library is a CLI tool of the materials toolset', () => {
     expect(buildLibraryToolDefinitions().map((tool) => tool.name)).toEqual(['register_material_library']);
-    expect(buildAllMcpTools().map((tool) => tool.name)).toContain('register_material_library');
+    expect(buildAllTools().map((tool) => tool.name)).toContain('register_material_library');
     expect(toolsetOf('register_material_library')).toBe('materials');
   });
 });

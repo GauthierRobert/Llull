@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { listCommands, toToolSchemas, execute } from '@core/commands/registry';
-import { buildMcpTools } from '@mcp/tools';
+import { buildCommandTools } from '@protocol/tools';
 import { xyz } from '../helpers/xy';
 
 // Helpers
@@ -12,9 +12,9 @@ function findSchema(name: string): ReturnType<typeof toToolSchemas>[number] {
   return schema;
 }
 
-function findTool(name: string): ReturnType<typeof buildMcpTools>[number] {
-  const tool = buildMcpTools().find((t) => t.name === name);
-  if (!tool) throw new Error(`buildMcpTools: tool '${name}' not found`);
+function findTool(name: string): ReturnType<typeof buildCommandTools>[number] {
+  const tool = buildCommandTools().find((t) => t.name === name);
+  if (!tool) throw new Error(`buildCommandTools: tool '${name}' not found`);
   return tool;
 }
 
@@ -86,7 +86,7 @@ describe('CommandDefinition.annotations — unannotated command', () => {
   });
 });
 
-// 2. toToolSchemas() — annotations surfaced as MCP hint names
+// 2. toToolSchemas() — annotations surfaced as tool-schema hint names
 
 describe('toToolSchemas() — annotations on readOnly command', () => {
   it('measure_distance schema has annotations.readOnlyHint === true', () => {
@@ -135,9 +135,9 @@ describe('toToolSchemas() — no annotations on plain command', () => {
   });
 });
 
-// 3. buildMcpTools() — mirrors toToolSchemas() annotations
+// 3. buildCommandTools() — mirrors toToolSchemas() annotations
 
-describe('buildMcpTools() — annotations on readOnly command', () => {
+describe('buildCommandTools() — annotations on readOnly command', () => {
   it('measure_distance tool has annotations.readOnlyHint === true', () => {
     expect(findTool('measure_distance').annotations?.readOnlyHint).toBe(true);
   });
@@ -146,7 +146,7 @@ describe('buildMcpTools() — annotations on readOnly command', () => {
   });
 });
 
-describe('buildMcpTools() — annotations on destructive command', () => {
+describe('buildCommandTools() — annotations on destructive command', () => {
   it('delete_entities tool has annotations.destructiveHint === true', () => {
     expect(findTool('delete_entities').annotations?.destructiveHint).toBe(true);
   });
@@ -155,7 +155,7 @@ describe('buildMcpTools() — annotations on destructive command', () => {
   });
 });
 
-describe('buildMcpTools() — annotations on idempotent command', () => {
+describe('buildCommandTools() — annotations on idempotent command', () => {
   it('set_units tool has annotations.idempotentHint === true', () => {
     expect(findTool('set_units').annotations?.idempotentHint).toBe(true);
   });
@@ -164,7 +164,7 @@ describe('buildMcpTools() — annotations on idempotent command', () => {
   });
 });
 
-describe('buildMcpTools() — no annotations on plain command', () => {
+describe('buildCommandTools() — no annotations on plain command', () => {
   it('add_box tool has no annotations field', () => {
     expect(findTool('add_box').annotations).toBeUndefined();
   });

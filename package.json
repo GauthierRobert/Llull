@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "llull — a modern, MCP-first 3D CAD app whose every operation is one command drivable by UI, AI, or any MCP agent.",
+  "description": "llull — a local 2D + 3D CAD desktop app whose every operation is one command, drivable from the UI or the llull CLI.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

@@ -2,8 +2,8 @@
 import fs from 'fs';
 import path from 'path';
 import type { CadDocument } from '@core/model/types';
-import { failedOutcome, runCommandOutcome } from '@mcp/commandOutcome';
-import { parseCommandResponse, type CommandOutcome } from '@mcp/restProtocol';
+import { failedOutcome, runCommandOutcome } from '@protocol/commandOutcome';
+import { parseCommandResponse, type CommandOutcome } from '@protocol/restProtocol';
 import { errorMessage } from '@lib/errorMessage';
 import type { StepObserver } from './progress';
 import type { ExchangeOptions } from '../pythonExchange';

@@ -3,7 +3,7 @@
 
 import { type CadDocument, type Entity, type EntityId, type Vec3, is2D } from '@core/model/types';
 import { type Bounds, entityBoundsInDoc, mergeBounds } from '@core/geometry/bounds';
-import type { LiveCommandSource } from '@mcp/liveSync';
+import type { LiveCommandSource } from '@protocol/liveSync';
 
 /** Where a document change came from: a broadcast command of someone else, a server snapshot, or this client. */
 export type LiveFxOrigin =

@@ -3,10 +3,6 @@
     "context7": {
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp"]
-    },
-    "llull": {
-      "type": "http",
-      "url": "http://localhost:3001/mcp"
     }
   }
 }

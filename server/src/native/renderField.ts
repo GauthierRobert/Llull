@@ -8,7 +8,7 @@
 
 import { defaultContext } from '@core/commands/context';
 import type { CommandResult } from '@core/commands/types';
-import type { FeaHost, FeaToolResult } from '@mcp/index';
+import type { FeaHost, FeaToolResult } from '@protocol/index';
 import { isRecord } from '@lib/isRecord';
 import { fieldPlotLayout } from '@cae/results/fieldPlotSvg';
 import { finishRaster, prepareRaster, rasterPixels, type PreparedRaster, type RasterPixels } from '@cae/results/fieldRaster';

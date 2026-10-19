@@ -5,7 +5,7 @@ import type { ParamSpec, ParamItemSpec } from '@core/commands/types';
 import { FTR_CODES, FTR_REVIEW_REASON, type FtrCheckData, type FtrResultMeta } from '@core/model/manufacturing';
 import type { HoleTableData } from '@core/commands/features/holeTable';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import { TOOLSETS } from '@mcp/toolsets';
+import { TOOLSETS } from '@protocol/toolsets';
 import { expectNoOp } from '../../helpers/expectNoOp';
 import { idOf, manifoldSuite, plate } from '../../helpers/featureSupport';
 

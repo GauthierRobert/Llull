@@ -1,6 +1,6 @@
 /**
- * SVG → PNG rasterization for MCP image content blocks, via @resvg/resvg-js (napi-rs, prebuilt
- * binaries). Server-side because it is a native-binary side effect: it MUST NOT move to core/mcp (L2).
+ * SVG → PNG rasterization (CLI `--save view.png`, image blocks for the production agent gate), via @resvg/resvg-js
+ * (napi-rs, prebuilt binaries). Server-side because it is a native-binary side effect: it MUST NOT move to a package (L2).
  */
 
 import { spawn, spawnSync } from 'child_process';
@@ -8,7 +8,7 @@ import { createRequire } from 'module';
 import { Resvg } from '@resvg/resvg-js';
 import { isRecord } from '@lib/isRecord';
 
-/** An MCP image content block; `data` is base64 PNG with NO `data:` URI prefix. */
+/** An image content block; `data` is base64 PNG with NO `data:` URI prefix. */
 interface ImageContentBlock {
   type: 'image';
   data: string;
@@ -46,7 +46,7 @@ function renderChild(): { command: string; args: string[]; env: NodeJS.ProcessEn
 
 /**
  * Render in a throw-away node process: a native abort inside resvg (Rust panic across the napi boundary
- * cannot unwind) then kills only the child, never the CLI or the MCP host. Blocking: for the CLI.
+ * cannot unwind) then kills only the child, never the CLI or the backend. Blocking: for the CLI.
  */
 function renderIsolated(svg: string, fitWidth: number): Buffer | null {
   const child = renderChild();
@@ -60,7 +60,7 @@ function renderIsolated(svg: string, fitWidth: number): Buffer | null {
   return result.status === 0 && result.stdout.length > 0 ? result.stdout : null;
 }
 
-/** `renderIsolated` without blocking the event loop (the MCP host keeps serving other clients while a render runs). */
+/** `renderIsolated` without blocking the event loop (the backend keeps serving other clients while a render runs). */
 function renderIsolatedAsync(svg: string, fitWidth: number): Promise<Buffer | null> {
   return new Promise((resolve) => {
     const child = renderChild();

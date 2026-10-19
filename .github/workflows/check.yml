@@ -1,7 +1,7 @@
 # Runs the same gate as `npm run check` (typecheck + architecture rules + unused exports + lint +
 # format + tests)
-# plus the coverage gate, the server + desktop suites and the production builds (web, server; the image
-# job builds and smoke-tests the on-prem image), so the architecture laws hold for every change.
+# plus the coverage gate, the server + desktop suites and the production builds (renderer, server), so the
+# architecture laws hold for every change.
 name: check
 
 on:
@@ -160,7 +160,7 @@ jobs:
       - run: npm --prefix server test
       - run: npm --prefix desktop run typecheck
       - run: npm --prefix desktop test
-      # Production artifacts: the web bundle, the server bundle and the on-prem image must build.
+      # Production artifacts: the renderer bundle and the server bundle must build.
       - run: npm run build
       - run: npm --prefix server run build
 
@@ -185,21 +185,3 @@ jobs:
           path: |
             playwright-report
             test-results
-
-  # The on-prem image exactly as shipped (LibreDWG included, checksum-pinned), then a smoke run.
-  image:
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v4
-      - run: docker build -t llull:ci .
-      - name: Smoke-test the image
-        run: |
-          docker run --rm --entrypoint dwg2dxf llull:ci --version
-          docker run -d --name llull -p 127.0.0.1:3001:3001 llull:ci
-          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:3001/health && break; sleep 2; done
-          curl -fsS http://127.0.0.1:3001/health | grep -q '"status":"ok"'
-          curl -fsSI http://127.0.0.1:3001/ | grep -qi 'content-security-policy'
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3001/live/snapshot)" = 401
-      - if: failure()
-        run: docker logs llull || true

@@ -15,7 +15,6 @@ import { _resetHistory, applyCommand } from '../src/commandBus';
 import { guardMutation, buildRestRateLimiter, getAllowedOrigins } from '../src/security';
 import { safeFileName as sanitizeFilename } from '@lib/safeFileName';
 import { createAutosaver } from '../src/autosave';
-import { closeAllSessions, sessions } from '../src/mcp/sessions';
 import { createEmptyDocument } from '@core/model/types';
 import * as registry from '@core/commands/registry';
 
@@ -292,10 +291,5 @@ describe('shutdown helpers', () => {
     closeAllSubscribers();
     expect(end).toHaveBeenCalled();
     expect(liveSubscriberCount()).toBe(0);
-  });
-
-  it('closeAllSessions leaves no sessions', async () => {
-    await closeAllSessions();
-    expect(sessions.size).toBe(0);
   });
 });

@@ -1,0 +1,10 @@
+{
+  "name": "@llull/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local host protocol over the command registry: live sync, REST bodies, CLI tool definitions, toolsets, result shaping.",
+  "dependencies": {
+    "@llull/core": "0.1.0"
+  }
+}

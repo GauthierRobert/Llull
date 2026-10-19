@@ -6,8 +6,8 @@ import fs from 'fs';
 import path from 'path';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
-import { outcomeIsFailure } from '@mcp/commandOutcome';
-import { parseCommandResponse } from '@mcp/restProtocol';
+import { outcomeIsFailure } from '@protocol/commandOutcome';
+import { parseCommandResponse } from '@protocol/restProtocol';
 import { requestJson, type FetchLike } from '@server/restClient';
 import { writeDocumentFile } from '@server/documentFile';
 

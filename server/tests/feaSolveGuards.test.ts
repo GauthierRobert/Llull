@@ -7,7 +7,13 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { FeMeshArtifact, FeResultsArtifact, ResultsSummary } from '@core/model/analysis';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import { applyExchangeToolCall, buildFeaToolDefinitions, FEA_SOLVE_TIMEOUT_S, type FeaToolResult, type FeaToolsPort } from '@mcp/index';
+import {
+  applyExchangeToolCall,
+  buildFeaToolDefinitions,
+  FEA_SOLVE_TIMEOUT_S,
+  type FeaToolResult,
+  type FeaToolsPort,
+} from '@protocol/index';
 import { createFeArtifactStore, type FeArtifactStore } from '../src/fea/artifactStore';
 import { caeHooks, type CaeHooks } from '../src/fea/caeHooks';
 import type { CcxRunner } from '../src/fea/ccxProcess';
@@ -98,7 +104,7 @@ describe('timeoutS bounds (review finding 9)', () => {
     expect(FEA_SOLVE_TIMEOUT_S).toEqual({ min: 1, max: 86400 });
   });
 
-  it('the MCP dispatch and the transport clamp the value to [1, 86400] seconds', async () => {
+  it('the @protocol dispatch and the transport clamp the value to [1, 86400] seconds', async () => {
     const seen: (number | undefined)[] = [];
     const port: FeaToolsPort = {
       mesh: () => Promise.resolve(ok('')),

@@ -56,6 +56,6 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - Lane 5, continuous: hold the coverage gate; `cad-reviewer` on every `[REVIEW]` diff.
 
 ## Open decisions
-- CFD-D2 move `FeaToolsPort` out of `packages/mcp` (covered by LC1 step 4); CFD-D3 one artifact store for FEA + CFD.
+- CFD-D3 one artifact store for FEA + CFD.
 - Lock policy is UI-only (core edit commands ignore locked layers) — decide for the CLI.
 - 2D rotation semantics, AutoCAD mouse mapping — owner to decide.

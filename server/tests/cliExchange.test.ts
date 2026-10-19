@@ -1,5 +1,5 @@
 /**
- * Exchange tools outside MCP: `unshapeExchangeResult`, `POST /exchange`, and the CLI (local
+ * Exchange tools over REST and the CLI: `unshapeExchangeResult`, `POST /exchange`, and the CLI (local
  * in-process + `file=`), with a fake Python port. A real CadQuery round trip (export_step →
  * import_step) runs when LLULL_TEST_PYTHON names an interpreter with CadQuery.
  */
@@ -10,8 +10,8 @@ import request from 'supertest';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import type { CadExchangePort } from '@mcp/index';
-import { shapeToolCallContent } from '@mcp/index';
+import type { CadExchangePort } from '@protocol/index';
+import { shapeToolCallContent } from '@protocol/index';
 import { deserializeDocument } from '@core/commands/persistence/serialization';
 import { unshapeExchangeResult } from '../src/exchangeResult';
 import { buildExchangeRouter } from '../src/exchangeRoutes';
@@ -51,7 +51,7 @@ function capture(exchangeOptions: () => ExchangeOptions = () => fakeOptions): { 
 const work = (): string => mkdtempSync(path.join(tmpdir(), 'llull-exchange-'));
 
 describe('unshapeExchangeResult', () => {
-  it('recovers summary, affected ids and data from an MCP-shaped result', () => {
+  it('recovers summary, affected ids and data from a shaped tool result', () => {
     const shaped = shapeToolCallContent({ summary: 'done', affected: ['a', 'b'], isError: false, data: { n: 1 } });
     expect(unshapeExchangeResult(shaped)).toEqual({ summary: 'done', affected: ['a', 'b'], isError: false, data: { n: 1 } });
   });

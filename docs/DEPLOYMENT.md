@@ -1,143 +1,62 @@
-# On-prem deployment (legacy — being removed)
+# Deployment — desktop app + CLI (local only)
 
-> **Legacy.** llull is CLI + local only ([LC1](decisions/LC1-local-only.md)): install the desktop app
-> ([desktop/README.md](../desktop/README.md)) and drive it with the `llull` CLI. There is no browser
-> build to host any more (LC1 step 2). The shared on-prem server below (Docker image, named users,
-> licence) is removed in LC1 step 3; do not extend it.
+llull is installed on the engineer's machine and runs offline (decision
+[LC1](decisions/LC1-local-only.md)). There is no shared server, no Docker image, no named users, licence
+seats, audit trail or admin routes: one local backend per machine, started by the desktop app or the CLI.
 
-The optional server hosts one shared live document, MCP for agents, named users with roles, a
-per-user audit trail and an offline license.
+| Piece           | What it is                                                                                     |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| Desktop app     | Electron shell (`desktop/`): starts the local backend on loopback and shows the React UI in it |
+| Local backend   | `server/` bundle: the live document, autosave, exchange (STEP / DWG / CadQuery), exports        |
+| `llull` CLI     | `server/src/cli`: the agent path (Claude Code, scripts, CI), on a file or on the open app       |
+| Native binaries | `solver/` (`llull-compute`, `llull-kernel`), bundled with the app when built                   |
 
 ## 1. Install
 
-```bash
-docker compose up -d --build        # builds web app + server, binds 127.0.0.1:3001
-curl http://127.0.0.1:3001/health
-```
-
-Set in a `.env` next to `docker-compose.yml`:
-
-| Variable                   | Meaning                                                                  |
-| -------------------------- | ------------------------------------------------------------------------ |
-| `LLULL_PUBLIC_URL`         | URL browsers use (baked into the web bundle, also the allowed origin)    |
-| `LLULL_ALLOWED_HOSTS`      | Host header(s) accepted behind the proxy (e.g. `cad.example.com`)        |
-| `LLULL_BIND`               | Host interface to publish (`127.0.0.1` default; use the proxy to expose) |
-| `LLULL_TOOLSETS`           | MCP toolsets per session (`core` default, `all`)                         |
-| `LLULL_LICENSE_PUBLIC_KEY` | Vendor public key PEM (see section 3)                                    |
-| `LLULL_TRUST_PROXY`        | Proxy hops trusted for the client IP (`1` default; per-client limits)    |
-
-Every other server variable (rate limits, session caps, timeouts, Python bridge, kernel) is listed
-in [server/README.md](../server/README.md#environment-variables).
-
-The image ships no Python/CadQuery (`LLULL_PYTHON=off`): STEP import and CadQuery code exchange
-answer "disabled". STEP export still works with `LLULL_KERNEL=occt` (OpenCascade writes it). For
-STEP import use the desktop app, or extend the image with a CadQuery Python and set `LLULL_PYTHON`.
-
-Without Docker: `npm ci && npm --prefix server ci && npm run build && npm --prefix server run build`,
-then `LLULL_STATIC_DIR=$PWD/dist HOST=0.0.0.0 LLULL_USERS_FILE=... node server/dist/index.js`.
-
-The container refuses to be reachable without auth: `LLULL_USERS_FILE` is always set, so until the
-first user exists every request is 401.
-
-## 2. Users and roles
+Build the installer on each target OS (native wheels, the Python runtime and the native binaries are per
+platform); details in [desktop/README.md](../desktop/README.md):
 
 ```bash
-docker compose exec llull node server/scripts/add-user.mjs ada "Ada Admin" admin
-docker compose exec llull node server/scripts/add-user.mjs ed  "Ed Editor" editor
-docker compose exec llull node server/scripts/add-user.mjs vera "Vera Viewer" viewer
+npm ci && npm --prefix server ci && npm --prefix desktop ci
+npm --prefix desktop run dist        # installer in desktop/release/
 ```
 
-Each call prints a fresh token once and appends only its SHA-256 to `users.json` (no restart needed;
-the file is re-read on change). To revoke or rotate, delete the entry and add the user again.
+The installer bundles a relocatable CPython with CadQuery, so STEP import / export and CadQuery code exchange
+work offline with nothing else installed. `import_code` (arbitrary Python) stays off unless the app is launched
+with `LLULL_ALLOW_CODE_EXECUTION=1`.
 
-| Role     | May                                                                                   |
-| -------- | ------------------------------------------------------------------------------------- |
-| `viewer` | `GET /live`, `/live/snapshot`, `/export/*`, read-only MCP tools (measure, query, ...) |
-| `editor` | + `/command`, `/undo`, `/redo`, `/import/*`, every MCP tool                           |
-| `admin`  | + `/admin/users`, `/admin/audit`, `/admin/license`                                    |
+## 2. Agents: the CLI
 
-Tokens are sent as `Authorization: Bearer <token>` (MCP agents, scripts) or, for the SSE stream, a single-use 30 s `?ticket=` minted by `POST /live/ticket` (header auth). `?access_token=` in a URL is deprecated: it ends up in proxy/access logs and browser history.
-Browser users open the app once at `https://cad.example.com/#token=<their token>`; it is kept in
-`localStorage` and the fragment is removed. Unknown token: 401. Role too low: 403.
-Named-user mode supersedes `MCP_AUTH_TOKEN`.
+Help › Install Command Line Tool puts a `llull` launcher in `~/.llull/bin`. `llull --app …` drives the open
+window's document (the user sees every change and can undo it); `llull --doc part.llull …` works headless on a
+file. Procedure: the `llull-cli` skill; reference: `node server/bin/llull.cjs help`.
 
-Audit (admin): `curl -H "Authorization: Bearer $ADMIN" "$URL/admin/audit?user=ed&since=2026-01-01T00:00:00Z&limit=200"`.
-Each line of `audit.jsonl`: `{ ts, userId, userName, source: rest|mcp, command, paramsSha256, summary,
-affectedCount, epoch, seq }`. Only applied (document-changing) commands, undo and redo are logged;
-parameters are hashed, not stored. It rotates at `LLULL_AUDIT_MAX_BYTES` keeping `LLULL_AUDIT_KEEP` files.
+## 3. Security of the local backend
 
-## 3. License
+- The backend binds `127.0.0.1` only; a non-loopback `HOST` refuses to start.
+- The desktop app mints a random per-launch token (`MCP_AUTH_TOKEN`, `LLULL_REQUIRE_TOKEN_FOR_REST=true`) and
+  writes it, owner-only, to `~/.llull/desktop.json` for the CLI. Every REST call needs it as
+  `Authorization: Bearer <token>`; the SSE stream takes a single-use 30 s `?ticket=` minted by
+  `POST /live/ticket`. Other local processes and websites cannot reach the document.
+- The only allowed browser origin is the app's own; Host headers other than loopback names are refused
+  (DNS rebinding).
 
-Without a license the server runs in **evaluation** mode: at most 3 named users, and the status bar
-shows "Evaluation - 3 users". A license is verified offline (Ed25519) and raises the seat count
-(distinct named users in `users.json`; admins first, then file order). Users beyond the seats get
-HTTP 402 with an explanatory message. Expired or tampered licenses fall back to evaluation with a
-warning in the logs and in `GET /license`.
+Every server variable (rate limits, timeouts, Python bridge, kernel) is listed in
+[server/README.md](../server/README.md#environment-variables).
 
-Vendor side (keep the private key off customer machines and out of git):
+## 4. DWG converter
 
-```bash
-node server/scripts/license.mjs keygen --out license-private.pem     # prints the public key PEM
-echo '{"customer":"ACME","seats":10,"expires":"2027-12-31","features":[]}' > acme.json
-node server/scripts/license.mjs sign acme.json --key license-private.pem > license.key
-```
+DWG import runs an external converter, never linked into llull: LibreDWG's `dwg2dxf` (0.14 or later, on the
+`PATH`; Debian stable does not package it and older releases have known CVEs) or the ODA File Converter.
+Without a converter `POST /import/dwg` answers 503; DXF import is unaffected. When running the backend or the
+CLI directly, `LLULL_DWG2DXF=<path|off>` and `LLULL_ODA_CONVERTER=<executable>` choose the converter.
 
-Customer side: put `license.key` in the license volume (`/data/license/license.key`) and set
-`LLULL_LICENSE_PUBLIC_KEY` (single line with `\n` escapes, or a file path). It is re-read on change.
-Check: `curl $URL/license`.
+LibreDWG is GPL-3.0: it runs as a separate program. Keep it that way (do not bundle a LibreDWG
+WebAssembly/library build into the app) unless llull's licence allows it.
 
-## 4. TLS
+## 5. Backup and upgrade
 
-The server speaks plain HTTP; terminate TLS in a reverse proxy and keep the container on loopback.
-Caddy:
-
-```
-cad.example.com {
-    encode zstd gzip           # the OCC kernel WASM is 66 MB raw, ~14 MB compressed
-    reverse_proxy 127.0.0.1:3001 {
-        flush_interval -1      # SSE (/live, /mcp) must not be buffered
-    }
-}
-```
-
-nginx: `proxy_buffering off; proxy_read_timeout 1h; proxy_http_version 1.1;` on `/live` and `/mcp`,
-and `gzip on; gzip_types application/javascript application/wasm text/css application/json;`.
-Keep `LLULL_TRUST_PROXY` equal to the number of proxies in front, so rate limits apply per client
-rather than to the proxy's single address.
-Set `LLULL_PUBLIC_URL=https://cad.example.com` and `LLULL_ALLOWED_HOSTS=cad.example.com`.
-
-## 5. DWG converter
-
-The image builds LibreDWG's `dwg2dxf` from a pinned GNU release (`LIBREDWG_VERSION`, default
-0.14 — Debian stable does not package LibreDWG, and Debian's tracker lists CVEs up to 0.13.4).
-The tarball must match the pinned `LIBREDWG_SHA256` (checked against the maintainer's signature
-when pinned); when bumping `LIBREDWG_VERSION`, verify the new `.sig` and pin its checksum. Fetch
-from a mirror with `--build-arg LIBREDWG_URL=<url>` — the checksum still applies. Build without
-DWG support with `--build-arg WITH_DWG=0`. Check with `docker compose exec llull dwg2dxf --version`.
-Alternatives: mount the ODA File Converter and set `LLULL_ODA_CONVERTER=<executable>`, or set
-`LLULL_DWG2DXF=off`. Without a converter `POST /import/dwg` answers 503; DXF import is unaffected.
-
-LibreDWG is GPL-3.0: it runs as a separate program, never linked into llull. Keep it that way
-(do not bundle a LibreDWG WebAssembly/library build into the app) unless llull's licence allows it.
-
-## 6. Backup
-
-State lives in four volumes: `llull-autosave` (the document), `llull-audit`, `llull-users`,
-`llull-license`. Back them up while running:
-
-```bash
-docker run --rm -v llull_llull-autosave:/d -v "$PWD":/b busybox tar czf /b/llull-autosave.tgz -C /d .
-```
-
-(repeat per volume; prefix is your compose project name). Restore by extracting into an empty
-volume before starting. Treat `users.json` as sensitive (token hashes).
-
-## 7. Upgrade
-
-```bash
-git pull && docker compose up -d --build
-```
-
-Volumes are kept. The autosave is versioned and migrated on load; an unreadable one is moved aside
-as `autosave.json.unreadable-<ts>` and the server starts empty (restore from backup). Roll back by
-checking out the previous tag and rebuilding.
+The open document is autosaved to `autosave.json` in the app's user-data directory; File › Save writes
+`.llull` files wherever the user chooses. Back up those files like any other engineering data. The autosave is
+versioned and migrated on load; an unreadable one is moved aside as `autosave.json.unreadable-<ts>` and the
+app starts empty. Upgrading is installing the new build over the old one.

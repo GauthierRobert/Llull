@@ -1,6 +1,6 @@
-/** GET /export/{stl,code,step}: downloads of the live document (`guardRead`: bearer or `?access_token=`). */
+/** GET /export/{stl,code,step}: downloads of the live document (`guardRead`: bearer token when one is set). */
 import { Router, type Response } from 'express';
-import { exportStepFile } from '@mcp/index';
+import { exportStepFile } from '@protocol/index';
 import { isRecord } from '@lib/isRecord';
 import { errorMessage } from '@lib/errorMessage';
 import { applyCommand } from './commandBus';

@@ -1,11 +1,11 @@
 /**
- * How the `llull` CLI prints a result. Text mode reuses the MCP shaping (`shapeToolCallContent`:
- * the same size caps an agent gets over MCP); `--json` prints one machine-readable object.
+ * How the `llull` CLI prints a result. Text mode uses the tool result shaping (`shapeToolCallContent`: size caps that keep an
+ * agent's context small); `--json` prints one machine-readable object.
  */
 
-import { shapeToolCallContent } from '@mcp/index';
+import { shapeToolCallContent } from '@protocol/index';
 import { isRecord } from '@lib/isRecord';
-import type { CommandOutcome } from '@mcp/restProtocol';
+import type { CommandOutcome } from '@protocol/restProtocol';
 import { formatDuration } from './progress';
 import { elideLargePayloads, type SavedFile } from './saveFiles';
 import { aliasLine, type PlanAliases } from './aliases';
@@ -43,7 +43,7 @@ function savedLines(saved: readonly SavedFile[] | undefined): string[] {
   return (saved ?? []).map((file) => `Saved ${file.path} (${file.bytes} bytes)${file.note === undefined ? '' : ` -- ${file.note}`}`);
 }
 
-/** Summary, affected ids and the data block, as an MCP agent would read them. */
+/** Summary, affected ids and the data block, as an agent reads them. */
 export function resultText(result: PrintableResult): string {
   const shaped = shapeToolCallContent({
     summary: result.summary,

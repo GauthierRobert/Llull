@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { FeConvergenceRow, FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
-import { FEA_SOLVE_TIMEOUT_S, type FeaHost, type FeaToolResult } from '@mcp/index';
+import { FEA_SOLVE_TIMEOUT_S, type FeaHost, type FeaToolResult } from '@protocol/index';
 import type { FeArtifactStore } from './artifactStore';
 import type { CaeHooks } from './caeHooks';
 import type { CcxRunner } from './ccxProcess';

@@ -19,10 +19,9 @@
   },
   "include": [
     "src",
-    "examples",
     "tests",
     "../packages/core/src",
-    "../packages/mcp/src",
+    "../packages/protocol/src",
     "../packages/domain-aec/src",
     "../packages/domain-cae/src",
     "../packages/domain-aero/src",

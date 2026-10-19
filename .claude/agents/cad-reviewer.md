@@ -1,6 +1,6 @@
 ---
 name: cad-reviewer
-description: Use to review a diff before declaring a non-trivial change done. Audits against llull's architecture laws — command-layer purity, the core→ui dependency direction, registry-as-contract, snake_case tool names, test + coverage requirements — plus correctness. Use PROACTIVELY at the end of any feature touching core/, ui interactions, or the AI/MCP surfaces.
+description: Use to review a diff before declaring a non-trivial change done. Audits against llull's architecture laws — command-layer purity, the core→ui dependency direction, registry-as-contract, snake_case tool names, test + coverage requirements — plus correctness. Use PROACTIVELY at the end of any feature touching core/, ui interactions, or the AI / CLI surfaces.
 tools: Read, Grep, Glob, Bash
 model: opus
 ---
@@ -19,13 +19,13 @@ Get the diff (`git diff` if initialized, else inspect changed files). Check, in 
 ### Architecture (blocking)
 - [ ] No document mutation outside a command. Components/server only `dispatch` / `execute`.
 - [ ] `packages/*/src` import no react / DOM / window / fetch and never `src/ui`;
-      `packages/core` imports no other package (`@aec` / `@mcp` / `@kernel-*`) (L2, L10).
+      `packages/core` imports no other package (`@aec` / `@protocol` / `@kernel-*`) (L2, L10).
 - [ ] Commands read the kernel only from `ctx.kernel` (+ `requiresKernel`); no
       `getGeometryKernel()` / `setGeometryKernel()` / concrete kernel in a command (L9).
 - [ ] Domain commands live in their plugin, not `packages/core` (L10).
 - [ ] Commands are pure: new doc returned, input untouched (purity test present).
 - [ ] New capability == a registered command (no surface-specific bypass).
-- [ ] AI/MCP tools come from `toToolSchemas()`; params from a zod `params` via
+- [ ] AI / CLI tools come from `toToolSchemas()`; params from a zod `params` via
       `defineCommand` — no hand-written `paramsSchema` / `<X>Params` interface.
 
 ### Contract & conventions (blocking)

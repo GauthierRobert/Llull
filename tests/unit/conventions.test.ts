@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CONVENTIONS_GUIDE, CONVENTIONS_URI } from '@mcp/conventions';
-
-describe('CONVENTIONS_URI', () => {
-  it('is the expected cad://conventions URI', () => {
-    expect(CONVENTIONS_URI).toBe('cad://conventions');
-  });
-});
+import { CONVENTIONS_GUIDE } from '@protocol/conventions';
 
 describe('CONVENTIONS_GUIDE content', () => {
   it('is a non-empty string', () => {

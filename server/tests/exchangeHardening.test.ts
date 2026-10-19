@@ -1,6 +1,6 @@
 /**
  * Hardening of the Python exchange: secret-free child environment, symlink-proof exchange
- * directory, and the structured exportStepFile used by both the MCP tool and GET /export/step.
+ * directory, and the structured exportStepFile used by both the export_step tool and GET /export/step.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { exportStepFile, type CadExchangePort } from '@mcp/index';
+import { exportStepFile, type CadExchangePort } from '@protocol/index';
 import { bridgeEnvironment, createPythonExchangePort, type PythonExchangeConfig } from '../src/pythonExchange';
 
 let scratch: string;

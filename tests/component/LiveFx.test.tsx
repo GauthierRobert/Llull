@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { documentHash } from '@mcp/liveSync';
+import { documentHash } from '@protocol/liveSync';
 import { useStore } from '@ui/store';
 import { useLiveFxStore } from '@ui/store/liveFxStore';
 import { consumeLiveOrigin, isOwnCommandId, markLiveOrigin } from '@ui/store/liveOrigin';

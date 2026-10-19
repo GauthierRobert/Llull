@@ -1,8 +1,7 @@
 /**
- * The live document over REST + SSE (protocol: `@mcp/liveSync`).
+ * The live document over REST + SSE (protocol: `@protocol/liveSync`).
  *   GET  /live           SSE: `snapshot` on connect / undo / redo; `command` per mutation.
- *                        guardRead: Bearer, or a single-use `?ticket=` (EventSource cannot set headers; the
- *                        `?access_token=` query is deprecated: it leaks into access logs).
+ *                        guardRead: Bearer, or a single-use `?ticket=` (EventSource cannot set headers).
  *   POST /live/ticket    `{ ticket, expiresInMs }`: 30 s single-use ticket (header auth only)
  *   GET  /live/snapshot  `{ seq, stateHash, document }` for resync after a gap or hash mismatch
  *   POST /command        `{ name, params?, commandId? }`; a repeated `commandId` is idempotent
@@ -14,20 +13,18 @@ import { isRecord } from '@lib/isRecord';
 import { applyCommand, undo, redo } from './commandBus';
 import { getLiveDoc, subscribeLive, getLiveSnapshot, liveSubscriberCount, MAX_LIVE_SUBSCRIBERS, liveMaxPerClient } from './liveDocument';
 import { guardMutation, guardRead, guardTicketIssue, isLocalPeer } from './security';
-import { redactLicensedOutcome } from '@mcp/index';
-import { actorOf } from './audit';
+import { redactLicensedOutcome } from '@protocol/index';
 import { TICKET_TTL_MS, issueTicket } from './tickets';
-import { requestUser } from './users';
 
 const KEEPALIVE_MS = 25_000;
 
 /**
- * Per-client key for the /live stream cap, or null when the client cannot be told apart: behind a proxy
- * with `trust proxy` unset every user shares the proxy's address, so only the global cap applies.
+ * Per-client key for the /live stream cap, or null when the client cannot be told apart: behind a proxy every client
+ * shares the proxy's address, so only the global cap applies.
  */
 function liveClientKey(req: Request): string | null {
   const proxied = req.headers['x-forwarded-for'] !== undefined || req.headers['forwarded'] !== undefined;
-  if (proxied && !req.app.get('trust proxy')) return null;
+  if (proxied) return null;
   return req.ip ?? req.socket.remoteAddress ?? 'unknown';
 }
 
@@ -63,7 +60,7 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
   });
 
   router.post('/live/ticket', restLimiter, ticketGuard, (req, res) => {
-    const ticket = issueTicket(requestUser(res), req.ip ?? req.socket.remoteAddress ?? 'unknown');
+    const ticket = issueTicket(req.ip ?? req.socket.remoteAddress ?? 'unknown');
     if (ticket === null) return void res.status(503).json({ error: 'Too many outstanding tickets.' });
     res.status(200).json({ ticket, expiresInMs: TICKET_TTL_MS });
   });
@@ -79,12 +76,12 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
     if (commandId !== undefined && (typeof commandId !== 'string' || commandId.length === 0)) {
       return void res.status(400).json({ error: '"commandId" must be a non-empty string when present.' });
     }
-    const applied = applyCommand(name, params ?? {}, commandId, actorOf(res, body.client === 'cli' ? 'cli' : 'rest'));
+    const applied = applyCommand(name, params ?? {}, commandId, body.client === 'cli' ? 'cli' : 'rest');
     res.status(200).json(isLocalPeer(req) ? applied : redactLicensedOutcome(getLiveDoc(), name, params, applied));
   });
 
-  router.post('/undo', restLimiter, mutationGuard, (_req, res) => void res.status(200).json(undo(actorOf(res, 'rest'))));
-  router.post('/redo', restLimiter, mutationGuard, (_req, res) => void res.status(200).json(redo(actorOf(res, 'rest'))));
+  router.post('/undo', restLimiter, mutationGuard, (_req, res) => void res.status(200).json(undo()));
+  router.post('/redo', restLimiter, mutationGuard, (_req, res) => void res.status(200).json(redo()));
 
   return router;
 }

@@ -4,7 +4,7 @@ import { exportDocumentHash, exportGate } from '@core/model/exportGate';
 import type { ExecutionContext } from '@core/commands/types';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { HumanSignaturePort } from '@core/model/analysis';
-import { exportStepFile } from '@mcp/exchangeTools';
+import { exportStepFile } from '@protocol/exchangeTools';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import type { CadDocument } from '@core/model/types';

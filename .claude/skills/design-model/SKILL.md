@@ -12,21 +12,21 @@ command actions applied as one undoable transaction, with cross-step id aliasing
 dry-run validator. Design the whole system as one plan, validate it, apply it, then
 verify and refine.
 
-> Building a NEW llull capability (a command/viewport/MCP/test change) is a different
-> job — use `add-command` / `viewport-feature` / `mcp-server` instead. This skill only
+> Building a NEW llull capability (a command/viewport/CLI/test change) is a different
+> job — use `add-command` / `viewport-feature` / `verify-llull` instead. This skill only
 > _uses_ the commands that already exist.
 
 ## References
 
 - Plan transaction & aliasing: `packages/core/src/commands/project/buildProject.ts` (`build_project`)
 - Full command vocabulary: `listCommands()` (`registry.ts` + plugins) · Schema: `.claude/context/model.md`
-- Cloud agents over MCP: only the `core` toolset is listed by default: `search_tools` to find a tool,
-  `enable_toolset` to load its toolset (`build_project` steps can use any command regardless).
+- Finding a tool: `llull search <words>`, `llull list <toolset>`, `llull describe <tool>` (every command is
+  callable, and `build_project` steps can use any of them).
 - 2D drafting: `draw-2d` skill · Parametrics & history: `parametric` skill
 - Read-only inspection/sizing: `measure` skill · Drive the live app: `verify-llull`
 - **Running the plan locally (Claude Code): the `llull-cli` skill** — `llull run plan.json
   --validate --app` (open desktop window) or `--doc file`, then without `--validate`; `--save`
-  for renders/exports. MCP tools (below) are the cloud-agent path.
+  for renders/exports. The CLI is the only agent path (no MCP server, LC1).
 
 ## The command vocabulary (what you compose)
 

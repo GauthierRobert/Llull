@@ -1,12 +1,12 @@
 ---
 name: add-command
-description: Add a new CAD operation to llull. Use whenever a task means a new way to change the document — "add a cylinder/boolean/array tool", "let the AI rotate things", "support filleting". One command added to the registry instantly becomes a UI button and an MCP tool (drivable by Claude or any MCP agent). Covers the command definition, registration, tests, and optional UI surfacing.
+description: Add a new CAD operation to llull. Use whenever a task means a new way to change the document — "add a cylinder/boolean/array tool", "let the AI rotate things", "support filleting". One command added to the registry instantly becomes a UI button and a CLI tool (drivable by Claude Code or any script through `llull`). Covers the command definition, registration, tests, and optional UI surfacing.
 ---
 
 # Skill: add-command
 
-Adding a command is the highest-leverage change in llull: define once → UI + MCP
-both gain it (MCP being drivable by Claude or any agent). Delegate the implementation
+Adding a command is the highest-leverage change in llull: define once → UI + CLI
+both gain it (the CLI being how Claude Code or any script drives llull). Delegate the implementation
 to the `command-author` agent unless the change is trivial.
 
 ## References
@@ -50,12 +50,12 @@ union, and note that the viewport needs a matching render branch (hand to `viewp
 
 ### 3. Register
 - Core: define it in its feature folder (`packages/core/src/commands/<feature>/`) and list the
-  const in that folder's `catalog.ts` (never `registry.ts`), then list its name in exactly one toolset in `packages/mcp/src/toolsets.ts`
+  const in that folder's `catalog.ts` (never `registry.ts`), then list its name in exactly one toolset in `packages/protocol/src/toolsets.ts`
   (`core` only if every agent needs it up front; a test asserts one toolset per tool).
 - Plugin: list it in its domain's `catalog.ts` (`packages/domain-aec/src/<building|industrial|civil>/catalog.ts`,
   consumed by that domain's `plugin.ts`); it joins the plugin's `toolset` automatically
   (`pluginToolNames`).
-That is the entire AI + MCP wiring — `toToolSchemas()` exposes it automatically.
+That is the entire AI + CLI wiring — `toToolSchemas()` exposes it automatically.
 
 ### 4. Test (same change)
 `tests/unit/<domain>.test.ts` (plugins: `tests/unit/building/`): happy path (assert `affected`,

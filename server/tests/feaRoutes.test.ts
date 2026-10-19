@@ -1,9 +1,9 @@
-/** FE tools over the transports that need no external tool: MCP-layer dispatch, `POST /exchange`, `llull describe`, with a fake FeaToolsPort. */
+/** FE tools over the transports that need no external tool: @protocol dispatch, `POST /exchange`, `llull describe`, with a fake FeaToolsPort. */
 
 import { describe, expect, it } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { applyExchangeToolCall, buildFeaToolDefinitions, type FeaToolResult, type FeaToolsPort } from '@mcp/index';
+import { applyExchangeToolCall, buildFeaToolDefinitions, type FeaToolResult, type FeaToolsPort } from '@protocol/index';
 import { createEmptyDocument } from '@core/model/types';
 import { buildExchangeRouter } from '../src/exchangeRoutes';
 import { EXIT_OK, runCli } from '../src/cli/main';

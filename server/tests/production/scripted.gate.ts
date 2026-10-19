@@ -1,8 +1,8 @@
 /**
- * Production gate, scripted driver: each engineering-office scenario's tool calls are sent through
- * the real /mcp endpoint (Streamable HTTP), like an MCP agent would — the session discovers and
- * enables the toolsets it needs — then the live document is graded against the office's acceptance
- * criteria (tests/production). Reports: .cache/production/reports/scripted/.
+ * Production gate, scripted driver: each engineering-office scenario's tool calls are sent to the
+ * running backend exactly as the `llull` CLI sends them (`llull --server` / `--app`: `POST /command`,
+ * `POST /exchange`), then the live document is graded against the office's acceptance criteria
+ * (tests/production). Reports: .cache/production/reports/scripted/.
  *
  *   npm run production:scripted
  *
@@ -12,14 +12,13 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getCommand } from '@core/commands/registry';
-import { toolsetOf } from '@mcp/toolsets';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import type { Scenario, ToolCall } from '../../../tests/production/contract';
 import { gradeContext, gradeScenario } from '../../../tests/production/grade';
 import { formatReport, resetReports, writeReport } from '../../../tests/production/report';
 import { SCENARIOS, chainOf } from '../../../tests/production/scenarios';
 import { estimateUsd, runAgent, type SendTurn } from './agentLoop';
-import { liveDocument, openSession, resetDocument, startServer, stopServer } from './mcpHarness';
+import { callTool, liveDocument, resetDocument, startServer, stopServer } from './cliHarness';
 
 beforeAll(async () => {
   resetReports('scripted');
@@ -27,48 +26,35 @@ beforeAll(async () => {
 });
 afterAll(stopServer);
 
-/** Run a scenario's calls in one MCP session on the current live document. */
+/** Run a scenario's calls through the CLI's server backend on the current live document. */
 async function drive(scenario: Scenario): Promise<{ calls: number; ms: number }> {
-  const session = await openSession(`production-scripted-${scenario.id}`);
   const started = Date.now();
-  try {
-    const toolsets = new Set(scenario.script.map((call) => toolsetOf(call.tool)).filter((t) => t !== undefined && t !== 'core'));
-    for (const toolset of toolsets) {
-      const enabled = await session.call('enable_toolset', { toolset });
-      expect(enabled.isError, enabled.text).toBe(false);
+  for (const call of scenario.script) {
+    const before = liveDocument();
+    const outcome = await callTool(call.tool, call.args);
+    expect(outcome.isError, `${call.tool}: ${outcome.text}`).toBe(false);
+    // A soft failure returns isError:false with the document unchanged.
+    if (getCommand(call.tool)?.annotations?.readOnly !== true) {
+      expect(liveDocument(), `${call.tool} changed nothing: ${outcome.text}`).not.toBe(before);
     }
-    for (const call of scenario.script) {
-      const before = liveDocument();
-      const outcome = await session.call(call.tool, call.args);
-      expect(outcome.isError, `${call.tool}: ${outcome.text}`).toBe(false);
-      // A soft failure returns isError:false with the document unchanged.
-      if (getCommand(call.tool)?.annotations?.readOnly !== true) {
-        expect(liveDocument(), `${call.tool} changed nothing: ${outcome.text}`).not.toBe(before);
-      }
-      expect(outcome.text, `${call.tool}`).not.toMatch(/\brejected\b/i);
-    }
-  } finally {
-    await session.close();
+    expect(outcome.text, `${call.tool}`).not.toMatch(/\brejected\b/i);
   }
   return { calls: scenario.script.length, ms: Date.now() - started };
 }
 
-/** Default `/mcp` limit (server/src/mcp/middleware.ts): requests per minute per IP. */
-const DEFAULT_MCP_LIMIT = 600;
+/** Default REST limit (`LLULL_REST_RATE_LIMIT_MAX`, server/src/security.ts): requests per minute per IP. */
+const DEFAULT_REST_LIMIT = 600;
 
-describe('each job fits the default /mcp rate limit', () => {
+describe('each job fits the default REST rate limit', () => {
   for (const scenario of SCENARIOS) {
     it(scenario.id, () => {
-      // One request per tool call, plus session setup (initialize + notification) and one
-      // enable_toolset per toolset, for the job itself (its starting model is already there).
-      const toolsets = new Set(scenario.script.map((call) => toolsetOf(call.tool)));
-      const requests = scenario.script.length + toolsets.size + 2;
-      expect(requests).toBeLessThan(DEFAULT_MCP_LIMIT);
+      // One request per tool call, for the job itself (its starting model is already there).
+      expect(scenario.script.length).toBeLessThan(DEFAULT_REST_LIMIT);
     });
   }
 });
 
-describe('production scenarios — scripted driver over /mcp', () => {
+describe('production scenarios — scripted driver through the CLI backend', () => {
   for (const scenario of SCENARIOS) {
     it(scenario.id, async () => {
       resetDocument(createEmptyDocument());
@@ -89,7 +75,7 @@ describe('production scenarios — scripted driver over /mcp', () => {
 
 /**
  * The AI-agent driver's loop (agentLoop.ts) with a stub model that replays the scripted calls as
- * tool_use blocks: proves the loop, tool listing / deferral and MCP plumbing without API credentials.
+ * tool_use blocks: proves the loop, tool listing / deferral and the CLI plumbing without API credentials.
  */
 describe('AI-agent loop plumbing (stub model)', () => {
   it('replays desmet-extraction-building through runAgent and grades like the scripted driver', async () => {
@@ -97,8 +83,7 @@ describe('AI-agent loop plumbing (stub model)', () => {
     if (!scenario) throw new Error('no scenario');
     resetDocument(createEmptyDocument());
     const pending: ToolCall[] = [
-      { tool: 'add_level', args: { name: 'probe', elevation: 0, height: 1000 } }, // not enabled yet
-      { tool: 'enable_toolset', args: { toolset: 'building' } },
+      { tool: 'add_levle', args: { name: 'probe' } }, // a typo: an error result, like the CLI's unknown command
       ...scenario.script,
     ];
     let seenTools = 0;
@@ -119,7 +104,7 @@ describe('AI-agent loop plumbing (stub model)', () => {
     expect(seenTools).toBeGreaterThan(100);
     expect(deferred).toBeGreaterThan(0);
     expect(run.transcript[0]?.isError).toBe(true);
-    expect(run.transcript[0]?.result).toMatch(/enable_toolset/);
+    expect(run.transcript[0]?.result).toMatch(/add_levle/);
     expect(run.toolErrors).toBe(1);
     expect(run.stopReason).toBe('end_turn');
     const report = gradeScenario(scenario, 'scripted', gradeContext(liveDocument()));

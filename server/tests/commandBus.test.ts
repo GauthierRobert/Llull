@@ -58,7 +58,7 @@ describe('applyCommand', () => {
   it('a command event names its channel and echoes the sender commandId', () => {
     const fakeRes = makeFakeRes();
     const unsub = subscribeLive(fakeRes);
-    applyCommand('add_box', BOX, 'cmd-own', { userId: 'anonymous', userName: 'anonymous', source: 'cli', named: false });
+    applyCommand('add_box', BOX, 'cmd-own', 'cli');
     applyCommand('add_box', BOX2);
     unsub();
     const [, first, second] = fakeRes.written.map((frame) => parseSseFrame(frame).data);

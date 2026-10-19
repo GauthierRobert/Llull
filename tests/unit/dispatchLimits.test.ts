@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_AFFECTED_IDS_SHOWN, MAX_CODE_TEXT_CHARS, MAX_JSON_TEXT_CHARS, shapeToolCallContent } from '@mcp/dispatch';
+import { MAX_AFFECTED_IDS_SHOWN, MAX_CODE_TEXT_CHARS, MAX_JSON_TEXT_CHARS, shapeToolCallContent } from '@protocol/toolResult';
 
 const ids = (count: number): string[] => Array.from({ length: count }, (_, i) => `box-${i}.1`);
 const totalChars = (blocks: Array<{ text: string }>): number => blocks.reduce((sum, block) => sum + block.text.length, 0);
@@ -49,7 +49,7 @@ describe('shapeToolCallContent size limits', () => {
     const text = shaped.content[1]?.text ?? '';
     expect(text.length).toBeLessThan(MAX_JSON_TEXT_CHARS + 500);
     expect(text).toMatch(/truncated \d+ of \d+ characters/);
-    expect(text).toContain('structuredContent');
+    expect(text).toContain('--json');
     expect(text.endsWith('```')).toBe(true);
     expect((shaped.structuredContent as typeof data).entities).toHaveLength(20_000);
   });
@@ -77,7 +77,7 @@ describe('shapeToolCallContent size limits', () => {
     const shaped = shapeToolCallContent({ summary: 's', affected: [], isError: false, data: { format: 'code', text: huge } });
     const text = shaped.content[2]?.text ?? '';
     expect(text.length).toBeLessThan(MAX_CODE_TEXT_CHARS + 300);
-    expect(text).toContain('structuredContent.text');
+    expect(text).toContain('--save');
     expect((shaped.structuredContent as { text: string }).text).toBe(huge);
   });
 });

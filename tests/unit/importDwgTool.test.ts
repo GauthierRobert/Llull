@@ -7,9 +7,9 @@ import {
   type DwgConverterPort,
   type ExchangeCommandResult,
   type ExchangeDeps,
-} from '@mcp/exchangeTools';
-import { buildAllMcpTools } from '@mcp/discovery';
-import { toolsetOf } from '@mcp/toolsets';
+} from '@protocol/exchangeTools';
+import { buildAllTools } from '@protocol/discovery';
+import { toolsetOf } from '@protocol/toolsets';
 
 const applied: Array<{ name: string; params: unknown }> = [];
 
@@ -35,7 +35,7 @@ const converter: DwgConverterPort = {
 describe('import_dwg tool', () => {
   it('is registered in the exchange toolset and the served tool list', () => {
     expect(buildExchangeToolDefinitions().map((t) => t.name)).toContain('import_dwg');
-    expect(buildAllMcpTools().map((t) => t.name)).toContain('import_dwg');
+    expect(buildAllTools().map((t) => t.name)).toContain('import_dwg');
     expect(toolsetOf('import_dwg')).toBe('exchange');
   });
   it('converts then runs import_dxf by default, forwarding only drawing params', async () => {

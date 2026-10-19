@@ -14,7 +14,7 @@ import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
 import type { PythonBackend } from '@core/codegen/pythonRuntime';
-import type { CadExchangePort, DwgConverterPort, FeaToolsPort, MaterialLibraryStorePort, ProgramRun } from '@mcp/index';
+import type { CadExchangePort, DwgConverterPort, FeaToolsPort, MaterialLibraryStorePort, ProgramRun } from '@protocol/index';
 import { exchangeDirOf, positiveInteger } from './env';
 import { trackChild } from './childProcesses';
 
@@ -31,7 +31,7 @@ export function bridgeEnvironment(env: NodeJS.ProcessEnv = process.env): NodeJS.
   return Object.fromEntries(Object.entries(env).filter(([key]) => ENV_ALLOWLIST.test(key)));
 }
 
-/** STEP / code exchange wiring injected into each MCP server; `dwg` = DWG -> DXF converter. */
+/** STEP / code exchange wiring injected into the exchange tools; `dwg` = DWG -> DXF converter. */
 export interface ExchangeOptions {
   readonly port: CadExchangePort | null;
   readonly dwg?: DwgConverterPort | null;

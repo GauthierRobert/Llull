@@ -1,6 +1,6 @@
 /** argv parsing for the `llull` CLI. No I/O. */
 
-import { DEFAULT_DOCUMENT_PATH } from '@mcp/documentFiles';
+import { DEFAULT_DOCUMENT_PATH } from '@protocol/documentFiles';
 
 /** Flags that never take a value (`--json`, not `--json yes`). */
 const BOOLEAN_FLAGS: ReadonlySet<string> = new Set('json dry-run validate continue force help quiet progress app no-fit'.split(' '));

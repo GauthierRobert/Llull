@@ -1,5 +1,5 @@
 /**
- * Inject the rigid-body physics engine (MuJoCo WASM) into the core at startup (architecture L9), so `simulate_motion` works for MCP
+ * Inject the rigid-body physics engine (MuJoCo WASM) into the core at startup (architecture L9), so `simulate_motion` works for the CLI
  * agents and the CLI exactly as in the browser app. On failure the command keeps its graceful "no physics engine" no-op.
  */
 

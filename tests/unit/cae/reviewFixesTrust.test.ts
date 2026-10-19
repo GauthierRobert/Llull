@@ -5,7 +5,7 @@ import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
 import type { AnalysisCase, HumanSignaturePort } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
-import { applyLiveCommand, documentHash, type LiveCommandEvent } from '@mcp/liveSync';
+import { applyLiveCommand, documentHash, type LiveCommandEvent } from '@protocol/liveSync';
 import { meshSummary, resultsSummary } from '@cae/results/summary';
 import { withCase } from '@cae/shared/access';
 import { stateOf } from '@cae/shared/state';

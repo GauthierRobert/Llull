@@ -8,7 +8,7 @@ pattern, scoped tightly to this app (no context bloat).
 
 ```
 CLAUDE.md            (repo root) entrypoint; imports the rules; read this first
-.mcp.json            (repo root) optional dev MCP server(s) — see "MCP" below
+.mcp.json            (repo root) optional dev-time MCP server(s) for Claude Code — see "Dev-time MCP" below
 .claude/
   settings.json      permissions (fewer prompts) + hook wiring
   rules/             AUTHORITATIVE ruleset (auto-loaded by Claude Code)
@@ -16,23 +16,22 @@ CLAUDE.md            (repo root) entrypoint; imports the rules; read this first
     conventions.md     always — machine-first code style
     workflow.md        always — loop, commit, testing, done, delegation threshold
     commands.md        paths: packages/**, tests/** — command skeleton, parametric/kernel/plugin as-built
-    sync.md            paths: packages/mcp, server, src/ui/store, src/app — live sync + MCP host
+    sync.md            paths: packages/protocol, server, src/ui/store, src/app — live sync + local backend + CLI
     react.md           paths: src/ui/** — React + r3f + Zustand
   agents/            focused subagents (delegate when it pays — workflow W5)
     command-author.md    add/modify commands in packages/core or a plugin (+ tests)
     viewport-engineer.md 2D + 3D viewport (r3f), snapping & interaction
-    mcp-engineer.md      MCP host over the registry
+    cli-engineer.md      `llull` CLI, local backend, packages/protocol
     test-verifier.md     tests + coverage gate + the check loop
     cad-reviewer.md      reviews a diff against the architecture laws (fixed terse output)
   skills/            invokable procedures (only the description loads until triggered)
-    add-command/         the highest-leverage change: UI + MCP in one
+    add-command/         the highest-leverage change: UI + CLI in one
     add-entity-kind/     new 2D/3D kind — checklist of every (mostly silent) dispatch site
     fix-bug/             reproduce first (failing test / golden plan), root cause, minimal fix
     draw-2d/             2D drafting: entities, snapping, dimensions, sketch→solid
     parametric/          parameters, constraints, feature history (edit-and-regenerate)
     measure/             read-only measurement/inspection query tools
     design-model/        use llull AS a CAD tool: build_project plans end-to-end
-    mcp-server/          build/extend the MCP host
     viewport-feature/    implement/change 2D/3D viewport behavior
     verify-llull/        full verification loop (+ Playwright for UI)
     continue-working/    resume the build from work/BOARD.md
@@ -62,7 +61,7 @@ CLAUDE.md            (repo root) entrypoint; imports the rules; read this first
   parsing (explicit types, structured doc-comment tags, registry-driven discovery).
   Human-prose rationale lives in `docs/`.
 
-## MCP (dev-time, optional)
+## Dev-time MCP (optional)
 
 `.mcp.json` enables **context7** for up-to-date three.js / react-three-fiber / drei
 API docs while building the viewport. It runs via `npx` (you'll be prompted to approve
@@ -70,9 +69,8 @@ the server on first use). Remove the entry if you don't want it — it is a conv
 not a requirement. The **Playwright** MCP server (browser automation for `verify-llull`)
 is provided by the harness plugin and needs no config here.
 
-> Not to be confused with llull's OWN MCP server (the product feature in `server/` +
-> `packages/mcp`), which exposes CAD commands to external agents. That is built by
-> `mcp-engineer`, not configured here.
+> llull itself has no MCP server any more (LC1 step 4): agents drive it through the `llull` CLI
+> (`llull-cli` skill, `cli-engineer` agent).
 
 ## Tuning
 

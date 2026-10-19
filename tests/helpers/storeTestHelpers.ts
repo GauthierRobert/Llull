@@ -15,7 +15,7 @@
 
 import { expect, vi } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import { type LiveSnapshotEvent, documentHash } from '@mcp/liveSync';
+import { type LiveSnapshotEvent, documentHash } from '@protocol/liveSync';
 import { execute } from '@core/commands/registry';
 import type { CommandResult } from '@core/commands/types';
 import { useStore } from '@ui/store';

@@ -4,7 +4,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
-import type { FeaHost } from '@mcp/index';
+import type { FeaHost } from '@protocol/index';
 import { createEmptyDocument, type CadDocument, type Entity, type MeshData } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { GeometryKernel } from '@core/geometry/kernel';

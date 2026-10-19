@@ -44,8 +44,7 @@ function hasPrototypeIdKey(value: unknown, keyHint = '', depth = 0): boolean {
   return Object.entries(value).some(([k, v]) => hasPrototypeIdKey(v, k, depth + 1));
 }
 
-const INVALID_PARAMS_FIX =
-  'Fix the params at `paths`; the schema of the command is in the tool list / `search_tools` (CLI: `llull describe <command>`).';
+const INVALID_PARAMS_FIX = 'Fix the params at `paths`; the schema of the command: `llull describe <command>`.';
 
 const POSITION_CONTRACT = ' Format [x, y, z]; [x, y] is accepted and placed at z=0.';
 

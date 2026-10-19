@@ -1,5 +1,5 @@
 import type { CadDocument, EntityId } from '@core/model/types';
-import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
+import type { LiveCommandEvent, LiveSnapshotEvent } from '@protocol/liveSync';
 
 /** Result `data` of the most recent read-only/query command. */
 export interface LastMeasure {

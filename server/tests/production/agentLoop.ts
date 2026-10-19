@@ -1,14 +1,17 @@
 /**
- * The AI-agent driver's loop: Claude receives the job brief and works it through llull's MCP
- * tools only (manual tool-use loop over an MCP session). The tool array is fixed for the whole
- * conversation (every llull tool; those outside the session's enabled toolsets are deferred and
- * found with tool search), so calling a not-yet-enabled tool returns llull's own guidance to call
- * enable_toolset — the same discovery path any MCP client meets.
+ * The AI-agent driver's loop: Claude receives the job brief and works it through llull's tools only, each tool call
+ * run exactly as the `llull` CLI runs it against the backend (`cliHarness.callTool`). The tool array is the CLI catalog
+ * (registry commands + exchange / FE / library tools, schemas from `toToolSchemas()`); tools outside the `core` toolset
+ * are deferred and found with tool search, so the model sees what `llull list core` shows and searches like `llull search`.
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { TOOLSET_NAMES } from '@mcp/toolsets';
-import { openSession, type McpSession } from './mcpHarness';
+import { buildAllTools } from '@protocol/discovery';
+import { toolsetOf } from '@protocol/toolsets';
+import { CONVENTIONS_GUIDE } from '@protocol/conventions';
+import type { ToolDefinition } from '@protocol/tools';
+import { buildImageBlock } from '../../src/renderImage';
+import { callTool } from './cliHarness';
 
 /** One model turn. Default: the Anthropic Messages API; tests inject a stub. */
 export type SendTurn = (params: Anthropic.Beta.MessageCreateParamsStreaming) => Promise<Anthropic.Beta.BetaMessage>;
@@ -79,46 +82,32 @@ const SYSTEM = [
   'When you are done, reply with a short completion note listing anything you could not do in llull.',
 ].join(' ');
 
-type ToolDefinition = Awaited<ReturnType<McpSession['client']['listTools']>>['tools'][number];
-
-/** Every llull tool, listed from a throwaway session with all toolsets enabled. */
-async function allTools(): Promise<ToolDefinition[]> {
-  const lister = await openSession('production-agent-lister');
-  try {
-    for (const toolset of TOOLSET_NAMES) await lister.call('enable_toolset', { toolset });
-    return (await lister.client.listTools()).tools;
-  } finally {
-    await lister.close();
-  }
-}
-
-function toApiTools(tools: ToolDefinition[], loaded: Set<string>): Anthropic.Beta.BetaToolUnion[] {
+function toApiTools(tools: readonly ToolDefinition[]): Anthropic.Beta.BetaToolUnion[] {
   const custom: Anthropic.Beta.BetaToolUnion[] = tools.map((tool) => ({
     name: tool.name,
-    description: tool.description ?? '',
+    description: tool.description,
     input_schema: tool.inputSchema as Anthropic.Beta.BetaTool.InputSchema,
-    defer_loading: !loaded.has(tool.name),
+    defer_loading: (toolsetOf(tool.name) ?? 'core') !== 'core',
   }));
   return [{ type: 'tool_search_tool_bm25_20251119', name: 'tool_search_tool_bm25' }, ...custom];
 }
 
-/** MCP result content → tool_result content (text + images, e.g. render_view PNGs). */
-function toResultContent(content: unknown): Array<Anthropic.Beta.BetaTextBlockParam | Anthropic.Beta.BetaImageBlockParam> {
-  const blocks: Array<Anthropic.Beta.BetaTextBlockParam | Anthropic.Beta.BetaImageBlockParam> = [];
-  for (const item of Array.isArray(content) ? content : []) {
-    const block = item as { type?: string; text?: string; data?: string; mimeType?: string };
-    if (block.type === 'text' && typeof block.text === 'string') {
-      blocks.push({ type: 'text', text: block.text });
-    } else if (block.type === 'image' && typeof block.data === 'string' && block.mimeType === 'image/png') {
-      blocks.push({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: block.data } });
-    }
-  }
-  return blocks.length > 0 ? blocks : [{ type: 'text', text: '(no content)' }];
+/** CLI result text, plus a PNG of any `data.svg` (render_view, sheets): the vision loop of the agent. */
+async function toResultContent(
+  text: string,
+  data: unknown,
+): Promise<Array<Anthropic.Beta.BetaTextBlockParam | Anthropic.Beta.BetaImageBlockParam>> {
+  const image = await buildImageBlock(data);
+  const blocks: Array<Anthropic.Beta.BetaTextBlockParam | Anthropic.Beta.BetaImageBlockParam> = [
+    { type: 'text', text: text === '' ? '(no content)' : text },
+  ];
+  if (image !== null) blocks.push({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: image.data } });
+  return blocks;
 }
 
 export async function runAgent(brief: string, options: AgentOptions, send: SendTurn = sendToApi): Promise<AgentRun> {
-  const tools = await allTools();
-  const session = await openSession('production-agent');
+  const apiTools = toApiTools(buildAllTools());
+  const system = `${SYSTEM}\n\nllull modeling conventions (\`llull guide\`):\n${CONVENTIONS_GUIDE}`;
   const started = Date.now();
   const run: AgentRun = {
     turns: 0,
@@ -135,10 +124,6 @@ export async function runAgent(brief: string, options: AgentOptions, send: SendT
     transcript: [],
   };
   try {
-    const loaded = new Set((await session.client.listTools()).tools.map((tool) => tool.name));
-    const apiTools = toApiTools(tools, loaded);
-    const instructions = session.client.getInstructions() ?? '';
-    const system = instructions === '' ? SYSTEM : `${SYSTEM}\n\nllull server instructions:\n${instructions}`;
     const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: brief }];
     while (run.turns < options.maxTurns) {
       run.turns++;
@@ -176,9 +161,9 @@ export async function runAgent(brief: string, options: AgentOptions, send: SendT
       messages.push({ role: 'assistant', content: message.content });
       const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
       for (const toolUse of toolUses) {
-        const raw = await session.client.callTool({ name: toolUse.name, arguments: (toolUse.input ?? {}) as Record<string, unknown> });
-        const content = toResultContent(raw.content);
-        const isError = raw.isError === true;
+        const outcome = await callTool(toolUse.name, (toolUse.input ?? {}) as Record<string, unknown>);
+        const content = await toResultContent(outcome.text, outcome.data);
+        const isError = outcome.isError;
         run.toolCalls++;
         if (isError) run.toolErrors++;
         run.transcript.push({
@@ -197,7 +182,6 @@ export async function runAgent(brief: string, options: AgentOptions, send: SendT
     }
   } finally {
     run.wallMs = Date.now() - started;
-    await session.close();
   }
   return run;
 }

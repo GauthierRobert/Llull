@@ -57,11 +57,11 @@ Lanes own disjoint write scopes (`.claude/work/BOARD.md` is the ledger):
 | 1 Core | `command-author` | `packages/core/src/**`, `packages/domain-{aec,cae,aero}/src/**`, `packages/kernel-*/src/**` |
 | 2 3D+Shell | `viewport-engineer` | `src/ui/viewport/3d/**`, `src/ui/{components,panels,store}/**`, `src/app/**` |
 | 3 2D | `viewport-engineer` | `src/ui/viewport/2d/**`, snapping/tracking helpers |
-| 4 MCP | `mcp-engineer` | `packages/mcp/src/**`, `server/**` |
+| 4 CLI | `cli-engineer` | `packages/protocol/src/**`, `server/**` |
 | 5 Review | `test-verifier` + `cad-reviewer` | `tests/**`; reviews diffs |
 
 Core feature catalogs (`commands/<feature>/catalog.ts`) are Lane-1-only. Run `cad-reviewer` when the diff touches `packages/core`, the
-registry, a plugin's commands, or `packages/mcp`/`server` — not for docs, tests-only or small UI tweaks.
+registry, a plugin's commands, or `packages/protocol`/`server` — not for docs, tests-only or small UI tweaks.
 
 ## W6 — When unsure
 

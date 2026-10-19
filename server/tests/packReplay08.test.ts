@@ -10,11 +10,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { deserializeDocument } from '@core/commands/persistence/serialization';
+import request from 'supertest';
 import { app } from '../src/index';
 import { _resetLiveDoc } from '../src/liveDocument';
 import { _resetHistory, applyCommand } from '../src/commandBus';
 import { libraryFile } from '../../tests/unit/materials/support';
-import { callMcpTool, openMcpSession } from './mcpTestSupport';
 import { REPO_ROOT, cliCall, cliExec, cliPlan, newSession, runPlan, type CliCall, type Session } from './packCli';
 
 afterAll(() => setGeometryKernel(null));
@@ -450,7 +450,7 @@ describe('VC-MAT-26 through the CLI: named defaults in select_fastener', () => {
   });
 });
 
-describe('VC-MAT-15 / 25 through the CLI and the cloud MCP: export-control gates', () => {
+describe('VC-MAT-15 / 25 through the CLI (local file and live backend): export-control gates', () => {
   const spec = agentFirst('VC-MAT-25').expected as Array<{
     call: string;
     exitCode: number;
@@ -525,13 +525,13 @@ describe('VC-MAT-15 / 25 through the CLI and the cloud MCP: export-control gates
     expect(deserializeDocument(readFileSync(other.doc, 'utf8')).materials['secret']?.record?.exportMarking).toEqual({ regime: 'EAR99' });
   });
 
-  describe('(b) cloud MCP', () => {
+  describe('(b) the CLI against the live backend (POST /command, --app / --server)', () => {
     beforeEach(() => {
       _resetLiveDoc();
       _resetHistory();
     });
 
-    it('export_step_exact on an ITAR-marked live document is refused over /mcp, with or without an agent confirmation', async () => {
+    it('export_step_exact on an ITAR-marked live document is refused over REST, with or without an agent confirmation', async () => {
       applyCommand('define_material_record', {
         id: 'secret',
         designation: 'X',
@@ -541,13 +541,14 @@ describe('VC-MAT-15 / 25 through the CLI and the cloud MCP: export-control gates
       });
       const box = applyCommand('add_box', { size: [2, 2, 2], position: [0, 0, 0] });
       applyCommand('assign_material', { materialName: 'secret', entityIds: box.affected });
-      const sessionId = await openMcpSession(app);
-      const plain = await callMcpTool(app, sessionId, 'export_step_exact', {});
-      expect(plain.isError).toBe(true);
-      expect(JSON.stringify(plain)).toContain('MAT_EXPORT_CONTROLLED');
-      const confirmed = await callMcpTool(app, sessionId, 'export_step_exact', { confirmExportControlled: true });
-      expect(confirmed.isError).toBe(true);
-      expect(JSON.stringify(confirmed)).toContain('MAT_HUMAN_GATE');
+      const call = async (params: Record<string, unknown>): Promise<request.Response> =>
+        request(app).post('/command').send({ name: 'export_step_exact', params, client: 'cli' });
+      const plain = await call({});
+      expect(plain.body.isError).toBe(true);
+      expect(JSON.stringify(plain.body)).toContain('MAT_EXPORT_CONTROLLED');
+      const confirmed = await call({ confirmExportControlled: true });
+      expect(confirmed.body.isError).toBe(true);
+      expect(JSON.stringify(confirmed.body)).toContain('MAT_HUMAN_GATE');
     });
   });
 });

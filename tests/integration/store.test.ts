@@ -70,7 +70,7 @@ function simulatedServer(failFirst?: number): {
   commands: () => string[];
   doc: () => CadDocument;
   bodies: () => { name: string; params: unknown; commandId?: string }[];
-  /** A concurrent change by another client (e.g. an MCP agent). Returns its affected ids. */
+  /** A concurrent change by another client (e.g. the CLI with --app). Returns its affected ids. */
   inject: (name: string, params: unknown) => string[];
 } {
   let serverDoc = createEmptyDocument();

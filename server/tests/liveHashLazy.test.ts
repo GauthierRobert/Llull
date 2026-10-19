@@ -4,8 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const hashed = vi.hoisted(() => ({ count: 0 }));
 
-vi.mock('@mcp/liveSync', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@mcp/liveSync')>();
+vi.mock('@protocol/liveSync', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@protocol/liveSync')>();
   return {
     ...original,
     documentHash: (...args: Parameters<typeof original.documentHash>): string => {
@@ -18,7 +18,7 @@ vi.mock('@mcp/liveSync', async (importOriginal) => {
 import { subscribeLive, getLiveSnapshot, _resetLiveDoc } from '../src/liveDocument';
 import { applyCommand } from '../src/commandBus';
 import { makeFakeRes, parseSseFrame } from './sseTestHelpers';
-import { applyLiveCommand, documentHash } from '@mcp/liveSync';
+import { applyLiveCommand, documentHash } from '@protocol/liveSync';
 import type { CadDocument } from '@core/model/types';
 
 describe('live command hash', () => {

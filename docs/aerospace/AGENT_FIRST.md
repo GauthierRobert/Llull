@@ -7,7 +7,7 @@ an engineer clicking in the UI, this document wins.
 
 | Role | Who | Uses | Responsibility |
 | ---- | --- | ---- | -------------- |
-| **Operator (primary)** | An AI agent (Claude Code or similar) | The `llull` CLI: `--doc FILE` headless, or `--app` on the open desktop window. MCP `/mcp` for cloud agents. | Turns an intent into plans, runs them, checks its own work, reports. |
+| **Operator (primary)** | An AI agent (Claude Code or similar) | The `llull` CLI: `--doc FILE` headless, or `--app` on the open desktop window. (The MCP host was removed, LC1 step 4.) | Turns an intent into plans, runs them, checks its own work, reports. |
 | **Owner** | The person who asks the agent for a result | Natural language to the agent; may watch the desktop app | States the goal and accepts the result. **Is not assumed to be an engineer.** |
 | **Qualified reviewer** (only where the work feeds certification, release or safety decisions) | A qualified engineer / design organisation signatory (Part 21 DOA, DER/CVE, company authority) | Desktop app review surfaces, release packages, reports | Approves, signs, owns the engineering judgement. |
 
@@ -27,9 +27,9 @@ Ids `AF-nn`. Each pack maps its own FR/TR to these where relevant and adds a VC 
 
 | Id | Pri | Requirement |
 | -- | --- | ----------- |
-| AF-01 | MUST | Every capability is a registry command (L1/L5), so `llull search`, `llull describe`, `llull list <toolset>` find it and MCP exposes it with no extra work. No CLI special cases. |
+| AF-01 | MUST | Every capability is a registry command (L1/L5), so `llull search`, `llull describe`, `llull list <toolset>` find it with no extra work. No CLI special cases. |
 | AF-02 | MUST | Command descriptions are written for an agent: what it does, when to use it, units of every numeric param, what it refuses and why, which command to call next. One paragraph, no marketing. |
-| AF-03 | MUST | `llull guide` (and the MCP prompt for the toolset) gains an aerospace section per gap: units and axes (FS/BL/WL where relevant), id and alias conventions, the minimal correct plan for the gap's main job. |
+| AF-03 | MUST | `llull guide` gains an aerospace section per gap: units and axes (FS/BL/WL where relevant), id and alias conventions, the minimal correct plan for the gap's main job. |
 | AF-04 | MUST | Every param that carries a physical quantity states its unit in the schema description, or takes `{ value, unit }`. No unit is ever inferred silently from context the agent cannot see. |
 | AF-05 | MUST | Everything a gap does can be expressed in one `build_project` plan file (aliases `$name`, `=expr`, loops) and checked with `llull run plan.json --validate` before any kernel work. Validation errors name the step path and the param. |
 
@@ -39,7 +39,7 @@ Ids `AF-nn`. Each pack maps its own FR/TR to these where relevant and adds a VC 
 | -- | --- | ----------- |
 | AF-10 | MUST | Every query returns its result in `data` (`llull … --json`) with a stable, documented shape. Every number carries its unit (field name suffix such as `massKg`, or an explicit `unit` field). No result exists only as prose in `summary`. |
 | AF-11 | MUST | Every refusal and every check failure has a **stable machine code** (e.g. `GDT_DATUM_UNDEFINED`, `FEA_MESH_INVERTED`, `MAT_ALLOWABLE_UNVERIFIED`), the offending ids or paths, and a one-line remediation ("call `set_datum` on a planar face first"). Exit code 1 as today. |
-| AF-12 | MUST | Output is compact by default and bounded (the existing CLI/MCP cap). Large results are paged or narrowed by ids; heavy artefacts (meshes, decks, sheets, STEP) are written with `--save`, never dumped to stdout. |
+| AF-12 | MUST | Output is compact by default and bounded (the existing CLI text cap). Large results are paged or narrowed by ids; heavy artefacts (meshes, decks, sheets, STEP) are written with `--save`, never dumped to stdout. |
 | AF-14 | MUST | **Plan reports an agent can script on** (shared prerequisite, core change to `packages/core/src/commands/project/types.ts`): today `StepReport` carries `index, path, command, ok, summary, affected` only. Add `error?: { code, ids, paths, remediation }` per failed step (AF-11), `data?` for query steps, and a top-level `aliases: Record<name, string[]>` mapping every `as:` alias to the ids it bound, so a CLI script can address results by alias instead of parsing summaries. Backward compatible (new optional fields); tool-schema snapshot unaffected (output, not params). |
 | AF-13 | MUST | Results are deterministic: the same plan on the same kernel gives the same ids, values and order, so an agent can diff runs and a golden test can pin them. |
 
@@ -77,12 +77,12 @@ Ids `AF-nn`. Each pack maps its own FR/TR to these where relevant and adds a VC 
 
 - `CommandResult.error?: CommandError` = `{ code, ids, paths, remediation }` (`packages/core/src/commands/types.ts`).
   Every registry refusal (`rejected: true`) carries one; a command may also set it on its own graceful no-op — packs
-  add their codes there (`KRN_*`, `GDT_*`, …). It reaches MCP (an `Error <code> at <paths>: <remediation>` line plus
+  add their codes there (`KRN_*`, `GDT_*`, …). It reaches the CLI text output (an `Error <code> at <paths>: <remediation>` line plus
   `structuredContent.error`), the command bus / REST body and `llull … --json` (`error`).
 - `build_project` (`commands/project/`): each failed step has `error` (the command's own, else a plan code), each
   read-only step has `data` (its answer), and a completed run has `data.aliases` (every `as`, loop-interpolated ones
   included, → the ids it bound; legacy `for_each` element variables are not aliases and are left out). An aborted run
-  also sets `CommandResult.error` to the failing step's error, so an outer plan or an MCP caller sees the real code.
+  also sets `CommandResult.error` to the failing step's error, so an outer plan or a CLI caller sees the real code.
   `llull run` derives its `aliases` / `consumedAliases` from that map. **Behaviour change:** a legacy
   `{ repeat: { count, as }, step }` alias now lists what `$alias` resolves to — the last iteration's ids — where the
   CLI used to print the union of all iterations; use a nestable loop with `as: "name{i}"` to address every iteration.

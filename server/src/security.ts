@@ -1,13 +1,18 @@
-/** HTTP hardening for the non-MCP routes: origin/host allowlists, auth guards, rate limits, JSON errors. */
+/**
+ * HTTP hardening of the local backend: loopback-only bind, origin/host allowlists, the per-launch token guard, rate limits,
+ * JSON errors. The token (`MCP_AUTH_TOKEN`, set by the desktop app per launch) keeps other local processes and websites
+ * away from the document; there are no named users or roles (LC1: one local backend per machine).
+ */
 import crypto from 'crypto';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { UNAUTHORIZED_BODY, bearerToken, isUserMode, requireRole, sha256Digest, type Role } from './users';
 import { positiveInteger } from './env';
 import { consumeTicket } from './tickets';
-import { warnQueryTokenOnce } from './queryTokenWarning';
 
 const DEFAULT_ALLOWED_ORIGINS: readonly string[] = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
+
+/** JSON body of every 401. */
+const UNAUTHORIZED_BODY = { error: 'Unauthorized — valid Bearer token required.' };
 
 /** Origins allowed to call the server from a browser. `LLULL_ALLOWED_ORIGINS` = comma-separated. */
 export function getAllowedOrigins(): string[] {
@@ -21,23 +26,18 @@ const csv = (raw: string): string[] =>
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
 
-/** Constant-time equality of two tokens (compares SHA-256 digests: no length leak). */
-function tokensMatch(presented: string, token: string): boolean {
-  return crypto.timingSafeEqual(sha256Digest(presented), sha256Digest(token));
+const sha256Digest = (value: string): Buffer => crypto.createHash('sha256').update(value).digest();
+
+/** `Authorization: Bearer <token>` (scheme case-insensitive). */
+function bearerToken(req: Request): string | undefined {
+  const header = req.headers['authorization'];
+  return typeof header === 'string' ? /^bearer +(.+)$/i.exec(header)?.[1] : undefined;
 }
 
 /** Constant-time `Authorization: Bearer <token>` check (digest compare: no length leak; scheme case-insensitive). */
 export function hasValidBearer(req: Request, token: string): boolean {
   const presented = bearerToken(req);
-  return presented !== undefined && tokensMatch(presented, token);
-}
-
-/** Constant-time check of the `?access_token=` query parameter (EventSource cannot set headers). */
-function hasValidAccessToken(req: Request, token: string): boolean {
-  const presented = req.query['access_token'];
-  if (typeof presented !== 'string' || presented.length === 0) return false;
-  warnQueryTokenOnce();
-  return tokensMatch(presented, token);
+  return presented !== undefined && crypto.timingSafeEqual(sha256Digest(presented), sha256Digest(token));
 }
 
 /** True for 127.0.0.0/8, ::1, ::ffff:127.*, and `localhost`. */
@@ -60,21 +60,16 @@ const PROXY_HEADERS: readonly string[] = [
 
 /**
  * Loopback TCP peer not relayed by a proxy (behind a local reverse proxy every client looks like loopback).
- * Remote redaction of licensed values (TR-MAT-32) relies on the proxy setting at least one of PROXY_HEADERS (every common
- * proxy sets X-Forwarded-For or Forwarded); a proxy that strips all of them makes its clients look local.
+ * Redaction of licensed values for a non-local client (TR-MAT-32) relies on the proxy setting at least one of PROXY_HEADERS.
  */
 export function isLocalPeer(req: Request): boolean {
   return PROXY_HEADERS.every((header) => req.headers[header] === undefined) && isLoopbackAddress(req.socket?.remoteAddress);
 }
 
-/** Refusal message when a non-loopback `HOST` would expose an unauthenticated API (opt out: `LLULL_ALLOW_UNAUTHENTICATED=true`), else null. */
-export function checkBindSafety(host: string, env: NodeJS.ProcessEnv = process.env): string | null {
-  if (isLoopbackAddress(host) || env['MCP_AUTH_TOKEN'] || env['LLULL_USERS_FILE'] || env['LLULL_ALLOW_UNAUTHENTICATED'] === 'true')
-    return null;
-  return (
-    `Refusing to start: HOST=${host} is not loopback and MCP_AUTH_TOKEN is not set. ` +
-    'Set MCP_AUTH_TOKEN (or LLULL_USERS_FILE), bind to 127.0.0.1, or set LLULL_ALLOW_UNAUTHENTICATED=true.'
-  );
+/** Refusal message when `HOST` is not a loopback address (the backend is local-only, LC1), else null. */
+export function checkBindSafety(host: string): string | null {
+  if (isLoopbackAddress(host)) return null;
+  return `Refusing to start: HOST=${host} is not a loopback address. The llull backend is local-only; bind to 127.0.0.1.`;
 }
 
 function hostWithoutPort(hostHeader: string): string {
@@ -87,28 +82,18 @@ function hostWithoutPort(hostHeader: string): string {
   return colon === -1 ? value : value.slice(0, colon);
 }
 
-/**
- * Host-header allowlist (DNS rebinding): localhost, 127.0.0.1, [::1] (any port) + `LLULL_ALLOWED_HOSTS` (`name` any port,
- * `name:port` exact). Non-loopback `HOST` with no allowlist accepts any Host (bearer auth is mandatory there).
- */
+/** Host-header allowlist (DNS rebinding): localhost, 127.0.0.1, [::1], any port. */
 export function hostAllowlist(): RequestHandler {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const extra = csv((process.env['LLULL_ALLOWED_HOSTS'] ?? '').toLowerCase());
     const header = req.headers['host'];
-    const full = typeof header === 'string' ? header.trim().toLowerCase() : undefined;
-    const bare = full === undefined ? undefined : hostWithoutPort(full);
-    const allowed =
-      (extra.length === 0 && !isLoopbackAddress(process.env['HOST'] ?? '127.0.0.1')) ||
-      (full !== undefined &&
-        bare !== undefined &&
-        (['localhost', '127.0.0.1', '[::1]'].includes(bare) || extra.includes(full) || extra.includes(bare)));
-    if (allowed) next();
+    const bare = typeof header === 'string' ? hostWithoutPort(header) : undefined;
+    if (bare !== undefined && ['localhost', '127.0.0.1', '[::1]'].includes(bare)) next();
     else res.status(403).json({ error: 'Host header is not allowed.' });
   };
 }
 
 /**
- * Guard for /command, /undo, /redo. The Origin allowlist is CSRF protection ONLY, never authentication. Policy:
+ * Guard for /command, /undo, /redo, /exchange, /import. The Origin allowlist is CSRF protection ONLY, never authentication:
  *   1. valid `Authorization: Bearer <MCP_AUTH_TOKEN>`              -> allow
  *   2. `LLULL_REQUIRE_TOKEN_FOR_REST=true` and a token is set       -> 401
  *   3. token set and peer is NOT loopback (or came via a proxy)     -> 401 (Origin is not trusted)
@@ -117,61 +102,41 @@ export function hostAllowlist(): RequestHandler {
  *   6. otherwise (allowed browser origin, or no token configured)   -> allow
  */
 export function guardMutation(): RequestHandler {
-  return buildGuard(false, 'editor');
+  return buildGuard(false);
 }
 
 /**
- * Guard for /live, /live/snapshot, /export/*: `guardMutation` policy + deprecated `?access_token=`; no token -> open.
+ * Guard for /live, /live/snapshot, /export/*: `guardMutation` policy; no token -> open to same-site requests.
  * `GET /live` (EventSource cannot send headers) also takes a single-use `?ticket=` (see tickets.ts); a request
  * carrying an Authorization header is judged by that header alone.
  */
 export function guardRead(): RequestHandler {
-  const inner = buildGuard(true, 'viewer');
+  const inner = buildGuard(true);
   return (req, res, next) => {
     const presented = req.query['ticket'];
     const isLiveStream = req.method === 'GET' && req.baseUrl + req.path === '/live';
     if (typeof presented !== 'string' || presented === '' || !isLiveStream || req.headers.authorization !== undefined)
       return inner(req, res, next);
-    const redeemed = consumeTicket(presented);
-    if (redeemed === null) return void res.status(401).json(UNAUTHORIZED_BODY);
-    if (redeemed.user !== undefined) res.locals['llullUser'] = redeemed.user;
+    if (!consumeTicket(presented)) return void res.status(401).json(UNAUTHORIZED_BODY);
     next();
   };
 }
 
-/** Guard for `POST /live/ticket`: viewer role, header auth ONLY (never a query token or a ticket). */
+/** Guard for `POST /live/ticket`: header auth ONLY (never a ticket). */
 export function guardTicketIssue(): RequestHandler {
-  return buildGuard(false, 'viewer');
+  return buildGuard(false);
 }
 
-/** Guard for `/admin/*`: role `admin` (named users), the shared token, or (no token) loopback peers only. */
-export function guardAdmin(): RequestHandler {
-  return userRoleOr('admin', false, (req, res, next) => {
+function buildGuard(isRead: boolean): RequestHandler {
+  return (req, res, next) => {
     const token = process.env['MCP_AUTH_TOKEN'];
-    if (token ? hasValidBearer(req, token) : isLocalPeer(req)) {
-      next();
-      return;
-    }
-    res.status(token ? 401 : 403).json(token ? UNAUTHORIZED_BODY : { error: 'Admin endpoints need MCP_AUTH_TOKEN or a loopback peer.' });
-  });
-}
-
-/** Named-user mode defers to the role check; otherwise `tokenGuard` decides. */
-function userRoleOr(role: Role, acceptQuery: boolean, tokenGuard: RequestHandler): RequestHandler {
-  const userGuard = requireRole(role, acceptQuery);
-  return (req, res, next) => (isUserMode() ? userGuard : tokenGuard)(req, res, next);
-}
-
-function buildGuard(acceptQueryToken: boolean, role: Role): RequestHandler {
-  return userRoleOr(role, acceptQueryToken, (req, res, next) => {
-    const token = process.env['MCP_AUTH_TOKEN'];
-    if (!token && acceptQueryToken) {
+    if (!token && isRead) {
       const refusal = crossSiteRefusal(req);
       if (refusal === null) next();
       else res.status(403).json({ error: refusal });
       return;
     }
-    if (token && (hasValidBearer(req, token) || (acceptQueryToken && hasValidAccessToken(req, token)))) {
+    if (token && hasValidBearer(req, token)) {
       next();
       return;
     }
@@ -189,7 +154,7 @@ function buildGuard(acceptQueryToken: boolean, role: Role): RequestHandler {
       return;
     }
     next();
-  });
+  };
 }
 
 /** Why a token-less read request must be refused as cross-site (CSRF of CPU-heavy exports), else null. */
@@ -210,16 +175,7 @@ function isSameHostOrigin(origin: string, host: string | undefined): boolean {
   }
 }
 
-/** `LLULL_TRUST_PROXY` -> Express `trust proxy` value (`true`/`false`, hop count, or a name/subnet list); undefined when unset. */
-export function trustProxySetting(raw: string | undefined): boolean | number | string | undefined {
-  const value = raw?.trim();
-  if (value === undefined || value === '') return undefined;
-  if (value === 'true') return true;
-  if (value === 'false') return false;
-  return /^\d+$/.test(value) ? Number(value) : value;
-}
-
-/** CSP for the served web app (wasm kernels, blob workers/images; connect-src = same origin + allowed origins). */
+/** CSP for the served app (wasm kernels, blob workers/images; connect-src = same origin + allowed origins). */
 export function contentSecurityPolicy(): string {
   return [
     "default-src 'self'",
@@ -251,7 +207,7 @@ export function securityHeaders(): RequestHandler {
 }
 
 /** Per-IP limiter: env `maxVariable` requests (default 600) per env `windowVariable` ms (default 60000). */
-export function buildRateLimiter(maxVariable: string, windowVariable: string): RequestHandler {
+function buildRateLimiter(maxVariable: string, windowVariable: string): RequestHandler {
   return rateLimit({
     windowMs: positiveInteger(process.env[windowVariable], 60_000),
     max: positiveInteger(process.env[maxVariable], 600),

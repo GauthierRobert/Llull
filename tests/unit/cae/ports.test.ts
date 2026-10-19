@@ -7,7 +7,7 @@ import type { ExecutionContext } from '@core/commands/types';
 import type { FeArtifactPort, HumanSignaturePort } from '@core/model/analysis';
 import { installPlugin } from '@core/plugins/host';
 import { createEmptyDocument } from '@core/model/types';
-import { TOOLSETS } from '@mcp/toolsets';
+import { TOOLSETS } from '@protocol/toolsets';
 import { listCommands } from '@core/commands/registry';
 
 const seen: Array<{ artifact: unknown; signer: unknown }> = [];

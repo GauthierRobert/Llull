@@ -1,8 +1,8 @@
 # Roadmap
 
 Priorities reflect the v1 goals: **(1) a working demo you can click around in,
-(2) clean architecture to build on, (3) the MCP integration (the sole path for
-AI control — there is no in-app AI bridge).**
+(2) clean architecture to build on, (3) the agent integration (the sole path for
+AI control — there is no in-app AI bridge): the `llull` CLI since LC1 (the MCP server of v0.3 was removed).**
 
 ## v0.1 — Working demo (current scaffold)
 
@@ -31,9 +31,9 @@ AI control — there is no in-app AI bridge).**
 - [x] Auth + rate limiting
 - [x] Example external agent script
 
-> AI control is delivered entirely through MCP. There is intentionally no in-app
-> AI assistant / Claude proxy — any MCP client (including Claude) drives llull by
-> calling the same commands the UI does.
+> AI control was delivered entirely through MCP. Superseded by LC1 (2026-10): the `/mcp` endpoint, toolset
+> discovery and the example agent were removed; agents drive llull through the `llull` CLI, calling the same
+> commands the UI does. There is still intentionally no in-app AI assistant / Claude proxy.
 
 ## v0.5 — Parametric & constraints (the leap to "real CAD")
 

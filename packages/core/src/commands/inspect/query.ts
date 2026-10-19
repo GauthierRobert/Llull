@@ -2,7 +2,7 @@
  * Query commands — read-only document inspection that returns structured data.
  *
  * These commands never mutate the document. They return the unchanged doc, `affected:[]`, a factual `summary`, and structured results in
- * `data`. Designed so AI/MCP agents can filter and locate entities by meaning rather than juggling generated ids.
+ * `data`. Designed so AI agents (CLI) can filter and locate entities by meaning rather than juggling generated ids.
  */
 
 import { type EntityKind, SHAPE2D_KINDS, SOLID_KINDS } from '../../model/types';

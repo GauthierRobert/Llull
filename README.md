@@ -9,7 +9,7 @@ document, driven equally well by a person and by an agent. The core bet:
 **every operation is a command**, and every command is drivable by a human (the desktop app)
 or by an agent (the `llull` CLI, e.g. from Claude Code), through the exact same code path.
 llull is local only: the React UI runs inside the Electron desktop app, nothing needs the
-network, and there is no browser or cloud deployment ([`docs/decisions/LC1-local-only.md`](docs/decisions/LC1-local-only.md)).
+network, and there is no browser, cloud host or MCP server ([`docs/decisions/LC1-local-only.md`](docs/decisions/LC1-local-only.md)).
 
 llull is developed **AI-first**: the [`CLAUDE.md`](CLAUDE.md) entrypoint and the
 [`.claude/`](.claude) directory (rules, agents, skills, hooks) are first-class
@@ -43,11 +43,11 @@ office? Click **Civil site starter** on the empty app for a complete sample site
 | UI             | React 19 + TypeScript, in Electron       | Best-in-class 3D ecosystem; Vite bundles the renderer |
 | 3D viewport    | three.js + @react-three/fiber + drei     | Mature, declarative Three.js |
 | State          | Zustand                                  | One store, no boilerplate, easy to drive externally |
-| Schemas        | zod                                      | One schema per command: TS type, tool JSON Schema and runtime validation |
+| Schemas        | zod                                      | One schema per command: TS type, tool JSON Schema (`llull describe`) and runtime validation |
 | Geometry kernel| Manifold (default) / OpenCascade.js      | Booleans and fillets behind one interface |
 | Tests          | Vitest + Testing Library + Playwright    | Fast, Vite-native |
 | Lint / format  | ESLint + Prettier                        | Consistent, enforced by `npm run check` |
-| Local backend  | Node + Express                           | Started by the desktop app or the CLI; same registry |
+| Local backend  | Node + Express                           | The desktop app's live document, exchange (STEP / DWG / CadQuery), exports; the `llull` CLI |
 
 ## Architecture in one picture
 
@@ -88,14 +88,22 @@ npm --prefix desktop run dist      # installable app: renderer + local backend +
 - Packaging, signing and the CLI hand-off: [`desktop/README.md`](desktop/README.md). Backend env
   reference: [`server/README.md`](server/README.md).
 
+Local backend and the `llull` CLI from a checkout:
+
+```bash
+npm --prefix server install
+npm --prefix server run dev        # the backend the UI syncs with (127.0.0.1:3001)
+node server/bin/llull.cjs help     # the CLI (agents: the llull-cli skill)
+```
+
 ## STEP and parametric code
 
 `export_code` writes the model as **CadQuery, build123d, OpenSCAD or a FreeCAD macro**.
 Parameters become variables, parameter-driven dimensions stay expressions, and features keep
-their history order. Edited CadQuery/build123d code comes back through the command
-`import_code` as an editable feature history. With the Python bridge (bundled in the desktop
-app, or `pip install -r server/python/requirements.txt`), the backend also offers
-`export_step` (exact B-rep through OpenCascade) and `import_step`. See
+their history order. Edited CadQuery/build123d code comes back through the exchange tool
+`import_code` (`llull exec import_code file=part.py`) as an editable feature history. With the Python bridge
+(bundled in the desktop app; otherwise `pip install -r server/python/requirements.txt`), the backend and CLI also
+offer `export_step` (exact B-rep through OpenCascade) and `import_step`. See
 [docs/CAD_EXCHANGE.md](docs/CAD_EXCHANGE.md).
 
 ## Project layout
@@ -104,7 +112,7 @@ app, or `pip install -r server/python/requirements.txt`), the backend also offer
 packages/                # npm workspaces — framework-agnostic, no React / DOM / fetch
   core/src/              # model, command layer (the heart of the app), execution context,
                          #   persistence, geometry kernel interface, plugin host, lib helpers
-  mcp/src/               # MCP tools, toolsets, discovery, live-sync protocol
+  protocol/src/          # host protocol: live sync, REST bodies, CLI tools, toolsets, tool search
   domain-aec/src/        # building (BIM) and industrial plugins
   kernel-manifold/src/   # Manifold geometry kernel (default)
   kernel-occt/src/       # OpenCascade geometry kernel
@@ -119,7 +127,7 @@ docs/                    # architecture, contributing, roadmap, domain guides
 
 ## The golden rule
 
-> **Never mutate the document outside a command.** The UI, the CLI and MCP all call
+> **Never mutate the document outside a command.** Both the UI and the CLI call
 > `execute(doc, name, params)`. If you find yourself editing entities directly
 > in a component, stop and write a command instead.
 

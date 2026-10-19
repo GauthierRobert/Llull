@@ -6,9 +6,9 @@
  *   fea_render     render_fea_results with the pixel raster in llull-compute raster (raster=auto|ts|cpu|gpu)
  */
 
-import type { McpToolDefinition } from '@mcp/tools';
-import type { FeaHost } from '@mcp/index';
-import type { CommandOutcome } from '@mcp/restProtocol';
+import type { ToolDefinition } from '@protocol/tools';
+import type { FeaHost } from '@protocol/index';
+import type { CommandOutcome } from '@protocol/restProtocol';
 import { getCommand } from '@core/commands/registry';
 import { isRecord } from '@lib/isRecord';
 import { nonEmptyString } from '@lib/nonEmptyString';
@@ -25,7 +25,7 @@ const TIMEOUT = {
   description: 'Wall-clock limit of the native job in seconds (default 600).',
 };
 
-export function nativeToolDefinitions(): McpToolDefinition[] {
+export function nativeToolDefinitions(): ToolDefinition[] {
   return [
     {
       name: 'fatigue_field',
@@ -68,7 +68,7 @@ export function nativeToolDefinitions(): McpToolDefinition[] {
 }
 
 /** fea_render: the params of render_fea_results plus `raster` (read from the registry, so both stay one schema). */
-function renderToolDefinition(): McpToolDefinition {
+function renderToolDefinition(): ToolDefinition {
   const schema = getCommand('render_fea_results')?.paramsSchema ?? { type: 'object' as const, properties: {}, required: [] };
   return {
     name: 'fea_render',

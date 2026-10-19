@@ -11,7 +11,7 @@ import { SOLID_PRESETS } from '@ui/components/toolbar/solidPresets';
 import { DRAW_TOOLS } from '@ui/components/toolbar/drawTools';
 import { SIDEBAR_TAB_SPECS, isSidebarTabAvailable } from '@ui/components/sidebarTabs';
 import { useReviewStore } from '@ui/panels/review/reviewStore';
-import { TOOLSET_NAMES, type ToolsetName, toolsetOf } from '@mcp/toolsets';
+import { TOOLSET_NAMES, type ToolsetName, toolsetOf } from '@protocol/toolsets';
 import { fuzzyScore } from './fuzzyMatch';
 import { humanizeName } from './paramForm';
 

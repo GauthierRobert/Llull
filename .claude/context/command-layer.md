@@ -17,7 +17,7 @@ interface CommandResult {
 }
 
 interface CommandDefinition<P> {
-  readonly name: string;              // snake_case; == AI/MCP tool name
+  readonly name: string;              // snake_case; == AI / CLI tool name
   readonly description: string;       // shown to humans + AI
   readonly paramsSchema: ParamsSchema; // DERIVED by defineCommand — never hand-written
   readonly paramsValidator?: ZodType;  // set by defineCommand; execute validates with it
@@ -26,9 +26,9 @@ interface CommandDefinition<P> {
 }
 
 interface CommandAnnotations {
-  readonly readOnly?: boolean;        // MCP readOnlyHint; same doc back, affected [], data
-  readonly destructive?: boolean;     // MCP destructiveHint
-  readonly idempotent?: boolean;      // MCP idempotentHint
+  readonly readOnly?: boolean;        // readOnlyHint; same doc back, affected [], data
+  readonly destructive?: boolean;     // destructiveHint
+  readonly idempotent?: boolean;      // idempotentHint
   readonly metaHistory?: boolean;     // execute appends no FeatureStep (history edits,
                                       // load_document, set_parameter/delete_parameter)
   readonly requiresKernel?: boolean;  // execute/replay refuse while ctx.kernel is null
@@ -173,5 +173,6 @@ No id-counter reset exists; tests rely on step-scoped determinism.
 
 - UI: `store.dispatch(name, params)` → online `POST /command` (server `execute`, result arrives on
   `/live`) or offline local `execute` + outbox → swap doc → undo snapshot.
-- MCP host (`packages/mcp` + `server`): `buildMcpTools()` from `toToolSchemas()`, filtered by
-  toolset; a call runs `execute` on the shared live document and broadcasts a `command` event.
+- CLI (`server/src/cli` + `packages/protocol`): `llull list / search / describe` read `toToolSchemas()` (`buildCommandTools()`);
+  `llull exec` / `run` call `execute` in-process on a document file, or `POST /command` on the local backend, which runs
+  `execute` on the shared live document and broadcasts a `command` event.
