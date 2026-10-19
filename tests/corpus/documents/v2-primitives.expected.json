@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "entityCount": 4,
+  "kinds": {
+    "cone": 1,
+    "pyramid": 1,
+    "torus": 1,
+    "wedge": 1
+  },
+  "boundingBox": {
+    "min": [
+      -2,
+      -3.5,
+      -0.5
+    ],
+    "max": [
+      11.5,
+      10,
+      4
+    ]
+  },
+  "featureSteps": 4
+}
