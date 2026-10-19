@@ -215,10 +215,13 @@ describe('render_view renderer native', () => {
     expect(nothing.error?.code).toBe('NATIVE_JOB_FAILED');
   });
 
-  it('reads the process-installed port through the default context', () => {
+  it('reads the process-installed port through the default context; reference digests ignore it (VC-VIS-60 c)', () => {
     const previous = getRasterPort();
-    setRasterPort(fakePort('twin'));
+    const before = (execute(twoBoxes(), 'render_view', { width: 80, height: 64 }).data as { svgSha256: string }).svgSha256;
+    setRasterPort(fakePort('fail'));
     try {
+      expect((execute(twoBoxes(), 'render_view', { width: 80, height: 64 }).data as { svgSha256: string }).svgSha256).toBe(before);
+      setRasterPort(fakePort('twin'));
       expect(execute(twoBoxes(), 'render_view', { renderer: 'native', width: 80, height: 64 }).error).toBeUndefined();
     } finally {
       setRasterPort(previous);
