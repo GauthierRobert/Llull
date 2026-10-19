@@ -152,6 +152,15 @@ fn an_f32_v_cycle_reaches_the_f64_tolerance_with_the_same_bits_for_any_thread_co
 #[test]
 #[ignore = "measurement: cargo test --release -p llull-voxfe --test solve -- --ignored --nocapture"]
 fn matvec_and_solve_throughput() {
+    fn solve_with<T: llull_voxfe::real::Real>(op: &Operator, f: &[f64]) -> (f64, usize, usize, f64) {
+        let started = std::time::Instant::now();
+        let mg = Multigrid::<T>::new(op, MultigridSettings::default());
+        let build = started.elapsed().as_secs_f64();
+        let started = std::time::Instant::now();
+        let mut x = vec![0.0; f.len()];
+        let stats = pcg(op, &mg, f, &mut x, TOLERANCE, 10_000).unwrap();
+        (build, mg.levels(), stats.iterations, started.elapsed().as_secs_f64())
+    }
     for n in [20usize, 40, 60] {
         let (op, f) = cantilever(2 * n, n, n);
         let u: Vec<f64> = (0..f.len()).map(|d| (d % 13) as f64).collect();
@@ -161,22 +170,13 @@ fn matvec_and_solve_throughput() {
             op.apply(&u, &mut y);
         }
         let matvec = started.elapsed().as_secs_f64() / 20.0;
-        let started = std::time::Instant::now();
-        let mg = llull_voxfe::multigrid::Multigrid::<f64>::new(&op, Default::default());
-        let build = started.elapsed().as_secs_f64();
-        let started = std::time::Instant::now();
-        let mut x = vec![0.0; f.len()];
-        let stats = llull_voxfe::pcg::pcg(&op, &mg, &f, &mut x, TOLERANCE, 10_000).unwrap();
-        let solve = started.elapsed().as_secs_f64();
-        eprintln!(
-            "{} DOF: mat-vec {:.2} ms, MG build {:.3} s ({} levels), MG-PCG {} iterations in {:.3} s",
-            f.len(),
-            matvec * 1e3,
-            build,
-            mg.levels(),
-            stats.iterations,
-            solve
-        );
+        for (precision, (build, levels, iterations, solve)) in [("f64", solve_with::<f64>(&op, &f)), ("f32", solve_with::<f32>(&op, &f))] {
+            eprintln!(
+                "{} DOF: mat-vec {:.2} ms, MG build {build:.3} s ({levels} levels), MG-PCG ({precision} V-cycle) {iterations} iterations in {solve:.3} s",
+                f.len(),
+                matvec * 1e3,
+            );
+        }
     }
 }
 
