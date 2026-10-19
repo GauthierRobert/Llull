@@ -857,9 +857,23 @@ Open items: set `LLULL_KERNEL` in the browser-only build (TR-KRN-03), the UI sta
 
 Built (opt-in, `LLULL_KERNEL=occt-native`; the desktop default stays `occt` = WASM until the full VC-KRN-25 parity suite passes):
 
-- **Crate `solver/crates/llull-kernel-occt`.** OCCT **7.8.1** built from source as static libraries by the `occt-sys` crate
-  (cmake, into `solver/target/OCCT`, shared by every cargo profile; `LLULL_OCCT_DIR` points at an existing install instead, as CI
-  does). A narrow C++ facade (`cpp/facade.{hxx,cxx}`, about 15 coarse functions) behind a `cxx` bridge: Rust never sees OCCT
+- **OCCT 7.9.2, shared, linked dynamically (LGPL-2.1 with exception, RS1 §2 rule 7).** `solver/scripts/build-occt.mjs` is the one
+  recipe: source `http://archive.ubuntu.com/ubuntu/pool/universe/o/opencascade/opencascade_7.9.2+dfsg.orig.tar.xz` (the upstream
+  `V7_9_2` tag, Debian dfsg repack; sha256 `f6e272b6aaa14743a611eb4b8d7affa98986cdcaa60f5a91ca7ac46b177b7181`, verified), cmake
+  `BUILD_LIBRARY_TYPE=Shared`, Release, every module off and `BUILD_ADDITIONAL_TOOLKITS` = the facade's toolkits (TKernel … TKFeat,
+  TKMesh, TKShHealing, TKXSBase, TKDE, TKDESTEP, TKCDF, TKLCAF, TKCAF, TKXCAF; cmake adds TKVCAF, TKV3d, TKService, TKHLR for XCAF),
+  `USE_XLIB/OPENGL/GLES2/FREETYPE/FREEIMAGE/TK/TCL/VTK/TBB/…` off, so the toolkits need only libc / libm / libstdc++ / libgcc_s
+  (`ldd`); each toolkit carries RUNPATH `$ORIGIN` (macOS: install name `@rpath`, rpath `@loader_path`). Install prefix
+  `include/opencascade`, `lib/`, the LGPL text, the exception and a `llull-occt.json` stamp (version + sha); default prefix per user
+  (`~/.cache/llull/occt-7.9.2`, macOS `~/Library/Caches`, Windows `%LOCALAPPDATA%`), shared by every checkout, or `LLULL_OCCT_DIR`.
+  Same prefix for local dev, CI (cached by version + sha + recipe hash) and desktop bundling. 7.9.2 is the newest 7.9 source
+  reachable here; the VC-KRN-25 reference files are OCP 7.9.3 (one maintenance release apart; parity tolerances unchanged so far).
+- **Crate `solver/crates/llull-kernel-occt`.** `build.rs` builds nothing: it requires the prefix (clear panic naming the script
+  otherwise), links the toolkit list (`OCCT_LIBS`, the one place) as `dylib`, compiles every `cpp/*.cxx` (glob: new facade files
+  need no build-script edit) and exports `DEP_OCCT_LIB_DIR` (`links = "occt"`). `solver/bins/llull-kernel/build.rs` sets the
+  runtime search path: `$ORIGIN/occt/lib` (macOS `@loader_path/occt/lib`; Windows loads the DLLs next to the exe) plus the
+  prefix's absolute `lib/` for development, left out when `LLULL_OCCT_RPATH_BUNDLE_ONLY=1` (the desktop bundle build).
+  A narrow C++ facade (`cpp/facade.{hxx,cxx}`, about 15 coarse functions) behind a `cxx` bridge: Rust never sees OCCT
   classes. Every C++ throw, `Standard_Failure` included, comes back as an `Err` (custom `rust::behavior::trycatch`), so an OCC
   exception is a refusal, never a degraded module. The bridge module is the only `unsafe` surface (generated code, local
   `allow(unsafe_code)` with its reason). The makers mirror `packages/kernel-occt` (same builders, placement order
@@ -883,8 +897,8 @@ Built (opt-in, `LLULL_KERNEL=occt-native`; the desktop default stays `occt` = WA
   routing). Per-op fallback: an op the sidecar does not list, a `NATIVE_UNSUPPORTED` reply or a sidecar death mid-call is
   answered by the WASM OCC kernel loaded lazily in the same worker; each op's first fallback is logged once
   (`[occt-native] <op>: answered by the WASM OCC kernel (<reason>)`); a dead sidecar is respawned on the next call.
-  `kernel_info`: `active: 'occt'`, `occtVersion: '7.8.1'`, `build: 'llull-kernel@0.1.0 (OCCT 7.8.1, native) +
-  opencascade.js@1.1.1 for ops it lacks'`. Selection (`server/src/geometryKernel.ts`): missing binary →
+  `kernel_info`: `active: 'occt'`, `occtVersion: '7.9.2'`, `build: 'llull-kernel@0.1.0 (OCCT 7.9.2, native) +
+  opencascade.js@1.1.1 for ops it lacks'`, `isolation: 'process'` (own OS process; `KernelInfo.isolation` gained `'process'`). Selection (`server/src/geometryKernel.ts`): missing binary →
   `NATIVE_TOOL_MISSING: llull-kernel not found: …` (`nativeInstallHint`) as `fallbackReason`, then the WASM kernel, then Manifold.
   `server/src/kernelInvoke.ts` holds the op dispatch now shared by both workers. The server bundle gains the worker entry.
 - **Tests.** Rust: 24 unit tests (facade, closure check, LRU, recipe evaluation, session protocol). Server, always run:
@@ -897,16 +911,29 @@ Built (opt-in, `LLULL_KERNEL=occt-native`; the desktop default stays `occt` = WA
   equal; refusals equal; plus the proxy end to end (fillet and topology served by WASM on a native session, abort recovery).
   It skips with a logged reason without the binary; `LLULL_REQUIRE_NATIVE_KERNEL=1` (CI) makes that a failure.
 - **Gates.** `LLULL_NATIVE_KERNEL=1 npm run native:check` (fmt, clippy `-D warnings`, tests on the whole workspace). CI job
-  `native-kernel` (`.github/workflows/check.yml`): OCCT install cached per version, then native:check, release build and the
-  parity suite. ESLint ignores `solver/target/**` (the cmake tree writes `compiler_depend.ts` files).
+  `native-kernel` (`.github/workflows/check.yml`): OCCT prefix from `build-occt.mjs`, cached by version + source sha + recipe hash,
+  then native:check, release build, the parity suite, `prepare-native.mjs` and an `ldd` check of the bundled binary. The plain
+  `native` job (default members, no OCCT) is unchanged. ESLint ignores `solver/target/**`.
+- **Desktop bundle.** `desktop/scripts/prepare-native.mjs` (`npm run prepare:native`, part of `dist`; extraResources
+  `build/native` → `resources/native`) builds `llull-compute` WITH the `gpu` feature (wgpu raster, CPU-twin fallback with a
+  warning) and `llull-kernel` (`LLULL_OCCT_RPATH_BUNDLE_ONLY=1`) into `desktop/build/cargo-target`, or takes
+  `LLULL_NATIVE_PREBUILT_DIR`; builds or reuses the OCCT prefix; stages `llull-compute`, `llull-kernel`, `occt/lib/libTK*.so.7.9`
+  (the SONAME files only; macOS `libTK*.7.9.dylib`; Windows `TK*.dll` next to the executables), `licenses/` (OCCT LGPL-2.1 text,
+  exception, a notice with the source URL + sha256 and how to replace the libraries; fdlibm + V8 BSD notice for `llull-jsmath`;
+  every linked third-party Rust crate with its licence files from `cargo metadata`) and `LLULL_NATIVE.json`; then smoke-runs both
+  binaries (`--version`, must name OCCT 7.9.2). `LLULL_NATIVE_GPU=0` / `LLULL_NATIVE_KERNEL=0` trim it. `desktop/src/backendEnv.ts`
+  passes `LLULL_NATIVE_DIR` only when the folder holds a binary (`nativeBundleDir`); an inherited one is dropped; the default
+  kernel stays `occt` (WASM). Linux measured: 66 MB bundle (OCCT 27 toolkits 59 MB, `llull-compute` 5.3 MB, `llull-kernel`
+  0.9 MB, 87 crates in the notice); the relocated bundle passes the parity, compute-job and render suites through
+  `LLULL_NATIVE_DIR`. macOS and Windows paths are written but untested.
 
 Measured (4-core Xeon 2.8 GHz container, Linux x86_64, release build; native times include the JSON round trip, WASM times are
-in-process calls of opencascade.js 1.1.1; medians):
+in-process calls of opencascade.js 1.1.1; medians; timing rows measured on the 7.8.1 static build):
 
 | Item | Native `llull-kernel` | WASM OCC |
 | ---- | --------------------- | -------- |
-| OCCT build from source (cold, `-j4`, machine also busy) | 58 min; then 36 s to rebuild facade + link | — |
-| Binary / install size | 25.9 MB static binary; OCCT libs 259 MB + headers 43 MB (build tree 1.2 GB) | — |
+| OCCT build from source (cold, `-j4`) | 7.8.1 static: 58 min (machine busy); 7.9.2 shared, 27 toolkits: 105 min at load 13-22 | — |
+| Binary / install size | 7.9.2: 0.9 MB binary + 59 MB shared toolkits (prefix 99 MB with headers 35 MB; build tree 287 MB); 7.8.1 static: 25.9 MB | — |
 | Cold start | 12 ms to the `info` reply, 9 MB RSS | 1.73 s, +371 MB RSS |
 | Box: evaluate / tessellate / massProperties | 0.8 / 1.7 / 1.8 ms | 0.8 / 9.2 / 9.6 ms |
 | Plate − cylinder | 5.5 / 3.3 / 3.8 ms | 48 / 16 / 15 ms |
@@ -915,23 +942,19 @@ in-process calls of opencascade.js 1.1.1; medians):
 
 Deviations and decisions to confirm:
 
-- **OCCT 7.8.1, not 7.9.x** (TR-KRN-02 asks 7.9): `occt-sys` 7.8.1 is the newest static source crate. Follow-up: bump to 7.9.x
-  (own `occt-sys`-style build of the 7.9 sources, or a newer crate) so the native kernel matches the OCP 7.9.3 references.
-- **Static linking.** `occt-sys` links OCCT statically; RS1 §2 rule 7 and TR-KRN-02 say "linked dynamically (LGPL-2.1 with
-  exception)". Shipping the static binary needs either a switch to `BUILD_LIBRARY_TYPE=Shared` (bundle the `.so`/`.dll` next to
-  the binary) or the LGPL relinking obligations met. Owner decision before bundling.
-- `kernel_info.isolation` reads `worker` for the native kernel: `KernelInfo.isolation` in core has no `'process'` value yet
-  (TR-KRN-04 names it); adding it is a one-line core change.
-- `occtVersion` is the sidecar's (7.8.1) although ops it lacks run on 7.4.0p1; `build` names both engines. Documents stamped by
-  `import_step_exact` (a WASM op) on this kernel record 7.8.1.
+- **OCCT 7.9.2, not 7.9.3** (the OCP reference): 7.9.2 is the newest 7.9 source reachable from the build hosts (Ubuntu archive;
+  GitHub blocked). Bump when a 7.9.3 tarball is pinned: change `OCCT_VERSION` / URL / sha in `build-occt.mjs` and `build.rs`.
+- The development binary keeps the prefix's absolute `lib/` as a second RUNPATH entry; only the bundle build drops it. Prebuilt
+  binaries given through `LLULL_NATIVE_PREBUILT_DIR` keep whatever they were linked with.
+- `occtVersion` is the sidecar's (7.9.2) although ops it lacks run on 7.4.0p1; `build` names both engines. Documents stamped by
+  `import_step_exact` (a WASM op) on this kernel record 7.9.2.
 - Fillet and chamfer stay on WASM in this slice: their edge indices come from `topology`, which is still WASM, and the explorer
-  order of 7.8 and 7.4 may differ on boolean results. They move with native `topology`.
+  order of 7.9 and 7.4 may differ on boolean results. They move with native `topology`.
 - A closed solid whose display mesh comes out open is re-meshed finer (0.02 / 0.2 rad) for every solid, not only freeform-heavy
   or thread-bearing ones as in `occtMesh.ts`; still open → null.
 - Exceptions are refusals (null result, `NATIVE_OCC_FAILURE` logged), not WASM fallbacks.
 
 Pending (rest of M2): native `topology`, `faceQuery.*`, `distance`, `exportStepAssembly`, `importShapes` (STEP read + heal) and
 `brep` blobs; fillet, chamfer, blend, shell and native `feature` nodes; exact curved profiles, loft, sweep, subdivision and
-thread tools; the OCCT 7.9 bump and dynamic linking; bundling in `desktop/scripts/prepare-native.mjs` (not created yet) and
-macOS / Windows builds; the full VC-KRN-25 suite against the OCP 7.9.3 reference files (probe cases, NIST set); the KI7 decision
+thread tools; macOS / Windows builds and bundles (scripts written, untested); the full VC-KRN-25 suite against the OCP 7.9.3 reference files (probe cases, NIST set); the KI7 decision
 record; then the desktop default flip to the native kernel.
