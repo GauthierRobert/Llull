@@ -38,6 +38,10 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
                               native llull-compute pipe auto-routing (plant 02 RTE V2), committed by auto_route_pipe after
                               validation  [timeoutS=60 maxExpansions=2000000]; without llull-compute: NATIVE_TOOL_MISSING
                               (auto_route_pipe alone runs the TypeScript search up to 200000 expansions)
+  stackup_monte_carlo [analyze_stackup params] samples=N   native llull-compute: stack-up Monte Carlo above the 2e6 TS cap
+                              (same Philox samples as analyze_stackup)  [timeoutS=600 verify=true]
+  vortex_lattice_solve [analyze_vortex_lattice params]   native llull-compute: vortex lattice above the 1000-panel TS cap
+                              (influence + dense LU, faer; up to 20000 panels)  [timeoutS=600 verify=true]
   register_material_library file=LIB.llull-matlib.json   copy a material library into $LLULL_LIBRARIES_DIR (~/.llull/libraries); then
                               import_material_library libraryId=ID version=V sha256=H, and resolve_material_libraries after a load
   run <plan.json | ->         build_project: an actions array or { actions, onError }

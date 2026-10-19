@@ -14,6 +14,8 @@ default-members = [
   "crates/llull-voxfe",
   "crates/llull-topopt",
   "crates/llull-route",
+  "crates/llull-stats",
+  "crates/llull-panel",
   "bins/llull-compute",
 ]
 

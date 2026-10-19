@@ -1,0 +1,18 @@
+[package]
+name = "llull-panel"
+description = "Vortex-lattice influence build + dense LU of llull-compute panel (aerospace 10 AER M3, RS1 RS-7; faer)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# Dense LU only: no rand / npy / sparse (rand pulls getrandom -> windows-sys raw-dylib, which needs dlltool on windows-gnu).
+faer = { version = "0.24", default-features = false, features = ["std", "rayon", "linalg"] }
+llull-protocol = { path = "../llull-protocol" }
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
