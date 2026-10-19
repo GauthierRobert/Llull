@@ -7,13 +7,14 @@ import { blendCases } from './casesBlends.mjs';
 import { booleanCases } from './casesBooleans.mjs';
 import { featureCases } from './casesFeatures.mjs';
 import { featureDepthCases } from './casesFeatureDepth.mjs';
+import { filletDepthCases } from './casesFilletDepth.mjs';
 import { primitiveCases } from './casesPrimitives.mjs';
 import { sheetMetalCases } from './casesSheetMetal.mjs';
 import { profileCases } from './casesProfiles.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../tests/oracle');
 const cases = [];
-for (const build of [primitiveCases, profileCases, booleanCases, featureCases, blendCases, sheetMetalCases, featureDepthCases]) build(cases);
+for (const build of [primitiveCases, profileCases, booleanCases, featureCases, blendCases, sheetMetalCases, featureDepthCases, filletDepthCases]) build(cases);
 
 for (const entry of readdirSync(root, { withFileTypes: true })) {
   if (entry.isDirectory() && /^\d{2,3}-/.test(entry.name)) rmSync(path.join(root, entry.name), { recursive: true });

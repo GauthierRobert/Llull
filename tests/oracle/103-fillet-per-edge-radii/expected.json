@@ -1,0 +1,20 @@
+{
+  "id": "103-fillet-per-edge-radii",
+  "family": "fillet",
+  "description": "two opposite vertical edges of a 20x10x5 block rounded with r=1 and r=2 in one fillet_edge call",
+  "source": "analytic",
+  "formula": "V = abc - sum (1 - pi/4) r_i^2 h; removed slivers centred (a/2 - r + r/(6(1-pi/4))) from the centre",
+  "kernels": ["occt"],
+  "bodies": 1,
+  "volume": 994.634954085,
+  "area": 691.415926536,
+  "centroid": [0.0306771287469, 0.0144951740719, 0],
+  "bbox": { "min": [-10, -5, -2.5], "max": [10, 5, 2.5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "knownFailure": {
+    "fields": ["plan"],
+    "kernels": ["occt"],
+    "measured": "plan refused: the native sidecar does not read recipe radii yet",
+    "diagnosis": "fillet_edge edges[] with differing radii emits a fillet node with radii[] (size 0 placeholder); the native llull-kernel (solver/, Rust nodes.rs fillet) must read radii and add one radius per edge to BRepFilletAPI_MakeFillet. Until then it refuses, and this case stays a documented known failure."
+  }
+}

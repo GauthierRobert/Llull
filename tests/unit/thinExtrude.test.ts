@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type ExtrusionEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
-import { polygonArea } from '@core/lib/polygon';
+import { polygonArea } from '@lib/polygon';
 import { thinRegion } from '@core/geometry/thinProfile';
 import { expectNoOp, expectPure } from '../helpers/expectNoOp';
 import { idOf, manifoldSuite, volumeOf } from '../helpers/featureSupport';

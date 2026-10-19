@@ -42,7 +42,7 @@ function keyText(recipe: ShapeRecipe): string {
       return `${recipe.boolean}(${recipeKey(recipe.a)},${recipeKey(recipe.b)})`;
     case 'fillet':
     case 'chamfer':
-      return `${recipe.op}(${recipeKey(recipe.source)},${recipe.size}${recipe.sizeEnd === undefined ? '' : `>${recipe.sizeEnd}`},[${recipe.edges.join(',')}])`;
+      return `${recipe.op}(${recipeKey(recipe.source)},${recipe.size}${recipe.sizeEnd === undefined ? '' : `>${recipe.sizeEnd}`},[${recipe.edges.join(',')}]${recipe.radii === undefined ? '' : `,radii${JSON.stringify(recipe.radii)}`})`;
     case 'blend':
       return `blend(${recipe.sources.map(recipeKey).join(',')},${recipe.radius})`;
     case 'shell':
@@ -127,6 +127,31 @@ function leafError(entity: Record<string, unknown>, validateLeaf: LeafValidator)
   return validateLeaf(entity);
 }
 
+const positiveNumber = (value: unknown): boolean => isFiniteNumber(value) && value > 0;
+
+/** Why the `radii` of an untrusted fillet node are unusable (a chamfer has none; one law per edge; sizes > 0; interior `t` increasing in (0, 1)), or null. */
+function radiiError(node: Record<string, unknown>, edgeCount: number): string | null {
+  const radii = node['radii'];
+  if (radii === undefined) return null;
+  if (node['op'] !== 'fillet') return 'chamfer: radii apply to fillets only';
+  if (!Array.isArray(radii) || radii.length === 0 || radii.length !== edgeCount) return 'fillet: radii needs one entry per listed edge';
+  for (const law of radii) {
+    if (!isRecord(law) || !positiveNumber(law['size'])) return 'fillet: every radii entry needs size > 0';
+    if (law['sizeEnd'] !== undefined && !positiveNumber(law['sizeEnd'])) return 'fillet: radii sizeEnd must be > 0';
+    const sizes = law['sizes'];
+    if (sizes === undefined) continue;
+    if (!Array.isArray(sizes)) return 'fillet: radii sizes must be a list of { t, size }';
+    let previous = 0;
+    for (const point of sizes) {
+      const t = isRecord(point) ? point['t'] : undefined;
+      if (!isRecord(point) || !isFiniteNumber(t) || !(t > previous) || !(t < 1) || !positiveNumber(point['size']))
+        return 'fillet: radii sizes need t strictly increasing inside (0, 1) and size > 0';
+      previous = t;
+    }
+  }
+  return null;
+}
+
 function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: LeafValidator): string | null {
   const child = (value: unknown): string | null => check(value, depth + 1, validateLeaf);
   switch (node['op']) {
@@ -140,7 +165,10 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
       const edges = node['edges'];
       if (!Array.isArray(edges) || !edges.every((e) => Number.isInteger(e) && (e as number) >= 0))
         return `${String(node['op'])}: edges must be non-negative integers`;
-      if (!isFiniteNumber(node['size']) || node['size'] <= 0) return `${String(node['op'])}: size must be > 0`;
+      const radiiProblem = radiiError(node, edges.length);
+      if (radiiProblem !== null) return radiiProblem;
+      if (node['radii'] === undefined && (!isFiniteNumber(node['size']) || node['size'] <= 0))
+        return `${String(node['op'])}: size must be > 0`;
       const sizeEnd = node['sizeEnd'];
       if (sizeEnd !== undefined && (!isFiniteNumber(sizeEnd) || sizeEnd <= 0)) return `${String(node['op'])}: sizeEnd must be > 0`;
       if (!isPointList(node['near'])) return `${String(node['op'])}: near must be a list of finite [x, y, z] points`;

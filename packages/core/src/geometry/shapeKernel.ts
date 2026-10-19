@@ -10,7 +10,7 @@
  * @failure an op returning null or throwing -> that recipe (and every recipe built on it) is null
  */
 
-import type { BooleanOp, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/types';
+import type { BooleanOp, EdgeRadius, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/types';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTopology, StepAssemblyPart, StepOccurrence } from './kernel';
 import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
 import { recipeKey } from './shapeRecipe';
@@ -48,6 +48,8 @@ export interface KernelOps<S> {
   prepareBoolean?(a: ShapeRecipe, b: ShapeRecipe): [ShapeRecipe, ShapeRecipe];
   /** `edges`: 0-based unique-edge indices ([] = all); `radiusEnd` varies the radius along each edge. */
   fillet(shape: S, edges: readonly number[], radius: number, radiusEnd?: number): S | null;
+  /** Optional per-edge radius laws (`edges[i]` rounded with `laws[i]`) in one builder; absent = only uniform laws can be built (via `fillet`). */
+  filletEach?(shape: S, edges: readonly number[], laws: readonly EdgeRadius[]): S | null;
   /** Union of `shapes` with the new intersection (joint) edges filleted by `radius`. */
   blend(shapes: readonly S[], radius: number): S | null;
   chamfer(shape: S, edges: readonly number[], distance: number): S | null;
@@ -113,6 +115,8 @@ export interface CachingKernel extends GeometryKernel {
   clear(): void;
 }
 
+const lawsEqual = (a: EdgeRadius, b: EdgeRadius): boolean => JSON.stringify(a) === JSON.stringify(b);
+
 function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe) => S | null): S | null {
   switch (recipe.op) {
     case 'solid':
@@ -127,9 +131,12 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
     case 'chamfer': {
       const source = child(recipe.source);
       if (source === null) return null;
-      return recipe.op === 'fillet'
-        ? ops.fillet(source, recipe.edges, recipe.size, recipe.sizeEnd)
-        : ops.chamfer(source, recipe.edges, recipe.size);
+      if (recipe.op === 'chamfer') return ops.chamfer(source, recipe.edges, recipe.size);
+      if (recipe.radii === undefined) return ops.fillet(source, recipe.edges, recipe.size, recipe.sizeEnd);
+      const [first] = recipe.radii;
+      const uniform = first !== undefined && recipe.radii.every((law) => lawsEqual(law, first));
+      if (ops.filletEach !== undefined && !uniform) return ops.filletEach(source, recipe.edges, recipe.radii);
+      return uniform && first.sizes === undefined ? ops.fillet(source, recipe.edges, first.size, first.sizeEnd) : null;
     }
     case 'blend': {
       const shapes: S[] = [];

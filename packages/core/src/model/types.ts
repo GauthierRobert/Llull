@@ -782,6 +782,16 @@ export interface MeshData {
 export type BooleanOp = 'union' | 'subtract' | 'intersect';
 
 /**
+ * Radius law of one filleted edge: `size` at its start, `sizeEnd` at its end (linear between, constant when absent); `sizes` adds interior
+ * control points (`t` in (0, 1) strictly increasing, radius `size` there) the radius passes through (BRepFilletAPI_MakeFillet radius law).
+ */
+export interface EdgeRadius {
+  readonly size: number;
+  readonly sizeEnd?: number;
+  readonly sizes?: ReadonlyArray<{ readonly t: number; readonly size: number }>;
+}
+
+/**
  * Shape recipe: the serializable construction tree of a solid, stored on kernel results (`MeshSolidEntity.brep`) and evaluated by the
  * kernel (`@core/geometry/shapeRecipe`).
  */
@@ -793,6 +803,8 @@ export type ShapeRecipe =
    * `edges`: 0-based indices into the source's unique edges (`ShapeTopology.edges`); [] = all. `sizeEnd` (fillet only): radius at each
    * edge's end, varying linearly from `size` at its start. `near`: the mid point of each selected edge at creation (document frame), so code
    * generators can pick the same edges by position when the kernel's edge indices are unavailable; kernels ignore it.
+   * `radii` (fillet only): one law per entry of `edges` (same length, edges non-empty); `size` is then the placeholder 0, so a kernel that
+   * does not read `radii` refuses instead of rounding every edge with one radius.
    */
   | {
       readonly op: 'fillet' | 'chamfer';
@@ -800,6 +812,7 @@ export type ShapeRecipe =
       readonly edges: readonly number[];
       readonly size: number;
       readonly sizeEnd?: number;
+      readonly radii?: readonly EdgeRadius[];
       readonly near?: readonly Vec3[];
     }
   /** One-piece union of `sources` with every new intersection (joint) edge filleted by `radius`. */

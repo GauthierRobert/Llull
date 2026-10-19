@@ -4,7 +4,7 @@
  * no-op.
  */
 
-import { type CadDocument, type Entity, type Vec3, is3D } from '../../model/types';
+import type { CadDocument, Vec3 } from '../../model/types';
 import type { ShapeRecipe } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
@@ -14,23 +14,9 @@ import type { ExecutionContext } from '../types';
 import { kernelUnavailable } from '../kernelRefusal';
 import { commitKernelResult, evaluateRecipe, operandRecipe } from './kernelShape';
 import { noop } from '../noop';
-import type { GeometryKernel } from '../../geometry/kernel';
-
-/** Surface-neutral pointer to the B-rep kernel (browser URL flag or server env var). */
-export const OCC_KERNEL_HINT = 'the OCC kernel (the desktop default; LLULL_KERNEL=occt-native or occt for the CLI and server)';
-
-function validateSolidTarget(doc: CadDocument, opName: string, id: string): { entity: Entity } | CommandResult {
-  const entity = doc.entities[id];
-  if (!entity) return noop(doc, `${opName}: entity '${id}' not found.`);
-  if (!is3D(entity))
-    return noop(
-      doc,
-      `${opName}: entity '${id}' is a 2D shape (kind '${entity.kind}'); only 3D solids can be filleted, chamfered or shelled.`,
-    );
-  if (entity.kind === 'instance')
-    return noop(doc, `${opName}: entity '${id}' is a component instance; run explode_instance first to get solids.`);
-  return { entity };
-}
+import { FILLET_MODES, edgeLawSchema } from './filletSpec';
+import { filletEach } from './filletEach';
+import { OCC_KERNEL_HINT, modifyFailure, validateSolidTarget } from './modifyTarget';
 
 interface EdgeModification {
   readonly command: 'fillet_edge' | 'chamfer_edge' | 'shell_solid';
@@ -44,29 +30,6 @@ interface EdgeModification {
   readonly near?: readonly Vec3[];
   /** The modification node over the operand's exact recipe, the resolved edges and their mid points (empty when the kernel has no topology). */
   readonly recipe: (source: ShapeRecipe, edges: readonly number[], near: readonly Vec3[]) => ShapeRecipe;
-}
-
-/** Why the kernel gave no usable result: an unsupported op, a failed / invalid solid, or an open mesh. */
-function modifyFailure(command: string, kernel: GeometryKernel, modified: ShapeRecipe, result: 'refused' | 'empty'): string {
-  if (!kernel.supports(modified.op))
-    return `${command}: kernel does not support ${command} for this operand (returned null). Use ${OCC_KERNEL_HINT} or a different operand.`;
-  if (result === 'empty')
-    return (
-      `${command}: the result could not be tessellated into a closed mesh (typically a corner where ` +
-      'several rounded edges meet); document unchanged. Round fewer edges per call, or clip the corners ' +
-      'with boolean op intersect (e.g. a rounded-rectangle prism) instead.'
-    );
-  if (command === 'shell_solid')
-    return (
-      'shell_solid: the kernel could not hollow this solid into a valid one (returned null: thickness too ' +
-      'large for a feature, a rounded edge whose radius is not larger than the thickness, an openFacesNear point that picks no face, or a ' +
-      'self-intersecting offset); document unchanged. Try a smaller thickness (below the smallest fillet radius), or shell BEFORE filleting.'
-    );
-  return (
-    `${command}: the kernel could not round these edges into a valid solid (returned null: size too large ` +
-    'for a neighbouring face, or a blend meeting a tangent face); document unchanged. Try a smaller size, ' +
-    'fewer edges per call, or build the round from sketch arcs + booleans.'
-  );
 }
 
 /**
@@ -123,6 +86,8 @@ export const filletEdge = defineCommand({
     'still see true faces and edges. The source entity is consumed. ' +
     'Select edges with edgeIndices (indices from inspect_topology) and/or edgesNear (points near the edges, ' +
     'robust to parametric edits); with neither, ALL edges are filleted. ' +
+    'To give each edge its own radius (optionally varying along the edge) pass edges: [{ index | near, size, sizeEnd?, sizes? }] instead; ' +
+    'mode "chord" reads every size as the chord between the tangent points (planar faces, converted per edge to a radius). ' +
     `Requires a geometry kernel that supports fillets (${OCC_KERNEL_HINT}). ` +
     'With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). ' +
     'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).',
@@ -143,7 +108,10 @@ export const filletEdge = defineCommand({
           're-selected after an upstream edit renumbers edges. Combines with edgeIndices.',
       )
       .optional(),
-    radius: z.number().describe('Fillet radius in document units. Must be > 0.'),
+    radius: z
+      .number()
+      .describe('Fillet radius in document units. Must be > 0. Required unless edges is given (then each entry carries its own size).')
+      .optional(),
     radiusEnd: z
       .number()
       .describe(
@@ -151,27 +119,46 @@ export const filletEdge = defineCommand({
           'from radius at the edge start to radiusEnd. Omit for a constant radius.',
       )
       .optional(),
+    edges: z
+      .array(edgeLawSchema)
+      .describe(
+        'Per-edge radii: each entry names ONE edge (index, or near = a point on it) and gives its own radius law (size, optional sizeEnd for a ' +
+          'linear variation along the edge, optional sizes control points). Edges listed here are rounded in one operation; use it INSTEAD OF ' +
+          'radius / radiusEnd / edgeIndices / edgesNear. Differing radii need a kernel that reads radius laws (native OCC); equal ones work everywhere exact.',
+      )
+      .optional(),
+    mode: z
+      .enum(FILLET_MODES)
+      .describe(
+        '"radius" (default): sizes are radii. "chord": sizes (radius, radiusEnd, edges[].size...) are the CHORD length between the two tangent ' +
+          'points of the round on the faces at the edge; converted per edge to r = c / (2 cos(theta / 2)) for planar faces meeting at wedge angle theta ' +
+          '(a right-angle edge: r = c / sqrt 2). Needs an exact kernel and two planar faces at every edge.',
+      )
+      .optional(),
   }),
-  run: (doc, { id, edgeIndices = [], edgesNear = [], radius, radiusEnd }, ctx): CommandResult =>
-    radiusEnd !== undefined && !(radiusEnd > 0)
-      ? noop(doc, `fillet_edge: radiusEnd must be > 0 (got ${radiusEnd}).`)
-      : modifyEdges(doc, ctx, {
-          command: 'fillet_edge',
-          pastTense: 'filleted',
-          amountName: 'radius',
-          amount: radius,
-          id,
-          edges: edgeIndices,
-          near: edgesNear,
-          recipe: (source, edges, near) => ({
-            op: 'fillet',
-            source,
-            edges: [...edges],
-            size: radius,
-            ...(near.length > 0 ? { near } : {}),
-            ...(radiusEnd === undefined ? {} : { sizeEnd: radiusEnd }),
-          }),
-        }),
+  run: (doc, { id, edgeIndices = [], edgesNear = [], radius, radiusEnd, edges, mode = 'radius' }, ctx): CommandResult => {
+    if (edges !== undefined || mode === 'chord')
+      return filletEach(doc, ctx, { id, mode, edges, edgeIndices, edgesNear, radius, radiusEnd });
+    if (radius === undefined) return noop(doc, 'fillet_edge: give radius (or edges with one size per edge); document unchanged.');
+    if (radiusEnd !== undefined && !(radiusEnd > 0)) return noop(doc, `fillet_edge: radiusEnd must be > 0 (got ${radiusEnd}).`);
+    return modifyEdges(doc, ctx, {
+      command: 'fillet_edge',
+      pastTense: 'filleted',
+      amountName: 'radius',
+      amount: radius,
+      id,
+      edges: edgeIndices,
+      near: edgesNear,
+      recipe: (source, edgeList, near) => ({
+        op: 'fillet',
+        source,
+        edges: [...edgeList],
+        size: radius,
+        ...(near.length > 0 ? { near } : {}),
+        ...(radiusEnd === undefined ? {} : { sizeEnd: radiusEnd }),
+      }),
+    });
+  },
 });
 
 /**
