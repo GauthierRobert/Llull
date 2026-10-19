@@ -72,7 +72,7 @@ describe('record_topology_result', () => {
   });
 
   it('two identical runs give the identical artifact hash (VC-TOP-27)', () => {
-    const second = solveAndRecord(model, artifactStore());
+    const second = solveAndRecord(model, artifactStore(), true);
     expect(second.hash).toBe(solved.hash);
     expect(second.result.summary).toBe(solved.result.summary);
   });

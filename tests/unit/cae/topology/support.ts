@@ -81,10 +81,14 @@ export function jobOf(model: Model): TopologyJob {
   return built.job;
 }
 
-/** The host's steps for a small 2D study: build the job, run the TypeScript reference, store the artifact, record it. */
+/** Reference runs are pure, so equal jobs share one artifact (a 60 x 20 solve takes seconds, much more under coverage). */
+const solvedJobs = new Map<string, FeTopologyArtifact>();
+
+/** The host's steps for a small 2D study: build the job, run the TypeScript reference (once per distinct job unless `fresh`), store the artifact, record it. */
 export function solveAndRecord(
   model: Model,
   store = artifactStore(),
+  fresh = false,
 ): {
   readonly doc: CadDocument;
   readonly hash: string;
@@ -92,8 +96,12 @@ export function solveAndRecord(
   readonly store: ReturnType<typeof artifactStore>;
   readonly result: CommandResult;
 } {
-  const artifact = runTopologyReference(jobOf(model));
+  const job = jobOf(model);
+  const key = `${job.inputHash}:${job.settingsHash}`;
+  const known = fresh ? undefined : solvedJobs.get(key);
+  const artifact = known ?? runTopologyReference(job);
   if (typeof artifact === 'string') throw new Error(artifact);
+  solvedJobs.set(key, artifact);
   const hash = store.put(artifact);
   const result = execute(model.doc, 'record_topology_result', { studyId: model.studyId, fieldHash: hash }, contextWith(store.port));
   return { doc: result.document, hash, artifact, store, result };
