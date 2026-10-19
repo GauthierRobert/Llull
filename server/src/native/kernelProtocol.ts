@@ -7,7 +7,8 @@
  * @invariant pure: no process, no I/O
  */
 
-import type { Entity, MeshData, ShapeRecipe, Vec3 } from '@core/model/types';
+import type { CurveSegment } from '@core/model/curve';
+import type { Entity, MeshData, ShapeRecipe, Vec2, Vec3 } from '@core/model/types';
 import type { StepAssemblyPart, StepOccurrence } from '@core/geometry/kernel';
 import { createEmptyDocument } from '@core/model/types';
 import { entityTrianglePositions } from '@core/geometry/entityTriangles';
@@ -124,6 +125,15 @@ export interface FeatureLowering {
     readonly normal: Vec3;
     readonly probes: readonly number[];
     readonly length: number;
+  };
+  /** Pocket floor fillet: the floor-edge selection inputs of core `floorEdgeIndices` (frame, floor depth, outline / island curves, frame-local). */
+  readonly floorFillet?: {
+    readonly radius: number;
+    readonly floorDepth: number;
+    readonly origin: Vec3;
+    readonly normal: Vec3;
+    readonly xDir: Vec3;
+    readonly outlines: readonly (readonly CurveSegment<Vec2>[])[];
   };
 }
 

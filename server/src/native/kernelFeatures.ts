@@ -3,13 +3,12 @@
  * OCCT calls. For each feature node of a request's recipes: the source's reach below the face plane (from the sidecar's own display
  * mesh, as the WASM kernel reads its mesh), the core lowering (`lowerFeature`) and the BRepFeat inputs (hole half-sections per position,
  * pocket outline chain and sketch-face probes). The sidecar then builds `featureCut` (solver/.../recipe/nodes.rs).
- * Nodes that stay on WASM for now: `fillet` / `chamfer` (edge indices come from `topology`, not native yet) and a pocket with a floor
- * fillet (it fillets edges found on the WASM topology); a request holding one is answered by the WASM kernel.
+ * A pocket floor fillet sends the floor-selection inputs; the sidecar picks the floor edges on the cut's own topology and fillets them.
  * @failure a sidecar that cannot tessellate a source (unsupported node) -> the whole request is unsupported natively
  */
 
 import type { MeshData, ShapeRecipe, Vec2, Vec3 } from '@core/model/types';
-import { holeToolProfile, lowerFeature, needsReach, throughReach } from '@core/geometry/featureLowering';
+import { holeToolProfile, lowerFeature, needsReach, throughReach, type PocketTool } from '@core/geometry/featureLowering';
 import { frameToWorld } from '@core/geometry/featureFrame';
 import { roundedOutline } from '@core/geometry/pocketOutline';
 import { polygonCentroid } from '@lib/polygon';
@@ -27,13 +26,6 @@ const NATIVE_MAX_HOLES = 8;
 export type SourceMesher = (source: ShapeRecipe, features: FeatureLowerings) => Promise<MeshData | null | 'unsupported'>;
 
 type PreparedFeatures = { readonly features: FeatureLowerings } | { readonly unsupported: string };
-
-/** Recipe nodes the host keeps on the WASM kernel, with the reason logged on the first fallback. */
-function gatedReason(recipe: ShapeRecipe): string | null {
-  if (recipe.op === 'feature' && recipe.feature === 'pocket' && recipe.pocket.floorFillet > 0)
-    return 'pocket floor fillet: needs native topology';
-  return null;
-}
 
 const flat = (points: readonly Vec3[]): number[] => points.flat();
 
@@ -61,12 +53,33 @@ function pocketInputs(node: Extract<FeatureRecipe, { feature: 'pocket' }>, reach
   return { chain: orientedChain(outline.curves, place, true), origin: frame.origin, normal: frame.normal, probes, length };
 }
 
+/** featureFillet.ts `floorEdgeIndices` inputs: the floor plane and the outline / island curves, selected on the cut's native topology. */
+function floorFilletInputs(node: Extract<FeatureRecipe, { feature: 'pocket' }>, tool: PocketTool): FeatureLowering['floorFillet'] {
+  if (!(node.pocket.floorFillet > 0)) return undefined;
+  const { origin, normal, xDir } = node.frame;
+  return {
+    radius: node.pocket.floorFillet,
+    floorDepth: tool.floorDepth,
+    origin,
+    normal,
+    xDir,
+    outlines: [tool.outline, ...tool.islands].map((outline) => outline.curves),
+  };
+}
+
 function lowering(node: FeatureRecipe, reach: number): FeatureLowering {
   const lowered = lowerFeature(node, reach);
   if (lowered === null) return { tool: null, mode: 'subtract' };
+  const floorFillet = node.feature === 'pocket' && lowered.pocket !== undefined ? floorFilletInputs(node, lowered.pocket) : undefined;
   const holes = node.feature === 'hole' ? holeInputs(node, reach) : undefined;
   const pocket = node.feature === 'pocket' ? pocketInputs(node, reach) : undefined;
-  return { tool: lowered.tool, mode: lowered.mode, ...(holes === undefined ? {} : { holes }), ...(pocket === undefined ? {} : { pocket }) };
+  return {
+    tool: lowered.tool,
+    mode: lowered.mode,
+    ...(holes === undefined ? {} : { holes }),
+    ...(pocket === undefined ? {} : { pocket }),
+    ...(floorFillet === undefined ? {} : { floorFillet }),
+  };
 }
 
 /** Every shape handle of an assembly export, each shared part once. */
@@ -101,8 +114,6 @@ class Unsupported extends Error {}
 export async function prepareFeatures(op: string, args: readonly unknown[], mesh: SourceMesher): Promise<PreparedFeatures> {
   const features = new Map<FeatureRecipe, FeatureLowering>();
   const visit = async (recipe: ShapeRecipe): Promise<void> => {
-    const gated = gatedReason(recipe);
-    if (gated !== null) throw new Unsupported(gated);
     switch (recipe.op) {
       case 'solid':
       case 'brep':

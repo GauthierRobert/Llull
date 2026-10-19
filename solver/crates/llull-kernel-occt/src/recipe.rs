@@ -15,6 +15,7 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::rc::Rc;
 
+mod floor;
 mod nodes;
 
 pub const RECIPE_OPS: [&str; 10] = ["solid", "boolean", "place", "scale", "brep", "fillet", "chamfer", "blend", "shell", "featureCut"];
