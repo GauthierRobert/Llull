@@ -7,8 +7,29 @@ import { installPhysicsEngine } from './physicsEngine';
 import { flushAutosave, stopAutosave, closeAllSubscribers } from './liveDocument';
 import { killAllChildren } from './childProcesses';
 import { checkBindSafety } from './security';
+import type { CrashSource } from './crashReports';
+import { reportServerCrash } from './serverCrash';
 
 const DRAIN_TIMEOUT_MS = 5_000;
+
+let failing = false;
+
+/** Last words of the backend: a crash report (SC-D3), the autosave flushed, exit 1. A fault while doing so exits at once. */
+function onFatalError(source: CrashSource, error: unknown): void {
+  if (failing) process.exit(1);
+  failing = true;
+  console.error(`[llull-server] ${source}:`, error);
+  const report = reportServerCrash(source, error);
+  if (report !== null) console.error(`[llull-server] crash report written to ${report} (llull crashes show latest)`);
+  flushAutosave();
+  process.exit(1);
+}
+
+/** uncaughtException and unhandledRejection both end the process through `onFatalError`. */
+export function installFatalErrorHandlers(): void {
+  process.on('uncaughtException', (error: Error) => onFatalError('server-uncaught-exception', error));
+  process.on('unhandledRejection', (reason: unknown) => onFatalError('server-unhandled-rejection', reason));
+}
 
 const delay = (ms: number): Promise<void> => new Promise<void>((resolve) => setTimeout(resolve, ms).unref());
 
@@ -28,7 +49,7 @@ async function shutdown(server: Server): Promise<void> {
 }
 
 /**
- * Listen on host:port and install SIGTERM/SIGINT/uncaughtException handlers.
+ * Listen on host:port and install SIGTERM/SIGINT/uncaughtException/unhandledRejection handlers.
  * Resolves once the geometry kernel and physics engine are installed and the port is bound.
  * @failure non-loopback host (see `checkBindSafety`) -> rejects
  */
@@ -68,10 +89,6 @@ export async function startServer(app: Express, port: number, host: string): Pro
   };
   process.on('SIGTERM', () => onSignal('SIGTERM'));
   process.on('SIGINT', () => onSignal('SIGINT'));
-  process.on('uncaughtException', (err: Error) => {
-    console.error('[llull-server] uncaughtException:', err);
-    flushAutosave();
-    process.exit(1);
-  });
+  installFatalErrorHandlers();
   return server;
 }

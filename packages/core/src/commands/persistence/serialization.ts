@@ -153,6 +153,22 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
   return { ...raw, units, displayPrecision, order: repairedOrder(raw), layerOrder: repairedLayerOrder(raw), ...collections };
 }
 
+/** Far beyond any document a command writes; well below the depth at which `JSON.stringify` overflows the stack. */
+const MAX_NESTING_DEPTH = 1000;
+
+/** Iterative (no recursion, so no stack overflow on hostile input): does `root` nest arrays/objects deeper than `limit`? */
+function exceedsNestingDepth(root: unknown, limit: number): boolean {
+  const pending: Array<readonly [unknown, number]> = [[root, 1]];
+  for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
+    const [value, depth] = next;
+    if (value === null || typeof value !== 'object') continue;
+    if (depth > limit) return true;
+    for (const child of Array.isArray(value) ? value : Object.values(value))
+      if (child !== null && typeof child === 'object') pending.push([child, depth + 1]);
+  }
+  return false;
+}
+
 /**
  * Parse and validate a `serializeDocument` string (old files gain defaults via `migrate()`).
  * @invariant every document a registered command produced reloads and re-serializes equal (tests/unit/persistenceRoundTrip.test.ts); the
@@ -168,6 +184,10 @@ export function deserializeDocument(json: string): CadDocument {
     throw new Error('load_document: invalid JSON — could not parse input string.');
   }
   if (!isRecord(parsed)) throw new Error('load_document: expected a JSON object at the root level.');
+  if (exceedsNestingDepth(parsed, MAX_NESTING_DEPTH))
+    throw new Error(
+      `load_document: the file has values nested deeper than ${MAX_NESTING_DEPTH} levels — refusing it (it could never be saved again).`,
+    );
   if (parsed['format'] !== 'llull-document')
     throw new Error(`load_document: unrecognized format '${String(parsed['format'])}' — expected 'llull-document'.`);
   if (!READABLE_VERSIONS.has(parsed['version']))

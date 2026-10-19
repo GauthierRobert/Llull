@@ -5,7 +5,12 @@ import { workspaceAliases } from './workspaceAliases.ts';
 import { ISOLATED_SUITES } from './tests/isolatedSuites.ts';
 
 const testExcludes = [...configDefaults.exclude, '.claude/worktrees/**', 'server/**', 'desktop/**', 'tests/e2e/**'];
-const NODE_SUITES = ['tests/unit/**/*.test.ts', 'tests/golden/**/*.test.ts', 'tests/oracle/**/*.test.ts'];
+const NODE_SUITES = [
+  'tests/unit/**/*.test.ts',
+  'tests/golden/**/*.test.ts',
+  'tests/oracle/**/*.test.ts',
+  'tests/action_matrix/**/*.test.ts',
+];
 const DOM_SUITES = [
   'tests/component/**/*.test.{ts,tsx}',
   'tests/integration/**/*.test.{ts,tsx}',

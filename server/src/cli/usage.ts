@@ -9,6 +9,8 @@ Discover
   toolsets                    toolset names and command counts
   guide                       CAD modeling conventions (units, axes, ids, plans)
   status                      is the desktop app running? which document would --doc use?
+  crashes list|show ID|dir    local crash reports (document, command log, error; show latest = newest,
+                              with an issue draft link; nothing is sent)  [$LLULL_DATA_DIR/llull/crashes]
 
 Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first change)
   exec <command> [params]     run one command; params are key=value pairs (values parsed as

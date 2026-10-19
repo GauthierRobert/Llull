@@ -11,7 +11,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - Lanes own disjoint write scopes (`.claude/rules/workflow.md` W5); one task per lane at a time, up to 4 lanes + Lane 5 review.
 
 ## NOW (auto-updated by the skill)
-- 2026-10-19 — branch `feat/sc-parity`: SolidCraft parity wave 1 in flight (worktrees): SC-S1+S2 solver, SC-Q1 oracle, SC-Q3+Q5+A1 fuzz/features/skills, SC-D1..D3 files. Native toolchain (MSVC, CMake, Rust, OCCT) being installed on Windows for SC-N1.
+- 2026-10-19 — branch `feat/sc-parity`: SC-Q1, Q3, Q5, A1, D1–D3 merged. In flight: SC-S1+S2, SC-Q2, oracle/fuzz bug fixes + SC-D4 (TS exports), SC-A2+A3, SC-F2+F3. Next: SC-N1 (native toolchain installing on Windows), SC-F1/F4, SC-N2, SC-S3, SC-Q4, SC-A4, IGES.
 - 2026-10-19 — branch `ccr-d5e76715-intlyp`: LC1 done (steps 1–6: native kernel default everywhere, opencascade.js retired, no outbox),
   RS-1 done (macOS bundle deferred by the owner), RS-2 done (native SIMP topology optimisation + plugin `topology` + `topology_solve` + UI panel).
   Next: CFD-M1, then RS-3.
@@ -24,21 +24,16 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - `[TODO]` **CFD-M2** `llull-compute flow` (LBM, wgpu), `cfd_solve` transport, records: same spec §10. _deps: CFD-M1_
 
 ## SolidCraft parity (spec: `docs/decisions/SC1-solidcraft-parity.md`)
-- `[WIP]` **SC-Q1** Reference parts `tests/oracle/` (analytic + FreeCAD expected values, STEP round-trip), `npm run oracle` → `docs/ORACLE.md`. _deps: —_
-- `[WIP]` **SC-Q3** `llull fuzz` / `fuzz-one --minimise`: seeded designs, solidity + volume-direction checks, boolean identities. _deps: —_
-- `[TODO]` **SC-Q2** Action matrix with baseline ratchet, PR sample + nightly shards + determinism. _deps: SC-Q1_
-- `[WIP]` **SC-Q5** `docs/FEATURES.md` generated from the registry, staleness checked. _deps: —_
+- `[WIP]` **SC-Q2** Action matrix with baseline ratchet, PR sample + nightly shards + determinism. _deps: SC-Q1_
 - `[TODO]` **SC-Q4** Mutation testing (Stryker) judged by oracle + golden + fuzz only, nightly. _deps: SC-Q1, SC-Q3_
 - `[WIP]` **SC-S1** Sketch solver: constructive + Levenberg–Marquardt, DOF, over-constraint refusal. _deps: —_
 - `[WIP]` **SC-S2** Constraint/dimension breadth (horizontal…G2; radius, diameter, arc length…). _deps: SC-S1_
 - `[TODO]` **SC-N1** Persistent face/edge naming from native OCCT history. _deps: LC1 step 1_
 - `[TODO]` **SC-N2** Lost/split reference reporting + re-pick. _deps: SC-N1_
 - `[TODO]` **SC-S3** Sketch on offset planes / faces, linked projection. _deps: SC-S2, SC-N1_
-- `[TODO]` **SC-F1…F4** Feature depth: draft/split/replace face/push-pull (absorbs NF7), threads/holes on points, thin extrude/variable fillets, joints check. _deps: SC-N1, SC-Q1_
-- `[WIP]` **SC-D1** `.bak` on save + kill-mid-save test. **SC-D2** old-document corpus + damaged variants. **SC-D3** local crash reports with reproducer. _deps: —_
-- `[TODO]` **SC-D4** STEP AP242 names/colours/assemblies export, 3MF, URDF, IGES check, mesh → solid. _deps: —_
-- `[WIP]` **SC-A1** User-facing agent skills shipped with the desktop app (`llull skills install`). _deps: —_
-- `[TODO]` **SC-A2…A4** Live previews + drag manipulators, 3D mouse, issue draft from feature errors. _deps: SC-D3 (A4)_
+- `[WIP]` **SC-F1…F4** Feature depth: draft/split/replace face/push-pull (absorbs NF7), threads/holes on points, thin extrude/variable fillets, joints check. _deps: SC-N1, SC-Q1_
+- `[WIP]` **SC-D4** STEP AP242 names/colours/assemblies export, 3MF, URDF, IGES check, mesh → solid. _deps: —_
+- `[WIP]` **SC-A2…A4** Live previews + drag manipulators, 3D mouse, issue draft from feature errors. _deps: SC-D3 (A4)_
 
 ## Aerospace + physics (spec = the linked pack)
 - `[TODO]` **AERO-4** Supply chain: 03 GDT, 04 XCH (AP242), 09 PLM (`HumanSignaturePort`, `dispose_*`): `docs/aerospace/README.md`. _deps: —_

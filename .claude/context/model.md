@@ -107,8 +107,12 @@ const DEFAULT_LAYER_ID = 'layer-default';
 createEmptyDocument(): CadDocument   // one default layer 'Layer 0', every table empty
 ```
 
-Constraint kinds: geometric `coincident | parallel | perpendicular | tangent`, dimensional
-`distance | angle`; solved by the pure `solve_constraints` (`commands/parametric/constraintSolver.ts`).
+Constraint kinds: geometric `coincident | parallel | perpendicular | tangent | horizontal | vertical | equal | concentric | collinear |
+midpoint | symmetric (+axis) | fix | point_on_curve | curvature`, dimensional (`value`: number or `=expr`) `distance | angle | radius |
+diameter | aligned | horizontal_distance | vertical_distance | point_to_line | arc_sweep | arc_length | slot_length`. Unary kinds store `b = a`.
+Solved by the pure `solve_constraints` (`commands/parametric/solver/`: constructive pass + Levenberg-Marquardt; data `dof`,
+`fullyConstrained`). `add_constraint` / `update_constraint` refuse conflicting, redundant and sketch-flipping constraints
+(`parametric/constraintGuard.ts`).
 Joints: `revolute | prismatic`.
 
 ## Constructive vs evaluated

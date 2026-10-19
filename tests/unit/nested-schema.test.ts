@@ -80,6 +80,6 @@ describe('nested parameter schemas', () => {
   it('emit the nested required lists into the tool schemas', () => {
     const constraint = toToolSchemas().find((schema) => schema.name === 'add_constraint');
     const properties = (constraint?.input_schema as unknown as SchemaNode).properties;
-    expect(properties?.['constraint']?.required).toEqual(['kind', 'a', 'b']);
+    expect(properties?.['constraint']?.required).toEqual(['kind', 'a']);
   });
 });
