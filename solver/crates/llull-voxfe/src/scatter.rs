@@ -9,14 +9,17 @@
 //! touches cut out as slices, local nodes in [`crate::grid::LOCAL_NODES`] order.
 
 use crate::grid::Grid;
-use crate::MIN_LEN;
+use crate::real::Real;
 use rayon::prelude::*;
+
+/// Smallest number of elements a rayon task of the scatter gets.
+const ELEMENTS_PER_TASK: usize = 4096;
 
 /// `y = Σ_e A_e u_e` on the free DOFs of a 2D grid, 0 elsewhere. `element(e, u_e, out)` writes `A_e u_e` and returns false
 /// for an element without stiffness (then `out` is ignored).
-pub fn apply_2d<F>(grid: &Grid, free: &[bool], u: &[f64], y: &mut [f64], element: F)
+pub fn apply_2d<T: Real, F>(grid: &Grid, free: &[bool], u: &[T], y: &mut [T], element: F)
 where
-    F: Fn(usize, &[f64; 8], &mut [f64; 8]) -> bool + Sync,
+    F: Fn(usize, &[T; 8], &mut [T; 8]) -> bool + Sync,
 {
     let row = (grid.nx + 1) * 2;
     slabs(grid, free, y, row, |slab, lower, upper| {
@@ -24,8 +27,8 @@ where
         let u0 = &u[start..start + row];
         let u1 = &u[start + row..start + 2 * row];
         let first = slab * grid.nx;
-        let mut ue = [0.0f64; 8];
-        let mut out = [0.0f64; 8];
+        let mut ue = [T::ZERO; 8];
+        let mut out = [T::ZERO; 8];
         for i in 0..grid.nx {
             let x = 2 * i;
             ue[0..4].copy_from_slice(&u0[x..x + 4]);
@@ -42,9 +45,9 @@ where
 }
 
 /// [`apply_2d`] for a 3D grid (24 DOFs per element).
-pub fn apply_3d<F>(grid: &Grid, free: &[bool], u: &[f64], y: &mut [f64], element: F)
+pub fn apply_3d<T: Real, F>(grid: &Grid, free: &[bool], u: &[T], y: &mut [T], element: F)
 where
-    F: Fn(usize, &[f64; 24], &mut [f64; 24]) -> bool + Sync,
+    F: Fn(usize, &[T; 24], &mut [T; 24]) -> bool + Sync,
 {
     let row = (grid.nx + 1) * 3;
     let layer = row * (grid.ny + 1);
@@ -58,8 +61,8 @@ where
             let (y00, y10) = lower[j * row..(j + 2) * row].split_at_mut(row);
             let (y01, y11) = upper[j * row..(j + 2) * row].split_at_mut(row);
             let first = (slab * grid.ny + j) * grid.nx;
-            let mut ue = [0.0f64; 24];
-            let mut out = [0.0f64; 24];
+            let mut ue = [T::ZERO; 24];
+            let mut out = [T::ZERO; 24];
             for i in 0..grid.nx {
                 let (x, z) = (3 * i, 3 * i + 3);
                 ue[0..3].copy_from_slice(&u00[x..x + 3]);
@@ -87,34 +90,46 @@ where
 }
 
 #[inline(always)]
-fn add(target: &mut [f64], values: &[f64]) {
-    for (t, v) in target.iter_mut().zip(values) {
+fn add<T: Real>(target: &mut [T], values: &[T]) {
+    for (t, &v) in target.iter_mut().zip(values) {
         *t += v;
     }
 }
 
 /// Runs `slab(s, lower, upper)` (the two node layers of slab `s`, each `layer` values) for the even slabs in parallel, then
-/// the odd ones, on a zeroed `y`; then zeroes the non-free DOFs.
-fn slabs<S>(grid: &Grid, free: &[bool], y: &mut [f64], layer: usize, slab: S)
+/// the odd ones, on a zeroed `y`, and zeroes the non-free DOFs of each layer in the task that completes it (layer `l` is
+/// complete once slabs `l − 1` and `l` ran).
+fn slabs<T: Real, S>(grid: &Grid, free: &[bool], y: &mut [T], layer: usize, slab: S)
 where
-    S: Fn(usize, &mut [f64], &mut [f64]) + Sync,
+    S: Fn(usize, &mut [T], &mut [T]) + Sync,
 {
     let count = if grid.dim == 3 { grid.nz } else { grid.ny };
+    // at least ELEMENTS_PER_TASK elements per rayon task (small levels run on one thread, without waking the pool)
+    let per_task = (ELEMENTS_PER_TASK / (grid.elements() / count).max(1)).max(1);
+    let mask = |l: usize, values: &mut [T]| {
+        for (value, &free) in values.iter_mut().zip(&free[l * layer..(l + 1) * layer]) {
+            if !free {
+                *value = T::ZERO;
+            }
+        }
+    };
     for colour in 0..2 {
-        y[colour * layer..].par_chunks_mut(2 * layer).enumerate().for_each(|(index, chunk)| {
+        y[colour * layer..].par_chunks_mut(2 * layer).enumerate().with_min_len(per_task).for_each(|(index, chunk)| {
             if colour == 0 {
-                chunk.fill(0.0);
+                chunk.fill(T::ZERO);
             }
             let s = colour + 2 * index;
             if s < count {
                 let (lower, upper) = chunk.split_at_mut(layer);
                 slab(s, lower, upper);
+                // colour 1 completes both its layers; colour 0 only the first and the last layer of the grid
+                if colour == 1 || s == 0 {
+                    mask(s, lower);
+                }
+                if colour == 1 || s + 1 == count {
+                    mask(s + 1, upper);
+                }
             }
         });
     }
-    y.par_iter_mut().with_min_len(MIN_LEN).zip(free).for_each(|(value, &free)| {
-        if !free {
-            *value = 0.0;
-        }
-    });
 }

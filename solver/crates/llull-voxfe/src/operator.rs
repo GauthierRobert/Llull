@@ -9,6 +9,7 @@
 //!   the bits do not depend on the thread count (the GPU shader computes the same sums in the same order, node by node).
 
 use crate::grid::{Grid, LOCAL_NODES};
+use crate::real::Real;
 use crate::scatter;
 use crate::MIN_LEN;
 use rayon::prelude::*;
@@ -182,19 +183,20 @@ impl Operator {
     }
 }
 
-/// `out = s · KE u_e` from the columns of KE; false (and `out` untouched) for an inactive element (`s = 0`).
+/// `out = s · KE u_e` from the columns of KE (all rows at once, each summed in element-DOF order); false (and `out`
+/// untouched) for an inactive element (`s = 0`).
 #[inline(always)]
-fn scaled_product<const ND: usize>(s: f64, columns: &[[f64; ND]; ND], ue: &[f64; ND], out: &mut [f64; ND]) -> bool {
-    if s == 0.0 {
+pub(crate) fn scaled_product<T: Real, const ND: usize>(s: T, columns: &[[T; ND]; ND], ue: &[T; ND], out: &mut [T; ND]) -> bool {
+    if s == T::ZERO {
         return false;
     }
-    let mut acc = [0.0f64; ND];
+    let mut acc = [T::ZERO; ND];
     for (column, &ut) in columns.iter().zip(ue) {
-        for (a, c) in acc.iter_mut().zip(column) {
+        for (a, &c) in acc.iter_mut().zip(column) {
             *a += c * ut;
         }
     }
-    for (value, a) in out.iter_mut().zip(&acc) {
+    for (value, &a) in out.iter_mut().zip(&acc) {
         *value = s * a;
     }
     true

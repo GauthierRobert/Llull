@@ -1,7 +1,8 @@
 //! The SIMP loop of TECHNICAL_SPEC §5.1 / §5.2 on llull-voxfe.
 //!
 //! Per iteration: element scales `s_e = (Emin + xPhys_e^p (E0 − Emin)) · g` (g = thickness in 2D, voxel edge in 3D) → one
-//! PCG solve per load case from a zero start (so a resumed run continues bit for bit) → `c = Σ_lc w_lc Σ_e s_e u_eᵀk0u_e`,
+//! PCG solve per load case, warm-started from that case's previous displacements (zero on the first iteration, or the
+//! `Start::displacements` of a resumed run, which then continues bit for bit) → `c = Σ_lc w_lc Σ_e s_e u_eᵀk0u_e`,
 //! `dc_e = −p (E0 − Emin) xPhys_e^(p−1) g Σ_lc w_lc u_eᵀk0u_e`, `dv_e = 1` → filter → OC → `change = max|x_new − x|`.
 //! Stop when `change ≤ changeTol` (converged) or after `maxIterations`. Keep-in / keep-out voxels are pinned to 1 / 0 in
 //! both x and xPhys; their sensitivities are dropped before the density-filter chain rule. The volume constraint is
@@ -134,6 +135,8 @@ pub struct Outcome {
     pub engine: Engine,
     pub pcg_iterations: usize,
     pub warnings: Vec<String>,
+    /// Per load case, the displacements of the last loop iteration's solve: the warm start a resumed run continues from.
+    pub displacements: Vec<Vec<f64>>,
 }
 
 /// A failed run: stable code (`TOP_SOLVER_FAILED`, …) and message.
@@ -188,9 +191,11 @@ struct Solver<'a> {
     settings: &'a Settings,
     backend: Backend,
     /// The CPU twin's multigrid hierarchy, built on the first CPU solve and updated in place when the scales change.
-    multigrid: Option<Multigrid>,
+    multigrid: Option<Multigrid<f32>>,
     /// The hierarchy does not match the operator's current scales yet.
     stale: bool,
+    /// Per load case, the displacements of its last solve: the start of its next solve (warm start; empty = zero).
+    warm: Vec<Vec<f64>>,
     pcg_iterations: usize,
     warnings: Vec<String>,
 }
@@ -205,19 +210,31 @@ impl Solver<'_> {
         let _ = op;
     }
 
-    fn cpu(&mut self, op: &Operator, b: &[f64]) -> Result<Vec<f64>, TopError> {
-        let mut u = vec![0.0; b.len()];
+    /// Builds the multigrid hierarchy, or updates it to the operator's current scales, once per scale change (multigrid
+    /// solver only) and mirrors it to the GPU (whose PCG then uses the V-cycle instead of Jacobi).
+    fn refresh_multigrid(&mut self, op: &Operator) {
+        if self.settings.solver != SolverKind::Multigrid || !self.stale {
+            return;
+        }
+        match &mut self.multigrid {
+            Some(multigrid) => multigrid.update(op),
+            None => self.multigrid = Some(Multigrid::new(op, MultigridSettings::default())),
+        }
+        self.stale = false;
+        #[cfg(feature = "gpu")]
+        if let (Backend::Gpu(gpu), Some(multigrid)) = (&mut self.backend, &self.multigrid) {
+            gpu.set_multigrid(multigrid);
+        }
+    }
+
+    /// PCG on the CPU twin from `u` (masked by the solver).
+    fn cpu(&mut self, op: &Operator, b: &[f64], mut u: Vec<f64>) -> Result<Vec<f64>, TopError> {
         let (tolerance, cap) = (self.settings.pcg_tolerance, self.settings.pcg_max_iterations);
         let stats = match self.settings.solver {
             SolverKind::Jacobi => pcg(op, &Jacobi::new(op), b, &mut u, tolerance, cap),
             SolverKind::Multigrid => {
-                match &mut self.multigrid {
-                    Some(multigrid) if self.stale => multigrid.update(op),
-                    Some(_) => {}
-                    None => self.multigrid = Some(Multigrid::new(op, MultigridSettings::default())),
-                }
-                self.stale = false;
-                let multigrid = self.multigrid.as_ref().unwrap_or_else(|| unreachable!("built above"));
+                self.refresh_multigrid(op);
+                let multigrid = self.multigrid.as_ref().unwrap_or_else(|| unreachable!("built by refresh_multigrid"));
                 pcg(op, multigrid, b, &mut u, tolerance, cap)
             }
         }
@@ -226,12 +243,27 @@ impl Solver<'_> {
         Ok(u)
     }
 
-    fn solve(&mut self, op: &Operator, b: &[f64]) -> Result<Vec<f64>, TopError> {
+    /// Solves load case `case` (`K u = b`) from its previous displacements and keeps the result for the next solve.
+    fn solve(&mut self, op: &Operator, case: usize, b: &[f64]) -> Result<Vec<f64>, TopError> {
+        let u = self.solve_from(op, b, self.start(case, b.len()))?;
+        self.warm[case].clone_from(&u);
+        Ok(u)
+    }
+
+    fn start(&self, case: usize, len: usize) -> Vec<f64> {
+        match self.warm.get(case) {
+            Some(u) if u.len() == len => u.clone(),
+            _ => vec![0.0; len],
+        }
+    }
+
+    fn solve_from(&mut self, op: &Operator, b: &[f64], start: Vec<f64>) -> Result<Vec<f64>, TopError> {
+        self.refresh_multigrid(op);
         match &self.backend {
-            Backend::Cpu => self.cpu(op, b),
+            Backend::Cpu => self.cpu(op, b, start),
             #[cfg(feature = "gpu")]
             Backend::Gpu(gpu) => {
-                let mut u = vec![0.0; b.len()];
+                let mut u = start.clone();
                 match llull_voxfe::gpu::refine(gpu, op, b, &mut u, self.settings.pcg_tolerance, 1e-4, self.settings.pcg_max_iterations) {
                     Ok(stats) => {
                         self.pcg_iterations += stats.inner;
@@ -241,7 +273,7 @@ impl Solver<'_> {
                         if self.warnings.len() < 20 {
                             self.warnings.push(format!("GPU solve failed ({reason}); solved by the CPU twin"));
                         }
-                        self.cpu(op, b)
+                        self.cpu(op, b, start)
                     }
                 }
             }
@@ -264,8 +296,8 @@ fn analyse(op: &Operator, solver: &mut Solver<'_>, problem: &Problem) -> Result<
     let mut energy = vec![0.0; problem.grid.elements()];
     let mut per_case = Vec::with_capacity(problem.load_cases.len());
     let mut weighted = 0.0;
-    for case in &problem.load_cases {
-        let u = solver.solve(op, &case.forces)?;
+    for (index, case) in problem.load_cases.iter().enumerate() {
+        let u = solver.solve(op, index, &case.forces)?;
         let ce = op.element_energies(&u);
         let scaled: Vec<f64> = ce.par_iter().with_min_len(MIN_LEN).zip(op.scale()).map(|(c, s)| c * s).collect();
         let c = sum(&scaled);
@@ -315,15 +347,38 @@ pub fn validate(problem: &Problem, settings: &Settings) -> Result<(), String> {
     Ok(())
 }
 
-/// Runs the SIMP loop from `start` (design variables x, element-length; `None` = uniform volume fraction). `progress` sees
-/// each history row as it is produced.
+/// Where a run starts: design variables x (element-length; `None` = uniform volume fraction) and the warm start of the first
+/// solves (load cases × DOFs, an earlier run's [`Outcome::displacements`]; `None` = zero).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Start<'a> {
+    pub design: Option<&'a [f64]>,
+    pub displacements: Option<&'a [f64]>,
+}
+
+/// Runs the SIMP loop from `start`. `progress` sees each history row as it is produced.
 pub fn optimise(
     problem: &Problem,
     settings: &Settings,
-    start: Option<&[f64]>,
+    start: Start<'_>,
     progress: &mut dyn FnMut(&HistoryRow),
 ) -> Result<Outcome, TopError> {
     validate(problem, settings).map_err(|message| TopError { code: "NATIVE_JOB_INPUT", message })?;
+    let dofs = problem.grid.dofs();
+    let warm: Vec<Vec<f64>> = match start.displacements {
+        Some(values) if values.len() == dofs * problem.load_cases.len() => values.chunks_exact(dofs).map(<[f64]>::to_vec).collect(),
+        Some(values) => {
+            return Err(TopError {
+                code: "NATIVE_JOB_INPUT",
+                message: format!(
+                    "start displacements: {} values, expected {} load cases x {dofs} DOFs",
+                    values.len(),
+                    problem.load_cases.len()
+                ),
+            })
+        }
+        None => vec![Vec::new(); problem.load_cases.len()],
+    };
+    let start_design = start.design;
     let g = problem.grid;
     let n = g.elements();
     let voxels = &problem.voxels;
@@ -348,12 +403,12 @@ pub fn optimise(
             FilterKind::Density => pin(filter.density(x)),
         }
     };
-    let mut x: Vec<f64> = match start {
+    let mut x: Vec<f64> = match start_design {
         Some(start) => pin(start.iter().map(|v| v.clamp(0.0, 1.0)).collect()),
         None => pin(vec![problem.volume_fraction; n]),
     };
     // top88 starts from xPhys = x; a resumed run recomputes xPhys from x exactly as the OC step did
-    let mut x_phys = if start.is_some() { physical(&x) } else { x.clone() };
+    let mut x_phys = if start_design.is_some() { physical(&x) } else { x.clone() };
     let mut op = Operator::new(
         g,
         element_matrix(g.dim, problem.nu),
@@ -361,7 +416,7 @@ pub fn optimise(
         problem.fixed.clone(),
     );
     let (backend, engine) = choose_backend(settings.device, &op);
-    let mut solver = Solver { settings, backend, multigrid: None, stale: true, pcg_iterations: 0, warnings: Vec::new() };
+    let mut solver = Solver { settings, backend, multigrid: None, stale: true, warm, pcg_iterations: 0, warnings: Vec::new() };
     let emin = settings.emin_ratio * problem.e0;
     let target = problem.volume_fraction * active_count as f64;
     let limits = Limits { move_limit: settings.move_limit, tolerance: settings.oc_tolerance, target };
@@ -398,6 +453,8 @@ pub fn optimise(
         progress(&row);
         history.push(row);
     }
+    // the warm start of the next iteration: what a resumed run needs to continue bit for bit
+    let displacements = solver.warm.clone();
     op.set_scale(element_scales(&x_phys, voxels, problem, settings, geometric));
     solver.set_scale(&op);
     let (compliance, per_load_case, _) = analyse(&op, &mut solver, problem)?;
@@ -415,5 +472,6 @@ pub fn optimise(
         engine,
         pcg_iterations: solver.pcg_iterations,
         warnings: solver.warnings,
+        displacements,
     })
 }

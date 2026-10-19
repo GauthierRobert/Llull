@@ -148,6 +148,11 @@ fn errors_carry_stable_codes() {
     let mut fraction = mbb(30, 10, tip, json!({}));
     fraction["volumeFraction"] = json!(1.2);
     assert_eq!(run(&dir, &fraction).unwrap_err().0, "NATIVE_JOB_INPUT");
+    // warm-start displacements must hold load cases × DOFs values
+    std::fs::write(dir.join("u.f64"), [0u8; 8 * 10]).unwrap();
+    let mut short = mbb(30, 10, json!([{ "name": "tip", "loads": [{ "node": [0, 10], "force": [0, -1] }] }]), json!({}));
+    short["startDisplacements"] = json!("u.f64");
+    assert_eq!(run(&dir, &short).unwrap_err().0, "NATIVE_JOB_INPUT");
     let _ = std::fs::remove_dir_all(dir);
 }
 

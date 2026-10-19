@@ -2,6 +2,8 @@
 //! iteration counts on a 3D cantilever, bit-reproducibility across thread counts, and the singular-system failure.
 
 use llull_voxfe::ke::element_matrix;
+use llull_voxfe::multigrid::{Multigrid, MultigridSettings};
+use llull_voxfe::pcg::pcg;
 use llull_voxfe::{solve, Grid, Operator, SolveError, SolverKind};
 
 const TOLERANCE: f64 = 1e-10;
@@ -121,6 +123,33 @@ fn solves_are_bit_identical_for_any_thread_count() {
 }
 
 #[test]
+fn an_f32_v_cycle_reaches_the_f64_tolerance_with_the_same_bits_for_any_thread_count() {
+    // large enough for several parallel slabs and transfer rows per level
+    let (op, f) = cantilever(32, 16, 16);
+    let mut reference = vec![0.0; f.len()];
+    let double = solve(&op, SolverKind::Multigrid, &f, &mut reference, TOLERANCE, 10_000).unwrap();
+    let run = |threads: usize| {
+        rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap().install(|| {
+            let single = Multigrid::<f32>::new(&op, MultigridSettings::default());
+            let mut u = vec![0.0; f.len()];
+            let stats = pcg(&op, &single, &f, &mut u, TOLERANCE, 10_000).unwrap();
+            (stats.iterations, u)
+        })
+    };
+    let (iterations, u) = run(1);
+    eprintln!("3D cantilever 32x16x16: MG-PCG {} iterations with an f64 V-cycle, {iterations} with an f32 one", double.iterations);
+    // f32 rounding makes the V-cycle slightly non-symmetric: a few more iterations on this soft-layer case (none on the SIMP
+    // designs of the benchmarks), the same f64 answer
+    assert!(2 * iterations <= 3 * double.iterations, "{iterations} vs {}", double.iterations);
+    let compliance = |u: &[f64]| f.iter().zip(u).map(|(a, b)| a * b).sum::<f64>();
+    assert!((compliance(&u) - compliance(&reference)).abs() < 1e-9 * compliance(&reference).abs());
+    let bits = |u: &[f64]| u.iter().map(|v| v.to_bits()).collect::<Vec<u64>>();
+    for threads in [2, 3, 4] {
+        assert_eq!(bits(&u), bits(&run(threads).1), "{threads} threads");
+    }
+}
+
+#[test]
 #[ignore = "measurement: cargo test --release -p llull-voxfe --test solve -- --ignored --nocapture"]
 fn matvec_and_solve_throughput() {
     for n in [20usize, 40, 60] {
@@ -133,7 +162,7 @@ fn matvec_and_solve_throughput() {
         }
         let matvec = started.elapsed().as_secs_f64() / 20.0;
         let started = std::time::Instant::now();
-        let mg = llull_voxfe::multigrid::Multigrid::new(&op, Default::default());
+        let mg = llull_voxfe::multigrid::Multigrid::<f64>::new(&op, Default::default());
         let build = started.elapsed().as_secs_f64();
         let started = std::time::Instant::now();
         let mut x = vec![0.0; f.len()];

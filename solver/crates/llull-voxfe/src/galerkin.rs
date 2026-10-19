@@ -13,15 +13,17 @@
 
 use crate::grid::{Grid, LOCAL_NODES};
 use crate::operator::Operator;
+use crate::real::Real;
 use crate::scatter;
 use crate::MIN_LEN;
 use rayon::prelude::*;
 
 /// Per-element stiffness matrices on a voxel grid (row-major `element_dofs²` each, exactly symmetric), with Dirichlet DOFs.
+/// Computed in f64, stored as `T`.
 #[derive(Debug)]
-pub struct ElementMatrices {
+pub struct ElementMatrices<T: Real = f64> {
     grid: Grid,
-    matrices: Vec<f64>,
+    matrices: Vec<T>,
     active: Vec<bool>,
     fixed: Vec<bool>,
     free: Vec<bool>,
@@ -81,6 +83,13 @@ fn add_triple_product(p: &[[f64; 8]; 8], a: &[f64], dim: usize, out: &mut [f64])
     }
 }
 
+/// Rounds an f64 matrix into `T` storage.
+fn store<T: Real>(matrix: &[f64], out: &mut [T]) {
+    for (value, m) in out.iter_mut().zip(matrix) {
+        *value = T::of(*m);
+    }
+}
+
 fn symmetrise(matrix: &mut [f64], nd: usize) {
     for r in 0..nd {
         for c in r + 1..nd {
@@ -111,14 +120,14 @@ fn children<'a>(fine: &'a Grid, coarse: &'a Grid, e: usize) -> impl Iterator<Ite
     })
 }
 
-impl ElementMatrices {
+impl<T: Real> ElementMatrices<T> {
     /// The Galerkin operator of the scaled fine operator on `fine.grid().coarsened()` with the coarse Dirichlet DOFs `fixed`.
-    pub fn from_scaled(fine: &Operator, fixed: Vec<bool>) -> ElementMatrices {
+    pub fn from_scaled(fine: &Operator, fixed: Vec<bool>) -> ElementMatrices<T> {
         let coarse = fine.grid().coarsened();
         let nd = coarse.element_dofs();
         let mut matrices = ElementMatrices {
             grid: coarse,
-            matrices: vec![0.0; coarse.elements() * nd * nd],
+            matrices: vec![T::ZERO; coarse.elements() * nd * nd],
             active: vec![false; coarse.elements()],
             fixed,
             free: Vec::new(),
@@ -129,12 +138,12 @@ impl ElementMatrices {
     }
 
     /// The Galerkin operator of `fine` one level down.
-    pub fn from_matrices(fine: &ElementMatrices, fixed: Vec<bool>) -> ElementMatrices {
+    pub fn from_matrices(fine: &ElementMatrices<T>, fixed: Vec<bool>) -> ElementMatrices<T> {
         let coarse = fine.grid.coarsened();
         let nd = coarse.element_dofs();
         let mut matrices = ElementMatrices {
             grid: coarse,
-            matrices: vec![0.0; coarse.elements() * nd * nd],
+            matrices: vec![T::ZERO; coarse.elements() * nd * nd],
             active: vec![false; coarse.elements()],
             fixed,
             free: Vec::new(),
@@ -161,7 +170,8 @@ impl ElementMatrices {
         let scale = fine.scale();
         self.matrices.par_chunks_mut(nd * nd).zip(&mut self.active).enumerate().with_min_len(MIN_LEN / 64).for_each(
             |(e, (out, active))| {
-                out.fill(0.0);
+                let mut sum = [0.0f64; 24 * 24];
+                let sum = &mut sum[..nd * nd];
                 *active = false;
                 for (c, child) in children(&g, &coarse, e) {
                     let s = scale[child];
@@ -169,33 +179,39 @@ impl ElementMatrices {
                         continue;
                     }
                     *active = true;
-                    for (value, m) in out.iter_mut().zip(&basis[c]) {
+                    for (value, m) in sum.iter_mut().zip(&basis[c]) {
                         *value += s * m;
                     }
                 }
-                symmetrise(out, nd);
+                symmetrise(sum, nd);
+                store(sum, out);
             },
         );
     }
 
     /// Recomputes the matrices from new fine matrices (same activity).
-    pub fn update_from_matrices(&mut self, fine: &ElementMatrices) {
+    pub fn update_from_matrices(&mut self, fine: &ElementMatrices<T>) {
         let g = fine.grid;
         let nd = g.element_dofs();
         let p = child_interpolation(g.dim);
         let coarse = self.grid;
         self.matrices.par_chunks_mut(nd * nd).zip(&mut self.active).enumerate().with_min_len(MIN_LEN / 256).for_each(
             |(e, (out, active))| {
-                out.fill(0.0);
+                let (mut sum, mut child_matrix) = ([0.0f64; 24 * 24], [0.0f64; 24 * 24]);
+                let (sum, child_matrix) = (&mut sum[..nd * nd], &mut child_matrix[..nd * nd]);
                 *active = false;
                 for (c, child) in children(&g, &coarse, e) {
                     if !fine.active[child] {
                         continue;
                     }
                     *active = true;
-                    add_triple_product(&p[c], &fine.matrices[child * nd * nd..(child + 1) * nd * nd], g.dim, out);
+                    for (value, m) in child_matrix.iter_mut().zip(&fine.matrices[child * nd * nd..(child + 1) * nd * nd]) {
+                        *value = m.get();
+                    }
+                    add_triple_product(&p[c], child_matrix, g.dim, sum);
                 }
-                symmetrise(out, nd);
+                symmetrise(sum, nd);
+                store(sum, out);
             },
         );
     }
@@ -212,19 +228,24 @@ impl ElementMatrices {
         &self.free
     }
 
+    /// Every element matrix, element after element.
+    pub fn matrices(&self) -> &[T] {
+        &self.matrices
+    }
+
     /// Whether element `e` has any stiffness.
     pub fn active(&self, e: usize) -> bool {
         self.active[e]
     }
 
     /// The matrix of element `e` (row-major).
-    pub fn matrix(&self, e: usize) -> &[f64] {
+    pub fn matrix(&self, e: usize) -> &[T] {
         let nd = self.grid.element_dofs();
         &self.matrices[e * nd * nd..(e + 1) * nd * nd]
     }
 
     /// `y = K u` on the free DOFs, 0 elsewhere ([`scatter`]; the matrices are symmetric, so they are read by columns).
-    pub fn apply(&self, u: &[f64], y: &mut [f64]) {
+    pub fn apply(&self, u: &[T], y: &mut [T]) {
         assert!(u.len() == self.grid.dofs() && y.len() == self.grid.dofs(), "vector length");
         if self.grid.dim == 3 {
             scatter::apply_3d(&self.grid, &self.free, u, y, |e, ue, out| self.product(e, ue, out));
@@ -234,14 +255,14 @@ impl ElementMatrices {
     }
 
     #[inline(always)]
-    fn product<const ND: usize>(&self, e: usize, ue: &[f64; ND], out: &mut [f64; ND]) -> bool {
+    fn product<const ND: usize>(&self, e: usize, ue: &[T; ND], out: &mut [T; ND]) -> bool {
         if !self.active[e] {
             return false;
         }
         let matrix = &self.matrices[e * ND * ND..(e + 1) * ND * ND];
-        out.fill(0.0);
+        out.fill(T::ZERO);
         for (column, &ut) in matrix.chunks_exact(ND).zip(ue) {
-            for (a, c) in out.iter_mut().zip(column) {
+            for (a, &c) in out.iter_mut().zip(column) {
                 *a += c * ut;
             }
         }
@@ -264,7 +285,7 @@ impl ElementMatrices {
                 let e = g.element(i - ox, j - oy, k - oz);
                 for (c, value) in out.iter_mut().enumerate() {
                     let r = a * dim + c;
-                    *value += self.matrices[e * nd * nd + r * nd + r];
+                    *value += self.matrices[e * nd * nd + r * nd + r].get();
                 }
             }
             for (c, value) in out.iter_mut().enumerate() {
@@ -300,7 +321,7 @@ mod tests {
         for (grid, geometric) in [(Grid::new_2d(4, 2), 1.0), (Grid::new_3d(2, 2, 2), 2.0)] {
             let ke = element_matrix(grid.dim, 0.3);
             let fine = Operator::new(grid, ke.clone(), vec![1.5; grid.elements()], vec![false; grid.dofs()]);
-            let coarse = ElementMatrices::from_scaled(&fine, vec![false; grid.coarsened().dofs()]);
+            let coarse: ElementMatrices = ElementMatrices::from_scaled(&fine, vec![false; grid.coarsened().dofs()]);
             for (a, b) in coarse.matrix(0).iter().zip(&ke) {
                 assert!((a - 1.5 * geometric * b).abs() < 1e-14, "{a} vs {}", 1.5 * geometric * b);
             }
