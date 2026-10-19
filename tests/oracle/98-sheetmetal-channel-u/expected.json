@@ -12,11 +12,5 @@
   "bbox": { "min": [-6.4, 0, 0], "max": [40, 50, 30] },
   "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
   "meshTolerance": { "volume": null, "area": 0.02, "reason": "area is summed over the display triangles of the tessellated bends" },
-  "stepRoundTrip": false,
-  "knownFailure": {
-    "fields": ["area"],
-    "kernels": ["manifold"],
-    "measured": { "areaApprox": 10954.149226362613 },
-    "diagnosis": "the folded mesh keeps both coincident faces at each flat/bend junction (4 junctions): area is overstated by 2 T W per junction (640)"
-  }
+  "stepRoundTrip": false
 }
