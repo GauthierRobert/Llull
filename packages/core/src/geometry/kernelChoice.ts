@@ -1,4 +1,4 @@
-/** Which geometry kernel a surface installs; one setting for browser (`?kernel=`) and server (`LLULL_KERNEL`). */
+/** Which geometry kernel the local backend and the CLI install (`LLULL_KERNEL`). */
 
 export type KernelChoice = 'manifold' | 'occt';
 

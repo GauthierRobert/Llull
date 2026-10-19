@@ -19,6 +19,23 @@ Binding text: `CLAUDE.md` § PRODUCT DIRECTIVE. Related: RS1 (native compute), K
 2. **Stop shipping the browser build**: drop the PWA (`serviceWorker/`, `viteServiceWorker.ts`, `playwright.pwa.config.ts`, `test:pwa`,
    `tests/pwa/`), the public web deployment docs, and the `?kernel=` URL switch in `src/main.tsx`; Vite stays as the Electron renderer's
    dev server and bundler.
+   - [x] Done 2026-10-19. Removed: `serviceWorker/`, `viteServiceWorker.ts` (+ its Vite plugin), `playwright.pwa.config.ts`,
+     `test:pwa`, `tests/pwa/`, `tests/unit/{viteServiceWorker,serviceWorkerRuntime}.test.ts`, the update banner
+     (`src/ui/services/appUpdates.ts`, `src/ui/components/UpdateBanner.tsx` + test + CSS), the `?kernel=` switch and
+     `src/ui/geometry/occtKernelBrowser.ts`. README / `docs/ARCHITECTURE.md` / `docs/DEPLOYMENT.md` / rules / skills describe
+     desktop + CLI. `parseKernelChoice` stays (it parses `LLULL_KERNEL` for the backend and the CLI).
+   - Kept for step 5: the renderer still installs Manifold (WASM) in-process (`src/main.tsx`) — it runs the commands the
+     renderer executes itself (local mode while the backend restarts, read-only queries, panel analyses) and re-runs live
+     events to check the state hash. The desktop backend defaults to OCC, so replay of kernel commands falls back to a
+     snapshot fetch; moving those to the backend removes the renderer kernel.
+   - Kept for step 6 (not clearly dead): `src/ui/serverConfig.ts` (`VITE_LLULL_SERVER_URL` / `VITE_LLULL_API_TOKEN`
+     build vars, `#token=` fragment), the IndexedDB material-library provider (`src/ui/services/browserLibraries.ts`,
+     used by renderer-side `execute`), the outbox / offline mode, COOP/COEP headers and the `node:module` stub in
+     `vite.config.ts`, unreferenced demo files `public/bike-*.svg` / `public/bike-views.html`.
+   - Out of this step's write scope: command descriptions in `packages/core` still say "?kernel=occt in the browser"
+     (fillet_edge, chamfer_edge, blend_union, export_step_exact, inspect_topology, inspect_faces, shell_solid summary;
+     `toolSchemas.json` snapshot) — reword with the command-layer owner; `.claude/agents/mcp-engineer.md` mentions the
+     browser kernel choice.
 3. **Remove the cloud host**: Docker image + CI `image` job, `docker-compose.yml`, multi-user auth / licence / tickets / admin routes
    (`server/src/{users,security,license,tickets,adminRoutes}.ts`), `docs/DEPLOYMENT.md` / `PILOT.md` cloud parts — after checking that
    the desktop and the CLI use none of it.

@@ -3,12 +3,13 @@
 > Named after Ramon Llull, whose *Ars Magna* mechanized reasoning by combining
 > primitives — exactly what this app does with CAD operations.
 
-A modern, web-based **2D + 3D** CAD application — an AutoCAD reimagined to be
-beautiful and easy to use: 2D drafting and 3D solid modeling in one shared document,
-with **MCP usability as its defining feature**. The core bet:
-**every operation is a command**, and every command is drivable by a human (UI)
-or by any external agent — Claude or any MCP client — over MCP, through the exact
-same code path.
+A modern **2D + 3D** CAD application for the desktop and the command line — an AutoCAD
+reimagined to be beautiful and easy to use: 2D drafting and 3D solid modeling in one shared
+document, driven equally well by a person and by an agent. The core bet:
+**every operation is a command**, and every command is drivable by a human (the desktop app)
+or by an agent (the `llull` CLI, e.g. from Claude Code), through the exact same code path.
+llull is local only: the React UI runs inside the Electron desktop app, nothing needs the
+network, and there is no browser or cloud deployment ([`docs/decisions/LC1-local-only.md`](docs/decisions/LC1-local-only.md)).
 
 llull is developed **AI-first**: the [`CLAUDE.md`](CLAUDE.md) entrypoint and the
 [`.claude/`](.claude) directory (rules, agents, skills, hooks) are first-class
@@ -39,14 +40,14 @@ office? Click **Civil site starter** on the empty app for a complete sample site
 
 | Concern        | Choice                                   | Why |
 | -------------- | ---------------------------------------- | --- |
-| UI             | React 19 + TypeScript + Vite             | Lightweight, best-in-class 3D ecosystem |
+| UI             | React 19 + TypeScript, in Electron       | Best-in-class 3D ecosystem; Vite bundles the renderer |
 | 3D viewport    | three.js + @react-three/fiber + drei     | Mature, declarative Three.js |
 | State          | Zustand                                  | One store, no boilerplate, easy to drive externally |
-| Schemas        | zod                                      | One schema per command: TS type, MCP JSON Schema and runtime validation |
+| Schemas        | zod                                      | One schema per command: TS type, tool JSON Schema and runtime validation |
 | Geometry kernel| Manifold (default) / OpenCascade.js      | Booleans and fillets behind one interface |
 | Tests          | Vitest + Testing Library + Playwright    | Fast, Vite-native |
 | Lint / format  | ESLint + Prettier                        | Consistent, enforced by `npm run check` |
-| Backend (opt.) | Node + Express                           | Only for hosting the MCP endpoint |
+| Local backend  | Node + Express                           | Started by the desktop app or the CLI; same registry |
 
 ## Architecture in one picture
 
@@ -55,7 +56,7 @@ Document (recipe + evaluated)   ← feature history, parameters, entities, layer
         ▲
 Command Layer (pure functions)  ← add_box, extrude_profile, move_entities, ... + plugins
         ▲                  ▲
-   React UI  ◄── /live ──  MCP Server (Claude / any MCP agent)
+   Desktop UI ◄── /live ── local backend ◄── `llull` CLI (you / Claude Code)
 ```
 
 Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) before writing code. It
@@ -64,45 +65,36 @@ explains the command-layer pattern that the entire project depends on.
 ## Getting started
 
 ```bash
-npm install          # installs the root app and every packages/* workspace
-npm run dev          # start the app at http://localhost:5173
-npm run check        # typecheck + lint + format check + test (run before every commit)
-npm run test:e2e     # Playwright end-to-end tests in Chromium (starts the dev server)
+npm install                                   # root app + every packages/* workspace
+npm --prefix server install                   # local backend + `llull` CLI
+npm --prefix desktop install                  # Electron shell
+npm --prefix desktop run build && npm --prefix desktop start   # the desktop app
+node server/bin/llull.cjs help                # the CLI (agents: `llull ... --app` drives the open app)
+npm run check        # typecheck + arch + deadcode + lint + format check + test (run before every commit)
+npm run dev          # renderer dev server (http://localhost:5173) for UI work
+npm run test:e2e     # Playwright tests of the UI renderer (starts the dev server)
 ```
 
-Optional backend (the MCP host):
+## Desktop app
 
 ```bash
-cp .env.example .env # set MCP_AUTH_TOKEN (and PORT) for the MCP endpoint
-npm --prefix server install
-npm --prefix server run dev
+npm --prefix desktop run dist      # installable app: renderer + local backend + CLI + Python/CadQuery
 ```
 
-## Production
-
-```bash
-npm ci && npm run build            # static web app in dist/ — serve with any static host
-npm ci --prefix server
-npm --prefix server run build      # bundles the MCP host to server/dist/index.js
-MCP_AUTH_TOKEN=<secret> npm --prefix server start
-```
-
-- Requires Node >= 22.12. Variables are read from the environment, `.env`, or `server/.env`.
-- The server binds `127.0.0.1:3001` by default. Binding a non-loopback `HOST` requires
-  `MCP_AUTH_TOKEN`; remote REST mutations then need the bearer token too.
-- Serve the web app from an origin listed in `LLULL_ALLOWED_ORIGINS`, and list public
-  hostnames in `LLULL_ALLOWED_HOSTS` (DNS-rebinding guard).
-- The OpenCascade kernel (~65 MB wasm) loads only with `?kernel=occt`; the default is Manifold.
-- Web app build vars: `VITE_LLULL_SERVER_URL` (server base URL), `VITE_LLULL_API_TOKEN` (bearer for REST when the server requires it).
-- Full env reference: [`server/README.md`](server/README.md).
+- Requires Node >= 22.12. The desktop app starts its own backend on `127.0.0.1` with a per-launch
+  token and serves the renderer from it; nothing listens on another interface.
+- Kernel: the backend and the CLI pick it with `LLULL_KERNEL` (`manifold`, `occt`, `occt-native`);
+  the renderer runs Manifold in-process for the commands it executes itself.
+- Packaging, signing and the CLI hand-off: [`desktop/README.md`](desktop/README.md). Backend env
+  reference: [`server/README.md`](server/README.md).
 
 ## STEP and parametric code
 
 `export_code` writes the model as **CadQuery, build123d, OpenSCAD or a FreeCAD macro**.
 Parameters become variables, parameter-driven dimensions stay expressions, and features keep
-their history order. Edited CadQuery/build123d code comes back through the MCP tool
-`import_code` as an editable feature history. With the optional Python bridge
-(`pip install -r server/python/requirements.txt`), the MCP server also offers
+their history order. Edited CadQuery/build123d code comes back through the command
+`import_code` as an editable feature history. With the Python bridge (bundled in the desktop
+app, or `pip install -r server/python/requirements.txt`), the backend also offers
 `export_step` (exact B-rep through OpenCascade) and `import_step`. See
 [docs/CAD_EXCHANGE.md](docs/CAD_EXCHANGE.md).
 
@@ -118,15 +110,16 @@ packages/                # npm workspaces — framework-agnostic, no React / DOM
   kernel-occt/src/       # OpenCascade geometry kernel
 src/
   app/                   # composition root: installs the default plugins
-  ui/                    # React: viewport, panels, store
-server/                  # Express MCP host (optional)
+  ui/                    # React: viewport, panels, store (rendered by the desktop app)
+server/                  # local backend + `llull` CLI
+desktop/                 # Electron app: starts the backend, File menu, CLI hand-off
 tests/                   # unit, contract, golden corpus, integration, component, e2e
 docs/                    # architecture, contributing, roadmap, domain guides
 ```
 
 ## The golden rule
 
-> **Never mutate the document outside a command.** Both the UI and MCP call
+> **Never mutate the document outside a command.** The UI, the CLI and MCP all call
 > `execute(doc, name, params)`. If you find yourself editing entities directly
 > in a component, stop and write a command instead.
 

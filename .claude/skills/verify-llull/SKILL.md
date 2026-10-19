@@ -36,7 +36,7 @@ npm --prefix server run typecheck && npm --prefix server test && npm --prefix se
 ## 4. Live app (for UI / viewport / interaction changes)
 Start the dev server and drive it with Playwright (MCP browser tools):
 ```bash
-npm run dev            # http://localhost:5173 (run in background); ?kernel=occt for OpenCascade
+npm run dev            # renderer dev server http://localhost:5173 (run in background; Manifold kernel)
 ```
 - `browser_navigate` to the URL.
 - `browser_snapshot` + `browser_take_screenshot` to confirm render.

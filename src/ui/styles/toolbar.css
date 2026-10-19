@@ -456,11 +456,6 @@
   box-shadow: var(--shadow-float);
 }
 
-/* Service-worker update notice: same look, stacked under the restore banner. */
-.update-banner {
-  top: 112px;
-}
-
 .unsaved-dot {
   flex-shrink: 0;
   margin-left: var(--space-2);

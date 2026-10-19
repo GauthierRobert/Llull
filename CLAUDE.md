@@ -47,7 +47,7 @@ packages/kernel-{manifold,occt}/src/   GeometryKernel impls
 packages/physics-mujoco/src/           PhysicsEngine impl (MuJoCo WASM) — rigid-body dynamics, docs/DYNAMICS.md
 src/app/                  @app   composition root: installDefaultPlugins()
 src/ui/                   @ui    React: presentation + param-gathering ONLY
-src/main.tsx                     installs kernel (`?kernel=occt`) + plugins, mounts <App>
+src/main.tsx                     renderer entry: installs Manifold + plugins, mounts <App> (Electron only)
 server/                          Express MCP host + `llull` CLI (src/cli/); own package.json
 desktop/                         Electron: starts server/, File menu, CLI hand-off; own package.json
 ```

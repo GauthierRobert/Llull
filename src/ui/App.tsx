@@ -28,7 +28,6 @@ import { SheetViewer } from '@ui/viewport/sheet/SheetViewer';
 import { useSheetViewStore } from '@ui/viewport/sheet/sheetViewStore';
 import { LiveActivityFeed } from '@ui/components/LiveActivityFeed';
 import { RestoredBanner } from '@ui/components/RestoredBanner';
-import { UpdateBanner } from '@ui/components/UpdateBanner';
 
 export function App(): React.ReactElement {
   const theme = useThemeStore((s) => s.theme);
@@ -64,7 +63,6 @@ export function App(): React.ReactElement {
         <MeasurementHUD />
         <EmptyState />
         <RestoredBanner />
-        <UpdateBanner />
         {!sheetOpen && <ViewportErrorBoundary key={viewMode}>{viewMode === '3d' ? <Viewport3D /> : <Viewport2D />}</ViewportErrorBoundary>}
         <SheetViewer />
         <LiveActivityFeed />

@@ -12,51 +12,24 @@ import '@ui/styles/index.css';
 import { installDefaultPlugins } from '@app/plugins';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
-import { parseKernelChoice } from '@core/geometry/kernelChoice';
-import { registerAppServiceWorker } from '@ui/services/appUpdates';
 import { useKernelStatusStore } from '@ui/store/kernelStatus';
 import { installBrowserLibraries } from '@ui/services/browserLibraries';
 
-// Kernel selection: Manifold by default (fast, no large WASM asset); ?kernel=occt swaps in OCC
-// (dev/power-user toggle, opt-in only). OCC carries a 63 MB WASM binary (~800–1000 ms cold init),
-// so it is lazy-imported and injected asynchronously: the first render is never blocked and
-// commands no-op gracefully until the kernel resolves (architecture L9 / SOLID S5).
-const useOcct = typeof window !== 'undefined' && parseKernelChoice(new URLSearchParams(window.location.search).get('kernel')) === 'occt';
-
-function installManifoldKernel(): void {
-  createManifoldKernel()
-    .then((kernel) => {
-      setGeometryKernel(kernel);
-      useKernelStatusStore.getState().setStatus('ready');
-    })
-    .catch((e: unknown) => {
-      console.error('Manifold kernel init failed', e);
-      useKernelStatusStore.getState().setStatus('failed');
-    });
-}
-
-if (useOcct) {
-  import('@ui/geometry/occtKernelBrowser')
-    .then(({ createBrowserOcctKernel }) => createBrowserOcctKernel())
-    .then((kernel) => {
-      setGeometryKernel(kernel);
-      useKernelStatusStore.getState().setStatus('ready');
-    })
-    .catch((e: unknown) => {
-      console.warn('OCC kernel init failed — falling back to Manifold', e);
-      installManifoldKernel();
-    });
-} else {
-  installManifoldKernel();
-}
+// Renderer kernel: Manifold (WASM, in-process) runs the commands this renderer executes itself (local mode while
+// the backend restarts, read-only queries, panel analyses). Exact B-rep work runs in the local backend (LLULL_KERNEL).
+// Injected asynchronously: first render never blocks; commands no-op until it resolves (L9). Retired in LC1 step 5.
+createManifoldKernel()
+  .then((kernel) => {
+    setGeometryKernel(kernel);
+    useKernelStatusStore.getState().setStatus('ready');
+  })
+  .catch((e: unknown) => {
+    console.error('Manifold kernel init failed', e);
+    useKernelStatusStore.getState().setStatus('failed');
+  });
 
 installDefaultPlugins();
 installBrowserLibraries();
-
-// Production builds only: the dev server has no sw.js and must never be served from a cache.
-if (import.meta.env.PROD) {
-  registerAppServiceWorker().catch((e: unknown) => console.warn('Service worker not registered', e));
-}
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('Root element #root not found.');
