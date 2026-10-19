@@ -37,3 +37,19 @@ Presentation only: every change still goes through one registered command (`stor
   if a device differs.
 - **Linux spacenavd is not supported yet.** WebHID reads the hidraw node directly; if `spacenavd` / udev holds it
   the picker lists nothing.
+
+## Reporting an internal failure (SC-A4)
+
+When a command fails INTERNALLY (it threw: `<name> failed: …; document unchanged.` or `Command <name> failed:`, an HTTP 5xx, or a
+kernel `OCC_FAILURE` / `PANIC`), the status bar shows **Report this…** next to the summary. Invalid params, guard refusals and
+`NATIVE_UNSUPPORTED` ("not supported") are user-facing notices and never offer it (`src/ui/report/classifyFailure.ts`).
+
+The dialog (`ReportIssueDialog`) shows exactly what would be included, all editable: title, description (error, command + params,
+llull version, platform) and the **reproducer**, a minimal `build_project` plan (the document recipe up to the failing command, or
+the backend crash report when `GET /crashes/latest` has one for this failure). Params are redacted like crash reports (human
+signatures dropped, home directory becomes `~`). The reproducer can be unticked; the document itself is never attached.
+
+- **Copy** puts the text on the clipboard; **Save reproducer…** downloads `llull-reproducer.json`; **Open GitHub issue draft**
+  opens a prefilled `issues/new?title=&body=` link through `window.open` (the desktop window-open handler routes https links to
+  the system browser). llull sends nothing itself and works offline (the crash report fetch is optional).
+- The link is capped at 7000 characters: the reproducer, then the description, is cut and the text says to attach the saved file.

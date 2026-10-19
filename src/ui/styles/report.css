@@ -1,0 +1,86 @@
+/* ---- Report-this-problem dialog and status-bar offer (SC-A4) -------------- */
+
+.report-dialog {
+  width: min(680px, 100%);
+}
+
+.report-dialog__body {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.report-dialog__lead,
+.report-dialog__note {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+.report-dialog__note {
+  color: var(--fg);
+}
+
+.report-dialog__field {
+  display: grid;
+  gap: 4px;
+}
+
+.report-dialog__label {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+
+.report-dialog__field input[type='text'] {
+  width: 100%;
+}
+
+.report-dialog__text {
+  width: 100%;
+  height: auto;
+  padding: var(--space-2);
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.report-dialog__text--code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-xs, 12px);
+}
+
+.report-dialog__text:disabled {
+  opacity: 0.5;
+}
+
+.report-dialog__check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--fg);
+}
+
+.report-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.status-report-link {
+  flex: none;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  background: var(--accent-softer);
+  font-size: var(--text-xs, 12px);
+  font-weight: var(--weight-medium);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.status-report-link:hover {
+  background: var(--accent-soft, var(--accent-softer));
+}
