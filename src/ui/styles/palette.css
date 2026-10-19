@@ -296,6 +296,19 @@
   color: var(--danger);
 }
 
+.palette-form__preview {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-muted, inherit);
+  border-left: 2px solid var(--accent, #3b82f6);
+}
+
+.palette-form__preview--refused {
+  border-left-color: var(--danger);
+  color: var(--danger);
+}
+
 .palette-form__footer {
   display: flex;
   align-items: center;

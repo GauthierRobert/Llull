@@ -206,6 +206,7 @@ function OpenPalette(): React.ReactElement {
       ) : (
         <CommandParamForm
           command={formCommand}
+          preview
           onBack={() => {
             setFormCommand(null);
             setActiveIndex(0);
