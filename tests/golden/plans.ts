@@ -483,6 +483,7 @@ export const plans: Record<string, GoldenAction[]> = {
       as: 'wing',
     },
     { command: 'wing_properties', params: { id: '$wing' } },
+  ],
   fea_modal_cantilever: [
     { command: 'set_units', params: { units: 'mm' } },
     { command: 'add_box', params: { size: [200, 10, 10], position: [0, 0, 0], anchor: 'min' }, as: 'bar' },
