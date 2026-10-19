@@ -9,6 +9,7 @@ import type { Vec3 } from './vectors';
 import type { Quantity } from './quantity';
 import type { DurabilityModel } from './durability';
 import type { FeTopologyArtifact, TopologyStudy } from './topology';
+import type { CaseDynamics, DynamicSummary, DynamicsLibrary, NodalRmsField } from './structuralDynamics';
 
 /** Same structural id as `types.ts` `EntityId` (not imported: types.ts imports this module). */
 type EntityId = string;
@@ -24,7 +25,9 @@ export type AnalysisType =
   | 'heat_transient'
   | 'thermo_static'
   | 'coupled_temperature_displacement'
-  | 'nonlinear_static';
+  | 'nonlinear_static'
+  | 'frequency_response'
+  | 'random_response';
 export type FeSolver = 'calculix' | 'nastran';
 export type UnitSystem = 'N-mm-t-s' | 'N-m-kg-s' | 'lbf-in-slinch-s';
 export type TemperatureScale = 'degC' | 'K';
@@ -54,7 +57,13 @@ export type ProbeQuantity =
   | 's_hoop'
   | 's_radial'
   | 's_axial'
-  | 'u_radial';
+  | 'u_radial'
+  | 'a_x'
+  | 'a_y'
+  | 'a_z'
+  | 'u_x_rel'
+  | 'u_y_rel'
+  | 'u_z_rel';
 
 /** Only `solid` is built; the other kinds are 05 backlog and exist so documents stay forward-compatible. */
 export type Idealization =
@@ -190,6 +199,8 @@ export interface ResultsSummary {
   readonly thermal?: ThermalResultsSummary;
   /** PHY-05: present iff the case is `nonlinear_static`. */
   readonly nonlinear?: NonlinearResultsSummary;
+  /** PHY-09: present iff the case is `frequency_response` or `random_response`. */
+  readonly dynamics?: DynamicSummary;
 }
 
 /** PHY-05 §3: how the load of one `*STEP` is driven. Increments are fractions of the step time (step time = 1). */
@@ -466,6 +477,8 @@ export interface AnalysisCase {
   /** PHY-17 topology studies of this case (plugin `topology`); absent until the first `create_topology_study`. */
   readonly topology?: Readonly<Record<string, TopologyStudy>>;
   readonly topologyOrder?: readonly string[];
+  /** PHY-09 dynamic set-up: present iff the case type is frequency_response or random_response. */
+  readonly dynamics?: CaseDynamics;
   /** Margin dispositions by row id (human gate). */
   readonly dispositions: Readonly<Record<string, Disposition>>;
 }
@@ -476,6 +489,8 @@ export interface AnalysisModel {
   readonly fitDispositions?: FitDispositions;
   /** Absent until the first durability command (`define_load_history`, `define_crack`; plugin `cae`, PHY-07 / PHY-08). */
   readonly durability?: DurabilityModel;
+  /** PHY-09 spectrum / time-history library and equivalent-load provenance; absent until the first spectrum or history command. */
+  readonly vibration?: DynamicsLibrary;
 }
 
 /** Mesh artifact (JSON, no typed arrays); stored by the host under `sha256Hex(canonicalJson(artifact))`. */
@@ -516,6 +531,8 @@ export interface FeResultsArtifact {
   };
   /** Nonlinear solves only: the increments the solver took (`.sta`). */
   readonly convergence?: readonly FeConvergenceRow[];
+  /** random_response only: nodal rms field of the PHY-09 post-processing (native `llull-compute post random` or the TS reference). */
+  readonly nodalRms?: NodalRmsField;
 }
 
 /** Temperature table (PHY-04 TR-TMC-14): rows `[x, y, z, T]` in the units the `table` field source declares; written by `fea_import_field`. */

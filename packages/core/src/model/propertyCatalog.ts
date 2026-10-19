@@ -46,6 +46,10 @@ const PROPERTY_CATALOG: readonly PropertyCatalogEntry[] = [
   row('thermalDiffusivity', 'm^2/s', 'thermal diffusivity', { ownerPack: 'PHY-01' }),
   row('diffusionRate', '1/s', 'thermally activated rate (Arrhenius)', { ownerPack: 'PHY-01' }),
   row('rateFactor', '1', 'dimensionless strain-rate multiplier of a flow stress', { ownerPack: 'PHY-01' }),
+  row('structuralLossFactor', '1', 'structural (hysteretic) damping loss factor eta, written as *DAMPING,STRUCTURAL', {
+    positive: false,
+    ownerPack: 'PHY-09',
+  }),
 ];
 
 export function catalogEntry(name: string): PropertyCatalogEntry | undefined {
