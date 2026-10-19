@@ -49,7 +49,7 @@ Decided by the owner in [RS1](../../decisions/RS1-native-compute.md) (programme 
 | Item | Before | Now |
 | ---- | ------ | --- |
 | 2D panel method (`panelMethod.ts`, M1) | TS | unchanged: stays TS (600 panels meet the §8 budget) |
-| M3 vortex lattice and any future 3D panel method | TS (planned) | TS for small N; when N exceeds what TS handles (threshold TBD — measure against the §8 budget), the influence build and the dense LU run in `llull-compute panel <job-folder>` (crate `llull-panel`, faer), reached through a host transport in `server/` (job style, like 05 FEA `fea_solve`); the result returns as query `data` with provenance `{ tool: 'llull-compute panel', version, threads }` |
+| M3 vortex lattice and any future 3D panel method | TS (planned) | TS for small N; when N exceeds what TS handles (as built: 1000 panels, §14), the influence build and the dense LU run in `llull-compute panel <job-folder>` (crate `llull-panel`, faer), reached through a host transport in `server/` (job style, like 05 FEA `fea_solve`); the result returns as query `data` with provenance `{ tool: 'llull-compute panel', version, threads }` |
 | Reference | — | the TS solver stays the small-case path and the test oracle (RS1 §2 rule 4); native vs TS: VC-AER-33 |
 | Missing binary | — | `NATIVE_TOOL_MISSING` with an install hint; the TS path still runs up to its cap |
 
@@ -241,7 +241,7 @@ The CLI (`llull <command> '{…}' --json`), MCP (toolset `aerodynamics`) and the
 | Operation    | Size                            | Time            |
 | ------------ | ------------------------------- | --------------- |
 | panel solve  | 600 panels (dense LU)           | < 0.2 s         |
-| VLM / 3D panel (M3) | N panels, TS below the native threshold, `llull-compute panel` above (§2.1) | TBD — measure   |
+| VLM / 3D panel (M3) | ≤ 1000 panels TS; 1000–20 000 `llull-compute panel` (§2.1) | TS 1000 panels 1.3 s; native 2400 / 5000 / 10 000 panels 2.4 / 4.4 / 23 s (§14) |
 | lifting line | 40 terms                        | < 1 ms          |
 | frontal area | 400 × 400 grid × ~10⁴ triangles | < 0.5 s         |
 | frontal area | 2000 cells                      | grows as cells² |
@@ -261,7 +261,8 @@ The resolution is capped at 2000 cells. All commands are deterministic (AF-13).
 | VC-AER-30     | planned (M6): `cfdSource.test.ts` with a recorded 12 CFD result fixture (fresh, stale, not converged, speed mismatch)                  |
 | VC-AER-31     | planned (M7): `compressibility.test.ts` (Prandtl-Glauert closed form) + a 12 CFD CLI scenario (Euler, extruded NACA 0012)             |
 | VC-AER-32     | planned (M4): `server/tests/cfd/externalExport.test.ts` (case files parsed back; known-result import round trip)                      |
-| VC-AER-33     | planned (M3, RS-7): `llull-panel` `cargo test` (`npm run native:check`) + `server/tests/aeroPanelNative.test.ts` (native vs TS on the same lattice; skipped with a logged reason without the binary) |
+| VC-AER-33     | built (M3, RS-7): `llull-panel` `cargo test` (`npm run native:check`) + `server/tests/aeroPanelNative.test.ts` (native vs TS on the same lattice; skipped with a logged reason without the binary) |
+| VC-AER-34..37 | built (M3): `vortexLattice.test.ts` (Bertin & Smith swept wing, elliptic wing vs lifting line, neutral point), `dragBuildup.test.ts` |
 
 The coverage gate on `packages/domain-aero/src/**` is 90/85/90/90 (CLAUDE.md).
 
@@ -271,7 +272,7 @@ The coverage gate on `packages/domain-aero/src/**` is 90/85/90/90 (CLAUDE.md).
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
 | M1        | atmosphere, NACA, panel, lifting line, frontal area, drag, cycling (this spec)                                                                    | **done 2026-10-18**   |
 | M2        | XFOIL hand-off: server transport `xfoil_polar` like `fea_solve`, bundled binary (GPL, decision 5), viscous polar as data                          | todo, ≈ 3 eng-weeks   |
-| M3        | Vortex-lattice (horseshoe VLM) over a wing / tail definition read from lofts; neutral point; drag build-up tables with sources. Large N: influence build + dense LU in `llull-compute panel` (crate `llull-panel`, faer, RS1 §2.1), VC-AER-33 | todo, ≈ 4 eng-weeks + native job (inside RS-7's 6 w) |
+| M3        | Vortex-lattice (horseshoe VLM) over a wing / tail definition read from lofts; neutral point; drag build-up tables with sources. Large N: influence build + dense LU in `llull-compute panel` (crate `llull-panel`, faer, RS1 §2.1), VC-AER-33 | **done 2026-10-19** (§14) |
 | M4        | External-solver export / import (`cfd_export_case`, `cfd_import_external`) on the case prepared by 12 CFD; the built-in solvers moved to [12 CFD](../12-cfd-gpu/TECHNICAL_SPEC.md) §10 | todo, ≈ 3 eng-weeks (after 12 CFD M1; was 6–8 before preparation was shared) |
 | M5        | UI: Cp and span-loading plots in the Analysis tab (same pattern as `plot_simulation`)                                                             | todo                  |
 | M6        | `cfdCaseId` drag-area source in `aero_drag` / `road_load_power` (FR-AER-14), VC-AER-30                                                            | todo, ≈ 1 eng-week, after 12 CFD M2 |
@@ -303,3 +304,48 @@ M1 is built and green:
   `validation/README.md` passes, against data pinned in `validation/data/`.
 
 Known limits are listed in FUNCTIONAL_SPEC §10.
+
+## 14. Implementation status — M3 (RS-7), 2026-10-19
+
+**Built:** M3 — `analyze_vortex_lattice`, `drag_buildup` (plugin `aerodynamics`), the native job `llull-compute panel` (crate
+`solver/crates/llull-panel`, faer 0.24) and the host transport `vortex_lattice_solve`; the RS1 §5 follow-up of `panelMethod.ts`.
+
+| Item | Where |
+| ---- | ----- |
+| Horseshoe kernel (bound vortex on the panel quarter-chord line, trailing legs to +∞ along +x, control point at three-quarter chord; Katz & Plotkin eq. 10.115 + the closed-form semi-infinite leg), influence build, one LU for the x̂ and ẑ free streams (Γ(α) = cos α Γx + sin α Γz), Trefftz-plane 2D velocities | `aerodynamics/vlmKernel.ts` |
+| Lattice from sections: spanwise stations by leading-edge arc length (uniform, or sine spacing = full-span cosine clustered at the tips), uniform chordwise; LE, chord and incidence interpolated; mirror about y = 0 keeping bound vortices along +span; sections from a `loft` entity (each ring in world frame: LE = least x, TE = largest x, incidence from their heights) | `aerodynamics/vlmLattice.ts` |
+| Loads: Kutta–Joukowski in the free stream (ρ = 1, \|V\| = 1), Cm about `referencePoint` (nose up +), CDi = ½ Σ Γ_i (v_i × s_i)·x̂ in the Trefftz plane, strip cl, CL_α / Cm_α by ±0.5° central differences at α = 0, x_np = x_ref − (Cm_α / CL_α) c_ref, static margin with the CG at `referencePoint` | `aerodynamics/vlmLoads.ts` |
+| Params, validation (codes `AER_SURFACE_SOURCE_CONFLICT`, `AER_SURFACE_INVALID`, `AER_LATTICE_TOO_LARGE`), result data shared by the command and the transport | `aerodynamics/vlmModel.ts`, `vlmCommand.ts` |
+| Drag build-up CD0 = Σ Cf FF Q S_wet / S_ref with sourced formulas only (§ below) | `aerodynamics/dragBuildup.ts`, `dragBuildupCommand.ts` |
+| Dense LU factorised once, `Float64Array`; the panel method solves its two right-hand sides on one factorisation (bit-identical to the former two `solveLinear` calls, VC-AER-10..12 unchanged) | `aerodynamics/denseLu.ts`, `panelMethod.ts` |
+| `llull-compute panel <job-folder>`: `job.json` `{ panels }` + `panels.f64` (12 f64 per panel) → `gamma.f64` (Γx, Γz) + `solve.json` `{ threads, buildMs, factorMs, residualX, residualZ }`; the influence build is the TS one operation for operation (rows in parallel), the LU is faer's partial-pivot LU | `solver/crates/llull-panel` |
+| `vortex_lattice_solve` transport (CLI, `POST /exchange`, toolset `aerodynamics`): analyze_vortex_lattice params + `timeoutS` / `verify`; loads computed in TS from the native Γ; `NATIVE_TOOL_MISSING` without the binary | `server/src/native/vortexLattice.ts`, `tools.ts` |
+
+**Decisions.**
+
+- **TS cap 1000 panels** (both sides): 1.34 s for a 1000-panel wing with two angles on the reference laptop (dense LU dominates);
+  `AER_LATTICE_TOO_LARGE` above, naming `vortex_lattice_solve`. **Native cap 20 000 panels** (the dense matrix is 3.2 GB).
+- **Camber** enters as a per-surface zero-lift angle (thin-airfoil α_L0 of `naca`, or `zeroLiftAngleDeg`) subtracted from the section
+  incidence: the lattice stays on the chord plane. A loft's rings give chord and incidence only (no camber line is extracted).
+- **Lofts as wing definitions** (open question 2, partly): `analyze_vortex_lattice` reads a `loft` entity directly (`loftId`);
+  `analyze_wing` (lifting line) still takes numbers.
+- **Planar wake** along +x (body axis) at every α, as in Bertin & Smith and Katz & Plotkin §12.3; the Trefftz plane is normal to x.
+- **Native determinism (VC-AER-33):** the influence matrix is bit-identical to TS; faer's blocked LU differs from the TS elimination
+  by round-off (measured ≤ 1e-14 of max |Γ| on the 56- and 288-panel lattices); a rerun with the same thread count is bit-identical.
+  The Γ are query data (no document record), so cross-thread-count bit equality is not required (RS1 §2 rule 3).
+- **Drag build-up formulas:** only those confirmed from a readable source (validation `sources.md` S15, S16): Raymer eq. 12.26 /
+  12.27 / 12.30 (via OpenAeroStruct, which cites them), Torenbeek and Hoerner form factors (via the OpenVSP documentation), the
+  OpenAeroStruct mixed laminar / turbulent Cf. Raymer's fuselage / nacelle form factors and his Q tables were not confirmed, so
+  bodies use Torenbeek or Hoerner and Q is an input (default 1, flagged). Not modelled: roughness cutoff Reynolds number, wave drag,
+  excrescences.
+
+**Validation (all green):** VC-AER-33 (crate fixture + `server/tests/aeroPanelNative.test.ts`), VC-AER-34 Bertin & Smith swept wing
+CL_α 3.4442 /rad vs 3.443 published, VC-AER-35 elliptic wing (AR 20 slope within 1.5 % of lifting line, e within 0.5 % at 200 strips,
+native 2400 panels e within 0.3 %), VC-AER-36 quarter-chord neutral point, VC-AER-37 build-up closed forms
+(`tests/unit/aero/aerodynamics/{vortexLattice,dragBuildup}.test.ts`).
+
+**Measured (Windows laptop, 22 hardware threads, release build, 2026-10-19):** `llull-compute panel` 2400 panels 2.4 s (build 0.13 s,
+LU 0.55 s), 5000 panels 4.4 s (0.48 s, 3.1 s), 10 000 panels 23.4 s (2.0 s, 17.7 s); relative residuals ≤ 1e-13.
+
+**Not built (M3 remainder / later):** sideslip and lateral derivatives, a wake aligned with the free stream, ground effect, viscous
+section polars inside the VLM (XFOIL, M2), the 3D source–doublet panel method.

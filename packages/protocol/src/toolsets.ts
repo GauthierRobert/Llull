@@ -86,9 +86,9 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   get fasteners(): readonly string[] {
     return pluginToolNames('fasteners');
   },
-  /** Contributed by the installed aerodynamics plugin (atmosphere, airfoils, wings, drag, cycling). */
+  /** Contributed by the installed aerodynamics plugin (atmosphere, airfoils, wings, drag, cycling) + the native vortex-lattice transport. */
   get aerodynamics(): readonly string[] {
-    return pluginToolNames('aerodynamics');
+    return [...pluginToolNames('aerodynamics'), 'vortex_lattice_solve'];
   },
   /** Contributed by the installed fluids plugin (compressible flow, rocket nozzles). */
   get fluids(): readonly string[] {

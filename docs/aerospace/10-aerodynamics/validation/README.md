@@ -60,10 +60,14 @@ and grade C values are never used.
 | VC-AER-30 | *planned* — CdA from a 12 CFD case in `aero_drag`; stale / non-converged case refused | D = ½ρV²·CdA with the recorded `forces.cdAM2` (closed form) | 1e-6 rel; refusal code `AER_CFD_RESULT_UNUSABLE` | `cfdSource.test.ts` |
 | VC-AER-31 | *planned* — Prandtl-Glauert cl vs the 12 CFD Euler solver, NACA 0012, M 0.5, α 2° | cl(M) = cl(0)/√(1 − M²), factor 1.1547 at M 0.5 [S7, Anderson ch. 11] | correction exact to 1e-9; panel+PG vs Euler within 5 % (cross-method, both inviscid) | `compressibility.test.ts`, 12 CFD scenario |
 | VC-AER-32 | *planned* — OpenFOAM / SU2 export of a 12 CFD case, import of external forces and Cp | the 12 CFD case itself | patch names and farfield box exact; re-imported forces equal the file values | `externalExport.test.ts` |
-| VC-AER-33 | *planned* — M3 VLM / 3D panel: native `llull-compute panel` (faer) vs the TS solver on the same lattice, at sizes both can run | the TS solver (reference, RS1 §2 rule 4; [RS1](../../../decisions/RS1-native-compute.md)) | Γ and CL native vs TS: TBD — measure (roundoff × condition number); same inputs → identical native output on rerun | `server/tests/aeroPanelNative.test.ts`, `npm run native:check` |
+| VC-AER-33 | M3 VLM: native `llull-compute panel` (faer) vs the TS solver on the same lattice | the TS solver (reference, RS1 §2 rule 4; [RS1](../../../decisions/RS1-native-compute.md)) | influence matrix bit-identical (crate fixture); Γ within 1e-12 of max |Γ| (measured ≤ 1e-14), CL / Cm within 1e-9, CDi within 1e-10; identical rerun; residual < 1e-12 | `solver/crates/llull-panel/tests/reference.rs` (fixture from `tests/unit/native/panelReference.test.ts`), `server/tests/aeroPanelNative.test.ts` |
+| VC-AER-34 | Swept wing AR 5, λ 1, Λ 45°, 4 + 4 horseshoes (`analyze_vortex_lattice`) | Bertin & Smith VLM example: CL_α 3.443 /rad [S14] | 0.2 % rel | `vortexLattice.test.ts` |
+| VC-AER-35 | Elliptic wing: lift slope vs lifting line at AR 20; span efficiency with 200 strips; slope below lifting line with the gap closing as AR grows (4, 8, 20) | a0/(1 + a0/πAR), e = 1 [S7] | 1.5 % (slope), 0.5 % (e) | `vortexLattice.test.ts`; native 2400 panels e within 0.3 % in `aeroPanelNative.test.ts` |
+| VC-AER-36 | Neutral point of an unswept AR-20 rectangular wing; a tail moves it aft; Cm slope ≈ 0 about it | thin-airfoil aerodynamic centre at c/4 [S6, S7] | 0.01 c | `vortexLattice.test.ts` |
+| VC-AER-37 | Drag build-up rows (Re, Cf, FF, Q, CD0, D) | Raymer eq. 12.26 / 12.27 / 12.30, Torenbeek, Hoerner closed forms [S15, S16] | 1e-8 rel | `dragBuildup.test.ts` |
 
 Planned cases VC-AER-30..32 link this pack to [12 CFD](../../12-cfd-gpu/validation/README.md). They become gates when
-their milestones (TECHNICAL_SPEC §10, M4, M6, M7) are built. VC-AER-33 (native panel job, RS-7) becomes a gate with M3.
+their milestones (TECHNICAL_SPEC §10, M4, M6, M7) are built. VC-AER-33..37 are gates since M3 (2026-10-19); reference values in `data/vlm_references.json`.
 
 ### Derivations used as expectations
 
