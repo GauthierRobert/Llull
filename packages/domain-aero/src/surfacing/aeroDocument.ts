@@ -69,6 +69,27 @@ function wingErrors(key: string, raw: unknown, aero: Record<string, unknown>, en
   return errors;
 }
 
+/** Drops definitions whose entities were deleted (airfoil curve, wing lofts) so a saved file always reopens; malformed data is left for `validate`. */
+function pruneDanglingAero(raw: Record<string, unknown>): Record<string, unknown> {
+  const slice = raw['aero'];
+  if (!isRecord(slice) || !isRecord(slice['airfoils']) || !isRecord(slice['wings']) || !isRecord(raw['entities'])) return raw;
+  const entities = raw['entities'];
+  const airfoils = Object.fromEntries(
+    Object.entries(slice['airfoils']).filter(([, a]) => !isRecord(a) || !isText(a['entityId']) || Object.hasOwn(entities, a['entityId'])),
+  );
+  const wings: Record<string, unknown> = {};
+  for (const [key, wing] of Object.entries(slice['wings'])) {
+    if (!isRecord(wing) || !Array.isArray(wing['entityIds']) || !Array.isArray(wing['sections'])) {
+      wings[key] = wing;
+      continue;
+    }
+    const entityIds = wing['entityIds'].filter((id) => !isText(id) || Object.hasOwn(entities, id));
+    const sectionsOk = wing['sections'].every((s) => !isRecord(s) || !isText(s['airfoilId']) || Object.hasOwn(airfoils, s['airfoilId']));
+    if (entityIds.length > 0 && sectionsOk) wings[key] = entityIds.length === wing['entityIds'].length ? wing : { ...wing, entityIds };
+  }
+  return { ...raw, aero: { ...slice, airfoils, wings } };
+}
+
 export const aeroDocument: DocumentExtension = {
   validate(raw) {
     const slice = raw['aero'];
@@ -81,5 +102,5 @@ export const aeroDocument: DocumentExtension = {
     ];
   },
   derivedEntityIds: () => new Set(),
-  restore: (raw) => raw,
+  restore: pruneDanglingAero,
 };

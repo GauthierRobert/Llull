@@ -66,4 +66,3 @@ export function placeSection(curve: NurbsCurveData, station: WingStation, twistL
   // The loft convention wants each section wound counter-clockwise about the travel direction (+y right wing, -y left wing).
   return mirror ? moved : reverseCurve(moved);
 }
-

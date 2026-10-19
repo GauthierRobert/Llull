@@ -114,7 +114,8 @@ export function airfoilMetrics(curve: NurbsCurveData): AirfoilMetrics | string {
   const areaSigned =
     (integrateCurve(curve, first, last, (p, d) => p[0] * d[1] - p[1] * d[0]) + (end[0] * start[1] - start[0] * end[1])) / 2;
   const momentX = (integrateCurve(curve, first, last, (p, d) => p[0] * p[0] * d[1]) + dy * (end[0] ** 2 + end[0] * dx + (dx * dx) / 3)) / 2;
-  const momentY = -(integrateCurve(curve, first, last, (p, d) => p[1] * p[1] * d[0]) + dx * (end[1] ** 2 + end[1] * dy + (dy * dy) / 3)) / 2;
+  const momentY =
+    -(integrateCurve(curve, first, last, (p, d) => p[1] * p[1] * d[0]) + dx * (end[1] ** 2 + end[1] * dy + (dy * dy) / 3)) / 2;
   return {
     chord,
     tMax: heights(fT).thickness / chord,

@@ -8,7 +8,6 @@ import {
   type EntityKind,
   type Vec2,
   type Vec3,
-
   SHAPE2D_KINDS,
   SOLID_KINDS,
   FINISH_PATTERNS,
