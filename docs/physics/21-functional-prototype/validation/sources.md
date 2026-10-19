@@ -39,6 +39,21 @@ as pass/fail thresholds in this pack.
 | [F-R19] Lycoming SSP-1776-5 (2020) — https://www.lycoming.com/sites/default/files/attachments/SSP-1776-5%2520Table%2520of%2520Limits%2520-%2520Complete.pdf | rod-bushing-to-pin clearance 0.020–0.053 mm → loop tiers (VC-35) | quoted |
 | [F-R22] E-Props manual HEP-ROTAX9-2020 — https://aircraft.e-props.fr/DOCS/HEP-ROTAX9-2020-02-15-EN.pdf | static rpm window 5100–5800, level flight 5500 (VC-32) | quoted |
 
+## Reference data shipped by `add_reference_data` (M3b, §11 Q9)
+
+Every number is a public manufacturer value. Graph values are digitised with a stated reading error; none is data of the user's engine.
+Grades: B = manufacturer document, digitised or re-paired from a table. Code: `packages/core/src/dynamics/engine/referencePresets.ts`.
+
+| Preset | Quantity | Source | Notes |
+| ------ | -------- | ------ | ----- |
+| `rotax_912uls_full_throttle` | brake torque N·m, 2500…5800 rpm (9 points) | [E-R2] OM-912 Ed.4 Rev.1 Fig. 4, digitised ±1 N·m; peak 128 N·m at 5100 and 121 N·m at 5800 agree with [E-R1] | calibration point 5800 rpm; = VC-FPR-31 via BMEP = 4π·T/V_d, V_d 1352 cm³ |
+| `rotax_912is_power_table` | brake power kW at 4300, 4800, 5000, 5500, 5800 rpm | [E-R3] OM-912 i Ed.2 Rev.1 power-setting table (note E §5.2), re-paired | 1.5 % reading tolerance (some pairs do not close); 974 hPa, altitude not modelled |
+| `o320a_full_throttle` | brake power kW (bhp × 0.7457) at 2200, 2600, 2700, 2800 rpm | [E-R6] Lycoming O-320 Operator's Manual 60297-30, curve 9540-B (O-320-A/-E, CR 7.0), digitised ±1 kW | calibration point 2700 rpm (rated 150 bhp) |
+| `o320b_full_throttle` | brake power kW at 2200, 2400, 2600, 2700, 2800 rpm | [E-R6] same manual, curve 11259 (O-320-B/-D, CR 8.5), digitised ±1 kW | calibration point 2700 rpm (rated 160 bhp) |
+| `rotax_912_static_rpm_window` | static full-throttle rpm window 5100–5800 | [F-R22] E-Props HEP-ROTAX9-2020; ≥ 5200 rpm WOT [E-R5] | window point (value 5450 = centre, not a measurement) |
+
+Materials of the catalogue (`assign_material`): `al_4032` 2680 kg/m³ [E-R32], `steel_4340` 7850 kg/m³ [E-R31] (grade B, datasheet values).
+
 ## Not reached (from the notes)
 
 - help.solidworks.com (rendered by JavaScript, partly read through a headless browser in note A, and empty in note B).

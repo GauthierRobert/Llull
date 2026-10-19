@@ -321,6 +321,7 @@ interface CheckResult {
 | `set_engine_losses` | mutating | `{ crank, cylinders?, model, oilTempFactor? }` | `@affects doc.dynamics.losses` · `@failure crank not revolute; component model without bearing sizes; table without source` |
 | `add_reference_data` | mutating | `ReferenceData` minus id + `{ id? }`; `preset?: 'rotax_912uls_full_throttle' \| 'rotax_912is_power_table' \| 'o320a_full_throttle' \| 'o320b_full_throttle' \| 'rotax_912_static_rpm_window'` | `@affects doc.prototype.references` · `@failure empty points, no source, band ≤ 0` |
 | `compare_to_reference` | query, physics | `{ reference: id \| 'all', points?: rpm[], detail? }` | per point S, D, E, U_val, band, origin, status; `@failure no losses on a brake quantity ⇒ FPR_NO_LOSSES (brake vs indicated would mislead)` |
+| `check_timestep_convergence` | query, physics | `{ rpm?, cycles?, gate? }` (added by M3b, FR-FPR-79) | runs the engine governed at dt and dt/2; change of mean brake torque and peak wrist-pin force vs the gate ⇒ `FPR_TIMESTEP_SENSITIVE`; `@failure no cylinder, no speed, a failed run ⇒ not_run` |
 | `set_dynamics_solver` | mutating | `Partial<DynamicsSolverSettings>` | `@affects doc.dynamics.solver` · `@failure loopTimeConstantSteps < 2, impedance ∉ (0, 0.9999]` |
 | `inspect_dynamics` (extended) | query | `+ mobility: boolean (default true)` | adds `data.topology { tree, loops }`, `data.mobility { gruebler, rank, dof, redundant[] }`, `data.loopGapsM` at the start pose |
 | `engine_quick_check` | query | `{ cylinder?: id, crankRadiusMm?, rodLengthMm?, forceN?, anglesDeg?, rpm?, mepBar?, displacementCm3?, cycle? }`. Taken from the model when a cylinder id is given | analytic only (§5.4), no kernel or physics |
@@ -650,6 +651,8 @@ use distinct shapes (✔ ▲ ✖ ○ ◌) with text [D-R43][D-R44].
 | `FPR_TIMESTEP_SENSITIVE` | warn | halving dt changes results by > 1 % → smaller timestep |
 | `FPR_CALIBRATION_FAILED` | refusal | brake target not reached (target, best, iterations) |
 | `FPR_NO_LOSSES` | refusal | brake comparison without `set_engine_losses` |
+| `FPR_LOSS_MODEL_UNSUPPORTED` | refusal | `set_engine_losses` model `component` (§11 Q8: equations unchecked, never approximated) → `chen_flynn` or `fmep_table` — added by M3b |
+| `FPR_REFERENCE_MATCH` | pass / info | `compare_to_reference` point inside its band (hold-out, pass) or a calibration point (info) — added by M3b |
 | `FPR_ENERGY_CLOSURE` | fail | ∮T dθ ≠ Σ∮p dV beyond the gate → timestep or loop settings |
 | `FPR_PRESSURE_TABLE_GAP` | refusal | table does not cover the cycle |
 | `FPR_IMEP_UNREACHABLE` | refusal | target IMEP below the motored work |
@@ -766,6 +769,76 @@ within its 2.5 w. MVP is about 12 weeks of agent lane time. M1 and M2 run in par
   `check_assembly` stays on `kernel.distance` / `analyze` (kernel-exact, not a mesh query). `check_motion_clearance` still calls
   `meshBvh` directly: moving it onto `minDistanceBatch` is the remaining RS-6 wiring (poses there carry per-mesh start offsets).
 - Tests: `tests/unit/geometryQueries.test.ts`.
+
+### M3b realism (FPR-E): as built, 2026-10-19
+
+Files. Core laws in `packages/core/src/dynamics/engine/` (`accuracy`, `engineLosses`, `brakeCalibration`, `gearLoss`, `propellerTable`,
+`plausibility`, `engineRealism`, `quickBrake`, `combustionOrigin`, `referencePresets`, `referenceComparison`, `sourcedMaterials`),
+commands in `packages/core/src/commands/dynamics/engine/` (`losses`, `reference`, `calibrateCylinder`, `compareReference`,
+`timestepConvergence`, `operatingPoint`, `engineValidation`); the MuJoCo side of the gear loss is `packages/physics-mujoco/src/gearLoss.ts`.
+
+- **Accuracy envelope (TR-FPR-14).** `Accuracy { band | null, basis, origin, validationLevel, comparison?, warnings }`. It is attached as
+  `data.engineReport.realism.accuracy` (keyed like the numbers: meanTorqueNm, brakeTorqueNm, bmepBar, fmepBar, mechanicalEfficiency, speedRipple,
+  energyClosure, peakReactionForces), as `data.accuracy` of `engine_quick_check`, and per point in `compare_to_reference`. A value at a
+  speed the heat release was calibrated at is `calibrated` (level 1); every other speed is `predicted` (level 0, band `null` = "± ?");
+  pressure tables and a given MEP are `input`. Bands combine by root-sum-square of the absolute contributions (`combineContributions`);
+  a missing band gives `null`, never 0. Reactions carry `null` ("inherit the worst input band": none is stated yet).
+- **Losses (FR-FPR-71).** `set_engine_losses` ships `chen_flynn` (A + B·p_max + C·n + D·n², B per Pa of absolute peak pressure) and `fmep_table`;
+  both need a `source` and there are no default constants (none fetched). `component` is refused with the new code
+  `FPR_LOSS_MODEL_UNSUPPORTED` (Q8). The torque on the crank is `-FMEP·V_d/(4π)·tanh(ω/1 rad/s)`; FMEP is evaluated once per cycle at the
+  previous cycle's mean rpm (`CylinderRuntime.heldRpm`) with the peak pressure of that speed's curve. `cylinders: []` means every cylinder
+  on the crank, so a record can be declared before the cylinders. The engine report gains `realism.losses` (FMEP, friction torque, brake
+  torque / power, BMEP, η_m, and the governor-torque cross-check when the governor is the only other load).
+  The cycle-energy closure on the governor side is not evaluated when losses exist (the brake cross-check replaces it).
+- **Single zone and brake calibration (FR-FPR-72 / 78).** `singleZone.ts` already had Woschni (M3). `add_cylinder_pressure` now accepts
+  `heat: { kind: 'calibrate_brake', brake: [{ rpm, brakeTorqueNm }], cylinderCount }`: secant iteration on the heat per cycle so that
+  IMEP − FMEP(rpm, p_max(Q)) meets the brake target (0.1 %, at most 30 iterations, else `FPR_CALIBRATION_FAILED`; no losses on the crank
+  ⇒ `FPR_NO_LOSSES`). The result is stored as `heat: table_vs_rpm` plus `calibratedRpm`, so the calibrated speeds are known later. The
+  brake target is for the whole engine; `cylinderCount` identical cylinders share it. Needs the mechanism geometry at declaration.
+- **Gear efficiency (FR-FPR-74, TR-FPR-17).** `add_gear_coupling` gains `efficiency` and `teeth` (+ `reverseRotation`). The loss
+  `(1 − η)·|T_driven|·tanh(v/1)` acts on the driven joint; `T_driven` is read from the equality row (`efc_J · efc_force`) after a forward pass at
+  the start of each step (one-step lag), only for gears with η < 1. **Deviation:** an absent efficiency means an ideal gear (1.0), not the
+  named default 0.99, so documents and plans saved before M3b keep their numbers; `simulate_motion` warns for every ideal gear of an
+  engine run. No speed-dependent tare torque yet.
+- **Propeller (FR-FPR-75).** `add_propeller` gains `table` ([J, C_T, C_P] rows with source and grade), `airspeedMps`, `inertiaKgM2`; PCHIP
+  (`propellerTable.ts`), J = V/(nD), static pair at J = 0, `FPR_OUTSIDE_VALIDATED_RANGE` beyond the last J. **Deviation:** no generic TR-640
+  table ships: the research notes hold no digitised table (note F: "not found"), and inventing one would be false data. The inertia limit
+  (0.15–0.60 kg·m²) and 315 N·m are checked for installs behind a 51/21 or 50/22 reduction.
+- **Materials (FR-FPR-73).** `Material` gains `source` / `grade`; `assign_material` creates `al_4032` (2680 kg/m³ [E-R32]) and `steel_4340`
+  (7850 kg/m³ [E-R31]) from a catalogue on first use, grade B; a body made of them is no longer "unverified"; `FPR_MASS_DEFAULTED` existed
+  (M2). The report adds per cylinder the reciprocating mass (piston + ⅓ rod, named) and the primary / secondary inertia amplitudes.
+- **Plausibility (FR-FPR-76).** `realism.plausibility[]` and `data.warnings`: peak-pressure angle (5–25° ATDC) and CA50 (3–15° ATDC) around the
+  MBT targets [E-R16], η_m 0.75–0.95, Rotax-class propeller inertia and torque, reciprocating mass on the default density. The tolerances
+  around the sourced targets are named defaults. **Not implemented:** the separate "static rpm below 5200" finding; the 5100–5800 window
+  of `rotax_912_static_rpm_window` covers it as a reference comparison.
+- **Reference data and comparison (FR-FPR-77 / 78, TR-FPR-18).** `doc.prototype.references`; five presets with sources in
+  `validation/sources.md`; `compare_to_reference` (governed full-throttle runs for brake torque / power / BMEP, free equilibrium for static /
+  propeller rpm, ≤ 12 points, `engineCylinders` to scale a single-cylinder model to the real engine's torque and power, `FPR_NO_LOSSES` refusal,
+  bsfc `not_run`). Status as §5.8; calibration points are `info`. U_num is the timestep-halving change of the brake torque at the calibration
+  point. U_input is `null` ("missing") away from the calibration point, so U_val there holds U_num and U_D only, and says so.
+- **Timestep halving (FR-FPR-79).** The new query `check_timestep_convergence` (not folded into `check_prototype`, which is M4);
+  `simulate_motion` accepts `timestep` ≥ 5e-6 s so the half of the smallest auto step is reachable. At the pack's rated point the mean brake
+  torque changes by far less than 1 %.
+- **Placement (Q3), not yet clean.** The M1–M3 engine files (`cylinderPressure`, `cylinderLoads`, `engineGeometry`, `engineReport`,
+  `singleZone`, `pressureCurve`, `slider`, `commands/dynamics/{cylinders,quickCheck}.ts`) were not moved into the `engine/` folders, and generic
+  dynamics code imports the new laws (`simulationModel` → `engineLosses`, `forceLaws` → `propellerTable`). A pure move is deferred.
+- **Persistence.** Load validation covers `losses`, gear `efficiency` / `teeth`, the propeller extras and `prototype.references`; older documents
+  load unchanged. Toolsets: `set_engine_losses`, `add_reference_data` in `assembly` (dynamics); `compare_to_reference`,
+  `check_timestep_convergence` in `analysis`.
+
+Validation cases automated (`tests/unit/engineRealism.test.ts`, `tests/unit/mujocoRealism.test.ts`, golden plan `dynamics_engine_realism`):
+
+| VC | Status | How |
+| -- | ------ | --- |
+| 15 | automated | calibrated single-cylinder share of 121.0126 N·m: brake torque within 0.5 % (run and `engine_quick_check`), `origin: calibrated`, BMEP 11.2477 bar |
+| 27 | automated | 121 N·m through 21/51 at η 0.99: 290.92 N·m within 0.1 % (measured 290.9186), ideal gear 293.86 |
+| 28 | automated | motored 0.40 kg piston at 5800 rpm, 30…150°, within 1 % (with `loopTimeConstantSteps` 16: the default 2 adds about 1 % of inertia) |
+| 29 | **not automated** | the `component` model is refused (Q8); the reconstructed PNH terms stay unchecked |
+| 30, 36 | automated | `al_4032` 50 mm cube 0.335 kg; no material ⇒ `FPR_MASS_DEFAULTED` warn and unverified mass |
+| 31, 34 | automated | preset torque reproduces the pack's BMEP within 0.1 bar; synthetic-S unit tests of E, U_val, status, origin; the Rotax set run on the calibrated demonstrator (hold-out misses are recorded: no breathing model) |
+| 32 | machinery only | free-equilibrium run against the window and the reduction on a synthetic single cylinder; the four-cylinder reference (V1) is not built |
+| 33 | automated | dt vs dt/2: mean brake torque and peak wrist-pin force ≤ 1 % |
+| 35 | automated | tiers 0.5 / 5 / 20 µm |
 
 ## 13. References
 
