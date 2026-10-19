@@ -779,7 +779,25 @@ reference, CLI first; no viewport UI). Everything else in §3–§8 is still pro
   single renders today**; its value is the GPU seam for the review shading of VIS-M4 / M6 (shadows, AO) and large
   batches. Follow-up: a multi-frame job (one process and one device per walkthrough or BCF export).
 
-### 12.4 Not built yet (remaining VIS work)
+### 12.4 Known limits and follow-ups (from the VIS-M9 review)
+
+- `delete_review_issue` exists, so a viewpoint used by an issue can be freed. Ids are de-duplicated on create and
+  export; entities deleted after an issue was opened are left out of the BCF selection.
+- GUIDs are unique per document, not across documents: two documents whose first issue has the same title share a
+  topic GUID. A document identity salt (or a `namespace` param) is a follow-up before BCF round trips (`import_bcf`).
+- The synchronous port blocks the backend's event loop for each native frame. A native walkthrough through
+  `POST /command` can stall live sync for its whole duration. Follow-up: a total native-time budget, or one batched
+  job per walkthrough / export.
+- Perspective strokes are clipped at the near plane only. A stroke ending next to the eye can project far
+  off-screen, and `strokeSegment` then walks every pixel step of it. Follow-up: clip to the buffer rectangle in the
+  prepare stage (both twins read the same buffers, so parity holds).
+- Windows build of `--features gpu` on a machine without MSVC: `solver/scripts/dlltool-shim` (GNU toolchain) makes
+  wgpu link. With it, the `gpu`-feature scene test intermittently ended with an access violation when run with
+  output capture: about 1 run in 3, 0 of 6 with `--nocapture`, 0 of 4 full workspace runs. The production binary was
+  stable: 12 / 12 renders, the server suite and the CLI. This still has to be reproduced on an MSVC toolchain to rule
+  out the stand-in.
+
+### 12.5 Not built yet (remaining VIS work)
 
 VIS-M1 (display / colour profiles), the rest of VIS-M2 (section boxes, markups, comments, status workflow,
 `check_review`, `apply_viewpoint`, `get_viewpoint`, UI), VIS-M3 (`renderPlan`, `render_stats`), the rest of VIS-M4
