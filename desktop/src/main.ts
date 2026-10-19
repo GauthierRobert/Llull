@@ -6,7 +6,7 @@ import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
 import { llullHome, removeDesktopDiscovery, writeDesktopDiscovery } from '@server/cli/desktopDiscovery';
 import { chooseBackendPort, startBackend, type RunningBackend } from './backend';
-import { backendEnv, backendOrigin, nativeBundleDir } from './backendEnv';
+import { backendEnv, backendOrigin, hasNativeKernel, nativeBundleDir } from './backendEnv';
 import { cliShimFor, installCliShim } from './cliShim';
 import { createDocumentSession, type DocumentSession } from './documents';
 import { DEFAULT_SAVE_NAME, DOCUMENT_EXTENSIONS, DOCUMENT_FILE_PATTERN } from '@mcp/documentFiles';
@@ -202,6 +202,7 @@ async function boot(): Promise<void> {
   const userData = app.getPath('userData');
   const port = await chooseBackendPort(userData);
   const url = backendOrigin(port);
+  const nativeDir = nativeBundleDir(layout.nativeDir, process.platform, existsSync);
   backend = await startBackend(
     (entry, env) => utilityProcess.fork(entry, [], { env, serviceName: 'llull-backend', stdio: 'inherit' }),
     layout.serverEntry,
@@ -211,7 +212,8 @@ async function boot(): Promise<void> {
       layout,
       userDataDir: userData,
       baseEnv: process.env,
-      nativeDir: nativeBundleDir(layout.nativeDir, process.platform, existsSync),
+      nativeDir,
+      nativeKernel: hasNativeKernel(nativeDir, process.platform, existsSync),
     }),
     url,
   );

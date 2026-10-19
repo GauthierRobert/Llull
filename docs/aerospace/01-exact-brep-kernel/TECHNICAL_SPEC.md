@@ -105,7 +105,8 @@ Laws respected:
 
 ### 2.1 Kernel selection & build
 
-- **TR-KRN-01 (MUST, MVP)** `desktop/src/backendEnv.ts` sets `LLULL_KERNEL: 'occt'`. `backendEnv` strips every
+- **TR-KRN-01 (MUST, MVP)** `desktop/src/backendEnv.ts` sets `LLULL_KERNEL: 'occt'` (since KI7, 2026-10-19: `'occt-native'`
+  when the bundle holds `llull-kernel`, else `'occt'`; an inherited `occt` is a second diagnostic override, see §13.D). `backendEnv` strips every
   inherited `LLULL_*` variable today, so a diagnostic override needs an explicit exception: an inherited
   `LLULL_KERNEL=manifold` is passed through (same pattern as the `LLULL_ALLOW_CODE_EXECUTION === '1'` pass-through),
   any other inherited value is ignored and `occt` is used; `desktop/tests` covers both. `server/src/geometryKernel.ts` already falls back to
@@ -133,7 +134,8 @@ wasmBytes?, capabilities: string[], modelingTolerance, isolation: 'process'|'wor
   produced this pack's numbers: counts equal and measures within VC tolerances on the analytic solids, the
   probe cases and the NIST set (VC-KRN-25). Fallback order on desktop: `llull-kernel` → opencascade.js WASM in
   the worker → Manifold, each step with a `fallbackReason` in `kernel_info`. (Was: "SHOULD V1, evaluate a native
-  backend via CPython OCP"; superseded by RS1.)
+  backend via CPython OCP"; superseded by RS1.) **Status 2026-10-19: VC-KRN-25 passed** on OCCT 7.9.2 (§13.D, validation/README.md §6);
+  the desktop default is the native kernel when bundled (KI7).
 
 ## 3. Data model
 
@@ -785,7 +787,7 @@ Tests: `tests/unit/massResolver.test.ts` (Jacobi, analytic corpus, mesh part fra
 
 Deviations:
 
-- The adaptive integration uses `VolumeProperties_2` with eps 1e-12, not 1e-9: at 1e-9 the cylinder transverse inertia was off by 4e-8. There is no `eps` parameter yet.
+- The adaptive integration uses `VolumeProperties_2` with eps 1e-12, not 1e-9: at 1e-9 the cylinder transverse inertia was off by 4e-8. There is no `eps` parameter yet. (VC-KRN-25 later showed the adaptive rule itself drifting on toroidal / freeform faces, up to 2.7e-4 in inertia; the native kernel uses the default Gauss rule, §13.D, validation/README.md §5 finding 7; `occtMass.ts` still adaptive.)
 - `method` is `closed-form` where it was absent before. Loft, subdivision, non-round sweep and a revolution that crosses its axis now report `mesh` (their volume is a triangle sum).
 - Cone, torus, wedge, pyramid, extrusion, round sweep and revolution have a closed-form volume only; their centroid and inertia come from the triangles, scaled by closed-form volume / mesh volume.
 - A kernel with `topology` but no `massProperties` gives an exact volume with mesh inertia scaled to it (`method` stays `exact`; `method_mesh` is added to the review reasons).
@@ -855,7 +857,8 @@ Open items: set `LLULL_KERNEL` in the browser-only build (TR-KRN-03), the UI sta
 
 ### 13.D Native kernel sidecar, first two slices (M2 / RS-1)
 
-Built (opt-in, `LLULL_KERNEL=occt-native`; the desktop default stays `occt` = WASM until the full VC-KRN-25 parity suite passes):
+Built (`LLULL_KERNEL=occt-native`; opt-in on server and CLI; the desktop default since the full VC-KRN-25 suite passed on 2026-10-19,
+KI7):
 
 - **OCCT 7.9.2, shared, linked dynamically (LGPL-2.1 with exception, RS1 §2 rule 7).** `solver/scripts/build-occt.mjs` is the one
   recipe: source `http://archive.ubuntu.com/ubuntu/pool/universe/o/opencascade/opencascade_7.9.2+dfsg.orig.tar.xz` (the upstream
@@ -867,7 +870,8 @@ Built (opt-in, `LLULL_KERNEL=occt-native`; the desktop default stays `occt` = WA
   `include/opencascade`, `lib/`, the LGPL text, the exception and a `llull-occt.json` stamp (version + sha); default prefix per user
   (`~/.cache/llull/occt-7.9.2`, macOS `~/Library/Caches`, Windows `%LOCALAPPDATA%`), shared by every checkout, or `LLULL_OCCT_DIR`.
   Same prefix for local dev, CI (cached by version + sha + recipe hash) and desktop bundling. 7.9.2 is the newest 7.9 source
-  reachable here; the VC-KRN-25 reference files are OCP 7.9.3 (one maintenance release apart; parity tolerances unchanged so far).
+  reachable here; the VC-KRN-25 reference files are OCP 7.9.3 (one maintenance release apart): no deviation found (the reference
+  procedure on plain 7.9.2 reproduces all 27 NIST rows bit for bit; VC-KRN-25 below).
 - **Crate `solver/crates/llull-kernel-occt`.** `build.rs` builds nothing: it requires the prefix (clear panic naming the script
   otherwise), links the toolkit list (`OCCT_LIBS`, the one place) as `dylib`, compiles every `cpp/*.cxx` (glob: new facade files
   need no build-script edit) and exports `DEP_OCCT_LIB_DIR` (`links = "occt"`). `solver/bins/llull-kernel/build.rs` sets the
@@ -878,7 +882,7 @@ Built (opt-in, `LLULL_KERNEL=occt-native`; the desktop default stays `occt` = WA
   exception is a refusal, never a degraded module. The bridge module is the only `unsafe` surface (generated code, local
   `allow(unsafe_code)` with its reason). The makers mirror `packages/kernel-occt` (same builders, placement order
   M = T·Rx·Ry·Rz·anchor, post-boolean `ShapeUpgrade_UnifySameDomain`, display deflections 0.1 / 0.5 rad, part-frame mass
-  properties with eps 1e-12). `recipe.rs` evaluates `ShapeRecipe` JSON with a sub-recipe LRU (sha256 of the canonical JSON).
+  properties; since VC-KRN-25 with BRepGProp's default Gauss rule, as the OCP reference, no longer the adaptive eps 1e-12 rule). `recipe.rs` evaluates `ShapeRecipe` JSON with a sub-recipe LRU (sha256 of the canonical JSON).
 - **Binary `solver/bins/llull-kernel`.** Long-lived; NDJSON on stdin/stdout. Request `{ id, op, args }`, reply
   `{ id, result, error? }`. Shapes travel as handles `{ key, recipe? }` (the host's `recipeKey`); a key-only handle the sidecar no
   longer holds answers `shape not cached: <key>` and the host resends the recipe, exactly like the worker protocol. `tessellate`
@@ -990,8 +994,8 @@ Built (opt-in, `LLULL_KERNEL=occt-native`; the desktop default stays `occt` = WA
   exception, a notice with the source URL + sha256 and how to replace the libraries; fdlibm + V8 BSD notice for `llull-jsmath`;
   every linked third-party Rust crate with its licence files from `cargo metadata`) and `LLULL_NATIVE.json`; then smoke-runs both
   binaries (`--version`, must name OCCT 7.9.2). `LLULL_NATIVE_GPU=0` / `LLULL_NATIVE_KERNEL=0` trim it. `desktop/src/backendEnv.ts`
-  passes `LLULL_NATIVE_DIR` only when the folder holds a binary (`nativeBundleDir`); an inherited one is dropped; the default
-  kernel stays `occt` (WASM). Linux measured: 66 MB bundle (OCCT 27 toolkits 59 MB, `llull-compute` 5.3 MB, `llull-kernel`
+  passes `LLULL_NATIVE_DIR` only when the folder holds a binary (`nativeBundleDir`); an inherited one is dropped; the kernel is
+  `occt-native` when the folder holds `llull-kernel` (`hasNativeKernel`, KI7), else `occt` (WASM). Linux measured: 66 MB bundle (OCCT 27 toolkits 59 MB, `llull-compute` 5.3 MB, `llull-kernel`
   0.9 MB, 87 crates in the notice); the relocated bundle passes the parity, compute-job and render suites through
   `LLULL_NATIVE_DIR`. macOS and Windows paths are written but untested.
 
@@ -1040,6 +1044,33 @@ Deviations and decisions to confirm:
   or thread-bearing ones as in `occtMesh.ts`; still open → null.
 - Exceptions are refusals (null result, `NATIVE_OCC_FAILURE` logged), not WASM fallbacks.
 
-Pending (rest of M2): floor-filleted pockets natively; macOS / Windows builds and bundles (scripts written, untested); the full
-VC-KRN-25 suite against the OCP 7.9.3 reference files (probe cases, NIST set); the KI7 decision
-record; then the desktop default flip to the native kernel.
+**Full VC-KRN-25 suite (2026-10-19).** `server/tests/nativeKernelReference.test.ts` (the 10 solids of `occt_crosscheck.json`, an
+arc-profile revolution against its closed form, the behaviour probe) and `nativeKernelReferenceNist.test.ts` (the 28 NIST files of
+`nist_occt_reference.json`, fetched and sha256-checked by `validation/fetch_nist_step_files.py` into `~/.cache/llull/nist-pmi-step-files`;
+`LLULL_REQUIRE_NIST_CORPUS=1` makes a missing corpus a failure), with `import_step_exact`'s default options. Because the reference
+measured the whole transferred shape (loose shells, faces, PMI wires and points included) and `import_step_exact` keeps the solid, the
+census is compared with the whole-file row and the solid with `validation/nist_occt_solid_reference.json` / `nist_occt_solid_faces.json`
+(the first solid of the same healed shape, measured by the C++ port `measure_step_brep.cxx` on the OCCT 7.9.3 libraries of the
+cadquery-ocp 7.9.3.1 wheel, whose whole-file rows reproduce `nist_occt_reference.json` bit for bit). Result, all within the VC-KRN-01
+tolerances: analytic volume 7.5e-15, area 1.4e-16, centroid 1.5e-11 mm, inertia 1.6e-15 (1.7e-16 against the closed form at 70 m,
+where the raw OCP reference is itself 2.2e-9 off); NIST 27 B-rep files: census, faces / edges / vertices, validity and max tolerance
+equal on all, volume 1.6e-12, area 2.0e-12, centroid 4.0e-10 mm, inertia 7.6e-13, per-face area / centroid within tolerance on all
+(the %.6f sha256 signature itself is equal on 8 files, the others differ only in the sign of values within 1e-15 of zero and two
+areas on a rounding boundary); the tessellated file `tessellated_only`; probe: fuzzy 0 → 2 solids / 12 faces, plate − cylinder 7 faces
+with signature `1125f7464525c4f6` equal to the reference and across two processes, fillet 1 generated + 4 modified faces, Iyy error
+1.7e-16 from 0 to 1000 m. Not runnable: the fuzzy 2e-5 run (no fuzzy value on the boolean recipe, TR-KRN-12). Defects found and
+fixed natively (Rust + server tests): (1) mass properties switched from the adaptive eps rule to the default Gauss rule — the adaptive
+rule drifts on toroidal / freeform faces with a ~1e-15 error estimate (arc-profile ring Ixx 2.7e-4 off and Ixx ≠ Iyy, NIST up to 1.6e-6
+in volume); the WASM kernel keeps the adaptive rule, so `nativeKernelFeatureParity` tolerates its documented inertia error on two
+curved revolutions, and the native kernel no longer reports `relError`; (2) OCCT 7.9 transfers AP242 tessellated geometry as
+surface-less faces: such pieces are now skipped and a tessellated-only file answers `tessellated_only` (7.4 never transferred them).
+Known, not native: stc_07 e3's B-rep text blob reads back BRepCheck-invalid on 7.4 and 7.9 alike (TR-KRN-21 follow-up). Findings in
+validation/README.md §5 (6 to 9) and §6.
+
+**Desktop default flipped (KI7, `docs/decisions/KI7-native-kernel-default.md`).** `desktopKernel` in `desktop/src/backendEnv.ts`:
+inherited `manifold` or `occt` → kept (diagnostic overrides), else `occt-native` when the bundle holds `llull-kernel`, else `occt`.
+Server, CLI and browser defaults unchanged. `desktop/tests`: unit cases for the choice and `hasNativeKernel`, and the e2e backend
+started with the local release binary as its bundle answers `kernel_info` with OCCT 7.9.2 and `isolation: 'process'`.
+
+Pending (rest of M2): floor-filleted pockets natively; macOS / Windows builds and bundles (scripts written, untested); align
+`occtMass.ts` (WASM) on the Gauss rule; fuzzy booleans (TR-KRN-12) to run the last probe case.

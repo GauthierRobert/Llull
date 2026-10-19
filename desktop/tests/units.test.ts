@@ -6,7 +6,7 @@ import net from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { chooseBackendPort, DEFAULT_DESKTOP_PORT } from '../src/backend';
-import { backendEnv, backendOrigin, nativeBundleDir } from '../src/backendEnv';
+import { backendEnv, backendOrigin, desktopKernel, hasNativeKernel, nativeBundleDir } from '../src/backendEnv';
 import { cliShimFor, installCliShim } from '../src/cliShim';
 import { bundledPythonOf, desktopLayout } from '../src/layout';
 import { agentHelpText, menuTemplate } from '../src/menu';
@@ -86,8 +86,26 @@ describe('backendEnv native bundle (RS1)', () => {
     expect('LLULL_NATIVE_DIR' in envWith(undefined, { LLULL_NATIVE_DIR: '/elsewhere' })).toBe(false);
   });
 
-  it('keeps the WASM OCC kernel as the default even with the native bundle', () => {
-    expect(envWith('/r/native')['LLULL_KERNEL']).toBe('occt');
+  it('defaults to the native kernel when the bundle holds llull-kernel (KI7), to the WASM OCC kernel otherwise', () => {
+    const withKernel = (nativeDir: string | null, nativeKernel: boolean, baseEnv: Record<string, string> = {}): string | undefined =>
+      backendEnv({ port: 1, token: 't', layout, userDataDir: '/u', baseEnv, nativeDir, nativeKernel })['LLULL_KERNEL'];
+    expect(withKernel('/r/native', true)).toBe('occt-native');
+    expect(withKernel('/r/native', false), 'a bundle with llull-compute only').toBe('occt');
+    expect(withKernel(null, true), 'no bundle directory').toBe('occt');
+    expect(envWith('/r/native')['LLULL_KERNEL'], 'nativeKernel not given').toBe('occt');
+    expect(withKernel('/r/native', true, { LLULL_KERNEL: 'occt' }), 'diagnostic override: the WASM kernel').toBe('occt');
+    expect(withKernel('/r/native', true, { LLULL_KERNEL: 'manifold' }), 'diagnostic override').toBe('manifold');
+    expect(withKernel('/r/native', true, { LLULL_KERNEL: 'OCCT-native ' })).toBe('occt-native');
+  });
+
+  it('detects the native kernel binary itself, per platform', () => {
+    const files = new Set([path.join('/n', 'llull-kernel'), path.join('/c', 'llull-compute'), path.join('/w', 'llull-kernel.exe')]);
+    const exists = (file: string): boolean => files.has(file);
+    expect(hasNativeKernel('/n', 'linux', exists)).toBe(true);
+    expect(hasNativeKernel('/c', 'linux', exists)).toBe(false);
+    expect(hasNativeKernel('/w', 'win32', exists)).toBe(true);
+    expect(hasNativeKernel('/n', 'win32', exists)).toBe(false);
+    expect(hasNativeKernel(null, 'linux', exists)).toBe(false);
   });
 
   it('detects the bundle by its binaries, per platform', () => {
@@ -120,9 +138,12 @@ describe('backendEnv kernel (TR-KRN-01)', () => {
     expect(kernelFor({ LLULL_KERNEL: 'manifold' })).toBe('manifold');
   });
 
-  it('ignores every other inherited value', () => {
-    for (const value of ['occt', 'OCCT', 'Manifold', 'cadquery', '', ' manifold'])
+  it('passes an inherited LLULL_KERNEL=occt (the WASM kernel) through, ignores every other value', () => {
+    for (const value of ['occt', 'OCCT', 'Manifold', 'cadquery', '', ' manifold', 'occt-native'])
       expect(kernelFor({ LLULL_KERNEL: value }), value).toBe('occt');
+    expect(desktopKernel('occt', true)).toBe('occt');
+    expect(desktopKernel('occt-native', false)).toBe('occt');
+    expect(desktopKernel(undefined, true)).toBe('occt-native');
   });
 });
 

@@ -9,7 +9,9 @@ Electron main (src/main.ts: wiring only)
   │     serves the web app (built with VITE_LLULL_SERVER_URL=same-origin), /command, /live, /export
   │     LLULL_PYTHON = resources/python (CadQuery: import_step / export_step;
   │     import_code runs arbitrary Python: only when the app is launched with LLULL_ALLOW_CODE_EXECUTION=1)
-  │     LLULL_NATIVE_DIR = resources/native, only when bundled (llull-compute jobs; llull-kernel for LLULL_KERNEL=occt-native)
+  │     LLULL_NATIVE_DIR = resources/native, only when bundled (llull-compute jobs; llull-kernel)
+  │     LLULL_KERNEL = occt-native when the bundle holds llull-kernel (native OCCT 7.9.2, KI7), else occt (WASM OCC);
+  │       an inherited LLULL_KERNEL=manifold or occt is kept as a diagnostic override
   ├─ BrowserWindow → http://127.0.0.1:<port>/#token=…   (sandboxed, navigation pinned)
   ├─ File menu → DocumentSession (load_document / clear_document / snapshot → .llull file)
   └─ ~/.llull/desktop.json → `llull --app …` (Claude Code drives the open document)
@@ -43,7 +45,10 @@ npm --prefix desktop run dist     # build → stage:server → prepare:python �
   `llull-kernel` into `build/cargo-target`, builds or reuses the shared OCCT 7.9.2 (`solver/scripts/build-occt.mjs`, about an
   hour the first time; or `LLULL_OCCT_DIR`), and stages `build/native/{llull-compute,llull-kernel,occt/lib/*,licenses/}`
   (Windows: the OCCT DLLs next to the executables). `LLULL_NATIVE_PREBUILT_DIR` takes prebuilt binaries, `LLULL_NATIVE_GPU=0`
-  drops wgpu, `LLULL_NATIVE_KERNEL=0` ships `llull-compute` only. The default kernel stays the WASM OCC (`LLULL_KERNEL=occt`).
+  drops wgpu, `LLULL_NATIVE_KERNEL=0` ships `llull-compute` only. With `llull-kernel` in the bundle the app runs the native kernel
+  (`LLULL_KERNEL=occt-native`, [KI7](../docs/decisions/KI7-native-kernel-default.md): it passed the VC-KRN-25 reference suite);
+  without it (`LLULL_NATIVE_KERNEL=0`) the WASM OCC kernel (`LLULL_KERNEL=occt`). Launch with
+  `LLULL_KERNEL=occt` to compare against the WASM kernel.
   Only the Linux path is exercised so far; macOS (`@loader_path` rpath, dylib install names) and Windows (DLL staging) are untested.
 - Output in `desktop/release/`: dmg/zip (macOS), nsis (Windows), AppImage/deb (Linux). `.llull`
   files open in the app.
