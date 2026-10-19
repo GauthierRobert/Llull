@@ -16,7 +16,7 @@ describe('load_document nesting depth', () => {
     const result = execute(before, 'load_document', { json: withNestedField(10_000) });
     expect(result.document).toBe(before);
     expect(result.affected).toEqual([]);
-    expect(result.summary).toMatch(/deeper than 1000 levels/);
+    expect(result.summary).toMatch(/nested deeper than 1000 levels/);
   });
 
   it('still loads a moderately nested value, and the result saves again', () => {

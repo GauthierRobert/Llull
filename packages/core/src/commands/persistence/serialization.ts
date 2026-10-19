@@ -186,7 +186,7 @@ export function deserializeDocument(json: string): CadDocument {
   if (!isRecord(parsed)) throw new Error('load_document: expected a JSON object at the root level.');
   if (exceedsNestingDepth(parsed, MAX_NESTING_DEPTH))
     throw new Error(
-      `load_document: the file nests values deeper than ${MAX_NESTING_DEPTH} levels — refusing it (it could never be saved again).`,
+      `load_document: the file has values nested deeper than ${MAX_NESTING_DEPTH} levels — refusing it (it could never be saved again).`,
     );
   if (parsed['format'] !== 'llull-document')
     throw new Error(`load_document: unrecognized format '${String(parsed['format'])}' — expected 'llull-document'.`);
