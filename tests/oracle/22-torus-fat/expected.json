@@ -1,0 +1,19 @@
+{
+  "id": "22-torus-fat",
+  "family": "primitive",
+  "description": "fat torus R=10 r=2",
+  "source": "analytic",
+  "formula": "V = 2 pi^2 R r^2; A = 4 pi^2 R r",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 789.568352087,
+  "area": 789.568352087,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-12, -12, -2], "max": [12, 12, 2] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": null,
+    "area": 0.03,
+    "reason": "area is summed over display triangles of a curved face; the volume is closed-form"
+  }
+}

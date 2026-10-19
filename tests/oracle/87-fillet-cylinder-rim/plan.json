@@ -1,0 +1,6 @@
+{
+  "actions": [
+    { "command": "add_cylinder", "params": { "radius": 5, "height": 10 }, "as": "a" },
+    { "command": "fillet_edge", "params": { "id": "$a", "edgesNear": [[5, 0, 5]], "radius": 1 } }
+  ]
+}

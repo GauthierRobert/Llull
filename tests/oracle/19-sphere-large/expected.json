@@ -1,0 +1,15 @@
+{
+  "id": "19-sphere-large",
+  "family": "primitive",
+  "description": "sphere r=10",
+  "source": "analytic",
+  "formula": "V = 4/3 pi r^3; A = 4 pi r^2",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 4188.79020479,
+  "area": 1256.63706144,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-10, -10, -10], "max": [10, 10, 10] },
+  "faces": 1,
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

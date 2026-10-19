@@ -1,0 +1,19 @@
+{
+  "id": "39-revolve-washer",
+  "family": "revolve",
+  "description": "rectangle (2..3, 0..1) revolved about Z",
+  "source": "analytic",
+  "formula": "Pappus-Guldin: V = 2 pi xbar A; lateral area = sum of 2 pi r_mid L",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 15.7079632679,
+  "area": 62.8318530718,
+  "centroid": [0, 0, 0.5],
+  "bbox": { "min": [-3, -3, 0], "max": [3, 3, 1] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": null,
+    "area": 0.02,
+    "reason": "area of a revolved curved face is summed over display triangles; the volume is closed-form"
+  }
+}

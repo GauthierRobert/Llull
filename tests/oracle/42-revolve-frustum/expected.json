@@ -1,0 +1,19 @@
+{
+  "id": "42-revolve-frustum",
+  "family": "revolve",
+  "description": "trapezoid on the axis gives a frustum r1=3 r2=2 h=4",
+  "source": "analytic",
+  "formula": "V = pi h (r1^2 + r1 r2 + r2^2) / 3",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 79.5870138909,
+  "area": 105.606296214,
+  "centroid": [0, 0, 1.73684210526],
+  "bbox": { "min": [-3, -3, 0], "max": [3, 3, 4] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": null,
+    "area": 0.02,
+    "reason": "area of a revolved curved face is summed over display triangles; the volume is closed-form"
+  }
+}

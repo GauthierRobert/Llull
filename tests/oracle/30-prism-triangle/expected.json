@@ -1,0 +1,14 @@
+{
+  "id": "30-prism-triangle",
+  "family": "prism",
+  "description": "right triangle 4x3 extruded 2",
+  "source": "analytic",
+  "formula": "V = A_polygon * depth (shoelace); centroid = polygon centroid, depth/2; A = 2 A_polygon + perimeter * depth",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 12,
+  "area": 36,
+  "centroid": [1.33333333333, 1, 1],
+  "bbox": { "min": [0, 0, 0], "max": [4, 3, 2] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

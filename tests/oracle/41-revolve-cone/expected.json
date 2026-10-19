@@ -1,0 +1,19 @@
+{
+  "id": "41-revolve-cone",
+  "family": "revolve",
+  "description": "right triangle on the axis gives a cone r=2 h=3",
+  "source": "analytic",
+  "formula": "V = pi r^2 h / 3",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 12.5663706144,
+  "area": 35.2207174126,
+  "centroid": [0, 0, 0.75],
+  "bbox": { "min": [-2, -2, 0], "max": [2, 2, 3] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": null,
+    "area": 0.02,
+    "reason": "area of a revolved curved face is summed over display triangles; the volume is closed-form"
+  }
+}

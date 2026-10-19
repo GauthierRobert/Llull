@@ -1,0 +1,7 @@
+{
+  "actions": [
+    { "command": "add_box", "params": { "size": [20, 10, 4] }, "as": "a" },
+    { "command": "add_box", "params": { "size": [4, 20, 2], "position": [0, 0, 2] }, "as": "b" },
+    { "command": "boolean", "params": { "op": "subtract", "a": "$a", "b": "$b" } }
+  ]
+}

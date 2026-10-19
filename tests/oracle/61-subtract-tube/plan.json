@@ -1,0 +1,7 @@
+{
+  "actions": [
+    { "command": "add_cylinder", "params": { "radius": 6, "height": 10 }, "as": "a" },
+    { "command": "add_cylinder", "params": { "radius": 4, "height": 12 }, "as": "b" },
+    { "command": "boolean", "params": { "op": "subtract", "a": "$a", "b": "$b" } }
+  ]
+}

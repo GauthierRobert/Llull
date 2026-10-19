@@ -1,0 +1,1 @@
+{ "actions": [{ "command": "add_cylinder", "params": { "radius": 1.5, "height": 4, "position": [3, -2, 1] } }] }

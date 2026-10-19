@@ -1,0 +1,14 @@
+{
+  "id": "62-subtract-square-tube",
+  "family": "boolean",
+  "description": "box 10x10x20 bored by a 6x6 square",
+  "source": "analytic",
+  "formula": "V = (100 - 36) 20; A = 2*64 + 4*10*20 + 4*6*20",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 1280,
+  "area": 1408,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-5, -5, -10], "max": [5, 5, 10] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

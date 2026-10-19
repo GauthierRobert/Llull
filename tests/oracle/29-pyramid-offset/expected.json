@@ -1,0 +1,14 @@
+{
+  "id": "29-pyramid-offset",
+  "family": "primitive",
+  "description": "pyramid 4x2x6 with its base centre at (3,3,3)",
+  "source": "analytic",
+  "formula": "V = w d h / 3; centroid at h/4 above the base",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 16,
+  "area": 44.9801607619,
+  "centroid": [3, 3, 4.5],
+  "bbox": { "min": [1, 2, 3], "max": [5, 4, 9] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

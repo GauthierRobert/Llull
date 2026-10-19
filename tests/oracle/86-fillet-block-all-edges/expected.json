@@ -1,0 +1,14 @@
+{
+  "id": "86-fillet-block-all-edges",
+  "family": "fillet",
+  "description": "r=2 on all twelve edges of a 20x12x8 block",
+  "source": "analytic",
+  "formula": "Steiner formula for a rounded box",
+  "kernels": ["occt"],
+  "bodies": 1,
+  "volume": 1793.36869884,
+  "area": 850.123859659,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-10, -6, -4], "max": [10, 6, 4] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}
