@@ -1,7 +1,8 @@
 /**
  * Per-op routing of the native kernel worker (RS-1): an op the sidecar implements goes to `llull-kernel`; an op it lacks, a recipe it
  * answers `NATIVE_UNSUPPORTED`, or a call during which the sidecar died goes to the WASM OCC kernel instead (loaded on first need).
- * Each op's first fallback is logged once. `info` describes both engines.
+ * Each op's first fallback is logged once. `info` describes both engines. Feature nodes are lowered on the host first (`kernelFeatures.ts`,
+ * which also keeps fillet / chamfer and floor-filleted pockets on WASM until native `topology` numbers edges like the WASM kernel).
  * @invariant replies keep the `KernelOps` shapes: a native `evaluate` answers a key-only handle, `tessellate` plain-array MeshData
  * @failure a throw anywhere -> `{ result: null, error }`, never a rejection
  */
@@ -9,7 +10,9 @@
 import type { KernelInfo } from '@core/geometry/kernelPorts';
 import { errorMessage } from '@lib/errorMessage';
 import type { KernelReply, KernelRequest } from '../occtWorkerProtocol';
-import { decodeMesh, isUnsupported, NATIVE_DIED, nativeArgs, type NativeInfo } from './kernelProtocol';
+import { recipeKey } from '@core/geometry/shapeRecipe';
+import { decodeMesh, isUnsupported, NATIVE_DIED, nativeArgs, nativeRecipe, type NativeInfo } from './kernelProtocol';
+import { prepareFeatures, type SourceMesher } from './kernelFeatures';
 import type { NativeKernelSession } from './kernelSession';
 
 /** One request answered by the fallback kernel, synchronously (the WASM kernel in the worker thread). */
@@ -65,10 +68,18 @@ export function createKernelRouter(deps: KernelRouterDeps): KernelRouter {
     return { result: info };
   };
 
+  const sourceMesh: SourceMesher = async (source, features) => {
+    const reply = await deps.session().request('tessellate', [{ key: recipeKey(source), recipe: nativeRecipe(source, features) }]);
+    if (isUnsupported(reply.error) || reply.error?.startsWith(NATIVE_DIED) === true) return 'unsupported';
+    return decodeMesh(reply.result);
+  };
+
   const route = async (request: KernelRequest): Promise<KernelReply> => {
     if (request.op === 'info') return describe();
     if (!nativeOps.has(request.op)) return viaFallback(request, 'op not native yet');
-    const reply = await deps.session().request(request.op, nativeArgs(request.op, request.args));
+    const prepared = await prepareFeatures(request.op, request.args, sourceMesh);
+    if ('unsupported' in prepared) return viaFallback(request, prepared.unsupported);
+    const reply = await deps.session().request(request.op, nativeArgs(request.op, request.args, prepared.features));
     if (isUnsupported(reply.error) || reply.error?.startsWith(NATIVE_DIED) === true) return viaFallback(request, reply.error ?? '');
     count('native', request.op);
     const result = request.op === 'tessellate' ? decodeMesh(reply.result) : reply.result;
