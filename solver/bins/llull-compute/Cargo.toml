@@ -7,6 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+llull-post = { path = "../../crates/llull-post" }
 llull-protocol = { path = "../../crates/llull-protocol" }
 
 [lints]

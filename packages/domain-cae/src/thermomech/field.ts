@@ -18,6 +18,7 @@ import { analysisLengthMetres } from '../shared/defaults';
 import { trustedRecord } from '../shared/trust';
 import { temperatureProblem } from '../shared/quantity';
 import { mapNodalField, type MappingReport } from './mapping';
+import { mappingRequest, readMappedField, type MappingRequest } from './mappedField';
 import { affineBetween, metresPer, temperatureIn, type Affine } from './units';
 
 /** Nodal temperatures aligned with `mesh.nodes` (same order), in the case temperature scale. */
@@ -235,14 +236,25 @@ export function thermalSourceProblem(
   return null;
 }
 
-function thermalResultField(
+interface ThermalSource {
+  readonly artifact: FeResultsArtifact;
+  readonly resultsHash: string;
+  readonly step: FeResultsArtifact['steps'][number];
+  readonly nodal: Readonly<Record<string, readonly number[]>>;
+  readonly affine: Affine;
+  readonly label: string;
+  readonly ids: readonly string[];
+}
+
+/** The verified thermal results, step, NDTEMP values and scale conversion a `thermal_result` field reads. */
+function thermalSource(
   field: Extract<TemperatureFieldSource, { kind: 'thermal_result' }>,
   doc: CadDocument,
   analysisCase: AnalysisCase,
   mesh: FeMeshArtifact,
   scale: TemperatureScale,
   artifacts: FeArtifactPort | null,
-): ResolvedField | FieldRefusal {
+): ThermalSource | FieldRefusal {
   const problem = thermalSourceProblem(doc, analysisCase, field, artifacts);
   if (problem !== null) return problem;
   const source = caseOf(doc, field.analysisId);
@@ -256,8 +268,7 @@ function thermalResultField(
       ids,
     );
   const artifact = results as FeResultsArtifact;
-  const interpolate = field.mapping === 'interpolate';
-  if (!interpolate) {
+  if (field.mapping !== 'interpolate') {
     const meshHash = sha256Hex(canonicalJson(mesh));
     if (meshesDiffer(artifacts, artifact.meshHash, meshHash, mesh))
       return refusal(
@@ -274,20 +285,34 @@ function thermalResultField(
   const affine = affineBetween(sourceScale, scale);
   if (affine === null) return refusal('TMC_FIELD_SOURCE_INVALID', `cannot convert ${sourceScale} to ${scale}`, ids);
   const label = `thermal_result ${field.analysisId} step ${step.step} ${source?.type === 'heat_steady' ? 'steady state' : `t=${step.time} s`} (results ${resultsHash.slice(0, 12)})`;
-  if (interpolate) {
-    const mapped = mapThermalField(artifact, nodal.values, affine, mesh, artifacts, ids);
+  return { artifact, resultsHash, step, nodal: nodal.values, affine, label, ids };
+}
+
+function thermalResultField(
+  field: Extract<TemperatureFieldSource, { kind: 'thermal_result' }>,
+  doc: CadDocument,
+  analysisCase: AnalysisCase,
+  mesh: FeMeshArtifact,
+  scale: TemperatureScale,
+  artifacts: FeArtifactPort | null,
+): ResolvedField | FieldRefusal {
+  const source = thermalSource(field, doc, analysisCase, mesh, scale, artifacts);
+  if (!('artifact' in source)) return source;
+  const { affine, label, ids } = source;
+  if (field.mapping === 'interpolate') {
+    const mapped = mapThermalField(source, mesh, artifacts);
     if (!mapped.ok) return mapped;
     const { report } = mapped.mapped;
     return resolved(
       mapped.mapped.values,
-      `${label} mapped by interpolation: max mapping distance ${report.maxMappingDistance}, ${report.outside} node(s) outside (projected), coincident-node error ${report.coincidentMaxError} over ${report.coincidentNodes} node(s)`,
+      `${label} mapped by interpolation${mapped.native ? ' (native llull-compute post map)' : ''}: max mapping distance ${report.maxMappingDistance}, ${report.outside} node(s) outside (projected), coincident-node error ${report.coincidentMaxError} over ${report.coincidentNodes} node(s)`,
       report,
     );
   }
   const values: number[] = [];
   let missing = 0;
   for (const [nodeId] of mesh.nodes) {
-    const raw = nodal.values[String(nodeId)]?.[0];
+    const raw = source.nodal[String(nodeId)]?.[0];
     if (raw === undefined || !Number.isFinite(raw)) {
       missing += 1;
       values.push(Number.NaN);
@@ -298,45 +323,85 @@ function thermalResultField(
   return resolved(values, label);
 }
 
-const mappings = new WeakMap<FeMeshArtifact, Map<string, MappedResult>>();
+interface CachedMapping {
+  readonly mapped: MappedResult;
+  readonly native: boolean;
+}
+
+const mappings = new WeakMap<FeMeshArtifact, Map<string, CachedMapping>>();
 type MappedResult = Extract<ReturnType<typeof mapNodalField>, { ok: true }>;
 
 /** Largest relative difference at a coincident node that still passes the TR-TMC-23 check (1e-9 of the field magnitude). */
 const COINCIDENT_TOLERANCE = 1e-9;
 
-/** The thermal NDTEMP mapped onto `mesh` (cached per target mesh object: the deck asks once per material and once for the step). */
+/** The interpolation request of a thermal source onto `mesh` (its key binds the thermal results and both meshes). */
+function requestOf(source: ThermalSource, mesh: FeMeshArtifact, artifacts: FeArtifactPort | null): MappingRequest | FieldRefusal {
+  const thermalMesh = artifacts?.get(source.artifact.meshHash) ?? null;
+  if (thermalMesh?.kind !== 'fe_mesh')
+    return refusal(
+      'FEA_RESULTS_MISSING',
+      `the thermal mesh ${source.artifact.meshHash} is not in the artifact store (mapping needs it)`,
+      source.ids,
+    );
+  return mappingRequest({
+    resultsHash: source.resultsHash,
+    step: source.step.step,
+    sourceMesh: thermalMesh,
+    sourceMeshHash: source.artifact.meshHash,
+    nodal: source.nodal,
+    affine: { offset: source.affine.offset, scale: source.affine.scale },
+    target: mesh,
+  });
+}
+
+/**
+ * The thermal NDTEMP mapped onto `mesh`: a native mapped-field artifact bound to the same request when the store holds one (TR-TMC-24),
+ * else the TypeScript mapping (cached per target mesh object: the deck asks once per material and once for the step).
+ */
 function mapThermalField(
-  results: FeResultsArtifact,
-  nodal: Readonly<Record<string, readonly number[]>>,
-  affine: Affine,
+  source: ThermalSource,
   mesh: FeMeshArtifact,
   artifacts: FeArtifactPort | null,
-  ids: readonly string[],
-): { readonly ok: true; readonly mapped: MappedResult } | FieldRefusal {
-  const thermalMesh = artifacts?.get(results.meshHash) ?? null;
-  if (thermalMesh?.kind !== 'fe_mesh')
-    return refusal('FEA_RESULTS_MISSING', `the thermal mesh ${results.meshHash} is not in the artifact store (mapping needs it)`, ids);
-  const key = `${results.meshHash}|${sha256Hex(canonicalJson(nodal))}|${affine.offset}|${affine.scale}`;
-  const cached = mappings.get(mesh)?.get(key);
-  if (cached !== undefined) return { ok: true, mapped: cached };
-  const values = new Map<number, number>();
-  for (const [id] of thermalMesh.nodes) {
-    const raw = nodal[String(id)]?.[0];
-    if (raw !== undefined && Number.isFinite(raw)) values.set(id, affine.offset + affine.scale * raw);
-  }
-  const mapped = mapNodalField(thermalMesh, values, mesh);
-  if (!mapped.ok) return refusal('TMC_FIELD_INVALID', `temperature mapping failed: ${mapped.message}`, ids);
-  const magnitude = Math.max(1, ...mapped.values.map(Math.abs));
+): ({ readonly ok: true } & CachedMapping) | FieldRefusal {
+  const request = requestOf(source, mesh, artifacts);
+  if (!('key' in request)) return request;
+  const cached = mappings.get(mesh)?.get(request.key);
+  if (cached !== undefined) return { ok: true, ...cached };
+  const native = readMappedField(artifacts, request);
+  const mapped = native ?? mapNodalField(request.source, request.values, mesh);
+  if (!mapped.ok) return refusal('TMC_FIELD_INVALID', `temperature mapping failed: ${mapped.message}`, source.ids);
+  let magnitude = 1;
+  for (const value of mapped.values) if (Math.abs(value) > magnitude) magnitude = Math.abs(value);
   if (!(mapped.report.coincidentMaxError <= COINCIDENT_TOLERANCE * magnitude))
     return refusal(
       'TMC_FIELD_INVALID',
       `the mapped field differs from the thermal values by ${mapped.report.coincidentMaxError} at coincident nodes (limit ${COINCIDENT_TOLERANCE} of the field magnitude)`,
-      ids,
+      source.ids,
     );
-  const perMesh = mappings.get(mesh) ?? new Map<string, MappedResult>();
-  perMesh.set(key, mapped);
+  const entry: CachedMapping = { mapped, native: native !== null };
+  const perMesh = mappings.get(mesh) ?? new Map<string, CachedMapping>();
+  perMesh.set(request.key, entry);
   mappings.set(mesh, perMesh);
-  return { ok: true, mapped };
+  return { ok: true, ...entry };
+}
+
+/**
+ * The interpolation request of a thermo_static case whose field is a `thermal_result` with `mapping: 'interpolate'` onto `mesh` (what the
+ * host's native mapping job computes); null for any other field.
+ * @failure the thermal source refusals of `resolveTemperatureField` (stale, unsolved, no NDTEMP, thermal mesh absent)
+ */
+export function temperatureMappingRequest(
+  doc: CadDocument,
+  analysisId: string,
+  mesh: FeMeshArtifact,
+  artifacts: FeArtifactPort | null,
+): MappingRequest | FieldRefusal | null {
+  const analysisCase = caseOf(doc, analysisId);
+  const setup = thermomechOf(analysisCase);
+  const field = setup?.field;
+  if (analysisCase === undefined || setup === undefined || field?.kind !== 'thermal_result' || field.mapping !== 'interpolate') return null;
+  const source = thermalSource(field, doc, analysisCase, mesh, setup.temperatureScale, artifacts);
+  return 'artifact' in source ? requestOf(source, mesh, artifacts) : source;
 }
 
 /** The case's thermo-mechanical set-up when it is a thermo_static case. */

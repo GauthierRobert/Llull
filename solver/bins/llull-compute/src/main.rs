@@ -1,13 +1,19 @@
-//! `llull-compute <job> <job-folder>`: dispatches one job (RS1 §2). `llull-compute --version` prints the version.
-//! Jobs register in `run_job`; an unknown job ends with an `error` event and exit code 2.
+//! `llull-compute <job> [<task>] <job-folder>`: dispatches one job (RS1 §2). `llull-compute --version` prints the version.
+//! Jobs: `post fatigue|map <folder>` (crate `llull-post`). An unknown job ends with an `error` event and exit code 2.
 
-use llull_protocol::{emit, Event};
+use llull_protocol::{emit, Event, Output};
 use std::io::stdout;
 use std::path::Path;
 use std::process::ExitCode;
 
-fn run_job(job: &str, _folder: &Path) -> Result<Vec<llull_protocol::Output>, (String, String)> {
-    Err(("NATIVE_JOB_UNKNOWN".to_string(), format!("unknown job '{job}'")))
+const USAGE: &str = "usage: llull-compute post <fatigue|map> <job-folder>";
+
+fn run_job(job: &str, rest: &[String]) -> Result<Vec<Output>, (String, String)> {
+    match (job, rest) {
+        ("post", [task, folder, ..]) => llull_post::run(task, Path::new(folder)).map_err(|error| (error.code.to_string(), error.message)),
+        ("post", _) => Err(("NATIVE_USAGE".to_string(), USAGE.to_string())),
+        _ => Err(("NATIVE_JOB_UNKNOWN".to_string(), format!("unknown job '{job}'"))),
+    }
 }
 
 fn main() -> ExitCode {
@@ -17,11 +23,11 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
     let mut out = stdout().lock();
-    let (Some(job), Some(folder)) = (args.first(), args.get(1)) else {
-        let _ = emit(&mut out, &Event::Error { code: "NATIVE_USAGE", message: "usage: llull-compute <job> <job-folder>" });
+    let Some(job) = args.first() else {
+        let _ = emit(&mut out, &Event::Error { code: "NATIVE_USAGE", message: USAGE });
         return ExitCode::from(2);
     };
-    match run_job(job, Path::new(folder)) {
+    match run_job(job, &args[1..]) {
         Ok(outputs) => {
             let _ = emit(&mut out, &Event::Done { ok: true, outputs });
             ExitCode::SUCCESS

@@ -1,0 +1,13 @@
+[package]
+name = "llull-bvh"
+description = "Deterministic AABB tree and tetrahedron / triangle closest-point queries shared by llull native jobs (RS1 §2)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+llull-jsmath = { path = "../llull-jsmath" }
+
+[lints]
+workspace = true

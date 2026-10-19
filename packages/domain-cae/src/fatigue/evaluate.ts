@@ -6,7 +6,7 @@ import { convertValue, isUnitFailure } from '@lib/quantity';
 import { blockCycles } from './historyData';
 import { countCycles, totalsOf, type Cycle } from './rainflow';
 import { findCurve, isCurveRefusal, strengthMpa } from './curves';
-import { stressLifeDamage, strainLifeDamage, type DamageSum } from './damage';
+import { stressLifeDamage, strainLifeDamage, type DamageSum, type StrainLifeSetup, type StressLifeSetup } from './damage';
 import { cyclicCurveOf, notchFactor } from './lifeMath';
 import { meanInputsFor, meanModelName } from './meanInputs';
 import { historyOf } from './store';
@@ -74,27 +74,29 @@ function stressCycles(doc: CadDocument, fatigueCase: FatigueCase): Cycle[] | Fai
 const isFailure = (value: unknown): value is Failure =>
   typeof value === 'object' && value !== null && 'code' in value && !Array.isArray(value);
 
-/**
- * Evaluation of `fatigueCase`.
- * @failure FE-driven case -> FAT_RESULTS_MISSING; missing curve / allowable / scatter factor (when `needScatter`) -> a Failure
- */
-export function evaluateCase(doc: CadDocument, fatigueCase: FatigueCase, needScatter: boolean): Evaluation | Failure {
-  if (fatigueCase.analysisId !== undefined)
-    return {
-      code: 'FAT_RESULTS_MISSING',
-      message: `FE hot-spot extraction for analysis '${fatigueCase.analysisId}' is not built`,
-      ids: [fatigueCase.analysisId],
+/** Curve, mean-stress inputs and notch of a case, ready for `damageOf` (shared by the history and the FE paths). */
+export type DamageSetup =
+  | {
+      readonly method: 'stress_life';
+      readonly setup: StressLifeSetup;
+      readonly unverifiedReasons: readonly string[];
+      readonly curveBasis: string;
+      readonly curveKind: string;
+    }
+  | {
+      readonly method: 'strain_life';
+      readonly setup: StrainLifeSetup;
+      readonly unverifiedReasons: readonly string[];
+      readonly curveBasis: string;
+      readonly curveKind: string;
     };
+
+/**
+ * The damage set-up of `fatigueCase`.
+ * @failure missing / unsupported curve, missing allowable, unsupported mean-stress model -> a Failure
+ */
+export function damageSetupOf(doc: CadDocument, fatigueCase: FatigueCase): DamageSetup | Failure {
   const { factors, material } = fatigueCase;
-  if (needScatter && factors.scatter === undefined)
-    return { code: 'FAT_SCATTER_FACTOR_UNSET', message: 'no scatter factor on the case', ids: [fatigueCase.id] };
-  const cycles = stressCycles(doc, fatigueCase);
-  if (isFailure(cycles)) return cycles;
-  const items: Item[] = [];
-  let sum: DamageSum;
-  let unverifiedReasons: readonly string[];
-  let curveBasis: string;
-  let curveKind: string;
   const kf = fatigueCase.notch === undefined ? null : notchFactor(fatigueCase.notch.kt, fatigueCase.notch.q);
   if (fatigueCase.method === 'stress_life') {
     const curve = findCurve(doc, material.recordId, material.modelId, ['sn_basquin', 'sn_power_law', 'sn_table']);
@@ -103,51 +105,87 @@ export function evaluateCase(doc: CadDocument, fatigueCase: FatigueCase, needSca
       return { code: 'FAT_CURVE_UNSUPPORTED', message: 'sn_table with measure max is not supported', ids: [material.recordId] };
     const mean = meanInputsFor(doc, material.recordId, fatigueCase.meanStress, factors.compressiveMean, curve.law);
     if ('missing' in mean) return { code: 'FAT_ALLOWABLE_MISSING', message: mean.missing, ids: [material.recordId] };
-    sum = stressLifeDamage(cycles, {
+    const setup: StressLifeSetup = {
       curve: curve.law,
       modifierProduct: factors.modifiers.reduce((product, entry) => product * entry.value, 1),
       mean,
       ftu: strengthMpa(doc, material.recordId, 'Ftu'),
       stressScale: fatigueCase.notch !== undefined && !fatigueCase.notch.feIncludesKt && kf !== null ? kf : 1,
-    });
-    unverifiedReasons = curve.unverifiedReasons;
-    curveBasis = curve.entry.basis;
-    curveKind = curve.law.kind;
-    const hasMean = cycles.some((cycle) => Math.abs(cycle.mean) > 1e-9);
-    if (meanModelName(fatigueCase.meanStress) === 'none' && hasMean)
-      items.push(
-        item(
-          'FAT_MEAN_MODEL_REQUIRED',
-          'warning',
-          'cycles have non-zero mean stress but meanStress is none: the curve amplitude is used unchanged',
-          'choose a mean-stress model (goodman, gerber, soderberg, morrow, swt, walker)',
-          [fatigueCase.id],
-        ),
-      );
-  } else {
-    const curve = findCurve(doc, material.recordId, material.modelId, ['en_coffin_manson']);
-    if (isCurveRefusal(curve)) return { ...curve, ids: [material.recordId] };
-    const cyclicFound =
-      material.cyclicModelId === undefined ? null : findCurve(doc, material.recordId, material.cyclicModelId, ['cyclic_ramberg_osgood']);
-    const cyclic = cyclicFound === null || isCurveRefusal(cyclicFound) ? null : cyclicCurveOf(cyclicFound.law);
-    if (cyclic === null)
-      return { code: 'FAT_CURVE_MISSING', message: 'strain_life needs a valid cyclic_ramberg_osgood model', ids: [material.recordId] };
-    const meanName = meanModelName(fatigueCase.meanStress);
-    if (meanName !== 'none' && meanName !== 'morrow' && meanName !== 'swt')
-      return { code: 'FAT_MEAN_MODEL_UNSUPPORTED', message: `strain_life does not support meanStress ${meanName}`, ids: [fatigueCase.id] };
-    sum = strainLifeDamage(cycles, {
-      curve: curve.law,
-      cyclic,
-      mean: meanName,
-      kf: fatigueCase.notch !== undefined && !fatigueCase.notch.feIncludesKt ? kf : null,
-    });
-    unverifiedReasons = [
+    };
+    return {
+      method: 'stress_life',
+      setup,
+      unverifiedReasons: curve.unverifiedReasons,
+      curveBasis: curve.entry.basis,
+      curveKind: curve.law.kind,
+    };
+  }
+  const curve = findCurve(doc, material.recordId, material.modelId, ['en_coffin_manson']);
+  if (isCurveRefusal(curve)) return { ...curve, ids: [material.recordId] };
+  const cyclicFound =
+    material.cyclicModelId === undefined ? null : findCurve(doc, material.recordId, material.cyclicModelId, ['cyclic_ramberg_osgood']);
+  const cyclic = cyclicFound === null || isCurveRefusal(cyclicFound) ? null : cyclicCurveOf(cyclicFound.law);
+  if (cyclic === null)
+    return { code: 'FAT_CURVE_MISSING', message: 'strain_life needs a valid cyclic_ramberg_osgood model', ids: [material.recordId] };
+  const meanName = meanModelName(fatigueCase.meanStress);
+  if (meanName !== 'none' && meanName !== 'morrow' && meanName !== 'swt')
+    return { code: 'FAT_MEAN_MODEL_UNSUPPORTED', message: `strain_life does not support meanStress ${meanName}`, ids: [fatigueCase.id] };
+  return {
+    method: 'strain_life',
+    setup: { curve: curve.law, cyclic, mean: meanName, kf: fatigueCase.notch !== undefined && !fatigueCase.notch.feIncludesKt ? kf : null },
+    unverifiedReasons: [
       ...curve.unverifiedReasons,
       ...(cyclicFound !== null && !isCurveRefusal(cyclicFound) ? cyclicFound.unverifiedReasons : []),
-    ];
-    curveBasis = curve.entry.basis;
-    curveKind = curve.law.kind;
-  }
+    ],
+    curveBasis: curve.entry.basis,
+    curveKind: curve.law.kind,
+  };
+}
+
+/** Miner sum of `cycles` under a damage set-up. */
+export const damageOf = (cycles: readonly Cycle[], damage: DamageSetup): DamageSum =>
+  damage.method === 'stress_life' ? stressLifeDamage(cycles, damage.setup) : strainLifeDamage(cycles, damage.setup);
+
+/**
+ * Evaluation of a history-only `fatigueCase`.
+ * @failure FE-driven case -> FAT_RESULTS_MISSING (the FE path is `evaluateFeCase`); missing curve / allowable / scatter factor (when `needScatter`) -> a Failure
+ */
+export function evaluateCase(doc: CadDocument, fatigueCase: FatigueCase, needScatter: boolean): Evaluation | Failure {
+  if (fatigueCase.analysisId !== undefined)
+    return {
+      code: 'FAT_RESULTS_MISSING',
+      message: `FE case on analysis '${fatigueCase.analysisId}': no current fatigue field (run fatigue_field caseId=${fatigueCase.id})`,
+      ids: [fatigueCase.analysisId],
+    };
+  if (needScatter && fatigueCase.factors.scatter === undefined)
+    return { code: 'FAT_SCATTER_FACTOR_UNSET', message: 'no scatter factor on the case', ids: [fatigueCase.id] };
+  const cycles = stressCycles(doc, fatigueCase);
+  if (isFailure(cycles)) return cycles;
+  const damage = damageSetupOf(doc, fatigueCase);
+  if (isFailure(damage)) return damage;
+  return evaluateCycles(fatigueCase, cycles, damage);
+}
+
+/** Damage, life, margin, status and review items of counted `cycles` (one history or one FE hot spot). */
+export function evaluateCycles(fatigueCase: FatigueCase, cycles: readonly Cycle[], damage: DamageSetup): Evaluation {
+  const { factors, material } = fatigueCase;
+  const items: Item[] = [];
+  const sum = damageOf(cycles, damage);
+  const { unverifiedReasons, curveBasis, curveKind } = damage;
+  if (
+    damage.method === 'stress_life' &&
+    meanModelName(fatigueCase.meanStress) === 'none' &&
+    cycles.some((cycle) => Math.abs(cycle.mean) > 1e-9)
+  )
+    items.push(
+      item(
+        'FAT_MEAN_MODEL_REQUIRED',
+        'warning',
+        'cycles have non-zero mean stress but meanStress is none: the curve amplitude is used unchanged',
+        'choose a mean-stress model (goodman, gerber, soderberg, morrow, swt, walker)',
+        [fatigueCase.id],
+      ),
+    );
   if (unverifiedReasons.length > 0)
     items.push(
       item('FAT_CURVE_UNVERIFIED', 'warning', `curve data unverified: ${unverifiedReasons.join('; ')}`, 'use a verified, sourced curve', [
