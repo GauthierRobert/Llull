@@ -21,7 +21,7 @@ import { withFailureStatus } from '@protocol/commandOutcome';
 import { exchangeOptionsWithDwg } from '../dwgConvert';
 import type { ExchangeOptions } from '../pythonExchange';
 import { USAGE } from './usage';
-import { parseKernelChoice } from '@core/geometry/kernelChoice';
+import { getGeometryKernel } from '@core/geometry/kernel';
 import { planKernelWarnings } from './planKernelWarning';
 import { benchmarkCli } from './benchmarks';
 
@@ -260,10 +260,7 @@ async function runPlan(args: ParsedArgv, io: CliIo): Promise<number> {
   const result = withTimeout(observer, withFailureStatus('build_project', await backend.run('build_project', params)));
   const framed = await frameAfterPlan(args, base['actions'], result, backend);
   const found = planAliases(result.data);
-  const warnings =
-    booleanFlag(args, 'validate') && serverOf(args, io) === undefined
-      ? planKernelWarnings(params, parseKernelChoice(stringFlag(args, 'kernel') ?? io.env['LLULL_KERNEL']))
-      : [];
+  const warnings = booleanFlag(args, 'validate') && serverOf(args, io) === undefined ? planKernelWarnings(params, getGeometryKernel()) : [];
   const printable: PrintableResult = {
     ...result,
     ...(found !== null ? { planAliases: found } : {}),

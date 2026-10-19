@@ -75,7 +75,8 @@ Always one call per plan (`llull run plan.json`), not a loop of single calls.
 5. **Look at it**: `llull render_view view=iso --save view.png --app` then read the PNG. FEA contour:
    `llull render_fea_results analysisId=an-… field=von_mises --save plot.png`. Saved SVG/PNG, DXF
    (`export_flat_pattern_dxf --save part.dxf`), IFC and `.glb` (binary chosen from the extension) all work.
-   `run --validate` warns when a plan uses fillet/chamfer/shell: run those with `--kernel occt`.
+   `run --validate` warns when a plan uses fillet/chamfer/shell and the active kernel is Manifold (the native `llull-kernel` was not found:
+   build it in `solver/` or set `LLULL_NATIVE_DIR`; `llull kernel_info` shows the active kernel and why).
 6. **Exchange (Python/CadQuery bundled in the desktop app)**: `llull import_step file=supplier.step --app`,
    `llull export_step --save out/part.step --app` (exact B-rep), `llull import_dwg file=site.dwg
 target=drawing` (needs a DWG converter). `llull list exchange` shows them all.
@@ -101,8 +102,8 @@ target=drawing` (needs a DWG converter). `llull list exchange` shows them all.
 `model.llull.json`, created on first change) ·
 `--server URL` / `--token T` (`$LLULL_SERVER`, `$LLULL_TOKEN`) · `--dry-run` (local, never writes) ·
 `--save PATH` (`.png` rasterizes svg; several files → directory) · `--json` (one object: `ok`,
-`summary`, `affected`, `changed`, `data`, `saved`) · `--quiet` · `--kernel occt` (exact B-rep:
-`export_step_exact`, real fillets).
+`summary`, `affected`, `changed`, `data`, `saved`) · `--quiet` · `--kernel manifold|occt-native` (default: the
+native `llull-kernel` when found, else Manifold with a warning; exact B-rep, real fillets need the native kernel).
 
 ## Long plans: progress, timing, timeout
 

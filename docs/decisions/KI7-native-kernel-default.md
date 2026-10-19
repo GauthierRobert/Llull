@@ -32,7 +32,11 @@ until it reproduced the OCP 7.9.3 numbers of the 01 KRN validation pack (TR-KRN-
 - The fallback chain is unchanged and stays visible: an op the sidecar lacks or a sidecar death is answered by the WASM kernel in the
   same worker (logged once per op), a missing binary gives `NATIVE_TOOL_MISSING` then WASM then Manifold, each with
   `kernel_info.fallbackReason`.
-- Server, CLI and browser defaults are unchanged (`LLULL_KERNEL` unset → their current default); `occt-native` stays opt-in there.
+- Server and CLI (LC1 step 1, 2026-10-19): `LLULL_KERNEL` unset installs the native kernel when `llull-kernel` is found (same discovery as
+  the desktop: `LLULL_KERNEL_BIN`, `LLULL_NATIVE_DIR`, `solver/target/release`; `server/src/geometryKernel.ts`), else Manifold with one
+  `console.warn` and `kernel_info.fallbackReason` (`GET /health` reports the active kernel). `LLULL_KERNEL=manifold` stays a diagnostic
+  override; `occt-native` is the explicit form (falls back to the WASM kernel); `occt` is the legacy WASM kernel. Tests inject the discovery
+  (`installGeometryKernel({ env, startNative })`) and need no binary.
 
 ## Consequences
 

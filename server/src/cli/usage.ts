@@ -59,7 +59,8 @@ Flags
   --timeout SEC               stop a whole run after SEC seconds: exit 1 with a clear message, nothing
                               saved. Local: checked between plan steps, a hard kill 5 s later for a
                               step that never ends; --server: per-request limit (default 120 s)
-  --kernel manifold|occt      geometry kernel for local runs (default manifold; $LLULL_KERNEL)
+  --kernel manifold|occt-native  geometry kernel for local runs (default: the native llull-kernel when found, else
+                              Manifold with a warning; $LLULL_KERNEL; manifold is a diagnostic override)
 
 Exit codes: 0 ok · 1 the command failed, a plan step failed, or a change command changed
 nothing · 2 bad usage or unreadable input`;

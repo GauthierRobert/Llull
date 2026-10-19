@@ -15,7 +15,11 @@ Binding text: `CLAUDE.md` § PRODUCT DIRECTIVE. Related: RS1 (native compute), K
 
 ## Order of work (each step keeps `npm run check` green)
 
-1. **Native kernel default on desktop + CLI** — VC-KRN-25 vs OCP 7.9.3, then flip (in progress, PR #89 follow-up).
+1. **Native kernel default on desktop + CLI** — VC-KRN-25 vs OCP 7.9.3 (passed), then flip.
+   - [x] Done 2026-10-19. Desktop: KI7 (`backendEnv.ts`). Server + CLI: `LLULL_KERNEL` unset installs the native `llull-kernel` when
+     found (`LLULL_KERNEL_BIN`, `LLULL_NATIVE_DIR`, `solver/target/release`), else Manifold with a warning and
+     `kernel_info.fallbackReason`; `LLULL_KERNEL=manifold` is a diagnostic override. `llull run --validate` now warns from the installed
+     kernel (`supports('fillet')`), not from `$LLULL_KERNEL`.
 2. **Stop shipping the browser build**: drop the PWA (`serviceWorker/`, `viteServiceWorker.ts`, `playwright.pwa.config.ts`, `test:pwa`,
    `tests/pwa/`), the public web deployment docs, and the `?kernel=` URL switch in `src/main.tsx`; Vite stays as the Electron renderer's
    dev server and bundler.

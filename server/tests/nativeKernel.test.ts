@@ -88,3 +88,42 @@ describe('LLULL_KERNEL=occt-native', () => {
     expect(info?.build).toBe('opencascade.js@1.1.1');
   }, 120_000);
 });
+
+describe('LLULL_KERNEL unset: the native kernel is the default (LC1 step 1, KI7)', () => {
+  const missing = path.join(__dirname, 'no-such-llull-kernel');
+
+  it.skipIf(process.platform === 'win32')(
+    'installs the sidecar when the binary is found (injected discovery)',
+    async () => {
+      const env = { LLULL_KERNEL_BIN: FAKE };
+      expect(await installGeometryKernel({ env, startNative: (options) => startNativeKernel(options, env) })).toBe(true);
+      expect(getActiveKernelName()).toBe('occt');
+      expect(getGeometryKernel()?.info?.()).toMatchObject({ occtVersion: '7.9.2', isolation: 'process' });
+      expect(getGeometryKernel()?.info?.().fallbackReason).toBeUndefined();
+    },
+    120_000,
+  );
+
+  it('falls back to Manifold with one visible warning and kernel_info.fallbackReason when it is not found', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const env = { LLULL_KERNEL_BIN: missing };
+    expect(await installGeometryKernel({ env, startNative: (options) => startNativeKernel(options, env) })).toBe(true);
+    expect(getActiveKernelName()).toBe('manifold');
+    expect(getGeometryKernel()?.info?.()).toMatchObject({
+      isolation: 'in-process',
+      fallbackReason: expect.stringMatching(/^NATIVE_TOOL_MISSING/),
+    });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain('using Manifold');
+  });
+
+  it('LLULL_KERNEL=manifold is a diagnostic override: no discovery, no warning', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const startNative = vi.fn(() => ({ reason: 'must not be asked' }));
+    expect(await installGeometryKernel({ env: { LLULL_KERNEL: ' Manifold ' }, startNative })).toBe(true);
+    expect(getActiveKernelName()).toBe('manifold');
+    expect(startNative).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+    expect(getGeometryKernel()?.info?.().fallbackReason).toBeUndefined();
+  });
+});

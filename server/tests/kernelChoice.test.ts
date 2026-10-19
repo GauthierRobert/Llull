@@ -22,9 +22,9 @@ describe('LLULL_OCC_TIMEOUT_MS', () => {
 });
 
 describe('LLULL_KERNEL', () => {
-  it('unset installs Manifold', async () => {
-    delete process.env['LLULL_KERNEL'];
-    expect(await installGeometryKernel()).toBe(true);
+  it('unset without the native binary installs Manifold (discovery injected)', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    expect(await installGeometryKernel({ env: {}, startNative: () => ({ reason: 'NATIVE_TOOL_MISSING: injected' }) })).toBe(true);
     expect(getActiveKernelName()).toBe('manifold');
     expect(getGeometryKernel()).not.toBeNull();
   });
@@ -51,13 +51,20 @@ describe('LLULL_KERNEL', () => {
 });
 
 describe('kernel_info through the composition root (TR-KRN-04)', () => {
+  const noNative = (): { reason: string } => ({ reason: 'NATIVE_TOOL_MISSING: injected' });
   const infoOf = (): Record<string, unknown> =>
     execute(createEmptyDocument(), 'kernel_info', {}, defaultContext()).data as Record<string, unknown>;
 
-  it('Manifold: in-process, no fallback reason', async () => {
-    await installGeometryKernel();
+  it('Manifold override: in-process, no fallback reason', async () => {
+    await installGeometryKernel({ env: { LLULL_KERNEL: 'manifold' }, startNative: noNative });
     expect(infoOf()).toMatchObject({ active: 'manifold', isolation: 'in-process' });
     expect(infoOf()['fallbackReason']).toBeUndefined();
+  });
+
+  it('native default missing: Manifold, and kernel_info says why', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    await installGeometryKernel({ env: {}, startNative: noNative });
+    expect(infoOf()).toMatchObject({ active: 'manifold', fallbackReason: 'NATIVE_TOOL_MISSING: injected' });
   });
 
   it('occt: reports OCCT 7.4.0p1, its ports and how it is isolated', async () => {

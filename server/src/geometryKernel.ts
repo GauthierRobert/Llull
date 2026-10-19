@@ -1,14 +1,16 @@
 /**
  * Inject the configured geometry kernel into the core at startup (architecture L9) so boolean and
- * fillet commands work for the CLI exactly as in the desktop app. `LLULL_KERNEL=occt` selects
- * OpenCascade (falls back to Manifold on failure); `LLULL_KERNEL=occt-native` the native `llull-kernel`
- * sidecar (RS-1, falls back to the WASM OpenCascade, then Manifold); anything else is Manifold.
+ * fillet commands work for the CLI exactly as in the desktop app. `LLULL_KERNEL` unset (or any unknown value) installs
+ * the native `llull-kernel` sidecar (RS-1, KI7, LC1 step 1) when the binary is found (`native/nativeBinary.ts`), else Manifold with a
+ * warning and `kernel_info.fallbackReason`. `LLULL_KERNEL=manifold` is a diagnostic override (Manifold, no warning);
+ * `LLULL_KERNEL=occt-native` requires the sidecar (falls back to the WASM OpenCascade, then Manifold); `LLULL_KERNEL=occt` is the WASM
+ * OpenCascade (falls back to Manifold on failure).
  */
 
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
 import type { KernelInfo } from '@core/geometry/kernelPorts';
 import { createIsolatedKernel, defaultWorkerEntry } from './isolatedKernel';
-import { parseKernelChoice, type KernelChoice } from '@core/geometry/kernelChoice';
+import type { KernelChoice } from '@core/geometry/kernelChoice';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { errorMessage } from '@lib/errorMessage';
 import { positiveInteger } from './env';
@@ -52,21 +54,36 @@ function described(kernel: GeometryKernel, extra: Pick<KernelInfo, 'isolation' |
   return { ...kernel, info: () => ({ capabilities: [], ...kernel.info?.(), ...extra }) };
 }
 
+export interface KernelInstallOptions {
+  readonly env?: NodeJS.ProcessEnv;
+  /** Native sidecar start (tests inject the discovery and the process). */
+  readonly startNative?: typeof startNativeKernel;
+}
+
 /** Load the configured kernel; on failure commands keep their graceful "no kernel" no-op. */
-export async function installGeometryKernel(): Promise<boolean> {
+export async function installGeometryKernel(options: KernelInstallOptions = {}): Promise<boolean> {
+  const env = options.env ?? process.env;
+  const startNative = options.startNative ?? startNativeKernel;
   let fallbackReason: string | undefined;
-  const nativeRequested = process.env['LLULL_KERNEL']?.trim().toLowerCase() === NATIVE_KERNEL_CHOICE;
-  if (nativeRequested) {
-    const native = startNativeKernel({ callTimeoutMs: occtCallTimeoutMs() });
+  const requested = env['LLULL_KERNEL']?.trim().toLowerCase();
+  const wasmRequested = requested === 'occt';
+  const nativeRequested = requested === NATIVE_KERNEL_CHOICE;
+  if (requested !== 'manifold' && !wasmRequested) {
+    const native = startNative({ callTimeoutMs: occtCallTimeoutMs(env) }, env);
     if ('kernel' in native) {
       setGeometryKernel(described(native.kernel, { isolation: 'process' }));
       activeKernel = 'occt';
       return true;
     }
     fallbackReason = native.reason;
-    warnUnavailable('native OCC kernel unavailable; falling back to the WASM OCC kernel', native.reason);
+    warnUnavailable(
+      nativeRequested
+        ? 'native OCC kernel unavailable; falling back to the WASM OCC kernel'
+        : 'native OCC kernel unavailable; using Manifold',
+      native.reason,
+    );
   }
-  if (nativeRequested || parseKernelChoice(process.env['LLULL_KERNEL']) === 'occt') {
+  if (nativeRequested || wasmRequested) {
     try {
       const { createNodeOcctKernel } = await import('./occtNode');
       const isolated = startIsolatedOcct();

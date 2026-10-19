@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createEmptyDocument } from '@core/model/types';
+import { fakeKernel } from '../../tests/helpers/fakeKernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { ctxWith, docWith, inchDocument, ok, sampleCatalogFile } from '../../tests/unit/aero/fasteners/fixtures';
@@ -325,10 +326,11 @@ describe('llull CLI — local document', () => {
     ]);
     const manifold = capture({ stdin: plan });
     await runCli(['run', '-', '--validate', ...docFlag()], manifold.io);
-    expect(manifold.out.join('\n')).toMatch(/warning: .*fillet_edge.*--kernel occt/);
-    const occt = capture({ stdin: plan });
-    await runCli(['run', '-', '--validate', '--kernel', 'occt', ...docFlag()], occt.io);
-    expect(occt.out.join('\n')).not.toMatch(/warning:/);
+    expect(manifold.out.join('\n')).toMatch(/warning: .*fillet_edge.*native llull-kernel/);
+    setGeometryKernel(fakeKernel());
+    const exact = capture({ stdin: plan });
+    await runCli(['run', '-', '--validate', ...docFlag()], exact.io);
+    expect(exact.out.join('\n')).not.toMatch(/warning:/);
   });
 
   it('--quiet prints nothing on success but still prints errors', async () => {
