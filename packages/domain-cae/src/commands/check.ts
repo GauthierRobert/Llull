@@ -13,6 +13,7 @@ import { analysisIdSchema } from '../shared/schemas';
 import { trustedRecord, type Trust } from '../shared/trust';
 import { analysisInputHash } from '../hash/inputHash';
 import { checkNonlinearItems } from '../nonlinear/check';
+import { structureItems } from './checkStructure';
 import { checkThermalItems } from '../thermal/check';
 import { checkThermomechItems } from '../thermomech/check';
 
@@ -175,6 +176,7 @@ export const checkAnalysis = defineCommand({
       ...partItems(doc, analysis),
       ...setupItems(analysis),
       ...disciplines,
+      ...structureItems(doc, analysis, trust),
       ...artifactItems(doc, analysis, trust),
     ];
     const errors = items.filter((entry) => entry.severity === 'error').length;

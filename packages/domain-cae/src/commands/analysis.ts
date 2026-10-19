@@ -7,6 +7,7 @@ import { changed, report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { nextId } from '@lib/id';
 import { analysisInputHash } from '../hash/inputHash';
+import { eigenSummaryText } from '../results/summary';
 import { trustedRecord, type Trust } from '../shared/trust';
 import { analysisOf, caseOf, withCase, withoutCase } from '../shared/access';
 import { refuseCode } from '../shared/codes';
@@ -61,6 +62,13 @@ function factorProblem(input: z.output<typeof factorsSchema>): string | null {
   return bad === undefined ? null : `extra factor '${bad.name}' needs name, value >= 1 and a justification`;
 }
 
+function bandValid(band: { readonly min?: number | undefined; readonly max?: number | undefined }): boolean {
+  const { min, max } = band;
+  if (min === undefined && max === undefined) return false;
+  if (min !== undefined && !(Number.isFinite(min) && min >= 0)) return false;
+  return max === undefined || (Number.isFinite(max) && max > (min ?? 0));
+}
+
 const plain = (value: number): string => String(Math.round(value * 1e6) / 1e6);
 
 /**
@@ -69,6 +77,7 @@ const plain = (value: number): string => String(Math.round(value * 1e6) / 1e6);
  *   and a coupled case a ThermoMechSetup holding an empty ThermalSetup (no default reference temperature); defaults are named in the summary
  * @failure factor and factors together or factor < 1 -> FEA_FACTOR_INVALID; modes on another type -> FEA_PARAM_NOT_APPLICABLE; modes outside 1..100 -> FEA_PARAM_INVALID; explicit unitSystem != document unit -> FEA_UNITS_MISMATCH;
  *   thermo_static / coupled without referenceTemperature -> TMC_REFERENCE_TEMPERATURE_MISSING; bad temperature unit -> THM_UNITS_MISMATCH;
+ *   frequencyRangeHz on a non-modal type -> FEA_PARAM_NOT_APPLICABLE, a band without min / max or with max <= min or min < 0 -> FEA_PARAM_INVALID;
  *   factor < 1 -> FEA_FACTOR_INVALID; temperature params on a type that has no use for them -> FEA_PARAM_NOT_APPLICABLE (all refusals, unchanged doc)
  */
 export const createAnalysis = defineCommand({
@@ -79,7 +88,7 @@ export const createAnalysis = defineCommand({
     'temperature field; REQUIRES referenceTemperature, the stress-free temperature, no default) or coupled_temperature_displacement ' +
     '(steady-state heat conduction and thermal stress solved together: thermal boundary conditions with add_thermal_bc, mechanical ones with ' +
     'add_fea_constraint / add_fea_load, REQUIRES referenceTemperature; the temperature field is solved, not set), modal (free-vibration natural ' +
-    'frequencies and mode shapes with `modes`; needs constraints and a material density, loads are ignored; results.frequenciesHz) or buckling ' +
+    'frequencies and mode shapes with `modes`, optionally restricted to frequencyRangeHz; needs a material density, loads are ignored; constraints define the supports - a free model has six rigid-body modes at about 0 Hz, flagged by check_analysis FEA_UNDERCONSTRAINED; results.frequenciesHz, fea_report data.eigen with mass participation) or buckling ' +
     '(linear eigenvalue buckling of the FIRST load case as reference load, `modes` factors; the critical load is factor x the applied load; ' +
     'results.bucklingFactors; needs constraints and a load) or nonlinear_static (plasticity and/or large displacement with load or displacement steps: set it up with set_nonlinear_controls, set_part_constitutive_set, add_analysis_step and add_curve_probe; results.nonlinear). SAFETY FACTORS: without `factors`/`factor` the aerospace defaults apply ' +
     '(ultimate 1.5 per 14 CFR 25.303, yield 1.0) and the summary says so; when the user states a safety factor (e.g. "SF 2") pass `factor: 2` ' +
@@ -130,6 +139,15 @@ export const createAnalysis = defineCommand({
       .describe(
         'modal / buckling only: number of modes (natural frequencies) or buckling factors to extract, 1 to 100. Default 6 (modal) or 3 (buckling).',
       ),
+    frequencyRangeHz: z
+      .object({
+        min: z.number().optional().describe('Lowest frequency of interest in Hz, >= 0.'),
+        max: z.number().optional().describe('Highest frequency of interest in Hz, > min.'),
+      })
+      .optional()
+      .describe(
+        'modal only: restrict the extraction to a frequency band in Hz (CalculiX `*FREQUENCY` n, min, max): at most `modes` frequencies inside the band are returned. Omit for the lowest `modes` frequencies.',
+      ),
   }),
   run: (doc, params): CommandResult => {
     const fail = (code: string, message: string, ids: readonly string[] = [], paths: readonly string[] = []): CommandResult =>
@@ -171,6 +189,16 @@ export const createAnalysis = defineCommand({
       return fail('FEA_PARAM_NOT_APPLICABLE', `modes applies to modal and buckling analyses only, not ${type}`, [], ['modes']);
     if (params.modes !== undefined && !(params.modes >= 1 && params.modes <= 100))
       return fail('FEA_PARAM_INVALID', `modes ${params.modes} must be an integer from 1 to 100`, [], ['modes']);
+    const band = params.frequencyRangeHz;
+    if (band !== undefined && type !== 'modal')
+      return fail('FEA_PARAM_NOT_APPLICABLE', `frequencyRangeHz applies to modal analyses only, not ${type}`, [], ['frequencyRangeHz']);
+    if (band !== undefined && !bandValid(band))
+      return fail(
+        'FEA_PARAM_INVALID',
+        'frequencyRangeHz needs min and / or max (finite), min >= 0 and max > min',
+        [],
+        ['frequencyRangeHz'],
+      );
 
     const scale = temperatureScale ?? 'degC';
     const factors: FactorSet =
@@ -198,6 +226,14 @@ export const createAnalysis = defineCommand({
       solver: 'calculix',
       unitSystem,
       ...(modes !== undefined ? { modes } : {}),
+      ...(band !== undefined
+        ? {
+            frequencyRangeHz: {
+              ...(band.min !== undefined ? { min: band.min } : {}),
+              ...(band.max !== undefined ? { max: band.max } : {}),
+            },
+          }
+        : {}),
       factors,
       parts: {},
       constraints: {},
@@ -213,7 +249,8 @@ export const createAnalysis = defineCommand({
     const stated = params.factor !== undefined || params.factors !== undefined;
     const extraNote = factors.extra.length > 0 ? ` + ${factors.extra.length} extra` : '';
     const factorNote = `safety factors ultimate ${plain(factors.ultimate)}, yield ${plain(factors.yield)}${extraNote} (${stated ? 'set by the caller' : 'DEFAULT 14 CFR 25.303 - pass factor/factors if the user states another safety factor'})`;
-    const modesNote = modes === undefined ? '' : `, ${modes} mode(s)`;
+    const modesNote =
+      modes === undefined ? '' : `, ${modes} mode(s)${band === undefined ? '' : ` in ${band.min ?? 0}-${band.max ?? 'inf'} Hz`}`;
     const scaleNote = thermalUse ? `, temperatureScale ${scale}${temperatureScale === undefined ? ' (default)' : ''}` : '';
     return changed(
       withCase(doc, analysisCase),
@@ -304,7 +341,8 @@ export const describeAnalysis = defineCommand({
       return refuseCode(doc, 'describe_analysis', 'FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`, [analysisId], ['analysisId']);
     const trust = trustedRecord(doc, analysisCase, port);
     const state = trust.state;
-    return report(doc, `describe_analysis: '${analysisId}' (${analysisCase.name}) — ${analysisCase.type}, ${state}.`, {
+    const eigenText = trust.results === null ? '' : eigenSummaryText(trust.results);
+    return report(doc, `describe_analysis: '${analysisId}' (${analysisCase.name}) — ${analysisCase.type}, ${state}${eigenText}.`, {
       case: verifiedView(analysisCase, trust),
       state,
       problem: trust.problem,

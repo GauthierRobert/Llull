@@ -111,10 +111,11 @@ const check = (doc: CadDocument, analysisId: string, ctx?: ExecutionContext): Ch
 const codes = (result: Check): string[] => result.items.map((entry) => entry.code);
 
 describe('check_analysis', () => {
-  it('passes a solved, current analysis and always requires review', () => {
+  it('passes a solved, current analysis (a 6-tet bar only draws the mesh-adequacy warning) and always requires review', () => {
     const bar = solvedBar();
     const result = check(recorded(bar), bar.analysisId, ctxOf(bar));
-    expect(result).toMatchObject({ status: 'pass', state: 'solved', items: [], reviewRequired: true });
+    expect(result).toMatchObject({ status: 'warn', state: 'solved', reviewRequired: true });
+    expect(codes(result)).toEqual(['FEA_MESH_ADEQUACY']);
     expect(execute(recorded(bar), 'check_analysis', { analysisId: bar.analysisId }, ctxOf(bar)).summary).toContain('reviewRequired');
   });
 
@@ -159,7 +160,7 @@ describe('check_analysis', () => {
       target: { entityId: bar.boxId, pointsNear: [[2, 0, 0]] },
     });
     const afterLoad = check(pointLoad, bar.analysisId, ctxOf(bar));
-    expect(codes(afterLoad)).toEqual(['FEA_POINT_LOAD_SINGULAR', 'FEA_MESH_STALE']);
+    expect(codes(afterLoad)).toEqual(['FEA_POINT_LOAD_SINGULAR', 'FEA_MESH_ADEQUACY', 'FEA_MESH_STALE']);
     expect(afterLoad.status).toBe('fail');
     // a recorded mesh that is current while the results are for other inputs
     const meshed = execute(
@@ -168,7 +169,7 @@ describe('check_analysis', () => {
       { analysisId: bar.analysisId, summary: meshSummary(bar.mesh, bar.meshHash) },
       ctxOf(bar),
     ).document;
-    expect(codes(check(meshed, bar.analysisId, ctxOf(bar)))).toEqual(['FEA_RESULTS_MISSING']);
+    expect(codes(check(meshed, bar.analysisId, ctxOf(bar)))).toEqual(['FEA_MESH_ADEQUACY', 'FEA_RESULTS_MISSING']);
   });
 
   it('flags results computed for other inputs and artifacts absent on this machine', () => {
@@ -177,7 +178,7 @@ describe('check_analysis', () => {
     const absent = check(solved, bar.analysisId, ctxOf(bar, portOf()));
     expect(codes(absent)).toEqual(['FEA_MESH_MISSING', 'FEA_RESULTS_MISSING']);
     const stale = mustRun(solved, 'add_fea_load', { analysisId: bar.analysisId, name: 'g', kind: 'gravity', vector: [0, 0, -9810] });
-    expect(codes(check(stale, bar.analysisId, ctxOf(bar)))).toEqual(['FEA_RESULTS_STALE']);
+    expect(codes(check(stale, bar.analysisId, ctxOf(bar)))).toEqual(['FEA_MESH_ADEQUACY', 'FEA_RESULTS_STALE']);
   });
 
   it('refuses an unknown analysis', () => {

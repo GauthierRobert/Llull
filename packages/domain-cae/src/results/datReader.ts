@@ -14,7 +14,14 @@ const EIGEN_TABLES = [
     columns: 5,
   },
   { heading: /B U C K L I N G\s+F A C T O R\s+O U T P U T/, title: 'buckling factors (mode, factor)', columns: 2 },
+  /** Modal mass tables of a `*FREQUENCY` step (x, y, z translations); `total` precedes `effective` because its heading contains the other. */
+  { heading: /T O T A L\s+E F F E C T I V E\s+M A S S/, title: 'total effective mass (x, y, z)', columns: 3 },
+  { heading: /P A R T I C I P A T I O N\s+F A C T O R S/, title: 'participation factors (mode, x, y, z)', columns: 4 },
+  { heading: /E F F E C T I V E\s+(?:M O D A L\s+)?M A S S/, title: 'effective modal mass (mode, x, y, z)', columns: 4 },
 ] as const;
+
+/** Tables dropped when CalculiX prints the heading without any row under it (the eigenvalue and buckling tables are always kept). */
+const OPTIONAL_TABLES = ['total effective mass', 'participation factors', 'effective modal mass'];
 
 /** C `%e` output with a 3-digit exponent loses its `E` in CalculiX tables: `1.52172-101` is 1.52172E-101. */
 const THREE_DIGIT_EXPONENT = /^([+-]?\d*\.\d+)([+-]\d{3})$/;
@@ -61,5 +68,5 @@ export function parseDat(text: string): Dat {
     if (values === null) open = null;
     else open.rows.push(values);
   }
-  return { tables };
+  return { tables: tables.filter((table) => table.rows.length > 0 || !OPTIONAL_TABLES.some((title) => table.title.startsWith(title))) };
 }

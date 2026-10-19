@@ -68,7 +68,7 @@ function temperatureRange(
 }
 
 /** Axis (0|1|2) a node set is flat in (one plane, or two parallel planes such as both ends of a symmetric slice), or null when it is not axis-aligned. */
-function planeAxis(ctx: DeckContext, nodeIds: readonly number[]): number | null {
+export function planeAxis(ctx: DeckContext, nodeIds: readonly number[]): number | null {
   const coordinates = new Map(ctx.mesh.nodes.map((node) => [node[0], [node[1], node[2], node[3]] as const]));
   const lo = [Infinity, Infinity, Infinity];
   const hi = [-Infinity, -Infinity, -Infinity];
