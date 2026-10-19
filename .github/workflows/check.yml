@@ -24,9 +24,11 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             solver/target
-          key: native-${{ runner.os }}-${{ hashFiles('solver/Cargo.lock', 'solver/**/Cargo.toml') }}
+          key: native-${{ runner.os }}-${{ hashFiles('solver/Cargo.lock', 'solver/**/Cargo.toml', 'solver/rust-toolchain.toml') }}
           restore-keys: native-${{ runner.os }}-
-      - run: rustup component add rustfmt clippy
+      # solver/rust-toolchain.toml pins the compiler + rustfmt / clippy (same lints as local builds).
+      - run: rustup toolchain install
+        working-directory: solver
       - run: node scripts/nativeCheck.mjs
 
   # Native OCCT kernel (RS-1): crate llull-kernel-occt + bin llull-kernel (clippy, cargo test), the native-vs-WASM parity suite, then
@@ -62,7 +64,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: native-kernel-${{ runner.os }}-${{ hashFiles('solver/Cargo.lock') }}
-      - run: rustup component add rustfmt clippy
+      - run: rustup toolchain install
+        working-directory: solver
       - run: node scripts/nativeCheck.mjs
         env:
           LLULL_NATIVE_KERNEL: '1'

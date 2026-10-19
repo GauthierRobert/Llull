@@ -1,0 +1,5 @@
+# One Rust toolchain for local builds and CI, so clippy -D warnings sees the same lints everywhere (bump deliberately).
+[toolchain]
+channel = "1.97.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"
