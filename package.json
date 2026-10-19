@@ -37,6 +37,7 @@
     "production:ui": "playwright test --config playwright.production.config.ts",
     "production": "npm run production:scripted && npm run production:ui",
     "llull": "node server/bin/llull.cjs",
+    "features": "node scripts/features.mjs",
     "deadcode": "knip --include exports,types"
   },
   "dependencies": {
