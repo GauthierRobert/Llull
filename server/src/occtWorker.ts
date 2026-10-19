@@ -7,11 +7,11 @@
  */
 
 import { workerData, type MessagePort } from 'node:worker_threads';
-import type { GeometryKernel, ShapeHandle } from '@core/geometry/kernel';
-import { keyOnlyHandle } from '@core/geometry/shapeKernel';
+import type { GeometryKernel } from '@core/geometry/kernel';
 import { errorMessage } from '@lib/errorMessage';
 import { nativeFailureCount } from '@kernel-occt/occtKernel';
 import { createNodeOcctKernel } from './occtNode';
+import { invokeKernelOperation, isTestHook, runTestHook } from './kernelInvoke';
 import { STATUS_READY, STATUS_REPLY, type KernelReply, type KernelRequest } from './occtWorkerProtocol';
 
 interface WorkerInit {
@@ -46,32 +46,7 @@ async function main(): Promise<void> {
 }
 
 function run(kernel: GeometryKernel, request: KernelRequest, testHooks: boolean): unknown {
-  if (request.op === '__abort' || request.op === '__hang' || request.op === '__exitIdle') {
-    if (!testHooks) throw new Error(`unknown kernel operation ${request.op}`);
-    if (request.op === '__abort') process.exit(1);
-    if (request.op === '__exitIdle') {
-      setTimeout(() => process.exit(1), 100); // after the reply: the worker dies while idle
-      return null;
-    }
-    for (;;);
-  }
-  const result = invoke(kernel, request);
-  // The server rebuilds the full handle from its own recipe: never clone the tree back.
-  return request.op === 'evaluate' && result !== null ? keyOnlyHandle(result as ShapeHandle) : result;
-}
-
-const FACE_QUERY_PREFIX = 'faceQuery.';
-
-/** Calls the kernel method named by `request.op` (`faceQuery.<method>` resolves on the face-query port). */
-function invoke(kernel: GeometryKernel, request: KernelRequest): unknown {
-  if (request.op.startsWith(FACE_QUERY_PREFIX)) {
-    const port = kernel.faceQuery as unknown as Record<string, ((...args: unknown[]) => unknown) | undefined> | undefined;
-    const method = port?.[request.op.slice(FACE_QUERY_PREFIX.length)];
-    if (method === undefined) throw new Error(`unknown kernel operation ${request.op}`);
-    return method.apply(port, [...request.args]);
-  }
-  const method = kernel[request.op as keyof GeometryKernel] as (...args: unknown[]) => unknown;
-  return method.apply(kernel, [...request.args]);
+  return isTestHook(request.op) ? runTestHook(request.op, testHooks) : invokeKernelOperation(kernel, request);
 }
 
 main().catch((error: unknown) => {
