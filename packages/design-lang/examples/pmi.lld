@@ -1,0 +1,9 @@
+# Pin in a bored plate: hole 20 +0.021/0 with pin 20 -0.007/-0.020 (GDT SU-03), and a floating-fastener check, with the pmi toolset
+design pin_fit units=mm
+param d = 20
+add_box plate size=[60, 40, 10] anchor=min position=[0, 0, 0]
+add_cylinder pin radius=d/2 height=30 anchor=base-center position=[30, 20, -5]
+check volume of=plate expect == 60*40*10
+check analyze_stackup contributors=[{"name":"Dhole","nominal":20,"upper":0.021,"lower":0},{"name":"Dpin","nominal":20,"upper":-0.007,"lower":-0.02}] expression="Dhole-Dpin" path=worstCase.min expect ~= 0.007 ± 0.000001
+check analyze_stackup contributors=[{"name":"Dhole","nominal":20,"upper":0.021,"lower":0,"sensitivity":1},{"name":"Dpin","nominal":20,"upper":-0.007,"lower":-0.02,"sensitivity":-1}] path=rss.halfTolerance expect ~= 0.012349089 ± 0.000001
+check fastener_tolerance holeMmc=6.6 fastenerMmc=6 type="floating" path=positionTolerance expect ~= 0.6 ± 0.000001

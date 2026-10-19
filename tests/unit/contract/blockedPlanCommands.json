@@ -33,9 +33,6 @@
       "add_datum_feature",
       "add_geometric_tolerance"
     ],
-    "docs/aerospace/03-gdt-mbd-pmi/validation/draft_plan_stackup_su01.json": [
-      "analyze_stackup"
-    ],
     "docs/aerospace/06-composites/validation/plans/cmp-cone-flat-pattern.json": [
       "add_ply",
       "create_composite_part",

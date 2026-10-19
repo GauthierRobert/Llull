@@ -26,6 +26,7 @@ export const TOOLSET_NAMES = [
   'piping',
   'civil',
   'design',
+  'pmi',
 ] as const;
 
 export type ToolsetName = (typeof TOOLSET_NAMES)[number];
@@ -56,6 +57,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'add_box add_cylinder add_sphere add_cone add_torus add_helix_spring add_bearing add_wedge add_pyramid extrude_profile revolve_profile sweep_profile loft_sections boolean blend_union fillet_edge chamfer_edge shell_solid inspect_topology inspect_faces add_spur_gear add_internal_gear add_planetary_gearset add_bevel_gear add_bevel_gear_pair add_spline_shaft add_keyed_shaft pattern_along_path add_decal remove_decal add_subdivision_solid edit_subdivision_cage surface_from_curves',
   ),
   measure: words('measure_distance measure_angle measure_area measure_perimeter measure_bounding_box mass_properties'),
+  pmi: words('analyze_stackup fastener_tolerance'),
   parametric: words(
     'replay_history set_step_suppressed edit_step_params reorder_step delete_step insert_step create_configuration activate_configuration add_constraint delete_constraint update_constraint solve_constraints save_recipe instantiate_recipe',
   ),
