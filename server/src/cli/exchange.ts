@@ -1,6 +1,6 @@
 /**
  * The exchange tools (export_step, import_step, import_dwg, import_code), the FE tools (fea_mesh, fea_solve, fea_export, fea_import_field) and
- * the native transports (fatigue_field, fea_map_field: `server/src/native/tools.ts`, local documents only) in the
+ * the native transports (fatigue_field, fea_map_field, fea_render: `server/src/native/tools.ts`, run by `runExchangeTool`) in the
  * `llull` CLI. They are not registry commands — Python / DWG / solver I/O sits behind ports — so the CLI runs the same MCP-layer handlers: in-process for a local --doc (document changes via `execute`), `POST /exchange`
  * for --app / --server. `file=<path>` reads a local file into the tool's content parameter.
  */
@@ -13,7 +13,7 @@ import { isRecord } from '@lib/isRecord';
 import { runExchangeTool } from '../exchangeResult';
 import type { ExchangeOptions } from '../pythonExchange';
 import type { CommandOutcome } from '@mcp/restProtocol';
-import { nativeToolDefinitions, runNativeTool } from '../native/tools';
+import { nativeToolDefinitions } from '../native/tools';
 
 let definitions: readonly McpToolDefinition[] | null = null;
 
@@ -66,10 +66,8 @@ interface LocalExchangeContext {
   readonly runCommand: (name: string, params: unknown) => CommandOutcome;
 }
 
-/** Run an exchange tool in-process against a local document. */
+/** Run an exchange tool (native transports included) in-process against a local document. */
 export async function runLocalExchange(name: string, params: unknown, context: LocalExchangeContext): Promise<CommandOutcome> {
-  const native = await runNativeTool(name, params, { getDoc: context.getDoc, applyCommand: context.runCommand });
-  if (native !== null) return native;
   const outcome = await runExchangeTool(name, params, context.options, { getDoc: context.getDoc, applyCommand: context.runCommand });
   if (outcome === null) throw new Error(`${name} is not an exchange tool.`);
   return outcome;

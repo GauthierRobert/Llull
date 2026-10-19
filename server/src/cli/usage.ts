@@ -25,9 +25,9 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
   fea_import_field analysisId=ID file=T.csv coordinatesUnit=mm temperatureUnit=degC   temperature table x,y,z,T -> thermo_static field
                               (works locally and with --app / --server; artifacts: $LLULL_FEA_CACHE)
   fatigue_field caseId=ID     native llull-compute: rainflow + Miner damage on every FE node, then compute_fatigue
-                              [timeoutS=600 verify=true]  (local --doc; needs llull-compute, $LLULL_COMPUTE)
+                              [timeoutS=600 verify=true]  (--doc, --app, --server: runs where the document lives; $LLULL_COMPUTE)
   fea_map_field analysisId=ID native llull-compute: interpolate the thermal result onto the mechanical mesh
-                              (fea_solve does it itself from $LLULL_NATIVE_MAP_MIN_NODES nodes; local --doc)
+                              (fea_solve does it itself from $LLULL_NATIVE_MAP_MIN_NODES nodes)
   fea_render analysisId=ID [render_fea_results params] raster=auto|ts|cpu|gpu --save plot.png
                               the same plot with the pixel raster in llull-compute (cpu = bit-identical twin, gpu = picture)
   register_material_library file=LIB.llull-matlib.json   copy a material library into $LLULL_LIBRARIES_DIR (~/.llull/libraries); then

@@ -734,7 +734,7 @@ light, normal, part), `rasterPixels` (z-buffer, edges, bands, resolve: the refer
 `fieldPlotSvg` into `fieldPlotLayout` + `finish`; the plot set-up of `render_fea_results` moved to `results/plotRequest.ts` (behaviour and schema
 unchanged) so a host can draw the same plot. `llull-compute raster` (crate `solver/crates/llull-raster`): a CPU twin of `rasterPixels`
 (bit-identical RGBA and float32 depth: `solver/crates/llull-raster/tests/reference.rs`, fixtures from `tests/unit/native/rasterReference.test.ts`)
-and a wgpu path behind the cargo feature `gpu` (GPU z-buffer, CPU resolve). Transport `fea_render` (CLI, local document; same params and data
+and a wgpu path behind the cargo feature `gpu` (GPU z-buffer, CPU resolve). Transport `fea_render` (CLI on a local document, and through `POST /exchange` for `--app` / `--server` since 2026-10-19, same SVG remotely: `server/tests/nativeExchange.test.ts`; same params and data
 as `render_fea_results` plus `raster: auto | ts | cpu | gpu` and `data.raster = { engine, deterministic, device?, reason?, elapsedMs }`;
 `server/src/native/renderField.ts`); a missing binary or GPU falls back to the TS raster with the reason.
 

@@ -12,6 +12,7 @@ import type { CommandOutcome } from '@mcp/restProtocol';
 import type { ExchangeCommandResult } from '@mcp/exchangeTools';
 import type { ExchangeOptions } from './pythonExchange';
 import { isRecord } from '@lib/isRecord';
+import { runNativeTool } from './native/tools';
 
 const AFFECTED_LINE = /^Affected entity ids: (.+)$/;
 
@@ -61,7 +62,9 @@ export interface ExchangeHost {
 
 /**
  * Run an exchange tool and answer the command-bus shape plus `changed` (the host document was
- * replaced). null = `name` is not an exchange tool. The one wiring of ports + host for REST and CLI.
+ * replaced). null = `name` is not an exchange tool. The one wiring of ports + host for REST and CLI:
+ * the native transports (fatigue_field, fea_map_field, fea_render: `native/tools.ts`) run here too,
+ * so a local `--doc`, `--app` and `--server` (`POST /exchange`) reach the same handlers.
  */
 export async function runExchangeTool(
   name: string,
@@ -69,6 +72,8 @@ export async function runExchangeTool(
   exchange: ExchangeOptions,
   host: ExchangeHost,
 ): Promise<CommandOutcome | null> {
+  const native = await runNativeTool(name, params, host);
+  if (native !== null) return native;
   const before = host.getDoc();
   const shaped = await applyExchangeToolCall(name, params, exchangeDepsOf(exchange, host));
   if (shaped === null) return null;

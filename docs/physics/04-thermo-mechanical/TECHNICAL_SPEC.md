@@ -474,5 +474,9 @@ throws `RangeError: Maximum call stack size exceeded`, so the TS mapping could n
 with the binary (`server/tests/nativeTransports.test.ts`). Measured (4 vCPU): 202 776 target nodes on a 201 600-element source: TS 30.0 s,
 native 1.44 s (1.64 s with job I/O) — §8 budget (≤ 5 s) met; building the request in TS (node hash, value map) takes 3.4 s at that size.
 
+**Remote hosts (2026-10-19).** `fea_map_field` runs in `runExchangeTool` (`server/src/exchangeResult.ts`) like the FE transports, so
+`llull --app` / `--server` reach it through `POST /exchange`: the job runs on the host of the live document and stores the field in that host's
+`LLULL_FEA_CACHE`; same report and stored field as a local run (`server/tests/nativeExchange.test.ts`).
+
 **Deviation:** the artifact is bound to the hash of the mechanical mesh NODES (ids + coordinates, all the mapping reads), not to the canonical
 mesh artifact hash: the canonical hash of a 200k-node mesh costs 8 s in TS, the node hash 0.4–3 s.
