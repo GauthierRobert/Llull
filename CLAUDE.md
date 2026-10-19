@@ -1,6 +1,16 @@
 # llull — agent operating manual
 
-MCP-first **2D + 3D** CAD web app (AutoCAD-like): 2D drafting + 3D solids in one document.
+**Local-first 2D + 3D CAD** (AutoCAD-like): 2D drafting + 3D solids in one document, used through the **desktop app** (Electron)
+and the **`llull` CLI** on the user's own machine.
+
+## PRODUCT DIRECTIVE (owner, 2026-10-19 — binding)
+
+- **CLI + local only.** No browser / web deployment, no PWA, no cloud host. The React UI runs only inside the Electron desktop app;
+  agents drive llull through the `llull` CLI (`--app` for the open desktop app). MCP is being removed.
+- **Optimize for that.** Native code (Rust sidecars, native OCCT kernel, local GPU) is the target path; anything that exists only to
+  make llull run in a browser (WASM kernels as the primary path, browser-only fallbacks, PWA, web hosting, browser e2e) is legacy:
+  do not extend it, and remove it once its native replacement is the default (plan: `docs/decisions/LC1-local-only.md`).
+- Still true: offline, no network needed (AF-41); every change goes through a registered command (PRIME DIRECTIVE).
 
 ## PRIME DIRECTIVE
 
@@ -11,9 +21,10 @@ One registered command = one UI action + one MCP tool. Editing entities in a com
 
 React 19 + TS strict + Vite · three.js + r3f + drei (3D perspective; 2D = same scene, ortho top-down) ·
 Zustand (one store, `dispatch`) · zod v4 (one schema per command → TS type + MCP JSON Schema + validation) ·
-kernels Manifold (default) / OpenCascade.js behind `GeometryKernel` · Vitest + Testing Library ·
-ESLint flat + Prettier + knip · Express (optional MCP host + live doc) · Electron `desktop/` + bundled CPython/CadQuery ·
-agents: local = `llull` CLI (`--app` drives desktop), cloud = MCP `/mcp`.
+kernels behind `GeometryKernel`: native OCCT sidecar `llull-kernel` (target), OpenCascade.js / Manifold WASM (legacy) ·
+Rust workspace `solver/` (`llull-compute`, `llull-kernel`) · Vitest + Testing Library · ESLint flat + Prettier + knip ·
+Express local backend (live doc, CLI host) · Electron `desktop/` + bundled CPython/CadQuery + native binaries ·
+agents: `llull` CLI only (`--app` drives the desktop app); MCP `/mcp` is legacy, being removed.
 Not fixed: use the best-suited language / library for each task (e.g. Rust + wgpu for GPU solvers) — `conventions.md` C7.
 
 ## LAYER MAP (npm workspaces `packages/*`; web app + `server/` at root)
