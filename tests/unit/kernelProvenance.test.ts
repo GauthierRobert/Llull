@@ -54,6 +54,11 @@ describe('kernel_info', () => {
     expect(result.affected).toEqual([]);
   });
 
+  it('reports a native sidecar kernel isolated in its own process', () => {
+    const native = fakeExactKernel({ info: { ...OCC_INFO, occtVersion: '7.9.2', build: 'llull-kernel', isolation: 'process' } }).kernel;
+    expect(infoOf(createEmptyDocument(), native)).toMatchObject({ active: 'occt', occtVersion: '7.9.2', isolation: 'process' });
+  });
+
   it('reports a Manifold kernel and no kernel at all', () => {
     const manifold = infoOf(
       createEmptyDocument(),

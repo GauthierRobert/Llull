@@ -753,6 +753,20 @@ within its 2.5 w. MVP is about 12 weeks of agent lane time. M1 and M2 run in par
     large case as a job and return the same envelope. Proposal: blocking call in the MVP of RS-6; revisit if the UI needs
     cancellation.
 
-## 12. References
+## 12. Implementation status
+
+- **TR-FPR-19 implemented (RS-6 prerequisite, TS only).** `packages/core/src/geometry/geometryQueries.ts`: port `GeometryQueryEngine`
+  with `provenance { engine, device, deterministic }`, `limits { maxViewFactorFacets, maxThicknessRays }` and the batch methods
+  `minDistanceBatch(meshes, poses, pairs, maxDistance)` (result `[pose][pair]`), `rayCastBatch(mesh, rays, maxT)` and
+  `segmentOcclusionBatch(occluders, segments)`, all in input order. Default `meshBvhEngine` on `meshBvh`; optional
+  `ExecutionContext.geometryQueries` (null/absent = default); `setGeometryQueryEngine` is the composition root's hook. No native
+  engine yet (RS-6).
+- Callers through the port: the wall-thickness rays of `check_assembly` (engine provenance in `data.geometryQueries` when rays ran;
+  the ray budget is `limits.maxThicknessRays`) and the obstruction test of `compute_view_factors` (PHY-03). Pair classification of
+  `check_assembly` stays on `kernel.distance` / `analyze` (kernel-exact, not a mesh query). `check_motion_clearance` still calls
+  `meshBvh` directly: moving it onto `minDistanceBatch` is the remaining RS-6 wiring (poses there carry per-mesh start offsets).
+- Tests: `tests/unit/geometryQueries.test.ts`.
+
+## 13. References
 
 See [`validation/sources.md`](validation/sources.md) and the research notes in [`validation/research/`](validation/research/).

@@ -17,7 +17,7 @@ import { type StepEntry, stepLabels, stepTargets } from './stepTargets';
 import { exportRefusal, noop, report } from '../noop';
 import { fixedNumber } from '../../lib/compactNumber';
 
-const OCC_HINT = 'the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)';
+const OCC_HINT = 'the OCC kernel (the desktop default; LLULL_KERNEL=occt-native or occt for the CLI and server)';
 
 /** Edges listed in the summary itself; the full list is always in `data.edges`. */
 const SUMMARY_EDGE_LIMIT = 24;

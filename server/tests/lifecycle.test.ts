@@ -32,14 +32,14 @@ describe('startServer', () => {
     expect(process.listenerCount('SIGTERM')).toBe(sigterm);
   }, 60_000);
 
-  it('refuses an unsafe bind before opening a socket', async () => {
+  it('refuses a non-loopback bind before opening a socket, even with a token', async () => {
     const previous = process.env['MCP_AUTH_TOKEN'];
-    delete process.env['MCP_AUTH_TOKEN'];
-    delete process.env['LLULL_ALLOW_UNAUTHENTICATED'];
+    process.env['MCP_AUTH_TOKEN'] = 'token';
     try {
-      await expect(startServer(express(), 0, '0.0.0.0')).rejects.toThrow(/MCP_AUTH_TOKEN/);
+      await expect(startServer(express(), 0, '0.0.0.0')).rejects.toThrow(/not a loopback address/);
     } finally {
-      if (previous !== undefined) process.env['MCP_AUTH_TOKEN'] = previous;
+      if (previous === undefined) delete process.env['MCP_AUTH_TOKEN'];
+      else process.env['MCP_AUTH_TOKEN'] = previous;
     }
   });
 });

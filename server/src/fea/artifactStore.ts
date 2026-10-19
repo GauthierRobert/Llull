@@ -2,6 +2,8 @@
  * Content-addressed FE artifact store: `<dir>/<sha256>.json.gz` where sha256 = `sha256Hex(canonicalJson(artifact))`.
  * The read side is the `FeArtifactPort` the registry commands re-verify artifacts through (record_fe_mesh / record_fea_results):
  * a file whose content no longer hashes to its name (tamper, truncation) or whose `kind` is unknown reads as absent.
+ * Derived artifacts (native FatigueField, mapped fields: RS1 RS-7) are also reachable under their INPUT hash: `alias(key, hash)` writes
+ * `<dir>/<key>.ref` naming the content hash, and `get(key)` follows it to a content-verified file (the reader then checks the bindings).
  * Environment: LLULL_FEA_CACHE  directory (default ~/.llull/cache/fea)
  */
 
@@ -22,6 +24,12 @@ export interface FeArtifactStore extends FeArtifactPort {
   readonly directory: string;
 }
 
+/** A store whose artifacts can also be found under an input-hash key (the native jobs' results). */
+export interface FeArtifactCache extends FeArtifactStore {
+  /** Makes `get(key)` return the artifact stored under content hash `hash` (overwrites an older alias). */
+  alias(key: string, hash: string): void;
+}
+
 const HASH = /^[0-9a-f]{64}$/;
 
 export function feaCacheDir(env: NodeJS.ProcessEnv = process.env): string {
@@ -35,8 +43,30 @@ function isArtifact(value: unknown): value is FeArtifact {
   return isRecord(value) && (value['kind'] === 'fe_mesh' || value['kind'] === 'fe_results' || value['kind'] === 'fe_table');
 }
 
-export function createFeArtifactStore(directory: string): FeArtifactStore {
+function writeAtomically(target: string, bytes: Buffer | string): void {
+  const partial = `${target}.${process.pid}.tmp`;
+  writeFileSync(partial, bytes);
+  renameSync(partial, target);
+}
+
+export function createFeArtifactStore(directory: string): FeArtifactCache {
   const fileOf = (hash: string): string => path.join(directory, `${hash}.json.gz`);
+  const read = (hash: string): FeArtifact | null => {
+    try {
+      const parsed: unknown = JSON.parse(gunzipSync(readFileSync(fileOf(hash))).toString('utf8'));
+      return isArtifact(parsed) && hashArtifact(parsed) === hash ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+  const aliasTarget = (key: string): string | null => {
+    try {
+      const named = readFileSync(path.join(directory, `${key}.ref`), 'utf8').trim();
+      return HASH.test(named) ? named : null;
+    } catch {
+      return null;
+    }
+  };
   return {
     directory,
     put(artifact) {
@@ -44,27 +74,27 @@ export function createFeArtifactStore(directory: string): FeArtifactStore {
       const target = fileOf(hash);
       if (existsSync(target)) return hash;
       mkdirSync(directory, { recursive: true });
-      const partial = `${target}.${process.pid}.tmp`;
-      writeFileSync(partial, gzipSync(JSON.stringify(artifact)));
-      renameSync(partial, target);
+      writeAtomically(target, gzipSync(JSON.stringify(artifact)));
       return hash;
+    },
+    alias(key, hash) {
+      if (!HASH.test(key) || !HASH.test(hash)) throw new Error(`artifact alias needs two sha256 hex hashes, got '${key}' -> '${hash}'`);
+      mkdirSync(directory, { recursive: true });
+      writeAtomically(path.join(directory, `${key}.ref`), hash);
     },
     get(hash) {
       if (!HASH.test(hash)) return null;
-      try {
-        const parsed: unknown = JSON.parse(gunzipSync(readFileSync(fileOf(hash))).toString('utf8'));
-        return isArtifact(parsed) && hashArtifact(parsed) === hash ? parsed : null;
-      } catch {
-        return null;
-      }
+      if (existsSync(fileOf(hash))) return read(hash);
+      const named = aliasTarget(hash);
+      return named === null ? null : read(named);
     },
   };
 }
 
-let shared: FeArtifactStore | null = null;
+let shared: FeArtifactCache | null = null;
 
 /** The process-wide store (`LLULL_FEA_CACHE`, read once). */
-export function defaultFeArtifactStore(): FeArtifactStore {
+export function defaultFeArtifactStore(): FeArtifactCache {
   shared ??= createFeArtifactStore(feaCacheDir());
   return shared;
 }

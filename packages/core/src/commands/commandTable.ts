@@ -35,7 +35,7 @@ export function getCommand(name: string): CommandDefinition<unknown> | undefined
   return byName.get(name);
 }
 
-/** One registry entry as an AI/MCP tool schema. */
+/** One registry entry as an AI / CLI tool schema. */
 export interface ToolSchema {
   name: string;
   description: string;
@@ -51,7 +51,7 @@ function toolAnnotations(def: CommandDefinition<unknown>): ToolSchema['annotatio
   return Object.keys(ann).length > 0 ? ann : undefined;
 }
 
-/** Generate AI/MCP tool schemas from the registry. */
+/** Generate AI / CLI tool schemas from the registry (`llull describe`, the CLI catalog). */
 export function toToolSchemas(): ToolSchema[] {
   return definitions.map((d) => {
     const annotations = toolAnnotations(d);

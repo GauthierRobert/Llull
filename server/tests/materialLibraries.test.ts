@@ -10,7 +10,7 @@ import path from 'node:path';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
 import { libraryHash } from '@core/commands/materials/libraryFormat';
 import type { MaterialLibrary } from '@core/model/materialLibrary';
-import { applyExchangeToolCall } from '@mcp/exchangeTools';
+import { applyExchangeToolCall } from '@protocol/exchangeTools';
 import { makeFakeRes, parseSseFrame } from './sseTestHelpers';
 import { applyCommand, canUndo, _resetHistory } from '../src/commandBus';
 import { getLiveDoc, getLiveSnapshot, _resetLiveDoc, subscribeLive } from '../src/liveDocument';

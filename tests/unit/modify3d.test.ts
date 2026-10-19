@@ -200,7 +200,7 @@ describe('modify3d commands', () => {
       expectSourceKept(result, doc, boxId);
       expect(result.summary).toContain('returned null');
       expect(result.summary).toContain('could not round these edges into a valid solid');
-      expect(result.summary).not.toContain('Try ?kernel=occt');
+      expect(result.summary).not.toContain('Use the OCC kernel');
     });
     it('no-op when the result has no closed mesh; source not pruned', () => {
       setGeometryKernel((fake = freshKernel({ [op]: { positions: [], indices: [] } })));
@@ -215,7 +215,7 @@ describe('modify3d commands', () => {
       const result = run(doc, boxId);
       expectSourceKept(result, doc, boxId);
       expect(result.summary).toContain(`does not support`);
-      expect(result.summary).toContain('LLULL_KERNEL=occt on the server');
+      expect(result.summary).toContain('LLULL_KERNEL=occt-native or occt');
     });
     it('is pure — input doc not mutated on success', () => {
       const { doc, boxId } = docWithBox();

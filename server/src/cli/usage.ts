@@ -1,4 +1,4 @@
-export const USAGE = `llull — the CAD command registry from a shell (same commands as the UI and MCP).
+export const USAGE = `llull — the CAD command registry from a shell (same commands as the desktop app).
 
 Usage: llull <subcommand> [args] [flags]
 
@@ -24,6 +24,12 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
   fea_export analysisId=ID    the CalculiX .inp deck (text + sha256)  [--save deck.inp]
   fea_import_field analysisId=ID file=T.csv coordinatesUnit=mm temperatureUnit=degC   temperature table x,y,z,T -> thermo_static field
                               (works locally and with --app / --server; artifacts: $LLULL_FEA_CACHE)
+  fatigue_field caseId=ID     native llull-compute: rainflow + Miner damage on every FE node, then compute_fatigue
+                              [timeoutS=600 verify=true]  (--doc, --app, --server: runs where the document lives; $LLULL_COMPUTE)
+  fea_map_field analysisId=ID native llull-compute: interpolate the thermal result onto the mechanical mesh
+                              (fea_solve does it itself from $LLULL_NATIVE_MAP_MIN_NODES nodes)
+  fea_render analysisId=ID [render_fea_results params] raster=auto|ts|cpu|gpu --save plot.png
+                              the same plot with the pixel raster in llull-compute (cpu = bit-identical twin, gpu = picture)
   register_material_library file=LIB.llull-matlib.json   copy a material library into $LLULL_LIBRARIES_DIR (~/.llull/libraries); then
                               import_material_library libraryId=ID version=V sha256=H, and resolve_material_libraries after a load
   run <plan.json | ->         build_project: an actions array or { actions, onError }

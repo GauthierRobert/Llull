@@ -22,6 +22,9 @@ export interface MappingReport {
 export interface MappedField {
   readonly ok: true;
   readonly values: readonly number[];
+  /** Source element used per target node (0-based index in block / element order) and the distance moved to it (0 inside). */
+  readonly elements: readonly number[];
+  readonly distances: readonly number[];
   readonly report: MappingReport;
 }
 
@@ -200,16 +203,9 @@ export function mapNodalField(
     elements,
     elements.map((_, i) => i),
   );
-  const low = [0, 1, 2].map((axis) => Math.min(...source.nodes.map((node) => node[axis + 1] ?? 0)));
-  const high = [0, 1, 2].map((axis) => Math.max(...source.nodes.map((node) => node[axis + 1] ?? 0)));
-  const size = Math.hypot(...high.map((h, axis) => h - (low[axis] ?? 0)));
-  const tolerance = 1e-9 * size;
-  const exact = new Map<string, number>(source.nodes.map(([id, x, y, z]) => [`${x}|${y}|${z}`, id]));
   const values: number[] = [];
-  let maxDistance = 0;
-  let outside = 0;
-  let coincident = 0;
-  let coincidentError = 0;
+  const used: number[] = [];
+  const distances: number[] = [];
   for (const [, x, y, z] of target.nodes) {
     const p: Vec = [x, y, z];
     const hit = locate(tree, elements, p);
@@ -225,19 +221,50 @@ export function mapNodalField(
       value += (weights[i] ?? 0) * nodal;
     }
     values.push(value);
-    if (hit.distance > tolerance) {
+    used.push(hit.element);
+    distances.push(hit.distance);
+  }
+  return { ok: true, values, elements: used, distances, report: mappingReport(source, sourceValues, target, values, distances) };
+}
+
+/**
+ * The TR-TMC-23 report of mapped `values` / `distances` (aligned with `target.nodes`): nodes moved by more than 1e-9 x the source size, the
+ * largest such move, and the largest error at target nodes that coincide with a source node. Shared by the TS mapping and the native
+ * mapped-field reader, so both report alike. Loops, not spreads: meshes of 200k nodes overflow `Math.min(...array)`.
+ */
+export function mappingReport(
+  source: FeMeshArtifact,
+  sourceValues: ReadonlyMap<number, number>,
+  target: FeMeshArtifact,
+  values: readonly number[],
+  distances: readonly number[],
+): MappingReport {
+  const low = [Infinity, Infinity, Infinity];
+  const high = [-Infinity, -Infinity, -Infinity];
+  for (const node of source.nodes)
+    for (let axis = 0; axis < 3; axis += 1) {
+      const value = node[axis + 1] ?? 0;
+      if (value < (low[axis] ?? 0)) low[axis] = value;
+      if (value > (high[axis] ?? 0)) high[axis] = value;
+    }
+  const size = Math.hypot(...high.map((h, axis) => h - (low[axis] ?? 0)));
+  const tolerance = 1e-9 * size;
+  const exact = new Map<string, number>(source.nodes.map(([id, x, y, z]) => [`${x}|${y}|${z}`, id]));
+  let maxDistance = 0;
+  let outside = 0;
+  let coincident = 0;
+  let coincidentError = 0;
+  for (const [index, [, x, y, z]] of target.nodes.entries()) {
+    const distance = distances[index] ?? Number.NaN;
+    if (distance > tolerance) {
       outside += 1;
-      maxDistance = Math.max(maxDistance, hit.distance);
+      maxDistance = Math.max(maxDistance, distance);
     }
     const same = exact.get(`${x}|${y}|${z}`);
     if (same !== undefined) {
       coincident += 1;
-      coincidentError = Math.max(coincidentError, Math.abs(value - (sourceValues.get(same) ?? Number.NaN)));
+      coincidentError = Math.max(coincidentError, Math.abs((values[index] ?? Number.NaN) - (sourceValues.get(same) ?? Number.NaN)));
     }
   }
-  return {
-    ok: true,
-    values,
-    report: { maxMappingDistance: maxDistance, outside, coincidentMaxError: coincidentError, coincidentNodes: coincident },
-  };
+  return { maxMappingDistance: maxDistance, outside, coincidentMaxError: coincidentError, coincidentNodes: coincident };
 }

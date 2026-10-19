@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import type { DocumentUnit } from '@core/model/types';
-import type { DwgImportTarget } from '@mcp/restProtocol';
+import type { DwgImportTarget } from '@protocol/restProtocol';
 import { useStore } from '@ui/store';
 import { fileStem } from '@ui/chosenFile';
 import { FileField } from '@ui/panels/FileField';

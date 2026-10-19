@@ -15,6 +15,7 @@ export default tseslint.config(
       '.claude/worktrees/**',
       'desktop/build/**',
       'desktop/release/**',
+      'solver/target/**', // OCCT's cmake build tree (RS-1) writes compiler_depend.ts files
     ],
   },
   js.configs.recommended,

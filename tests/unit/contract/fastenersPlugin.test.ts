@@ -6,7 +6,7 @@ import { pluginToolNames } from '@core/plugins/host';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { CadDocument } from '@core/model/types';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
-import { TOOLSETS, toolsetOf } from '@mcp/toolsets';
+import { TOOLSETS, toolsetOf } from '@protocol/toolsets';
 import { ctxWith, docWith, inchDocument, ok, sampleCatalogFile } from '../aero/fasteners/fixtures';
 
 const NAMES = [

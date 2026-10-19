@@ -1,0 +1,20 @@
+[package]
+name = "llull-kernel-occt"
+description = "OpenCascade (OCCT 7.9.2, shared, LGPL-2.1 dynamic linking) behind a narrow cxx facade for the native llull kernel (RS-1)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+# Exports DEP_OCCT_LIB_DIR / DEP_OCCT_BIN_DIR to dependents (runtime search path of the shared toolkits).
+links = "occt"
+
+[dependencies]
+cxx = "1"
+serde_json.workspace = true
+sha2.workspace = true
+
+[build-dependencies]
+cxx-build = "1"
+
+[lints]
+workspace = true

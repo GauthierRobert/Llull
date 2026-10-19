@@ -61,11 +61,13 @@ Rules:
    tolerance (one "native vs reference" VC per row).
 5. **Offline and bundled (AF-41).** `desktop/scripts/prepare-native.mjs` builds or fetches the two binaries per OS / arch (like
    CPython and `ccx`); missing binaries refuse with `NATIVE_TOOL_MISSING` and an install hint. llull stays fully usable without them
-   (TypeScript paths, smaller caps).
+   (TypeScript paths, smaller caps). Bundle layout `resources/native/{llull-compute,llull-kernel,occt/lib/*,licenses/}`; the desktop
+   backend gets `LLULL_NATIVE_DIR` only when the bundle holds a binary.
 6. **Gates.** `cargo test` + `cargo clippy -D warnings` run as `npm run native:check`, part of `npm run check` when `cargo` is present
    and in CI always. GPU tests run where an adapter exists and skip with a logged reason otherwise; every GPU kernel has a CPU twin, so
    every VC has a CI path.
-7. **Licences.** wgpu MIT / Apache-2.0; OCCT LGPL-2.1 with exception (dynamic linking, as today); faer MIT; las / laz-rs / e57 crates
+7. **Licences.** wgpu MIT / Apache-2.0; OCCT LGPL-2.1 with exception (dynamic linking: shared OCCT 7.9.2 built by
+   `solver/scripts/build-occt.mjs`, shipped beside `llull-kernel` with the LGPL text, the exception and a source / relink notice); faer MIT; las / laz-rs / e57 crates
    MIT or Apache; PyFR BSD (12 CFD V2). Nothing GPL is linked into the binaries.
 
 ## 3. Programme (priority order)

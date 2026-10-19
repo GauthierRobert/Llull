@@ -2,7 +2,7 @@
 
 import type { FeMeshArtifact } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
-import type { FeaToolResult } from '@mcp/index';
+import type { FeaToolResult } from '@protocol/index';
 import type { FeArtifactStore } from './artifactStore';
 import type { CaeHooks } from './caeHooks';
 

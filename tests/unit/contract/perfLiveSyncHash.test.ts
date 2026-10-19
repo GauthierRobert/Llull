@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createEmptyDocument, type CadDocument, type Entity, type ShapeRecipe } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { makeBlob, withBlob } from '@core/model/blobs';
-import { documentHash } from '@mcp/liveSync';
+import { documentHash } from '@protocol/liveSync';
 
 afterEach(() => vi.restoreAllMocks());
 

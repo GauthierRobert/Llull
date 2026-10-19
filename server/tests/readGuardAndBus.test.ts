@@ -1,6 +1,6 @@
 /**
  * guardRead (token / loopback / proxy), SSE backpressure + subscriber cap, idempotency cache rules,
- * MCP session cap, unreadable-autosave quarantine.
+ * unreadable-autosave quarantine.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -11,11 +11,10 @@ import request from 'supertest';
 import { app } from '../src/index';
 import { _resetLiveDoc, subscribeLive, liveSubscriberCount, MAX_LIVE_SUBSCRIBERS } from '../src/liveDocument';
 import { _resetHistory, applyCommand, canUndo, undo } from '../src/commandBus';
-import { evictForCapacity, sessions } from '../src/mcp/sessions';
 import type { Response } from 'express';
 
 const TOKEN = 'secret-token';
-const ENV_KEYS = ['MCP_AUTH_TOKEN', 'LLULL_REQUIRE_TOKEN_FOR_REST', 'MCP_MAX_SESSIONS'];
+const ENV_KEYS = ['MCP_AUTH_TOKEN', 'LLULL_REQUIRE_TOKEN_FOR_REST'];
 
 beforeEach(() => {
   _resetLiveDoc();
@@ -23,7 +22,6 @@ beforeEach(() => {
 });
 afterEach(() => {
   for (const key of ENV_KEYS) delete process.env[key];
-  sessions.clear();
 });
 
 describe('guardRead', () => {
@@ -32,7 +30,7 @@ describe('guardRead', () => {
     expect((await request(app).get('/export/stl')).status).toBe(200);
   });
 
-  it('with a token: rejects bare loopback requests, accepts bearer and ?access_token=', async () => {
+  it('with a token: rejects bare loopback requests and ?access_token=, accepts bearer', async () => {
     process.env['MCP_AUTH_TOKEN'] = TOKEN;
     expect((await request(app).get('/live/snapshot')).status).toBe(401);
     expect((await request(app).get('/export/stl')).status).toBe(401);
@@ -40,9 +38,7 @@ describe('guardRead', () => {
     const bearer = await request(app).get('/live/snapshot').set('Authorization', `Bearer ${TOKEN}`);
     expect(bearer.status).toBe(200);
     const query = await request(app).get('/live/snapshot').query({ access_token: TOKEN });
-    expect(query.status).toBe(200);
-    const wrong = await request(app).get('/live/snapshot').query({ access_token: 'nope' });
-    expect(wrong.status).toBe(401);
+    expect(query.status).toBe(401);
   });
 
   it('with a token: the local UI (allowed Origin, loopback) still reads', async () => {
@@ -107,19 +103,6 @@ describe('idempotency cache', () => {
     expect(canUndo()).toBe(false);
     expect(replay.canUndo).toBe(false);
     expect(replay.summary).toBe(first.summary);
-  });
-});
-
-describe('MCP session cap', () => {
-  it('evicts the oldest idle session when full', () => {
-    process.env['MCP_MAX_SESSIONS'] = '2';
-    const close = vi.fn().mockResolvedValue(undefined);
-    const entry = (lastSeenMs: number): never => ({ transport: { close }, lastSeenMs }) as never;
-    sessions.set('old', entry(1));
-    sessions.set('new', entry(2));
-    evictForCapacity();
-    expect([...sessions.keys()]).toEqual(['new']);
-    expect(close).toHaveBeenCalledTimes(1);
   });
 });
 

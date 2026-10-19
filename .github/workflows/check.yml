@@ -1,7 +1,7 @@
 # Runs the same gate as `npm run check` (typecheck + architecture rules + unused exports + lint +
 # format + tests)
-# plus the coverage gate, the server + desktop suites and the production builds (web, server; the image
-# job builds and smoke-tests the on-prem image), so the architecture laws hold for every change.
+# plus the coverage gate, the server + desktop suites and the production builds (renderer, server), so the
+# architecture laws hold for every change.
 name: check
 
 on:
@@ -12,6 +12,122 @@ permissions:
   contents: read
 
 jobs:
+  # Rust workspace solver/ (docs/decisions/RS1-native-compute.md): fmt + clippy -D warnings + tests of the default members.
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            solver/target
+          key: native-${{ runner.os }}-${{ hashFiles('solver/Cargo.lock', 'solver/**/Cargo.toml', 'solver/rust-toolchain.toml') }}
+          restore-keys: native-${{ runner.os }}-
+      # solver/rust-toolchain.toml pins the compiler + rustfmt / clippy (same lints as local builds).
+      - run: rustup toolchain install
+        working-directory: solver
+      - run: node scripts/nativeCheck.mjs
+
+  # Native OCCT kernel (RS-1): crate llull-kernel-occt + bin llull-kernel (clippy, cargo test), the native-vs-WASM parity suite, then
+  # the desktop native bundle. OCCT 7.9.2 is built SHARED by solver/scripts/build-occt.mjs (pinned source + sha256, ~60 min on 4 cores)
+  # into an install prefix cached by version + source sha + recipe; warm runs reuse it through LLULL_OCCT_DIR and take a few minutes.
+  native-kernel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      LLULL_OCCT_DIR: ${{ github.workspace }}/occt-7.9.2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+      - uses: actions/cache@v4
+        id: occt
+        with:
+          path: occt-7.9.2
+          key: occt-7.9.2-f6e272b6-${{ runner.os }}-${{ hashFiles('solver/scripts/build-occt.mjs') }}
+      - name: Build OCCT 7.9.2 shared (cache miss only)
+        if: steps.occt.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get install -y ninja-build
+          node solver/scripts/build-occt.mjs
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: native-kernel-${{ runner.os }}-${{ hashFiles('solver/Cargo.lock') }}
+      - run: rustup toolchain install
+        working-directory: solver
+      - run: node scripts/nativeCheck.mjs
+        env:
+          LLULL_NATIVE_KERNEL: '1'
+      - run: cargo build --release -p llull-kernel
+        working-directory: solver
+      - run: npm ci
+      - run: npm --prefix server ci
+      - run: npx vitest run --config vitest.config.mts tests/nativeKernelParity.test.ts tests/nativeKernel.test.ts
+        working-directory: server
+        env:
+          LLULL_REQUIRE_NATIVE_KERNEL: '1'
+      # The desktop bundle as shipped: llull-compute (gpu), llull-kernel resolving OCCT via $ORIGIN/occt/lib only, licence notices.
+      - run: node desktop/scripts/prepare-native.mjs
+      - run: ldd desktop/build/native/llull-kernel && ! ldd desktop/build/native/llull-kernel | grep 'not found'
+
+  # The desktop native bundle on Windows (macOS deferred): OCCT 7.9.2 shared (cached per OS), llull-compute + llull-kernel, prepare-native.mjs
+  # (which runs both bundled binaries with --version), then the native kernel parity suite against the bundle itself.
+  native-bundle:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest] # macOS deferred (owner, 2026-10-19)
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    env:
+      LLULL_OCCT_DIR: ${{ github.workspace }}/occt-7.9.2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - uses: actions/cache@v4
+        id: occt
+        with:
+          path: occt-7.9.2
+          key: occt-7.9.2-f6e272b6-${{ runner.os }}-${{ hashFiles('solver/scripts/build-occt.mjs') }}
+      - name: Build OCCT 7.9.2 shared (cache miss only)
+        if: steps.occt.outputs.cache-hit != 'true'
+        run: node solver/scripts/build-occt.mjs
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: native-bundle-${{ runner.os }}-${{ hashFiles('solver/Cargo.lock', 'solver/rust-toolchain.toml') }}
+      - run: rustup toolchain install
+        working-directory: solver
+      - run: node desktop/scripts/prepare-native.mjs
+      - run: npm ci
+      - run: npm --prefix server ci
+      - run: npx vitest run --config vitest.config.mts tests/nativeKernelParity.test.ts tests/nativeKernel.test.ts tests/nativeBinary.test.ts
+        working-directory: server
+        env:
+          LLULL_REQUIRE_NATIVE_KERNEL: '1'
+          LLULL_NATIVE_DIR: ${{ github.workspace }}/desktop/build/native
+
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -44,7 +160,7 @@ jobs:
       - run: npm --prefix server test
       - run: npm --prefix desktop run typecheck
       - run: npm --prefix desktop test
-      # Production artifacts: the web bundle, the server bundle and the on-prem image must build.
+      # Production artifacts: the renderer bundle and the server bundle must build.
       - run: npm run build
       - run: npm --prefix server run build
 
@@ -69,21 +185,3 @@ jobs:
           path: |
             playwright-report
             test-results
-
-  # The on-prem image exactly as shipped (LibreDWG included, checksum-pinned), then a smoke run.
-  image:
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v4
-      - run: docker build -t llull:ci .
-      - name: Smoke-test the image
-        run: |
-          docker run --rm --entrypoint dwg2dxf llull:ci --version
-          docker run -d --name llull -p 127.0.0.1:3001:3001 llull:ci
-          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:3001/health && break; sleep 2; done
-          curl -fsS http://127.0.0.1:3001/health | grep -q '"status":"ok"'
-          curl -fsSI http://127.0.0.1:3001/ | grep -qi 'content-security-policy'
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3001/live/snapshot)" = 401
-      - if: failure()
-        run: docker logs llull || true

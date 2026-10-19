@@ -3,7 +3,7 @@
  * checked by `npm run arch` (part of `npm run check`) for every change, human or agent.
  * The PreToolUse hook gives agents early feedback; this file is the authority.
  *
- * Layers (one-way): desktop → server; src/ui, server → src/app → packages/{mcp, domain-aec, domain-cae, domain-aero, kernel-*, physics-*} → packages/core
+ * Layers (one-way): desktop → server; src/ui, server → src/app → packages/{protocol, domain-aec, domain-cae, domain-aero, kernel-*, physics-*} → packages/core
  * Inside core:      commands, codegen, plugins → dynamics → geometry → model → lib
  */
 
@@ -22,7 +22,7 @@ module.exports = {
     },
     {
       name: 'core-imports-no-package',
-      comment: 'L2/L10: packages/core is the bottom layer; plugins, kernels and mcp depend on it.',
+      comment: 'L2/L10: packages/core is the bottom layer; plugins, kernels and the protocol package depend on it.',
       severity: 'error',
       from: { path: '^packages/core/' },
       to: { path: '^(packages/(?!core/)|src/|server/)' },
@@ -66,10 +66,11 @@ module.exports = {
       },
     },
     {
-      name: 'mcp-is-a-view-of-the-registry',
-      comment: 'L5: MCP exposes the registry; it never depends on a plugin, a concrete kernel or a physics engine.',
+      name: 'protocol-is-a-view-of-the-registry',
+      comment:
+        'L5: the host protocol (CLI tools, live sync) exposes the registry; it never depends on a plugin, a concrete kernel or a physics engine.',
       severity: 'error',
-      from: { path: '^packages/mcp/' },
+      from: { path: '^packages/protocol/' },
       to: { path: '^packages/(domain-|kernel-|physics-)' },
     },
     {
@@ -102,7 +103,7 @@ module.exports = {
     },
     {
       name: 'server-is-thin',
-      comment: 'L6: the server hosts /mcp and the live document; it never imports the React app.',
+      comment: 'L6: the server hosts the live document and the CLI; it never imports the React app.',
       severity: 'error',
       from: { path: '^server/' },
       to: { path: '^src/ui/' },

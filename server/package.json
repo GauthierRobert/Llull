@@ -2,7 +2,7 @@
   "name": "llull-server",
   "version": "0.1.0",
   "private": true,
-  "description": "Express MCP host for llull",
+  "description": "llull local backend (live document, exchange, exports) and the llull CLI",
   "type": "commonjs",
   "bin": {
     "llull": "bin/llull.cjs"
@@ -10,13 +10,11 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc --noEmit && npm run bundle",
-    "bundle": "esbuild src/index.ts src/occtWorker.ts cli=src/cli/bin.ts --bundle --platform=node --target=node22 --format=cjs --packages=external --sourcemap --outdir=dist",
+    "bundle": "esbuild src/index.ts src/occtWorker.ts src/nativeKernelWorker.ts cli=src/cli/bin.ts --bundle --platform=node --target=node22 --format=cjs --packages=external --sourcemap --outdir=dist",
     "start": "node --enable-source-maps dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.mts",
     "test:watch": "vitest --config vitest.config.mts",
-    "agent:example": "tsx examples/mcp-agent.ts",
-    "demo:factory": "tsx examples/factory-demo.mts",
     "quality:step": "vitest run --config vitest.quality.config.mts",
     "quality:drawings": "vitest run --config vitest.quality.config.mts tests/quality/drawingCorpus.gate.ts",
     "production:scripted": "vitest run --config vitest.production.config.mts tests/production/scripted.gate.ts",
@@ -24,12 +22,11 @@
     "cli": "node bin/llull.cjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@mujoco/mujoco": "3.14.0",
     "@resvg/resvg-js": "^2.6.2",
     "cors": "^2.8.5",
     "express": "^5.3.0",
     "express-rate-limit": "^8.5.2",
-    "@mujoco/mujoco": "3.14.0",
     "manifold-3d": "^3.5.4",
     "opencascade.js": "^1.1.1",
     "zod": "^4.6.6"

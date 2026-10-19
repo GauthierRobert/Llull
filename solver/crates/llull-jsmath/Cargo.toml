@@ -1,0 +1,15 @@
+[package]
+name = "llull-jsmath"
+description = "Bit-exact twins of the JavaScript (V8) Math functions the TypeScript references use: pow, log, log10, hypot, round"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

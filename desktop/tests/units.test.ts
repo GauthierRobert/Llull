@@ -1,12 +1,12 @@
 /** Electron-free desktop modules: layout, backend env, port choice, CLI shim, menu. */
 
 import { describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { chooseBackendPort, DEFAULT_DESKTOP_PORT } from '../src/backend';
-import { backendEnv, backendOrigin } from '../src/backendEnv';
+import { backendEnv, backendOrigin, desktopKernel, hasNativeKernel, nativeBundleDir } from '../src/backendEnv';
 import { cliShimFor, installCliShim } from '../src/cliShim';
 import { bundledPythonOf, desktopLayout } from '../src/layout';
 import { agentHelpText, menuTemplate } from '../src/menu';
@@ -23,6 +23,7 @@ describe('desktopLayout', () => {
       serverEntry: path.join('/r', 'server', 'dist', 'index.js'),
       cliEntry: path.join('/r', 'server', 'dist', 'cli.js'),
       python: path.join('/r', 'python', 'bin', 'python3'),
+      nativeDir: path.join('/r', 'native'),
     });
   });
 
@@ -40,6 +41,7 @@ describe('desktopLayout', () => {
       path.join('/repo', 'desktop', 'build', 'python', 'bin', 'python3'),
     );
     expect(bundledPythonOf('C:\\py', 'win32')).toMatch(/python\.exe$/);
+    expect(layout.nativeDir).toBe(path.join('/repo', 'desktop', 'build', 'native'));
   });
 });
 
@@ -73,6 +75,56 @@ describe('backendEnv', () => {
   });
 });
 
+describe('backendEnv native bundle (RS1)', () => {
+  const layout = desktopLayout({ packaged: true, resourcesPath: '/r', repoRoot: '', platform: 'linux' });
+  const envWith = (nativeDir: string | null | undefined, baseEnv: Record<string, string> = {}): Record<string, string> =>
+    backendEnv({ port: 1, token: 't', layout, userDataDir: '/u', baseEnv, ...(nativeDir === undefined ? {} : { nativeDir }) });
+
+  it('passes LLULL_NATIVE_DIR only when the bundle exists, and never an inherited one', () => {
+    expect(envWith('/r/native')['LLULL_NATIVE_DIR']).toBe('/r/native');
+    expect('LLULL_NATIVE_DIR' in envWith(null)).toBe(false);
+    expect('LLULL_NATIVE_DIR' in envWith(undefined, { LLULL_NATIVE_DIR: '/elsewhere' })).toBe(false);
+  });
+
+  it('defaults to the native kernel when the bundle holds llull-kernel (KI7), to the WASM OCC kernel otherwise', () => {
+    const withKernel = (nativeDir: string | null, nativeKernel: boolean, baseEnv: Record<string, string> = {}): string | undefined =>
+      backendEnv({ port: 1, token: 't', layout, userDataDir: '/u', baseEnv, nativeDir, nativeKernel })['LLULL_KERNEL'];
+    expect(withKernel('/r/native', true)).toBe('occt-native');
+    expect(withKernel('/r/native', false), 'a bundle with llull-compute only').toBe('occt');
+    expect(withKernel(null, true), 'no bundle directory').toBe('occt');
+    expect(envWith('/r/native')['LLULL_KERNEL'], 'nativeKernel not given').toBe('occt');
+    expect(withKernel('/r/native', true, { LLULL_KERNEL: 'occt' }), 'diagnostic override: the WASM kernel').toBe('occt');
+    expect(withKernel('/r/native', true, { LLULL_KERNEL: 'manifold' }), 'diagnostic override').toBe('manifold');
+    expect(withKernel('/r/native', true, { LLULL_KERNEL: 'OCCT-native ' })).toBe('occt-native');
+  });
+
+  it('detects the native kernel binary itself, per platform', () => {
+    const files = new Set([path.join('/n', 'llull-kernel'), path.join('/c', 'llull-compute'), path.join('/w', 'llull-kernel.exe')]);
+    const exists = (file: string): boolean => files.has(file);
+    expect(hasNativeKernel('/n', 'linux', exists)).toBe(true);
+    expect(hasNativeKernel('/c', 'linux', exists)).toBe(false);
+    expect(hasNativeKernel('/w', 'win32', exists)).toBe(true);
+    expect(hasNativeKernel('/n', 'win32', exists)).toBe(false);
+    expect(hasNativeKernel(null, 'linux', exists)).toBe(false);
+  });
+
+  it('detects the bundle by its binaries, per platform', () => {
+    const files = new Set([path.join('/n', 'llull-kernel'), path.join('/w', 'llull-compute.exe')]);
+    const exists = (file: string): boolean => files.has(file);
+    expect(nativeBundleDir('/n', 'linux', exists)).toBe('/n');
+    expect(nativeBundleDir('/n', 'win32', exists)).toBeNull();
+    expect(nativeBundleDir('/w', 'win32', exists)).toBe('/w');
+    expect(nativeBundleDir('/empty', 'darwin', exists)).toBeNull();
+  });
+
+  it('finds a real bundle on disk', () => {
+    const dir = scratch();
+    expect(nativeBundleDir(dir, process.platform, existsSync)).toBeNull();
+    writeFileSync(path.join(dir, process.platform === 'win32' ? 'llull-compute.exe' : 'llull-compute'), '');
+    expect(nativeBundleDir(dir, process.platform, existsSync)).toBe(dir);
+  });
+});
+
 describe('backendEnv kernel (TR-KRN-01)', () => {
   const layout = desktopLayout({ packaged: true, resourcesPath: '/r', repoRoot: '', platform: 'linux' });
   const kernelFor = (baseEnv: Record<string, string>): string | undefined =>
@@ -86,9 +138,12 @@ describe('backendEnv kernel (TR-KRN-01)', () => {
     expect(kernelFor({ LLULL_KERNEL: 'manifold' })).toBe('manifold');
   });
 
-  it('ignores every other inherited value', () => {
-    for (const value of ['occt', 'OCCT', 'Manifold', 'cadquery', '', ' manifold'])
+  it('passes an inherited LLULL_KERNEL=occt (the WASM kernel) through, ignores every other value', () => {
+    for (const value of ['occt', 'OCCT', 'Manifold', 'cadquery', '', ' manifold', 'occt-native'])
       expect(kernelFor({ LLULL_KERNEL: value }), value).toBe('occt');
+    expect(desktopKernel('occt', true)).toBe('occt');
+    expect(desktopKernel('occt-native', false)).toBe('occt');
+    expect(desktopKernel(undefined, true)).toBe('occt-native');
   });
 });
 

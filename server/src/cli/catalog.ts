@@ -4,9 +4,9 @@ import type { CommandDefinition, ParamsSchema } from '@core/commands/types';
 import { similarNames } from '@lib/similarNames';
 import { suggestCommandNames } from '@core/commands/project/unknownCommandHint';
 import { paramsLines } from './describeSchema';
-import type { McpToolDefinition } from '@mcp/tools';
+import type { ToolDefinition } from '@protocol/tools';
 import { exchangeTool, exchangeToolDefinitions } from './exchange';
-import { TOOLSET_NAMES, searchTools, toolsetOf, type ToolsetName } from '@mcp/index';
+import { TOOLSET_NAMES, searchTools, toolsetOf, type ToolsetName } from '@protocol/index';
 
 const SHORT_DESCRIPTION_CHARS = 110;
 
@@ -44,7 +44,7 @@ function commandTool(def: CommandDefinition<unknown>): CatalogTool {
   };
 }
 
-function exchangeCatalogTool(tool: McpToolDefinition): CatalogTool {
+function exchangeCatalogTool(tool: ToolDefinition): CatalogTool {
   return {
     name: tool.name,
     description: tool.description,
@@ -77,9 +77,9 @@ export function listCatalog(toolset?: ToolsetName): CatalogEntry[] {
     .sort((a, b) => order(a.toolset) - order(b.toolset) || a.name.localeCompare(b.name));
 }
 
-/** Tools matching `query` (the MCP `search_tools` ranking, minus the MCP discovery tools). */
+/** Tools matching `query` (`searchTools` ranking over the full tool catalog). */
 export function searchCatalog(query: string, limit: number): CatalogEntry[] {
-  return searchTools(query, limit * 2, new Set<ToolsetName>(TOOLSET_NAMES))
+  return searchTools(query, limit * 2)
     .map((hit) => toolNamed(hit.name))
     .filter((tool): tool is CatalogTool => tool !== undefined)
     .slice(0, limit)

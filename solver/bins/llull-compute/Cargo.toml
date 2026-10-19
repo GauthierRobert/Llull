@@ -1,0 +1,19 @@
+[package]
+name = "llull-compute"
+description = "llull native job binary: `llull-compute <job> <job-folder>` (RS1 §2)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+llull-post = { path = "../../crates/llull-post" }
+llull-protocol = { path = "../../crates/llull-protocol" }
+llull-raster = { path = "../../crates/llull-raster" }
+
+[features]
+# wgpu offscreen raster (`llull-compute raster` with engine "gpu"); off by default, the CPU twin answers without it.
+gpu = ["llull-raster/gpu"]
+
+[lints]
+workspace = true

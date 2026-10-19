@@ -12,7 +12,7 @@ import { commandError, rejection, report } from '../noop';
 import { fixedNumber } from '../../lib/compactNumber';
 
 const MAX_SAMPLES = 256;
-const OCC_HINT = 'the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)';
+const OCC_HINT = 'the OCC kernel (the desktop default; LLULL_KERNEL=occt-native or occt for the CLI and server)';
 /** Faces listed in the summary itself; the full records are always in `data.faces`. */
 const SUMMARY_FACE_LIMIT = 12;
 

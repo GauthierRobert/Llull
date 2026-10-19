@@ -1,19 +1,30 @@
 # llull — agent operating manual
 
-MCP-first **2D + 3D** CAD web app (AutoCAD-like): 2D drafting + 3D solids in one document.
+**Local-first 2D + 3D CAD** (AutoCAD-like): 2D drafting + 3D solids in one document, used through the **desktop app** (Electron)
+and the **`llull` CLI** on the user's own machine.
+
+## PRODUCT DIRECTIVE (owner, 2026-10-19 — binding)
+
+- **CLI + local only.** No browser / web deployment, no PWA, no cloud host. The React UI runs only inside the Electron desktop app;
+  agents drive llull through the `llull` CLI (`--app` for the open desktop app). There is no MCP server (removed, LC1 step 4).
+- **Optimize for that.** Native code (Rust sidecars, native OCCT kernel, local GPU) is the target path; anything that exists only to
+  make llull run in a browser (WASM kernels as the primary path, browser-only fallbacks, PWA, web hosting, browser e2e) is legacy:
+  do not extend it, and remove it once its native replacement is the default (plan: `docs/decisions/LC1-local-only.md`).
+- Still true: offline, no network needed (AF-41); every change goes through a registered command (PRIME DIRECTIVE).
 
 ## PRIME DIRECTIVE
 
-**Never mutate the document outside a command.** UI and MCP both call `execute(doc, name, params)`.
-One registered command = one UI action + one MCP tool. Editing entities in a component/server = bug.
+**Never mutate the document outside a command.** UI and CLI both call `execute(doc, name, params)`.
+One registered command = one UI action + one CLI tool. Editing entities in a component/server = bug.
 
 ## STACK (current; pick the best-suited stack per task — rule C7)
 
 React 19 + TS strict + Vite · three.js + r3f + drei (3D perspective; 2D = same scene, ortho top-down) ·
-Zustand (one store, `dispatch`) · zod v4 (one schema per command → TS type + MCP JSON Schema + validation) ·
-kernels Manifold (default) / OpenCascade.js behind `GeometryKernel` · Vitest + Testing Library ·
-ESLint flat + Prettier + knip · Express (optional MCP host + live doc) · Electron `desktop/` + bundled CPython/CadQuery ·
-agents: local = `llull` CLI (`--app` drives desktop), cloud = MCP `/mcp`.
+Zustand (one store, `dispatch`) · zod v4 (one schema per command → TS type + tool JSON Schema + validation) ·
+kernels behind `GeometryKernel`: native OCCT sidecar `llull-kernel` (target), OpenCascade.js / Manifold WASM (legacy) ·
+Rust workspace `solver/` (`llull-compute`, `llull-kernel`) · Vitest + Testing Library · ESLint flat + Prettier + knip ·
+Express local backend (live doc, CLI host) · Electron `desktop/` + bundled CPython/CadQuery + native binaries ·
+agents: `llull` CLI only (`--app` drives the desktop app); no MCP server.
 Not fixed: use the best-suited language / library for each task (e.g. Rust + wgpu for GPU solvers) — `conventions.md` C7.
 
 ## LAYER MAP (npm workspaces `packages/*`; web app + `server/` at root)
@@ -28,7 +39,7 @@ packages/core/src/        @core  framework-agnostic: NO react/DOM/window/fetch
     <feature>/catalog.ts         solids draw2d modify2d edit brep inspect render exchange persistence history parametric project assembly motion dynamics document entity
   plugins/                       plugin.ts (CadPlugin) · host.ts (installPlugin, derivedEntityIds)
   codegen/                       CadQuery / build123d / OpenSCAD / FreeCAD emitters
-packages/mcp/src/         @mcp   tools/resources/prompts/toolsets/discovery/liveSync over the registry
+packages/protocol/src/    @protocol  host protocol over the registry: liveSync · restProtocol · CLI tools (exchange/fea/library) · toolsets · search
 packages/domain-aec/src/  @aec   plugins `<domain>/{catalog,plugin}.ts`: building/ industrial/<discipline>/ civil/<topic>/ steel/ shared/
 packages/domain-cae/src/  @cae   plugin `cae` (toolset analysis): 05 FEA set-up, decks, results, thermal/ thermomech/ margins/
 packages/domain-aero/src/ @aero  plugins `sheetmetal` (toolset manufacturing, 07 FTR) and `fasteners` (toolset fasteners, 08 MAT)
@@ -36,8 +47,8 @@ packages/kernel-{manifold,occt}/src/   GeometryKernel impls
 packages/physics-mujoco/src/           PhysicsEngine impl (MuJoCo WASM) — rigid-body dynamics, docs/DYNAMICS.md
 src/app/                  @app   composition root: installDefaultPlugins()
 src/ui/                   @ui    React: presentation + param-gathering ONLY
-src/main.tsx                     installs kernel (`?kernel=occt`) + plugins, mounts <App>
-server/                          Express MCP host + `llull` CLI (src/cli/); own package.json
+src/main.tsx                     renderer entry: installs Manifold + plugins, mounts <App> (Electron only)
+server/                          Express local backend (live doc, exchange, exports) + `llull` CLI (src/cli/); own package.json
 desktop/                         Electron: starts server/, File menu, CLI hand-off; own package.json
 ```
 
@@ -49,18 +60,18 @@ Dependency law: `.claude/rules/architecture.md` L2, enforced by `npm run arch` +
 @.claude/rules/conventions.md
 @.claude/rules/workflow.md
 
-Path-scoped (auto-load): `rules/commands.md` (packages/**, tests/**), `rules/sync.md` (MCP/server/store), `rules/react.md` (src/ui/**).
+Path-scoped (auto-load): `rules/commands.md` (packages/**, tests/**), `rules/sync.md` (protocol/server/store), `rules/react.md` (src/ui/**).
 On demand: `.claude/context/command-layer.md` (signatures) · `.claude/context/model.md` (entity schema) ·
 `docs/ARCHITECTURE.md` · `docs/ADD_A_TOOL.md` · `docs/ROADMAP.md` · `.claude/work/BOARD.md` (task board).
 
 ## AGENTS / SKILLS (descriptions come from the harness; delegation rules: workflow W5)
 
-Agents: `command-author` · `viewport-engineer` · `mcp-engineer` · `test-verifier` · `cad-reviewer` (diffs touching core/registry/plugins/MCP).
+Agents: `command-author` · `viewport-engineer` · `cli-engineer` · `test-verifier` · `cad-reviewer` (diffs touching core/registry/plugins/protocol/server).
 
 ## SKILLS
 
 `design-model` `llull-cli` `add-command` `add-entity-kind` `fix-bug` `draw-2d` `parametric` `drawing-to-model` `measure`
-`mcp-server` `viewport-feature` `verify-llull` `continue-working`
+`viewport-feature` `verify-llull` `continue-working`
 
 ## COMMANDS
 

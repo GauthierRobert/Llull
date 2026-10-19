@@ -3,7 +3,7 @@ import { createEmptyDocument } from '@core/model/types';
 import { execute, getCommand, listCommands } from '@core/commands/registry';
 import { defineCommand, z } from '@core/commands/schema';
 import { installPlugin, pluginToolNames } from '@core/plugins/host';
-import { TOOLSETS, toolsetOf } from '@mcp/toolsets';
+import { TOOLSETS, toolsetOf } from '@protocol/toolsets';
 import type { CadPlugin } from '@core/plugins/plugin';
 import type { CommandDefinition } from '@core/commands/types';
 

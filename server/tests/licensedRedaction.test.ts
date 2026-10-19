@@ -1,5 +1,5 @@
 /**
- * TR-MAT-32: licensed (licensed-no-redistribution) material values are redacted from answers to a non-local client, over MCP and REST;
+ * TR-MAT-32: licensed (licensed-no-redistribution) material values are redacted from answers to a non-local client over REST;
  * a loopback peer (CLI, desktop) still reads them. A relayed request (X-Forwarded-For) is not a local peer.
  */
 
@@ -15,7 +15,6 @@ import { getLiveDoc, setLiveDoc } from '../src/liveDocument';
 import { applyCommand, _resetHistory } from '../src/commandBus';
 import { _resetLiveDoc } from '../src/liveDocument';
 import { createLibraryStorePort } from '../src/libraries/libraryStore';
-import { INITIALIZE_PARAMS, type McpToolResult } from './mcpTestSupport';
 
 const SENTINEL = 123.456789;
 const REMOTE = { 'X-Forwarded-For': '203.0.113.9' };
@@ -85,32 +84,6 @@ afterEach(() => {
 const command = (name: string, params: Record<string, unknown>, headers: Record<string, string> = {}): request.Test =>
   request(app).post('/command').set(headers).send({ name, params });
 
-async function mcpCall(headers: Record<string, string>, name: string, args: Record<string, unknown>): Promise<McpToolResult> {
-  const post = (session?: string): request.Test => {
-    const req = request(app)
-      .post('/mcp')
-      .set(headers)
-      .set('Content-Type', 'application/json')
-      .set('Accept', 'application/json, text/event-stream');
-    return session !== undefined ? req.set('mcp-session-id', session) : req;
-  };
-  const rpc = async (body: object, session?: string): Promise<request.Response> => {
-    const res = await post(session).send(body);
-    expect(res.status).toBe(200);
-    return res;
-  };
-  const init = await rpc({ jsonrpc: '2.0', id: 1, method: 'initialize', params: INITIALIZE_PARAMS });
-  const session = init.headers['mcp-session-id'] as string;
-  await post(session).send({ jsonrpc: '2.0', method: 'notifications/initialized' });
-  await rpc(
-    { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'enable_toolset', arguments: { toolset: 'materials' } } },
-    session,
-  );
-  const res = await rpc({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name, arguments: args } }, session);
-  const line = res.text.split('\n').find((entry) => entry.startsWith('data: ') && entry.includes('"id":3'));
-  return (JSON.parse((line ?? '').slice('data: '.length)) as { result: McpToolResult }).result;
-}
-
 describe('licensed values and non-local clients (TR-MAT-32)', () => {
   it('REST /command: a loopback peer reads the value, a relayed peer gets redacted data with basis and locator kept', async () => {
     const local = await command('get_material_allowable', ALLOWABLE);
@@ -145,15 +118,6 @@ describe('licensed values and non-local clients (TR-MAT-32)', () => {
     expect(evaluated.body.data).toMatchObject({ redacted: true, basis: 'A' });
     const localMaterial = await command('get_material', { material: 'aa7075_t6' });
     expect(JSON.stringify(localMaterial.body)).toContain(String(SENTINEL));
-  });
-
-  it('MCP: a relayed session gets the redacted answer, a loopback session the value', async () => {
-    const local = await mcpCall({}, 'get_material_allowable', ALLOWABLE);
-    expect(JSON.stringify(local)).toContain(String(SENTINEL));
-    const remote = await mcpCall(REMOTE, 'get_material_allowable', ALLOWABLE);
-    expect(remote.isError).toBe(false);
-    expect(JSON.stringify(remote)).not.toContain(String(SENTINEL));
-    expect(remote.structuredContent).toMatchObject({ redacted: true, basis: 'A', provenance: { locator: 'Table 3.7.6.0(b)' } });
   });
 
   it('a non-licensed record is not redacted for a remote peer', async () => {
@@ -273,24 +237,5 @@ describe('licensed values and non-local clients (TR-MAT-32)', () => {
     expect(steps[1]?.data?.redacted).toBe(true);
     expect(steps[2]?.data?.redacted).toBeUndefined();
     expect(steps[2]?.data?.value).toBe(80);
-  });
-
-  it('MCP: a session is bound to the locality that opened it; a request from the other locality gets 403', async () => {
-    const post = (headers: Record<string, string>, session?: string): request.Test => {
-      const req = request(app)
-        .post('/mcp')
-        .set(headers)
-        .set('Content-Type', 'application/json')
-        .set('Accept', 'application/json, text/event-stream');
-      return session !== undefined ? req.set('mcp-session-id', session) : req;
-    };
-    const init = await post(REMOTE).send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: INITIALIZE_PARAMS });
-    const session = init.headers['mcp-session-id'] as string;
-    const call = { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} };
-    expect((await post({}, session).send(call)).status).toBe(403);
-    expect((await post(REMOTE, session).send(call)).status).toBe(200);
-    const local = await post({}).send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: INITIALIZE_PARAMS });
-    const localSession = local.headers['mcp-session-id'] as string;
-    expect((await post(REMOTE, localSession).send(call)).status).toBe(403);
   });
 });

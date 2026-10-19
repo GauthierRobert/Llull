@@ -1,6 +1,6 @@
 ---
 name: command-author
-description: Use to add or modify a CAD operation in packages/core/src/commands (or a domain plugin such as packages/domain-aec) — the most common change in llull. Adding one command gives both the UI and the MCP server the capability at once. Handles the command definition, registration, and its unit tests. Covers both 2D drafting commands (draw_polyline, draw_arc, add_dimension, ...) and 3D solid commands. Use PROACTIVELY whenever a task implies a new document operation ("add a way to ...", "draw a ...", "the AI should be able to ...", "support cylinders/booleans/...").
+description: Use to add or modify a CAD operation in packages/core/src/commands (or a domain plugin such as packages/domain-aec) — the most common change in llull. Adding one command gives both the UI and the `llull` CLI the capability at once. Handles the command definition, registration, and its unit tests. Covers both 2D drafting commands (draw_polyline, draw_arc, add_dimension, ...) and 3D solid commands. Use PROACTIVELY whenever a task implies a new document operation ("add a way to ...", "draw a ...", "the AI should be able to ...", "support cylinders/booleans/...").
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: sonnet
 ---
@@ -19,7 +19,7 @@ Rules are already in context (`rules/commands.md` loads when you touch `packages
 - Commands are PURE: return a NEW `CadDocument`; never mutate the argument. Use spreads.
 - Bad/missing input ⇒ return the unchanged doc, `affected: []`, descriptive `summary`.
   Never throw for user/agent error.
-- `name` is `snake_case` (it is the AI & MCP tool id). Exported const is `camelCase`.
+- `name` is `snake_case` (it is the AI & CLI tool id). Exported const is `camelCase`.
 - Define with `defineCommand({ name, description, params: z.object(...), annotations?, run })`.
   `description` and every `.describe()` text are read by an agent that cannot see the
   code — write them to be self-sufficient and precise. No hand-written `paramsSchema`.
@@ -38,7 +38,7 @@ Rules are already in context (`rules/commands.md` loads when you touch `packages
    viewport needs a render branch (hand that to viewport-engineer). For 2D drafting
    specifics, follow the `draw-2d` skill.
 3. Register: core — list it in its feature folder's `catalog.ts`, add the name to
-   one toolset in `packages/mcp/src/toolsets.ts`; plugin — list it in its domain's catalog
+   one toolset in `packages/protocol/src/toolsets.ts`; plugin — list it in its domain's catalog
    (`packages/domain-aec/src/<building|industrial|civil>/catalog.ts`).
 4. Write tests in `tests/unit/<domain>.test.ts` (plugins: `tests/unit/building/`): happy path (asserts `affected`,
    resulting entity, `document.order`) AND a failure path (missing id / invalid input

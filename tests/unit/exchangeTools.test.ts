@@ -9,8 +9,8 @@ import {
   type ExchangeCommandResult,
   type ExchangeDeps,
   type ProgramRun,
-} from '@mcp/exchangeTools';
-import { shapeToolCallContent } from '@mcp/dispatch';
+} from '@protocol/exchangeTools';
+import { shapeToolCallContent } from '@protocol/toolResult';
 
 interface Harness {
   deps: ExchangeDeps;

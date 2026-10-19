@@ -47,9 +47,8 @@ Delegate in parallel when large: Lane 1 (`command-author`) model→codegen, Lane
   `freecad.ts`, `identifiers.ts` reserved names, `commands/exchange/codeTrace.ts` `add_*` list.
 - 2D: `packages/domain-aec/src/building/exchange/dxfExport.ts` case (default skips). `exchange/exportStl.ts` description string.
 
-## 6. MCP
-- `packages/mcp/src/toolsets.ts` (place the command), `conventions.ts` tables, `resources.ts`
-  anchor summary.
+## 6. CLI tool surface
+- `packages/protocol/src/toolsets.ts` (place the command), `conventions.ts` tables (`llull guide`).
 
 ## 7. UI
 - 3D: `src/ui/viewport/3d/Entities.tsx` case + `entities/XMesh.tsx`, `primitiveGeometry.ts`,

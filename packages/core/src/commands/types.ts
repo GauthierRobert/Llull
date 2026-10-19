@@ -1,11 +1,12 @@
 /**
  * Command contracts: a command is the ONE unit of change. Each is a pure function `(document, params, ctx?) -> CommandResult` that returns
- * a new document; the UI, the AI bridge and the MCP server all invoke the same set through `execute`.
+ * a new document; the UI, the local backend and the `llull` CLI all invoke the same set through `execute`.
  */
 
 import type { CadDocument } from '../model/types';
 import type { GeometryKernel } from '../geometry/kernel';
 import type { PhysicsEngine } from '../dynamics/physicsEngine';
+import type { GeometryQueryEngine } from '../geometry/geometryQueries';
 import type { FeArtifactPort, HumanSignaturePort } from '../model/analysis';
 import type { MaterialLibrary } from '../model/materialLibrary';
 import type { IdSource } from '../lib/id';
@@ -25,7 +26,7 @@ export interface CommandResult {
   affected: string[];
   /**
    * Structured result of read-only/query commands (e.g. `{ distance: 42, unit: 'mm' }`); absent on mutating commands. Passes through
-   * `execute` and the MCP layer.
+   * `execute` and the CLI.
    */
   data?: unknown;
   /**
@@ -50,7 +51,7 @@ export interface CommandError {
   readonly remediation: string;
 }
 
-/** Safety annotations; emitted as MCP tool annotations (readOnlyHint, destructiveHint, idempotentHint). */
+/** Safety annotations; emitted as tool-schema annotations (readOnlyHint, destructiveHint, idempotentHint). */
 export interface CommandAnnotations {
   /** Never mutates the document: returns the SAME document, `affected: []`, results in `data`. */
   readonly readOnly?: boolean;
@@ -60,24 +61,24 @@ export interface CommandAnnotations {
   readonly idempotent?: boolean;
   /**
    * `execute()` appends no FeatureStep: history meta-commands (appending would recurse), `load_document` (wholesale replacement) and
-   * parameter-table commands (document INPUT state, architecture L8). Not emitted to MCP.
+   * parameter-table commands (document INPUT state, architecture L8). Not emitted in tool schemas.
    */
   readonly metaHistory?: boolean;
   /**
    * Session command (OQ-MAT-09): changes the in-memory document only. `execute` appends no FeatureStep and the host neither logs nor
-   * syncs it; its effect is never serialized (private material-library values, TR-MAT-31). Not emitted to MCP.
+   * syncs it; its effect is never serialized (private material-library values, TR-MAT-31). Not emitted in tool schemas.
    */
   readonly session?: boolean;
   /**
    * Needs `ExecutionContext.kernel`: `execute` no-ops it with a "kernel not ready" summary when none is available and `replayHistory`
-   * refuses to regenerate a history containing it. Not emitted to MCP.
+   * refuses to regenerate a history containing it. Not emitted in tool schemas.
    */
   readonly requiresKernel?: boolean;
 }
 
-/** A registered command: enough metadata to generate the UI affordance, AI tool schema and MCP tool. */
+/** A registered command: enough metadata to generate the UI affordance and the AI / CLI tool schema. */
 export interface CommandDefinition<P> {
-  /** Stable snake_case id, e.g. "add_box"; the MCP/AI tool name. */
+  /** Stable snake_case id, e.g. "add_box"; the CLI / AI tool name. */
   readonly name: string;
   /** One-line description shown to humans and to the AI. */
   readonly description: string;
@@ -173,6 +174,8 @@ export interface ExecutionContext {
   readonly kernel: GeometryKernel | null;
   /** Rigid-body physics engine for `simulate_motion`; null/absent while none is installed. */
   readonly physics?: PhysicsEngine | null;
+  /** Batch mesh-query engine (distance / ray / occlusion, TR-FPR-19); null/absent = the default `meshBvh` engine. */
+  readonly geometryQueries?: GeometryQueryEngine | null;
   /** Read-only FE mesh/results artifact store (host-provided); null/absent = `record_fe_*` commands no-op with FEA_ARTIFACT_NOT_FOUND. */
   readonly feaArtifacts?: FeArtifactPort | null;
   /** Human-signature verifier (09 PLM); null/absent = human-gate commands refuse. */

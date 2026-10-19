@@ -1,6 +1,6 @@
 /**
  * Rot gate for validation plans: every step (`{ command, params }`, found anywhere in the JSON) of every docs/**\/validation/**\/*.json plan must
- * name a registered command (listCommands()) or an MCP-only tool (fea / exchange / library / discovery). Plans that reference commands not built
+ * name a registered command (listCommands()) or a non-registry CLI tool (fea / exchange / library). Plans that reference commands not built
  * yet are tracked in blockedPlanCommands.json (plan path -> sorted missing names).
  *
  * Fails on (a) a missing command not in the allowlist (new rot) and (b) a stale allowlist entry (command now registered, or no longer referenced).
@@ -12,12 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { listCommands } from '@core/commands/registry';
-import {
-  buildDiscoveryToolDefinitions,
-  buildExchangeToolDefinitions,
-  buildFeaToolDefinitions,
-  buildLibraryToolDefinitions,
-} from '@mcp/index';
+import { buildExchangeToolDefinitions, buildFeaToolDefinitions, buildLibraryToolDefinitions } from '@protocol/index';
 
 const root = process.cwd();
 const ALLOWLIST_PATH = resolve(root, 'tests/unit/contract/blockedPlanCommands.json');
@@ -44,7 +39,11 @@ function validationPlans(): string[] {
     }
   };
   walk(docs);
-  return found.map((path) => relative(root, path).split('\\').join('/')).sort();
+  // `data/reference/` holds pinned raw tool outputs (e.g. ifcopenshell logs saved as .json), not plans.
+  return found
+    .map((path) => relative(root, path).split('\\').join('/'))
+    .filter((path) => !path.includes('/data/reference/'))
+    .sort();
 }
 
 /** Step = object with a string `command` and an object `params`; assertion/expectation objects without params are ignored. */
@@ -62,7 +61,7 @@ function collectCommands(node: unknown, into: Set<string>): void {
 
 function registeredNames(): Set<string> {
   const names = new Set(listCommands().map((command) => command.name));
-  for (const build of [buildFeaToolDefinitions, buildExchangeToolDefinitions, buildLibraryToolDefinitions, buildDiscoveryToolDefinitions]) {
+  for (const build of [buildFeaToolDefinitions, buildExchangeToolDefinitions, buildLibraryToolDefinitions]) {
     for (const tool of build()) names.add(tool.name);
   }
   return names;

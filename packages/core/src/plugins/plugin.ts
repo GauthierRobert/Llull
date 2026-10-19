@@ -1,5 +1,5 @@
 /**
- * Plugin contract: a domain (building, industrial, …) extends the CAD core by contributing commands, an MCP toolset, derivation guards and
+ * Plugin contract: a domain (building, industrial, …) extends the CAD core by contributing commands, a toolset, derivation guards and
  * a deriver — without the core importing it.
  * @invariant core/** never imports a plugin; the app composition root installs plugins
  */
@@ -24,7 +24,7 @@ export interface DocumentExtension {
 export interface CadPlugin {
   /** Unique plugin id, e.g. `building`. */
   readonly name: string;
-  /** MCP toolset its commands belong to (see core/mcp/toolsets.ts). */
+  /** Toolset its commands belong to in CLI listings and the UI palette (see @protocol/toolsets). */
   readonly toolset: string;
   readonly commands: ReadonlyArray<CommandDefinition<unknown>>;
   readonly guards?: ReadonlyArray<DerivationGuard>;

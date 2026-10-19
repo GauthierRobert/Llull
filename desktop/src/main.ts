@@ -1,14 +1,15 @@
 /** Electron main: wiring only (unchanged server in a utility process + per-launch token); logic is in Electron-free modules. */
 import { app, BrowserWindow, dialog, Menu, shell, utilityProcess } from 'electron';
 import { randomBytes } from 'crypto';
+import { existsSync } from 'fs';
 import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
 import { llullHome, removeDesktopDiscovery, writeDesktopDiscovery } from '@server/cli/desktopDiscovery';
 import { chooseBackendPort, startBackend, type RunningBackend } from './backend';
-import { backendEnv, backendOrigin } from './backendEnv';
+import { backendEnv, backendOrigin, hasNativeKernel, nativeBundleDir } from './backendEnv';
 import { cliShimFor, installCliShim } from './cliShim';
 import { createDocumentSession, type DocumentSession } from './documents';
-import { DEFAULT_SAVE_NAME, DOCUMENT_EXTENSIONS, DOCUMENT_FILE_PATTERN } from '@mcp/documentFiles';
+import { DEFAULT_SAVE_NAME, DOCUMENT_EXTENSIONS, DOCUMENT_FILE_PATTERN } from '@protocol/documentFiles';
 import { desktopLayout } from './layout';
 import { agentHelpText, menuTemplate } from './menu';
 import { navigationDecision, permissionAllowed } from './navigation';
@@ -201,10 +202,19 @@ async function boot(): Promise<void> {
   const userData = app.getPath('userData');
   const port = await chooseBackendPort(userData);
   const url = backendOrigin(port);
+  const nativeDir = nativeBundleDir(layout.nativeDir, process.platform, existsSync);
   backend = await startBackend(
     (entry, env) => utilityProcess.fork(entry, [], { env, serviceName: 'llull-backend', stdio: 'inherit' }),
     layout.serverEntry,
-    backendEnv({ port, token, layout, userDataDir: userData, baseEnv: process.env }),
+    backendEnv({
+      port,
+      token,
+      layout,
+      userDataDir: userData,
+      baseEnv: process.env,
+      nativeDir,
+      nativeKernel: hasNativeKernel(nativeDir, process.platform, existsSync),
+    }),
     url,
   );
   session = createDocumentSession({ url, token });

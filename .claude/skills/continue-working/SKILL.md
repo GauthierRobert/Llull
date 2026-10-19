@@ -18,12 +18,12 @@ Open `.claude/work/BOARD.md`. Note each task's status, deps, and lane.
 ### 2. Reconcile against reality (ground truth = the repo, not the board)
 The board can be stale (a prior agent finished, a session ended mid-task). Verify:
 - For each `[WIP]`/`[REVIEW]` task, check whether its deliverable exists (the files/exports it
-  promised) and `npm run check` is green. If so → flip to `[DONE]` (after `cad-reviewer` for
-  `[REVIEW]`). If a `[WIP]` task has no progress in the repo, treat it as `[TODO]` again.
+  promised) and `npm run check` is green. If so → it is done (after `cad-reviewer` for
+  `[REVIEW]`): delete its line. If a `[WIP]` task has no progress in the repo, treat it as `[TODO]` again.
 - Use `Glob`/`Grep`/`Read` to confirm; don't trust the token blindly.
 
 ### 3. Select the next batch
-- A task is **eligible** if status is `[TODO]` and every dep is `[DONE]`.
+- A task is **eligible** if status is `[TODO]` and none of its deps is still on the board.
 - Pick **one eligible task per free lane**, up to **4 lanes in parallel** (Lane 5 review is
   separate and runs after, not as one of the 4). Prefer the lowest-ID eligible task per lane.
 - Lanes own disjoint files (see board table) so parallel writes never collide. Core command
@@ -36,7 +36,7 @@ The board can be stale (a prior agent finished, a session ended mid-task). Verif
 - Edit the board: flip the chosen tasks to `[WIP]`, update the **NOW** block (timestamp, WIP
   list, next-up), and write it.
 - Launch the lane agents **in one message, in parallel** (multiple `Agent` calls in a single
-  turn). Map lane → `subagent_type` via the board's Lane table. Each spawn prompt MUST carry:
+  turn). Map lane → `subagent_type` via the lane table in `.claude/rules/workflow.md` W5. Each spawn prompt MUST carry:
   - the task ID + acceptance criteria;
   - its **writable file scope** (the lane's owned paths) and an explicit **off-limits** note:
     "write ONLY within your scope; do not edit other lanes' files or core command catalogs unless you
@@ -52,18 +52,13 @@ The board can be stale (a prior agent finished, a session ended mid-task). Verif
 
 ### 5. Converge
 - When an agent returns, flip its task to `[REVIEW]`, then run `cad-reviewer` on the diff.
-- On a clean review + green `npm run check`, flip to `[DONE]`. On findings, keep `[WIP]` and
+- On a clean review + green `npm run check`, delete the task line (done). On findings, keep `[WIP]` and
   hand the findings back to the same lane agent (via `SendMessage` to reuse its context).
 - Always re-run step 3 to top up any lane that just went free, keeping ~4 in flight.
 
 ### 6. Write the board back + report
 - Persist every status change and refresh the **NOW** block before yielding.
 - Tell the user, in 3–5 lines: what just completed, what is `[WIP]` now, and what unblocked.
-
-## First-run behavior (nothing started yet)
-Fan out immediately on the dep-free work — typically in one parallel batch:
-`W0-1` (store, Lane 2) + `A1`/`A5` (Lane 1) + `G1` (Lane 4) + `B1` (Lane 1 second pass or
-queue). Lanes 2-bis (C*) and Lane 3 (D*) start the moment `W0-1` is `[DONE]`.
 
 ## Coordination model (how parallel agents stay out of each other's way)
 Agents are isolated — they cannot see each other's in-progress work, and they never need to.
@@ -75,14 +70,14 @@ Coordination is structural, enforced by you (the orchestrator), not by agent-to-
    (Lane 1), and a lane runs ≤1 task at a time → never double-written.
 3. **A `[WIP]` lane is NOT free** — selection (step 3) skips it, so re-invoking the skill mid-run
    never double-assigns or collides with in-flight work.
-4. **Deps resolve by ordering, not chat** — a task waits until its deps are `[DONE]` and merged,
+4. **Deps resolve by ordering, not chat** — a task waits until its deps are done (off the board) and merged,
    then reads their output from committed files. The repo is the only channel between lanes.
 5. **Convergence is the backstop** — `[REVIEW]` → `cad-reviewer` + `npm run check` (+ merge, if
    worktrees) catches anything that strayed across a boundary.
 
 ## Guardrails
 - Obey the PRIME DIRECTIVE and dependency law — agents must too. A `cad-reviewer` pass gates
-  every `[DONE]`.
+  every task leaving the board.
 - Don't invent tasks not on the board; if the user asks for something new, add it to the
   correct lane in the board first, then schedule it.
 - Keep parallelism at the file-conflict-safe maximum (lanes), not per-subtask.

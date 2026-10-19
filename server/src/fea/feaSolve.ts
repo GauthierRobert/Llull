@@ -6,8 +6,9 @@
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import type { FeConvergenceRow, FeResultsArtifact } from '@core/model/analysis';
-import { FEA_SOLVE_TIMEOUT_S, type FeaHost, type FeaToolResult } from '@mcp/index';
+import type { FeConvergenceRow, FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
+import type { CadDocument } from '@core/model/types';
+import { FEA_SOLVE_TIMEOUT_S, type FeaHost, type FeaToolResult } from '@protocol/index';
 import type { FeArtifactStore } from './artifactStore';
 import type { CaeHooks } from './caeHooks';
 import type { CcxRunner } from './ccxProcess';
@@ -21,6 +22,8 @@ export interface FeaSolveDeps {
   readonly keepJobs?: boolean;
   /** Largest `.frd` read into memory, in bytes (default MAX_FRD_BYTES). */
   readonly maxResultsBytes?: number;
+  /** Host pre-step before the deck (the native temperature mapping, TR-TMC-24); returns a note for the summary or null. Never throws. */
+  readonly beforeDeck?: (doc: CadDocument, analysisId: string, mesh: FeMeshArtifact) => Promise<string | null>;
 }
 
 const DEFAULT_SOLVE_TIMEOUT_S = 600;
@@ -65,6 +68,7 @@ export async function runFeaSolve(
   const current = currentMesh('fea_solve', doc, analysisId, deps.store, deps.hooks);
   if (isFailure(current)) return current;
   const nonlinear = doc.analysis?.cases[analysisId]?.type === 'nonlinear_static';
+  const prepared = deps.beforeDeck === undefined ? null : await deps.beforeDeck(doc, analysisId, current.mesh).catch(() => null);
   const deck = deps.hooks.writeInp(doc, analysisId, current.mesh, deps.store);
   if ('code' in deck) return feaFailure('fea_solve', deck.code, deck.message, [analysisId]);
 
@@ -154,7 +158,7 @@ export async function runFeaSolve(
     });
     const increments = nonlinear ? ` ${convergenceNote(convergence)}.` : '';
     return {
-      summary: `fea_solve: CalculiX ${results.solverVersion}, ${steps.length} result step(s).${increments} ${recorded.summary}`,
+      summary: `fea_solve: CalculiX ${results.solverVersion}, ${steps.length} result step(s).${increments}${prepared === null ? '' : ` ${prepared}.`} ${recorded.summary}`,
       affected: recorded.affected,
       isError: recorded.isError,
       data: {

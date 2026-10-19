@@ -1,7 +1,7 @@
 /** fea_export: the CalculiX input deck of a meshed analysis (text + sha256); nothing is run or recorded. */
 
 import { sha256Hex } from '@lib/sha256';
-import type { FeaHost, FeaToolResult } from '@mcp/index';
+import type { FeaHost, FeaToolResult } from '@protocol/index';
 import type { FeArtifactStore } from './artifactStore';
 import type { CaeHooks } from './caeHooks';
 import { currentMesh, feaFailure, isFailure } from './feaCommon';

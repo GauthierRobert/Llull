@@ -28,15 +28,17 @@ coverage gap is a missing branch test, not a reason to lower the threshold.
   A golden diff means behaviour changed: update (`npx vitest run tests/golden -u`) ONLY when the
   change is intended, and say so in the report.
 
-## 3. Server (when `server/`, `packages/mcp` or command schemas changed)
+## 3. Server + CLI (when `server/`, `packages/protocol` or command schemas changed)
 ```bash
 npm --prefix server run typecheck && npm --prefix server test && npm --prefix server run build
+npm --prefix desktop test     # the desktop backend + CLI --app
+node server/bin/llull.cjs help && node server/bin/llull.cjs search box
 ```
 
 ## 4. Live app (for UI / viewport / interaction changes)
 Start the dev server and drive it with Playwright (MCP browser tools):
 ```bash
-npm run dev            # http://localhost:5173 (run in background); ?kernel=occt for OpenCascade
+npm run dev            # renderer dev server http://localhost:5173 (run in background; Manifold kernel)
 ```
 - `browser_navigate` to the URL.
 - `browser_snapshot` + `browser_take_screenshot` to confirm render.
@@ -45,11 +47,10 @@ npm run dev            # http://localhost:5173 (run in background); ?kernel=occt
 - `browser_console_messages` — must be free of errors.
 - `npm run test:e2e` runs the Playwright suite (starts the dev server).
 
-## 5. AI/MCP changes
-Start the backend (`npm --prefix server run dev`; `LLULL_TOOLSETS=all` to list every tool,
-`LLULL_KERNEL=occt` for B-rep), connect Claude or `npm --prefix server run agent:example`, issue a
-tool call, and confirm it mutates the live document, returns a sensible `summary`, and the UI
-follows over `/live`.
+## 5. AI / CLI changes
+Run the change through the CLI (`llull-cli` skill): `llull exec <tool> …` or `llull run plan.json` on a `--doc` file
+(`LLULL_KERNEL=occt` for B-rep), or `--app` against the open desktop app, and confirm it mutates the document, returns a
+sensible `summary`, and (with `--app`) the UI follows over `/live`.
 
 ## Report
 State pass/fail per stage with the command output. List anything skipped. Only call

@@ -41,7 +41,8 @@
   top: var(--chrome-gap);
   left: var(--chrome-gap);
   right: var(--chrome-gap);
-  z-index: 30;
+  /* Above the sidebar and inspector (30): the More menu popover opens over the inspector card. */
+  z-index: 35;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;

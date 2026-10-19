@@ -65,8 +65,8 @@ describe('shell_solid', () => {
     setGeometryKernel(fakeKernel({ unsupported: ['shell'] }));
     const result = execute(doc, 'shell_solid', { id, thickness: 0.5 });
     expectNoOp(result, doc, 'does not support shell_solid');
-    expect(result.summary).toContain('?kernel=occt in the browser');
-    expect(result.summary).toContain('LLULL_KERNEL=occt on the server');
+    expect(result.summary).toContain('the desktop default');
+    expect(result.summary).toContain('LLULL_KERNEL=occt-native or occt');
   });
   it('is a no-op when the kernel cannot build the source solid', () => {
     setGeometryKernel(fakeKernel({ solid: null }));

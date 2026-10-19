@@ -1204,16 +1204,16 @@
   },
   {
    "vc": "VC-KRN-25",
-   "title": "native llull-kernel (RS-1) vs the OCP 7.9.3 reference (planned)",
+   "title": "native llull-kernel (RS-1) vs the OCP 7.9.3 reference",
    "proves": [
     "FR-KRN-10",
     "TR-KRN-02",
     "TR-KRN-05"
    ],
-   "status": "planned (RS-1, TECHNICAL_SPEC §2.A, M2)",
+   "status": "passed 2026-10-19 on OCCT 7.9.2 (server/tests/nativeKernelReference*.test.ts; README §6); fuzzy 2e-5 run not runnable (TR-KRN-12 not built)",
    "value": {
     "analyticSolids": "every case of occt_crosscheck.json (volume_mm3, area_mm2, centroid_mm, inertia_rho1_mm5)",
-    "nist": "every file of nist_occt_reference.json (solids, shells, faces, edges, vertices, validAsRead, validAfterShapeFix, volumeMm3, areaMm2, centroidMm, inertiaRho1Mm5)",
+    "nist": "every file of nist_occt_reference.json (census: solids, shells, faces of the whole file; validAsRead) and of nist_occt_solid_reference.json for the imported solid (faces, edges, vertices, validAfterShapeFix, maxToleranceMm, volumeMm3, areaMm2, centroidMm, inertiaRho1Mm5; per-face area / centroid of nist_occt_solid_faces.json)",
     "probe": {
      "fuzzyFuse": {
       "fuzzy0": {
@@ -1246,7 +1246,7 @@
     "signature": "equal on the same 7.9.3 patch build; else VC-KRN-10 cross-build mode"
    },
    "unit": "mm, mm^2, mm, mm^5",
-   "source": "measured (OCP 7.9.3.1): occt_crosscheck.json, nist_occt_reference.json, occt_behaviour_probe.json; tolerances = VC-KRN-01"
+   "source": "measured (OCP 7.9.3.1): occt_crosscheck.json, nist_occt_reference.json, occt_behaviour_probe.json; nist_occt_solid_reference.json / nist_occt_solid_faces.json (measure_step_brep.cxx on the cadquery-ocp 7.9.3.1 OCCT libraries); tolerances = VC-KRN-01"
   }
  ]
 }

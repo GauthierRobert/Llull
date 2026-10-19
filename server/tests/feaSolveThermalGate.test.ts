@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { CadDocument } from '@core/model/types';
-import type { FeaHost, FeaToolResult } from '@mcp/index';
+import type { FeaHost, FeaToolResult } from '@protocol/index';
 import { createFeArtifactStore, type FeArtifactStore } from '../src/fea/artifactStore';
 import { caeHooks } from '../src/fea/caeHooks';
 import type { CcxRunner } from '../src/fea/ccxProcess';

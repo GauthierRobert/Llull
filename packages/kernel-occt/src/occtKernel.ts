@@ -1,5 +1,5 @@
 /**
- * OpenCascade.js kernel (opt-in `?kernel=occt` / `LLULL_KERNEL=occt`; notes: docs/decisions/KI4-occt-spike.md).
+ * OpenCascade.js kernel (opt-in `LLULL_KERNEL=occt`; notes: docs/decisions/KI4-occt-spike.md).
  * Recipes evaluate to TopoDS_Shapes; booleans/fillets/chamfers/shells run on the B-rep; meshes only come out.
  * @invariant exact for every solid kind but `mesh` without `brep` and `pyramid` (sewn planar triangles)
  * @failure unsupported kind / non-manifold mesh / OCC refusal or failure -> null

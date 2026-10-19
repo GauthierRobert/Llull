@@ -1,11 +1,11 @@
 ---
 name: llull-cli
-description: Drive llull from the shell with the `llull` CLI — the local agent path (MCP is for cloud agents). Same command registry as the UI. Use when you have a terminal (Claude Code, CI, a cloud session) and need to build, inspect, measure, render or export a model — in the open llull desktop app (`--app`, the user sees it live) or on a document file; when a plan should live in a file (write plan.json, validate, apply); or when an export/render must land on disk (STL, STEP, code, sheets, PNG). Pairs with design-model (what to build) — this skill is how to run it.
+description: Drive llull from the shell with the `llull` CLI — the agent path (llull has no MCP server). Same command registry as the UI. Use when you have a terminal (Claude Code, CI, a cloud session) and need to build, inspect, measure, render or export a model — in the open llull desktop app (`--app`, the user sees it live) or on a document file; when a plan should live in a file (write plan.json, validate, apply); or when an export/render must land on disk (STL, STEP, code, sheets, PNG). Pairs with design-model (what to build) — this skill is how to run it.
 ---
 
 # Skill: llull-cli
 
-The CLI is **the local agent path** (Claude Code, scripts, CI); MCP is for cloud agents. It runs
+The CLI is **the agent path** (Claude Code, scripts, CI); there is no MCP server (LC1). It runs
 any registry command — a third caller of `execute` (L1), so every command, present and future,
 is there with no CLI change. Help: `llull help` · code: `server/src/cli/`.
 
@@ -19,7 +19,6 @@ else from the repo `node server/bin/llull.cjs …` (bundles on first call, ~0.3 
 | The llull desktop app is running (status says so)      | `--app` — the open window's document; the user sees each change live and can undo it (Ctrl+Z / `llull undo --app`) |
 | No app, work on a file (headless, CI, a cloud session) | `--doc part.llull` (default `model.llull.json`, created on first change)                                           |
 | A deployed / dev server                                | `--server URL --token T`                                                                                           |
-| Agent without a shell (Claude Desktop, claude.ai)      | not this skill: MCP                                                                                                |
 
 Always one call per plan (`llull run plan.json`), not a loop of single calls.
 
@@ -135,6 +134,6 @@ flag such as `--save` given without its value).
 
 - Never edit the `.llull.json` document by hand — every change is a command (PRIME DIRECTIVE).
 - Prefer one plan over a loop of single calls: one process, one transaction, one rollback.
-- Output is capped like MCP results; for big data use `--json` with `jq`, or narrow the query
+- Text output is capped; for big data use `--json` with `jq`, or narrow the query
   (`find_entities`, ids) instead of dumping `describe_scene` for thousands of entities.
 - A missing capability is a new command (`add-command`), never a CLI special case.

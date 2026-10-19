@@ -1,6 +1,6 @@
 /** TR-MAT-32: which params count as referencing a licensed material (direct, via entity, via fastener stack, via plan alias). */
 import { describe, expect, it } from 'vitest';
-import { hasLicensedMaterial, referencesLicensed } from '@mcp/licensedReferences';
+import { hasLicensedMaterial, referencesLicensed } from '@protocol/licensedReferences';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 
 const licensed = { licence: 'licensed-no-redistribution' };

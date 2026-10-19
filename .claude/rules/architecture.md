@@ -3,20 +3,20 @@
 Authoritative. Violations are bugs, not style choices. Dependency laws are checked by `npm run arch`
 (`.dependency-cruiser.cjs`, part of `npm run check`) and, at edit time, by a hook.
 Implementation detail loads on demand: `rules/commands.md` (packages/tests), `rules/sync.md`
-(MCP/server/store), `.claude/context/*`.
+(protocol/server/store), `.claude/context/*`.
 
 ## L1 — One command layer, two callers
 
 A command is a pure function `(doc, params, ctx?) => { document, summary, affected }` — the ONLY
 unit of change. UI: `store.dispatch(name, params)` → `POST /command` (online) or local `execute`
-(offline). MCP: external agent → `execute`. `execute(doc, name, params, ctx?)`
+(offline). CLI: agent (Claude Code, scripts) → `execute` in-process on a file, or the backend's `POST /command`. `execute(doc, name, params, ctx?)`
 (`@core/commands/registry`) validates `params` against the zod schema first; invalid ⇒ unchanged
 doc, summary `<name> rejected: invalid params — <path>: …`. NEVER build a capability for one
 surface that bypasses a command.
 
 ## L2 — Dependency direction is one-way
 
-`src/ui`, `server/` → `src/app` → `packages/{mcp, domain-aec, domain-cae, domain-aero, kernel-*, physics-*}` → `packages/core`
+`src/ui`, `server/` → `src/app` → `packages/{protocol, domain-aec, domain-cae, domain-aero, kernel-*, physics-*}` → `packages/core`
 (`@lib` inside core). No package imports `src/ui`; `packages/core` imports no other package. No
 `packages/*/src` touches `react`, `window`, `document`, `fetch`, `localStorage`, or the DOM — put
 side effects in `src/ui/`, `server/`, or behind an injected interface. No import cycles (type-only included).
@@ -39,18 +39,18 @@ commands (`packages/core/src/commands` or a plugin's commands). No component or 
 
 Registry = every core feature catalog (`commands/<feature>/catalog.ts`) + each installed plugin's
 `commands`. It exposes `listCommands()`,
-`getCommand()`, `execute()`, `toToolSchemas()`. UI menus iterate `listCommands()`; MCP schemas come
+`getCommand()`, `execute()`, `toToolSchemas()`. UI menus iterate `listCommands()`; CLI tool schemas (`llull describe`, plan validation) come
 from `toToolSchemas()`; `paramsSchema` is derived from zod `params` — never hand-write either.
 `execute()` is the single choke point (validation, `requiresKernel`, derivation guards,
-feature-step append). MCP exposure is a VIEW (`@mcp/toolsets`); hidden tools stay callable via
+feature-step append). Toolsets are a VIEW (`@protocol/toolsets`: CLI listings, UI palette); every tool stays callable via
 `execute`.
 
 ## L6 — Backend is optional and thin (desktop + CLI are hosts, not logic)
 
-The app is fully usable offline. `server/` hosts `/mcp` and the shared live document; no business
-logic — it forwards to the same registry. Live sync = the command log (`@mcp/liveSync`), never a
+The app is fully usable offline. `server/` is the local backend (one per machine, loopback only) holding the shared live document; no business
+logic — it forwards to the same registry. Live sync = the command log (`@protocol/liveSync`), never a
 document diff. `desktop/` (Electron) only starts that server and wires menus/files; the `llull`
-CLI (`server/src/cli`) is a third caller of `execute`. Local agents use the CLI; MCP = cloud.
+CLI (`server/src/cli`) is the agent caller of `execute`. There is no MCP server and no cloud host (LC1).
 
 ## L7 — 2D and 3D are one model, one command layer
 

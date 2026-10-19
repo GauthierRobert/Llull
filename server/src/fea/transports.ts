@@ -1,6 +1,6 @@
 /** The `FeaToolsPort` of the server and CLI: Gmsh through the Python bridge, CalculiX through a tracked child, artifacts in the store. */
 
-import type { FeaToolsPort } from '@mcp/index';
+import type { FeaToolsPort } from '@protocol/index';
 import { getGeometryKernel } from '@core/geometry/kernel';
 import { positiveInteger } from '../env';
 import { callBridge, pythonExchangeConfigFromEnv } from '../pythonExchange';
@@ -11,6 +11,8 @@ import { runFeaExport } from './feaExport';
 import { runFeaImportField } from './feaImportField';
 import { runFeaMesh, type MeshBridgeResponse } from './feaMesh';
 import { runFeaSolve } from './feaSolve';
+import { createComputeRunner } from '../native/computeJob';
+import { nativeMappingStep } from '../native/mapField';
 
 const DEFAULT_MESH_TIMEOUT_MS = 600_000;
 
@@ -23,13 +25,15 @@ export function createFeaToolsPort(env: NodeJS.ProcessEnv = process.env): FeaToo
   const store = defaultFeArtifactStore();
   const ccx = createCcxRunner(env);
   const keepJobs = env['LLULL_FEA_KEEP'] === '1';
+  const beforeDeck = nativeMappingStep({ store, runner: createComputeRunner(env), env }, env);
   const bridge = async (request: Record<string, unknown>): Promise<MeshBridgeResponse> => {
     if (bridgeScript === undefined) throw new Error('cannot start Python: the bridge is disabled (LLULL_PYTHON=off); FEA_TOOL_MISSING');
     return callBridge(python, bridgeScript, request, timeoutMs);
   };
   return {
     mesh: (analysisId, host) => runFeaMesh(analysisId, host, { bridge, store, hooks: caeHooks, kernel: getGeometryKernel }),
-    solve: (analysisId, options, host) => runFeaSolve(analysisId, options.timeoutS, host, { store, hooks: caeHooks, ccx, keepJobs }),
+    solve: (analysisId, options, host) =>
+      runFeaSolve(analysisId, options.timeoutS, host, { store, hooks: caeHooks, ccx, keepJobs, beforeDeck }),
     exportDeck: (analysisId, host) => Promise.resolve(runFeaExport(analysisId, host, { store, hooks: caeHooks })),
     importField: (analysisId, table, host) => Promise.resolve(runFeaImportField(analysisId, table, host, { store, hooks: caeHooks })),
   };

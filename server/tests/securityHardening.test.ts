@@ -14,7 +14,7 @@ import { guardMutation, hasValidBearer, isLoopbackAddress, isLocalPeer, checkBin
 import { createAutosaver } from '../src/autosave';
 import { createEmptyDocument } from '@core/model/types';
 
-const ENV_KEYS = ['MCP_AUTH_TOKEN', 'HOST', 'LLULL_ALLOWED_HOSTS', 'LLULL_REQUIRE_TOKEN_FOR_REST'];
+const ENV_KEYS = ['MCP_AUTH_TOKEN', 'LLULL_REQUIRE_TOKEN_FOR_REST'];
 afterEach(() => {
   for (const key of ENV_KEYS) delete process.env[key];
 });
@@ -100,25 +100,22 @@ describe('Host allowlist', () => {
     expect((await request(app).get('/live/snapshot').set('Host', 'evil.example:3001')).status).toBe(403);
   });
 
-  it('honours LLULL_ALLOWED_HOSTS (name = any port, name:port = exact)', async () => {
-    process.env['LLULL_ALLOWED_HOSTS'] = 'cad.example, other.example:8080';
-    expect((await request(app).get('/live/snapshot').set('Host', 'cad.example:9')).status).toBe(200);
-    expect((await request(app).get('/live/snapshot').set('Host', 'other.example:8080')).status).toBe(200);
-    expect((await request(app).get('/live/snapshot').set('Host', 'other.example:1')).status).toBe(403);
-  });
-
-  it('accepts any Host when HOST is non-loopback and no allowlist is set', async () => {
-    process.env['HOST'] = '0.0.0.0';
-    expect((await request(app).get('/live/snapshot').set('Host', 'anything.example')).status).toBe(200);
+  it('has no host-name allowlist extension (LLULL_ALLOWED_HOSTS is gone)', async () => {
+    process.env['LLULL_ALLOWED_HOSTS'] = 'cad.example';
+    try {
+      expect((await request(app).get('/live/snapshot').set('Host', 'cad.example:9')).status).toBe(403);
+    } finally {
+      delete process.env['LLULL_ALLOWED_HOSTS'];
+    }
   });
 });
 
 describe('checkBindSafety', () => {
-  it('refuses non-loopback without token unless explicitly allowed', () => {
-    expect(checkBindSafety('0.0.0.0', {})).toContain('Refusing to start');
-    expect(checkBindSafety('0.0.0.0', { MCP_AUTH_TOKEN: 't' })).toBeNull();
-    expect(checkBindSafety('0.0.0.0', { LLULL_ALLOW_UNAUTHENTICATED: 'true' })).toBeNull();
-    expect(checkBindSafety('127.0.0.1', {})).toBeNull();
+  it('refuses any non-loopback host, with or without a token (local-only backend)', () => {
+    expect(checkBindSafety('0.0.0.0')).toContain('Refusing to start');
+    expect(checkBindSafety('192.168.1.20')).toContain('loopback');
+    expect(checkBindSafety('127.0.0.1')).toBeNull();
+    expect(checkBindSafety('::1')).toBeNull();
   });
 });
 

@@ -27,9 +27,9 @@ Each draw op is a pure `defineCommand`, snake_case, drafting-verb named, in
 `packages/core/src/commands/draw2d/` / `modify2d/` (`draw_polyline`,
 `draw_arc`, `draw_rectangle`, `draw_ellipse`, `draw_spline`,
 `add_dimension`, `offset_2d`, `trim`, …). Points: `vec2()` / `looseVec2()` schema helpers. Same
-rules as any command: pure, registered (+ `2d` toolset in `packages/mcp/src/toolsets.ts`),
+rules as any command: pure, registered (+ `2d` toolset in `packages/protocol/src/toolsets.ts`),
 happy + failure tests.
-Registering it gives the UI tool and the MCP tool (drivable by Claude or any agent) at once.
+Registering it gives the UI tool and the CLI tool (drivable by Claude Code or any script) at once.
 
 ### 3. Drafting interaction & rendering — viewport-engineer / viewport-feature skill
 - 2D drafting view = orthographic top-down camera over the SAME three.js scene; render

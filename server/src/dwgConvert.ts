@@ -3,7 +3,7 @@
  *   LibreDWG    `dwg2dxf -y -o <out.dxf> <in.dwg>`   env LLULL_DWG2DXF (default "dwg2dxf"; "off" disables)
  *   ODA         `<exe> <in-dir> <out-dir> ACAD2018 DXF 0 1 *.DWG`   env LLULL_ODA_CONVERTER (path)
  * Other env: LLULL_DWG_TIMEOUT_MS (default 60000), LLULL_DWG_MAX_BYTES (default 50 MB),
- *            LLULL_EXCHANGE_DIR (for the MCP tool's `path` argument).
+ *            LLULL_EXCHANGE_DIR (for the import_dwg tool's `path` argument).
  *
  * Safety: private temp dir per request (always removed), argv-only spawn with fixed file names, allowlisted env, timeout, size caps.
  */
@@ -11,7 +11,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import type { DwgConverterPort } from '@mcp/index';
+import type { DwgConverterPort } from '@protocol/index';
 import {
   bridgeEnvironment,
   captureStderrTail,
@@ -146,7 +146,7 @@ async function convertDwgToDxf(bytes: Uint8Array, config: DwgConvertConfig = dwg
   }
 }
 
-/** The one conversion limiter: shared by the MCP port and `POST /import/dwg`. */
+/** The one conversion limiter: shared by the import_dwg tool's port and `POST /import/dwg`. */
 const limitConversions = concurrencyLimiter(MAX_CONCURRENT_CONVERSIONS);
 
 /** `convertDwgToDxf` through the shared concurrency limit. */

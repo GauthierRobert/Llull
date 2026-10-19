@@ -40,7 +40,7 @@ export const fooThing = defineCommand({
 - Schema helpers (`@core/commands/schema`): `vec2`/`vec3` (exact tuples), `looseVec2`/`looseVec3`
   (`run` checks length), `untypedArray` (`run` validates), `tolerant(schema)` (never rejected).
   Every property needs `.describe(...)` — `defineCommand` throws without it. Descriptions become
-  the MCP `paramsSchema`: write them for an agent that cannot see the code.
+  the tool `paramsSchema` (`llull describe`): write them for an agent that cannot see the code.
 - `run`: still validate semantics (ids exist, sizes > 0); on bad input return the **unchanged doc**,
   an explanatory `summary`, `affected: []`. Never throw for user error.
 - `summary` is the AI's feedback signal: specific and factual (ids, sizes, counts).
@@ -78,12 +78,12 @@ export const fooThing = defineCommand({
 - Prefer deriving evaluated geometry from the document rather than storing it (L8).
 - `requiresKernel` command with `ctx.kernel === null` ⇒ "kernel not available" summary; replay
   refuses rather than silently dropping geometry.
-- Kernel choice (`@core/geometry/kernelChoice`): browser `?kernel=occt`, server
-  `LLULL_KERNEL=manifold|occt`; installed in `src/main.tsx` / `server/src/geometryKernel.ts`.
+- Kernel choice (`@core/geometry/kernelChoice`): backend + CLI `LLULL_KERNEL=manifold|occt|occt-native`, installed in
+  `server/src/geometryKernel.ts`; the desktop renderer installs Manifold in `src/main.tsx` (no URL switch, LC1).
 
 ## Plugins (L10, as built)
 
 - Installed by `installDefaultPlugins()` (called by `src/main.tsx`, `server/src/plugins.ts`,
   `tests/setup.ts`). Plugins import `@core` / `@lib` only.
-- Command name clash ⇒ install throws; `toolset` places commands in an MCP toolset; `guards` are
+- Command name clash ⇒ install throws; `toolset` places commands in a toolset (CLI listings, UI palette); `guards` are
   derivation guards; `document` (`DocumentExtension`) validates plugin data + restores derived geometry.

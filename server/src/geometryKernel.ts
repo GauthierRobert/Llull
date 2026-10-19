@@ -1,7 +1,8 @@
 /**
  * Inject the configured geometry kernel into the core at startup (architecture L9) so boolean and
- * fillet commands work for MCP agents exactly as in the browser app. `LLULL_KERNEL=occt` selects
- * OpenCascade (falls back to Manifold on failure); anything else is Manifold.
+ * fillet commands work for the CLI exactly as in the desktop app. `LLULL_KERNEL=occt` selects
+ * OpenCascade (falls back to Manifold on failure); `LLULL_KERNEL=occt-native` the native `llull-kernel`
+ * sidecar (RS-1, falls back to the WASM OpenCascade, then Manifold); anything else is Manifold.
  */
 
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
@@ -11,6 +12,7 @@ import { parseKernelChoice, type KernelChoice } from '@core/geometry/kernelChoic
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { errorMessage } from '@lib/errorMessage';
 import { positiveInteger } from './env';
+import { NATIVE_KERNEL_CHOICE, startNativeKernel } from './nativeKernel';
 
 let activeKernel: KernelChoice | null = null;
 
@@ -53,15 +55,29 @@ function described(kernel: GeometryKernel, extra: Pick<KernelInfo, 'isolation' |
 /** Load the configured kernel; on failure commands keep their graceful "no kernel" no-op. */
 export async function installGeometryKernel(): Promise<boolean> {
   let fallbackReason: string | undefined;
-  if (parseKernelChoice(process.env['LLULL_KERNEL']) === 'occt') {
+  const nativeRequested = process.env['LLULL_KERNEL']?.trim().toLowerCase() === NATIVE_KERNEL_CHOICE;
+  if (nativeRequested) {
+    const native = startNativeKernel({ callTimeoutMs: occtCallTimeoutMs() });
+    if ('kernel' in native) {
+      setGeometryKernel(described(native.kernel, { isolation: 'process' }));
+      activeKernel = 'occt';
+      return true;
+    }
+    fallbackReason = native.reason;
+    warnUnavailable('native OCC kernel unavailable; falling back to the WASM OCC kernel', native.reason);
+  }
+  if (nativeRequested || parseKernelChoice(process.env['LLULL_KERNEL']) === 'occt') {
     try {
       const { createNodeOcctKernel } = await import('./occtNode');
       const isolated = startIsolatedOcct();
-      setGeometryKernel(described(isolated ?? (await createNodeOcctKernel()), { isolation: isolated === null ? 'in-process' : 'worker' }));
+      const isolation = isolated === null ? 'in-process' : 'worker';
+      setGeometryKernel(
+        described(isolated ?? (await createNodeOcctKernel()), { isolation, ...(fallbackReason === undefined ? {} : { fallbackReason }) }),
+      );
       activeKernel = 'occt';
       return true;
     } catch (error) {
-      fallbackReason = errorMessage(error);
+      fallbackReason = fallbackReason === undefined ? errorMessage(error) : `${fallbackReason}; ${errorMessage(error)}`;
       warnUnavailable('OCC kernel unavailable; falling back to Manifold', error);
     }
   }

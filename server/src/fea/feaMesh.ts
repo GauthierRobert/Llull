@@ -6,7 +6,7 @@
 import type { FeMeshArtifact } from '@core/model/analysis';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { isRecord } from '@lib/isRecord';
-import type { FeaHost, FeaToolResult } from '@mcp/index';
+import type { FeaHost, FeaToolResult } from '@protocol/index';
 import type { FeArtifactStore } from './artifactStore';
 import type { CaeCode, CaeHooks } from './caeHooks';
 import { feaFailure, INSTALL_HINT } from './feaCommon';

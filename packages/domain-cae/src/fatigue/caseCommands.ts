@@ -19,7 +19,8 @@ const mappingSchema = z
     }),
   )
   .describe(
-    'Histories driving the case. History-only: stress-kind histories whose scaled series are summed (same length). Needs >= 1 entry.',
+    'Histories driving the case. History-only: stress-kind histories whose scaled series are summed (same length). FE: one load_factor history per load case ' +
+      '(loadCase; may be omitted when the analysis has one load case), superposed per node. Needs >= 1 entry.',
   );
 
 const materialSchema = z.object({
@@ -55,7 +56,7 @@ const caseShape = {
     .string()
     .optional()
     .describe(
-      'FE analysis whose stresses drive the case. Stored; FE hot-spot extraction is not built yet, so compute_fatigue then refuses with FAT_RESULTS_MISSING.',
+      'FE analysis whose STRESS results drive the case. After fea_solve, run the fatigue_field transport (llull-compute, every node) so compute_fatigue can rank the hot spots; without it compute_fatigue refuses with FAT_RESULTS_MISSING.',
     ),
   mapping: mappingSchema,
   measure: measureSchema.optional().describe('FE stress measure (default signed_von_mises).'),

@@ -69,7 +69,7 @@ export const setEntityName = defineCommand({
   description:
     "Set an entity's display name and/or tags. Both fields are optional and independent — omitting a field leaves it unchanged. " +
     'Pass name:"" to clear the name, or tags:[] to clear all tags. ' +
-    'Enables AI/MCP plans to reference entities by meaning instead of generated ids, ' +
+    'Enables AI/CLI plans to reference entities by meaning instead of generated ids, ' +
     'and allows `find_entities` to filter by name or tag.',
   params: z.object({
     id: z.string().describe('Id of the entity to label.'),

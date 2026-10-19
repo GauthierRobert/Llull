@@ -14,7 +14,7 @@ vi.mock('@core/commands/registry', () => ({
   },
 }));
 
-import { shapeToolCallContent } from '@mcp/dispatch';
+import { shapeToolCallContent } from '@protocol/toolResult';
 import { applyToolCall } from '../helpers/applyToolCall';
 
 // shapeToolCallContent — the single shaping implementation
@@ -75,7 +75,7 @@ describe('shapeToolCallContent() — pure shaping', () => {
 
 // applyToolCall — delegates to shapeToolCallContent (registry mock active)
 
-describe('CommandResult.data — MCP passthrough via applyToolCall', () => {
+describe('CommandResult.data — tool-result passthrough via applyToolCall', () => {
   it('surfaces `data` when the command produced it', () => {
     const result = applyToolCall(createEmptyDocument(), 'fake_measure', {});
     expect(result.isError).toBe(false);

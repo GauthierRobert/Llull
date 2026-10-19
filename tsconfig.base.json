@@ -3,7 +3,7 @@
     "paths": {
       "@core/*": ["./packages/core/src/*"],
       "@lib/*": ["./packages/core/src/lib/*"],
-      "@mcp/*": ["./packages/mcp/src/*"],
+      "@protocol/*": ["./packages/protocol/src/*"],
       "@aec/*": ["./packages/domain-aec/src/*"],
       "@cae/*": ["./packages/domain-cae/src/*"],
       "@aero/*": ["./packages/domain-aero/src/*"],

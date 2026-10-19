@@ -1,12 +1,12 @@
 /**
- * Subscribes to the server SSE command log (`GET <SERVER_BASE>/live`, `?ticket=` via liveTicketStreamUrl when a token is set). Events (`@mcp/liveSync`,
+ * Subscribes to the server SSE command log (`GET <SERVER_BASE>/live`, `?ticket=` via liveTicketStreamUrl when a token is set). Events (`@protocol/liveSync`,
  * seq per server `epoch`): `snapshot` (connect, undo/redo) → hydrateLiveDocument; `command` → applyLiveCommand, and on a
  * seq gap / hash mismatch a `GET /live/snapshot` resync. onerror → 'disconnected', reconnect with 1s..30s backoff.
  */
 
 import { useEffect } from 'react';
 import { useStore } from '@ui/store';
-import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
+import type { LiveCommandEvent, LiveSnapshotEvent } from '@protocol/liveSync';
 import { hasApiToken, liveStreamUrl, liveTicketStreamUrl } from '@ui/serverConfig';
 import { fetchLiveSnapshot } from '@ui/store/serverCommands';
 import { isOwnCommandId, markLiveOrigin } from '@ui/store/liveOrigin';
