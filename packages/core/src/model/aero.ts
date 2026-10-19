@@ -19,7 +19,7 @@ export type AirfoilSource =
     };
 
 /** Whether an input comes from a pinned source (SRF AF-32): generated sections are verified, imported ones only when their hash was pinned. */
-export interface AirfoilProvenance {
+interface AirfoilProvenance {
   readonly verified: boolean;
   readonly source: string;
 }
@@ -59,7 +59,7 @@ export interface WingDef {
   readonly twistLocation: number;
   readonly loft: 'linear' | 'smooth';
   readonly mirror: boolean;
-  /** Right half first, then the mirrored left half when `mirror`. */
+  /** Right half first (its id is the wing id), then the mirrored left half when `mirror`. */
   readonly entityIds: ReadonlyArray<string>;
 }
 

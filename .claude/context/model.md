@@ -46,7 +46,8 @@ WedgeEntity      'wedge'      size: Vec3
 PyramidEntity    'pyramid'    baseWidth; baseDepth; height
 RevolutionEntity 'revolution' profile; axis: Vec3; angle; segments; curves?  // same rule as extrusion
 SweepEntity      'sweep'      path: CurveSegment<Vec3>[] (local, open, G1); section: {shape:'circle'; radius; innerRadius?} | {shape:'profile'; profile; curves?}; stations?: {at; ring: Vec2[]}[]  // variable section
-LoftEntity       'loft'       rings: Vec3[][] (local, SECTION_RING_POINTS each, aligned); ruled
+LoftEntity       'loft'       rings: Vec3[][] (local, aligned; SECTION_RING_POINTS each, or the dense fallback of the exact sections); ruled; sections?: NurbsCurveData[] (loft v3, exact, unresampled: the kernel skins these)
+NurbsCurveEntity 'nurbs_curve' curve: NurbsCurveData {degree 1..25; poles: Vec3[] (local); weights?; knots; multiplicities}  // 3D curve, no volume; isCurve3D(e) (model/curveKinds)
 SubdivisionEntity 'subdivision' vertices: Vec3[] (local cage); faces: number[][] (CCW from outside, closed); creases: [a, b][]; levels 0..4  // Catmull-Clark
 // 2D (geometry LOCAL to the work plane placed by position/rotation; default z=0, normal +Z)
 LineEntity       'line'       start: Vec2; end: Vec2

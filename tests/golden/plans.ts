@@ -436,6 +436,54 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'set_part_grounded', params: { ids: ['$base'], grounded: true } },
     { command: 'allow_interference', params: { a: '$pin', b: '$base', kind: 'press_fit', reason: 'pin pressed into the frame boss' } },
   ],
+  // 02 SRF: NURBS curves, edits and analysis
+  surface_nurbs_curves: [
+    { command: 'create_nurbs_curve', params: { degree: 3, poles: xyz(0, 0, 0, 1, 2, 0, 3, 2, 1, 4, 0, 1, 6, -1, 2) }, as: 'c' },
+    { command: 'edit_nurbs', params: { id: '$c', operation: 'insert_knot', u: 0.25, times: 2 } },
+    {
+      command: 'interpolate_curve',
+      params: { points: xyz(0, 0, 0, 1, 1, 0, 2, 0.5, 1, 3, -1, 0, 4, 0, 2), parameterization: 'centripetal' },
+    },
+    { command: 'create_conic', params: { start: [5, 0, 0], apex: [5, 5, 0], end: [0, 5, 0], rho: 0.41421356237309515 }, as: 'arc' },
+    { command: 'analyze_curve_curvature', params: { id: '$arc', samples: 5 } },
+    { command: 'inspect_nurbs', params: { id: '$c' } },
+  ],
+  // 02 SRF VC-SRF-11: NACA 0012 trapezoid wing, 2 m -> 1 m chord, 5 m semi-span, volume 0.959117 m3 per half
+  aero_naca_trap_wing: [
+    { command: 'set_units', params: { units: 'm' } },
+    { command: 'airfoil_from_naca', params: { designation: '0012', points: 41, trailingEdge: 'open' }, as: 'af' },
+    {
+      command: 'create_wing',
+      params: {
+        sections: [
+          { airfoilId: '$af', span: 0, chord: 2 },
+          { airfoilId: '$af', span: 5, chord: 1 },
+        ],
+        loft: 'linear',
+      },
+      as: 'wing',
+    },
+    { command: 'wing_properties', params: { id: '$wing' } },
+    { command: 'airfoil_properties', params: { airfoilId: '$af' } },
+  ],
+  // 02 SRF VC-SRF-10: NACA TR-1208 45 degree swept wing from a planform (2024.35 in2, MAC 16.67 in, AR 8.0)
+  aero_tr1208: [
+    { command: 'set_units', params: { units: 'in' } },
+    { command: 'airfoil_from_naca', params: { designation: '0012', points: 41 }, as: 'af' },
+    {
+      command: 'create_wing',
+      params: {
+        planform: { semiSpan: 63.63, rootChord: 21.941, taper: 0.45, sweepDeg: 45, sweepLocation: 0.25, dihedralDeg: 0 },
+        sections: [
+          { airfoilId: '$af', span: 0 },
+          { airfoilId: '$af', span: 63.63 },
+        ],
+        mirror: true,
+      },
+      as: 'wing',
+    },
+    { command: 'wing_properties', params: { id: '$wing' } },
+  ],
 };
 
 /** Plans needing the Manifold geometry kernel (booleans). */

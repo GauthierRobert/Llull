@@ -133,7 +133,11 @@ function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string
       };
     case 'loft':
       return {
-        scaled: { ...e, rings: e.rings.map((ring) => ring.map((p) => scale3(p, f))) },
+        scaled: {
+          ...e,
+          rings: e.rings.map((ring) => ring.map((p) => scale3(p, f))),
+          ...(e.sections === undefined ? {} : { sections: e.sections.map((section) => scaleCurve(section, f)) }),
+        },
         dims: `scaled ${e.rings.length} section rings`,
       };
     case 'subdivision':

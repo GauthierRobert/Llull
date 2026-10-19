@@ -15,6 +15,7 @@ import { orientOutward } from '@core/geometry/meshVolume';
 import { revolutionAxisIndex } from '@core/geometry/revolution';
 import { mapSegment, reverseChain, sampleProfile, segmentTangent } from '@core/geometry/curveSegments';
 import { ringCurves } from '@core/geometry/sectionRing';
+import { sectionChain } from '@core/geometry/sectionChain';
 import { frameAtFraction, stationRingAt, sweepStartAxes } from '@core/geometry/sweep';
 import { subdivisionPatches } from '@core/geometry/subdivisionPatches';
 import { clamp } from '@lib/clamp';
@@ -104,6 +105,13 @@ function withPayload(entity: Entity, native: Record<string, unknown>): Entity {
   return { id, kind, layerId, color, position, rotation, native } as unknown as Entity;
 }
 
+/** Wire chains of a loft: its exact sections (Béziers + closing edge) when every one is expressible, else the Catmull-Rom ring curves. */
+function loftChains(entity: Extract<Entity, { kind: 'loft' }>): number[][] {
+  const chains = entity.sections?.map(sectionChain);
+  if (chains?.every((chain): chain is CurveSegment<Vec3>[] => chain !== null) === true) return chains.map(encodeChain);
+  return entity.rings.map((ring) => encodeChain(ringCurves(ring)));
+}
+
 /** The leaf the sidecar builds for `entity` (see the module comment). */
 export function nativeLeaf(entity: Entity): Entity {
   switch (entity.kind) {
@@ -121,7 +129,7 @@ export function nativeLeaf(entity: Entity): Entity {
       return { ...rest, chain: orientedChain(curves, place, frame === 1) } as unknown as Entity;
     }
     case 'loft':
-      return withPayload(entity, { chains: entity.rings.map((ring) => encodeChain(ringCurves(ring))), ruled: entity.ruled });
+      return withPayload(entity, { chains: loftChains(entity), ruled: entity.ruled });
     case 'sweep':
       return withPayload(entity, sweepPayload(entity));
     case 'subdivision':
