@@ -38,11 +38,11 @@ to back, Defraeye 2010 calibration and the Martin 1998 power model. Stock S5 dra
 
 | | round tube | aero concept | concept + fit | **S5 2025** | S5 Aero+ | **S5 Aero+ fit** |
 | --- | --- | --- | --- | --- | --- | --- |
-| Bike CdA (m²) | 0.0770 | 0.0498 | 0.0497 | 0.0534 | 0.0452 | 0.0450 |
-| Rider CdA (m²) | 0.1930 | 0.1904 | 0.1723 | 0.1828 | 0.1662 | 0.1456 |
-| Rider + bike CdA (m²) | 0.2700 | 0.2402 | 0.2220 | 0.2363 | 0.2114 | 0.1906 |
-| Power at 40 km/h (W) | 268 | 242 | 227 | 239 | 217 | 200 |
-| 40 km at 250 W | 61:33 | 59:20 | 57:53 | 59:00 | 57:00 | 55:13 |
+| Bike CdA (m²) | 0.0770 | 0.0498 | 0.0497 | 0.0534 | 0.0485 | 0.0484 |
+| Rider CdA (m²) | 0.1930 | 0.1904 | 0.1723 | 0.1828 | 0.1745 | 0.1432 |
+| Rider + bike CdA (m²) | 0.2700 | 0.2402 | 0.2220 | 0.2363 | 0.2230 | 0.1917 |
+| Power at 40 km/h (W) | 268 | 242 | 227 | 239 | 227 | 200 |
+| 40 km at 250 W | 61:33 | 59:20 | 57:53 | 59:00 | 57:58 | 55:18 |
 
 The 2025 S5's taller front end (stack 565 mm, rising one-piece cockpit) sits the same rider higher than the 542 mm
 stack of the earlier frames, so its rider CdA is higher. The bike row is the like-for-like comparison.
@@ -56,8 +56,8 @@ stack of the earlier frames, so its rider CdA is higher. The bike row is the lik
 - 1× 52T with a flush ring cover and no front derailleur
 - 360 mm bar, −17° stem, narrower hoods and saddle
 
-That takes 82.9 cm² off the bike CdA. **Aero+ fit** (`s5xf`) adds the position the bike is built for: 330 mm hoods,
-forearms level, torso 17°, aero road helmet. That gives −19% system CdA, 39 W less at 40 km/h and 3:48 saved over
+That takes 49.6 cm² off the bike CdA. **Aero+ fit** (`s5xf`) adds the position the bike is built for: 330 mm hoods,
+forearms level, torso 17°, aero road helmet. That gives −19% system CdA, 38 W less at 40 km/h and 3:42 saved over
 40 km at 250 W.
 
 ## Build
