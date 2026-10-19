@@ -262,6 +262,36 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'add_constraint', params: { constraint: { kind: 'distance', a: { entityId: '$a' }, b: { entityId: '$b' }, value: 4 } } },
     { command: 'solve_constraints', params: {} },
   ],
+  constraints_fully_constrained_sketch: [
+    { command: 'draw_polyline', params: { points: xy(0, 0, 40, 1) }, as: 'bottom' },
+    { command: 'draw_polyline', params: { points: xy(40, 1, 41, 20) }, as: 'right' },
+    { command: 'draw_polyline', params: { points: xy(41, 20, 1, 21) }, as: 'top' },
+    { command: 'draw_polyline', params: { points: xy(1, 21, 0, 0) }, as: 'left' },
+    {
+      command: 'add_constraint',
+      params: { constraint: { kind: 'coincident', a: { entityId: '$bottom', kind: 'end' }, b: { entityId: '$right', kind: 'start' } } },
+    },
+    {
+      command: 'add_constraint',
+      params: { constraint: { kind: 'coincident', a: { entityId: '$right', kind: 'end' }, b: { entityId: '$top', kind: 'start' } } },
+    },
+    {
+      command: 'add_constraint',
+      params: { constraint: { kind: 'coincident', a: { entityId: '$top', kind: 'end' }, b: { entityId: '$left', kind: 'start' } } },
+    },
+    {
+      command: 'add_constraint',
+      params: { constraint: { kind: 'coincident', a: { entityId: '$left', kind: 'end' }, b: { entityId: '$bottom', kind: 'start' } } },
+    },
+    { command: 'add_constraint', params: { constraint: { kind: 'horizontal', a: { entityId: '$bottom' } } } },
+    { command: 'add_constraint', params: { constraint: { kind: 'horizontal', a: { entityId: '$top' } } } },
+    { command: 'add_constraint', params: { constraint: { kind: 'vertical', a: { entityId: '$right' } } } },
+    { command: 'add_constraint', params: { constraint: { kind: 'vertical', a: { entityId: '$left' } } } },
+    { command: 'add_constraint', params: { constraint: { kind: 'aligned', a: { entityId: '$bottom' }, value: 40 } } },
+    { command: 'add_constraint', params: { constraint: { kind: 'aligned', a: { entityId: '$right' }, value: 20 } } },
+    { command: 'add_constraint', params: { constraint: { kind: 'fix', a: { entityId: '$bottom', kind: 'start' } } } },
+    { command: 'solve_constraints', params: {} },
+  ],
   assembly_components_instances: [
     ...CUBE_COMPONENT,
     { command: 'insert_instance', params: { componentId: 'comp-cube', position: [5, 0, 0] } },

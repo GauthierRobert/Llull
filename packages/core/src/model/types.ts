@@ -536,10 +536,55 @@ export interface Component {
  */
 export type EntityRef = { readonly entityId: string } | { readonly entityId: string; readonly kind: 'start' | 'end' | 'center' | 'mid' };
 
-export const CONSTRAINT_KINDS = ['coincident', 'parallel', 'perpendicular', 'tangent', 'distance', 'angle'] as const;
+export const DIMENSION_CONSTRAINT_KINDS = [
+  'distance',
+  'angle',
+  'radius',
+  'diameter',
+  'aligned',
+  'horizontal_distance',
+  'vertical_distance',
+  'point_to_line',
+  'arc_sweep',
+  'arc_length',
+  'slot_length',
+] as const;
+
+export const CONSTRAINT_KINDS = [
+  'coincident',
+  'parallel',
+  'perpendicular',
+  'tangent',
+  'distance',
+  'angle',
+  'horizontal',
+  'vertical',
+  'equal',
+  'concentric',
+  'collinear',
+  'midpoint',
+  'symmetric',
+  'fix',
+  'point_on_curve',
+  'curvature',
+  'radius',
+  'diameter',
+  'aligned',
+  'horizontal_distance',
+  'vertical_distance',
+  'point_to_line',
+  'arc_sweep',
+  'arc_length',
+  'slot_length',
+] as const;
 
 type ConstraintKind = (typeof CONSTRAINT_KINDS)[number];
 
+export type DimensionConstraintKind = (typeof DIMENSION_CONSTRAINT_KINDS)[number];
+
+type GeometricConstraintKind = Exclude<ConstraintKind, DimensionConstraintKind | 'symmetric'>;
+
+/** Unary kinds (horizontal on a line, fix, radius, ...) store `b` equal to `a`. */
 interface ConstraintBase<K extends ConstraintKind> {
   readonly id: string;
   readonly kind: K;
@@ -547,19 +592,24 @@ interface ConstraintBase<K extends ConstraintKind> {
   readonly b: EntityRef;
 }
 
-/** `value` is a literal or a parameter expression: distance in document units, angle in radians. */
+/**
+ * `value` is a literal or a parameter expression. Units: document units for lengths and distances, radians for angles and sweeps.
+ * Offsets (horizontal_distance, vertical_distance, point_to_line) are magnitudes; the side of the current sketch is kept.
+ */
 interface ConstraintTarget {
   readonly value: number | string;
 }
 
+/** Mirror axis of `symmetric`: a line (no `kind`) or a point (a named sub-point). */
+interface ConstraintAxis {
+  readonly axis: EntityRef;
+}
+
 /** Solver-driven relation between entities `a` and `b` (see solve_constraints). */
 export type Constraint =
-  | ConstraintBase<'coincident'>
-  | ConstraintBase<'parallel'>
-  | ConstraintBase<'perpendicular'>
-  | ConstraintBase<'tangent'>
-  | (ConstraintBase<'distance'> & ConstraintTarget)
-  | (ConstraintBase<'angle'> & ConstraintTarget);
+  | ConstraintBase<GeometricConstraintKind>
+  | (ConstraintBase<'symmetric'> & ConstraintAxis)
+  | (ConstraintBase<DimensionConstraintKind> & ConstraintTarget);
 
 /** An InstanceEntity and the frame of it a joint attaches to. */
 export interface JointMateRef {
