@@ -127,8 +127,10 @@ export const materialPointResponse = defineCommand({
     '(dimensionless; engineering shear for xy, xz, yz) or stress ({ value, unit }) per component xx, yy, zz, xy, xz, yz, reached linearly over ' +
     'its increments; uncontrolled components stay stress-free. Presets fill components a step leaves out: uniaxial_strain, plane_strain (zz, xz, yz ' +
     'held at zero strain, NAFEMS NL1), equibiaxial (yy follows xx), pure_shear (yy held), simple_shear, uniaxial_stress. Give increments per step ' +
-    '(default 100, named). Small strain for elasticity, J2 plasticity, Ramberg-Osgood, Prony viscoelasticity and creep; finite for incompressible ' +
-    'hyperelastic modes (xx = nominal strain λ − 1 or nominal stress; rows carry Hencky strain, Cauchy stress, stretch and nominal stress). ' +
+    '(default 100, named). Small strain for elasticity, J2 plasticity, Ramberg-Osgood, Prony viscoelasticity and creep; finite for hyperelastic laws ' +
+    '(incompressible, D = 0: modes uniaxial_stress / equibiaxial / pure_shear with xx = nominal strain λ − 1 or nominal stress; compressible, D1 > 0: general paths ' +
+    'on any of the six components, shear by the simple-shear gradient, uncontrolled components stress-free and solved by Newton, so uniaxial stress contracts laterally; ' +
+    'rows carry Hencky strain, Cauchy stress, principal stretches, nominal stress and volumeRatio J). ' +
     'Stress in MPa, time in s, T in K; step and increment are 1-based; at most 100 000 increments per call.  Next: compare with test data, then check_material_models.',
   params: z.object({
     material: z.string().describe('Material id (create_material name).'),

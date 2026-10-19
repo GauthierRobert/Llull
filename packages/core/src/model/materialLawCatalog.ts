@@ -48,6 +48,7 @@ const CATALOG: readonly MaterialLawCatalogEntry[] = [
   entry('elastic_transversely_isotropic', 'elastic', 'PHY-02', validateElastic, CCX_ONLY),
   entry('elastic_anisotropic', 'elastic', 'PHY-02', validateElastic, CCX_ONLY),
   entry('j2_plasticity', 'plastic', 'PHY-02', validatePlastic, NATIVE),
+  entry('hill48_plasticity', 'plastic', 'PHY-02', validatePlastic, { calculix: 'mfront_v2', nastran: 'unsupported' }),
   entry('ramberg_osgood', 'plastic', 'PHY-02', validatePlastic, { calculix: 'native', nastran: 'unsupported' }),
   hyper('hyper_neo_hooke'),
   hyper('hyper_mooney_rivlin'),

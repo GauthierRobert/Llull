@@ -5,6 +5,7 @@
 
 import { convertValue, isUnitFailure } from '../../lib/quantity';
 import { isRecord } from '../../lib/isRecord';
+import { coefficientsFromRValues, coefficientsFromStressRatios, type HillCoefficients } from './hill';
 import { engineeringToCalculix } from './rambergOsgood';
 import { ogden1972ToCanonical } from './hyperelastic';
 import { failure, isLawFailure, type LawFailure } from './resolve';
@@ -174,6 +175,67 @@ function j2(raw: Record<string, unknown>): NormalizedLaw | LawFailure {
   };
 }
 
+const numbersOf = (value: unknown, keys: readonly string[]): Record<string, number> | null => {
+  if (!isRecord(value)) return null;
+  const out: Record<string, number> = {};
+  for (const key of keys) {
+    const entry = value[key];
+    if (typeof entry !== 'number' || !Number.isFinite(entry)) return null;
+    out[key] = entry;
+  }
+  return out;
+};
+
+const HILL_FORMS = {
+  stress_ratios: ['R11', 'R22', 'R33', 'R12', 'R13', 'R23'],
+  r_values: ['r0', 'r45', 'r90'],
+  coefficients: ['F', 'G', 'H', 'L', 'M', 'N'],
+} as const;
+
+/** Hill-1948: the agent states how the anisotropy is written; llull stores the six coefficients F G H L M N (PHY-02 §5.3, V2). */
+function hill48(raw: Record<string, unknown>): NormalizedLaw | LawFailure {
+  const base = j2(raw);
+  if (isLawFailure(base)) return base;
+  const form = raw['form'];
+  if (form !== 'stress_ratios' && form !== 'r_values' && form !== 'coefficients')
+    return failure(
+      'MATL_LAW_PARAMS_INVALID',
+      'model.form',
+      "state how the Hill anisotropy is written: 'stress_ratios' (anisotropy { R11, R22, R33, R12, R13, R23 }, Abaqus *POTENTIAL), 'r_values' (anisotropy { r0, r45, r90 }, Lankford sheet ratios) or 'coefficients' (anisotropy { F, G, H, L, M, N }); it is never defaulted",
+      "set model.form to 'stress_ratios', 'r_values' or 'coefficients'",
+    );
+  const values = numbersOf(raw['anisotropy'], HILL_FORMS[form]);
+  if (values === null)
+    return failure(
+      'MATL_LAW_PARAMS_INVALID',
+      'model.anisotropy',
+      `form '${form}' needs model.anisotropy with the finite numbers ${HILL_FORMS[form].join(', ')}`,
+      'give every value as a plain number',
+    );
+  let coefficients: HillCoefficients | null;
+  let note: string;
+  if (form === 'stress_ratios') {
+    coefficients = coefficientsFromStressRatios(values as Parameters<typeof coefficientsFromStressRatios>[0]);
+    note = 'F = ½(1/R22² + 1/R33² − 1/R11²), G and H cyclic; L = 3/(2 R23²), M = 3/(2 R13²), N = 3/(2 R12²)';
+  } else if (form === 'r_values') {
+    coefficients = coefficientsFromRValues(values['r0'] ?? 0, values['r45'] ?? 0, values['r90'] ?? 0);
+    note = 'F = r0/(r90(1+r0)), G = 1/(1+r0), H = r0/(1+r0), N = (F+G)(1+2 r45)/2, L = M = 3/2 (reference: rolling-direction yield stress)';
+  } else {
+    coefficients = values as unknown as HillCoefficients;
+    note = 'coefficients as given';
+  }
+  if (coefficients === null)
+    return failure(
+      'MATL_LAW_PARAMS_INVALID',
+      'model.anisotropy',
+      `every value of '${form}' must be a finite number > 0`,
+      'check the ratios',
+    );
+  const law = without(base.law as Record<string, unknown>, 'form', 'anisotropy');
+  const hardening = base.conversion === undefined ? '' : `; ${base.conversion.note}`;
+  return { law: { ...law, ...coefficients }, conversion: { from: `hill48 ${form}`, note: `${note}${hardening}` } };
+}
+
 /**
  * Canonical form of an input law.
  * @failure missing convention / measure / modulusKind -> the dedicated MATL_* code with the path; engineering Ramberg-Osgood without constants
@@ -193,6 +255,8 @@ export function normalizeLawInput(raw: unknown): NormalizedLaw | LawFailure {
       return rambergOsgood(raw);
     case 'j2_plasticity':
       return j2(raw);
+    case 'hill48_plasticity':
+      return hill48(raw);
     default:
       return { law: raw };
   }

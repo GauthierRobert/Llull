@@ -1,6 +1,7 @@
 /** Validation of plasticity laws: J2 hardening (PHY-02 §5.2), Ramberg-Osgood, and the rate laws. */
 
 import type { IsotropicHardening, KinematicHardening, LawOf } from '../materialModel';
+import { hillIsConvex } from './hill';
 import { poissonIssues } from './validateElastic';
 import {
   constantValue,
@@ -101,7 +102,24 @@ function kinematicIssues(law: KinematicHardening, context: ValidateContext): Mat
   }
 }
 
-export function validatePlastic(law: LawOf<'j2_plasticity' | 'ramberg_osgood'>, context: ValidateContext): MatlIssue[] {
+function hillIssues(law: LawOf<'hill48_plasticity'>, context: ValidateContext): MatlIssue[] {
+  const issues = [...isotropicIssues(law.isotropic, context)];
+  for (const key of ['F', 'G', 'H', 'L', 'M', 'N'] as const)
+    if (!Number.isFinite(law[key])) issues.push(invalid(`model.${key}`, `${key} must be a finite number, got ${String(law[key])}`));
+  if (issues.length > 0) return issues;
+  return hillIsConvex(law)
+    ? []
+    : [
+        error(
+          'MATL_HILL_NOT_CONVEX',
+          'model',
+          `the Hill yield surface is not convex: need G + H > 0, FG + GH + HF > 0 and L, M, N > 0 (F ${law.F}, G ${law.G}, H ${law.H}, L ${law.L}, M ${law.M}, N ${law.N})`,
+        ),
+      ];
+}
+
+export function validatePlastic(law: LawOf<'j2_plasticity' | 'ramberg_osgood' | 'hill48_plasticity'>, context: ValidateContext): MatlIssue[] {
+  if (law.kind === 'hill48_plasticity') return hillIssues(law, context);
   if (law.kind === 'j2_plasticity') return [...isotropicIssues(law.isotropic, context), ...kinematicIssues(law.kinematic, context)];
   const issues = [
     ...signedParameterIssues(law.E, 'stress', 'model.E', context, 'positive'),

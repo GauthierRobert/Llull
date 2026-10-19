@@ -66,6 +66,12 @@ export function combinationIssues(set: ConstitutiveSet, models: readonly Materia
       issues.push(combination('set.plastic', `j2_plasticity needs elastic_isotropic or elastic_orthotropic, not ${elastic.kind}`));
     }
   }
+  if (plastic?.kind === 'hill48_plasticity') {
+    if (members.hyperelastic !== undefined)
+      issues.push(combination('set.plastic', 'hill48_plasticity needs elastic_isotropic or elastic_orthotropic, not a hyperelastic law'));
+    else if (elastic !== undefined && elastic.kind !== 'elastic_isotropic' && elastic.kind !== 'elastic_orthotropic')
+      issues.push(combination('set.plastic', `hill48_plasticity needs elastic_isotropic or elastic_orthotropic, not ${elastic.kind}`));
+  }
   if (members.creep !== undefined && elastic?.kind !== 'elastic_isotropic' && elastic?.kind !== 'elastic_orthotropic')
     issues.push(combination('set.creep', 'creep needs an elastic_isotropic or elastic_orthotropic model in the set'));
   if (members.viscoelastic !== undefined && elastic === undefined && members.hyperelastic === undefined)

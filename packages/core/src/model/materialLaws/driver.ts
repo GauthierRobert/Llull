@@ -23,7 +23,7 @@ const unsupported = (message: string): DriverFailure => ({
   path: 'kinematics',
   message,
   remediation:
-    "small strain for elasticity, plasticity, viscoelasticity, creep and Ramberg-Osgood; 'finite' for incompressible hyperelastic laws",
+    "small strain for elasticity, plasticity, viscoelasticity, creep and Ramberg-Osgood; 'finite' for hyperelastic laws",
 });
 
 /**

@@ -85,6 +85,16 @@ type ConstitutiveLaw =
   | { readonly kind: 'elastic_anisotropic'; readonly stiffness: readonly number[]; readonly unit: string }
   | { readonly kind: 'j2_plasticity'; readonly isotropic: IsotropicHardening; readonly kinematic: KinematicHardening }
   | {
+      readonly kind: 'hill48_plasticity';
+      readonly isotropic: IsotropicHardening;
+      readonly F: number;
+      readonly G: number;
+      readonly H: number;
+      readonly L: number;
+      readonly M: number;
+      readonly N: number;
+    }
+  | {
       readonly kind: 'ramberg_osgood';
       readonly E: LawParameter;
       readonly nu: LawParameter;

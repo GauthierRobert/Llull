@@ -147,8 +147,13 @@ function isotropicRows(
 }
 
 function plasticCards(model: MaterialModel, rate: MaterialModel | undefined, context: Context): string[] | LawFailure {
-  const law = model.model as LawOf<'j2_plasticity' | 'ramberg_osgood'>;
+  const law = model.model as LawOf<'j2_plasticity' | 'ramberg_osgood' | 'hill48_plasticity'>;
   const path = `models.${model.id}`;
+  if (law.kind === 'hill48_plasticity')
+    return unsupported(
+      'hill48_plasticity',
+      'no Hill-48 yield card is mapped for CalculiX (none in the verified card set of TECHNICAL_SPEC §6.1; the pack does not claim one exists): use the MFront / MTest transport or another solver',
+    );
   if (law.kind === 'ramberg_osgood') {
     const lines = ['*DEFORMATION PLASTICITY'];
     for (const temperature of context.temperatures) {
