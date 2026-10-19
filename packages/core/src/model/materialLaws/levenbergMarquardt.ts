@@ -7,7 +7,7 @@
 import { solveLeastSquares } from '../../lib/leastSquares';
 import { solveLinear } from './linalg';
 
-export type LmStop = 'cost_change' | 'exact' | 'gradient' | 'no_descent' | 'max_iterations' | 'invalid_start';
+export type LmStop = 'cost_change' | 'exact' | 'gradient' | 'no_descent' | 'invalid_probe' | 'max_iterations' | 'invalid_start';
 
 export interface LmOptions {
   readonly lower: readonly number[];
@@ -104,7 +104,7 @@ export function levenbergMarquardt(residuals: Residuals, start: readonly number[
     }
     const j = jacobian(residuals, params, options, count);
     if (j === null) {
-      stop = 'no_descent';
+      stop = 'invalid_probe';
       break;
     }
     lastJ = j;
@@ -150,7 +150,7 @@ export function levenbergMarquardt(residuals: Residuals, start: readonly number[
     cost,
     iterations,
     evaluations: count.evaluations,
-    converged: stop !== 'max_iterations',
+    converged: stop !== 'max_iterations' && stop !== 'invalid_probe',
     stop,
     conditionNumber: rowsJ.length > 0 ? scaledConditionNumber(rowsJ) : Number.POSITIVE_INFINITY,
     finalDamping: damping,

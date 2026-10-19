@@ -73,6 +73,20 @@ describe('Levenberg-Marquardt core', () => {
     expect(result.iterations).toBeLessThan(100);
   });
 
+  it('reports invalid_probe, not convergence, when a Jacobian probe has no residuals', () => {
+    let calls = 0;
+    const result = levenbergMarquardt(
+      (p) => {
+        calls += 1;
+        return calls <= 1 ? [(p[0] ?? 0) - 3] : null;
+      },
+      [0],
+      { lower: [-10], upper: [10] },
+    );
+    expect(result.stop).toBe('invalid_probe');
+    expect(result.converged).toBe(false);
+  });
+
   it('honours bounds: the constrained minimum sits on the bound', () => {
     const result = levenbergMarquardt((p) => [(p[0] ?? 0) - 3, (p[1] ?? 0) + 1], [0, 0], { lower: [-10, 0], upper: [2, 10] });
     expect(result.params[0]).toBeCloseTo(2, 10);

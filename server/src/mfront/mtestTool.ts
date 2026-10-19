@@ -65,7 +65,6 @@ export function mtestToolDefinition(): ToolDefinition {
       },
       required: [],
     },
-    annotations: { readOnlyHint: true, idempotentHint: true },
   };
 }
 
@@ -82,6 +81,14 @@ const refusal = (code: string, message: string, data: Record<string, unknown> = 
   outcome(true, `${MTEST_TOOL}: ${code} — ${message}`, { code, ...data }, code, remediation);
 
 const libraryExtension = (platform: NodeJS.Platform): string => (platform === 'win32' ? 'dll' : platform === 'darwin' ? 'dylib' : 'so');
+
+/** The library the build produced in `src/` (lib<name>.<ext> | <name>.dll); the conventional lib<name> path when none is found. */
+async function builtLibrary(folder: string, library: string, platform: NodeJS.Platform): Promise<string> {
+  const extension = libraryExtension(platform);
+  const candidates = [`lib${library}.${extension}`, `${library}.${extension}`];
+  const present = await readdir(path.join(folder, 'src')).catch(() => [] as string[]);
+  return `src/${candidates.find((file) => present.includes(file)) ?? candidates[0] ?? ''}`;
+}
 
 /**
  * @failure tools absent -> MFRONT_TOOL_MISSING (reason in the message and data.reason); code execution not allowed ->
@@ -154,7 +161,7 @@ export async function runMtestTool(params: unknown, deps: MtestDeps = {}): Promi
           'fix the .mfront source; the log tail is in data.log',
         );
     }
-    const text = script.split(LIBRARY_TOKEN).join(`src/lib${library}.${libraryExtension(process.platform)}`);
+    const text = script.split(LIBRARY_TOKEN).join(await builtLibrary(folder, library, process.platform));
     await writeFile(path.join(folder, 'job.mtest'), text);
     const ran = await runner.run(tools.mtest, ['job.mtest'], folder, timeoutMs, processEnv);
     log.push(ran.log);
