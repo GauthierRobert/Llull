@@ -15,7 +15,7 @@ describe('nativeBinaryPath', () => {
     const found = nativeBinaryPath(
       'llull-kernel',
       { LLULL_NATIVE_DIR: '/bundle' },
-      (file) => (seen.push(file), file.startsWith('/bundle')),
+      (file) => (seen.push(file), file.startsWith(path.join('/bundle'))),
       'win32',
     );
     expect(found).toBe(path.join('/bundle', 'llull-kernel.exe'));
