@@ -72,11 +72,11 @@ function pointRefs(c: Constraint): EntityRef[] {
 }
 
 /** Lay out every line/arc/circle of the document plus every other entity a constraint references. */
-export function buildLayout(doc: CadDocument, constraints: readonly Constraint[]): Layout {
+export function buildLayout(doc: CadDocument, constraints: readonly Constraint[], scoped = false): Layout {
   const refs = constraints.flatMap(constraintRefs).filter((ref) => Object.hasOwn(doc.entities, ref.entityId));
   const needsPosition = new Set<string>();
   const ids = new Set<string>();
-  for (const [id, entity] of Object.entries(doc.entities)) if (blockKindOf(entity) !== 'point') ids.add(id);
+  if (!scoped) for (const [id, entity] of Object.entries(doc.entities)) if (blockKindOf(entity) !== 'point') ids.add(id);
   for (const ref of refs) ids.add(ref.entityId);
   for (const ref of constraints.flatMap(pointRefs)) {
     const entity = doc.entities[ref.entityId];
@@ -104,6 +104,15 @@ export function buildLayout(doc: CadDocument, constraints: readonly Constraint[]
     blocks.set(id, { id, kind, offset, size: GEOMETRY_SIZE[kind], posOffset, position: entity.position });
   }
   return { blocks, x0: Float64Array.from(values), owner };
+}
+
+/** Size of an entity in the initial sketch: line length or radius (0 for bare positions). Scales tolerances and difference steps. */
+export function featureSize(layout: Layout, id: string): number {
+  const block = layout.blocks.get(id);
+  if (!block || block.kind === 'point') return 0;
+  const o = block.offset;
+  if (block.kind === 'line') return Math.hypot(at(layout.x0, o + 2) - at(layout.x0, o), at(layout.x0, o + 3) - at(layout.x0, o + 1));
+  return Math.abs(at(layout.x0, o + 2));
 }
 
 export function positionOf(block: Block, x: Float64Array): Pt {
