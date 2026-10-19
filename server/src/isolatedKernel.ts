@@ -20,6 +20,7 @@ export interface IsolatedKernelOptions {
   readonly callTimeoutMs?: number; // default 60 000
   readonly startTimeoutMs?: number; // WASM load, default 60 000
   readonly testHooks?: boolean; // enables `__abort` / `__hang`
+  readonly workerData?: Readonly<Record<string, unknown>>; // extra entry inputs (the native kernel worker's binary path)
 }
 
 export interface IsolatedKernel extends GeometryKernel {
@@ -115,7 +116,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     const { port1, port2 } = new MessageChannel();
     const worker = new Worker(BOOTSTRAP, {
       eval: true,
-      workerData: { entry, statusBuffer, port: port2, testHooks: options.testHooks === true },
+      workerData: { ...options.workerData, entry, statusBuffer, port: port2, testHooks: options.testHooks === true },
       transferList: [port2],
       ...(execArgv !== undefined ? { execArgv } : {}),
     });

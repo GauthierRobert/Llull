@@ -1,0 +1,15 @@
+[package]
+name = "llull-kernel"
+description = "llull native geometry kernel sidecar: KernelOps request/reply over stdio NDJSON (RS-1)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+llull-kernel-occt = { path = "../../crates/llull-kernel-occt" }
+base64 = "0.22"
+serde_json.workspace = true
+
+[lints]
+workspace = true

@@ -22,6 +22,12 @@ unsafe_code = "deny"
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
 
+# OCCT is built by the kernel crate's build script through cmake, whose flags derive from the profile's opt-level/debug.
+# Pinning both for that crate makes dev, test, clippy and release share ONE OCCT build (target/OCCT), never two.
+[profile.dev.package.llull-kernel-occt]
+opt-level = 3
+debug = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

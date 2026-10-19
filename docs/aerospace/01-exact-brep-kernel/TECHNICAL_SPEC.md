@@ -851,4 +851,87 @@ Deviations from the plan:
 - STEP input must be valid UTF-8 text (Part 21 is ASCII with escapes); anything else is `KRN_STEP_UNREADABLE`.
 - `heal_shape`, `validate_shape` and the `heal` recipe node are not built; `import_step_exact` fails with `KRN_HEAL_FAILED` instead.
 
-Open items: set `LLULL_KERNEL` in the browser-only build (TR-KRN-03), the UI status badge for the fallback reason (`useKernelStatusStore`), `check_model` issues for the mismatch and fallback codes, `quality:kernel` (TR-KRN-62), and the native 7.9 kernel (`llull-kernel`, M2 / RS-1).
+Open items: set `LLULL_KERNEL` in the browser-only build (TR-KRN-03), the UI status badge for the fallback reason (`useKernelStatusStore`), `check_model` issues for the mismatch and fallback codes, `quality:kernel` (TR-KRN-62), and the rest of the native kernel (`llull-kernel`, M2 / RS-1; first slice in §13.D).
+
+### 13.D Native kernel sidecar, first slice (M2 / RS-1)
+
+Built (opt-in, `LLULL_KERNEL=occt-native`; the desktop default stays `occt` = WASM until the full VC-KRN-25 parity suite passes):
+
+- **Crate `solver/crates/llull-kernel-occt`.** OCCT **7.8.1** built from source as static libraries by the `occt-sys` crate
+  (cmake, into `solver/target/OCCT`, shared by every cargo profile; `LLULL_OCCT_DIR` points at an existing install instead, as CI
+  does). A narrow C++ facade (`cpp/facade.{hxx,cxx}`, about 15 coarse functions) behind a `cxx` bridge: Rust never sees OCCT
+  classes. Every C++ throw, `Standard_Failure` included, comes back as an `Err` (custom `rust::behavior::trycatch`), so an OCC
+  exception is a refusal, never a degraded module. The bridge module is the only `unsafe` surface (generated code, local
+  `allow(unsafe_code)` with its reason). The makers mirror `packages/kernel-occt` (same builders, placement order
+  M = T·Rx·Ry·Rz·anchor, post-boolean `ShapeUpgrade_UnifySameDomain`, display deflections 0.1 / 0.5 rad, part-frame mass
+  properties with eps 1e-12). `recipe.rs` evaluates `ShapeRecipe` JSON with a sub-recipe LRU (sha256 of the canonical JSON).
+- **Binary `solver/bins/llull-kernel`.** Long-lived; NDJSON on stdin/stdout. Request `{ id, op, args }`, reply
+  `{ id, result, error? }`. Shapes travel as handles `{ key, recipe? }` (the host's `recipeKey`); a key-only handle the sidecar no
+  longer holds answers `shape not cached: <key>` and the host resends the recipe, exactly like the worker protocol. `tessellate`
+  answers `{ encoding: 'base64-le', positions: <f64[]>, indices: <u32[]> }` (half the bytes of JSON numbers, bit-exact). Error
+  codes: `NATIVE_UNSUPPORTED` (op or recipe node not native yet), `NATIVE_BAD_REQUEST`, `NATIVE_OCC_FAILURE`, `NATIVE_PANIC`.
+  OCCT's console printers are removed and `std::cout` goes to stderr, so stdout carries only the protocol (the host also skips
+  any non-JSON line). stdin is read on its own thread: with `--exit-on-eof` (what the server passes) the process exits as soon
+  as the host closes the pipe, even mid-operation, so a hung OCCT call never outlives a killed worker.
+- **Native ops.** `info`, `evaluate`, `tessellate`, `massProperties`, `analyze`, `exportStep`. Recipe nodes `solid`,
+  `boolean`, `place`, `scale`; solid kinds box, cylinder, sphere, cone, torus, wedge, polygon extrusion, polygon revolution,
+  triangle mesh (sewn), and pyramid (the host sends its triangles, as the WASM kernel sews them).
+- **Server proxy.** `server/src/nativeKernel.ts` + worker entry `server/src/nativeKernelWorker.ts`, driven by the unchanged
+  `isolatedKernel.ts` (synchronous call, `LLULL_OCC_TIMEOUT_MS`, recycle, blob resend; new option `workerData`). Pure parts in
+  `server/src/native/`: `kernelProtocol.ts` (framing, mesh decoding, recipe rewrites: `evaluate` as a handle, pyramid as
+  triangles, the WASM tangent-sphere guard), `kernelSession.ts` (id-matched replies, death handling), `kernelRouter.ts` (per-op
+  routing). Per-op fallback: an op the sidecar does not list, a `NATIVE_UNSUPPORTED` reply or a sidecar death mid-call is
+  answered by the WASM OCC kernel loaded lazily in the same worker; each op's first fallback is logged once
+  (`[occt-native] <op>: answered by the WASM OCC kernel (<reason>)`); a dead sidecar is respawned on the next call.
+  `kernel_info`: `active: 'occt'`, `occtVersion: '7.8.1'`, `build: 'llull-kernel@0.1.0 (OCCT 7.8.1, native) +
+  opencascade.js@1.1.1 for ops it lacks'`. Selection (`server/src/geometryKernel.ts`): missing binary →
+  `NATIVE_TOOL_MISSING: llull-kernel not found: …` (`nativeInstallHint`) as `fallbackReason`, then the WASM kernel, then Manifold.
+  `server/src/kernelInvoke.ts` holds the op dispatch now shared by both workers. The server bundle gains the worker entry.
+- **Tests.** Rust: 24 unit tests (facade, closure check, LRU, recipe evaluation, session protocol). Server, always run:
+  `nativeKernelProtocol`, `nativeKernelSession` (fake process), `nativeKernelRouter` (fake session and fallback),
+  `nativeKernel` (the real worker path against a scripted sidecar, `fixtures/fakeKernel.cjs`: native and fallback ops, crash
+  recovery, a sidecar that does not speak, NATIVE_TOOL_MISSING fallback). With the binary built: `nativeKernelParity` (VC-KRN-25
+  slice): 11 primitives (translated, rotated about all axes), 4 boolean recipes (union, subtract, intersect, nested + place +
+  scale): volume, area and inertia within 1e-6 relative, centroid 1e-6, bounds 1e-3 of the WASM kernel; display meshes closed,
+  mesh volume within 6 % of the exact one and 3 % of the WASM mesh; `analyze` validity / closure / lumps equal; STEP solid count
+  equal; refusals equal; plus the proxy end to end (fillet and topology served by WASM on a native session, abort recovery).
+  It skips with a logged reason without the binary; `LLULL_REQUIRE_NATIVE_KERNEL=1` (CI) makes that a failure.
+- **Gates.** `LLULL_NATIVE_KERNEL=1 npm run native:check` (fmt, clippy `-D warnings`, tests on the whole workspace). CI job
+  `native-kernel` (`.github/workflows/check.yml`): OCCT install cached per version, then native:check, release build and the
+  parity suite. ESLint ignores `solver/target/**` (the cmake tree writes `compiler_depend.ts` files).
+
+Measured (4-core Xeon 2.8 GHz container, Linux x86_64, release build; native times include the JSON round trip, WASM times are
+in-process calls of opencascade.js 1.1.1; medians):
+
+| Item | Native `llull-kernel` | WASM OCC |
+| ---- | --------------------- | -------- |
+| OCCT build from source (cold, `-j4`, machine also busy) | 58 min; then 36 s to rebuild facade + link | — |
+| Binary / install size | 25.9 MB static binary; OCCT libs 259 MB + headers 43 MB (build tree 1.2 GB) | — |
+| Cold start | 12 ms to the `info` reply, 9 MB RSS | 1.73 s, +371 MB RSS |
+| Box: evaluate / tessellate / massProperties | 0.8 / 1.7 / 1.8 ms | 0.8 / 9.2 / 9.6 ms |
+| Plate − cylinder | 5.5 / 3.3 / 3.8 ms | 48 / 16 / 15 ms |
+| Plate − 25 holes (25 chained subtracts) | 228 / 64 / 66 ms | 2315 / 209 / 161 ms |
+| RSS after the runs | 23 MB | — |
+
+Deviations and decisions to confirm:
+
+- **OCCT 7.8.1, not 7.9.x** (TR-KRN-02 asks 7.9): `occt-sys` 7.8.1 is the newest static source crate. Follow-up: bump to 7.9.x
+  (own `occt-sys`-style build of the 7.9 sources, or a newer crate) so the native kernel matches the OCP 7.9.3 references.
+- **Static linking.** `occt-sys` links OCCT statically; RS1 §2 rule 7 and TR-KRN-02 say "linked dynamically (LGPL-2.1 with
+  exception)". Shipping the static binary needs either a switch to `BUILD_LIBRARY_TYPE=Shared` (bundle the `.so`/`.dll` next to
+  the binary) or the LGPL relinking obligations met. Owner decision before bundling.
+- `kernel_info.isolation` reads `worker` for the native kernel: `KernelInfo.isolation` in core has no `'process'` value yet
+  (TR-KRN-04 names it); adding it is a one-line core change.
+- `occtVersion` is the sidecar's (7.8.1) although ops it lacks run on 7.4.0p1; `build` names both engines. Documents stamped by
+  `import_step_exact` (a WASM op) on this kernel record 7.8.1.
+- Fillet and chamfer stay on WASM in this slice: their edge indices come from `topology`, which is still WASM, and the explorer
+  order of 7.8 and 7.4 may differ on boolean results. They move with native `topology`.
+- A closed solid whose display mesh comes out open is re-meshed finer (0.02 / 0.2 rad) for every solid, not only freeform-heavy
+  or thread-bearing ones as in `occtMesh.ts`; still open → null.
+- Exceptions are refusals (null result, `NATIVE_OCC_FAILURE` logged), not WASM fallbacks.
+
+Pending (rest of M2): native `topology`, `faceQuery.*`, `distance`, `exportStepAssembly`, `importShapes` (STEP read + heal) and
+`brep` blobs; fillet, chamfer, blend, shell and native `feature` nodes; exact curved profiles, loft, sweep, subdivision and
+thread tools; the OCCT 7.9 bump and dynamic linking; bundling in `desktop/scripts/prepare-native.mjs` (not created yet) and
+macOS / Windows builds; the full VC-KRN-25 suite against the OCP 7.9.3 reference files (probe cases, NIST set); the KI7 decision
+record; then the desktop default flip to the native kernel.
