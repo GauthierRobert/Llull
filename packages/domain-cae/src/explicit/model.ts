@@ -89,6 +89,20 @@ function specErrors(caseId: string, spec: unknown): string[] {
     )
   )
     errors.push(`${where}.rigidWalls / rigidWallOrder are malformed`);
+  const failure = spec['failure'];
+  if (
+    failure !== undefined &&
+    (!isRecord(failure) ||
+      !Object.values(failure).every(
+        (entry) =>
+          isRecord(entry) &&
+          Array.isArray(entry['D']) &&
+          entry['D'].length === 5 &&
+          entry['D'].every(finite) &&
+          typeof entry['source'] === 'string',
+      ))
+  )
+    errors.push(`${where}.failure is malformed`);
   return errors;
 }
 

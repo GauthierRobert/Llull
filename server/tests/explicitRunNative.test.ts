@@ -90,4 +90,36 @@ describe('explicit_run with the real llull-compute', () => {
     },
     300_000,
   );
+  native(
+    'Johnson-Cook failure erodes the elements at the wall and the summary counts them (RS-8b, TR-EXP-21)',
+    async () => {
+      const model = barModel({ plastic: true, size: 5 });
+      let doc = execute(model.doc, 'set_initial_velocity', {
+        analysisId: model.analysisId,
+        entityId: model.barId,
+        velocity: { vector: [0, 0, -100], unit: 'm/s' },
+      }).document;
+      doc = execute(doc, 'set_johnson_cook_failure', {
+        analysisId: model.analysisId,
+        material: 'steel_like',
+        D: [0.05, 0, 0, 0, 0],
+        source: 'synthetic test input (failure at eps_p = 0.05), not a material claim',
+      }).document;
+      const host: FeaHost = {
+        getDoc: () => doc,
+        applyCommand: (name, params) => {
+          const result = execute(doc, name, params, { ...defaultContext(), feaArtifacts: store });
+          if (result.rejected !== true) doc = result.document;
+          return { summary: result.summary, affected: result.affected, isError: result.rejected === true, data: result.data };
+        },
+      };
+      const result = await runExplicitRun(model.analysisId, { timeoutS: 300 }, host, { store, runner: createComputeRunner({}, BINARY) });
+      expect(result.isError, result.summary).toBe(false);
+      const summary = doc.analysis?.cases[model.analysisId]?.explicit?.results as ExplicitResultsSummary;
+      expect(summary.failedElements).toBeGreaterThan(0);
+      expect(summary.maxPlasticStrain.value).toBeGreaterThanOrEqual(0.05);
+      expect(summary.maxPlasticStrain.at[2]).toBeLessThan(20);
+    },
+    300_000,
+  );
 });

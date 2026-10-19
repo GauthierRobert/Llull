@@ -470,6 +470,7 @@ were read; single symbols were restored from the standard form and checked by th
 | Stress update | hypoelastic, Jaumann rotation first (`r_ij = (σ_ip ω_pj + σ_jp ω_pi)Δt`), then `Δσ = Δt(λ tr D I + 2μD)` with D and ω at the mid-step configuration | [E2] §21.1 Eqs. 21.3–21.7 |
 | Plasticity | J2 radial return: trial deviator, `σ̄* = √(3/2 s*:s*)`, `σ̄* − 3GΔε_p = σ_y(ε_p + Δε_p, Δε_p/Δt)` solved by bisection (the residual decreases strictly), `s = (σ_y/σ̄*) s*` | [E2] §22.3 Eqs. 22.3.14–22.3.16 (Krieg & Key 1976, cited there) |
 | Johnson–Cook strength | `σ_y = (A + Bε_pⁿ)(1 + C ln max(ε̇_p/ε̇_0, 1))`, plastic strain rate (LS-DYNA VP = 1); isothermal at the transition temperature (T* = 0) in RS-8a | [E2] §22.15 Eq. 22.15.1, [E4] *MAT_015; rate clamp TR-EXP-20 (llull convention: the clamp is not in the extractable [E2]/[E4] text) |
+| Johnson–Cook failure, erosion (RS-8b) | `ε_f = max([D1 + D2 exp(D3 σ*)][1 + D4 ln max(ε̇_p/ε̇_0, 1)], EFMIN = 1e-6)`, σ* = mean stress / von Mises after the return (tension positive, the 1985 convention of the validation generator; LS-DYNA takes |D3| with its own pressure sign); `D += Δε_p/ε_f`; at `D ≥ 1` the element carries no stress, no hourglass or bulk force and leaves the step computation; its nodes keep their mass | [E2] §22.15 Eqs. 22.15.2–22.15.4; EFMIN [E4] *MAT_015; T* = 0 (isothermal) |
 | Stable step | element eigenvalue bound: `ω²_max = λ_max((1/V) C^½ H C^½)`, `H = Σ_I B_I B_Iᵀ / m_I` (6×6 Mandel; cyclic Jacobi); effective length `h = 2c/ω`; `Δt_e = h / (Q + √(Q² + c²))`, `Q = C_lin c + C_quad h |ε̇_kk|` for `ε̇_kk < 0`; `Δt = α min Δt_e`, α default 0.90 | [E1] §12.3.1 Eqs. 12.13–12.16 ("the maximum element eigenvalue is an upper bound on the maximum global eigenvalue", `ω = 2c/h`); [E2] §25.1 Eqs. 25.1–25.3; [E3] *CONTROL_TIMESTEP TSSFAC 0.90 |
 | Bulk viscosity | `q = ρ l (C_quad l ε̇_kk² − C_lin c ε̇_kk)` for `ε̇_kk < 0`, `l = V^{1/3}`, added to the pressure in the momentum and energy equations; defaults quadratic 1.5, linear 0.06 | [E2] §24.2 Eq. 24.15; [E3] *CONTROL_BULK_VISCOSITY (Q1 = 1.5 quadratic, Q2 = 0.06 linear) |
 | Rigid wall | stonewall: a node whose next position crosses the plane while moving into it loses its normal velocity (frictionless) | [E2] §29.15 Eqs. 29.100–29.102 |
@@ -507,7 +508,7 @@ the reviewer reads the history.
 | ----- | ----- | ----- |
 | `AnalysisType` `explicit_dynamics`, `FeSolver` `llull_explicit` / `opencourant` | `packages/core/src/model/analysis.ts` | `opencourant` is refused (`EXP_SOLVER_UNSUPPORTED`) |
 | `ExplicitSpec`, `ExplicitResultsSummary`, `FeExplicitArtifact` | `packages/core/src/model/explicit.ts` | spec on `AnalysisCase.explicit`; results on `explicit.results`, not 05 `ResultsSummary` |
-| Plugin `explicit` (toolset `analysis`) | `packages/domain-cae/src/explicit/` | `set_explicit_controls`, `set_initial_velocity`, `add_rigid_wall`, `delete_rigid_wall`, `record_explicit_results`, `explicit_report`, `explicit_energy_check`, `explicit_quick_check` |
+| Plugin `explicit` (toolset `analysis`) | `packages/domain-cae/src/explicit/` | `set_explicit_controls`, `set_initial_velocity`, `add_rigid_wall`, `delete_rigid_wall`, `set_johnson_cook_failure` (D1–D5 + source per material, no default), `record_explicit_results`, `explicit_report`, `explicit_energy_check`, `explicit_quick_check` |
 | Laws | `explicit/laws.ts` | E, ν from 05 `elasticConstants`; Johnson–Cook from the default PHY-02 constitutive set (`j2_plasticity` + `johnson_cook` isotropic + optional `rate_johnson_cook`); other plastic laws `EXP_MATERIAL_UNSUPPORTED` |
 | Mesh | `explicit/mesh.ts` | `structured_hex {size}` on unrotated boxes (llull grid, hex8), or `fea_mesh` (C3D4 of the 05 artifact, tet4); other blocks `EXP_MESH_UNSUPPORTED` |
 | Trust | `explicit/trust.ts`, `record.ts` | 05 §4.1 model: summary recomputed from the artifact; input hash `explicitInputHash` (parts, laws, spec, mesh hash) |
@@ -543,6 +544,7 @@ Measured 2026-10-19, Rust CPU path. Closed form: ρc₀vA = 39 623 N, 2L/c₀ = 
 | VC-EXP-67b (drop) | `vc_exp_67b_free_fall_reaches_the_floor_at_the_closed_form_time_and_speed` (10 mm drop) | v_z = √(2gh) within 0.5 %; kinetic energy = gravity work to 1e-6 | VC-EXP-51: 0.5 % |
 | Patch / objectivity | `rigid_translation_and_spin_are_stress_free`; hex8 identities (`Σ x_iI B_jI = V δ_ij`, `γ_α·x_i = 0`, unit-cube `B = ±¼`) | translation at round-off; 1 mrad spin < 0.5 MPa (E θ²/2 = 0.1 MPa) | — |
 | Plasticity | `johnson_cook_bar_yields_at_the_wall_and_caps_the_elastic_wave`; `radial_return_lands_on_the_johnson_cook_surface` | von Mises ≤ flow stress everywhere; plastic only near the wall | 1e-9 rel |
+| Failure / erosion (RS-8b, TR-EXP-21) | `material.rs` `johnson_cook_damage_erodes_when_the_plastic_strain_reaches_the_failure_strain` (erodes at ε_p = D1 when D2 = 0; VC-EXP-21.a ε_f = 1.74690296571 at 1/3); `johnson_cook_failure_erodes_the_elements_at_the_wall_and_the_run_continues`; server `explicitRunNative.test.ts` (100 m/s, `failedElements` > 0) | as stated | 1e-9 |
 | Mass scaling | `selective_mass_scaling_raises_every_element_to_the_target_step` | 4× step → 15× added mass, step = target | 1e-9 |
 | Determinism | `runs_are_bit_identical_across_repeats_and_thread_counts`; server test (same artifact hash twice) | bit-identical | exact |
 | Job contract | `tests/job.rs` | outputs hashed, events, refusals | exact |
@@ -556,8 +558,8 @@ Test material constants are synthetic (validation pack inputs, Q7): no Johnson�
   - wgpu kernels for element forces and the nodal update, with fixed-order reductions and GPU-vs-CPU-twin tests. Not started. On the
     2026-10-19 build machine the wgpu crates do not link (no MSVC `link.exe`; the GNU toolchain lacks `dlltool` for `windows-sys`
     raw-dylib). `llull-voxfe` / `llull-topopt` tests fail there for the same reason.
-  - Johnson–Cook failure and erosion (TR-EXP-21): D1–D5 need a data home (a PHY-02 failure law kind or an explicit-case table with
-    source).
+  - Johnson–Cook failure and erosion: **built 2026-10-19** on the CPU path (`set_johnson_cook_failure`, §13.1). Moving D1–D5 into a
+    PHY-02 failure law kind is open.
   - Temperature (adiabatic heating) for T*.
 - **RS-8c:** penalty contact on `llull-bvh`, self contact, friction, shells.
 - **Hand-off MVP (M2–M4):** deck writers, readers, OpenCourant run, import (unchanged plan).

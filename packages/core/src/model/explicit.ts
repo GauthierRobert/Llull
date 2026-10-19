@@ -32,6 +32,12 @@ interface ExplicitRigidWall {
   readonly normal: Vec3;
 }
 
+/** D1–D5 of `ε_f = [D1 + D2 exp(D3 σ*)][1 + D4 ln ε̇*][1 + D5 T*]`, σ* = mean stress / von Mises (tension positive). */
+export interface ExplicitFailure {
+  readonly D: readonly [number, number, number, number, number];
+  readonly source: string;
+}
+
 export interface ExplicitSpec {
   readonly endTimeS: number;
   readonly historyIntervalS: number;
@@ -49,6 +55,8 @@ export interface ExplicitSpec {
   readonly initialVelocities: Readonly<Record<string, ExplicitInitialVelocity>>;
   readonly rigidWalls: Readonly<Record<string, ExplicitRigidWall>>;
   readonly rigidWallOrder: readonly string[];
+  /** Johnson–Cook failure constants per document material id (TR-EXP-21); never defaulted, always with their source (Q7). */
+  readonly failure?: Readonly<Record<string, ExplicitFailure>>;
   readonly results?: ExplicitResultsSummary;
 }
 

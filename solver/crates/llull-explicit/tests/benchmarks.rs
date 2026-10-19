@@ -190,3 +190,21 @@ fn min_time_step_and_inverted_elements_end_abnormally_or_refuse() {
     inverted.hex8.swap(3, 7);
     assert!(run(&inverted, &mut |_| {}).is_err());
 }
+
+#[test]
+fn johnson_cook_failure_erodes_the_elements_at_the_wall_and_the_run_continues() {
+    use llull_explicit::model::JohnsonCookFailure;
+    // Synthetic inputs: perfectly plastic A = 300 MPa, failure at ε_p = 0.02 (D2 = 0), 100 m/s onto the wall.
+    let jc = JohnsonCook { a: 300.0, b: 0.0, n: 1.0, c: 0.0, reference_rate: 1.0, m: 1.0, melt_k: 1800.0, transition_k: 293.0 };
+    let (coordinates, hex8) = hex_grid([0.0, 0.0, 0.0], [10.0, 10.0, 50.0], [2, 2, 20]);
+    let mut material = steel(0.3, Some(jc));
+    material.failure = Some(JohnsonCookFailure { d: [0.02, 0.0, 0.0, 0.0, 0.0], reference_rate: 1.0 });
+    let mut eroding = model(coordinates, hex8, vec![], material, [0.0, 0.0, -100_000.0], controls(1e-5, 1e-7));
+    eroding.walls.push(floor("anvil"));
+    let outcome = solve(&eroding);
+    assert!(outcome.normal, "{}", outcome.message);
+    let failed: Vec<&[f64]> = outcome.fields.chunks_exact(6).filter(|f| f[2] == 1.0).collect();
+    assert!(!failed.is_empty(), "elements erode");
+    assert!(failed.iter().all(|f| f[0] == 0.0 && f[1] >= 0.02 * (1.0 - 1e-9)), "eroded elements are stress free past ε_f");
+    assert!(outcome.fields.chunks_exact(6).filter(|f| f[5] > 40.0).all(|f| f[2] == 0.0), "the far end survives");
+}

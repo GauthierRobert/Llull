@@ -150,6 +150,16 @@ fn step_element(
     settings: &Settings,
 ) -> Result<ElementStep, String> {
     let Motion { x0, x1, v, dt } = *motion;
+    if state.failed {
+        // Eroded (Johnson–Cook damage reached 1): the element is gone; its nodes keep their mass and move freely.
+        return Ok(ElementStep {
+            state: *state,
+            forces: vec![[0.0; 3]; element.nodes.len()],
+            internal_work: 0.0,
+            hourglass_work: 0.0,
+            dt: f64::INFINITY,
+        });
+    }
     let material = &model.materials[element.material];
     let mid: Vec<f64> = x0.iter().zip(x1).map(|(a, b)| 0.5 * (a + b)).collect();
     let (b_mid, volume_mid) = kinematics(&element.nodes, &mid);
@@ -395,7 +405,8 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
     let mut fields = Vec::with_capacity(6 * elements.len());
     for (element, state) in elements.iter().zip(&states) {
         let c = centroid(&element.nodes, &x);
-        fields.extend_from_slice(&[von_mises(&state.stress), state.plastic_strain, 0.0, c[0], c[1], c[2]]);
+        let failed = if state.failed { 1.0 } else { 0.0 };
+        fields.extend_from_slice(&[von_mises(&state.stress), state.plastic_strain, failed, c[0], c[1], c[2]]);
     }
     Ok(Outcome {
         normal,

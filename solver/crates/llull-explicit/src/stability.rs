@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn the_element_bound_dominates_the_breathing_and_stretching_modes_of_a_free_cube() {
-        let material = Material { density: 1.0, youngs_modulus: 1.0, poisson: 0.3, johnson_cook: None };
+        let material = Material { density: 1.0, youngs_modulus: 1.0, poisson: 0.3, johnson_cook: None, failure: None };
         let x = [[0., 0., 0.], [1., 0., 0.], [1., 1., 0.], [0., 1., 0.], [0., 0., 1.], [1., 0., 1.], [1., 1., 1.], [0., 1., 1.]];
         let (b, volume) = hex8::gradients(&x);
         let masses = [0.125; 8];

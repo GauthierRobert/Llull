@@ -29,6 +29,8 @@ export interface ExplicitJob {
   readonly units: { readonly length: string; readonly stress: string; readonly energy: string; readonly force: string };
   readonly mesh: ExplicitMesh;
   readonly materials: readonly ExplicitMaterial[];
+  /** Johnson–Cook D1–D5 per entry of `materials` (null: no failure law). */
+  readonly materialFailure: readonly (readonly number[] | null)[];
   /** Index into `materials` per element (hex8 first, then tet4). */
   readonly elementMaterial: readonly number[];
   /** 3 values per node, case velocity unit. */
@@ -82,6 +84,17 @@ export function buildExplicitJob(doc: CadDocument, analysisId: string, meshArtif
     if (index < 0) index = materials.push(material) - 1;
     partMaterial.set(entityId, index);
   }
+  const failures = spec.failure ?? {};
+  const withoutStrength = materials.find((material) => Object.hasOwn(failures, material.materialId) && material.johnsonCook === undefined);
+  if (withoutStrength !== undefined)
+    return refuse(
+      'EXP_MATERIAL_INCOMPLETE',
+      `material '${withoutStrength.materialId}' has Johnson-Cook failure constants but no Johnson-Cook strength law (its plastic strain drives the damage)`,
+      [analysisId],
+    );
+  const materialFailure = materials.map((material) =>
+    Object.hasOwn(failures, material.materialId) ? (failures[material.materialId]?.D ?? null) : null,
+  );
   const velocities = new Map(Object.values(spec.initialVelocities).map((entry) => [entry.entityId, entry.velocity] as const));
   const gravity: Vec3 = spec.gravity ?? [0, 0, 0];
   if (velocities.size === 0 && gravity.every((component) => component === 0))
@@ -102,6 +115,7 @@ export function buildExplicitJob(doc: CadDocument, analysisId: string, meshArtif
       units,
       mesh,
       materials,
+      materialFailure,
       elementMaterial: mesh.elementPart.map((part) => partMaterial.get(part) ?? 0),
       initialVelocity,
       gravity,

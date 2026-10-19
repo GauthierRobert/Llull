@@ -21,16 +21,25 @@ impl JohnsonCook {
         let rate_term = 1.0 + self.c * (rate / self.reference_rate).max(1.0).ln();
         hardening * rate_term
     }
+}
 
-    /// dσ_y/dε_p of the strain-hardening term at `eps_p` (rate term held), used by the radial return.
-    pub fn hardening_slope(&self, eps_p: f64, rate: f64) -> f64 {
-        let rate_term = 1.0 + self.c * (rate / self.reference_rate).max(1.0).ln();
-        if self.b == 0.0 || self.n == 0.0 {
-            return 0.0;
-        }
-        // n < 1 makes the slope unbounded at eps_p = 0: evaluate it at a tiny positive strain.
-        let at = eps_p.max(1e-12);
-        self.b * self.n * at.powf(self.n - 1.0) * rate_term
+/// Johnson–Cook (1985) failure strain `ε_f = [D1 + D2 exp(D3 σ*)][1 + D4 ln max(ε̇_p/ε̇_0, 1)][1 + D5 T*]` with `σ*` = mean stress / von Mises
+/// (positive in tension, the 1985 convention: D3 is normally negative) and damage `D = Σ Δε_p / ε_f`; the element erodes at `D ≥ 1`
+/// (LS-DYNA R14 Theory Manual §22.15 Eqs. 22.15.2–22.15.4). `ε_f` is floored at `EFMIN` = 1e-6 (LS-DYNA *MAT_015). Isothermal: T* = 0.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct JohnsonCookFailure {
+    pub d: [f64; 5],
+    pub reference_rate: f64,
+}
+
+/// LS-DYNA *MAT_015 EFMIN default.
+const EFMIN: f64 = 1e-6;
+
+impl JohnsonCookFailure {
+    pub fn failure_strain(&self, triaxiality: f64, rate: f64) -> f64 {
+        let [d1, d2, d3, d4, _] = self.d;
+        let strain = (d1 + d2 * (d3 * triaxiality).exp()) * (1.0 + d4 * (rate / self.reference_rate).max(1.0).ln());
+        strain.max(EFMIN)
     }
 }
 
@@ -40,6 +49,7 @@ pub struct Material {
     pub youngs_modulus: f64,
     pub poisson: f64,
     pub johnson_cook: Option<JohnsonCook>,
+    pub failure: Option<JohnsonCookFailure>,
 }
 
 impl Material {

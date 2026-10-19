@@ -8,7 +8,8 @@
 //!   "version": 1,
 //!   "nodes": "nodes.f64", "hex8": "hex8.u32", "tet4": "tet4.u32", "elementMaterial": "elmat.u32", "initialVelocity": "velocity.f64",
 //!   "materials": [{ "density": 7.85e-9, "youngsModulus": 200000, "poisson": 0.3,
-//!                   "johnsonCook": { "a": 300, "b": 500, "n": 0.5, "c": 0.02, "referenceRate": 1, "m": 1, "meltK": 1800, "transitionK": 293 } }],
+//!                   "johnsonCook": { "a": 300, "b": 500, "n": 0.5, "c": 0.02, "referenceRate": 1, "m": 1, "meltK": 1800, "transitionK": 293 },
+//!                   "johnsonCookFailure": { "d": [0.05, 3.44, -2.12, 0.002, 0.61] } }],
 //!   "gravity": [0, 0, 0],
 //!   "walls": [{ "name": "anvil", "point": [5, 5, 0], "normal": [0, 0, 1] }],
 //!   "controls": { "endTime": 1.6e-4, "historyInterval": 1e-6, "timeStepScale": 0.9, "minTimeStep": 1e-12, "hourglassCoefficient": 0.1,
@@ -38,7 +39,7 @@
 //! - `fields.f64`: per element `[von Mises, equivalent plastic strain, failed (0/1), centroid x, y, z]` at the end, little-endian f64.
 //!   Every output is byte-identical across runs and thread counts.
 
-use crate::model::{Controls, JohnsonCook, MassScaling, Material, Model, Wall};
+use crate::model::{Controls, JohnsonCook, JohnsonCookFailure, MassScaling, Material, Model, Wall};
 use crate::solver::{run, Outcome, Progress};
 use llull_protocol::{emit, sha256_hex, Event, Output};
 use serde::{Deserialize, Serialize};
@@ -81,6 +82,13 @@ struct MaterialSpec {
     youngs_modulus: f64,
     poisson: f64,
     johnson_cook: Option<JohnsonCookSpec>,
+    johnson_cook_failure: Option<FailureSpec>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct FailureSpec {
+    d: [f64; 5],
 }
 
 #[derive(Debug, Deserialize)]
@@ -196,7 +204,14 @@ fn material_of(spec: MaterialSpec) -> Result<Material, JobError> {
             })
         }
     };
-    Ok(Material { density: spec.density, youngs_modulus: spec.youngs_modulus, poisson: spec.poisson, johnson_cook })
+    let failure = match (spec.johnson_cook_failure, johnson_cook) {
+        (None, _) => None,
+        (Some(failure), Some(strength)) if finite(&failure.d) => {
+            Some(JohnsonCookFailure { d: failure.d, reference_rate: strength.reference_rate })
+        }
+        (Some(_), _) => return Err(input("johnsonCookFailure needs five finite D values and a johnsonCook strength (its plastic strain)")),
+    };
+    Ok(Material { density: spec.density, youngs_modulus: spec.youngs_modulus, poisson: spec.poisson, johnson_cook, failure })
 }
 
 fn controls_of(spec: ControlsSpec) -> Result<Controls, JobError> {

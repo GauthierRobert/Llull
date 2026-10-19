@@ -19,6 +19,10 @@ pub type Sym = [f64; 6];
 pub struct PointState {
     pub stress: Sym,
     pub plastic_strain: f64,
+    /// Johnson–Cook damage `Σ Δε_p / ε_f` (0 without a failure law).
+    pub damage: f64,
+    /// Eroded: the element carries no stress from now on.
+    pub failed: bool,
 }
 
 /// Rate of deformation `D` and spin `ω` of a velocity gradient `L`.
@@ -54,6 +58,9 @@ pub fn von_mises(s: &Sym) -> f64 {
 
 /// Updated state after a step of length `dt` with rate of deformation `d` and spin `w`.
 pub fn update(material: &Material, state: &PointState, d: &Sym, w: &[f64; 3], dt: f64) -> PointState {
+    if state.failed {
+        return *state;
+    }
     let rotated = rotate(&state.stress, w, dt);
     let lambda = material.lambda();
     let mu = material.shear();
@@ -66,12 +73,12 @@ pub fn update(material: &Material, state: &PointState, d: &Sym, w: &[f64; 3], dt
         trial[i] += dt * 2.0 * mu * d[i];
     }
     let Some(jc) = material.johnson_cook else {
-        return PointState { stress: trial, plastic_strain: state.plastic_strain };
+        return PointState { stress: trial, ..*state };
     };
     let equivalent = von_mises(&trial);
     let eps = state.plastic_strain;
     if equivalent <= jc.flow_stress(eps, 0.0) {
-        return PointState { stress: trial, plastic_strain: eps };
+        return PointState { stress: trial, ..*state };
     }
     let residual = |increment: f64| equivalent - 3.0 * mu * increment - jc.flow_stress(eps + increment, increment / dt);
     let (mut low, mut high) = (0.0, equivalent / (3.0 * mu));
@@ -98,7 +105,16 @@ pub fn update(material: &Material, state: &PointState, d: &Sym, w: &[f64; 3], dt
         trial[4] * scale,
         trial[5] * scale,
     ];
-    PointState { stress, plastic_strain: eps + increment }
+    let Some(failure) = material.failure else {
+        return PointState { stress, plastic_strain: eps + increment, ..*state };
+    };
+    // σ* = mean stress / von Mises after the return (the von Mises stress is the yield stress there).
+    let triaxiality = pressure / yield_stress;
+    let damage = state.damage + increment / failure.failure_strain(triaxiality, increment / dt);
+    if damage >= 1.0 {
+        return PointState { stress: [0.0; 6], plastic_strain: eps + increment, damage, failed: true };
+    }
+    PointState { stress, plastic_strain: eps + increment, damage, failed: false }
 }
 
 #[cfg(test)]
@@ -107,12 +123,12 @@ mod tests {
     use crate::model::JohnsonCook;
 
     fn steel(jc: Option<JohnsonCook>) -> Material {
-        Material { density: 7.85e-9, youngs_modulus: 200_000.0, poisson: 0.3, johnson_cook: jc }
+        Material { density: 7.85e-9, youngs_modulus: 200_000.0, poisson: 0.3, johnson_cook: jc, failure: None }
     }
 
     #[test]
     fn a_pure_spin_rotates_a_uniaxial_stress_without_changing_its_invariants() {
-        let mut state = PointState { stress: [100.0, 0.0, 0.0, 0.0, 0.0, 0.0], plastic_strain: 0.0 };
+        let mut state = PointState { stress: [100.0, 0.0, 0.0, 0.0, 0.0, 0.0], ..PointState::default() };
         let w = [1.0, 0.0, 0.0];
         for _ in 0..1000 {
             state = update(&steel(None), &state, &[0.0; 6], &w, 1e-5);
@@ -120,6 +136,42 @@ mod tests {
         // after 0.01 rad about z the stress is still ~uniaxial 100: σ_xy ≈ −100 · 0.01 (sign by the ω convention) and |σ| conserved to O(θ²).
         assert!((von_mises(&state.stress) - 100.0).abs() < 1e-2);
         assert!((state.stress[3].abs() - 1.0).abs() < 1e-2);
+    }
+
+    #[test]
+    fn johnson_cook_damage_erodes_when_the_plastic_strain_reaches_the_failure_strain() {
+        use crate::model::JohnsonCookFailure;
+        let jc = JohnsonCook { a: 300.0, b: 0.0, n: 1.0, c: 0.0, reference_rate: 1.0, m: 1.0, melt_k: 1800.0, transition_k: 293.0 };
+        // D2 = 0: ε_f = D1 = 0.05 whatever the triaxiality (synthetic test inputs).
+        let failure = JohnsonCookFailure { d: [0.05, 0.0, -2.12, 0.0, 0.0], reference_rate: 1.0 };
+        let material = Material { failure: Some(failure), ..steel(Some(jc)) };
+        let d = [1.0, -0.5, -0.5, 0.0, 0.0, 0.0];
+        let mut state = PointState::default();
+        let mut last = state;
+        for _ in 0..200_000 {
+            last = state;
+            state = update(&material, &state, &d, &[0.0; 3], 1e-6);
+            if state.failed {
+                break;
+            }
+        }
+        assert!(state.failed && state.stress == [0.0; 6]);
+        assert!(
+            last.plastic_strain < 0.05 && state.plastic_strain >= 0.05 * (1.0 - 1e-9),
+            "{} → {}",
+            last.plastic_strain,
+            state.plastic_strain
+        );
+        assert!((state.damage - state.plastic_strain / 0.05).abs() < 1e-9);
+        // An eroded point stays eroded and stress free.
+        assert_eq!(update(&material, &state, &d, &[0.0; 3], 1e-6), state);
+        // The rate term: ε_f = D1 (1 + D4 ln(rate / rate0)) above the reference rate, D1 below it (clamped).
+        let rated = JohnsonCookFailure { d: [0.05, 0.0, 0.0, 0.1, 0.0], reference_rate: 1.0 };
+        assert!((rated.failure_strain(0.3, 1000.0) - 0.05 * (1.0 + 0.1 * 1000.0_f64.ln())).abs() < 1e-15);
+        assert_eq!(rated.failure_strain(0.3, 1e-3), 0.05);
+        // VC-EXP-21.a: the pack's test inputs at triaxiality 1/3 give ε_f = 1.74690296571 (generate_explicit_reference.py).
+        let pack = JohnsonCookFailure { d: [0.05, 3.44, -2.12, 0.002, 0.61], reference_rate: 1.0 };
+        assert!((pack.failure_strain(1.0 / 3.0, 1.0) / 1.74690296571 - 1.0).abs() < 1e-9);
     }
 
     #[test]

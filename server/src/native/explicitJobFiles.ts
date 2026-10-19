@@ -35,7 +35,7 @@ export function explicitJobFiles(job: ExplicitJob, device: ExplicitDevice): Reco
     ...(mesh.tet4.length > 0 ? { tet4: 'tet4.u32' } : {}),
     elementMaterial: 'elmat.u32',
     initialVelocity: 'velocity.f64',
-    materials: job.materials.map((material) => ({
+    materials: job.materials.map((material, index) => ({
       density: material.density,
       youngsModulus: material.E,
       poisson: material.nu,
@@ -52,6 +52,9 @@ export function explicitJobFiles(job: ExplicitJob, device: ExplicitDevice): Reco
               transitionK: material.johnsonCook.transitionK,
             },
           }
+        : {}),
+      ...(job.materialFailure[index] !== null && job.materialFailure[index] !== undefined
+        ? { johnsonCookFailure: { d: job.materialFailure[index] } }
         : {}),
     })),
     gravity: job.gravity,
