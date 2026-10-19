@@ -5,7 +5,7 @@
  * length unit (the voxel size is converted from document units), forces in its force unit.
  */
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { TopologyHistoryRow } from '@core/model/topology';
 import type { CadDocument } from '@core/model/types';
@@ -14,7 +14,7 @@ import { isRecord } from '@lib/isRecord';
 import { sha256Hex } from '@lib/sha256';
 import { analysisLengthMetres } from '@cae/shared/defaults';
 import type { TopologyJob } from '@cae/index';
-import { f64Bytes } from './computeJob';
+import { f64Bytes, f64Values } from './computeJob';
 
 export type TopologyDevice = 'cpu' | 'gpu' | 'auto';
 
@@ -29,7 +29,7 @@ export function topologyJobFiles(
   doc: CadDocument,
   job: TopologyJob,
   device: TopologyDevice,
-  start?: { readonly design: Float64Array; readonly iterationsDone: number },
+  start?: { readonly design: Float64Array; readonly displacements?: Float64Array; readonly iterationsDone: number },
 ): Record<string, Buffer | string> {
   const dofs = dofCount(job);
   const fixed = new Uint8Array(dofs);
@@ -49,6 +49,7 @@ export function topologyJobFiles(
     return { name: loadCase.name, weight: loadCase.weight, forces: `lc${index}.f64` };
   });
   if (start !== undefined) files['start.f64'] = f64Bytes(start.design);
+  if (start?.displacements !== undefined) files['start_u.f64'] = f64Bytes(start.displacements);
   const { settings } = job;
   files['job.json'] = JSON.stringify({
     version: 1,
@@ -77,13 +78,18 @@ export function topologyJobFiles(
       device,
     },
     ...(start !== undefined ? { startDesign: 'start.f64' } : {}),
+    ...(start?.displacements !== undefined ? { startDisplacements: 'start_u.f64' } : {}),
   });
   return files;
 }
 
-/** What the last run of a study left behind: its design variables (`design.f64`), the problem they belong to and the iterations so far. */
+/**
+ * What the last run of a study left behind: its design variables (`design.f64`), the last solve's displacements (`displacements.f64`, the warm
+ * start that makes a resumed run continue bit for bit), the problem they belong to and the iterations so far.
+ */
 export interface ResumeState {
   readonly design: Float64Array;
+  readonly displacements?: Float64Array;
   readonly iterations: number;
   readonly history: readonly TopologyHistoryRow[];
 }
@@ -104,6 +110,11 @@ export function saveResume(directory: string, studyId: string, job: TopologyJob,
   const meta: ResumeMeta = { inputHash: job.inputHash, voxels: state.design.length, iterations: state.iterations, history: state.history };
   writeFileSync(`${base}.f64.${process.pid}.tmp`, f64Bytes(state.design));
   renameSync(`${base}.f64.${process.pid}.tmp`, `${base}.f64`);
+  if (state.displacements === undefined) rmSync(`${base}.u.f64`, { force: true });
+  else {
+    writeFileSync(`${base}.u.f64.${process.pid}.tmp`, f64Bytes(state.displacements));
+    renameSync(`${base}.u.f64.${process.pid}.tmp`, `${base}.u.f64`);
+  }
   writeFileSync(`${base}.json`, JSON.stringify(meta));
 }
 
@@ -122,10 +133,21 @@ export function loadResume(directory: string, studyId: string, job: TopologyJob)
     const iterations = meta['iterations'];
     const history = meta['history'];
     if (typeof iterations !== 'number' || !Array.isArray(history)) return null;
-    const copy = new Uint8Array(bytes.length);
-    copy.set(bytes);
-    return { design: new Float64Array(copy.buffer), iterations, history: history as TopologyHistoryRow[] };
+    const displacements = readDisplacements(`${base}.u.f64`, job.loadCases.length * dofCount(job));
+    return {
+      design: f64Values(bytes),
+      ...(displacements === undefined ? {} : { displacements }),
+      iterations,
+      history: history as TopologyHistoryRow[],
+    };
   } catch {
     return null;
   }
+}
+
+/** The saved warm start when it has the expected length (load cases x DOFs); without it a resumed run matches to the PCG tolerance. */
+function readDisplacements(file: string, length: number): Float64Array | undefined {
+  if (!existsSync(file)) return undefined;
+  const bytes = readFileSync(file);
+  return bytes.length === 8 * length ? f64Values(bytes) : undefined;
 }

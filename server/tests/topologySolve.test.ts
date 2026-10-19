@@ -59,6 +59,8 @@ interface FakeOptions {
   readonly fail?: { readonly code: string; readonly message: string };
   readonly iterations?: number;
   readonly design?: Float64Array;
+  /** Written as `displacements.f64` (the warm start of a resumed run) when given. */
+  readonly displacements?: Float64Array;
   readonly progress?: readonly Record<string, unknown>[];
 }
 
@@ -94,7 +96,8 @@ function fakeRunner(options: FakeOptions = {}): ComputeRunner & { readonly calls
           deterministic: true,
         }),
       );
-      const outputs = { 'field.bin': field, 'design.f64': design, 'result.json': result };
+      const outputs: Record<string, Buffer> = { 'field.bin': field, 'design.f64': design, 'result.json': result };
+      if (options.displacements !== undefined) outputs['displacements.f64'] = Buffer.from(options.displacements.buffer);
       for (const [name, bytes] of Object.entries(outputs)) writeFileSync(path.join(folder, name), bytes);
       return Promise.resolve<JobRun>({
         ok: true,
@@ -252,11 +255,12 @@ describe('topology_solve with a fake job runner', () => {
   });
 
   describe('resume', () => {
-    it('passes the saved design of the last finished run as startDesign and accumulates iterations and history', async () => {
+    it('passes the saved design and displacements of the last finished run as startDesign / startDisplacements and accumulates iterations and history', async () => {
       const model = mbbModel();
       const host = hostOf(model);
       const design = Float64Array.from({ length: 1200 }, (_, i) => (i % 7) / 10);
-      const first = fakeRunner({ iterations: 4, design });
+      const displacements = Float64Array.from({ length: 2 * 61 * 21 }, (_, i) => i / 100);
+      const first = fakeRunner({ iterations: 4, design, displacements });
       await runTopologySolve(model.studyId, {}, host, { store, runner: first });
       const second = fakeRunner({ iterations: 2 });
       const result = await runTopologySolve(model.studyId, { resumeFromLast: true }, host, { store, runner: second });
@@ -264,9 +268,11 @@ describe('topology_solve with a fake job runner', () => {
       const files = second.calls[0]?.files ?? {};
       expect(JSON.parse(files['job.json']?.toString() ?? '{}')).toMatchObject({
         startDesign: 'start.f64',
+        startDisplacements: 'start_u.f64',
         settings: { maxIterations: 296 },
       });
       expect(f64At(files['start.f64'])).toEqual(Array.from(design));
+      expect(f64At(files['start_u.f64'])).toEqual(Array.from(displacements));
       const data = result.data as { fieldHash: string; resumedFromIteration: number };
       expect(data.resumedFromIteration).toBe(4);
       const artifact = store.get(data.fieldHash) as FeTopologyArtifact | null;

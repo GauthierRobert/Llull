@@ -13,7 +13,7 @@ import { buildTopologyArtifact, buildTopologyJob, runTopologyReference, TS_REFER
 import { topologySummary } from '@cae/topology/artifact';
 import { findStudy } from '@cae/topology/model';
 import { feaFailure } from '../fea/feaCommon';
-import { readOutput, withJobFolder, type JobRun } from './computeJob';
+import { f64Values, readOutput, withJobFolder, type JobRun } from './computeJob';
 import { nativeInstallHint } from './nativeBinary';
 import type { NativeDeps } from './fatigueField';
 import { loadResume, saveResume, topologyJobFiles, type ResumeState, type TopologyDevice } from './topologyJobFiles';
@@ -115,7 +115,13 @@ async function solveNatively(
     doc,
     job,
     options.device ?? 'cpu',
-    resume === null ? undefined : { design: resume.design, iterationsDone: resume.iterations },
+    resume === null
+      ? undefined
+      : {
+          design: resume.design,
+          ...(resume.displacements === undefined ? {} : { displacements: resume.displacements }),
+          iterationsDone: resume.iterations,
+        },
   );
   const sink = deps.onProgress;
   const outcome = await withJobFolder(
@@ -128,12 +134,14 @@ async function solveNatively(
         sink === undefined ? undefined : (event) => sink(progressLine(event, resume?.iterations ?? 0)),
       );
       if (!run.ok) return { run, outputs: null };
-      const [field, design, result] = await Promise.all([
+      const reported = run.outputs.some((entry) => entry.path === 'displacements.f64');
+      const [field, design, result, displacements] = await Promise.all([
         readOutput(folder, run, 'field.bin'),
         readOutput(folder, run, 'design.f64'),
         readOutput(folder, run, 'result.json'),
+        reported ? readOutput(folder, run, 'displacements.f64') : undefined,
       ]);
-      return { run, outputs: { field, design, result } };
+      return { run, outputs: { field, design, result, displacements } };
     },
     deps.env,
   ).catch((error: unknown) => ({ error: error instanceof Error ? error.message : String(error) }));
@@ -160,12 +168,18 @@ async function solveNatively(
   if (typeof artifact === 'string') return failure('TOP_SOLVER_FAILED', artifact, [studyId]);
   const copy = new Uint8Array(outputs.design.length);
   copy.set(outputs.design);
+  const displacements = outputs.displacements === undefined ? undefined : f64Values(outputs.displacements);
   return {
     artifact,
     elapsedMs: run.elapsedMs,
     warnings: run.warnings,
     resumedFrom: before,
-    state: { design: new Float64Array(copy.buffer), iterations: artifact.iterations, history },
+    state: {
+      design: new Float64Array(copy.buffer),
+      ...(displacements === undefined ? {} : { displacements }),
+      iterations: artifact.iterations,
+      history,
+    },
   };
 }
 
