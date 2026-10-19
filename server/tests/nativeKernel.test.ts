@@ -54,7 +54,7 @@ describe.skipIf(process.platform === 'win32')('native kernel proxy (scripted sid
   it('reports a sidecar that does not speak the protocol', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const started = startNativeKernel({ startTimeoutMs: 20_000 }, { LLULL_KERNEL_BIN: '/bin/false' });
+    const started = startNativeKernel({ startTimeoutMs: 20_000 }, { LLULL_KERNEL_BIN: '/usr/bin/false' });
     expect(started).toEqual({ reason: expect.stringContaining('did not start') });
   }, 60_000);
 });
