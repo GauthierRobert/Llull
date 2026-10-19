@@ -16,6 +16,10 @@ assemblies. Every expected value is (a) quoted from a cited source, (b) analytic
 | `occt_crosscheck.json` | measured (c) | BRepGProp vs closed form for the 10 cases: worst relative error 2.2e-9 (inertia at x = 70 m), all others <= 1.1e-14; all shapes valid |
 | `probe_occt_behaviour.py` → `occt_behaviour_probe.json` | measured (c) | inertia error vs coordinate offset, part-frame mitigation, fuzzy boolean, same-process determinism, fillet history counts |
 | `measure_step_brep.py` → `nist_occt_reference.json` | measured (c) | 28 NIST STEP files read as exact B-rep: topology counts, validity before/after ShapeFix, max tolerance, volume/area/centroid/inertia, bbox, read time, signature x2 |
+| `measure_step_brep.cxx` | port (C++) | line-for-line C++ port of `measure_step_brep.py` for hosts without the OCP wheel; adds the same measures for the first solid of the healed shape (`solid`) |
+| `nist_occt_solid_reference.json` | measured (c) | solid-level companion of `nist_occt_reference.json` (what `import_step_exact` keeps): counts, validity, tolerance, volume / area / centroid / inertia, optimal bbox, signature; measured by the port on the OCCT 7.9.3 libraries of the cadquery-ocp 7.9.3.1 wheel, whose whole-file rows reproduce `nist_occt_reference.json` bit for bit |
+| `nist_occt_solid_faces.json` | measured (c) | per-face area + centroid (6 decimals, MapShapes order) of each solid of the same run: the VC-KRN-10 cross-build comparison |
+| `fetch_nist_step_files.py` | fetcher (python3, stdlib) | downloads R20, checks its sha256 and every file's sha256 against `nist_occt_reference.json`, copies the 28 files to `~/.cache/llull/nist-pmi-step-files` (or `LLULL_NIST_STEP_DIR`) for the VC-KRN-25 server suite |
 | `nist_gvp_vs_occt.json` | measured vs quoted | OCCT values vs geometric validation properties written by the originating CAD systems (R20, R28); verdict per file |
 | `expected_results.json` | expected | every VC case: value, tolerance, unit, source |
 | `plans/krn-analytic-primitives.json` | draft `build_project` plan | primitives + plate-hole + far box, then `mass_properties` |
@@ -32,6 +36,12 @@ python3 -I generate_analytic_solids.py --occt  # + OCCT cross-check
 python3 -I probe_occt_behaviour.py
 # NIST files: download R20, check sha256, unzip into a fresh directory, then
 python3 -I measure_step_brep.py nist_occt_reference.json <dir>/NIST-PMI-STEP-Files/"AP203 geometry only"/*.stp <dir>/NIST-PMI-STEP-Files/nist_*ap242*.stp
+# VC-KRN-25 (native kernel): the corpus for the server suite, then the suite itself (needs the llull-kernel release build)
+python3 -I fetch_nist_step_files.py
+(cd ../../../../server && LLULL_REQUIRE_NATIVE_KERNEL=1 LLULL_REQUIRE_NIST_CORPUS=1 npx vitest run tests/nativeKernelReference)
+# solid-level reference without the OCP wheel: build the C++ port against any OCCT 7.9 (header of measure_step_brep.cxx),
+# e.g. the TK*.so of the cadquery-ocp wheel (unzip cadquery_ocp.libs/; LD_LIBRARY_PATH to it), one JSON row per file
+./measure_step_brep ~/.cache/llull/nist-pmi-step-files/*.stp | grep '^{'
 ```
 
 ## 2. Real use cases
@@ -76,7 +86,7 @@ Tolerances are relative (`rel`) or absolute (`abs`). "Gate" names the automated 
 | VC-KRN-22 | FR-KRN-25, TR-KRN-105 | faceted rib (fillet recipe under Manifold), agent caller | `export_step_ap242 {acceptUnverified: true}` → exit 1, `XCH_HUMAN_GATE` (04 export gate; `KRN_HUMAN_GATE` for a baseline accept), nothing saved; same act from the desktop UI (human caller) proceeds | exact | server unit + desktop test |
 | VC-KRN-23 | FR-KRN-21, FR-KRN-22, TR-KRN-101, TR-KRN-102 | rib; `kernel_info` | `mass_properties` `.data.volumeUnit == "mm³"`, `.data.eps == {value: 1e-9, unit: "relative", source: …, defaulted: true}`, `.data.densitySource` present, `.data.provenance.method == "BRepGProp"`; `kernel_info` `.data.modelingTolerance.linear == {value: 1e-4, unit: "mm", source: "OCCT read.precision.val default", defaulted: true}` | exact | CLI script |
 | VC-KRN-24 | FR-KRN-26, TR-KRN-106 | `nist_ctc_02_asme1_rc.stp` (largest measured read, 0.84 s native) | `import_step_exact … --dry-run --json` → `.changed == false`, document file byte-identical; `--progress` prints the import stages; with `LLULL_OCC_TIMEOUT_MS=1` (or a `--timeout` shorter than the import) → exit 1, nothing saved | exact | CLI script |
-| VC-KRN-25 (planned, RS-1) | FR-KRN-10, TR-KRN-02, TR-KRN-05 | the 10 analytic solids (`occt_crosscheck.json`), the probe cases (`occt_behaviour_probe.json`), the 28 NIST files (`nist_occt_reference.json`) | native `llull-kernel` (OCCT 7.9.x) reproduces the OCP 7.9.3.1 reference: per-NIST-file solids / shells / faces / edges / vertices and `validAsRead` / `validAfterShapeFix` equal, volume / area / centroid / inertia equal to the reference; probe: fuzzy fuse 2 → 1 solids (12 → 10 faces), plate-minus-cylinder signature `1125f7464525c4f6` (7 faces), fillet history 1 generated / 4 modified, inertia error at 70 m as tabulated | counts and validity exact; measures rel 1e-9 / centroid abs 1e-6 mm (VC-KRN-01 tolerances); signature equal if the build is the same 7.9.3 patch, else VC-KRN-10 cross-build mode; read time not compared | quality:kernel + `npm run native:check` |
+| VC-KRN-25 (**passed** 2026-10-19, OCCT 7.9.2) | FR-KRN-10, TR-KRN-02, TR-KRN-05 | the 10 analytic solids (`occt_crosscheck.json`), the probe cases (`occt_behaviour_probe.json`), the 28 NIST files (`nist_occt_reference.json`, solid level `nist_occt_solid_reference.json` + `nist_occt_solid_faces.json`) | native `llull-kernel` (OCCT 7.9.x) reproduces the OCP 7.9.3.1 reference: per NIST file the census (solids / shells / faces of the whole file) and the imported solid's faces / edges / vertices, `validAsRead` / `validAfterShapeFix` and max tolerance equal, volume / area / centroid / inertia equal to the reference; probe: fuzzy fuse 2 → 1 solids (12 → 10 faces), plate-minus-cylinder signature `1125f7464525c4f6` (7 faces), fillet history 1 generated / 4 modified, inertia error at 70 m at most the tabulated one | counts and validity exact; measures rel 1e-9 / centroid abs 1e-6 mm (VC-KRN-01 tolerances); signature equal if the build is the same 7.9.3 patch, else VC-KRN-10 cross-build mode (per-face area / centroid); read time not compared. Results: §6 | `server/tests/nativeKernelReference*.test.ts` (with the binary; NIST files from `fetch_nist_step_files.py`) + `npm run native:check` |
 
 ### 3.1 CLI form of the validation cases (AF-23)
 
@@ -153,3 +163,54 @@ All formulas are standard closed forms for homogeneous solids.
    bundled CadQuery uses OCCT 7.9.3 (R13) → TR-KRN-02 / TR-KRN-61. RS1 ([../../../decisions/RS1-native-compute.md](../../../decisions/RS1-native-compute.md),
    2026-10-18) resolves it with a native OCCT 7.9 kernel process (`llull-kernel`) on desktop; the committed OCP
    7.9.3 measurements become its reference (VC-KRN-25).
+6. **Whole file vs imported solid** (VC-KRN-25, `nist_occt_solid_reference.json`): `measure_step_brep.py` measures the whole
+   transferred shape, which in 11 of the 27 B-rep files also holds loose shells / faces (1 to 18 faces) and in most files loose
+   wires and points (PMI geometry): e.g. ctc_01 rd counts 468 edges / 433 vertices for the file, 390 / 256 for its solid, and the
+   file's optimal bbox is 190 mm wider. `import_step_exact` keeps solids only, so VC-KRN-25 compares the census with the whole file
+   and the imported solid with the solid-level reference. Measured at solid level, 4 of the 5 VC-KRN-04x "GVP disagreements" vanish:
+   ctc_02 e2 3.5e-2 → 4.9e-9, stc_08 e3 2.3e-1 → 5.4e-9, ctc_05 rd 1.1e-2 → 5.6e-7, ctc_02 rc 1.6e-2 → 2.1e-5 (ctc_04 e2 7.5e-5 →
+   9.4e-11); only ftc_07 e2 stays apart (factor 1.6e4, a GVP unit or scope issue). The loose faces of the file, not the solid, were
+   what disagreed with the CAD system → VC-KRN-04x should be re-triaged at solid level (TR-KRN-23).
+7. **Adaptive mass integration drifts** (VC-KRN-25): `BRepGProp::VolumeProperties` with an `Eps` (adaptive rule, 1e-12 in both
+   llull kernels until 2026-10-19) is wrong on toroidal and some freeform faces while its error estimate stays near 1e-15: an
+   arc-profile ring revolved about Z gets Ixx = 55.616 / Iyy = 55.586 instead of 55.6012 (2.7e-4, closed form by quadrature), the
+   torus R40 r8 3e-11, the NIST files up to 1.6e-6 in volume (ctc_02 rc / e2) and 5e-7 in inertia with Ixx ≠ Iyy on the symmetric
+   FTC-11 ring; tightening `Eps` makes it worse (1e-9: 2.3e-4, 1e-6: 2e-3 on FTC-11). The default (Gauss) rule of the reference
+   gives the closed forms to 1e-14 and the CAD GVP of ctc_02 e2 to 4.9e-9 (adaptive: 1.2e-6) → the native kernel integrates with the
+   default rule; the WASM kernel (`occtMass.ts`) still uses the adaptive one (follow-up).
+8. **OCCT 7.9 reads AP242 tessellated geometry** (`read.step.tessellated` on by default): `nist_ftc_08_asme1_ap242-e4-tg.stp`
+   transfers as a solid of 272 triangulated faces without surfaces (the reference's `Bnd_Box is void`). The native import now skips
+   pieces whose faces have no surface and answers `tessellated_only` when nothing else is left (VC-KRN-05), as the 7.4 WASM reader.
+9. **B-rep text blobs can lose validity**: stc_07 e3's healed solid is BRepCheck-valid, its `BRepTools::Write` text (V1 and V3)
+   reads back invalid, on OCCT 7.4 (WASM) and 7.9.2 alike. Documents store that text (`occt-brep-v1`) → a TR-KRN-21 follow-up
+   (full-precision or binary blobs, or re-heal after read).
+
+## 6. VC-KRN-25 results (native `llull-kernel`, OCCT 7.9.2, 2026-10-19)
+
+Suite: `server/tests/nativeKernelReference.test.ts` (analytic + probe) and `nativeKernelReferenceNist.test.ts` (NIST), run with
+the release binary; the NIST files come from `fetch_nist_step_files.py` (R20 reachable from the build host; sha256 checked).
+Import options are `import_step_exact`'s defaults (precision 1e-4 mm, max tolerance 0.1 mm, heal, sew). Worst deviations:
+
+| Set | Cases | Counts / validity | Volume | Area | Centroid | Inertia |
+| --- | ----- | ----------------- | ------ | ---- | -------- | ------- |
+| analytic (`occt_crosscheck.json`) | 10 | 1 valid solid each | 7.5e-15 | 1.4e-16 | 1.5e-11 mm (at 70 m) | 1.6e-15; at 70 m 1.7e-16 vs closed form (the reference's own raw error there: 2.2e-9) |
+| arc-profile revolution (closed form) | 1 | — | < 1e-12 | — | — | < 1e-12, Ixx = Iyy |
+| NIST B-rep files | 27 | census, faces / edges / vertices, validity, max tolerance equal on all 27 | 1.6e-12 | 2.0e-12 | 4.0e-10 mm | 7.6e-13 (relative to the largest moment) |
+| NIST tessellated file | 1 | `tessellated_only` | — | — | — | — |
+| probe | 5 | fuzzy 0: 2 solids / 12 faces; plate − cylinder 7 faces, signature `1125f7464525c4f6` = reference, same in a second process; fillet: 1 generated (r 1) + 4 modified of 6 | — | — | — | Iyy at 0 … 1000 m: 1.7e-16 (reference raw 5e-16 … 1.2e-7) |
+
+- **7.9.2 vs 7.9.3**: no deviation found. The C++ port of `measure_step_brep.py` linked against plain OCCT 7.9.2 reproduces every
+  whole-file field of `nist_occt_reference.json` (OCP 7.9.3.1) bit for bit on all 27 files, signatures included, and the plate −
+  cylinder signature is identical. The remaining differences come from llull's own pipeline: the healed solid is written to a
+  B-rep text blob and read back (worst 1.6e-12 volume, stc_07 e3), and the per-face %.6f signature differs on 19 of 27 files
+  only through values within 1e-15 of zero printed as -0.000000 vs 0.000000 and two areas at a 6th-decimal rounding boundary
+  (ftc_08 e2): in cross-build mode every face's area and centroid are within tolerance on all 27 files.
+- **Not runnable**: the fuzzy 2e-5 run (2 → 1 solids): the boolean `ShapeRecipe` has no fuzzy value on any kernel yet (TR-KRN-12);
+  the test is a `todo`. Fillet history is read off the result faces (1 new cylindrical face r 1, 4 of 6 input faces changed),
+  since `Generated` / `Modified` are not exposed by `KernelOps`.
+- **Bounds**: the kernel's `bounds` (BRepBndLib::Add) enclose the reference's optimal box but are up to 2.6 mm larger (ftc_11 e3);
+  VC-KRN-25 does not compare them.
+- **Defects fixed on the way** (native, each with a Rust and a server test): mass properties now use the default Gauss rule
+  (finding 7; `relError` is no longer reported by the native kernel), and tessellated-only STEP is refused as `tessellated_only`
+  (finding 8).
+

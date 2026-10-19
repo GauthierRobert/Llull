@@ -7,14 +7,16 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFile, fork } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { deserializeDocument } from '@core/commands/persistence/serialization';
 import { writeDesktopDiscovery } from '@server/cli/desktopDiscovery';
+import { nativeBinaryPath, nativeInstallHint } from '@server/native/nativeBinary';
+import { requestJson } from '@server/restClient';
 import { chooseBackendPort, startBackend, type RunningBackend } from '../src/backend';
-import { backendEnv, backendOrigin } from '../src/backendEnv';
+import { backendEnv, backendOrigin, hasNativeKernel, nativeBundleDir } from '../src/backendEnv';
 import { createDocumentSession, type DocumentSession } from '../src/documents';
 import { desktopLayout } from '../src/layout';
 
@@ -76,7 +78,7 @@ describe('desktop backend', () => {
     expect([401, 403]).toContain(otherSite.status);
   });
 
-  it('runs the exact OCC kernel (kernel_info, TR-KRN-01)', async () => {
+  it('runs the exact OCC kernel, WASM without a native bundle (kernel_info, TR-KRN-01)', async () => {
     const info = await runCli('kernel_info', '--app', '--json');
     expect(JSON.parse(info.stdout)).toMatchObject({
       ok: true,
@@ -141,4 +143,42 @@ describe('desktop backend', () => {
     },
     120_000,
   );
+});
+
+// The KI7 default: with the native bundle (here the local release build of llull-kernel standing in for resources/native) the app
+// starts the backend on the native OCCT 7.9 kernel, exactly as src/main.ts computes it.
+const nativeKernelBinary = nativeBinaryPath('llull-kernel', { ...process.env, LLULL_NATIVE_DIR: '' });
+if (nativeKernelBinary === null && process.env['LLULL_REQUIRE_NATIVE_KERNEL'] === '1') throw new Error(nativeInstallHint('llull-kernel'));
+
+describe.skipIf(nativeKernelBinary === null)('desktop backend with the native bundle (KI7)', () => {
+  let native: RunningBackend | undefined;
+
+  beforeAll(async () => {
+    const userData = path.join(work, 'userData-native');
+    const port = await chooseBackendPort(userData);
+    const nativeDir = nativeBundleDir(path.dirname(nativeKernelBinary!), process.platform, existsSync);
+    native = await startBackend(
+      (entry, env) => fork(entry, [], { env, stdio: 'ignore' }),
+      layout.serverEntry,
+      backendEnv({
+        port,
+        token,
+        layout,
+        userDataDir: userData,
+        baseEnv: { ...process.env, TEST: undefined, VITEST: undefined, LLULL_KERNEL: undefined },
+        nativeDir,
+        nativeKernel: hasNativeKernel(nativeDir, process.platform, existsSync),
+      }),
+      backendOrigin(port),
+    );
+  }, 60_000);
+
+  afterAll(async () => {
+    await native?.stop();
+  });
+
+  it('runs the native OCCT 7.9 kernel in its own process (kernel_info)', async () => {
+    const reply = await requestJson(`${native!.url}/command`, { token, body: { name: 'kernel_info', params: {} } });
+    expect(reply.body).toMatchObject({ data: { active: 'occt', occtVersion: '7.9.2', isolation: 'process' } });
+  }, 120_000);
 });

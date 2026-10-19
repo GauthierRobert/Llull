@@ -135,6 +135,17 @@ int free_edge_count(const TopoDS_Shape &shape, double tolerance) {
   }
 }
 
+// AP242 tessellated geometry (TRIANGULATED_FACE, COMPLEX_TRIANGULATED_FACE, read by OCCT >= 7.6) becomes faces holding a
+// Poly_Triangulation and no surface: not an exact B-rep, so such a solid or shell is skipped (the 7.4 WASM reader never transfers it).
+bool is_tessellated(const TopoDS_Shape &shape) {
+  const auto faces = distinct(shape, TopAbs_FACE);
+  for (int i = 1; i <= faces.Extent(); ++i) {
+    TopLoc_Location location;
+    if (BRep_Tool::Surface(TopoDS::Face(faces(i)), location).IsNull()) return true;
+  }
+  return false;
+}
+
 bool is_faceted(const TopoDS_Shape &shape) {
   const auto faces = distinct(shape, TopAbs_FACE);
   if (faces.Extent() == 0) return false;
@@ -254,9 +265,28 @@ rust::String import_step_json(rust::Str text, double precision, double max_toler
   const int faces = count_of(shape, TopAbs_FACE);
   std::vector<std::string> skipped;
   std::vector<Candidate> candidates;
-  for (int i = 1; i <= solids.Extent(); ++i) candidates.push_back({solids(i), is_valid(solids(i)), false});
-  std::vector<TopoDS_Shape> loose(loose_shells);
-  loose.insert(loose.end(), loose_faces.begin(), loose_faces.end());
+  int tessellated = 0;
+  for (int i = 1; i <= solids.Extent(); ++i) {
+    if (is_tessellated(solids(i))) {
+      ++tessellated;
+      continue;
+    }
+    candidates.push_back({solids(i), is_valid(solids(i)), false});
+  }
+  std::vector<TopoDS_Shape> loose;
+  for (const auto *pieces : {&loose_shells, &loose_faces})
+    for (const TopoDS_Shape &piece : *pieces) {
+      if (is_tessellated(piece)) {
+        ++tessellated;
+        continue;
+      }
+      loose.push_back(piece);
+    }
+  if (tessellated > 0)
+    skipped.push_back(std::to_string(tessellated) + " tessellated pieces (triangulated faces without exact surfaces)");
+  if (tessellated > 0 && solids.Extent() + static_cast<int>(loose_shells.size() + loose_faces.size()) == tessellated)
+    return error_json("tessellated_only", "the file holds TESSELLATED_* geometry only (" + std::to_string(tessellated) +
+                                              " triangulated pieces, no exact B-rep surfaces)");
   if (!loose.empty() && options.sew) {
     for (Candidate &candidate : sew_loose(loose, precision, skipped)) candidates.push_back(candidate);
   } else if (!loose.empty()) {
