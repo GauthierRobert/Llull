@@ -6,7 +6,7 @@ import { escapeXml } from '@lib/escapeXml';
 import { significantNumber } from '@lib/compactNumber';
 import { resultColor } from '@lib/isoBands';
 import type { FieldFace } from './fieldFaces';
-import { rasterField } from './fieldRaster';
+import { rasterField, type FieldRaster, type RasterInput } from './fieldRaster';
 
 export interface PlotMarker {
   readonly label: string;
@@ -159,8 +159,14 @@ function markerSvg(
   return out;
 }
 
-/** The complete, self-contained SVG of the plot: vector text around one embedded raster image. @pure */
-export function fieldPlotSvg(input: FieldPlotInput): { svg: string; facesDrawn: number } {
+/** A laid-out plot waiting for its raster: the raster input and the function that wraps a finished raster into the SVG. */
+export interface FieldPlotLayout {
+  readonly raster: RasterInput;
+  readonly finish: (raster: FieldRaster) => { svg: string; facesDrawn: number };
+}
+
+/** Screen fit and raster input of the plot; `finish` adds the vector parts around the raster (from `rasterField` or a native twin). @pure */
+export function fieldPlotLayout(input: FieldPlotInput): FieldPlotLayout {
   const plotRight = input.width - LEGEND_WIDTH;
   const area = { left: 0, top: HEADER, right: plotRight, bottom: input.height - FOOTER };
   const fitPoints = [
@@ -175,7 +181,7 @@ export function fieldPlotSvg(input: FieldPlotInput): { svg: string; facesDrawn: 
   };
   const sheetXs = fitPoints.map((p) => input.frame.project(p)[0]);
   const size = maxOf(sheetXs) - minOf(sheetXs);
-  const raster = rasterField({
+  const rasterInput: RasterInput = {
     faces: input.faces,
     ghost: input.ghost,
     toViewer: input.frame.toViewer,
@@ -187,36 +193,45 @@ export function fieldPlotSvg(input: FieldPlotInput): { svg: string; facesDrawn: 
     levels: input.levels,
     showMesh: input.showMesh,
     size,
-  });
-  const inPlot = ([x, y]: readonly [number, number]): boolean => x >= 0 && x <= plotRight && y >= HEADER && y <= input.height - FOOTER;
-  const shown = (point: Vec3): boolean => inPlot(exact(point)) && raster.visible(point);
-  const markers = input.markers.flatMap((marker) => markerSvg(marker, exact, size * 0.15, plotRight, shown));
-  const maxAt = input.max === null ? null : screen(input.max.at);
-  const minAt = input.min === null ? null : screen(input.min.at);
-  const crowded = maxAt !== null && minAt !== null && Math.hypot(maxAt[0] - minAt[0], maxAt[1] - minAt[1]) < 40;
-  const extremes = [
-    ...(input.max === null || maxAt === null || !inPlot(maxAt)
-      ? []
-      : [extremeMarker(maxAt, `MAX ${label(input.max.value)}`, '#ff3030', plotRight, false)]),
-    ...(input.min === null || minAt === null || !inPlot(minAt)
-      ? []
-      : [extremeMarker(minAt, `MIN ${label(input.min.value)}`, '#3080ff', plotRight, crowded)]),
-  ];
-  const keyItems = input.markers.map(
-    (marker, index) =>
-      `<circle cx="${18 + index * 170}" cy="${input.height - 10}" r="4" fill="${marker.color}"/><text x="${26 + index * 170}" y="${input.height - 6}" fill="#e8e8f0" font-size="11">${escapeXml(marker.label.slice(0, 26))}</text>`,
-  );
-  const svg = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${input.width}" height="${input.height}" viewBox="0 0 ${input.width} ${input.height}">`,
-    `<rect width="${input.width}" height="${input.height}" fill="#1a1a2e"/>`,
-    `<text x="12" y="20" fill="#ffffff" font-size="15" font-weight="bold">${escapeXml(input.title.slice(0, 120))}</text>`,
-    `<text x="12" y="38" fill="#c8c8d8" font-size="12">${escapeXml(input.subtitle.slice(0, 160))}</text>`,
-    raster.image,
-    ...markers,
-    ...extremes,
-    ...legend(input),
-    ...keyItems,
-    '</svg>',
-  ].join('\n');
-  return { svg, facesDrawn: raster.facesDrawn };
+  };
+  const finish = (raster: FieldRaster): { svg: string; facesDrawn: number } => {
+    const inPlot = ([x, y]: readonly [number, number]): boolean => x >= 0 && x <= plotRight && y >= HEADER && y <= input.height - FOOTER;
+    const shown = (point: Vec3): boolean => inPlot(exact(point)) && raster.visible(point);
+    const markers = input.markers.flatMap((marker) => markerSvg(marker, exact, size * 0.15, plotRight, shown));
+    const maxAt = input.max === null ? null : screen(input.max.at);
+    const minAt = input.min === null ? null : screen(input.min.at);
+    const crowded = maxAt !== null && minAt !== null && Math.hypot(maxAt[0] - minAt[0], maxAt[1] - minAt[1]) < 40;
+    const extremes = [
+      ...(input.max === null || maxAt === null || !inPlot(maxAt)
+        ? []
+        : [extremeMarker(maxAt, `MAX ${label(input.max.value)}`, '#ff3030', plotRight, false)]),
+      ...(input.min === null || minAt === null || !inPlot(minAt)
+        ? []
+        : [extremeMarker(minAt, `MIN ${label(input.min.value)}`, '#3080ff', plotRight, crowded)]),
+    ];
+    const keyItems = input.markers.map(
+      (marker, index) =>
+        `<circle cx="${18 + index * 170}" cy="${input.height - 10}" r="4" fill="${marker.color}"/><text x="${26 + index * 170}" y="${input.height - 6}" fill="#e8e8f0" font-size="11">${escapeXml(marker.label.slice(0, 26))}</text>`,
+    );
+    const svg = [
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${input.width}" height="${input.height}" viewBox="0 0 ${input.width} ${input.height}">`,
+      `<rect width="${input.width}" height="${input.height}" fill="#1a1a2e"/>`,
+      `<text x="12" y="20" fill="#ffffff" font-size="15" font-weight="bold">${escapeXml(input.title.slice(0, 120))}</text>`,
+      `<text x="12" y="38" fill="#c8c8d8" font-size="12">${escapeXml(input.subtitle.slice(0, 160))}</text>`,
+      raster.image,
+      ...markers,
+      ...extremes,
+      ...legend(input),
+      ...keyItems,
+      '</svg>',
+    ].join('\n');
+    return { svg, facesDrawn: raster.facesDrawn };
+  };
+  return { raster: rasterInput, finish };
+}
+
+/** The complete, self-contained SVG of the plot: vector text around one embedded raster image. @pure */
+export function fieldPlotSvg(input: FieldPlotInput): { svg: string; facesDrawn: number } {
+  const layout = fieldPlotLayout(input);
+  return layout.finish(rasterField(layout.raster));
 }

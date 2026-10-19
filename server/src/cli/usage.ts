@@ -28,6 +28,8 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
                               [timeoutS=600 verify=true]  (local --doc; needs llull-compute, $LLULL_COMPUTE)
   fea_map_field analysisId=ID native llull-compute: interpolate the thermal result onto the mechanical mesh
                               (fea_solve does it itself from $LLULL_NATIVE_MAP_MIN_NODES nodes; local --doc)
+  fea_render analysisId=ID [render_fea_results params] raster=auto|ts|cpu|gpu --save plot.png
+                              the same plot with the pixel raster in llull-compute (cpu = bit-identical twin, gpu = picture)
   register_material_library file=LIB.llull-matlib.json   copy a material library into $LLULL_LIBRARIES_DIR (~/.llull/libraries); then
                               import_material_library libraryId=ID version=V sha256=H, and resolve_material_libraries after a load
   run <plan.json | ->         build_project: an actions array or { actions, onError }

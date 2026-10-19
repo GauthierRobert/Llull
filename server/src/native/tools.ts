@@ -3,17 +3,20 @@
  * against the local document. They never change the document: results are artifacts read back by read-only registry commands.
  *   fatigue_field  FE fatigue case -> llull-compute post fatigue (every node) -> FatigueField artifact -> compute_fatigue
  *   fea_map_field  thermo_static interpolate field -> llull-compute post map -> mapped-field artifact (read by the fea_solve deck)
+ *   fea_render     render_fea_results with the pixel raster in llull-compute raster (raster=auto|ts|cpu|gpu)
  */
 
 import type { McpToolDefinition } from '@mcp/tools';
 import type { FeaHost } from '@mcp/index';
 import type { CommandOutcome } from '@mcp/restProtocol';
+import { getCommand } from '@core/commands/registry';
 import { isRecord } from '@lib/isRecord';
 import { nonEmptyString } from '@lib/nonEmptyString';
 import { defaultFeArtifactStore } from '../fea/artifactStore';
 import { createComputeRunner } from './computeJob';
 import { runFatigueField, type NativeDeps } from './fatigueField';
 import { runMapField } from './mapField';
+import { runFeaRender } from './renderField';
 
 const TIMEOUT = {
   type: 'number' as const,
@@ -60,9 +63,33 @@ export function nativeToolDefinitions(): McpToolDefinition[] {
       },
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
+    renderToolDefinition(),
   ];
 }
-const NAMES: ReadonlySet<string> = new Set(['fatigue_field', 'fea_map_field']);
+
+/** fea_render: the params of render_fea_results plus `raster` (read from the registry, so both stay one schema). */
+function renderToolDefinition(): McpToolDefinition {
+  const schema = getCommand('render_fea_results')?.paramsSchema ?? { type: 'object' as const, properties: {}, required: [] };
+  return {
+    name: 'fea_render',
+    description:
+      'render_fea_results (same params, same data: svg, field, unit, min, max, levels, ...) with the pixel raster drawn by the native llull-compute ' +
+      'binary for large headless plots (save with --save plot.png). raster: auto (default: TypeScript below 1e6 supersampled pixels, native CPU ' +
+      'above), ts (the TypeScript reference and hash path), cpu (native CPU twin, bit-identical to ts), gpu (wgpu offscreen; a picture, not ' +
+      'bit-identical: data.raster.deterministic false). data.raster = { engine ts | native-cpu | native-gpu, deterministic, device?, reason?, ' +
+      'elapsedMs }; a missing binary or GPU falls back to the TypeScript raster and says why.',
+    inputSchema: {
+      ...schema,
+      properties: {
+        ...schema.properties,
+        raster: { type: 'string', enum: ['auto', 'ts', 'cpu', 'gpu'], description: 'Raster engine (default auto).' },
+      },
+    },
+    annotations: { readOnlyHint: true, idempotentHint: true },
+  };
+}
+
+const NAMES: ReadonlySet<string> = new Set(['fatigue_field', 'fea_map_field', 'fea_render']);
 
 export const isNativeTool = (name: string): boolean => NAMES.has(name);
 
@@ -83,6 +110,7 @@ export async function runNativeTool(
   deps: NativeDeps = defaultDeps(process.env),
 ): Promise<CommandOutcome | null> {
   if (!isNativeTool(name)) return null;
+  if (name === 'fea_render') return { ...(await runFeaRender(params, host, deps)), changed: false };
   const args = isRecord(params) ? params : {};
   const timeout = typeof args['timeoutS'] === 'number' && Number.isFinite(args['timeoutS']) ? { timeoutS: args['timeoutS'] } : {};
   if (name === 'fatigue_field') {

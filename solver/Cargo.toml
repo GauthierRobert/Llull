@@ -8,6 +8,7 @@ default-members = [
   "crates/llull-jsmath",
   "crates/llull-bvh",
   "crates/llull-post",
+  "crates/llull-raster",
   "bins/llull-compute",
 ]
 

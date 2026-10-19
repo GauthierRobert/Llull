@@ -728,3 +728,18 @@ marginalBand, minMs, minMsRow, factors, rows, singularScreening, warnings, revie
   `reviewRequired: true`; `unverified` = OR of the allowable's PHY-01 flags, the E / nu flags (and, for thermo_static, the CTE flags of `check_thermo_mechanical`).
 - **Singular zones are not screened.** Every row has `singular: false` and `data.singularScreening` says so; peak stresses at point loads, supports and re-entrant
   corners must be judged by the reader (a node in a constraint set is visible with `groupBy target`).
+
+**Native raster, TR-FEA-92 (2026-10-19).** `fieldRaster.ts` is split into `prepareRaster` (per face: supersampled screen points, depth, value,
+light, normal, part), `rasterPixels` (z-buffer, edges, bands, resolve: the reference) and `finishRaster` (PNG, depth-tested visibility);
+`fieldPlotSvg` into `fieldPlotLayout` + `finish`; the plot set-up of `render_fea_results` moved to `results/plotRequest.ts` (behaviour and schema
+unchanged) so a host can draw the same plot. `llull-compute raster` (crate `solver/crates/llull-raster`): a CPU twin of `rasterPixels`
+(bit-identical RGBA and float32 depth: `solver/crates/llull-raster/tests/reference.rs`, fixtures from `tests/unit/native/rasterReference.test.ts`)
+and a wgpu path behind the cargo feature `gpu` (GPU z-buffer, CPU resolve). Transport `fea_render` (CLI, local document; same params and data
+as `render_fea_results` plus `raster: auto | ts | cpu | gpu` and `data.raster = { engine, deterministic, device?, reason?, elapsedMs }`;
+`server/src/native/renderField.ts`); a missing binary or GPU falls back to the TS raster with the reason.
+
+VC-FEA-29: the native CPU twin gives the identical SVG (same bytes) as the TS raster (`server/tests/nativeRender.test.ts`); the GPU path on
+llvmpipe (software Vulkan, lavapipe) differs from the twin on 0.000–0.001 % of the pixels (rasterisation rule at triangle edges); without an
+adapter the GPU tests skip with the logged reason. Measured raster stage (4 vCPU, a 16k-node block): TS 0.21 / 0.42–0.53 / 1.30–1.35 s vs native
+CPU 0.06–0.08 / 0.22–0.42 / 0.52–0.55 s (incl. process start) at 480×320 / 960×640 / 2000×2000; `auto` goes native from 1e6 supersampled pixels.
+The whole render is 2–4 s, dominated by the TS plot set-up (artifact trust, faces), which stays in TS.
