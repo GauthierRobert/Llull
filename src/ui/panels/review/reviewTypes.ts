@@ -1,9 +1,10 @@
-// Review-tab result types, mirroring PHY-21 TECHNICAL_SPEC §3.4 (check result envelope) and §3.3 (Disposition). Defined locally until
-// check_prototype / set_review_disposition exist in the registry; the shapes are the contract, so wiring later is a no-op.
+// Review-tab result types, mirroring PHY-21 TECHNICAL_SPEC §3.4 (check result envelope) and §3.3 (Disposition), as returned by
+// check_prototype (core types are not imported: the tab also reads results saved by an older llull).
 
 import { isRecord } from '@lib/isRecord';
 
-export type CheckStatus = 'pass' | 'warn' | 'fail' | 'not_run';
+/** `info` never counts against a check (a touch, a calibration point): it is never shown as a pass. */
+export type CheckStatus = 'pass' | 'warn' | 'fail' | 'not_run' | 'info';
 export type CheckName = 'assembly' | 'mechanism' | 'motion_clearance' | 'dynamics';
 export type DispositionStatus = 'not_reviewed' | 'relevant' | 'irrelevant' | 'accepted';
 
@@ -78,10 +79,14 @@ export interface CheckResult {
 export interface PrototypeReview {
   readonly verdict?: string;
   readonly ownerSummary?: string;
+  /** Finding keys whose disposition was made on other inputs (or whose finding is gone): listed for re-review. */
+  readonly staleDispositions?: readonly string[];
+  /** Simulated seconds of the review run (null when the motion checks were skipped). */
+  readonly durationS?: number | null;
   readonly checks: readonly CheckResult[];
 }
 
-const STATUSES: readonly unknown[] = ['pass', 'warn', 'fail', 'not_run'];
+const STATUSES: readonly unknown[] = ['pass', 'warn', 'fail', 'not_run', 'info'];
 
 function isCheckResult(value: unknown): value is CheckResult {
   return (
@@ -98,9 +103,13 @@ export function parsePrototypeReview(data: unknown): PrototypeReview | null {
   if (!isRecord(data) || !Array.isArray(data['checks']) || !data['checks'].every(isCheckResult)) return null;
   const verdict = data['verdict'];
   const ownerSummary = data['ownerSummary'];
+  const stale: unknown = data['staleDispositions'];
+  const durationS = data['durationS'];
   return {
     checks: data['checks'],
     ...(typeof verdict === 'string' ? { verdict } : {}),
     ...(typeof ownerSummary === 'string' ? { ownerSummary } : {}),
+    ...(typeof durationS === 'number' || durationS === null ? { durationS } : {}),
+    ...(Array.isArray(stale) && stale.every((key) => typeof key === 'string') ? { staleDispositions: stale } : {}),
   };
 }

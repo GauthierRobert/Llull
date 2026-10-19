@@ -8,6 +8,8 @@ import type { CheckItem, CheckName, CheckResult, CheckStatus, DispositionStatus 
 export interface Finding {
   readonly check: CheckName;
   readonly item: CheckItem;
+  /** inputsHash of the check the item belongs to (sent with a disposition). */
+  readonly inputsHash: string;
 }
 
 export interface FindingFilters {
@@ -23,7 +25,7 @@ export interface FindingGroupModel {
 }
 
 export function flattenFindings(checks: readonly CheckResult[]): Finding[] {
-  return checks.flatMap((result) => result.items.map((item) => ({ check: result.check, item })));
+  return checks.flatMap((result) => result.items.map((item) => ({ check: result.check, item, inputsHash: result.inputsHash })));
 }
 
 export const reviewerStatusOf = (item: CheckItem): DispositionStatus => item.disposition?.status ?? 'not_reviewed';

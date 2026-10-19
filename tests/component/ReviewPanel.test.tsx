@@ -34,12 +34,12 @@ beforeEach(() => {
   });
 });
 
-describe('ReviewPanel without check_prototype', () => {
-  it('runs the buildability check (check_assembly) read-only and says what it covers', async () => {
+describe('ReviewPanel running check_prototype', () => {
+  it('runs the whole review (check_prototype) read-only, without a partial-coverage note', async () => {
     const dispatch = vi.spyOn(useStore.getState(), 'dispatch');
     render(<ReviewPanel />);
     expect(screen.queryByTestId('review-unavailable')).toBeNull();
-    expect(screen.getByTestId('review-assembly-only')).toHaveTextContent(/Runs buildability.*dynamics/);
+    expect(screen.queryByTestId('review-assembly-only')).toBeNull();
     expect(screen.getByTestId('review-run')).toBeEnabled();
     fireEvent.click(screen.getByTestId('review-run'));
     await waitFor(() => expect(useReviewStore.getState().busy).toBe(false));
@@ -142,11 +142,11 @@ describe('findings list', () => {
     expect(within(screen.getByTestId('checklist-row-interference')).queryByText('pass')).toBeNull();
   });
 
-  it('disables reviewer controls with a note while set_review_disposition is not registered', () => {
+  it('enables the reviewer controls now that set_review_disposition is registered', () => {
     render(<ReviewPanel />);
     show();
-    expect(screen.getByTestId('findings-disposition-unavailable')).toBeInTheDocument();
-    expect(screen.getByLabelText('Reviewer status for FPR_PAIR_HARD')).toBeDisabled();
+    expect(screen.queryByTestId('findings-disposition-unavailable')).toBeNull();
+    expect(screen.getByLabelText('Reviewer status for FPR_PAIR_HARD')).toBeEnabled();
   });
 });
 

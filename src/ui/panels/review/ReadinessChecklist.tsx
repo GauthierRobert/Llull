@@ -4,7 +4,8 @@
 import React, { useState } from 'react';
 import { Icon } from '@ui/components/Icon';
 import { StatusMark } from './StatusMark';
-import { formatThreshold, headlineValue, itemStatusLabel, type ChecklistRowModel } from './checklist';
+import { formatThreshold, headlineAccuracy, headlineValue, itemStatusLabel, type ChecklistRowModel } from './checklist';
+import { AccuracyBadge } from './AccuracyBadge';
 
 interface ChecklistRowProps {
   readonly row: ChecklistRowModel;
@@ -14,6 +15,7 @@ interface ChecklistRowProps {
 function ChecklistRow({ row, onExplain }: ChecklistRowProps): React.ReactElement {
   const [open, setOpen] = useState(false);
   const value = row.headline === null ? null : headlineValue(row.headline);
+  const accuracy = row.headline === null ? null : headlineAccuracy(row.headline);
   const threshold = row.headline === null ? null : formatThreshold(row.headline);
   const panelId = `checklist-row-${row.id}`;
   return (
@@ -45,6 +47,7 @@ function ChecklistRow({ row, onExplain }: ChecklistRowProps): React.ReactElement
       {(value !== null || threshold !== null) && (
         <p className="checklist-row__detail">
           {value !== null && <span data-testid={`checklist-value-${row.id}`}>{value}</span>}
+          {accuracy !== null && <AccuracyBadge accuracy={accuracy} testId={`checklist-accuracy-${row.id}`} />}
           {threshold !== null && <span data-testid={`checklist-threshold-${row.id}`}>{threshold}</span>}
         </p>
       )}

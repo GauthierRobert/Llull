@@ -325,3 +325,132 @@
   font-family: var(--font-sans);
   white-space: normal;
 }
+
+.status-mark--info {
+  color: var(--cat-2);
+}
+
+/* verdict: "ready for review" is not an approval, so it never takes the pass colour */
+.review-panel__verdict {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  border-left: 3px solid var(--fg-subtle);
+  background: var(--surface-2);
+}
+.review-panel__verdict--blocked {
+  border-left-color: var(--danger);
+}
+
+/* accuracy badge (FR-FPR-62): band + origin; calibrated values are hatched and grey, never green; labels >= 12 px (FR-FPR-60) */
+.accuracy-badge {
+  display: inline-flex;
+  gap: 4px;
+  align-items: baseline;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  cursor: help;
+}
+.accuracy-badge__origin {
+  font-style: italic;
+}
+.accuracy-badge--calibrated {
+  background: repeating-linear-gradient(45deg, var(--surface-2), var(--surface-2) 3px, transparent 3px, transparent 6px);
+  color: var(--fg-subtle);
+}
+.accuracy-badge--predicted {
+  border-color: var(--cat-5);
+}
+
+/* mechanism graph (FR-FPR-52) */
+.mechanism-graph,
+.reference-chart {
+  margin: 0;
+}
+.mechanism-graph svg,
+.reference-chart svg {
+  width: 100%;
+  height: auto;
+}
+.mechanism-graph__badges {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+}
+.mechanism-graph__dof {
+  font-weight: 600;
+}
+.mechanism-graph__redundant {
+  color: var(--warning);
+}
+.mechanism-graph__edge path {
+  stroke: var(--fg-muted);
+  stroke-width: 1.5;
+}
+.mechanism-graph__edge--loop path {
+  stroke-dasharray: 5 3;
+}
+.mechanism-graph__edge--gear path {
+  stroke: var(--cat-1);
+  stroke-dasharray: 1.5 3;
+}
+.mechanism-graph__glyph,
+.mechanism-graph__label {
+  font-size: 12px;
+  fill: var(--fg);
+}
+.mechanism-graph__node circle {
+  fill: var(--surface-2);
+  stroke: var(--cat-5);
+  stroke-width: 2;
+  cursor: pointer;
+}
+.mechanism-graph__node--ground circle {
+  stroke: var(--fg-subtle);
+  cursor: default;
+}
+.mechanism-graph__node--selected circle {
+  fill: var(--cat-5);
+}
+.mechanism-graph__problems {
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  color: var(--danger);
+}
+
+/* reference overlay (FR-FPR-63) */
+.reference-chart__band {
+  fill: var(--cat-5);
+  opacity: 0.15;
+}
+.reference-chart__simulated {
+  stroke: var(--cat-5);
+  stroke-width: 1.5;
+}
+.reference-chart__error {
+  stroke: var(--fg-muted);
+}
+.reference-chart__holdout {
+  fill: var(--cat-1);
+}
+.reference-chart__calibration {
+  fill: none;
+  stroke: var(--fg-subtle);
+}
+.reference-chart__s {
+  fill: var(--cat-5);
+}
+.series-chart__mark line {
+  stroke: var(--fg-subtle);
+}
+.review-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
