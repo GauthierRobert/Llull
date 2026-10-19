@@ -205,7 +205,7 @@ describe('supports and mesh adequacy from the mesh artifact', () => {
     });
     const key = `C_${one.affected[0]}`;
     const ctx = contextOf(one.document, bar.analysisId, barMesh(one.document, bar.analysisId, bar.boxId, { [key]: [1] }));
-    expect(partRestraints(ctx)).toEqual([{ entityId: bar.boxId, rank: 3, restrainedDofs: 3 }]);
+    expect(partRestraints(ctx)).toEqual([{ entityIds: [bar.boxId], rank: 3, restrainedDofs: 3 }]);
     const face = contextOf(one.document, bar.analysisId, barMesh(one.document, bar.analysisId, bar.boxId, { [key]: X0_NODES }));
     expect(partRestraints(face)[0]).toMatchObject({ rank: 6, restrainedDofs: 12 });
     const edge = contextOf(one.document, bar.analysisId, barMesh(one.document, bar.analysisId, bar.boxId, { [key]: [1, 3] }));
@@ -227,6 +227,49 @@ describe('supports and mesh adequacy from the mesh artifact', () => {
     expect(partRestraints(missing)[0]).toMatchObject({ rank: 0, restrainedDofs: 0 });
     const none = contextOf(symmetric.document, bar.analysisId, barMesh(symmetric.document, bar.analysisId, bar.boxId, {}));
     expect(partRestraints(none)[0]?.rank).toBe(0);
+  });
+
+  it('parts that share mesh nodes (conformal bonding) are restrained as one group; an unconnected part needs its own supports', () => {
+    const bar = barDocument({ analysisType: 'static', supports: false });
+    let doc = bar.doc;
+    const parts: string[] = [];
+    for (const name of ['bonded', 'loose']) {
+      const box = execute(doc, 'add_box', { size: [1, 1, 1] });
+      const part = execute(box.document, 'set_part_idealization', { analysisId: bar.analysisId, entityId: box.affected[0] ?? '' });
+      doc = part.document;
+      parts.push(box.affected[0] ?? name);
+    }
+    const fixed = execute(doc, 'add_fea_constraint', {
+      analysisId: bar.analysisId,
+      name: 'root',
+      kind: 'fixed',
+      target: { entityId: bar.boxId, facesNear: [[0, 0.5, 0.5]] },
+    });
+    const [bonded, loose] = parts as [string, string];
+    const base = barMesh(fixed.document, bar.analysisId, bar.boxId, { [`C_${fixed.affected[0]}`]: X0_NODES });
+    const mesh = {
+      ...base,
+      nodes: [
+        ...base.nodes,
+        [9, 3, 0, 0],
+        [10, 3, 1, 0],
+        [11, 3, 0, 1],
+        [12, 8, 0, 0],
+        [13, 9, 0, 0],
+        [14, 8, 1, 0],
+        [15, 8, 0, 1],
+      ] as typeof base.nodes,
+      blocks: [
+        ...base.blocks,
+        { type: 'C3D4' as const, entityId: bonded, elements: [[101, 8, 9, 10, 11]] },
+        { type: 'C3D4' as const, entityId: loose, elements: [[102, 12, 13, 14, 15]] },
+      ],
+    };
+    const groups = partRestraints(contextOf(fixed.document, bar.analysisId, mesh));
+    expect(groups).toEqual([
+      { entityIds: [bar.boxId, bonded], rank: 6, restrainedDofs: 12 },
+      { entityIds: [loose], rank: 0, restrainedDofs: 0 },
+    ]);
   });
 
   it('check_analysis warns FEA_UNDERCONSTRAINED for a part held by one point, naming the rank; a fixed face does not', () => {

@@ -698,7 +698,7 @@ server process (no ticket cancel yet).
   `FEA_BUCKLING_NEGATIVE_FACTOR` and `FEA_BUCKLING_BELOW_APPLIED` (factor < 1: the applied load exceeds the linear buckling load; warnings). Linear buckling is an upper bound
   (no imperfections): the summary says so and `reviewRequired` is always true.
 - **`check_analysis` additions.** `FEA_UNDERCONSTRAINED` from the mesh artifact: the restrained (node, dof) rows of every support are projected on the six rigid-body motions of each part
-  (rank by Gram-Schmidt: a fixed face 6, a fixed point 3, a fixed edge 5); `FEA_MESH_ADEQUACY` when fewer than 2 element edges fit across the thinnest bounding-box side of a
+  (rank by Gram-Schmidt: a fixed face 6, a fixed point 3, a fixed edge 5; parts that share mesh nodes under conformal bonding form one group); `FEA_MESH_ADEQUACY` when fewer than 2 element edges fit across the thinnest bounding-box side of a
   part (bounding box over the mean tet edge: a heuristic, VC-FEA-09); margin items for a solved static / thermo_static case with allowables: `FEA_MS_NEGATIVE` (error, also after
   a disposition: a FAIL never becomes a pass), `FEA_MS_MARGINAL`, `FEA_MARGINAL_BAND_UNSET` (warning, VC-FEA-62) and `FEA_DISPOSITION_PENDING`. Because of the last two a solved
   case with allowables reads `warn` at best until a band is stated.

@@ -128,8 +128,8 @@ function meshItems(doc: CadDocument, analysis: AnalysisCase, trust: Trust): Stru
           item(
             'FEA_UNDERCONSTRAINED',
             'warning',
-            `part '${part.entityId}': the supports remove ${part.rank} of 6 rigid-body motions (${part.restrainedDofs} restrained dofs): the stiffness matrix is singular unless other parts or springs hold it`,
-            [part.entityId],
+            `part(s) '${part.entityIds.join("', '")}': the supports remove ${part.rank} of 6 rigid-body motions (${part.restrainedDofs} restrained dofs): the stiffness matrix is singular unless other parts or springs hold it`,
+            part.entityIds,
           ),
         );
   for (const part of partAdequacy(trust.meshArtifact))

@@ -1,12 +1,13 @@
 /** Rigid-body restraint of a part (05 §7.1 FEA_UNDERCONSTRAINED): how many of the six rigid-body motions the supports remove. */
 
-import type { FeaConstraint } from '@core/model/analysis';
+import type { FeaConstraint, FeMeshArtifact } from '@core/model/analysis';
 import type { DeckContext } from '../decks/context';
 import { planeAxis } from '../decks/mechanical';
-import { nodeCoordinates, nodeEntities } from './fields';
+import { nodeCoordinates } from './fields';
 
-export interface PartRestraint {
-  readonly entityId: string;
+export interface RestraintGroup {
+  /** Analysed parts that move together: parts sharing mesh nodes (conformal bonding) form one group, every other part is its own. */
+  readonly entityIds: readonly string[];
   /** Independent rigid-body motions removed (6 = fully restrained). */
   readonly rank: number;
   readonly restrainedDofs: number;
@@ -30,22 +31,49 @@ function restrainedAxes(ctx: DeckContext, constraint: FeaConstraint, nodes: read
 const rigidRow = (axis: number, p: readonly [number, number, number]): number[] =>
   axis === 0 ? [1, 0, 0, 0, p[2], -p[1]] : axis === 1 ? [0, 1, 0, -p[2], 0, p[0]] : [0, 0, 1, p[1], -p[0], 0];
 
+/** Group of each entity (smallest entity id of the connected set) and of each node, parts joined when an element block of another part uses the same node. */
+function groupsOf(mesh: FeMeshArtifact): { entityGroup: Map<string, string>; nodeGroup: Map<number, string> } {
+  const parent = new Map<string, string>();
+  const find = (id: string): string => {
+    const up = parent.get(id) ?? id;
+    return up === id ? id : find(up);
+  };
+  const firstOwner = new Map<number, string>();
+  for (const block of mesh.blocks) {
+    if (!parent.has(block.entityId)) parent.set(block.entityId, block.entityId);
+    for (const element of block.elements)
+      for (const node of element.slice(1)) {
+        const owner = firstOwner.get(node);
+        if (owner === undefined) firstOwner.set(node, block.entityId);
+        else {
+          const [a, b] = [find(owner), find(block.entityId)];
+          if (a !== b) parent.set(a < b ? b : a, a < b ? a : b);
+        }
+      }
+  }
+  return {
+    entityGroup: new Map([...parent.keys()].map((id) => [id, find(id)])),
+    nodeGroup: new Map([...firstOwner].map(([node, owner]) => [node, find(owner)])),
+  };
+}
+
 /**
- * Rank of the restraints on each part: every restrained (node, axis) is a row of the rigid-body map (positions relative to the part centre,
+ * Rank of the restraints on each group of parts: every restrained (node, axis) is a row of the rigid-body map (positions relative to the group centre,
  * scaled by its size, so translations and rotations weigh alike); the rank is the number of independent rows (Gram-Schmidt, at most 6).
- * @invariant a part with no restrained node has rank 0; collinear supports give at most 5 (rotation about their line stays free)
+ * @invariant a group with no restrained node has rank 0; collinear supports give at most 5 (rotation about their line stays free); groups without an analysed part are omitted
  */
-export function partRestraints(ctx: DeckContext): PartRestraint[] {
+export function partRestraints(ctx: DeckContext): RestraintGroup[] {
   const coordinates = nodeCoordinates(ctx.mesh);
-  const owner = nodeEntities(ctx.mesh);
+  const { entityGroup, nodeGroup } = groupsOf(ctx.mesh);
   const extent = new Map<string, { lo: number[]; hi: number[] }>();
   for (const [node, point] of coordinates) {
-    const box = extent.get(owner.get(node) ?? '') ?? { lo: [Infinity, Infinity, Infinity], hi: [-Infinity, -Infinity, -Infinity] };
+    const group = nodeGroup.get(node) ?? '';
+    const box = extent.get(group) ?? { lo: [Infinity, Infinity, Infinity], hi: [-Infinity, -Infinity, -Infinity] };
     point.forEach((value, axis) => {
       box.lo[axis] = Math.min(box.lo[axis] ?? Infinity, value);
       box.hi[axis] = Math.max(box.hi[axis] ?? -Infinity, value);
     });
-    extent.set(owner.get(node) ?? '', box);
+    extent.set(group, box);
   }
   const basis = new Map<string, number[][]>();
   const counts = new Map<string, number>();
@@ -55,8 +83,8 @@ export function partRestraints(ctx: DeckContext): PartRestraint[] {
     if (constraint === undefined || nodes.length === 0) continue;
     const axes = restrainedAxes(ctx, constraint, nodes);
     for (const node of nodes) {
-      const entityId = owner.get(node) ?? '';
-      const box = extent.get(entityId);
+      const group = nodeGroup.get(node) ?? '';
+      const box = extent.get(group);
       const point = coordinates.get(node);
       if (box === undefined || point === undefined) continue;
       const centre = box.lo.map((low, axis) => (low + (box.hi[axis] ?? low)) / 2);
@@ -66,10 +94,10 @@ export function partRestraints(ctx: DeckContext): PartRestraint[] {
         (point[1] - (centre[1] ?? 0)) / size,
         (point[2] - (centre[2] ?? 0)) / size,
       ];
-      const taken = basis.get(entityId) ?? [];
-      basis.set(entityId, taken);
+      const taken = basis.get(group) ?? [];
+      basis.set(group, taken);
       for (const axis of axes) {
-        counts.set(entityId, (counts.get(entityId) ?? 0) + 1);
+        counts.set(group, (counts.get(group) ?? 0) + 1);
         if (taken.length >= 6) continue;
         const row = rigidRow(axis, local);
         const norm = Math.hypot(...row);
@@ -83,9 +111,14 @@ export function partRestraints(ctx: DeckContext): PartRestraint[] {
       }
     }
   }
-  return Object.keys(ctx.analysis.parts).map((entityId) => ({
-    entityId,
-    rank: basis.get(entityId)?.length ?? 0,
-    restrainedDofs: counts.get(entityId) ?? 0,
+  const partsOf = new Map<string, string[]>();
+  for (const entityId of Object.keys(ctx.analysis.parts)) {
+    const group = entityGroup.get(entityId) ?? entityId;
+    partsOf.set(group, [...(partsOf.get(group) ?? []), entityId]);
+  }
+  return [...partsOf].map(([group, entityIds]) => ({
+    entityIds,
+    rank: basis.get(group)?.length ?? 0,
+    restrainedDofs: counts.get(group) ?? 0,
   }));
 }
