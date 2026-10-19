@@ -179,4 +179,3 @@ export function loftSections(doc: CadDocument, entityId: string): LatticeSection
   if (sections.some((s) => s === null)) return `${entityId} has a section of zero chord`;
   return (sections as LatticeSection[]).sort((a, b) => a.leadingEdge[1] - b.leadingEdge[1] || a.leadingEdge[2] - b.leadingEdge[2]);
 }
-

@@ -204,7 +204,6 @@ function explicitToolDefinition(): ToolDefinition {
   };
 }
 
-
 export const isNativeTool = (name: string): boolean => NAMES.has(name);
 
 function defaultDeps(env: NodeJS.ProcessEnv, onProgress?: (line: string) => void): NativeDeps {
