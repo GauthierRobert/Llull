@@ -2,7 +2,7 @@
 
 import { planarFacets } from '../../lib/planarFacets';
 import { convertValue, isUnitFailure } from '../../lib/quantity';
-import { segmentHitsTriangle } from '../../lib/segmentTriangle';
+import { type OcclusionSegment, resolveGeometryQueries } from '../../geometry/geometryQueries';
 import { exchangeArea, facing, type Facet } from '../../lib/viewFactorContour';
 import type { Vec3 } from '../../model/vectors';
 import type { CadDocument } from '../../model/types';
@@ -13,7 +13,6 @@ import { toSi } from '../../lib/thermalUnits';
 
 const RECIPROCITY_WARNING = 1e-3;
 const ROW_SUM_TOLERANCE = 1e-3;
-const MAX_FACETS = 400;
 const PLANARITY_RELATIVE = 1e-6;
 
 interface Finding {
@@ -44,7 +43,7 @@ const scaled = (vertices: readonly Vec3[], factor: number): Vec3[] =>
   vertices.map((v): Vec3 => [v[0] * factor, v[1] * factor, v[2] * factor]);
 
 /**
- * @affects nothing — read-only; data { surfaces[], matrix[][], rowSums[], method, facetCounts[], reciprocityMaxError, findings[], closedCavity?, obstruction }
+ * @affects nothing — read-only; data { surfaces[], matrix[][], rowSums[], method, facetCounts[], reciprocityMaxError, findings[], closedCavity?, obstruction, geometryQueries? (engine provenance, obstruction only) }
  * @invariant F[I][J] = sum_i sum_j A_i F_ij / A_I over facets that face each other (centroid test); the diagonal of planar surfaces is 0; no document change
  * @failure bad length unit / maxFacetSize -> THM_UNITS_MISMATCH; < 2 surfaces, duplicate names, non-planar or degenerate polygons -> THM_SURFACE_INVALID;
  *   more than 400 facets (surfaces + blockers) -> THM_FACET_LIMIT (rejections, document unchanged); reciprocity error > 1e-3 -> warning THM_VIEW_FACTOR_RECIPROCITY
@@ -95,7 +94,9 @@ export const computeViewFactors = defineCommand({
       .optional()
       .describe('The surfaces form a closed enclosure: report whether every row sum is 1 within 1e-3. Default false.'),
   }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
+    const engine = resolveGeometryQueries(ctx?.geometryQueries);
+    const maxFacets = engine.limits.maxViewFactorFacets;
     const factor = convertValue(1, params.lengthUnit, 'm');
     if (isUnitFailure(factor)) {
       return refuse(
@@ -127,7 +128,7 @@ export const computeViewFactors = defineCommand({
     }
     const prepared = [];
     for (const [index, surface] of params.surfaces.entries()) {
-      const built = planarFacets(scaled(surface.vertices, factor.value), surface.flip === true, maxSize, MAX_FACETS);
+      const built = planarFacets(scaled(surface.vertices, factor.value), surface.flip === true, maxSize, maxFacets);
       if (built === undefined) {
         return refuse(
           doc,
@@ -150,7 +151,7 @@ export const computeViewFactors = defineCommand({
         return refuse(
           doc,
           'THM_FACET_LIMIT',
-          `surfaces[${index}] '${surface.name}' would exceed ${MAX_FACETS} facets`,
+          `surfaces[${index}] '${surface.name}' would exceed ${maxFacets} facets`,
           'Increase maxFacetSize or simplify the surfaces.',
           ['maxFacetSize'],
         );
@@ -159,11 +160,11 @@ export const computeViewFactors = defineCommand({
     }
     const facetCounts = prepared.map((p) => p.facets.length);
     const total = facetCounts.reduce((a, b) => a + b, 0);
-    if (total > MAX_FACETS) {
+    if (total > maxFacets) {
       return refuse(
         doc,
         'THM_FACET_LIMIT',
-        `${total} facets exceed the limit of ${MAX_FACETS}`,
+        `${total} facets exceed the limit of ${maxFacets}`,
         'Increase maxFacetSize or simplify the surfaces.',
         ['maxFacetSize'],
       );
@@ -173,36 +174,53 @@ export const computeViewFactors = defineCommand({
     const blockerFacets: Facet[] = [];
     if (params.obstruction === true) {
       for (const [index, blocker] of (params.blockers ?? []).entries()) {
-        const built = planarFacets(scaled(blocker.vertices, factor.value), false, undefined, MAX_FACETS);
+        const built = planarFacets(scaled(blocker.vertices, factor.value), false, undefined, maxFacets);
         if (built === undefined) {
           return refuse(doc, 'THM_SURFACE_INVALID', `blockers[${index}] is degenerate`, REMEDIATION_SURFACE, [`blockers[${index}]`]);
         }
         blockerFacets.push(...built.facets);
       }
     }
-    if (total + blockerFacets.length > MAX_FACETS) {
+    if (total + blockerFacets.length > maxFacets) {
       return refuse(
         doc,
         'THM_FACET_LIMIT',
-        `${total + blockerFacets.length} facets (surfaces + blockers) exceed the limit of ${MAX_FACETS}`,
+        `${total + blockerFacets.length} facets (surfaces + blockers) exceed the limit of ${maxFacets}`,
         'Increase maxFacetSize, drop blockers or simplify the surfaces.',
         ['maxFacetSize'],
       );
     }
     const occluders: readonly Facet[] = params.obstruction === true ? [...owners.map((o) => o.facet), ...blockerFacets] : [];
-    const blocked = (from: Facet, to: Facet): boolean =>
-      occluders.some((other) => other !== from && other !== to && segmentHitsTriangle(from.centroid, to.centroid, other.corners));
+    const occluderIndex = new Map<Facet, number>(occluders.map((facet, index) => [facet, index]));
 
     const count = prepared.length;
     const exchange = Array.from({ length: count }, () => new Array<number>(count).fill(0));
+    const candidates: { a: (typeof owners)[number]; b: (typeof owners)[number] }[] = [];
     for (const a of owners) {
       for (const b of owners) {
-        if (a.surface === b.surface || !facing(a.facet, b.facet)) continue;
-        if (blocked(a.facet, b.facet)) continue;
-        const row = exchange[a.surface];
-        if (row !== undefined) row[b.surface] = (row[b.surface] ?? 0) + exchangeArea(a.facet, b.facet);
+        if (a.surface !== b.surface && facing(a.facet, b.facet)) candidates.push({ a, b });
       }
     }
+    const segments: OcclusionSegment[] =
+      params.obstruction === true
+        ? candidates.map(({ a, b }) => ({
+            start: a.facet.centroid,
+            end: b.facet.centroid,
+            skip: [occluderIndex.get(a.facet) ?? -1, occluderIndex.get(b.facet) ?? -1],
+          }))
+        : [];
+    const blocked =
+      params.obstruction === true
+        ? engine.segmentOcclusionBatch(
+            occluders.map((facet) => facet.corners),
+            segments,
+          )
+        : [];
+    candidates.forEach(({ a, b }, k) => {
+      if (blocked[k] === true) return;
+      const row = exchange[a.surface];
+      if (row !== undefined) row[b.surface] = (row[b.surface] ?? 0) + exchangeArea(a.facet, b.facet);
+    });
     const areas = prepared.map((p) => p.area);
     const matrix = exchange.map((row, i) => row.map((value) => value / (areas[i] ?? 1)));
     const rowSums = matrix.map((row) => row.reduce((a, b) => a + b, 0));
@@ -250,6 +268,7 @@ export const computeViewFactors = defineCommand({
       facetCounts,
       reciprocityMaxError,
       obstruction: params.obstruction === true,
+      ...(params.obstruction === true ? { geometryQueries: engine.provenance } : {}),
       findings,
       ...(closedCavity !== undefined ? { closedCavity } : {}),
     };

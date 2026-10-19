@@ -8,7 +8,7 @@ import { MAX_RAYS_TOTAL, runAssemblyCheck } from './assemblyCheckRun';
 import { scopedIds } from './assemblyParts';
 
 /**
- * @affects nothing — read-only; returns the CheckResult envelope (+ parts, skipped2D, pairsChecked) in data
+ * @affects nothing — read-only; returns the CheckResult envelope (+ parts, skipped2D, pairsChecked, geometryQueries provenance when thickness ran) in data
  * @invariant returns the SAME document, affected []; deterministic (same document, kernel and params give identical data, numbers rounded
  *   to 12 significant digits); 2D entities are skipped and counted
  * @failure no kernel -> rejected by execute; kernel without analyze / distance -> items not_run FPR_KERNEL_UNSUPPORTED (never a pass);
@@ -76,7 +76,7 @@ export const checkAssembly = defineCommand({
     if (selected !== null && selected.size === 0) return noop(doc, 'check_assembly: the selected body or component has no parts; no-op.');
     const missing = [...(selected ?? [])].filter((id) => doc.entities[id] === undefined);
     if (missing.length > 0) return noop(doc, `check_assembly: unknown id(s) ${missing.join(', ')}; no-op.`);
-    const outcome = runAssemblyCheck(doc, kernel, params);
+    const outcome = runAssemblyCheck(doc, kernel, params, ctx?.geometryQueries);
     if (outcome.refused)
       return rejection(
         doc,

@@ -525,6 +525,11 @@ Toolset `analysis`.
 - **Extra codes:** `THM_INPUT_INVALID`, `THM_SURFACE_INVALID`, `THM_FACET_LIMIT` (400 facets, surfaces + blockers; at most 16 blockers and 256 vertices per polygon; the TS path keeps this cap, larger cases go to `llull-compute geomq`, §2.2), `THM_VIEW_FACTOR_ROWSUM` (closed cavity
   row sum off by > 1e-3).
 
+**View factors through the PHY-21 port (RS-6 prerequisite, TS only).** `compute_view_factors` reads its obstruction test from
+`ctx.geometryQueries` (`segmentOcclusionBatch`, PHY-21 TR-FPR-19; default `meshBvh` engine, identical results) and its facet cap from
+the engine's `limits.maxViewFactorFacets` (400 on the TS engine); `data.geometryQueries` names engine, device and `deterministic` when
+obstruction ran. The contour-integral batch (`viewFactorBatch`) is not on the port yet: it arrives with the native `geomq` kernel (RS-6).
+
 **FE milestones M0–M3 and the M4 decks: built (2026-10-16, owner decision).** The minimal 05 FEA slice was built first
 (`docs/physics/FE_PIPELINE_DESIGN.md`) and the thermal discipline sits inside it — **Proposal B** of §2.1 (`packages/domain-cae/src/thermal/`),
 so no core extension port was needed.

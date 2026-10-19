@@ -18,6 +18,7 @@ import type { AssemblyPart, CheckTolerances } from '../../geometry/assemblyCheck
 import { kernelUnsupportedItem, makeItem, validateParts } from '../../geometry/assemblyCheck/partValidity';
 import { candidatePairs, classifyPair, pairItem } from '../../geometry/assemblyCheck/pairClassify';
 import { connectivityItems } from '../../geometry/assemblyCheck/connectivity';
+import { type GeometryQueryEngine, meshBvhEngine, resolveGeometryQueries } from '../../geometry/geometryQueries';
 import { measureThickness } from '../../geometry/assemblyCheck/thickness';
 import { realiseJoint } from '../../geometry/assemblyCheck/jointRealisation';
 import { type PartScope, candidateIds, collectParts, scopedIds } from './assemblyParts';
@@ -36,7 +37,7 @@ export interface AssemblyCheckParams extends PartScope {
 /** Budgets (TECHNICAL_SPEC 8). */
 export const MAX_PARTS = 500;
 export const MAX_PAIRS = 20_000;
-export const MAX_RAYS_TOTAL = 200_000;
+export const MAX_RAYS_TOTAL = meshBvhEngine.limits.maxThicknessRays;
 export const DEFAULT_RAYS = 2000;
 const CONTAINMENT_RATIO = 0.99;
 const VOLUME_RELATIVE = 1e-6;
@@ -67,6 +68,7 @@ function thicknessItems(
   threshold: CheckThreshold | null,
   rays: number,
   tolerances: CheckTolerances,
+  engine: GeometryQueryEngine,
 ): CheckItem[] {
   const { mmPerUnit } = tolerances;
   const items: CheckItem[] = [];
@@ -75,7 +77,7 @@ function thicknessItems(
     if (skip(part)) continue;
     const thresholdUnits = threshold === null ? 0 : threshold.value / mmPerUnit;
     const report =
-      part.mesh === null ? null : measureThickness(part.mesh, rays, CORNER_EXCLUSION_FACTOR * thresholdUnits, 2 * thresholdUnits);
+      part.mesh === null ? null : measureThickness(part.mesh, rays, CORNER_EXCLUSION_FACTOR * thresholdUnits, 2 * thresholdUnits, engine);
     if (report === null) {
       items.push(
         makeItem(code, 'not_run', [part.id], 'Check that the part is a closed solid (check_assembly part validity) and retry.', {
@@ -172,7 +174,13 @@ function staleReferenceItem(doc: CadDocument): CheckItem[] {
 
 const refusal = (limit: string, remediation: string): BudgetRefusal => ({ refused: true, limit, remediation });
 
-export function runAssemblyCheck(doc: CadDocument, kernel: GeometryKernel, params: AssemblyCheckParams): AssemblyCheckOutcome {
+export function runAssemblyCheck(
+  doc: CadDocument,
+  kernel: GeometryKernel,
+  params: AssemblyCheckParams,
+  geometryQueries?: GeometryQueryEngine | null,
+): AssemblyCheckOutcome {
+  const engine = resolveGeometryQueries(geometryQueries);
   const mmPerUnit = MM_PER_UNIT[doc.units];
   const tolerances: CheckTolerances = {
     epsTouch: params.touchToleranceMm === undefined ? DEFAULT_TOUCH_UNITS : params.touchToleranceMm / mmPerUnit,
@@ -189,9 +197,9 @@ export function runAssemblyCheck(doc: CadDocument, kernel: GeometryKernel, param
   const threshold = thresholdOf(params);
   const rays = params.raysPerPart ?? DEFAULT_RAYS;
   const thicknessOn = (params.thickness ?? (threshold === null ? 'off' : 'ray')) === 'ray';
-  if (thicknessOn && subjectIds.length * rays > MAX_RAYS_TOTAL)
+  if (thicknessOn && subjectIds.length * rays > engine.limits.maxThicknessRays)
     return refusal(
-      `${subjectIds.length * rays} thickness rays, limit ${MAX_RAYS_TOTAL}`,
+      `${subjectIds.length * rays} thickness rays, limit ${engine.limits.maxThicknessRays}`,
       'Lower raysPerPart, narrow the scope, or set thickness to "off".',
     );
 
@@ -271,7 +279,7 @@ export function runAssemblyCheck(doc: CadDocument, kernel: GeometryKernel, param
   const reported = items.filter((entry) => entry.ids.length === 0 || entry.ids.some((id) => subjects.has(id)));
   if (thicknessOn)
     reported.push(
-      ...thicknessItems(parts, (part) => !subjects.has(part.id) || validity.excluded.has(part.id), threshold, rays, tolerances),
+      ...thicknessItems(parts, (part) => !subjects.has(part.id) || validity.excluded.has(part.id), threshold, rays, tolerances, engine),
     );
   if (params.includeJoints !== false) {
     const bodyInScope = (bodyId: string): boolean =>
@@ -321,6 +329,7 @@ export function runAssemblyCheck(doc: CadDocument, kernel: GeometryKernel, param
       .map((part) => ({ id: part.id, volumeMm3: (validity.analyses.get(part.id)?.volume ?? 0) * mmPerUnit ** 3 })),
     skipped2D,
     pairsChecked: candidates.length,
+    ...(thicknessOn ? { geometryQueries: engine.provenance } : {}),
   };
   return { refused: false, result: roundDeep(result), extras: roundDeep(extras) };
 }
