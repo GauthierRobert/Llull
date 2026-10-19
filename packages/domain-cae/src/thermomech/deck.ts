@@ -7,6 +7,7 @@ import { commentText, num } from '../decks/format';
 import { mechanicalStepLines } from '../decks/mechanical';
 import { providerFor, secantExpansion } from './cte';
 import { resolveTemperatureField, thermomechOf } from './field';
+import { isOrthotropicCte, orthotropicExpansionCards } from './orthoCte';
 import { kelvinOf, temperatureIn } from './units';
 
 export const refused = (code: string, message: string, ids: readonly string[]): DeckSections => ({ code, message, ids });
@@ -24,6 +25,8 @@ export function expansionCards(ctx: DeckContext, entityId: string, setup: Thermo
   const scale = setup.temperatureScale;
   const reference = temperatureIn(setup.referenceTemperature, scale);
   if (reference === null) return refused('THM_UNITS_MISMATCH', 'the reference temperature has an invalid unit', [ctx.analysisId]);
+  const material = Object.hasOwn(ctx.doc.materials, materialId) ? ctx.doc.materials[materialId] : undefined;
+  if (isOrthotropicCte(material)) return orthotropicExpansionCards(ctx, entityId, materialId, setup, low, high);
   const provider = providerFor(ctx.doc, setup, materialId, 'material');
   if (isCteRefusal(provider)) return refused(provider.code, provider.reason, [materialId, entityId]);
   const table = secantExpansion(

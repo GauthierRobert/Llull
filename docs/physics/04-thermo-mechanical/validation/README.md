@@ -17,6 +17,7 @@ two runs byte-identical), or **(c) TBD**. Tolerances are llull acceptance choice
 | `plans/tmc_nafems_le11.plan.json` | draft plan | LE11 quarter model: FeenoX profile revolved 90° about z; expression field `hypot(x, y) + z`; probe A |
 | `plans/tmc_restrained_bar.plan.json` | draft plan | 100 × 10 × 10 mm bar, axial ends fixed, uniform 120 °C, reference 20 °C |
 | `plans/tmc_thick_cylinder_sequential.plan.json` | draft plan | `heat_steady` quarter tube (bore 120 °C, outer 20 °C) then `thermo_static` reading it (same mesh) |
+| `plans/tmc_bimetal_cantilever.plan.json` | plan (replayed by a unit test; FE run in `server/tests/feaThermomechTransient.test.ts`) | two bonded 50 x 1 x 0.5 mm layers (E 200 / 100 GPa, alpha 12 / 19 ppm per K), clamped at x = 0, uniform 120 °C, reference 20 °C, conformal mesh; tip uz and curvature vs VC-TMC-04 |
 | `plans/tmc_fit_al_steel.plan.json` | draft plan | Al housing Ø20 H7 bore, steel shaft Ø20 g6 (03 PMI, explicit limits), `fit_at_temperature` at −55 / 20 / 85 °C |
 
 Plans use existing commands (`set_units`, `add_box`, `add_cylinder`, `boolean`, `draw_arc`, `draw_polyline`,
@@ -41,7 +42,7 @@ values are test inputs.
 | VC-TMC-01 | FR-TMC-01, 03; TR-TMC-11 | `plans/tmc_restrained_bar.plan.json` (uniaxial); plate and block variants | −252 / −360 / −630 MPa | 0.5 % (uniform field, exact for any element) | A | integration |
 | VC-TMC-02 | FR-TMC-01, 02; TR-TMC-10, 12 | `plans/tmc_nafems_le11.plan.json`, tet10 | σzz(A) = −105 MPa | 3 % (FeenoX tet10 −105.9, Abaqus C3D20 fine −103.3) | A | quality gate |
 | VC-TMC-03 | FR-TMC-01, 17 | NAFEMS T1 (FeenoX statement), plane stress quarter plate, `thermal_stress_check inclusion` | σθ(a⁺) = 50 MPa; σy(1.005, 0) = 49.5037 MPa; inside −50 MPa | 2 % (finite plate, nodal averaging at the interface) | A (B statement) | integration + unit |
-| VC-TMC-04 | FR-TMC-05, 17; TR-TMC-13 | `thermal_stress_check bimetal`; FE when 05 bonded meshes exist (V1) | κ = 1.018182e-3 1/mm; cantilever tip 1.27273 mm | 2 % / 3 % (beam theory vs solid) | A | unit (FE V1) |
+| VC-TMC-04 | FR-TMC-05, 17; TR-TMC-13 | `thermal_stress_check bimetal`; FE: `plans/tmc_bimetal_cantilever.plan.json` (conformal two-material mesh, M4b) | κ = 1.018182e-3 1/mm; cantilever tip 1.27273 mm | 2 % / 3 % (beam theory vs solid) | A | unit + FE (skips without Gmsh / CalculiX; not yet measured) |
 | VC-TMC-05 | FR-TMC-02, 06; TR-TMC-10 | `plans/tmc_thick_cylinder_sequential.plan.json` | σθ(a) = −209.824, σθ(b) = 133.033, σz(a) = −209.824 MPa | 2 % (log field interpolated by quadratic elements) | A | integration |
 | VC-TMC-06 | FR-TMC-07; TR-TMC-20 | `plans/tmc_fit_al_steel.plan.json` and the other pairs of the CSV | −55 °C c_min −0.0102560375 mm (`interference_possible`); +85 °C c_max 0.055996345 mm; steel/Al +85 °C c_min −0.007939535 mm; 20 °C 0.007 / 0.041 mm | 1e-7 mm (pure arithmetic) | A (limits B) | unit |
 | VC-TMC-07 | FR-TMC-04, 09; TR-TMC-15 | CTE conversion unit test | α_sec(120; 20) = 2.25e-5, α_sec(120; 0) = 2.24e-5, ε_th(20→120) = 2.25e-3 for both references | 1e-9 | A | unit |
@@ -74,3 +75,13 @@ cd docs/physics/04-thermo-mechanical/validation
 python3 -I generate_thermomech_reference.py && python3 -I generate_thermomech_reference.py
 git diff --stat .
 ```
+
+## M4b checks (unit tests, not in `expected_results.json`)
+
+| Check | Setup | Expected | Test |
+| ----- | ----- | -------- | ---- |
+| Transient coupled deck | `set_thermal_step` on a coupled case | `*COUPLED TEMPERATURE-DISPLACEMENT` with DELTMX / DIRECT / increment row, `*TIME POINTS`, amplitudes, specific heat, pre-heating `*STATIC` step iff start != T_ref | `tests/unit/cae/thermomech/coupledTransient.test.ts` |
+| Per-increment results | hand-built FRD sets | series, peaks, time offset of a pre-heating step | same |
+| Orthotropic CTE | cte / thermalStrain models per direction | `*EXPANSION, TYPE=ORTHO` rows, `*ORIENTATION`, codes | `tests/unit/cae/thermomech/orthoCte.test.ts` |
+| Stack-up at temperature | housing 50 ±0.05 (23 ppm per K) − shaft 49.5 ±0.03 (12 ppm per K), 20 / 100 °C | closed form to 1e-12: mean 0.5 → 0.54448 mm, worst case ±0.0801208, RSS ±0.0584033 | `tests/unit/cae/thermomech/stackup.test.ts` |
+| Bimetal plan | `plans/tmc_bimetal_cantilever.plan.json` | replays; inputs = VC-TMC-04; deck per layer | `tests/unit/cae/thermomech/bimetal.test.ts` |

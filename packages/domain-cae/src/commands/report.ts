@@ -7,6 +7,7 @@ import { significantNumber } from '@lib/compactNumber';
 import { buildDeckContext } from '../decks/context';
 import { eigenNote, eigenReport } from '../results/eigenReport';
 import { eigenSummaryText } from '../results/summary';
+import { transientSummaryText } from '../thermomech/transientSummary';
 import { evaluateProbes } from '../results/probes';
 import { caseOf } from '../shared/access';
 import { refuseFe } from '../shared/feCodes';
@@ -64,7 +65,7 @@ export const feaReport = defineCommand({
       meshRecord === null ? 'no verified mesh' : `${meshRecord.nodes} nodes, ${meshRecord.quality.inverted} inverted`,
       resultsRecord === null
         ? 'no verified results'
-        : `${resultsRecord.loadCases.length} load case(s)${resultsRecord.loadCases.map((lc) => ` ${lc.name} vm ${significantNumber(lc.maxVonMises.value, 6)}`).join(',')}${eigenSummaryText(resultsRecord)}${eigen === null || eigenNote(eigen) === '' ? '' : `; ${eigenNote(eigen)}`}`,
+        : `${resultsRecord.loadCases.length} load case(s)${resultsRecord.loadCases.map((lc) => ` ${lc.name} vm ${significantNumber(lc.maxVonMises.value, 6)}`).join(',')}${eigenSummaryText(resultsRecord)}${transientSummaryText(resultsRecord)}${eigen === null || eigenNote(eigen) === '' ? '' : `; ${eigenNote(eigen)}`}`,
       `${probes.length} probe(s) evaluated`,
     ];
     return report(doc, `${parts.join('; ')}.`, data);

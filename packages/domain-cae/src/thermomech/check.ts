@@ -12,6 +12,9 @@ import { trustedRecord } from '../shared/trust';
 import { checkThermalItems } from '../thermal/check';
 import { analysisIdSchema } from '../shared/schemas';
 import { elasticUnverifiedReasons, providerFor, REFERENCE_PROBE_KELVIN } from './cte';
+import { orthoPartProblems } from './orthoCheck';
+import { isOrthotropicCte } from './orthoCte';
+import { transientStartProblems } from './transientCheck';
 import { expressionProblem, resolveTemperatureField, thermalSourceProblem, thermomechOf } from './field';
 import { refuseTmc, remediationOf } from './refusal';
 import { kelvinOf, temperatureIn } from './units';
@@ -162,6 +165,13 @@ function partItems(doc: CadDocument, analysisCase: AnalysisCase, setup: ThermoMe
       items.push(item('TMC_MATERIAL_NO_CTE', 'error', `part '${entityId}' has no material, so no thermal expansion`, [entityId]));
       continue;
     }
+    const material = Object.hasOwn(doc.materials, materialId) ? doc.materials[materialId] : undefined;
+    if (isOrthotropicCte(material)) {
+      items.push(
+        ...orthoPartProblems(doc, setup, entityId, materialId, referenceKelvin).map((p) => item(p.code, p.severity, p.message, p.ids)),
+      );
+      continue;
+    }
     const provider = providerFor(doc, setup, materialId, 'material');
     if (isCteRefusal(provider)) {
       items.push(item(provider.code, 'error', provider.reason, [materialId, entityId], provider.remediation));
@@ -213,8 +223,10 @@ export function checkThermomechItems(doc: CadDocument, analysisId: string, artif
       item('TMC_REFERENCE_TEMPERATURE_MISSING', 'error', 'the reference temperature is missing or has an invalid unit', [analysisId]),
     );
   }
-  if (coupled) items.push(...checkThermalItems(doc, analysisId));
-  else items.push(...fieldItems(doc, analysisCase, setup, artifacts));
+  if (coupled) {
+    items.push(...checkThermalItems(doc, analysisId));
+    items.push(...transientStartProblems(analysisCase, setup).map((p) => item(p.code, p.severity, p.message, p.ids)));
+  } else items.push(...fieldItems(doc, analysisCase, setup, artifacts));
   if (reference !== null && Number.isFinite(reference))
     items.push(...partItems(doc, analysisCase, setup, kelvinOf(reference, setup.temperatureScale)));
   if (!coupled && reference !== null && Number.isFinite(reference))

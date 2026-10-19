@@ -25,6 +25,8 @@ export interface DisciplineTable {
     readonly materialCards: (ctx: DeckContext, entityId: string) => DeckSections;
     readonly sections: (ctx: DeckContext) => DeckSections;
   };
+  /** `*ORIENTATION` block + name for a part's material axes (thermo-mechanical orthotropic CTE), null when the part needs none. */
+  readonly orientation?: (ctx: DeckContext, entityId: string) => { readonly name: string; readonly text: string } | DeckRefusal | null;
   readonly coupled: {
     readonly materialCards: (ctx: DeckContext, entityId: string) => DeckSections;
     readonly sections: (ctx: DeckContext) => DeckSections;
@@ -171,8 +173,20 @@ export function buildInp(
       lines.push(...card.text.split('\n').filter((line) => line !== ''));
     }
   }
-  for (const entityId of Object.keys(analysis.parts))
-    lines.push(`*SOLID SECTION, ELSET=${ctx.elset(entityId)}, MATERIAL=${ctx.materialName(entityId)}`);
+  const orientations = new Map<string, string>();
+  for (const entityId of Object.keys(analysis.parts)) {
+    const block = disciplines.orientation?.(ctx, entityId) ?? null;
+    if (block === null) continue;
+    if ('code' in block) return block;
+    lines.push(...block.text.split('\n').filter((line) => line !== ''));
+    orientations.set(entityId, block.name);
+  }
+  for (const entityId of Object.keys(analysis.parts)) {
+    const orientation = orientations.get(entityId);
+    lines.push(
+      `*SOLID SECTION, ELSET=${ctx.elset(entityId)}, MATERIAL=${ctx.materialName(entityId)}${orientation === undefined ? '' : `, ORIENTATION=${orientation}`}`,
+    );
+  }
   const steps = heat
     ? disciplines.heat.sections(ctx)
     : analysis.type === 'static'

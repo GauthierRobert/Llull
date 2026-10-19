@@ -171,6 +171,20 @@ export interface ThermalResultsSummary {
   readonly physicalConstants?: { stefanBoltzmann: Named; absoluteZero: Named };
 }
 
+/** PHY-04 M4b: per-increment results of a transient `coupled_temperature_displacement` step (times in seconds from the step start). */
+export interface ThermomechTransientSummary {
+  readonly temperatureScale: TemperatureScale;
+  readonly series: ReadonlyArray<{
+    readonly timeS: number;
+    readonly maxVonMises: number;
+    readonly maxDisplacement: number;
+    readonly maxTemperature: number;
+    readonly minTemperature: number;
+  }>;
+  readonly peakVonMises: { readonly value: number; readonly timeS: number; readonly at: Vec3; readonly entityId: EntityId };
+  readonly peakDisplacement: { readonly value: number; readonly timeS: number; readonly at: Vec3 };
+}
+
 export interface ResultsSummary {
   /** `false` = recorded WITHOUT its artifact: state `missing`, never read as numbers (see `MeshSummary.verified`). */
   readonly verified?: false;
@@ -188,6 +202,8 @@ export interface ResultsSummary {
   readonly bucklingFactors?: readonly number[];
   readonly units: UnitSystem;
   readonly thermal?: ThermalResultsSummary;
+  /** PHY-04 M4b: present iff the case is a transient coupled_temperature_displacement case. */
+  readonly thermomechTransient?: ThermomechTransientSummary;
   /** PHY-05: present iff the case is `nonlinear_static`. */
   readonly nonlinear?: NonlinearResultsSummary;
 }
@@ -415,6 +431,12 @@ export type TemperatureFieldSource =
 /** Stated basis of a material's `cte` model (PHY-04 §3.3 override until PHY-01 carries one). */
 export type CteBasisSpec = { readonly kind: 'secant'; readonly referenceTemperature: Q } | { readonly kind: 'instantaneous' };
 
+/** PHY-04 M4b: material axes of a part with an orthotropic CTE, in the document frame (`axis1` = material direction 1, `axis2` lies in the 1-2 plane). */
+export interface MaterialOrientation {
+  readonly axis1: Vec3;
+  readonly axis2: Vec3;
+}
+
 export interface ThermoMechSetup {
   readonly referenceTemperature: Q;
   /** Scale the temperature field and results are reported in (recorded, never implied). */
@@ -423,6 +445,8 @@ export interface ThermoMechSetup {
   /** Per material id: how its `cte` property model is to be read (secant at a reference, or instantaneous). */
   readonly cteBasis?: Readonly<Record<string, CteBasisSpec>>;
   readonly thermal?: ThermalSetup;
+  /** Per part id: the material axes of its orthotropic CTE (absent = the document X, Y, Z axes; a rotated part then needs one). */
+  readonly orientations?: Readonly<Record<EntityId, MaterialOrientation>>;
   readonly loadCaseName: string;
 }
 
