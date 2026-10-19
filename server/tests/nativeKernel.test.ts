@@ -40,7 +40,7 @@ describe.skipIf(process.platform === 'win32')('native kernel proxy (scripted sid
     expect(meshOf(kernel, { op: 'fillet', source: cube, edges: [0], size: 0.2 })?.indices.length).toBeGreaterThan(36);
 
     const info = kernel.info?.();
-    expect(info?.occtVersion).toBe('7.8.1');
+    expect(info?.occtVersion).toBe('7.9.2');
     expect(info?.build).toContain('llull-kernel@fake');
     expect(info?.build).toContain('opencascade.js');
     expect(info?.capabilities).toContain('topology');
@@ -64,6 +64,18 @@ describe('LLULL_KERNEL=occt-native', () => {
     const started = startNativeKernel({}, { LLULL_KERNEL_BIN: path.join(__dirname, 'no-such-llull-kernel') });
     expect(started).toEqual({ reason: expect.stringMatching(/^NATIVE_TOOL_MISSING: llull-kernel not found: .*LLULL_KERNEL_BIN/) });
   });
+
+  it.skipIf(process.platform === 'win32')(
+    'installs the sidecar and reports it isolated in its own process',
+    async () => {
+      process.env['LLULL_KERNEL'] = 'occt-native';
+      process.env['LLULL_KERNEL_BIN'] = FAKE;
+      expect(await installGeometryKernel()).toBe(true);
+      expect(getActiveKernelName()).toBe('occt');
+      expect(getGeometryKernel()?.info?.()).toMatchObject({ occtVersion: '7.9.2', isolation: 'process' });
+    },
+    120_000,
+  );
 
   it('falls back to the WASM OCC kernel and says why in kernel_info', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);

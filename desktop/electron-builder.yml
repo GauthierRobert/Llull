@@ -1,5 +1,5 @@
-# llull desktop packaging. Run `npm run dist` on each target OS (native wheels and the bundled
-# Python are per platform). Signing/notarization: set the usual electron-builder env
+# llull desktop packaging. Run `npm run dist` on each target OS (native wheels, the bundled
+# Python and the native binaries + OCCT are per platform). Signing/notarization: set the usual electron-builder env
 # (CSC_LINK / CSC_KEY_PASSWORD, APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID).
 appId: app.llull.desktop
 productName: llull
@@ -21,6 +21,10 @@ extraResources:
   # Relocatable CPython with CadQuery (npm run prepare:python).
   - from: build/python
     to: python
+  # Native binaries llull-compute + llull-kernel, shared OCCT (occt/lib, LGPL-2.1 dynamic) and their licence notices
+  # (npm run prepare:native). The backend gets LLULL_NATIVE_DIR only when this folder holds a binary.
+  - from: build/native
+    to: native
 fileAssociations:
   - ext: llull
     name: llull document

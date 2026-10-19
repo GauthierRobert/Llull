@@ -1,5 +1,5 @@
 /**
- * Native `llull-kernel` (OCCT 7.8.1) vs the WASM OCC kernel (OCCT 7.4) on the exchange ops (VC-KRN-25 slice 2): STEP assemblies,
+ * Native `llull-kernel` (OCCT 7.9.2) vs the WASM OCC kernel (OCCT 7.4) on the exchange ops (VC-KRN-25 slice 2): STEP assemblies,
  * STEP import + healing (the committed 07-pack files: three llull parts and NIST CTC-01) and B-rep blobs, both ways (a native blob read
  * by the WASM kernel and the reverse). Tolerances: VC-KRN-04 (volume 1e-4, area 1e-3 relative). Skipped without the binary.
  */

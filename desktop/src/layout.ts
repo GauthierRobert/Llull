@@ -1,6 +1,6 @@
 /**
  * Where the desktop app finds its parts: the built web app, the server bundle, the CLI bundle and
- * the bundled Python. Packaged: under `process.resourcesPath` (electron-builder `extraResources`).
+ * the bundled Python and native binaries. Packaged: under `process.resourcesPath` (electron-builder `extraResources`).
  * Development (`npm start`): the repo checkout.
  */
 
@@ -15,6 +15,8 @@ export interface DesktopLayout {
   readonly cliEntry: string;
   /** Python interpreter with CadQuery (bundled), or the dev fallback. */
   readonly python: string;
+  /** Native binaries bundle (`llull-compute`, `llull-kernel`, `occt/lib`; npm run prepare:native) — may be absent. */
+  readonly nativeDir: string;
 }
 
 interface LayoutInput {
@@ -41,6 +43,7 @@ export function desktopLayout(input: LayoutInput): DesktopLayout {
       serverEntry: path.join(resources, 'server', 'dist', 'index.js'),
       cliEntry: path.join(resources, 'server', 'dist', 'cli.js'),
       python: bundledPythonOf(path.join(resources, 'python'), input.platform),
+      nativeDir: path.join(resources, 'native'),
     };
   }
   const root = input.repoRoot;
@@ -49,5 +52,6 @@ export function desktopLayout(input: LayoutInput): DesktopLayout {
     serverEntry: path.join(root, 'server', 'dist', 'index.js'),
     cliEntry: path.join(root, 'server', 'dist', 'cli.js'),
     python: input.pythonOverride ?? bundledPythonOf(path.join(root, 'desktop', 'build', 'python'), input.platform),
+    nativeDir: path.join(root, 'desktop', 'build', 'native'),
   };
 }

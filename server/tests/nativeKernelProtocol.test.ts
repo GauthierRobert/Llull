@@ -34,7 +34,7 @@ describe('native kernel framing', () => {
   });
 
   it('reads the info handshake and refuses a malformed one', () => {
-    const info = { occtVersion: '7.8.1', build: 'llull-kernel@0.1.0', capabilities: ['analyze'], ops: ['info', 'evaluate'] };
+    const info = { occtVersion: '7.9.2', build: 'llull-kernel@0.1.0', capabilities: ['analyze'], ops: ['info', 'evaluate'] };
     expect(parseNativeInfo(info)).toEqual(info);
     expect(parseNativeInfo({ ...info, ops: [1] })).toBeNull();
     expect(parseNativeInfo(null)).toBeNull();

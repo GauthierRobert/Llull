@@ -2,7 +2,8 @@
 [workspace]
 resolver = "2"
 members = ["crates/*", "bins/*"]
-# The OCCT kernel builds OpenCascade from source (slow first build); `npm run native:check` skips it unless LLULL_NATIVE_KERNEL=1.
+# The OCCT kernel links a shared OpenCascade built by solver/scripts/build-occt.mjs (slow first build); `npm run native:check`
+# skips it unless LLULL_NATIVE_KERNEL=1.
 default-members = [
   "crates/llull-protocol",
   "crates/llull-jsmath",
@@ -30,12 +31,6 @@ unsafe_code = "deny"
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
-
-# OCCT is built by the kernel crate's build script through cmake, whose flags derive from the profile's opt-level/debug.
-# Pinning both for that crate makes dev, test, clippy and release share ONE OCCT build (target/OCCT), never two.
-[profile.dev.package.llull-kernel-occt]
-opt-level = 3
-debug = false
 
 [profile.release]
 lto = "thin"

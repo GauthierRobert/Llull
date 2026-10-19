@@ -29,26 +29,33 @@ jobs:
       - run: rustup component add rustfmt clippy
       - run: node scripts/nativeCheck.mjs
 
-  # Native OCCT kernel (RS-1): crate llull-kernel-occt + bin llull-kernel (clippy, cargo test), then the native-vs-WASM parity suite.
-  # OCCT 7.8.1 builds from source once per version (~70 min on 4 cores) into an install dir cached by version; warm runs reuse it
-  # through LLULL_OCCT_DIR and take a few minutes.
+  # Native OCCT kernel (RS-1): crate llull-kernel-occt + bin llull-kernel (clippy, cargo test), the native-vs-WASM parity suite, then
+  # the desktop native bundle. OCCT 7.9.2 is built SHARED by solver/scripts/build-occt.mjs (pinned source + sha256, ~60 min on 4 cores)
+  # into an install prefix cached by version + source sha + recipe; warm runs reuse it through LLULL_OCCT_DIR and take a few minutes.
   native-kernel:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 150
     env:
-      LLULL_OCCT_DIR: ${{ github.workspace }}/occt-7.8.1
+      LLULL_OCCT_DIR: ${{ github.workspace }}/occt-7.9.2
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
       - uses: actions/cache@v4
         id: occt
         with:
-          path: occt-7.8.1
-          key: occt-7.8.1-${{ runner.os }}-v1
-      - name: Build OCCT 7.8.1 (cache miss only)
+          path: occt-7.9.2
+          key: occt-7.9.2-f6e272b6-${{ runner.os }}-${{ hashFiles('solver/scripts/build-occt.mjs') }}
+      - name: Build OCCT 7.9.2 shared (cache miss only)
         if: steps.occt.outputs.cache-hit != 'true'
         run: |
-          (cd solver && env -u LLULL_OCCT_DIR cargo build --release -p llull-kernel-occt)
-          mkdir -p occt-7.8.1 && cp -r solver/target/OCCT/include solver/target/OCCT/lib occt-7.8.1/
+          sudo apt-get install -y ninja-build
+          node solver/scripts/build-occt.mjs
       - uses: actions/cache@v4
         with:
           path: |
@@ -61,19 +68,15 @@ jobs:
           LLULL_NATIVE_KERNEL: '1'
       - run: cargo build --release -p llull-kernel
         working-directory: solver
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            server/package-lock.json
       - run: npm ci
       - run: npm --prefix server ci
       - run: npx vitest run --config vitest.config.mts tests/nativeKernelParity.test.ts tests/nativeKernel.test.ts
         working-directory: server
         env:
           LLULL_REQUIRE_NATIVE_KERNEL: '1'
+      # The desktop bundle as shipped: llull-compute (gpu), llull-kernel resolving OCCT via $ORIGIN/occt/lib only, licence notices.
+      - run: node desktop/scripts/prepare-native.mjs
+      - run: ldd desktop/build/native/llull-kernel && ! ldd desktop/build/native/llull-kernel | grep 'not found'
 
   check:
     runs-on: ubuntu-latest

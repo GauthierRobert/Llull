@@ -1,5 +1,5 @@
 /**
- * Native `llull-kernel` (OCCT 7.8.1) vs the WASM OCC kernel (opencascade.js, OCCT 7.4) on the query ops (VC-KRN-25 slice 2): exact
+ * Native `llull-kernel` (OCCT 7.9.2) vs the WASM OCC kernel (opencascade.js, OCCT 7.4) on the query ops (VC-KRN-25 slice 2): exact
  * topology with the SAME face / edge numbering (fillet and chamfer select edges by these indices), every face-query method and shape
  * distance. Corpus: the 11 primitives and 4 boolean recipes of the first slice. Skipped without the binary (nativeParitySupport.ts).
  */

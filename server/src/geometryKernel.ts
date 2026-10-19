@@ -59,7 +59,7 @@ export async function installGeometryKernel(): Promise<boolean> {
   if (nativeRequested) {
     const native = startNativeKernel({ callTimeoutMs: occtCallTimeoutMs() });
     if ('kernel' in native) {
-      setGeometryKernel(described(native.kernel, { isolation: 'worker' }));
+      setGeometryKernel(described(native.kernel, { isolation: 'process' }));
       activeKernel = 'occt';
       return true;
     }

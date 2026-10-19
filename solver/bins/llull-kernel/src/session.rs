@@ -284,7 +284,7 @@ mod tests {
         assert!(session.handle_line("not json")["error"].as_str().unwrap().starts_with(BAD_REQUEST));
         assert!(call(&mut session, "evaluate", json!([{}]))["error"].as_str().unwrap().starts_with(BAD_REQUEST));
         let described = call(&mut session, "info", json!([]));
-        assert_eq!(described["result"]["occtVersion"], json!("7.8.1"));
+        assert_eq!(described["result"]["occtVersion"], json!("7.9.2"));
         assert_eq!(described["result"]["ops"], json!(native_ops()));
     }
 
