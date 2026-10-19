@@ -8,7 +8,6 @@ import { ORIGIN, finiteVec3OrZero, len3 } from '../../lib/vec3';
 import { noop } from '../noop';
 import { MAX_PROFILE_POINTS, MAX_REVOLVE_SEGMENTS } from '../limits';
 import { newEntity } from '../entity/newEntity';
-import { nextId } from '../../lib/id';
 import { compactNumber, fixedNumber } from '../../lib/compactNumber';
 import {
   DEFAULT_SOLID_COLOR,
@@ -17,7 +16,6 @@ import {
   commitSolid,
   rejectBadProfile,
   rejectZeroAreaProfile,
-  resolveRotation,
   axisField,
   rotationField,
   existingLayerOrDefault,
@@ -25,6 +23,8 @@ import {
   explicitIdTaken,
 } from './shared';
 import { sketchLoop } from './sketchCurves';
+import { exactCurves, extrusionResult } from './extrusionResult';
+import { thinExtrude, thinSchema } from './thinExtrude';
 import { mapSegment } from '../../geometry/curveSegments';
 
 /**
@@ -49,7 +49,9 @@ export const extrudeProfile = defineCommand({
     '(override with `position`), does not inherit the source rotation, and stays in the document. ' +
     'The solid spans from the position along +Z for depth units (depth must be > 0). ' +
     'Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = the extrusion direction ' +
-    '(the profile plane normal; local +Z maps to it). axis wins when both are given; the derived Euler angles are stored.',
+    '(the profile plane normal; local +Z maps to it). axis wins when both are given; the derived Euler angles are stored. ' +
+    'thin {thickness, side centre|inside|outside} extrudes only a wall instead of a solid prism: an open polyline (id, or inline profile with ' +
+    'openPath true) becomes an offset band, a closed profile a ring (needs a geometry kernel; result is a mesh with an exact B-rep).',
   params: z.object({
     profile: untypedArray(
       'Inline closed loop: array of [x, y] points in the XY plane of the profile (at least 3, do not repeat ' +
@@ -75,8 +77,15 @@ export const extrudeProfile = defineCommand({
     rotation: rotationField(),
     axis: axisField('is the extrusion direction (local +Z)'),
     color: colorField(EXTRUSION_COLOR),
+    thin: thinSchema.optional(),
+    openPath: z
+      .boolean()
+      .describe('Only with thin: true means the inline `profile` is an OPEN path (not implicitly closed). Default false.')
+      .optional(),
   }),
-  run: (doc, { profile, id, ids, depth, position, rotation, axis, color = EXTRUSION_COLOR }) => {
+  run: (doc, { profile, id, ids, depth, position, rotation, axis, color = EXTRUSION_COLOR, thin, openPath }, ctx) => {
+    if (thin !== undefined) return thinExtrude(doc, { profile, openPath, id, ids, depth, position, rotation, axis, color, thin }, ctx);
+    if (openPath === true) return noop(doc, 'extrude_profile: openPath needs thin (a solid prism needs a closed profile); no-op.');
     const sources = [profile, id, ids].filter((source) => source !== undefined).length;
     if (sources === 0)
       return noop(doc, 'extrude_profile: give profile (inline points), id (one closed shape) or ids (pieces of a loop); no-op.');
@@ -133,33 +142,6 @@ function rejectInlineProfile(doc: CadDocument, profile: ReadonlyArray<readonly [
   return null;
 }
 
-function extrusionResult(
-  doc: CadDocument,
-  extrusion: {
-    readonly profile: ReadonlyArray<readonly [number, number]>;
-    readonly depth: number;
-    readonly position: Vec3;
-    readonly rotation: unknown;
-    readonly axis: unknown;
-    readonly color: string;
-    readonly curves?: ReadonlyArray<CurveSegment<Vec2>>;
-    readonly describe: (id: string) => string;
-  },
-): CommandResult {
-  const resolved = resolveRotation(extrusion.axis, extrusion.rotation);
-  if (resolved.error !== undefined) return noop(doc, `extrude_profile: ${resolved.error}; no-op.`);
-  const id = nextId('ext');
-  const entity = newEntity(
-    'extrusion',
-    id,
-    { profile: extrusion.profile, depth: extrusion.depth, ...exactCurves(extrusion.curves ?? []) },
-    extrusion.position,
-    extrusion.color,
-    { rotation: resolved.rotation },
-  );
-  return commitSolid(doc, entity, extrusion.describe(id));
-}
-
 /** Legacy single-shape messages: missing, open, too short or a non-closable kind. */
 function singleSourceIssue(doc: CadDocument, id: string): string | null {
   const source = doc.entities[id];
@@ -174,11 +156,6 @@ function singleSourceIssue(doc: CadDocument, id: string): string | null {
 }
 
 const CLOSED_SHAPE_KINDS: ReadonlySet<string> = new Set(['circle', 'rectangle', 'ellipse', 'polyline', 'spline']);
-
-/** `{ curves }` when the loop has an arc or Bézier (a pure polygon needs no exact copy). */
-function exactCurves(curves: ReadonlyArray<CurveSegment<Vec2>>): { curves?: ReadonlyArray<CurveSegment<Vec2>> } {
-  return curves.some((segment) => segment.type !== 'line') ? { curves } : {};
-}
 
 function curveNote(curves: ReadonlyArray<CurveSegment<Vec2>>): string {
   const curved = curves.filter((segment) => segment.type !== 'line').length;

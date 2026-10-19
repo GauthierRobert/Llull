@@ -77,9 +77,9 @@ const ORACLE_DIR = __dirname;
 
 export function loadCases(): OracleCase[] {
   return readdirSync(ORACLE_DIR, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && /^\d\d-/.test(entry.name))
+    .filter((entry) => entry.isDirectory() && /^\d{2,3}-/.test(entry.name))
     .map((entry) => entry.name)
-    .sort()
+    .sort((a, b) => Number.parseInt(a, 10) - Number.parseInt(b, 10))
     .map((id) => {
       const read = (file: string): unknown => JSON.parse(readFileSync(path.join(ORACLE_DIR, id, file), 'utf8'));
       return { id, actions: (read('plan.json') as { actions: unknown[] }).actions, expected: read('expected.json') as OracleExpected };
