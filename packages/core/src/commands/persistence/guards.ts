@@ -12,7 +12,8 @@ import {
   SOLID_KINDS,
   FINISH_PATTERNS,
 } from '../../model/types';
-import { nurbsCurveProblem } from './nurbsGuard';
+import { exactSectionsProblem, nurbsCurveProblem } from './nurbsGuard';
+import type { NurbsCurveData } from '../../lib/nurbs/types';
 import { CURVE_KINDS } from '../../model/curveKinds';
 import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber, isPositiveNumber } from '../../lib/isFiniteNumber';
@@ -208,7 +209,7 @@ function loftProblem(v: Record<string, unknown>): string | null {
     const problem = nurbsCurveProblem(sections[i], `sections.${i}`);
     if (problem !== null) return problem;
   }
-  return null;
+  return exactSectionsProblem(sections as NurbsCurveData[]);
 }
 
 /** Optional BaseEntity fields (`name`, `tags`, `materialId`) must have their declared types, or null. */
