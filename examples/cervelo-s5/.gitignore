@@ -9,3 +9,4 @@ build.log
 __pycache__/
 s5x*.meta.json
 s5x*.parts.json
+*.pass1*
