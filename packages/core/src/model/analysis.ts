@@ -8,6 +8,7 @@
 import type { Vec3 } from './vectors';
 import type { Quantity } from './quantity';
 import type { DurabilityModel } from './durability';
+import type { FeTopologyArtifact, TopologyStudy } from './topology';
 
 /** Same structural id as `types.ts` `EntityId` (not imported: types.ts imports this module). */
 type EntityId = string;
@@ -462,6 +463,9 @@ export interface AnalysisCase {
   readonly thermal?: ThermalSetup;
   readonly thermomech?: ThermoMechSetup;
   readonly nonlinear?: NonlinearSettings;
+  /** PHY-17 topology studies of this case (plugin `topology`); absent until the first `create_topology_study`. */
+  readonly topology?: Readonly<Record<string, TopologyStudy>>;
+  readonly topologyOrder?: readonly string[];
   /** Margin dispositions by row id (human gate). */
   readonly dispositions: Readonly<Record<string, Disposition>>;
 }
@@ -522,7 +526,7 @@ export interface FeTableArtifact {
 
 /** Read-only artifact store injected by the host (`ExecutionContext.feaArtifacts`). */
 export interface FeArtifactPort {
-  get(hash: string): FeMeshArtifact | FeResultsArtifact | FeTableArtifact | null;
+  get(hash: string): FeMeshArtifact | FeResultsArtifact | FeTableArtifact | FeTopologyArtifact | null;
 }
 
 /** Verifies a human signature over a payload hash (09 PLM); no implementation is installed, so human gates refuse. */
