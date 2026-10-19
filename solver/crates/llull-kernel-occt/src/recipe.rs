@@ -2,21 +2,22 @@
 //! recipe walk of `packages/core/src/geometry/shapeKernel.ts`. Sub-recipes are cached by the sha256 of their canonical JSON (serde_json
 //! maps are sorted), so an unchanged prefix of the feature tree is built once.
 //!
-//! Native: recipe ops `solid`, `boolean`, `place`, `scale`, `fillet`, `chamfer`, `blend`, `shell` and `featureCut` (a `feature`
-//! node the host lowered, see [`nodes`]); solid kinds box, cylinder, sphere, cone, torus, wedge, extrusion and revolution (polygon
-//! or exact curve chain), triangle mesh (thread groove tools included), loft, sweep and subdivision. Anything else is
-//! [`EvalError::Unsupported`]: the host evaluates that recipe with the WASM kernel instead. The host still routes fillet / chamfer
-//! to WASM until native `topology` numbers edges like the WASM kernel (their indices come from it).
+//! Native: recipe ops `solid`, `boolean`, `place`, `scale`, `brep` (a document blob loaded with [`Evaluator::load_blob`]), `fillet`,
+//! `chamfer`, `blend`, `shell` and `featureCut` (a `feature` node the host lowered, see [`nodes`]); solid kinds box, cylinder, sphere,
+//! cone, torus, wedge, extrusion and revolution (polygon or exact curve chain), triangle mesh (thread groove tools included), loft,
+//! sweep and subdivision. Anything else is [`EvalError::Unsupported`]: the host evaluates that recipe with the WASM kernel instead.
+//! Fillet / chamfer edge indices come from `topology`, which numbers edges like the WASM kernel (unique sub-shapes in explorer order).
 
 use crate::lru::Lru;
 use crate::{BooleanOp, Built, Shape};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 mod nodes;
 
-pub const RECIPE_OPS: [&str; 9] = ["solid", "boolean", "place", "scale", "fillet", "chamfer", "blend", "shell", "featureCut"];
+pub const RECIPE_OPS: [&str; 10] = ["solid", "boolean", "place", "scale", "brep", "fillet", "chamfer", "blend", "shell", "featureCut"];
 pub const SOLID_KINDS: [&str; 12] =
     ["box", "cylinder", "sphere", "cone", "torus", "wedge", "extrusion", "revolution", "mesh", "loft", "sweep", "subdivision"];
 
@@ -33,11 +34,18 @@ pub type Evaluated = Result<Option<Rc<Shape>>, EvalError>;
 pub struct Evaluator {
     cache: Lru<Option<Rc<Shape>>>,
     builds: u64,
+    /// Document blobs (`BRepTools::Write` text by sha256 hex) that `brep` leaves read.
+    blobs: HashMap<String, String>,
+}
+
+/// Lower-case hex sha256 of `bytes`.
+pub fn sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes).iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 /// Content key of a recipe: sha256 hex of its canonical JSON.
 pub fn canonical_key(recipe: &Value) -> String {
-    Sha256::digest(recipe.to_string().as_bytes()).iter().map(|byte| format!("{byte:02x}")).collect()
+    sha256_hex(recipe.to_string().as_bytes())
 }
 
 fn shape_of(built: Built) -> Evaluated {
@@ -269,7 +277,19 @@ fn boolean_op(name: &str) -> Option<BooleanOp> {
 
 impl Evaluator {
     pub fn new(capacity: usize) -> Self {
-        Self { cache: Lru::new(capacity), builds: 0 }
+        Self { cache: Lru::new(capacity), builds: 0, blobs: HashMap::new() }
+    }
+
+    /// Keeps blob `sha256` for `brep` leaves (idempotent) and forgets refusals, which may have been "blob missing"; false when the
+    /// text does not hash to `sha256` (`KRN_BLOB_HASH_MISMATCH`, the blob is refused).
+    pub fn load_blob(&mut self, sha256: &str, text: &str) -> bool {
+        if sha256_hex(text.as_bytes()) != sha256 {
+            return false;
+        }
+        if self.blobs.insert(sha256.to_string(), text.to_string()).is_none() {
+            self.cache.retain(Option::is_some);
+        }
+        true
     }
 
     /// Recipe nodes actually built (cache misses).
@@ -337,6 +357,13 @@ impl Evaluator {
             "blend" => self.blend(recipe),
             "shell" => self.shell(recipe),
             "featureCut" => self.feature_cut(recipe),
+            "brep" => {
+                let blob = recipe.get("blob").and_then(Value::as_str).and_then(|sha256| self.blobs.get(sha256));
+                match blob {
+                    Some(text) => crate::queries::read_brep(text).map(|shape| shape.map(Rc::new)).map_err(EvalError::Failure),
+                    None => refused(),
+                }
+            }
             other => Err(EvalError::Unsupported(format!("recipe op '{other}'"))),
         }
     }
@@ -425,6 +452,19 @@ mod tests {
             json!({ "mesh": { "positions": [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1], "indices": [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2] } }),
         );
         assert!((volume(evaluator.evaluate(&leaf(mesh))) - 1.0 / 6.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn brep_leaves_read_loaded_blobs_and_retry_after_a_load() {
+        let mut evaluator = Evaluator::new(8);
+        let text = crate::queries::write_brep(&crate::make_box([0.0; 3], [1.0, 2.0, 3.0]).unwrap().unwrap()).unwrap();
+        assert!(!evaluator.load_blob(&sha256_hex(b"other"), &text), "a blob whose text hashes differently is refused");
+        let digest = sha256_hex(text.as_bytes());
+        let leaf = json!({ "op": "brep", "blob": digest, "format": "occt-brep-v1" });
+        let scaled = json!({ "op": "scale", "factor": 2, "source": leaf });
+        assert_eq!(evaluator.evaluate(&scaled).map(|shape| shape.is_none()), Ok(true), "blob not loaded yet: refused");
+        assert!(evaluator.load_blob(&digest, &text));
+        assert!((volume(evaluator.evaluate(&scaled)) - 48.0).abs() < 1e-9);
     }
 
     #[test]

@@ -15,7 +15,8 @@ import { roundedOutline } from '@core/geometry/pocketOutline';
 import { polygonCentroid } from '@lib/polygon';
 import { add3, scale3 } from '@lib/vec3';
 import { orientedChain } from './kernelLeaves';
-import { SINGLE_SHAPE_OPS, type FeatureLowering, type FeatureLowerings } from './kernelProtocol';
+import type { StepAssemblyPart, StepOccurrence } from '@core/geometry/kernel';
+import { takesShapeFirst, type FeatureLowering, type FeatureLowerings } from './kernelProtocol';
 
 type FeatureRecipe = Extract<ShapeRecipe, { op: 'feature' }>;
 
@@ -29,7 +30,6 @@ type PreparedFeatures = { readonly features: FeatureLowerings } | { readonly uns
 
 /** Recipe nodes the host keeps on the WASM kernel, with the reason logged on the first fallback. */
 function gatedReason(recipe: ShapeRecipe): string | null {
-  if (recipe.op === 'fillet' || recipe.op === 'chamfer') return `${recipe.op}: edge indices wait for native topology`;
   if (recipe.op === 'feature' && recipe.feature === 'pocket' && recipe.pocket.floorFillet > 0)
     return 'pocket floor fillet: needs native topology';
   return null;
@@ -69,13 +69,29 @@ function lowering(node: FeatureRecipe, reach: number): FeatureLowering {
   return { tool: lowered.tool, mode: lowered.mode, ...(holes === undefined ? {} : { holes }), ...(pocket === undefined ? {} : { pocket }) };
 }
 
+/** Every shape handle of an assembly export, each shared part once. */
+function assemblyHandles(occurrences: readonly StepOccurrence<unknown>[]): unknown[] {
+  const seen = new Set<StepAssemblyPart<unknown>>();
+  const handles: unknown[] = [];
+  const visit = ({ part }: StepOccurrence<unknown>): void => {
+    if (seen.has(part)) return;
+    seen.add(part);
+    handles.push(...part.shapes);
+    for (const child of part.children ?? []) visit(child);
+  };
+  occurrences.forEach(visit);
+  return handles;
+}
+
 /** The recipes a request carries (evaluate's recipe, or the recipes of its shape handles). */
 function requestRecipes(op: string, args: readonly unknown[]): ShapeRecipe[] {
   const ofHandle = (handle: unknown): ShapeRecipe[] =>
     typeof handle === 'object' && handle !== null && 'recipe' in handle ? [(handle as { recipe: ShapeRecipe }).recipe] : [];
   if (op === 'evaluate') return args[0] === undefined ? [] : [args[0] as ShapeRecipe];
-  if (SINGLE_SHAPE_OPS.has(op)) return ofHandle(args[0]);
+  if (takesShapeFirst(op)) return ofHandle(args[0]);
+  if (op === 'distance') return [...ofHandle(args[0]), ...ofHandle(args[1])];
   if (op === 'exportStep' && Array.isArray(args[0])) return args[0].flatMap(ofHandle);
+  if (op === 'exportStepAssembly' && Array.isArray(args[0])) return assemblyHandles(args[0] as StepOccurrence<unknown>[]).flatMap(ofHandle);
   return [];
 }
 

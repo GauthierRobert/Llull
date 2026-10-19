@@ -193,16 +193,16 @@ describe('native feature lowering', () => {
     expect(Math.min(...profile.filter((_, k) => k % 3 === 2))).toBeLessThan(-1);
   });
 
-  it('keeps fillets, chamfers and floor-filleted pockets on WASM', async () => {
+  it('keeps floor-filleted pockets on WASM and sends fillets / chamfers native (native topology numbers their edges)', async () => {
+    expect(await prepareFeatures('massProperties', [{ key: 'k', recipe: pocket({ floorFillet: 0.1 }) }], meshes(slab))).toMatchObject({
+      unsupported: expect.stringContaining('NATIVE_UNSUPPORTED'),
+    });
     const source = leaf(box([0, 0, 0], [1, 1, 1]));
     for (const recipe of [
       { op: 'fillet', source, edges: [], size: 0.1 },
       { op: 'chamfer', source, edges: [0], size: 0.1 },
-      pocket({ floorFillet: 0.1 }),
     ])
-      expect(await prepareFeatures('massProperties', [{ key: 'k', recipe }], meshes(slab))).toMatchObject({
-        unsupported: expect.stringContaining('NATIVE_UNSUPPORTED'),
-      });
+      expect(await prepareFeatures('massProperties', [{ key: 'k', recipe }], meshes(slab))).toHaveProperty('features');
   });
 
   it('lowers without BRepFeat inputs where the WASM kernel does (many holes, modelled thread, islands, rib)', async () => {

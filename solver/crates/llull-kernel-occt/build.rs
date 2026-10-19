@@ -35,7 +35,7 @@ const OCCT_LIBS: &[&str] = &[
 ];
 
 /// Rust modules holding a `#[cxx::bridge]`.
-const BRIDGES: [&str; 2] = ["src/lib.rs", "src/features.rs"];
+const BRIDGES: [&str; 3] = ["src/lib.rs", "src/features.rs", "src/queries.rs"];
 
 fn occt_root() -> PathBuf {
     println!("cargo:rerun-if-env-changed=LLULL_OCCT_DIR");
@@ -67,10 +67,12 @@ fn main() {
         println!("cargo:rustc-link-lib=dylib=advapi32");
     }
 
-    // Every C++ source of the facade (cpp/*.cxx), sorted so the build is reproducible.
-    let mut sources: Vec<PathBuf> =
-        std::fs::read_dir("cpp").map(|entries| entries.filter_map(Result::ok).map(|entry| entry.path()).collect()).unwrap_or_default();
-    sources.retain(|path| path.extension().is_some_and(|extension| extension == "cxx"));
+    // Every cpp/*.cxx translation unit, sorted so the build is reproducible; one cxx bridge per Rust module that declares one.
+    let mut sources: Vec<PathBuf> = std::fs::read_dir("cpp")
+        .expect("cpp/ is readable")
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| path.extension().is_some_and(|extension| extension == "cxx"))
+        .collect();
     sources.sort();
 
     cxx_build::bridges(BRIDGES)
