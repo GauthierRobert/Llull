@@ -11,7 +11,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - Lanes own disjoint write scopes (`.claude/rules/workflow.md` W5); one task per lane at a time, up to 4 lanes + Lane 5 review.
 
 ## NOW (auto-updated by the skill)
-- 2026-10-19 — branch `feat/sc-parity`: SC-Q1, Q3, Q5, A1, D1–D3 merged. In flight: SC-S1+S2, SC-Q2, oracle/fuzz bug fixes + SC-D4 (TS exports), SC-A2+A3, SC-F2+F3. Next: SC-N1 (native toolchain installing on Windows), SC-F1/F4, SC-N2, SC-S3, SC-Q4, SC-A4, IGES.
+- 2026-10-19 — branch `feat/sc-parity`: SC wave 2 merged (see SolidCraft section). WIP: SC-Q4, SC-S1-R, SC-N1. Next: SC-N2, SC-S3, SC-F1, SC-D4b.
 - 2026-10-19 — branch `ccr-d5e76715-intlyp`: LC1 done (steps 1–6: native kernel default everywhere, opencascade.js retired, no outbox),
   RS-1 done (macOS bundle deferred by the owner), RS-2 done (native SIMP topology optimisation + plugin `topology` + `topology_solve` + UI panel).
   Next: CFD-M1, then RS-3.
@@ -24,16 +24,15 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - `[TODO]` **CFD-M2** `llull-compute flow` (LBM, wgpu), `cfd_solve` transport, records: same spec §10. _deps: CFD-M1_
 
 ## SolidCraft parity (spec: `docs/decisions/SC1-solidcraft-parity.md`)
-- `[WIP]` **SC-Q2** Action matrix with baseline ratchet, PR sample + nightly shards + determinism. _deps: SC-Q1_
-- `[TODO]` **SC-Q4** Mutation testing (Stryker) judged by oracle + golden + fuzz only, nightly. _deps: SC-Q1, SC-Q3_
-- `[WIP]` **SC-S1** Sketch solver: constructive + Levenberg–Marquardt, DOF, over-constraint refusal. _deps: —_
-- `[WIP]` **SC-S2** Constraint/dimension breadth (horizontal…G2; radius, diameter, arc length…). _deps: SC-S1_
-- `[TODO]` **SC-N1** Persistent face/edge naming from native OCCT history. _deps: LC1 step 1_
+- Done on `feat/sc-parity`: SC-Q1 (oracle, 109 cases), Q2 (action matrix), Q3 (fuzz), Q5 (FEATURES.md), S1+S2 (solver), D1–D3, D4 (3MF, URDF,
+  AP242 schema, mesh_to_solid), F2–F4, A1–A4.
+- `[WIP]` **SC-Q4** Mutation testing (Stryker) judged by oracle + golden + fuzz only, nightly. _deps: —_
+- `[WIP]` **SC-S1-R** Solver review fixes (half-applied edits, per-cluster solve, LM stall, FD step). _deps: —_
+- `[WIP]` **SC-N1** Persistent face/edge naming from native OCCT history (+ native fillet `radii`). MSVC install waits for an admin prompt. _deps: —_
 - `[TODO]` **SC-N2** Lost/split reference reporting + re-pick. _deps: SC-N1_
-- `[TODO]` **SC-S3** Sketch on offset planes / faces, linked projection. _deps: SC-S2, SC-N1_
-- `[WIP]` **SC-F1…F4** Feature depth: draft/split/replace face/push-pull (absorbs NF7), threads/holes on points, thin extrude/variable fillets, joints check. _deps: SC-N1, SC-Q1_
-- `[WIP]` **SC-D4** STEP AP242 names/colours/assemblies export, 3MF, URDF, IGES check, mesh → solid. _deps: —_
-- `[WIP]` **SC-A2…A4** Live previews + drag manipulators, 3D mouse, issue draft from feature errors. _deps: SC-D3 (A4)_
+- `[TODO]` **SC-S3** Sketch on offset planes / faces, linked projection. _deps: SC-S1-R, SC-N1_
+- `[TODO]` **SC-F1** Draft, split body/face, replace face, push-pull (absorbs NF7), on SC-N1 names. _deps: SC-N1_
+- `[TODO]` **SC-D4b** IGES import/export through the native sidecar. _deps: —_
 
 ## Aerospace + physics (spec = the linked pack)
 - `[TODO]` **AERO-4** Supply chain: 03 GDT, 04 XCH (AP242), 09 PLM (`HumanSignaturePort`, `dispose_*`): `docs/aerospace/README.md`. _deps: —_
