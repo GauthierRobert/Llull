@@ -164,50 +164,50 @@ def build_fork(plan, colors):
 
 
 def build_cockpit(plan, colors):
-    """One-piece carbon cockpit: a single stem body rising from the top cap into the aero bar, hoods and levers. Returns
-    the hood grip point and bar centre."""
-    bar_half = O["bar_half"]
+    """One-piece carbon cockpit (HB19 style), proportions from the side photo: a slim stem blade rising from the top cap into
+    the centre of flat aero tops that sweep forward to the hoods, compact drops tucked under the hoods. Returns the hood grip
+    point and bar centre."""
+    bh = O["bar_half"]
     m, col, cat = "carbon_black", colors["black"], "cockpit"
     # top cap / spacer follows the head-block airfoil
     tube(plan, [on_steer(-6), on_steer(8 + O["spacers"])], [kamm(150, 46, 52, truncate=(52 + 86) / 150)] * 2, cat, cd_strut(76, 44, True), m, "stem", col)
     root = on_steer(10 + O["spacers"])
-    stem_dir = norm([math.cos(math.radians(O["stem_deg"])), 0, math.sin(math.radians(O["stem_deg"]))])
-    bar = add(root, mul(stem_dir, 100))
-    pts = [add(root, mul(stem_dir, -20)), add(root, mul(stem_dir, 30)), add(bar, mul(stem_dir, -14))]
-    outs = [superellipse(18, 19, 3), superellipse(15, 21, 3), superellipse(13, 26, 3)]
-    tube(plan, pts, outs, cat, cd_strut(38, 40), m, "stem", col, hints=[[0, 0, 1]] * 3)
-    # bar clamp fairing: the stem ends inside it, the bar wing passes through it
-    plan.loft(stations([add(bar, [0, -44, 0]), bar, add(bar, [0, 44, 0])], [kamm(66, 40, 30), kamm(70, 44, 32), kamm(66, 40, 30)], [[1, 0, 0]] * 3),
-              cat, cd_strut(62, 44, True), m, "stem", col)
-    # aero tops: a flat wing, swept 8 mm forward at the ends
-    wing = []
-    for y in (-(bar_half - 26), -60, 0, 60, bar_half - 26):
-        wing.append(add(bar, [8 * abs(y) / bar_half, y, 0]))
-    hints = [[1, 0, 0]] * len(wing)
+    fwd = norm([math.cos(math.radians(O["stem_deg"])), 0, math.sin(math.radians(O["stem_deg"]))])
+    up = [-fwd[2], 0, fwd[0]]
+
+    def at(x, y, z):
+        """Point x along the stem, y lateral, z normal to the stem (in its vertical plane), from the bar centre."""
+        return add(add(add(bar, mul(fwd, x)), mul(up, z)), [0, y, 0])
+
+    bar = add(root, mul(fwd, 140))
+    # stem: a 22 mm tall blade, narrow from the front, from inside the top cap into the bar centre
+    pts = [add(on_steer(2 + O["spacers"]), mul(fwd, -14)), add(root, mul(fwd, 24)), add(root, mul(fwd, 80)), add(bar, mul(fwd, 4))]
+    outs = [superellipse(7, 15, 2.6), superellipse(11.5, 15, 3), superellipse(10.5, 14.5, 3), superellipse(10, 17, 3)]
+    tube(plan, pts, outs, cat, cd_strut(30, 22), m, "stem", col, hints=[up] * 4)
+    # aero tops: a flat wing swept forward and slightly up to the hoods
+    wing = [at(70, -(bh - 30), 6), at(18, -60, 1), at(0, 0, 0), at(18, 60, 1), at(70, bh - 30, 6)]
     outs = [kamm(*O["wing"])] * 2 + [kamm(*O["wing_centre"])] + [kamm(*O["wing"])] * 2
-    plan.loft(stations(wing, outs, hints), cat, cd_strut(O["wing"][0] * 0.86, O["wing"][1], True), m, "stem", col)
-    bx, bz = bar[0], bar[2]
+    plan.loft(stations(wing, outs, [fwd] * 5), cat, cd_strut(O["wing"][0] * 0.86, O["wing"][1], True), m, "stem", col)
     hood = None
     for side in (1, -1):
-        y = side * bar_half
-        drop = [[bx + 8, side * (bar_half - 26), bz], [bx + 42, side * (bar_half - 4), bz + 2], [bx + 80, y, bz - 18],
-                [bx + 80, side * (bar_half + 8), bz - 70], [bx + 44, side * (bar_half + 16), bz - 122], [bx - 20, side * (bar_half + 20), bz - 124],
-                [bx - 48, side * (bar_half + 20), bz - 112]]
-        plan.add("sweep_profile", {"path": [rnd(p) for p in drop], "smooth": True, "stations": [{"at": 0, "radiusX": 7.5, "radiusY": 11.9}, {"at": 0.12, "radiusX": 11.9, "radiusY": 11.9}, {"at": 1, "radiusX": 11.9, "radiusY": 11.9}], "color": colors["tape"]},
+        y = side * bh
+        drop = [at(62, side * (bh - 34), 5), at(88, side * (bh - 10), 4), at(98, y, -12), at(86, side * (bh + 3), -48), at(60, side * (bh + 9), -100),
+                at(22, side * (bh + 15), -134), at(-30, side * (bh + 20), -140), at(-86, side * (bh + 20), -136)]
+        plan.add("sweep_profile", {"path": [rnd(p) for p in drop], "smooth": True, "stations": [{"at": 0, "radiusX": 7.5, "radiusY": 11.9}, {"at": 0.15, "radiusX": 11.9, "radiusY": 11.9}, {"at": 1, "radiusX": 11.9, "radiusY": 11.9}], "color": colors["tape"]},
                  cat, cd_strut(23.8, 23.8), "bar_tape")
-        # brake / shift hood: smooth subdivision body sitting on the ramp, horn rising at the front
+        # Di2 hood: long body on the ramp, tall horn at the front
         rings = []
-        for t, (dx, dz, a, b, n) in enumerate(((54, -18, 19, 14, 2.4), (72, -12, 24, 16, 2.6), (96, -4, 23, 15.5, 2.8), (118, 6, 25, 13, 2.4), (136, 12, 15, 10, 2.2))):
-            centre = [bx + dx, y, bz + dz]
-            ex, ey, ez = section_frame([1, 0, 0.12], [0, 0, 1])
-            rings.append((centre, ex, ey, ring(a, b * O["hood_width"], 8, n)))
+        for dx, dz, a, b, n in ((80, 3, 12, 13, 2.6), (94, 9, 16, 15, 3), (110, 13, 18, 15.5, 3), (124, 17, 19, 15, 3), (136, 25, 15, 13, 2.8),
+                                (143, 34, 10, 10, 2.5), (146, 42, 5, 6.5, 2.3)):
+            ex, ey, ez = section_frame(fwd, up)
+            rings.append((at(dx, y, dz), ex, ey, ring(a, b * O["hood_width"], 8, n)))
         v, f = ring_cage(rings)
         plan.cage(v, f, cat, 0.6, "rubber_hood", colors["hood"])
-        hood = [bx + 92, y, bz + 6]
-        lever = [[bx + 128, y, bz - 6], [bx + 132, y, bz - 50], [bx + 118, side * (bar_half + 7), bz - 100]]
-        tube(plan, lever, [superellipse(9, 5, 3), superellipse(8, 4.5, 3), superellipse(6, 4, 3)], cat, 1.0, "black_anod", None, colors["lever"],
-             hints=[[1, 0, 0]] * 3)
-    return {"bar": bar, "hood": hood, "bar_half": bar_half}
+        hood = at(112, y, 34)
+        lever = [at(136, y, 4), at(144, y, -50), at(140, side * (bh + 5), -112)]
+        tube(plan, lever, [superellipse(10, 5, 3), superellipse(9, 4.5, 3), superellipse(6, 4, 3)], cat, 1.0, "black_anod", None, colors["lever"],
+             hints=[fwd] * 3)
+    return {"bar": bar, "hood": hood, "bar_half": bh}
 
 
 def build_seat(plan, colors):
