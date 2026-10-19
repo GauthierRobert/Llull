@@ -5,6 +5,7 @@ import { addRigidBody, deleteDynamicsItem, setGravity } from './bodies';
 import { addBodyJoint, addGearCoupling } from './connections';
 import { checkDynamics } from './checkDynamics';
 import { checkMotionClearance } from './checkMotionClearance';
+import { checkPrototype } from './checkPrototype';
 import { addCylinderPressure } from './cylinders';
 import { setEngineLosses } from './engine/losses';
 import { addReferenceData } from './engine/reference';
@@ -43,6 +44,7 @@ export const dynamicsCommands = commandCatalog(
   simulateMotion,
   checkDynamics,
   checkMotionClearance,
+  checkPrototype,
   plotSimulation,
   renderMotion,
 );

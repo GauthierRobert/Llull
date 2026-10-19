@@ -33,7 +33,7 @@ export type ToolsetName = (typeof TOOLSET_NAMES)[number];
 const words = (list: string): readonly string[] => list.split(' ');
 
 const ANALYSIS_CORE_TOOLS = words(
-  'check_assembly check_mechanism check_motion_clearance check_dynamics engine_quick_check compare_to_reference check_timestep_convergence check_convergence compare_to_expected thermal_analytic_check compute_view_factors fit_at_temperature thermal_stress_check fea_mesh fea_solve fea_export fea_import_field topology_solve',
+  'check_prototype check_assembly check_mechanism check_motion_clearance check_dynamics engine_quick_check compare_to_reference check_timestep_convergence check_convergence compare_to_expected thermal_analytic_check compute_view_factors fit_at_temperature thermal_stress_check fea_mesh fea_solve fea_export fea_import_field topology_solve',
 );
 
 /** Core part-modelling features (07 FTR §4.1); the sheet-metal plugin adds its commands to the same toolset. */
@@ -68,7 +68,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
       'define_property_model remove_property_model evaluate_property sample_property fit_property_model check_property_models add_material_model remove_material_model define_constitutive_set check_material_models',
   ),
   'material-lab': words('fit_material_model material_point_response export_material_cards'),
-  review: words('allow_interference remove_interference_intent set_part_grounded'),
+  review: words('allow_interference remove_interference_intent set_part_grounded set_review_disposition'),
   exchange: words(
     'export_stl export_obj export_gltf export_step_exact export_code apply_code_trace import_mesh import_dxf import_step_exact export_step import_step import_dwg import_code',
   ),
