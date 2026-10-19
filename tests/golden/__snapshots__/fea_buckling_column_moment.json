@@ -1,0 +1,164 @@
+{
+  "format": "llull-document",
+  "version": 3,
+  "document": {
+    "entities": {
+      "#1": {
+        "id": "#1",
+        "kind": "box",
+        "size": [300,10,10],
+        "position": [150,5,5],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#6b8f9c",
+        "materialId": "steel"
+      }
+    },
+    "order": [
+      "#1"
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#2"
+    ],
+    "selection": [],
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {},
+    "animations": {},
+    "featureHistory": [
+      {
+        "id": "#3",
+        "name": "#4_units",
+        "params": {"units":"mm"},
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "#5",
+        "name": "add_box",
+        "params": {"size":[300,10,10],"position":[0,0,0],"anchor":"min"},
+        "suppressed": false,
+        "affected": ["#1"]
+      },
+      {
+        "id": "#6",
+        "name": "create_material",
+        "params": {"name":"steel","density":0.0078},
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "#7",
+        "name": "add_material_model",
+        "params": {"material":"steel","id":"elastic","model":{"kind":"elastic_isotropic","E":{"value":210,"unit":"GPa"},"nu":{"value":0.3,"unit":"1"}},"basis":"company","source":{"citation":"golden test input"}},
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "#8",
+        "name": "define_constitutive_#4",
+        "params": {"material":"steel","#4":{"id":"#4","elastic":"elastic"},"makeDefault":true},
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "#9",
+        "name": "assign_material",
+        "params": {"materialName":"steel","entityIds":["#1"]},
+        "suppressed": false,
+        "affected": ["#1"]
+      },
+      {
+        "id": "#10",
+        "name": "create_analysis",
+        "params": {"name":"column","analysisType":"buckling","modes":2},
+        "suppressed": false,
+        "affected": ["#11"]
+      },
+      {
+        "id": "#12",
+        "name": "#4_part_idealization",
+        "params": {"analysisId":"#11","entityId":"#1"},
+        "suppressed": false,
+        "affected": ["#11"]
+      },
+      {
+        "id": "#13",
+        "name": "add_fea_constraint",
+        "params": {"analysisId":"#11","name":"root","kind":"fixed","target":{"entityId":"#1","facesNear":[[0,5,5]]}},
+        "suppressed": false,
+        "affected": ["#14"]
+      },
+      {
+        "id": "#15",
+        "name": "add_fea_load",
+        "params": {"analysisId":"#11","name":"axial","kind":"force","vector":[-1000,0,0],"target":{"entityId":"#1","facesNear":[[300,5,5]]}},
+        "suppressed": false,
+        "affected": ["#16"]
+      },
+      {
+        "id": "#17",
+        "name": "add_fea_load",
+        "params": {"analysisId":"#11","name":"tip torque","kind":"moment","loadCase":"LC2","vector":[0,0,500],"target":{"entityId":"#1","facesNear":[[300,5,5]]}},
+        "suppressed": false,
+        "affected": ["#18"]
+      },
+      {
+        "id": "#19",
+        "name": "#4_mesh_controls",
+        "params": {"analysisId":"#11","elementFamily":"tet","order":2,"globalSize":4},
+        "suppressed": false,
+        "affected": ["#11"]
+      }
+    ],
+    "configurations": {},
+    "materials": {
+      "steel": {
+        "name": "steel",
+        "density": 0.0078,
+        "color": "#b0b0b0",
+        "metalness": 0,
+        "roughness": 0.5,
+        "materialModels": [{"id":"elastic","model":{"kind":"elastic_isotropic","E":{"value":210,"unit":"GPa"},"nu":{"value":0.3,"unit":"1"}},"basis":"company","provenance":{"citation":"golden test input"},"parametersSha256":"30421fa3f397d54eaf45d88076fc32649f5afb824ea335b2b4eceedcacc52612"}],
+        "constitutiveSets": [{"id":"#4","elastic":"elastic"}],
+        "defaultConstitutiveSet": "#4"
+      }
+    },
+    "recipes": {},
+    "components": {},
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": [],
+    "nextStepNumber": 13,
+    "analysis": {
+      "cases": {
+        "#11": {"id":"#11","name":"column","type":"buckling","solver":"calculix","unitSystem":"N-mm-t-s","modes":2,"factors":{"ultimate":1.5,"yield":1,"extra":[]},"parts":{"#1":{"kind":"solid"}},"constraints":{"#14":{"id":"#14","name":"root","kind":"fixed","target":{"entityId":"#1","facesNear":[[0,5,5]]}}},"constraintOrder":["#14"],"loads":{"#16":{"id":"#16","name":"axial","loadCase":"LC1","category":"limit","kind":"force","target":{"entityId":"#1","facesNear":[[300,5,5]]},"vector":[-1000,0,0],"distribution":"total"},"#18":{"id":"#18","name":"tip torque","loadCase":"LC2","category":"limit","kind":"moment","target":{"entityId":"#1","facesNear":[[300,5,5]]},"vector":[0,0,500]}},"loadOrder":["#16","#18"],"mesh":{"mesher":"gmsh","elementFamily":"tet","order":2,"globalSize":4,"refinements":[],"optimize":"default"},"probes":{},"dispositions":{}}
+      },
+      "caseOrder": [
+        "#11"
+      ]
+    }
+  }
+}
