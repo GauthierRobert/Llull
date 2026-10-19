@@ -1,7 +1,8 @@
 /**
  * Locates the native binaries of the Rust workspace `solver/` (docs/decisions/RS1-native-compute.md): `llull-compute` (jobs) and
  * `llull-kernel` (native OCCT). Order: the per-binary override (`LLULL_COMPUTE`, `LLULL_KERNEL_BIN`), then `LLULL_NATIVE_DIR`
- * (the desktop bundle), then a local `solver/target/release` build, else null — callers refuse with `NATIVE_TOOL_MISSING`.
+ * (the desktop bundle), then a local build (`solver/target/compute` for llull-compute's `compute` profile, then `solver/target/release`),
+ * else null — callers refuse with `NATIVE_TOOL_MISSING`.
  */
 
 import { existsSync } from 'node:fs';
@@ -31,6 +32,7 @@ export function nativeBinaryPath(
   const bundleDir = env['LLULL_NATIVE_DIR'];
   const candidates = [
     ...(bundleDir !== undefined && bundleDir !== '' ? [path.join(bundleDir, name)] : []),
+    ...(binary === 'llull-compute' ? [path.join(REPO_ROOT, 'solver', 'target', 'compute', name)] : []),
     path.join(REPO_ROOT, 'solver', 'target', 'release', name),
   ];
   return candidates.find((candidate) => exists(candidate)) ?? null;

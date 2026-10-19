@@ -35,3 +35,10 @@ all = { level = "deny", priority = -1 }
 [profile.release]
 lto = "thin"
 codegen-units = 1
+
+# llull-compute jobs: fat LTO + abort on panic measured ~5 % faster on the 50k-node fatigue job (no unwind paths in the hot loops). Not for
+# llull-kernel, which catches panics per request (NATIVE_PANIC). Build: cargo build --profile compute -p llull-compute (target/compute/).
+[profile.compute]
+inherits = "release"
+lto = "fat"
+panic = "abort"

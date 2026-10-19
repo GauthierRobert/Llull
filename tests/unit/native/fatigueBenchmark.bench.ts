@@ -3,7 +3,7 @@
  * Builds the reference case (51 612 nodes = cells 43 x 50 x 22, 2 load cases, 10 000 steps, signed von Mises, Basquin + Goodman), times the
  * TS job builder, `llull-compute post fatigue` on every node and the TS reference on a node sample, and checks the sample bit for bit.
  *
- *   cargo build --release --manifest-path solver/Cargo.toml -p llull-compute
+ *   cargo build --profile compute --manifest-path solver/Cargo.toml -p llull-compute
  *   npx vitest run -c tests/unit/native/fatigueBenchmark.config.ts
  *
  * Environment: LLULL_BENCH_CELLS=43,50,22 · LLULL_BENCH_STEPS=10000 · LLULL_BENCH_SAMPLE=200 (TS nodes) · LLULL_BENCH_MEASURE=max_principal
@@ -23,14 +23,14 @@ const cells = (env['LLULL_BENCH_CELLS'] ?? '43,50,22').split(',').map(Number) as
 const steps = Number(env['LLULL_BENCH_STEPS'] ?? 10_000);
 const sample = Number(env['LLULL_BENCH_SAMPLE'] ?? 200);
 const measure = env['LLULL_BENCH_MEASURE'];
-const binary = env['LLULL_COMPUTE'] ?? path.resolve(__dirname, '../../../solver/target/release/llull-compute');
+const binary = env['LLULL_COMPUTE'] ?? path.resolve(__dirname, '../../../solver/target/compute/llull-compute');
 
 function seconds(started: number): string {
   return `${((performance.now() - started) / 1000).toFixed(2)} s`;
 }
 
 function run(): void {
-  if (!existsSync(binary)) throw new Error(`${binary} not built: cargo build --release in solver/`);
+  if (!existsSync(binary)) throw new Error(`${binary} not built: cargo build --profile compute -p llull-compute in solver/`);
   let started = performance.now();
   const fixture = feFatigue({ cells, steps, seed: 11, ...(measure !== undefined ? { caseParams: { measure } } : {}) });
   const fixtureTime = seconds(started);

@@ -57,12 +57,12 @@ function cargo(args, env) {
 
 function binaries(occtPrefix) {
   const prebuilt = process.env.LLULL_NATIVE_PREBUILT_DIR;
-  if (prebuilt) return prebuilt;
+  if (prebuilt) return { compute: prebuilt, kernel: prebuilt };
   const rustTarget = { CARGO_TARGET_DIR: cargoTarget };
-  cargo(['build', '--release', '-p', 'llull-compute', ...(withGpu ? ['--features', 'gpu'] : [])], rustTarget);
+  cargo(['build', '--profile', 'compute', '-p', 'llull-compute', ...(withGpu ? ['--features', 'gpu'] : [])], rustTarget);
   if (withKernel)
     cargo(['build', '--release', '-p', 'llull-kernel'], { ...rustTarget, LLULL_OCCT_DIR: occtPrefix, LLULL_OCCT_RPATH_BUNDLE_ONLY: '1' });
-  return path.join(cargoTarget, 'release');
+  return { compute: path.join(cargoTarget, 'compute'), kernel: path.join(cargoTarget, 'release') };
 }
 
 /** The toolkit files the loader asks for by name (SONAME / install name / DLL), never the development symlinks. */
@@ -203,7 +203,7 @@ const source = binaries(occtPrefix);
 rmSync(nativeDir, { recursive: true, force: true });
 mkdirSync(path.join(nativeDir, 'licenses'), { recursive: true });
 for (const binary of ['llull-compute', ...(withKernel ? ['llull-kernel'] : [])]) {
-  const from = path.join(source, `${binary}${exe}`);
+  const from = path.join(binary === 'llull-compute' ? source.compute : source.kernel, `${binary}${exe}`);
   if (!existsSync(from)) throw new Error(`${from} is missing`);
   cpSync(from, path.join(nativeDir, `${binary}${exe}`));
   if (process.platform !== 'win32') chmodSync(path.join(nativeDir, `${binary}${exe}`), 0o755);

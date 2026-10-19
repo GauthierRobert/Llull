@@ -22,6 +22,13 @@ describe('nativeBinaryPath', () => {
     expect(seen).toHaveLength(1);
   });
 
+  it('prefers the local compute-profile build of llull-compute', () => {
+    const found = nativeBinaryPath('llull-compute', {}, (file) => file.includes(path.join('solver', 'target')), 'linux');
+    expect(found).toMatch(/solver[\\/]target[\\/]compute[\\/]llull-compute$/);
+    const kernel = nativeBinaryPath('llull-kernel', {}, (file) => file.includes(path.join('solver', 'target')), 'linux');
+    expect(kernel).toMatch(/solver[\\/]target[\\/]release[\\/]llull-kernel$/);
+  });
+
   it('falls back to a local release build, else null', () => {
     const local = nativeBinaryPath('llull-compute', {}, (file) => file.includes(path.join('solver', 'target', 'release')), 'linux');
     expect(local).toMatch(/solver[\\/]target[\\/]release[\\/]llull-compute$/);
