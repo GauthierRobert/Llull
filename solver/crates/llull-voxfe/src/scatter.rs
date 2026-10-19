@@ -6,17 +6,24 @@
 //! slabs write disjoint node layers, each slab is one sequential task (elements in index order, local nodes in local order),
 //! so every node sums its contributions in the same order for any thread count (colour 0 first, then colour 1). No
 //! per-element product buffer and no separate gather pass; an element row is walked with the 2 (2D) or 4 (3D) node rows it
-//! touches cut out as slices, local nodes in [`crate::grid::LOCAL_NODES`] order.
+//! touches cut out as slices. Element vectors are in row order ([`ROW_ORDER`]): the element's nodes as they lie in memory, so
+//! `u_e` is read and `A_e u_e` added back as 2 (2D) or 4 (3D) contiguous runs.
 
 use crate::grid::Grid;
 use crate::real::Real;
 use rayon::prelude::*;
 
-/// Smallest number of elements a rayon task of the scatter gets.
-const ELEMENTS_PER_TASK: usize = 4096;
+/// Row order of the element nodes: position `p` holds local node `ROW_ORDER[p]` ([`crate::grid::LOCAL_NODES`] numbering;
+/// 2D uses the first four). It swaps the two nodes of each upper row, so it is its own inverse.
+pub const ROW_ORDER: [usize; 8] = [0, 1, 3, 2, 4, 5, 7, 6];
 
-/// `y = Σ_e A_e u_e` on the free DOFs of a 2D grid, 0 elsewhere. `element(e, u_e, out)` writes `A_e u_e` and returns false
-/// for an element without stiffness (then `out` is ignored).
+/// The local element DOF (LOCAL_NODES order, `dim` DOFs per node) at row-order position `d`, and back (an involution).
+pub fn local_dof(d: usize, dim: usize) -> usize {
+    ROW_ORDER[d / dim] * dim + d % dim
+}
+
+/// `y = Σ_e A_e u_e` on the free DOFs of a 2D grid, 0 elsewhere. `element(e, u_e, out)` writes `A_e u_e` (both in row order)
+/// and returns false for an element without stiffness (then `out` is ignored).
 pub fn apply_2d<T: Real, F>(grid: &Grid, free: &[bool], u: &[T], y: &mut [T], element: F)
 where
     F: Fn(usize, &[T; 8], &mut [T; 8]) -> bool + Sync,
@@ -32,14 +39,12 @@ where
         for i in 0..grid.nx {
             let x = 2 * i;
             ue[0..4].copy_from_slice(&u0[x..x + 4]);
-            ue[4..6].copy_from_slice(&u1[x + 2..x + 4]);
-            ue[6..8].copy_from_slice(&u1[x..x + 2]);
+            ue[4..8].copy_from_slice(&u1[x..x + 4]);
             if !element(first + i, &ue, &mut out) {
                 continue;
             }
             add(&mut lower[x..x + 4], &out[0..4]);
-            add(&mut upper[x + 2..x + 4], &out[4..6]);
-            add(&mut upper[x..x + 2], &out[6..8]);
+            add(&mut upper[x..x + 4], &out[4..8]);
         }
     });
 }
@@ -64,26 +69,18 @@ where
             let mut ue = [T::ZERO; 24];
             let mut out = [T::ZERO; 24];
             for i in 0..grid.nx {
-                let (x, z) = (3 * i, 3 * i + 3);
-                ue[0..3].copy_from_slice(&u00[x..x + 3]);
-                ue[3..6].copy_from_slice(&u00[z..z + 3]);
-                ue[6..9].copy_from_slice(&u10[z..z + 3]);
-                ue[9..12].copy_from_slice(&u10[x..x + 3]);
-                ue[12..15].copy_from_slice(&u01[x..x + 3]);
-                ue[15..18].copy_from_slice(&u01[z..z + 3]);
-                ue[18..21].copy_from_slice(&u11[z..z + 3]);
-                ue[21..24].copy_from_slice(&u11[x..x + 3]);
+                let x = 3 * i;
+                ue[0..6].copy_from_slice(&u00[x..x + 6]);
+                ue[6..12].copy_from_slice(&u10[x..x + 6]);
+                ue[12..18].copy_from_slice(&u01[x..x + 6]);
+                ue[18..24].copy_from_slice(&u11[x..x + 6]);
                 if !element(first + i, &ue, &mut out) {
                     continue;
                 }
-                add(&mut y00[x..x + 3], &out[0..3]);
-                add(&mut y00[z..z + 3], &out[3..6]);
-                add(&mut y10[z..z + 3], &out[6..9]);
-                add(&mut y10[x..x + 3], &out[9..12]);
-                add(&mut y01[x..x + 3], &out[12..15]);
-                add(&mut y01[z..z + 3], &out[15..18]);
-                add(&mut y11[z..z + 3], &out[18..21]);
-                add(&mut y11[x..x + 3], &out[21..24]);
+                add(&mut y00[x..x + 6], &out[0..6]);
+                add(&mut y10[x..x + 6], &out[6..12]);
+                add(&mut y01[x..x + 6], &out[12..18]);
+                add(&mut y11[x..x + 6], &out[18..24]);
             }
         }
     });
@@ -104,8 +101,6 @@ where
     S: Fn(usize, &mut [T], &mut [T]) + Sync,
 {
     let count = if grid.dim == 3 { grid.nz } else { grid.ny };
-    // at least ELEMENTS_PER_TASK elements per rayon task (small levels run on one thread, without waking the pool)
-    let per_task = (ELEMENTS_PER_TASK / (grid.elements() / count).max(1)).max(1);
     let mask = |l: usize, values: &mut [T]| {
         for (value, &free) in values.iter_mut().zip(&free[l * layer..(l + 1) * layer]) {
             if !free {
@@ -114,7 +109,7 @@ where
         }
     };
     for colour in 0..2 {
-        y[colour * layer..].par_chunks_mut(2 * layer).enumerate().with_min_len(per_task).for_each(|(index, chunk)| {
+        y[colour * layer..].par_chunks_mut(2 * layer).enumerate().for_each(|(index, chunk)| {
             if colour == 0 {
                 chunk.fill(T::ZERO);
             }

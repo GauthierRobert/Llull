@@ -29,7 +29,7 @@ pub mod gpu;
 pub mod gpu_multigrid;
 
 /// Smallest slice a rayon task gets in the element-wise loops (smaller grids run inline on the calling worker).
-pub const MIN_LEN: usize = 4096;
+pub const MIN_LEN: usize = 1024;
 
 pub use grid::Grid;
 pub use operator::Operator;

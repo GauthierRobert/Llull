@@ -248,23 +248,28 @@ impl<T: Real> ElementMatrices<T> {
     pub fn apply(&self, u: &[T], y: &mut [T]) {
         assert!(u.len() == self.grid.dofs() && y.len() == self.grid.dofs(), "vector length");
         if self.grid.dim == 3 {
-            scatter::apply_3d(&self.grid, &self.free, u, y, |e, ue, out| self.product(e, ue, out));
+            scatter::apply_3d(&self.grid, &self.free, u, y, |e, ue, out| self.product::<3, 24>(e, ue, out));
         } else {
-            scatter::apply_2d(&self.grid, &self.free, u, y, |e, ue, out| self.product(e, ue, out));
+            scatter::apply_2d(&self.grid, &self.free, u, y, |e, ue, out| self.product::<2, 8>(e, ue, out));
         }
     }
 
+    /// `out = A_e u_e` with `u_e` and `out` in row order (the matrices are stored in local order).
     #[inline(always)]
-    fn product<const ND: usize>(&self, e: usize, ue: &[T; ND], out: &mut [T; ND]) -> bool {
+    fn product<const D: usize, const ND: usize>(&self, e: usize, ue: &[T; ND], out: &mut [T; ND]) -> bool {
         if !self.active[e] {
             return false;
         }
         let matrix = &self.matrices[e * ND * ND..(e + 1) * ND * ND];
-        out.fill(T::ZERO);
-        for (column, &ut) in matrix.chunks_exact(ND).zip(ue) {
-            for (a, &c) in out.iter_mut().zip(column) {
+        let local: [T; ND] = std::array::from_fn(|d| ue[scatter::local_dof(d, D)]);
+        let mut acc = [T::ZERO; ND];
+        for (column, &ut) in matrix.chunks_exact(ND).zip(&local) {
+            for (a, &c) in acc.iter_mut().zip(column) {
                 *a += c * ut;
             }
+        }
+        for (d, value) in out.iter_mut().enumerate() {
+            *value = acc[scatter::local_dof(d, D)];
         }
         true
     }

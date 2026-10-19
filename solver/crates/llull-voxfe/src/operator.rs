@@ -94,23 +94,18 @@ impl Operator {
         let g = &self.grid;
         assert!(u.len() == g.dofs() && y.len() == g.dofs(), "vector length");
         if g.dim == 3 {
-            let columns = self.columns::<24>();
+            let columns = self.columns::<3, 24>();
             scatter::apply_3d(g, &self.free, u, y, |e, ue, out| scaled_product(self.scale[e], &columns, ue, out));
         } else {
-            let columns = self.columns::<8>();
+            let columns = self.columns::<2, 8>();
             scatter::apply_2d(g, &self.free, u, y, |e, ue, out| scaled_product(self.scale[e], &columns, ue, out));
         }
     }
 
-    /// The element matrix transposed into columns (`[t][r] = KE[r][t]`), so `KE u_e` accumulates all rows at once.
-    fn columns<const ND: usize>(&self) -> [[f64; ND]; ND] {
-        let mut columns = [[0.0; ND]; ND];
-        for (t, column) in columns.iter_mut().enumerate() {
-            for (r, value) in column.iter_mut().enumerate() {
-                *value = self.ke[r * ND + t];
-            }
-        }
-        columns
+    /// The element matrix in row order ([`scatter::ROW_ORDER`]) by columns (`[t][r] = KE[r][t]`), so `KE u_e` accumulates
+    /// all rows at once.
+    fn columns<const D: usize, const ND: usize>(&self) -> [[f64; ND]; ND] {
+        std::array::from_fn(|t| std::array::from_fn(|r| self.ke[scatter::local_dof(r, D) * ND + scatter::local_dof(t, D)]))
     }
 
     /// Diagonal of K on the free DOFs (0 elsewhere), summed per node in the same fixed order as [`Operator::apply`].
@@ -152,11 +147,11 @@ impl Operator {
         energies
     }
 
-    /// `Σ_r u_e[r] · (Σ_t KE[r][t] u_e[t])`, inner sums in `t` order, outer in `r` order.
+    /// `Σ_r u_e[r] · (Σ_t KE[r][t] u_e[t])` in local order, inner sums in `t` order, outer in `r` order.
     fn energies_fixed<const D: usize, const NPE: usize, const ND: usize>(&self, u: &[f64], energies: &mut [f64]) {
         let g = &self.grid;
         let offsets = g.local_offsets();
-        let columns = self.columns::<ND>();
+        let columns: [[f64; ND]; ND] = std::array::from_fn(|t| std::array::from_fn(|r| self.ke[r * ND + t]));
         let rows = (ROW_WORK / g.nx).max(1);
         energies.par_chunks_mut(g.nx).enumerate().with_min_len(rows).for_each(|(row, out)| {
             let (j, k) = (row % g.ny, row / g.ny);

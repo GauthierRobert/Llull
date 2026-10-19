@@ -249,14 +249,16 @@ impl<T: Real> Multigrid<T> {
         let steps = self.settings.smoothing_steps.max(1);
         let Work { residual, direction, product, .. } = work;
         let d = &level.inverse_diagonal;
-        if from_zero {
-            residual.copy_from_slice(r);
-        } else {
+        if !from_zero {
             level.op.apply(z, product);
-            difference(r, product, residual);
         }
         match self.settings.smoother {
             Smoother::Jacobi => {
+                if from_zero {
+                    residual.copy_from_slice(r);
+                } else {
+                    difference(r, product, residual);
+                }
                 let omega = T::of(4.0 / (3.0 * level.lambda));
                 for step in 0..steps {
                     let first = from_zero && step == 0;
@@ -271,26 +273,28 @@ impl<T: Real> Multigrid<T> {
                 }
             }
             Smoother::Chebyshev => {
+                // one fused pass per step (the same operations, in the same order, as separate passes)
                 let (first_scale, recurrence) = chebyshev(level.lambda, self.settings.chebyshev_ratio, steps);
                 let scale = T::of(first_scale);
-                direction.par_iter_mut().with_min_len(MIN_LEN).zip(&**residual).zip(d).for_each(|((p, &r), &d)| *p = scale * d * r);
-                for step in 0..steps {
-                    if step > 0 {
-                        let (a, b) = recurrence[step - 1];
-                        let (a, b) = (T::of(a), T::of(b));
-                        direction
-                            .par_iter_mut()
-                            .with_min_len(MIN_LEN)
-                            .zip(&**residual)
-                            .zip(d)
-                            .for_each(|((p, &r), &d)| *p = a * *p + b * d * r);
-                    }
-                    let first = from_zero && step == 0;
-                    z.par_iter_mut().with_min_len(MIN_LEN).zip(&**direction).for_each(|(z, &p)| *z = if first { p } else { *z + p });
-                    if step + 1 < steps || want_residual {
-                        level.op.apply(direction, product);
-                        residual.par_iter_mut().with_min_len(MIN_LEN).zip(&**product).for_each(|(r, &kp)| *r -= kp);
-                    }
+                let first = residual.par_iter_mut().zip(direction.par_iter_mut()).zip(z.par_iter_mut()).zip(r).zip(&**product).zip(d);
+                first.with_min_len(MIN_LEN).for_each(|(((((residual, p), z), &r), &kz), &d)| {
+                    *residual = if from_zero { r } else { r - kz };
+                    *p = scale * d * *residual;
+                    *z = if from_zero { *p } else { *z + *p };
+                });
+                for &(a, b) in &recurrence {
+                    level.op.apply(direction, product);
+                    let (a, b) = (T::of(a), T::of(b));
+                    let next = residual.par_iter_mut().zip(direction.par_iter_mut()).zip(z.par_iter_mut()).zip(&**product).zip(d);
+                    next.with_min_len(MIN_LEN).for_each(|((((residual, p), z), &kp), &d)| {
+                        *residual -= kp;
+                        *p = a * *p + b * d * *residual;
+                        *z += *p;
+                    });
+                }
+                if want_residual {
+                    level.op.apply(direction, product);
+                    residual.par_iter_mut().with_min_len(MIN_LEN).zip(&**product).for_each(|(r, &kp)| *r -= kp);
                 }
             }
         }

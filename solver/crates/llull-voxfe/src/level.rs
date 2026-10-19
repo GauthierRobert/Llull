@@ -8,9 +8,12 @@ use crate::operator::{scaled_product, Operator};
 use crate::real::Real;
 use crate::scatter;
 
-/// The fine operator rounded to `T`: KE by columns (`[t][r] = KE[r][t]`) and the element scales.
+/// The fine operator rounded to `T`: KE in row order by columns (`[t][r] = KE[r][t]`, [`scatter::ROW_ORDER`]) and the
+/// element scales.
 pub struct Fine<T: Real> {
     grid: Grid,
+    /// KE as given (local order, f64), for the dense coarse factor of a single-level hierarchy.
+    ke: Vec<f64>,
     columns: Vec<T>,
     scale: Vec<T>,
     fixed: Vec<bool>,
@@ -21,9 +24,10 @@ impl<T: Real> Fine<T> {
     pub fn new(op: &Operator) -> Fine<T> {
         let nd = op.grid().element_dofs();
         let ke = op.ke();
-        let columns = (0..nd * nd).map(|i| T::of(ke[(i % nd) * nd + i / nd])).collect();
+        let dim = op.grid().dim;
+        let columns = (0..nd * nd).map(|i| T::of(ke[scatter::local_dof(i % nd, dim) * nd + scatter::local_dof(i / nd, dim)])).collect();
         let scale = op.scale().iter().map(|&s| T::of(s)).collect();
-        Fine { grid: *op.grid(), columns, scale, fixed: op.fixed().to_vec(), free: op.free().to_vec() }
+        Fine { grid: *op.grid(), ke: ke.to_vec(), columns, scale, fixed: op.fixed().to_vec(), free: op.free().to_vec() }
     }
 
     /// Takes the scales of `op` (same grid, supports and activity).
@@ -84,10 +88,9 @@ impl<T: Real> LevelOperator<T> {
     fn element_matrix(&self, e: usize, out: &mut [f64]) -> bool {
         match self {
             LevelOperator::Fine(op) => {
-                let nd = op.grid.element_dofs();
                 let s = op.scale[e].get();
-                for (i, value) in out.iter_mut().enumerate() {
-                    *value = s * op.columns[(i % nd) * nd + i / nd].get();
+                for (value, k) in out.iter_mut().zip(&op.ke) {
+                    *value = s * k;
                 }
                 s != 0.0
             }

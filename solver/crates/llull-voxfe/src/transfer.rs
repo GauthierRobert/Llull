@@ -20,7 +20,7 @@ pub fn parents(i: usize) -> [(usize, f64); 2] {
 
 /// Rows of nodes a rayon task gets at least.
 fn rows_per_task(nodes_per_row: usize) -> usize {
-    (2048 / nodes_per_row).max(1)
+    (512 / nodes_per_row).max(1)
 }
 
 /// `fine += w · (1D interpolation of the coarse row)`, `D` interleaved components per node.
