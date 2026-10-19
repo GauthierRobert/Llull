@@ -1,0 +1,3 @@
+# Local desktop builds (ignored by desktop/.gitignore, which Prettier does not read): bundled Python packages and packaged app assets.
+desktop/build/
+desktop/release/
