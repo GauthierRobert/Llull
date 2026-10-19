@@ -17,6 +17,7 @@ import { AnalysisModes } from './AnalysisModes';
 import { AnalysisProbes } from './AnalysisProbes';
 import { AnalysisResults } from './AnalysisResults';
 import { AnalysisSetup } from './AnalysisSetup';
+import { TopologyPanel } from './TopologyPanel';
 import { useHostQuery } from './useHostQuery';
 
 const ALL_CASES: Record<string, unknown> = {};
@@ -115,6 +116,9 @@ export function AnalysisPanel({ className }: { className?: string }): React.Reac
             />
           )}
           <AnalysisResults key={detail.described.analysisCase.id} analysisCase={detail.described.analysisCase} />
+          {detail.described.analysisCase.type === 'static' && (
+            <TopologyPanel key={detail.described.analysisCase.id} analysisId={detail.described.analysisCase.id} />
+          )}
         </>
       )}
     </aside>
