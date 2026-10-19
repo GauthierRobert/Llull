@@ -95,6 +95,8 @@ target=drawing` (needs a DWG converter). `llull list exchange` shows them all.
   `llull add_image_underlay dataUrl=@img:scan.png`, then `calibrate_underlay` and `image_to_world`.
 - A value `@text:part.lld` is read as the file's UTF-8 text: `llull apply_design source=@text:part.lld` (a `.lld` design,
   see the design-model skill; `check_design` gates on its checks, `export_design --save part.lld` writes it back).
+- `import_code file=part.py` runs CadQuery / build123d Python: it needs `LLULL_ALLOW_CODE_EXECUTION=1` and `LLULL_PYTHON` (a python
+  with CadQuery). A plain script imports as frozen meshes; prefer a `.lld` design for an editable model (design-model skill).
 - `llull <command> …` is shorthand for `llull exec <command> …`.
 
 ## Flags

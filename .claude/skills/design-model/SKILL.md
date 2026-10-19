@@ -80,6 +80,14 @@ check bbox of=drilled expect == [120, w, 66] ± 0.01
 `llull export_design --save bracket.lld`. Use the JSON plan below when a design is not a fit (editing a document built
 from the UI step by step, or `onError: "continue"`).
 
+**CadQuery is an exchange format, not the default.** `llull import_code file=part.py` (needs `LLULL_ALLOW_CODE_EXECUTION=1` and
+`LLULL_PYTHON` = a python with CadQuery) imports a plain CadQuery script's `result` as a **frozen mesh**: no parameters, no
+features (`hole_table` / `check_machining` see no holes), nothing `set_parameter` can regenerate. Only code written with llull's
+CadQuery runtime (what `export_code` emits) comes back as an editable history, and that runtime records an unrolled trace (no
+loops over a parameter). Use CadQuery for a one-shot shape that will not be edited in llull, or to hand a model to / take one from
+CadQuery users (`export_code language=cadquery` -> edit -> `import_code`); use `.lld` for everything else. Measured on the same 6
+tasks (docs/DESIGN_LANGUAGE.md §10): CadQuery 6/6 first attempt but 1/6 editable; `.lld` 6/6 and 6/6.
+
 Build an ordered `actions` list for `build_project`. Use **aliases** to chain steps
 without knowing generated ids: bind a step's result with `as: "base"`, then reference
 its first affected id later as `$base` (or `$base[N]` for the Nth). Typical shape:
