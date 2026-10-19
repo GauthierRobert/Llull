@@ -11,6 +11,8 @@ use crate::filter::{Filter, FilterKind};
 use crate::oc::{self, Design, Limits};
 use llull_gpu::reduce::{max_abs, sum};
 use llull_voxfe::ke::element_matrix;
+use llull_voxfe::multigrid::{Multigrid, MultigridSettings};
+use llull_voxfe::pcg::{pcg, Jacobi};
 use llull_voxfe::MIN_LEN;
 use llull_voxfe::{Grid, Operator, SolverKind};
 use rayon::prelude::*;
@@ -185,12 +187,17 @@ fn gpu_backend(device: Device, _op: &Operator) -> (Backend, Engine) {
 struct Solver<'a> {
     settings: &'a Settings,
     backend: Backend,
+    /// The CPU twin's multigrid hierarchy, built on the first CPU solve and updated in place when the scales change.
+    multigrid: Option<Multigrid>,
+    /// The hierarchy does not match the operator's current scales yet.
+    stale: bool,
     pcg_iterations: usize,
     warnings: Vec<String>,
 }
 
 impl Solver<'_> {
     fn set_scale(&mut self, op: &Operator) {
+        self.stale = true;
         #[cfg(feature = "gpu")]
         if let Backend::Gpu(gpu) = &self.backend {
             gpu.set_scale(op.scale());
@@ -200,8 +207,21 @@ impl Solver<'_> {
 
     fn cpu(&mut self, op: &Operator, b: &[f64]) -> Result<Vec<f64>, TopError> {
         let mut u = vec![0.0; b.len()];
-        let stats = llull_voxfe::solve(op, self.settings.solver, b, &mut u, self.settings.pcg_tolerance, self.settings.pcg_max_iterations)
-            .map_err(|error| TopError { code: "TOP_SOLVER_FAILED", message: error.to_string() })?;
+        let (tolerance, cap) = (self.settings.pcg_tolerance, self.settings.pcg_max_iterations);
+        let stats = match self.settings.solver {
+            SolverKind::Jacobi => pcg(op, &Jacobi::new(op), b, &mut u, tolerance, cap),
+            SolverKind::Multigrid => {
+                match &mut self.multigrid {
+                    Some(multigrid) if self.stale => multigrid.update(op),
+                    Some(_) => {}
+                    None => self.multigrid = Some(Multigrid::new(op, MultigridSettings::default())),
+                }
+                self.stale = false;
+                let multigrid = self.multigrid.as_ref().unwrap_or_else(|| unreachable!("built above"));
+                pcg(op, multigrid, b, &mut u, tolerance, cap)
+            }
+        }
+        .map_err(|error| TopError { code: "TOP_SOLVER_FAILED", message: error.to_string() })?;
         self.pcg_iterations += stats.iterations;
         Ok(u)
     }
@@ -341,7 +361,7 @@ pub fn optimise(
         problem.fixed.clone(),
     );
     let (backend, engine) = choose_backend(settings.device, &op);
-    let mut solver = Solver { settings, backend, pcg_iterations: 0, warnings: Vec::new() };
+    let mut solver = Solver { settings, backend, multigrid: None, stale: true, pcg_iterations: 0, warnings: Vec::new() };
     let emin = settings.emin_ratio * problem.e0;
     let target = problem.volume_fraction * active_count as f64;
     let limits = Limits { move_limit: settings.move_limit, tolerance: settings.oc_tolerance, target };

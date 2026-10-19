@@ -12,11 +12,13 @@
 //! and is the exploration path (`deterministic: false`); llull-topopt wraps it in f64 iterative refinement on the CPU so its
 //! answers still meet the 1e-10 residual.
 
+pub mod galerkin;
 pub mod grid;
 pub mod ke;
 pub mod multigrid;
 pub mod operator;
 pub mod pcg;
+pub mod scatter;
 
 #[cfg(feature = "gpu")]
 pub mod gpu;

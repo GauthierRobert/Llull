@@ -9,33 +9,21 @@
 //!   the bits do not depend on the thread count (the GPU shader computes the same sums in the same order, node by node).
 
 use crate::grid::{Grid, LOCAL_NODES};
+use crate::scatter;
 use crate::MIN_LEN;
 use rayon::prelude::*;
-use std::sync::Mutex;
+
+/// Grid points (elements or nodes) a rayon task gets at least in the row-wise loops.
+const ROW_WORK: usize = 2048;
 
 /// The stiffness operator of one grid, element matrix and set of element scales.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Operator {
     grid: Grid,
     ke: Vec<f64>,
     scale: Vec<f64>,
     fixed: Vec<bool>,
     free: Vec<bool>,
-    /// Per-element products of the first pass, reused between calls.
-    scratch: Mutex<Vec<f64>>,
-}
-
-impl Clone for Operator {
-    fn clone(&self) -> Operator {
-        Operator {
-            grid: self.grid,
-            ke: self.ke.clone(),
-            scale: self.scale.clone(),
-            fixed: self.fixed.clone(),
-            free: self.free.clone(),
-            scratch: Mutex::new(Vec::new()),
-        }
-    }
 }
 
 impl Operator {
@@ -44,7 +32,7 @@ impl Operator {
         assert_eq!(ke.len(), grid.element_dofs() * grid.element_dofs(), "element matrix size");
         assert_eq!(scale.len(), grid.elements(), "one scale per element");
         assert_eq!(fixed.len(), grid.dofs(), "one fixed flag per DOF");
-        let mut operator = Operator { grid, ke, scale, fixed, free: Vec::new(), scratch: Mutex::new(Vec::new()) };
+        let mut operator = Operator { grid, ke, scale, fixed, free: Vec::new() };
         operator.free = operator.free_dofs();
         operator
     }
@@ -98,68 +86,30 @@ impl Operator {
         });
     }
 
-    /// `y = K u` on the free DOFs, 0 elsewhere (`u` is used as given, including non-free entries).
+    /// `y = K u` on the free DOFs, 0 elsewhere (`u` is used as given, including non-free entries). Every row of `KE u_e`
+    /// sums its terms in element-DOF order, all rows at once (the loop vectorises); [`scatter`] fixes the order of the sums
+    /// per node.
     pub fn apply(&self, u: &[f64], y: &mut [f64]) {
         let g = &self.grid;
         assert!(u.len() == g.dofs() && y.len() == g.dofs(), "vector length");
         if g.dim == 3 {
-            self.apply_fixed::<3, 8, 24>(u, y);
+            let columns = self.columns::<24>();
+            scatter::apply_3d(g, &self.free, u, y, |e, ue, out| scaled_product(self.scale[e], &columns, ue, out));
         } else {
-            self.apply_fixed::<2, 4, 8>(u, y);
+            let columns = self.columns::<8>();
+            scatter::apply_2d(g, &self.free, u, y, |e, ue, out| scaled_product(self.scale[e], &columns, ue, out));
         }
     }
 
-    /// [`Operator::apply`] for `D` DOFs per node, `NPE` nodes and `ND = NPE·D` DOFs per element (unrolled by the compiler).
-    fn apply_fixed<const D: usize, const NPE: usize, const ND: usize>(&self, u: &[f64], y: &mut [f64]) {
-        let g = &self.grid;
-        let [nnx, nny, _] = g.node_dims();
-        let offsets = g.local_offsets();
-        let ke: Vec<[f64; ND]> = self.ke.chunks_exact(ND).map(|row| row.try_into().unwrap_or([0.0; ND])).collect();
-        let mut guard = self.scratch.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        let products = &mut *guard;
-        products.resize(g.elements() * ND, 0.0);
-        products.par_chunks_mut(ND).enumerate().with_min_len(MIN_LEN / 8).for_each(|(e, out)| {
-            let s = self.scale[e];
-            if s == 0.0 {
-                return;
+    /// The element matrix transposed into columns (`[t][r] = KE[r][t]`), so `KE u_e` accumulates all rows at once.
+    fn columns<const ND: usize>(&self) -> [[f64; ND]; ND] {
+        let mut columns = [[0.0; ND]; ND];
+        for (t, column) in columns.iter_mut().enumerate() {
+            for (r, value) in column.iter_mut().enumerate() {
+                *value = self.ke[r * ND + t];
             }
-            let [i, j, k] = g.element_ijk(e);
-            let origin = g.node(i, j, k);
-            let mut ue = [0.0f64; ND];
-            for b in 0..NPE {
-                let node = (origin + offsets[b]) * D;
-                ue[b * D..b * D + D].copy_from_slice(&u[node..node + D]);
-            }
-            for (row, value) in ke.iter().zip(out.iter_mut()) {
-                let mut sum = 0.0;
-                for t in 0..ND {
-                    sum += row[t] * ue[t];
-                }
-                *value = s * sum;
-            }
-        });
-        let products = &*products;
-        y.par_chunks_mut(D).enumerate().with_min_len(MIN_LEN / 4).for_each(|(n, out)| {
-            let (i, j, k) = (n % nnx, (n / nnx) % nny, n / (nnx * nny));
-            let mut acc = [0.0f64; D];
-            for a in 0..NPE {
-                let [ox, oy, oz] = LOCAL_NODES[a];
-                if i < ox || j < oy || k < oz || i - ox >= g.nx || j - oy >= g.ny || k - oz >= g.nz {
-                    continue;
-                }
-                let e = g.element(i - ox, j - oy, k - oz);
-                if self.scale[e] == 0.0 {
-                    continue;
-                }
-                let rows = &products[e * ND + a * D..e * ND + a * D + D];
-                for c in 0..D {
-                    acc[c] += rows[c];
-                }
-            }
-            for c in 0..D {
-                out[c] = if self.free[n * D + c] { acc[c] } else { 0.0 };
-            }
-        });
+        }
+        columns
     }
 
     /// Diagonal of K on the free DOFs (0 elsewhere), summed per node in the same fixed order as [`Operator::apply`].
@@ -192,32 +142,62 @@ impl Operator {
 
     /// Unscaled element energies `u_eᵀ KE u_e` (0 for inactive elements), each in a fixed order.
     pub fn element_energies(&self, u: &[f64]) -> Vec<f64> {
+        let mut energies = vec![0.0; self.grid.elements()];
+        if self.grid.dim == 3 {
+            self.energies_fixed::<3, 8, 24>(u, &mut energies);
+        } else {
+            self.energies_fixed::<2, 4, 8>(u, &mut energies);
+        }
+        energies
+    }
+
+    /// `Σ_r u_e[r] · (Σ_t KE[r][t] u_e[t])`, inner sums in `t` order, outer in `r` order.
+    fn energies_fixed<const D: usize, const NPE: usize, const ND: usize>(&self, u: &[f64], energies: &mut [f64]) {
         let g = &self.grid;
-        let (dim, npe) = (g.dim, g.nodes_per_element());
-        let nd = npe * dim;
-        (0..g.elements())
-            .into_par_iter()
-            .with_min_len(MIN_LEN)
-            .map(|e| {
-                if self.scale[e] == 0.0 {
-                    return 0.0;
+        let offsets = g.local_offsets();
+        let columns = self.columns::<ND>();
+        let rows = (ROW_WORK / g.nx).max(1);
+        energies.par_chunks_mut(g.nx).enumerate().with_min_len(rows).for_each(|(row, out)| {
+            let (j, k) = (row % g.ny, row / g.ny);
+            let first = g.element(0, j, k);
+            let origin = g.node(0, j, k);
+            for (i, energy) in out.iter_mut().enumerate() {
+                if self.scale[first + i] == 0.0 {
+                    continue;
                 }
-                let nodes = g.element_nodes(e);
-                let mut ue = [0.0f64; 24];
-                for b in 0..npe {
-                    for q in 0..dim {
-                        ue[b * dim + q] = u[nodes[b] * dim + q];
+                let mut ue = [0.0f64; ND];
+                for b in 0..NPE {
+                    let node = (origin + i + offsets[b]) * D;
+                    ue[b * D..b * D + D].copy_from_slice(&u[node..node + D]);
+                }
+                let mut acc = [0.0f64; ND];
+                for (column, &ut) in columns.iter().zip(&ue) {
+                    for (a, c) in acc.iter_mut().zip(column) {
+                        *a += c * ut;
                     }
                 }
-                let mut energy = 0.0;
-                for r in 0..nd {
-                    let row = &self.ke[r * nd..(r + 1) * nd];
-                    energy += ue[r] * row.iter().zip(&ue[..nd]).fold(0.0, |acc, (k, v)| acc + k * v);
-                }
-                energy
-            })
-            .collect()
+                *energy = ue.iter().zip(&acc).fold(0.0, |sum, (v, a)| sum + v * a);
+            }
+        });
     }
+}
+
+/// `out = s · KE u_e` from the columns of KE; false (and `out` untouched) for an inactive element (`s = 0`).
+#[inline(always)]
+fn scaled_product<const ND: usize>(s: f64, columns: &[[f64; ND]; ND], ue: &[f64; ND], out: &mut [f64; ND]) -> bool {
+    if s == 0.0 {
+        return false;
+    }
+    let mut acc = [0.0f64; ND];
+    for (column, &ut) in columns.iter().zip(ue) {
+        for (a, c) in acc.iter_mut().zip(column) {
+            *a += c * ut;
+        }
+    }
+    for (value, a) in out.iter_mut().zip(&acc) {
+        *value = s * a;
+    }
+    true
 }
 
 #[cfg(test)]
