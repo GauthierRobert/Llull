@@ -599,10 +599,21 @@ dependencies = [
 name = "llull-compute"
 version = "0.1.0"
 dependencies = [
+ "llull-explicit",
  "llull-post",
  "llull-protocol",
  "llull-raster",
  "llull-topopt",
+]
+
+[[package]]
+name = "llull-explicit"
+version = "0.1.0"
+dependencies = [
+ "llull-protocol",
+ "rayon",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -13,6 +13,7 @@ default-members = [
   "crates/llull-gpu",
   "crates/llull-voxfe",
   "crates/llull-topopt",
+  "crates/llull-explicit",
   "bins/llull-compute",
 ]
 
@@ -45,6 +46,10 @@ opt-level = 3
 opt-level = 3
 
 [profile.dev.package.llull-gpu]
+opt-level = 3
+
+# The explicit benchmarks integrate tens of thousands of cycles (bar wave, drop).
+[profile.dev.package.llull-explicit]
 opt-level = 3
 
 [profile.release]

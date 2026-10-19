@@ -1,0 +1,399 @@
+//! `llull-compute explicit <job-folder>`: the job folder contract (PHY-19 TECHNICAL_SPEC §13.3; host side
+//! `server/src/native/explicitJobFiles.ts`).
+//!
+//! # Input: `job.json` (camelCase, unknown fields rejected)
+//!
+//! ```json
+//! {
+//!   "version": 1,
+//!   "nodes": "nodes.f64", "hex8": "hex8.u32", "tet4": "tet4.u32", "elementMaterial": "elmat.u32", "initialVelocity": "velocity.f64",
+//!   "materials": [{ "density": 7.85e-9, "youngsModulus": 200000, "poisson": 0.3,
+//!                   "johnsonCook": { "a": 300, "b": 500, "n": 0.5, "c": 0.02, "referenceRate": 1, "m": 1, "meltK": 1800, "transitionK": 293 } }],
+//!   "gravity": [0, 0, 0],
+//!   "walls": [{ "name": "anvil", "point": [5, 5, 0], "normal": [0, 0, 1] }],
+//!   "controls": { "endTime": 1.6e-4, "historyInterval": 1e-6, "timeStepScale": 0.9, "minTimeStep": 1e-12, "hourglassCoefficient": 0.1,
+//!                 "bulkLinear": 0.06, "bulkQuadratic": 1.5, "massScaling": { "targetTimeStep": 1e-7, "maxAddedMassRatio": 0.05 },
+//!                 "maxCycles": 50000000 },
+//!   "device": "cpu"
+//! }
+//! ```
+//!
+//! - Units are consistent and never converted (N-mm-t-s: mm, s, t, MPa, mJ; N-m-kg-s: SI).
+//! - Binary arrays are little-endian: `nodes` 3 × f64 per node, `hex8` 8 × u32 per element, `tet4` 4 × u32 per element (either may be
+//!   absent, not both), `elementMaterial` one u32 per element (hex8 first, then tet4), `initialVelocity` 3 × f64 per node.
+//! - `device`: `cpu` (default, deterministic Rust path) | `gpu` | `auto`. RS-8a has no GPU kernels: a GPU request runs the CPU twin and
+//!   reports the warning `EXP_GPU_FALLBACK`.
+//!
+//! # Events (stdout NDJSON, `llull-protocol`)
+//!
+//! `progress` about every 1 % of the end time: `{"step":k,"total":100,"cycle":…,"time":…,"endTime":…,"dt":…}`; `warning`; then `done`
+//! with the outputs and their sha256, or `error` with `NATIVE_JOB_IO`, `NATIVE_JOB_INPUT` or `EXP_SOLVER_FAILED`.
+//!
+//! # Outputs
+//!
+//! - `result.json`: `version`, `termination` (`normal` | `abnormal`), `message`, `cycles`, `finalTime`, `minTimeStep`, `initialMass`,
+//!   `addedMass`, `elements` {hex8, tet4}, `device` (`cpu`), `deterministic` (true), `energy` (rows `[t, kinetic, internal, hourglass,
+//!   wall, externalWork]`, one per history interval plus t = 0 and the end), `walls` ([{name, t[], force[]}], the normal force averaged
+//!   over each history interval = impulse / interval).
+//! - `fields.f64`: per element `[von Mises, equivalent plastic strain, failed (0/1), centroid x, y, z]` at the end, little-endian f64.
+//!   Every output is byte-identical across runs and thread counts.
+
+use crate::model::{Controls, JohnsonCook, MassScaling, Material, Model, Wall};
+use crate::solver::{run, Outcome, Progress};
+use llull_protocol::{emit, sha256_hex, Event, Output};
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::io::Write;
+use std::path::Path;
+
+/// A job failure: a stable code and a message.
+#[derive(Debug, Clone, PartialEq)]
+pub struct JobError {
+    pub code: &'static str,
+    pub message: String,
+}
+
+fn input(message: impl Into<String>) -> JobError {
+    JobError { code: "NATIVE_JOB_INPUT", message: message.into() }
+}
+
+fn io(message: impl Into<String>) -> JobError {
+    JobError { code: "NATIVE_JOB_IO", message: message.into() }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct JohnsonCookSpec {
+    a: f64,
+    b: f64,
+    n: f64,
+    c: f64,
+    reference_rate: f64,
+    m: f64,
+    melt_k: f64,
+    transition_k: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct MaterialSpec {
+    density: f64,
+    youngs_modulus: f64,
+    poisson: f64,
+    johnson_cook: Option<JohnsonCookSpec>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct WallSpec {
+    name: String,
+    point: [f64; 3],
+    normal: [f64; 3],
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct MassScalingSpec {
+    target_time_step: f64,
+    max_added_mass_ratio: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ControlsSpec {
+    end_time: f64,
+    history_interval: f64,
+    time_step_scale: f64,
+    min_time_step: Option<f64>,
+    hourglass_coefficient: f64,
+    bulk_linear: f64,
+    bulk_quadratic: f64,
+    mass_scaling: Option<MassScalingSpec>,
+    max_cycles: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum DeviceName {
+    #[default]
+    Cpu,
+    Gpu,
+    Auto,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct JobSpec {
+    version: u32,
+    nodes: String,
+    hex8: Option<String>,
+    tet4: Option<String>,
+    element_material: String,
+    initial_velocity: String,
+    materials: Vec<MaterialSpec>,
+    #[serde(default)]
+    gravity: [f64; 3],
+    #[serde(default)]
+    walls: Vec<WallSpec>,
+    controls: ControlsSpec,
+    #[serde(default)]
+    device: DeviceName,
+}
+
+/// Default cap on cycles when the job gives none.
+const DEFAULT_MAX_CYCLES: u64 = 50_000_000;
+
+fn read_bytes(folder: &Path, name: &str) -> Result<Vec<u8>, JobError> {
+    if Path::new(name).file_name().map(|file| file != name).unwrap_or(true) {
+        return Err(input(format!("'{name}' is not a plain file name")));
+    }
+    fs::read(folder.join(name)).map_err(|error| io(format!("cannot read {name}: {error}")))
+}
+
+fn read_f64(folder: &Path, name: &str) -> Result<Vec<f64>, JobError> {
+    let bytes = read_bytes(folder, name)?;
+    if bytes.len() % 8 != 0 {
+        return Err(input(format!("{name} is not a whole number of f64 values")));
+    }
+    Ok(bytes.chunks_exact(8).map(|chunk| f64::from_le_bytes(chunk.try_into().unwrap_or([0; 8]))).collect())
+}
+
+fn read_u32(folder: &Path, name: &str) -> Result<Vec<u32>, JobError> {
+    let bytes = read_bytes(folder, name)?;
+    if bytes.len() % 4 != 0 {
+        return Err(input(format!("{name} is not a whole number of u32 values")));
+    }
+    Ok(bytes.chunks_exact(4).map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap_or([0; 4]))).collect())
+}
+
+fn finite(values: &[f64]) -> bool {
+    values.iter().all(|value| value.is_finite())
+}
+
+fn material_of(spec: MaterialSpec) -> Result<Material, JobError> {
+    if !(spec.density > 0.0 && spec.youngs_modulus > 0.0 && spec.poisson > -1.0 && spec.poisson < 0.5)
+        || !finite(&[spec.density, spec.youngs_modulus])
+    {
+        return Err(input("a material needs density > 0, youngsModulus > 0 and poisson in (-1, 0.5)"));
+    }
+    let johnson_cook = match spec.johnson_cook {
+        None => None,
+        Some(jc) => {
+            if !(jc.a > 0.0 && jc.b >= 0.0 && jc.n >= 0.0 && jc.c >= 0.0 && jc.reference_rate > 0.0 && jc.melt_k > jc.transition_k)
+                || !finite(&[jc.a, jc.b, jc.n, jc.c, jc.reference_rate, jc.m])
+            {
+                return Err(input("johnsonCook needs a > 0, b, n, c >= 0, referenceRate > 0 and meltK > transitionK"));
+            }
+            Some(JohnsonCook {
+                a: jc.a,
+                b: jc.b,
+                n: jc.n,
+                c: jc.c,
+                reference_rate: jc.reference_rate,
+                m: jc.m,
+                melt_k: jc.melt_k,
+                transition_k: jc.transition_k,
+            })
+        }
+    };
+    Ok(Material { density: spec.density, youngs_modulus: spec.youngs_modulus, poisson: spec.poisson, johnson_cook })
+}
+
+fn controls_of(spec: ControlsSpec) -> Result<Controls, JobError> {
+    let ControlsSpec {
+        end_time, history_interval, time_step_scale, min_time_step, hourglass_coefficient, bulk_linear, bulk_quadratic, ..
+    } = spec;
+    if !(end_time > 0.0 && history_interval > 0.0 && history_interval <= end_time) || !end_time.is_finite() {
+        return Err(input("controls need 0 < historyInterval <= endTime"));
+    }
+    if !(time_step_scale > 0.0 && time_step_scale <= 1.0)
+        || !(hourglass_coefficient >= 0.0)
+        || !(bulk_linear >= 0.0 && bulk_quadratic >= 0.0)
+    {
+        return Err(input("controls need timeStepScale in (0, 1] and non-negative hourglass and bulk viscosity coefficients"));
+    }
+    let mass_scaling = match spec.mass_scaling {
+        None => None,
+        Some(scaling) if scaling.target_time_step > 0.0 && scaling.max_added_mass_ratio >= 0.0 => {
+            Some(MassScaling { target_time_step: scaling.target_time_step, max_added_mass_ratio: scaling.max_added_mass_ratio })
+        }
+        Some(_) => return Err(input("massScaling needs targetTimeStep > 0 and maxAddedMassRatio >= 0")),
+    };
+    Ok(Controls {
+        end_time,
+        history_interval,
+        time_step_scale,
+        min_time_step,
+        hourglass_coefficient,
+        bulk_linear,
+        bulk_quadratic,
+        mass_scaling,
+        max_cycles: spec.max_cycles.unwrap_or(DEFAULT_MAX_CYCLES),
+    })
+}
+
+/// The model of a job folder, validated (indices in range, unit wall normals, finite values).
+pub fn load(folder: &Path) -> Result<(Model, bool), JobError> {
+    let text = fs::read_to_string(folder.join("job.json")).map_err(|error| io(format!("cannot read job.json: {error}")))?;
+    let spec: JobSpec = serde_json::from_str(&text).map_err(|error| input(format!("job.json: {error}")))?;
+    if spec.version != 1 {
+        return Err(input(format!("job.json version {} is not supported (1)", spec.version)));
+    }
+    let coordinates = read_f64(folder, &spec.nodes)?;
+    let hex8 = match &spec.hex8 {
+        Some(name) => read_u32(folder, name)?,
+        None => Vec::new(),
+    };
+    let tet4 = match &spec.tet4 {
+        Some(name) => read_u32(folder, name)?,
+        None => Vec::new(),
+    };
+    let element_material = read_u32(folder, &spec.element_material)?;
+    let initial_velocity = read_f64(folder, &spec.initial_velocity)?;
+    let materials = spec.materials.into_iter().map(material_of).collect::<Result<Vec<_>, _>>()?;
+    let walls = spec
+        .walls
+        .into_iter()
+        .map(|wall| {
+            let length = wall.normal.iter().map(|value| value * value).sum::<f64>().sqrt();
+            if !(length > 0.0) || !finite(&wall.point) || !length.is_finite() {
+                return Err(input(format!("wall '{}' needs a finite point and a non-zero normal", wall.name)));
+            }
+            Ok(Wall { name: wall.name, point: wall.point, normal: wall.normal.map(|value| value / length) })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let model = Model {
+        coordinates,
+        hex8,
+        tet4,
+        element_material,
+        materials,
+        initial_velocity,
+        gravity: spec.gravity,
+        walls,
+        controls: controls_of(spec.controls)?,
+    };
+    validate(&model)?;
+    Ok((model, spec.device != DeviceName::Cpu))
+}
+
+/// Shape and index checks of a model.
+pub fn validate(model: &Model) -> Result<(), JobError> {
+    let nodes = model.node_count();
+    if !model.coordinates.len().is_multiple_of(3) || nodes == 0 || !finite(&model.coordinates) {
+        return Err(input("nodes must hold 3 finite values per node"));
+    }
+    if !model.hex8.len().is_multiple_of(8) || !model.tet4.len().is_multiple_of(4) || model.element_count() == 0 {
+        return Err(input("hex8 needs 8 and tet4 4 indices per element, and there must be at least one element"));
+    }
+    if model.hex8.iter().chain(model.tet4.iter()).any(|&node| node as usize >= nodes) {
+        return Err(input("an element references a node that does not exist"));
+    }
+    if model.element_material.len() != model.element_count()
+        || model.element_material.iter().any(|&index| index as usize >= model.materials.len())
+    {
+        return Err(input("elementMaterial needs one valid material index per element"));
+    }
+    if model.initial_velocity.len() != 3 * nodes || !finite(&model.initial_velocity) || !finite(&model.gravity) {
+        return Err(input("initialVelocity needs 3 finite values per node and gravity 3 finite values"));
+    }
+    Ok(())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ElementCounts {
+    hex8: usize,
+    tet4: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WallOutput<'a> {
+    name: &'a str,
+    t: &'a [f64],
+    force: &'a [f64],
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ResultFile<'a> {
+    version: u32,
+    termination: &'static str,
+    message: &'a str,
+    cycles: u64,
+    final_time: f64,
+    min_time_step: f64,
+    initial_mass: f64,
+    added_mass: f64,
+    elements: ElementCounts,
+    device: &'static str,
+    deterministic: bool,
+    energy: Vec<[f64; 6]>,
+    walls: Vec<WallOutput<'a>>,
+}
+
+/// The bytes of `result.json` and `fields.f64` for an outcome.
+pub fn outputs(model: &Model, outcome: &Outcome) -> Result<(Vec<u8>, Vec<u8>), JobError> {
+    let result = ResultFile {
+        version: 1,
+        termination: if outcome.normal { "normal" } else { "abnormal" },
+        message: &outcome.message,
+        cycles: outcome.cycles,
+        final_time: outcome.final_time,
+        min_time_step: outcome.min_time_step,
+        initial_mass: outcome.initial_mass,
+        added_mass: outcome.added_mass,
+        elements: ElementCounts { hex8: model.hex_count(), tet4: model.tet_count() },
+        device: "cpu",
+        deterministic: true,
+        energy: outcome
+            .energy
+            .iter()
+            .map(|row| [row.time, row.kinetic, row.internal, row.hourglass, row.wall, row.external_work])
+            .collect(),
+        walls: outcome.walls.iter().map(|wall| WallOutput { name: &wall.name, t: &wall.times, force: &wall.forces }).collect(),
+    };
+    let json = serde_json::to_vec(&result).map_err(|error| io(format!("result.json: {error}")))?;
+    let mut fields = Vec::with_capacity(model.element_count() * 6 * 8);
+    for value in &outcome.fields {
+        fields.extend_from_slice(&value.to_le_bytes());
+    }
+    Ok((json, fields))
+}
+
+/// Runs the job in `folder`: progress events to `out`, outputs written next to `job.json`.
+pub fn run_job(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobError> {
+    let (model, wants_gpu) = load(folder)?;
+    if wants_gpu {
+        let _ = emit(
+            out,
+            &Event::Warning {
+                code: "EXP_GPU_FALLBACK",
+                message: "no GPU kernels in this build of llull-explicit: the deterministic CPU twin ran",
+            },
+        );
+    }
+    let mut last_step = 0u64;
+    let end_time = model.controls.end_time;
+    let mut report = |progress: Progress| {
+        let step = ((progress.time / end_time) * 100.0).floor().clamp(0.0, 100.0) as u64;
+        if step > last_step {
+            last_step = step;
+            let mut detail = serde_json::Map::new();
+            detail.insert("cycle".into(), serde_json::json!(progress.cycle));
+            detail.insert("time".into(), serde_json::json!(progress.time));
+            detail.insert("endTime".into(), serde_json::json!(end_time));
+            detail.insert("dt".into(), serde_json::json!(progress.dt));
+            let _ = emit(out, &Event::Progress { step, total: 100, message: "explicit", detail: Some(detail) });
+        }
+    };
+    let outcome = run(&model, &mut report).map_err(|message| JobError { code: "EXP_SOLVER_FAILED", message })?;
+    let (json, fields) = outputs(&model, &outcome)?;
+    let mut written = Vec::new();
+    for (name, bytes) in [("fields.f64", fields), ("result.json", json)] {
+        fs::write(folder.join(name), &bytes).map_err(|error| io(format!("cannot write {name}: {error}")))?;
+        written.push(Output { path: name.to_string(), sha256: sha256_hex(&bytes) });
+    }
+    Ok(written)
+}
