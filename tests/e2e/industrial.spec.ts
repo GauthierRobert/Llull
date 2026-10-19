@@ -198,13 +198,21 @@ test.describe('industrial workflow', () => {
     await expect(page.getByTestId('building-export-status')).toContainText('DSTV NC1:');
   });
   test('I38 — a fixed-base crane hall designs lighter than a pinned one', async ({ page }) => {
+    // The first Design frames sizes the hall twice (pinned, then fixed bases): ~30 s on its own.
+    test.setTimeout(120_000);
     await openBuilding(page);
     const hallFields = { span: '24000', length: '30000', cladding: 'false', craneRailHeight: '6000' };
     await applyTool(page, 'hall', hallFields);
     await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
     await page.getByTestId('frame-design').click();
     await expect(status(page)).toContainText('Designed 6 frame(s)');
-    await expect(page.getByTestId('takeoff-member.HEB500.kg')).toBeVisible();
+    // Sway governs the pinned design: Design frames (allowFixedBases default) re-runs it with fixed bases and keeps the lighter one.
+    await expect(status(page)).toContainText('column bases pinned → fixed');
+    const summary = (await status(page).textContent()) ?? '';
+    const [, pinnedTonnes, fixedTonnes] = /pinned-base design .*frames ([\d.]+) t\); fixed bases: .*frames ([\d.]+) t/.exec(summary) ?? [];
+    expect(Number(fixedTonnes)).toBeLessThan(0.75 * Number(pinnedTonnes));
+    await expect(page.getByTestId('takeoff-member.HEB500.kg')).toHaveCount(0);
+    await expect(page.getByTestId('takeoff-member.HEA400.kg')).toBeVisible();
     await openBuilding(page);
     await applyTool(page, 'hall', { ...hallFields, columnBase: 'fixed' });
     await expect(status(page)).toContainText('fixed column bases');

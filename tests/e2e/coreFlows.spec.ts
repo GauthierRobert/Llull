@@ -96,8 +96,9 @@ test('core flow: draw, extrude, dimension, export, undo/redo, layers', async ({ 
   await page.keyboard.press('Control+y');
   await expect(status(page)).toContainText('Entities2');
 
-  // (f) Layers: one click on the browser panel button, create a layer, hide and lock it.
+  // (f) Layers: open the browser panel (it opens on Objects) on its Layers tab, create a layer, hide and lock it.
   await button(page, 'Show browser panel').click();
+  await page.getByRole('tab', { name: /^Layers/ }).click();
   const layers = page.getByRole('complementary', { name: 'Layers' });
   await expect(layers).toBeVisible();
   await layers.getByLabel('New layer name').fill('Frozen');
