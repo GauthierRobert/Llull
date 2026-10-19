@@ -73,6 +73,53 @@ describe('nativeArgs / nativeRecipe', () => {
     expect(nativeArgs('distance', [{ key: 'a' }, { key: 'b' }, 5])).toEqual([{ key: 'a' }, { key: 'b' }, 5]);
   });
 
+  it('rewrites the shape handles of topology, every face query and both distance operands', () => {
+    expect(nativeArgs('topology', [{ key: 't', recipe: cube }])).toEqual([{ key: 't', recipe: cube }]);
+    expect(nativeArgs('faceQuery.projectOnFace', [{ key: 'f' }, 2, [[0, 0, 0]]])).toEqual([{ key: 'f' }, 2, [[0, 0, 0]]]);
+    const tangent: ShapeRecipe = leaf({
+      id: 'p',
+      kind: 'pyramid',
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      baseWidth: 1,
+      baseDepth: 1,
+      height: 1,
+      ...common,
+    } as Entity);
+    const [rewritten] = nativeArgs('faceQuery.faceGraph', [{ key: 'p', recipe: tangent }]) as [{ recipe: ShapeRecipe }];
+    expect(rewritten.recipe.op === 'solid' && rewritten.recipe.entity.kind).toBe('mesh');
+    const [, second] = nativeArgs('distance', [{ key: 'a' }, { key: 'p', recipe: tangent }, 5]) as [
+      unknown,
+      { recipe: ShapeRecipe },
+      number,
+    ];
+    expect(second.recipe.op === 'solid' && second.recipe.entity.kind).toBe('mesh');
+  });
+
+  it('flattens assembly parts to indices so a shared part stays one product', () => {
+    const bolt = { shapes: [{ key: 'bolt' }] };
+    const bracket = { shapes: [{ key: 'bracket', recipe: cube }], children: [{ part: bolt, position: [1, 0, 0], rotation: [0, 0, 0] }] };
+    const occurrences = [
+      { part: bracket, position: [0, 0, 0], rotation: [0, 0, 0] },
+      { part: bolt, position: [5, 0, 0], rotation: [0, 0, 1] },
+      { part: bracket, position: [9, 0, 0], rotation: [0, 0, 0] },
+    ];
+    expect(nativeArgs('exportStepAssembly', [occurrences])).toEqual([
+      {
+        parts: [
+          { shapes: [{ key: 'bracket', recipe: cube }], children: [{ part: 1, position: [1, 0, 0], rotation: [0, 0, 0] }] },
+          { shapes: [{ key: 'bolt' }], children: [] },
+        ],
+        occurrences: [
+          { part: 0, position: [0, 0, 0], rotation: [0, 0, 0] },
+          { part: 1, position: [5, 0, 0], rotation: [0, 0, 1] },
+          { part: 0, position: [9, 0, 0], rotation: [0, 0, 0] },
+        ],
+      },
+    ]);
+    expect(nativeArgs('importShapes', ['step', 'text', { heal: true }])).toEqual(['step', 'text', { heal: true }]);
+  });
+
   it('sends a pyramid as the sewn triangles the WASM kernel builds it from', () => {
     const pyramid = {
       id: 'p',

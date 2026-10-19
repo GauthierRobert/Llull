@@ -1,12 +1,14 @@
 /**
  * Wire vocabulary of the native `llull-kernel` sidecar (RS-1; Rust side: solver/bins/llull-kernel/src/session.rs). One JSON object per
  * line both ways: request `{ id, op, args }`, reply `{ id, result, error? }`. Ops and argument shapes are the `KernelOps` worker protocol
- * (`occtWorkerProtocol.ts`) with two rewrites made here: `evaluate` takes a handle `{ key, recipe }` instead of a bare recipe (the
- * sidecar caches by the host's recipe key), and `tessellate` answers base64 little-endian arrays (decoded by `decodeMesh`).
+ * (`occtWorkerProtocol.ts`) with three rewrites made here: `evaluate` takes a handle `{ key, recipe }` instead of a bare recipe (the
+ * sidecar caches by the host's recipe key), `exportStepAssembly` takes `{ parts, occurrences }` with parts by index (JSON has no object
+ * identity), and `tessellate` answers base64 little-endian arrays (decoded by `decodeMesh`).
  * @invariant pure: no process, no I/O
  */
 
-import type { Entity, MeshData, ShapeRecipe } from '@core/model/types';
+import type { Entity, MeshData, ShapeRecipe, Vec3 } from '@core/model/types';
+import type { StepAssemblyPart, StepOccurrence } from '@core/geometry/kernel';
 import { createEmptyDocument } from '@core/model/types';
 import { entityTrianglePositions } from '@core/geometry/entityTriangles';
 import { orientOutward } from '@core/geometry/meshVolume';
@@ -133,7 +135,37 @@ function nativeHandle(handle: unknown): unknown {
   return recipe === undefined ? { key } : { key, recipe: nativeRecipe(recipe) };
 }
 
-const SINGLE_SHAPE_OPS: ReadonlySet<string> = new Set(['tessellate', 'massProperties', 'analyze']);
+/** Ops whose first argument is a shape handle (every `faceQuery.<method>` too). */
+const FIRST_ARG_SHAPE_OPS: ReadonlySet<string> = new Set(['tessellate', 'massProperties', 'analyze', 'topology']);
+
+interface WireUse {
+  readonly part: number;
+  readonly position: Vec3;
+  readonly rotation: Vec3;
+}
+
+/** `exportStepAssembly` on the wire: part objects become indices, so a part shared by several occurrences stays one product. */
+interface WireAssembly {
+  readonly parts: { readonly shapes: readonly unknown[]; readonly children: readonly WireUse[] }[];
+  readonly occurrences: readonly WireUse[];
+}
+
+function wireAssembly(occurrences: readonly StepOccurrence<unknown>[]): WireAssembly {
+  const parts: WireAssembly['parts'][number][] = [];
+  const indexOf = new Map<StepAssemblyPart<unknown>, number>();
+  const placedUse = ({ part, position, rotation }: StepOccurrence<unknown>): WireUse => ({ part: partIndex(part), position, rotation });
+  function partIndex(part: StepAssemblyPart<unknown>): number {
+    const known = indexOf.get(part);
+    if (known !== undefined) return known;
+    const index = parts.length;
+    indexOf.set(part, index);
+    const children: WireUse[] = [];
+    parts.push({ shapes: part.shapes.map(nativeHandle), children });
+    for (const child of part.children ?? []) children.push(placedUse(child));
+    return index;
+  }
+  return { occurrences: occurrences.map(placedUse), parts };
+}
 
 /** Arguments of a `KernelOps` request rewritten for the sidecar (see the module comment). */
 export function nativeArgs(op: string, args: readonly unknown[]): readonly unknown[] {
@@ -141,7 +173,9 @@ export function nativeArgs(op: string, args: readonly unknown[]): readonly unkno
     const recipe = args[0] as ShapeRecipe;
     return [{ key: recipeKey(recipe), recipe: nativeRecipe(recipe) }];
   }
-  if (SINGLE_SHAPE_OPS.has(op)) return [nativeHandle(args[0]), ...args.slice(1)];
+  if (FIRST_ARG_SHAPE_OPS.has(op) || op.startsWith('faceQuery.')) return [nativeHandle(args[0]), ...args.slice(1)];
+  if (op === 'distance') return [nativeHandle(args[0]), nativeHandle(args[1]), ...args.slice(2)];
   if (op === 'exportStep' && Array.isArray(args[0])) return [args[0].map(nativeHandle)];
+  if (op === 'exportStepAssembly' && Array.isArray(args[0])) return [wireAssembly(args[0] as StepOccurrence<unknown>[])];
   return args;
 }

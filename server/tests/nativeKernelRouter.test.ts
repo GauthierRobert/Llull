@@ -113,6 +113,46 @@ describe('native kernel router', () => {
     });
   });
 
+  it('loads document blobs into the sidecar now and into the WASM kernel before its first request', async () => {
+    const native: NativeInfo = { ...NATIVE, ops: [...NATIVE.ops, 'loadBlob'] };
+    const nativeCalls: { op: string; args: readonly unknown[] }[] = [];
+    const fallbackCalls: KernelRequest[] = [];
+    let live = 0;
+    const sessions = [0, 1].map(
+      (index): NativeKernelSession => ({
+        request: (op, args) => {
+          nativeCalls.push({ op: `${index}:${op}`, args });
+          return Promise.resolve({ result: op === 'loadBlob' ? null : 'native' });
+        },
+        alive: () => index === live,
+        close: () => undefined,
+      }),
+    );
+    const router = createKernelRouter({
+      native,
+      session: () => sessions[live]!,
+      fallback: () =>
+        Promise.resolve((request: KernelRequest): KernelReply => {
+          fallbackCalls.push(request);
+          return { result: `wasm:${request.op}` };
+        }),
+      warn: () => undefined,
+    });
+    expect(await router.route({ op: 'loadBlob', args: ['sha-a', 'text-a'] })).toEqual({ result: null });
+    expect(nativeCalls).toEqual([{ op: '0:loadBlob', args: ['sha-a', 'text-a'] }]);
+    expect(fallbackCalls).toEqual([]);
+
+    await router.route({ op: 'topology', args: [{ key: 'k' }] }); // not native here: the WASM kernel gets the blob first
+    expect(fallbackCalls.map((request) => request.op)).toEqual(['loadBlob', 'topology']);
+    await router.route({ op: 'topology', args: [{ key: 'k' }] });
+    expect(fallbackCalls.filter((request) => request.op === 'loadBlob')).toHaveLength(1);
+
+    live = 1; // the sidecar died and was respawned: it gets every blob again before the next request
+    await router.route({ op: 'massProperties', args: [{ key: 'k' }] });
+    expect(nativeCalls.slice(1).map((call) => call.op)).toEqual(['1:loadBlob', '1:massProperties']);
+    expect((await router.route({ op: 'loadBlob', args: ['sha', 7] })).error).toMatch(/expects/);
+  });
+
   it('turns a throw into an error reply', async () => {
     const h = harness(() => {
       throw new Error('broken pipe');

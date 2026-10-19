@@ -33,6 +33,18 @@ impl<V> Lru<V> {
         Some(&entry.1)
     }
 
+    /// Drops every entry for which `keep` is false.
+    pub fn retain(&mut self, mut keep: impl FnMut(&V) -> bool) {
+        let order = &mut self.order;
+        self.entries.retain(|_, (tick, value)| {
+            let kept = keep(value);
+            if !kept {
+                order.remove(tick);
+            }
+            kept
+        });
+    }
+
     /// Inserts (or replaces) `key`, then drops the least recently used entries beyond the capacity.
     pub fn insert(&mut self, key: String, value: V) {
         self.tick += 1;
@@ -72,5 +84,18 @@ mod tests {
         assert_eq!(cache.len(), 1);
         assert_eq!(cache.get("a"), Some(&2));
         assert!(!cache.is_empty());
+    }
+
+    #[test]
+    fn retain_drops_entries_and_their_order() {
+        let mut cache = Lru::new(3);
+        cache.insert("a".to_string(), 1);
+        cache.insert("b".to_string(), 2);
+        cache.retain(|value| *value != 1);
+        assert_eq!(cache.get("a"), None);
+        assert_eq!(cache.len(), 1);
+        cache.insert("c".to_string(), 3);
+        cache.insert("d".to_string(), 4);
+        assert_eq!(cache.get("b"), Some(&2), "a dropped entry no longer counts towards the capacity");
     }
 }

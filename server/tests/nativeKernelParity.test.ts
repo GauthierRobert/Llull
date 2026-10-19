@@ -1,97 +1,25 @@
 /**
- * Native `llull-kernel` (OCCT 7.8.1) vs the WASM OCC kernel (opencascade.js, OCCT 7.4) on the ops the sidecar implements — the first
- * slice of VC-KRN-25 (01 KRN TR-KRN-05): primitives, booleans, transforms, exact mass properties, analysis, tessellation sanity and
- * STEP. Runs when the binary is built (`cargo build --release -p llull-kernel` in solver/, or LLULL_KERNEL_BIN / LLULL_NATIVE_DIR);
- * otherwise skipped with the reason logged.
+ * Native `llull-kernel` (OCCT 7.8.1) vs the WASM OCC kernel (opencascade.js, OCCT 7.4) — the first slice of VC-KRN-25 (01 KRN
+ * TR-KRN-05): primitives, booleans, transforms, exact mass properties, analysis, tessellation sanity and STEP, plus the proxy end to end.
+ * Query ops: nativeKernelQueryParity.test.ts; exchange ops: nativeKernelExchangeParity.test.ts. Runs when the binary is built
+ * (`cargo build --release -p llull-kernel` in solver/, or LLULL_KERNEL_BIN / LLULL_NATIVE_DIR); otherwise skipped with the reason logged.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { GeometryKernel } from '@core/geometry/kernel';
-import type { ExactMassProperties } from '@core/geometry/kernelPorts';
-import type { Entity, MeshData, ShapeRecipe, Vec3 } from '@core/model/types';
+import type { ExactMassProperties, ImportedShapes } from '@core/geometry/kernelPorts';
+import type { MeshData, ShapeRecipe } from '@core/model/types';
 import { recipeKey } from '@core/geometry/shapeRecipe';
+import { sha256Hex } from '@lib/sha256';
 import { isClosedMesh } from '@kernel-occt/meshClosure';
 import { createNodeOcctKernel } from '../src/occtNode';
 import { createNativeKernel } from '../src/nativeKernel';
-import { nativeBinaryPath, nativeInstallHint } from '../src/native/nativeBinary';
 import { decodeMesh, nativeArgs } from '../src/native/kernelProtocol';
 import { createKernelSession, spawnKernelChild, type NativeKernelSession } from '../src/native/kernelSession';
-import { booleanRecipe, box, common, leaf, volume } from './kernelTestSupport';
+import { booleanRecipe, box, leaf, volume } from './kernelTestSupport';
+import { BOOLEANS, entity, nativeKernelBinary, plate, PRIMITIVES, relative } from './nativeParitySupport';
 
-const binary = nativeBinaryPath('llull-kernel');
-// CI's native-kernel job builds the binary first: there a missing binary is a failure, not a skip.
-if (binary === null && process.env['LLULL_REQUIRE_NATIVE_KERNEL'] === '1') throw new Error(nativeInstallHint('llull-kernel'));
-if (binary === null) console.warn(`[native parity] skipped: ${nativeInstallHint('llull-kernel')}`);
-
-const entity = (kind: string, fields: Record<string, unknown>, position: Vec3 = [0, 0, 0], rotation: Vec3 = [0, 0, 0]): Entity =>
-  ({ id: kind, kind, position, rotation, ...common, ...fields }) as Entity;
-
-const PRIMITIVES: readonly [string, Entity][] = [
-  ['box', box([1, 2, 3], [4, 5, 6])],
-  ['rotated box', entity('box', { size: [4, 5, 6] }, [-2, 4, 1], [0.3, -0.5, 1.1])],
-  ['cylinder', entity('cylinder', { radius: 2, height: 5 }, [5, -3, 2])],
-  ['rotated cylinder', entity('cylinder', { radius: 1.5, height: 4 }, [0, 0, 0], [Math.PI / 2, 0, 0.4])],
-  ['sphere', entity('sphere', { radius: 3 }, [1, 1, 1])],
-  ['cone', entity('cone', { radius: 2, height: 6 })],
-  ['torus', entity('torus', { ringRadius: 5, tubeRadius: 1 }, [0, 0, 2], [0.2, 0, 0])],
-  ['wedge', entity('wedge', { size: [3, 4, 5] }, [1, 0, 0])],
-  [
-    'extrusion',
-    entity('extrusion', {
-      profile: [
-        [0, 0],
-        [4, 0],
-        [4, 1],
-        [1, 1],
-        [1, 3],
-        [0, 3],
-      ],
-      depth: 2,
-    }),
-  ],
-  [
-    'revolution',
-    entity('revolution', {
-      profile: [
-        [1, 0],
-        [2, 0],
-        [2, 3],
-        [1, 3],
-      ],
-      axis: [0, 0, 1],
-      angle: Math.PI * 1.5,
-      segments: 32,
-    }),
-  ],
-  ['pyramid', entity('pyramid', { baseWidth: 4, baseDepth: 3, height: 5 }, [0, 0, 1])],
-];
-
-const cylinder = entity('cylinder', { radius: 1.2, height: 8 }, [1, 1, 0]);
-const plate = box([0, 0, 0], [6, 6, 2]);
-const BOOLEANS: readonly [string, ShapeRecipe][] = [
-  ['union', booleanRecipe('union', plate, cylinder)],
-  ['subtract', booleanRecipe('subtract', plate, cylinder)],
-  ['intersect', booleanRecipe('intersect', plate, cylinder)],
-  [
-    'nested, placed and scaled',
-    {
-      op: 'scale',
-      factor: 1.5,
-      source: {
-        op: 'place',
-        position: [10, 0, 0],
-        rotation: [0, 0, 0.7],
-        source: booleanRecipe(
-          'subtract',
-          booleanRecipe('union', plate, box([2, 0, 1], [2, 2, 4])),
-          entity('sphere', { radius: 1.5 }, [-2, 0, 1]),
-        ),
-      },
-    },
-  ],
-];
-
-const relative = (a: number, b: number): number => Math.abs(a - b) / Math.max(Math.abs(b), 1e-12);
+const binary = nativeKernelBinary;
 
 describe.skipIf(binary === null)('native llull-kernel vs WASM OCC parity (VC-KRN-25 slice)', () => {
   let session: NativeKernelSession;
@@ -186,18 +114,49 @@ describe.skipIf(binary === null)('native llull-kernel vs WASM OCC parity (VC-KRN
 });
 
 describe.skipIf(binary === null)('native llull-kernel behind the synchronous proxy', () => {
-  it('serves commands end to end: native evaluate / tessellate / mass, WASM for fillet and topology', () => {
+  it('serves commands end to end: native evaluate / tessellate / mass / topology, WASM for fillet', () => {
     const kernel = createNativeKernel(binary!, { testHooks: true });
     try {
       expect(kernel.start()).toBe(true);
       const drilled = kernel.evaluate(BOOLEANS[1]![1]);
       expect(kernel.massProperties?.(drilled!)?.volume).toBeCloseTo(6 * 6 * 2 - Math.PI * 1.2 * 1.2 * 2, 6);
       expect(isClosedMesh(kernel.tessellate(drilled!))).toBe(true);
+      expect(kernel.topology(drilled!)?.faces.map((face) => face.surface)).toEqual([
+        'plane',
+        'plane',
+        'plane',
+        'plane',
+        'plane',
+        'plane',
+        'cylinder',
+      ]);
+      expect(kernel.faceQuery?.faceDetails(drilled!, { samples: 2 })?.[6]).toMatchObject({ surface: 'cylinder', radius: 1.2 });
       const rounded = kernel.evaluate({ op: 'fillet', source: leaf(plate), edges: [0], size: 0.3 });
       expect(kernel.topology(rounded!)?.faces).toHaveLength(7);
       expect(kernel.info?.()).toMatchObject({ occtVersion: '7.8.1', build: expect.stringContaining('llull-kernel@') });
+      expect(kernel.info?.().capabilities).toEqual(expect.arrayContaining(['topology', 'faceQuery', 'importShapes', 'brepBlobs']));
       kernel.forceFailure('__abort');
       expect(kernel.massProperties?.(drilled!)?.volume).toBeGreaterThan(0);
+    } finally {
+      kernel.dispose();
+    }
+  }, 120_000);
+
+  it('imports STEP natively and evaluates the blob after a worker restart (blob resend)', () => {
+    const kernel = createNativeKernel(binary!, { testHooks: true });
+    try {
+      expect(kernel.start()).toBe(true);
+      const step = kernel.exportStep([kernel.evaluate(leaf(entity('cylinder', { radius: 3, height: 7 })))!])!;
+      const imported = kernel.importShapes?.('step', step, { precision: 0.01, maxTolerance: 1, heal: true, sew: true }) as ImportedShapes;
+      const { brep } = imported.solids[0]!;
+      kernel.loadBlob?.(sha256Hex(brep), brep);
+      const recipe: ShapeRecipe = { op: 'brep', blob: sha256Hex(brep), format: 'occt-brep-v1' };
+      expect(kernel.massProperties?.(kernel.evaluate(recipe)!)?.volume).toBeCloseTo(Math.PI * 9 * 7, 6);
+      kernel.forceFailure('__abort'); // the worker and its sidecar restart: the host resends every blob
+      expect(kernel.massProperties?.(kernel.evaluate(booleanRecipe('subtract', recipe, box([0, 0, 0], [1, 1, 20])))!)?.volume).toBeCloseTo(
+        Math.PI * 9 * 7 - 7,
+        6,
+      );
     } finally {
       kernel.dispose();
     }

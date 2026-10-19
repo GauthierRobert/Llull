@@ -7,6 +7,7 @@
 //! "indices": <u32[]>}`. Error codes: `NATIVE_UNSUPPORTED` (op / recipe node not native yet: the host falls back), `NATIVE_BAD_REQUEST`,
 //! `NATIVE_OCC_FAILURE` (OCCT threw; result null), `NATIVE_PANIC`.
 
+use crate::queries::{self, QUERY_CAPABILITIES, QUERY_OPS};
 use base64::Engine;
 use llull_kernel_occt::lru::Lru;
 use llull_kernel_occt::recipe::{EvalError, Evaluator, RECIPE_OPS, SOLID_KINDS};
@@ -21,8 +22,13 @@ pub const PANIC: &str = "NATIVE_PANIC";
 /// Same prefix as `SHAPE_NOT_CACHED` in `packages/core/src/geometry/shapeKernel.ts`.
 pub const NOT_CACHED: &str = "shape not cached";
 
-/// Operations answered natively; every other op replies `NATIVE_UNSUPPORTED`.
+/// Operations answered natively besides `queries::QUERY_OPS`; every other op replies `NATIVE_UNSUPPORTED`.
 pub const OPS: [&str; 6] = ["info", "evaluate", "tessellate", "massProperties", "analyze", "exportStep"];
+
+/// Every op the session answers (`info().ops`).
+pub fn native_ops() -> Vec<&'static str> {
+    OPS.iter().chain(QUERY_OPS.iter()).copied().collect()
+}
 
 /// Shapes kept alive by recipe (sub-recipes) and by host key (handles).
 const CAPACITY: usize = 256;
@@ -33,11 +39,11 @@ pub struct Reply {
 }
 
 impl Reply {
-    fn ok(result: Value) -> Self {
+    pub fn ok(result: Value) -> Self {
         Self { result, error: None }
     }
 
-    fn fail(code: &str, message: impl std::fmt::Display) -> Self {
+    pub fn fail(code: &str, message: impl std::fmt::Display) -> Self {
         Self { result: Value::Null, error: Some(format!("{code}: {message}")) }
     }
 }
@@ -65,11 +71,12 @@ fn bounds_json(values: &[f64]) -> Value {
 }
 
 fn info() -> Value {
+    let capabilities: Vec<&str> = ["analyze", "massProperties", "exportStep"].into_iter().chain(QUERY_CAPABILITIES).collect();
     json!({
         "occtVersion": occt_version(),
         "build": format!("llull-kernel@{}", env!("CARGO_PKG_VERSION")),
-        "capabilities": ["analyze", "massProperties", "exportStep"],
-        "ops": OPS,
+        "capabilities": capabilities,
+        "ops": native_ops(),
         "recipeOps": RECIPE_OPS,
         "solidKinds": SOLID_KINDS,
     })
@@ -151,7 +158,7 @@ impl Session {
                 }))
             }),
             "exportStep" => self.export_step(first),
-            other => Reply::fail(UNSUPPORTED, format!("op '{other}'")),
+            other => queries::dispatch(self, other, args).unwrap_or_else(|| Reply::fail(UNSUPPORTED, format!("op '{other}'"))),
         }
     }
 
@@ -172,8 +179,17 @@ impl Session {
         }
     }
 
+    /// Keeps a document blob for `brep` leaves and forgets refused handles (one may have been "blob missing"); false on a hash mismatch.
+    pub fn load_blob(&mut self, sha256: &str, text: &str) -> bool {
+        let loaded = self.evaluator.load_blob(sha256, text);
+        if loaded {
+            self.handles.retain(|state| !matches!(state, HandleState::Built(None)));
+        }
+        loaded
+    }
+
     /// Runs `query` on the handle's shape; a refused shape answers null, an OCCT throw `NATIVE_OCC_FAILURE`.
-    fn with_shape(&mut self, handle: &Value, query: impl FnOnce(&Shape) -> Result<Value, String>) -> Reply {
+    pub fn with_shape(&mut self, handle: &Value, query: impl FnOnce(&Shape) -> Result<Value, String>) -> Reply {
         match self.resolve(handle) {
             Ok(Some(shape)) => match query(&shape) {
                 Ok(result) => Reply::ok(result),
@@ -184,7 +200,7 @@ impl Session {
         }
     }
 
-    fn resolve(&mut self, handle: &Value) -> Result<Option<Rc<Shape>>, Reply> {
+    pub fn resolve(&mut self, handle: &Value) -> Result<Option<Rc<Shape>>, Reply> {
         let Some(key) = handle.get("key").and_then(Value::as_str).map(str::to_string) else {
             return Err(Reply::fail(BAD_REQUEST, "a shape handle needs a string key"));
         };
@@ -255,7 +271,7 @@ mod tests {
     #[test]
     fn unsupported_ops_and_recipes_name_the_gap() {
         let mut session = Session::new();
-        assert_eq!(call(&mut session, "topology", json!([]))["error"], json!("NATIVE_UNSUPPORTED: op 'topology'"));
+        assert_eq!(call(&mut session, "fillet", json!([]))["error"], json!("NATIVE_UNSUPPORTED: op 'fillet'"));
         let fillet = json!({ "op": "fillet", "source": box_recipe(1.0), "edges": [], "size": 0.1 });
         let reply = call(&mut session, "evaluate", json!([{ "key": "f", "recipe": fillet }]));
         assert_eq!(reply["error"], json!("NATIVE_UNSUPPORTED: recipe op 'fillet'"));
@@ -269,7 +285,7 @@ mod tests {
         assert!(call(&mut session, "evaluate", json!([{}]))["error"].as_str().unwrap().starts_with(BAD_REQUEST));
         let described = call(&mut session, "info", json!([]));
         assert_eq!(described["result"]["occtVersion"], json!("7.8.1"));
-        assert_eq!(described["result"]["ops"], json!(OPS));
+        assert_eq!(described["result"]["ops"], json!(native_ops()));
     }
 
     #[test]
