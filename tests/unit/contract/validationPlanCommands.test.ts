@@ -44,7 +44,11 @@ function validationPlans(): string[] {
     }
   };
   walk(docs);
-  return found.map((path) => relative(root, path).split('\\').join('/')).sort();
+  // `data/reference/` holds pinned raw tool outputs (e.g. ifcopenshell logs saved as .json), not plans.
+  return found
+    .map((path) => relative(root, path).split('\\').join('/'))
+    .filter((path) => !path.includes('/data/reference/'))
+    .sort();
 }
 
 /** Step = object with a string `command` and an object `params`; assertion/expectation objects without params are ignored. */
