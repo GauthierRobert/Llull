@@ -8,6 +8,7 @@ import { dynamicsProblems } from '@core/commands/persistence/dynamicsValidation'
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 import { lightFourBarActions } from './lightFourBarFixture';
+import { expectPure } from '../helpers/expectNoOp';
 
 beforeAll(async () => setPhysicsEngine(await createMujocoPhysics()));
 afterAll(() => setPhysicsEngine(null));
@@ -220,6 +221,14 @@ describe('add_spring: failures, persistence, deletion', () => {
     expect(execute(doc, 'add_spring', { ...base, stiffness: 0 }).affected).toEqual([]);
     expect(execute(doc, 'add_spring', { ...base, damping: -1 }).affected).toEqual([]);
     expect(JSON.stringify(doc)).toBe(before);
+  });
+
+  it('a successful add_spring leaves its input document untouched', () => {
+    const doc = build(hangingMass({}));
+    expectPure(doc, () => {
+      const result = execute(doc, 'add_spring', { ...base, id: 'sp2' });
+      expect(result.affected).toEqual(['sp2']);
+    });
   });
 
   it('refuses a spring that joins the ground to a fixed body, or two fixed bodies', () => {

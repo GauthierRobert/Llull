@@ -6,6 +6,11 @@ export interface MjModel {
   readonly jnt_qposadr: Int32Array;
   readonly jnt_dofadr: Int32Array;
   readonly body_rootid: Int32Array;
+  /** Actuator gain / bias parameters, 10 per actuator (intvelocity: gain [kp], bias [0, -kp, -kv]). */
+  readonly actuator_gainprm: Float64Array;
+  readonly actuator_biasprm: Float64Array;
+  /** Dry-friction limit of each DOF (an inequality constraint row while it is above 0). */
+  readonly dof_frictionloss: Float64Array;
   delete(): void;
 }
 
@@ -14,6 +19,8 @@ export interface MjData {
   readonly qpos: Float64Array;
   readonly qvel: Float64Array;
   readonly qfrc_applied: Float64Array;
+  /** Generalised acceleration of the last forward pass (constraint forces included). */
+  readonly qacc: Float64Array;
   readonly ctrl: Float64Array;
   readonly act: Float64Array;
   readonly actuator_force: Float64Array;

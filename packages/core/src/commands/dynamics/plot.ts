@@ -4,7 +4,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { failer, report } from '../noop';
 import { RAD_PER_S_PER_RPM } from '../../dynamics/forceLaws';
-import { timeSeriesSvg, type PlotPanel, type PlotSeries } from '../../dynamics/timeSeriesSvg';
+import { timeSeriesSvg, type PlotPanel, type PlotSeries } from '../../lib/timeSeriesSvg';
 import type { SimulationData } from '../../dynamics/simulationReport';
 import type { ReactionsData } from '../../dynamics/reactions';
 import { simulateMotion } from './simulate';

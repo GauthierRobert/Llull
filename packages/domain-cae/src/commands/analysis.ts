@@ -23,6 +23,7 @@ const ANALYSIS_TYPES = [
   'modal',
   'buckling',
   'coupled_temperature_displacement',
+  'nonlinear_static',
 ] as const;
 const BUILT: ReadonlySet<AnalysisType> = new Set([
   'static',
@@ -32,6 +33,7 @@ const BUILT: ReadonlySet<AnalysisType> = new Set([
   'heat_transient',
   'thermo_static',
   'coupled_temperature_displacement',
+  'nonlinear_static',
 ]);
 const isThermal = (type: AnalysisType): boolean => type === 'heat_steady' || type === 'heat_transient';
 /** Types that carry a ThermoMechSetup (stress-free reference temperature). */
@@ -79,7 +81,7 @@ export const createAnalysis = defineCommand({
     'add_fea_constraint / add_fea_load, REQUIRES referenceTemperature; the temperature field is solved, not set), modal (free-vibration natural ' +
     'frequencies and mode shapes with `modes`; needs constraints and a material density, loads are ignored; results.frequenciesHz) or buckling ' +
     '(linear eigenvalue buckling of the FIRST load case as reference load, `modes` factors; the critical load is factor x the applied load; ' +
-    'results.bucklingFactors; needs constraints and a load). SAFETY FACTORS: without `factors`/`factor` the aerospace defaults apply ' +
+    'results.bucklingFactors; needs constraints and a load) or nonlinear_static (plasticity and/or large displacement with load or displacement steps: set it up with set_nonlinear_controls, set_part_constitutive_set, add_analysis_step and add_curve_probe; results.nonlinear). SAFETY FACTORS: without `factors`/`factor` the aerospace defaults apply ' +
     '(ultimate 1.5 per 14 CFR 25.303, yield 1.0) and the summary says so; when the user states a safety factor (e.g. "SF 2") pass `factor: 2` ' +
     '(one number applied to both ultimate and yield) or `factors` { ultimate, yield } - compute_margins applies exactly these. unitSystem follows the document unit (mm: N-mm-t-s, m: N-m-kg-s, in: lbf-in-slinch-s) and a different one is ' +
     'refused. The case starts with the default mesh (tet, quadratic, 10 mm) and no parts: next set_part_idealization, then ' +
@@ -89,7 +91,9 @@ export const createAnalysis = defineCommand({
     name: z.string().min(1).describe('Display name of the analysis, e.g. "bracket under 500 N".'),
     analysisType: z
       .enum(ANALYSIS_TYPES)
-      .describe('static | heat_steady | heat_transient | thermo_static | coupled_temperature_displacement | modal | buckling.'),
+      .describe(
+        'static | heat_steady | heat_transient | thermo_static | coupled_temperature_displacement | modal | buckling | nonlinear_static.',
+      ),
     solver: z.enum(['calculix']).optional().describe('Solver; only calculix is built (default).'),
     unitSystem: z
       .enum(['N-mm-t-s', 'N-m-kg-s', 'lbf-in-slinch-s'])

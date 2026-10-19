@@ -7,7 +7,7 @@ import { shapeToolCallContent } from '@mcp/index';
 import { isRecord } from '@lib/isRecord';
 import type { CommandOutcome } from '@mcp/restProtocol';
 import { formatDuration } from './progress';
-import type { SavedFile } from './saveFiles';
+import { elideLargePayloads, type SavedFile } from './saveFiles';
 import { aliasLine, type PlanAliases } from './aliases';
 
 /** Affected ids printed per plan step in text mode. */
@@ -49,7 +49,7 @@ export function resultText(result: PrintableResult): string {
     summary: result.summary,
     affected: [...result.affected],
     isError: result.isError,
-    data: result.data,
+    data: elideLargePayloads(result.data),
     ...(result.error !== undefined ? { error: result.error } : {}),
   });
   return [...shaped.content.map((block) => block.text), ...savedLines(result.saved)].join('\n');

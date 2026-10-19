@@ -38,8 +38,12 @@ const packRel = (id: string): number => cases.get(id)?.tolerance.rel ?? 0;
 
 /** Pack tolerance replaced by what the engine reaches (relative), with the reason. */
 const ENGINE = {
-  /** the slider-crank links cannot be massless in MuJoCo (links 5 g, crank 100 kg flywheel for a stiff speed servo): about 0.5 % off */
-  crankTorque: 0.01,
+  /**
+   * crank torque of the governed slider-crank against the closed form of the SAME model (5 g rod with its inertia, see rodCrankTorque).
+   * What is left is the finite stiffness of the speed servo (its ripple times the 0.084 kg m^2 crank is an error torque) and of the loop
+   * closure (16 steps, plan): measured 1.4e-4 and 1.9e-4 at 60 and 90 deg.
+   */
+  crankTorque: 3e-4,
   /** a(theta) is the difference of the sampled velocity (1e-3 covers the start-up transient of the speed servo) */
   pistonAcceleration: 1e-3,
   /** piston stroke and speed follow the crank angle; the speed servo lags it by about 1e-5 rad */
@@ -112,6 +116,27 @@ function period(data: SimulationData, joint: string): number {
   const crossings = turningTimes(data.series.times, data.series.jointVelocity[joint] ?? []);
   expect(crossings.length).toBeGreaterThanOrEqual(2);
   return 2 * ((crossings[1] ?? 0) - (crossings[0] ?? 0));
+}
+
+/**
+ * Crank torque (N m) of the pack-10 slider-crank (r 0.05 m, l 0.2 m, 100 rad/s constant, piston 0.5 kg) when the rod of `rodKg` is not
+ * massless: virtual power tau * omega = d(KE)/dt = m a . v of piston and rod centre of mass + I phi'' phi' of the rod (a 200 x 8 x 8 mm
+ * box about its centre), with a, v from 5-point derivatives of the geometry. rodKg 0 is the pack's VC-RBD-21 closed form.
+ */
+function rodCrankTorque(thetaRad: number, rodKg: number): number {
+  const [r, l, omega, pistonKg, h] = [0.05, 0.2, 100, 0.5, 1e-3];
+  const rodInertia = (rodKg * (0.2 ** 2 + 0.008 ** 2)) / 12;
+  const geometry = (t: number): number[] => {
+    const [s, c] = [Math.sin(t), Math.cos(t)];
+    const x = r * c + Math.sqrt(l * l - r * r * s * s);
+    return [x, (r * c + x) / 2, (r * s) / 2, Math.asin((-r * s) / l)];
+  };
+  const samples = [-2, -1, 0, 1, 2].map((k) => geometry(thetaRad + k * h));
+  const at = (k: number, i: number): number => samples[k]?.[i] ?? 0;
+  const first = (i: number): number => (at(0, i) - 8 * at(1, i) + 8 * at(3, i) - at(4, i)) / (12 * h);
+  const second = (i: number): number => (-at(0, i) + 16 * at(1, i) - 30 * at(2, i) + 16 * at(3, i) - at(4, i)) / (12 * h * h);
+  const power = (mass: number, i: number): number => mass * second(i) * first(i);
+  return omega * omega * (power(pistonKg, 0) + power(rodKg, 1) + power(rodKg, 2) + power(rodInertia, 3));
 }
 
 /** Every comparison made (label, actual, expected, relative error, allowed): `LLULL_PACK10_TABLE=<file>` writes it after the run. */
@@ -229,8 +254,17 @@ describe('VC-RBD-20, 21 — slider-crank r 0.05 m, l 0.2 m, 100 rad/s', () => {
       near('a(90)', acceleration(90), a90, ENGINE.pistonAcceleration);
       near('a(0)', velocity(0.0002 * 100 * (180 / Math.PI)) / 2e-4, a0, ENGINE.pistonAcceleration);
       const [t60, t90] = expectedOf('VC-RBD-21') as [number, number];
-      near('crank torque 60 deg', at(motorTorque['drive'] as number[], 60), t60, ENGINE.crankTorque);
-      near('crank torque 90 deg', at(motorTorque['drive'] as number[], 90), t90, ENGINE.crankTorque);
+      const rodKg = 0.005;
+      near('closed form helper, massless rod, 60 deg', rodCrankTorque(Math.PI / 3, 0), t60, packRel('VC-RBD-21'));
+      near('closed form helper, massless rod, 90 deg', rodCrankTorque(Math.PI / 2, 0), t90, packRel('VC-RBD-21'));
+      for (const [deg, massless] of [
+        [60, t60],
+        [90, t90],
+      ] as const) {
+        const withRod = rodCrankTorque((deg * Math.PI) / 180, rodKg);
+        expect(Math.abs(withRod / massless - 1), 'the 5 g rod is 0.7 % of the torque, it must be in the reference').toBeGreaterThan(5e-3);
+        near(`crank torque ${deg} deg (5 g rod in the reference)`, at(motorTorque['drive'] as number[], deg), withRod, ENGINE.crankTorque);
+      }
       near('crank speed held', at(jointVelocity['j_crank'] as number[], 90), 100, 1e-3);
     },
     SLOW,

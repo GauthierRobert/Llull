@@ -70,3 +70,18 @@ export function pointAtPose(point: Vec3, pose: BodyPoseAt): Vec3 {
   ]);
   return [pose.position[0] + turned[0], pose.position[1] + turned[1], pose.position[2] + turned[2]];
 }
+
+/** Every body's pose at sample `index` of a recorded run (`SimulationData.poses`); bodies without that sample are left out. */
+export function posesAtSample(
+  poses: { readonly bodies: Readonly<Record<string, { readonly position: readonly Vec3[]; readonly orientation: readonly Quaternion[] }>> },
+  index: number,
+): Record<string, BodyPoseAt> {
+  const result: Record<string, BodyPoseAt> = {};
+  for (const [id, track] of Object.entries(poses.bodies)) {
+    const start = track.position[0];
+    const position = track.position[index];
+    const orientation = track.orientation[index];
+    if (start !== undefined && position !== undefined && orientation !== undefined) result[id] = { start, position, orientation };
+  }
+  return result;
+}

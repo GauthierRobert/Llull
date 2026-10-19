@@ -102,3 +102,10 @@ describe('parseDat on real CalculiX 2.21 output', () => {
     ]);
   });
 });
+
+describe('parseDat tiny values', () => {
+  it('reads the numbers whose three-digit exponent lost its E (underflowing zero results)', () => {
+    const text = ' displacements (vx,vy,vz) for set N1 and time  1.5750000E+00\n\n         2  1.52172-101 -4.1000-120  0.0000000E+00\n';
+    expect(parseDat(text).tables[0]?.rows).toEqual([[2, 1.52172e-101, -4.1e-120, 0]]);
+  });
+});

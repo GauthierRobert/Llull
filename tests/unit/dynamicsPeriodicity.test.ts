@@ -1,7 +1,7 @@
 /** Pure helpers behind the audit fixes: period detection, time-series chart, jam detection. */
 import { describe, expect, it } from 'vitest';
 import { findPeriod, tailMean } from '@core/dynamics/periodicity';
-import { timeSeriesSvg } from '@core/dynamics/timeSeriesSvg';
+import { timeSeriesSvg } from '@lib/timeSeriesSvg';
 import { warnJams } from '@core/dynamics/jamDetection';
 import type { DynamicsModel } from '@core/model/dynamics';
 import type { SimulationTrace } from '@core/dynamics/physicsEngine';

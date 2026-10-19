@@ -497,6 +497,28 @@ above the gate gives `FPR_LOOP_OPEN`.
    time and angle, max penetration estimate and the volume at the worst pose; the achieved resolution. Pairs joined by
    a joint whose min distance ≈ the realised clearance are `touch` (pin in bore), not a failure.
 
+**As built (FPR-C), deviations from the sketch above** (`commands/dynamics/{checkMotionClearance,motionClearanceRun}.ts`,
+`dynamics/motionPoses.ts`):
+
+- Source: simulated runs only (`simulate_motion` poses, same `duration` / `timestep` / `sampleRate`); the `motion_study` sweep source
+  and `cycles` are not built. Params: `ids` (focus: pairs with at least one member listed), `crankAxis` (revolute joint whose angle
+  labels findings), `clearanceMm`, `touchToleranceMm`, `pairs: 'moving' | 'all'`, `maxSamples` (default 4000, thinned by stride).
+- Codes: `FPR_MOTION_INTERFERENCE` (fail), `FPR_MOTION_CLEARANCE_LOW` (warn), `FPR_MOTION_TOUCH` (info), `FPR_MOTION_ALLOWED` (pass, a
+  `doc.prototype` intent covers the pair), `FPR_MOTION_UNDERSAMPLED` (warn, unverified), `FPR_NO_PAIRS` / `FPR_PART_INVALID` (not_run).
+  Rejections: `FPR_NO_MOTION` (no bodies, nothing moves, simulation did not run), `FPR_UNKNOWN_ID`, `FPR_BUDGET_EXCEEDED` (500 parts,
+  2000 pairs, 400 000 pair-samples, 300 000 distance evaluations); a refused simulation keeps its own code (e.g. `FPR_LOOP_OPEN`).
+- Poses between samples are interpolated (lerp / slerp), up to 16 substeps per pair and sample, so the displacement per step stays under
+  half of the thinnest part side. Intervals are NOT bisected: start / end are the first / last contact moment, resolved to the substep
+  (`data.samples.resolutionS` is the sample spacing). When the cap leaves a step larger than the thinnest side, `FPR_MOTION_UNDERSAMPLED`.
+- A zero BVH distance is contact, not interference: the exact overlap volume at the first, middle and last moment of each interval
+  (kernel `intersect` + `analyze` on the placed recipes) decides; no volume = touch. At most 12 intervals per pair (200 per run) are classified. An
+  `allow_interference` intent allows the pair whatever the interval kinds; without one, unclassified intervals beside classified touches
+  give a warn with `unverified: true`, and a kernel without `analyze` gives a fail with `unverified: true`. The "worst pose" is the largest
+  of those three, not a search.
+- Joint-connected pairs get no special treatment beyond the volume rule (a pin touching its bore is touch). One part wholly inside another
+  without surface contact is not detected (BVH distance is surface to surface).
+- `data.minClearance` is the closest approach among pairs that never overlap or touch; per-pair minima are in `data.pairs[]`.
+
 ### 5.7 `check_prototype`
 
 Order: `check_assembly` → `inspect_dynamics` (mobility) → `simulate_motion` (duration = settle + cycles·(720°/ω), with
