@@ -34,7 +34,7 @@ beforeAll(() => {
     outfile: childScript,
     logLevel: 'error',
   });
-});
+}, 60_000); // esbuild bundles the child: slow on a loaded machine
 
 afterAll(() => rmSync(workDir, { recursive: true, force: true }));
 
