@@ -569,9 +569,7 @@
       "trace_pipe_centreline"
     ],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-03-registration.json": [
-      "apply_registration",
-      "check_point_clouds",
-      "compute_registration"
+      "check_point_clouds"
     ],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-04-deviation-clash.json": [
       "check_asbuilt_clash",

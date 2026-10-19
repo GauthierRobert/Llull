@@ -146,21 +146,21 @@ export interface CloudReference {
 export type RegistrationMethod = 'targets' | 'icp_point_to_point' | 'icp_point_to_plane' | 'targets+icp' | 'supplied';
 
 export interface RegistrationQuality {
-  readonly targetResiduals?: readonly { readonly name: string; readonly residual: number }[];
+  readonly targetResiduals?: readonly { readonly name: string; readonly residual: number }[] | undefined;
   /** Metres. */
   readonly rms: number;
-  readonly overlap?: number;
-  readonly iterations?: number;
+  readonly overlap?: number | undefined;
+  readonly iterations?: number | undefined;
   readonly converged: boolean;
 }
 
 export interface ScanProvenance {
   readonly method: string;
   readonly algorithmVersion: string;
-  readonly seed?: number;
-  readonly thresholds?: Readonly<Record<string, number>>;
-  readonly device?: 'cpu' | 'gpu';
-  readonly deterministic?: boolean;
+  readonly seed?: number | undefined;
+  readonly thresholds?: Readonly<Record<string, number>> | undefined;
+  readonly device?: 'cpu' | 'gpu' | undefined;
+  readonly deterministic?: boolean | undefined;
 }
 
 export interface RegistrationRecord {
