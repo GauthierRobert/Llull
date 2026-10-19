@@ -13,6 +13,7 @@ import type { FeArtifactStore } from './artifactStore';
 import type { CaeHooks } from './caeHooks';
 import type { CcxRunner } from './ccxProcess';
 import { currentMesh, feaFailure, INSTALL_HINT, isFailure } from './feaCommon';
+import type { RandomPostStep } from '../native/randomField';
 
 export interface FeaSolveDeps {
   readonly store: FeArtifactStore;
@@ -24,6 +25,8 @@ export interface FeaSolveDeps {
   readonly maxResultsBytes?: number;
   /** Host pre-step before the deck (the native temperature mapping, TR-TMC-24); returns a note for the summary or null. Never throws. */
   readonly beforeDeck?: (doc: CadDocument, analysisId: string, mesh: FeMeshArtifact) => Promise<string | null>;
+  /** PHY-09 random_response post-step (nodal rms field, native or TypeScript); absent = no nodal field is attached. */
+  readonly randomPost?: RandomPostStep;
 }
 
 const DEFAULT_SOLVE_TIMEOUT_S = 600;
@@ -68,6 +71,9 @@ export async function runFeaSolve(
   const current = currentMesh('fea_solve', doc, analysisId, deps.store, deps.hooks);
   if (isFailure(current)) return current;
   const nonlinear = doc.analysis?.cases[analysisId]?.type === 'nonlinear_static';
+  const random = doc.analysis?.cases[analysisId]?.type === 'random_response';
+  const tooLarge = random ? (deps.randomPost?.precheck(doc, analysisId, current.mesh) ?? null) : null;
+  if (tooLarge !== null) return feaFailure('fea_solve', tooLarge.code, tooLarge.message, [analysisId]);
   const prepared = deps.beforeDeck === undefined ? null : await deps.beforeDeck(doc, analysisId, current.mesh).catch(() => null);
   const deck = deps.hooks.writeInp(doc, analysisId, current.mesh, deps.store);
   if ('code' in deck) return feaFailure('fea_solve', deck.code, deck.message, [analysisId]);
@@ -132,7 +138,7 @@ export async function runFeaSolve(
     }
     const datText = await readOptional(path.join(directory, `${JOB}.dat`));
     const dat = datText === '' ? undefined : deps.hooks.parseDat(datText);
-    const results: FeResultsArtifact = {
+    const solved: FeResultsArtifact = {
       kind: 'fe_results',
       meshHash: current.meshHash,
       inputHash: deps.hooks.analysisInputHash(doc, analysisId, 'full'),
@@ -142,6 +148,9 @@ export async function runFeaSolve(
       ...(dat !== undefined ? { dat } : {}),
       ...(nonlinear && convergence.length > 0 ? { convergence } : {}),
     };
+    const post = random && deps.randomPost !== undefined ? await deps.randomPost.run(doc, analysisId, current.mesh, solved) : null;
+    if (post !== null && !('results' in post)) return feaFailure('fea_solve', post.code, post.message, [analysisId]);
+    const results = post?.results ?? solved;
     const resultsHash = deps.store.put(results);
     const stored = deps.store.get(resultsHash);
     if (stored === null || stored.kind !== 'fe_results') {
@@ -158,13 +167,14 @@ export async function runFeaSolve(
     });
     const increments = nonlinear ? ` ${convergenceNote(convergence)}.` : '';
     return {
-      summary: `fea_solve: CalculiX ${results.solverVersion}, ${steps.length} result step(s).${increments}${prepared === null ? '' : ` ${prepared}.`} ${recorded.summary}`,
+      summary: `fea_solve: CalculiX ${results.solverVersion}, ${steps.length} result step(s).${increments}${prepared === null ? '' : ` ${prepared}.`}${post === null ? '' : ` ${post.note}.`} ${recorded.summary}`,
       affected: recorded.affected,
       isError: recorded.isError,
       data: {
         resultsHash,
         steps: steps.length,
         ...(nonlinear ? { convergence: convergenceTotals(convergence) } : {}),
+        ...(post !== null ? { nodalField: { engine: post.engine, elapsedMs: post.elapsedMs, deterministic: true } } : {}),
         ...(deps.keepJobs === true ? { jobDirectory: directory } : {}),
       },
     };
