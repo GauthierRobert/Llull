@@ -24,6 +24,7 @@ import { USAGE } from './usage';
 import { getGeometryKernel } from '@core/geometry/kernel';
 import { planKernelWarnings } from './planKernelWarning';
 import { benchmarkCli } from './benchmarks';
+import { fuzzCli, fuzzOneCli, FuzzUsageError } from './fuzz';
 
 export interface CliIo {
   readonly stdout: (text: string) => void;
@@ -346,6 +347,16 @@ async function runHistory(direction: 'undo' | 'redo', args: ParsedArgv, io: CliI
   return finish(await (direction === 'undo' ? backend.undo() : backend.redo()), args, io);
 }
 
+/** A host subcommand (fuzz, skills) whose own usage errors exit 2 like the rest of the CLI. */
+async function hostCommand(body: () => number | Promise<number>): Promise<number> {
+  try {
+    return await body();
+  } catch (error) {
+    if (error instanceof FuzzUsageError) throw new UsageError(error.message);
+    throw error;
+  }
+}
+
 export async function runCli(argv: readonly string[], io: CliIo): Promise<number> {
   const args = parseArgv(argv);
   const subcommand = args.positionals[0];
@@ -387,6 +398,10 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
           { stdout: io.stdout, cwd: process.cwd() },
         );
       }
+      case 'fuzz':
+        return await hostCommand(() => fuzzCli(args, io));
+      case 'fuzz-one':
+        return await hostCommand(() => fuzzOneCli(args, io));
       default:
         // `llull add_box width=10` is `llull exec add_box width=10`.
         if (getCommand(subcommand) !== undefined || exchangeTool(subcommand) !== undefined)

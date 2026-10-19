@@ -486,6 +486,15 @@ export const kernelPlans: Record<string, GoldenAction[]> = {
     { command: 'sweep_profile', params: { path: xyz(2, 0, 2, 7, 0, 2, 7, 0, 8), radius: 0.5, bendRadius: 2 }, as: 'pipe' },
     { command: 'boolean', params: { op: 'union', a: '$drum', b: '$pipe' } },
   ],
+  // BUG (open, found by the SC-Q3 fuzz, seed 2274): A = cylinder R7.5 lies inside B = cylinder R10 (same height, internally tangent),
+  // so A - B is empty, yet boolean subtract reports success and leaves an 8-triangle zero-volume mesh (mass_properties 0 mm3,
+  // check_assembly FPR_PART_EMPTY) instead of its documented "empty result" no-op. The snapshot records today's wrong result.
+  kernel_fuzz_2274_tangent_subtract_leaves_empty_mesh: [
+    { command: 'set_units', params: { units: 'mm' } },
+    { command: 'add_cylinder', params: { radius: 7.5, height: 25, position: [0, 0, 0] }, as: 'a' },
+    { command: 'add_cylinder', params: { radius: 10, height: 25, position: [2.5, 0, 0] }, as: 'b' },
+    { command: 'boolean', params: { op: 'subtract', a: '$a', b: '$b' } },
+  ],
   // PHY-21: slider-crank with a spherical wrist (loop closure), gas pressure and solver settings; ids are step-scoped (cyl-<step>.<k>)
   dynamics_slider_crank_engine: [
     { command: 'add_cylinder', params: { radius: 80, height: 20, axis: [0, 0, 1], position: [0, 0, 0] }, as: 'crankSolid' },
