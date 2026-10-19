@@ -7,3 +7,5 @@ s5.pass1*
 _measure.json
 build.log
 __pycache__/
+s5x*.meta.json
+s5x*.parts.json

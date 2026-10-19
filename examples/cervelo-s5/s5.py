@@ -1,14 +1,20 @@
 """Cervélo S5 (2023, size 56, Dura-Ace Di2, Reserve 52 | 63) with a working chain drive: pass-1 build plan.
 
-Writes s5.plan.json (geometry, as a build_project plan), s5.parts.json (per-part aero category, drag coefficient,
+Usage: python3 s5.py [s5 | s5x]  (s5x = the optimised "S5 Aero+", see options.py). Writes <variant>.plan.json (geometry, as a build_project plan), s5.parts.json (per-part aero category, drag coefficient,
 material, weld group) and s5.meta.json (key points, chain data). weld.py then fuses the frame, fork and stem;
 organize.py adds materials, decals, layers, animation and physics; aero.py measures. Run everything with ./build.sh."""
 
 import json
+import sys
 
-import frame as F
-import parts as P
-from plan import Plan
+import options
+
+VARIANT = sys.argv[1] if len(sys.argv) > 1 else "s5"
+options.use(VARIANT)
+
+import frame as F  # noqa: E402  (modules read the variant options at build time)
+import parts as P  # noqa: E402
+from plan import Plan  # noqa: E402
 
 COLORS = {
     "frame": "#8a2116", "tape": "#121212", "hood": "#1b1b1b", "lever": "#2b2b2d", "black": "#141414", "saddle": "#1e1e1e",
@@ -33,8 +39,8 @@ def main():
     P.build_wheels(plan, COLORS)
     drive = P.build_drivetrain(plan, COLORS)
     rider = P.build_rider(plan, COLORS, saddle, cockpit["hood"], cockpit["bar_half"])
-    json.dump({"actions": plan.actions}, open("s5.plan.json", "w"), indent=1)
-    json.dump(plan.parts, open("s5.parts.json", "w"), indent=1)
+    json.dump({"actions": plan.actions}, open(f"{VARIANT}.plan.json", "w"), indent=1)
+    json.dump(plan.parts, open(f"{VARIANT}.parts.json", "w"), indent=1)
     meta = {
         "links": drive["links"], "chain_length_mm": drive["chain_length_mm"], "radii": drive["radii"], "chain_y": P.CHAIN_Y,
         "fork_offset_mm": offset, "trail_mm": trail, "torso_deg": rider["torso_deg"],
@@ -44,8 +50,8 @@ def main():
         "geometry": {"stack": F.STACK, "reach": F.REACH, "hta": F.HTA, "sta": F.STA, "chainstay": F.CHAINSTAY, "wheelbase": F.WHEELBASE,
                      "bb_drop": F.BB_DROP, "head_tube": F.HEAD_TUBE},
     }
-    json.dump(meta, open("s5.meta.json", "w"), indent=1)
-    print(f"{len(plan.actions)} actions, {drive['links']} links ({drive['chain_length_mm']} mm), offset {offset} trail {trail}, torso {rider['torso_deg']} deg")
+    json.dump(meta, open(f"{VARIANT}.meta.json", "w"), indent=1)
+    print(f"{VARIANT}: {len(plan.actions)} actions, {drive['links']} links ({drive['chain_length_mm']} mm), offset {offset} trail {trail}, torso {rider['torso_deg']} deg")
 
 
 if __name__ == "__main__":

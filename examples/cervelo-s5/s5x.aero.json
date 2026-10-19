@@ -1,0 +1,120 @@
+{
+ "bikeAreaM2": 0.08097620543,
+ "bikeCdABuildUpM2": 0.06304674543237701,
+ "bikeCdAM2": 0.04457805572211534,
+ "riderAreaM2": 0.382601797,
+ "riderCdAM2": 0.17552665163619993,
+ "byCategory": {
+  "wheel_front": {
+   "areaM2": 0.024895081189999998,
+   "cdaM2": 0.02286128455488
+  },
+  "cockpit": {
+   "areaM2": 0.016107004360000007,
+   "cdaM2": 0.012705168359931006
+  },
+  "fork": {
+   "areaM2": 0.01280191981,
+   "cdaM2": 0.007301623691256998
+  },
+  "frame": {
+   "areaM2": 0.014662368089999961,
+   "cdaM2": 0.010358511695142967
+  },
+  "crankset": {
+   "areaM2": 0.0041113239300000215,
+   "cdaM2": 0.0041113239300000215
+  },
+  "chain": {
+   "areaM2": 0.0010345035099999927,
+   "cdaM2": 0.0010345035099999927
+  },
+  "seat": {
+   "areaM2": 0.005248331470000006,
+   "cdaM2": 0.0027173281977840055
+  },
+  "wheel_rear": {
+   "areaM2": 0.0009496462500000052,
+   "cdaM2": 0.000790974673382008
+  },
+  "cassette": {
+   "areaM2": 0.0004154160200000173,
+   "cdaM2": 0.0004154160200000173
+  },
+  "derailleur": {
+   "areaM2": 0.0007506107999999956,
+   "cdaM2": 0.0007506107999999956
+  }
+ },
+ "calibration": {
+  "riderCd": 0.4587711114075084,
+  "bikeInterferenceFactor": 0.7070635512808363,
+  "source": "Defraeye et al. 2010, J Biomech 43:1262"
+ },
+ "yaw": [
+  {
+   "yawDeg": 0,
+   "bikeAreaM2": 0.08097620543,
+   "systemAreaM2": 0.4518807327
+  },
+  {
+   "yawDeg": 5,
+   "bikeAreaM2": 0.1394787505,
+   "systemAreaM2": 0.4845567205
+  },
+  {
+   "yawDeg": 10,
+   "bikeAreaM2": 0.1762131488,
+   "systemAreaM2": 0.4773495265
+  },
+  {
+   "yawDeg": 15,
+   "bikeAreaM2": 0.2243090454,
+   "systemAreaM2": 0.5133949883
+  },
+  {
+   "yawDeg": 20,
+   "bikeAreaM2": 0.2743675442,
+   "systemAreaM2": 0.5666231854
+  }
+ ],
+ "systemCdAM2": 0.22010470735831528,
+ "massKg": 82.6,
+ "powerAt40kmhW": 224.9110303,
+ "breakdownAt40kmh": {
+  "aeroW": 188.626939,
+  "rollingW": 28.80104142,
+  "bearingW": 2.085185185,
+  "gravityW": 0,
+  "drivetrainLossW": 5.397864727
+ },
+ "speedAt250WKmh": 41.57850154,
+ "dragAt40kmhN": 16.64370869,
+ "timeFor40kmAt250W": 57.72213791040821,
+ "earlier": {
+  "baseline": {
+   "systemCdAM2": 0.27,
+   "bikeCdAM2": 0.07700000000000001,
+   "riderCdAM2": 0.193,
+   "powerAt40kmhW": 268.1492923,
+   "speedAt250WKmh": 38.99733568,
+   "timeFor40kmAt250W": 61.542665880911784
+  },
+  "aero": {
+   "systemCdAM2": 0.24021440309019135,
+   "bikeCdAM2": 0.049808613478872055,
+   "riderCdAM2": 0.1904057896113193,
+   "powerAt40kmhW": 242.3654023,
+   "speedAt250WKmh": 40.45454994,
+   "timeFor40kmAt250W": 59.32583611879381
+  },
+  "aero_fit": {
+   "systemCdAM2": 0.22202152765091013,
+   "bikeCdAM2": 0.04974513597427032,
+   "riderCdAM2": 0.1722763916766398,
+   "powerAt40kmhW": 226.7040307,
+   "speedAt250WKmh": 41.45771956,
+   "timeFor40kmAt250W": 57.89030427799054
+  }
+ }
+}

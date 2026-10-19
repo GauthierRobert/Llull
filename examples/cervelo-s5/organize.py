@@ -1,20 +1,22 @@
 """Pass 2 for the welded S5 document: PBR materials, decals, layers + named groups, the drivetrain animation (Play) and
 the physics model of the chain drive carrying the measured road load.
 
-Usage: python3 organize.py  (reads s5.plan/parts/meta/run/welds/aero json)  -> s5.organize.json"""
+Usage: python3 organize.py [s5 | s5x]  (reads <v>.plan/parts/meta/run/welds/aero json)  -> <v>.organize.json"""
 
 import json
 import math
+import sys
 
+V = sys.argv[1] if len(sys.argv) > 1 else "s5"
 PLAYBACK = 0.25  # the viewport plays at quarter speed; physics runs at real speed
 CADENCE_RPM = 90.0
 
-plan = json.load(open("s5.plan.json"))["actions"]
-parts = json.load(open("s5.parts.json"))
-meta = json.load(open("s5.meta.json"))
-steps = json.load(open("s5.run.json"))["data"]["steps"]
-welds = json.load(open("s5.welds.json"))
-aero = json.load(open("s5.aero.json"))
+plan = json.load(open(f"{V}.plan.json"))["actions"]
+parts = json.load(open(f"{V}.parts.json"))
+meta = json.load(open(f"{V}.meta.json"))
+steps = json.load(open(f"{V}.run.json"))["data"]["steps"]
+welds = json.load(open(f"{V}.welds.json"))
+aero = json.load(open(f"{V}.aero.json"))
 
 alias_ids = {a["as"]: s["affected"] for a, s in zip(plan, steps)}
 welded = {m: w["id"] for w in welds.values() for m in w["members"]}
@@ -127,5 +129,5 @@ for key, centre, damping in (("crank", pts["bb"], 0.002), ("rear", pts["rear_axl
 actions.append({"command": "add_gear_coupling", "params": {"driver": "joint-crank", "driven": "joint-rear", "ratio": round(52 / 15, 6), "id": "chain-drive"}})
 actions.append({"command": "add_gear_coupling", "params": {"driver": "joint-rear", "driven": "joint-front", "ratio": 1, "id": "road-contact"}})
 actions.append({"command": "add_motor", "params": {"joint": "joint-crank", "kind": "speed", "rpm": CADENCE_RPM, "maxTorque": 80, "id": "rider-legs"}})
-json.dump({"actions": actions}, open("s5.organize.json", "w"), indent=1)
+json.dump({"actions": actions}, open(f"{V}.organize.json", "w"), indent=1)
 print(f"{len(actions)} organize actions; road-load damping {load_damping:.4f} N m s/rad")

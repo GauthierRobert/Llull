@@ -5,7 +5,7 @@ earlier aero concepts: per-part exposed frontal area (front-to-back accumulation
 drag coefficients at 40 km/h, rider Cd and bike interference factor from Defraeye et al. 2010 (taken from
 ../bike/aero_results.json), then road_load_power and aero_drag.
 
-Usage: python3 aero.py s5.pass1.llull.json s5.pass1.run.json  -> s5.aero.json"""
+Usage: python3 aero.py <v>.pass1.llull.json <v>.pass1.run.json  -> <v>.aero.json  (v = s5 or s5x)"""
 
 import json
 import math
@@ -37,8 +37,9 @@ def flow(yaw):
 
 
 def main(doc, run_path):
-    actions = json.load(open(HERE / "s5.plan.json"))["actions"]
-    parts = json.load(open(HERE / "s5.parts.json"))
+    name = Path(run_path).name.split(".")[0]  # s5.pass1.run.json -> s5
+    actions = json.load(open(HERE / f"{name}.plan.json"))["actions"]
+    parts = json.load(open(HERE / f"{name}.parts.json"))
     report = json.load(open(run_path))["data"]
     bounds = {e["id"]: e["bounds"] for e in report["scene"]["entities"] if "bounds" in e}
     groups = {}
@@ -91,8 +92,8 @@ def main(doc, run_path):
     # the same S5 bike with the rider in the "+ fit" position of the earlier study is not modelled here; the earlier versions:
     res["earlier"] = {k: {kk: v[kk] for kk in ("systemCdAM2", "bikeCdAM2", "riderCdAM2", "powerAt40kmhW", "speedAt250WKmh", "timeFor40kmAt250W")}
                       for k, v in json.load(open(HERE.parent / "bike" / "aero_results.json")).items() if k != "calibration"}
-    json.dump(res, open(HERE / "s5.aero.json", "w"), indent=1)
-    print(f"S5: A_bike {prev:.4f} CdA_bike {res['bikeCdAM2']:.4f} A_rider {rider_area:.4f} CdA_rider {res['riderCdAM2']:.4f} "
+    json.dump(res, open(HERE / f"{name}.aero.json", "w"), indent=1)
+    print(f"{name}: A_bike {prev:.4f} CdA_bike {res['bikeCdAM2']:.4f} A_rider {rider_area:.4f} CdA_rider {res['riderCdAM2']:.4f} "
           f"CdA_sys {res['systemCdAM2']:.4f} P40 {res['powerAt40kmhW']:.1f} W v250 {res['speedAt250WKmh']:.2f} km/h")
     for c, v in sorted(by_cat.items(), key=lambda kv: -kv[1]["cdaM2"]):
         print(f"  {c:12s} A {v['areaM2'] * 1e4:6.1f} cm2  CdA {v['cdaM2'] * calib['bikeInterferenceFactor'] * 1e4:6.1f} cm2")

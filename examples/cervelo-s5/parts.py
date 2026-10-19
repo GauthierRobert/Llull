@@ -6,6 +6,7 @@ import math
 from geom import add, sub, mul, lerp, superellipse, section_frame, ring_cage, ring, rnd, pitch_radius, sprocket_outline
 from plan import cd_strut, BLUFF
 import frame as F
+from options import O
 
 BSD = 622.0
 TYRE = 28.0
@@ -43,12 +44,14 @@ def rim_profile(depth, w_bead=15.6, w_max=16.0, w_bed=10.5, n=14):
     return right + bottom + left
 
 
-def tyre_profile():
-    rc = F.R_WHEEL - 14.0
+def tyre_profile(width=TYRE):
+    """Tyre section of the given width with its tread at the rolling radius (a narrower tyre sits deeper in the rim)."""
+    h = width / 2
+    rc = F.R_WHEEL - h
     pts = []
     for i in range(40):
         t = -math.pi / 2 + math.pi * 2 * i / 40
-        r, a = rc + 14.0 * math.cos(t), 14.6 * math.sin(t)
+        r, a = rc + h * math.cos(t), (h + 0.6) * math.sin(t)
         if r >= BSD / 2 + 1:
             pts.append((r, a))
     pts.sort(key=lambda p: math.atan2(p[1], p[0] - rc))
@@ -61,9 +64,10 @@ def hub_profile(half, flange_l, flange_r, rf):
             (rf - 2, flange_r + 2), (14, flange_r + 3), (14, half - 6), (10.5, half - 4), (10.5, half), (6, half)]
 
 
-def build_wheel(plan, axle, depth, half, flanges, spokes, rotor_r, rotor_y, category, colors):
-    plan.revolve(axle, tyre_profile(), category, cd_strut(TYRE, TYRE), "rubber", colors["tyre"], 160)
-    plan.revolve(axle, rim_profile(depth), category, cd_strut(depth + TYRE, TYRE), "carbon_rim", colors["rim"], 160)
+def build_wheel(plan, axle, depth, half, flanges, spokes, rotor_r, rotor_y, category, colors, tyre=TYRE):
+    plan.revolve(axle, tyre_profile(tyre), category, cd_strut(tyre, tyre), "rubber", colors["tyre"], 160)
+    # a rim wider than the tyre (31 mm vs a 25c) carries the flow off the tyre: the rim+tyre section is one airfoil
+    plan.revolve(axle, rim_profile(depth), category, cd_strut(depth + tyre, max(tyre, 31.0 if tyre < 28 else tyre)), "carbon_rim", colors["rim"], 160)
     plan.revolve(axle, hub_profile(half, flanges[0], flanges[1], 24), category, BLUFF, "alloy", colors["hub"], 64)
     r_in = BSD / 2 + 3 - depth + 4
     spokes_per_side = spokes // 2
@@ -108,8 +112,9 @@ def caliper(plan, axle, theta, rotor_r, y, category, colors):
 
 
 def build_wheels(plan, colors):
-    build_wheel(plan, F.FRONT, 52, F.HUB_FRONT, (-35, 35), 24, 80, 44, "wheel_front", colors)
-    build_wheel(plan, F.REAR, 63, F.HUB_REAR, (-22, 34), 24, 70, 47, "wheel_rear", colors)
+    (fd, fs, ft), (rd, rs, rt) = O["front"], O["rear"]
+    build_wheel(plan, F.FRONT, fd, F.HUB_FRONT, (-35, 35), fs, 80, 44, "wheel_front", colors, ft)
+    build_wheel(plan, F.REAR, rd, F.HUB_REAR, (-22, 34), rs, 70, 47, "wheel_rear", colors, rt)
     caliper(plan, F.FRONT, math.radians(-62), 80, 50, "fork", colors)
     caliper(plan, F.REAR, math.radians(108), 70, 52, "frame", colors)
 
@@ -169,11 +174,15 @@ def plate_outline(r_lobe, waist, k=10):
 
 def build_drivetrain(plan, colors):
     bb, rear = F.BB, F.REAR
-    # chainrings: 52 / 36, the big ring a solid hollow-forged face like the R9200
+    # chainrings: 52 / 36 (or a single 52), the big ring a solid hollow-forged face like the R9200
     sprocket(plan, bb, CHAIN_Y, 52, 1.9, "crankset", "black_anod", colors["ring"])
+    if O["ring_cover"]:  # flush outboard disc over the crank spider, out to the chain's pitch line
+        plan.revolve(bb, [(0, CHAIN_Y - 3.2), (pitch_radius(52) - 8, CHAIN_Y - 3.2), (pitch_radius(52) - 8, CHAIN_Y - 1.0), (0, CHAIN_Y - 1.0)],
+                     "crankset", 0.3, "carbon_black", colors["ring"], 96)
     plan.revolve(bb, [(0, CHAIN_Y + 1.0), (pitch_radius(52) - 7, CHAIN_Y + 1.0), (pitch_radius(52) - 7, CHAIN_Y + 4.5), (0, CHAIN_Y + 4.5)],
                  "crankset", BLUFF, "black_anod", colors["ring"], 96)
-    sprocket(plan, bb, CHAIN_Y + 7.4, 36, 1.9, "crankset", "black_anod", colors["ring"])
+    if 36 in O["rings"]:
+        sprocket(plan, bb, CHAIN_Y + 7.4, 36, 1.9, "crankset", "black_anod", colors["ring"])
     plan.add("add_cylinder", {"radius": 12, "height": Q_FACTOR - 18, "position": rnd(bb), "axis": [0, 1, 0], "color": colors["alloy"]},
              "crankset", BLUFF, "alloy")
     pedals = []
@@ -236,21 +245,22 @@ def build_drivetrain(plan, colors):
         rings.append((centre, ex, ey, ring(b, a, 8, 3)))
     v, f = ring_cage(rings)
     plan.cage(v, f, "derailleur", BLUFF, "black_anod", colors["rd"])
-    # front derailleur: braze-on body and a cage arc over the big ring
-    fd = F.on_seat(r_ring + 60)
-    arc = []
-    for deg in (104, 122, 140, 158):
-        a = math.radians(deg)
-        arc.append([bb[0] + (r_ring + 13) * math.cos(a), CHAIN_Y - 5, bb[2] + (r_ring + 13) * math.sin(a)])
-    plan.add("sweep_profile", {"path": [rnd(p) for p in arc], "smooth": True, "section": [[-1, -9], [1, -9], [1, 9], [-1, 9]], "color": colors["rd"]},
-             "derailleur", BLUFF, "black_anod")
-    rings = []
-    for t, a, b in ((0, 10, 12), (0.5, 14, 15), (1, 10, 12)):
-        centre = lerp(add(fd, [10, -30, -6]), add(arc[1], [0, -6, 8]), t)
-        ex, ey, ez = section_frame([0.2, -1, -0.3], [0, 0, 1])
-        rings.append((centre, ex, ey, ring(a, b, 8, 3)))
-    v, f = ring_cage(rings)
-    plan.cage(v, f, "derailleur", BLUFF, "black_anod", colors["rd"])
+    # front derailleur: braze-on body and a cage arc over the big ring (none on a 1x drivetrain)
+    if O["front_derailleur"]:
+        fd = F.on_seat(r_ring + 60)
+        arc = []
+        for deg in (104, 122, 140, 158):
+            a = math.radians(deg)
+            arc.append([bb[0] + (r_ring + 13) * math.cos(a), CHAIN_Y - 5, bb[2] + (r_ring + 13) * math.sin(a)])
+        plan.add("sweep_profile", {"path": [rnd(p) for p in arc], "smooth": True, "section": [[-1, -9], [1, -9], [1, 9], [-1, 9]], "color": colors["rd"]},
+                 "derailleur", BLUFF, "black_anod")
+        rings = []
+        for t, a, b in ((0, 10, 12), (0.5, 14, 15), (1, 10, 12)):
+            centre = lerp(add(fd, [10, -30, -6]), add(arc[1], [0, -6, 8]), t)
+            ex, ey, ez = section_frame([0.2, -1, -0.3], [0, 0, 1])
+            rings.append((centre, ex, ey, ring(a, b, 8, 3)))
+        v, f = ring_cage(rings)
+        plan.cage(v, f, "derailleur", BLUFF, "black_anod", colors["rd"])
 
     # chain: pitch line round the four pitch circles, then 54 inner + 54 outer links (figure-8 plates, rollers, pins)
     plan.raw("draw_belt_around", {"pulleys": [{"center": [round(x, 3), round(z, 3)], "radius": round(r, 4)} for x, z, r in loop],
@@ -302,6 +312,11 @@ def build_rider(plan, colors, saddle_top, hood, bar_half, drivetrain_pedals=None
         if best is None or err < best[0]:
             best = (err, deg, sh)
     torso_deg, shoulder = best[1], best[2]
+    fit = O.get("fit", False)
+    if fit:  # "aero hoods": torso 17 deg, elbows bent so the forearms run about level onto the hoods
+        torso_deg = 17.0
+        a = math.radians(torso_deg)
+        shoulder = add(hip, [560 * math.cos(a), 0, 560 * math.sin(a)])
     kit, skin = colors["kit"], colors["skin"]
     # legs: thigh / shank solved for cranks at 3 and 9 o'clock
     for side, x in ((-1, F.BB[0] + CRANK), (1, F.BB[0] - CRANK)):
@@ -331,27 +346,41 @@ def build_rider(plan, colors, saddle_top, hood, bar_half, drivetrain_pedals=None
         p = add(hip, mul(spine, t))
         torso.append((p, spine, superellipse(a, b, 2.3), [0, 0, 1]))
     plan.loft(torso, "rider", None, "kit", color=kit)
-    neck = add(shoulder, [70, 0, 55])
-    head = add(neck, [75, 0, 62])
+    neck = add(shoulder, [80, 0, 38]) if fit else add(shoulder, [70, 0, 55])
+    head = add(neck, [82, 0, 46]) if fit else add(neck, [75, 0, 62])
     limb(plan, add(shoulder, [-10, 0, 0]), neck, 60, 52, skin, "skin")
     joint(plan, head, 96, skin, "skin")
-    # road helmet: smooth shell over the head
+    # road helmet (aero road helmet with the fit package: closed shell, tail running onto the back)
     rings = []
-    for dx, dz, a, b in ((-138, 14, 10, 18), (-112, 30, 52, 74), (-50, 52, 82, 100), (30, 60, 86, 104), (98, 44, 58, 86), (128, 32, 14, 24)):
+    shell = ((-138, 14, 10, 18), (-112, 30, 52, 74), (-50, 52, 82, 100), (30, 60, 86, 104), (98, 44, 58, 86), (128, 32, 14, 24))
+    if fit:
+        shell = ((-196, -2, 8, 14), (-150, 18, 42, 60), (-80, 44, 74, 92), (10, 56, 84, 100), (88, 44, 62, 88), (124, 30, 18, 28))
+    for dx, dz, a, b in shell:
         ex, ey, ez = section_frame([1, 0, 0], [0, 0, 1])
         rings.append((add(head, [dx, 0, dz]), ex, ey, ring(a, b, 10, 2.4)))
     v, f = ring_cage(rings)
     plan.cage(v, f, "rider", None, "helmet", colors["helmet"])
     # arms to the hoods
     for side in (1, -1):
-        sh = add(shoulder, [0, side * 180, 0])
+        sh = add(shoulder, [0, side * (175 if fit else 180), 0])
         joint(plan, sh, 56, kit, "kit")
         grip = [hood[0] + 8, side * bar_half, hood[2] + 16]
         mid = lerp(sh, grip, 0.5)
         ua, fa = 320.0, 300.0
         half = math.dist(sh, grip) / 2
         bend = math.sqrt(max(0.0, ((ua + fa) / 2) ** 2 - half**2))
-        elbow = add(mid, [0, side * bend * 0.45, -bend * 0.85])
+        if fit:  # two-link arm: elbow on the circle of points 320 mm from the shoulder and 300 mm from the grip, lowest one
+            d = math.dist(sh, grip)
+            u = [(grip[i] - sh[i]) / d for i in range(3)]
+            along = (ua**2 - fa**2 + d * d) / (2 * d)
+            r = math.sqrt(max(0.0, ua**2 - along**2))
+            down = [0, 0, -1.0]  # elbows bend straight down: in line between shoulder and hand, not flared
+            k = sum(down[i] * u[i] for i in range(3))
+            perp = [down[i] - k * u[i] for i in range(3)]
+            n = math.sqrt(sum(c * c for c in perp))
+            elbow = [sh[i] + u[i] * along + perp[i] / n * r for i in range(3)]
+        else:
+            elbow = add(mid, [0, side * bend * 0.45, -bend * 0.85])
         limb(plan, sh, elbow, 50, 40, kit, "kit", 46)
         joint(plan, elbow, 40, skin, "skin")
         limb(plan, elbow, grip, 39, 28, skin, "skin", 36)
