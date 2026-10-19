@@ -1,5 +1,9 @@
-"""Cervélo S5 (2023, size 56) frameset, fork, V-stem cockpit and seat, as airfoil lofts (sections normal to each tube's
-centre line) that weld.py later fuses into one-piece parts with filleted joints.
+"""Cervélo S5 (2025, size 56) frameset, bayonet fork, one-piece cockpit and seat, as airfoil lofts (sections normal to
+each tube's centre line) that weld.py later fuses into one-piece parts with filleted joints.
+
+Tube centre lines and side-view depths are traced from Cervélo's official size-56 geometry drawing (trace.py style:
+frame fill segmented, every station re-centred between its two edges, depth measured normal to the tube); lateral
+widths are not in a side drawing and come from photos. Options scale depth (chord) and width for the Aero+ variants.
 
 World frame: +X travel, +Y rider's left, +Z up, ground z = 0, bottom bracket at x = 0. Drive side is -Y."""
 
@@ -9,14 +13,13 @@ from geom import add, sub, mul, norm, lerp, kamm, superellipse, section_frame, r
 from plan import cd_strut
 from options import O
 
-# ---------------------------------------------------------------- geometry (Bike Insights, 2023 S5 size 56)
-STACK, REACH = 542.0, 384.0
-HTA, STA = 73.0, 73.0
-CHAINSTAY, WHEELBASE, BB_DROP = 405.0, 975.0, 70.0
-HEAD_TUBE = 140.0
-SEAT_CLUSTER = 505.0  # BB -> top-tube junction along the seat tube
+# ---------------------------------------------------------------- geometry (Cervélo, 2025 S5 size 56)
+STACK, REACH = 565.0, 392.0
+HTA, STA = 73.5, 73.0
+CHAINSTAY, WHEELBASE, BB_DROP = 405.0, 982.0, 72.0
+HEAD_TUBE = 125.0
 SADDLE_HEIGHT = 745.0  # BB -> saddle top along the seat tube (1.80 m rider, same as the earlier study)
-R_WHEEL = 339.0  # 700 x 28c on a 23 mm internal rim
+R_WHEEL = 339.0  # 700 x 28c
 HUB_REAR, HUB_FRONT = 71.0, 50.0  # half of 142 / 100 mm thru-axle spacing
 
 H_BB = R_WHEEL - BB_DROP
@@ -29,6 +32,29 @@ STEER_DOWN = [c, 0.0, -s]
 SEAT_UP = [-math.cos(math.radians(STA)), 0.0, math.sin(math.radians(STA))]
 HT_TOP = [REACH, 0.0, H_BB + STACK]
 HT_BOT = add(HT_TOP, mul(STEER_DOWN, HEAD_TUBE))
+
+# traced side view, (x, z, depth normal to the tube) in mm
+TT = [(-150, 734, 30), (-95, 739, 28), (0, 756, 23), (100, 772, 26), (200, 786, 30), (270, 794, 36), (338, 806, 50)]
+DT = [(22, 302, 86), (57, 338, 84), (100, 380, 78), (151, 430, 76), (200, 481, 76), (248, 533, 71), (290, 584, 61), (316, 610, 66),
+      (348, 652, 70), (366, 670, 66)]
+ST = [(-12, 300, 40), (-36, 366, 30), (-45, 396, 30), (-51, 427, 26), (-63, 456, 27), (-73, 486, 24), (-87, 515, 26), (-100, 535, 31),
+      (-118, 565, 42), (-142, 600, 56), (-154, 640, 56), (-161, 680, 60), (-163, 712, 62), (-167, 740, 60)]
+ST_WIDTH = [44, 30, 28, 26, 26, 25, 25, 26, 28, 32, 33, 34, 34, 34]
+SS = [(-394, 376, 22), (-334, 439, 21), (-280, 486, 26), (-227, 534, 29), (-182, 572, 32), (-158, 602, 32)]
+SS_Y = [HUB_REAR - 8, 48, 35, 22, 12, 8]
+CS = [(-385, 336, 24), (-250, 310, 33), (-120, 288, 42), (-25, 276, 52)]
+CS_Y = [HUB_REAR - 8.5, 47, 29, 27]
+BLADES = [(466, 640, 66), (490, 570, 62), (530, 470, 52), (578, 352, 47)]
+BLADE_Y = [50, 52, 54, 56]
+# head block in steering-axis coordinates: front edge u (mm ahead of the axis) at height z; the frame head tube runs
+# back to u = -88 (the front corner of the main triangle), the fork's bayonet covers its front
+BAYONET = [(658, 54), (680, 60), (710, 63), (770, 58), (818, 52)]
+HEAD_BACK = -88.0
+
+
+def axis_at(z):
+    """Point on the steering axis at height z."""
+    return [HT_TOP[0] + (HT_TOP[2] - z) * c / s, 0.0, z]
 
 
 def on_seat(d):
@@ -63,102 +89,95 @@ def tube(plan, points, outlines, category, cd, material, weld, color, hints=None
     return plan.loft(stations(points, outlines, hints), category, cd, material, weld, color)
 
 
-def clearance_back(centre, ex, wanted, axle, min_r):
-    """Longest tail (along -ex from centre, up to `wanted`) whose end stays >= min_r from the axle (wheel cut-out)."""
-    back = wanted
-    while back > 6:
-        p = sub(centre, mul(ex, back))
-        if math.dist(p, axle) >= min_r:
-            return back
-        back -= 1.0
-    return back
+def airfoil(depth, width, scale="frame"):
+    """Kamm section centred on the traced centre line: `depth` = traced side depth, scaled by the variant options."""
+    d, w = depth * O[scale][0], width * O[scale][1]
+    chord = d / 0.86
+    return kamm(chord, min(w, 0.95 * chord), lead=d / 2)
+
+
+def traced(rows, y=None):
+    return [[x, (y[i] if y else 0.0), z] for i, (x, z, _) in enumerate(rows)]
 
 
 # ---------------------------------------------------------------- frameset
 
 
 def build_frame(plan, colors):
-    m, col, cat = "carbon_frame", colors["frame"], "frame"
-    W = "frame"
-    # head tube: 110 mm deep truncated airfoil, nose 32 mm ahead of the steering axis
-    ht = [on_steer(-HEAD_TUBE - 4), on_steer(-HEAD_TUBE * 0.5), on_steer(14)]
-    c0 = O["ht"][0]
-    tube(plan, ht, [kamm(*k) for k in O["ht"]], cat, cd_strut(c0[0] * 0.86, c0[1], True), m, W + "/1", col)
-    # top tube: tall and narrow, slight slope, ends buried in the head tube and seat tube
-    tt0 = add(on_steer(-30), [-30, 0, 0])
-    tt1 = add(on_seat(SEAT_CLUSTER), mul([0.956, 0, 0.292], 4))
-    tt = [tt0, lerp(tt0, tt1, 0.5), tt1]
-    tube(plan, tt, [superellipse(a, b, 3) for a, b in O["tt"]], cat, cd_strut(2 * O["tt"][1][0], 2 * O["tt"][1][1]), m, W + "/1", col)
-    # down tube: deep at the head tube, slim in the middle, wide at the bottom bracket
-    dt0 = add(on_steer(-HEAD_TUBE + 50), [-12, 0, 0])
-    dt1 = [2, 0, H_BB - 2]
-    dt = [dt0, lerp(dt0, dt1, 0.25), lerp(dt0, dt1, 0.65), dt1]
-    mid = O["dt"][1]
-    tube(plan, dt, [kamm(*k) for k in O["dt"]], cat, cd_strut(mid[0] * 0.86, mid[1], True), m, W + "/1", col)
-    # bottom-bracket shell: deep, flat-sided (PF BBright, 79 mm wide body)
-    bb = [[-6, -42, H_BB - 4], [-6, 0, H_BB - 4], [-6, 42, H_BB - 4]]
-    tube(plan, bb, [superellipse(44, 44, 3.5)] * 3, cat, 1.0, m, W + "/2", col)
-    # seat tube: airfoil whose tail is cut back around the rear tyre (12 mm clearance) - the S5 wheel cut-out
-    pts, outs = [], []
-    for d in (18, 80, 150, 230, 320, 420, SEAT_CLUSTER + 30):
-        centre = on_seat(d)
-        ex, _, _ = section_frame(SEAT_UP)
-        chord, thick, lead = O["st_low"] if d < 60 else O["st"]
-        back = clearance_back(centre, ex, 0.86 * chord - lead, REAR, R_WHEEL + O["st_clearance"])
-        outs.append(kamm(chord, thick, lead, truncate=max(0.45, (lead + back) / chord)))
-        pts.append(centre)
-    tube(plan, pts, outs, cat, cd_strut(O["st"][0] * 0.75, O["st"][1], True), m, W + "/3", col)
-    # dropped seatstays, meeting the seat tube 165 mm below the top tube
+    m, col, cat, W = "carbon_frame", colors["frame"], "frame", "frame"
+    # head tube: from the fork crown to the top cap, its front hidden under the bayonet, its back the triangle's front corner
+    hz = [650, 700, 770, 826]
+    widths = [56, 52, 48, 46]
+    outs = []
+    for z, w in zip(hz, widths):
+        chord = (10 - HEAD_BACK) / 0.86 * O["frame"][0]
+        outs.append(kamm(chord, w * O["frame"][1], lead=10))
+    tube(plan, [axis_at(z) for z in hz], outs, cat, cd_strut(90, 50, True), m, W + "/1", col)
+    # top tube: shallow (23 mm) and flat, flaring into the head tube
+    tt_half = [16, 16, 17, 19, 21, 23, 24]
+    outs = [superellipse(d / 2 * O["frame"][0], h * O["frame"][1], 3) for (_, _, d), h in zip(TT, tt_half)]
+    tube(plan, traced(TT), outs, cat, cd_strut(26, 36), m, W + "/1", col)
+    # down tube: 76-86 mm deep and narrow, nose forward-down
+    dt_w = [58, 54, 46, 40, 38, 38, 40, 44, 46, 46]
+    tube(plan, traced(DT), [airfoil(d, w) for (_, _, d), w in zip(DT, dt_w)], cat, cd_strut(76 / 0.86, 40, True), m, W + "/1", col)
+    # bottom-bracket shell: deep, flat-sided (BB shell 79 mm wide body)
+    bb = [[-2, -42, H_BB + 4], [-2, 0, H_BB + 4], [-2, 42, H_BB + 4]]
+    tube(plan, bb, [superellipse(36, 34, 3.5)] * 3, cat, 1.0, m, W + "/2", col)
+    # seat tube: slim and curved round the rear tyre from the BB, then the seat mast up into the cluster
+    tube(plan, traced(ST), [airfoil(d, w) for (_, _, d), w in zip(ST, ST_WIDTH)], cat, cd_strut(30 / 0.86, 26, True), m, W + "/3", col)
+    # dropped seatstays, straight, meeting the mast 160 mm below the top tube
     for side in (1, -1):
-        j = add(on_seat(340), [-6, side * 5, 0])
-        d = add(REAR, [12, side * (HUB_REAR - 8), 14])
-        sm = O["ss"][1]
-        tube(plan, [j, lerp(j, d, 0.5), d], [kamm(*k) for k in O["ss"]], cat, cd_strut(sm[0] * 0.86, sm[1], True), m, W + "/4", col)
-    # chainstays: tall near the BB, inboard of the 52T ring, flaring out to the dropouts
+        y = [side * v for v in SS_Y]
+        outs = [airfoil(d, w) for (_, _, d), w in zip(SS, (18, 16, 16, 17, 18, 18))]
+        tube(plan, traced(SS, y), outs, cat, cd_strut(26 / 0.86, 16, True), m, W + "/4", col)
+    # chainstays: deep and flat-sided, inboard of the 52T ring, flaring out to the dropouts
     for side in (1, -1):
-        path = [[-24, side * 26, H_BB - 6], [-120, side * 32, H_BB + 12], [-262, side * 47, H_BB + 50], [REAR[0] + 14, side * (HUB_REAR - 8.5), R_WHEEL - 2]]
-        outs = [superellipse(20, 11.5, 3), superellipse(17, 11, 3), superellipse(13, 9.5, 3), superellipse(10, 6, 3)]
-        tube(plan, path, outs, cat, cd_strut(30, 20), m, W + "/2", col, hints=[[0, 0, 1]] * 4)
+        y = [side * v for v in CS_Y]
+        outs = [superellipse(d / 2, b, 3) for (_, _, d), b in zip(CS, (9, 10.5, 11, 13))]
+        tube(plan, traced(CS, y), outs, cat, cd_strut(34, 21), m, W + "/2", col, hints=[[0, 0, 1]] * 4)
     # dropouts (flat-mount, 12 mm thru-axle)
     for side in (1, -1):
         y0, y1 = side * (HUB_REAR - 15), side * (HUB_REAR - 2)
-        pts = [add(REAR, [6, y0, 6]), add(REAR, [6, y1, 6])]
-        tube(plan, pts, [superellipse(22, 25, 3)] * 2, cat, 1.0, m, W + "/2", col)
+        pts = [add(REAR, [4, y0, 8]), add(REAR, [4, y1, 8])]
+        tube(plan, pts, [superellipse(22, 26, 3)] * 2, cat, 1.0, m, W + "/2", col)
 
 
 def build_fork(plan, colors):
     m, col, cat, W = "carbon_frame", colors["frame"], "fork", "fork"
-    # crown continues the head-tube airfoil and widens to the blades
-    crown = [on_steer(-HEAD_TUBE - 6), on_steer(-HEAD_TUBE - 22), on_steer(-HEAD_TUBE - 40)]
-    outs = [superellipse(47, 26, 2.3, du=-14), superellipse(44, 40, 2.5, du=-11), superellipse(36, 63, 3.0, du=-6)]
+    # bayonet: the fork's crown runs up the front of the head tube to the top cap (the S5's steering "bayonet")
+    outs = []
+    for z, front in BAYONET:
+        chord = 150 * O["fork"][0]
+        outs.append(kamm(chord, 50 * O["fork"][1], lead=front, truncate=(front - 4) / chord))
+    tube(plan, [axis_at(z) for z, _ in BAYONET], outs, cat, cd_strut(60, 50), m, W, col)
+    # crown: widens from the bayonet to the blades, its back stepped under the down tube
+    crown = [axis_at(z) for z in (690, 668, 646)]
+    outs = [superellipse(34, 27, 2.3, du=28), superellipse(33, 46, 2.6, du=24), superellipse(32, 64, 3.0, du=20)]
     tube(plan, crown, outs, cat, cd_strut(80, 70), m, W, col)
-    top = on_steer(-HEAD_TUBE - 32)
     for side in (1, -1):
-        a = add(top, [0, side * 46, 0])
-        b = add(FRONT, [3, side * (HUB_FRONT + 6), 6])
-        bm = O["blades"][1]
-        tube(plan, [a, lerp(a, b, 0.45), b], [kamm(*k) for k in O["blades"]], cat, cd_strut(bm[0] * 0.86, bm[1], True), m, W, col)
-        tips = [add(FRONT, [3, side * (HUB_FRONT - 3), 4]), add(FRONT, [3, side * (HUB_FRONT + 13), 4])]
+        y = [side * v for v in BLADE_Y]
+        outs = [airfoil(d, w, "fork") for (_, _, d), w in zip(BLADES, (24, 21, 17, 14))]
+        tube(plan, traced(BLADES, y), outs, cat, cd_strut(55 / 0.86, 18, True), m, W, col)
+        tips = [add(FRONT, [0, side * (HUB_FRONT - 3), 4]), add(FRONT, [0, side * (HUB_FRONT + 13), 4])]
         tube(plan, tips, [superellipse(17, 19, 3)] * 2, cat, 1.0, m, W, col)
     return fork_numbers()
 
 
 def build_cockpit(plan, colors):
-    """S5 V-stem (two arms) + HB13-style aero bar, hoods and levers. Returns the hood grip point and bar centre."""
+    """One-piece carbon cockpit: a single stem body rising from the top cap into the aero bar, hoods and levers. Returns
+    the hood grip point and bar centre."""
     bar_half = O["bar_half"]
-    m, col, cat = "carbon_frame", colors["frame"], "cockpit"
-    # top cover / spacer follows the head-tube airfoil
-    tube(plan, [on_steer(12), on_steer(24)], [kamm(90, 46, 28), kamm(86, 44, 27)], cat, cd_strut(76, 44, True), m, "stem", col)
-    clamp = on_steer(44)
-    tube(plan, [on_steer(22), on_steer(66)], [superellipse(26, 19, 3), superellipse(24, 18, 3)], cat, 1.0, m, "stem", col)
+    m, col, cat = "carbon_black", colors["black"], "cockpit"
+    # top cap / spacer follows the head-block airfoil
+    tube(plan, [on_steer(-6), on_steer(8 + O["spacers"])], [kamm(150, 46, 52, truncate=(52 + 86) / 150)] * 2, cat, cd_strut(76, 44, True), m, "stem", col)
+    root = on_steer(10 + O["spacers"])
     stem_dir = norm([math.cos(math.radians(O["stem_deg"])), 0, math.sin(math.radians(O["stem_deg"]))])
-    bar = add(clamp, mul(stem_dir, 100))
-    for side in (1, -1):  # the V: two thin arms from the steerer clamp to the bar
-        a = add(clamp, [8, side * 9, 0])
-        b = add(bar, [-12, side * 30, 0])
-        tube(plan, [a, lerp(a, b, 0.5), b], [superellipse(17, 7.5, 3)] * 3, cat, cd_strut(34, 15), m, "stem", col, hints=[[0, 0, 1]] * 3)
-    # bar clamp fairing: the stem arms end inside it, the bar wing passes through it
-    plan.loft(stations([add(bar, [0, -44, 0]), bar, add(bar, [0, 44, 0])], [kamm(66, 44, 30), kamm(70, 48, 32), kamm(66, 44, 30)], [[1, 0, 0]] * 3),
+    bar = add(root, mul(stem_dir, 100))
+    pts = [add(root, mul(stem_dir, -20)), add(root, mul(stem_dir, 30)), add(bar, mul(stem_dir, -14))]
+    outs = [superellipse(18, 19, 3), superellipse(15, 21, 3), superellipse(13, 26, 3)]
+    tube(plan, pts, outs, cat, cd_strut(38, 40), m, "stem", col, hints=[[0, 0, 1]] * 3)
+    # bar clamp fairing: the stem ends inside it, the bar wing passes through it
+    plan.loft(stations([add(bar, [0, -44, 0]), bar, add(bar, [0, 44, 0])], [kamm(66, 40, 30), kamm(70, 44, 32), kamm(66, 40, 30)], [[1, 0, 0]] * 3),
               cat, cd_strut(62, 44, True), m, "stem", col)
     # aero tops: a flat wing, swept 8 mm forward at the ends
     wing = []
@@ -171,8 +190,8 @@ def build_cockpit(plan, colors):
     hood = None
     for side in (1, -1):
         y = side * bar_half
-        drop = [[bx + 8, side * (bar_half - 26), bz], [bx + 42, side * (bar_half - 4), bz + 2], [bx + 76, y, bz - 18],
-                [bx + 74, side * (bar_half + 4), bz - 70], [bx + 40, side * (bar_half + 8), bz - 122], [bx - 20, side * (bar_half + 9), bz - 124],
+        drop = [[bx + 8, side * (bar_half - 26), bz], [bx + 42, side * (bar_half - 4), bz + 2], [bx + 80, y, bz - 18],
+                [bx + 80, side * (bar_half + 4), bz - 70], [bx + 44, side * (bar_half + 8), bz - 122], [bx - 20, side * (bar_half + 9), bz - 124],
                 [bx - 48, side * (bar_half + 9), bz - 112]]
         plan.add("sweep_profile", {"path": [rnd(p) for p in drop], "smooth": True, "stations": [{"at": 0, "radiusX": 7.5, "radiusY": 11.9}, {"at": 0.12, "radiusX": 11.9, "radiusY": 11.9}, {"at": 1, "radiusX": 11.9, "radiusY": 11.9}], "color": colors["tape"]},
                  cat, cd_strut(23.8, 23.8), "bar_tape")
@@ -183,9 +202,8 @@ def build_cockpit(plan, colors):
             ex, ey, ez = section_frame([1, 0, 0.12], [0, 0, 1])
             rings.append((centre, ex, ey, ring(a, b * O["hood_width"], 8, n)))
         v, f = ring_cage(rings)
-        h = plan.cage(v, f, cat, 0.6, "rubber_hood", colors["hood"])
+        plan.cage(v, f, cat, 0.6, "rubber_hood", colors["hood"])
         hood = [bx + 92, y, bz + 6]
-        del h
         lever = [[bx + 128, y, bz - 6], [bx + 132, y, bz - 50], [bx + 118, side * (bar_half + 3), bz - 100]]
         tube(plan, lever, [superellipse(9, 5, 3), superellipse(8, 4.5, 3), superellipse(6, 4, 3)], cat, 1.0, "black_anod", None, colors["lever"],
              hints=[[1, 0, 0]] * 3)
@@ -193,13 +211,15 @@ def build_cockpit(plan, colors):
 
 
 def build_seat(plan, colors):
-    m, cat = "carbon_frame", "seat"
-    post = [on_seat(SEAT_CLUSTER - 30), on_seat(SADDLE_HEIGHT - 48)]
-    tube(plan, post, [kamm(*k) for k in O["post"]], cat, cd_strut(O["post"][0][0] * 0.86, O["post"][0][1], True), m, None, colors["frame"])
+    """Black aero seatpost (D-shaped, steeper than the effective seat angle in the drawing), clamp head and saddle."""
+    m, cat = "carbon_black", "seat"
+    saddle_top = on_seat(SADDLE_HEIGHT)
     head = on_seat(SADDLE_HEIGHT - 40)
+    post = [[-166, 0, 700], lerp([-166, 0, 700], add(head, [8, 0, -8]), 0.5), add(head, [8, 0, -8])]
+    d, w = O["post"]
+    tube(plan, post, [airfoil(d, w, "unit")] * 3, cat, cd_strut(d / 0.86, w, True), m, None, colors["black"])
     tube(plan, [add(head, [-22, 0, 0]), add(head, [22, 0, 0])], [superellipse(12, 16, 3)] * 2, cat, 1.0, "black_anod", None, colors["black"],
          hints=[[0, 0, 1]] * 2)
-    saddle_top = on_seat(SADDLE_HEIGHT)
     rings = []
     sw = O["saddle_width"] / 72
     for x, a, b, dz in ((-118, 16, 70 * sw, 2), (-90, 20, 72 * sw, 0), (-40, 18, 64 * sw, -2), (20, 15, 40, -3), (80, 12, 22, -2), (130, 11, 17, 0), (152, 8, 10, 1)):

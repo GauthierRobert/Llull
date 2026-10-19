@@ -32,10 +32,10 @@ for action in plan:
             if key and i not in table.setdefault(key, []):
                 table[key].append(i)
 
-FRAME_RED = "#8a2116"
+FRAME_BLUE = "#12668e"  # Reef Blue, as the 2025 S5 Ultegra Di2
 MATERIALS = {  # name: (density g/cm3, colour, metalness, roughness, extra)
-    "carbon_frame": (1.55, FRAME_RED, 0.25, 0.34, {"finish": "carbon_twill", "color2": "#5c140d", "finishScale": 22, "normalStrength": 0.45,
-                                                  "clearcoat": 1.0}),
+    "carbon_frame": (1.55, FRAME_BLUE, 0.55, 0.26, {"finish": "carbon_twill", "color2": "#0d5374", "finishScale": 22, "normalStrength": 0.2,
+                                                   "clearcoat": 1.0}),
     "carbon_black": (1.55, "#18181a", 0.15, 0.36, {"finish": "carbon_twill", "color2": "#2a2a2d", "finishScale": 16, "clearcoat": 0.9}),
     "carbon_rim": (1.55, "#1a1a1c", 0.1, 0.38, {"finish": "carbon_twill", "color2": "#2c2c2f", "finishScale": 18, "clearcoat": 0.7}),
     "rubber": (1.15, "#1d1d1d", 0.0, 0.88, {}),
@@ -60,17 +60,17 @@ for name, (rho, color, metal, rough, extra) in MATERIALS.items():
     if ids_by_mat.get(name):
         actions.append({"command": "assign_material", "params": {"materialName": name, "entityIds": ids_by_mat[name]}})
 
-# decals: CERVELO on both sides of the down tube, S5 on the seat tube, RESERVE on the rims
+# decals: lime CERVELO on both sides of the down tube, S5 on the seat tube, RESERVE on the rims
 frame_id = welds["frame"]["id"]
 fork_id = welds["fork"]["id"]
 bb, ht_bot = meta["points"]["bb"], meta["points"]["ht_bottom"]
 dt_mid = [bb[0] + (ht_bot[0] - bb[0]) * 0.52, 0, bb[2] + (ht_bot[2] - bb[2]) * 0.52]
 dt_angle = math.atan2(ht_bot[2] - bb[2], ht_bot[0] - bb[0])
 for side in (1, -1):
-    actions.append({"command": "add_decal", "params": {"id": frame_id, "text": "CERVELO", "at": [round(dt_mid[0], 2), side * 15.0, round(dt_mid[2], 2)],
-                                                       "normal": [0, side, 0], "height": 30, "angle": round(dt_angle if side < 0 else -dt_angle, 4),
-                                                       "color": "#f2f2f2"}})
-    actions.append({"command": "add_decal", "params": {"id": fork_id, "text": "S5", "at": [round(meta["points"]["front_axle"][0] - 62, 2), side * 56.0, 520],
+    actions.append({"command": "add_decal", "params": {"id": frame_id, "text": "CERVELO", "at": [round(dt_mid[0], 2), side * 22.0, round(dt_mid[2], 2)],
+                                                       "normal": [0, side, 0], "height": 46, "angle": round(dt_angle if side < 0 else -dt_angle, 4),
+                                                       "color": "#c6e43a"}})
+    actions.append({"command": "add_decal", "params": {"id": fork_id, "text": "S5", "at": [round(meta["points"]["front_axle"][0] - 62, 2), side * 64.0, 520],
                                                        "normal": [0, side, 0], "height": 22, "angle": round(-1.27 * side, 4), "color": "#f2f2f2"}})
 for axle, rim_alias_cat in ((meta["points"]["front_axle"], "wheel_front"), (meta["points"]["rear_axle"], "wheel_rear")):
     rim = [i for i in ids_by_mat["carbon_rim"] if i in ids_by_cat[rim_alias_cat]][0]
@@ -91,7 +91,7 @@ actions.append({"command": "set_entity_layer", "params": {"entityId": alias_ids[
 actions.append({"command": "update_layer", "params": {"id": "$layer_construction", "visible": False}})
 actions.append({"command": "set_entity_name", "params": {"id": frame_id, "name": "S5 frame"}})
 actions.append({"command": "set_entity_name", "params": {"id": fork_id, "name": "S5 fork"}})
-actions.append({"command": "set_entity_name", "params": {"id": welds["stem"]["id"], "name": "V-stem + HB13 bar"}})
+actions.append({"command": "set_entity_name", "params": {"id": welds["stem"]["id"], "name": "One-piece cockpit"}})
 actions.append({"command": "assign_material", "params": {"materialName": "carbon_black", "entityIds": [welds["stem"]["id"]]}})
 
 guide_id, tension_id = alias_ids[meta["aliases"]["guide"]][0], alias_ids[meta["aliases"]["tension"]][0]

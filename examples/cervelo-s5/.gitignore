@@ -4,7 +4,7 @@ s5.meta.json
 s5.parts.json
 s5.pass1*
 *.bak
-_measure.json
+_measure*.json
 build.log
 __pycache__/
 s5x*.meta.json

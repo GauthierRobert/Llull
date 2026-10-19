@@ -1,4 +1,4 @@
-"""Cervélo S5 (2023, size 56, Dura-Ace Di2, Reserve 52 | 63) with a working chain drive: pass-1 build plan.
+"""Cervélo S5 (2025, size 56, Ultegra Di2, Reserve 57 | 64) with a working chain drive: pass-1 build plan.
 
 Usage: python3 s5.py [s5 | s5x]  (s5x = the optimised "S5 Aero+", see options.py). Writes <variant>.plan.json (geometry, as a build_project plan), s5.parts.json (per-part aero category, drag coefficient,
 material, weld group) and s5.meta.json (key points, chain data). weld.py then fuses the frame, fork and stem;
@@ -17,7 +17,7 @@ import parts as P  # noqa: E402
 from plan import Plan  # noqa: E402
 
 COLORS = {
-    "frame": "#8a2116", "tape": "#121212", "hood": "#1b1b1b", "lever": "#2b2b2d", "black": "#141414", "saddle": "#1e1e1e",
+    "frame": "#12668e", "tape": "#121212", "hood": "#1b1b1b", "lever": "#2b2b2d", "black": "#141414", "saddle": "#1e1e1e",
     "tyre": "#1c1c1c", "rim": "#18181a", "hub": "#1f1f1f", "spoke": "#101010", "rotor": "#b9bdc2", "ring": "#2a2a2c",
     "crank": "#2a2a2c", "pedal": "#1a1a1a", "cog": "#9da1a7", "pulley": "#1b1b1b", "rd": "#26262a", "alloy": "#b4b8bd",
     "chain_in": "#8d9196", "chain_out": "#b3b6ba", "roller": "#6f7378", "pin": "#d0d2d5",

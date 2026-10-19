@@ -16,12 +16,12 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 LLULL = ["node", str(HERE.parents[1] / "server" / "bin" / "llull.cjs")]
 RESOLUTION = 1500
-RIDER_KG, BIKE_KG = 75.0, 7.6  # S5 Dura-Ace Di2 size 56, claimed ~7.6 kg
+RIDER_KG, BIKE_KG = 75.0, 7.6  # S5 size 56 (Dura-Ace Di2 ~7.6 kg; kept from the earlier study so the CdA runs compare)
 YAWS = [0, 5, 10, 15, 20]
 
 
 def run(actions, doc):
-    tmp = HERE / "_measure.json"
+    tmp = HERE / f"_measure.{Path(doc).name.split('.')[0]}.json"
     tmp.write_text(json.dumps({"actions": actions}))
     out = subprocess.run(LLULL + ["run", str(tmp), "--doc", doc, "--dry-run", "--json", "--no-fit"], capture_output=True, text=True)
     tmp.unlink()
