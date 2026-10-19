@@ -231,7 +231,8 @@ describe('cliShim', () => {
     const bin = path.join(scratch(), 'bin');
     const shim = cliShimFor('linux', '/opt/llull/llull', '/opt/llull/bin.js');
     const off = installCliShim(bin, shim, 'linux', '/usr/bin:/bin');
-    expect(statSync(off.path).mode & 0o111).not.toBe(0);
+    // The execute bit is POSIX: Windows reports no x bits for any file.
+    if (process.platform !== 'win32') expect(statSync(off.path).mode & 0o111).not.toBe(0);
     expect(off.onPath).toBe(false);
     expect(off.pathHint).toContain(`export PATH="${bin}:$PATH"`);
     expect(installCliShim(bin, shim, 'linux', `/usr/bin:${bin}`).onPath).toBe(true);

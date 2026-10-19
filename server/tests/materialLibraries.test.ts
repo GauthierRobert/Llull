@@ -94,7 +94,8 @@ describe('library store', () => {
       licence: 'licensed-no-redistribution',
     });
     const stored = path.join(directory, 'mmpds@2024.llull-matlib.json');
-    expect(statSync(stored).mode & 0o777).toBe(0o600);
+    // Owner-only mode is POSIX: Windows reports 0o666 for any writable file.
+    if (process.platform !== 'win32') expect(statSync(stored).mode & 0o777).toBe(0o600);
     expect(libraryHash(JSON.parse(readFileSync(stored, 'utf8')) as MaterialLibrary)).toBe(sha256);
     const provider = createLibraryProvider();
     expect(libraryHash(provider.get('mmpds', '2024') as MaterialLibrary)).toBe(sha256);

@@ -189,7 +189,8 @@ let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
     await expect(port.importStep('bad')).rejects.toThrow(/no bodies/);
   });
 
-  it('routes build123d to the build123d python', async () => {
+  // POSIX-only: the build123d python is a `#!/bin/sh` wrapper made executable with chmod, which Windows cannot spawn.
+  it.skipIf(process.platform === 'win32')('routes build123d to the build123d python', async () => {
     const scriptA = await script('which-a.js', `process.stdout.write('{"ok":true,"trace":"A","traced":true,"log":""}')`);
     const scriptB = await script('which-b.js', `process.stdout.write('{"ok":true,"trace":"B","traced":true,"log":""}')`);
     const wrapper = await script('wrapper.sh', `#!/bin/sh\nexec "${process.execPath}" "${scriptB}"\n`);
