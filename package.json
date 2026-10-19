@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "oracle": "node scripts/oracle.mjs",
+    "action-matrix": "node scripts/actionMatrix.mjs",
     "lint": "eslint . --max-warnings 0 --cache --cache-location node_modules/.cache/eslint/",
     "format": "prettier --write \"**/*.{ts,tsx,mts,mjs,cjs,js}\"",
     "typecheck": "node scripts/runParallel.mjs typecheck:app typecheck:tests typecheck:quality typecheck:production",
