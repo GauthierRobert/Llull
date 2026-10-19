@@ -16,7 +16,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## Priority
 - `[WIP]` **LC** CLI + local only — LC1 steps 1–6 (step 5 after one release on the native default): `docs/decisions/LC1-local-only.md`. _deps: —_
-- `[WIP]` **RS** Native compute (Rust + wgpu, native OCCT) RS-1 → RS-8: `docs/decisions/RS1-native-compute.md`. Open in RS-1: VC-KRN-25 vs OCP 7.9.3, default flip, macOS/Windows bundle. _deps: —_
+- `[WIP]` **RS** Native compute (Rust + wgpu, native OCCT) RS-1 → RS-8: `docs/decisions/RS1-native-compute.md`. Open in RS-1: VC-KRN-25 vs OCP 7.9.3, default flip, Windows bundle (macOS deferred). _deps: —_
 - `[TODO]` **CFD-M1** `cfd` slice, case commands, `cfd_prepare`, `check_cfd`: `docs/aerospace/12-cfd-gpu/TECHNICAL_SPEC.md` §10. _deps: —_
 - `[TODO]` **CFD-M2** `llull-compute flow` (LBM, wgpu), `cfd_solve` transport, records: same spec §10. _deps: CFD-M1_
 

@@ -993,7 +993,7 @@ Built (opt-in, `LLULL_KERNEL=occt-native`; the desktop default stays `occt` = WA
   passes `LLULL_NATIVE_DIR` only when the folder holds a binary (`nativeBundleDir`); an inherited one is dropped; the default
   kernel stays `occt` (WASM). Linux measured: 66 MB bundle (OCCT 27 toolkits 59 MB, `llull-compute` 5.3 MB, `llull-kernel`
   0.9 MB, 87 crates in the notice); the relocated bundle passes the parity, compute-job and render suites through
-  `LLULL_NATIVE_DIR`. macOS and Windows paths are written but untested.
+  `LLULL_NATIVE_DIR`. Windows is built and tested by the CI job `native-bundle`; macOS paths are written but deferred (owner, 2026-10-19).
 
 Measured (4-core Xeon 2.8 GHz container, Linux x86_64, release build; native times include the JSON round trip, WASM times are
 in-process calls of opencascade.js 1.1.1; medians; timing rows measured on the 7.8.1 static build):
@@ -1040,6 +1040,6 @@ Deviations and decisions to confirm:
   or thread-bearing ones as in `occtMesh.ts`; still open → null.
 - Exceptions are refusals (null result, `NATIVE_OCC_FAILURE` logged), not WASM fallbacks.
 
-Pending (rest of M2): floor-filleted pockets natively; macOS / Windows builds and bundles (scripts written, untested); the full
+Pending (rest of M2): floor-filleted pockets natively; Windows bundle (CI `native-bundle`, first run pending); macOS deferred (owner, 2026-10-19); the full
 VC-KRN-25 suite against the OCP 7.9.3 reference files (probe cases, NIST set); the KI7 decision
 record; then the desktop default flip to the native kernel.

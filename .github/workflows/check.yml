@@ -81,13 +81,13 @@ jobs:
       - run: node desktop/scripts/prepare-native.mjs
       - run: ldd desktop/build/native/llull-kernel && ! ldd desktop/build/native/llull-kernel | grep 'not found'
 
-  # The desktop native bundle on macOS and Windows: OCCT 7.9.2 shared (cached per OS), llull-compute + llull-kernel, prepare-native.mjs
+  # The desktop native bundle on Windows (macOS deferred): OCCT 7.9.2 shared (cached per OS), llull-compute + llull-kernel, prepare-native.mjs
   # (which runs both bundled binaries with --version), then the native kernel parity suite against the bundle itself.
   native-bundle:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [windows-latest] # macOS deferred (owner, 2026-10-19)
     runs-on: ${{ matrix.os }}
     timeout-minutes: 240
     env:
