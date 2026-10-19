@@ -536,53 +536,19 @@ export interface Component {
  */
 export type EntityRef = { readonly entityId: string } | { readonly entityId: string; readonly kind: 'start' | 'end' | 'center' | 'mid' };
 
-export const DIMENSION_CONSTRAINT_KINDS = [
-  'distance',
-  'angle',
-  'radius',
-  'diameter',
-  'aligned',
-  'horizontal_distance',
-  'vertical_distance',
-  'point_to_line',
-  'arc_sweep',
-  'arc_length',
-  'slot_length',
-] as const;
+// prettier-ignore
+export const DIMENSION_CONSTRAINT_KINDS = ['distance', 'angle', 'radius', 'diameter', 'aligned', 'horizontal_distance', 'vertical_distance', 'point_to_line', 'arc_sweep', 'arc_length', 'slot_length'] as const;
 
-export const CONSTRAINT_KINDS = [
-  'coincident',
-  'parallel',
-  'perpendicular',
-  'tangent',
-  'distance',
-  'angle',
-  'horizontal',
-  'vertical',
-  'equal',
-  'concentric',
-  'collinear',
-  'midpoint',
-  'symmetric',
-  'fix',
-  'point_on_curve',
-  'curvature',
-  'radius',
-  'diameter',
-  'aligned',
-  'horizontal_distance',
-  'vertical_distance',
-  'point_to_line',
-  'arc_sweep',
-  'arc_length',
-  'slot_length',
-] as const;
+// prettier-ignore
+const GEOMETRIC_CONSTRAINT_KINDS = ['coincident', 'parallel', 'perpendicular', 'tangent', 'horizontal', 'vertical', 'equal', 'concentric', 'collinear', 'midpoint', 'symmetric', 'fix', 'point_on_curve', 'curvature'] as const;
+
+export const CONSTRAINT_KINDS = [...GEOMETRIC_CONSTRAINT_KINDS, ...DIMENSION_CONSTRAINT_KINDS] as const;
 
 type ConstraintKind = (typeof CONSTRAINT_KINDS)[number];
 
 export type DimensionConstraintKind = (typeof DIMENSION_CONSTRAINT_KINDS)[number];
 
-type GeometricConstraintKind = Exclude<ConstraintKind, DimensionConstraintKind | 'symmetric'>;
+type GeometricConstraintKind = Exclude<(typeof GEOMETRIC_CONSTRAINT_KINDS)[number], 'symmetric'>;
 
 /** Unary kinds (horizontal on a line, fix, radius, ...) store `b` equal to `a`. */
 interface ConstraintBase<K extends ConstraintKind> {
