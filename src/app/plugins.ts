@@ -2,7 +2,7 @@
 
 import { installPlugin } from '@core/plugins/host';
 import { buildingPlugin, civilPlugin, industrialPlugin } from '@aec/index';
-import { caePlugin, topologyPlugin } from '@cae/index';
+import { caePlugin, explicitPlugin, topologyPlugin } from '@cae/index';
 import { aerodynamicsPlugin, fastenersPlugin, fluidsPlugin, sheetMetalPlugin } from '@aero/index';
 import { designPlugin } from '@design/index';
 
@@ -18,4 +18,5 @@ export function installDefaultPlugins(): void {
   installPlugin(aerodynamicsPlugin);
   installPlugin(fluidsPlugin);
   installPlugin(designPlugin);
+  installPlugin(explicitPlugin);
 }

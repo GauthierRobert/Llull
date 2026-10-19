@@ -4,6 +4,7 @@
  *   fatigue_field  FE fatigue case -> llull-compute post fatigue (every node) -> FatigueField artifact -> compute_fatigue
  *   fea_map_field  thermo_static interpolate field -> llull-compute post map -> mapped-field artifact (read by the fea_solve deck)
  *   fea_render     render_fea_results with the pixel raster in llull-compute raster (raster=auto|ts|cpu|gpu)
+ *   explicit_run   explicit_dynamics case -> llull-compute explicit -> fe_explicit artifact -> record_explicit_results (PHY-19 RS-8)
  */
 
 import type { ToolDefinition } from '@protocol/tools';
@@ -18,6 +19,7 @@ import { runFatigueField, type NativeDeps } from './fatigueField';
 import { runMapField } from './mapField';
 import { DEFAULT_TOPOLOGY_TIMEOUT_S, runTopologySolve, type TopologySolveOptions } from './topologySolve';
 import { runFeaRender } from './renderField';
+import { DEFAULT_EXPLICIT_TIMEOUT_S, runExplicitRun, type ExplicitRunOptions } from './explicitRun';
 
 const TIMEOUT = {
   type: 'number' as const,
@@ -66,6 +68,7 @@ export function nativeToolDefinitions(): ToolDefinition[] {
     },
     renderToolDefinition(),
     topologyToolDefinition(),
+    explicitToolDefinition(),
   ];
 }
 
@@ -124,7 +127,36 @@ function topologyToolDefinition(): ToolDefinition {
   };
 }
 
-const NAMES: ReadonlySet<string> = new Set(['fatigue_field', 'fea_map_field', 'fea_render', 'topology_solve']);
+/** explicit_run: the transport of the explicit plugin (PHY-19 RS-8); the case itself is set up with the explicit commands. */
+function explicitToolDefinition(): ToolDefinition {
+  return {
+    name: 'explicit_run',
+    description:
+      'Run an explicit_dynamics case (create_analysis analysisType=explicit_dynamics, set_part_idealization, set_explicit_controls, set_initial_velocity, ' +
+      'add_rigid_wall) in the native llull-compute explicit solver (central difference, lumped mass, hex8 with Flanagan-Belytschko hourglass ' +
+      'control, tet4, elastic or Johnson-Cook plasticity, planar rigid walls; progress with --progress) and record the result with ' +
+      'record_explicit_results (fe_explicit artifact; numbers are recomputed from it). Read it with explicit_report and explicit_energy_check. ' +
+      'Screening only: review required, never certification evidence. Errors: EXP_TOOL_MISSING (no llull-compute), EXP_SOLVER_FAILED, ' +
+      'EXP_RUN_TIMEOUT and the set-up codes (EXP_NO_EXCITATION, EXP_MESH_UNSUPPORTED, EXP_MATERIAL_INCOMPLETE, ...).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        analysisId: { type: 'string', description: 'Id of the explicit_dynamics analysis (affected[0] of create_analysis).' },
+        timeoutS: { ...TIMEOUT, description: `Wall-clock limit of the native job in seconds (default ${DEFAULT_EXPLICIT_TIMEOUT_S}).` },
+        device: {
+          type: 'string',
+          enum: ['cpu', 'gpu', 'auto'],
+          description:
+            'cpu (default, deterministic Rust CPU path), gpu or auto (a GPU build of llull-compute; else the CPU twin with a warning).',
+        },
+      },
+      required: ['analysisId'],
+    },
+    annotations: { idempotentHint: true },
+  };
+}
+
+const NAMES: ReadonlySet<string> = new Set(['fatigue_field', 'fea_map_field', 'fea_render', 'topology_solve', 'explicit_run']);
 
 export const isNativeTool = (name: string): boolean => NAMES.has(name);
 
@@ -161,6 +193,15 @@ export async function runNativeTool(
     return { ...result, changed: host.getDoc() !== before };
   }
   const timeout = typeof args['timeoutS'] === 'number' && Number.isFinite(args['timeoutS']) ? { timeoutS: args['timeoutS'] } : {};
+  if (name === 'explicit_run') {
+    const analysisId = nonEmptyString(args['analysisId']);
+    if (analysisId === undefined) return failure('explicit_run: analysisId is required.');
+    const device = args['device'];
+    const options: ExplicitRunOptions = { ...timeout, ...(device === 'cpu' || device === 'gpu' || device === 'auto' ? { device } : {}) };
+    const before = host.getDoc();
+    const result = await runExplicitRun(analysisId, options, host, deps);
+    return { ...result, changed: host.getDoc() !== before };
+  }
   if (name === 'fatigue_field') {
     const caseId = nonEmptyString(args['caseId']);
     if (caseId === undefined) return failure('fatigue_field: caseId is required.');

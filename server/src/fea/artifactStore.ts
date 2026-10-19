@@ -13,11 +13,12 @@ import path from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import type { FeArtifactPort, FeMeshArtifact, FeResultsArtifact, FeTableArtifact } from '@core/model/analysis';
 import type { FeTopologyArtifact } from '@core/model/topology';
+import type { FeExplicitArtifact } from '@core/model/explicit';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { isRecord } from '@lib/isRecord';
 
-type FeArtifact = FeMeshArtifact | FeResultsArtifact | FeTableArtifact | FeTopologyArtifact;
+type FeArtifact = FeMeshArtifact | FeResultsArtifact | FeTableArtifact | FeTopologyArtifact | FeExplicitArtifact;
 
 export interface FeArtifactStore extends FeArtifactPort {
   /** Stores `artifact` and returns its hash (idempotent). */
@@ -43,7 +44,11 @@ const hashArtifact = (artifact: FeArtifact): string => sha256Hex(canonicalJson(a
 function isArtifact(value: unknown): value is FeArtifact {
   return (
     isRecord(value) &&
-    (value['kind'] === 'fe_mesh' || value['kind'] === 'fe_results' || value['kind'] === 'fe_table' || value['kind'] === 'fe_topology')
+    (value['kind'] === 'fe_mesh' ||
+      value['kind'] === 'fe_results' ||
+      value['kind'] === 'fe_table' ||
+      value['kind'] === 'fe_topology' ||
+      value['kind'] === 'fe_explicit')
   );
 }
 

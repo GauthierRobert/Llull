@@ -24,6 +24,7 @@ const ANALYSIS_TYPES = [
   'buckling',
   'coupled_temperature_displacement',
   'nonlinear_static',
+  'explicit_dynamics',
 ] as const;
 const BUILT: ReadonlySet<AnalysisType> = new Set([
   'static',
@@ -34,6 +35,7 @@ const BUILT: ReadonlySet<AnalysisType> = new Set([
   'thermo_static',
   'coupled_temperature_displacement',
   'nonlinear_static',
+  'explicit_dynamics',
 ]);
 const isThermal = (type: AnalysisType): boolean => type === 'heat_steady' || type === 'heat_transient';
 /** Types that carry a ThermoMechSetup (stress-free reference temperature). */
@@ -94,7 +96,12 @@ export const createAnalysis = defineCommand({
       .describe(
         'static | heat_steady | heat_transient | thermo_static | coupled_temperature_displacement | modal | buckling | nonlinear_static.',
       ),
-    solver: z.enum(['calculix']).optional().describe('Solver; only calculix is built (default).'),
+    solver: z
+      .enum(['calculix', 'llull_explicit', 'opencourant'])
+      .optional()
+      .describe(
+        'Solver: calculix (default; every implicit type) or llull_explicit (explicit_dynamics only, its default). opencourant is not built.',
+      ),
     unitSystem: z
       .enum(['N-mm-t-s', 'N-m-kg-s', 'lbf-in-slinch-s'])
       .optional()
@@ -136,6 +143,14 @@ export const createAnalysis = defineCommand({
       refuseCode(doc, 'create_analysis', code, message, ids, paths);
     const { name, analysisType: type, referenceTemperature, loadCaseName, temperatureScale } = params;
     if (!BUILT.has(type)) return fail('FEA_ANALYSIS_TYPE_UNSUPPORTED', `analysisType '${type}' is not built`, [], ['analysisType']);
+    const solver = params.solver ?? (type === 'explicit_dynamics' ? 'llull_explicit' : 'calculix');
+    if ((type === 'explicit_dynamics') !== (solver === 'llull_explicit'))
+      return fail(
+        'EXP_SOLVER_UNSUPPORTED',
+        `solver '${solver}' cannot run a '${type}' analysis (explicit_dynamics: llull_explicit; others: calculix)`,
+        [],
+        ['solver'],
+      );
     const unitSystem = unitSystemOf(doc.units);
     if (params.unitSystem !== undefined && params.unitSystem !== unitSystem)
       return fail(
@@ -195,7 +210,7 @@ export const createAnalysis = defineCommand({
       id,
       name,
       type,
-      solver: 'calculix',
+      solver,
       unitSystem,
       ...(modes !== undefined ? { modes } : {}),
       factors,
@@ -217,7 +232,7 @@ export const createAnalysis = defineCommand({
     const scaleNote = thermalUse ? `, temperatureScale ${scale}${temperatureScale === undefined ? ' (default)' : ''}` : '';
     return changed(
       withCase(doc, analysisCase),
-      `create_analysis: '${id}' (${name}) — ${type}, calculix, ${unitSystem}${modesNote}${scaleNote}; ${isThermal(type) && !stated ? '' : `${factorNote}; `}mesh default tet order ${mesh.order} globalSize ${plain(mesh.globalSize)} ${doc.units}; no parts yet (next: set_part_idealization).`,
+      `create_analysis: '${id}' (${name}) — ${type}, ${solver}, ${unitSystem}${modesNote}${scaleNote}; ${isThermal(type) && !stated ? '' : `${factorNote}; `}mesh default tet order ${mesh.order} globalSize ${plain(mesh.globalSize)} ${doc.units}; no parts yet (next: set_part_idealization).`,
       [id],
     );
   },

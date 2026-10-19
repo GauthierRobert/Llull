@@ -9,6 +9,7 @@ import type { Vec3 } from './vectors';
 import type { Quantity } from './quantity';
 import type { DurabilityModel } from './durability';
 import type { FeTopologyArtifact, TopologyStudy } from './topology';
+import type { ExplicitSpec, FeExplicitArtifact } from './explicit';
 
 /** Same structural id as `types.ts` `EntityId` (not imported: types.ts imports this module). */
 type EntityId = string;
@@ -24,8 +25,10 @@ export type AnalysisType =
   | 'heat_transient'
   | 'thermo_static'
   | 'coupled_temperature_displacement'
-  | 'nonlinear_static';
-export type FeSolver = 'calculix' | 'nastran';
+  | 'nonlinear_static'
+  | 'explicit_dynamics';
+/** `opencourant` (PHY-19 hand-off) is typed for forward compatibility and refused (not built); `llull_explicit` is RS1 RS-8. */
+export type FeSolver = 'calculix' | 'nastran' | 'opencourant' | 'llull_explicit';
 export type UnitSystem = 'N-mm-t-s' | 'N-m-kg-s' | 'lbf-in-slinch-s';
 export type TemperatureScale = 'degC' | 'K';
 export type LoadCategory = 'limit' | 'ultimate';
@@ -466,6 +469,8 @@ export interface AnalysisCase {
   /** PHY-17 topology studies of this case (plugin `topology`); absent until the first `create_topology_study`. */
   readonly topology?: Readonly<Record<string, TopologyStudy>>;
   readonly topologyOrder?: readonly string[];
+  /** PHY-19 explicit dynamics set-up (plugin `explicit`); absent until `set_explicit_controls`. */
+  readonly explicit?: ExplicitSpec;
   /** Margin dispositions by row id (human gate). */
   readonly dispositions: Readonly<Record<string, Disposition>>;
 }
@@ -526,7 +531,7 @@ export interface FeTableArtifact {
 
 /** Read-only artifact store injected by the host (`ExecutionContext.feaArtifacts`). */
 export interface FeArtifactPort {
-  get(hash: string): FeMeshArtifact | FeResultsArtifact | FeTableArtifact | FeTopologyArtifact | null;
+  get(hash: string): FeMeshArtifact | FeResultsArtifact | FeTableArtifact | FeTopologyArtifact | FeExplicitArtifact | null;
 }
 
 /** Verifies a human signature over a payload hash (09 PLM); no implementation is installed, so human gates refuse. */
