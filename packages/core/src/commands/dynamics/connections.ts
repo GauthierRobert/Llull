@@ -152,11 +152,38 @@ export const addGearCoupling = defineCommand({
   params: z.object({
     driver: z.string().describe('Joint id whose speed drives the other (e.g. the crankshaft joint).'),
     driven: z.string().describe('Joint id that follows (e.g. the propeller joint).'),
-    ratio: z.number().describe('speed(driven) / speed(driver); negative reverses the direction.'),
+    ratio: z
+      .number()
+      .optional()
+      .describe('speed(driven) / speed(driver); negative reverses the direction. Give this OR `teeth`; with both they must agree.'),
+    teeth: z
+      .tuple([z.number().int().positive(), z.number().int().positive()])
+      .optional()
+      .describe(
+        'Tooth counts [driver, driven]: ratio = driverTeeth / drivenTeeth, exact (Rotax 912 reduction 21/51 pinion on the crank: [21, 51] gives 2388.24 rpm from 5800 rpm), negated by `reverseRotation`.',
+      ),
+    reverseRotation: z
+      .boolean()
+      .optional()
+      .describe('With `teeth`: true for an external spur mesh (the driven shaft turns the other way, ratio negative). Default false.'),
+    efficiency: z
+      .number()
+      .gt(0)
+      .max(1)
+      .optional()
+      .describe(
+        'Mesh efficiency in (0, 1] (FR-FPR-74): the transmitted torque is reduced by (1 - efficiency) on the driven shaft, against its rotation. ' +
+          'Real spur meshes are above 0.98 with peaks 0.993-0.999 [NASA TM 81426]; 0.99 is the usual value. Omitted = ideal gear (1, no loss).',
+      ),
     id: z.string().optional().describe('Optional explicit coupling id.'),
   }),
-  run: (doc, { driver, driven, ratio, id }): CommandResult => {
+  run: (doc, { driver, driven, teeth, reverseRotation, efficiency, id, ...rest }): CommandResult => {
     const fail = failer(doc, 'add_gear_coupling');
+    const fromTeeth = teeth === undefined ? undefined : (reverseRotation === true ? -1 : 1) * (teeth[0] / teeth[1]);
+    if (rest.ratio === undefined && fromTeeth === undefined) return fail('give a ratio or tooth counts');
+    if (rest.ratio !== undefined && fromTeeth !== undefined && Math.abs(rest.ratio - fromTeeth) > 1e-9 * Math.abs(fromTeeth))
+      return fail(`ratio ${rest.ratio} disagrees with the tooth counts (${teeth?.join('/')} give ${fromTeeth})`);
+    const ratio = rest.ratio ?? fromTeeth ?? 0;
     const dynamics = dynamicsOf(doc);
     if (dynamics.joints[driver] === undefined) return fail(`driver joint '${driver}' not found (add_body_joint first)`);
     if (dynamics.joints[driven] === undefined) return fail(`driven joint '${driven}' not found`);
@@ -172,8 +199,22 @@ export const addGearCoupling = defineCommand({
     const gearId = idOrNext(id, 'gear');
     if (dynamicsIdTaken(dynamics, gearId)) return fail(`id '${gearId}' is already used`);
     return changed(
-      withDynamics(doc, { ...dynamics, gears: { ...dynamics.gears, [gearId]: { id: gearId, driver, driven, ratio } } }),
-      `add_gear_coupling: '${gearId}' — speed(${driven}) = ${ratio} × speed(${driver}).`,
+      withDynamics(doc, {
+        ...dynamics,
+        gears: {
+          ...dynamics.gears,
+          [gearId]: {
+            id: gearId,
+            driver,
+            driven,
+            ratio,
+            ...(efficiency !== undefined ? { efficiency } : {}),
+            ...(teeth !== undefined ? { teeth } : {}),
+          },
+        },
+      }),
+      `add_gear_coupling: '${gearId}' — speed(${driven}) = ${Number(ratio.toPrecision(8))} × speed(${driver})` +
+        `${teeth === undefined ? '' : ` (teeth ${teeth.join('/')})`}, efficiency ${efficiency ?? 1}${efficiency === undefined ? ' (ideal; 0.99 is typical for a real mesh)' : ''}.`,
       [gearId],
     );
   },

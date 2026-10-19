@@ -30,7 +30,7 @@ export const inspectDynamics = defineCommand({
   annotations: { readOnly: true },
   description:
     'List the physics model: every rigid body with its computed mass (kg), centre of mass (document units) and moment of inertia about ' +
-    'its joint axis (kg·m², revolute joints; a prismatic joint reports translatingMassKg instead: the body plus the bodies it carries) and the densities used (densitySources, densityDefaulted: true when the steel default filled in, with a DYN_DENSITY_DEFAULTED warning; unverified), plus joints, gear couplings, motors, propellers and cylinder pressures, and any problem that would stop ' +
+    'its joint axis (kg·m², revolute joints; a prismatic joint reports translatingMassKg instead: the body plus the bodies it carries) and the densities used (densitySources, densityDefaulted: true when the steel default filled in, with a DYN_DENSITY_DEFAULTED warning; unverified), plus joints, gear couplings (ratio, teeth, efficiency), motors, propellers (with their Ct / Cp table), cylinder pressures and engine losses (losses, only when set), and any problem that would stop ' +
     'simulate_motion. With mobility true (default) it also reports the closed-loop structure: data.topology { tree: spanning-tree ' +
     'joints rooted at the ground, loops: joints that close loops, flipped: tree joints whose declared parent/child sense is reversed }, ' +
     'data.mobility { gruebler: 6·bodies − joint constraints; rank: numerical rank of the loop-constraint Jacobian at the start pose; ' +
@@ -121,6 +121,7 @@ export const inspectDynamics = defineCommand({
       motors: dynamics.motors,
       propellers: dynamics.propellers,
       cylinders: dynamics.cylinders ?? {},
+      ...(Object.keys(dynamics.losses ?? {}).length > 0 ? { losses: dynamics.losses } : {}),
       problems,
       warnings,
       ...(structure ?? {}),

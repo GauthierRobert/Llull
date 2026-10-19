@@ -10,6 +10,8 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { failer, report } from '../noop';
 import { dynamicsOf } from './bodies';
+import { accuracy, RIGID_BODY_WARNING, type Accuracy } from '../../dynamics/engine/accuracy';
+import { quickBrake } from '../../dynamics/engine/quickBrake';
 
 const DEFAULT_ANGLES = [0, 30, 60, 90, 120, 150, 180];
 
@@ -30,7 +32,10 @@ export const engineQuickCheck = defineCommand({
     'model; angles are then CYCLE angles, 0 = firing TDC, and the gas force at each angle is used) or from crankRadiusMm + rodLengthMm ' +
     '(+ optional offsetMm of the cylinder axis; angles are crank degrees from TDC). Units: lengths mm, force N, pressure bar, ' +
     'displacement cm³, speed rpm, torque N·m, power kW. Use it before simulate_motion to check the model against hand numbers: the ' +
-    'simulated static torque and bearing forces must match these within 0.5 %. Read-only; needs no kernel or physics engine.',
+    'simulated static torque and bearing forces must match these within 0.5 %. With a `cylinder` whose crank has set_engine_losses and an `rpm`, ' +
+    'data.brake gives the friction (FMEP), BMEP = IMEP - FMEP, brake torque / power and mechanical efficiency at that speed. data.accuracy states ' +
+    'for each number its band (null = "± ?"), basis and origin: "calibrated" at a speed the heat release was calibrated at (not validation ' +
+    'evidence), "predicted" elsewhere, "input" for a pressure table or a MEP you give. Read-only; needs no kernel or physics engine.',
   params: z.object({
     cylinder: z
       .string()
@@ -118,6 +123,31 @@ export const engineQuickCheck = defineCommand({
         ...(omega !== undefined ? { powerKW: (torque * omega) / 1000, rpm: params.rpm ?? 0 } : {}),
       };
     }
+    const dynamics = dynamicsOf(doc);
+    const record = params.cylinder === undefined ? undefined : dynamics.cylinders?.[params.cylinder];
+    const quick =
+      record !== undefined && model !== undefined
+        ? quickBrake({
+            model: record.model,
+            losses: Object.values(dynamics.losses ?? {}).find((losses) => losses.crank === record.crank),
+            imepPa: model.imepBar * 1e5,
+            peakPa: model.peakBar * 1e5,
+            rpm: params.rpm,
+            displacementM3: displacement ?? 0,
+            cycle,
+          })
+        : null;
+    const given = accuracy(null, 'mean effective pressure given by the caller; its uncertainty is not stated', 'input', {
+      warnings: [RIGID_BODY_WARNING],
+    });
+    const accuracies: Record<string, Accuracy> = {
+      kinematics: accuracy(
+        null,
+        'exact slider-crank kinematics and virtual work [C-R12]; no uncertainty of the stated geometry is available',
+        'predicted',
+      ),
+      ...(quick !== null ? quick.accuracy : mean !== undefined ? { meanTorqueNm: given, powerKW: given } : {}),
+    };
     const data = {
       source: params.cylinder !== undefined ? `model:${params.cylinder}` : 'parameters',
       basis: 'exact slider-crank kinematics and virtual work; MEP relation of a four-/two-stroke engine (no simulation, no losses)',
@@ -132,6 +162,8 @@ export const engineQuickCheck = defineCommand({
       angles,
       ...(model !== undefined ? { cylinder: { id: params.cylinder, imepBar: model.imepBar, peakPressureBar: model.peakBar } } : {}),
       ...(mean !== undefined ? { mean } : {}),
+      ...(quick?.brake != null ? { brake: quick.brake } : {}),
+      accuracy: accuracies,
     };
     const first = angles.find((a) => a.angleDeg === 90) ?? angles[0];
     const text = [
@@ -143,6 +175,9 @@ export const engineQuickCheck = defineCommand({
         ? `Mean torque ${(mean['meanTorqueNm'] ?? 0).toPrecision(5)} N·m at MEP ${(mean['mepBar'] ?? 0).toPrecision(5)} bar.`
         : '',
       mean?.['powerKW'] !== undefined ? `Power ${mean['powerKW'].toPrecision(5)} kW.` : '',
+      quick?.brake != null
+        ? `Brake ${quick.brake.brakeTorqueNm.toPrecision(5)} N·m (${quick.brake.brakePowerKW.toPrecision(4)} kW, BMEP ${quick.brake.bmepBar.toPrecision(5)} bar = IMEP - FMEP ${quick.brake.fmepBar.toPrecision(4)} bar, mechanical efficiency ${(quick.brake.mechanicalEfficiency * 100).toFixed(1)} %), ${quick.accuracy['brakeTorqueNm']?.origin ?? ''}.`
+        : '',
     ];
     return report(doc, text.filter((t) => t !== '').join(' '), data);
   },
