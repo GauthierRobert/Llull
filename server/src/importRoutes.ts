@@ -12,7 +12,6 @@ import { isRecord } from '@lib/isRecord';
 import { applyCommand } from './commandBus';
 import { convertDwgLimited, dwgConfigFromEnv, DwgConvertError } from './dwgConvert';
 import { guardMutation } from './security';
-import { actorOf } from './audit';
 import type { DwgImportResponseBody, ErrorResponseBody } from '@mcp/restProtocol';
 
 const LIST_KEYS = new Set(['layers', 'sources']);
@@ -63,7 +62,7 @@ export function buildImportRouter(restLimiter: RequestHandler): Router {
     convertDwgLimited(bytes)
       .then((text) => {
         const command = target === 'survey' ? 'import_survey_dxf' : 'import_dxf';
-        const result = applyCommand(command, commandParams(target, source, text), undefined, actorOf(res, 'rest'));
+        const result = applyCommand(command, commandParams(target, source, text), undefined, 'rest');
         res.status(200).json({ ...result, command, dxfBytes: Buffer.byteLength(text) } satisfies DwgImportResponseBody);
       })
       .catch((error: unknown) =>

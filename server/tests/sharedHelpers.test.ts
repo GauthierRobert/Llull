@@ -14,7 +14,7 @@ import { parseCommandResponse } from '@mcp/restProtocol';
 import { cliTarget, parseArgv, type CliTarget } from '../src/cli/argv';
 import { readDocumentFile, writeDocumentFile } from '../src/documentFile';
 import { exchangeDirOf, isTestRun, positiveInteger } from '../src/env';
-import { hashJson } from '../src/audit';
+import { hashJson } from '../src/commandBus';
 import { isHealthy, requestJson } from '../src/restClient';
 import { writeFileAtomic } from '../src/writeFileAtomic';
 

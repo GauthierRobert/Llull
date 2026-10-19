@@ -26,7 +26,7 @@ export interface LiveCommandEvent {
   readonly params: unknown;
   /** `documentHash` of the server document after the command. */
   readonly stateHash: string;
-  /** Named user who ran the command (server in named-user mode only); clients may ignore it. */
+  /** Legacy, never emitted since LC1 step 3 removed named users; kept until the UI stops reading it. */
   readonly userId?: string;
   readonly userName?: string;
   /** Channel the command came in on; clients use it to label remote edits. */

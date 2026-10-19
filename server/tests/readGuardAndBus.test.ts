@@ -32,7 +32,7 @@ describe('guardRead', () => {
     expect((await request(app).get('/export/stl')).status).toBe(200);
   });
 
-  it('with a token: rejects bare loopback requests, accepts bearer and ?access_token=', async () => {
+  it('with a token: rejects bare loopback requests and ?access_token=, accepts bearer', async () => {
     process.env['MCP_AUTH_TOKEN'] = TOKEN;
     expect((await request(app).get('/live/snapshot')).status).toBe(401);
     expect((await request(app).get('/export/stl')).status).toBe(401);
@@ -40,9 +40,7 @@ describe('guardRead', () => {
     const bearer = await request(app).get('/live/snapshot').set('Authorization', `Bearer ${TOKEN}`);
     expect(bearer.status).toBe(200);
     const query = await request(app).get('/live/snapshot').query({ access_token: TOKEN });
-    expect(query.status).toBe(200);
-    const wrong = await request(app).get('/live/snapshot').query({ access_token: 'nope' });
-    expect(wrong.status).toBe(401);
+    expect(query.status).toBe(401);
   });
 
   it('with a token: the local UI (allowed Origin, loopback) still reads', async () => {

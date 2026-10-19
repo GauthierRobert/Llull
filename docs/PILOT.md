@@ -21,11 +21,11 @@ The samples are an analytic hillside on a local site grid (easting 1000–1240 m
 
 ## Before you start (5 minutes)
 
-- Open the app (your hosted URL, or `npm install && npm run dev` → http://localhost:5173). Chrome,
-  Edge or Firefox; nothing to install for CSV / DXF work.
-- DWG files need the optional server with a converter (LibreDWG `dwg2dxf` or the ODA File
-  Converter) — see [CIVIL.md › DWG import](CIVIL.md#dwg-import-via-the-server). Without it, save
-  your DWG as ASCII DXF from your CAD tool.
+- Install and open the llull desktop app ([DEPLOYMENT.md](DEPLOYMENT.md)); it runs offline on your
+  machine, nothing else to install for CSV / DXF work.
+- DWG files need a converter on the machine (LibreDWG `dwg2dxf` or the ODA File Converter) — see
+  [CIVIL.md › DWG import](CIVIL.md#dwg-import-via-the-server). Without it, save your DWG as ASCII DXF
+  from your CAD tool.
 - Pick **one real, finished job** from your office to compare against: its survey file, the pad
   level and volumes your tool computed, the road layout, and the storm network with the pipe sizes
   you issued. The comparison is what makes the pilot worth doing.
@@ -54,7 +54,7 @@ same commands are in the command palette (Ctrl/Cmd + K) and available to AI agen
    **Import points**. Header and `#` lines are skipped; unreadable lines are listed in the status.
 3. Or **Survey DXF file**: contours as 3D polylines, 3D points, 3D faces and spot-level texts
    become points (try `pilot-site-survey.dxf`). **Drawing DXF file** brings a client background
-   drawing in as editable entities. DWG: **Survey DWG file** / **Drawing DWG file** (server).
+   drawing in as editable entities. DWG: **Survey DWG file** / **Drawing DWG file** (needs a converter).
 4. Grid coordinates? Set the coordinate system and the site calibration your surveyor provides
    (Coordinate system section) before importing with grid coordinates (`import_survey_points`
    `coordinates: "grid"` in the palette).

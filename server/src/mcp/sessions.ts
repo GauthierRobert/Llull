@@ -7,8 +7,6 @@ interface SessionEntry {
   transport: StreamableHTTPServerTransport;
   /** Epoch-ms of the last request routed to this session. */
   lastSeenMs: number;
-  /** Named user that opened the session (named-user mode); other users cannot reuse the id. */
-  userId?: string;
   /** Locality of the creating request (`!isLocalPeer`); a request of the other locality is refused (licensed redaction is fixed per session). */
   remote: boolean;
 }
@@ -25,18 +23,13 @@ function maxSessions(): number {
   return positiveInteger(process.env['MCP_MAX_SESSIONS'], DEFAULT_MAX_SESSIONS);
 }
 
-/**
- * Make room for one more session by closing the oldest-idle ones while at/over the cap. With a known `userId`
- * that user's own sessions go first (a user at the cap recycles their own); a caller with none evicts by global LRU.
- */
-export function evictForCapacity(userId?: string): void {
+/** Make room for one more session by closing the oldest-idle ones while at/over the cap (global LRU). */
+export function evictForCapacity(): void {
   const limit = maxSessions();
   while (sessions.size >= limit) {
-    const owned = userId === undefined ? false : [...sessions.values()].some((entry) => entry.userId === userId);
     let oldestId: string | undefined;
     let oldestSeen = Infinity;
     for (const [id, entry] of sessions) {
-      if (owned && entry.userId !== userId) continue;
       if (entry.lastSeenMs < oldestSeen) {
         oldestSeen = entry.lastSeenMs;
         oldestId = id;

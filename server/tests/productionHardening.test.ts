@@ -1,4 +1,4 @@
-/** Production hardening: shared limiters, proxy trust, headers, probes, child cleanup, per-client caps, MCP eviction. */
+/** Production hardening: shared limiters, local-only surface, headers, probes, child cleanup, per-client caps, MCP eviction. */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import fs from 'fs';
@@ -8,20 +8,13 @@ import { spawn } from 'node:child_process';
 import { app } from '../src/index';
 import { BusyError, concurrencyLimiter, createPythonExchangePort } from '../src/pythonExchange';
 import { killAllChildren, liveChildCount, trackChild } from '../src/childProcesses';
-import { contentSecurityPolicy, trustProxySetting } from '../src/security';
+import { contentSecurityPolicy } from '../src/security';
 import { evictForCapacity, sessions } from '../src/mcp/sessions';
 import { liveSubscriberCount } from '../src/liveDocument';
 import { mcpRequest, INITIALIZE_PARAMS } from './mcpTestSupport';
 import { convertDwgLimited } from '../src/dwgConvert';
 
-const ENV_KEYS = [
-  'MCP_AUTH_TOKEN',
-  'HOST',
-  'LLULL_ALLOWED_HOSTS',
-  'LLULL_LIVE_MAX_PER_CLIENT',
-  'MCP_MAX_SESSIONS',
-  'LLULL_PYTHON_QUEUE_MAX',
-];
+const ENV_KEYS = ['MCP_AUTH_TOKEN', 'LLULL_LIVE_MAX_PER_CLIENT', 'MCP_MAX_SESSIONS', 'LLULL_PYTHON_QUEUE_MAX'];
 afterEach(() => {
   for (const key of ENV_KEYS) delete process.env[key];
   sessions.clear();
@@ -33,19 +26,11 @@ describe('shared DWG limiter', () => {
   });
 });
 
-describe('trustProxySetting', () => {
-  it('parses env values', () => {
-    expect(trustProxySetting(undefined)).toBeUndefined();
-    expect(trustProxySetting('')).toBeUndefined();
-    expect(trustProxySetting('true')).toBe(true);
-    expect(trustProxySetting('2')).toBe(2);
-    expect(trustProxySetting('loopback')).toBe('loopback');
-    expect(trustProxySetting('10.0.0.0/8, loopback')).toBe('10.0.0.0/8, loopback');
-  });
-
-  it('does not let X-Forwarded-For fake a loopback peer for admin endpoints', async () => {
-    const res = await request(app).get('/admin/users').set('X-Forwarded-For', '203.0.113.9');
-    expect(res.status).not.toBe(200);
+describe('local-only surface (LC1)', () => {
+  it('serves no multi-user licence or admin routes', async () => {
+    for (const route of ['/license', '/admin/users', '/admin/audit', '/admin/license']) {
+      expect((await request(app).get(route)).status).toBe(404);
+    }
   });
 });
 
@@ -63,14 +48,13 @@ describe('MCP session eviction', () => {
     expect(sessions.has('victim')).toBe(false);
   });
 
-  it('evicts the same user first when ownership is known', () => {
+  it('evicts the least recently used session at the cap', () => {
     process.env['MCP_MAX_SESSIONS'] = '2';
-    const mk = (userId: string | undefined, lastSeenMs: number): never =>
-      ({ transport: { close: () => Promise.resolve() }, lastSeenMs, ...(userId ? { userId } : {}) }) as never;
-    sessions.set('other-old', mk('bob', 1));
-    sessions.set('mine', mk('alice', 5));
-    evictForCapacity('alice');
-    expect([...sessions.keys()]).toEqual(['other-old']);
+    const mk = (lastSeenMs: number): never => ({ transport: { close: () => Promise.resolve() }, lastSeenMs }) as never;
+    sessions.set('old', mk(1));
+    sessions.set('recent', mk(5));
+    evictForCapacity();
+    expect([...sessions.keys()]).toEqual(['recent']);
   });
 });
 
@@ -130,8 +114,7 @@ describe('security headers and probes', () => {
     expect(res.headers['referrer-policy']).toBe('no-referrer');
   });
 
-  it('serves /health to a pod-IP Host while other routes keep the allowlist', async () => {
-    process.env['LLULL_ALLOWED_HOSTS'] = 'llull.example';
+  it('serves /health to any Host while other routes keep the loopback allowlist', async () => {
     expect((await request(app).get('/health').set('Host', '10.1.2.3:3001')).status).toBe(200);
     expect((await request(app).get('/live/snapshot').set('Host', '10.1.2.3:3001')).status).toBe(403);
   });
@@ -182,7 +165,7 @@ describe('per-client live stream cap', () => {
     }
   });
 
-  it('does not cap proxied streams while trust proxy is unset (all users share the proxy IP)', async () => {
+  it('does not cap proxied streams (all clients share the proxy IP)', async () => {
     process.env['LLULL_LIVE_MAX_PER_CLIENT'] = '1';
     const server = app.listen(0);
     const { port } = server.address() as { port: number };

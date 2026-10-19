@@ -19,9 +19,15 @@ Binding text: `CLAUDE.md` § PRODUCT DIRECTIVE. Related: RS1 (native compute), K
 2. **Stop shipping the browser build**: drop the PWA (`serviceWorker/`, `viteServiceWorker.ts`, `playwright.pwa.config.ts`, `test:pwa`,
    `tests/pwa/`), the public web deployment docs, and the `?kernel=` URL switch in `src/main.tsx`; Vite stays as the Electron renderer's
    dev server and bundler.
-3. **Remove the cloud host**: Docker image + CI `image` job, `docker-compose.yml`, multi-user auth / licence / tickets / admin routes
-   (`server/src/{users,security,license,tickets,adminRoutes}.ts`), `docs/DEPLOYMENT.md` / `PILOT.md` cloud parts — after checking that
-   the desktop and the CLI use none of it.
+3. **Remove the cloud host** — done 2026-10-19. Removed: `Dockerfile`, `.dockerignore`, `docker-compose.yml`, the CI `image` job;
+   named users / roles (`server/src/users.ts`, `scripts/add-user.mjs`), the offline licence (`license.ts`, `scripts/license.mjs`,
+   `GET /license`), the audit trail (`audit.ts`), `/admin/*` (`adminRoutes.ts`), the deprecated `?access_token=` query token,
+   `LLULL_TRUST_PROXY`, `LLULL_ALLOWED_HOSTS`, `LLULL_ALLOW_UNAUTHENTICATED` and non-loopback binding (a non-loopback `HOST` now
+   refuses to start). Kept, because the desktop app uses them: `security.ts` (per-launch bearer token `MCP_AUTH_TOKEN` +
+   `LLULL_REQUIRE_TOKEN_FOR_REST`, origin / Host allowlists, CSRF guard, rate limits) and `tickets.ts` (single-use `?ticket=` for
+   the UI's `/live` EventSource, now without user identity). Live `command` events keep their `source` (rest / cli) for the UI's
+   labels. `docs/DEPLOYMENT.md` rewritten for the desktop app + CLI; `PILOT.md`, `README.md`, `server/README.md` updated.
+   Deferred: the UI status bar still asks `GET /license` (now 404, it renders nothing) — remove with the UI clean-up.
 4. **Remove MCP**: `packages/mcp` exposure and `/mcp`; move what the CLI still needs (`FeaToolsPort`, exchange tools, discovery used by
    `llull search`) to `server/` (12 CFD open question 2). Tool schemas stay (`toToolSchemas()` feeds the CLI's `describe`).
 5. **Retire the WASM kernels** once the native kernel has been the desktop default for a release: `packages/kernel-occt` (opencascade.js),

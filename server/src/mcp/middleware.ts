@@ -1,8 +1,7 @@
 /** Auth and rate-limit middleware for the /mcp router. */
 
 import type { Request, RequestHandler, Response } from 'express';
-import { buildRateLimiter, hasValidBearer } from '../security';
-import { UNAUTHORIZED_BODY, isUserMode, requireRole } from '../users';
+import { UNAUTHORIZED_BODY, buildRateLimiter, hasValidBearer } from '../security';
 
 /**
  * Bearer-token auth guard.
@@ -12,16 +11,11 @@ import { UNAUTHORIZED_BODY, isUserMode, requireRole } from '../users';
  * Never logs the token value.
  */
 export function buildAuthMiddleware(): (req: Request, res: Response, next: () => void) => void {
-  const userGuard = requireRole('viewer', false); // per-tool role checks live in mcp/server.ts
   const token = process.env['MCP_AUTH_TOKEN'];
-  if (!token && !isUserMode()) {
+  if (!token) {
     console.warn('[warn] MCP_AUTH_TOKEN is not set — /mcp endpoint is unprotected. Set it in production.');
   }
   return (req: Request, res: Response, next: () => void) => {
-    if (isUserMode()) {
-      userGuard(req, res, next);
-      return;
-    }
     if (!token) {
       next();
       return;

@@ -1,15 +1,13 @@
 /**
  * Express entry: middleware + route mounting only (L1, L6).
  *   GET /health            liveness + active kernel
- *   /license /admin/*      `adminRoutes.ts` (license status; admin: users, audit, license)
  *   /live /command /undo /redo   `liveRoutes.ts`      /export/*   `exportRoutes.ts`
  *   POST /import/dwg       `importRoutes.ts` (DWG -> DXF converter, then import_dxf)
  *   POST /exchange         `exchangeRoutes.ts` (STEP / DWG / CadQuery exchange tools for the CLI)
  *   ALL /mcp               `mcp.ts` (Streamable HTTP; bearer auth + rate limit)
  *
- * Env: PORT (3001), HOST (127.0.0.1: llull is a local tool and /command is unauthenticated for the
- * browser UI, so network exposure is opt-in, ideally with MCP_AUTH_TOKEN), LLULL_BODY_LIMIT (2mb),
- * plus the security/MCP vars in server/README.md.
+ * Env: PORT (3001), HOST (127.0.0.1; loopback only: the backend is local, one per machine, LC1), LLULL_BODY_LIMIT (2mb),
+ * MCP_AUTH_TOKEN (the desktop app's per-launch token) plus the vars in server/README.md.
  */
 
 import './plugins'; // must stay first: installs domain plugins before liveDocument loads
@@ -24,7 +22,6 @@ import { buildExchangeRouter } from './exchangeRoutes';
 import { getActiveKernelName } from './geometryKernel';
 import { buildLiveRouter } from './liveRoutes';
 import { buildExportRouter } from './exportRoutes';
-import { buildAdminRouter } from './adminRoutes';
 import { errorMessage } from '@lib/errorMessage';
 import { startServer } from './lifecycle';
 import {
@@ -34,14 +31,11 @@ import {
   jsonErrorHandler,
   securityHeaders,
   setHtmlSecurityHeaders,
-  trustProxySetting,
 } from './security';
 
 const app = express();
 
 app.disable('x-powered-by');
-const trustProxy = trustProxySetting(process.env['LLULL_TRUST_PROXY']);
-if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
 app.use(securityHeaders());
 // Disallowed origins get no CORS headers. Before the body parser so its 400/413 errors stay readable by the UI.
 app.use(
@@ -51,7 +45,7 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 );
-// Before the Host allowlist: LB / k8s probes arrive with the pod IP as Host.
+// Before the Host allowlist: a liveness probe needs no Host check.
 app.get('/health', (_req, res) => void res.json({ status: 'ok', kernel: getActiveKernelName() }));
 app.use(hostAllowlist());
 const jsonBody = express.json({ limit: process.env['LLULL_BODY_LIMIT'] ?? '2mb' });
@@ -62,12 +56,11 @@ const restLimiter = buildRestRateLimiter();
 const exchange = exchangeOptionsWithDwg();
 
 app.use(buildLiveRouter(restLimiter));
-app.use(buildAdminRouter(restLimiter));
 app.use('/export', restLimiter, buildExportRouter(exchange));
 app.use('/import', buildImportRouter(restLimiter));
 app.use(buildExchangeRouter(restLimiter, exchange));
 app.use('/mcp', buildMcpRouter(exchange));
-// On-prem: serve the built web app (`LLULL_STATIC_DIR`, e.g. /app/dist) from the same origin.
+// Desktop: serve the built renderer (`LLULL_STATIC_DIR`) from the same origin as the API.
 const staticDir = process.env['LLULL_STATIC_DIR'];
 if (staticDir !== undefined && staticDir !== '') {
   app.use(

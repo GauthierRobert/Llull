@@ -1,5 +1,5 @@
 /**
- * On-prem static serving (`LLULL_STATIC_DIR`): built assets and the SPA fallback for HTML
+ * Desktop static serving (`LLULL_STATIC_DIR`): built assets and the SPA fallback for HTML
  * navigations; API 404s stay JSON.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';

@@ -1,19 +1,17 @@
 /**
  * Short-lived single-use tickets for `GET /live` (EventSource cannot send headers, and a bearer token in the URL leaks into
  * proxy/access logs and history). `POST /live/ticket` (header auth) mints one; `GET /live?ticket=` consumes it.
- * @invariant a ticket is valid once, for TICKET_TTL_MS, and carries the identity of the user who minted it.
+ * @invariant a ticket is valid once, for TICKET_TTL_MS.
  */
 import crypto from 'crypto';
-import type { NamedUser } from './users';
 
 export const TICKET_TTL_MS = 30_000;
 export const MAX_TICKETS = 1024;
-/** Outstanding tickets per owner (user id, else client address): one caller cannot fill the shared store. */
+/** Outstanding tickets per owner (client address): one caller cannot fill the shared store. */
 export const MAX_TICKETS_PER_OWNER = 8;
 
 interface TicketEntry {
   readonly expiresAt: number;
-  readonly user: NamedUser | undefined;
   readonly owner: string;
 }
 
@@ -28,26 +26,23 @@ function evictOldestOf(owner: string): void {
   if (owned.length >= MAX_TICKETS_PER_OWNER && owned[0] !== undefined) tickets.delete(owned[0][0]);
 }
 
-/**
- * New ticket bound to `user` (named-user mode). An owner past MAX_TICKETS_PER_OWNER recycles its oldest ticket;
- * null when the store is full of live tickets.
- */
-export function issueTicket(user: NamedUser | undefined, clientKey: string, now: number = Date.now()): string | null {
+/** New ticket for the client `clientKey`. An owner past MAX_TICKETS_PER_OWNER recycles its oldest ticket; null when the store is full. */
+export function issueTicket(clientKey: string, now: number = Date.now()): string | null {
   sweepExpired(now);
-  const owner = user?.id ?? `client:${clientKey}`;
+  const owner = `client:${clientKey}`;
   evictOldestOf(owner);
   if (tickets.size >= MAX_TICKETS) return null;
   const ticket = crypto.randomBytes(32).toString('base64url');
-  tickets.set(ticket, { expiresAt: now + TICKET_TTL_MS, user, owner });
+  tickets.set(ticket, { expiresAt: now + TICKET_TTL_MS, owner });
   return ticket;
 }
 
-/** Redeems (and deletes) `ticket`: `{ user }` when valid and fresh, else null. */
-export function consumeTicket(ticket: string, now: number = Date.now()): { user: NamedUser | undefined } | null {
+/** Redeems (and deletes) `ticket`: true when it was valid and fresh. */
+export function consumeTicket(ticket: string, now: number = Date.now()): boolean {
   const entry = tickets.get(ticket);
-  if (entry === undefined) return null;
+  if (entry === undefined) return false;
   tickets.delete(ticket);
-  return entry.expiresAt > now ? { user: entry.user } : null;
+  return entry.expiresAt > now;
 }
 
 /** Test hook. */

@@ -10,12 +10,9 @@ import { withoutPrivateValues } from '@core/commands/materials/libraryRecords';
 import { errorMessage } from '@lib/errorMessage';
 import { withoutConfirmations } from '@lib/withoutConfirmations';
 import { type LiveCommandEvent, type LiveCommandSource, type LiveSnapshotEvent, documentHash } from '@mcp/liveSync';
-import { setAuditDefaultDirectory } from './audit';
 import { isTestRun, positiveInteger } from './env';
 
 const AUTOSAVE_PATH = process.env['LLULL_AUTOSAVE_PATH'] ?? path.resolve(__dirname, '..', '.autosave.json');
-
-setAuditDefaultDirectory(path.dirname(AUTOSAVE_PATH));
 
 const AUTOSAVE_ENABLED = !isTestRun() /* keep the user's saved project */ && process.env['LLULL_AUTOSAVE_DISABLED'] !== 'true';
 
@@ -74,11 +71,6 @@ let _liveDoc: CadDocument = loadAutosave();
 
 let _seq = 0; // changes since process start
 const _epoch: string = randomUUID(); // `_seq` restarts on restart, so clients compare `(epoch, seq)`
-
-/** Log position without hashing the document (audit lines). */
-export function getLiveLogPosition(): { epoch: string; seq: number } {
-  return { epoch: _epoch, seq: _seq };
-}
 
 export function getLiveDoc(): CadDocument {
   return _liveDoc;
@@ -140,7 +132,6 @@ interface LiveCommand {
   readonly params: unknown;
   readonly source?: LiveCommandSource;
   readonly commandId?: string;
-  readonly user?: { readonly id: string; readonly name: string };
 }
 
 /** Replace the shared document; broadcast a `command` event (clients re-run + verify `stateHash`), or a `snapshot` without one. */
@@ -162,7 +153,6 @@ export function setLiveDoc(next: CadDocument, command?: LiveCommand): void {
     stateHash: documentHash(next),
     ...(command.source !== undefined ? { source: command.source } : {}),
     ...(command.commandId !== undefined ? { commandId: command.commandId } : {}),
-    ...(command.user !== undefined ? { userId: command.user.id, userName: command.user.name } : {}),
   };
   broadcast('command', event);
 }

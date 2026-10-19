@@ -28,14 +28,12 @@ import {
   toolsetOf,
   redactLicensedOutcome,
 } from '@mcp/index';
-import { getCommand, listCommands } from '@core/commands/registry';
+import { getCommand } from '@core/commands/registry';
 import type { ToolsetName } from '@mcp/index';
 import { withFailureStatus } from '@mcp/commandOutcome';
 import { errorMessage } from '@lib/errorMessage';
 import { getLiveDoc } from '../liveDocument';
-import { ANONYMOUS_ACTOR, type Actor } from '../audit';
 import { applyLiveExchangeToolCall } from '../liveExchange';
-import type { Role } from '../users';
 import { applyCommand } from '../commandBus';
 import type { ExchangeOptions } from '../pythonExchange';
 import { buildImageBlock, stripSvgFromData } from '../renderImage';
@@ -49,29 +47,12 @@ function unknownToolResult(name: string, enabledToolsets: ReadonlySet<ToolsetNam
   return makeErrorResult(`Unknown command: ${name}.${hint} Use search_tools to find tools by keyword.`);
 }
 
-/** `role: null` = no named-user auth (full access). */
 interface McpCaller {
-  readonly actor: Actor;
-  readonly role: Role | null;
   /** Not a direct loopback peer: licensed material values are redacted from its answers (TR-MAT-32). */
   readonly remote?: boolean;
 }
 
-/** What a viewer may call. */
-let readOnlyCache: { readonly count: number; readonly names: ReadonlySet<string> } | null = null;
-const isReadOnlyTool = (name: string): boolean => {
-  const count = listCommands().length; // registry changes (plugin install) change the count
-  if (readOnlyCache === null || readOnlyCache.count !== count) {
-    readOnlyCache = { count, names: new Set(buildAllMcpTools().flatMap((t) => (t.annotations?.readOnlyHint === true ? [t.name] : []))) };
-  }
-  return readOnlyCache.names.has(name);
-};
-
-export function buildMcpServer(
-  exchange: ExchangeOptions,
-  configuredToolsets: ReadonlySet<ToolsetName>,
-  caller: McpCaller = { actor: ANONYMOUS_ACTOR('mcp'), role: null },
-): Server {
+export function buildMcpServer(exchange: ExchangeOptions, configuredToolsets: ReadonlySet<ToolsetName>, caller: McpCaller = {}): Server {
   const server = new Server(
     { name: 'llull', version: '0.1.0' },
     { capabilities: { tools: { listChanged: true }, resources: {}, prompts: {} }, instructions: SERVER_INSTRUCTIONS },
@@ -81,7 +62,6 @@ export function buildMcpServer(
   server.setRequestHandler(ListToolsRequestSchema, () => ({
     tools: buildAllMcpTools()
       .filter((t) => isToolEnabled(t.name, enabledToolsets))
-      .filter((t) => caller.role !== 'viewer' || t.name === 'enable_toolset' || t.annotations?.readOnlyHint === true)
       .map((t) => ({
         name: t.name,
         description: t.description,
@@ -105,17 +85,11 @@ export function buildMcpServer(
       if (discovery.toolsListChanged) server.sendToolListChanged().catch(() => {});
       return discovery.result;
     }
-    if (caller.role === 'viewer' && !isReadOnlyTool(name)) {
-      return makeErrorResult(
-        `Forbidden — role "viewer" may only call read-only tools; ${name} can change the document. ` +
-          'Ask an administrator for the "editor" role.',
-      );
-    }
     // Exchange tools: Python I/O behind the injected port; document changes still go through the command bus.
-    const exchangeResult = await applyLiveExchangeToolCall(name, args, exchange, caller.actor);
+    const exchangeResult = await applyLiveExchangeToolCall(name, args, exchange, 'mcp');
     if (exchangeResult !== null) return exchangeResult;
     if (getCommand(name) === undefined) return unknownToolResult(name, enabledToolsets);
-    const applied = applyCommand(name, args ?? {}, undefined, caller.actor);
+    const applied = applyCommand(name, args ?? {}, undefined, 'mcp');
     const busResult = withFailureStatus(name, caller.remote === true ? redactLicensedOutcome(getLiveDoc(), name, args, applied) : applied);
     // Vision loop: the PNG replaces the multi-KB SVG in the text/structured content.
     const imageBlock = await buildImageBlock(busResult.data);

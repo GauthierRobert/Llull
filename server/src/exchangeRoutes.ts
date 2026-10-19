@@ -10,7 +10,6 @@ import { isRecord } from '@lib/isRecord';
 import { runLiveExchangeTool } from './liveExchange';
 import { PYTHON_BUSY_MESSAGE, type ExchangeOptions } from './pythonExchange';
 import { guardMutation } from './security';
-import { actorOf } from './audit';
 
 export function buildExchangeRouter(restLimiter: RequestHandler, exchange: ExchangeOptions): Router {
   const router = Router();
@@ -21,8 +20,8 @@ export function buildExchangeRouter(restLimiter: RequestHandler, exchange: Excha
       res.status(400).json({ error: 'Request body must be an object with a "name" field.' });
       return;
     }
-    const actor = actorOf(res, isRecord(body) && body['client'] === 'cli' ? 'cli' : 'rest');
-    runLiveExchangeTool(name, isRecord(body) ? body['params'] : undefined, exchange, actor)
+    const source = isRecord(body) && body['client'] === 'cli' ? 'cli' : 'rest';
+    runLiveExchangeTool(name, isRecord(body) ? body['params'] : undefined, exchange, source)
       .then((outcome) => {
         if (outcome === null) {
           res.status(404).json({ error: `"${name}" is not an exchange tool; use POST /command.` });
