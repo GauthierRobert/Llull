@@ -475,3 +475,113 @@
   gap: var(--space-2);
   margin-top: var(--space-2);
 }
+
+/* Legend dot: the colour of the row's glyph on the model */
+.panel__swatch {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px oklch(0 0 0 / 0.35);
+}
+
+/* Glanceable headline numbers at the top of a panel (the 5-second read) */
+.panel__kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+
+.panel__kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--kpi-color, var(--border-strong));
+  border-radius: var(--radius-xs);
+  background: var(--surface-2);
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
+button.panel__kpi {
+  cursor: pointer;
+}
+
+button.panel__kpi:hover {
+  background: var(--surface-3);
+}
+
+.panel__kpi--ok {
+  --kpi-color: var(--success);
+}
+
+.panel__kpi--warn {
+  --kpi-color: var(--warning);
+}
+
+.panel__kpi--bad {
+  --kpi-color: var(--danger);
+}
+
+.panel__kpi-label {
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.panel__kpi-value {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel__kpi-sub {
+  overflow: hidden;
+  font-size: var(--text-2xs);
+  color: var(--fg-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Status chip: pass / warn / fail at a glance */
+.panel__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.panel__status--ok {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.panel__status--warn {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.panel__status--bad {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.panel__status--info {
+  background: var(--accent-softer);
+  color: var(--accent-text);
+}

@@ -21,6 +21,7 @@ import { CivilPanel } from '@ui/panels/civil/CivilPanel';
 import { ManufacturingPanel } from '@ui/panels/manufacturing/ManufacturingPanel';
 import { FastenersPanel } from '@ui/panels/fasteners/FastenersPanel';
 import { AnalysisPanel } from '@ui/panels/analysis/AnalysisPanel';
+import { AeroPanel } from '@ui/panels/aero/AeroPanel';
 import { ReviewPanel } from '@ui/panels/review/ReviewPanel';
 import { useReviewStore } from '@ui/panels/review/reviewStore';
 import { type SidebarTabSpec, SIDEBAR_TAB_COUNTS, SIDEBAR_TAB_SPECS, isSidebarTabAvailable, partitionSidebarTabs } from './sidebarTabs';
@@ -40,6 +41,7 @@ const TAB_PANELS: Readonly<Record<SidebarTab, React.ComponentType<{ className?: 
   manufacturing: ManufacturingPanel,
   fasteners: FastenersPanel,
   analysis: AnalysisPanel,
+  aero: AeroPanel,
   review: ReviewPanel,
 };
 

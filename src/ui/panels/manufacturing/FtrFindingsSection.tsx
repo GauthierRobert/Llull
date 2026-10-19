@@ -2,11 +2,15 @@
 // unverified marker, the standing "review required" banner and the provenance popover. Findings are facts; nothing here approves them.
 
 import React from 'react';
-import { PanelSection } from '@ui/panels/PanelParts';
+import { KpiStrip, PanelSection } from '@ui/panels/PanelParts';
+import { useStore } from '@ui/store';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { useIsFocused } from '@ui/store/focusStore';
 import { ProvenancePopover } from '@ui/panels/ProvenancePopover';
 import { ReviewBanner } from '@ui/panels/ReviewBanner';
 import { useReadOnlyQuery } from '@ui/panels/useReadOnlyQuery';
 import { parseCheck, type FtrFindingView } from './ftrData';
+import { FINDING_COLORS, partFocus } from './mfgFocus';
 
 const GLYPH: Readonly<Record<FtrFindingView['severity'], string>> = { fail: '✖', warn: '▲', info: '○' };
 
@@ -17,10 +21,21 @@ function formatMeasure(finding: FtrFindingView): string | null {
   return finding.limit === undefined ? value : `${value} (limit ${finding.limit}${unit})`;
 }
 
-function FindingRow({ finding }: { finding: FtrFindingView }): React.ReactElement {
+function FindingRow({ finding, partId, index }: { finding: FtrFindingView; partId: string; index: number }): React.ReactElement {
   const measure = formatMeasure(finding);
+  const document = useStore((s) => s.document);
+  const focusItem = useFocusItem();
+  const focus = partFocus(
+    document,
+    partId,
+    `finding:${finding.code}:${index}`,
+    `${finding.code}${measure === null ? '' : ` · ${measure}`}`,
+    FINDING_COLORS[finding.severity],
+    finding.ids,
+  );
+  const focused = useIsFocused(focus.key);
   return (
-    <li className="finding" data-testid={`ftr-finding-${finding.code}`}>
+    <li className={focused ? 'finding finding--focused' : 'finding'} data-testid={`ftr-finding-${finding.code}`}>
       <div className="finding__head">
         <span className={`status-mark status-mark--${finding.severity === 'info' ? 'not_run' : finding.severity}`}>
           <span className="status-mark__glyph" aria-hidden="true">
@@ -30,6 +45,16 @@ function FindingRow({ finding }: { finding: FtrFindingView }): React.ReactElemen
         </span>
         <code className="finding__code">{finding.code}</code>
         {finding.code === 'FTR_UNVERIFIED_DATA' && <span className="finding__badge">unverified</span>}
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          aria-pressed={focused}
+          title="Show the part and this finding on the model"
+          data-testid={`ftr-finding-show-${finding.code}`}
+          onClick={() => focusItem(focus)}
+        >
+          Show
+        </button>
       </div>
       <p className="finding__meta">
         {finding.ids.length > 0 && <span>{finding.ids.join(', ')}</span>}
@@ -50,6 +75,8 @@ export function FtrFindingsSection({
 }): React.ReactElement {
   const check = useReadOnlyQuery(command, parseCheck);
   const view = check.view;
+  const fails = view?.findings.filter((finding) => finding.severity === 'fail').length ?? 0;
+  const warns = view?.findings.filter((finding) => finding.severity === 'warn').length ?? 0;
   return (
     <PanelSection title="Findings" {...(view === null ? {} : { count: view.findings.length })} testId="mfg-findings">
       <div className="mfg__actions">
@@ -68,16 +95,29 @@ export function FtrFindingsSection({
               <span aria-hidden="true">◌</span> The model changed after these checks ran. Re-run to refresh them.
             </p>
           )}
+          <KpiStrip
+            label="Check summary"
+            items={[
+              {
+                key: 'status',
+                label: 'Verdict',
+                value: view.status,
+                tone: view.status === 'fail' ? 'bad' : view.status === 'warn' ? 'warn' : 'ok',
+              },
+              { key: 'fails', label: 'Failures', value: String(fails), tone: fails > 0 ? 'bad' : 'ok' },
+              { key: 'warns', label: 'Warnings', value: String(warns), tone: warns > 0 ? 'warn' : 'ok' },
+            ]}
+          />
           {view.reviewRequired && (
             <ReviewBanner {...(view.reviewReason === undefined ? {} : { reason: view.reviewReason })} unverified={view.unverified} />
           )}
           <p className="mfg__figures" data-testid="ftr-overall">
             Overall: <strong>{view.status}</strong>
-            {view.rulesSkipped.length > 0 && ` · skipped ${view.rulesSkipped.join(', ')}`}
+            {view.rulesSkipped.length > 0 && ` · not checked (no data): ${view.rulesSkipped.join(', ')}`}
           </p>
           <ul className="findings__list" data-testid="ftr-findings-list">
             {view.findings.map((finding, index) => (
-              <FindingRow key={`${finding.code}-${index}`} finding={finding} />
+              <FindingRow key={`${finding.code}-${index}`} finding={finding} partId={partId} index={index} />
             ))}
           </ul>
           <ProvenancePopover entries={view.provenance} testId="ftr-provenance" />

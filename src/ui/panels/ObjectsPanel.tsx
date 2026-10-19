@@ -9,6 +9,9 @@ import { type Entity, type EntityGroup, type EntityKind, type Layer, is2D } from
 import { type IconName, Icon } from '@ui/components/Icon';
 import { IconButton, PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
 import { CommitInput } from '@ui/panels/propertyFields';
+import { useFocusStore } from '@ui/store/focusStore';
+import { useDropFocusOnSelectionChange } from '@ui/hooks/useDropFocusOnSelectionChange';
+import { entitiesFocus } from '@ui/panels/entityFocus';
 import { capitalize } from '@ui/panels/capitalize';
 import { orderedValues } from '@ui/panels/orderedValues';
 
@@ -46,13 +49,17 @@ function matchesFilter(entity: Entity, filter: string): boolean {
   return [entity.name ?? '', entity.kind, entity.id, ...(entity.tags ?? [])].some((text) => text.toLowerCase().includes(filter));
 }
 
-/** Plain click replaces the selection; Ctrl/Cmd/Shift adds or removes. */
-function useRowSelect(): (event: React.MouseEvent, ids: readonly string[]) => void {
+/** Plain click replaces the selection and highlights it on the model (banner + beacon with the size); Ctrl/Cmd/Shift adds or removes. */
+function useRowSelect(): (event: React.MouseEvent, ids: readonly string[], label: string) => void {
   const select = useStore((s) => s.select);
   const toggleSelection = useStore((s) => s.toggleSelection);
-  return (event, ids) => {
-    if (event.ctrlKey || event.metaKey || event.shiftKey) ids.forEach(toggleSelection);
-    else select([...ids]);
+  return (event, ids, label) => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey) {
+      ids.forEach(toggleSelection);
+      return;
+    }
+    select([...ids]);
+    useFocusStore.getState().setFocus(entitiesFocus(useStore.getState().document, { key: 'objects:selection', label, ids }));
   };
 }
 
@@ -97,7 +104,7 @@ const EntityRow = memo(function EntityRow({ entity, selected, nested }: { entity
           aria-pressed={selected}
           aria-label={`Select ${label}`}
           title={`${label} — ${entity.kind} (${entity.id}). Double-click to rename.`}
-          onClick={(event) => onSelect(event, [entity.id])}
+          onClick={(event) => onSelect(event, [entity.id], label)}
           onDoubleClick={() => setRenaming(true)}
         >
           <Icon name={entityIcon(entity)} size={14} />
@@ -157,7 +164,7 @@ function GroupNode({
           className="object-row__main"
           aria-label={`Select group ${group.name}`}
           title={`Group ${group.name} — select its ${memberIds.length} members`}
-          onClick={(event) => onSelect(event, memberIds)}
+          onClick={(event) => onSelect(event, memberIds, `Group ${group.name} — ${memberIds.length} members`)}
         >
           <Icon name="layers" size={14} />
           <span className="object-row__name">{group.name}</span>
@@ -244,7 +251,7 @@ function CollectionNode({
           className="object-row__main"
           aria-label={`Select all in ${name}`}
           title={`${name} — select its ${memberIds.length} objects`}
-          onClick={(event) => onSelect(event, memberIds)}
+          onClick={(event) => onSelect(event, memberIds, `${name} — ${memberIds.length} objects`)}
         >
           {collection.color !== undefined && <span className="object-swatch" style={{ background: collection.color }} aria-hidden="true" />}
           <span className="object-row__name">{name}</span>
@@ -273,6 +280,7 @@ export function ObjectsPanel({ className }: { className?: string }): React.React
   const hiddenCount = useViewportStore((s) => s.hiddenEntityIds.size);
   const showAllEntities = useViewportStore((s) => s.showAllEntities);
   const selection = useSelectionSet();
+  useDropFocusOnSelectionChange('objects:');
   const [filterText, setFilterText] = useState('');
   const filter = filterText.trim().toLowerCase();
   const [overrides, setOverrides] = useState<Record<string, CollectionOverride>>({});

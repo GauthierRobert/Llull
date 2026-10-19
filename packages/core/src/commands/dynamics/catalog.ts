@@ -3,6 +3,7 @@
 import { commandCatalog } from '../schema';
 import { addRigidBody, deleteDynamicsItem, setGravity } from './bodies';
 import { addBodyJoint, addGearCoupling } from './connections';
+import { checkDynamics } from './checkDynamics';
 import { checkMotionClearance } from './checkMotionClearance';
 import { addCylinderPressure } from './cylinders';
 import { addMotor, addPropeller } from './drives';
@@ -28,6 +29,7 @@ export const dynamicsCommands = commandCatalog(
   inspectDynamics,
   engineQuickCheck,
   simulateMotion,
+  checkDynamics,
   checkMotionClearance,
   plotSimulation,
   renderMotion,

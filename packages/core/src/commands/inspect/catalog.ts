@@ -8,6 +8,7 @@ import { measureArea, measurePerimeter } from './measureAreaPerimeter';
 import { measureBoundingBox, massProperties } from './measureSolid';
 import { checkModel } from './checkModel';
 import { checkAssembly } from './checkAssembly';
+import { checkMechanism } from './checkMechanism';
 
 export const inspectCommands = commandCatalog(
   findEntities,
@@ -20,4 +21,5 @@ export const inspectCommands = commandCatalog(
   massProperties,
   checkModel,
   checkAssembly,
+  checkMechanism,
 );

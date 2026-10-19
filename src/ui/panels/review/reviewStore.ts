@@ -26,6 +26,9 @@ interface ReviewState {
   group: FindingGroup;
   /** findingKey of the item shown in the Explain drawer. */
   explainKey: string | null;
+  /** Draw a severity badge at each finding on the model (FindingsOverlay). */
+  markersShown: boolean;
+  setMarkersShown(shown: boolean): void;
   setResult(result: PrototypeReview | null, source?: ReviewSource): void;
   setBusy(busy: boolean): void;
   setStatus(status: string): void;
@@ -48,6 +51,8 @@ export const useReviewStore = create<ReviewState>()((set) => ({
   sort: 'severity',
   group: 'none',
   explainKey: null,
+  markersShown: true,
+  setMarkersShown: (markersShown) => set({ markersShown }),
   setResult: (result, source) => set({ result, source: result === null ? null : (source ?? null), explainKey: null }),
   setBusy: (busy) => set({ busy }),
   setStatus: (status) => set({ status }),

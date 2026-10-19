@@ -1,0 +1,93 @@
+/* Analysis on the model: value pills (ProjectedLabel) and the result colour legend over the 3D viewport. */
+
+.analysis-label {
+  font-weight: 600;
+}
+
+.analysis-legend {
+  position: absolute;
+  bottom: calc(var(--space-3) + 72px);
+  left: var(--vp-inset-left, var(--space-3));
+  z-index: 17;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 220px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-float);
+  border-radius: var(--radius-sm);
+  background: var(--surface-float);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--text-xs);
+  color: var(--fg);
+  pointer-events: none;
+}
+
+.analysis-legend--note {
+  color: var(--fg-subtle);
+}
+
+.analysis-legend__title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.analysis-legend__unit {
+  font-weight: 400;
+  color: var(--fg-subtle);
+}
+
+.analysis-legend__sub,
+.analysis-legend__warn {
+  margin: 0;
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+}
+
+.analysis-legend__warn {
+  color: var(--warning);
+}
+
+.analysis-legend__bands {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analysis-legend__band {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 14px;
+}
+
+.analysis-legend__chip {
+  flex: none;
+  width: 18px;
+  height: 14px;
+}
+
+.analysis-legend__chip--none {
+  height: 0;
+}
+
+.analysis-legend__band--floor {
+  height: 0;
+  overflow: visible;
+}
+
+.analysis-legend__tick {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transform: translateY(-7px);
+}
+
+.analysis-legend__band--floor .analysis-legend__tick {
+  transform: translateY(0);
+}

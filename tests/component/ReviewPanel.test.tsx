@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ReviewPanel } from '@ui/panels/review/ReviewPanel';
 import { ReadinessChecklist } from '@ui/panels/review/ReadinessChecklist';
 import { buildChecklist } from '@ui/panels/review/checklist';
@@ -7,8 +7,11 @@ import { explainCliCommand } from '@ui/panels/review/explainCli';
 import { parsePrototypeReview } from '@ui/panels/review/reviewTypes';
 import { useReviewStore } from '@ui/panels/review/reviewStore';
 import { useStore } from '@ui/store';
+import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
+import { setGeometryKernel } from '@core/geometry/kernel';
 import { hardOverlap, reviewFixture, reviewWith, thinWall, withAccepted } from './reviewFixtures';
 import { resetStore } from '../helpers/componentEntities';
+import { localDispatch } from '../helpers/storeTestHelpers';
 
 function show(review = reviewFixture): void {
   const { document } = useStore.getState();
@@ -31,14 +34,28 @@ beforeEach(() => {
   });
 });
 
-describe('ReviewPanel without the commands', () => {
-  it('says checks are not available yet and does not dispatch', () => {
+describe('ReviewPanel without check_prototype', () => {
+  it('runs the buildability check (check_assembly) read-only and says what it covers', async () => {
     const dispatch = vi.spyOn(useStore.getState(), 'dispatch');
     render(<ReviewPanel />);
-    expect(screen.getByTestId('review-unavailable')).toHaveTextContent('not available yet');
-    expect(screen.getByTestId('review-run')).toBeDisabled();
+    expect(screen.queryByTestId('review-unavailable')).toBeNull();
+    expect(screen.getByTestId('review-assembly-only')).toHaveTextContent(/Runs buildability.*dynamics/);
+    expect(screen.getByTestId('review-run')).toBeEnabled();
     fireEvent.click(screen.getByTestId('review-run'));
+    await waitFor(() => expect(useReviewStore.getState().busy).toBe(false));
     expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('two overlapping boxes come back as a failing interference finding', async () => {
+    setGeometryKernel(await createManifoldKernel());
+    localDispatch('add_box', { size: [10, 10, 10], position: [0, 0, 5] });
+    localDispatch('add_box', { size: [10, 10, 10], position: [5, 0, 5] });
+    render(<ReviewPanel />);
+    fireEvent.click(screen.getByTestId('review-run'));
+    await waitFor(() => expect(useReviewStore.getState().result).not.toBeNull());
+    const assembly = useReviewStore.getState().result?.checks[0];
+    expect(assembly?.check).toBe('assembly');
+    expect(assembly?.items.some((item) => item.code === 'FPR_PAIR_HARD' && item.status === 'fail')).toBe(true);
   });
 });
 

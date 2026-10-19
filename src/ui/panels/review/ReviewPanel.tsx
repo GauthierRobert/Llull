@@ -4,8 +4,8 @@
 import React, { useCallback } from 'react';
 import { getCommand } from '@core/commands/registry';
 import { classNames } from '@ui/classNames';
-import { PanelEmpty, PanelHeader, PanelSection, StatusLine } from '@ui/panels/PanelParts';
-import { CHECK_COMMAND, runPrototypeCheck } from '@ui/services/prototypeCheck';
+import { KpiStrip, PanelEmpty, PanelHeader, PanelSection, StatusLine } from '@ui/panels/PanelParts';
+import { availableParts, CHECK_COMMAND, reviewCheckCommand, runPrototypeCheck } from '@ui/services/prototypeCheck';
 import { useStore } from '@ui/store';
 import { ReadinessChecklist } from './ReadinessChecklist';
 import { FindingsList, type DispositionChange } from './FindingsList';
@@ -14,9 +14,12 @@ import { StatusMark } from './StatusMark';
 import { buildChecklist, overallStatus } from './checklist';
 import { findFinding, flattenFindings } from './findings';
 import { isReviewStale, useReviewStore } from './reviewStore';
-import { parsePrototypeReview } from './reviewTypes';
+import { parsePrototypeReview, type CheckResult, type CheckStatus } from './reviewTypes';
 
 const DISPOSITION_COMMAND = 'set_review_disposition';
+
+const countOf = (checks: readonly CheckResult[], status: CheckStatus): number =>
+  flattenFindings(checks).filter(({ item }) => item.status === status).length;
 
 function useRunChecks(): () => void {
   const document = useStore((s) => s.document);
@@ -37,17 +40,37 @@ function useRunChecks(): () => void {
   }, [document]);
 }
 
+const PART_LABELS: Readonly<Record<string, string>> = {
+  check_assembly: 'buildability (solids, overlaps, floating parts, walls)',
+  check_mechanism: 'mechanism mobility (DOF)',
+  check_motion_clearance: 'clearance in motion',
+  check_dynamics: 'dynamics inputs and solver self-checks',
+};
+
+/** "Runs the buildability check …; dynamics reads “not run” here." for the checks this app can run. */
+function partsText(parts: readonly string[]): string {
+  const missing = [
+    ...(parts.includes('check_mechanism') ? [] : ['mechanism']),
+    ...(parts.includes('check_motion_clearance') ? [] : ['motion clearance']),
+    ...(parts.includes('check_dynamics') ? [] : ['dynamics']),
+  ];
+  const runs = `Runs ${parts.map((name) => PART_LABELS[name] ?? name).join(', ')}`;
+  return missing.length === 0 ? `${runs}.` : `${runs}; ${missing.join(', ')} ${missing.length === 1 ? 'reads' : 'read'} “not run” here.`;
+}
+
 export function ReviewPanel({ className }: { className?: string }): React.ReactElement {
   const result = useReviewStore((s) => s.result);
   const source = useReviewStore((s) => s.source);
   const busy = useReviewStore((s) => s.busy);
   const status = useReviewStore((s) => s.status);
   const explainKey = useReviewStore((s) => s.explainKey);
+  const markersShown = useReviewStore((s) => s.markersShown);
   const entities = useStore((s) => s.document.entities);
   const dynamics = useStore((s) => s.document.dynamics);
   const dispatch = useStore((s) => s.dispatch);
   const run = useRunChecks();
-  const canCheck = getCommand(CHECK_COMMAND) !== undefined;
+  const checkCommand = reviewCheckCommand();
+  const canCheck = checkCommand !== null;
   const canDispose = getCommand(DISPOSITION_COMMAND) !== undefined;
   const stale = isReviewStale(source, { entities, dynamics });
 
@@ -72,6 +95,11 @@ export function ReviewPanel({ className }: { className?: string }): React.ReactE
             Prototype checks are not available yet.
           </p>
         )}
+        {canCheck && checkCommand !== CHECK_COMMAND && (
+          <p className="panel__row-meta review-panel__hint" data-testid="review-assembly-only">
+            {partsText(availableParts())}
+          </p>
+        )}
       </div>
       <StatusLine text={status} testId="review-status" />
       {stale && (
@@ -93,6 +121,33 @@ export function ReviewPanel({ className }: { className?: string }): React.ReactE
               {result.ownerSummary}
             </p>
           )}
+          <KpiStrip
+            label="Review summary"
+            items={[
+              {
+                key: 'review-fail',
+                label: 'Failing',
+                value: String(countOf(checks, 'fail')),
+                tone: countOf(checks, 'fail') > 0 ? 'bad' : 'ok',
+              },
+              {
+                key: 'review-warn',
+                label: 'Warnings',
+                value: String(countOf(checks, 'warn')),
+                tone: countOf(checks, 'warn') > 0 ? 'warn' : 'ok',
+              },
+              { key: 'review-pass', label: 'Passing', value: String(countOf(checks, 'pass')), tone: 'ok' },
+            ]}
+          />
+          <label className="loads-check review-panel__markers">
+            <input
+              type="checkbox"
+              checked={markersShown}
+              onChange={(event) => useReviewStore.getState().setMarkersShown(event.target.checked)}
+              data-testid="review-markers-shown"
+            />
+            Mark findings on the model
+          </label>
           <PanelSection title="Readiness" testId="review-readiness">
             <ReadinessChecklist rows={buildChecklist(checks, stale)} onExplain={useReviewStore.getState().openExplain} />
           </PanelSection>

@@ -42,7 +42,8 @@ export function toWarnings(data: unknown): string[] {
   return Array.isArray(warnings) ? warnings.filter((warning): warning is string => typeof warning === 'string') : [];
 }
 
-function toReportRows(data: unknown): ReportRow[] {
+/** Every row of a check result (the KPIs and the model colouring use all of them; the list shows the worst). */
+export function allRows(data: unknown): ReportRow[] {
   if (isRecord(data) && Array.isArray(data.pipes)) return toPipeRows(data.pipes);
   const rows: unknown = isRecord(data) ? (data.rows ?? data.members) : undefined;
   if (!Array.isArray(rows)) return [];
@@ -68,7 +69,7 @@ function toReportRows(data: unknown): ReportRow[] {
 
 /** The `limit` most utilised rows of a check result, worst first. */
 export function worstRows(data: unknown, limit = 12): ReportRow[] {
-  return toReportRows(data)
+  return allRows(data)
     .sort((a, b) => b.utilisation - a.utilisation)
     .slice(0, limit);
 }

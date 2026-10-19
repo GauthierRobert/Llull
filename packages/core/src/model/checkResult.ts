@@ -45,7 +45,7 @@ interface CheckProvenance {
 }
 
 export interface CheckResult {
-  readonly check: 'assembly' | 'motion_clearance';
+  readonly check: 'assembly' | 'motion_clearance' | 'dynamics';
   /** Worst item: fail > not_run > warn > pass > info. */
   readonly status: CheckStatus;
   readonly items: readonly CheckItem[];

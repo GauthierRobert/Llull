@@ -3,8 +3,12 @@
 import React, { useMemo, useState } from 'react';
 import type { CivilCategory, CivilObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
+import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { PairSelect } from '@ui/panels/OptionSelect';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { useIsFocused } from '@ui/store/focusStore';
 import { formatPoints, selectedPolylinePoints } from './civilInput';
+import { civilFocus } from './civilFocus';
 
 /** Creation order, re-derived when the civil model changes. */
 export function useCivilObjects<C extends CivilCategory>(category: C): Array<Extract<CivilObject, { category: C }>> {
@@ -37,12 +41,26 @@ interface CivilObjectRowProps {
 
 export function CivilObjectRow({ object, detail, children, body }: CivilObjectRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
+  const document = useDocumentWithoutSelection();
+  const focusItem = useFocusItem();
+  const focus = civilFocus(document, object, detail);
+  const focused = useIsFocused(focus.key);
   return (
-    <li className="civil-row" data-testid={`civil-row-${object.id}`}>
+    <li className={focused ? 'civil-row civil-row--focused' : 'civil-row'} data-testid={`civil-row-${object.id}`}>
       <div className="building-actions">
-        <span className="civil-row__name" title={object.id}>
-          {object.name} <small>({object.id})</small>
-        </span>
+        <button
+          type="button"
+          className="civil-row__name building-row-btn"
+          title="Show on the model"
+          aria-pressed={focused}
+          data-testid={`civil-focus-${object.id}`}
+          onClick={() => focusItem(focus)}
+        >
+          <span className="panel__swatch" style={{ background: focus.color }} aria-hidden="true" />
+          <span className="civil-row__label">
+            {object.name} <small>({object.id})</small>
+          </span>
+        </button>
         {children}
         <button
           type="button"

@@ -8,6 +8,7 @@ import type { Vec3 } from '@core/model/vectors';
 import { meshSummary, resultsSummary } from '@cae/results/summary';
 import { meshSkin } from '@cae/results/fieldSurface';
 import { bandLevels, resultColor, triangleBands } from '@lib/isoBands';
+import { surfacePayload } from '@cae/results/surfacePayload';
 import { solvedBar, type SolvedBar } from './deckFixtures';
 import { solvedWall } from './thermal/solved';
 
@@ -285,5 +286,44 @@ describe('iso bands', () => {
     expect(resultColor(1)).toBe('#ff0000');
     expect(resultColor(0.5)).toBe('#00ff00');
     expect(resultColor(-2)).toBe('#0000ff');
+  });
+});
+
+describe('render_fea_results surface', () => {
+  const bar = solvedBar();
+  const solved = recorded(bar);
+  type Surface = { positions: number[]; values: number[]; triangles: number; truncated: boolean };
+  const surfaceOf = (params: Record<string, unknown>): Surface | undefined =>
+    (execute(solved, 'render_fea_results', { analysisId: bar.analysisId, ...params }, ctxOf(bar)).data as { surface?: Surface }).surface;
+
+  it('returns the plotted triangles per corner with values, only when asked', () => {
+    expect(surfaceOf({})).toBeUndefined();
+    const surface = surfaceOf({ surface: true, deformationScale: 0 });
+    expect(surface?.triangles).toBeGreaterThan(0);
+    expect(surface?.positions).toHaveLength((surface?.triangles ?? 0) * 9);
+    expect(surface?.values).toHaveLength((surface?.triangles ?? 0) * 3);
+    expect(surface?.truncated).toBe(false);
+    expect(Math.max(...(surface?.values ?? []))).toBeCloseTo(210, 3);
+  });
+
+  it('is pure', () => {
+    const before = JSON.stringify(solved);
+    const result = execute(solved, 'render_fea_results', { analysisId: bar.analysisId, surface: true }, ctxOf(bar));
+    expect(result.document).toBe(solved);
+    expect(JSON.stringify(solved)).toBe(before);
+  });
+
+  it('converts analysis length to document units and truncates past the corner budget', () => {
+    const vertex = (x: number, v: number): { u: Vec3; p: Vec3; v: number } => ({ u: [x, 0, 0], p: [x, 0, 0], v });
+    const face = { corners: [vertex(0, 1), vertex(1000, 2), vertex(2000, 3)] as const, entityId: 'a', cap: false };
+    const full = surfacePayload([face, face], 'N-mm-t-s', 0.001, 100);
+    expect(full.positions.slice(0, 6)).toEqual([0, 0, 0, 1000, 0, 0]);
+    expect(full.truncated).toBe(false);
+    const metres = surfacePayload([face], 'N-m-kg-s', 0.001, 100);
+    expect(metres.positions[3]).toBe(1_000_000);
+    const cut = surfacePayload([face, face, face], 'N-mm-t-s', 0.001, 6);
+    expect(cut.triangles).toBe(2);
+    expect(cut.values).toHaveLength(6);
+    expect(cut.truncated).toBe(true);
   });
 });

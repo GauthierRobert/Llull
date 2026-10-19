@@ -4,6 +4,9 @@
 import React, { memo, useMemo, useState } from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { useIsFocused } from '@ui/store/focusStore';
+import { entitiesFocus } from '@ui/panels/entityFocus';
 import { type Layer, DEFAULT_LAYER_ID } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { ConfirmDialog } from '@ui/components/ConfirmDialog';
@@ -29,6 +32,9 @@ const LayerRow = memo(function LayerRow({ layer, entityCount }: { layer: Layer; 
   const dispatch = useStore((s) => s.dispatch);
   const isLocallyHidden = useViewportStore((s) => s.hiddenLayerIds.has(layer.id));
   const toggleLayerVisibility = useViewportStore((s) => s.toggleLayerVisibility);
+  const focusItem = useFocusItem();
+  const focusKey = `layers:layer:${layer.id}`;
+  const focused = useIsFocused(focusKey);
   const [renaming, setRenaming] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -37,7 +43,7 @@ const LayerRow = memo(function LayerRow({ layer, entityCount }: { layer: Layer; 
 
   return (
     <li
-      className={`panel__row layer-row${effectivelyVisible ? '' : ' layer-row--hidden'}`}
+      className={`panel__row layer-row${effectivelyVisible ? '' : ' layer-row--hidden'}${focused ? ' panel__row--selected' : ''}`}
       data-testid={`layer-row-${layer.id}`}
       aria-label={`Layer: ${layer.name}`}
     >
@@ -85,13 +91,33 @@ const LayerRow = memo(function LayerRow({ layer, entityCount }: { layer: Layer; 
           onFinish={() => setRenaming(false)}
         />
       ) : (
-        <span className="panel__row-main layer-name">{layer.name}</span>
+        <button
+          type="button"
+          className="building-row-btn layer-focus-btn"
+          aria-pressed={focused}
+          aria-label={`Highlight layer ${layer.name} on the model`}
+          title={entityCount === 0 ? 'No entities on this layer' : "Highlight this layer's entities on the model"}
+          disabled={entityCount === 0}
+          onClick={() => {
+            const state = useStore.getState().document;
+            const ids = Object.values(state.entities).flatMap((entity) => (entity?.layerId === layer.id ? [entity.id] : []));
+            focusItem(
+              entitiesFocus(state, {
+                key: focusKey,
+                label: `Layer ${layer.name} — ${entityCount} ${entityCount === 1 ? 'entity' : 'entities'}`,
+                color: layer.color,
+                ids,
+              }),
+            );
+          }}
+        >
+          <span className="panel__row-main layer-name">{layer.name}</span>
+          <span className="panel__row-meta" title={`${entityCount} ${entityCount === 1 ? 'entity' : 'entities'} on this layer`}>
+            {entityCount}
+            <span className="visually-hidden">{entityCount === 1 ? ' entity' : ' entities'}</span>
+          </span>
+        </button>
       )}
-
-      <span className="panel__row-meta" title={`${entityCount} ${entityCount === 1 ? 'entity' : 'entities'} on this layer`}>
-        {entityCount}
-        <span className="visually-hidden">{entityCount === 1 ? ' entity' : ' entities'}</span>
-      </span>
 
       <span className="panel__row-actions">
         <IconButton

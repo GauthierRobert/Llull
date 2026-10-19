@@ -5,8 +5,21 @@ import { toDegrees, toRadians } from '@lib/angle';
 import React from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
+import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import type { Constraint, Joint, DriveRelation } from '@core/model/types';
-import { PanelEmpty, PanelHeader, PanelSection, IconButton, DeleteButton } from '@ui/panels/PanelParts';
+import { PanelEmpty, PanelHeader, PanelSection, IconButton, DeleteButton, KpiStrip, type Kpi } from '@ui/panels/PanelParts';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { useIsFocused, type PanelFocus } from '@ui/store/focusStore';
+import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
+import {
+  CONSTRAINT_COLOR,
+  PRISMATIC_COLOR,
+  REVOLUTE_COLOR,
+  constraintFocus,
+  driveFocus,
+  jointFocus,
+  mechanismCounts,
+} from '@ui/panels/mechanismFocus';
 import { CommitInput } from '@ui/panels/propertyFields';
 import { orderedValues } from '@ui/panels/orderedValues';
 import { parseNumber } from '@ui/numberText';
@@ -50,6 +63,10 @@ interface MechanismRowProps {
   kind?: string;
   tone?: ChipTone;
   highlighted?: boolean;
+  /** Legend dot: the colour the item is drawn with on the model. */
+  swatch: string;
+  /** Click on the row text: select the parts involved and beacon the item on the model. */
+  focus: PanelFocus;
   /** Omitted = the row cannot be highlighted in the viewport (no eye button). */
   onHighlight?: (id: string) => void;
   info: React.ReactNode;
@@ -64,15 +81,29 @@ function MechanismRow({
   kind,
   tone = 'accent',
   highlighted = false,
+  swatch,
+  focus,
   onHighlight,
   info,
   inline,
   actions,
 }: MechanismRowProps): React.ReactElement {
+  const focusItem = useFocusItem();
+  const focused = useIsFocused(focus.key);
   return (
-    <li className={mechanismRowClass(highlighted)} data-testid={`${noun}-row-${id}`}>
-      {kind !== undefined && <span className={`chip chip--${tone}`}>{kind}</span>}
-      <span className="panel__row-main mechanisms-row-info">{info}</span>
+    <li className={mechanismRowClass(highlighted || focused)} data-testid={`${noun}-row-${id}`}>
+      <button
+        type="button"
+        className="building-row-btn"
+        aria-pressed={focused}
+        data-testid={`${noun}-focus-${id}`}
+        title="Show on the model"
+        onClick={() => focusItem(focus)}
+      >
+        <span className="panel__swatch" style={{ background: swatch }} aria-hidden="true" />
+        {kind !== undefined && <span className={`chip chip--${tone}`}>{kind}</span>}
+        <span className="panel__row-main mechanisms-row-info">{info}</span>
+      </button>
       {inline}
       <div className="panel__row-actions">
         {onHighlight !== undefined && (
@@ -101,6 +132,7 @@ function ConstraintRow({
   onHighlight: (id: string) => void;
 }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
+  const document = useDocumentWithoutSelection();
 
   const chipTone = CONSTRAINT_CHIP_TONE[constraint.kind] ?? 'accent';
   const aRef = fmtEntityRef(constraint.a);
@@ -118,6 +150,8 @@ function ConstraintRow({
       kind={constraint.kind}
       tone={chipTone}
       highlighted={highlighted}
+      swatch={CONSTRAINT_COLOR}
+      focus={constraintFocus(document, constraint)}
       onHighlight={onHighlight}
       info={
         <>
@@ -160,7 +194,8 @@ function JointRow({
 }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
-  const documentUnits = useStore((s) => s.document.units);
+  const document = useDocumentWithoutSelection();
+  const documentUnits = document.units;
   const revolute = joint.kind === 'revolute';
   // Revolute angles shown in degrees (like Properties); the command takes radians.
   const currentValue = revolute ? toDegrees(joint.angle, 6) : joint.displacement;
@@ -183,6 +218,8 @@ function JointRow({
       kind={joint.kind}
       tone={chipTone}
       highlighted={highlighted}
+      swatch={revolute ? REVOLUTE_COLOR : PRISMATIC_COLOR}
+      focus={jointFocus(document, joint)}
       onHighlight={onHighlight}
       info={`${joint.a.instanceId.slice(-6)} → ${joint.b.instanceId.slice(-6)} · axis ${axisLabel}`}
       inline={
@@ -212,6 +249,7 @@ function JointRow({
 
 function DriveRelationRow({ relation }: { relation: DriveRelation }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
+  const document = useDocumentWithoutSelection();
 
   const offsetLabel = relation.offset !== undefined && relation.offset !== 0 ? ` + ${relation.offset.toFixed(3)}` : '';
 
@@ -219,6 +257,8 @@ function DriveRelationRow({ relation }: { relation: DriveRelation }): React.Reac
     <MechanismRow
       noun="drive"
       id={relation.id}
+      swatch="#69f0ae"
+      focus={driveFocus(document, relation)}
       info={
         <>
           <strong>{relation.driver.slice(-6)}</strong>
@@ -273,6 +313,35 @@ function MechanismSection({ title, testId, listLabel, rows, collapseEmpty }: Mec
   );
 }
 
+/** Headline numbers: mobility, bodies, joints, drives and whether a simulation has been run. */
+function MechanismKpis(): React.ReactElement {
+  const document = useDocumentWithoutSelection();
+  const simulated = useDynamicsPlaybackStore((s) => s.result !== null);
+  const counts = mechanismCounts(document);
+  const items: Kpi[] = [
+    ...(counts.bodies > 0
+      ? [
+          {
+            key: 'dof',
+            label: 'Mobility',
+            value: String(counts.mobility),
+            sub: 'degrees of freedom (estimate)',
+            tone: 'info',
+          } satisfies Kpi,
+        ]
+      : []),
+    ...(counts.bodies > 0
+      ? [{ key: 'bodies', label: 'Bodies', value: String(counts.bodies), sub: `${counts.movableBodies} moving` } satisfies Kpi]
+      : []),
+    { key: 'joints', label: 'Joints', value: String(counts.joints) },
+    { key: 'drives', label: 'Drives', value: String(counts.drives) },
+    ...(counts.bodies > 0
+      ? [{ key: 'sim', label: 'Simulation', value: simulated ? 'Run' : 'Not run', tone: simulated ? 'ok' : 'warn' } satisfies Kpi]
+      : []),
+  ];
+  return <KpiStrip items={items} label="Mechanism summary" />;
+}
+
 export function MechanismsPanel({ className }: { className?: string }): React.ReactElement {
   const constraints = useStore((s) => s.document.constraints);
   const constraintOrder = useStore((s) => s.document.constraintOrder);
@@ -310,6 +379,7 @@ export function MechanismsPanel({ className }: { className?: string }): React.Re
   return (
     <aside className={classNames('panel mechanisms-panel', className)} aria-label="Mechanisms">
       <PanelHeader title="Mechanisms" />
+      <MechanismKpis />
       {hasBodies && <PhysicsLoadsSection />}
       {hasBodies && <PhysicsSection />}
       <MechanismSection

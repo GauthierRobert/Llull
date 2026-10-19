@@ -1,6 +1,6 @@
 // `document.configurations`: create_configuration, activate_configuration.
 
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { Configuration } from '@core/model/types';
@@ -8,12 +8,74 @@ import { Icon } from '@ui/components/Icon';
 import { useDraftSubmit } from '@ui/hooks/useDraftSubmit';
 import { LabeledInput } from '@ui/panels/LabeledInput';
 import { configurationDraftOf, isConfigurationActive } from '@ui/panels/configurationRules';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { useIsFocused } from '@ui/store/focusStore';
+import { entitiesFocus } from '@ui/panels/entityFocus';
+import { entitiesDrivenBy } from '@ui/panels/parameterDrivenEntities';
 import { PanelEmpty, PanelHeader, IconButton } from '@ui/panels/PanelParts';
 
 interface ConfigurationRowProps {
   config: Configuration;
   /** True when every parameter already holds this configuration's expression. */
   active: boolean;
+}
+
+function ConfigurationParamEntry({ paramName, expression }: { paramName: string; expression: string }): React.ReactElement {
+  const focusItem = useFocusItem();
+  const focusKey = `configurations:parameter:${paramName}`;
+  const focused = useIsFocused(focusKey);
+  const current = useStore((s) => s.document.parameters[paramName]);
+  const history = useStore((s) => s.document.featureHistory);
+  const differs = current?.expression !== expression;
+  const drivenIds = useMemo(
+    () => entitiesDrivenBy({ ...useStore.getState().document, featureHistory: history }, [paramName]),
+    [history, paramName],
+  );
+  const content = (
+    <>
+      <span className="config-param-name" title={paramName}>
+        {paramName}
+      </span>
+      <span className="config-param-equals" aria-hidden="true">
+        =
+      </span>
+      <span className="config-param-value" title={expression}>
+        {expression}
+      </span>
+      {differs && (
+        <span className="config-param-differs" title="The document currently holds a different value">
+          now {current?.expression ?? 'undefined'}
+        </span>
+      )}
+    </>
+  );
+  return (
+    <li className={classNames('config-param-entry', differs && 'config-param-entry--differs', focused && 'panel__row--selected')}>
+      {drivenIds.length === 0 ? (
+        content
+      ) : (
+        <button
+          type="button"
+          className="building-row-btn"
+          aria-pressed={focused}
+          aria-label={`Highlight objects driven by ${paramName}`}
+          title={`Highlight the ${drivenIds.length} objects ${paramName} drives`}
+          onClick={() =>
+            focusItem(
+              entitiesFocus(useStore.getState().document, {
+                key: focusKey,
+                label: `${paramName} drives ${drivenIds.length} ${drivenIds.length === 1 ? 'object' : 'objects'}`,
+                ids: drivenIds,
+                note: `${paramName} = ${expression}`,
+              }),
+            )
+          }
+        >
+          {content}
+        </button>
+      )}
+    </li>
+  );
 }
 
 function ConfigurationRow({ config, active }: ConfigurationRowProps): React.ReactElement {
@@ -47,17 +109,7 @@ function ConfigurationRow({ config, active }: ConfigurationRowProps): React.Reac
       {paramEntries.length > 0 && (
         <ul className="config-param-list" aria-label={`Parameters for configuration ${config.name}`}>
           {paramEntries.map(([paramName, expression]) => (
-            <li key={paramName} className="config-param-entry">
-              <span className="config-param-name" title={paramName}>
-                {paramName}
-              </span>
-              <span className="config-param-equals" aria-hidden="true">
-                =
-              </span>
-              <span className="config-param-value" title={expression}>
-                {expression}
-              </span>
-            </li>
+            <ConfigurationParamEntry key={paramName} paramName={paramName} expression={expression} />
           ))}
         </ul>
       )}

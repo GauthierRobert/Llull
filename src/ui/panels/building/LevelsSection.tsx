@@ -7,6 +7,10 @@ import { DeleteButton, IconButton, ListRow, PanelSection } from '@ui/panels/Pane
 import { optionalNumber, optionalText } from '@ui/numberText';
 import { CopyLevelForm, LevelEditForm } from './LevelEditors';
 import { useBuildingLevels } from './useBuildingLevels';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { entitiesFocus } from '@ui/panels/entityFocus';
+
+const LEVEL_COLOR = '#7c4dff';
 
 interface LevelRowProps {
   level: BuildingLevel;
@@ -19,7 +23,25 @@ type RowMode = 'edit' | 'copy' | null;
 
 function LevelRow({ level, active, units, levels }: LevelRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
+  const focusItem = useFocusItem();
   const [mode, setMode] = useState<RowMode>(null);
+  // Activating a level also shows what is on it: its elements highlighted on the model.
+  const activate = (): void => {
+    dispatch('set_active_level', { levelId: level.id });
+    const doc = useStore.getState().document;
+    const ids = Object.values(doc.building?.elements ?? {}).flatMap((element) =>
+      'levelId' in element && element.levelId === level.id ? element.entityIds : [],
+    );
+    if (ids.length > 0)
+      focusItem(
+        entitiesFocus(doc, {
+          key: `building:level:${level.id}`,
+          label: `${/^level\b/i.test(level.name) ? '' : 'Level '}${level.name} (${level.elevation >= 0 ? '+' : ''}${level.elevation} ${units})`,
+          color: LEVEL_COLOR,
+          ids,
+        }),
+      );
+  };
   const toggle = (next: Exclude<RowMode, null>): void => setMode(mode === next ? null : next);
   return (
     <>
@@ -27,7 +49,7 @@ function LevelRow({ level, active, units, levels }: LevelRowProps): React.ReactE
         selected={active}
         current={active}
         testId={`level-row-${level.id}`}
-        onSelect={() => dispatch('set_active_level', { levelId: level.id })}
+        onSelect={activate}
         actions={
           <>
             <IconButton

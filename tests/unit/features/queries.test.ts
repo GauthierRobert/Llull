@@ -144,8 +144,29 @@ describe('hole_table', () => {
     });
     const table = dataOf<HoleTableData>(execute(drilled.document, 'hole_table', { id: idOf(drilled), origin: [0, 0] }));
     expect(table.rows[0]).toMatchObject({ x: 10, y: -10 });
+    // the hole centre on the top face, part coordinates (where the panel beacons it)
+    expect(table.rows[0]?.at[2]).toBeCloseTo(10, 6);
+    expect(Math.hypot((table.rows[0]?.at[0] ?? 0) - 10, (table.rows[0]?.at[1] ?? 0) - 10)).toBeLessThan(1e-6);
     expect(table.rows[0]?.drillPointAngle).toMatchObject({ value: 135, defaulted: false, verification: 'verified' });
     expect(table.unverified).toBe(false);
+  });
+
+  it('reports each hole centre in world coordinates, following the part when it moves', () => {
+    const stock = plate();
+    const drilled = execute(stock.doc, 'add_hole', {
+      target: stock.id,
+      face: TOP,
+      points: [[10, 10]],
+      hole: { kind: 'simple', diameter: 4 },
+      extent: { kind: 'blind', depth: 5, drillPointAngle: 135 },
+    });
+    const id = idOf(drilled);
+    const before = dataOf<HoleTableData>(execute(drilled.document, 'hole_table', { id })).rows[0]?.at;
+    const moved = execute(drilled.document, 'move_entities', { ids: [id], delta: [100, 0, 5] });
+    const after = dataOf<HoleTableData>(execute(moved.document, 'hole_table', { id })).rows[0]?.at;
+    expect(after?.[0]).toBeCloseTo((before?.[0] ?? 0) + 100, 6);
+    expect(after?.[1]).toBeCloseTo(before?.[1] ?? 0, 6);
+    expect(after?.[2]).toBeCloseTo((before?.[2] ?? 0) + 5, 6);
   });
 
   it('an entity without holes has no rows; a missing id is refused', () => {

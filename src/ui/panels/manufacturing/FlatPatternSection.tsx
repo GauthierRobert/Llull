@@ -2,7 +2,7 @@
 // bend table, a provenance popover and the review banner. Drawing it into the document and the DXF are commands (materialize / export).
 
 import React, { useMemo } from 'react';
-import { PanelSection } from '@ui/panels/PanelParts';
+import { KpiStrip, PanelSection } from '@ui/panels/PanelParts';
 import { ProvenancePopover } from '@ui/panels/ProvenancePopover';
 import { ReviewBanner } from '@ui/panels/ReviewBanner';
 import { useReadOnlyQuery } from '@ui/panels/useReadOnlyQuery';
@@ -10,6 +10,8 @@ import { downloadQuery } from '@ui/services/localQuery';
 import { significantNumber } from '@lib/compactNumber';
 import { useStore } from '@ui/store';
 import { parseFlatPattern, type FlatPatternView } from './ftrData';
+import { BEND_COLOR, partFocus } from './mfgFocus';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
 
 const SVG_SIZE = 160;
 const fmt = (value: number): string => significantNumber(value, 5);
@@ -39,6 +41,7 @@ function OutlinePreview({ view }: { view: FlatPatternView }): React.ReactElement
 export function FlatPatternSection({ partId }: { partId: string }): React.ReactElement {
   const flat = useReadOnlyQuery('flat_pattern', parseFlatPattern);
   const dispatch = useStore((s) => s.dispatch);
+  const focusItem = useFocusItem();
   const shown = flat.view !== null;
   const toggle = (): void => (shown ? flat.clear() : flat.run({ id: partId }));
   const view = flat.view;
@@ -80,6 +83,14 @@ export function FlatPatternSection({ partId }: { partId: string }): React.ReactE
             </p>
           )}
           <ReviewBanner {...(view.reviewReason === undefined ? {} : { reason: view.reviewReason })} unverified={view.unverified} />
+          <KpiStrip
+            label="Flat pattern summary"
+            items={[
+              { key: 'flat-size', label: 'Blank', value: `${fmt(view.extents[0])} × ${fmt(view.extents[1])}`, sub: view.unit },
+              { key: 'flat-area', label: 'Area', value: fmt(view.area), sub: view.unit === '' ? '' : `${view.unit}²` },
+              { key: 'flat-bends', label: 'Bends', value: String(view.bends.length) },
+            ]}
+          />
           <OutlinePreview view={view} />
           <p className="mfg__figures" data-testid="flat-figures">
             {fmt(view.extents[0])} × {fmt(view.extents[1])} {view.unit} · area {fmt(view.area)} · {view.bends.length} bend(s)
@@ -99,7 +110,28 @@ export function FlatPatternSection({ partId }: { partId: string }): React.ReactE
               <tbody>
                 {view.bends.map((bend) => (
                   <tr key={bend.id}>
-                    <th scope="row">{bend.id}</th>
+                    <th scope="row">
+                      <button
+                        type="button"
+                        className="takeoff-item"
+                        title="Show this bend on the model"
+                        data-testid={`bend-show-${bend.id}`}
+                        onClick={() =>
+                          focusItem(
+                            partFocus(
+                              useStore.getState().document,
+                              partId,
+                              `bend:${bend.id}`,
+                              `Bend ${bend.id} · ${bend.angleDeg}° R${bend.insideRadius}`,
+                              BEND_COLOR,
+                              [bend.id],
+                            ),
+                          )
+                        }
+                      >
+                        {bend.id}
+                      </button>
+                    </th>
                     <td>{bend.angleDeg}</td>
                     <td>{bend.insideRadius}</td>
                     <td>{bend.direction}</td>

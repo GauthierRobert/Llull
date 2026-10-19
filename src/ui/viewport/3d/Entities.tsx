@@ -14,6 +14,8 @@ import { SOLID_MESHES, type SolidMeshBranch } from './entities/solidMeshes';
 import { Shape2DRenderer } from '../2d/Shape2DRenderer';
 import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
+import { useGhostStore } from '@ui/store/ghostStore';
+import { useTintStore } from '@ui/store/tintStore';
 import { GridAnnotations3D } from './GridAnnotations3D';
 import { GRID_LAYER_NAME } from './gridAnnotations';
 import { expandInstance } from '@core/geometry/instanceExpansion';
@@ -118,6 +120,9 @@ export function Entities(): React.ReactElement {
   const toggleClickAnimation = useViewportStore((s) => s.toggleClickAnimation);
   // Entities mid live-transition leave their instanced batch for the per-entity path (own matrix + materials).
   const transitions = useTransitioningIds();
+  // Ghosted solids (a painted FEA result stands in for them) also take the per-entity path: their own see-through material.
+  const ghosted = useGhostStore((s) => s.ghostedIds);
+  const tints = useTintStore((s) => s.tints);
 
   const handleSelect = useCallback(
     (id: EntityId, additive: boolean): void => {
@@ -153,19 +158,31 @@ export function Entities(): React.ReactElement {
   const batches = useMemo(
     () =>
       groupEntitiesForInstancing(
-        visibleEntities.filter((entity) => !animatedIds.has(entity.id) && !hasFinish(entity) && !transitions.has(entity.id)),
+        visibleEntities.filter(
+          (entity) =>
+            !animatedIds.has(entity.id) &&
+            !hasFinish(entity) &&
+            !transitions.has(entity.id) &&
+            !ghosted.has(entity.id) &&
+            !tints.has(entity.id),
+        ),
         materials,
       ),
-    [visibleEntities, animatedIds, materials, hasFinish, transitions],
+    [visibleEntities, animatedIds, materials, hasFinish, transitions, ghosted, tints],
   );
   const nonBatchableEntities = useMemo(
     () =>
       visibleEntities.filter(
         (entity) =>
-          (!isBatchable(entity) || animatedIds.has(entity.id) || hasFinish(entity) || transitions.has(entity.id)) &&
+          (!isBatchable(entity) ||
+            animatedIds.has(entity.id) ||
+            hasFinish(entity) ||
+            transitions.has(entity.id) ||
+            ghosted.has(entity.id) ||
+            tints.has(entity.id)) &&
           layers[entity.layerId]?.name !== GRID_LAYER_NAME,
       ),
-    [visibleEntities, animatedIds, layers, hasFinish, transitions],
+    [visibleEntities, animatedIds, layers, hasFinish, transitions, ghosted, tints],
   );
 
   return (

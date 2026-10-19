@@ -1,7 +1,7 @@
 // `document.featureHistory` timeline: set_step_suppressed, reorder_step, delete_step, replay_history, edit_step_params
 // (a refused edit keeps the form open with the summary). Labels are read-only (no rename_step command).
 
-import React, { memo, useState } from 'react';
+import React, { memo, useMemo, useState } from 'react';
 import { getCommand } from '@core/commands/registry';
 import { CommandParamForm } from '@ui/components/commandPalette/CommandParamForm';
 import { classNames } from '@ui/classNames';
@@ -9,6 +9,10 @@ import { useStore } from '@ui/store';
 import type { FeatureStep } from '@core/model/types';
 import { useDispatchThen } from '@ui/hooks/useDispatchThen';
 import { Icon } from '@ui/components/Icon';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { useIsFocused } from '@ui/store/focusStore';
+import { stepEntityIds } from '@ui/panels/stepEntities';
+import { entitiesFocus } from '@ui/panels/entityFocus';
 import { PanelEmpty, PanelHeader, IconButton, DeleteButton } from '@ui/panels/PanelParts';
 
 const FeatureStepRow = memo(function FeatureStepRow({
@@ -25,6 +29,12 @@ const FeatureStepRow = memo(function FeatureStepRow({
   const [refusal, setRefusal] = useState<string | null>(null);
   const dispatchThen = useDispatchThen();
   const command = getCommand(step.name);
+  const focusItem = useFocusItem();
+  const focusKey = `history:step:${step.id}`;
+  const focused = useIsFocused(focusKey);
+  const entities = useStore((s) => s.document.entities);
+  const stepIds = useMemo(() => stepEntityIds(step, entities), [step, entities]);
+  const liveAffected = stepIds.length;
 
   const isSuppressed = step.suppressed === true;
   const displayLabel = step.label ?? step.name;
@@ -37,18 +47,46 @@ const FeatureStepRow = memo(function FeatureStepRow({
   return (
     <>
       <li
-        className={classNames('panel__row panel__row--overlay-actions history-step', isSuppressed && 'history-step--suppressed')}
+        className={classNames(
+          'panel__row panel__row--overlay-actions history-step',
+          isSuppressed && 'history-step--suppressed',
+          focused && 'panel__row--selected',
+        )}
         data-testid={`history-step-${step.id}`}
         aria-label={`Step ${index + 1}: ${displayLabel}${isSuppressed ? ' (suppressed)' : ''}`}
       >
-        <span className="history-step-index" aria-hidden="true">
-          {index + 1}
-        </span>
+        <button
+          type="button"
+          className="history-step-focus"
+          aria-pressed={focused}
+          aria-label={`Highlight objects made by step ${index + 1}: ${displayLabel}`}
+          title={liveAffected === 0 ? 'This step leaves no objects in the model' : 'Highlight the objects this step made or changed'}
+          disabled={liveAffected === 0 || isSuppressed}
+          onClick={() =>
+            focusItem(
+              entitiesFocus(useStore.getState().document, {
+                key: focusKey,
+                label: `Step ${index + 1}: ${displayLabel} — ${liveAffected} ${liveAffected === 1 ? 'object' : 'objects'}`,
+                ids: stepIds,
+              }),
+            )
+          }
+        >
+          <span className="history-step-index" aria-hidden="true">
+            {index + 1}
+          </span>
 
-        <span className="history-step-name" title={step.name}>
-          <span className="history-step-cmd">{step.name}</span>
-          {step.label != null && <span className="history-step-label">{step.label}</span>}
-        </span>
+          <span className="history-step-name" title={step.name}>
+            <span className="history-step-cmd">{step.name}</span>
+            {step.label != null && <span className="history-step-label">{step.label}</span>}
+          </span>
+
+          {liveAffected > 0 && !isSuppressed && (
+            <span className="history-step-count" title={`${liveAffected} objects`}>
+              {liveAffected}
+            </span>
+          )}
+        </button>
 
         {isSuppressed && <span className="chip chip--warning">off</span>}
 

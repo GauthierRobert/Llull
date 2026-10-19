@@ -27,10 +27,19 @@ import { AdaptiveClipping, CameraReactor, OrbitSettle, sphericalToCartesian } fr
 import { GROUND_PLANE_ROTATION, SceneLighting } from './SceneLighting';
 import { MechanismOverlay } from './MechanismOverlay';
 import { DynamicsLoadsOverlay } from './DynamicsLoadsOverlay';
+import { AeroOverlay } from './aero/AeroOverlay';
+import { StructuralOverlay } from './structural/StructuralOverlay';
+import { FindingsOverlay } from './findings/FindingsOverlay';
 import { useViewportPalette } from '@ui/viewport/viewportPalette';
 import { StoreInvalidator, ViewportStoreInvalidator } from '../StoreInvalidator';
 import { LiveFxCamera } from '../liveFx/LiveFxCamera';
 import { ScreenAnchorOverlay } from '../screenAnchor/ScreenAnchorOverlay';
+import { FocusOverlay } from '../FocusOverlay';
+import { FocusBanner } from '../FocusBanner';
+import { AnalysisOverlay } from './analysis/AnalysisOverlay';
+import { AnalysisLegend } from './analysis/AnalysisLegend';
+import { type PanelFocus, useFocusStore } from '@ui/store/focusStore';
+import { zoomToFocus } from './zoomToFocus';
 
 // Idempotent, StrictMode-safe.
 ensureBvhSetup();
@@ -120,7 +129,12 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <MeasureBBoxWireframe />
         <MechanismOverlay />
         <DynamicsLoadsOverlay />
+        <AeroOverlay />
+        <StructuralOverlay />
+        <FindingsOverlay />
         <DimensionLens />
+        <AnalysisOverlay />
+        <FocusOverlay />
       </group>
 
       <GizmoHelper alignment="bottom-right" margin={[72, 72]}>
@@ -129,6 +143,8 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
     </>
   );
 }
+
+const zoomToHighlight = (focus: PanelFocus): void => zoomToFocus(useStore.getState().document, focus);
 
 export function Viewport3D(): React.ReactElement {
   const clearSelection = useStore((s) => s.clearSelection);
@@ -143,6 +159,7 @@ export function Viewport3D(): React.ReactElement {
 
   const handlePointerMissed = useCallback((): void => {
     clearSelection();
+    useFocusStore.getState().setFocus(null);
   }, [clearSelection]);
 
   return (
@@ -161,6 +178,8 @@ export function Viewport3D(): React.ReactElement {
       </Canvas>
 
       <ScreenAnchorOverlay />
+      <FocusBanner onZoom={zoomToHighlight} />
+      <AnalysisLegend />
       <ViewOptionsToggle />
       {viewOptionsOpen && (
         <>

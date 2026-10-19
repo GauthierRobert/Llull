@@ -127,3 +127,34 @@
   background: var(--surface-popover);
   box-shadow: var(--shadow-popover);
 }
+
+/* The long check text stays one click away: the verdict (KPIs) and the member list come first */
+.building-report {
+  margin: 0 var(--space-3) var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+.building-report > summary {
+  cursor: pointer;
+}
+
+.utilisation-legend {
+  display: flex;
+  flex-basis: 100%;
+  gap: var(--space-3);
+}
+
+.takeoff-item {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--accent-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.takeoff-item:hover {
+  text-decoration: underline;
+}

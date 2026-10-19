@@ -2,23 +2,16 @@
 
 import React, { useId, useState } from 'react';
 import type { AnalysisCase } from '@core/model/analysis';
+import { useShallow } from 'zustand/react/shallow';
 import { PanelSection, StatusLine } from '@ui/panels/PanelParts';
 import { svgDataUrl } from './analysisData';
+import { fieldsOf, isEigen, isHeat, loadCasesOf, resolvedField, resultParams, timesOf } from './analysisFields';
+import { useAnalysisViewStore } from './analysisViewStore';
 import { PlotDialog } from './PlotDialog';
 import { formatQuantities, formatSignificant } from './quantityFormat';
 import { useFeaRender } from './useFeaRender';
 
-const STRUCTURAL_FIELDS = ['von_mises', 'u_mag', 'u_x', 'u_y', 'u_z', 's_xx', 's_yy', 's_zz'] as const;
-const THERMAL_FIELDS = ['temperature', 'heat_flux'] as const;
-const EIGEN_FIELDS = ['mode'] as const;
 const VIEWS = ['iso', 'front', 'back', 'left', 'right', 'top', 'bottom'] as const;
-
-const isEigen = (analysisCase: AnalysisCase): boolean => analysisCase.type === 'modal' || analysisCase.type === 'buckling';
-const isHeat = (analysisCase: AnalysisCase): boolean => analysisCase.type === 'heat_steady' || analysisCase.type === 'heat_transient';
-const loadCasesOf = (analysisCase: AnalysisCase): string[] => [...new Set(Object.values(analysisCase.loads).map((load) => load.loadCase))];
-
-const timesOf = (analysisCase: AnalysisCase): readonly number[] =>
-  analysisCase.type === 'heat_transient' ? (analysisCase.results?.thermal?.times ?? []) : [];
 
 function SolveHint({ analysisId }: { analysisId: string }): React.ReactElement {
   return (
@@ -31,47 +24,39 @@ function SolveHint({ analysisId }: { analysisId: string }): React.ReactElement {
 
 interface AnalysisResultsProps {
   analysisCase: AnalysisCase;
-  /** Mode plotted for modal / buckling cases (1-based); owned by the panel so the mode list can select it. */
-  mode: number;
-  onModeChange: (mode: number) => void;
 }
 
-export function AnalysisResults({ analysisCase, mode, onModeChange }: AnalysisResultsProps): React.ReactElement {
+/** Field / load case / time / deformation / mode live in the view store: the 3D overlay paints the same result. */
+export function AnalysisResults({ analysisCase }: AnalysisResultsProps): React.ReactElement {
   const ids = useId();
+  const choice = useAnalysisViewStore(
+    useShallow((s) => ({ field: s.field, loadCase: s.loadCase, time: s.time, scale: s.scale, mode: s.mode })),
+  );
+  const set = useAnalysisViewStore(
+    useShallow((s) => ({ setField: s.setField, setLoadCase: s.setLoadCase, setTime: s.setTime, setScale: s.setScale, setMode: s.setMode })),
+  );
   const heat = isHeat(analysisCase);
   const eigen = isEigen(analysisCase);
-  const fields = heat ? THERMAL_FIELDS : eigen ? EIGEN_FIELDS : STRUCTURAL_FIELDS;
+  const fields = fieldsOf(analysisCase);
   const loadCases = heat || eigen ? [] : loadCasesOf(analysisCase);
   const times = timesOf(analysisCase);
-  const [field, setField] = useState<string>(fields[0]);
+  const field = resolvedField(analysisCase, choice);
+  const { loadCase, time, scale, mode } = choice;
   const [view, setView] = useState<string>('iso');
-  const [loadCase, setLoadCase] = useState('');
-  const [time, setTime] = useState('');
   const [showMesh, setShowMesh] = useState(false);
-  const [scale, setScale] = useState('');
   const [full, setFull] = useState(false);
 
-  const scaleValue = scale.trim() === '' ? Number.NaN : Number(scale);
-  const params: Record<string, unknown> = {
-    analysisId: analysisCase.id,
-    field,
-    view,
-    ...(eigen && Number.isInteger(mode) && mode >= 1 ? { mode } : {}),
-    ...(time !== '' ? { time: Number(time) } : {}),
-    ...(showMesh ? { showMesh: true } : {}),
-    ...(loadCase !== '' ? { loadCase } : {}),
-    ...(Number.isFinite(scaleValue) && scaleValue >= 0 ? { deformationScale: scaleValue } : {}),
-  };
+  const params: Record<string, unknown> = { ...resultParams(analysisCase, choice), view, ...(showMesh ? { showMesh: true } : {}) };
   const render = useFeaRender(params, analysisCase);
   const extremes = render.status === 'ready' ? formatQuantities([render.view.min.value, render.view.max.value], render.view.unit) : null;
   const image = render.status === 'ready' ? svgDataUrl(render.view.svg) : '';
 
   return (
-    <PanelSection title="Results" hint="Contour plot of the solved fields (server artifacts).">
+    <PanelSection title="Results" hint="Pick the field here: it is painted on the model and drawn in the plot below (server artifacts).">
       <div className="analysis__controls">
         <label className="field" htmlFor={`${ids}-field`}>
           <span className="field__label">Field</span>
-          <select id={`${ids}-field`} data-testid="analysis-field" value={field} onChange={(e) => setField(e.target.value)}>
+          <select id={`${ids}-field`} data-testid="analysis-field" value={field} onChange={(e) => set.setField(e.target.value)}>
             {fields.map((name) => (
               <option key={name} value={name}>
                 {name}
@@ -92,7 +77,7 @@ export function AnalysisResults({ analysisCase, mode, onModeChange }: AnalysisRe
         {loadCases.length > 1 && (
           <label className="field" htmlFor={`${ids}-lc`}>
             <span className="field__label">Load case</span>
-            <select id={`${ids}-lc`} data-testid="analysis-load-case" value={loadCase} onChange={(e) => setLoadCase(e.target.value)}>
+            <select id={`${ids}-lc`} data-testid="analysis-load-case" value={loadCase} onChange={(e) => set.setLoadCase(e.target.value)}>
               <option value="">first</option>
               {loadCases.map((name) => (
                 <option key={name} value={name}>
@@ -105,7 +90,7 @@ export function AnalysisResults({ analysisCase, mode, onModeChange }: AnalysisRe
         {times.length > 1 && (
           <label className="field" htmlFor={`${ids}-time`}>
             <span className="field__label">Time</span>
-            <select id={`${ids}-time`} data-testid="analysis-time" value={time} onChange={(e) => setTime(e.target.value)}>
+            <select id={`${ids}-time`} data-testid="analysis-time" value={time} onChange={(e) => set.setTime(e.target.value)}>
               <option value="">last</option>
               {times.map((t) => (
                 <option key={t} value={t}>
@@ -127,7 +112,7 @@ export function AnalysisResults({ analysisCase, mode, onModeChange }: AnalysisRe
               value={mode}
               onChange={(e) => {
                 const next = Number(e.target.value);
-                if (Number.isInteger(next) && next >= 1) onModeChange(next);
+                if (Number.isInteger(next) && next >= 1) set.setMode(next);
               }}
             />
           </label>
@@ -142,7 +127,7 @@ export function AnalysisResults({ analysisCase, mode, onModeChange }: AnalysisRe
               placeholder="auto"
               data-testid="analysis-scale"
               value={scale}
-              onChange={(e) => setScale(e.target.value)}
+              onChange={(e) => set.setScale(e.target.value)}
             />
           </label>
         )}
@@ -168,7 +153,7 @@ export function AnalysisResults({ analysisCase, mode, onModeChange }: AnalysisRe
             {render.view.deformationScale > 0 ? ` · deformation ×${render.view.deformationScale}` : ''}
           </figcaption>
           <button type="button" className="btn btn--ghost" data-testid="analysis-open-full" onClick={() => setFull(true)}>
-            Open full size
+            Open plot full size
           </button>
         </figure>
       )}

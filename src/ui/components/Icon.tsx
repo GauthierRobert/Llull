@@ -89,6 +89,7 @@ const ICON_PATHS = {
   keyboard: 'M3 6h18v12H3zM7 10h.01M11 10h.01M15 10h.01M17 10h.01M7 14h.01M17 14h.01M10 14h4',
   text: 'M5 6V4h14v2M12 4v16M9 20h6',
   image: 'M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6M15.5 9.5h.01',
+  aero: 'M3 8h4M3 12h3M3 16h4M10 12c2-3.5 6-4.5 11-3-2.5 1.5-4.5 3-6.5 5.5-2 0-3.5-.8-4.5-2.5Z',
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;

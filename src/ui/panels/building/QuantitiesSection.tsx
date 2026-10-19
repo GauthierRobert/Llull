@@ -11,6 +11,8 @@ import { capitalize } from '@ui/panels/capitalize';
 import { isEstimateData } from '@ui/resultData';
 import { isRecord } from '@lib/isRecord';
 import { parseNumber } from '@ui/numberText';
+import { useFocusItem } from '@ui/hooks/useFocusItem';
+import { entitiesFocus } from '@ui/panels/entityFocus';
 
 const UNIT_LABEL: Readonly<Record<string, string>> = { m: 'm', m2: 'm²', m3: 'm³', ea: 'ea', kg: 'kg' };
 const SCHEDULES = [
@@ -32,6 +34,40 @@ const SCHEDULES = [
   'connection',
   'support',
 ] as const;
+
+const TAKEOFF_COLOR = '#26a69a';
+
+/** A takeoff line's item: a button highlighting the elements of its category on the model (plain text when none is modelled). */
+function TakeoffItem({ lineKey, category, description }: { lineKey: string; category: string; description: string }): React.ReactElement {
+  const focusItem = useFocusItem();
+  const ids = useStore((s) =>
+    Object.values(s.document.building?.elements ?? {})
+      .filter((element) => element.category === category)
+      .flatMap((element) => element.entityIds)
+      .join('|'),
+  );
+  if (ids === '') return <>{description}</>;
+  return (
+    <button
+      type="button"
+      className="takeoff-item"
+      title="Show these elements on the model"
+      data-testid={`takeoff-show-${lineKey}`}
+      onClick={() =>
+        focusItem(
+          entitiesFocus(useStore.getState().document, {
+            key: `building:takeoff:${lineKey}`,
+            label: description,
+            color: TAKEOFF_COLOR,
+            ids: ids.split('|'),
+          }),
+        )
+      }
+    >
+      {description}
+    </button>
+  );
+}
 
 function RateForm({ lines }: { lines: ReadonlyArray<CostLine> }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
@@ -111,7 +147,9 @@ function EstimateTable(): React.ReactElement {
             <tbody>
               {estimate.lines.map((line) => (
                 <tr key={line.key} data-testid={`takeoff-${line.key}`}>
-                  <td title={line.key}>{line.description}</td>
+                  <td title={line.key}>
+                    <TakeoffItem lineKey={line.key} category={line.category} description={line.description} />
+                  </td>
                   <td className="building-table__number">
                     {line.quantity} {UNIT_LABEL[line.unit] ?? line.unit}
                     {typeof gross[line.key] === 'number' && (

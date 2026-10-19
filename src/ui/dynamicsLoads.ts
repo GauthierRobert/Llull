@@ -9,6 +9,7 @@ import { RAD_PER_S_PER_RPM, propellerOutput } from '@core/dynamics/forceLaws';
 import type { SimulationData } from '@core/dynamics/simulationReport';
 import { toMetres } from '@core/model/units';
 import { normalize3 } from '@lib/vec3';
+import { formatSi } from '@ui/siText';
 
 export const LOAD_LAYERS = ['gravity', 'joints', 'drives', 'thrust'] as const;
 export type LoadLayer = (typeof LOAD_LAYERS)[number];
@@ -117,7 +118,7 @@ function weightItems(context: Context): LoadItem[] {
       layer: 'gravity',
       shape: 'force',
       title: context.bodyName(body.id),
-      value: `W ${formatQuantity(weight)} N`,
+      value: `W ${formatSi(weight, 'N')}`,
       detail: `${formatQuantity(props.mass)} kg · ${density}${body.fixed ? ' · fixed to ground' : ''} · ${body.entityIds.length} part(s)`,
       origin,
       direction: g > 0 ? normalize3(dynamics.gravity) : [0, 0, -1],
@@ -198,7 +199,7 @@ function motorDesign(motor: Motor): { value: string; detail: string; magnitude: 
   const peak = motor.curve.reduce((best, point) => (point[1] > best[1] ? point : best), motor.curve[0] ?? [0, 0]);
   const rpms = motor.curve.map((point) => point[0]);
   return {
-    value: `≤ ${formatQuantity(peak[1] * motor.throttle)} N·m`,
+    value: `≤ ${formatSi(peak[1] * motor.throttle, 'N·m')}`,
     detail: `torque curve ${formatQuantity(Math.min(...rpms))}–${formatQuantity(Math.max(...rpms))} rpm, peak ${formatQuantity(peak[1])} N·m @ ${formatQuantity(peak[0])} rpm · throttle ${formatQuantity(motor.throttle * 100)} %`,
     magnitude: peak[1] * motor.throttle,
   };
@@ -217,7 +218,7 @@ function motorItems(context: Context): LoadItem[] {
       layer: 'drives',
       shape: 'torque',
       title: `${motor.id} on ${context.bodyName(joint.child)}`,
-      value: torque === undefined ? design.value : `${formatQuantity(torque)} N·m`,
+      value: torque === undefined ? design.value : formatSi(torque, 'N·m'),
       detail: design.detail,
       origin: joint.anchor,
       direction: normalize3(joint.axis),
@@ -251,7 +252,7 @@ function propellerItems(context: Context): LoadItem[] {
       layer: 'thrust',
       shape: 'force',
       title: `${propeller.id} on ${context.bodyName(joint.child)}`,
-      value: thrust === null ? 'T after a run' : `T ${formatQuantity(thrust)} N`,
+      value: thrust === null ? 'T after a run' : `T ${formatSi(thrust, 'N')}`,
       detail: `Ø ${formatQuantity(propeller.diameter)} m · Ct ${formatQuantity(propeller.thrustCoefficient)} · Cp ${formatQuantity(propeller.powerCoefficient)} · ρ ${formatQuantity(propeller.airDensity)} kg/m³${live === undefined && thrust !== null ? ' · at the governed speed' : ''}`,
       origin: centreAt(context, joint.child) ?? joint.anchor,
       direction: normalize3(propeller.thrustDirection),

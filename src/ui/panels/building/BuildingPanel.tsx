@@ -14,9 +14,9 @@ import { QuantitiesSection } from './QuantitiesSection';
 import { BuildingExportsSection } from './BuildingExportsSection';
 import { ClashSection } from './ClashSection';
 import { StructuralSection } from './StructuralSection';
+import { CLADDING_LAYER_NAME } from './claddingLayer';
 
 /** AEC plugin cladding layer (domain-aec entities.ts). */
-const CLADDING_LAYER_NAME = 'A-CLAD';
 
 function StarterTemplates(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);

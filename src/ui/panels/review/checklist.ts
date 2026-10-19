@@ -148,7 +148,7 @@ export function describeValueKey(key: string): { label: string; unit: string } {
   return { label, unit: suffix?.[1] ?? '' };
 }
 
-const formatNumber = (value: number): string => (Number.isInteger(value) ? String(value) : value.toPrecision(3).replace(/\.?0+$/, ''));
+const formatNumber = (value: number): string => (Number.isInteger(value) ? String(value) : String(Number(value.toPrecision(3))));
 
 export function formatValue(key: string, value: number): string {
   const { unit } = describeValueKey(key);
@@ -167,4 +167,50 @@ export function formatThreshold(item: CheckItem): string | null {
   const t = item.threshold;
   if (t === undefined) return null;
   return `limit ${formatNumber(t.value)} ${t.unit} (${t.source}, grade ${t.grade}${t.defaulted ? ', default' : ''})`;
+}
+
+/** Plain-language title of a finding code, for badges and highlights on the model. */
+const FINDING_TITLES: Readonly<Record<string, string>> = {
+  FPR_PART_INVALID: 'Invalid solid',
+  FPR_PART_EMPTY: 'Empty part',
+  FPR_PART_DISCONNECTED: 'Part in pieces',
+  FPR_PART_SHEET: 'Open surface, not a solid',
+  FPR_PAIR_HARD: 'Parts overlap',
+  FPR_PAIR_CONTAINED: 'Part inside another',
+  FPR_PAIR_TOUCH: 'Parts touch',
+  FPR_PAIR_CLEARANCE: 'Too close',
+  FPR_PAIR_ALLOWED: 'Overlap allowed',
+  FPR_WALL_THIN: 'Wall too thin',
+  FPR_PART_FLOATING: 'Floating part',
+  FPR_PART_RESTING_ONLY: 'Only resting, not fixed',
+  FPR_JOINT_NOT_REALISED: 'Joint not realised',
+  FPR_MASS_DEFAULTED: 'Mass assumed',
+  FPR_UNREALISTIC: 'Unrealistic input',
+  FPR_OUTSIDE_VALIDATED_RANGE: 'Outside validated range',
+  FPR_REFERENCE_MISMATCH: 'Differs from reference',
+  FPR_CALIBRATION_FAILED: 'Calibration failed',
+  FPR_NO_LOSSES: 'No losses modelled',
+  FPR_MECH_LOCKED: 'Mechanism locked',
+  FPR_MECH_UNDERCONSTRAINED: 'Free motion not driven',
+  FPR_MECH_OK: 'Mobility matches the drives',
+  FPR_MECH_NONE: 'No mechanism',
+  FPR_MOTION_INTERFERENCE: 'Parts collide in motion',
+  FPR_MOTION_CLEARANCE_LOW: 'Too close in motion',
+  FPR_MOTION_TOUCH: 'Parts touch in motion',
+  FPR_MOTION_ALLOWED: 'Contact allowed',
+  FPR_MOTION_UNDERSAMPLED: 'Motion undersampled',
+  FPR_NO_MOTION: 'Nothing moves to check',
+  FPR_LOOP_PRISMATIC: 'Prismatic joint inside a loop',
+  FPR_LOOP_OPEN: 'Loop does not close',
+  FPR_REDUNDANT_CONSTRAINT: 'Redundant constraint',
+  FPR_LOOP_DRIFT: 'Loop drifts open in the run',
+  FPR_ENERGY_CLOSURE: 'Energy does not balance',
+  FPR_TIMESTEP_SENSITIVE: 'Result depends on the timestep',
+  FPR_SPHERICAL_TREE: 'Spherical joint chain unsupported',
+  FPR_JOINT_DANGLING: 'Joint connects nothing',
+};
+
+/** The title of `code`, else the checklist row it belongs to, else the code itself. */
+export function findingTitle(code: string): string {
+  return FINDING_TITLES[code] ?? ROW_SPECS.find((spec) => spec.codes?.includes(code))?.label ?? code;
 }

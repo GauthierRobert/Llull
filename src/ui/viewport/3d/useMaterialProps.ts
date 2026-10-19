@@ -32,7 +32,11 @@ interface UseMaterialPropsInput {
   envMapIntensity?: number;
   /** Document material: replaces color/roughness/metalness in shaded mode only (wireframe/x-ray keep their look). */
   pbrOverride?: PbrMaterial | undefined;
+  /** Faint see-through ghost whatever the display mode (another rendering stands in for the solid, e.g. a painted FEA result). */
+  ghosted?: boolean;
 }
+
+const GHOST_OPACITY = 0.12;
 
 export function useMaterialProps({
   color,
@@ -41,6 +45,7 @@ export function useMaterialProps({
   metalness = 0.08,
   envMapIntensity = 0.8,
   pbrOverride,
+  ghosted = false,
 }: UseMaterialPropsInput): MaterialProps {
   const displayMode: DisplayMode = useViewportStore((s) => s.displayMode);
 
@@ -58,6 +63,7 @@ export function useMaterialProps({
       depthWrite: true,
       side: THREE.FrontSide,
     };
+    if (ghosted) return { ...base, emissiveIntensity: 0, transparent: true, opacity: GHOST_OPACITY, depthWrite: false };
     if (displayMode === 'wireframe') return { ...base, wireframe: true };
     if (displayMode === 'xray') {
       const state = selected ? 'selected' : 'idle';
@@ -76,5 +82,5 @@ export function useMaterialProps({
     return pbrOverride
       ? { ...base, color: pbrOverride.color, roughness: pbrOverride.roughness, metalness: displayMetalness(pbrOverride.metalness) }
       : base;
-  }, [displayMode, selected, color, roughness, metalness, envMapIntensity, pbrOverride]);
+  }, [displayMode, selected, color, roughness, metalness, envMapIntensity, pbrOverride, ghosted]);
 }

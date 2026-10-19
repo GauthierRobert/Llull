@@ -27,6 +27,13 @@ import { useViewportPalette } from '@ui/viewport/viewportPalette';
 import { StoreInvalidator } from '../StoreInvalidator';
 import { RenderOriginSyncer } from '../RenderOriginSyncer';
 import { ScreenAnchorOverlay } from '../screenAnchor/ScreenAnchorOverlay';
+import { FocusOverlay } from '../FocusOverlay';
+import { AeroOverlay } from '../3d/aero/AeroOverlay';
+import { AnalysisOverlay } from '../3d/analysis/AnalysisOverlay';
+import { AnalysisLegend } from '../3d/analysis/AnalysisLegend';
+import { StructuralOverlay } from '../3d/structural/StructuralOverlay';
+import { FindingsOverlay } from '../3d/findings/FindingsOverlay';
+import { FocusBanner } from '../FocusBanner';
 
 /** Reports the ortho camera zoom to the HTML overlay, only when it changes. */
 function ZoomReader({ onZoom }: { onZoom: (zoom: number) => void }): null {
@@ -121,6 +128,11 @@ function SceneContents2D({
         <ModifyPickInteraction activeTool={activeModifyTool} phase={modifyPhase} zoom={zoom} onEntityPick={onEntityPick} />
 
         <MeasureBBoxRect2D />
+        <AeroOverlay />
+        <AnalysisOverlay />
+        <StructuralOverlay hulls />
+        <FindingsOverlay />
+        <FocusOverlay />
       </group>
     </>
   );
@@ -162,6 +174,8 @@ export function Viewport2D(): React.ReactElement {
       </Canvas>
 
       <ScreenAnchorOverlay />
+      <FocusBanner />
+      <AnalysisLegend />
       <ScaleBar zoom={cameraZoom} />
 
       {/* On demand: the modify palette shows once there is something to modify. */}

@@ -23,6 +23,7 @@ import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
 import { useAutoFrame } from '@ui/hooks/useAutoFrame';
 import { useAutosave } from '@ui/hooks/useAutosave';
 import { useLiveFx } from '@ui/hooks/useLiveFx';
+import { useFocusHousekeeping } from '@ui/hooks/useFocusHousekeeping';
 import { SheetViewer } from '@ui/viewport/sheet/SheetViewer';
 import { useSheetViewStore } from '@ui/viewport/sheet/sheetViewStore';
 import { LiveActivityFeed } from '@ui/components/LiveActivityFeed';
@@ -45,6 +46,7 @@ export function App(): React.ReactElement {
   useAutoFrame();
   useAutosave();
   useLiveFx();
+  useFocusHousekeeping();
 
   // On <html> so CSS variables cascade to portals.
   useEffect(() => {

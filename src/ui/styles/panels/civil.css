@@ -151,3 +151,14 @@
   color: var(--fg-subtle);
   overflow-wrap: anywhere;
 }
+
+.civil-row--focused {
+  border-color: var(--accent);
+  background: var(--accent-soft, var(--surface-3));
+}
+
+.civil-row__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
