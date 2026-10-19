@@ -4,6 +4,7 @@
  *   fatigue_field  FE fatigue case -> llull-compute post fatigue (every node) -> FatigueField artifact -> compute_fatigue
  *   fea_map_field  thermo_static interpolate field -> llull-compute post map -> mapped-field artifact (read by the fea_solve deck)
  *   fea_render     render_fea_results with the pixel raster in llull-compute raster (raster=auto|ts|cpu|gpu)
+ *   stackup_monte_carlo  analyze_stackup with the Monte Carlo above the TS cap in llull-compute stats (GDT TR-GDT-22)
  */
 
 import type { ToolDefinition } from '@protocol/tools';
@@ -18,6 +19,7 @@ import { runFatigueField, type NativeDeps } from './fatigueField';
 import { runMapField } from './mapField';
 import { DEFAULT_TOPOLOGY_TIMEOUT_S, runTopologySolve, type TopologySolveOptions } from './topologySolve';
 import { runFeaRender } from './renderField';
+import { runStackupTool, stackupToolDefinition } from './stackupMonteCarlo';
 
 const TIMEOUT = {
   type: 'number' as const,
@@ -66,6 +68,7 @@ export function nativeToolDefinitions(): ToolDefinition[] {
     },
     renderToolDefinition(),
     topologyToolDefinition(),
+    stackupToolDefinition(),
   ];
 }
 
@@ -124,7 +127,7 @@ function topologyToolDefinition(): ToolDefinition {
   };
 }
 
-const NAMES: ReadonlySet<string> = new Set(['fatigue_field', 'fea_map_field', 'fea_render', 'topology_solve']);
+const NAMES: ReadonlySet<string> = new Set(['fatigue_field', 'fea_map_field', 'fea_render', 'topology_solve', 'stackup_monte_carlo']);
 
 export const isNativeTool = (name: string): boolean => NAMES.has(name);
 
@@ -146,6 +149,7 @@ export async function runNativeTool(
 ): Promise<CommandOutcome | null> {
   if (!isNativeTool(name)) return null;
   if (name === 'fea_render') return { ...(await runFeaRender(params, host, deps)), changed: false };
+  if (name === 'stackup_monte_carlo') return { ...(await runStackupTool(params, host, deps)), changed: false };
   const args = isRecord(params) ? params : {};
   if (name === 'topology_solve') {
     const studyId = nonEmptyString(args['studyId']);

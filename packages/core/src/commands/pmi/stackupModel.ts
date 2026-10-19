@@ -162,6 +162,16 @@ export const sampledContributors = (model: StackupModel): SampledContributor[] =
     distribution: c.distribution,
   }));
 
+/** `job.json` of `llull-compute stats` (crate `llull-stats`): the sampled contributors and the program, as the TS sampler uses them. */
+export const stackupJob = (model: StackupModel): Record<string, unknown> => ({
+  samples: model.samples,
+  seed: model.seed,
+  contributors: sampledContributors(model),
+  program: model.program,
+  ...(model.params.lowerSpecLimit === undefined ? {} : { lowerSpecLimit: model.params.lowerSpecLimit }),
+  ...(model.params.upperSpecLimit === undefined ? {} : { upperSpecLimit: model.params.upperSpecLimit }),
+});
+
 export interface MonteCarloRun {
   readonly stats: SamplingStats;
   readonly engine: 'ts' | 'native';
