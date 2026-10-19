@@ -14,10 +14,12 @@ export interface CommandRun {
   /** The document after the command (the input document when nothing changed or it threw). */
   readonly document: CadDocument;
   readonly outcome: CommandOutcome;
+  /** What the command threw (with its stack), when it threw: host-side only (crash reports), never sent over the wire. */
+  readonly thrown?: unknown;
 }
 
 /**
- * Run `name` on `doc` through `execute`; a throwing command is an error outcome, never an exception.
+ * Run `name` on `doc` through `execute`; a throwing command is an error outcome (plus `thrown`), never an exception.
  * `changed` = the returned document is not the input document.
  */
 export function runCommandOutcome(doc: CadDocument, name: string, params: unknown, ctx?: ExecutionContext): CommandRun {
@@ -35,7 +37,7 @@ export function runCommandOutcome(doc: CadDocument, name: string, params: unknow
       },
     };
   } catch (error) {
-    return { document: doc, outcome: failedOutcome(name, error) };
+    return { document: doc, outcome: failedOutcome(name, error), thrown: error };
   }
 }
 

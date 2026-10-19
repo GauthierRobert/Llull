@@ -4,7 +4,7 @@
  */
 import type { CadDocument } from '@core/model/types';
 import { withMonotonicStepCounter } from '@core/model/stepCounter';
-import { execute, getCommand } from '@core/commands/registry';
+import { getCommand } from '@core/commands/registry';
 import { reportServerCrash } from './serverCrash';
 import { getLiveDoc, setLiveDoc } from './liveDocument';
 import { createHash } from 'crypto';
@@ -86,8 +86,8 @@ function boundedForReplay(result: CommandResponseBody): CommandResponseBody {
 
 function runCommand(name: string, params: unknown, source?: LiveCommandSource, commandId?: string): CommandResponseBody {
   const prior = getLiveDoc();
-  const { document, outcome } = runCommandOutcome(prior, name, params, serverContext());
-  if (outcome.isError && !outcome.changed && outcome.summary.startsWith(`Command ${name} failed: `)) reportIfItThrows(prior, name, params);
+  const { document, outcome, thrown } = runCommandOutcome(prior, name, params, serverContext());
+  if (thrown !== undefined) reportCommandCrash(thrown, name, params, prior);
   if (outcome.changed && getCommand(name)?.annotations?.session === true) {
     // Session command (resolve_material_libraries): in memory only, no undo entry, no command log; clients get a snapshot.
     setLiveDoc(document);
@@ -99,17 +99,10 @@ function runCommand(name: string, params: unknown, source?: LiveCommandSource, c
   return withHistoryFlags(outcome);
 }
 
-/**
- * `runCommandOutcome` turned a throw into an error result and keeps no stack: commands are pure, so run it again on the same document
- * to capture the exception, and write a crash report (SC-D3) only when it really throws (a command's own failure summary does not).
- */
-function reportIfItThrows(prior: CadDocument, name: string, params: unknown): void {
-  try {
-    execute(prior, name, params, serverContext());
-  } catch (error) {
-    const report = reportServerCrash('command-threw', error, { name, params, document: prior });
-    if (report !== null) console.error(`[llull-server] command ${name} threw; crash report: ${report}`);
-  }
+/** A command threw inside `execute` (a command's own failure summary is not a crash): a rate-limited crash report (SC-D3). */
+function reportCommandCrash(thrown: unknown, name: string, params: unknown, prior: CadDocument): void {
+  const report = reportServerCrash('command-threw', thrown, { name, params, document: prior });
+  if (report !== null) console.error(`[llull-server] command ${name} threw; crash report: ${report}`);
 }
 
 /** Restore the top of `history[from]`, park the current doc on `history[to]`; empty stack -> no-op result. */

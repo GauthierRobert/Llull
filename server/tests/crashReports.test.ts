@@ -15,6 +15,7 @@ import { crashReportsDir, issueDraftUrl, listCrashReports, readCrashReport, reda
 import { _resetHistory, applyCommand } from '../src/commandBus';
 import { _resetLiveDoc, getLiveDoc } from '../src/liveDocument';
 import { runCli, type CliIo } from '../src/cli/main';
+import { _resetCrashRateLimit, reportServerCrash } from '../src/serverCrash';
 
 let dataDir = '';
 let crashes = '';
@@ -27,6 +28,7 @@ beforeEach(() => {
   process.env['LLULL_DATA_DIR'] = dataDir; // the backend hooks read it
   _resetLiveDoc();
   _resetHistory();
+  _resetCrashRateLimit();
 });
 
 afterEach(() => {
@@ -113,7 +115,40 @@ describe('writeCrashReport', () => {
   });
 
   it('redacts both separator spellings of the home directory', () => {
-    expect(redactHome('at C:\\Users\\me\\x and C:/Users/me/y', 'C:\\Users\\me')).toBe('at ~\\x and ~/y');
+    expect(redactHome('at C:\\Users\\me\\x and C:/Users/me/y', 'C:\\Users\\me', 'win32')).toBe('at ~\\x and ~/y');
+  });
+
+  it('redacts a home with a space: any case on Windows, URL-encoded, file:/// and JSON-escaped forms', () => {
+    const home = 'C:\\Users\\John Doe';
+    const text = [
+      'at c:\\users\\john doe\\src\\a.ts:1',
+      'file:///C:/Users/John%20Doe/src/b.ts',
+      'file:///c:/users/john%20doe/src/c.ts',
+      '{"path":"C:\\\\Users\\\\John Doe\\\\part.step"}',
+      'C:/USERS/JOHN DOE/d.ts',
+    ].join('\n');
+    const redacted = redactHome(text, home, 'win32');
+    expect(redacted).not.toMatch(/john/i);
+    expect(redacted).toBe(
+      ['at ~\\src\\a.ts:1', 'file:///~/src/b.ts', 'file:///~/src/c.ts', '{"path":"~\\\\part.step"}', '~/d.ts'].join('\n'),
+    );
+    // POSIX homes are case-sensitive.
+    expect(redactHome('/home/John Doe/x /HOME/JOHN DOE/y', '/home/John Doe', 'linux')).toBe('~/x /HOME/JOHN DOE/y');
+  });
+
+  it('redacts the home directory inside command params (import/export paths) in commands.json', () => {
+    const inHome = path.join(homedir(), 'models', 'part.step');
+    const dir = writeCrashReport(
+      {
+        source: 'command-threw',
+        error: 'x',
+        commandLog: { replayFrom: 'empty', commands: [{ name: 'import_step', params: { path: inHome, nested: [{ file: inHome }] } }] },
+      },
+      { directory: crashes, now: T0 },
+    );
+    const commands = readFileSync(path.join(dir ?? '', 'commands.json'), 'utf8');
+    expect(commands).not.toContain(path.basename(homedir()));
+    expect(JSON.parse(commands)).toMatchObject({ commands: [{ params: { path: path.join('~', 'models', 'part.step') } }] });
   });
 });
 
@@ -220,6 +255,38 @@ describe('a command that throws in the backend', () => {
   it("a command's own failure summary is not a crash", () => {
     expect(applyCommand('add_box', { size: [-1, 1, 1] }).changed).toBe(false);
     expect(listCrashReports(crashes)).toEqual([]);
+  });
+
+  it('a throw that does not repeat is still reported (no re-run): the stack comes from the one execution', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    let calls = 0;
+    const realExecute = registry.execute;
+    vi.spyOn(registry, 'execute').mockImplementation((...args: Parameters<typeof registry.execute>) => {
+      calls++;
+      if (calls === 1) throw new Error('only once');
+      return realExecute(...args);
+    });
+    expect(applyCommand('add_box', { size: [1, 1, 1] }).isError).toBe(true);
+    expect(calls).toBe(1);
+    expect(readCrashReport(crashes, 'latest')?.errorText).toMatch(/^Error: only once/);
+  });
+
+  it('rate-limits command crash reports: one per command name per minute, five per minute overall; fatal ones never', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const failing = (name: string): { name: string; params: unknown; document: CadDocument } => ({
+      name,
+      params: { confirmation: { signature: 'secret-signature' } },
+      document: createEmptyDocument(),
+    });
+    const first = reportServerCrash('command-threw', new Error('a'), failing('add_box'), T0);
+    expect(first).not.toBe(null);
+    expect(readFileSync(path.join(first ?? '', 'commands.json'), 'utf8')).not.toContain('secret-signature');
+    expect(reportServerCrash('command-threw', new Error('a'), failing('add_box'), T0 + 59_000)).toBe(null);
+    for (const name of ['b', 'c', 'd', 'e'])
+      expect(reportServerCrash('command-threw', new Error(name), failing(name), T0 + 1000)).not.toBe(null);
+    expect(reportServerCrash('command-threw', new Error('f'), failing('f'), T0 + 2000)).toBe(null);
+    expect(reportServerCrash('server-uncaught-exception', new Error('fatal'), undefined, T0 + 2000)).not.toBe(null);
+    expect(reportServerCrash('command-threw', new Error('a'), failing('add_box'), T0 + 61_000)).not.toBe(null);
   });
 });
 
