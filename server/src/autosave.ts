@@ -3,13 +3,14 @@
  *
  * - `schedule(doc)` coalesces bursts of mutations into one write after `debounceMs`. The debounced write is ASYNC
  *   (`fs.promises`, off the event loop) and writes never overlap: one in flight, the newest pending doc follows.
- * - Writes go to a temp file then `rename` (atomic on POSIX) so a crash never leaves a truncated autosave.
+ * - Writes go to a fsynced temp file then `rename`, keeping the replaced autosave as `<file>.bak` (SC-D1), so a crash never leaves
+ *   a truncated or missing autosave.
  * - `flush()` writes any pending document SYNCHRONOUSLY (shutdown / uncaughtException) and supersedes an in-flight async
  *   write: that one drops its rename, so an older document can never land after a newer one.
  */
 
 import fs from 'fs';
-import { writeFileAtomic } from './writeFileAtomic';
+import { replaceKeepingBackup, writeFileKeepingBackup } from './writeFileAtomic';
 import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
 import type { CadDocument } from '@core/model/types';
@@ -55,7 +56,7 @@ export function createAutosaver(options: AutosaverOptions): Autosaver {
     syncWrites += 1;
     try {
       fs.mkdirSync(path.dirname(filePath), { recursive: true });
-      writeFileAtomic(filePath, serialize(doc));
+      writeFileKeepingBackup(filePath, serialize(doc));
     } catch (err) {
       console.warn(`[autosave] write failed: ${errorMessage(err)}`);
     }
@@ -65,7 +66,13 @@ export function createAutosaver(options: AutosaverOptions): Autosaver {
     try {
       await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
       await fs.promises.writeFile(asyncTemporary, text, 'utf8');
-      if (generation === syncWrites) fs.renameSync(asyncTemporary, filePath);
+      const handle = await fs.promises.open(asyncTemporary, 'r+');
+      try {
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+      if (generation === syncWrites) replaceKeepingBackup(asyncTemporary, filePath);
       else await fs.promises.rm(asyncTemporary, { force: true });
     } catch (err) {
       console.warn(`[autosave] write failed: ${errorMessage(err)}`);

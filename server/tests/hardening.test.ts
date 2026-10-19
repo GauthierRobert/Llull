@@ -264,6 +264,23 @@ describe('createAutosaver', () => {
     expect(fs.readFileSync(file, 'utf8')).toBe('{"x":1}');
   });
 
+  it('keeps the replaced autosave as .bak, for sync and debounced async writes (SC-D1)', async () => {
+    const file = path.join(dir, 'k.json');
+    const texts = ['{"v":1}', '{"v":2}', '{"v":3}'];
+    let next = 0;
+    const saver = createAutosaver({ filePath: file, debounceMs: 1, serialize: () => texts[next++] ?? '' });
+    saver.schedule(createEmptyDocument());
+    saver.flush();
+    saver.schedule(createEmptyDocument());
+    saver.flush();
+    expect(fs.readFileSync(`${file}.bak`, 'utf8')).toBe('{"v":1}');
+    saver.schedule(createEmptyDocument());
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(fs.readFileSync(file, 'utf8')).toBe('{"v":3}');
+    expect(fs.readFileSync(`${file}.bak`, 'utf8')).toBe('{"v":2}');
+    expect(fs.readdirSync(dir).sort()).toEqual(['k.json', 'k.json.bak']);
+  });
+
   it('write failure warns and leaves the previous file intact', () => {
     const file = path.join(dir, 'c.json');
     fs.writeFileSync(file, 'old');

@@ -21,9 +21,8 @@ export interface CliBackend {
   redo(): Promise<CommandOutcome>;
 }
 
-/** Save `doc`, keeping the previous file as `<docPath>.bak` (one level of undo). */
+/** Save `doc`, keeping the previous file as `<docPath>.bak` (one level of undo): every document save does (`writeDocumentFile`). */
 export function saveDocumentWithBackup(docPath: string, doc: CadDocument): void {
-  if (fs.existsSync(docPath)) fs.copyFileSync(docPath, `${docPath}.bak`);
   writeDocumentFile(docPath, doc);
 }
 
