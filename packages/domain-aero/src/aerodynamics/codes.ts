@@ -15,6 +15,9 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   AER_AREA_SOURCE_CONFLICT: 'give exactly one of cdA, (cd + referenceArea) or (cd + entityIds)',
   AER_SPEED_SOURCE_CONFLICT: 'give exactly one of speed or powerW',
   AER_NO_EQUILIBRIUM: 'the steady speed would exceed 100 m/s: lower powerW, or the downhill grade / tailwind',
+  AER_SURFACE_SOURCE_CONFLICT: 'give exactly one of loftId or sections per surface',
+  AER_SURFACE_INVALID: 'a surface needs >= 2 sections with chord > 0 spread along y or z (a loft: rings at different span stations)',
+  AER_LATTICE_TOO_LARGE: 'lower spanwisePanels / chordwisePanels, or run the native tool vortex_lattice_solve (llull-compute, up to 20000 panels)',
 };
 
 export const refuseAero = tableRejection(REMEDIATION);

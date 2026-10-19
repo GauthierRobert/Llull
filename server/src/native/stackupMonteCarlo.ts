@@ -27,9 +27,9 @@ import { readOutput, withJobFolder, type ComputeRunner } from './computeJob';
 
 const TOOL = 'stackup_monte_carlo';
 /** Native cap (`llull_stats::MAX_SAMPLES`, 2^40): chunk counts and the Chan merge products stay exact in f64. */
-export const NATIVE_STACKUP_SAMPLES_CAP = 2 ** 40;
+const NATIVE_STACKUP_SAMPLES_CAP = 2 ** 40;
 /** Default when `samples` is omitted: the first size above the TS cap that the native path exists for. */
-export const NATIVE_STACKUP_DEFAULT_SAMPLES = 10_000_000;
+const NATIVE_STACKUP_DEFAULT_SAMPLES = 10_000_000;
 const DEFAULT_TIMEOUT_S = 600;
 
 export interface StackupNativeDeps {
