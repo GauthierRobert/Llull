@@ -34,6 +34,9 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
                               record_topology_result  [timeoutS=1800 resumeFromLast=true device=cpu|gpu|auto]; --progress prints one
                               line per iteration; without llull-compute only 2D studies up to 2000 voxels (TypeScript), else
                               TOP_TOOL_MISSING; then: topology_report studyId=ID, check_topology studyId=ID
+  scan import FILE [sourceUnit=mm columns=xyzi …]   point cloud (E57 / LAS / LAZ / XYZ / PTS / CSV) -> native llull-compute octree
+                              asset in $LLULL_SCAN_CACHE (~/.llull/cache/pointcloud); prints assetKey; then attach_point_cloud
+                              assetKey=KEY. scan list = the stored assets. Toolset scan (llull list scan)
   register_material_library file=LIB.llull-matlib.json   copy a material library into $LLULL_LIBRARIES_DIR (~/.llull/libraries); then
                               import_material_library libraryId=ID version=V sha256=H, and resolve_material_libraries after a load
   run <plan.json | ->         build_project: an actions array or { actions, onError }

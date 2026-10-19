@@ -6,6 +6,7 @@
 export { buildingPlugin } from './building/plugin';
 export { industrialPlugin } from './industrial/plugin';
 export { civilPlugin } from './civil/plugin';
+export { scanPlugin } from './scan/plugin';
 export { buildPlanDrawing } from './building/drawings/planDrawing';
 export { CATEGORY_LAYER } from './building/evaluate/entities';
 export { buildingElementOf } from './building/evaluate/integrity';

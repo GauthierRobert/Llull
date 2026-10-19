@@ -58,6 +58,7 @@ export const clearDocument = defineCommand({
       doc.fasteners === undefined &&
       doc.sheetMetal === undefined &&
       doc.probabilistic === undefined &&
+      doc.scan === undefined &&
       (keepLayers || isLayersDefault);
     if (isAlreadyEmpty) return noop(doc, 'Document is already empty.');
     const nextDoc: CadDocument = {
@@ -78,6 +79,7 @@ export const clearDocument = defineCommand({
     delete nextDoc.fasteners;
     delete nextDoc.sheetMetal;
     delete nextDoc.probabilistic;
+    delete nextDoc.scan;
     const layerPart = keepLayers ? `kept ${layerCount} layer${layerCount === 1 ? '' : 's'}` : `reset to default layer`;
     return report(
       nextDoc,

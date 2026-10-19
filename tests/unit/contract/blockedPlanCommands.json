@@ -558,14 +558,9 @@
       "create_clash_issues"
     ],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-01-import-e57-las.json": [
-      "attach_point_cloud",
-      "check_point_clouds",
-      "describe_point_cloud",
-      "nearest_cloud_point",
-      "query_cloud_points"
+      "check_point_clouds"
     ],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-02-pipe-extraction.json": [
-      "attach_point_cloud",
       "check_point_clouds",
       "commit_asbuilt_extraction",
       "extract_pipes",
@@ -575,17 +570,14 @@
     ],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-03-registration.json": [
       "apply_registration",
-      "attach_point_cloud",
       "check_point_clouds",
       "compute_registration"
     ],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-04-deviation-clash.json": [
-      "attach_point_cloud",
       "check_asbuilt_clash",
       "cloud_to_model_deviation"
     ],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-05-steel-section.json": [
-      "attach_point_cloud",
       "check_point_clouds",
       "commit_asbuilt_extraction",
       "fit_steel_member"

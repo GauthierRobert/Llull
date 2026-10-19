@@ -26,6 +26,7 @@ export const TOOLSET_NAMES = [
   'piping',
   'civil',
   'design',
+  'scan',
 ] as const;
 
 export type ToolsetName = (typeof TOOLSET_NAMES)[number];
@@ -107,6 +108,10 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   /** Contributed by the installed design-language plugin (`.lld`). */
   get design(): readonly string[] {
     return pluginToolNames('design');
+  },
+  /** Point clouds (plant 10): the host transport `scan_import` plus the installed scan plugin's commands. */
+  get scan(): readonly string[] {
+    return ['scan_import', 'scan_list', ...pluginToolNames('scan')];
   },
 };
 

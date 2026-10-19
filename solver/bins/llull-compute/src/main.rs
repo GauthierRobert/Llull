@@ -1,7 +1,7 @@
 //! `llull-compute <job> [<task>] <job-folder>`: dispatches one job (RS1 §2). `llull-compute --version` prints the version.
 //! Jobs: `post fatigue|map <folder>` (crate `llull-post`), `raster <folder>` (crate `llull-raster`), `topopt <folder>` (crate
 //! `llull-topopt`, PHY-17 SIMP; one `progress` event per iteration, contract in `llull_topopt::job`). An unknown job ends with an `error`
-//! event and exit code 2. The raster job reports a `warning` event when it was asked for the GPU but drew with the CPU twin.
+//! event and exit code 2. `cloud import|op <folder>`: crate `llull-cloud` (plant 10 point clouds, RS-3 / RS-4). The raster job reports a `warning` event when it was asked for the GPU but drew with the CPU twin.
 
 use llull_protocol::{emit, Event, Output};
 use llull_raster::Produced;
@@ -10,7 +10,7 @@ use std::path::Path;
 use std::process::ExitCode;
 
 const USAGE: &str =
-    "usage: llull-compute post <fatigue|map> <job-folder> | llull-compute raster <job-folder> | llull-compute topopt <job-folder>";
+    "usage: llull-compute post <fatigue|map> <job-folder> | llull-compute raster <job-folder> | llull-compute topopt <job-folder> | llull-compute cloud <import|op> <job-folder>";
 
 fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Output>, (String, String)> {
     match (job, rest) {
@@ -32,7 +32,10 @@ fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Outpu
             Ok(outputs)
         }
         ("topopt", [folder, ..]) => llull_topopt::job::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
-        ("post" | "raster" | "topopt", _) => Err(("NATIVE_USAGE".to_string(), USAGE.to_string())),
+        ("cloud", [task, folder, ..]) => {
+            llull_cloud::job::run(task, Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message))
+        }
+        ("post" | "raster" | "topopt" | "cloud", _) => Err(("NATIVE_USAGE".to_string(), USAGE.to_string())),
         _ => Err(("NATIVE_JOB_UNKNOWN".to_string(), format!("unknown job '{job}'"))),
     }
 }

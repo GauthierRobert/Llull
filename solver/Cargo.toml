@@ -13,6 +13,7 @@ default-members = [
   "crates/llull-gpu",
   "crates/llull-voxfe",
   "crates/llull-topopt",
+  "crates/llull-cloud",
   "bins/llull-compute",
 ]
 

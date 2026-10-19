@@ -4,6 +4,7 @@
  *   fatigue_field  FE fatigue case -> llull-compute post fatigue (every node) -> FatigueField artifact -> compute_fatigue
  *   fea_map_field  thermo_static interpolate field -> llull-compute post map -> mapped-field artifact (read by the fea_solve deck)
  *   fea_render     render_fea_results with the pixel raster in llull-compute raster (raster=auto|ts|cpu|gpu)
+ *   scan_import / scan_list  point-cloud file -> llull-compute cloud import -> asset store (`../scan/scanTools.ts`, plant 10)
  */
 
 import type { ToolDefinition } from '@protocol/tools';
@@ -18,6 +19,7 @@ import { runFatigueField, type NativeDeps } from './fatigueField';
 import { runMapField } from './mapField';
 import { DEFAULT_TOPOLOGY_TIMEOUT_S, runTopologySolve, type TopologySolveOptions } from './topologySolve';
 import { runFeaRender } from './renderField';
+import { defaultScanDeps, isScanTool, runScanTool, scanToolDefinitions } from '../scan/scanTools';
 
 const TIMEOUT = {
   type: 'number' as const,
@@ -66,6 +68,7 @@ export function nativeToolDefinitions(): ToolDefinition[] {
     },
     renderToolDefinition(),
     topologyToolDefinition(),
+    ...scanToolDefinitions(),
   ];
 }
 
@@ -144,6 +147,7 @@ export async function runNativeTool(
   host: FeaHost & { readonly onProgress?: (line: string) => void },
   deps: NativeDeps = defaultDeps(process.env, host.onProgress),
 ): Promise<CommandOutcome | null> {
+  if (isScanTool(name)) return runScanTool(name, params, defaultScanDeps(deps.env, host.onProgress));
   if (!isNativeTool(name)) return null;
   if (name === 'fea_render') return { ...(await runFeaRender(params, host, deps)), changed: false };
   const args = isRecord(params) ? params : {};
