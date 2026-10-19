@@ -190,19 +190,19 @@ describe('hyperelastic law validation', () => {
     );
   });
 
-  it('refuses compressible laws and unreachable paths in the finite driver', () => {
+  it('drives compressible laws through the general finite driver and refuses unreachable paths for incompressible ones', () => {
     let local = addModel(withMaterial(createEmptyDocument(), 'rubber'), 'rubber', 'nh', {
       ...LAWS['neoHooke'],
       D1: { value: 0.01, unit: '1/MPa' },
     });
     local = defineSet(local, 'rubber', { id: 's', hyperelastic: 'nh' }, true);
-    expect(
-      codeOf(local, 'material_point_response', {
-        material: 'rubber',
-        kinematics: 'finite',
-        steps: [{ increments: 2, control: { xx: { strain: 0.5 } } }],
-      }),
-    ).toBe('MATL_PATH_INVALID');
+    const compressible = pointResponse(local, {
+      material: 'rubber',
+      kinematics: 'finite',
+      steps: [{ increments: 2, control: { xx: { strain: 0.5 } } }],
+    }).rows[0] as unknown as { volumeRatio: number; stretch: number[] };
+    expect(compressible.volumeRatio).toBeLessThan(1.2);
+    expect(compressible.stretch[0]).toBeCloseTo(1.5, 12);
     let incompressible = addModel(withMaterial(createEmptyDocument(), 'rubber'), 'rubber', 'nh', LAWS['neoHooke'] ?? {});
     incompressible = defineSet(incompressible, 'rubber', { id: 's', hyperelastic: 'nh' }, true);
     const finite = (steps: unknown[], extra: Record<string, unknown> = {}): string =>

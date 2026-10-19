@@ -7,6 +7,8 @@ import type { Matrix } from './linalg';
 import { invertMatrix, pivotReport } from './linalg';
 import { cowperSymondsRateFactor, johnsonCookRateFactor, resolveIsotropic } from './hardening';
 import type { J2Material } from './j2';
+import { resolveHill } from './driverHill';
+import type { HillMaterial } from './hill';
 import { arrheniusLnShift, wlfLog10Shift } from './viscoelastic';
 import { convertQuantity, failure, isLawFailure, resolveAll, resolveParameter, type LawFailure, type ResolveEnv } from './resolve';
 import { resolveOrthotropicConstants } from './elasticResolve';
@@ -45,6 +47,7 @@ export type CreepModel =
 export interface SmallModel {
   readonly elastic: ElasticModel;
   readonly j2: J2Material | null;
+  readonly hill: HillMaterial | null;
   readonly prony: PronyModel | null;
   readonly creep: CreepModel | null;
   /** Stress scale for tolerances (yield stress, else the elastic modulus × 1e-3). */
@@ -267,7 +270,12 @@ export function resolveSmallModel(slots: Slots, env: ResolveEnv, temperatureK: n
   const elastic = resolveElastic(elasticModel, env);
   if (isLawFailure(elastic)) return elastic;
   let j2: J2Material | null = null;
-  if (slots.plastic !== undefined) {
+  let hill: HillMaterial | null = null;
+  if (slots.plastic?.model.kind === 'hill48_plasticity') {
+    const resolved = resolveHill(slots.plastic, elastic.C, elastic.iso?.E ?? null, env, temperatureK);
+    if (isLawFailure(resolved)) return resolved;
+    hill = resolved;
+  } else if (slots.plastic !== undefined) {
     const resolved = resolveJ2(slots.plastic, slots.rate, elastic, env, temperatureK);
     if (isLawFailure(resolved)) return resolved;
     j2 = resolved;
@@ -284,7 +292,7 @@ export function resolveSmallModel(slots: Slots, env: ResolveEnv, temperatureK: n
     if (isLawFailure(resolved)) return resolved;
     creep = resolved;
   }
-  const combos = [j2 !== null, prony !== null, creep !== null].filter(Boolean).length;
+  const combos = [j2 !== null || hill !== null, prony !== null, creep !== null].filter(Boolean).length;
   if (combos > 1)
     return failure(
       'MATL_PATH_INVALID',
@@ -295,6 +303,8 @@ export function resolveSmallModel(slots: Slots, env: ResolveEnv, temperatureK: n
   if ((prony !== null || creep !== null) && elastic.iso === null)
     return failure('MATL_PATH_INVALID', 'set', 'viscoelastic and creep runs need elastic_isotropic', 'use an elastic_isotropic model');
   const referenceStress =
-    j2?.referenceYield ?? 1e-3 * (elastic.iso?.E ?? Math.max(...elastic.C.map((row) => Math.max(...row.map(Math.abs)))));
-  return { elastic, j2, prony, creep, referenceStress };
+    j2?.referenceYield ??
+    hill?.referenceYield ??
+    1e-3 * (elastic.iso?.E ?? Math.max(...elastic.C.map((row) => Math.max(...row.map(Math.abs)))));
+  return { elastic, j2, hill, prony, creep, referenceStress };
 }

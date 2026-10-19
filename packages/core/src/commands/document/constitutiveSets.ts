@@ -24,7 +24,7 @@ export const defineConstitutiveSet = defineCommand({
     'Define a constitutive set on a material: a named combination of its material models (add_material_model first) that fills the slots ' +
     'elastic / hyperelastic / plastic / viscoelastic / creep / rate. Rules: exactly one of elastic and hyperelastic (a ramberg_osgood plastic ' +
     'model carries E and ν itself and forbids both); j2_plasticity needs elastic_isotropic (elastic_orthotropic only with perfect or linear ' +
-    'hardening); creep needs an elastic model; viscoelastic needs elastic or hyperelastic; rate_johnson_cook needs johnson_cook hardening; ' +
+    'hardening; hill48_plasticity needs elastic_isotropic or elastic_orthotropic); creep needs an elastic model; viscoelastic needs elastic or hyperelastic; rate_johnson_cook needs johnson_cook hardening; ' +
     'fatigue and crack-growth models are never members. material_point_response and export_material_cards take the set id.',
   params: z.object({
     material: z.string().describe('Material id (create_material name).'),

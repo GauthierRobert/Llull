@@ -1,6 +1,6 @@
 /**
  * Finite-strain driver for incompressible hyperelastic laws in homogeneous modes (PHY-02 §5.6): uniaxial_stress, equibiaxial, pure_shear.
- * `xx` controls the mode by a nominal strain (λ − 1) or a nominal stress (MPa, solved for λ). Compressible laws are V2.
+ * `xx` controls the mode by a nominal strain (λ − 1) or a nominal stress (MPa, solved for λ). Compressible laws (D1 > 0) go to `driverCompressible`.
  */
 
 import type { MaterialModel } from '../materialModel';
@@ -13,6 +13,7 @@ import {
   type PathStep,
   type Preset,
 } from './driverTypes';
+import { runCompressibleHyperelastic } from './driverCompressible';
 import { ValidityMonitor } from './driverValidity';
 import { cauchyStresses, modeStretches, nominalStress, strainEnergy, type HyperMode, type ResolvedHyper } from './hyperelastic';
 import { isIncompressible, resolveHyper, type HyperLaw } from './hyperResolve';
@@ -59,17 +60,16 @@ function stretchForNominalStress(law: ResolvedHyper, mode: HyperMode, target: nu
 
 /**
  * Run a finite-strain homogeneous-mode path.
- * @failure control other than xx / unknown preset / compressible law -> MATL_PATH_INVALID; unreachable stress -> MATL_PATH_DIVERGED
+ * @failure control other than xx / unknown preset / incompressible law with another control -> MATL_PATH_INVALID; unreachable stress -> MATL_PATH_DIVERGED
  */
 export function runFiniteHyperelastic(input: FiniteRunInput): DriverOutcome | DriverFailure {
   const law = input.model.model as HyperLaw;
   const usedDefaults = new Set<string>();
+  if (!isIncompressible(law)) return runCompressibleHyperelastic(input);
   const preset = input.preset ?? 'uniaxial_stress';
   if (input.preset === undefined) usedDefaults.add('kinematicsPreset');
   const mode = MODE_OF[preset];
   if (mode === undefined) return invalid('preset', `preset '${preset}' is not a hyperelastic mode`);
-  if (!isIncompressible(law))
-    return invalid(`models.${input.model.id}`, 'compressible hyperelastic laws (D > 0) are not supported by the driver yet (V2)');
   const resolved = resolveHyper(law);
   if (resolved === null)
     return failure('MATL_LAW_PARAMS_INVALID', `models.${input.model.id}`, 'the hyperelastic law does not resolve to numbers');

@@ -214,6 +214,16 @@ export const lawSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('elastic_anisotropic'), stiffness: finiteList, unit: unitSchema }),
   z.strictObject({ kind: z.literal('j2_plasticity'), isotropic, kinematic }),
   z.strictObject({
+    kind: z.literal('hill48_plasticity'),
+    isotropic,
+    F: z.number(),
+    G: z.number(),
+    H: z.number(),
+    L: z.number(),
+    M: z.number(),
+    N: z.number(),
+  }),
+  z.strictObject({
     kind: z.literal('ramberg_osgood'),
     E: lawParameter,
     nu: lawParameter,

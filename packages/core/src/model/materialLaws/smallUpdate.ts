@@ -3,6 +3,7 @@
 import { garofaloRate, nortonEffectiveTime } from './creep';
 import type { CreepModel, SmallModel } from './driverModel';
 import { initialJ2State, j2Update, totalBackStress, trialStress, workIncrement, type J2State } from './j2';
+import { hillUpdate, initialHillState } from './hill';
 import { matVec } from './linalg';
 import { solveDecreasing } from './scalar';
 import { deviator, equivalent, mean3, zero6, type Vec6 } from './tensor';
@@ -32,7 +33,7 @@ export function initialState(model: SmallModel): PointState {
   return {
     strain: zero6(),
     stress: zero6(),
-    j2: model.j2 === null ? null : initialJ2State(model.j2),
+    j2: model.j2 !== null ? initialJ2State(model.j2) : model.hill !== null ? initialHillState() : null,
     visco: model.prony === null ? null : { shear: model.prony.shear.map(zero6), bulk: model.prony.bulk.map(() => 0) },
     creepEq: 0,
     work: 0,
@@ -119,6 +120,17 @@ export function advance(model: SmallModel, state: PointState, dEps: readonly num
   if (model.prony !== null) return viscoelasticUpdate(model, state, dEps, slice);
   if (model.creep !== null) return creepUpdate(model, state, dEps, slice);
   const strain = addStrain(state.strain, dEps);
+  if (model.hill !== null && state.j2 !== null) {
+    const update = hillUpdate(model.hill, state.j2, dEps);
+    if (update === null) return null;
+    return {
+      ...state,
+      strain,
+      stress: update.state.stress,
+      j2: update.state,
+      work: state.work + workIncrement(state.stress, update.state.stress, dEps),
+    };
+  }
   if (model.j2 !== null && state.j2 !== null) {
     const update = j2Update(model.j2, state.j2, dEps, slice.t1 - slice.t0);
     if (update === null) return null;

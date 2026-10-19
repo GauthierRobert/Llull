@@ -18,13 +18,13 @@ export interface HyperTest {
   readonly weight: number;
 }
 
-interface Residual {
+export interface Residual {
   readonly rms: number;
   readonly maxAbs: number;
   readonly count: number;
 }
 
-interface FitSummary {
+export interface FitSummary {
   readonly rms: number;
   readonly maxAbs: number;
   readonly maxRel: number;
@@ -71,7 +71,7 @@ const HYPER_TERMS: Readonly<Record<HyperFitKind, (order: number) => ReadonlyArra
 
 const sumSquares = (values: readonly number[]): number => values.reduce((sum, value) => sum + value * value, 0);
 
-const summarise = (residuals: readonly number[], observed: readonly number[], conditionNumber: number): FitSummary => {
+export const summarise = (residuals: readonly number[], observed: readonly number[], conditionNumber: number): FitSummary => {
   const mean = observed.reduce((sum, y) => sum + y, 0) / Math.max(observed.length, 1);
   const total = observed.reduce((sum, y) => sum + (y - mean) ** 2, 0);
   const relative = residuals.flatMap((r, i) => ((observed[i] ?? 0) !== 0 ? [Math.abs(r / (observed[i] ?? 1))] : []));

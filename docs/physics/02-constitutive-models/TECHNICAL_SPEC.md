@@ -38,7 +38,7 @@ Baseline after the aerospace packs and PHY-01 (README §1): 08 `MaterialRecord` 
 | `fit_material_model`, `material_point_response`, `export_material_cards` | `packages/domain-physics/src/materials/` (`@phys`), `CadPlugin { name: 'physMaterials', toolset: 'material-lab' }` | Numerics-heavy queries; plugin per discipline (README §6.2) |
 | Solver card writers | `@phys/materials/writers/{calculix,nastran}.ts`, registered with the 05 `@cae` deck writer through a `MaterialCardWriter` extension point | 05 owns decks; PHY-02 owns material cards |
 | Least squares / LM | `packages/core/src/lib/leastSquares.ts` (PHY-01) + `@phys/materials/fit/levenbergMarquardt.ts` (V2) | Reuse |
-| MFront/MTest backend (V2) | `server/` host transport `mtest_run` (spawns a bundled executable), result fed back as query data | L2/L6: processes live in server/desktop |
+| MFront/MTest backend (V2) | `server/src/mfront/` host transport `mtest_run` (spawns a USER-INSTALLED `mtest` / `mfront`, never bundled, OQ-MATL-05), result fed back as query data | L2/L6: processes live in server/desktop |
 
 Laws: L1 (only commands change the record), L2 (no I/O in core or `@phys`), L3 (pure, `is pure` tests), L4, L5 (zod
 schemas → MCP), L8 (`add_material_model` is a recorded step; fits and driver runs are queries), L9 (no kernel needed),
@@ -125,6 +125,7 @@ export type ConstitutiveLaw =
   | { kind: 'elastic_anisotropic'; stiffness: readonly number[]; unit: string }   // 21 values, upper triangle row-wise in Voigt order
   // ---- plastic (incremental J2) and deformation plasticity
   | { kind: 'j2_plasticity'; isotropic: IsotropicHardening; kinematic: KinematicHardening }
+  | { kind: 'hill48_plasticity'; isotropic: IsotropicHardening; F: number; G: number; H: number; L: number; M: number; N: number }  // Hill-1948 [V2], material axes 1-2-3: σ̄² = F(σ22−σ33)² + G(σ33−σ11)² + H(σ11−σ22)² + 2Lσ23² + 2Mσ13² + 2Nσ12²; isotropic = the reference flow stress σ̄(ε̄p); input forms stress_ratios {R11…R23} / r_values {r0, r45, r90} / coefficients, converted on input with `conversion` recorded
   | { kind: 'ramberg_osgood'; E: P; nu: P; sigma0: P; n: number; alpha: number;   // E·ε = σ + α(|σ|/σ0)^(n−1)σ, true stress / log strain [R3][R9]
       theory: 'deformation' }                                                     // monotonic loading only
   // ---- hyperelastic (stress unit in each Q; D in 1/stress; D = 0 ⇒ incompressible)
@@ -195,6 +196,7 @@ export interface MaterialLawCatalogEntry {
 | `creep` requires `elastic` (isotropic or orthotropic) [R3 *CREEP] | `MATL_COMBINATION_INVALID` |
 | `viscoelastic` requires `elastic` or `hyperelastic` | `MATL_COMBINATION_INVALID` |
 | `rate_johnson_cook` requires `isotropic.kind = 'johnson_cook'` and isotropic elasticity [R3 *PLASTIC] | `MATL_COMBINATION_INVALID` |
+| `hill48_plasticity` requires `elastic_isotropic` or `elastic_orthotropic` (material axes), never a hyperelastic law or a rate law | `MATL_COMBINATION_INVALID` |
 | Durability kinds are never members of a set | `MATL_COMBINATION_INVALID` |
 
 ### 3.5 Consumer view (extends 05 `FeaMaterialView`)
@@ -221,7 +223,7 @@ models use `schemaVersion: 2` (shared with PHY-01).
 | `remove_material_model` | mutating · `materials` | `{ material, id }` | `@invariant others untouched` · `@failure MATL_MODEL_NOT_FOUND; MATL_MODEL_IN_USE (sets or analyses listing it)` |
 | `define_constitutive_set` | mutating · `materials` | `{ material, set: ConstitutiveSet, makeDefault?: boolean, replace?: boolean }` | `@affects constitutiveSets, defaultConstitutiveSet` · `@invariant §3.4 rules hold` · `@failure MATL_COMBINATION_INVALID; MATL_MODEL_NOT_FOUND` |
 | `check_material_models` | query · `materials` | `{ material?: string[], target?: 'calculix'\|'nastran', usedBy?: 'analyses'\|'all' }` | readiness check (AF-20) → `data { status, items: [{ code, severity, ids[], message, remediation }], stability: { [modelId]: DruckerReport \| ElasticReport } }` |
-| `fit_material_model` | query · `material-lab` (`@phys`) | `{ kind, tests: [{ mode: 'uniaxial'\|'equibiaxial'\|'planar'\|'uniaxial_plastic'\|'relaxation'\|'creep_rate', rows: [x, y][], xMeasure, yMeasure, units, weight? }], objective?: 'absolute'\|'relative', fixed?: {…} (e.g. Prony τ), start?: {…}, validity?, basis?, dataSource? }` | `@invariant read-only; deterministic; returns a model add_material_model accepts unchanged; includes stability` · `@failure MATL_FIT_INSUFFICIENT_DATA, MATL_FIT_ILL_CONDITIONED, MATL_FIT_DID_NOT_CONVERGE (V2), MATL_FIT_INSUFFICIENT_MODES (warning: hyperelastic from one mode)` → `data { model, fit: FitRecord, residualsPerTest, stability, defaults[], warnings[] }` |
+| `fit_material_model` | query · `material-lab` (`@phys`) | `{ kind, tests: [{ mode: 'uniaxial'\|'equibiaxial'\|'planar'\|'uniaxial_plastic'\|'relaxation'\|'creep_rate', rows: [x, y][], xMeasure, yMeasure, units, weight? }], objective?: 'absolute'\|'relative', fixed?: {…} (e.g. Prony τ), start?: {…}, validity?, basis?, dataSource? }` | `@invariant read-only; deterministic; returns a model add_material_model accepts unchanged; includes stability` · `@failure MATL_FIT_INSUFFICIENT_DATA, MATL_FIT_ILL_CONDITIONED, MATL_FIT_DID_NOT_CONVERGE, MATL_FIT_START_INVALID, MATL_FIT_INSUFFICIENT_MODES (warning: hyperelastic from one mode)` → `data { model, fit: FitRecord, residualsPerTest, stability, convergence? (non-linear: converged, stop, iterations, evaluations, starts, cost, conditionNumber, parameters[]), defaults[], warnings[] }`; non-linear kinds add `terms`, `start`, `bounds`, `positive`, `form` (built as in §13) |
 | `material_point_response` | query · `material-lab` | `{ material, set?, model?: MaterialLaw (ad-hoc, not stored), kinematics: 'small'\|'finite', preset?: 'uniaxial_stress'\|'uniaxial_strain'\|'plane_strain'\|'equibiaxial'\|'pure_shear'\|'simple_shear', steps: [{ duration?: Q, temperature?: Q, increments?: number, control: { xx?: { strain: number } \| { stress: Q }, yy?: …, zz?: …, xy?: …, xz?: …, yz?: … } }], output?: 'increments'\|'steps' }` | `@invariant read-only; deterministic; components not controlled by the preset or the step are stress-free (σ = 0)` · `@failure MATL_PATH_INVALID; MATL_PATH_DIVERGED (local/global Newton); MATL_STRAIN_OUT_OF_RANGE (warning, beyond validity); PROP_OUT_OF_RANGE (from a referenced property model)` → `data { rows: [{ step, increment, time, T, strain[6], stress[6], eqPlasticStrain, vonMises, backStress[6], energyDensity }], units, defaults[], unverified, unverifiedReasons }` (≤ 10 000 rows; larger via `--save`) |
 | `export_material_cards` | query · `material-lab` | `{ material, set, target: 'calculix'\|'nastran', name?, mid?: integer, temperatures?: Q[] }` | `@invariant same text as the deck writer emits (single implementation)` · `@failure MATL_EXPORT_UNSUPPORTED (law and target named), MATL_COMBINATION_INVALID` → `data { lines: string[], header, unverified }` |
 
@@ -279,6 +281,20 @@ plastic: solve for Δλ ≥ 0:  q_tr − 3GΔλ − ΔX_eq(Δλ) − σ_y(ε̄p_
   multiaxial by the J2 deformation-theory generalisation (secant, proportional loading); non-proportional path → warning
   `MATL_DEFORMATION_THEORY_PATH`.
 
+**Hill-1948 (V2, `hill48_plasticity`).** Equivalent stress `σ̄ = √(σᵀPσ)` with `P` (Voigt, tensor shear stresses) diagonal `G+H, F+H, F+G, 2N, 2M, 2L`
+and off-diagonal `P12 = −H, P13 = −G, P23 = −F`. Input conversions: stress ratios `R_ij = σ_ij/σ0` (`R12, R13, R23` for √3 τ_ij/σ0, Abaqus
+*POTENTIAL): `F = ½(1/R22² + 1/R33² − 1/R11²)`, `G, H` cyclic, `L = 3/(2R23²)`, `M = 3/(2R13²)`, `N = 3/(2R12²)`. Lankford ratios of a sheet (rolling
+direction 1, thickness 3): `F = r0/(r90(1+r0))`, `G = 1/(1+r0)`, `H = r0/(1+r0)`, `N = (F+G)(1+2 r45)/2`, `L = M = 3/2`, so that σ̄ equals the
+rolling-direction yield stress; derivation: tension at 45° has plastic flow `n = Pσ`, width/thickness strain ratio `(N − (F+G)/2)/(F+G) = r45`
+(with 2Nσ12² in σ̄², the form that reduces to von Mises for N = 3/2). Convex iff `G + H > 0`, `FG + GH + HF > 0`, `L, M, N > 0`
+(`MATL_HILL_NOT_CONVEX`). Associative flow `Δε^p = Δλ Pσ/σ̄`, work-conjugate hardening (σ̄ is homogeneous of degree 1, so `Δε̄p = Δλ`). Return
+mapping (backward Euler) on the scalar `Δλ`: with trial stress `σ_tr = σ_n + C:Δε` (any resolved elasticity, so orthotropic works), elastic when
+`σ̄_tr ≤ σ_y(ε̄p_n)(1 + 1e-12)`; else `σ(Δλ) = (I + (Δλ/σ_y(ε̄p_n + Δλ)) C P)⁻¹ σ_tr` is explicit in Δλ and
+`σ̄(σ(Δλ)) − σ_y(ε̄p_n + Δλ) = 0` is solved by the safeguarded scalar Newton of §5.3 (|r| ≤ 1e-10 σ_y). With isotropic ratios it equals the J2 mapping
+(proved on the NL1 path to 1e-8); uniaxial rolling-direction tension with linear hardening has the closed form `σ = (σ0 + Hε)/(1 + H/E)`, and the flow
+reproduces r0 = H/G and r90 = H/F. Isotropic hardening only (no kinematic, no rate). No CalculiX / Nastran card is mapped (§6.1): export refuses with
+`MATL_EXPORT_UNSUPPORTED`; the route is the optional MFront / MTest transport (§6.5).
+
 ### 5.4 Ramberg-Osgood conversions
 
 Engineering form `ε = σ/E + 0.002 (σ/σ0.2)^n` ⇔ CalculiX form with `σ0 = σ0.2`, `α = 0.002·E/σ0.2` (identical curve:
@@ -316,15 +332,39 @@ stability dσ:dε > 0 for isochoric increments ⇔ H positive definite. For `W(I
 PS (ln λ, 0); grid λ = 1 + 0.01k (k = 1…900) and 1 − 0.01k (k = 1…90), i.e. nominal strain −0.9…9 as the Abaqus check
 range quoted in [R5]. Report the first unstable λ per mode and side. Results for the Treloar fits: VC-MATL-08/09.
 
+**Compressible laws (V2).** `W = W_dev(λ̄1, λ̄2, λ̄3) + U(J)`, `λ̄_i = J^(−1/3) λ_i`, with the CalculiX / Abaqus volumetric forms
+`U = Σ_i (1/D_i)(J − 1)^(2i)` (Neo-Hooke, Mooney-Rivlin, polynomial, reduced polynomial, Yeoh, Ogden) and, for Arruda-Boyce,
+`U = (1/D)((J² − 1)/2 − ln J)` (Abaqus theory manual form; the CalculiX manual was not re-read for this form — flag `unverified` for exports). Both give the
+initial bulk modulus `K0 = 2/D1`. `D1 = 0` is incompressible; a higher `D_i > 0` with `D1 = 0` is `MATL_LAW_PARAMS_INVALID`. Cauchy stress at a general
+`F`: spectral decomposition of `b = F Fᵀ`; deviatoric Kirchhoff principal stresses `τ_i = 2(x_i − mean x)` with
+`x_i = W1 λ̄_i² + W2 (Ī1 λ̄_i² − λ̄_i⁴)` (invariant laws) or `τ_i = Σ (2μ_k/α_k)(λ̄_i^α_k − ⅓ Σ_j λ̄_j^α_k)` (Ogden); `σ_i = τ_i/J + U′(J)`;
+`P = J σ F⁻ᵀ`. The driver (`driverCompressible.ts`) runs general homogeneous paths on the upper-triangular `F = [[F11, γxy, γxz], [0, F22, γyz], [0, 0, F33]]`: normal components
+by nominal strain (F_ii − 1) or nominal stress (P_ii), shear components by the simple-shear gradient γ or Cauchy σ_ij; presets fill what a step omits and every
+uncontrolled component is stress-free, solved by a damped Newton iteration on the stress residuals (finite-difference tangent, tolerance
+`max(1e-10 · scale, 1e-13 · K0)`, 50 iterations, 16 halvings) so uniaxial stress contracts laterally by itself. Rows carry Hencky strain, Cauchy stress, principal
+stretches (descending), `nominalStress = P11`, `volumeRatio J`.
+
 ### 5.7 Fitting
 
 - **Linear in parameters** (V1): polynomial / reduced polynomial / Yeoh / Mooney-Rivlin / Neo-Hooke (P linear in C_ij for
   each mode, rows from §5.6), Prony with fixed τ (relaxation linear in g_i), Ramberg-Osgood (log(ε − σ/E) vs log σ),
   multilinear (direct conversion §5.2, no fit). Solve by PHY-01 scaled QR; objective `absolute` (named default) or
   `relative`. VC-MATL-08 compares against exact rational normal-equation solutions on the Treloar table.
-- **Non-linear** (V2): Levenberg-Marquardt with geodesic-free classic damping, λ0 = 1e-3, ×10 / ÷10, stop on relative
-  cost change < 1e-12 or 500 iterations; deterministic multi-start from a fixed grid (Ogden α ∈ {−2, 1, 2, 3, 5} combos)
-  in a fixed order; best by cost, ties by lower parameter norm.
+- **Non-linear** (V2, built — `fitSearch.ts`, `levenbergMarquardt.ts`, `fitHyperNonlinear.ts`, `fitLawsNonlinear.ts`): Levenberg-Marquardt with Marquardt diagonal scaling
+  (`(JᵀJ + λ diag(JᵀJ)) δ = −Jᵀr`), central-difference Jacobian, steps projected on the box bounds, λ0 = 1e-3, ×10 on a rejected step, ÷10 on an accepted
+  one, stop on relative cost change < 1e-12 (or ½‖r‖² < 1e-30, or no descent after 40 damping increases = numerical stationary point) or 500 iterations
+  (`MATL_FIT_DID_NOT_CONVERGE`). Variable projection: for fixed exponents / locking stretch / relaxation times the linear parameters are solved by QR to start each run.
+  Deterministic multi-start from a fixed grid in a fixed order (Ogden α ∈ {−2, 1, 2, 3, 5}, all N-subsets in lexicographic order; Arruda-Boyce λm ∈ {1.5, 2, 3, 5, 10, 30};
+  Prony τ log-spaced over the data range at three spreads; Ramberg-Osgood n ∈ {2, 3, 5, 10, 20, 40}; Voce b ∈ {1, 5, 20, 100}/ε_max; Chaboche γ ∈ {1, 10, 100, 1000};
+  Garofalo n × α × Q grids); `start` (every parameter, by name) replaces the list; best converged run by cost, ties by lower parameter norm. `bounds` per parameter name
+  (null keeps a side of the named default); Ogden shear terms μ_i ≥ 0 by default (`positive`), α ∈ [−30, 30]; Arruda-Boyce λm ∈ [1.001, 1000]; Prony g_i ∈ [1e-9, 1] and τ searched as ln τ,
+  Σ g < 1 checked after the fit (`MATL_PRONY_INVALID`); a parameter on a bound warns `MATL_FIT_PARAMETER_AT_BOUND`. Jacobian conditioning = Householder-QR estimate of the
+  column-equilibrated Jacobian at the solution; refused above 1e8 (`MATL_FIT_ILL_CONDITIONED`) — a finite-difference Jacobian resolves collinearity only to ~1e-10, so the 1e12
+  of the QR path is not enforceable here. Fitted hyperelastic sets get the Drucker scan of §5.6 and a positive initial shear modulus check (`MATL_HYPERELASTIC_INITIAL_MODULUS`).
+  Kinds: `hyper_ogden` (N ≤ 3, canonical convention), `hyper_arruda_boyce`, `visco_prony` without `fixed.tau` (≤ 20 terms), `ramberg_osgood` with `form: 'true_stress'`
+  (E, ν, σ0 fixed: α and σ0 are degenerate), `j2_voce`, `j2_chaboche` (monotonic, yield fixed, ≤ 10 terms: `MATL_FIT_MONOTONIC_ONLY`), `creep_garofalo` (ln-rate residual, Q fitted from several
+  temperatures or fixed). Results on the pinned Treloar table (all modes, absolute nominal-stress residual): Ogden N = 1 RMS 0.368, N = 2 0.169, N = 3 0.0612 MPa (UT 0.081); Arruda-Boyce μ 0.2697 MPa,
+  λm 4.64, RMS 0.149 MPa — the N = 3 fit beats the cited Ogden-1972 set (UT 0.288 MPa, OQ-MATL-03) as it should of a least-squares optimum.
 - Every fit returns stability (§5.6 or §5.1), residuals per test (RMS, max), and `FitRecord`. Hyperelastic fit from a
   single mode → warning `MATL_FIT_INSUFFICIENT_MODES` (the neo-Hooke UT-only fit of Treloar has 0.27 / 0.65 MPa RMS in
   ET / PS against 0.79 in UT, VC-MATL-08).
@@ -361,6 +401,8 @@ unverified ∨ (`fit` ∧ (no `dataProvenance` ∨ no `reviewedBy`)) ∨ driver 
 | Fit objective | `absolute` nominal-stress residual | llull choice (Treloar VCs use it) |
 | Linear law extended for a writer table | up to the model's `validity` max strain | llull rule; no validity ⇒ `MATL_VALIDITY_MISSING` |
 | J-C rate term below ε̇0 | 1 | llull rule |
+| Levenberg-Marquardt | λ0 = 1e-3, ×10 / ÷10, relative cost change 1e-12, 500 iterations, condition bound 1e8 | §5.7 |
+| Ogden shear terms | μ_i ≥ 0 (`positive`) | llull choice (stable at small strain); `positive: false` lifts it |
 
 Never defaulted: `modulusKind`, curve measures, Ogden input convention, Ramberg-Osgood input form, stress and time units.
 
@@ -410,6 +452,18 @@ format, V1). Expected text: VC-MATL-13/14.
 | `*.llull-matlib.json` | 08 `MaterialLibrary` `schemaVersion: 2` with `materialModels`, `constitutiveSets` |
 | Test-data files for fits | CSV `x,y` with `# measure` / `# unit` header lines, read by the host and passed as `rows` (bounded) |
 
+### 6.5 MFront / MTest transport (optional, not bundled — OQ-MATL-05)
+
+`server/src/mfront/` (`mtestProcess.ts` detection + runner, `mtestResult.ts` `.res` parser, `mtestTool.ts` the tool). The CLI tool `mtest_run`
+(a native transport of `server/src/native/tools.ts`, not a registry command: processes live in the host, L6) takes `mtest` (the script text), optional
+`mfront { name, source, library? }` (compiled first with `mfront --obuild --interface=generic name.mfront`; the token `{{library}}` of the script becomes
+`src/lib<library>.<so|dll|dylib>`), `timeoutS`, `probe`. It writes `job.mtest` into a temporary job folder, runs `mtest job.mtest`, parses the `.res` file (columns named by its `#`
+header, ≤ 10 000 rows) and answers `data { columns, rows, rowCount, truncated, mtest, log }`; the document is never changed and the numbers are
+labelled "not llull-validated". Executables: `LLULL_MTEST`, `LLULL_MFRONT` or `mtest` / `mfront` on PATH, found at runtime; the child sees the server environment
+minus credential-like variables. Compiling and loading a behaviour executes native code, so a run needs `LLULL_ALLOW_CODE_EXECUTION=1` (as `import_code`).
+Absent tools are a normal state: `probe: true` reports availability, a run answers `MFRONT_TOOL_MISSING` with the reason, tests skip with a logged reason.
+The MFront-specific syntax (generic-interface library naming, MTest keywords) is NOT verified here: no MFront was available to the builder; the flow is proven with an injected process runner only.
+
 ## 7. CLI / MCP / UI surfaces
 
 - **CLI:** no new verbs. `llull guide` gains a "material laws" section: conventions (true vs engineering, plastic vs
@@ -449,11 +503,18 @@ their meaning when passed through.
 | `MATL_PATH_DIVERGED` | error | local or global Newton failed | step, increment | more increments; check the law |
 | `MATL_FIT_INSUFFICIENT_DATA` | error | rows ≤ parameters | `tests` | add data or a simpler law |
 | `MATL_FIT_INSUFFICIENT_MODES` | warning | hyperelastic fit from one mode | tests | add equibiaxial / planar data |
-| `MATL_FIT_ILL_CONDITIONED` | error | condition > 1e12 | law | simpler law |
-| `MATL_FIT_DID_NOT_CONVERGE` | error | LM stop without convergence (V2) | law, iterations | other start / law |
+| `MATL_FIT_ILL_CONDITIONED` | error | condition > 1e12 (QR fits) or > 1e8 (Levenberg-Marquardt Jacobian) | law | simpler law |
+| `MATL_FIT_DID_NOT_CONVERGE` | error | LM: no run converged within 500 iterations | law, iterations, best cost | other start / bounds / law |
+| `MATL_FIT_START_INVALID` | error | `start` names / values outside the bounds, unknown or empty `bounds` | `start.<name>` / `bounds.<name>` | give every parameter once inside its bounds |
+| `MATL_FIT_PARAMETER_AT_BOUND` | warning | a fitted parameter sits on a bound | parameter | widen the bound or drop the term |
+| `MATL_FIT_MONOTONIC_ONLY` | warning | Chaboche fitted to monotonic data | — | confirm with a reverse-loading test |
+| `MATL_HILL_NOT_CONVEX` | error | Hill coefficients not convex (§5.3) | model | check ratios / r-values |
+| `MFRONT_TOOL_MISSING` | error | `mtest` / `mfront` not installed or not startable | reason in message and `data.reason` | install TFEL / MFront (not bundled), set `LLULL_MTEST` / `LLULL_MFRONT` |
+| `MFRONT_CODE_EXECUTION_DISABLED` | error | native code would be compiled and loaded | — | `LLULL_ALLOW_CODE_EXECUTION=1` on a trusted machine |
+| `MFRONT_BUILD_FAILED` / `MTEST_FAILED` / `MTEST_TIMEOUT` / `MTEST_RESULT_MISSING` / `MTEST_PARAMS_INVALID` | error | the external process failed, timed out, wrote no parsable `.res`, or the request is malformed | `data.log` (tail) | fix the source / script |
 | `MATL_RO_FORMS_DIFFER` | warning | monotonic and cyclic Ramberg-Osgood with inconsistent E | model ids | align E |
 | `MATL_EXPORT_UNSUPPORTED` | error | target cannot represent the law | law kind, target | other law / target, or the V2 MFront route |
-| `MATL_BACKEND_MISSING` | error | `engine: 'mtest'` without the bundled executable (V2) | — | install the bundle; use the built-in driver |
+| `MATL_BACKEND_MISSING` | — | superseded: the MFront route is the separate CLI tool `mtest_run`, refused with `MFRONT_TOOL_MISSING` (no `engine` parameter on `material_point_response`) | — | — |
 
 ### 7.2 Agent-first compliance
 
@@ -509,7 +570,7 @@ their meaning when passed through.
 | M4 CalculiX writers | §6.1 + extension point in 05 deck writer + ccx read tests | M1, 05 M1 | 4 d |
 | M5 Linear fits | hyperelastic polynomial family, RO, Prony fixed τ | M3, PHY-01 M4 | 3 d |
 | M6 V1 laws | Chaboche, combined, Prony + shift, Norton/Garofalo, J-C/C-S in driver; Nastran writers | M2 | 7 d |
-| M7 V2 | LM fits, compressible hyperelastic, Hill-48, MFront/MTest transport (legal review) | M5, M6 | 10 d |
+| M7 V2 | LM fits, compressible hyperelastic, Hill-48, MFront/MTest transport (not bundled, OQ-MATL-05) | M5, M6 | 10 d — **built 2026-10-19** (§13) |
 
 MVP (M1–M4) ≈ 19 d; V1 (M5, M6) ≈ 10 d; V2 ≈ 10 d. PHY-05 needs M1–M4; PHY-07/08 need M1 only (variants + storage).
 
@@ -521,7 +582,7 @@ MVP (M1–M4) ≈ 19 d; V1 (M5, M6) ≈ 10 d; V2 ≈ 10 d. PHY-05 needs M1–M4;
 | OQ-MATL-02 | Treloar primary (1944) not reached; the pinned table is Steinmann 2012's | Keep grade B; re-pin if the primary is found |
 | OQ-MATL-03 | The commonly cited Ogden "1972" set fits Treloar UT with 0.29 MPa RMS (worst at λ > 6); is the set mis-quoted? | Report only, no gate (VC-MATL-08) |
 | OQ-MATL-04 | CalculiX has no native Prony viscoelasticity; PHY-11 assumed `*VISCO` covers it | Tell PHY-11: `*VISCO` is a step procedure; Prony needs MFront/UMAT (V2) or another solver |
-| OQ-MATL-05 | MFront distribution (GPL-3 + linking exception or CeCILL-A) inside the desktop installer | Separate executable, legal review before V2 |
+| OQ-MATL-05 | MFront distribution (GPL-3 + linking exception or CeCILL-A) inside the desktop installer | **Decided 2026-10-19: not bundled; user-installed separate executable.** llull ships no TFEL / MFront code, binary or installer step; the user installs it and points `LLULL_MTEST` / `LLULL_MFRONT` at it (or puts it on PATH); detected at runtime; absent ⇒ `MFRONT_TOOL_MISSING` with the reason, tests skip with a logged reason. The licence review stays open only for a future decision to bundle |
 | OQ-MATL-06 | Nastran `CREEP` / `MATEV` / `TABLES1` semantics (total vs plastic strain) not verified | Mark `tbd`; verify with the MSC/NX QRG under licence |
 | OQ-MATL-07 | Should `cyclic_ramberg_osgood` (PHY-07) become `ramberg_osgood` with a `cyclic` flag? | Keep two kinds (different parameterisations) and the consistency warning |
 | OQ-MATL-08 | Where do test-data CSVs live (document, artifact store, library)? | Inline rows ≤ 10 000; larger via the 05 artifact store hash (V2) |
@@ -537,9 +598,9 @@ See FUNCTIONAL_SPEC §11 [R1]–[R15] and `validation/sources.md` [S1]–[S14]. 
 - [T5] PHY-01 TECHNICAL_SPEC §3 (`PropertyModel`, `FitRecord`, evaluator) — `docs/physics/01-property-models/TECHNICAL_SPEC.md`
 - [T6] PHY-07 / PHY-08 TECHNICAL_SPEC §3.1 (durability variants) — `docs/physics/07-fatigue/`, `docs/physics/08-fracture-damage-tolerance/`
 
-## 13. Implementation status (2026-10-16)
+## 13. Implementation status (2026-10-19)
 
-**Built: M1–M6** (the parts that need no 05 FEA, 08 MAT or solver binaries). All 107 cases of `validation/expected_results.json` are
+**Built: M1–M7** (M1–M6 on 2026-10-16, M7 on 2026-10-19; the parts that need no 05 FEA, 08 MAT or solver binaries). All 107 cases of `validation/expected_results.json` are
 judged by `tests/unit/physics/materials/` through the PHY-00 judge and pass (VC-MATL-01…15 and 17 values incl. the converged
 N = 100 000 NL1 runs; VC-MATL-16 durability kinds accepted and refused in sets; VC-MATL-18 budgets asserted with a 10× margin — measured
 J2 8 × 1000 increments ≈ 40 ms, Drucker scan ≈ 4 ms, card export ≈ 0.6 ms). The `nl1_material_point_proposed` plan runs through
@@ -551,7 +612,12 @@ J2 8 × 1000 increments ≈ 40 ms, Drucker scan ≈ 4 ms, card export ≈ 0.6 ms
 | Pure law kernels (elastic + LDLᵀ PD, J2 return mapping with linear / multilinear / Voce / J-C isotropic and linear / Chaboche kinematic, Ramberg-Osgood, hyperelastic stresses + Drucker scan, Prony / WLF / Arrhenius, Norton / Garofalo, J-C / Cowper-Symonds), driver, fits, card writers | `model/materialLaws/*.ts` |
 | `add_material_model`, `remove_material_model`, `define_constitutive_set`, `check_material_models` (toolset `materials`) | `commands/document/{materialModels,constitutiveSets,checkMaterialModels,materialLawSchema,materialModelRefusal,materialModelStored}.ts` |
 | `fit_material_model`, `material_point_response`, `export_material_cards` (toolset `material-lab`) | `commands/materiallab/` |
-| Load-time validation of the new fields | `commands/persistence/guards.ts` |
+| Load-time validation of the new fields | `commands/persistence/guards.ts` (the `lawSchema` parse, which now includes `hill48_plasticity`) |
+| M7 Levenberg-Marquardt fits (Ogden, Arruda-Boyce, Prony free τ, Ramberg-Osgood true stress, Voce, Chaboche, Garofalo), `start` / `bounds` / `positive`, convergence report, refusal codes, Drucker of the fit | `model/materialLaws/{levenbergMarquardt,fitSearch,fitHyperNonlinear,fitLawsNonlinear,fitCommon,eigen}.ts`, `commands/materiallab/{fitMaterialModel,fitNonlinear,fitInputs,fitSchema}.ts`; tests `tests/unit/physics/materials/fitNonlinear.test.ts` (VC-MATL-19…23) |
+| M7 compressible hyperelastic driver | `model/materialLaws/{hyperVolumetric,finiteStress,driverCompressible}.ts`, dispatch in `driverFinite.ts`; `compressibleHyper.test.ts` (VC-MATL-24) |
+| M7 Hill-48 | `model/materialLaws/{hill,driverHill}.ts`, `lawInput.ts` (`hill48`), `validatePlastic.ts`, `smallUpdate.ts`; `hill48.test.ts` (VC-MATL-25) |
+| M7 MFront / MTest transport (not bundled) | `server/src/mfront/*`, `server/src/native/tools.ts`, `server/tests/mtestTransport.test.ts` |
+| `llull guide` §10 "Material laws" | `packages/protocol/src/conventions.ts` |
 
 **Deviations (recorded, not silent):**
 
@@ -569,9 +635,18 @@ J2 8 × 1000 increments ≈ 40 ms, Drucker scan ≈ 4 ms, card export ≈ 0.6 ms
   strain-hardening Norton.
 - **Driver limits.** Plasticity / viscoelasticity / creep need `elastic_isotropic`; one run combines elasticity with at most one of
   plasticity, Prony or creep; Norton is time hardening; finite kinematics covers incompressible hyperelastic laws in `uniaxial_stress`,
-  `equibiaxial`, `pure_shear` with control on `xx` (compressible ⇒ `MATL_PATH_INVALID`). Rows ≤ 10 000; the command allows ≤ 100 000 increments in total (the converged NL1 runs call the kernel directly). Chaboche back stresses ≤ 10 and Prony terms ≤ 20 (schema, also at load).
-- **Fits** are linear only (Neo-Hooke, Mooney-Rivlin, Yeoh, polynomial / reduced polynomial order 1–3, engineering Ramberg-Osgood, Prony
-  with fixed τ); no `start` param; multilinear curves are converted by `add_material_model`, not fitted.
+  `equibiaxial`, `pure_shear` with control on `xx`; compressible laws (D1 > 0) run general paths (M7, §5.6). Rows ≤ 10 000; the command allows ≤ 100 000 increments in total (the converged NL1 runs call the kernel directly). Chaboche back stresses ≤ 10 and Prony terms ≤ 20 (schema, also at load).
+- **Fits.** Linear: Neo-Hooke, Mooney-Rivlin, Yeoh, polynomial / reduced polynomial order 1–3, engineering Ramberg-Osgood, Prony with fixed τ. Levenberg-Marquardt (M7):
+  see §5.7 — Ogden, Arruda-Boyce, Prony with free τ, Ramberg-Osgood true stress, Voce, monotonic Chaboche, Garofalo; Jacobian conditioning is refused above **1e8** (not the 1e12 of the QR path:
+  finite-difference noise); a parameter fitted onto a bound is a warning, not a refusal (e.g. Garofalo Q from one temperature ends at 0 with A absorbing it); multilinear curves are converted by
+  `add_material_model`, not fitted. Non-linear hyperelastic fits give D = 0 (incompressible data).
+- **M7 limits (recorded).** (1) The compressible driver covers the upper-triangular F family above, not arbitrary rotations of the reference axes. (2) Near-incompressible runs (D1 ≲ 1e-6 /MPa)
+  hit the double-precision floor of the volumetric Newton residual (tolerance `1e-13 · K0`). (3) The Arruda-Boyce volumetric form follows the Abaqus manual (§5.6); the CalculiX manual was not re-read.
+  (4) Hill-48 has isotropic hardening only, no kinematic part and no rate laws; no CalculiX / Nastran card (refused `MATL_EXPORT_UNSUPPORTED`, catalogue target `mfront_v2` / `unsupported`);
+  the Lankford N formula is derived here (`N = (F+G)(1+2 r45)/2` for the `2Nσ12²` convention), not copied from a source, and verified by the flow-direction identity and the von Mises limit.
+  (5) The M7 validation cases VC-MATL-19…25 are recovered-parameter fixtures and closed forms judged in the tests; they are NOT in `generate_matl_reference.py` / `expected_results.json`
+  (no Python in the build environment); the Treloar Ogden / Arruda-Boyce results of §5.7 are measured, report-only values.
+  (6) The MFront transport is proven with an injected process runner; no MFront install was available, so its real behaviour (library naming, MTest keywords) is unverified.
 - **Unverified** follows basis, fit and property-model rules only (no 08 source status), as PHY-01. `check_material_models usedBy:
   'analyses'` only adds a note (no analyses exist).
 - **Benchmark rounding.** The pack stores 12 significant digits but some cases judge at rel 1e-12, so the tests round measured values to
@@ -579,5 +654,6 @@ J2 8 × 1000 increments ≈ 40 ms, Drucker scan ≈ 4 ms, card export ≈ 0.6 ms
 
 **Not built (blocked):** the 05 deck-writer `MaterialCardWriter` extension point, `FeaConstitutiveView` and ccx single-element read tests
 (05 FEA); the pyNastran `read_bdf` round trip (server Python test infrastructure); `reviewedBy`, library `schemaVersion: 2` and private
-libraries (08 MAT, 09 signing); M7 (Levenberg-Marquardt fits, compressible hyperelastic driver, Hill-48, MFront — V2, licence review);
-the `llull guide` material-laws section.
+libraries (08 MAT, 09 signing). Deferred inside M7: a generator-backed (Python) entry for VC-MATL-19…25; an `engine: 'mtest'` switch on `material_point_response`
+(the transport is a separate tool); Hill-48 kinematic hardening and rate dependence; a real-MFront run of the transport. The "Driver limits" line above
+("compressible ⇒ `MATL_PATH_INVALID`") is lifted by M7.

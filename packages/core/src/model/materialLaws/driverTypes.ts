@@ -34,6 +34,8 @@ export interface DriverRow {
   readonly eqCreepStrain?: number;
   readonly stretch?: readonly number[];
   readonly nominalStress?: number;
+  /** Volume ratio J = det F (compressible finite runs). */
+  readonly volumeRatio?: number;
 }
 
 export interface DriverWarning {

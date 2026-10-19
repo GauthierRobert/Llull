@@ -33,8 +33,10 @@ const MODEL_DESCRIPTION =
   "elastic_transversely_isotropic {isotropyPlane '12'|'23', Ep, Et, nuP, nuPT, Gt}; elastic_anisotropic {stiffness: 21 numbers, upper triangle row-wise in Voigt order 11 22 33 12 13 23 (engineering shear), unit}. " +
   'PLASTIC: j2_plasticity {isotropic: perfect {yieldStress} | linear {yieldStress, modulus, modulusKind plastic|tangent REQUIRED} | multilinear {stressUnit, curves [{temperature?, points [[stress, plasticStrain]…]}], ' +
   'inputMeasure {stress true|engineering, strain plastic|total, strainKind true|engineering, youngModulus? for total} REQUIRED} | voce {yieldStress, Q, b} | johnson_cook {A, B, n, m, meltTemperature, transitionTemperature}; ' +
-  "kinematic: none | linear {C} | chaboche {backstresses [{C, gamma}…]}}; ramberg_osgood {form 'calculix' {E, nu, sigma0, alpha, n} | 'engineering' {E, nu, sigma02, n} REQUIRED}. " +
-  'HYPERELASTIC (stress parameters {value, unit}, D in 1/stress, D = 0 incompressible): hyper_neo_hooke {C10, D1}; hyper_mooney_rivlin {C10, C01, D1}; hyper_polynomial {order, C {C10…}, D[], stressUnit}; ' +
+  "kinematic: none | linear {C} | chaboche {backstresses [{C, gamma}…]}}; ramberg_osgood {form 'calculix' {E, nu, sigma0, alpha, n} | 'engineering' {E, nu, sigma02, n} REQUIRED}; " +
+  "hill48_plasticity {isotropic: as j2 (the reference flow stress), form 'stress_ratios' {anisotropy {R11,R22,R33,R12,R13,R23}} | 'r_values' {anisotropy {r0,r45,r90}} | 'coefficients' {anisotropy {F,G,H,L,M,N}} REQUIRED, " +
+  'material axes 1-2-3, stored as F,G,H,L,M,N; needs elastic_isotropic or elastic_orthotropic; no CalculiX / Nastran card}. ' +
+  'HYPERELASTIC (stress parameters {value, unit}, D in 1/stress, D1 > 0 compressible: W = W_dev + Σ (1/D_i)(J − 1)^2i, Arruda-Boyce (1/D)((J² − 1)/2 − ln J); D = 0 incompressible): hyper_neo_hooke {C10, D1}; hyper_mooney_rivlin {C10, C01, D1}; hyper_polynomial {order, C {C10…}, D[], stressUnit}; ' +
   "hyper_reduced_polynomial {order, Ci0[], D[], stressUnit}; hyper_yeoh {C10, C20, C30, D[3], compliance}; hyper_ogden {convention 'calculix'|'ogden1972' REQUIRED, terms [{mu, alpha}] (1-3), D[], stressUnit}; " +
   'hyper_arruda_boyce {mu, lambdaM, D}. TIME: visco_prony {shear [{g, tau}], bulk?, shift? wlf|arrhenius}; creep_norton {A, n, m, stressUnit, timeUnit, hardening}; creep_garofalo {A, alpha, n, activationEnergy}; ' +
   'rate_johnson_cook {C, referenceRate}; rate_cowper_symonds {D, q}. DURABILITY (stored and validated structurally, never in a set): sn_basquin, sn_power_law, sn_table, sn_equivalent_stress, ' +
