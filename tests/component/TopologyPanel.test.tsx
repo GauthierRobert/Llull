@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@ui/store/serverCommands', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@ui/store/serverCommands')>()),
-  postCommand: mocks.post,
+  postExchange: mocks.post,
 }));
 
 vi.mock('@ui/services/localQuery', async (importOriginal) => {
@@ -144,11 +144,17 @@ describe('TopologyPanel', () => {
   it('disables the solve button when the backend has no topology_solve tool', async () => {
     const { analysisId } = seed();
     useStore.setState({ liveStatus: 'connected' });
-    mocks.post.mockResolvedValue({ summary: 'Unknown command: topology_solve', isError: true, affected: [], changed: false });
+    mocks.post.mockResolvedValue({
+      summary: 'topology_solve: llull-compute is not installed and the grid is above the TS reference cap',
+      isError: true,
+      affected: [],
+      changed: false,
+      data: { code: 'TOP_TOOL_MISSING', nativeCode: 'NATIVE_TOOL_MISSING' },
+    });
     render(<TopologyPanel analysisId={analysisId} />);
     fireEvent.click(screen.getByTestId('topology-solve'));
     await waitFor(() => expect((screen.getByTestId('topology-solve') as HTMLButtonElement).disabled).toBe(true));
-    expect(screen.getByTestId('topology-solve-reason').textContent).toContain('Unknown command');
+    expect(screen.getByTestId('topology-solve-reason').textContent).toContain('llull-compute is not installed');
   });
 
   it('renders the report: numbers, badges and the history plot', () => {

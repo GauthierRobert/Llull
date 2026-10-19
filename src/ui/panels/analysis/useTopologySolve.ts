@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '@ui/store';
-import { postCommand, ServerCommandError } from '@ui/store/serverCommands';
+import { postExchange, ServerCommandError } from '@ui/store/serverCommands';
 import { errorMessage } from '@lib/errorMessage';
 
 export type TopologySolveState =
@@ -22,6 +22,11 @@ interface TopologySolve {
 
 const OFFLINE = 'Needs the llull backend: open the desktop app (or run `llull serve`) to solve; offline only the set-up can be edited.';
 const MISSING_TOOL = /unknown (command|tool)|not (available|found|installed)|TOOL_MISSING/i;
+
+/** The transport's TOP_* code (`data.code`) when it reports no `error`. */
+function dataCode(data: unknown): string | null {
+  return typeof data === 'object' && data !== null && 'code' in data && typeof data.code === 'string' ? data.code : null;
+}
 
 /** `studyId` changes reset the state: a result belongs to one study. */
 export function useTopologySolve(studyId: string): TopologySolve {
@@ -46,9 +51,9 @@ export function useTopologySolve(studyId: string): TopologySolve {
   const start = (): void => {
     startedAt.current = Date.now();
     setState({ studyId, value: { status: 'running', elapsedS: 0 } });
-    postCommand('topology_solve', { studyId })
+    postExchange('topology_solve', { studyId })
       .then((response) => {
-        const code = response.error?.code ?? null;
+        const code = response.error?.code ?? dataCode(response.data);
         if (!response.isError) setState({ studyId, value: { status: 'done', summary: response.summary } });
         else if (MISSING_TOOL.test(`${code ?? ''} ${response.summary}`))
           setState({ studyId, value: { status: 'missing', reason: response.summary } });

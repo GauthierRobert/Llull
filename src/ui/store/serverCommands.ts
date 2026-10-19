@@ -46,6 +46,11 @@ export function postCommand(name: string, params: unknown, commandId?: string): 
   return request('/command', commandId === undefined ? { name, params } : { name, params, commandId });
 }
 
+/** Host tool over POST /exchange (`topology_solve`, exchange tools): not a document command, so not in the command log. */
+export function postExchange(name: string, params: unknown): Promise<ServerCommandResponse> {
+  return request('/exchange', { name, params });
+}
+
 export function postUndo(): Promise<ServerCommandResponse> {
   return request('/undo', {});
 }
