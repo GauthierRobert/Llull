@@ -8,10 +8,13 @@ import {
   type EntityKind,
   type Vec2,
   type Vec3,
+
   SHAPE2D_KINDS,
   SOLID_KINDS,
   FINISH_PATTERNS,
 } from '../../model/types';
+import { nurbsCurveProblem } from './nurbsGuard';
+import { CURVE_KINDS } from '../../model/curveKinds';
 import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber, isPositiveNumber } from '../../lib/isFiniteNumber';
 import { isVec3 } from '../../lib/vec3';
@@ -148,7 +151,7 @@ function isCurveSegment(s: unknown, dims: number): boolean {
 /** Points per curve segment type (`CurveSegment`). */
 const SEGMENT_POINT_COUNT: Readonly<Record<string, number>> = { line: 2, arc: 3, bezier: 4 };
 
-const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set([...SOLID_KINDS, ...SHAPE2D_KINDS, 'instance']);
+const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set([...SOLID_KINDS, ...SHAPE2D_KINDS, ...CURVE_KINDS, 'instance']);
 
 export function validateCamera(v: unknown): v is CameraState {
   if (!isRecord(v)) return false;
@@ -196,6 +199,18 @@ function tupleProblem(v: Record<string, unknown>, key: string, ok: (c: unknown) 
 const sizeProblem = (v: Record<string, unknown>): string | null => tupleProblem(v, 'size', isPositiveNumber, 'finite and > 0');
 
 const noProblem = (): null => null;
+
+function loftProblem(v: Record<string, unknown>): string | null {
+  const base = ringsProblem(v['rings'], 3, 2) ?? (typeof v['ruled'] === 'boolean' ? null : 'ruled must be a boolean');
+  const sections = v['sections'];
+  if (base !== null || sections === undefined) return base;
+  if (!Array.isArray(sections) || sections.length !== (v['rings'] as unknown[]).length) return 'sections must list one curve per ring';
+  for (let i = 0; i < sections.length; i++) {
+    const problem = nurbsCurveProblem(sections[i], `sections.${i}`);
+    if (problem !== null) return problem;
+  }
+  return null;
+}
 
 /** Optional BaseEntity fields (`name`, `tags`, `materialId`) must have their declared types, or null. */
 function baseOptionalProblem(v: Record<string, unknown>): string | null {
@@ -295,7 +310,8 @@ const KIND_PROBLEMS: Readonly<Record<EntityKind, (v: Record<string, unknown>) =>
     firstProblem(finiteField('depth')(v), pointListProblem(v, 'profile', 3, MAX_STORED_PROFILE_POINTS), curvesProblem(v['curves'])),
   revolution: revolutionProblem,
   sweep: sweepProblem,
-  loft: (v) => ringsProblem(v['rings'], 3, 2) ?? (typeof v['ruled'] === 'boolean' ? null : 'ruled must be a boolean'),
+  loft: loftProblem,
+  nurbs_curve: (v) => nurbsCurveProblem(v['curve'], 'curve'),
   subdivision: subdivisionProblem,
   image: imageProblem,
   mesh: meshProblem,

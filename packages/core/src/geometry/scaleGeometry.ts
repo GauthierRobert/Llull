@@ -3,6 +3,7 @@
 import type { Entity, SweepSection, Vec2, Vec3 } from '../model/types';
 import type { CurveSegment } from '../model/curve';
 import { mapSegment } from './curveSegments';
+import { scaleCurve } from './nurbsCurve';
 import { scaledDecals } from './decal';
 import { scale3 } from '../lib/vec3';
 import { scale2 } from '../lib/vec2';
@@ -53,6 +54,8 @@ function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string
       const end = scale2(e.end, f);
       return { scaled: { ...e, start, end }, dims: `new start [${start.join(', ')}] end [${end.join(', ')}]` };
     }
+    case 'nurbs_curve':
+      return { scaled: { ...e, curve: scaleCurve(e.curve, f) }, dims: `scaled ${e.curve.poles.length} poles` };
     case 'polyline':
     case 'spline':
       return { scaled: { ...e, points: e.points.map((p) => scale2(p, f)) }, dims: `scaled ${e.points.length} points` };

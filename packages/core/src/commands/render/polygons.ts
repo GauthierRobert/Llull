@@ -5,7 +5,8 @@
 
 import type { Entity, SplineEntity, Vec2, Vec3 } from '../../model/types';
 import { applyEulerXYZ, isZeroRotation } from '../../lib/eulerRotation';
-import { ORIGIN } from '../../lib/vec3';
+import { ORIGIN, add3 } from '../../lib/vec3';
+import { curveDisplayPoints } from '../../geometry/nurbsCurve';
 import { revolutionPolygons } from '../../geometry/revolution';
 import { sweepTriangles } from '../../geometry/sweep';
 import { loftTriangles } from '../../geometry/loft';
@@ -165,6 +166,13 @@ export function tessellateEntity(e: Entity): PreDepthPolygon[] {
       return strokeEllipseArc(e, e.radiusX, e.radiusY, 0, 2 * Math.PI);
     case 'spline':
       return tessellate2DSpline(e);
+    case 'nurbs_curve':
+      return [
+        stroke(
+          curveDisplayPoints(e.curve).map((point) => applyEulerXYZ(add3(e.position, point), e.position, e.rotation)),
+          e.color,
+        ),
+      ];
     case 'text':
     case 'dimension':
       return []; // drawn by renderScene (annotations.ts): dimension strokes + SVG text on top
