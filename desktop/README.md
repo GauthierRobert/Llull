@@ -6,7 +6,7 @@ installable offline app. Rationale: [`docs/decisions/KI6-desktop-app-cli-first.m
 ```
 Electron main (src/main.ts: wiring only)
   ├─ utilityProcess: server/dist/index.js on 127.0.0.1:<stable port>, per-launch token
-  │     serves the web app (built with VITE_LLULL_SERVER_URL=same-origin), /command, /live, /export
+  │     serves the web app (the renderer uses the page origin), /command, /live, /export
   │     LLULL_PYTHON = resources/python (CadQuery: import_step / export_step;
   │     import_code runs arbitrary Python: only when the app is launched with LLULL_ALLOW_CODE_EXECUTION=1)
   │     LLULL_NATIVE_DIR = resources/native, only when bundled (llull-compute jobs; llull-kernel)
@@ -21,7 +21,7 @@ Electron main (src/main.ts: wiring only)
 
 ```bash
 npm install && npm --prefix server install && npm --prefix desktop install
-npm --prefix desktop run build    # web (same-origin) + server bundle + main process
+npm --prefix desktop run build    # renderer bundle + server bundle + main process
 npm --prefix desktop start        # Electron; LLULL_PYTHON=python3 to use a system CadQuery
 npm --prefix desktop test         # Electron-free: real backend + File ops + CLI --app
 npm --prefix desktop run typecheck

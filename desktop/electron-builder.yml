@@ -10,7 +10,7 @@ files:
   - dist/**
   - package.json
 extraResources:
-  # Web app built with VITE_LLULL_SERVER_URL=same-origin (npm run build:web).
+  # Renderer bundle (npm run build:web); the backend serves it, so the API base is the page origin.
   - from: ../dist
     to: web
   # Server bundle + CLI (dist/cli.js) + production node_modules + Python bridge script.

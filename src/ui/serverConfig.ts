@@ -1,27 +1,16 @@
-// Build-time server config (Vite env, `.env.example`). @invariant SERVER_BASE has no trailing slash. The shared token is
-// embedded in the bundle: only for access-controlled deployments; required with LLULL_REQUIRE_TOKEN_FOR_REST=true.
+// Where the renderer finds the local backend. @invariant SERVER_BASE has no trailing slash.
+// Packaged desktop app: the backend serves this page, so its origin is the API base. `npm run dev` (Vite on :5173): the
+// backend on loopback :3001. The per-launch bearer token arrives once as `#token=<token>` (desktop/src/main.ts).
 
-const DEFAULT_SERVER_BASE = 'http://localhost:3001';
+const DEV_SERVER_BASE = 'http://localhost:3001';
 
-function readEnvString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
-}
+export const SERVER_BASE: string = (
+  import.meta.env.PROD && typeof window !== 'undefined' ? window.location.origin : DEV_SERVER_BASE
+).replace(/\/+$/, '');
 
-/** `VITE_LLULL_SERVER_URL=same-origin`: the server serves this page (desktop app, on-prem image). */
-const SAME_ORIGIN = 'same-origin';
-
-function serverBaseOf(configured: string | undefined): string {
-  if (configured !== SAME_ORIGIN) return configured ?? DEFAULT_SERVER_BASE;
-  return typeof window === 'undefined' ? DEFAULT_SERVER_BASE : window.location.origin;
-}
-
-export const SERVER_BASE: string = serverBaseOf(readEnvString(import.meta.env['VITE_LLULL_SERVER_URL'])).replace(/\/+$/, '');
-
-// WARNING: VITE_* values are inlined into the PUBLIC bundle; never set VITE_LLULL_API_TOKEN for a public deployment.
-const BUILD_API_TOKEN: string | undefined = readEnvString(import.meta.env['VITE_LLULL_API_TOKEN']);
 const TOKEN_STORAGE_KEY = 'llull.apiToken';
 
-/** Per-user token `localStorage['llull.apiToken']`, set by opening `/#token=<token>` (fragment stripped); else the build-time token. */
+/** Token from `#token=<token>` (kept in `localStorage['llull.apiToken']`, fragment stripped so a reload keeps working). */
 function currentApiToken(): string | undefined {
   try {
     const fragment = /^#token=(.+)$/.exec(window.location.hash)?.[1];
@@ -29,9 +18,10 @@ function currentApiToken(): string | undefined {
       window.localStorage.setItem(TOKEN_STORAGE_KEY, decodeURIComponent(fragment));
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
     }
-    return readEnvString(window.localStorage.getItem(TOKEN_STORAGE_KEY)) ?? BUILD_API_TOKEN;
+    const stored = window.localStorage.getItem(TOKEN_STORAGE_KEY)?.trim();
+    return stored === undefined || stored === '' ? undefined : stored;
   } catch {
-    return BUILD_API_TOKEN;
+    return undefined;
   }
 }
 
