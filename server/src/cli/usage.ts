@@ -55,6 +55,10 @@ Robustness fuzz (local kernel; seeded designs on a 2.5 mm grid, checked after ev
                               one seed step by step; --minimise delta-debugs the steps to a minimal failing
                               build_project plan (printed, or written to FILE; replay with llull run FILE)
 
+Agent skills (for your own agent driving this CLI)
+  skills list | path          the shipped skills (llull-modeling, llull-editing, llull-checking, llull-mechanisms)
+  skills install [--dir D] [--force]   copy them into ~/.claude/skills (or D); --force replaces changed copies
+
 Flags
   --app                      act on the running llull desktop app (what the user sees;
                               found via ~/.llull/desktop.json, token included)

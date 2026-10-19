@@ -25,6 +25,7 @@ import { getGeometryKernel } from '@core/geometry/kernel';
 import { planKernelWarnings } from './planKernelWarning';
 import { benchmarkCli } from './benchmarks';
 import { fuzzCli, fuzzOneCli, FuzzUsageError } from './fuzz';
+import { skillsCli, SkillsUsageError } from './skills';
 
 export interface CliIo {
   readonly stdout: (text: string) => void;
@@ -352,7 +353,7 @@ async function hostCommand(body: () => number | Promise<number>): Promise<number
   try {
     return await body();
   } catch (error) {
-    if (error instanceof FuzzUsageError) throw new UsageError(error.message);
+    if (error instanceof FuzzUsageError || error instanceof SkillsUsageError) throw new UsageError(error.message);
     throw error;
   }
 }
@@ -402,6 +403,8 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
         return await hostCommand(() => fuzzCli(args, io));
       case 'fuzz-one':
         return await hostCommand(() => fuzzOneCli(args, io));
+      case 'skills':
+        return await hostCommand(() => skillsCli(args, io));
       default:
         // `llull add_box width=10` is `llull exec add_box width=10`.
         if (getCommand(subcommand) !== undefined || exchangeTool(subcommand) !== undefined)
