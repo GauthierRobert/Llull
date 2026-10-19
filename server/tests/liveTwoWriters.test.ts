@@ -9,7 +9,7 @@ import request from 'supertest';
 import { app } from '../src/index';
 import { _resetHistory } from '../src/commandBus';
 import { _resetLiveDoc, getLiveSnapshot, subscribeLive } from '../src/liveDocument';
-import { applyLiveCommand, documentHash, type LiveCommandEvent } from '@mcp/liveSync';
+import { applyLiveCommand, documentHash, type LiveCommandEvent } from '@protocol/liveSync';
 import type { CadDocument } from '@core/model/types';
 import { parseSseFrame } from './sseTestHelpers';
 

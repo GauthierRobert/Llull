@@ -1,4 +1,4 @@
-export const USAGE = `llull — the CAD command registry from a shell (same commands as the UI and MCP).
+export const USAGE = `llull — the CAD command registry from a shell (same commands as the desktop app).
 
 Usage: llull <subcommand> [args] [flags]
 

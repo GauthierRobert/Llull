@@ -1,5 +1,5 @@
 /**
- * The ONLY mutation path of the shared live document (MCP tools/call and REST /command, /undo, /redo): one
+ * The ONLY mutation path of the shared live document (REST /command, /undo, /redo, /exchange, /import): one
  * undo/redo history (mirrors src/ui/store/store.ts) + SSE broadcast. Queries/no-ops skip history and broadcast.
  */
 import type { CadDocument } from '@core/model/types';
@@ -7,9 +7,9 @@ import { withMonotonicStepCounter } from '@core/model/stepCounter';
 import { getCommand } from '@core/commands/registry';
 import { getLiveDoc, setLiveDoc } from './liveDocument';
 import { createHash } from 'crypto';
-import type { LiveCommandSource } from '@mcp/liveSync';
-import { runCommandOutcome } from '@mcp/commandOutcome';
-import type { CommandResponseBody } from '@mcp/restProtocol';
+import type { LiveCommandSource } from '@protocol/liveSync';
+import { runCommandOutcome } from '@protocol/commandOutcome';
+import type { CommandResponseBody } from '@protocol/restProtocol';
 import { serverContext } from './fea/context';
 
 const MAX_UNDO_DEPTH = 100; // = the UI store's cap

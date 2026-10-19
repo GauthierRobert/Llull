@@ -12,7 +12,7 @@ import { isRecord } from '@lib/isRecord';
 import { applyCommand } from './commandBus';
 import { convertDwgLimited, dwgConfigFromEnv, DwgConvertError } from './dwgConvert';
 import { guardMutation } from './security';
-import type { DwgImportResponseBody, ErrorResponseBody } from '@mcp/restProtocol';
+import type { DwgImportResponseBody, ErrorResponseBody } from '@protocol/restProtocol';
 
 const LIST_KEYS = new Set(['layers', 'sources']);
 const BOOLEAN_KEYS = new Set(['keepZeroElevation']);

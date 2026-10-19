@@ -8,8 +8,8 @@ import type { ExportMarking, LibraryStorage, LicenceFlag, MaterialLibrary } from
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
 import { nonEmptyString } from '@lib/nonEmptyString';
-import type { McpToolDefinition } from './tools';
-import { shapeToolCallContent, type McpShapedResult } from './dispatch';
+import type { ToolDefinition } from './tools';
+import { shapeToolCallContent, type ShapedToolResult } from './toolResult';
 
 /** What registering a library file answers. */
 export interface LibraryRegistration {
@@ -28,7 +28,7 @@ export interface MaterialLibraryStorePort {
 
 const TOOL_NAME = 'register_material_library';
 
-export function buildLibraryToolDefinitions(): McpToolDefinition[] {
+export function buildLibraryToolDefinitions(): ToolDefinition[] {
   return [
     {
       name: TOOL_NAME,
@@ -55,7 +55,7 @@ export function buildLibraryToolDefinitions(): McpToolDefinition[] {
   ];
 }
 
-const failure = (message: string): McpShapedResult => shapeToolCallContent({ summary: message, affected: [], isError: true });
+const failure = (message: string): ShapedToolResult => shapeToolCallContent({ summary: message, affected: [], isError: true });
 
 /**
  * Dispatch the register_material_library call; null for any other tool name.
@@ -65,7 +65,7 @@ export function applyLibraryToolCall(
   toolName: string,
   rawArgs: unknown,
   deps: { readonly libraries?: MaterialLibraryStorePort | null },
-): McpShapedResult | null {
+): ShapedToolResult | null {
   if (toolName !== TOOL_NAME) return null;
   const args = isRecord(rawArgs) ? rawArgs : {};
   const text = nonEmptyString(args['libraryJson']);

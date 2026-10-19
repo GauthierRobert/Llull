@@ -1,5 +1,5 @@
-/** Production hardening: shared limiters, local-only surface, headers, probes, child cleanup, per-client caps, MCP eviction. */
-import { describe, it, expect, afterEach, vi } from 'vitest';
+/** Production hardening: shared limiters, local-only surface, headers, probes, child cleanup, per-client caps. */
+import { describe, it, expect, afterEach } from 'vitest';
 import request from 'supertest';
 import fs from 'fs';
 import os from 'os';
@@ -9,15 +9,12 @@ import { app } from '../src/index';
 import { BusyError, concurrencyLimiter, createPythonExchangePort } from '../src/pythonExchange';
 import { killAllChildren, liveChildCount, trackChild } from '../src/childProcesses';
 import { contentSecurityPolicy } from '../src/security';
-import { evictForCapacity, sessions } from '../src/mcp/sessions';
 import { liveSubscriberCount } from '../src/liveDocument';
-import { mcpRequest, INITIALIZE_PARAMS } from './mcpTestSupport';
 import { convertDwgLimited } from '../src/dwgConvert';
 
-const ENV_KEYS = ['MCP_AUTH_TOKEN', 'LLULL_LIVE_MAX_PER_CLIENT', 'MCP_MAX_SESSIONS', 'LLULL_PYTHON_QUEUE_MAX'];
+const ENV_KEYS = ['MCP_AUTH_TOKEN', 'LLULL_LIVE_MAX_PER_CLIENT', 'LLULL_PYTHON_QUEUE_MAX'];
 afterEach(() => {
   for (const key of ENV_KEYS) delete process.env[key];
-  sessions.clear();
 });
 
 describe('shared DWG limiter', () => {
@@ -27,34 +24,10 @@ describe('shared DWG limiter', () => {
 });
 
 describe('local-only surface (LC1)', () => {
-  it('serves no multi-user licence or admin routes', async () => {
-    for (const route of ['/license', '/admin/users', '/admin/audit', '/admin/license']) {
+  it('serves no multi-user licence or admin routes, and no MCP endpoint', async () => {
+    for (const route of ['/license', '/admin/users', '/admin/audit', '/admin/license', '/mcp']) {
       expect((await request(app).get(route)).status).toBe(404);
     }
-  });
-});
-
-describe('MCP session eviction', () => {
-  it('a session-less non-initialize POST is refused and evicts nothing', async () => {
-    process.env['MCP_MAX_SESSIONS'] = '1';
-    const close = vi.fn().mockResolvedValue(undefined);
-    sessions.set('victim', { transport: { close } as never, lastSeenMs: 1, remote: false });
-    const res = await mcpRequest(app).send({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} });
-    expect(res.status).toBe(400);
-    expect(sessions.has('victim')).toBe(true);
-    expect(close).not.toHaveBeenCalled();
-    const init = await mcpRequest(app).send({ jsonrpc: '2.0', id: 2, method: 'initialize', params: INITIALIZE_PARAMS });
-    expect(init.status).toBe(200);
-    expect(sessions.has('victim')).toBe(false);
-  });
-
-  it('evicts the least recently used session at the cap', () => {
-    process.env['MCP_MAX_SESSIONS'] = '2';
-    const mk = (lastSeenMs: number): never => ({ transport: { close: () => Promise.resolve() }, lastSeenMs }) as never;
-    sessions.set('old', mk(1));
-    sessions.set('recent', mk(5));
-    evictForCapacity();
-    expect([...sessions.keys()]).toEqual(['recent']);
   });
 });
 

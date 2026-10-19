@@ -1,13 +1,13 @@
 ---
 name: measure
-description: Add read-only measurement & inspection tools — distance, angle, area, perimeter, volume, bounding box, mass properties (with material density), interference/clash checks. These are QUERY commands: they don't mutate the document, they return a computed value. They are ideal MCP tools (safe, side-effect-free) and cheap to build with huge AI value. Use for "measure", "how big/far/heavy is", inspection, or analysis.
+description: Add read-only measurement & inspection tools — distance, angle, area, perimeter, volume, bounding box, mass properties (with material density), interference/clash checks. These are QUERY commands: they don't mutate the document, they return a computed value. They are ideal agent tools (safe, side-effect-free) and cheap to build with huge AI value. Use for "measure", "how big/far/heavy is", inspection, or analysis.
 ---
 
 # Skill: measure
 
 Measurement makes the model meaningful and inspectable — and queries are the safest,
-highest-value MCP tools (no mutation, an agent can call them freely). Queries are still
-commands (one path: UI / AI / MCP), but read-only. Delegate to `command-author`; keep
+highest-value agent tools (no mutation, an agent can call them freely). Queries are still
+commands (one path: UI / AI / CLI), but read-only. Delegate to `command-author`; keep
 the math pure in `packages/core/src` (`commands/measure*.ts`, `lib/`) and unit-tested.
 
 ## References
@@ -15,7 +15,7 @@ the math pure in `packages/core/src` (`commands/measure*.ts`, `lib/`) and unit-t
 - Math is pure + tested: `.claude/rules/workflow.md` (W3)
 
 ## The query contract (differs from mutating commands)
-A query is a `defineCommand` with `annotations: { readOnly: true }` (MCP `readOnlyHint`; no
+A query is a `defineCommand` with `annotations: { readOnly: true }` (tool-schema `readOnlyHint`; no
 feature step). It returns the SAME document, `affected: []`, a factual `summary` with units
 ("distance = 42.0 mm"), and the structured value in `CommandResult.data`. The `summary` is for humans/AI to read; `data` is for an
 agent to consume programmatically. NEVER mutate the document in a query.
@@ -35,4 +35,4 @@ agent to consume programmatically. NEVER mutate the document in a query.
 ## Done checklist
 - [ ] Each query returns unchanged doc + `affected: []` + factual `summary` (with units) + `data`
 - [ ] Geometry math is pure, in `packages/core/src`, unit-tested
-- [ ] Tools named as queries, registered (so AI + MCP get them), `npm run check` green
+- [ ] Tools named as queries, registered (so AI + CLI get them), `npm run check` green

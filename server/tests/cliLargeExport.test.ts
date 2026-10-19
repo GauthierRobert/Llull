@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import type { CadExchangePort } from '@mcp/index';
+import type { CadExchangePort } from '@protocol/index';
 import type { ExchangeOptions } from '../src/pythonExchange';
 import { EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 import { withoutPayloads, elideLargePayloads } from '../src/cli/saveFiles';

@@ -1,6 +1,6 @@
 /** The `FeaToolsPort` of the server and CLI: Gmsh through the Python bridge, CalculiX through a tracked child, artifacts in the store. */
 
-import type { FeaToolsPort } from '@mcp/index';
+import type { FeaToolsPort } from '@protocol/index';
 import { getGeometryKernel } from '@core/geometry/kernel';
 import { positiveInteger } from '../env';
 import { callBridge, pythonExchangeConfigFromEnv } from '../pythonExchange';

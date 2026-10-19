@@ -5,8 +5,8 @@
 The hardest requirement of this project is "everything controllable by AI."
 The naive approach — building UI features, then separately building AI
 integrations for each — leads to duplicated logic and drift. We avoid that with
-a single **command layer**. AI control is delivered through MCP, not a bespoke
-in-app integration.
+a single **command layer**. AI control is delivered through the `llull` CLI, not a
+bespoke in-app integration (llull is local only, decision LC1: there is no MCP server).
 
 A _command_ is a pure function:
 
@@ -21,7 +21,7 @@ source, the registry for commands that run other commands — arrives in an inje
 `ExecutionContext`.
 
 Each command is declared once with `defineCommand`, from a single zod schema. That one
-schema gives the TypeScript type of the parameters, the JSON Schema agents see over MCP,
+schema gives the TypeScript type of the parameters, the JSON Schema agents read (`llull describe`),
 and the runtime validation `execute` applies before the command runs (invalid params are
 rejected with a summary naming the offending field, and the document is left unchanged).
 
@@ -29,8 +29,10 @@ Two callers invoke the same commands:
 
 1. **React UI** — a button or gizmo gathers params and calls `dispatch(...)`, which runs
    the command on the server's live document (or locally when offline).
-2. **MCP Server** — tool schemas generated from the command registry are served over
-   MCP, so any external agent (Claude or any MCP client) calls the same `execute(...)`.
+2. **`llull` CLI** — tool schemas generated from the command registry are listed, searched and
+   described by the CLI, and `llull exec` / `llull run` call the same `execute(...)`: in-process on a
+   document file, or on the open desktop app's live document (`--app`). Claude Code and scripts drive
+   llull this way.
 
 Because both converge on the registry, **any operation a human can do, an agent
 can do, for free.** Add a command once; both surfaces gain it.
@@ -42,19 +44,20 @@ The repository is an npm-workspaces monorepo:
 ```
 packages/core            model, command layer, execution context, persistence,
                          geometry kernel interface, plugin host, code generators, pure helpers
-packages/mcp             MCP tools, resources, prompts, toolsets, discovery, live-sync protocol
+packages/protocol        host protocol: live sync, REST bodies, CLI tool definitions (exchange / FE /
+                         library), toolsets, tool search, result shaping
 packages/domain-aec      building (AEC/BIM), industrial-steel and civil plugins
 packages/kernel-manifold Manifold mesh kernel (default)
 packages/kernel-occt     OpenCascade B-rep kernel
 src/app                  composition root: installs the default plugins
 src/ui                   React UI: viewport, panels, store
-server/                  Express MCP host (optional)
+server/                  Express local backend (live document, exchange, exports) + the `llull` CLI
 ```
 
 **Dependency direction is one-way:** the UI and the server depend on the composition
-root, which depends on the plugins, kernels and MCP layer, which all depend on the core.
+root, which depends on the plugins, kernels and the protocol package, which all depend on the core.
 The core depends on nothing else in the repository. This is what keeps the brain testable
-in isolation, reusable by the headless MCP server, and open to new domains without edits.
+in isolation, reusable by the headless backend and CLI, and open to new domains without edits.
 
 ## Inside the core
 
@@ -108,7 +111,7 @@ The dependency laws are executable. `npm run arch` (part of `npm run check`) run
 - plugins and kernels see only core's public API — `model`, `lib`, `geometry`, the plugin
   contract and the command-authoring API (`schema`, `types`, `noop`, `derivation`,
   `registry`); composing another command goes through `execute`;
-- MCP never depends on a plugin or a concrete kernel; `lib` is a leaf; `model` imports only
+- the protocol package never depends on a plugin or a concrete kernel; `lib` is a leaf; `model` imports only
   itself and `lib`; `geometry` never reaches up into commands;
 - the web app and the server never import each other.
 
@@ -121,7 +124,7 @@ See `docs/decisions/AR1-modular-command-layer.md` for the reasoning.
 ## Plugins
 
 A domain such as building or industrial design extends the core through a plugin: a
-name, the MCP toolset its commands belong to, the commands themselves, optional
+name, the toolset its commands belong to (CLI listings, UI palette), the commands themselves, optional
 _derivation guards_, and an optional document extension. The composition root installs
 the default plugins at start-up in the browser, the server and the test setup. The
 registry is the core commands plus every installed plugin's commands.
@@ -190,10 +193,10 @@ The live stream carries the **command log**, not document diffs: each event is
 `{ seq, name, params, stateHash }`. Clients re-run the command with the same `execute`
 and compare the resulting state hash; a missed event or a mismatch triggers a full
 snapshot fetch (`GET /live/snapshot`). Deterministic ids and the shared kernel choice are
-what make this replay exact. Every MCP session and every browser tab therefore edits one
+what make this replay exact. The desktop window and every `llull --app` call therefore edit one
 document.
 
-Events also carry `source` (`mcp` | `cli` | `rest`) and the sender's `commandId`. The browser
+Events also carry `source` (`cli` | `rest`) and the sender's `commandId`. The browser
 uses them only for presentation: it diffs each new document against the previous one
 (`src/ui/viewport/liveFx/planLiveFx.ts`) and animates the change — new entities grow with a
 ripple, remotely moved ones travel from their old pose, reshaped / removed ones leave a fading
@@ -206,25 +209,25 @@ every command — present or future — is animated with no per-tool code.
 Everything — model, commands, rendering — runs in the browser. A backend is
 only required for:
 
-- **MCP host:** MCP is a running process exposing tools over a transport, so it
-  cannot live inside a static site. The Express server serves `/mcp`, forwarding
-  every tool call to the same command registry the UI uses.
-- **Shared live document:** the server holds the document that agents and browser
-  tabs edit together, with autosave.
+- **Shared live document:** the local backend holds the document that the desktop window and
+  `llull --app` edit together, with autosave. It binds loopback only and is guarded by the desktop
+  app's per-launch token (decision LC1: one local backend per machine, no cloud host).
+- **Native and Python I/O:** STEP / DWG / CadQuery exchange, FE solvers and native compute run
+  behind ports implemented in `server/`.
 
 It is an optional add-on; llull is fully usable offline without it.
 
-## Data flow of an AI edit (via MCP)
+## Data flow of an AI edit (via the CLI)
 
 ```
-Agent (Claude or any MCP client) is told to "make a 3-story tower"
+Agent (Claude Code) is told to "make a 3-story tower"
         │
         ▼
-Agent lists tools: the `core` toolset + search_tools / enable_toolset
-        │  (search_tools "box" → enable_toolset "3d" → tools/list_changed)
-        ▼
-Agent calls tools over MCP: add_box {...} ×3   (or one build_project plan)
+Agent finds tools: llull search box · llull describe add_box
         │
+        ▼
+Agent runs: llull run tower.json --app   (one build_project plan; or llull exec add_box … ×3)
+        │  (POST /command to the desktop app's local backend)
         ▼
 For each call: execute("add_box", params) on the shared live document
         │  (params validated, step recorded, ids step-scoped)

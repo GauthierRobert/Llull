@@ -8,7 +8,7 @@
 
 import type { FeMeshArtifact } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
-import type { FeaHost, FeaToolResult } from '@mcp/index';
+import type { FeaHost, FeaToolResult } from '@protocol/index';
 import { temperatureMappingRequest } from '@cae/thermomech/field';
 import { mappedFieldArtifact, mappingJobBuffers, readMappedField, type MappingRequest } from '@cae/thermomech/mappedField';
 import { positiveInteger } from '../env';

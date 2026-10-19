@@ -1,6 +1,7 @@
 # KI6 — Desktop app (Electron); local agents use the CLI, MCP is for the cloud
 
-Status: accepted (2026-10).
+Status: accepted (2026-10). Amended by [LC1](LC1-local-only.md) (2026-10-19): the cloud / on-prem host and MCP were
+removed; the CLI is the only agent path. The "MCP is the cloud surface" bullet below is historical.
 
 ## Problem
 

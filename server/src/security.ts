@@ -12,7 +12,7 @@ import { consumeTicket } from './tickets';
 const DEFAULT_ALLOWED_ORIGINS: readonly string[] = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
 
 /** JSON body of every 401. */
-export const UNAUTHORIZED_BODY = { error: 'Unauthorized — valid Bearer token required.' };
+const UNAUTHORIZED_BODY = { error: 'Unauthorized — valid Bearer token required.' };
 
 /** Origins allowed to call the server from a browser. `LLULL_ALLOWED_ORIGINS` = comma-separated. */
 export function getAllowedOrigins(): string[] {
@@ -207,7 +207,7 @@ export function securityHeaders(): RequestHandler {
 }
 
 /** Per-IP limiter: env `maxVariable` requests (default 600) per env `windowVariable` ms (default 60000). */
-export function buildRateLimiter(maxVariable: string, windowVariable: string): RequestHandler {
+function buildRateLimiter(maxVariable: string, windowVariable: string): RequestHandler {
   return rateLimit({
     windowMs: positiveInteger(process.env[windowVariable], 60_000),
     max: positiveInteger(process.env[maxVariable], 600),

@@ -8,7 +8,7 @@ beforeEach(() => {
   _resetLiveDoc();
 });
 
-/** What the MCP router does after a call: run it on the live doc, store the result. */
+/** What the command bus does after a call: run it on the live doc, store the result. */
 function callLive(name: string, params: Record<string, unknown>): ReturnType<typeof applyToolCall> {
   const result = applyToolCall(getLiveDoc(), name, params);
   setLiveDoc(result.document);

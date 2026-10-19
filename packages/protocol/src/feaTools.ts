@@ -11,8 +11,8 @@ import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
 import { nonEmptyString } from '@lib/nonEmptyString';
 import type { CadDocument } from '@core/model/types';
-import type { McpToolDefinition } from './tools';
-import { shapeToolCallContent, type McpShapedResult } from './dispatch';
+import type { ToolDefinition } from './tools';
+import { shapeToolCallContent, type ShapedToolResult } from './toolResult';
 import type { CommandOutcome } from './restProtocol';
 
 export type FeaToolResult = Omit<CommandOutcome, 'changed'>;
@@ -45,7 +45,7 @@ const ANALYSIS_ID = { type: 'string' as const, description: 'Id of the analysis 
 
 const FEA_TOOL_NAMES = ['fea_mesh', 'fea_solve', 'fea_export', 'fea_import_field'] as const;
 
-export function buildFeaToolDefinitions(): McpToolDefinition[] {
+export function buildFeaToolDefinitions(): ToolDefinition[] {
   return [
     {
       name: 'fea_mesh',
@@ -111,7 +111,7 @@ export function buildFeaToolDefinitions(): McpToolDefinition[] {
   ];
 }
 
-const failure = (message: string): McpShapedResult => shapeToolCallContent({ summary: message, affected: [], isError: true });
+const failure = (message: string): ShapedToolResult => shapeToolCallContent({ summary: message, affected: [], isError: true });
 
 /** What `applyFeaToolCall` needs: the port (null = not configured) + the host. */
 interface FeaDeps extends FeaHost {
@@ -138,7 +138,7 @@ async function tableInput(args: Record<string, unknown>, deps: FeaDeps): Promise
  * Dispatch an FE tool call; null for any other tool name.
  * @failure no port, missing analysisId, transport throw -> isError result, document unchanged
  */
-export async function applyFeaToolCall(toolName: string, rawArgs: unknown, deps: FeaDeps): Promise<McpShapedResult | null> {
+export async function applyFeaToolCall(toolName: string, rawArgs: unknown, deps: FeaDeps): Promise<ShapedToolResult | null> {
   if (!(FEA_TOOL_NAMES as readonly string[]).includes(toolName)) return null;
   const args = isRecord(rawArgs) ? rawArgs : {};
   const analysisId = nonEmptyString(args['analysisId']);

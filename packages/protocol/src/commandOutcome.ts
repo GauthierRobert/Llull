@@ -60,7 +60,7 @@ export function outcomeIsFailure(name: string, outcome: CommandOutcome, mayNoop?
   return !(mayNoop ?? (annotations?.idempotent === true || annotations?.metaHistory === true));
 }
 
-/** `outcome` with `isError` raised when `outcomeIsFailure` says so: the one status every surface (MCP, CLI) reports. */
+/** `outcome` with `isError` raised when `outcomeIsFailure` says so: the one status every surface (REST, CLI) reports. */
 export function withFailureStatus<T extends CommandOutcome>(name: string, outcome: T): T {
   return !outcome.isError && outcomeIsFailure(name, outcome) ? { ...outcome, isError: true } : outcome;
 }

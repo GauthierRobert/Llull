@@ -1,4 +1,4 @@
-/** The ONE shared `CadDocument` (MCP sessions + browser): store, autosave, SSE broadcast (`GET /live`). */
+/** The ONE shared `CadDocument` (desktop UI + CLI `--app`): store, autosave, SSE broadcast (`GET /live`). */
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
@@ -9,7 +9,7 @@ import { serializeDocument, deserializeDocument } from '@core/commands/persisten
 import { withoutPrivateValues } from '@core/commands/materials/libraryRecords';
 import { errorMessage } from '@lib/errorMessage';
 import { withoutConfirmations } from '@lib/withoutConfirmations';
-import { type LiveCommandEvent, type LiveCommandSource, type LiveSnapshotEvent, documentHash } from '@mcp/liveSync';
+import { type LiveCommandEvent, type LiveCommandSource, type LiveSnapshotEvent, documentHash } from '@protocol/liveSync';
 import { isTestRun, positiveInteger } from './env';
 
 const AUTOSAVE_PATH = process.env['LLULL_AUTOSAVE_PATH'] ?? path.resolve(__dirname, '..', '.autosave.json');

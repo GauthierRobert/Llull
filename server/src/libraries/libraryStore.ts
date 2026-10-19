@@ -10,7 +10,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import type { MaterialLibraryProvider } from '@core/commands/types';
 import { libraryHash, parseMaterialLibrary } from '@core/commands/materials/libraryFormat';
-import type { MaterialLibraryStorePort } from '@mcp/index';
+import type { MaterialLibraryStorePort } from '@protocol/index';
 import { safeFileName } from '@lib/safeFileName';
 import { writeFileAtomic } from '../writeFileAtomic';
 

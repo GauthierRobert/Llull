@@ -1,8 +1,8 @@
-// REST file/metadata calls to the optional server (STEP export, DWG import, license); wire shapes from @mcp/restProtocol.
+// REST file/metadata calls to the optional server (STEP export, DWG import, license); wire shapes from @protocol/restProtocol.
 // Never throws: every failure becomes a user-facing message.
 
 import type { DocumentUnit } from '@core/model/types';
-import type { DwgImportResponseBody, DwgImportTarget, ErrorResponseBody, LicenseResponseBody } from '@mcp/restProtocol';
+import type { DwgImportResponseBody, DwgImportTarget, ErrorResponseBody, LicenseResponseBody } from '@protocol/restProtocol';
 import { fileStem } from '@ui/chosenFile';
 import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
 

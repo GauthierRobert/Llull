@@ -3,10 +3,10 @@
 
 import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
 import { errorMessage } from '@lib/errorMessage';
-import type { LiveSnapshotEvent } from '@mcp/liveSync';
-import type { CommandResponseBody } from '@mcp/restProtocol';
+import type { LiveSnapshotEvent } from '@protocol/liveSync';
+import type { CommandResponseBody } from '@protocol/restProtocol';
 
-/** POST /command, /undo, /redo body (`@mcp/restProtocol`); older servers omit `changed`. */
+/** POST /command, /undo, /redo body (`@protocol/restProtocol`); older servers omit `changed`. */
 export type ServerCommandResponse = Omit<CommandResponseBody, 'changed'> & { changed?: boolean };
 
 export class ServerCommandError extends Error {

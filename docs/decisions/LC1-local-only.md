@@ -28,8 +28,20 @@ Binding text: `CLAUDE.md` § PRODUCT DIRECTIVE. Related: RS1 (native compute), K
    the UI's `/live` EventSource, now without user identity). Live `command` events keep their `source` (rest / cli) for the UI's
    labels. `docs/DEPLOYMENT.md` rewritten for the desktop app + CLI; `PILOT.md`, `README.md`, `server/README.md` updated.
    Deferred: the UI status bar still asks `GET /license` (now 404, it renders nothing) — remove with the UI clean-up.
-4. **Remove MCP**: `packages/mcp` exposure and `/mcp`; move what the CLI still needs (`FeaToolsPort`, exchange tools, discovery used by
-   `llull search`) to `server/` (12 CFD open question 2). Tool schemas stay (`toToolSchemas()` feeds the CLI's `describe`).
+4. **Remove MCP** — done 2026-10-19. Removed: the `/mcp` endpoint (`server/src/mcp.ts`, `server/src/mcp/{server,middleware,sessions}.ts`),
+   the `@modelcontextprotocol/sdk` dependency, MCP resources (`cad://…`), prompts, server instructions, the `search_tools` /
+   `enable_toolset` meta-tools and per-session toolset gating (`LLULL_TOOLSETS`, `MCP_RATE_LIMIT_*`, `MCP_MAX_SESSIONS`,
+   `MCP_SESSION_*`), `server/examples/{mcp-agent.ts,factory-demo.mts}`, the MCP-only tests, `.mcp.json`'s `llull` entry, the
+   `mcp-server` skill; the `mcp-engineer` agent became `cli-engineer`. Moved: `packages/mcp` → `packages/protocol` (`@protocol`,
+   `@llull/protocol`), which keeps what the UI, the backend, the desktop shell and the CLI share — live sync (`liveSync.ts`), REST
+   bodies (`restProtocol.ts`), command outcomes, document file names, the exchange / FE / library tool definitions and their ports
+   (`FeaToolsPort`, `CadExchangePort`, …), toolsets (CLI listings, UI palette), tool search (`llull search`) and result shaping
+   (`toolResult.ts`, was `dispatch.ts`). They stay in a workspace package rather than `server/` because root unit tests and the UI
+   import them (`server/` is not a workspace). `toToolSchemas()` is unchanged (`llull describe`, plan validation; the contract
+   snapshot stays). The production gates now drive the backend the way the CLI does (`server/tests/production/cliHarness.ts`).
+   Deferred: the token keeps its env name `MCP_AUTH_TOKEN` (set by `desktop/src/backendEnv.ts`); the UI still has an MCP connect
+   panel (`McpConnect`), the `mcp` live-event source label and the `useMcpLiveDocument` hook name — UI clean-up; aerospace / physics /
+   plant feature specs still mention MCP as written at the time.
 5. **Retire the WASM kernels** once the native kernel has been the desktop default for a release: `packages/kernel-occt` (opencascade.js),
    then decide on Manifold (still useful as an in-process mesh kernel for tests and for commands that need no exact B-rep).
 6. **Simplify for one local backend**: outbox / live-sync paths that only existed for remote or flaky connections; bundle size budgets

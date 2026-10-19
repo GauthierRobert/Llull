@@ -2,7 +2,7 @@
 /**
  * PreToolUse guard (Edit|Write|MultiEdit). Blocks:
  * - architecture L2: react / DOM / fetch in any `packages/<name>/src/`; `packages/core` importing
- *   another package (plugins/kernels/mcp depend on core, never the reverse).
+ *   another package (plugins/kernels/protocol depend on core, never the reverse).
  * - conventions C1: `any` newly introduced in TS source (packages, src, server/src).
  * - conventions C6: an eslint-disable of `max-lines` (split the file instead).
  * - workflow: `.only(` / `.skip(` newly introduced in a test (focus/skip silently drops coverage).
@@ -35,8 +35,8 @@ async function main() {
     if (/\blocalStorage\b/.test(newText)) violations.push('localStorage in a library package (architecture L2)');
     if (/\bdocument\.(getElementById|querySelector|createElement|body|cookie|addEventListener)\b/.test(newText))
       violations.push('document.* DOM global in a library package (architecture L2)');
-    if (inCore && /from\s+['"]@(aec|cae|aero|mcp|kernel-manifold|kernel-occt|physics-mujoco)\//.test(newText))
-      violations.push('packages/core importing another package — core must not depend on plugins/kernels/mcp (architecture L2/L10)');
+    if (inCore && /from\s+['"]@(aec|cae|aero|protocol|kernel-manifold|kernel-occt|physics-mujoco)\//.test(newText))
+      violations.push('packages/core importing another package — core must not depend on plugins/kernels/protocol (architecture L2/L10)');
   }
 
   const oldText = collectOldText(input, filePath);

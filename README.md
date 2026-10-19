@@ -5,10 +5,11 @@
 
 A modern, web-based **2D + 3D** CAD application — an AutoCAD reimagined to be
 beautiful and easy to use: 2D drafting and 3D solid modeling in one shared document,
-with **MCP usability as its defining feature**. The core bet:
+with **agent usability as its defining feature**. The core bet:
 **every operation is a command**, and every command is drivable by a human (UI)
-or by any external agent — Claude or any MCP client — over MCP, through the exact
-same code path.
+or by an agent — Claude Code or any script — through the `llull` CLI, through the exact
+same code path. llull runs locally (desktop app + CLI, decision
+[LC1](docs/decisions/LC1-local-only.md)); there is no cloud host and no MCP server.
 
 llull is developed **AI-first**: the [`CLAUDE.md`](CLAUDE.md) entrypoint and the
 [`.claude/`](.claude) directory (rules, agents, skills, hooks) are first-class
@@ -42,11 +43,11 @@ office? Click **Civil site starter** on the empty app for a complete sample site
 | UI             | React 19 + TypeScript + Vite             | Lightweight, best-in-class 3D ecosystem |
 | 3D viewport    | three.js + @react-three/fiber + drei     | Mature, declarative Three.js |
 | State          | Zustand                                  | One store, no boilerplate, easy to drive externally |
-| Schemas        | zod                                      | One schema per command: TS type, MCP JSON Schema and runtime validation |
+| Schemas        | zod                                      | One schema per command: TS type, tool JSON Schema (`llull describe`) and runtime validation |
 | Geometry kernel| Manifold (default) / OpenCascade.js      | Booleans and fillets behind one interface |
 | Tests          | Vitest + Testing Library + Playwright    | Fast, Vite-native |
 | Lint / format  | ESLint + Prettier                        | Consistent, enforced by `npm run check` |
-| Backend (opt.) | Node + Express                           | Only for hosting the MCP endpoint |
+| Local backend  | Node + Express                           | The desktop app's live document, exchange (STEP / DWG / CadQuery), exports; the `llull` CLI |
 
 ## Architecture in one picture
 
@@ -55,7 +56,7 @@ Document (recipe + evaluated)   ← feature history, parameters, entities, layer
         ▲
 Command Layer (pure functions)  ← add_box, extrude_profile, move_entities, ... + plugins
         ▲                  ▲
-   React UI  ◄── /live ──  MCP Server (Claude / any MCP agent)
+   React UI  ◄── /live ──  local backend ◄── llull CLI (Claude Code / scripts)
 ```
 
 Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) before writing code. It
@@ -70,12 +71,12 @@ npm run check        # typecheck + lint + format check + test (run before every 
 npm run test:e2e     # Playwright end-to-end tests in Chromium (starts the dev server)
 ```
 
-Optional backend (the MCP host):
+Local backend and the `llull` CLI:
 
 ```bash
-cp .env.example .env # set MCP_AUTH_TOKEN (and PORT) for the MCP endpoint
 npm --prefix server install
-npm --prefix server run dev
+npm --prefix server run dev        # the backend the UI syncs with (127.0.0.1:3001)
+node server/bin/llull.cjs help     # the CLI (agents: the llull-cli skill)
 ```
 
 ## Production
@@ -83,7 +84,7 @@ npm --prefix server run dev
 ```bash
 npm ci && npm run build            # static web app in dist/ — serve with any static host
 npm ci --prefix server
-npm --prefix server run build      # bundles the MCP host to server/dist/index.js
+npm --prefix server run build      # bundles the backend + CLI to server/dist/
 MCP_AUTH_TOKEN=<secret> npm --prefix server start
 ```
 
@@ -99,10 +100,10 @@ MCP_AUTH_TOKEN=<secret> npm --prefix server start
 
 `export_code` writes the model as **CadQuery, build123d, OpenSCAD or a FreeCAD macro**.
 Parameters become variables, parameter-driven dimensions stay expressions, and features keep
-their history order. Edited CadQuery/build123d code comes back through the MCP tool
-`import_code` as an editable feature history. With the optional Python bridge
-(`pip install -r server/python/requirements.txt`), the MCP server also offers
-`export_step` (exact B-rep through OpenCascade) and `import_step`. See
+their history order. Edited CadQuery/build123d code comes back through the exchange tool
+`import_code` (`llull exec import_code file=part.py`) as an editable feature history. With the Python bridge
+(bundled in the desktop app; otherwise `pip install -r server/python/requirements.txt`), the backend and CLI also
+offer `export_step` (exact B-rep through OpenCascade) and `import_step`. See
 [docs/CAD_EXCHANGE.md](docs/CAD_EXCHANGE.md).
 
 ## Project layout
@@ -111,21 +112,21 @@ their history order. Edited CadQuery/build123d code comes back through the MCP t
 packages/                # npm workspaces — framework-agnostic, no React / DOM / fetch
   core/src/              # model, command layer (the heart of the app), execution context,
                          #   persistence, geometry kernel interface, plugin host, lib helpers
-  mcp/src/               # MCP tools, toolsets, discovery, live-sync protocol
+  protocol/src/          # host protocol: live sync, REST bodies, CLI tools, toolsets, tool search
   domain-aec/src/        # building (BIM) and industrial plugins
   kernel-manifold/src/   # Manifold geometry kernel (default)
   kernel-occt/src/       # OpenCascade geometry kernel
 src/
   app/                   # composition root: installs the default plugins
   ui/                    # React: viewport, panels, store
-server/                  # Express MCP host (optional)
+server/                  # Express local backend + the llull CLI (src/cli)
 tests/                   # unit, contract, golden corpus, integration, component, e2e
 docs/                    # architecture, contributing, roadmap, domain guides
 ```
 
 ## The golden rule
 
-> **Never mutate the document outside a command.** Both the UI and MCP call
+> **Never mutate the document outside a command.** Both the UI and the CLI call
 > `execute(doc, name, params)`. If you find yourself editing entities directly
 > in a component, stop and write a command instead.
 

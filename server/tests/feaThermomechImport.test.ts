@@ -1,5 +1,5 @@
 /**
- * fea_import_field (PHY-04 TR-TMC-14) through the `llull` CLI and the MCP layer: CSV `x,y,z,T` with declared units -> `fe_table` artifact in the
+ * fea_import_field (PHY-04 TR-TMC-14) through the `llull` CLI and the @protocol tool layer: CSV `x,y,z,T` with declared units -> `fe_table` artifact in the
  * content-addressed store -> set_temperature_field kind table. Needs neither Gmsh nor CalculiX (the nearest-node match at deck time is
  * covered by the unit tests and by feaThermomechT1.test.ts).
  */
@@ -10,7 +10,7 @@ import { gunzipSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
-import { applyExchangeToolCall } from '@mcp/index';
+import { applyExchangeToolCall } from '@protocol/index';
 import { sha256Hex } from '@lib/sha256';
 import { canonicalJson } from '@lib/canonicalJson';
 import { createFeaToolsPort } from '../src/fea/transports';
@@ -103,7 +103,7 @@ describe('fea_import_field', () => {
     expect(field.kind).toBe('uniform');
   });
 
-  it('works at the MCP layer with inline csv and refuses path without an exchange directory', async () => {
+  it('works at the @protocol tool layer with inline csv and refuses path without an exchange directory', async () => {
     const session = workspace.open('import-mcp');
     const analysisId = await session.idOf(planPath('tmc_restrained_bar'), 'an');
     const applied: { name: string; params: unknown }[] = [];

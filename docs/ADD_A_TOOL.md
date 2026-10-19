@@ -1,7 +1,7 @@
 # How to add a tool
 
-Adding a tool gives you a UI button and an MCP tool (drivable by Claude or any
-MCP agent) — both at once. Four steps.
+Adding a tool gives you a UI button and a `llull` CLI tool (drivable by Claude Code or any
+script) — both at once. Four steps.
 
 ## 1. Write the command
 
@@ -32,7 +32,7 @@ export const scaleUniform = defineCommand({
 ```
 
 The schema is the single source of truth: it types `run`'s parameters, becomes the JSON
-Schema that MCP agents see (so every field needs a `.describe(...)` written for someone who
+Schema that agents read with `llull describe` (so every field needs a `.describe(...)` written for someone who
 cannot read the code), and is checked by `execute` before `run` is called. Helpers such as
 `vec2()` / `vec3()` cover points and vectors. Commands that need the geometry kernel read it
 from the execution context (`ctx.kernel`) and declare `annotations: { requiresKernel: true }`;
@@ -42,7 +42,7 @@ read-only queries declare `annotations: { readOnly: true }` and return their val
 
 Core command — put it in the feature folder it belongs to (`packages/core/src/commands/<feature>/`,
 e.g. `edit/` for transforms) and list it in that folder's `catalog.ts`, then add its name to one
-MCP toolset in `packages/mcp/src/toolsets.ts`:
+toolset in `packages/protocol/src/toolsets.ts` (CLI listings, UI palette):
 
 ```ts
 // packages/core/src/commands/edit/catalog.ts
@@ -60,9 +60,9 @@ Plugin command — list it in its domain's catalog (for the AEC plugins,
 `packages/domain-aec/src/<building|industrial|civil>/catalog.ts`, the same shape as a core feature
 folder); installing the plugin registers it and places it in the plugin's toolset.
 
-That's it for MCP — the MCP host reads the registry, so `scale_uniform` is now a callable
-tool for Claude and any MCP agent automatically (agents find it with `search_tools` and load
-its toolset with `enable_toolset`).
+That's it for agents — the CLI reads the registry, so `scale_uniform` is now a callable
+tool automatically: `llull search scale` finds it, `llull describe scale_uniform` prints its
+schema, and `llull exec scale_uniform …` or a `build_project` plan step runs it.
 
 ## 3. (Optional) surface it in the UI
 

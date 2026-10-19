@@ -1,23 +1,21 @@
 /**
- * MCP result shaping. `shapeToolCallContent` is the single place CallToolResult content blocks are
- * assembled (the server calls it after `commandBus.applyCommand`).
+ * Tool result shaping. `shapeToolCallContent` is the single place a result's text blocks are assembled: the `llull`
+ * CLI prints them (text mode) and the exchange / FE / library tool handlers answer with them.
  */
 
 import type { CommandError } from '@core/commands/types';
 import { isRecord } from '@lib/isRecord';
 
-interface McpTextContent {
+interface TextContent {
   type: 'text';
   text: string;
 }
 
 /**
- * MCP CallToolResult minus the document. `structuredContent` = the full `data` (non-records wrapped
+ * A tool result minus the document. `structuredContent` = the full `data` (non-records wrapped
  * as `{ data }`) + all (deduplicated) `affected` ids; absent when there is neither data, error nor ids.
- * @invariant a type alias, not an interface: only an alias is assignable to the SDK's
- *            index-signatured CallToolResult (server/src/mcp/server.ts relies on it, no casts).
  */
-export type McpShapedResult = { content: McpTextContent[]; isError: boolean; structuredContent?: Record<string, unknown> };
+export type ShapedToolResult = { content: TextContent[]; isError: boolean; structuredContent?: Record<string, unknown> };
 
 /** The `text` of a `{ format: 'code', text }` data record, else null. */
 function codeText(data: unknown): string | null {
@@ -67,7 +65,7 @@ function jsonText(value: unknown): string {
   return clip(
     JSON.stringify(roundForText(value)) ?? 'undefined',
     MAX_JSON_TEXT_CHARS,
-    'the full data is in structuredContent; narrow the request (filters, a smaller selection) or read the cad://scene resource',
+    'the full data is in --json output; narrow the request (filters, a smaller selection) or call describe_scene / find_entities',
   );
 }
 
@@ -83,10 +81,10 @@ export function shapeToolCallContent(result: {
   isError: boolean;
   data?: unknown;
   error?: CommandError;
-}): McpShapedResult {
+}): ShapedToolResult {
   const { summary, isError, data, error } = result;
   const affected = [...new Set(result.affected)];
-  const content: McpTextContent[] = [{ type: 'text', text: summary }];
+  const content: TextContent[] = [{ type: 'text', text: summary }];
   const errorPart = error === undefined ? {} : { error };
   if (error !== undefined) {
     const where = error.paths.length > 0 ? ` at ${error.paths.join(', ')}` : '';
@@ -99,7 +97,7 @@ export function shapeToolCallContent(result: {
       type: 'text',
       text:
         more > 0
-          ? `Affected entity ids (first ${MAX_AFFECTED_IDS_SHOWN} of ${affected.length}; ${more} more not listed: all ids are in structuredContent.affected, or use find_entities or describe_scene): ${shown}`
+          ? `Affected entity ids (first ${MAX_AFFECTED_IDS_SHOWN} of ${affected.length}; ${more} more not listed: all ids are in the --json output, or use find_entities or describe_scene): ${shown}`
           : `Affected entity ids: ${shown}`,
     });
   }
@@ -114,7 +112,10 @@ export function shapeToolCallContent(result: {
   const jsonData = isRecord(data) && code !== null ? { ...data, text: '(source code in the next block)' } : data;
   content.push({ type: 'text', text: `\`\`\`json\n${jsonText(jsonData)}\n\`\`\`` });
   if (code !== null) {
-    content.push({ type: 'text', text: clip(code, MAX_CODE_TEXT_CHARS, 'the full source is in structuredContent.text') });
+    content.push({
+      type: 'text',
+      text: clip(code, MAX_CODE_TEXT_CHARS, 'the full source is in the --json output, or save it with --save'),
+    });
   }
   return { content, isError, structuredContent: { ...structuredOf(data, affected), ...errorPart } };
 }

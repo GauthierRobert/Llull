@@ -3,7 +3,7 @@
  * `set_temperature_field { source: { kind: 'table', csvSha256, rows, coordinatesUnit, temperatureUnit } }` through the command bus.
  */
 
-import type { FeaHost, FeaToolResult, FieldTableInput } from '@mcp/index';
+import type { FeaHost, FeaToolResult, FieldTableInput } from '@protocol/index';
 import type { FeArtifactStore } from './artifactStore';
 import type { CaeHooks } from './caeHooks';
 import { feaFailure } from './feaCommon';

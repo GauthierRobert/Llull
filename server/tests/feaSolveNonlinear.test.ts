@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { FeMeshArtifact, FeResultsArtifact, ResultsSummary } from '@core/model/analysis';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import type { FeaToolResult } from '@mcp/index';
+import type { FeaToolResult } from '@protocol/index';
 import { createFeArtifactStore, type FeArtifactStore } from '../src/fea/artifactStore';
 import { caeHooks, type CaeHooks } from '../src/fea/caeHooks';
 import type { CcxRunner } from '../src/fea/ccxProcess';

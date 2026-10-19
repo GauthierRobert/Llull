@@ -1,6 +1,6 @@
 /**
  * Inject the configured geometry kernel into the core at startup (architecture L9) so boolean and
- * fillet commands work for MCP agents exactly as in the browser app. `LLULL_KERNEL=occt` selects
+ * fillet commands work for the CLI exactly as in the desktop app. `LLULL_KERNEL=occt` selects
  * OpenCascade (falls back to Manifold on failure); `LLULL_KERNEL=occt-native` the native `llull-kernel`
  * sidecar (RS-1, falls back to the WASM OpenCascade, then Manifold); anything else is Manifold.
  */

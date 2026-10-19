@@ -1,8 +1,7 @@
 /**
- * MCP toolsets: named tool groups a host exposes (e.g. `core,3d,measure`) to keep `tools/list` small. A VIEW of
- * the registry: every command stays callable through `execute()` (build_project steps, UI).
+ * Toolsets: named tool groups (e.g. `core`, `3d`, `measure`) the `llull` CLI lists by (`llull toolsets`, `llull list <toolset>`)
+ * and the UI command palette groups by. A VIEW of the registry: every command stays callable through `execute()`.
  * @invariant every registered command + exchange tool belongs to exactly one toolset
- * @invariant `core` is always enabled
  */
 
 import { pluginToolNames } from '@core/plugins/host';
@@ -47,7 +46,7 @@ const PIPING_TOOLS = words('add_pipe_run add_pipe_support add_cable_tray check_p
 /** Tool names per toolset; `building` / `civil` / the FE part of `analysis` come from their plugins. */
 export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   core: words(
-    'search_tools enable_toolset describe_scene find_entities build_project check_model render_view set_units load_document clear_document move_entities rotate_entity scale_entity mirror_entity duplicate_entities delete_entities array_linear array_polar group_entities ungroup_entities set_entity_name align distribute stack_on set_parameter delete_parameter add_layer update_layer set_entity_layer delete_layer set_camera fit_view kernel_info set_modeling_tolerance',
+    'describe_scene find_entities build_project check_model render_view set_units load_document clear_document move_entities rotate_entity scale_entity mirror_entity duplicate_entities delete_entities array_linear array_polar group_entities ungroup_entities set_entity_name align distribute stack_on set_parameter delete_parameter add_layer update_layer set_entity_layer delete_layer set_camera fit_view kernel_info set_modeling_tolerance',
   ),
   '2d': words(
     'draw_polyline draw_arc draw_rectangle draw_point draw_ellipse draw_spline draw_involute draw_belt_around explode_polyline offset_2d trim extend fillet_2d chamfer_2d add_text add_dimension add_image_underlay calibrate_underlay set_underlay image_to_world create_sheet create_drawing_view add_section_view add_detail_view update_drawing_view delete_drawing_view update_sheet delete_sheet export_sheet_svg',
@@ -106,63 +105,11 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   },
 };
 
-interface ParsedToolsets {
-  readonly enabled: ReadonlySet<ToolsetName>; // always contains `core`
-  readonly unknown: readonly string[]; // ignored
-}
-
 export function isToolsetName(value: string): value is ToolsetName {
   return (TOOLSET_NAMES as readonly string[]).includes(value);
-}
-
-/**
- * Parse a comma-separated toolset list (the `LLULL_TOOLSETS` value).
- * @invariant unset / empty -> `core` only (agents load the rest via search_tools / enable_toolset)
- * @invariant `all` -> every toolset
- * @failure unknown names -> listed in `unknown`, otherwise ignored
- */
-export function parseToolsets(raw: string | undefined): ParsedToolsets {
-  const requested = (raw ?? '')
-    .split(',')
-    .map((part) => part.trim().toLowerCase())
-    .filter((part) => part.length > 0);
-  const unknown = requested.filter((name) => name !== 'all' && !isToolsetName(name));
-  return {
-    enabled: requested.includes('all') ? new Set(TOOLSET_NAMES) : new Set<ToolsetName>(['core', ...requested.filter(isToolsetName)]),
-    unknown,
-  };
 }
 
 /** The toolset a tool belongs to, or `undefined` for a tool no toolset lists. */
 export function toolsetOf(toolName: string): ToolsetName | undefined {
   return TOOLSET_NAMES.find((toolset) => TOOLSETS[toolset].includes(toolName));
-}
-
-/** Session-set key for one individually enabled tool (the set holds toolset names and these keys). */
-export const toolKey = (toolName: string): string => `tool:${toolName}`;
-
-/**
- * @invariant a tool no toolset lists is always enabled (fail open: never hide a new tool)
- * @invariant a tool is enabled by its toolset or individually (`enable_toolset { tools }` adds `toolKey(name)`)
- */
-export function isToolEnabled(toolName: string, enabled: ReadonlySet<string>): boolean {
-  const toolset = toolsetOf(toolName);
-  return toolset === undefined || enabled.has(toolset) || enabled.has(toolKey(toolName));
-}
-
-/** Prompts whose workflow calls a toolset's tools directly; unlisted prompts need only `core`. */
-const PROMPT_TOOLSETS: Readonly<Record<string, ToolsetName>> = {
-  design_building: 'building',
-  design_factory: 'building',
-  piping_hydraulics: 'piping',
-  fea_static_check: 'analysis',
-  dynamics_simulation: 'assembly',
-  design_site: 'civil',
-  design_sheet_bracket: 'manufacturing',
-};
-
-/** True when the MCP prompt `promptName` only references enabled tools. */
-export function isPromptEnabled(promptName: string, enabled: ReadonlySet<string>): boolean {
-  const toolset = PROMPT_TOOLSETS[promptName];
-  return toolset === undefined || enabled.has(toolset);
 }

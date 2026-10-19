@@ -15,7 +15,7 @@ Rules are already in context (`rules/react.md` loads for `src/ui/`). Read
 
 ## Hard rules
 
-- `src/ui/` may import `@core` / `@mcp` / `@aec` but holds NO business logic. It gathers params and calls
+- `src/ui/` may import `@core` / `@protocol` / `@aec` but holds NO business logic. It gathers params and calls
   `store.dispatch(name, params)` — it never mutates the document or builds an Entity.
 - To change the document, call an existing command. If none fits, STOP and hand the
   gap to `command-author`; do not edit entities in a component.

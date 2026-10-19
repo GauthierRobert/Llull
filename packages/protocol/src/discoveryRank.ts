@@ -1,9 +1,9 @@
 /**
- * `search_tools` ranking: whole-word and name hits outweigh prefix and description hits, rare words (IDF over the
+ * Tool search ranking (`llull search`): whole-word and name hits outweigh prefix and description hits, rare words (IDF over the
  * tool catalog) outweigh common ones, adjacent query words earn a phrase bonus, and a small phrase / synonym table
  * maps everyday phrasing onto the vocabulary tool names use.
  */
-import type { McpToolDefinition } from './tools';
+import type { ToolDefinition } from './tools';
 
 /** Plural-insensitive stem: "edges" -> "edge", "holes" -> "hole", "entities" -> "entity". */
 function stem(word: string): string {
@@ -132,7 +132,7 @@ interface ToolIndex {
 let cached: { readonly size: number; readonly index: ToolIndex } | undefined;
 
 /** The tool index for `all`, rebuilt only when the tool count changes (plugins install once at startup). */
-export function toolIndex(all: readonly McpToolDefinition[]): ToolIndex {
+export function toolIndex(all: readonly ToolDefinition[]): ToolIndex {
   if (cached?.size === all.length) return cached.index;
   const tools = new Map<string, IndexedTool>();
   const documentFrequency = new Map<string, number>();

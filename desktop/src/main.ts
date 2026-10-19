@@ -9,7 +9,7 @@ import { chooseBackendPort, startBackend, type RunningBackend } from './backend'
 import { backendEnv, backendOrigin, nativeBundleDir } from './backendEnv';
 import { cliShimFor, installCliShim } from './cliShim';
 import { createDocumentSession, type DocumentSession } from './documents';
-import { DEFAULT_SAVE_NAME, DOCUMENT_EXTENSIONS, DOCUMENT_FILE_PATTERN } from '@mcp/documentFiles';
+import { DEFAULT_SAVE_NAME, DOCUMENT_EXTENSIONS, DOCUMENT_FILE_PATTERN } from '@protocol/documentFiles';
 import { desktopLayout } from './layout';
 import { agentHelpText, menuTemplate } from './menu';
 import { navigationDecision, permissionAllowed } from './navigation';

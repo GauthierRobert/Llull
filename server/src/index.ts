@@ -4,7 +4,6 @@
  *   /live /command /undo /redo   `liveRoutes.ts`      /export/*   `exportRoutes.ts`
  *   POST /import/dwg       `importRoutes.ts` (DWG -> DXF converter, then import_dxf)
  *   POST /exchange         `exchangeRoutes.ts` (STEP / DWG / CadQuery exchange tools for the CLI)
- *   ALL /mcp               `mcp.ts` (Streamable HTTP; bearer auth + rate limit)
  *
  * Env: PORT (3001), HOST (127.0.0.1; loopback only: the backend is local, one per machine, LC1), LLULL_BODY_LIMIT (2mb),
  * MCP_AUTH_TOKEN (the desktop app's per-launch token) plus the vars in server/README.md.
@@ -15,7 +14,6 @@ import './loadEnv';
 import path from 'path';
 import express from 'express';
 import cors from 'cors';
-import { buildMcpRouter } from './mcp';
 import { exchangeOptionsWithDwg } from './dwgConvert';
 import { buildImportRouter } from './importRoutes';
 import { buildExchangeRouter } from './exchangeRoutes';
@@ -59,7 +57,6 @@ app.use(buildLiveRouter(restLimiter));
 app.use('/export', restLimiter, buildExportRouter(exchange));
 app.use('/import', buildImportRouter(restLimiter));
 app.use(buildExchangeRouter(restLimiter, exchange));
-app.use('/mcp', buildMcpRouter(exchange));
 // Desktop: serve the built renderer (`LLULL_STATIC_DIR`) from the same origin as the API.
 const staticDir = process.env['LLULL_STATIC_DIR'];
 if (staticDir !== undefined && staticDir !== '') {

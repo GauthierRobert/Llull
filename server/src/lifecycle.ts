@@ -5,17 +5,15 @@ import type { Express } from 'express';
 import { installGeometryKernel } from './geometryKernel';
 import { installPhysicsEngine } from './physicsEngine';
 import { flushAutosave, stopAutosave, closeAllSubscribers } from './liveDocument';
-import { closeAllSessions } from './mcp/sessions';
 import { killAllChildren } from './childProcesses';
 import { checkBindSafety } from './security';
 
-const SESSION_CLOSE_TIMEOUT_MS = 3_000;
 const DRAIN_TIMEOUT_MS = 5_000;
 
 const delay = (ms: number): Promise<void> => new Promise<void>((resolve) => setTimeout(resolve, ms).unref());
 
 /**
- * Stop accepting connections, end SSE/MCP streams, drain, flush autosave. Resolves when closed.
+ * Stop accepting connections, end SSE streams, drain, flush autosave. Resolves when closed.
  * Autosave is switched to synchronous-write mode first so an edit finishing mid-drain is persisted.
  */
 async function shutdown(server: Server): Promise<void> {
@@ -23,7 +21,6 @@ async function shutdown(server: Server): Promise<void> {
   killAllChildren();
   const closed = new Promise<void>((resolve) => server.close(() => resolve()));
   closeAllSubscribers();
-  await Promise.race([closeAllSessions(), delay(SESSION_CLOSE_TIMEOUT_MS)]);
   server.closeIdleConnections();
   await Promise.race([closed, delay(DRAIN_TIMEOUT_MS)]);
   server.closeAllConnections();

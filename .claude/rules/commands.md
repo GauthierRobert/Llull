@@ -40,7 +40,7 @@ export const fooThing = defineCommand({
 - Schema helpers (`@core/commands/schema`): `vec2`/`vec3` (exact tuples), `looseVec2`/`looseVec3`
   (`run` checks length), `untypedArray` (`run` validates), `tolerant(schema)` (never rejected).
   Every property needs `.describe(...)` — `defineCommand` throws without it. Descriptions become
-  the MCP `paramsSchema`: write them for an agent that cannot see the code.
+  the tool `paramsSchema` (`llull describe`): write them for an agent that cannot see the code.
 - `run`: still validate semantics (ids exist, sizes > 0); on bad input return the **unchanged doc**,
   an explanatory `summary`, `affected: []`. Never throw for user error.
 - `summary` is the AI's feedback signal: specific and factual (ids, sizes, counts).
@@ -85,5 +85,5 @@ export const fooThing = defineCommand({
 
 - Installed by `installDefaultPlugins()` (called by `src/main.tsx`, `server/src/plugins.ts`,
   `tests/setup.ts`). Plugins import `@core` / `@lib` only.
-- Command name clash ⇒ install throws; `toolset` places commands in an MCP toolset; `guards` are
+- Command name clash ⇒ install throws; `toolset` places commands in a toolset (CLI listings, UI palette); `guards` are
   derivation guards; `document` (`DocumentExtension`) validates plugin data + restores derived geometry.

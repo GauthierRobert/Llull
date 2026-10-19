@@ -125,7 +125,7 @@ export function withoutPayloads(data: unknown): unknown {
   );
 }
 
-/** Payload strings longer than this are not printed inline (the MCP text cap would cut them silently). */
+/** Payload strings longer than this are not printed inline (the text cap would cut them silently). */
 const MAX_INLINE_PAYLOAD_CHARS = 20_000;
 
 /**

@@ -6,16 +6,16 @@ import type { CadDocument } from '@core/model/types';
  * d'études): a client brief, the tool calls an engineer would make, and the acceptance criteria
  * the office checks before issuing deliverables. Three drivers run the same scenario and the same
  * criteria grade the result:
- *   scripted — deterministic tool calls through the real `/mcp` endpoint (server/tests/production)
+ *   scripted — deterministic tool calls sent to the real backend as the `llull` CLI sends them (server/tests/production)
  *   ui       — a human-like flow in the browser (tests/production/ui.gate.ts, Playwright)
- *   agent    — an AI agent given only `brief`, through `/mcp` (server/tests/production)
+ *   agent    — an AI agent given only `brief`, through the CLI tools (server/tests/production)
  *
  * @invariant criteria read only the final document + deliverables, never driver internals
  */
 
 export type DriverId = 'scripted' | 'ui' | 'agent';
 
-/** One MCP tool call, exactly as an agent would send it. */
+/** One tool call, exactly as an agent sends it through the CLI (`llull exec <tool> <args>`). */
 export interface ToolCall {
   tool: string;
   args: Record<string, unknown>;

@@ -1,7 +1,6 @@
 /**
- * The agent modeling conventions guide an MCP agent should read BEFORE modeling, exposed as the
- * `cad://conventions` resource. A RESOURCE, never a registry command: the
- * `buildMcpTools().length === listCommands().length` invariant must hold.
+ * The agent modeling conventions guide an agent should read BEFORE modeling, printed by `llull guide`.
+ * Not a registry command: the `buildCommandTools().length === listCommands().length` invariant must hold.
  */
 
 export const CONVENTIONS_GUIDE: string = `# llull CAD — Agent Modeling Conventions
@@ -15,7 +14,7 @@ anchor points, rotation convention, and the recommended workflow loop.
 
 Every llull document has a \`units\` field (default: \`"mm"\`). All coordinates,
 sizes, radii, and heights you pass to commands are in those document units.
-Read \`cad://document\` or \`cad://scene\` to check the current units before
+Check the document \`units\` (a field of the document file; \`set_units\` changes them) before
 placing geometry. Do NOT mix units — if the document is in \`mm\`, a box of
 \`size: [1, 1, 1]\` is 1 mm × 1 mm × 1 mm.
 
@@ -120,7 +119,7 @@ wildly unexpected orientation. Always use radians.
   Z, not 90°. Use \`[0, 0, 1.5708]\` or \`[0, 0, Math.PI/2]\`.
 
 - **Units mismatch**: A 1 m box in a mm document would be tiny. Check
-  \`cad://document\` for \`units\` first.
+  the document \`units\` first.
 
 - **Forgetting +Z up**: Y is NOT up in llull. Stacking objects vertically
   means increasing the Z component of \`position\`.
@@ -210,5 +209,3 @@ reviewRequired. Never present them as released; say what a qualified person must
   \`check_sheet_metal\` → \`flat_pattern\` → \`export_flat_pattern_dxf --save blank.dxf\`. Existing exact
   solids: \`convert_to_sheet_metal\`. Waivers stay FTR_WAIVER_NOT_APPROVED until a human approval exists.
 `;
-
-export const CONVENTIONS_URI = 'cad://conventions' as const;

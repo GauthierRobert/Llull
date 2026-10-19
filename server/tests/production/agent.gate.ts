@@ -1,6 +1,6 @@
 /**
  * Production gate, AI-agent driver: Claude gets ONLY the scenario brief (what a lead engineer
- * hands a designer) and must do the job through llull's MCP tools; the result is graded with the
+ * hands a designer) and must do the job through llull's tools, run as the `llull` CLI runs them; the result is graded with the
  * same acceptance criteria as the scripted and UI drivers. Revision scenarios start from the
  * previous issue, produced by the scripted calls (the colleague's model).
  *
@@ -26,7 +26,7 @@ import { formatReport, resetReports, writeArtifact, writeReport } from '../../..
 import { SCENARIOS, chainOf } from '../../../tests/production/scenarios';
 import type { Scenario } from '../../../tests/production/contract';
 import { runAgent, type AgentOptions } from './agentLoop';
-import { liveDocument, resetDocument, startServer, stopServer } from './mcpHarness';
+import { liveDocument, resetDocument, startServer, stopServer } from './cliHarness';
 
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 const effort = process.env['PRODUCTION_AGENT_EFFORT'] ?? 'high';
@@ -67,7 +67,7 @@ function startingDocument(scenario: Scenario): CadDocument {
   return doc;
 }
 
-describe('production scenarios — AI agent over /mcp', () => {
+describe('production scenarios — AI agent through the CLI tools', () => {
   const scenarios = SCENARIOS.filter((s) => SELECTED.length === 0 || SELECTED.includes(s.id));
   for (const scenario of scenarios) {
     for (let trial = 1; trial <= TRIALS; trial++) {

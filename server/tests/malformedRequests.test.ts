@@ -1,5 +1,5 @@
 /**
- * Malformed HTTP and JSON-RPC input on /command and /mcp: every case gets a clean, JSON, bounded
+ * Malformed HTTP and JSON input on /command and /exchange: every case gets a clean, JSON, bounded
  * error (no crash, no HTML, no stack trace) and leaves the document untouched.
  */
 
@@ -9,7 +9,6 @@ import { app } from '../src/index';
 import { _resetHistory } from '../src/commandBus';
 import { _resetLiveDoc, getLiveSnapshot } from '../src/liveDocument';
 
-const MCP = { Accept: 'application/json, text/event-stream' };
 const post = (path: string): request.Test => request(app).post(path);
 
 function expectCleanError(res: request.Response, status: number): void {
@@ -89,49 +88,15 @@ describe('POST /command with malformed input', () => {
   });
 });
 
-describe('/mcp with malformed input', () => {
-  it('truncated JSON is a 400 JSON error', async () => {
-    const res = await post('/mcp').set(MCP).set('Content-Type', 'application/json').send('{"jsonrpc":');
-    expectCleanError(res, 400);
+describe('/exchange with malformed input', () => {
+  it('a body without a tool name is a 400 JSON error', async () => {
+    expectCleanError(await post('/exchange').send({ params: {} }), 400);
   });
 
-  it('a non JSON-RPC object gets a JSON-RPC parse error (-32700)', async () => {
-    const res = await post('/mcp').set(MCP).send({ hello: 'world' });
-    expectCleanError(res, 400);
-    expect(res.body.error.code).toBe(-32700);
-  });
-
-  it.each([
-    ['an unknown method', { jsonrpc: '2.0', id: 1, method: 'nope/nothing' }],
-    ['a batch', [{ jsonrpc: '2.0', id: 1, method: 'tools/list' }]],
-    ['initialize with a wrong protocolVersion type', { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: 5 } }],
-  ])('%s before a session exists is a JSON-RPC error, not a crash', async (_label, body) => {
-    const res = await post('/mcp').set(MCP).send(body);
-    expectCleanError(res, 400);
-    expect(res.body.jsonrpc).toBe('2.0');
-    expect(res.body.error.code).toBeLessThan(0);
-  });
-
-  it('an unknown session id is a 404 JSON error', async () => {
-    const res = await post('/mcp').set(MCP).set('mcp-session-id', 'nope').send({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+  it('a registry command name is a 404 JSON error pointing at /command', async () => {
+    const res = await post('/exchange').send({ name: 'add_box', params: {} });
     expectCleanError(res, 404);
-  });
-
-  it('GET and DELETE without a session id are 400 JSON errors', async () => {
-    expectCleanError(await request(app).get('/mcp').set(MCP), 400);
-    expectCleanError(await request(app).delete('/mcp'), 400);
-  });
-
-  it('a client that does not accept event streams gets a 406 JSON-RPC error', async () => {
-    const res = await post('/mcp').send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
-    expectCleanError(res, 406);
-  });
-
-  it('an oversized body is a 413 JSON error', async () => {
-    const res = await post('/mcp')
-      .set(MCP)
-      .send({ jsonrpc: '2.0', id: 1, method: 'x', params: { pad: 'x'.repeat(3e6) } });
-    expectCleanError(res, 413);
+    expect(res.body.error).toMatch(/POST \/command/);
   });
 });
 
@@ -140,6 +105,7 @@ describe('unknown routes', () => {
     ['GET', '/nope'],
     ['POST', '/live'],
     ['DELETE', '/command'],
+    ['POST', '/mcp'],
   ])('%s %s is a JSON 404 (never the framework HTML page)', async (method, path) => {
     const res = await request(app)[method.toLowerCase() as 'get' | 'post' | 'delete'](path);
     expectCleanError(res, 404);

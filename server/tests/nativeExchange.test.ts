@@ -17,7 +17,7 @@ import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import type { FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
-import type { FeaHost } from '@mcp/index';
+import type { FeaHost } from '@protocol/index';
 import { analysisInputHash } from '@cae/hash/inputHash';
 import { meshSummary } from '@cae/results/summary';
 import { createFeArtifactStore, defaultFeArtifactStore, type FeArtifactCache } from '../src/fea/artifactStore';

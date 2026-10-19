@@ -14,7 +14,10 @@ import { execute } from '@core/commands/registry';
 import { withoutPrivateValues } from '@core/commands/materials/libraryRecords';
 import { hashText } from '@lib/hash';
 
-/** Who sent a broadcast command: the REST API (browser, scripts), an MCP agent, or the `llull` CLI. */
+/**
+ * Who sent a broadcast command: the REST API (the UI, scripts) or the `llull` CLI. `mcp` is legacy (the MCP host was removed,
+ * LC1 step 4); it stays in the union until the UI drops its label.
+ */
 export type LiveCommandSource = 'rest' | 'mcp' | 'cli';
 
 /** SSE `command` event: one mutating command, applied server-side as number `seq`. */

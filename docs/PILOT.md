@@ -44,7 +44,7 @@ use **Fit all into view** if the camera lost the site. Undo removes everything.
 ## Guided tutorial — your own data (45 minutes)
 
 Work in the **Site** tab (Civil / Site panel), top to bottom. Every button runs a command; the
-same commands are in the command palette (Ctrl/Cmd + K) and available to AI agents over MCP.
+same commands are in the command palette (Ctrl/Cmd + K) and available to AI agents through the `llull` CLI.
 
 ### 1. Survey (8 min)
 
@@ -169,7 +169,7 @@ Would you use it on a live job? (yes / with changes / no) — why:
 ## The same job, automated
 
 The production gate's `civil-site-development` scenario runs this workflow on the sample survey
-through MCP and through the browser, and grades it with the office's acceptance criteria (balance
+through the `llull` CLI's backend calls and through the UI, and grades it with the office's acceptance criteria (balance
 residual < 1 %, no design-check failure at the design speed, no surcharged or flooding pipe, a
 well-formed LandXML with Surface / Alignment / PipeNetwork). See
 [`PRODUCTION_GATE.md`](PRODUCTION_GATE.md).

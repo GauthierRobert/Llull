@@ -98,13 +98,13 @@ LLULL_PYTHON=python3 npm --prefix server run dev   # python3 is the default
 | `LLULL_PYTHON_BUILD123D`     | `LLULL_PYTHON` | Python that has build123d. build123d and CadQuery pin different OCP versions, so give each its own virtualenv.                           |
 | `LLULL_PYTHON_TIMEOUT_MS`    | `120000`       | Per-request timeout. The process is killed after it.                                                                                     |
 | `LLULL_EXCHANGE_DIR`         | unset          | Directory that the tools' `path` arguments resolve inside (no `..` or absolute paths). `export_step` also saves `<name>.step` there.     |
-| `LLULL_ALLOW_CODE_EXECUTION` | unset          | `1` enables `import_code`. **It runs arbitrary Python with server privileges.** Enable it only on a machine whose MCP clients you trust. |
+| `LLULL_ALLOW_CODE_EXECUTION` | unset          | `1` enables `import_code`. **It runs arbitrary Python with server privileges.** Enable it only on a machine you trust. |
 | `LLULL_BODY_LIMIT`           | `2mb`          | Raise it to send large STEP files inline as base64, or use `path` instead.                                                               |
 
 Each bridge process runs with these limits:
 
 - **Environment:** it gets an allow-listed environment (`PATH`, `HOME`, locale, `PYTHON*`,
-  virtualenv/conda variables). Server secrets such as `MCP_AUTH_TOKEN` never reach it.
+  virtualenv/conda variables). Server secrets such as the desktop app's token (`MCP_AUTH_TOKEN`) never reach it.
 - **Concurrency:** at most two bridge processes run at once. The rest wait in a queue.
 - **Output:** a response may be at most 128 MB.
 - **Paths:** `path` arguments are checked again after following symbolic links. A link inside
@@ -115,21 +115,21 @@ Generated code never carries raw document text. Names go in string literals, and
 stripped of line breaks and `"""`. Numbers are formatted, and expressions are re-tokenised. So
 a hostile document loaded with `load_document` cannot inject code into `export_step`.
 
-### MCP tools
+### Exchange tools
 
 | Tool          | What it does                                                                                                                             |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `export_code` | Registry command (works offline, also in the UI). Returns `data.text`.                                                                   |
-| `export_step` | `export_code` (CadQuery), evaluated by OpenCascade. Returns `structuredContent.stepBase64` and saves into `LLULL_EXCHANGE_DIR` when set. |
+| `export_step` | `export_code` (CadQuery), evaluated by OpenCascade. Returns `data.stepBase64` (`--save part.step` writes it) and saves into `LLULL_EXCHANGE_DIR` when set. |
 | `import_step` | `stepBase64` or `path`, producing `import_mesh` (undoable).                                                                              |
 | `import_code` | `code` or `path`, `language`, `mode: replace / append`. Produces `apply_code_trace` (undoable).                                          |
 
 HTTP downloads for the browser: `GET /export/code?language=cadquery|build123d|openscad|freecad`
 and `GET /export/step` (503 when the bridge is not configured).
 
-### CLI (local agents, desktop app)
+### CLI (agents, desktop app)
 
-The same tools run from the `llull` CLI: in-process on a `--doc` file, or through
+These tools run from the `llull` CLI: in-process on a `--doc` file, or through
 `POST /exchange { name, params }` with `--app` / `--server`. `file=<path>` reads a local file
 into the content parameter (`stepBase64`, `dwgBase64`, or `code`), and `--save` writes the result:
 
@@ -161,7 +161,7 @@ conversion; every request uses a private temp dir that is always removed.
 - HTTP: `POST /import/dwg?target=drawing|survey&sourceUnit=m&layers=A,B` with the raw bytes
   (`application/octet-stream`) or JSON `{ "base64": "...", "target": "survey", "name": "..." }`.
   400 not a DWG (`AC10xx` header), 413 too large, 503 no converter installed, 504 timeout.
-- MCP: `import_dwg { dwgBase64 | path, target, sourceUnit, layers, ... }` (toolset `exchange`).
+- CLI: `llull exec import_dwg file=plan.dwg target=drawing …` (`dwgBase64 | path`, `target`, `sourceUnit`, `layers`, …; toolset `exchange`).
 - UI: Civil / Site panel › DWG file inputs (needs the server).
 
 ## Limits and known gaps
@@ -170,8 +170,8 @@ conversion; every request uses a private temp dir that is always removed.
   STEP file (feature recognition) is not done.
 - Sketch-level 2D entities and constraints are not exported. Only 3D solids and the
   parameters that drive them are.
-- Booleans replayed from a trace use the Manifold mesh kernel, which both the browser app and
-  the MCP server load. Inside llull the boolean result is a mesh. In the code and in STEP export
+- Booleans replayed from a trace use the Manifold mesh kernel, which both the desktop app and
+  the backend / CLI load. Inside llull the boolean result is a mesh. In the code and in STEP export
   it stays an exact `cut`/`union`/`intersect`.
 - build123d and CadQuery pin different OCP versions. Install them in separate virtualenvs and
   point `LLULL_PYTHON_BUILD123D` at the build123d one.

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { execute, getCommand, listCommands, toToolSchemas } from '@core/commands/registry';
 import type { ParamItemSpec, ParamSpec } from '@core/commands/types';
 import { FTR_CODES } from '@core/model/manufacturing';
-import { TOOLSETS } from '@mcp/toolsets';
+import { TOOLSETS } from '@protocol/toolsets';
 import { sheetMetalCommands } from '@aero/sheetmetal/catalog';
 import { createEmptyDocument } from '@core/model/types';
 import { RULE, bracket } from './helpers';

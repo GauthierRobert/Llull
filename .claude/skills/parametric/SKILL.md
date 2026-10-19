@@ -1,6 +1,6 @@
 ---
 name: parametric
-description: Add or extend llull's parametric modeling — named parameters/variables, geometric & dimensional constraints (coincident, tangent, parallel, distance, angle...), and the editable feature history (timeline). Use when a task means "drive it by a parameter", "constrain these", a feature tree, edit-and-regenerate, or relations between entities. This is the highest-value MCP capability: an agent edits one parameter and the whole model regenerates.
+description: Add or extend llull's parametric modeling — named parameters/variables, geometric & dimensional constraints (coincident, tangent, parallel, distance, angle...), and the editable feature history (timeline). Use when a task means "drive it by a parameter", "constrain these", a feature tree, edit-and-regenerate, or relations between entities. This is the highest-value agent (CLI) capability: an agent edits one parameter and the whole model regenerates.
 ---
 
 # Skill: parametric
@@ -46,5 +46,5 @@ A full CAD stores HOW a model was built, not just final geometry. Commands are p
 - [ ] Data lives in the document (model.md shapes); not ad hoc
 - [ ] Solver/evaluation is pure, unit-tested; constraints reference entity ids
 - [ ] Editing a parameter/step re-evaluates only what depends on it, deterministically
-- [ ] Exposed as MCP/AI tools via the registry (`defineCommand`)
+- [ ] Exposed as AI / CLI tools via the registry (`defineCommand`)
 - [ ] Purity, golden corpus and the coverage gate hold; `npm run check` green

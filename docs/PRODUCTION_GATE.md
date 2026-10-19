@@ -11,9 +11,9 @@ build, and the acceptance criteria the office checks before anything leaves the 
 
 ```bash
 npx vitest run tests/production   # in-process scripted run, part of npm run check (seconds)
-npm run production:scripted       # the same calls through the real /mcp endpoint
+npm run production:scripted       # the same calls sent to the real backend the way the llull CLI sends them
 npm run production:ui             # a human-like flow in the browser (Playwright)
-npm run production:agent          # Claude gets only the brief and works through /mcp (API credentials, costs money)
+npm run production:agent          # Claude gets only the brief and works through the CLI tools (API credentials, costs money)
 # agent env: PRODUCTION_SCENARIOS, PRODUCTION_AGENT_MODEL (claude-opus-5-5), PRODUCTION_AGENT_EFFORT (high),
 #            PRODUCTION_AGENT_MAX_TURNS (150), PRODUCTION_AGENT_TRIALS (1), PRODUCTION_AGENT_MAX_USD (20 per trial)
 npm run production                # scripted + ui
@@ -28,9 +28,9 @@ estimated spend; a trial stops when its estimate reaches `PRODUCTION_AGENT_MAX_U
 
 | Driver     | Who does the job                                                                                                  | Proves                                            |
 | ---------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `scripted` | the tool calls a competent engineer makes, sent over `/mcp` (toolsets discovered and enabled like any MCP client) | the product can do the job                        |
+| `scripted` | the tool calls a competent engineer makes, sent to the backend as `llull --server` sends them (`POST /command`, `/exchange`) | the product can do the job                        |
 | `ui`       | Playwright drives the Building panel, properties, export buttons, Save / Open project                             | a person can do the job in the app                |
-| `agent`    | Claude, given only the brief, through `/mcp`                                                                      | an AI designer can do the job from the same brief |
+| `agent`    | Claude, given only the brief, through the CLI tool catalog (each call run as `llull` runs it)                     | an AI designer can do the job from the same brief |
 
 All three are graded by the same criteria (`tests/production/criteria/`), which read only the
 final document and the issued files. Files are read back with **independent parsers**
@@ -80,7 +80,7 @@ stay green.
 | pipe rack           | 28 / 28  | 28 / 28 | not run                         |
 | civil site          | 11 / 11  | 11 / 11 | not run                         |
 
-Every acceptance criterion passes through `/mcp` and through the browser; `knownIssues` is empty
+Every acceptance criterion passes through the CLI backend calls and through the UI; `knownIssues` is empty
 for both drivers. The structure, equipment, lines, openings and stairs are modelled exactly; the
 model is clash-free; the steel tonnage matches an independent table to 0.02 %; every steel member
 passes `check_steel_members` and every storey has a lateral system (bracing or moment frames) in
@@ -90,7 +90,7 @@ title block; the line list carries line number, DN, from and to; schedules agree
 the project reopens and replays identically; a revision keeps every id, mark and IFC GlobalId.
 
 The civil scenario (added with the [pilot kit](PILOT.md)) passes all 11 criteria in-process
-(`npx vitest run tests/production`), through `/mcp` (`npm run production:scripted`, 23 calls) and in
+(`npx vitest run tests/production`), through the CLI backend calls (`npm run production:scripted`, 23 calls) and in
 the browser (`npm run production:ui`, 23 / 23 calls through Civil / Site panel controls, no palette
 detour). Its UI report still lists four `uiGaps`: the panel has no field for `minVelocity` /
 `diameters` on sizing or `minCoverM` / `minVelocity` on the check — the defaults equal the brief's
@@ -112,7 +112,7 @@ inputs (Playwright strict mode). The UI driver now scopes the editor to the Equi
 | 2   | No structural verification outside portal frames (0 / 117 and 0 / 48 members)            | `structural-coverage` | `check_steel_members` (EN 1993, loads from the model — see INDUSTRIAL.md)                                        |
 | 3   | IFC equipment had no property set (operating weight)                                     | `ifc-equipment-data`  | `Pset_llullEquipment` (operating weight, clearance), GlobalIds stable across revisions                           |
 | 4   | Upper-floor plans did not draw the columns passing through                               | `dxf-plans`           | plans / DXF draw every column crossing the level's cut height                                                    |
-| 5   | The default `/mcp` rate limit (60 / min / IP) throttled a real job (140–300 calls)       | —                     | default raised to 600 / min; the gate asserts every job fits it                                                  |
+| 5   | The default rate limit (60 / min / IP, then on `/mcp`) throttled a real job (140–300 calls) | —                     | default 600 / min (now the REST limit); the gate asserts every job fits it                                                 |
 | 6   | UI: no slab material, no equipment tag, no equipment editing, no level picker on exports | (UI driver)           | Building panel fields, Equipment section editor (`update_equipment`), "Export level" picker; no palette fallback |
 | 7   | Design: IPE450 main beams under the 60 t extractor fail deflection (1.05)                | `structural-coverage` | the scenario design was corrected (IPE500), as an engineer would — the check was not weakened                    |
 | 8   | No pipe supports: line weight never reached the steel, spans unchecked                   | `pipe-supports`       | `add_pipe_support` (shoe / hanger / guide / anchor on steel) and `check_pipe_supports` (MSS SP-69 spans)         |

@@ -1,23 +1,23 @@
 /**
  * The exchange tools (export_step, import_step, import_dwg, import_code), the FE tools (fea_mesh, fea_solve, fea_export, fea_import_field) and
  * the native transports (fatigue_field, fea_map_field, fea_render: `server/src/native/tools.ts`, run by `runExchangeTool`) in the
- * `llull` CLI. They are not registry commands — Python / DWG / solver I/O sits behind ports — so the CLI runs the same MCP-layer handlers: in-process for a local --doc (document changes via `execute`), `POST /exchange`
+ * `llull` CLI. They are not registry commands — Python / DWG / solver I/O sits behind ports — so the CLI runs their `@protocol` handlers: in-process for a local --doc (document changes via `execute`), `POST /exchange`
  * for --app / --server. `file=<path>` reads a local file into the tool's content parameter.
  */
 
 import fs from 'fs';
 import type { CadDocument } from '@core/model/types';
-import { buildExchangeToolDefinitions, buildFeaToolDefinitions, buildLibraryToolDefinitions } from '@mcp/index';
-import type { McpToolDefinition } from '@mcp/tools';
+import { buildExchangeToolDefinitions, buildFeaToolDefinitions, buildLibraryToolDefinitions } from '@protocol/index';
+import type { ToolDefinition } from '@protocol/tools';
 import { isRecord } from '@lib/isRecord';
 import { runExchangeTool } from '../exchangeResult';
 import type { ExchangeOptions } from '../pythonExchange';
-import type { CommandOutcome } from '@mcp/restProtocol';
+import type { CommandOutcome } from '@protocol/restProtocol';
 import { nativeToolDefinitions } from '../native/tools';
 
-let definitions: readonly McpToolDefinition[] | null = null;
+let definitions: readonly ToolDefinition[] | null = null;
 
-export function exchangeToolDefinitions(): readonly McpToolDefinition[] {
+export function exchangeToolDefinitions(): readonly ToolDefinition[] {
   definitions ??= [
     ...buildExchangeToolDefinitions(),
     ...buildFeaToolDefinitions(),
@@ -27,7 +27,7 @@ export function exchangeToolDefinitions(): readonly McpToolDefinition[] {
   return definitions;
 }
 
-export function exchangeTool(name: string): McpToolDefinition | undefined {
+export function exchangeTool(name: string): ToolDefinition | undefined {
   return exchangeToolDefinitions().find((tool) => tool.name === name);
 }
 

@@ -12,7 +12,7 @@ import { serializeDocument } from '@core/commands/persistence/serialization';
 import { Icon } from '@ui/components/Icon';
 import { downloadBlob } from '@ui/download';
 import { readChosenFile } from '@ui/chosenFile';
-import { DOCUMENT_ACCEPT } from '@mcp/documentFiles';
+import { DOCUMENT_ACCEPT } from '@protocol/documentFiles';
 
 function timestamp(): string {
   const d = new Date();

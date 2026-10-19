@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { sanitizeSvgForResvg, rasterizeSvg, buildImageBlock, stripSvgFromData, MAX_RASTER_PX } from '../src/renderImage';
-import { shapeToolCallContent } from '@mcp/index';
+import { shapeToolCallContent } from '@protocol/index';
 
 const VALID_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#336699"/></svg>';
 const PNG_MAGIC_HEX = '89504e47';
@@ -114,7 +114,7 @@ describe('stripSvgFromData', () => {
   });
 });
 
-describe('MCP content shaping', () => {
+describe('tool result shaping with an image block', () => {
   it('stripped render data: no markup in text, metadata kept in json and structuredContent', () => {
     const result = shaped(stripSvgFromData({ svg: VALID_SVG, width: 800, height: 600, entityCount: 5, view: 'top' }));
     for (const block of result.content) expect(block.text).not.toMatch(/<svg|<polygon|<rect/i);

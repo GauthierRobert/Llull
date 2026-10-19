@@ -1,5 +1,5 @@
 /**
- * Civil / site-engineering plugin: its command catalog (catalog.ts), the `civil` MCP toolset, the derivation guard and the document
+ * Civil / site-engineering plugin: its command catalog (catalog.ts), the `civil` toolset, the derivation guard and the document
  * extension that validates the civil model and re-derives its geometry on load.
  */
 

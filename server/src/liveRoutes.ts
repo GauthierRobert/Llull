@@ -1,5 +1,5 @@
 /**
- * The live document over REST + SSE (protocol: `@mcp/liveSync`).
+ * The live document over REST + SSE (protocol: `@protocol/liveSync`).
  *   GET  /live           SSE: `snapshot` on connect / undo / redo; `command` per mutation.
  *                        guardRead: Bearer, or a single-use `?ticket=` (EventSource cannot set headers).
  *   POST /live/ticket    `{ ticket, expiresInMs }`: 30 s single-use ticket (header auth only)
@@ -13,7 +13,7 @@ import { isRecord } from '@lib/isRecord';
 import { applyCommand, undo, redo } from './commandBus';
 import { getLiveDoc, subscribeLive, getLiveSnapshot, liveSubscriberCount, MAX_LIVE_SUBSCRIBERS, liveMaxPerClient } from './liveDocument';
 import { guardMutation, guardRead, guardTicketIssue, isLocalPeer } from './security';
-import { redactLicensedOutcome } from '@mcp/index';
+import { redactLicensedOutcome } from '@protocol/index';
 import { TICKET_TTL_MS, issueTicket } from './tickets';
 
 const KEEPALIVE_MS = 25_000;

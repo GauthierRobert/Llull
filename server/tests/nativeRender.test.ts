@@ -11,7 +11,7 @@ import path from 'node:path';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import type { CadDocument } from '@core/model/types';
-import type { FeaHost } from '@mcp/index';
+import type { FeaHost } from '@protocol/index';
 import { prepareRaster, rasterPixels } from '@cae/results/fieldRaster';
 import { createFeArtifactStore, type FeArtifactCache } from '../src/fea/artifactStore';
 import { createComputeRunner, f64Bytes, readOutput, withJobFolder } from '../src/native/computeJob';

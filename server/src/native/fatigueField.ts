@@ -4,7 +4,7 @@
  * come back through the read-only `compute_fatigue` command (which re-reads and checks the artifact). The document is never written.
  */
 
-import type { FeaHost, FeaToolResult } from '@mcp/index';
+import type { FeaHost, FeaToolResult } from '@protocol/index';
 import { isEvaluationFailure } from '@cae/fatigue/evaluate';
 import { fatigueFieldArtifact, fatigueFieldInput, fatigueFieldReference, FIELD_COMPONENTS, readFatigueField } from '@cae/fatigue/feField';
 import type { FeArtifactCache } from '../fea/artifactStore';

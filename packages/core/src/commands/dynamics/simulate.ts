@@ -23,7 +23,7 @@ const MIN_SAMPLES_PER_TURN = 8;
 
 /** Upper bound on integration steps of one run (keeps a call interactive). */
 const MAX_STEPS = 1_000_000;
-/** Upper bound on recorded samples (keeps results small enough for MCP and the viewport). */
+/** Upper bound on recorded samples (keeps results small enough for the CLI and the viewport). */
 const MAX_SAMPLES = 6001;
 /** Most halvings of the auto timestep after a failed loop-residual gate, and the smallest step they may reach (s). */
 const MAX_HALVINGS = 5;

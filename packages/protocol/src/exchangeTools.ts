@@ -13,10 +13,10 @@ import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
 import { nonEmptyString } from '@lib/nonEmptyString';
 import { safeFileName } from '@lib/safeFileName';
-import type { McpToolDefinition } from './tools';
+import type { ToolDefinition } from './tools';
 import { applyFeaToolCall, type FeaToolsPort } from './feaTools';
 import { applyLibraryToolCall, type MaterialLibraryStorePort } from './libraryTools';
-import { shapeToolCallContent, type McpShapedResult } from './dispatch';
+import { shapeToolCallContent, type ShapedToolResult } from './toolResult';
 import type { CommandOutcome } from './restProtocol';
 
 export interface ProgramRun {
@@ -60,7 +60,7 @@ const LANGUAGE_SCHEMA = {
   enum: ['cadquery', 'build123d'],
 };
 
-export function buildExchangeToolDefinitions(): McpToolDefinition[] {
+export function buildExchangeToolDefinitions(): ToolDefinition[] {
   return [
     {
       name: 'export_step',
@@ -162,7 +162,7 @@ export function buildExchangeToolDefinitions(): McpToolDefinition[] {
   ];
 }
 
-const failure = (message: string): McpShapedResult => shapeToolCallContent({ summary: message, affected: [], isError: true });
+const failure = (message: string): ShapedToolResult => shapeToolCallContent({ summary: message, affected: [], isError: true });
 
 /** `language` (default cadquery), or null for another library. */
 function pythonLanguage(raw: unknown): PythonBackend | null {
@@ -249,7 +249,7 @@ export async function exportStepFile(
   return { stepBase64: run.stepBase64, fileName, bytes, summary, ...(savedTo !== undefined ? { savedTo } : {}) };
 }
 
-async function exportStep(deps: ExchangeDeps, port: CadExchangePort | null, args: Record<string, unknown>): Promise<McpShapedResult> {
+async function exportStep(deps: ExchangeDeps, port: CadExchangePort | null, args: Record<string, unknown>): Promise<ShapedToolResult> {
   const name = nonEmptyString(args['name']);
   const file = await exportStepFile(deps.getDoc, port, {
     language: args.language,
@@ -266,11 +266,11 @@ async function exportStep(deps: ExchangeDeps, port: CadExchangePort | null, args
 }
 
 /** An import tool's outcome: a command that created nothing counts as a failure. */
-function importOutcome(summary: string, result: ExchangeCommandResult): McpShapedResult {
+function importOutcome(summary: string, result: ExchangeCommandResult): ShapedToolResult {
   return shapeToolCallContent({ summary, affected: result.affected, isError: result.isError || result.affected.length === 0 });
 }
 
-async function importStep(deps: ExchangeDeps, port: CadExchangePort, args: Record<string, unknown>): Promise<McpShapedResult> {
+async function importStep(deps: ExchangeDeps, port: CadExchangePort, args: Record<string, unknown>): Promise<ShapedToolResult> {
   const stepBase64 = await readInput(port, nonEmptyString(args['stepBase64']), nonEmptyString(args['path']), 'base64');
   const { bodies } = await port.importStep(stepBase64);
   const result = deps.applyCommand('import_mesh', { bodies });
@@ -287,7 +287,7 @@ const NO_DWG =
   'ODA File Converter (LLULL_ODA_CONVERTER=<executable>) and leave LLULL_DWG2DXF unset/not "off" ' +
   '(see docs/CAD_EXCHANGE.md). Alternatively save the drawing as ASCII DXF and use import_dxf.';
 
-async function importDwg(deps: ExchangeDeps, dwg: DwgConverterPort, args: Record<string, unknown>): Promise<McpShapedResult> {
+async function importDwg(deps: ExchangeDeps, dwg: DwgConverterPort, args: Record<string, unknown>): Promise<ShapedToolResult> {
   const target = args.target ?? 'drawing';
   if (target !== 'drawing' && target !== 'survey') return failure('import_dwg: target must be "drawing" or "survey"; nothing was changed.');
   let dwgBase64 = nonEmptyString(args['dwgBase64']);
@@ -307,11 +307,11 @@ async function importDwg(deps: ExchangeDeps, dwg: DwgConverterPort, args: Record
   return importOutcome(`import_dwg (${command}): ${result.summary}`, result);
 }
 
-async function importCode(deps: ExchangeDeps, port: CadExchangePort, args: Record<string, unknown>): Promise<McpShapedResult> {
+async function importCode(deps: ExchangeDeps, port: CadExchangePort, args: Record<string, unknown>): Promise<ShapedToolResult> {
   if (!deps.allowCodeExecution) {
     return failure(
       'import_code: running Python is disabled on this server. Start it with LLULL_ALLOW_CODE_EXECUTION=1 ' +
-        '(only on a machine you trust the MCP clients of — the script runs with server privileges).',
+        '(only on a machine you trust — the script runs with backend privileges).',
     );
   }
   const language = pythonLanguage(args.language);
@@ -339,7 +339,7 @@ const EXCHANGE_HANDLERS = new Map([
  * Dispatch an exchange tool call; returns null for any other tool name.
  * @failure missing Python, disabled execution, script/bridge errors → isError result, document unchanged
  */
-export async function applyExchangeToolCall(toolName: string, rawArgs: unknown, deps: ExchangeDeps): Promise<McpShapedResult | null> {
+export async function applyExchangeToolCall(toolName: string, rawArgs: unknown, deps: ExchangeDeps): Promise<ShapedToolResult | null> {
   const fea = await applyFeaToolCall(toolName, rawArgs, deps);
   if (fea !== null) return fea;
   const library = applyLibraryToolCall(toolName, rawArgs, deps);

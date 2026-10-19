@@ -10,7 +10,7 @@ import { flushOutbox, onSseDisconnected, resetSyncBookkeeping, withLocalSelectio
 import { isLocalMode, refuseDuringSync, runLocally, stepLocalHistory } from './localMode';
 import { postDispatch, postHistoryStep } from './onlineMode';
 import type { CadStoreState, DispatchOptions, LiveStatus } from './storeTypes';
-import { type LiveCommandEvent, type LiveSnapshotEvent, applyLiveCommand } from '@mcp/liveSync';
+import { type LiveCommandEvent, type LiveSnapshotEvent, applyLiveCommand } from '@protocol/liveSync';
 import { reuseUnchanged } from './reuseUnchanged';
 import { toggledInList } from '@ui/toggleMember';
 
