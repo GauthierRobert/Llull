@@ -1,0 +1,21 @@
+{
+  "version": 3,
+  "entityCount": 3,
+  "kinds": {
+    "extrusion": 2,
+    "polyline": 1
+  },
+  "boundingBox": {
+    "min": [
+      -22,
+      -31.8911371,
+      0
+    ],
+    "max": [
+      82,
+      31.8911371,
+      5
+    ]
+  },
+  "featureSteps": 3
+}

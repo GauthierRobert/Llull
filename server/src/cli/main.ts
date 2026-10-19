@@ -24,6 +24,7 @@ import { USAGE } from './usage';
 import { getGeometryKernel } from '@core/geometry/kernel';
 import { planKernelWarnings } from './planKernelWarning';
 import { benchmarkCli } from './benchmarks';
+import { crashesCli } from './crashes';
 import { fuzzCli, fuzzOneCli, FuzzUsageError } from './fuzz';
 import { skillsCli, SkillsUsageError } from './skills';
 
@@ -391,6 +392,13 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
       case 'undo':
       case 'redo':
         return await runHistory(subcommand, args, io);
+      case 'crashes':
+        return crashesCli(args.positionals.slice(1), {
+          stdout: io.stdout,
+          stderr: io.stderr,
+          env: io.env,
+          json: booleanFlag(args, 'json'),
+        });
       case 'run_benchmarks': {
         const save = stringFlag(args, 'save');
         return benchmarkCli(
