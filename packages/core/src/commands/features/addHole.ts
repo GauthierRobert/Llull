@@ -13,7 +13,8 @@ import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
 import { commitKernelResult, evaluateRecipe, operandRecipe } from '../brep/kernelShape';
 import { noop } from '../noop';
-import { frameToWorld } from '../../geometry/featureFrame';
+import { frameToWorld, heightAbove } from '../../geometry/featureFrame';
+import { resolveSketchPoints, sketchPointsSchema } from './sketchPoints';
 import { throughReach } from '../../geometry/featureLowering';
 import { MAX_THREAD_TURNS } from '../../geometry/threadTool';
 import { buildMeshBvh } from '../../geometry/meshBvh';
@@ -55,9 +56,12 @@ export const addHole = defineCommand({
       .object({ near: vec3('World point [x, y, z] on (or within 0.1% of the part size of) the planar face, in document length units.') })
       .describe('The planar face to drill into, picked by a world point.'),
     points: z
-      .array(z.array(z.number()))
-      .min(1)
-      .describe('Hole centres, in document length units: [u, v] (pointsFrame face), [x, y] (world_xy) or [x, y, z] (world). At least one.'),
+      .union([z.array(z.array(z.number())).min(1), sketchPointsSchema])
+      .describe(
+        'Hole centres. Either a list in document length units: [u, v] (pointsFrame face), [x, y] (world_xy) or [x, y, z] (world), at least one; ' +
+          'OR { sketchEntityIds?, pointRefs? } taking the centres from 2D sketch points (point entities, polyline vertices...) lying on the face ' +
+          'plane (pointsFrame is then ignored; a sketch point off the face plane is refused).',
+      ),
     pointsFrame: z
       .enum(POINT_FRAMES)
       .optional()
@@ -95,9 +99,31 @@ export const addHole = defineCommand({
         [target],
         ['face.near'],
       );
-    return drill(doc, kernel, entity, source, resolved, points, pointsFrame, built);
+    if (Array.isArray(points)) return drill(doc, kernel, entity, source, resolved, points, pointsFrame, built);
+    const sketch = resolveSketchPoints(doc, points);
+    if (typeof sketch === 'string')
+      return refuse(doc, 'add_hole', 'FTR_HOLE_POINT_OUTSIDE_FACE', sketch, 'pass existing sketch point ids', [target], ['points']);
+    const off = sketch.points.flatMap((point, index) => {
+      const distance = heightAbove(resolved.frame, point);
+      return Math.abs(distance) > SKETCH_PLANE_TOLERANCE
+        ? [`${sketch.labels[index]} (${Math.round(distance * 1e6) / 1e6} off the face plane)`]
+        : [];
+    });
+    if (off.length > 0)
+      return refuse(
+        doc,
+        'add_hole',
+        'FTR_HOLE_POINT_OUTSIDE_FACE',
+        `sketch points ${off.join(', ')} do not lie on the picked face plane`,
+        'move the sketch onto the face plane (same offset along the face normal)',
+        [target],
+        ['points'],
+      );
+    return drill(doc, kernel, entity, source, resolved, sketch.points, 'world', built);
   },
 });
+
+const SKETCH_PLANE_TOLERANCE = 1e-4;
 
 const isPending = (extent: BuiltHole['extent']): extent is PendingExtent =>
   (extent.kind === 'up_to_next' || extent.kind === 'up_to_face') && !('depth' in extent);

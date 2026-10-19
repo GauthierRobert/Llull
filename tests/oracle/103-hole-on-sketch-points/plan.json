@@ -1,0 +1,28 @@
+{
+  "actions": [
+    { "command": "add_box", "params": { "size": [20, 20, 4] }, "as": "p" },
+    { "command": "draw_point", "params": { "position": [5, 5, 2] }, "as": "a" },
+    { "command": "draw_point", "params": { "position": [-5, -5, 2] }, "as": "b" },
+    {
+      "command": "draw_polyline",
+      "params": {
+        "position": [0, 0, 2],
+        "points": [
+          [-5, 5],
+          [5, -5]
+        ]
+      },
+      "as": "c"
+    },
+    {
+      "command": "add_hole",
+      "params": {
+        "target": "$p",
+        "face": { "near": [0, 0, 2] },
+        "points": { "sketchEntityIds": ["$a", "$b", "$c"] },
+        "hole": { "kind": "simple", "diameter": 3 },
+        "extent": { "kind": "through_all" }
+      }
+    }
+  ]
+}
