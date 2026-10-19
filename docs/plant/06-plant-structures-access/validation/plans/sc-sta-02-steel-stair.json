@@ -1,0 +1,171 @@
+{
+  "id": "SC-STA-02",
+  "status": "PROPOSED — add_steel_stair, check_access are not built; add_level exists today",
+  "validates": [
+    "VC-STA-04",
+    "VC-STA-05"
+  ],
+  "description": "Steel stringer stair rising 3000 mm, riser max 180, going 280: 17 risers / 16 treads, 2h+g = 632.9 mm, 32.22 deg; both rulesets pass. Second stair with h 218.2 / g 200 fails OSHA tread and stays inside ISO 600..660 but outside ISO preferred angle (not gated).",
+  "actions": [
+    {
+      "command": "set_units",
+      "params": {
+        "units": "mm"
+      }
+    },
+    {
+      "command": "add_level",
+      "params": {
+        "name": "Grade",
+        "elevation": 0,
+        "height": 3000
+      }
+    },
+    {
+      "command": "add_level",
+      "params": {
+        "name": "+3000",
+        "elevation": 3000,
+        "height": 3000
+      }
+    },
+    {
+      "command": "add_steel_stair",
+      "params": {
+        "start": [
+          0,
+          0,
+          0
+        ],
+        "angle": 0,
+        "rise": 3000,
+        "width": 800,
+        "riserMax": 180,
+        "going": 280,
+        "stringerProfile": "UPN200",
+        "tread": {
+          "kind": "grating",
+          "gratingType": "19-W-4 1-1/4x3/16"
+        },
+        "railings": "both",
+        "railingHeight": 1100,
+        "rulesets": [
+          "iso_14122",
+          "osha_1910"
+        ]
+      },
+      "as": "st1"
+    },
+    {
+      "command": "add_steel_stair",
+      "params": {
+        "start": [
+          0,
+          3000,
+          0
+        ],
+        "angle": 0,
+        "rise": 2400,
+        "width": 800,
+        "riserMax": 220,
+        "going": 200,
+        "stringerProfile": "UPN200",
+        "railings": "both"
+      },
+      "as": "st2"
+    },
+    {
+      "command": "check_access",
+      "params": {
+        "ids": [
+          "$st1",
+          "$st2"
+        ],
+        "rulesets": [
+          "iso_14122",
+          "osha_1910"
+        ]
+      }
+    }
+  ],
+  "expected": [
+    {
+      "step": 3,
+      "path": "data.riserCount",
+      "value": 17,
+      "source": "ceil(3000/180)"
+    },
+    {
+      "step": 3,
+      "path": "data.treadCount",
+      "value": 16
+    },
+    {
+      "step": 3,
+      "path": "data.riserHeightMm",
+      "value": 176.4706,
+      "abs": 0.001
+    },
+    {
+      "step": 3,
+      "path": "data.blondelMm",
+      "value": 632.9412,
+      "abs": 0.001,
+      "source": "2h + g"
+    },
+    {
+      "step": 3,
+      "path": "data.pitchDeg",
+      "value": 32.2213,
+      "abs": 0.001,
+      "source": "atan(h/g)"
+    },
+    {
+      "step": 3,
+      "path": "data.runMm",
+      "value": 4480,
+      "abs": 0.001,
+      "source": "(n-1) g"
+    },
+    {
+      "step": 4,
+      "path": "data.riserCount",
+      "value": 11
+    },
+    {
+      "step": 4,
+      "path": "data.riserHeightMm",
+      "value": 218.1818,
+      "abs": 0.001
+    },
+    {
+      "step": 4,
+      "path": "data.blondelMm",
+      "value": 636.3636,
+      "abs": 0.001
+    },
+    {
+      "step": 4,
+      "path": "data.pitchDeg",
+      "value": 47.4896,
+      "abs": 0.001
+    },
+    {
+      "step": 5,
+      "path": "data.byId.$st1.verdict",
+      "value": "pass"
+    },
+    {
+      "step": 5,
+      "path": "data.byId.$st2.findings[code=STA_STAIR_TREAD].ruleset",
+      "value": "osha_1910",
+      "source": "200 < 241.3 mm (1910.25(c)(3))"
+    },
+    {
+      "step": 5,
+      "path": "data.byId.$st2.findings[code=STA_STAIR_BLONDEL]",
+      "value": "absent",
+      "source": "636.4 in 600..660"
+    }
+  ]
+}

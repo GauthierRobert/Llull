@@ -1,0 +1,37 @@
+{
+  "id": "SC-PSC-02",
+  "validates": ["VC-PSC-08", "VC-PSC-09"],
+  "description": "Import the CS150-A1 fixture spec, resolve components by type and size, resolve branches from the branch table, and refuse sizes and branches the spec does not cover",
+  "unbuilt": ["import_pipe_spec", "resolve_spec_component", "resolve_branch"],
+  "harness": { "inline": { "actions[0].params.spec": "../data/sample_spec_cs150.json" }, "note": "the test harness (and the CLI `--param-file`, TR-PSC-14) inlines the fixture before the run" },
+  "actions": [
+    { "command": "import_pipe_spec", "params": { "spec": "<data/sample_spec_cs150.json>" } },
+    { "command": "resolve_spec_component", "params": { "specId": "CS150-A1", "type": "elbow90", "nps": 6 } },
+    { "command": "resolve_spec_component", "params": { "specId": "CS150-A1", "type": "elbow90", "nps": 1 } },
+    { "command": "resolve_spec_component", "params": { "specId": "CS150-A1", "type": "pipe", "nps": 10 } },
+    { "command": "resolve_branch", "params": { "specId": "CS150-A1", "headerNps": 6, "branchNps": 6 } },
+    { "command": "resolve_branch", "params": { "specId": "CS150-A1", "headerNps": 6, "branchNps": 4 } },
+    { "command": "resolve_branch", "params": { "specId": "CS150-A1", "headerNps": 6, "branchNps": 2 } },
+    { "command": "resolve_branch", "params": { "specId": "CS150-A1", "headerNps": 6, "branchNps": 1 } },
+    { "command": "resolve_branch", "params": { "specId": "CS150-A1", "headerNps": 4, "branchNps": 6 } },
+    { "command": "resolve_spec_component", "params": { "specId": "CS150-A1", "type": "elbow90", "nps": 30 } }
+  ],
+  "expected": [
+    { "step": 1, "path": "componentId", "value": "E90-LR", "source": "fixture: elbow90 NPS 2..24 is E90-LR" },
+    { "step": 1, "path": "schedule", "value": "40", "source": "fixture: scheduleFromPipe, P-BW NPS 2..6 Sch 40" },
+    { "step": 1, "path": "centreToEndMm", "value": 228.6, "abs": 0.01, "source": "B16.9 LR NPS 6 (data/asme_b16_9_buttweld_fittings.json)" },
+    { "step": 1, "path": "wallMm", "value": 7.11, "abs": 0.001, "source": "B36.10M NPS 6 Sch 40" },
+    { "step": 2, "path": "componentId", "value": "E90-SW", "source": "fixture: NPS 1 is socket-weld" },
+    { "step": 2, "path": "ends", "value": "SW", "source": "fixture" },
+    { "step": 2, "path": "verified", "value": false, "source": "B16.11 dimensions not in the open catalogue: TBD - the result says unverified (AF-32)" },
+    { "step": 3, "path": "schedule", "value": "STD", "source": "fixture: P-BW-L NPS 8..24 STD" },
+    { "step": 3, "path": "wallMm", "value": 9.27, "abs": 0.001, "source": "B36.10M NPS 10 STD" },
+    { "step": 4, "path": "fitting", "value": "T", "source": "fixture branch table" },
+    { "step": 5, "path": "fitting", "value": "RT", "source": "fixture branch table" },
+    { "step": 6, "path": "fitting", "value": "W", "source": "fixture branch table" },
+    { "step": 6, "path": "componentId", "value": "WOL", "source": "fixture" },
+    { "step": 7, "path": "fitting", "value": "S", "source": "fixture branch table" },
+    { "step": 8, "path": "error.code", "value": "PSC_BRANCH_UNDEFINED", "source": "branch larger than header: no cell" },
+    { "step": 9, "path": "error.code", "value": "PSC_SIZE_OUT_OF_RANGE", "source": "spec size range NPS 1/2..24" }
+  ]
+}

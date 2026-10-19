@@ -196,3 +196,30 @@ describe('simulate_motion with loops', () => {
     expect(execute(withMotor(doc, 600), 'simulate_motion', { duration: 0.01, crankAxis: 'slide_j' }).summary).toMatch(/crankAxis/);
   });
 });
+
+describe('speed governor of a loop mechanism under the default solver (ENG-3)', () => {
+  const governed = (crankKg: number, pistonKg: number, rodKg: number): LoopData => {
+    const crankInertia = (crankKg * 0.08 ** 2) / 2;
+    const { doc } = sliderCrank({ crankRpm: 955, crankInertia, pistonKg, rodKg });
+    return simulate(withMotor(doc, 955), { duration: 0.2, detail: 'series', sampleRate: 2000 });
+  };
+  const meanRpm = (data: LoopData): number => {
+    const speed = data.series?.jointVelocity['crank_j'] ?? [];
+    const tail = speed.slice(Math.floor(speed.length / 2));
+    return (tail.reduce((sum, v) => sum + v, 0) / tail.length) * (30 / Math.PI);
+  };
+
+  it('1 kg crank, 0.5 kg rod, 0.5 kg piston: speed held within 1e-3, loop tier pass', () => {
+    const data = governed(1, 0.5, 0.5);
+    expect(data.loops?.tier).toBe('pass');
+    expect(Math.abs(meanRpm(data) / 955 - 1)).toBeLessThan(1e-3);
+    expect(Math.abs((data.joints['crank_j']?.finalRpm ?? 0) / 955 - 1)).toBeLessThan(1e-3);
+  });
+
+  it('a 0.1 kg crank (links five times heavier than the crank) stays bounded with the loop closed', () => {
+    const data = governed(0.1, 0.5, 0.5);
+    expect(data.loops?.tier).toBe('pass');
+    expect(Math.abs(meanRpm(data) / 955 - 1)).toBeLessThan(0.05);
+    expect(Math.max(...(data.series?.jointVelocity['crank_j'] ?? [0]).map(Math.abs))).toBeLessThan(2 * 100);
+  });
+});

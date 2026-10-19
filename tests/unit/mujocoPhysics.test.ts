@@ -4,6 +4,7 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { PhysicsEngine, SimulationBody, SimulationModel } from '@core/dynamics/physicsEngine';
+import { speedServoGains } from '@core/dynamics/forceLaws';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 
 let engine: PhysicsEngine;
@@ -127,6 +128,79 @@ describe('MuJoCo physics engine', () => {
       { duration: 1, timestep: 0.001, sampleInterval: 1 },
     );
     expect(trace.bodyPosition['block']?.[1]?.[0]).toBeCloseTo(1, 6);
+  });
+
+  // fixed gains on purpose (no naturalFrequency): omega_n · dt = 0.25 keeps the 4th-order difference of omega below accurate enough to
+  // tell the sampled-state force from the stale last-RK4-stage one; the scheduled omega_n · dt = 0.5 of the shipped gains does not
+  it('a speed servo reports its force at the sampled state: F = I dω/dt through the spin-up from rest', () => {
+    const [timestep, inertia] = [0.001, 0.5];
+    const model: SimulationModel = {
+      gravity: [0, 0, 0],
+      bodies: [rotor('wheel', [0, 0, 1], 10, inertia)],
+      gears: [],
+      ...tree,
+      servos: [
+        { id: 'drive', joint: 'wheel-hinge', targetVelocity: 10, stiffness: inertia * 250 ** 2, damping: 2 * inertia * 250, maxForce: 1e9 },
+      ],
+      loads: noLoads,
+    };
+    const trace = engine.simulate(model, { duration: 0.1, timestep, sampleInterval: timestep });
+    const [force, omega] = [trace.servoForce['drive'] ?? [], trace.jointVelocity['wheel-hinge'] ?? []];
+    const rate = (k: number): number =>
+      ((omega[k - 2] ?? 0) - 8 * (omega[k - 1] ?? 0) + 8 * (omega[k + 1] ?? 0) - (omega[k + 2] ?? 0)) / (12 * timestep);
+    const peak = Math.max(...force.map(Math.abs));
+    const worst = Math.max(...Array.from({ length: 40 }, (_, i) => Math.abs((force[i + 3] ?? 0) - inertia * rate(i + 3))));
+    expect(peak).toBeGreaterThan(100);
+    expect(worst / peak).toBeLessThan(1e-3);
+  });
+
+  it('a saturated speed servo does not overshoot its target on spin-up (anti-windup)', () => {
+    const [timestep, inertia, target] = [0.001, 0.5, 10];
+    const model: SimulationModel = {
+      gravity: [0, 0, 0],
+      bodies: [rotor('wheel', [0, 0, 1], 10, inertia)],
+      gears: [],
+      ...tree,
+      servos: [{ id: 'drive', joint: 'wheel-hinge', targetVelocity: target, ...speedServoGains(inertia, timestep), maxForce: 2 }],
+      loads: noLoads,
+    };
+    const trace = engine.simulate(model, { duration: 12, timestep, sampleInterval: 0.01 });
+    const omega = trace.jointVelocity['wheel-hinge'] ?? [];
+    expect(Math.max(...(trace.servoForce['drive'] ?? []).map(Math.abs))).toBeCloseTo(2, 6);
+    expect(Math.max(...omega)).toBeLessThan(target * 1.001);
+    expect(last(omega)).toBeCloseTo(target, 6);
+  });
+
+  it('anti-windup holds in the negative sense: target -10 rad/s from rest never goes below -10.01 and settles at -10', () => {
+    const [timestep, inertia, target] = [0.001, 0.5, -10];
+    const model: SimulationModel = {
+      gravity: [0, 0, 0],
+      bodies: [rotor('wheel', [0, 0, 1], 10, inertia)],
+      gears: [],
+      ...tree,
+      servos: [{ id: 'drive', joint: 'wheel-hinge', targetVelocity: target, ...speedServoGains(inertia, timestep), maxForce: 2 }],
+      loads: noLoads,
+    };
+    const omega = engine.simulate(model, { duration: 12, timestep, sampleInterval: 0.01 }).jointVelocity['wheel-hinge'] ?? [];
+    expect(Math.min(...omega)).toBeGreaterThan(-10.01);
+    expect(last(omega)).toBeCloseTo(-10, 6);
+  });
+
+  it('scheduled gains do not depend on the static ones: absurd first-step gains still spin the wheel up to 10 rad/s without ringing', () => {
+    const [timestep, inertia] = [0.001, 0.5];
+    const model: SimulationModel = {
+      gravity: [0, 0, 0],
+      bodies: [rotor('wheel', [0, 0, 1], 10, inertia)],
+      gears: [],
+      ...tree,
+      servos: [
+        { id: 'drive', joint: 'wheel-hinge', targetVelocity: 10, stiffness: 1e12, damping: 1e6, naturalFrequency: 500, maxForce: 1e9 },
+      ],
+      loads: noLoads,
+    };
+    const omega = engine.simulate(model, { duration: 1, timestep, sampleInterval: 0.01 }).jointVelocity['wheel-hinge'] ?? [];
+    expect(Math.max(...omega)).toBeLessThan(10.001);
+    expect(last(omega)).toBeCloseTo(10, 6);
   });
 
   it('rejects a model MuJoCo cannot compile', () => {

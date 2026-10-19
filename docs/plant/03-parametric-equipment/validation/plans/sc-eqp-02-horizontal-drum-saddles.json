@@ -1,0 +1,340 @@
+{
+  "id": "SC-EQP-02",
+  "status": "PROPOSED - commands not built yet (add_vessel, add_nozzle, vessel_volume, vessel_thickness, equipment_weights, equipment_ports, check_equipment, update_equipment_parameters).",
+  "validates": [
+    "VC-EQP-02",
+    "VC-EQP-05",
+    "VC-EQP-06",
+    "VC-EQP-09",
+    "VC-EQP-12",
+    "VC-EQP-14",
+    "VC-EQP-16"
+  ],
+  "description": "Horizontal reflux drum D-201: ID 2000 mm, T/T 6000 mm, 2:1 heads, shell 18 mm (E 0.85 spot RT), seamless heads 16 mm (E 1.0), CA 3 mm, 1.5 MPa(g), S 137.9 MPa (input), two saddles at 1200 mm from the tangent lines, axis 1500 mm above grade, four nozzles. Then a deliberate under-design revision (shell 12 mm) that the check must fail with EQP_SHELL_UNDER_THICKNESS.",
+  "actions": [
+    {
+      "command": "set_units",
+      "params": {
+        "units": "mm"
+      }
+    },
+    {
+      "command": "add_vessel",
+      "params": {
+        "tag": "D-201",
+        "name": "Reflux drum",
+        "orientation": "horizontal",
+        "location": [
+          0,
+          0
+        ],
+        "planRotationDeg": 0,
+        "insideDiameter": 2000,
+        "tangentLength": 6000,
+        "heads": {
+          "left": {
+            "type": "ellipsoidal",
+            "ratio": 2
+          },
+          "right": {
+            "type": "ellipsoidal",
+            "ratio": 2
+          }
+        },
+        "shellThickness": 18,
+        "headThickness": 16,
+        "corrosionAllowance": 3,
+        "support": {
+          "type": "saddles",
+          "stations": [
+            1200,
+            4800
+          ],
+          "width": 250,
+          "axisElevation": 1500
+        },
+        "design": {
+          "pressure": {
+            "value": 1.5,
+            "unit": "MPa"
+          },
+          "temperatureC": 120,
+          "material": "SA-516 Gr 70",
+          "allowableStress": {
+            "value": 137.9,
+            "unit": "MPa",
+            "source": "user input"
+          },
+          "jointEfficiency": {
+            "shell": 0.85,
+            "heads": 1.0
+          },
+          "materialDensityKgM3": 7850
+        }
+      },
+      "as": "d201"
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipment": "D-201",
+        "mark": "N1",
+        "service": "inlet",
+        "dn": 200,
+        "rating": "CL300",
+        "facing": "RF",
+        "location": {
+          "on": "shell",
+          "station": 600,
+          "orientationDeg": 0
+        },
+        "projection": 1400
+      }
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipment": "D-201",
+        "mark": "N2",
+        "service": "outlet",
+        "dn": 150,
+        "rating": "CL300",
+        "facing": "RF",
+        "location": {
+          "on": "shell",
+          "station": 5400,
+          "orientationDeg": 180
+        },
+        "projection": 1300
+      }
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipment": "D-201",
+        "mark": "N3",
+        "service": "PSV",
+        "dn": 100,
+        "rating": "CL300",
+        "facing": "RF",
+        "location": {
+          "on": "shell",
+          "station": 3000,
+          "orientationDeg": 0
+        },
+        "projection": 1100
+      }
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipment": "D-201",
+        "mark": "N4",
+        "service": "level bridle",
+        "dn": 50,
+        "rating": "CL300",
+        "facing": "RF",
+        "location": {
+          "on": "head",
+          "head": "right",
+          "radialOffset": 0
+        },
+        "projection": 1000
+      }
+    },
+    {
+      "command": "vessel_volume",
+      "params": {
+        "equipment": "D-201",
+        "levels": [
+          1000,
+          500
+        ]
+      }
+    },
+    {
+      "command": "vessel_thickness",
+      "params": {
+        "equipment": "D-201"
+      }
+    },
+    {
+      "command": "equipment_weights",
+      "params": {
+        "equipment": "D-201",
+        "include": [
+          "body"
+        ]
+      }
+    },
+    {
+      "command": "equipment_ports",
+      "params": {
+        "equipment": "D-201"
+      }
+    },
+    {
+      "command": "check_equipment",
+      "params": {
+        "equipment": [
+          "D-201"
+        ]
+      }
+    },
+    {
+      "command": "update_equipment_parameters",
+      "params": {
+        "equipment": "D-201",
+        "set": {
+          "shellThickness": 12
+        }
+      }
+    },
+    {
+      "command": "check_equipment",
+      "params": {
+        "equipment": [
+          "D-201"
+        ]
+      }
+    }
+  ],
+  "expected": [
+    {
+      "step": 6,
+      "path": "totalVolumeM3",
+      "value": 20.943951023931955,
+      "rel": 1e-09,
+      "source": "closed form"
+    },
+    {
+      "step": 6,
+      "path": "levels.0.liquidVolumeM3",
+      "value": 10.471975511965978,
+      "rel": 1e-09,
+      "source": "Jones horizontal ellipsoidal, h = D/2 (S1)"
+    },
+    {
+      "step": 6,
+      "path": "levels.1.liquidVolumeM3",
+      "value": 4.012358330575208,
+      "rel": 1e-09,
+      "source": "Jones horizontal ellipsoidal, h = 500 mm (S1)"
+    },
+    {
+      "step": 7,
+      "path": "components.shell.requiredThicknessMm",
+      "value": 15.934703176718392,
+      "rel": 1e-09,
+      "source": "UG-27(c)(1), E 0.85, corroded R"
+    },
+    {
+      "step": 7,
+      "path": "mawpMPa",
+      "value": 1.737376482213439,
+      "rel": 1e-09,
+      "source": "min(shell 1.73738, head 1.78502)"
+    },
+    {
+      "step": 7,
+      "path": "hydrotestPressureMPa",
+      "value": 2.258589426877471,
+      "rel": 1e-09,
+      "source": "UG-99(b)"
+    },
+    {
+      "step": 8,
+      "path": "body.emptyKg",
+      "value": 6485.731147911467,
+      "rel": 1e-06,
+      "source": "derive_expected.py"
+    },
+    {
+      "step": 8,
+      "path": "body.testKg",
+      "value": 27429.682171843422,
+      "rel": 1e-06,
+      "source": "empty + water 20.944 m3"
+    },
+    {
+      "step": 9,
+      "path": "ports.D-201:N1.position",
+      "value": [
+        -2400,
+        0,
+        2900
+      ],
+      "abs": 1e-06,
+      "source": "left tangent at x = -3000, station 600, orientation 0 = top for horizontal vessels, face 1400 above axis"
+    },
+    {
+      "step": 9,
+      "path": "ports.D-201:N2.position",
+      "value": [
+        2400,
+        0,
+        200
+      ],
+      "abs": 1e-06,
+      "source": "orientation 180 = bottom"
+    },
+    {
+      "step": 9,
+      "path": "ports.D-201:N4.position",
+      "value": [
+        4000,
+        0,
+        1500
+      ],
+      "abs": 1e-06,
+      "source": "right tangent 3000 + projection 1000 along the axis"
+    },
+    {
+      "step": 9,
+      "path": "ports.D-201:N4.direction",
+      "value": [
+        1,
+        0,
+        0
+      ],
+      "abs": 1e-09,
+      "source": "axial outward"
+    },
+    {
+      "step": 10,
+      "path": "status",
+      "value": "warn",
+      "source": "no fail; warnings EQP_FLANGE_PLACEHOLDER (01 PSC not present); status precedence fail > warn > pass_with_review > pass"
+    },
+    {
+      "step": 10,
+      "path": "issues[severity=fail].length",
+      "value": 0,
+      "source": "all code checks pass"
+    },
+    {
+      "step": 10,
+      "path": "reviewRequired",
+      "value": true,
+      "source": "AF-33: pressure equipment"
+    },
+    {
+      "step": 12,
+      "path": "status",
+      "value": "fail",
+      "source": "t_avail 12 mm < t_req 15.93 mm"
+    },
+    {
+      "step": 12,
+      "path": "issues[code=EQP_SHELL_UNDER_THICKNESS].severity",
+      "value": "fail",
+      "source": "t_avail 12 - 3 = 9 mm < t_req - CA = 12.93 mm"
+    },
+    {
+      "step": 12,
+      "path": "issues[code=EQP_MAWP_BELOW_DESIGN].severity",
+      "value": "fail",
+      "source": "MAWP shell = 137.9 x 0.85 x 9 / (1003 + 5.4) = 1.04615 MPa < 1.5 MPa"
+    }
+  ]
+}

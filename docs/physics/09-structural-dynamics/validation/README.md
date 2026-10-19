@@ -73,6 +73,7 @@ Status **P** (proposed) for all. Gate: `unit` = pure TS, no solver; `integration
 | VC-DYN-45 | FR-DYN-01, 22; TR-DYN-01/02/03/70 | plugin contract, staleness, surface equality | flags in the JSON | exact | A | contract + golden |
 | VC-DYN-46 | FR-DYN-13, 15; TR-DYN-61 | V1 joint history in a transient; stress ASD CSV for PHY-07 | shape only (values TBD) | exact | A | V1 |
 | VC-DYN-47 | FR-DYN-03; TR-DYN-11/12 | `structural_material` damping via the PHY-01 property API | missing → `DYN_MATERIAL_NO_DAMPING`; η 0.02 → `*DAMPING,STRUCTURAL=0.02`, ζ_eq 0.01 | exact | A | unit |
+| VC-DYN-48 | FR-DYN-08, 10; TR-DYN-40, 44 | native vs reference ([RS1](../../../decisions/RS1-native-compute.md) RS-7, planned): `llull-compute post random` against `math/randomResponse.ts` on the VC-DYN-21 case (all nodes, 3 components) and seeded synthetic modal bases; then a large mesh for wall time | same nodal rms field, same nodal max and location; wall time recorded (TBD — measure) | 1e-10 rel per node (llull choice: same grid and Simpson rule in f64, only summation order may differ); location exact | — (comparison, not in `expected_results.json`) | integration |
 
 Notes on specific cases:
 

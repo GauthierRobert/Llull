@@ -1,0 +1,102 @@
+{
+ "sc-dat-01-reference.ifc": [
+  {
+   "spec": "Pipe segments carry a nominal diameter",
+   "status": true,
+   "applicable": 5,
+   "failed": 0
+  },
+  {
+   "spec": "Pipe segments belong to a distribution system (pipeline)",
+   "status": true,
+   "applicable": 5,
+   "failed": 0
+  },
+  {
+   "spec": "Valves carry a tag of the form LETTERS-DIGITS",
+   "status": true,
+   "applicable": 0,
+   "failed": 0
+  }
+ ],
+ "sc-dat-02-reference.ifc": [
+  {
+   "spec": "Pipe segments carry a nominal diameter",
+   "status": true,
+   "applicable": 5,
+   "failed": 0
+  },
+  {
+   "spec": "Pipe segments belong to a distribution system (pipeline)",
+   "status": true,
+   "applicable": 5,
+   "failed": 0
+  },
+  {
+   "spec": "Valves carry a tag of the form LETTERS-DIGITS",
+   "status": true,
+   "applicable": 2,
+   "failed": 0
+  }
+ ],
+ "sc-dat-02-negative.ifc": [
+  {
+   "spec": "Pipe segments carry a nominal diameter",
+   "status": true,
+   "applicable": 5,
+   "failed": 0
+  },
+  {
+   "spec": "Pipe segments belong to a distribution system (pipeline)",
+   "status": true,
+   "applicable": 5,
+   "failed": 0
+  },
+  {
+   "spec": "Valves carry a tag of the form LETTERS-DIGITS",
+   "status": true,
+   "applicable": 2,
+   "failed": 0
+  }
+ ],
+ "Infra-Plumbing.ifc": [
+  {
+   "spec": "Pipe segments carry a nominal diameter",
+   "status": false,
+   "applicable": 24,
+   "failed": 24
+  },
+  {
+   "spec": "Pipe segments belong to a distribution system (pipeline)",
+   "status": true,
+   "applicable": 24,
+   "failed": 0
+  },
+  {
+   "spec": "Valves carry a tag of the form LETTERS-DIGITS",
+   "status": true,
+   "applicable": 0,
+   "failed": 0
+  }
+ ],
+ "Building-Hvac.ifc": [
+  {
+   "spec": "Pipe segments carry a nominal diameter",
+   "status": true,
+   "applicable": 0,
+   "failed": 0
+  },
+  {
+   "spec": "Pipe segments belong to a distribution system (pipeline)",
+   "status": true,
+   "applicable": 0,
+   "failed": 0
+  },
+  {
+   "spec": "Valves carry a tag of the form LETTERS-DIGITS",
+   "status": true,
+   "applicable": 0,
+   "failed": 0
+  }
+ ]
+}

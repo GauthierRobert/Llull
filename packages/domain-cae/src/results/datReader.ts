@@ -16,10 +16,13 @@ const EIGEN_TABLES = [
   { heading: /B U C K L I N G\s+F A C T O R\s+O U T P U T/, title: 'buckling factors (mode, factor)', columns: 2 },
 ] as const;
 
+/** C `%e` output with a 3-digit exponent loses its `E` in CalculiX tables: `1.52172-101` is 1.52172E-101. */
+const THREE_DIGIT_EXPONENT = /^([+-]?\d*\.\d+)([+-]\d{3})$/;
+
 const numbersOf = (line: string): number[] | null => {
   const tokens = line.trim().split(/\s+/);
   if (tokens.length === 0 || tokens[0] === '') return null;
-  const values = tokens.map(Number);
+  const values = tokens.map((token) => Number(token.replace(THREE_DIGIT_EXPONENT, '$1E$2')));
   return values.every(Number.isFinite) ? values : null;
 };
 

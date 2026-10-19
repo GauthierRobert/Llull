@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ids xmlns="http://standards.buildingsmart.org/IDS" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://standards.buildingsmart.org/IDS http://standards.buildingsmart.org/IDS/1.0/ids.xsd">
+  <info>
+    <title>llull plant handover minimum (gap 08 DAT, VC-DAT-07)</title>
+    <version>0.1</version>
+    <description>Minimum information requirements for an IFC 4.3 piping/process export from llull. Written for the validation pack, not an industry standard.</description>
+  </info>
+  <specifications>
+    <specification name="Pipe segments carry a nominal diameter" ifcVersion="IFC4X3_ADD2">
+      <applicability minOccurs="0" maxOccurs="unbounded">
+        <entity><name><simpleValue>IFCPIPESEGMENT</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <property dataType="IFCPOSITIVELENGTHMEASURE" cardinality="required">
+          <propertySet><simpleValue>Pset_PipeSegmentTypeCommon</simpleValue></propertySet>
+          <baseName><simpleValue>NominalDiameter</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+    <specification name="Pipe segments belong to a distribution system (pipeline)" ifcVersion="IFC4X3_ADD2">
+      <applicability minOccurs="0" maxOccurs="unbounded">
+        <entity><name><simpleValue>IFCPIPESEGMENT</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <partOf relation="IFCRELASSIGNSTOGROUP" cardinality="required">
+          <entity><name><simpleValue>IFCDISTRIBUTIONSYSTEM</simpleValue></name></entity>
+        </partOf>
+      </requirements>
+    </specification>
+    <specification name="Valves carry a tag of the form LETTERS-DIGITS" ifcVersion="IFC4X3_ADD2">
+      <applicability minOccurs="0" maxOccurs="unbounded">
+        <entity><name><simpleValue>IFCVALVE</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>Tag</simpleValue></name>
+          <value><xs:restriction base="xs:string"><xs:pattern value="[A-Z]{1,4}-[0-9]{3,5}"/></xs:restriction></value>
+        </attribute>
+      </requirements>
+    </specification>
+  </specifications>
+</ids>

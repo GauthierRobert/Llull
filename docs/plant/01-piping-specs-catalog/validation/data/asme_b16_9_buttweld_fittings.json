@@ -1,0 +1,50 @@
+{
+  "meta": {
+    "id": "PSC-DATA-B169",
+    "title": "ASME B16.9 butt-welding fittings: centre-to-end of 90 deg / 45 deg long-radius and 90 deg short-radius elbows, straight tee run, concentric reducer length",
+    "standard": "ASME B16.9 (factory-made wrought butt-welding fittings), paywalled. Values below are quoted from public manufacturer / reference tables found by search and cross-checked; inch values are the standard's, mm = inch x 25.4 unless a source prints a rounded metric value.",
+    "sources": {
+      "S8": "Texas Flange, '90 deg Long Radius Elbow Dimensions' and '45 deg Long Radius Elbow Dimensions', https://texasflange.com/butt-weld-fittings/elbow-long-radius/ , https://texasflange.com/butt-weld-fittings/elbow-45-long-radius/ (search extract)",
+      "S9": "Wermac, 'Dimensions of butt-weld elbows / straight tees ASME B16.9', https://www.wermac.org/fittings/dim_elbows_c.html , https://wermac.org/fittings/dim_tees_eq.html (search extract)",
+      "S10": "Hardhat Engineer, 'Pipe elbow dimensions long/short radius in mm', https://hardhatengineer.com/pipe-elbow-dimensions-long-short-radius-elbow-dimensions-in-mm/ (search extract)",
+      "S11": "dodo FreeCAD workbench (oddtopus), tablez/Reduct_SCH-STD.csv column H, LGPL-3.0, https://raw.githubusercontent.com/oddtopus/dodo/master/tablez/Reduct_SCH-STD.csv (downloaded, copy in data/)",
+      "S12": "Hardhat Engineer 'pipe reducer dimensions' / Wermac 'dim reducers' (search extract: 8x6 length 152 mm; NPS 4 reducers length 4 in)"
+    },
+    "rules": {
+      "lr90": "A = 1.5 x NPS (inch) for NPS >= 3/4 (S8, S9, S10: 'centre-to-end of an LR elbow is 1.5 x NPS'; NPS 1/2 is an exception at 1.50 in)",
+      "sr90": "A = 1.0 x NPS for NPS >= 1 (S9 extract: short radius centre-to-face equals the nominal pipe size)"
+    },
+    "tolerance": "B16.9 centre-to-end tolerance for NPS 2..8 is +/- 2 mm (S9 extract on the tee table).",
+    "units": { "inch": "in", "mm": "mm" }
+  },
+  "lr90": [
+    { "nps": 2, "inch": 3.0, "mm": 76.2, "sources": ["S8", "rule"], "grade": "A" },
+    { "nps": 4, "inch": 6.0, "mm": 152.4, "printedMm": 152, "sources": ["S8", "S9"], "grade": "A" },
+    { "nps": 6, "inch": 9.0, "mm": 228.6, "printedMm": 229, "sources": ["S8", "S9", "S10"], "grade": "A" }
+  ],
+  "lr45": [
+    { "nps": 4, "inch": 2.5, "mm": 63.5, "printedMm": 64, "sources": ["S8", "S10"], "grade": "A" },
+    { "nps": 6, "inch": 3.75, "mm": 95.25, "printedMm": 95, "sources": ["S8", "S10"], "grade": "A" }
+  ],
+  "sr90": [
+    { "nps": 6, "inch": 6.0, "mm": 152.4, "sources": ["S9 rule only"], "grade": "B" }
+  ],
+  "teeRun": [
+    { "nps": 2, "printedMm": 64, "inch": 2.5, "sources": ["S9"], "grade": "B" },
+    { "nps": 4, "printedMm": 105, "inch": 4.12, "sources": ["S9"], "grade": "B" },
+    { "nps": 6, "printedMm": 143, "inch": 5.62, "sources": ["S9"], "grade": "B" }
+  ],
+  "reducerLength": [
+    { "nps": 4, "mm": 102, "inch": 4.0, "sources": ["S11", "S12"], "grade": "A" },
+    { "nps": 8, "mm": 152, "inch": 6.0, "sources": ["S11", "S12"], "grade": "A" },
+    { "nps": 6, "mm": 140, "inch": 5.5, "sources": ["S11"], "grade": "B" },
+    { "nps": 12, "mm": 203, "inch": 8.0, "sources": ["S11"], "grade": "B" }
+  ],
+  "negativeExample": {
+    "what": "dodo tablez/Elbow_SCH-STD.csv BendRadius = 0.75 x OD (NPS 6: 126.2 mm), not the B16.9 LR radius 228.6 mm",
+    "use": "VC-PSC-05 failure case: a catalogue import that carries this radius as 'B16.9 LR' must be flagged PSC_CATALOG_DIM_MISMATCH by check_piping_catalog against the rule lr90."
+  },
+  "notVerified": [
+    "Caps (length E) and reducing tees: no second source found; grade C, not used."
+  ]
+}

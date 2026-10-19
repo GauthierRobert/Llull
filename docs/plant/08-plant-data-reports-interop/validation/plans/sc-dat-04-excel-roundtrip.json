@@ -1,0 +1,23 @@
+{
+  "id": "SC-DAT-04",
+  "status": "PROPOSED — DAT MVP commands flagged \"unbuilt\". A plan step cannot read a file: the import step runs from the CLI as `llull import_plant_data @params.json --doc d.llull.json` with params.json = { \"fileBase64\": <base64 of data/reference/equipment-list-sc-dat-01-edited.xlsx>, \"mode\": \"preview\" }.",
+  "validates": ["VC-DAT-09"],
+  "description": "Excel round trip of the SC-DAT-01 equipment list: export, edit outside llull (fixture), preview the import (diff only), apply the accepted change. Prerequisite: SC-DAT-01 steps 0-14 (the fixture's ObjectId column holds equipment-1 / equipment-2, the ids add_equipment issues on an empty building).",
+  "actions": [
+    { "command": "build_project", "params": { "planRef": "sc-dat-01-tank-pump-mvp.json", "steps": "0-14" }, "note": "shorthand: replay SC-DAT-01 steps 0-14" },
+    { "command": "export_plant_data", "unbuilt": true, "params": { "classes": ["Equipment"], "format": "xlsx" } },
+    { "command": "import_plant_data", "unbuilt": true, "params": { "fileRef": "data/reference/equipment-list-sc-dat-01-edited.xlsx", "mode": "preview" } },
+    { "command": "import_plant_data", "unbuilt": true, "params": { "fileRef": "data/reference/equipment-list-sc-dat-01-edited.xlsx", "mode": "apply" } },
+    { "command": "plant_report", "unbuilt": true, "params": { "kind": "equipment_list" } }
+  ],
+  "expected": [
+    { "step": 1, "path": "sheets.Equipment.rows", "value": 2, "source": "plan" },
+    { "step": 1, "path": "sheets.Equipment.cellsEqualTo", "value": "data/reference/equipment-list-sc-dat-01.xlsx", "source": "fixture written by openpyxl 3.1 (same header and values; read back with openpyxl)" },
+    { "step": 2, "path": "changes.length", "value": 1, "source": "fixture: P-101 OperatingWeight 450 -> 480" },
+    { "step": 2, "path": "rejected[0].code", "value": "DAT_IMPORT_READONLY_COLUMN", "source": "Tag is derived (read-only), T-101 -> T-102 in the sheet" },
+    { "step": 2, "path": "rejected[1].code", "value": "DAT_IMPORT_TYPE", "source": "DesignPressure 'high' is not a number" },
+    { "step": 2, "path": "documentChanged", "value": false, "source": "preview is read-only" },
+    { "step": 3, "path": "applied", "value": 1, "source": "only the valid change is applied (rejected cells are reported, never half-applied)" },
+    { "step": 4, "path": "rowsByTag.P-101.OperatingWeightKg", "value": 480, "source": "fixture" }
+  ]
+}

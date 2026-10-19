@@ -1201,6 +1201,52 @@
    "unit": "-",
    "input": "nist_ctc_02_asme1_rc.stp",
    "source": "requirement (AGENT_FIRST.md); policy values, not measured"
+  },
+  {
+   "vc": "VC-KRN-25",
+   "title": "native llull-kernel (RS-1) vs the OCP 7.9.3 reference (planned)",
+   "proves": [
+    "FR-KRN-10",
+    "TR-KRN-02",
+    "TR-KRN-05"
+   ],
+   "status": "planned (RS-1, TECHNICAL_SPEC §2.A, M2)",
+   "value": {
+    "analyticSolids": "every case of occt_crosscheck.json (volume_mm3, area_mm2, centroid_mm, inertia_rho1_mm5)",
+    "nist": "every file of nist_occt_reference.json (solids, shells, faces, edges, vertices, validAsRead, validAfterShapeFix, volumeMm3, areaMm2, centroidMm, inertiaRho1Mm5)",
+    "probe": {
+     "fuzzyFuse": {
+      "fuzzy0": {
+       "solids": 2,
+       "faces": 12
+      },
+      "fuzzy2e-5": {
+       "solids": 1,
+       "faces": 10
+      }
+     },
+     "determinism": {
+      "faces": 7,
+      "sha256_16": "1125f7464525c4f6"
+     },
+     "filletHistory": {
+      "facesGeneratedFromEdge": 1,
+      "inputFacesModified": 4
+     },
+     "inertiaVsOffset": "iyy_rel_err per x_mm as in occt_behaviour_probe.json"
+    }
+   },
+   "tolerance": {
+    "counts": "exact",
+    "validity": "exact",
+    "volumeRel": 1e-09,
+    "areaRel": 1e-09,
+    "inertiaRel": 1e-09,
+    "centroidAbs": 1e-06,
+    "signature": "equal on the same 7.9.3 patch build; else VC-KRN-10 cross-build mode"
+   },
+   "unit": "mm, mm^2, mm, mm^5",
+   "source": "measured (OCP 7.9.3.1): occt_crosscheck.json, nist_occt_reference.json, occt_behaviour_probe.json; tolerances = VC-KRN-01"
   }
  ]
 }

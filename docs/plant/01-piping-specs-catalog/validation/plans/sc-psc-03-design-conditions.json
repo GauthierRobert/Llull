@@ -1,0 +1,31 @@
+{
+  "id": "SC-PSC-03",
+  "validates": ["VC-PSC-07", "VC-PSC-10", "VC-PSC-11"],
+  "description": "Flange P-T rating with interpolation, spec design-condition check, and B31.3 pressure-design wall selection",
+  "unbuilt": ["pt_rating", "check_pipe_spec", "pipe_wall_check", "import_pipe_spec"],
+  "harness": { "inline": { "actions[0].params.spec": "../data/sample_spec_cs150.json" } },
+  "actions": [
+    { "command": "import_pipe_spec", "params": { "spec": "<data/sample_spec_cs150.json>" } },
+    { "command": "pt_rating", "params": { "standard": "ASME B16.5", "materialGroup": "1.1", "class": 150, "temperatureC": 38 } },
+    { "command": "pt_rating", "params": { "standard": "ASME B16.5", "materialGroup": "1.1", "class": 300, "temperatureC": 20 } },
+    { "command": "pt_rating", "params": { "standard": "ASME B16.5", "materialGroup": "1.1", "class": 150, "temperatureC": 45 } },
+    { "command": "check_pipe_spec", "params": { "specId": "CS150-A1", "design": { "pressureBar": 19.0, "temperatureC": 45 } } },
+    { "command": "check_pipe_spec", "params": { "specId": "CS150-A1", "design": { "pressureBar": 19.5, "temperatureC": 45 } } },
+    { "command": "pipe_wall_check", "params": { "nps": 4, "standard": "ASME B36.10M", "pressure": { "value": 1200, "unit": "psi" }, "allowableStress": { "value": 19000, "unit": "psi" }, "jointFactorE": 1, "weldStrengthW": 1, "coefficientY": 0.4, "corrosionAllowance": { "value": 3, "unit": "mm" }, "millTolerance": 0.125 } },
+    { "command": "pipe_wall_check", "params": { "nps": 4, "schedule": "40", "standard": "ASME B36.10M", "pressure": { "value": 1200, "unit": "psi" }, "allowableStress": { "value": 19000, "unit": "psi" }, "jointFactorE": 1, "weldStrengthW": 1, "coefficientY": 0.4, "corrosionAllowance": { "value": 3, "unit": "mm" }, "millTolerance": 0.125 } }
+  ],
+  "expected": [
+    { "step": 1, "path": "ratingBar", "value": 19.6, "abs": 0.001, "source": "B16.5 group 1.1 Cl150 -29..38 C (Engineering ToolBox; Fike)" },
+    { "step": 2, "path": "ratingBar", "value": 51.1, "abs": 0.001, "source": "B16.5 group 1.1 Cl300 -29..38 C (same)" },
+    { "step": 3, "path": "ratingBar", "value": 19.3667, "abs": 0.0005, "source": "linear interpolation 19.6 + (19.2 - 19.6) * 7/12" },
+    { "step": 4, "path": "status", "value": "warn", "source": "design within rating; warnings: spec status draft (PSC_SPEC_NOT_APPROVED), SW fittings unverified (PSC_DATA_UNVERIFIED)" },
+    { "step": 4, "path": "issues[code=PSC_PT_RATING_EXCEEDED]", "value": null, "source": "19.0 <= 19.3667" },
+    { "step": 5, "path": "status", "value": "fail", "source": "19.5 > 19.3667" },
+    { "step": 5, "path": "issues[0].code", "value": "PSC_PT_RATING_EXCEEDED", "source": "same" },
+    { "step": 6, "path": "pressureThicknessMm", "value": 3.5205, "abs": 0.0005, "source": "B31.3 eq. 3a: 1200 * 114.3 / (2 (19000 + 0.4 * 1200))" },
+    { "step": 6, "path": "requiredNominalMm", "value": 7.452, "abs": 0.001, "source": "(t + c) / 0.875; worked example 7.45 (whatispiping.com)" },
+    { "step": 6, "path": "selectedSchedule", "value": "80", "source": "lightest B36.10M NPS 4 numbered schedule with wall >= 7.452 mm: Sch 80 8.56 (XS also 8.56)" },
+    { "step": 6, "path": "reviewRequired", "value": true, "source": "AF-33: pressure design" },
+    { "step": 7, "path": "error.code", "value": "PSC_WALL_INSUFFICIENT", "source": "Sch 40 6.02 < 7.452" }
+  ]
+}

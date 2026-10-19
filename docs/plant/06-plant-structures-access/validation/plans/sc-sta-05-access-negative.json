@@ -1,0 +1,190 @@
+{
+  "id": "SC-STA-05",
+  "status": "PROPOSED — add_railing, add_ladder, check_access are not built",
+  "validates": [
+    "VC-STA-05",
+    "VC-STA-13"
+  ],
+  "description": "Deliberately wrong access: 1000 mm guardrail with no knee rail, ladder pitch 320 mm, no toe plate, an ISO grade-B rule in play. check_access must return the stable codes with remediation, the unverified-rule warning, and reviewRequired.",
+  "actions": [
+    {
+      "command": "set_units",
+      "params": {
+        "units": "mm"
+      }
+    },
+    {
+      "command": "add_level",
+      "params": {
+        "name": "Grade",
+        "elevation": 0,
+        "height": 4000
+      }
+    },
+    {
+      "command": "add_level",
+      "params": {
+        "name": "+4000",
+        "elevation": 4000,
+        "height": 3000
+      },
+      "as": "lvl"
+    },
+    {
+      "command": "add_slab",
+      "params": {
+        "boundary": [
+          [
+            0,
+            0
+          ],
+          [
+            4000,
+            0
+          ],
+          [
+            4000,
+            2000
+          ],
+          [
+            0,
+            2000
+          ]
+        ],
+        "thickness": 30,
+        "levelId": "$lvl"
+      },
+      "as": "deck"
+    },
+    {
+      "command": "add_railing",
+      "params": {
+        "path": [
+          [
+            0,
+            2000,
+            4000
+          ],
+          [
+            4000,
+            2000,
+            4000
+          ]
+        ],
+        "height": 1000,
+        "kneeRails": 0,
+        "toePlate": 0,
+        "postSpacingMax": 1500
+      },
+      "as": "rail"
+    },
+    {
+      "command": "add_ladder",
+      "params": {
+        "base": [
+          2000,
+          -250,
+          0
+        ],
+        "climbHeight": 4000,
+        "facing": [
+          0,
+          1
+        ],
+        "clearWidth": 450,
+        "rungPitch": 320,
+        "fallProtection": "none"
+      },
+      "as": "lad"
+    },
+    {
+      "command": "check_access",
+      "params": {
+        "rulesets": [
+          "iso_14122",
+          "osha_1910"
+        ],
+        "edgeDropThresholdMm": 500,
+        "edgeDropSource": "project rule (owner supplied); no grade-A rule row exists for the edge-protection trigger"
+      }
+    }
+  ],
+  "expected": [
+    {
+      "step": 4,
+      "path": "data.posts",
+      "value": 4,
+      "source": "ceil(4000/1500)+1 = 4, spacing 1333.33 mm"
+    },
+    {
+      "step": 6,
+      "path": "data.findings[code=STA_RAIL_HEIGHT_LOW][ruleset=iso_14122].severity",
+      "value": "fail",
+      "source": "1000 < 1100 (ISO-GRD-TOP, A)"
+    },
+    {
+      "step": 6,
+      "path": "data.findings[code=STA_RAIL_HEIGHT_LOW][ruleset=osha_1910]",
+      "value": "absent",
+      "source": "1000 >= 990.6 (42 in - 3 in)"
+    },
+    {
+      "step": 6,
+      "path": "data.findings[code=STA_RAIL_GAP].severity",
+      "value": "fail",
+      "source": "no knee rail: 1000 mm clear > 500 (ISO-GRD-GAP, A)"
+    },
+    {
+      "step": 6,
+      "path": "data.findings[code=STA_TOE_PLATE_MISSING][ruleset=iso_14122].severity",
+      "value": "fail",
+      "source": "ISO-TOE-HEIGHT 100 mm (A)"
+    },
+    {
+      "step": 6,
+      "path": "data.findings[code=STA_TOE_PLATE_MISSING][ruleset=osha_1910].severity",
+      "value": "warn",
+      "source": "OSHA-TOE-HEIGHT is grade B -> warn + STA_RULE_UNVERIFIED"
+    },
+    {
+      "step": 6,
+      "path": "data.findings[code=STA_LADDER_PITCH_OUT_OF_RANGE][ruleset=iso_14122].severity",
+      "value": "fail",
+      "source": "320 > 300"
+    },
+    {
+      "step": 6,
+      "path": "data.findings[code=STA_LADDER_PITCH_OUT_OF_RANGE][ruleset=osha_1910]",
+      "value": "absent",
+      "source": "320 <= 355.6"
+    },
+    {
+      "step": 6,
+      "path": "data.findings[code=STA_LADDER_FALL_PROTECTION_MISSING][ruleset=iso_14122].severity",
+      "value": "fail",
+      "source": "4000 >= 3000 falling height"
+    },
+    {
+      "step": 6,
+      "path": "data.findings[code=STA_EDGE_UNPROTECTED].ids",
+      "value": "contains $deck",
+      "source": "three deck edges have no railing"
+    },
+    {
+      "step": 6,
+      "path": "data.findings[*].remediation",
+      "value": "non-empty for every finding",
+      "source": "AF-11"
+    },
+    {
+      "step": 6,
+      "path": "data.reviewRequired",
+      "value": true
+    },
+    {
+      "step": 6,
+      "path": "data.verdict",
+      "value": "fail"
+    }
+  ]
+}

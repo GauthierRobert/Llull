@@ -1,6 +1,6 @@
 /** 05 §5.6 mechanical deck sections: material cards, boundary conditions, loads and the static step (solid tets only). */
 
-import type { FeaConstraint, TemperatureScale } from '@core/model/analysis';
+import type { FeaConstraint, FeaLoad, TemperatureScale } from '@core/model/analysis';
 import { ALL_ELEMENTS, isDeckRefusal, loadCasesOf, type DeckContext, type DeckRefusal, type DeckSections } from './context';
 import { densityToAnalysis, stressPerMpa } from './units';
 import { elasticConstants, elasticTable, isElasticRefusal, propertyTemperatureK } from './elastic';
@@ -67,7 +67,7 @@ function temperatureRange(
   return field.ok ? { scale: thermoStatic.temperatureScale, low: field.min, high: field.max, label: 'the field range' } : undefined;
 }
 
-/** Axis (0|1|2) a node set is flat in, or null when it is not an axis-aligned plane. */
+/** Axis (0|1|2) a node set is flat in (one plane, or two parallel planes such as both ends of a symmetric slice), or null when it is not axis-aligned. */
 function planeAxis(ctx: DeckContext, nodeIds: readonly number[]): number | null {
   const coordinates = new Map(ctx.mesh.nodes.map((node) => [node[0], [node[1], node[2], node[3]] as const]));
   const lo = [Infinity, Infinity, Infinity];
@@ -88,8 +88,23 @@ function planeAxis(ctx: DeckContext, nodeIds: readonly number[]): number | null 
     }
   }
   const size = Math.hypot(...meshHi.map((value, axis) => value - (meshLo[axis] ?? 0)));
-  const flat = [0, 1, 2].filter((axis) => (hi[axis] ?? 0) - (lo[axis] ?? 0) <= 1e-6 * size);
-  return flat.length === 1 ? (flat[0] ?? null) : null;
+  const tolerance = 1e-6 * size;
+  const flat = [0, 1, 2].filter((axis) => (hi[axis] ?? 0) - (lo[axis] ?? 0) <= tolerance);
+  if (flat.length === 1) return flat[0] ?? null;
+  if (flat.length > 0) return null;
+  const paired = [0, 1, 2].filter((axis) => levelCount(nodeIds, coordinates, axis, tolerance) <= 2);
+  return paired.length === 1 ? (paired[0] ?? null) : null;
+}
+
+/** Number of distinct coordinate levels (values further apart than `tolerance`) the nodes take along `axis`. */
+function levelCount(
+  nodeIds: readonly number[],
+  coordinates: ReadonlyMap<number, readonly number[]>,
+  axis: number,
+  tolerance: number,
+): number {
+  const values = nodeIds.flatMap((id) => coordinates.get(id)?.[axis] ?? []).sort((a, b) => a - b);
+  return values.reduce((count, value, index) => (index === 0 || value - (values[index - 1] ?? value) > tolerance ? count + 1 : count), 0);
 }
 
 function constraintLines(ctx: DeckContext, constraint: FeaConstraint): string[] | DeckRefusal {
@@ -138,6 +153,16 @@ export function boundaryData(ctx: DeckContext): string[] | DeckRefusal {
   return boundary;
 }
 
+/** Nonlinear steps restate loads incrementally: scaled by a multiplier, modified (not replaced) and without the boundary block after step 1. */
+export interface StepLoadOptions {
+  /** Multiplier of each load (loads of every load case are written). */
+  readonly scale: (load: FeaLoad) => number;
+  /** Keyword parameters appended to `*CLOAD` / `*DLOAD` (e.g. `, AMPLITUDE=A_X`); the default operation is OP=MOD, so none. */
+  readonly parameters: string;
+  /** Write the constraint `*BOUNDARY` block (first step only). */
+  readonly boundary: boolean;
+}
+
 /**
  * Mechanical `*BOUNDARY, OP=NEW` / `*CLOAD, OP=NEW` / `*DLOAD, OP=NEW` lines for one step.
  * Force: the vector is the TOTAL load split equally over the nodes of the target (`distribution: 'total'`), or applied at every node
@@ -145,25 +170,31 @@ export function boundaryData(ctx: DeckContext): string[] | DeckRefusal {
  * positive into the material. Gravity: acceleration vector on every element (`GRAV`, magnitude and unit direction). All of them
  * are restated with `OP=NEW` in each step, so load cases do not accumulate.
  * @param loadCase only the loads of this load case; without it every load of the case is written (thermo_static uses a single step)
+ * @param options nonlinear steps: every load scaled by its multiplier, zero values kept (they remove a load under OP=MOD), no `OP=NEW`
  * @failure constraint / load target without nodes or faces in the mesh -> FEA_TARGET_UNRESOLVED; rotational dof or non-axis symmetry plane
  *   -> FEA_CONSTRAINT_INVALID
  */
-export function mechanicalStepLines(ctx: DeckContext, loadCase?: string): DeckSections {
-  const boundary = boundaryData(ctx);
+export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options?: StepLoadOptions): DeckSections {
+  const boundary = options?.boundary === false ? [] : boundaryData(ctx);
   if (!Array.isArray(boundary)) return boundary;
   const forces = new Map<string, readonly [node: number, dof: number, value: number]>();
   const pressures = new Map<string, readonly [element: number, face: number, value: number]>();
   const gravity = [0, 0, 0];
+  const gravityDirection = [0, 0, 0];
   for (const id of ctx.analysis.loadOrder) {
     const load = ctx.analysis.loads[id];
     if (load === undefined || (loadCase !== undefined && load.loadCase !== loadCase)) continue;
+    const factor = options === undefined ? 1 : options.scale(load);
     const key = `L_${id}`;
     if (load.kind === 'gravity' && load.vector !== undefined) {
-      load.vector.forEach((component, axis) => (gravity[axis] = (gravity[axis] ?? 0) + component));
+      load.vector.forEach((component, axis) => {
+        gravity[axis] = (gravity[axis] ?? 0) + component * factor;
+        gravityDirection[axis] = (gravityDirection[axis] ?? 0) + component;
+      });
     } else if (load.kind === 'force' && load.vector !== undefined) {
       const nodes = Object.hasOwn(ctx.mesh.nodeSets, key) ? (ctx.mesh.nodeSets[key] ?? []) : [];
       if (nodes.length === 0) return refusal('FEA_TARGET_UNRESOLVED', `force '${id}' (${load.name}) has no nodes in the mesh`, [id]);
-      const share = load.distribution === 'per_node' ? 1 : 1 / nodes.length;
+      const share = (load.distribution === 'per_node' ? 1 : 1 / nodes.length) * factor;
       for (const node of nodes)
         load.vector.forEach((component, axis) => {
           const mapKey = `${node}:${axis + 1}`;
@@ -174,19 +205,24 @@ export function mechanicalStepLines(ctx: DeckContext, loadCase?: string): DeckSe
       if (faces.length === 0) return refusal('FEA_TARGET_UNRESOLVED', `pressure '${id}' (${load.name}) has no faces in the mesh`, [id]);
       for (const [element, face] of faces) {
         const mapKey = `${element}:${face}`;
-        pressures.set(mapKey, [element, face, (pressures.get(mapKey)?.[2] ?? 0) + load.magnitude]);
+        pressures.set(mapKey, [element, face, (pressures.get(mapKey)?.[2] ?? 0) + load.magnitude * factor]);
       }
     }
   }
   const lines: string[] = [];
   if (boundary.length > 0) lines.push('*BOUNDARY, OP=NEW', ...boundary);
-  const cloads = [...forces.values()].filter((entry) => entry[2] !== 0).sort(byNumbers);
-  lines.push('*CLOAD, OP=NEW', ...cloads.map(([node, dof, value]) => row(node, dof, value)));
+  const parameters = options === undefined ? ', OP=NEW' : options.parameters;
+  const cloads = [...forces.values()].filter((entry) => options !== undefined || entry[2] !== 0).sort(byNumbers);
   const dloads = [...pressures.values()].sort(byNumbers).map(([element, face, value]) => row(element, `P${face}`, value));
   const magnitude = Math.hypot(gravity[0] ?? 0, gravity[1] ?? 0, gravity[2] ?? 0);
+  const directionLength = Math.hypot(gravityDirection[0] ?? 0, gravityDirection[1] ?? 0, gravityDirection[2] ?? 0);
   if (magnitude > 0)
     dloads.push(`${ALL_ELEMENTS}, GRAV, ${num(magnitude)}, ${gravity.map((component) => num(component / magnitude)).join(', ')}`);
-  lines.push('*DLOAD, OP=NEW', ...dloads);
+  else if (options !== undefined && directionLength > 0)
+    dloads.push(`${ALL_ELEMENTS}, GRAV, 0, ${gravityDirection.map((component) => num(component / directionLength)).join(', ')}`);
+  if (options === undefined || cloads.length > 0)
+    lines.push(`*CLOAD${parameters}`, ...cloads.map(([node, dof, value]) => row(node, dof, value)));
+  if (options === undefined || dloads.length > 0) lines.push(`*DLOAD${parameters}`, ...dloads);
   return { text: linesText(lines) };
 }
 

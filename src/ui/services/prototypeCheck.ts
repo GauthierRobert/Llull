@@ -12,7 +12,8 @@ import { postCommand, ServerCommandError } from '@ui/store/serverCommands';
 export const CHECK_COMMAND = 'check_prototype';
 const ASSEMBLY_COMMAND = 'check_assembly';
 /** Single-check commands composed into a review when check_prototype is absent, in checklist order. */
-const PART_COMMANDS = [ASSEMBLY_COMMAND, 'check_mechanism', 'check_motion_clearance'] as const;
+const MOTION_COMMAND = 'check_motion_clearance';
+const PART_COMMANDS = [ASSEMBLY_COMMAND, 'check_mechanism', MOTION_COMMAND] as const;
 
 /** The single checks the Review tab will run (check_prototype absent). */
 const CHECK_TITLES: Readonly<Record<string, string>> = {
@@ -48,8 +49,13 @@ async function runOnServer(command: string, params: Record<string, unknown>): Pr
 const isEnvelope = (data: unknown): boolean => typeof data === 'object' && data !== null && 'check' in data && 'items' in data;
 
 /** Runs every available single check and wraps the envelopes as one review (a failed run is reported, the others still count). */
-async function runSingleChecks(params: Record<string, unknown>): Promise<PrototypeCheckRun> {
+async function runSingleChecks(params: Record<string, unknown>, onStatus: (status: string) => void): Promise<PrototypeCheckRun> {
   const online = useStore.getState().liveStatus === 'connected';
+  // check_motion_clearance simulates the mechanism: offline it needs the in-page physics engine first.
+  if (!online && availableParts().includes(MOTION_COMMAND)) {
+    onStatus('Loading the physics engine…');
+    await ensurePhysicsEngine();
+  }
   const runs = await Promise.all(
     availableParts().map((name) => (online ? runOnServer(name, params) : Promise.resolve(runQuery(name, params)))),
   );
@@ -66,7 +72,7 @@ async function runSingleChecks(params: Record<string, unknown>): Promise<Prototy
 }
 
 export async function runPrototypeCheck(params: Record<string, unknown>, onStatus: (status: string) => void): Promise<PrototypeCheckRun> {
-  if (reviewCheckCommand() === ASSEMBLY_COMMAND) return runSingleChecks(params);
+  if (reviewCheckCommand() === ASSEMBLY_COMMAND) return runSingleChecks(params, onStatus);
   if (useStore.getState().liveStatus === 'connected') return runOnServer(CHECK_COMMAND, params);
   onStatus('Loading the physics engine…');
   if (!(await ensurePhysicsEngine())) return { summary: 'The physics engine could not be loaded (see the console).', data: undefined };

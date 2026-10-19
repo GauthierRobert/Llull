@@ -1,0 +1,178 @@
+{
+  "id": "SC-STA-01",
+  "status": "PROPOSED — add_ladder, check_access are not built (TECHNICAL_SPEC §4); add_level, add_slab exist today",
+  "validates": [
+    "VC-STA-01",
+    "VC-STA-02",
+    "VC-STA-03"
+  ],
+  "description": "Fixed ladder from grade to a 7.3 m platform under ISO 14122-4 and OSHA 1910: rung count closed form, cage start, OSHA ladder-safety-system requirement above 24 ft",
+  "actions": [
+    {
+      "command": "set_units",
+      "params": {
+        "units": "mm"
+      }
+    },
+    {
+      "command": "add_level",
+      "params": {
+        "name": "Grade",
+        "elevation": 0,
+        "height": 7300
+      }
+    },
+    {
+      "command": "add_level",
+      "params": {
+        "name": "Platform +7300",
+        "elevation": 7300,
+        "height": 3000
+      },
+      "as": "top"
+    },
+    {
+      "command": "add_slab",
+      "params": {
+        "boundary": [
+          [
+            0,
+            0
+          ],
+          [
+            3000,
+            0
+          ],
+          [
+            3000,
+            2000
+          ],
+          [
+            0,
+            2000
+          ]
+        ],
+        "thickness": 30,
+        "levelId": "$top"
+      },
+      "as": "deck"
+    },
+    {
+      "command": "add_ladder",
+      "params": {
+        "base": [
+          1500,
+          -250,
+          0
+        ],
+        "climbHeight": 7300,
+        "facing": [
+          0,
+          1
+        ],
+        "clearWidth": 450,
+        "rungPitchMax": 300,
+        "exit": "through",
+        "fallProtection": "cage",
+        "installedOn": "2026-10-18",
+        "rulesets": [
+          "iso_14122",
+          "osha_1910"
+        ]
+      },
+      "as": "lad"
+    },
+    {
+      "command": "check_access",
+      "params": {
+        "ids": [
+          "$lad"
+        ],
+        "rulesets": [
+          "iso_14122",
+          "osha_1910"
+        ]
+      }
+    }
+  ],
+  "expected": [
+    {
+      "step": 4,
+      "path": "data.rungCount",
+      "value": 24,
+      "abs": 0,
+      "source": "closed form N = ceil(H / pmax) - 1 (data/derive_expected.py)"
+    },
+    {
+      "step": 4,
+      "path": "data.rungPitchMm",
+      "value": 292.0,
+      "abs": 0.001,
+      "source": "H / ceil(H / pmax)"
+    },
+    {
+      "step": 4,
+      "path": "data.cage.startHeightMm",
+      "value": 2200,
+      "abs": 0,
+      "source": "named default = ISO-LAD-CAGE-START min (access_rules.json)"
+    },
+    {
+      "step": 5,
+      "path": "data.findings[code=STA_LADDER_PITCH_OUT_OF_RANGE]",
+      "value": "absent",
+      "source": "292 mm in ISO 225..300 and OSHA 254..355.6"
+    },
+    {
+      "step": 5,
+      "path": "data.findings[code=STA_LADDER_CAGE_NOT_PRIMARY]",
+      "value": "absent",
+      "source": "7300 < 7315.2 mm (24 ft); OSHA does not require LSS; ISO requires fall protection above 3000 mm and the cage satisfies it"
+    },
+    {
+      "step": 5,
+      "path": "data.verdict",
+      "value": "pass",
+      "source": "all grade-A rules satisfied"
+    },
+    {
+      "step": 5,
+      "path": "data.reviewRequired",
+      "value": true,
+      "source": "AF-33: access means are safety-relevant"
+    }
+  ],
+  "variant": {
+    "description": "Same ladder with climbHeight 8000: OSHA now requires a ladder safety system or PFAS for a ladder installed after 2018-11-19",
+    "change": {
+      "step": 4,
+      "params.climbHeight": 8000
+    },
+    "expected": [
+      {
+        "step": 4,
+        "path": "data.rungCount",
+        "value": 26,
+        "source": "ceil(8000/300) - 1 = 27 - 1"
+      },
+      {
+        "step": 4,
+        "path": "data.rungPitchMm",
+        "value": 296.296,
+        "abs": 0.001,
+        "source": "8000 / 27"
+      },
+      {
+        "step": 5,
+        "path": "data.findings[code=STA_LADDER_CAGE_NOT_PRIMARY].severity",
+        "value": "fail",
+        "source": "1910.28(b)(9)(i): > 24 ft, installed on/after 2018-11-19, cage alone not acceptable"
+      },
+      {
+        "step": 5,
+        "path": "data.verdict",
+        "value": "fail"
+      }
+    ]
+  }
+}

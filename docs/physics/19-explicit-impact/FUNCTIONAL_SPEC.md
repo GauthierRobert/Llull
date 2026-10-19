@@ -12,7 +12,8 @@ fragment or a rod hitting a plate. These events need an **explicit** time integr
 speed through the smallest element), rate- and temperature-dependent plasticity, element failure and erosion, contact,
 and energy-balance checks — a separate solver class.
 
-llull will not write an explicit solver. It will **prepare, hand off, run where installed, and read back**:
+In the MVP llull does not write an explicit solver. It will **prepare, hand off, run where installed, and read back**
+(long term, see the note after this list):
 
 1. **Set-up as document data.** An `explicit_dynamics` analysis case on the 05 model: end time, output, mass-scaling
    policy, initial velocities, gravity, rigid walls, contacts, time-history requests, J–C strength and failure from PHY-02.
@@ -23,6 +24,10 @@ llull will not write an explicit solver. It will **prepare, hand off, run where 
 3. **Results as data.** Time histories (displacement, velocity, rigid-wall and contact impulse / force, energies),
    maximum plastic strain with location, failed (eroded) elements, termination status, energy error, hourglass and
    contact energy ratios, added mass — numbers first, with quick analytic checks beside them.
+
+Long term (V1 / V2), decision [RS1](../../decisions/RS1-native-compute.md) step RS-8 plans a llull-owned explicit solver
+(`llull-compute explicit`, TECHNICAL_SPEC §2.2) bundled with the desktop app, so the same cases run offline without the
+AGPL tool. The hand-off stays as the MVP path and as the cross-check.
 
 Bird strike and blade-out are certification items [R11][R12]. llull's output is engineering preparation and screening:
 every scenario result is `reviewRequired`, is marked `certificationEvidence: false`, and any acceptance is a human act.
@@ -76,9 +81,9 @@ User stories:
 | Phase | In scope |
 | ----- | -------- |
 | **MVP (M1–M4)** | `explicit_dynamics` analysis type; controls (end time, animation / history intervals, precision, time-step floor, mass-scaling policy with limit); initial velocity, gravity, rigid walls (planar), imposed velocity; solid hex-dominant / tet meshes from 05 (Gmsh) and shells from 05 midsurfaces; elastic and J–C strength (PHY-02) with J–C failure and erosion; OpenCourant native deck export (`.rad`); run of a user-installed OpenCourant (external process, progress, timeout, cancel); import of the Engine listing, time histories (`th_to_csv`) and animation fields (`anim_to_vtk`); `explicit_report`, `explicit_energy_check`, `check_explicit`; quick checks (wave speeds, CFL, mass scaling, bar impact, Taylor estimate, J–C flow and failure, drop and bird kinematics). |
-| **V1 (M5–M6)** | Contacts (self, surface-to-surface, with friction); SPH (and ALE) substitute bird with an EOS model (PHY-02 addition); scenario templates bird strike and drop test; container run (`ghcr.io/opencourant/opencourant`); rigid bodies; shells with J–C. |
-| **V2** | LS-DYNA keyword export (COULD) and LS-DYNA results (d3plot via external converters); blade-out templates (rotating part, release, containment ring) for parts; composite failure for impact (with 06 CMP / PHY-08); restart files. |
-| **Out of scope** | Writing or bundling an explicit solver inside llull's own code; shipping proprietary material data; certification credit; hydrocodes for hypervelocity impact; crash-dummy / occupant models. |
+| **V1 (M5–M6)** | Contacts (self, surface-to-surface, with friction); SPH (and ALE) substitute bird with an EOS model (PHY-02 addition); scenario templates bird strike and drop test; container run (`ghcr.io/opencourant/opencourant`); rigid bodies; shells with J–C. llull-owned solver, first increment (RS1 RS-8a/b): solids, J–C with erosion, rigid walls, GPU with CPU twin. |
+| **V2** | llull-owned solver contact and shells (RS1 RS-8c). LS-DYNA keyword export (COULD) and LS-DYNA results (d3plot via external converters); blade-out templates (rotating part, release, containment ring) for parts; composite failure for impact (with 06 CMP / PHY-08); restart files. |
+| **Out of scope** | Bundling a third-party explicit solver (AGPL); a llull-owned solver before V1 (planned by RS1 RS-8 for V1 / V2); shipping proprietary material data; certification credit; hydrocodes for hypervelocity impact; crash-dummy / occupant models. |
 
 ## 5. Functional requirements
 
@@ -231,6 +236,9 @@ llull claims no certification credit; scenario results are screening data for a 
 | Literature J–C constants vary widely and the primary FAA tables were not reached [R9] | Wrong material response | No built-in constants; `unverified` until a human confirms against the report; range guards |
 | Explicit results are mesh-, contact- and hourglass-sensitive | Over-trust by a non-engineer owner | Health checks, `reviewRequired`, `certificationEvidence: false`, human dispositions |
 | Substitute-bird models need an EOS model PHY-02 does not list | Bird scenario delayed to V1 | Request the addition (TS §11) |
+| Own solver (RS1 RS-8): element library (hourglass, tet locking, shells) | Wrong stiffness or energy | Published formulations only (TS §11 Q10), patch and single-element tests, OpenCourant cross-check |
+| Own solver: contact robustness and speed | Penetration, unstable runs | Contact only in V2; health checks and energy balance on every run |
+| Own solver: V&V cost | Effort 16+ w and scarce open benchmarks | Solids and rigid walls first; every case also runs through the hand-off where installed; `reviewRequired`, `certificationEvidence: false` |
 
 ## 11. References
 

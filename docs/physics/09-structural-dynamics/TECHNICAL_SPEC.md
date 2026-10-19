@@ -47,7 +47,8 @@ Facts read in the CalculiX manual [R1] that this design depends on:
 
 ```
 src/ui (FRF / ASD / SRS plots, damping badges)       server/ (05 transports fea_mesh / fea_solve learn the new types)
-        │ dispatch                                            │ spawns bundled ccx; runs pure @phys post-processing
+        │ dispatch                                            │ spawns bundled ccx; runs pure @phys post-processing;
+        │                                                     │ nodal contraction → `llull-compute post` (RS1, §2.1)
         ▼                                                     ▼
 src/app installDefaultPlugins() + caePlugin + physicsDynamicsPlugin
         ▼
@@ -74,11 +75,21 @@ Laws respected:
 - **L3.** Pure commands, `is pure` tests.
 - **L4.** Dynamic inputs live in the 05 `analysis` slice (`AnalysisCase.dynamics`) and a new optional
   `CadDocument.physics.dynamics` library slice for spectra and load histories shared by cases.
-- **L6.** `server/` spawns ccx and calls the pure `@phys` math; no dynamics logic in the server.
+- **L6.** `server/` spawns ccx and calls the pure `@phys` math (or, for the nodal field, the `llull-compute post` job,
+  §2.1); no dynamics logic in the server.
 - **L8.** Each command records a `FeatureStep`; spectra and histories are document data, so a replay re-derives
   the same results inputs; staleness extends 05 TR-FEA-06 with the dynamic inputs.
 - **L9.** No kernel need beyond 05 (targets on exact faces).
 - **L10.** Plugin in `packages/domain-physics` (README §6.2 proposal), alias `@phys/*`.
+
+### 2.1 Stack amendment (RS1, 2026-10-18)
+
+Decision [RS1](../../decisions/RS1-native-compute.md) step **RS-7** (medium, Rust CPU) moves the random and SSD
+post-processing contraction (modes × frequencies × nodes) to `llull-compute post` (crate `llull-post`). CalculiX stays the
+solver; the per-probe math, quick checks, SRS and deck writing stay in TS. `math/randomResponse.ts` and `modalFrf.ts` stay the
+reference: the native field must match them (VC-DYN-48). Nothing in `packages/*` imports native code; the job runs inside the
+05 `fea_solve` transport and its output enters the document only through `record_fea_results` (trust model 05 §4.1). Rust
+CPU, not GPU, because the field numbers are recorded and must be bit-reproducible (RS1 §2 rule 3).
 
 **Requirements (technical)**
 
@@ -94,10 +105,11 @@ Laws respected:
 | TR-DYN-22 | SHOULD | Half-power Q from any computed FRF magnitude (linear interpolation on the dense grid of §5.4). |
 | TR-DYN-30 | MUST | INP dynamic steps (§5.6) match the manual keyword syntax; byte-identical output for identical input (05 TR-FEA-40). |
 | TR-DYN-31 | MUST | `datParticipation.ts` parses PARTICIPATION FACTORS, EFFECTIVE MODAL MASS, TOTAL EFFECTIVE MASS and FRACTION OF TOTALS tables (fixed layout seen in `beamdy8.dat.ref`). |
-| TR-DYN-40 | MUST | `math/randomResponse.ts`: response ASD by modal superposition with exact per-mode FRFs, integrated on the adaptive grid (§5.4); output rms of each probe quantity, nodal max rms, zero-crossing rate ν₀⁺ = √(m₂/m₀) (spectral moments). |
+| TR-DYN-40 | MUST | `math/randomResponse.ts`: response ASD by modal superposition with exact per-mode FRFs, integrated on the adaptive grid (§5.4); output rms of each probe quantity, nodal max rms, zero-crossing rate ν₀⁺ = √(m₂/m₀) (spectral moments). The nodal field (every node × component) may run in `llull-compute post` (TR-DYN-44); the TS module stays the probe path, the small-mesh path and the reference. |
 | TR-DYN-41 | MUST | Base-excitation transfer functions use the participation factors of the frequency step and the probe mode-shape values from FRD; absolute acceleration and relative displacement both reported. |
 | TR-DYN-42 | MUST | Peak factor `{ value, source, defaulted, rationale }`; default 3 with rationale "Gaussian 3-sigma (P(\|x\| > 3σ) = 0.27 %)". |
 | TR-DYN-43 | MUST | `math/psd.ts`: exact log-log segment integration (§5.3); spectra validated (sorted, positive, ≥ 2 points). |
+| TR-DYN-44 | SHOULD | RS1 RS-7: `fea_solve` hands the random / SSD nodal contraction (modes × frequencies × nodes × components) to `llull-compute post random\|ssd <job-folder>` (crate `llull-post`, Rust CPU, rayon over nodes, fixed reduction order per node, RS1 §2 rule 3). Same grid, FRFs and Simpson rule as §5.4. Output: a nodal rms field artifact; `record_fea_results` recomputes the summary (nodal max and its location) from it. Missing binary → TS path within the budget of §8, else `DYN_POST_TOO_LARGE` naming the node count. |
 | TR-DYN-50 | MUST | `math/srs.ts`: Smallwood ramp-invariant recursive filter for absolute acceleration (and relative displacement, pseudo-velocity) (§5.5); maximax, positive, negative. |
 | TR-DYN-51 | MUST | SRS sampling guard: Δt ≤ 1/(10 f_max) or refuse; residual tail of 1.5 periods of the lowest frequency appended with zeros (or a stated shorter tail with a warning). |
 | TR-DYN-60 | MUST | `frdComplex.ts` reads SSD output: real/imaginary pairs or `PU`/`PHS` magnitude-phase blocks per frequency step (05 FRD reader extended). |
@@ -374,6 +386,7 @@ record and the SSD output is the cross-check.
 | `DYN_DAMPING_UNSET` | error | solve or quick check without damping | analysis id / param `zeta` | `set_dynamic_damping` with a cited value, or pass `zeta`/`Q` |
 | `DYN_DAMPING_INVALID` | error | ζ ∉ [0, 1), α or β < 0, f1 ≥ f2, empty citation | param path | correct the value; cite its source |
 | `DYN_MATERIAL_NO_DAMPING` | error | `structural_material` but `resolvePropertyModel` refuses `structuralLossFactor` (absent, out of range) | material id, PHY-01 code | add a `structuralLossFactor` property model (PHY-01 / 08 commands) or use modal damping |
+| `DYN_POST_TOO_LARGE` | error | nodal random / SSD field above the TS budget and `llull-compute` absent (RS1) | node count | install the desktop bundle (`llull-compute`), or request probes only |
 | `DYN_SWEEP_INVALID` | error | fMin ≥ fMax, points < 2, bias < 1 | param path | correct the sweep |
 | `DYN_SWEEP_UNSET` | error | frequency/random case without sweep | analysis id | `set_frequency_sweep` |
 | `DYN_BASE_ACCEL_TRANSIENT` | error | acceleration base motion in a transient | analysis id | give a displacement history (CalculiX limit [R1]) |
@@ -425,7 +438,8 @@ record and the SSD output is the cross-check.
 | ------ | ------ |
 | Pure quick checks (`sdof_response`, `psd_rms`, `damping_coefficients`) | ≤ 20 ms |
 | `shock_response_spectrum`, 30 frequencies, 50 k samples | ≤ 300 ms |
-| Random post-processing, 30 modes, 50 probes, nodal max over 50 k nodes, 3 components | ≤ 10 s (TBD: measure) |
+| Random post-processing, 30 modes, 50 probes, nodal max over 50 k nodes, 3 components | ≤ 10 s (TBD: measure); nodal part in `llull-compute post` when installed |
+| Native nodal contraction (`llull-post`), largest mesh in the same time | target ≥ 10× the TS node count (target, TBD — measure, VC-DYN-48) |
 | SSD solve 50 k nodes, 30 modes, 200 points | ≤ 60 s (TBD: measure, production gate) |
 | Memory | modal stress per node streamed from FRD; never more than one mode field resident per component |
 
@@ -438,6 +452,7 @@ record and the SSD output is the cross-check.
 | Contract | `toToolSchemas()` snapshot grows; AnalysisType extension; plugin validate/restore | 01 |
 | Golden | the three draft plans once commands exist; replay equality | 20, 21, 40 |
 | Integration (server, needs ccx) | re-run pinned decks (1e-4), native beamdy8 model (2 %), EB strip random (5 %), FV32 modal | 15, 20, 21, 30–32 |
+| Native (`npm run native:check`; `server/tests` with `llull-compute`) | `llull-post` random / SSD contraction vs `randomResponse.ts` on the VC-DYN-21 case and seeded synthetic modal bases | 48 |
 | Agent-first | codes, named defaults, unverified, review, human gate | 40–44 |
 | PHY-00 harness | `run_benchmarks` reads this pack's `expected_results.json` | all A-grade |
 
@@ -449,6 +464,7 @@ record and the SSD output is the cross-check.
 | M2 | INP dynamic steps, DAT participation + FRD complex readers, `frequency_response` end-to-end, VC-06, 17, 20, 22 | 05 M3 (ccx, readers) | 2.5 w |
 | M3 | Random response post-processing (adaptive grid, base input, probes, nodal max), equivalent static load case into 05 margins, VC-21, 40–44 | M2 | 3 w |
 | M4 | MCP prompt, guide section, golden plans, quality:dyn, production-gate scenario | M3 | 1 w |
+| RS-7 | `llull-post` random / SSD nodal contraction, `fea_solve` hand-off, nodal rms artifact, VC-DYN-48 | M3, RS-0 (`solver/` workspace) | 1.5 w (share of RS1 RS-7) |
 | M5 (V1) | Transient modal + direct, histories, PHY-10 joint histories, SRS of probe history, stress ASD export to PHY-07, BDF SOL 111/112 | M4, PHY-10 M3, PHY-07 | 3 w |
 | V2 | Cross-spectra, response spectrum analysis, residual vectors, acoustic loads from PHY-20 | PHY-20 | — |
 
@@ -471,6 +487,9 @@ Total MVP ≈ 9 weeks of one engineer-equivalent agent lane (Lane 1 core/plugin 
    source was verified, so llull ships no default (warning only).
 7. **Single-deck vs two-deck** CalculiX runs: initial conditions in `*MODAL DYNAMIC` need the frequency step in a
    separate deck [R1]; MVP has zero initial conditions, V1 decides whether to support non-zero ones.
+
+8. **Native field outputs (RS1).** Should the `llull-post` job also produce the stress ASD per node for PHY-07 spectral
+   fatigue (M5), or only rms fields? Proposal: rms fields in RS-7, ASD export with M5.
 
 ## 12. References
 

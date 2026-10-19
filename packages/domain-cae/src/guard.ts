@@ -14,7 +14,14 @@ function referencedEntities(analysisCase: AnalysisCase): Set<string> {
         else collect(item);
       }
   };
-  collect([analysisCase.constraints, analysisCase.loads, analysisCase.mesh, analysisCase.thermal, analysisCase.thermomech]);
+  collect([
+    analysisCase.constraints,
+    analysisCase.loads,
+    analysisCase.mesh,
+    analysisCase.thermal,
+    analysisCase.thermomech,
+    analysisCase.nonlinear,
+  ]);
   return ids;
 }
 

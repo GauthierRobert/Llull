@@ -1,0 +1,79 @@
+{
+  "id": "SC-RTE-07",
+  "status": "PROPOSED - not runnable yet. Unbuilt: import_pipe_spec (01), add_tie_in_point, create_pipeline, route_pipe, check_clashes extension (insulated envelope), line_heat_loss (V1).",
+  "unbuilt": ["import_pipe_spec", "add_tie_in_point", "create_pipeline", "route_pipe", "line_heat_loss"],
+  "validates": ["VC-RTE-13", "VC-RTE-14"],
+  "description": "DN80 hot line (design 180 C) with insulation code H taken from the spec thickness table (DN <= 100, T <= 200 C -> 50 mm mineral wool). A steel beam is placed so that it clears the bare pipe (OD 88.9) but not the insulation (OD 188.9). Heat loss per metre is compared with the ht 1.2.0 reference example (same inputs).",
+  "units": "mm",
+  "actions": [
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "TP-H1", "position": [0, 0, 3000], "direction": [1, 0, 0], "dn": 80, "endType": "BW" },
+      "as": "h1"
+    },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "TP-H2", "position": [6000, 0, 3000], "direction": [-1, 0, 0], "dn": 80, "endType": "BW" },
+      "as": "h2"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "HO",
+        "sequence": "4001",
+        "spec": "CS150",
+        "dn": 80,
+        "designTempC": 180,
+        "insulation": { "code": "H", "thickness": "fromSpec" }
+      },
+      "as": "line"
+    },
+    { "command": "route_pipe", "params": { "lineId": "$line", "from": { "portId": "$h1" }, "to": { "portId": "$h2" } }, "as": "run" },
+    {
+      "command": "add_steel_member",
+      "params": { "role": "beam", "start": [3000, -1000, 2830], "end": [3000, 1000, 2830], "profile": "IPE200" }
+    },
+    { "command": "check_clashes", "params": {} },
+    {
+      "command": "line_heat_loss",
+      "params": {
+        "lineId": "$line",
+        "fluidTempC": 180,
+        "ambientTempC": 28,
+        "outsideFilmWm2K": 22.697193,
+        "insideFilmWm2K": 1e12,
+        "steelConductivityWmK": 56.045
+      }
+    }
+  ],
+  "expected": [
+    {
+      "step": 2,
+      "path": "data.insulation",
+      "value": { "code": "H", "thicknessMm": 50, "source": "spec CS150 insulation table row dnMax 100 / tempMax 200" }
+    },
+    { "step": 2, "path": "data.lineNumber", "value": "80-HO-4001-CS150-H50" },
+    { "step": 3, "path": "data.envelopeDiameterMm", "value": 188.9, "abs": 1e-9, "source": "88.9 + 2 x 50" },
+    {
+      "step": 5,
+      "path": "data.clashes[?kind=='insulation'].length",
+      "value": 1,
+      "depthMm": 24.45,
+      "abs": 0.5,
+      "source": "beam axis assumed at the section centroid: top = 2830 + 100 (IPE200 half depth) = 2930; insulation bottom 3000 - 94.45 = 2905.55 < 2930 < bare-pipe bottom 3000 - 44.45 = 2955.55, so the beam clears the bare pipe (25.55 mm) but penetrates the insulation by 24.45 mm"
+    },
+    {
+      "step": 6,
+      "path": "data.heatLossWPerM",
+      "value": 73.12,
+      "rel": 1e-4,
+      "source": "data/insulation_heat_loss.json (ht 1.2.0 example + own closed form)"
+    },
+    {
+      "step": 6,
+      "path": "data.reviewRequired",
+      "value": true,
+      "source": "AF-33: energy / personnel-protection decisions need a qualified reviewer"
+    }
+  ]
+}

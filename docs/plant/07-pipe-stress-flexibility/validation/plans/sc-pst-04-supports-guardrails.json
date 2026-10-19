@@ -1,0 +1,34 @@
+{
+  "id": "SC-PST-04",
+  "validates": ["VC-PST-11", "VC-PST-18"],
+  "description": "6 m DN100 cantilever anchored at x = 0 with a one-way +Z rest at the free end. A downward 10 kN force at mid-span loads the rest with the propped-cantilever reaction 5P/16 = 3125 N; an upward force lifts it off (reaction 0, PST_SUPPORT_LIFTOFF). Then the agent-first guardrails: defaulted edition and cycles, unsigned material, stale results after an edit, approval refused to an agent",
+  "unbuilt": ["create_stress_model", "import_pipe_material_data", "set_pipe_operating_conditions", "add_stress_restraint", "set_stress_load_cases", "analyze_pipe_stress", "check_pipe_stress", "record_pipe_stress_results", "approve_pipe_stress"],
+  "actions": [
+    { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },
+    { "command": "add_pipe_run", "params": { "points": [[0, 0, 2000], [6000, 0, 2000]], "dn": 100, "line": "U-0704" }, "as": "pipe" },
+    { "command": "import_pipe_material_data", "params": { "materialId": "cs-plain", "designation": "carbon steel (validation inputs)", "source": "validation inputs", "rows": [ { "tempC": 20, "growthMmPerM": 0, "EGPa": 200, "ShMPa": 137.9 }, { "tempC": 100, "growthMmPerM": 0.96, "EGPa": 200, "ShMPa": 137.9 } ] } },
+    { "command": "create_stress_model", "params": { "name": "lift-off", "pipeIds": ["$pipe"], "code": "B31.3" }, "as": "stress" },
+    { "command": "set_pipe_operating_conditions", "params": { "modelId": "$stress", "temperatures": [{ "name": "T1", "tempC": 20 }], "pressures": [{ "name": "P1", "gaugeBar": 0 }], "fluidDensityKgM3": 0, "materialId": "cs-plain", "wallMm": 6.02 } },
+    { "command": "add_stress_restraint", "params": { "modelId": "$stress", "at": { "pipeId": "$pipe", "atMm": 0 }, "kind": "anchor" } },
+    { "command": "add_stress_restraint", "params": { "modelId": "$stress", "at": { "pipeId": "$pipe", "atMm": 6000 }, "kind": "rest", "direction": [0, 0, 1], "oneWay": "+", "friction": 0 }, "as": "rest" },
+    { "command": "set_stress_load_cases", "params": { "modelId": "$stress", "forces": [ { "name": "F1", "at": { "pipeId": "$pipe", "atMm": 3000 }, "forceN": [0, 0, -10000] }, { "name": "F2", "at": { "pipeId": "$pipe", "atMm": 3000 }, "forceN": [0, 0, 10000] } ], "cases": [ { "name": "DOWN", "type": "OPE", "basic": ["F1"] }, { "name": "UP", "type": "OPE", "basic": ["F2"] } ] } },
+    { "command": "analyze_pipe_stress", "params": { "modelId": "$stress", "include": ["reactions"] } },
+    { "command": "check_pipe_stress", "params": { "modelId": "$stress" } },
+    { "command": "record_pipe_stress_results", "params": { "modelId": "$stress" } },
+    { "command": "move_building_element", "params": { "elementIds": ["$pipe"], "delta": [0, 100] } },
+    { "command": "check_pipe_stress", "params": { "modelId": "$stress" } },
+    { "command": "approve_pipe_stress", "params": { "modelId": "$stress", "confirmation": true } }
+  ],
+  "expected": [
+    { "step": 8, "path": "data.cases[case=DOWN].reactions[restraintId=$rest].forceN.2", "value": 3125, "rel": 0.001, "source": "propped cantilever, load at L/2: R = P a^2 (3L - a) / (2 L^3) = 5P/16 = 3125 N (Euler); frame3d Timoshenko 3126.19 N (+0.04 %)" },
+    { "step": 8, "path": "data.cases[case=UP].reactions[restraintId=$rest].forceN.2", "value": 0, "abs": 0.001, "source": "a one-way rest cannot pull (PSI test_plus_y_positive_load)" },
+    { "step": 8, "path": "data.cases[case=UP].reactions[restraintId=$rest].status", "value": "lifted", "source": "TR-PST-05" },
+    { "step": 9, "path": "items[code=PST_SUPPORT_LIFTOFF].ids", "value": ["$rest"], "source": "TR-PST-11" },
+    { "step": 9, "path": "items[code=PST_EDITION_DEFAULTED]", "value": "present", "source": "AF-31" },
+    { "step": 9, "path": "items[code=PST_CYCLES_DEFAULTED]", "value": "present", "source": "AF-31" },
+    { "step": 9, "path": "items[code=PST_INSTALL_TEMP_DEFAULTED]", "value": "present", "source": "AF-31" },
+    { "step": 9, "path": "items[code=PST_MATERIAL_UNVERIFIED]", "value": "present", "source": "AF-32" },
+    { "step": 12, "path": "items[code=PST_RESULTS_STALE]", "value": "present", "source": "FR-PST-20" },
+    { "step": 13, "path": "error.code", "value": "PST_HUMAN_GATE", "source": "AF-34" }
+  ]
+}

@@ -1,0 +1,655 @@
+{
+ "pack": "10 SCN",
+ "what": "LAS / LAZ (ASPRS LAS 1.1-1.4) reference values: own header reader (tools/las_own_header.py) and laspy 2.7.0 + lazrs 0.8.2 (points decoded) agree on every point count; header bounds compared with decoded data at one scale step",
+ "files": [
+  {
+   "bytes": 32381,
+   "sha256": "7123dad6ee56dfb52220a4b3fe22a0b92e62181557db7fbe915789b8d766139a",
+   "versionMajor": 1,
+   "versionMinor": 4,
+   "pointFormat": 6,
+   "compressed": false,
+   "pointRecordLength": 30,
+   "headerSize": 375,
+   "offsetToPointData": 2305,
+   "numberOfVlrs": 2,
+   "pointCount": 1000,
+   "scale": [
+    1.16451354e-06,
+    1.164510015e-06,
+    1.003143236e-06
+   ],
+   "offset": [
+    1692500.352,
+    1817499.596,
+    7350.194653
+   ],
+   "min": [
+    1694038.4456374517,
+    1816492.7062700584,
+    5592.7499174683535
+   ],
+   "max": [
+    1694539.677014474,
+    1816497.9762624602,
+    5599.069686751426
+   ],
+   "systemIdentifier": "",
+   "generatingSoftware": "pylas",
+   "file": "las/1_4_w_evlr.las",
+   "numberOfEvlrs": 1,
+   "decodedPoints": 1000,
+   "dataMin": [
+    1694038.4456374517,
+    1816492.7062700584,
+    5592.7499174683535
+   ],
+   "dataMax": [
+    1694539.677014474,
+    1816497.9762624602,
+    5599.069686751426
+   ],
+   "centroid": [
+    1694379.477654,
+    1816495.465573,
+    5597.520533
+   ],
+   "headerBoundsMatchData": true,
+   "returnNumberHistogram": [
+    0,
+    974,
+    23,
+    2,
+    1
+   ],
+   "classificationHistogram": {
+    "2": 1000
+   },
+   "source": "S4 laspy 2.7.0 sdist tests/data (BSD-2-Clause)"
+  },
+  {
+   "bytes": 8948,
+   "sha256": "c16e65ec5c704f0a60d90b154cf21b1df9e5cd9b40cec58b2488754a0ced1a5b",
+   "versionMajor": 1,
+   "versionMinor": 4,
+   "pointFormat": 6,
+   "compressed": true,
+   "pointRecordLength": 30,
+   "headerSize": 375,
+   "offsetToPointData": 2399,
+   "numberOfVlrs": 3,
+   "pointCount": 1000,
+   "scale": [
+    1.16451354e-06,
+    1.164510015e-06,
+    1.003143236e-06
+   ],
+   "offset": [
+    1692500.352,
+    1817499.596,
+    7350.194653
+   ],
+   "min": [
+    1694038.4456374517,
+    1816492.7062700584,
+    5592.7499174683535
+   ],
+   "max": [
+    1694539.677014474,
+    1816497.9762624602,
+    5599.069686751426
+   ],
+   "systemIdentifier": "",
+   "generatingSoftware": "pylas",
+   "file": "las/1_4_w_evlr.laz",
+   "numberOfEvlrs": 1,
+   "decodedPoints": 1000,
+   "dataMin": [
+    1694038.4456374517,
+    1816492.7062700584,
+    5592.7499174683535
+   ],
+   "dataMax": [
+    1694539.677014474,
+    1816497.9762624602,
+    5599.069686751426
+   ],
+   "centroid": [
+    1694379.477654,
+    1816495.465573,
+    5597.520533
+   ],
+   "headerBoundsMatchData": true,
+   "returnNumberHistogram": [
+    0,
+    974,
+    23,
+    2,
+    1
+   ],
+   "classificationHistogram": {
+    "2": 1000
+   },
+   "source": "S4 laspy 2.7.0 sdist tests/data (BSD-2-Clause)"
+  },
+  {
+   "bytes": 603353,
+   "sha256": "75867b3e75cfc3c2e96da9f753c04c9fbaa6a59468dea13e2859f3109b38bd66",
+   "versionMajor": 1,
+   "versionMinor": 2,
+   "pointFormat": 3,
+   "compressed": true,
+   "pointRecordLength": 34,
+   "headerSize": 227,
+   "offsetToPointData": 2144,
+   "numberOfVlrs": 6,
+   "pointCount": 110000,
+   "scale": [
+    0.01,
+    0.01,
+    0.01
+   ],
+   "offset": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "min": [
+    636001.76,
+    848935.2000000001,
+    406.26
+   ],
+   "max": [
+    637179.2200000001,
+    849497.9,
+    520.51
+   ],
+   "systemIdentifier": "PDAL",
+   "generatingSoftware": "PDAL 1.0.0 (9e8465)",
+   "file": "las/autzen_trim.laz",
+   "numberOfEvlrs": 0,
+   "decodedPoints": 110000,
+   "dataMin": [
+    636001.76,
+    848935.2000000001,
+    406.26
+   ],
+   "dataMax": [
+    637179.22,
+    849497.9,
+    520.51
+   ],
+   "centroid": [
+    636546.404951,
+    849145.785739,
+    430.337525
+   ],
+   "headerBoundsMatchData": true,
+   "returnNumberHistogram": [
+    0,
+    99257,
+    9021,
+    1623,
+    99
+   ],
+   "classificationHistogram": {
+    "1": 83893,
+    "2": 26107
+   },
+   "source": "S4 laspy 2.7.0 sdist tests/data (BSD-2-Clause)"
+  },
+  {
+   "bytes": 66354,
+   "sha256": "b8daf5a96114ac86c42fff13e07abdc736e00e1eb34188506a6895b1126ed75b",
+   "versionMajor": 1,
+   "versionMinor": 4,
+   "pointFormat": 3,
+   "compressed": false,
+   "pointRecordLength": 61,
+   "headerSize": 375,
+   "offsetToPointData": 1389,
+   "numberOfVlrs": 1,
+   "pointCount": 1065,
+   "scale": [
+    0.01,
+    0.01,
+    0.01
+   ],
+   "offset": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "min": [
+    635619.85,
+    848899.7000000001,
+    406.59000000000003
+   ],
+   "max": [
+    638982.55,
+    853535.43,
+    586.38
+   ],
+   "systemIdentifier": "PDAL",
+   "generatingSoftware": "PDAL 1.0.0.b1 (84d15e)",
+   "file": "las/extrabytes.las",
+   "numberOfEvlrs": 0,
+   "decodedPoints": 1065,
+   "dataMin": [
+    635619.85,
+    848899.7000000001,
+    406.59000000000003
+   ],
+   "dataMax": [
+    638982.55,
+    853535.43,
+    586.38
+   ],
+   "centroid": [
+    637296.735183,
+    851249.538488,
+    434.09784
+   ],
+   "headerBoundsMatchData": true,
+   "returnNumberHistogram": [
+    0,
+    925,
+    114,
+    21,
+    5
+   ],
+   "classificationHistogram": {
+    "1": 789,
+    "2": 276
+   },
+   "source": "S4 laspy 2.7.0 sdist tests/data (BSD-2-Clause)"
+  },
+  {
+   "bytes": 59344,
+   "sha256": "2251306106cd2aaaf4d67b30a81704b421c7d46de0e49eebcd2d87efc00b5948",
+   "versionMajor": 1,
+   "versionMinor": 2,
+   "pointFormat": 3,
+   "compressed": true,
+   "pointRecordLength": 34,
+   "headerSize": 227,
+   "offsetToPointData": 878,
+   "numberOfVlrs": 4,
+   "pointCount": 28185,
+   "scale": [
+    0.01,
+    0.01,
+    0.01
+   ],
+   "offset": [
+    1423210.0,
+    4189100.0,
+    67.86
+   ],
+   "min": [
+    1423214.5200004578,
+    4189096.6300001144,
+    67.86000061035156
+   ],
+   "max": [
+    1423216.7600002289,
+    4189098.600000024,
+    67.9000015258789
+   ],
+   "systemIdentifier": "PDAL",
+   "generatingSoftware": "PDAL 1.6.0 (810417)",
+   "file": "las/plane.laz",
+   "numberOfEvlrs": 0,
+   "decodedPoints": 28185,
+   "dataMin": [
+    1423214.52,
+    4189096.63,
+    67.86
+   ],
+   "dataMax": [
+    1423216.76,
+    4189098.6,
+    67.9
+   ],
+   "centroid": [
+    1423215.63838,
+    4189097.725252,
+    67.885597
+   ],
+   "headerBoundsMatchData": true,
+   "returnNumberHistogram": [
+    0,
+    28185
+   ],
+   "classificationHistogram": {
+    "0": 28185
+   },
+   "source": "S4 laspy 2.7.0 sdist tests/data (BSD-2-Clause)"
+  },
+  {
+   "bytes": 36437,
+   "sha256": "a0570ef57b685b77a6d3e3992cbdfeecdb2c3065d3780bbeaba490818258b734",
+   "versionMajor": 1,
+   "versionMinor": 2,
+   "pointFormat": 3,
+   "compressed": false,
+   "pointRecordLength": 34,
+   "headerSize": 227,
+   "offsetToPointData": 227,
+   "numberOfVlrs": 0,
+   "pointCount": 1065,
+   "scale": [
+    0.01,
+    0.01,
+    0.01
+   ],
+   "offset": [
+    -0.0,
+    -0.0,
+    -0.0
+   ],
+   "min": [
+    635619.85,
+    848899.7000000001,
+    406.59000000000003
+   ],
+   "max": [
+    638982.55,
+    853535.43,
+    586.38
+   ],
+   "systemIdentifier": "",
+   "generatingSoftware": "TerraScan",
+   "file": "las/simple.las",
+   "numberOfEvlrs": 0,
+   "decodedPoints": 1065,
+   "dataMin": [
+    635619.85,
+    848899.7000000001,
+    406.59000000000003
+   ],
+   "dataMax": [
+    638982.55,
+    853535.43,
+    586.38
+   ],
+   "centroid": [
+    637296.735183,
+    851249.538488,
+    434.09784
+   ],
+   "headerBoundsMatchData": true,
+   "returnNumberHistogram": [
+    0,
+    925,
+    114,
+    21,
+    5
+   ],
+   "classificationHistogram": {
+    "1": 789,
+    "2": 276
+   },
+   "source": "S4 laspy 2.7.0 sdist tests/data (BSD-2-Clause)"
+  },
+  {
+   "bytes": 18217,
+   "sha256": "87ac5d2e8edb6cd3c63f1dd1b982d76b1b3c23ca634658ac6c658e1a70e73e71",
+   "versionMajor": 1,
+   "versionMinor": 2,
+   "pointFormat": 3,
+   "compressed": true,
+   "pointRecordLength": 34,
+   "headerSize": 227,
+   "offsetToPointData": 333,
+   "numberOfVlrs": 1,
+   "pointCount": 1065,
+   "scale": [
+    0.01,
+    0.01,
+    0.01
+   ],
+   "offset": [
+    -0.0,
+    -0.0,
+    -0.0
+   ],
+   "min": [
+    635619.85,
+    848899.7000000001,
+    406.59000000000003
+   ],
+   "max": [
+    638982.55,
+    853535.43,
+    586.38
+   ],
+   "systemIdentifier": "",
+   "generatingSoftware": "TerraScan",
+   "file": "las/simple.laz",
+   "numberOfEvlrs": 0,
+   "decodedPoints": 1065,
+   "dataMin": [
+    635619.85,
+    848899.7000000001,
+    406.59000000000003
+   ],
+   "dataMax": [
+    638982.55,
+    853535.43,
+    586.38
+   ],
+   "centroid": [
+    637296.735183,
+    851249.538488,
+    434.09784
+   ],
+   "headerBoundsMatchData": true,
+   "returnNumberHistogram": [
+    0,
+    925,
+    114,
+    21,
+    5
+   ],
+   "classificationHistogram": {
+    "1": 789,
+    "2": 276
+   },
+   "source": "S4 laspy 2.7.0 sdist tests/data (BSD-2-Clause)"
+  },
+  {
+   "bytes": 30047,
+   "sha256": "63d6a138863a75617161accc0e0b918bdebd6f365c9900573af66724be5b9848",
+   "versionMajor": 1,
+   "versionMinor": 1,
+   "pointFormat": 1,
+   "compressed": false,
+   "pointRecordLength": 28,
+   "headerSize": 227,
+   "offsetToPointData": 227,
+   "numberOfVlrs": 0,
+   "pointCount": 1065,
+   "scale": [
+    0.01,
+    0.01,
+    0.01
+   ],
+   "offset": [
+    -0.0,
+    -0.0,
+    -0.0
+   ],
+   "min": [
+    635619.85,
+    848899.7000000001,
+    406.59000000000003
+   ],
+   "max": [
+    638982.55,
+    853535.43,
+    586.38
+   ],
+   "systemIdentifier": "LAStools (c) by rapidlasso GmbH",
+   "generatingSoftware": "las2las (version 200216)",
+   "file": "las/simple1_1.las",
+   "numberOfEvlrs": 0,
+   "decodedPoints": 1065,
+   "dataMin": [
+    635619.85,
+    848899.7000000001,
+    406.59000000000003
+   ],
+   "dataMax": [
+    638982.55,
+    853535.43,
+    586.38
+   ],
+   "centroid": [
+    637296.735183,
+    851249.538488,
+    434.09784
+   ],
+   "headerBoundsMatchData": true,
+   "returnNumberHistogram": [
+    0,
+    925,
+    114,
+    21,
+    5
+   ],
+   "classificationHistogram": {
+    "1": 789,
+    "2": 276
+   },
+   "source": "S4 laspy 2.7.0 sdist tests/data (BSD-2-Clause)"
+  },
+  {
+   "bytes": 62888,
+   "sha256": "6753c0da6e89b9e9e1e866946746dadb2b2c31b7eb8fd4602bcaf6a1d1ad2cea",
+   "versionMajor": 1,
+   "versionMinor": 3,
+   "pointFormat": 4,
+   "compressed": false,
+   "pointRecordLength": 57,
+   "headerSize": 235,
+   "offsetToPointData": 5785,
+   "numberOfVlrs": 5,
+   "pointCount": 999,
+   "scale": [
+    0.001,
+    0.001,
+    0.001
+   ],
+   "offset": [
+    0.0,
+    5000000.0,
+    0.0
+   ],
+   "min": [
+    -235434519.0,
+    800843145.0,
+    265094.0
+   ],
+   "max": [
+    -234935841.0,
+    800946249.0,
+    273811.0
+   ],
+   "systemIdentifier": "ALSXX",
+   "generatingSoftware": "ALSXX_PP V2.70 BUILD#15",
+   "file": "las/simple1_3.las",
+   "numberOfEvlrs": 0,
+   "decodedPoints": 999,
+   "dataMin": [
+    -235434.519,
+    5800843.145,
+    265.094
+   ],
+   "dataMax": [
+    -234935.84100000001,
+    5800946.249,
+    273.811
+   ],
+   "centroid": [
+    -235238.946563,
+    5800905.903915,
+    270.751011
+   ],
+   "headerBoundsMatchData": false,
+   "returnNumberHistogram": [
+    0,
+    999
+   ],
+   "classificationHistogram": {
+    "1": 999
+   },
+   "source": "S4 laspy 2.7.0 sdist tests/data (BSD-2-Clause)"
+  },
+  {
+   "bytes": 32305,
+   "sha256": "f4e840920885fc175ab90c0a50778165e64e3f9ccb049ea5e360f3e30bb932b1",
+   "versionMajor": 1,
+   "versionMinor": 4,
+   "pointFormat": 6,
+   "compressed": false,
+   "pointRecordLength": 30,
+   "headerSize": 375,
+   "offsetToPointData": 2305,
+   "numberOfVlrs": 2,
+   "pointCount": 1000,
+   "scale": [
+    1.16451354e-06,
+    1.164510015e-06,
+    1.003143236e-06
+   ],
+   "offset": [
+    1692500.352,
+    1817499.596,
+    7350.194653
+   ],
+   "min": [
+    1694038.4456376971,
+    1816492.7062704284,
+    5592.7499171740965
+   ],
+   "max": [
+    1694539.6770148913,
+    1816497.9762628325,
+    5599.069686454539
+   ],
+   "systemIdentifier": "",
+   "generatingSoftware": "Global Mapper",
+   "file": "las/test1_4.las",
+   "numberOfEvlrs": 0,
+   "decodedPoints": 1000,
+   "dataMin": [
+    1694038.4456374517,
+    1816492.7062700584,
+    5592.7499174683535
+   ],
+   "dataMax": [
+    1694539.677014474,
+    1816497.9762624602,
+    5599.069686751426
+   ],
+   "centroid": [
+    1694379.477654,
+    1816495.465573,
+    5597.520533
+   ],
+   "headerBoundsMatchData": true,
+   "returnNumberHistogram": [
+    0,
+    974,
+    23,
+    2,
+    1
+   ],
+   "classificationHistogram": {
+    "2": 1000
+   },
+   "source": "S4 laspy 2.7.0 sdist tests/data (BSD-2-Clause)"
+  }
+ ]
+}

@@ -1,0 +1,68 @@
+{
+  "title": "Routing rules: what is a standard, what is a project rule, what is a vendor behaviour (for defaults that must be NAMED, AF-31)",
+  "rows": [
+    {
+      "id": "RR-01",
+      "rule": "Elbows are inserted at direction changes, tees / olets at branches; the compass ticks equal the fitting angles of the spec; a tolerance angle lets e.g. a 91 deg turn take a 90 deg elbow",
+      "sources": ["S1"],
+      "grade": "B",
+      "use": "behaviour model (FR-RTE-05, -06, -12)"
+    },
+    {
+      "id": "RR-02",
+      "rule": "Branch table in the spec: header size x branch size -> fitting legend (tee, reducing tee, olet...)",
+      "sources": ["S2"],
+      "grade": "B",
+      "use": "FR-RTE-08; the table itself is spec data (01 PSC)"
+    },
+    {
+      "id": "RR-03",
+      "rule": "Mating flange, gasket and bolt set are added automatically at flanged connections; failure when a matching gasket / bolt is missing in the spec or no connection rule exists for the end-type pair (e.g. FL and SO)",
+      "sources": ["S3", "S4"],
+      "grade": "A (two vendors agree)",
+      "use": "FR-RTE-07, RTE_SPEC_NO_COMPONENT / RTE_NO_CONNECTION_RULE"
+    },
+    {
+      "id": "RR-04",
+      "rule": "Branch = head + tail + components; head/tail reference the nozzle (HREF / TREF, CREF on the nozzle); components have arrive / leave p-points; tube between components is implied",
+      "sources": ["S20"],
+      "grade": "A (AVEVA reference manual extracts, several pages)",
+      "use": "data model of a run (TECHNICAL 3)"
+    },
+    {
+      "id": "RR-05",
+      "rule": "Pipe features: straight, turn, branch, end, run change, split, along-leg component; parts are selected from the pipe specification of the run",
+      "sources": ["S21"],
+      "grade": "B",
+      "use": "feature model (TECHNICAL 3)"
+    },
+    {
+      "id": "RR-06",
+      "rule": "Minimum distance between adjacent circumferential butt welds: none in ASME B31.3; BS 2633 / BS 4515 'no closer than 4 x nominal thickness whenever possible'; many company specs 50 mm or 2T",
+      "sources": ["S22"],
+      "grade": "B",
+      "use": "project rule with a NAMED default minWeldSpacing = max(4 t, 50 mm) flagged `source: project default`, never claimed as code"
+    },
+    {
+      "id": "RR-07",
+      "rule": "Sloped piping: slope as rise/run or percent; Autodesk example 1/4 in per ft (2.083 %)",
+      "sources": ["S23"],
+      "grade": "B",
+      "use": "FR-RTE-10 units"
+    },
+    {
+      "id": "RR-08",
+      "rule": "Valve operability: MSS SP-91 operator = ~670 N (150 lbf) on a 300 mm lever; handwheel heights are project rules (no public code value found)",
+      "sources": ["S24"],
+      "grade": "C",
+      "use": "handwheel height limit is an explicit param or a project table; no built-in number"
+    },
+    {
+      "id": "RR-09",
+      "rule": "Validation of disconnected ports and property mismatches as named error types (Plant 3D)",
+      "sources": ["S25"],
+      "grade": "B",
+      "use": "check_piping code set"
+    }
+  ]
+}

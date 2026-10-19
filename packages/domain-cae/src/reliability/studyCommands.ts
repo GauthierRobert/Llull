@@ -158,7 +158,7 @@ const METHODS = ['form', 'sorm', 'mc', 'fosm'] as const;
 
 /**
  * @affects nothing; read-only, data { form?, sorm?, monteCarlo?, fosm?, comparison { pf per method, formInsideMonteCarloInterval? }, items, reviewRequired: true }
- * @invariant FORM / SORM / FOSM are deterministic; Monte Carlo is deterministic for its seed; PRB_FORM_MC_DISAGREE when FORM Pf lies outside the Wilson 95 % interval
+ * @invariant FORM / SORM / FOSM are deterministic; Monte Carlo is deterministic for its seed; PRB_FORM_MC_DISAGREE when the Pf of the requested FORM (SORM when only SORM is requested) lies outside the Wilson 95 % interval
  * @failure unknown limit state, no random variable, mc without seed, samples above 2e6 -> PRB_* refusal (unchanged doc)
  */
 export const runReliabilityStudy = defineCommand({
@@ -196,7 +196,7 @@ export const runReliabilityStudy = defineCommand({
       const data: Record<string, unknown> = { limitState: params.limitState, unit: context.limitState.unit, reviewRequired: true };
       const iterations = params.maxIterations ?? 100;
       const tolerance = params.tolerance ?? 1e-8;
-      let formPf: number | null = null;
+      let compared: { method: string; value: number | null } | null = null;
       if (methods.has('form') || methods.has('sorm')) {
         const study = formStudy(context, methods.has('sorm'), iterations, tolerance);
         if (methods.has('form')) {
@@ -204,8 +204,8 @@ export const runReliabilityStudy = defineCommand({
           pf['form'] = study.pf;
         }
         if (methods.has('sorm')) data['sorm'] = study.data;
-        formPf = study.pf;
         if (methods.has('sorm')) pf['sorm'] = study.pfSorm;
+        compared = methods.has('form') ? { method: 'FORM', value: study.pf } : { method: 'SORM', value: study.pfSorm };
       }
       let interval: [number, number] | null = null;
       if (methods.has('mc')) {
@@ -219,14 +219,15 @@ export const runReliabilityStudy = defineCommand({
         data['fosm'] = study.data;
         pf['fosm'] = study.pf;
       }
-      const inside = formPf !== null && interval !== null ? formPf >= interval[0] && formPf <= interval[1] : null;
+      const comparedPf = compared?.value ?? null;
+      const inside = comparedPf !== null && interval !== null ? comparedPf >= interval[0] && comparedPf <= interval[1] : null;
       if (inside === false)
         items.push({
           code: 'PRB_FORM_MC_DISAGREE',
           severity: 'warning',
           ids: [params.limitState],
-          message: `FORM Pf ${formPf} is outside the Monte Carlo Wilson 95 % interval [${interval?.[0]}, ${interval?.[1]}]`,
-          remediation: 'report the Monte Carlo value; consider SORM',
+          message: `${compared?.method} Pf ${comparedPf} is outside the Monte Carlo Wilson 95 % interval [${interval?.[0]}, ${interval?.[1]}]`,
+          remediation: compared?.method === 'SORM' ? 'report the Monte Carlo value' : 'report the Monte Carlo value; consider SORM',
         });
       data['comparison'] = { pf, formInsideMonteCarloInterval: inside };
       data['items'] = items;

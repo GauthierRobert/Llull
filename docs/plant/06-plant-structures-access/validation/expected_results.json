@@ -1,0 +1,200 @@
+{
+  "pack": "06 STA",
+  "generatedBy": "hand-written index; derivations in data/derive_expected.py, rules in data/access_rules.json, grating in data/grating_19w4_load_table.json",
+  "units": "mm, kg, m2, kPa, deg unless stated",
+  "cases": [
+    {
+      "id": "VC-STA-01",
+      "what": "fixed ladder rung count and pitch, closed form",
+      "command": "add_ladder",
+      "formula": "spaces = ceil(H / pMax); rungs = spaces - 1 (the arrival level is the last step); pitch = H / spaces",
+      "inputs": { "pMax_mm": 300 },
+      "expected": [
+        { "H_mm": 2800, "rungs": 9, "pitch_mm": 280.0 },
+        { "H_mm": 4500, "rungs": 14, "pitch_mm": 300.0 },
+        { "H_mm": 6000, "rungs": 19, "pitch_mm": 300.0 },
+        { "H_mm": 7300, "rungs": 24, "pitch_mm": 292.0 },
+        { "H_mm": 8000, "rungs": 26, "pitch_mm": 296.2963 },
+        { "H_mm": 9000, "rungs": 29, "pitch_mm": 300.0 }
+      ],
+      "tolerance": "count exact; pitch 1e-3 mm",
+      "source": "closed form; pMax = ISO-LAD-PITCH max (A)",
+      "frs": ["FR-STA-03"],
+      "plan": "plans/sc-sta-01-caged-ladder.json",
+      "test": "tests/unit/plantStructures/ladder.test.ts"
+    },
+    {
+      "id": "VC-STA-02",
+      "what": "ladder dimensional rules: pitch, clear width, back clearance, rail extension, per ruleset",
+      "command": "check_access",
+      "expected": [
+        { "pitch_mm": 292, "iso": "pass", "osha": "pass" },
+        { "pitch_mm": 320, "iso": "STA_LADDER_PITCH_OUT_OF_RANGE", "osha": "pass" },
+        { "pitch_mm": 240, "iso": "pass", "osha": "STA_LADDER_PITCH_OUT_OF_RANGE" },
+        { "clearWidth_mm": 400, "osha": "STA_LADDER_WIDTH (< 406.4)" },
+        { "backClearance_mm": 170, "osha": "STA_LADDER_BACK_CLEARANCE (< 177.8)" },
+        { "railExtension_mm": 1000, "osha": "STA_LADDER_RAIL_EXTENSION (< 1066.8)", "iso": "warn STA_RULE_UNVERIFIED (ISO-LAD-STILE-EXT is B)" }
+      ],
+      "tolerance": "verdict exact; limits from access_rules.json",
+      "source": "OSHA-LAD-RUNG-PITCH, OSHA-LAD-CLEAR-WIDTH, OSHA-LAD-BACK-CLEAR, OSHA-LAD-RAIL-EXT, ISO-LAD-PITCH (A); ISO-LAD-STILE-EXT (B)",
+      "frs": ["FR-STA-03", "FR-STA-09"],
+      "test": "tests/unit/plantStructures/accessRules.test.ts"
+    },
+    {
+      "id": "VC-STA-03",
+      "what": "fall-protection trigger, cage start, OSHA cage-not-primary, landing intervals",
+      "command": "check_access",
+      "expected": [
+        { "H_mm": 2800, "iso": "no fall protection required", "osha": "none" },
+        { "H_mm": 5000, "fallProtection": "none", "iso": "STA_LADDER_FALL_PROTECTION_MISSING", "osha": "pass (5000 <= 7315.2)" },
+        { "H_mm": 7300, "fallProtection": "cage", "installedOn": "2026-10-18", "iso": "pass", "osha": "pass (7300 <= 7315.2)" },
+        { "H_mm": 8000, "fallProtection": "cage", "installedOn": "2026-10-18", "osha": "STA_LADDER_CAGE_NOT_PRIMARY (fail)" },
+        { "H_mm": 8000, "fallProtection": "cage", "installedOn": "2010-05-01", "osha": "warn STA_LADDER_CAGE_RETROFIT (existing cage allowed until 2036-11-18; date under proposed repeal) + reviewRequired" },
+        { "H_mm": 8000, "fallProtection": "ladder_safety_system", "osha": "pass" },
+        { "cageStart_mm": 2500, "iso": "pass (2200..3000)" },
+        { "cageStart_mm": 3200, "iso": "STA_LADDER_CAGE_START" },
+        { "cagedSectionHeight_mm": 16000, "osha": "STA_LADDER_LANDING_INTERVAL (> 15240)" }
+      ],
+      "source": "ISO-LAD-FALLPROT-HEIGHT 3000, ISO-LAD-CAGE-START 2200..3000, OSHA-LAD-FALLPROT-HEIGHT 7315.2, OSHA-LAD-CAGE-LANDING 15240 (all A)",
+      "frs": ["FR-STA-03", "FR-STA-09"],
+      "plan": "plans/sc-sta-01-caged-ladder.json",
+      "test": "tests/unit/plantStructures/accessRules.test.ts"
+    },
+    {
+      "id": "VC-STA-04",
+      "what": "steel stair geometry closed form and rule checks",
+      "command": "add_steel_stair / check_access",
+      "formula": "n = ceil(rise / riserMax); h = rise / n; treads = n - 1; run = treads x g; blondel = 2h + g; pitch = atan(h / g)",
+      "expected": [
+        { "rise_mm": 3000, "riserMax_mm": 180, "g_mm": 280, "risers": 17, "treads": 16, "h_mm": 176.4706, "blondel_mm": 632.9412, "pitch_deg": 32.2213, "run_mm": 4480, "iso": "pass", "osha": "pass" },
+        { "rise_mm": 4500, "riserMax_mm": 190, "g_mm": 250, "risers": 24, "treads": 23, "h_mm": 187.5, "blondel_mm": 625.0, "pitch_deg": 36.8699, "run_mm": 5750, "iso": "warn STA_STAIR_FLIGHT_RISE (4500 > 3000, B rule) ", "osha": "pass" },
+        { "rise_mm": 2400, "riserMax_mm": 220, "g_mm": 200, "risers": 11, "treads": 10, "h_mm": 218.1818, "blondel_mm": 636.3636, "pitch_deg": 47.4896, "run_mm": 2000, "iso": "pass (600..660)", "osha": "STA_STAIR_TREAD (200 < 241.3)" }
+      ],
+      "tolerance": "counts exact; lengths 1e-3 mm; angle 1e-3 deg",
+      "source": "ISO-STR-BLONDEL, OSHA-STR-RISER / TREAD / ANGLE (A); ISO-STR-FLIGHT-RISE (B, warn only)",
+      "frs": ["FR-STA-04", "FR-STA-09"],
+      "plan": "plans/sc-sta-02-steel-stair.json",
+      "test": "tests/unit/plantStructures/stair.test.ts"
+    },
+    {
+      "id": "VC-STA-05",
+      "what": "guardrail height, knee-rail gap, toe plate per ruleset; post count closed form",
+      "command": "add_railing / check_access",
+      "expected": [
+        { "height_mm": 1100, "kneeRails": 1, "toePlate_mm": 100, "iso": "pass", "osha": "pass" },
+        { "height_mm": 1000, "kneeRails": 0, "toePlate_mm": 0, "iso": ["STA_RAIL_HEIGHT_LOW", "STA_RAIL_GAP", "STA_TOE_PLATE_MISSING"], "osha": ["warn STA_TOE_PLATE_MISSING (B)"] },
+        { "height_mm": 980, "osha": "STA_RAIL_HEIGHT_LOW (< 990.6)" },
+        { "height_mm": 1200, "osha": "warn STA_RAIL_HEIGHT_HIGH (> 1143, allowed if other criteria met)", "iso": "pass" },
+        { "length_mm": 4000, "postSpacingMax_mm": 1500, "posts": 4, "spacing_mm": 1333.333 },
+        { "length_mm": 6000, "postSpacingMax_mm": 1500, "posts": 5, "spacing_mm": 1500.0 }
+      ],
+      "formula": "posts = ceil(L / sMax) + 1, equal spacing L / (posts - 1)",
+      "source": "ISO-GRD-TOP 1100, ISO-GRD-GAP 500, ISO-TOE-HEIGHT 100, OSHA-GRD-TOP 990.6..1143 (A); OSHA-TOE-HEIGHT (B)",
+      "frs": ["FR-STA-05", "FR-STA-09"],
+      "plan": "plans/sc-sta-05-access-negative.json",
+      "test": "tests/unit/plantStructures/railing.test.ts"
+    },
+    {
+      "id": "VC-STA-06",
+      "what": "grating allowable load and deflection vs two manufacturer tables (19-W-4, 1-1/4 x 3/16)",
+      "command": "check_grating",
+      "reference": "data/grating_19w4_load_table.json",
+      "expected": [
+        { "span_ft": 2.0, "U_psf": 1480, "closedForm": 1480.263 },
+        { "span_ft": 2.5, "U_psf": 947, "closedForm": 947.368 },
+        { "span_ft": 3.0, "U_psf": 658, "closedForm": 657.895 },
+        { "pedestrianMaxSpan_mm": 1711.3, "rule": "100 psf, deflection <= 1/4 in" },
+        { "span_mm": 914.4, "load_kPa": 4.788, "deflection_mm": 0.5176 }
+      ],
+      "tolerance": "|closed form - published| <= 0.5 psf (integer rounding); deflection 1e-3 rel",
+      "source": "S19 (F, E), S20 + S21 (two manufacturers agree) — grade A",
+      "frs": ["FR-STA-01"],
+      "plan": "plans/sc-sta-06-grating-span.json",
+      "test": "tests/unit/plantStructures/grating.test.ts"
+    },
+    {
+      "id": "VC-STA-07",
+      "what": "circular platform around a vertical vessel: radii, area, grating mass, arcs, posts, brackets",
+      "command": "add_circular_platform / platform_takeoff",
+      "inputs": { "vesselOD_mm": 3000, "gap_mm": 150, "width_mm": 1000, "sweep_deg": 180, "gratingMass_kgm2": 43.4536 },
+      "expected": { "ri_mm": 1650, "ro_mm": 2650, "area_m2": 6.754424, "gratingMass_kg": 293.504, "outerArc_m": 8.325221, "innerArc_m": 5.183628, "railingLength_m": 10.325221, "outerRailPosts": 7, "brackets": 7 },
+      "tolerance": "1e-6 rel (area, arcs); 1e-4 rel (mass); counts exact",
+      "source": "closed form A = theta/2 (ro^2 - ri^2); mass per m2 from S20/S21",
+      "frs": ["FR-STA-02"],
+      "plan": "plans/sc-sta-03-vessel-circular-platform.json",
+      "test": "tests/unit/plantStructures/circularPlatform.test.ts"
+    },
+    {
+      "id": "VC-STA-08",
+      "what": "rectangular platform on beams: grating area, mass, railing length, edge protection",
+      "command": "add_platform / platform_takeoff / check_access",
+      "inputs": { "plan_mm": [6000, 3000], "railedEdges": "all four, one 800 mm stair opening with gate", "gratingMass_kgm2": 43.4536 },
+      "expected": { "area_m2": 18.0, "gratingMass_kg": 782.165, "perimeter_m": 18.0, "railingLength_m": 17.2, "edgeUnprotected": "absent" },
+      "tolerance": "1e-6 rel; mass 1e-4 rel",
+      "source": "closed form",
+      "frs": ["FR-STA-02", "FR-STA-05"],
+      "test": "tests/unit/plantStructures/platform.test.ts"
+    },
+    {
+      "id": "VC-STA-09",
+      "what": "pipe-rack generator counts, lengths and steel mass",
+      "command": "add_pipe_rack",
+      "inputs": { "length_mm": 60000, "bentSpacing_mm": 6000, "width_mm": 6000, "tiers_mm": [5000, 7000], "column": "HEB300 117 kg/m", "beamsAndStruts": "IPE300 42.2 kg/m" },
+      "expected": { "bents": 11, "columns": 22, "tierBeams": 22, "struts": 40, "columnLength_m": 154.0, "tierBeamLength_m": 132.0, "strutLength_m": 240.0, "steelMassExBracing_kg": 33716.4 },
+      "tolerance": "counts exact; lengths 1e-6 m; mass 1e-6 rel",
+      "source": "closed form with llull's catalogue masses (packages/domain-aec/src/steel/profiles.ts)",
+      "frs": ["FR-STA-06"],
+      "plan": "plans/sc-sta-04-pipe-rack.json",
+      "test": "tests/unit/plantStructures/pipeRack.test.ts"
+    },
+    {
+      "id": "VC-STA-10",
+      "what": "fireproofing takeoff: boxed cementitious encasement of a column over a project-given height",
+      "command": "set_fireproofing / fireproofing_takeoff",
+      "inputs": { "profile": "HEB300 (h = b = 300)", "method": "boxed", "thickness_mm": 40, "height_m": 9.0, "heightSource": "project fire-scenario envelope (explicit param, no default)" },
+      "expected": { "boxedPerimeter_m": 1.2, "area_m2": 10.8, "volume_m3": 0.4896 },
+      "formula": "area = 2 (h + b) H; volume = ((h + 2t)(b + 2t) - h b) H",
+      "tolerance": "1e-6 rel",
+      "source": "closed form; envelope height is never defaulted (API 2218 dimensions not verified, grade C)",
+      "frs": ["FR-STA-08"],
+      "test": "tests/unit/plantStructures/fireproofing.test.ts"
+    },
+    {
+      "id": "VC-STA-11",
+      "what": "reachability of operating points through the access graph",
+      "command": "check_reachability",
+      "expected": { "HV-101": "ok, platform, 900 mm above, route grade->ladder->platform", "HV-102": "STA_OPERATING_HEIGHT", "PI-103": "ok, grade, 1200 mm", "HV-101 without ladder": "STA_ACCESS_NO_EGRESS" },
+      "source": "scenario geometry; operating band is an explicit project rule",
+      "frs": ["FR-STA-10"],
+      "plan": "plans/sc-sta-07-valve-reachability.json",
+      "test": "tests/unit/plantStructures/reachability.test.ts"
+    },
+    {
+      "id": "VC-STA-12",
+      "what": "IFC export classes and predefined types",
+      "command": "export_ifc",
+      "expected": { "ladder": "IFCSTAIR .LADDER. (aggregating IFCMEMBER .STRINGER. stiles + rungs)", "railing": "IFCRAILING .GUARDRAIL. (stair side: .HANDRAIL.)", "grating": "IFCPLATE .USERDEFINED. ObjectType 'GRATING' (platform) / IFCSLAB .LANDING. (stair landing)", "steelStair": "IFCSTAIR + IFCSTAIRFLIGHT .STRAIGHT. + IFCMEMBER .STRINGER.", "rackStrut": "IFCMEMBER .STRUT." },
+      "reference": "data/ifc4x3_enums/*.md (buildingSMART IFC 4.3)",
+      "tolerance": "exact enum strings present in the enum files",
+      "frs": ["FR-STA-12"],
+      "test": "tests/unit/plantStructures/ifcAccess.test.ts"
+    },
+    {
+      "id": "VC-STA-13",
+      "what": "stable codes, remediation, unverified-rule propagation, reviewRequired",
+      "command": "check_access",
+      "expected": { "everyFindingHas": ["code", "ruleId", "ruleset", "clause", "severity", "ids", "measured", "limit", "remediation"], "gradeBRule": "severity warn + STA_RULE_UNVERIFIED, never fail", "reviewRequired": true, "invalidRuleset": "CMD_INVALID_PARAMS" },
+      "frs": ["FR-STA-09", "FR-STA-11"],
+      "plan": "plans/sc-sta-05-access-negative.json",
+      "test": "tests/unit/plantStructures/accessCodes.test.ts"
+    },
+    {
+      "id": "VC-STA-14",
+      "what": "purity and deterministic replay of every mutating command; golden plan id-normalised snapshot",
+      "command": "build_project",
+      "expected": { "isPure": true, "replayIdentical": true },
+      "frs": ["FR-STA-11"],
+      "test": "tests/golden (plan plant_access_structures)"
+    }
+  ]
+}

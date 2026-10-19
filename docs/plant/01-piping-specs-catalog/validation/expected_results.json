@@ -1,0 +1,437 @@
+{
+  "pack": "01 PSC",
+  "generatedBy": "hand-written index; every value lives in the data files or plans named here; no value was produced by running llull",
+  "gatePolicy": "Only grade A rows and cited closed forms gate pass / fail; grade B rows are data (flagged unverified) or behavioural checks; grade C is never used.",
+  "cases": [
+    {
+      "id": "VC-PSC-01",
+      "proves": [
+        "FR-PSC-01",
+        "TR-PSC-02",
+        "TR-PSC-03"
+      ],
+      "command": "lookup_piping_component",
+      "inputs": {
+        "type": "pipe",
+        "nps": 6,
+        "schedule": "40",
+        "standard": "ASME B36.10M"
+      },
+      "expected": {
+        "outsideDiameterMm": 168.3,
+        "wallMm": 7.11,
+        "insideDiameterMm": 154.08,
+        "verified": true
+      },
+      "reference": "data/asme_b36_pipe_schedules.json: every row with grade A (86 rows) returned exactly",
+      "tolerance": "exact to the printed 0.01 mm",
+      "source": "S1 fluids 1.3.1 + S2 formulab 0.72.3 (two independent transcriptions of B36.10M)",
+      "grade": "A",
+      "plan": "plans/sc-psc-01-catalog-lookup-mass.json",
+      "test": "tests/unit/plant/piping/catalogLookup.test.ts"
+    },
+    {
+      "id": "VC-PSC-02",
+      "proves": [
+        "FR-PSC-04",
+        "TR-PSC-09"
+      ],
+      "command": "pipe_section_properties",
+      "inputs": [
+        {
+          "D": 168.3,
+          "t": 7.11,
+          "contentDensityKgM3": 1000
+        },
+        {
+          "D": 114.3,
+          "t": 6.02
+        },
+        {
+          "D": 73.0,
+          "t": 5.16
+        }
+      ],
+      "expected": [
+        {
+          "massKgPerM": 28.264,
+          "contentMassKgPerM": 18.646,
+          "totalMassKgPerM": 46.909
+        },
+        {
+          "massKgPerM": 16.075
+        },
+        {
+          "massKgPerM": 8.633
+        }
+      ],
+      "bridge": "industrial/piping/pipeWeight.ts pipeWeightPerMetre(168.3, 1000) = 0.46002 kN/m = 46.909 kg/m x 9.80665 / 1000 (existing code must keep agreeing)",
+      "tolerance": "1e-3 kg/m",
+      "source": "closed form m = 0.0246615 (D - t) t (S16 Ferrostaal, S17 Steel & Tube); water 1000 kg/m3",
+      "grade": "A (closed form)",
+      "plan": "plans/sc-psc-01-catalog-lookup-mass.json",
+      "test": "tests/unit/plant/piping/sectionProperties.test.ts"
+    },
+    {
+      "id": "VC-PSC-03",
+      "proves": [
+        "FR-PSC-02",
+        "TR-PSC-04"
+      ],
+      "command": "lookup_piping_component",
+      "inputs": "elbow90 LR NPS 2, 4, 6; elbow45 LR NPS 4, 6",
+      "expected": {
+        "lr90Mm": {
+          "2": 76.2,
+          "4": 152.4,
+          "6": 228.6
+        },
+        "lr45Mm": {
+          "4": 63.5,
+          "6": 95.25
+        }
+      },
+      "tolerance": "0.01 mm against inch x 25.4; printed metric 152 / 229 / 64 / 95 within 0.5 mm",
+      "source": "data/asme_b16_9_buttweld_fittings.json (S8 Texas Flange, S9 Wermac, S10 Hardhat; rule A = 1.5 NPS)",
+      "grade": "A",
+      "plan": "plans/sc-psc-01-catalog-lookup-mass.json",
+      "test": "tests/unit/plant/piping/catalogLookup.test.ts"
+    },
+    {
+      "id": "VC-PSC-04",
+      "proves": [
+        "FR-PSC-02"
+      ],
+      "command": "lookup_piping_component",
+      "inputs": "reducerConcentric NPS 4 x 2, NPS 8 x 6",
+      "expected": {
+        "lengthMm": {
+          "4": 102,
+          "8": 152
+        }
+      },
+      "tolerance": "0.5 mm (printed metric)",
+      "source": "S11 dodo Reduct_SCH-STD.csv H column; S12 Hardhat / Wermac extract",
+      "grade": "A",
+      "plan": "plans/sc-psc-05-catalog-import-checks.json",
+      "test": "tests/unit/plant/piping/catalogLookup.test.ts"
+    },
+    {
+      "id": "VC-PSC-05",
+      "proves": [
+        "FR-PSC-03",
+        "FR-PSC-12",
+        "TR-PSC-05",
+        "TR-PSC-13"
+      ],
+      "command": "import_piping_catalog + check_piping_catalog",
+      "inputs": "family elbow90 LR B16.9 NPS 6 with centreToEnd 126.2 (dodo 0.75 x OD); second family without citation",
+      "expected": {
+        "check": "fail with PSC_CATALOG_DIM_MISMATCH at families.0.sizes.0.centreToEnd",
+        "import": "refused PSC_PROVENANCE_MISSING"
+      },
+      "source": "B16.9 rule lr90 (VC-PSC-03); negative example data/dodo_Elbow_SCH-STD.csv",
+      "grade": "A (rule) / behavioural",
+      "plan": "plans/sc-psc-05-catalog-import-checks.json",
+      "test": "tests/unit/plant/piping/catalogImport.test.ts"
+    },
+    {
+      "id": "VC-PSC-06",
+      "proves": [
+        "FR-PSC-02",
+        "TR-PSC-04"
+      ],
+      "command": "lookup_piping_component",
+      "inputs": {
+        "type": "flangeWeldNeck",
+        "nps": 4,
+        "class": 150,
+        "facing": "RF"
+      },
+      "expected": {
+        "outsideDiameterMm": 228.6,
+        "boltCircleMm": 190.5,
+        "boltCount": 8,
+        "boltDiameterIn": "5/8",
+        "boltHoleMm": 19.05
+      },
+      "reference": "data/asme_b16_5_wn_rf_flanges.json: bolt count and bolt diameter of all 24 rows (Cl150/300/600, NPS 1..12)",
+      "tolerance": "0.01 mm; counts exact",
+      "source": "S2 formulab, S3 flange-studbolt-finder, S4 Engineering ToolBox / Wermac extract",
+      "grade": "A (NPS 4 Cl150 full row; bolt pattern all rows); B (other OD / bolt circle values: returned with verified=false)",
+      "plan": "plans/sc-psc-01-catalog-lookup-mass.json",
+      "test": "tests/unit/plant/piping/catalogLookup.test.ts"
+    },
+    {
+      "id": "VC-PSC-07",
+      "proves": [
+        "FR-PSC-05",
+        "TR-PSC-07"
+      ],
+      "command": "pt_rating",
+      "inputs": "group 1.1: Cl150 at 38 C; Cl300 at 20 C; Cl150 at 45 C; Cl150 at 100 F in psig",
+      "expected": {
+        "cl150_38C_bar": 19.6,
+        "cl300_20C_bar": 51.1,
+        "cl150_45C_bar": 19.3667,
+        "cl150_100F_psig": 285
+      },
+      "tolerance": "1e-3 bar; interpolation 5e-4 bar",
+      "source": "data/asme_b16_5_pt_group_1_1.json (S5 Engineering ToolBox, S6 Fike, S7 Project Materials); interpolation 19.6 + (19.2 - 19.6) x 7/12",
+      "grade": "A",
+      "plan": "plans/sc-psc-03-design-conditions.json",
+      "test": "tests/unit/plant/piping/ptRating.test.ts"
+    },
+    {
+      "id": "VC-PSC-08",
+      "proves": [
+        "FR-PSC-06",
+        "FR-PSC-07",
+        "TR-PSC-06"
+      ],
+      "command": "resolve_spec_component",
+      "inputs": "CS150-A1 fixture: elbow90 NPS 6, NPS 1, pipe NPS 10, elbow90 NPS 30",
+      "expected": {
+        "nps6": {
+          "componentId": "E90-LR",
+          "schedule": "40",
+          "centreToEndMm": 228.6,
+          "wallMm": 7.11
+        },
+        "nps1": {
+          "componentId": "E90-SW",
+          "ends": "SW",
+          "verified": false
+        },
+        "pipe10": {
+          "schedule": "STD",
+          "wallMm": 9.27
+        },
+        "nps30": "PSC_SIZE_OUT_OF_RANGE"
+      },
+      "source": "fixture data/sample_spec_cs150.json (logic) + B36.10M / B16.9 rows (values, grade A)",
+      "grade": "A (values) / behavioural (selection)",
+      "plan": "plans/sc-psc-02-spec-resolution.json",
+      "test": "tests/unit/plant/piping/specResolve.test.ts"
+    },
+    {
+      "id": "VC-PSC-09",
+      "proves": [
+        "FR-PSC-08",
+        "TR-PSC-06"
+      ],
+      "command": "resolve_branch",
+      "inputs": "CS150-A1 header 6 x branch 6, 4, 2, 1; header 4 x branch 6",
+      "expected": {
+        "6x6": "T",
+        "6x4": "RT",
+        "6x2": "W (WOL)",
+        "6x1": "S",
+        "4x6": "PSC_BRANCH_UNDEFINED"
+      },
+      "source": "fixture branch table",
+      "grade": "behavioural",
+      "plan": "plans/sc-psc-02-spec-resolution.json",
+      "test": "tests/unit/plant/piping/specResolve.test.ts"
+    },
+    {
+      "id": "VC-PSC-10",
+      "proves": [
+        "FR-PSC-09",
+        "FR-PSC-05",
+        "TR-PSC-10"
+      ],
+      "command": "check_pipe_spec",
+      "inputs": "CS150-A1, design 19.0 bar / 45 C and 19.5 bar / 45 C",
+      "expected": {
+        "19.0": "no PSC_PT_RATING_EXCEEDED (status warn for draft + unverified only)",
+        "19.5": "fail PSC_PT_RATING_EXCEEDED"
+      },
+      "source": "VC-PSC-07 interpolated rating 19.3667 bar",
+      "grade": "A",
+      "plan": "plans/sc-psc-03-design-conditions.json",
+      "test": "tests/unit/plant/piping/checkPipeSpec.test.ts"
+    },
+    {
+      "id": "VC-PSC-11",
+      "proves": [
+        "FR-PSC-10",
+        "TR-PSC-08"
+      ],
+      "command": "pipe_wall_check",
+      "inputs": {
+        "D": 114.3,
+        "Ppsi": 1200,
+        "Spsi": 19000,
+        "E": 1,
+        "W": 1,
+        "Y": 0.4,
+        "cMm": 3,
+        "millTolerance": 0.125
+      },
+      "expected": {
+        "pressureThicknessMm": 3.5205,
+        "requiredNominalMm": 7.452,
+        "selectedSchedule": "80",
+        "schedule40": "PSC_WALL_INSUFFICIENT",
+        "reviewRequired": true
+      },
+      "tolerance": "5e-4 mm",
+      "source": "data/component_references.json b313PressureWall (S18 worked example, S19)",
+      "grade": "A (closed form + worked example)",
+      "plan": "plans/sc-psc-03-design-conditions.json",
+      "test": "tests/unit/plant/piping/wallCheck.test.ts"
+    },
+    {
+      "id": "VC-PSC-12",
+      "proves": [
+        "FR-PSC-02"
+      ],
+      "command": "lookup_piping_component",
+      "inputs": "valveGate FL RF Class 150 NPS 2, 4, 6",
+      "expected": {
+        "faceToFaceMm": {
+          "2": 178,
+          "4": 229,
+          "6": 267
+        }
+      },
+      "tolerance": "0.5 mm",
+      "source": "S20 Project Materials, S21 Wermac (B16.10)",
+      "grade": "A",
+      "plan": "plans/sc-psc-01-catalog-lookup-mass.json",
+      "test": "tests/unit/plant/piping/catalogLookup.test.ts"
+    },
+    {
+      "id": "VC-PSC-13",
+      "proves": [
+        "FR-PSC-02"
+      ],
+      "command": "lookup_piping_component",
+      "inputs": "gasketSpiralWound NPS 4 Class 150",
+      "expected": {
+        "innerRingIdMm": 106.4,
+        "centeringRingOdMm": 174.8,
+        "sealingElementOdMm": "149.4 (grade B, verified=false)"
+      },
+      "tolerance": "0.05 mm",
+      "source": "S22 Wermac, S23 Garlock, S24",
+      "grade": "A (inner ring, outer ring) / B (sealing element)",
+      "plan": "plans/sc-psc-01-catalog-lookup-mass.json",
+      "test": "tests/unit/plant/piping/catalogLookup.test.ts"
+    },
+    {
+      "id": "VC-PSC-14",
+      "proves": [
+        "FR-PSC-11",
+        "TR-PSC-11"
+      ],
+      "command": "lookup_piping_component + check_pipe_spec",
+      "inputs": "EN 1092-1 PN16 DN100; spec MIX-1 = EN 10220 pipe + ASME B16.9 elbow DN50..100",
+      "expected": {
+        "flange": {
+          "outsideDiameterMm": 220,
+          "boltCircleMm": 180
+        },
+        "check": "PSC_DIM_STANDARD_MIXED on component E (DN65: 76.1 vs 73.0; DN125 not in range)"
+      },
+      "source": "data/en_1092_1_flanges.json (S13 dodo, S14 Wermac); data/component_references.json en10220Diameters",
+      "grade": "A",
+      "plan": "plans/sc-psc-05-catalog-import-checks.json",
+      "test": "tests/unit/plant/piping/checkPipeSpec.test.ts"
+    },
+    {
+      "id": "VC-PSC-15",
+      "proves": [
+        "FR-PSC-13",
+        "TR-PSC-12"
+      ],
+      "command": "add_pipe_run (spec, nps) + legacy add_pipe_run (dn)",
+      "expected": {
+        "specPipeOdMm": 73.0,
+        "specPipeSchedule": "40",
+        "legacyDn65OdMm": 76.1,
+        "massKgPerM": 8.633
+      },
+      "source": "B36.10M NPS 2-1/2 (S1, S2); data/llull_pipe_sizes_crosscheck.json (current table)",
+      "grade": "A",
+      "plan": "plans/sc-psc-04-spec-driven-pipe-run.json",
+      "test": "tests/unit/plant/piping/specPipeRun.test.ts"
+    },
+    {
+      "id": "VC-PSC-16",
+      "proves": [
+        "FR-PSC-14",
+        "FR-PSC-15",
+        "TR-PSC-15"
+      ],
+      "command": "resolve_spec_component / check_pipe_spec / approve_pipe_spec",
+      "expected": {
+        "unverifiedRow": "verified=false and PSC_DATA_UNVERIFIED warning in check_pipe_spec (e.g. NPS 6 Cl600 flange thickness: sources 47.8 vs 47.6)",
+        "approveByAgent": "PSC_HUMAN_GATE",
+        "checkStatusDraft": "PSC_SPEC_NOT_APPROVED warning"
+      },
+      "source": "AF-32, AF-33, AF-34",
+      "grade": "behavioural",
+      "plan": "plans/sc-psc-04-spec-driven-pipe-run.json",
+      "test": "tests/unit/plant/piping/specGovernance.test.ts"
+    },
+    {
+      "id": "VC-PSC-17",
+      "proves": [
+        "FR-PSC-16",
+        "TR-PSC-14"
+      ],
+      "command": "export_pipe_spec / import_pipe_spec",
+      "expected": {
+        "roundTrip": "sha256(canonical JSON) identical after export -> import -> export",
+        "replay": "same plan twice -> identical ids and data"
+      },
+      "source": "AF-13",
+      "grade": "behavioural",
+      "plan": "plans/sc-psc-05-catalog-import-checks.json",
+      "test": "tests/unit/plant/piping/specPersistence.test.ts"
+    },
+    {
+      "id": "VC-PSC-18",
+      "proves": [
+        "FR-PSC-01",
+        "TR-PSC-03"
+      ],
+      "command": "lookup_piping_component",
+      "inputs": "NPS 14: ASME B36.10M Sch 10 vs ASME B36.19M 10S",
+      "expected": {
+        "b3610_sch10_wallMm": 6.35,
+        "b3619_10S_wallMm": 4.78,
+        "distinct": true
+      },
+      "source": "S1 fluids (both tables); S2 formulab lists 4.78 under 'SCH10' (a 10S value): the case pins that the standard tag, not the schedule label, selects the row",
+      "grade": "B values / behavioural gate (the two answers must differ and carry their standard)",
+      "test": "tests/unit/plant/piping/catalogLookup.test.ts"
+    },
+    {
+      "id": "VC-PSC-19",
+      "proves": [
+        "FR-PSC-19",
+        "TR-PSC-16"
+      ],
+      "command": "component_shape (query) + measure_bounds on the inserted solid",
+      "inputs": {
+        "type": "elbow90",
+        "radius": "LR",
+        "nps": 6,
+        "schedule": "40",
+        "placement": "ends along +X and +Y, centre of bend at origin"
+      },
+      "expected": {
+        "inPlaneExtentMm": 312.75,
+        "outOfPlaneExtentMm": 168.3,
+        "derivation": "in-plane: centre-to-end 228.6 + OD/2 84.15 = 312.75 per axis; out-of-plane: OD 168.3"
+      },
+      "tolerance": "0.5 % (display tessellation; exact on the OCC kernel to 1e-6 mm)",
+      "source": "closed form from VC-PSC-01 (OD) and VC-PSC-03 (A)",
+      "grade": "A (closed form)",
+      "test": "tests/unit/plant/piping/componentShape.test.ts"
+    }
+  ]
+}

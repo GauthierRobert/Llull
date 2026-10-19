@@ -35,6 +35,7 @@
     "params": { "joint": "j_crank", "kind": "speed", "rpm": 954.929658551, "maxTorque": 1000000.0, "id": "drive" }
   },
   { "command": "set_gravity", "params": { "gravity": [0, 0, 0] } },
+  { "command": "set_dynamics_solver", "params": { "loopTimeConstantSteps": 16 } },
   { "command": "inspect_dynamics", "params": {} },
   {
     "command": "simulate_motion",

@@ -1,0 +1,42 @@
+{
+  "title": "API 650 welded atmospheric storage tanks: one-foot method shell thickness, allowable stresses, minimum thickness",
+  "note": "API Std 650 is paywalled; formulas and table rows below are public extracts cross-checked between independent sources. Clause numbers differ between editions (3.6.x in old editions, 5.6.x since the 11th edition).",
+  "oneFootMethod": {
+    "SI": {
+      "td_mm": "4.9 D (H - 0.3) G / Sd + CA",
+      "tt_mm": "4.9 D (H - 0.3) / St",
+      "units": "D nominal tank diameter m, H design liquid level above the bottom of the course m, G design specific gravity, Sd / St allowable product-design / hydrostatic-test stress MPa, CA mm"
+    },
+    "USC": { "td_in": "2.6 D (H - 1) G / Sd + CA", "tt_in": "2.6 D (H - 1) / St", "units": "D ft, H ft, S psi, CA in" },
+    "governing": "t = max(td, tt), not less than the minimum nominal thickness for the tank diameter, rounded up to a commercial plate",
+    "applicability": "not for tanks larger than 60 m (200 ft) in diameter (variable-design-point method instead)",
+    "sources": ["S16", "S15"],
+    "grade": "A",
+    "gradeReason": "same SI and USC forms in >= 3 independent extracts (epcland, midstreamcalculator, industrialmonitordirect, PPNS journal); some sheets divide by a joint efficiency E (Appendix A tanks)"
+  },
+  "workedExample": {
+    "id": "API650-PPNS",
+    "inputs": { "D_m": 7.7, "H_m": 10.2, "G": 0.895, "Sd_MPa": 137, "St_MPa": 154, "CA_mm": 3 },
+    "published": { "td_mm": 5.44, "tt_mm": 2.43, "governing": "minimum thickness (6 mm stated by the article)" },
+    "derived": { "td_mm": 5.440194635036496, "tt_mm": 2.4255 },
+    "source": "S15 journal.ppns.ac.id CPEAA article 1520 (search extract)",
+    "grade": "B",
+    "gradeReason": "one extract; values re-derived exactly from the grade-A formula, and Sd/St = 137/154 MPa agree with the A283 Gr C row of the stress table below"
+  },
+  "allowableStressRows": [
+    { "material": "A283M Gr C", "minYield_MPa": 205, "minTensile_MPa": 380, "Sd_MPa": 137, "St_MPa": 154, "sources": ["S17 Table 5-2a extract", "S15 PPNS example"], "grade": "A" },
+    { "material": "A36M", "minYield_MPa": 250, "minTensile_MPa": 400, "Sd_MPa": 160, "St_MPa": 171, "sources": ["S17 Table 5-2a extract", "S17 second calculation sheet"], "grade": "A" },
+    { "material": "A516M Gr 485 (A516 Gr 70)", "minYield_MPa": 260, "minTensile_MPa": 485, "Sd_MPa": 173, "St_MPa": 195, "sources": ["S17 Table 5-2a extract", "S17 calculation sheet"], "grade": "A", "remark": "one software printout shows 174.4 / 196.5 MPa (unrounded); not used" }
+  ],
+  "stressBasis": { "text": "Sd <= 2/3 yield and <= 2/5 tensile; St <= 3/4 yield and <= 3/7 tensile (public summaries)", "grade": "C", "use": "documentation only, not gated" },
+  "minimumNominalThickness": {
+    "rows": [
+      { "D_lt_m": 15, "t_mm": 5, "grade": "B" },
+      { "D_from_m": 15, "D_lt_m": 36, "t_mm": 6, "grade": "B" },
+      { "D_from_m": 36, "D_le_m": 60, "t_mm": 8, "grade": "C" },
+      { "D_gt_m": 60, "t_mm": 10, "grade": "C" }
+    ],
+    "sources": ["S18"],
+    "conflict": "one extract says 6 mm for the lowest course when 3.2 m < D < 15 m, the PPNS example also applies 6 mm at D = 7.7 m; edition-dependent. llull ships this table as data with its edition, flags rows below grade A as unverified and never uses them silently (EQP_TABLE_UNVERIFIED warning)."
+  }
+}

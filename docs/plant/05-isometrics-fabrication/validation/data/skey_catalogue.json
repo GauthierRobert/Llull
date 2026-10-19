@@ -1,0 +1,24 @@
+{
+  "meta": {
+    "id": "ISO-DATA-SKEY",
+    "title": "ISOGEN symbol keys (SKEY) used by the 05 ISO MVP export and the isometric symbol library",
+    "note": "The ISOGEN Symbol Key (SKEY) Definitions Reference Guide (Hexagon, 2016) was located (S9) but not readable from the sandbox; rows come from search extracts of it and of the AVEVA ISODRAFT manual. SKEY = 2 characters for the component family + 2 characters for the end condition (BW, SW, FL, CP, SC, PL). An SKEY not listed here is exported only when the user supplies it (catalogue field `skey`); llull never invents one.",
+    "accessed": "2026-10-18"
+  },
+  "rows": [
+    { "skey": "ELBW", "family": "ELBO", "meaning": "elbow, butt weld", "sources": ["S9", "S16"], "grade": "A" },
+    { "skey": "ELSW", "family": "ELBO", "meaning": "elbow, socket weld (90 and 45)", "sources": ["S9"], "grade": "B" },
+    { "skey": "TEBW", "family": "TEE", "meaning": "tee, butt weld", "sources": ["S9", "S4"], "grade": "A" },
+    { "skey": "FLWN", "family": "FLAN", "meaning": "weld neck flange", "sources": ["S9", "S5"], "grade": "A" },
+    { "skey": "FLSJ", "family": "FLAN", "meaning": "flange, slip-on (as listed by one source)", "sources": ["S16"], "grade": "C" },
+    { "skey": "REBW", "family": "REDU", "meaning": "eccentric reducer, butt weld", "sources": ["S9"], "grade": "B" },
+    { "skey": "ELCL", "family": "ELBO", "meaning": "elbow with clamped ends", "sources": ["S15"], "grade": "B" },
+    { "skey": "TECL", "family": "TEE", "meaning": "tee with clamped ends", "sources": ["S15"], "grade": "B" },
+    { "skey": "TEPL", "family": "TEE", "meaning": "tee set-on (plain end), PypeServer TEE-SET example", "sources": ["S17"], "grade": "C" },
+    { "skey": "WW", "family": "WELD", "meaning": "shop weld", "sources": ["S6"], "grade": "B" },
+    { "skey": "WS", "family": "WELD", "meaning": "site (field) weld", "sources": ["S6", "S13"], "grade": "A" },
+    { "skey": "WF", "family": "WELD", "meaning": "field-fitted weld (extra length left on the pipe, trimmed on site)", "sources": ["S6", "S8"], "grade": "A" }
+  ],
+  "unconfirmed": ["VTFL", "CPBW", "KABW", "FLSO", "GASK"],
+  "unconfirmedNote": "Searched, not found in any reachable extract; not used by the MVP until read from the SKEY guide (OQ-ISO-02)."
+}

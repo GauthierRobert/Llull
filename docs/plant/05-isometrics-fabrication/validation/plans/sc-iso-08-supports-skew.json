@@ -1,0 +1,22 @@
+{
+  "id": "SC-ISO-08",
+  "validates": ["VC-ISO-21"],
+  "description": "A DN80 line with a 45 deg horizontal offset (legs 1000 / 1000 mm) and two shoes placed with add_pipe_support: the PCF carries two SUPPORT records with CO-ORDS on the centreline, the iso draws the offset inside a squaring-in triangle with both leg dimensions.",
+  "status": "UNBUILT - add_pipe_run and add_pipe_support exist today; export_pcf and export_isometric are unbuilt; 45 deg elbows come from the legacy derivation (warning ISO_LEGACY_FITTINGS_DERIVED expected)",
+  "unbuilt": ["export_pcf", "export_isometric"],
+  "actions": [
+    { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },
+    { "command": "add_pipe_run", "params": { "points": [[0, 0, 2000], [2000, 0, 2000], [3000, 1000, 2000], [5000, 1000, 2000]], "dn": 80, "line": "S-501", "service": "steam condensate" }, "as": "s501" },
+    { "command": "add_pipe_support", "params": { "pipeId": "$s501", "at": [[1000, 0, 2000], [4000, 1000, 2000]], "type": "shoe" } },
+    { "command": "export_pcf", "params": { "lineIds": ["S-501"], "includeSupports": true, "allowMissingSkey": true } },
+    { "command": "export_isometric", "params": { "lineId": "S-501", "style": "check", "paper": "A3", "formats": ["svg"] } }
+  ],
+  "expected": [
+    { "step": 3, "path": "data.files[0].countsByType.SUPPORT", "value": 2, "source": "two supports" },
+    { "step": 3, "path": "data.files[0].supports[*].coordsMm", "value": [[1000.0, 0.0, 2000.0], [4000.0, 1000.0, 2000.0]], "abs": 1e-6, "source": "support at points on the centreline" },
+    { "step": 4, "path": "data.annotations[kind=skew].lengthMm", "value": 1414.2135624, "abs": 1e-6, "source": "sqrt(1000^2 + 1000^2)" },
+    { "step": 4, "path": "data.annotations[kind=skew].legsMm", "value": [1000, 1000], "source": "offset legs" },
+    { "step": 4, "path": "data.annotations[kind=skew].angleDeg", "value": 45.0, "abs": 1e-9, "source": "atan(1000/1000)" },
+    { "step": 4, "path": "data.warnings[code=ISO_LEGACY_FITTINGS_DERIVED]", "value": "present", "source": "legacy polyline line" }
+  ]
+}

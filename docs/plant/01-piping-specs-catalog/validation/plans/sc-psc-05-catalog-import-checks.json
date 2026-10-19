@@ -1,0 +1,26 @@
+{
+  "id": "SC-PSC-05",
+  "validates": ["VC-PSC-05", "VC-PSC-04", "VC-PSC-14", "VC-PSC-17"],
+  "description": "Import a user catalogue fragment and check it: a wrong LR elbow radius (0.75 x OD, as in a FreeCAD table) is flagged, a missing citation is refused, an EN 10220 pipe mixed with ASME B16.9 fittings is flagged, and export / re-import is byte-stable",
+  "unbuilt": ["import_piping_catalog", "check_piping_catalog", "export_pipe_spec", "import_pipe_spec", "lookup_piping_component"],
+  "actions": [
+    { "command": "import_piping_catalog", "params": { "catalog": { "format": "llull-piping-catalog", "schemaVersion": 1, "id": "user-elbows", "licence": "company-proprietary", "families": [ { "id": "lr90-bad", "type": "elbow90", "radius": "LR", "standard": "ASME B16.9", "unit": "mm", "sizes": [ { "nps": 6, "outsideDiameter": 168.3, "centreToEnd": 126.2, "provenance": { "citation": "dodo tablez/Elbow_SCH-STD.csv BendRadius" } } ] } ] } } },
+    { "command": "check_piping_catalog", "params": { "catalogId": "user-elbows" } },
+    { "command": "import_piping_catalog", "params": { "catalog": { "format": "llull-piping-catalog", "schemaVersion": 1, "id": "user-nocite", "licence": "company-proprietary", "families": [ { "id": "x", "type": "elbow90", "radius": "LR", "standard": "ASME B16.9", "unit": "mm", "sizes": [ { "nps": 4, "outsideDiameter": 114.3, "centreToEnd": 152.4 } ] } ] } } },
+    { "command": "lookup_piping_component", "params": { "catalogId": "llull-open-piping", "type": "reducerConcentric", "nps": 8, "smallNps": 6 } },
+    { "command": "lookup_piping_component", "params": { "catalogId": "llull-open-piping", "type": "flangeWeldNeck", "standard": "EN 1092-1", "dn": 100, "pn": 16 } },
+    { "command": "import_pipe_spec", "params": { "spec": { "format": "llull-pipe-spec", "schemaVersion": 1, "id": "MIX-1", "dimensionalStandard": "EN", "rating": { "system": "EN 1092-1", "pn": 16 }, "corrosionAllowance": { "value": 1, "unit": "mm" }, "sizeRange": { "fromDn": 50, "toDn": 100 }, "catalogs": ["llull-open-piping"], "components": [ { "id": "P", "type": "pipe", "fromDn": 50, "toDn": 100, "standard": "EN 10220", "wallMm": 3.6, "catalogRef": "en-10220" }, { "id": "E", "type": "elbow90", "radius": "LR", "fromDn": 50, "toDn": 100, "catalogRef": "asme-b16.9" } ], "status": "draft" } } },
+    { "command": "check_pipe_spec", "params": { "specId": "MIX-1" } },
+    { "command": "export_pipe_spec", "params": { "specId": "MIX-1" } }
+  ],
+  "expected": [
+    { "step": 1, "path": "issues[0].code", "value": "PSC_CATALOG_DIM_MISMATCH", "source": "B16.9 LR rule A = 1.5 NPS: 228.6 mm vs 126.2" },
+    { "step": 1, "path": "issues[0].paths", "value": ["families.0.sizes.0.centreToEnd"], "source": "AF-11" },
+    { "step": 2, "path": "error.code", "value": "PSC_PROVENANCE_MISSING", "source": "AF-30 / AF-35: every catalogue value needs a citation" },
+    { "step": 3, "path": "lengthMm", "value": 152, "abs": 0.5, "source": "B16.9 reducer NPS 8 H = 6 in (dodo; Hardhat 8x6 152)" },
+    { "step": 4, "path": "outsideDiameterMm", "value": 220, "abs": 0.01, "source": "EN 1092-1 PN16 DN100 (dodo; Wermac)" },
+    { "step": 4, "path": "boltCircleMm", "value": 180, "abs": 0.01, "source": "same" },
+    { "step": 6, "path": "issues[code=PSC_DIM_STANDARD_MIXED].ids", "value": ["E"], "source": "EN 10220 DN65 76.1 vs B16.9 NPS 2-1/2 73.0 end diameter mismatch > 1.5 mm" },
+    { "step": 7, "path": "sha256", "value": "equal to sha256 of the canonical JSON of the imported spec", "source": "AF-13 determinism (round trip)" }
+  ]
+}

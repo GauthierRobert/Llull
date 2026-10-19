@@ -1,0 +1,40 @@
+{
+  "id": "SC-EQP-04",
+  "status": "PROPOSED - commands not built yet (add_storage_tank, tank_shell_thickness, vessel_volume, check_equipment).",
+  "validates": ["VC-EQP-08", "VC-EQP-17"],
+  "description": "API 650 cone-roof water tank T-401: D 20 m, shell height 12 m in six 2 m courses, G 1.0, A36M (Sd 160, St 171 MPa from the tank material table, grade A), CA 1.5 mm. One-foot method course by course; the minimum-thickness row for 15..36 m (6 mm) is grade B and must be reported as unverified.",
+  "actions": [
+    { "command": "set_units", "params": { "units": "mm" } },
+    {
+      "command": "add_storage_tank",
+      "params": {
+        "tag": "T-401",
+        "name": "Fire water tank",
+        "standard": "api_650",
+        "location": [30000, 0],
+        "diameter": 20000,
+        "shellHeight": 12000,
+        "courses": [2000, 2000, 2000, 2000, 2000, 2000],
+        "roof": { "type": "cone", "slopeRatio": "1:12" },
+        "bottom": { "type": "flat", "annularPlate": false },
+        "design": { "specificGravity": 1.0, "designLiquidLevel": 12000, "material": "A36M", "corrosionAllowance": 1.5, "materialDensityKgM3": 7850 }
+      },
+      "as": "t401"
+    },
+    { "command": "tank_shell_thickness", "params": { "equipment": "T-401", "method": "one_foot" } },
+    { "command": "vessel_volume", "params": { "equipment": "T-401", "levels": [12000] } },
+    { "command": "check_equipment", "params": { "equipment": ["T-401"] } },
+    { "command": "tank_shell_thickness", "params": { "equipment": "T-401", "method": "one_foot", "overrideDiameterM": 65 } }
+  ],
+  "expected": [
+    { "step": 2, "path": "courses.0.designThicknessMm", "value": 8.66625, "rel": 1e-9, "source": "4.9 x 20 x 11.7 x 1.0 / 160 + 1.5" },
+    { "step": 2, "path": "courses.0.testThicknessMm", "value": 6.705263157894736, "rel": 1e-9, "source": "4.9 x 20 x 11.7 / 171" },
+    { "step": 2, "path": "courses.2.governingThicknessMm", "value": 6.21625, "rel": 1e-9, "source": "course 3, H = 8 m" },
+    { "step": 2, "path": "courses.3.governingThicknessMm", "value": 6.0, "abs": 1e-9, "source": "minimum nominal thickness 6 mm for 15 m <= D < 36 m (grade B row)" },
+    { "step": 2, "path": "courses.3.minimumThickness.unverified", "value": true, "source": "AF-32: grade-B table row" },
+    { "step": 2, "path": "allowableStress.Sd.source", "value": "API 650 Table 5-2a A36M (data/api650_references.json, grade A)", "source": "AF-31 provenance" },
+    { "step": 3, "path": "levels.0.liquidVolumeM3", "value": 3769.9111843077517, "rel": 1e-9, "source": "pi/4 x 20^2 x 12" },
+    { "step": 4, "path": "issues[code=EQP_TABLE_UNVERIFIED].severity", "value": "warning", "source": "AF-32" },
+    { "step": 5, "path": "error.code", "value": "EQP_API650_ONE_FOOT_LIMIT", "source": "one-foot method not for D > 60 m" }
+  ]
+}

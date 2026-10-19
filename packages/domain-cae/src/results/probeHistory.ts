@@ -29,7 +29,9 @@ export function historySeries(readings: readonly ProbeReading[], probeIds?: read
   return readings
     .filter((reading) => probeIds === undefined || probeIds.includes(reading.probeId))
     .map((reading) => {
-      const points: HistoryPoint[] = reading.values.flatMap(({ time, value }) => (value === null ? [] : [{ time, value }]));
+      const points: HistoryPoint[] = reading.values.flatMap(({ time, value }) =>
+        value === null || !Number.isFinite(value) || !Number.isFinite(time) ? [] : [{ time, value }],
+      );
       let min: HistoryPoint | null = null;
       let max: HistoryPoint | null = null;
       for (const point of points) {

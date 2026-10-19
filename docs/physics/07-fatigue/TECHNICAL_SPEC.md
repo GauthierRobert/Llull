@@ -25,7 +25,7 @@ A `grep -ril "rainflow\|miner\|basquin\|coffin" packages/` hits only `building/e
 
 
 ```
-src/ui (fatigue table, hot-spot glyphs, disposition dialog)        server/ (transport: export_stress_spectrum file write)
+src/ui (fatigue table, hot-spot glyphs, disposition dialog)        server/ (transports: export_stress_spectrum file write; fatigue_field ✱ → `llull-compute post`, RS1)
         │ dispatch                                                         │
 src/app installDefaultPlugins() + fatiguePlugin (after caePlugin)
         ▼
@@ -69,6 +69,21 @@ domain capability lives in the plugin; core gets data types only.
 | TR-FAT-30 | MUST | Agent-first result contract (AF-10/11/31–36): factors named with `source`/`defaulted`; `unverified` = OR over curve, profile, 05 inputs; `reviewRequired: true` on every row; dispositions only through `dispose_fatigue_result` + 09 signature port. |
 | TR-FAT-31 | MUST | Staleness: `fatigueInputHash = sha256(canonical{05 resultsHash, case, histories, curve model ids + values hash, factors})`; dispositions bind to it; any change → `stale`. |
 | TR-FAT-40 | SHOULD | `export_stress_spectrum` transport: CSV / JSON writer pure in `@phys`, file write in `server/` (AF-12). |
+| TR-FAT-41 | SHOULD | `fatigue_field` ✱ transport (RS1 RS-7): runs `llull-compute post fatigue <job-folder>` (crate `llull-post`, Rust CPU, rayon over nodes) on the 05 results artifact and the case; superposition, scalar measure, rainflow, correction and Miner damage on **every** node; stores a `FatigueField { damagePerNode, lifePerNode, fatigueInputHash }` artifact. `compute_fatigue` reads it through `ctx.feaArtifacts` when its hash is current and then ranks hot spots by damage, not by scalar range. Rows reproduce the TS code (VC-FAT-43); the per-node loop is deterministic (fixed node order for every reduction, RS1 §2 rule 3). Without the binary the TS pre-selection path of §5.6 runs. |
+
+### 2.1 Stack amendment (RS1, 2026-10-18)
+
+Decision [RS1](../../decisions/RS1-native-compute.md) step **RS-7** (medium, Rust CPU) moves the all-node FE fatigue loop to
+`llull-compute post` (crate `llull-post`). It removes the need for the top-1 % hot-spot pre-selection by scalar range: every
+node is counted and damaged, so a node with a small range but a damaging mean or sequence is no longer missed.
+
+- The pure TS code (`counting/`, `life/`, `fe/`) stays: `count_cycles`, `fatigue_life`, history-only cases and small meshes
+  run in TS, and TS is the oracle the native rows must match (VC-FAT-43).
+- Core stays pure: the native job runs behind the `fatigue_field` transport in `server/` and returns an artifact that
+  `compute_fatigue` reads and validates by hash (05 §4.1 trust model). Nothing in `packages/*` imports native code.
+- Rust CPU, not GPU: the per-node work is branchy (stack-based rainflow, Newton for strain-life) and the numbers must be
+  bit-reproducible.
+
 
 ## 3. Data model
 
@@ -165,6 +180,7 @@ Plugin `fatigue`, toolset `durability`. All pure `defineCommand`, snake_case. �
 | `check_fatigue` | query | `{ caseId }` → `{ status, items[{code, severity, ids, message, remediation}], reviewRequired: true }` | readiness check (AF-20) |
 | `dispose_fatigue_result` | mutating, **human gate** | `{ caseId, rowKey, decision, justification, signature }` | @affects case.dispositions · @invariant signature verified by the 09 `ctx.signatures` port, bound to `fatigueInputHash` · @failure agent caller / no valid human signature → `FAT_HUMAN_GATE`, doc unchanged |
 | ✱ `export_stress_spectrum` | transport | `{ caseId, hotspot, format: 'csv' \| 'json', content: 'history' \| 'rainflow_matrix', path }` | refuses stale results; writes only with `--save` |
+| ✱ `fatigue_field` (RS1) | transport | `{ caseId, timeoutS?: number (default 600) }` | runs `llull-compute post fatigue`, stores the `FatigueField` artifact (TR-FAT-41); refuses stale 05 results; without the binary returns `NATIVE_TOOL_MISSING` and `compute_fatigue` keeps the TS path |
 
 ## 5. Algorithms
 
@@ -223,8 +239,10 @@ Gerber, Soderberg, Morrow. σmax ≤ 0 (SWT/Walker) → zero damage with item `F
    of different lengths are refused with `FAT_HISTORY_MISMATCH`).
 3. Scalar measure per time step: signed von Mises (sign of the principal with the largest magnitude) or max principal or a
    component; proportionality check from the principal directions (TR-FAT-15).
-4. Candidate hot spots: the `count` nodes with the largest scalar range, one per part and at least 2 element lengths apart
-   (05 mesh size); 05 singular zones excluded and listed `singular: true`.
+4. Candidate hot spots: with a current `FatigueField` artifact (TR-FAT-41), the `count` nodes with the largest damage;
+   without it (TS path), the `count` nodes with the largest scalar range. In both cases one per part and at least 2 element
+   lengths apart (05 mesh size); 05 singular zones excluded and listed `singular: true`. The result names the path
+   (`selection: 'all_nodes' | 'scalar_range'`).
 5. Count, correct, accumulate damage, compute life and margin per hot spot.
 
 ### 5.7 `compute_fatigue` data shape
@@ -335,7 +353,8 @@ factors ≥ 1 (scatter) and > 0 (modifiers), dispositions well formed.
 | Budget | Target |
 | ------ | ------ |
 | `count_cycles` | ≥ 1e6 reversals/s in TS (single pass, stack) |
-| `compute_fatigue` on 50k nodes × 3 load cases × 10k-point history | ≤ 10 s (hot-spot pre-selection by scalar range; full counting only on the top 1 % of nodes) — TBD measure |
+| `compute_fatigue` on 50k nodes × 3 load cases × 10k-point history, TS path | ≤ 10 s (hot-spot pre-selection by scalar range; full counting only on the top 1 % of nodes) — TBD measure |
+| `fatigue_field` (native, all nodes) on the same case | target ≤ 10 s with full counting on every node (target, TBD — measure, VC-FAT-43) |
 | Memory | streaming over nodes; no full time × node matrix |
 | Robustness | every refusal is a no-op with code; NaN anywhere → `FAT_HISTORY_INVALID` |
 
@@ -347,6 +366,7 @@ factors ≥ 1 (scatter) and > 0 (modifiers), dispositions well formed.
 | Contract | `toToolSchemas()` snapshot gains `durability`; toolset invariant; plugin validate/restore | — |
 | Golden | `validation/plans/*.plan.json` once commands exist | 01, 40, 42 |
 | Integration (needs 05 + ccx) | plate-with-hole spectrum: hot spot at the hole edge, local history = VC-FAT-42 within 5 % (FE Kt) | 42 |
+| Native (`npm run native:check`; `server/tests` with `llull-compute`) | `llull-post` rainflow on the E1049 cases; native vs TS (all nodes, no pre-selection) on the VC-FAT-42 mesh; determinism | 01–03, 43 |
 | Agent-first | codes, named factors, human gate, unverified propagation, stale | 50, 60 |
 
 Coverage 90/85/90/90 extends to `packages/domain-physics/src/**`.
@@ -360,6 +380,7 @@ Coverage 90/85/90/90 extends to `packages/domain-physics/src/**`.
 | M3 | FE coupling (05 artifacts, superposition, hot spots, proportionality), staleness, spectrum export, plans, VC-42 | M2; aerospace 05 M3 | 2 w |
 | M4 (V1) | modifiers, MMPDS-style fits, Haigh tables, CSV spectrum import, nonlinear damage options | M3 | 2 w |
 | M5 (V1) | PHY-09 stress PSD → spectral fatigue (COULD) | PHY-09 | 1–2 w |
+| RS-7 | `llull-post` fatigue job (all nodes), `fatigue_field` transport, `FatigueField` artifact, damage-ranked hot spots, VC-FAT-43 | M3, RS-0 (`solver/` workspace) | 1.5 w (share of RS1 RS-7) |
 | V2 | critical-plane multiaxial, welded joints, FKM-style sets | — | — |
 
 ## 11. Open questions / decisions needed
@@ -377,11 +398,13 @@ Coverage 90/85/90/90 extends to `packages/domain-physics/src/**`.
 6. **OQ-FAT-06 Package**: confirm `packages/domain-physics` with toolset `durability` (README §5.1).
 7. **OQ-FAT-07 Standard spectra**: can a licence for TWIST / FALSTAFF sequence files (ESDU 97018 [R16]) be obtained for
    validation, or do we stay with E1049 and synthetic histories?
+8. **OQ-FAT-08 Field size (RS1).** A per-node damage artifact on a large mesh is the first fatigue output that is a full field.
+   Keep it in the 05 artifact store only (proposal), or also feed the 05 contour view and `render_view`?
 
 ## 12. References
 
 See [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md) §11 ([R1]–[R22]) and [`validation/sources.md`](validation/sources.md)
-for access method and grade. Repository paths: `packages/core/src/model/types.ts`,
+for access method and grade. Native compute programme: [RS1](../../decisions/RS1-native-compute.md) (step RS-7). Repository paths: `packages/core/src/model/types.ts`,
 `packages/core/src/plugins/plugin.ts`, `packages/mcp/src/toolsets.ts`, `packages/core/src/commands/project/types.ts`,
 `packages/domain-aec/src/industrial/runway/*`, `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md`,
 `docs/aerospace/08-materials-standards-libraries/TECHNICAL_SPEC.md`, `docs/aerospace/09-plm-configuration-traceability/TECHNICAL_SPEC.md`.

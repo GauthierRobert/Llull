@@ -1,0 +1,76 @@
+{
+ "IFC4X3_ADD2_Infra-Plumbing.ifc": {
+  "schema": "IFC4X3_ADD2",
+  "counts": {
+   "IfcPipeSegment": 24,
+   "IfcPipeFitting": 0,
+   "IfcValve": 0,
+   "IfcTank": 0,
+   "IfcPump": 0,
+   "IfcBuildingElementProxy": 1,
+   "IfcDistributionPort": 0,
+   "IfcRelConnectsPorts": 0,
+   "IfcRelNests": 0,
+   "IfcDistributionSystem": 1,
+   "IfcRelAssignsToGroup": 1,
+   "IfcPropertySet": 0,
+   "IfcRelDefinesByProperties": 0,
+   "IfcFacility": 0,
+   "IfcFacilityPartCommon": 0,
+   "IfcSite": 6,
+   "IfcRelContainedInSpatialStructure": 5,
+   "IfcRelAggregates": 5,
+   "IfcCableCarrierSegment": 0,
+   "IfcBuildingStorey": 0
+  },
+  "ports": 0,
+  "portsNestedInElements": 0,
+  "connectedPorts": 0,
+  "openPorts": 0,
+  "predefinedTypes": {
+   "IfcDistributionChamberElement.None": 2,
+   "IfcPipeSegment.None": 24
+  },
+  "duplicateTags": [],
+  "systemMembers": {
+   "road wastewater system": 26
+  }
+ },
+ "IFC4X3_ADD2_Building-Hvac.ifc": {
+  "schema": "IFC4X3_ADD2",
+  "counts": {
+   "IfcPipeSegment": 0,
+   "IfcPipeFitting": 0,
+   "IfcValve": 0,
+   "IfcTank": 0,
+   "IfcPump": 0,
+   "IfcBuildingElementProxy": 2,
+   "IfcDistributionPort": 0,
+   "IfcRelConnectsPorts": 0,
+   "IfcRelNests": 0,
+   "IfcDistributionSystem": 1,
+   "IfcRelAssignsToGroup": 1,
+   "IfcPropertySet": 0,
+   "IfcRelDefinesByProperties": 0,
+   "IfcFacility": 0,
+   "IfcFacilityPartCommon": 0,
+   "IfcSite": 2,
+   "IfcRelContainedInSpatialStructure": 3,
+   "IfcRelAggregates": 4,
+   "IfcCableCarrierSegment": 0,
+   "IfcBuildingStorey": 1
+  },
+  "ports": 0,
+  "portsNestedInElements": 0,
+  "connectedPorts": 0,
+  "openPorts": 0,
+  "predefinedTypes": {
+   "IfcAirTerminal.None": 2,
+   "IfcDuctSegment.None": 1
+  },
+  "duplicateTags": [],
+  "systemMembers": {
+   "house - chimney flue": 3
+  }
+ }
+}

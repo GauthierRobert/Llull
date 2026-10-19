@@ -1,0 +1,23 @@
+{
+  "material": "Carbon steel (ASTM A53 Gr A as listed by PSI; B31.3 Table C-1 'carbon steel' group)",
+  "referenceTemperatureF": 70,
+  "columns": ["temperatureF", "meanAlphaPerF_from70", "growthInPer100ft"],
+  "derivation": "growth = meanAlpha x (T - 70) x 1200 in per 100 ft",
+  "rows": [
+    [200, 6.38e-6, 0.9953, "S3 PSI materials.csv", "B"],
+    [300, 6.60e-6, 1.8216, "S3", "B"],
+    [400, 6.82e-6, 2.7007, "S3 + S8 (AutoPIPE note quoting B31.3 Table C-1: 2.70 in/100 ft at 400 degF)", "A"],
+    [500, 7.02e-6, 3.6223, "S3", "B"],
+    [600, 7.23e-6, 4.5983, "S3", "B"],
+    [700, 7.44e-6, 5.6246, "S3", "B"],
+    [800, 7.65e-6, 6.7014, "S3", "B"],
+    [900, 7.84e-6, 7.8086, "S3", "B"]
+  ],
+  "siCheck": { "case": "30 m of carbon steel line, 21.1 -> 204.4 degC (70 -> 400 degF)", "growthMm": 67.52, "mmPerM": 2.2506, "vc": "VC-PST-04" },
+  "notVerified": [
+    "S9 secondary summary claiming about 3.4 in/100 ft at 500 degF (conflicts with 3.62 above; not used)",
+    "Rolled Alloys per-foot data sheet values (different basis; not used)",
+    "Austenitic stainless rows: no second source reached; TBD from ASME II-D Table TE-1 / B31.3 Table C-1 by a licensed user"
+  ],
+  "sha256": { "psi/data/materials.csv": "d07296ea544a0183f1c845d7c8f5e758b4fa8c0d1d3d2d30af3327261b1b4b38" }
+}

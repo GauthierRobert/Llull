@@ -1,0 +1,1246 @@
+{
+ "pack": "10 SCN",
+ "generatedBy": "index built from data/*.json by the pack author; every value lives in the data files named here",
+ "units": "metres, degrees unless named",
+ "cases": [
+  {
+   "id": "VC-SCN-01",
+   "command": "scan import (host) + describe_point_cloud",
+   "reference": "data/e57_reference.json files[*] (10 files)",
+   "expected": {
+    "e57/ColourRepresentation.e57": {
+     "data3DCount": 1,
+     "pointCounts": [
+      153
+     ],
+     "fileGuid": "6107aa44-6289-4e9c-80bd-f36cc3fbd44b"
+    },
+    "e57/ColouredCubeDouble.e57": {
+     "data3DCount": 1,
+     "pointCounts": [
+      7680
+     ],
+     "fileGuid": "Coloured Cube File GUID"
+    },
+    "e57/ColouredCubeFloat.e57": {
+     "data3DCount": 1,
+     "pointCounts": [
+      7680
+     ],
+     "fileGuid": "Coloured Cube File GUID"
+    },
+    "e57/bunnyDouble.e57": {
+     "data3DCount": 1,
+     "pointCounts": [
+      30571
+     ],
+     "fileGuid": "{19AA90ED-145E-4B3B-922C-80BC00648844}"
+    },
+    "e57/bunnyInt32.e57": {
+     "data3DCount": 1,
+     "pointCounts": [
+      30571
+     ],
+     "fileGuid": "{991574D2-854C-4CEF-8CB8-D0132E4BCD0A}"
+    },
+    "e57/testWithNormals.e57": {
+     "data3DCount": 1,
+     "pointCounts": [
+      2
+     ],
+     "fileGuid": "{e5c56e10-b82b-4960-933f-b47ff881e78e}"
+    },
+    "e57/translationWithoutRotation.e57": {
+     "data3DCount": 1,
+     "pointCounts": [
+      4
+     ],
+     "fileGuid": "{b293dedf-c4cb-436b-9c13-3c36b43353b9}"
+    }
+   },
+   "tolerance": "exact",
+   "source": "S2 libE57Format assertions + own reader + pye57 0.4.19",
+   "grade": "A",
+   "fr": [
+    "FR-SCN-01"
+   ],
+   "test": "solver/crates/llull-cloud/tests/e57.rs"
+  },
+  {
+   "id": "VC-SCN-02",
+   "command": "scan import (host)",
+   "inputs": {
+    "file": "data/e57/bad-crc.e57"
+   },
+   "expected": {
+    "errorCode": "SCN_E57_CHECKSUM",
+    "badPages": 1,
+    "assetWritten": false
+   },
+   "tolerance": "exact",
+   "source": "S2",
+   "grade": "A",
+   "fr": [
+    "FR-SCN-01",
+    "FR-SCN-21"
+   ],
+   "test": "server/tests/scanImport.test.ts"
+  },
+  {
+   "id": "VC-SCN-03",
+   "command": "scan import (host)",
+   "inputs": {
+    "files": [
+     "data/e57/empty.e57",
+     "data/e57/ZeroPoints.e57"
+    ]
+   },
+   "expected": {
+    "errorCode": "SCN_CLOUD_EMPTY"
+   },
+   "tolerance": "exact",
+   "source": "S2",
+   "grade": "A",
+   "fr": [
+    "FR-SCN-01",
+    "FR-SCN-21"
+   ],
+   "test": "server/tests/scanImport.test.ts"
+  },
+  {
+   "id": "VC-SCN-04",
+   "command": "scan import (host)",
+   "inputs": {
+    "files": [
+     "data/e57/bunnyInt32.e57",
+     "data/e57/bunnyDouble.e57"
+    ]
+   },
+   "expected": {
+    "pointCount": 30571,
+    "localMin_m": [
+     -0.094689,
+     0.040011,
+     -0.061873
+    ],
+    "localMax_m": [
+     0.061009,
+     0.187321,
+     0.058799
+    ],
+    "centroid_m": [
+     -0.027513,
+     0.103078,
+     0.008644
+    ],
+    "maxPointDifference_m": 0.0
+   },
+   "tolerance": "point difference <= 5e-7 m (half the 1e-6 ScaledInteger quantum); bounds and centroid 1e-6 m",
+   "source": "pye57 0.4.19",
+   "grade": "A",
+   "fr": [
+    "FR-SCN-01"
+   ],
+   "test": "solver/crates/llull-cloud/tests/e57.rs"
+  },
+  {
+   "id": "VC-SCN-05",
+   "command": "scan import (host) + describe_point_cloud",
+   "inputs": {
+    "file": "data/e57/translationWithoutRotation.e57"
+   },
+   "expected": {
+    "pointCount": 4,
+    "poseTranslation_m": [
+     4.0,
+     5.0,
+     6.0
+    ],
+    "poseRotationWXYZ": [
+     1,
+     0,
+     0,
+     0
+    ],
+    "fileFrameCentroid_m": [
+     4.5,
+     5.5,
+     6.0
+    ],
+    "ColourRepresentation.e57.fields": [
+     "cartesianX",
+     "cartesianY",
+     "cartesianZ",
+     "returnIndex",
+     "returnCount",
+     "pointSourceId",
+     "colorRed",
+     "colorGreen",
+     "colorBlue"
+    ],
+    "ColourRepresentation.e57.pointCount": 153
+   },
+   "tolerance": "1e-9 m; field list exact",
+   "source": "pye57 transform=True",
+   "grade": "A",
+   "fr": [
+    "FR-SCN-01",
+    "FR-SCN-04"
+   ],
+   "test": "solver/crates/llull-cloud/tests/e57.rs"
+  },
+  {
+   "id": "VC-SCN-06",
+   "command": "scan import (host) + describe_point_cloud",
+   "reference": "data/las_reference.json files[*] (10 files)",
+   "expected": {
+    "las/1_4_w_evlr.las": {
+     "version": "1.4",
+     "pointFormat": 6,
+     "compressed": false,
+     "pointCount": 1000,
+     "scale": [
+      1.16451354e-06,
+      1.164510015e-06,
+      1.003143236e-06
+     ],
+     "offset": [
+      1692500.352,
+      1817499.596,
+      7350.194653
+     ]
+    },
+    "las/1_4_w_evlr.laz": {
+     "version": "1.4",
+     "pointFormat": 6,
+     "compressed": true,
+     "pointCount": 1000,
+     "scale": [
+      1.16451354e-06,
+      1.164510015e-06,
+      1.003143236e-06
+     ],
+     "offset": [
+      1692500.352,
+      1817499.596,
+      7350.194653
+     ]
+    },
+    "las/autzen_trim.laz": {
+     "version": "1.2",
+     "pointFormat": 3,
+     "compressed": true,
+     "pointCount": 110000,
+     "scale": [
+      0.01,
+      0.01,
+      0.01
+     ],
+     "offset": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "las/extrabytes.las": {
+     "version": "1.4",
+     "pointFormat": 3,
+     "compressed": false,
+     "pointCount": 1065,
+     "scale": [
+      0.01,
+      0.01,
+      0.01
+     ],
+     "offset": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "las/plane.laz": {
+     "version": "1.2",
+     "pointFormat": 3,
+     "compressed": true,
+     "pointCount": 28185,
+     "scale": [
+      0.01,
+      0.01,
+      0.01
+     ],
+     "offset": [
+      1423210.0,
+      4189100.0,
+      67.86
+     ]
+    },
+    "las/simple.las": {
+     "version": "1.2",
+     "pointFormat": 3,
+     "compressed": false,
+     "pointCount": 1065,
+     "scale": [
+      0.01,
+      0.01,
+      0.01
+     ],
+     "offset": [
+      -0.0,
+      -0.0,
+      -0.0
+     ]
+    },
+    "las/simple.laz": {
+     "version": "1.2",
+     "pointFormat": 3,
+     "compressed": true,
+     "pointCount": 1065,
+     "scale": [
+      0.01,
+      0.01,
+      0.01
+     ],
+     "offset": [
+      -0.0,
+      -0.0,
+      -0.0
+     ]
+    },
+    "las/simple1_1.las": {
+     "version": "1.1",
+     "pointFormat": 1,
+     "compressed": false,
+     "pointCount": 1065,
+     "scale": [
+      0.01,
+      0.01,
+      0.01
+     ],
+     "offset": [
+      -0.0,
+      -0.0,
+      -0.0
+     ]
+    },
+    "las/simple1_3.las": {
+     "version": "1.3",
+     "pointFormat": 4,
+     "compressed": false,
+     "pointCount": 999,
+     "scale": [
+      0.001,
+      0.001,
+      0.001
+     ],
+     "offset": [
+      0.0,
+      5000000.0,
+      0.0
+     ]
+    },
+    "las/test1_4.las": {
+     "version": "1.4",
+     "pointFormat": 6,
+     "compressed": false,
+     "pointCount": 1000,
+     "scale": [
+      1.16451354e-06,
+      1.164510015e-06,
+      1.003143236e-06
+     ],
+     "offset": [
+      1692500.352,
+      1817499.596,
+      7350.194653
+     ]
+    }
+   },
+   "tolerance": "exact (doubles bit-exact)",
+   "source": "S4 laspy 2.7.0 + lazrs 0.8.2 + own header reader",
+   "grade": "A",
+   "fr": [
+    "FR-SCN-02"
+   ],
+   "test": "solver/crates/llull-cloud/tests/las.rs"
+  },
+  {
+   "id": "VC-SCN-07",
+   "command": "scan import (host)",
+   "inputs": {
+    "pairs": [
+     [
+      "data/las/simple.las",
+      "data/las/simple.laz"
+     ],
+     [
+      "data/las/1_4_w_evlr.las",
+      "data/las/1_4_w_evlr.laz"
+     ]
+    ]
+   },
+   "expected": {
+    "identicalDimensions": [
+     19,
+     18
+    ]
+   },
+   "tolerance": "bit-exact",
+   "source": "laspy + lazrs comparison (this pack)",
+   "grade": "A",
+   "fr": [
+    "FR-SCN-02"
+   ],
+   "test": "solver/crates/llull-cloud/tests/las.rs"
+  },
+  {
+   "id": "VC-SCN-08",
+   "command": "scan import (host)",
+   "inputs": {
+    "file": "data/las/simple1_3.las"
+   },
+   "expected": {
+    "warningCode": "SCN_LAS_HEADER_BOUNDS",
+    "headerMin": [
+     -235434519.0,
+     800843145.0,
+     265094.0
+    ],
+    "headerMax": [
+     -234935841.0,
+     800946249.0,
+     273811.0
+    ],
+    "boundsUsed_min_m": [
+     -235434.519,
+     5800843.145,
+     265.094
+    ],
+    "boundsUsed_max_m": [
+     -234935.84100000001,
+     5800946.249,
+     273.811
+    ],
+    "pointCount": 999
+   },
+   "tolerance": "exact",
+   "source": "laspy decoded data",
+   "grade": "A",
+   "fr": [
+    "FR-SCN-02",
+    "FR-SCN-21"
+   ],
+   "test": "solver/crates/llull-cloud/tests/las.rs"
+  },
+  {
+   "id": "VC-SCN-09",
+   "command": "scan import (host) + query_cloud_points",
+   "inputs": {
+    "file": "data/las/test1_4.las"
+   },
+   "expected": {
+    "maxCoordinateError_m": "<= 0.5 * scale per axis",
+    "scale": [
+     1.16451354e-06,
+     1.164510015e-06,
+     1.003143236e-06
+    ],
+    "counterExample_absoluteFloat32MaxError_m": 0.062009987654164433
+   },
+   "tolerance": "0.5 * scale",
+   "source": "closed form (int32 code at source quantum); counter-example measured with numpy",
+   "grade": "A",
+   "fr": [
+    "FR-SCN-05"
+   ],
+   "test": "solver/crates/llull-cloud/tests/octree.rs"
+  },
+  {
+   "id": "VC-SCN-10",
+   "command": "scan import (host) + query_cloud_points",
+   "inputs": {
+    "file": "data/las/autzen_trim.laz"
+   },
+   "expected": {
+    "totalPoints": 110000,
+    "nodeMaxPoints": "<= maxPointsPerNode",
+    "spacingRatioPerLevel": 0.5,
+    "budgetRespected": true,
+    "deterministicAssetHash": true
+   },
+   "tolerance": "exact",
+   "source": "invariants",
+   "grade": "closed form",
+   "fr": [
+    "FR-SCN-05",
+    "FR-SCN-06"
+   ],
+   "test": "solver/crates/llull-cloud/tests/octree.rs"
+  },
+  {
+   "id": "VC-SCN-11",
+   "command": "scan import (host)",
+   "inputs": {
+    "file": "any.rcp / any.rcs"
+   },
+   "expected": {
+    "errorCode": "SCN_FORMAT_PROPRIETARY",
+    "remediationContains": "E57"
+   },
+   "tolerance": "exact",
+   "source": "policy FR-SCN-11",
+   "grade": "\u2014",
+   "fr": [
+    "FR-SCN-11"
+   ],
+   "test": "server/tests/scanImport.test.ts"
+  },
+  {
+   "id": "VC-SCN-12",
+   "command": "nearest_cloud_point",
+   "inputs": {
+    "file": "data/e57/ColouredCubeFloat.e57",
+    "point_m": [
+     0.6,
+     0.6,
+     0.6
+    ]
+   },
+   "expected": {
+    "recordIndex": 6606,
+    "point_m": [
+     0.4936401844024658,
+     0.49933964014053345,
+     0.5
+    ],
+    "distance_m": 0.177327150828571,
+    "secondNearestDistance_m": 0.18779628280088134
+   },
+   "tolerance": "index exact; distance 1e-6 m",
+   "source": "brute force, numpy",
+   "grade": "A",
+   "fr": [
+    "FR-SCN-07"
+   ],
+   "test": "tests/unit/scan/nearest.test.ts"
+  },
+  {
+   "id": "VC-SCN-20a",
+   "command": "fit_primitive {kind: cylinder} / extract_pipes",
+   "inputs": {
+    "file": "data/synthetic/cyl-a.csv",
+    "seed": 101,
+    "noiseSigma_m": 0.001,
+    "outliers": 0
+   },
+   "expected": {
+    "radius_m": 0.05715,
+    "axisDirection": [
+     0.8,
+     0.6,
+     0.0
+    ],
+    "axisPoint_m": [
+     1.0,
+     2.0,
+     3.0
+    ]
+   },
+   "tolerance": {
+    "radius_m": 0.0002,
+    "axisAngle_deg": 0.05,
+    "axisPosition_m": 0.001
+   },
+   "crlb": {
+    "radiusStd_m": 3.5850843110520144e-05,
+    "axisAngleStd_deg": 0.003104645125854856,
+    "axisPositionStd_m": 7.776646327516304e-05
+   },
+   "source": "synthetic truth; tolerance = max(5 CRLB std, floor) [S13]; reference run RANSAC [S8] + LM [S9] passes (data/reference_check_output.json)",
+   "grade": "closed form + run",
+   "fr": [
+    "FR-SCN-12"
+   ],
+   "test": "tests/unit/scan/cylinderFit.test.ts"
+  },
+  {
+   "id": "VC-SCN-20b",
+   "command": "fit_primitive {kind: cylinder} / extract_pipes",
+   "inputs": {
+    "file": "data/synthetic/cyl-b.csv",
+    "seed": 102,
+    "noiseSigma_m": 0.002,
+    "outliers": 2000
+   },
+   "expected": {
+    "radius_m": 0.10955,
+    "axisDirection": [
+     0.034899496703,
+     0.0,
+     0.999390827019
+    ],
+    "axisPoint_m": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   "tolerance": {
+    "radius_m": 0.0002,
+    "axisAngle_deg": 0.05,
+    "axisPosition_m": 0.001
+   },
+   "crlb": {
+    "radiusStd_m": 2.5833433620230683e-05,
+    "axisAngleStd_deg": 0.003400359768270505,
+    "axisPositionStd_m": 0.00010351257310872039
+   },
+   "source": "synthetic truth; tolerance = max(5 CRLB std, floor) [S13]; reference run RANSAC [S8] + LM [S9] passes (data/reference_check_output.json)",
+   "grade": "closed form + run",
+   "fr": [
+    "FR-SCN-12"
+   ],
+   "test": "tests/unit/scan/cylinderFit.test.ts"
+  },
+  {
+   "id": "VC-SCN-20c",
+   "command": "fit_primitive {kind: cylinder} / extract_pipes",
+   "inputs": {
+    "file": "data/synthetic/cyl-c.csv",
+    "seed": 103,
+    "noiseSigma_m": 0.001,
+    "outliers": 167
+   },
+   "expected": {
+    "radius_m": 0.03015,
+    "axisDirection": [
+     0.57735026919,
+     0.57735026919,
+     0.57735026919
+    ],
+    "axisPoint_m": [
+     -0.5,
+     0.3,
+     1.2
+    ]
+   },
+   "tolerance": {
+    "radius_m": 0.0007173039536150317,
+    "axisAngle_deg": 0.055471146149582144,
+    "axisPosition_m": 0.0010078475184590895
+   },
+   "crlb": {
+    "radiusStd_m": 0.00014346079072300634,
+    "axisAngleStd_deg": 0.011094229229916429,
+    "axisPositionStd_m": 0.0002015695036918179
+   },
+   "source": "synthetic truth; tolerance = max(5 CRLB std, floor) [S13]; reference run RANSAC [S8] + LM [S9] passes (data/reference_check_output.json)",
+   "grade": "closed form + run",
+   "fr": [
+    "FR-SCN-12"
+   ],
+   "test": "tests/unit/scan/cylinderFit.test.ts"
+  },
+  {
+   "id": "VC-SCN-21",
+   "command": "extract_pipes",
+   "expected": {
+    "CYL-A": {
+     "dn": 100
+    },
+    "CYL-B": {
+     "dn": 200
+    },
+    "CYL-C": {
+     "dn": 50
+    },
+    "r=0.070 m": {
+     "dn": 125
+    },
+    "OD 150 mm": {
+     "warningCode": "SCN_FIT_NO_STANDARD_SIZE"
+    }
+   },
+   "tolerance": "exact",
+   "source": "llull pipeSizes.ts EN 10220 OD table, OUTSIDE_DIAMETER_TOLERANCE_MM 1.5 [S15]",
+   "grade": "A",
+   "fr": [
+    "FR-SCN-13"
+   ],
+   "test": "tests/unit/scan/cylinderFit.test.ts"
+  },
+  {
+   "id": "VC-SCN-22",
+   "command": "trace_pipe_centreline",
+   "inputs": {
+    "file": "data/synthetic/elb-a.csv",
+    "seed_m": [
+     0.5,
+     0.0,
+     1.0
+    ]
+   },
+   "expected": {
+    "straights": 2,
+    "bends": 1,
+    "radius_m": 0.05715,
+    "bendRadius_m": 0.1524,
+    "bendAngle_deg": 90.0,
+    "intersectionPoint_m": [
+     1.6524,
+     0.0,
+     1.0
+    ]
+   },
+   "tolerance": {
+    "radius_m": 0.001,
+    "bendRadius_m": 0.01,
+    "bendAngle_deg": 1.0,
+    "intersectionPoint_m": 0.005
+   },
+   "source": "synthetic truth; TOL-ENG; REF-TBD",
+   "grade": "closed form (generator)",
+   "fr": [
+    "FR-SCN-14"
+   ],
+   "test": "tests/unit/scan/centreline.test.ts"
+  },
+  {
+   "id": "VC-SCN-23",
+   "command": "fit_steel_member",
+   "inputs": {
+    "file": "data/synthetic/stl-a.csv",
+    "families": [
+     "IPE",
+     "HEA",
+     "HEB"
+    ]
+   },
+   "expected": {
+    "profile": "IPE 300",
+    "h_mm": 300,
+    "b_mm": 150,
+    "axisDirection": [
+     0,
+     1,
+     0
+    ],
+    "sectionCentre_m": [
+     5.0,
+     1.0,
+     4.0
+    ]
+   },
+   "tolerance": {
+    "h_mm": 3.0,
+    "b_mm": 3.0,
+    "axisAngle_deg": 0.2,
+    "sectionCentre_m": 0.003
+   },
+   "source": "llull profiles.ts IPE 300 [S16]; synthetic truth; TOL-ENG; REF-TBD",
+   "grade": "closed form (generator)",
+   "fr": [
+    "FR-SCN-15"
+   ],
+   "test": "tests/unit/scan/steelFit.test.ts"
+  },
+  {
+   "id": "VC-SCN-24",
+   "command": "slice_cloud + fit_primitive {kind: circle}",
+   "inputs": {
+    "file": "data/synthetic/cyl-b.csv",
+    "plane": "normal = CYL-B axis, through axisPoint + 1.5 m along the axis",
+    "thickness_m": 0.02
+   },
+   "expected": {
+    "radius_m": 0.10955
+   },
+   "tolerance": {
+    "radius_m": 0.0016
+   },
+   "source": "sigma_r ~ sigma/sqrt(N), N ~ 40, sigma 2 mm; 5 sigma_r",
+   "grade": "closed form",
+   "fr": [
+    "FR-SCN-16"
+   ],
+   "test": "tests/unit/scan/slice.test.ts"
+  },
+  {
+   "id": "VC-SCN-30",
+   "command": "compute_registration {method: icp}",
+   "inputs": {
+    "sourceFile": "e57/bunnyInt32.e57",
+    "seed": 401,
+    "targetSubsample": 0.7,
+    "targetNoiseSigma_m": 0.0002,
+    "rotationAxis": [
+     0.303045763366,
+     0.505076272276,
+     0.808122035642
+    ],
+    "rotationAngle_deg": 10.0,
+    "translation_m": [
+     0.05,
+     -0.03,
+     0.02
+    ]
+   },
+   "expected": {
+    "rotationMatrix": [
+     [
+      0.986202959368,
+      -0.138003574895,
+      0.091426124546
+     ],
+     [
+      0.142654262748,
+      0.988683326223,
+      -0.04642242742
+     ],
+     [
+      -0.083985023981,
+      0.058824261696,
+      0.994729220433
+     ]
+    ],
+    "translation_m": [
+     0.05,
+     -0.03,
+     0.02
+    ]
+   },
+   "tolerance": {
+    "rotation_deg": 0.05,
+    "translation_m": 0.0005,
+    "rmsResidual": "at most the nearest-neighbour RMS of the true transform + 1e-5 m (sampling-limited, not noise-limited)"
+   },
+   "source": "Besl & McKay 1992 [S10]; reference run 0.0054 deg / 0.0067 mm",
+   "grade": "closed form + run",
+   "fr": [
+    "FR-SCN-09"
+   ],
+   "test": "tests/unit/scan/icp.test.ts"
+  },
+  {
+   "id": "VC-SCN-31",
+   "command": "fit_primitive {kind: sphere} + compute_registration {method: targets}",
+   "inputs": {
+    "files": [
+     "data/synthetic/tgt-a-station1.csv",
+     "data/synthetic/tgt-a-station2.csv"
+    ],
+    "sphereRadius_m": 0.0725
+   },
+   "expected": {
+    "centresStation1_m": [
+     [
+      1.5,
+      -2.0,
+      0.0
+     ],
+     [
+      6.0,
+      0.5,
+      0.2
+     ],
+     [
+      2.0,
+      7.0,
+      1.5
+     ],
+     [
+      -3.0,
+      4.0,
+      0.8
+     ]
+    ],
+    "centresStation2_m": [
+     [
+      -7.182042809,
+      7.916328763,
+      -0.35
+     ],
+     [
+      -2.083645456,
+      7.204749934,
+      -0.15
+     ],
+     [
+      -1.366389846,
+      14.803140842,
+      1.15
+     ],
+     [
+      -7.165012465,
+      15.416309428,
+      0.45
+     ]
+    ],
+    "rotationMatrix": [
+     [
+      0.798635510047,
+      -0.601815023152,
+      0.0
+     ],
+     [
+      0.601815023152,
+      0.798635510047,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    "translation_m": [
+     12.0,
+     -4.0,
+     0.35
+    ]
+   },
+   "tolerance": {
+    "sphereCentre_m": 0.002,
+    "rotation_deg": 0.05,
+    "translation_m": 0.003
+   },
+   "source": "Horn 1987 [S11]; reference run 0.34 mm / 0.0018 deg / 0.27 mm",
+   "grade": "closed form + run",
+   "fr": [
+    "FR-SCN-08"
+   ],
+   "test": "tests/unit/scan/targets.test.ts"
+  },
+  {
+   "id": "VC-SCN-32",
+   "command": "compute_registration",
+   "expected": {
+    "2 targets": "SCN_REG_TARGETS_INSUFFICIENT",
+    "3 collinear targets": "SCN_REG_DEGENERATE",
+    "overlap < 10 %": "SCN_REG_NOT_CONVERGED",
+    "documentUnchanged": true
+   },
+   "tolerance": "exact",
+   "source": "Horn needs >= 3 non-collinear correspondences [S11]",
+   "grade": "closed form",
+   "fr": [
+    "FR-SCN-08",
+    "FR-SCN-09",
+    "FR-SCN-21"
+   ],
+   "test": "tests/unit/scan/targets.test.ts"
+  },
+  {
+   "id": "VC-SCN-40",
+   "command": "cloud_to_model_deviation",
+   "inputs": {
+    "mesh": {
+     "positions": [
+      [
+       0,
+       0,
+       0
+      ],
+      [
+       1,
+       0,
+       0
+      ],
+      [
+       1,
+       1,
+       0
+      ],
+      [
+       0,
+       1,
+       0
+      ]
+     ],
+     "triangles": [
+      [
+       0,
+       1,
+       2
+      ],
+      [
+       0,
+       2,
+       3
+      ]
+     ]
+    },
+    "points_m": [
+     [
+      0.25,
+      0.25,
+      0.04
+     ],
+     [
+      0.5,
+      0.5,
+      0.04
+     ],
+     [
+      0.75,
+      0.1,
+      0.04
+     ],
+     [
+      1.3,
+      0.5,
+      0.04
+     ],
+     [
+      0.5,
+      -0.2,
+      -0.03
+     ],
+     [
+      1.3,
+      1.4,
+      0.0
+     ]
+    ]
+   },
+   "expected": {
+    "unsignedDistance_m": [
+     0.04,
+     0.04,
+     0.04,
+     0.3026549190084311,
+     0.20223748416156687,
+     0.5
+    ]
+   },
+   "tolerance": 1e-12,
+   "source": "Ericson 2005 [S12]; Pythagoras",
+   "grade": "closed form",
+   "fr": [
+    "FR-SCN-17"
+   ],
+   "test": "tests/unit/scan/deviation.test.ts"
+  },
+  {
+   "id": "VC-SCN-41",
+   "command": "cloud_to_model_deviation",
+   "inputs": {
+    "file": "data/synthetic/clh-a.csv",
+    "design": {
+     "kind": "cylinder",
+     "start": [
+      0,
+      -0.025,
+      0
+     ],
+     "end": [
+      2.0,
+      -0.025,
+      0
+     ],
+     "radius_m": 0.10955
+    }
+   },
+   "expected": {
+    "signedDistanceMax_m": 0.025,
+    "signedDistanceMin_m": -0.025,
+    "fittedAxisOffset_m": 0.025,
+    "pointsBeyond10mm_fraction": 0.7444444444444445,
+    "rmsDistance_m": 0.017648493703962532
+   },
+   "tolerance": {
+    "distance_m": 1e-06,
+    "fraction": "exact"
+   },
+   "source": "d(theta) = sqrt(r^2 + D^2 + 2 r D cos(theta)) - r for a point at angle theta on a cylinder of radius r whose axis is offset by D",
+   "grade": "closed form",
+   "fr": [
+    "FR-SCN-17",
+    "FR-SCN-18"
+   ],
+   "test": "tests/unit/scan/deviation.test.ts"
+  },
+  {
+   "id": "VC-SCN-42",
+   "command": "cloud_to_model_deviation {model: tessellated}",
+   "inputs": {
+    "file": "data/synthetic/clh-a.csv",
+    "design": {
+     "kind": "cylinder",
+     "start": [
+      0,
+      -0.025,
+      0
+     ],
+     "end": [
+      2.0,
+      -0.025,
+      0
+     ],
+     "radius_m": 0.10955
+    },
+    "segments": 64
+   },
+   "expected": {
+    "maxDifferenceFromAnalytic_m": "<= sagitta",
+    "sagitta_m": 0.00013195777272336304,
+    "reportedBound": true
+   },
+   "tolerance": "sagitta",
+   "source": "r (1 - cos(pi/n))",
+   "grade": "closed form",
+   "fr": [
+    "FR-SCN-17"
+   ],
+   "test": "tests/unit/scan/deviation.test.ts"
+  },
+  {
+   "id": "VC-SCN-43",
+   "command": "check_asbuilt_clash",
+   "inputs": {
+    "file": "data/synthetic/clh-a.csv",
+    "designs": [
+     {
+      "designAxisOffset_m": [
+       0.0,
+       0.0,
+       0.15
+      ],
+      "designRadius_m": 0.08415,
+      "requiredClearance_m": 0.075,
+      "minGap_m": -0.0437,
+      "status": "hard",
+      "tolerance_m": 1.7684995617336417e-05
+     },
+     {
+      "designAxisOffset_m": [
+       0.0,
+       0.0,
+       0.25
+      ],
+      "designRadius_m": 0.08415,
+      "requiredClearance_m": 0.075,
+      "minGap_m": 0.05630000000000002,
+      "status": "clearance",
+      "tolerance_m": 1.7684995617336417e-05
+     },
+     {
+      "designAxisOffset_m": [
+       0.0,
+       0.0,
+       0.5
+      ],
+      "designRadius_m": 0.08415,
+      "requiredClearance_m": 0.075,
+      "minGap_m": 0.3063,
+      "status": "clear",
+      "tolerance_m": 1.7684995617336417e-05
+     }
+    ]
+   },
+   "expected": [
+    {
+     "minGap_m": -0.0437,
+     "status": "hard"
+    },
+    {
+     "minGap_m": 0.05630000000000002,
+     "status": "clearance"
+    },
+    {
+     "minGap_m": 0.3063,
+     "status": "clear"
+    }
+   ],
+   "tolerance": {
+    "gap_m": 1.7684995617336417e-05,
+    "status": "exact"
+   },
+   "source": "gap = D - r_scan - r_design (parallel cylinders, axis spacing D); sampling error <= r_scan (1 - cos(half angular step))",
+   "grade": "closed form",
+   "fr": [
+    "FR-SCN-19"
+   ],
+   "test": "tests/unit/scan/asbuiltClash.test.ts"
+  },
+  {
+   "id": "VC-SCN-50",
+   "command": "build_project (wrong plan)",
+   "expected": {
+    "codes": [
+     "SCN_CLOUD_NOT_FOUND",
+     "SCN_CROP_INVALID",
+     "SCN_FIT_TOO_FEW_POINTS"
+    ],
+    "pathsPresent": true,
+    "remediationPresent": true
+   },
+   "tolerance": "exact",
+   "source": "AGENT_FIRST AF-11",
+   "grade": "\u2014",
+   "fr": [
+    "FR-SCN-21"
+   ],
+   "test": "tests/unit/scan/agentCodes.test.ts"
+  },
+  {
+   "id": "VC-SCN-51",
+   "command": "check_point_clouds",
+   "expected": {
+    "unverifiedOnExtraction": true,
+    "unverifiedOnPipeRun": true,
+    "warningCode": "SCN_REGISTRATION_UNVERIFIED"
+   },
+   "tolerance": "exact",
+   "source": "AGENT_FIRST AF-32",
+   "grade": "\u2014",
+   "fr": [
+    "FR-SCN-20",
+    "FR-SCN-22"
+   ],
+   "test": "tests/unit/scan/checkPointClouds.test.ts"
+  },
+  {
+   "id": "VC-SCN-52",
+   "command": "check_asbuilt_clash / cloud_to_model_deviation",
+   "expected": {
+    "reviewRequired": true,
+    "minPointsInVolume": {
+     "value": 10,
+     "defaulted": true
+    }
+   },
+   "tolerance": "exact",
+   "source": "AGENT_FIRST AF-31, AF-33",
+   "grade": "\u2014",
+   "fr": [
+    "FR-SCN-19",
+    "FR-SCN-22"
+   ],
+   "test": "tests/unit/scan/asbuiltClash.test.ts"
+  },
+  {
+   "id": "VC-SCN-60",
+   "command": "same plans and unit inputs on the native llull-compute binary, the llull-cloud WASM build and (M7) device: gpu",
+   "expected": {
+    "nativeVsWasm": "bit-identical data for VC-SCN-01..12, 20..24, 30..32, 40..43; each VC still meets its own expected value and tolerance",
+    "gpuClashCLH_A": "same status per spacing (hard / clearance / clear), cluster count and minGap as the CPU path",
+    "gpuDeviationDEV_A": {
+     "maxAbsPointDistanceDiffM": "TBD - measure (bound eps_gpu derived from f32 unit roundoff at M7)",
+     "deterministic": false
+    }
+   },
+   "tolerance": {
+    "nativeVsWasm": "exact",
+    "gpuClash": "exact",
+    "gpuDeviation": "eps_gpu - TBD - measure"
+   },
+   "source": "RS1 section 2 rules 3 and 4; TECHNICAL_SPEC section 2.A (libm, fixed-order merges, conservative GPU prune)",
+   "grade": "derived",
+   "fr": [
+    "TR-SCN-08",
+    "TR-SCN-12"
+   ],
+   "test": "server/tests/scanNativeParity.test.ts; solver/crates/llull-cloud/tests/gpu_parity.rs"
+  }
+ ]
+}

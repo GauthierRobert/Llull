@@ -92,6 +92,21 @@ packages/kernel-occt/src  occtMidsurface.ts, occtDefeature.ts (KernelOps), face 
 | TR-FEA-80 | SHOULD | Performance budgets in §8 are enforced by the production-gate scenario VC-FEA-53. |
 | TR-FEA-90 | MUST | Agent-first result contract (AF-10/11/31–35): `compute_margins`, `check_analysis` and `fea_report` follow §5.8/§7.1; factors carry `source`/`defaulted`; `unverified` is the OR of all gap 08 inputs' flags; `reviewRequired` is always true on margins. |
 | TR-FEA-91 | MUST | `dispose_margin` verifies a human-held signature through the gap 09 signing port; the CLI/MCP agent path cannot supply one (AF-34). |
+| TR-FEA-92 | SHOULD (V1, RS-5) | Headless field plots (`render_fea_results … --save plot.png`) get a GPU raster path through `llull-compute raster` (crate `llull-raster`, wgpu offscreen) per §2.1. The TS z-buffer `packages/domain-cae/src/results/fieldRaster.ts` stays the reference, the hash path and the small-case path. Native vs TS pixel agreement: VC-FEA-29. |
+
+### 2.1 Stack amendment (RS1, 2026-10-18)
+
+Decided by the owner in [RS1](../../decisions/RS1-native-compute.md) (programme step **RS-5**, shared with plant 09 VIS).
+
+| Item | Before | Now |
+| ---- | ------ | --- |
+| Field-plot raster (`render_fea_results` → `fieldPlotSvg.ts` → `fieldRaster.ts`) | CPU z-buffer in TS (2× supersampling, PNG embedded in the SVG) | unchanged as the default, the reference and the hash path; small plots always use it |
+| Headless CLI renders of large plots | same TS raster | host path in `server/`: the CLI writes the same `RasterInput` (faces, view, levels, area) to a job folder and runs `llull-compute raster` (crate `llull-raster`, wgpu offscreen, CPU twin per RS1 §2 rule 6); the returned PNG goes into the same SVG frame (legend, markers, title still from `fieldPlotSvg.ts`) |
+| Selection | — | TS below a triangle threshold (TBD — measure the crossover on the reference machine), or when `--raster ts` is given; native above it or with `--raster gpu`; missing binary or no adapter → TS with a logged reason (`NATIVE_TOOL_MISSING`) |
+| Provenance | — | `data.raster = { engine: 'ts' \| 'native-gpu' \| 'native-cpu', device?, deterministic }`; a GPU raster is a picture (`deterministic: false`); any image hash that a test or report pins comes from the TS raster |
+| Viewport result colouring | WebGL (three.js, GPU attribute swap) | unchanged: the viewport stays WebGL; RS-5 is headless only |
+
+The registry command stays pure and writes nothing to the document (L1); `packages/domain-cae` does not import native code (L2).
 
 ## 3. Data model
 
@@ -480,7 +495,8 @@ summaries well formed. Recipes inside `midsurface`/`defeature` nodes are checked
   `--app`/`--server`, mirroring `cli/exchange.ts`. Long transports stream progress and respect `--timeout` (AF-40). `llull guide` gains an
   FEA section: analysis unit systems, FoS defaults and their sources, the minimal static plan, the end-of-job `check_analysis` (AF-03).
 - **render_view.** Proposed optional params `analysisId`, `field`, `loadCase`, `mode` so `llull render_view … --save vm.png` draws the
-  skin mesh with scalars for multimodal agents (AF-22); the host supplies the field from the artifact store, nothing is stored.
+  skin mesh with scalars for multimodal agents (AF-22); the host supplies the field from the artifact store, nothing is stored. Built
+  today as `render_fea_results` (SVG with a TS z-buffer raster); large headless renders may use the native GPU raster (§2.1, TR-FEA-92).
 - **MCP.** The `analysis` toolset holds the registry commands plus the ✱ transports. Hosts without Gmsh/ccx return a
   how-to-enable message, as `import_step` does when Python is off. There is a prompt `fea_quick_check` (set up, mesh, solve, margins).
 - **REST.** `POST /fea/mesh|solve|import|export` live in `server/src/feaRoutes.ts` and reuse the token and security model (KI6).
@@ -557,7 +573,8 @@ Check items from `check_analysis` use the same codes with a severity.
 | Mesh of a 20k-node tet10 bracket | ≤ 15 s (Gmsh, 1 thread) |
 | Solve (CalculiX, static, 50k nodes, SPOOLES/PARDISO) | ≤ 30 s. TBD: measure (VC-FEA-53) |
 | FRD parse | ≥ 50 MB/s in TS, streaming line reader, no full-file string when > 64 MB |
-| Skin colour update when the field changes | ≤ 50 ms for 200k skin triangles (pre-computed per field, GPU attribute swap) |
+| Skin colour update when the field changes | ≤ 50 ms for 200k skin triangles (pre-computed per field, GPU attribute swap; viewport WebGL, unchanged by RS1) |
+| Headless field-plot raster (`render_fea_results --save`) | TS raster below the crossover; native `llull-compute raster` above it (§2.1). Crossover and native time: TBD — measure on the reference machine |
 | Artifact size | gzip JSON. Cap 512 MB per artifact, refuse above with advice to coarsen |
 | Process safety | Every child is tracked and killed on shutdown. Timeouts on mesh (120 s default, configurable) and solve (600 s). No shell interpolation of paths |
 | Determinism | `General.NumThreads = 1` for meshing. The hash covers canonical sorted sets |
@@ -575,6 +592,7 @@ Check items from `check_analysis` use the same codes with a severity.
 | E2E (Playwright) | result overlay screenshot, margins table | 17 |
 | Desktop (`npm --prefix desktop test`) | bundled `ccx --version`, `python -c "import gmsh"`, licence files | 52 |
 | Agent-first (`tests/unit/cae/agentFirst.test.ts` + CLI harness) | named factors, `reviewRequired`, human gate, unverified propagation, error codes, driven by `fea_analytic_expected.json` | 28, 60–65 |
+| Native (`npm run native:check` + `server/tests`, skipped with a logged reason without the binary or a GPU adapter; the CPU twin always runs) | `llull-raster` on the VC-FEA-17 plot and a large plot: native PNG vs TS PNG | 29 |
 | Production gate | LE10 timing scenario; the agent driver runs the whole CLI scenario unattended except the human gate (AF-23) | 53 |
 
 Coverage 90/85/90/90 extends to `packages/domain-cae/src/**` (CLAUDE.md non-negotiable 3).
@@ -589,6 +607,7 @@ Coverage 90/85/90/90 extends to `packages/domain-cae/src/**` (CLAUDE.md non-nego
 | M4 | MCP toolset and prompt, REST routes, golden plans, quality:fea, production-gate scenario, licence packaging | M3 | 2 w |
 | M5 (V1) | BDF writer + pyNastran check, OP2 import, VTU export, RBE3/distributing coupling, Netgen option | M4 | 3 w |
 | M6 (V1) | Shell idealization: midsurface (fast path, then face-pairing), defeaturing, shell decks (S8/CQUAD8), shell result mapping | M4, 07 FTR (sheet metal recipes help the fast path) | 4 w |
+| M7 (V1, RS-5) | `llull-compute raster` field-plot job (crate `llull-raster`, shared with plant 09 VIS), CLI selection + provenance, VC-FEA-29 | M3; RS-0 (`solver/` workspace); RS-5 renderer | 1 w (the renderer itself is costed in RS-5) |
 | V2 | beams (CBAR/B32), composites (06 CMP → PCOMP / `*SHELL SECTION, COMPOSITE`), tied contact, user Nastran/MYSTRAN runner | 06 CMP, 08 MAT | — |
 
 **Status (2026-10-17):** the static-solid part of M1–M3 is built (§13) as the minimal slice for PHY-03 / PHY-04: data model, plugin `cae`, Gmsh mesh op, artifact store, INP writer, ccx solve, FRD/DAT readers, record commands, margins. The remaining items (face map, Verdict port, modal / buckling, M4 prompt + golden plans, M5, M6) form **FEA-REST**, in step **AERO-5** of the aerospace story (`../README.md`). The face map needs the 01 `FaceQueryPort` (AERO-2). The `FeaMaterialView` over 08 records needs 08 M2 (AERO-3); until then the decks read PHY-01 / PHY-02 models on `Material`.
@@ -604,7 +623,8 @@ exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results w
    and reproducibility for tool qualification have to be settled either way.
 3. **Mesh in the document versus the cache.** TR-FEA-05 proposes the cache, with a `.llullz` bundle for sharing. Live sync (L6) does not carry artifacts, so
    collaborators re-mesh. Is that acceptable?
-4. **opencascade.js 1.1.1 bindings**: is `BRepAlgoAPI_Defeaturing` available? If not, rebuild the WASM or delegate to Gmsh.
+4. **`BRepAlgoAPI_Defeaturing` availability**: on desktop, settled by RS1 (01 KRN M2: native OCCT 7.9 in `llull-kernel`, full toolkit
+   set). In the browser-only path (opencascade.js 1.1.1) it may be missing: delegate to Gmsh `occ.defeature` there.
 5. Should **web/cloud** offer meshing at all (server-side Gmsh), or is FEA desktop-only? The proposal: MCP transports are available only where configured.
 6. **Nastran conformance**: get access to an official MSC or Simcenter QRG, or a MYSTRAN install (licence not verified), to check BDF beyond pyNastran.
 7. **Shell stress output**: decide how top and bottom fibre stresses are extracted from CalculiX shell expansion for MS.
@@ -628,6 +648,7 @@ exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results w
 - [R30] CalculiX source / manual / tests — https://github.com/Dhondtguido/CalculiX/tree/fd588701edd6a92fde06e99b1bdf01f3b0f80f2c (accessed 2026-10)
 - [R43] FeenoX NAFEMS examples — https://github.com/seamplex/feenox/tree/3759eb2426a9e9a77ab8a9ce97db93071a389776/examples (accessed 2026-10)
 - Other references (R4–R6, R20–R22, R31, R40–R45): see [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md) §11 and [`validation/sources.md`](validation/sources.md).
+- [RS1] Native compute programme — [../../decisions/RS1-native-compute.md](../../decisions/RS1-native-compute.md) (owner decision 2026-10-18)
 - L1 llull: `.claude/rules/architecture.md`, `docs/decisions/KI5-shape-kernel-boundary.md`, `docs/decisions/KI6-desktop-app-cli-first.md`, `packages/core/src/geometry/kernel.ts`, `server/src/pythonExchange.ts`.
 
 ## 13. Implementation status (2026-10-16)

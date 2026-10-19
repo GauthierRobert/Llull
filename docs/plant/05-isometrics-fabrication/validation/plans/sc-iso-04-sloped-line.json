@@ -1,0 +1,18 @@
+{
+  "id": "SC-ISO-04",
+  "validates": ["VC-ISO-12"],
+  "description": "A drain line falling 100 mm over a 10 m horizontal run (1:100) must carry a SLOPE 1:100 annotation with the fall arrow toward +X on the isometric, and the slope in data.",
+  "status": "UNBUILT - add_pipe_run exists today; export_isometric is unbuilt",
+  "unbuilt": ["export_isometric"],
+  "actions": [
+    { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },
+    { "command": "add_pipe_run", "params": { "points": [[0, 0, 1000], [10000, 0, 900]], "dn": 50, "line": "D-201", "service": "drain" } },
+    { "command": "export_isometric", "params": { "lineId": "D-201", "style": "check", "paper": "A3", "formats": ["svg"] } }
+  ],
+  "expected": [
+    { "step": 2, "path": "data.annotations[kind=slope].text", "value": "SLOPE 1:100", "source": "CV-05" },
+    { "step": 2, "path": "data.annotations[kind=slope].percent", "value": 1.0, "abs": 1e-9, "source": "100 / 10000" },
+    { "step": 2, "path": "data.annotations[kind=slope].deg", "value": 0.5729386977, "abs": 1e-9, "source": "atan(0.01)" },
+    { "step": 2, "path": "data.annotations[kind=slope].fallDirection", "value": "+X", "source": "z decreases with x" }
+  ]
+}

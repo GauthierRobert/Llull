@@ -65,6 +65,8 @@ spec, ICs/BCs and laws). L9: no kernel use beyond 05 targeting. L10: plugin; cor
 **External solver policy.** OpenCourant is **not bundled** in MVP (AGPL-3.0 plus a binary `hm_reader` dependency of
 unclear redistribution status, [R1]); the user installs a release or a container and sets `LLULL_OPENCOURANT`
 (directory) or `LLULL_OPENCOURANT_CONTAINER` (image reference). llull never links, patches or redistributes it.
+Long term (V1 / V2), decision RS1 step RS-8 adds a llull-owned explicit solver that removes this non-bundled problem for
+the cases it covers; the hand-off stays the MVP path and the cross-check (§2.2).
 
 ### 2.1 Technical requirements
 
@@ -90,13 +92,37 @@ unclear redistribution status, [R1]); the user installs a release or a container
 | TR-EXP-51 | MUST | Each run artifact records `ToolRecord` (name, version / tag, executable sha256, licence, source URL) and the deck sha256; `record_explicit_results` refuses an artifact whose deck sha256 ≠ the current export (`EXP_RESULTS_FOREIGN`) and stores it review-only. |
 | TR-EXP-60 | MUST | Agent-first contract: unit-suffixed fields, `provenance`, `unverified` (OR of law / EOS flags and grade-B sources), `reviewRequired: true`, `certificationEvidence: false`, named defaults with `source` + `defaulted`. |
 | TR-EXP-61 | SHOULD | Scenario rows (failed elements per part, penetration flag, health-check fails) register as a 05 margin provider (criterion `impact_damage`, `run_health`) so `dispose_margin` / `check_analysis` handle them. |
+| TR-EXP-70 | SHOULD (V1) | RS1 RS-8: `FeSolver` gains **`llull_explicit`**. The `explicit_run` transport, when the case selects it, writes a job folder (mesh artifact, `ExplicitSpec`, laws, ICs / BCs) and runs `llull-compute explicit <job-folder>` (crate `llull-explicit`) instead of OpenCourant. Output is the same artifact shape as the hand-off (energies, histories, fields, termination, `ToolRecord` with the `llull-compute` version), so `energy.ts`, `explicit_report`, `explicit_energy_check` and `record_explicit_results` are reused unchanged. |
+| TR-EXP-71 | SHOULD (V1) | `llull-explicit` core: central-difference time integration, lumped (row-sum) mass, stable time step from the element characteristic length with a named safety factor, 8-node hexahedron with one-point integration and hourglass control, 4-node tetrahedron, elastic and J–C strength (PHY-02, same view as TR-EXP-20), J–C failure with element erosion (TR-EXP-21), planar rigid walls, initial velocity, gravity, imposed velocity, mass scaling as TR-EXP-31. Element formulations and hourglass form are pinned from published references before coding (§11 Q10). |
+| TR-EXP-72 | SHOULD (V2) | Contact in `llull-explicit`: penalty node-to-surface and self contact, broad phase on the shared `llull-bvh`, friction; shells with J–C. |
+| TR-EXP-73 | SHOULD (V1) | Device and determinism (RS1 §2 rule 3): wgpu kernels for element forces and the nodal update, with a Rust-CPU twin for every kernel; nodal force assembly and energy sums use a fixed order, so a recorded run is bit-reproducible on one device and driver; a GPU run without that guarantee says `deterministic: false` and cannot feed dispositions. |
+
+### 2.2 Stack amendment (RS1, 2026-10-18)
+
+Decision [RS1](../../decisions/RS1-native-compute.md) step **RS-8** (GPU, long term V1 / V2) plans a llull-owned explicit
+solver, `llull-explicit`, run as `llull-compute explicit` (TR-EXP-70…73). Why: the only open target today is AGPL-3.0 with a
+closed `hm_reader` dependency (§11 Q2), so llull cannot bundle it and macOS has no build (§11 Q3); an own solver in the
+bundled binary (RS1 §2 rule 5, MIT / Apache dependencies only, rule 7) makes impact screening work offline on every desktop.
+
+| Item | MVP (unchanged) | RS-8 (V1 / V2) |
+| ---- | --------------- | -------------- |
+| Solver | user-installed OpenCourant / container, hand-off | `llull-compute explicit` (bundled); hand-off kept as an alternative and as the cross-check |
+| Method | Radioss Starter / Engine | central difference, lumped mass, hex8 (one-point + hourglass), tet4, J–C + erosion, rigid walls (V1); contact on `llull-bvh`, shells (V2) |
+| Device | solver's own (OpenMP / MPI) | wgpu with a Rust-CPU twin; fixed-order reductions for recorded runs |
+| Results path | readers → artifact → `record_explicit_results` | same artifact shape, same record, same health checks |
+| Reference | analytic quick checks (VC-EXP-10…12, 32), OpenCourant runs (VC-EXP-50, 51) | the same, plus native vs reference VC-EXP-67 |
+
+Risks recorded for RS-8: the **element library** (hourglass control, tet locking, shells) is where explicit codes differ most;
+**contact** is the hardest part to make robust and fast; the **V&V cost** is large (each element, law and contact form needs
+its own benchmark, and open published results are scarce). Mitigation: V1 ships solids and rigid walls only, every case also
+runs through the hand-off where OpenCourant is installed, and results stay `reviewRequired` and `certificationEvidence: false`.
 
 ## 3. Data model
 
 ```ts
 // packages/core/src/model/analysis.ts (05) — members added by this pack
 export type AnalysisType = 'static' | 'modal' | 'buckling' /* 05 */ | 'explicit_dynamics' /* PHY-19 */;
-export type FeSolver = 'calculix' | 'nastran' /* 05 */ | 'opencourant' | 'ls_dyna' /* PHY-19; ls_dyna export-only */;
+export type FeSolver = 'calculix' | 'nastran' /* 05 */ | 'opencourant' | 'ls_dyna' /* PHY-19; ls_dyna export-only */ | 'llull_explicit' /* PHY-19 V1, RS1 RS-8 */;
 
 export interface ExplicitSpec {
   readonly endTimeS: number;
@@ -299,7 +325,7 @@ contact ratio > limit, any limit unset, minimum time step < `minTimeStepS`. Each
 | `EXP_ENERGY_ERROR_HIGH` | fail | \|energy error\| > `energyErrorLimit` | analysis id | inspect the listing; smaller time step |
 | `EXP_ENERGY_LIMIT_UNSET` | warning | energy-error or added-mass limit not given | analysis id | ask the owner / company rule |
 | `EXP_ABNORMAL_TERMINATION` | fail | no `NORMAL TERMINATION` | log tail | read the listing |
-| `EXP_TOOL_MISSING` | error | OpenCourant / container not found | tool | install a release or container; set `LLULL_OPENCOURANT` |
+| `EXP_TOOL_MISSING` | error | OpenCourant / container not found, or `llull-compute` absent when the case uses `llull_explicit` (generic `NATIVE_TOOL_MISSING`) | tool | install a release or container; set `LLULL_OPENCOURANT`; or install the desktop bundle |
 | `EXP_RUN_TIMEOUT` | error | timeout reached | analysis id | longer timeout or coarser mesh |
 | `EXP_RESULTS_FOREIGN` | warning | imported results from a different deck hash | analysis id | re-export and re-run; review-only |
 | `EXP_SCENARIO_INPUT_MISSING` | error | bird speed / drop height / source missing | param path | ask the owner for the value and its source |
@@ -340,6 +366,7 @@ contact ratio > limit, any limit unset, minimum time step < `minTimeStepS`. Each
 | Deck export, 200k elements | ≤ 5 s, streaming writer |
 | Listing / CSV parse | ≥ 50 MB/s |
 | Run | solver-bound; llull overhead ≤ 2 s plus converters — TBD measure on the reference desktop (bar plan) |
+| Run, `llull_explicit` (V1) | bar and drop plans on GPU and CPU twin, wall time recorded — TBD measure (VC-EXP-67) |
 | Summary | ≤ 500 points × 32 histories in the document |
 | Robustness | every failure is a no-op with a code; killed runs leave no results; a foreign result is never used for dispositions |
 
@@ -353,6 +380,7 @@ contact ratio > limit, any limit unset, minimum time step < `minTimeStepS`. Each
 | Integration (`server/tests`, needs OpenCourant) | Starter acceptance, bar and drop runs, import, range guard | 50–55, 66 |
 | CI Python | PyDyna parse of `.k` (COULD) | 54 |
 | Quality (`quality:physics`) | VC-EXP-50/51 table | 50, 51 |
+| Native (`npm run native:check`; `server/tests` with `llull-compute`, V1) | `llull-explicit` element patch and single-element tests, energy balance, GPU vs Rust-CPU twin where an adapter exists; bar and drop plans against the analytic values and OpenCourant | 10–12, 32, 67 |
 
 Coverage 90/85/90/90 extends to `packages/domain-physics/src/**`.
 
@@ -366,15 +394,19 @@ Coverage 90/85/90/90 extends to `packages/domain-physics/src/**`.
 | M4 | plans to golden, CLI harness, guide, MCP prompt, UI review overlays | M3 | 1.5 w |
 | V1 | contacts, SPH bird with EOS (PHY-02 addition), scenario templates, shells with J–C | PHY-02 EOS | 3 w |
 | V2 | LS-DYNA `.k` export + PyDyna check, blade-out templates, composites | 06 CMP, PHY-08 | 3 w |
+| RS-8a (V1) | `llull-explicit` on the Rust-CPU twin: central difference, lumped mass, hex8 + hourglass, tet4, elastic + J–C, rigid walls, energies; `llull_explicit` solver option in `explicit_run`; VC-EXP-67 on bar and drop | M3, RS-0 (`solver/` workspace), §11 Q10 | 6 w |
+| RS-8b (V1) | wgpu kernels with fixed-order reductions, J–C failure and erosion, mass scaling; GPU vs CPU-twin tests | RS-8a | 5 w |
+| RS-8c (V2) | penalty contact on `llull-bvh`, self contact, friction, shells with J–C; drop-test template on the own solver | RS-8b | 5+ w |
 
-MVP ≈ 7.5 w.
+MVP ≈ 7.5 w. RS-8 ≈ 16+ w (RS1 estimate), outside the MVP.
 
 ## 11. Open questions / decisions needed
 
 1. **Solver dependency.** OpenCourant is weeks old after the OpenRadioss takedown [R1][R3]. Accept it as the default
    target, or design the writer against the Radioss format only and treat any compatible engine as a user choice?
 2. **Licensing.** AGPL-3.0-or-later solver plus the binary `hm_reader` "recovered from a community-donated source
-   checkout" [R1]: legal decision before any bundling or cloud hosting (AGPL network clause).
+   checkout" [R1]: legal decision before any bundling or cloud hosting (AGPL network clause). RS1 RS-8 (own solver, §2.2)
+   avoids the question for the cases it covers; the hand-off path still needs it.
 3. **macOS.** No macOS build listed [R1]: container-only, remote run, or unsupported?
 4. **Engine control cards** for time-step scale, minimum time step and mass scaling: pin exact card names and defaults from
    the cfg files / manual at M2 (not verified here).
@@ -384,6 +416,10 @@ MVP ≈ 7.5 w.
 7. **J–C constants**: a human extracts Lesuer / Kay tables with locators [R9]; until then no constants in any public library.
 8. **Hourglass default** 0.10 is a rule of thumb [R13]: keep it as a named default or require it explicitly?
 9. **Results artifact size** for large animation sets: cap and down-sampling policy (05 cap 512 MB).
+
+10. **Own solver formulations (RS1 RS-8).** Which published hex8 hourglass formulation, tet4 variant and contact algorithm
+    to implement, and which open benchmarks prove each (the V&V cost)? To decide before RS-8a; no formulation is coded from
+    memory.
 
 ## 12. References
 
@@ -399,4 +435,5 @@ MVP ≈ 7.5 w.
 - [R13] Energy-balance practice — https://ftp.lstc.com/anonymous/outgoing/jday/faq/energy_balance (accessed 2026-10, search)
 - [R14] Wilbeck — https://apps.dtic.mil/sti/pdfs/ADA061313.pdf (accessed 2026-10, search)
 - Others ([R5], [R11], [R12]): [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md) §11 and [`validation/sources.md`](validation/sources.md).
+- [RS1] Native compute programme — [`../../decisions/RS1-native-compute.md`](../../decisions/RS1-native-compute.md) (step RS-8)
 - L1 llull: `.claude/rules/architecture.md`, `.claude/context/command-layer.md`, `packages/core/src/model/types.ts`, `packages/mcp/src/toolsets.ts`, `server/src/childProcesses.ts`, `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md`.

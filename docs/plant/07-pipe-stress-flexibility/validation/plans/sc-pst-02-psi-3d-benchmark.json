@@ -1,0 +1,27 @@
+{
+  "id": "SC-PST-02",
+  "validates": ["VC-PST-07", "VC-PST-08", "VC-PST-09"],
+  "description": "PSI test_loads fixture in SI: NPS 10 Sch 40 (273.0 x 9.27 mm), anchors at both ends, 3048 mm up, 4572 mm along +y, 15240 mm down, 7620 mm along +y (shifted +13000 mm in z). Thermal 70 -> 900 degF, weight, 250 psi pressure; node 30 = second bend point",
+  "unbuilt": ["create_stress_model", "import_pipe_material_data", "set_pipe_operating_conditions", "add_stress_restraint", "set_stress_load_cases", "analyze_pipe_stress"],
+  "unitConversions": { "E": "27.9e6 psi = 192.364 GPa", "strain": "7.84e-6 /degF x 830 degF = 6.5072e-3 = 6.5072 mm/m", "density": "0.283 lb/in3 = 7833.4 kg/m3", "pressure": "250 psi = 17.237 bar", "temperatures": "70 degF = 21.111 degC, 900 degF = 482.222 degC" },
+  "actions": [
+    { "command": "add_level", "params": { "name": "Unit", "elevation": 0 } },
+    { "command": "add_pipe_run", "params": { "points": [[0, 0, 13000], [0, 0, 16048], [0, 4572, 16048], [0, 4572, 808], [0, 12192, 808]], "dn": 250, "line": "PSI-LOADS" }, "as": "pipe" },
+    { "command": "import_pipe_material_data", "params": { "materialId": "a53a-psi", "designation": "A53 Gr A (PSI data)", "source": "PSI psi/data/materials.csv (S3), B31.1 mean coefficients", "densityKgM3": 7833.4, "rows": [ { "tempC": 21.111, "growthMmPerM": 0, "EGPa": 192.364, "ShMPa": 82.74 }, { "tempC": 482.222, "growthMmPerM": 6.5072, "EGPa": 192.364, "ShMPa": 62.05 } ] } },
+    { "command": "create_stress_model", "params": { "name": "PSI 3D", "pipeIds": ["$pipe"], "code": "B31.1", "edition": "2020", "elbowRadiusFactor": 0 }, "as": "stress" },
+    { "command": "set_pipe_operating_conditions", "params": { "modelId": "$stress", "installTempC": 21.111, "temperatures": [{ "name": "T1", "tempC": 482.222 }], "pressures": [{ "name": "P1", "gaugeBar": 17.237 }], "fluidDensityKgM3": 0, "materialId": "a53a-psi", "wallMm": 9.27, "corrosionAllowanceMm": 0, "millTolerancePct": 0, "cycles": 7000 } },
+    { "command": "add_stress_restraint", "params": { "modelId": "$stress", "at": { "pipeId": "$pipe", "atMm": 0 }, "kind": "anchor" } },
+    { "command": "add_stress_restraint", "params": { "modelId": "$stress", "at": { "pipeId": "$pipe", "atMm": 30480 }, "kind": "anchor" } },
+    { "command": "set_stress_load_cases", "params": { "modelId": "$stress", "cases": [ { "name": "TH", "type": "OPE", "basic": ["T1"] }, { "name": "WT", "type": "SUS", "basic": ["W"] }, { "name": "PR", "type": "SUS", "basic": ["P1"] } ] } },
+    { "command": "analyze_pipe_stress", "params": { "modelId": "$stress", "include": ["displacements", "stresses"] } }
+  ],
+  "expected": [
+    { "step": 8, "path": "data.cases[case=TH].displacements[at=(0,4572,16048)].uMm.1", "value": 19.248, "rel": 0.01, "source": "PSI 0.758 in = frame3d 0.7578 in (data/psi_benchmarks.json)" },
+    { "step": 8, "path": "data.cases[case=TH].displacements[at=(0,4572,16048)].uMm.2", "value": 48.034, "rel": 0.01, "source": "PSI 1.891 in = frame3d 1.8911 in" },
+    { "step": 8, "path": "data.cases[case=TH].displacements[at=(0,4572,16048)].rotDeg.0", "value": 0.1521, "rel": 0.01, "source": "PSI / frame3d" },
+    { "step": 8, "path": "data.cases[case=WT].displacements[at=(0,4572,16048)].uMm.2", "value": -33.15, "rel": 0.03, "source": "PSI -1.31 in, frame3d -1.3051 in" },
+    { "step": 8, "path": "data.cases[case=PR].stresses[0].hoopMPa", "value": 25.383, "rel": 0.0005, "source": "3681.51 psi = 250 x 10.75 / (2 x 0.365)" },
+    { "step": 8, "path": "data.cases[case=PR].stresses[0].longitudinalPressureMPa", "value": 11.414, "rel": 0.0005, "source": "1655.45 psi, exact-area form" }
+  ],
+  "notes": "Sh rows (12 000 / 9 000 psi) are PSI's B31.1 A53A values, used only so the material is complete; no gate depends on them. The elbows are sharp corners because PSI's fixture has no bends."
+}

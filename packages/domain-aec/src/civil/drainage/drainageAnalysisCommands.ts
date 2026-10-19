@@ -119,7 +119,15 @@ export const checkDrainageNetwork = defineCommand({
     const criteria = criteriaOrFailure(doc, params, 'check_drainage_network');
     if ('summary' in criteria) return criteria;
     const civil = getCivil(doc);
-    if (civilObjectsOf(civil, 'pipe').length === 0) return noop(doc, 'check_drainage_network: the document has no drainage pipes.');
+    if (civilObjectsOf(civil, 'pipe').length === 0) {
+      return report(doc, 'Drainage check: the document has no drainage pipes, nothing to check.', {
+        pipes: [],
+        manholes: [],
+        failures: [],
+        diverging: [],
+        csv: '',
+      });
+    }
     const { pipes, manholes, diverging } = analyseNetwork(doc, civil, criteria);
     const failures = [
       ...pipes.filter((row) => row.status === 'fail').map((r) => `${r.id} ${r.name}: ${r.reasons.join('; ')}`),

@@ -1,0 +1,45 @@
+{
+  "meta": {
+    "id": "ISO-DATA-CONVENTIONS",
+    "title": "Isometric projection geometry and piping-isometric drawing conventions",
+    "note": "Closed forms are exact; conventions are trade practice (no clause of the paywalled ISO 6412-2 text was read). Each row names its source id from ../sources.md.",
+    "accessed": "2026-10-18"
+  },
+  "projection": {
+    "closedForms": [
+      { "quantity": "angle between any two projected axes", "value": 120, "unit": "deg", "sources": ["S18", "S19"], "grade": "A" },
+      { "quantity": "receding axes to the horizontal", "value": 30, "unit": "deg", "sources": ["S18", "S19", "S20"], "grade": "A" },
+      { "quantity": "view tilt for equal foreshortening", "value": 35.26438968, "unit": "deg", "formula": "atan(1/sqrt(2)) = asin(1/sqrt(3))", "sources": ["S18", "S19"], "grade": "A" },
+      { "quantity": "foreshortening of every axis (true isometric projection)", "value": 0.8164965809, "unit": "-", "formula": "sqrt(2/3)", "sources": ["S18", "S19"], "grade": "A" }
+    ],
+    "llullIsoFrame": {
+      "file": "packages/core/src/geometry/viewDirections.ts",
+      "definition": "iso: right = unit(1, 1, 0); up = unit(cross(unit(1, -1, 1), right)); viewer at (+X, -Y, +Z)",
+      "derived": {
+        "east+X": { "angleDeg": -30.0, "scale": 0.816496580928 },
+        "north+Y": { "angleDeg": 30.0, "scale": 0.816496580928 },
+        "up+Z": { "angleDeg": 90.0, "scale": 0.816496580928 }
+      },
+      "derivation": "pcf_reference_parse.py iso_axes(); plant north (+Y) projects up-right at +30 deg, which is the preferred north-arrow direction on piping isometrics (S20)."
+    }
+  },
+  "conventions": [
+    { "id": "CV-01", "rule": "Isometrics are not drawn to scale; lengths are written as dimensions", "sources": ["S20", "S21"], "grade": "A" },
+    { "id": "CV-02", "rule": "North arrow pointing up-right is preferred; up-left is the alternative; it rarely if ever points down", "sources": ["S20", "S21"], "grade": "A" },
+    { "id": "CV-03", "rule": "Dimensions are taken from the pipe centreline (centre of fittings / face of flanges), not from the outside diameter", "sources": ["S20", "S21"], "grade": "A" },
+    { "id": "CV-04", "rule": "Horizontal positions are given by coordinates, vertical ones by elevations (EL)", "sources": ["S20"], "grade": "B" },
+    { "id": "CV-05", "rule": "Slopes are marked on the pipe with a ratio (e.g. SLOPE 1:100) and an arrow showing the fall direction", "sources": ["S20", "S21"], "grade": "A" },
+    { "id": "CV-06", "rule": "Lines not parallel to an isometric axis are skews / offsets: drawn inside a hatched 'squaring-in' triangle or box; a 45 deg offset is drawn at 22.5 deg from the axis so it does not read as an axis line", "sources": ["S20"], "grade": "B" },
+    { "id": "CV-07", "rule": "Shop welds, field (site) welds and field-fit welds use different symbols (SKEY WW / WS / WF); field welds split spools", "sources": ["S6", "S11", "S13"], "grade": "A" },
+    { "id": "CV-08", "rule": "Isometric tables: bill of materials, cut piece list, weld list, spool list", "sources": ["S11"], "grade": "A" },
+    { "id": "CV-09", "rule": "Isometric styles in Plant 3D: check, stress, final (with BOM, document of record), spool", "sources": ["S11"], "grade": "A" },
+    { "id": "CV-10", "rule": "A large isometric is split over several sheets; continuation is marked at the split point and sheet content is kept stable across re-issues (Smart 3D: overflow goes to a new sheet '1A')", "sources": ["S22"], "grade": "B" },
+    { "id": "CV-11", "rule": "Spool size limit is a project / shipping rule (cube size, weight or model property in Plant 3D); ASME B31.3 sets no maximum spool length", "sources": ["S11", "S23"], "grade": "A" },
+    { "id": "CV-12", "rule": "A field-fit weld adds a user-set allowance to the calculated cut length of the adjoining pipe (ISODRAFT)", "sources": ["S23"], "grade": "B" },
+    { "id": "CV-13", "rule": "Spool numbers run continuously from one drawing to the next by default; weld numbers not stored in the database are not kept between revisions (ISODRAFT)", "sources": ["S6"], "grade": "B" }
+  ],
+  "standards": [
+    { "id": "ISO 6412-1:2017", "title": "Technical product documentation - Simplified representation of pipelines - Part 1: General rules and orthogonal representation", "facts": "edition 2, 2017-12, confirmed 2023, replaces ISO 6412-1:1989; applies to all kinds of pipes and pipelines, rigid or flexible, any material; can be used for ventilation / air-conditioning ducts", "url": "https://www.iso.org/standard/73352.html", "sources": ["S24"], "grade": "A" },
+    { "id": "ISO 6412-2:2017", "title": "Technical product documentation - Simplified representation of pipelines - Part 2: Isometric projection", "facts": "edition 2, 2017-12, 12 pages, confirmed 2023, replaces ISO 6412-2:1989, ISO/TC 10/SC 10; supplementary rules to Part 1 for isometric representation, used where essential features must be shown clearly in three dimensions", "url": "https://www.iso.org/standard/73353.html", "sources": ["S25"], "grade": "A" }
+  ]
+}

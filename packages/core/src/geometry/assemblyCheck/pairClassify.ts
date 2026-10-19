@@ -50,7 +50,7 @@ export function candidatePairs(parts: readonly AssemblyPart[], margin: number): 
 
 const ZERO_DISTANCE = 1e-12;
 
-function overlapOf(kernel: GeometryKernel, a: AssemblyPart, b: AssemblyPart): { volume: number; depth: number } | null {
+export function overlapOf(kernel: GeometryKernel, a: AssemblyPart, b: AssemblyPart): { volume: number; depth: number } | null {
   const analyze = kernel.analyze?.bind(kernel);
   if (analyze === undefined) return null;
   const shape = kernel.evaluate({ op: 'boolean', boolean: 'intersect', a: a.recipe, b: b.recipe });

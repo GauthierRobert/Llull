@@ -195,9 +195,11 @@ const FINDING_TITLES: Readonly<Record<string, string>> = {
   FPR_MECH_OK: 'Mobility matches the drives',
   FPR_MECH_NONE: 'No mechanism',
   FPR_MOTION_INTERFERENCE: 'Parts collide in motion',
-  FPR_MOTION_CLEAR: 'Clear through the motion',
-  FPR_MOTION_NO_LIMITS: 'No travel limits to sweep',
-  FPR_MOTION_NONE: 'No joints to sweep',
+  FPR_MOTION_CLEARANCE_LOW: 'Too close in motion',
+  FPR_MOTION_TOUCH: 'Parts touch in motion',
+  FPR_MOTION_ALLOWED: 'Contact allowed',
+  FPR_MOTION_UNDERSAMPLED: 'Motion undersampled',
+  FPR_NO_MOTION: 'Nothing moves to check',
 };
 
 /** The title of `code`, else the checklist row it belongs to, else the code itself. */

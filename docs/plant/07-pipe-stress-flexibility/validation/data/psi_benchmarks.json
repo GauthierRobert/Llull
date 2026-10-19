@@ -1,0 +1,42 @@
+{
+  "source": "S3 — Pipe Stress Infinity (PSI), D. Gomes, GPL-3.0, https://github.com/denisgomes/psi (master, raw files fetched 2026-10-18); numbers transcribed from tests/*.py assertions, no code copied",
+  "units": { "length": "in", "force": "lbf", "moment": "in-lbf", "stress": "psi", "temperature": "degF", "rotation": "deg" },
+  "psiTolerance": "tests/utils.py compare(): within 3 % of the asserted value after rounding to 4 decimals",
+  "independentCheck": "data/scripts/frame3d.py (written for this pack, Timoshenko shear area A/2 as PSI elements.py) — results in column `frame3d`",
+  "fixtures": {
+    "loads_3d": {
+      "file": "tests/test_loads.py (sha256 6bf729f15fea0c6affa1a1ba1471f8cd6f1ad498eb2b116ab5c584ef59fa529b)",
+      "vertical": "z",
+      "pipe": { "nps": "10", "schedule": "40", "odIn": 10.75, "wallIn": 0.365, "dataFile": "psi/data/pipes.csv" },
+      "material": { "name": "A53A", "code": "B31.1", "densityLbIn3": 0.283, "poisson": 0.3, "eColdPsi": 27900000, "meanAlphaAt900FPerF": 7.84e-6, "dataFile": "psi/data/materials.csv" },
+      "nodes": { "10": [0, 0, 0], "20": [0, 0, 120], "30": [0, 180, 120], "40": [0, 180, -480], "50": [0, 480, -480] },
+      "elements": [["10", "20"], ["20", "30"], ["30", "40"], ["40", "50"]],
+      "supports": { "10": "anchor", "50": "anchor" }
+    },
+    "cantilever_10ft": {
+      "file": "tests/test_supports.py (sha256 296533e531a0ce94a75d4d1a792edf23cb7a02e1563157fed88bcb6a509ca92e)",
+      "geometry": "node 10 at origin, node 15 at x = 60, node 20 at x = 120; NPS 10 Sch 40 A53A"
+    }
+  },
+  "cases": [
+    { "id": "PSI-THERMAL-3D", "fixture": "loads_3d", "load": "Thermal 900 degF, reference 70 degF (alpha at 900, E at 70)", "node": "30",
+      "psi": { "dy": 0.758, "dz": 1.891, "rxDeg": 0.1521 }, "frame3d": { "dy": 0.7578, "dz": 1.8911, "rxDeg": 0.1521 }, "frame3dEulerBernoulli": { "dy": 0.7573, "dz": 1.8909, "rxDeg": 0.1534 }, "vc": "VC-PST-07" },
+    { "id": "PSI-WEIGHT-3D", "fixture": "loads_3d", "load": "Weight, steel only, w = 0.283 x A = 3.370 lbf/in", "node": "30",
+      "psi": { "dy": 0.33, "dz": -1.31, "rxDeg": -0.4 }, "frame3d": { "dy": 0.3295, "dz": -1.3051, "rxDeg": -0.3966 }, "vc": "VC-PST-08" },
+    { "id": "PSI-PRESSURE", "fixture": "loads_3d", "load": "Pressure 250 psi", "node": "30",
+      "psi": { "hoopPsi": 3681.51, "longitudinalPressurePsi": 1655.45 }, "closedForm": { "hoopPsi": 3681.507, "longitudinalPressurePsi": 1655.450 },
+      "formula": "S_hoop = P Do / (2 t); S_lp = P di^2 / (Do^2 - di^2)", "vc": "VC-PST-09" },
+    { "id": "PSI-LIMITSTOP-AXIAL", "fixture": "cantilever_10ft", "load": "Thermal 500 degF, axial stop at node 20", "node": "20",
+      "psi": { "fxLbf": 1002348.1 }, "closedForm": { "fxLbf": 1002903.2 }, "formula": "F = E A alpha dT with E 27.9e6, A 11.9083 in2, alpha 7.02e-6, dT 430", "note": "0.055 % apart (area rounding in PSI); both inside the PSI 3 % tolerance", "vc": "VC-PST-10" },
+    { "id": "PSI-ONEWAY-LIFTOFF", "fixture": "cantilever_10ft", "load": "Force +10000 lbf (up) at node 15, +Y one-way support at node 20", "node": "20",
+      "psi": { "reaction20FyLbf": 0, "reaction10FyLbf": 10000 }, "formula": "a +Y support cannot pull: it lifts off, reaction 0", "vc": "VC-PST-11" },
+    { "id": "PSI-ONEWAY-BEARING", "fixture": "cantilever_10ft", "load": "Force -10000 lbf (down) at node 15, +Y one-way support at node 20", "node": "20",
+      "psi": { "reaction20FyLbf": -5000, "movement20Dy": 0 }, "formula": "symmetric simply supported: R = P/2", "vc": "VC-PST-11" },
+    { "id": "PSI-SIF-UNREINFORCED", "file": "tests/test_sifs.py (sha256 8400ce45881901e5857503cd5f5812d32acfb474e722b5c4eb8929e244704b45)", "inputs": { "odIn": 3.5, "tnIn": 0.216 },
+      "psi": { "i": 3.4795 }, "closedForm": { "i": 3.47954 }, "formula": "h = T/r, i = 0.9/h^(2/3), r = (Do - T)/2", "vc": "VC-PST-02" },
+    { "id": "PSI-SIF-WELDING-TEE", "inputs": { "odIn": 3.5, "tnIn": 0.216, "crotchRadius": 0 }, "psi": { "i": 1.6366 }, "closedForm": { "i": 1.63662 }, "formula": "h = 3.1 T/r (crotch conditions not met), i = 0.9/h^(2/3)", "vc": "VC-PST-02" },
+    { "id": "PSI-SIF-WELDOLET", "inputs": { "odIn": 3.5, "tnIn": 0.216 }, "psi": { "i": 1.5698 }, "closedForm": { "i": 1.56981 }, "formula": "h = 3.3 T/r, i = 0.9/h^(2/3)", "vc": "VC-PST-02" },
+    { "id": "PSI-SIF-REINFORCED", "inputs": { "odIn": 3.5, "tnIn": 0.216, "padIn": 0.25 }, "psi": { "i": 1.6366 }, "closedForm": { "i": 1.62563 },
+      "formula": "h = (T + tr/2)^2.5 / (T^1.5 r), i = 0.9/h^(2/3)", "note": "PSI asserts 1.6366 within its 3 % tolerance; the closed form gives 1.6256 (0.67 % lower). Not a gate.", "vc": "context" }
+  ]
+}

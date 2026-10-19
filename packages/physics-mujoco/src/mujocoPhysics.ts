@@ -15,6 +15,7 @@ import type { Vec3 } from '@core/model/vectors';
 import { OBJECT_BODY, OBJECT_JOINT, OBJECT_TENDON, type MjData, type MjModel, type MujocoModule } from './bindings';
 import { jointReaction, loopReader, loopSlots, type ReactionSlot } from './constraintForces';
 import { springTendonName, toMjcf } from './mjcf';
+import { createServoSchedule } from './servoSchedule';
 
 interface JointSlot {
   readonly id: string;
@@ -91,17 +92,25 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
       springs.map(({ spring }) => [spring.id, { length: [], velocity: [], force: [] }]),
     );
     const servoJoints = model.servos.map((servo) => joints.find((slot) => slot.id === servo.joint));
+    const schedule = createServoSchedule(
+      mujoco,
+      mjModel,
+      data,
+      model,
+      servoJoints.map((joint) => joint?.dof),
+    );
     let appliedWork = 0;
     const initialPosition = new Map(joints.map((joint) => [joint.id, data.qpos[joint.qpos] ?? 0]));
     model.servos.forEach((servo, i) => {
       data.ctrl[i] = servo.targetVelocity;
-      // the set-point starts where the servo force is zero at the joint's start state: q + damping · v / stiffness
+      // the set-point starts where the servo force is zero at the joint's start state: q + damping · v / stiffness, which is q + 2 v / wn
+      // for a scheduled servo whatever the inertia (kv / kp = 2 / wn), so it does not wait for the first measurement
       const joint = joints.find((slot) => slot.id === servo.joint);
-      data.act[i] =
-        joint === undefined
-          ? 0
-          : (data.qpos[joint.qpos] ?? 0) + (servo.stiffness > 0 ? (servo.damping * (data.qvel[joint.dof] ?? 0)) / servo.stiffness : 0);
+      const lead =
+        (servo.naturalFrequency ?? 0) > 0 ? 2 / (servo.naturalFrequency ?? 1) : servo.stiffness > 0 ? servo.damping / servo.stiffness : 0;
+      data.act[i] = joint === undefined ? 0 : (data.qpos[joint.qpos] ?? 0) + lead * (data.qvel[joint.dof] ?? 0);
     });
+    schedule.update();
     const peaks: Record<string, { force: StepPeak; moment: StepPeak | null }> = {};
     const keepPeak = (id: string, force: Vec3, moment: Vec3 | null): void => {
       const [f, m] = [Math.hypot(force[0], force[1], force[2]), moment === null ? 0 : Math.hypot(moment[0], moment[1], moment[2])];
@@ -143,9 +152,11 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
         trace.jointPosition[joint.id]?.push((data.qpos[joint.qpos] ?? 0) - (initialPosition.get(joint.id) ?? 0));
         trace.jointVelocity[joint.id]?.push(data.qvel[joint.dof] ?? 0);
       }
+      // mj_step leaves the actuator force and the energy of its last RK4 stage (a predicted state, not the sampled one): re-evaluate at the
+      // sample, once (a reactions read has just done it)
+      if ((model.servos.length > 0 || options.energy === true) && read === undefined) mujoco.mj_forward(mjModel, data);
       model.servos.forEach((servo, i) => trace.servoForce[servo.id]?.push(data.actuator_force[i] ?? 0));
       if (options.energy === true) {
-        mujoco.mj_forward(mjModel, data); // energy of the sampled state (mj_step leaves the value of its last stage)
         energy.potential.push(data.energy[0] ?? 0);
         energy.kinetic.push(data.energy[1] ?? 0);
         energy.appliedWork.push(appliedWork);
@@ -174,10 +185,21 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     let previousVelocity = joints.map((joint) => data.qvel[joint.dof] ?? 0);
     for (let step = 1; step <= steps; step++) {
       previousVelocity = applyLoads(model, data, { joints, bodies, initialPosition, previousVelocity, timestep: options.timestep });
+      schedule.update();
       const before = options.energy === true ? stepWorkBasis(data, joints, servoJoints) : null;
       mujoco.mj_step(mjModel, data);
       if (before !== null) appliedWork += stepWork(data, joints, servoJoints, before);
       if (!data.qvel.every(Number.isFinite)) throw new Error(`simulation diverged at t = ${data.time.toFixed(4)} s.`);
+      // anti-windup: after the step the set-point never leads the joint by more than the servo force limit allows (force = kp (act - q) - kv v);
+      // a position hold (target speed 0) keeps its set-point
+      model.servos.forEach((servo, i) => {
+        const joint = servoJoints[i];
+        const gain = schedule.gains[i];
+        if (joint === undefined || gain === undefined || servo.targetVelocity === 0 || !(gain.stiffness > 0)) return;
+        const centre = (data.qpos[joint.qpos] ?? 0) + (gain.damping * (data.qvel[joint.dof] ?? 0)) / gain.stiffness;
+        const reach = servo.maxForce / gain.stiffness;
+        data.act[i] = Math.min(centre + reach, Math.max(centre - reach, data.act[i] ?? 0));
+      });
       if (slots.length > 0) residual = Math.max(residual, reader.residual(data));
       const sampled = step % stride === 0 || step === steps;
       if (wantReactions && (sampled || step % peakStride === 0)) {

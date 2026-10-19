@@ -40,15 +40,18 @@ No third-party file is stored here (topoptlab is GPL-3.0: its code was run, not 
 
 ## Validation cases
 
+VC-TOP-33 and 34 (added by [RS1](../../../decisions/RS1-native-compute.md), 2026-10-18) compare two runs or measure; they
+have no fixed value and are not in `expected_results.json` until the generator emits comparison cases.
+
 | VC | Proves | Setup | Expected | Tolerance | Source | Grade | Gate |
 | -- | ------ | ----- | -------- | --------- | ------ | ----- | ---- |
 | VC-TOP-01 | TR-TOP-05 | KE for ν = 0.3, E = 1, unit square | KE[0][0] = 0.494505494505 = (12 − 4ν)/(24(1−ν²)); KE[0][1] = 0.178571428571 = (3 + 3ν)/(24(1−ν²)); row sums 0 | 1e-12 rel; 1e-14 abs | (b) [S1] | A | unit |
 | VC-TOP-02 | FR-TOP-04 | filter weights, rmin = 1.5 | centre 1.5; edge 0.5; diagonal 0.0857864376269; Hs (interior) 3.84314575051 | 1e-15 | (b) | A | unit |
 | VC-TOP-03 | FR-TOP-05; TR-TOP-06 | minimise Σ a_i/x_i, a = [1, 4, 9, 16], Σ x = 2 (OC with p = 1) | x = [0.2, 0.4, 0.6, 0.8], objective 50 | 1e-6 | (b) Lagrange | A | unit |
 | VC-TOP-04 | FR-TOP-03 | 30×10 MBB, uniform x = 1 and x = 0.5 | c(1) = 123.069351174; c(0.5)/c(1) = 7.99999994398 = 1/(Emin + 0.5³(1 − Emin)) | 1e-9 / 1e-8 rel | (b) exact solve | A | unit |
-| VC-TOP-10 | FR-TOP-02, 03, 08, 09 | `plans/top_mbb_60x20.plan.json`, sensitivity filter | compliance at last iteration 203.192457639 (topoptlab 203.19245763914194); final-design compliance 203.182593258; volume 0.499970090278 (topoptlab 0.49997009027820527); iterations 94; grey 0.174175545817 | 1e-6 rel; 1e-6; 1e-3 abs; ±2 (bridge) / exact (TS reference); 1e-4 abs | (b) + S3 run | A (b, d), B (a, c, e) | unit (TS reference) + integration (bridge) + quality |
+| VC-TOP-10 | FR-TOP-02, 03, 08, 09 | `plans/top_mbb_60x20.plan.json`, sensitivity filter | compliance at last iteration 203.192457639 (topoptlab 203.19245763914194); final-design compliance 203.182593258; volume 0.499970090278 (topoptlab 0.49997009027820527); iterations 94; grey 0.174175545817 | 1e-6 rel; 1e-6; 1e-3 abs; ±2 (native job) / exact (TS reference); 1e-4 abs | (b) + S3 run | A (b, d), B (a, c, e) | unit (TS reference) + integration (native job) + quality |
 | VC-TOP-11 | same | `plans/top_mbb_60x20_density.plan.json`, density filter | compliance at last iteration 218.803221064 (topoptlab 218.80322107077228); final-design 218.815227557; volume 0.499980636009; iterations 127; grey 0.268323476248 | as VC-TOP-10 | (b) + S3 run | A (b), B (rest) | same |
-| VC-TOP-12 | FR-TOP-02; budgets | 300×100 MBB | **TBD — measure** with the bridge op (too large for the stdlib generator) | — | TBD | TBD | integration |
+| VC-TOP-12 | FR-TOP-02; budgets | 300×100 MBB | **TBD — measure** with `llull-compute topopt` (too large for the stdlib generator) | — | TBD | TBD | integration |
 | VC-TOP-20 | FR-TOP-07 | `move_entities` on the derived mesh | `TOP_DERIVED_READ_ONLY`, doc unchanged | exact | — | A | unit |
 | VC-TOP-21 | FR-TOP-14 | solved study, then `set_parameter` changing the domain | `TOP_RESULT_STALE` from `check_topology` and `suggest_rebuild` | exact | — | A | golden |
 | VC-TOP-22 | FR-TOP-10 | `suggest_rebuild` on VC-TOP-10 | closed loops; enclosed fraction within 0.02 of the thresholded fraction | 0.02 | (b) | A | unit |
@@ -57,6 +60,8 @@ No third-party file is stored here (topoptlab is GPL-3.0: its code was run, not 
 | VC-TOP-25 | FR-TOP-16 | E from an 08 `typical` value | `unverified: true`; `TOP_INPUT_UNVERIFIED` | exact | — | A | unit |
 | VC-TOP-26 | FR-TOP-15; TR-TOP-12 | 09 release including the derived mesh | `TOP_RESULT_NOT_RELEASABLE` | exact | — | A | unit |
 | VC-TOP-27 | FR-TOP-18 | two identical solves | identical fieldHash and report | exact | — | A | integration |
+| VC-TOP-33 | TR-TOP-03, 04, 06 | native vs TS reference: `llull-compute topopt` (CPU twin, and GPU where an adapter exists) against `@lib/topology.ts` on the 2D benchmark grids (MBB 30×10, 60×20, both filters) | same final compliance, volume and iteration count as the TS reference | CPU twin: compliance 1e-6 rel and iterations ±2 (as VC-TOP-10, derived from the PCG residual tolerance 1e-10); GPU: TBD — measure | (b) comparison | A once run (planned) | native + integration |
+| VC-TOP-34 | TR-TOP-04; budgets | 3D cantilever voxel grids of increasing size, 100 iterations, CPU twin and GPU | largest grid per device and wall time; target ≥ 1e7 DOF on a desktop GPU | **TBD — measure** | TBD | TBD | integration |
 
 Note on the reference problem: the MBB setup is the top88 default call `top88(60, 20, 0.5, 3, 1.5, ft)` as transcribed
 by topoptlab (`mbb_2d`: unit load at DOF 2, ux = 0 on the left edge, uy = 0 at the last DOF). The paper's own printed
@@ -83,7 +88,7 @@ numbering differs from top88's 1/2).
 | FR-TOP-21 (render) | manual review (UI) |
 | FR-TOP-22…24 (V1/V2) | deferred; VCs added with the milestone |
 | TR-TOP-02 (grid / masks) | VC-TOP-24, 28 |
-| TR-TOP-03, 04 (bridge op, solver) | VC-TOP-10, 11 (integration) |
+| TR-TOP-03, 04 (native job, solver) | VC-TOP-10, 11 (integration), VC-TOP-33, 34 |
 | TR-TOP-07 (artifact + validated record) | **VC-TOP-32**: `record_topology_result` with absent hash / edited summary / genuine → `TOP_ARTIFACT_NOT_FOUND`, `TOP_SUMMARY_MISMATCH`, accepted |
 | TR-TOP-08 (derived mesh) | VC-TOP-20, 27 |
 | TR-TOP-09 (contours) | VC-TOP-22 |

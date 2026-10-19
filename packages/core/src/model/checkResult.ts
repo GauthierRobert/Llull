@@ -27,7 +27,7 @@ export interface CheckItem {
   readonly findingKey: string;
   readonly values: Readonly<Record<string, number>>;
   readonly threshold?: CheckThreshold;
-  readonly witness?: { readonly pointsMm: readonly Vec3[] };
+  readonly witness?: { readonly pointsMm: readonly Vec3[]; readonly timeS?: number; readonly crankDeg?: number };
   readonly remediation: string;
   /** Declared intent that turned an overlap into an allowed pair. */
   readonly intent?: { readonly id: string; readonly kind: string; readonly reason: string; readonly declaredBy: string };
@@ -39,12 +39,13 @@ export interface CheckItem {
 interface CheckProvenance {
   readonly method: string;
   readonly kernel?: string;
+  readonly engine?: string;
   readonly tolerances: Readonly<Record<string, number>>;
   readonly params: unknown;
 }
 
 export interface CheckResult {
-  readonly check: 'assembly';
+  readonly check: 'assembly' | 'motion_clearance';
   /** Worst item: fail > not_run > warn > pass > info. */
   readonly status: CheckStatus;
   readonly items: readonly CheckItem[];

@@ -38,6 +38,9 @@ packages/core/src/commands/
 packages/core/src/geometry/
    assemblyCheck/  partValidity.ts · pairClassify.ts · connectivity.ts · thickness.ts · jointRealisation.ts
    meshBvh.ts (deterministic AABB tree over MeshData) · triangleQueries.ts (tri–tri intersect / distance, ray–tri)
+                   — the reference and small-case path (RS1 §2 rule 4)
+   geometryQueries.ts  GeometryQueryEngine port (batch distance / ray queries); TS default on meshBvh, host-installed
+                   native implementation = `llull-compute geomq` (§2.1)
 packages/core/src/dynamics/
    topology.ts (spanning tree + loop closures) · mobility.ts (Gruebler + Jacobian rank) · cylinderPressure.ts ·
    engineReport.ts (crank-angle series, MEP, energy closure, ripple) · reactions.ts (frames, derived engine loads)
@@ -48,6 +51,8 @@ packages/core/src/model/   materials catalogue with sources (al_4032, steel_4340
 packages/core/src/geometry/kernel.ts   + analyze · distance  (optional methods; null = unsupported)
 packages/kernel-manifold · packages/kernel-occt        implement them
 packages/physics-mujoco                                  connect equalities, solver settings, reactions in the trace
+server/ + desktop                                        install the native GeometryQueryEngine when `llull-compute` is present
+solver/crates/llull-geomq on llull-bvh                   clearance and wall-thickness batches, wgpu traversal + Rust-CPU twin (RS1 RS-6)
 ```
 
 Laws respected:
@@ -55,7 +60,8 @@ Laws respected:
 - **L1/L5.** Every capability is a command. The four checks are pure read-only queries returning `data`. Intents,
   grounding, dispositions and sign-off are mutating commands. UI menus and MCP schemas come from the registry.
 - **L2.** Core gains no DOM or three.js. Mesh queries use an own deterministic BVH in `geometry/meshBvh.ts` (three-mesh-bvh
-  stays a UI-only optimisation). File output stays in the CLI `--save` path.
+  stays a UI-only optimisation); large batches go through the injected `GeometryQueryEngine` port, whose native
+  implementation lives outside `packages/*` (§2.1). File output stays in the CLI `--save` path.
 - **L3.** Pure, with `is pure` tests on every new command.
 - **L4.** New document slice `doc.prototype` (§3.3) holds intents, grounding, dispositions and signatures. Check results
   are **not** stored in the document: they are recomputable, cached by the host by `inputsHash`, and saved to a file by
@@ -82,7 +88,7 @@ Laws respected:
 | TR-FPR-07 | MUST | MuJoCo adapter: revolute loop = two `connect` equalities at the anchor ± `axis · s` (s = half the shorter body's bounding-box extent along the axis, ≥ 5 mm, named); spherical loop = one `connect`. Each equality gets the loop `solref`/`solimp` from `solver` (§5.3). `<flag diagexact="enable"/>` when available. Reactions: `mj_rnePostConstraint` after each recorded step, `cfrc_int` moved from the subtree-COM frame to the joint anchor; loop forces from `efc_force` rows with `efc_type == mjCNSTR_EQUALITY` and matching `efc_id`, sign fixed by a static unit test; residual from `efc_pos`. |
 | TR-FPR-08 | MUST | Cylinder pressure law (§5.4) is pure core code, evaluated in `loads(state)` as a generalised force on the piston's prismatic joint, so MuJoCo applies the reaction to the cylinder's body (the joint parent) automatically. The pressure–angle table is precomputed once per run on a 0.1° grid. |
 | TR-FPR-09 | MUST | Mobility (§5.5) in core from the same topology: Gruebler count and numerical rank of the loop-constraint Jacobian at the initial pose (finite differences in tree coordinates, column-pivoted QR, rank tolerance 1e-6 relative = sqrt(eps), the noise floor of the differences; named). |
-| TR-FPR-10 | MUST | `check_motion_clearance` (§5.6) rebuilds part poses from `SimulationTrace.bodyPosition/bodyOrientation` (or from `motion_study` steps) and uses `meshBvh` on the kernel tessellation (tessellation tolerance reported). The worst colliding pose is re-evaluated exactly through placed recipes for volume. |
+| TR-FPR-10 | MUST | `check_motion_clearance` (§5.6) rebuilds part poses from `SimulationTrace.bodyPosition/bodyOrientation` (or from `motion_study` steps) and runs the pose × pair distance batch through `ctx.geometryQueries` on the kernel tessellation (tessellation tolerance reported): `llull-compute geomq` when installed, else `meshBvh` within the TS budget (§8). The worst colliding pose is re-evaluated exactly through placed recipes for volume. |
 | TR-FPR-11 | MUST | Determinism: fixed iteration orders (entity order, body order, joint creation order, pair `(i < j)` order), no `Math.random`, numbers in `data` rounded to 12 significant digits (PHY-10 TR-RBD-24 convention). |
 | TR-FPR-12 | MUST | `inputsHash` per check = sha256 of the canonical JSON of everything the check reads: recipes' `recipeKey`, transforms, dynamics slice, intents, params, kernel and engine names. Uses `@lib/hash` over canonical JSON (keys sorted). Deviation: `@lib/hash` is a 64-bit FNV-style hash, not sha256 (core has no sha256 and may not use Node crypto); it identifies inputs but is not collision-resistant against an adversary. |
 | TR-FPR-13 | MUST | Agent-first result envelope on every query: `{ status, items[], provenance, unverified, reviewRequired, inputsHash }`, unit-suffixed fields, `FPR_*` codes (§7.1). |
@@ -91,6 +97,22 @@ Laws respected:
 | TR-FPR-16 | MUST | `singleZone.ts`: first-law single-zone ODE with Wiebe heat release and Woschni heat loss, RK4 on a 0.1° grid, precomputed per operating point (rpm enters through Woschni and burn scaling). The model is no longer linear in Q, so calibration uses a secant iteration on Q_total until \|brake target error\| ≤ 0.1 % (named), at most 30 iterations, else `FPR_CALIBRATION_FAILED`. |
 | TR-FPR-17 | MUST | Gear loss: on each gear equality the transmitted torque is read from the equality force (`efc_force`, as for the loop reactions). The loss (1 − η)·\|T_in\| is applied as a load on the driven joint, against its velocity. Power flow direction comes from sign(T·ω) on the driving side. |
 | TR-FPR-18 | MUST | `compare_to_reference`: per operating point, a governed run (full throttle, the point's rpm, settle + 2 cycles) or a free-equilibrium run with the propeller. It reports S from the last cycle, D, E, U_val and `origin` from the calibration set. U_num comes from the timestep-halving difference at the calibration point (FR-FPR-79); U_input comes from the input bands; U_D comes from the reference record. |
+| TR-FPR-19 | MUST | `GeometryQueryEngine` port (`packages/core/src/geometry/geometryQueries.ts`, proposal): `minDistanceBatch(meshes, poses, pairs, maxDistance)` and `rayCastBatch(mesh, rays, maxT)`, results in input order. Default implementation = `meshBvh` (always available, browser included). The host may install the native one (`llull-compute geomq`, crate `llull-geomq` on `llull-bvh`); provenance names the engine, the device and `deterministic`. Numbers in `data` come from the Rust-CPU twin or fixed-order GPU reductions (RS1 §2 rule 3); a GPU-only fast pass may prune pairs but the reported minima are recomputed on a deterministic path. |
+
+### 2.1 Stack amendment (RS1, 2026-10-18)
+
+Decision [RS1](../../decisions/RS1-native-compute.md) step **RS-6** moves the two large mesh-query batches to native code:
+`check_motion_clearance` (up to 4 000 poses × 200 pairs) and the wall-thickness rays of `check_assembly` (up to 200 000).
+They run in `llull-compute geomq` (crate `llull-geomq` on the shared `llull-bvh`: deterministic BVH build, GPU traversal on
+wgpu, Rust-CPU twin). What does not change:
+
+- `meshBvh.ts` and `triangleQueries.ts` stay. They are the small-case path, the browser path and the test oracle;
+  the native results must match them (VC-FPR-37).
+- The checks stay pure registry queries; they read the batch engine from an injected port (TR-FPR-19), like
+  `ctx.kernel` and `ctx.physics` (L9). Nothing in `packages/*` imports native code (RS1 §2 rule 1).
+- MuJoCo stays the dynamics engine; OCC / Manifold stay the exact-geometry path (worst-pose volume, joint realisation).
+- Without `llull-compute` everything works within the TS budgets of §8; above them the request is refused with
+  `FPR_BUDGET_EXCEEDED` naming the limit (no silent truncation).
 
 ## 3. Data model
 
@@ -356,7 +378,7 @@ interface ShapeDistance { distance: number; pointA: Vec3; pointB: Vec3; inside: 
    joint whose parent is `ground`, the grounded list, and the parents of kinematic joints that are not themselves a
    joint child. Results: components without a grounded member → `FPR_PART_FLOATING` (one item per component, listing
    its parts). Parts whose only links are `touch` → `FPR_PART_RESTING_ONLY`.
-6. **Thickness, ray method** (FR-FPR-07): tessellate; build `meshBvh`; sample `raysPerPart` triangle centroids,
+6. **Thickness, ray method** (FR-FPR-07): tessellate; build the BVH (`meshBvh`, or `llull-geomq` through `ctx.geometryQueries`, TR-FPR-19); sample `raysPerPart` triangle centroids,
    area-weighted, with a deterministic low-discrepancy sequence (Halton bases 2 and 3 over the cumulative area). From
    each sample, shoot a ray along the inward normal; the thickness is the first hit at t > 1e-6·diag. Exclude samples
    within `cornerExclusionMm` (default 0.5 × threshold, named) of a sharp edge (dihedral > 60°). Report min, 1st
@@ -464,8 +486,8 @@ above the gate gives `FPR_LOOP_OPEN`.
 1. Poses: body b at sample i is the rigid motion (COM translation + quaternion relative to t = 0) applied to its
    entities. Instances in a kinematic sweep use the `motion_study` transforms.
 2. Pairs: every pair with at least one moving part, after per-sample AABB pruning. Pairs inside one body are skipped.
-3. Per pair and sample: `meshBvh.minDistance(maxDistance = clearance + ε_touch)`, then `intersects` when the distance
-   is 0.
+3. Per pair and sample: `minDistance(maxDistance = clearance + ε_touch)`, then `intersects` when the distance
+   is 0, as one batch through `ctx.geometryQueries` (`meshBvh` or `llull-compute geomq`, TR-FPR-19).
 4. **No tunnelling** (FR-FPR-21): the displacement bound of part b between samples is
    δ = |Δc| + |Δθ|·R_b (COM travel plus rotation angle times bounding radius). When δ exceeds the clearance (or
    ε_touch), the interval is subdivided with poses interpolated (lerp COM, slerp orientation), up to `maxSamples`.
@@ -474,6 +496,28 @@ above the gate gives `FPR_LOOP_OPEN`.
 6. Output: per pair, min clearance with time, crank angle and witness points; collision intervals with start/end
    time and angle, max penetration estimate and the volume at the worst pose; the achieved resolution. Pairs joined by
    a joint whose min distance ≈ the realised clearance are `touch` (pin in bore), not a failure.
+
+**As built (FPR-C), deviations from the sketch above** (`commands/dynamics/{checkMotionClearance,motionClearanceRun}.ts`,
+`dynamics/motionPoses.ts`):
+
+- Source: simulated runs only (`simulate_motion` poses, same `duration` / `timestep` / `sampleRate`); the `motion_study` sweep source
+  and `cycles` are not built. Params: `ids` (focus: pairs with at least one member listed), `crankAxis` (revolute joint whose angle
+  labels findings), `clearanceMm`, `touchToleranceMm`, `pairs: 'moving' | 'all'`, `maxSamples` (default 4000, thinned by stride).
+- Codes: `FPR_MOTION_INTERFERENCE` (fail), `FPR_MOTION_CLEARANCE_LOW` (warn), `FPR_MOTION_TOUCH` (info), `FPR_MOTION_ALLOWED` (pass, a
+  `doc.prototype` intent covers the pair), `FPR_MOTION_UNDERSAMPLED` (warn, unverified), `FPR_NO_PAIRS` / `FPR_PART_INVALID` (not_run).
+  Rejections: `FPR_NO_MOTION` (no bodies, nothing moves, simulation did not run), `FPR_UNKNOWN_ID`, `FPR_BUDGET_EXCEEDED` (500 parts,
+  2000 pairs, 400 000 pair-samples, 300 000 distance evaluations); a refused simulation keeps its own code (e.g. `FPR_LOOP_OPEN`).
+- Poses between samples are interpolated (lerp / slerp), up to 16 substeps per pair and sample, so the displacement per step stays under
+  half of the thinnest part side. Intervals are NOT bisected: start / end are the first / last contact moment, resolved to the substep
+  (`data.samples.resolutionS` is the sample spacing). When the cap leaves a step larger than the thinnest side, `FPR_MOTION_UNDERSAMPLED`.
+- A zero BVH distance is contact, not interference: the exact overlap volume at the first, middle and last moment of each interval
+  (kernel `intersect` + `analyze` on the placed recipes) decides; no volume = touch. At most 12 intervals per pair (200 per run) are classified. An
+  `allow_interference` intent allows the pair whatever the interval kinds; without one, unclassified intervals beside classified touches
+  give a warn with `unverified: true`, and a kernel without `analyze` gives a fail with `unverified: true`. The "worst pose" is the largest
+  of those three, not a search.
+- Joint-connected pairs get no special treatment beyond the volume rule (a pin touching its bore is touch). One part wholly inside another
+  without surface contact is not detected (BVH distance is surface to surface).
+- `data.minClearance` is the closest approach among pairs that never overlap or touch; per-pair minima are in `data.pairs[]`.
 
 ### 5.7 `check_prototype`
 
@@ -621,8 +665,8 @@ use distinct shapes (✔ ▲ ✖ ○ ◌) with text [D-R43][D-R44].
 | Item | Budget (named) |
 | ---- | -------------- |
 | Parts per `check_assembly` | 500; pairs after broad phase 20 000 |
-| Thickness rays | 2000 per part by default, 200 000 total |
-| `check_motion_clearance` | 4000 samples × 200 pairs; reference engine < 5 s on the desktop |
+| Thickness rays | 2000 per part by default, 200 000 total (TS path); native `geomq`: higher cap, target set from VC-FPR-37 measurement — TBD measure |
+| `check_motion_clearance` | 4000 samples × 200 pairs; reference engine < 5 s on the desktop (TS path); native `geomq`: target ≥ 10× the pose × pair product in the same time (target, TBD — measure) |
 | Simulation | 2 × 10⁶ steps (reference engine: 2 cycles at 5800 rpm, dt 14.4 µs ≈ 2900 steps) |
 | `compare_to_reference` | ≤ 12 operating points × (settle + 2 cycles); Rotax curve (9 points) < 30 s on the desktop; the timestep-halving run is counted once |
 | Review tab | open a saved result < 300 ms; playback ≥ 30 fps with overlays |
@@ -640,6 +684,7 @@ use distinct shapes (✔ ▲ ✖ ○ ◌) with text [D-R43][D-R44].
 | MuJoCo integration, realism | motored inertia torque (VC-28), brake calibration (VC-15), timestep halving (VC-33), friction torque cycle average = FMEP·V_d (TR-FPR-15) | VC-FPR-15, 28, 33 |
 | Validation (V1, production gate) | four-cylinder Rotax-class reference against the full-throttle curve and the static rpm window; result recorded, misses listed (KPI, not a CI gate) | VC-FPR-31, 32 |
 | Contract | `toToolSchemas()` snapshot gains the new commands; load validation of the new slices; `is pure` on every command | VC-FPR-23 |
+| Native (`npm run native:check`; `server/tests` with `llull-compute`) | `llull-bvh` / `llull-geomq` vs brute force; GPU vs Rust-CPU twin where an adapter exists (skip logged otherwise); native vs `meshBvh.ts` on VC-FPR-07, 08, 18, 19 and seeded random meshes | VC-FPR-37 |
 | Golden | `build_project` plan of the reference engine → id-normalised snapshot + replay equality | VC-FPR-24 |
 | Component (Testing Library) | checklist row (icon + word + value + source), findings filter and disposition dispatch, sign-off disabled reason, Explain content, mechanism graph rendering | VC-FPR-22, 25 |
 | E2E (Playwright) | open the Review tab on the reference engine, click a finding → isolated, scrub → chart cursor moves, crank axis | VC-FPR-26 |
@@ -655,6 +700,7 @@ use distinct shapes (✔ ▲ ✖ ○ ◌) with text [D-R43][D-R44].
 | M3b | Realism: `Accuracy` envelope, materials with sources + `FPR_MASS_DEFAULTED`, `set_engine_losses` (after Q8), single-zone Woschni + brake calibration, gear efficiency, propeller C_T(J)/C_P(J) + inertia check, plausibility checks, `add_reference_data` presets, `compare_to_reference`, timestep halving; VC-15, 27…36 | 1 | M3 | 2.5 w |
 | M4 | `check_motion_clearance`, `check_prototype`, joint realisation (OCC topology axes), VC-09, 18, 19, 24; reference engine plan | 1 | M1, M3b | 1.5 w |
 | M5 | Review tab: checklist, findings + overlay, mechanism graph, timeline dock with crank axis + `SeriesChart`, reaction arrows, thickness map, Explain, dispositions + interim sign-off; component + e2e tests VC-22, 25, 26 | 2 (+3 for overlays) | M1 data shapes (can start on fixtures after M1), M4 | 2.5 w |
+| RS-6 | `GeometryQueryEngine` port + TS default; `llull-compute geomq` (clearance batch, thickness rays) on `llull-bvh`, host installation, VC-FPR-37 | 1 + 4 (server) | M4, RS-0 (`solver/` workspace) | 2 w (share of RS1 RS-6) |
 | V1 | Fits on joints, inscribed-sphere thickness, swept volume, Rotax-class 4-cylinder reference with gearbox validated against the full-throttle curve and static rpm window, load-dependent joint friction, cycle-to-cycle variation, bsfc, reaction export to 05 / PHY-10 | 1, 2 | MVP | 3.5 w |
 
 M5 also covers the accuracy badges, the "Matches reality" row and the reference overlays on charts (FR-FPR-62/63),
@@ -701,6 +747,11 @@ within its 2.5 w. MVP is about 12 weeks of agent lane time. M1 and M2 run in par
 9. **Real data for the target design. Decided 2026-10-16 (owner): none available.**
    - Validation is limited to the public Rotax and Lycoming curves (FR-FPR-77) and the rpm windows.
    - The MVP demonstrator is the single-cylinder engine (Q6). Piston and rod masses stay test values, `unverified`.
+
+10. **Native batch engine call style (RS1).** The `GeometryQueryEngine` port is synchronous like the other ports. The host
+    implementation can run the `geomq` job and wait (the CLI command blocks, progress on stderr), or the CLI can route the
+    large case as a job and return the same envelope. Proposal: blocking call in the MVP of RS-6; revisit if the UI needs
+    cancellation.
 
 ## 12. References
 

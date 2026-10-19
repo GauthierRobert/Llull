@@ -103,6 +103,33 @@
       "command": "road_load_power",
       "expected": "grade, wind, altitude effects; CdA from model area",
       "test": "roadLoad.test.ts"
+    },
+    {
+      "id": "VC-AER-30",
+      "status": "planned (M6, after 12 CFD M2)",
+      "command": "aero_drag / road_load_power with cfdCaseId",
+      "expected": "drag = 1/2 rho V^2 * forces.cdAM2 of the recorded 12 CFD result; stale or converged:false -> AER_CFD_RESULT_UNUSABLE",
+      "tolerance": "1e-6 rel",
+      "source": "closed form",
+      "test": "cfdSource.test.ts"
+    },
+    {
+      "id": "VC-AER-31",
+      "status": "planned (M7, after 12 CFD M4)",
+      "command": "analyze_airfoil (compressibility: prandtl_glauert) vs 12 CFD Euler",
+      "inputs": { "naca": "0012", "mach": 0.5, "alphaDeg": 2 },
+      "expected": { "prandtlGlauertFactor": 1.154700538 },
+      "tolerance": "factor 1e-9; panel+PG vs Euler cl within 5 %",
+      "source": "Prandtl-Glauert 1/sqrt(1-M^2) (Anderson, Fundamentals of Aerodynamics, ch. 11)",
+      "test": "compressibility.test.ts"
+    },
+    {
+      "id": "VC-AER-32",
+      "status": "planned (M4, after 12 CFD M1)",
+      "command": "cfd_export_case / cfd_import_external",
+      "expected": "patches and farfield box equal the 12 CFD case; imported forces equal the external files",
+      "tolerance": "exact",
+      "test": "server/tests/cfd/externalExport.test.ts"
     }
   ],
   "scenarios": "plans/sc-aer-0*.json (tests/unit/aero/scenarioPlans.test.ts)"

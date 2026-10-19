@@ -1,0 +1,94 @@
+{
+  "pack": "09 VIS",
+  "description": "Pipe-content identification colour schemes, transcribed from the sources in ../sources.md. The standards are paywalled; every row is a public fact repeated by the cited extracts. Colours are NAMED categories. A standard never fixes an sRGB value (ANSI Z535.1 / RAL / BS 4800 define physical colours, several outside sRGB), so the display hex lives in llull_display_palette.json and is a llull choice, never a gate.",
+  "gradeLegend": "A = two or more independent extracts agree; B = one extract, or extracts conflict; C = located only",
+  "asme_a13_1": {
+    "standard": "ASME A13.1 Scheme for the Identification of Piping Systems (colour scheme in force since the 2007 edition, oxidizing added to the yellow class in 2015; editions 2020 and 2023 cited by vendors)",
+    "catalogue": "https://www.asme.org/codes-standards/find-codes-standards/a13-1-scheme-identification-piping-systems",
+    "note": "A13.1 colours a MARKER (label band) on the pipe, not the pipe. Plant-review tools tint the whole pipe by service; llull does both (display tint + optional marker decals). Field = background of the marker, letters = legend text colour.",
+    "rows": [
+      { "id": "A13-FQ", "category": "fire_quenching", "contents": "fire-quenching fluids (water / foam / CO2 for fire suppression)", "field": "red", "letters": "white", "sources": ["S1", "S2", "S3"], "grade": "A" },
+      { "id": "A13-TC", "category": "toxic_corrosive", "contents": "toxic and corrosive fluids", "field": "orange", "letters": "black", "sources": ["S1", "S3"], "grade": "A", "conflict": "S2 (projectmaterials chart) prints white letters on orange; field colour agrees in all three" },
+      { "id": "A13-FO", "category": "flammable_oxidizing", "contents": "flammable fluids and oxidizing fluids (oxidizing added in 2015)", "field": "yellow", "letters": "black", "sources": ["S1", "S3"], "grade": "A", "conflict": "S2 assigns flammable to brown/white and only oxidizing to yellow; S1 and S3 (J.J. Keller, Brimar 2015 summary) agree on yellow/black for both" },
+      { "id": "A13-CB", "category": "combustible", "contents": "combustible fluids (can burn, not flammable)", "field": "brown", "letters": "white", "sources": ["S1", "S3"], "grade": "A" },
+      { "id": "A13-WA", "category": "water", "contents": "potable, cooling, boiler feed and other water", "field": "green", "letters": "white", "sources": ["S1", "S2", "S3"], "grade": "A" },
+      { "id": "A13-CA", "category": "compressed_air", "contents": "compressed air", "field": "blue", "letters": "white", "sources": ["S1", "S2", "S3"], "grade": "A" },
+      { "id": "A13-U1", "category": "user_defined_1", "contents": "defined by the facility", "field": "purple", "letters": "white", "sources": ["S1", "S3"], "grade": "A" },
+      { "id": "A13-U2", "category": "user_defined_2", "contents": "defined by the facility", "field": "white", "letters": "black", "sources": ["S3"], "grade": "B" },
+      { "id": "A13-U3", "category": "user_defined_3", "contents": "defined by the facility", "field": "gray", "letters": "white", "sources": ["S1"], "grade": "B" },
+      { "id": "A13-U4", "category": "user_defined_4", "contents": "defined by the facility", "field": "black", "letters": "white", "sources": ["S1", "S3"], "grade": "B", "conflict": "S3 (Brady) lists purple/white, white/black, brown/white, black/white as the four user pairs; S1 lists purple, gray or black backgrounds with white letters" }
+    ],
+    "unresolved": [
+      "Steam / hot water: one vendor extract gives 'gray field, black letters' for steam, condensate, boiler feedwater and other hot water; another gives white/black. Not used as a gate (grade C)."
+    ]
+  },
+  "asme_a13_1_legend_size": {
+    "standard": "ASME A13.1 (vendor tables cite the 2007 / 2015 editions)",
+    "basis": "outside diameter of pipe OR covering (insulation included), inches",
+    "rows": [
+      { "odMinIn": 0.75, "odMaxIn": 1.25, "fieldLengthIn": 8, "letterHeightIn": 0.5, "sources": ["S4", "S5"], "grade": "A (letter height) / B (length: S6 Brady brochure prints 5 in)" },
+      { "odMinIn": 1.5, "odMaxIn": 2, "fieldLengthIn": 8, "letterHeightIn": 0.75, "sources": ["S4", "S5"], "grade": "A" },
+      { "odMinIn": 2.5, "odMaxIn": 6, "fieldLengthIn": 12, "letterHeightIn": 1.25, "sources": ["S4", "S5"], "grade": "A" },
+      { "odMinIn": 8, "odMaxIn": 10, "fieldLengthIn": 24, "letterHeightIn": 2.5, "sources": ["S4", "S5"], "grade": "A" },
+      { "odMinIn": 10, "odMaxIn": null, "odExclusiveMin": true, "fieldLengthIn": 32, "letterHeightIn": 3.5, "sources": ["S4", "S5"], "grade": "A" }
+    ],
+    "placement": {
+      "rule": "markers at valves and flanges, at changes of direction, at branches, on both sides of wall / floor / ceiling penetrations, and at intervals on straight runs; flow arrows, both directions where flow reverses",
+      "straightRunSpacing": "conflicting: 25-50 ft (Brady, 2007), 20-25 ft (Safety Media), 25 ft (Brimar, 2023) -> llull default 25 ft = 7620 mm, named default, grade B",
+      "sources": ["S6", "S7"]
+    },
+    "gaps": "The interval band between 1.25 and 1.5 in, 6 and 8 in OD is not covered by the vendor tables (edition differences). llull maps an OD in a gap to the next larger row and reports `bandInterpolated: true`."
+  },
+  "iso_14726": {
+    "standard": "ISO 14726:2008 Ships and marine technology - Identification colours for the content of piping systems (confirmed 2024)",
+    "catalogue": "https://www.iso.org/standard/44744.html",
+    "note": "Main colour = group of media; one or two additional colours distinguish media in a group (e.g. potable water blue-green-blue, condensate blue-yellow-blue per the DIN ISO 14726 abstract). Not for medical gases, industrial gases or cargo.",
+    "rows": [
+      { "id": "ISO-BK", "mainColour": "black", "code": "BK", "media": "waste media", "ral": "9005", "sources": ["S8", "S9"], "grade": "A" },
+      { "id": "ISO-BU", "mainColour": "blue", "code": "BU", "media": "fresh water", "ral": "5015", "sources": ["S8", "S9"], "grade": "A" },
+      { "id": "ISO-BN", "mainColour": "brown", "code": "BN", "media": "fuel", "ral": "8001", "sources": ["S8", "S9"], "grade": "A" },
+      { "id": "ISO-GN", "mainColour": "green", "code": "GN", "media": "sea water", "ral": "6018", "sources": ["S8", "S9"], "grade": "A" },
+      { "id": "ISO-GY", "mainColour": "grey", "code": "GY", "media": "non-flammable gases", "ral": "7001", "sources": ["S8", "S9"], "grade": "A" },
+      { "id": "ISO-MN", "mainColour": "maroon", "code": "MN", "media": "air and sounding pipes", "ral": null, "sources": ["S8", "S9"], "grade": "A (medium) / C (RAL not confirmed)" },
+      { "id": "ISO-OG", "mainColour": "orange", "code": "OG", "media": "oils other than fuels", "ral": "2003", "sources": ["S8", "S9"], "grade": "A" },
+      { "id": "ISO-SR", "mainColour": "silver", "code": "SR", "media": "steam", "ral": "9006", "sources": ["S8", "S9"], "grade": "A" },
+      { "id": "ISO-RD", "mainColour": "red", "code": "RD", "media": "fire fighting", "ral": "3000", "sources": ["S8", "S9"], "grade": "A" },
+      { "id": "ISO-VT", "mainColour": "violet", "code": "VT", "media": "acids, alkalis", "ral": "4001", "sources": ["S8", "S9"], "grade": "A" },
+      { "id": "ISO-WH", "mainColour": "white", "code": "WH", "media": "air in ventilation systems", "ral": "9010", "sources": ["S8", "S9"], "grade": "A" },
+      { "id": "ISO-YE", "mainColour": "yellow", "code": "YE", "media": "flammable gases", "ral": "1021", "sources": ["S8", "S9"], "grade": "A", "note": "yellow-ochre in ISO 14726-1:1999" }
+    ]
+  },
+  "bs_1710": {
+    "standard": "BS 1710 Specification for identification of pipelines and services (2014 edition; one vendor cites 2019)",
+    "note": "Basic identification colour bands with BS 4800 references; safety colours added on top of the basic colour.",
+    "rows": [
+      { "id": "BS-WA", "contents": "water", "basicColour": "green", "bs4800": "12 D 45", "sources": ["S10", "S11"], "grade": "A" },
+      { "id": "BS-ST", "contents": "steam", "basicColour": "silver-grey", "bs4800": "10 A 03", "sources": ["S10", "S11"], "grade": "A" },
+      { "id": "BS-OI", "contents": "oils - mineral, vegetable or animal; combustible liquids", "basicColour": "brown", "bs4800": "06 C 39", "sources": ["S10", "S11"], "grade": "A" },
+      { "id": "BS-GA", "contents": "gases in either gaseous or liquefied condition (except air)", "basicColour": "yellow ochre", "bs4800": "08 C 35", "sources": ["S10", "S11"], "grade": "A" },
+      { "id": "BS-AA", "contents": "acids and alkalis", "basicColour": "violet", "bs4800": "22 C 37", "sources": ["S10", "S11"], "grade": "A" },
+      { "id": "BS-AI", "contents": "air", "basicColour": "light blue", "bs4800": "20 E 51", "sources": ["S10", "S11"], "grade": "A" },
+      { "id": "BS-OL", "contents": "other liquids", "basicColour": "black", "bs4800": "00 E 53", "sources": ["S10", "S11"], "grade": "A" },
+      { "id": "BS-EL", "contents": "electrical services and ventilation ducts", "basicColour": "orange", "bs4800": "06 E 51", "sources": ["S10", "S11"], "grade": "A" }
+    ],
+    "safetyColours": [
+      { "meaning": "fire fighting", "colour": "red", "bs4800": "04 E 53", "grade": "A" },
+      { "meaning": "warning", "colour": "yellow", "bs4800": "08 E 51", "grade": "A" },
+      { "meaning": "fresh water from a public supply (auxiliary)", "colour": "auxiliary blue", "bs4800": "18 E 53", "grade": "A" }
+    ]
+  },
+  "din_2403": {
+    "standard": "DIN 2403 Kennzeichnung von Rohrleitungen nach dem Durchflussstoff (2014-06 referenced by TRGS 201; later editions withdrawn / in draft)",
+    "note": "Group colour per medium, as tabulated by TRGS 201 Anhang 3. One extract only: documentation, not a gate.",
+    "rows": [
+      { "medium": "water", "groupColour": "green", "grade": "B" },
+      { "medium": "steam", "groupColour": "red", "grade": "B" },
+      { "medium": "air", "groupColour": "grey", "grade": "B" },
+      { "medium": "flammable gases", "groupColour": "yellow (with red additional colour)", "grade": "B" },
+      { "medium": "acids", "groupColour": "orange", "grade": "B" },
+      { "medium": "alkalis", "groupColour": "violet", "grade": "B" },
+      { "medium": "oxygen", "groupColour": "blue", "grade": "B" }
+    ],
+    "sources": ["S12"]
+  }
+}

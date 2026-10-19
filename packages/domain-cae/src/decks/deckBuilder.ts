@@ -11,6 +11,7 @@ import type { MaterialCardWriter } from './constitutive';
 import { commentText, idLines, linesText, row } from './format';
 import { bucklingSteps, modalStep } from './eigen';
 import { mechanicalMaterialLines, staticStep } from './mechanical';
+import { nonlinearSteps } from '../nonlinear/deck';
 
 /** The discipline functions of the thermal and thermo-mechanical lanes (FE_PIPELINE_DESIGN §5 table). */
 export interface DisciplineTable {
@@ -176,13 +177,15 @@ export function buildInp(
     ? disciplines.heat.sections(ctx)
     : analysis.type === 'static'
       ? staticStep(ctx)
-      : analysis.type === 'modal'
-        ? modalStep(ctx)
-        : analysis.type === 'buckling'
-          ? bucklingSteps(ctx)
-          : analysis.type === 'coupled_temperature_displacement'
-            ? disciplines.coupled.sections(ctx)
-            : disciplines.thermomech.sections(ctx);
+      : analysis.type === 'nonlinear_static'
+        ? nonlinearSteps(ctx)
+        : analysis.type === 'modal'
+          ? modalStep(ctx)
+          : analysis.type === 'buckling'
+            ? bucklingSteps(ctx)
+            : analysis.type === 'coupled_temperature_displacement'
+              ? disciplines.coupled.sections(ctx)
+              : disciplines.thermomech.sections(ctx);
   if (isDeckRefusal(steps)) return steps;
   return { text: `${linesText(lines)}${steps.text === '' || steps.text.endsWith('\n') ? steps.text : `${steps.text}\n`}` };
 }

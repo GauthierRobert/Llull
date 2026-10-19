@@ -1,0 +1,261 @@
+{
+  "id": "SC-EQP-03",
+  "status": "PROPOSED - commands not built yet (add_heat_exchanger, add_nozzle, vessel_volume, equipment_ports, check_equipment).",
+  "validates": [
+    "VC-EQP-11",
+    "VC-EQP-12",
+    "VC-EQP-15"
+  ],
+  "description": "Fixed-tubesheet exchanger E-301, TEMA BEM: shell ID 600 mm x 8 mm, 300 tubes 19.05 x 1.651 mm (3/4 in BWG 16), tube length 4877 mm (16 ft), tubesheets 50 mm, front and rear bonnets with 300 mm channel + 2:1 bonnet head, two saddles, axis at 1000 mm, shell and tube nozzles. A second call with an invalid TEMA type must be refused.",
+  "actions": [
+    {
+      "command": "set_units",
+      "params": {
+        "units": "mm"
+      }
+    },
+    {
+      "command": "add_heat_exchanger",
+      "params": {
+        "tag": "E-301",
+        "name": "Product cooler",
+        "temaType": "BEM",
+        "location": [
+          0,
+          8000
+        ],
+        "orientation": "horizontal",
+        "shellInsideDiameter": 600,
+        "shellThickness": 8,
+        "tubes": {
+          "outsideDiameter": 19.05,
+          "wallThickness": 1.651,
+          "count": 300,
+          "length": 4877,
+          "passes": 2,
+          "pitch": 23.8125,
+          "layoutAngleDeg": 30
+        },
+        "tubesheetThickness": 50,
+        "frontChannel": {
+          "length": 300
+        },
+        "rearChannel": {
+          "length": 300
+        },
+        "support": {
+          "type": "saddles",
+          "stations": [
+            800,
+            4077
+          ],
+          "width": 200,
+          "axisElevation": 1000
+        },
+        "design": {
+          "shellSide": {
+            "pressure": {
+              "value": 1.0,
+              "unit": "MPa"
+            },
+            "temperatureC": 120
+          },
+          "tubeSide": {
+            "pressure": {
+              "value": 0.6,
+              "unit": "MPa"
+            },
+            "temperatureC": 60
+          }
+        }
+      },
+      "as": "e301"
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipment": "E-301",
+        "mark": "S1",
+        "service": "shell inlet",
+        "dn": 150,
+        "rating": "CL150",
+        "facing": "RF",
+        "location": {
+          "on": "shell",
+          "station": 400,
+          "orientationDeg": 0
+        },
+        "projection": 600
+      }
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipment": "E-301",
+        "mark": "S2",
+        "service": "shell outlet",
+        "dn": 150,
+        "rating": "CL150",
+        "facing": "RF",
+        "location": {
+          "on": "shell",
+          "station": 4377,
+          "orientationDeg": 180
+        },
+        "projection": 600
+      }
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipment": "E-301",
+        "mark": "T1",
+        "service": "tube inlet",
+        "dn": 100,
+        "rating": "CL150",
+        "facing": "RF",
+        "location": {
+          "on": "channel",
+          "channel": "front",
+          "station": 150,
+          "orientationDeg": 180
+        },
+        "projection": 550
+      }
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipment": "E-301",
+        "mark": "T2",
+        "service": "tube outlet",
+        "dn": 100,
+        "rating": "CL150",
+        "facing": "RF",
+        "location": {
+          "on": "channel",
+          "channel": "front",
+          "station": 150,
+          "orientationDeg": 0
+        },
+        "projection": 550
+      }
+    },
+    {
+      "command": "vessel_volume",
+      "params": {
+        "equipment": "E-301"
+      }
+    },
+    {
+      "command": "equipment_ports",
+      "params": {
+        "equipment": "E-301"
+      }
+    },
+    {
+      "command": "check_equipment",
+      "params": {
+        "equipment": [
+          "E-301"
+        ]
+      }
+    },
+    {
+      "command": "add_heat_exchanger",
+      "params": {
+        "tag": "E-302",
+        "temaType": "BXZ",
+        "location": [
+          0,
+          12000
+        ],
+        "shellInsideDiameter": 600,
+        "tubes": {
+          "outsideDiameter": 19.05,
+          "wallThickness": 1.651,
+          "count": 100,
+          "length": 3000
+        }
+      }
+    }
+  ],
+  "expected": [
+    {
+      "step": 1,
+      "path": "tema",
+      "value": {
+        "front": "B",
+        "shell": "E",
+        "rear": "M",
+        "fixedTubesheet": true,
+        "removableBundle": false
+      },
+      "source": "TEMA letters via ht / Wikipedia (data/tema_designations.json)"
+    },
+    {
+      "step": 6,
+      "path": "shellSide.volumeM3",
+      "value": 0.9421985298921338,
+      "rel": 1e-09,
+      "source": "pi/4 Ds^2 (Lt - 2 tts) - N pi/4 do^2 (Lt - 2 tts); baffles and tie rods ignored (stated in data.assumptions)"
+    },
+    {
+      "step": 6,
+      "path": "tubeSide.volumeM3",
+      "value": 0.5111748822078709,
+      "rel": 1e-09,
+      "source": "N pi/4 di^2 Lt + 2 (pi/4 Ds^2 x 0.3 + pi Ds^3/24)"
+    },
+    {
+      "step": 6,
+      "path": "insideOverallLengthMm",
+      "value": 5777,
+      "abs": 1e-06,
+      "source": "Lt + 2 (channel 300 + head depth 150)"
+    },
+    {
+      "step": 7,
+      "path": "ports.E-301:T1.direction",
+      "value": [
+        0,
+        0,
+        -1
+      ],
+      "abs": 1e-09,
+      "source": "front channel, orientation 180 = bottom"
+    },
+    {
+      "step": 8,
+      "path": "status",
+      "value": "warn",
+      "source": "no fail; warnings EQP_FLANGE_PLACEHOLDER (01 PSC not present) and EQP_DESIGN_DATA_MISSING (channel thickness); status precedence fail > warn > pass_with_review > pass"
+    },
+    {
+      "step": 8,
+      "path": "issues[severity=fail].length",
+      "value": 0,
+      "source": "all code checks pass"
+    },
+    {
+      "step": 8,
+      "path": "reviewRequired",
+      "value": true,
+      "source": "AF-33: pressure equipment"
+    },
+    {
+      "step": 9,
+      "path": "error.code",
+      "value": "EQP_TEMA_INVALID",
+      "source": "Z is not a TEMA rear-head letter"
+    },
+    {
+      "step": 9,
+      "path": "error.paths",
+      "value": [
+        "temaType.2"
+      ],
+      "source": "error-code table"
+    }
+  ]
+}

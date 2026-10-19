@@ -1,0 +1,43 @@
+{
+  "id": "SC-STA-04",
+  "status": "PROPOSED — add_pipe_rack is not built; quantity_takeoff and check_steel_members exist today",
+  "validates": ["VC-STA-09"],
+  "description": "Two-tier pipe rack 60 m long, 6 m bents, 6 m wide, tiers at +5000 / +7000, HEB300 columns, IPE300 tier beams and longitudinal struts, fixed bases, X-bracing in the column-line planes of bays 1 and 10",
+  "actions": [
+    { "command": "set_units", "params": { "units": "mm" } },
+    { "command": "add_level", "params": { "name": "Grade", "elevation": 0, "height": 7000 } },
+    {
+      "command": "add_pipe_rack",
+      "params": {
+        "origin": [0, 0],
+        "direction": [1, 0],
+        "length": 60000,
+        "bentSpacing": 6000,
+        "width": 6000,
+        "tiers": [5000, 7000],
+        "columnProfile": "HEB300",
+        "tierBeamProfile": "IPE300",
+        "strutProfile": "IPE300",
+        "struts": "every_tier",
+        "bracingBays": [1, 10],
+        "bracingProfile": "L100x10",
+        "baseFixity": "fixed",
+        "gridPrefix": "PR"
+      },
+      "as": "rack"
+    },
+    { "command": "quantity_takeoff", "params": {} },
+    { "command": "check_steel_members", "params": {} }
+  ],
+  "expected": [
+    { "step": 2, "path": "data.bents", "value": 11, "source": "L / s + 1" },
+    { "step": 2, "path": "data.columns", "value": 22 },
+    { "step": 2, "path": "data.tierBeams", "value": 22, "source": "bents x tiers" },
+    { "step": 2, "path": "data.struts", "value": 40, "source": "2 column lines x 10 bays x 2 tiers" },
+    { "step": 2, "path": "data.columnLengthM", "value": 154.0, "abs": 1e-6 },
+    { "step": 2, "path": "data.tierBeamLengthM", "value": 132.0, "abs": 1e-6, "source": "axis length; member-end trimming is reported separately" },
+    { "step": 2, "path": "data.strutLengthM", "value": 240.0, "abs": 1e-6 },
+    { "step": 2, "path": "data.steelMassKgExBracing", "value": 33716.4, "rel": 1e-6, "source": "154 x 117 + 372 x 42.2 kg/m (llull catalogue rows HEB300, IPE300)" },
+    { "step": 4, "path": "data.members[*].analysed", "value": "all true", "source": "rack is a moment frame transversally and braced longitudinally (docs/INDUSTRIAL.md pipe-rack bent)" }
+  ]
+}

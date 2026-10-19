@@ -1,0 +1,238 @@
+{
+ "title": "Instrument tag parsing cases",
+ "rules": "parse_instrument_tag default grammar: <first letter>[<first-letter modifier>]<succeeding letters and modifiers>{sep}<loop number>[<suffix>]; sep in {\"-\", \" \", \"\"}; letters per data/isa51_letters.json grade-A rows",
+ "sources": [
+  "S1",
+  "S5",
+  "S6"
+ ],
+ "cases": [
+  {
+   "id": "T01",
+   "input": "FIC-101",
+   "origin": "brief example (ISA style)",
+   "expect": {
+    "ok": true,
+    "firstLetter": "F",
+    "variable": "Flow, flow rate",
+    "modifier": null,
+    "functions": [
+     {
+      "letter": "I",
+      "role": "readout",
+      "meaning": "Indicate"
+     },
+     {
+      "letter": "C",
+      "role": "output",
+      "meaning": "Control"
+     }
+    ],
+    "loop": "101"
+   }
+  },
+  {
+   "id": "T02",
+   "input": "FIC 032",
+   "origin": "I06V01-VER.EX01.xml ProcessInstrumentationFunction-2 (category F, functions IC, number 032)",
+   "expect": {
+    "ok": true,
+    "firstLetter": "F",
+    "functions": [
+     "I",
+     "C"
+    ],
+    "loop": "032"
+   }
+  },
+  {
+   "id": "T03",
+   "input": "LI 01",
+   "origin": "I01V01-VER.EX01.xml (L, I, 01)",
+   "expect": {
+    "ok": true,
+    "firstLetter": "L",
+    "variable": "Level",
+    "functions": [
+     "I"
+    ],
+    "loop": "01"
+   }
+  },
+  {
+   "id": "T04",
+   "input": "HC 02",
+   "origin": "I02V01-VER.EX01.xml (H, C, 02)",
+   "expect": {
+    "ok": true,
+    "firstLetter": "H",
+    "variable": "Hand (manually initiated)",
+    "functions": [
+     "C"
+    ],
+    "loop": "02"
+   }
+  },
+  {
+   "id": "T05",
+   "input": "PI 4712.01",
+   "origin": "C01V04-VER.EX01.xml PIF-1 (P, I, 4712.01)",
+   "expect": {
+    "ok": true,
+    "firstLetter": "P",
+    "functions": [
+     "I"
+    ],
+    "loop": "4712.01"
+   }
+  },
+  {
+   "id": "T06",
+   "input": "PICSA 4712.02",
+   "origin": "C01V04-VER.EX01.xml PIF-2 (P, ICSA, 4712.02)",
+   "expect": {
+    "ok": true,
+    "firstLetter": "P",
+    "functions": [
+     "I",
+     "C",
+     "S",
+     "A"
+    ],
+    "loop": "4712.02",
+    "notes": "valid letters under ISA 5.1; the reference P&ID follows IEC 62424 conventions, so the parse carries convention \"ISA-5.1\" and no semantic claim beyond letter meanings"
+   }
+  },
+  {
+   "id": "T07",
+   "input": "TICSA 4750.03",
+   "origin": "C01V04-VER.EX01.xml PIF-4",
+   "expect": {
+    "ok": true,
+    "firstLetter": "T",
+    "functions": [
+     "I",
+     "C",
+     "S",
+     "A"
+    ],
+    "loop": "4750.03"
+   }
+  },
+  {
+   "id": "T08",
+   "input": "HS 4750.01",
+   "origin": "C01V04-VER.EX01.xml PIF-3",
+   "expect": {
+    "ok": true,
+    "firstLetter": "H",
+    "functions": [
+     "S"
+    ],
+    "loop": "4750.01"
+   }
+  },
+  {
+   "id": "T09",
+   "input": "YCS 033",
+   "origin": "I06V01-VER.EX01.xml PIF-1",
+   "expect": {
+    "ok": true,
+    "firstLetter": "Y",
+    "variable": "Event, state or presence",
+    "functions": [
+     "C",
+     "S"
+    ],
+    "loop": "033"
+   }
+  },
+  {
+   "id": "T10",
+   "input": "US 031",
+   "origin": "I06V01-VER.EX01.xml PIF-3",
+   "expect": {
+    "ok": true,
+    "firstLetter": "U",
+    "variable": "Multivariable",
+    "functions": [
+     "S"
+    ],
+    "loop": "031"
+   }
+  },
+  {
+   "id": "T11",
+   "input": "PDIC-205",
+   "origin": "constructed: first-letter modifier D after P",
+   "expect": {
+    "ok": true,
+    "firstLetter": "P",
+    "modifier": "D",
+    "modifierMeaning": "Differential",
+    "functions": [
+     "I",
+     "C"
+    ],
+    "loop": "205"
+   }
+  },
+  {
+   "id": "T12",
+   "input": "TAHH-300",
+   "origin": "constructed: succeeding modifiers H H after alarm",
+   "expect": {
+    "ok": true,
+    "firstLetter": "T",
+    "functions": [
+     "A"
+    ],
+    "functionModifiers": [
+     "H",
+     "H"
+    ],
+    "loop": "300"
+   }
+  },
+  {
+   "id": "T13",
+   "input": "PIS+Z+A 275003",
+   "origin": "C02V03-VER.EX02.xml PIF (P, \"IS⁺Z⁺A\", 275003) with superscript plus normalised to +",
+   "expect": {
+    "ok": false,
+    "code": "PID_TAG_NONSTANDARD",
+    "notes": "DIN 19227-style limit marks are not ISA 5.1 letters; the raw string is kept and the item is still imported"
+   }
+  },
+  {
+   "id": "T14",
+   "input": "FIC",
+   "origin": "constructed: no loop number",
+   "expect": {
+    "ok": false,
+    "code": "PID_TAG_FORMAT"
+   }
+  },
+  {
+   "id": "T15",
+   "input": "CIC-12",
+   "origin": "constructed: user's-choice first letter C",
+   "expect": {
+    "ok": true,
+    "firstLetter": "C",
+    "variable": "User's choice",
+    "warning": "PID_TAG_USER_LETTER"
+   }
+  },
+  {
+   "id": "T16",
+   "input": "FI-101",
+   "origin": "constructed duplicate of loop 101 with FIC-101",
+   "expect": {
+    "ok": true,
+    "loop": "101",
+    "notes": "same loop, different function: allowed; duplicate full tag FIC-101 twice -> PID_TAG_DUPLICATE in check_pid"
+   }
+  }
+ ]
+}
