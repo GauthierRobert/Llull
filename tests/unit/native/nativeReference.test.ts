@@ -9,9 +9,11 @@ import { describe, expect, it } from 'vitest';
 import type { FeMeshArtifact } from '@core/model/analysis';
 import { isEvaluationFailure } from '@cae/fatigue/evaluate';
 import { fatigueFieldInput, fatigueFieldReference } from '@cae/fatigue/feField';
+import { maxPrincipal, signedVonMises } from '@cae/fatigue/feStress';
 import { countCycles, type CountingMethod, type ResidueRule } from '@cae/fatigue/rainflow';
 import { mapNodalField } from '@cae/thermomech/mapping';
 import { feFatigue } from '../cae/fatigue/feFixtures';
+import { stressTensors } from '../cae/fatigue/stressTensors';
 import { gridMesh, seeded } from '../cae/gridMesh';
 
 const SOLVER = path.resolve(__dirname, '../../../solver/crates');
@@ -130,6 +132,9 @@ function fatigueJobCases(): unknown[] {
   });
 }
 
+/** `[...tensor, maxPrincipal, signedVonMises]` rows (degenerate spectra exercise the Jacobi fallback). */
+const stressCases = (): number[][] => stressTensors().map((tensor) => [...tensor, maxPrincipal(tensor), signedVonMises(tensor)]);
+
 const asMesh = (grid: ReturnType<typeof gridMesh>): FeMeshArtifact => ({
   kind: 'fe_mesh',
   unitSystem: 'N-mm-t-s',
@@ -186,6 +191,7 @@ function mapCases(): unknown[] {
 describe('native reference fixtures (TS = oracle)', () => {
   it('V8 Math samples for llull-jsmath', () => fixture('llull-jsmath/tests/fixtures/jsmath.json', jsmathCases()));
   it('rainflow cycles for llull-post', () => fixture('llull-post/tests/fixtures/rainflow.json', rainflowCases()));
+  it('stress measures for llull-post', () => fixture('llull-post/tests/fixtures/stress.json', stressCases()));
   it('all-node fatigue fields for llull-post (VC-FAT-43 at crate level)', () =>
     fixture('llull-post/tests/fixtures/fatigue_jobs.json', fatigueJobCases()));
   it('mesh mappings for llull-post (VC-TMC-10 at crate level)', () => fixture('llull-post/tests/fixtures/map.json', mapCases()));

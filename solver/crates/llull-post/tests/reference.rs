@@ -4,6 +4,7 @@
 use llull_post::fatigue::{self, FatigueJob};
 use llull_post::map::{map_field, MapInput};
 use llull_post::rainflow::{count_cycles, CountingMethod, ResidueRule};
+use llull_post::stress::{max_principal, signed_von_mises, Tensor};
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -36,6 +37,16 @@ fn rainflow_cycles_are_identical() {
         for (cycle, row) in cycles.iter().zip(&expected) {
             assert_eq!([cycle.from, cycle.to, cycle.range, cycle.mean, cycle.count], *row);
         }
+    }
+}
+
+#[test]
+fn stress_measures_are_identical() {
+    let cases = fixture("stress.json");
+    for (index, row) in rows::<8>(&cases).iter().enumerate() {
+        let tensor: Tensor = std::array::from_fn(|i| row[i]);
+        assert!(same(max_principal(&tensor), row[6]), "case {index}: max principal {} vs {}", max_principal(&tensor), row[6]);
+        assert!(same(signed_von_mises(&tensor), row[7]), "case {index}: signed von Mises {} vs {}", signed_von_mises(&tensor), row[7]);
     }
 }
 

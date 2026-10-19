@@ -3,8 +3,8 @@
 //! TypeScript builder `fatigue/feField.ts`; this job writes `field.f64`. Nodes run in parallel (rayon) but every node's numbers come
 //! from its own sequential loop and land at its own index, so the output is identical for any thread count (RS1 §2 rule 3).
 
-use crate::damage::{strain_life_damage, stress_life_damage, StrainLifeSetup, StressLifeSetup, FLAG_STATIC_FAILURE};
-use crate::rainflow::{count_cycles, CountingMethod, ResidueRule};
+use crate::damage::{add_strain_life_cycle, add_stress_life_cycle, StrainLifeSetup, StressLifeSetup, EMPTY_SUM, FLAG_STATIC_FAILURE};
+use crate::rainflow::{for_each_cycle, CountingMethod, ResidueRule};
 use crate::stress::{node_series, Measure, Tensor};
 use crate::JobError;
 use rayon::prelude::*;
@@ -43,14 +43,29 @@ pub const FIELD_COMPONENTS: usize = 4;
 /// Bit of the flags value (component 3) set when a cycle fell outside the tested life range of the curve.
 pub const FLAG_EXTRAPOLATED: u32 = 8;
 
-/// `[damagePerBlock, cyclesCounted, maxEquivalentAmplitude, flags]` of one node (flags: damage flags | FLAG_EXTRAPOLATED).
-fn node_field(job: &FatigueJob, tensors: &[Tensor], series: &mut Vec<f64>) -> [f64; FIELD_COMPONENTS] {
+/// Per-thread buffers reused from node to node (no per-node allocation on the hot path).
+#[derive(Default)]
+struct Scratch {
+    series: Vec<f64>,
+    stack: Vec<f64>,
+    tensors: Vec<Tensor>,
+}
+
+/// `[damagePerBlock, cyclesCounted, maxEquivalentAmplitude, flags]` of one node (flags: damage flags | FLAG_EXTRAPOLATED). Cycles go
+/// straight from the counter into the Miner sum in counting order, which is the order of `count_cycles` + `*_damage`, so the sum is the same.
+fn node_field(job: &FatigueJob, scratch: &mut Scratch) -> [f64; FIELD_COMPONENTS] {
+    let Scratch { series, stack, tensors } = scratch;
     node_series(tensors, &job.histories, job.steps, job.measure, series);
-    let cycles = count_cycles(series, job.counting.method, job.counting.residue, job.counting.gate);
-    let sum = match &job.damage {
-        DamageSetup::StressLife(setup) => stress_life_damage(&cycles, setup),
-        DamageSetup::StrainLife(setup) => strain_life_damage(&cycles, setup),
-    };
+    let Counting { method, residue, gate } = job.counting;
+    let mut sum = EMPTY_SUM;
+    match &job.damage {
+        DamageSetup::StressLife(setup) => {
+            for_each_cycle(series, method, residue, gate, stack, |c| add_stress_life_cycle(&mut sum, &c, setup))
+        }
+        DamageSetup::StrainLife(setup) => {
+            for_each_cycle(series, method, residue, gate, stack, |c| add_strain_life_cycle(&mut sum, &c, setup))
+        }
+    }
     let flags = sum.flags | if sum.extrapolated { FLAG_EXTRAPOLATED } else { 0 };
     [sum.damage, sum.cycles_counted, sum.max_equivalent_amplitude, f64::from(flags)]
 }
@@ -85,15 +100,12 @@ pub fn run(job: &FatigueJob, tensors: &[f64]) -> Result<Vec<f64>, JobError> {
     check(job, tensors)?;
     let per_node = job.load_cases * 6;
     let mut field = vec![0.0f64; job.node_count * FIELD_COMPONENTS];
-    field.par_chunks_mut(FIELD_COMPONENTS).enumerate().for_each_init(
-        || (Vec::with_capacity(job.steps), Vec::with_capacity(job.load_cases)),
-        |(series, node_tensors), (node, out)| {
-            node_tensors.clear();
-            let values = &tensors[node * per_node..(node + 1) * per_node];
-            node_tensors.extend(values.chunks_exact(6).map(|c| [c[0], c[1], c[2], c[3], c[4], c[5]]));
-            out.copy_from_slice(&node_field(job, node_tensors, series));
-        },
-    );
+    field.par_chunks_mut(FIELD_COMPONENTS).enumerate().for_each_init(Scratch::default, |scratch, (node, out)| {
+        scratch.tensors.clear();
+        let values = &tensors[node * per_node..(node + 1) * per_node];
+        scratch.tensors.extend(values.chunks_exact(6).map(|c| [c[0], c[1], c[2], c[3], c[4], c[5]]));
+        out.copy_from_slice(&node_field(job, scratch));
+    });
     Ok(field)
 }
 

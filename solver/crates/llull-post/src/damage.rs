@@ -34,35 +34,43 @@ pub struct StressLifeSetup {
     pub stress_scale: f64,
 }
 
+/// The Miner sum of no cycles.
+pub const EMPTY_SUM: DamageSum =
+    DamageSum { damage: 0.0, cycles_counted: 0.0, extrapolated: false, flags: 0, max_equivalent_amplitude: 0.0 };
+
 /// Miner sum of `cycles` (MPa) on a stress-life curve.
 pub fn stress_life_damage(cycles: &[Cycle], setup: &StressLifeSetup) -> DamageSum {
-    let mut sum = DamageSum { damage: 0.0, cycles_counted: 0.0, extrapolated: false, flags: 0, max_equivalent_amplitude: 0.0 };
-    for cycle in cycles {
-        sum.cycles_counted += cycle.count;
-        let sa = (cycle.range / 2.0) * setup.stress_scale;
-        let sm = cycle.mean * setup.stress_scale;
-        let Some(equivalent) = equivalent_amplitude(sa, sm, &setup.mean) else {
-            sum.flags |= FLAG_NO_LIFE;
-            continue;
-        };
-        if setup.ftu.is_some_and(|ftu| sm + sa >= ftu) || !equivalent.is_finite() {
-            sum.flags |= FLAG_STATIC_FAILURE;
-            continue;
-        }
-        if equivalent == 0.0 && (setup.mean.model == MeanModel::Swt || setup.mean.model == MeanModel::Walker) {
-            sum.flags |= FLAG_SWT_NONPOSITIVE;
-        }
-        sum.max_equivalent_amplitude = js_max(sum.max_equivalent_amplitude, equivalent);
-        let Some(life) = stress_life(&setup.curve, equivalent / setup.modifier_product) else {
-            sum.flags |= FLAG_NO_LIFE;
-            continue;
-        };
-        sum.extrapolated = sum.extrapolated || life.extrapolated;
-        if life.cycles.is_finite() {
-            sum.damage += cycle.count / life.cycles;
-        }
-    }
+    let mut sum = EMPTY_SUM;
+    cycles.iter().for_each(|cycle| add_stress_life_cycle(&mut sum, cycle, setup));
     sum
+}
+
+/// Adds one cycle to a stress-life Miner sum (cycles added in counting order give `stress_life_damage` bit for bit).
+#[inline]
+pub fn add_stress_life_cycle(sum: &mut DamageSum, cycle: &Cycle, setup: &StressLifeSetup) {
+    sum.cycles_counted += cycle.count;
+    let sa = (cycle.range / 2.0) * setup.stress_scale;
+    let sm = cycle.mean * setup.stress_scale;
+    let Some(equivalent) = equivalent_amplitude(sa, sm, &setup.mean) else {
+        sum.flags |= FLAG_NO_LIFE;
+        return;
+    };
+    if setup.ftu.is_some_and(|ftu| sm + sa >= ftu) || !equivalent.is_finite() {
+        sum.flags |= FLAG_STATIC_FAILURE;
+        return;
+    }
+    if equivalent == 0.0 && (setup.mean.model == MeanModel::Swt || setup.mean.model == MeanModel::Walker) {
+        sum.flags |= FLAG_SWT_NONPOSITIVE;
+    }
+    sum.max_equivalent_amplitude = js_max(sum.max_equivalent_amplitude, equivalent);
+    let Some(life) = stress_life(&setup.curve, equivalent / setup.modifier_product) else {
+        sum.flags |= FLAG_NO_LIFE;
+        return;
+    };
+    sum.extrapolated = sum.extrapolated || life.extrapolated;
+    if life.cycles.is_finite() {
+        sum.damage += cycle.count / life.cycles;
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -108,18 +116,21 @@ fn strain_life_at(curve: &StrainLifeCurve, response: &LocalResponse, mean: Strai
 
 /// Miner sum of nominal-stress `cycles` (MPa) on a strain-life curve.
 pub fn strain_life_damage(cycles: &[Cycle], setup: &StrainLifeSetup) -> DamageSum {
-    let mut sum = DamageSum { damage: 0.0, cycles_counted: 0.0, extrapolated: false, flags: 0, max_equivalent_amplitude: 0.0 };
-    for cycle in cycles {
-        sum.cycles_counted += cycle.count;
-        let response = local_response(&setup.cyclic, cycle.range / 2.0, cycle.mean, setup.kf);
-        sum.max_equivalent_amplitude = js_max(sum.max_equivalent_amplitude, response.sigma_a);
-        match strain_life_at(&setup.curve, &response, setup.mean) {
-            None => sum.flags |= FLAG_NO_LIFE,
-            Some(reversals) if !reversals.is_finite() => sum.flags |= FLAG_SWT_NONPOSITIVE,
-            Some(reversals) => sum.damage += cycle.count / (reversals / 2.0),
-        }
-    }
+    let mut sum = EMPTY_SUM;
+    cycles.iter().for_each(|cycle| add_strain_life_cycle(&mut sum, cycle, setup));
     sum
+}
+
+/// Adds one cycle to a strain-life Miner sum (counting order gives `strain_life_damage` bit for bit).
+pub fn add_strain_life_cycle(sum: &mut DamageSum, cycle: &Cycle, setup: &StrainLifeSetup) {
+    sum.cycles_counted += cycle.count;
+    let response = local_response(&setup.cyclic, cycle.range / 2.0, cycle.mean, setup.kf);
+    sum.max_equivalent_amplitude = js_max(sum.max_equivalent_amplitude, response.sigma_a);
+    match strain_life_at(&setup.curve, &response, setup.mean) {
+        None => sum.flags |= FLAG_NO_LIFE,
+        Some(reversals) if !reversals.is_finite() => sum.flags |= FLAG_SWT_NONPOSITIVE,
+        Some(reversals) => sum.damage += cycle.count / (reversals / 2.0),
+    }
 }
 
 #[cfg(test)]

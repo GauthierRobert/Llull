@@ -416,7 +416,7 @@ without a field an FE case is refused with `FAT_RESULTS_MISSING`, as before).
 
 | Item | Where |
 | ---- | ----- |
-| FE stress histories: superposition σ(t) = Σ s_k(t) σ_k (load-factor histories, `mapping[].loadCase`), signed von Mises / max principal / component, principal stresses by cyclic Jacobi (square roots only, so bit-reproducible) | `packages/domain-cae/src/fatigue/feStress.ts` |
+| FE stress histories: superposition σ(t) = Σ s_k(t) σ_k (load-factor histories, `mapping[].loadCase`), signed von Mises (sign from invariants) / max principal (Newton on the deviatoric cubic, cyclic Jacobi near a double root) / component; + − × ÷ and √ only, so bit-reproducible | `packages/domain-cae/src/fatigue/feStress.ts` |
 | Job builder (trusted 05 results, STRESS per load case in MPa, resolved curve / mean inputs), the TS reference of the field, the `FatigueField` artifact and its reader | `fatigue/feField.ts` |
 | Hot spots: the `locations.count` nodes of largest damage (static failures first, ties by mesh node order); every row recomputed by the TS code and checked against the native damage (`FAT_NATIVE_MISMATCH`, 1e-12 rel) | `fatigue/feHotspots.ts`, `compute_fatigue` / `check_fatigue` |
 | `llull-compute post fatigue` (rayon over nodes, results at fixed node indices) | `solver/crates/llull-post` (`rainflow.rs`, `life.rs`, `damage.rs`, `stress.rs`, `fatigue.rs`) |
@@ -440,6 +440,41 @@ real binary in `server/tests/nativeTransports.test.ts` (`verify: identical`); re
 vs 326 s TS. The §8 target (≤ 10 s) is not met on this machine: the per-step principal-stress Jacobi is ≈ 85 % of the native time (rainflow 5 %,
 damage 9 %). Job input build in TS: 8.9 s for 51k nodes (artifact trust re-hash).
 
+**Performance pass (2026-10-19).** The per-step Jacobi is gone from both the TS reference and the crate (same operations in both, so VC-FAT-43
+stays bit-identical):
+
+- signed von Mises: the magnitude is unchanged; its sign (|σ1| ≥ |σ3| ⇔ σ1 + σ3 = I1 − σ2 ≥ 0) comes from invariants, no eigenvalues: the sign
+  of I1 when |2 I1| > σvM (|σ2 − I1/3| ≤ σvM/3), else the sign of −(I1 I2 − I3) = −(σ1+σ2)(σ2+σ3)(σ3+σ1) (I1 then lies in [σ3, σ1]);
+- max principal: Newton on the deviatoric cubic t³ − J2 t − J3 from its upper bound 2√(J2/3) (convex there, so monotone; + − × ÷ and √ only,
+  no transcendental function, so no new `llull-jsmath` twin is needed); when q′(s1) < 1e-2 J2 (σ1 ≈ σ2, where the cubic is ill-conditioned)
+  the old cyclic Jacobi gives the value. A trigonometric (Cardano) closed form was rejected: `acos` near ±1 loses half the digits at the same
+  double roots, and V8's `Math.cos` / `Math.acos` would need bit-exact native twins;
+- crate: one monomorphised step loop per measure and load-case count (1–4; straight-line, branch-free sign so it vectorises — IEEE ops lane by
+  lane give the same bits), three-point rainflow streamed from the series into the Miner sum (no reversal / cycle buffers, same cycle order),
+  per-thread scratch buffers, no per-step allocation.
+
+Numeric change of the TS reference against the Jacobi version: signed von Mises is bit-identical on every fixture and on all 51 612 nodes of
+the benchmark (5.2e8 steps, `field.f64` byte-identical); max principal moves by ≤ 1.6e-15 of the tensor norm over 413 tensors (textbook,
+rotated equal / nearly equal / opposite spectra, random over 8 decades: `tests/unit/cae/fatigue/feField.test.ts`), which moves the damage of
+the `strain_swt_max_principal` fixture by ≤ 9.7e-15 relative (45 of 96 values; all other fixtures unchanged). New crate fixture
+`stress.json` (max principal and signed von Mises of those tensors) checks the port bit for bit.
+
+Benchmark (`tests/unit/native/fatigueBenchmark.bench.ts`, own config, not in the default run): the same 51 612-node case. This 4-vCPU container
+was shared with other jobs (load average 13–19) during the pass, so 4 rayon threads ran on ≈ 1 effective core; CPU time is the comparable figure:
+
+| | before (Jacobi) | after |
+| --- | --- | --- |
+| `llull-compute post fatigue`, 51 612 nodes, CPU time | 270 s (211 s wall) | 46 s (47 s wall); bench run: 50.2 s wall with 4 threads, 58.5 s with 1 |
+| per node, 1 thread (min of 3, 5 000 nodes) | 5.2 ms (series 4.6, rainflow 0.18, damage 0.45) | 0.75 ms |
+| TS reference per node | 64 ms | 12 ms |
+
+Per-node work after the pass (callgrind, instructions): V8-exact `pow` of the Basquin life 33 % (one per cycle, ≈ 3 300 cycles per node; it must
+stay the fdlibm transliteration to match V8), stress series 19 %, rainflow + mean-stress + Miner bookkeeping 35 %. At 0.75 CPU-ms per node the
+all-node case is 39 CPU-s, i.e. ≈ 9.7 s on 4 uncontended cores: at the §8 target (≤ 10 s) but not demonstrated on this shared box; the next
+lever would be the per-cycle `pow` (no GPU: RS1 §2 rule 3 keeps recorded numbers on the deterministic CPU path).
+
 **Deviations / open:** hot spots are not spaced (§5.6 "one per part, ≥ 2 element lengths apart") and 05 singular zones are not excluded
-(05 has no singular-zone data); no proportionality check (`FAT_NONPROPORTIONAL`); only `load_factor` series drive FE cases; the transport runs on
-local documents (`llull --doc`), not yet through `POST /exchange` (`--app` / `--server`).
+(05 has no singular-zone data); no proportionality check (`FAT_NONPROPORTIONAL`); only `load_factor` series drive FE cases. Since 2026-10-19
+the native transports (`fatigue_field`, `fea_map_field`, `fea_render`) also run through `POST /exchange` (one hook in `runExchangeTool`,
+`server/src/exchangeResult.ts`), so `llull --app` / `--server` reach them; the job runs on the host of the live document against its
+`LLULL_FEA_CACHE` and answers the same data as a local run (`server/tests/nativeExchange.test.ts`).

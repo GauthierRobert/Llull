@@ -164,6 +164,108 @@ pub fn count_cycles(series: &[f64], method: CountingMethod, residue: ResidueRule
     full
 }
 
+/// The reversals of `reversals_of(series, 0.0)` one at a time, as soon as each is final (a later push can no longer replace it).
+struct ReversalStream {
+    previous: f64,
+    last: f64,
+    points: usize,
+}
+
+impl ReversalStream {
+    const fn new() -> ReversalStream {
+        ReversalStream { previous: 0.0, last: 0.0, points: 0 }
+    }
+
+    #[inline(always)]
+    fn feed(&mut self, x: f64, mut on_final: impl FnMut(f64)) {
+        if self.points == 0 {
+            self.last = x;
+            self.points = 1;
+            on_final(x);
+        } else if x == self.last {
+        } else if self.points >= 2 && (self.last - self.previous) * (x - self.last) > 0.0 {
+            self.last = x;
+        } else {
+            if self.points >= 2 {
+                on_final(self.last);
+            }
+            self.previous = self.last;
+            self.last = x;
+            self.points += 1;
+        }
+    }
+
+    fn finish(&self, mut on_final: impl FnMut(f64)) {
+        if self.points >= 2 {
+            on_final(self.last);
+        }
+    }
+}
+
+/// The stack of `rainflow_three_point`, cycles handed to `sink` in the same order.
+struct ThreePointStack {
+    stack: Vec<f64>,
+}
+
+impl ThreePointStack {
+    #[inline(always)]
+    fn push(&mut self, point: f64, sink: &mut impl FnMut(Cycle)) {
+        let stack = &mut self.stack;
+        stack.push(point);
+        while stack.len() >= 3 {
+            let len = stack.len();
+            let (first, middle, last) = (stack[len - 3], stack[len - 2], stack[len - 1]);
+            if (last - middle).abs() < (middle - first).abs() {
+                break;
+            }
+            if len == 3 {
+                sink(cycle_of(first, middle, 0.5));
+                stack.remove(0);
+            } else {
+                sink(cycle_of(first, middle, 1.0));
+                stack.drain(len - 3..len - 1);
+            }
+        }
+    }
+
+    fn finish(&self, sink: &mut impl FnMut(Cycle)) {
+        for pair in self.stack.windows(2) {
+            sink(cycle_of(pair[0], pair[1], 0.5));
+        }
+    }
+}
+
+/// `count_cycles(...)` handed to `sink` one cycle at a time, in the same order (the three-point rule with half-cycle residue streams
+/// straight from the series, no reversal or cycle buffers; the other rules run `count_cycles`). `stack` is reused scratch space.
+pub fn for_each_cycle(
+    series: &[f64],
+    method: CountingMethod,
+    residue: ResidueRule,
+    gate: f64,
+    stack: &mut Vec<f64>,
+    mut sink: impl FnMut(Cycle),
+) {
+    if method != CountingMethod::ThreePoint || residue != ResidueRule::HalfCycles {
+        count_cycles(series, method, residue, gate).into_iter().for_each(sink);
+        return;
+    }
+    stack.clear();
+    let mut counter = ThreePointStack { stack: std::mem::take(stack) };
+    if gate <= 0.0 {
+        let mut reversals = ReversalStream::new();
+        for &x in series {
+            reversals.feed(x, |point| counter.push(point, &mut sink));
+        }
+        reversals.finish(|point| counter.push(point, &mut sink));
+    } else {
+        for point in reversals_of(series, gate) {
+            counter.push(point, &mut sink);
+        }
+    }
+    counter.finish(&mut sink);
+    *stack = counter.stack;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,5 +309,29 @@ mod tests {
         assert_eq!(reversals_of(&[0.0, 1.0, 1.0, 2.0, 0.0], 0.0), [0.0, 2.0, 0.0]);
         assert_eq!(reversals_of(&[0.0, 0.1, 0.0, 5.0], 1.0), [0.0, 5.0]);
         assert_eq!(reversals_of(&[0.0, 0.1, 0.0], 1.0), [0.0]);
+    }
+
+    #[test]
+    fn streamed_cycles_equal_count_cycles_for_every_rule() {
+        let mut state = 7u64;
+        let mut noisy: Vec<f64> = (0..400)
+            .map(|_| {
+                state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+                ((state >> 33) % 41) as f64 - 20.0
+            })
+            .collect();
+        noisy.extend([3.0, 3.0, 3.0, -2.0]);
+        let mut stack = Vec::new();
+        for series in [&E1049[..], &[][..], &[4.0][..], &[1.0, 1.0][..], &noisy[..]] {
+            for method in [CountingMethod::ThreePoint, CountingMethod::FourPoint, CountingMethod::Repeating] {
+                for residue in [ResidueRule::HalfCycles, ResidueRule::Repeat] {
+                    for gate in [0.0, 6.5] {
+                        let mut streamed = Vec::new();
+                        for_each_cycle(series, method, residue, gate, &mut stack, |cycle| streamed.push(cycle));
+                        assert_eq!(streamed, count_cycles(series, method, residue, gate), "{method:?} {residue:?} gate {gate}");
+                    }
+                }
+            }
+        }
     }
 }

@@ -10,8 +10,9 @@ import {
   readFatigueField,
   type FatigueFieldInput,
 } from '@cae/fatigue/feField';
-import { measureOf, nodeSeries, principalExtremes } from '@cae/fatigue/feStress';
+import { maxPrincipal, measureOf, nodeSeries, principalExtremes, signedVonMises } from '@cae/fatigue/feStress';
 import { feFatigue, type FeFatigue } from './feFixtures';
+import { stressTensors } from './stressTensors';
 
 type Json = Record<string, unknown>;
 const data = (result: { data?: unknown }): Json => (result.data ?? {}) as Json;
@@ -43,6 +44,13 @@ describe('FE stress measures (feStress)', () => {
     expect(h3).toBeGreaterThan(30);
     expect(l3).toBeLessThan(10);
     expect(h3 + l3).toBeLessThan(trace);
+    expect(maxPrincipal([0, 0, 0, 50, 0, 0])).toBeCloseTo(50, 12);
+    expect(maxPrincipal([-100, 0, 0, 0, 0, 0])).toBe(0);
+    expect(maxPrincipal([0, 0, 0, 0, 0, 0])).toBe(0);
+    expect(signedVonMises([0, 0, 0, 50, 0, 0])).toBeGreaterThan(0);
+    expect(signedVonMises([-70, -70, -70, 0, 0, 0])).toBe(0);
+    expect(signedVonMises([-100, -100, 0, 0, 0, 0])).toBe(-100);
+    expect(signedVonMises([30, -100, 0, 0, 0, 0])).toBeLessThan(0);
     expect(measureOf([-100, 0, 0, 0, 0, 0], { kind: 'signed_von_mises' })).toBe(-100);
     expect(measureOf([100, 0, 0, 0, 0, 0], { kind: 'max_principal' })).toBe(100);
     expect(measureOf([1, 2, 3, 4, 5, 6], { kind: 'component', index: 5 })).toBe(6);
@@ -60,6 +68,17 @@ describe('FE stress measures (feStress)', () => {
         { kind: 'component', index: 1 },
       ),
     ).toEqual([0, 20]);
+  });
+
+  it('max principal and the signed von Mises sign agree with cyclic Jacobi to round-off (degenerate spectra included)', () => {
+    let worst = 0;
+    for (const tensor of stressTensors()) {
+      const norm = Math.hypot(...tensor);
+      const [high, low] = principalExtremes(tensor);
+      worst = Math.max(worst, Math.abs(maxPrincipal(tensor) - high) / Math.max(norm, Number.MIN_VALUE));
+      if (Math.abs(high + low) > 1e-9 * norm) expect(signedVonMises(tensor) < 0, String(tensor)).toBe(Math.abs(high) < Math.abs(low));
+    }
+    expect(worst).toBeLessThan(1e-13);
   });
 });
 
