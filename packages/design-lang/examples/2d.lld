@@ -1,0 +1,27 @@
+# Flange gasket drawing: filleted outline, bolt-hole pattern, centre slot, dimensions and a label in the XY work plane
+design gasket units=mm
+param w = 160
+param h = 100
+param r = 12
+param e = 20        # bolt-hole inset from the edges
+param bolt = 9
+
+draw_polyline outline points=[[0, 0], [w, 0], [w, h], [0, h]] closed=true color="#333333"
+for i in 0..3 {
+  fillet_2d _ id=outline radius=r vertexIndex=2*i
+}
+for i in 0..1 {
+  for j in 0..1 {
+    draw_arc hole{i}{j} center=[e+i*(w-2*e), e+j*(h-2*e)] radius=bolt/2
+  }
+}
+draw_ellipse slot center=[w/2, h/2] radiusX=30 radiusY=15
+offset_2d seal id=outline distance=5
+add_dimension _ dimensionKind=diameter entityIds=[hole00] precision=1
+add_dimension _ dimensionKind=radial entityIds=[slot]
+add_text label content="GASKET 160x100 t=2" position=[w/2, h+10, 0] height=6 anchor=center
+
+check size of=outline expect == [w, h, 0]
+check find_entities kind=circle path=count expect == 4
+check find_entities kind=arc path=count expect == 4
+check size of=seal expect == [w-10, h-10, 0]

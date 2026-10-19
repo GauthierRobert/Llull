@@ -70,14 +70,16 @@ function pipInstall() {
   execFileSync(
     interpreter(),
     // Wheels only: sdists make pip backtrack for many minutes and need a compiler toolchain.
-    ['-m', 'pip', 'install', '--no-cache-dir', '--disable-pip-version-check', '--only-binary', ':all:', '-r', requirements],
+    // -s: ignore the builder's user site, or pip counts packages found there as installed and leaves them out of the bundle.
+    ['-s', '-m', 'pip', 'install', '--no-cache-dir', '--disable-pip-version-check', '--only-binary', ':all:', '-r', requirements],
     { stdio: 'inherit' },
   );
 }
 
 function probeBridge() {
   const bridge = path.join(repo, 'server', 'python', 'llull_bridge.py');
-  const output = execFileSync(interpreter(), [bridge], { input: '{"op":"probe"}' }).toString();
+  // -s: probe the bundle as the backend runs it (no user site), so a dependency missing from the bundle fails the build.
+  const output = execFileSync(interpreter(), ['-s', bridge], { input: '{"op":"probe"}' }).toString();
   const probe = JSON.parse(output);
   if (probe.ok !== true || probe.cadquery === null) throw new Error(`bundled Python has no working CadQuery: ${output}`);
   console.warn(`[prepare-python] Python ${probe.python}, CadQuery ${probe.cadquery} ready in ${pythonRoot}`);

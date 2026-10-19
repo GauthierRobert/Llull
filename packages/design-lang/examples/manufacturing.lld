@@ -1,0 +1,29 @@
+# Motor mount: a machined block (counterbored bolt pattern, tapped holes, pocket) and a formed sheet-metal bracket with its flat pattern
+design motor_mount units=mm
+param w = 100mm
+param d = 60mm
+param h = 25mm
+param bolt = 6.6mm
+param t = 2mm
+
+# machined block
+add_box block size=[w, d, h] position=[0, 0, h/2]
+add_pocket pocketed target=block face=block.top outline.kind=rectangle outline.center=[0, 0] outline.size=[40, 30] pointsFrame=world_xy depth=8 cornerRadius=5 floorFillet=0 toolDiameter=8
+add_hole bored target=pocketed face.near=[w/2-5, 0, h] pointsFrame=world_xy points=[[-w/2+12, -d/2+12], [w/2-12, -d/2+12], [-w/2+12, d/2-12], [w/2-12, d/2-12]] hole.kind=counterbore hole.diameter=bolt hole.cboreDiameter=11 hole.cboreDepth=6.5 extent.kind=through_all
+add_hole tapped target=bored face=block.front pointsFrame=world points=[[-20, -d/2, h/2], [20, -d/2, h/2]] hole.kind=simple hole.diameter=5 hole.thread.designation="M6x1-6H" hole.thread.family=M hole.thread.depth=12 extent.kind=blind extent.depth=15
+
+# sheet-metal bracket: an 80 x 50 blank (draw_rectangle position = min corner) with one 90-degree flange
+draw_rectangle blank width=80 height=50 position=[0, 120]
+import_bend_radius_table _ rows=[{"material":"al5052","temper":"H32","thickness":2,"minInsideRadius":2,"units":"mm","bendAngle":90,"source":"company bend table BT-3 rev B"}]
+create_sheet_metal_rule _ name=al5052_2mm material=al5052 temper=H32 thickness=t insideRadius=2*t kFactor=0.42 relief.type=rectangular relief.widthRatio=1 thresholds=[{"kind":"holeToBend","value":4,"source":"company rule SM-7"}, {"kind":"holeToEdge","value":4,"source":"company rule SM-7"}, {"kind":"minFlange","value":8,"source":"company rule SM-7"}]
+add_sheet_metal_base bracket profileId=blank rule=al5052_2mm side=up
+add_flange _ id=bracket edge=bracket.right angle=90 length=30 lengthReference=outside_mold_line position=material_inside
+add_sheet_cutout _ id=bracket face.near=[30, 145, t] circle.center=[30, 145, t] circle.radius=bolt/2
+
+check hole_table id=tapped path=rows.length expect == 6
+check check_machining id=tapped rules=[{"rule":"maxDepthRatio","value":6,"source":"company rule MR-12"}, {"rule":"toolDiameter","value":8,"source":"shop cutter list"}] path=status expect == "pass"
+check sheet_metal_calc units=mm thickness=t insideRadius=2*t angle=90 kFactor=0.42 path=ba expect ~= pi/2*(2*t+0.42*t)
+# every sheet-metal rule runs; the one finding left is FTR_UNVERIFIED_DATA (only a human reviewer may mark the sourced values verified)
+check check_sheet_metal id=bracket path=rulesApplied.length expect == 5
+check check_sheet_metal id=bracket path=findings.length expect == 1
+check flat_pattern id=bracket path=bends.length expect == 1

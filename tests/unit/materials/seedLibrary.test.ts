@@ -2,6 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parseMaterialLibrary } from '@core/commands/materials/libraryFormat';
 import { BASES } from '@core/model/propertyModel';
@@ -107,7 +108,7 @@ describe('seed library (VC-MAT-18)', () => {
 
   it('marks a value read from MIL-HDBK-5J as superseded and refuses an unverified or unmapped value (generator)', () => {
     const script = `
-      const { buildSeed } = await import(${JSON.stringify(resolve(root, 'scripts/build-seed-library.mjs'))});
+      const { buildSeed } = await import(${JSON.stringify(pathToFileURL(resolve(root, 'scripts/build-seed-library.mjs')).href)});
       const entry = (status, source) => ({ value: 65, unit: 'ksi', basis: 'A', status, source });
       const make = (mechanical) => ({ materials: [{ id: 'm', designation: 'x', specs: [], physical: {}, mechanical }], fastenerMaterialAllowables: [] });
       const mil = buildSeed(make({ Ftu_L: entry('verified', 'S38') })).library.materials[0];

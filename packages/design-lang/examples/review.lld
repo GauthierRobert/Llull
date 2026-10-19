@@ -1,0 +1,19 @@
+# Fixture plate review: four dowel pins pressed into a grounded base plate, declared as intended press fits so the assembly gate passes
+design dowel_fixture units=mm
+param pitch = 60mm
+param d = 8mm
+param t = 15mm
+
+add_box base size=[2*pitch+40, 2*pitch+40, t] position=[0, 0, t/2]
+set_part_grounded _ ids=[base] grounded=true
+
+# each pin sinks 10 mm into the plate: a press fit, not a clash
+for i in 0..3 {
+  add_cylinder pin{i} radius=d/2 height=30 position=[(mod(i, 2)-0.5)*2*pitch, (floor(i/2)-0.5)*2*pitch, t-10+15]
+  allow_interference fit{i} a=pin{i} b=base kind=press_fit reason="H7/p6 dowel"
+}
+
+check hard_interferences expect == 0
+check check_assembly path=status expect == "pass"
+check bbox of=base expect == [2*pitch+40, 2*pitch+40, t]
+check max of=pin3 expect == [pitch+d/2, pitch+d/2, t+20]

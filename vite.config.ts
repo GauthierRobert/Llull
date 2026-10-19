@@ -90,6 +90,7 @@ export default defineConfig(({ command }) => ({
         'packages/domain-aec/src/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
         'packages/domain-cae/src/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
         'packages/domain-aero/src/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
+        'packages/design-lang/src/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
       },
     },
   },

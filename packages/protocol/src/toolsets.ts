@@ -25,6 +25,7 @@ export const TOOLSET_NAMES = [
   'building',
   'piping',
   'civil',
+  'design',
 ] as const;
 
 export type ToolsetName = (typeof TOOLSET_NAMES)[number];
@@ -102,6 +103,10 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   /** Contributed by the installed civil (site / terrain / roads / drainage) plugin. */
   get civil(): readonly string[] {
     return pluginToolNames('civil');
+  },
+  /** Contributed by the installed design-language plugin (`.lld`). */
+  get design(): readonly string[] {
+    return pluginToolNames('design');
   },
 };
 

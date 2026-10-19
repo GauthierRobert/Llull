@@ -1,0 +1,20 @@
+# L-bracket sketch closed by the constraint solver: a loose upright and pin snapped onto a parameter-sized base
+design l_sketch units=mm
+param L = 80
+param H = 50
+param pin_r = 4
+
+draw_polyline base points=[[0, 0], [L, 0]]
+draw_polyline upright points=[[L+2, 1], [L+2, 1+H]]
+draw_arc pin center=[L-3, H+2] radius=pin_r
+add_constraint corner constraint.kind=coincident constraint.a.entityId=base constraint.a.kind=end constraint.b.entityId=upright constraint.b.kind=start
+add_constraint square constraint.kind=perpendicular constraint.a.entityId=base constraint.b.entityId=upright
+add_constraint seat constraint.kind=coincident constraint.a.entityId=upright constraint.a.kind=end constraint.b.entityId=pin constraint.b.kind=center
+solve_constraints _
+# configurations and recipes are document inputs, not design lines: after apply_design run
+#   llull create_configuration name=compact parameterValues='{"L": "60", "H": "40"}'   (and llull save_recipe …)
+
+check measure_angle lineId1=base lineId2=upright path=degrees expect ~= 90 ± 0.01
+check measure_distance entityId1=base entityId2=upright path=distance expect ~= hypot(L/2,H/2) ± 0.01mm
+check measure_distance entityId1=base entityId2=pin path=distance expect ~= hypot(L/2,H) ± 0.01mm
+check measure_perimeter entityId=base path=perimeter expect == L

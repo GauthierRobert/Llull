@@ -1,0 +1,23 @@
+# Terrace take-off: a deck outline, a round planter and a column row, verified with the measure toolset
+design terrace units=mm
+param depth = 4000
+param width = 6000
+param bay = 2000
+param col = 150
+
+draw_polyline deck points=[[0, 0], [width, 0], [width, depth], [0, depth]] closed=true
+draw_arc planter center=[width-800, depth-800] radius=500
+draw_polyline stair points=[[0, 0], [-1200, 900]]
+for i in 0..3 {
+  add_cylinder col{i} radius=col/2 height=2600 anchor=base-center position=[i*bay, depth, 0]
+}
+add_box slab size=[width, depth, 200] anchor=min position=[0, 0, -200]
+
+check measure_area entityId=deck path=area expect == width*depth
+check measure_perimeter entityId=deck path=perimeter expect == 2*(width+depth)
+check measure_area entityId=planter path=area expect ~= pi*500*500 ± 0.5%
+check measure_perimeter entityId=stair path=perimeter expect == 1500
+check measure_distance entityId1=col0 entityId2=col3 path=distance expect == 3*bay
+check measure_angle points=[[0, 0, 0], [1, 0, 0], [-1200, 900, 0]] path=degrees expect ~= 143.13 ± 0.01
+check measure_bounding_box path=size expect == [width+1200+col/2, depth+col/2, 2800]
+check volume of=slab expect == width*depth*200

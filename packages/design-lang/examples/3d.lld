@@ -1,0 +1,35 @@
+# Pillow-block bracket: a plate with a bored boss on top, two gussets and four counter-drilled mounting holes
+design pillow_block units=mm
+param L = 120
+param W = 60
+param t = 12
+param boss_r = 22
+param boss_h = 40
+param bore_r = 12
+param hole_r = 4.5
+
+add_box base size=[L, W, t] anchor=base-center
+add_cylinder boss radius=boss_r height=boss_h on=base.top
+add_wedge rib_l size=[t, L/2-boss_r+4, 30] on=base.top align=left rotation=[0, 0, 90deg]
+add_wedge rib_r size=[t, L/2-boss_r+4, 30] on=base.top align=right rotation=[0, 0, -90deg]
+boolean b0 op=union a=base b=boss
+boolean b1 op=union a=b0 b=rib_l
+boolean body op=union a=b1 b=rib_r
+add_cylinder bore radius=bore_r height=t+boss_h+2 position=[0, 0, -1] anchor=base-center
+boolean part op=subtract a=body b=bore
+for i in 0..3 {
+  add_cylinder hole{i} radius=hole_r height=t+2 anchor=base-center position=[(mod(i,2)*2-1)*(L/2-12), (floor(i/2)*2-1)*(W/2-12), -1]
+}
+boolean p0 op=subtract a=part b=hole0
+boolean p1 op=subtract a=p0 b=hole1
+boolean p2 op=subtract a=p1 b=hole2
+boolean block op=subtract a=p2 b=hole3
+create_material _ name=steel density=0.00785
+assign_material _ materialName=steel entityIds=[block]
+
+check bbox of=block expect == [L, W, t+boss_h]
+check max of=block expect == [L/2, W/2, t+boss_h]
+check volume of=block expect ~= 132000 ± 3%
+check issues expect == 0
+check mass_properties entityId=block path=centroid expect ~= [0, 0, 15.7] ± 0.5mm
+check mass of=block expect ~= 1.04kg ± 3%

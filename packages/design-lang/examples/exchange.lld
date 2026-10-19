@@ -1,0 +1,16 @@
+# Laser-cut plate round trip: import DXF outline + hole layers, extrude and cut, add a scanned mesh tag, verify the STL / OBJ / code exports
+design dxf_plate units=mm
+param t = 6
+
+import_dxf outline text="0\nSECTION\n2\nENTITIES\n0\nLWPOLYLINE\n8\nPLATE\n90\n4\n70\n1\n10\n0\n20\n0\n10\n100\n20\n0\n10\n100\n20\n60\n10\n0\n20\n60\n0\nENDSEC\n0\nEOF\n" sourceUnit=mm layers=[PLATE]
+import_dxf hole text="0\nSECTION\n2\nENTITIES\n0\nCIRCLE\n8\nHOLES\n10\n50\n20\n30\n40\n10\n0\nENDSEC\n0\nEOF\n" sourceUnit=mm layers=[HOLES]
+extrude_profile blank id=outline depth=t
+extrude_profile plug id=hole depth=t+2 position=[0, 0, -1]
+boolean plate op=subtract a=blank b=plug
+import_mesh tag bodies=[{"name": "tag", "color": "#2a9d8f", "positions": [0,0,0, 10,0,0, 0,10,0, 0,0,10], "indices": [0,2,1, 0,1,3, 1,2,3, 0,3,2]}]
+
+check bbox of=plate expect == [100, 60, t]
+check volume of=plate expect ~= 100*60*t - pi*10*10*t ± 0.5%
+check export_obj entityIds=[tag] path=triangleCount expect == 4
+check export_stl format=ascii entityIds=[plate, tag] path=triangleCount expect > 100
+check export_code language=openscad path=language expect == "openscad"

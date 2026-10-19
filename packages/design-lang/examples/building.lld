@@ -1,0 +1,22 @@
+# Single-storey workshop: concrete shell with a door and a row of windows, columns on a 5 m bay, floor slab and pad footings
+design workshop units=m
+param L = 15
+param W = 8
+param H = 3.5
+param bay = 5
+add_level ground name="Ground floor" elevation=0 height=H
+draw_walls shell points=[[0,0],[L,0],[L,W],[0,W]] closed=true thickness=0.3 height=H levelId=ground
+add_slab floor boundary=[[0,0],[L,0],[L,W],[0,W]] thickness=0.2 role=floor levelId=ground
+add_door entrance wallId=shell[0] offset=2 width=1.2 height=2.2      # shell[0] = first wall of the chain (south)
+for j in 0..2 {
+  add_window win{j} wallId=shell[2] offset=1.75+j*bay width=1.5 height=1.2 sillHeight=0.9
+}
+for i in 0..L/bay {
+  add_column col{i} location=[i*bay,W/2] width=0.3 height=H levelId=ground
+}
+add_footing pads underColumns=true width=1.2 length=1.2 thickness=0.5 levelId=ground
+check bbox of=floor expect ~= [L,W,0.2]
+check building_schedule kind=column path=rows.length expect == L/bay+1
+check building_schedule kind=window path=rows.length expect == 3
+check quantity_takeoff path=lines.0.quantity expect ~= 2*(L+W)        # wall centreline length
+check describe_building path=levels.0.elevation expect == 0

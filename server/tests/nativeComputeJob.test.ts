@@ -23,6 +23,9 @@ beforeAll(() => {
 });
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
+/** The fake tools are `#!/bin/sh` scripts made executable with chmod: Windows cannot spawn them (POSIX-only cases). */
+const posixOnly = process.platform === 'win32';
+
 describe('createComputeRunner', () => {
   it('reports NATIVE_TOOL_MISSING with the install hint when the binary is absent or cannot start', async () => {
     const absent = createComputeRunner({}, null);
@@ -34,7 +37,7 @@ describe('createComputeRunner', () => {
     expect(broken).toMatchObject({ ok: false, code: 'NATIVE_TOOL_MISSING' });
   });
 
-  it('parses progress, warning and done events and checks output hashes', async () => {
+  it.skipIf(posixOnly)('parses progress, warning and done events and checks output hashes', async () => {
     const binary = fake(
       'ok',
       [
@@ -57,7 +60,7 @@ describe('createComputeRunner', () => {
     });
   });
 
-  it('maps error events, missing final events, garbage and timeouts to codes', async () => {
+  it.skipIf(posixOnly)('maps error events, missing final events, garbage and timeouts to codes', async () => {
     const error = createComputeRunner({}, fake('error', 'echo \'{"type":"error","code":"NATIVE_JOB_INPUT","message":"bad job"}\'; exit 2'));
     expect(await error.run([], dir, 5000)).toMatchObject({ ok: false, code: 'NATIVE_JOB_INPUT', message: 'bad job' });
     const silent = createComputeRunner({}, fake('silent', 'exit 3'));
@@ -78,7 +81,7 @@ describe('createComputeRunner', () => {
     expect(await slow.run([], dir, 200)).toMatchObject({ ok: false, code: 'NATIVE_TIMEOUT' });
   });
 
-  it('reads the version once and converts f64 buffers', async () => {
+  it.skipIf(posixOnly)('reads the version once and converts f64 buffers', async () => {
     const runner = createComputeRunner({}, fake('version', 'echo "llull-compute 1.2.3"'));
     expect(await runner.version()).toBe('1.2.3');
     expect(await runner.version()).toBe('1.2.3');

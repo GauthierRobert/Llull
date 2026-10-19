@@ -1,0 +1,29 @@
+# Cantilever arm: a static CalculiX case set up on the part (fixed root, tip force), checked before meshing, plus hand calcs
+design cantilever units=mm
+param len = 200mm
+param h = 20mm
+param b = 30mm
+param tip = 500
+
+add_box arm size=[len, b, h] position=[len/2, 0, h/2]
+create_material _ name=al7075 density=2.81 densityUnit=g/cm^3
+add_material_model _ material=al7075 id=elastic model={"kind":"elastic_isotropic","E":{"value":71.7,"unit":"GPa"},"nu":{"value":0.33,"unit":"1"}} validity=[{"variable":"T","unit":"degC","data":[-50,100]}] basis=typical source.citation="MMPDS-17"
+define_constitutive_set _ material=al7075 set.id=linear set.elastic=elastic makeDefault=true
+assign_material _ materialName=al7075 entityIds=[arm]
+set_part_grounded _ ids=[arm] grounded=true
+
+create_analysis case name="Tip load" analysisType=static
+set_part_idealization _ analysisId=case entityId=arm idealization=solid
+add_fea_constraint root analysisId=case name=root kind=fixed target.entityId=arm target.facesNear=[[0, 0, h/2]]
+add_fea_load load analysisId=case name=tip_force kind=force target.entityId=arm target.facesNear=[[len, 0, h/2]] vector=[0, 0, -tip]
+
+# damage tolerance: a 2 mm edge crack at the root (Tada beta = 1.196 at a/b = 0.1), under the root bending stress 6 F L / (b h^2)
+define_crack crack name=root_crack geometry={"kind":"edge_through","a":{"value":2,"unit":"mm"},"b":{"value":20,"unit":"mm"},"t":{"value":30,"unit":"mm"},"form":"tada"}
+
+# set-up is complete: the only finding before fea_mesh is the missing mesh (meshing and solving need Gmsh + CalculiX)
+check check_analysis analysisId=case path=items.length expect == 1
+check check_analysis analysisId=case path=items.0.code expect == "FEA_MESH_MISSING"
+check describe_analysis analysisId=case path=case.loadOrder.length expect == 1
+check fea_report analysisId=case path=state expect == "unmeshed"
+check stress_intensity crackId=crack stress.value=6*tip*len/(b*h*h) stress.unit=MPa path=KMPaSqrtM expect ~= 0.09478*6*tip*len/(b*h*h)
+check check_assembly path=status expect == "pass"

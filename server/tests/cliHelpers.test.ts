@@ -7,7 +7,7 @@ import path from 'node:path';
 import { booleanFlag, missingValueFlag, paramsSource, parseArgv, stringFlag } from '../src/cli/argv';
 import { describeCommand, listCatalog, searchCatalog, shortDescription, suggestNames, toolsetCounts } from '../src/cli/catalog';
 import { filesOfData, saveDataFiles, withoutPayloads, withSaveDefaults } from '../src/cli/saveFiles';
-import { imageDataUrl, resolveImageRefs } from '../src/cli/imageParams';
+import { imageDataUrl, resolveFileRefs } from '../src/cli/fileParams';
 import { listCommands } from '@core/commands/registry';
 import { exchangeToolDefinitions } from '../src/cli/exchange';
 import { paramsLines } from '../src/cli/describeSchema';
@@ -63,7 +63,7 @@ describe('paramsSource', () => {
   });
 });
 
-describe('imageParams', () => {
+describe('fileParams', () => {
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2]);
   const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
 
@@ -75,7 +75,7 @@ describe('imageParams', () => {
 
   it('replaces only top-level "@img:" strings of an object', () => {
     const read = (file: string): Buffer => (file === 'scan.jpg' ? jpeg : png);
-    const resolved = resolveImageRefs({ dataUrl: '@img:scan.jpg', name: 'scan', nested: { dataUrl: '@img:x.png' }, n: 2 }, read) as Record<
+    const resolved = resolveFileRefs({ dataUrl: '@img:scan.jpg', name: 'scan', nested: { dataUrl: '@img:x.png' }, n: 2 }, read) as Record<
       string,
       unknown
     >;
@@ -83,8 +83,14 @@ describe('imageParams', () => {
     expect(resolved['name']).toBe('scan');
     expect(resolved['nested']).toEqual({ dataUrl: '@img:x.png' });
     expect(resolved['n']).toBe(2);
-    expect(resolveImageRefs(['@img:a.png'], read)).toEqual(['@img:a.png']);
-    expect(resolveImageRefs(null, read)).toBeNull();
+    expect(resolveFileRefs(['@img:a.png'], read)).toEqual(['@img:a.png']);
+    expect(resolveFileRefs(null, read)).toBeNull();
+  });
+
+  it('replaces top-level "@text:" strings with the file text', () => {
+    const text = 'add_box b size=[1,1,1] # é\n';
+    const read = (file: string): Buffer => Buffer.from(file === 'part.lld' ? text : '', 'utf8');
+    expect(resolveFileRefs({ source: '@text:part.lld', set: { w: 1 } }, read)).toEqual({ source: text, set: { w: 1 } });
   });
 });
 

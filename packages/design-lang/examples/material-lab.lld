@@ -1,0 +1,19 @@
+# Steel tie rod: an elastic-perfectly-plastic S355 law, probed at a material point and exported as CalculiX cards
+design tie_rod units=mm
+param d = 16mm
+param len = 300mm
+
+add_cylinder rod radius=d/2 height=len axis=[1, 0, 0]
+create_material _ name=s355 density=7.85 densityUnit=g/cm^3
+assign_material _ materialName=s355 entityIds=[rod]
+
+# laws are JSON objects (union schemas take no dotted keys)
+add_material_model _ material=s355 id=elastic model={"kind":"elastic_isotropic","E":{"value":210,"unit":"GPa"},"nu":{"value":0.3,"unit":"1"}} validity=[{"variable":"T","unit":"degC","data":[-20,100]}] basis=typical source.citation="EN 1993-1-1" source.locator="3.2.6"
+add_material_model _ material=s355 id=plastic model={"kind":"j2_plasticity","isotropic":{"kind":"perfect","yieldStress":{"value":355,"unit":"MPa"}},"kinematic":{"kind":"none"}} validity=[{"variable":"equivalentPlasticStrain","unit":"1","data":[0,0.05]}] basis=typical source.citation="EN 1993-1-1" source.locator="Table 3.1"
+define_constitutive_set _ material=s355 set.id=epp set.elastic=elastic set.plastic=plastic makeDefault=true
+
+# elastic at 0.1 % strain (210 MPa), capped at the yield stress at 1 %
+check material_point_response material=s355 kinematics=small preset=uniaxial_stress steps=[{"control":{"xx":{"strain":0.001}},"increments":10}] path=rows.0.stress.0 expect ~= 210
+check material_point_response material=s355 kinematics=small preset=uniaxial_stress steps=[{"control":{"xx":{"strain":0.01}},"increments":50}] path=rows.0.stress.0 expect ~= 355
+check export_material_cards material=s355 target=calculix path=lines.0 expect == "*MATERIAL,NAME=S355_EPP"
+check fit_material_model kind=hyper_neo_hooke tests=[{"mode":"uniaxial","rows":[[1.1,0.27355],[1.2,0.50556],[1.5,1.05556],[2,1.75]],"xMeasure":"stretch","yMeasure":"nominal_stress","units":{"y":"MPa"}}] path=model.C10.value expect ~= 0.5

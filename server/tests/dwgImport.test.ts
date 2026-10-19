@@ -62,30 +62,41 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-describe('POST /import/dwg', () => {
-  it('converts and imports a drawing into the live document', async () => {
-    const { app, getLiveDoc } = await load({ LLULL_DWG2DXF: okScript });
-    const res = await request(app)
-      .post('/import/dwg?target=drawing&sourceUnit=m')
-      .set('Content-Type', 'application/octet-stream')
-      .send(DWG);
-    expect(res.status).toBe(200);
-    expect(res.body.isError).toBe(false);
-    expect(res.body.command).toBe('import_dxf');
-    expect(res.body.affected.length).toBeGreaterThan(0);
-    expect(Object.keys(getLiveDoc().entities).length).toBeGreaterThan(0);
-  }, 60_000);
+/** The fake converters are `#!/usr/bin/env node` scripts: Windows cannot spawn them (POSIX-only cases). */
+const posixOnly = process.platform === 'win32';
 
-  it('imports a survey point group from base64 JSON', async () => {
-    const { app, getLiveDoc } = await load({ LLULL_DWG2DXF: okScript });
-    const res = await request(app)
-      .post('/import/dwg')
-      .send({ base64: DWG.toString('base64'), target: 'survey', name: 'Topo', layers: ['TOPO'] });
-    expect(res.status).toBe(200);
-    expect(res.body.command).toBe('import_survey_dxf');
-    expect(res.body.isError).toBe(false);
-    expect(Object.keys(getLiveDoc().entities).length).toBeGreaterThan(0);
-  }, 60_000);
+describe('POST /import/dwg', () => {
+  it.skipIf(posixOnly)(
+    'converts and imports a drawing into the live document',
+    async () => {
+      const { app, getLiveDoc } = await load({ LLULL_DWG2DXF: okScript });
+      const res = await request(app)
+        .post('/import/dwg?target=drawing&sourceUnit=m')
+        .set('Content-Type', 'application/octet-stream')
+        .send(DWG);
+      expect(res.status).toBe(200);
+      expect(res.body.isError).toBe(false);
+      expect(res.body.command).toBe('import_dxf');
+      expect(res.body.affected.length).toBeGreaterThan(0);
+      expect(Object.keys(getLiveDoc().entities).length).toBeGreaterThan(0);
+    },
+    60_000,
+  );
+
+  it.skipIf(posixOnly)(
+    'imports a survey point group from base64 JSON',
+    async () => {
+      const { app, getLiveDoc } = await load({ LLULL_DWG2DXF: okScript });
+      const res = await request(app)
+        .post('/import/dwg')
+        .send({ base64: DWG.toString('base64'), target: 'survey', name: 'Topo', layers: ['TOPO'] });
+      expect(res.status).toBe(200);
+      expect(res.body.command).toBe('import_survey_dxf');
+      expect(res.body.isError).toBe(false);
+      expect(Object.keys(getLiveDoc().entities).length).toBeGreaterThan(0);
+    },
+    60_000,
+  );
 
   it('answers 503 with install instructions when no converter is available', async () => {
     const { app } = await load({ LLULL_DWG2DXF: 'off' });
@@ -118,12 +129,16 @@ describe('POST /import/dwg', () => {
     expect(empty.status).toBe(400);
   }, 60_000);
 
-  it('answers 504 when the converter exceeds the timeout, and cleans its temp dir', async () => {
-    const { app } = await load({ LLULL_DWG2DXF: slowScript, LLULL_DWG_TIMEOUT_MS: '300' });
-    const before = (await readdir(tmpdir())).filter((n) => n.startsWith('llull-dwg-'));
-    const res = await request(app).post('/import/dwg').set('Content-Type', 'application/octet-stream').send(DWG);
-    expect(res.status).toBe(504);
-    const after = (await readdir(tmpdir())).filter((n) => n.startsWith('llull-dwg-'));
-    expect(after.length).toBeLessThanOrEqual(before.length);
-  }, 60_000);
+  it.skipIf(posixOnly)(
+    'answers 504 when the converter exceeds the timeout, and cleans its temp dir',
+    async () => {
+      const { app } = await load({ LLULL_DWG2DXF: slowScript, LLULL_DWG_TIMEOUT_MS: '300' });
+      const before = (await readdir(tmpdir())).filter((n) => n.startsWith('llull-dwg-'));
+      const res = await request(app).post('/import/dwg').set('Content-Type', 'application/octet-stream').send(DWG);
+      expect(res.status).toBe(504);
+      const after = (await readdir(tmpdir())).filter((n) => n.startsWith('llull-dwg-'));
+      expect(after.length).toBeLessThanOrEqual(before.length);
+    },
+    60_000,
+  );
 });

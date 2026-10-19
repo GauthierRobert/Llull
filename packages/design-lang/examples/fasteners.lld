@@ -1,0 +1,14 @@
+# Lap splice: two 8 mm steel flats joined by a row of four M8 hex bolts with nuts
+design lap_splice units=mm
+param L = 240
+param W = 60
+param t = 8
+param edge = 20
+import_fastener_catalog _ catalog={"format":"llull-fastener-catalog","schemaVersion":1,"title":"ISO M8 (typical, unverified)","families":[{"id":"ISO4014","kind":"bolt","standard":{"body":"ISO","id":"ISO4014"},"partNumber":[{"kind":"literal","text":"ISO4014-M"},{"kind":"int","name":"diameterDash"},{"kind":"literal","text":"x"},{"kind":"int","name":"gripDash","scale":1,"unit":"mm"}],"gripIncrement":{"value":1,"unit":"mm"},"gripMode":"min_grip_ge_stack","lengthRule":{"kind":"grip_plus_thread"},"sizes":[{"dash":"8","nominalDiameter":{"value":8,"unit":"mm"},"thread":"M8x1.25","threadsPerInch":20.32,"threadLength":{"value":22,"unit":"mm"},"dims":{"headDiameter":{"nominal":14.38,"unit":"mm","provenance":{"citation":"ISO 4014 e min"}},"acrossFlats":{"nominal":13,"unit":"mm","provenance":{"citation":"ISO 4014 s"}},"headHeight":{"nominal":5.3,"unit":"mm","provenance":{"citation":"ISO 4014 k"}},"clearanceHoleDiameter":{"min":8.4,"nominal":9,"max":10,"options":[8.4,9,10],"unit":"mm","provenance":{"citation":"ISO 273"}}}}],"availableGripDash":{"min":1,"max":150},"licence":"vendor-catalogue","provenance":{"citation":"ISO 4014 hex head bolt"}},{"id":"ISO4032","kind":"nut","standard":{"body":"ISO","id":"ISO 4032"},"partNumber":[{"kind":"literal","text":"ISO4032-M"},{"kind":"int","name":"diameterDash"}],"sizes":[{"dash":"8","nominalDiameter":{"value":8,"unit":"mm"},"thread":"M8x1.25","dims":{"height":{"nominal":6.8,"unit":"mm","provenance":{"citation":"ISO 4032 m max"}},"acrossFlats":{"nominal":13,"unit":"mm","provenance":{"citation":"ISO 4032 s max"}}}}],"licence":"vendor-catalogue","provenance":{"citation":"ISO 4032 hexagon nut"}}]}
+add_box lower size=[L,W,t] anchor=min color="#8a9aa8"
+add_box upper size=[L,W,t] on=lower.top color="#b0bcc6"
+insert_fastener_row joint family=ISO4014 diameterDash="8" nut=ISO4032 stackIds=[lower,upper] from=[edge,W/2,0] to=[L-edge,W/2,0] count=4 holeMode=cut_clearance
+check check_fastener_layout path=status expect == "pass"
+check list_fastener_families kind=bolt path=families.0.id expect == "ISO4014"
+check bbox of=lower expect == [L,W,t]
+check volume of=upper expect ~= L*W*t-4*pi*4.5*4.5*t ± 2%
