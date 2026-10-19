@@ -6,13 +6,13 @@
     "name": "carbon_frame",
     "density": 1.55,
     "densityUnit": "g/cm^3",
-    "color": "#8a2116",
-    "metalness": 0.25,
-    "roughness": 0.34,
+    "color": "#12668e",
+    "metalness": 0.55,
+    "roughness": 0.26,
     "finish": "carbon_twill",
-    "color2": "#5c140d",
+    "color2": "#0d5374",
     "finishScale": 22,
-    "normalStrength": 0.45,
+    "normalStrength": 0.2,
     "clearcoat": 1.0
    }
   },
@@ -21,10 +21,8 @@
    "params": {
     "materialName": "carbon_frame",
     "entityIds": [
-     "mesh-1137.1",
-     "mesh-1140.1",
-     "mesh-1145.1",
-     "loft-1021.1"
+     "mesh-1919.1",
+     "mesh-1924.1"
     ]
    }
   },
@@ -41,6 +39,16 @@
     "color2": "#2a2a2d",
     "finishScale": 16,
     "clearcoat": 0.9
+   }
+  },
+  {
+   "command": "assign_material",
+   "params": {
+    "materialName": "carbon_black",
+    "entityIds": [
+     "mesh-1927.1",
+     "loft-1802.1"
+    ]
    }
   },
   {
@@ -63,8 +71,8 @@
    "params": {
     "materialName": "carbon_rim",
     "entityIds": [
-     "rev-1025.1",
-     "rev-1042.1"
+     "rev-1806.1",
+     "rev-1823.1"
     ]
    }
   },
@@ -84,8 +92,8 @@
    "params": {
     "materialName": "rubber",
     "entityIds": [
-     "rev-1024.1",
-     "rev-1041.1"
+     "rev-1805.1",
+     "rev-1822.1"
     ]
    }
   },
@@ -105,8 +113,8 @@
    "params": {
     "materialName": "rubber_hood",
     "entityIds": [
-     "subd-1016.1",
-     "subd-1019.1"
+     "subd-1797.1",
+     "subd-1800.1"
     ]
    }
   },
@@ -126,8 +134,8 @@
    "params": {
     "materialName": "bar_tape",
     "entityIds": [
-     "swp-1015.1",
-     "swp-1018.1"
+     "swp-1796.1",
+     "swp-1799.1"
     ]
    }
   },
@@ -147,7 +155,7 @@
    "params": {
     "materialName": "saddle",
     "entityIds": [
-     "subd-1023.1"
+     "subd-1804.1"
     ]
    }
   },
@@ -169,11 +177,11 @@
    "params": {
     "materialName": "alloy",
     "entityIds": [
-     "rev-1026.1",
-     "rev-1043.1",
-     "cyl-1063.1",
-     "cyl-1065.1",
-     "cyl-1068.1"
+     "rev-1807.1",
+     "rev-1824.1",
+     "cyl-1844.1",
+     "cyl-1846.1",
+     "cyl-1849.1"
     ]
    }
   },
@@ -193,45 +201,45 @@
    "params": {
     "materialName": "black_anod",
     "entityIds": [
-     "loft-1017.1",
-     "loft-1020.1",
-     "loft-1022.1",
-     "rev-1036.1",
-     "loft-1037.1",
-     "loft-1038.1",
-     "loft-1038.2",
-     "loft-1038.3",
-     "loft-1038.4",
-     "loft-1038.5",
-     "cyl-1039.1",
-     "rev-1040.1",
-     "rev-1053.1",
-     "loft-1054.1",
-     "loft-1055.1",
-     "loft-1055.2",
-     "loft-1055.3",
-     "loft-1055.4",
-     "loft-1055.5",
-     "cyl-1056.1",
-     "rev-1057.1",
-     "subd-1058.1",
-     "subd-1059.1",
-     "ext-1060.1",
-     "rev-1061.1",
-     "ext-1062.1",
-     "loft-1064.1",
-     "subd-1066.1",
-     "loft-1067.1",
-     "subd-1069.1",
-     "rev-1070.1",
-     "rev-1083.1",
-     "ext-1084.1",
-     "ext-1085.1",
-     "ext-1086.1",
-     "ext-1087.1",
-     "subd-1088.1",
-     "swp-1089.1",
-     "subd-1090.1"
+     "loft-1798.1",
+     "loft-1801.1",
+     "loft-1803.1",
+     "rev-1817.1",
+     "loft-1818.1",
+     "loft-1819.1",
+     "loft-1819.2",
+     "loft-1819.3",
+     "loft-1819.4",
+     "loft-1819.5",
+     "cyl-1820.1",
+     "rev-1821.1",
+     "rev-1834.1",
+     "loft-1835.1",
+     "loft-1836.1",
+     "loft-1836.2",
+     "loft-1836.3",
+     "loft-1836.4",
+     "loft-1836.5",
+     "cyl-1837.1",
+     "rev-1838.1",
+     "subd-1839.1",
+     "subd-1840.1",
+     "ext-1841.1",
+     "rev-1842.1",
+     "ext-1843.1",
+     "loft-1845.1",
+     "subd-1847.1",
+     "loft-1848.1",
+     "subd-1850.1",
+     "rev-1851.1",
+     "rev-1864.1",
+     "ext-1865.1",
+     "ext-1866.1",
+     "ext-1867.1",
+     "ext-1868.1",
+     "subd-1869.1",
+     "swp-1870.1",
+     "subd-1871.1"
     ]
    }
   },
@@ -251,124 +259,124 @@
    "params": {
     "materialName": "steel",
     "entityIds": [
-     "ext-1071.1",
-     "ext-1072.1",
-     "ext-1073.1",
-     "ext-1074.1",
-     "ext-1075.1",
-     "ext-1076.1",
-     "ext-1077.1",
-     "ext-1078.1",
-     "ext-1079.1",
-     "ext-1080.1",
-     "ext-1081.1",
-     "ext-1082.1",
-     "instance-1103.1",
-     "instance-1103.2",
-     "instance-1103.3",
-     "instance-1103.4",
-     "instance-1103.5",
-     "instance-1103.6",
-     "instance-1103.7",
-     "instance-1103.8",
-     "instance-1103.9",
-     "instance-1103.10",
-     "instance-1103.11",
-     "instance-1103.12",
-     "instance-1103.13",
-     "instance-1103.14",
-     "instance-1103.15",
-     "instance-1103.16",
-     "instance-1103.17",
-     "instance-1103.18",
-     "instance-1103.19",
-     "instance-1103.20",
-     "instance-1103.21",
-     "instance-1103.22",
-     "instance-1103.23",
-     "instance-1103.24",
-     "instance-1103.25",
-     "instance-1103.26",
-     "instance-1103.27",
-     "instance-1103.28",
-     "instance-1103.29",
-     "instance-1103.30",
-     "instance-1103.31",
-     "instance-1103.32",
-     "instance-1103.33",
-     "instance-1103.34",
-     "instance-1103.35",
-     "instance-1103.36",
-     "instance-1103.37",
-     "instance-1103.38",
-     "instance-1103.39",
-     "instance-1103.40",
-     "instance-1103.41",
-     "instance-1103.42",
-     "instance-1103.43",
-     "instance-1103.44",
-     "instance-1103.45",
-     "instance-1103.46",
-     "instance-1103.47",
-     "instance-1103.48",
-     "instance-1103.49",
-     "instance-1103.50",
-     "instance-1103.51",
-     "instance-1103.52",
-     "instance-1103.53",
-     "instance-1104.1",
-     "instance-1104.2",
-     "instance-1104.3",
-     "instance-1104.4",
-     "instance-1104.5",
-     "instance-1104.6",
-     "instance-1104.7",
-     "instance-1104.8",
-     "instance-1104.9",
-     "instance-1104.10",
-     "instance-1104.11",
-     "instance-1104.12",
-     "instance-1104.13",
-     "instance-1104.14",
-     "instance-1104.15",
-     "instance-1104.16",
-     "instance-1104.17",
-     "instance-1104.18",
-     "instance-1104.19",
-     "instance-1104.20",
-     "instance-1104.21",
-     "instance-1104.22",
-     "instance-1104.23",
-     "instance-1104.24",
-     "instance-1104.25",
-     "instance-1104.26",
-     "instance-1104.27",
-     "instance-1104.28",
-     "instance-1104.29",
-     "instance-1104.30",
-     "instance-1104.31",
-     "instance-1104.32",
-     "instance-1104.33",
-     "instance-1104.34",
-     "instance-1104.35",
-     "instance-1104.36",
-     "instance-1104.37",
-     "instance-1104.38",
-     "instance-1104.39",
-     "instance-1104.40",
-     "instance-1104.41",
-     "instance-1104.42",
-     "instance-1104.43",
-     "instance-1104.44",
-     "instance-1104.45",
-     "instance-1104.46",
-     "instance-1104.47",
-     "instance-1104.48",
-     "instance-1104.49",
-     "instance-1104.50",
-     "instance-1104.51",
-     "instance-1104.52",
-     "instance-1104.53"
+     "ext-1852.1",
+     "ext-1853.1",
+     "ext-1854.1",
+     "ext-1855.1",
+     "ext-1856.1",
+     "ext-1857.1",
+     "ext-1858.1",
+     "ext-1859.1",
+     "ext-1860.1",
+     "ext-1861.1",
+     "ext-1862.1",
+     "ext-1863.1",
+     "instance-1884.1",
+     "instance-1884.2",
+     "instance-1884.3",
+     "instance-1884.4",
+     "instance-1884.5",
+     "instance-1884.6",
+     "instance-1884.7",
+     "instance-1884.8",
+     "instance-1884.9",
+     "instance-1884.10",
+     "instance-1884.11",
+     "instance-1884.12",
+     "instance-1884.13",
+     "instance-1884.14",
+     "instance-1884.15",
+     "instance-1884.16",
+     "instance-1884.17",
+     "instance-1884.18",
+     "instance-1884.19",
+     "instance-1884.20",
+     "instance-1884.21",
+     "instance-1884.22",
+     "instance-1884.23",
+     "instance-1884.24",
+     "instance-1884.25",
+     "instance-1884.26",
+     "instance-1884.27",
+     "instance-1884.28",
+     "instance-1884.29",
+     "instance-1884.30",
+     "instance-1884.31",
+     "instance-1884.32",
+     "instance-1884.33",
+     "instance-1884.34",
+     "instance-1884.35",
+     "instance-1884.36",
+     "instance-1884.37",
+     "instance-1884.38",
+     "instance-1884.39",
+     "instance-1884.40",
+     "instance-1884.41",
+     "instance-1884.42",
+     "instance-1884.43",
+     "instance-1884.44",
+     "instance-1884.45",
+     "instance-1884.46",
+     "instance-1884.47",
+     "instance-1884.48",
+     "instance-1884.49",
+     "instance-1884.50",
+     "instance-1884.51",
+     "instance-1884.52",
+     "instance-1884.53",
+     "instance-1885.1",
+     "instance-1885.2",
+     "instance-1885.3",
+     "instance-1885.4",
+     "instance-1885.5",
+     "instance-1885.6",
+     "instance-1885.7",
+     "instance-1885.8",
+     "instance-1885.9",
+     "instance-1885.10",
+     "instance-1885.11",
+     "instance-1885.12",
+     "instance-1885.13",
+     "instance-1885.14",
+     "instance-1885.15",
+     "instance-1885.16",
+     "instance-1885.17",
+     "instance-1885.18",
+     "instance-1885.19",
+     "instance-1885.20",
+     "instance-1885.21",
+     "instance-1885.22",
+     "instance-1885.23",
+     "instance-1885.24",
+     "instance-1885.25",
+     "instance-1885.26",
+     "instance-1885.27",
+     "instance-1885.28",
+     "instance-1885.29",
+     "instance-1885.30",
+     "instance-1885.31",
+     "instance-1885.32",
+     "instance-1885.33",
+     "instance-1885.34",
+     "instance-1885.35",
+     "instance-1885.36",
+     "instance-1885.37",
+     "instance-1885.38",
+     "instance-1885.39",
+     "instance-1885.40",
+     "instance-1885.41",
+     "instance-1885.42",
+     "instance-1885.43",
+     "instance-1885.44",
+     "instance-1885.45",
+     "instance-1885.46",
+     "instance-1885.47",
+     "instance-1885.48",
+     "instance-1885.49",
+     "instance-1885.50",
+     "instance-1885.51",
+     "instance-1885.52",
+     "instance-1885.53"
     ]
    }
   },
@@ -388,54 +396,54 @@
    "params": {
     "materialName": "spoke",
     "entityIds": [
-     "loft-1027.1",
-     "loft-1028.1",
-     "loft-1028.2",
-     "loft-1028.3",
-     "loft-1028.4",
-     "loft-1028.5",
-     "loft-1029.1",
-     "loft-1030.1",
-     "loft-1030.2",
-     "loft-1030.3",
-     "loft-1030.4",
-     "loft-1030.5",
-     "loft-1031.1",
-     "loft-1032.1",
-     "loft-1032.2",
-     "loft-1032.3",
-     "loft-1032.4",
-     "loft-1032.5",
-     "loft-1033.1",
-     "loft-1034.1",
-     "loft-1034.2",
-     "loft-1034.3",
-     "loft-1034.4",
-     "loft-1034.5",
-     "loft-1044.1",
-     "loft-1045.1",
-     "loft-1045.2",
-     "loft-1045.3",
-     "loft-1045.4",
-     "loft-1045.5",
-     "loft-1046.1",
-     "loft-1047.1",
-     "loft-1047.2",
-     "loft-1047.3",
-     "loft-1047.4",
-     "loft-1047.5",
-     "loft-1048.1",
-     "loft-1049.1",
-     "loft-1049.2",
-     "loft-1049.3",
-     "loft-1049.4",
-     "loft-1049.5",
-     "loft-1050.1",
-     "loft-1051.1",
-     "loft-1051.2",
-     "loft-1051.3",
-     "loft-1051.4",
-     "loft-1051.5"
+     "loft-1808.1",
+     "loft-1809.1",
+     "loft-1809.2",
+     "loft-1809.3",
+     "loft-1809.4",
+     "loft-1809.5",
+     "loft-1810.1",
+     "loft-1811.1",
+     "loft-1811.2",
+     "loft-1811.3",
+     "loft-1811.4",
+     "loft-1811.5",
+     "loft-1812.1",
+     "loft-1813.1",
+     "loft-1813.2",
+     "loft-1813.3",
+     "loft-1813.4",
+     "loft-1813.5",
+     "loft-1814.1",
+     "loft-1815.1",
+     "loft-1815.2",
+     "loft-1815.3",
+     "loft-1815.4",
+     "loft-1815.5",
+     "loft-1825.1",
+     "loft-1826.1",
+     "loft-1826.2",
+     "loft-1826.3",
+     "loft-1826.4",
+     "loft-1826.5",
+     "loft-1827.1",
+     "loft-1828.1",
+     "loft-1828.2",
+     "loft-1828.3",
+     "loft-1828.4",
+     "loft-1828.5",
+     "loft-1829.1",
+     "loft-1830.1",
+     "loft-1830.2",
+     "loft-1830.3",
+     "loft-1830.4",
+     "loft-1830.5",
+     "loft-1831.1",
+     "loft-1832.1",
+     "loft-1832.2",
+     "loft-1832.3",
+     "loft-1832.4",
+     "loft-1832.5"
     ]
    }
   },
@@ -457,8 +465,8 @@
    "params": {
     "materialName": "rotor",
     "entityIds": [
-     "rev-1035.1",
-     "rev-1052.1"
+     "rev-1816.1",
+     "rev-1833.1"
     ]
    }
   },
@@ -478,15 +486,15 @@
    "params": {
     "materialName": "kit",
     "entityIds": [
-     "loft-1105.1",
-     "sph-1109.1",
-     "loft-1110.1",
-     "sph-1114.1",
-     "loft-1115.1",
-     "sph-1119.1",
-     "loft-1120.1",
-     "sph-1124.1",
-     "loft-1125.1"
+     "loft-1886.1",
+     "sph-1890.1",
+     "loft-1891.1",
+     "sph-1895.1",
+     "loft-1896.1",
+     "sph-1900.1",
+     "loft-1901.1",
+     "sph-1905.1",
+     "loft-1906.1"
     ]
    }
   },
@@ -506,16 +514,16 @@
    "params": {
     "materialName": "skin",
     "entityIds": [
-     "sph-1106.1",
-     "loft-1107.1",
-     "sph-1111.1",
-     "loft-1112.1",
-     "loft-1116.1",
-     "sph-1117.1",
-     "sph-1121.1",
-     "loft-1122.1",
-     "sph-1126.1",
-     "loft-1127.1"
+     "sph-1887.1",
+     "loft-1888.1",
+     "sph-1892.1",
+     "loft-1893.1",
+     "loft-1897.1",
+     "sph-1898.1",
+     "sph-1902.1",
+     "loft-1903.1",
+     "sph-1907.1",
+     "loft-1908.1"
     ]
    }
   },
@@ -535,8 +543,8 @@
    "params": {
     "materialName": "shoe",
     "entityIds": [
-     "subd-1108.1",
-     "subd-1113.1"
+     "subd-1889.1",
+     "subd-1894.1"
     ]
    }
   },
@@ -556,7 +564,7 @@
    "params": {
     "materialName": "helmet",
     "entityIds": [
-     "subd-1118.1"
+     "subd-1899.1"
     ]
    }
   },
@@ -576,39 +584,39 @@
    "params": {
     "materialName": "glove",
     "entityIds": [
-     "subd-1123.1",
-     "subd-1128.1"
+     "subd-1904.1",
+     "subd-1909.1"
     ]
    }
   },
   {
    "command": "add_decal",
    "params": {
-    "id": "mesh-1137.1",
+    "id": "mesh-1919.1",
     "text": "CERVELO",
     "at": [
-     220.96,
-     15.0,
-     481.22
+     222.3,
+     22.0,
+     498.48
     ],
     "normal": [
      0,
      1,
      0
     ],
-    "height": 30,
-    "angle": -0.7652,
-    "color": "#f2f2f2"
+    "height": 46,
+    "angle": -0.8056,
+    "color": "#c6e43a"
    }
   },
   {
    "command": "add_decal",
    "params": {
-    "id": "mesh-1140.1",
+    "id": "mesh-1924.1",
     "text": "S5",
     "at": [
-     514.1,
-     56.0,
+     521.45,
+     64.0,
      520
     ],
     "normal": [
@@ -624,31 +632,31 @@
   {
    "command": "add_decal",
    "params": {
-    "id": "mesh-1137.1",
+    "id": "mesh-1919.1",
     "text": "CERVELO",
     "at": [
-     220.96,
-     -15.0,
-     481.22
+     222.3,
+     -22.0,
+     498.48
     ],
     "normal": [
      0,
      -1,
      0
     ],
-    "height": 30,
-    "angle": 0.7652,
-    "color": "#f2f2f2"
+    "height": 46,
+    "angle": 0.8056,
+    "color": "#c6e43a"
    }
   },
   {
    "command": "add_decal",
    "params": {
-    "id": "mesh-1140.1",
+    "id": "mesh-1924.1",
     "text": "S5",
     "at": [
-     514.1,
-     -56.0,
+     521.45,
+     -64.0,
      520
     ],
     "normal": [
@@ -664,10 +672,10 @@
   {
    "command": "add_decal",
    "params": {
-    "id": "rev-1025.1",
+    "id": "rev-1806.1",
     "text": "RESERVE",
     "at": [
-     576.1,
+     583.45,
      16.0,
      625.0
     ],
@@ -683,10 +691,10 @@
   {
    "command": "add_decal",
    "params": {
-    "id": "rev-1025.1",
+    "id": "rev-1806.1",
     "text": "RESERVE",
     "at": [
-     576.1,
+     583.45,
      -16.0,
      625.0
     ],
@@ -702,10 +710,10 @@
   {
    "command": "add_decal",
    "params": {
-    "id": "rev-1042.1",
+    "id": "rev-1823.1",
     "text": "RESERVE",
     "at": [
-     -398.9,
+     -398.55,
      16.0,
      625.0
     ],
@@ -721,10 +729,10 @@
   {
    "command": "add_decal",
    "params": {
-    "id": "rev-1042.1",
+    "id": "rev-1823.1",
     "text": "RESERVE",
     "at": [
-     -398.9,
+     -398.55,
      -16.0,
      625.0
     ],
@@ -747,14 +755,14 @@
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "mesh-1137.1",
+    "entityId": "mesh-1919.1",
     "layerId": "$layer_frame"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "subd-1059.1",
+    "entityId": "subd-1840.1",
     "layerId": "$layer_frame"
    }
   },
@@ -768,14 +776,14 @@
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "mesh-1140.1",
+    "entityId": "mesh-1924.1",
     "layerId": "$layer_fork"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "subd-1058.1",
+    "entityId": "subd-1839.1",
     "layerId": "$layer_fork"
    }
   },
@@ -789,49 +797,49 @@
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "mesh-1145.1",
+    "entityId": "mesh-1927.1",
     "layerId": "$layer_cockpit"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "swp-1015.1",
+    "entityId": "swp-1796.1",
     "layerId": "$layer_cockpit"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "subd-1016.1",
+    "entityId": "subd-1797.1",
     "layerId": "$layer_cockpit"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1017.1",
+    "entityId": "loft-1798.1",
     "layerId": "$layer_cockpit"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "swp-1018.1",
+    "entityId": "swp-1799.1",
     "layerId": "$layer_cockpit"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "subd-1019.1",
+    "entityId": "subd-1800.1",
     "layerId": "$layer_cockpit"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1020.1",
+    "entityId": "loft-1801.1",
     "layerId": "$layer_cockpit"
    }
   },
@@ -845,21 +853,21 @@
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1021.1",
+    "entityId": "loft-1802.1",
     "layerId": "$layer_seat"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1022.1",
+    "entityId": "loft-1803.1",
     "layerId": "$layer_seat"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "subd-1023.1",
+    "entityId": "subd-1804.1",
     "layerId": "$layer_seat"
    }
   },
@@ -873,259 +881,259 @@
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "rev-1024.1",
+    "entityId": "rev-1805.1",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "rev-1025.1",
+    "entityId": "rev-1806.1",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "rev-1026.1",
+    "entityId": "rev-1807.1",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1027.1",
+    "entityId": "loft-1808.1",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1028.1",
+    "entityId": "loft-1809.1",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1028.2",
+    "entityId": "loft-1809.2",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1028.3",
+    "entityId": "loft-1809.3",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1028.4",
+    "entityId": "loft-1809.4",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1028.5",
+    "entityId": "loft-1809.5",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1029.1",
+    "entityId": "loft-1810.1",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1030.1",
+    "entityId": "loft-1811.1",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1030.2",
+    "entityId": "loft-1811.2",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1030.3",
+    "entityId": "loft-1811.3",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1030.4",
+    "entityId": "loft-1811.4",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1030.5",
+    "entityId": "loft-1811.5",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1031.1",
+    "entityId": "loft-1812.1",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1032.1",
+    "entityId": "loft-1813.1",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1032.2",
+    "entityId": "loft-1813.2",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1032.3",
+    "entityId": "loft-1813.3",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1032.4",
+    "entityId": "loft-1813.4",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1032.5",
+    "entityId": "loft-1813.5",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1033.1",
+    "entityId": "loft-1814.1",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1034.1",
+    "entityId": "loft-1815.1",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1034.2",
+    "entityId": "loft-1815.2",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1034.3",
+    "entityId": "loft-1815.3",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1034.4",
+    "entityId": "loft-1815.4",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1034.5",
+    "entityId": "loft-1815.5",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "rev-1035.1",
+    "entityId": "rev-1816.1",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "rev-1036.1",
+    "entityId": "rev-1817.1",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1037.1",
+    "entityId": "loft-1818.1",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1038.1",
+    "entityId": "loft-1819.1",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1038.2",
+    "entityId": "loft-1819.2",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1038.3",
+    "entityId": "loft-1819.3",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1038.4",
+    "entityId": "loft-1819.4",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1038.5",
+    "entityId": "loft-1819.5",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "cyl-1039.1",
+    "entityId": "cyl-1820.1",
     "layerId": "$layer_wheel_front"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "rev-1040.1",
+    "entityId": "rev-1821.1",
     "layerId": "$layer_wheel_front"
    }
   },
@@ -1139,259 +1147,259 @@
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "rev-1041.1",
+    "entityId": "rev-1822.1",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "rev-1042.1",
+    "entityId": "rev-1823.1",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "rev-1043.1",
+    "entityId": "rev-1824.1",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1044.1",
+    "entityId": "loft-1825.1",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1045.1",
+    "entityId": "loft-1826.1",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1045.2",
+    "entityId": "loft-1826.2",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1045.3",
+    "entityId": "loft-1826.3",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1045.4",
+    "entityId": "loft-1826.4",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1045.5",
+    "entityId": "loft-1826.5",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1046.1",
+    "entityId": "loft-1827.1",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1047.1",
+    "entityId": "loft-1828.1",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1047.2",
+    "entityId": "loft-1828.2",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1047.3",
+    "entityId": "loft-1828.3",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1047.4",
+    "entityId": "loft-1828.4",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1047.5",
+    "entityId": "loft-1828.5",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1048.1",
+    "entityId": "loft-1829.1",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1049.1",
+    "entityId": "loft-1830.1",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1049.2",
+    "entityId": "loft-1830.2",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1049.3",
+    "entityId": "loft-1830.3",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1049.4",
+    "entityId": "loft-1830.4",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1049.5",
+    "entityId": "loft-1830.5",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1050.1",
+    "entityId": "loft-1831.1",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1051.1",
+    "entityId": "loft-1832.1",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1051.2",
+    "entityId": "loft-1832.2",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1051.3",
+    "entityId": "loft-1832.3",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1051.4",
+    "entityId": "loft-1832.4",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1051.5",
+    "entityId": "loft-1832.5",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "rev-1052.1",
+    "entityId": "rev-1833.1",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "rev-1053.1",
+    "entityId": "rev-1834.1",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1054.1",
+    "entityId": "loft-1835.1",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1055.1",
+    "entityId": "loft-1836.1",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1055.2",
+    "entityId": "loft-1836.2",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1055.3",
+    "entityId": "loft-1836.3",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1055.4",
+    "entityId": "loft-1836.4",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1055.5",
+    "entityId": "loft-1836.5",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "cyl-1056.1",
+    "entityId": "cyl-1837.1",
     "layerId": "$layer_wheel_rear"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "rev-1057.1",
+    "entityId": "rev-1838.1",
     "layerId": "$layer_wheel_rear"
    }
   },
@@ -1405,98 +1413,98 @@
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "rev-1070.1",
+    "entityId": "rev-1851.1",
     "layerId": "$layer_cassette"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1071.1",
+    "entityId": "ext-1852.1",
     "layerId": "$layer_cassette"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1072.1",
+    "entityId": "ext-1853.1",
     "layerId": "$layer_cassette"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1073.1",
+    "entityId": "ext-1854.1",
     "layerId": "$layer_cassette"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1074.1",
+    "entityId": "ext-1855.1",
     "layerId": "$layer_cassette"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1075.1",
+    "entityId": "ext-1856.1",
     "layerId": "$layer_cassette"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1076.1",
+    "entityId": "ext-1857.1",
     "layerId": "$layer_cassette"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1077.1",
+    "entityId": "ext-1858.1",
     "layerId": "$layer_cassette"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1078.1",
+    "entityId": "ext-1859.1",
     "layerId": "$layer_cassette"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1079.1",
+    "entityId": "ext-1860.1",
     "layerId": "$layer_cassette"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1080.1",
+    "entityId": "ext-1861.1",
     "layerId": "$layer_cassette"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1081.1",
+    "entityId": "ext-1862.1",
     "layerId": "$layer_cassette"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1082.1",
+    "entityId": "ext-1863.1",
     "layerId": "$layer_cassette"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "rev-1083.1",
+    "entityId": "rev-1864.1",
     "layerId": "$layer_cassette"
    }
   },
@@ -1510,70 +1518,70 @@
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1060.1",
+    "entityId": "ext-1841.1",
     "layerId": "$layer_crankset"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "rev-1061.1",
+    "entityId": "rev-1842.1",
     "layerId": "$layer_crankset"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1062.1",
+    "entityId": "ext-1843.1",
     "layerId": "$layer_crankset"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "cyl-1063.1",
+    "entityId": "cyl-1844.1",
     "layerId": "$layer_crankset"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1064.1",
+    "entityId": "loft-1845.1",
     "layerId": "$layer_crankset"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "cyl-1065.1",
+    "entityId": "cyl-1846.1",
     "layerId": "$layer_crankset"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "subd-1066.1",
+    "entityId": "subd-1847.1",
     "layerId": "$layer_crankset"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1067.1",
+    "entityId": "loft-1848.1",
     "layerId": "$layer_crankset"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "cyl-1068.1",
+    "entityId": "cyl-1849.1",
     "layerId": "$layer_crankset"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "subd-1069.1",
+    "entityId": "subd-1850.1",
     "layerId": "$layer_crankset"
    }
   },
@@ -1587,49 +1595,49 @@
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1084.1",
+    "entityId": "ext-1865.1",
     "layerId": "$layer_derailleur"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1085.1",
+    "entityId": "ext-1866.1",
     "layerId": "$layer_derailleur"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1086.1",
+    "entityId": "ext-1867.1",
     "layerId": "$layer_derailleur"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "ext-1087.1",
+    "entityId": "ext-1868.1",
     "layerId": "$layer_derailleur"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "subd-1088.1",
+    "entityId": "subd-1869.1",
     "layerId": "$layer_derailleur"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "swp-1089.1",
+    "entityId": "swp-1870.1",
     "layerId": "$layer_derailleur"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "subd-1090.1",
+    "entityId": "subd-1871.1",
     "layerId": "$layer_derailleur"
    }
   },
@@ -1643,742 +1651,742 @@
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.1",
+    "entityId": "instance-1884.1",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.2",
+    "entityId": "instance-1884.2",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.3",
+    "entityId": "instance-1884.3",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.4",
+    "entityId": "instance-1884.4",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.5",
+    "entityId": "instance-1884.5",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.6",
+    "entityId": "instance-1884.6",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.7",
+    "entityId": "instance-1884.7",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.8",
+    "entityId": "instance-1884.8",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.9",
+    "entityId": "instance-1884.9",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.10",
+    "entityId": "instance-1884.10",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.11",
+    "entityId": "instance-1884.11",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.12",
+    "entityId": "instance-1884.12",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.13",
+    "entityId": "instance-1884.13",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.14",
+    "entityId": "instance-1884.14",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.15",
+    "entityId": "instance-1884.15",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.16",
+    "entityId": "instance-1884.16",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.17",
+    "entityId": "instance-1884.17",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.18",
+    "entityId": "instance-1884.18",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.19",
+    "entityId": "instance-1884.19",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.20",
+    "entityId": "instance-1884.20",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.21",
+    "entityId": "instance-1884.21",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.22",
+    "entityId": "instance-1884.22",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.23",
+    "entityId": "instance-1884.23",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.24",
+    "entityId": "instance-1884.24",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.25",
+    "entityId": "instance-1884.25",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.26",
+    "entityId": "instance-1884.26",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.27",
+    "entityId": "instance-1884.27",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.28",
+    "entityId": "instance-1884.28",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.29",
+    "entityId": "instance-1884.29",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.30",
+    "entityId": "instance-1884.30",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.31",
+    "entityId": "instance-1884.31",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.32",
+    "entityId": "instance-1884.32",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.33",
+    "entityId": "instance-1884.33",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.34",
+    "entityId": "instance-1884.34",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.35",
+    "entityId": "instance-1884.35",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.36",
+    "entityId": "instance-1884.36",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.37",
+    "entityId": "instance-1884.37",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.38",
+    "entityId": "instance-1884.38",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.39",
+    "entityId": "instance-1884.39",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.40",
+    "entityId": "instance-1884.40",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.41",
+    "entityId": "instance-1884.41",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.42",
+    "entityId": "instance-1884.42",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.43",
+    "entityId": "instance-1884.43",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.44",
+    "entityId": "instance-1884.44",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.45",
+    "entityId": "instance-1884.45",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.46",
+    "entityId": "instance-1884.46",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.47",
+    "entityId": "instance-1884.47",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.48",
+    "entityId": "instance-1884.48",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.49",
+    "entityId": "instance-1884.49",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.50",
+    "entityId": "instance-1884.50",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.51",
+    "entityId": "instance-1884.51",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.52",
+    "entityId": "instance-1884.52",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1103.53",
+    "entityId": "instance-1884.53",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.1",
+    "entityId": "instance-1885.1",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.2",
+    "entityId": "instance-1885.2",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.3",
+    "entityId": "instance-1885.3",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.4",
+    "entityId": "instance-1885.4",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.5",
+    "entityId": "instance-1885.5",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.6",
+    "entityId": "instance-1885.6",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.7",
+    "entityId": "instance-1885.7",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.8",
+    "entityId": "instance-1885.8",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.9",
+    "entityId": "instance-1885.9",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.10",
+    "entityId": "instance-1885.10",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.11",
+    "entityId": "instance-1885.11",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.12",
+    "entityId": "instance-1885.12",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.13",
+    "entityId": "instance-1885.13",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.14",
+    "entityId": "instance-1885.14",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.15",
+    "entityId": "instance-1885.15",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.16",
+    "entityId": "instance-1885.16",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.17",
+    "entityId": "instance-1885.17",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.18",
+    "entityId": "instance-1885.18",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.19",
+    "entityId": "instance-1885.19",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.20",
+    "entityId": "instance-1885.20",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.21",
+    "entityId": "instance-1885.21",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.22",
+    "entityId": "instance-1885.22",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.23",
+    "entityId": "instance-1885.23",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.24",
+    "entityId": "instance-1885.24",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.25",
+    "entityId": "instance-1885.25",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.26",
+    "entityId": "instance-1885.26",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.27",
+    "entityId": "instance-1885.27",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.28",
+    "entityId": "instance-1885.28",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.29",
+    "entityId": "instance-1885.29",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.30",
+    "entityId": "instance-1885.30",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.31",
+    "entityId": "instance-1885.31",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.32",
+    "entityId": "instance-1885.32",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.33",
+    "entityId": "instance-1885.33",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.34",
+    "entityId": "instance-1885.34",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.35",
+    "entityId": "instance-1885.35",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.36",
+    "entityId": "instance-1885.36",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.37",
+    "entityId": "instance-1885.37",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.38",
+    "entityId": "instance-1885.38",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.39",
+    "entityId": "instance-1885.39",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.40",
+    "entityId": "instance-1885.40",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.41",
+    "entityId": "instance-1885.41",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.42",
+    "entityId": "instance-1885.42",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.43",
+    "entityId": "instance-1885.43",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.44",
+    "entityId": "instance-1885.44",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.45",
+    "entityId": "instance-1885.45",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.46",
+    "entityId": "instance-1885.46",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.47",
+    "entityId": "instance-1885.47",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.48",
+    "entityId": "instance-1885.48",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.49",
+    "entityId": "instance-1885.49",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.50",
+    "entityId": "instance-1885.50",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.51",
+    "entityId": "instance-1885.51",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.52",
+    "entityId": "instance-1885.52",
     "layerId": "$layer_chain"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "instance-1104.53",
+    "entityId": "instance-1885.53",
     "layerId": "$layer_chain"
    }
   },
@@ -2392,168 +2400,168 @@
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1105.1",
+    "entityId": "loft-1886.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "sph-1106.1",
+    "entityId": "sph-1887.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1107.1",
+    "entityId": "loft-1888.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "subd-1108.1",
+    "entityId": "subd-1889.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "sph-1109.1",
+    "entityId": "sph-1890.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1110.1",
+    "entityId": "loft-1891.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "sph-1111.1",
+    "entityId": "sph-1892.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1112.1",
+    "entityId": "loft-1893.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "subd-1113.1",
+    "entityId": "subd-1894.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "sph-1114.1",
+    "entityId": "sph-1895.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1115.1",
+    "entityId": "loft-1896.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1116.1",
+    "entityId": "loft-1897.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "sph-1117.1",
+    "entityId": "sph-1898.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "subd-1118.1",
+    "entityId": "subd-1899.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "sph-1119.1",
+    "entityId": "sph-1900.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1120.1",
+    "entityId": "loft-1901.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "sph-1121.1",
+    "entityId": "sph-1902.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1122.1",
+    "entityId": "loft-1903.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "subd-1123.1",
+    "entityId": "subd-1904.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "sph-1124.1",
+    "entityId": "sph-1905.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1125.1",
+    "entityId": "loft-1906.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "sph-1126.1",
+    "entityId": "sph-1907.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "loft-1127.1",
+    "entityId": "loft-1908.1",
     "layerId": "$layer_rider"
    }
   },
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "subd-1128.1",
+    "entityId": "subd-1909.1",
     "layerId": "$layer_rider"
    }
   },
@@ -2567,7 +2575,7 @@
   {
    "command": "set_entity_layer",
    "params": {
-    "entityId": "belt-1091.1",
+    "entityId": "belt-1872.1",
     "layerId": "$layer_construction"
    }
   },
@@ -2581,22 +2589,22 @@
   {
    "command": "set_entity_name",
    "params": {
-    "id": "mesh-1137.1",
+    "id": "mesh-1919.1",
     "name": "S5 frame"
    }
   },
   {
    "command": "set_entity_name",
    "params": {
-    "id": "mesh-1140.1",
+    "id": "mesh-1924.1",
     "name": "S5 fork"
    }
   },
   {
    "command": "set_entity_name",
    "params": {
-    "id": "mesh-1145.1",
-    "name": "V-stem + HB13 bar"
+    "id": "mesh-1927.1",
+    "name": "One-piece cockpit"
    }
   },
   {
@@ -2604,7 +2612,7 @@
    "params": {
     "materialName": "carbon_black",
     "entityIds": [
-     "mesh-1145.1"
+     "mesh-1927.1"
     ]
    }
   },
@@ -2612,43 +2620,43 @@
    "command": "group_entities",
    "params": {
     "ids": [
-     "rev-1024.1",
-     "rev-1025.1",
-     "rev-1026.1",
-     "loft-1027.1",
-     "loft-1028.1",
-     "loft-1028.2",
-     "loft-1028.3",
-     "loft-1028.4",
-     "loft-1028.5",
-     "loft-1029.1",
-     "loft-1030.1",
-     "loft-1030.2",
-     "loft-1030.3",
-     "loft-1030.4",
-     "loft-1030.5",
-     "loft-1031.1",
-     "loft-1032.1",
-     "loft-1032.2",
-     "loft-1032.3",
-     "loft-1032.4",
-     "loft-1032.5",
-     "loft-1033.1",
-     "loft-1034.1",
-     "loft-1034.2",
-     "loft-1034.3",
-     "loft-1034.4",
-     "loft-1034.5",
-     "rev-1035.1",
-     "rev-1036.1",
-     "loft-1037.1",
-     "loft-1038.1",
-     "loft-1038.2",
-     "loft-1038.3",
-     "loft-1038.4",
-     "loft-1038.5",
-     "cyl-1039.1",
-     "rev-1040.1"
+     "rev-1805.1",
+     "rev-1806.1",
+     "rev-1807.1",
+     "loft-1808.1",
+     "loft-1809.1",
+     "loft-1809.2",
+     "loft-1809.3",
+     "loft-1809.4",
+     "loft-1809.5",
+     "loft-1810.1",
+     "loft-1811.1",
+     "loft-1811.2",
+     "loft-1811.3",
+     "loft-1811.4",
+     "loft-1811.5",
+     "loft-1812.1",
+     "loft-1813.1",
+     "loft-1813.2",
+     "loft-1813.3",
+     "loft-1813.4",
+     "loft-1813.5",
+     "loft-1814.1",
+     "loft-1815.1",
+     "loft-1815.2",
+     "loft-1815.3",
+     "loft-1815.4",
+     "loft-1815.5",
+     "rev-1816.1",
+     "rev-1817.1",
+     "loft-1818.1",
+     "loft-1819.1",
+     "loft-1819.2",
+     "loft-1819.3",
+     "loft-1819.4",
+     "loft-1819.5",
+     "cyl-1820.1",
+     "rev-1821.1"
     ],
     "name": "Front wheel"
    },
@@ -2658,57 +2666,57 @@
    "command": "group_entities",
    "params": {
     "ids": [
-     "rev-1041.1",
-     "rev-1042.1",
-     "rev-1043.1",
-     "loft-1044.1",
-     "loft-1045.1",
-     "loft-1045.2",
-     "loft-1045.3",
-     "loft-1045.4",
-     "loft-1045.5",
-     "loft-1046.1",
-     "loft-1047.1",
-     "loft-1047.2",
-     "loft-1047.3",
-     "loft-1047.4",
-     "loft-1047.5",
-     "loft-1048.1",
-     "loft-1049.1",
-     "loft-1049.2",
-     "loft-1049.3",
-     "loft-1049.4",
-     "loft-1049.5",
-     "loft-1050.1",
-     "loft-1051.1",
-     "loft-1051.2",
-     "loft-1051.3",
-     "loft-1051.4",
-     "loft-1051.5",
-     "rev-1052.1",
-     "rev-1053.1",
-     "loft-1054.1",
-     "loft-1055.1",
-     "loft-1055.2",
-     "loft-1055.3",
-     "loft-1055.4",
-     "loft-1055.5",
-     "cyl-1056.1",
-     "rev-1057.1",
-     "rev-1070.1",
-     "ext-1071.1",
-     "ext-1072.1",
-     "ext-1073.1",
-     "ext-1074.1",
-     "ext-1075.1",
-     "ext-1076.1",
-     "ext-1077.1",
-     "ext-1078.1",
-     "ext-1079.1",
-     "ext-1080.1",
-     "ext-1081.1",
-     "ext-1082.1",
-     "rev-1083.1"
+     "rev-1822.1",
+     "rev-1823.1",
+     "rev-1824.1",
+     "loft-1825.1",
+     "loft-1826.1",
+     "loft-1826.2",
+     "loft-1826.3",
+     "loft-1826.4",
+     "loft-1826.5",
+     "loft-1827.1",
+     "loft-1828.1",
+     "loft-1828.2",
+     "loft-1828.3",
+     "loft-1828.4",
+     "loft-1828.5",
+     "loft-1829.1",
+     "loft-1830.1",
+     "loft-1830.2",
+     "loft-1830.3",
+     "loft-1830.4",
+     "loft-1830.5",
+     "loft-1831.1",
+     "loft-1832.1",
+     "loft-1832.2",
+     "loft-1832.3",
+     "loft-1832.4",
+     "loft-1832.5",
+     "rev-1833.1",
+     "rev-1834.1",
+     "loft-1835.1",
+     "loft-1836.1",
+     "loft-1836.2",
+     "loft-1836.3",
+     "loft-1836.4",
+     "loft-1836.5",
+     "cyl-1837.1",
+     "rev-1838.1",
+     "rev-1851.1",
+     "ext-1852.1",
+     "ext-1853.1",
+     "ext-1854.1",
+     "ext-1855.1",
+     "ext-1856.1",
+     "ext-1857.1",
+     "ext-1858.1",
+     "ext-1859.1",
+     "ext-1860.1",
+     "ext-1861.1",
+     "ext-1862.1",
+     "ext-1863.1",
+     "rev-1864.1"
     ],
     "name": "Rear wheel + cassette"
    },
@@ -2718,16 +2726,16 @@
    "command": "group_entities",
    "params": {
     "ids": [
-     "ext-1060.1",
-     "rev-1061.1",
-     "ext-1062.1",
-     "cyl-1063.1",
-     "loft-1064.1",
-     "cyl-1065.1",
-     "subd-1066.1",
-     "loft-1067.1",
-     "cyl-1068.1",
-     "subd-1069.1"
+     "ext-1841.1",
+     "rev-1842.1",
+     "ext-1843.1",
+     "cyl-1844.1",
+     "loft-1845.1",
+     "cyl-1846.1",
+     "subd-1847.1",
+     "loft-1848.1",
+     "cyl-1849.1",
+     "subd-1850.1"
     ],
     "name": "Crankset"
    },
@@ -2737,112 +2745,112 @@
    "command": "group_entities",
    "params": {
     "ids": [
-     "instance-1103.1",
-     "instance-1103.2",
-     "instance-1103.3",
-     "instance-1103.4",
-     "instance-1103.5",
-     "instance-1103.6",
-     "instance-1103.7",
-     "instance-1103.8",
-     "instance-1103.9",
-     "instance-1103.10",
-     "instance-1103.11",
-     "instance-1103.12",
-     "instance-1103.13",
-     "instance-1103.14",
-     "instance-1103.15",
-     "instance-1103.16",
-     "instance-1103.17",
-     "instance-1103.18",
-     "instance-1103.19",
-     "instance-1103.20",
-     "instance-1103.21",
-     "instance-1103.22",
-     "instance-1103.23",
-     "instance-1103.24",
-     "instance-1103.25",
-     "instance-1103.26",
-     "instance-1103.27",
-     "instance-1103.28",
-     "instance-1103.29",
-     "instance-1103.30",
-     "instance-1103.31",
-     "instance-1103.32",
-     "instance-1103.33",
-     "instance-1103.34",
-     "instance-1103.35",
-     "instance-1103.36",
-     "instance-1103.37",
-     "instance-1103.38",
-     "instance-1103.39",
-     "instance-1103.40",
-     "instance-1103.41",
-     "instance-1103.42",
-     "instance-1103.43",
-     "instance-1103.44",
-     "instance-1103.45",
-     "instance-1103.46",
-     "instance-1103.47",
-     "instance-1103.48",
-     "instance-1103.49",
-     "instance-1103.50",
-     "instance-1103.51",
-     "instance-1103.52",
-     "instance-1103.53",
-     "instance-1104.1",
-     "instance-1104.2",
-     "instance-1104.3",
-     "instance-1104.4",
-     "instance-1104.5",
-     "instance-1104.6",
-     "instance-1104.7",
-     "instance-1104.8",
-     "instance-1104.9",
-     "instance-1104.10",
-     "instance-1104.11",
-     "instance-1104.12",
-     "instance-1104.13",
-     "instance-1104.14",
-     "instance-1104.15",
-     "instance-1104.16",
-     "instance-1104.17",
-     "instance-1104.18",
-     "instance-1104.19",
-     "instance-1104.20",
-     "instance-1104.21",
-     "instance-1104.22",
-     "instance-1104.23",
-     "instance-1104.24",
-     "instance-1104.25",
-     "instance-1104.26",
-     "instance-1104.27",
-     "instance-1104.28",
-     "instance-1104.29",
-     "instance-1104.30",
-     "instance-1104.31",
-     "instance-1104.32",
-     "instance-1104.33",
-     "instance-1104.34",
-     "instance-1104.35",
-     "instance-1104.36",
-     "instance-1104.37",
-     "instance-1104.38",
-     "instance-1104.39",
-     "instance-1104.40",
-     "instance-1104.41",
-     "instance-1104.42",
-     "instance-1104.43",
-     "instance-1104.44",
-     "instance-1104.45",
-     "instance-1104.46",
-     "instance-1104.47",
-     "instance-1104.48",
-     "instance-1104.49",
-     "instance-1104.50",
-     "instance-1104.51",
-     "instance-1104.52",
-     "instance-1104.53"
+     "instance-1884.1",
+     "instance-1884.2",
+     "instance-1884.3",
+     "instance-1884.4",
+     "instance-1884.5",
+     "instance-1884.6",
+     "instance-1884.7",
+     "instance-1884.8",
+     "instance-1884.9",
+     "instance-1884.10",
+     "instance-1884.11",
+     "instance-1884.12",
+     "instance-1884.13",
+     "instance-1884.14",
+     "instance-1884.15",
+     "instance-1884.16",
+     "instance-1884.17",
+     "instance-1884.18",
+     "instance-1884.19",
+     "instance-1884.20",
+     "instance-1884.21",
+     "instance-1884.22",
+     "instance-1884.23",
+     "instance-1884.24",
+     "instance-1884.25",
+     "instance-1884.26",
+     "instance-1884.27",
+     "instance-1884.28",
+     "instance-1884.29",
+     "instance-1884.30",
+     "instance-1884.31",
+     "instance-1884.32",
+     "instance-1884.33",
+     "instance-1884.34",
+     "instance-1884.35",
+     "instance-1884.36",
+     "instance-1884.37",
+     "instance-1884.38",
+     "instance-1884.39",
+     "instance-1884.40",
+     "instance-1884.41",
+     "instance-1884.42",
+     "instance-1884.43",
+     "instance-1884.44",
+     "instance-1884.45",
+     "instance-1884.46",
+     "instance-1884.47",
+     "instance-1884.48",
+     "instance-1884.49",
+     "instance-1884.50",
+     "instance-1884.51",
+     "instance-1884.52",
+     "instance-1884.53",
+     "instance-1885.1",
+     "instance-1885.2",
+     "instance-1885.3",
+     "instance-1885.4",
+     "instance-1885.5",
+     "instance-1885.6",
+     "instance-1885.7",
+     "instance-1885.8",
+     "instance-1885.9",
+     "instance-1885.10",
+     "instance-1885.11",
+     "instance-1885.12",
+     "instance-1885.13",
+     "instance-1885.14",
+     "instance-1885.15",
+     "instance-1885.16",
+     "instance-1885.17",
+     "instance-1885.18",
+     "instance-1885.19",
+     "instance-1885.20",
+     "instance-1885.21",
+     "instance-1885.22",
+     "instance-1885.23",
+     "instance-1885.24",
+     "instance-1885.25",
+     "instance-1885.26",
+     "instance-1885.27",
+     "instance-1885.28",
+     "instance-1885.29",
+     "instance-1885.30",
+     "instance-1885.31",
+     "instance-1885.32",
+     "instance-1885.33",
+     "instance-1885.34",
+     "instance-1885.35",
+     "instance-1885.36",
+     "instance-1885.37",
+     "instance-1885.38",
+     "instance-1885.39",
+     "instance-1885.40",
+     "instance-1885.41",
+     "instance-1885.42",
+     "instance-1885.43",
+     "instance-1885.44",
+     "instance-1885.45",
+     "instance-1885.46",
+     "instance-1885.47",
+     "instance-1885.48",
+     "instance-1885.49",
+     "instance-1885.50",
+     "instance-1885.51",
+     "instance-1885.52",
+     "instance-1885.53"
     ],
     "name": "Chain (106 links)"
    },
@@ -2852,30 +2860,30 @@
    "command": "group_entities",
    "params": {
     "ids": [
-     "loft-1105.1",
-     "sph-1106.1",
-     "loft-1107.1",
-     "subd-1108.1",
-     "sph-1109.1",
-     "loft-1110.1",
-     "sph-1111.1",
-     "loft-1112.1",
-     "subd-1113.1",
-     "sph-1114.1",
-     "loft-1115.1",
-     "loft-1116.1",
-     "sph-1117.1",
-     "subd-1118.1",
-     "sph-1119.1",
-     "loft-1120.1",
-     "sph-1121.1",
-     "loft-1122.1",
-     "subd-1123.1",
-     "sph-1124.1",
-     "loft-1125.1",
-     "sph-1126.1",
-     "loft-1127.1",
-     "subd-1128.1"
+     "loft-1886.1",
+     "sph-1887.1",
+     "loft-1888.1",
+     "subd-1889.1",
+     "sph-1890.1",
+     "loft-1891.1",
+     "sph-1892.1",
+     "loft-1893.1",
+     "subd-1894.1",
+     "sph-1895.1",
+     "loft-1896.1",
+     "loft-1897.1",
+     "sph-1898.1",
+     "subd-1899.1",
+     "sph-1900.1",
+     "loft-1901.1",
+     "sph-1902.1",
+     "loft-1903.1",
+     "subd-1904.1",
+     "sph-1905.1",
+     "loft-1906.1",
+     "sph-1907.1",
+     "loft-1908.1",
+     "subd-1909.1"
     ],
     "name": "Rider"
    },
@@ -2884,14 +2892,14 @@
   {
    "command": "set_entity_name",
    "params": {
-    "id": "ext-1084.1",
+    "id": "ext-1865.1",
     "name": "Guide pulley 13T"
    }
   },
   {
    "command": "set_entity_name",
    "params": {
-    "id": "ext-1085.1",
+    "id": "ext-1866.1",
     "name": "Tension pulley 13T"
    }
   },
@@ -2907,7 +2915,7 @@
      0
     ],
     "pivot": [
-     576.095,
+     583.451,
      0,
      339.0
     ]
@@ -2925,7 +2933,7 @@
      0
     ],
     "pivot": [
-     -398.905,
+     -398.549,
      0,
      339.0
     ]
@@ -2945,14 +2953,14 @@
     "pivot": [
      0.0,
      0,
-     269.0
+     267.0
     ]
    }
   },
   {
    "command": "animate",
    "params": {
-    "targetId": "ext-1084.1",
+    "targetId": "ext-1865.1",
     "mode": "spin",
     "speed": 9.33899,
     "axis": [
@@ -2961,7 +2969,7 @@
      0
     ],
     "pivot": [
-     -404.905,
+     -404.549,
      0,
      272.924
     ]
@@ -2970,7 +2978,7 @@
   {
    "command": "animate",
    "params": {
-    "targetId": "ext-1085.1",
+    "targetId": "ext-1866.1",
     "mode": "spin",
     "speed": 9.33899,
     "axis": [
@@ -2979,9 +2987,9 @@
      0
     ],
     "pivot": [
-     -386.957,
+     -387.276,
      0,
-     201.134
+     200.968
     ]
    }
   },
@@ -2990,7 +2998,7 @@
    "params": {
     "targetId": "$g_chain",
     "mode": "follow_path",
-    "pathId": "belt-1091.1",
+    "pathId": "belt-1872.1",
     "speed": -247.8007
    }
   },
@@ -2998,27 +3006,27 @@
    "command": "add_rigid_body",
    "params": {
     "entityIds": [
-     "mesh-1137.1",
-     "subd-1059.1",
-     "mesh-1140.1",
-     "subd-1058.1",
-     "mesh-1145.1",
-     "swp-1015.1",
-     "subd-1016.1",
-     "loft-1017.1",
-     "swp-1018.1",
-     "subd-1019.1",
-     "loft-1020.1",
-     "loft-1021.1",
-     "loft-1022.1",
-     "subd-1023.1",
-     "ext-1084.1",
-     "ext-1085.1",
-     "ext-1086.1",
-     "ext-1087.1",
-     "subd-1088.1",
-     "swp-1089.1",
-     "subd-1090.1"
+     "mesh-1919.1",
+     "subd-1840.1",
+     "mesh-1924.1",
+     "subd-1839.1",
+     "mesh-1927.1",
+     "swp-1796.1",
+     "subd-1797.1",
+     "loft-1798.1",
+     "swp-1799.1",
+     "subd-1800.1",
+     "loft-1801.1",
+     "loft-1802.1",
+     "loft-1803.1",
+     "subd-1804.1",
+     "ext-1865.1",
+     "ext-1866.1",
+     "ext-1867.1",
+     "ext-1868.1",
+     "subd-1869.1",
+     "swp-1870.1",
+     "subd-1871.1"
     ],
     "name": "frame",
     "id": "body-frame",
@@ -3030,16 +3038,16 @@
    "command": "add_rigid_body",
    "params": {
     "entityIds": [
-     "ext-1060.1",
-     "rev-1061.1",
-     "ext-1062.1",
-     "cyl-1063.1",
-     "loft-1064.1",
-     "cyl-1065.1",
-     "subd-1066.1",
-     "loft-1067.1",
-     "cyl-1068.1",
-     "subd-1069.1"
+     "ext-1841.1",
+     "rev-1842.1",
+     "ext-1843.1",
+     "cyl-1844.1",
+     "loft-1845.1",
+     "cyl-1846.1",
+     "subd-1847.1",
+     "loft-1848.1",
+     "cyl-1849.1",
+     "subd-1850.1"
     ],
     "name": "crank",
     "id": "body-crank",
@@ -3050,57 +3058,57 @@
    "command": "add_rigid_body",
    "params": {
     "entityIds": [
-     "rev-1041.1",
-     "rev-1042.1",
-     "rev-1043.1",
-     "loft-1044.1",
-     "loft-1045.1",
-     "loft-1045.2",
-     "loft-1045.3",
-     "loft-1045.4",
-     "loft-1045.5",
-     "loft-1046.1",
-     "loft-1047.1",
-     "loft-1047.2",
-     "loft-1047.3",
-     "loft-1047.4",
-     "loft-1047.5",
-     "loft-1048.1",
-     "loft-1049.1",
-     "loft-1049.2",
-     "loft-1049.3",
-     "loft-1049.4",
-     "loft-1049.5",
-     "loft-1050.1",
-     "loft-1051.1",
-     "loft-1051.2",
-     "loft-1051.3",
-     "loft-1051.4",
-     "loft-1051.5",
-     "rev-1052.1",
-     "rev-1053.1",
-     "loft-1054.1",
-     "loft-1055.1",
-     "loft-1055.2",
-     "loft-1055.3",
-     "loft-1055.4",
-     "loft-1055.5",
-     "cyl-1056.1",
-     "rev-1057.1",
-     "rev-1070.1",
-     "ext-1071.1",
-     "ext-1072.1",
-     "ext-1073.1",
-     "ext-1074.1",
-     "ext-1075.1",
-     "ext-1076.1",
-     "ext-1077.1",
-     "ext-1078.1",
-     "ext-1079.1",
-     "ext-1080.1",
-     "ext-1081.1",
-     "ext-1082.1",
-     "rev-1083.1"
+     "rev-1822.1",
+     "rev-1823.1",
+     "rev-1824.1",
+     "loft-1825.1",
+     "loft-1826.1",
+     "loft-1826.2",
+     "loft-1826.3",
+     "loft-1826.4",
+     "loft-1826.5",
+     "loft-1827.1",
+     "loft-1828.1",
+     "loft-1828.2",
+     "loft-1828.3",
+     "loft-1828.4",
+     "loft-1828.5",
+     "loft-1829.1",
+     "loft-1830.1",
+     "loft-1830.2",
+     "loft-1830.3",
+     "loft-1830.4",
+     "loft-1830.5",
+     "loft-1831.1",
+     "loft-1832.1",
+     "loft-1832.2",
+     "loft-1832.3",
+     "loft-1832.4",
+     "loft-1832.5",
+     "rev-1833.1",
+     "rev-1834.1",
+     "loft-1835.1",
+     "loft-1836.1",
+     "loft-1836.2",
+     "loft-1836.3",
+     "loft-1836.4",
+     "loft-1836.5",
+     "cyl-1837.1",
+     "rev-1838.1",
+     "rev-1851.1",
+     "ext-1852.1",
+     "ext-1853.1",
+     "ext-1854.1",
+     "ext-1855.1",
+     "ext-1856.1",
+     "ext-1857.1",
+     "ext-1858.1",
+     "ext-1859.1",
+     "ext-1860.1",
+     "ext-1861.1",
+     "ext-1862.1",
+     "ext-1863.1",
+     "rev-1864.1"
     ],
     "name": "rear",
     "id": "body-rear",
@@ -3111,43 +3119,43 @@
    "command": "add_rigid_body",
    "params": {
     "entityIds": [
-     "rev-1024.1",
-     "rev-1025.1",
-     "rev-1026.1",
-     "loft-1027.1",
-     "loft-1028.1",
-     "loft-1028.2",
-     "loft-1028.3",
-     "loft-1028.4",
-     "loft-1028.5",
-     "loft-1029.1",
-     "loft-1030.1",
-     "loft-1030.2",
-     "loft-1030.3",
-     "loft-1030.4",
-     "loft-1030.5",
-     "loft-1031.1",
-     "loft-1032.1",
-     "loft-1032.2",
-     "loft-1032.3",
-     "loft-1032.4",
-     "loft-1032.5",
-     "loft-1033.1",
-     "loft-1034.1",
-     "loft-1034.2",
-     "loft-1034.3",
-     "loft-1034.4",
-     "loft-1034.5",
-     "rev-1035.1",
-     "rev-1036.1",
-     "loft-1037.1",
-     "loft-1038.1",
-     "loft-1038.2",
-     "loft-1038.3",
-     "loft-1038.4",
-     "loft-1038.5",
-     "cyl-1039.1",
-     "rev-1040.1"
+     "rev-1805.1",
+     "rev-1806.1",
+     "rev-1807.1",
+     "loft-1808.1",
+     "loft-1809.1",
+     "loft-1809.2",
+     "loft-1809.3",
+     "loft-1809.4",
+     "loft-1809.5",
+     "loft-1810.1",
+     "loft-1811.1",
+     "loft-1811.2",
+     "loft-1811.3",
+     "loft-1811.4",
+     "loft-1811.5",
+     "loft-1812.1",
+     "loft-1813.1",
+     "loft-1813.2",
+     "loft-1813.3",
+     "loft-1813.4",
+     "loft-1813.5",
+     "loft-1814.1",
+     "loft-1815.1",
+     "loft-1815.2",
+     "loft-1815.3",
+     "loft-1815.4",
+     "loft-1815.5",
+     "rev-1816.1",
+     "rev-1817.1",
+     "loft-1818.1",
+     "loft-1819.1",
+     "loft-1819.2",
+     "loft-1819.3",
+     "loft-1819.4",
+     "loft-1819.5",
+     "cyl-1820.1",
+     "rev-1821.1"
     ],
     "name": "front",
     "id": "body-front",
@@ -3162,7 +3170,7 @@
     "anchor": [
      0.0,
      0,
-     269.0
+     267.0
     ],
     "axis": [
      0,
@@ -3179,7 +3187,7 @@
     "kind": "revolute",
     "child": "body-rear",
     "anchor": [
-     -398.905,
+     -398.549,
      0,
      339.0
     ],
@@ -3189,7 +3197,7 @@
      0
     ],
     "id": "joint-rear",
-    "damping": 0.208069
+    "damping": 0.213057
    }
   },
   {
@@ -3198,7 +3206,7 @@
     "kind": "revolute",
     "child": "body-front",
     "anchor": [
-     576.095,
+     583.451,
      0,
      339.0
     ],
