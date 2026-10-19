@@ -18,6 +18,7 @@ STACK, REACH = 565.0, 392.0
 HTA, STA = 73.5, 73.0
 CHAINSTAY, WHEELBASE, BB_DROP = 405.0, 982.0, 72.0
 HEAD_TUBE = 125.0
+BAR_DEG = 22.0  # attitude of the one-piece bar (tops to hoods) in the side photo, whatever the stem angle
 SADDLE_HEIGHT = 745.0  # BB -> saddle top along the seat tube (1.80 m rider, same as the earlier study)
 R_WHEEL = 339.0  # 700 x 28c
 HUB_REAR, HUB_FRONT = 71.0, 50.0  # half of 142 / 100 mm thru-axle spacing
@@ -172,18 +173,19 @@ def build_cockpit(plan, colors):
     # top cap / spacer follows the head-block airfoil
     tube(plan, [on_steer(-6), on_steer(8 + O["spacers"])], [kamm(150, 46, 52, truncate=(52 + 86) / 150)] * 2, cat, cd_strut(76, 44, True), m, "stem", col)
     root = on_steer(10 + O["spacers"])
-    fwd = norm([math.cos(math.radians(O["stem_deg"])), 0, math.sin(math.radians(O["stem_deg"]))])
+    stem = norm([math.cos(math.radians(O["stem_deg"])), 0, math.sin(math.radians(O["stem_deg"]))])
+    fwd = norm([math.cos(math.radians(BAR_DEG)), 0, math.sin(math.radians(BAR_DEG))])  # the bar keeps the photo's attitude
     up = [-fwd[2], 0, fwd[0]]
 
     def at(x, y, z):
         """Point x along the stem, y lateral, z normal to the stem (in its vertical plane), from the bar centre."""
         return add(add(add(bar, mul(fwd, x)), mul(up, z)), [0, y, 0])
 
-    bar = add(root, mul(fwd, 140))
+    bar = add(root, mul(stem, 140))
     # stem: a 22 mm tall blade, narrow from the front, from inside the top cap into the bar centre
-    pts = [add(on_steer(2 + O["spacers"]), mul(fwd, -14)), add(root, mul(fwd, 24)), add(root, mul(fwd, 80)), add(bar, mul(fwd, 4))]
+    pts = [add(on_steer(2 + O["spacers"]), mul(stem, -14)), add(root, mul(stem, 24)), add(root, mul(stem, 80)), add(bar, mul(stem, 4))]
     outs = [superellipse(7, 15, 2.6), superellipse(11.5, 15, 3), superellipse(10.5, 14.5, 3), superellipse(10, 17, 3)]
-    tube(plan, pts, outs, cat, cd_strut(30, 22), m, "stem", col, hints=[up] * 4)
+    tube(plan, pts, outs, cat, cd_strut(30, 22), m, "stem", col, hints=[[-stem[2], 0, stem[0]]] * 4)
     # aero tops: a flat wing swept forward and slightly up to the hoods
     wing = [at(70, -(bh - 30), 6), at(18, -60, 1), at(0, 0, 0), at(18, 60, 1), at(70, bh - 30, 6)]
     outs = [kamm(*O["wing"])] * 2 + [kamm(*O["wing_centre"])] + [kamm(*O["wing"])] * 2
