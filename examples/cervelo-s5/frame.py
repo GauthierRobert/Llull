@@ -191,8 +191,8 @@ def build_cockpit(plan, colors):
     for side in (1, -1):
         y = side * bar_half
         drop = [[bx + 8, side * (bar_half - 26), bz], [bx + 42, side * (bar_half - 4), bz + 2], [bx + 80, y, bz - 18],
-                [bx + 80, side * (bar_half + 4), bz - 70], [bx + 44, side * (bar_half + 8), bz - 122], [bx - 20, side * (bar_half + 9), bz - 124],
-                [bx - 48, side * (bar_half + 9), bz - 112]]
+                [bx + 80, side * (bar_half + 8), bz - 70], [bx + 44, side * (bar_half + 16), bz - 122], [bx - 20, side * (bar_half + 20), bz - 124],
+                [bx - 48, side * (bar_half + 20), bz - 112]]
         plan.add("sweep_profile", {"path": [rnd(p) for p in drop], "smooth": True, "stations": [{"at": 0, "radiusX": 7.5, "radiusY": 11.9}, {"at": 0.12, "radiusX": 11.9, "radiusY": 11.9}, {"at": 1, "radiusX": 11.9, "radiusY": 11.9}], "color": colors["tape"]},
                  cat, cd_strut(23.8, 23.8), "bar_tape")
         # brake / shift hood: smooth subdivision body sitting on the ramp, horn rising at the front
@@ -204,7 +204,7 @@ def build_cockpit(plan, colors):
         v, f = ring_cage(rings)
         plan.cage(v, f, cat, 0.6, "rubber_hood", colors["hood"])
         hood = [bx + 92, y, bz + 6]
-        lever = [[bx + 128, y, bz - 6], [bx + 132, y, bz - 50], [bx + 118, side * (bar_half + 3), bz - 100]]
+        lever = [[bx + 128, y, bz - 6], [bx + 132, y, bz - 50], [bx + 118, side * (bar_half + 7), bz - 100]]
         tube(plan, lever, [superellipse(9, 5, 3), superellipse(8, 4.5, 3), superellipse(6, 4, 3)], cat, 1.0, "black_anod", None, colors["lever"],
              hints=[[1, 0, 0]] * 3)
     return {"bar": bar, "hood": hood, "bar_half": bar_half}

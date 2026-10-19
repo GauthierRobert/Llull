@@ -19,10 +19,10 @@ within a few mm, apart from the seatpost (its saddle height is the 1.80 m rider'
 | --- | --- |
 | Frame | Kamm-section lofts on the traced centre lines: shallow 23 mm top tube that flares into the head, 76–86 mm down tube, a slim seat tube curved round the rear tyre, a seat mast up into the cluster, straight dropped seatstays meeting the mast 160 mm below the top tube, deep chainstays, flat-mount dropouts. Welded into one solid with `blend_union` (filleted joints) on the exact OCC kernel, with a plain `boolean` union where the kernel will not fillet. |
 | Fork | Bayonet: the crown runs up the front of the head tube to the top cap (nose 52–63 mm ahead of the steering axis). Wide crown stepped under the down tube, blades 66 → 47 mm deep. Offset 43.5 mm, trail 55 mm. Welded. |
-| Cockpit | One-piece carbon bar/stem rising from the top cap (as in the drawing), flat airfoil tops, swept drops, subdivision hoods, levers |
+| Cockpit | One-piece carbon bar/stem (HB19, 100 mm stem, 40 cm at the hoods flaring to 44 cm in the drops) rising from the top cap as in the drawing, flat airfoil tops, subdivision hoods, levers |
 | Seat | Black D-shaped aero seatpost, clamp head, saddle |
 | Wheels | Reserve 57 / 64 toroidal rims (revolved cross-section), 28c tyres, 24 bladed spokes laced 2-cross, centre-lock 160 / 140 rotors, flat-mount calipers, thru-axles |
-| Drivetrain | Roller-seat tooth profiles on the 52/36 rings, the 11–30 cassette and both 13T pulleys. Derailleur cage angle solved for a whole number of links (106 = 1346.2 mm). Figure-8 chain plates, 7.75 mm rollers, pins |
+| Drivetrain | Roller-seat tooth profiles on the 52/36 rings, the Ultegra 11–34 cassette and both 13T pulleys, 170 mm cranks. Derailleur cage angle solved for a whole number of links (106 = 1346.2 mm). Figure-8 chain plates, 7.75 mm rollers, pins |
 | Finish | Reef Blue metallic carbon under clearcoat, lime CERVELO on the down tube, black carbon cockpit and seatpost, carbon rims, brushed alloy, rubber |
 | Rider | 1.80 m, lofted limbs and torso, subdivision helmet and shoes, hands on the hoods (torso angle solved from the cockpit position) |
 
@@ -35,15 +35,15 @@ BB drop 72, fork offset 43.5, trail 55.6 mm (Cervélo geometry chart, 2025 S5).
 
 Same method and calibration as `../bike`: Hoerner strut and cylinder drag coefficients, exposed areas accumulated front
 to back, Defraeye 2010 calibration and the Martin 1998 power model. Stock S5 drag ranking (bike CdA share): front wheel
-173 cm², fork 107, cockpit 96, frame 56, crankset 31, seat 21.
+174 cm², fork 107, cockpit 97, frame 56, crankset 31, seat 21.
 
 | | round tube | aero concept | concept + fit | **S5 2025** | S5 Aero+ | **S5 Aero+ fit** |
 | --- | --- | --- | --- | --- | --- | --- |
-| Bike CdA (m²) | 0.0770 | 0.0498 | 0.0497 | 0.0505 | 0.0457 | 0.0455 |
+| Bike CdA (m²) | 0.0770 | 0.0498 | 0.0497 | 0.0507 | 0.0460 | 0.0458 |
 | Rider CdA (m²) | 0.1930 | 0.1904 | 0.1723 | 0.1806 | 0.1740 | 0.1453 |
-| Rider + bike CdA (m²) | 0.2700 | 0.2402 | 0.2220 | 0.2311 | 0.2197 | 0.1907 |
-| Power at 40 km/h (W) | 268 | 242 | 227 | 234 | 225 | 200 |
-| 40 km at 250 W | 61:33 | 59:20 | 57:53 | 58:36 | 57:41 | 55:13 |
+| Rider + bike CdA (m²) | 0.2700 | 0.2402 | 0.2220 | 0.2313 | 0.2201 | 0.1911 |
+| Power at 40 km/h (W) | 268 | 242 | 227 | 235 | 225 | 200 |
+| 40 km at 250 W | 61:33 | 59:20 | 57:53 | 58:37 | 57:43 | 55:15 |
 
 The 2025 S5's taller front end (stack 565 mm, rising one-piece cockpit) sits the same rider higher than the 542 mm
 stack of the earlier frames, so its rider CdA is higher. The bike row is the like-for-like comparison.
@@ -57,8 +57,8 @@ stack of the earlier frames, so its rider CdA is higher. The bike row is the lik
 - 1× 52T with a flush ring cover and no front derailleur
 - 360 mm bar, −17° stem, narrower hoods and saddle
 
-That takes 4.8 cm² off the bike CdA. **Aero+ fit** (`s5xf`) adds the position the bike is built for: 330 mm hoods,
-forearms level, torso 17°, aero road helmet. That gives −17% system CdA, 34 W less at 40 km/h and 3:23 saved over
+That takes 46.2 cm² off the bike CdA. **Aero+ fit** (`s5xf`) adds the position the bike is built for: 330 mm hoods,
+forearms level, torso 17°, aero road helmet. That gives −17% system CdA, 35 W less at 40 km/h and 3:22 saved over
 40 km at 250 W.
 
 ## Build

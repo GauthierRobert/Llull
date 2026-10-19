@@ -11,10 +11,10 @@ from options import O
 BSD = 622.0
 TYRE = 28.0
 CHAIN_Y = -48.5
-CASSETTE = [11, 12, 13, 14, 15, 16, 17, 19, 21, 24, 27, 30]
+CASSETTE = [11, 12, 13, 14, 15, 17, 19, 21, 24, 27, 30, 34]  # Ultegra R8100 11-34
 COG_IN_USE = 15
 CASSETTE_SMALL_Y, COG_SPACING = -63.0, 3.5
-CRANK = 172.5
+CRANK = 170.0  # size 56 spec
 Q_FACTOR = 148.0
 PULLEY_TEETH = 13
 PITCH = 12.7
@@ -202,7 +202,7 @@ def build_drivetrain(plan, colors):
             rings.append((add(pc, [dx, 0, 0]), ex, ey, ring(a, b, 8, 3)))
         v, f = ring_cage(rings)
         pedals.append(plan.cage(v, f, "crankset", BLUFF, "black_anod", colors["pedal"]))
-    # cassette 11-30 on the freehub, tooth profiles
+    # cassette 11-34 on the freehub, tooth profiles
     plan.revolve(rear, [(0, -64), (17, -64), (17, -24), (0, -24)], "cassette", BLUFF, "black_anod", colors["black"], 48)
     for i, teeth in enumerate(CASSETTE):
         sprocket(plan, rear, CASSETTE_SMALL_Y + i * COG_SPACING, teeth, 1.6, "cassette", "steel", colors["cog"])
