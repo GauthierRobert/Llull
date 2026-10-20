@@ -3,6 +3,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { DerivationGuard, GuardRefusal } from '@core/commands/derivation';
 import { commandError } from '@core/commands/noop';
+import type { Revision } from '@core/model/plm';
 import { getCommand } from '@core/commands/registry';
 import { remediationOf } from './refusal';
 
@@ -73,6 +74,18 @@ export const releaseLockGuard: DerivationGuard = {
   },
 };
 
+/**
+ * Whether the frozen snapshot is kept: identical, or moved to the vault under its own content hash (`externalize_snapshots`, which checked the object).
+ * A vault reference never goes back to different content.
+ */
+function sameSnapshot(before: Revision, after: Revision): boolean {
+  const [a, b] = [before.snapshot, after.snapshot];
+  if (a === undefined || b === undefined) return a === b;
+  if (a.kind === 'inline' && b.kind === 'inline') return a.canonicalJson === b.canonicalJson;
+  if (a.kind === 'vault' && b.kind === 'vault') return a.objectSha256 === b.objectSha256;
+  return a.kind === 'inline' && b.kind === 'vault' && b.objectSha256 === before.contentHash;
+}
+
 /** Released history is immutable: a frozen revision keeps its hash and snapshot and may not vanish. */
 function historyRefusal(previous: CadDocument, next: CadDocument): GuardRefusal | null {
   const before = previous.plm?.item;
@@ -81,11 +94,7 @@ function historyRefusal(previous: CadDocument, next: CadDocument): GuardRefusal 
   for (const [label, revision] of Object.entries(before.revisions)) {
     if (!FROZEN.has(revision.state)) continue;
     const kept = after.revisions[label];
-    if (
-      kept === undefined ||
-      kept.contentHash !== revision.contentHash ||
-      kept.snapshot?.canonicalJson !== revision.snapshot?.canonicalJson
-    )
+    if (kept === undefined || kept.contentHash !== revision.contentHash || !sameSnapshot(revision, kept))
       return refusal('PLM_HISTORY_IMMUTABLE', `${before.partNumber} rev ${label} history cannot change`, [before.partNumber, label]);
   }
   return null;

@@ -5,11 +5,6 @@
       "export_step_ap242"
     ],
     "docs/aerospace/09-plm-configuration-traceability/validation/scenarios/S3_baseline_bom_fai.json": [
-      "assign_characteristic_ids",
-      "compare_baselines",
-      "create_baseline",
-      "engineering_bom",
-      "fai_report_skeleton",
       "record_as_built"
     ],
     "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-01-prepare-checks.json": [

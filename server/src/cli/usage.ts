@@ -51,6 +51,9 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
   release verify DIR          re-verify a package: member hashes, manifest hash, Ed25519 signatures, key trust (works without a document)
   release sign --revision R --key KEYID [--kind release|iteration] [--apply]   sign release_manifest with a local key; --apply records it
                               with record_signature (the key must be trusted), else prints the params
+  vault init | status [PN] | checkout PN | checkin | renew PN | break-lock PN | verify   the local vault (09 PLM; --vault DIR or $LLULL_VAULT, --doc FILE):
+                              checkout takes the exclusive lock and writes the head document, checkin checkpoints, stores frozen snapshots as
+                              content-addressed objects, updates refs and frees the lock; PLM_VAULT_LOCKED names the holder; break-lock only a stale lock
   audit verify [DIR]          recompute the hash-chained audit log ($LLULL_AUDIT_DIR, default ~/.llull/audit); exit 1 on a broken chain
   run_benchmarks [packs=a,b]  judge every docs/physics/*/validation/expected_results.json case
                               (harness recipes + unit-test measurements); exit 1 on an A-grade

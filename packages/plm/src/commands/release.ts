@@ -10,6 +10,7 @@ import { type PlmCode, refusePlm } from '../refusal';
 import { revisionLabel } from '../schemes';
 import { NOT_MANAGED, currentRevisionOf, revisionText, scopeOf, stateChange } from '../state';
 import { humanAct } from '../gate';
+import { liveStructure } from '../structure';
 import { isLegalTransition, transitionRefusal } from '../transitions';
 import { openRevision, withPlm, withRevision } from '../revisions';
 import { atSchema, bySchema, confirmationSchema, effectivitySchema } from '../params';
@@ -76,6 +77,7 @@ export const releaseItem = defineCommand({
       contentHash: scope.sha256,
       snapshot: { kind: 'inline', canonicalJson: scope.canonicalJson },
       unverified: unverifiedInScope(doc),
+      ...(plm.subItems !== undefined && Object.keys(plm.subItems).length > 0 ? { releasedStructure: liveStructure(doc, plm) } : {}),
       stateHistory: [...revision.stateHistory, stateChange('in_review', 'released', at, by)],
     };
     const revisions: Record<string, Revision> = { ...plm.item.revisions, [revision.label]: released };

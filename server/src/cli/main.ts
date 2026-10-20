@@ -25,6 +25,7 @@ import { getGeometryKernel } from '@core/geometry/kernel';
 import { planKernelWarnings } from './planKernelWarning';
 import { benchmarkCli } from './benchmarks';
 import { PlmUsage, confirmedParams, runPlmCli } from './plm';
+import { runVault } from './vault';
 
 export interface CliIo {
   readonly stdout: (text: string) => void;
@@ -390,6 +391,8 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
       case 'undo':
       case 'redo':
         return await runHistory(subcommand, args, io);
+      case 'vault':
+        return runVault(args, io);
       case 'keys':
       case 'release':
       case 'audit':
