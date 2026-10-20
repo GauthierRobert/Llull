@@ -5,6 +5,7 @@ import { defineCommand, z } from '../schema';
 import { codedRejection, noop, rejection, report } from '../noop';
 import { currentContext } from '../context';
 import { MM_PER_UNIT } from '../../model/units';
+import { checkedPrototype } from '../../model/prototype';
 import { type CheckItem, type CheckResult, worstStatus } from '../../model/checkResult';
 import type { SimulationData } from '../../dynamics/simulationReport';
 import { isMoving } from '../../dynamics/motionPoses';
@@ -222,7 +223,7 @@ export const checkMotionClearance = defineCommand({
         canonicalJson({
           parts: built.map((part) => [part.id, recipeKey(part.recipe)]),
           dynamics: doc.dynamics ?? null,
-          prototype: doc.prototype ?? null,
+          prototype: checkedPrototype(doc.prototype) ?? null,
           params,
           units: doc.units,
           kernel: kernel.name ?? null,

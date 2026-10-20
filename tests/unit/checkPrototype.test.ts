@@ -9,6 +9,8 @@ import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { prototypeProblems } from '@core/commands/persistence/prototypeValidation';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
+import { sliderCrank } from './sliderCrankFixture';
+import { ownerSummary, skippedCheck } from '@core/commands/dynamics/prototypeVerdict';
 
 let kernel: GeometryKernel;
 beforeAll(async () => {
@@ -140,6 +142,27 @@ describe('check_prototype', () => {
     expect(data.ownerSummary).toMatch(/not run: clearance in motion, dynamics and realism/);
   });
 
+  it('a disposition never changes the hash of the stand-alone checks either (one shared prototype view)', () => {
+    const { doc } = armScene(150);
+    const hashes = (d: CadDocument): string[] =>
+      ['check_assembly', 'check_motion_clearance'].map(
+        (name) => (execute(d, name, name === 'check_assembly' ? {} : { duration: 0.2 }, ctxOf()).data as { inputsHash: string }).inputsHash,
+      );
+    const disposed = step(doc, 'set_review_disposition', { findingKey: 'assembly:FPR_X:a', status: 'relevant', inputsHash: 'h' }).doc;
+    expect(hashes(disposed)).toEqual(hashes(doc));
+  });
+
+  it('an open loop is a mechanism fail that blocks the verdict and stops the motion checks (spec 5.7)', () => {
+    const { doc } = sliderCrank({ wristGapMm: 1 });
+    const { data } = run(doc, { crankAxis: 'crank_j' });
+    expect(data.verdict).toBe('blocked');
+    const open = checkOf(data, 'mechanism').items.find((item) => item.code === 'FPR_LOOP_OPEN');
+    expect(open).toMatchObject({ status: 'fail', ids: ['wrist_j'] });
+    expect(checkOf(data, 'mechanism').status).toBe('fail');
+    expect(checkOf(data, 'motion_clearance').items[0]?.note).toMatch(/FPR_LOOP_OPEN: loop joint 'wrist_j'/);
+    expect(data.ownerSummary).not.toMatch(/Passed: .*mechanism/);
+  });
+
   it('a document without parts is blocked and nothing reads as a pass', () => {
     const { data } = run(createEmptyDocument(), { crankAxis: undefined });
     expect(data.verdict).toBe('blocked');
@@ -204,5 +227,16 @@ describe('set_review_disposition', () => {
     expect(prototypeProblems({ ...base, dispositions: { [key]: { ...good, inputsHash: '' } } })[0]).toMatch(/inputsHash/);
     expect(prototypeProblems({ ...base, dispositions: { [key]: { ...good, by: 'bot' } } })[0]).toMatch(/by must be/);
     expect(prototypeProblems({ ...base, dispositions: JSON.parse('{"__proto__": {}}') as object })[0]).toMatch(/reserved/);
+  });
+});
+
+describe('owner summary', () => {
+  it('lists only pass checks under "Passed": information (a touch, a calibration point) is never read as a pass', () => {
+    const skipped = skippedCheck('dynamics', 'FPR_X', 'why', 'fix');
+    const info = { ...skipped, check: 'motion_clearance' as const, status: 'info' as const, items: [] };
+    const pass = { ...skipped, check: 'mechanism' as const, status: 'pass' as const, items: [] };
+    const text = ownerSummary([pass, info], { parts: 2, dof: 1, durationS: 1, closestMm: null, stale: 0 }, 'ready_for_review');
+    expect(text).toMatch(/Passed: mechanism\./);
+    expect(text).not.toMatch(/clearance in motion/);
   });
 });

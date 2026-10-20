@@ -5,21 +5,21 @@
  */
 
 import type { CadDocument } from '../../model/types';
-import { findingKey } from '../../model/checkResult';
+import { findingKey, worstStatus } from '../../model/checkResult';
 import { hashText } from '../../lib/hash';
 import { canonicalJson } from '../../lib/canonicalJson';
 import { isRecord } from '../../lib/isRecord';
 import type { ExecutionContext } from '../types';
 import { dynamicsOf } from './bodies';
-import { skippedCheck, type PrototypeCheck, type PrototypeItem } from './prototypeVerdict';
+import { isCheck, skippedCheck, type PrototypeCheck, type PrototypeItem } from './prototypeVerdict';
 
 export interface Mobility {
   readonly dof: number;
   readonly gruebler: number;
   readonly rank: number;
   readonly redundantRows: number;
-  /** Loop joints open at the start pose (FPR_LOOP_OPEN). */
-  readonly openLoops: readonly string[];
+  /** Loop joints open at the start pose (FPR_LOOP_OPEN) with the gap in mm. */
+  readonly openLoops: readonly { readonly joint: string; readonly gapMm: number }[];
 }
 
 /** Rank mobility of the dynamics model, or null without bodies or when the topology is refused. */
@@ -35,7 +35,10 @@ export function mobilityOf(context: ExecutionContext, doc: CadDocument): Mobilit
     gruebler: number('gruebler'),
     rank: number('rank'),
     redundantRows: Array.isArray(mobility['redundant']) ? mobility['redundant'].length : 0,
-    openLoops: problems.flatMap((problem) => /^FPR_LOOP_OPEN: loop joint '([^']+)'/.exec(problem)?.[1] ?? []),
+    openLoops: problems.flatMap((problem) => {
+      const match = /^FPR_LOOP_OPEN: loop joint '([^']+)' is open by ([0-9.eE+-]+) mm/.exec(problem);
+      return match?.[1] === undefined ? [] : [{ joint: match[1], gapMm: Number(match[2]) }];
+    }),
   };
 }
 
@@ -60,8 +63,7 @@ export function mechanismCheck(context: ExecutionContext, doc: CadDocument, mobi
   if (mobility === null) {
     if (Object.keys(dynamics.bodies).length === 0) {
       const kinematic = context.registry('check_mechanism')?.run(doc, {}, context).data;
-      if (isRecord(kinematic) && Array.isArray(kinematic['items']) && typeof kinematic['inputsHash'] === 'string')
-        return kinematic as unknown as PrototypeCheck;
+      if (isCheck(kinematic) && kinematic.check === 'mechanism') return kinematic;
     }
     return skippedCheck(
       'mechanism',
@@ -76,9 +78,20 @@ export function mechanismCheck(context: ExecutionContext, doc: CadDocument, mobi
     mobility.dof <= 0
       ? [item('FPR_MECH_LOCKED', 'fail', joints, 'Nothing can move: remove a redundant joint or make a loop joint spherical.', { values })]
       : [item('FPR_MECH_OK', 'pass', joints, 'The mechanism moves.', { values })];
+  // spec 5.7: an open loop is a fail that stops the motion checks; the verdict must not read ready_for_review
+  for (const { joint, gapMm } of mobility.openLoops)
+    items.push(
+      item(
+        'FPR_LOOP_OPEN',
+        'fail',
+        [joint],
+        'Fix the anchors or the geometry so the loop pins coincide at the start pose (inspect_dynamics loopGapsM).',
+        { values: { gapMm } },
+      ),
+    );
   return {
     check: 'mechanism',
-    status: items[0]?.status ?? 'pass',
+    status: worstStatus(items.map((entry) => entry.status)),
     items,
     provenance: {
       method: 'inspect_dynamics mobility: numerical rank of the loop-constraint Jacobian at the start pose (Grubler alongside)',

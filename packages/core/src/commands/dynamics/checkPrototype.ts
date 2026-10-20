@@ -2,6 +2,7 @@
 
 import type { CadDocument } from '../../model/types';
 import { PROCESS_IDS } from '../../model/processRules';
+import { checkedPrototype } from '../../model/prototype';
 import type { Accuracy } from '../../dynamics/accuracy';
 import { RAD_PER_S_PER_RPM } from '../../dynamics/forceLaws';
 import { announcedSpeed } from '../../dynamics/timestep';
@@ -13,6 +14,7 @@ import { currentContext } from '../context';
 import { dynamicsOf } from './bodies';
 import { mechanismCheck, mobilityOf } from './prototypeMechanism';
 import {
+  isCheck,
   mergeChecks,
   ownerSummary,
   skippedCheck,
@@ -29,9 +31,6 @@ const MAX_DURATION_S = 600;
 /** Settling cycles before the measured ones when the duration comes from the crank speed. */
 const SETTLE_CYCLES = 2;
 
-const isCheck = (data: unknown): data is PrototypeCheck =>
-  isRecord(data) && typeof data['check'] === 'string' && Array.isArray(data['items']) && typeof data['inputsHash'] === 'string';
-
 interface Sub {
   readonly result: CommandResult;
   readonly check: PrototypeCheck | null;
@@ -45,10 +44,8 @@ function runSub(context: ExecutionContext, doc: CadDocument, name: string, param
 }
 
 function withoutDispositions(doc: CadDocument): CadDocument {
-  const prototype = doc.prototype;
-  if (prototype?.dispositions === undefined) return doc;
-  const { intents, grounded, references } = prototype;
-  return { ...doc, prototype: { intents, grounded, ...(references === undefined ? {} : { references }) } };
+  const prototype = checkedPrototype(doc.prototype);
+  return prototype === doc.prototype || prototype === undefined ? doc : { ...doc, prototype };
 }
 
 const reasonOf = (summary: string): string => summary.replace(/^[a-z_]+:\s*/, '').replace(/;\s*no-op\.$/, '');
@@ -163,7 +160,7 @@ export const checkPrototype = defineCommand({
     const stopper = assembly.items.find(
       (item) => item.status === 'fail' && (item.code === 'FPR_PART_INVALID' || item.code === 'FPR_PART_FLOATING'),
     );
-    const openLoop = mobility?.openLoops[0];
+    const openLoop = mobility?.openLoops[0]?.joint;
     const stopReason =
       stopper !== undefined
         ? `${stopper.code} on ${stopper.ids.join(', ')} makes the motion checks meaningless`

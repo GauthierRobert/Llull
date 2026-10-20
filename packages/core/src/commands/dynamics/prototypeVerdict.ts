@@ -9,6 +9,7 @@ import type { Disposition } from '../../model/prototype';
 import type { Accuracy } from '../../dynamics/accuracy';
 import { hashText } from '../../lib/hash';
 import { canonicalJson } from '../../lib/canonicalJson';
+import { isRecord } from '../../lib/isRecord';
 
 export type PrototypeCheckName = 'assembly' | 'mechanism' | 'motion_clearance' | 'dynamics';
 
@@ -33,6 +34,9 @@ export interface PrototypeCheck {
   readonly unverified: boolean;
   readonly reviewRequired: true;
 }
+
+export const isCheck = (data: unknown): data is PrototypeCheck =>
+  isRecord(data) && typeof data['check'] === 'string' && Array.isArray(data['items']) && typeof data['inputsHash'] === 'string';
 
 /** A check that did not run, with the reason as its one not_run item (an empty check is never a pass). */
 export function skippedCheck(check: PrototypeCheckName, code: string, reason: string, remediation: string): PrototypeCheck {
@@ -144,7 +148,8 @@ export function ownerSummary(checks: readonly PrototypeCheck[], facts: SummaryFa
   const fails = items.filter((item) => item.status === 'fail');
   const accepted = fails.filter((item) => item.disposition?.status === 'accepted').length;
   const warns = items.filter((item) => item.status === 'warn').length;
-  const passed = checks.filter((check) => check.status === 'pass' || check.status === 'info').map((check) => LABEL[check.check]);
+  // info (a touch, a calibration point) is never read as a pass
+  const passed = checks.filter((check) => check.status === 'pass').map((check) => LABEL[check.check]);
   const notRun = checks.filter((check) => check.status === 'not_run').map((check) => LABEL[check.check]);
   const done =
     `Checked ${facts.parts} part(s)` +

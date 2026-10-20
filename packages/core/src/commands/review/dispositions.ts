@@ -29,8 +29,8 @@ const idsOfKey = (findingKey: string): string[] =>
 export const setReviewDisposition = defineCommand({
   name: NAME,
   description:
-    'Record a reviewer status and comment on one finding of check_prototype (or of check_assembly / check_motion_clearance / ' +
-    'check_dynamics): status "relevant" (needs work), "irrelevant" (does not apply, say why), "accepted" (known and accepted as is) or ' +
+    'Record a reviewer status and comment on one finding of check_prototype (pass the findingKey of the item and the inputsHash of its check, data.checks[].inputsHash; the stand-alone ' +
+    'checks run with other parameters, so their hashes differ and would read stale): status "relevant" (needs work), "irrelevant" (does not apply, say why), "accepted" (known and accepted as is) or ' +
     '"not_reviewed". Stored in the document (doc.prototype.dispositions) with the inputsHash of the check it was made on: when that check is ' +
     're-run on changed inputs the disposition is kept but flagged stale for re-review. An "accepted" disposition NEVER turns a fail into a ' +
     'pass: the item reads "fail (accepted)" and check_prototype stays blocked while a fail remains. "not_reviewed" with an empty comment ' +
@@ -43,7 +43,9 @@ export const setReviewDisposition = defineCommand({
     comment: z.string().optional().describe('Reviewer comment (why it is irrelevant / accepted, what to do). Default empty.'),
     inputsHash: z
       .string()
-      .describe('The inputsHash of the check result the finding came from (checks[].inputsHash); a later different hash marks it stale.'),
+      .describe(
+        'The inputsHash of the check_prototype check the finding came from (data.checks[].inputsHash); a later different hash marks it stale.',
+      ),
   }),
   run: (doc, { findingKey, status, comment = '', inputsHash }): CommandResult => {
     const fail = failer(doc, NAME);
