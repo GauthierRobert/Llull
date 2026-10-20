@@ -1,5 +1,5 @@
 import type { DimensionConstraintKind } from '../../../model/types';
-import { positiveSweep, wrapSignedAngle } from '../../../lib/angle';
+import { positiveSweep } from '../../../lib/angle';
 import { at } from './linalg';
 import { directionOf, type Pt } from './layout';
 import {
@@ -56,7 +56,10 @@ function compileAngle(ctx: CompileContext, target: number): CompileOutcome {
   return build(ctx, 1, (x, out, row) => {
     const da = directionOf(la(x));
     const db = directionOf(lb(x));
-    out[row] = wrapSignedAngle(Math.atan2(cross(da, db), dot(da, db)) - target);
+    out[row] = Math.atan2(
+      cross(da, db) * Math.cos(target) - dot(da, db) * Math.sin(target),
+      dot(da, db) * Math.cos(target) + cross(da, db) * Math.sin(target),
+    );
   });
 }
 

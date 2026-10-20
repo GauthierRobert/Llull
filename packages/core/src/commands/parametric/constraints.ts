@@ -269,7 +269,7 @@ export const solveConstraints = defineCommand({
     const status = `${dof} degree(s) of freedom; ${fullyConstrained.length} entit${fullyConstrained.length === 1 ? 'y' : 'ies'} fully constrained.`;
     const summary = converged
       ? `solve_constraints: converged in ${iterations} iteration(s). Residual: ${residual.toExponential(3)}. ${uniqueMoved.length} entity/entities may have moved. ${status}`
-      : `solve_constraints: did NOT converge after ${iterations} iteration(s). Residual: ${residual.toExponential(3)} (threshold 1e-8). Positions reflect best-effort result. ${status}`;
+      : `solve_constraints: did NOT converge after ${iterations} iteration(s). Residual: ${residual.toExponential(3)}. Positions reflect best-effort result. ${status}`;
     return {
       document: outcome.document,
       summary,
