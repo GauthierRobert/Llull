@@ -60,6 +60,7 @@ const TOOLKITS = [
   'TKXSBase',
   'TKDE',
   'TKDESTEP',
+  'TKDEIGES',
   'TKCDF',
   'TKLCAF',
   'TKCAF',

@@ -696,7 +696,7 @@ export interface DocumentKernelSettings {
  */
 export interface DocumentBlob {
   readonly sha256: string;
-  readonly mediaType: 'model/x-occt-brep' | 'model/step';
+  readonly mediaType: 'model/x-occt-brep' | 'model/step' | 'model/iges';
   /** Base64 of the payload text. */
   readonly bytes: string;
   readonly size: number;

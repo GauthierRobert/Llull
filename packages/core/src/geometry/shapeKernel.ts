@@ -80,7 +80,7 @@ export interface KernelOps<S> {
   /** Keep the B-rep text of blob `sha256` (idempotent) so `brep(sha256)` can build, and rebuild after a cache eviction. */
   loadBlob?(sha256: string, brep: string): void;
   /** Exact import of an exchange file (`GeometryKernel.importShapes`); the ops own the native reader, no recipe is involved. */
-  importShapes?(format: 'step', text: string, options: ImportShapesOptions): ImportShapesResult | null;
+  importShapes?(format: 'step' | 'iges', text: string, options: ImportShapesOptions): ImportShapesResult | null;
   /** Kernel description (`GeometryKernel.info`). */
   info?(): KernelInfo;
 }

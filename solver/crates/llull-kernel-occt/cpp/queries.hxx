@@ -9,6 +9,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include <TopoDS_Compound.hxx>
@@ -50,5 +51,11 @@ rust::String assembly_write(StepAssembly &assembly);
 std::unique_ptr<Shape> read_brep(rust::Str text);
 rust::String write_brep(const Shape &shape);
 rust::String import_step_json(rust::Str text, double precision, double max_tolerance, bool heal, bool sew);
+// The solids report of import_step_json for a shape any reader transferred (`roots` root entities, the file `content` for diagnostics);
+// shared by the STEP and IGES importers.
+rust::String imported_shapes_json(const TopoDS_Shape &shape, int roots, const std::string &content, double precision, double max_tolerance,
+                                  bool heal, bool sew);
+// IGES 5.3 import (IGESControl_Reader, read from a temporary file) with the same report as STEP.
+rust::String import_iges_json(rust::Str text, double precision, double max_tolerance, bool heal, bool sew);
 
 }  // namespace llull

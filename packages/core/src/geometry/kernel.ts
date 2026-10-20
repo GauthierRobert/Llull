@@ -150,7 +150,10 @@ export interface GeometryKernel {
   massProperties?(shape: ShapeHandle): ExactMassProperties | null;
 
   /** Read and heal an exchange file into exact solids (TR-KRN-20/24); `text` is the Part 21 file content. */
-  importShapes?(format: 'step', text: string, options: ImportShapesOptions): ImportShapesResult | null;
+  importShapes?(format: 'step' | 'iges', text: string, options: ImportShapesOptions): ImportShapesResult | null;
+
+  /** IGES 5.3 text of the shapes as exact B-rep solids (SC-D4); absent or null when the kernel cannot write IGES. */
+  exportIges?(shapes: readonly ShapeHandle[]): string | null;
 
   /** Make a document blob (`brep` recipe leaves, `BRepTools::Write` text keyed by sha256) available to `evaluate`. Idempotent. */
   loadBlob?(sha256: string, brep: string): void;

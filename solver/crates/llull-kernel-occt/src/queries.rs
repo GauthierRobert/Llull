@@ -38,6 +38,7 @@ mod ffi {
         fn read_brep(text: &str) -> Result<UniquePtr<Shape>>;
         fn write_brep(shape: &Shape) -> Result<String>;
         fn import_step_json(text: &str, precision: f64, max_tolerance: f64, heal: bool, sew: bool) -> Result<String>;
+        fn import_iges_json(text: &str, precision: f64, max_tolerance: f64, heal: bool, sew: bool) -> Result<String>;
     }
 }
 
@@ -200,6 +201,11 @@ pub struct ImportOptions {
 }
 
 /// `importShapes('step', …)`: healed solids with their blob text and report, or `{ error, detail }`.
+/// IGES import with the same healing and report as [`import_step`].
+pub fn import_iges(text: &str, options: ImportOptions) -> OcctResult<Value> {
+    parsed(ffi::import_iges_json(text, options.precision, options.max_tolerance, options.heal, options.sew))
+}
+
 pub fn import_step(text: &str, options: ImportOptions) -> OcctResult<Value> {
     parsed(ffi::import_step_json(text, options.precision, options.max_tolerance, options.heal, options.sew))
 }

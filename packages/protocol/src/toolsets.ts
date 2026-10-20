@@ -70,7 +70,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   'material-lab': words('fit_material_model material_point_response export_material_cards'),
   review: words('allow_interference remove_interference_intent set_part_grounded'),
   exchange: words(
-    'export_stl export_obj export_gltf export_3mf export_urdf mesh_to_solid export_step_exact export_code apply_code_trace import_mesh import_dxf import_step_exact export_step import_step import_dwg import_code',
+    'export_stl export_obj export_gltf export_3mf export_urdf mesh_to_solid export_step_exact export_iges export_code apply_code_trace import_mesh import_dxf import_step_exact export_step import_step import_dwg import_code',
   ),
   /** Core analytic checks plus the finite-element commands contributed by the installed cae plugin. */
   get analysis(): readonly string[] {

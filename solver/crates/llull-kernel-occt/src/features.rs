@@ -46,6 +46,7 @@ mod ffi {
         fn draft_faces(shape: &Shape, faces: &[u32], angle: f64, pull: &[f64], origin: &[f64], normal: &[f64]) -> Result<UniquePtr<Shape>>;
         fn push_pull(shape: &Shape, face: u32, distance: f64) -> Result<UniquePtr<Shape>>;
         fn split_faces(shape: &Shape, faces: &[u32], origin: &[f64], normal: &[f64]) -> Result<UniquePtr<Shape>>;
+        fn export_iges(list: &ShapeList) -> Result<String>;
         fn is_valid_shape(shape: &Shape) -> Result<bool>;
         fn unified_shape(shape: &Shape) -> Result<UniquePtr<Shape>>;
     }
@@ -150,6 +151,17 @@ pub fn push_pull(shape: &Shape, face: u32, distance: f64) -> Built {
 /// Split `faces` along the plane (`origin`, `normal`); the body stays one solid.
 pub fn split_faces(shape: &Shape, faces: &[u32], origin: [f64; 3], normal: [f64; 3]) -> Built {
     built(ffi::split_faces(inner(shape)?, faces, &origin, &normal))
+}
+
+/// IGES 5.3 text of `shapes` (B-rep mode, millimetres); `None` when the writer refuses a shape.
+pub fn export_iges(shapes: &[&Shape]) -> OcctResult<Option<String>> {
+    let mut list = ffi::new_shape_list();
+    for shape in shapes {
+        let Some(pinned) = list.as_mut() else { return Err("shape list not created".to_string()) };
+        ffi::shape_list_add(pinned, inner(shape)?);
+    }
+    let Some(list) = list.as_ref() else { return Err("shape list not created".to_string()) };
+    occt(ffi::export_iges(list)).map(|text| (!text.is_empty()).then_some(text))
 }
 
 pub fn is_valid(shape: &Shape) -> OcctResult<bool> {

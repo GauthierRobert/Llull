@@ -25,7 +25,7 @@ export interface FakeExactKernel {
   readonly kernel: GeometryKernel;
   /** sha256 of every `loadBlob` call, in order. */
   readonly loaded: string[];
-  readonly imports: Array<{ readonly text: string; readonly options: unknown }>;
+  readonly imports: Array<{ readonly text: string; readonly options: unknown; readonly format: string }>;
 }
 
 export const importedSolid = (extra: Partial<ImportedSolid> = {}): ImportedSolid => ({
@@ -44,7 +44,7 @@ export const CENSUS = { roots: 1, solids: 1, shells: 1, openShells: 0, faces: 6 
 
 export function fakeExactKernel(spec: FakeExactSpec = {}): FakeExactKernel {
   const loaded: string[] = [];
-  const imports: Array<{ text: string; options: unknown }> = [];
+  const imports: Array<{ text: string; options: unknown; format: string }> = [];
   const texts = new Map<string, string>();
   const exact = spec.exact !== false;
   const info = spec.info === undefined ? { capabilities: ['importShapes', 'brepBlobs'] } : spec.info;
@@ -70,8 +70,8 @@ export function fakeExactKernel(spec: FakeExactSpec = {}): FakeExactKernel {
             loaded.push(sha256);
             texts.set(sha256, brep);
           },
-          importShapes: (_format: 'step', text: string, options: unknown) => {
-            imports.push({ text, options });
+          importShapes: (format: 'step' | 'iges', text: string, options: unknown) => {
+            imports.push({ text, options, format });
             return spec.imported === undefined ? null : spec.imported;
           },
         }

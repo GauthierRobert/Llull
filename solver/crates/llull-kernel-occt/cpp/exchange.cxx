@@ -239,7 +239,6 @@ rust::String write_brep(const Shape &shape) { return rust::String(brep_text(shap
 
 rust::String import_step_json(rust::Str text, double precision, double max_tolerance, bool heal, bool sew) {
   const std::string content(text.data(), text.size());
-  const Options options{precision, max_tolerance, heal, sew};
   STEPControl_Reader reader;
   std::istringstream stream(content);
   if (reader.ReadStream("in.step", stream) != IFSelect_RetDone)
@@ -247,6 +246,12 @@ rust::String import_step_json(rust::Str text, double precision, double max_toler
   const int roots = reader.NbRootsForTransfer();
   const int transferred = roots > 0 ? reader.TransferRoots() : 0;
   const TopoDS_Shape shape = transferred > 0 && reader.NbShapes() > 0 ? reader.OneShape() : TopoDS_Shape();
+  return imported_shapes_json(shape, roots, content, precision, max_tolerance, heal, sew);
+}
+
+rust::String imported_shapes_json(const TopoDS_Shape &shape, int roots, const std::string &content, double precision, double max_tolerance,
+                                  bool heal, bool sew) {
+  const Options options{precision, max_tolerance, heal, sew};
   if (shape.IsNull()) {
     const bool tessellated = content.find("TESSELLATED_") != std::string::npos ||
                              content.find("TRIANGULATED_FACE") != std::string::npos ||

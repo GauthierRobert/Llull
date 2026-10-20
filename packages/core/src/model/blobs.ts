@@ -8,7 +8,7 @@ import { base64ToText, textToBase64 } from '../lib/base64';
 import { sha256Hex } from '../lib/sha256';
 import type { CadDocument, DocumentBlob } from './types';
 
-const BLOB_MEDIA_TYPES: ReadonlyArray<string> = ['model/x-occt-brep', 'model/step'];
+const BLOB_MEDIA_TYPES: ReadonlyArray<string> = ['model/x-occt-brep', 'model/step', 'model/iges'];
 
 export function makeBlob(mediaType: DocumentBlob['mediaType'], text: string): DocumentBlob {
   return { sha256: sha256Hex(text), mediaType, bytes: textToBase64(text), size: new TextEncoder().encode(text).length };
