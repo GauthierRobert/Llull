@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 /**
+ * TEMPORARY (owner 2026-10-20): delete this folder once the build machine has MSVC Build Tools ("Desktop development with C++").
  * Developer stand-in for GNU dlltool on Windows machines without MSVC and without MinGW binutils (the `x86_64-pc-windows-gnu` rustup
  * toolchain ships dlltool but not the assembler it spawns). wgpu's Windows dependencies (`windows-link`) import with raw-dylib, so any
  * build or test that enables wgpu (`npm run native:check`, `--features gpu`) needs import libraries. This writes the same layout
