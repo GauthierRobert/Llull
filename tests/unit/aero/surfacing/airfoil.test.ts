@@ -293,7 +293,7 @@ describe('aero document extension', () => {
     expect(errors.join('\n')).toMatch(/source.type/);
     expect(errors.join('\n')).toMatch(/normalize/);
     expect(errors.join('\n')).toMatch(/provenance/);
-    expect(errors.join('\n')).toMatch(/missing curve/);
+    expect(errors.join('\n')).not.toMatch(/missing/);
     expect(aeroDocument.validate({ aero: 3 })).toEqual(['aero must be { airfoils, wings }']);
     const raws = raw();
     (raws['aero'] as { airfoils: Record<string, unknown> }).airfoils[id] = 5;

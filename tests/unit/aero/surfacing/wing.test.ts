@@ -155,18 +155,25 @@ describe('create_wing', () => {
     expect(aeroDocument.validate(JSON.parse(JSON.stringify(doc)) as Record<string, unknown>)).toEqual([]);
   });
 
-  it('a file saved after deleting a referenced loft or airfoil curve still reopens, without the dangling definitions', () => {
+  it('a file saved after deleting a referenced loft or airfoil curve reopens unchanged; stale definitions are refused at use', () => {
     const { doc, wing, ids } = trapezoid();
     const noWing = execute(doc, 'delete_entities', { ids });
     const loadedNoWing = deserializeDocument(serializeDocument(noWing.document));
-    expect(loadedNoWing.aero!.wings[wing]).toBeUndefined();
-    expect(Object.keys(loadedNoWing.aero!.airfoils)).toHaveLength(1);
-    const airfoilId = Object.values(doc.aero!.airfoils)[0]!.entityId;
-    const noAirfoil = execute(doc, 'delete_entities', { ids: [airfoilId] });
+    expect(loadedNoWing.aero).toEqual(noWing.document.aero);
+    expect(loadedNoWing.aero!.wings[wing]).toBeDefined();
+    const airfoilId = Object.keys(doc.aero!.airfoils)[0]!;
+    const curveId = doc.aero!.airfoils[airfoilId]!.entityId;
+    const noAirfoil = execute(doc, 'delete_entities', { ids: [curveId] });
     const loaded = deserializeDocument(serializeDocument(noAirfoil.document));
-    expect(loaded.aero!.airfoils).toEqual({});
-    expect(loaded.aero!.wings[wing]).toBeUndefined();
-    expect(loaded.entities[ids[0]!]).toBeDefined();
+    expect(loaded.aero).toEqual(noAirfoil.document.aero);
+    const again = execute(loaded, 'create_wing', {
+      sections: [
+        { airfoilId, span: 0, chord: 2 },
+        { airfoilId, span: 5, chord: 1 },
+      ],
+    });
+    expectNoOp(again, loaded);
+    expect(again.error?.code).toBe('AERO_AIRFOIL_NOT_FOUND');
   });
 
   it('scale_entity scales the exact sections together with the rings', () => {

@@ -264,6 +264,6 @@ describe('loft_fuselage (VC-SRF-13, VC-SRF-14)', () => {
     expect(loaded.aero?.bodies?.[id]?.stations).toHaveLength(searsHaack.stations.length);
     const gone = execute(sears.document, 'delete_entities', { ids: [id] });
     const reopened = deserializeDocument(serializeDocument(gone.document));
-    expect(reopened.aero?.bodies?.[id]).toBeUndefined();
+    expect(reopened.aero).toEqual(gone.document.aero);
   });
 });
