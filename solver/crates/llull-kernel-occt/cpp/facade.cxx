@@ -12,7 +12,6 @@
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
 #include <BRepBndLib.hxx>
-#include <BRepBuilderAPI_Copy.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
 #include <BRepBuilderAPI_MakeSolid.hxx>
@@ -31,14 +30,12 @@
 #include <BRep_Tool.hxx>
 #include <Bnd_Box.hxx>
 #include <GProp_GProps.hxx>
-#include <Geom_BSplineCurve.hxx>
 #include <Message.hxx>
 #include <Message_Messenger.hxx>
 #include <Message_PrinterOStream.hxx>
 #include <Poly_Triangulation.hxx>
 #include <STEPControl_Writer.hxx>
 #include <ShapeAnalysis_ShapeContents.hxx>
-#include <ShapeUpgrade_ShapeDivideContinuity.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
 #include <Standard_Version.hxx>
 #include <TopExp.hxx>
@@ -62,30 +59,6 @@ void require_length(rust::Slice<const double> values, size_t length, const char 
 std::unique_ptr<Shape> wrap(const TopoDS_Shape &shape) {
   if (shape.IsNull()) return nullptr;
   return std::make_unique<Shape>(shape);
-}
-
-// Whether an edge curve has interior knots (a multi-span B-spline, e.g. a lofted B-spline section).
-bool has_multispan_edge(const TopoDS_Shape &shape) {
-  for (TopExp_Explorer edges(shape, TopAbs_EDGE); edges.More(); edges.Next()) {
-    Standard_Real first = 0;
-    Standard_Real last = 0;
-    const Handle(Geom_BSplineCurve) curve = Handle(Geom_BSplineCurve)::DownCast(BRep_Tool::Curve(TopoDS::Edge(edges.Current()), first, last));
-    if (!curve.IsNull() && curve->NbKnots() > 2) return true;
-  }
-  return false;
-}
-
-// The shape BRepGProp integrates. The Gauss rule integrates a face boundary span-blind: a boundary that is ONE multi-span B-spline (a B-spline loft
-// section, 160 cubic spans) under-integrates (measured: a NACA wing 12 % low, a degree-1 square 13 % low, a rational circle 0.9 % high, while the
-// tessellation gives the exact volume). Splitting curves and surfaces at every knot (continuity below C3) makes each span one integration piece.
-TopoDS_Shape integration_shape(const TopoDS_Shape &shape) {
-  if (!has_multispan_edge(shape)) return shape;
-  // on a deep copy: shape healing may update shared sub-shapes in place, and shape can be a cached recipe result
-  ShapeUpgrade_ShapeDivideContinuity divide(BRepBuilderAPI_Copy(shape).Shape());
-  divide.SetBoundaryCriterion(GeomAbs_C3);
-  divide.SetPCurveCriterion(GeomAbs_C3);
-  divide.SetSurfaceCriterion(GeomAbs_C3);
-  return divide.Perform() && !divide.Result().IsNull() ? divide.Result() : shape;
 }
 
 // Closed planar polygon face through `polygon` (x, y, z triples); null shape when OCC rejects the wire or the face.
@@ -321,10 +294,9 @@ MassOut mass_properties(const Shape &shape) {
   MassOut out;
   // Default (Gauss) rule, as the OCP 7.9.3 reference of VC-KRN-25: the adaptive Eps rule drifts on toroidal and some freeform faces
   // (up to 1.6e-6 relative volume, Ixx != Iyy on a symmetric ring, on the NIST corpus) while its error estimate stays near 1e-15.
-  const TopoDS_Shape integrand = integration_shape(local);
-  BRepGProp::VolumeProperties(integrand, volume, Standard_True, Standard_False, Standard_False);
+  BRepGProp::VolumeProperties(local, volume, Standard_True, Standard_False, Standard_False);
   out.rel_error = std::numeric_limits<double>::quiet_NaN();
-  BRepGProp::SurfaceProperties(integrand, surface, Standard_False, Standard_False);
+  BRepGProp::SurfaceProperties(local, surface, Standard_False, Standard_False);
   const double signed_volume = volume.Mass();
   out.volume = std::fabs(signed_volume);
   out.area = surface.Mass();
@@ -352,15 +324,14 @@ AnalysisOut analyze(const Shape &shape) {
   for (int i = 1; i <= solids.Extent(); ++i) {
     GProp_GProps volume;
     GProp_GProps area;
-    const TopoDS_Shape lump = integration_shape(solids(i));
-    BRepGProp::VolumeProperties(lump, volume, Standard_False, Standard_False, Standard_False);
-    BRepGProp::SurfaceProperties(lump, area, Standard_False, Standard_False);
+    BRepGProp::VolumeProperties(solids(i), volume, Standard_False, Standard_False, Standard_False);
+    BRepGProp::SurfaceProperties(solids(i), area, Standard_False, Standard_False);
     out.lumps.push_back(std::fabs(volume.Mass()));
     out.lumps.push_back(area.Mass());
     push_bounds(out.lumps, bounds_of(solids(i)));
   }
   GProp_GProps total;
-  BRepGProp::SurfaceProperties(integration_shape(shape.shape), total, Standard_False, Standard_False);
+  BRepGProp::SurfaceProperties(shape.shape, total, Standard_False, Standard_False);
   out.area = total.Mass();
   return out;
 }

@@ -188,8 +188,8 @@ mod tests {
         assert!((volume(&pipe) - std::f64::consts::PI * 0.75 * 3.0).abs() < 1e-6);
     }
 
-    /// A B-spline loft section is ONE multi-span edge; OCC's Gauss rule under-integrated such faces (square 6.963 instead of 8, circle 0.9 % high)
-    /// although the solid was exact (its fine tessellation gives 8 and 2 pi). Mass properties now integrate span by span.
+    /// As ONE multi-span edge per section the loft was exact but OCC's Gauss rule under-integrated its faces (square 6.963 instead of 8, circle
+    /// 0.9 % high; the fine tessellations gave 8 and 2 pi). Each knot span of a section is now its own edge.
     #[test]
     fn b_spline_sections_integrate_to_the_exact_volume() {
         let square = |z: f64| -> Vec<f64> {

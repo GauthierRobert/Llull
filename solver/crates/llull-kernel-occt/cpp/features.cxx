@@ -158,10 +158,18 @@ TopoDS_Wire bspline_wire(rust::Slice<const double> data) {
   if (total != pole_count + degree + 1) throw std::invalid_argument("bspline section: multiplicities do not fit the poles");
   const Handle(Geom_BSplineCurve) curve =
       rational ? new Geom_BSplineCurve(poles, weights, knots, multiplicities, degree) : new Geom_BSplineCurve(poles, knots, multiplicities, degree);
-  BRepBuilderAPI_MakeEdge edge(curve);
-  if (!edge.IsDone()) return TopoDS_Wire();
+  // One edge per knot span (each the exact segment of the curve). As ONE multi-span edge the solid was exact but OCC's Gauss rule (mass
+  // properties, analyze) integrated its faces span-blind: the NACA 0012 half wing of VC-SRF-11 gave 0.846 m^3 instead of 0.959117, a degree-1
+  // square loft 6.963 instead of 8 (measured with OCCT 7.9.2; the tessellations gave the exact volumes).
   BRepBuilderAPI_MakeWire maker;
-  maker.Add(edge.Edge());
+  for (int k = 1; k < curve->NbKnots(); ++k) {
+    const Handle(Geom_BSplineCurve) span = Handle(Geom_BSplineCurve)::DownCast(curve->Copy());
+    span->Segment(curve->Knot(k), curve->Knot(k + 1));
+    BRepBuilderAPI_MakeEdge edge(span);
+    if (!edge.IsDone()) return TopoDS_Wire();
+    maker.Add(edge.Edge());
+    if (!maker.IsDone()) return TopoDS_Wire();
+  }
   if (closing) {
     const gp_Pnt first = curve->StartPoint();
     const gp_Pnt last = curve->EndPoint();
