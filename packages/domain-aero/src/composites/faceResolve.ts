@@ -5,8 +5,7 @@ import type { Entity, Vec2, Vec3 } from '@core/model/types';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { recipeOf } from '@core/geometry/shapeRecipe';
 import { toCounterClockwise } from '@lib/polygon';
-import { cross3, dot3, len3, normalize3, scale3, sub3 } from '@lib/vec3';
-import { toFlat } from './surface';
+import { add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '@lib/vec3';
 import {
   type CylinderFace,
   type FaceCandidate,
@@ -76,7 +75,7 @@ function conePart(face: ConeFace, tolerance: number, mirrored = false): FaceReso
     const n = arcSteps(rho, (u1 - u0) * k, tolerance);
     const points = Array.from({ length: n + 1 }, (_, i): Vec2 => {
       const u = u0 + ((u1 - u0) * i) / n;
-      const theta = (mirrored ? TWO_PI * Math.ceil(u1 / TWO_PI - 1e-12) - u : u) * k;
+      const theta = (mirrored ? u1 - u : u) * k;
       return [rho * Math.cos(theta), rho * Math.sin(theta)];
     });
     return reverse ? points.reverse() : points;
@@ -168,12 +167,18 @@ function kernelFace(kernel: GeometryKernel, entity: Entity, near: Vec3, rosette:
     // The part axis points from the apex into the solid; the azimuth runs counter-clockwise about the kernel's own axis.
     const axis = dot3(sub3((probes[1] as { point: Vec3 }).point, surface.apex), kernelAxis) < 0 ? scale3(kernelAxis, -1) : kernelAxis;
     const frame = { type: 'cone', apex: surface.apex, axis, xDir: normalize3(surface.xDir), semiAngle: surface.semiAngle } as const;
-    const hit = toFlat(frame, (probes[2] as { point: Vec3 }).point).uv;
-    const measured = Math.atan2(hit[1], hit[0]) / Math.sin(surface.semiAngle);
+    const rel = sub3((probes[2] as { point: Vec3 }).point, surface.apex);
+    const measured = Math.atan2(dot3(rel, cross3(frame.xDir, frame.axis)), dot3(rel, frame.xDir));
     const wrapped = (angle: number): number => ((angle % TWO_PI) + TWO_PI) % TWO_PI;
     const gap = (a: number, b: number): number => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
     const mirrored = gap(wrapped(measured), um) > gap(wrapped(measured), -um);
-    return withIndex(conePart({ ...frame, uRange: [u0, u1], rhoRange: [Math.min(rhoA, rhoB), Math.max(rhoA, rhoB)] }, tolerance, mirrored));
+    // Put azimuth 0 of the part frame at the start of the face so the sector never straddles the seam of the development.
+    const around = cross3(frame.xDir, frame.axis);
+    const turn = mirrored ? -u1 : u0;
+    const xDir = add3(scale3(frame.xDir, Math.cos(turn)), scale3(around, Math.sin(turn)));
+    return withIndex(
+      conePart({ ...frame, xDir, uRange: [0, u1 - u0], rhoRange: [Math.min(rhoA, rhoB), Math.max(rhoA, rhoB)] }, tolerance, mirrored),
+    );
   }
   return fail('CMP_FACE_UNSUPPORTED', `face ${index} is a ${surface.type} surface; only plane, cylinder and cone faces are supported`);
 }

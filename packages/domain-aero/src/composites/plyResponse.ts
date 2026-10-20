@@ -16,7 +16,7 @@ import {
   strainsFor,
 } from './clt';
 import { type Criterion, DEFAULT_F12_STAR, type Strengths, strengthRatio, strengthsOf } from './failure';
-import { larc03Constants, larc03Ratio } from './larc03';
+import { larc03Constants, larc03Index, larc03Ratio } from './larc03';
 
 type Outcome<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly code: string; readonly message: string };
 
@@ -57,7 +57,8 @@ function ratioOf(criterion: Criterion, material: LaminaMaterial, resid: Triple, 
       : strengthRatio(criterion, stress, strengths, f12);
   if (isZero(resid)) return at(mech);
   const state = (lambda: number): Triple => [resid[0] + lambda * mech[0], resid[1] + lambda * mech[1], resid[2] + lambda * mech[2]];
-  const fails = (lambda: number): boolean => at(state(lambda)).R <= 1;
+  const fails = (lambda: number): boolean =>
+    larc !== null && !('missing' in larc) ? larc03Index(larc, state(lambda)) >= 1 : at(state(lambda)).R <= 1;
   if (fails(0)) return { R: 0, mode: 'environment' };
   if (isZero(mech)) return { R: Infinity };
   let upper = 1;
@@ -143,7 +144,13 @@ export function respond(
       return [
         criterion,
         hit === undefined
-          ? { R: null, note: 'no stress: the load does not stress any ply' }
+          ? {
+              R: null,
+              note:
+                env !== undefined && load.every((component) => component === 0)
+                  ? 'the residual hygrothermal state does not fail; no mechanical load to scale'
+                  : 'no stress: the load does not stress any ply',
+            }
           : { ...hit, R: sig(hit.R), unit: 'load multiplier of the mechanical loads' },
       ];
     }),

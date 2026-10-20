@@ -791,3 +791,16 @@ not domain-aero). `export_ply_table` / `import_ply_table` use the CSV layout `pl
 (the spec's `mass_g` column is named `mass`, in density unit x document unit^3); imported plies cover the whole face, and the round trip is
 byte-identical for whole-face plies. `ply_book_data` returns the numeric content of the ply book; the SVG / PDF sheets are not generated.
 Still not built: M3 drape (live OCC), laser projection, per-ply solids and STEP, `add_core`, `split_ply`, AP242, optimiser.
+
+### 13.2 Re-review fixes (2026-10-20)
+
+Ply angles are stored from the part rosette; `add_ply`, `edit_ply` and `import_ply_table` convert from the ply's own rosette (shared
+`plyFrame.ts`; degenerate -> `CMP_ROSETTE_DEGENERATE`, curved part with another rosette -> `CMP_PARAM_INVALID`) and `export_ply_table` writes
+the angle back relative to the ply rosette named in its row. A blank `orientation` or `order` cell is refused. Text cells starting with
+`= + - @` or a tab / CR are prefixed with an apostrophe on export and stripped on import (round trip stays byte-identical); a BOM is
+ignored and more than 5000 rows are refused. The `larc03` criterion is LaRC04-style (Mohr-Coulomb matrix compression on a searched fracture
+plane), not the LaRC03 `<|tau| + eta sigma_n>/S` form, and does not separate the sigma1 < -Yc misalignment-frame case; a strength set for
+which the kink angle is undefined (4 (S/Xc + muL) S/Xc > 1) is refused instead of dropping the fibre-compression mode; with an
+`environment` the ratio is a single bisection on the worst failure index. Stored sections are validated on load (name, thickness equal to
+the ply sum, side, zone and materials). Kernel partial cone faces start the part azimuth at the face start (no straddling of the
+development seam), with the azimuth direction read from a third probe point; still verified only through a stub port, never live OCC.
