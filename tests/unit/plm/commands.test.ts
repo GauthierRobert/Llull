@@ -373,7 +373,10 @@ describe('queries (VC-PLM-12, 27)', () => {
       density: 0.00278,
       color: '#aaaaaa',
     }).document;
-    const graded = { ...doc, materials: { ...doc.materials, mystery: { ...(doc.materials['mystery'] as object), grade: 'C' as const } } };
+    const graded = {
+      ...doc,
+      materials: { ...doc.materials, mystery: { ...(doc.materials['mystery'] as object), grade: 'C' as const } },
+    } as unknown as CadDocument;
     const result = run(graded, 'check_release_readiness', { changeOrder: 'ECO-404' });
     expect(result.document).toBe(graded);
     const report = result.data as { status: string; findings: { code: string }[]; humanActionsNeeded: { act: string }[] };
