@@ -7,7 +7,7 @@ import { analysisInputHash } from '@cae/hash/inputHash';
 import { parseFrd } from '@cae/results/frdReader';
 import { meshSummary, resultsSummary } from '@cae/results/summary';
 import { withCase } from '@cae/shared/access';
-import { barDocument, barMesh, hashOf, mustRun, portOf, X0_NODES, X2_NODES, type SolvedBar } from './deckFixtures';
+import { barDocument, barMesh, facesOn, hashOf, mustRun, portOf, X0_NODES, X2_NODES, type SolvedBar } from './deckFixtures';
 import type { FeArtifactPort } from '@core/model/analysis';
 import { defaultContext } from '@core/commands/context';
 import type { ExecutionContext } from '@core/commands/types';
@@ -34,6 +34,10 @@ export interface MarginBarOptions {
   readonly category?: 'limit' | 'ultimate';
   readonly analysisType?: 'static' | 'thermo_static';
   readonly ftuExtra?: Record<string, unknown>;
+  /** Mesh globalSize in mm (default 0.1: the singularity radius 0.2 mm reaches only the two point-support nodes). */
+  readonly globalSize?: number;
+  /** The point supports (nodes 1 and 3) are singular sources (no face in the mesh artifact). Default: false. */
+  readonly pointSupportsSingular?: boolean;
 }
 
 export interface MarginBar extends SolvedBar {
@@ -70,13 +74,22 @@ export function marginBar(options: MarginBarOptions = {}): MarginBar {
       target: { entityId: bar.boxId, facesNear: [[2, 0.5, 0.5]] },
     });
   }
+  doc = mustRun(doc, 'set_mesh_controls', { analysisId: bar.analysisId, globalSize: options.globalSize ?? 0.1 });
   const sets: Record<string, number[]> = {
     [`C_${bar.constraints['x0']}`]: X0_NODES,
     [`C_${bar.constraints['nodeA']}`]: [1],
     [`C_${bar.constraints['nodeB']}`]: [3],
     [`C_${pull.affected[0]}`]: X2_NODES,
   };
-  const mesh = barMesh(doc, bar.analysisId, bar.boxId, sets);
+  const faces = {
+    [`C_${bar.constraints['x0']}`]: facesOn(X0_NODES),
+    [`C_${pull.affected[0]}`]: facesOn(X2_NODES),
+    // the two point supports resolve to no face (singular sources) only with `pointSupportsSingular`; otherwise stand-in faces keep every node regular
+    ...(options.pointSupportsSingular === true
+      ? {}
+      : { [`C_${bar.constraints['nodeA']}`]: facesOn(X0_NODES), [`C_${bar.constraints['nodeB']}`]: facesOn(X0_NODES) }),
+  };
+  const mesh = barMesh(doc, bar.analysisId, bar.boxId, sets, faces);
   const meshHash = hashOf(mesh);
   const results: FeResultsArtifact = {
     kind: 'fe_results',

@@ -242,4 +242,29 @@ Laws are data on a document material (\`create_material\` name), never in the so
   \`export_material_cards\` writes CalculiX / Nastran cards and refuses laws they cannot represent (MATL_EXPORT_UNSUPPORTED).
 - **MFront (optional).** The CLI tool mtest_run (not a registry command) runs an MTest script on a behaviour outside this set. MFront is NOT bundled: install it yourself, set LLULL_MTEST (and LLULL_MFRONT
   to compile) and LLULL_ALLOW_CODE_EXECUTION=1; absent tools answer MFRONT_TOOL_MISSING with the reason. \`llull mtest_run probe=true\` reports what was found.
+
+## 11. Structural analysis (FEA, toolset analysis)
+
+llull sets up, meshes and solves (CalculiX) and reports numbers; it never approves a design. Say what an engineer must check.
+
+- **Units.** The analysis unit system follows the document unit: mm -> N-mm-t-s (MPa), m -> N-m-kg-s (Pa), in -> lbf-in-slinch-s (psi). Lengths of targets
+  and mesh sizes are in DOCUMENT units; loads, pressures and gravity are in the case unit system (N-mm-t-s: N, MPa, gravity 9810 mm/s^2). Result field names carry the unit.
+- **Factors of safety.** \`create_analysis\` factors default to ultimate 1.5 (14 CFR 25.303) and yield 1.0 (25.305(a)); margin results name each factor with its source
+  and a defaulted flag. When the user states a safety factor ("SF 2") set it there (\`factor\` = one number for both). Never invent a factor.
+- **Minimal static plan.** \`create_analysis\` → \`set_part_idealization\` (the solid) → a material with E and nu (\`add_material_model\` + \`define_constitutive_set\`, then
+  \`assign_material\`; add Ftu / Fty with \`define_property_model\` when margins are wanted) → \`add_fea_constraint\` + \`add_fea_load\` (a moment may carry
+  \`referencePoint\`) → \`set_mesh_controls\` → transports \`llull fea_mesh analysisId=ID\` then \`llull fea_solve analysisId=ID\` (they run the mesher / solver and record the
+  artifacts) → \`fea_report\` / \`compute_margins\`. \`set_result_view\` picks the field the desktop app shows; \`fea_result_field\` reads node values from the verified results.
+- **Shells.** \`set_part_idealization\` with idealization=shell, thickness=… (default: the wall thickness found), offset=mid|top|bottom; preview the surface with
+  \`extract_midsurface\`; mesh with \`set_mesh_controls\` elementFamily=shell_tri or shell_quad.
+- **Modal / buckling.** analysisType modal or buckling with \`modes\`; a buckling case multiplies its first non-preload load case, and \`set_buckling_preload\` names a constant
+  preload case applied first (the Nastran export refuses preloads).
+- **Exports.** \`llull fea_export analysisId=ID format=calculix_inp|nastran_bdf|vtu --save FILE\` writes the deck or a VTU (mesh + results) and runs nothing.
+- **Margins and the human gate.** \`compute_margins\` reads the verified results (stale or missing artifacts are refused; run fea_mesh and fea_solve again). Use \`set_margin_band\` for
+  a MARGINAL band (no default). FAIL / MARGINAL rows are disposition pending_human: only a qualified human can \`dispose_margin\` them, an agent always gets FEA_HUMAN_GATE: hand the
+  row over, never retry or work around it. A disposition never turns a FAIL into a PASS.
+- **Singularities.** Nodes within a radius of point / edge loads and supports are excluded from the part rows and listed in separate singular rows that never count towards minMs.
+  Default radius = 2 x mesh globalSize (named llull default); override with singularityRadius (document units, 0 = none) which REQUIRES singularityNote (your justification).
+  Re-entrant corners and sharp edges are NOT screened: judge them yourself.
+- **Finish.** Every FEA job ends with \`check_analysis\` and its items (stale results, unverified inputs, FEA_MS_NEGATIVE, pending dispositions) reported to the user.
 `;

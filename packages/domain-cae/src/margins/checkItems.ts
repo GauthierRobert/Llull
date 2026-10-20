@@ -36,8 +36,8 @@ export function marginItems(doc: CadDocument, analysisId: string, ctx: Execution
   const table = marginTable(doc, analysisId, band === undefined ? {} : { marginalBand: band }, ctx);
   if ('code' in table) return [];
   const items: MarginCheckItem[] = [];
-  const failed = table.rows.filter((row) => row.status === 'FAIL');
-  const pending = table.rows.filter((row) => row.disposition === 'pending_human');
+  const failed = table.rows.filter((row) => row.status === 'FAIL' && row['singular'] !== true);
+  const pending = table.rows.filter((row) => row.disposition === 'pending_human' && row['singular'] !== true);
   if (failed.length > 0)
     items.push(
       item('FEA_MS_NEGATIVE', 'error', `${failed.length} margin row(s) with MS < 0: ${failed.map(describeRow).join('; ')}`, [
