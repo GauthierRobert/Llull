@@ -12,11 +12,16 @@ import type { AnalysisModel } from './analysis';
 import type { DrawingsModel } from './sheet';
 import type { DynamicsModel } from './dynamics';
 import type { PrototypeModel } from './prototype';
+import type { ReviewModel } from './review';
 import type { CurveSegment } from './curve';
 import type { FastenerModel, PartRef } from './fasteners';
 import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary';
+import type { MaterialFinish } from './materialFinish';
+export { FINISH_PATTERNS, type FinishPattern, type MaterialFinish } from './materialFinish';
 import type { ReliabilityModel } from './probabilistic';
 import type { SheetMetalModel } from './sheetMetal';
+import type { PlantModel } from './plant';
+import type { ScanModel } from './pointCloud';
 import type { FeatureParams } from './features';
 import type { FaceOpParams } from './faceOps';
 import type { SketchLink, SketchPlane } from './sketchPlanes';
@@ -647,6 +652,8 @@ export interface CadDocument {
   dynamics?: DynamicsModel;
   /** Absent until the first prototype-review command (`allow_interference`, `set_part_grounded`). */
   prototype?: PrototypeModel;
+  /** Absent until the first model-review command (`save_viewpoint`, `create_review_issue`; plant 09 VIS). */
+  review?: ReviewModel;
   /** Absent until a kernel-provenance command or a v3 save stamps it (`set_modeling_tolerance`, `import_step_exact`). */
   kernelSettings?: DocumentKernelSettings;
   /** Content-addressed binary payloads keyed by sha256 (healed B-rep, original STEP); absent until the first exact import. */
@@ -661,6 +668,10 @@ export interface CadDocument {
   sheetMetal?: SheetMetalModel;
   /** Absent until the first probabilistic command (`define_random_variable`; plugin `cae`, PHY-18). */
   probabilistic?: ReliabilityModel;
+  /** Absent until the first plant command (plugin `piping`, plant 02 RTE: `add_tie_in_point`, `create_pipeline`). */
+  plant?: PlantModel;
+  /** Point-cloud references, registrations and extractions (plugin `scan`, plant 10); absent until the first scan command. No points. */
+  scan?: ScanModel;
   /** Absent until the first `create_contact_set`. */
   contactSets?: Record<string, ContactSet>;
   /** Absent until the first `create_exploded_view`; display-only offsets, never moves real placements. */
@@ -728,26 +739,6 @@ export interface Material {
   readonly constitutiveSets?: readonly ConstitutiveSet[];
   /** Id of the set used when a query names none. */
   readonly defaultConstitutiveSet?: string;
-}
-
-export const FINISH_PATTERNS = ['carbon_twill', 'carbon_plain', 'brushed', 'knurl', 'checker'] as const;
-
-export type FinishPattern = (typeof FINISH_PATTERNS)[number];
-
-/**
- * Tileable procedural finish: one texture tile spans `scale` document units, box-projected onto the part (glTF export + viewport use the
- * same maps).
- * @invariant scale > 0; normalStrength in [0, 2]; clearcoat in [0, 1]
- */
-export interface MaterialFinish {
-  readonly pattern: FinishPattern;
-  readonly scale: number;
-  /** Secondary colour (alternate tows, checker squares); default derived from `color`. */
-  readonly color2?: string;
-  /** Normal-map strength (relief depth), default 1. */
-  readonly normalStrength?: number;
-  /** Clear lacquer layer over the finish (0 = none, 1 = full gloss coat), default 0. */
-  readonly clearcoat?: number;
 }
 
 export const DEFAULT_LAYER_ID = 'layer-default';

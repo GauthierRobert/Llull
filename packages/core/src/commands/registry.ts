@@ -32,6 +32,7 @@ import { materialLabCommands } from './materiallab/catalog';
 import { thermalCommands } from './thermal/catalog';
 import { thermomechCommands } from './thermomech/catalog';
 import { materialCommands } from './materials/catalog';
+import { pmiCommands } from './pmi/catalog';
 
 registerCommands('core', [
   ...documentCommands,
@@ -58,6 +59,7 @@ registerCommands('core', [
   ...thermalCommands,
   ...thermomechCommands,
   ...materialCommands,
+  ...pmiCommands,
 ]);
 onPluginInstalled((plugin) => registerCommands(`plugin '${plugin.name}'`, plugin.commands));
 

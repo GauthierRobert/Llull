@@ -26,6 +26,8 @@ export const TOOLSET_NAMES = [
   'piping',
   'civil',
   'design',
+  'pmi',
+  'scan',
 ] as const;
 
 export type ToolsetName = (typeof TOOLSET_NAMES)[number];
@@ -56,6 +58,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'add_box add_cylinder add_sphere add_cone add_torus add_helix_spring add_coil add_bearing add_wedge add_pyramid extrude_profile revolve_profile sweep_profile loft_sections boolean blend_union fillet_edge chamfer_edge shell_solid draft_faces push_pull_face split_face replace_face split_body inspect_topology inspect_faces add_spur_gear add_internal_gear add_planetary_gearset add_bevel_gear add_bevel_gear_pair add_spline_shaft add_keyed_shaft pattern_along_path add_decal remove_decal add_subdivision_solid edit_subdivision_cage surface_from_curves',
   ),
   measure: words('measure_distance measure_angle measure_area measure_perimeter measure_bounding_box mass_properties'),
+  pmi: words('analyze_stackup fastener_tolerance stackup_monte_carlo'),
   parametric: words(
     'replay_history set_step_suppressed edit_step_params reorder_step delete_step insert_step create_configuration activate_configuration add_constraint delete_constraint update_constraint solve_constraints save_recipe instantiate_recipe',
   ),
@@ -68,7 +71,9 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
       'define_property_model remove_property_model evaluate_property sample_property fit_property_model check_property_models add_material_model remove_material_model define_constitutive_set check_material_models',
   ),
   'material-lab': words('fit_material_model material_point_response export_material_cards'),
-  review: words('allow_interference remove_interference_intent set_part_grounded'),
+  review: words(
+    'allow_interference remove_interference_intent set_part_grounded save_viewpoint list_viewpoints delete_viewpoint create_walkthrough delete_walkthrough render_walkthrough create_review_issue delete_review_issue export_bcf',
+  ),
   exchange: words(
     'export_stl export_obj export_gltf export_3mf export_urdf mesh_to_solid export_step_exact export_iges export_code apply_code_trace import_mesh import_dxf import_step_exact export_step import_step import_dwg import_code',
   ),
@@ -84,9 +89,9 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   get fasteners(): readonly string[] {
     return pluginToolNames('fasteners');
   },
-  /** Contributed by the installed aerodynamics plugin (atmosphere, airfoils, wings, drag, cycling). */
+  /** Contributed by the installed aerodynamics plugin (atmosphere, airfoils, wings, drag, cycling) + the native vortex-lattice transport. */
   get aerodynamics(): readonly string[] {
-    return pluginToolNames('aerodynamics');
+    return [...pluginToolNames('aerodynamics'), 'vortex_lattice_solve'];
   },
   /** Contributed by the installed fluids plugin (compressible flow, rocket nozzles). */
   get fluids(): readonly string[] {
@@ -96,9 +101,9 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   get building(): readonly string[] {
     return pluginToolNames('building').filter((name) => !PIPING_TOOLS.includes(name));
   },
-  /** Industrial pipe runs, supports, cable trays and hydraulics (from the industrial plugin). */
+  /** Industrial pipe runs, supports, cable trays and hydraulics (industrial plugin) plus the plant piping plugin (02 RTE). */
   get piping(): readonly string[] {
-    return pluginToolNames('building').filter((name) => PIPING_TOOLS.includes(name));
+    return [...pluginToolNames('building').filter((name) => PIPING_TOOLS.includes(name)), ...pluginToolNames('piping'), 'auto_route'];
   },
   /** Contributed by the installed civil (site / terrain / roads / drainage) plugin. */
   get civil(): readonly string[] {
@@ -107,6 +112,10 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   /** Contributed by the installed design-language plugin (`.lld`). */
   get design(): readonly string[] {
     return pluginToolNames('design');
+  },
+  /** Point clouds (plant 10): the host transport `scan_import` plus the installed scan plugin's commands. */
+  get scan(): readonly string[] {
+    return ['scan_import', 'scan_list', ...pluginToolNames('scan')];
   },
 };
 

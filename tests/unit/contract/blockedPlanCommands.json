@@ -33,9 +33,6 @@
       "add_datum_feature",
       "add_geometric_tolerance"
     ],
-    "docs/aerospace/03-gdt-mbd-pmi/validation/draft_plan_stackup_su01.json": [
-      "analyze_stackup"
-    ],
     "docs/aerospace/06-composites/validation/plans/cmp-cone-flat-pattern.json": [
       "add_ply",
       "create_composite_part",
@@ -134,23 +131,6 @@
     "docs/physics/06-contact-joints/validation/plans/cnt_ssnp154_cylinder_block.plan.json": [
       "add_contact_pair"
     ],
-    "docs/physics/09-structural-dynamics/validation/plans/dyn_beamdy8_ssd.plan.json": [
-      "set_dynamic_damping",
-      "set_frequency_sweep"
-    ],
-    "docs/physics/09-structural-dynamics/validation/plans/dyn_cantilever_random_gevs.plan.json": [
-      "define_vibration_spectrum",
-      "set_base_excitation",
-      "set_dynamic_damping",
-      "set_frequency_sweep"
-    ],
-    "docs/physics/09-structural-dynamics/validation/plans/dyn_quick_checks.plan.json": [
-      "damping_coefficients",
-      "define_vibration_spectrum",
-      "psd_rms",
-      "sdof_response",
-      "shock_response_spectrum"
-    ],
     "docs/physics/11-creep-viscoelasticity/validation/plans/crp_bar_relaxation.plan.json": [
       "set_creep_step"
     ],
@@ -209,26 +189,13 @@
       "sensitivity_indices"
     ],
     "docs/physics/19-explicit-impact/validation/plans/exp_bar_rigid_wall.plan.json": [
-      "add_rigid_wall",
-      "add_time_history",
-      "set_explicit_controls",
-      "set_initial_velocity"
+      "add_time_history"
     ],
     "docs/physics/19-explicit-impact/validation/plans/exp_bird_rigid_plate.plan.json": [
-      "add_rigid_wall",
-      "add_time_history",
-      "set_explicit_controls",
-      "set_initial_velocity"
+      "add_time_history"
     ],
     "docs/physics/19-explicit-impact/validation/plans/exp_drop_box.plan.json": [
-      "add_rigid_wall",
-      "add_time_history",
-      "set_explicit_controls"
-    ],
-    "docs/physics/19-explicit-impact/validation/plans/exp_taylor_rod.plan.json": [
-      "add_rigid_wall",
-      "set_explicit_controls",
-      "set_initial_velocity"
+      "add_time_history"
     ],
     "docs/physics/20-vibroacoustics/validation/plans/vac_flat_spectrum_handoff.plan.json": [
       "acoustic_spectrum_report",
@@ -269,55 +236,42 @@
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-01-pump-to-vessel.json": [
       "add_nozzle",
       "check_piping",
-      "create_pipeline",
       "piping_takeoff",
       "route_pipe"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-02-pump-discharge-gate-valve.json": [
       "add_nozzle",
       "check_piping",
-      "create_pipeline",
       "insert_inline_component",
       "piping_takeoff",
       "route_pipe"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-03-header-branches.json": [
       "add_branch",
-      "add_tie_in_point",
       "check_piping",
-      "create_pipeline",
       "piping_connectivity",
       "piping_takeoff",
       "route_pipe"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-04-gravity-drain-slope.json": [
-      "add_tie_in_point",
       "check_piping",
-      "create_pipeline",
       "piping_takeoff",
       "route_pipe"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-05-routing-refusals.json": [
       "add_nozzle",
-      "add_tie_in_point",
       "check_piping",
-      "create_pipeline",
       "route_pipe"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-06-move-with-connected.json": [
       "piping_takeoff"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-07-insulated-hot-line.json": [
-      "add_tie_in_point",
-      "create_pipeline",
       "line_heat_loss",
       "route_pipe"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-08-auto-route-v2.json": [
-      "add_tie_in_point",
-      "auto_route_pipe",
-      "check_piping",
-      "create_pipeline"
+      "check_piping"
     ],
     "docs/plant/02-spec-driven-routing/validation/plans/sc-rte-09-legacy-pipe-run-conversion.json": [
       "check_piping",
@@ -537,8 +491,7 @@
       "apply_viewpoint",
       "export_bcf_viewpoint",
       "get_viewpoint",
-      "import_bcf_viewpoint",
-      "save_viewpoint"
+      "import_bcf_viewpoint"
     ],
     "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-03-synthetic-rack-drawcalls.json": [
       "render_stats"
@@ -547,8 +500,6 @@
       "add_markup",
       "add_review_comment",
       "check_review",
-      "create_review_issue",
-      "save_viewpoint",
       "section_box_report",
       "set_issue_status",
       "set_section_box"
@@ -557,37 +508,10 @@
       "check_review",
       "create_clash_issues"
     ],
-    "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-01-import-e57-las.json": [
-      "attach_point_cloud",
-      "check_point_clouds",
-      "describe_point_cloud",
-      "nearest_cloud_point",
-      "query_cloud_points"
-    ],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-02-pipe-extraction.json": [
-      "attach_point_cloud",
-      "check_point_clouds",
-      "commit_asbuilt_extraction",
-      "extract_pipes",
-      "fit_primitive",
-      "slice_cloud",
       "trace_pipe_centreline"
     ],
-    "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-03-registration.json": [
-      "apply_registration",
-      "attach_point_cloud",
-      "check_point_clouds",
-      "compute_registration"
-    ],
-    "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-04-deviation-clash.json": [
-      "attach_point_cloud",
-      "check_asbuilt_clash",
-      "cloud_to_model_deviation"
-    ],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-05-steel-section.json": [
-      "attach_point_cloud",
-      "check_point_clouds",
-      "commit_asbuilt_extraction",
       "fit_steel_member"
     ]
   }

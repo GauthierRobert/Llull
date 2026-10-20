@@ -263,6 +263,8 @@ export interface PipeElement extends LevelElementBase {
   from?: string;
   /** Destination: equipment tag or battery-limit / tie-in id. */
   to?: string;
+  /** Set when the run was committed from a point-cloud extraction (plant 10 `commit_asbuilt_extraction`): scan-derived geometry. */
+  asBuilt?: { readonly extractionId: string; readonly unverified: boolean };
 }
 
 export type PipeSupportType = 'shoe' | 'hanger' | 'guide' | 'anchor';

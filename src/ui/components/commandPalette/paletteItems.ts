@@ -36,6 +36,8 @@ const TOOLSET_GROUPS = {
   piping: 'Piping',
   civil: 'Civil / site',
   design: 'Design (.lld)',
+  pmi: 'GD&T / tolerances',
+  scan: 'Point clouds',
 } as const satisfies Record<ToolsetName, string>;
 
 const OTHER_COMMANDS_GROUP = 'Other commands' as const;

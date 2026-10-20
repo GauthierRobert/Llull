@@ -9,6 +9,7 @@ import { caseOf, withCase } from '../shared/access';
 import { refuseCode } from '../shared/codes';
 import { axisFrame, CYLINDRICAL_QUANTITIES } from '../results/cylindrical';
 import { analysisIdSchema } from '../shared/schemas';
+import { DYNAMIC_PROBE_QUANTITIES, isDynamicQuantity, probeQuantitiesOf } from '../dynamics/quantities';
 
 const QUANTITIES = [
   'temperature',
@@ -36,12 +37,14 @@ export const addResultProbe = defineCommand({
     'is used). quantity: temperature (thermal / thermo-mechanical cases, in the case temperature scale), heat_flux, u_mag / u_x / u_y / u_z ' +
     '(displacement), von_mises, s_xx / s_yy / s_zz (stress), and the cylindrical components s_hoop / s_radial / s_axial / u_radial about an ' +
     'axis (axisPoint + axisDirection; default: the z axis through the centre of the mesh bounding box, so a quarter / half model needs the ' +
-    'real axis; hoop / radial are null on the axis). Returns the probe id in affected[0].',
+    'real axis; hoop / radial are null on the axis). Dynamic cases: random_response probes read a_x / a_y / a_z (absolute acceleration rms, g), ' +
+    'u_x_rel / u_y_rel / u_z_rel (displacement relative to the base) and s_xx / s_yy / s_zz; frequency_response probes read u_x / u_y / u_z and ' +
+    's_xx / s_yy / s_zz (complex response peaks). Returns the probe id in affected[0].',
   params: z.object({
     analysisId: analysisIdSchema,
     name: z.string().min(1).describe('Display name, e.g. "hot spot".'),
     point: vec3('Probe location [x, y, z] in document units; it should lie on or inside a part.'),
-    quantity: z.enum(PROBE_QUANTITIES).describe('Quantity to read at the point.'),
+    quantity: z.enum([...PROBE_QUANTITIES, ...DYNAMIC_PROBE_QUANTITIES]).describe('Quantity to read at the point.'),
     axisPoint: vec3(
       'A point [x, y, z] (document units) on the axis of the cylindrical quantities. Default: centre of the mesh bounding box.',
     )
@@ -55,6 +58,16 @@ export const addResultProbe = defineCommand({
     const analysisCase = caseOf(doc, analysisId);
     if (analysisCase === undefined)
       return refuseCode(doc, 'add_result_probe', 'FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`, [analysisId], ['analysisId']);
+    const allowed = probeQuantitiesOf(analysisCase.type);
+    if (allowed === null ? isDynamicQuantity(quantity) : !allowed.includes(quantity))
+      return refuseCode(
+        doc,
+        'add_result_probe',
+        'DYN_PROBE_QUANTITY',
+        `quantity ${quantity} does not apply to a ${analysisCase.type} analysis${allowed === null ? '' : ` (use ${allowed.join(', ')})`}`,
+        [analysisId],
+        ['quantity'],
+      );
     if (!point.every(Number.isFinite))
       return refuseCode(doc, 'add_result_probe', 'FEA_PROBE_INVALID', 'point must be three finite numbers', [analysisId], ['point']);
     const cylindrical = (CYLINDRICAL_QUANTITIES as readonly string[]).includes(quantity);

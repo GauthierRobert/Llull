@@ -1,6 +1,7 @@
 import type { Vec3 } from '../../model/types';
 import type { Bounds } from '../../geometry/bounds';
 import type { Camera, ViewName } from './camera';
+import type { RasterScene } from '../../model/raster';
 
 /** The `data` payload of render_view. */
 export interface RenderViewData {
@@ -63,7 +64,14 @@ export interface RenderOptions {
   mode?: 'raster' | 'vector';
   /** false: no view caption and axis triad (frames composed by another command, e.g. render_motion). */
   caption?: boolean;
+  /** Explicit camera (a viewpoint or a perspective view) replacing the framed named view; `orthoHalf` sizes its frustum / scale. */
+  view?: { readonly camera: Camera; readonly orthoHalf: number };
+  /** Replaces the reference per-pixel stage of raster mode (a host's native raster, `ctx.raster`). */
+  pixels?: PixelStage;
 }
+
+/** Replaces the reference per-pixel stage (a host's native raster); returns the logical RGBA image. */
+export type PixelStage = (scene: RasterScene) => Uint8Array;
 
 /** Polygon before depth is computed (all tessellation helpers return this). */
 export interface PreDepthPolygon {

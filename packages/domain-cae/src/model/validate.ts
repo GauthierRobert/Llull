@@ -13,6 +13,8 @@ const TYPES = [
   'thermo_static',
   'coupled_temperature_displacement',
   'nonlinear_static',
+  'frequency_response',
+  'random_response',
 ];
 const UNIT_SYSTEMS = ['N-mm-t-s', 'N-m-kg-s', 'lbf-in-slinch-s'];
 const CONSTRAINT_KINDS = ['fixed', 'pinned', 'symmetry', 'displacement'];
@@ -34,6 +36,12 @@ const QUANTITIES = [
   's_radial',
   's_axial',
   'u_radial',
+  'a_x',
+  'a_y',
+  'a_z',
+  'u_x_rel',
+  'u_y_rel',
+  'u_z_rel',
 ];
 const IDEALIZATION_KINDS = ['solid', 'plane_stress', 'shell', 'beam'];
 

@@ -1,0 +1,15 @@
+[package]
+name = "llull-route"
+description = "Plant 02 RTE V2 auto-router: sparse 3D lattice A* with bend costs, rack-elevation preference and inflated obstacle boxes; the `llull-compute route` job (RS1 RS-7)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+llull-protocol = { path = "../llull-protocol" }
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

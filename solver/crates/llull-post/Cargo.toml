@@ -1,6 +1,6 @@
 [package]
 name = "llull-post"
-description = "FE post-processing jobs of llull-compute: rainflow + Miner damage on every node, mesh-to-mesh field mapping (RS1 RS-7)"
+description = "FE post-processing jobs of llull-compute: rainflow + Miner damage on every node, mesh-to-mesh field mapping, random-response nodal rms (RS1 RS-7)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

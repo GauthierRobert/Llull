@@ -1,4 +1,4 @@
-/** SHA-256 (FIPS 180-4) of a string's UTF-8 bytes, hex-encoded. Pure; for provenance hashes of small JSON texts. */
+/** SHA-256 (FIPS 180-4) of a string's UTF-8 bytes (or of raw bytes), hex-encoded. Pure; for provenance hashes and file digests. */
 
 const K = new Uint32Array([
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be,
@@ -11,8 +11,8 @@ const K = new Uint32Array([
 
 const rotr = (x: number, n: number): number => (x >>> n) | (x << (32 - n));
 
-export function sha256Hex(text: string): string {
-  const bytes = new TextEncoder().encode(text);
+export function sha256Hex(text: string | Uint8Array): string {
+  const bytes = typeof text === 'string' ? new TextEncoder().encode(text) : text;
   const bitLength = bytes.length * 8;
   const padded = new Uint8Array((((bytes.length + 9 + 63) >> 6) << 6) >>> 0);
   padded.set(bytes);

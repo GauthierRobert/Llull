@@ -1,0 +1,10 @@
+# Brownfield tie-in: a laser scan referenced next to a new pump skid, cropped to the tie-in area, with the scan toolset
+# (the points stay in the machine's asset store: `llull scan import site.e57` prints the asset key; replay never needs them)
+design tie_in units=m
+param w = 2
+add_box skid size=[w, 1.2, 0.3] anchor=min position=[0, 0, 0]
+attach_point_cloud site assetKey="5c1a9e0b7d3f42a68e1b0c9d2f4a6b8c0e2d4f6a8b0c2e4f6a8b0c2d4e6f8a0b" name="site scan"
+set_scan_crop tie_in name="tie-in area" min=[-1, -1, 0] max=[w+1, 2.2, 3]
+check volume of=skid expect ~= w*1.2*0.3 ± 0.1%
+check check_point_clouds path=status expect == "pass"
+check bbox of=skid expect ~= [w, 1.2, 0.3] ± 0.1%

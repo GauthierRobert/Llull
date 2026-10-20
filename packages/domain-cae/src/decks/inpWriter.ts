@@ -6,6 +6,7 @@ import { thermalMaterialCards, thermalSections } from '../thermal/deck';
 import { coupledMaterialCards, coupledSections } from '../thermomech/coupledDeck';
 import { thermomechMaterialCards, thermomechSections } from '../thermomech/deck';
 import { constitutiveMaterialCards } from './constitutive';
+import { dynamicMaterialCards, dynamicSections } from '../dynamics/deck';
 import { buildInp, type DisciplineTable, type InpResult } from './deckBuilder';
 
 const DISCIPLINES: DisciplineTable = {
@@ -13,6 +14,7 @@ const DISCIPLINES: DisciplineTable = {
   heat: { materialCards: thermalMaterialCards, sections: thermalSections },
   thermomech: { materialCards: thermomechMaterialCards, sections: thermomechSections },
   coupled: { materialCards: coupledMaterialCards, sections: coupledSections },
+  dynamics: { materialCards: dynamicMaterialCards, sections: dynamicSections },
 };
 
 /**

@@ -10,6 +10,8 @@ import { nonlinearSummary } from '../nonlinear/summary';
 import { thermalResultsSummary } from '../thermal/summary';
 import { maxOverNodes, magnitude, nodeCoordinates, nodeEntities, stepOfLoadCase, vonMises } from './fields';
 import { meshQuality } from './meshQuality';
+import { isDynamicType } from '../dynamics/quantities';
+import { dynamicResultsSummary } from '../dynamics/summary';
 
 /**
  * Summary of a mesh artifact: node and element counts per type, tet quality and inverted-element warning.
@@ -75,6 +77,13 @@ export function resultsSummary(
     return { ...base, loadCases: [], thermal: thermalResultsSummary(doc, analysisId, mesh, results) };
   if (analysis.type === 'nonlinear_static') return { ...base, ...nonlinearSummary(analysis, mesh, results) };
   if (analysis.type === 'modal') return { ...base, loadCases: [], frequenciesHz: eigenColumn(results, 'eigenvalues', 3) };
+  if (isDynamicType(analysis.type))
+    return {
+      ...base,
+      loadCases: [],
+      frequenciesHz: eigenColumn(results, 'eigenvalues', 3),
+      dynamics: dynamicResultsSummary(doc, analysis, mesh, results),
+    };
   if (analysis.type === 'buckling') return { ...base, loadCases: [], bucklingFactors: eigenColumn(results, 'buckling factors', 1) };
   const coordinates = nodeCoordinates(mesh);
   const entities = nodeEntities(mesh);

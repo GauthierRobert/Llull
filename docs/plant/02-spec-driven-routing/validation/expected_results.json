@@ -297,7 +297,7 @@
         "nativeEqualsTsReference": ["pis", "bends", "costMicrometres", "optimal"],
         "nativeSolutionAccepted": true,
         "staleOrObstacleSolution": "RTE_AUTOROUTE_SOLUTION_INVALID, document unchanged",
-        "largeProblem": { "gridMm": 50, "boxM": [100, 100, 30], "maxExpansions": 2000000, "timeS": "TBD - measure (budget <= 5 s, TECHNICAL section 8)" }
+        "largeProblem": { "gridMm": 50, "boxM": [100, 100, 30], "maxExpansions": 2000000, "timeS": "TBD on the reference machine (budget <= 5 s, TECHNICAL section 8); development laptop 2026-10-19: 1 761 410 expansions in 3.65-3.98 s on a 1.6e10-cell box (TECHNICAL section 13.3)" }
       },
       "tolerance": "exact (paths, cost, codes); time TBD - measure",
       "reference": "TECHNICAL_SPEC section 2.A and 5.12: same state, cost and total open-set order; integer-micrometre costs",

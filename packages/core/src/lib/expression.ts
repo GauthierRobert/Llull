@@ -34,17 +34,17 @@ export type EvalResult = EvalOk | EvalErr;
 
 type TokenKind = 'number' | 'ident' | 'op' | 'lparen' | 'rparen' | 'comma' | 'eof';
 
-interface Token {
+export interface Token {
   readonly kind: TokenKind;
   readonly text: string;
 }
 
 const EOF_TOKEN: Token = { kind: 'eof', text: '' };
 
-const BUILTIN_CONSTANTS: Readonly<Record<string, number>> = { pi: Math.PI, tau: 2 * Math.PI };
+export const BUILTIN_CONSTANTS: Readonly<Record<string, number>> = { pi: Math.PI, tau: 2 * Math.PI };
 
 /** Built-in functions: accepted argument count range and implementation. */
-const BUILTIN_FUNCTIONS: Readonly<Record<string, { min: number; max: number; fn: (...args: number[]) => number }>> = {
+export const BUILTIN_FUNCTIONS: Readonly<Record<string, { min: number; max: number; fn: (...args: number[]) => number }>> = {
   sin: { min: 1, max: 1, fn: Math.sin },
   cos: { min: 1, max: 1, fn: Math.cos },
   tan: { min: 1, max: 1, fn: Math.tan },
@@ -78,7 +78,7 @@ export function isBuiltinConstant(name: string): boolean {
 const TOKEN_PATTERN =
   /[ \t\n\r]*(?:(?<number>(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)|(?<ident>[A-Za-z_]\w*)|(?<op>[-+*/])|(?<lparen>\()|(?<rparen>\))|(?<comma>,)|$)/y;
 
-function tokenize(src: string): Token[] | string {
+export function tokenize(src: string): Token[] | string {
   const pattern = new RegExp(TOKEN_PATTERN);
   const tokens: Token[] = [];
   while (pattern.lastIndex < src.length) {

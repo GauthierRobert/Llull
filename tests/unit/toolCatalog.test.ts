@@ -111,7 +111,8 @@ describe('searchTools ranking regression table', () => {
   });
 
   it('does not rank natural-frequency queries onto animation or surface tools above the analysis tools', () => {
-    expect(ranked('natural frequency', 2)).toEqual(['create_analysis', 'render_fea_results']);
+    // sdof_response (PHY-09 quick check: natural frequency fnHz) is an analysis tool too.
+    expect(ranked('natural frequency', 2)).toEqual(['create_analysis', 'sdof_response']);
   });
 });
 
@@ -140,6 +141,14 @@ const allToolNames = [
   ...buildLibraryToolDefinitions().map((tool) => tool.name),
   // server-side native transport listed in the analysis toolset (server/src/native/tools.ts; covered by server/tests/topologySolve.test.ts)
   'topology_solve',
+  // server-side native transport listed in the piping toolset (server/src/native/autoRoute.ts; covered by server/tests/routeNativeParity.test.ts)
+  'auto_route',
+  // GDT / aero native transports (server/src/native/{stackupMonteCarlo,vortexLattice}.ts; server/tests/{stackupNative,aeroPanelNative}.test.ts)
+  'stackup_monte_carlo',
+  'vortex_lattice_solve',
+  // point-cloud host transports listed in the scan toolset (server/src/scan/scanTools.ts; covered by server/tests/scanImport.test.ts)
+  'scan_import',
+  'scan_list',
 ];
 
 describe('TOOLSETS', () => {
