@@ -690,22 +690,20 @@ Sources read from rendered pages of [E2] (LS-DYNA R14 Theory Manual) and the [E3
 | ---- | -------- | ------ |
 | Adiabatic heating | `ΔT = β σ_y Δε_p / (ρ c_p)` per point, explicit in T after each J2 return (`σ_y Δε_p` = plastic work per volume of the radial return); flow stress × `(1 − T*ᵐ)`, `T* = (T − T_r)/(T_m − T_r)` clamped to [0, 1]; failure strain × `(1 + D5 T*)`; start at the J–C transition temperature (job `initialTemperature` overrides) | [E4] *MAT_107 Eq. 107.21 and its TQC entry ("portion of plastic work converted into heat (normally taken to be 0.9)"); [E2] Eq. 22.15.1 |
 | β | `DEFAULT_TAYLOR_QUINNEY` = 0.9, named (AF-31); `set_adiabatic_heating {analysisId, material, taylorQuinney?, enabled?}` | [E4] *MAT_107 TQC |
-| c_p | the material's PHY-01 cp model, in the case unit system, through the thermal module's `propertyTable`; held constant in the run, a T-table read at T_r (reported in `unverifiedReasons`); none -> `EXP_MATERIAL_NO_CP` | llull rule |
+| c_p | the material's PHY-01 cp model, in the case unit system, through the thermal module's `propertyTable`; a T-table is read at each point's temperature every update since §13.10; none -> `EXP_MATERIAL_NO_CP` | llull rule |
 | Shell erosion | a shell whose every thickness point reached J–C damage 1 carries no force or moment and leaves the step computation; its nodes keep their mass and inertia (the hex rule of §13.1 per point, the element once all points failed) | llull rule, consistent with §13.1 |
 | Warping stiffness (BWC) | the Belytschko–Leviathan projection `P = I − R(RᵀR)⁻¹Rᵀ` on the 24 element-frame nodal velocities before the rates and on the forces / moments after (internal power invariant). R: 3 rigid rotations about the centroid (translations `e_a × x̂_I` are orthogonal to the rigid translations there) and 4 nodal drills about the shared, area-weighted nodal normals. Job `shellWarping`, default on (LS-DYNA's BT default is off) | [E2] §11.6 Eq. 11.28; [E3] *CONTROL_SHELL BWC = 1 with PROJ = 1 ("the full projection", recommended in its Remark 1); nodal-normal drills: Belytschko–Leviathan elements carry nodal fibers, and the Radioss theory page states the drill projection about the nodal normal (help.altair.com, One-Point Quadrature Shell Element, read through a page summary) |
 | Shells in contact | every shell of a contact part is a two-sided mid-surface segment, offset by half its thickness; slave nodes carry half the largest thickness of their shells; penetration `\|g\| − (h_m + h_s)` against shells, `g − h_s` against solid faces; shell segment stiffness `k = f_si K A / max(shell diagonal)` | [E2] §29.8.2, Figs. 29.11–29.13, Eq. 29.19 |
-| GPU path | fixed DOFs: a mask in the kick kernel. Contact and shells: a deterministic hybrid cycle; the host reads back `x_new` / `v_new`, runs the CPU twin's contact and shell routines in the same order and uploads one per-node force the next kick adds. Heating, (1 − T*ᵐ) and D5 in the kernels | llull design (RS1 §2 rule 3: no float atomics, fixed-order gathers) |
-| 05 supports | `buildExplicitJob` maps `fixed` (translations; and rotations of shell nodes), `pinned` (translations) and `displacement` dofs of 0 onto the job's fixed DOFs: the box face of the part nearest each `facesNear` point (structured hex) or the nearest node to each `pointsNear` point, else the `fea_mesh` node set `C_<id>`. Symmetry, non-zero motion, edge / plane targets -> `EXP_CONSTRAINT_UNSUPPORTED` | 05 constraint model |
+| GPU path | fixed DOFs: a mask in the kick kernel. Contact and shells: a deterministic hybrid cycle in this round (host routines on read-back positions), replaced by WGSL kernels in §13.10. Heating, (1 − T*ᵐ) and D5 in the kernels | llull design (RS1 §2 rule 3: no float atomics, fixed-order gathers) |
+| 05 supports | `buildExplicitJob` maps `fixed` (translations; and rotations of shell nodes), `pinned` (translations) and `displacement` dofs of 0 onto the job's fixed DOFs: the box face of the part nearest each `facesNear` point (structured hex) or the nearest node to each `pointsNear` point, else the `fea_mesh` node set `C_<id>`. Edge / plane targets -> `EXP_CONSTRAINT_UNSUPPORTED`; symmetry and motion histories since §13.10 | 05 constraint model |
 | Artifact | `fields.f64` carries 7 values per element (temperature after the failed flag); `fe_explicit` gains `temperature`, the summary `maxTemperature` (K) | — |
 
 **Decision: D1–D5 stay in the explicit set-up.** PHY-02's `ConstitutiveSet` has the slots elastic, hyperelastic, plastic, viscoelastic,
 creep and rate, and no failure slot. Adding one is a PHY-02 schema change outside RS-8, so the constants stay in
 `set_johnson_cook_failure` (always with their source, Q7).
 
-**Not built:** the BWC fiber coupling of Eqs. 9.55–9.60 and its improved transverse shear (Eqs. 9.61–9.65; the warping stiffness here
-is the projection that *CONTROL_SHELL documents for it); contact and shell kernels in WGSL (they run as the GPU cycle's host part);
-rounded shell edges in contact (§29.8.3); shell thickness change; symmetry supports and prescribed motion; temperature-dependent c_p in the
-run. The OpenCourant / Radioss hand-off (M2–M4) is outside RS-8.
+**Left open by this round, closed in §13.10:** the BWC fiber coupling and transverse shear, the WGSL contact and shell kernels, symmetry
+supports and prescribed motion, temperature-dependent c_p in the run.
 
 **Verification:**
 
@@ -729,5 +727,43 @@ less than 1e-6 of the depth (the friction benchmark fails with 1e-6). The physic
 momentum on its own (1e-9).
 
 **Timing** (`tests/gpu.rs`, ignored tests, sequential, RTX 4080 Laptop, Vulkan): two bars in contact, 20 480 hex8, 286 cycles: CPU twin
-49.2 s, GPU hybrid 4.49 s; the RS-8b bar, 10 240 hex8, 754 cycles: CPU twin 29.9 s, GPU 3.79 s.
+49.2 s, GPU hybrid 4.49 s; the RS-8b bar, 10 240 hex8, 754 cycles: CPU twin 29.9 s, GPU 3.79 s (WGSL contact: §13.10).
 
+### 13.10 As built: RS-8 closing round (2026-10-20)
+
+RS-8 is complete with this round: nothing of the RS1 RS-8 row stays open. Sources as in §13.9 (rendered [E2] pages unless stated).
+
+| Item | As built | Source |
+| ---- | -------- | ------ |
+| WGSL shell kernels | `explicit_shell.wgsl`: angular-velocity kick; nodal normals (per-shell diagonal cross product, shell-ordered per-node gather); one thread per shell porting `shell.rs` / `bwc.rs` / `projection.rs` (frame, gradients, 7 × 7 Gauss–Jordan projection, fibers, edge shear, plane stress through `update_point`, hourglass, erosion); forces into the element force slots after the solids so the existing fixed-order gather adds them; moments by a shell-ordered gather | llull port of §13.8–§13.9 |
+| WGSL contact kernels | `explicit_contact.wgsl`: one thread per slave (pass-major, the CPU order) on its candidate list: projection (Gauss–Newton then Newton), MAXPAR, offsets, the kept / shallowest selection, penalty, Coulomb friction state; a per-node gather over host-built entries (the slave's own force, then −φ_k f of each slave whose selected segment holds the node) in the order `Contacts::forces` adds them | llull port of §13.7, §13.9 |
+| Candidate search | stays on the host BVH (`Contacts::candidates`) with the margin 2δ, δ = ¼ of the contact reach; `min_step` reduces the largest node motion since the search and the host searches again once it passes δ: a pair within reach now was within reach + 2δ at the search, so the lists contain every candidate of the CPU search at every cycle | llull rule (coordinator's option: host search, uploaded with a safety margin) |
+| BWC fibers | nodal fibers = the shared nodal normals; z-linear rates `b^c v̂ + b (ω × p)` (Eqs. 9.55–9.59); `b^c` = the exact centre derivative of the fiber-shifted gradients (the printed leading term of Eq. 9.60 over 2A plus the change of the area; the manual leaves "the details" to the Belytschko papers); power-conjugate forces (`S = ∫ẑσ` on `b^c`, moments `p × c`), element stiffness symmetric to 1e-12 | [E2] §9.6 Eqs. 9.55–9.60 |
+| BWC transverse shear | tangential shear per side `(ŵ_J − ŵ_I)/L + ½(θ_I + θ_J)·r(t)` (Eq. 9.65), corners from their two sides solved on the side tangents (Eqs. 9.63–9.64; equal to the printed projection sum on rectangles), centre value with N_I = ¼ (Eqs. 9.61–9.62); signs fixed so a rigid rotation is strain free (the printed ones follow Fig. 9.4) | [E2] §9.6 Eqs. 9.61–9.65 |
+| Symmetry supports | 05 `symmetry`: the translation normal to its plane, plus the two in-plane rotations on shell nodes; the plane is the box face of the target (structured hex) or the axis on which the fea_mesh node set is flat; otherwise `EXP_CONSTRAINT_UNSUPPORTED` | llull mapping of the 05 constraint |
+| Imposed motion | `add_imposed_motion / delete_imposed_motion` (§3 `imposedMotions`, §4): velocity or displacement curve `[[t s, value], …]` of one dof on box-face / near-point nodes, case units, piecewise linear and constant outside, one motion per dof; counts as excitation. Solver: after the fixed dofs, `v^{n+½} = v(t^n + Δt/2)` or `(u(t^{n+1}) − (x^n − x^0))/Δt`; the reaction work `m(v_imposed − v_pred)/(½(Δt_prev + Δt)) · ½(Δt_prev v^{n−½} + Δt v^{n+½})` enters the external work; in the WGSL kick too. A non-zero 05 static displacement is refused with a pointer to it | spec §3 / §4; TR-EXP-71 "imposed velocity" |
+| c_p(T) | the PHY-01 cp(T) table in K goes to the job (`specificHeatTable`) and is interpolated linearly at each point's temperature every update (clamped at its ends), CPU and WGSL (`cp_table`) | §13.9 heating |
+
+**Not part of RS-8** (decided at close, not open RS-8 work): rounded shell edges in contact ([E2] §29.8.3 describes them as LS-DYNA
+behaviour, not a contact-algorithm requirement) and shell thickness change ([E2] §29.8.2: "accounted for if and only if the shell thickness
+change option is flagged in the input"); both are options for a later physics-19 row. The OpenCourant / Radioss hand-off (PHY-19 M2–M4) is
+the alternative path of RS1, outside RS-8.
+
+**Verification:**
+
+| Case | Closed form / reference | Measured | Asserted |
+| ---- | ----------------------- | -------- | -------- |
+| Linear c_p(T) (`c0 + c1(T − T_r)`) | `ΔT = (−c0 + √(c0² + 2c1βAε_p/ρ))/c1` | 1.79561 K vs 1.79552 K (5e-5); constant c_p would give 2.146 K | 1e-3 |
+| Bar pulled at 10 m/s by an imposed velocity (ν = 0) | `σ = ρ c0 v` = 396.23 MPa behind the front | 396.17 MPa; energy balance 0.6 % with the reaction work | 2 % |
+| Same, displacement form `u = v t` | the same run | identical to 1e-6 of σ | 1e-6 |
+| Half hex bar on a wall, symmetry plane x = 5 | `F_full = 2 F_half` | 5e-15 of the peak | 1e-9 |
+| Half shell cantilever, symmetry plane y = 5 (uy, rx, rz held) | the full strip | tip speed and internal energy to ~3e-13 | 1e-6 |
+| Twisted beam, BWC (projection + fibers + edge shear), both loads | beam-theory static work (§13.9), time mean over ~20 periods | tip-width load −2.24 %, tip-normal load +1.23 % (projection only: −0.32 % / +2.74 %; plain BT +82.9 % / +25.8 %) | 5 % |
+| `fiber_gradients`, `edge_shear` (unit) | finite differences; rigid rotations strain free; linear fields exact; rectangle = one-point form | 1e-7 / 1e-12 | as measured |
+| GPU vs CPU twin, WGSL kernels | friction (Coulomb block, 4 ms); shell plate on a block; twisted beam (BWC); plastic shell strip with erosion; imposed motion; c_p table | 2.9e-6 of v; 2.9e-9; 1.8e-14 of the tip speed; 1.2e-15, same eroded set; 7.7e-10; 4.6e-8 K of 16 K | 1e-4; 1e-3; 1e-9; 4 % of ε_f, same set; 1e-7; 1e-4 of the rise |
+| Two-bar contact twin | as §13.9 (threshold event at coplanar edges) | bar mean velocity 3.3e-4, contact energy 3.5e-4 (unchanged from the hybrid) | 1e-3 |
+| Native e2e | a bar pulled by `add_imposed_motion` through commands and the job contract | von Mises behind the front = ρ c0 v | 5 % |
+| 05 supports and imposed motions (domain-cae unit, `supports.test.ts`, `heating.test.ts`) | the plane / face / node-set dofs; curves in case units; refusals; is pure | as asserted | exact |
+
+**Timing** (`tests/gpu.rs`, ignored, sequential, RTX 4080 Laptop, Vulkan): two bars in contact, 20 480 hex8, 286 cycles: CPU twin 43.1 s,
+GPU (WGSL contact) 2.69 s (the hybrid of §13.9 took 4.49 s); the RS-8b bar, 10 240 hex8, 754 cycles: CPU twin 28.5 s, GPU 3.88 s.
