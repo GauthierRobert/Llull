@@ -5,7 +5,7 @@
 
 type StressField = { readonly values: Readonly<Record<string, readonly number[]>> };
 
-export type Fibre = 'mid' | 'top' | 'bottom';
+type Fibre = 'mid' | 'top' | 'bottom';
 
 export interface Applied {
   readonly node: number;

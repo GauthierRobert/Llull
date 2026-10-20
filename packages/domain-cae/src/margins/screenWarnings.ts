@@ -4,7 +4,7 @@ import type { AnalysisCase, FeMeshArtifact } from '@core/model/analysis';
 import { nodeEntities } from '../results/fields';
 
 /** Excluded share of a part's nodes above which the singular screening is reported as large. */
-export const LARGE_EXCLUSION_FRACTION = 0.25;
+const LARGE_EXCLUSION_FRACTION = 0.25;
 
 /** The part is a composite shell: an isotropic von Mises margin against the entity's Ftu / Fty would be meaningless. */
 export function isCompositeEntity(analysis: AnalysisCase, entityId: string): boolean {
