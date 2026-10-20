@@ -14,8 +14,18 @@ export const PIPE_SIZES: ReadonlyArray<readonly [number, number, number, number]
   [400, 406.4, 9.53, 8.2], [450, 457, 9.53, 8.5], [500, 508, 9.53, 9.1], [600, 610, 9.53, 9.8],
 ];
 
+/** ASME B36.10M outside diameter (mm) of the sizes whose EN 10220 one differs by more than the tolerance: NPS 2½ and NPS 5. */
+const ASME_OUTSIDE_DIAMETER_MM: Readonly<Record<number, number>> = { 65: 73.0, 125: 141.3 };
+
 /** An outside diameter within this of a tabulated one (mm) is that size. */
-export const OUTSIDE_DIAMETER_TOLERANCE_MM = 1.5;
+const OUTSIDE_DIAMETER_TOLERANCE_MM = 1.5;
+
+/** The tabulated size whose EN 10220 or ASME B36.10M outside diameter is within 1.5 mm of `outsideDiameterMm`, else undefined. */
+export function pipeSizeByOutsideDiameter(outsideDiameterMm: number): (typeof PIPE_SIZES)[number] | undefined {
+  const near = (diameter: number | undefined): boolean =>
+    diameter !== undefined && Math.abs(diameter - outsideDiameterMm) <= OUTSIDE_DIAMETER_TOLERANCE_MM;
+  return PIPE_SIZES.find(([dn, diameter]) => near(diameter) || near(ASME_OUTSIDE_DIAMETER_MM[dn]));
+}
 
 /** Largest DN whose outside diameter add_pipe_run takes from the table (larger sizes need `diameter`). */
 const MAX_ORDERED_DN = 400;

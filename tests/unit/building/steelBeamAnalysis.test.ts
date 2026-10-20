@@ -67,6 +67,12 @@ describe('pipe weight', () => {
     expect(pipeWallThickness(114.3)).toBe(6.02);
     expect(pipeWallThickness(60.3)).toBe(3.91);
   });
+  it('takes the standard wall of the ASME outside diameters that differ from EN 10220 (NPS 2½, NPS 5)', () => {
+    expect(pipeWallThickness(73.0)).toBe(5.16);
+    expect(pipeWallThickness(76.1)).toBe(5.16);
+    expect(pipeWallThickness(141.3)).toBe(6.55);
+    expect(pipeWallThickness(139.7)).toBe(6.55);
+  });
   it('falls back to OD / 40 (minimum 2.5 mm) for an untabulated diameter', () => {
     expect(pipeWallThickness(700)).toBeCloseTo(17.5, 9);
     expect(pipeWallThickness(30)).toBe(2.5);
