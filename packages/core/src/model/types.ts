@@ -5,6 +5,7 @@ import { isCurve3D, isSheet } from './curveKinds';
 import type { PropertyModel } from './propertyModel';
 import type { ConstitutiveSet, MaterialModel } from './materialModel';
 import type { Vec2, Vec3 } from './vectors';
+import type { FaceSlabRecipe } from './faceSlab';
 import type { BuildingModel } from './building';
 import type { CivilModel } from './civil';
 import type { AnalysisModel } from './analysis';
@@ -153,6 +154,8 @@ export interface MeshSolidEntity extends BaseEntity {
   mesh: MeshData;
   /** Exact shape recipe of a kernel result; absent for imported / triangle-only meshes. */
   brep?: ShapeRecipe;
+  /** Exact `faceSlab` of a ply solid (before `position` / `rotation`); read ONLY by `export_step_exact` (B-rep if the kernel builds it, else `mesh`). */
+  stepSlab?: ShapeRecipe;
   /** Set only on the groove tool of a modelled thread (feature lowering): kernels skip post-boolean face merging on results built from it. */
   threadTool?: true;
 }
@@ -819,19 +822,4 @@ export type ShapeRecipe =
   | { readonly op: 'brep'; readonly blob: string; readonly format: 'occt-brep-v1'; readonly label?: string }
   /** A hole group or pocket cut into a face of `source` (07 FTR); kernels lower it to boolean subtracts (`geometry/featureLowering`). */
   | ({ readonly op: 'feature'; readonly source: ShapeRecipe } & FeatureParams)
-  /**
-   * An exact constant-thickness slab over a trimmed face (06 CMP ply solids): the face of `surface` bounded by `loops` (the (u, v) polygons of
-   * `encodeLoops`), lifted along its normal from offset `from` to `to` (> from). `direction` is the lift direction at the first loop vertex
-   * (it fixes the sign of the normal), `tolerance` the sewing tolerance. Only an exact kernel with the capability `faceSlab` builds it.
-   * `surface.data` is the number list of `geometry/surfaceWire` (bspline) or: plane = origin, xDir, yDir; cylinder = origin, axis, xDir, radius
-   * (u = azimuth from xDir, v = axial); cone = apex, axis, xDir, semi-angle (u = azimuth, v = distance from the apex).
-   */
-  | {
-      readonly op: 'faceSlab';
-      readonly surface: { readonly type: 'bspline' | 'plane' | 'cylinder' | 'cone'; readonly data: readonly number[] };
-      readonly loops: readonly number[];
-      readonly from: number;
-      readonly to: number;
-      readonly direction: Vec3;
-      readonly tolerance: number;
-    };
+  | FaceSlabRecipe;

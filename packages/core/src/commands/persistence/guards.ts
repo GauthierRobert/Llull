@@ -268,7 +268,9 @@ function meshProblem(v: Record<string, unknown>): string | null {
   if (!indices.every((i) => Number.isInteger(i) && (i as number) >= 0 && (i as number) < vertexCount))
     return `mesh.indices must be integers in [0, ${vertexCount})`;
   const problem = v['brep'] === undefined ? null : validateShapeRecipe(v['brep'], validateEntityValue);
-  return problem === null ? null : `brep recipe invalid — ${problem}`;
+  if (problem !== null) return `brep recipe invalid — ${problem}`;
+  const slab = v['stepSlab'] === undefined ? null : validateShapeRecipe(v['stepSlab'], validateEntityValue);
+  return slab === null ? null : `stepSlab recipe invalid — ${slab}`;
 }
 
 function textProblem(v: Record<string, unknown>): string | null {
