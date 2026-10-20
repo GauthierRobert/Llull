@@ -55,7 +55,7 @@ describe('create_nurbs_surface', () => {
     expect(entityBounds(scaled.document.entities[id]!).max[0]).toBeCloseTo(20, 9);
     const loaded = deserializeDocument(serializeDocument(doc));
     expect(JSON.stringify((loaded.entities[id] as NurbsSurfaceEntity).surface)).toBe(JSON.stringify(entity.surface));
-    expect(collectExportTriangles(doc, undefined).tris).toHaveLength(0);
+    expect(collectExportTriangles(doc, undefined).tris.length).toBeGreaterThan(100);
   });
 
   it.each([
@@ -565,6 +565,64 @@ describe('check_continuity, surfaces', () => {
     const joint = data<{ joints: Array<{ order: string; g1AngleRad: number }> }>(result).joints[0]!;
     expect(joint.order).toBe('G0');
     expect(joint.g1AngleRad).toBeCloseTo(Math.PI / 2, 9);
+  });
+
+  describe('parabolic cylinder z = x^2 / 2 (curvature varies along the surface)', () => {
+    /** Degree (2, 1) patch: u runs along three x-poles, v along y; `shear` slants the v lines, `lead` is the x-pole row. */
+    const patch = (xPoles: number[][], shear: number): NurbsSurfaceData => ({
+      degreeU: 2,
+      degreeV: 1,
+      poles: xPoles.map(([x, z, dy]) => [
+        [x, (dy as number) * shear, z as number],
+        [x, 1 + (dy as number) * shear, z as number],
+      ]),
+      knotsU: [0, 1],
+      multiplicitiesU: [3, 3],
+      knotsV: [0, 1],
+      multiplicitiesV: [2, 2],
+    });
+    const base = patch(
+      [
+        [0, 0, 0],
+        [0.5, 0, 0],
+        [1, 0.5, 0],
+      ],
+      0,
+    );
+    const join = (next: NurbsSurfaceData): { order: string; g1AngleRad: number; g2Gap: number } => {
+      const first = addSurface(empty, base);
+      const second = addSurface(first.doc, next);
+      const result = execute(second.doc, 'check_continuity', {
+        pairs: [{ a: { id: first.id, side: 'u1' }, b: { id: second.id, side: 'u0' } }],
+        samples: 7,
+      });
+      return data<{ joints: Array<{ order: string; g1AngleRad: number; g2Gap: number }> }>(result).joints[0]!;
+    };
+
+    it('a continuation has G2 whatever its parametrisation (sheared v lines)', () => {
+      const next = [
+        [1, 0.5, 0],
+        [1.5, 1, 0.5],
+        [2, 2, 1],
+      ];
+      expect(join(patch(next, 0))).toMatchObject({ order: 'G2' });
+      expect(join(patch(next, 0.8))).toMatchObject({ order: 'G2' });
+    });
+
+    it('a patch folded back over the first one is not G1', () => {
+      const folded = join(
+        patch(
+          [
+            [1, 0.5, 0],
+            [0.5, 0, 0],
+            [0, 0, 0],
+          ],
+          0,
+        ),
+      );
+      expect(folded.order).toBe('G0');
+      expect(folded.g1AngleRad).toBeCloseTo(Math.PI, 6);
+    });
   });
 
   it('far apart patches report no order', () => {

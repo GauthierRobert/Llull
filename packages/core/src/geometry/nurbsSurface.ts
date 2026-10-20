@@ -89,6 +89,14 @@ export function scaleSurface(surface: NurbsSurfaceData, factor: number): NurbsSu
   return mapSurfacePoles(surface, ([x, y, z]) => [x * factor, y * factor, z * factor]);
 }
 
+/** World-space triangles of a sheet (entity rotation about its position applied), for mesh export and projected-area queries. */
+export function sheetTriangles(entity: NurbsSurfaceEntity): Array<readonly [Vec3, Vec3, Vec3]> {
+  const place = (point: Vec3): Vec3 => (isZeroRotation(entity.rotation) ? point : applyEulerXYZ(point, entity.position, entity.rotation));
+  return surfaceTriangles(entity.surface, entity.position, 8).map(
+    ([a, b, c]) => [place(a as Vec3), place(b as Vec3), place(c as Vec3)] as const,
+  );
+}
+
 /** Triangles of the display tessellation, each as three vertices with `position` added (the form `render_view` rotates and paints). */
 export function surfaceTriangles(surface: NurbsSurfaceData, position: Vec3, perSpan = 4): Vec3[][] {
   const { positions, indices } = tessellateSurface(surface, perSpan);

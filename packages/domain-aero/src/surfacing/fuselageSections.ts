@@ -7,6 +7,7 @@
 import type { FuselageSection } from '@core/model/aero';
 import type { Vec3 } from '@core/model/types';
 import { conicWeight } from '@lib/nurbs/conic';
+import { evaluateCurve } from '@lib/nurbs/evaluate';
 import type { NurbsCurveData } from '@lib/nurbs/types';
 
 /** Largest allowed superellipse exponent (the arcs flatten into a rectangle as it grows; rho -> 1). */
@@ -48,8 +49,24 @@ function ring(fs: number, spec: RingSpec): NurbsCurveData {
   };
 }
 
+/**
+ * Largest radial distance (document units) between the four-conic ring and the true superellipse |y/a|^n + |z/b|^n = 1: the conic arcs
+ * meet the curve at the axes and the 45 degree point only, so the ring is exact for n = 2 and an approximation otherwise (about 0.4 % of
+ * the radius at n = 2.5, 1 % at n = 6).
+ */
+function superellipseDeviation(curve: NurbsCurveData, bl: number, wl: number, a: number, b: number, n: number): number {
+  let worst = 0;
+  for (let k = 0; k <= 160; k++) {
+    const [, y, z] = evaluateCurve(curve, k / 160);
+    const [dy, dz] = [y - bl, z - wl];
+    const implicit = Math.abs(dy / a) ** n + Math.abs(dz / b) ** n;
+    if (implicit > 0) worst = Math.max(worst, Math.abs(1 - implicit ** (-1 / n)) * Math.hypot(dy, dz));
+  }
+  return worst;
+}
+
 export type SectionResult =
-  | { readonly curve: NurbsCurveData }
+  | { readonly curve: NurbsCurveData; readonly deviation?: number }
   | { readonly code: 'AERO_PARAM_INVALID' | 'SRF_CONIC_RHO_RANGE'; readonly message: string };
 
 const bad = (message: string): SectionResult => ({ code: 'AERO_PARAM_INVALID', message });
@@ -99,9 +116,16 @@ export function sectionCurve(fs: number, section: FuselageSection): SectionResul
       if (!isNumber(exponent) || !(exponent > 1) || exponent > MAX_EXPONENT)
         return bad(`exponent must be within (1, ${MAX_EXPONENT}] (2 = ellipse)`);
       const rho = 2 ** (1 - 1 / exponent) - 1;
-      return {
-        curve: ring(fs, { bl, halfBreadth, wlMax: wl, wlUpper: wl + halfHeight, wlLower: wl - halfHeight, rhoUpper: rho, rhoLower: rho }),
-      };
+      const curve = ring(fs, {
+        bl,
+        halfBreadth,
+        wlMax: wl,
+        wlUpper: wl + halfHeight,
+        wlLower: wl - halfHeight,
+        rhoUpper: rho,
+        rhoLower: rho,
+      });
+      return { curve, deviation: superellipseDeviation(curve, bl, wl, halfBreadth, halfHeight, exponent) };
     }
     case 'conic': {
       const { halfBreadth, wlMaxBreadth, upper, lower } = section;

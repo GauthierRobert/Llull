@@ -229,20 +229,54 @@ export const thickenSurface = defineCommand({
     const bottom = countU * countV;
     const indices: number[] = [];
     const at = (i: number, j: number): number => i * countV + j;
+    // Seams (a sheet closed in u or v) and collapsed edges (poles) share their vertices and get no wall: otherwise the mesh has coincident fins.
+    const eps = 1e-9 * Math.max(1, ...samples.map((s) => distance3(s.point, (samples[0] as { point: Vec3 }).point)));
+    const coincide = (a: number, b: number): boolean =>
+      distance3((samples[a] as { point: Vec3 }).point, (samples[b] as { point: Vec3 }).point) <= eps;
+    const rowsU = Array.from({ length: countU }, (_, i) => i);
+    const colsV = Array.from({ length: countV }, (_, j) => j);
+    const closedU = colsV.every((j) => coincide(at(0, j), at(countU - 1, j)));
+    const closedV = rowsU.every((i) => coincide(at(i, 0), at(i, countV - 1)));
+    const alias = Array.from({ length: bottom }, (_, k) => k);
+    if (closedU) for (const j of colsV) alias[at(countU - 1, j)] = at(0, j);
+    if (closedV) for (const i of rowsU) alias[at(i, countV - 1)] = at(i, 0);
+    const edges: number[][] = [
+      colsV.map((j) => at(0, j)),
+      colsV.map((j) => at(countU - 1, j)),
+      rowsU.map((i) => at(i, 0)),
+      rowsU.map((i) => at(i, countV - 1)),
+    ];
+    for (const edge of edges)
+      if (edge.every((k) => coincide(k, edge[0] as number))) for (const k of edge) alias[k] = alias[edge[0] as number] as number;
+    const canon = (k: number): number => {
+      let current = k;
+      while (alias[current] !== current) current = alias[current] as number;
+      return current;
+    };
+    const push = (...triangle: number[]): void => {
+      const corners = triangle.map((k) => (k >= bottom ? bottom + canon(k - bottom) : canon(k)));
+      if (new Set(corners).size === 3) indices.push(...corners);
+    };
     for (let i = 0; i + 1 < countU; i++)
       for (let j = 0; j + 1 < countV; j++) {
         const [p, q, r, s] = [at(i, j), at(i, j + 1), at(i + 1, j), at(i + 1, j + 1)];
-        indices.push(p, r, q, q, r, s);
-        indices.push(bottom + p, bottom + q, bottom + r, bottom + q, bottom + s, bottom + r);
+        push(p, r, q);
+        push(q, r, s);
+        push(bottom + p, bottom + q, bottom + r);
+        push(bottom + q, bottom + s, bottom + r);
       }
-    const boundary: number[] = [];
-    for (let j = 0; j < countV; j++) boundary.push(at(0, j));
-    for (let i = 1; i < countU; i++) boundary.push(at(i, countV - 1));
-    for (let j = countV - 2; j >= 0; j--) boundary.push(at(countU - 1, j));
-    for (let i = countU - 2; i >= 1; i--) boundary.push(at(i, 0));
-    boundary.forEach((top, k) => {
-      const next = boundary[(k + 1) % boundary.length] as number;
-      indices.push(top, bottom + next, bottom + top, top, next, bottom + next);
+    const loop: Array<readonly [number, number]> = [];
+    for (let j = 0; j < countV; j++) loop.push([0, j]);
+    for (let i = 1; i < countU; i++) loop.push([i, countV - 1]);
+    for (let j = countV - 2; j >= 0; j--) loop.push([countU - 1, j]);
+    for (let i = countU - 2; i >= 1; i--) loop.push([i, 0]);
+    loop.forEach(([i, j], k) => {
+      const [ni, nj] = loop[(k + 1) % loop.length] as readonly [number, number];
+      const onSeam = (closedU && i === ni && (i === 0 || i === countU - 1)) || (closedV && j === nj && (j === 0 || j === countV - 1));
+      if (onSeam) return;
+      const [top, next] = [at(i, j), at(ni, nj)];
+      push(top, bottom + next, bottom + top);
+      push(top, next, bottom + next);
     });
     const solid: Entity = newEntity('mesh', nextId('mesh'), { mesh: { positions, indices } }, [0, 0, 0], entity.color, {
       layerId: entity.layerId,

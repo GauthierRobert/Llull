@@ -3,6 +3,7 @@
 import { z } from '@core/commands/schema';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { is3D } from '@core/model/types';
+import { isSheet } from '@core/model/curveKinds';
 import { entityToTriangles } from '@core/geometry/entityTriangles';
 import { toMetres } from '@core/model/units';
 import { projectedArea, type ProjectedArea } from './projectedArea';
@@ -60,7 +61,7 @@ export function geometryArea(
   const scale = toMetres(doc, 1);
   const triangles = ids.flatMap((id) => {
     const entity = doc.entities[id];
-    return entity !== undefined && is3D(entity) ? entityToTriangles(entity, doc) : [];
+    return entity !== undefined && (is3D(entity) || isSheet(entity)) ? entityToTriangles(entity, doc) : [];
   });
   const toMetric = (point: Vec3): Vec3 => [point[0] * scale, point[1] * scale, point[2] * scale];
   const metric = triangles.map(([a, b, c]): Triangle => [toMetric(a), toMetric(b), toMetric(c)]);

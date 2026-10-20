@@ -9,10 +9,31 @@ import { curvatureAt, planeNormalOf, type CurvatureSample } from '../../lib/nurb
 import { closestOnCurve } from '../../lib/nurbs/closest';
 import { curveDomain, evaluateCurve } from '../../lib/nurbs/evaluate';
 import { isoCurve, surfaceDomain } from '../../lib/nurbs/surface';
-import { normalCurvature, surfaceSample } from '../../lib/nurbs/surfaceCurvature';
+import { normalCurvature, surfaceSample, type SurfaceSample } from '../../lib/nurbs/surfaceCurvature';
 import type { NurbsCurveData } from '../../lib/nurbs/types';
 import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import type { ContinuityEdge, ContinuityJoint, ContinuityOrder, ContinuitySample, ContinuityTolerances, SurfaceSide } from './types';
+
+const unit = (v: Vec3): Vec3 => scale3(v, 1 / (len3(v) || 1));
+
+/** Tangent-plane direction in which the patch leaves through `side` (towards increasing u / v at u1 / v1, the opposite at u0 / v0). */
+function outward(sample: SurfaceSample, side: SurfaceSide): Vec3 {
+  const along = side.startsWith('u') ? sample.su : sample.sv;
+  return side.endsWith('1') ? along : scale3(along, -1);
+}
+
+/** The tangent-plane direction perpendicular to the edge of `side` (n x edge tangent), signed to agree with `across` (the oblique outward / inward direction). */
+function perpendicularToEdge(sample: SurfaceSample, side: SurfaceSide, across: Vec3): Vec3 {
+  const perpendicular = cross3(sample.normal, side.startsWith('u') ? sample.sv : sample.su);
+  return dot3(perpendicular, across) < 0 ? scale3(perpendicular, -1) : perpendicular;
+}
+
+/** (a, b) with `w` ~ a Su + b Sv, the orthogonal projection of `w` onto the tangent plane (normal equations of the first fundamental form). */
+function directionCoefficients(sample: SurfaceSample, w: Vec3): [number, number] {
+  const [p, q] = [dot3(w, sample.su), dot3(w, sample.sv)];
+  const determinant = sample.e * sample.g - sample.f * sample.f;
+  return [(sample.g * p - sample.f * q) / determinant, (sample.e * q - sample.f * p) / determinant];
+}
 
 const clampUnit = (value: number): number => Math.max(-1, Math.min(1, value));
 
@@ -103,8 +124,6 @@ function surfaceJoint(
   let [g0Max, g1Max, g2Max, g2RelMax] = [0, 0, 0, 0];
   let g2All = true;
   let worst: { t: number; point: Vec3; score: number } = { t: 0, point: evaluateCurve(edgeA.curve, first), score: -1 };
-  const crossA = sideA.startsWith('u') ? ([1, 0] as const) : ([0, 1] as const);
-  const crossB = sideB.startsWith('u') ? ([1, 0] as const) : ([0, 1] as const);
   for (let i = 0; i < count; i++) {
     const t = i / (count - 1);
     const [uA, vA] = edgeA.at(first + (last - first) * t);
@@ -114,11 +133,17 @@ function surfaceJoint(
     const sampleB = surfaceSample(b, uB, vB);
     if (sampleA.degenerate || sampleB.degenerate) continue;
     const g0Gap = distance3(sampleA.point, sampleB.point);
+    // across the edge: the in-plane direction perpendicular to the edge pointing out of A, and the one pointing into B
+    const w = perpendicularToEdge(sampleA, sideA, outward(sampleA, sideA));
+    const inwardB = perpendicularToEdge(sampleB, sideB, scale3(outward(sampleB, sideB), -1));
+    // G1: the direction leaving A must continue into B (a 180 degree fold-back is not G1)
+    const g1 = Math.acos(clampUnit(dot3(unit(w), unit(inwardB))));
+    // G2 (Pegna-Wolter): normal curvatures along that ONE common direction w
     const alignment = dot3(sampleA.normal, sampleB.normal);
-    const g1 = Math.acos(clampUnit(Math.abs(alignment)));
     const sign = alignment < 0 ? -1 : 1;
-    const kA = normalCurvature(sampleA, crossA[0], crossA[1]);
-    const kB = sign * normalCurvature(sampleB, crossB[0], crossB[1]);
+    const [ca, cb] = [directionCoefficients(sampleA, w), directionCoefficients(sampleB, w)];
+    const kA = normalCurvature(sampleA, ca[0], ca[1]);
+    const kB = sign * normalCurvature(sampleB, cb[0], cb[1]);
     const g2Gap = Math.abs(kA - kB);
     const g2Rel = relativeJump(kA, kB, tol.g2Abs);
     const g2Fine = g2Gap <= tol.g2Abs || g2Rel <= tol.g2Rel;
