@@ -4,7 +4,7 @@
  */
 
 import { type Entity, type Vec3, is2D } from '../model/types';
-import { isCurve3D } from '../model/curveKinds';
+import { isCurve3D, isSheet } from '../model/curveKinds';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { revolutionTriangles } from './revolution';
 import { sweepTriangles } from './sweep';
@@ -63,7 +63,7 @@ function applyRotationToTriangles(tris: Triangle[], position: Vec3, rotation: Ve
 
 /** Triangles of a non-instance entity before its own `rotation` is applied (world position baked in). */
 function unrotatedTriangles(e: Entity): Triangle[] {
-  if (is2D(e) || isCurve3D(e)) return [];
+  if (is2D(e) || isCurve3D(e) || isSheet(e)) return [];
   switch (e.kind) {
     case 'box':
       return boxFaces(e.position, e.size).flatMap(fanTriangulate);

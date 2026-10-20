@@ -59,8 +59,15 @@ export const thicknessAt = (x: number, t: number, closedTrailingEdge: boolean): 
  * Ordinates from the upper trailing edge round the leading edge to the lower trailing edge (Selig order), cosine spacing,
  * `pointsPerSide` + 1 stations per surface; the leading edge point is shared.
  */
-export function nacaOrdinates(section: NacaSection, pointsPerSide: number, closedTrailingEdge: boolean): Array<[number, number]> {
-  const stations = Array.from({ length: pointsPerSide + 1 }, (_, index) => (1 - Math.cos((Math.PI * index) / pointsPerSide)) / 2);
+export function nacaOrdinates(
+  section: NacaSection,
+  pointsPerSide: number,
+  closedTrailingEdge: boolean,
+  spacing: 'cosine' | 'uniform' = 'cosine',
+): Array<[number, number]> {
+  const stations = Array.from({ length: pointsPerSide + 1 }, (_, index) =>
+    spacing === 'cosine' ? (1 - Math.cos((Math.PI * index) / pointsPerSide)) / 2 : index / pointsPerSide,
+  );
   const surface = (sign: 1 | -1): Array<[number, number]> =>
     stations.map((x) => {
       const yt = thicknessAt(x, section.maxThickness, closedTrailingEdge);

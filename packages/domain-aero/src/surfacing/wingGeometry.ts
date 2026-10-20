@@ -7,6 +7,7 @@ import type { WingSection, WingSegment } from '@core/model/aero';
 import type { Vec3 } from '@core/model/types';
 import type { NurbsCurveData } from '@lib/nurbs/types';
 import { reverseCurve } from '@lib/nurbs/edit';
+import { airfoilMetrics } from './airfoilMetrics';
 
 const RAD = Math.PI / 180;
 
@@ -67,3 +68,16 @@ export function placeSection(curve: NurbsCurveData, station: WingStation, twistL
   return mirror ? moved : reverseCurve(moved);
 }
 
+/**
+ * `curve` moved and scaled so its leading edge is at the origin and its chord is 1 (the frame `placeSection` assumes), so a section imported
+ * with normalize "none" or placed away from the origin lofts to the chord the wing definition asks for. Exact: an affine map of the poles.
+ * @failure not a trailing edge -> leading edge -> trailing edge section -> string reason
+ */
+export function unitChordSection(curve: NurbsCurveData): NurbsCurveData | string {
+  const metrics = airfoilMetrics(curve);
+  if (typeof metrics === 'string') return metrics;
+  const [x0, y0] = metrics.leadingEdge;
+  if (Math.abs(metrics.chord - 1) < 1e-6 && Math.hypot(x0, y0) < 1e-6) return curve;
+  const poles = curve.poles.map(([x, y, z]): Vec3 => [(x - x0) / metrics.chord, (y - y0) / metrics.chord, z / metrics.chord]);
+  return { ...curve, poles };
+}

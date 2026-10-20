@@ -11,6 +11,7 @@ import { isEntityOnLockedLayer, isEntityVisible } from '../entityVisibility';
 import { DecalOverlay } from './entities/DecalOverlay';
 import { TextMesh } from './entities/TextMesh';
 import { NurbsCurveLine } from './entities/NurbsCurveLine';
+import { NurbsSurfaceMesh } from './entities/NurbsSurfaceMesh';
 import { SOLID_MESHES, type SolidMeshBranch } from './entities/solidMeshes';
 import { Shape2DRenderer } from '../2d/Shape2DRenderer';
 import { isBatchable, groupEntitiesForInstancing } from './grouping';
@@ -89,6 +90,8 @@ const EntityRenderer = memo(function EntityRenderer({
       return <TextMesh entity={entity} selected={selected} onSelect={onSelect} />;
     case 'nurbs_curve':
       return <NurbsCurveLine entity={entity} selected={selected} />;
+    case 'nurbs_surface':
+      return <NurbsSurfaceMesh entity={entity} selected={selected} onSelect={onSelect} pbrMaterial={pbrMaterial} />;
     case 'instance':
       if (!components) return null;
       return <InstanceEntityRenderer instance={entity} components={components} selected={selected} onSelect={onSelect} />;

@@ -26,6 +26,19 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   SRF_ENTITY_NOT_FOUND: 'list ids with describe_scene or find_entities',
   SRF_NOT_NURBS: 'pass the id of a nurbs_curve (create_nurbs_curve, interpolate_curve, create_conic)',
   SRF_PARAM_INVALID: 'give the parameters exactly as the command description states',
+  SRF_NOT_SURFACE: 'pass the id of a nurbs_surface (create_nurbs_surface, surface_from_points, loft_surface, fill_surface, loft_fuselage)',
+  SRF_NOT_ANALYSABLE: 'pass a nurbs_surface, a nurbs_curve or a 3D solid',
+  SRF_LOFT_SECTIONS_TOO_FEW: 'give at least 2 section curves',
+  SRF_LOFT_GUIDE_MISSES_SECTION:
+    'snap the guide to the section curves (interpolate_curve through section points) or raise `guideTolerance`',
+  SRF_FILL_LOOP_OPEN: 'give 3 or 4 curves whose ends meet end to end; `tolerance` is the largest gap bridged',
+  SRF_FILL_UNSUPPORTED: 'fill 3 or 4 boundary curves of the same kind (all rational or all not)',
+  SRF_TRIM_RANGE: 'give u and v intervals [from, to] inside the surface domain (see inspect_surface)',
+  SRF_SEW_NOT_MERGEABLE: 'the surfaces must share one whole edge within `tolerance`; fill or move the edges, or raise `tolerance`',
+  SRF_THICKEN_FAILED: 'thicken a surface with at least one non-degenerate normal',
+  SRF_THICKEN_SELF_INTERSECT: 'reduce thickness below the radius of curvature reported, or thicken the other side',
+  SRF_CONTINUITY_MISMATCH: 'give two curves or two surfaces (a curve cannot be joined to a surface here)',
+  SRF_CHECK_NO_JOINT: 'the edges do not meet: check the ids and the sides, or leave `side` empty to detect it',
 };
 
 /** Coded refusal of a surfacing command: unchanged document, `SRF_*` code, offending ids / param paths, one-line fix. */

@@ -9,35 +9,13 @@ import { sha256Hex } from '@lib/sha256';
 import type { AirfoilDef, AirfoilSource } from '@core/model/aero';
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { briefReport, sig } from '../shared/results';
-import { parseNaca, thicknessAt } from '../aerodynamics/naca';
+import { nacaOrdinates, parseNaca } from '../aerodynamics/naca';
 import { aeroOf, withAirfoil } from './aeroState';
 import { refuseAero } from './codes';
 import { crossingIndex, normalizeToChord, parseAirfoilText, trailingEdgeGap, withoutDuplicates } from './airfoilFormats';
 import { airfoilMetrics } from './airfoilMetrics';
 
 const MAX_IMPORT_POINTS = 2_000;
-
-/** Selig-order ordinates of a NACA section: `pointsPerSide` + 1 stations per surface (cosine or uniform), the leading edge shared. */
-function nacaPoints(
-  designation: string,
-  pointsPerSide: number,
-  closedTrailingEdge: boolean,
-  spacing: 'cosine' | 'uniform',
-): Vec2[] | string {
-  const section = parseNaca(designation);
-  if (typeof section === 'string') return section;
-  const stations = Array.from({ length: pointsPerSide + 1 }, (_, i) =>
-    spacing === 'cosine' ? (1 - Math.cos((Math.PI * i) / pointsPerSide)) / 2 : i / pointsPerSide,
-  );
-  const surface = (sign: 1 | -1): Vec2[] =>
-    stations.map((x): Vec2 => {
-      const yt = thicknessAt(x, section.maxThickness, closedTrailingEdge);
-      const { y, slope } = section.camber(x);
-      const theta = Math.atan(slope);
-      return [x - sign * yt * Math.sin(theta), y + sign * yt * Math.cos(theta)];
-    });
-  return [...surface(1).reverse(), ...surface(-1).slice(1)];
-}
 
 /** Creates the planar curve through `points` (z = 0) with the core `interpolate_curve` and registers the airfoil definition. */
 function registerAirfoil(
@@ -118,7 +96,7 @@ export const airfoilFromNaca = defineCommand({
       return refuseAero(doc, 'airfoil_from_naca', 'AERO_NACA_DESIGNATION_UNKNOWN', section, [], ['params.designation']);
     const pointsPerSide = (points - 1) / 2;
     const closedTrailingEdge = trailingEdge === 'closed';
-    const ordinates = nacaPoints(designation, pointsPerSide, closedTrailingEdge, spacing) as Vec2[];
+    const ordinates: Vec2[] = nacaOrdinates(section, pointsPerSide, closedTrailingEdge, spacing);
     return registerAirfoil(
       doc,
       'airfoil_from_naca',
@@ -186,7 +164,8 @@ export const importAirfoil = defineCommand({
     const hash = sha256Hex(text);
     if (expectedSha256 !== undefined && expectedSha256.toLowerCase() !== hash)
       return refuse('AERO_AIRFOIL_HASH_MISMATCH', `sha256 of the text is ${hash}, not ${expectedSha256}`, 'params.expectedSha256');
-    const shaped = normalize === 'chord' ? normalizeToChord(parsed.points) : [...parsed.points];
+    const normalised = normalize === 'chord' ? normalizeToChord(parsed.points) : [...parsed.points];
+    const shaped = trailingEdge === 'closed' ? [...normalised.slice(0, -1), normalised[0] as Vec2] : normalised;
     const crossing = crossingIndex(normalizeToChord(parsed.points));
     if (crossing >= 0)
       return refuse('AERO_AIRFOIL_SELF_INTERSECT', `the lower surface crosses the upper surface at point ${crossing}`, `params.text`);
