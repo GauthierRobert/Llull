@@ -5,6 +5,8 @@ import { analyzeLaminate } from './analyzeCommand';
 import { addCore } from './coreCommands';
 import { splitPly } from './cutCommands';
 import { checkProducibility, drapePlyCommand } from './drapeCommands';
+import { exportCompositeAp242 } from './ap242/exportCommand';
+import { importCompositeAp242 } from './ap242/importCommand';
 import { exportFlatPatternsDxf } from './flatPatternDxf';
 import { exportLaserProjection } from './laserCommand';
 import { exportPlyBook } from './plyBook';
@@ -54,4 +56,6 @@ export const compositesCommands = commandCatalog(
   exportLaserProjection,
   exportPlyBook,
   createPlySolids,
+  exportCompositeAp242,
+  importCompositeAp242,
 );
