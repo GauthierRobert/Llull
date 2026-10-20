@@ -5,6 +5,7 @@ import { buildingPlugin, civilPlugin, industrialPlugin } from '@aec/index';
 import { caePlugin, topologyPlugin } from '@cae/index';
 import { aerodynamicsPlugin, compositesPlugin, fastenersPlugin, fluidsPlugin, sheetMetalPlugin, surfacingPlugin } from '@aero/index';
 import { designPlugin } from '@design/index';
+import { plmPlugin } from '@plm/index';
 
 /** Install every default domain plugin (idempotent). */
 export function installDefaultPlugins(): void {
@@ -20,4 +21,5 @@ export function installDefaultPlugins(): void {
   installPlugin(compositesPlugin);
   installPlugin(fluidsPlugin);
   installPlugin(designPlugin);
+  installPlugin(plmPlugin);
 }

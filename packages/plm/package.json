@@ -1,0 +1,10 @@
+{
+  "name": "@llull/plm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "PLM, configuration management and quality traceability (09 PLM, toolset plm): managed item, revisions, lifecycle, release lock, change control, effectivity, signatures, release manifest.",
+  "dependencies": {
+    "@llull/core": "0.1.0"
+  }
+}

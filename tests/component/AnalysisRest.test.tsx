@@ -309,13 +309,127 @@ describe('AnalysisPanel FEA-REST UI', () => {
     expect(useStore.getState().document.analysis?.cases[id]).toBeUndefined();
   });
 
-  it('offers the disposition only as a disabled, explained control', () => {
+  it('explains that there is nothing to sign with when the backend holds no signing key (or is unreachable)', async () => {
     seedAnalysis();
+    vi.stubGlobal('fetch', () => Promise.reject(new Error('ECONNREFUSED')));
     render(<AnalysisPanel />);
     const button = screen.getByTestId('analysis-disposition') as HTMLButtonElement;
-    expect(button.disabled).toBe(true);
-    expect(button.title).toContain('signature');
+    expect(button.title).toContain('signing key');
     fireEvent.click(button);
+    expect(await screen.findByTestId('disposition-no-key')).toBeTruthy();
+    expect((screen.getByTestId('disposition-sign') as HTMLButtonElement).disabled).toBe(true);
     expect(dispatched.some((call) => call.name === 'dispose_margin')).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it('signs a FAIL row with a local key and dispatches dispose_margin with that signature, never a bare confirmation', async () => {
+    const id = seedAnalysis();
+    mocks.margins = {
+      isError: false,
+      summary: 'ok',
+      data: {
+        minMs: -0.1,
+        resultsHash: 'r'.repeat(64),
+        rows: [
+          {
+            rowId: 'r1',
+            rowKey: 'k1',
+            part: 'bracket',
+            region: 'bulk',
+            loadCase: 'LC1',
+            check: 'yield',
+            criterion: 'von Mises',
+            status: 'FAIL',
+            ms: -0.1,
+            appliedMPa: 300,
+            allowableMPa: 270,
+          },
+          {
+            rowId: 'r2',
+            rowKey: 'k2',
+            part: 'bracket',
+            region: 'bulk',
+            loadCase: 'LC1',
+            check: 'ultimate',
+            criterion: 'von Mises',
+            status: 'PASS',
+            ms: 0.4,
+            appliedMPa: 100,
+            allowableMPa: 270,
+          },
+        ],
+      },
+    };
+    const sent: Array<{ url: string; body: unknown }> = [];
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+      if (String(url).endsWith('/signing/keys'))
+        return Promise.resolve(
+          new Response(JSON.stringify({ keys: [{ keyId: 'k-1', userId: 'u-1', name: 'J. Example' }] }), { status: 200 }),
+        );
+      sent.push({ url: String(url), body: JSON.parse(String(init?.body)) as unknown });
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ signature: { alg: 'Ed25519', keyId: 'k-1', publicKey: 'a'.repeat(64), signature: 'b'.repeat(128) } }),
+          { status: 200 },
+        ),
+      );
+    });
+    render(<AnalysisPanel />);
+    fireEvent.click(screen.getByTestId('analysis-disposition'));
+    expect(await screen.findByTestId('disposition-row')).toBeTruthy();
+    expect(within(screen.getByTestId('disposition-row')).queryByText(/r2/)).toBeNull();
+    expect((screen.getByTestId('disposition-sign') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByTestId('disposition-justification'), { target: { value: 'tested at 1.5 limit' } });
+    fireEvent.change(screen.getByTestId('disposition-passphrase'), { target: { value: 'pw' } });
+    await screen.findByText(/J. Example/);
+    fireEvent.click(screen.getByTestId('disposition-sign'));
+    await vi.waitFor(() => expect(dispatched.some((call) => call.name === 'dispose_margin')).toBe(true));
+    const call = dispatched.find((entry) => entry.name === 'dispose_margin');
+    expect(call?.params).toMatchObject({ analysisId: id, rowId: 'r1', decision: 'accepted', justification: 'tested at 1.5 limit' });
+    expect(call?.params['signature']).toMatchObject({ alg: 'Ed25519', keyId: 'k-1' });
+    expect(sent[0]?.body).toMatchObject({ keyId: 'k-1', passphrase: 'pw' });
+    expect(String((sent[0]?.body as { payloadSha256: string }).payloadSha256)).toMatch(/^[0-9a-f]{64}$/);
+    vi.unstubAllGlobals();
+  });
+
+  it('shows the signing error and dispatches nothing when the key cannot sign', async () => {
+    seedAnalysis();
+    mocks.margins = {
+      isError: false,
+      summary: 'ok',
+      data: {
+        minMs: -0.1,
+        resultsHash: 'r'.repeat(64),
+        rows: [
+          {
+            rowId: 'r1',
+            rowKey: 'k1',
+            part: 'bracket',
+            region: 'bulk',
+            loadCase: 'LC1',
+            check: 'yield',
+            criterion: 'von Mises',
+            status: 'FAIL',
+            ms: -0.1,
+          },
+        ],
+      },
+    };
+    vi.stubGlobal('fetch', (url: string) =>
+      Promise.resolve(
+        String(url).endsWith('/signing/keys')
+          ? new Response(JSON.stringify({ keys: [{ keyId: 'k-1', userId: 'u-1', name: 'J. Example' }] }), { status: 200 })
+          : new Response(JSON.stringify({ error: 'The key could not sign: wrong passphrase, or the key is revoked.' }), { status: 403 }),
+      ),
+    );
+    render(<AnalysisPanel />);
+    fireEvent.click(screen.getByTestId('analysis-disposition'));
+    await screen.findByText(/J. Example/);
+    fireEvent.change(screen.getByTestId('disposition-justification'), { target: { value: 'why' } });
+    fireEvent.change(screen.getByTestId('disposition-passphrase'), { target: { value: 'wrong' } });
+    fireEvent.click(screen.getByTestId('disposition-sign'));
+    expect((await screen.findByTestId('disposition-error')).textContent).toContain('wrong passphrase');
+    expect(dispatched.some((call) => call.name === 'dispose_margin')).toBe(false);
+    vi.unstubAllGlobals();
   });
 });

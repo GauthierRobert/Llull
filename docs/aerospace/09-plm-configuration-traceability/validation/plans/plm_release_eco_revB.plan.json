@@ -8,7 +8,7 @@
     { "command": "add_box", "params": { "size": ["=w", 40, "=t"] }, "as": "plate" },
     { "command": "create_sheet", "params": { "name": "LL-1001", "views": ["front", "top", "right"], "partNumber": "LL-1001", "revision": "A", "date": "2026-11-02" }, "as": "sheet" },
     { "command": "set_item_identity", "params": { "partNumber": "LL-1001", "name": "Bracket, hinge fitting", "itemType": "part", "revisionScheme": "asme-alpha" } },
-    { "command": "set_export_marking", "params": { "regime": "none", "statement": "NLR-EXAMPLE", "decidedBy": "u-0003" } },
+    { "command": "set_item_marking", "params": { "regime": "none", "statement": "NLR-EXAMPLE", "decidedBy": "u-0003" } },
     { "command": "submit_for_review", "params": { "comment": "ready for release", "at": "2026-11-01T10:00:00Z", "by": "u-0007" } },
     { "command": "create_change_order", "params": { "id": "ECO-0001", "purpose": "initial-release", "affectedItems": ["LL-1001"], "effectivity": [{ "kind": "serial", "from": 1 }], "at": "2026-11-01T12:00:00Z", "by": "u-0005" } },
     { "command": "release_item", "params": { "changeOrder": "ECO-0001", "effectivity": [{ "kind": "serial", "from": 1 }], "at": "2026-11-02T09:30:00Z", "by": "u-0007", "approvals": [{ "role": "design-authority", "userId": "u-0007" }, { "role": "checker", "userId": "u-0011" }] } },

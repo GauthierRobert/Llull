@@ -1,0 +1,137 @@
+{
+  "format": "llull-document",
+  "version": 3,
+  "document": {
+    "entities": {
+      "#1": {
+        "id": "#1",
+        "kind": "box",
+        "size": [60,40,5],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#6b8f9c"
+      }
+    },
+    "order": [
+      "#1"
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#2"
+    ],
+    "selection": [],
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {
+      "w": {
+        "name": "w",
+        "expression": "60",
+        "value": 60
+      },
+      "t": {
+        "name": "t",
+        "expression": "5",
+        "value": 5
+      }
+    },
+    "animations": {},
+    "featureHistory": [
+      {
+        "id": "#3",
+        "name": "set_units",
+        "params": {"units":"mm"},
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "#4",
+        "name": "add_box",
+        "params": {"size":["=w",40,"=t"]},
+        "suppressed": false,
+        "affected": ["#1"]
+      },
+      {
+        "id": "#5",
+        "name": "create_sheet",
+        "params": {"name":"LL-1001","views":["front","top","right"],"partNumber":"LL-1001","revision":"A"},
+        "suppressed": false,
+        "affected": ["#6","#7","#8","#9"]
+      },
+      {
+        "id": "#10",
+        "name": "update_sheet",
+        "params": {"sheetId":"#6","revision":"B","date":"2026-12-05"},
+        "suppressed": false,
+        "affected": ["#6"]
+      }
+    ],
+    "configurations": {},
+    "materials": {},
+    "recipes": {},
+    "components": {},
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": [],
+    "nextStepNumber": 5,
+    "plm": {
+      "schema": 1,
+      "item": {
+        "partNumber": "LL-1001",
+        "name": "Bracket, hinge fitting",
+        "itemType": "part",
+        "revisionScheme": "asme-alpha",
+        "currentRevision": "B",
+        "revisions": {"A":{"label":"A","state":"superseded","iterations":[{"n":1,"contentHash":"1e45a357528aef72fccf6a7f680a29415a4a874ecd06280cdee978cf5c1ab2c1"}],"effectivity":[{"kind":"serial","from":1,"to":4}],"approvals":[{"role":"design-authority","userId":"u-0007"},{"role":"checker","userId":"u-0011"}],"signatures":[],"stateHistory":[{"from":null,"to":"in_work"},{"from":"in_work","to":"in_review","at":"2026-11-01T10:00:00Z","by":"u-0007","reason":"ready for release"},{"from":"in_review","to":"released","at":"2026-11-02T09:30:00Z","by":"u-0007"},{"from":"released","to":"superseded","at":"2026-12-05T09:00:00Z","by":"u-0007","reason":"superseded by B"}],"releasedEffectivity":[{"kind":"serial","from":1}],"releasedMarking":{"regime":"none","statement":"NLR-EXAMPLE","decidedBy":"u-0003"},"releasedAt":"2026-11-02T09:30:00Z","releasedBy":"u-0007","changeOrder":"#11","contentHash":"1e45a357528aef72fccf6a7f680a29415a4a874ecd06280cdee978cf5c1ab2c1","snapshot":{"kind":"inline","canonicalJson":"{\"document\":{\"animations\":{},\"components\":{},\"configurations\":{},\"constraintOrder\":[],\"constraints\":{},\"displayPrecision\":3,\"drawings\":{\"order\":[\"#6\"],\"sheets\":{\"#6\":{\"id\":\"#6\",\"name\":\"LL-1001\",\"paper\":\"A3\",\"projectionAngle\":\"first\",\"titleBlock\":{\"partNumber\":\"LL-1001\",\"revision\":\"A\",\"title\":\"LL-1001\"},\"views\":[{\"direction\":\"front\",\"id\":\"#7\",\"kind\":\"projection\",\"label\":\"FRONT\"},{\"direction\":\"top\",\"id\":\"#8\",\"kind\":\"projection\",\"label\":\"TOP\"},{\"direction\":\"right\",\"id\":\"#9\",\"kind\":\"projection\",\"label\":\"RIGHT\"}]}}},\"driveRelationOrder\":[],\"driveRelations\":{},\"entities\":{\"#1\":{\"color\":\"#6b8f9c\",\"id\":\"#1\",\"kind\":\"box\",\"layerId\":\"#2\",\"position\":[0,0,0],\"rotation\":[0,0,0],\"size\":[60,40,4]}},\"featureHistory\":[{\"affected\":[],\"id\":\"#3\",\"name\":\"set_units\",\"params\":{\"units\":\"mm\"},\"suppressed\":false},{\"affected\":[\"#1\"],\"id\":\"#4\",\"name\":\"add_box\",\"params\":{\"size\":[\"=w\",40,\"=t\"]},\"suppressed\":false},{\"affected\":[\"#6\",\"#7\",\"#8\",\"#9\"],\"id\":\"#5\",\"name\":\"create_sheet\",\"params\":{\"name\":\"LL-1001\",\"partNumber\":\"LL-1001\",\"revision\":\"A\",\"views\":[\"front\",\"top\",\"right\"]},\"suppressed\":false}],\"groups\":{},\"jointOrder\":[],\"joints\":{},\"layerOrder\":[\"#2\"],\"layers\":{\"#2\":{\"id\":\"#2\",\"locked\":false,\"name\":\"Layer 0\",\"visible\":true}},\"materials\":{},\"nextStepNumber\":4,\"order\":[\"#1\"],\"parameters\":{\"t\":{\"expression\":\"4\",\"name\":\"t\",\"value\":4},\"w\":{\"expression\":\"60\",\"name\":\"w\",\"value\":60}},\"recipes\":{},\"units\":\"mm\"},\"format\":\"llull-document\",\"version\":2}"},"unverified":[]},"B":{"label":"B","state":"released","basedOn":"A","iterations":[{"n":1,"contentHash":"1e45a357528aef72fccf6a7f680a29415a4a874ecd06280cdee978cf5c1ab2c1","at":"2026-12-03T08:05:00Z","by":"u-0007"},{"n":2,"contentHash":"805b8e6e0c187129e3bac80c36b77f6dfcb1c60ba4248390b021c0359ab53931","at":"2026-12-04T10:00:00Z","by":"u-0007","comment":"#12 implemented"}],"changeOrder":"#12","effectivity":[{"kind":"serial","from":5}],"approvals":[{"role":"design-authority","userId":"u-0007"},{"role":"checker","userId":"u-0011"}],"signatures":[],"stateHistory":[{"from":null,"to":"in_work","at":"2026-12-03T08:05:00Z","by":"u-0007"},{"from":"in_work","to":"in_review","at":"2026-12-04T10:00:00Z","by":"u-0007","reason":"#12 implemented"},{"from":"in_review","to":"released","at":"2026-12-05T09:00:00Z","by":"u-0007"}],"releasedEffectivity":[{"kind":"serial","from":5}],"releasedMarking":{"regime":"none","statement":"NLR-EXAMPLE","decidedBy":"u-0003"},"releasedAt":"2026-12-05T09:00:00Z","releasedBy":"u-0007","contentHash":"805b8e6e0c187129e3bac80c36b77f6dfcb1c60ba4248390b021c0359ab53931","snapshot":{"kind":"inline","canonicalJson":"{\"document\":{\"animations\":{},\"components\":{},\"configurations\":{},\"constraintOrder\":[],\"constraints\":{},\"displayPrecision\":3,\"drawings\":{\"order\":[\"#6\"],\"sheets\":{\"#6\":{\"id\":\"#6\",\"name\":\"LL-1001\",\"paper\":\"A3\",\"projectionAngle\":\"first\",\"titleBlock\":{\"date\":\"2026-12-05\",\"partNumber\":\"LL-1001\",\"revision\":\"B\",\"title\":\"LL-1001\"},\"views\":[{\"direction\":\"front\",\"id\":\"#7\",\"kind\":\"projection\",\"label\":\"FRONT\"},{\"direction\":\"top\",\"id\":\"#8\",\"kind\":\"projection\",\"label\":\"TOP\"},{\"direction\":\"right\",\"id\":\"#9\",\"kind\":\"projection\",\"label\":\"RIGHT\"}]}}},\"driveRelationOrder\":[],\"driveRelations\":{},\"entities\":{\"#1\":{\"color\":\"#6b8f9c\",\"id\":\"#1\",\"kind\":\"box\",\"layerId\":\"#2\",\"position\":[0,0,0],\"rotation\":[0,0,0],\"size\":[60,40,5]}},\"featureHistory\":[{\"affected\":[],\"id\":\"#3\",\"name\":\"set_units\",\"params\":{\"units\":\"mm\"},\"suppressed\":false},{\"affected\":[\"#1\"],\"id\":\"#4\",\"name\":\"add_box\",\"params\":{\"size\":[\"=w\",40,\"=t\"]},\"suppressed\":false},{\"affected\":[\"#6\",\"#7\",\"#8\",\"#9\"],\"id\":\"#5\",\"name\":\"create_sheet\",\"params\":{\"name\":\"LL-1001\",\"partNumber\":\"LL-1001\",\"revision\":\"A\",\"views\":[\"front\",\"top\",\"right\"]},\"suppressed\":false},{\"affected\":[\"#6\"],\"id\":\"#10\",\"name\":\"update_sheet\",\"params\":{\"date\":\"2026-12-05\",\"revision\":\"B\",\"sheetId\":\"#6\"},\"suppressed\":false}],\"groups\":{},\"jointOrder\":[],\"joints\":{},\"layerOrder\":[\"#2\"],\"layers\":{\"#2\":{\"id\":\"#2\",\"locked\":false,\"name\":\"Layer 0\",\"visible\":true}},\"materials\":{},\"nextStepNumber\":5,\"order\":[\"#1\"],\"parameters\":{\"t\":{\"expression\":\"5\",\"name\":\"t\",\"value\":5},\"w\":{\"expression\":\"60\",\"name\":\"w\",\"value\":60}},\"recipes\":{},\"units\":\"mm\"},\"format\":\"llull-document\",\"version\":2}"},"unverified":[]}},
+        "revisionOrder": ["A","B"],
+        "marking": {"regime":"none","statement":"NLR-EXAMPLE","decidedBy":"u-0003"}
+      },
+      "changes": {
+        "#11": {"id":"#11","kind":"eco","title":"Initial release of LL-1001","affectedItems":["LL-1001"],"purpose":"initial-release","effectivity":[{"kind":"serial","from":1}],"state":"implemented","createdAt":"2026-11-01T12:00:00Z","createdBy":"u-0005","notice":"ECN-0001","closedAt":"2026-11-02T09:30:00Z"},
+        "#13": {"id":"#13","kind":"ecr","title":"Increase flange thickness 4 -> 5 mm","reason":"SN-118 negative margin","affectedItems":["LL-1001"],"purpose":"change","proposedClassification":"minor","state":"accepted","createdAt":"2026-12-01T08:00:00Z","createdBy":"u-0021"},
+        "#12": {"id":"#12","kind":"eco","title":"Change of LL-1001","affectedItems":["LL-1001"],"purpose":"change","classification":"minor","effectivity":[{"kind":"serial","from":5}],"fromRequests":["#13"],"state":"implemented","createdAt":"2026-12-03T08:00:00Z","createdBy":"u-0007","notice":"ECN-0002","closedAt":"2026-12-05T09:00:00Z"}
+      },
+      "changeOrder": [
+        "#11",
+        "#13",
+        "#12"
+      ],
+      "policy": {
+        "requireChangeOrder": true,
+        "requireIndependentChecker": true,
+        "requiredApprovalRoles": ["design-authority","checker"],
+        "humanSignatureRequired": false,
+        "requireMarking": false
+      }
+    },
+    "drawings": {
+      "sheets": {
+        "#6": {"id":"#6","name":"LL-1001","paper":"A3","titleBlock":{"title":"LL-1001","partNumber":"LL-1001","revision":"B","date":"2026-12-05"},"projectionAngle":"first","views":[{"id":"#7","label":"FRONT","kind":"projection","direction":"front"},{"id":"#8","label":"TOP","kind":"projection","direction":"top"},{"id":"#9","label":"RIGHT","kind":"projection","direction":"right"}]}
+      },
+      "order": [
+        "#6"
+      ]
+    }
+  }
+}

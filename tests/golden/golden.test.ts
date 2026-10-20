@@ -3,12 +3,13 @@ import { plans } from './plans';
 import { feaPlans } from './feaPlans';
 import { compositePlans } from './compositePlans';
 import { describePlans } from './describePlans';
+import { plmPlans } from './plmPlans';
 import { execute } from '@core/commands/registry';
 import { runPlan } from './runPlan';
 import type { CadDocument } from '@core/model/types';
 import type { GoldenAction } from './plans';
 
-describe('golden replay corpus', () => describePlans({ ...plans, ...feaPlans, ...compositePlans }));
+describe('golden replay corpus', () => describePlans({ ...plans, ...feaPlans, ...compositePlans, ...plmPlans }));
 
 describe('loops_polar_pattern parametric regeneration', () => {
   const cylinderCount = (doc: CadDocument): number => Object.values(doc.entities).filter((e) => e.kind === 'cylinder').length;

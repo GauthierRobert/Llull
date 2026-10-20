@@ -612,3 +612,71 @@ See [FUNCTIONAL_SPEC.md §11](FUNCTIONAL_SPEC.md#11-references) for [R1]–[R39]
 - [R17] NIST SHA-256 example "abc" (FIPS 180-x) — NIST — https://www.nist.gov/node/1078681 (accessed 2026-10)
 - [R41] Node.js `crypto.verify(null, …)` for Ed25519 — verified locally on Node v22.22.0 by `validation/verify_vectors.mjs` (accessed 2026-10)
 - llull internal: `docs/decisions/KI5-shape-kernel-boundary.md`, `docs/decisions/KI6-desktop-app-cli-first.md`, `.claude/rules/architecture.md`
+
+## 13. Implementation status (2026-10-20): M0, M1 and M2 built (aerospace step AERO-4, part 3, first slice)
+
+Branch `feat/plm`. Built: M0 (core), M1 (`packages/plm`, alias `@plm`, toolset `plm`, 24 commands) and the M2 integrity pieces (audit chain, signatures,
+release package, trust store, package verify CLI). Not built: M3 vault, M4 structure / baselines, M5 FAI, M6 V2 (13.3).
+
+### 13.1 What exists
+
+| Area | As built | Where |
+| ---- | -------- | ----- |
+| Canonical hash | `@lib/canonicalJson` already existed but sorted keys through `Object.fromEntries`, which reorders integer-like keys numerically; rewritten to strict RFC 8785 key order. `@lib/sha256` already existed (FNV is `hash.ts`); both pass `validation/vectors/hash_vectors.json`. New core query `document_content_hash` (toolset core): the release-scope canonical text and its SHA-256. It reproduces the published golden hash `7e3943fb…f3c24f` (1551 bytes) and the edit hash `c913cadc…91017e`. The scope format version is **pinned to 2** (the version of the published vectors), so an envelope version bump never changes the hash of an unchanged definition (the false-mismatch problem of R-2). | `packages/core/src/lib`, `commands/persistence/releaseScope.ts`, `tests/unit/lib/canonicalHash.test.ts` |
+| Guard contract | `DerivationGuard.check(previous, next, commandName)` may return a `GuardRefusal { reason, error }` carrying its own stable code (`PLM_LOCKED`, …); a string still means `CMD_DERIVED_GEOMETRY`. **`execute()` now also runs the guards on the final document, after the FeatureStep is appended**: before, a command whose own result equalled its input (`scale_entity factor 1`) slipped past the release lock because the step was appended after the guard ran. Found by the TR-PLM-30 contract test. | `commands/derivation.ts`, `commands/execute.ts`, `commands/guard.ts` |
+| Ports | `ctx.caller: { kind: 'human' \| 'agent', userId? }` (absent = in-process caller, not gated). **One signature port**: `ctx.humanSignature` (`HumanSignaturePort`) is extended with `verifyEd25519?` and `keyTrust?`; `ctx.signatures` of TR-PLM-07 was **not** added. 05 `dispose_margin` and the other `dispose_*`, 08 `set_export_marking` / export gates and 09 all go through the same port, and the same real Ed25519 port clears the 08 `humanGate` payload (`server/tests/plmSigning.test.ts`). | `commands/types.ts`, `model/analysis.ts` |
+| Document hooks | `DocumentExtension.carry` (called by `replayHistory` after the seed is built; `history/carry.ts` documents the class) and `afterLoad` (appended to the `load_document` summary). `replay_history` leaves `doc.plm` identical (`===` after replay). | `plugins/plugin.ts`, `history/replay.ts`, `persistence/serialization.ts` |
+| Model | `CadDocument.plm?: PlmModel`. The data types live in core `model/plm.ts` (types only, the precedent of `model/fasteners.ts`), the rules in the plugin. `Revision` also keeps `releasedEffectivity` and `releasedMarking` (the release manifest must not change when a later revision supersedes it or the marking is edited, or signatures would break) and `unverified`. Q1: files were already written as version 3 (`CURRENT_SCHEMA_VERSION = 3`), so no bump was needed. | `packages/core/src/model/plm.ts` |
+| Plugin | `packages/plm` (`plmPlugin`, installed in `src/app/plugins.ts`; workspace, `@plm/*` alias, dependency-cruiser and coverage 90/85/90/90 extended). Commands: `set_item_identity`, `set_revision_scheme`, `set_item_marking`, `checkpoint_iteration`, `submit_for_review`, `reject_review`, `record_approval`, `release_item`, `revise_item`, `set_lifecycle_state`, `create_change_request`, `create_change_order`, `classify_change_order`, `set_change_state`, `record_signature`, `attach_release_package`, `restore_revision_snapshot` (all `metaHistory`), and the queries `plm_status`, `check_release_readiness`, `resolve_effectivity`, `release_manifest`, `view_revision`, `plm_diff`, `verify_release`. | `packages/plm/src` |
+| Release lock | `releaseLockGuard` (§5.2): codes `PLM_LOCKED`, `PLM_HISTORY_IMMUTABLE`, `PLM_RECORD_REMOVED`; exempt `load_document`, `clear_document` (replacement) and `restore_revision_snapshot` (history check only). The open-revision case returns before any hashing. Contract test over `listCommands()` (`tests/unit/contract/plmReleaseLock.test.ts`). | `packages/plm/src/guard.ts` |
+| Readiness | `release_item` refuses on the first failing finding of the same function `check_release_readiness` reports (one code path: state, ECO, classification, approvals, checker ≠ author, effectivity, marking, signature, parameter errors; warnings: unverified materials, title block). | `packages/plm/src/readiness.ts` |
+| Title block | `export_sheet_svg` prints the managed part number and revision (an unreleased revision reads `B (IN WORK)`) and the export-control notice in the frame; nothing is copied into the sheet. | `commands/drawings/plmProjection.ts` |
+| Host (server) | `ed25519.ts` (node:crypto), `keyStore.ts` (local key store, scrypt + AES-256-GCM, `$LLULL_KEYS_DIR`), `signaturePort.ts` (trust store; the RFC 8032 test keys are refused unless `LLULL_PLM_TEST_KEYS=1`, TR-PLM-19), `auditChain.ts`, `hostRun.ts`, `releasePackage.ts`, `signingRoutes.ts` (`/signing/keys`, `/signing/sign`). | `server/src/plm` |
+| Host run | One runner for the command bus and the local CLI: fills `at` / `by` / `decidedBy` a command declares and the caller omitted (live sync replays the **filled** params), sets `ctx.caller`, writes the audit chain. A REST request is an agent unless its body says `caller: 'human'` (the desktop UI sends it); the CLI is an agent unless `--as human`. | `server/src/plm/hostRun.ts`, `server/src/cli/main.ts` |
+| Audit | Hash chain per §5.8: `prevSha256`, `entrySha256` over canonical JSON, params hashed canonically, segments `audit-NNNNNN.jsonl` that rotate and are **never deleted**; `llull audit verify` (`PLM_AUDIT_CHAIN_BROKEN`). `server/src/audit.ts` of §1 does not exist in this tree, so the log is new. Off in test runs unless `LLULL_AUDIT_DIR` is set. | `auditChain.ts` |
+| Package | `llull release pack --revision R --out DIR [--attach]` writes the read-only package (canonical definition, sheet SVGs of that revision, manifest with SHA-256 per member and the recorded signatures); `llull release verify DIR` recomputes every hash and signature (no document needed). `server/tests/plmReleasePackage.test.ts` also verifies a package with plain `node:crypto` and no llull code, and flips one byte. | `releasePackage.ts`, `cli/plm.ts` |
+| CLI | `llull keys list \| create \| revoke`, `llull release pack \| verify \| sign`, `llull audit verify`, `--as human\|agent`. Refusals print their stable code and remediation. | `server/src/cli` |
+| UI | The Analysis panel Disposition control is enabled: a dialog picks a FAIL / MARGINAL row, decision and justification, the user types the key passphrase, the backend signs the row payload (`marginDispositionPayload`), and `dispose_margin` is dispatched with that signature. UI dispatch sends `caller: 'human'`. | `src/ui/panels/analysis/DispositionDialog.tsx`, `src/ui/services/signing.ts` |
+| FPR | 21 FPR uses the same caller: `set_review_disposition status=accepted` by an agent caller is refused with `FPR_HUMAN_GATE`; `by` / `declaredBy` record `human` for a human caller (an absent caller keeps the conservative `agent`). `sign_prototype_review` is not built (13.3). | `commands/review/dispositions.ts`, `intents.ts` |
+
+### 13.2 Deviations from the spec text
+
+| Spec | As built | Why |
+| ---- | -------- | --- |
+| `set_export_marking` (§4) | **`set_item_marking`** | `set_export_marking` already exists in core (08 MAT: material-record marking); plugin command names cannot clash. The S1 scenario and the plan use the new name. |
+| `humanSignatureRequired` default true | Enforced always when true (`PLM_SIGNATURE_REQUIRED`). The S1 / S2 / golden runs set `policy.humanSignatureRequired: false` through `set_item_identity` (a human-gated param): the test host has no key store. With a key store the flow is `release_manifest kind iteration` → sign → `record_signature` → `release_item` (`server/tests/plmSigning.test.ts`). | A release without a human signature is not a release; changing the policy is itself a human act. |
+| `create_change_order` with `purpose 'change'` and no classification refused | Accepted as an unclassified draft (an agent can prepare it); `classify_change_order` (new, human gate) records the classification; `release_item` and `check_release_readiness` report `PLM_CLASSIFICATION_MISSING`. | FR-PLM-17 lets an agent draft ECOs but never classify; the §7.2 table already says "at release". |
+| Errors in `data.error` | On `CommandResult.error` (AF-11 `CommandError`), which the CLI `--json` prints as `error`. | llull's existing convention. |
+| `record_signature` target `change` | Only `{kind:'iteration', ref:'A.2'}` and `{kind:'release', ref:'A'}`. | Signatures live on the revision. |
+| `requireChangeOrder` default "after first release" | The first release needs no ECO; every later release and `revise_item` does (a single open ECO listing the item is picked automatically by `revise_item`). | Matches S1 / S2-06. |
+| `clear_document` | Exempt from the lock (document replacement, like `load_document`); the previous document stays in undo. | §5.2. |
+| Live sync | `record_signature` needs the host port: a UI client that re-executes the command log has no key store and falls back to the next snapshot (like the other host-port commands). Refused commands are never in the log. | L6. |
+
+### 13.3 Not built, and why
+
+| Item | Why |
+| ---- | --- |
+| M3 vault (CAS, refs, locks, check-in / out, menu, snapshots externalized), `PLM_VAULT_LOCKED`, VC-PLM-23 | Next milestone. |
+| M4 sub-items, `engineering_bom`, baselines, `compare_baselines`, `PLM_CHILDREN_UNRELEASED`, `PLM_BASELINE_MEMBER_UNRELEASED`, S3 BOM / baseline cases (VC-PLM-10, 11) | Next milestone. |
+| M5 `assign_characteristic_ids`, `fai_report_skeleton` (VC-PLM-15) | Needs 03 GD&T / PMI entities (another agent). |
+| M6 `record_as_built`, `as_built_vs_as_designed` (VC-PLM-14), AP242 PDM, LOTAR, QIF (VC-PLM-24) | Needs 04 (AP242) and a shared server vault. |
+| `PLM_REVIEW_PENDING` / `reviewRequired` propagation (VC-PLM-27 second half) | `reviewRequired` items come from 03 PMI; the readiness check already reports `unverified` (material grade C / unresolved records) and the manifest carries them. |
+| `verify_release {regenerate}`, `geometryFingerprint`, `plm_diff {geometry}` mass delta | Needs the kernel pass of §5.4; the hash / snapshot path is complete. |
+| Full `PlmPanel`, lock overlay, release dialog, desktop File > Vault menu, MCP prompts, `llull guide` PLM section, `--sign-with`, undo block after persistence (Q5), `tests/perf/plm.bench.ts` (VC-PLM-19), e2e | UI / desktop lane; the commands they need exist. `desktop/` could not be built here (no electron). |
+| `sign_prototype_review` (21 FPR FR-FPR-33) | The signature path now exists; the command needs the `check_prototype` verdict model and a `doc.prototype` sign-off record, a separate 21 FPR slice. |
+| Audit tail truncation | The chain detects an edited, removed (middle) or reordered line; removing the last lines needs an external anchor (V2). |
+
+### 13.4 Validation status
+
+| VC | Status |
+| -- | ------ |
+| 01, 02, 03, 05, 06, 12 | pass: `tests/unit/plm/lifecycle.test.ts` runs S1 step by step (`scenarioRunner.ts`); golden plan `plm_release_eco` (snapshot + replay equality). |
+| 04, 07 | pass: `tests/unit/plm/vectors.test.ts` (revision sequence, 12 effectivity cases, transition table). |
+| 08, 09, 13, 25, 26 | pass: `tests/unit/plm/guards.test.ts` (S2-01…S2-13), `commands.test.ts`; tamper on load (S2-10) with `restore_revision_snapshot`. |
+| 16 | pass: `tests/unit/lib/canonicalHash.test.ts` (FIPS vectors, canonical cases, sample document scope hash, invariances, edit hash). |
+| 17 | pass: `server/tests/plmSigning.test.ts` (RFC 8032 TEST 1-3 verify and re-sign deterministically, negatives rejected, test keys refused), `tests/unit/plm/signature.test.ts`. |
+| 18 | pass: `server/tests/plmReleasePackage.test.ts` (write, verify with llull and with plain `node:crypto`, flip one byte, revoked key). |
+| 20 | pass for `requireMarking` (`commands.test.ts`); the sheet notice is rendered by the same projection as the title block. |
+| 21 | pass: `server/tests/plmAudit.test.ts` (chain, tamper, rotation keeps the chain). |
+| 22 | pass: `server/tests/plmCli.test.ts` (human and agent over the CLI, stable codes, keys / sign / pack / verify / audit); the tool-schema snapshot lists the plm tools (24 + `document_content_hash`). |
+| 10, 11, 14, 15, 19, 23, 24, 27 | not yet (13.3). |

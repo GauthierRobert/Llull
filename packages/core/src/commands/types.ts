@@ -170,6 +170,12 @@ export interface MaterialLibraryProvider {
   get(libraryId: string, version: string): MaterialLibrary | null;
 }
 
+/** The caller of a command (AF-34): human-only acts refuse `agent` callers. `userId` is the authenticated user when the host knows one. */
+export interface CommandCaller {
+  readonly kind: 'human' | 'agent';
+  readonly userId?: string;
+}
+
 export interface ExecutionContext {
   /** Geometry kernel for booleans/fillets; null while none is installed or loaded. */
   readonly kernel: GeometryKernel | null;
@@ -181,8 +187,10 @@ export interface ExecutionContext {
   readonly surfaceAnalysis?: SurfaceAnalysisEngine | null;
   /** Read-only FE mesh/results artifact store (host-provided); null/absent = `record_fe_*` commands no-op with FEA_ARTIFACT_NOT_FOUND. */
   readonly feaArtifacts?: FeArtifactPort | null;
-  /** Human-signature verifier (09 PLM); null/absent = human-gate commands refuse. */
+  /** The signature port (verification of human signatures, Ed25519; 05/08/09); null/absent = human-gate commands refuse. */
   readonly humanSignature?: HumanSignaturePort | null;
+  /** Who runs the command (set only by hosts: the desktop UI dispatch is `human`, CLI / REST default `agent`); absent = in-process caller, not gated. */
+  readonly caller?: CommandCaller;
   /** Material library files of this machine (`import_material_library` by reference, `resolve_material_libraries`); null/absent = none. */
   readonly libraries?: MaterialLibraryProvider | null;
   /** Mints every id the command creates. */

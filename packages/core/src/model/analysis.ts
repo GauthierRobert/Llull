@@ -588,7 +588,18 @@ export interface FeArtifactPort {
   get(hash: string): FeMeshArtifact | FeResultsArtifact | FeTableArtifact | FeTopologyArtifact | null;
 }
 
-/** Verifies a human signature over a payload hash (09 PLM); no implementation is installed, so human gates refuse. */
+/** How a signing key is trusted: registered, unknown / revoked, or a published RFC 8032 test key (refused outside test mode). */
+type KeyTrust = 'trusted' | 'untrusted' | 'test';
+
+/**
+ * THE signature port (`ExecutionContext.humanSignature`; 05 FEA dispositions, 08 MAT markings, 09 PLM releases). Hosts with a local key
+ * store install it; none installed, so human gates refuse. Verification only: a command never signs.
+ */
 export interface HumanSignaturePort {
+  /** Human gate: the signer when `signature` (an Ed25519 signature object signed over the UTF-8 hex `payloadSha256`) verifies and its key is trusted, else null. */
   verify(signature: unknown, payloadSha256: string): { readonly signer: string; readonly signatureId: string } | null;
+  /** Raw Ed25519 (RFC 8032 PureEdDSA) verification of `signatureHex` over the UTF-8 bytes of `message`; absent = this host cannot verify. */
+  verifyEd25519?(publicKeyHex: string, message: string, signatureHex: string): boolean;
+  /** Trust of a public key (64 hex chars); absent = every key is treated as untrusted. */
+  keyTrust?(publicKeyHex: string): KeyTrust;
 }

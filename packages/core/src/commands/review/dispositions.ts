@@ -1,9 +1,9 @@
-/** Reviewer dispositions on prototype findings (PHY-21 FR-FPR-31 / 32, spec 11 Q5: no sign-off in the MVP). */
+/** Reviewer dispositions on prototype findings (PHY-21 FR-FPR-31 / 32; acceptance is human-gated through ctx.caller, spec 11 Q5). */
 
 import { DISPOSITION_STATUSES, type Disposition } from '../../model/prototype';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { changed, failer } from '../noop';
+import { changed, codedRejection, failer } from '../noop';
 import { isFindingKey } from '../persistence/prototypeValidation';
 import { prototypeOf } from './intents';
 
@@ -22,9 +22,9 @@ const idsOfKey = (findingKey: string): string[] =>
 /**
  * @affects sets or clears doc.prototype.dispositions[findingKey] (affected: the ids the finding key names)
  * @invariant an `accepted` disposition never changes a check status: check_prototype reports the item as "fail (accepted)" and the verdict
- *   stays blocked while any fail remains; `by` is 'agent' (the context carries no caller yet, spec 11 Q5)
- * @failure malformed finding key, empty inputsHash, same status + comment as stored -> no-op; not_reviewed with an empty comment removes the
- *   disposition (no-op when there is none)
+ *   stays blocked while any fail remains; `by` is the host-declared caller kind ('agent' when the context carries none, spec 11 Q5)
+ * @failure accepted by an agent caller -> FPR_HUMAN_GATE (acceptance is a human act, FR-FPR-31, AF-34); malformed finding key, empty inputsHash,
+ *   same status + comment as stored -> no-op; not_reviewed with an empty comment removes the disposition (no-op when there is none)
  */
 export const setReviewDisposition = defineCommand({
   name: NAME,
@@ -47,8 +47,17 @@ export const setReviewDisposition = defineCommand({
         'The inputsHash of the check_prototype check the finding came from (data.checks[].inputsHash); a later different hash marks it stale.',
       ),
   }),
-  run: (doc, { findingKey, status, comment = '', inputsHash }): CommandResult => {
+  run: (doc, { findingKey, status, comment = '', inputsHash }, ctx): CommandResult => {
     const fail = failer(doc, NAME);
+    if (status === 'accepted' && ctx?.caller?.kind === 'agent')
+      return codedRejection(
+        doc,
+        NAME,
+        'FPR_HUMAN_GATE',
+        'accepting a finding is a human act; an agent may mark it relevant or irrelevant',
+        'Ask the reviewer to accept it in the desktop app (Review tab).',
+        [findingKey],
+      );
     if (!isFindingKey(findingKey))
       return fail(
         `'${findingKey}' is not a finding key (<check>:<code>:<ids>, check one of assembly, mechanism, motion_clearance, dynamics)`,
@@ -65,13 +74,19 @@ export const setReviewDisposition = defineCommand({
     }
     if (stored !== undefined && stored.status === status && stored.comment === text && stored.inputsHash === inputsHash)
       return fail(`'${findingKey}' is already ${status} with the same comment`);
-    const disposition: Disposition = { findingKey, status, comment: text, inputsHash, by: 'agent' };
+    const disposition: Disposition = {
+      findingKey,
+      status,
+      comment: text,
+      inputsHash,
+      by: ctx?.caller?.kind === 'human' ? 'human' : 'agent',
+    };
     const dispositions = { ...prototype.dispositions, [findingKey]: disposition };
     const note =
       status === 'accepted' ? ' Recorded only: an accepted fail still reads "fail (accepted)" and keeps check_prototype blocked.' : '';
     return changed(
       { ...doc, prototype: { ...prototype, dispositions } },
-      `Marked ${findingKey} ${status}${text.length > 0 ? ` ("${text}")` : ''} (by agent, hash ${inputsHash}).${note}`,
+      `Marked ${findingKey} ${status}${text.length > 0 ? ` ("${text}")` : ''} (by ${disposition.by}, hash ${inputsHash}).${note}`,
       affected,
     );
   },

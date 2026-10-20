@@ -8,9 +8,9 @@ import { getCommand } from '@core/commands/registry';
 import { getLiveDoc, setLiveDoc } from './liveDocument';
 import { createHash } from 'crypto';
 import type { LiveCommandSource } from '@protocol/liveSync';
-import { runCommandOutcome } from '@protocol/commandOutcome';
 import type { CommandResponseBody } from '@protocol/restProtocol';
-import { serverContext } from './fea/context';
+import { AGENT, runHostCommand } from './plm/hostRun';
+import type { CommandCaller } from '@core/commands/types';
 
 const MAX_UNDO_DEPTH = 100; // = the UI store's cap
 const MAX_IDEMPOTENCY_ENTRIES = 1000; // commandId -> result LRU
@@ -45,8 +45,14 @@ export function hashJson(value: unknown): string {
  * @param commandId repeated id -> cached result, not re-applied (only changing, non-readOnly results are cached;
  *   reuse with different name/params -> error result)
  */
-export function applyCommand(name: string, params: unknown, commandId?: string, source?: LiveCommandSource): CommandResponseBody {
-  if (commandId === undefined) return runCommand(name, params, source);
+export function applyCommand(
+  name: string,
+  params: unknown,
+  commandId?: string,
+  source?: LiveCommandSource,
+  caller: CommandCaller = AGENT,
+): CommandResponseBody {
+  if (commandId === undefined) return runCommand(name, params, source, undefined, caller);
   const requestHash = hashJson([name, params]);
   const cached = _resultsByCommandId.get(commandId);
   if (cached !== undefined) {
@@ -62,7 +68,7 @@ export function applyCommand(name: string, params: unknown, commandId?: string, 
     _resultsByCommandId.set(commandId, cached); // refresh LRU position
     return withHistoryFlags(cached.result);
   }
-  const result = runCommand(name, params, source, commandId);
+  const result = runCommand(name, params, source, commandId, caller);
   if (!result.changed || getCommand(name)?.annotations?.readOnly === true) return result;
   _resultsByCommandId.set(commandId, { requestHash, result: boundedForReplay(result) });
   if (_resultsByCommandId.size > MAX_IDEMPOTENCY_ENTRIES) {
@@ -83,16 +89,22 @@ function boundedForReplay(result: CommandResponseBody): CommandResponseBody {
   return { ...rest, summary: `${result.summary} (replay: the result data was not kept, re-query the scene)` };
 }
 
-function runCommand(name: string, params: unknown, source?: LiveCommandSource, commandId?: string): CommandResponseBody {
+function runCommand(
+  name: string,
+  params: unknown,
+  source: LiveCommandSource | undefined,
+  commandId: string | undefined,
+  caller: CommandCaller,
+): CommandResponseBody {
   const prior = getLiveDoc();
-  const { document, outcome } = runCommandOutcome(prior, name, params, serverContext());
+  const { document, outcome, params: filled } = runHostCommand(prior, name, params, { caller, source: source ?? 'rest' });
   if (outcome.changed && getCommand(name)?.annotations?.session === true) {
     // Session command (resolve_material_libraries): in memory only, no undo entry, no command log; clients get a snapshot.
     setLiveDoc(document);
   } else if (outcome.changed) {
     history.undo = pushCapped(history.undo, prior);
     history.redo = [];
-    setLiveDoc(document, { name, params, source: source ?? 'rest', ...(commandId !== undefined ? { commandId } : {}) });
+    setLiveDoc(document, { name, params: filled, source: source ?? 'rest', ...(commandId !== undefined ? { commandId } : {}) });
   }
   return withHistoryFlags(outcome);
 }

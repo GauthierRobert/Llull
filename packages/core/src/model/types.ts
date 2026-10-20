@@ -21,6 +21,7 @@ import type { DocumentKernelSettings } from './documentKernelSettings';
 import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary';
 import type { ReliabilityModel } from './probabilistic';
 import type { SheetMetalModel } from './sheetMetal';
+import type { PlmModel } from './plm';
 import type { FeatureParams } from './features';
 import type { NurbsCurveData } from '../lib/nurbs/types';
 import type { NurbsSurfaceData, UvTrimLoop } from '../lib/nurbs/surfaceTypes';
@@ -687,6 +688,8 @@ export interface CadDocument {
   sheetMetal?: SheetMetalModel;
   /** Absent until the first probabilistic command (`define_random_variable`; plugin `cae`, PHY-18). */
   probabilistic?: ReliabilityModel;
+  /** Absent until `set_item_identity` (plugin `plm`, 09): the managed item, revisions, change records. Outside the release scope. */
+  plm?: PlmModel;
 }
 
 export type { DocumentKernelSettings, Animation, AnimationChannel, AnimationMode };

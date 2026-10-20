@@ -204,6 +204,22 @@ describe('set_review_disposition', () => {
     expect(cleared.summary).toMatch(/Cleared the disposition/);
   });
 
+  it('acceptance is a human act: an agent caller gets FPR_HUMAN_GATE, a human is recorded as human (FR-FPR-31, VC-FPR-22)', () => {
+    const doc = createEmptyDocument();
+    const as = (kind: 'human' | 'agent'): ExecutionContext => ({ ...ctxOf(), caller: { kind } });
+    const params = { findingKey: key, inputsHash: 'h1', status: 'accepted', comment: 'tested' };
+    const refused = execute(doc, 'set_review_disposition', params, as('agent'));
+    expect(refused.error?.code).toBe('FPR_HUMAN_GATE');
+    expect(refused.document).toBe(doc);
+    const relevant = execute(doc, 'set_review_disposition', { ...params, status: 'relevant' }, as('agent'));
+    expect(relevant.document.prototype?.dispositions?.[key]?.by).toBe('agent');
+    const accepted = execute(doc, 'set_review_disposition', params, as('human'));
+    expect(accepted.document.prototype?.dispositions?.[key]).toMatchObject({ status: 'accepted', by: 'human' });
+    expect(accepted.summary).toContain('by human');
+    const intent = execute({ ...doc, entities: {} }, 'allow_interference', { a: 'x', b: 'y', kind: 'weld', reason: 'r' }, as('human'));
+    expect(intent.affected).toEqual([]);
+  });
+
   it('refuses a malformed key, an empty hash, an unchanged disposition and clearing nothing', () => {
     const doc = createEmptyDocument();
     expect(set(doc, { findingKey: 'nope', status: 'relevant' }).affected).toEqual([]);

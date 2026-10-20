@@ -7,6 +7,8 @@ type FibreView = 'top' | 'bottom' | 'mid';
 
 export interface MarginRowView {
   readonly rowId: string;
+  /** Stable row key the disposition signature binds to. */
+  readonly rowKey: string;
   readonly part: string;
   readonly region: string;
   readonly fibre: FibreView | null;
@@ -54,6 +56,7 @@ function parseRow(entry: unknown): MarginRowView[] {
   return [
     {
       rowId: entry['rowId'],
+      rowKey: str(entry['rowKey']),
       part: str(entry['part']),
       region: str(entry['region']),
       fibre: fibre === 'top' || fibre === 'bottom' || fibre === 'mid' ? fibre : null,

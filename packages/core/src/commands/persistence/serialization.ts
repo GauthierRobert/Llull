@@ -50,7 +50,7 @@ export function serializeDocument(doc: CadDocument, options: SerializeOptions = 
   return JSON.stringify(envelope);
 }
 
-function withoutDerivedEntities(doc: CadDocument): CadDocument {
+export function withoutDerivedEntities(doc: CadDocument): CadDocument {
   const derived = derivedEntityIds(doc);
   if (derived.size === 0) return doc;
   const entities = Object.entries(doc.entities).filter(([id]) => !derived.has(id));
@@ -212,9 +212,11 @@ export const loadDocument = defineCommand({
     }
     const entityCount = Object.keys(parsed.entities).length;
     const layerCount = Object.keys(parsed.layers).length;
+    const warnings = documentExtensions().flatMap((extension) => extension.afterLoad?.(parsed) ?? []);
     return changed(
       parsed,
-      `Loaded document: ${entityCount} ${entityCount === 1 ? 'entity' : 'entities'}, ${layerCount} ${layerCount === 1 ? 'layer' : 'layers'}.`,
+      `Loaded document: ${entityCount} ${entityCount === 1 ? 'entity' : 'entities'}, ${layerCount} ${layerCount === 1 ? 'layer' : 'layers'}.` +
+        warnings.map((warning) => ` Warning: ${warning}.`).join(''),
       parsed.order,
     );
   },
