@@ -66,8 +66,8 @@ function titleBlock(sheet: DrawingSheet, scale: number): string {
   ].join('');
 }
 
-/** The complete sheet document around the already-painted `body` (view groups) and `defs` (clip paths). */
-export function composeSheet(sheet: DrawingSheet, scale: number, body: string, defs: string): string {
+/** The complete sheet document around the already-painted `body` (view groups) and `defs` (clip paths); `notice` = export-control statement for the frame. */
+export function composeSheet(sheet: DrawingSheet, scale: number, body: string, defs: string, notice?: string): string {
   const [width, height] = PAPER_MM[sheet.paper];
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}" font-family="Helvetica, Arial, sans-serif">`,
@@ -78,6 +78,11 @@ export function composeSheet(sheet: DrawingSheet, scale: number, body: string, d
     `<rect x="${BINDING_MARGIN}" y="${MARGIN}" width="${width - BINDING_MARGIN - MARGIN}" height="${height - 2 * MARGIN}" class="frame"/>`,
     body,
     titleBlock(sheet, scale),
+    ...(notice === undefined
+      ? []
+      : [
+          `<text id="export-marking" x="${BINDING_MARGIN + 2}" y="${height - MARGIN - 2}" font-size="3" font-weight="bold">${escapeXml(notice)}</text>`,
+        ]),
     `</svg>`,
   ].join('\n');
 }

@@ -6,6 +6,7 @@ import type { DrawingSheet, DrawingView } from '../../model/sheet';
 import { type Bounds, type DerivedView, cuttingLine, deriveView } from './viewDrawing';
 import { type Area, type PlacedView, layoutViews } from './layout';
 import { composeSheet, sheetArea } from './sheetFrame';
+import { managedSheet } from './plmProjection';
 import { DrawingPainter, n, paperDimension, svgLine, svgText } from '../../geometry/drawingSvg';
 import { escapeXml } from '../../lib/escapeXml';
 import { scaleText } from './sheetOps';
@@ -207,5 +208,7 @@ export function renderSheet(doc: CadDocument, sheet: DrawingSheet, options: { re
       bounds[3] <= area.y + area.height + 0.01,
   );
   if (!fits) warnings.push(overflowWarning(views, area, layout.scale, layoutViews(items, { ...layoutOptions, scale: undefined }).scale));
-  return { svg: composeSheet(sheet, layout.scale, groups.join('\n'), defs.join('')), scale: layout.scale, views, skipped, warnings, fits };
+  const printed = managedSheet(doc, sheet);
+  const svg = composeSheet(printed.sheet, layout.scale, groups.join('\n'), defs.join(''), printed.notice);
+  return { svg, scale: layout.scale, views, skipped, warnings, fits };
 }

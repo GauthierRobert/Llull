@@ -6,6 +6,7 @@
 import { type CadDocument, type FeatureStep, createEmptyDocument } from '../../model/types';
 import { createEmptyBuilding } from '../../model/building';
 import { currentContext } from '../context';
+import { documentExtensions } from '../../plugins/host';
 import type { CommandDefinition, CommandError, CommandResult } from '../types';
 import { commandError } from '../noop';
 import { orphanState } from './carry';
@@ -115,7 +116,7 @@ export function replayHistory(
     return base;
   }
   // Start from empty geometry but preserve document-level settings.
-  let doc: CadDocument = {
+  const seed: CadDocument = {
     ...createEmptyDocument(),
     camera: base.camera,
     units: base.units,
@@ -137,6 +138,8 @@ export function replayHistory(
     // The building identity (IFC GlobalId salt) survives replay; its content is regenerated.
     ...(base.building?.uid !== undefined ? { building: { ...createEmptyBuilding(), uid: base.building.uid } } : {}),
   };
+  // Slices an installed plugin owns as document input state (PLM record, ...) survive replay unchanged.
+  let doc: CadDocument = documentExtensions().reduce((next, extension) => extension.carry?.(base, next) ?? next, seed);
   // idMap tracks old entity id (from when the step was first recorded) → new id
   // (assigned during this replay). Subsequent steps' params are rewritten via
   // remapIds. Step-scoped ids replay identically, so this only maps legacy (pre-v2) ids.
