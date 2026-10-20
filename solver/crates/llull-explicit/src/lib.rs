@@ -12,6 +12,8 @@ pub mod bwc;
 pub mod contact;
 #[cfg(feature = "gpu")]
 pub mod gpu;
+#[cfg(feature = "gpu")]
+mod gpu_tables;
 pub mod hex8;
 pub mod job;
 pub mod material;

@@ -6,10 +6,10 @@ use crate::shell::{masses, step, ShellState};
 use rayon::prelude::*;
 
 pub struct Shells {
-    corners: Vec<[usize; 4]>,
-    material: Vec<usize>,
-    thickness: Vec<f64>,
-    states: Vec<ShellState>,
+    pub(crate) corners: Vec<[usize; 4]>,
+    pub(crate) material: Vec<usize>,
+    pub(crate) thickness: Vec<f64>,
+    pub(crate) states: Vec<ShellState>,
     /// Rotary inertia per node (0 for nodes without a shell).
     pub inertia: Vec<f64>,
     /// Angular velocity at n−½, 3 per node.

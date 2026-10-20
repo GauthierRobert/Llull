@@ -384,6 +384,100 @@ impl Contacts {
     }
 }
 
+#[cfg(feature = "gpu")]
+/// The contact set flattened for the GPU kernels (`gpu.rs`, `explicit_contact.wgsl`). Slaves are numbered pass-major, in the CPU order.
+pub(crate) struct GpuContactTables {
+    /// 4 node indices per segment (u32::MAX as the 4th of a triangle).
+    pub(crate) segment_nodes: Vec<u32>,
+    /// Per segment: stiffness, depth, half thickness.
+    pub(crate) segment_data: Vec<f64>,
+    /// Per slave: node, pass.
+    pub(crate) slaves: Vec<[u32; 2]>,
+    /// Per slave: stiffness, half thickness.
+    pub(crate) slave_data: Vec<f64>,
+    /// Per pass: penalty scale, static and dynamic friction, decay.
+    pub(crate) pass_data: Vec<f64>,
+    /// Largest search radius of any pass.
+    pub(crate) reach: f64,
+}
+
+#[cfg(feature = "gpu")]
+impl Contacts {
+    pub(crate) fn gpu_tables(&self) -> GpuContactTables {
+        let segment_nodes = self
+            .segments
+            .iter()
+            .flat_map(|segment| std::array::from_fn::<u32, 4, _>(|k| segment.nodes.get(k).map_or(u32::MAX, |&node| node as u32)))
+            .collect();
+        let segment_data = self.segments.iter().flat_map(|segment| [segment.stiffness, segment.depth, segment.half]).collect();
+        let mut slaves = Vec::new();
+        let mut slave_data = Vec::new();
+        let mut pass_data = Vec::new();
+        let mut reach: f64 = 0.0;
+        for (index, pass) in self.passes.iter().enumerate() {
+            for (position, &node) in pass.slaves.iter().enumerate() {
+                slaves.push([node as u32, index as u32]);
+                slave_data.extend_from_slice(&[pass.slave_stiffness[position], pass.slave_half[position]]);
+            }
+            let definition = &self.definitions[pass.contact];
+            let friction = definition.friction;
+            pass_data.extend_from_slice(&[
+                definition.penalty_scale,
+                friction.static_coefficient,
+                friction.dynamic_coefficient,
+                friction.decay,
+            ]);
+            let depth = pass.masters.iter().map(|&s| self.segments[s].depth).fold(0.0, f64::max);
+            reach = reach.max(depth + pass.slave_half.iter().copied().fold(0.0, f64::max));
+        }
+        GpuContactTables { segment_nodes, segment_data, slaves, slave_data, pass_data, reach }
+    }
+
+    /// Candidate segments of every slave (pass-major, as `gpu_tables`) within the pass reach plus `extra` at `x`, ascending, without the
+    /// segments the CPU loop skips (its own, and the element's in self contact): a superset of the candidates of `forces` while no node
+    /// moved more than `extra / 2`.
+    pub(crate) fn candidates(&self, x: &[f64], extra: f64) -> Vec<Vec<u32>> {
+        let mut lists = Vec::new();
+        for pass in &self.passes {
+            let boxes: Vec<Aabb> = pass
+                .masters
+                .iter()
+                .map(|&s| {
+                    let mut low = [f64::INFINITY; 3];
+                    let mut high = [f64::NEG_INFINITY; 3];
+                    for &node in &self.segments[s].nodes {
+                        let p = point(x, node);
+                        for i in 0..3 {
+                            low[i] = low[i].min(p[i]);
+                            high[i] = high[i].max(p[i]);
+                        }
+                    }
+                    Aabb { low, high }
+                })
+                .collect();
+            let tree = Bvh::build(&boxes);
+            let reach = pass.masters.iter().map(|&s| self.segments[s].depth).fold(0.0, f64::max)
+                + pass.slave_half.iter().copied().fold(0.0, f64::max)
+                + extra;
+            for &node in &pass.slaves {
+                let found = tree.as_ref().map_or_else(Vec::new, |tree| tree.overlapping(&point(x, node), reach));
+                lists.push(
+                    found
+                        .into_iter()
+                        .map(|candidate| pass.masters[candidate])
+                        .filter(|&s| {
+                            let segment = &self.segments[s];
+                            !(segment.nodes.contains(&node) || (pass.self_contact && self.element_nodes[segment.element].contains(&node)))
+                        })
+                        .map(|s| s as u32)
+                        .collect(),
+                );
+            }
+        }
+        lists
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

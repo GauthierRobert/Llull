@@ -38,8 +38,8 @@ struct Counts { nodes: u32, elements: u32, walls: u32, groups_x: u32 };
 @group(0) @binding(18) var<storage, read> incidence_start: array<u32>;
 @group(0) @binding(19) var<storage, read> incidence: array<u32>;
 @group(0) @binding(20) var<storage, read_write> reduced: array<f64>;
-// 3 per node: forces the host adds (contact minus the shells' internal forces), zero without contact and shells
-@group(0) @binding(21) var<storage, read> host_force: array<f64>;
+// 3 per node: penalty contact forces at x (contact_gather, explicit_contact.wgsl)
+@group(0) @binding(21) var<storage, read_write> contact_force: array<f64>;
 // 3 per node: 1 = fixed degree of freedom (velocity held at 0 after the walls, as solver.rs)
 @group(0) @binding(22) var<storage, read> fixed: array<u32>;
 // (temperature K, c_p) pairs of every material's c_p table, in material order
@@ -50,6 +50,8 @@ struct Counts { nodes: u32, elements: u32, walls: u32, groups_x: u32 };
 @group(0) @binding(25) var<storage, read> motions: array<f64>;
 // 3 per node: initial coordinates (displacement curves)
 @group(0) @binding(26) var<storage, read> x_ref: array<f64>;
+// 1 per node: energy taken by the contact forces (running total)
+@group(0) @binding(27) var<storage, read_write> contact_energy: array<f64>;
 
 // A motion curve at a time: linear, constant outside it (model.rs ImposedMotion::at).
 fn curve_at(motion: u32, time: f64) -> f64 {
@@ -97,7 +99,7 @@ fn kick(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_index) 
   var v: array<f64, 3>;
   for (var c = 0u; c < 3u; c = c + 1u) {
     let f_ext = m * scalars[5u + c];
-    v[c] = v_half[3u * i + c] + 0.5lf * (dtp + dt) * (f_ext + host_force[3u * i + c] - f_int[3u * i + c]) / m;
+    v[c] = v_half[3u * i + c] + 0.5lf * (dtp + dt) * (f_ext + contact_force[3u * i + c] - f_int[3u * i + c]) / m;
   }
   for (var w = 0u; w < counts.walls; w = w + 1u) {
     let n = array<f64, 3>(walls[6u * w + 3u], walls[6u * w + 4u], walls[6u * w + 5u]);
@@ -134,6 +136,10 @@ fn kick(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_index) 
     v_new[3u * i + c] = v[c];
     x_new[3u * i + c] = x[3u * i + c] + dt * v[c];
   }
+  // Work of the contact forces at step n over the central-difference step (solver.rs).
+  var contact_work = 0.0lf;
+  for (var c = 0u; c < 3u; c = c + 1u) { contact_work = contact_work + contact_force[3u * i + c] * 0.5lf * (dtp * v_half[3u * i + c] + dt * v[c]); }
+  contact_energy[i] = contact_energy[i] - contact_work;
 }
 
 // ---------------------------------------------------------------- element geometry (hex8.rs, tet4.rs)
@@ -567,7 +573,7 @@ var<workgroup> scratch: array<f64, 64>;
 @compute @workgroup_size(64)
 fn min_step(@builtin(local_invocation_index) lid: u32) {
   var m = BIG;
-  for (var e = lid; e < counts.elements; e = e + 64u) { m = min(m, elem_energy[3u * e + 2u]); }
+  for (var e = lid; e < counts.elements + shell_counts.shells; e = e + 64u) { m = min(m, elem_energy[3u * e + 2u]); }
   scratch[lid] = m;
   workgroupBarrier();
   for (var s = 32u; s > 0u; s = s >> 1u) {
@@ -575,6 +581,24 @@ fn min_step(@builtin(local_invocation_index) lid: u32) {
     workgroupBarrier();
   }
   if (lid == 0u) { reduced[0] = scratch[0]; }
+  workgroupBarrier();
+  // Largest node motion since the last contact candidate search (the host searches again past half the search margin).
+  var motion = 0.0lf;
+  if (shell_counts.slaves > 0u) {
+    for (var i = lid; i < counts.nodes; i = i + 64u) {
+      let dx = x_new[3u * i] - x_search[3u * i];
+      let dy = x_new[3u * i + 1u] - x_search[3u * i + 1u];
+      let dz = x_new[3u * i + 2u] - x_search[3u * i + 2u];
+      motion = max(motion, sqrt(dx * dx + dy * dy + dz * dz));
+    }
+  }
+  scratch[lid] = motion;
+  workgroupBarrier();
+  for (var s = 32u; s > 0u; s = s >> 1u) {
+    if (lid < s) { scratch[lid] = max(scratch[lid], scratch[lid + s]); }
+    workgroupBarrier();
+  }
+  if (lid == 0u) { reduced[1] = scratch[0]; }
 }
 
 // ---------------------------------------------------------------- commit: external work, x <- x_new, v_half <- v_new

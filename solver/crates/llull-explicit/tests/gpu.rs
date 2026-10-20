@@ -260,6 +260,144 @@ fn imposed_motion_gpu_matches_the_cpu_twin() {
     assert!(speed_error < 1e-7 && (w_gpu - w_cpu).abs() < 1e-7 * w_cpu.abs());
 }
 
+/// A 2 x 2 shell plate (10 x 10 mm, t = 1) at height `z`, numbered from `first`.
+fn plate(z: f64, first: u32) -> (Vec<f64>, Vec<u32>) {
+    let mut coordinates = Vec::new();
+    for j in 0..3 {
+        for i in 0..3 {
+            coordinates.extend_from_slice(&[5.0 * i as f64, 5.0 * j as f64, z]);
+        }
+    }
+    let node = |i: u32, j: u32| first + i + 3 * j;
+    let mut shell4 = Vec::new();
+    for j in 0..2 {
+        for i in 0..2 {
+            shell4.extend_from_slice(&[node(i, j), node(i + 1, j), node(i + 1, j + 1), node(i, j + 1)]);
+        }
+    }
+    (coordinates, shell4)
+}
+
+#[test]
+fn wgsl_contact_and_shell_kernels_match_the_cpu_twin() {
+    use llull_explicit::model::{Contact, ContactKind, Friction, JohnsonCookFailure};
+    let compare = |label: &str, model: &Model, scale: f64| -> (Outcome, Outcome, f64) {
+        let gpu = gpu_or_skip(model).expect("adapter");
+        let reference = cpu(model);
+        assert!(gpu.normal, "{label}: {}", gpu.message);
+        let error = max_relative(&gpu.velocities, &reference.velocities, scale);
+        eprintln!("{label} GPU vs CPU: velocity {error:e} of {scale:e}");
+        (gpu, reference, error)
+    };
+    if gpu_or_skip(&bar(0.3, 4, 1e-6)).is_none() {
+        return;
+    }
+    // Friction: the Coulomb block of tests/contact.rs mid-slide (μ = 0.5, 150 mm/s), nodes_to_surface.
+    let (mut coordinates, mut hex8) = hex_grid([5.0, 10.0, 5.0], [10.0, 10.0, 10.0], [2, 2, 2]);
+    let block_nodes = coordinates.len() / 3;
+    let block_elements = hex8.len() / 8;
+    let (p_coordinates, p_hex8) = hex_grid([0.0, 0.0, 0.0], [80.0, 30.0, 5.0], [16, 6, 1]);
+    coordinates.extend_from_slice(&p_coordinates);
+    hex8.extend(p_hex8.iter().map(|node| node + block_nodes as u32));
+    let (elements, nodes) = (hex8.len() / 8, coordinates.len() / 3);
+    let mut sliding = model(coordinates, hex8, vec![], steel(0.3, None), [0.0; 3], controls(0.004, 1e-3));
+    sliding.gravity = [0.0, 0.0, -9806.65];
+    for node in 0..block_nodes {
+        sliding.initial_velocity[3 * node] = 150.0;
+    }
+    sliding.element_part = (0..elements).map(|e| if e < block_elements { 0 } else { 1 }).collect();
+    sliding.fixed = (0..3 * nodes).map(|k| k / 3 >= block_nodes).collect();
+    sliding.contacts.push(Contact {
+        name: "slide".into(),
+        kind: ContactKind::NodesToSurface { slave: vec![0], master: vec![1] },
+        friction: Friction { static_coefficient: 0.5, dynamic_coefficient: 0.5, decay: 0.0 },
+        penalty_scale: 0.1,
+    });
+    let (_, _, friction) = compare("Coulomb block (friction)", &sliding, 150.0);
+    assert!(friction < 1e-4);
+
+    // Shell segments: a shell plate falling 1 mm (gap) onto a hex block at 10 m/s.
+    let (mut coordinates, hex8) = hex_grid([0.0, 0.0, -10.0], [10.0, 10.0, 10.0], [2, 2, 2]);
+    let block_nodes = coordinates.len() / 3;
+    let (upper, shells) = plate(2.0, block_nodes as u32);
+    coordinates.extend_from_slice(&upper);
+    let solids = hex8.len() / 8;
+    let mut landing = model(coordinates, hex8, vec![], steel(0.3, None), [0.0; 3], controls(3e-4, 1e-6));
+    landing.shell4 = shells;
+    landing.shell_thickness = vec![1.0; 4];
+    landing.element_material = vec![0; solids + 4];
+    landing.element_part = (0..solids + 4).map(|e| if e < solids { 0 } else { 1 }).collect();
+    let nodes = block_nodes + 9;
+    landing.initial_velocity = (0..nodes).flat_map(|n| [0.0, 0.0, if n < block_nodes { 0.0 } else { -10_000.0 }]).collect();
+    landing.contacts.push(Contact {
+        name: "touch".into(),
+        kind: ContactKind::SurfaceToSurface { a: vec![0], b: vec![1] },
+        friction: Friction::default(),
+        penalty_scale: 0.1,
+    });
+    let (_, _, shell_contact) = compare("shell plate on a block", &landing, 10_000.0);
+    assert!(shell_contact < 1e-3);
+
+    // Warped BWC shells: the twisted beam of tests/warping.rs, 2 ms under gravity along the tip width.
+    let mut beam = model(vec![], vec![], vec![], steel(0.22, None), [0.0; 3], controls(2e-3, 1e-4));
+    for j in 0..=2 {
+        for i in 0..=12 {
+            let x = i as f64;
+            let s = 1.1 * (j as f64 / 2.0 - 0.5);
+            let theta = std::f64::consts::FRAC_PI_2 * x / 12.0;
+            beam.coordinates.extend_from_slice(&[x, s * theta.cos(), s * theta.sin()]);
+        }
+    }
+    let node = |i: usize, j: usize| (i + 13 * j) as u32;
+    for j in 0..2 {
+        for i in 0..12 {
+            beam.shell4.extend_from_slice(&[node(i, j), node(i + 1, j), node(i + 1, j + 1), node(i, j + 1)]);
+        }
+    }
+    let nodes = beam.coordinates.len() / 3;
+    beam.shell_thickness = vec![0.32; 24];
+    beam.element_material = vec![0; 24];
+    beam.initial_velocity = vec![0.0; 3 * nodes];
+    beam.fixed = (0..3 * nodes).map(|k| beam.coordinates[3 * (k / 3)] == 0.0).collect();
+    beam.fixed_rotation = beam.fixed.clone();
+    beam.gravity = [0.0, 0.0, 1e7];
+    let (gpu, reference, _) = compare("twisted beam (BWC)", &beam, 1.0);
+    let tip = reference.velocities.iter().map(|v| v.abs()).fold(0.0, f64::max);
+    let warped = max_relative(&gpu.velocities, &reference.velocities, tip);
+    eprintln!("twisted beam GPU vs CPU: {warped:e} of the tip speed {tip:e}");
+    assert!(warped < 1e-9);
+
+    // Plastic shells with Johnson-Cook erosion: the strip of tests/shell.rs pulled at 1000 /s (synthetic, ε_f = 0.01).
+    let jc = JohnsonCook { a: 300.0, b: 0.0, n: 1.0, c: 0.0, reference_rate: 1.0, m: 1.0, melt_k: 1800.0, transition_k: 293.0 };
+    let mut material = steel(0.3, Some(jc));
+    material.failure = Some(JohnsonCookFailure { d: [0.01, 0.0, 0.0, 0.0, 0.0], reference_rate: 1.0 });
+    let mut strip = model(vec![], vec![], vec![], material, [0.0; 3], controls(6e-5, 1e-6));
+    for j in 0..=2 {
+        for i in 0..=8 {
+            strip.coordinates.extend_from_slice(&[5.0 * i as f64, 5.0 * j as f64, 0.0]);
+        }
+    }
+    let node = |i: usize, j: usize| (i + 9 * j) as u32;
+    for j in 0..2 {
+        for i in 0..8 {
+            strip.shell4.extend_from_slice(&[node(i, j), node(i + 1, j), node(i + 1, j + 1), node(i, j + 1)]);
+        }
+    }
+    let nodes = strip.coordinates.len() / 3;
+    strip.shell_thickness = vec![1.0; 16];
+    strip.element_material = vec![0; 16];
+    strip.fixed = (0..3 * nodes).map(|k| strip.coordinates[3 * (k / 3)] == 0.0).collect();
+    strip.fixed_rotation = strip.fixed.clone();
+    strip.initial_velocity = strip.coordinates.chunks_exact(3).flat_map(|x| [1000.0 * x[0], 0.0, 0.0]).collect();
+    let (gpu, reference, _) = compare("plastic shell strip", &strip, 40_000.0);
+    let failed = |outcome: &Outcome| outcome.fields.chunks_exact(7).filter(|f| f[2] == 1.0).count();
+    let plastic = |outcome: &Outcome| outcome.fields.chunks_exact(7).map(|f| f[1]).collect::<Vec<_>>();
+    let gap = plastic(&gpu).iter().zip(plastic(&reference)).map(|(a, b)| (a - b).abs()).fold(0.0, f64::max);
+    eprintln!("plastic shell strip GPU vs CPU: failed {} vs {}, plastic strain gap {gap:e}", failed(&gpu), failed(&reference));
+    assert!(failed(&reference) > 0 && failed(&gpu) == failed(&reference));
+    assert!(gap < 0.04 * 0.01);
+}
+
 /// Wall time of the CPU twin and the GPU path on a contact case (`cargo test --features gpu --test gpu -- --ignored --nocapture`).
 #[test]
 #[ignore = "timing, not a check"]
@@ -271,6 +409,6 @@ fn timing_cpu_vs_gpu_on_two_bars_in_contact() {
     let started = std::time::Instant::now();
     let Some(gpu) = gpu_or_skip(&bars) else { return };
     let gpu_ms = started.elapsed().as_millis();
-    eprintln!("TIMING contact {} hex8, {} cycles: CPU twin {cpu_ms} ms, GPU hybrid {gpu_ms} ms", bars.hex8.len() / 8, reference.cycles);
+    eprintln!("TIMING contact {} hex8, {} cycles: CPU twin {cpu_ms} ms, GPU {gpu_ms} ms", bars.hex8.len() / 8, reference.cycles);
     assert_eq!(gpu.cycles, reference.cycles);
 }
