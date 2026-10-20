@@ -69,7 +69,7 @@ function signatureStatus(plm: PlmModel, revision: Revision, ctx: ExecutionContex
   const port = ctx?.humanSignature ?? null;
   if (port?.verifyEd25519 === undefined) return 'unverified (no verifier port)';
   return revision.signatures.every((signature) => {
-    const manifest = manifestFor(plm, signature.target);
+    const manifest = manifestFor(plm, signature.target, signature.meaning);
     return (
       manifest !== null &&
       manifest.sha256 === signature.signedSha256 &&

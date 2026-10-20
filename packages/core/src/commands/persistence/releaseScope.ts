@@ -1,7 +1,7 @@
 /** document_content_hash: the canonical release-scope bytes of a document and their SHA-256 (09 PLM FR-PLM-06, TR-PLM-17). */
 
 import type { CadDocument } from '../../model/types';
-import { canonicalJson } from '../../lib/canonicalJson';
+import { jcsJson } from '../../lib/jcs';
 import { sha256Hex } from '../../lib/sha256';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
@@ -22,7 +22,7 @@ const SCOPE_FORMAT_VERSION = 2;
 export function releaseScopeJson(doc: CadDocument): string {
   const { selection: _selection, camera: _camera, plm: _plm, ...definition } = withoutPrivateValues(withoutDerivedEntities(doc));
   void [_selection, _camera, _plm];
-  return canonicalJson({ format: 'llull-document', version: SCOPE_FORMAT_VERSION, document: definition });
+  return jcsJson({ format: 'llull-document', version: SCOPE_FORMAT_VERSION, document: definition });
 }
 
 /**

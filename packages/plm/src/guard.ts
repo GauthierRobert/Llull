@@ -3,7 +3,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { DerivationGuard, GuardRefusal } from '@core/commands/derivation';
 import { commandError } from '@core/commands/noop';
-import { canonicalJson } from '@lib/canonicalJson';
+import { jcsJson } from '@lib/jcs';
 import { remediationOf } from './refusal';
 
 /** Commands that replace the document wholesale (integrity is checked on load) or restore a released snapshot (checked by the command). */
@@ -18,7 +18,7 @@ function scopeChanged(previous: CadDocument, next: CadDocument): boolean {
   const after = next as unknown as Record<string, unknown>;
   for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
     if (OUTSIDE_SCOPE.has(key) || before[key] === after[key]) continue;
-    if (canonicalJson(before[key]) !== canonicalJson(after[key])) return true;
+    if (jcsJson(before[key]) !== jcsJson(after[key])) return true;
   }
   return false;
 }

@@ -7,9 +7,10 @@ import type { CadDocument } from '@core/model/types';
 import type { ChangeRecord, PlmModel } from '@core/model/plm';
 import { effectivityProblem } from '../effectivity';
 import { refusePlm } from '../refusal';
-import { NOT_MANAGED, humanGateRefusal } from '../state';
+import { NOT_MANAGED } from '../state';
+import { humanAct } from '../gate';
 import { withPlm } from '../revisions';
-import { atSchema, bySchema, dispositionSchema, effectivitySchema } from '../params';
+import { atSchema, bySchema, confirmationSchema, dispositionSchema, effectivitySchema } from '../params';
 
 const classificationSchema = z.enum(['minor', 'major']);
 const tagsSchema = z
@@ -109,6 +110,7 @@ export const createChangeOrder = defineCommand({
     affectedItems: z.array(z.string()).optional().describe("Affected part numbers. Default: this document's managed item."),
     classification: classificationSchema.optional().describe('HUMAN: minor or major, decided by the applicant. Never inferred.'),
     classificationTags: tagsSchema.optional(),
+    confirmation: confirmationSchema,
     classificationJustification: z.string().optional().describe('HUMAN: why that classification.'),
     effectivity: z
       .array(effectivitySchema)
@@ -172,8 +174,8 @@ export const createChangeOrder = defineCommand({
     const classifies =
       params.classification !== undefined || params.classificationTags !== undefined || params.classificationJustification !== undefined;
     if (classifies) {
-      const gate = humanGateRefusal(doc, 'create_change_order', ctx, [plm.item.partNumber]);
-      if (gate !== null) return gate;
+      const gate = humanAct(doc, 'create_change_order', params, ctx);
+      if ('refusal' in gate) return gate.refusal;
     }
     const id = params.id ?? mintId(plm, 'ECO');
     if (Object.hasOwn(plm.changes, id))
@@ -222,12 +224,14 @@ export const classifyChangeOrder = defineCommand({
     classification: classificationSchema.describe('minor or major.'),
     justification: z.string().describe('Why (non-empty).'),
     tags: tagsSchema.optional(),
+    confirmation: confirmationSchema,
   }),
-  run: (doc, { id, classification, justification, tags }, ctx): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
+    const { id, classification, justification, tags } = params;
     const plm = doc.plm;
     if (plm === undefined) return refusePlm(doc, 'classify_change_order', 'PLM_NOT_MANAGED', NOT_MANAGED);
-    const gate = humanGateRefusal(doc, 'classify_change_order', ctx, [id]);
-    if (gate !== null) return gate;
+    const gate = humanAct(doc, 'classify_change_order', params, ctx);
+    if ('refusal' in gate) return gate.refusal;
     const record = plm.changes[id];
     if (record === undefined || record.kind !== 'eco')
       return refusePlm(doc, 'classify_change_order', 'PLM_ECO_UNKNOWN', `unknown change order '${id}'`, [id], ['id']);
@@ -272,12 +276,14 @@ export const setChangeState = defineCommand({
     reason: z.string().describe('Why (non-empty).'),
     at: atSchema.optional(),
     by: bySchema.optional(),
+    confirmation: confirmationSchema,
   }),
-  run: (doc, { id, state, reason, at }, ctx): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
+    const { id, state, reason, at } = params;
     const plm = doc.plm;
     if (plm === undefined) return refusePlm(doc, 'set_change_state', 'PLM_NOT_MANAGED', NOT_MANAGED);
-    const gate = humanGateRefusal(doc, 'set_change_state', ctx, [id]);
-    if (gate !== null) return gate;
+    const gate = humanAct(doc, 'set_change_state', params, ctx);
+    if ('refusal' in gate) return gate.refusal;
     const record = plm.changes[id];
     if (record === undefined) return refusePlm(doc, 'set_change_state', 'PLM_ECO_UNKNOWN', `unknown change '${id}'`, [id], ['id']);
     if (reason.trim() === '')

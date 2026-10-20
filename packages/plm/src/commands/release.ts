@@ -5,13 +5,14 @@ import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { ChangeRecord, PlmModel, Revision } from '@core/model/plm';
 import { closeForCutIn } from '../effectivity';
-import { mergedApprovals, plannedEffectivity, releaseFindings, unverifiedInScope } from '../readiness';
+import { plannedEffectivity, releaseFindings, unverifiedInScope } from '../readiness';
 import { type PlmCode, refusePlm } from '../refusal';
 import { revisionLabel } from '../schemes';
-import { NOT_MANAGED, currentRevisionOf, humanGateRefusal, revisionText, scopeOf, stateChange } from '../state';
+import { NOT_MANAGED, currentRevisionOf, revisionText, scopeOf, stateChange } from '../state';
+import { humanAct } from '../gate';
 import { isLegalTransition, transitionRefusal } from '../transitions';
 import { openRevision, withPlm, withRevision } from '../revisions';
-import { approvalSchema, atSchema, bySchema, effectivitySchema } from '../params';
+import { atSchema, bySchema, confirmationSchema, effectivitySchema } from '../params';
 
 const ecnOf = (id: string): string => (id.startsWith('ECO-') ? `ECN-${id.slice(4)}` : `ECN-${id}`);
 
@@ -25,31 +26,27 @@ const ecnOf = (id: string): string => (id.startsWith('ECO-') ? `ECN-${id.slice(4
 export const releaseItem = defineCommand({
   name: 'release_item',
   description:
-    'HUMAN GATE. Release the in_review revision: freezes its content (SHA-256 of the canonical definition + an inline snapshot), records approvals, change ' +
+    'HUMAN GATE. Release the in_review revision: freezes its content (SHA-256 of the canonical definition + an inline snapshot), uses the approvals recorded with record_approval, change ' +
     'order and effectivity, supersedes the previously released revision (its open effectivity closes the day / serial before this one starts) and ' +
     'implements the ECO. Needs submit_for_review first, the policy roles approved (checker different from the author), an open ECO listing the item ' +
     '(after the first release) and, by default, a human approval signature (record_signature). check_release_readiness lists every blocker without ' +
-    'changing anything. An agent caller gets PLM_HUMAN_GATE: prepare with check_release_readiness and hand over to the humans.',
+    'changing anything. Needs `confirmation`, a trusted human signature over this exact act (plm_act_payload): an agent gets PLM_HUMAN_GATE; prepare with check_release_readiness and hand over to the humans.',
   annotations: { destructive: true, metaHistory: true },
   params: z.object({
     changeOrder: z.string().optional().describe('The open ECO that authorizes this release (lists this item).'),
     effectivity: z.array(effectivitySchema).optional().describe("Effectivity of this revision; default: the ECO's planned effectivity."),
-    approvals: z
-      .array(approvalSchema)
-      .optional()
-      .describe('Approvals given with the release, on top of those already recorded (record_approval).'),
     at: atSchema.optional(),
-    by: bySchema.optional(),
+    by: bySchema.optional().describe('Ignored: the release is recorded under the signer of the confirmation.'),
+    confirmation: confirmationSchema,
   }),
   run: (doc, params, ctx): CommandResult => {
     const plm = doc.plm;
     if (plm === undefined) return refusePlm(doc, 'release_item', 'PLM_NOT_MANAGED', NOT_MANAGED);
-    const gate = humanGateRefusal(doc, 'release_item', ctx, [plm.item.partNumber, plm.item.currentRevision]);
-    if (gate !== null) return gate;
+    const gate = humanAct(doc, 'release_item', params, ctx);
+    if ('refusal' in gate) return gate.refusal;
     const inputs = {
       ...(params.changeOrder !== undefined ? { changeOrder: params.changeOrder } : {}),
       ...(params.effectivity !== undefined ? { effectivity: params.effectivity } : {}),
-      ...(params.approvals !== undefined ? { approvals: params.approvals } : {}),
     };
     const failure = releaseFindings(doc, plm, inputs).find((finding) => finding.severity === 'fail');
     if (failure !== undefined) return refusePlm(doc, 'release_item', failure.code as PlmCode, failure.message, failure.ids);
@@ -65,11 +62,11 @@ export const releaseItem = defineCommand({
     const cut = closeForCutIn(priors, effectivity);
     const closed = 'closed' in cut ? cut.closed : {};
     const scope = scopeOf(doc, ctx);
-    const { at, by } = params;
+    const { at } = params;
+    const by = gate.signer;
     const released: Revision = {
       ...revision,
       state: 'released',
-      approvals: mergedApprovals(revision, params.approvals),
       effectivity,
       releasedEffectivity: effectivity,
       releasedMarking: plm.item.marking,
@@ -203,7 +200,7 @@ export const setLifecycleState = defineCommand({
   description:
     'Retire a revision: released or superseded -> obsolete, in_work -> cancelled (an in_review revision needs reject_review first). A reason is ' +
     'mandatory; obsoleting a released revision also needs an open change order (policy.requireChangeOrder). The content hash and snapshot stay; ' +
-    'obsolete and cancelled revisions no longer resolve by effectivity. Not reversible (terminal states).',
+    'obsolete and cancelled revisions no longer resolve by effectivity. Not reversible (terminal states). Obsoleting is a human act (`confirmation`).',
   annotations: { destructive: true, metaHistory: true },
   params: z.object({
     revision: z.string().describe('Revision label, e.g. "B".'),
@@ -212,8 +209,10 @@ export const setLifecycleState = defineCommand({
     changeOrder: z.string().optional().describe('Open ECO authorizing the obsolescence.'),
     at: atSchema.optional(),
     by: bySchema.optional(),
+    confirmation: confirmationSchema,
   }),
-  run: (doc, { revision: label, state, reason, changeOrder, at, by }): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
+    const { revision: label, state, reason, changeOrder, at } = params;
     const plm = doc.plm;
     if (plm === undefined) return refusePlm(doc, 'set_lifecycle_state', 'PLM_NOT_MANAGED', NOT_MANAGED);
     const revision = plm.item.revisions[label];
@@ -229,6 +228,9 @@ export const setLifecycleState = defineCommand({
       );
     if (reason.trim() === '')
       return refusePlm(doc, 'set_lifecycle_state', 'PLM_PARAM_INVALID', 'a lifecycle change needs a reason', [], ['reason']);
+    const gate = state === 'obsolete' ? humanAct(doc, 'set_lifecycle_state', params, ctx) : null;
+    if (gate !== null && 'refusal' in gate) return gate.refusal;
+    const by = gate !== null && 'signer' in gate ? gate.signer : params.by;
     if (revision.state === 'released' && plm.policy.requireChangeOrder) {
       const eco = changeOrder === undefined ? undefined : plm.changes[changeOrder];
       if (eco === undefined || eco.state !== 'open')

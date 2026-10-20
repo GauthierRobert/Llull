@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { canonicalJson } from '@lib/canonicalJson';
+import { jcsJson } from '@lib/jcs';
 import { sha256Hex } from '@lib/sha256';
 import { execute } from '@core/commands/registry';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
@@ -25,19 +26,26 @@ describe('sha256Hex (VC-PLM-16)', () => {
   });
 });
 
-describe('canonicalJson (RFC 8785 profile)', () => {
+describe('jcsJson (strict RFC 8785)', () => {
   it.each(vectors.canonicalization_cases)('$name', ({ input, canonical }) => {
-    expect(canonicalJson(input)).toBe(canonical);
+    expect(jcsJson(input)).toBe(canonical);
   });
   it('sorts integer-like keys by code units, not numerically', () => {
-    expect(canonicalJson({ '10': 1, '9': 2, a: 3 })).toBe('{"10":1,"9":2,"a":3}');
+    expect(jcsJson({ '10': 1, '9': 2, a: 3 })).toBe('{"10":1,"9":2,"a":3}');
   });
   it('omits undefined and functions, nulls array holes, writes -0 as 0 and honours toJSON', () => {
-    expect(canonicalJson({ a: undefined, b: () => 1, c: -0, d: [undefined, 2], e: new Date(0), f: 5n })).toBe(
+    expect(jcsJson({ a: undefined, b: () => 1, c: -0, d: [undefined, 2], e: new Date(0), f: 5n })).toBe(
       '{"c":0,"d":[null,2],"e":"1970-01-01T00:00:00.000Z","f":"5"}',
     );
-    expect(canonicalJson(undefined)).toBe('null');
-    expect(canonicalJson(Number.NaN)).toBe('null');
+    expect(jcsJson(undefined)).toBe('null');
+    expect(jcsJson(Number.NaN)).toBe('null');
+  });
+});
+
+describe('canonicalJson keeps the legacy key order of every stored hash (FEA artifacts, inputsHash, library hashes)', () => {
+  it('orders integer-like keys numerically, as it always did, so no stored hash changes', () => {
+    expect(canonicalJson({ '10': 1, '9': 2, a: 3 })).toBe('{"9":2,"10":1,"a":3}');
+    expect(jcsJson({ '10': 1, '9': 2, a: 3 })).not.toBe(canonicalJson({ '10': 1, '9': 2, a: 3 }));
   });
 });
 

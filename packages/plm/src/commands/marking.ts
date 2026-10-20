@@ -5,9 +5,10 @@ import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { ExportMarking } from '@core/model/plm';
 import { refusePlm } from '../refusal';
-import { NOT_MANAGED, humanGateRefusal } from '../state';
+import { NOT_MANAGED } from '../state';
+import { humanAct } from '../gate';
 import { withPlm } from '../revisions';
-import { atSchema } from '../params';
+import { atSchema, confirmationSchema } from '../params';
 
 const CONTROLLED = new Set(['ITAR', 'EAR', 'EU-dual-use', 'national', 'other']);
 
@@ -36,14 +37,17 @@ export const setItemMarking = defineCommand({
       .string()
       .optional()
       .describe('Notice printed on every sheet and in the release manifest. Required for a controlled regime.'),
-    decidedBy: z.string().min(1).describe('User id of the officer who decided.'),
+    decidedBy: z.string().min(1).optional().describe('Ignored: the decision is recorded under the signer of the confirmation (the trusted key record), never a name given here.'),
+    confirmation: confirmationSchema,
     at: atSchema.optional(),
   }),
-  run: (doc, { regime, classification, statement, decidedBy, at }, ctx): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
+    const { regime, classification, statement, at } = params;
     const plm = doc.plm;
     if (plm === undefined) return refusePlm(doc, 'set_item_marking', 'PLM_NOT_MANAGED', NOT_MANAGED);
-    const gate = humanGateRefusal(doc, 'set_item_marking', ctx, [plm.item.partNumber]);
-    if (gate !== null) return gate;
+    const gate = humanAct(doc, 'set_item_marking', params, ctx);
+    if ('refusal' in gate) return gate.refusal;
+    const decidedBy = gate.signer;
     if (CONTROLLED.has(regime) && (statement === undefined || statement.trim() === ''))
       return refusePlm(
         doc,

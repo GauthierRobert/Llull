@@ -11,7 +11,7 @@ import { execute } from '@core/commands/registry';
 import type { HumanSignaturePort } from '@core/model/analysis';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import type { SignatureRecord } from '@core/model/plm';
-import { canonicalJson } from '@lib/canonicalJson';
+import { jcsJson } from '@lib/jcs';
 import { isRecord } from '@lib/isRecord';
 
 interface PackageMember {
@@ -103,7 +103,7 @@ export function buildReleasePackage(doc: CadDocument, label: string, toolVersion
   const bodyTool = isRecord(body['tool']) ? body['tool'] : {};
   const unsealed: Manifest = { ...body, tool: { ...bodyTool, version: toolVersion }, members, documentContentHash: revision.contentHash };
   const signatures = revision.signatures.filter((signature) => signature.target.kind === 'release' && signature.target.ref === label);
-  const manifest: Manifest = { ...unsealed, manifestSha256: sha256(canonicalJson(unsealed)), signatures };
+  const manifest: Manifest = { ...unsealed, manifestSha256: sha256(jcsJson(unsealed)), signatures };
   return { manifest, files, notes };
 }
 
@@ -181,9 +181,9 @@ export function verifyReleasePackage(
       message: 'documentContentHash is not the hash of the canonical definition member',
     });
   const { manifestSha256, signatures, ...unsealed } = manifest;
-  if (sha256(canonicalJson(unsealed)) !== manifestSha256)
+  if (sha256(jcsJson(unsealed)) !== manifestSha256)
     findings.push({ code: 'PLM_PACKAGE_MANIFEST_MISMATCH', message: 'manifestSha256 does not match the manifest content' });
-  const signedBody = canonicalJson(signedBodyOf(manifest));
+  const signedBody = jcsJson(signedBodyOf(manifest));
   for (const signature of Array.isArray(signatures) ? (signatures as SignatureRecord[]) : []) {
     if (port?.verifyEd25519 === undefined) {
       findings.push({ code: 'PLM_SIGNATURE_UNVERIFIED', message: `signature by ${signature.signer.userId} not verified: no verifier` });

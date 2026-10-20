@@ -7,7 +7,7 @@ import { setItemMarking } from './commands/marking';
 import { releaseItem, reviseItem, setLifecycleState } from './commands/release';
 import { checkpointIteration, recordApproval, rejectReview, submitForReview } from './commands/review';
 import { attachReleasePackage, recordSignature } from './commands/signature';
-import { checkReleaseReadiness, plmStatus, releaseManifestQuery, resolveEffectivity, viewRevision } from './commands/status';
+import { checkReleaseReadiness, plmActPayload, plmStatus, releaseManifestQuery, resolveEffectivity, viewRevision } from './commands/status';
 import { plmDiff, restoreRevisionSnapshot, verifyRelease } from './commands/verify';
 
 export const plmCommands = commandCatalog(
@@ -28,6 +28,7 @@ export const plmCommands = commandCatalog(
   recordSignature,
   attachReleasePackage,
   plmStatus,
+  plmActPayload,
   checkReleaseReadiness,
   resolveEffectivity,
   releaseManifestQuery,

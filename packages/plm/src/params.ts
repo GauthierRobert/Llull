@@ -29,14 +29,12 @@ export const effectivitySchema = z
 
 export const dispositionSchema = z.enum(['use-as-is', 'rework', 'scrap', 'return-to-supplier', 'no-action']);
 
-export const approvalSchema = z
-  .object({
-    role: z
-      .string()
-      .min(1)
-      .describe("Approval role, e.g. 'design-authority' or 'checker' (see policy.requiredApprovalRoles in plm_status)."),
-    userId: z.string().min(1).describe('The approving user id.'),
-    at: atSchema.optional(),
-    comment: z.string().optional().describe('Optional remark.'),
-  })
-  .describe('One approval by a role.');
+/** The human proof of a human-only act (see `humanAct`): never stored, never part of the signed payload itself. */
+export const confirmationSchema = z
+  .record(z.string(), z.unknown())
+  .optional()
+  .describe(
+    'HUMAN SIGNATURE, required: { alg: "Ed25519", keyId, publicKey, signature, nonce } made by a human with a TRUSTED signing key over this exact act ' +
+      '(get the bytes with plm_act_payload, sign them in the desktop app or `llull exec ... --confirm-key KEYID`). An agent has no trusted key: it ' +
+      'prepares the act and hands over (PLM_HUMAN_GATE).',
+  );

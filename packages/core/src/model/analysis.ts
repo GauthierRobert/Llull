@@ -602,4 +602,6 @@ export interface HumanSignaturePort {
   verifyEd25519?(publicKeyHex: string, message: string, signatureHex: string): boolean;
   /** Trust of a public key (64 hex chars); absent = every key is treated as untrusted. */
   keyTrust?(publicKeyHex: string): KeyTrust;
+  /** The enrolled record of a trusted public key (the signer identity is always taken from here, never from request params). */
+  signerOf?(publicKeyHex: string): { readonly keyId: string; readonly userId: string; readonly name: string } | null;
 }

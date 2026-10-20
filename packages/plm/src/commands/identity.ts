@@ -7,9 +7,10 @@ import type { PlmPolicy } from '@core/model/plm';
 import { PART_NUMBER } from '../document';
 import { refusePlm } from '../refusal';
 import { DEFAULT_SCHEME, isKnownScheme, isValidCustomList, revisionLabel } from '../schemes';
-import { DEFAULT_POLICY, NOT_MANAGED, humanGateRefusal, scopeHash } from '../state';
+import { DEFAULT_POLICY, NOT_MANAGED, scopeHash } from '../state';
+import { humanAct } from '../gate';
 import { openRevision, withPlm } from '../revisions';
-import { atSchema, bySchema } from '../params';
+import { atSchema, bySchema, confirmationSchema } from '../params';
 
 const policySchema = z
   .object({
@@ -72,6 +73,7 @@ export const setItemIdentity = defineCommand({
       ),
     customLabels: z.array(z.string()).optional().describe("Ordered revision labels of a 'custom:<name>' scheme, e.g. ['X1','X2']."),
     policy: policySchema.optional(),
+    confirmation: confirmationSchema,
     at: atSchema.optional(),
     by: bySchema.optional(),
   }),
@@ -110,8 +112,8 @@ export const setItemIdentity = defineCommand({
         [existing.item.partNumber],
       );
     if (policy !== undefined) {
-      const gate = humanGateRefusal(doc, 'set_item_identity', ctx, [partNumber]);
-      if (gate !== null) return gate;
+      const gate = humanAct(doc, 'set_item_identity', params, ctx);
+      if ('refusal' in gate) return gate.refusal;
     }
     const label = revisionLabel(scheme, 1, labels);
     if (label === null)

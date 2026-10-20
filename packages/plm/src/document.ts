@@ -4,6 +4,7 @@ import type { DocumentExtension } from '@core/plugins/plugin';
 import { isRecord } from '@lib/isRecord';
 import { integrityWarnings } from './integrity';
 import { LIFECYCLE_STATES, isLegalTransition } from './transitions';
+import { REVISION_LABEL } from './schemes';
 
 export const PART_NUMBER = /^[A-Z0-9][A-Z0-9._\-/]{0,63}$/i;
 
@@ -12,7 +13,7 @@ const isText = (value: unknown): value is string => typeof value === 'string' &&
 function revisionErrors(at: string, raw: unknown): string[] {
   if (!isRecord(raw)) return [`${at} must be an object`];
   const errors: string[] = [];
-  if (!isText(raw['label'])) errors.push(`${at}.label must be a non-empty string`);
+  if (typeof raw['label'] !== 'string' || !REVISION_LABEL.test(raw['label'])) errors.push(`${at}.label must be 1-16 characters of A-Z, 0-9 and -`);
   if (!LIFECYCLE_STATES.includes(raw['state'] as never)) errors.push(`${at}.state is not a lifecycle state`);
   for (const key of ['iterations', 'effectivity', 'approvals', 'signatures', 'stateHistory'])
     if (!Array.isArray(raw[key])) errors.push(`${at}.${key} must be a list`);
@@ -57,7 +58,10 @@ function itemErrors(raw: unknown): string[] {
     errors.push('plm.item.revisionOrder must list every revision label once');
   if (typeof raw['currentRevision'] !== 'string' || !Object.hasOwn(revisions, raw['currentRevision']))
     errors.push('plm.item.currentRevision is not a revision');
-  for (const [label, revision] of Object.entries(revisions)) errors.push(...revisionErrors(`plm.item.revisions.${label}`, revision));
+  for (const [label, revision] of Object.entries(revisions)) {
+    if (!REVISION_LABEL.test(label)) errors.push(`plm.item.revisions key '${label}' must be 1-16 characters of A-Z, 0-9 and -`);
+    errors.push(...revisionErrors(`plm.item.revisions.${label}`, revision));
+  }
   if (!isRecord(raw['marking']) || !isText(raw['marking']['regime'])) errors.push('plm.item.marking.regime must be a string');
   return errors;
 }

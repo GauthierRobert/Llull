@@ -6,9 +6,10 @@ import { changed } from '@core/commands/noop';
 import type { SignatureRecord } from '@core/model/plm';
 import { manifestFor } from '../manifest';
 import { refusePlm } from '../refusal';
-import { NOT_MANAGED, humanGateRefusal, revisionText } from '../state';
+import { NOT_MANAGED, revisionText } from '../state';
+import { humanAct } from '../gate';
 import { withRevision } from '../revisions';
-import { atSchema } from '../params';
+import { atSchema, confirmationSchema } from '../params';
 
 const HEX_KEY = /^[0-9a-f]{64}$/;
 const HEX_SIGNATURE = /^[0-9a-f]{128}$/;
@@ -38,22 +39,18 @@ export const recordSignature = defineCommand({
       })
       .describe('What was signed.'),
     alg: z.literal('Ed25519').describe("Signature algorithm: only 'Ed25519'."),
-    keyId: z.string().min(1).describe('Id of the signer key in the vault key registry.'),
+    keyId: z.string().min(1).describe('Ignored: the key id and signer are taken from the trusted key record of `publicKey`.'),
     publicKey: z.string().describe('Ed25519 public key, 64 lowercase hex characters.'),
     signature: z.string().describe('Ed25519 signature, 128 lowercase hex characters, over the UTF-8 canonical manifest bytes.'),
     meaning: z.enum(['authorship', 'review', 'approval', 'release']).describe('What the signer attests.'),
     signer: z
       .object({ userId: z.string().min(1).describe('Signer user id.'), name: z.string().min(1).describe('Signer display name.') })
-      .describe('Who signed.'),
+      .describe('Ignored: the signer is taken from the trusted key record, never from a request.'),
     at: atSchema.describe('When it was signed (ISO-8601 UTC).'),
   }),
   run: (doc, params, ctx): CommandResult => {
     const plm = doc.plm;
     if (plm === undefined) return refusePlm(doc, 'record_signature', 'PLM_NOT_MANAGED', NOT_MANAGED);
-    if (params.meaning === 'approval' || params.meaning === 'release') {
-      const gate = humanGateRefusal(doc, 'record_signature', ctx, [params.target.ref]);
-      if (gate !== null) return gate;
-    }
     const port = ctx?.humanSignature ?? null;
     if (port === null || port.verifyEd25519 === undefined)
       return refusePlm(
@@ -76,7 +73,7 @@ export const recordSignature = defineCommand({
         `${revisionText(plm, label)} is ${revision.state}; a release signature needs a released revision`,
         [label],
       );
-    const manifest = manifestFor(plm, params.target);
+    const manifest = manifestFor(plm, params.target, params.meaning);
     if (manifest === null)
       return refusePlm(doc, 'record_signature', 'PLM_REVISION_UNKNOWN', `no manifest for ${params.target.kind} '${params.target.ref}'`, [
         params.target.ref,
@@ -94,7 +91,8 @@ export const recordSignature = defineCommand({
         [params.target.ref],
         ['signature'],
       );
-    if (port.keyTrust?.(params.publicKey) !== 'trusted')
+    const known = port.keyTrust?.(params.publicKey) === 'trusted' ? (port.signerOf?.(params.publicKey) ?? null) : null;
+    if (known === null)
       return refusePlm(
         doc,
         'record_signature',
@@ -105,10 +103,10 @@ export const recordSignature = defineCommand({
       );
     const record: SignatureRecord = {
       alg: 'Ed25519',
-      keyId: params.keyId,
+      keyId: known.keyId,
       publicKey: params.publicKey,
       meaning: params.meaning,
-      signer: params.signer,
+      signer: { userId: known.userId, name: known.name },
       signedAt: params.at,
       target: params.target,
       signedSha256: manifest.sha256,
@@ -132,7 +130,7 @@ export const attachReleasePackage = defineCommand({
   name: 'attach_release_package',
   description:
     'HUMAN GATE. Record that the host wrote the signed release package of a released revision: its manifest SHA-256 and the documentContentHash it ' +
-    'states (must equal the revision content hash). Called by the desktop / `llull release pack` after writing the package; an agent caller gets PLM_HUMAN_GATE.',
+    'states (must equal the revision content hash). Called by the desktop / `llull release pack` after writing the package; needs `confirmation` (a trusted human signature): an agent gets PLM_HUMAN_GATE.',
   annotations: { metaHistory: true },
   params: z.object({
     revision: z.string().describe('Released revision label.'),
@@ -142,12 +140,14 @@ export const attachReleasePackage = defineCommand({
       .describe('SHA-256 (64 hex) of the canonical package manifest.'),
     documentContentHash: z.string().describe("The package manifest's documentContentHash; must equal the revision's content hash."),
     location: z.string().optional().describe('Where the package was written (informational).'),
+    confirmation: confirmationSchema,
   }),
-  run: (doc, { revision: label, manifestSha256, documentContentHash, location }, ctx): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
+    const { revision: label, manifestSha256, documentContentHash, location } = params;
     const plm = doc.plm;
     if (plm === undefined) return refusePlm(doc, 'attach_release_package', 'PLM_NOT_MANAGED', NOT_MANAGED);
-    const gate = humanGateRefusal(doc, 'attach_release_package', ctx, [label]);
-    if (gate !== null) return gate;
+    const gate = humanAct(doc, 'attach_release_package', params, ctx);
+    if ('refusal' in gate) return gate.refusal;
     const revision = plm.item.revisions[label];
     if (revision === undefined)
       return refusePlm(doc, 'attach_release_package', 'PLM_REVISION_UNKNOWN', `${plm.item.partNumber} has no revision '${label}'`, [label]);
