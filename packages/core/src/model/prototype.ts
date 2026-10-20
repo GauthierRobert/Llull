@@ -98,3 +98,15 @@ export interface PrototypeModel {
 export function createPrototypeModel(): PrototypeModel {
   return { intents: {}, grounded: [] };
 }
+
+/**
+ * The prototype slice a check reads (intents, grounding, references) without the reviewer dispositions: every check hashes this, so recording
+ * a disposition never changes a check's inputsHash (and never makes the dispositions stale by itself).
+ */
+export function checkedPrototype(prototype: PrototypeModel | undefined): PrototypeModel | undefined {
+  if (prototype?.dispositions === undefined) return prototype;
+  // a copy without the field (rest-spread would leave an unused binding, which the lint config rejects)
+  const checked: PrototypeModel = { ...prototype };
+  delete checked.dispositions;
+  return checked;
+}

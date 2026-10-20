@@ -9,6 +9,7 @@ import type { Disposition } from '../../model/prototype';
 import type { Accuracy } from '../../dynamics/accuracy';
 import { hashText } from '../../lib/hash';
 import { canonicalJson } from '../../lib/canonicalJson';
+import { isRecord } from '../../lib/isRecord';
 
 export type PrototypeCheckName = 'assembly' | 'mechanism' | 'motion_clearance' | 'dynamics';
 
@@ -33,6 +34,9 @@ export interface PrototypeCheck {
   readonly unverified: boolean;
   readonly reviewRequired: true;
 }
+
+export const isCheck = (data: unknown): data is PrototypeCheck =>
+  isRecord(data) && typeof data['check'] === 'string' && Array.isArray(data['items']) && typeof data['inputsHash'] === 'string';
 
 /** A check that did not run, with the reason as its one not_run item (an empty check is never a pass). */
 export function skippedCheck(check: PrototypeCheckName, code: string, reason: string, remediation: string): PrototypeCheck {
@@ -120,10 +124,11 @@ const LABEL: Readonly<Record<PrototypeCheckName, string>> = {
 };
 
 /** Largest stated relative band among the physics outputs, and whether any value is calibrated or has no band ("± ?"). */
-function trustOf(checks: readonly PrototypeCheck[]): { largest: number | null; calibrated: boolean; unknown: boolean } {
+function trustOf(checks: readonly PrototypeCheck[]): { count: number; largest: number | null; calibrated: boolean; unknown: boolean } {
   const all = checks.flatMap((check) => check.items.flatMap((item) => Object.values(item.accuracy ?? {})));
   const rels = all.flatMap((entry) => (entry.band !== null && 'rel' in entry.band ? [entry.band.rel] : []));
   return {
+    count: all.length,
     largest: rels.length === 0 ? null : Math.max(...rels),
     calibrated: all.some((entry) => entry.origin === 'calibrated'),
     unknown: all.some((entry) => entry.band === null),
@@ -144,7 +149,8 @@ export function ownerSummary(checks: readonly PrototypeCheck[], facts: SummaryFa
   const fails = items.filter((item) => item.status === 'fail');
   const accepted = fails.filter((item) => item.disposition?.status === 'accepted').length;
   const warns = items.filter((item) => item.status === 'warn').length;
-  const passed = checks.filter((check) => check.status === 'pass' || check.status === 'info').map((check) => LABEL[check.check]);
+  // info (a touch, a calibration point) is never read as a pass
+  const passed = checks.filter((check) => check.status === 'pass').map((check) => LABEL[check.check]);
   const notRun = checks.filter((check) => check.status === 'not_run').map((check) => LABEL[check.check]);
   const done =
     `Checked ${facts.parts} part(s)` +
@@ -161,11 +167,12 @@ export function ownerSummary(checks: readonly PrototypeCheck[], facts: SummaryFa
       : `Needs a human: ${fails.length} fail(s)${accepted > 0 ? ` (${accepted} accepted, still fails)` : ''}, ${warns} warning(s)` +
         `${facts.stale > 0 ? `, ${facts.stale} stale disposition(s)` : ''}${notRun.length > 0 ? `; not run: ${notRun.join(', ')}` : ''}.`;
   const trust = trustOf(checks);
-  const trustText =
-    trust.largest === null && !trust.unknown
-      ? 'No physics number carries an accuracy statement here.'
-      : `Trust: ${trust.calibrated ? 'some values are calibrated (matched by construction, not validation evidence); ' : ''}` +
-        `${trust.largest === null ? '' : `largest stated band ± ${Number((trust.largest * 100).toPrecision(3))} %`}` +
-        `${trust.unknown ? `${trust.largest === null ? '' : '; '}some values have no stated band (± ?)` : ''}.`;
+  const trustParts = [
+    ...(trust.calibrated ? ['some values are calibrated (matched by construction, not validation evidence)'] : []),
+    ...(trust.largest === null ? [] : [`largest stated band ± ${Number((trust.largest * 100).toPrecision(3))} %`]),
+    ...(trust.unknown ? ['some values have no stated band (± ?)'] : []),
+    ...(trust.largest === null && !trust.unknown ? ['bands stated in absolute units only (see the items)'] : []),
+  ];
+  const trustText = trust.count === 0 ? 'No physics number carries an accuracy statement here.' : `Trust: ${trustParts.join('; ')}.`;
   return `${verdict === 'ready_for_review' ? 'Ready for review.' : 'Blocked.'} ${done} ${pass} ${human} ${trustText} Computed by llull, not approved — needs a qualified engineer.`;
 }

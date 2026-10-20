@@ -9,7 +9,7 @@ const sources = import.meta.glob<string>(['/tests/unit/**/*.test.ts', '/tests/go
 
 // A shared (isolate: false) module graph must not see module mocks, stubbed globals, DOM state or test-only commands.
 const NEEDS_ISOLATION =
-  /\bvi\.(mock|doMock|stubGlobal|stubEnv|resetModules)\(|\blocalStorage\b|\bwindow\.(location|history|addEventListener)|\bregisterCommands\(|\binstallPlugin\(/;
+  /\bvi\.(mock|doMock|stubGlobal|stubEnv|resetModules)\(|\blocalStorage\b|\bwindow\.(location|history|addEventListener)|\bregisterCommands\(|\binstallPlugin\(|\bset(?:EngineLoss|Realism)Law\(/;
 
 describe('isolated test suites', () => {
   it('lists every unit suite that mocks modules, stubs globals, uses the DOM or registers test commands', () => {

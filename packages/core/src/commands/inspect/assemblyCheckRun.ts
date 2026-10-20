@@ -10,6 +10,7 @@ import { MM_PER_UNIT } from '../../model/units';
 import { type CheckItem, type CheckResult, type CheckThreshold, worstStatus } from '../../model/checkResult';
 import { PROCESS_RULES, type ProcessId } from '../../model/processRules';
 import { GROUND } from '../../model/dynamics';
+import { checkedPrototype } from '../../model/prototype';
 import { hashText } from '../../lib/hash';
 import { canonicalJson } from '../../lib/canonicalJson';
 import { roundDeep } from '../../lib/significant';
@@ -296,7 +297,7 @@ export function runAssemblyCheck(
       subjects: subjectIds,
       dynamics: doc.dynamics ?? null,
       joints: doc.joints,
-      prototype: doc.prototype ?? null,
+      prototype: checkedPrototype(doc.prototype) ?? null,
       params: provenanceParams,
       units: doc.units,
       kernel: kernel.name ?? null,

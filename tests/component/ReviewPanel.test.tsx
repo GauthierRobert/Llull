@@ -13,6 +13,9 @@ import { hardOverlap, reviewFixture, reviewWith, thinWall, withAccepted } from '
 import { resetStore } from '../helpers/componentEntities';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
+/** A full check_prototype run in the page (physics load included) can take long under a loaded full suite. */
+const RUN_TIMEOUT = 60_000;
+
 function show(review = reviewFixture): void {
   const { document } = useStore.getState();
   act(() => useReviewStore.getState().setResult(review, { entities: document.entities, dynamics: document.dynamics }));
@@ -35,28 +38,38 @@ beforeEach(() => {
 });
 
 describe('ReviewPanel running check_prototype', () => {
-  it('runs the whole review (check_prototype) read-only, without a partial-coverage note', async () => {
-    const dispatch = vi.spyOn(useStore.getState(), 'dispatch');
-    render(<ReviewPanel />);
-    expect(screen.queryByTestId('review-unavailable')).toBeNull();
-    expect(screen.queryByTestId('review-assembly-only')).toBeNull();
-    expect(screen.getByTestId('review-run')).toBeEnabled();
-    fireEvent.click(screen.getByTestId('review-run'));
-    await waitFor(() => expect(useReviewStore.getState().busy).toBe(false));
-    expect(dispatch).not.toHaveBeenCalled();
-  });
+  it(
+    'runs the whole review (check_prototype) read-only, without a partial-coverage note',
+    async () => {
+      const dispatch = vi.spyOn(useStore.getState(), 'dispatch');
+      render(<ReviewPanel />);
+      expect(screen.queryByTestId('review-unavailable')).toBeNull();
+      expect(screen.queryByTestId('review-assembly-only')).toBeNull();
+      expect(screen.getByTestId('review-run')).toBeEnabled();
+      fireEvent.click(screen.getByTestId('review-run'));
+      expect(useReviewStore.getState().busy).toBe(true);
+      // the run loads the physics engine and checks the model: wait for its end, however slow the machine is
+      await waitFor(() => expect(useReviewStore.getState().busy).toBe(false), { timeout: RUN_TIMEOUT });
+      expect(dispatch).not.toHaveBeenCalled();
+    },
+    2 * RUN_TIMEOUT,
+  );
 
-  it('two overlapping boxes come back as a failing interference finding', async () => {
-    setGeometryKernel(await createManifoldKernel());
-    localDispatch('add_box', { size: [10, 10, 10], position: [0, 0, 5] });
-    localDispatch('add_box', { size: [10, 10, 10], position: [5, 0, 5] });
-    render(<ReviewPanel />);
-    fireEvent.click(screen.getByTestId('review-run'));
-    await waitFor(() => expect(useReviewStore.getState().result).not.toBeNull());
-    const assembly = useReviewStore.getState().result?.checks[0];
-    expect(assembly?.check).toBe('assembly');
-    expect(assembly?.items.some((item) => item.code === 'FPR_PAIR_HARD' && item.status === 'fail')).toBe(true);
-  });
+  it(
+    'two overlapping boxes come back as a failing interference finding',
+    async () => {
+      setGeometryKernel(await createManifoldKernel());
+      localDispatch('add_box', { size: [10, 10, 10], position: [0, 0, 5] });
+      localDispatch('add_box', { size: [10, 10, 10], position: [5, 0, 5] });
+      render(<ReviewPanel />);
+      fireEvent.click(screen.getByTestId('review-run'));
+      await waitFor(() => expect(useReviewStore.getState().busy).toBe(false), { timeout: RUN_TIMEOUT });
+      const assembly = useReviewStore.getState().result?.checks.find((check) => check.check === 'assembly');
+      expect(assembly?.items.some((item) => item.code === 'FPR_PAIR_HARD' && item.status === 'fail')).toBe(true);
+      expect(await screen.findByTestId('review-verdict')).toHaveTextContent(/blocked/);
+    },
+    2 * RUN_TIMEOUT,
+  );
 });
 
 describe('readiness checklist', () => {

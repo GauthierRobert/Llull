@@ -2,7 +2,7 @@
 // as set_review_disposition (with the check's inputsHash). Below: the mechanism graph, the motion timeline and the reference overlay.
 // No sign-off in the MVP (spec 11 Q5).
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { getCommand } from '@core/commands/registry';
 import { classNames } from '@ui/classNames';
 import { KpiStrip, PanelEmpty, PanelHeader, PanelSection, StatusLine } from '@ui/panels/PanelParts';
@@ -11,6 +11,7 @@ import { useStore } from '@ui/store';
 import { ReadinessChecklist } from './ReadinessChecklist';
 import { FindingsList, type DispositionChange } from './FindingsList';
 import { ExplainDrawer } from './ExplainDrawer';
+import { joinDispositions } from './joinDispositions';
 import { MechanismGraph } from './MechanismGraph';
 import { ReviewTimeline } from './ReviewTimeline';
 import { ReferenceChart } from './ReferenceChart';
@@ -74,7 +75,13 @@ function VerdictLine({ verdict }: { verdict: string }): React.ReactElement {
 }
 
 export function ReviewPanel({ className }: { className?: string }): React.ReactElement {
-  const result = useReviewStore((s) => s.result);
+  const stored = useReviewStore((s) => s.result);
+  const dispositions = useStore((s) => s.document.prototype?.dispositions);
+  // dispositions are joined here over the stored result: an edit shows at once, the checks re-run only on request
+  const result = useMemo(
+    () => (stored === null || dispositions === undefined ? stored : joinDispositions(stored, dispositions)),
+    [stored, dispositions],
+  );
   const source = useReviewStore((s) => s.source);
   const busy = useReviewStore((s) => s.busy);
   const status = useReviewStore((s) => s.status);
@@ -91,7 +98,7 @@ export function ReviewPanel({ className }: { className?: string }): React.ReactE
 
   const onDisposition = (change: DispositionChange): void => {
     if (!canDispose) return;
-    dispatch(DISPOSITION_COMMAND, change, { onResult: ({ changed }) => changed && canCheck && run() });
+    dispatch(DISPOSITION_COMMAND, change);
   };
   const checks = result?.checks ?? [];
   const explained = explainKey === null ? undefined : findFinding(checks, explainKey);
