@@ -17,6 +17,9 @@ import { syntheticInput } from '../cae/dynamics/syntheticBasis';
 
 const FIXTURE = path.resolve(__dirname, '../../../solver/crates/llull-post/tests/fixtures/random_jobs.json');
 const WRITE = process.env['LLULL_WRITE_NATIVE_FIXTURES'] === '1';
+// The nodal rms fields sample V8 Math, so the fixture is pinned to the Node major CI generates it with (another V8 can differ in the last ulp).
+const FIXTURE_NODE_MAJOR = 22;
+const v8Pinned = it.skipIf(!WRITE && Number(process.versions.node.split('.')[0]) !== FIXTURE_NODE_MAJOR);
 
 function stripInput(): RandomFieldInput {
   const ready = readyRandomStrip();
@@ -36,7 +39,7 @@ function stripInput(): RandomFieldInput {
 }
 
 describe('llull-post random fixtures (VC-DYN-48 crate level)', () => {
-  it('writes the jobs and TypeScript nodal rms fields the Rust job must reproduce bit for bit', () => {
+  v8Pinned('writes the jobs and TypeScript nodal rms fields the Rust job must reproduce bit for bit', () => {
     const cases = [
       { name: 'eb_strip_vc_dyn_21', input: stripInput() },
       { name: 'synthetic_viscous', input: syntheticInput(48, 16, 20, false) },
