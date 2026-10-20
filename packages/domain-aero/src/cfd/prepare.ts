@@ -7,6 +7,7 @@ import { caseHashOf } from './caseDoc';
 import type { DefaultNote } from './caseParams';
 import { CFD_REMEDIATION } from './codes';
 import { blockageRatio, boxContains, MAX_BLOCKAGE, sizeDomain, type DomainSizing } from './domainSizing';
+import { MIN_CELLS_PER_LENGTH } from './caseValidate';
 import { collectBodies, leafBounds } from './flowSurface';
 import { scale3, add3 } from '@lib/vec3';
 import { CELLS_PER_REFERENCE_LENGTH, estimateCase, type Estimate } from './memoryEstimate';
@@ -73,11 +74,13 @@ function surfaceRows(stage: SurfaceStage): CheckRow[] {
         })
       : row('CFD_KERNEL_REQUIRED', 'pass', `bodies unioned by: ${built.method}`),
     closed
-      ? row('CFD_GEOMETRY_NOT_WATERTIGHT', 'pass', 'every edge is shared by exactly two triangles with opposite orientation', {
-          openEdges: 0,
-          nonManifoldEdges: 0,
-          misorientedEdges: 0,
-        })
+      ? row(
+          'CFD_GEOMETRY_NOT_WATERTIGHT',
+          'pass',
+          'every edge is shared by exactly two triangles with opposite orientation' +
+            (edges.openingEdges > 0 ? `, except ${edges.openingEdges} open edge(s) of bodies tagged inlet / outlet` : ''),
+          { openEdges: 0, nonManifoldEdges: 0, misorientedEdges: 0, openingEdges: edges.openingEdges },
+        )
       : row(
           'CFD_GEOMETRY_NOT_WATERTIGHT',
           'fail',
@@ -126,7 +129,7 @@ function attributor(doc: CadDocument, stage: SurfaceStage, cfdCase: CfdCase, mar
 }
 
 function voxelStats(stage: SurfaceStage, h: number): { voxel: VoxelReport | null; relativeError: number | null; bound: number | null } {
-  if (!stage.closed || !(stage.volumeM3 > 0)) return { voxel: null, relativeError: null, bound: null };
+  if (!stage.closed || stage.edges.openingEdges > 0 || !(stage.volumeM3 > 0)) return { voxel: null, relativeError: null, bound: null };
   const voxel = voxelise(stage.surface, stage.bounds.min, stage.bounds.max, h);
   if (voxel === null) return { voxel: null, relativeError: null, bound: null };
   return {
@@ -181,8 +184,10 @@ export function prepareCase(
         )
       : row(resolved.code, 'fail', resolved.message),
   ];
-  const { leaves, skipped2D } = collectBodies(doc, cfdCase);
+  const { leaves, skipped2D, missing } = collectBodies(doc, cfdCase);
   const warnings = skipped2D.length > 0 ? [`2D entities skipped: ${skipped2D.join(', ')}`] : [];
+  if (missing.length > 0)
+    checks.push(row('CFD_ENTITY_NOT_FOUND', 'fail', `entities no longer in the document: ${missing.join(', ')}`, { ids: missing }));
   if (leaves.length === 0) {
     checks.push(row('CFD_NO_GEOMETRY', 'fail', 'the case has no 3D solid after the exclusions'));
     return emptyReport(cfdCase, checks, flow, warnings);
@@ -236,7 +241,7 @@ export function prepareCase(
     checks.push(
       row('CFD_PARAM_INVALID', 'fail', 'domain.symmetryPlane xz is set but the body is not mirror-symmetric about y = 0 within 1e-4 L'),
     );
-  if (cfdCase.domain.rule === 'custom' && !boxContains(sizing.box, stage.bounds))
+  if (cfdCase.domain.rule === 'custom' && !boxContains(cfdCase.domain.box ?? sizing.box, stage.bounds))
     checks.push(
       row('CFD_PARAM_INVALID', 'fail', 'the custom domain box does not contain the body', { box: sizing.box, body: stage.bounds }),
     );
@@ -281,7 +286,7 @@ export function prepareCase(
     basis: sizing.basis,
     frame: { x: stage.frame.x, y: stage.frame.y, z: stage.frame.z },
   };
-  const status = checks.some((c) => c.status === 'fail') ? 'fail' : checks.some((c) => c.status === 'warn') ? 'warn' : 'pass';
+  const status = worstStatus(checks);
   return {
     caseId: cfdCase.id,
     status,
@@ -324,17 +329,32 @@ export function prepareCase(
   };
 }
 
+/** `not_run` is never a pass: it raises the status to warn, except the neutral memory row when no device was given. */
+export const isUnverified = (check: CheckRow): boolean => check.status === 'not_run' && check['neutral'] !== true;
+
+function worstStatus(checks: readonly CheckRow[]): 'pass' | 'warn' | 'fail' {
+  if (checks.some((c) => c.status === 'fail')) return 'fail';
+  return checks.some((c) => c.status === 'warn' || isUnverified(c)) ? 'warn' : 'pass';
+}
+
 function memoryRow(estimate: Estimate | null): CheckRow {
   if (estimate === null) return row('CFD_MEMORY_EXCEEDED', 'not_run', 'skipped: no solver (regime error)');
   const need = `${estimate.cells.toExponential(3)} cells, ${gigabytes(estimate.bytes)}`;
   if (estimate.fitsDevice === null)
-    return row('CFD_MEMORY_EXCEEDED', 'not_run', `${need}; no deviceMemoryBytes given to compare with`, { bytes: estimate.bytes });
-  return estimate.fitsDevice
-    ? row('CFD_MEMORY_EXCEEDED', 'pass', `${need} fit the device`, { bytes: estimate.bytes })
-    : row(
-        'CFD_MEMORY_EXCEEDED',
-        'fail',
-        `${need} exceed the device budget; the largest fitting resolution is ${estimate.largestFittingCellsPerReferenceLength} cells per reference length`,
-        { bytes: estimate.bytes, largestFittingCellsPerReferenceLength: estimate.largestFittingCellsPerReferenceLength },
-      );
+    return row('CFD_MEMORY_EXCEEDED', 'not_run', `${need}; no deviceMemoryBytes given to compare with`, {
+      bytes: estimate.bytes,
+      neutral: true,
+    });
+  if (estimate.fitsDevice) return row('CFD_MEMORY_EXCEEDED', 'pass', `${need} fit the device`, { bytes: estimate.bytes });
+  const largest = estimate.largestFittingCellsPerReferenceLength ?? 0;
+  const usable = largest >= MIN_CELLS_PER_LENGTH;
+  return row(
+    'CFD_MEMORY_EXCEEDED',
+    'fail',
+    `${need} exceed the device budget; ` +
+      (usable
+        ? `the largest fitting resolution is ${largest} cells per reference length`
+        : `it does not fit at any allowed resolution (minimum ${MIN_CELLS_PER_LENGTH} cells per reference length): use a larger device or a smaller domain`),
+    { bytes: estimate.bytes, largestFittingCellsPerReferenceLength: usable ? largest : null },
+  );
 }

@@ -4,6 +4,8 @@ import type { DocumentExtension } from '@core/plugins/plugin';
 import { isRecord } from '@lib/isRecord';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { isVec3 } from '@lib/vec3';
+import type { CfdCase } from '@core/model/cfd';
+import { semanticProblem } from './caseValidate';
 
 const REGIMES: readonly unknown[] = ['auto', 'low_speed', 'compressible'];
 const RULES: readonly unknown[] = ['external_aero', 'buildings', 'custom'];
@@ -51,10 +53,24 @@ function caseErrors(key: string, raw: unknown): string[] {
   need(raw['solver'] === undefined || SOLVERS.includes(raw['solver']), 'solver must be lbm or euler');
   const outputs = raw['outputs'];
   need(
-    isRecord(outputs) && isTextList(outputs['surfaceFields']) && Array.isArray(outputs['slices']) && Array.isArray(outputs['probes']),
-    'outputs needs surfaceFields, slices and probes',
+    isRecord(outputs) &&
+      isTextList(outputs['surfaceFields']) &&
+      Array.isArray(outputs['slices']) &&
+      outputs['slices'].every((slice) => isRecord(slice) && isVec3(slice['origin']) && isVec3(slice['normal']) && isText(slice['field'])) &&
+      Array.isArray(outputs['probes']) &&
+      outputs['probes'].every(isVec3),
+    'outputs needs surfaceFields, slices { origin, normal, field } and probes [x, y, z]',
   );
-  return errors;
+  const box = isRecord(domain) ? domain['box'] : undefined;
+  need(box === undefined || (isRecord(box) && isVec3(box['min']) && isVec3(box['max'])), 'domain.box needs min and max [x, y, z]');
+  const air = isRecord(freestream) ? freestream['air'] : undefined;
+  need(
+    air === undefined || (isRecord(air) && [air['densityKgM3'], air['temperatureK'], air['viscosityPaS']].every(isFiniteNumber)),
+    'freestream.air needs numeric densityKgM3, temperatureK and viscosityPaS',
+  );
+  if (errors.length > 0) return errors;
+  const invalid = semanticProblem(raw as unknown as CfdCase);
+  return invalid === null ? [] : [`${at}: ${invalid.message}`];
 }
 
 function resultErrors(key: string, raw: unknown): string[] {

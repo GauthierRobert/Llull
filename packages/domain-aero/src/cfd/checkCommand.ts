@@ -6,7 +6,7 @@ import type { CommandResult } from '@core/commands/types';
 import { roundDeep } from '@lib/significant';
 import { caseIds, caseOf, cfdSlice } from './caseDoc';
 import { refuseCfd } from './codes';
-import { prepareCase, type CheckRow } from './prepare';
+import { isUnverified, prepareCase, type CheckRow } from './prepare';
 
 type Status = 'pass' | 'warn' | 'fail';
 
@@ -46,7 +46,7 @@ export const checkCfd = defineCommand({
       const stale = recorded !== undefined && (recorded.caseHash !== prepared.caseHash || recorded.geometryHash !== prepared.geometryHash);
       const failing = prepared.checks.filter((check) => check.status === 'fail').map((check) => check.code);
       const warning = [
-        ...prepared.checks.filter((check) => check.status === 'warn').map((check) => check.code),
+        ...prepared.checks.filter((check) => check.status === 'warn' || isUnverified(check)).map((check) => check.code),
         ...(stale ? ['CFD_RESULT_STALE'] : []),
       ];
       return [

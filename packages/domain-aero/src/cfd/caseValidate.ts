@@ -38,8 +38,10 @@ function boundaryProblem(tags: readonly CfdBoundaryTag[]): CaseProblem | null {
   return null;
 }
 
-function entityProblem(doc: CadDocument, c: CfdCase): CaseProblem | null {
-  const missing = [...c.entityIds, ...c.excludedEntityIds, ...c.boundaries.map((tag) => tag.entityId)].filter((id) => !exists(doc, id));
+function entityProblem(doc: CadDocument, c: CfdCase, tolerated: readonly string[]): CaseProblem | null {
+  const missing = [...c.entityIds, ...c.excludedEntityIds, ...c.boundaries.map((tag) => tag.entityId)].filter(
+    (id) => !exists(doc, id) && !tolerated.includes(id),
+  );
   if (missing.length > 0)
     return problem('CFD_ENTITY_NOT_FOUND', `no entity ${[...new Set(missing)].join(', ')}`, 'entityIds', [...new Set(missing)]);
   const outside = c.boundaries.filter((tag) => !c.entityIds.includes(tag.entityId));
@@ -90,13 +92,18 @@ function numberProblem(c: CfdCase): CaseProblem | null {
  * First problem of the case, or null.
  * @failure order: unknown ids -> CFD_ENTITY_NOT_FOUND; numbers -> CFD_PARAM_INVALID; tags -> CFD_BOUNDARY_CONFLICT; free stream / solver -> CFD_PARAM_INVALID / CFD_REGIME_MISMATCH
  */
-export function validateCase(doc: CadDocument, c: CfdCase): CaseProblem | null {
+export function validateCase(doc: CadDocument, c: CfdCase, tolerated: readonly string[] = []): CaseProblem | null {
+  const unknownId = entityProblem(doc, c, tolerated);
+  return unknownId ?? semanticProblem(c);
+}
+
+/** The document-independent part of `validateCase` (numbers, tags, free stream); also used to validate a loaded slice. */
+export function semanticProblem(c: CfdCase): CaseProblem | null {
   const flow = resolveFlow(c);
   const flowProblem = flow.ok ? null : problem(flow.code, flow.message, flow.code === 'CFD_REGIME_MISMATCH' ? 'regime' : 'freestream');
-  const unknownId = entityProblem(doc, c);
-  if (unknownId !== null) return unknownId;
   const nonFlow = numberProblem(c) ?? boundaryProblem(c.boundaries);
   if (nonFlow !== null) return nonFlow;
   if (c.entityIds.length === 0) return problem('CFD_PARAM_INVALID', 'entityIds must list at least one body', 'entityIds');
+  if (new Set(c.entityIds).size !== c.entityIds.length) return problem('CFD_PARAM_INVALID', 'entityIds lists an id twice', 'entityIds');
   return flowProblem;
 }

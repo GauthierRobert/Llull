@@ -6,6 +6,8 @@ import type { IndexedSurface } from './weld';
 export interface EdgeReport {
   /** Undirected edges used by exactly one triangle. */
   readonly openEdges: number;
+  /** Open edges whose midpoint is an accepted opening (inlet / outlet body); not counted in `openEdges`. */
+  readonly openingEdges: number;
   /** Edges used by more than two triangles. */
   readonly nonManifoldEdges: number;
   /** Edges used twice in the same direction (inconsistent winding). */
@@ -29,7 +31,7 @@ export const MAX_REPORTED_POINTS = 20;
 const point = (vertices: readonly number[], v: number): Vec3 => [vertices[v * 3] ?? 0, vertices[v * 3 + 1] ?? 0, vertices[v * 3 + 2] ?? 0];
 
 /** @invariant a closed, consistently oriented 2-manifold has all three counts 0 */
-export function edgeReport({ vertices, triangles }: IndexedSurface): EdgeReport {
+export function edgeReport({ vertices, triangles }: IndexedSurface, isOpening: (midpoint: Vec3) => boolean = () => false): EdgeReport {
   const stride = vertices.length / 3 + 1;
   const uses = new Map<number, EdgeUse>();
   for (let t = 0; t + 2 < triangles.length; t += 3) {
@@ -49,20 +51,25 @@ export function edgeReport({ vertices, triangles }: IndexedSurface): EdgeReport 
   const nonManifold: Vec3[] = [];
   const misoriented: Vec3[] = [];
   const counts = { open: 0, nonManifold: 0, misoriented: 0 };
+  let openings = 0;
   for (const use of uses.values()) {
     const total = use.forward + use.backward;
     const target = total === 1 ? 'open' : total > 2 ? 'nonManifold' : use.forward !== 1 ? 'misoriented' : null;
     if (target === null) continue;
+    const p = point(vertices, use.a);
+    const q = point(vertices, use.b);
+    const mid: Vec3 = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2];
+    if (target === 'open' && isOpening(mid)) {
+      openings++;
+      continue;
+    }
     counts[target]++;
     const list = target === 'open' ? open : target === 'nonManifold' ? nonManifold : misoriented;
-    if (list.length < MAX_REPORTED_POINTS) {
-      const p = point(vertices, use.a);
-      const q = point(vertices, use.b);
-      list.push([(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2]);
-    }
+    if (list.length < MAX_REPORTED_POINTS) list.push(mid);
   }
   return {
     openEdges: counts.open,
+    openingEdges: openings,
     nonManifoldEdges: counts.nonManifold,
     misorientedEdges: counts.misoriented,
     openAt: open,

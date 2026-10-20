@@ -20,6 +20,8 @@ export interface CollectedBodies {
   readonly leaves: Leaf[];
   /** Case entities that are 2D sketches (skipped). */
   readonly skipped2D: string[];
+  /** Ids of entityIds / boundary tags that no longer exist in the document (excluded ids are not reported). */
+  readonly missing: string[];
 }
 
 const MAX_EXPANSION_DEPTH = 8;
@@ -39,13 +41,17 @@ function expandLeaves(doc: CadDocument, entity: Entity, ownerId: string, depth: 
 export function collectBodies(doc: CadDocument, cfdCase: CfdCase): CollectedBodies {
   const leaves: Leaf[] = [];
   const skipped2D: string[] = [];
+  const missing = [
+    ...cfdCase.entityIds.filter((id) => !cfdCase.excludedEntityIds.includes(id)),
+    ...cfdCase.boundaries.map((tag) => tag.entityId),
+  ].filter((id, index, all) => !Object.hasOwn(doc.entities, id) && all.indexOf(id) === index);
   for (const id of cfdCase.entityIds) {
     if (cfdCase.excludedEntityIds.includes(id) || !Object.hasOwn(doc.entities, id)) continue;
     const entity = doc.entities[id] as Entity;
     if (!is3D(entity)) skipped2D.push(id);
     else leaves.push(...expandLeaves(doc, entity, id, 0));
   }
-  return { leaves, skipped2D };
+  return { leaves, skipped2D, missing };
 }
 
 export type UnionMethod = 'single_body' | 'kernel_union' | 'display_triangles';

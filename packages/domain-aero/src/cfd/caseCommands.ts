@@ -138,16 +138,25 @@ export const cfdUpdateCase = defineCommand({
     if (given.length === 0)
       return refuseCfd(doc, 'cfd_update_case', 'CFD_PARAM_INVALID', 'no field to change was given', [caseId], ['caseId']);
     const next = applyFields(previous, fields);
-    const invalid = validateCase(doc, next);
+    const alreadyGone = [...previous.entityIds, ...previous.excludedEntityIds, ...previous.boundaries.map((tag) => tag.entityId)].filter(
+      (id) => !Object.hasOwn(doc.entities, id),
+    );
+    const invalid = validateCase(doc, next, alreadyGone);
     if (invalid !== null) return refuseCfd(doc, 'cfd_update_case', invalid.code, invalid.message, invalid.ids, [invalid.path]);
     const slice = cfdSlice(doc);
     const result = Object.hasOwn(slice.results, caseId) ? slice.results[caseId] : undefined;
     const caseHash = caseHashOf(next);
     const stale = result !== undefined && result.caseHash !== caseHash;
-    const summary = `cfd_update_case: case '${caseId}' updated (${given.join(', ')})${stale ? '; its recorded result is now stale' : ''}.`;
+    const notes =
+      fields.entityIds !== undefined && fields.reference?.momentPointM === undefined
+        ? ['reference.momentPointM was not recomputed for the new bodies: pass reference.momentPointM to move it']
+        : [];
+    const summary =
+      `cfd_update_case: case '${caseId}' updated (${given.join(', ')})${stale ? '; its recorded result is now stale' : ''}.` +
+      (notes.length > 0 ? ` Note: ${notes.join('; ')}.` : '');
     return {
       ...changed(withCfd(doc, { cases: { ...slice.cases, [caseId]: next } }), summary, [caseId]),
-      data: { case: next, caseHash, resultStale: stale, changed: given },
+      data: { case: next, caseHash, resultStale: stale, changed: given, notes },
     };
   },
 });
