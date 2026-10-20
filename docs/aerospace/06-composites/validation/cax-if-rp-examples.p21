@@ -1,0 +1,32 @@
+/* Part 21 examples printed in "CAx-IF Recommended Practices, Composite Structure Validation Properties", Release 1.0, 23 June 2026
+   (https://www.mbx-if.org/home/wp-content/uploads/2026/06/rec_prac_val_prop_composite_v10.pdf, sections 4.1 - 4.5; sources.md S42), transcribed
+   unchanged (one record per line; record ids that collided or were not printed were renumbered). The records are fragments: they refer to records of the practice's example file that are not reproduced, and #1 to #9
+   of the last block are the practice's skeleton with unset attributes. Used by tests/unit/aero/composites/ap242RpExamples.test.ts to compare the form. */
+#8=PRODUCT_RELATED_PRODUCT_CATEGORY('part',$,(#5));
+#5=PRODUCT('Startmodel_CPD','','',(#2));
+#6=PRODUCT_DEFINITION_FORMATION('',' ',#5);
+#7=PRODUCT_CATEGORY('part','specification');
+#10=PRODUCT_DEFINITION('',' ',#6,#3);
+#27039=PROPERTY_DEFINITION('composite validation property',$,#10);
+#27040=PROPERTY_DEFINITION_REPRESENTATION(#27039,#27038);
+#27038=REPRESENTATION('',(#27041),#16);
+#27041=INTEGER_REPRESENTATION_ITEM('number of tables',3.0);
+#27043=INTEGER_REPRESENTATION_ITEM('number of plies',11.0);
+#27049=CARTESIAN_POINT('centre point of all plies',(-20.,-50.,0.));
+#27048=MEASURE_REPRESENTATION_ITEM('total ply surface area',AREA_MEASURE(31177.2868069),#64);
+#26911=DESCRIPTIVE_REPRESENTATION_ITEM('ordered list of orientation values','-45 -30 0 30 45 135');
+#26300=COMPOSITE_ASSEMBLY_TABLE('01_PliesGroup-UnderCore','',#6,#26293);
+#26314=COMPOSITE_ASSEMBLY_SEQUENCE_DEFINITION('A010','',#6,#26293);
+#26901=ROW_REPRESENTATION_ITEM('ordered sequences per laminate table',LIST_REPRESENTATION_ITEM((#26902,#26903,#26904)));
+#26902=DESCRIPTIVE_REPRESENTATION_ITEM('sequence name','A010');
+#27051=MEASURE_REPRESENTATION_ITEM('volume measure',VOLUME_MEASURE(376922.561622),#26272);
+#27052=CARTESIAN_POINT('centre point',(1300.0000445,499.999984776,85.7435045689));
+#27053=MEASURE_REPRESENTATION_ITEM('area measure',AREA_MEASURE(81361.3229339),#3003);
+#27054=MEASURE_REPRESENTATION_ITEM('curve length measure',LENGTH_MEASURE(5524.94214762),#12);
+#27055=INTEGER_REPRESENTATION_ITEM('number of ply pieces per ply',4.0);
+#101=COMPOSITE_ASSEMBLY_TABLE($,$,$,$);
+#104=REINFORCEMENT_ORIENTATION_BASIS($,(#108),$);
+#106=PLY_ORIENTATION_ANGLE($,$,#104,#107);
+#107=PLY_ANGLE_REPRESENTATION($,$,$);
+#108=(AXIS2_PLACEMENT_3D($,$)CARTESIAN_11()GEOMETRIC_REPRESENTATION_ITEM()PLACEMENT($)REPRESENTATION_ITEM($));
+#109=ITEM_IDENTIFIED_REPRESENTATION_USAGE(' ',$,#102,#104,#108);

@@ -509,9 +509,9 @@ software imports point lists.
   cores as specified by the CAx-IF Recommended Practices for Composite Materials v4.x (supplement to the
   AP242 ed4 practices) [R13], plus the validation properties v1.0 [R14]. OCC/OCP has no composite writer, so
   llull emits the Part 21 entities itself in a pure core module (`codegen`-like), linking them to the
-  explicit solids. Conformance: VC-CMP-19 (TBD with a CAx-IF round or checker). The entity names are taken
-  from the rec-practice document when implemented. They are not reproduced here, because that text was not
-  fully reviewed.
+  explicit solids. Conformance: VC-CMP-19, partly met in §13.6 (structure against the AP242 ed4 MIM, the
+  practice's examples, read-back; no CAx-IF round). The entity names are those of the CAx-IF practices
+  v4.4 and 1.0 (§13.6, sources.md S41 to S43).
 
 ### 6.5 CSV ply table
 
@@ -906,69 +906,86 @@ fallback), `server/tests/nativeKernelSheets.test.ts` (the table above), `feature
 ### 13.6 M5: AP242 composite export and import (2026-10-20, branch `feat/cmp-ap242`)
 
 Commands (plugin `composites`, toolset `manufacturing`): `export_composite_ap242`, `import_composite_ap242`. Code: `packages/domain-aero/src/composites/ap242/`
-(`interchange.ts` types, `writer.ts`, `reader.ts`, `validation.ts`, `rebuild.ts`, `part21.ts`, `exportCommand.ts`, `importCommand.ts`). This closes the
-last open item of AERO-5 (06 §13.5 "Not done: AP242 composite (M5)").
+(`standard.ts` the CAx-IF structure writer, `standardReader.ts` its checker-reader, `standardCheck.ts`, `writer.ts` / `reader.ts` the llull records, `emit.ts`,
+`validation.ts`, `rebuild.ts`, `part21.ts`, `exportCommand.ts`, `importCommand.ts`). This closes the last open item of AERO-5 (§13.5 "AP242 composite (M5)").
 
-**Chosen representation: explicit + implicit in one file.**
+**Sources (sources.md S41 to S43, retrieved 2026-10-20).** The CAx-IF Recommended Practices for Composite Materials **v4.4 (2025-12-03, Final)**, the
+Composite Structure Validation Properties practice **Release 1.0 (2026-06-23)** and the AP242 ed4 MIM long form EXPRESS schema were downloaded and read (an
+earlier version of this section said they could not be checked offline: that was a limit of the first session, not of the material). The figures of the
+composites practice are raster images and could not be read here; every entity chain below comes from its text, from the Part 21 examples of the validation
+practice and from the schema. **No CAx-IF composite test file is downloadable** (the test-round page lists test-suite PDFs only), so there is no third-party
+reference file; the reference material is the practice's own examples (`validation/cax-if-rp-examples.p21`).
 
-- *Explicit.* The tool solid and, when `create_ply_solids` made them, the ply solids ("<ply> piece <n>"; exact `faceSlab` B-reps where the kernel builds the
-  slab, §13.5, triangle B-reps otherwise: the sphere cap) go through the 04 XCH writer, `export_step_ap242` (flat, one named product per solid, geometric
-  validation properties, self-check). Nothing in the XDE path was changed.
-- *Implicit.* The XDE writer (OCCT 7.9.2, XCAF) has no composite entities, so llull appends the records to the writer's Part 21 text in TypeScript
-  (`appendComposite`; no sidecar change, so no new native build; a pure function, the same input gives the same bytes, existing records untouched, new ids after
-  the highest one). Everything hangs off the PRODUCT_DEFINITION of the tool product (and of each ply solid), as `PROPERTY_DEFINITION` +
-  `PROPERTY_DEFINITION_REPRESENTATION` + `REPRESENTATION` records whose items are `DESCRIPTIVE_REPRESENTATION_ITEM`, `VALUE_REPRESENTATION_ITEM`,
-  `MEASURE_REPRESENTATION_ITEM` (with `LENGTH_MEASURE_WITH_UNIT` / `AREA_MEASURE_WITH_UNIT` / `PLANE_ANGLE_MEASURE_WITH_UNIT` units: SI milli / centi / metre,
-  or a conversion-based INCH / FOOT, and a DEGREE), `CARTESIAN_POINT`, `DIRECTION` and `POLYLINE`. They are constructs of the AP242 MIM that every reader accepts
-  and that the CAx-IF geometric validation properties already use, and the reader of this repo (`@lib/step21/records`) is independent of OpenCascade.
+**Two layers in one file.**
 
-**What is written (the subset).** Property names (all llull's own):
+1. *Explicit.* The tool solid and, when `create_ply_solids` made them, the ply solids ("<ply> piece <n>"; exact `faceSlab` B-reps where the kernel builds the slab, §13.5,
+   triangle B-reps otherwise) through `export_step_ap242` (flat, named products, 04 XCH geometric validation properties, self-check). No change to the XDE path.
+2. *Implicit.* OCCT 7.9.2 XCAF has no composite entities, so the records are appended to the writer's text in TypeScript (`appendComposite`; pure, deterministic, existing
+   records untouched, new ids after the highest one, the practice's identification string `CAx-IF Rec.Pracs.---Composite Materials---4.3---2025-10-02` added to
+   FILE_DESCRIPTION). (a) The **CAx-IF structure** (`standard.ts`); (b) llull's own lossless records, encoding `llull-composite-2` (`writer.ts`), as property records of the tool
+   product: part frame (tool surface, outline, rules), chart polygons, lamina records, per-ply area, thickness, mass. The first encoding `llull-composite-1` (llull records
+   only) is still read. Import reads (b) for the data and checks (a) against it.
 
-| Property name | Hangs on | Items |
+**What (a) writes** (names and attribute lists are the AP242 ed4 MIM's; "RP" = composites practice v4.4, "VP" = validation practice 1.0):
+
+| Entity | Written as | Source |
 | --- | --- | --- |
-| `composite laminate` | tool product | encoding `llull-composite-1`, part name, document unit, laminate side, tool name, part rosette, tool face point, JSON of the part frame (tool surface as `PartSurface`, outline, laminate rules, ply-drop rules) |
-| `composite ply` (one per ply) | tool product | name, sequence, material, rosette, boundary kind, stacking order, orientation (deg, part frame), cured thickness, ply area on the tool surface, JSON (drape settings, cuts, explicit solid names), the ply boundaries as 2D `POLYLINE`s in the part frame (`ply boundary k`, read back) and as 3D `POLYLINE`s on the tool surface (`ply boundary curve k`, vertices mapped from the chart, informative) |
-| `composite rosette` | tool product | name, method, origin, axis0, normal, axis |
-| `composite material` | tool product | name, form, JSON of the lamina record, cured ply thickness |
-| `composite ply piece` | each ply solid product | ply name, laminate name, stacking order (links the explicit solid to its ply) |
-| `composite validation property` | tool product | description `laminate`: `number of plies`, `laminate thickness`, `laminate mass` (absent when a material has no density); one per ply, description `ply area`: ply name, `ply area` |
+| `PRODUCT` + `PRODUCT_DEFINITION_FORMATION` + `PRODUCT_DEFINITION` of the laminate part, `PRODUCT_RELATED_PRODUCT_CATEGORY` `'part'` and `'ply_laminate'` | one product `<part> laminate` | RP 3.1.2.8 |
+| `PLY_LAMINATE_TABLE` (id = part name) and `MAKE_FROM_USAGE_OPTION` part -> table | the table shares the laminate's formation | RP 3.1.1.1 |
+| `PLY_LAMINATE_SEQUENCE_DEFINITION` chain | consecutive plies with the same `sequence` label share a sequence; table -> seq 1 -> seq 2 ... by `NEXT_ASSEMBLY_USAGE_OCCURRENCE` | RP 3.1.1.1 |
+| ply products (`PRODUCT_RELATED_PRODUCT_CATEGORY` `'ply'`) | each sequence -> ply by `NEXT_ASSEMBLY_USAGE_OCCURRENCE` | RP 3.1.2.1 |
+| ply pieces | the explicit solids (products of the file) chained under their ply by `NEXT_ASSEMBLY_USAGE_OCCURRENCE` (ply -> piece 1 -> piece 2) | RP 3.1.2.1 |
+| stock material product per lamina record (`'filament_assembly'` UD, `'woven_assembly'` woven, `'stock_core'` cores) | ply -> material by `MAKE_FROM_USAGE_OPTION` (the RP says `material_designation` is not recommended, so it is not used) | RP 3.1.2.1, 3.1.3 |
+| `REINFORCEMENT_ORIENTATION_BASIS` per rosette with a `cartesian_11` member (complex `AXIS2_PLACEMENT_3D` + `CARTESIAN_11` + `GEOMETRIC_REPRESENTATION_ITEM` + `PLACEMENT` + `REPRESENTATION_ITEM`; `polar_11` for a radial rosette) and one `PROPERTY_DEFINITION('basis')` on the table per rosette | origin, 0-degree axis, normal | RP 3.1.1, 3.1.2.2, mapping note |
+| `PLY_ORIENTATION_ANGLE` (rep_1 basis, rep_2 `PLY_ANGLE_REPRESENTATION` with one `PLANE_ANGLE_MEASURE` in degrees) and a `PROPERTY_DEFINITION('orientation')` on the ply | angle measured from the ply's own rosette | RP 3.1.2.2 |
+| ply thickness | `PROPERTY_DEFINITION('thickness')` -> `REPRESENTATION` with one `LENGTH_MEASURE` item | RP 3.1.2.1 (the property name is mine: the figure is not readable) |
+| base surface of the table | `PRODUCT_DEFINITION_SHAPE` + `SHAPE_ASPECT('base_surface')` + `SHAPE_REPRESENTATION` whose first item is the `PLANE` / `CYLINDRICAL_SURFACE` / `CONICAL_SURFACE` / `SPHERICAL_SURFACE` named `base_surface` and second a `DIRECTION('material side')`; not written for a NURBS tool | RP 3.1.1 |
+| ply boundary | per ply a `GEOMETRIC_SET` of closed `POLYLINE`s through the polygon vertices mapped onto the tool surface, as `GEOMETRICALLY_BOUNDED_SURFACE_SHAPE_REPRESENTATION` ("laid ply shape") and `SHAPE_REPRESENTATION` ("outer edge"), related by `SHAPE_REPRESENTATION_RELATIONSHIP`, each under a `SHAPE_ASPECT` of the ply's `PRODUCT_DEFINITION_SHAPE` | RP 3.1.2.3 |
+| composite validation properties (`PROPERTY_DEFINITION('composite validation property', $, ...)`, representation name `''`, `INTEGER_REPRESENTATION_ITEM` with a REAL value) | part: `number of tables / sequences / plies / cores / materials / orientations / rosettes`, `total ply surface area`, `ordered list of orientation values`; table: the counts, `ordered sequences per laminate table` (`ROW_REPRESENTATION_ITEM` of `LIST_REPRESENTATION_ITEM`), `total ply surface area`; sequence: `number of plies`; ply: `curve length measure`, `number of ply pieces per ply`; rosette (on an `ITEM_IDENTIFIED_REPRESENTATION_USAGE`): `number of plies`, `total boundary curve length`; material: `total ply surface area` | VP 4.1 to 4.6 |
 
-**Not written, and why.** The CAx-IF Recommended Practices for Composite Materials (v4.x) and the composite validation properties (v1.0) are not available
-offline, and §6.4 already notes that their entity names were never reviewed; none is guessed. So the composite entity set of AP242 ed2+ (the ply laminate
-table / sequence definitions, `ply_laminate_*`, composite shape aspects, core and ply-boundary relationships) is NOT written, and a CAD system that expects it
-will not read the table (it still reads the solids and the property records as user-defined properties). Ply boundaries are polylines through the polygon
-vertices, not curves (B-splines / arcs) of the tool surface, and a ply "piece" boundary on a doubly curved surface is a chord polyline. Cores, zones,
-laminate sections and waivers are not written. A conformance round with the CAx-IF composite test cases is therefore still open (VC-CMP-19): the only reference
-here is synthetic, built by the unit suite (a minimal Part 21 base plus the appended records, `tests/unit/aero/composites/ap242.test.ts`) and the native
-round trips below.
+**Not written, and why.** Cores and processed cores, thickness / percentage laminate tables, smeared material, zones and core samples (`point_zone_shape`), "associated shape"
+(nominal / manufacturing edge of part), flat pattern and projected ply shapes, courses and sectors, LLAI, `curve_11` / `cylindrical_11` rosettes (they need a guide curve:
+translational, cylindrical and edge rosettes are written as `cartesian_11`, llull's method is kept in its own record), `user_defined_11`, a NURBS base surface, B-spline / arc
+boundary curves (polylines through vertices are written, chords on curved faces), the `composite_sheet_representation` surface of a ply (the defining model holds the curves only),
+and the validation properties `centre point of all contours / plies`, `total core volume`, `total ply volume`, `ordered list of orientation names`, `notional rosette centroid`,
+`number of facets`, `guide curve ...` and the ply-level `volume measure / centre point / surface area measure` (the ply solids carry the 04 XCH geometric validation properties
+instead). The property names `thickness` and `orientation` on a ply and the aspect names `base_surface` / `laid ply shape` / `outer edge` follow the text of the practice where it
+gives names; where only a figure shows them they are my reading.
 
-**Validation properties and their check.** Ply count, per-ply area (true area on the tool surface, ramps included, the figure `laminate_mass` uses),
-summed cured thickness, laminate mass. Written from the model; on export the written text is read back and recomputed (`data.selfCheck`, must be green or the
-export is refused `CMP_AP242_SELFCHECK_RED`); on import they are recomputed from the rebuilt plies and the recorded tool surface and compared with the
-embedded values and with the ply table's own area column (`data.validation`: property, subject, embedded, recomputed, relative difference, band). Bands: relative
-difference <= 1e-6 green, <= 1e-3 yellow, else red, an absent property not checkable; the overall band is the worst. A red import still completes (the part is built)
-and reports `validation_red` in `data.reviewRequired.reasons`.
+**What was checked against what** (VC-CMP-19, partly met: structural conformance and form, not interoperability):
 
-**Import.** `import_composite_ap242` (needs the kernel unless `importSolids` is false) calls `import_step_exact` on the same text (so the tool and ply solids become
-mesh entities named as in the file, with its XCH provenance / validation flags), then builds the composite part directly from the records: rosettes and lamina
-materials the document lacks are created (materials with `basis: 'unknown'` and the original basis in `source`, so every result computed from them is flagged
-unverified; same-named ones are reused), the part (tool surface frame and outline from the file, `toolFaces` pointing at the imported tool entity, or at the
-file's tool id with `data.tool.imported` false when the solids were not imported), then the plies in stacking order through the `add_ply` helper (`insertPly`,
-step-scoped ids), then `syncOutlines`. Deviation from the task wording: the part is built from the recorded part frame, not by re-running `create_composite_part`,
-because the tool of a doubly curved part (sphere cap, NURBS sheet) re-imports as a B-rep solid / not at all and its face cannot be re-resolved by `faceNear`; the
-recorded frame is exact. The result is always `reviewRequired` (`composite_import_unverified`); only files carrying the llull encoding are read
-(`CMP_AP242_NO_COMPOSITE` otherwise, `CMP_AP242_MALFORMED` for damaged records).
+1. *AP242 ed4 MIM long form (S43)*: `tests/helpers/expressSchema.ts` reads the EXPRESS and checks every Part 21 record for a known entity, the schema's attribute count
+   (supertype attributes first; partial entities of complex instances against their own), `$` only on OPTIONAL attributes, aggregates where the schema has aggregates, and that
+   every `#n` reference points at an instance of the attribute's type or a subtype (SELECT and alias types resolved). Result with the live native kernel
+   (`server/tests/nativeCompositeAp242.test.ts`, `LLULL_AP242_MIM` set): **every record of the exported panel file, OpenCascade's base records and the 345 composite records, 1117 to 1837
+   records depending on the run, 0 violations**; unit exports (a fake XDE base; only the appended records) of a plane, cylinder, cone and sphere part: 0 violations
+   (`ap242Schema.test.ts`); the checker is shown to flag a missing argument, a `$` on a mandatory attribute and a reference of the wrong entity type. **Not evaluated**: WHERE rules,
+   UNIQUE rules, derived and redeclared attributes, global rules, literal ranges (for example `make_from_usage_option` WR1 is not run), and the ISO 10303-1770 / -1771 / -1772 mapping
+   tables (not downloaded).
+2. *The practice's own examples (S42)*: `validation/cax-if-rp-examples.p21` holds the Part 21 examples of VP 4.1 to 4.5. `ap242RpExamples.test.ts` checks that every entity that appears there and
+   that llull writes is written with the same number of attributes, that every validation item name of the examples that llull writes is the practice's name, and (with the schema) that the examples' own
+   records have known entities and the schema's attribute counts. Also compared by eye: `INTEGER_REPRESENTATION_ITEM` with a REAL value, `ROW_REPRESENTATION_ITEM` of `LIST_REPRESENTATION_ITEM`,
+   `ITEM_IDENTIFIED_REPRESENTATION_USAGE`, the complex rosette instance in alphabetical partial order.
+3. *llull's own read-back*: `standardReader.ts` reads the structure back and `export_composite_ap242` refuses (`CMP_AP242_SELFCHECK_RED`) unless 56 and more comparisons (structure: table, ordered
+   sequences and plies, per ply material / rosette / orientation angle / thickness / ply pieces; every validation property above recomputed from the plies and the tool surface) are green; on import
+   the same comparisons run against the rebuilt plies (`data.validation`, bands green <= 1e-6, yellow <= 1e-3, red, not_checkable). Tampering is detected (number of plies, a ply angle, a
+   sequence name, an orientation list: red; a renamed property: not checkable).
+4. *Not done*: reading by another CAD system or by a CAx-IF checker, the CAx-IF composite test cases (none downloadable), reading composite files of other systems (refused,
+   `CMP_AP242_NO_COMPOSITE`).
 
-**Measured** (native kernel, `server/tests/nativeCompositeAp242.test.ts`; Windows, GNU toolchain, OCCT 7.9.2):
+**OpenCascade finding.** OpenCascade's STEP reader (XDE) loses the ply solids when they hang by `NEXT_ASSEMBLY_USAGE_OCCURRENCE` below the shapeless ply products: reading the written file raw yields only the tool
+product. `import_composite_ap242` therefore passes `import_step_exact` the text without the usages of the composite structure (`withoutCompositeUsages`, ids of other assemblies kept) and reads the
+usages itself; a consumer built on OpenCascade that reads the raw file will see the tool solid only (the geometric validation properties and the solids are in the file).
 
-| Example | Written | Re-imported |
-| --- | --- | --- |
-| Flat panel 200 x 100 on a box tool, 3 plies (full 0, +45 polygon 160 x 80 of another material, -45 polygon 80 x 60), exact ply slabs | 4 `MANIFOLD_SOLID_BREP` (24 `ADVANCED_FACE`), 142 composite records, 79 454 bytes, self-check green (9 comparisons), mass 12.48, thickness 0.625 | same plies (name, order, orientation, material, sequence, boundary polygons exactly), same outline and surface, 9 / 9 comparisons green with relative difference 0, ply solid volumes 5000 / 1600 / 1200 against area x thickness within 3.3e-16, all 3 solids linked by name, tool attached |
-| Hemisphere cap R 100 on a sphere tool, 2 whole-face plies (0, 90) draped, faceted ply solids (no slab on a sphere) | 2 triangle B-rep solids, 338 composite records, 11.9 MB, self-check green (7 comparisons) | same plies and drape settings, same `sphere` surface, ply area 62349.90371 (written, 10 digits) against 62349.90371048 recomputed, validation green |
+**Import.** `import_composite_ap242` (kernel needed unless `importSolids` is false): `import_step_exact` on the text without the structural usages (solids named as in the file), then the part is built from the
+recorded part frame (deviation from the task wording: not by re-running `create_composite_part`, because a sphere or NURBS tool does not re-import as a face that `faceNear` can re-resolve), rosettes and
+lamina materials the document lacks (materials `basis: 'unknown'` with the original basis in `source`, so results from them are flagged unverified), plies in stacking order through the `add_ply`
+helper (step-scoped ids), `syncOutlines`. Always `reviewRequired` (`composite_import_unverified`, plus `validation_<band>` when not green).
 
-Unit suite: 15 tests (writer / reader / bands / refusals / units / optional data), coverage of `ap242/` 98 % statements, 78 % branches on its own (the
-gate is on the whole of `domain-aero`). Tampered embedded area x1.17 -> red, 12800.5 for 12800 -> yellow, removed property -> not checkable.
+**Measured** (native kernel, Windows GNU toolchain, OCCT 7.9.2): flat panel 200 x 100 on a box, 3 plies (full 0, +45 polygon of another material, -45 polygon), exact slabs: 4 `MANIFOLD_SOLID_BREP`, 345 composite
+records, mass 12.48, thickness 0.625; re-import gives the same plies (name, order, orientation, material, sequence, boundary polygons exactly), same outline and surface, every comparison green (56 and more, relative
+difference 0), ply solid volumes 5000 / 1600 / 1200 within 3.3e-16 of area x thickness, all solids linked. Hemisphere R100, 2 draped plies, triangle ply solids (no exact slab on a sphere): same plies, drape settings and
+sphere surface back, validation green, ply area 62349.90371 (written, 10 digits) against 62349.90371048 recomputed, file 11.9 MB.
 
-**Not done.** The CAx-IF composite entity set and its conformance round (VC-CMP-19, needs the practice documents and a CAx-IF test case or a second
-CAD system); import of composite files written by other systems; B-spline / arc ply boundary curves; cores, zones and sections in the file; exact slabs
-on the sphere cap (the explicit solids there are triangle B-reps, the file is large); regeneration of the ply solids when plies change (they stay a snapshot).
+**Not done.** The items under "Not written"; a CAx-IF conformance round (needs a second system or the CAx-IF test cases); import of other systems' composite files; regeneration of the ply solids when plies change (snapshot);
+exact slabs on the sphere cap (the explicit solids there are triangle B-reps, hence the file size).

@@ -51,3 +51,23 @@ Column "Verified" says exactly what the excerpt confirmed.
 | S38 | Kaw, Mechanics of Composite Materials, 2e (CRC 2006), ISBN 978-0-8493-1343-1 | (book; catalogue) | Not accessed. Cited only as the textbook that reproduces Tsai-Hahn T300/5208 (Table 2.1) | clt generator |
 | S39 | Jones, Mechanics of Composite Materials, 2e (Taylor & Francis 1999) | (book; catalogue) | Not accessed. Standard reference for Q / Qbar / ABD, used for the formulas only (identical to S32) | TECH §5.2 |
 | S40 | Van der Weeën, "Algorithms for draping fabrics on doubly-curved surfaces", IJNME 31 (1991) 1415-1426 (bibliographic record via Borouchaki & Cherouat, C. R. Mécanique 2003) | https://comptes-rendus.academie-sciences.fr/mecanique/articles/10.1016/S1631-0721(03)00087-1 | Citation only | TECH §5.4 |
+
+## Added 2026-10-20 (M5 follow-up): the practice documents and the schema were downloaded
+
+The statement at the top of this file (fetches blocked) described the session of 2026-10-15. On 2026-10-20 `curl` with a browser user agent reached
+`www.mbx-if.org` (200; `www.cax-if.org` answered 403) and `standards.iso.org`. The following were **downloaded and read in full** (text extracted with
+pdftotext; the figures are raster images and could not be read, so every entity chain below comes from the text, the Part 21 examples and the schema).
+Nothing is stored in the repository except the short example excerpt `cax-if-rp-examples.p21`.
+
+| Id | Source | URL | Retrieved 2026-10-20 | Used in |
+| -- | ------ | --- | -------------------- | ------- |
+| S41 | CAx-IF Recommended Practices for Composite Materials, **Version 4.4, December 3, 2025**, status Final (supplement to the AP242 ed4 practices; identification string in section 2 reads `CAx-IF Rec.Pracs.---Composite Materials---4.3---2025-10-02`, which is what `export_composite_ap242` writes into FILE_DESCRIPTION) | https://www.mbx-if.org/home/wp-content/uploads/2026/01/Rec_Pracs_Composites_V4.4.pdf (listed at https://www.mbx-if.org/home/cax/recpractices/) | 3 131 693 bytes, sha256 `00d45be2380c077a1223c9c10c0271a0e80d933ceaef3bfd54a2c4cd8d9e2d48` | §13.6 |
+| S42 | CAx-IF Recommended Practices for Composite Structure Validation Properties, **Release 1.0, 23 June 2026** | https://www.mbx-if.org/home/wp-content/uploads/2026/06/rec_prac_val_prop_composite_v10.pdf | 934 165 bytes, sha256 `04ab7f84b69dad6379d55c893cb631ac752ce1f6b37543acca2027762e0a4da8` | §13.6, VC-CMP-19 |
+| S43 | ISO/TS 10303-442 AP242 MIM long form EXPRESS (`AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF`, ISO TC184/SC4/WG12 N11521, the ed4 schema named in S41 Annex B), the schema `tests/unit/aero/composites/ap242Schema.test.ts` checks against | https://standards.iso.org/iso/ts/10303/-442/ed-7/tech/express/mim_lf.exp | 2 529 983 bytes, sha256 `e7e93cf97880fd87d634e4b9ee58400da0a1be6c06a1de76ec13807ecdc15ccb`. Set `LLULL_AP242_MIM` to a local copy to run the check | §13.6 |
+| S44 | AP242 ed2 MIM long form (zip, S41 Annex B.2) | https://www.mbx-if.org/home/wp-content/uploads/2024/07/ap242ed2_mim_lf_v1.101.zip | 239 599 bytes, sha256 `c49efcf85172276dd769cf899f7543bcc1ef4bc003cb5ec26329ab6439019cdc`; downloaded, not used | n/a |
+
+**CAx-IF composite test files: not available.** The test-round page (https://www.mbx-if.org/home/cax/testrounds/) lists only the test-suite PDFs
+(`test_suite_<n>j_v<m>.pdf`, 1j .. 47j) and, on the recommended-practice page, two PID-trace archives (`PID_trace_TEST7.zip`, `PID_trace_TEST8.zip`); no
+composite STEP test file is offered for download. No third-party composite STEP file was therefore available, and none is claimed. The reference material built
+from the practice documents is `cax-if-rp-examples.p21`: the Part 21 examples the validation practice (S42, sections 4.1 to 4.5) prints, transcribed
+unchanged, used to compare the form of what llull writes (entity, number of attributes, literal item names) with the practice's own examples.
