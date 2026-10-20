@@ -48,9 +48,10 @@ export function renderDocument(
   const bounds = options.frame !== undefined ? options.frame : snapshot.bounds;
   const radius = bounds ? boundsRadius(bounds) : 5; // 5 frames an empty scene
   const center = options.target ?? (bounds ? boundsCenter(bounds) : ORIGIN);
-  const cam = cameraForView(view, center, radius, options.direction);
+  const cam = options.view?.camera ?? cameraForView(view, center, radius, options.direction);
   const basis = cameraBasis(cam);
-  const orthoHalf = (radius * 1.2) / (options.zoom ?? 1);
+  const orthoHalf = options.view?.orthoHalf ?? (radius * 1.2) / (options.zoom ?? 1);
+  const perspective = cam.fovDeg !== undefined;
   const budget = options.maxPolygons ?? MAX_POLYGONS;
   const cut = options.cut;
   const planes = cut ? unitPlanes(cut) : [];
@@ -91,7 +92,11 @@ export function renderDocument(
   });
   const background = backgroundOption;
   // Underlays are never capped by MAX_POLYGONS: they are one <image> each, painted first.
-  const underlays = orderedEntities(doc).flatMap((e) => drawableEntities(doc, e).filter((d): d is ImageEntity => d.kind === 'image'));
+  const drawables = orderedEntities(doc).flatMap((e) => drawableEntities(doc, e));
+  const underlays = drawables.filter((d): d is ImageEntity => d.kind === 'image');
+  const rasterSettings = raster ? { radius, ...(options.pixels !== undefined ? { pixels: options.pixels } : {}) } : null;
+  const caption = options.caption !== false;
+  const svg = buildSvg(polygons, underlays, cam, orthoHalf, width, height, view, snapshot.entityCount, background, rasterSettings, caption);
   return {
     view,
     width,
@@ -105,25 +110,8 @@ export function renderDocument(
     simplifiedEntityIds: fitted.simplifiedEntityIds,
     skippedEntityIds: fitted.skippedEntityIds,
     cutEntityIds,
-    svg: appendAnnotationText(
-      buildSvg(
-        polygons,
-        underlays,
-        cam,
-        orthoHalf,
-        width,
-        height,
-        view,
-        snapshot.entityCount,
-        background,
-        raster ? radius : null,
-        options.caption !== false,
-      ),
-      doc,
-      orderedEntities(doc).flatMap((e) => drawableEntities(doc, e)),
-      makeProjector(cam, orthoHalf, width, height),
-      worldPerPx,
-      background,
-    ),
+    svg: perspective
+      ? svg
+      : appendAnnotationText(svg, doc, drawables, makeProjector(cam, orthoHalf, width, height), worldPerPx, background),
   };
 }

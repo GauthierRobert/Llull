@@ -84,7 +84,7 @@ fn vertices(p: &Prepared, w: f64, h: f64, ghost: bool) -> Vec<f32> {
     out
 }
 
-fn target(device: &wgpu::Device, w: u32, h: u32, format: wgpu::TextureFormat) -> wgpu::Texture {
+pub(crate) fn target(device: &wgpu::Device, w: u32, h: u32, format: wgpu::TextureFormat) -> wgpu::Texture {
     device.create_texture(&wgpu::TextureDescriptor {
         label: None,
         size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
@@ -140,7 +140,7 @@ fn pipeline(
     })
 }
 
-fn read_back(device: &wgpu::Device, queue: &wgpu::Queue, texture: &wgpu::Texture, w: u32, h: u32) -> Result<Vec<u8>, String> {
+pub(crate) fn read_back(device: &wgpu::Device, queue: &wgpu::Queue, texture: &wgpu::Texture, w: u32, h: u32) -> Result<Vec<u8>, String> {
     let row = (w * 4).div_ceil(256) * 256;
     let buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: None,
@@ -170,7 +170,7 @@ fn read_back(device: &wgpu::Device, queue: &wgpu::Queue, texture: &wgpu::Texture
     Ok(out)
 }
 
-fn words(bytes: &[u8]) -> impl Iterator<Item = [u8; 4]> + '_ {
+pub(crate) fn words(bytes: &[u8]) -> impl Iterator<Item = [u8; 4]> + '_ {
     bytes.chunks_exact(4).map(|c| [c[0], c[1], c[2], c[3]])
 }
 

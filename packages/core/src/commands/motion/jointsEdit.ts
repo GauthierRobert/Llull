@@ -1,81 +1,9 @@
-import type { Joint, JointMateRef } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { idOrNext, idTaken } from '../entity/explicitId';
 import { resolveNumeric } from '../parametric/expression';
-import { instanceFrameRef, instanceRefsProblem } from '../assembly/instanceFrameRef';
-import { isValidAxis } from '../../lib/axis';
+import { clampToLimit, withJointValue } from './jointValues';
+import { JOINT_DOF } from '../../model/joints';
 import { changed, noop, report } from '../noop';
-/**
- * @affects appends 1 entry to doc.joints and doc.jointOrder
- * @invariant both a.instanceId and b.instanceId must exist as InstanceEntity in doc.entities
- * @invariant axis must be 'x'|'y'|'z' or a [number,number,number] Vec3
- * @failure unknown instanceId / non-instance entity / invalid axis → no-op, affected:[]
- */
-export const addJoint = defineCommand({
-  name: 'add_joint',
-  description:
-    'Add a kinematic joint between two InstanceEntity frames to model a mechanism. ' +
-    'A "revolute" joint allows rotation of instance b around the given axis through instance a\'s origin. ' +
-    'A "prismatic" joint allows translation of instance b along the given axis from instance a\'s origin. ' +
-    '"a" and "b" are MateRef objects: { instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }. ' +
-    '"axis" is the rotation/slide axis: use "x", "y", or "z" for world axes, or a [x,y,z] unit vector. ' +
-    'Initial joint value (angle / displacement) defaults to 0. ' +
-    'Use set_joint_value to drive the joint. Use evaluate_motion or bake_motion to apply motion to instances. ' +
-    'Returns the new joint id in affected[0].',
-  params: z.object({
-    kind: z
-      .enum(['revolute', 'prismatic'])
-      .describe(
-        'Joint type. "revolute": rotation about an axis (like a hinge or pin). ' +
-          '"prismatic": linear translation along an axis (like a slider or piston).',
-      ),
-    a: instanceFrameRef(
-      'first',
-      'First instance frame reference (the fixed/anchor frame). ' +
-        '{ instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }. ' +
-        'instanceId must be an existing InstanceEntity. frame defaults to "origin".',
-    ),
-    b: instanceFrameRef(
-      'second',
-      'Second instance frame reference (the moving frame). { instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }. ' +
-        'instanceId must be an existing InstanceEntity. frame defaults to "origin".',
-    ),
-    axis: z
-      .union([z.string(), z.array(z.number())])
-      .describe(
-        'Rotation or slide axis. Use "x", "y", or "z" for world-aligned axes, ' +
-          'or pass a [x,y,z] unit vector array for an arbitrary direction.',
-      ),
-    id: z
-      .string()
-      .optional()
-      .describe(
-        'Optional explicit joint id. When omitted a unique id is generated. ' +
-          'If the id already exists in doc.joints the command is a no-op.',
-      ),
-  }),
-  run: (doc, { kind, a, b, axis, id }): CommandResult => {
-    if (!isValidAxis(axis))
-      return noop(doc, `add_joint: invalid axis '${JSON.stringify(axis)}'. Use "x", "y", "z", or a [x,y,z] number array.`);
-    const refProblem = instanceRefsProblem(doc, 'add_joint', { a, b });
-    if (refProblem !== null) return noop(doc, refProblem);
-    const jointId = idOrNext(id, 'joint');
-    if (idTaken(doc.joints, jointId)) return noop(doc, `add_joint: joint id '${jointId}' already exists — no change made.`);
-    const mateRef = ({ instanceId, frame }: typeof a): JointMateRef => (frame !== undefined ? { instanceId, frame } : { instanceId });
-    const refs = { a: mateRef(a), b: mateRef(b), axis };
-    const newJoint: Joint =
-      kind === 'revolute' ? { id: jointId, kind, ...refs, angle: 0 } : { id: jointId, kind, ...refs, displacement: 0 };
-    const newDoc = { ...doc, joints: { ...doc.joints, [jointId]: newJoint }, jointOrder: [...doc.jointOrder, jointId] };
-    return changed(
-      newDoc,
-      `add_joint: added '${kind}' joint '${jointId}' between instance '${a.instanceId}' (a) ` +
-        `and instance '${b.instanceId}' (b), axis=${JSON.stringify(axis)}.`,
-      [jointId],
-    );
-  },
-});
-
 /**
  * @affects removes 1 joint from doc.joints and doc.jointOrder; cascade-removes dependent DriveRelations
  * @invariant jointOrder and joints remain consistent after deletion
@@ -117,15 +45,17 @@ export const deleteJoint = defineCommand({
 });
 
 /**
- * @affects updates angle (revolute) or displacement (prismatic) on the specified joint
+ * @affects updates one DOF value of the specified joint (clamped into its limit)
+ * @failure unknown joint id, DOF index out of range, rigid / cam joint (no settable DOF), non-numeric value -> no-op, affected:[]
  * @invariant joint must exist in doc.joints
- * @failure unknown joint id → no-op, affected:[]
  */
 export const setJointValue = defineCommand({
   name: 'set_joint_value',
   description:
     'Set the current value of a kinematic joint. For revolute joints, "value" is the rotation angle in radians. ' +
-    'For prismatic joints, "value" is the displacement in document units. ' +
+    'For prismatic joints, "value" is the displacement in document units. Multi-DOF joints (cylindrical, pin_slot, planar, ball) ' +
+    'take "dof" = index of the coordinate (0-based, order: cylindrical/pin_slot [angle, slide]; planar [u, v, angle]; ball [rx, ry, rz]). ' +
+    'rigid and cam joints have no settable value (a cam follows its camJoint). The value is clamped into the joint limit when one is set. ' +
     '"value" may be a plain number or a parameter expression string (e.g. "=spoke_angle * 2" or "gap / 3"). ' +
     'Expression strings are stored as-is and evaluated when evaluate_motion or bake_motion is called. ' +
     'Call evaluate_motion (query) or bake_motion (mutates doc) to apply the new value to instance transforms.',
@@ -138,16 +68,23 @@ export const setJointValue = defineCommand({
           'May be a plain number ("1.5708") or a parameter expression string ("spoke_angle * 2"). ' +
           'Expression strings reference named parameters in doc.parameters.',
       ),
+    dof: z.number().int().min(0).optional().describe('Index of the coordinate to set on a multi-DOF joint (0-based). Default 0.'),
   }),
-  run: (doc, { id, value }): CommandResult => {
+  run: (doc, { id, value, dof = 0 }): CommandResult => {
     const existing = Object.hasOwn(doc.joints, id) ? doc.joints[id] : undefined;
     if (!existing) return noop(doc, `set_joint_value: joint '${String(id)}' does not exist — no change made.`);
-    const fieldName = existing.kind === 'revolute' ? 'angle' : 'displacement';
-    const storedValue = resolveNumeric(value, doc.parameters) ?? (existing.kind === 'revolute' ? existing.angle : existing.displacement);
-    const newDoc = { ...doc, joints: { ...doc.joints, [id]: { ...existing, [fieldName]: storedValue } as Joint } };
+    const count = JOINT_DOF[existing.kind].length;
+    if (existing.kind === 'cam' || dof >= count)
+      return noop(doc, `set_joint_value: a ${existing.kind} joint has no settable coordinate ${dof} (${count} DOF) — no change made.`);
+    const resolved = resolveNumeric(value, doc.parameters);
+    if (resolved === null || !Number.isFinite(resolved))
+      return noop(doc, `set_joint_value: '${String(value)}' is not a number or a valid expression — no change made.`);
+    const limited = clampToLimit(resolved, existing.limits?.[dof]);
+    const newDoc = { ...doc, joints: { ...doc.joints, [id]: withJointValue(existing, dof, limited.value) } };
     return changed(
       newDoc,
-      `set_joint_value: joint '${id}' (${existing.kind}) ${fieldName} set to ${storedValue}` +
+      `set_joint_value: joint '${id}' (${existing.kind}) coordinate ${dof} set to ${limited.value}` +
+        (limited.clamped ? ` (clamped from ${resolved} to its limit)` : '') +
         (typeof value === 'string' ? ` (expression: "${value}").` : '.'),
       [id],
     );

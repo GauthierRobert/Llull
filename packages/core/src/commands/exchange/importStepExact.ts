@@ -62,15 +62,16 @@ type StepRead =
 /** The product tree through XDE when the kernel has it and `assembly` is wanted, else the flat shape list. */
 function readStep(
   kernel: GeometryKernel,
+  format: 'step' | 'iges',
   text: string,
   options: { precision: number; maxTolerance: number; heal: boolean; sew: boolean },
   assembly: boolean,
 ): StepRead {
   if (assembly && kernel.importExchange !== undefined) {
-    const tree = kernel.importExchange('step', text, options);
+    const tree = kernel.importExchange(format, text, options);
     if (tree !== null) return 'error' in tree ? tree : { imported: tree, tree: 'products' in tree ? simplifyTree(tree) : null };
   }
-  const flat = kernel.importShapes?.('step', text, options) ?? null;
+  const flat = kernel.importShapes?.(format, text, options) ?? null;
   if (flat === null) return 'unreadable';
   return 'error' in flat ? flat : { imported: flat, tree: null };
 }
@@ -106,7 +107,7 @@ function run(doc: CadDocument, params: Params, ctx: ExecutionContext | undefined
     heal,
     sew: params.sew !== false,
   };
-  const read = readStep(kernel, text, options, params.assembly !== false);
+  const read = readStep(kernel, params.format ?? 'step', text, options, params.assembly !== false);
   if (read === 'unreadable') return refuse(doc, ...IMPORT_ERRORS.unreadable, 'the kernel could not read the file', [source]);
   if ('error' in read) {
     const [code, remediation] = IMPORT_ERRORS[read.error as keyof typeof IMPORT_ERRORS] ?? IMPORT_ERRORS.unreadable;
@@ -161,7 +162,7 @@ function run(doc: CadDocument, params: Params, ctx: ExecutionContext | undefined
   const depth = structure === null ? 0 : instanceDepth(structure.components, structure.topLevel);
   const topLevel = structure?.topLevel ?? bodies.map((body) => body.entity);
   const stamp = kernelStampOf(kernel);
-  const original = params.keepOriginal === true ? makeBlob('model/step', text) : null;
+  const original = params.keepOriginal === true ? makeBlob(params.format === 'iges' ? 'model/iges' : 'model/step', text) : null;
   const staged = bodies.reduce((next, body) => withBlob(next, body.blob), original === null ? doc : withBlob(doc, original));
   const ids = topLevel.map((entity) => entity.id);
   const solidIds = bodies.map((body) => body.entity.id);
@@ -302,6 +303,12 @@ const paramsSchema = z.object({
     .string()
     .optional()
     .describe('sha256 (hex) of the file bytes, computed by the host; kept in the provenance. Default: sha256 of the text.'),
+  format: z
+    .enum(['step', 'iges'])
+    .optional()
+    .describe(
+      '"step" (default, ISO 10303-21) or "iges" (IGES 5.3; same healing, report and refusal codes). The file goes in text / stepBase64 either way.',
+    ),
   heal: z.boolean().optional().describe('Run shape healing (ShapeFix) on every solid at the document linear tolerance. Default true.'),
   sew: z.boolean().optional().describe('Sew loose shells and faces into closed solids. Default true.'),
   name: z
@@ -368,7 +375,7 @@ export const importStepExact = defineCommand({
     'Needs the exact OCC kernel (kernel_info); otherwise use import_step for a mesh. Give the file as stepBase64 or text. Lengths are converted from millimetres into the ' +
     'document unit. data.report lists per solid validAsRead / validAfterHeal / actions / maxToleranceMm / freeEdges / faces / faceted, the root census, skipped items and ' +
     'warnings (KRN_IMPORT_TOLERANCE_HIGH above kernelSettings maxImportTolerance; XCH_GVP_YELLOW / XCH_GVP_RED / XCH_GVP_NOT_CHECKABLE). Refusals carry error.code: ' +
-    'KRN_NO_EXACT_KERNEL, KRN_STEP_UNREADABLE, KRN_STEP_TESSELLATED_ONLY, KRN_STEP_NO_SOLID, KRN_HEAL_FAILED.',
+    'KRN_NO_EXACT_KERNEL, KRN_STEP_UNREADABLE, KRN_STEP_TESSELLATED_ONLY, KRN_STEP_NO_SOLID, KRN_HEAL_FAILED. format: "iges" reads an IGES file the same way (import_iges adds the IGES census, sewing report and unit handling).',
   params: paramsSchema,
   run,
 });

@@ -69,6 +69,8 @@ export function backendEnv(input: BackendEnvInput): Record<string, string> {
     ...(input.nativeDir === undefined || input.nativeDir === null ? {} : { LLULL_NATIVE_DIR: input.nativeDir }),
     // The native OCC kernel is the desktop default (TR-KRN-01, KI7); a bundle without llull-kernel falls back to Manifold with a warning.
     LLULL_KERNEL: desktopKernel(input.baseEnv['LLULL_KERNEL']),
+    // Crash reports (SC-D3) land where the desktop's Help > Crash Reports looks.
+    ...(input.baseEnv['LLULL_DATA_DIR'] !== undefined ? { LLULL_DATA_DIR: input.baseEnv['LLULL_DATA_DIR'] } : {}),
     // import_code runs arbitrary Python: off unless the user launched the app with it set to 1.
     ...(input.baseEnv['LLULL_ALLOW_CODE_EXECUTION'] === '1' ? { LLULL_ALLOW_CODE_EXECUTION: '1' } : {}),
   };

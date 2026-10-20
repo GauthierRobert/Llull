@@ -1,0 +1,14 @@
+{
+  "id": "87-fillet-cylinder-rim",
+  "family": "fillet",
+  "description": "r=1 fillet on the top rim of a cylinder R=5 h=10",
+  "source": "analytic",
+  "formula": "Pappus: removed = 2 pi [(R - r)(1 - pi/4) r^2 + r^3/6]",
+  "kernels": ["occt"],
+  "bodies": 1,
+  "volume": 778.95743342,
+  "area": 457.310240532,
+  "centroid": [0, 0, -0.0394950943252],
+  "bbox": { "min": [-5, -5, -5], "max": [5, 5, 5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

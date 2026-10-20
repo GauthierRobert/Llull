@@ -6,6 +6,9 @@ import type { PropertyModel } from './propertyModel';
 import type { ConstitutiveSet, MaterialModel } from './materialModel';
 import type { Vec2, Vec3 } from './vectors';
 import type { FaceSlabRecipe } from './faceSlab';
+import type { AssemblyPresentationFields, Joint } from './joints';
+
+export type { Joint, JointKind, JointMateRef } from './joints';
 import type { BuildingModel } from './building';
 import type { CivilModel } from './civil';
 import type { AnalysisModel } from './analysis';
@@ -13,18 +16,25 @@ import type { DrawingsModel } from './sheet';
 import type { PmiModel } from './pmi';
 import type { DynamicsModel } from './dynamics';
 import type { PrototypeModel } from './prototype';
+import type { ReviewModel } from './review';
 import type { CurveSegment } from './curve';
 import type { FastenerModel, PartRef } from './fasteners';
 import type { AeroModel } from './aero';
 import type { CompositesModel } from './composites';
 import type { DocumentKernelSettings } from './documentKernelSettings';
 import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary';
+import type { MaterialFinish } from './materialFinish';
+export { FINISH_PATTERNS, type FinishPattern, type MaterialFinish } from './materialFinish';
 import type { ReliabilityModel } from './probabilistic';
 import type { SheetMetalModel } from './sheetMetal';
 import type { PlmModel } from './plm';
 import type { FeatureParams } from './features';
 import type { NurbsCurveData } from '../lib/nurbs/types';
 import type { NurbsSurfaceData, UvTrimLoop } from '../lib/nurbs/surfaceTypes';
+import type { PlantModel } from './plant';
+import type { ScanModel } from './pointCloud';
+import type { FaceOpParams } from './faceOps';
+import type { SketchPlaneFields } from './sketchPlanes';
 
 /** Re-exported: every model consumer reads its vectors from here. */
 export type { Vec2, Vec3 };
@@ -552,10 +562,21 @@ export interface Component {
  */
 export type EntityRef = { readonly entityId: string } | { readonly entityId: string; readonly kind: 'start' | 'end' | 'center' | 'mid' };
 
-export const CONSTRAINT_KINDS = ['coincident', 'parallel', 'perpendicular', 'tangent', 'distance', 'angle'] as const;
+// prettier-ignore
+export const DIMENSION_CONSTRAINT_KINDS = ['distance', 'angle', 'radius', 'diameter', 'aligned', 'horizontal_distance', 'vertical_distance', 'point_to_line', 'arc_sweep', 'arc_length', 'slot_length'] as const;
+
+// prettier-ignore
+const GEOMETRIC_CONSTRAINT_KINDS = ['coincident', 'parallel', 'perpendicular', 'tangent', 'horizontal', 'vertical', 'equal', 'concentric', 'collinear', 'midpoint', 'symmetric', 'fix', 'point_on_curve', 'curvature'] as const;
+
+export const CONSTRAINT_KINDS = [...GEOMETRIC_CONSTRAINT_KINDS, ...DIMENSION_CONSTRAINT_KINDS] as const;
 
 type ConstraintKind = (typeof CONSTRAINT_KINDS)[number];
 
+export type DimensionConstraintKind = (typeof DIMENSION_CONSTRAINT_KINDS)[number];
+
+type GeometricConstraintKind = Exclude<(typeof GEOMETRIC_CONSTRAINT_KINDS)[number], 'symmetric'>;
+
+/** Unary kinds (horizontal on a line, fix, radius, ...) store `b` equal to `a`. */
 interface ConstraintBase<K extends ConstraintKind> {
   readonly id: string;
   readonly kind: K;
@@ -563,44 +584,24 @@ interface ConstraintBase<K extends ConstraintKind> {
   readonly b: EntityRef;
 }
 
-/** `value` is a literal or a parameter expression: distance in document units, angle in radians. */
+/**
+ * `value` is a literal or a parameter expression. Units: document units for lengths and distances, radians for angles and sweeps.
+ * Offsets (horizontal_distance, vertical_distance, point_to_line) are magnitudes; the side of the current sketch is kept.
+ */
 interface ConstraintTarget {
   readonly value: number | string;
 }
 
+/** Mirror axis of `symmetric`: a line (no `kind`) or a point (a named sub-point). */
+interface ConstraintAxis {
+  readonly axis: EntityRef;
+}
+
 /** Solver-driven relation between entities `a` and `b` (see solve_constraints). */
 export type Constraint =
-  | ConstraintBase<'coincident'>
-  | ConstraintBase<'parallel'>
-  | ConstraintBase<'perpendicular'>
-  | ConstraintBase<'tangent'>
-  | (ConstraintBase<'distance'> & ConstraintTarget)
-  | (ConstraintBase<'angle'> & ConstraintTarget);
-
-/** An InstanceEntity and the frame of it a joint attaches to. */
-export interface JointMateRef {
-  readonly instanceId: string;
-  /** Default 'origin'. */
-  readonly frame?: 'origin' | 'axis-x' | 'axis-y' | 'axis-z';
-}
-
-interface JointBase<K extends string> {
-  readonly id: string;
-  readonly kind: K;
-  readonly a: JointMateRef;
-  readonly b: JointMateRef;
-  /** 'x'|'y'|'z' shorthand or a unit Vec3. */
-  axis: 'x' | 'y' | 'z' | Vec3;
-}
-
-/**
- * Instance `b` moves relative to `a`: revolute rotates by `angle` (radians) about `axis`, prismatic slides by `displacement` (document
- * units) along it.
- * @see add_joint, set_joint_value, evaluate_motion, bake_motion
- */
-export type Joint = (JointBase<'revolute'> & { angle: number }) | (JointBase<'prismatic'> & { displacement: number });
-
-export type JointKind = Joint['kind'];
+  | ConstraintBase<GeometricConstraintKind>
+  | (ConstraintBase<'symmetric'> & ConstraintAxis)
+  | (ConstraintBase<DimensionConstraintKind> & ConstraintTarget);
 
 /**
  * Couples joints: `driven = driver * ratio + offset` (gears, belts, linkages).
@@ -619,7 +620,7 @@ export interface DriveRelation {
 }
 
 /** Document units default to 'mm'; every map/list below is initialized empty by createEmptyDocument. */
-export interface CadDocument {
+export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFields {
   entities: Record<EntityId, Entity>;
   /** Z-order / creation order of entity ids. */
   order: EntityId[];
@@ -669,6 +670,8 @@ export interface CadDocument {
   dynamics?: DynamicsModel;
   /** Absent until the first prototype-review command (`allow_interference`, `set_part_grounded`). */
   prototype?: PrototypeModel;
+  /** Absent until the first model-review command (`save_viewpoint`, `create_review_issue`; plant 09 VIS). */
+  review?: ReviewModel;
   /** Absent until a kernel-provenance command or a v3 save stamps it (`set_modeling_tolerance`, `import_step_exact`). */
   kernelSettings?: DocumentKernelSettings;
   /** Content-addressed binary payloads keyed by sha256 (healed B-rep, original STEP); absent until the first exact import. */
@@ -691,6 +694,11 @@ export interface CadDocument {
   probabilistic?: ReliabilityModel;
   /** Absent until `set_item_identity` (plugin `plm`, 09): the managed item, revisions, change records. Outside the release scope. */
   plm?: PlmModel;
+  /** Absent until the first plant command (plugin `piping`, plant 02 RTE: `add_tie_in_point`, `create_pipeline`). */
+  plant?: PlantModel;
+  /** Point-cloud references, registrations and extractions (plugin `scan`, plant 10); absent until the first scan command. No points. */
+  scan?: ScanModel;
+  /** Contact sets / exploded views (`AssemblyPresentationFields`) and sketch planes / links (`SketchPlaneFields`) are inherited. */
 }
 
 export type { DocumentKernelSettings, Animation, AnimationChannel, AnimationMode };
@@ -701,7 +709,7 @@ export type { DocumentKernelSettings, Animation, AnimationChannel, AnimationMode
  */
 export interface DocumentBlob {
   readonly sha256: string;
-  readonly mediaType: 'model/x-occt-brep' | 'model/step';
+  readonly mediaType: 'model/x-occt-brep' | 'model/step' | 'model/iges';
   /** Base64 of the payload text. */
   readonly bytes: string;
   readonly size: number;
@@ -737,26 +745,6 @@ export interface Material {
   readonly constitutiveSets?: readonly ConstitutiveSet[];
   /** Id of the set used when a query names none. */
   readonly defaultConstitutiveSet?: string;
-}
-
-export const FINISH_PATTERNS = ['carbon_twill', 'carbon_plain', 'brushed', 'knurl', 'checker'] as const;
-
-export type FinishPattern = (typeof FINISH_PATTERNS)[number];
-
-/**
- * Tileable procedural finish: one texture tile spans `scale` document units, box-projected onto the part (glTF export + viewport use the
- * same maps).
- * @invariant scale > 0; normalStrength in [0, 2]; clearcoat in [0, 1]
- */
-export interface MaterialFinish {
-  readonly pattern: FinishPattern;
-  readonly scale: number;
-  /** Secondary colour (alternate tows, checker squares); default derived from `color`. */
-  readonly color2?: string;
-  /** Normal-map strength (relief depth), default 1. */
-  readonly normalStrength?: number;
-  /** Clear lacquer layer over the finish (0 = none, 1 = full gloss coat), default 0. */
-  readonly clearcoat?: number;
 }
 
 export const DEFAULT_LAYER_ID = 'layer-default';
@@ -797,6 +785,16 @@ export interface MeshData {
 export type BooleanOp = 'union' | 'subtract' | 'intersect';
 
 /**
+ * Radius law of one filleted edge: `size` at its start, `sizeEnd` at its end (linear between, constant when absent); `sizes` adds interior
+ * control points (`t` in (0, 1) strictly increasing, radius `size` there) the radius passes through (BRepFilletAPI_MakeFillet radius law).
+ */
+export interface EdgeRadius {
+  readonly size: number;
+  readonly sizeEnd?: number;
+  readonly sizes?: ReadonlyArray<{ readonly t: number; readonly size: number }>;
+}
+
+/**
  * Shape recipe: the serializable construction tree of a solid, stored on kernel results (`MeshSolidEntity.brep`) and evaluated by the
  * kernel (`@core/geometry/shapeRecipe`).
  */
@@ -808,6 +806,8 @@ export type ShapeRecipe =
    * `edges`: 0-based indices into the source's unique edges (`ShapeTopology.edges`); [] = all. `sizeEnd` (fillet only): radius at each
    * edge's end, varying linearly from `size` at its start. `near`: the mid point of each selected edge at creation (document frame), so code
    * generators can pick the same edges by position when the kernel's edge indices are unavailable; kernels ignore it.
+   * `radii` (fillet only): one law per entry of `edges` (same length, edges non-empty); `size` is then the placeholder 0, so a kernel that
+   * does not read `radii` refuses instead of rounding every edge with one radius.
    */
   | {
       readonly op: 'fillet' | 'chamfer';
@@ -815,6 +815,7 @@ export type ShapeRecipe =
       readonly edges: readonly number[];
       readonly size: number;
       readonly sizeEnd?: number;
+      readonly radii?: readonly EdgeRadius[];
       readonly near?: readonly Vec3[];
     }
   /** One-piece union of `sources` with every new intersection (joint) edge filleted by `radius`. */
@@ -829,4 +830,6 @@ export type ShapeRecipe =
   | { readonly op: 'brep'; readonly blob: string; readonly format: 'occt-brep-v1'; readonly label?: string }
   /** A hole group or pocket cut into a face of `source` (07 FTR); kernels lower it to boolean subtracts (`geometry/featureLowering`). */
   | ({ readonly op: 'feature'; readonly source: ShapeRecipe } & FeatureParams)
-  | FaceSlabRecipe;
+  | FaceSlabRecipe
+  /** Draft, push-pull or split of faces of `source` on its exact B-rep (SC-F1, `model/faceOps`); exact kernels only. */
+  | ({ readonly op: 'faceOp'; readonly source: ShapeRecipe } & FaceOpParams);

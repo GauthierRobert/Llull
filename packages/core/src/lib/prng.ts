@@ -1,63 +1,108 @@
 /**
- * Seeded pseudo-random stream for Monte Carlo (03 GDT TR-GDT-11): xoshiro128** seeded by SplitMix32 of `seed`, uniform from the top 24 bits,
- * normal by Box-Muller (cosine branch returned, sine branch kept for the next call). The same seed gives the same sequence; the generator
- * state is local to the returned object.
+ * Counter-based random numbers: Philox4x32-10 (Salmon, Moraes, Dror, Shaw, "Parallel random numbers: as easy as 1, 2, 3", SC'11,
+ * doi:10.1145/2063384.2063405; constants and round as in Random123 `philox.h`). A draw is a pure function of (counter, key), so the
+ * sample i of a Monte Carlo run does not depend on how many samples ran before it or on which thread: the native `llull-stats` crate
+ * draws the same numbers. Normals by Box–Muller (cos branch) with a polynomial cos(2πu) written with + − × only, so it is bit-identical
+ * in TypeScript and Rust; the only transcendental call is `Math.log` (V8 fdlibm, twin `llull_jsmath::log`).
  */
 
-export interface RandomStream {
-  /** Uniform in (0, 1) (never 0 or 1). */
-  uniform(): number;
-  /** Standard normal. */
-  normal(): number;
-}
+const M0 = 0xd2511f53;
+const M1 = 0xcd9e8d57;
+const W0 = 0x9e3779b9;
+const W1 = 0xbb67ae85;
+const TWO_32 = 4294967296;
 
-const TWO_POW_24 = 16777216;
+/**
+ * High 32 bits of the 64-bit product a·b (a, b < 2^32) given its exact low word: the double a·b − low is within 2^11 of the exact
+ * multiple high·2^32, so rounding the quotient recovers `high` exactly.
+ */
+const mulHigh = (a: number, b: number, low: number): number => Math.round((a * b - low) / TWO_32);
 
-/** One SplitMix32 step: the next state and its output word. */
-function splitMix32(state: number): { state: number; word: number } {
-  const next = (state + 0x9e3779b9) | 0;
-  let t = next ^ (next >>> 16);
-  t = Math.imul(t, 0x21f0aaad);
-  t ^= t >>> 15;
-  t = Math.imul(t, 0x735a2d97);
-  return { state: next, word: (t ^ (t >>> 15)) >>> 0 };
-}
-
-const rotl = (value: number, shift: number): number => (value << shift) | (value >>> (32 - shift));
-
-/** Stream for an integer seed (any finite number is truncated to 32 bits). */
-export function createRandomStream(seed: number): RandomStream {
-  let mix = splitMix32(Math.trunc(seed) | 0);
-  const words: number[] = [];
-  for (let i = 0; i < 4; i++) {
-    words.push(mix.word);
-    mix = splitMix32(mix.state);
-  }
-  let [s0, s1, s2, s3] = words as [number, number, number, number];
-  if ((s0 | s1 | s2 | s3) === 0) s0 = 1;
-  const nextWord = (): number => {
-    const result = Math.imul(rotl(Math.imul(s1, 5), 7), 9) >>> 0;
-    const t = s1 << 9;
-    s2 ^= s0;
-    s3 ^= s1;
-    s1 ^= s2;
-    s0 ^= s3;
-    s2 ^= t;
-    s3 = rotl(s3, 11);
-    return result;
-  };
-  const uniform = (): number => (nextWord() >>> 8) / TWO_POW_24 + 1 / (2 * TWO_POW_24);
-  let spare: number | null = null;
-  const normal = (): number => {
-    if (spare !== null) {
-      const value = spare;
-      spare = null;
-      return value;
+/**
+ * Philox4x32-10 of the counter (c0, c1, c2, c3) under the key (k0, k1), written into `out[0..3]`.
+ * @invariant matches the Random123 known-answer vectors (kat_vectors, `philox4x32 10`)
+ */
+export function philox4x32(c0: number, c1: number, c2: number, c3: number, k0: number, k1: number, out: Uint32Array): void {
+  let x0 = c0 >>> 0;
+  let x1 = c1 >>> 0;
+  let x2 = c2 >>> 0;
+  let x3 = c3 >>> 0;
+  let key0 = k0 >>> 0;
+  let key1 = k1 >>> 0;
+  for (let round = 0; round < 10; round += 1) {
+    if (round > 0) {
+      key0 = (key0 + W0) >>> 0;
+      key1 = (key1 + W1) >>> 0;
     }
-    const radius = Math.sqrt(-2 * Math.log(uniform()));
-    const angle = 2 * Math.PI * uniform();
-    spare = radius * Math.sin(angle);
-    return radius * Math.cos(angle);
-  };
-  return { uniform, normal };
+    const lo0 = Math.imul(M0, x0) >>> 0;
+    const hi0 = mulHigh(M0, x0, lo0);
+    const lo1 = Math.imul(M1, x2) >>> 0;
+    const hi1 = mulHigh(M1, x2, lo1);
+    x0 = (hi1 ^ x1 ^ key0) >>> 0;
+    x1 = lo1;
+    x2 = (hi0 ^ x3 ^ key1) >>> 0;
+    x3 = lo0;
+  }
+  out[0] = x0;
+  out[1] = x1;
+  out[2] = x2;
+  out[3] = x3;
 }
+
+/** Philox key of a seed (integer 0 ≤ seed < 2^53): its low and high 32-bit words. */
+export const philoxKey = (seed: number): readonly [number, number] => [seed >>> 0, Math.floor(seed / TWO_32) >>> 0];
+
+/** A 32-bit word as a uniform number in the open interval (0, 1): (w + ½)·2^-32. */
+export const unitUniform = (word: number): number => (word + 0.5) / TWO_32;
+
+const HALF_PI = Math.PI / 2;
+
+/** sin x for |x| ≤ π/4, Taylor series to x^17 (truncation < 1e-19), Horner in x². */
+function sinSmall(x: number): number {
+  const x2 = x * x;
+  return (
+    x *
+    (1 +
+      x2 *
+        (-1 / 6 +
+          x2 *
+            (1 / 120 +
+              x2 *
+                (-1 / 5040 +
+                  x2 * (1 / 362880 + x2 * (-1 / 39916800 + x2 * (1 / 6227020800 + x2 * (-1 / 1307674368000 + x2 / 355687428096000))))))))
+  );
+}
+
+/** cos x for |x| ≤ π/4, Taylor series to x^18 (truncation < 1e-19), Horner in x². */
+function cosSmall(x: number): number {
+  const x2 = x * x;
+  return (
+    1 +
+    x2 *
+      (-1 / 2 +
+        x2 *
+          (1 / 24 +
+            x2 *
+              (-1 / 720 +
+                x2 *
+                  (1 / 40320 +
+                    x2 *
+                      (-1 / 3628800 +
+                        x2 * (1 / 479001600 + x2 * (-1 / 87178291200 + x2 * (1 / 20922789888000 - x2 / 6402373705728000))))))))
+  );
+}
+
+/** cos(2πu) for 0 ≤ u < 1: quadrant from 4u (exact), then a series on at most π/4. */
+export function cosTwoPi(u: number): number {
+  const q = u * 4;
+  const quadrant = Math.floor(q);
+  const f = q - quadrant;
+  const low = f <= 0.5;
+  const cos = low ? cosSmall(f * HALF_PI) : sinSmall((1 - f) * HALF_PI);
+  const sin = low ? sinSmall(f * HALF_PI) : cosSmall((1 - f) * HALF_PI);
+  return quadrant === 0 ? cos : quadrant === 1 ? -sin : quadrant === 2 ? -cos : sin;
+}
+
+/** A standard normal from two 32-bit words: √(−2 ln u1)·cos(2π u2) (Box–Muller, cos branch). */
+export const boxMuller = (word1: number, word2: number): number =>
+  Math.sqrt(-2 * Math.log(unitUniform(word1))) * cosTwoPi(unitUniform(word2));

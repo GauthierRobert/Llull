@@ -1,0 +1,19 @@
+{
+  "id": "108-coil-round-wire",
+  "family": "coil",
+  "description": "coil of wire r=1 on a helix of radius 10, pitch 5, 6 turns (base on z = 0)",
+  "source": "analytic",
+  "formula": "V = pi r_s^2 L, L = turns sqrt((2 pi R)^2 + pitch^2); z from r_s (1 - cos a) to pitch turns + r_s (1 + cos a), tan a = pitch / (2 pi R)",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 1188.09661007,
+  "area": null,
+  "centroid": [0, 0, 16],
+  "bbox": { "min": [-11, -11, 0.00315132784967], "max": [11, 11, 31.9968486722] },
+  "tolerance": { "volume": 0.006, "area": 0.001, "centroid": 0.002, "bbox": 0.002 },
+  "meshTolerance": {
+    "volume": 0.01,
+    "area": null,
+    "reason": "the wire is a 24-gon section along a 16-per-turn Catmull-Rom spline of the helix (measured 4e-4 on Manifold); the exact run tolerates 6e-3 for the spline path"
+  }
+}

@@ -7,6 +7,7 @@ import type { Entity, Vec3 } from '../model/types';
 import { applyEulerXYZ } from '../lib/eulerRotation';
 import { ORIGIN } from '../lib/vec3';
 import type { InertiaTensor, MassProperties } from './massProperties';
+import { polygonArea } from '../lib/polygon';
 
 /** Rotate a principal (diagonal) inertia [a, b, c] given in the entity's local axes into world axes: I_w = R · diag · Rᵀ. */
 function rotatedPrincipalInertia([a, b, c]: Vec3, rotation: Vec3): InertiaTensor {
@@ -47,10 +48,28 @@ export function primitiveMassProperties(e: Entity, density: number): MassPropert
   return null;
 }
 
-/** Surface area of a box / cylinder / sphere (closed forms); null for every other kind. */
+/**
+ * Pappus-Guldin surface: sweep angle x sum of (edge length x mean edge distance to the axis), plus both profile caps when the turn is
+ * partial. Null for a profile that crosses the axis or carries exact curves (its polygon is then only a display approximation).
+ */
+function revolutionArea(e: Extract<Entity, { kind: 'revolution' }>): number | null {
+  if (e.curves !== undefined || e.profile.length < 3 || e.profile.some(([x]) => x < 0)) return null;
+  const angle = Math.min(e.angle, 2 * Math.PI);
+  let lateral = 0;
+  e.profile.forEach(([x1, y1], i) => {
+    const [x2, y2] = e.profile[(i + 1) % e.profile.length] ?? [x1, y1];
+    lateral += Math.hypot(x2 - x1, y2 - y1) * ((x1 + x2) / 2);
+  });
+  return angle * lateral + (angle < 2 * Math.PI ? 2 * Math.abs(polygonArea(e.profile)) : 0);
+}
+
+/** Surface area in closed form (box, cylinder, sphere, cone, torus, revolution); null for every other kind. */
 export function primitiveArea(e: Entity): number | null {
   if (e.kind === 'box') return 2 * (e.size[0] * e.size[1] + e.size[0] * e.size[2] + e.size[1] * e.size[2]);
   if (e.kind === 'cylinder') return 2 * Math.PI * e.radius * (e.radius + e.height);
   if (e.kind === 'sphere') return 4 * Math.PI * e.radius * e.radius;
+  if (e.kind === 'cone') return Math.PI * e.radius * (e.radius + Math.hypot(e.radius, e.height));
+  if (e.kind === 'torus') return 4 * Math.PI * Math.PI * e.ringRadius * e.tubeRadius;
+  if (e.kind === 'revolution') return revolutionArea(e);
   return null;
 }

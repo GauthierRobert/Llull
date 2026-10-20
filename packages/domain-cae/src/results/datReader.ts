@@ -1,4 +1,9 @@
-/** CalculiX `.dat` reader (05 §5.7): the `*NODE PRINT` / `*EL PRINT` tables and the eigenvalue / buckling-factor tables. */
+/**
+ * CalculiX `.dat` reader (05 §5.7): the `*NODE PRINT` / `*EL PRINT` tables, the eigenvalue / buckling-factor tables and, for the dynamic
+ * steps (PHY-09 TR-DYN-31), the participation factors, effective modal mass, total effective mass, fraction of totals and the modal
+ * coordinates printed per steady-state frequency (fixed layout of the CalculiX test outputs beamdy8 / beamdy10bm). A modal-mass heading printed
+ * without any readable row is reported in `warnings` (never silently dropped).
+ */
 
 import type { FeResultsArtifact } from '@core/model/analysis';
 
@@ -6,27 +11,40 @@ type Dat = NonNullable<FeResultsArtifact['dat']>;
 
 const TITLE = /\bfor (?:set|element set)\b.*\band time\s+(\S+)/i;
 
+/** Titles the PHY-09 readers look the frequency-step tables up by (rows: mode then x, y, z, rx, ry, rz; totals without the mode). */
+export const DAT_TITLES = {
+  participation: 'participation factors (mode, x, y, z, rx, ry, rz)',
+  effectiveMass: 'effective modal mass (mode, x, y, z, rx, ry, rz)',
+  totalMass: 'total effective mass (x, y, z, rx, ry, rz)',
+  fractions: 'fraction of totals (x, y, z, rx, ry, rz)',
+  modalCoordinates: 'modal coordinates (mode, frequency cycles/time, real, imaginary)',
+} as const;
+
 /**
- * Eigenvalue tables: the heading spaced out by CalculiX, the title the table is stored under, and the numbers on each row. The mass tables
- * (`exact: false`) accept rows of AT LEAST `columns` numbers: ccx prints six components (x, y, z translation, then rotation) where the three
- * translations are read first; all printed numbers are kept.
+ * Fixed-layout tables: the heading spaced out by CalculiX, the title the table is stored under, the numbers on each row, and whether the
+ * table is kept without rows (the 05 eigenvalue tables are; the PHY-09 ones only once a row is read). `timeGroup`: the heading carries the
+ * table time (the steady-state frequency).
  */
-const EIGEN_TABLES = [
+const FIXED_TABLES: readonly { heading: RegExp; title: string; columns: number; lazy: boolean; timeGroup?: number }[] = [
   {
     heading: /E I G E N V A L U E\s+O U T P U T/,
     title: 'eigenvalues (mode, eigenvalue, real part rad/time, frequency cycles/time, imaginary part)',
     columns: 5,
-    exact: true,
+    lazy: false,
   },
-  { heading: /B U C K L I N G\s+F A C T O R\s+O U T P U T/, title: 'buckling factors (mode, factor)', columns: 2, exact: true },
-  /** Modal mass tables of a `*FREQUENCY` step (x, y, z translations); `total` precedes `effective` because its heading contains the other. */
-  { heading: /T O T A L\s+E F F E C T I V E\s+M A S S/, title: 'total effective mass (x, y, z)', columns: 3, exact: false },
-  { heading: /P A R T I C I P A T I O N\s+F A C T O R S/, title: 'participation factors (mode, x, y, z)', columns: 4, exact: false },
-  { heading: /E F F E C T I V E\s+(?:M O D A L\s+)?M A S S/, title: 'effective modal mass (mode, x, y, z)', columns: 4, exact: false },
-] as const;
-
-/** Tables dropped when CalculiX prints the heading without any row under it (the eigenvalue and buckling tables are always kept). */
-const OPTIONAL_TABLES = ['total effective mass', 'participation factors', 'effective modal mass'];
+  { heading: /B U C K L I N G\s+F A C T O R\s+O U T P U T/, title: 'buckling factors (mode, factor)', columns: 2, lazy: false },
+  {
+    heading: /P A R T I C I P A T I O N\s+F A C T O R S\s+F O R\s+F R E Q U E N C Y\s+(\S+)/,
+    title: DAT_TITLES.modalCoordinates,
+    columns: 4,
+    lazy: true,
+    timeGroup: 1,
+  },
+  { heading: /P A R T I C I P A T I O N\s+F A C T O R S\s*$/, title: DAT_TITLES.participation, columns: 7, lazy: true },
+  { heading: /E F F E C T I V E\s+M O D A L\s+M A S S/, title: DAT_TITLES.effectiveMass, columns: 7, lazy: true },
+  { heading: /T O T A L\s+E F F E C T I V E\s+M A S S/, title: DAT_TITLES.totalMass, columns: 6, lazy: true },
+  { heading: /F R A C T I O N\s+O F\s+T O T A L S/, title: DAT_TITLES.fractions, columns: 6, lazy: true },
+];
 
 /** C `%e` output with a 3-digit exponent loses its `E` in CalculiX tables: `1.52172-101` is 1.52172E-101. */
 const THREE_DIGIT_EXPONENT = /^([+-]?\d*\.\d+)([+-]\d{3})$/;
@@ -46,22 +64,28 @@ const numbersOf = (line: string): number[] | null => {
 export function parseDat(text: string): Dat {
   const tables: { title: string; time: number; rows: number[][] }[] = [];
   let open: (typeof tables)[number] | null = null;
-  let eigen: { table: (typeof tables)[number]; columns: number; exact: boolean } | null = null;
+  let fixed: { table: (typeof tables)[number]; columns: number; pushed: boolean } | null = null;
+  const unread = new Set<string>();
   for (const line of text.split(/\r?\n/)) {
-    const heading = EIGEN_TABLES.find((candidate) => candidate.heading.test(line));
+    const heading = FIXED_TABLES.find((candidate) => candidate.heading.test(line));
     if (heading !== undefined) {
       open = null;
-      eigen = { table: { title: heading.title, time: 0, rows: [] }, columns: heading.columns, exact: heading.exact };
-      tables.push(eigen.table);
+      const time = heading.timeGroup === undefined ? 0 : Number.parseFloat(heading.heading.exec(line)?.[heading.timeGroup] ?? '');
+      fixed = { table: { title: heading.title, time, rows: [] }, columns: heading.columns, pushed: !heading.lazy };
+      if (!heading.lazy) tables.push(fixed.table);
+      else if (heading.title !== DAT_TITLES.modalCoordinates) unread.add(heading.title);
       continue;
     }
-    if (eigen !== null) {
+    if (fixed !== null) {
       const values = numbersOf(line);
-      if (values !== null && (eigen.exact ? values.length === eigen.columns : values.length >= eigen.columns))
-        eigen.table.rows.push(values);
-      else if (eigen.table.rows.length > 0) eigen = null;
+      if (values !== null && values.length === fixed.columns) {
+        fixed.table.rows.push(values);
+        if (!fixed.pushed) tables.push(fixed.table);
+        fixed.pushed = true;
+        unread.delete(fixed.table.title);
+      } else if (fixed.table.rows.length > 0) fixed = null;
       else continue;
-      if (eigen !== null) continue;
+      if (fixed !== null) continue;
     }
     const title = TITLE.exec(line);
     if (title !== null) {
@@ -74,10 +98,9 @@ export function parseDat(text: string): Dat {
     if (values === null) open = null;
     else open.rows.push(values);
   }
-  const dropped = tables.filter((table) => table.rows.length === 0 && OPTIONAL_TABLES.some((title) => table.title.startsWith(title)));
-  const warnings = dropped.map(
-    (table) =>
-      `the heading of '${table.title.split(' (')[0]}' is present but no row of it could be read (a ccx layout this reader does not know)`,
+  const warnings = [...unread].map(
+    (title) =>
+      `the heading of '${title.split(' (')[0]}' is present but no row of it could be read (a ccx layout this reader does not know)`,
   );
-  return { tables: tables.filter((table) => !dropped.includes(table)), ...(warnings.length > 0 ? { warnings } : {}) };
+  return { tables, ...(warnings.length > 0 ? { warnings } : {}) };
 }

@@ -1,0 +1,14 @@
+{
+  "id": "04-box-anchor-min",
+  "family": "primitive",
+  "description": "box anchored by its min corner at (5,5,5)",
+  "source": "analytic",
+  "formula": "centre = min + size/2",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 24,
+  "area": 52,
+  "centroid": [6, 6.5, 7],
+  "bbox": { "min": [5, 5, 5], "max": [7, 8, 9] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

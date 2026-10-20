@@ -1,12 +1,13 @@
 [package]
 name = "llull-stats"
-description = "Statistics jobs of llull-compute: counter-based (Philox4x32-10) Monte Carlo tolerance stack-ups, fixed-order reductions (03 GDT M5n, RS1 RS-7)"
+description = "Monte Carlo stack-up job of llull-compute (aerospace 03 GDT TR-GDT-22, RS1 RS-7): Philox4x32-10 counter streams, fixed-order reductions"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
 [dependencies]
+llull-jsmath = { path = "../llull-jsmath" }
 llull-protocol = { path = "../llull-protocol" }
 rayon.workspace = true
 serde.workspace = true

@@ -38,6 +38,7 @@ const TOOLSET_GROUPS = {
   design: 'Design (.lld)',
   pmi: 'GD&T / PMI',
   plm: 'PLM / configuration',
+  scan: 'Point clouds',
 } as const satisfies Record<ToolsetName, string>;
 
 const OTHER_COMMANDS_GROUP = 'Other commands' as const;

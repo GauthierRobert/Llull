@@ -7,3 +7,6 @@ export { meshRequest, type MeshRequest } from './hash/meshRequest';
 export { buildTopologyJob, type TopologyJob, type TopologyJobResult } from './topology/job';
 export { buildTopologyArtifact, runTopologyReference, type TopologySolveOutput } from './topology/artifact';
 export { TS_REFERENCE_MAX_ELEMENTS } from './topology/defaults';
+export { explicitPlugin } from './explicit/plugin';
+export { buildExplicitJob, type ExplicitJob } from './explicit/job';
+export { buildExplicitArtifact, explicitSummary } from './explicit/artifact';

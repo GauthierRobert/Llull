@@ -1,0 +1,14 @@
+{
+  "id": "25-wedge-offset",
+  "family": "primitive",
+  "description": "wedge 10x4x6 with its min corner at (1,1,1)",
+  "source": "analytic",
+  "formula": "V = whd/2; centroid (w/2, h/3, d/3) from the min corner",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 120,
+  "area": 196.111025509,
+  "centroid": [6, 2.33333333333, 3],
+  "bbox": { "min": [1, 1, 1], "max": [11, 5, 7] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

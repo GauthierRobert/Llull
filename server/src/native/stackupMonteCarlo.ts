@@ -1,179 +1,197 @@
 /**
- * `stackup_monte_carlo` transport (03 GDT M5n, TR-GDT-22, RS1 RS-7): the Monte Carlo of `analyze_stackup` above its 2e6-sample cap, run by
- * `llull-compute stats stackup` (crate `llull-stats`: Philox4x32-10 counter-based streams, fixed-order block reductions, rayon). The closed
- * forms, the contributor resolution (pmiId links, typed limits), the sensitivities and the spec-limit probabilities come from the registry
- * command itself, so this tool answers the same `data` shape plus the native `monteCarlo`; the document is never written.
- * The result is a pure function of (seed, samples, inputs): bit-identical for any thread count. It agrees with the TypeScript Monte Carlo
- * statistically (the §5.7 item 7 acceptance bounds), not bit for bit: another generator.
+ * `stackup_monte_carlo` transport (aerospace 03 GDT TR-GDT-22, RS1 RS-7): the analyze_stackup params, validated by the same core model,
+ * Monte Carlo above the TypeScript cap in `llull-compute stats` (crate `llull-stats`). It draws the same Philox4x32-10 samples as
+ * analyze_stackup and reduces them in the same fixed order, so for the same (seed, samples, inputs) the result equals the TS one bit for
+ * bit whenever the expression has no trigonometric function (VC-GDT-37). Closed forms come from the core model; the document is never
+ * written (query data only).
  */
 
 import type { FeaHost, FeaToolResult } from '@protocol/index';
-import { parseStackExpression } from '@lib/stackExpression';
-import { probabilityAcceptance } from '@lib/stackup';
+import type { ToolDefinition } from '@protocol/tools';
+import { getCommand } from '@core/commands/registry';
+import { programFunction } from '@lib/expressionProgram';
 import { isRecord } from '@lib/isRecord';
+import { sampleStackup, type SamplingStats } from '@lib/stackupSampling';
+import {
+  isStackupRefusal,
+  resolveStackup,
+  sampledContributors,
+  stackupData,
+  stackupJob,
+  stackupParams,
+  STACKUP_TS_SAMPLES_CAP,
+  type StackupModel,
+} from '@core/commands/pmi/stackupModel';
 import { feaFailure } from '../fea/feaCommon';
 import { readOutput, withJobFolder, type ComputeRunner } from './computeJob';
 
 const TOOL = 'stackup_monte_carlo';
-const DEFAULT_SAMPLES = 10_000_000;
-/** Mirrors `MAX_SAMPLES` of llull-stats. */
-export const MAX_NATIVE_SAMPLES = 10_000_000_000;
-const DEFAULT_SEED = 20_261_020;
+/** Native cap (`llull_stats::MAX_SAMPLES`, 2^40): chunk counts and the Chan merge products stay exact in f64. */
+const NATIVE_STACKUP_SAMPLES_CAP = 2 ** 40;
+/** Default when `samples` is omitted: the first size above the TS cap that the native path exists for. */
+const NATIVE_STACKUP_DEFAULT_SAMPLES = 10_000_000;
 const DEFAULT_TIMEOUT_S = 600;
 
-export interface StackupDeps {
+export interface StackupNativeDeps {
   readonly runner: ComputeRunner;
   readonly env?: NodeJS.ProcessEnv;
 }
 
-interface Resolved {
-  readonly name: string;
-  readonly nominal: number;
-  readonly lower: number;
-  readonly upper: number;
-  readonly sensitivity: number;
-  readonly distribution: 'normal' | 'uniform';
-}
-
-const finiteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
-
-/** The resolved contributors of an `analyze_stackup` answer, or null when its data is not the expected shape. */
-function resolvedOf(data: unknown): { contributors: Resolved[]; mean: number; k: number } | null {
-  if (!isRecord(data) || !Array.isArray(data['contributors']) || !finiteNumber(data['mean'])) return null;
-  const sigma = data['sigmaPerHalfTolerance'];
-  const k = isRecord(sigma) ? sigma['value'] : undefined;
-  if (!finiteNumber(k)) return null;
-  const contributors: Resolved[] = [];
-  for (const entry of data['contributors']) {
-    if (!isRecord(entry)) return null;
-    const { name, nominal, lower, upper, sensitivity, distribution } = entry;
-    if (
-      typeof name !== 'string' ||
-      !finiteNumber(nominal) ||
-      !finiteNumber(lower) ||
-      !finiteNumber(upper) ||
-      !finiteNumber(sensitivity) ||
-      (distribution !== 'normal' && distribution !== 'uniform')
-    )
-      return null;
-    contributors.push({ name, nominal, lower, upper, sensitivity, distribution });
-  }
-  return { contributors, mean: data['mean'], k };
-}
-
-export interface StackupOptions {
-  readonly samples?: number;
-  readonly seed?: number;
+export interface StackupNativeOptions {
   readonly timeoutS?: number;
+  /** Also run the TypeScript sampler (samples ≤ 2e6 only) and report whether the statistics are identical. */
+  readonly verify?: boolean;
+}
+
+function statsOf(value: unknown): (SamplingStats & { readonly threads: number }) | string {
+  if (!isRecord(value)) return 'stats.json is not an object';
+  const numeric = ['samples', 'mean', 'std', 'min', 'max', 'below', 'above', 'nonFinite', 'threads'] as const;
+  for (const key of numeric) if (typeof value[key] !== 'number') return `stats.json has no numeric ${key}`;
+  const n = (key: (typeof numeric)[number]): number => value[key] as number;
+  return {
+    samples: n('samples'),
+    mean: n('mean'),
+    std: n('std'),
+    min: n('min'),
+    max: n('max'),
+    below: n('below'),
+    above: n('above'),
+    nonFinite: n('nonFinite'),
+    threads: n('threads'),
+  };
+}
+
+function verification(model: StackupModel, native: SamplingStats): Record<string, unknown> {
+  if (model.samples > STACKUP_TS_SAMPLES_CAP) return { skipped: `samples above the TypeScript cap ${STACKUP_TS_SAMPLES_CAP}` };
+  const started = Date.now();
+  const reference = sampleStackup({
+    contributors: sampledContributors(model),
+    evaluate: programFunction(model.program),
+    samples: model.samples,
+    seed: model.seed,
+    ...(model.params.lowerSpecLimit === undefined ? {} : { lowerSpecLimit: model.params.lowerSpecLimit }),
+    ...(model.params.upperSpecLimit === undefined ? {} : { upperSpecLimit: model.params.upperSpecLimit }),
+  });
+  const keys = ['mean', 'std', 'min', 'max', 'below', 'above'] as const;
+  return {
+    referenceMs: Date.now() - started,
+    identical: keys.every((key) => Object.is(reference[key], native[key])),
+    largestRelativeDifference: Math.max(
+      ...keys.map(
+        (key) => Math.abs(reference[key] - native[key]) / Math.max(Math.abs(reference[key]), Math.abs(native[key]), Number.MIN_VALUE),
+      ),
+    ),
+  };
+}
+
+/** stackup_monte_carlo: the analyze_stackup params (read from the registry, one schema) plus timeoutS and verify. */
+export function stackupToolDefinition(): ToolDefinition {
+  const schema = getCommand('analyze_stackup')?.paramsSchema ?? { type: 'object' as const, properties: {}, required: [] };
+  return {
+    name: TOOL,
+    description:
+      'analyze_stackup (same params, same data) with the Monte Carlo run by the native llull-compute binary (crate llull-stats, rayon): ' +
+      `for samples above the 2000000 TypeScript cap, up to 2^40 (default ${NATIVE_STACKUP_DEFAULT_SAMPLES}). It draws the same ` +
+      'Philox4x32-10 samples as analyze_stackup and reduces them in the same fixed order, so the numbers do not depend on the thread count ' +
+      'and equal the TypeScript ones bit for bit for expressions without trigonometric functions (data.monteCarlo.bitExactWithTs). ' +
+      'monteCarlo is always run; data.monteCarlo.engine "native", provenance { tool, version, threads, deterministic }. verify: true also ' +
+      'runs the TypeScript sampler (samples <= 2000000) and reports the agreement. Without llull-compute: NATIVE_TOOL_MISSING.',
+    inputSchema: {
+      ...schema,
+      properties: {
+        ...schema.properties,
+        timeoutS: {
+          type: 'number',
+          minimum: 1,
+          maximum: 86400,
+          description: 'Wall-clock limit of the native job in seconds (default 600).',
+        },
+        verify: { type: 'boolean', description: 'Also run the TypeScript sampler (samples <= 2000000) and compare. Default false.' },
+      },
+    },
+    annotations: { readOnlyHint: true, idempotentHint: true },
+  };
+}
+
+/** Runs the transport with `timeoutS` / `verify` taken from the params. */
+export function runStackupTool(params: unknown, host: FeaHost, deps: StackupNativeDeps): Promise<FeaToolResult> {
+  const args = isRecord(params) ? params : {};
+  const { timeoutS, verify, ...rest } = args;
+  const options: StackupNativeOptions = {
+    ...(typeof timeoutS === 'number' && Number.isFinite(timeoutS) ? { timeoutS } : {}),
+    verify: verify === true,
+  };
+  return runStackupMonteCarlo(rest, options, host, deps);
 }
 
 /**
- * @failure invalid stack-up -> the GDT_* refusal of analyze_stackup; samples outside 1..1e10 -> GDT_STACKUP_SAMPLES; binary absent -> NATIVE_TOOL_MISSING
- *   (analyze_stackup keeps its 2e6-sample TypeScript Monte Carlo); timeout / job error / protocol or output hash problem -> NATIVE_TIMEOUT / the job code / NATIVE_PROTOCOL
+ * @failure invalid params -> CMD_INVALID_PARAMS; model refusals -> the GDT_* code of analyze_stackup; binary absent -> NATIVE_TOOL_MISSING
+ *   (analyze_stackup still runs up to 2e6 samples); job error / timeout / protocol -> its code; non-finite samples -> GDT_STACKUP_NON_FINITE
  */
 export async function runStackupMonteCarlo(
-  stack: Readonly<Record<string, unknown>>,
-  options: StackupOptions,
+  params: unknown,
+  options: StackupNativeOptions,
   host: FeaHost,
-  deps: StackupDeps,
+  deps: StackupNativeDeps,
 ): Promise<FeaToolResult> {
-  const samples = options.samples ?? DEFAULT_SAMPLES;
-  if (!Number.isInteger(samples) || samples < 1 || samples > MAX_NATIVE_SAMPLES)
-    return feaFailure(
-      TOOL,
-      'GDT_STACKUP_SAMPLES',
-      `samples must be an integer from 1 to ${MAX_NATIVE_SAMPLES}, got ${String(options.samples)}`,
-    );
-  const seed = options.seed ?? DEFAULT_SEED;
-  if (!Number.isInteger(seed)) return feaFailure(TOOL, 'GDT_STACKUP_SAMPLES', `seed must be an integer, got ${String(options.seed)}`);
-  const analysis = host.applyCommand('analyze_stackup', { ...stack, methods: ['worstCase', 'rss'], samples: undefined, seed: undefined });
-  if (analysis.isError) return { ...analysis, summary: `${TOOL}: ${analysis.summary}` };
-  const resolved = resolvedOf(analysis.data);
-  if (resolved === null) return feaFailure(TOOL, 'GDT_STACKUP_INVALID', 'analyze_stackup answered no contributor table');
-  const { contributors, k } = resolved;
-  const expression = typeof stack['expression'] === 'string' ? stack['expression'] : undefined;
-  let model: Record<string, unknown>;
-  if (expression === undefined) model = { kind: 'linear', sensitivities: contributors.map((c) => c.sensitivity) };
-  else {
-    const parsed = parseStackExpression(
-      expression,
-      contributors.map((c) => c.name),
-    );
-    if (!parsed.ok) return feaFailure(TOOL, 'GDT_STACKUP_EXPRESSION', parsed.error);
-    model = { kind: 'expression', tree: parsed.tree };
+  const parsed = stackupParams.safeParse(params);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return feaFailure(TOOL, 'CMD_INVALID_PARAMS', `${issue?.path.join('.') ?? ''}: ${issue?.message ?? 'invalid params'}`);
   }
-  const lower = finiteNumber(stack['lowerSpecLimit']) ? stack['lowerSpecLimit'] : undefined;
-  const upper = finiteNumber(stack['upperSpecLimit']) ? stack['upperSpecLimit'] : undefined;
-  const job = {
-    seed,
-    samples,
-    contributors: contributors.map((c) => {
-      const half = (c.upper - c.lower) / 2;
-      return {
-        centre: c.nominal + (c.lower + c.upper) / 2,
-        spread: c.distribution === 'normal' ? half / k : half,
-        normal: c.distribution === 'normal',
-      };
-    }),
-    model,
-    ...(lower === undefined ? {} : { lower }),
-    ...(upper === undefined ? {} : { upper }),
+  const withDefaults = {
+    ...parsed.data,
+    methods: [...new Set([...(parsed.data.methods ?? ['worstCase', 'rss']), 'monteCarlo' as const])],
+    samples: parsed.data.samples ?? NATIVE_STACKUP_DEFAULT_SAMPLES,
   };
+  const model = resolveStackup(withDefaults, NATIVE_STACKUP_SAMPLES_CAP, host.getDoc());
+  if (isStackupRefusal(model)) return { ...feaFailure(TOOL, model.code, model.message), data: { code: model.code, paths: model.paths } };
   const seconds = Math.max(1, Math.min(86_400, options.timeoutS ?? DEFAULT_TIMEOUT_S));
   const outcome = await withJobFolder(
-    { 'job.json': JSON.stringify(job) },
+    { 'job.json': JSON.stringify(stackupJob(model)) },
     async (folder) => {
-      const run = await deps.runner.run(['stats', 'stackup'], folder, seconds * 1000);
-      return { run, result: run.ok ? (JSON.parse((await readOutput(folder, run, 'result.json')).toString('utf8')) as unknown) : null };
+      const run = await deps.runner.run(['stats'], folder, seconds * 1000);
+      if (!run.ok) return { run, stats: null };
+      return { run, stats: statsOf(JSON.parse((await readOutput(folder, run, 'stats.json')).toString('utf8'))) };
     },
     deps.env,
-  ).catch((error: unknown) => ({ run: null, result: null, error: error instanceof Error ? error.message : String(error) }));
+  ).catch((error: unknown) => ({ run: null, stats: null, error: error instanceof Error ? error.message : String(error) }));
   if (outcome.run === null) return feaFailure(TOOL, 'NATIVE_PROTOCOL', 'error' in outcome ? outcome.error : 'job folder failure');
-  const { run, result } = outcome;
-  if (!isRecord(result)) {
-    const fallback = run.code === 'NATIVE_TOOL_MISSING' ? ' analyze_stackup still runs up to 2000000 samples in TypeScript.' : '';
+  const { run, stats } = outcome;
+  if (stats === null) {
+    const hint = run.code === 'NATIVE_TOOL_MISSING' ? ' analyze_stackup still samples up to 2000000 in TypeScript.' : '';
     return {
-      ...feaFailure(TOOL, run.code ?? 'NATIVE_JOB_FAILED', `${run.message ?? 'llull-compute failed'}.${fallback}`),
+      ...feaFailure(TOOL, run.code ?? 'NATIVE_JOB_FAILED', `${run.message ?? 'llull-compute failed'}.${hint}`),
       data: { code: run.code, log: run.log.slice(-4000) },
     };
   }
-  const { counted, mean, std, min, max, below, above, prng, nonFinite } = result as Record<string, unknown>;
-  if (!finiteNumber(counted) || !finiteNumber(mean) || !finiteNumber(std) || !finiteNumber(min) || !finiteNumber(max))
-    return feaFailure(TOOL, 'NATIVE_PROTOCOL', 'the job answered an incomplete result');
-  const data = isRecord(analysis.data) ? analysis.data : {};
-  const sigma = finiteNumber(data['sigma']) ? data['sigma'] : 0;
-  const exactBelow = finiteNumber(data['pBelow']) ? data['pBelow'] : null;
-  const exactAbove = finiteNumber(data['pAbove']) ? data['pAbove'] : null;
-  const pBelow = lower !== undefined && finiteNumber(below) ? below / counted : undefined;
-  const pAbove = upper !== undefined && finiteNumber(above) ? above / counted : undefined;
-  const monteCarlo = {
-    seed,
-    samples,
-    prng,
-    engine: 'native-cpu',
+  if (typeof stats === 'string') return feaFailure(TOOL, 'NATIVE_PROTOCOL', stats);
+  if (stats.nonFinite > 0)
+    return feaFailure(
+      TOOL,
+      'GDT_STACKUP_NON_FINITE',
+      `${stats.nonFinite} of ${stats.samples} samples are not finite: check the expression and limits`,
+    );
+  const provenance = {
+    tool: 'llull-compute stats',
+    version: await deps.runner.version(),
+    threads: stats.threads,
     deterministic: true,
-    nonFinite: finiteNumber(nonFinite) ? nonFinite : 0,
     elapsedMs: run.elapsedMs,
-    mean,
-    std,
-    min,
-    max,
-    ...(pBelow === undefined ? {} : { pBelow }),
-    ...(pAbove === undefined ? {} : { pAbove }),
-    acceptance: {
-      mean: (5 * sigma) / Math.sqrt(counted),
-      std: (5 * sigma) / Math.sqrt(2 * counted),
-      ...(pBelow !== undefined && exactBelow !== null ? { pBelow: probabilityAcceptance(exactBelow, counted) } : {}),
-      ...(pAbove !== undefined && exactAbove !== null ? { pAbove: probabilityAcceptance(exactAbove, counted) } : {}),
-    },
   };
-  const fmt = (value: number): string => String(Number(value.toPrecision(9)));
+  const data = stackupData(model, host.getDoc().units, { stats, engine: 'native', provenance });
+  const mc = data['monteCarlo'] as Record<string, unknown>;
+  const checked = options.verify === true ? verification(model, stats) : undefined;
   return {
     summary:
-      `${TOOL}: ${samples} samples in ${run.elapsedMs} ms (native, seed ${seed}): mean ${fmt(mean)}, std ${fmt(std)}, range [${fmt(min)}, ${fmt(max)}]` +
-      `${pBelow === undefined ? '' : `, P(below) ${fmt(pBelow)}`}${pAbove === undefined ? '' : `, P(above) ${fmt(pAbove)}`}. ${analysis.summary}`,
+      `stackup_monte_carlo: llull-compute sampled ${stats.samples} stacks on ${stats.threads} threads in ${run.elapsedMs} ms: ` +
+      `mean ${Number(stats.mean.toPrecision(6))}, std ${Number(stats.std.toPrecision(6))}` +
+      (mc['pBelowLowerLimit'] === undefined ? '' : `, P(y<L) ${String(mc['pBelowLowerLimit'])}`) +
+      (mc['pAboveUpperLimit'] === undefined ? '' : `, P(y>U) ${String(mc['pAboveUpperLimit'])}`) +
+      (checked === undefined ? '' : `; TypeScript check: ${checked['identical'] === true ? 'identical' : JSON.stringify(checked)}`) +
+      '. Not approved: a qualified engineer must review.',
     affected: [],
     isError: false,
-    data: { ...data, monteCarlo },
+    data: { ...data, ...(checked === undefined ? {} : { verification: checked }) },
   };
 }

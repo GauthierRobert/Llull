@@ -10,6 +10,7 @@ import { createLibraryProvider } from '../libraries/libraryStore';
 import { createSignaturePort } from '../plm/signaturePort';
 import { objectsOf } from '../plm/vault/location';
 import { defaultFeArtifactStore } from './artifactStore';
+import { defaultPointCloudPort } from '../scan/pointCloudPort';
 
 export function serverContext(
   onStep?: (event: PlanStepEvent) => void,
@@ -22,5 +23,6 @@ export function serverContext(
     libraries: createLibraryProvider(),
     objects: objectsOf(),
     ...(onStep !== undefined ? { onStep } : {}),
+    pointClouds: defaultPointCloudPort(),
   };
 }

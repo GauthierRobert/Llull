@@ -1,0 +1,6 @@
+{
+  "actions": [
+    { "command": "add_box", "params": { "size": [10, 10, 10] }, "as": "a" },
+    { "command": "draft_faces", "params": { "id": "$a", "facesNear": [[5, 0, 0]], "angle": 5, "pull": [0, 0, 1] } }
+  ]
+}

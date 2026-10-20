@@ -1,3 +1,4 @@
+import { placementOf } from '../draw2d/sketchPlanes';
 import { idOrNext } from '../entity/explicitId';
 import type { CadDocument, Vec2, Vec3 } from '../../model/types';
 import type { CurveSegment } from '../../model/curve';
@@ -8,7 +9,6 @@ import { ORIGIN, finiteVec3OrZero, len3 } from '../../lib/vec3';
 import { noop } from '../noop';
 import { MAX_PROFILE_POINTS, MAX_REVOLVE_SEGMENTS } from '../limits';
 import { newEntity } from '../entity/newEntity';
-import { nextId } from '../../lib/id';
 import { compactNumber, fixedNumber } from '../../lib/compactNumber';
 import {
   DEFAULT_SOLID_COLOR,
@@ -17,7 +17,6 @@ import {
   commitSolid,
   rejectBadProfile,
   rejectZeroAreaProfile,
-  resolveRotation,
   axisField,
   rotationField,
   existingLayerOrDefault,
@@ -25,13 +24,15 @@ import {
   explicitIdTaken,
 } from './shared';
 import { sketchLoop } from './sketchCurves';
+import { exactCurves, extrusionResult } from './extrusionResult';
+import { thinExtrude, thinSchema } from './thinExtrude';
 import { mapSegment } from '../../geometry/curveSegments';
 
 /**
  * @affects creates 1 extrusion entity; sources (id/ids) are kept
  * @invariant depth > 0; exactly one of profile (>= 3 finite [x,y] points), id, ids
- * @invariant sketch sources store their exact `curves` and sit at the (first) source position unless `position` is given; the source
- *   rotation is not inherited
+ * @invariant sketch sources store their exact `curves` and sit at the (first) source position unless `position` is given; without
+ *   rotation / axis / plane they inherit the source rotation (the extrusion runs along the sketch's work-plane normal)
  * @failure no/ambiguous source, profile < 3 points or non-finite, open/unsupported sketch, pieces that do not close, depth <= 0,
  *   zero-length axis -> no-op, affected:[]
  * @failure malformed rotation -> entity still created with rotation [0,0,0]
@@ -46,10 +47,13 @@ export const extrudeProfile = defineCommand({
     'open spline) that join end to end into one closed loop, in any order and direction. A drawn sketch ' +
     'keeps its curved boundaries exact (true arcs and Bézier splines for the exact kernel and STEP export; ' +
     'the polygon is only the display tessellation), is placed at the (first) source entity position ' +
-    '(override with `position`), does not inherit the source rotation, and stays in the document. ' +
+    '(override with `position`), inherits the source rotation (it extrudes along its work-plane normal) unless rotation, axis or plane ' +
+    'is given (the profile keeps the source in-plane [x, y]; an explicit rotation / axis re-orients that plane), and stays in the document. ' +
     'The solid spans from the position along +Z for depth units (depth must be > 0). ' +
     'Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = the extrusion direction ' +
-    '(the profile plane normal; local +Z maps to it). axis wins when both are given; the derived Euler angles are stored.',
+    '(the profile plane normal; local +Z maps to it). axis wins when both are given; the derived Euler angles are stored. ' +
+    'thin {thickness, side centre|inside|outside} extrudes only a wall instead of a solid prism: an open polyline (id, or inline profile with ' +
+    'openPath true) becomes an offset band, a closed profile a ring (needs a geometry kernel; result is a mesh with an exact B-rep).',
   params: z.object({
     profile: untypedArray(
       'Inline closed loop: array of [x, y] points in the XY plane of the profile (at least 3, do not repeat ' +
@@ -74,9 +78,28 @@ export const extrudeProfile = defineCommand({
     ).optional(),
     rotation: rotationField(),
     axis: axisField('is the extrusion direction (local +Z)'),
+    plane: z
+      .string()
+      .describe(
+        'Sketch plane id (create_sketch_plane): extrude along the plane normal, the profile in the plane axes. Without it a drawn source ' +
+          'already extrudes along its own work plane (its rotation). Excludes rotation and axis.',
+      )
+      .optional(),
     color: colorField(EXTRUSION_COLOR),
+    thin: thinSchema.optional(),
+    openPath: z
+      .boolean()
+      .describe('Only with thin: true means the inline `profile` is an OPEN path (not implicitly closed). Default false.')
+      .optional(),
   }),
-  run: (doc, { profile, id, ids, depth, position, rotation, axis, color = EXTRUSION_COLOR }) => {
+  run: (doc, { profile, id, ids, depth, position, rotation: given, axis, plane, color = EXTRUSION_COLOR, thin, openPath }, ctx) => {
+    const sketchPlane = plane === undefined ? undefined : doc.sketchPlanes?.[plane];
+    if (plane !== undefined && sketchPlane === undefined) return noop(doc, `extrude_profile: no sketch plane '${plane}'; no-op.`);
+    if (sketchPlane !== undefined && (given !== undefined || axis !== undefined))
+      return noop(doc, 'extrude_profile: give plane OR rotation / axis, not both; no-op.');
+    const rotation = sketchPlane === undefined ? given : placementOf(sketchPlane.frame).rotation;
+    if (thin !== undefined) return thinExtrude(doc, { profile, openPath, id, ids, depth, position, rotation, axis, color, thin }, ctx);
+    if (openPath === true) return noop(doc, 'extrude_profile: openPath needs thin (a solid prism needs a closed profile); no-op.');
     const sources = [profile, id, ids].filter((source) => source !== undefined).length;
     if (sources === 0)
       return noop(doc, 'extrude_profile: give profile (inline points), id (one closed shape) or ids (pieces of a loop); no-op.');
@@ -87,7 +110,7 @@ export const extrudeProfile = defineCommand({
       return extrusionResult(doc, {
         profile,
         depth,
-        position: position ?? ORIGIN,
+        position: position ?? sketchPlane?.frame.origin ?? ORIGIN,
         rotation,
         axis,
         color,
@@ -111,7 +134,7 @@ export const extrudeProfile = defineCommand({
       profile: loop.profile,
       depth,
       position: position ?? loop.origin,
-      rotation,
+      rotation: rotation ?? (axis === undefined ? loop.rotation : undefined),
       axis,
       color,
       curves: loop.curves,
@@ -133,33 +156,6 @@ function rejectInlineProfile(doc: CadDocument, profile: ReadonlyArray<readonly [
   return null;
 }
 
-function extrusionResult(
-  doc: CadDocument,
-  extrusion: {
-    readonly profile: ReadonlyArray<readonly [number, number]>;
-    readonly depth: number;
-    readonly position: Vec3;
-    readonly rotation: unknown;
-    readonly axis: unknown;
-    readonly color: string;
-    readonly curves?: ReadonlyArray<CurveSegment<Vec2>>;
-    readonly describe: (id: string) => string;
-  },
-): CommandResult {
-  const resolved = resolveRotation(extrusion.axis, extrusion.rotation);
-  if (resolved.error !== undefined) return noop(doc, `extrude_profile: ${resolved.error}; no-op.`);
-  const id = nextId('ext');
-  const entity = newEntity(
-    'extrusion',
-    id,
-    { profile: extrusion.profile, depth: extrusion.depth, ...exactCurves(extrusion.curves ?? []) },
-    extrusion.position,
-    extrusion.color,
-    { rotation: resolved.rotation },
-  );
-  return commitSolid(doc, entity, extrusion.describe(id));
-}
-
 /** Legacy single-shape messages: missing, open, too short or a non-closable kind. */
 function singleSourceIssue(doc: CadDocument, id: string): string | null {
   const source = doc.entities[id];
@@ -174,11 +170,6 @@ function singleSourceIssue(doc: CadDocument, id: string): string | null {
 }
 
 const CLOSED_SHAPE_KINDS: ReadonlySet<string> = new Set(['circle', 'rectangle', 'ellipse', 'polyline', 'spline']);
-
-/** `{ curves }` when the loop has an arc or Bézier (a pure polygon needs no exact copy). */
-function exactCurves(curves: ReadonlyArray<CurveSegment<Vec2>>): { curves?: ReadonlyArray<CurveSegment<Vec2>> } {
-  return curves.some((segment) => segment.type !== 'line') ? { curves } : {};
-}
 
 function curveNote(curves: ReadonlyArray<CurveSegment<Vec2>>): string {
   const curved = curves.filter((segment) => segment.type !== 'line').length;

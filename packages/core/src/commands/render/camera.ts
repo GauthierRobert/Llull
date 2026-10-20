@@ -8,6 +8,8 @@ export interface Camera {
   position: [number, number, number];
   target: [number, number, number];
   up: [number, number, number];
+  /** Vertical field of view in degrees: a perspective camera (raster mode only; `position` is the eye). Absent = orthographic. */
+  fovDeg?: number;
 }
 
 /** Build an orthographic camera for a named view at a given scene radius. */

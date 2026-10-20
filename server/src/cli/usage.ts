@@ -9,6 +9,8 @@ Discover
   toolsets                    toolset names and command counts
   guide                       CAD modeling conventions (units, axes, ids, plans)
   status                      is the desktop app running? which document would --doc use?
+  crashes list|show ID|dir    local crash reports (document, command log, error; show latest = newest,
+                              with an issue draft link; nothing is sent)  [$LLULL_DATA_DIR/llull/crashes]
 
 Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first change)
   exec <command> [params]     run one command; params are key=value pairs (values parsed as
@@ -40,6 +42,17 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
                               TOP_TOOL_MISSING; then: topology_report studyId=ID, check_topology studyId=ID
   mtest_run mtest=SCRIPT      OPTIONAL MFront / MTest (user-installed, never bundled: $LLULL_MTEST, $LLULL_MFRONT; needs LLULL_ALLOW_CODE_EXECUTION=1):
                               run an MTest script [mfront={name,source} timeoutS=120 probe=true]; absent tools -> MFRONT_TOOL_MISSING with the reason
+  auto_route lineId=ID from='{"portId":"tie-1.1"}' to='{"portId":"tie-2.1"}' [route_problem params]
+                              native llull-compute pipe auto-routing (plant 02 RTE V2), committed by auto_route_pipe after
+                              validation  [timeoutS=60 maxExpansions=2000000]; without llull-compute: NATIVE_TOOL_MISSING
+                              (auto_route_pipe alone runs the TypeScript search up to 200000 expansions)
+  stackup_monte_carlo [analyze_stackup params] samples=N   native llull-compute: stack-up Monte Carlo above the 2e6 TS cap
+                              (same Philox samples as analyze_stackup)  [timeoutS=600 verify=true]
+  vortex_lattice_solve [analyze_vortex_lattice params]   native llull-compute: vortex lattice above the 1000-panel TS cap
+                              (influence + dense LU, faer; up to 20000 panels)  [timeoutS=600 verify=true]
+  scan import FILE [sourceUnit=mm columns=xyzi …]   point cloud (E57 / LAS / LAZ / XYZ / PTS / CSV) -> native llull-compute octree
+                              asset in $LLULL_SCAN_CACHE (~/.llull/cache/pointcloud); prints assetKey; then attach_point_cloud
+                              assetKey=KEY. scan list = the stored assets. Toolset scan (llull list scan)
   register_material_library file=LIB.llull-matlib.json   copy a material library into $LLULL_LIBRARIES_DIR (~/.llull/libraries); then
                               import_material_library libraryId=ID version=V sha256=H, and resolve_material_libraries after a load
   run <plan.json | ->         build_project: an actions array or { actions, onError }
@@ -68,8 +81,23 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
                               (harness recipes + unit-test measurements); exit 1 on an A-grade
                               fail/error  [grades=A,B caseIds=… measurements=FILE root=DIR]
 
+Robustness fuzz (local kernel; seeded designs on a 2.5 mm grid, checked after every step)
+  fuzz [--from N] [--count K] [--jobs J] [--out DIR] [--report FILE] [--kinds join,cut,…] [--max-steps M]
+                              run seeds N..N+K-1: base (box / extrusion / revolve) + up to 8 joins, cuts, fillets,
+                              chamfers, shells, holes, patterns (fillet/chamfer/shell only on a kernel that has them);
+                              every body a valid closed solid of positive volume, cuts never add and joins never
+                              remove volume, plus V(A∪B)+V(A∩B)=V(A)+V(B) and V(A−B)=V(A)−V(A∩B) within 0.2 %.
+                              --out writes each failing seed's plan, --report the JSON report; exit 1 on a failure
+  fuzz-one <seed> [--minimise] [--out FILE]
+                              one seed step by step; --minimise delta-debugs the steps to a minimal failing
+                              build_project plan (printed, or written to FILE; replay with llull run FILE)
+
+Agent skills (for your own agent driving this CLI)
+  skills list | path          the shipped skills (llull-modeling, llull-editing, llull-checking, llull-mechanisms)
+  skills install [--dir D] [--force]   copy them into ~/.claude/skills (or D); --force replaces changed copies
+
 Flags
-  --app                       act on the running llull desktop app (what the user sees;
+  --app                      act on the running llull desktop app (what the user sees;
                               found via ~/.llull/desktop.json, token included)
   --confirm-key KEYID         human-only plm acts (record_approval, release_item, classify_change_order, set_change_state, set_item_marking,
                               set_lifecycle_state obsolete, set_item_identity policy, attach_release_package) need a signature by a TRUSTED
@@ -80,8 +108,8 @@ Flags
                               ($LLULL_SERVER; --token T or $LLULL_TOKEN for Bearer auth)
   --dry-run                   run against the local file but never write it
   --no-fit                    run: keep the camera as it is (by default a plan that never sets it is framed with fit_view)
-  --save PATH                 write the file a command returns (export_stl, export_code,
-                              export_step_exact, export_step_ap242, export_iges, sheets, export_nc_files → a directory);
+  --save PATH                 write the file a command returns (export_stl, export_3mf, export_code,
+                              export_step_exact, export_step_ap242, export_iges, sheets, export_urdf, export_nc_files → a directory);
                               PATH.png rasterizes an svg (render_view)
   --json                      print one JSON object instead of text
   --quiet                     print nothing on success

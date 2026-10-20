@@ -59,6 +59,11 @@ export function postRedo(): Promise<ServerCommandResponse> {
   return request('/redo', {});
 }
 
+/** The newest local crash report with its command log (SC-A4); rejects (404) when there is none. */
+export function fetchLatestCrashReport(): Promise<unknown> {
+  return request('/crashes/latest');
+}
+
 /** Server document with its log position (resync). */
 export function fetchLiveSnapshot(): Promise<LiveSnapshotEvent> {
   return request('/live/snapshot');

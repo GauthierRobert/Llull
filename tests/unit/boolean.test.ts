@@ -184,8 +184,12 @@ describe('boolean edge cases', () => {
     setGeometryKernel(kernelReturning({ positions: [], indices: [] }));
     expectNoOp(execute(doc, 'boolean', { op: 'intersect', a: idA, b: idB }), doc, 'is empty');
   });
+  it('a zero-volume sliver result (tangent subtract) is treated as empty and keeps both operands', () => {
+    setGeometryKernel(kernelReturning({ positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2, 0, 2, 1] }));
+    expectNoOp(execute(doc, 'boolean', { op: 'subtract', a: idA, b: idB }), doc, 'is empty');
+  });
   it('a non-empty result still replaces the operands', () => {
-    setGeometryKernel(kernelReturning({ positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] }));
+    setGeometryKernel(kernelReturning(TETRA));
     const result = execute(doc, 'boolean', { op: 'union', a: idA, b: idB });
     expect(result.affected).toHaveLength(1);
     expect(result.document.entities[idA]).toBeUndefined();

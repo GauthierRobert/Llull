@@ -18,6 +18,7 @@ mod ffi {
         fn shape_list_add(list: Pin<&mut ShapeList>, shape: &Shape);
 
         fn fillet_edges(shape: &Shape, edges: &[u32], radius: f64, radius_end: f64) -> Result<UniquePtr<Shape>>;
+        fn fillet_laws(shape: &Shape, edges: &[u32], laws: &[f64]) -> Result<UniquePtr<Shape>>;
         fn chamfer_edges(shape: &Shape, edges: &[u32], distance: f64) -> Result<UniquePtr<Shape>>;
         fn blend_union(list: &ShapeList, radius: f64) -> Result<UniquePtr<Shape>>;
         fn shell_hollow(shape: &Shape, thickness: f64) -> Result<UniquePtr<Shape>>;
@@ -44,7 +45,7 @@ mod ffi {
             tolerance: f64,
         ) -> Result<UniquePtr<Shape>>;
 
-        fn feature_revol_cut(source: &Shape, profile: &[f64], origin: &[f64], normal: &[f64]) -> Result<UniquePtr<Shape>>;
+        fn feature_revol_cut(source: &Shape, profile: &[f64], origin: &[f64], normal: &[f64], tag: &str) -> Result<UniquePtr<Shape>>;
         fn feature_prism_cut(
             source: &Shape,
             chain: &[f64],
@@ -52,13 +53,22 @@ mod ffi {
             normal: &[f64],
             probes: &[f64],
             length: f64,
+            tag: &str,
         ) -> Result<UniquePtr<Shape>>;
+        fn draft_faces(shape: &Shape, faces: &[u32], angle: f64, pull: &[f64], origin: &[f64], normal: &[f64]) -> Result<UniquePtr<Shape>>;
+        fn push_pull(shape: &Shape, face: u32, distance: f64) -> Result<UniquePtr<Shape>>;
+        fn split_faces(shape: &Shape, faces: &[u32], origin: &[f64], normal: &[f64]) -> Result<UniquePtr<Shape>>;
         fn is_valid_shape(shape: &Shape) -> Result<bool>;
         fn unified_shape(shape: &Shape) -> Result<UniquePtr<Shape>>;
     }
 }
 
 /// Fillet of the unique edges `edges` (explorer order, `[]` = all); `radius_end` varies the radius linearly along each edge.
+/// One radius law per edge (`radii`): `laws` per edge: size, sizeEnd (NaN = constant), n, then n (t, size) pairs.
+pub fn fillet_laws(shape: &Shape, edges: &[u32], laws: &[f64]) -> Built {
+    built(ffi::fillet_laws(inner(shape)?, edges, laws))
+}
+
 pub fn fillet(shape: &Shape, edges: &[u32], radius: f64, radius_end: Option<f64>) -> Built {
     built(ffi::fillet_edges(inner(shape)?, edges, radius, radius_end.unwrap_or(f64::NAN)))
 }
@@ -147,12 +157,37 @@ pub fn face_slab(kind: i32, surface: &[f64], loops: &[f64], range: [f64; 2], dir
     built(ffi::face_slab(kind, surface, loops, range[0], range[1], &direction, tolerance))
 }
 
-pub fn feature_revol_cut(source: &Shape, profile: &[f64], origin: [f64; 3], normal: [f64; 3]) -> Built {
-    built(ffi::feature_revol_cut(inner(source)?, profile, &origin, &normal))
+/// `tag` names the faces the cut generates (SC-N1, `hole<n>.<k>`).
+pub fn feature_revol_cut(source: &Shape, profile: &[f64], origin: [f64; 3], normal: [f64; 3], tag: &str) -> Built {
+    built(ffi::feature_revol_cut(inner(source)?, profile, &origin, &normal, tag))
 }
 
-pub fn feature_prism_cut(source: &Shape, chain: &[f64], origin: [f64; 3], normal: [f64; 3], probes: &[f64], length: f64) -> Built {
-    built(ffi::feature_prism_cut(inner(source)?, chain, &origin, &normal, probes, length))
+/// `tag` names the faces the cut generates (SC-N1, `pocket<n>`).
+pub fn feature_prism_cut(
+    source: &Shape,
+    chain: &[f64],
+    origin: [f64; 3],
+    normal: [f64; 3],
+    probes: &[f64],
+    length: f64,
+    tag: &str,
+) -> Built {
+    built(ffi::feature_prism_cut(inner(source)?, chain, &origin, &normal, probes, length, tag))
+}
+
+/// Draft `faces` by `angle` radians along `pull` about the neutral plane (`origin`, `normal`).
+pub fn draft(shape: &Shape, faces: &[u32], angle: f64, pull: [f64; 3], origin: [f64; 3], normal: [f64; 3]) -> Built {
+    built(ffi::draft_faces(inner(shape)?, faces, angle, &pull, &origin, &normal))
+}
+
+/// Move planar `face` along its outward normal by `distance` (> 0 adds material).
+pub fn push_pull(shape: &Shape, face: u32, distance: f64) -> Built {
+    built(ffi::push_pull(inner(shape)?, face, distance))
+}
+
+/// Split `faces` along the plane (`origin`, `normal`); the body stays one solid.
+pub fn split_faces(shape: &Shape, faces: &[u32], origin: [f64; 3], normal: [f64; 3]) -> Built {
+    built(ffi::split_faces(inner(shape)?, faces, &origin, &normal))
 }
 
 pub fn is_valid(shape: &Shape) -> OcctResult<bool> {

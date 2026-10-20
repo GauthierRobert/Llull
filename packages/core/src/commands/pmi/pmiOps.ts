@@ -130,13 +130,6 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   GDT_FEATURE_UNTOLERANCED: 'add PMI or set_pmi_standard generalToleranceNote',
   GDT_COMPOSITE_INVALID: 'the upper segment must be an existing position / profile FCF on the same target, and not itself a lower segment',
   GDT_REVIEW_HUMAN_ONLY: 'ask the owner to have a qualified engineer review in the desktop app and pass the signed confirmation',
-  GDT_STACKUP_EXPRESSION: 'use + - * / ( ) numbers, pi and the contributor names (plain identifiers)',
-  GDT_STACKUP_SAMPLES_CAP: 'use at most 2000000 samples (a native Monte Carlo above that is planned)',
-  GDT_STACKUP_CONTRIBUTOR_UNTOLERANCED: 'add a tolerance to the PMI item (basic dimensions carry none)',
-  GDT_STACKUP_SENSITIVITY_CONFLICT: 'give either expression or per-contributor sensitivity, not both',
-  GDT_STACKUP_INVALID: 'fix the contributors: unique names, finite nominal, lower <= upper, at least one',
-  GDT_FASTENER_HOLE_LE_FASTENER: 'no clearance: no positional tolerance is possible; the hole must exceed the fastener',
-  GDT_FASTENER_INVALID: 'fix the sizes: holeLmc >= holeMmc, actualSize within [holeMmc, holeLmc]',
 };
 
 const pmiRefusal = tableRejection(REMEDIATION);

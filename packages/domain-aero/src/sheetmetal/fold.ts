@@ -13,6 +13,7 @@ import { formPieces } from './foldForms';
 import { type Piece, SHEET_COLOR, leaf, solidPiece } from './foldPiece';
 import { bendGeometry, basisOf, bottomOffset, frameEuler } from './frames';
 import { bendsOf, flatsOf } from './graph';
+import { removeInternalFaces } from './foldWeld';
 
 /** Maximum angular step of a displayed bend sector, radians (3 degrees). */
 const SECTOR_STEP = Math.PI / 60;
@@ -114,7 +115,7 @@ export function foldPart(part: SheetMetalPart, rule: SheetMetalRule): MeshSolidE
   return {
     id: part.id,
     kind: 'mesh',
-    mesh: { positions, indices },
+    mesh: removeInternalFaces({ positions, indices }),
     brep,
     position: [0, 0, 0],
     rotation: [0, 0, 0],

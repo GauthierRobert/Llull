@@ -5,6 +5,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createEmptyDocument } from '@core/model/types';
@@ -13,6 +14,20 @@ import { exportStepFile, type CadExchangePort } from '@protocol/index';
 import { bridgeEnvironment, createPythonExchangePort, type PythonExchangeConfig } from '../src/pythonExchange';
 
 let scratch: string;
+
+// Windows refuses file symlinks without Developer Mode or admin (EPERM): the confinement suite needs real ones.
+function canSymlink(): boolean {
+  const probe = mkdtempSync(path.join(tmpdir(), 'llull-symlink-probe-'));
+  try {
+    writeFileSync(path.join(probe, 'target'), '');
+    symlinkSync(path.join(probe, 'target'), path.join(probe, 'link'));
+    return true;
+  } catch {
+    return false;
+  } finally {
+    rmSync(probe, { recursive: true, force: true });
+  }
+}
 
 beforeAll(async () => {
   scratch = await mkdtemp(path.join(tmpdir(), 'llull-hardening-'));
@@ -50,7 +65,7 @@ describe('bridgeEnvironment', () => {
   });
 });
 
-describe('exchange directory symlink confinement', () => {
+describe.skipIf(!canSymlink())('exchange directory symlink confinement', () => {
   let root: string;
   let outside: string;
   let port: CadExchangePort;

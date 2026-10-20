@@ -1,0 +1,319 @@
+{
+  "format": "llull-document",
+  "version": 3,
+  "document": {
+    "entities": {
+      "#1": {
+        "id": "#1",
+        "kind": "arc",
+        "center": [0,0],
+        "radius": 5,
+        "startAngle": 1.57079265,
+        "endAngle": 4.71239063,
+        "position": [0,0,0],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#4a90d9"
+      },
+      "#3": {
+        "id": "#3",
+        "kind": "arc",
+        "center": [30,-1.32955548e-13],
+        "radius": 5,
+        "startAngle": -1.57079447,
+        "endAngle": 1.57079179,
+        "position": [0,0,0],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#4a90d9"
+      },
+      "#4": {
+        "id": "#4",
+        "kind": "line",
+        "start": [0.00000822332506,-5],
+        "end": [30.0000093,-5],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#4a90d9"
+      },
+      "#5": {
+        "id": "#5",
+        "kind": "line",
+        "start": [30.0000227,5],
+        "end": [0.0000184031789,5],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#4a90d9"
+      }
+    },
+    "order": [
+      "#1",
+      "#3",
+      "#4",
+      "#5"
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#2"
+    ],
+    "selection": [],
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {},
+    "animations": {},
+    "featureHistory": [
+      {
+        "id": "#6",
+        "name": "draw_arc",
+        "params": {"center":[0,0],"radius":4,"startAngle":1.57079633,"endAngle":4.71238898},
+        "suppressed": false,
+        "affected": ["#1"]
+      },
+      {
+        "id": "#7",
+        "name": "draw_arc",
+        "params": {"center":[21,1],"radius":6,"startAngle":-1.57079633,"endAngle":1.57079633},
+        "suppressed": false,
+        "affected": ["#3"]
+      },
+      {
+        "id": "#8",
+        "name": "draw_polyline",
+        "params": {"points":[[0,-4],[21,-5]]},
+        "suppressed": false,
+        "affected": ["#4"]
+      },
+      {
+        "id": "#9",
+        "name": "draw_polyline",
+        "params": {"points":[[21,7],[0,4]]},
+        "suppressed": false,
+        "affected": ["#5"]
+      },
+      {
+        "id": "#10",
+        "name": "add_constraint",
+        "params": {"constraint":{"kind":"coincident","a":{"entityId":"#1","kind":"end"},"b":{"entityId":"#4","kind":"start"}}},
+        "suppressed": false,
+        "affected": ["#11"]
+      },
+      {
+        "id": "#12",
+        "name": "add_constraint",
+        "params": {"constraint":{"kind":"coincident","a":{"entityId":"#4","kind":"end"},"b":{"entityId":"#3","kind":"start"}}},
+        "suppressed": false,
+        "affected": ["#13"]
+      },
+      {
+        "id": "#14",
+        "name": "add_constraint",
+        "params": {"constraint":{"kind":"coincident","a":{"entityId":"#3","kind":"end"},"b":{"entityId":"#5","kind":"start"}}},
+        "suppressed": false,
+        "affected": ["#15"]
+      },
+      {
+        "id": "#16",
+        "name": "add_constraint",
+        "params": {"constraint":{"kind":"coincident","a":{"entityId":"#5","kind":"end"},"b":{"entityId":"#1","kind":"start"}}},
+        "suppressed": false,
+        "affected": ["#17"]
+      },
+      {
+        "id": "#18",
+        "name": "add_constraint",
+        "params": {"constraint":{"kind":"tangent","a":{"entityId":"#4"},"b":{"entityId":"#1"}}},
+        "suppressed": false,
+        "affected": ["#19"]
+      },
+      {
+        "id": "#20",
+        "name": "add_constraint",
+        "params": {"constraint":{"kind":"tangent","a":{"entityId":"#4"},"b":{"entityId":"#3"}}},
+        "suppressed": false,
+        "affected": ["#21"]
+      },
+      {
+        "id": "#22",
+        "name": "add_constraint",
+        "params": {"constraint":{"kind":"tangent","a":{"entityId":"#5"},"b":{"entityId":"#3"}}},
+        "suppressed": false,
+        "affected": ["#23"]
+      },
+      {
+        "id": "#24",
+        "name": "add_constraint",
+        "params": {"constraint":{"kind":"tangent","a":{"entityId":"#5"},"b":{"entityId":"#1"}}},
+        "suppressed": false,
+        "affected": ["#25"]
+      },
+      {
+        "id": "#26",
+        "name": "add_constraint",
+        "params": {"constraint":{"kind":"equal","a":{"entityId":"#1"},"b":{"entityId":"#3"}}},
+        "suppressed": false,
+        "affected": ["#27"]
+      },
+      {
+        "id": "#28",
+        "name": "add_constraint",
+        "params": {"constraint":{"kind":"radius","a":{"entityId":"#1"},"value":5}},
+        "suppressed": false,
+        "affected": ["#29"]
+      },
+      {
+        "id": "#30",
+        "name": "add_constraint",
+        "params": {"constraint":{"kind":"slot_length","a":{"entityId":"#1"},"b":{"entityId":"#3"},"value":30}},
+        "suppressed": false,
+        "affected": ["#31"]
+      },
+      {
+        "id": "#32",
+        "name": "add_constraint",
+        "params": {"constraint":{"kind":"horizontal","a":{"entityId":"#4"}}},
+        "suppressed": false,
+        "affected": ["#33"]
+      },
+      {
+        "id": "#34",
+        "name": "add_constraint",
+        "params": {"constraint":{"kind":"fix","a":{"entityId":"#1","kind":"center"}}},
+        "suppressed": false,
+        "affected": ["#35"]
+      },
+      {
+        "id": "#36",
+        "name": "solve_constraints",
+        "params": {},
+        "suppressed": false,
+        "affected": ["#1","#4","#3","#5"]
+      }
+    ],
+    "configurations": {},
+    "materials": {},
+    "recipes": {},
+    "components": {},
+    "constraints": {
+      "#11": {
+        "kind": "coincident",
+        "a": {"entityId":"#1","kind":"end"},
+        "b": {"entityId":"#4","kind":"start"},
+        "id": "#11"
+      },
+      "#13": {
+        "kind": "coincident",
+        "a": {"entityId":"#4","kind":"end"},
+        "b": {"entityId":"#3","kind":"start"},
+        "id": "#13"
+      },
+      "#15": {
+        "kind": "coincident",
+        "a": {"entityId":"#3","kind":"end"},
+        "b": {"entityId":"#5","kind":"start"},
+        "id": "#15"
+      },
+      "#17": {
+        "kind": "coincident",
+        "a": {"entityId":"#5","kind":"end"},
+        "b": {"entityId":"#1","kind":"start"},
+        "id": "#17"
+      },
+      "#19": {
+        "kind": "tangent",
+        "a": {"entityId":"#4"},
+        "b": {"entityId":"#1"},
+        "id": "#19"
+      },
+      "#21": {
+        "kind": "tangent",
+        "a": {"entityId":"#4"},
+        "b": {"entityId":"#3"},
+        "id": "#21"
+      },
+      "#23": {
+        "kind": "tangent",
+        "a": {"entityId":"#5"},
+        "b": {"entityId":"#3"},
+        "id": "#23"
+      },
+      "#25": {
+        "kind": "tangent",
+        "a": {"entityId":"#5"},
+        "b": {"entityId":"#1"},
+        "id": "#25"
+      },
+      "#27": {
+        "kind": "equal",
+        "a": {"entityId":"#1"},
+        "b": {"entityId":"#3"},
+        "id": "#27"
+      },
+      "#29": {
+        "kind": "radius",
+        "a": {"entityId":"#1"},
+        "value": 5,
+        "b": {"entityId":"#1"},
+        "id": "#29"
+      },
+      "#31": {
+        "kind": "slot_length",
+        "a": {"entityId":"#1"},
+        "b": {"entityId":"#3"},
+        "value": 30,
+        "id": "#31"
+      },
+      "#33": {
+        "kind": "horizontal",
+        "a": {"entityId":"#4"},
+        "b": {"entityId":"#4"},
+        "id": "#33"
+      },
+      "#35": {
+        "kind": "fix",
+        "a": {"entityId":"#1","kind":"center"},
+        "b": {"entityId":"#1","kind":"center"},
+        "id": "#35"
+      }
+    },
+    "constraintOrder": [
+      "#11",
+      "#13",
+      "#15",
+      "#17",
+      "#19",
+      "#21",
+      "#23",
+      "#25",
+      "#27",
+      "#29",
+      "#31",
+      "#33",
+      "#35"
+    ],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": [],
+    "nextStepNumber": 19
+  }
+}

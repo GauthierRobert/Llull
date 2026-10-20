@@ -7,7 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
-import { writeFileAtomic } from './writeFileAtomic';
+import { writeFileKeepingBackup } from './writeFileAtomic';
 
 /** The document stored at `docPath`; an empty document when the file does not exist yet. */
 export function readDocumentFile(docPath: string): CadDocument {
@@ -15,8 +15,8 @@ export function readDocumentFile(docPath: string): CadDocument {
   return deserializeDocument(fs.readFileSync(docPath, 'utf8'));
 }
 
-/** Atomically write `doc` to `docPath`, creating its directory. */
+/** Atomically write `doc` to `docPath`, creating its directory; the replaced file is kept as `<docPath>.bak` (SC-D1). */
 export function writeDocumentFile(docPath: string, doc: CadDocument): void {
   fs.mkdirSync(path.dirname(path.resolve(docPath)), { recursive: true });
-  writeFileAtomic(docPath, serializeDocument(doc));
+  writeFileKeepingBackup(docPath, serializeDocument(doc));
 }

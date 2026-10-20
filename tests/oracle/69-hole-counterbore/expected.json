@@ -1,0 +1,19 @@
+{
+  "id": "69-hole-counterbore",
+  "family": "hole",
+  "description": "counterbore D=8 x 1.5 over a d=4 through hole",
+  "source": "analytic",
+  "formula": "V = abc - pi r^2 h - pi (R^2 - r^2) c",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 1493.18584978,
+  "area": 1163.98229715,
+  "centroid": [0, 0, -0.0473389395676],
+  "bbox": { "min": [-10, -10, -2], "max": [10, 10, 2] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": 0.0018995865546513194,
+    "area": 0.012528831758061743,
+    "reason": "bore tessellated as an inscribed n-gon (n from the kernel default circle resolution): loss <= k (1 - cos(pi/n)) of the removed share"
+  }
+}

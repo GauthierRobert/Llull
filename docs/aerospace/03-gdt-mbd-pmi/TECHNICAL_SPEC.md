@@ -75,7 +75,7 @@ Decided by the owner in [RS1](../../decisions/RS1-native-compute.md) (programme 
 | ---- | ------ | --- |
 | Monte Carlo ≤ 2e6 samples | `lib/stackup.ts`, pure TS, synchronous | unchanged (TS stays the default, the reference and the only path without native binaries) |
 | Monte Carlo > 2e6 samples | refused (`GDT_STACKUP_SAMPLES_CAP`) | host transport `stackup_monte_carlo` (`server/`, job style like 05 FEA `fea_solve`) runs `llull-compute stats <job-folder>` (crate `llull-stats`, rayon) |
-| Random stream | xoshiro128** (sequential) | TS unchanged; native uses a counter-based generator (Philox4x32-10 [R37]): sample *i* draws from counter *i* under a key derived from `seed`, so the result does not depend on thread count or scheduling |
+| Random stream | xoshiro128** (sequential) | **as built (Q-9): TS and native both use** a counter-based generator (Philox4x32-10 [R37]): sample *i* draws from counter *i* under a key derived from `seed`, so the result does not depend on thread count or scheduling |
 | Reductions | sequential loop | fixed-size chunks reduced in chunk-index order (RS1 §2 rule 3), so a native run is bit-reproducible per (seed, samples, inputs) |
 
 The transport returns the same `data` shape as `analyze_stackup` (closed forms still from `lib/stackup.ts`; only the
@@ -263,7 +263,7 @@ pollute the recipe. Toolset `pmi` lists all of the above; `analyze_stackup`, `fa
 | TR-GDT-08 | MUST | Saved views; `activate_saved_view` sets camera through the same code path as `set_camera` |
 | TR-GDT-09 | MUST | `list_pmi` text rendering grammar §5.4 (Unicode symbols for display; ASCII fallback `--ascii`) |
 | TR-GDT-10 | MUST | `check_pmi` error codes (stable strings) §5.5 |
-| TR-GDT-11 | MUST | `lib/stackup.ts` formulas §5.7; `lib/prng.ts` xoshiro128** seeded by SplitMix32 of `seed`; normal by Box–Muller (cos branch, spare kept) |
+| TR-GDT-11 | MUST | `lib/stackup.ts` formulas §5.7; `lib/prng.ts` Philox4x32-10 counter streams keyed by `seed` (amended 2026-10-19, Q-9: was xoshiro128** / SplitMix32); normal by Box–Muller (cos branch, one normal per word pair) |
 | TR-GDT-12 | SHOULD | fastener formulas §5.7.6 |
 | TR-GDT-13 | MUST | `apply_pmi_set` input schema = the Python bridge JSON (§6.2) |
 | TR-GDT-14 | MUST | Sheet PMI rendering §5.8 |
@@ -273,7 +273,7 @@ pollute the recipe. Toolset `pmi` lists all of the above; `analyze_stackup`, `fa
 | TR-GDT-19 | MUST | Review flag + human gate (FR-GDT-31/32): `review` set from `ctx.caller` on create/edit/import; `accept_pmi_review` refuses agents; `check_pmi` warns `GDT_REVIEW_REQUIRED` per item; gap 09 `release_item` refuses while any PMI item is unreviewed (`PLM_PMI_UNREVIEWED`) |
 | TR-GDT-20 | MUST | Error contract (FR-GDT-33): every refusal returns `data.error = { code, ids?, paths?, remediation }` and the summary starts `<command> rejected: <code>`; codes = §7.2; zone/projected/UZ value checks are done in `run` (not zod `.positive()`), so they get `GDT_ZONE_NON_POSITIVE` instead of the generic invalid-params text |
 | TR-GDT-21 | MUST | Unverified propagation + provenance + named defaults (FR-GDT-34/35): `unverified` on items and stack-up contributors propagates to `analyze_stackup.data.unverified` and `check_pmi` warnings `GDT_UNVERIFIED_INPUT`; `provenance` and `{value, source, defaulted}` on every defaulted numeric |
-| TR-GDT-22 | SHOULD (V1, RS-7) | Monte Carlo above the TS cap (§2.3): `stackup_monte_carlo` transport → `llull-compute stats` (crate `llull-stats`, rayon, Philox4x32-10 counter-based streams, fixed-order reductions); same `data` shape; results bit-identical per (seed, samples, inputs) for any thread count; native vs TS distributions agree within the §5.7 item 7 acceptance bounds (VC-GDT-37); native sample cap TBD — measure against the §8 budget |
+| TR-GDT-22 | SHOULD (V1, RS-7) | Monte Carlo above the TS cap (§2.3): `stackup_monte_carlo` transport → `llull-compute stats` (crate `llull-stats`, rayon, Philox4x32-10 counter-based streams, fixed-order reductions); same `data` shape; results bit-identical per (seed, samples, inputs) for any thread count; native vs TS distributions agree within the §5.7 item 7 acceptance bounds (VC-GDT-37); as built: bit-identical to TS for trig-free expressions, native cap 2^40 samples (§13) |
 | TR-GDT-18 | MUST | Coverage gate 90/85/90/90 for `commands/pmi/**`, `geometry/pmi*.ts`; `lib/stackup.ts` 100 % lines (pure math) |
 
 ## 5. Kernel / algorithms
@@ -384,8 +384,8 @@ coefficients come out exactly ±1, ½ …; a central difference is **not** accep
    relative error < 1e-12 in the tested range); all-uniform linear ⇒ exact generalised Irwin–Hall CDF
    P(Σ U_i ≤ x) = (1/(n! Π w_i)) Σ_{S ⊆ {1..n}} (−1)^{|S|} (x − Σ lo_i − Σ_{i∈S} w_i)_+^n (n ≤ 12); otherwise MC only. Evaluate it on centred terms (lo_i = −|a_i| t_i, x = L − y_mean) and with exact coefficients for linear stacks: a central-difference a_i at |c_i| = 100 carries ~1e-9 relative error, which moves P by ≫ 1e-12 (review finding; the reference generator now takes explicit `sensitivities`).
 6. Contribution % = (a_i σ_i)² / σ_y² × 100 (RSS) and |a_i| t_i / T_wc × 100 (WC).
-7. Monte Carlo: N samples (default 100 000, cap 2 000 000), xoshiro128** seeded by SplitMix32(seed),
-   uniform u ∈ (0,1) from the top 24 bits / 2^24 offset by 2^-25; normal via Box–Muller; reports mean,
+7. Monte Carlo: N samples (default 100 000, cap 2 000 000), Philox4x32-10 counter streams keyed by the seed (as built, §13;
+   planned: xoshiro128** seeded by SplitMix32(seed)), uniform u = (w + ½)·2^-32 from a 32-bit word; normal via Box–Muller; reports mean,
    unbiased std, min, max, P(y<L), P(y>U), and the 5σ statistical acceptance bounds
    (mean ± 5σ_y/√N, std ± 5σ_y/√(2N), p ± max(5√(p(1−p)/N), 1e-5) — the absolute 1e-5 floor keeps tiny tail
    probabilities such as SU-03's 2.8e-9 testable with N = 2e5, as in the reference generator). The Python reference generator uses CPython's
@@ -396,8 +396,8 @@ coefficients come out exactly ±1, ½ …; a central difference is **not** accep
 
 Budgets: 1e6 samples × 10 contributors < 1.5 s in Node on a 2020 laptop (pure loop, no allocation per
 sample); the command is synchronous and capped. Above the cap, Monte Carlo runs natively (§2.3, TR-GDT-22): same
-sampling formulas and acceptance bounds, Philox4x32-10 instead of xoshiro128**, so native and TS agree
-statistically (acceptance bounds), not bit for bit — as with the Python reference.
+sampling formulas and acceptance bounds, the same Philox4x32-10 stream as TS (Q-9, §13), so native and TS agree bit for bit on trig-free expressions and
+statistically (acceptance bounds) otherwise; the Python reference (Mersenne Twister) is compared by acceptance bounds.
 
 ### 5.8 PMI on drawing sheets (`commands/drawings/pmiPainter.ts`)
 
@@ -593,7 +593,7 @@ same shape inside `errors[]` / `warnings[]`. Codes are part of the public contra
 | `check_pmi` | ≤ 50 ms for 500 items |
 | `export_sheet_svg` with PMI | ≤ +30 % vs without, A3 sheet, 100 PMI items |
 | `analyze_stackup` | 1e6 samples × 10 contributors ≤ 1.5 s; hard cap 2e6 samples |
-| `stackup_monte_carlo` (native, V1) | samples > 2e6; throughput and native cap TBD — measure with `llull-compute stats` on the reference machine |
+| `stackup_monte_carlo` (native, V1) | samples > 2e6, cap 2^40 (exactness of the f64 reduction); measured 1e8 samples × 10 contributors in 5.6 s on 22 threads (§13); default timeout 600 s |
 | AP242 import (Python) | NIST FTC 09 (6.1 MB) ≤ 20 s on desktop incl. tessellation |
 | Robustness | no command throws on malformed PMI; every failure is a no-op with a reason (guard + `noop`) |
 
@@ -644,7 +644,7 @@ Total MVP (M1–M5) ≈ 11 eng-weeks; V1 ≈ +8 (incl. M5n 1.5, RS1).
 | Q-5 | Should PMI be entities (`kind: 'pmi'`) for selection/layers? | No: separate model like drawings; selection via panel; revisit if layer control is required |
 | Q-6 | ASME vs ISO symbol differences in rendering (e.g. datum feature triangle style) | Two glyph sets keyed by `standard`; proportions configurable |
 | Q-7 | Inch documents: surface texture µin under ASME? | `unit` per item; default from `standard` + `doc.units` |
-| Q-9 | Should `lib/prng.ts` also implement Philox4x32-10, so TS and native are bit-equal for N ≤ 2e6? | Not required: VC-GDT-37 compares by acceptance bounds; revisit if a bit-level cross-check is wanted |
+| Q-9 | Should `lib/prng.ts` also implement Philox4x32-10, so TS and native are bit-equal for N ≤ 2e6? | **Decided 2026-10-19 (RS-7): yes.** TS and native draw the same Philox4x32-10 samples and reduce them in the same order; VC-GDT-37 asserts bit equality for trig-free expressions and the acceptance bounds otherwise (§13) |
 | Q-8 | Which current editions of ISO 5459 and ISO 14405-1 apply (catalogue showed a 2024 ISO 5459 entry and the 2016 ISO 14405-1 as withdrawn)? | Confirm with ISO catalogue before V1 |
 
 ## 12. References
@@ -673,14 +673,14 @@ write and read through the 04 XCH transport, `apply_pmi_set`, `xcafMapping.ts`, 
 | Model | `packages/core/src/model/pmi.ts` (`PmiModel`, 7 item kinds, saved views, `activeSavedViewId`); `CadDocument.pmi?`; `DrawingSheet.pmiMode?`, `DrawingView.pmiIds?` |
 | Face resolution + measurement | `geometry/pmiFeatures.ts` (`openSolid`, `resolveIn`, `resolveFeature`), `geometry/pmiMeasure.ts` (size, location, angle), `geometry/pmiPlacement.ts`, `geometry/pmiText.ts` (grammar §5.4, `toleranceBasis`), `geometry/pmiSymbols.ts` (glyph strokes) |
 | Commands (toolset `pmi`, catalog `commands/pmi/catalog.ts`) | `set_pmi_standard`, `add_datum_feature`, `add_datum_target`, `add_size_dimension`, `add_location_dimension`, `add_geometric_tolerance`, `add_surface_texture`, `add_pmi_note`, `update_pmi`, `delete_pmi`, `create_saved_view`, `update_saved_view`, `delete_saved_view`, `activate_saved_view`, `list_pmi`, `check_pmi`, `accept_pmi_review`, `analyze_stackup`, `fastener_tolerance`; extended `update_sheet` (`pmiMode`), `update_drawing_view` (`pmiIds`, `pmiAuto`), `export_sheet_svg` (`data.pmi`) |
-| Stack-up math | `lib/prng.ts` (xoshiro128** / SplitMix32 / Box-Muller), `lib/erfc.ts`, `lib/stackExpression.ts` (parser + dual-number gradient), `lib/stackup.ts` (WC, corners, RSS, sigma, normal and Irwin-Hall CDF, Monte Carlo) |
+| Stack-up math | merged from main (§13.6): `lib/prng.ts` (Philox4x32-10), `lib/expressionProgram.ts` (the `@lib/expression` grammar as a postfix program + dual-number gradient), `lib/stackup.ts` (WC, corners, RSS, sigma, erfc, normal and uniform-sum CDF, acceptance bounds; plus the linear helpers of `stackup_at_temperature`), `lib/stackupSampling.ts`; `commands/pmi/{stackupModel,codes}.ts` (one params / validation / data model for the command and the native transport, PMI links resolved there) |
 | Sheets | `commands/drawings/pmiPainter.ts` (selection, projection, FCF / datum / callout painting, skip report) |
 | Persistence | `commands/persistence/pmiValidation.ts`; `pmi-<step>.<k>` ids keep the step counter safe (`serialization.ts`) |
 | UI | `src/ui/viewport/3d/PmiLayer.tsx` + `pmiViewStore.ts`, `src/ui/panels/pmi/PmiPanel.tsx`, sidebar tab `pmi` |
 | Tests | `tests/unit/pmi/{plate,commands,sheet,geometry,persistence,stackupCommand}.test.ts`, `tests/unit/lib/stackup.test.ts`, `tests/component/PmiPanel.test.tsx`, analytic kernel `tests/helpers/pmiPlateKernel.ts` |
 
 Coverage of the pmi files (unit suite): `commands/pmi/**` 95.4 % statements / 89.9 % branches / 100 % functions / 97.1 % lines; `geometry/pmi*.ts` 95-100 %
-statements (branches 91-99 %); `lib/stackup.ts`, `lib/erfc.ts`, `lib/stackExpression.ts` 100 % lines.
+statements (branches 91-99 %). (Measured before the merge with main; the stack-up files are now main's, §13.6.)
 
 ### 13.2 Deviations from §3-§10 (as built)
 
@@ -700,13 +700,13 @@ statements (branches 91-99 %); `lib/stackup.ts`, `lib/erfc.ts`, `lib/stackExpres
 | M7 datum targets | item kind `datum_target` (`add_datum_target`: point / line / area with `areaSize`, numbered per datum, the datum must exist); drawn as a circle `A1` | |
 | M7 all-around / all-over | zone modifiers `all_around` / `all_over`, accepted on profile characteristics only (`GDT_MODIFIER_NOT_APPLICABLE`); text `ALL AROUND` | no ALL_AROUND_SHAPE_ASPECT export: the 04 transport has no all-around attribute (`xcafMapping` lists the modifier as lost) |
 | M7 ISO 14405 | `sizeModifiers` codes E LP LS GG GX GN GC CC CA CM CV SX SN SA SM SD SR stored and rendered (`Ⓔ`, `(LP)`); a symbolic list, no standard text | |
-| M7 PMI-linked stacks | `analyze_stackup` contributor `{ pmiId }`: measured nominal + tolerance (limits become deviations), verified by default; `stackup_at_temperature` (04 §16) takes the same link and uses the same WC / RSS / share formulas | |
-| Stack-up expression grammar | the 03 spec says "over the `parametric/expression` grammar"; as built `lib/stackExpression.ts` is its own small parser (same grammar: + - * / unary minus, parentheses, numbers, names, calls) because the existing evaluator folds values while parsing and has no tree to differentiate. Differentiable functions only: sin cos tan asin acos atan sqrt abs exp ln pow hypot, constants pi tau; floor, ceil, round, mod, min, max are refused (`GDT_STACKUP_EXPRESSION`) | forward-mode dual numbers need a tree |
-| `analyze_stackup` `methods` | default `["worstCase","rss"]`; the closed forms are always in `data`, `monteCarlo` only when listed; no sensitivities and no expression = every contributor +1 (named in `provenance.note`) | |
+| M7 PMI-linked stacks | `analyze_stackup` / `stackup_monte_carlo` contributor `{ pmiId }` (resolved in `stackupModel.resolveStackup` against the document): measured nominal + tolerance (limits become deviations), verified by default; a linked item still awaiting review sets `reviewRequired` with its id; `stackup_at_temperature` (04 §16) takes the same link and uses the same WC / RSS / share formulas. **Verified default (merge decision):** a typed contributor is unverified only with `verified: false` (main's reading of VC-GDT-55; the §6 table's "false when typed" is superseded) | |
+| Stack-up expression grammar | merged (2026-10-21): our `lib/stackExpression.ts` parser was replaced by main's `lib/expressionProgram.ts`, which compiles the `@lib/expression` grammar itself (all its functions, incl. min / max / floor / round / mod) to a JSON-shippable program with forward-mode dual-number sensitivities; the native sampler evaluates the same program | one grammar, one program for TS and native |
+| `analyze_stackup` `methods` / data | default `["worstCase","rss"]`, `monteCarlo` only when listed; exactly one of `expression` or a sensitivity on EVERY contributor (else `GDT_STACKUP_SENSITIVITY_CONFLICT`; the earlier "neither = +1 each" default was dropped in the merge). Data field names follow `validation/expected_results.json` (`yNominal`, `yMean`, `pBelowLowerLimit`, `pAboveUpperLimit`, `pMethod`, §13.6); `data.contributors[]` echoes each contributor with `source` (`typed` / `pmi <id>`), `verified`, `unit` | |
 | `check_pmi` | adds `requireCoverage` (opt-in `GDT_FEATURE_UNTOLERANCED`); `rules: builtin+table` is accepted but no table exists (`GDT_TABLE_RULE` warning); `ruleTable` is always `none`; an always-on `GDT_UNVERIFIED_INPUT` warning says characteristic / modifier permissions per standard are NOT checked | §5.6 rule tables are customer data; nothing is shipped |
 | Sheet PMI | frames at the projected frame anchor, leader to the projected `leaderTo`, greedy right-shift on overlap; skip reasons `GDT_SHEET_PLANE_NOT_PARALLEL`, `GDT_SHEET_SOLID_NOT_IN_VIEW`, `GDT_SHEET_VIEW_KIND_UNSUPPORTED`, `GDT_PMI_UNKNOWN` (explicit id deleted since); section-cut symbols and a warning for unavoidable collisions are not built | §5.8 items 4-5 |
 | Viewport | DOM label (`ScreenAnchor`) at the frame anchor + a drei `Line` leader; `pmi` sidebar tab with items, review state, standard, saved views (open / delete), "show PMI" toggle, and an add-datum form that gathers a **point** (x, y, z) | face picking in the 3D view is not built: the form takes typed coordinates (the command contract is unchanged: points, never indices) |
-| Error codes added to §7.2 | `GDT_TARGET_FORM`, `GDT_SIZE_KIND_MISMATCH`, `GDT_LOCATION_AMBIGUOUS`, `GDT_LOCATION_INVALID`, `GDT_LOCATION_SAME_FEATURE`, `GDT_MODIFIER_NOT_APPLICABLE`, `GDT_COMPOSITE_INVALID`, `GDT_NOTE_EMPTY`, `GDT_STACKUP_INVALID`, `GDT_FASTENER_INVALID` | gaps in §7.2 found while building |
+| Error codes added to §7.2 | `GDT_TARGET_FORM`, `GDT_SIZE_KIND_MISMATCH`, `GDT_LOCATION_AMBIGUOUS`, `GDT_LOCATION_INVALID`, `GDT_LOCATION_SAME_FEATURE`, `GDT_MODIFIER_NOT_APPLICABLE`, `GDT_COMPOSITE_INVALID`, `GDT_NOTE_EMPTY`; stack-up / fastener codes are main's (`commands/pmi/codes.ts`: `GDT_STACKUP_CONTRIBUTOR_INVALID`, `GDT_STACKUP_PARAM_INVALID`, `GDT_STACKUP_NON_FINITE`, `GDT_FASTENER_PARAM_INVALID`, plus `GDT_PMI_UNKNOWN` / `GDT_STACKUP_CONTRIBUTOR_UNTOLERANCED` for links; stack-up refusals also carry `data.error`) | gaps in §7.2 found while building |
 
 ### 13.3 Validation cases reached (automated)
 
@@ -794,17 +794,55 @@ flatness / perpendicularity / position tolerance and datum entities) probes for 
 written from SFA's documentation and have never run, so treat them as unverified. The offline stand-in is the entity census of the written Part 21 text with the independent reader
 (`lib/step21`), asserted in the round-trip test. A CTC case is not exported (llull writes one product per loose solid; the NIST CTC files have no llull model behind them).
 
-**M5n: `llull-stats`, `llull-compute stats stackup`, `stackup_monte_carlo` (TR-GDT-22, VC-GDT-37).** Crate `solver/crates/llull-stats`: Philox4x32-10 (the Random123 known-answer
-vectors pass); sample `i` of contributor `j` draws from counter `[i_lo, i_hi, j, 0]` under key `[seed_lo, seed_hi]` (uniform from the top 24 bits as in TS, normal by Box-Muller
-cosine); the stack result is the linear sum with the given sensitivities or the expression tree of `lib/stackExpression` (JSON, evaluated in Rust); samples are cut into fixed
-blocks of 8192, reduced by Welford and merged left to right (Chan), so the result is bit-identical for any thread count (tested on 1 / 2 / 3 / 8 threads in Rust and 1 / 4 in the server
-test). Host: `server/src/native/stackupMonteCarlo.ts` runs the registry `analyze_stackup` for the closed forms and the contributor resolution, then the job, and answers the same `data` with
-the native `monteCarlo` (`engine: native-cpu`, `deterministic: true`, acceptance bounds incl. the probability floor); samples 1 .. 1e10 (default 1e7); CLI verb `stackup_monte_carlo` (a
-native transport like `fatigue_field`, not a registry command: the tool-schema snapshot does not list it). Measured: SU-01 .. SU-04 at 4e6 samples inside the 5-sigma acceptance bounds
-of the analytic reference (mean, std, and the SU-03 / SU-01 pBelow), SU-05 (non-linear, expression tree in Rust) within the combined bounds of the TypeScript Monte Carlo; 2e8 samples x
-5 contributors in 5.4 s on this 22-thread machine (about 3.7e7 samples/s against about 7e5/s for the TypeScript loop). Without the binary: `NATIVE_TOOL_MISSING`, `analyze_stackup` keeps
-its 2e6 TypeScript cap. The native run is not bit-equal to the TypeScript one (another generator, Q-9 stays open).
+**M5n.** Our M5n build (xoshiro TS sampler, a separate Philox native sampler, not bit-equal) was replaced in the merge with main by main's RS-7 build, which is bit-equal between TypeScript and `llull-compute stats` (§13.6). What we kept: the PMI-linked contributors, the `contributors[]` echo, the `lowerSpecLimit <= upperSpecLimit` check (`GDT_LIMITS_INVERTED`), the review reason for linked items awaiting review, and on `fastener_tolerance` the `part`, `statedWithinClearance` and `allowedPositionAtLmc` fields.
 
 Tests: `tests/unit/pmi/ap242.test.ts` (apply_pmi_set, xcafMapping tables, write stage on the analytic plate), `tests/unit/exchange/importPmi.test.ts` (read stage),
 `tests/unit/pmi/persistence.test.ts` (`pmi.import`), `server/tests/gdtPmiRoundTrip.test.ts`, `server/tests/gdtPmiNistGate.test.ts`, `server/tests/stackupNative.test.ts`,
-`solver/crates/llull-stats` (14 `cargo test`).
+`solver/crates/llull-stats` (main's crate, 7 `cargo test`).
+
+### 13.6 Stack-up engine M5 + M5n (RS-7, built on main 2026-10-19, merged 2026-10-21)
+
+**Built:** M5 (`analyze_stackup`, `fastener_tolerance`) and M5n (`llull-stats`, `llull-compute stats`, `stackup_monte_carlo`, VC-GDT-37).
+On main M1–M4, M6, M7 were not built; after the merge the contributors also take `pmiId` (§13.2, M7 row).
+
+| Item | Where |
+| ---- | ----- |
+| Philox4x32-10 (Random123 constants and round; KAT vectors), uniform (w + ½)·2^-32, Box–Muller with a polynomial cos(2πu) (+ − × only; Taylor to x^17 / x^18 on ≤ π/4) so the Rust twin gives the same bits; the only transcendental is `Math.log` (V8 fdlibm = `llull_jsmath::log`) | `packages/core/src/lib/prng.ts` |
+| The expression grammar of `@lib/expression` compiled to a postfix program (same operations, same order, same bits as `evaluateExpression`), forward-mode dual-number sensitivities, JSON-shippable | `lib/expressionProgram.ts` (`tokenize` and the built-in tables are now exported by `lib/expression.ts`) |
+| Closed forms §5.7 items 1–6, erfc (series < 2, continued fraction ≥ 2), exact uniform-sum CDF, acceptance bounds | `lib/stackup.ts` |
+| Sampler: sample i, contributor k ← Philox counter (i mod 2^32, ⌊i/2^32⌋, ⌊k/2⌋, 0), words 2(k mod 2), 2(k mod 2)+1; chunks of 4096 samples (sum, then squared deviations from the chunk mean), merged in index order (Chan et al.) | `lib/stackupSampling.ts`; Rust `solver/crates/llull-stats` |
+| Commands (core feature catalog `pmi`, toolset `pmi`): params, validation, data shape shared with the transport | `packages/core/src/commands/pmi/{stackupModel,stackup,fastener,codes,catalog}.ts` |
+| `llull-compute stats <job-folder>`: `job.json` (`stackupJob`) → `stats.json`; rayon over chunks in blocks of 16 384 chunks, one `progress` event per block | `solver/crates/llull-stats`, `solver/bins/llull-compute` |
+| `stackup_monte_carlo` transport (CLI, `POST /exchange`): analyze_stackup schema + `timeoutS` / `verify`; NATIVE_TOOL_MISSING without the binary | `server/src/native/stackupMonteCarlo.ts`, `tools.ts` |
+
+**Data shape.** As in §4, with the field names of `validation/expected_results.json`: `yNominal`, `yMean`, `worstCase`,
+`worstCaseExactCorners` (null above 16 contributors), `rss`, `sigma`, `pBelowLowerLimit` / `pAboveUpperLimit` + `pMethod`
+(`normal` | `uniform_sum` | `linearised_normal` for an expression | `none` for mixed distributions), `contributions[]` (+ `sensitivity`),
+`monteCarlo { seed, seedDefaulted, samples, samplesDefaulted, prng: 'philox4x32-10', engine: 'ts' | 'native', bitExactWithTs, mean, std, min,
+max, pBelowLowerLimit?, pAboveUpperLimit?, acceptance, provenance? }`, `sigmaPerHalfTolerance { value, source, defaulted }`, `provenance`,
+`unverified?`, `warnings[]` (`GDT_UNVERIFIED_INPUT`), `reviewRequired`, `reviewReason?`. `methods` takes `worstCase`, `rss`, `monteCarlo`
+(the names of `draft_plan_stackup_su01.json`; default `["worstCase", "rss"]`).
+
+**Decisions.**
+
+- **Q-9 decided yes**: one generator in both languages. VC-GDT-37 is bit equality, not only acceptance bounds: native = TS for
+  SU-01..04 and a program using `pow exp ln log10 hypot round min max mod floor ceil trunc sign sqrt abs` (crate fixture
+  `tests/fixtures/stackup.json`, written by `tests/unit/native/stackupReference.test.ts`; `server/tests/stackupNative.test.ts` end to end).
+  Trigonometric functions use the platform libm natively (V8's sin / cos have no Rust twin here), so SU-05 agrees within the acceptance
+  bounds and `data.monteCarlo.bitExactWithTs` says so.
+- **Unverified default (FR-GDT-34 / VC-GDT-55):** a typed contributor is unverified only with `verified: false`; the §4 sketch ("false when
+  typed") contradicted VC-GDT-55, which the build follows.
+- **Seed** defaults to 1 and `samples` to 100 000 (native: 10 000 000), both reported as defaulted; `seed` is an integer below 2^53 (the
+  Philox key is its two 32-bit words).
+- **Native cap 2^40 samples**: chunk counts and the Chan products a.n·b.n (≤ 2^52) stay exact in f64. The practical limit is the
+  timeout (default 600 s).
+- New codes: `GDT_STACKUP_CONTRIBUTOR_INVALID` (names, counts, seed, k), `GDT_STACKUP_NON_FINITE` (a sampled y not finite),
+  `GDT_FASTENER_PARAM_INVALID`; the sensitivity conflict code also covers "neither" and "some but not all".
+
+**Measured (Windows laptop, 22 hardware threads, shared with other jobs, 2026-10-19):** `analyze_stackup` 1e6 samples × 10 contributors
+in 1.40 s in Vitest (§8 budget 1.5 s). `llull-compute stats` release build, 1e8 samples: 5 contributors 3.0 s, 10 contributors 5.6 s on
+all threads, 64 s on one thread (≈ 25× the TS throughput with all threads, 2.2× per thread).
+
+**Review follow-ups (2026-10-19).** `GDT_STACKUP_PARAM_INVALID` (new code) for a bad `sigmaPerHalfTolerance` or `seed`; `samples` is only
+checked when `methods` contains `monteCarlo`; the uniform-sum CDF treats a width below 1e-6 of the largest as a point mass at its
+centre (the inclusion–exclusion sum cancels badly for very unequal widths).

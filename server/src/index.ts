@@ -21,6 +21,7 @@ import { buildExchangeRouter } from './exchangeRoutes';
 import { getActiveKernelName } from './geometryKernel';
 import { buildLiveRouter } from './liveRoutes';
 import { buildSigningRouter } from './plm/signingRoutes';
+import { buildCrashRouter } from './crashRoutes';
 import { buildExportRouter } from './exportRoutes';
 import { errorMessage } from '@lib/errorMessage';
 import { startServer } from './lifecycle';
@@ -67,6 +68,7 @@ const exchange = exchangeOptionsWithDwg();
 
 app.use(buildLiveRouter(restLimiter));
 app.use(buildSigningRouter(restLimiter));
+app.use(buildCrashRouter(restLimiter));
 app.use('/export', restLimiter, buildExportRouter(exchange));
 app.use('/import', buildImportRouter(restLimiter));
 app.use(buildExchangeRouter(restLimiter, exchange));

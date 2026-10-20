@@ -10,6 +10,7 @@ coverage
 .claude/worktrees
 .playwright-mcp
 server/.autosave.json
+server/.autosave.json.bak
 *.tsbuildinfo
 test-results
 playwright-report
@@ -23,3 +24,7 @@ server/audit.jsonl*
 
 # Rust native workspace (RS1)
 solver/target
+
+# Mutation testing (SC-Q4)
+reports/
+.stryker-tmp/

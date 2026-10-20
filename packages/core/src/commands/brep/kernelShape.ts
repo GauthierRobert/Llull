@@ -101,7 +101,7 @@ export function evaluateRecipe(kernel: GeometryKernel, recipe: ShapeRecipe): Ker
 }
 
 /** The `mesh` entity of a kernel result (world space), styled after `source`. */
-function kernelResultEntity(id: string, result: KernelResult, source: Entity): Entity {
+export function kernelResultEntity(id: string, result: KernelResult, source: Entity): Entity {
   return newEntity('mesh', id, { mesh: result.mesh, brep: result.recipe }, [0, 0, 0], source.color, { layerId: source.layerId });
 }
 

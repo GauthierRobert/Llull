@@ -198,7 +198,7 @@ function JointRow({
   const documentUnits = document.units;
   const revolute = joint.kind === 'revolute';
   // Revolute angles shown in degrees (like Properties); the command takes radians.
-  const currentValue = revolute ? toDegrees(joint.angle, 6) : joint.displacement;
+  const currentValue = revolute ? toDegrees(joint.angle, 6) : joint.kind === 'prismatic' ? joint.displacement : (joint.values[0] ?? 0);
 
   const commitInput = (text: string): void => {
     const parsed = parseNumber(text);

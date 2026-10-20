@@ -1,0 +1,6 @@
+{
+  "actions": [
+    { "command": "add_box", "params": { "size": [10, 10, 10] }, "as": "a" },
+    { "command": "push_pull_face", "params": { "id": "$a", "faceNear": [0, 0, 5], "distance": 5 } }
+  ]
+}

@@ -26,6 +26,9 @@ import { planKernelWarnings } from './planKernelWarning';
 import { benchmarkCli } from './benchmarks';
 import { PlmUsage, confirmedParams, runPlmCli } from './plm';
 import { runVault } from './vault';
+import { crashesCli } from './crashes';
+import { fuzzCli, fuzzOneCli, FuzzUsageError } from './fuzz';
+import { skillsCli, SkillsUsageError } from './skills';
 
 export interface CliIo {
   readonly stdout: (text: string) => void;
@@ -354,9 +357,30 @@ async function runStatus(args: ParsedArgv, io: CliIo): Promise<number> {
   return EXIT_OK;
 }
 
+/** `llull scan import FILE [k=v…]` = `llull exec scan_import path=FILE [k=v…]`; `llull scan list` = `llull exec scan_list`. */
+function scanArgv(argv: readonly string[]): string[] {
+  const at = argv.indexOf('scan');
+  const [verb, file] = [argv[at + 1], argv[at + 2]];
+  const before = argv.slice(0, at);
+  if (verb === 'list') return ['exec', 'scan_list', ...before, ...argv.slice(at + 2)];
+  if (verb === 'import' && file !== undefined && !file.startsWith('--'))
+    return ['exec', 'scan_import', `path=${file}`, ...before, ...argv.slice(at + 3)];
+  throw new UsageError('scan needs a verb: llull scan import <file> [sourceUnit=mm columns=xyz …] | llull scan list');
+}
+
 async function runHistory(direction: 'undo' | 'redo', args: ParsedArgv, io: CliIo): Promise<number> {
   const backend = await backendOf(args, io);
   return finish(await (direction === 'undo' ? backend.undo() : backend.redo()), args, io);
+}
+
+/** A host subcommand (fuzz, skills) whose own usage errors exit 2 like the rest of the CLI. */
+async function hostCommand(body: () => number | Promise<number>): Promise<number> {
+  try {
+    return await body();
+  } catch (error) {
+    if (error instanceof FuzzUsageError || error instanceof SkillsUsageError) throw new UsageError(error.message);
+    throw error;
+  }
 }
 
 export async function runCli(argv: readonly string[], io: CliIo): Promise<number> {
@@ -399,6 +423,15 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
       case 'lotar':
       case 'audit':
         return await runPlmCli(args, io, () => backendOf(args, io));
+      case 'scan':
+        return await runExec(parseArgv(scanArgv(argv)), io);
+      case 'crashes':
+        return crashesCli(args.positionals.slice(1), {
+          stdout: io.stdout,
+          stderr: io.stderr,
+          env: io.env,
+          json: booleanFlag(args, 'json'),
+        });
       case 'run_benchmarks': {
         const save = stringFlag(args, 'save');
         return benchmarkCli(
@@ -407,6 +440,12 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
           { stdout: io.stdout, cwd: process.cwd() },
         );
       }
+      case 'fuzz':
+        return await hostCommand(() => fuzzCli(args, io));
+      case 'fuzz-one':
+        return await hostCommand(() => fuzzOneCli(args, io));
+      case 'skills':
+        return await hostCommand(() => skillsCli(args, io));
       default:
         // `llull add_box width=10` is `llull exec add_box width=10`.
         if (getCommand(subcommand) !== undefined || exchangeTool(subcommand) !== undefined)

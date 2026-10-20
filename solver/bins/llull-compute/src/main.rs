@@ -1,8 +1,11 @@
 //! `llull-compute <job> [<task>] <job-folder>`: dispatches one job (RS1 §2). `llull-compute --version` prints the version.
-//! Jobs: `post fatigue|map <folder>` (crate `llull-post`), `raster <folder>` (crate `llull-raster`), `topopt <folder>` (crate
-//! `llull-topopt`, PHY-17 SIMP; one `progress` event per iteration, contract in `llull_topopt::job`), `stats stackup <folder>` (crate
-//! `llull-stats`, 03 GDT M5n Monte Carlo, Philox4x32-10). An unknown job ends with an `error`
-//! event and exit code 2. The raster job reports a `warning` event when it was asked for the GPU but drew with the CPU twin.
+//! Jobs: `post fatigue|map|random <folder>` (crate `llull-post`), `raster <folder>` (crate `llull-raster`), `topopt <folder>` (crate
+//! `llull-topopt`, PHY-17 SIMP; one `progress` event per iteration, contract in `llull_topopt::job`), `route <folder>` (crate
+//! `llull-route`, plant 02 RTE V2 auto-router; contract in `llull_route::job`), `stats <folder>` (crate `llull-stats`,
+//! GDT stack-up Monte Carlo, contract in `llull_stats`), `panel <folder>` (crate `llull-panel`, AER vortex-lattice influence + LU, faer),
+//! `explicit <folder>` (crate `llull-explicit`, PHY-19 RS-8a; contract in `llull_explicit::job`).
+//! An unknown job ends with an `error`
+//! event and exit code 2. `cloud import|op <folder>`: crate `llull-cloud` (plant 10 point clouds, RS-3 / RS-4). The raster job reports a `warning` event when it was asked for the GPU but drew with the CPU twin.
 
 use llull_protocol::{emit, Event, Output};
 use llull_raster::Produced;
@@ -11,7 +14,7 @@ use std::path::Path;
 use std::process::ExitCode;
 
 const USAGE: &str =
-    "usage: llull-compute post <fatigue|map> <job-folder> | llull-compute raster <job-folder> | llull-compute topopt <job-folder> | llull-compute stats stackup <job-folder>";
+    "usage: llull-compute post <fatigue|map|random> <job-folder> | llull-compute raster <job-folder> | llull-compute topopt <job-folder> | llull-compute stats <job-folder> | llull-compute panel <job-folder> | llull-compute route <job-folder> | llull-compute explicit <job-folder> | llull-compute cloud <import|op> <job-folder>";
 
 fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Output>, (String, String)> {
     match (job, rest) {
@@ -33,8 +36,18 @@ fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Outpu
             Ok(outputs)
         }
         ("topopt", [folder, ..]) => llull_topopt::job::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
-        ("stats", [task, folder, ..]) => llull_stats::run(task, Path::new(folder)).map_err(|error| (error.code.to_string(), error.message)),
-        ("post" | "raster" | "topopt" | "stats", _) => Err(("NATIVE_USAGE".to_string(), USAGE.to_string())),
+        ("route", [folder, ..]) => llull_route::job::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
+        ("stats", [folder, ..]) => llull_stats::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
+        ("panel", [folder, ..]) => llull_panel::run(Path::new(folder)).map_err(|error| (error.code.to_string(), error.message)),
+        ("explicit", [folder, ..]) => {
+            llull_explicit::job::run_job(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message))
+        }
+        ("cloud", [task, folder, ..]) => {
+            llull_cloud::job::run(task, Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message))
+        }
+        ("post" | "raster" | "topopt" | "route" | "stats" | "panel" | "explicit" | "cloud", _) => {
+            Err(("NATIVE_USAGE".to_string(), USAGE.to_string()))
+        }
         _ => Err(("NATIVE_JOB_UNKNOWN".to_string(), format!("unknown job '{job}'"))),
     }
 }

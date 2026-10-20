@@ -1,228 +1,218 @@
 /**
- * Tolerance stack-up mathematics (03 GDT TECHNICAL_SPEC §5.7): linearised worst case, exact corners, RSS, sigma model, exact probabilities
- * (normal CDF, generalised Irwin-Hall) and seeded Monte Carlo. Pure: no document, no clock; lengths in one consistent unit.
+ * Tolerance stack-up closed forms (GDT TECHNICAL_SPEC §5.7): worst case, exact corners, RSS, σ model, probabilities (normal CDF via a
+ * double-precision erfc; exact CDF of a sum of uniforms), contribution percentages and Monte Carlo acceptance bounds.
  */
 
-import { normalCdf } from './erfc';
-import { createRandomStream } from './prng';
+import { programFunction, programGradient, type Program } from './expressionProgram';
 
-export type StackDistribution = 'normal' | 'uniform';
+type StackDistribution = 'normal' | 'uniform';
 
-/** Limits are [nominal + lower, nominal + upper]. `sensitivity` is the partial derivative of the stack result with respect to this value. */
-export interface StackContributor {
+export interface StackInput {
   readonly name: string;
   readonly nominal: number;
+  /** Signed limits relative to the nominal: [nominal + lower, nominal + upper]. */
   readonly lower: number;
   readonly upper: number;
-  readonly sensitivity: number;
   readonly distribution: StackDistribution;
 }
 
-/** Centre of the tolerance band. */
-export const meanOf = (c: Pick<StackContributor, 'nominal' | 'lower' | 'upper'>): number => c.nominal + (c.lower + c.upper) / 2;
+/** Largest contributor count for the 2^n corner enumeration (TECHNICAL_SPEC §5.7 item 2). */
+const EXACT_CORNERS_MAX = 16;
+/** Largest contributor count for the exact uniform-sum CDF (2^n inclusion–exclusion terms). */
+const UNIFORM_CDF_MAX = 12;
 
-/** Half of the tolerance band. */
-export const halfOf = (c: Pick<StackContributor, 'lower' | 'upper'>): number => (c.upper - c.lower) / 2;
+export const centreOf = (c: StackInput): number => c.nominal + (c.lower + c.upper) / 2;
+export const halfToleranceOf = (c: StackInput): number => (c.upper - c.lower) / 2;
+/** σ_i = t_i / k (normal) or t_i / √3 (uniform). */
+export const sigmaOf = (c: StackInput, sigmaPerHalfTolerance: number): number =>
+  c.distribution === 'normal' ? halfToleranceOf(c) / sigmaPerHalfTolerance : halfToleranceOf(c) / Math.sqrt(3);
 
-/** Standard deviation: half / k (normal) or half / sqrt(3) (uniform). */
-export const sigmaOf = (c: StackContributor, sigmaPerHalfTolerance: number): number =>
-  c.distribution === 'normal' ? halfOf(c) / sigmaPerHalfTolerance : halfOf(c) / Math.sqrt(3);
+const SQRT_PI = Math.sqrt(Math.PI);
 
-/** Linearised worst-case half tolerance: sum |a_i| t_i. */
-export const worstCaseHalf = (items: readonly StackContributor[]): number =>
-  items.reduce((sum, c) => sum + Math.abs(c.sensitivity) * halfOf(c), 0);
-
-/** RSS half tolerance: sqrt(sum (a_i t_i)^2). */
-export const rssHalf = (items: readonly StackContributor[]): number =>
-  Math.sqrt(items.reduce((sum, c) => sum + (c.sensitivity * halfOf(c)) ** 2, 0));
-
-/** Standard deviation of the stack result: sqrt(sum (a_i sigma_i)^2). */
-export const stackSigma = (items: readonly StackContributor[], sigmaPerHalfTolerance: number): number =>
-  Math.sqrt(items.reduce((sum, c) => sum + (c.sensitivity * sigmaOf(c, sigmaPerHalfTolerance)) ** 2, 0));
-
-export interface Contribution {
-  readonly name: string;
-  readonly wcPercent: number;
-  readonly rssPercent: number;
+/** erfc(x) for x ≥ 0: positive power series below 2 (no cancellation), continued fraction above. */
+function erfcPositive(x: number): number {
+  if (x < 2) {
+    let term = x;
+    let sum = x;
+    for (let n = 1; n < 200 && term >= 1e-18 * sum; n += 1) {
+      term *= (2 * x * x) / (2 * n + 1);
+      sum += term;
+    }
+    return 1 - (2 / SQRT_PI) * Math.exp(-x * x) * sum;
+  }
+  let fraction = x;
+  for (let k = 160; k >= 1; k -= 1) fraction = x + k / 2 / fraction;
+  return Math.exp(-x * x) / SQRT_PI / fraction;
 }
 
-/** Share of each contributor in the worst case (|a| t) and in the variance ((a sigma)^2), percent. */
-export function contributions(items: readonly StackContributor[], sigmaPerHalfTolerance: number): Contribution[] {
+/** Complementary error function, relative error < 1e-12 on the tested range. */
+export const erfc = (x: number): number => (x >= 0 ? erfcPositive(x) : 2 - erfcPositive(-x));
+
+/** Standard normal CDF Φ(z) = ½ erfc(−z/√2). */
+export const normalCdf = (z: number): number => 0.5 * erfc(-z / Math.SQRT2);
+
+/**
+ * P(Σ U_i ≤ x) for independent U_i uniform on [lo_i, lo_i + w_i] (generalised Irwin–Hall, inclusion–exclusion), n ≤ 12. A width below
+ * 1e-6 of the largest is taken as a point mass at its centre: the alternating r^n sums would lose more digits to it (review finding) than
+ * the point mass costs, which is at most (narrow width) × (density of the other terms) ≤ 1e-6 × (n-term density × largest width).
+ * @failure more than 12 terms -> null
+ */
+export function uniformSumCdf(x: number, terms: readonly { readonly lo: number; readonly width: number }[]): number | null {
+  const n = terms.length;
+  if (n > UNIFORM_CDF_MAX) return null;
+  const narrow = 1e-6 * Math.max(0, ...terms.map((t) => t.width));
+  const widths = terms.filter((t) => t.width > narrow);
+  const shift = terms.reduce((sum, t) => sum + (t.width > narrow ? t.lo : t.lo + t.width / 2), 0);
+  if (widths.length === 0) return x >= shift ? 1 : 0;
+  let factorial = 1;
+  for (let k = 2; k <= widths.length; k += 1) factorial *= k;
+  const product = widths.reduce((p, t) => p * t.width, 1);
+  let total = 0;
+  for (let mask = 0; mask < 1 << widths.length; mask += 1) {
+    let offset = shift;
+    let sign = 1;
+    widths.forEach((t, i) => {
+      if ((mask >> i) & 1) {
+        offset += t.width;
+        sign = -sign;
+      }
+    });
+    const r = x - offset;
+    if (r > 0) total += sign * Math.pow(r, widths.length);
+  }
+  return Math.min(1, Math.max(0, total / (factorial * product)));
+}
+
+export interface StackClosedForms {
+  readonly yNominal: number;
+  readonly yMean: number;
+  /** ∂f/∂x_i at the means (exact: given, or forward-mode automatic differentiation). */
+  readonly sensitivities: readonly number[];
+  readonly worstCase: { readonly halfTolerance: number; readonly min: number; readonly max: number };
+  /** min / max of f over the 2^n limit combinations; null above EXACT_CORNERS_MAX contributors. */
+  readonly worstCaseExactCorners: { readonly min: number; readonly max: number } | null;
+  readonly rss: { readonly halfTolerance: number; readonly min: number; readonly max: number };
+  readonly sigma: number;
+  readonly contributions: readonly { readonly name: string; readonly wcPercent: number; readonly rssPercent: number }[];
+}
+
+/** Closed forms of y = f(x) (`program` over the contributors in order). */
+export function stackClosedForms(contributors: readonly StackInput[], program: Program, sigmaPerHalfTolerance: number): StackClosedForms {
+  const f = programFunction(program);
+  const centres = contributors.map(centreOf);
+  const halves = contributors.map(halfToleranceOf);
+  const sigmas = contributors.map((c) => sigmaOf(c, sigmaPerHalfTolerance));
+  const { value: yMean, gradient } = programGradient(program, centres);
+  const wcTerms = gradient.map((a, i) => Math.abs(a) * (halves[i] as number));
+  const halfWc = wcTerms.reduce((sum, t) => sum + t, 0);
+  const halfRss = Math.sqrt(wcTerms.reduce((sum, t) => sum + t * t, 0));
+  const varianceTerms = gradient.map((a, i) => (a * (sigmas[i] as number)) ** 2);
+  const variance = varianceTerms.reduce((sum, t) => sum + t, 0);
+  let corners: { min: number; max: number } | null = null;
+  if (contributors.length <= EXACT_CORNERS_MAX) {
+    corners = { min: Infinity, max: -Infinity };
+    const x = new Float64Array(contributors.length);
+    for (let mask = 0; mask < 1 << contributors.length; mask += 1) {
+      contributors.forEach((c, i) => {
+        x[i] = c.nominal + ((mask >> i) & 1 ? c.upper : c.lower);
+      });
+      const y = f(x);
+      corners = { min: Math.min(corners.min, y), max: Math.max(corners.max, y) };
+    }
+  }
+  return {
+    yNominal: f(contributors.map((c) => c.nominal)),
+    yMean,
+    sensitivities: gradient,
+    worstCase: { halfTolerance: halfWc, min: yMean - halfWc, max: yMean + halfWc },
+    worstCaseExactCorners: corners,
+    rss: { halfTolerance: halfRss, min: yMean - halfRss, max: yMean + halfRss },
+    sigma: Math.sqrt(variance),
+    contributions: contributors.map((c, i) => ({
+      name: c.name,
+      wcPercent: halfWc === 0 ? 0 : ((wcTerms[i] as number) / halfWc) * 100,
+      rssPercent: variance === 0 ? 0 : ((varianceTerms[i] as number) / variance) * 100,
+    })),
+  };
+}
+
+export type ProbabilityMethod = 'normal' | 'uniform_sum' | 'linearised_normal' | 'none';
+
+/**
+ * P(y < limit) of the linearised stack: exact normal CDF when every contributor is normal, exact uniform-sum CDF when every contributor is
+ * uniform (n ≤ 12); `linear` false labels the normal result as a linearisation of a non-linear expression; mixed distributions -> none
+ * (Monte Carlo only).
+ */
+export function probabilityBelow(
+  limit: number,
+  forms: StackClosedForms,
+  contributors: readonly StackInput[],
+  linear: boolean,
+): { readonly p: number | null; readonly method: ProbabilityMethod } {
+  if (contributors.every((c) => c.distribution === 'normal')) {
+    const p = forms.sigma === 0 ? (forms.yMean < limit ? 1 : 0) : normalCdf((limit - forms.yMean) / forms.sigma);
+    return { p, method: linear ? 'normal' : 'linearised_normal' };
+  }
+  if (linear && contributors.every((c) => c.distribution === 'uniform')) {
+    const terms = contributors.map((c, i) => {
+      const w = Math.abs(forms.sensitivities[i] as number) * halfToleranceOf(c);
+      return { lo: -w, width: 2 * w };
+    });
+    const p = uniformSumCdf(limit - forms.yMean, terms);
+    return p === null ? { p: null, method: 'none' } : { p, method: 'uniform_sum' };
+  }
+  return { p: null, method: 'none' };
+}
+
+/**
+ * P(y > limit), computed on the small tail directly (merge port of our upper-tail fix: 1 − P(y < limit) loses every digit of a tail below
+ * 1e-16): the normal CDF of the reflected argument, or the uniform-sum CDF of the reflected sum (the centred terms are symmetric).
+ */
+export function probabilityAbove(
+  limit: number,
+  forms: StackClosedForms,
+  contributors: readonly StackInput[],
+  linear: boolean,
+): { readonly p: number | null; readonly method: ProbabilityMethod } {
+  return probabilityBelow(2 * forms.yMean - limit, forms, contributors, linear);
+}
+
+/** 5σ statistical acceptance bounds of a Monte Carlo estimate with N samples (TECHNICAL_SPEC §5.7 item 7). */
+export function monteCarloAcceptance(
+  sigma: number,
+  samples: number,
+  p: number | null,
+): { readonly meanTolerance: number; readonly stdTolerance: number; readonly pTolerance: number | null } {
+  return {
+    meanTolerance: (5 * sigma) / Math.sqrt(samples),
+    stdTolerance: (5 * sigma) / Math.sqrt(2 * samples),
+    pTolerance: p === null ? null : Math.max(5 * Math.sqrt((p * (1 - p)) / samples), 1e-5),
+  };
+}
+
+/** A linear-stack term: `sensitivity` is the coefficient a_i of this value in the result (stack-up at temperature, 04 §16). */
+export interface StackContributor extends StackInput {
+  readonly sensitivity: number;
+}
+
+/** Linearised worst-case half tolerance: Σ |a_i| t_i. */
+export const worstCaseHalf = (items: readonly StackContributor[]): number =>
+  items.reduce((sum, c) => sum + Math.abs(c.sensitivity) * halfToleranceOf(c), 0);
+
+/** RSS half tolerance: √Σ (a_i t_i)². */
+export const rssHalf = (items: readonly StackContributor[]): number =>
+  Math.sqrt(items.reduce((sum, c) => sum + (c.sensitivity * halfToleranceOf(c)) ** 2, 0));
+
+/** Share of each term in the worst case (|a| t) and in the variance ((a σ)²), percent. */
+export function contributions(
+  items: readonly StackContributor[],
+  sigmaPerHalfTolerance: number,
+): { readonly name: string; readonly wcPercent: number; readonly rssPercent: number }[] {
   const wc = worstCaseHalf(items);
   const variance = items.reduce((sum, c) => sum + (c.sensitivity * sigmaOf(c, sigmaPerHalfTolerance)) ** 2, 0);
   return items.map((c) => ({
     name: c.name,
-    wcPercent: wc > 0 ? (100 * Math.abs(c.sensitivity) * halfOf(c)) / wc : 0,
+    wcPercent: wc > 0 ? (100 * Math.abs(c.sensitivity) * halfToleranceOf(c)) / wc : 0,
     rssPercent: variance > 0 ? (100 * (c.sensitivity * sigmaOf(c, sigmaPerHalfTolerance)) ** 2) / variance : 0,
   }));
-}
-
-/** Largest contributor count of the exact-corner enumeration (2^n evaluations). */
-const MAX_CORNER_CONTRIBUTORS = 16;
-
-/** Min and max of `f` over the 2^n limit combinations; null above MAX_CORNER_CONTRIBUTORS. */
-export function exactCorners(
-  items: readonly StackContributor[],
-  f: (values: readonly number[]) => number,
-): { min: number; max: number } | null {
-  const n = items.length;
-  if (n === 0 || n > MAX_CORNER_CONTRIBUTORS) return null;
-  const values = items.map((c) => c.nominal + c.lower);
-  let [min, max] = [Infinity, -Infinity];
-  for (let mask = 0; mask < 2 ** n; mask++) {
-    for (let i = 0; i < n; i++) {
-      const c = items[i] as StackContributor;
-      values[i] = c.nominal + ((mask >> i) & 1 ? c.upper : c.lower);
-    }
-    const y = f(values);
-    if (y < min) min = y;
-    if (y > max) max = y;
-  }
-  return { min, max };
-}
-
-/** Largest contributor count of the exact uniform-sum CDF (2^n subset terms). */
-const MAX_IRWIN_HALL = 12;
-
-/**
- * Exact P(sum <= x) of independent uniform terms on [-h_i, +h_i] (generalised Irwin-Hall, evaluated on centred terms):
- * (1 / (n! prod w_i)) sum over subsets S of (-1)^|S| (x + sum h_i - sum_{i in S} w_i)_+^n with w_i = 2 h_i. Zero-width terms are dropped.
- */
-export function uniformSumCdf(halves: readonly number[], x: number): number {
-  const widths = halves.filter((h) => h > 0).map((h) => 2 * h);
-  const n = widths.length;
-  if (n === 0) return x >= 0 ? 1 : 0;
-  const span = widths.reduce((sum, w) => sum + w, 0);
-  const shifted = x + span / 2;
-  if (shifted <= 0) return 0;
-  if (shifted >= span) return 1;
-  // The terms alternate in sign: above the middle fold with the symmetry F(x) = 1 - F(-x), so only the small lower tail is summed.
-  if (shifted > span / 2) return 1 - subsetSum(widths, span - shifted);
-  return subsetSum(widths, shifted);
-}
-
-/** Inclusion-exclusion sum of the Irwin-Hall CDF at `shifted` (0 < shifted <= half the span). */
-function subsetSum(widths: readonly number[], shifted: number): number {
-  const n = widths.length;
-  let total = 0;
-  for (let mask = 0; mask < 2 ** n; mask++) {
-    let arg = shifted;
-    let bits = 0;
-    for (let i = 0; i < n; i++)
-      if ((mask >> i) & 1) {
-        arg -= widths[i] as number;
-        bits++;
-      }
-    if (arg > 0) total += (bits % 2 === 0 ? 1 : -1) * arg ** n;
-  }
-  let denominator = 1;
-  for (let i = 2; i <= n; i++) denominator *= i;
-  for (const w of widths) denominator *= w;
-  return total / denominator;
-}
-
-export interface ExactProbabilities {
-  readonly pBelow: number;
-  readonly pAbove: number;
-  readonly method: string;
-}
-
-/**
- * P(y < lower) and P(y > upper) of a linear stack. All normal: the normal CDF of the exact sum; all uniform (<= MAX_IRWIN_HALL terms):
- * the exact Irwin-Hall CDF; mixed or too many terms: null (Monte Carlo only).
- */
-export function exactProbabilities(
-  items: readonly StackContributor[],
-  yMean: number,
-  sigmaPerHalfTolerance: number,
-  lower: number | undefined,
-  upper: number | undefined,
-): ExactProbabilities | null {
-  if (items.length === 0) return null;
-  const sigma = stackSigma(items, sigmaPerHalfTolerance);
-  if (items.every((c) => c.distribution === 'normal') && sigma > 0) {
-    return {
-      pBelow: lower === undefined ? 0 : normalCdf((lower - yMean) / sigma),
-      pAbove: upper === undefined ? 0 : normalCdf((yMean - upper) / sigma),
-      method: 'normal CDF of the sum of independent normals',
-    };
-  }
-  if (items.every((c) => c.distribution === 'uniform') && items.length <= MAX_IRWIN_HALL) {
-    const halves = items.map((c) => Math.abs(c.sensitivity) * halfOf(c));
-    return {
-      pBelow: lower === undefined ? 0 : uniformSumCdf(halves, lower - yMean),
-      pAbove: upper === undefined ? 0 : uniformSumCdf(halves, yMean - upper),
-      method: 'exact generalised Irwin-Hall CDF of the sum of independent uniforms',
-    };
-  }
-  return null;
-}
-
-export interface MonteCarloResult {
-  readonly seed: number;
-  readonly samples: number;
-  readonly prng: string;
-  readonly mean: number;
-  readonly std: number;
-  readonly min: number;
-  readonly max: number;
-  readonly pBelow?: number;
-  readonly pAbove?: number;
-  /** 5-sigma statistical acceptance half-widths around the analytic values (mean, std, probability floor 1e-5). */
-  readonly acceptance: { readonly mean: number; readonly std: number };
-}
-
-export interface MonteCarloOptions {
-  readonly seed: number;
-  readonly samples: number;
-  readonly sigmaPerHalfTolerance: number;
-  readonly lower?: number;
-  readonly upper?: number;
-  /** Analytic sigma of the result, for the acceptance bounds. */
-  readonly sigma: number;
-}
-
-/** 5-sigma acceptance half-width of an estimated probability `p` over `n` draws (absolute floor 1e-5). */
-export const probabilityAcceptance = (p: number, n: number): number => Math.max(5 * Math.sqrt((p * (1 - p)) / n), 1e-5);
-
-/**
- * Seeded Monte Carlo of `f` over independent contributors: normal = mean + sigma z, uniform = mean + half (2u - 1). Deterministic for
- * (seed, samples, inputs). Welford mean / unbiased variance, one scratch array for the whole run.
- */
-export function monteCarlo(
-  items: readonly StackContributor[],
-  f: (values: readonly number[]) => number,
-  options: MonteCarloOptions,
-): MonteCarloResult {
-  const { seed, samples, sigmaPerHalfTolerance, lower, upper } = options;
-  const stream = createRandomStream(seed);
-  const centres = items.map(meanOf);
-  const spreads = items.map((c) => (c.distribution === 'normal' ? sigmaOf(c, sigmaPerHalfTolerance) : halfOf(c)));
-  const normal = items.map((c) => c.distribution === 'normal');
-  const values = [...centres];
-  let [mean, m2, min, max, below, above] = [0, 0, Infinity, -Infinity, 0, 0];
-  for (let s = 1; s <= samples; s++) {
-    for (let i = 0; i < values.length; i++)
-      values[i] = (centres[i] as number) + (spreads[i] as number) * (normal[i] === true ? stream.normal() : 2 * stream.uniform() - 1);
-    const y = f(values);
-    const delta = y - mean;
-    mean += delta / s;
-    m2 += delta * (y - mean);
-    if (y < min) min = y;
-    if (y > max) max = y;
-    if (lower !== undefined && y < lower) below++;
-    if (upper !== undefined && y > upper) above++;
-  }
-  return {
-    seed,
-    samples,
-    prng: 'xoshiro128** seeded by SplitMix32; uniform from the top 24 bits; normal by Box-Muller',
-    mean,
-    std: samples > 1 ? Math.sqrt(m2 / (samples - 1)) : 0,
-    min,
-    max,
-    ...(lower === undefined ? {} : { pBelow: below / samples }),
-    ...(upper === undefined ? {} : { pAbove: above / samples }),
-    acceptance: { mean: (5 * options.sigma) / Math.sqrt(samples), std: (5 * options.sigma) / Math.sqrt(2 * samples) },
-  };
 }

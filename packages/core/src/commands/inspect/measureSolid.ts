@@ -2,6 +2,7 @@ import type { CadDocument, Entity, Vec3 } from '../../model/types';
 import type { CommandResult, ExecutionContext } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { entityBoundsInDoc, mergeBounds } from '../../geometry/bounds';
+import { recipeOf } from '../../geometry/shapeRecipe';
 import { expandInstance } from '../../geometry/instanceExpansion';
 import type { Bounds } from '../../geometry/bounds';
 import { formatLength } from '../document/units';
@@ -31,6 +32,17 @@ import {
   type ReviewRequired,
 } from './massReport';
 
+/** World bounds of e: a kernel result that keeps its B-rep recipe uses the kernel's exact bounds when it reports them (OCC). */
+function measuredBounds(doc: CadDocument, e: Entity, ctx: ExecutionContext | undefined): Bounds {
+  if (e.kind === 'mesh' && e.brep !== undefined) {
+    const kernel = (ctx ?? currentContext()).kernel;
+    const shape = kernel?.evaluate(recipeOf(e)) ?? null;
+    const exact = shape === null ? null : (kernel?.massProperties?.(shape) ?? null);
+    if (exact !== null) return { min: exact.bounds.min, max: exact.bounds.max };
+  }
+  return entityBoundsInDoc(doc, e);
+}
+
 interface MeasureBoundingBoxData {
   min: Vec3;
   max: Vec3;
@@ -50,7 +62,8 @@ export const measureBoundingBox = defineCommand({
     '(b) useSelection:true — combined AABB of the current document selection; ' +
     '(c) no params (or useSelection:false) — combined AABB of the entire document. ' +
     'Returns data: { min:[x,y,z], max:[x,y,z], size:[w,h,d] }. Does not modify the document. ' +
-    'Entity rotation and the sweep angle of a partly turned profile are applied (the AABB wraps the actual geometry).',
+    'Entity rotation and the sweep angle of a partly turned profile are applied (the AABB wraps the actual geometry). ' +
+    'A kernel result (mesh with its B-rep) under the exact OCC kernel uses the B-rep bounds, not the display triangles.',
   params: z.object({
     entityId: z.string().optional().describe('Id of the entity whose bounding box to compute. Takes precedence over useSelection.'),
     useSelection: z
@@ -61,18 +74,18 @@ export const measureBoundingBox = defineCommand({
           'Falls back to the whole document if the selection is empty.',
       ),
   }),
-  run: (doc, { entityId, useSelection }): CommandResult => {
+  run: (doc, { entityId, useSelection }, ctx): CommandResult => {
     let bounds: Bounds | null = null;
     if (entityId) {
       const e = doc.entities[entityId];
       if (!e) return noop(doc, `measure_bounding_box: entity '${entityId}' not found.`);
-      bounds = entityBoundsInDoc(doc, e);
+      bounds = measuredBounds(doc, e, ctx);
     } else {
       const ids = useSelection && doc.selection.length > 0 ? doc.selection : doc.order;
       for (const id of ids) {
         const e = doc.entities[id];
         if (!e) continue;
-        const b = entityBoundsInDoc(doc, e);
+        const b = measuredBounds(doc, e, ctx);
         bounds = bounds ? mergeBounds(bounds, b) : b;
       }
       if (!bounds) return noop(doc, 'measure_bounding_box: document is empty — no bounds to compute.');

@@ -1,0 +1,14 @@
+{
+  "id": "92-shell-box-sealed",
+  "family": "shell",
+  "description": "10-cube with a sealed 8-cube cavity",
+  "source": "analytic",
+  "formula": "V = abc - (a-2t)^3; A = 6a^2 + 6(a-2t)^2",
+  "kernels": ["occt"],
+  "bodies": 1,
+  "volume": 488,
+  "area": 984,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-5, -5, -5], "max": [5, 5, 5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

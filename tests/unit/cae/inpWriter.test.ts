@@ -185,6 +185,13 @@ describe('discipline dispatch', () => {
         return { text: '*STEP\n*COUPLED TEMPERATURE-DISPLACEMENT, STEADY STATE\n*END STEP\n' };
       },
     },
+    dynamics: {
+      materialCards: () => ({ text: '' }),
+      sections: () => {
+        log.push('dynamics');
+        return { text: '*STEP\n*FREQUENCY, STORAGE=YES\n1\n*END STEP\n' };
+      },
+    },
   });
 
   it('uses the thermal functions for heat cases and no mechanical cards', () => {

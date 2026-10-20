@@ -1,0 +1,14 @@
+{
+  "id": "85-fillet-cube-all-edges",
+  "family": "fillet",
+  "description": "r=1 on all twelve edges of a 10-cube",
+  "source": "analytic",
+  "formula": "Steiner: V = x y z + 2r(xy+yz+xz) + pi r^2 (x+y+z) + 4/3 pi r^3, x = a - 2r",
+  "kernels": ["occt"],
+  "bodies": 1,
+  "volume": 975.587013891,
+  "area": 547.362817987,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-5, -5, -5], "max": [5, 5, 5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

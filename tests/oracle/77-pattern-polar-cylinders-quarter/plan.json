@@ -1,0 +1,6 @@
+{
+  "actions": [
+    { "command": "add_cylinder", "params": { "radius": 0.5, "height": 2, "position": [5, 0, 0] }, "as": "a" },
+    { "command": "array_polar", "params": { "id": "$a", "count": 4, "center": [0, 0, 0] } }
+  ]
+}

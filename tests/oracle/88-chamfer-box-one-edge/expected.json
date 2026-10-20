@@ -1,0 +1,14 @@
+{
+  "id": "88-chamfer-box-one-edge",
+  "family": "chamfer",
+  "description": "d=1 chamfer on one vertical edge of a 10-cube",
+  "source": "analytic",
+  "formula": "V = abc - d^2 L / 2; A = A0 - 2 d L + sqrt2 d L - d^2",
+  "kernels": ["occt"],
+  "bodies": 1,
+  "volume": 995,
+  "area": 593.142135624,
+  "centroid": [-0.0234505862647, -0.0234505862647, 0],
+  "bbox": { "min": [-5, -5, -5], "max": [5, 5, 5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

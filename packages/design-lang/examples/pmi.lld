@@ -1,4 +1,4 @@
-# Machined plate PMI: governing standard, a note, a bolted-joint budget and a stack-up, verified with the pmi toolset (no kernel needed)
+# Machined plate PMI: governing standard, a note, a bolted-joint budget, a stack-up and the pin-in-bore fit of GDT SU-03, verified with the pmi toolset (no kernel needed)
 design pmi_plate units=mm
 param hole = 6.6
 param bolt = 6
@@ -13,3 +13,6 @@ check fastener_tolerance holeMmc=hole fastenerMmc=bolt type="floating" path=clea
 check fastener_tolerance holeMmc=hole fastenerMmc=bolt type="floating" statedPosition=0.3 path=virtualCondition expect ~= 6.3 ± 0.1%
 check analyze_stackup contributors=[{"name": "H", "nominal": 100, "upper": 0.1, "lower": -0.1}, {"name": "A", "nominal": 99.85, "upper": 0.05, "lower": -0.05}] expression="H - A" path=worstCase.halfTolerance expect ~= 0.15 ± 0.1%
 check volume of=plate expect == 120*80*thickness
+check analyze_stackup contributors=[{"name":"Dhole","nominal":20,"upper":0.021,"lower":0},{"name":"Dpin","nominal":20,"upper":-0.007,"lower":-0.02}] expression="Dhole-Dpin" path=worstCase.min expect ~= 0.007 ± 0.000001
+check analyze_stackup contributors=[{"name":"Dhole","nominal":20,"upper":0.021,"lower":0,"sensitivity":1},{"name":"Dpin","nominal":20,"upper":-0.007,"lower":-0.02,"sensitivity":-1}] path=rss.halfTolerance expect ~= 0.012349089 ± 0.000001
+check fastener_tolerance holeMmc=6.6 fastenerMmc=6 type="floating" path=positionTolerance expect ~= 0.6 ± 0.000001

@@ -1,0 +1,14 @@
+{
+  "id": "114-draft-one-side-5deg",
+  "family": "draft",
+  "description": "the x+ side of a 10 mm cube drafted 5 degrees along +z about the bottom face (the part narrows toward the pull)",
+  "source": "analytic",
+  "formula": "removed wedge = w h^2 tan(theta) / 2 = 10 * 100 * tan(5 deg) / 2; bbox unchanged (the side keeps its bottom edge)",
+  "kernels": ["occt"],
+  "bodies": 1,
+  "volume": 956.255668237,
+  "area": null,
+  "centroid": null,
+  "bbox": { "min": [-5, -5, -5], "max": [5, 5, 5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

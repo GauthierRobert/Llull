@@ -10,6 +10,8 @@ import type { GeometryQueryEngine } from '../geometry/geometryQueries';
 import type { SurfaceAnalysisEngine } from '../geometry/surfaceAnalysis/types';
 import type { FeArtifactPort, HumanSignaturePort } from '../model/analysis';
 import type { MaterialLibrary } from '../model/materialLibrary';
+import type { RasterPort } from '../model/raster';
+import type { PointCloudPort } from '../model/pointCloud';
 import type { IdSource } from '../lib/id';
 import type { ReplayCache } from './history/replayCache';
 import type { ZodType } from 'zod';
@@ -38,6 +40,11 @@ export interface CommandResult {
   rejected?: true;
   /** Machine-readable reason of a refusal (always set with `rejected`; a command may also set it on its own no-op). */
   error?: CommandError;
+  /**
+   * Params the command resolved itself and wants replayed (SC-N1: the persistent names of the edges / faces it picked), merged into the
+   * FeatureStep `execute` records; never returned to the caller.
+   */
+  recordExtras?: Readonly<Record<string, unknown>>;
 }
 
 /**
@@ -197,6 +204,10 @@ export interface ExecutionContext {
   readonly objects?: ObjectStorePort | null;
   /** Material library files of this machine (`import_material_library` by reference, `resolve_material_libraries`); null/absent = none. */
   readonly libraries?: MaterialLibraryProvider | null;
+  /** Native offscreen raster (`renderer: 'native'`, plant 09 VIS-M9 / RS-5); null/absent = NATIVE_TOOL_MISSING. */
+  readonly raster?: RasterPort | null;
+  /** Point-cloud assets of this machine (plant 10, TR-SCN-02); null/absent = scan queries refuse with SCN_ASSET_UNAVAILABLE. */
+  readonly pointClouds?: PointCloudPort | null;
   /** Mints every id the command creates. */
   readonly ids: IdSource;
   /** Resolves command names for commands that run other commands. */

@@ -1,0 +1,6 @@
+{
+  "actions": [
+    { "command": "add_box", "params": { "size": [2, 3, 4], "position": [3, 2, 1] }, "as": "a" },
+    { "command": "mirror_entity", "params": { "id": "$a", "axis": "y" } }
+  ]
+}

@@ -1,188 +1,168 @@
 /**
- * stackup_monte_carlo transport (03 GDT M5n, VC-GDT-37) with the real `llull-compute stats` when it is built (cargo build --release in
- * solver/, or LLULL_COMPUTE), else skipped with a logged reason; the missing-binary and refusal paths always run.
- * Native vs the analytic reference (stackup_reference.json, SU-01..05) inside the 5-sigma acceptance bounds, native vs the TypeScript Monte Carlo,
- * and bit-identical results on 1 and 4 threads.
+ * stackup_monte_carlo (GDT TR-GDT-22, VC-GDT-37) with the real `llull-compute` when it is built (cargo build --release -p llull-compute in
+ * solver/), else skipped with a logged reason; the missing-binary and refusal paths always run. Native vs TypeScript: bit-identical on the
+ * linear SU-01..04 stacks, within the §5.7 acceptance bounds on the trigonometric SU-05, independent of the thread count.
  */
 
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
-import { defaultContext } from '@core/commands/context';
-import { createEmptyDocument } from '@core/model/types';
+import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { FeaHost } from '@protocol/index';
 import { createComputeRunner } from '../src/native/computeJob';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
-import { runNativeTool } from '../src/native/tools';
-import { exchangeTool } from '../src/cli/exchange';
+import { runStackupMonteCarlo } from '../src/native/stackupMonteCarlo';
+import { isNativeTool, nativeToolDefinitions, runNativeTool } from '../src/native/tools';
+import reference from '../../docs/aerospace/03-gdt-mbd-pmi/validation/stackup_reference.json';
 
 const BINARY = nativeBinaryPath('llull-compute');
-if (BINARY === null) console.warn('stackupNative: llull-compute not built (cargo build --release in solver/): native runs skipped');
+if (BINARY === null)
+  console.warn('stackupNative: llull-compute not built (cargo build --release -p llull-compute in solver/): native runs skipped');
 const native = BINARY === null ? it.skip : it;
-
-const PACK = path.resolve(__dirname, '../../docs/aerospace/03-gdt-mbd-pmi/validation');
-interface Reference {
-  readonly id: string;
-  readonly expression: string;
-  readonly contributors: { name: string; nominal: number; lower: number; upper: number; distribution?: string; sensitivity: number }[];
-  readonly analytic: { yMean: number; sigma: number; lowerSpecLimit?: number; pBelowLowerLimit?: number };
-}
-const stackups = (JSON.parse(readFileSync(path.join(PACK, 'stackup_reference.json'), 'utf8')) as { stackups: Reference[] }).stackups;
-const reference = (id: string): Reference => stackups.find((entry) => entry.id === id) as Reference;
 
 const doc = createEmptyDocument();
 const host: FeaHost = {
-  getDoc: () => doc,
+  getDoc: (): CadDocument => doc,
   applyCommand: (name, params) => {
-    const result = execute(doc, name, params, defaultContext());
+    const result = execute(doc, name, params);
     return { summary: result.summary, affected: result.affected, isError: result.rejected === true, data: result.data };
   },
 };
 
-const typed = (s: Reference): unknown[] =>
-  s.contributors.map(({ name, nominal, lower, upper, distribution }) => ({
-    name,
-    nominal,
-    lower,
-    upper,
-    ...(distribution === undefined ? {} : { distribution }),
-    verified: true,
-  }));
-const linear = (s: Reference): unknown[] =>
-  s.contributors.map(({ name, nominal, lower, upper, distribution, sensitivity }) => ({
-    name,
-    nominal,
-    lower,
-    upper,
-    sensitivity,
-    ...(distribution === undefined ? {} : { distribution }),
-    verified: true,
-  }));
+type Case = (typeof reference.stackups)[number];
+const su = (id: string): Case => reference.stackups.find((s) => s.id === id) as Case;
 
-interface McData {
-  monteCarlo: {
-    seed: number;
-    samples: number;
-    engine: string;
-    deterministic: boolean;
-    mean: number;
-    std: number;
-    min: number;
-    max: number;
-    pBelow?: number;
-    elapsedMs: number;
-    acceptance: { mean: number; std: number; pBelow?: number };
+function paramsOf(stack: Case, samples: number): Record<string, unknown> {
+  const contributors = stack.contributors.map((c) => ({
+    name: c.name,
+    nominal: c.nominal,
+    upper: c.upper,
+    lower: c.lower,
+    ...(stack.id === 'SU-05' ? {} : { sensitivity: c.sensitivity }),
+    ...('distribution' in c ? { distribution: c.distribution } : {}),
+  }));
+  return {
+    contributors,
+    ...(stack.id === 'SU-05' ? { expression: stack.expression } : {}),
+    ...('lowerSpecLimit' in stack.analytic ? { lowerSpecLimit: stack.analytic.lowerSpecLimit } : {}),
+    methods: ['worstCase', 'rss', 'monteCarlo'],
+    samples,
+    seed: stack.monteCarlo.seed,
   };
-  pBelow: number | null;
-  worstCase: { min: number; max: number };
 }
 
-async function monteCarlo(
-  params: Record<string, unknown>,
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<{ isError: boolean; summary: string; data: McData }> {
-  const outcome = await runNativeTool('stackup_monte_carlo', params, host, { store: null as never, runner: createComputeRunner(env), env });
-  return outcome as unknown as { isError: boolean; summary: string; data: McData };
+interface MonteCarlo {
+  engine: string;
+  samples: number;
+  mean: number;
+  std: number;
+  min: number;
+  max: number;
+  pBelowLowerLimit?: number;
+  bitExactWithTs: boolean;
+  acceptance: { meanTolerance: number; stdTolerance: number; pTolerance: number | null };
+  provenance?: { tool: string; threads: number; deterministic: boolean };
 }
+const monteCarloOf = (data: unknown): MonteCarlo => (data as { monteCarlo: MonteCarlo }).monteCarlo;
 
-const SAMPLES = 4_000_000;
-
-describe('stackup_monte_carlo: native Monte Carlo above the TypeScript cap', () => {
-  native(
-    'SU-01 / SU-02 / SU-03 / SU-04 agree with the analytic reference within the acceptance bounds (VC-GDT-37)',
-    async () => {
-      for (const [id, expression] of [
-        ['SU-01', true],
-        ['SU-02', true],
-        ['SU-03', false],
-        ['SU-04', false],
-      ] as const) {
-        const s = reference(id);
-        const lower = s.analytic.lowerSpecLimit;
-        const result = await monteCarlo({
-          contributors: expression ? typed(s) : linear(s),
-          ...(expression ? { expression: s.expression.split('=')[1]?.trim() } : {}),
-          ...(lower === undefined ? {} : { lowerSpecLimit: lower }),
-          samples: SAMPLES,
-          seed: 20261015,
-        });
-        expect(result.isError, `${id}: ${result.summary}`).toBe(false);
-        const mc = result.data.monteCarlo;
-        expect(mc).toMatchObject({ samples: SAMPLES, seed: 20261015, engine: 'native-cpu', deterministic: true });
-        expect(Math.abs(mc.mean - s.analytic.yMean), `${id} mean`).toBeLessThan(mc.acceptance.mean);
-        expect(Math.abs(mc.std - s.analytic.sigma), `${id} std`).toBeLessThan(mc.acceptance.std);
-        if (id === 'SU-02') expect(mc.min).toBeGreaterThanOrEqual(result.data.worstCase.min - 1e-9);
-        if (id === 'SU-02') expect(mc.max).toBeLessThanOrEqual(result.data.worstCase.max + 1e-9);
-        if (lower !== undefined && s.analytic.pBelowLowerLimit !== undefined && result.data.pBelow !== null) {
-          expect(Math.abs((mc.pBelow ?? 0) - s.analytic.pBelowLowerLimit), `${id} pBelow`).toBeLessThan(mc.acceptance.pBelow ?? 0);
-        }
-      }
-    },
-    300_000,
-  );
-
-  native(
-    'SU-05 (non-linear, expression tree in Rust) agrees with the TypeScript Monte Carlo of analyze_stackup',
-    async () => {
-      const s = reference('SU-05');
-      const expression = s.expression.split('=')[1]?.trim();
-      const typedStack = { contributors: typed(s), expression, seed: 7 };
-      const nativeResult = await monteCarlo({ ...typedStack, samples: SAMPLES });
-      const ts = execute(doc, 'analyze_stackup', { ...typedStack, methods: ['monteCarlo'], samples: 2_000_000 }).data as McData;
-      const [a, b] = [nativeResult.data.monteCarlo, ts.monteCarlo];
-      expect(Math.abs(a.mean - b.mean)).toBeLessThan(a.acceptance.mean + b.acceptance.mean);
-      expect(Math.abs(a.std - b.std)).toBeLessThan(a.acceptance.std + b.acceptance.std);
-    },
-    300_000,
-  );
-
-  native(
-    'the same seed gives identical results on 1 and 4 threads, another seed another stream',
-    async () => {
-      const s = reference('SU-04');
-      const params = { contributors: linear(s), samples: 1_000_003, seed: 99 };
-      const strip = (data: McData): unknown => ({ ...data.monteCarlo, elapsedMs: 0 });
-      const one = await monteCarlo(params, { ...process.env, RAYON_NUM_THREADS: '1' });
-      const four = await monteCarlo(params, { ...process.env, RAYON_NUM_THREADS: '4' });
-      expect(strip(four.data)).toEqual(strip(one.data));
-      const other = await monteCarlo({ ...params, seed: 100 }, { ...process.env, RAYON_NUM_THREADS: '4' });
-      expect(other.data.monteCarlo.mean).not.toBe(one.data.monteCarlo.mean);
-    },
-    300_000,
-  );
-
-  native('refuses a bad stack with the analyze_stackup code and a bad sample count with its own', async () => {
-    const s = reference('SU-03');
-    const twin = await monteCarlo({ contributors: [...linear(s), ...linear(s)] });
-    expect(twin.isError).toBe(true);
-    expect(twin.summary).toContain('contributor names must be unique');
-    for (const samples of [0, 1.5, 1e11]) {
-      const refused = await monteCarlo({ contributors: linear(s), samples });
-      expect(refused.isError).toBe(true);
-      expect(refused.summary).toContain('GDT_STACKUP_SAMPLES');
-    }
-  });
-
-  it('without llull-compute it answers NATIVE_TOOL_MISSING and says analyze_stackup still runs in TypeScript', async () => {
-    const env = { ...process.env, LLULL_COMPUTE: path.join(__dirname, 'does-not-exist') };
-    const outcome = await runNativeTool('stackup_monte_carlo', { contributors: linear(reference('SU-03')), samples: 10 }, host, {
-      store: null as never,
-      runner: createComputeRunner(env, null),
-      env,
-    });
-    expect(outcome).toMatchObject({ isError: true, changed: false, data: { code: 'NATIVE_TOOL_MISSING' } });
-    expect(outcome?.summary).toContain('analyze_stackup still runs up to 2000000 samples');
-  });
-
-  it('is a CLI tool carrying the analyze_stackup schema with the native sample range', () => {
-    const tool = exchangeTool('stackup_monte_carlo');
-    expect(tool?.annotations).toMatchObject({ readOnlyHint: true });
-    const properties = tool?.inputSchema.properties as Record<string, { maximum?: number }>;
-    expect(Object.keys(properties)).toEqual(
-      expect.arrayContaining(['contributors', 'expression', 'lowerSpecLimit', 'samples', 'seed', 'timeoutS']),
+describe('stackup_monte_carlo transport', () => {
+  it('is a native tool whose schema is analyze_stackup plus timeoutS / verify', () => {
+    expect(isNativeTool('stackup_monte_carlo')).toBe(true);
+    const tool = nativeToolDefinitions().find((definition) => definition.name === 'stackup_monte_carlo');
+    expect(Object.keys(tool?.inputSchema.properties ?? {})).toEqual(
+      expect.arrayContaining(['contributors', 'expression', 'samples', 'timeoutS', 'verify']),
     );
-    expect(properties['methods']).toBeUndefined();
-    expect(properties['samples']?.maximum).toBe(10_000_000_000);
   });
+
+  it('without the binary answers NATIVE_TOOL_MISSING (analyze_stackup still works up to 2e6)', async () => {
+    const result = await runStackupMonteCarlo(paramsOf(su('SU-01'), 3_000_000), {}, host, { runner: createComputeRunner({}, null) });
+    expect(result).toMatchObject({ isError: true, data: { code: 'NATIVE_TOOL_MISSING' } });
+    expect(result.summary).toContain('analyze_stackup still samples up to 2000000');
+  });
+
+  it('refuses invalid params and model errors before running anything', async () => {
+    const runner = createComputeRunner({}, null);
+    const invalid = await runStackupMonteCarlo({ contributors: 'x' }, {}, host, { runner });
+    expect(invalid).toMatchObject({ isError: true, data: { code: 'CMD_INVALID_PARAMS' } });
+    const tooMany = await runStackupMonteCarlo(paramsOf(su('SU-01'), 2 ** 41), {}, host, { runner });
+    expect(tooMany).toMatchObject({ isError: true, data: { code: 'GDT_STACKUP_SAMPLES_CAP', paths: ['samples'] } });
+    const ghost = await runStackupMonteCarlo({ contributors: [{ name: 'x', pmiId: 'ghost', sensitivity: 1 }] }, {}, host, { runner });
+    expect(ghost).toMatchObject({ isError: true, data: { code: 'GDT_PMI_UNKNOWN' } });
+    const outcome = await runNativeTool('stackup_monte_carlo', { contributors: [] }, host, { runner, store: undefined as never });
+    expect(outcome).toMatchObject({ isError: true, changed: false });
+  });
+
+  native.each(['SU-01', 'SU-02', 'SU-03', 'SU-04'])(
+    '%s: native statistics are bit-identical to analyze_stackup at 200000 samples (VC-GDT-37)',
+    async (id) => {
+      const params = paramsOf(su(id), 200_000);
+      const result = await runStackupMonteCarlo(params, { verify: true }, host, { runner: createComputeRunner({}, BINARY) });
+      expect(result.isError, result.summary).toBe(false);
+      const nativeRun = monteCarloOf(result.data);
+      const ts = monteCarloOf(execute(doc, 'analyze_stackup', params).data);
+      expect(nativeRun).toMatchObject({
+        engine: 'native',
+        bitExactWithTs: true,
+        provenance: { tool: 'llull-compute stats', deterministic: true },
+      });
+      for (const key of ['mean', 'std', 'min', 'max', 'pBelowLowerLimit'] as const)
+        expect(Object.is(nativeRun[key], ts[key]), key).toBe(true);
+      expect((result.data as { verification: { identical: boolean } }).verification.identical).toBe(true);
+    },
+    120_000,
+  );
+
+  native(
+    'SU-05 (sin): native agrees with TypeScript within the §5.7 acceptance bounds',
+    async () => {
+      const stack = su('SU-05');
+      const params = paramsOf(stack, 200_000);
+      const result = await runStackupMonteCarlo(params, {}, host, { runner: createComputeRunner({}, BINARY) });
+      expect(result.isError, result.summary).toBe(false);
+      const nativeRun = monteCarloOf(result.data);
+      const ts = monteCarloOf(execute(doc, 'analyze_stackup', params).data);
+      expect(nativeRun.bitExactWithTs).toBe(false);
+      expect(Math.abs(nativeRun.mean - ts.mean)).toBeLessThanOrEqual(stack.monteCarlo.acceptance.meanTolerance);
+      expect(Math.abs(nativeRun.std - ts.std)).toBeLessThanOrEqual(stack.monteCarlo.acceptance.stdTolerance);
+    },
+    120_000,
+  );
+
+  native(
+    'above the TS cap: 5e6 samples within the acceptance bounds of the closed forms, same bits on 1 and 4 threads',
+    async () => {
+      const stack = su('SU-01');
+      const params = paramsOf(stack, 5_000_000);
+      const on = async (threads: string): Promise<MonteCarlo> => {
+        const env = { ...process.env, RAYON_NUM_THREADS: threads };
+        const result = await runStackupMonteCarlo(params, { verify: true }, host, { runner: createComputeRunner(env, BINARY), env });
+        expect(result.isError, result.summary).toBe(false);
+        expect((result.data as { verification: { skipped: string } }).verification.skipped).toContain('above the TypeScript cap');
+        return monteCarloOf(result.data);
+      };
+      const one = await on('1');
+      const four = await on('4');
+      expect(one.provenance?.threads).toBe(1);
+      expect(four.provenance?.threads).toBe(4);
+      for (const key of ['mean', 'std', 'min', 'max', 'pBelowLowerLimit'] as const) expect(Object.is(one[key], four[key]), key).toBe(true);
+      expect(Math.abs(one.mean - stack.analytic.yMean)).toBeLessThanOrEqual(one.acceptance.meanTolerance);
+      expect(Math.abs(one.std - stack.analytic.sigma)).toBeLessThanOrEqual(one.acceptance.stdTolerance);
+      expect(Math.abs((one.pBelowLowerLimit as number) - (stack.analytic.pBelowLowerLimit as number))).toBeLessThanOrEqual(
+        one.acceptance.pTolerance as number,
+      );
+    },
+    300_000,
+  );
+
+  native(
+    'through runNativeTool (the CLI / POST /exchange path), never changing the document',
+    async () => {
+      const outcome = await runNativeTool('stackup_monte_carlo', { ...paramsOf(su('SU-03'), 50_000), timeoutS: 60 }, host, {
+        runner: createComputeRunner({}, BINARY),
+        store: undefined as never,
+      });
+      expect(outcome).toMatchObject({ isError: false, changed: false });
+      expect(outcome?.summary).toContain('llull-compute sampled 50000 stacks');
+    },
+    120_000,
+  );
 });

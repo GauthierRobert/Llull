@@ -5,6 +5,7 @@
 import type { CadDocument } from '@core/model/types';
 import { withMonotonicStepCounter } from '@core/model/stepCounter';
 import { getCommand } from '@core/commands/registry';
+import { reportServerCrash } from './serverCrash';
 import { getLiveDoc, setLiveDoc } from './liveDocument';
 import { createHash } from 'crypto';
 import type { LiveCommandSource } from '@protocol/liveSync';
@@ -84,7 +85,8 @@ function boundedForReplay(result: CommandResponseBody): CommandResponseBody {
 
 function runCommand(name: string, params: unknown, source?: LiveCommandSource, commandId?: string): CommandResponseBody {
   const prior = getLiveDoc();
-  const { document, outcome, params: filled } = runHostCommand(prior, name, params, { source: source ?? 'rest' });
+  const { document, outcome, params: filled, thrown } = runHostCommand(prior, name, params, { source: source ?? 'rest' });
+  if (thrown !== undefined) reportCommandCrash(thrown, name, params, prior);
   if (outcome.changed && getCommand(name)?.annotations?.session === true) {
     // Session command (resolve_material_libraries): in memory only, no undo entry, no command log; clients get a snapshot.
     setLiveDoc(document);
@@ -94,6 +96,12 @@ function runCommand(name: string, params: unknown, source?: LiveCommandSource, c
     setLiveDoc(document, { name, params: filled, source: source ?? 'rest', ...(commandId !== undefined ? { commandId } : {}) });
   }
   return withHistoryFlags(outcome);
+}
+
+/** A command threw inside `execute` (a command's own failure summary is not a crash): a rate-limited crash report (SC-D3). */
+function reportCommandCrash(thrown: unknown, name: string, params: unknown, prior: CadDocument): void {
+  const report = reportServerCrash('command-threw', thrown, { name, params, document: prior });
+  if (report !== null) console.error(`[llull-server] command ${name} threw; crash report: ${report}`);
 }
 
 /** Restore the top of `history[from]`, park the current doc on `history[to]`; empty stack -> no-op result. */

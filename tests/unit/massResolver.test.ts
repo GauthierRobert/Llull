@@ -256,6 +256,39 @@ describe('mass_properties payload', () => {
   });
 });
 
+describe('closed-form surface areas (no exact kernel)', () => {
+  const areaOf = (name: string, params: Record<string, unknown>): number => {
+    const { doc, id } = solid(createEmptyDocument(), name, params);
+    return dataOf(doc, { entityId: id }).area;
+  };
+
+  it('cone: base disc plus lateral pi r s; torus: 4 pi^2 R r', () => {
+    expect(areaOf('add_cone', { radius: 3, height: 4 })).toBeCloseTo(Math.PI * 3 * 3 + Math.PI * 3 * 5, 9);
+    expect(areaOf('add_torus', { ringRadius: 5, tubeRadius: 1 })).toBeCloseTo(4 * Math.PI * Math.PI * 5, 9);
+  });
+
+  it('revolution: Pappus surface of the profile edges, plus both caps on a partial turn', () => {
+    const washer = [
+      [2, 0],
+      [3, 0],
+      [3, 1],
+      [2, 1],
+    ];
+    const full = 2 * Math.PI * (3 * 1 + 2 * 1) + 2 * Math.PI * (3 * 3 - 2 * 2);
+    expect(areaOf('revolve_profile', { profile: washer, axis: 'z', angle: 2 * Math.PI })).toBeCloseTo(full, 9);
+    expect(areaOf('revolve_profile', { profile: washer, axis: 'z', angle: Math.PI })).toBeCloseTo(full / 2 + 2 * 1, 9);
+  });
+
+  it('a profile that crosses its axis keeps the display-triangle area', () => {
+    const crossing = [
+      [-1, 0],
+      [2, 0],
+      [2, 1],
+    ];
+    expect(areaOf('revolve_profile', { profile: crossing, axis: 'z', angle: 2 * Math.PI })).toBeGreaterThan(0);
+  });
+});
+
 describe('exact kernel path', () => {
   const EXACT: ExactMassProperties = {
     volume: 7,
@@ -294,6 +327,40 @@ describe('exact kernel path', () => {
     const silent: GeometryKernel = { ...kernel, massProperties: () => null };
     const data = execute(doc, 'mass_properties', { entityId: id }, { ...defaultContext(), kernel: silent }).data as MassData;
     expect(data.method).toBe('mesh');
+  });
+
+  it('measure_bounding_box takes the B-rep bounds of a kernel result, alone or merged, and the mesh bounds without them', () => {
+    const { doc, id, kernel } = kernelResult();
+    const ctx = {
+      ...defaultContext(),
+      kernel: { ...kernel, massProperties: (): ExactMassProperties => ({ ...EXACT, bounds: { min: [-2, -3, -4], max: [5, 6, 7] } }) },
+    };
+    const one = execute(doc, 'measure_bounding_box', { entityId: id }, ctx).data as { min: Vec3; max: Vec3; size: Vec3 };
+    expect(one).toEqual({ min: [-2, -3, -4], max: [5, 6, 7], size: [7, 9, 11] });
+    const all = execute(doc, 'measure_bounding_box', {}, ctx).data as { min: Vec3; max: Vec3 };
+    expect(all.min).toEqual([-2, -3, -4]);
+    const silent = { ...defaultContext(), kernel: { ...kernel, massProperties: () => null } };
+    const mesh = execute(doc, 'measure_bounding_box', { entityId: id }, silent).data as { min: Vec3; max: Vec3 };
+    expect(mesh.max).not.toEqual([5, 6, 7]);
+  });
+
+  it('a kernel result moved after creation is measured from its placed recipe, not its creation frame', () => {
+    const { doc, id, kernel } = kernelResult();
+    const moved = execute(doc, 'move_entities', { ids: [id], delta: [10, 0, 0] }).document;
+    const evaluated: string[] = [];
+    const spy: GeometryKernel = {
+      ...kernel,
+      massProperties: () => EXACT,
+      evaluate: (recipe) => {
+        evaluated.push(recipe.op);
+        return kernel.evaluate(recipe);
+      },
+    };
+    const ctx = { ...defaultContext(), kernel: spy };
+    execute(moved, 'measure_bounding_box', { entityId: id }, ctx);
+    execute(moved, 'mass_properties', { entityId: id }, ctx);
+    expect(evaluated.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(evaluated)).toEqual(new Set(['place']));
   });
 
   it('dynamics: a rigid body made of a kernel part gets the exact inertia', () => {

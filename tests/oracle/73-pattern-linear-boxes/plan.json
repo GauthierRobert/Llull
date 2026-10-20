@@ -1,0 +1,6 @@
+{
+  "actions": [
+    { "command": "add_box", "params": { "size": [1, 1, 1] }, "as": "a" },
+    { "command": "array_linear", "params": { "id": "$a", "count": 5, "offset": [3, 0, 0] } }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "34-prism-trapezoid",
+  "family": "prism",
+  "description": "trapezoid section extruded 1.5",
+  "source": "analytic",
+  "formula": "V = A_polygon * depth (shoelace); centroid = polygon centroid, depth/2; A = 2 A_polygon + perimeter * depth",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 27,
+  "area": 64.8166538264,
+  "centroid": [4, 1.33333333333, 0.75],
+  "bbox": { "min": [0, 0, 0], "max": [8, 3, 1.5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

@@ -1,6 +1,6 @@
 /**
  * The application menu as data: File (New / Open / Save / Save As), Edit and View roles, and Help
- * (Install Command Line Tool, Claude Code instructions). Handlers are injected; no Electron calls.
+ * (Install Command Line Tool, Claude Code instructions, Crash Reports). Handlers are injected; no Electron calls.
  */
 
 import type { MenuItemConstructorOptions } from 'electron';
@@ -19,6 +19,7 @@ export interface MenuHandlers {
   readonly vaultCheckOut: () => void;
   /** File > Vault: Check In: store the open managed item in the vault (checkpoint, snapshots, refs) and free its lock. */
   readonly vaultCheckIn: () => void;
+  readonly showCrashReports: () => void;
 }
 
 export function menuTemplate(handlers: MenuHandlers, platform: NodeJS.Platform, appName: string): MenuItemConstructorOptions[] {
@@ -46,6 +47,8 @@ export function menuTemplate(handlers: MenuHandlers, platform: NodeJS.Platform, 
     submenu: [
       { label: 'Install Command Line Tool…', click: handlers.installCli },
       { label: 'Use with Claude Code…', click: handlers.showAgentHelp },
+      { type: 'separator' },
+      { label: 'Crash Reports…', click: handlers.showCrashReports },
     ],
   };
   return [

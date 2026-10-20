@@ -1,0 +1,19 @@
+{
+  "id": "15-cone-tall",
+  "family": "primitive",
+  "description": "tall cone r=1 h=10 at (2,2,2)",
+  "source": "analytic",
+  "formula": "V = pi r^2 h / 3; A = pi r (r + sqrt(r^2+h^2)); centroid at h/4 from the base",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 10.471975512,
+  "area": 34.7142080744,
+  "centroid": [2, 2, 4.5],
+  "bbox": { "min": [1, 1, 2], "max": [3, 3, 12] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": null,
+    "area": 0.02,
+    "reason": "area is summed over display triangles of a curved face; the volume is closed-form"
+  }
+}

@@ -5,8 +5,8 @@ import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import { pmiReviewPayload } from '@core/commands/pmi/review';
 import { setGeometryKernel } from '@core/geometry/kernel';
-import { exactProbabilities, uniformSumCdf, type StackContributor } from '@lib/stackup';
-import { parseStackExpression, stackGradient } from '@lib/stackExpression';
+import { probabilityAbove, stackClosedForms, uniformSumCdf, type StackContributor } from '@lib/stackup';
+import { compileExpression, linearProgram, programGradient } from '@lib/expressionProgram';
 import { plateKernel } from '../../helpers/pmiPlateKernel';
 
 beforeEach(() => setGeometryKernel(plateKernel()));
@@ -241,31 +241,38 @@ describe('accept_pmi_review: a verified signature, never a caller label', () => 
 
 describe('stack-up details', () => {
   it('upper-tail probability of uniform terms is exact (symmetry, no cancellation)', () => {
+    // merge note: main's uniformSumCdf takes (x, [{ lo, width }]); the exact upper tail now comes from probabilityAbove (reflection)
     const halves = Array.from({ length: 12 }, () => 0.5);
+    const terms = halves.map((h) => ({ lo: -h, width: 2 * h }));
     const tail = 0.1 ** 12 / 479001600;
-    expect(Math.abs(uniformSumCdf(halves, -5.9) / tail - 1)).toBeLessThan(1e-9);
-    expect(Math.abs((1 - uniformSumCdf(halves, 5.9)) / tail - 1)).toBeGreaterThan(1e-3);
+    expect(Math.abs((uniformSumCdf(-5.9, terms) as number) / tail - 1)).toBeLessThan(1e-9);
+    expect(Math.abs((1 - (uniformSumCdf(5.9, terms) as number)) / tail - 1)).toBeGreaterThan(1e-3);
     const items = halves.map(
       (h, i): StackContributor => ({ name: `c${i}`, nominal: 0, lower: -h, upper: h, sensitivity: 1, distribution: 'uniform' }),
     );
-    const p = exactProbabilities(items, 0, 3, undefined, 5.9);
-    expect(Math.abs((p?.pAbove ?? 0) / tail - 1)).toBeLessThan(1e-9);
-    expect(uniformSumCdf([0.5, 0.5], 0.2)).toBeCloseTo(1 - uniformSumCdf([0.5, 0.5], -0.2), 12);
+    const forms = stackClosedForms(items, linearProgram(items.map(() => 1)), 3);
+    const p = probabilityAbove(5.9, forms, items, true);
+    expect(Math.abs((p.p ?? 0) / tail - 1)).toBeLessThan(1e-9);
+    const pair = [
+      { lo: -0.5, width: 1 },
+      { lo: -0.5, width: 1 },
+    ];
+    expect(uniformSumCdf(0.2, pair)).toBeCloseTo(1 - (uniformSumCdf(-0.2, pair) as number), 12);
   });
 
   it('pow with a non-positive base and a constant exponent has an exact finite gradient', () => {
-    const parsed = parseStackExpression('pow(A, 2) + pow(A, 3)', ['A']);
-    expect(parsed.ok).toBe(true);
-    if (!parsed.ok) return;
-    const { value, gradient } = stackGradient(parsed.tree, [-3]);
+    const compiled = compileExpression('pow(A, 2) + pow(A, 3)', ['A']);
+    expect(typeof compiled).not.toBe('string');
+    if (typeof compiled === 'string') return;
+    const { value, gradient } = programGradient(compiled, [-3]);
     expect(value).toBe(9 - 27);
     expect(gradient[0]).toBeCloseTo(2 * -3 + 3 * 9, 12);
   });
 
   it('Monte Carlo acceptance carries pAbove when an upper limit is given; angle links are in degrees', () => {
     const contributors = [
-      { name: 'a', nominal: 10, upper: 0.1, lower: -0.1, verified: true },
-      { name: 'b', nominal: 5, upper: 0.1, lower: -0.1, verified: true },
+      { name: 'a', nominal: 10, upper: 0.1, lower: -0.1, sensitivity: 1 },
+      { name: 'b', nominal: 5, upper: 0.1, lower: -0.1, sensitivity: 1 },
     ];
     const run = execute(createEmptyDocument(), 'analyze_stackup', {
       contributors,
@@ -273,9 +280,9 @@ describe('stack-up details', () => {
       methods: ['monteCarlo'],
       samples: 2000,
     });
-    const data = run.data as { monteCarlo: { acceptance: { pAbove?: number } }; pAbove: number };
-    expect(data.pAbove).toBeGreaterThan(0);
-    expect(data.monteCarlo.acceptance.pAbove).toBeGreaterThan(0);
+    const data = run.data as { monteCarlo: { acceptance: { pAboveTolerance?: number } }; pAboveUpperLimit: number };
+    expect(data.pAboveUpperLimit).toBeGreaterThan(0);
+    expect(data.monteCarlo.acceptance.pAboveTolerance).toBeGreaterThan(0);
     const box = step(createEmptyDocument(), 'add_box', { size: [120, 80, 12] });
     const entityId = box.affected[0] as string;
     const angle = step(box.document, 'add_location_dimension', {
@@ -285,9 +292,8 @@ describe('stack-up details', () => {
       measure: 'angle',
       tolerance: { type: 'plusMinus', upper: 0.5, lower: -0.5 },
     });
-    const linked = execute(angle.document, 'analyze_stackup', { contributors: [{ name: 'phi', pmiId: angle.affected[0] }] }).data as {
-      contributors: Array<{ unit: string }>;
-    };
+    const linked = execute(angle.document, 'analyze_stackup', { contributors: [{ name: 'phi', pmiId: angle.affected[0], sensitivity: 1 }] })
+      .data as { contributors: Array<{ unit: string }> };
     expect(linked.contributors[0]?.unit).toBe('deg');
     const chain = execute(angle.document, 'stackup_at_temperature', {
       contributors: [

@@ -1,0 +1,19 @@
+{
+  "id": "107-tapped-hole-m6",
+  "family": "thread",
+  "description": "M6 coarse (P 1) tapped through hole in a 20x20x4 plate",
+  "source": "analytic",
+  "formula": "V = abc - pi r1^2 t - (t/p) int w(r) 2 pi r dr, w = p/8 + 2 (R - r) tan 30 on [r1, R], r1 = R - 5H/8 (ISO 68-1)",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 1508.17118381,
+  "area": null,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-10, -10, -2], "max": [10, 10, 2] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": 0.002,
+    "area": null,
+    "reason": "mesh kernel: bore tessellated as an inscribed n-gon and the thread groove tool is faceted"
+  }
+}

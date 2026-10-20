@@ -41,6 +41,9 @@ import { AnalysisOverlay } from './analysis/AnalysisOverlay';
 import { AnalysisLegend } from './analysis/AnalysisLegend';
 import { type PanelFocus, useFocusStore } from '@ui/store/focusStore';
 import { zoomToFocus } from './zoomToFocus';
+import { FeatureSessionLayer } from './manipulators/FeatureSessionLayer';
+import { FeatureStartBar } from './manipulators/FeatureStartBar';
+import { SpaceMouseControl } from '@ui/input/SpaceMouseControl';
 
 // Idempotent, StrictMode-safe.
 ensureBvhSetup();
@@ -127,6 +130,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
       <group position={groupOffset}>
         <Entities />
         <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
+        <FeatureSessionLayer />
         <MeasureBBoxWireframe />
         <MechanismOverlay />
         <DynamicsLoadsOverlay />
@@ -180,6 +184,8 @@ export function Viewport3D(): React.ReactElement {
       </Canvas>
 
       <ScreenAnchorOverlay />
+      <FeatureStartBar />
+      <SpaceMouseControl />
       <FocusBanner onZoom={zoomToHighlight} />
       <AnalysisLegend />
       <ViewOptionsToggle />

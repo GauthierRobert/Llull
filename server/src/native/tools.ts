@@ -5,6 +5,11 @@
  *   fea_map_field  thermo_static interpolate field -> llull-compute post map -> mapped-field artifact (read by the fea_solve deck)
  *   fea_render     render_fea_results with the pixel raster in llull-compute raster (raster=auto|ts|cpu|gpu)
  *   mtest_run      optional user-installed MFront / MTest (not llull-compute): runs an MTest script, returns its result table
+ *   auto_route     route_problem -> llull-compute route (plant 02 RTE V2 A*) -> auto_route_pipe { solution } (validated, then committed)
+ *   stackup_monte_carlo  analyze_stackup with the Monte Carlo above the TS cap in llull-compute stats (GDT TR-GDT-22)
+ *   vortex_lattice_solve analyze_vortex_lattice with the influence build + dense LU in llull-compute panel (AER M3)
+ *   explicit_run   explicit_dynamics case -> llull-compute explicit -> fe_explicit artifact -> record_explicit_results (PHY-19 RS-8)
+ *   scan_import / scan_list  point-cloud file -> llull-compute cloud import -> asset store (`../scan/scanTools.ts`, plant 10)
  */
 
 import type { ToolDefinition } from '@protocol/tools';
@@ -19,7 +24,11 @@ import { runFatigueField, type NativeDeps } from './fatigueField';
 import { runMapField } from './mapField';
 import { DEFAULT_TOPOLOGY_TIMEOUT_S, runTopologySolve, type TopologySolveOptions } from './topologySolve';
 import { runFeaRender } from './renderField';
-import { MAX_NATIVE_SAMPLES, runStackupMonteCarlo } from './stackupMonteCarlo';
+import { DEFAULT_AUTO_ROUTE_TIMEOUT_S, NATIVE_EXPANSIONS_CEILING, NATIVE_MAX_EXPANSIONS, runAutoRoute } from './autoRoute';
+import { runStackupTool, stackupToolDefinition } from './stackupMonteCarlo';
+import { runVortexLatticeTool, vortexLatticeToolDefinition } from './vortexLattice';
+import { DEFAULT_EXPLICIT_TIMEOUT_S, runExplicitRun, type ExplicitRunOptions } from './explicitRun';
+import { defaultScanDeps, isScanTool, runScanTool, scanToolDefinitions } from '../scan/scanTools';
 import { MTEST_TOOL, mtestToolDefinition, runMtestTool } from '../mfront/mtestTool';
 
 const TIMEOUT = {
@@ -68,10 +77,43 @@ export function nativeToolDefinitions(): ToolDefinition[] {
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
     renderToolDefinition(),
-    stackupToolDefinition(),
     topologyToolDefinition(),
     mtestToolDefinition(),
+    autoRouteToolDefinition(),
+    stackupToolDefinition(),
+    vortexLatticeToolDefinition(),
+    explicitToolDefinition(),
+    ...scanToolDefinitions(),
   ];
+}
+
+/** auto_route: the params of route_problem plus the transport's own (read from the registry, so both stay one schema). */
+function autoRouteToolDefinition(): ToolDefinition {
+  const schema = getCommand('route_problem')?.paramsSchema ?? { type: 'object' as const, properties: {}, required: [] };
+  return {
+    name: 'auto_route',
+    description:
+      'Auto-route a pipe line between two ports with the native router (llull-compute route, plant 02 RTE V2): route_problem builds the ' +
+      'lattice problem from the document, the native sparse 3D A* searches it (up to maxExpansions, default 2e6) and auto_route_pipe validates ' +
+      'the solution against the current document (problem hash, legs, clearance, length / bends / cost) and adds the pipe run. Same params as ' +
+      'route_problem / auto_route_pipe. data = auto_route_pipe data + native { version, elapsedMs }. Errors: route_problem refusals, ' +
+      'RTE_AUTOROUTE_NO_PATH, RTE_AUTOROUTE_BUDGET, RTE_AUTOROUTE_SOLUTION_INVALID, NATIVE_TOOL_MISSING (then auto_route_pipe alone runs the ' +
+      'TypeScript search on small grids), NATIVE_TIMEOUT.',
+    inputSchema: {
+      ...schema,
+      properties: {
+        ...schema.properties,
+        timeoutS: { ...TIMEOUT, description: `Wall-clock limit of the native job in seconds (default ${DEFAULT_AUTO_ROUTE_TIMEOUT_S}).` },
+        maxExpansions: {
+          type: 'integer',
+          minimum: 1,
+          maximum: NATIVE_EXPANSIONS_CEILING,
+          description: `Native expansion budget (default ${NATIVE_MAX_EXPANSIONS}); above it RTE_AUTOROUTE_BUDGET.`,
+        },
+      },
+    },
+    annotations: {},
+  };
 }
 
 /** fea_render: the params of render_fea_results plus `raster` (read from the registry, so both stay one schema). */
@@ -90,44 +132,6 @@ function renderToolDefinition(): ToolDefinition {
       properties: {
         ...schema.properties,
         raster: { type: 'string', enum: ['auto', 'ts', 'cpu', 'gpu'], description: 'Raster engine (default auto).' },
-      },
-    },
-    annotations: { readOnlyHint: true, idempotentHint: true },
-  };
-}
-
-const STACKUP_TOOL = 'stackup_monte_carlo';
-
-/** stackup_monte_carlo: the params of analyze_stackup (read from the registry, one schema) with a native sample range and a timeout. */
-function stackupToolDefinition(): ToolDefinition {
-  const schema = getCommand('analyze_stackup')?.paramsSchema ?? { type: 'object' as const, properties: {}, required: [] };
-  const properties = Object.fromEntries(Object.entries(schema.properties).filter(([key]) => key !== 'methods'));
-  return {
-    name: STACKUP_TOOL,
-    description:
-      'analyze_stackup with its Monte Carlo run natively above the 2000000-sample TypeScript cap: llull-compute stats (counter-based Philox4x32-10 streams, ' +
-      'fixed-order block reductions on every core). Same params as analyze_stackup (contributors, expression, lowerSpecLimit, upperSpecLimit, sigmaPerHalfTolerance; ' +
-      `no methods) with samples 1 to ${MAX_NATIVE_SAMPLES} (default 10000000) and seed. Answers the data of analyze_stackup (closed forms, contributions, exact pBelow / ` +
-      'pAbove, review flags) plus data.monteCarlo { seed, samples, prng, engine native-cpu, deterministic true, mean, std, min, max, pBelow, pAbove, acceptance }. ' +
-      'The result is bit-identical for the same (seed, samples, inputs) on any number of threads; it agrees with the TypeScript Monte Carlo within the 5-sigma ' +
-      'acceptance bounds, not bit for bit (another generator). Typed contributor limits stay unverified; results need engineer review. Without llull-compute: ' +
-      'NATIVE_TOOL_MISSING (analyze_stackup still runs up to 2000000 samples). Refusals: the GDT_STACKUP_* codes of analyze_stackup, GDT_STACKUP_SAMPLES.',
-    inputSchema: {
-      ...schema,
-      properties: {
-        ...properties,
-        samples: {
-          type: 'integer',
-          minimum: 1,
-          maximum: MAX_NATIVE_SAMPLES,
-          description: `Monte Carlo samples, 1 to ${MAX_NATIVE_SAMPLES}. Default 10000000.`,
-        },
-        seed: {
-          type: 'integer',
-          description:
-            'Monte Carlo seed (counter-based: sample i of contributor j draws from counter [i, j] under this key). Default 20261020.',
-        },
-        timeoutS: TIMEOUT,
       },
     },
     annotations: { readOnlyHint: true, idempotentHint: true },
@@ -167,7 +171,46 @@ function topologyToolDefinition(): ToolDefinition {
   };
 }
 
-const NAMES: ReadonlySet<string> = new Set(['fatigue_field', 'fea_map_field', 'fea_render', 'topology_solve', STACKUP_TOOL, MTEST_TOOL]);
+const NAMES: ReadonlySet<string> = new Set([
+  'fatigue_field',
+  'fea_map_field',
+  'fea_render',
+  'topology_solve',
+  'stackup_monte_carlo',
+  'vortex_lattice_solve',
+  'auto_route',
+  'explicit_run',
+  MTEST_TOOL,
+]);
+
+/** explicit_run: the transport of the explicit plugin (PHY-19 RS-8); the case itself is set up with the explicit commands. */
+function explicitToolDefinition(): ToolDefinition {
+  return {
+    name: 'explicit_run',
+    description:
+      'Run an explicit_dynamics case (create_analysis analysisType=explicit_dynamics, set_part_idealization, set_explicit_controls, set_initial_velocity, ' +
+      'add_rigid_wall) in the native llull-compute explicit solver (central difference, lumped mass, hex8 with Flanagan-Belytschko hourglass ' +
+      'control, tet4, elastic or Johnson-Cook plasticity, planar rigid walls; progress with --progress) and record the result with ' +
+      'record_explicit_results (fe_explicit artifact; numbers are recomputed from it). Read it with explicit_report and explicit_energy_check. ' +
+      'Screening only: review required, never certification evidence. Errors: EXP_TOOL_MISSING (no llull-compute), EXP_SOLVER_FAILED, ' +
+      'EXP_RUN_TIMEOUT and the set-up codes (EXP_NO_EXCITATION, EXP_MESH_UNSUPPORTED, EXP_MATERIAL_INCOMPLETE, ...).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        analysisId: { type: 'string', description: 'Id of the explicit_dynamics analysis (affected[0] of create_analysis).' },
+        timeoutS: { ...TIMEOUT, description: `Wall-clock limit of the native job in seconds (default ${DEFAULT_EXPLICIT_TIMEOUT_S}).` },
+        device: {
+          type: 'string',
+          enum: ['cpu', 'gpu', 'auto'],
+          description:
+            'cpu (default, deterministic Rust CPU path), gpu or auto (a GPU build of llull-compute; else the CPU twin with a warning).',
+        },
+      },
+      required: ['analysisId'],
+    },
+    annotations: { idempotentHint: true },
+  };
+}
 
 export const isNativeTool = (name: string): boolean => NAMES.has(name);
 
@@ -187,19 +230,13 @@ export async function runNativeTool(
   host: FeaHost & { readonly onProgress?: (line: string) => void },
   deps: NativeDeps = defaultDeps(process.env, host.onProgress),
 ): Promise<CommandOutcome | null> {
+  if (isScanTool(name)) return runScanTool(name, params, defaultScanDeps(deps.env, host.onProgress));
   if (!isNativeTool(name)) return null;
   if (name === MTEST_TOOL) return runMtestTool(params);
   if (name === 'fea_render') return { ...(await runFeaRender(params, host, deps)), changed: false };
+  if (name === 'stackup_monte_carlo') return { ...(await runStackupTool(params, host, deps)), changed: false };
+  if (name === 'vortex_lattice_solve') return { ...(await runVortexLatticeTool(params, host, deps)), changed: false };
   const args = isRecord(params) ? params : {};
-  if (name === STACKUP_TOOL) {
-    const { samples, seed, timeoutS, ...stack } = args;
-    const options = {
-      ...(typeof samples === 'number' ? { samples } : {}),
-      ...(typeof seed === 'number' ? { seed } : {}),
-      ...(typeof timeoutS === 'number' && Number.isFinite(timeoutS) ? { timeoutS } : {}),
-    };
-    return { ...(await runStackupMonteCarlo(stack, options, host, deps)), changed: false };
-  }
   if (name === 'topology_solve') {
     const studyId = nonEmptyString(args['studyId']);
     if (studyId === undefined) return failure('topology_solve: studyId is required.');
@@ -214,6 +251,25 @@ export async function runNativeTool(
     return { ...result, changed: host.getDoc() !== before };
   }
   const timeout = typeof args['timeoutS'] === 'number' && Number.isFinite(args['timeoutS']) ? { timeoutS: args['timeoutS'] } : {};
+  if (name === 'auto_route') {
+    const maxExpansions = args['maxExpansions'];
+    const options = {
+      ...timeout,
+      ...(typeof maxExpansions === 'number' && Number.isInteger(maxExpansions) && maxExpansions > 0 ? { maxExpansions } : {}),
+    };
+    const before = host.getDoc();
+    const result = await runAutoRoute(args, options, host, deps);
+    return { ...result, changed: host.getDoc() !== before };
+  }
+  if (name === 'explicit_run') {
+    const analysisId = nonEmptyString(args['analysisId']);
+    if (analysisId === undefined) return failure('explicit_run: analysisId is required.');
+    const device = args['device'];
+    const options: ExplicitRunOptions = { ...timeout, ...(device === 'cpu' || device === 'gpu' || device === 'auto' ? { device } : {}) };
+    const before = host.getDoc();
+    const result = await runExplicitRun(analysisId, options, host, deps);
+    return { ...result, changed: host.getDoc() !== before };
+  }
   if (name === 'fatigue_field') {
     const caseId = nonEmptyString(args['caseId']);
     if (caseId === undefined) return failure('fatigue_field: caseId is required.');

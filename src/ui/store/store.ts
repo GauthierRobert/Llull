@@ -12,6 +12,7 @@ import type { CadStoreState, DispatchOptions, LiveStatus } from './storeTypes';
 import { type LiveCommandEvent, type LiveSnapshotEvent, applyLiveCommand } from '@protocol/liveSync';
 import { reuseUnchanged } from './reuseUnchanged';
 import { toggledInList } from '@ui/toggleMember';
+import { withFailureTracking } from '@ui/report/failureStore';
 
 /** Selection survives a document replacement, minus ids that no longer exist. */
 const withLocalSelection = (doc: CadDocument, selection: readonly EntityId[]): CadDocument => ({
@@ -43,7 +44,8 @@ export const useStore = create<CadStoreState>()((set, get) => {
     liveSeq: -1,
     liveEpoch: null,
 
-    dispatch(name: string, params?: unknown, options?: DispatchOptions): void {
+    dispatch(name: string, params?: unknown, callerOptions?: DispatchOptions): void {
+      const options = withFailureTracking(name, params, callerOptions);
       if (isLocalMode(get())) runLocally(set, get, name, params, options);
       else postDispatch(set, get, name, params, options);
     },

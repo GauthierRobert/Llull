@@ -1,0 +1,14 @@
+{
+  "id": "33-prism-hexagon",
+  "family": "prism",
+  "description": "regular hexagon R=2 extruded 5",
+  "source": "analytic",
+  "formula": "V = A_polygon * depth (shoelace); centroid = polygon centroid, depth/2; A = 2 A_polygon + perimeter * depth",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 51.9615242271,
+  "area": 80.7846096908,
+  "centroid": [0, 0, 2.5],
+  "bbox": { "min": [-2, -1.73205080757, 0], "max": [2, 1.73205080757, 5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

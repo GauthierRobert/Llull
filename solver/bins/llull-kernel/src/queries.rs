@@ -7,6 +7,7 @@
 
 use crate::session::{Reply, Session, BAD_REQUEST, OCC_FAILURE};
 use llull_kernel_occt::queries::{self, AssemblyPart, ImportOptions, PartUse, UvRequest};
+use llull_kernel_occt::xde;
 use llull_kernel_occt::Shape;
 use serde_json::Value;
 use std::rc::Rc;
@@ -187,10 +188,11 @@ fn export_assembly(session: &mut Session, tree: &Value) -> Reply {
 }
 
 fn import_shapes(args: &[Value]) -> Reply {
-    if arg(args, 0).as_str() != Some("step") {
+    let format = arg(args, 0).as_str();
+    if format != Some("step") && format != Some("iges") {
         return Reply::ok(Value::Null);
     }
-    let Some(text) = arg(args, 1).as_str() else { return bad("importShapes expects the STEP text") };
+    let Some(text) = arg(args, 1).as_str() else { return bad("importShapes expects the file text") };
     let options = arg(args, 2);
     let number = |field: &str| options.get(field).and_then(Value::as_f64);
     let flag = |field: &str| options.get(field).and_then(Value::as_bool);
@@ -199,7 +201,9 @@ fn import_shapes(args: &[Value]) -> Reply {
     else {
         return bad("importShapes expects { precision, maxTolerance, heal, sew }");
     };
-    answered(queries::import_step(text, ImportOptions { precision, max_tolerance, heal, sew }))
+    let options = ImportOptions { precision, max_tolerance, heal, sew };
+    // IGES goes through the XDE reader of the exchange ops (sewing at max(1e-6 x diagonal, precision): no file resolution here)
+    answered(if format == Some("iges") { xde::import_iges(text, options, 0.0) } else { queries::import_step(text, options) })
 }
 
 fn load_blob(session: &mut Session, args: &[Value]) -> Reply {
@@ -293,7 +297,21 @@ mod tests {
         assert_eq!(call(&mut session, "loadBlob", json!([sha256, brep])), json!({ "id": 1, "result": null }));
         let mass = call(&mut session, "massProperties", json!([leaf]));
         assert!((mass["result"]["volume"].as_f64().unwrap_or(0.0) - 8.0).abs() < 1e-9);
-        assert_eq!(call(&mut session, "importShapes", json!(["iges", "", options]))["result"], Value::Null);
+        assert_eq!(call(&mut session, "importShapes", json!(["obj", "", options]))["result"], Value::Null);
+        if xde::iges_available() {
+            let request = json!({
+                "format": "iges",
+                "unit": "mm",
+                "products": [{ "key": "p", "solids": [{ "shape": { "key": "s", "recipe": box_recipe(2.0, 0.0) } }] }],
+                "occurrences": [],
+                "header": {}
+            });
+            let iges = call(&mut session, "writeExchange", json!([request]))["result"].clone();
+            let back = call(&mut session, "importShapes", json!(["iges", iges, options]));
+            assert_eq!(back["result"]["solids"].as_array().map(Vec::len), Some(1), "an exported box reads back as one solid: {back}");
+        } else {
+            assert_eq!(call(&mut session, "importShapes", json!(["iges", "x", options]))["result"]["error"], json!("unavailable"));
+        }
         assert!(error_of(&call(&mut session, "importShapes", json!(["step", "x", {}]))).starts_with("NATIVE_BAD_REQUEST"));
         assert!(error_of(&call(&mut session, "loadBlob", json!([1]))).starts_with("NATIVE_BAD_REQUEST"));
     }

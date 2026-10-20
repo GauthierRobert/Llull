@@ -686,7 +686,7 @@ Coverage gate 90/85/90/90 applies to `packages/core/src/{commands,geometry}` and
 | VIS-M6 | viewport realism tiers (CSM, GTAO, edges), material classes, walk / fly, walkthroughs | M3 | 8 d |
 | VIS-M7 | instance BVH in a worker, glTF instancing, pipe markers; measure the 10⁶ build; `llull-bvh` WASM / `llull-compute geomq` if the target is missed (RS-6) | M3; RS-0 `llull-bvh` for the native part | 7 d (+ native part inside RS-6) |
 | VIS-M8 (V2) | 10⁶: streaming, Hi-Z occlusion, impostors, instance-array storage; terrain / sky / sun | 08-DAT storage decision | 15 d |
-| VIS-M9 | native GPU raster (RS-5): `ctx.raster`, `llull-compute raster` for `render_view`, walkthroughs and BCF snapshots; VC-VIS-60 | M4; RS-0 | inside RS-5 (4 wk in RS1, shared with aerospace 05) |
+| VIS-M9 | native GPU raster (RS-5): `ctx.raster`, `llull-compute raster` for `render_view`, walkthroughs and BCF snapshots; VC-VIS-60 | M4; RS-0 | inside RS-5 (4 wk in RS1, shared with aerospace 05). **Built 2026-10-19 with the M2 / M4 / M5 / M6 slices it needs (§12).** |
 
 Sibling dependencies:
 
@@ -713,12 +713,99 @@ Sibling dependencies:
    a `define_palette` command (V1) whose palette is named in every report.
 6. **Q6. Determinism scope of `render_view` digests.** Per Node major version, or with an own sin / cos
    implementation for full portability? Only the reference renderer is concerned; the native renderer is non-hash
-   (§2.A).
+   (§2.A). **Decided at VIS-M9 (2026-10-19):** digests are pinned per `rendererVersion` (`llull-ts-raster/1`) on the
+   supported Node major; an own sin / cos is not added until a digest is seen to differ across machines. The native
+   CPU twin reproduces the reference RGBA bit for bit (it uses the JS rounding and V8 `hypot` of `llull-jsmath`), so
+   the reference is portable to Rust already.
 7. **Q7. Snapshot in BCF.** Use the `render_view` raster (deterministic), or the viewport canvas (what the human
    saw)? Proposal: reference raster by default, canvas when the export runs from the UI; the native GPU raster
-   only on request (`snapshotRenderer: 'native'`, non-hash).
+   only on request (`snapshotRenderer: 'native'`, non-hash). **Decided at VIS-M9:** as proposed for the CLI: the
+   reference raster by default (the `.bcf` bytes are reproducible), `snapshotRenderer: 'native'` on request. The UI
+   canvas snapshot waits for the Review panel (VIS-M2 UI).
 
-## 12. References
+## 12. As built — VIS-M9 native raster (RS-5), 2026-10-19
+
+VIS-M9 is built, with the minimal slices of VIS-M2 / M4 / M5 / M6 it needs (pure commands and the TypeScript
+reference, CLI first; no viewport UI). Everything else in §3–§8 is still proposed.
+
+### 12.1 What exists
+
+| Area | As built | Files |
+| ---- | -------- | ----- |
+| Review model (VIS-M2 slice) | `CadDocument.review` with `viewpoints` / `viewpointOrder`, `walkthroughs`, `issues` / `issueOrder`, `nextNumber`; load validation (`reviewProblems`). Section boxes, markups, comments arrive later as optional fields (no migration). | `model/review.ts`, `commands/persistence/reviewValidation.ts` |
+| Commands (metaHistory, coded refusals §7) | `save_viewpoint` (camera or `fromDocumentCamera`), `list_viewpoints`, `delete_viewpoint` (refused while used: `VIS_VIEWPOINT_IN_USE`), `create_walkthrough` / `delete_walkthrough`, `create_review_issue` (status `open`) | `commands/review/{viewpoints,walkthroughs,issues,reviewModel}.ts` |
+| Camera maths | orthonormalisation, document orbit camera → viewpoint (45°), interpolation: eye linear, direction / up slerp, fov or view height linear | `geometry/viewpointCamera.ts` |
+| `render_view` (VIS-M4 slice) | `projection: 'perspective'` + `fovDeg`, `viewpointId` (perspective or orthographic BCF camera; ortho `viewHeight` = visible height), `renderer: 'reference' \| 'native'`; data `renderer`, `rendererVersion`, `svgSha256` (reference) or `device` / `version` / `engine` / `deterministic: false` (native), `projection`, `viewpointId` | `commands/render/{viewRequest,viewSetup,rendererProvenance}.ts` |
+| Raster seam | the old `raster.ts` split, bit-identical (svg sha256 of 7 scenes incl. caps, strokes, turntable, unsupersampled): `prepareRasterScene` (projection, Lambert colour, back-face flip, near-plane clipping) → `RasterScene` → `rasterScenePixels` (reference) or `ctx.raster` | `commands/render/{rasterScene,raster}.ts`, `model/raster.ts` |
+| `ctx.raster` | `ExecutionContext.raster?: RasterPort \| null`, default context reads `setRasterPort` (`commands/rasterPort.ts`) | `commands/types.ts`, `commands/context.ts` |
+| `render_walkthrough` (VIS-M6 slice) | PNG frames (`data.files`, `--save dir/`), frames = ⌊duration · fps⌋ + 1, `frameSha256[]` (reference), native frames without digests; `maxFrames` ≤ 600, 100 Mpx budget (`VIS_RENDER_BUDGET`) | `commands/render/{renderWalkthrough,frames}.ts` |
+| `export_bcf` (VIS-M5 slice) | BCF 3.0 archive: `bcf.version`, `extensions.xml`, per topic `markup.bcf` + `.bcfv` (metres, vertical `FieldOfView`, `ViewToWorldScale`) + PNG snapshot; behind the export gate; `VIS_BCF_GUID_UNMAPPED` warning | `commands/exchange/bcf/{exportBcf,bcfXml}.ts`, `lib/zip.ts` |
+| Native job | `llull-compute raster <folder>` with `"kind": "scene"`: flat f64 buffers → `rgba.bin`. CPU twin bit-identical to `rasterScenePixels`; wgpu fill (convex faces batched as fans, other faces even-odd via stencil INVERT + stencil-tested cover), strokes / outline / resolve on the twin. `llull-compute` `main.rs` unchanged (dispatch inside `llull_raster::run`). | `solver/crates/llull-raster/src/{scene,scene_cpu,scene_gpu}.rs` |
+| Host transport | `RasterPort` running the job with `spawnSync` (commands are synchronous), hash-checked output, provenance from the NDJSON warnings; installed by the CLI and the backend only when the binary exists | `server/src/native/rasterPort.ts` |
+
+### 12.2 Decisions
+
+- **RasterScene is post-projection.** The TypeScript prepares screen-space polygons with their flat colour, normal,
+  owner and flags; the native side only fills, depth-tests, outlines and resolves. Colour profiles, material classes,
+  section boxes and review shading (VIS-M1 / M4) will extend the prepare stage, so both renderers stay one scene.
+  `renderPlan` buckets / instancing in the scene wait for VIS-M3 / M7.
+- **Perspective is raster-only.** Depth is z = −1/d (affine in screen space), near plane = 10⁻³ · scene radius in
+  camera space (polygons and strokes clipped there); outlines compare linear depth. Grid, axes, labels, dimensions,
+  image underlays and annotation text are orthographic overlays and are not drawn in perspective; turntable /
+  isolate / section with perspective is `VIS_RENDER_INVALID`.
+- **No silent fallback.** No port → `NATIVE_TOOL_MISSING`; a failed frame fails the command with the job's code
+  (`NATIVE_TIMEOUT`, `NATIVE_PROTOCOL`, …). A GPU request that the binary drew on its CPU twin is reported
+  (`engine: 'native-cpu'`, `reason`), still `deterministic: false` and without a digest.
+- **Ids and GUIDs.** Review ids are `vp-<n>`, `wt-<n>`, `iss-<n>` from `review.nextNumber` (one id per command, so no
+  `.<k>`). GUIDs are name-based UUIDs version 8 (sha256 of the id and content at creation, `lib/nameUuid.ts`), not v5:
+  core has no SHA-1 and the GUID only needs to be stable and unique per document. BCF viewpoint GUIDs are derived
+  per topic (issue GUID × viewpoint GUID).
+- **Walkthrough frames are PNG** (the scene composited over the background), so their digest is `frameSha256` of
+  the PNG bytes rather than `svgSha256`.
+- **BCF.** 3.0 export only (`version: '2.1'` → `VIS_BCF_VERSION`); `CreationDate` is a param (default
+  `1970-01-01T00:00:00Z`) because commands never read the clock. Entities have no IFC GUID yet: components are
+  written with `OriginatingSystem` `llull` + `AuthoringToolId` (entity id) and the export warns.
+- **Synchronous port.** The CLI and the backend block for one native frame. A walkthrough is one process per frame.
+
+### 12.3 Measured (RTX 4080 Laptop GPU, Vulkan; shared machine with parallel jobs, so wall times are indicative)
+
+- VC-VIS-60 (b): render_view, walkthrough frames and BCF snapshots drawn by the GPU agree with the reference at
+  coverage IoU 1.0000 and mean |ΔRGB| ≤ 0.01 levels on the 5 crate fixtures and the server scenes (tolerance
+  IoU ≥ 0.97, mean ≤ 8). The CPU twin is byte-identical on every case. (c) holds: reference digests are unchanged with
+  a raster port installed.
+- Fixed cost of one native frame: process start ≈ 0.1 s, GPU instance / device / pipelines ≈ 0.7 s. A 1600 × 1200
+  scene of 8 720 polygons: GPU job ≈ 1.5 s, CPU twin job ≈ 2.0 s (both include writing `rgba.bin`), reference
+  `render_view` ≈ 1.1 s in process; 2000 × 2000: reference 1.3 s, native 2.0 s. **So the native path is not faster for
+  single renders today**; its value is the GPU seam for the review shading of VIS-M4 / M6 (shadows, AO) and large
+  batches. Follow-up: a multi-frame job (one process and one device per walkthrough or BCF export).
+
+### 12.4 Known limits and follow-ups (from the VIS-M9 review)
+
+- `delete_review_issue` exists, so a viewpoint used by an issue can be freed. Ids are de-duplicated on create and
+  export; entities deleted after an issue was opened are left out of the BCF selection.
+- GUIDs are unique per document, not across documents: two documents whose first issue has the same title share a
+  topic GUID. A document identity salt (or a `namespace` param) is a follow-up before BCF round trips (`import_bcf`).
+- The synchronous port blocks the backend's event loop for each native frame. A native walkthrough through
+  `POST /command` can stall live sync for its whole duration. Follow-up: a total native-time budget, or one batched
+  job per walkthrough / export.
+- Perspective strokes are clipped at the near plane only. A stroke ending next to the eye can project far
+  off-screen, and `strokeSegment` then walks every pixel step of it. Follow-up: clip to the buffer rectangle in the
+  prepare stage (both twins read the same buffers, so parity holds).
+- Windows build of `--features gpu` on a machine without MSVC: `solver/scripts/dlltool-shim` (GNU toolchain) makes
+  wgpu link. With it, the `gpu`-feature scene test intermittently ended with an access violation when run with
+  output capture: about 1 run in 3, 0 of 6 with `--nocapture`, 0 of 4 full workspace runs. The production binary was
+  stable: 12 / 12 renders, the server suite and the CLI. This still has to be reproduced on an MSVC toolchain to rule
+  out the stand-in.
+
+### 12.5 Not built yet (remaining VIS work)
+
+VIS-M1 (display / colour profiles), the rest of VIS-M2 (section boxes, markups, comments, status workflow,
+`check_review`, `apply_viewpoint`, `get_viewpoint`, UI), VIS-M3 (`renderPlan`, `render_stats`), the rest of VIS-M4
+(profile / section-box / review shading, `visibleEntityIds`, `VIS_RENDER_BUDGET` on render_view), the rest of VIS-M5
+(`create_clash_issues`, `import_bcf`, single-viewpoint BCF commands, XSD validation VC-VIS-15), VIS-M6 viewport tiers
+and walk / fly, VIS-M7, VIS-M8. VC-VIS-60 (a) belongs to RS-6 (`llull-bvh`).
+
+## 13. References
 
 - [R1]–[R15]: see [`FUNCTIONAL_SPEC.md` §11](FUNCTIONAL_SPEC.md#11-references).
 - [R16] three-mesh-bvh 0.9.16 (npm, MIT): README (BatchedMesh BVH, ObjectBVH frustum culling) — https://registry.npmjs.org/three-mesh-bvh/-/three-mesh-bvh-0.9.16.tgz (downloaded 2026-10)

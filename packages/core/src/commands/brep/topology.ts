@@ -11,6 +11,7 @@ import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
 import { exactOrMesh, operandRecipe } from './kernelShape';
 import { labelStep } from './stepLabels';
+import { retargetStepSchema, type StepSchema } from './stepSchema';
 import { labelStepAssembly } from './stepAssemblyLabels';
 import { planStepAssembly } from './stepAssembly';
 import { exportedIds, stepLabels, stepTargets } from './stepTargets';
@@ -74,16 +75,17 @@ export const inspectTopology = defineCommand({
   },
 });
 
-/** AP214 export through the kernel's XDE writer (aerospace 04 TR-XCH-19): the data of the legacy path, with names, colours and structure written by the writer. */
+/** AP214 / AP242 export through the kernel's XDE writer (aerospace 04 TR-XCH-19): the data of the legacy path, with names, colours and structure written by the writer. */
 function exportThroughXde(
   doc: CadDocument,
   kernel: GeometryKernel,
   entityIds: readonly string[] | undefined,
+  schema: StepSchema,
   confirmation: unknown,
   ctx: ExecutionContext | undefined,
 ): CommandResult {
   const outcome = buildStepExport(doc, kernel, entityIds, {
-    schema: 'ap214',
+    schema,
     validation: false,
     structured: true,
     fileName: 'llull.stp',
@@ -115,7 +117,7 @@ function exportThroughXde(
   const left = data.skipped.length > 0 ? `; skipped ${data.skipped.join(', ')}.` : '.';
   return report(
     doc,
-    `export_step_exact: ${data.solidCount} exact solid(s)${sheets} from ${data.entityIds.join(', ')} → STEP AP214${data.assembly === undefined ? '' : ' assembly'}${structure}, ${data.step.length} bytes${data.faceted.length > 0 ? `; ${data.faceted.length} ply solid(s) written from triangles (exact slab refused): ${data.faceted.join(', ')}` : ''}${left}`,
+    `export_step_exact: ${data.solidCount} exact solid(s)${sheets} from ${data.entityIds.join(', ')} → STEP ${schema === 'ap242' ? 'AP242' : 'AP214'}${data.assembly === undefined ? '' : ' assembly'}${structure}, ${data.step.length} bytes${data.faceted.length > 0 ? `; ${data.faceted.length} ply solid(s) written from triangles (exact slab refused): ${data.faceted.join(', ')}` : ''}${left}`,
     exact,
   );
 }
@@ -147,7 +149,7 @@ export const exportStepExact = defineCommand({
   name: 'export_step_exact',
   annotations: { readOnly: true, requiresKernel: true },
   description:
-    "Export 3D solids to STEP (AP214, ISO 10303-21) directly from the geometry kernel's exact B-rep: primitives, " +
+    "Export 3D solids to STEP (AP214 by default, AP242 with schema ap242; ISO 10303-21) directly from the geometry kernel's exact B-rep: primitives, " +
     'booleans, fillets, chamfers and shells are written as true analytic/NURBS faces, not triangles. ' +
     `No Python needed. Requires ${OCC_HINT}; the default Manifold kernel gracefully no-ops ` +
     '(use export_step via the Python bridge, or export_stl, instead). ' +
@@ -167,15 +169,23 @@ export const exportStepExact = defineCommand({
       .optional()
       .describe('Ids of the 3D solids to export. Omit or pass [] to export every 3D solid of the document.'),
     acceptUnverified: confirmExportControlled.describe(ACCEPT_UNVERIFIED),
+    schema: z
+      .enum(['ap214', 'ap242'])
+      .optional()
+      .describe(
+        'STEP application protocol declared in the file: "ap214" (default, AUTOMOTIVE_DESIGN) or "ap242" (managed model based 3D engineering, the current edition read by CAD/PLM tools). Geometry, names, colours and assembly structure are identical.',
+      ),
     confirmExportControlled,
   }),
   run: (doc, params, ctx): CommandResult => {
     const { entityIds } = params;
+    const schema = params.schema ?? 'ap214';
+    const protocol = schema === 'ap242' ? 'AP242' : 'AP214';
     const refused = exportRefusal(doc, 'export_step_exact', 'step', params.confirmExportControlled, ctx);
     if (refused !== null) return refused;
     const kernel = (ctx ?? currentContext()).kernel;
     if (!kernel) return noop(doc, kernelUnavailable('export_step_exact'));
-    if (kernel.writeExchange !== undefined) return exportThroughXde(doc, kernel, entityIds, params.acceptUnverified, ctx);
+    if (kernel.writeExchange !== undefined) return exportThroughXde(doc, kernel, entityIds, schema, params.acceptUnverified, ctx);
     const { solids, sheets, skipped, entries } = stepTargets(doc, entityIds);
     if (solids.length === 0 && sheets.length === 0) return noop(doc, 'export_step_exact: no 3D solids to export.');
     if (kernel.exportStepAssembly !== undefined && entries.some((entry) => entry.kind === 'instance')) {
@@ -192,7 +202,7 @@ export const exportStepExact = defineCommand({
         'export_step_exact',
       );
       if (blocked !== null) return gateResult(doc, blocked, 'export_step_exact');
-      const step = labelStepAssembly(assemblyStep, plan.labels);
+      const step = retargetStepSchema(labelStepAssembly(assemblyStep, plan.labels), schema);
       const assembly = { products: plan.partCount, occurrences: plan.occurrences.length };
       const left = sheets.map((sheet) => `${sheet.id} (surface sheet: not written into an assembly file)`);
       const data: ExportStepExactData = {
@@ -207,7 +217,7 @@ export const exportStepExact = defineCommand({
       };
       return report(
         doc,
-        `export_step_exact: ${solids.length} exact solid(s) from ${exported.join(', ')} → STEP AP214 assembly, ${assembly.products} product(s), ` +
+        `export_step_exact: ${solids.length} exact solid(s) from ${exported.join(', ')} → STEP ${protocol} assembly, ${assembly.products} product(s), ` +
           `${assembly.occurrences} occurrence(s), ${step.length} bytes` +
           (plan.faceted.length > 0
             ? `; ${plan.faceted.length} ply solid(s) written from triangles (exact slab refused): ${plan.faceted.join(', ')}`
@@ -242,7 +252,7 @@ export const exportStepExact = defineCommand({
     const blocked = unverifiedGate(doc, { entityIds: exported, faceted }, params.acceptUnverified, ctx, 'export_step_exact');
     if (blocked !== null) return gateResult(doc, blocked, 'export_step_exact');
     const exactStep = kernel.exportStep(shapes);
-    const step = exactStep === null ? null : labelStep(exactStep, stepLabels(doc, [...solids, ...faces]));
+    const step = exactStep === null ? null : retargetStepSchema(labelStep(exactStep, stepLabels(doc, [...solids, ...faces])), schema);
     if (step === null) return noop(doc, `export_step_exact: this kernel cannot write exact STEP; use ${OCC_HINT}.`);
     const left = [...skipped, ...notBuilt];
     const data: ExportStepExactData = {
@@ -256,7 +266,7 @@ export const exportStepExact = defineCommand({
     };
     return report(
       doc,
-      `export_step_exact: ${solids.length} exact solid(s)${faces.length > 0 ? ` and ${faces.length} surface sheet(s)` : ''} from ${exported.join(', ')} → STEP AP214, ${step.length} bytes` +
+      `export_step_exact: ${solids.length} exact solid(s)${faces.length > 0 ? ` and ${faces.length} surface sheet(s)` : ''} from ${exported.join(', ')} → STEP ${protocol}, ${step.length} bytes` +
         (faceted.length > 0 ? `; ${faceted.length} ply solid(s) written from triangles (exact slab refused): ${faceted.join(', ')}` : '') +
         (left.length > 0 ? `; skipped ${left.join(', ')}.` : '.'),
       data,

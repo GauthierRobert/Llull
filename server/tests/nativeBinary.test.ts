@@ -29,6 +29,12 @@ describe('nativeBinaryPath', () => {
     expect(kernel).toMatch(/solver[\\/]target[\\/]release[\\/]llull-kernel$/);
   });
 
+  it('looks for local builds under this repository solver/ (also from the CLI bundle in server/dist)', () => {
+    const solverTarget = path.join(path.resolve(__dirname, '..', '..'), 'solver', 'target');
+    const found = nativeBinaryPath('llull-compute', {}, (file) => file.startsWith(solverTarget), 'linux');
+    expect(found).toBe(path.join(solverTarget, 'compute', 'llull-compute'));
+  });
+
   it('falls back to a local release build, else null', () => {
     const local = nativeBinaryPath('llull-compute', {}, (file) => file.includes(path.join('solver', 'target', 'release')), 'linux');
     expect(local).toMatch(/solver[\\/]target[\\/]release[\\/]llull-compute$/);

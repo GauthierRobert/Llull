@@ -125,11 +125,12 @@ export function lowerRecipe(recipe: ShapeRecipe, lowering: RecipeLowering): Lowe
     case 'blend':
     case 'brep':
     case 'faceSlab':
+    case 'faceOp':
       return null;
     case 'fillet':
     case 'chamfer':
     case 'shell': {
-      if (recipe.op !== 'shell' && recipe.sizeEnd !== undefined) return null;
+      if (recipe.op !== 'shell' && (recipe.sizeEnd !== undefined || recipe.radii !== undefined)) return null;
       if (recipe.op === 'shell' && recipe.openNear !== undefined && recipe.openNear.length > 0) return null;
       const source = lowerRecipe(recipe.source, lowering);
       if (source === null) return null;

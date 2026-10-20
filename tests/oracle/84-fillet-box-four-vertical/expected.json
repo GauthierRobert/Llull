@@ -1,0 +1,14 @@
+{
+  "id": "84-fillet-box-four-vertical",
+  "family": "fillet",
+  "description": "r=2 fillets on the four vertical edges of a 20x10x5 block",
+  "source": "analytic",
+  "formula": "V = abc - 4 (1 - pi/4) r^2 c",
+  "kernels": ["occt"],
+  "bodies": 1,
+  "volume": 982.831853072,
+  "area": 675.964594301,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-10, -5, -2.5], "max": [10, 5, 2.5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

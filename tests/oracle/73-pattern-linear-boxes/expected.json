@@ -1,0 +1,14 @@
+{
+  "id": "73-pattern-linear-boxes",
+  "family": "pattern",
+  "description": "five unit cubes 3 apart",
+  "source": "analytic",
+  "formula": "bodies = n; V = n V1; centroid = mean",
+  "kernels": ["manifold", "occt"],
+  "bodies": 5,
+  "volume": 5,
+  "area": 30,
+  "centroid": [6, 0, 0],
+  "bbox": { "min": [-0.5, -0.5, -0.5], "max": [12.5, 0.5, 0.5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

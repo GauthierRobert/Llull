@@ -106,19 +106,30 @@ describe('offset_2d on a rotated rectangle', () => {
   });
 });
 
-describe('extrude_profile does not inherit the sketch rotation', () => {
+describe('extrude_profile follows the sketch rotation', () => {
   const sketch = (): { doc: CadDocument; id: string } => {
     const base = run(createEmptyDocument(), 'draw_rectangle', { width: 4, height: 2 }).document;
     const id = base.order[0] as string;
     const rect = base.entities[id] as RectangleEntity;
     return { id, doc: { ...base, entities: { ...base.entities, [id]: { ...rect, rotation: [Math.PI / 2, 0, 0] as Vec3 } } } };
   };
-  it('defaults to [0, 0, 0] and uses an explicit rotation verbatim', () => {
+  it('defaults to the sketch rotation (its work-plane normal) and uses an explicit rotation verbatim', () => {
     const { doc, id } = sketch();
     const plain = run(doc, 'extrude_profile', { id, depth: 3 });
-    expect((only(plain.document, 'extrusion') as ExtrusionEntity).rotation).toEqual([0, 0, 0]);
+    expect((only(plain.document, 'extrusion') as ExtrusionEntity).rotation).toEqual([Math.PI / 2, 0, 0]);
     const rotated = run(doc, 'extrude_profile', { id, depth: 3, rotation: [0, 0, Math.PI / 2] });
     expect((only(rotated.document, 'extrusion') as ExtrusionEntity).rotation).toEqual([0, 0, Math.PI / 2]);
+  });
+  it('an explicit axis overrides the sketch rotation; a thin wall follows the sketch too', () => {
+    const { doc, id } = sketch();
+    const along = run(doc, 'extrude_profile', { id, depth: 3, axis: [0, 0, 1] });
+    expect((only(along.document, 'extrusion') as ExtrusionEntity).rotation.map(Math.abs)).toEqual([0, 0, 0]);
+    const drawn = run(createEmptyDocument(), 'draw_polyline', { points: xy(0, 0, 4, 0, 4, 2) }).document;
+    const pathId = drawn.order[0] as string;
+    const path = { ...drawn.entities[pathId], rotation: [Math.PI / 2, 0, 0] } as Entity;
+    const tilted: CadDocument = { ...drawn, entities: { ...drawn.entities, [pathId]: path } };
+    const thin = run(tilted, 'extrude_profile', { id: pathId, depth: 3, thin: { thickness: 0.2, side: 'centre' } });
+    expect((only(thin.document, 'extrusion') as ExtrusionEntity).rotation).toEqual([Math.PI / 2, 0, 0]);
   });
   it('failure: depth <= 0 is a no-op', () => {
     const { doc, id } = sketch();

@@ -1,4 +1,8 @@
-/** 03 GDT M5 / M7: analyze_stackup and fastener_tolerance against stackup_reference.json (VC-GDT-30..36, 55, 58), PMI-linked stacks. */
+/**
+ * 03 GDT M5 / M7: analyze_stackup and fastener_tolerance against stackup_reference.json (VC-GDT-30..36, 55, 58), PMI-linked stacks.
+ * Merge note (2026-10-21): adapted to main's data shape (yNominal / yMean / pBelowLowerLimit / pMethod, positionTolerance + perPart), its
+ * refusal codes and its verified default (typed contributors are verified unless verified: false); main's own suite is stackup.test.ts.
+ */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -31,19 +35,28 @@ const reference = JSON.parse(readFileSync(path.join(validation, 'stackup_referen
 
 interface Data {
   unit: string;
-  nominal: number;
-  mean: number;
+  yNominal: number;
+  yMean: number;
   worstCase: { min: number; max: number; halfTolerance: number };
   worstCaseExactCorners: { min: number; max: number } | null;
   rss: { halfTolerance: number; min: number; max: number };
   sigma: number;
-  pBelow: number | null;
-  pAbove: number | null;
-  probabilityMethod: string;
+  pBelowLowerLimit?: number | null;
+  pAboveUpperLimit?: number | null;
+  pMethod?: string;
   contributions: Array<{ name: string; wcPercent: number; rssPercent: number }>;
-  monteCarlo?: { seed: number; samples: number; mean: number; std: number; pBelow?: number; acceptance: { mean: number; std: number } };
+  contributors: Array<{ name: string; source: string; verified: boolean; unit: string }>;
+  monteCarlo?: {
+    seed: number;
+    samples: number;
+    mean: number;
+    std: number;
+    pBelowLowerLimit?: number;
+    pAboveUpperLimit?: number;
+    acceptance: { meanTolerance: number; stdTolerance: number };
+  };
   sigmaPerHalfTolerance: { value: number; source: string; defaulted: boolean };
-  provenance: { method: string; sensitivitySource: string; note?: string };
+  provenance: { method: string; sensitivitySource: string };
   unverified?: { contributors: string[] };
   reviewRequired: boolean;
   reviewReason?: string;
@@ -58,21 +71,20 @@ const analyze = (
 };
 const stack = (id: string): (typeof reference.stackups)[number] =>
   reference.stackups.find((s) => s.id === id) as (typeof reference.stackups)[number];
-const typed = (contributors: Contributor[], verified = true): Array<Contributor & { verified: boolean }> =>
+const typed = (contributors: Contributor[]): Contributor[] =>
   contributors.map(({ name, nominal, lower, upper, distribution }) => ({
     name,
     nominal,
     lower,
     upper,
     ...(distribution === undefined ? {} : { distribution }),
-    verified,
   }));
 
 describe('analyze_stackup against the reference (VC-GDT-30..34)', () => {
   it('SU-01 plan: normal linear stack, expression, autodiff, exact probability, seeded Monte Carlo (VC-GDT-30, 58)', () => {
     const { data, result } = analyze(su01[0]?.params as Record<string, unknown>);
     expect(result.rejected).toBeUndefined();
-    expect(data.mean).toBeCloseTo(0.15, 12);
+    expect(data.yMean).toBeCloseTo(0.15, 12);
     expect(data.worstCase).toMatchObject({
       halfTolerance: expect.closeTo(0.24, 12),
       min: expect.closeTo(-0.09, 12),
@@ -80,57 +92,65 @@ describe('analyze_stackup against the reference (VC-GDT-30..34)', () => {
     });
     expect(data.rss.halfTolerance).toBeCloseTo(0.124096736, 9);
     expect(data.sigma).toBeCloseTo(0.041365579, 9);
-    expect(data.pBelow).toBeCloseTo(0.000143809451, 12);
-    expect(data.pAbove).toBeNull();
+    expect(data.pBelowLowerLimit).toBeCloseTo(0.000143809451, 12);
+    expect(data.pAboveUpperLimit).toBeUndefined();
     expect(data.worstCaseExactCorners?.min).toBeCloseTo(-0.09, 12);
     expect(data.sigmaPerHalfTolerance).toMatchObject({ value: 3, defaulted: true });
     expect(data.sigmaPerHalfTolerance.source).not.toBe('');
     expect(data.provenance).toMatchObject({ sensitivitySource: 'autodiff' });
-    expect(data.unverified?.contributors).toEqual(['H', 'A', 'B', 'C', 'D']);
-    expect(data.warnings?.[0]?.code).toBe('GDT_UNVERIFIED_INPUT');
+    expect(data.unverified).toBeUndefined();
+    expect(data.contributors.map((c) => c.source)).toEqual(['typed', 'typed', 'typed', 'typed', 'typed']);
     expect(data.reviewRequired).toBe(true);
+    expect(data.reviewReason).toContain('non-linear expression');
     const mc = data.monteCarlo;
     expect(mc).toMatchObject({ seed: 20261015, samples: 200000 });
-    expect(Math.abs((mc?.mean ?? 0) - 0.15)).toBeLessThan(mc?.acceptance.mean ?? 0);
-    expect(Math.abs((mc?.std ?? 0) - data.sigma)).toBeLessThan(mc?.acceptance.std ?? 0);
+    expect(Math.abs((mc?.mean ?? 0) - 0.15)).toBeLessThan(mc?.acceptance.meanTolerance ?? 0);
+    expect(Math.abs((mc?.std ?? 0) - data.sigma)).toBeLessThan(mc?.acceptance.stdTolerance ?? 0);
     expect(analyze(su01[0]?.params as Record<string, unknown>).data.monteCarlo).toEqual(mc);
-    expect(result.summary).toContain('Monte Carlo 200000 samples seed 20261015');
+    expect(result.summary).toContain('Monte Carlo 200000 samples');
   });
 
   it('only the typed contributor flagged verified:false is unverified (VC-GDT-55)', () => {
     const params = su01[0]?.params as { contributors: Contributor[] };
-    const contributors = params.contributors.map((c) => ({ ...c, verified: c.name !== 'C' }));
+    const contributors = params.contributors.map((c) => (c.name === 'C' ? { ...c, verified: false } : c));
     const { data } = analyze({ ...params, contributors });
     expect(data.unverified?.contributors).toEqual(['C']);
-    expect(data.pBelow).toBeCloseTo(0.000143809451, 12);
+    expect(data.warnings?.[0]?.code).toBe('GDT_UNVERIFIED_INPUT');
+    expect(data.pBelowLowerLimit).toBeCloseTo(0.000143809451, 12);
   });
 
   it('SU-02 uniform: exact Irwin-Hall probability 29/2400 (VC-GDT-31)', () => {
     const s = stack('SU-02');
-    const { data } = analyze({ expression: 'H - (A + B + C + D)', contributors: typed(s.contributors), lowerSpecLimit: 0 });
+    const signs = [1, -1, -1, -1, -1];
+    const contributors = typed(s.contributors).map((c, i) => ({ ...c, sensitivity: signs[i] }));
+    const { data } = analyze({ contributors, lowerSpecLimit: 0 });
     expect(data.sigma).toBeCloseTo(0.071647284, 9);
-    expect(data.pBelow).toBeCloseTo(29 / 2400, 12);
-    expect(data.probabilityMethod).toContain('Irwin-Hall');
+    expect(data.pBelowLowerLimit).toBeCloseTo(29 / 2400, 12);
+    expect(data.pMethod).toBe('uniform_sum');
+    // an expression is treated as non-linear: the uniform-sum CDF needs a linear stack
+    expect(analyze({ expression: 'H - (A + B + C + D)', contributors: typed(s.contributors), lowerSpecLimit: 0 }).data.pMethod).toBe(
+      'none',
+    );
   });
 
   it('SU-03 and SU-04 linear stacks with sensitivities (VC-GDT-32, 33)', () => {
     const s3 = stack('SU-03');
     const three = analyze({
-      contributors: s3.contributors.map((c, i) => ({ ...c, sensitivity: i === 0 ? 1 : -1, verified: true })),
+      contributors: s3.contributors.map((c, i) => ({ ...c, sensitivity: i === 0 ? 1 : -1 })),
       lowerSpecLimit: 0,
     }).data;
     expect(three.worstCase.min).toBeCloseTo(0.007, 12);
     expect(three.rss.halfTolerance).toBeCloseTo(0.012349089, 9);
-    expect(three.pBelow).toBeCloseTo(2.765e-9, 12);
-    expect(analyze({ contributors: typed(s3.contributors) }).data.provenance.note).toContain('no sensitivities given');
+    expect(three.pBelowLowerLimit).toBeCloseTo(2.765e-9, 12);
+    expect(analyze({ contributors: typed(s3.contributors) }).result.error?.code).toBe('GDT_STACKUP_SENSITIVITY_CONFLICT');
     const s4 = stack('SU-04');
     const four = analyze({
-      contributors: s4.contributors.map((c) => ({ ...c, sensitivity: (c as { sensitivity: number }).sensitivity, verified: true })),
+      contributors: s4.contributors.map((c) => ({ ...c, sensitivity: (c as { sensitivity: number }).sensitivity })),
       lowerSpecLimit: 0,
     }).data;
     expect(four.worstCase.min).toBeCloseTo(-0.035, 12);
     expect(four.rss.halfTolerance).toBeCloseTo(0.044440972, 9);
-    expect(four.pBelow).toBeCloseTo(0.000368724955, 12);
+    expect(four.pBelowLowerLimit).toBeCloseTo(0.000368724955, 12);
     expect(four.contributions.reduce((s, c) => s + c.rssPercent, 0)).toBeCloseTo(100, 9);
   });
 
@@ -148,7 +168,7 @@ describe('analyze_stackup against the reference (VC-GDT-30..34)', () => {
     expect(data.worstCaseExactCorners?.max).toBeCloseTo(50.804590132, 9);
     expect(data.sigma).toBeCloseTo(0.252467305, 9);
     expect(data.monteCarlo?.samples).toBe(20000);
-    expect(data.pBelow).toBeNull();
+    expect(data.pBelowLowerLimit).toBeUndefined();
   });
 
   it('mixed distributions have no closed-form probability; Monte Carlo reports pAbove', () => {
@@ -162,9 +182,9 @@ describe('analyze_stackup against the reference (VC-GDT-30..34)', () => {
       methods: ['monteCarlo'],
       samples: 5000,
     });
-    expect(data.pBelow).toBeNull();
-    expect(data.probabilityMethod).toContain('not available');
-    expect(data.monteCarlo).toBeDefined();
+    expect(data.pBelowLowerLimit).toBeNull();
+    expect(data.pMethod).toBe('none');
+    expect(data.monteCarlo?.pAboveUpperLimit).toBeGreaterThanOrEqual(0);
   });
 });
 
@@ -175,21 +195,26 @@ describe('analyze_stackup refusals', () => {
   it('reports each coded refusal and leaves the document untouched', () => {
     expect(code({ expression: 'Dhole - ', contributors: base })).toBe('GDT_STACKUP_EXPRESSION');
     expect(code({ expression: 'Dhole - Missing', contributors: base })).toBe('GDT_STACKUP_EXPRESSION');
-    expect(code({ expression: '1 / (Dhole - Dhole)', contributors: base })).toBe('GDT_STACKUP_EXPRESSION');
+    expect(code({ expression: '1 / (Dhole - Dhole)', contributors: base })).toBe('GDT_STACKUP_NON_FINITE');
     expect(code({ expression: 'Dhole - Dpin', contributors: base.map((c) => ({ ...c, name: `${c.name} x` })) })).toBe(
-      'GDT_STACKUP_EXPRESSION',
+      'GDT_STACKUP_CONTRIBUTOR_INVALID',
     );
     expect(code({ expression: 'Dhole - Dpin', contributors: base.map((c) => ({ ...c, sensitivity: 1 })) })).toBe(
       'GDT_STACKUP_SENSITIVITY_CONFLICT',
     );
-    expect(code({ contributors: base, methods: ['monteCarlo'], samples: 2_000_001 })).toBe('GDT_STACKUP_SAMPLES_CAP');
-    expect(code({ contributors: [base[0], base[0]] })).toBe('GDT_STACKUP_INVALID');
-    expect(code({ contributors: [{ name: 'a', nominal: 1, lower: 2, upper: 1 }] })).toBe('GDT_STACKUP_INVALID');
-    expect(code({ contributors: [{ name: 'a' }] })).toBe('GDT_STACKUP_INVALID');
-    expect(code({ contributors: base, lowerSpecLimit: 2, upperSpecLimit: 1 })).toBe('GDT_STACKUP_INVALID');
-    expect(code({ contributors: [{ name: 'a', pmiId: 'ghost' }] })).toBe('GDT_PMI_UNKNOWN');
+    const linear = base.map((c, i) => ({ ...c, sensitivity: i === 0 ? 1 : -1 }));
+    expect(code({ contributors: linear, methods: ['monteCarlo'], samples: 2_000_001 })).toBe('GDT_STACKUP_SAMPLES_CAP');
+    expect(code({ contributors: [linear[0], linear[0]] })).toBe('GDT_STACKUP_CONTRIBUTOR_INVALID');
+    expect(code({ contributors: [{ name: 'a', nominal: 1, lower: 2, upper: 1, sensitivity: 1 }] })).toBe('GDT_LIMITS_INVERTED');
+    expect(code({ contributors: [{ name: 'a', sensitivity: 1 }] })).toBe('GDT_STACKUP_CONTRIBUTOR_INVALID');
+    expect(code({ contributors: linear, lowerSpecLimit: 2, upperSpecLimit: 1 })).toBe('GDT_LIMITS_INVERTED');
+    expect(code({ contributors: [{ name: 'a', pmiId: 'ghost', sensitivity: 1 }] })).toBe('GDT_PMI_UNKNOWN');
+    const refused = analyze({ contributors: [{ name: 'a', pmiId: 'ghost', sensitivity: 1 }] }).data as unknown as {
+      error: { code: string };
+    };
+    expect(refused.error.code).toBe('GDT_PMI_UNKNOWN');
     const doc = createEmptyDocument();
-    expect(analyze({ contributors: base }, doc).result.document).toBe(doc);
+    expect(analyze({ contributors: linear }, doc).result.document).toBe(doc);
   });
 });
 
@@ -214,7 +239,7 @@ describe('PMI-linked contributors (VC-GDT-36)', () => {
     const params = {
       contributors: [
         { name: 'bore', pmiId: boreId, sensitivity: 1 },
-        { name: 'pin', nominal: 20, upper: -0.007, lower: -0.02, sensitivity: -1, verified: true },
+        { name: 'pin', nominal: 20, upper: -0.007, lower: -0.02, sensitivity: -1 },
       ],
       lowerSpecLimit: 0,
     };
@@ -223,6 +248,10 @@ describe('PMI-linked contributors (VC-GDT-36)', () => {
     expect(first.worstCase.max).toBeCloseTo(0.041, 9);
     expect(first.rss.halfTolerance).toBeCloseTo(0.012349089, 9);
     expect(first.unverified).toBeUndefined();
+    expect(first.contributors.map((c) => [c.source, c.verified])).toEqual([
+      [`pmi ${boreId}`, true],
+      ['typed', true],
+    ]);
     expect(first.reviewRequired).toBe(true);
     expect(first.reviewReason).toContain(boreId);
     const edited = execute(bore.document, 'update_pmi', { pmiId: boreId, tolerance: { type: 'plusMinus', upper: 0.025, lower: 0 } });
@@ -256,22 +285,26 @@ describe('PMI-linked contributors (VC-GDT-36)', () => {
     const run = analyze(
       {
         contributors: [
-          { name: 'r', pmiId: sizeId },
-          { name: 'd', pmiId: locId, unit: 'length' },
+          { name: 'r', pmiId: sizeId, sensitivity: 1 },
+          { name: 'd', pmiId: locId, unit: 'length', sensitivity: 1 },
         ],
       },
       stackDoc,
     ).data;
-    expect(run.mean).toBeCloseTo(3.3 + 20, 9);
-    expect(analyze({ contributors: [{ name: 'r', pmiId: sizeId }] }, stackDoc).data.worstCase.halfTolerance).toBeCloseTo(0.1, 9);
-    const refused = (pmiId: string): string | undefined => analyze({ contributors: [{ name: 'x', pmiId }] }, stackDoc).result.error?.code;
+    expect(run.yMean).toBeCloseTo(3.3 + 20, 9);
+    expect(analyze({ contributors: [{ name: 'r', pmiId: sizeId, sensitivity: 1 }] }, stackDoc).data.worstCase.halfTolerance).toBeCloseTo(
+      0.1,
+      9,
+    );
+    const refused = (pmiId: string): string | undefined =>
+      analyze({ contributors: [{ name: 'x', pmiId, sensitivity: 1 }] }, stackDoc).result.error?.code;
     expect(refused(basicId as string)).toBe('GDT_STACKUP_CONTRIBUTOR_UNTOLERANCED');
     expect(refused(datumId as string)).toBe('GDT_STACKUP_CONTRIBUTOR_UNTOLERANCED');
     const unresolved = JSON.parse(JSON.stringify(stackDoc)) as { pmi: { items: Record<string, { feature: { ofSize?: unknown } }> } };
     delete unresolved.pmi.items[sizeId as string]?.feature.ofSize;
-    expect(analyze({ contributors: [{ name: 'x', pmiId: sizeId }] }, unresolved as unknown as CadDocument).result.error?.code).toBe(
-      'GDT_STACKUP_CONTRIBUTOR_UNTOLERANCED',
-    );
+    expect(
+      analyze({ contributors: [{ name: 'x', pmiId: sizeId, sensitivity: 1 }] }, unresolved as unknown as CadDocument).result.error?.code,
+    ).toBe('GDT_STACKUP_CONTRIBUTOR_UNTOLERANCED');
   });
 });
 
@@ -282,20 +315,11 @@ describe('fastener_tolerance (VC-GDT-35)', () => {
   };
 
   it('FF-01 floating, FF-02 fixed equal split and unequal split', () => {
-    expect(
-      (run({ holeMmc: 6.6, fastenerMmc: 6, type: 'floating' }).data['positionTolerance'] as { eachPart: number }).eachPart,
-    ).toBeCloseTo(0.6, 12);
-    const fixed = run({ holeMmc: 6.6, fastenerMmc: 6, type: 'fixed' }).data['positionTolerance'] as {
-      part1: number;
-      part2: number;
-      total: number;
-    };
+    expect(run({ holeMmc: 6.6, fastenerMmc: 6, type: 'floating' }).data['positionTolerance']).toBeCloseTo(0.6, 12);
+    const fixed = run({ holeMmc: 6.6, fastenerMmc: 6, type: 'fixed' }).data['perPart'] as { part1: number; part2: number };
     expect(fixed.part1).toBeCloseTo(0.3, 12);
     expect(fixed.part2).toBeCloseTo(0.3, 12);
-    const split = run({ holeMmc: 6.6, fastenerMmc: 6, type: 'fixed', split: 0.25 }).data['positionTolerance'] as {
-      part1: number;
-      part2: number;
-    };
+    const split = run({ holeMmc: 6.6, fastenerMmc: 6, type: 'fixed', split: 0.25 }).data['perPart'] as { part1: number; part2: number };
     expect(split.part1).toBeCloseTo(0.15, 12);
     expect(split.part2).toBeCloseTo(0.45, 12);
   });
@@ -312,19 +336,23 @@ describe('fastener_tolerance (VC-GDT-35)', () => {
     expect(run({ holeMmc: 6.6, fastenerMmc: 6, type: 'fixed', statedPosition: 0.2 }).data['statedWithinClearance']).toBe(true);
     expect(run({ holeMmc: 6.6, fastenerMmc: 6, type: 'floating', statedPosition: 0.9 }).data['statedWithinClearance']).toBe(false);
     const flexible = run({ holeMmc: 6.6, fastenerMmc: 6, type: 'fixed', split: 0.9, statedPosition: 0.5 });
-    expect(flexible.result.summary).toContain('virtual condition 6.1');
+    expect(flexible.result.summary).toContain('VC 6.1');
+    expect(flexible.data['statedWithinClearance']).toBe(true);
+    expect(
+      run({ holeMmc: 6.6, fastenerMmc: 6, type: 'fixed', split: 0.9, part: 2, statedPosition: 0.5 }).data['statedWithinClearance'],
+    ).toBe(false);
   });
 
   it('refuses without clearance and for invalid inputs, with codes', () => {
     const code = (params: Record<string, unknown>): string | undefined => run(params).result.error?.code;
     expect(code({ holeMmc: 6, fastenerMmc: 6, type: 'floating' })).toBe('GDT_FASTENER_HOLE_LE_FASTENER');
-    expect(code({ holeMmc: 6.6, fastenerMmc: 6, type: 'floating', holeLmc: 6.5 })).toBe('GDT_FASTENER_INVALID');
-    expect(code({ holeMmc: 6.6, fastenerMmc: 6, type: 'fixed', split: 1 })).toBe('GDT_FASTENER_INVALID');
-    expect(code({ holeMmc: 6.6, fastenerMmc: 6, type: 'fixed', statedPosition: 0 })).toBe('GDT_FASTENER_INVALID');
-    expect(code({ holeMmc: 6.6, fastenerMmc: 6, type: 'fixed', actualSize: 6.7 })).toBe('GDT_FASTENER_INVALID');
-    expect(code({ holeMmc: 6.6, fastenerMmc: 6, type: 'fixed', statedPosition: 0.3, actualSize: 6.5 })).toBe('GDT_FASTENER_INVALID');
+    expect(code({ holeMmc: 6.6, fastenerMmc: 6, type: 'floating', holeLmc: 6.5 })).toBe('GDT_FASTENER_PARAM_INVALID');
+    expect(code({ holeMmc: 6.6, fastenerMmc: 6, type: 'fixed', split: 1 })).toBe('GDT_FASTENER_PARAM_INVALID');
+    expect(code({ holeMmc: 6.6, fastenerMmc: 6, type: 'fixed', statedPosition: -0.1 })).toBe('GDT_FASTENER_PARAM_INVALID');
+    expect(code({ holeMmc: 6.6, fastenerMmc: 6, type: 'fixed', actualSize: 6.7 })).toBe('GDT_FASTENER_PARAM_INVALID');
+    expect(code({ holeMmc: 6.6, fastenerMmc: 6, type: 'fixed', statedPosition: 0.3, actualSize: 6.5 })).toBe('GDT_FASTENER_PARAM_INVALID');
     expect(code({ holeMmc: 6.6, fastenerMmc: 6, type: 'fixed', holeLmc: 6.9, statedPosition: 0.3, actualSize: 7 })).toBe(
-      'GDT_FASTENER_INVALID',
+      'GDT_FASTENER_PARAM_INVALID',
     );
   });
 });

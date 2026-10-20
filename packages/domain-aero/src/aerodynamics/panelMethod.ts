@@ -3,7 +3,7 @@
  * "Foundations of Aerodynamics", §5.10 program VORTEX; Katz & Plotkin §11.4), plus thin-airfoil theory integrals of the mean line.
  */
 
-import { solveLinear } from '@core/model/materialLaws/linalg';
+import { luFactor, luSolve } from './denseLu';
 
 export interface PanelSolution {
   readonly cl: number;
@@ -19,7 +19,8 @@ export interface PanelSolution {
 
 /**
  * Solve the flow at each angle of attack in `alphas` (rad) about a closed contour given clockwise (lower TE -> LE -> upper TE), chord along x.
- * @invariant the influence matrix is built and solved once: γ(α) = cos α γ(0) + sin α γ(π/2) (the boundary condition is linear in α)
+ * @invariant the influence matrix is built and LU-factorised once (Float64Array, RS1 §5); γ(α) = cos α γ(0) + sin α γ(π/2) from two
+ *   right-hand sides on that one factorisation (the boundary condition is linear in α)
  * @failure singular influence matrix -> null
  */
 export function solveVortexPanels(
@@ -33,12 +34,12 @@ export function solveVortexPanels(
   const ys = Array.from({ length: m }, (_, i) => (node(i)[1] + node(i + 1)[1]) / 2);
   const lengths = Array.from({ length: m }, (_, i) => Math.hypot(node(i + 1)[0] - node(i)[0], node(i + 1)[1] - node(i)[1]));
   const angles = Array.from({ length: m }, (_, i) => Math.atan2(node(i + 1)[1] - node(i)[1], node(i + 1)[0] - node(i)[0]));
-  const an = Array.from({ length: m + 1 }, () => new Array<number>(m + 1).fill(0));
-  const at = Array.from({ length: m }, () => new Array<number>(m + 1).fill(0));
+  const size = m + 1;
+  const an = new Float64Array(size * size);
+  const at = new Float64Array(m * size);
   for (let i = 0; i < m; i += 1) {
     const ti = angles[i] as number;
-    const rowN = an[i] as number[];
-    const rowT = at[i] as number[];
+    const row = i * size;
     for (let j = 0; j < m; j += 1) {
       let cn1 = -1;
       let cn2 = 1;
@@ -63,27 +64,26 @@ export function solveVortexPanels(
         ct2 = c + (0.5 * p * f) / sj + ((a * d - c * e) * g) / sj;
         ct1 = 0.5 * c * f - d * g - ct2;
       }
-      rowN[j] = (rowN[j] as number) + cn1;
-      rowN[j + 1] = (rowN[j + 1] as number) + cn2;
-      rowT[j] = (rowT[j] as number) + ct1;
-      rowT[j + 1] = (rowT[j + 1] as number) + ct2;
+      an[row + j] = (an[row + j] as number) + cn1;
+      an[row + j + 1] = (an[row + j + 1] as number) + cn2;
+      at[row + j] = (at[row + j] as number) + ct1;
+      at[row + j + 1] = (at[row + j + 1] as number) + ct2;
     }
   }
-  const kutta = an[m] as number[];
-  kutta[0] = 1;
-  kutta[m] = 1;
-  const atZero = solveLinear(an, [...angles.map((theta) => Math.sin(theta)), 0]);
-  const atRight = solveLinear(an, [...angles.map((theta) => -Math.cos(theta)), 0]);
-  if (atZero === null || atRight === null || [...atZero, ...atRight].some((value) => !Number.isFinite(value))) return null;
+  an[m * size] = 1;
+  an[m * size + m] = 1;
+  const factors = luFactor(an, size);
+  if (factors === null) return null;
+  const atZero = luSolve(factors, [...angles.map((theta) => Math.sin(theta)), 0]);
+  const atRight = luSolve(factors, [...angles.map((theta) => -Math.cos(theta)), 0]);
+  if ([...atZero, ...atRight].some((value) => !Number.isFinite(value))) return null;
   const xMax = Math.max(...nodes.map(([x]) => x));
   const xMin = Math.min(...nodes.map(([x]) => x));
   const chord = xMax - xMin;
-  const panelForces = (gamma: readonly number[], alpha: number): PanelSolution => {
+  const panelForces = (gamma: ArrayLike<number>, alpha: number): PanelSolution => {
     const surface = Array.from({ length: m }, (_, i) => {
-      const tangential = (at[i] as number[]).reduce(
-        (sum, coefficient, j) => sum + coefficient * (gamma[j] as number),
-        Math.cos((angles[i] as number) - alpha),
-      );
+      let tangential = Math.cos((angles[i] as number) - alpha);
+      for (let j = 0; j < size; j += 1) tangential += (at[i * size + j] as number) * (gamma[j] as number);
       return { x: xs[i] as number, y: ys[i] as number, velocityRatio: tangential, cp: 1 - tangential * tangential };
     });
     let fx = 0;

@@ -1,0 +1,15 @@
+{
+  "id": "17-sphere-r2",
+  "family": "primitive",
+  "description": "sphere r=2",
+  "source": "analytic",
+  "formula": "V = 4/3 pi r^3; A = 4 pi r^2",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 33.5103216383,
+  "area": 50.2654824574,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-2, -2, -2], "max": [2, 2, 2] },
+  "faces": 1,
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

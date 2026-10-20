@@ -1,0 +1,19 @@
+{
+  "id": "45-revolve-offset-axis",
+  "family": "revolve",
+  "description": "washer revolved about an axis through (1,2,3)",
+  "source": "analytic",
+  "formula": "Pappus-Guldin: V = 2 pi xbar A; lateral area = sum of 2 pi r_mid L",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 15.7079632679,
+  "area": 62.8318530718,
+  "centroid": [1, 2, 3.5],
+  "bbox": { "min": [-2, -1, 3], "max": [4, 5, 4] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": null,
+    "area": 0.02,
+    "reason": "area of a revolved curved face is summed over display triangles; the volume is closed-form"
+  }
+}

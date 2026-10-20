@@ -1,178 +1,238 @@
-//! Statistics jobs of `llull-compute stats` (03 GDT M5n, TR-GDT-22, RS1 RS-7): `stackup` runs the Monte Carlo of a tolerance stack-up above
-//! the TypeScript cap. Counter-based Philox4x32-10 streams and fixed-order block reductions make the result a pure function of
-//! (seed, samples, inputs): bit-identical for any thread count (VC-GDT-37).
+//! Monte Carlo stack-up job of `llull-compute stats` (aerospace 03 GDT TR-GDT-22, RS1 RS-7).
 //!
-//! Job folder: `job.json` in, `result.json` out (reported with its sha256).
+//! Sample i draws contributor k from Philox4x32-10 counter (i mod 2^32, ⌊i/2^32⌋, ⌊k/2⌋, 0) under the key of the seed, so a sample does
+//! not depend on any other. Statistics are reduced per chunk of [`CHUNK`] samples (sum, then squared deviations from the chunk mean) and
+//! the chunks are merged in index order (Chan et al.), exactly as `packages/core/src/lib/stackupSampling.ts` does: the result is
+//! bit-identical for any thread count, and bit-identical to TypeScript for every program without a trigonometric function.
+//!
+//! Job folder: `job.json` = `{ samples, seed, contributors: [{ centre, half, sigma, distribution }], program, lowerSpecLimit?,
+//! upperSpecLimit? }`; output `stats.json` = `{ samples, mean, std, min, max, below, above, nonFinite, chunks, threads }`.
 
-pub mod expr;
-pub mod mc;
 pub mod philox;
+pub mod program;
 
-use expr::{Expr, Node};
-use llull_protocol::{sha256_hex, Output};
-use mc::{Config, Contributor, Model};
-use serde::Deserialize;
+use llull_protocol::{emit, sha256_hex, Event, Output};
+use philox::{box_muller, key_of, philox4x32, unit_uniform};
+use program::{Program, Step};
+use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 
-/// Largest sample count one job accepts (10^10 draws x contributors is hours of CPU: refuse rather than hang the host).
-pub const MAX_SAMPLES: u64 = 10_000_000_000;
+/// Samples per reduction chunk (the TS `STACKUP_CHUNK`).
+pub const CHUNK: u64 = 4096;
+/// Chunks reduced in parallel between two progress events (bounds memory to one `Stats` per chunk of a block).
+const BLOCK_CHUNKS: u64 = 16_384;
+/// Native sample cap (TR-GDT-22): 2^40 samples keeps every chunk count and Chan product exact in f64.
+pub const MAX_SAMPLES: u64 = 1 << 40;
+const MAX_CONTRIBUTORS: usize = 64;
 
-/// A job failure: stable code + message (the host maps it to its own codes).
+/// A job failure: stable code + message.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JobError {
     pub code: &'static str,
     pub message: String,
 }
 
-fn input(message: impl Into<String>) -> JobError {
-    JobError { code: "NATIVE_JOB_INPUT", message: message.into() }
+fn input_error(message: String) -> JobError {
+    JobError { code: "NATIVE_JOB_INPUT", message }
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ContributorJob {
-    centre: f64,
-    spread: f64,
-    normal: bool,
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Distribution {
+    Normal,
+    Uniform,
 }
 
-#[derive(Deserialize)]
-#[serde(tag = "kind", rename_all = "lowercase")]
-enum ModelJob {
-    Linear { sensitivities: Vec<f64> },
-    Expression { tree: Node },
+#[derive(Debug, Clone, Deserialize)]
+pub struct Contributor {
+    pub centre: f64,
+    pub half: f64,
+    pub sigma: f64,
+    pub distribution: Distribution,
 }
 
-#[derive(Deserialize)]
-struct StackupJob {
-    seed: i64,
-    samples: u64,
-    contributors: Vec<ContributorJob>,
-    model: ModelJob,
-    lower: Option<f64>,
-    upper: Option<f64>,
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatsJob {
+    pub samples: u64,
+    pub seed: u64,
+    pub contributors: Vec<Contributor>,
+    pub program: Vec<Step>,
+    pub lower_spec_limit: Option<f64>,
+    pub upper_spec_limit: Option<f64>,
 }
 
-/// Runs the job in `folder`.
-pub fn run(task: &str, folder: &Path) -> Result<Vec<Output>, JobError> {
-    if task != "stackup" {
-        return Err(JobError { code: "NATIVE_JOB_UNKNOWN", message: format!("unknown stats task '{task}'") });
+/// Statistics of a run (the TS `SamplingStats` plus run metadata).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Stats {
+    pub samples: u64,
+    pub mean: f64,
+    pub std: f64,
+    pub min: f64,
+    pub max: f64,
+    pub below: u64,
+    pub above: u64,
+    pub non_finite: u64,
+    pub chunks: u64,
+    pub threads: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Partial {
+    n: f64,
+    mean: f64,
+    m2: f64,
+    min: f64,
+    max: f64,
+    below: u64,
+    above: u64,
+    non_finite: u64,
+}
+
+/// Chan et al. pairwise merge of `b` into `a` (the TS `merge`, same operation order).
+fn merge(a: Partial, b: Partial) -> Partial {
+    let n = a.n + b.n;
+    let delta = b.mean - a.mean;
+    Partial {
+        n,
+        mean: a.mean + delta * (b.n / n),
+        m2: a.m2 + b.m2 + delta * delta * ((a.n * b.n) / n),
+        min: if b.min < a.min { b.min } else { a.min },
+        max: if b.max > a.max { b.max } else { a.max },
+        below: a.below + b.below,
+        above: a.above + b.above,
+        non_finite: a.non_finite + b.non_finite,
     }
+}
+
+struct Sampler<'a> {
+    job: &'a StatsJob,
+    program: Program,
+    key: [u32; 2],
+}
+
+impl Sampler<'_> {
+    fn draw(&self, index: u64, x: &mut [f64]) {
+        let (low, high) = (index as u32, (index >> 32) as u32);
+        let mut words = [0u32; 4];
+        for (k, contributor) in self.job.contributors.iter().enumerate() {
+            let odd = k & 1;
+            if odd == 0 {
+                words = philox4x32([low, high, (k >> 1) as u32, 0], self.key);
+            }
+            let w1 = words[2 * odd];
+            x[k] = match contributor.distribution {
+                Distribution::Normal => contributor.centre + contributor.sigma * box_muller(w1, words[2 * odd + 1]),
+                Distribution::Uniform => contributor.centre + contributor.half * (2.0 * unit_uniform(w1) - 1.0),
+            };
+        }
+    }
+
+    fn chunk(&self, chunk: u64) -> Partial {
+        let start = chunk * CHUNK;
+        let end = (start + CHUNK).min(self.job.samples);
+        let mut x = vec![0.0; self.job.contributors.len()];
+        let mut stack = self.program.stack();
+        let mut values = Vec::with_capacity((end - start) as usize);
+        let (mut sum, mut min, mut max) = (0.0, f64::INFINITY, f64::NEG_INFINITY);
+        let (mut below, mut above, mut non_finite) = (0u64, 0u64, 0u64);
+        for index in start..end {
+            self.draw(index, &mut x);
+            let y = self.program.evaluate(&x, &mut stack);
+            values.push(y);
+            if !y.is_finite() {
+                non_finite += 1;
+            }
+            sum += y;
+            if y < min {
+                min = y;
+            }
+            if y > max {
+                max = y;
+            }
+            if self.job.lower_spec_limit.is_some_and(|limit| y < limit) {
+                below += 1;
+            }
+            if self.job.upper_spec_limit.is_some_and(|limit| y > limit) {
+                above += 1;
+            }
+        }
+        let n = (end - start) as f64;
+        let mean = sum / n;
+        let mut m2 = 0.0;
+        for y in &values {
+            let d = y - mean;
+            m2 += d * d;
+        }
+        Partial { n, mean, m2, min, max, below, above, non_finite }
+    }
+}
+
+fn validate(job: &StatsJob) -> Result<Program, JobError> {
+    if job.samples < 2 || job.samples > MAX_SAMPLES {
+        return Err(input_error(format!("samples {} outside 2..{MAX_SAMPLES}", job.samples)));
+    }
+    if job.seed > (1 << 53) - 1 {
+        return Err(input_error("seed must be below 2^53".to_string()));
+    }
+    if job.contributors.is_empty() || job.contributors.len() > MAX_CONTRIBUTORS {
+        return Err(input_error(format!("1..{MAX_CONTRIBUTORS} contributors expected")));
+    }
+    if job.contributors.iter().any(|c| !(c.centre.is_finite() && c.half.is_finite() && c.sigma.is_finite())) {
+        return Err(input_error("contributor values must be finite".to_string()));
+    }
+    Program::compile(&job.program, job.contributors.len()).map_err(input_error)
+}
+
+/// Runs the Monte Carlo; `progress(done_chunks, total_chunks)` is called after every block.
+pub fn sample(job: &StatsJob, mut progress: impl FnMut(u64, u64)) -> Result<Stats, JobError> {
+    let program = validate(job)?;
+    let sampler = Sampler { job, program, key: key_of(job.seed) };
+    let chunks = job.samples.div_ceil(CHUNK);
+    let mut total: Option<Partial> = None;
+    let mut first = 0u64;
+    while first < chunks {
+        let last = (first + BLOCK_CHUNKS).min(chunks);
+        let partials: Vec<Partial> = (first..last).into_par_iter().map(|chunk| sampler.chunk(chunk)).collect();
+        for partial in partials {
+            total = Some(match total {
+                None => partial,
+                Some(running) => merge(running, partial),
+            });
+        }
+        progress(last, chunks);
+        first = last;
+    }
+    let t = total.ok_or_else(|| input_error("no samples".to_string()))?;
+    Ok(Stats {
+        samples: job.samples,
+        mean: t.mean,
+        std: (t.m2 / (t.n - 1.0)).sqrt(),
+        min: t.min,
+        max: t.max,
+        below: t.below,
+        above: t.above,
+        non_finite: t.non_finite,
+        chunks,
+        threads: rayon::current_num_threads(),
+    })
+}
+
+/// Runs `llull-compute stats <folder>`: reads `job.json`, writes `stats.json`, one `progress` event per block of chunks.
+pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobError> {
     let path = folder.join("job.json");
     let text =
         fs::read_to_string(&path).map_err(|error| JobError { code: "NATIVE_JOB_IO", message: format!("{}: {error}", path.display()) })?;
-    let job: StackupJob = serde_json::from_str(&text).map_err(|error| input(format!("job.json: {error}")))?;
-    if job.samples == 0 || job.samples > MAX_SAMPLES {
-        return Err(input(format!("samples must be 1 to {MAX_SAMPLES}, got {}", job.samples)));
-    }
-    if job.contributors.is_empty() {
-        return Err(input("at least one contributor is required"));
-    }
-    if job.contributors.iter().any(|c| !c.centre.is_finite() || !c.spread.is_finite() || c.spread < 0.0) {
-        return Err(input("contributor centres and spreads must be finite, spreads not negative"));
-    }
-    let model = match job.model {
-        ModelJob::Linear { sensitivities } if sensitivities.len() == job.contributors.len() => Model::Linear(sensitivities),
-        ModelJob::Linear { sensitivities } => {
-            return Err(input(format!("{} sensitivities for {} contributors", sensitivities.len(), job.contributors.len())))
-        }
-        ModelJob::Expression { tree } => Model::Expression(Expr::build(tree, job.contributors.len()).map_err(input)?),
-    };
-    let contributors: Vec<Contributor> =
-        job.contributors.iter().map(|c| Contributor { centre: c.centre, spread: c.spread, normal: c.normal }).collect();
-    let summary = mc::simulate(&Config {
-        seed: job.seed,
-        samples: job.samples,
-        contributors: &contributors,
-        model: &model,
-        lower: job.lower,
-        upper: job.upper,
-    });
-    if summary.count == 0 {
-        return Err(input("the stack result is not finite for any sample"));
-    }
-    let result = serde_json::json!({
-        "seed": job.seed,
-        "samples": job.samples,
-        "counted": summary.count,
-        "nonFinite": summary.non_finite,
-        "mean": summary.mean,
-        "std": summary.std(),
-        "min": summary.min,
-        "max": summary.max,
-        "below": job.lower.map(|_| summary.below),
-        "above": job.upper.map(|_| summary.above),
-        "prng": "Philox4x32-10, counter [sample, contributor], key = seed; uniform from the top 24 bits; normal by Box-Muller (cosine); fixed 8192-sample blocks merged in order",
-    });
-    let bytes = serde_json::to_vec(&result).map_err(|error| input(error.to_string()))?;
-    let out = folder.join("result.json");
-    fs::write(&out, &bytes).map_err(|error| JobError { code: "NATIVE_JOB_IO", message: format!("{}: {error}", out.display()) })?;
-    Ok(vec![Output { path: "result.json".to_string(), sha256: sha256_hex(&bytes) }])
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn run_job(json: &str) -> Result<serde_json::Value, JobError> {
-        let folder = std::env::temp_dir().join(format!("llull-stats-test-{}-{}", std::process::id(), sha256_hex(json.as_bytes())));
-        fs::create_dir_all(&folder).unwrap();
-        fs::write(folder.join("job.json"), json).unwrap();
-        let outputs = run("stackup", &folder);
-        let result = outputs.map(|outputs| {
-            let bytes = fs::read(folder.join(&outputs[0].path)).unwrap();
-            assert_eq!(outputs[0].sha256, sha256_hex(&bytes));
-            serde_json::from_slice(&bytes).unwrap()
-        });
-        let _ = fs::remove_dir_all(&folder);
-        result
-    }
-
-    #[test]
-    fn a_linear_stack_reports_mean_std_and_limit_counts() {
-        let job = r#"{"seed":1,"samples":20000,"lower":9.0,"upper":11.0,
-            "contributors":[{"centre":10.0,"spread":0.5,"normal":true},{"centre":0.0,"spread":0.25,"normal":false}],
-            "model":{"kind":"linear","sensitivities":[1.0,1.0]}}"#;
-        let result = run_job(job).unwrap();
-        assert_eq!(result["samples"], 20000);
-        assert!((result["mean"].as_f64().unwrap() - 10.0).abs() < 0.02);
-        assert!(result["below"].is_u64() && result["above"].is_u64());
-        let again = run_job(job).unwrap();
-        assert_eq!(result, again);
-    }
-
-    #[test]
-    fn an_expression_stack_runs_and_limits_may_be_absent() {
-        let job = r#"{"seed":-5,"samples":1000,
-            "contributors":[{"centre":3.0,"spread":0.0,"normal":false},{"centre":4.0,"spread":0.0,"normal":false}],
-            "model":{"kind":"expression","tree":{"kind":"call","name":"hypot","args":[{"kind":"var","index":0},{"kind":"var","index":1}]}}}"#;
-        let result = run_job(job).unwrap();
-        assert_eq!(result["mean"].as_f64().unwrap(), 5.0);
-        assert!(result["below"].is_null() && result["above"].is_null());
-    }
-
-    #[test]
-    fn refuses_bad_jobs_with_a_stable_code() {
-        let base = |samples: u64, model: &str, contributors: &str| {
-            format!(r#"{{"seed":1,"samples":{samples},"contributors":{contributors},"model":{model}}}"#)
-        };
-        let one = r#"[{"centre":1.0,"spread":0.1,"normal":true}]"#;
-        let linear = r#"{"kind":"linear","sensitivities":[1.0]}"#;
-        for (job, expect) in [
-            (base(0, linear, one), "samples must be"),
-            (base(MAX_SAMPLES + 1, linear, one), "samples must be"),
-            (base(10, linear, "[]"), "at least one contributor"),
-            (base(10, r#"{"kind":"linear","sensitivities":[1.0,2.0]}"#, one), "2 sensitivities for 1"),
-            (base(10, r#"{"kind":"expression","tree":{"kind":"var","index":3}}"#, one), "out of range"),
-            (base(10, linear, r#"[{"centre":1.0,"spread":-1.0,"normal":true}]"#), "not negative"),
-            ("not json".to_string(), "job.json"),
-        ] {
-            let error = run_job(&job).unwrap_err();
-            assert_eq!(error.code, "NATIVE_JOB_INPUT");
-            assert!(error.message.contains(expect), "{}: {}", expect, error.message);
-        }
-        assert_eq!(run("nope", Path::new(".")).unwrap_err().code, "NATIVE_JOB_UNKNOWN");
-        assert_eq!(run("stackup", Path::new("/nonexistent-llull-stats-folder")).unwrap_err().code, "NATIVE_JOB_IO");
-    }
+    let job: StatsJob = serde_json::from_str(&text).map_err(|error| input_error(format!("job.json: {error}")))?;
+    let stats = sample(&job, |done, total| {
+        let _ = emit(out, &Event::Progress { step: done, total, message: "chunks sampled", detail: None });
+    })?;
+    let bytes = serde_json::to_vec(&stats).map_err(|error| input_error(error.to_string()))?;
+    let output = folder.join("stats.json");
+    fs::write(&output, &bytes).map_err(|error| JobError { code: "NATIVE_JOB_IO", message: format!("{}: {error}", output.display()) })?;
+    Ok(vec![Output { path: "stats.json".to_string(), sha256: sha256_hex(&bytes) }])
 }

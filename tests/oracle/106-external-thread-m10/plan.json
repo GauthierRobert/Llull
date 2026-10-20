@@ -1,0 +1,6 @@
+{
+  "actions": [
+    { "command": "add_cylinder", "params": { "radius": 5, "height": 18 }, "as": "c" },
+    { "command": "add_external_thread", "params": { "target": "$c", "size": "M10" } }
+  ]
+}

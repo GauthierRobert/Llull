@@ -7,6 +7,7 @@ import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
 import { execute } from '../execute';
 import { withoutConfirmations } from '../../lib/withoutConfirmations';
+import { isRecord } from '../../lib/isRecord';
 
 /**
  * @invariant when `execute` appended exactly one step FOR `command`, its `params` become `recordedParams` (a `confirmation` signature never stored); otherwise (query, no-op,
@@ -19,11 +20,12 @@ export function executeRecorded(doc: CadDocument, command: string, params: unkno
   // Only the step this command recorded for itself: a history meta-command (insert_step) appends a step for ANOTHER command, whose params
   // must stay as given.
   if (appended === undefined || appended.name !== command) return result;
+  // Keys the command added to its own recorded params (`CommandResult.recordExtras`, e.g. persistent edge names) survive the swap.
+  const given = isRecord(params) ? params : {};
+  const added = Object.entries(isRecord(appended.params) ? appended.params : {}).filter(([key]) => !Object.hasOwn(given, key));
+  const base = isRecord(recordedParams) && added.length > 0 ? { ...recordedParams, ...Object.fromEntries(added) } : recordedParams;
   return {
     ...result,
-    document: {
-      ...result.document,
-      featureHistory: [...history.slice(0, -1), { ...appended, params: withoutConfirmations(recordedParams) }],
-    },
+    document: { ...result.document, featureHistory: [...history.slice(0, -1), { ...appended, params: withoutConfirmations(base) }] },
   };
 }

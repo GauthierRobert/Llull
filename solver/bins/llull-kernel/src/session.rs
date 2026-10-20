@@ -162,15 +162,16 @@ impl Session {
                     "freeFaces": report.free_faces,
                 }))
             }),
-            "exportStep" => self.export_step(first),
+            "exportStep" => self.export_with(first, "exportStep", export_step),
             other => exchange::dispatch(self, other, args)
                 .or_else(|| queries::dispatch(self, other, args))
                 .unwrap_or_else(|| Reply::fail(UNSUPPORTED, format!("op '{other}'"))),
         }
     }
 
-    fn export_step(&mut self, handles: &Value) -> Reply {
-        let Some(list) = handles.as_array() else { return Reply::fail(BAD_REQUEST, "exportStep expects [handles]") };
+    /// `exportStep`: the exchange text of the resolved handles, null when one is refused or the writer refuses.
+    fn export_with(&mut self, handles: &Value, op: &str, write: fn(&[&Shape]) -> Result<Option<String>, String>) -> Reply {
+        let Some(list) = handles.as_array() else { return Reply::fail(BAD_REQUEST, format!("{op} expects [handles]")) };
         let mut shapes = Vec::with_capacity(list.len());
         for handle in list {
             match self.resolve(handle) {
@@ -180,7 +181,7 @@ impl Session {
             }
         }
         let borrowed: Vec<&Shape> = shapes.iter().map(Rc::as_ref).collect();
-        match export_step(&borrowed) {
+        match write(&borrowed) {
             Ok(text) => Reply::ok(text.map_or(Value::Null, Value::String)),
             Err(error) => Reply::fail(OCC_FAILURE, error),
         }

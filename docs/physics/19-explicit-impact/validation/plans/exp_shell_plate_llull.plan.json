@@ -1,0 +1,44 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_box", "params": { "size": [50, 50, 2], "position": [0, 0, 1], "anchor": "min" }, "as": "plate" },
+  {
+    "command": "create_material",
+    "params": { "name": "steel_like", "density": 0.00785, "color": "#9aa0a6", "metalness": 1, "roughness": 0.4 }
+  },
+  {
+    "command": "add_material_model",
+    "params": {
+      "material": "steel_like",
+      "id": "elastic",
+      "model": { "kind": "elastic_isotropic", "E": { "value": 200000, "unit": "MPa" }, "nu": { "value": 0.3, "unit": "1" } },
+      "basis": "company",
+      "source": { "citation": "test input of this validation case (not a material claim)" }
+    }
+  },
+  {
+    "command": "define_constitutive_set",
+    "params": { "material": "steel_like", "set": { "id": "set", "elastic": "elastic" }, "makeDefault": true }
+  },
+  { "command": "assign_material", "params": { "materialName": "steel_like", "entityIds": ["$plate"] } },
+  {
+    "command": "create_analysis",
+    "params": { "name": "shell_plate", "analysisType": "explicit_dynamics", "unitSystem": "N-mm-t-s" },
+    "as": "an"
+  },
+  { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$plate", "idealization": "solid" } },
+  {
+    "command": "set_explicit_controls",
+    "params": {
+      "analysisId": "$an",
+      "endTime": { "value": 0.003, "unit": "s" },
+      "historyInterval": { "value": 0.00001, "unit": "s" },
+      "mesh": { "kind": "structured_hex", "size": 10 }
+    }
+  },
+  { "command": "set_explicit_shell", "params": { "analysisId": "$an", "entityId": "$plate", "shell": true } },
+  {
+    "command": "set_initial_velocity",
+    "params": { "analysisId": "$an", "entityId": "$plate", "velocity": { "vector": [0, 0, -1], "unit": "m/s" } }
+  },
+  { "command": "add_rigid_wall", "params": { "analysisId": "$an", "name": "floor", "point": [0, 0, 0], "normal": [0, 0, 1] } }
+]

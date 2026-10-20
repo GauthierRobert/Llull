@@ -1,8 +1,9 @@
-//! FE post-processing jobs of `llull-compute post` (RS1 RS-7): `fatigue` (PHY-07 TR-FAT-41, rainflow + Miner damage on every node) and
+//! FE post-processing jobs of `llull-compute post` (RS1 RS-7): `fatigue` (PHY-07 TR-FAT-41, rainflow + Miner damage on every node),
+//! `random` (PHY-09 TR-DYN-44, nodal rms of a random base-excitation response by modal superposition) and
 //! `map` (PHY-04 TR-TMC-24, mesh-to-mesh field mapping on `llull-bvh`). Rust CPU: the numbers are written into documents and decks, so
 //! they must reproduce the TypeScript references bit for bit (RS1 §2 rules 3 and 4).
 //!
-//! Job folder: `job.json` (`{ "task": "fatigue" | "map", ... }`) plus little-endian `f64` buffers written by the host; results are
+//! Job folder: `job.json` (`{ "task": "fatigue" | "map" | "random", ... }`) plus little-endian `f64` buffers written by the host; results are
 //! written next to them and reported with their sha256 (`llull_protocol::Output`).
 
 pub mod damage;
@@ -10,6 +11,7 @@ pub mod fatigue;
 pub mod life;
 pub mod map;
 pub mod rainflow;
+pub mod random;
 pub mod stress;
 
 use llull_protocol::{sha256_hex, Output};
@@ -88,11 +90,19 @@ fn run_map(folder: &Path) -> Result<Vec<Output>, JobError> {
     Ok(vec![write_output(folder, "mapped.f64", &f64_bytes(&flat))?, write_output(folder, "map.json", &report_json)?])
 }
 
+fn run_random(folder: &Path) -> Result<Vec<Output>, JobError> {
+    let job: random::RandomJob = read_json(&folder.join("job.json"))?;
+    let modal = read_f64(&folder.join("modal.f64"))?;
+    let field = random::run(&job, &modal)?;
+    Ok(vec![write_output(folder, "field.f64", &f64_bytes(&field))?])
+}
+
 /// Runs `llull-compute post <task> <folder>`.
 pub fn run(task: &str, folder: &Path) -> Result<Vec<Output>, JobError> {
     match task {
         "fatigue" => run_fatigue(folder),
         "map" => run_map(folder),
-        _ => Err(JobError { code: "NATIVE_JOB_UNKNOWN", message: format!("unknown post task '{task}' (fatigue | map)") }),
+        "random" => run_random(folder),
+        _ => Err(JobError { code: "NATIVE_JOB_UNKNOWN", message: format!("unknown post task '{task}' (fatigue | map | random)") }),
     }
 }

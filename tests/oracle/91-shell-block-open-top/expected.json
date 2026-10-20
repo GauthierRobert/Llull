@@ -1,0 +1,14 @@
+{
+  "id": "91-shell-block-open-top",
+  "family": "shell",
+  "description": "20x10x6 block hollowed to 1.5 walls, top face removed",
+  "source": "analytic",
+  "formula": "V = abc - (a-2t)(b-2t)(c-t)",
+  "kernels": ["occt"],
+  "bodies": 1,
+  "volume": 664.5,
+  "area": 976,
+  "centroid": [0, 0, -0.604401805869],
+  "bbox": { "min": [-10, -5, -3], "max": [10, 5, 3] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

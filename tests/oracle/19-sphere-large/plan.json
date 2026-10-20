@@ -1,0 +1,1 @@
+{ "actions": [{ "command": "add_sphere", "params": { "radius": 10 } }] }

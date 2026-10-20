@@ -82,6 +82,7 @@ function recipeAxes(recipe: ShapeRecipe, place: Placement, scale: number, depth:
     case 'fillet':
     case 'chamfer':
     case 'shell':
+    case 'faceOp':
       return recipeAxes(recipe.source, place, scale, depth + 1);
     case 'place': {
       const frame = { position: recipe.position, rotation: recipe.rotation };

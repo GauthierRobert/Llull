@@ -281,8 +281,23 @@ llull receives and delivers exact geometry; the checks below tell an engineer wh
   The import always completes; verify_exchange_file exits 1 on red. Never hide a red or not-checkable band from the user.
 - **Deliver.** \`llull export_step_ap242 --save part.stp\` (schema ap242 by default, ap214 / ap203 on request) writes products, placed occurrences, names, colours, layers, materials and the validation
   properties of every product and the root assembly, in the DOCUMENT unit (numbers are not converted; the file says the unit), then re-reads them (\`data.selfCheck\` must be green). Pass \`timestamp\`
-  for a reproducible header; the same document and timestamp give identical bytes. \`llull export_iges --save part.igs\` writes B-rep solids (mode faces for legacy CAM). \`export_step_exact\` stays
-  the AP214 form. Exporting bodies that were imported red or not-checkable (or ply solids written from triangles) needs \`acceptUnverified\` with a human signature on export_step_ap242, export_step_exact and export_iges alike: an agent gets XCH_HUMAN_GATE and hands the request over.
+  for a reproducible header; the same document and timestamp give identical bytes. \`llull export_iges --save part.igs\` writes B-rep solids (mode faces for legacy CAM). \`export_step_exact\` is
+  the simple AP214 form (schema ap242 only relabels the header; import_step_exact format iges reads an IGES file without the IGES census). Exporting bodies that were imported red or not-checkable (or ply solids written from triangles) needs \`acceptUnverified\` with a human signature on export_step_ap242, export_step_exact and export_iges alike: an agent gets XCH_HUMAN_GATE and hands the request over.
 - **Minimal sequence.** verify_exchange_file, import_step_exact (read \`data.report.exchange\` and reviewRequired), model, geometric_validation_properties (the values that will be embedded),
   export_step_ap242, then verify_exchange_file on the written file.
+## 13. Structural dynamics: frequency and random response (toolset analysis, PHY-09)
+
+g = 9.80665 m/s^2; ASD levels in g^2/Hz; frequencies in Hz. There is NO default damping and no default modal truncation rule; the 3-sigma
+peak factor is a named default stated in every result; Miles' equation is a quick check, never the answer of record.
+
+- **Quick checks first (no solver).** \`define_vibration_spectrum\` (points + source, or library gevs_component_qual / gevs_component_accept: grade B,
+  results stay unverified) → \`psd_rms\` (grms) → \`sdof_response\` (fnHz + zeta or Q: exact rms and Miles beside it) → \`damping_coefficients\`
+  (Rayleigh alpha / beta from two ratios) → \`shock_response_spectrum\` (half-sine or sampled history, Q).
+- **Random vibration plan.** \`create_analysis\` analysisType random_response with modes (enough to pass 1.5 x the top of the band) →
+  \`set_part_idealization\` → \`add_fea_constraint\` fixed on the base faces → \`set_dynamic_damping\` (cited) → \`set_base_excitation\` (direction +
+  spectrum) → \`set_frequency_sweep\` → \`add_result_probe\` (a_x/y/z in g, u_x/y/z_rel, s_xx/yy/zz) → \`check_structural_dynamics\` (no error) →
+  the fea_mesh and fea_solve transports (modes by CalculiX, response by llull; the nodal rms field runs in llull-compute when installed) →
+  \`dynamic_report\` → \`equivalent_static_load_case\` into a static case → \`compute_margins\` → \`check_structural_dynamics\`.
+  frequency_response: same set-up with loads or \`set_base_excitation\` amplitudeG; \`dynamic_report\` gives the peaks and half-power Q.
+- Report results as "computed by llull, not approved": every dynamic result carries reviewRequired and its unverified reasons.
 `;
