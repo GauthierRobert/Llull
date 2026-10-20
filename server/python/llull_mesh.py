@@ -3,12 +3,14 @@ llull FE mesher (bridge op `mesh`): Gmsh tetrahedral meshing of the analysed sol
 
 Request (all lengths in DOCUMENT units; `lengthScale` converts to the analysis unit, the output is in the analysis unit):
   {"op": "mesh", "lengthScale": 1.0,
-   "parts": [{"entityId": "box-1", "geometry": {"kind": "step", "stepBase64": "..."} | {"kind": "stl", "stlBase64": "..."}}],
-   "targets": [{"key": "C_c1", "entityId": "box-1" | null, "facesNear": [[x,y,z]], "edgesNear": [...], "pointsNear": [...]}],
+   "parts": [{"entityId": "box-1", "geometry": {"kind": "step", "stepBase64": "..."} | {"kind": "stl", "stlBase64": "..."},
+              "faces": [{"index": 0, "area": 1.0, "centroid": [x,y,z]}]}],          (optional, kernel B-rep faces: TR-FEA-32 face map)
+   "targets": [{"key": "C_c1", "entityId": "box-1" | null, "facesNear": [[x,y,z]], "faceIndices": [0], "edgesNear": [...], "pointsNear": [...]}],
    "controls": {"order": 1 | 2, "globalSize": 5.0, "minSize": 1.0, "refinements": [{"key": "R_0", "size": 1.0}]}}
   (`geometry` + `entityId` at the top level is accepted for a single part; `stlBase64` is a binary STL.)
 Response: {"ok": true, "mesher", "mesherVersion", "nodes": [[id,x,y,z]], "blocks": [{"type","entityId","elements":[[id,n1..]]}],
-  "nodeSets": {key: [ids]}, "faceSets": {key: [[elementId, ccxFaceLabel]]}, "targets": {key: {"residual"}}}
+  "nodeSets": {key: [ids]}, "faceSets": {key: [[elementId, ccxFaceLabel]]}, "targets": {key: {"residual"}},
+  "faceMap": [{"entityId", "faceIndex", "tag", "residual"}]}   (faceMap only for parts given `faces`; STEP geometry, separate bonding)
 Errors: {"ok": false, "code": "FEA_*", "error": "..."} (see MeshError).
 
 Every entity is meshed in its own Gmsh model (separate volumes, no shared nodes); ids are global and contiguous (1..n).
@@ -25,6 +27,8 @@ TET4, TET10, TRI3, TRI6 = 4, 11, 2, 9
 CLASSIFY_ANGLE = math.radians(40.0)
 AMBIGUOUS_REL = 1e-6
 UNRESOLVED_REL = 1e-3
+# TR-FEA-32: a kernel face and a Gmsh surface are the same face when area and centroid agree to this fraction (of the area / of the model diagonal)
+FACE_MAP_REL = 1e-6
 # CalculiX tet face labels over 0-based corner indices: 1 = 1-2-3, 2 = 1-4-2, 3 = 2-4-3, 4 = 3-4-1
 CCX_FACES = ((1, (0, 1, 2)), (2, (0, 3, 1)), (3, (1, 3, 2)), (4, (2, 3, 0)))
 
@@ -162,6 +166,33 @@ def _faces_of(gmsh, region_of, points, key, entity_id):
     return resolved, residual
 
 
+def _face_map(gmsh, region_of, refs, scale, entity_id):
+    """Kernel face index -> (Gmsh surface tag, centroid residual) by area and centroid (TR-FEA-32). A face with no candidate is left out
+    (its targets fall back to the nearest-surface resolution); more than one candidate is AMBIGUOUS_FACE_MAP."""
+    box = gmsh.model.getBoundingBox(-1, -1)
+    diag = _dist(box[:3], box[3:]) or 1.0
+    surfaces = []
+    for surface in region_of:
+        surfaces.append((surface, gmsh.model.occ.getMass(2, surface), gmsh.model.occ.getCenterOfMass(2, surface)))
+    mapped = {}
+    for ref in refs:
+        area = float(ref["area"]) * scale * scale
+        centre = [float(c) * scale for c in ref["centroid"]]
+        found = []
+        for surface, surface_area, surface_centre in surfaces:
+            distance = _dist(centre, surface_centre)
+            if abs(surface_area - area) <= FACE_MAP_REL * area and distance <= FACE_MAP_REL * diag:
+                found.append((surface, distance))
+        if len(found) > 1:
+            raise MeshError(
+                "AMBIGUOUS_FACE_MAP",
+                "face %s of '%s' matches Gmsh surfaces %s by area and centroid" % (ref["index"], entity_id, [s for s, _ in found]),
+            )
+        if found:
+            mapped[int(ref["index"])] = found[0]
+    return mapped
+
+
 def _edges_of(gmsh, points, key, entity_id, curves=None):
     diag = _dist(gmsh.model.getBoundingBox(-1, -1)[:3], gmsh.model.getBoundingBox(-1, -1)[3:]) or 1.0
     resolved, residual = set(), 0.0
@@ -216,14 +247,19 @@ def _size_fields(gmsh, controls, refinements, scale):
         gmsh.option.setNumber("Mesh.MeshSizeMin", float(controls["minSize"]) * scale)
 
 
-def _resolve_targets(gmsh, geometry_kind, region_of, curves, targets, controls, scale, entity_id):
-    """Targets of one entity -> resolved faces / edges / points + the refinement fields they define."""
+def _resolve_targets(gmsh, geometry_kind, region_of, curves, targets, controls, scale, entity_id, face_map=None):
+    """Targets of one entity -> resolved faces / edges / points + the refinement fields they define. With a `face_map` a target that names
+    kernel `faceIndices` all of which are mapped takes those surfaces instead of the nearest surface of its `facesNear` points."""
     resolved = {}
     for target in targets:
         key = target["key"]
         faces, residual, edges = set(), 0.0, set()
+        indices = target.get("faceIndices") or []
         if target.get("facesNear"):
+            # always run the point resolution: it still reports FEA_TARGET_UNRESOLVED / FEA_TARGET_AMBIGUOUS and gives the residual
             faces, residual = _faces_of(gmsh, region_of, [[c * scale for c in p] for p in target["facesNear"]], key, entity_id)
+        if face_map and indices and all(int(i) in face_map for i in indices):
+            faces = {face_map[int(i)][0] for i in indices}
         if target.get("edgesNear"):
             if geometry_kind != "step":
                 raise MeshError("FEA_TARGET_UNRESOLVED", "target %s: edgesNear needs exact STEP geometry (use the OCC kernel)" % key)
@@ -310,9 +346,15 @@ def _mesh_part(gmsh, part, targets, controls, scale, workdir):
         region_of = _load_stl(gmsh, path + ".stl")
     else:
         raise MeshError("FEA_MESH_FAILED", "unknown geometry kind %r" % geometry.get("kind"))
-    resolved, refinements = _resolve_targets(gmsh, geometry["kind"], region_of, None, targets, controls, scale, entity_id)
+    refs = part.get("faces") or []
+    face_map = _face_map(gmsh, region_of, refs, scale, entity_id) if refs and geometry["kind"] == "step" else None
+    resolved, refinements = _resolve_targets(gmsh, geometry["kind"], region_of, None, targets, controls, scale, entity_id, face_map)
     _generate(gmsh, controls, refinements, scale, entity_id)
-    return _extract(gmsh, [tag for _, tag in gmsh.model.getEntities(3)], region_of, controls, entity_id, resolved)
+    raw = _extract(gmsh, [tag for _, tag in gmsh.model.getEntities(3)], region_of, controls, entity_id, resolved)
+    raw["face_map"] = [
+        {"entityId": entity_id, "faceIndex": index, "tag": tag, "residual": residual} for index, (tag, residual) in sorted((face_map or {}).items())
+    ]
+    return raw
 
 
 def _boundary_tags(gmsh, dim_tags):
@@ -486,6 +528,7 @@ def op_mesh(request):
             "nodeSets": node_sets,
             "faceSets": face_sets,
             "targets": residuals,
+            "faceMap": [entry for raw in raws for entry in raw.get("face_map", [])],
         }
     finally:
         gmsh.finalize()

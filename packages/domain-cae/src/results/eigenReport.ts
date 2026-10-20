@@ -10,19 +10,19 @@ interface ModalMode {
   readonly participation?: Vec3;
   /** Effective modal mass per axis, in the analysis mass unit, when printed. */
   readonly effectiveMass?: Vec3;
-  /** Effective modal mass over the total effective mass of the model, per axis (0..1), when both were printed. */
-  readonly effectiveMassFraction?: Vec3;
+  /** Effective modal mass over the TOTAL EFFECTIVE MASS table of ccx, per axis (0..1). That table is the sum over the EXTRACTED modes (not the model mass), so this is a share of the extracted sum. */
+  readonly fractionOfExtractedSum?: Vec3;
 }
 
 export interface ModalReport {
   readonly kind: 'modal';
   readonly modes: readonly ModalMode[];
   readonly totalEffectiveMass: Vec3 | null;
-  /** Share of the total mass per axis moving in the extracted modes (sum of the fractions), when masses were printed. */
-  readonly cumulativeMassFraction: Vec3 | null;
   readonly massUnit: string;
   /** Modes with a frequency at or below the rigid-body threshold: the model is not fully restrained. */
   readonly rigidBodyModes: number;
+  /** Reader notes of the `.dat` (a mass table that was printed but could not be read). */
+  readonly warnings: readonly string[];
 }
 
 export interface BucklingReport {
@@ -97,17 +97,16 @@ export function eigenReport(analysis: AnalysisCase, results: FeResultsArtifact):
       frequencyHz: row[3] ?? Number.NaN,
       ...(factor !== undefined ? { participation: factor } : {}),
       ...(mass !== undefined ? { effectiveMass: mass } : {}),
-      ...(share !== undefined ? { effectiveMassFraction: share } : {}),
+      ...(share !== undefined ? { fractionOfExtractedSum: share } : {}),
     };
   });
-  const shares = modes.flatMap((mode) => (mode.effectiveMassFraction === undefined ? [] : [mode.effectiveMassFraction]));
   return {
     kind: 'modal',
     modes,
     totalEffectiveMass: total,
-    cumulativeMassFraction: shares.length === 0 ? null : perAxis((axis) => shares.reduce((sum, value) => sum + (value[axis] ?? 0), 0)),
     massUnit: MASS_UNITS[analysis.unitSystem],
     rigidBodyModes: modes.filter((mode) => mode.frequencyHz <= threshold).length,
+    warnings: results.dat?.warnings ?? [],
   };
 }
 
@@ -119,9 +118,12 @@ export function eigenNote(report: ModalReport | BucklingReport): string {
       : `critical buckling load = ${Number(report.criticalFactor.toPrecision(6))} x the applied load (mode ${report.criticalMode}); linear buckling, no imperfections`;
   const parts: string[] = [];
   if (report.rigidBodyModes > 0) parts.push(`${report.rigidBodyModes} rigid-body mode(s): the model is not fully restrained`);
-  if (report.cumulativeMassFraction !== null)
+  if (report.totalEffectiveMass !== null && report.modes.length > 0 && report.modes.every((mode) => mode.effectiveMass !== undefined)) {
+    const shares = [0, 1, 2].map((axis) => report.modes.reduce((sum, mode) => sum + (mode.fractionOfExtractedSum?.[axis] ?? 0), 0));
     parts.push(
-      `mass participation x/y/z ${report.cumulativeMassFraction.map((share) => `${Math.round(share * 1000) / 10}%`).join(' / ')} of the model mass`,
+      `extracted modes carry x/y/z ${shares.map((share) => `${Math.round(share * 1000) / 10}%`).join(' / ')} of ccx's TOTAL EFFECTIVE MASS (the sum over the extracted modes, not the model mass)`,
     );
+  }
+  parts.push(...report.warnings);
   return parts.join('; ');
 }

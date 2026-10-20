@@ -3,6 +3,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { ExecutionContext } from '@core/commands/types';
 import { feRemediation } from '../shared/feCodes';
+import { caseOf } from '../shared/access';
 import { marginTable, type MarginRow } from './computeMargins';
 
 export interface MarginCheckItem {
@@ -31,7 +32,8 @@ const describeRow = (row: MarginRow): string =>
  * FEA_DISPOSITION_PENDING (warning for FAIL rows without a valid human disposition). Empty when no margin can be computed (stale, unverified, no allowable): the other checks name those problems.
  */
 export function marginItems(doc: CadDocument, analysisId: string, ctx: ExecutionContext | undefined): MarginCheckItem[] {
-  const table = marginTable(doc, analysisId, {}, ctx);
+  const band = caseOf(doc, analysisId)?.marginalBand;
+  const table = marginTable(doc, analysisId, band === undefined ? {} : { marginalBand: band }, ctx);
   if ('code' in table) return [];
   const items: MarginCheckItem[] = [];
   const failed = table.rows.filter((row) => row.status === 'FAIL');
@@ -43,11 +45,15 @@ export function marginItems(doc: CadDocument, analysisId: string, ctx: Execution
         ...failed.map((row) => row.rowId),
       ]),
     );
-  items.push(
-    item('FEA_MARGINAL_BAND_UNSET', 'warning', 'no marginalBand is stated, so no row can be MARGINAL: ask the owner for a band', [
-      analysisId,
-    ]),
-  );
+  if (band === undefined)
+    items.push(
+      item(
+        'FEA_MARGINAL_BAND_UNSET',
+        'warning',
+        'no marginalBand is stated, so no row can be MARGINAL: ask the owner for a band and record it with set_margin_band',
+        [analysisId],
+      ),
+    );
   if (pending.length > 0)
     items.push(
       item(

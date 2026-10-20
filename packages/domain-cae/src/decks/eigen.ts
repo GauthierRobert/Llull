@@ -9,12 +9,17 @@ const DEFAULT_MODES = 6;
 
 const modesOf = (ctx: DeckContext): number => Math.max(1, Math.round(ctx.analysis.modes ?? DEFAULT_MODES));
 
-/** Data line of `*FREQUENCY`: `n`, or `n, [min], [max]` for a band (cycles/time = Hz). */
+/** Lower bound (Hz) written for a case without supports: the stiffness matrix is singular, so the eigenproblem is shifted below zero. A llull choice, not verified against a real ccx run. */
+const FREE_FREE_LOWER_BOUND_HZ = -1;
+
+/** Data line of `*FREQUENCY`: `n`, or `n, [min], [max]` for a band (cycles/time = Hz); a supportless case without a stated minimum gets a small negative one. */
 function frequencyLine(ctx: DeckContext): string {
   const band = ctx.analysis.frequencyRangeHz;
-  if (band === undefined) return num(modesOf(ctx));
-  const fields = [num(modesOf(ctx)), band.min === undefined ? '' : num(band.min)];
-  if (band.max !== undefined) fields.push(num(band.max));
+  const free = ctx.analysis.constraintOrder.length === 0;
+  if (band === undefined && !free) return num(modesOf(ctx));
+  const minimum = band?.min ?? (free ? FREE_FREE_LOWER_BOUND_HZ : undefined);
+  const fields = [num(modesOf(ctx)), minimum === undefined ? '' : num(minimum)];
+  if (band?.max !== undefined) fields.push(num(band.max));
   return fields.join(', ');
 }
 
@@ -34,20 +39,40 @@ export function modalStep(ctx: DeckContext): DeckSections {
 }
 
 /**
- * Buckling: ONE `*BUCKLE, <n>` step holding the constraints and the loads of the first load case (CalculiX takes the reference load of
- * a buckling step from the step itself; a preceding `*STATIC` step is a pre-stress, not the reference). Buckling factors multiply that load
- * pattern; they are in the `.dat` (`B U C K L I N G   F A C T O R   O U T P U T`), the mode shapes in the `.frd`.
- * @failure no load -> FEA_NO_LOADS; unresolved targets -> FEA_TARGET_UNRESOLVED
+ * Buckling. Without a `preloadLoadCase`: ONE `*BUCKLE, <n>` step holding the constraints and the loads of the first load case (the reference load,
+ * which the factors multiply). With one: a `*STATIC` step first (constraints and the loads of the preload case, no output), then the `*BUCKLE` step
+ * with the loads of the first OTHER load case added on top (`*CLOAD` / `*DLOAD` without `OP=NEW`, so the preload stays): the preload stresses the
+ * structure and is not multiplied. The preload layout follows the ccx manual's buckling example and is NOT verified against a real run here. Buckling
+ * factors are in the `.dat` (`B U C K L I N G   F A C T O R   O U T P U T`), the mode shapes in the `.frd`.
+ * @failure no load / no reference load case besides the preload -> FEA_NO_LOADS; unresolved targets -> FEA_TARGET_UNRESOLVED
  */
 export function bucklingSteps(ctx: DeckContext): DeckSections {
   if (ctx.analysis.loadOrder.length === 0)
     return refuse('FEA_NO_LOADS', `buckling analysis '${ctx.analysisId}' has no load: the buckling factor multiplies the applied load`, [
       ctx.analysisId,
     ]);
-  const loadCase = loadCasesOf(ctx.analysis)[0]?.name ?? 'LC1';
-  const mechanical = mechanicalStepLines(ctx, loadCase);
+  const preload = ctx.analysis.preloadLoadCase;
+  const cases = loadCasesOf(ctx.analysis).filter(({ name }) => name !== preload);
+  const loadCase = cases[0]?.name;
+  if (loadCase === undefined)
+    return refuse(
+      'FEA_NO_LOADS',
+      `buckling analysis '${ctx.analysisId}' has no load case besides the preload '${preload ?? ''}': nothing to scale`,
+      [ctx.analysisId],
+    );
+  const lines: string[] = [];
+  if (preload !== undefined) {
+    const preloaded = mechanicalStepLines(ctx, preload);
+    if (isDeckRefusal(preloaded)) return preloaded;
+    lines.push(`** buckling preload (not scaled): load case ${commentText(preload)}`, '*STEP', '*STATIC');
+    lines.push(...preloaded.text.split('\n').filter((line) => line !== ''), '*END STEP');
+  }
+  const mechanical =
+    preload === undefined
+      ? mechanicalStepLines(ctx, loadCase)
+      : mechanicalStepLines(ctx, loadCase, { scale: () => 1, parameters: '', boundary: false });
   if (isDeckRefusal(mechanical)) return mechanical;
-  const lines = [`** buckling reference load case ${commentText(loadCase)}`, '*STEP', '*BUCKLE', num(modesOf(ctx))];
+  lines.push(`** buckling reference load case ${commentText(loadCase)}`, '*STEP', '*BUCKLE', num(modesOf(ctx)));
   lines.push(...mechanical.text.split('\n').filter((line) => line !== ''));
   lines.push('*NODE FILE', 'U', '*END STEP');
   return { text: linesText(lines) };

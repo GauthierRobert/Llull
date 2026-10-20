@@ -34,6 +34,7 @@ function metric(values: readonly number[], outside: (value: number) => boolean):
 
 const TRIANGLES: ReadonlySet<string> = new Set(['CPS3', 'CPS6', 'S3', 'S6']);
 const QUADS: ReadonlySet<string> = new Set(['CPS4', 'CPS8', 'S4', 'S8']);
+const TETS: ReadonlySet<string> = new Set(['C3D4', 'C3D10']);
 
 /**
  * Quality of every element. Tetrahedra (C3D4 / C3D10): `tet_scaled_jacobian` (`J sqrt(2) / lambdaMax`, 1 regular, <= 0 inverted), `tet_aspect_ratio`
@@ -49,7 +50,8 @@ export function meshQuality(mesh: FeMeshArtifact): QualitySummary {
   let inverted = 0;
   for (const block of mesh.blocks)
     for (const element of block.elements) {
-      const count = TRIANGLES.has(block.type) ? 3 : QUADS.has(block.type) ? 4 : 4;
+      if (!TRIANGLES.has(block.type) && !QUADS.has(block.type) && !TETS.has(block.type)) continue;
+      const count = TRIANGLES.has(block.type) ? 3 : 4;
       const corners = element.slice(1, 1 + count).map((id) => coordinates.get(id));
       if (corners.length < count || corners.some((corner) => corner === undefined)) continue;
       const [a, b, c, d] = corners as [Vec3, Vec3, Vec3, Vec3];

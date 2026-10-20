@@ -6,6 +6,7 @@ import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { caseOf, withCase } from '../shared/access';
 import { analysisIdSchema } from '../shared/schemas';
+import { analysisInputHash } from '../hash/inputHash';
 import { marginDispositionPayload } from './disposition';
 import { marginQueryShape, marginTable } from './computeMargins';
 import { refuseMarginsAs } from './refusal';
@@ -55,7 +56,13 @@ export const disposeMargin = defineCommand({
     const resultsHash = String(table.data['resultsHash']);
     const signed = port.verify(
       signature,
-      marginDispositionPayload(analysisId, { rowKey, status: row.status, ms: row.ms }, decision, justification, resultsHash),
+      marginDispositionPayload(
+        analysisId,
+        { rowKey, status: row.status, ms: row.ms, inputHash: analysisInputHash(doc, analysisId, 'full') },
+        decision,
+        justification,
+        resultsHash,
+      ),
     );
     if (signed === null)
       return fail('FEA_HUMAN_GATE', 'the signature does not verify for this disposition: hand over to the qualified reviewer');
@@ -71,7 +78,7 @@ export const disposeMargin = defineCommand({
     return changed(
       withCase(doc, next),
       `dispose_margin: '${rowId}' (${rowKey}) ${row.status} ${decision} by ${signed.signer} (signature ${signed.signatureId}) on results ${resultsHash.slice(0, 12)}; the status stays ${row.status}.`,
-      [rowKey],
+      [analysisId],
     );
   },
 });

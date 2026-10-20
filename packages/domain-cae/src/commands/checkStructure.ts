@@ -49,7 +49,11 @@ function eigenSetupItems(analysis: AnalysisCase): StructureItem[] {
       items.push(item('FEA_NO_CONSTRAINTS', 'error', 'no support: a buckling analysis of a free model is singular', [id]));
     if (analysis.loadOrder.length === 0)
       items.push(item('FEA_NO_LOADS', 'error', 'no load: the buckling factor multiplies the applied reference load', [id]));
-    const cases = [...new Set(analysis.loadOrder.flatMap((loadId) => analysis.loads[loadId]?.loadCase ?? []))];
+    const cases = [...new Set(analysis.loadOrder.flatMap((loadId) => analysis.loads[loadId]?.loadCase ?? []))].filter(
+      (name) => name !== analysis.preloadLoadCase,
+    );
+    if (analysis.preloadLoadCase !== undefined && cases.length === 0)
+      items.push(item('FEA_NO_LOADS', 'error', `no load case besides the preload '${analysis.preloadLoadCase}': nothing to scale`, [id]));
     if (cases.length > 1)
       items.push(
         item(
@@ -138,7 +142,9 @@ function meshItems(doc: CadDocument, analysis: AnalysisCase, trust: Trust): Stru
         item(
           'FEA_MESH_ADEQUACY',
           'warning',
-          `part '${part.entityId}': about ${Number(part.elementsAcross.toPrecision(2))} element edge(s) across its thinnest dimension (${Number(part.thinnestExtent.toPrecision(4))} ${analysis.unitSystem.split('-')[1] ?? ''} over a mean edge of ${Number(part.meanEdge.toPrecision(4))}); bending is under-resolved`,
+          `part '${part.entityId}': about ${Number(part.elementsAcross.toPrecision(2))} element edge(s) across its thinnest bounding-box dimension (${Number(part.thinnestExtent.toPrecision(4))} ${analysis.unitSystem.split('-')[1] ?? ''} over a mean edge of ${Number(part.meanEdge.toPrecision(4))}); ` +
+            (heat ? 'the temperature gradient across that dimension is under-resolved' : 'bending is under-resolved') +
+            '. Heuristic: the axis-aligned bounding box can miss a thin wall of a rotated or curved part and flag a thick, slender one',
           [part.entityId],
         ),
       );

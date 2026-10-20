@@ -114,6 +114,7 @@ describe('timeoutS bounds (review finding 9)', () => {
       },
       exportDeck: () => Promise.resolve(ok('')),
       importField: () => Promise.resolve(ok('')),
+      importResults: () => Promise.resolve(ok('')),
     };
     const deps = { port: null, allowCodeExecution: false, getDoc: createEmptyDocument, applyCommand: () => ok(''), fea: port };
     for (const timeoutS of [1e12, 0.001, 30]) await applyExchangeToolCall('fea_solve', { analysisId: 'an', timeoutS }, deps);

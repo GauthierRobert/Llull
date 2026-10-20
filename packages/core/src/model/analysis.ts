@@ -494,6 +494,10 @@ export interface AnalysisCase {
   readonly topologyOrder?: readonly string[];
   /** Margin dispositions by row id (human gate). */
   readonly dispositions: Readonly<Record<string, Disposition>>;
+  /** buckling only: load case applied as a `*STATIC` preload before the `*BUCKLE` step and NOT scaled (`set_buckling_preload`); absent = no preload. */
+  readonly preloadLoadCase?: string;
+  /** Marginal band in margin-of-safety units stated by the owner (`set_margin_band`); absent = none (no default, FR-FEA-31). */
+  readonly marginalBand?: number;
 }
 
 export interface AnalysisModel {
@@ -522,6 +526,13 @@ export interface FeMeshArtifact {
   readonly targets: Readonly<Record<string, { readonly residual: number }>>;
   /** Parts meshed from a faceted tessellation that has curved faces (polygons, not B-rep): stresses at curved features are off by several %. */
   readonly facetedParts?: readonly EntityId[];
+  /** TR-FEA-32 face map: kernel face index -> mesher surface tag with the centroid residual (analysis length unit); absent when the mesher got no kernel faces. */
+  readonly faceMap?: readonly {
+    readonly entityId: EntityId;
+    readonly faceIndex: number;
+    readonly tag: number;
+    readonly residual: number;
+  }[];
 }
 
 export interface FeResultsArtifact {
@@ -539,6 +550,8 @@ export interface FeResultsArtifact {
   }[];
   readonly dat?: {
     readonly tables: readonly { readonly title: string; readonly time: number; readonly rows: readonly (readonly number[])[] }[];
+    /** Reader notes: a table whose heading was printed but whose rows could not be read (dropped, never silently). */
+    readonly warnings?: readonly string[];
   };
   /** Nonlinear solves only: the increments the solver took (`.sta`). */
   readonly convergence?: readonly FeConvergenceRow[];

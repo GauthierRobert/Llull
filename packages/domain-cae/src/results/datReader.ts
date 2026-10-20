@@ -6,18 +6,23 @@ type Dat = NonNullable<FeResultsArtifact['dat']>;
 
 const TITLE = /\bfor (?:set|element set)\b.*\band time\s+(\S+)/i;
 
-/** Eigenvalue tables: the heading spaced out by CalculiX, the title the table is stored under, and the numbers on each row. */
+/**
+ * Eigenvalue tables: the heading spaced out by CalculiX, the title the table is stored under, and the numbers on each row. The mass tables
+ * (`exact: false`) accept rows of AT LEAST `columns` numbers: ccx prints six components (x, y, z translation, then rotation) where the three
+ * translations are read first; all printed numbers are kept.
+ */
 const EIGEN_TABLES = [
   {
     heading: /E I G E N V A L U E\s+O U T P U T/,
     title: 'eigenvalues (mode, eigenvalue, real part rad/time, frequency cycles/time, imaginary part)',
     columns: 5,
+    exact: true,
   },
-  { heading: /B U C K L I N G\s+F A C T O R\s+O U T P U T/, title: 'buckling factors (mode, factor)', columns: 2 },
+  { heading: /B U C K L I N G\s+F A C T O R\s+O U T P U T/, title: 'buckling factors (mode, factor)', columns: 2, exact: true },
   /** Modal mass tables of a `*FREQUENCY` step (x, y, z translations); `total` precedes `effective` because its heading contains the other. */
-  { heading: /T O T A L\s+E F F E C T I V E\s+M A S S/, title: 'total effective mass (x, y, z)', columns: 3 },
-  { heading: /P A R T I C I P A T I O N\s+F A C T O R S/, title: 'participation factors (mode, x, y, z)', columns: 4 },
-  { heading: /E F F E C T I V E\s+(?:M O D A L\s+)?M A S S/, title: 'effective modal mass (mode, x, y, z)', columns: 4 },
+  { heading: /T O T A L\s+E F F E C T I V E\s+M A S S/, title: 'total effective mass (x, y, z)', columns: 3, exact: false },
+  { heading: /P A R T I C I P A T I O N\s+F A C T O R S/, title: 'participation factors (mode, x, y, z)', columns: 4, exact: false },
+  { heading: /E F F E C T I V E\s+(?:M O D A L\s+)?M A S S/, title: 'effective modal mass (mode, x, y, z)', columns: 4, exact: false },
 ] as const;
 
 /** Tables dropped when CalculiX prints the heading without any row under it (the eigenvalue and buckling tables are always kept). */
@@ -41,18 +46,19 @@ const numbersOf = (line: string): number[] | null => {
 export function parseDat(text: string): Dat {
   const tables: { title: string; time: number; rows: number[][] }[] = [];
   let open: (typeof tables)[number] | null = null;
-  let eigen: { table: (typeof tables)[number]; columns: number } | null = null;
+  let eigen: { table: (typeof tables)[number]; columns: number; exact: boolean } | null = null;
   for (const line of text.split(/\r?\n/)) {
     const heading = EIGEN_TABLES.find((candidate) => candidate.heading.test(line));
     if (heading !== undefined) {
       open = null;
-      eigen = { table: { title: heading.title, time: 0, rows: [] }, columns: heading.columns };
+      eigen = { table: { title: heading.title, time: 0, rows: [] }, columns: heading.columns, exact: heading.exact };
       tables.push(eigen.table);
       continue;
     }
     if (eigen !== null) {
       const values = numbersOf(line);
-      if (values !== null && values.length === eigen.columns) eigen.table.rows.push(values);
+      if (values !== null && (eigen.exact ? values.length === eigen.columns : values.length >= eigen.columns))
+        eigen.table.rows.push(values);
       else if (eigen.table.rows.length > 0) eigen = null;
       else continue;
       if (eigen !== null) continue;
@@ -68,5 +74,10 @@ export function parseDat(text: string): Dat {
     if (values === null) open = null;
     else open.rows.push(values);
   }
-  return { tables: tables.filter((table) => table.rows.length > 0 || !OPTIONAL_TABLES.some((title) => table.title.startsWith(title))) };
+  const dropped = tables.filter((table) => table.rows.length === 0 && OPTIONAL_TABLES.some((title) => table.title.startsWith(title)));
+  const warnings = dropped.map(
+    (table) =>
+      `the heading of '${table.title.split(' (')[0]}' is present but no row of it could be read (a ccx layout this reader does not know)`,
+  );
+  return { tables: tables.filter((table) => !dropped.includes(table)), ...(warnings.length > 0 ? { warnings } : {}) };
 }
