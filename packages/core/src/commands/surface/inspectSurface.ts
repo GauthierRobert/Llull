@@ -5,6 +5,7 @@ import type { CommandResult } from '../types';
 import { report } from '../noop';
 import { surfaceDomain } from '../../lib/nurbs/surface';
 import { surfacePoleExtent } from '../../geometry/nurbsSurface';
+import { sheetArea } from '../../geometry/sheetArea';
 import { sig, sigVec } from './surfaceShared';
 
 const interior = (knots: ReadonlyArray<number>, multiplicities: ReadonlyArray<number>, degree: number): unknown[] =>
@@ -14,7 +15,7 @@ const interior = (knots: ReadonlyArray<number>, multiplicities: ReadonlyArray<nu
   });
 
 /**
- * @affects none; data = { id, type: 'nurbs_surface', degreeU, degreeV, poleCount, rational, domain, knotsU, multiplicitiesU, knotsV, multiplicitiesV, interiorContinuity, bounds, unit }
+ * @affects none; data = { id, type: 'nurbs_surface', degreeU, degreeV, poleCount, rational, domain, area, areaUnit, trimmed, knotsU, multiplicitiesU, knotsV, multiplicitiesV, interiorContinuity, bounds, unit }
  */
 export function inspectSurface(doc: CadDocument, entity: NurbsSurfaceEntity): CommandResult {
   const { surface } = entity;
@@ -37,6 +38,9 @@ export function inspectSurface(doc: CadDocument, entity: NurbsSurfaceEntity): Co
       u: interior(surface.knotsU, surface.multiplicitiesU, surface.degreeU),
       v: interior(surface.knotsV, surface.multiplicitiesV, surface.degreeV),
     },
+    area: sig(sheetArea(entity)),
+    areaUnit: `${doc.units}^2`,
+    trimmed: (entity.trims?.length ?? 0) > 0,
     bounds: { min: sigVec(extent.min), max: sigVec(extent.max), frame: 'entity-local pole box (add the entity position)' },
     unit: doc.units,
     unverified: false,

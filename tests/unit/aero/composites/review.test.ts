@@ -274,7 +274,7 @@ describe('kernel cone faces whose azimuth runs the other way', () => {
       faceQuery,
     };
     const base = apply(withMaterials(), 'define_rosette', ROSETTE);
-    const sphere = ok(base, 'add_sphere', { radius: 10 });
+    const sphere = ok(base, 'add_torus', { ringRadius: 10, tubeRadius: 3 });
     const result = execute(
       sphere.document,
       'create_composite_part',

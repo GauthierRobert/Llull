@@ -1,7 +1,15 @@
 /** First-ply failure criteria (06 CMP §5.3): strength ratio R = load multiplier that brings a ply point to failure (Infinity: never). */
 
-import type { LaminaMaterial } from '@core/model/composites';
 import type { Triple } from './clt';
+
+/** The strength fields of a lamina record (MPa, positive magnitudes); absent ones refuse the criteria that need them. */
+export interface LaminaStrengths {
+  readonly Xt?: number | undefined;
+  readonly Xc?: number | undefined;
+  readonly Yt?: number | undefined;
+  readonly Yc?: number | undefined;
+  readonly S?: number | undefined;
+}
 
 export type Criterion = 'max_stress' | 'tsai_hill' | 'tsai_wu' | 'larc03';
 
@@ -23,7 +31,7 @@ export interface Strengths {
 }
 
 /** The five strengths of `material`, or the names of the missing ones. */
-export function strengthsOf(material: LaminaMaterial): Strengths | { readonly missing: readonly string[] } {
+export function strengthsOf(material: LaminaStrengths): Strengths | { readonly missing: readonly string[] } {
   const { Xt, Xc, Yt, Yc, S } = material;
   const missing = (['Xt', 'Xc', 'Yt', 'Yc', 'S'] as const).filter((name) => material[name] === undefined);
   return missing.length > 0 || Xt === undefined || Xc === undefined || Yt === undefined || Yc === undefined || S === undefined

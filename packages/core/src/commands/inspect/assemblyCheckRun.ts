@@ -4,7 +4,7 @@
  * @invariant a scoped run builds the connectivity graph over ALL parts and reports only items that touch the scope
  */
 
-import type { CadDocument, Vec3 } from '../../model/types';
+import type { CadDocument, MeshData, Vec3 } from '../../model/types';
 import type { GeometryKernel, ShapeAnalysis } from '../../geometry/kernel';
 import { MM_PER_UNIT } from '../../model/units';
 import { type CheckItem, type CheckResult, type CheckThreshold, worstStatus } from '../../model/checkResult';
@@ -130,6 +130,8 @@ function jointItems(
       const part = partsById.get(id);
       return part === undefined ? [] : [part.shape];
     });
+  const meshesOf = (bodyId: string): MeshData[] =>
+    (doc.dynamics?.bodies[bodyId]?.entityIds ?? []).flatMap((id) => partsById.get(id)?.mesh ?? []);
   return Object.values(doc.dynamics?.joints ?? {})
     .filter((joint) => joint.kind === 'revolute' && (inScope(joint.child) || inScope(joint.parent)))
     .map((joint) =>
@@ -139,6 +141,8 @@ function jointItems(
         axis: joint.axis,
         parentShapes: joint.parent === GROUND ? [] : shapesOf(joint.parent),
         childShapes: shapesOf(joint.child),
+        parentMeshes: joint.parent === GROUND ? [] : meshesOf(joint.parent),
+        childMeshes: meshesOf(joint.child),
         mmPerUnit,
       }),
     );

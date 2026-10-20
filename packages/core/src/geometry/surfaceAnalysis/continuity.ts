@@ -52,6 +52,44 @@ function sideCurve(surface: NurbsSurfaceData, side: SurfaceSide): { curve: Nurbs
   }
 }
 
+/** Fraction of the parameter domain used as the step of the one-sided stencils that measure the cross-edge rate of normal curvature. */
+const RATE_STEP = 0.01;
+
+/**
+ * d(normal curvature along `w`)/ds at an edge point, along +`w` (the direction leaving patch A and continuing into patch B). The scalar field
+ * f(u, v) = normal curvature along `w` (re-projected on each tangent plane) is differentiated in the parameters (one-sided into the patch across
+ * the edge, along the edge two-sided where possible) and combined with the coefficients of `w`, so the stencil never leaves the patch laterally.
+ * Null where the stencil meets a degenerate point.
+ */
+function crossCurvatureRate(surface: NurbsSurfaceData, base: SurfaceSample, w: Vec3, side: SurfaceSide, normalSign: number): number | null {
+  const [[u0, u1], [v0, v1]] = surfaceDomain(surface);
+  const direction = unit(w);
+  const [a, b] = directionCoefficients(base, direction);
+  const crossIsU = side.startsWith('u');
+  const interior = side.endsWith('0') ? 1 : -1;
+  const [crossMin, crossMax, edgeMin, edgeMax] = crossIsU ? [u0, u1, v0, v1] : [v0, v1, u0, u1];
+  const [crossBase, edgeBase] = crossIsU ? [base.u, base.v] : [base.v, base.u];
+  const [crossCoefficient, edgeCoefficient] = crossIsU ? [a, b] : [b, a];
+  const field = (cross: number, edge: number): number | null => {
+    const sample = crossIsU ? surfaceSample(surface, cross, edge) : surfaceSample(surface, edge, cross);
+    if (sample.degenerate) return null;
+    const [ca, cb] = directionCoefficients(sample, direction);
+    return normalSign * normalCurvature(sample, ca, cb);
+  };
+  const [hCross, hEdge] = [RATE_STEP * (crossMax - crossMin), RATE_STEP * (edgeMax - edgeMin)];
+  const f0 = field(crossBase, edgeBase);
+  const f1 = field(crossBase + interior * hCross, edgeBase);
+  const f2 = field(crossBase + 2 * interior * hCross, edgeBase);
+  if (f0 === null || f1 === null || f2 === null) return null;
+  const dCross = (interior * (-3 * f0 + 4 * f1 - f2)) / (2 * hCross);
+  const edgeAt = (offset: number): number | null => field(crossBase, edgeBase + offset * hEdge);
+  const [lo, hi] = [edgeBase - hEdge >= edgeMin - 1e-12, edgeBase + hEdge <= edgeMax + 1e-12];
+  const [e1, e2] = lo && hi ? [edgeAt(-1), edgeAt(1)] : lo ? [edgeAt(-1), edgeAt(-2)] : [edgeAt(1), edgeAt(2)];
+  if (e1 === null || e2 === null) return null;
+  const dEdge = lo && hi ? (e2 - e1) / (2 * hEdge) : lo ? (3 * f0 - 4 * e1 + e2) / (2 * hEdge) : (-3 * f0 + 4 * e1 - e2) / (2 * hEdge);
+  return crossCoefficient * dCross + edgeCoefficient * dEdge;
+}
+
 const orderOf = (g0: boolean, g1: boolean, g2: boolean, g3: boolean): ContinuityOrder =>
   !g0 ? 'none' : !g1 ? 'G0' : !g2 ? 'G1' : !g3 ? 'G2' : 'G3';
 
@@ -123,6 +161,7 @@ function surfaceJoint(
   const samples: ContinuitySample[] = [];
   let [g0Max, g1Max, g2Max, g2RelMax] = [0, 0, 0, 0];
   let g2All = true;
+  let [g3Max, g3All, g3Known] = [0, true, true];
   let worst: { t: number; point: Vec3; score: number } = { t: 0, point: evaluateCurve(edgeA.curve, first), score: -1 };
   for (let i = 0; i < count; i++) {
     const t = i / (count - 1);
@@ -148,27 +187,36 @@ function surfaceJoint(
     const g2Rel = relativeJump(kA, kB, tol.g2Abs);
     const g2Fine = g2Gap <= tol.g2Abs || g2Rel <= tol.g2Rel;
     g2All = g2All && g2Fine;
-    samples.push({ t, point: sampleA.point, g0Gap, g1AngleRad: g1, g2Gap, g3Gap: null });
+    // G3: the one-sided rates of that normal curvature towards the interior of each patch (a leaves along w, b continues along w)
+    const rateA = crossCurvatureRate(a, sampleA, w, sideA, 1);
+    const rateB = crossCurvatureRate(b, sampleB, w, sideB, sign);
+    let g3Gap: number | null = null;
+    if (rateA !== null && rateB !== null) {
+      g3Gap = Math.abs(rateA - rateB);
+      g3Max = Math.max(g3Max, g3Gap);
+      g3All = g3All && (g3Gap <= tol.g2Abs || g3Gap <= tol.g3Rel * Math.max(Math.abs(rateA), Math.abs(rateB)));
+    } else g3Known = false;
+    samples.push({ t, point: sampleA.point, g0Gap, g1AngleRad: g1, g2Gap, g3Gap });
     [g0Max, g1Max, g2Max, g2RelMax] = [Math.max(g0Max, g0Gap), Math.max(g1Max, g1), Math.max(g2Max, g2Gap), Math.max(g2RelMax, g2Rel)];
     const score = Math.max(g0Gap / tol.g0, g1 / tol.g1AngleRad, g2Fine ? 0 : g2Rel / tol.g2Rel);
     if (score > worst.score) worst = { t, point: sampleA.point, score };
   }
-  const order = samples.length === 0 ? 'none' : orderOf(g0Max <= tol.g0, g1Max <= tol.g1AngleRad, g2All, false);
+  const order = samples.length === 0 ? 'none' : orderOf(g0Max <= tol.g0, g1Max <= tol.g1AngleRad, g2All, g3Known && g3All);
   return {
     samples,
     g0Gap: g0Max,
     g1AngleRad: g1Max,
     g2Gap: g2Max,
     g2Rel: g2RelMax,
-    g3Gap: null,
-    order: order === 'G3' ? 'G2' : order,
+    g3Gap: g3Known && samples.length > 0 ? g3Max : null,
+    order,
     worst: { t: worst.t, point: worst.point },
   };
 }
 
 /**
  * Continuity of the joint between two edges of the same kind (curve + curve, or patch side + patch side); a mixed pair reports no joint.
- * @invariant the order is the highest G-level whose measures are all within tolerance (surfaces stop at G2; third order is not measured)
+ * @invariant the order is the highest G-level whose measures are all within tolerance (surfaces: G3 = the cross-edge rate of normal curvature agrees)
  */
 export function analyzeContinuity(
   a: ContinuityEdge,

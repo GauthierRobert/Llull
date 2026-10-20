@@ -1,9 +1,25 @@
-/** Classical Laminate Theory (06 CMP §5.2, Jones 1999 ch. 2-4, NASA RP-1351). N, mm, MPa; plies bottom to top; engineering shear strain. */
-
-import type { LaminaMaterial } from '@core/model/composites';
+/**
+ * Classical Laminate Theory (06 CMP §5.2, Jones 1999 ch. 2-4, NASA RP-1351). N, mm, MPa; plies bottom to top; engineering shear strain.
+ * Pure leaf shared by the composites plugin (`@aero`) and the margin recovery of `@cae`; the lamina record is described structurally
+ * (`LaminaElastic`) so no plugin type is imported (`CadDocument.composites` lamina records satisfy it).
+ */
 
 export type Matrix = number[][];
 export type Triple = readonly [number, number, number];
+
+/** What CLT needs of a lamina record: moduli (MPa), cured thickness (mm) and the optional expansion coefficients. */
+export interface LaminaElastic {
+  readonly E1: number;
+  readonly E2: number;
+  readonly G12: number;
+  readonly nu12: number;
+  /** Cured ply thickness, mm. */
+  readonly plyThickness: number;
+  readonly alpha1?: number | undefined;
+  readonly alpha2?: number | undefined;
+  readonly beta1?: number | undefined;
+  readonly beta2?: number | undefined;
+}
 
 export interface ReducedStiffness {
   readonly Q11: number;
@@ -12,8 +28,8 @@ export interface ReducedStiffness {
   readonly Q66: number;
 }
 
-export interface StackPly {
-  readonly material: LaminaMaterial;
+export interface StackPly<M extends LaminaElastic = LaminaElastic> {
+  readonly material: M;
   /** Degrees from the laminate x axis. */
   readonly angle: number;
 }
@@ -31,7 +47,7 @@ export interface Laminate {
   readonly z: readonly number[];
 }
 
-export function reducedStiffness({ E1, E2, G12, nu12 }: Pick<LaminaMaterial, 'E1' | 'E2' | 'G12' | 'nu12'>): ReducedStiffness {
+export function reducedStiffness({ E1, E2, G12, nu12 }: Pick<LaminaElastic, 'E1' | 'E2' | 'G12' | 'nu12'>): ReducedStiffness {
   const nu21 = (nu12 * E2) / E1;
   const delta = 1 - nu12 * nu21;
   return { Q11: E1 / delta, Q22: E2 / delta, Q12: (nu12 * E2) / delta, Q66: G12 };
@@ -89,7 +105,7 @@ export function laminateStiffness(stack: readonly StackPly[]): Laminate {
 }
 
 /** [[A, B], [B, D]] as a 6x6 matrix. */
-export function assemble6(laminate: Pick<Laminate, 'A' | 'B' | 'D'>): Matrix {
+function assemble6(laminate: Pick<Laminate, 'A' | 'B' | 'D'>): Matrix {
   const { A, B, D } = laminate;
   return [0, 1, 2, 3, 4, 5].map((i) =>
     [0, 1, 2, 3, 4, 5].map((j) => {
@@ -193,7 +209,7 @@ export interface PlyPointStress {
 
 /** Stresses at height z (mm from the mid-plane) in a ply of angle `angleDeg`. */
 export function plyStressAt(
-  material: LaminaMaterial,
+  material: LaminaElastic,
   angleDeg: number,
   strain: Triple,
   curvature: Triple,
@@ -222,14 +238,14 @@ export interface Environment {
 }
 
 /** Names of the hygrothermal coefficients `material` lacks for `env`. */
-export function missingHygrothermal(material: LaminaMaterial, env: Environment): string[] {
+export function missingHygrothermal(material: LaminaElastic, env: Environment): string[] {
   const thermal = env.deltaT !== 0 ? (['alpha1', 'alpha2'] as const).filter((name) => material[name] === undefined) : [];
   const moisture = env.deltaMoisture !== 0 ? (['beta1', 'beta2'] as const).filter((name) => material[name] === undefined) : [];
   return [...thermal, ...moisture];
 }
 
 /** Free (unrestrained) strain of a ply in the laminate axes (engineering shear): alpha dT + beta dC rotated by the ply angle. */
-export function freeStrainXy(material: LaminaMaterial, angleDeg: number, env: Environment): Triple {
+export function freeStrainXy(material: LaminaElastic, angleDeg: number, env: Environment): Triple {
   const theta = (angleDeg * Math.PI) / 180;
   const [m, n] = [Math.cos(theta), Math.sin(theta)];
   const along = (material.alpha1 ?? 0) * env.deltaT + (material.beta1 ?? 0) * env.deltaMoisture;

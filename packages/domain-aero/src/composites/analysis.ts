@@ -13,10 +13,10 @@ import {
   laminateStiffness,
   reducedStiffness,
   type Environment,
-} from './clt';
-import { CRITERIA, type Criterion, DEFAULT_F12_STAR } from './failure';
+} from '@lib/laminate/clt';
+import { CRITERIA, type Criterion, DEFAULT_F12_STAR } from '@lib/laminate/failure';
 import { respond, thermalExpansion } from './plyResponse';
-import { isUnverified } from './provenance';
+import { isUnverified } from '@lib/laminate/provenance';
 
 export interface Loads {
   readonly Nx?: number | undefined;
@@ -37,7 +37,7 @@ export interface NamedDefault {
 const rounded = (m: Matrix): number[][] => m.map((row) => row.map(sig));
 
 /** The stack with every ply thickness converted from document units to millimetres (CLT runs in N-mm-MPa). */
-export const toMillimetres = (stack: readonly StackPly[], units: DocumentUnit): StackPly[] =>
+export const toMillimetres = (stack: readonly StackPly<LaminaMaterial>[], units: DocumentUnit): StackPly<LaminaMaterial>[] =>
   stack.map((ply) => ({ ...ply, material: { ...ply.material, plyThickness: ply.material.plyThickness * MM_PER_UNIT[units] } }));
 
 export type AnalysisOutcome =
@@ -49,7 +49,7 @@ export type AnalysisOutcome =
  * @failure singular ABD -> CMP_LAMINATE_SINGULAR; loads with a material lacking a strength -> CMP_MATERIAL_ALLOWABLE_MISSING
  */
 export function analyzeStack(
-  stack: readonly StackPly[],
+  stack: readonly StackPly<LaminaMaterial>[],
   units: DocumentUnit,
   loads: Loads | undefined,
   criteria: readonly Criterion[] = CRITERIA,

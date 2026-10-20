@@ -9,7 +9,16 @@ import { type ReviewItem, type ReviewResult, reviewItem, reviewResult, reviewSum
 import { dynamicsOf } from './bodies';
 import { simulateMotion } from './simulate';
 import { staticChecks } from './dynamicsStaticChecks';
-import { type SimulationRun, energyItem, loopDriftItem, notRunItems, TIMESTEP_GATE, timestepItem, tipMachItems } from './dynamicsSimChecks';
+import {
+  type SimulationRun,
+  energyItem,
+  loopDriftItem,
+  notRunItems,
+  TIMESTEP_GATE,
+  timestepFloorItem,
+  timestepItem,
+  tipMachItems,
+} from './dynamicsSimChecks';
 
 const NAME = 'check_dynamics';
 const DEFAULT_DURATION = 2;
@@ -120,20 +129,15 @@ export function dynamicsCheck(
     else {
       engine = run.engine;
       const half = run.timestep / 2;
-      const second = half < MIN_TIMESTEP ? null : simulateMotion.run(doc, { ...common, timestep: half }, ctx);
+      const atFloor = half < MIN_TIMESTEP;
+      const second = atFloor ? null : simulateMotion.run(doc, { ...common, timestep: half }, ctx);
       const fine = second === null ? null : asRun(second.data);
       items.push(
         ...loopDriftItem(run),
         energyItem(run),
-        timestepItem(
-          run,
-          fine,
-          second === null
-            ? `the timestep ${run.timestep} s cannot be halved (minimum ${MIN_TIMESTEP} s)`
-            : fine === null
-              ? reasonOf(second.summary)
-              : null,
-        ),
+        atFloor
+          ? timestepFloorItem(run.timestep, MIN_TIMESTEP)
+          : timestepItem(run, fine, second !== null && fine === null ? reasonOf(second.summary) : null),
         ...tipMachItems(run),
       );
     }

@@ -18,7 +18,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   CMP_ROSETTE_DEGENERATE: 'give a non-zero 0-degree axis and normal that are not parallel',
   CMP_FACE_NOT_FOUND: 'pick a point on the intended face (faceNear), within the tolerance of the face',
   CMP_FACE_AMBIGUOUS: 'pick a point in the interior of the intended face, away from edges',
-  CMP_FACE_UNSUPPORTED: 'use a box, a cylinder or cone side/cap, or a plane / cylinder / cone face on the OCC kernel',
+  CMP_FACE_UNSUPPORTED: 'use a box, cylinder, cone, sphere or nurbs_surface tool, or a plane / cylinder / cone face on the OCC kernel',
   CMP_REF_MISSING: 'create the material, rosette, part, zone or ply first, or fix the id / name (`llull describe_scene`)',
   CMP_NAME_TAKEN: 'use a name that is not used yet in this part (or edit the existing item)',
   CMP_ZONE_BOUNDARY_INVALID: 'give a simple (non self-intersecting) polygon of at least 3 vertices inside the part outline',
@@ -31,7 +31,14 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   CMP_NO_PLIES: 'add plies (add_ply or generate_plies_from_zones) at that point first',
   CMP_POINT_OFF_PART: 'give a point on the tool face of the part (within its outline)',
   CMP_WAIVER_NO_FINDING: 'run check_layup and copy the code and ids of a current finding',
-  CMP_FLAT_UNSUPPORTED: 'flat patterns need a plane, cylinder or cone tool face (doubly curved faces need drape, not built yet)',
+  CMP_FLAT_UNSUPPORTED: 'flat patterns need a plane, cylinder, cone, sphere cap or nurbs_surface tool face',
+  CMP_DRAPE_LIMIT_MISSING:
+    'add lockingAngle (degrees, from a cited drape test) to the lamina record or pass lockingAngle explicitly (no default exists)',
+  CMP_PRODUCIBILITY_OVER_LOCK:
+    'split the ply with a dart or splice (split_ply), change its orientation or seed, or set drape.allowOverLock with a reviewer',
+  CMP_CUT_INVALID: 'give a path inside the part frame that touches the ply; a splice must cross the ply boundary at both ends',
+  CMP_CORE_INVALID: 'give a boundary inside the part outline, a core_honeycomb / core_foam material and thickness > 0',
+  CMP_CORE_UNSUPPORTED: 'sandwich cores are not modelled by this analysis; analyse the skins separately or choose a point outside the core',
 };
 
 export const refuseCmp = tableRejection(REMEDIATION);

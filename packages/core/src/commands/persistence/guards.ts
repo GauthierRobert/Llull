@@ -12,7 +12,7 @@ import {
   SOLID_KINDS,
   FINISH_PATTERNS,
 } from '../../model/types';
-import { exactSectionsProblem, nurbsCurveProblem, nurbsSurfaceProblem } from './nurbsGuard';
+import { exactSectionsProblem, nurbsCurveProblem, nurbsSurfaceProblem, surfaceTrimsProblem } from './nurbsGuard';
 import type { NurbsCurveData } from '../../lib/nurbs/types';
 import { CURVE_KINDS, SHEET_KINDS } from '../../model/curveKinds';
 import { isRecord } from '../../lib/isRecord';
@@ -312,7 +312,7 @@ const KIND_PROBLEMS: Readonly<Record<EntityKind, (v: Record<string, unknown>) =>
   sweep: sweepProblem,
   loft: loftProblem,
   nurbs_curve: (v) => nurbsCurveProblem(v['curve'], 'curve'),
-  nurbs_surface: (v) => nurbsSurfaceProblem(v['surface'], 'surface'),
+  nurbs_surface: (v) => firstProblem(nurbsSurfaceProblem(v['surface'], 'surface'), surfaceTrimsProblem(v['trims'])),
   subdivision: subdivisionProblem,
   image: imageProblem,
   mesh: meshProblem,

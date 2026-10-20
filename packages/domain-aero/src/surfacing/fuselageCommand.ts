@@ -12,6 +12,7 @@ import { skinCurves } from '@lib/nurbs/surfaceFit';
 import type { NurbsSurfaceData } from '@lib/nurbs/surfaceTypes';
 import { briefNumbers, sig } from '../shared/results';
 import { withBody } from './aeroState';
+import { curveToDocument, frameOf } from './aircraftFrame';
 import { refuseAero } from './codes';
 import { sectionCurve } from './fuselageSections';
 
@@ -70,7 +71,7 @@ function enclosedVolume(surface: NurbsSurfaceData): number {
 export const loftFuselage = defineCommand({
   name: 'loft_fuselage',
   description:
-    'Loft a fuselage outer skin from a station table in the aircraft frame (FS along +x aft, BL along +y right, WL along +z up, document units). ' +
+    'Loft a fuselage outer skin from a station table in the aircraft frame (document units; FS along +x aft, BL along +y right, WL along +z up unless set_aircraft_frame changed it, then stations are mapped through that frame; control curves are always in document coordinates). ' +
     '`stations` is a list of { fs, section } with fs strictly increasing; a section is "point" (the nose / tail tip, allowed only first or last), ' +
     '"circle" { radius, wl }, "superellipse" { halfBreadth, halfHeight, exponent, wl } or "conic" { halfBreadth, wlMaxBreadth, upper { wlExtreme, rho }, ' +
     'lower { wlExtreme, rho } } (Liming conic halves: rho 0.4142 is circular, 0.5 parabolic; conic and circle sections are exact rational NURBS, a superellipse an approximation). The skin is the exact ' +
@@ -116,6 +117,7 @@ export const loftFuselage = defineCommand({
         `station ${unordered} (fs ${stations[unordered]?.fs}) is not beyond station ${unordered - 1}`,
         `stations.${unordered}.fs`,
       );
+    const frame = frameOf(doc);
     const curves: NurbsCurveData[] = [];
     let superellipseDeviation = 0;
     for (const [index, station] of stations.entries()) {
@@ -123,7 +125,7 @@ export const loftFuselage = defineCommand({
         return refuse('AERO_PARAM_INVALID', 'a point station is only allowed first or last', `stations.${index}.section.type`);
       const made = sectionCurve(station.fs, station.section as FuselageSection);
       if ('code' in made) return refuse(made.code, `station ${index}: ${made.message}`, `stations.${index}.section`);
-      curves.push(made.curve);
+      curves.push(curveToDocument(frame, made.curve));
       if (made.deviation !== undefined) superellipseDeviation = Math.max(superellipseDeviation, made.deviation);
     }
     const guides: NurbsCurveData[] = [];

@@ -8,8 +8,11 @@ import { polygonArea, polygonCentroid } from '@lib/polygon';
 import { add3, scale3 } from '@lib/vec3';
 import { sig } from '../shared/results';
 import { refuseCmp } from './codes';
+import { autoStepLength } from './drape/plyDrape';
 import { piecesOf } from './geometry2d';
-import { isUnverified } from './provenance';
+import { pieceSurfaceArea } from './plySolid';
+import { isUnverified } from '@lib/laminate/provenance';
+import { coreAt, coreThicknessAt, coreVolume, coresOf, heightBelow } from './sandwich';
 import { compositesOf, findPart, pliesOf } from './state';
 import { fromFlat, normalAt } from './surface';
 
@@ -37,6 +40,8 @@ export const laminateMass = defineCommand({
     if (plies.length === 0)
       return refuseCmp(doc, 'laminate_mass', 'CMP_NO_PLIES', `part "${part.name}" has no plies`, [part.id], ['params.part']);
     const side = part.laminateSide === 'positive_normal' ? 1 : -1;
+    const edge = autoStepLength(part) * 12.5;
+    const areaOf = (piece: readonly Vec2[]): number => pieceSurfaceArea(part, piece, edge);
     let z = 0;
     let area = 0;
     let volume = 0;
@@ -58,12 +63,12 @@ export const laminateMass = defineCommand({
           [ply.id],
           [`materials.${material.name}`],
         );
-      const mid = z + material.plyThickness / 2;
       z += material.plyThickness;
       for (const piece of piecesOf(ply, part)) {
-        const pieceArea = polygonArea(piece);
+        const pieceArea = areaOf(piece);
         const pieceMass = pieceArea * material.plyThickness * material.density;
         const centre: Vec2 = polygonCentroid(piece);
+        const mid = heightBelow(model, part, ply, centre) + material.plyThickness / 2;
         const point = add3(fromFlat(part.surface, centre), scale3(normalAt(part.surface, centre), side * mid));
         area += pieceArea;
         volume += pieceArea * material.plyThickness;
@@ -71,13 +76,39 @@ export const laminateMass = defineCommand({
         moment = add3(moment, scale3(point, pieceMass));
       }
       const entry = perMaterial.get(material.name) ?? { area: 0, volume: 0, mass: 0, plies: 0 };
-      const planar = piecesOf(ply, part).reduce((sum, piece) => sum + polygonArea(piece), 0);
+      const planar = piecesOf(ply, part).reduce((sum, piece) => sum + areaOf(piece), 0);
       perMaterial.set(material.name, {
         area: entry.area + planar,
         volume: entry.volume + planar * material.plyThickness,
         mass: entry.mass + planar * material.plyThickness * material.density,
         plies: entry.plies + 1,
       });
+    }
+    const coreRows: Record<string, unknown>[] = [];
+    let coreMass = 0;
+    for (const core of coresOf(model, part.id)) {
+      const lamina = model.materials[core.materialName];
+      if (lamina === undefined || lamina.density === undefined)
+        return refuseCmp(
+          doc,
+          'laminate_mass',
+          'CMP_MATERIAL_DENSITY_MISSING',
+          `core "${core.name}" material "${core.materialName}" has no density`,
+          [core.id],
+          [`materials.${core.materialName}`],
+        );
+      const coreVol = coreVolume(core);
+      const centre: Vec2 = polygonCentroid(core.boundary);
+      const slice = coreAt(model, part, centre);
+      const mean = coreVol / polygonArea(core.boundary);
+      const lift = (slice?.z0 ?? 0) + Math.max(coreThicknessAt(core, centre), mean) / 2;
+      const point = add3(fromFlat(part.surface, centre), scale3(normalAt(part.surface, centre), side * lift));
+      const coreWeight = coreVol * lamina.density;
+      coreMass += coreWeight;
+      mass += coreWeight;
+      volume += coreVol;
+      moment = add3(moment, scale3(point, coreWeight));
+      coreRows.push({ id: core.id, name: core.name, material: core.materialName, volume: sig(coreVol), mass: sig(coreWeight) });
     }
     const cg = scale3(moment, 1 / mass);
     const unverified = plies.some((ply) => {
@@ -96,6 +127,8 @@ export const laminateMass = defineCommand({
         volume: sig(volume),
         mass: sig(mass),
         massUnit: 'density unit x length unit^3',
+        cores: coreRows,
+        coreMass: sig(coreMass),
         cg: cg.map(sig),
         perMaterial: Object.fromEntries(
           [...perMaterial].map(([name, entry]) => [

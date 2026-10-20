@@ -511,13 +511,13 @@ describe('check_continuity, surfaces', () => {
     return { doc: second.doc, a: first.id, b: second.id };
   };
 
-  it('two halves of a sphere join with G2 (side detected)', () => {
+  it('two halves of a sphere join with G3 (side detected)', () => {
     const { doc, a, b } = halves();
-    const result = execute(doc, 'check_continuity', { pairs: [{ a: { id: a }, b: { id: b } }], samples: 9, require: 'G2' });
+    const result = execute(doc, 'check_continuity', { pairs: [{ a: { id: a }, b: { id: b } }], samples: 9, require: 'G3' });
     const joint = data<{
       joints: Array<{ order: string; pass: boolean; a: { side: string }; g0Gap: number; g1AngleRad: number; g2Gap: number }>;
     }>(result).joints[0]!;
-    expect(joint.order).toBe('G2');
+    expect(joint.order).toBe('G3');
     expect(joint.pass).toBe(true);
     expect(joint.g0Gap).toBeLessThan(1e-9);
     expect(joint.g1AngleRad).toBeLessThan(1e-6);
@@ -599,14 +599,47 @@ describe('check_continuity, surfaces', () => {
       return data<{ joints: Array<{ order: string; g1AngleRad: number; g2Gap: number }> }>(result).joints[0]!;
     };
 
-    it('a continuation has G2 whatever its parametrisation (sheared v lines)', () => {
+    it('a continuation of the same surface has G3 whatever its parametrisation (sheared v lines)', () => {
       const next = [
         [1, 0.5, 0],
         [1.5, 1, 0.5],
         [2, 2, 1],
       ];
-      expect(join(patch(next, 0))).toMatchObject({ order: 'G2' });
-      expect(join(patch(next, 0.8))).toMatchObject({ order: 'G2' });
+      expect(join(patch(next, 0))).toMatchObject({ order: 'G3' });
+      expect(join(patch(next, 0.8))).toMatchObject({ order: 'G3' });
+    });
+
+    it('a cubic continuation with the same z, z′, z″ but another z‴ is G2 and not G3 (g3Gap = the jump of the rate)', () => {
+      /** Degree (3, 1) strip over x in [x0, x0 + 1]: z = z0 + z1 t + z2 t^2 + z3 t^3 with t = x - x0. */
+      const cubic = (x0: number, a: [number, number, number, number]): NurbsSurfaceData => {
+        const z = [a[0], a[0] + a[1] / 3, a[0] + (2 * a[1]) / 3 + a[2] / 3, a[0] + a[1] + a[2] + a[3]];
+        return {
+          degreeU: 3,
+          degreeV: 1,
+          poles: z.map((height, i) => [
+            [x0 + i / 3, 0, height],
+            [x0 + i / 3, 1, height],
+          ]),
+          knotsU: [0, 1],
+          multiplicitiesU: [4, 4],
+          knotsV: [0, 1],
+          multiplicitiesV: [2, 2],
+        };
+      };
+      const joinCubic = (z3: number): { order: string; g3Gap: number } => {
+        const first = addSurface(empty, cubic(0, [0, 0, 0.5, 0]));
+        const second = addSurface(first.doc, cubic(1, [0.5, 1, 0.5, z3]));
+        const result = execute(second.doc, 'check_continuity', {
+          pairs: [{ a: { id: first.id, side: 'u1' }, b: { id: second.id, side: 'u0' } }],
+          samples: 5,
+          require: 'G3',
+        });
+        return data<{ joints: Array<{ order: string; g3Gap: number }> }>(result).joints[0]!;
+      };
+      expect(joinCubic(0)).toMatchObject({ order: 'G3' });
+      const bent = joinCubic(0.4);
+      expect(bent.order).toBe('G2');
+      expect(bent.g3Gap).toBeGreaterThan(0.1);
     });
 
     it('a patch folded back over the first one is not G1', () => {

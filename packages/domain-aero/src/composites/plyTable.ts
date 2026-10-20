@@ -13,7 +13,7 @@ import { piecesOf } from './geometry2d';
 import { normalizeAngle } from './notation';
 import { frameRefusal, orientationInPartFrame, orientationInRosette } from './plyFrame';
 import { insertPly } from './plyCommands';
-import { isUnverified } from './provenance';
+import { isUnverified } from '@lib/laminate/provenance';
 import { compositesOf, findPart, findRosette, pliesOf, withComposites, zonesOf } from './state';
 
 const MAX_ROWS = 5000;

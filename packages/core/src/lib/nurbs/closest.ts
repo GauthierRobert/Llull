@@ -55,7 +55,7 @@ export function closestOnCurve(curve: NurbsCurveData, target: Vec3): CurveProjec
 }
 
 /** Newton refinement of (u, v) towards the foot point of `target`; returns the best of the start and the result. */
-function refineOnSurface(surface: NurbsSurfaceData, target: Vec3, u0: number, v0: number): SurfaceProjection {
+export function refineOnSurface(surface: NurbsSurfaceData, target: Vec3, u0: number, v0: number): SurfaceProjection {
   const [[uMin, uMax], [vMin, vMax]] = surfaceDomain(surface);
   let [u, v] = [u0, v0];
   for (let step = 0; step < NEWTON_STEPS; step++) {

@@ -51,7 +51,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   FEA_SINGULAR_EXCLUSION_LARGE:
     'a large share of the part is excluded as singular: lower singularityRadius (with a note) or refine the mesh (smaller globalSize)',
   FEA_COMPOSITE_MARGINS_UNSUPPORTED:
-    'composite shells need ply failure criteria (not built): assess them with the 06 CMP laminate analysis; their rows are left out',
+    'a composite shell got no ply-failure rows (the laminate lacks Xt, Xc, Yt, Yc, S, the shell is not planar, or the results lack STRESS_TOP / STRESS_BOT): complete the lamina data (create_lamina_material) or assess the plies with the 06 CMP laminate analysis',
   FEA_MARGINAL_BAND_UNSET: 'ask the owner / company rule for a marginal band and pass marginalBand to compute_margins',
   FEA_DISPOSITION_PENDING:
     'hand the FAIL / MARGINAL rows to the qualified reviewer, who dispositions them with dispose_margin in the desktop app',

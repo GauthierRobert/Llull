@@ -9,9 +9,8 @@ import { DxfWriter, assembleDxf, dxfLayerName } from '@lib/dxfWriter';
 import { offsetPolygon, polygonArea, polygonCentroid, toCounterClockwise } from '@lib/polygon';
 import { sig } from '../shared/results';
 import { refuseCmp } from './codes';
-import { piecesOf } from './geometry2d';
+import { flatPiecesOf } from './flatPieces';
 import { compositesOf, findPart, findPly, pliesOf } from './state';
-import { fibreDirection } from './surface';
 
 const GAP_MM = 10;
 const LABEL_FIELDS = ['name', 'orientation', 'sequence', 'material'] as const;
@@ -31,7 +30,8 @@ export const exportFlatPatternsDxf = defineCommand({
     'fibre-direction arrow sits on layer ORIENT and a text label (name, orientation in degrees, sequence, material; choose with `labels`) ' +
     'on the ply layer. Pieces are laid out left to right, 10 mm apart (no nesting). `plies` selects plies by id or name (default all); ' +
     '`allowance` (document length units, default 0) grows every outline for trimming. The DXF text is returned in data.files[0].content ' +
-    '(mime image/vnd.dxf); save it with the CLI --save option. Plies with drape on a doubly curved face are not supported yet. Read-only.',
+    '(mime image/vnd.dxf); save it with the CLI --save option. On a sphere cap or nurbs_surface face each ply piece is draped (fishnet, see drape_ply) and flattened with the warp along +x; ' +
+    'it is refused (CMP_PRODUCIBILITY_OVER_LOCK) where the shear exceeds the material lockingAngle unless `allowOverLock`. Read-only.',
   params: z.object({
     part: z.string().describe('Part id or name.'),
     plies: z.array(z.string().describe('Ply id or name.')).describe('Plies to export; default every ply of the part.').optional(),
@@ -39,12 +39,23 @@ export const exportFlatPatternsDxf = defineCommand({
       .array(z.enum(LABEL_FIELDS))
       .describe('Label fields to write: name, orientation, sequence, material; default all four.')
       .optional(),
+    allowOverLock: z
+      .boolean()
+      .describe('On sphere / nurbs_surface faces: flatten even where the drape shear exceeds the material locking angle (default false).')
+      .optional(),
     allowance: z.number().describe('Trim allowance added around every outline, document length units; default 0; must be >= 0.').optional(),
     confirmExportControlled,
   }),
   run: (
     doc,
-    { part: partRef, plies: selection, labels = [...LABEL_FIELDS], allowance = 0, confirmExportControlled: confirmation },
+    {
+      part: partRef,
+      plies: selection,
+      labels = [...LABEL_FIELDS],
+      allowOverLock = false,
+      allowance = 0,
+      confirmExportControlled: confirmation,
+    },
     ctx,
   ): CommandResult => {
     const refused = exportRefusal(doc, 'export_flat_patterns_dxf', 'data', confirmation, ctx);
@@ -79,10 +90,14 @@ export const exportFlatPatternsDxf = defineCommand({
     const writer = new DxfWriter({ ORIENT: 3 });
     let cursor = 0;
     const pieces: Record<string, unknown>[] = [];
+    const methods = new Set<string>();
     for (const ply of plies) {
       const layer = `PLY_${dxfLayerName(ply.name)}`;
       const material = model.materials[ply.materialName];
-      for (const [index, source] of piecesOf(ply, part).entries()) {
+      const flat = flatPiecesOf(part, ply, material, allowOverLock);
+      if (!flat.ok) return refuseCmp(doc, 'export_flat_patterns_dxf', flat.code, flat.message, [ply.id], ['params.allowOverLock']);
+      methods.add(flat.method);
+      for (const { index, polygon: source, fibre } of flat.pieces) {
         const grown = allowance > 0 ? offsetPolygon(toCounterClockwise(source), allowance) : toCounterClockwise(source);
         const centre = polygonCentroid(grown);
         const xs = grown.map(([x]) => x * scale);
@@ -91,7 +106,7 @@ export const exportFlatPatternsDxf = defineCommand({
         const [width, height] = [Math.max(...xs) - minX, Math.max(...ys) - minY];
         const place = ([x, y]: Vec2): Vec2 => [x * scale - minX + cursor, y * scale - minY];
         writer.polyline(layer, grown.map(place), true);
-        const direction = fibreDirection(part.surface, centre, ply.orientation);
+        const direction = fibre;
         const size = 0.12 * Math.max(width, height, 1);
         const from = place(centre);
         const tip: Vec2 = [from[0] + direction[0] * size, from[1] + direction[1] * size];
@@ -145,11 +160,7 @@ export const exportFlatPatternsDxf = defineCommand({
         unit: 'mm',
         files: [{ name: `${dxfLayerName(part.name)}.dxf`, mime: 'image/vnd.dxf', content }],
         pieces,
-        provenance: {
-          method: part.surface.type === 'plane' ? 'planar projection' : 'exact developable unrolling',
-          reference: 'isometric development of the tool face',
-          inputs: { part: part.id },
-        },
+        provenance: { method: [...methods].join(' + '), reference: 'isometric development of the tool face', inputs: { part: part.id } },
       },
     );
   },

@@ -1,53 +1,22 @@
-/** trim_surface (parameter rectangle), sew_surfaces (join patches along a shared edge) and thicken_surface (closed mesh solid from a sheet). */
+/** sew_surfaces (join patches along a shared edge) and thicken_surface (closed mesh solid from a sheet). */
 
-import type { Entity, NurbsSurfaceEntity, Vec3 } from '../../model/types';
+import type { Entity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed } from '../noop';
 import { newEntity } from '../entity/newEntity';
-import { replaceEntity, replaceEntities, withEntity } from '../entity/entityOps';
+import { replaceEntities, withEntity } from '../entity/entityOps';
 import { nextId } from '../../lib/id';
 import { distance3 } from '../../lib/vec3';
 import { expandKnots } from '../../lib/nurbs/knotVector';
 import { surfaceDomain } from '../../lib/nurbs/surface';
 import { surfaceSample } from '../../lib/nurbs/surfaceCurvature';
-import { commonBasis, extractSubSurface, reverseSurface, transposeSurface } from '../../lib/nurbs/surfaceEdit';
+import { commonBasis, reverseSurface, transposeSurface } from '../../lib/nurbs/surfaceEdit';
 import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import { gridParameters, placedSurface, surfacePoleExtent } from '../../geometry/nurbsSurface';
 import { refuseSrf } from './shared';
+import { sewIntoSolid } from './sewShell';
 import { isRefusal, sig, surfaceEntityOf } from './surfaceShared';
-
-/**
- * @affects replaces the surface of 1 nurbs_surface entity by the part inside the parameter rectangle (same id)
- * @invariant exact: the trimmed patch coincides with the original over the rectangle and its domain is that rectangle
- * @failure unknown id / not a surface -> SRF_ENTITY_NOT_FOUND / SRF_NOT_SURFACE; an empty or out-of-domain interval -> SRF_TRIM_RANGE
- */
-export const trimSurface = defineCommand({
-  name: 'trim_surface',
-  description:
-    'Cut a nurbs_surface down to a rectangle of its parameter domain: keep u in [u0, u1] and v in [v0, v1] (see inspect_nurbs `domain`). ' +
-    'Exact (knots are inserted at the cuts and the outer poles dropped); the sheet keeps its id and its parameter values inside the ' +
-    'rectangle. Only iso-parametric trims are available: trimming by a curve, a plane or a projected loop needs trimmed faces from the exact kernel.',
-  params: z.object({
-    id: z.string().describe('Id of a nurbs_surface entity.'),
-    u: z.array(z.number()).describe('[from, to] along u, inside the surface domain, from < to.'),
-    v: z.array(z.number()).describe('[from, to] along v, inside the surface domain, from < to.'),
-  }),
-  run: (doc, { id, u, v }): CommandResult => {
-    const entity = surfaceEntityOf(doc, 'trim_surface', id);
-    if (isRefusal(entity)) return entity;
-    if (u.length !== 2 || v.length !== 2)
-      return refuseSrf(doc, 'trim_surface', 'SRF_TRIM_RANGE', 'u and v each need [from, to]', [id], ['params.u']);
-    const result = extractSubSurface(entity.surface, [u[0] as number, u[1] as number], [v[0] as number, v[1] as number]);
-    if (typeof result === 'string') return refuseSrf(doc, 'trim_surface', 'SRF_TRIM_RANGE', result, [id], ['params.u']);
-    const next: NurbsSurfaceEntity = { ...entity, surface: result };
-    return changed(
-      replaceEntity(doc, next),
-      `trim_surface: trimmed "${id}" to u [${u[0]}, ${u[1]}], v [${v[0]}, ${v[1]}] (${result.poles.length} x ${result.poles[0]?.length ?? 0} poles).`,
-      [id],
-    );
-  },
-});
 
 type Side = 'u0' | 'u1' | 'v0' | 'v1';
 
@@ -92,34 +61,54 @@ function mergeAlong(a: NurbsSurfaceData, b: NurbsSurfaceData, tolerance: number)
 }
 
 /**
- * @affects removes 2 nurbs_surface entities, creates 1 nurbs_surface (world coordinates) whose joint is a C0 crease
- * @invariant the merged patch coincides with both inputs; only whole shared edges are joined
- * @failure unknown id / not a surface -> SRF_ENTITY_NOT_FOUND / SRF_NOT_SURFACE; no shared edge within tolerance -> SRF_SEW_NOT_MERGEABLE
+ * @affects two sheets, makeSolid false: removes 2 nurbs_surface, creates 1 nurbs_surface (C0 crease); makeSolid true or 3+ sheets: removes the sheets, creates 1 closed mesh solid
+ * @invariant the merged patch coincides with both inputs, only whole shared edges are joined; the solid is closed (0 free edges) and oriented outward
+ * @failure unknown id / not a surface -> SRF_ENTITY_NOT_FOUND / SRF_NOT_SURFACE; no shared edge within tolerance -> SRF_SEW_NOT_MERGEABLE; free edges remaining -> SRF_SEW_FREE_EDGES; an edge shared by 3 sheets -> SRF_SEW_NONMANIFOLD
  */
 export const sewSurfaces = defineCommand({
   name: 'sew_surfaces',
   description:
-    'Sew two nurbs_surface sheets that share one whole boundary edge into a single multi-span nurbs_surface: the edges must coincide within ' +
-    '`tolerance` (document units); the sides, their orientation and the knot vectors are matched automatically (degrees and knots are made ' +
-    'compatible without changing either shape). The joint becomes a C0 crease (a repeated knot), so check_continuity on the original ' +
-    'pair first if tangency matters. The two inputs are removed and the result has position [0, 0, 0] (world poles). Sewing into a closed ' +
-    'shell or a solid, free-edge reports, and more than two patches need the exact kernel: sew pairs one after the other.',
+    'Sew nurbs_surface sheets together. (1) Exactly two sheets that share one whole boundary edge and `makeSolid` false (default): they become ' +
+    'a single multi-span nurbs_surface; the edges must coincide within `tolerance` (document units), the sides, their orientation and the knot ' +
+    'vectors are matched automatically, the joint is a C0 crease (check_continuity on the pair first if tangency matters). (2) `makeSolid` true, ' +
+    'or three and more sheets: the sheets are meshed with identical boundary samples along shared edges and welded within `tolerance`; when the ' +
+    'result has no free edge it becomes ONE closed, outward-oriented triangle-mesh solid (volume and mass_properties work; there is no exact B-rep, ' +
+    'which needs the native kernel) and the summary / data give the volume. A single closed sheet (a sphere, a tube) can be sewn on its own ' +
+    '(`ids` of 1 with makeSolid true) to close its seam. If free edges remain nothing changes and the refusal says how many and where: raise ' +
+    '`tolerance`, or fill / blend the gap first. The inputs are removed and the result has position [0, 0, 0].',
   params: z.object({
-    ids: z.array(z.string()).describe('Exactly 2 nurbs_surface ids.'),
+    ids: z.array(z.string()).describe('2 or more nurbs_surface ids (1 only with makeSolid true).'),
     tolerance: z
       .number()
-      .describe('Largest distance (document units) between matching edge poles. Default 1e-6 x the size of the surfaces.')
+      .describe('Largest distance (document units) between matching edge poles / welded vertices. Default 1e-6 x the size of the surfaces.')
+      .optional(),
+    makeSolid: z
+      .boolean()
+      .describe('Sew into a closed mesh solid (default false for exactly two sheets; implied for three or more).')
+      .optional(),
+    resolution: z
+      .number()
+      .describe('Solid only: mesh resolution, integer 8..96 (grid lines per sheet direction and boundary samples across the longest extent). Curved sheets lose volume as it drops (a sphere is 1.6 % low at 24, 0.4 % at 48). Default 24.')
       .optional(),
   }),
-  run: (doc, { ids, tolerance }): CommandResult => {
-    if (ids.length !== 2 || ids[0] === ids[1])
-      return refuseSrf(doc, 'sew_surfaces', 'SRF_PARAM_INVALID', 'give exactly 2 different surface ids', ids, ['params.ids']);
+  run: (doc, { ids, tolerance, makeSolid, resolution = 24 }): CommandResult => {
+    if (new Set(ids).size !== ids.length || ids.length === 0 || ids.length > 64 || (ids.length === 1 && makeSolid !== true))
+      return refuseSrf(doc, 'sew_surfaces', 'SRF_PARAM_INVALID', 'give 2..64 different surface ids (1 only with makeSolid true)', ids, [
+        'params.ids',
+      ]);
+    if (!(Number.isInteger(resolution) && resolution >= 8 && resolution <= 96))
+      return refuseSrf(doc, 'sew_surfaces', 'SRF_PARAM_INVALID', `resolution must be an integer in 8..96 (got ${resolution})`, ids, [
+        'params.resolution',
+      ]);
+    if (ids.length > 2 || makeSolid === true) return sewIntoSolid(doc, ids, tolerance, resolution);
     const [first, second] = [
       surfaceEntityOf(doc, 'sew_surfaces', ids[0] as string),
       surfaceEntityOf(doc, 'sew_surfaces', ids[1] as string),
     ];
     if (isRefusal(first)) return first;
     if (isRefusal(second)) return second;
+    if ((first.trims?.length ?? 0) > 0 || (second.trims?.length ?? 0) > 0)
+      return refuseSrf(doc, 'sew_surfaces', 'SRF_TRIM_UNSUPPORTED', 'sheets trimmed by curves cannot be sewn', ids, ['params.ids']);
     const [a, b] = [placedSurface(first), placedSurface(second)];
     const size = Math.max(
       ...[surfacePoleExtent(a), surfacePoleExtent(b)].flatMap(({ min, max }) => [max[0] - min[0], max[1] - min[1], max[2] - min[2]]),
@@ -172,6 +161,15 @@ export const thickenSurface = defineCommand({
   run: (doc, { id, thickness, side = 'normal', quality = 8 }): CommandResult => {
     const entity = surfaceEntityOf(doc, 'thicken_surface', id);
     if (isRefusal(entity)) return entity;
+    if (entity.trims !== undefined && entity.trims.length > 0)
+      return refuseSrf(
+        doc,
+        'thicken_surface',
+        'SRF_TRIM_UNSUPPORTED',
+        'a sheet trimmed by curves cannot be thickened (it would use the whole underlying patch)',
+        [id],
+        ['params.id'],
+      );
     const invalid = (message: string, path: string): CommandResult =>
       refuseSrf(doc, 'thicken_surface', 'SRF_PARAM_INVALID', message, [id], [`params.${path}`]);
     if (!(thickness > 0) || !Number.isFinite(thickness))

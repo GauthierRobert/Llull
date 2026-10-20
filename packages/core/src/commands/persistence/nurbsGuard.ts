@@ -39,6 +39,25 @@ export function exactSectionsProblem(curves: ReadonlyArray<NurbsCurveData>): str
   return mismatch > 0 ? `sections.${mismatch} must have the same Bézier span count and closing edge as sections.0` : null;
 }
 
+const MAX_TRIM_VERTICES = 20_000;
+
+/** First structural problem of the stored trim loops of a sheet (`trims` of `nurbs_surface`), or null when absent or valid. */
+export function surfaceTrimsProblem(value: unknown): string | null {
+  if (value === undefined) return null;
+  if (!Array.isArray(value) || value.length > 64) return 'trims must be a list of at most 64 loops';
+  for (const [index, loop] of value.entries()) {
+    if (!isRecord(loop) || typeof loop['outer'] !== 'boolean') return `trims.${index} must be { outer, polygon }`;
+    const polygon = loop['polygon'];
+    const valid =
+      Array.isArray(polygon) &&
+      polygon.length >= 3 &&
+      polygon.length <= MAX_TRIM_VERTICES &&
+      polygon.every((p) => Array.isArray(p) && p.length === 2 && p.every(isFiniteNumber));
+    if (!valid) return `trims.${index}.polygon must be 3..${MAX_TRIM_VERTICES} [u, v] points`;
+  }
+  return null;
+}
+
 /** First structural problem of a stored NURBS surface (`label` names it in the message), or null when it is a valid clamped patch. */
 export function nurbsSurfaceProblem(value: unknown, label: string): string | null {
   if (!isRecord(value)) return `${label} must be an object`;

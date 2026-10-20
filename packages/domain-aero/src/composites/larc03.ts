@@ -7,8 +7,8 @@
  */
 
 import type { LaminaMaterial } from '@core/model/composites';
-import type { Triple } from './clt';
-import { strengthsOf } from './failure';
+import type { Triple } from '@lib/laminate/clt';
+import { strengthsOf } from '@lib/laminate/failure';
 
 export type Larc03Mode = 'FT' | 'FC' | 'MT' | 'MC';
 

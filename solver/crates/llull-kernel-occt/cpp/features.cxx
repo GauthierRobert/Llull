@@ -124,6 +124,56 @@ TopoDS_Wire chain_wire(rust::Slice<const double> chain) {
   return maker.IsDone() ? maker.Wire() : TopoDS_Wire();
 }
 
+// One exact NURBS section as a wire (see features.hxx `skinned_solid_bsplines` for the layout): a single Geom_BSplineCurve edge, plus the straight
+// closing edge when asked. Null wire when OCC rejects the curve or an edge; std::invalid_argument when the data are inconsistent.
+TopoDS_Wire bspline_wire(rust::Slice<const double> data) {
+  if (data.size() < 5) throw std::invalid_argument("bspline section: header too short");
+  const int degree = static_cast<int>(data[0]);
+  const int pole_count = static_cast<int>(data[1]);
+  const int knot_count = static_cast<int>(data[2]);
+  const bool rational = data[3] != 0.0;
+  const bool closing = data[4] != 0.0;
+  if (degree < 1 || pole_count < degree + 1 || knot_count < 2) throw std::invalid_argument("bspline section: bad counts");
+  const size_t poles_size = 3 * static_cast<size_t>(pole_count);
+  const size_t weights_size = rational ? static_cast<size_t>(pole_count) : 0;
+  if (data.size() != 5 + poles_size + weights_size + 2 * static_cast<size_t>(knot_count))
+    throw std::invalid_argument("bspline section: length mismatch");
+  size_t offset = 5;
+  TColgp_Array1OfPnt poles(1, pole_count);
+  for (int i = 0; i < pole_count; ++i) poles.SetValue(i + 1, point_at(data, offset + 3 * static_cast<size_t>(i)));
+  offset += poles_size;
+  TColStd_Array1OfReal weights(1, pole_count);
+  for (int i = 0; i < pole_count; ++i) weights.SetValue(i + 1, rational ? data[offset + static_cast<size_t>(i)] : 1.0);
+  offset += weights_size;
+  TColStd_Array1OfReal knots(1, knot_count);
+  for (int i = 0; i < knot_count; ++i) knots.SetValue(i + 1, data[offset + static_cast<size_t>(i)]);
+  offset += static_cast<size_t>(knot_count);
+  TColStd_Array1OfInteger multiplicities(1, knot_count);
+  int total = 0;
+  for (int i = 0; i < knot_count; ++i) {
+    const int multiplicity = static_cast<int>(data[offset + static_cast<size_t>(i)]);
+    multiplicities.SetValue(i + 1, multiplicity);
+    total += multiplicity;
+  }
+  if (total != pole_count + degree + 1) throw std::invalid_argument("bspline section: multiplicities do not fit the poles");
+  const Handle(Geom_BSplineCurve) curve =
+      rational ? new Geom_BSplineCurve(poles, weights, knots, multiplicities, degree) : new Geom_BSplineCurve(poles, knots, multiplicities, degree);
+  BRepBuilderAPI_MakeEdge edge(curve);
+  if (!edge.IsDone()) return TopoDS_Wire();
+  BRepBuilderAPI_MakeWire maker;
+  maker.Add(edge.Edge());
+  if (closing) {
+    const gp_Pnt first = curve->StartPoint();
+    const gp_Pnt last = curve->EndPoint();
+    if (first.Distance(last) > 1e-9) {
+      BRepBuilderAPI_MakeEdge closer(last, first);
+      if (!closer.IsDone()) return TopoDS_Wire();
+      maker.Add(closer.Edge());
+    }
+  }
+  return maker.IsDone() ? maker.Wire() : TopoDS_Wire();
+}
+
 // occtCurves.ts circleWire.
 TopoDS_Wire circle_wire(const gp_Pnt &center, const gp_Dir &normal, double radius) {
   BRepBuilderAPI_MakeEdge edge(gp_Circ(gp_Ax2(center, normal), radius));
@@ -382,6 +432,21 @@ std::unique_ptr<Shape> skinned_solid(rust::Slice<const double> chains, rust::Sli
   for (uint32_t length : lengths) {
     if (offset + length > chains.size()) throw std::invalid_argument("loft: chain lengths overrun");
     const TopoDS_Wire wire = chain_wire(rust::Slice<const double>(chains.data() + offset, length));
+    if (wire.IsNull()) return nullptr;
+    maker.AddWire(wire);
+    offset += length;
+  }
+  maker.Build();
+  return maker.IsDone() ? wrap(maker.Shape()) : nullptr;
+}
+
+std::unique_ptr<Shape> skinned_solid_bsplines(rust::Slice<const double> curves, rust::Slice<const uint32_t> lengths, bool ruled) {
+  BRepOffsetAPI_ThruSections maker(Standard_True, ruled, 1e-6);
+  maker.CheckCompatibility(Standard_False);
+  size_t offset = 0;
+  for (uint32_t length : lengths) {
+    if (offset + length > curves.size()) throw std::invalid_argument("loft: section lengths overrun");
+    const TopoDS_Wire wire = bspline_wire(rust::Slice<const double>(curves.data() + offset, length));
     if (wire.IsNull()) return nullptr;
     maker.AddWire(wire);
     offset += length;

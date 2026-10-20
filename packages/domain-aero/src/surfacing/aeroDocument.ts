@@ -84,6 +84,12 @@ function bodyErrors(key: string, raw: unknown): string[] {
   return errors;
 }
 
+function frameErrors(raw: unknown): string[] {
+  if (raw === undefined) return [];
+  const axes = ['datum', 'fsAxis', 'blAxis', 'wlAxis'] as const;
+  return isRecord(raw) && axes.every((axis) => isVec3(raw[axis])) ? [] : ['aero.frame needs datum, fsAxis, blAxis and wlAxis as [x, y, z]'];
+}
+
 export const aeroDocument: DocumentExtension = {
   validate(raw) {
     const slice = raw['aero'];
@@ -92,6 +98,7 @@ export const aeroDocument: DocumentExtension = {
     return [
       ...Object.entries(slice['airfoils']).flatMap(([key, value]) => airfoilErrors(key, value)),
       ...Object.entries(slice['wings']).flatMap(([key, value]) => wingErrors(key, value, slice)),
+      ...frameErrors(slice['frame']),
       ...(slice['bodies'] === undefined
         ? []
         : isRecord(slice['bodies'])

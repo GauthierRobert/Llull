@@ -2,7 +2,13 @@
 
 import { commandCatalog } from '@core/commands/schema';
 import { analyzeLaminate } from './analyzeCommand';
+import { addCore } from './coreCommands';
+import { splitPly } from './cutCommands';
+import { checkProducibility, drapePlyCommand } from './drapeCommands';
 import { exportFlatPatternsDxf } from './flatPatternDxf';
+import { exportLaserProjection } from './laserCommand';
+import { exportPlyBook } from './plyBook';
+import { createPlySolids } from './plySolidCommand';
 import { generatePliesFromZones } from './generateCommand';
 import { checkLayup, requestLayupWaiver } from './layupCommands';
 import { createLaminaMaterial, defineRosette } from './materialCommands';
@@ -41,4 +47,11 @@ export const compositesCommands = commandCatalog(
   exportPlyTable,
   importPlyTable,
   plyBookData,
+  drapePlyCommand,
+  checkProducibility,
+  splitPly,
+  addCore,
+  exportLaserProjection,
+  exportPlyBook,
+  createPlySolids,
 );

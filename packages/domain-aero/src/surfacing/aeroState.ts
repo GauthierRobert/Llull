@@ -1,6 +1,6 @@
 /** Read / write access to `CadDocument.aero` (absent until the first airfoil or wing command). */
 
-import type { AeroModel, AirfoilDef, BodyDef, WingDef } from '@core/model/aero';
+import type { AeroModel, AircraftFrame, AirfoilDef, BodyDef, WingDef } from '@core/model/aero';
 import type { CadDocument } from '@core/model/types';
 
 const EMPTY: AeroModel = { airfoils: {}, wings: {} };
@@ -21,3 +21,5 @@ export const withWing = (doc: CadDocument, wing: WingDef): CadDocument => ({
   ...doc,
   aero: { ...aeroOf(doc), wings: { ...aeroOf(doc).wings, [wing.id]: wing } },
 });
+
+export const withFrame = (doc: CadDocument, frame: AircraftFrame): CadDocument => ({ ...doc, aero: { ...aeroOf(doc), frame } });

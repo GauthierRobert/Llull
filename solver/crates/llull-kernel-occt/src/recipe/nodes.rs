@@ -55,11 +55,17 @@ pub(super) fn revolution(face: Shape, axis: [f64; 3], angle: f64, entity: &Value
     place_entity(shape_of(features::revolution_of_face(&face, axis, angle))?, entity, [0.0; 3])
 }
 
-/// Loft (`loftedSolid`): ThruSections through the ring curves (`native.chains`), placed.
+/// Loft (`loftedSolid`): ThruSections through the ring curves (`native.chains`), placed. With the capability `bsplineSections` the host also
+/// sends each exact section as ONE B-spline (`native.bsplines`): those are tried first, and a refusal or malformed data falls back to the chains.
 pub(super) fn loft(entity: &Value) -> Evaluated {
     let native = entity.get("native");
-    let Some(rings) = chains(native.and_then(|inner| inner.get("chains"))) else { return refused() };
     let ruled = native.and_then(|inner| inner.get("ruled")).and_then(Value::as_bool).unwrap_or(false);
+    if let Some(curves) = chains(native.and_then(|inner| inner.get("bsplines"))) {
+        if let Ok(Some(shape)) = features::skinned_solid_bsplines(&curves, ruled) {
+            return place_entity(Some(Rc::new(shape)), entity, [0.0; 3]);
+        }
+    }
+    let Some(rings) = chains(native.and_then(|inner| inner.get("chains"))) else { return refused() };
     place_entity(shape_of(features::skinned_solid(&rings, ruled))?, entity, [0.0; 3])
 }
 
@@ -274,6 +280,18 @@ mod tests {
         };
         let loft = json!({ "kind": "loft", "native": { "chains": [square(0.0), square(2.0)], "ruled": true } });
         assert!((volume(evaluator.evaluate(&leaf(loft))) - 8.0).abs() < 1e-6);
+        // the same loft from B-spline sections (degree 1, five poles, closed square): volume 8; malformed B-spline data falls back to the chains
+        let bspline_square = |z: f64| -> Vec<f64> {
+            let corners = [[1.0, 1.0], [-1.0, 1.0], [-1.0, -1.0], [1.0, -1.0], [1.0, 1.0]];
+            let mut data = vec![1.0, 5.0, 5.0, 0.0, 0.0];
+            data.extend(corners.iter().flat_map(|corner| [corner[0], corner[1], z]));
+            data.extend([0.0, 1.0, 2.0, 3.0, 4.0, 2.0, 1.0, 1.0, 1.0, 2.0]);
+            data
+        };
+        let exact = json!({ "kind": "loft", "native": { "bsplines": [bspline_square(0.0), bspline_square(2.0)], "chains": [square(0.0), square(2.0)], "ruled": true } });
+        assert!((volume(evaluator.evaluate(&leaf(exact))) - 8.0).abs() < 1e-6, "B-spline sections");
+        let malformed = json!({ "kind": "loft", "native": { "bsplines": [[1.0, 5.0], [1.0]], "chains": [square(0.0), square(2.0)], "ruled": true } });
+        assert!((volume(evaluator.evaluate(&leaf(malformed))) - 8.0).abs() < 1e-6, "fallback to the chains");
         let sweep = json!({ "kind": "sweep", "native": { "spine": [0, 0, 0, 0, 0, 0, 2], "chain": square(0.0) } });
         assert!((volume(evaluator.evaluate(&leaf(sweep))) - 8.0).abs() < 1e-6);
         let tetra = json!({ "positions": [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1], "indices": [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2] });

@@ -12,9 +12,11 @@ import { positionsGeometry } from '../../lineGeometry';
 /** Edges sharper than this stay hard (radians). */
 const MESH_CREASE_ANGLE = toRadians(30);
 
-export function buildMeshSolidGeometry(mesh: MeshData): THREE.BufferGeometry {
+/** `colors` (r, g, b per vertex) become the geometry's `color` attribute (analysis colour maps); they survive the crease splitting. */
+export function buildMeshSolidGeometry(mesh: MeshData, colors?: ReadonlyArray<number>): THREE.BufferGeometry {
   const indexed = positionsGeometry(mesh.positions);
   indexed.setIndex(new THREE.BufferAttribute(new Uint32Array(mesh.indices), 1));
+  if (colors !== undefined) indexed.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   const creased = toCreasedNormals(indexed, MESH_CREASE_ANGLE);
   indexed.dispose();
   return creased;

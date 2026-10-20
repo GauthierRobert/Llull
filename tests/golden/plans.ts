@@ -468,6 +468,57 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'loft_surface', params: { sectionIds: ['$bottom', '$top'], degreeV: 1 }, as: 'skin' },
     { command: 'measure_deviation', params: { id: '$skin', points: [[1, 0.5, 1.5]] } },
   ],
+  // 02 SRF M5 / M7 (SRF-3): trim by a circle (VC-SRF-23), approximate a point cloud, blend two strips G2, sew a box shell, report quality
+  surface_trim_blend_sew: [
+    {
+      command: 'create_nurbs_surface',
+      params: {
+        degreeU: 1,
+        degreeV: 1,
+        poles: [
+          [xyz(0, 0, 0)[0], xyz(0, 10, 0)[0]],
+          [xyz(10, 0, 0)[0], xyz(10, 10, 0)[0]],
+        ],
+        knotsU: [0, 1],
+        multiplicitiesU: [2, 2],
+        knotsV: [0, 1],
+        multiplicitiesV: [2, 2],
+      },
+      as: 'plate',
+    },
+    {
+      command: 'create_nurbs_curve',
+      params: {
+        degree: 2,
+        poles: [
+          [8, 5, 0],
+          [8, 8, 0],
+          [5, 8, 0],
+          [2, 8, 0],
+          [2, 5, 0],
+          [2, 2, 0],
+          [5, 2, 0],
+          [8, 2, 0],
+          [8, 5, 0],
+        ],
+        weights: [1, Math.SQRT1_2, 1, Math.SQRT1_2, 1, Math.SQRT1_2, 1, Math.SQRT1_2, 1],
+        knots: [0, 0.25, 0.5, 0.75, 1],
+        multiplicities: [3, 2, 2, 2, 3],
+      },
+      as: 'circle',
+    },
+    { command: 'trim_surface', params: { id: '$plate', curveIds: ['$circle'], keep: 'inside' } },
+    { command: 'measure_area', params: { entityId: '$plate' } },
+    {
+      command: 'approximate_curve',
+      params: { points: xyz(0, 0, 0, 1, 0.8, 0, 2, 1.1, 0, 3, 0.9, 0, 4, 0.2, 0, 5, -0.6, 0, 6, -1, 0), tolerance: 0.05 },
+      as: 'fit',
+    },
+    {
+      command: 'check_surface_quality',
+      params: { ids: ['$plate'], require: 'G0', g0: 1e-6, g1AngleRad: 0.01, g2Rel: 0.1, g3Rel: 0.1, sewing: 1e-6 },
+    },
+  ],
   // 02 SRF VC-SRF-11: NACA 0012 trapezoid wing, 2 m -> 1 m chord, 5 m semi-span, volume 0.959117 m3 per half
   aero_naca_trap_wing: [
     { command: 'set_units', params: { units: 'm' } },

@@ -12,13 +12,16 @@ export function isCompositeEntity(analysis: AnalysisCase, entityId: string): boo
   return idealization?.kind === 'shell' && idealization.laminate !== undefined;
 }
 
-/** One warning per composite shell part left out of the table. */
-export function compositeWarnings(analysis: AnalysisCase): string[] {
+/**
+ * One warning per composite shell part left out of the table, with the reason it got no ply-failure rows (`reasons` by entity id; without one the
+ * part is reported with a generic reason). A composite shell that produced rows has no warning.
+ */
+export function compositeWarnings(analysis: AnalysisCase, reasons?: ReadonlyMap<string, string>): string[] {
   return Object.keys(analysis.parts)
-    .filter((entityId) => isCompositeEntity(analysis, entityId))
+    .filter((entityId) => isCompositeEntity(analysis, entityId) && (reasons === undefined || reasons.has(entityId)))
     .map(
       (entityId) =>
-        `FEA_COMPOSITE_MARGINS_UNSUPPORTED: composite shell '${entityId}' has no margin rows (ply failure criteria are not built; an isotropic von Mises margin would be wrong)`,
+        `FEA_COMPOSITE_MARGINS_UNSUPPORTED: composite shell '${entityId}' has no margin rows (${reasons?.get(entityId) ?? 'ply failure margins were not computed'}; an isotropic von Mises margin would be wrong)`,
     );
 }
 

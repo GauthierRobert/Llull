@@ -173,7 +173,7 @@ describe('kernel cone faces with a sector above pi', () => {
       exportStep: () => null,
       faceQuery,
     };
-    const sphere = ok(apply(withMaterials(), 'define_rosette', ROSETTE), 'add_sphere', { radius: 10 });
+    const sphere = ok(apply(withMaterials(), 'define_rosette', ROSETTE), 'add_torus', { ringRadius: 10, tubeRadius: 3 });
     const created = execute(
       sphere.document,
       'create_composite_part',

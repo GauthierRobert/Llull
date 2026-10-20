@@ -5,10 +5,11 @@ import type { DocumentUnit } from '@core/model/types';
 import { polygonCentroid } from '@lib/polygon';
 import { sig } from '../shared/results';
 import { analyzeStack, type Loads } from './analysis';
-import { isUnverified } from './provenance';
+import { isUnverified } from '@lib/laminate/provenance';
 import { type Thresholds, effectiveRules, ruleFindings } from './ruleReport';
 import { DEFAULT_DROP_RULES } from './rules';
 import { representativePoint, stackAt } from './sample';
+import { coreAt } from './sandwich';
 import { pliesOf, zonesOf } from './state';
 import { blendZones } from './zones';
 
@@ -37,6 +38,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   CMP_WAIVER_PENDING: 'ask the qualified reviewer to approve the waiver; the finding stays a failure until then',
   CMP_MATERIAL_ALLOWABLE_MISSING: 'add Xt, Xc, Yt, Yc and S from a cited source (no default exists) to run the strength check',
   CMP_NOT_BLENDABLE: 'edit the zones so every stack embeds in the thickest one',
+  CMP_CORE_UNSUPPORTED: 'analyse the skins of the sandwich separately; cores are not part of the laminate strength check',
 };
 
 const waiverFor = (waivers: readonly LayupWaiver[], part: CompositePart, finding: LayupFinding): LayupWaiver | undefined =>
@@ -134,6 +136,17 @@ export function layupFindings(
   for (const station of stations) {
     const entries = stackAt(model, part, station.uv);
     if (entries.length === 0) continue;
+    if (coreAt(model, part, station.uv) !== null) {
+      if ((options.loads ?? []).length > 0)
+        findings.push({
+          code: 'CMP_CORE_UNSUPPORTED',
+          severity: 'warn',
+          message: `zone "${station.name}" lies over a sandwich core: the strength ratio was not evaluated`,
+          ids: [station.id],
+          remediation: REMEDIATION['CMP_CORE_UNSUPPORTED'] as string,
+        });
+      continue;
+    }
     for (const loadCase of options.loads ?? []) {
       const outcome = analyzeStack(
         entries.map((entry) => ({ material: entry.material, angle: entry.ply.orientation })),
