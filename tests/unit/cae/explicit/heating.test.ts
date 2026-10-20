@@ -120,12 +120,11 @@ describe('05 supports in the explicit job', () => {
     expect(job(bar.doc).fixed).toEqual([]);
   });
 
-  it('refuses supports it cannot hold: symmetry, prescribed motion and edge targets', () => {
+  it('refuses supports it cannot hold: prescribed motion and edge targets', () => {
     const refusedCode = (doc: CadDocument): string | null => {
       const built = buildExplicitJob(doc, bar.analysisId, null);
       return built.ok ? null : built.code;
     };
-    expect(refusedCode(support('symmetry', { facesNear: [[5, 5, 200]] }))).toBe('EXP_CONSTRAINT_UNSUPPORTED');
     expect(refusedCode(support('displacement', { facesNear: [[5, 5, 200]] }, { uz: 0.1 }))).toBe('EXP_CONSTRAINT_UNSUPPORTED');
     expect(refusedCode(support('fixed', { edgesNear: [[0, 0, 100]] }))).toBe('EXP_CONSTRAINT_UNSUPPORTED');
   });
@@ -160,6 +159,20 @@ describe('05 supports in the explicit job', () => {
     expect(built.job.fixed).toEqual([0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0]);
     const empty = buildExplicitJob(tetCase, bar.analysisId, { ...mesh, nodeSets: {} });
     expect(empty.ok ? null : empty.code).toBe('EXP_CONSTRAINT_UNSUPPORTED');
+    // A symmetry node set on the plane z = 0 holds uz only; a set off any axis-aligned plane is refused.
+    const symmetric = must(tetCase, 'add_fea_constraint', {
+      analysisId: bar.analysisId,
+      name: 'sym',
+      kind: 'symmetry',
+      target: { entityId: bar.barId, facesNear: [[5, 5, 0]] },
+    });
+    const withoutFixed = must(symmetric.document, 'delete_fea_constraint', { analysisId: bar.analysisId, constraintId }).document;
+    const symmetryId = symmetric.affected[0] ?? '';
+    const planar = buildExplicitJob(withoutFixed, bar.analysisId, { ...mesh, nodeSets: { [`C_${symmetryId}`]: [11, 12, 13] } });
+    if (!planar.ok) throw new Error(planar.message);
+    expect(planar.job.fixed).toEqual([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0]);
+    const skew = buildExplicitJob(withoutFixed, bar.analysisId, { ...mesh, nodeSets: { [`C_${symmetryId}`]: [12, 13, 14] } });
+    expect(skew.ok ? null : skew.code).toBe('EXP_CONSTRAINT_UNSUPPORTED');
   });
 });
 

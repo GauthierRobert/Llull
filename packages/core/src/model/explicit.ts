@@ -44,6 +44,23 @@ export interface ExplicitHeating {
   readonly taylorQuinney: NamedValue;
 }
 
+/** Where an imposed motion acts: points near box faces or nodes of a part (the 05 target subset llull_explicit resolves). */
+export interface ExplicitMotionTarget {
+  readonly entityId: string;
+  readonly facesNear?: readonly Vec3[];
+  readonly pointsNear?: readonly Vec3[];
+}
+
+/** Imposed motion of one translational dof (§3 `imposedMotions`, RS-8): a (time s, value) curve in the case units, held constant outside. */
+export interface ExplicitImposedMotion {
+  readonly name: string;
+  readonly target: ExplicitMotionTarget;
+  readonly dof: 'x' | 'y' | 'z';
+  /** velocity: length/s; displacement: length, from the initial position. */
+  readonly kind: 'velocity' | 'displacement';
+  readonly curve: readonly (readonly [number, number])[];
+}
+
 /** Penalty contact (RS-8c): two part sets checked both ways, the nodes of `a` against the surface of `b` (one way), or `a` against itself. */
 export interface ExplicitContact {
   readonly name: string;
@@ -79,6 +96,9 @@ export interface ExplicitSpec {
   readonly failure?: Readonly<Record<string, ExplicitFailure>>;
   /** Adiabatic heating per document material id (RS-8); absent = isothermal at the Johnson–Cook transition temperature. */
   readonly heating?: Readonly<Record<string, ExplicitHeating>>;
+  /** Imposed motions (RS-8), by id `im-<step>.<k>`, applied in `imposedMotionOrder`. */
+  readonly imposedMotions?: Readonly<Record<string, ExplicitImposedMotion>>;
+  readonly imposedMotionOrder?: readonly string[];
   /** Penalty contacts (RS-8c), by id `ct-<step>.<k>`. */
   readonly contacts?: Readonly<Record<string, ExplicitContact>>;
   readonly contactOrder?: readonly string[];

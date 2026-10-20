@@ -6,6 +6,7 @@ import { explicitQuickCheck } from './quickCheck';
 import { addContact, deleteContact } from './contactCommands';
 import { setJohnsonCookFailure } from './failureCommand';
 import { setAdiabaticHeating } from './heatingCommand';
+import { addImposedMotion, deleteImposedMotion } from './imposedMotionCommands';
 import { setExplicitShell } from './shellCommand';
 import { recordExplicitResults } from './record';
 import { addRigidWall, deleteRigidWall, setExplicitControls, setInitialVelocity } from './setupCommands';
@@ -17,6 +18,8 @@ export const explicitCommands = commandCatalog(
   deleteRigidWall,
   setJohnsonCookFailure,
   setAdiabaticHeating,
+  addImposedMotion,
+  deleteImposedMotion,
   addContact,
   deleteContact,
   setExplicitShell,

@@ -123,6 +123,26 @@ function specErrors(caseId: string, spec: unknown): string[] {
       ))
   )
     errors.push(`${where}.failure is malformed`);
+  const motions = spec['imposedMotions'];
+  const motionOrder = spec['imposedMotionOrder'];
+  if (
+    motions !== undefined &&
+    (!isRecord(motions) ||
+      !Array.isArray(motionOrder) ||
+      motionOrder.some((id) => typeof id !== 'string' || !Object.hasOwn(motions, id)) ||
+      !Object.values(motions).every(
+        (entry) =>
+          isRecord(entry) &&
+          typeof entry['name'] === 'string' &&
+          isRecord(entry['target']) &&
+          typeof entry['target']['entityId'] === 'string' &&
+          ['x', 'y', 'z'].includes(String(entry['dof'])) &&
+          ['velocity', 'displacement'].includes(String(entry['kind'])) &&
+          Array.isArray(entry['curve']) &&
+          entry['curve'].every((point) => Array.isArray(point) && point.length === 2 && point.every(finite)),
+      ))
+  )
+    errors.push(`${where}.imposedMotions / imposedMotionOrder are malformed`);
   const heating = spec['heating'];
   if (
     heating !== undefined &&

@@ -9,7 +9,7 @@ import type { Vec3 } from '@core/model/vectors';
 import type { CadDocument } from '@core/model/types';
 import { toMetres } from '@core/model/units';
 import { analysisLengthMetres } from '../shared/defaults';
-import { fixedDofs } from './constraints';
+import { fixedDofs, jobImposedMotions, type JobImposedMotion } from './constraints';
 import { explicitInputHash } from './hash';
 import { jobHeating, type JobHeating } from './heating';
 import { explicitMaterial, type ExplicitMaterial } from './laws';
@@ -39,6 +39,8 @@ export interface ExplicitJob {
   readonly fixed: readonly number[];
   /** One 0/1 per rotational dof of the shell nodes held by fixed supports; empty = none. */
   readonly fixedRotation: readonly number[];
+  /** Imposed motions on mesh nodes, in order. */
+  readonly imposedMotions: readonly JobImposedMotion[];
   /** Index into `materials` per element (hex8 first, then tet4). */
   readonly elementMaterial: readonly number[];
   /** Part index per element (position in the sorted part ids). */
@@ -71,7 +73,7 @@ const refuse = (code: string, message: string, ids: readonly string[]): Explicit
 /**
  * @failure unknown / non-explicit case or no controls -> FEA_ANALYSIS_NOT_FOUND / EXP_CASE_TYPE / EXP_CONTROLS_MISSING; other unit systems ->
  *   EXP_UNITS_UNSUPPORTED; no parts / mesh refusals -> EXP_MESH_UNSUPPORTED; fea_mesh without a mesh artifact -> EXP_MESH_MISSING; material
- *   refusals -> EXP_MATERIAL_*; neither an initial velocity nor gravity -> EXP_NO_EXCITATION; a support it cannot hold -> EXP_CONSTRAINT_UNSUPPORTED
+ *   refusals -> EXP_MATERIAL_*; no initial velocity, gravity or imposed motion -> EXP_NO_EXCITATION; a support it cannot hold -> EXP_CONSTRAINT_UNSUPPORTED
  */
 export function buildExplicitJob(doc: CadDocument, analysisId: string, meshArtifact: FeMeshArtifact | null): ExplicitJobResult {
   const found = explicitCase(doc, analysisId);
@@ -120,10 +122,12 @@ export function buildExplicitJob(doc: CadDocument, analysisId: string, meshArtif
   if ('code' in heated) return refuse(heated.code, heated.message, heated.ids);
   const held = fixedDofs(analysisCase, mesh, spec.mesh.kind === 'structured_hex' ? null : meshArtifact, lengthToAnalysis);
   if ('code' in held) return refuse(held.code, held.message, held.ids);
+  const imposedMotions = jobImposedMotions(spec, mesh, lengthToAnalysis);
+  if ('code' in imposedMotions) return refuse(imposedMotions.code, imposedMotions.message, imposedMotions.ids);
   const velocities = new Map(Object.values(spec.initialVelocities).map((entry) => [entry.entityId, entry.velocity] as const));
   const gravity: Vec3 = spec.gravity ?? [0, 0, 0];
-  if (velocities.size === 0 && gravity.every((component) => component === 0))
-    return refuse('EXP_NO_EXCITATION', `analysis '${analysisId}' has no initial velocity and no gravity`, [analysisId]);
+  if (velocities.size === 0 && gravity.every((component) => component === 0) && imposedMotions.length === 0)
+    return refuse('EXP_NO_EXCITATION', `analysis '${analysisId}' has no initial velocity, gravity or imposed motion`, [analysisId]);
   const initialVelocity = mesh.nodePart.flatMap((part) => [...(velocities.get(part) ?? [0, 0, 0])]);
   const walls = spec.rigidWallOrder.flatMap((id) => {
     const wall = spec.rigidWalls[id];
@@ -144,6 +148,7 @@ export function buildExplicitJob(doc: CadDocument, analysisId: string, meshArtif
       materialHeating: heated,
       fixed: held.fixed,
       fixedRotation: held.fixedRotation,
+      imposedMotions,
       elementPart: mesh.elementPart.map((part) => partIds.indexOf(part)),
       contacts: (spec.contactOrder ?? []).flatMap((id) => {
         const contact = spec.contacts?.[id];

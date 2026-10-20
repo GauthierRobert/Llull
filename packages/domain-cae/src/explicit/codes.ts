@@ -28,6 +28,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   EXP_MATERIAL_NO_CP: 'give the material a specific heat model (define_property_model property cp), or remove its adiabatic heating',
   EXP_CONSTRAINT_UNSUPPORTED:
     'llull_explicit holds fixed / pinned supports (and displacement dofs of 0) on box faces, nodes near points or whole parts of a structured hex mesh, or the mesh node sets of fea_mesh',
+  EXP_CURVE_INVALID: 'give at least one [time s, value] point, times strictly increasing, finite values',
+  EXP_IMPOSED_MOTION_NOT_FOUND: 'list the imposed motions with explicit_report',
   EXP_SHELL_INVALID: 'pick an unrotated box part whose smallest dimension is at most a quarter of the others, points 1 to 5',
 };
 

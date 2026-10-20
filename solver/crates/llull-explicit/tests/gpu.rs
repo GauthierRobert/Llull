@@ -242,6 +242,24 @@ fn shells_and_adiabatic_heating_gpu_match_the_cpu_twin() {
     assert!(rise > 1.0 && gap < 1e-4 * rise);
 }
 
+#[test]
+fn imposed_motion_gpu_matches_the_cpu_twin() {
+    use llull_explicit::model::{ImposedKind, ImposedMotion};
+    // The bar is pulled at z = 0 by a velocity ramp (0 to 10 m/s over 10 µs) and its top by a displacement curve.
+    let (coordinates, hex8) = hex_grid([0.0, 0.0, 0.0], [10.0, 10.0, 100.0], [2, 2, 20]);
+    let mut bar = model(coordinates, hex8, vec![], steel(0.3, None), [0.0; 3], controls(3e-5, 1e-6));
+    let at = |z: f64| -> Vec<usize> { (0..bar.coordinates.len() / 3).filter(|&n| bar.coordinates[3 * n + 2] == z).collect() };
+    let (bottom, top) = (at(0.0), at(100.0));
+    bar.imposed.push(ImposedMotion { nodes: bottom, dof: 2, kind: ImposedKind::Velocity, curve: vec![[0.0, 0.0], [1e-5, -10_000.0]] });
+    bar.imposed.push(ImposedMotion { nodes: top, dof: 2, kind: ImposedKind::Displacement, curve: vec![[0.0, 0.0], [3e-5, 0.1]] });
+    let Some(gpu) = gpu_or_skip(&bar) else { return };
+    let reference = cpu(&bar);
+    let speed_error = max_relative(&gpu.velocities, &reference.velocities, 10_000.0);
+    let (w_gpu, w_cpu) = (gpu.energy.last().expect("rows").external_work, reference.energy.last().expect("rows").external_work);
+    eprintln!("imposed motion GPU vs CPU: velocity {speed_error:e}, external work {w_gpu:e} vs {w_cpu:e}");
+    assert!(speed_error < 1e-7 && (w_gpu - w_cpu).abs() < 1e-7 * w_cpu.abs());
+}
+
 /// Wall time of the CPU twin and the GPU path on a contact case (`cargo test --features gpu --test gpu -- --ignored --nocapture`).
 #[test]
 #[ignore = "timing, not a check"]

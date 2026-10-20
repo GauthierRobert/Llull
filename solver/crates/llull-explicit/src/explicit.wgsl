@@ -6,7 +6,7 @@
 struct Counts { nodes: u32, elements: u32, walls: u32, groups_x: u32 };
 
 @group(0) @binding(0) var<uniform> counts: Counts;
-// [dt_prev, dt, hourglass, bulk_linear, bulk_quadratic, gx, gy, gz]
+// [dt_prev, dt, hourglass, bulk_linear, bulk_quadratic, gx, gy, gz, time]
 @group(0) @binding(1) var<storage, read> scalars: array<f64>;
 @group(0) @binding(2) var<storage, read> mass: array<f64>;
 @group(0) @binding(3) var<storage, read_write> x: array<f64>;
@@ -44,6 +44,29 @@ struct Counts { nodes: u32, elements: u32, walls: u32, groups_x: u32 };
 @group(0) @binding(22) var<storage, read> fixed: array<u32>;
 // (temperature K, c_p) pairs of every material's c_p table, in material order
 @group(0) @binding(23) var<storage, read> cp_table: array<f64>;
+// 1 per dof: 0 = free, k + 1 = imposed by motion k
+@group(0) @binding(24) var<storage, read> imposed: array<u32>;
+// per motion [kind (0 velocity, 1 displacement), first point (index of its time in this array), point count]; then the (t, value) points
+@group(0) @binding(25) var<storage, read> motions: array<f64>;
+// 3 per node: initial coordinates (displacement curves)
+@group(0) @binding(26) var<storage, read> x_ref: array<f64>;
+
+// A motion curve at a time: linear, constant outside it (model.rs ImposedMotion::at).
+fn curve_at(motion: u32, time: f64) -> f64 {
+  let start = u32(motions[3u * motion + 1u]);
+  let count = u32(motions[3u * motion + 2u]);
+  if (time <= motions[start]) { return motions[start + 1u]; }
+  let last = start + 2u * (count - 1u);
+  if (time >= motions[last]) { return motions[last + 1u]; }
+  for (var k = start + 2u; k <= last; k = k + 2u) {
+    if (time < motions[k]) {
+      let t0 = motions[k - 2u];
+      let v0 = motions[k - 1u];
+      return v0 + (motions[k + 1u] - v0) * (time - t0) / (motions[k] - t0);
+    }
+  }
+  return motions[last + 1u];
+}
 
 const BIG: f64 = 1.0e300lf;
 
@@ -95,6 +118,19 @@ fn kick(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_index) 
   }
   for (var c = 0u; c < 3u; c = c + 1u) {
     if (fixed[3u * i + c] != 0u) { v[c] = 0.0lf; }
+    let code = imposed[3u * i + c];
+    if (code != 0u) {
+      let motion = code - 1u;
+      let time = scalars[8];
+      var target_v = curve_at(motion, time + 0.5lf * dt);
+      if (motions[3u * motion] > 0.5lf) {
+        target_v = (curve_at(motion, time + dt) - (x[3u * i + c] - x_ref[3u * i + c])) / dt;
+      }
+      // Reaction work over the central-difference step (solver.rs impose).
+      let reaction = m * (target_v - v[c]) / (0.5lf * (dtp + dt));
+      node_energy[2u * i + 1u] = node_energy[2u * i + 1u] + reaction * 0.5lf * (dtp * v_half[3u * i + c] + dt * target_v);
+      v[c] = target_v;
+    }
     v_new[3u * i + c] = v[c];
     x_new[3u * i + c] = x[3u * i + c] + dt * v[c];
   }

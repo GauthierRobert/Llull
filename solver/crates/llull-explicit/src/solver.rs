@@ -284,6 +284,23 @@ pub(crate) fn centroid(nodes: &[usize], x: &[f64]) -> [f64; 3] {
     std::array::from_fn(|i| nodes.iter().map(|&node| x[3 * node + i]).sum::<f64>() / count)
 }
 
+/// Overrides the imposed dofs of `v_new` and returns the work of their reactions over the central-difference step: the reaction
+/// `R = m (v_imposed − v_pred) / (½(Δt_prev + Δt))` at step n times `½(Δt_prev v^{n−½} + Δt v^{n+½})` (the contact-energy form).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn impose(model: &Model, v_new: &mut [f64], v_half: &[f64], x: &[f64], masses: &[f64], time: f64, dt_prev: f64, dt: f64) -> f64 {
+    let mut work = 0.0;
+    for motion in &model.imposed {
+        for &node in &motion.nodes {
+            let k = 3 * node + motion.dof;
+            let imposed = motion.velocity(time, dt, x[k], model.coordinates[k]);
+            let reaction = masses[node] * (imposed - v_new[k]) / (0.5 * (dt_prev + dt));
+            work += reaction * 0.5 * (dt_prev * v_half[k] + dt * imposed);
+            v_new[k] = imposed;
+        }
+    }
+    work
+}
+
 /// Integrates `model` to its end time. `progress` is called once per cycle.
 pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome, String> {
     let controls = &model.controls;
@@ -385,6 +402,7 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
                 v_new[k] = 0.0;
             }
         }
+        external_work += impose(model, &mut v_new, &v_half, &x, &masses, time, dt_prev, dt);
         let omega_previous = shells.as_ref().map(|set| set.omega.clone());
         if let Some(set) = shells.as_mut() {
             set.kick(dt_prev, dt, &model.fixed_rotation);

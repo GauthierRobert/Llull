@@ -24,8 +24,8 @@ const SHADER: &str = include_str!("explicit.wgsl");
 const WORKGROUP: u32 = 64;
 /// Group count per dispatch row the shader folds linear indices with (`counts.groups_x`).
 const GROUPS_X: u32 = 65_535;
-const READ_ONLY: [u32; 12] = [1, 2, 8, 11, 12, 13, 14, 18, 19, 21, 22, 23];
-const BINDINGS: u32 = 24;
+const READ_ONLY: [u32; 15] = [1, 2, 8, 11, 12, 13, 14, 18, 19, 21, 22, 23, 24, 25, 26];
+const BINDINGS: u32 = 27;
 
 fn f64_bytes(values: &[f64]) -> Vec<u8> {
     let mut bytes: Vec<u8> = values.iter().flat_map(|value| value.to_le_bytes()).collect();
@@ -191,7 +191,7 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
         .collect();
     let walls: Vec<f64> = model.walls.iter().flat_map(|wall| [wall.point, wall.normal].concat()).collect();
     let g = model.gravity;
-    let scalars_init = [0.0, 0.0, controls.hourglass_coefficient, controls.bulk_linear, controls.bulk_quadratic, g[0], g[1], g[2]];
+    let scalars_init = [0.0, 0.0, controls.hourglass_coefficient, controls.bulk_linear, controls.bulk_quadratic, g[0], g[1], g[2], 0.0];
     let counts = gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("explicit counts"),
         contents: &u32_bytes(&[nodes as u32, count as u32, walls_count as u32, GROUPS_X]),
@@ -224,6 +224,25 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
     let host_force_buffer = buffer(&gpu, "host_force", f64_bytes(&vec![0.0; 3 * nodes]));
     let fixed_mask: Vec<u32> = (0..3 * nodes).map(|k| u32::from(model.fixed.get(k).copied().unwrap_or(false))).collect();
     let fixed_buffer = buffer(&gpu, "fixed", u32_bytes(&fixed_mask));
+    let mut imposed_codes = vec![0u32; 3 * nodes];
+    let mut motion_data: Vec<f64> = Vec::new();
+    let header = 3 * model.imposed.len();
+    let mut points: Vec<f64> = Vec::new();
+    for (index, motion) in model.imposed.iter().enumerate() {
+        let kind = match motion.kind {
+            crate::model::ImposedKind::Velocity => 0.0,
+            crate::model::ImposedKind::Displacement => 1.0,
+        };
+        motion_data.extend_from_slice(&[kind, (header + points.len()) as f64, motion.curve.len() as f64]);
+        points.extend(motion.curve.iter().flatten());
+        for &node in &motion.nodes {
+            imposed_codes[3 * node + motion.dof] = index as u32 + 1;
+        }
+    }
+    motion_data.extend(points);
+    let imposed_buffer = buffer(&gpu, "imposed", u32_bytes(&imposed_codes));
+    let motions_buffer = buffer(&gpu, "motions", f64_bytes(&motion_data));
+    let x_ref_buffer = buffer(&gpu, "x_ref", f64_bytes(&x0));
     let entries: Vec<wgpu::BindGroupLayoutEntry> = (0..BINDINGS)
         .map(|binding| if binding == 0 { uniform_entry(0) } else { storage_entry(binding, READ_ONLY.contains(&binding)) })
         .collect();
@@ -253,6 +272,9 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
         &host_force_buffer,
         &fixed_buffer,
         &cp_table_buffer,
+        &imposed_buffer,
+        &motions_buffer,
+        &x_ref_buffer,
     ];
     let bind_entries: Vec<wgpu::BindGroupEntry> = resources
         .iter()
@@ -321,6 +343,7 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
         min_dt = min_dt.min(dt);
         dt = dt.min(end - time);
         gpu.queue.write_buffer(&b.scalars, 0, &f64_bytes(&[dt_prev, dt]));
+        gpu.queue.write_buffer(&b.scalars, 64, &f64_bytes(&[time]));
         let contact_force = contacts.as_mut().map(|set| set.forces(&host_x, dt_prev));
         if hybrid {
             let host: Vec<f64> = (0..3 * nodes).map(|k| contact_force.as_ref().map_or(0.0, |forces| forces[k]) - shell_force[k]).collect();

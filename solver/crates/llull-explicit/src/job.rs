@@ -29,9 +29,11 @@
 //!   `[{ "name", "kind": "surface_to_surface" | "nodes_to_surface" | "self", "a": [parts] (the slaves of
 //!   nodes_to_surface), "b": [parts], "staticFriction", "dynamicFriction", "decay",
 //!   "penaltyScale" }]` (friction 0 by default, dynamic = static when absent, penalty scale 0.1 = LS-DYNA SLSFAC).
-//! - Optional (RS-8): per material `heating` `{ "taylorQuinney": 0.9, "specificHeat": 4.6e8 }` (adiabatic heating of the Johnson–Cook
-//!   plastic work), `initialTemperature` (K; default: each Johnson–Cook material at its transition temperature), `shellWarping`
-//!   (Belytschko–Leviathan warping projection of the shells, default true).
+//! - Optional (RS-8): per material `heating` `{ "taylorQuinney": 0.9, "specificHeat": 4.6e8, "specificHeatTable": [[T K, c_p], …] }`
+//!   (adiabatic heating of the Johnson–Cook plastic work; the table, when given, is read at each point's temperature),
+//!   `initialTemperature` (K; default: each Johnson–Cook material at its transition temperature), `shellWarping` (Belytschko–Wong–Chiang
+//!   shell: warping projection, fiber coupling and edge shear, default true), `imposedMotions`
+//!   `[{ "nodes": [..], "dof": 0..2, "kind": "velocity" | "displacement", "curve": [[t s, value], …] }]`.
 //! - `device`: `cpu` (default, deterministic Rust path) | `gpu` | `auto`. Without the GPU kernels (feature) or an f64 adapter a GPU
 //!   request runs the CPU twin and reports the warning `EXP_GPU_FALLBACK`; contacts, fixed DOFs and shells run on the GPU path (contact
 //!   and shells as its deterministic host part, `gpu.rs`).
@@ -51,7 +53,8 @@
 //!   Every output is byte-identical across runs and thread counts.
 
 use crate::model::{
-    Contact, ContactKind, Controls, Friction, Heating, JohnsonCook, JohnsonCookFailure, MassScaling, Material, Model, Wall,
+    Contact, ContactKind, Controls, Friction, Heating, ImposedKind, ImposedMotion, JohnsonCook, JohnsonCookFailure, MassScaling, Material,
+    Model, Wall,
 };
 use crate::solver::{run, Outcome, Progress};
 use llull_protocol::{emit, sha256_hex, Event, Output};
@@ -233,6 +236,40 @@ struct JobSpec {
     fixed_rotation: Option<String>,
     #[serde(default)]
     contacts: Vec<ContactSpec>,
+    #[serde(default)]
+    imposed_motions: Vec<ImposedSpec>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ImposedSpec {
+    nodes: Vec<usize>,
+    dof: usize,
+    kind: ImposedKindName,
+    curve: Vec<[f64; 2]>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ImposedKindName {
+    Velocity,
+    Displacement,
+}
+
+fn imposed_motion(spec: ImposedSpec, nodes: usize) -> Result<ImposedMotion, JobError> {
+    if spec.dof > 2
+        || spec.curve.is_empty()
+        || spec.nodes.iter().any(|&node| node >= nodes)
+        || !spec.curve.iter().all(|[t, v]| t.is_finite() && v.is_finite())
+        || !spec.curve.windows(2).all(|pair| pair[0][0] < pair[1][0])
+    {
+        return Err(input("imposedMotions need nodes in range, dof 0..2 and a curve increasing in time with finite values"));
+    }
+    let kind = match spec.kind {
+        ImposedKindName::Velocity => ImposedKind::Velocity,
+        ImposedKindName::Displacement => ImposedKind::Displacement,
+    };
+    Ok(ImposedMotion { nodes: spec.nodes, dof: spec.dof, kind, curve: spec.curve })
 }
 
 /// Default cap on cycles when the job gives none.
@@ -385,6 +422,12 @@ pub fn load(folder: &Path) -> Result<(Model, bool), JobError> {
             Ok(Wall { name: wall.name, point: wall.point, normal: wall.normal.map(|value| value / length) })
         })
         .collect::<Result<Vec<_>, _>>()?;
+    let node_count = coordinates.len() / 3;
+    let imposed = spec.imposed_motions.into_iter().map(|motion| imposed_motion(motion, node_count)).collect::<Result<Vec<_>, _>>()?;
+    let mut taken = std::collections::BTreeSet::new();
+    if !imposed.iter().all(|motion| motion.nodes.iter().all(|&node| taken.insert(3 * node + motion.dof))) {
+        return Err(input("a dof is imposed by two imposedMotions"));
+    }
     let model = Model {
         coordinates,
         hex8,
@@ -415,6 +458,7 @@ pub fn load(folder: &Path) -> Result<(Model, bool), JobError> {
         shell_points: spec.shell_points.unwrap_or(2),
         shell_warping: spec.shell_warping.unwrap_or(true),
         initial_temperature: spec.initial_temperature,
+        imposed,
         fixed_rotation: match &spec.fixed_rotation {
             Some(name) => read_bytes(folder, name)?.into_iter().map(|byte| byte != 0).collect(),
             None => Vec::new(),

@@ -74,6 +74,9 @@ export function explicitJobFiles(job: ExplicitJob, device: ExplicitDevice): Reco
     })),
     ...(job.fixed.length > 0 ? { fixed: 'fixed.u8' } : {}),
     ...(job.fixedRotation.length > 0 ? { fixedRotation: 'fixed_rotation.u8' } : {}),
+    ...(job.imposedMotions.length > 0
+      ? { imposedMotions: job.imposedMotions.map(({ nodes, dof, kind, curve }) => ({ nodes, dof, kind, curve })) }
+      : {}),
     gravity: job.gravity,
     walls: job.walls,
     ...(job.contacts.length > 0

@@ -117,6 +117,50 @@ impl Material {
     }
 }
 
+/// What an imposed-motion curve gives: the velocity, or the displacement from the initial position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImposedKind {
+    Velocity,
+    Displacement,
+}
+
+/// Imposed motion of one translational dof of a node set (PHY-19 §3 `imposedMotions`, TR-EXP-71 "imposed velocity"): a piecewise-linear
+/// curve of (time s, value) held constant outside it. Velocity: `v^{n+½} = v(t^n + Δt/2)`; displacement: `v^{n+½} = (u(t^{n+1}) − (x^n −
+/// x^0))/Δt`, so the node follows u exactly at every step.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImposedMotion {
+    pub nodes: Vec<usize>,
+    /// 0 = x, 1 = y, 2 = z.
+    pub dof: usize,
+    pub kind: ImposedKind,
+    pub curve: Vec<[f64; 2]>,
+}
+
+impl ImposedMotion {
+    /// The curve at `time` (linear, constant outside its range).
+    pub fn at(&self, time: f64) -> f64 {
+        let curve = &self.curve;
+        let (Some(first), Some(last)) = (curve.first(), curve.last()) else { return 0.0 };
+        if time <= first[0] {
+            return first[1];
+        }
+        if time >= last[0] {
+            return last[1];
+        }
+        let k = curve.partition_point(|point| point[0] <= time).max(1);
+        let ([t0, v0], [t1, v1]) = (curve[k - 1], curve[k]);
+        v0 + (v1 - v0) * (time - t0) / (t1 - t0)
+    }
+
+    /// Half-step velocity of node `node` (current coordinate `x`, initial `x0` of this dof) for the step from `time` to `time + dt`.
+    pub fn velocity(&self, time: f64, dt: f64, x: f64, x0: f64) -> f64 {
+        match self.kind {
+            ImposedKind::Velocity => self.at(time + 0.5 * dt),
+            ImposedKind::Displacement => (self.at(time + dt) - (x - x0)) / dt,
+        }
+    }
+}
+
 /// A fixed planar rigid wall: nodes stay on the side `normal` points to.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Wall {
@@ -204,6 +248,8 @@ pub struct Model {
     pub fixed_rotation: Vec<bool>,
     /// Initial temperature, K (None: each Johnson–Cook material starts at its transition temperature, others at 293.15 K).
     pub initial_temperature: Option<f64>,
+    /// Imposed motions, applied after the fixed dofs in this order (a later one wins on a shared dof).
+    pub imposed: Vec<ImposedMotion>,
 }
 
 impl Model {
