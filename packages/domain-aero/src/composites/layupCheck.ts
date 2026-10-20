@@ -1,15 +1,14 @@
 /** check_layup engine (06 CMP FR-CMP-66): rule, blending, ramp, strength-ratio, material-verification and default findings with waiver state. */
 
-import type { CompositePart, CompositesModel, LayupWaiver, Zone } from '@core/model/composites';
-import type { DocumentUnit, Vec2 } from '@core/model/types';
+import type { CompositePart, CompositesModel, LayupWaiver } from '@core/model/composites';
+import type { DocumentUnit } from '@core/model/types';
 import { polygonCentroid } from '@lib/polygon';
 import { sig } from '../shared/results';
 import { analyzeStack, type Loads } from './analysis';
-import { insideOrOn } from './geometry2d';
 import { isUnverified } from './provenance';
 import { type Thresholds, effectiveRules, ruleFindings } from './ruleReport';
 import { DEFAULT_DROP_RULES } from './rules';
-import { stackAt } from './sample';
+import { representativePoint, stackAt } from './sample';
 import { pliesOf, zonesOf } from './state';
 import { blendZones } from './zones';
 
@@ -39,14 +38,6 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   CMP_MATERIAL_ALLOWABLE_MISSING: 'add Xt, Xc, Yt, Yc and S from a cited source (no default exists) to run the strength check',
   CMP_NOT_BLENDABLE: 'edit the zones so every stack embeds in the thickest one',
 };
-
-/** A representative interior point of the zone (its centroid, else a vertex pulled toward it). */
-function interiorPoint(zone: Zone): Vec2 {
-  const centre = polygonCentroid(zone.boundary);
-  if (insideOrOn(centre, zone.boundary, 0)) return centre;
-  const vertex = zone.boundary[0] as Vec2;
-  return [vertex[0] + (centre[0] - vertex[0]) * 0.01, vertex[1] + (centre[1] - vertex[1]) * 0.01];
-}
 
 const waiverFor = (waivers: readonly LayupWaiver[], part: CompositePart, finding: LayupFinding): LayupWaiver | undefined =>
   waivers.find((w) => w.partId === part.id && w.code === finding.code && w.ids.every((id) => finding.ids.includes(id)));
@@ -127,7 +118,7 @@ export function layupFindings(
     });
   const stations =
     zones.length > 0
-      ? zones.map((zone) => ({ id: zone.id, name: zone.name, uv: interiorPoint(zone) }))
+      ? zones.map((zone) => ({ id: zone.id, name: zone.name, uv: representativePoint(model, part, zone) }))
       : [{ id: part.id, name: part.name, uv: polygonCentroid(part.outline) }];
   for (const station of stations) {
     const entries = stackAt(model, part, station.uv);

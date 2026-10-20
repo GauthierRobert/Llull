@@ -1,6 +1,5 @@
 /** Ply outlines are derived from the ply boundaries (06 CMP §3): omitted from saved files, re-derived on load, read-only (architecture L8). Planar parts only. */
 
-import { newEntity } from '@core/commands/entity/newEntity';
 import type { DerivationGuard } from '@core/commands/derivation';
 import type { CompositePart, CompositesModel, Ply } from '@core/model/composites';
 import { DEFAULT_LAYER_ID, type CadDocument, type Entity } from '@core/model/types';
@@ -42,15 +41,19 @@ export function outlineEntities(model: CompositesModel, layerOf: (part: Composit
       .map((id) => model.plies[id])
       .filter((ply): ply is Ply => ply !== undefined && ply.partId === part.id)
       .flatMap((ply) =>
-        piecesOf(ply, part).map((piece, k) =>
-          newEntity(
-            'polyline',
-            `${ply.id}.o${k}`,
-            { points: piece, closed: true },
-            add3(surface.origin, scale3(surface.normal, side * (heights.get(ply.id) ?? 0))),
-            OUTLINE_COLOR,
-            { rotation, name: `${ply.name} outline`, layerId: layerOf(part) },
-          ),
+        piecesOf(ply, part).map(
+          (piece, k) =>
+            ({
+              id: `${ply.id}.o${k}`,
+              kind: 'polyline',
+              points: piece,
+              closed: true,
+              position: add3(surface.origin, scale3(surface.normal, side * (heights.get(ply.id) ?? 0))),
+              rotation,
+              layerId: layerOf(part),
+              color: OUTLINE_COLOR,
+              name: `${ply.name} outline`,
+            }) as Entity,
         ),
       );
   });

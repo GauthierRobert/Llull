@@ -5,7 +5,13 @@ import { normalizeAngle } from './notation';
 
 export const DEFAULT_RULES: RuleConfig = { symmetric: true, balanced: true, minFraction: 0.1, maxConsecutive: 4, outerPlusMinus45: true };
 
-export const DEFAULT_DROP_RULES: PlyDropRules = { rampRatio: 20, minStagger: 3, staggerUnit: 'dropped_thickness', dropOrder: 'inner_first', coverPlies: 1 };
+export const DEFAULT_DROP_RULES: PlyDropRules = {
+  rampRatio: 20,
+  minStagger: 3,
+  staggerUnit: 'dropped_thickness',
+  dropOrder: 'inner_first',
+  coverPlies: 1,
+};
 
 export type RuleCode =
   | 'CMP_RULE_R1_SYMMETRY'
@@ -172,15 +178,4 @@ export function checkStack(rawAngles: readonly number[], config: RuleConfig): Ru
         );
     }
   return findings;
-}
-
-/** Fractions of the 0, +-45 and 90 families (0..1). */
-export function familyFractions(rawAngles: readonly number[]): {
-  readonly zero: number;
-  readonly plusMinus45: number;
-  readonly ninety: number;
-} {
-  const angles = rawAngles.map(normalizeAngle);
-  const share = (member: (a: number) => boolean): number => (angles.length === 0 ? 0 : angles.filter(member).length / angles.length);
-  return { zero: share((a) => a === 0), plusMinus45: share((a) => Math.abs(a) === 45), ninety: share((a) => a === 90) };
 }

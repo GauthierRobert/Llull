@@ -89,7 +89,7 @@ describe('cone flat pattern (VC-CMP-15)', () => {
     const outline = doc.composites?.parts[part]?.outline ?? [];
     expect(outline[0]).toEqual([0, 0]);
     const last = outline[outline.length - 1] as [number, number];
-    expect((((Math.atan2(last[1], last[0]) * 180) / Math.PI) + 360) % 360).toBeCloseTo((360 * 100) / slant, 6);
+    expect(((Math.atan2(last[1], last[0]) * 180) / Math.PI + 360) % 360).toBeCloseTo((360 * 100) / slant, 6);
     expect(polygonArea(outline)).toBeGreaterThan(0.9995 * Math.PI * 100 * slant);
     expect(polygonArea(outline)).toBeLessThan(Math.PI * 100 * slant);
   });

@@ -250,16 +250,7 @@ describe('laminate_mass failures', () => {
   it('refuses a part without plies, an unknown part and a material without density', () => {
     expectRefusal(start, 'laminate_mass', { part }, 'CMP_NO_PLIES');
     expectRefusal(start, 'laminate_mass', { part: 'nope' }, 'CMP_REF_MISSING');
-    const rest = {
-      name: 'light',
-      form: 'ud_tape',
-      E1: 1e5,
-      E2: 8e3,
-      G12: 4e3,
-      nu12: 0.3,
-      plyThickness: 0.2,
-      source: 'test',
-    };
+    const rest = { name: 'light', form: 'ud_tape', E1: 1e5, E2: 8e3, G12: 4e3, nu12: 0.3, plyThickness: 0.2, source: 'test' };
     const light = apply(stacked(), 'create_lamina_material', rest);
     const used = apply(light, 'edit_ply', { part, ply: 'A', material: 'light' });
     expectRefusal(used, 'laminate_mass', { part }, 'CMP_MATERIAL_DENSITY_MISSING');

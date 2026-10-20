@@ -7,8 +7,8 @@
 
 import type { Vec2, Vec3 } from './vectors';
 
-export type LaminaForm = 'ud_tape' | 'woven' | 'core_honeycomb' | 'core_foam';
-export type AllowableBasis = 'mean' | 'b_basis' | 'a_basis' | 'unknown';
+type LaminaForm = 'ud_tape' | 'woven' | 'core_honeycomb' | 'core_foam';
+type AllowableBasis = 'mean' | 'b_basis' | 'a_basis' | 'unknown';
 
 export interface LaminaMaterial {
   readonly name: string;
@@ -38,7 +38,7 @@ export interface LaminaMaterial {
   readonly source: string;
 }
 
-export type RosetteMethod = 'translational' | 'cylindrical' | 'radial' | 'edge';
+type RosetteMethod = 'translational' | 'cylindrical' | 'radial' | 'edge';
 
 export interface Rosette {
   readonly id: string;
@@ -52,7 +52,7 @@ export interface Rosette {
   readonly axis?: Vec3;
 }
 
-export interface FaceRef {
+interface FaceRef {
   readonly entityId: string;
   readonly faceNear: Vec3;
   readonly faceIndex?: number;

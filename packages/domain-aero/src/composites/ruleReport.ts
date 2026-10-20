@@ -2,6 +2,7 @@
 
 import type { CompositePart, CompositesModel, RuleConfig } from '@core/model/composites';
 import { type RuleFinding, DEFAULT_RULES, checkStack } from './rules';
+import { representativePoint, stackAt } from './sample';
 import { pliesOf, zonesOf } from './state';
 
 export interface Thresholds {
@@ -64,7 +65,7 @@ export interface ZoneFinding extends RuleFinding {
   readonly zoneName: string;
 }
 
-/** Rule findings of each selected zone's stack (all zones; or the whole ply list when the part has no zones). */
+/** Rule findings of each selected zone's stack: the plies actually laid at a point where the zone governs (the zone's own stack while it has no plies); the whole ply list when the part has no zones. */
 export function ruleFindings(
   model: CompositesModel,
   part: CompositePart,
@@ -75,7 +76,14 @@ export function ruleFindings(
   const stacks =
     zonesOf(model, part.id).length === 0
       ? [{ id: null, name: 'all plies', angles: pliesOf(model, part.id).map((ply) => ply.orientation) }]
-      : zones.map((zone) => ({ id: zone.id as string | null, name: zone.name, angles: zone.angles }));
+      : zones.map((zone) => {
+          const placed = stackAt(model, part, representativePoint(model, part, zone));
+          return {
+            id: zone.id as string | null,
+            name: zone.name,
+            angles: placed.length > 0 ? placed.map((entry) => entry.ply.orientation) : zone.angles,
+          };
+        });
   const findings = stacks.flatMap((stack) =>
     stack.angles.length === 0
       ? []
