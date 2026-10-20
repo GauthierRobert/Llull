@@ -17,7 +17,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
   Next: CFD-M1, then RS-3.
 
 ## Priority
-- `[REVIEW]` **RS** wave RS-3, RS-4, RS-5, RS-7, RS-8 (a/b/c) on branch `feat/rs-native-wave` (worktree `.claude/worktrees/rs-integration`): `docs/decisions/RS1-native-compute.md`. _deps: —_
+- `[REVIEW]` **RS** wave RS-3, RS-4, RS-5, RS-7, RS-8 on branch `feat/rs-native-wave`, PR #98 (merged with main 2026-10-20): `docs/decisions/RS1-native-compute.md`. Verified on the owner PC (GNU toolchain + dlltool shim, RTX 4080): TS gates, unit + server suites, native parity suites 67/67, coverage gate (sharded) 97.25 / 88.58 / 98.8 / 98.89, two cad-reviewer passes fixed. _Open: `npm run native:check` with MSVC (CI on push, or RS-MSVC)._
 - `[TODO]` **RS-MSVC** Temporary `solver/scripts/dlltool-shim` (owner 2026-10-20): delete it and its notes (plant 09 §12, plant 10 §13.6, physics 19 §13) once MSVC Build Tools are installed; then run `npm run native:check` in full. _deps: owner installs MSVC_
 - `[TODO]` **RS-6** clearance / thickness / view factors on `llull-geomq`. _deps: —_
 - `[TODO]` **RS follow-ups** plant 10 M3 viewport, plant 02 V1 (route_pipe, fittings, check_piping), PHY-09 M4/M5, GDT M1–M4, AER 3D panel, PHY-19 hand-off (OpenCourant); physics 19 options outside RS-8 (rounded shell edges in contact §29.8.3, shell thickness change §29.8.2; §13.10). _deps: RS wave_
