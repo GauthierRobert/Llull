@@ -10,14 +10,14 @@ import { add3, cross3, dot3, len3, scale3, sub3 } from '@lib/vec3';
 import { aeroOf, withFrame } from './aeroState';
 import { refuseAero } from './codes';
 
-const IDENTITY: AircraftFrame = { datum: [0, 0, 0], fsAxis: [1, 0, 0], blAxis: [0, 1, 0], wlAxis: [0, 0, 1] };
+export const IDENTITY_FRAME: AircraftFrame = { datum: [0, 0, 0], fsAxis: [1, 0, 0], blAxis: [0, 1, 0], wlAxis: [0, 0, 1] };
 const AXIS_TOLERANCE = 1e-6;
 
 /** The frame of the document (the identity frame until `set_aircraft_frame`). */
-export const frameOf = (doc: CadDocument): AircraftFrame => aeroOf(doc).frame ?? IDENTITY;
+export const frameOf = (doc: CadDocument): AircraftFrame => aeroOf(doc).frame ?? IDENTITY_FRAME;
 
 const isIdentity = (frame: AircraftFrame): boolean =>
-  frame === IDENTITY ||
+  frame === IDENTITY_FRAME ||
   (frame.datum.every((v) => v === 0) &&
     frame.fsAxis.join() === '1,0,0' &&
     frame.blAxis.join() === '0,1,0' &&
@@ -39,7 +39,7 @@ export function curveToDocument(frame: AircraftFrame, curve: NurbsCurveData): Nu
 }
 
 /** Why the axes are not an orthonormal right-handed triple, or null. */
-function frameViolation(frame: AircraftFrame): string | null {
+export function frameViolation(frame: AircraftFrame): string | null {
   const { fsAxis, blAxis, wlAxis } = frame;
   for (const [name, axis] of [
     ['fsAxis', fsAxis],

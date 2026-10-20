@@ -99,9 +99,13 @@ export const importOpenvspWing = defineCommand({
       );
     const groups = groupNamed(chosen.node, /^XSec_\d+$/)
       .map((group) => ({ group, index: Number((group.attrs['Name'] ?? '').slice(5)) }))
+      // XSec_0 is the root section: it only carries the root twist, its Span / chords (if any) are not a segment
       .filter(
-        ({ group }) =>
-          parameter(group, 'Root_Chord') !== null && parameter(group, 'Tip_Chord') !== null && parameter(group, 'Span') !== null,
+        ({ group, index }) =>
+          index >= 1 &&
+          parameter(group, 'Root_Chord') !== null &&
+          parameter(group, 'Tip_Chord') !== null &&
+          parameter(group, 'Span') !== null,
       )
       .sort((a, b) => a.index - b.index);
     const segments: Segment[] = groups.map(({ group }) => ({
@@ -193,6 +197,7 @@ export const importOpenvspWing = defineCommand({
         })),
         substituted,
         unverified: substituted.length > 0,
+        layoutVerifiedAgainstRealFile: false,
         properties: properties ?? null,
         unit: doc.units,
         provenance: {

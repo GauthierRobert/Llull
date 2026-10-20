@@ -3,6 +3,8 @@
 import type { DocumentExtension } from '@core/plugins/plugin';
 import { isRecord } from '@lib/isRecord';
 import { isVec3 } from '@lib/vec3';
+import type { AircraftFrame } from '@core/model/aero';
+import { frameViolation } from './aircraftFrame';
 
 const isText = (value: unknown): value is string => typeof value === 'string' && value !== '';
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
@@ -81,13 +83,16 @@ function bodyErrors(key: string, raw: unknown): string[] {
     errors.push(`${at}.controlCurveIds must be a list of ids`);
   if (!isNumber(raw['degreeV'])) errors.push(`${at}.degreeV must be a number`);
   if (!isText(raw['entityId'])) errors.push(`${at}.entityId must be text`);
+  errors.push(...frameErrors(raw['frame'], `${at}.frame`));
   return errors;
 }
 
-function frameErrors(raw: unknown): string[] {
+function frameErrors(raw: unknown, at = 'aero.frame'): string[] {
   if (raw === undefined) return [];
   const axes = ['datum', 'fsAxis', 'blAxis', 'wlAxis'] as const;
-  return isRecord(raw) && axes.every((axis) => isVec3(raw[axis])) ? [] : ['aero.frame needs datum, fsAxis, blAxis and wlAxis as [x, y, z]'];
+  if (!isRecord(raw) || !axes.every((axis) => isVec3(raw[axis]))) return [`${at} needs datum, fsAxis, blAxis and wlAxis as [x, y, z]`];
+  const violation = frameViolation(raw as unknown as AircraftFrame);
+  return violation === null ? [] : [`${at}: ${violation}`];
 }
 
 export const aeroDocument: DocumentExtension = {

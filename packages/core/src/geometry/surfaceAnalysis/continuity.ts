@@ -67,7 +67,7 @@ function crossCurvatureRate(surface: NurbsSurfaceData, base: SurfaceSample, w: V
   const [a, b] = directionCoefficients(base, direction);
   const crossIsU = side.startsWith('u');
   const interior = side.endsWith('0') ? 1 : -1;
-  const [crossMin, crossMax, edgeMin, edgeMax] = crossIsU ? [u0, u1, v0, v1] : [v0, v1, u0, u1];
+  const [edgeMin, edgeMax] = crossIsU ? [v0, v1] : [u0, u1];
   const [crossBase, edgeBase] = crossIsU ? [base.u, base.v] : [base.v, base.u];
   const [crossCoefficient, edgeCoefficient] = crossIsU ? [a, b] : [b, a];
   const field = (cross: number, edge: number): number | null => {
@@ -76,7 +76,12 @@ function crossCurvatureRate(surface: NurbsSurfaceData, base: SurfaceSample, w: V
     const [ca, cb] = directionCoefficients(sample, direction);
     return normalSign * normalCurvature(sample, ca, cb);
   };
-  const [hCross, hEdge] = [RATE_STEP * (crossMax - crossMin), RATE_STEP * (edgeMax - edgeMin)];
+  // steps of 1 % of the span next to the edge (never across a knot: a lower-continuity line inside would corrupt the one-sided stencil)
+  const spanWidth = (knots: ReadonlyArray<number>, atStart: boolean): number =>
+    atStart ? (knots[1] as number) - (knots[0] as number) : (knots[knots.length - 1] as number) - (knots[knots.length - 2] as number);
+  const [crossKnots, edgeKnots] = crossIsU ? [surface.knotsU, surface.knotsV] : [surface.knotsV, surface.knotsU];
+  const hCross = RATE_STEP * spanWidth(crossKnots, interior === 1);
+  const hEdge = RATE_STEP * Math.min(...edgeKnots.slice(1).map((knot, k) => knot - (edgeKnots[k] as number)));
   const f0 = field(crossBase, edgeBase);
   const f1 = field(crossBase + interior * hCross, edgeBase);
   const f2 = field(crossBase + 2 * interior * hCross, edgeBase);
@@ -132,7 +137,7 @@ function curveJoint(a: NurbsCurveData, b: NurbsCurveData, tol: ContinuityToleran
   const g0 = g0Gap <= tol.g0;
   const g1ok = g1 <= tol.g1AngleRad;
   const g2ok = g2Gap <= tol.g2Abs || g2Gap / Math.max(sa.curvature, sb.curvature) <= tol.g2Rel;
-  const g3ok = g3Gap <= tol.g2Abs || g3Gap <= tol.g3Rel * Math.max(Math.abs(rateA), Math.abs(rateB));
+  const g3ok = g3Gap <= tol.g3Abs || g3Gap <= tol.g3Rel * Math.max(Math.abs(rateA), Math.abs(rateB));
   const t = endA.atEnd ? 1 : 0;
   const sample: ContinuitySample = { t, point: sa.point, g0Gap, g1AngleRad: g1, g2Gap, g3Gap };
   return {
@@ -194,7 +199,7 @@ function surfaceJoint(
     if (rateA !== null && rateB !== null) {
       g3Gap = Math.abs(rateA - rateB);
       g3Max = Math.max(g3Max, g3Gap);
-      g3All = g3All && (g3Gap <= tol.g2Abs || g3Gap <= tol.g3Rel * Math.max(Math.abs(rateA), Math.abs(rateB)));
+      g3All = g3All && (g3Gap <= tol.g3Abs || g3Gap <= tol.g3Rel * Math.max(Math.abs(rateA), Math.abs(rateB)));
     } else g3Known = false;
     samples.push({ t, point: sampleA.point, g0Gap, g1AngleRad: g1, g2Gap, g3Gap });
     [g0Max, g1Max, g2Max, g2RelMax] = [Math.max(g0Max, g0Gap), Math.max(g1Max, g1), Math.max(g2Max, g2Gap), Math.max(g2RelMax, g2Rel)];

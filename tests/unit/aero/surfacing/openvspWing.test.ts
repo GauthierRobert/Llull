@@ -113,3 +113,22 @@ describe('import_openvsp_wing (VC-SRF-20, planform values of TR1208.vsp3)', () =
     expectNoOp(execute(empty, 'import_openvsp_wing', { text: flat }), empty, 'AERO_VSP_NO_WING');
   });
 });
+
+describe('review fixes', () => {
+  it('ignores the Span / chords of the root section XSec_0 and refuses absurdly nested XML', () => {
+    const withRoot = tr1208().replace(
+      '<Group Name="XSec_1">',
+      '<Group Name="XSec_0"><Span Value="99"/><Root_Chord Value="1"/><Tip_Chord Value="1"/><Twist Value="2"/></Group><Group Name="XSec_1">',
+    );
+    const data = importData(execute(empty, 'import_openvsp_wing', { text: withRoot }));
+    expect(data.properties.areaPerSide).toBeCloseTo(769.1085, 3);
+    expect(execute(empty, 'import_openvsp_wing', { text: withRoot }).data).toMatchObject({ layoutVerifiedAgainstRealFile: false });
+    expect(parseXml('<a>'.repeat(300) + '</a>'.repeat(300))).toContain('nested deeper');
+    expectNoOp(execute(empty, 'import_openvsp_wing', { text: '<a>'.repeat(300) + '</a>'.repeat(300) }), empty, 'AERO_VSP_PARSE');
+  });
+
+  it('reads parameter values strictly (a trailing unit or an empty value is not a number)', () => {
+    const tree = parseXml('<a><x Value="12abc"/><y Value=""/><z Value=" 3.5 "/></a>') as XmlNode;
+    expect([parameter(tree, 'x'), parameter(tree, 'y'), parameter(tree, 'z')]).toEqual([null, null, 3.5]);
+  });
+});

@@ -28,6 +28,8 @@ export interface SewnShell {
   /** Total enclosed volume of the closed components (each oriented outward); meaningful only when the shell is closed. */
   readonly volume: number;
   readonly weldedVertices: number;
+  /** Closed components (shells) found; the volume adds them up, so a nested shell is not subtracted: callers refuse more than one. */
+  readonly components: number;
 }
 
 type Side = 'v0' | 'u1' | 'v1' | 'u0';
@@ -56,7 +58,7 @@ function sideSamples(surface: NurbsSurfaceData, side: Side, spacing: number, eps
   const offset = { v0: 0, u1: 1, v1: 2, u0: 3 }[side];
   const length = curveLength(curve, ...curveDomain(curve));
   if (length <= eps) return [{ point: evaluateCurve(curve, curveDomain(curve)[0]), p: offset }];
-  const { points, parameters } = arcLengthSamples(curve, Math.max(2, Math.min(400, Math.ceil(length / spacing))));
+  const { points, parameters } = arcLengthSamples(curve, Math.max(2, Math.min(400, Math.ceil(length / spacing - 1e-6))));
   const along = (t: number): number =>
     side === 'v0' ? (t - uMin) / uRange : side === 'u1' ? (t - vMin) / vRange : side === 'v1' ? (uMax - t) / uRange : (vMax - t) / vRange;
   const samples = points.map((point, k) => ({ point, p: offset + along(parameters[k] as number) }));
@@ -175,6 +177,7 @@ export function sewParts(parts: ReadonlyArray<PartMesh>, tolerance: number): Sew
   }
   const flipped = new Array<boolean>(triangles.length).fill(false);
   let volume = 0;
+  let components = 0;
   if (freeEdges.length === 0 && nonManifoldEdges === 0) {
     const component = new Array<number>(triangles.length).fill(-1);
     const volumes: number[] = [];
@@ -208,7 +211,17 @@ export function sewParts(parts: ReadonlyArray<PartMesh>, tolerance: number): Sew
       if ((signed[component[t] as number] as number) < 0) flipped[t] = !flipped[t];
     });
     volume = signed.reduce((sum, value) => sum + Math.abs(value), 0);
+    components = signed.length;
   }
   const indices = triangles.flatMap(([a, b, c], t) => (flipped[t] === true ? [a, c, b] : [a, b, c]));
-  return { positions: positions.flat(), indices, freeEdges, nonManifoldEdges, nonManifoldAt, volume, weldedVertices: positions.length };
+  return {
+    positions: positions.flat(),
+    indices,
+    freeEdges,
+    nonManifoldEdges,
+    nonManifoldAt,
+    volume,
+    weldedVertices: positions.length,
+    components,
+  };
 }

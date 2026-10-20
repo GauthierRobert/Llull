@@ -167,6 +167,7 @@ export const checkContinuity = defineCommand({
         g2Rel: params.g2Rel ?? 0.1,
         g2Abs: params.g2Abs ?? 1e-9,
         g3Rel: params.g3Rel ?? 0.1,
+        g3Abs: 1e-6 / Math.max(sizeOf(a), sizeOf(b)) ** 2,
       };
       const { joint, sideA, sideB } = bestJoint(engine, a, b, pair.a.side, pair.b.side, samples, tolerances);
       if (index === 0)

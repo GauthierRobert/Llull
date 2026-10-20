@@ -39,21 +39,42 @@ export function exactSectionsProblem(curves: ReadonlyArray<NurbsCurveData>): str
   return mismatch > 0 ? `sections.${mismatch} must have the same Bézier span count and closing edge as sections.0` : null;
 }
 
-const MAX_TRIM_VERTICES = 20_000;
+const MAX_TRIM_VERTICES = 4096;
+const MAX_TRIM_LOOPS = 64;
 
-/** First structural problem of the stored trim loops of a sheet (`trims` of `nurbs_surface`), or null when absent or valid. */
-export function surfaceTrimsProblem(value: unknown): string | null {
+/** [min, max] of a stored knot list, or null when it is not a list of numbers. */
+const knotRange = (knots: unknown): [number, number] | null =>
+  Array.isArray(knots) && knots.length >= 2 && knots.every(isFiniteNumber) ? [knots[0] as number, knots[knots.length - 1] as number] : null;
+
+/**
+ * First structural problem of the stored trim loops of a sheet (`trims` of `nurbs_surface`; `surface` gives the parameter domain the points
+ * must lie in), or null when absent or valid: at most 64 loops of 3..4096 points, an even count (the area rule decimates by two).
+ */
+export function surfaceTrimsProblem(value: unknown, surface: unknown): string | null {
   if (value === undefined) return null;
-  if (!Array.isArray(value) || value.length > 64) return 'trims must be a list of at most 64 loops';
+  if (!Array.isArray(value) || value.length > MAX_TRIM_LOOPS) return `trims must be a list of at most ${MAX_TRIM_LOOPS} loops`;
+  const [u, v] = isRecord(surface) ? [knotRange(surface['knotsU']), knotRange(surface['knotsV'])] : [null, null];
+  const slack = 1e-9;
   for (const [index, loop] of value.entries()) {
     if (!isRecord(loop) || typeof loop['outer'] !== 'boolean') return `trims.${index} must be { outer, polygon }`;
     const polygon = loop['polygon'];
     const valid =
       Array.isArray(polygon) &&
-      polygon.length >= 3 &&
+      polygon.length >= 4 &&
       polygon.length <= MAX_TRIM_VERTICES &&
+      polygon.length % 2 === 0 &&
       polygon.every((p) => Array.isArray(p) && p.length === 2 && p.every(isFiniteNumber));
-    if (!valid) return `trims.${index}.polygon must be 3..${MAX_TRIM_VERTICES} [u, v] points`;
+    if (!valid) return `trims.${index}.polygon must be an even number (4..${MAX_TRIM_VERTICES}) of [u, v] points`;
+    if (u !== null && v !== null) {
+      const outside = (polygon as number[][]).some(
+        (p) =>
+          (p[0] as number) < u[0] - slack ||
+          (p[0] as number) > u[1] + slack ||
+          (p[1] as number) < v[0] - slack ||
+          (p[1] as number) > v[1] + slack,
+      );
+      if (outside) return `trims.${index}.polygon has points outside the parameter domain of the surface`;
+    }
   }
   return null;
 }

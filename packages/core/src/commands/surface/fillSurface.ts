@@ -103,6 +103,15 @@ export const fillSurface = defineCommand({
       if (input < 0) return mismatch(`neighbours.${index}.curveId "${neighbour.curveId}" is not one of boundaryIds`, [neighbour.curveId]);
       const sheet = surfaceEntityOf(doc, 'fill_surface', neighbour.surfaceId);
       if (isRefusal(sheet)) return sheet;
+      if ((sheet.trims?.length ?? 0) > 0)
+        return refuseSrf(
+          doc,
+          'fill_surface',
+          'SRF_TRIM_UNSUPPORTED',
+          'a sheet trimmed by curves cannot be a G1 / G2 neighbour (its edges are not the patch edges)',
+          [neighbour.surfaceId],
+          [`params.neighbours.${index}`],
+        );
       const surface = placedSurface(sheet);
       const loopIndex = loop.order.indexOf(input);
       const curve = loop.curves[loopIndex] as NurbsCurveData;
@@ -119,7 +128,7 @@ export const fillSurface = defineCommand({
       return refuseSrf(doc, 'fill_surface', 'SRF_FILL_UNSUPPORTED', patch, boundaryIds, ['params.boundaryIds']);
     const deviation = maxCurveDeviation(patch, loop.curves);
     const engine = resolveSurfaceAnalysis((ctx ?? currentContext()).surfaceAnalysis);
-    const tolerances = { g0: 1e-4 * size, g1AngleRad: 0.01, g2Rel: 0.1, g2Abs: 1e-9, g3Rel: 0.1 };
+    const tolerances = { g0: 1e-4 * size, g1AngleRad: 0.01, g2Rel: 0.1, g2Abs: 1e-9, g3Rel: 0.1, g3Abs: 1e-6 / size ** 2 };
     const boundaries = constraints.map((constraint, index) => {
       const joint = engine.continuity(
         { type: 'surface', surface: constraint.surface, side: constraint.side },

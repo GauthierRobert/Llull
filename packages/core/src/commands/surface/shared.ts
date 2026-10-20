@@ -35,13 +35,17 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   SRF_LOFT_GUIDE_NOT_CONTAINED: 'use fewer or better aligned guides, or add sections near where the guides bend',
   SRF_FILL_LOOP_OPEN: 'give 3 to 12 curves whose ends meet end to end; `tolerance` is the largest gap bridged',
   SRF_FILL_UNSUPPORTED: 'fill 3 to 12 boundary curves of the same kind (all non-rational) whose ends meet',
-  SRF_FILL_NEIGHBOUR_MISMATCH: 'name a curve of boundaryIds that IS a boundary edge of the sheet, within tolerance (e.g. made by interpolating that edge)',
+  SRF_FILL_NEIGHBOUR_MISMATCH:
+    'name a curve of boundaryIds that IS a boundary edge of the sheet, within tolerance (e.g. made by interpolating that edge)',
   SRF_TRIM_MISS: 'the curve must project onto the sheet: use projectAlong with a direction that hits it, or move the curve onto the sheet',
-  SRF_TRIM_LOOP_INVALID: 'give curves that chain end to end within tolerance, without self-crossings; an open curve must cross the sheet edge to edge',
+  SRF_TRIM_LOOP_INVALID:
+    'give curves that chain end to end within tolerance, without self-crossings; an open curve must cross the sheet edge to edge',
   SRF_TRIM_AMBIGUOUS: 'give keepPoint, a point on the side of the cut to keep',
   SRF_TRIM_UNSUPPORTED: 'trim an untrimmed sheet, or add holes inside the kept region of a trimmed one',
-  SRF_BLEND_DEGENERATE: 'blend two edges with a gap between them and a regular (non-pole) surface along them; use check_continuity if they already touch',
-  SRF_BLEND_FOLD: 'choose the edges that face each other (each sheet must leave its edge towards the other one), or flip / reorder the sheets',
+  SRF_BLEND_DEGENERATE:
+    'blend two edges with a gap between them and a regular (non-pole) surface along them; use check_continuity if they already touch',
+  SRF_BLEND_FOLD:
+    'choose the edges that face each other (each sheet must leave its edge towards the other one), or flip / reorder the sheets',
   SRF_TRIM_RANGE: 'give u and v intervals [from, to] inside the surface domain (see inspect_surface)',
   SRF_SEW_NOT_MERGEABLE: 'the surfaces must share one whole edge within `tolerance`; fill or move the edges, or raise `tolerance`',
   SRF_SEW_FREE_EDGES: 'raise tolerance within the model accuracy, or fill / blend the gap first; the message says where the free edges are',

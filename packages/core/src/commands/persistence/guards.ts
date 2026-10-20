@@ -312,7 +312,7 @@ const KIND_PROBLEMS: Readonly<Record<EntityKind, (v: Record<string, unknown>) =>
   sweep: sweepProblem,
   loft: loftProblem,
   nurbs_curve: (v) => nurbsCurveProblem(v['curve'], 'curve'),
-  nurbs_surface: (v) => firstProblem(nurbsSurfaceProblem(v['surface'], 'surface'), surfaceTrimsProblem(v['trims'])),
+  nurbs_surface: (v) => firstProblem(nurbsSurfaceProblem(v['surface'], 'surface'), surfaceTrimsProblem(v['trims'], v['surface'])),
   subdivision: subdivisionProblem,
   image: imageProblem,
   mesh: meshProblem,

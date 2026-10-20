@@ -88,7 +88,9 @@ export const sewSurfaces = defineCommand({
       .optional(),
     resolution: z
       .number()
-      .describe('Solid only: mesh resolution, integer 8..96 (grid lines per sheet direction and boundary samples across the longest extent). Curved sheets lose volume as it drops (a sphere is 1.6 % low at 24, 0.4 % at 48). Default 24.')
+      .describe(
+        'Solid only: mesh resolution, integer 8..96 (grid lines per sheet direction and boundary samples across the longest extent). Curved sheets lose volume as it drops (a sphere is 1.6 % low at 24, 0.4 % at 48). Default 24.',
+      )
       .optional(),
   }),
   run: (doc, { ids, tolerance, makeSolid, resolution = 24 }): CommandResult => {
