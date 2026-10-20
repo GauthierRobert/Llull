@@ -1074,5 +1074,14 @@ inherited `manifold` or `occt` → kept (diagnostic overrides), else `occt-nativ
 Server, CLI and browser defaults unchanged. `desktop/tests`: unit cases for the choice and `hasNativeKernel`, and the e2e backend
 started with the local release binary as its bundle answers `kernel_info` with OCCT 7.9.2 and `isolation: 'process'`.
 
+**MinGW OCCT access violation (2026-10-20, `docs/decisions/SV1-solver-toolchain-windows.md`).** On the Windows GNU toolchain (w64devkit GCC
+16.2, `x86_64-pc-windows-gnu`) the sidecar died with 0xC0000005 in distance queries, shells and every boolean that classifies a solid,
+intermittently. Cause: GCC 16.2 at `-O3` calls an IPA-CP clone of `NCollection_UBTree::Select` devirtualised for the line selector from the
+point query of `BRepClass3d_SClassifier::Perform` (wrong code; found with gdb + a hardware watchpoint, bisected to that one translation unit
+and to `-fipa-cp-clone`). Fix: `build-occt.mjs` builds OCCT with `-fno-ipa-cp-clone` under GCC (recipe 2 in the stamp, old prefixes
+rebuild) and the facade's `build.rs` passes the same flag. Afterwards `shells_hollow_and_open` 30 / 30, the kernel crates 62 / 62 and
+13 / 13, and occtAnalysis, occtChamferShell, nativeKernelFeatures, occtCheckAssembly, occtSheetMetal, brepCodeExchange each three times
+green on Windows.
+
 Pending (rest of M2): floor-filleted pockets natively; Windows bundle (CI `native-bundle`); macOS deferred (owner, 2026-10-19); align
 `occtMass.ts` (WASM) on the Gauss rule; fuzzy booleans (TR-KRN-12) to run the last probe case.

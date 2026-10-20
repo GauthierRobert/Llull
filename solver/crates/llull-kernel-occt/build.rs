@@ -113,6 +113,12 @@ fn main() {
     if has_iges {
         build.define("LLULL_HAS_IGES", None);
     }
+    // GCC 16.2 at -O3 calls an IPA-CP clone devirtualised for the wrong OCCT selector type (an access violation in OCCT); same
+    // workaround as build-occt.mjs (docs/decisions/SV1-solver-toolchain-windows.md).
+    let compiler = build.get_compiler();
+    if compiler.is_like_gnu() && !compiler.is_like_clang() {
+        build.flag("-fno-ipa-cp-clone");
+    }
     build.include(&include_dir).std("c++17").define("_USE_MATH_DEFINES", None).flag_if_supported("-w").compile("llull-kernel-occt-facade");
     // After the static facade: a single-pass linker (GNU ld with MinGW import libraries) resolves the facade's OCCT symbols only from libraries
     // named after it.
