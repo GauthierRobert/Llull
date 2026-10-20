@@ -4,8 +4,15 @@
 //! order. No atomics anywhere, so a run is bit-reproducible on one device and driver (`deterministic: true`); it is NOT
 //! bit-identical to the CPU twin (operation order, FMA contraction, f32 exp / log / pow): the CPU path stays the reference
 //! (RS1 §2 rule 3) and `tests/gpu.rs` bounds the difference.
+//!
+//! Fixed degrees of freedom are a mask in the kick kernel. Contact and shells run on the host inside the GPU cycle (a deterministic
+//! hybrid, RS-8): when the model has either, each cycle reads back `x_new` / `v_new`, computes the contact forces at `x` and the
+//! shells exactly as `solver.rs` does (same routines, same order) and uploads one per-node `host_force` (contact minus the shells'
+//! internal forces) that the next kick adds. The solid elements, the gather, the step reduction and the integration stay on the GPU.
 
+use crate::contact::Contacts;
 use crate::model::Model;
+use crate::shells::Shells;
 use crate::solver::{centroid, eigen_step, elements_of, kinematics, nodal_masses, sample_walls, EnergyRow, Outcome, Progress, WallHistory};
 use llull_gpu::buffers::{dispatch_dims, u32_bytes, STORAGE};
 use llull_gpu::device::{acquire_with, Gpu};
@@ -17,7 +24,8 @@ const SHADER: &str = include_str!("explicit.wgsl");
 const WORKGROUP: u32 = 64;
 /// Group count per dispatch row the shader folds linear indices with (`counts.groups_x`).
 const GROUPS_X: u32 = 65_535;
-const READ_ONLY: [u32; 9] = [1, 2, 8, 11, 12, 13, 14, 18, 19];
+const READ_ONLY: [u32; 11] = [1, 2, 8, 11, 12, 13, 14, 18, 19, 21, 22];
+const BINDINGS: u32 = 23;
 
 fn f64_bytes(values: &[f64]) -> Vec<u8> {
     let mut bytes: Vec<u8> = values.iter().flat_map(|value| value.to_le_bytes()).collect();
@@ -85,7 +93,7 @@ fn pass(encoder: &mut wgpu::CommandEncoder, pipeline: &wgpu::ComputePipeline, bi
     compute.dispatch_workgroups(x, y, 1);
 }
 
-/// Material table: 20 f64 per material (layout in explicit.wgsl).
+/// Material table: 24 f64 per material (layout in explicit.wgsl).
 fn material_table(model: &Model) -> Vec<f64> {
     model
         .materials
@@ -114,7 +122,11 @@ fn material_table(model: &Model) -> Vec<f64> {
             });
             row.extend_from_slice(&[j.a, j.b, j.n, j.c, j.reference_rate, j.m, if failure.is_some() { 1.0 } else { 0.0 }]);
             row.extend_from_slice(&failure.map(|f| f.d).unwrap_or([0.0; 5]));
-            row.push(0.0);
+            row.extend_from_slice(&[j.melt_k, j.transition_k]);
+            match material.heating {
+                Some(heat) => row.extend_from_slice(&[1.0, heat.taylor_quinney, heat.specific_heat]),
+                None => row.extend_from_slice(&[0.0, 0.0, 1.0]),
+            }
             row
         })
         .collect()
@@ -122,14 +134,18 @@ fn material_table(model: &Model) -> Vec<f64> {
 
 /// Integrates `model` on the GPU. `Err` when no adapter with SHADER_F64 exists (the caller runs the CPU twin) or a GPU call fails.
 pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcome, String), String> {
-    if !model.contacts.is_empty() || model.fixed.iter().any(|&held| held) || !model.shell4.is_empty() {
-        return Err("contact, fixed supports and shells run on the CPU path only (RS-8c)".to_string());
-    }
     let gpu = acquire_with("llull-explicit", wgpu::Features::SHADER_F64)?;
     let controls = &model.controls;
     let x0 = model.coordinates.clone();
-    let (elements, initial_mass, added_mass) = elements_of(model, &x0)?;
-    let masses = nodal_masses(model, &elements);
+    let (elements, mut initial_mass, added_mass) = elements_of(model, &x0)?;
+    let mut masses = nodal_masses(model, &elements);
+    let mut shells = Shells::new(model, &x0, &mut masses).map(|(set, mass)| {
+        initial_mass += mass;
+        set
+    });
+    let volumes: Vec<f64> = elements.iter().map(|element| kinematics(&element.nodes, &x0).1).collect();
+    let mut contacts = Contacts::new(model, &x0, &volumes);
+    let hybrid = shells.is_some() || contacts.is_some();
     if masses.iter().any(|&mass| !(mass > 0.0)) {
         return Err("a node belongs to no element (zero mass)".to_string());
     }
@@ -196,11 +212,14 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
     let elem_force = buffer(&gpu, "elem_force", f64_bytes(&vec![0.0; 24 * count]));
     let start_buffer = buffer(&gpu, "incidence_start", u32_bytes(&incidence_start));
     let incidence_buffer = buffer(&gpu, "incidence", u32_bytes(&incidence));
-    let entries: Vec<wgpu::BindGroupLayoutEntry> = (0..21u32)
+    let host_force_buffer = buffer(&gpu, "host_force", f64_bytes(&vec![0.0; 3 * nodes]));
+    let fixed_mask: Vec<u32> = (0..3 * nodes).map(|k| u32::from(model.fixed.get(k).copied().unwrap_or(false))).collect();
+    let fixed_buffer = buffer(&gpu, "fixed", u32_bytes(&fixed_mask));
+    let entries: Vec<wgpu::BindGroupLayoutEntry> = (0..BINDINGS)
         .map(|binding| if binding == 0 { uniform_entry(0) } else { storage_entry(binding, READ_ONLY.contains(&binding)) })
         .collect();
     let layout = gpu.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some("explicit"), entries: &entries });
-    let resources: [&wgpu::Buffer; 21] = [
+    let resources: [&wgpu::Buffer; BINDINGS as usize] = [
         &counts,
         &b.scalars,
         &mass,
@@ -222,6 +241,8 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
         &start_buffer,
         &incidence_buffer,
         &b.reduced,
+        &host_force_buffer,
+        &fixed_buffer,
     ];
     let bind_entries: Vec<wgpu::BindGroupEntry> = resources
         .iter()
@@ -243,6 +264,14 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
         let (gradients, volume) = kinematics(&element.nodes, &x0);
         element_dt = element_dt.min(eigen_step(&gradients, volume, &element.node_masses, &model.materials[element.material]));
     }
+    if let Some(set) = &shells {
+        element_dt = element_dt.min(set.initial_step(model, &x0));
+    }
+    // Host side of the hybrid cycle: positions and velocities at n, the shells' forces of the last cycle, host energy totals.
+    let mut host_x = x0.clone();
+    let mut host_v_half = model.initial_velocity.clone();
+    let mut shell_force = vec![0.0; 3 * nodes];
+    let (mut shell_internal, mut shell_hourglass, mut contact_energy) = (0.0, 0.0, 0.0);
     let initial_kinetic: f64 = (0..3 * nodes).map(|k| 0.5 * masses[k / 3] * model.initial_velocity[k] * model.initial_velocity[k]).sum();
     let mut energy =
         vec![EnergyRow { time: 0.0, kinetic: initial_kinetic, internal: 0.0, hourglass: 0.0, wall: 0.0, contact: 0.0, external_work: 0.0 }];
@@ -282,20 +311,39 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
         min_dt = min_dt.min(dt);
         dt = dt.min(end - time);
         gpu.queue.write_buffer(&b.scalars, 0, &f64_bytes(&[dt_prev, dt]));
+        let contact_force = contacts.as_mut().map(|set| set.forces(&host_x, dt_prev));
+        if hybrid {
+            let host: Vec<f64> = (0..3 * nodes).map(|k| contact_force.as_ref().map_or(0.0, |forces| forces[k]) - shell_force[k]).collect();
+            gpu.queue.write_buffer(&host_force_buffer, 0, &f64_bytes(&host));
+        }
         let mut encoder = gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         pass(&mut encoder, &kernels.kick, &bind, nodes);
         gpu.queue.submit([encoder.finish()]);
+        let (host_x_new, host_v_new) =
+            if hybrid { (read_f64(&gpu, &x_new, 3 * nodes)?, read_f64(&gpu, &b.v_new, 3 * nodes)?) } else { (vec![], vec![]) };
+        let omega_previous = shells.as_ref().map(|set| set.omega.clone());
+        if let Some(set) = shells.as_mut() {
+            set.kick(dt_prev, dt, &model.fixed_rotation);
+        }
+        if let Some(forces) = &contact_force {
+            contact_energy -= (0..3 * nodes).map(|k| forces[k] * 0.5 * (dt_prev * host_v_half[k] + dt * host_v_new[k])).sum::<f64>();
+        }
         if cycles > 0 && time >= next_sample * (1.0 - 1e-12) {
             let v_half = read_f64(&gpu, &b.v_half, 3 * nodes)?;
             let v_new = read_f64(&gpu, &b.v_new, 3 * nodes)?;
-            let kinetic: f64 = (0..3 * nodes).map(|k| 0.5 * masses[k / 3] * (0.5 * (v_half[k] + v_new[k])).powi(2)).sum();
+            let rotation = match (&shells, &omega_previous) {
+                (Some(set), Some(previous)) => set.kinetic(previous),
+                _ => 0.0,
+            };
+            let kinetic: f64 = rotation + (0..3 * nodes).map(|k| 0.5 * masses[k / 3] * (0.5 * (v_half[k] + v_new[k])).powi(2)).sum::<f64>();
             let (internal, hourglass, wall, external_work, mut impulse) = totals(&gpu, &b)?;
+            let (internal, hourglass) = (internal + shell_internal, hourglass + shell_hourglass);
             if !internal.is_finite() {
                 normal = false;
                 message = format!("the solution became non-finite at t = {time:e} s");
                 break;
             }
-            energy.push(EnergyRow { time, kinetic, internal, hourglass, wall, contact: 0.0, external_work });
+            energy.push(EnergyRow { time, kinetic, internal, hourglass, wall, contact: contact_energy, external_work });
             sample_walls(&mut walls_history, &mut impulse, time, last_sample);
             gpu.queue.write_buffer(&b.wall_impulse, 0, &f64_bytes(&vec![0.0; walls_count * nodes]));
             last_sample = time;
@@ -313,6 +361,17 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
         pass(&mut encoder, &kernels.commit, &bind, nodes);
         gpu.queue.submit([encoder.finish()]);
         element_dt = read_f64(&gpu, &b.reduced, 1)?[0];
+        if let Some(set) = shells.as_mut() {
+            let cycle = set.cycle(model, &host_x, &host_x_new, &host_v_new, dt);
+            shell_force = cycle.forces;
+            shell_internal += cycle.internal_work;
+            shell_hourglass += cycle.hourglass_work;
+            element_dt = element_dt.min(cycle.dt);
+        }
+        if hybrid {
+            host_x = host_x_new;
+            host_v_half = host_v_new;
+        }
         time += dt;
         dt_prev = dt;
         cycles += 1;
@@ -331,10 +390,13 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
     let v_half = read_f64(&gpu, &b.v_half, 3 * nodes)?;
     let f_int = read_f64(&gpu, &b.f_int, 3 * nodes)?;
     let external: Vec<f64> = (0..3 * nodes).map(|k| masses[k / 3] * g[k % 3]).collect();
-    let v_end: Vec<f64> = (0..3 * nodes).map(|k| v_half[k] + 0.5 * dt_prev * (external[k] - f_int[k]) / masses[k / 3]).collect();
-    let kinetic: f64 = (0..3 * nodes).map(|k| 0.5 * masses[k / 3] * v_end[k] * v_end[k]).sum();
+    let v_end: Vec<f64> =
+        (0..3 * nodes).map(|k| v_half[k] + 0.5 * dt_prev * (external[k] - f_int[k] - shell_force[k]) / masses[k / 3]).collect();
+    let rotation = shells.as_ref().map_or(0.0, |set| set.kinetic(&set.omega));
+    let kinetic: f64 = rotation + (0..3 * nodes).map(|k| 0.5 * masses[k / 3] * v_end[k] * v_end[k]).sum::<f64>();
     let (internal, hourglass, wall, external_work, mut impulse) = totals(&gpu, &b)?;
-    energy.push(EnergyRow { time, kinetic, internal, hourglass, wall, contact: 0.0, external_work });
+    let (internal, hourglass) = (internal + shell_internal, hourglass + shell_hourglass);
+    energy.push(EnergyRow { time, kinetic, internal, hourglass, wall, contact: contact_energy, external_work });
     if time > last_sample {
         sample_walls(&mut walls_history, &mut impulse, time, last_sample);
     }
@@ -353,6 +415,9 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
             c[1],
             c[2],
         ]);
+    }
+    if let Some(set) = &shells {
+        fields.extend(set.fields(&x));
     }
     let outcome = Outcome {
         normal,

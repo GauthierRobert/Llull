@@ -26,9 +26,10 @@ struct Counts { nodes: u32, elements: u32, walls: u32, groups_x: u32 };
 @group(0) @binding(12) var<storage, read> elem_info: array<u32>;
 // 9 per element: mass, node masses
 @group(0) @binding(13) var<storage, read> elem_mass: array<f64>;
-// 20 per material: density, E, nu, lambda, mu, K, has_jc, a, b, n, c, rate0, m, has_failure, d1..d5, pad
+// 24 per material: density, E, nu, lambda, mu, K, has_jc, a, b, n, c, rate0, m, has_failure, d1..d5, melt, transition,
+// has_heating, taylor_quinney, specific_heat
 @group(0) @binding(14) var<storage, read> materials: array<f64>;
-// 10 per element: stress (6), plastic strain, damage, failed, pad
+// 10 per element: stress (6), plastic strain, damage, failed, temperature
 @group(0) @binding(15) var<storage, read_write> state: array<f64>;
 // 24 per element
 @group(0) @binding(16) var<storage, read_write> elem_force: array<f64>;
@@ -37,6 +38,10 @@ struct Counts { nodes: u32, elements: u32, walls: u32, groups_x: u32 };
 @group(0) @binding(18) var<storage, read> incidence_start: array<u32>;
 @group(0) @binding(19) var<storage, read> incidence: array<u32>;
 @group(0) @binding(20) var<storage, read_write> reduced: array<f64>;
+// 3 per node: forces the host adds (contact minus the shells' internal forces), zero without contact and shells
+@group(0) @binding(21) var<storage, read> host_force: array<f64>;
+// 3 per node: 1 = fixed degree of freedom (velocity held at 0 after the walls, as solver.rs)
+@group(0) @binding(22) var<storage, read> fixed: array<u32>;
 
 const BIG: f64 = 1.0e300lf;
 
@@ -67,7 +72,7 @@ fn kick(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_index) 
   var v: array<f64, 3>;
   for (var c = 0u; c < 3u; c = c + 1u) {
     let f_ext = m * scalars[5u + c];
-    v[c] = v_half[3u * i + c] + 0.5lf * (dtp + dt) * (f_ext - f_int[3u * i + c]) / m;
+    v[c] = v_half[3u * i + c] + 0.5lf * (dtp + dt) * (f_ext + host_force[3u * i + c] - f_int[3u * i + c]) / m;
   }
   for (var w = 0u; w < counts.walls; w = w + 1u) {
     let n = array<f64, 3>(walls[6u * w + 3u], walls[6u * w + 4u], walls[6u * w + 5u]);
@@ -87,6 +92,7 @@ fn kick(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_index) 
     }
   }
   for (var c = 0u; c < 3u; c = c + 1u) {
+    if (fixed[3u * i + c] != 0u) { v[c] = 0.0lf; }
     v_new[3u * i + c] = v[c];
     x_new[3u * i + c] = x[3u * i + c] + dt * v[c];
   }
@@ -231,8 +237,8 @@ fn omega_squared(g: Gradients, count: u32, e: u32, mat: u32) -> f64 {
       }
     }
   }
-  let shear = sqrt(2.0lf * materials[20u * mat + 4u]);
-  let bulk = sqrt(3.0lf * materials[20u * mat + 5u]);
+  let shear = sqrt(2.0lf * materials[24u * mat + 4u]);
+  let bulk = sqrt(3.0lf * materials[24u * mat + 5u]);
   var root: array<array<f64, 6>, 6>;
   for (var i = 0u; i < 6u; i = i + 1u) {
     for (var j = 0u; j < 6u; j = j + 1u) {
@@ -270,18 +276,27 @@ fn von_mises(s: array<f64, 6>) -> f64 {
   return sqrt(1.5lf * (a * a + b * b + c * c + 2.0lf * (s[3] * s[3] + s[4] * s[4] + s[5] * s[5])));
 }
 
-fn flow_stress(mat: u32, eps: f64, rate: f64) -> f64 {
-  let base = 20u * mat;
+// Johnson-Cook flow stress with the thermal term (1 - T*^m) (model.rs flow_stress_at).
+fn flow_stress(mat: u32, eps: f64, rate: f64, t_star: f64) -> f64 {
+  let base = 24u * mat;
   let hardening = materials[base + 7u] + materials[base + 8u] * pow_f(max(eps, 0.0lf), materials[base + 9u]);
   let rate_term = 1.0lf + materials[base + 10u] * ln_f(max(rate / materials[base + 11u], 1.0lf));
-  return hardening * rate_term;
+  var thermal = 1.0lf;
+  if (t_star > 0.0lf) { thermal = 1.0lf - pow_f(t_star, materials[base + 12u]); }
+  return hardening * rate_term * thermal;
 }
 
-struct Point { stress: array<f64, 6>, eps: f64, damage: f64, failed: f64 };
+// Homologous temperature clamped to [0, 1] (model.rs homologous).
+fn homologous(mat: u32, temperature: f64) -> f64 {
+  let base = 24u * mat;
+  return clamp((temperature - materials[base + 20u]) / (materials[base + 19u] - materials[base + 20u]), 0.0lf, 1.0lf);
+}
+
+struct Point { stress: array<f64, 6>, eps: f64, damage: f64, failed: f64, temperature: f64 };
 
 fn update_point(mat: u32, old: Point, d: array<f64, 6>, w: vec3<f64>, dt: f64) -> Point {
   if (old.failed > 0.5lf) { return old; }
-  let base = 20u * mat;
+  let base = 24u * mat;
   // Jaumann rotation r_ij = (σ_ip ω_pj + σ_jp ω_pi) dt with ω = [[0, wxy, -wzx], [-wxy, 0, wyz], [wzx, -wyz, 0]]
   let st = old.stress;
   var sf = array<array<f64, 3>, 3>(
@@ -314,13 +329,14 @@ fn update_point(mat: u32, old: Point, d: array<f64, 6>, w: vec3<f64>, dt: f64) -
   if (materials[base + 6u] < 0.5lf) { return next; }
   let equivalent = von_mises(trial);
   let eps = old.eps;
-  if (equivalent <= flow_stress(mat, eps, 0.0lf)) { return next; }
+  let t_star = homologous(mat, old.temperature);
+  if (equivalent <= flow_stress(mat, eps, 0.0lf, t_star)) { return next; }
   var low = 0.0lf;
   var high = equivalent / (3.0lf * mu);
   for (var it = 0u; it < 200u; it = it + 1u) {
     let middle = 0.5lf * (low + high);
     if (middle <= low || middle >= high) { break; }
-    let residual = equivalent - 3.0lf * mu * middle - flow_stress(mat, eps + middle, middle / dt);
+    let residual = equivalent - 3.0lf * mu * middle - flow_stress(mat, eps + middle, middle / dt, t_star);
     if (residual > 0.0lf) { low = middle; } else { high = middle; }
   }
   let increment = 0.5lf * (low + high);
@@ -332,10 +348,14 @@ fn update_point(mat: u32, old: Point, d: array<f64, 6>, w: vec3<f64>, dt: f64) -
   for (var k = 3u; k < 6u; k = k + 1u) { stress[k] = trial[k] * scale; }
   next.stress = stress;
   next.eps = eps + increment;
+  if (materials[base + 21u] > 0.5lf) {
+    next.temperature = old.temperature + materials[base + 22u] * yield_stress * increment / (materials[base] * materials[base + 23u]);
+  }
   if (materials[base + 13u] < 0.5lf) { return next; }
   let triaxiality = pressure / yield_stress;
   var strain = (materials[base + 14u] + materials[base + 15u] * exp_f(materials[base + 16u] * triaxiality))
-    * (1.0lf + materials[base + 17u] * ln_f(max((increment / dt) / materials[base + 11u], 1.0lf)));
+    * (1.0lf + materials[base + 17u] * ln_f(max((increment / dt) / materials[base + 11u], 1.0lf)))
+    * (1.0lf + materials[base + 18u] * t_star);
   strain = max(strain, 1.0e-6lf);
   next.damage = old.damage + increment / strain;
   if (next.damage >= 1.0lf) {
@@ -368,6 +388,7 @@ fn element(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_inde
   old.eps = state[10u * e + 6u];
   old.damage = state[10u * e + 7u];
   old.failed = state[10u * e + 8u];
+  old.temperature = state[10u * e + 9u];
   if (old.failed > 0.5lf) {
     for (var k = 0u; k < 24u; k = k + 1u) { elem_force[24u * e + k] = 0.0lf; }
     elem_energy[3u * e + 2u] = BIG;
@@ -399,7 +420,7 @@ fn element(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_inde
   let next = update_point(mat, old, d, w, dt);
   let g1 = gradients_of(p1, count);
   let density = elem_mass[9u * e] / g1.volume;
-  let base = 20u * mat;
+  let base = 24u * mat;
   let speed = sqrt((materials[base + 3u] + 2.0lf * materials[base + 4u]) / density);
   let trace = d[0] + d[1] + d[2];
   var bulk = 0.0lf;
@@ -460,6 +481,7 @@ fn element(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_inde
   state[10u * e + 6u] = next.eps;
   state[10u * e + 7u] = next.damage;
   state[10u * e + 8u] = next.failed;
+  state[10u * e + 9u] = next.temperature;
   for (var k = 0u; k < 8u; k = k + 1u) {
     var f = vec3<f64>(0.0lf, 0.0lf, 0.0lf);
     if (k < count && next.failed < 0.5lf) { f = forces[k]; }
