@@ -23,6 +23,7 @@ import { ZONE_MODIFIER_TEXT, formatNumber, pmiText } from '../../geometry/pmiTex
 import { n, svgLine, svgText } from '../../geometry/drawingSvg';
 import { escapeXml } from '../../lib/escapeXml';
 import { dot3 } from '../../lib/vec3';
+import { characteristicBalloon } from './characteristicBalloon';
 import { viewSolids } from './viewDrawing';
 import { primaryFeature } from '../pmi/refresh';
 
@@ -260,7 +261,9 @@ export function paintViewPmi(
               ? strokes(TRIANGLE_GLYPH, target[0] - 1.5, target[1] - 3, 3, true)
               : [arrow(painted.anchor, target)]),
           ];
-    body.push(`<g id="pmi-${escapeXml(item.id)}" data-kind="${item.kind}">${[...painted.parts, ...leader].join('')}</g>`);
+    body.push(
+      `<g id="pmi-${escapeXml(item.id)}" data-kind="${item.kind}">${[...painted.parts, ...characteristicBalloon(doc, item.id, painted.box), ...leader].join('')}</g>`,
+    );
   }
   return { parts: body, placedIds: ids, reasons };
 }

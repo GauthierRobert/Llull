@@ -5,6 +5,7 @@ import { isRecord } from '@lib/isRecord';
 import { integrityWarnings } from './integrity';
 import { LIFECYCLE_STATES, isLegalTransition } from './transitions';
 import { REVISION_LABEL } from './schemes';
+import { membersHash } from './structure';
 
 export const PART_NUMBER = /^[A-Z0-9][A-Z0-9._\-/]{0,63}$/i;
 
@@ -38,6 +39,9 @@ function revisionErrors(at: string, raw: unknown): string[] {
   }
   if (['released', 'superseded', 'obsolete'].includes(String(raw['state'])) && (!isText(raw['contentHash']) || !isRecord(raw['snapshot'])))
     errors.push(`${at} is ${String(raw['state'])} and needs a contentHash and a snapshot`);
+  const snapshot = raw['snapshot'];
+  if (isRecord(snapshot) && snapshot['kind'] === 'vault' && snapshot['objectSha256'] !== raw['contentHash'])
+    errors.push(`${at}.snapshot is a vault reference whose object is not the content hash`);
   return errors;
 }
 
@@ -67,6 +71,17 @@ function itemErrors(raw: unknown): string[] {
   return errors;
 }
 
+/** Baselines are never edited: each member list must still hash to the recorded hash. */
+function baselineErrors(raw: unknown): string[] {
+  if (raw === undefined) return [];
+  if (!isRecord(raw)) return ['plm.baselines must be an object'];
+  return Object.entries(raw).flatMap(([id, baseline]) =>
+    isRecord(baseline) && Array.isArray(baseline['members']) && baseline['hash'] === membersHash(baseline['members'] as never)
+      ? []
+      : [`plm.baselines.${id} does not hash to its recorded hash (edited by hand?)`],
+  );
+}
+
 /** `DocumentExtension` for `CadDocument.plm`: structural validation, carried across replay, integrity warnings on load. */
 export const plmDocument: DocumentExtension = {
   validate(raw) {
@@ -76,6 +91,7 @@ export const plmDocument: DocumentExtension = {
     const errors = itemErrors(slice['item']);
     if (!isRecord(slice['changes']) || !Array.isArray(slice['changeOrder']) || !isRecord(slice['policy']))
       errors.push('plm needs changes, changeOrder and policy');
+    errors.push(...baselineErrors(slice['baselines']));
     return errors;
   },
   derivedEntityIds: () => new Set(),

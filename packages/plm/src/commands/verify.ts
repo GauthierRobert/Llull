@@ -11,6 +11,7 @@ import { integrityOf } from '../integrity';
 import { manifestFor } from '../manifest';
 import { titleBlockMismatches } from '../readiness';
 import { refusePlm } from '../refusal';
+import { snapshotText, unreadableSnapshot } from '../snapshot';
 import { NOT_MANAGED, revisionText, scopeOf } from '../state';
 import { getCommand } from '@core/commands/registry';
 
@@ -25,8 +26,9 @@ function definitionOf(
 ): { json: unknown; source: string } | string {
   const revision = plm.item.revisions[label];
   if (label !== WORKING && revision === undefined) return `${plm.item.partNumber} has no revision '${label}'`;
-  if (revision?.snapshot !== undefined)
-    return { json: JSON.parse(revision.snapshot.canonicalJson) as unknown, source: `release snapshot ${label}` };
+  const text = revision === undefined ? null : snapshotText(revision, ctx);
+  if (text !== null) return { json: JSON.parse(text) as unknown, source: `release snapshot ${label}` };
+  if (revision?.snapshot !== undefined) return `${revisionText(plm, label)}: ${unreadableSnapshot(revision)}`;
   if (label === WORKING || label === plm.item.currentRevision)
     return { json: JSON.parse(scopeOf(doc, ctx).canonicalJson) as unknown, source: 'working document' };
   return `${revisionText(plm, label)} (${revision?.state ?? '?'}) has no release snapshot`;
@@ -105,7 +107,12 @@ export const verifyRelease = defineCommand({
         `${revisionText(plm, label)} is ${revision.state}; only a released, superseded or obsolete revision verifies`,
         [label],
       );
-    const contentHashMatches = sha256Hex(revision.snapshot.canonicalJson) === revision.contentHash;
+    const text = snapshotText(revision, ctx);
+    if (text === null)
+      return refusePlm(doc, 'verify_release', 'PLM_VAULT_OBJECT_MISSING', `${revisionText(plm, label)}: ${unreadableSnapshot(revision)}`, [
+        label,
+      ]);
+    const contentHashMatches = sha256Hex(text) === revision.contentHash;
     const live =
       label === plm.item.currentRevision && revision.state === 'released'
         ? scopeOf(doc, ctx).sha256 === revision.contentHash
@@ -159,7 +166,16 @@ export const restoreRevisionSnapshot = defineCommand({
         [label],
       );
     const load = (ctx?.registry ?? getCommand)('load_document');
-    const envelope = JSON.parse(revision.snapshot.canonicalJson) as { document: Record<string, unknown> };
+    const text = snapshotText(revision, ctx);
+    if (text === null)
+      return refusePlm(
+        doc,
+        'restore_revision_snapshot',
+        'PLM_VAULT_OBJECT_MISSING',
+        `${revisionText(plm, label)}: ${unreadableSnapshot(revision)}`,
+        [label],
+      );
+    const envelope = JSON.parse(text) as { document: Record<string, unknown> };
     const withViewState = { ...envelope, document: { ...envelope.document, selection: [], camera: doc.camera } };
     const loaded = load?.run(doc, { json: JSON.stringify(withViewState) }, ctx);
     if (loaded === undefined || loaded.document === doc)
@@ -173,7 +189,7 @@ export const restoreRevisionSnapshot = defineCommand({
     const restored: CadDocument = { ...loaded.document, camera: doc.camera, selection: doc.selection, plm };
     return changed(
       restored,
-      `${revisionText(plm, label)} definition restored from its release snapshot (${revision.snapshot.canonicalJson.length} bytes).`,
+      `${revisionText(plm, label)} definition restored from its release snapshot (${text.length} bytes).`,
       restored.order,
     );
   },

@@ -53,11 +53,10 @@ interface StateChange {
   readonly reason?: string;
 }
 
-/** The definition at release: the exact canonical bytes that were hashed. */
-interface ReleaseSnapshot {
-  readonly kind: 'inline';
-  readonly canonicalJson: string;
-}
+/** The definition at release: the exact canonical bytes that were hashed, inline, or by reference to the local vault object of that SHA-256 (V1, M3). */
+type ReleaseSnapshot =
+  | { readonly kind: 'inline'; readonly canonicalJson: string }
+  | { readonly kind: 'vault'; readonly objectSha256: string };
 
 export interface Revision {
   readonly label: string;
@@ -79,6 +78,8 @@ export interface Revision {
   readonly snapshot?: ReleaseSnapshot;
   /** `unverified` data in the scope at release (AF-33): ids and reasons, copied into the release manifest. */
   readonly unverified?: readonly { readonly id: string; readonly reason: string }[];
+  /** The structure (EBOM level 1) at release: bound sub-items with their instance counts (immutable; absent for an item without sub-items). */
+  readonly releasedStructure?: readonly StructureRow[];
   /** Manifest hash once the host wrote the release package (`attach_release_package`). */
   readonly packageSha256?: string;
   readonly stateHistory: readonly StateChange[];
@@ -130,6 +131,62 @@ export interface ChangeRecord {
   readonly closedAt?: string;
 }
 
+/** One EBOM row: a bound sub-item and how many instances of its component the assembly places. */
+export interface StructureRow {
+  readonly partNumber: string;
+  readonly revision: string;
+  readonly state: LifecycleState;
+  readonly quantity: number;
+  readonly contentHash?: string;
+}
+
+/**
+ * A component of this assembly bound to a managed item of another document (V1). The binding is ATTESTED by a human signature (`bind_component_item`):
+ * the child's own lifecycle lives in its own document / vault, so this record is the assembly's claim about it, never derived by an agent.
+ */
+export interface SubItem {
+  readonly partNumber: string;
+  readonly name: string;
+  readonly componentId: string;
+  readonly revision: string;
+  readonly state: LifecycleState;
+  /** Release-scope hash of that revision (64 hex); required once the child is released / superseded / obsolete. */
+  readonly contentHash?: string;
+  readonly boundBy: string;
+  readonly boundAt?: string;
+}
+
+export interface BaselineMember {
+  readonly partNumber: string;
+  readonly revision: string;
+  readonly contentHash: string;
+}
+
+/** A frozen product structure (MIL-HDBK-61B vocabulary): released members only; `hash` = SHA-256 of the canonical JSON of `members`. */
+export interface Baseline {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: 'functional' | 'allocated' | 'product' | 'custom';
+  readonly members: readonly BaselineMember[];
+  readonly hash: string;
+  readonly at?: string;
+  readonly by?: string;
+}
+
+/** A numbered characteristic (balloon), keyed in `PlmModel.characteristics` by the id of the PMI item it numbers; stable across regeneration. */
+export interface Characteristic {
+  readonly charNo: number;
+  readonly sourceRef: { readonly kind: 'dimension' | 'gdt' | 'note' | 'process'; readonly id: string };
+  /** Sheet that places the item explicitly (`view.pmiIds`) or the sheet named at assignment; absent when none. */
+  readonly sheetId?: string;
+  readonly designator?: string;
+  /** The requirement as rendered on the drawing at assignment. */
+  readonly requirementText: string;
+  readonly introducedIn: string;
+  /** Revision in which the PMI item was found missing; the number is never reused. */
+  readonly retiredIn?: string;
+}
+
 export interface PlmPolicy {
   readonly requireChangeOrder: boolean;
   readonly requireIndependentChecker: boolean;
@@ -146,5 +203,10 @@ export interface PlmModel {
   readonly item: ManagedItem;
   readonly changes: Readonly<Record<string, ChangeRecord>>;
   readonly changeOrder: readonly string[];
+  /** V1: components bound to managed items, keyed by part number. */
+  readonly subItems?: Readonly<Record<string, SubItem>>;
+  readonly baselines?: Readonly<Record<string, Baseline>>;
+  /** V1-FAI: keyed by PMI item id. */
+  readonly characteristics?: Readonly<Record<string, Characteristic>>;
   readonly policy: PlmPolicy;
 }

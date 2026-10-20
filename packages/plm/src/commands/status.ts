@@ -9,6 +9,7 @@ import { integrityOf } from '../integrity';
 import { iterationManifest, releaseManifest } from '../manifest';
 import { type Finding, releaseFindings, unverifiedInScope } from '../readiness';
 import { refusePlm } from '../refusal';
+import { snapshotText, unreadableSnapshot } from '../snapshot';
 import { DEFAULT_POLICY, NOT_MANAGED, currentRevisionOf, isDirty, revisionText } from '../state';
 import { effectivitySchema } from '../params';
 import { actParts, actPayload } from '../gate';
@@ -246,7 +247,7 @@ export const viewRevision = defineCommand({
     'Large. Read-only: it never loads the snapshot into the working document (restore_revision_snapshot does).',
   annotations: { readOnly: true },
   params: z.object({ revision: z.string().describe('Revision label, e.g. "A".') }),
-  run: (doc, { revision: label }): CommandResult => {
+  run: (doc, { revision: label }, ctx): CommandResult => {
     const plm = doc.plm;
     if (plm === undefined) return refusePlm(doc, 'view_revision', 'PLM_NOT_MANAGED', NOT_MANAGED);
     const revision = plm.item.revisions[label];
@@ -256,11 +257,12 @@ export const viewRevision = defineCommand({
       return refusePlm(doc, 'view_revision', 'PLM_NO_SNAPSHOT', `${revisionText(plm, label)} (${revision.state}) has no release snapshot`, [
         label,
       ]);
-    return report(
-      doc,
-      `${revisionText(plm, label)} snapshot: ${revision.snapshot.canonicalJson.length} bytes.`,
-      JSON.parse(revision.snapshot.canonicalJson) as unknown,
-    );
+    const text = snapshotText(revision, ctx);
+    if (text === null)
+      return refusePlm(doc, 'view_revision', 'PLM_VAULT_OBJECT_MISSING', `${revisionText(plm, label)}: ${unreadableSnapshot(revision)}`, [
+        label,
+      ]);
+    return report(doc, `${revisionText(plm, label)} snapshot: ${text.length} bytes.`, JSON.parse(text) as unknown);
   },
 });
 
@@ -275,6 +277,8 @@ export const GATED_COMMANDS = [
   'set_change_state',
   'set_lifecycle_state',
   'attach_release_package',
+  'bind_component_item',
+  'unbind_component_item',
 ] as const;
 
 /**
@@ -285,7 +289,7 @@ export const plmActPayload = defineCommand({
   name: 'plm_act_payload',
   description:
     'The SHA-256 a human signs to authorize one human-only PLM act (set_item_identity with policy, set_item_marking, record_approval, release_item, ' +
-    'create_change_order with a classification, classify_change_order, set_change_state, set_lifecycle_state to obsolete, attach_release_package): ' +
+    'create_change_order with a classification, classify_change_order, set_change_state, set_lifecycle_state to obsolete, attach_release_package, bind_component_item, unbind_component_item): ' +
     'pass the command, the params you will send (without confirmation) and a fresh nonce. The signature (Ed25519 over the UTF-8 hex hash, prefixed by ' +
     'the context string the signing host applies) goes in the command as confirmation { alg, keyId, publicKey, signature, nonce }. It is valid only ' +
     'for the current PLM state of this document. An agent cannot sign. Read-only.',

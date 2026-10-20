@@ -18,6 +18,8 @@ interface BackendEnvInput {
   readonly baseEnv: Readonly<Record<string, string | undefined>>;
   /** The native binaries bundle when it is present (`nativeBundleDir`), else null: the backend then uses its TypeScript paths. */
   readonly nativeDir?: string | null;
+  /** The local vault folder (09 PLM M3): the backend reads externalized release snapshots from it (`ctx.objects`). */
+  readonly vaultDir?: string;
 }
 
 const NATIVE_BINARIES = ['llull-compute', 'llull-kernel'] as const;
@@ -62,6 +64,7 @@ export function backendEnv(input: BackendEnvInput): Record<string, string> {
     LLULL_AUTOSAVE_PATH: path.join(input.userDataDir, 'autosave.json'),
     LLULL_BODY_LIMIT: DESKTOP_BODY_LIMIT,
     LLULL_PYTHON: input.layout.python,
+    ...(input.vaultDir === undefined ? {} : { LLULL_VAULT: input.vaultDir }),
     // Native compute jobs and the native kernel binary, only when bundled.
     ...(input.nativeDir === undefined || input.nativeDir === null ? {} : { LLULL_NATIVE_DIR: input.nativeDir }),
     // The native OCC kernel is the desktop default (TR-KRN-01, KI7); a bundle without llull-kernel falls back to Manifold with a warning.

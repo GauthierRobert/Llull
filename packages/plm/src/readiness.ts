@@ -5,6 +5,7 @@ import type { Approval, ChangeRecord, Effectivity, PlmModel, Revision } from '@c
 import { closeForCutIn, effectivityProblem } from './effectivity';
 import { type PlmCode, remediationOf } from './refusal';
 import { currentRevisionOf, revisionText } from './state';
+import { unreleasedChildren } from './structure';
 
 export interface Finding {
   readonly code: PlmCode | 'PLM_UNVERIFIED_INPUT' | 'PLM_TITLEBLOCK_MISMATCH';
@@ -137,6 +138,16 @@ export function releaseFindings(doc: CadDocument, plm: PlmModel, inputs: Release
     const cut = closeForCutIn(priors, ranges);
     if ('overlap' in cut) found.push(finding('PLM_EFFECTIVITY_OVERLAP', 'fail', cut.overlap));
   }
+  const children = unreleasedChildren(plm);
+  if (children.length > 0)
+    found.push(
+      finding(
+        'PLM_CHILDREN_UNRELEASED',
+        'fail',
+        `${pn} places sub-items that are not released: ${children.map((child) => `${child} (${plm.subItems?.[child]?.state ?? '?'})`).join(', ')}`,
+        children,
+      ),
+    );
   if (plm.policy.requireMarking && plm.item.marking.regime === 'undetermined')
     found.push(finding('PLM_MARKING_UNDECIDED', 'fail', `${pn} export marking is undetermined and policy.requireMarking is on`, [pn]));
   const iteration = `${revision.label}.${revision.iterations.length}`;

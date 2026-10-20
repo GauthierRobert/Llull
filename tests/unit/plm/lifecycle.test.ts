@@ -33,7 +33,7 @@ describe('S1 release A, ECR -> ECO -> revision B (VC-PLM-01..07, 12)', () => {
     for (const step of s1.steps.filter((candidate) => (candidate.n ?? 0) <= 7)) doc = runStep(doc, step, options);
     const released = doc.plm?.item.revisions['A'];
     expect(released?.contentHash).toBe(vectors.sample_document['release_scope_canonical_sha256']);
-    expect(sha256Hex(released?.snapshot?.canonicalJson ?? '')).toBe(released?.contentHash);
+    expect(sha256Hex(released?.snapshot?.kind === 'inline' ? released.snapshot.canonicalJson : '')).toBe(released?.contentHash);
   });
 
   it('is deterministic: replaying the same plan reproduces identical plm state', () => {

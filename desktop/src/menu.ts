@@ -15,6 +15,10 @@ export interface MenuHandlers {
   readonly openDataFolder: () => void;
   /** File > Trust Signing Keys…: the user confirms enrolled signing keys one by one (the only way a key becomes trusted). */
   readonly trustKeys: () => void;
+  /** File > Vault: Check Out…: pick an item the local vault holds, lock it and open its head document. */
+  readonly vaultCheckOut: () => void;
+  /** File > Vault: Check In: store the open managed item in the vault (checkpoint, snapshots, refs) and free its lock. */
+  readonly vaultCheckIn: () => void;
 }
 
 export function menuTemplate(handlers: MenuHandlers, platform: NodeJS.Platform, appName: string): MenuItemConstructorOptions[] {
@@ -27,6 +31,10 @@ export function menuTemplate(handlers: MenuHandlers, platform: NodeJS.Platform, 
       { type: 'separator' },
       { label: 'Save', accelerator: 'CmdOrCtrl+S', click: handlers.save },
       { label: 'Save As…', accelerator: 'Shift+CmdOrCtrl+S', click: handlers.saveAs },
+      { type: 'separator' },
+      { type: 'separator' },
+      { label: 'Vault: Check Out…', click: handlers.vaultCheckOut },
+      { label: 'Vault: Check In', click: handlers.vaultCheckIn },
       { type: 'separator' },
       { label: 'Open Data Folder', click: handlers.openDataFolder },
       { label: 'Trust Signing Keys…', click: handlers.trustKeys },

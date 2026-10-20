@@ -18,7 +18,7 @@ const seal = (body: Record<string, unknown>): SigningManifest => {
 
 /**
  * The release manifest body of a released / superseded / obsolete revision: identity, state, change, effectivity, marking, release stamp, document
- * content hash, tool provenance and the unverified flags present at release. The host adds the package members when it writes the package.
+ * content hash, tool provenance, the unverified flags present at release and, for an assembly, the structure frozen at release. The host adds the package members when it writes the package.
  * @invariant a pure function of the PLM record at release (deterministic: no clock, no tool version; unchanged when the revision is later superseded,
  *   so signatures stay valid)
  */
@@ -46,6 +46,7 @@ export function releaseManifest(
     tool: { name: 'llull', releaseScopeFormat: 2 },
     reviewRequired: [],
     unverified: revision.unverified ?? [],
+    ...(revision.releasedStructure !== undefined ? { structure: revision.releasedStructure } : {}),
   });
 }
 
