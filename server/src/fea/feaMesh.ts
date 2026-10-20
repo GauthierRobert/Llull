@@ -10,6 +10,7 @@ import type { FeaHost, FeaToolResult } from '@protocol/index';
 import type { FeArtifactStore } from './artifactStore';
 import type { CaeCode, CaeHooks } from './caeHooks';
 import { feaFailure, INSTALL_HINT } from './feaCommon';
+import { partFaces } from './faceRefs';
 import { partGeometry } from './feaGeometry';
 
 export interface MeshBridgeResponse {
@@ -36,11 +37,26 @@ function bridgeFailure(message: string): FeaToolResult {
     : feaFailure('fea_mesh', 'FEA_MESH_FAILED', message);
 }
 
+/** The `faceMap` entries of a bridge response that have the expected shape (anything else is dropped). */
+function faceMapOf(value: unknown): NonNullable<FeMeshArtifact['faceMap']> {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry: unknown) =>
+    isRecord(entry) &&
+    typeof entry['entityId'] === 'string' &&
+    typeof entry['faceIndex'] === 'number' &&
+    typeof entry['tag'] === 'number' &&
+    typeof entry['residual'] === 'number'
+      ? [{ entityId: entry['entityId'], faceIndex: entry['faceIndex'], tag: entry['tag'], residual: entry['residual'] }]
+      : [],
+  );
+}
+
 function meshArtifact(
   response: MeshBridgeResponse,
   request: { unitSystem: FeMeshArtifact['unitSystem']; inputHash: string },
   facetedParts: readonly string[],
 ): FeMeshArtifact | null {
+  const faceMap = faceMapOf(response['faceMap']);
   const { nodes, blocks, nodeSets, faceSets, targets } = response;
   if (!Array.isArray(nodes) || !Array.isArray(blocks) || !isRecord(nodeSets) || !isRecord(faceSets) || !isRecord(targets)) return null;
   return {
@@ -55,7 +71,18 @@ function meshArtifact(
     faceSets: faceSets as FeMeshArtifact['faceSets'],
     targets: targets as FeMeshArtifact['targets'],
     ...(facetedParts.length > 0 ? { facetedParts } : {}),
+    ...(faceMap.length > 0 ? { faceMap } : {}),
   };
+}
+
+/** `faceIndices`: the kernel face of every `facesNear` point, only when ALL of them resolve (else the mesher resolves the target by the nearest surface). */
+function faceIndicesOf(
+  faces: ReturnType<typeof partFaces> | undefined,
+  facesNear: readonly (readonly [number, number, number])[] | undefined,
+): { faceIndices?: number[] } {
+  if (faces === null || faces === undefined || facesNear === undefined || facesNear.length === 0) return {};
+  const found = faces.nearest(facesNear);
+  return found.every((index) => index !== null) ? { faceIndices: [...new Set(found as number[])] } : {};
 }
 
 /**
@@ -66,11 +93,14 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
   const doc = host.getDoc();
   const request = deps.hooks.meshRequest(doc, analysisId);
   if (isCode(request)) return feaFailure('fea_mesh', request.code, request.message, [analysisId]);
-  const parts: { entityId: string; geometry: unknown }[] = [];
+  const parts: { entityId: string; geometry: unknown; faces?: unknown }[] = [];
+  const kernelFaces = new Map<string, ReturnType<typeof partFaces>>();
   for (const entityId of request.entityIds) {
     const geometry = partGeometry(doc, entityId, deps.kernel());
     if ('code' in geometry) return feaFailure('fea_mesh', geometry.code, geometry.message, [analysisId, entityId]);
-    parts.push({ entityId, geometry });
+    const faces = geometry.kind === 'step' && request.controls.bonding === undefined ? partFaces(doc, entityId, deps.kernel()) : null;
+    kernelFaces.set(entityId, faces);
+    parts.push({ entityId, geometry, ...(faces === null ? {} : { faces: faces.faces }) });
   }
   let response: MeshBridgeResponse;
   try {
@@ -82,6 +112,7 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
         key,
         entityId,
         ...(facesNear !== undefined ? { facesNear } : {}),
+        ...faceIndicesOf(kernelFaces.get(entityId ?? ''), facesNear),
         ...(edgesNear !== undefined ? { edgesNear } : {}),
         ...(pointsNear !== undefined ? { pointsNear } : {}),
       })),

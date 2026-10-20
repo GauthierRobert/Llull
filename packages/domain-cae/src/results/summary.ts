@@ -28,7 +28,7 @@ export function meshSummary(mesh: FeMeshArtifact, meshHash: string): MeshSummary
     elements,
     quality,
     warnings: quality.inverted > 0 ? [`FEA_MESH_INVERTED: ${quality.inverted} element(s) with scaled Jacobian <= 0`] : [],
-    faceMap: [],
+    faceMap: mesh.faceMap ?? [],
   };
 }
 
