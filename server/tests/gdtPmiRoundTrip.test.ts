@@ -43,7 +43,10 @@ function carried(item: PmiItem): unknown {
         characteristic: item.characteristic,
         value: round(item.zone.value),
         diametral: item.zone.diametral === true,
-        datums: item.datums.map((datum) => datum.label),
+        spherical: item.zone.spherical === true,
+        materialCondition: item.materialCondition,
+        modifiers: [...item.modifiers].sort(),
+        datums: item.datums.map((datum) => `${datum.label}${datum.boundary ?? ''}`),
       };
     case 'size_dimension': {
       const measured = item.feature.ofSize?.measured ?? 0;
@@ -61,27 +64,13 @@ function carried(item: PmiItem): unknown {
         lower: round(lower),
         upper: round(upper),
         count: item.count,
+        fit: tolerance.type === 'fit' ? tolerance.code : null,
+        sizeModifiers: [...(item.sizeModifiers ?? [])].filter((code) => code !== 'E').sort(),
       };
     }
     default:
       return { kind: item.kind };
   }
-}
-
-/** The same view of an imported item (limits come back as deviations). */
-function readBack(item: PmiItem): unknown {
-  if (item.kind !== 'size_dimension') return carried(item);
-  const measured = item.feature.ofSize?.measured ?? 0;
-  const tolerance = item.tolerance;
-  const [lower, upper] = tolerance.type === 'plusMinus' ? [tolerance.lower, tolerance.upper] : [0, 0];
-  return {
-    kind: item.kind,
-    sizeKind: item.sizeKind,
-    measured: round(measured),
-    lower: round(lower),
-    upper: round(upper),
-    count: item.count,
-  };
 }
 
 const canonical = (values: unknown[]): string[] => values.map((value) => JSON.stringify(value)).sort();
@@ -102,7 +91,7 @@ describeNative('AP242 PMI round trip on the native kernel (VC-GDT-21, 25)', () =
     // 3 datums + 2 size dimensions + 4 frames written; the surface texture has no semantic form and is listed
     expect(data.pmi.written).toHaveLength(9);
     expect(data.pmi.skipped.map((entry) => entry.reason)).toEqual(['a surface texture has no semantic AP242 transport form']);
-    expect(data.pmi.lossy.flatMap((entry) => entry.lost)).toEqual(expect.arrayContaining(['materialCondition']));
+    expect(data.pmi.lossy).toEqual([]);
     expect(data.reviewRequired).toEqual({ value: true, reasons: ['pmi_review_required'] });
     const census = summarizeStep21(data.step).entityCensus;
     expect(census['FLATNESS_TOLERANCE']).toBe(1);
@@ -115,7 +104,7 @@ describeNative('AP242 PMI round trip on the native kernel (VC-GDT-21, 25)', () =
     expect(back.rejected, back.summary).toBeUndefined();
     const imported = items(back.document);
     const wanted = authored.filter((item) => item.kind !== 'surface_texture');
-    expect(canonical(imported.map(readBack))).toEqual(canonical(wanted.map(carried)));
+    expect(canonical(imported.map(carried))).toEqual(canonical(wanted.map(carried)));
     expect(back.document.pmi?.import).toMatchObject({ source: 'plate-roundtrip.stp', items: 9, unresolved: 0, unmapped: 0 });
     expect(imported.every((item) => item.review.required && item.review.reason?.includes('imported from plate-roundtrip.stp'))).toBe(true);
     expect((back.data as { report: { pmi: { items: number }; reviewRequired: { reasons: string[] } } }).report.pmi.items).toBe(9);
@@ -138,6 +127,80 @@ describeNative('AP242 PMI round trip on the native kernel (VC-GDT-21, 25)', () =
     });
     expect(accept.error?.code).toBe('GDT_REVIEW_HUMAN_ONLY');
     expect(accept.document).toBe(back.document);
+  }, 300_000);
+
+  it('round-trips MMC / LMC, a spherical-free zone, modifiers, the MMB boundary, size modifiers and a fit class; reports what the writer refuses', () => {
+    let doc = toleranced();
+    const part = items(doc)[0]!.kind === 'datum_feature' ? (items(doc)[0] as { feature: { entityId: string } }).feature.entityId : '';
+    const exec = (name: string, params: Record<string, unknown>): string[] => {
+      const result = run(doc, name, params);
+      expect(result.rejected, `${name}: ${result.summary}`).toBeUndefined();
+      doc = result.document;
+      return result.affected;
+    };
+    const ids = Object.fromEntries(
+      items(doc).map((item) => [item.kind === 'geometric_tolerance' ? `${item.characteristic}:${item.datums.length}` : item.id, item.id]),
+    );
+    const holeFrame = ids['position:3'] as string;
+    // datum B is MMB on every frame that references it, so the one boundary a transport datum carries is exact
+    for (const item of items(doc))
+      if (item.kind === 'geometric_tolerance' && item.datums.some((datum) => datum.label === 'B'))
+        exec('update_pmi', {
+          pmiId: item.id,
+          datums: item.datums.map((datum) => ({ label: datum.label, ...(datum.label === 'B' ? { boundary: 'MMB' } : {}) })),
+        });
+    exec('update_pmi', { pmiId: holeFrame, modifiers: ['tangent_plane', 'statistical'] });
+    const [bore] = exec('add_size_dimension', {
+      entityId: part,
+      facesNear: [[50, 40, 6]],
+      sizeKind: 'diameter',
+      tolerance: { type: 'fit', code: 'H7', upper: 0.021, lower: 0 },
+      sizeModifiers: ['LP', 'SX', 'E'],
+    });
+    exec('add_geometric_tolerance', {
+      characteristic: 'position',
+      targetPmiId: bore,
+      zone: { value: 0.05, diametral: true },
+      materialCondition: 'LMC',
+      modifiers: ['free_state'],
+      datums: [{ label: 'A' }, { label: 'B', boundary: 'MMB' }],
+    });
+    exec('add_geometric_tolerance', {
+      characteristic: 'profile_surface',
+      entityId: part,
+      facesNear: [[30, 10, 0]],
+      zone: { value: 0.2, projectedLength: 5, maxValue: 0.3 },
+      modifiers: ['all_around', 'not_convex'],
+    });
+    const authored = items(doc);
+    const exported = run(doc, 'export_step_ap242', { entityIds: [part], includePmi: true, timestamp: '2026-10-20T00:00:00' });
+    expect(exported.rejected, exported.summary).toBeUndefined();
+    const data = exported.data as { step: string; pmi: { written: string[]; skipped: { reason: string }[]; lossy: { lost: string[] }[] } };
+    const lost = data.pmi.lossy.flatMap((entry) => entry.lost).map((entry) => entry.split(' (')[0]);
+    expect(lost.sort()).toEqual(['modifiers.all_around', 'sizeModifiers.E', 'zone.maxValue', 'zone.projectedLength']);
+    expect(data.pmi.written).toHaveLength(authored.length - 1);
+
+    const back = run(createEmptyDocument(), 'import_step_exact', { text: data.step, fileName: 'plate-v2.stp' });
+    expect(back.rejected, back.summary).toBeUndefined();
+    const withoutLost = (item: PmiItem): unknown => {
+      const view = carried(item) as Record<string, unknown>;
+      if (item.kind === 'geometric_tolerance')
+        return { ...view, modifiers: (view['modifiers'] as string[]).filter((m) => m !== 'all_around') };
+      return view;
+    };
+    const wanted = authored.filter((item) => item.kind !== 'surface_texture');
+    expect(canonical(items(back.document).map(carried))).toEqual(canonical(wanted.map(withoutLost)));
+    const frames = items(back.document).filter((item) => item.kind === 'geometric_tolerance');
+    expect(frames.some((f) => f.kind === 'geometric_tolerance' && f.materialCondition === 'MMC')).toBe(true);
+    expect(
+      frames.some((f) => f.kind === 'geometric_tolerance' && f.materialCondition === 'LMC' && f.modifiers.includes('free_state')),
+    ).toBe(true);
+    expect(frames.some((f) => f.kind === 'geometric_tolerance' && f.datums.some((d) => d.label === 'B' && d.boundary === 'MMB'))).toBe(
+      true,
+    );
+    expect(
+      items(back.document).some((item) => item.kind === 'size_dimension' && item.tolerance.type === 'fit' && item.tolerance.code === 'H7'),
+    ).toBe(true);
   }, 300_000);
 
   it('a file without PMI imports with no pmi model, and includePmi on a document without PMI writes none', () => {

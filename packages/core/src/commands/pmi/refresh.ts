@@ -104,6 +104,8 @@ export function refreshItem(item: PmiItem, lookup: SolidLookup, adopt = false): 
       const refreshed = run('feature', item.feature);
       if (refreshed.resolved === null || 'code' in refreshed.resolved)
         return { item: { ...item, feature: refreshed.feature }, findings, notRun };
+      if (item.sizeKind === 'angular' || item.sizeKind === 'curve_length')
+        return { item: { ...item, feature: refreshed.feature }, findings, notRun };
       const size = measureSize(refreshed.resolved.faces, item.sizeKind, refreshed.resolved.topology, refreshed.resolved.tolerance);
       if ('code' in size) {
         findings.push(finding('error', 'GDT_FEATURE_UNRESOLVED', [item.id], `feature: ${size.message}`, ['feature']));

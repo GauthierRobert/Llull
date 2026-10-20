@@ -52,10 +52,10 @@
   },
   "imported": {
    "tolerances": 5,
-   "dimensions": 6,
+   "dimensions": 7,
    "datumFeatures": 8,
    "unresolved": 0,
-   "unmapped": 2,
+   "unmapped": 1,
    "unverified": 0
   }
  },
@@ -82,11 +82,11 @@
   },
   "imported": {
    "tolerances": 27,
-   "dimensions": 17,
+   "dimensions": 18,
    "datumFeatures": 2,
    "unresolved": 0,
-   "unmapped": 3,
-   "unverified": 40
+   "unmapped": 2,
+   "unverified": 41
   }
  },
  "ftc_07": {
@@ -157,10 +157,10 @@
   },
   "imported": {
    "tolerances": 4,
-   "dimensions": 5,
+   "dimensions": 6,
    "datumFeatures": 2,
    "unresolved": 0,
-   "unmapped": 1,
+   "unmapped": 0,
    "unverified": 3
   }
  },
@@ -172,11 +172,11 @@
   },
   "imported": {
    "tolerances": 25,
-   "dimensions": 16,
+   "dimensions": 17,
    "datumFeatures": 6,
    "unresolved": 0,
-   "unmapped": 1,
-   "unverified": 16
+   "unmapped": 0,
+   "unverified": 17
   }
  },
  "stc_07": {

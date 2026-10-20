@@ -751,8 +751,18 @@ size dimensions -> `size_diameter | size_radius | size_thickness | size_spherica
 (limits become plus / minus around the nominal); location dimensions -> `location_linear_distance | location_angular`. Only a loose solid written as its own
 product carries PMI (`ExchangePlan.productEntities`); items of a component, an unselected solid or a faceted ply are listed. `data.pmi = { requested, written,
 skipped[{id, reason}], lossy[{id, lost[]}], reviewRequired[] }`; written-but-unreviewed items set `data.reviewRequired = { value: true, reasons: ['pmi_review_required'] }`.
-`includePmi` with AP214 / AP203 refuses `XCH_PMI_SCHEMA`. Lossy (the transport has no vocabulary): material condition, zone modifiers, projected / unequal / max zones,
-datum boundary, composite frames, ISO 14405 size modifiers, all-around. Not written (no semantic form): datum targets, surface texture, notes (graphic PMI is V2).
+`includePmi` with AP214 / AP203 refuses `XCH_PMI_SCHEMA`. **Vocabulary v2 (04 §13.2)** is written: material condition (MMC / LMC -> `materialRequirement`), spherical zone, zone modifiers
+(free state, tangent plane, statistical, common zone, each radial element, line element, not convex, any cross section, major / minor / pitch diameter, separate requirement, reciprocity), the datum
+boundary MMB / LMB (a transport datum modifier: the first frame's boundary per label; a frame that differs is listed), ISO 14405 size modifiers (LP LS GG GX GN CC CA CV SX SN SA SM SD SR), limits
+as the range (written alone: OCC reads a range next to deviations back with a wrong lower bound; the value it stores is the mid-range, so the nominal check is skipped for limits) and fit classes
+(H7 -> hole H, IT7). **Still lossy, with the writer's reason in `data.pmi.lossy`:** projected zones, unequally disposed (non-uniform) zones, `maxValue`, composite frames, all-around / all-over,
+the size codes E and GC, fit codes that are not letter + IT2..IT18, a datum boundary that differs between frames. Not written (no semantic form): datum targets, surface texture, notes (graphic PMI is V2).
+The read side maps all of it back (material requirement, spherical zone, modifiers, boundary onto the frame's datum references, range -> limits, class -> fit, size modifiers) and the three
+dimension types that had no model form: `size_spherical_radius` (new sizeKind `spherical_radius`, measured on a sphere), `size_angular` and `size_curve_length` (sizeKinds `angular` / `curve_length`
+keep the stated `nominal`, not measurable from the B-rep). Source attributes with no model field (dimension qualifiers, `between` and other modifiers, datum modifiers other than the boundary or
+with a value, the runout zone) arrive in `unmodelled` and are listed in the item's `unverified` reason. Round trip on the native kernel
+(`gdtPmiRoundTrip.test.ts`): MMC on the hole frame, LMC + free state on a bore frame, tangent plane + statistical, MMB on datum B, LP / SX size modifiers, an H7 fit and a not-convex profile come
+back equal; the refused ones (all-around, projected length, maxValue, size code E) are listed as lossy and absent after import.
 
 **Read (`import_step_exact`, `importPmi` default true, TR-GDT-15).** `commands/exchange/importPmi.ts` takes `ImportedProduct.pmi` (document unit), walks the product's
 solids in order (face indices of a product run through its solids), picks for each named face a point that the face query resolves back to that face, and calls the
@@ -770,9 +780,10 @@ size kinds, measured sizes, deviations (limits as plus / minus) and counts; 0 un
 
 **NIST census gate (`server/tests/gdtPmiNistGate.test.ts`, VC-GDT-20; pinned in `validation/nist_pmi_import_expected.json`, a ratchet: an imported count may only rise, `unmapped` only
 fall; skips without the fetched files).** `import_step_exact` on the 16 semantic NIST files, items in `doc.pmi` against the independent entity census of the file:
-geometric tolerances 323 / 362 (89 %), size + location dimensions 213 / 260 (82 %), datum features 50 / 100 (XDE datum objects include datum targets); 36 items unresolved (34 in `stc_07`, 2 in
-`ftc_07`), 14 unmapped, 296 flagged `unverified` (mostly frames naming datums the reader did not deliver). CTC-01 (the 04 reference): 6 / 6 tolerances, 8 / 12 dimensions, 1 / 3 datum
-features. Per file the numbers are in the pinned JSON. **The FUNCTIONAL_SPEC target of 100 % recall per category is NOT met**: the shortfall is mostly upstream of this stage (the XDE
+geometric tolerances 349 / 362 (96 %), size + location dimensions 217 / 260 (83 %; 213 before the three new size kinds, they unlocked 4 angular sizes), datum features 95 / 100 (XDE datum objects
+include datum targets); 36 items unresolved (34 in `stc_07`, 2 in `ftc_07`), 10 unmapped, 12 of 16 files carry `unverified` items (file nominal differing from the B-rep, frames naming datums the reader did not deliver). CTC-01 (the 04
+reference): 6 / 6 tolerances, 8 / 12 dimensions, 3 / 3 datum features. Per file the numbers are in the pinned JSON (re-recorded 2026-10-20 with the v2 reader; no count fell). The 43 dimensions still
+missing are those the reader of 04 cannot attach to faces (they name edges or vertices; 03 `SizeDimensionPmi` / `LocationDimensionPmi` attach to faces only). **The FUNCTIONAL_SPEC target of 100 % recall per category is NOT met**: the shortfall is mostly upstream of this stage (the XDE
 reader of 04 does not return every datum, angular or composite item: CTC-01 delivers 1 of 3 datum features), and only the 14 `unmapped` are lost here. Face numbering cannot be checked
 after healing; a wrong attachment is caught for dimensions by the nominal check (FTC-09: 5 of 56 items flagged, e.g. file 38.1 against B-rep 28.575), not for frames.
 

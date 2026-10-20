@@ -95,7 +95,8 @@ function toleranceText(tolerance: PmiTolerance, nominal: string): string {
 /** Nominal of a size dimension as shown (radius sizeKind shows half the measured diameter). */
 export const sizeNominal = (item: SizeDimensionPmi): number | undefined => {
   const measured = item.feature.ofSize?.measured;
-  return measured === undefined ? undefined : item.sizeKind === 'radius' ? measured / 2 : measured;
+  if (item.sizeKind === 'angular' || item.sizeKind === 'curve_length') return item.nominal;
+  return measured === undefined ? undefined : item.sizeKind === 'radius' || item.sizeKind === 'spherical_radius' ? measured / 2 : measured;
 };
 
 /**
@@ -119,6 +120,9 @@ const SIZE_PREFIX: Readonly<Record<SizeDimensionPmi['sizeKind'], string>> = {
   radius: 'R',
   width: '',
   spherical_diameter: 'SØ',
+  spherical_radius: 'SR',
+  angular: '∠',
+  curve_length: '⌒',
 };
 
 /** "4X Ø6.6–6.9", "Ø20 +0.021/0", "R5 ±0.1". */

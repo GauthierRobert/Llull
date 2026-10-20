@@ -4,7 +4,7 @@
  * @invariant plane-plane distance needs parallel planes (|n1.n2| >= cos 1e-9); axes group by collinearity so a pattern counts one per axis
  */
 
-import type { PmiFeature } from '../model/pmi';
+import type { MeasuredSizeKind, PmiFeature } from '../model/pmi';
 import type { Vec3 } from '../model/types';
 import type { ShapeTopology } from './kernel';
 import type { FaceDetail } from './kernelPorts';
@@ -57,7 +57,7 @@ const withInternal = (kind: 'cylinder' | 'width' | 'sphere', measured: number, i
  */
 export function measureSize(
   faces: readonly FaceDetail[],
-  sizeKind: 'diameter' | 'radius' | 'width' | 'spherical_diameter',
+  sizeKind: MeasuredSizeKind,
   topology: ShapeTopology,
   tolerance: number,
 ): MeasuredSize | SizeProblem {
@@ -83,7 +83,7 @@ export function measureSize(
     const separation = dot3(sub3(b.centroid, a.centroid), na);
     return { ofSize: withInternal('width', Math.abs(separation), separation > 0), count: 1 };
   }
-  const wanted = sizeKind === 'spherical_diameter' ? 'sphere' : 'cylinder';
+  const wanted = sizeKind === 'spherical_diameter' || sizeKind === 'spherical_radius' ? 'sphere' : 'cylinder';
   if (faces.some((face) => face.surface !== wanted || face.radius === undefined || face.axis === undefined)) {
     return faces.every((face) => face.surface === 'plane')
       ? { code: 'GDT_NOT_FOS', message: 'a plane is not a feature of size; use add_location_dimension', faceIndices: indices }

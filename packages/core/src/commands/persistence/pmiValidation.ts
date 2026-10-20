@@ -13,6 +13,7 @@ import { isStringArray } from '../../lib/isStringArray';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isReservedKey } from '../../lib/reservedKey';
 
+const SIZE_KINDS = ['diameter', 'radius', 'width', 'spherical_diameter', 'spherical_radius', 'angular', 'curve_length'];
 const SAFE_ID = /^[A-Za-z0-9._-]+$/;
 const isSafeId = (value: unknown): boolean => typeof value === 'string' && SAFE_ID.test(value);
 const isOneOf = (list: ReadonlyArray<string>, value: unknown): boolean => typeof value === 'string' && list.includes(value);
@@ -101,8 +102,9 @@ function kindProblem(where: string, item: Record<string, unknown>): string | nul
         return `${where}: datum target needs a label ^[A-Z]{1,2}$, integer targetNumber >= 1, targetKind point|line|area and areaSize > 0 when present`;
       return featureProblem(where, item['feature']);
     case 'size_dimension':
-      if (!isOneOf(['diameter', 'radius', 'width', 'spherical_diameter'], item['sizeKind'])) return `${where}: unknown sizeKind`;
+      if (!isOneOf(SIZE_KINDS, item['sizeKind'])) return `${where}: unknown sizeKind`;
       if (!Number.isInteger(item['count']) || (item['count'] as number) < 1) return `${where}: count must be an integer >= 1`;
+      if (!isOptional(item['nominal'], isFiniteNumber)) return `${where}: nominal must be a finite number`;
       if (!isOptional(item['sizeModifiers'], (v) => Array.isArray(v) && v.every((m) => isOneOf(SIZE_MODIFIERS, m))))
         return `${where}: sizeModifiers must be ISO 14405 codes`;
       return featureProblem(where, item['feature']) ?? toleranceProblem(where, item['tolerance']);
