@@ -48,7 +48,7 @@ export const renderWalkthrough = defineCommand({
     'spherical) at `fps` frames per second; frames = floor(duration × fps) + 1. Solids and sketches only (no grid / axes). data: { frames, ' +
     'fps, durationS, width, height, files: [{ fileName: "frame-0001.png", base64 }] } — save them with `--save dir/`. renderer "reference" ' +
     '(default) adds frameSha256[] (deterministic per rendererVersion); "native" draws each frame on the GPU with llull-compute (CLI / ' +
-    'desktop only): pictures, no digests, data.deterministic false. Errors: VIS_WALKTHROUGH_NOT_FOUND, VIS_WALKTHROUGH_INVALID (more ' +
+    'desktop only): GPU frames without digests, data.deterministic false. Errors: VIS_WALKTHROUGH_NOT_FOUND, VIS_WALKTHROUGH_INVALID (more ' +
     'frames than maxFrames), VIS_RENDER_BUDGET, NATIVE_TOOL_MISSING.',
   annotations: { readOnly: true },
   params: z.object({
@@ -58,7 +58,7 @@ export const renderWalkthrough = defineCommand({
     height: z.number().optional().describe('Frame height in pixels, clamped to [64, 2000]. Default 360.'),
     maxFrames: z.number().int().optional().describe('Refuse when the walkthrough needs more frames than this (1..600). Default 600.'),
     background: z.string().optional().describe('Frame background "#rrggbb". Default "#1a1a2e".'),
-    renderer: z.enum(['reference', 'native']).optional().describe('"reference" (default, digests) or "native" (GPU pictures).'),
+    renderer: z.enum(['reference', 'native']).optional().describe('"reference" (default, digests) or "native" (GPU frames, no digests).'),
   }),
   run: (doc, params, ctx): CommandResult => {
     const fail = (code: string, message: string, paths: readonly string[] = []): CommandResult =>
