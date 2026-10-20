@@ -1,0 +1,42 @@
+# Nightly mutation testing (SC-Q4, docs/MUTATION.md): Stryker over one packages/core/src/commands folder per job, judged only by the
+# oracle suite + golden corpus + fuzz sample + action-matrix PR sample (vitest.mutation.config.mts). Never a PR gate: the score is reported,
+# not enforced (stryker.config.mjs `thresholds.break` is null). Surviving mutants go to docs/MUTATION.md by hand after a review.
+name: mutation
+
+on:
+  schedule:
+    - cron: '43 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        folder: [brep, solids, parametric, history]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Incremental state (reports/stryker-incremental-<folder>.json): unchanged mutants against unchanged tests are not re-run.
+      - uses: actions/cache@v4
+        with:
+          path: reports/stryker-incremental-${{ matrix.folder }}.json
+          key: stryker-${{ matrix.folder }}-${{ github.run_id }}
+          restore-keys: stryker-${{ matrix.folder }}-
+      - run: npm run mutation -- --folder ${{ matrix.folder }} --concurrency 3
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-${{ matrix.folder }}
+          path: |
+            reports/mutation-${{ matrix.folder }}.html
+            reports/mutation-${{ matrix.folder }}.json
