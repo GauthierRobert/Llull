@@ -680,11 +680,13 @@ dependencies = [
  "las",
  "libm",
  "llull-bvh",
+ "llull-gpu",
  "llull-protocol",
  "rayon",
  "serde",
  "serde_json",
  "sha2",
+ "wgpu",
 ]
 
 [[package]]

@@ -255,3 +255,51 @@ describe('check_point_clouds', () => {
     expect((execute(createEmptyDocument(), 'check_point_clouds', {}).data as { status: string }).status).toBe('pass');
   });
 });
+
+describe('device gpu (RS-4)', () => {
+  it('passes the device, labels the picture non-deterministic and surfaces native fallbacks', () => {
+    const picture = (op: CloudOp): CloudOpResult => {
+      const base = deviationAnswer(op);
+      if (!base.ok) return base;
+      return {
+        ...opOk({ ...base.result, gpu: { adapter: 'test GPU', deterministic: false, epsilon: 4e-6, maxDifferenceFromCpu: 1e-8 } }, 'gpu'),
+        warnings: [{ code: 'SCN_GPU_FALLBACK', message: 'not used' }],
+      };
+    };
+    const { ctx, ops } = context(picture);
+    const { doc, cloudId, ids } = scene(ctx);
+    const result = execute(
+      doc,
+      'cloud_to_model_deviation',
+      { cloudId, entityIds: [ids.pipe], maxDistance: 100, threshold: 10, device: 'gpu' },
+      ctx,
+    );
+    expect(ops[0]?.params['device']).toBe('gpu');
+    const data = result.data as {
+      gpu: { deterministic: boolean };
+      provenance: { device: string; deterministic: boolean; numbers: string };
+      nativeWarnings: { code: string }[];
+    };
+    expect(data.gpu.deterministic).toBe(false);
+    expect(data.provenance).toMatchObject({ device: 'gpu', deterministic: false, numbers: 'Rust CPU (deterministic)' });
+    expect(data.nativeWarnings[0]?.code).toBe('SCN_GPU_FALLBACK');
+    const clash = context((op) => {
+      const base = clashAnswer(op);
+      return base.ok
+        ? {
+            ...opOk({ ...base.result, gpu: { adapter: 'test GPU', epsilon: 4e-6 } }, 'gpu'),
+            warnings: [{ code: 'SCN_GPU_FALLBACK', message: 'x' }],
+          }
+        : base;
+    });
+    const scene2 = scene(clash.ctx);
+    const clashed = execute(
+      scene2.doc,
+      'check_asbuilt_clash',
+      { cloudId: scene2.cloudId, entityIds: [scene2.ids.pipe], clearance: 75, device: 'gpu' },
+      clash.ctx,
+    );
+    expect((clashed.data as { gpu: unknown; nativeWarnings: unknown[] }).gpu).toBeDefined();
+    expect((clashed.data as { nativeWarnings: unknown[] }).nativeWarnings).toHaveLength(1);
+  });
+});

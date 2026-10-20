@@ -10,9 +10,12 @@
 pub mod asset;
 pub mod cloud;
 pub mod compare;
+pub mod compare_op;
 pub mod distance;
 pub mod error;
 pub mod fit;
+#[cfg(feature = "gpu")]
+pub mod gpu;
 pub mod job;
 pub mod kdtree;
 pub mod linalg;

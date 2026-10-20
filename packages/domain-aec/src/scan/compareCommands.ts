@@ -139,6 +139,7 @@ export const cloudToModelDeviation = defineCommand({
       threshold,
       reviewRequired: { value: true, reason: DEVIATION_REVIEW },
       provenance: { ...ran.provenance, numbers: 'Rust CPU (deterministic)' },
+      ...(ran.warnings !== undefined ? { nativeWarnings: ran.warnings } : {}),
       ...(gpu !== undefined ? { gpu } : {}),
     };
     const worst = results.reduce((m, r) => Math.max(m, Math.abs(r.max ?? 0), Math.abs(r.min ?? 0)), 0);
@@ -251,6 +252,7 @@ export const checkAsbuiltClash = defineCommand({
       warnings,
       reviewRequired: { value: true, reason: CLASH_REVIEW },
       provenance: ran.provenance,
+      ...(ran.warnings !== undefined ? { nativeWarnings: ran.warnings } : {}),
       ...(ran.result['gpu'] !== undefined ? { gpu: ran.result['gpu'] } : {}),
     };
     const counts = ['hard', 'clearance', 'clear'].map((s) => `${results.filter((r) => r.status === s).length} ${s}`).join(', ');

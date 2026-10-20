@@ -145,6 +145,18 @@ function terminal(stdout: string): { outputs: { path: string; sha256: string }[]
   return found;
 }
 
+/** The `warning` events of a run (e.g. SCN_GPU_FALLBACK). */
+function warningsOf(stdout: string): { code: string; message: string }[] {
+  return stdout.split('\n').flatMap((line) => {
+    try {
+      const event: unknown = JSON.parse(line);
+      return isRecord(event) && event['type'] === 'warning' ? [{ code: String(event['code']), message: String(event['message']) }] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
 function runCompute(store: string, binary: string | null, env: NodeJS.ProcessEnv, op: CloudOp): CloudOpResult | null {
   if (!op.clouds.every((cloud) => isAssetKey(cloud.assetKey) && AssetReader.open(assetDir(store, cloud.assetKey), cloud.assetKey) !== null))
     return null;
@@ -186,10 +198,12 @@ function runCompute(store: string, binary: string | null, env: NodeJS.ProcessEnv
     if (!isRecord(result)) return failure('NATIVE_PROTOCOL', 'result.json is not an object');
     const device = result['device'] === 'gpu' ? 'gpu' : 'cpu';
     const version = /llull-compute\s+(\S+)/.exec(spawnSync(binary, ['--version'], { encoding: 'utf8' }).stdout ?? '')?.[1] ?? 'unknown';
+    const warnings = warningsOf(run.stdout);
     return {
       ok: true,
       result,
       provenance: { binary: `llull-compute ${version}`, device, deterministic: result['deterministic'] !== false, elapsedMs },
+      ...(warnings.length > 0 ? { warnings } : {}),
     };
   } finally {
     if (env['LLULL_NATIVE_KEEP'] !== '1') rmSync(folder, { recursive: true, force: true });

@@ -168,6 +168,30 @@ describe('scan comparison on llull-compute', () => {
     });
     expect(data.reviewRequired.value).toBe(true);
     expect(data.minPointsInVolume.defaulted).toBe(true);
+
+    // RS-4 device "gpu" (VC-SCN-60 b / c): the clash equals the CPU-only result; the deviation numbers are the CPU's and the GPU picture,
+    // when this llull-compute was built with --features gpu and an adapter exists, stays within epsilon_gpu (else a logged fallback).
+    const onGpu = execute(doc, 'check_asbuilt_clash', { cloudId, entityIds: ids, clearance: 0.075, device: 'gpu' }, ctx);
+    expect((onGpu.data as { results: unknown[] }).results).toEqual(data.results);
+    const pictured = execute(
+      designed.document,
+      'cloud_to_model_deviation',
+      { cloudId, entityIds: [pipeId], maxDistance: 0.1, threshold: 0.01, device: 'gpu' },
+      ctx,
+    );
+    const gpuData = pictured.data as {
+      results: unknown[];
+      gpu?: { epsilon: number; maxDifferenceFromCpu: number; deterministic: boolean };
+      nativeWarnings?: { code: string }[];
+    };
+    expect(gpuData.results).toEqual((analytic.data as { results: unknown[] }).results);
+    if (gpuData.gpu === undefined) {
+      expect(gpuData.nativeWarnings?.map((w) => w.code)).toContain('SCN_GPU_FALLBACK');
+      console.warn(`scanNative: GPU picture not drawn (${JSON.stringify(gpuData.nativeWarnings)})`);
+    } else {
+      expect(gpuData.gpu.deterministic).toBe(false);
+      expect(gpuData.gpu.maxDifferenceFromCpu).toBeLessThanOrEqual(gpuData.gpu.epsilon);
+    }
   });
 });
 

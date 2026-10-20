@@ -94,6 +94,11 @@ pub fn assign(entities: &[Entity], p: &Vec3, max_distance: f64) -> Option<(usize
     best
 }
 
+/// The nearest entity and its distance of every point (CPU, f64), in point order.
+pub fn assignments(points: &[Vec3], entities: &[Entity], max_distance: f64) -> Vec<Option<(usize, f64)>> {
+    points.par_chunks(CHUNK).flat_map_iter(|chunk| chunk.iter().map(|p| assign(entities, p, max_distance))).collect()
+}
+
 fn axis_offset(design: &PipeAxis, fitted: &Cylinder) -> PipeDeviation {
     let mid = scale(&crate::linalg::add(&design.start, &design.end), 0.5);
     let v = sub(&mid, &fitted.point);
@@ -113,8 +118,7 @@ pub fn deviation(points: &[Vec3], entities: &[Entity], settings: &DeviationSetti
     let bins = settings.bins.max(1);
     let low = if settings.signed { -settings.max_distance } else { 0.0 };
     let width = (settings.max_distance - low) / bins as f64;
-    let assigned: Vec<Option<(usize, f64)>> =
-        points.par_chunks(CHUNK).flat_map_iter(|chunk| chunk.iter().map(|p| assign(entities, p, settings.max_distance))).collect();
+    let assigned = assignments(points, entities, settings.max_distance);
     let partials: Vec<Vec<Partial>> = assigned
         .par_chunks(CHUNK)
         .map(|chunk| {
@@ -246,6 +250,18 @@ fn clusters_of(points: &[(Vec3, f64)], voxel: f64) -> Vec<Vec<usize>> {
 /// Design-vs-scan clash of each entity with `points`: d < 0 hard, d < clearance clearance; clusters (voxel 2 × spacing) below
 /// `min_points` are noise. `exclude[i]` (metres): points with |d| below it are the entity's own as-built surface and are ignored.
 pub fn clash(points: &[Vec3], entities: &[Entity], exclude: &[Option<f64>], settings: &ClashSettings) -> (Vec<ClashResult>, f64) {
+    clash_candidates(points, entities, exclude, settings, None)
+}
+
+/// [`clash`] evaluating, for entity i, only the point indices `candidates[i]` (ascending; the GPU prune's survivors). Any superset of the
+/// points within reach gives the same result as `clash`, because the f64 evaluation and its order are the same.
+pub fn clash_candidates(
+    points: &[Vec3],
+    entities: &[Entity],
+    exclude: &[Option<f64>],
+    settings: &ClashSettings,
+    candidates: Option<&[Vec<usize>]>,
+) -> (Vec<ClashResult>, f64) {
     let spacing = if points.len() >= 2 { median_spacing(&KdTree::build(points), 2000) } else { 0.0 };
     let voxel = (2.0 * spacing).max(1e-6);
     let results = entities
@@ -254,7 +270,11 @@ pub fn clash(points: &[Vec3], entities: &[Entity], exclude: &[Option<f64>], sett
         .map(|(i, entity)| {
             let reach = settings.search_distance.max(settings.clearance);
             let band = exclude.get(i).copied().flatten();
-            let evaluated: Vec<(Vec3, f64)> = points
+            let selected: Vec<Vec3> = match candidates.and_then(|c| c.get(i)) {
+                Some(indices) => indices.iter().map(|&k| points[k]).collect(),
+                None => points.to_vec(),
+            };
+            let evaluated: Vec<(Vec3, f64)> = selected
                 .par_chunks(CHUNK)
                 .flat_map_iter(|chunk| {
                     chunk

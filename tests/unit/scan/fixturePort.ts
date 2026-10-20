@@ -3,7 +3,7 @@
  * that records each op and answers with a scripted result (the numerics are tested natively in `llull-cloud` and end to end in server/tests).
  */
 
-import type { CloudManifest, CloudOp, CloudOpResult, PointCloudPort } from '@core/model/pointCloud';
+import type { CloudManifest, CloudOp, CloudOpResult, CloudOpSuccess, PointCloudPort } from '@core/model/pointCloud';
 import type { ExecutionContext } from '@core/commands/types';
 import type { Vec3 } from '@core/model/vectors';
 import { defaultContext } from '@core/commands/context';
@@ -107,7 +107,7 @@ export function fixturePort(clouds: readonly FixtureCloud[], answer: (op: CloudO
 export const withPort = (port: PointCloudPort | null): ExecutionContext => ({ ...defaultContext(), pointClouds: port });
 
 /** A successful op result with CPU provenance. */
-export const opOk = (result: Record<string, unknown>, device: 'cpu' | 'gpu' = 'cpu'): CloudOpResult => ({
+export const opOk = (result: Record<string, unknown>, device: 'cpu' | 'gpu' = 'cpu'): CloudOpSuccess => ({
   ok: true,
   result,
   provenance: { binary: 'llull-compute 0.1.0', device, deterministic: device === 'cpu', elapsedMs: 1 },

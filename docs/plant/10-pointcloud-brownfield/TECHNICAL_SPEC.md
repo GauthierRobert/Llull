@@ -1,8 +1,8 @@
 # Gap 10 SCN — Point clouds and brownfield revamps: technical specification
 
 Companion of [FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md). Laws: `.claude/rules/architecture.md` (L1–L10). Operator model:
-`docs/aerospace/AGENT_FIRST.md`. Validation: [validation/README.md](validation/README.md). Status: specification, nothing
-implemented.
+`docs/aerospace/AGENT_FIRST.md`. Validation: [validation/README.md](validation/README.md). Status: RS-3 / RS-4 built 2026-10-19
+(M1, M2, M4, M5, M6, M7; M3 viewport and the V1 items not built): see §13 "As built". §1–§12 are the specification as written.
 
 ## 1. Current state in llull (2026-10-18)
 
@@ -634,6 +634,114 @@ is M7 (2 wk, after the MVP).
    `domain-cae/thermomech/plane.ts` stays where it is.
 8. **Q8 — Scan-to-model registration.** Register a cloud to the *design model* (ICP against the tessellated design) for
    plants whose design model is trusted. Useful but risky: it hides real deviations. V1 behind a reviewer gate?
+
+## 13. As built (RS-3 / RS-4, 2026-10-19)
+
+### 13.1 Layout
+
+| Layer | Path | Content |
+| ----- | ---- | ------- |
+| Native crate | `solver/crates/llull-cloud` | readers (`read/{e57,las,ascii}.rs`), octree + asset (`octree.rs`, `asset.rs`, `manifest.rs`, `store.rs`), `kdtree.rs` (+ seeded xorshift128+), `linalg.rs` (cyclic Jacobi, LU), `lm.rs`, `normals.rs`, `fit/{cylinder,plane,sphere,circle}.rs`, `slice.rs`, `register.rs`, `distance.rs`, `compare.rs`, `compare_op.rs`, `gpu.rs` (feature `gpu`), `job.rs` / `ops.rs` |
+| Job binary | `llull-compute cloud import <folder>`, `llull-compute cloud op <folder>` | job contracts in the module docs of `job.rs` and `ops.rs`; NDJSON events of `llull-protocol` |
+| Core | `packages/core/src/model/pointCloud.ts` | `PointCloudPort`, `CloudManifest`, `CloudOp`, the `ScanModel` slice (`CadDocument.scan`); `ExecutionContext.pointClouds` |
+| Plugin | `packages/domain-aec/src/scan/` (plugin `scan`, toolset `scan`) | 24 commands (below), `document.ts` (slice validation) |
+| Host | `server/src/scan/` | `scanStore.ts` (store, asset key), `assetReader.ts` (synchronous TS reader of the asset), `pointCloudPort.ts` (Node port: reads in TS, `compute` = `spawnSync llull-compute cloud op`), `scanImport.ts` + `scanTools.ts` (`scan_import`, `scan_list`; CLI `llull scan import FILE`, `llull scan list`); installed by `server/src/fea/context.ts` `serverContext()` |
+
+Commands: mutating `attach_point_cloud`, `update_point_cloud`, `detach_point_cloud`, `set_scan_crop`, `clear_scan_crop`,
+`apply_registration`, `mark_registration_supplied`, `accept_registration` (human gate), `commit_asbuilt_extraction`,
+`accept_asbuilt_extraction` (human gate); queries `describe_point_cloud`, `query_cloud_points`, `nearest_cloud_point`,
+`measure_cloud`, `slice_cloud`, `fit_primitive`, `extract_pipes`, `compute_registration`, `cloud_to_model_deviation`,
+`check_asbuilt_clash`, `check_point_clouds`. `add_pipe_run` gained the optional `asBuilt { extractionId, unverified }`.
+
+### 13.2 Decisions and deviations from §1–§11
+
+1. **No WASM build (owner directive LC1, CLAUDE.md "PRODUCT DIRECTIVE").** TR-SCN-05's browser / no-binary WASM path, the
+   `src/ui/services/pointCloudStore.ts` port and Q3 are dropped: llull runs only in the desktop app and the CLI. Without
+   `llull-compute`, `scan_import` and every heavy query answer `NATIVE_TOOL_MISSING` with the install hint; the reads that the Node
+   port does in TypeScript (`describe_point_cloud`, `query_cloud_points`, `nearest_cloud_point`, `measure_cloud`) work on any asset
+   already in the store. VC-SCN-60 (a) "native vs WASM" becomes "native reproducibility": identical asset bytes, fits, ICP
+   transforms and deviation sums for any thread count (`tests/octree.rs`, `fits.rs`, `registration.rs`, `compare.rs`).
+2. **M3 (viewport) not built** (CLI-first scope). `render_view` does not draw clouds yet.
+3. **Asset key** (decision 1): `sha256("<sourceSha256>\n<importerVersion>\n<canonicalJson(importOptions with defaults)>")`,
+   `importerVersion = "llull-cloud@<crate version>/asset-1"`. Options in the key: `format`, `sourceUnit`, `columns`,
+   `applyStationPoses`, `checksum`, `maxPointsPerNode`.
+4. **Asset layout v1** (§3.1): node offsets are **u32** from the node's grid origin (not i32: the root node's samples span the whole cube),
+   then a u32 record-index column, then the attribute columns. LAS / LAZ keep the raw record integers (bit-exact, VC-SCN-09). Float
+   sources (E57, ASCII) use quantum **1e-7 m**, ×10 until the extent is below 2^30 codes (finer than §3.1's 1e-5 m, which could not
+   meet VC-SCN-12's ±1e-6 m). `sourceUnit` now also scales LAS / LAZ grids (quantum and offset × the unit, the codes stay exact);
+   a CRS declaring feet with `sourceUnit=m` warns `SCN_LAS_UNIT_FEET` (`autzen_trim.laz` is in US feet).
+5. **In-core octree build.** Counting-sort on 96-bit Morton codes, grid sampling of 128³ cells per node (first point per cell in
+   Morton order, no RNG), deterministic for any thread count. Not out of core and no memory map (the workspace forbids `unsafe`, which
+   `memmap2` needs): ≈ 60 B/point during import, so §8's 1.5 GB peak is not met above ~25 M points (follow-up).
+6. **Fit refinement**: inliers are re-selected until the set is stable (2 to 10 passes) rather than exactly twice: with the adaptive
+   RANSAC count, two passes left CYL-B at a fixed point of a mediocre model (axis error 0.076°, 4 500 of 6 000 inliers); iterating
+   (local optimisation, Chum, Matas & Kittler, DAGM 2003) gives 0.004° for every seed. `fit_primitive` fits plane / cylinder / sphere;
+   circles are fitted in `slice_cloud` (`fit: "circle"`).
+7. **Registration frames.** `RegistrationRecord.transform` maps the moving asset frame to the fixed asset frame; `apply_registration`
+   sets `moving.transform = fixed.transform · record.transform`. Target seeds are in the document frame. ICP: rejection
+   d > max(3 × median, 1e-4 m), trimming to `trimRatio`, overlap = fraction of moving points within 3 × the fixed spacing at the end.
+8. **Replay without the asset (TR-SCN-04)**: `attach_point_cloud` takes `assetKey` (sourceSha256 is an optional cross-check) and stores
+   nothing derived from the port (name default `scan <key prefix>`, colour mode `rgb`), so a replay with no port gives the same document
+   (unit test and server test). A `grid` placement is the site calibration's 2D Helmert (scale included): `CloudReference.transform`
+   is affine; registration records are rigid.
+9. **Extraction records** keep the native fit in metres in the document frame; `extractionHash` = sha256 of canonical
+   `{ kind, cloudId, assetKey, region, fit, snapped, cloudTransform, unverified, unverifiedReasons, provenance }`.
+   Unverified = the cloud's registration is `unverified`, or the fit warned `SCN_FIT_LOW_COVERAGE` / `SCN_FIT_HIGH_RMS`.
+10. **DN snap (01 PSC not built)**: `packages/domain-aec/src/industrial/piping/pipeSizes.ts` `PIPE_SIZES` (DN 15–600) and
+    `OUTSIDE_DIAMETER_TOLERANCE_MM`; insulation thickness per extraction (Q5: a parameter, named default 0). When 01 PSC's table API
+    lands, `snapDn` (`scan/extraction.ts`) is the one place to switch.
+11. **Distances**: a pipe segment is an open tube (radial distance while the axial projection is inside, distance to the end disk
+    beyond); an entity is the union of its primitives (minimum); a mesh is signed by the normal of its nearest triangle (per mesh part;
+    no angle-weighted pseudo-normal). Tessellated mode facets pipes / cylinders at `segments` (bound r(1 − cos(π/n)), VC-SCN-42);
+    spheres and general solids use display triangles with `modelErrorBound: null` and a reason.
+12. **Clash**: the gap of a clear entity is the minimum over points within `searchDistance` (named default 1 m) — required for the
+    exact GPU prune; an as-built run committed from the same cloud ignores points within 3 × its fit's median spacing of itself.
+13. **GPU (RS-4, M7)**: one WGSL kernel (`gpu.rs`) gives per-point signed distances in f32 relative to the entities' centre; triangles
+    are brute force per entity (GPU BVH traversal is RS-6). ε_gpu = 64 · 2⁻²⁴ · L (L the largest local coordinate). Measured on an
+    NVIDIA GeForce RTX 4080 Laptop GPU (Vulkan): DEV-A analytic max |d_gpu − d_cpu| = 1.5e-8 m, 64-facet mesh 1.4e-8 m, ε_gpu ≈ 4e-6 m;
+    the CLH-A clash with the GPU prune equals the CPU result byte for byte. Ericson's barycentric closest point lost 3.8e-4 m in f32 on
+    the 2 m × 1 cm facets, so the shader projects on the plane (edge-side tests) else takes the nearest edge segment. `llull-compute`
+    supports `device: "gpu"` only when built with `--features gpu` (else `SCN_GPU_FALLBACK`, CPU numbers unchanged).
+14. **Not built**: `$fromStep` plan binding (TR-SCN-03, a core prerequisite: plans stay DRAFT, agents run queries with `--json`),
+    `trace_pipe_centreline` (VC-SCN-22), `fit_steel_member` (VC-SCN-23), `commit_slice_geometry`, COPC / E57 export, `llull scan gc`,
+    `server/tests/packReplay10scn.test.ts`, M3 viewport.
+
+### 13.3 Validation status
+
+| VC | Status | Test |
+| -- | ------ | ---- |
+| 01–05 E57 inventory, CRC, empty, encodings, pose | pass | `solver/crates/llull-cloud/tests/e57.rs`; 02, 03 also `server/tests/scanImport.test.ts` |
+| 06–08 LAS / LAZ inventory, LAZ ≡ LAS, header bounds | pass | `tests/las.rs` |
+| 09 large coordinates (bit-exact through the asset) | pass | `tests/octree.rs`, `server/tests/scanImport.test.ts` (TS reader) |
+| 10 octree / LOD invariants, identical bytes | pass | `tests/octree.rs`, `server/tests/scanImport.test.ts` |
+| 11 proprietary refusal | pass | `server/tests/scanImport.test.ts`, `tests/e57.rs` |
+| 12 nearest on the coloured cube | pass | `tests/octree.rs`, `server/tests/scanImport.test.ts` (registry command) |
+| 20a–c cylinders within the CRLB tolerances | pass | `tests/fits.rs`, `server/tests/scanNative.test.ts` |
+| 21 DN snap | pass | `tests/unit/scan/extraction.test.ts`, `server/tests/scanNative.test.ts` |
+| 22, 23 | not built (V1) | — |
+| 24 slice circle | pass | `tests/fits.rs`, `server/tests/scanNative.test.ts` |
+| 30 ICP-A | pass (own seeded 70 % / σ 0.2 mm draw; the pack's numpy draw is not reproducible in Rust) | `tests/registration.rs` |
+| 31 TGT-A | pass | `tests/registration.rs`, `server/tests/scanNative.test.ts` |
+| 32 degenerate registrations | pass | `tests/registration.rs`, `tests/unit/scan/registration.test.ts` |
+| 40–43 C2M-A, DEV-A, 64-facet bound, CLH-A | pass | `tests/compare.rs`, `server/tests/scanNative.test.ts` |
+| 50–52 codes, unverified propagation, review flags | pass | `tests/unit/scan/*.test.ts` |
+| 60 (a) reproducibility, (b) GPU clash, (c) GPU deviation | pass (a re-scoped, decision 1) | `tests/*.rs`, `tests/gpu_parity.rs`, `server/tests/scanNative.test.ts` |
+
+### 13.4 Open questions (§11) decided
+
+Q1 deferred (core). Q2 settled (own cache, u32 offsets). Q3 dropped (no browser, LC1). Q4 settled (`e57` crate). Q5 decided: a
+parameter per extraction (`insulationThickness`, named default 0). Q6 open (owner). Q7 closed. Q8 deferred to V1.
+
+### 13.5 Crates and licences (RS1 §2 rule 7)
+
+`e57` 0.11.13 (MIT), `las` 0.11.1 (MIT) with `laz` 0.13.0 (Apache-2.0), `libm` 0.2 (MIT / Apache-2.0), `chrono` (via `las`,
+MIT / Apache-2.0), `wgpu` 25 (MIT / Apache-2.0, feature `gpu`). Nothing GPL. Test data: the pack's files (licences in
+`validation/data/licenses/`) and clouds generated in the tests.
+
+### 13.6 Build note (Windows without MSVC Build Tools)
+
+The crates build with the `1.97.0-x86_64-pc-windows-gnu` toolchain, `RUSTFLAGS=-C link-self-contained=yes` and a MinGW `as` /
+`dlltool` on `PATH` (`windows-link` raw-dylib import libraries); MSVC builds are unchanged.
 
 ## 12. References
 

@@ -12,8 +12,6 @@
 //! Errors: `SCN_*` codes of the op, `SCN_ASSET_MISSING`, `SCN_QUERY_LIMIT` (a region above `maxPoints`), `NATIVE_JOB_INPUT`.
 
 use crate::cloud::Vec3;
-use crate::compare::{clash, deviation, ClashSettings, DeviationSettings};
-use crate::distance::{Entity, EntitySpec};
 use crate::error::{CloudError, CloudResult};
 use crate::fit::{self, FitSettings};
 use crate::job::read_json;
@@ -140,18 +138,18 @@ fn open(clouds: &[OpCloud], count: usize) -> CloudResult<Vec<PlacedCloud>> {
     clouds.iter().map(|c| Ok(PlacedCloud { asset: Asset::open(&c.dir, Some(&c.asset_key))?, to_document: mat4(&c.to_document)? })).collect()
 }
 
-fn param<T: for<'de> Deserialize<'de>>(params: &Value, name: &str) -> CloudResult<T> {
+pub fn param<T: for<'de> Deserialize<'de>>(params: &Value, name: &str) -> CloudResult<T> {
     serde_json::from_value(params.get(name).cloned().unwrap_or(Value::Null)).map_err(|e| CloudError::input(format!("params.{name}: {e}")))
 }
 
-fn optional<T: for<'de> Deserialize<'de>>(params: &Value, name: &str, default: T) -> CloudResult<T> {
+pub fn optional<T: for<'de> Deserialize<'de>>(params: &Value, name: &str, default: T) -> CloudResult<T> {
     match params.get(name) {
         None | Some(Value::Null) => Ok(default),
         Some(_) => param(params, name),
     }
 }
 
-fn run_kind(job: &OpJob) -> CloudResult<Value> {
+fn run_kind(job: &OpJob, warnings: &mut Vec<(String, String)>) -> CloudResult<Value> {
     let p = &job.params;
     let max_points: usize = optional(p, "maxLoadPoints", DEFAULT_OP_MAX_POINTS)?;
     match job.kind.as_str() {
@@ -218,43 +216,7 @@ fn run_kind(job: &OpJob) -> CloudResult<Value> {
         }
         "deviation" | "clash" => {
             let clouds = open(&job.clouds, 1)?;
-            let specs: Vec<EntitySpec> = param(p, "entities")?;
-            let entities: Vec<Entity> = specs.iter().map(Entity::prepare).collect();
-            if entities.is_empty() || entities.iter().any(|e| !e.low.iter().all(|v| v.is_finite())) {
-                return Err(CloudError::input("params.entities needs at least one entity with a primitive"));
-            }
-            let reach: f64 = if job.kind == "deviation" {
-                param(p, "maxDistance")?
-            } else {
-                let clearance: f64 = param(p, "clearance")?;
-                clearance.max(optional(p, "searchDistance", 1.0)?)
-            };
-            let (mut low, mut high) = ([f64::INFINITY; 3], [f64::NEG_INFINITY; 3]);
-            for e in &entities {
-                for a in 0..3 {
-                    low[a] = low[a].min(e.low[a] - reach);
-                    high[a] = high[a].max(e.high[a] + reach);
-                }
-            }
-            let points = clouds[0].points(&Region::Box { min: low, max: high }, max_points)?;
-            if job.kind == "deviation" {
-                let settings = DeviationSettings {
-                    max_distance: reach,
-                    threshold: param(p, "threshold")?,
-                    signed: optional(p, "signed", true)?,
-                    bins: optional(p, "histogramBins", 20)?,
-                };
-                let stats = deviation(&points, &entities, &settings);
-                return Ok(json!({ "entities": stats, "pointsInRange": points.len() }));
-            }
-            let settings = ClashSettings {
-                clearance: param(p, "clearance")?,
-                min_points: optional(p, "minPointsInVolume", 10)?,
-                search_distance: optional(p, "searchDistance", 1.0)?,
-            };
-            let exclude: Vec<Option<f64>> = optional(p, "exclude", vec![None; entities.len()])?;
-            let (results, spacing) = clash(&points, &entities, &exclude, &settings);
-            Ok(json!({ "results": results, "spacing": spacing, "samplingBound": spacing / 2.0, "pointsInRange": points.len() }))
+            crate::compare_op::run(&job.kind, &clouds[0], p, max_points, warnings)
         }
         other => Err(CloudError::input(format!("unknown op kind '{other}'"))),
     }
@@ -279,12 +241,17 @@ fn extract_pipes(points: &[Vec3], settings: &FitSettings) -> CloudResult<Value> 
 }
 
 /// Runs one op job and writes `result.json`.
-pub fn run(folder: &Path, _out: &mut impl Write) -> CloudResult<Vec<Output>> {
+pub fn run(folder: &Path, out: &mut impl Write) -> CloudResult<Vec<Output>> {
     let job: OpJob = read_json(&folder.join("job.json"))?;
     if job.version != 1 {
         return Err(CloudError::input(format!("job version {} is not 1", job.version)));
     }
-    let mut result = run_kind(&job)?;
+    let mut warnings = Vec::new();
+    let outcome = run_kind(&job, &mut warnings);
+    for (code, message) in &warnings {
+        let _ = llull_protocol::emit(out, &llull_protocol::Event::Warning { code, message });
+    }
+    let mut result = outcome?;
     if let Value::Object(map) = &mut result {
         map.entry("device").or_insert(json!("cpu"));
         map.entry("deterministic").or_insert(json!(true));

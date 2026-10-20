@@ -115,6 +115,8 @@ export interface CloudOpSuccess {
     readonly deterministic: boolean;
     readonly elapsedMs: number;
   };
+  /** Warning events of the native job (e.g. SCN_GPU_FALLBACK). */
+  readonly warnings?: readonly { readonly code: string; readonly message: string }[] | undefined;
 }
 
 export type CloudOpResult = CloudOpSuccess | CloudOpFailure;
