@@ -36,6 +36,8 @@ interface OracleExpected {
   /** Wider relative tolerances for the mesh kernel (tessellated curved surfaces), with the reason. */
   readonly meshTolerance?: { readonly volume: number | null; readonly area: number | null; readonly reason: string };
   readonly stepRoundTrip?: boolean;
+  /** Bodies after the STEP round trip when it differs from `bodies`: import makes one entity per solid of a compound. */
+  readonly stepBodies?: number;
   /** A real defect the suite found: the listed fields (volume, area, bbox, centroid, bodies) are expected to be wrong on those kernels. */
   readonly knownFailure?: {
     readonly fields: readonly string[];
@@ -230,7 +232,7 @@ export function runCase(oracle: OracleCase, kernel: OracleKernel, options: { ste
     }
     if (options.stepRoundTrip && expected.stepRoundTrip !== false) {
       const back = measureDocument(stepRoundTrip(doc));
-      const stepProblems = compare(expected, back, kernel);
+      const stepProblems = compare({ ...expected, bodies: expected.stepBodies ?? expected.bodies }, back, kernel);
       roundTrip = stepProblems.length === 0 ? 'pass' : 'fail';
       failures.push(...stepProblems.map((problem) => `after STEP round trip: ${problem}`));
     }

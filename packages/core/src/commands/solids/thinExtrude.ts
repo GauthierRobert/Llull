@@ -50,6 +50,8 @@ interface ThinSource {
   readonly points: ReadonlyArray<Vec2>;
   readonly closed: boolean;
   readonly origin: Vec3;
+  /** Rotation of the drawn source (its work plane); [0, 0, 0] for an inline profile. */
+  readonly rotation: Vec3;
   readonly label: string;
 }
 
@@ -65,16 +67,29 @@ function thinSource(doc: CadDocument, request: ThinRequest): ThinSource | string
       points: profile,
       closed: openPath !== true,
       origin: request.position ?? [0, 0, 0],
+      rotation: [0, 0, 0],
       label: `${profile.length}-point ${openPath === true ? 'open' : 'closed'} profile`,
     };
   }
   const sourceIds = ids ?? (id === undefined ? [] : [id]);
   const single: Entity | undefined = sourceIds.length === 1 ? doc.entities[sourceIds[0] as string] : undefined;
   if (single?.kind === 'polyline' && !single.closed)
-    return { points: single.points, closed: false, origin: request.position ?? single.position, label: `open polyline "${single.id}"` };
+    return {
+      points: single.points,
+      closed: false,
+      origin: request.position ?? single.position,
+      rotation: single.rotation,
+      label: `open polyline "${single.id}"`,
+    };
   const loop = sketchLoop(doc, sourceIds);
   if (typeof loop === 'string') return loop;
-  return { points: loop.profile, closed: true, origin: request.position ?? loop.origin, label: `[${sourceIds.join(', ')}]` };
+  return {
+    points: loop.profile,
+    closed: true,
+    origin: request.position ?? loop.origin,
+    rotation: loop.rotation,
+    label: `[${sourceIds.join(', ')}]`,
+  };
 }
 
 const OVERSHOOT = 0.5;
@@ -94,6 +109,7 @@ export function thinExtrude(doc: CadDocument, request: ThinRequest, ctx: Executi
   const source = thinSource(doc, request);
   if (typeof source === 'string') return fail(source);
   const { thickness, side } = request.thin;
+  const rotation = request.rotation ?? (request.axis === undefined ? source.rotation : undefined);
   const region = thinRegion(source.points, source.closed, thickness, side);
   if (typeof region === 'string') return fail(region);
   const note = `${side} wall ${compactNumber(thickness)} of ${source.label}, depth=${request.depth}, wall area ${compactNumber(region.area)}`;
@@ -102,12 +118,12 @@ export function thinExtrude(doc: CadDocument, request: ThinRequest, ctx: Executi
       profile: region.polygon,
       depth: request.depth,
       position: source.origin,
-      rotation: request.rotation,
+      rotation,
       axis: request.axis,
       color: request.color,
       describe: (id) => `extrude_profile: created thin extrusion "${id}" (${note})`,
     });
-  const resolved = resolveRotation(request.axis, request.rotation);
+  const resolved = resolveRotation(request.axis, rotation);
   if (resolved.error !== undefined) return fail(resolved.error);
   const kernel = (ctx ?? currentContext()).kernel;
   if (!kernel) return noop(doc, kernelUnavailable('extrude_profile (thin closed profile)'));

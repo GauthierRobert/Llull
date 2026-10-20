@@ -4,6 +4,7 @@ import type { ExecutionContext } from '../types';
 import { expandInstance } from '../../geometry/instanceExpansion';
 import { closedFormVolume } from '../../geometry/closedFormVolume';
 import { currentContext } from '../context';
+import { recipeOf } from '../../geometry/shapeRecipe';
 
 /** Volume of one solid: how it was computed, or why it could not be. */
 export type SolidVolume =
@@ -24,7 +25,7 @@ export type SolidVolume =
 function exactVolume(e: Entity, ctx: ExecutionContext | undefined): number | null {
   if (e.kind !== 'mesh' || e.brep === undefined) return null;
   const kernel = (ctx ?? currentContext()).kernel;
-  const shape = kernel?.evaluate(e.brep) ?? null;
+  const shape = kernel?.evaluate(recipeOf(e)) ?? null;
   const topology = shape === null ? null : (kernel?.topology(shape) ?? null);
   return topology !== null && topology.volume > 0 ? topology.volume : null;
 }

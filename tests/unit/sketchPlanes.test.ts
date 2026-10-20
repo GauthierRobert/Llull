@@ -57,7 +57,7 @@ describe('world sketch planes', () => {
 
 describe('a sketch placed on a vertical plane extrudes along the plane normal (Manifold)', () => {
   const kernel = manifoldSuite();
-  it('a 4 x 2 rectangle on xz (normal -Y) extruded 3 with plane fills y in [-3, 0]; without plane the documented flat extrusion is unchanged', () => {
+  it('a 4 x 2 rectangle on xz (normal -Y) extruded 3 with plane fills y in [-3, 0]; without plane the placed sketch extrudes along its own plane too', () => {
     setGeometryKernel(kernel());
     const plane = execute(createEmptyDocument(), 'create_sketch_plane', { plane: 'xz' });
     const rect = execute(plane.document, 'draw_rectangle', { width: 4, height: 2 });
@@ -72,7 +72,7 @@ describe('a sketch placed on a vertical plane extrudes along the plane normal (M
     expect(box.max[2]! - box.min[2]!).toBeCloseTo(2, 6);
     const flat = execute(placed.document, 'extrude_profile', { id: rect.affected[0], depth: 3 });
     const flatBox = execute(flat.document, 'measure_bounding_box', { entityId: flat.affected[0] }).data as { size: number[] };
-    expect(flatBox.size).toEqual([4, 2, 3]);
+    expect(flatBox.size.map((v) => Number(v.toFixed(9)))).toEqual([4, 3, 2]);
     expect(execute(placed.document, 'extrude_profile', { id: rect.affected[0], depth: 3, plane: 'nope' }).summary).toMatch(
       /no sketch plane/,
     );

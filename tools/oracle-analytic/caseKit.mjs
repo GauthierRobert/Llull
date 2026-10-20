@@ -48,6 +48,7 @@ export function addCase(out, c) {
     tolerance: { volume: 1e-3, area: 1e-3, centroid: 1e-3, bbox: 1e-3, ...c.tolerance },
     ...(c.mesh === undefined ? {} : { meshTolerance: c.mesh }),
     ...(c.stepRoundTrip === false ? { stepRoundTrip: false } : {}),
+    ...(c.stepBodies === undefined ? {} : { stepBodies: c.stepBodies }),
     ...(c.knownFailure === undefined ? {} : { knownFailure: c.knownFailure }),
   };
   out.push({ id, plan: { actions: c.actions }, expected });

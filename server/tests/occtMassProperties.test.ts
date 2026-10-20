@@ -69,7 +69,16 @@ describeNative('occt exact mass properties', () => {
     expect(source).toBeDefined();
     const handle = kernels.occt.evaluate({ op: 'solid', entity: source as Entity });
     const mesh = kernels.occt.tessellate(handle!);
-    const solid = { ...(source as Entity), id: 'k', kind: 'mesh', mesh, brep: { op: 'solid', entity: source } } as unknown as Entity;
+    // A kernel result lives in world space at position / rotation zero; its brep is placed by them (types.ts MeshSolidEntity).
+    const solid = {
+      ...(source as Entity),
+      id: 'k',
+      kind: 'mesh',
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      mesh,
+      brep: { op: 'solid', entity: source },
+    } as unknown as Entity;
     const doc = { ...box.document, entities: { ...box.document.entities, k: solid }, order: [...box.document.order, 'k'] };
     const result = execute(doc, 'mass_properties', { entityId: 'k' }, { ...defaultContext(), kernel: kernels.occt });
     const data = result.data as { method: string; inertia: { atCentroid: number[][] }; centroid: number[] };

@@ -3,7 +3,8 @@
 // an entity (L4). A join / cut extrusion commits as ONE build_project (extrude, then boolean), so a single Undo reverts it.
 
 import { type Bounds, boundsExtent, entityBoundsInDoc } from '@core/geometry/bounds';
-import type { CadDocument, EntityId } from '@core/model/types';
+import type { CadDocument, Entity, EntityId } from '@core/model/types';
+import { applyEulerXYZ } from '@lib/eulerRotation';
 import {
   type BooleanMode,
   type ModeChoice,
@@ -52,6 +53,9 @@ export interface HandleFrame {
 const UP: Vec3 = [0, 0, 1];
 const DOWN: Vec3 = [0, 0, -1];
 
+/** Normal of a sketch's work plane: its local +Z, which extrude_profile follows (a flat sketch gives UP). */
+const sketchNormal = (entity: Entity): Vec3 => applyEulerXYZ(UP, [0, 0, 0], entity.rotation);
+
 const KIND_COMMAND: Record<FeatureKind, string> = { extrude: 'extrude_profile', fillet: 'fillet_edge', shell: 'shell_solid' };
 const KIND_VALUE_PARAM = { fillet: 'radius', shell: 'thickness' } as const;
 
@@ -72,7 +76,7 @@ export function handleFrame(doc: CadDocument, kind: FeatureKind, targetId: Entit
   const centreY = (box.min[1] + box.max[1]) / 2;
   switch (kind) {
     case 'extrude':
-      return { origin: [centreX, centreY, entity.position[2]], axis: UP, scale };
+      return { origin: [centreX, centreY, (box.min[2] + box.max[2]) / 2], axis: sketchNormal(entity), scale };
     case 'fillet':
       return { origin: [box.max[0], centreY, box.max[2]], axis: [-1, 0, 0], scale };
     case 'shell':
@@ -95,7 +99,9 @@ export function minimumValue(kind: FeatureKind): number {
 function extrudePlan(doc: CadDocument, session: FeatureSession): FeaturePlan | null {
   const profile = doc.entities[session.targetId];
   if (profile === undefined || Math.abs(session.value) < MIN_VALUE) return null;
-  const params = { id: session.targetId, depth: Math.abs(session.value), axis: session.value < 0 ? DOWN : UP };
+  const normal = sketchNormal(profile);
+  const axis: Vec3 = session.value < 0 ? [0 - normal[0], 0 - normal[1], 0 - normal[2]] : normal;
+  const params = { id: session.targetId, depth: Math.abs(session.value), axis };
   const extrude: CommandCall = { name: KIND_COMMAND.extrude, params };
   const swept = sweptBounds(entityBoundsInDoc(doc, profile), session.value);
   const bodyId = findBodyInReach(doc, swept, (id) => entityBoundsInDoc(doc, doc.entities[id] ?? profile), new Set([session.targetId]));
