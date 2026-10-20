@@ -172,9 +172,7 @@ export function featureCases(out) {
       { command: 'array_polar', params: { id: '$a', count: 6, center: [0, 0, 0] } },
     ],
     polar,
-    {
-      bodies: 6,
-    },
+    { bodies: 6 },
   );
   pattern(
     'pattern-polar-cylinders-quarter',

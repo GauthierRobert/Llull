@@ -22,7 +22,7 @@ export const sketchPointsSchema = z
             .int()
             .nonnegative()
             .describe(
-              'Vertex index in that entity: polyline point index; line 0 = start, 1 = end; rectangle 0..3 counter-clockwise from the lower-left ' +
+              'Vertex index in that entity (dimensionless): polyline point index; line 0 = start, 1 = end; rectangle 0..3 counter-clockwise from the lower-left ' +
                 'corner; circle / arc / point 0.',
             ),
         }),

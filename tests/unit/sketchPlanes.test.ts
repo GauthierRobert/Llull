@@ -69,7 +69,7 @@ describe('a sketch placed on a vertical plane extrudes along the plane normal (M
     const box = execute(solid.document, 'measure_bounding_box', { entityId: id }).data as { min: number[]; max: number[] };
     expect(box.min[1]).toBeCloseTo(-3, 6);
     expect(box.max[1]).toBeCloseTo(0, 6);
-    expect(box.max[2] - box.min[2]).toBeCloseTo(2, 6);
+    expect(box.max[2]! - box.min[2]!).toBeCloseTo(2, 6);
     const flat = execute(placed.document, 'extrude_profile', { id: rect.affected[0], depth: 3 });
     const flatBox = execute(flat.document, 'measure_bounding_box', { entityId: flat.affected[0] }).data as { size: number[] };
     expect(flatBox.size).toEqual([4, 2, 3]);

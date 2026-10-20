@@ -62,9 +62,7 @@ export function sheetMetalCases(out) {
     F,
     [rule('R1', 1.6, 4.8), ...baseActions('R1', 33.6, 50), flange([33.6, 25, 0], 30)],
     l1.p,
-    {
-      mesh: { volume: null, area: 0.02, reason: 'area is summed over the display triangles of the tessellated bend' },
-    },
+    { mesh: { volume: null, area: 0.02, reason: 'area is summed over the display triangles of the tessellated bend' } },
   );
   const l2 = bracket(40, 30, 3, 2, 20);
   add(
@@ -73,9 +71,7 @@ export function sheetMetalCases(out) {
     F,
     [rule('R2', 3, 2), ...baseActions('R2', 40, 30), flange([40, 15, 0], 20)],
     l2.p,
-    {
-      mesh: { volume: null, area: 0.02, reason: 'area is summed over the display triangles of the tessellated bend' },
-    },
+    { mesh: { volume: null, area: 0.02, reason: 'area is summed over the display triangles of the tessellated bend' } },
   );
   const l3 = bracket(60, 25, 1, 1, 15);
   add(
@@ -84,9 +80,7 @@ export function sheetMetalCases(out) {
     F,
     [rule('R3', 1, 1), ...baseActions('R3', 60, 25), flange([60, 12.5, 0], 15)],
     l3.p,
-    {
-      mesh: { volume: null, area: 0.02, reason: 'area is summed over the display triangles of the tessellated bend' },
-    },
+    { mesh: { volume: null, area: 0.02, reason: 'area is summed over the display triangles of the tessellated bend' } },
   );
   const u = bracket(33.6, 50, 1.6, 4.8, 30, true);
   add(
@@ -95,9 +89,7 @@ export function sheetMetalCases(out) {
     F,
     [rule('R1', 1.6, 4.8), ...baseActions('R1', 33.6, 50), flange([33.6, 25, 0], 30), flange([0, 25, 0], 30)],
     u.p,
-    {
-      mesh: { volume: null, area: 0.02, reason: 'area is summed over the display triangles of the tessellated bends' },
-    },
+    { mesh: { volume: null, area: 0.02, reason: 'area is summed over the display triangles of the tessellated bends' } },
   );
   // 45 degree flange: bend sector 45 degrees, leg = F - (R+T) tan(22.5 deg); only the volume is checked.
   const T = 1.6;

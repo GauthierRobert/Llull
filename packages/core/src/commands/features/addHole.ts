@@ -56,7 +56,10 @@ export const addHole = defineCommand({
       .object({ near: vec3('World point [x, y, z] on (or within 0.1% of the part size of) the planar face, in document length units.') })
       .describe('The planar face to drill into, picked by a world point.'),
     points: z
-      .union([z.array(z.array(z.number())).min(1), sketchPointsSchema])
+      .union([
+        z.array(z.array(z.number()).describe('One centre: [u, v], [x, y] or [x, y, z] in document length units.')).min(1),
+        sketchPointsSchema,
+      ])
       .describe(
         'Hole centres. Either a list in document length units: [u, v] (pointsFrame face), [x, y] (world_xy) or [x, y, z] (world), at least one; ' +
           'OR { sketchEntityIds?, pointRefs? } taking the centres from 2D sketch points (point entities, polyline vertices...) lying on the face ' +

@@ -147,7 +147,9 @@ describe('split_body (any kernel with booleans: Manifold here)', () => {
     const box = boxDoc();
     const split = execute(box.document, 'split_body', { id: box.affected[0], plane: { origin: [0, 0, 2], normal: [0, 0, 1] } });
     expect(split.affected).toHaveLength(2);
-    const volumes = split.affected.map((id) => (execute(split.document, 'mass_properties', { entityId: id }).data as { volume: number }).volume);
+    const volumes = split.affected.map(
+      (id) => (execute(split.document, 'mass_properties', { entityId: id }).data as { volume: number }).volume,
+    );
     expect(volumes[0]).toBeCloseTo(300, 6);
     expect(volumes[1]).toBeCloseTo(700, 6);
     expect(split.document.entities[box.affected[0] ?? '']).toBeUndefined();

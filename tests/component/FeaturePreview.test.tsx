@@ -118,8 +118,8 @@ describe('palette form preview', () => {
   it('shows the refusal in the dialog instead of crashing (kernel command without a kernel)', () => {
     const { doc, boxId } = profileAndBody();
     useStore.setState({ document: { ...doc, selection: [boxId] }, dispatch });
-    render(<CommandParamForm command={getCommand('fillet_edge')!} preview onBack={() => undefined} onSubmit={() => undefined} />);
-    fireEvent.change(screen.getByLabelText(/^Radius(\*)?$/), { target: { value: '1' } });
+    render(<CommandParamForm command={getCommand('shell_solid')!} preview onBack={() => undefined} onSubmit={() => undefined} />);
+    fireEvent.change(screen.getByLabelText(/^Thickness(\*)?$/), { target: { value: '1' } });
     act(() => void vi.advanceTimersByTime(PREVIEW_DEBOUNCE_MS + 1));
     expect(usePreviewStore.getState().outcome?.ok).toBe(false);
     expect(screen.getByRole('status').textContent).toContain('Preview unavailable');

@@ -18,5 +18,3 @@ export type FaceOpParams =
   | { readonly kind: 'draft'; readonly faces: readonly number[]; readonly angle: number; readonly pull: Vec3; readonly neutral: PlaneSpec }
   | { readonly kind: 'pushPull'; readonly faces: readonly [number]; readonly distance: number }
   | { readonly kind: 'splitFace'; readonly faces: readonly number[]; readonly plane: PlaneSpec };
-
-export type FaceOpKind = FaceOpParams['kind'];
