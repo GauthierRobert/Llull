@@ -15,7 +15,8 @@ import { explicitCase, supportedUnits, withSpec } from './model';
  * @invariant ids `im-<step>.<k>`; curve values stored in the case units (length/s or length), times in s
  * @failure unknown / non-explicit case / no controls -> FEA_ANALYSIS_NOT_FOUND / EXP_CASE_TYPE / EXP_CONTROLS_MISSING; target entity not a
  *   part of the case or without facesNear / pointsNear -> EXP_TARGET_NOT_IN_CASE / EXP_PARAM_INVALID; empty curve, times not increasing,
- *   non-finite values -> EXP_CURVE_INVALID; a unit that is not a velocity / length -> EXP_PARAM_INVALID
+ *   non-finite values -> EXP_CURVE_INVALID; unsupported case unit system -> EXP_UNITS_UNSUPPORTED; a unit that is not a velocity / length ->
+ *   EXP_PARAM_INVALID
  */
 export const addImposedMotion = defineCommand({
   name: 'add_imposed_motion',
@@ -61,9 +62,10 @@ export const addImposedMotion = defineCommand({
     )
       return fail('EXP_CURVE_INVALID', 'the curve needs at least one point, finite values and strictly increasing times', ['curve']);
     const units = supportedUnits(analysisCase);
-    const caseUnit = units === null ? '' : kind === 'velocity' ? `${units.length}/s` : units.length;
+    if (units === null) return fail('EXP_UNITS_UNSUPPORTED', `unit system ${analysisCase.unitSystem} is not supported by llull_explicit`);
+    const caseUnit = kind === 'velocity' ? `${units.length}/s` : units.length;
     const values = curve.map(([, value]) => convertValue(value, unit, caseUnit));
-    if (units === null || values.some((value) => isUnitFailure(value)))
+    if (values.some((value) => isUnitFailure(value)))
       return fail('EXP_PARAM_INVALID', `'${unit}' is not a ${kind === 'velocity' ? 'velocity' : 'length'} unit`, ['unit']);
     const converted = curve.map(([t], k) => {
       const value = values[k];

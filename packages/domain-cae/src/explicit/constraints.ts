@@ -80,7 +80,7 @@ function locate(
     const distance = (node: number): number => Math.hypot(at(node, 0) - point[0], at(node, 1) - point[1], at(node, 2) - point[2]);
     selected.add(part.reduce((nearest, node) => (distance(node) < distance(nearest) ? node : nearest)));
   }
-  const axis = target.pointsNear === undefined && axes.size === 1 ? ([...axes][0] ?? null) : null;
+  const axis = (target.pointsNear ?? []).length === 0 && axes.size === 1 ? ([...axes][0] ?? null) : null;
   return { nodes: [...selected].sort((a, b) => a - b), axis };
 }
 
@@ -95,10 +95,15 @@ function meshSet(mesh: ExplicitMesh, artifact: FeMeshArtifact, constraint: FeaCo
     return at === undefined ? [] : [at];
   });
   const spread = [0, 1, 2].map((axis) => {
-    const values = nodes.map((node) => mesh.nodes[3 * node + axis] ?? 0);
-    return Math.max(...values) - Math.min(...values);
+    let [low, high] = [Infinity, -Infinity];
+    for (const node of nodes) {
+      const value = mesh.nodes[3 * node + axis] ?? 0;
+      low = Math.min(low, value);
+      high = Math.max(high, value);
+    }
+    return high - low;
   });
-  const extent = Math.max(...spread, 1e-300);
+  const extent = Math.max(spread[0] ?? 0, spread[1] ?? 0, spread[2] ?? 0, 1e-300);
   const flat = [0, 1, 2].filter((axis) => (spread[axis] ?? 0) <= ON_PLANE * extent);
   return { nodes, axis: flat.length === 1 ? (flat[0] ?? null) : null };
 }
@@ -165,11 +170,17 @@ export function fixedDofs(
 
 /**
  * The imposed motions of the case on mesh nodes, in order.
- * @failure an unresolvable target, or a dof imposed twice -> EXP_CONSTRAINT_UNSUPPORTED
+ * @failure an unresolvable target, a dof imposed twice, or a dof a support holds -> EXP_CONSTRAINT_UNSUPPORTED
  */
-export function jobImposedMotions(spec: ExplicitSpec, mesh: ExplicitMesh, toCase: number): readonly JobImposedMotion[] | Refusal {
+export function jobImposedMotions(
+  spec: ExplicitSpec,
+  mesh: ExplicitMesh,
+  toCase: number,
+  fixed: readonly number[],
+): readonly JobImposedMotion[] | Refusal {
   const motions: JobImposedMotion[] = [];
   const taken = new Set<number>();
+  const held = new Set(fixed.flatMap((flag, dof) => (flag === 1 ? [dof] : [])));
   for (const id of spec.imposedMotionOrder ?? []) {
     const motion = spec.imposedMotions?.[id];
     if (motion === undefined) continue;
@@ -183,6 +194,8 @@ export function jobImposedMotions(spec: ExplicitSpec, mesh: ExplicitMesh, toCase
     const dof = AXES.indexOf(motion.dof);
     if (located.nodes.some((node) => taken.has(3 * node + dof)))
       return refuse(`a node's ${motion.dof} motion is already imposed by another motion`);
+    if (located.nodes.some((node) => held.has(3 * node + dof)))
+      return refuse(`a node's ${motion.dof} motion is held by a support (fixed, pinned or symmetry): drop one of them`);
     for (const node of located.nodes) taken.add(3 * node + dof);
     motions.push({ name: motion.name, nodes: located.nodes, dof, kind: motion.kind, curve: motion.curve });
   }

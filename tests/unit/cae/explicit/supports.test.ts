@@ -36,6 +36,11 @@ describe('symmetry supports in the explicit job', () => {
     expect(job.fixedRotation).toEqual([]);
   });
 
+  it('changes the job input hash, so recorded results go stale when a support changes', () => {
+    const doc = symmetry(bar.doc, bar.barId, { facesNear: [[0, 5, 100]] });
+    expect(jobOf(doc, bar.analysisId).inputHash).not.toBe(jobOf(bar.doc, bar.analysisId).inputHash);
+  });
+
   it('also holds the two in-plane rotations of shell nodes', () => {
     const plate = must(bar.doc, 'add_box', { size: [50, 50, 2], position: [-20, -20, -10], anchor: 'min' });
     const plateId = plate.affected[0] ?? '';
@@ -174,5 +179,19 @@ describe('add_imposed_motion / delete_imposed_motion', () => {
     );
     const twice = must(must(bar.doc, 'add_imposed_motion', params).document, 'add_imposed_motion', { ...params, name: 'again' }).document;
     expect(refusal(twice, bar.analysisId)).toBe('EXP_CONSTRAINT_UNSUPPORTED');
+    const held = must(bar.doc, 'add_fea_constraint', {
+      analysisId: bar.analysisId,
+      name: 'base',
+      kind: 'fixed',
+      target: { entityId: bar.barId, facesNear: [[5, 5, 0]] },
+    }).document;
+    expect(refusal(must(held, 'add_imposed_motion', params).document, bar.analysisId)).toBe('EXP_CONSTRAINT_UNSUPPORTED');
+  });
+
+  it('delete_imposed_motion is pure', () => {
+    const added = must(bar.doc, 'add_imposed_motion', params);
+    const before = structuredClone(added.document);
+    must(added.document, 'delete_imposed_motion', { analysisId: bar.analysisId, motionId: added.affected[1] ?? '' });
+    expect(added.document).toEqual(before);
   });
 });

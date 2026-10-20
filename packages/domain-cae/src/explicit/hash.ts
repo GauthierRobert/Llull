@@ -35,6 +35,7 @@ export function explicitInputHash(doc: CadDocument, analysisCase: AnalysisCase):
       documentUnit: doc.units,
       unitSystem: analysisCase.unitSystem,
       parts,
+      constraints: analysisCase.constraintOrder.map((id) => analysisCase.constraints[id] ?? null),
       spec: {
         ...rest,
         timeStepScale: timeStepScale.value,

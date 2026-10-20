@@ -23,7 +23,8 @@ describe('delete_pipe_run', () => {
   it('removes the run and its tube, keeps the line and tie-ins, and frees the ports for a re-route', () => {
     const s = routed();
     expect(s.doc.entities[s.runId]).toBeDefined();
-    const deleted = ok(s.doc, 'delete_pipe_run', { runId: s.runId });
+    const deleted = ok({ ...s.doc, selection: [s.runId] }, 'delete_pipe_run', { runId: s.runId });
+    expect(deleted.document.selection).toEqual([]);
     expect(deleted.affected).toEqual([s.runId]);
     expect(deleted.document.entities[s.runId]).toBeUndefined();
     expect(deleted.document.order).not.toContain(s.runId);

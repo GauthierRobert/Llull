@@ -122,7 +122,7 @@ export function buildExplicitJob(doc: CadDocument, analysisId: string, meshArtif
   if ('code' in heated) return refuse(heated.code, heated.message, heated.ids);
   const held = fixedDofs(analysisCase, mesh, spec.mesh.kind === 'structured_hex' ? null : meshArtifact, lengthToAnalysis);
   if ('code' in held) return refuse(held.code, held.message, held.ids);
-  const imposedMotions = jobImposedMotions(spec, mesh, lengthToAnalysis);
+  const imposedMotions = jobImposedMotions(spec, mesh, lengthToAnalysis, held.fixed);
   if ('code' in imposedMotions) return refuse(imposedMotions.code, imposedMotions.message, imposedMotions.ids);
   const velocities = new Map(Object.values(spec.initialVelocities).map((entry) => [entry.entityId, entry.velocity] as const));
   const gravity: Vec3 = spec.gravity ?? [0, 0, 0];

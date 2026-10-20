@@ -23,7 +23,7 @@ export const deletePipeRun = defineCommand({
     void removedRun;
     void removedEntity;
     const next = withPiping(
-      { ...doc, entities, order: doc.order.filter((id) => id !== runId) },
+      { ...doc, entities, order: doc.order.filter((id) => id !== runId), selection: doc.selection.filter((id) => id !== runId) },
       { ...piping, runs, runOrder: piping.runOrder.filter((id) => id !== runId) },
     );
     return changed(next, `delete_pipe_run: removed run ${runId}; its tie-in points are free again.`, [runId]);
