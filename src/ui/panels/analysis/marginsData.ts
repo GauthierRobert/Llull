@@ -73,6 +73,25 @@ function parseRow(entry: unknown): MarginRowView[] {
   ];
 }
 
+/** One line about compute_margins `data.singularScreening` ({ radius { value, unit, defaulted }, excludedNodes, singularityNote? }); '' when absent. */
+function screeningText(screening: unknown): string {
+  if (!isRecord(screening)) return '';
+  const radius = isRecord(screening['radius']) ? screening['radius'] : {};
+  const value = typeof radius['value'] === 'number' ? radius['value'] : null;
+  const excluded = typeof screening['excludedNodes'] === 'number' ? screening['excludedNodes'] : 0;
+  const note = str(screening['singularityNote']);
+  const size =
+    value === null ? 'no radius' : `radius ${value} ${str(radius['unit'])}${radius['defaulted'] === true ? ' (llull default)' : ''}`;
+  return `Singularity screening: ${size}, ${excluded} node(s) excluded${note === '' ? '' : ` — ${note}`}. Re-entrant corners are not screened.`;
+}
+
+/** The min-MS chip tone: a failing singular row keeps the table from reading green. */
+export function minMsTone(view: MarginsView): 'info' | 'ok' | 'warn' | 'bad' {
+  if (view.minMs !== null && view.minMs < 0) return 'bad';
+  if (view.rows.some((row) => row.singular && row.status === 'FAIL')) return 'warn';
+  return view.minMs === null ? 'info' : 'ok';
+}
+
 export function parseMargins(data: unknown): MarginsView | null {
   if (!isRecord(data) || !Array.isArray(data['rows'])) return null;
   const warnings = Array.isArray(data['warnings']) ? data['warnings'].filter((w): w is string => typeof w === 'string') : [];
@@ -80,7 +99,7 @@ export function parseMargins(data: unknown): MarginsView | null {
     minMs: typeof data['minMs'] === 'number' ? data['minMs'] : null,
     warnings,
     reviewRequired: data['reviewRequired'] === true,
-    singularScreening: str(data['singularScreening']),
+    singularScreening: screeningText(data['singularScreening']),
     rows: data['rows'].flatMap(parseRow),
   };
 }
