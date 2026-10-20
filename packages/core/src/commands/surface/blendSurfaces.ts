@@ -84,6 +84,15 @@ export const blendSurfaces = defineCommand({
     const [first, second] = [surfaceEntityOf(doc, 'blend_surfaces', a.id), surfaceEntityOf(doc, 'blend_surfaces', b.id)];
     if (isRefusal(first)) return first;
     if (isRefusal(second)) return second;
+    if ((first.trims?.length ?? 0) > 0 || (second.trims?.length ?? 0) > 0)
+      return refuseSrf(
+        doc,
+        'blend_surfaces',
+        'SRF_TRIM_UNSUPPORTED',
+        'sheets trimmed by curves cannot be blended (the blend would follow the untrimmed patch edge)',
+        [a.id, b.id],
+        ['params.a', 'params.b'],
+      );
     const [surfaceA, surfaceB] = [placedSurface(first), placedSurface(second)];
     const [sideA, sideB] = nearestSides(surfaceA, surfaceB, a.side, b.side);
     const built = buildBlend({ a: surfaceA, sideA, b: surfaceB, sideB, continuity, factor, stations });
@@ -94,7 +103,7 @@ export const blendSurfaces = defineCommand({
       max[2] - min[2],
     ]);
     const size = Math.max(...extent, 1e-9);
-    const tolerances = { g0: 1e-5 * size, g1AngleRad: 0.01, g2Rel: 0.1, g2Abs: 1e-9, g3Rel: 0.1 };
+    const tolerances = { g0: 1e-5 * size, g1AngleRad: 0.01, g2Rel: 0.1, g2Abs: 1e-9, g3Rel: 0.1, g3Abs: 1e-6 / size ** 2 };
     const engine = resolveSurfaceAnalysis((ctx ?? currentContext()).surfaceAnalysis);
     const jointA = engine.continuity(
       { type: 'surface', surface: surfaceA, side: sideA },

@@ -118,6 +118,23 @@ describe('trim_surface by curves (VC-SRF-23)', () => {
     );
   });
 
+  it('an open curve floating above the sheet and carried down along projectAlong cuts it (the ray misses beyond the edges)', () => {
+    const line = addCurve(sheet.doc, {
+      degree: 1,
+      poles: [
+        [-2, 3, 4],
+        [12, 3, 4],
+      ],
+    });
+    const cut = execute(line.doc, 'trim_surface', { id: sheet.id, curveIds: [line.id], projectAlong: [0, 0, -1], keepPoint: [5, 1, 0] });
+    expect(trimData(cut).area).toBeCloseTo(30, 6);
+    expectNoOp(
+      execute(line.doc, 'trim_surface', { id: sheet.id, curveIds: [line.id], projectAlong: [0, 1, 0], keepPoint: [5, 1, 0] }),
+      line.doc,
+      'SRF_TRIM_MISS',
+    );
+  });
+
   it('an open curve across the sheet cuts it in two and keepPoint chooses the side (exact area 50)', () => {
     const line = addCurve(sheet.doc, {
       degree: 1,
@@ -322,5 +339,91 @@ describe('trimmed sheets on curved surfaces', () => {
     const rescaled = { ...half, polygon: half.polygon.map(([u, v]) => [u0 + u * (u1 - u0), v0 + v * (v1 - v0)] as const) };
     expect(trimmedArea(wall, [rescaled])).toBeCloseTo(2 * Math.PI * 2 * 5, 6);
     expect(tessellateSheet(sphere, undefined, 4).indices.length).toBeGreaterThan(0);
+  });
+});
+
+describe('trimmed sheets in other commands, stored trims', () => {
+  const sheetDoc = addSheet(empty, plane(10));
+  const circle = addCurve(sheetDoc.doc, circleParams(5, 5, 0, 3));
+  const trimmed = execute(circle.doc, 'trim_surface', { id: sheetDoc.id, curveIds: [circle.id] });
+  const other = addSheet(trimmed.document, plane(10));
+
+  it('blend_surfaces and fill_surface neighbours refuse a trimmed sheet; check_surface_quality lists trims as not checked', () => {
+    expectNoOp(execute(other.doc, 'blend_surfaces', { a: { id: sheetDoc.id }, b: { id: other.id } }), other.doc, 'SRF_TRIM_UNSUPPORTED');
+    const line = (a: number[], b: number[]): Record<string, unknown> => ({ degree: 1, poles: [a, b] });
+    let doc = other.doc;
+    const ids: string[] = [];
+    for (const [a, b] of [
+      [
+        [0, 0, 0],
+        [10, 0, 0],
+      ],
+      [
+        [10, 0, 0],
+        [10, 10, 0],
+      ],
+      [
+        [10, 10, 0],
+        [0, 10, 0],
+      ],
+      [
+        [0, 10, 0],
+        [0, 0, 0],
+      ],
+    ] as const) {
+      const made = addCurve(doc, line([...a], [...b]));
+      doc = made.doc;
+      ids.push(made.id);
+    }
+    expectNoOp(
+      execute(doc, 'fill_surface', { boundaryIds: ids, neighbours: [{ curveId: ids[0]!, surfaceId: sheetDoc.id, continuity: 'G1' }] }),
+      doc,
+      'SRF_TRIM_UNSUPPORTED',
+    );
+    const quality = execute(trimmed.document, 'check_surface_quality', { ids: [sheetDoc.id] }).data as { notChecked: string[] };
+    expect(quality.notChecked.some((text) => text.includes('trim loops'))).toBe(true);
+  });
+
+  it('the saved-document guard wants an even vertex count and points inside the parameter domain', () => {
+    const stored = JSON.parse(JSON.stringify(trimmed.document.entities[sheetDoc.id])) as Record<string, unknown>;
+    expect(validateEntityValue(stored)).toBeNull();
+    const square = [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ];
+    expect(validateEntityValue({ ...stored, trims: [{ outer: true, polygon: square }] })).toBeNull();
+    expect(
+      validateEntityValue({
+        ...stored,
+        trims: [
+          {
+            outer: true,
+            polygon: square.slice(0, 3).concat([
+              [0, 1],
+              [0, 0.5],
+            ]),
+          },
+        ],
+      }),
+    ).not.toBeNull();
+    expect(
+      validateEntityValue({
+        ...stored,
+        trims: [
+          {
+            outer: true,
+            polygon: [
+              [0, 0],
+              [2, 0],
+              [2, 1],
+              [0, 1],
+            ],
+          },
+        ],
+      }),
+    ).not.toBeNull();
+    expect(validateEntityValue({ ...stored, trims: Array.from({ length: 65 }, () => ({ outer: true, polygon: square })) })).not.toBeNull();
   });
 });

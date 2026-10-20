@@ -14,7 +14,7 @@ import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import { len3 } from '../../lib/vec3';
 import { placedSurface, surfacePoleExtent } from '../../geometry/nurbsSurface';
 import { resolveSurfaceAnalysis } from '../../geometry/surfaceAnalysis/port';
-import type { ContinuityTolerances, SurfaceAnalysisEngine } from '../../geometry/surfaceAnalysis/types';
+import type { ContinuityOrder, ContinuityTolerances, SurfaceAnalysisEngine } from '../../geometry/surfaceAnalysis/types';
 import { currentContext } from '../context';
 import { refuseSrf } from './shared';
 import { sig, sigVec } from './surfaceShared';
@@ -60,16 +60,9 @@ function creaseKnots(knots: ReadonlyArray<number>, multiplicities: ReadonlyArray
   return knots.filter((_, index) => index > 0 && index < knots.length - 1 && (multiplicities[index] as number) >= degree - 2);
 }
 
-function levelOf(
-  joint: { g0Gap: number; g1AngleRad: number; g2Rel: number; g2Gap: number; g3Gap: number | null },
-  tol: ContinuityTolerances,
-  scale: number,
-): Level | null {
-  if (joint.g0Gap > tol.g0) return 'G0';
-  if (joint.g1AngleRad > tol.g1AngleRad) return 'G1';
-  if (!(joint.g2Gap <= tol.g2Abs || joint.g2Rel <= tol.g2Rel)) return 'G2';
-  if (joint.g3Gap !== null && joint.g3Gap > tol.g2Abs && joint.g3Gap > tol.g3Rel * scale) return 'G3';
-  return null;
+/** The first level the joint does NOT reach (its engine `order` is the highest it does), or null when it reaches G3. */
+function failedLevel(order: ContinuityOrder): Level | null {
+  return ({ none: 'G0', G0: 'G1', G1: 'G2', G2: 'G3', G3: null } as const)[order];
 }
 
 /** Continuity findings across the interior crease lines of one sheet. */
@@ -98,7 +91,7 @@ function knotFindings(
       samples,
       tol,
     );
-    const level = levelOf(joint, tol, Math.max(...joint.samples.map((s) => Math.abs(s.g3Gap ?? 0)), 1e-12));
+    const level = failedLevel(joint.order);
     if (level === null || LEVELS.indexOf(level) > LEVELS.indexOf(require)) return;
     const [code, value, limit] =
       level === 'G0'
@@ -107,7 +100,7 @@ function knotFindings(
           ? ['SRF_CHECK_G1_ANGLE', joint.g1AngleRad, tol.g1AngleRad]
           : level === 'G2'
             ? ['SRF_CHECK_G2_CURVATURE', joint.g2Rel, tol.g2Rel]
-            : ['SRF_CHECK_G3', joint.g3Gap ?? 0, tol.g3Rel];
+            : ['SRF_CHECK_G3', joint.g3Gap ?? 0, 0];
     findings.push({
       code: code as string,
       severity: 'fail',
@@ -115,7 +108,8 @@ function knotFindings(
       edgeIndex,
       value: sig(value as number),
       limit: sig(limit as number),
-      unit: level === 'G0' ? unit : level === 'G1' ? 'rad' : 'relative',
+      unit:
+        level === 'G0' ? unit : level === 'G1' ? 'rad' : level === 'G2' ? 'relative' : `1/${unit}^2 (limit: relative g3Rel ${tol.g3Rel})`,
       worst: { point: sigVec(joint.worst.point) },
       remediation: REMEDIATION[code as string] as string,
       message: `${direction} = ${sig(knot)}: ${code === 'SRF_CHECK_G0_GAP' ? 'position gap' : 'continuity broken at'} ${sig(value as number)} (limit ${sig(limit as number)})`,
@@ -235,6 +229,7 @@ export const checkSurfaceQuality = defineCommand({
       g2Rel: tolerances.g2Rel.value,
       g2Abs: 1e-9,
       g3Rel: tolerances.g3Rel.value,
+      g3Abs: 1e-6 / size ** 2,
     };
     const engine = resolveSurfaceAnalysis((ctx ?? currentContext()).surfaceAnalysis);
     const findings: Finding[] = [];
@@ -358,6 +353,7 @@ export const checkSurfaceQuality = defineCommand({
         'section deviation of lofts / wings (needs the loft sections)',
         'B-rep faces and edges (native kernel)',
         'waivers (human approval workflow)',
+        'trim loops: a sheet trimmed by curves is checked as its whole underlying patch',
       ],
       unverified: false,
       reviewRequired,

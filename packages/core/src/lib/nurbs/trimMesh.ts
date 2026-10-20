@@ -4,7 +4,7 @@
  * region): marching squares then cuts each sub-cell along the zero crossing, so the mesh edge follows the curve to a fraction of a sub-cell.
  */
 
-import { insideRegion } from './trimRegion';
+import { regionTester } from './trimRegion';
 import type { UvTrimLoop } from './surfaceTypes';
 
 type Uv = readonly [number, number];
@@ -91,11 +91,12 @@ export function trimGrid(loops: ReadonlyArray<UvTrimLoop>, us: ReadonlyArray<num
           cellSegments.set(key, list);
         }
     });
+  const contains = regionTester(loops);
   const inside = (p: Uv): boolean => {
     // a point on the boundary of the domain is judged from just inside it
     const nudge = 1e-9 * reach;
     const nudged: Uv = [Math.min(uMax - nudge, Math.max(uMin + nudge, p[0])), Math.min(vMax - nudge, Math.max(vMin + nudge, p[1]))];
-    return insideRegion(loops, nudged);
+    return contains(nudged);
   };
   const full: Array<readonly [number, number]> = [];
   const triangles: Triangle[] = [];

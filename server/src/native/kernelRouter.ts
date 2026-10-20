@@ -61,7 +61,9 @@ export function createKernelRouter(deps: KernelRouterDeps): KernelRouter {
   const wire = { bsplineSections: deps.native.capabilities.includes('bsplineSections') };
 
   const sourceMesh: SourceMesher = async (source, features) => {
-    const reply = await (await nativeSession()).request('tessellate', [{ key: recipeKey(source), recipe: nativeRecipe(source, features, wire) }]);
+    const reply = await (
+      await nativeSession()
+    ).request('tessellate', [{ key: recipeKey(source), recipe: nativeRecipe(source, features, wire) }]);
     if (isUnsupported(reply.error) || reply.error?.startsWith(NATIVE_DIED) === true) return 'unsupported';
     return decodeMesh(reply.result);
   };

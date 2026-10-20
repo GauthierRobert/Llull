@@ -27,6 +27,8 @@ export interface ContinuityTolerances {
   readonly g2Abs: number;
   /** Relative jump of d(curvature)/ds still counted as G3 (surfaces: of the cross-edge rate of normal curvature). */
   readonly g3Rel: number;
+  /** Curvature rates (1/length^2) below this count as equal in the G3 test; scale it with the model size (1e-6 / size^2). */
+  readonly g3Abs: number;
 }
 
 export type ContinuityOrder = 'none' | 'G0' | 'G1' | 'G2' | 'G3';

@@ -52,6 +52,15 @@ export function sewIntoSolid(
       ['params.ids', 'params.tolerance'],
     );
   }
+  if (shell.components > 1)
+    return refuseSrf(
+      doc,
+      'sew_surfaces',
+      'SRF_SEW_NONMANIFOLD',
+      `the sheets close ${shell.components} separate shells: sew them separately (nested shells are not supported)`,
+      [...ids],
+      ['params.ids'],
+    );
   if (shell.nonManifoldEdges > 0)
     return refuseSrf(
       doc,

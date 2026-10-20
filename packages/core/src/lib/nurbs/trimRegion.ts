@@ -10,11 +10,36 @@ type Uv = readonly [number, number];
 
 const asPoint = (uv: Uv): [number, number] => [uv[0], uv[1]];
 
-/** Even-odd membership of `point` in the region bounded by `loops`. */
+/** Even-odd membership test of the region bounded by `loops`: the polygons are converted and boxed once, then each query only reads the loops whose box holds the point. */
+export function regionTester(loops: ReadonlyArray<UvTrimLoop>): (point: Uv) => boolean {
+  const prepared = loops.map((loop) => {
+    const polygon = loop.polygon.map(asPoint);
+    return {
+      polygon,
+      uMin: Math.min(...polygon.map((p) => p[0])),
+      uMax: Math.max(...polygon.map((p) => p[0])),
+      vMin: Math.min(...polygon.map((p) => p[1])),
+      vMax: Math.max(...polygon.map((p) => p[1])),
+    };
+  });
+  return (point) => {
+    let inside = false;
+    for (const box of prepared)
+      if (
+        point[0] >= box.uMin &&
+        point[0] <= box.uMax &&
+        point[1] >= box.vMin &&
+        point[1] <= box.vMax &&
+        pointInPolygon(asPoint(point), box.polygon)
+      )
+        inside = !inside;
+    return inside;
+  };
+}
+
+/** Even-odd membership of `point` in the region bounded by `loops` (one-off form of `regionTester`). */
 export function insideRegion(loops: ReadonlyArray<UvTrimLoop>, point: Uv): boolean {
-  let inside = false;
-  for (const loop of loops) if (pointInPolygon(asPoint(point), loop.polygon.map(asPoint))) inside = !inside;
-  return inside;
+  return regionTester(loops)(point);
 }
 
 /** True when an edge of polygon `a` crosses an edge of polygon `b`. */

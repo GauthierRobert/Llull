@@ -146,7 +146,9 @@ describe('frame stored on the body', () => {
   it('rejects a stored body frame that is not orthonormal on load', () => {
     const lofted = execute(empty, 'loft_fuselage', { stations: cylinderStations });
     const id = lofted.affected[0]!;
-    const json = JSON.parse(serializeDocument(lofted.document)) as { document: { aero: { bodies: Record<string, { frame: { fsAxis: number[] } }> } } };
+    const json = JSON.parse(serializeDocument(lofted.document)) as {
+      document: { aero: { bodies: Record<string, { frame: { fsAxis: number[] } }> } };
+    };
     json.document.aero.bodies[id]!.frame.fsAxis = [2, 0, 0];
     expect(() => deserializeDocument(JSON.stringify(json))).toThrow();
   });

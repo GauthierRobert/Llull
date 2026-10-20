@@ -17,8 +17,8 @@ export interface ProjectedPoint {
 }
 
 export interface CurveProjector {
-  /** Projection of the curve point at parameter `t` (continuing from `seed`, else from the previous result), or null when the ray along the direction misses the surface. */
-  project(t: number, seed?: Uv): ProjectedPoint | null;
+  /** Projection of the curve point at parameter `t` (continuing from `seed`, else from the previous result), (a ray that misses the surface comes back `onBoundary` with an infinite gap). */
+  project(t: number, seed?: Uv): ProjectedPoint;
 }
 
 const RAY_STEPS = 40;
@@ -77,7 +77,8 @@ export function curveProjector(
       } else {
         const start = seeded ?? ((found) => [found.u, found.v] as const)(closestOnSurface(surface, point, probe));
         const hit = rayHit(surface, point, direction, start[0], start[1], hitTolerance);
-        if (hit === null) return null;
+        // a ray that misses the sheet is off the sheet: the same as a clamped projection (the curve leaves the domain there)
+        if (hit === null) return { uv: start, onBoundary: true, gap: Number.POSITIVE_INFINITY };
         uv = hit;
       }
       last = uv;

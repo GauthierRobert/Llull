@@ -7,6 +7,7 @@ export interface XmlNode {
   text: string;
 }
 
+const MAX_DEPTH = 256;
 const ENTITIES: Readonly<Record<string, string>> = { '&lt;': '<', '&gt;': '>', '&amp;': '&', '&quot;': '"', '&apos;': "'" };
 const decode = (text: string): string => text.replace(/&(?:lt|gt|amp|quot|apos);/g, (match) => ENTITIES[match] ?? match);
 
@@ -33,7 +34,10 @@ export function parseXml(text: string): XmlNode | string {
         attrs[attribute[1] as string] = decode((attribute[2] ?? attribute[3]) as string);
       const node: XmlNode = { tag, attrs, children: [], text: '' };
       top.children.push(node);
-      if (selfClosing !== '/') stack.push(node);
+      if (selfClosing !== '/') {
+        stack.push(node);
+        if (stack.length > MAX_DEPTH) return `elements nested deeper than ${MAX_DEPTH}`;
+      }
     }
   }
   if (stack.length !== 1) return `unclosed element <${(stack[stack.length - 1] as XmlNode).tag}>`;
@@ -52,6 +56,7 @@ export function findAll(node: XmlNode, test: (node: XmlNode) => boolean): XmlNod
 export function parameter(node: XmlNode, name: string): number | null {
   const [found] = findAll(node, (candidate) => candidate.tag === name || (candidate.tag === 'Parm' && candidate.attrs['Name'] === name));
   if (found === undefined) return null;
-  const value = Number.parseFloat(found.attrs['Value'] ?? found.text);
+  const raw = (found.attrs['Value'] ?? found.text).trim();
+  const value = raw === '' ? Number.NaN : Number(raw);
   return Number.isFinite(value) ? value : null;
 }

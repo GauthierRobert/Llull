@@ -36,6 +36,9 @@ export interface TrimRequest {
 /** About this many vertices per loop (each knot span is cut into an even number of equal parts). */
 const TARGET_VERTICES = 512;
 
+/** Most vertices of one stored loop (also the limit the saved-document guard enforces). */
+const MAX_LOOP_VERTICES = 4096;
+
 const fail = (code: TrimFailureCode, message: string): TrimBuild => ({ code, message });
 const midpoint = (a: Uv, b: Uv): Uv => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
 const asPoint = (uv: Uv): [number, number] => [uv[0], uv[1]];
@@ -115,7 +118,7 @@ function cutRegion(surface: NurbsSurfaceData, curve: ReadonlyArray<Uv>, ccw: boo
 
 /** Bisection of the chain parameter between a boundary sample and an interior sample: the boundary crossing of the projected curve. */
 function crossingPoint(
-  project: (tau: number, seed?: Uv) => ProjectedPoint | null,
+  project: (tau: number, seed?: Uv) => ProjectedPoint,
   boundary: { tau: number; uv: Uv },
   interior: { tau: number; uv: Uv },
 ): Uv | null {
@@ -123,11 +126,10 @@ function crossingPoint(
   for (let step = 0; step < 48; step++) {
     const mid = (outside + inside) / 2;
     const hit = project(mid, step === 0 ? interior.uv : undefined);
-    if (hit === null) return null;
     if (hit.onBoundary) outside = mid;
     else inside = mid;
   }
-  return project(outside)?.uv ?? null;
+  return project(outside).uv;
 }
 
 /** True when two non-adjacent segments of the open polyline cross. */
@@ -157,15 +159,18 @@ function addHole(existing: ReadonlyArray<UvTrimLoop>, hole: UvTrimLoop): TrimBui
 export function buildTrimLoops(request: TrimRequest): TrimBuild {
   const { surface, chain, closed, direction, keepPoint, existing } = request;
   const taus = chainParameters(chain);
+  if (taus.length > MAX_LOOP_VERTICES)
+    return fail(
+      'SRF_TRIM_LOOP_INVALID',
+      `the trimming curves have too many knot spans: the loop would need ${taus.length} vertices (limit ${MAX_LOOP_VERTICES})`,
+    );
   const projector = curveProjector(surface, chainPoint(chain), direction, request.hitTolerance);
   const samples: ProjectedPoint[] = [];
   for (const tau of taus) {
     const hit = projector.project(tau);
-    if (hit === null)
-      return fail('SRF_TRIM_MISS', `the line along projectAlong through the curve at parameter ${tau.toFixed(3)} does not hit the sheet`);
     samples.push(hit);
   }
-  const maxGap = Math.max(...samples.map((sample) => sample.gap));
+  const maxGap = Math.max(0, ...samples.map((sample) => sample.gap).filter(Number.isFinite));
   const keepUv = keepPoint === null ? null : ((found) => [found.u, found.v] as const)(closestOnSurface(surface, keepPoint));
   const intervals = samples.length - 1;
   if (closed) {

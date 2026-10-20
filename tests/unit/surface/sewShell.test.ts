@@ -143,3 +143,17 @@ describe('arc-length samples', () => {
     a.points.forEach((point, k) => expect(Math.hypot(...(point.map((v, i) => v - b.points[k]![i]!) as P))).toBeLessThan(1e-12));
   });
 });
+
+describe('sew_surfaces review fixes', () => {
+  it('refuses separate (or nested) shells instead of adding their volumes', () => {
+    const { doc, ids } = addSheets(empty, [...boxFaces(2, 2, 2), ...boxFaces(1, 1, 1, 10)]);
+    const result = execute(doc, 'sew_surfaces', { ids });
+    expectNoOp(result, doc, 'SRF_SEW_NONMANIFOLD');
+    expect(result.summary).toContain('separate shells');
+  });
+
+  it('samples an edge whose length is an exact multiple of the spacing without an extra interval', () => {
+    const { doc, ids } = addSheets(empty, boxFaces(24, 24, 24));
+    expect(data(execute(doc, 'sew_surfaces', { ids, resolution: 24 })).volume).toBeCloseTo(24 ** 3, 6);
+  });
+});
