@@ -18,7 +18,10 @@ export const exportSheetSvg = defineCommand({
     'sections, clipped details). Geometry is derived from the CURRENT model, so edits to the model show without touching the sheet. ' +
     'Returns `data`: { svg, sheetId, paper, scale (denominator N), scaleText ("1:2"), widthMm, heightMm, fits, ' +
     'views: [{ id, label, kind, scale, scaleText, bounds: [minX, minY, maxX, maxY] in paper mm }], skipped: [{ id, reason }], warnings: string[] }. ' +
-    '`fits` is false when views overflow the drawing area (choose a smaller scale or larger paper).',
+    '`fits` is false when views overflow the drawing area (choose a smaller scale or larger paper). With PMI on the sheet (update_sheet pmiMode ' +
+    '"auto", or update_drawing_view pmiIds) the frames, datum symbols, sizes and notes are drawn on the views and `data.pmi` = { placed: ' +
+    '[{ viewId, pmiIds }], skipped: [{ pmiId, reason }] } with reason GDT_SHEET_PLANE_NOT_PARALLEL, GDT_SHEET_SOLID_NOT_IN_VIEW, ' +
+    'GDT_SHEET_VIEW_KIND_UNSUPPORTED or GDT_PMI_UNKNOWN.',
   params: z.object({
     confirmExportControlled,
     sheetId: z.string().describe('Id of the sheet to export.'),
@@ -54,6 +57,7 @@ export const exportSheetSvg = defineCommand({
         views: rendered.views,
         skipped: rendered.skipped,
         warnings: rendered.warnings,
+        ...(rendered.pmi === undefined ? {} : { pmi: rendered.pmi }),
       },
     );
   },

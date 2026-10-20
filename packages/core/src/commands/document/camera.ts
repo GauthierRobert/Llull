@@ -13,7 +13,7 @@ import { noop, report } from '../noop';
 import { clamp } from '../../lib/clamp';
 
 /** Direction presets (eye position → view); top/bottom stop short of the poles to avoid gimbal lock. */
-const DIRECTION_PRESETS: Record<string, { azimuth: number; polar: number }> = {
+export const DIRECTION_PRESETS: Record<string, { azimuth: number; polar: number }> = {
   front: { azimuth: Math.PI, polar: Math.PI / 2 },
   back: { azimuth: 0, polar: Math.PI / 2 },
   right: { azimuth: Math.PI / 2, polar: Math.PI / 2 },

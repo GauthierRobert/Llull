@@ -89,6 +89,9 @@ function withSafeStepCounter(raw: Record<string, unknown>): Record<string, unkno
     for (const view of views)
       if (isRecord(view) && typeof view['id'] === 'string') noteStepNumber(STEP_SCOPED_ID.exec(view['id'])?.[1], `view id '${view['id']}'`);
   }
+  const pmi = raw['pmi'];
+  for (const table of isRecord(pmi) ? [pmi['items'], pmi['savedViews']] : [])
+    for (const id of Object.keys(isRecord(table) ? table : {})) noteStepNumber(STEP_SCOPED_ID.exec(id)?.[1], `pmi id '${id}'`);
   const stored = raw['nextStepNumber'];
   if (stored !== undefined && (typeof stored !== 'number' || !Number.isSafeInteger(stored) || stored < 1))
     throw new Error(`load_document: nextStepNumber must be a safe integer >= 1, got ${String(stored)}.`);

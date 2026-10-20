@@ -9,6 +9,7 @@ import type { BuildingModel } from './building';
 import type { CivilModel } from './civil';
 import type { AnalysisModel } from './analysis';
 import type { DrawingsModel } from './sheet';
+import type { PmiModel } from './pmi';
 import type { DynamicsModel } from './dynamics';
 import type { PrototypeModel } from './prototype';
 import type { CurveSegment } from './curve';
@@ -659,6 +660,8 @@ export interface CadDocument {
   civil?: CivilModel;
   /** Absent until the first sheet command (`create_sheet`). */
   drawings?: DrawingsModel;
+  /** Absent until the first PMI command (`set_pmi_standard`, `add_datum_feature`, ...). */
+  pmi?: PmiModel;
   /** Absent until the first rigid-body dynamics command (`add_rigid_body`). */
   dynamics?: DynamicsModel;
   /** Absent until the first prototype-review command (`allow_interference`, `set_part_grounded`). */

@@ -1,0 +1,15 @@
+# Machined plate PMI: governing standard, a note, a bolted-joint budget and a stack-up, verified with the pmi toolset (no kernel needed)
+design pmi_plate units=mm
+param hole = 6.6
+param bolt = 6
+param thickness = 12
+
+add_box plate size=[120, 80, thickness] anchor=min
+set_pmi_standard _ standard="ISO_GPS" generalToleranceNote="ISO 2768-m"
+add_pmi_note note1 text="BREAK ALL SHARP EDGES 0.2-0.5"
+
+check list_pmi path=standard expect == "ISO_GPS"
+check fastener_tolerance holeMmc=hole fastenerMmc=bolt type="floating" path=clearance expect ~= 0.6 ± 0.1%
+check fastener_tolerance holeMmc=hole fastenerMmc=bolt type="floating" statedPosition=0.3 path=virtualCondition expect ~= 6.3 ± 0.1%
+check analyze_stackup contributors=[{"name": "H", "nominal": 100, "upper": 0.1, "lower": -0.1}, {"name": "A", "nominal": 99.85, "upper": 0.05, "lower": -0.05}] expression="H - A" path=worstCase.halfTolerance expect ~= 0.15 ± 0.1%
+check volume of=plate expect == 120*80*thickness

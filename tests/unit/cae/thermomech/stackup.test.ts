@@ -1,7 +1,9 @@
-/** PHY-04 M4b: stackup_at_temperature (the at-temperature dimension chain; 03 GDT analyze_stackup is not built). */
+/** PHY-04 M4b: stackup_at_temperature (the at-temperature dimension chain; closed forms from the 03 GDT stack-up model, PMI-linked contributors). */
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
+import { setGeometryKernel } from '@core/geometry/kernel';
+import { plateKernel } from '../../../helpers/pmiPlateKernel';
 import { cteModel, strainModel, withModel } from '../../physics/thermomech/thermomechFixtures';
 
 const SPEC = { value: 20, unit: 'degC' };
@@ -99,7 +101,7 @@ describe('stackup_at_temperature', () => {
     ]);
     const verified = run({ contributors: CHAIN.map((entry) => ({ ...entry, verified: true })) }).data as Data;
     expect(verified.rows[0]?.unverifiedReasons.every((reason) => reason.includes('explicit CTE'))).toBe(true);
-    expect(data.assumptions.join(' ')).toContain('analyze_stackup is not built');
+    expect(data.assumptions.join(' ')).toContain('lib/stackup.ts');
   });
 
   it('judges the spec limits: within worst case, within RSS only (TMC_STACKUP_WC_EXCEEDED), outside (TMC_STACKUP_OUT_OF_SPEC)', () => {
@@ -172,6 +174,43 @@ describe('stackup_at_temperature', () => {
     wrong({ contributors: [{ ...CHAIN[0], material: 'alu' }] }, 'TMC_CTE_SOURCE_CONFLICT');
     wrong({ contributors: [{ ...CHAIN[0], cte: { ...cte(1e-5), alpha: { value: 1, unit: 'mm' } } }] }, 'THM_UNITS_MISMATCH');
     wrong({ contributors: Array.from({ length: 51 }, (_, i) => ({ ...CHAIN[0], name: `c${i}` })) }, 'TMC_STACKUP_INVALID');
+  });
+
+  it('takes nominal and limits from a linked 03 PMI dimension (verified by default) and refuses a bad link', () => {
+    setGeometryKernel(plateKernel());
+    try {
+      const box = execute(createEmptyDocument(), 'add_box', { size: [120, 80, 12] });
+      const entityId = box.affected[0] as string;
+      const bore = execute(box.document, 'add_size_dimension', {
+        entityId,
+        facesNear: [[50, 40, 6]],
+        sizeKind: 'diameter',
+        tolerance: { type: 'plusMinus', upper: 0.021, lower: 0 },
+      });
+      const basic = execute(bore.document, 'add_size_dimension', {
+        entityId,
+        facesNear: [[16.7, 20, 6]],
+        sizeKind: 'diameter',
+        tolerance: { type: 'basic' },
+      });
+      const [boreId, basicId] = [bore.affected[0], basic.affected[0]] as string[];
+      const doc = basic.document;
+      const linked = run({ contributors: [{ name: 'bore', pmiId: boreId, cte: cte(23e-6), sensitivity: 1 }] }, doc);
+      const data = linked.data as Data;
+      expect(linked.rejected).not.toBe(true);
+      expect(data.specRow.mean).toBeCloseTo(20.0105, 9);
+      expect(data.specRow.worstCase.halfTolerance).toBeCloseTo(0.0105, 9);
+      expect(data.specRow.unverifiedReasons.join(' ')).not.toContain('typed limits');
+      const code = (contributor: Record<string, unknown>): string | undefined =>
+        (run({ contributors: [{ name: 'x', cte: cte(1e-5), ...contributor }] }, doc).data as { code?: string }).code;
+      expect(code({ pmiId: 'ghost' })).toBe('TMC_STACKUP_INVALID');
+      expect(code({ pmiId: basicId })).toBe('TMC_STACKUP_INVALID');
+      expect(code({ nominal: 1 })).toBe('TMC_STACKUP_INVALID');
+      const unconfirmed = run({ contributors: [{ name: 'bore', pmiId: boreId, cte: cte(23e-6), verified: false }] }, doc).data as Data;
+      expect(unconfirmed.specRow.unverifiedReasons.join(' ')).toContain('typed limits');
+    } finally {
+      setGeometryKernel(null);
+    }
   });
 
   it('is pure: the document is untouched and the result is deterministic', () => {

@@ -9,6 +9,8 @@ import type { CommandResult } from '@core/commands/types';
 import { explicitCteProvider, isCteRefusal, materialCteProvider, type CteBasis, type CteProvider } from '@core/model/materialCte';
 import type { CadDocument } from '@core/model/types';
 import { convertValue, isUnitFailure } from '@lib/quantity';
+import { toleranceBasis } from '@core/geometry/pmiText';
+import { type StackContributor, contributions, rssHalf, worstCaseHalf } from '@lib/stackup';
 import { remediationOf } from './refusal';
 import { temperatureIn } from './units';
 
@@ -22,9 +24,26 @@ const quantity = z.object({ value: z.number().describe('Value.'), unit: z.string
 
 const contributorSchema = z.object({
   name: z.string().min(1).describe('Unique contributor name, e.g. "bore depth".'),
-  nominal: z.number().describe('Nominal dimension in document length units at specTemperature (> 0).'),
-  upper: z.number().describe('Upper deviation from nominal, document units, at specTemperature (e.g. +0.05).'),
-  lower: z.number().describe('Lower deviation from nominal, document units, at specTemperature; must not exceed upper.'),
+  nominal: z
+    .number()
+    .optional()
+    .describe(
+      'Nominal dimension in document length units at specTemperature (> 0). Required unless pmiId is given (then measured from the PMI item).',
+    ),
+  upper: z
+    .number()
+    .optional()
+    .describe('Upper deviation from nominal, document units, at specTemperature (e.g. +0.05). Required unless pmiId is given.'),
+  lower: z
+    .number()
+    .optional()
+    .describe('Lower deviation from nominal, document units, at specTemperature; must not exceed upper. Required unless pmiId is given.'),
+  pmiId: z
+    .string()
+    .optional()
+    .describe(
+      'Id of a 03 GDT size or location dimension (list_pmi): its measured nominal and tolerance become nominal / upper / lower (at specTemperature), and the contributor is verified unless verified: false.',
+    ),
   sensitivity: z
     .number()
     .optional()
@@ -47,16 +66,33 @@ const contributorSchema = z.object({
     .boolean()
     .optional()
     .describe(
-      'true when the limits are confirmed against their source (a PMI size dimension once 03 exists). Default false: typed limits are unverified.',
+      'true when the limits are confirmed against their source. Default true for a pmiId-linked contributor, false for typed limits (unverified).',
     ),
 });
 
-type Contributor = z.output<typeof contributorSchema>;
+type Given = z.output<typeof contributorSchema>;
+/** A contributor with its limits resolved (typed, or taken from its PMI item). */
+type Contributor = Omit<Given, 'nominal' | 'upper' | 'lower'> & { nominal: number; upper: number; lower: number };
 
 const rejection = (doc: CadDocument, code: string, message: string, remediation: string, path: string): CommandResult => ({
   ...codedRejection(doc, 'stackup_at_temperature', code, message, remediation, [], [path]),
   data: { code, reason: message, remediation, path },
 });
+
+/** The contributor with its limits resolved: typed, or the measured nominal and tolerance of its 03 PMI dimension; or why it cannot be. */
+function resolveContributor(doc: CadDocument, given: Given): Contributor | string {
+  const { nominal, upper, lower, pmiId, verified, ...rest } = given;
+  if (pmiId === undefined) {
+    if (nominal === undefined || upper === undefined || lower === undefined)
+      return `contributor '${given.name}' needs nominal, upper and lower (or a pmiId)`;
+    return { ...rest, nominal, upper, lower, ...(verified === undefined ? {} : { verified }) };
+  }
+  const item = doc.pmi !== undefined && Object.hasOwn(doc.pmi.items, pmiId) ? doc.pmi.items[pmiId] : undefined;
+  if (item === undefined) return `contributor '${given.name}': no PMI item '${pmiId}' (list_pmi shows the ids)`;
+  const basis = toleranceBasis(item);
+  if (typeof basis === 'string') return `contributor '${given.name}': ${basis}`;
+  return { ...rest, ...basis, verified: verified ?? true };
+}
 
 interface Evaluated {
   readonly contributor: Contributor;
@@ -122,7 +158,7 @@ export const stackupAtTemperature = defineCommand({
       ),
   }),
   run: (doc, params): CommandResult => {
-    const { contributors, specTemperature } = params;
+    const { contributors: given, specTemperature } = params;
     if (specTemperature === undefined)
       return rejection(
         doc,
@@ -164,14 +200,21 @@ export const stackupAtTemperature = defineCommand({
         );
       kelvins.push(kelvin);
     }
-    if (contributors.length === 0 || contributors.length > MAX_CONTRIBUTORS)
+    if (given.length === 0 || given.length > MAX_CONTRIBUTORS)
       return rejection(
         doc,
         'TMC_STACKUP_INVALID',
-        `1 to ${MAX_CONTRIBUTORS} contributors are needed, got ${contributors.length}`,
+        `1 to ${MAX_CONTRIBUTORS} contributors are needed, got ${given.length}`,
         remediationOf('TMC_STACKUP_INVALID'),
         'contributors',
       );
+    const contributors: Contributor[] = [];
+    for (const [index, entry] of given.entries()) {
+      const resolved = resolveContributor(doc, entry);
+      if (typeof resolved === 'string')
+        return rejection(doc, 'TMC_STACKUP_INVALID', resolved, remediationOf('TMC_STACKUP_INVALID'), `contributors[${index}]`);
+      contributors.push(resolved);
+    }
     const names = new Set<string>();
     for (const [index, contributor] of contributors.entries()) {
       const where = `contributors[${index}]`;
@@ -333,7 +376,7 @@ export const stackupAtTemperature = defineCommand({
         'one-dimensional chain: each dimension expands linearly with its secant CTE from the specification temperature',
         'uniform temperature per row, equal for every contributor; no elastic deformation, form error, gradient or assembly clearance',
         'worst case = sum of |sensitivity| x half tolerance; RSS = sqrt of the sum of (sensitivity x half tolerance)^2 (normal, k sigma per half tolerance)',
-        '03 GDT analyze_stackup is not built: limits are typed (unverified unless verified is true), there is no Monte Carlo or expression mode',
+        'worst case, RSS and contribution shares are the 03 GDT stack-up formulas (lib/stackup.ts); limits are typed (unverified unless verified is true) or linked to a PMI dimension by pmiId; Monte Carlo and expression stacks are analyze_stackup (not at temperature)',
       ],
       summary,
     });
@@ -373,26 +416,36 @@ interface Row {
 /** Chain statistics of the scaled contributors at one temperature (pure). */
 function combine(parts: readonly Part[], kelvin: number, k: number, reasons: readonly string[], lower?: number, upper?: number): Row {
   const mean = parts.reduce((sum, part) => sum + part.sensitivity * part.mid, 0);
-  const wc = parts.reduce((sum, part) => sum + Math.abs(part.sensitivity) * part.half, 0);
-  const squares = parts.reduce((sum, part) => sum + (part.sensitivity * part.half) ** 2, 0);
-  const rssHalf = Math.sqrt(squares);
+  const chain = parts.map(
+    (part): StackContributor => ({
+      name: part.name,
+      nominal: part.mid,
+      lower: -part.half,
+      upper: part.half,
+      sensitivity: part.sensitivity,
+      distribution: 'normal',
+    }),
+  );
+  const wc = worstCaseHalf(chain);
+  const rss = rssHalf(chain);
+  const shares = contributions(chain, k);
   const within = (half: number): boolean => (lower === undefined || mean - half >= lower) && (upper === undefined || mean + half <= upper);
   const limited = lower !== undefined || upper !== undefined;
-  const status = !limited ? undefined : within(wc) ? 'within_worst_case' : within(rssHalf) ? 'within_rss_only' : 'outside';
+  const status = !limited ? undefined : within(wc) ? 'within_worst_case' : within(rss) ? 'within_rss_only' : 'outside';
   const code = status === 'within_rss_only' ? 'TMC_STACKUP_WC_EXCEEDED' : status === 'outside' ? 'TMC_STACKUP_OUT_OF_SPEC' : undefined;
   return {
     temperatureKelvin: kelvin,
     mean,
     worstCase: { min: mean - wc, max: mean + wc, halfTolerance: wc },
-    rss: { sigma: rssHalf / k, min: mean - rssHalf, max: mean + rssHalf, halfRange: rssHalf },
+    rss: { sigma: rss / k, min: mean - rss, max: mean + rss, halfRange: rss },
     shiftFromSpec: 0,
-    contributions: parts.map((part) => ({
+    contributions: parts.map((part, index) => ({
       name: part.name,
       thermalStrain: part.strain,
       scaledNominal: part.mid,
       halfTolerance: part.half,
-      wcPercent: wc > 0 ? (100 * Math.abs(part.sensitivity) * part.half) / wc : 0,
-      rssPercent: squares > 0 ? (100 * (part.sensitivity * part.half) ** 2) / squares : 0,
+      wcPercent: shares[index]?.wcPercent ?? 0,
+      rssPercent: shares[index]?.rssPercent ?? 0,
     })),
     ...(status !== undefined ? { status } : {}),
     ...(code !== undefined ? { code } : {}),

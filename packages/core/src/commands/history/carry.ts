@@ -85,3 +85,10 @@ export function orphanState(
     driveRelationOrder: driveRelations.order,
   };
 }
+
+/** `doc` with the active saved PMI view of `base` carried over (view state is set by a metaHistory command, so no step regenerates it). */
+export function withActiveSavedView(doc: CadDocument, base: CadDocument): CadDocument {
+  const active = base.pmi?.activeSavedViewId;
+  if (active === undefined || doc.pmi === undefined || !Object.hasOwn(doc.pmi.savedViews, active)) return doc;
+  return { ...doc, pmi: { ...doc.pmi, activeSavedViewId: active } };
+}

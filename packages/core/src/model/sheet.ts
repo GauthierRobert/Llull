@@ -56,6 +56,8 @@ export interface DrawingView {
   readonly section?: { readonly offset: number; readonly parentViewId?: string };
   /** Detail: circle on the parent view, in the parent's projected model coordinates (front: X,Z; back: -X,Z; right: Y,Z; left: -Y,Z; top: X,Y; bottom: X,-Y). */
   readonly detail?: { readonly parentViewId: string; readonly center: Vec2; readonly radius: number };
+  /** PMI items drawn on this view (explicit; overrides the sheet's automatic selection). */
+  readonly pmiIds?: string[];
 }
 
 export interface DrawingSheet {
@@ -67,6 +69,8 @@ export interface DrawingSheet {
   readonly titleBlock: TitleBlock;
   readonly projectionAngle: ProjectionAngle;
   readonly views: DrawingView[];
+  /** `auto` draws the PMI whose annotation plane faces each projection view; absent = `off`. */
+  readonly pmiMode?: 'off' | 'auto';
 }
 
 /** Absent on the document until the first sheet command. */
