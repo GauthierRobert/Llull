@@ -31,6 +31,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   SRF_LOFT_SECTIONS_TOO_FEW: 'give at least 2 section curves',
   SRF_LOFT_GUIDE_MISSES_SECTION:
     'snap the guide to the section curves (interpolate_curve through section points) or raise `guideTolerance`',
+  SRF_LOFT_GUIDE_NOT_CONTAINED: 'use fewer or better aligned guides, or add sections near where the guides bend',
   SRF_FILL_LOOP_OPEN: 'give 3 or 4 curves whose ends meet end to end; `tolerance` is the largest gap bridged',
   SRF_FILL_UNSUPPORTED: 'fill 3 or 4 boundary curves of the same kind (all rational or all not)',
   SRF_TRIM_RANGE: 'give u and v intervals [from, to] inside the surface domain (see inspect_surface)',

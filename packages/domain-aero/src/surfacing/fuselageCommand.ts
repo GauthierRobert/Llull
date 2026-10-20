@@ -21,7 +21,7 @@ const sectionSchema = z.object({
   type: z
     .enum(['point', 'conic', 'circle', 'superellipse'])
     .describe(
-      '"point" = an apex (nose / tail tip, first or last station only); "conic" = four rho-conic arcs; "circle"; "superellipse" (|y/a|^n + |z/b|^n = 1).',
+      '"point" = an apex (nose / tail tip, first or last station only); "conic" = four rho-conic arcs; "circle"; "superellipse" (|y/a|^n + |z/b|^n = 1, approximated by four conics: exact for n = 2, max radial error about 0.4 % of the radius at n = 2.5 and 1 % at n = 6, reported as superellipseDeviation).',
     ),
   wl: z.number().describe('point / circle / superellipse: water line of the point or of the section centre, document units.').optional(),
   bl: z.number().describe('Buttock line of the section centre (default 0 = the centre plane).').optional(),
@@ -64,7 +64,7 @@ function enclosedVolume(surface: NurbsSurfaceData): number {
 
 /**
  * @affects creates 1 nurbs_surface (the closed outer skin) and doc.aero.bodies[id]
- * @invariant stations are skinned exactly (rational conic sections stay exact); with control curves the skin also contains them
+ * @invariant conic / circle stations are exact rational sections (skinned exactly); a superellipse station is the four-conic APPROXIMATION of |y/a|^n + |z/b|^n = 1 (exact only for n = 2, deviation reported); with control curves the skin lies within the reported `controlCurveDeviation` of them (refused above 1e-3 of the size)
  * @failure fewer than 2 or more than 60 stations -> SRF_LOFT_SECTIONS_TOO_FEW; fs not strictly increasing -> AERO_FS_NOT_INCREASING; a point station inside -> AERO_PARAM_INVALID; rho outside (0, 1) -> SRF_CONIC_RHO_RANGE; a control curve missing a station -> SRF_LOFT_GUIDE_MISSES_SECTION
  */
 export const loftFuselage = defineCommand({
@@ -73,9 +73,9 @@ export const loftFuselage = defineCommand({
     'Loft a fuselage outer skin from a station table in the aircraft frame (FS along +x aft, BL along +y right, WL along +z up, document units). ' +
     '`stations` is a list of { fs, section } with fs strictly increasing; a section is "point" (the nose / tail tip, allowed only first or last), ' +
     '"circle" { radius, wl }, "superellipse" { halfBreadth, halfHeight, exponent, wl } or "conic" { halfBreadth, wlMaxBreadth, upper { wlExtreme, rho }, ' +
-    'lower { wlExtreme, rho } } (Liming conic halves: rho 0.4142 is circular, 0.5 parabolic; all sections are exact rational NURBS). The skin is the exact ' +
+    'lower { wlExtreme, rho } } (Liming conic halves: rho 0.4142 is circular, 0.5 parabolic; conic and circle sections are exact rational NURBS, a superellipse an approximation). The skin is the exact ' +
     'skin through the sections (cubic across stations by default). `controlCurveIds` (nurbs_curve ids such as the crown, keel or max-breadth ' +
-    'lines made with interpolate_curve) must cross every station and turn the skin into a Gordon surface that contains them. The result is one ' +
+    'lines made with interpolate_curve) must cross every station and turn the skin into a Gordon surface (periodic around the closed sections); the distance from the curves to the skin is reported as controlCurveDeviation and a skin farther than 1e-3 of the size from them is refused. The result is one ' +
     'closed nurbs_surface sheet (no volume entity: use thicken_surface for a shell); the summary and data report the enclosed volume when both ' +
     'ends are points. Reference: Sears-Haack body L 10, R 0.5 has volume 3 pi^2 R^2 L / 16 = 4.6264. Next: analyze_surface_curvature, check_continuity.',
   params: z.object({
@@ -117,12 +117,14 @@ export const loftFuselage = defineCommand({
         `stations.${unordered}.fs`,
       );
     const curves: NurbsCurveData[] = [];
+    let superellipseDeviation = 0;
     for (const [index, station] of stations.entries()) {
       if (station.section.type === 'point' && index !== 0 && index !== stations.length - 1)
         return refuse('AERO_PARAM_INVALID', 'a point station is only allowed first or last', `stations.${index}.section.type`);
       const made = sectionCurve(station.fs, station.section as FuselageSection);
       if ('code' in made) return refuse(made.code, `station ${index}: ${made.message}`, `stations.${index}.section`);
       curves.push(made.curve);
+      if (made.deviation !== undefined) superellipseDeviation = Math.max(superellipseDeviation, made.deviation);
     }
     const guides: NurbsCurveData[] = [];
     for (const [index, id] of controlCurveIds.entries()) {
@@ -134,6 +136,7 @@ export const loftFuselage = defineCommand({
     const skinDegree = Math.min(degreeV, stations.length - 1);
     let surface: NurbsSurfaceData;
     let note = '';
+    let guideDeviation: number | null = null;
     if (guides.length === 0) {
       const skin = skinCurves(curves, skinDegree);
       if ('code' in skin) return refuse(skin.code, skin.message, 'stations');
@@ -148,7 +151,8 @@ export const loftFuselage = defineCommand({
           gordon.guide === undefined ? [] : [controlCurveIds[gordon.guide] as string],
         );
       surface = gordon.surface;
-      note = `, control curves within ${sig(gordon.gap)}, section deviation ${sig(gordon.deviation)}`;
+      guideDeviation = gordon.guideDeviation;
+      note = `, control curves cross the sections within ${sig(gordon.gap)} and lie within ${sig(gordon.guideDeviation)} of the skin (seam gap ${sig(gordon.seamGap)}), section deviation ${sig(gordon.deviation)}`;
     }
     const created = execute(
       doc,
@@ -180,7 +184,16 @@ export const loftFuselage = defineCommand({
         ),
         [id],
       ),
-      data: { id, stations: stations.length, length: sig(length), closed, volume: volume === null ? null : sig(volume), unit: doc.units },
+      data: {
+        id,
+        stations: stations.length,
+        length: sig(length),
+        closed,
+        volume: volume === null ? null : sig(volume),
+        controlCurveDeviation: guideDeviation === null ? null : sig(guideDeviation),
+        superellipseDeviation: sig(superellipseDeviation),
+        unit: doc.units,
+      },
     };
   },
 });

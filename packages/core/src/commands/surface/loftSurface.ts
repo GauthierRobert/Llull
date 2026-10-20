@@ -127,7 +127,7 @@ export const loftSurface = defineCommand({
       gordon.surface,
       { ...params, position: [0, 0, 0] },
       (id) =>
-        `loft_surface: created Gordon surface "${id}" through ${sections.length} sections and ${guides.length} guide(s) (guide gap ${sig(gordon.gap)}, max section deviation ${sig(gordon.deviation)} ${doc.units}).`,
+        `loft_surface: created Gordon surface "${id}" through ${sections.length} sections and ${guides.length} guide(s) (guide gap ${sig(gordon.gap)}, guides within ${sig(gordon.guideDeviation)} of the surface, seam gap ${sig(gordon.seamGap)}, max section deviation ${sig(gordon.deviation)} ${doc.units}).`,
     );
   },
 });

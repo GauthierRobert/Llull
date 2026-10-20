@@ -24,6 +24,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   SRF_CONIC_RHO_RANGE: 'use 0 < rho < 1 (0.4142 = circle, 0.5 = parabola)',
   SRF_NOT_NURBS: 'pass the id of a nurbs_curve (interpolate_curve, create_conic, create_nurbs_curve)',
   SRF_LOFT_GUIDE_MISSES_SECTION: 'snap the control curve to the section curves, list the stations along it, or raise controlTolerance',
+  SRF_LOFT_GUIDE_NOT_CONTAINED: 'use fewer or better aligned control curves, or add stations where they bend',
   SRF_NURBS_INVALID: 'check the station sections: every fs and dimension must be finite',
   SRF_POINTS_INSUFFICIENT: 'give at least 2 stations',
 };

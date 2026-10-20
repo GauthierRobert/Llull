@@ -134,7 +134,8 @@ describe('loft_fuselage (VC-SRF-13, VC-SRF-14)', () => {
     ];
     const result = execute(doc, 'loft_fuselage', { stations, controlCurveIds: [crown.affected[0]!, keel.affected[0]!] });
     expect(result.affected).toHaveLength(1);
-    expect(result.summary).toMatch(/control curves within/);
+    expect(result.summary).toMatch(/lie within/);
+    expect((result.data as { controlCurveDeviation: number }).controlCurveDeviation).toBeLessThan(6e-3);
     const off = execute(doc, 'interpolate_curve', {
       points: [
         [0, 0, 0.5],
@@ -147,6 +148,61 @@ describe('loft_fuselage (VC-SRF-13, VC-SRF-14)', () => {
     const miss = execute(off.document, 'loft_fuselage', { stations, controlCurveIds: [off.affected[0]!] });
     expectNoOp(miss, off.document);
     expect(miss.error?.code).toBe('SRF_LOFT_GUIDE_MISSES_SECTION');
+  });
+
+  it('crown and bulge guides: closed seam and the guides lie on the skin', () => {
+    const curve = (points: number[][]): ReturnType<typeof execute> => execute(empty, 'interpolate_curve', { points, degree: 3 });
+    const crown = curve([
+      [0, 0, 0],
+      [2, 0, 1],
+      [4, 0, 1.5],
+      [6, 0, 1],
+    ]);
+    const bulge = execute(crown.document, 'interpolate_curve', {
+      points: [
+        [0, 0, 0],
+        [2, 1, 0],
+        [4, 1.5, 0],
+        [6, 1, 0],
+      ],
+      degree: 3,
+    });
+    const circleAt = (fs: number, radius: number): unknown => ({ fs, section: { type: 'circle', radius, wl: 0 } });
+    const stations = [{ fs: 0, section: { type: 'point', wl: 0 } }, circleAt(2, 1), circleAt(4, 1.5), circleAt(6, 1)];
+    const result = execute(bulge.document, 'loft_fuselage', { stations, controlCurveIds: [crown.affected[0]!, bulge.affected[0]!] });
+    expect(result.summary).not.toMatch(/no-op/);
+    expect(result.affected).toHaveLength(1);
+    const surface = surfaceOf(result.document, result.affected[0]!).surface;
+    const [uMin, uMax] = [surface.knotsU[0]!, surface.knotsU[surface.knotsU.length - 1]!];
+    for (const v of [0.2, 0.5, 0.8, 1]) {
+      const [a, b] = [evaluateSurface(surface, uMin, v), evaluateSurface(surface, uMax, v)];
+      expect(Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])).toBeLessThan(1e-9);
+    }
+    expect((result.data as { controlCurveDeviation: number }).controlCurveDeviation).toBeLessThan(6e-3);
+    // measured independently: points of the crown line against the skin
+    const samples = [
+      [2, 0, 1],
+      [4, 0, 1.5],
+      [2, 1, 0],
+      [4, 1.5, 0],
+    ];
+    const deviation = execute(result.document, 'measure_deviation', { id: result.affected[0]!, points: samples });
+    expect((deviation.data as { max: number }).max).toBeLessThan(6e-3);
+  });
+
+  it('a superellipse station reports its conic approximation error (exact for n = 2)', () => {
+    const body = (exponent: number): ReturnType<typeof execute> =>
+      execute(empty, 'loft_fuselage', {
+        stations: [
+          { fs: 0, section: { type: 'superellipse', halfBreadth: 1, halfHeight: 1, exponent, wl: 0 } },
+          { fs: 3, section: { type: 'superellipse', halfBreadth: 1, halfHeight: 1, exponent, wl: 0 } },
+        ],
+        degreeV: 1,
+      });
+    expect((body(2).data as { superellipseDeviation: number }).superellipseDeviation).toBeLessThan(1e-9);
+    const boxy = (body(4).data as { superellipseDeviation: number }).superellipseDeviation;
+    expect(boxy).toBeGreaterThan(1e-3);
+    expect(boxy).toBeLessThan(0.02);
   });
 
   it('refuses bad station tables', () => {
