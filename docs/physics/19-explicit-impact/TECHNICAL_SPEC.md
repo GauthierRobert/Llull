@@ -469,8 +469,8 @@ were read; single symbols were restored from the standard form and checked by th
 | tet4 | constant strain, one point: `B_I = V∇N_I` from edge cross products | [E2] §4.6 Eq. 4.102 (shape functions); gradient algebra checked by the identity `Σ x_iI B_jI = V δ_ij` in the tests |
 | Stress update | hypoelastic, Jaumann rotation first (`r_ij = (σ_ip ω_pj + σ_jp ω_pi)Δt`), then `Δσ = Δt(λ tr D I + 2μD)` with D and ω at the mid-step configuration | [E2] §21.1 Eqs. 21.3–21.7 |
 | Plasticity | J2 radial return: trial deviator, `σ̄* = √(3/2 s*:s*)`, `σ̄* − 3GΔε_p = σ_y(ε_p + Δε_p, Δε_p/Δt)` solved by bisection (the residual decreases strictly), `s = (σ_y/σ̄*) s*` | [E2] §22.3 Eqs. 22.3.14–22.3.16 (Krieg & Key 1976, cited there) |
-| Johnson–Cook strength | `σ_y = (A + Bε_pⁿ)(1 + C ln max(ε̇_p/ε̇_0, 1))`, plastic strain rate (LS-DYNA VP = 1); isothermal at the transition temperature (T* = 0) in RS-8a | [E2] §22.15 Eq. 22.15.1, [E4] *MAT_015; rate clamp TR-EXP-20 (llull convention: the clamp is not in the extractable [E2]/[E4] text) |
-| Johnson–Cook failure, erosion (RS-8b) | `ε_f = max([D1 + D2 exp(D3 σ*)][1 + D4 ln max(ε̇_p/ε̇_0, 1)], EFMIN = 1e-6)`, σ* = mean stress / von Mises after the return (tension positive, the 1985 convention of the validation generator; LS-DYNA takes |D3| with its own pressure sign); `D += Δε_p/ε_f`; at `D ≥ 1` the element carries no stress, no hourglass or bulk force and leaves the step computation; its nodes keep their mass | [E2] §22.15 Eqs. 22.15.2–22.15.4; EFMIN [E4] *MAT_015; T* = 0 (isothermal) |
+| Johnson–Cook strength | `σ_y = (A + Bε_pⁿ)(1 + C ln max(ε̇_p/ε̇_0, 1))`, plastic strain rate (LS-DYNA VP = 1); isothermal at the transition temperature (T* = 0) in RS-8a, with `(1 − T*ᵐ)` and adiabatic heating since RS-8 (§13.9) | [E2] §22.15 Eq. 22.15.1, [E4] *MAT_015; rate clamp TR-EXP-20 (llull convention: the clamp is not in the extractable [E2]/[E4] text) |
+| Johnson–Cook failure, erosion (RS-8b) | `ε_f = max([D1 + D2 exp(D3 σ*)][1 + D4 ln max(ε̇_p/ε̇_0, 1)], EFMIN = 1e-6)`, σ* = mean stress / von Mises after the return (tension positive, the 1985 convention of the validation generator; LS-DYNA takes |D3| with its own pressure sign); `D += Δε_p/ε_f`; at `D ≥ 1` the element carries no stress, no hourglass or bulk force and leaves the step computation; its nodes keep their mass | [E2] §22.15 Eqs. 22.15.2–22.15.4; EFMIN [E4] *MAT_015; T* = 0 (isothermal) in RS-8b, the `(1 + D5 T*)` term since RS-8 (§13.9) |
 | Stable step | element eigenvalue bound: `ω²_max = λ_max((1/V) C^½ H C^½)`, `H = Σ_I B_I B_Iᵀ / m_I` (6×6 Mandel; cyclic Jacobi); effective length `h = 2c/ω`; `Δt_e = h / (Q + √(Q² + c²))`, `Q = C_lin c + C_quad h |ε̇_kk|` for `ε̇_kk < 0`; `Δt = α min Δt_e`, α default 0.90 | [E1] §12.3.1 Eqs. 12.13–12.16 ("the maximum element eigenvalue is an upper bound on the maximum global eigenvalue", `ω = 2c/h`); [E2] §25.1 Eqs. 25.1–25.3; [E3] *CONTROL_TIMESTEP TSSFAC 0.90 |
 | Bulk viscosity | `q = ρ l (C_quad l ε̇_kk² − C_lin c ε̇_kk)` for `ε̇_kk < 0`, `l = V^{1/3}`, added to the pressure in the momentum and energy equations; defaults quadratic 1.5, linear 0.06 | [E2] §24.2 Eq. 24.15; [E3] *CONTROL_BULK_VISCOSITY (Q1 = 1.5 quadratic, Q2 = 0.06 linear) |
 | Rigid wall | stonewall: a node whose next position crosses the plane while moving into it loses its normal velocity (frictionless) | [E2] §29.15 Eqs. 29.100–29.102 |
@@ -556,12 +556,13 @@ Test material constants are synthetic (validation pack inputs, Q7): no Johnson�
 
 - **RS-8b:**
   - wgpu kernels: **built 2026-10-20** (§13.6).
-  - Johnson–Cook failure and erosion: **built 2026-10-19** on the CPU path (`set_johnson_cook_failure`, §13.1). Moving D1–D5 into a
-    PHY-02 failure law kind is open.
-  - Temperature (adiabatic heating) for T*.
+  - Johnson–Cook failure and erosion: **built 2026-10-19** on the CPU path (`set_johnson_cook_failure`, §13.1). D1–D5 stay in the
+    explicit set-up: PHY-02 has no failure-law slot (§13.9).
+  - Temperature (adiabatic heating) for T*: **built 2026-10-20** (§13.9).
 - **RS-8c:** penalty contact on `llull-bvh`, self contact and Coulomb friction, Belytschko–Tsay shells with Johnson–Cook: **built
   2026-10-20** (§13.7, §13.8).
-- **Hand-off MVP (M2–M4):** deck writers, readers, OpenCourant run, import (unchanged plan).
+- **Hand-off MVP (M2–M4):** deck writers, readers, OpenCourant run, import. RS1 lists the hand-off as the alternative path, not RS-8
+  work: out of scope of RS-8 (unchanged plan).
 
 ### 13.6 As built: RS-8b GPU kernels (2026-10-20)
 
@@ -600,8 +601,7 @@ Build note: on Windows without MSVC the GNU toolchain needs a `dlltool` stand-in
 ### 13.7 As built: RS-8c penalty contact (2026-10-20)
 
 Source: [E2] Ch. 29, with every equation read from rendered page images (PDF pages 650–690), plus [E3] for keyword defaults. Code:
-`solver/crates/llull-explicit/src/contact.rs` (CPU path; a model with contacts or fixed DOFs falls back from the GPU with
-`EXP_GPU_FALLBACK`).
+`solver/crates/llull-explicit/src/contact.rs` (the CPU path, and the host part of the GPU cycle since RS-8, §13.9).
 
 | Item | As built | Source |
 | ---- | -------- | ------ |
@@ -639,8 +639,8 @@ Source: [E2] Ch. 29, with every equation read from rendered page images (PDF pag
 The Coulomb block is the classical result that the Abaqus 2017 Verification Manual problem "Friction models in Abaqus/Explicit" checks:
 deceleration μg, stop at v₀²/(2μg), t = v₀/(μg) (abaqus-docs.mit.edu 2017, simaver-c-expfricmodels, page summary read).
 
-**Fixed DOFs.** `fixed` (u8 per DOF, velocity held at 0) is part of the job contract and is used by the friction benchmark. Mapping the
-05 `fixed` constraints onto it from the commands is not built.
+**Fixed DOFs.** `fixed` (u8 per DOF, velocity held at 0) is part of the job contract and is used by the friction benchmark. The 05 supports
+map onto it since RS-8 (§13.9).
 
 **Drop-test template on the own solver.** `validation/plans/exp_drop_box_llull.plan.json` builds the VC-EXP-51 set-up from built
 commands: 50 mm aluminium-like box 1.2 m above a rigid floor, gravity, `structured_hex` 12.5 mm, `llull_explicit`.
@@ -650,8 +650,8 @@ and gravity work before contact equal ½m(gt)² within 0.5 %.
 ### 13.8 As built: RS-8c Belytschko–Tsay shells (2026-10-20)
 
 Source: [E2] Ch. 9 (pp. 9-1 to 9-11), §13.4, §22.3 and §25.3, read from rendered pages; [E3] *SECTION_SHELL, *CONTROL_SHELL and
-*HOURGLASS for defaults. Code: `solver/crates/llull-explicit/src/shell.rs` (element) and `shells.rs` (time-loop driver). CPU path only;
-a GPU request falls back with `EXP_GPU_FALLBACK`.
+*HOURGLASS for defaults. Code: `solver/crates/llull-explicit/src/shell.rs` (element) and `shells.rs` (time-loop driver). CPU path, and
+the host part of the GPU cycle since RS-8 (§13.9).
 
 | Item | As built | Source |
 | ---- | -------- | ------ |
@@ -665,7 +665,7 @@ a GPU request falls back with `EXP_GPU_FALLBACK`.
 | Time step | `L_s/c`, `L_s = A/max(L1..L4)`, `c = √(E/(ρ(1 − ν²)))` | Eqs. 25.13–25.15 |
 | Mass, inertia | `ρAt/4` per node; rotary inertia `αM`, `α = max(t²/12, A/8)`; angular velocities by central difference on the lumped scalar inertia; rotational kinetic energy in the balance | Eqs. 13.51–13.57 (mid-surface specialisation) |
 
-Not built: warping correction (BWC), Lobatto points, shells in contacts, shell failure / erosion, shell thickness change.
+Built since (§13.9): warping stiffness, shells in contact, shell erosion. Not built: Lobatto points, shell thickness change.
 
 **Set-up.** `set_explicit_shell {analysisId, entityId, shell, points?}` marks an unrotated box part whose smallest dimension is at
 most 1/4 of the others. It is meshed on its mid-surface across the two largest dimensions under `structured_hex`; `fea_mesh` with shells
@@ -681,3 +681,53 @@ is `EXP_MESH_UNSUPPORTED`. The job contract adds `shell4`, `shellThickness`, `sh
 | Spinning strip (1 mrad) | stress free | < 0.5 MPa (E θ²/2 = 0.1) | 0.5 MPa |
 | Johnson–Cook membrane, plane stress | von Mises = flow stress, σzz = 0 | within 1e-3 | 1e-3 |
 | Shell plate falling flat on the floor (`exp_shell_plate_llull` plan through `explicit_run`) | wall impulse = m·v | 0.03925 N·s = m·v | 2 % |
+
+### 13.9 As built: RS-8 completion (2026-10-20)
+
+Sources read from rendered pages of [E2] (LS-DYNA R14 Theory Manual) and the [E3]/[E4] keyword manuals, unless the row says otherwise.
+
+| Item | As built | Source |
+| ---- | -------- | ------ |
+| Adiabatic heating | `ΔT = β σ_y Δε_p / (ρ c_p)` per point, explicit in T after each J2 return (`σ_y Δε_p` = plastic work per volume of the radial return); flow stress × `(1 − T*ᵐ)`, `T* = (T − T_r)/(T_m − T_r)` clamped to [0, 1]; failure strain × `(1 + D5 T*)`; start at the J–C transition temperature (job `initialTemperature` overrides) | [E4] *MAT_107 Eq. 107.21 and its TQC entry ("portion of plastic work converted into heat (normally taken to be 0.9)"); [E2] Eq. 22.15.1 |
+| β | `DEFAULT_TAYLOR_QUINNEY` = 0.9, named (AF-31); `set_adiabatic_heating {analysisId, material, taylorQuinney?, enabled?}` | [E4] *MAT_107 TQC |
+| c_p | the material's PHY-01 cp model, in the case unit system, through the thermal module's `propertyTable`; held constant in the run, a T-table read at T_r (reported in `unverifiedReasons`); none -> `EXP_MATERIAL_NO_CP` | llull rule |
+| Shell erosion | a shell whose every thickness point reached J–C damage 1 carries no force or moment and leaves the step computation; its nodes keep their mass and inertia (the hex rule of §13.1 per point, the element once all points failed) | llull rule, consistent with §13.1 |
+| Warping stiffness (BWC) | the Belytschko–Leviathan projection `P = I − R(RᵀR)⁻¹Rᵀ` on the 24 element-frame nodal velocities before the rates and on the forces / moments after (internal power invariant). R: 3 rigid rotations about the centroid (translations `e_a × x̂_I` are orthogonal to the rigid translations there) and 4 nodal drills about the shared, area-weighted nodal normals. Job `shellWarping`, default on (LS-DYNA's BT default is off) | [E2] §11.6 Eq. 11.28; [E3] *CONTROL_SHELL BWC = 1 with PROJ = 1 ("the full projection", recommended in its Remark 1); nodal-normal drills: Belytschko–Leviathan elements carry nodal fibers, and the Radioss theory page states the drill projection about the nodal normal (help.altair.com, One-Point Quadrature Shell Element, read through a page summary) |
+| Shells in contact | every shell of a contact part is a two-sided mid-surface segment, offset by half its thickness; slave nodes carry half the largest thickness of their shells; penetration `\|g\| − (h_m + h_s)` against shells, `g − h_s` against solid faces; shell segment stiffness `k = f_si K A / max(shell diagonal)` | [E2] §29.8.2, Figs. 29.11–29.13, Eq. 29.19 |
+| GPU path | fixed DOFs: a mask in the kick kernel. Contact and shells: a deterministic hybrid cycle; the host reads back `x_new` / `v_new`, runs the CPU twin's contact and shell routines in the same order and uploads one per-node force the next kick adds. Heating, (1 − T*ᵐ) and D5 in the kernels | llull design (RS1 §2 rule 3: no float atomics, fixed-order gathers) |
+| 05 supports | `buildExplicitJob` maps `fixed` (translations; and rotations of shell nodes), `pinned` (translations) and `displacement` dofs of 0 onto the job's fixed DOFs: the box face of the part nearest each `facesNear` point (structured hex) or the nearest node to each `pointsNear` point, else the `fea_mesh` node set `C_<id>`. Symmetry, non-zero motion, edge / plane targets -> `EXP_CONSTRAINT_UNSUPPORTED` | 05 constraint model |
+| Artifact | `fields.f64` carries 7 values per element (temperature after the failed flag); `fe_explicit` gains `temperature`, the summary `maxTemperature` (K) | — |
+
+**Decision: D1–D5 stay in the explicit set-up.** PHY-02's `ConstitutiveSet` has the slots elastic, hyperelastic, plastic, viscoelastic,
+creep and rate, and no failure slot. Adding one is a PHY-02 schema change outside RS-8, so the constants stay in
+`set_johnson_cook_failure` (always with their source, Q7).
+
+**Not built:** the BWC fiber coupling of Eqs. 9.55–9.60 and its improved transverse shear (Eqs. 9.61–9.65; the warping stiffness here
+is the projection that *CONTROL_SHELL documents for it); contact and shell kernels in WGSL (they run as the GPU cycle's host part);
+rounded shell edges in contact (§29.8.3); shell thickness change; symmetry supports and prescribed motion; temperature-dependent c_p in the
+run. The OpenCourant / Radioss hand-off (M2–M4) is outside RS-8.
+
+**Verification:**
+
+| Case | Closed form / reference | Measured | Asserted |
+| ---- | ----------------------- | -------- | -------- |
+| Heating, uniform plastic flow, T_m far | `ΔT = βAε_p/(ρc_p)` | relative error < 1e-9 | 1e-9 |
+| Heating with linear softening (m = 1, T_m = 600 K) | `T − T_r = (T_m − T_r)(1 − exp(−βAε_p/(ρc_p(T_m − T_r))))` | within 2e-3 | 2e-3 |
+| Twisted beam (MacNeal–Harder geometry: L 12, b 1.1, t 0.32, 90°, E 29e6, ν 0.22), 12 × 2 shells, sudden uniform load along the tip width | static work `w²/(4E)∫(L−s)⁴c(s)ds + w²L³/(3κGA)` (unit-load integration over the rotating section; the same integration for a tip load gives 5.426e-3 vs the MacNeal–Harder 5.424e-3 [MacNeal & Harder 1985, values read through the Altair SimSolid verification page]); time mean of the external work over whole periods | projected +1.79 %, plain BT +80.5 % ([E2] Fig. 9.2: BT fails, BWC does not) | 5 %; plain ≥ 4× the error |
+| Warped element in rigid rotation | force free | plain 5.0e-3, projected 2.7e-6 (straight-line path stretch) | projected < 1e-3 plain |
+| Two shell plates (t = 1, centre gap 3 mm, 10 m/s) | contact at `(d − t)/v` = 2e-4 s (mid-surfaces: 3e-4 s); momentum conserved | onset 2.007e-4 s; momentum to 1e-9 | onset within one history interval (1 µs) |
+| Shell plate on a hex block | contact at `(d − t/2)/v` = 1.5e-4 s | 1.505e-4 s; momentum to 1e-9 | as above |
+| Shell erosion (strip pulled at 1000/s, ε_f = 0.01) | eroded shells carry no stress, past ε_f | 2 of 16 eroded | — |
+| 05 supports in the job (unit) | the nodes of the face / point / node set, the right dofs; refusals | as asserted | exact |
+| GPU vs CPU twin | fixed DOFs; shells (cantilever, no solids); heating; contact | 1.4e-9; 2.7e-15; 3.9e-8 K of a 16 K rise; bar mean velocity 3.3e-4 of v, contact energy 3.5e-4 | 1e-7; 1e-9; 1e-4 of the rise; 1e-3 |
+| Native e2e (`explicitRunNative.test.ts`) | a held, heated plastic bar through commands heats; the GPU path matches the CPU twin's temperatures | — | 1e-4 of the rise |
+
+Contact GPU tolerance: contact is a threshold event, like erosion. The edge nodes of one bar lie on the plane of the other bar's side
+faces, within the round-off cut (1e-9 of the segment depth, ~2.5e-9 mm), while the twins' positions differ by ~1e-8 mm, so such a pair can
+flip at impact (the first energy row apart is the first contact row). Raising the cut is no fix: a block resting under gravity penetrates
+less than 1e-6 of the depth (the friction benchmark fails with 1e-6). The physical quantities are bounded instead, and the GPU run conserves
+momentum on its own (1e-9).
+
+**Timing** (`tests/gpu.rs`, ignored tests, sequential, RTX 4080 Laptop, Vulkan): two bars in contact, 20 480 hex8, 286 cycles: CPU twin
+49.2 s, GPU hybrid 4.49 s; the RS-8b bar, 10 240 hex8, 754 cycles: CPU twin 29.9 s, GPU 3.79 s.
+
