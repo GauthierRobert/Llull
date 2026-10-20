@@ -154,6 +154,8 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
     }
     case 'brep':
       return ops.brep?.(recipe.blob) ?? null;
+    case 'faceSlab':
+      return null;
     case 'feature': {
       const source = child(recipe.source);
       const mesh = source !== null && needsReach(recipe) ? ops.tessellate(source) : null;

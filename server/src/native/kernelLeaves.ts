@@ -3,7 +3,7 @@
  * (occtCurves.ts, occtShapes.ts, occtPatches.ts) is computed here with the same core helpers, so the sidecar runs the same OCCT
  * builders on the same numbers (solver/crates/llull-kernel-occt/src/recipe/nodes.rs). Exact profile `curves` become an oriented
  * 3D `chain`; loft, sweep and subdivision entities carry a `native` payload (ring curves, spine and section, Bézier patches plus
- * the fallback triangles).
+ * the fallback triangles), a `nurbs_surface` sheet its encoded surface and trim loops.
  * @invariant pure: no process, no I/O; an entity the sidecar builds without help is returned unchanged
  */
 
@@ -19,6 +19,7 @@ import { hasClosingEdge, sectionChain } from '@core/geometry/sectionChain';
 import type { NurbsCurveData } from '@lib/nurbs/types';
 import { frameAtFraction, stationRingAt, sweepStartAxes } from '@core/geometry/sweep';
 import { subdivisionPatches } from '@core/geometry/subdivisionPatches';
+import { encodeLoops, encodeSurface } from '@core/geometry/surfaceWire';
 import { clamp } from '@lib/clamp';
 import { signedArea } from '@lib/polygon';
 import { add3, scale3 } from '@lib/vec3';
@@ -117,6 +118,8 @@ function loftChains(entity: Extract<Entity, { kind: 'loft' }>): number[][] {
 export interface WireOptions {
   /** Capability `bsplineSections`: a loft also carries each exact section as ONE B-spline curve (`native.bsplines`). */
   readonly bsplineSections?: boolean;
+  /** Capability `nurbsSurface`: a `nurbs_surface` sheet leaf carries its surface and trim loops (`native.surface`, `native.loops`). */
+  readonly nurbsSurface?: boolean;
 }
 
 /**
@@ -167,6 +170,9 @@ export function nativeLeaf(entity: Entity, wire: WireOptions = {}): Entity {
       return withPayload(entity, sweepPayload(entity));
     case 'subdivision':
       return withPayload(entity, subdivisionPayload(entity));
+    case 'nurbs_surface':
+      if (wire.nurbsSurface !== true) return entity;
+      return withPayload(entity, { surface: encodeSurface(entity.surface), loops: encodeLoops(entity.trims ?? []) });
     default:
       return entity;
   }

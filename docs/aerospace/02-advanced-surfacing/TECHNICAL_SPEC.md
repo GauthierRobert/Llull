@@ -734,3 +734,42 @@ reference volumes (VC-KRN-25, pinned to OCP's Gauss values) by up to 1.3e-4. Reg
 
 Not run: VC-SRF-15 / 16 / 23 / 24 on OCC (no kernel sheet ops exist, §13.7), the face-query `distance` paths (crash of the MinGW-built
 sidecar in `BRepExtrema_DistShapeShape`, see the record).
+
+### 13.9 AERO-5 exact sheets: B-spline face leaf and STEP of sheets (2026-10-20, branch `feat/step-sheets`)
+
+Built and run on the native kernel (OCCT 7.9.2, MinGW, SV1). Two sidecar capabilities, both reported in `info` and both gated on the host
+(`WireOptions.nurbsSurface` in `server/src/native/kernelLeaves.ts`; a sidecar without it gets the entity unchanged and refuses the kind):
+
+| Piece | Where |
+| --- | --- |
+| `nurbs_surface` recipe leaf (capability `nurbsSurface`) | `packages/core/src/geometry/surfaceWire.ts` (`encodeSurface`, `encodeLoops`, pure), `server/src/native/kernelLeaves.ts` (payload `native.surface` + `native.loops`, entity placement kept), `solver/crates/llull-kernel-occt/src/recipe/nodes.rs` `nurbs_surface`, `cpp/surfaces.cxx` `surface_face` |
+| `faceSlab` recipe op (capability `faceSlab`, see 06 §13.5) | `packages/core/src/model/types.ts` `ShapeRecipe`, `shapeRecipe.ts` (key, validation), `nodes.rs` `face_slab`, `cpp/surfaces.cxx` `face_slab` |
+| STEP of sheets | `export_step_exact` (`commands/brep/topology.ts`, `stepTargets.ts`): sheets are written after the solids, one product each (entity name, color), `data.sheetCount`; a sheet the kernel cannot build is listed in `skipped` and never fails the export; not placed into an assembly file |
+
+**Face construction (`surface_face`).** `Geom_BSplineSurface` (clamped, rational or not; multiplicity totals checked) and
+`BRepBuilderAPI_MakeFace`. Without trims the sheet keeps its natural boundary (`MakeFace(surface, tol)`, no p-curve approximation). Trims are
+the document's (u, v) polygon loops built as p-curves on the surface (`BRepBuilderAPI_MakeEdge(Geom2d segment, surface, V1, V2)` with shared
+vertices, 3D curves from the p-curves at 1e-7, `ShapeFix_Face` for the loop orientation), one outer loop plus holes; more than one outer loop is
+an error (the document never stores that: a trimmed sheet has exactly one outer loop plus holes). Edges are the 512-vertex polygons of
+13.7.1, so a trimmed area is the polygon's, not the circle's.
+
+**Measured (cargo, `features.rs`).** Bilinear sheet 4 x 3: area 12 (1e-9); trimmed to the middle: 4.0 and with a hole 10.0 (1e-9);
+`nodes.rs a_sheet_leaf_and_a_face_slab_build_from_their_payloads`: placed sheet, trim, refusal without payload.
+
+**Measured (`server/tests/nativeKernelSheets.test.ts`, sidecar built from this branch):**
+
+| VC | Result |
+| --- | --- |
+| VC-SRF-23 on OCC | plane 10 x 10, circle r = 3: kept inside 28.273620 (closed form 28.274334, 2.5e-5 = the 512-gon), kept outside 71.726380 (71.725666) |
+| rational cylinder sheet (r 10, h 5, 4 spans) | `analyze` area 314.7091 against 314.1593 (+1.75e-3), display triangles within 2e-3. **Not a geometry error:** OCC's default Gauss rule does not split a face at its knot spans (the same effect as 13.8 for lofts); the face itself is exact. `mass_properties` of a sheet stays the TS value (the sidecar answers null mass for a shape without volume) |
+| STEP of two sheets (plane + cylinder, named) | file holds 2 `ADVANCED_FACE`, `B_SPLINE_SURFACE_WITH_KNOTS`, the product name; re-import reports `no_solid` with census "2 faces" (the existing importer returns solids only) |
+| VC-SRF-16 shape: six sheets of a 4 x 3 x 2 box | exported as 6 faces; the existing STEP import with `sew: true` (BRepBuilderAPI_Sewing) returns ONE solid with 6 faces and volume 24 (1e-9); `sew_surfaces` makeSolid mesh volume is within 2 % of it |
+| VC-SRF-24 shape: spherical shell | a sphere-patch sheet (R 100, polar 30..90 degrees, azimuth 90) lifted 0.25 outward by `faceSlab`: exact 3409.38305 against the closed form A t (1 + t/R + t^2/3R^2) = 3409.38308 (8e-9); the triangle solid of the ply command is 3.8e-4 low |
+
+**Not built / limits.** `sew_surfaces` and `thicken_surface` still create triangle-mesh solids without an exact recipe: attaching a recipe that the
+kernel may refuse would turn a working mesh boolean operand into a failing one (an exact tree is never downgraded to its triangles on a refusal,
+`kernelShape.ts`). A closed set of exported sheets re-imports as an exact solid through the STEP importer's sewing (above). A sheet with a
+degenerate pole row (a full sphere) was not tried as a `faceSlab` input (an offset surface is singular at a pole); the sphere patch of the VC
+above has no pole. VC-SRF-24 on the 2 % mesh path is unchanged. Not run: the CRM wing-body STEP (VC-SRF-12), `by.planes` trims.
+Tests: `tests/unit/stepSheets.test.ts` (stub kernel: order, skip, no-op, assembly note, `surfaceWire`), `server/tests/nativeKernelLeaves.test.ts` /
+`nativeKernelRouter.test.ts` (capability gating, wire payload).

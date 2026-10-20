@@ -40,6 +40,7 @@ function lowered(recipe: ShapeRecipe): ShapeRecipe {
   switch (recipe.op) {
     case 'solid':
     case 'brep':
+    case 'faceSlab':
       return recipe;
     case 'boolean':
       return { ...recipe, a: lowered(recipe.a), b: lowered(recipe.b) };

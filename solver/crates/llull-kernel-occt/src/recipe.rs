@@ -18,7 +18,8 @@ use std::rc::Rc;
 mod floor;
 mod nodes;
 
-pub const RECIPE_OPS: [&str; 10] = ["solid", "boolean", "place", "scale", "brep", "fillet", "chamfer", "blend", "shell", "featureCut"];
+pub const RECIPE_OPS: [&str; 11] =
+    ["solid", "boolean", "place", "scale", "brep", "fillet", "chamfer", "blend", "shell", "featureCut", "faceSlab"];
 pub const SOLID_KINDS: [&str; 12] =
     ["box", "cylinder", "sphere", "cone", "torus", "wedge", "extrusion", "revolution", "mesh", "loft", "sweep", "subdivision"];
 
@@ -263,6 +264,7 @@ fn solid(entity: &Value) -> Evaluated {
         "loft" => nodes::loft(entity),
         "sweep" => nodes::sweep(entity),
         "subdivision" => nodes::subdivision(entity),
+        "nurbs_surface" => nodes::nurbs_surface(entity),
         other => Err(EvalError::Unsupported(format!("solid kind '{other}'"))),
     }
 }
@@ -358,6 +360,7 @@ impl Evaluator {
             "blend" => self.blend(recipe),
             "shell" => self.shell(recipe),
             "featureCut" => self.feature_cut(recipe),
+            "faceSlab" => nodes::face_slab(recipe),
             "brep" => {
                 let blob = recipe.get("blob").and_then(Value::as_str).and_then(|sha256| self.blobs.get(sha256));
                 match blob {

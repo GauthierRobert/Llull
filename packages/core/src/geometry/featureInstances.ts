@@ -27,6 +27,7 @@ export function featureNodes(recipe: ShapeRecipe): FeatureRecipe[] {
       return featureNodes(recipe.source);
     case 'solid':
     case 'brep':
+    case 'faceSlab':
       return [];
   }
 }
@@ -136,6 +137,7 @@ export function editFeatureNode(recipe: ShapeRecipe, ordinal: number, edit: (nod
         return { ...node, source: visit(node.source) };
       case 'solid':
       case 'brep':
+      case 'faceSlab':
         return node;
     }
   };

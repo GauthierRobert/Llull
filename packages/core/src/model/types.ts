@@ -818,4 +818,20 @@ export type ShapeRecipe =
   /** An exact B-rep held in `CadDocument.blobs[blob]` (`BRepTools::Write` text): imported geometry (01 KRN TR-KRN-21). */
   | { readonly op: 'brep'; readonly blob: string; readonly format: 'occt-brep-v1'; readonly label?: string }
   /** A hole group or pocket cut into a face of `source` (07 FTR); kernels lower it to boolean subtracts (`geometry/featureLowering`). */
-  | ({ readonly op: 'feature'; readonly source: ShapeRecipe } & FeatureParams);
+  | ({ readonly op: 'feature'; readonly source: ShapeRecipe } & FeatureParams)
+  /**
+   * An exact constant-thickness slab over a trimmed face (06 CMP ply solids): the face of `surface` bounded by `loops` (the (u, v) polygons of
+   * `encodeLoops`), lifted along its normal from offset `from` to `to` (> from). `direction` is the lift direction at the first loop vertex
+   * (it fixes the sign of the normal), `tolerance` the sewing tolerance. Only an exact kernel with the capability `faceSlab` builds it.
+   * `surface.data` is the number list of `geometry/surfaceWire` (bspline) or: plane = origin, xDir, yDir; cylinder = origin, axis, xDir, radius
+   * (u = azimuth from xDir, v = axial); cone = apex, axis, xDir, semi-angle (u = azimuth, v = distance from the apex).
+   */
+  | {
+      readonly op: 'faceSlab';
+      readonly surface: { readonly type: 'bspline' | 'plane' | 'cylinder' | 'cone'; readonly data: readonly number[] };
+      readonly loops: readonly number[];
+      readonly from: number;
+      readonly to: number;
+      readonly direction: Vec3;
+      readonly tolerance: number;
+    };

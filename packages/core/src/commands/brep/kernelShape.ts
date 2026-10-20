@@ -20,6 +20,7 @@ function unsupportedOp(kernel: GeometryKernel, recipe: ShapeRecipe): ShapeRecipe
   switch (recipe.op) {
     case 'solid':
     case 'brep':
+    case 'faceSlab':
       return null;
     case 'boolean':
       return unsupportedOp(kernel, recipe.a) ?? unsupportedOp(kernel, recipe.b);
