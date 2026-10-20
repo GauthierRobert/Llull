@@ -58,8 +58,12 @@ export function runFeaImportResults(
     const text = new TextDecoder().decode(file.bytes);
     const binding = bindingOf(frdBoundHashes(text), inputHash);
     if (binding.kind === 'mismatch') return feaFailure(tool, 'FEA_RESULTS_INPUT_MISMATCH', mismatchMessage(binding.found), [analysisId]);
-    const steps = deps.hooks.parseFrd(text);
-    if (steps.length === 0) return feaFailure(tool, 'FEA_RESULTS_EMPTY', 'the .frd holds no result set', [analysisId]);
+    const parsed = deps.hooks.parseFrd(text);
+    if (parsed.length === 0) return feaFailure(tool, 'FEA_RESULTS_EMPTY', 'the .frd holds no result set', [analysisId]);
+    // Shell / plane-stress results sit on CalculiX's expanded nodes: map them back to the mesh nodes before the mesh check (as fea_solve does).
+    const shellMapped = deps.hooks.mapShellResults(doc, analysisId, current.mesh, parsed, text);
+    if ('code' in shellMapped) return feaFailure(tool, shellMapped.code, shellMapped.message, [analysisId]);
+    const steps = shellMapped.steps;
     const nonFinite = deps.hooks.firstNonFinite(steps);
     if (nonFinite !== null)
       return feaFailure(tool, 'FEA_SOLVER_FAILED', `the .frd holds non-finite results (${nonFinite}); the solution is not usable`, [

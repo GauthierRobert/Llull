@@ -64,7 +64,14 @@ function flatFace(flat: FlatNode, zMid: number, thickness: number): MidFace {
 }
 
 /** Faceted mid strips of one bend, or a note when the bend cannot be built from its two flats. */
-function bendFaces(bend: BendNode, from: FlatNode, to: FlatNode, zMid: number, thickness: number): MidFace[] | string {
+function bendFaces(
+  bend: BendNode,
+  from: FlatNode,
+  to: FlatNode,
+  zMid: number,
+  thickness: number,
+  stripLength?: number,
+): MidFace[] | string {
   const [p, q] = bend.lineInFrom;
   const length = Math.hypot(q[0] - p[0], q[1] - p[1]);
   if (!(length > 0)) return `bend ${bend.id} has a zero-length bend line`;
@@ -86,7 +93,9 @@ function bendFaces(bend: BendNode, from: FlatNode, to: FlatNode, zMid: number, t
   }
   const radius = chord / (2 * Math.sin(Math.abs(theta) / 2));
   const centre = add3(a0, scale3(normalize3(cross3(axis, outward)), radius * Math.sign(theta)));
-  const strips = Math.max(2, Math.ceil(Math.abs(theta) / STRIP_ANGLE));
+  // At most 15 degrees per strip, and no more strips than the mesh can resolve: a strip shorter than the element size only adds slivers.
+  const byMesh = stripLength !== undefined && stripLength > 0 ? Math.ceil((radius * Math.abs(theta)) / stripLength) : Infinity;
+  const strips = Math.max(1, Math.min(Math.ceil(Math.abs(theta) / STRIP_ANGLE), byMesh));
   const along = sub3(b0, a0);
   const at = (k: number): Vec3 => add3(centre, applyMat3(matFromAxisAngle(axis, (theta * k) / strips), sub3(a0, centre)));
   const end = at(strips);
@@ -108,7 +117,12 @@ function bendFaces(bend: BendNode, from: FlatNode, to: FlatNode, zMid: number, t
  * on the mid radius. Forms (flanged holes, beads) are not on the midsurface: each is a warning.
  * @failure part without a rule / thickness -> FEA_MIDSURFACE_FAILED; a bend whose arc does not reach its child flat -> FEA_MIDSURFACE_FAILED
  */
-export function sheetMetalMidsurface(doc: CadDocument, entityId: string, part: SheetMetalPart): Midsurface | MidsurfaceRefusal {
+export function sheetMetalMidsurface(
+  doc: CadDocument,
+  entityId: string,
+  part: SheetMetalPart,
+  stripLength?: number,
+): Midsurface | MidsurfaceRefusal {
   const rule = doc.sheetMetal?.rules[part.rule];
   if (rule === undefined || !(rule.thickness > 0))
     return { code: 'FEA_MIDSURFACE_FAILED', message: `sheet-metal part '${part.id}' has no rule '${part.rule}' with a thickness` };
@@ -128,7 +142,7 @@ export function sheetMetalMidsurface(doc: CadDocument, entityId: string, part: S
       const to = flatOf(node.to);
       if (from === undefined || to === undefined)
         return { code: 'FEA_MIDSURFACE_FAILED', message: `bend ${node.id} of '${part.id}' does not join two flats` };
-      const strips = bendFaces(node, from, to, zMid, thickness);
+      const strips = bendFaces(node, from, to, zMid, thickness, stripLength);
       if (typeof strips === 'string') return { code: 'FEA_MIDSURFACE_FAILED', message: `sheet-metal part '${part.id}': ${strips}` };
       faces.push(...strips);
     } else if (node?.type === 'form')
