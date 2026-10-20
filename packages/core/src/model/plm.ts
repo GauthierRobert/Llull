@@ -82,6 +82,8 @@ export interface Revision {
   readonly releasedStructure?: readonly StructureRow[];
   /** Manifest hash once the host wrote the release package (`attach_release_package`). */
   readonly packageSha256?: string;
+  /** Manifest hash once the host wrote the LOTAR archive package (`attach_release_package` with package "lotar"): its own anchor, never replacing the release package one. */
+  readonly lotarPackageSha256?: string;
   readonly stateHistory: readonly StateChange[];
 }
 
@@ -274,6 +276,8 @@ export interface FaiResultSet {
   readonly missing: readonly number[];
   readonly importedBy: string;
   readonly at?: string;
+  /** SHA-256 of every other field: a hand edit of a saved file is found on load. */
+  readonly sha256: string;
 }
 
 export interface PlmPolicy {

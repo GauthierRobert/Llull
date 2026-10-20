@@ -4,6 +4,7 @@ import type { LifecycleState, PlmModel, Revision } from '@core/model/plm';
 import type { CadDocument } from '@core/model/types';
 import { liveStructure } from '../structure';
 import { isoOf, parseInstant } from './part21';
+import { own } from '../records';
 
 export type ApprovalStatus = 'approved' | 'not yet approved' | 'disapproved' | 'withdrawn';
 
@@ -38,7 +39,8 @@ export interface PdmModel {
   readonly approvalStatus: ApprovalStatus;
   readonly approvals: readonly { readonly role: string; readonly userId: string; readonly at: string | null }[];
   readonly release: { readonly by: string; readonly at: string | null } | null;
-  readonly marking: { readonly regime: string; readonly statement: string | null };
+  /** `regime` is the export-control regime, `classification` the security level (null = unclassified), `statement` the marking statement. */
+  readonly marking: { readonly regime: string; readonly classification: string | null; readonly statement: string | null };
   /** Date-range effectivity as ISO dates (general validity period); serial / msn / lot ranges travel as an llull property (the practice has no place for them here). */
   readonly dateEffectivity: readonly { readonly from: string; readonly to: string | null }[];
   readonly unitEffectivity: readonly PdmUnitEffectivity[];
@@ -80,14 +82,14 @@ export interface PdmOptions {
 
 /** The PDM view of revision `label` of the managed item (a frozen revision reads its frozen structure, effectivity and marking); a reason string when `label` or the mbom is unknown. */
 export function pdmModelOf(doc: CadDocument, plm: PlmModel, label: string, options: PdmOptions): PdmModel | string {
-  const revision: Revision | undefined = plm.item.revisions[label];
+  const revision: Revision | undefined = own(plm.item.revisions, label);
   if (revision === undefined) return `${plm.item.partNumber} has no revision '${label}'`;
   const nameOf = (partNumber: string): string => plm.subItems?.[partNumber]?.name ?? partNumber;
   const rows = revision.releasedStructure ?? (label === plm.item.currentRevision ? liveStructure(doc, plm) : []);
   const structure = rows
     .filter((row) => row.quantity > 0)
     .map((row) => ({ partNumber: row.partNumber, name: nameOf(row.partNumber), revision: row.revision, quantity: row.quantity }));
-  const mbomRecord = options.mbom === undefined ? undefined : plm.mbom?.[options.mbom];
+  const mbomRecord = options.mbom === undefined ? undefined : own(plm.mbom, options.mbom);
   if (options.mbom !== undefined && mbomRecord === undefined) return `no manufacturing BOM '${options.mbom}'`;
   const marking = revision.releasedMarking ?? plm.item.marking;
   const ranges = revision.releasedEffectivity ?? revision.effectivity;
@@ -107,7 +109,11 @@ export function pdmModelOf(doc: CadDocument, plm: PlmModel, label: string, optio
     approvalStatus: STATUS[revision.state],
     approvals: revision.approvals.map((approval) => ({ role: approval.role, userId: approval.userId, at: instantText(approval.at) })),
     release: revision.releasedBy === undefined ? null : { by: revision.releasedBy, at: instantText(revision.releasedAt) },
-    marking: { regime: marking.regime, statement: marking.statement ?? null },
+    marking: {
+      regime: marking.regime,
+      classification: marking.classification === undefined || marking.classification === 'unclassified' ? null : marking.classification,
+      statement: marking.statement ?? null,
+    },
     dateEffectivity: dates.map((range) => ({ from: dateText(range.from) ?? '', to: range.to === undefined ? null : dateText(range.to) })),
     unitEffectivity: ranges
       .filter((range) => !dates.includes(range))

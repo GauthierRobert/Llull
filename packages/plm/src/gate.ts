@@ -32,6 +32,8 @@ export function actParts(
     details: {
       stateHash: sha256Hex(jcsJson(doc.plm ?? null)),
       ...(BINDS_CONTENT.has(command) ? { contentHash: scopeOf(doc, ctx).sha256 } : {}),
+      // The signer must be able to see WHICH file they sign: its hash is a named detail, not buried in the params hash.
+      ...(command === 'import_qif_results' && typeof params['xml'] === 'string' ? { xmlSha256: sha256Hex(params['xml']) } : {}),
       params: signed,
     },
   };

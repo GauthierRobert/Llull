@@ -92,7 +92,8 @@ describe('export_step_pdm', () => {
       "'design-authority')",
       "'release')",
       "APPROVAL_ROLE('approver')",
-      "SECURITY_CLASSIFICATION('export control'",
+      "SECURITY_CLASSIFICATION('undetermined'",
+      "PERSON('u-1','u-1',$,$,$,$)",
       "PRODUCT_DEFINITION_CONTEXT('assembly definition'",
     ])
       expect(text, entity).toContain(entity);

@@ -233,6 +233,32 @@ describe('LOTAR package', () => {
     expect(verifyLotarPackage(path.join(dir, 'nothing'), port()).ok).toBe(false);
   });
 
+  it('does not throw on an unreadable manifest and does not parse a member whose hash already failed', async () => {
+    const out = path.join(dir, 'lotar');
+    const built = pack(await archivable());
+    writeReleasePackage(built, out);
+    const stp = path.join(out, 'pdm/LL-2001_A.pdm.stp');
+    chmodSync(stp, 0o644);
+    writeFileSync(stp, 'garbage that is not a PDM file');
+    const verdict = verifyLotarPackage(out, port(), built.manifest['manifestSha256'] as string);
+    expect(verdict.findings.map((finding) => finding.code)).toEqual(['PLM_PACKAGE_MEMBER_MISMATCH']);
+    const manifestFile = path.join(out, 'manifest.json');
+    chmodSync(manifestFile, 0o644);
+    writeFileSync(manifestFile, '{ not json');
+    const broken = verifyLotarPackage(out, port());
+    expect(broken.ok).toBe(false);
+    expect(broken.findings.map((finding) => finding.code)).toContain('PLM_PACKAGE_UNREADABLE');
+    writeFileSync(
+      manifestFile,
+      JSON.stringify({ ...JSON.parse(JSON.stringify(built.manifest)), lotar: { schema: 'llull-lotar-1', content: {} } }),
+    );
+    expect(
+      verifyLotarPackage(out, port())
+        .findings.map((finding) => finding.message)
+        .join('|'),
+    ).toContain('validationProperties is missing');
+  });
+
   it('only archives a frozen revision, and an export-controlled definition needs the human confirmation', async () => {
     const doc = await archivable();
     expect(buildLotarPackage(doc, 'Z', '0.1.0', undefined)).toContain('not a frozen');
@@ -315,7 +341,7 @@ describe('llull lotar (CLI)', () => {
       '--json',
     );
     expect(packed.code, packed.out + packed.err).toBe(EXIT_OK);
-    const attachedHash = deserializeDocument(readFileSync(docPath, 'utf8')).plm?.item.revisions['A']?.packageSha256;
+    const attachedHash = deserializeDocument(readFileSync(docPath, 'utf8')).plm?.item.revisions['A']?.lotarPackageSha256;
     expect(attachedHash).toBe((JSON.parse(packed.out) as { manifestSha256: string }).manifestSha256);
     expect(existsSync(path.join(out, 'pdm/LL-1001_A.pdm.stp'))).toBe(true);
     const verified = await llull('lotar', 'verify', out);

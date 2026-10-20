@@ -8,7 +8,7 @@ import { PART_NUMBER } from '../document';
 import { humanAct } from '../gate';
 import { atSchema, bySchema, confirmationSchema } from '../params';
 import { refusePlm } from '../refusal';
-import { SERIAL, isSealed, sealAsBuilt } from '../records';
+import { SERIAL, isSealed, sealAsBuilt, own } from '../records';
 import { withPlm } from '../revisions';
 import { REVISION_LABEL } from '../schemes';
 import { NOT_MANAGED } from '../state';
@@ -68,7 +68,7 @@ export const recordAsBuilt = defineCommand({
     if (!SERIAL.test(serial)) return invalid(`'${serial}' is not a serial number (A-Z a-z 0-9 . _ - /, 1-64 characters)`, 'serial');
     if (partNumber !== plm.item.partNumber)
       return invalid(`this document manages ${plm.item.partNumber}, not ${partNumber}`, 'partNumber', [partNumber]);
-    const baseline = plm.baselines?.[asDesignedBaseline];
+    const baseline = own(plm.baselines, asDesignedBaseline);
     if (baseline === undefined)
       return refusePlm(
         doc,
@@ -86,7 +86,7 @@ export const recordAsBuilt = defineCommand({
         `baseline ${asDesignedBaseline} no longer hashes to its recorded hash`,
         [asDesignedBaseline],
       );
-    if (plm.asBuilt?.[serial] !== undefined)
+    if (own(plm.asBuilt, serial) !== undefined)
       return refusePlm(
         doc,
         'record_as_built',
@@ -94,7 +94,7 @@ export const recordAsBuilt = defineCommand({
         `serial ${serial} already has an as-built record (records are never edited)`,
         [serial],
       );
-    if (params.mbom !== undefined && plm.mbom?.[params.mbom]?.baseline !== asDesignedBaseline)
+    if (params.mbom !== undefined && own(plm.mbom, params.mbom)?.baseline !== asDesignedBaseline)
       return invalid(`mbom '${params.mbom}' does not exist or was not made from ${asDesignedBaseline}`, 'mbom', [serial, params.mbom]);
     if (deviations.length > MAX_DEVIATIONS) return invalid(`at most ${MAX_DEVIATIONS} deviations per record`, 'deviations');
     const seen = new Set<string>();
@@ -153,7 +153,7 @@ export const asBuiltVsAsDesigned = defineCommand({
   run: (doc, { serial }): CommandResult => {
     const plm = doc.plm;
     if (plm === undefined) return refusePlm(doc, 'as_built_vs_as_designed', 'PLM_NOT_MANAGED', NOT_MANAGED);
-    const record: AsBuiltRecord | undefined = plm.asBuilt?.[serial];
+    const record: AsBuiltRecord | undefined = own(plm.asBuilt, serial);
     if (record === undefined)
       return refusePlm(
         doc,
@@ -163,7 +163,7 @@ export const asBuiltVsAsDesigned = defineCommand({
         [serial],
         ['serial'],
       );
-    const baseline = plm.baselines?.[record.asDesignedBaseline];
+    const baseline = own(plm.baselines, record.asDesignedBaseline);
     if (baseline === undefined)
       return refusePlm(doc, 'as_built_vs_as_designed', 'PLM_BASELINE_UNKNOWN', `unknown baseline '${record.asDesignedBaseline}'`, [
         record.asDesignedBaseline,

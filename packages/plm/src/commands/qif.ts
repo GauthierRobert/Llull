@@ -8,7 +8,7 @@ import { sha256Hex } from '@lib/sha256';
 import { humanAct } from '../gate';
 import { atSchema, bySchema, confirmationSchema } from '../params';
 import { readQifResults } from '../qif/results';
-import { SERIAL } from '../records';
+import { SERIAL, sealResults, own } from '../records';
 import { inRevision } from '../register';
 import { refusePlm } from '../refusal';
 import { withPlm } from '../revisions';
@@ -59,7 +59,7 @@ export const importQifResults = defineCommand({
     const gate = humanAct(doc, 'import_qif_results', params, ctx);
     if ('refusal' in gate) return gate.refusal;
     const { revision, serial, xml } = params;
-    if (plm.item.revisions[revision] === undefined)
+    if (own(plm.item.revisions, revision) === undefined)
       return refusePlm(
         doc,
         'import_qif_results',
@@ -121,7 +121,7 @@ export const importQifResults = defineCommand({
       );
     results.sort((a, b) => a.charNo - b.charNo);
     const missing = [...register.keys()].filter((charNo) => !results.some((result) => result.charNo === charNo)).sort((a, b) => a - b);
-    const set: FaiResultSet = {
+    const set: FaiResultSet = sealResults({
       id,
       revision,
       ...(serial !== undefined ? { serial } : {}),
@@ -131,7 +131,7 @@ export const importQifResults = defineCommand({
       missing,
       importedBy: gate.signer,
       ...(params.at !== undefined ? { at: params.at } : {}),
-    };
+    });
     const failed = results.filter((result) => result.status === 'FAIL').length;
     return changed(
       withPlm(doc, { ...plm, faiResults: { ...existing, [id]: set } }),

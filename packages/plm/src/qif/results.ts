@@ -14,7 +14,9 @@ const STATUSES: ReadonlySet<string> = new Set([
   'BASIC_OR_TED',
   'UNDEFINED',
 ]);
-const DECIMAL = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
+const DECIMAL = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+/** A number token longer than this is refused before any pattern runs on it. */
+const MAX_NUMBER_CHARS = 64;
 const MAX_MEASUREMENTS = 100_000;
 
 interface QifMeasurement {
@@ -57,7 +59,7 @@ function find(root: XmlNode, test: (node: XmlNode) => boolean): XmlNode[] {
 function numberOf(node: XmlNode | undefined, what: string): { readonly value?: number } | string {
   if (node === undefined) return {};
   const text = node.text.trim();
-  if (!DECIMAL.test(text)) return `line ${node.line}: ${what} '${text.slice(0, 40)}' is not a number`;
+  if (text.length > MAX_NUMBER_CHARS || !DECIMAL.test(text)) return `line ${node.line}: ${what} '${text.slice(0, 40)}' is not a number`;
   const value = Number(text);
   return Number.isFinite(value) ? { value } : `line ${node.line}: ${what} is not finite`;
 }
@@ -70,7 +72,7 @@ function statusOf(measurement: XmlNode): FaiResultStatus {
 
 /**
  * The characteristic measurements of a QIF 3 file. Refuses a file that is not QIF 3 (root element and namespace), is not well-formed or exceeds the limits.
- * @invariant pure and linear in the file; the status is the measuring system's verdict as written, never recomputed
+ * @invariant pure; reads the file once and each number token only up to 64 characters; the status is the measuring system's verdict as written, never recomputed
  */
 export function readQifResults(xml: string, limits?: XmlLimits): QifRead {
   const parsed = limits === undefined ? parseXml(xml) : parseXml(xml, limits);

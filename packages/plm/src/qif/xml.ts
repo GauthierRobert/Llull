@@ -2,13 +2,15 @@
  * A small XML reader for untrusted QIF files (M6, 09 PLM threat model): one pass, no recursion, no external resources.
  * @invariant DOCTYPE, ENTITY and processing instructions (other than the XML declaration) are refused, so there is nothing to expand and nothing external to load (no XXE,
  *   no entity blow-up); only the five predefined entities and numeric character references are decoded; size, depth, element count and attribute count are capped and
- *   checked while reading; every scan is anchored or an indexOf from the current position, so the work is linear in the input
+ *   checked while reading; tokens are matched with anchored, non-nested patterns and text with indexOf from the current position, so the work is proportional to the input (tested on 2 to 5 MB hostile shapes)
  * @failure malformed or over-limit input -> `{ ok: false, code, message }` with the line of the fault; never throws
  */
 
 export interface XmlNode {
   /** Local name (the namespace prefix is dropped; `xmlns*` attributes keep their names so the namespace can be checked). */
   readonly name: string;
+  /** The name as written, prefix included (an end tag must repeat it). */
+  readonly qname: string;
   readonly attrs: Readonly<Record<string, string>>;
   readonly children: XmlNode[];
   text: string;
@@ -67,7 +69,14 @@ class Reader {
     return raw.replace(REFERENCE, (_, body: string) => {
       if (!body.startsWith('#')) return NAMED[body] ?? '';
       const code = body[1] === 'x' ? Number.parseInt(body.slice(2), 16) : Number.parseInt(body.slice(1), 10);
-      if (code === 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) this.invalid('invalid character reference', position);
+      const allowed =
+        code === 9 ||
+        code === 10 ||
+        code === 13 ||
+        (code >= 0x20 && code <= 0xd7ff) ||
+        (code >= 0xe000 && code <= 0xfffd) ||
+        (code >= 0x10000 && code <= 0x10ffff);
+      if (!allowed) this.invalid('a character reference to a character XML does not allow', position);
       return String.fromCodePoint(code);
     });
   }
@@ -80,7 +89,7 @@ class Reader {
     if (this.elements > this.limits.maxElements) throw new Fault('PLM_QIF_LIMIT', `more than ${this.limits.maxElements} elements`);
     if (this.stack.length >= this.limits.maxDepth) throw new Fault('PLM_QIF_LIMIT', `nesting deeper than ${this.limits.maxDepth}`);
     let position = NAME.lastIndex;
-    const attrs: Record<string, string> = {};
+    const attrs: Record<string, string> = Object.create(null) as Record<string, string>;
     for (;;) {
       ATTRIBUTE.lastIndex = position;
       const attribute = ATTRIBUTE.exec(this.text);
@@ -95,7 +104,14 @@ class Reader {
     TAG_END.lastIndex = position;
     const end = TAG_END.exec(this.text);
     if (end === null) return this.invalid(`bad attribute syntax in <${name[0]}>`, position);
-    const node: XmlNode = { name: name[0].slice(name[0].indexOf(':') + 1), attrs, children: [], text: '', line: this.lineAt(at) };
+    const node: XmlNode = {
+      name: name[0].slice(name[0].indexOf(':') + 1),
+      qname: name[0],
+      attrs,
+      children: [],
+      text: '',
+      line: this.lineAt(at),
+    };
     const parent = this.stack[this.stack.length - 1];
     if (parent !== undefined) parent.children.push(node);
     else if (this.root !== null) this.invalid('more than one root element', at);
@@ -115,16 +131,15 @@ class Reader {
     const top = this.stack.pop();
     if (name === null || top === undefined) return this.invalid('bad end tag', at);
     const close = this.text.indexOf('>', NAME.lastIndex);
-    const local = name[0].slice(name[0].indexOf(':') + 1);
-    if (local !== top.name || close < 0 || this.text.slice(NAME.lastIndex, close).trim() !== '')
-      return this.invalid(`end tag </${name[0]}> does not close <${top.name}>`, at);
+    if (name[0] !== top.qname || close < 0 || this.text.slice(NAME.lastIndex, close).trim() !== '')
+      return this.invalid(`end tag </${name[0]}> does not close <${top.qname}>`, at);
     return close + 1;
   }
 
   read(): { readonly root: XmlNode; readonly elements: number } {
     const { text } = this;
     let i = text.charCodeAt(0) === 0xfeff ? 1 : 0;
-    if (text.startsWith('<?xml', i)) {
+    if (/^<\?xml[ \t\r\n]/.test(text.slice(i, i + 7))) {
       const end = text.indexOf('?>', i);
       if (end < 0) this.invalid('unterminated XML declaration', i);
       i = end + 2;

@@ -30,7 +30,7 @@ class Index {
       const instance = { id, calls };
       this.byId.set(id, instance);
       for (const entity of new Set(calls.map((call) => call.entity)))
-        this.byEntity.set(entity, [...(this.byEntity.get(entity) ?? []), instance]);
+        (this.byEntity.get(entity) ?? this.byEntity.set(entity, []).get(entity))?.push(instance);
     }
   }
   all(entity: string): Instance[] {
@@ -179,7 +179,8 @@ export function readPdm(text: string): PdmModel | string {
     asRef(classification === undefined ? undefined : argsOf(classification, 'APPLIED_SECURITY_CLASSIFICATION_ASSIGNMENT')[0]),
     'SECURITY_CLASSIFICATION',
   );
-  const regime = asString(index.args(asRef(classified?.[2]), 'SECURITY_CLASSIFICATION_LEVEL')?.[0]) ?? 'undetermined';
+  const regime = asString(classified?.[0]) ?? 'undetermined';
+  const level = asString(index.args(asRef(classified?.[2]), 'SECURITY_CLASSIFICATION_LEVEL')?.[0]) ?? 'unclassified';
   const statement = asString(classified?.[1]) ?? '';
 
   const dateEffectivity: PdmModel['dateEffectivity'][number][] = [];
@@ -187,8 +188,9 @@ export function readPdm(text: string): PdmModel | string {
     const args = argsOf(assignment, 'APPLIED_EFFECTIVITY_ASSIGNMENT');
     if (!asRefs(args[1]).includes(current)) continue;
     const effectivity = index.args(asRef(args[0]), 'DATED_EFFECTIVITY');
-    const from = instantOf(index, asRef(effectivity?.[1]), true);
-    if (from !== null) dateEffectivity.push({ from, to: instantOf(index, asRef(effectivity?.[2]), true) });
+    // The schema order is effectivity_end_date, then effectivity_start_date (both optional); a range with no start is not one llull writes.
+    const from = instantOf(index, asRef(effectivity?.[2]), true);
+    if (from !== null) dateEffectivity.push({ from, to: instantOf(index, asRef(effectivity?.[1]), true) });
   }
   const unitEffectivity = (propertiesOf(index, PROPERTY.effectivity, design.id)[0] ?? []).flatMap(([kind, range]): PdmUnitEffectivity[] => {
     try {
@@ -199,7 +201,7 @@ export function readPdm(text: string): PdmModel | string {
     }
   });
 
-  const signatures: PdmSignature[] = propertiesOf(index, PROPERTY.signature, current).map((items) => ({
+  const signatures: PdmSignature[] = propertiesOf(index, PROPERTY.signature, design.id).map((items) => ({
     keyId: itemOf(items, 'keyId') ?? '',
     publicKey: itemOf(items, 'publicKey') ?? '',
     meaning: itemOf(items, 'meaning') ?? '',
@@ -209,7 +211,7 @@ export function readPdm(text: string): PdmModel | string {
     signedSha256: itemOf(items, 'signedSha256') ?? '',
     signature: itemOf(items, 'signature') ?? '',
   }));
-  const integrity = propertiesOf(index, PROPERTY.integrity, current)[0] ?? [];
+  const integrity = propertiesOf(index, PROPERTY.integrity, design.id)[0] ?? [];
   const state = itemOf(integrity, 'state') ?? '';
   if (!STATES.includes(state)) return `the version has no llull lifecycle state property (got '${state}')`;
   const mbomName = manufacturing === undefined ? null : asString(argsOf(manufacturing, 'PRODUCT_DEFINITION')[1]);
@@ -231,7 +233,7 @@ export function readPdm(text: string): PdmModel | string {
     approvalStatus,
     approvals,
     release,
-    marking: { regime, statement: statement === '' ? null : statement },
+    marking: { regime, classification: level === 'unclassified' ? null : level, statement: statement === '' ? null : statement },
     dateEffectivity,
     unitEffectivity,
     structure: usagesOf(index, design.id),

@@ -7,7 +7,7 @@ import type { MbomLine, MbomOmission, MbomRecord } from '@core/model/plm';
 import { PART_NUMBER } from '../document';
 import { atSchema, bySchema } from '../params';
 import { refusePlm } from '../refusal';
-import { byPartNumber, frozenQuantity, isSealed, sealMbom } from '../records';
+import { byPartNumber, frozenQuantity, isSealed, sealMbom, own } from '../records';
 import { withPlm } from '../revisions';
 import { NOT_MANAGED } from '../state';
 import { membersHash } from '../structure';
@@ -75,7 +75,7 @@ export const createMbom = defineCommand({
     const invalid = (message: string, path: string, ids: readonly string[] = []): CommandResult =>
       refusePlm(doc, 'create_mbom', 'PLM_PARAM_INVALID', message, ids, [path]);
     if (params.name.trim() === '') return invalid('an MBOM needs a name', 'name');
-    const baseline = plm.baselines?.[params.baseline];
+    const baseline = own(plm.baselines, params.baseline);
     if (baseline === undefined)
       return refusePlm(
         doc,
@@ -193,10 +193,10 @@ export const manufacturingBom = defineCommand({
       const list = Object.values(all).map((mbom) => ({ id: mbom.id, name: mbom.name, baseline: mbom.baseline, lines: mbom.lines.length }));
       return report(doc, `${list.length} manufacturing BOM(s).`, { mboms: list });
     }
-    const mbom = all[id];
+    const mbom = own(all, id);
     if (mbom === undefined) return refusePlm(doc, 'manufacturing_bom', 'PLM_MBOM_UNKNOWN', `unknown MBOM '${id}'`, [id], ['id']);
     const sealOk = isSealed(mbom);
-    const ebom = plm.baselines?.[mbom.baseline];
+    const ebom = own(plm.baselines, mbom.baseline);
     const root = ebom?.members.find((member) => member.partNumber === plm.item.partNumber)?.revision;
     const quantityChanged = mbom.lines
       .filter((line) => line.origin === 'ebom-quantity')

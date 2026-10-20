@@ -202,14 +202,16 @@ async function runSign(args: ParsedArgv, io: PlmCliIo, backend: () => Promise<Cl
 }
 
 /** The manifest hash a human attached: `--manifest-sha256`, else `packageSha256` of the package's revision in the managed document (`--doc`). */
-function packageAnchor(dir: string, args: ParsedArgv, io: PlmCliIo): string | null {
+function packageAnchor(dir: string, args: ParsedArgv, io: PlmCliIo, kind: 'release' | 'lotar' = 'release'): string | null {
   const given = stringFlag(args, 'manifest-sha256');
   if (given !== undefined) return given;
   try {
     const manifest = JSON.parse(readFileSync(path.join(dir, 'manifest.json'), 'utf8')) as { item?: { revision?: unknown } };
     const label = manifest.item?.revision;
     const doc = readDocumentFile(cliTarget(args, io.env).doc);
-    return typeof label === 'string' ? (doc.plm?.item.revisions[label]?.packageSha256 ?? null) : null;
+    return typeof label === 'string'
+      ? ((kind === 'lotar' ? doc.plm?.item.revisions[label]?.lotarPackageSha256 : doc.plm?.item.revisions[label]?.packageSha256) ?? null)
+      : null;
   } catch {
     return null;
   }
@@ -285,7 +287,7 @@ async function runLotar(args: ParsedArgv, io: PlmCliIo, backend: () => Promise<C
   if (action === 'verify') {
     const dir = args.positionals[2];
     if (dir === undefined) throw new PlmUsage('lotar verify needs a package folder: llull lotar verify DIR');
-    const verdict = verifyLotarPackage(dir, createSignaturePort(createTrustStore()), packageAnchor(dir, args, io));
+    const verdict = verifyLotarPackage(dir, createSignaturePort(createTrustStore()), packageAnchor(dir, args, io, 'lotar'));
     print(
       io,
       args,
@@ -314,6 +316,7 @@ async function runLotar(args: ParsedArgv, io: PlmCliIo, backend: () => Promise<C
         manifestSha256: written.manifestSha256,
         documentContentHash: String(pack.manifest['documentContentHash']),
         location: required(args, 'out'),
+        package: 'lotar',
       });
     const notes = pack.notes.length > 0 ? ` Notes: ${pack.notes.join('; ')}.` : '';
     print(
