@@ -25,6 +25,9 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   EXP_INPUT_MISSING: 'supply the named input with its unit',
   EXP_CONTACT_INVALID: 'give parts of the case for a (and b except for self), a unique name, friction >= 0 and a penalty scale > 0',
   EXP_CONTACT_NOT_FOUND: 'list the contacts with explicit_report',
+  EXP_MATERIAL_NO_CP: 'give the material a specific heat model (define_property_model property cp), or remove its adiabatic heating',
+  EXP_CONSTRAINT_UNSUPPORTED:
+    'llull_explicit holds fixed / pinned supports (and displacement dofs of 0) on box faces, nodes near points or whole parts of a structured hex mesh, or the mesh node sets of fea_mesh',
   EXP_SHELL_INVALID: 'pick an unrotated box part whose smallest dimension is at most a quarter of the others, points 1 to 5',
 };
 

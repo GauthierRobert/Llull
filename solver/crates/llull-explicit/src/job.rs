@@ -29,8 +29,12 @@
 //!   `[{ "name", "kind": "surface_to_surface" | "nodes_to_surface" | "self", "a": [parts] (the slaves of
 //!   nodes_to_surface), "b": [parts], "staticFriction", "dynamicFriction", "decay",
 //!   "penaltyScale" }]` (friction 0 by default, dynamic = static when absent, penalty scale 0.1 = LS-DYNA SLSFAC).
-//! - `device`: `cpu` (default, deterministic Rust path) | `gpu` | `auto`. Without the GPU kernels (feature) or an f64 adapter, or with contacts / fixed DOFs, a GPU request runs the CPU twin and
-//!   reports the warning `EXP_GPU_FALLBACK`.
+//! - Optional (RS-8): per material `heating` `{ "taylorQuinney": 0.9, "specificHeat": 4.6e8 }` (adiabatic heating of the Johnson–Cook
+//!   plastic work), `initialTemperature` (K; default: each Johnson–Cook material at its transition temperature), `shellWarping`
+//!   (Belytschko–Leviathan warping projection of the shells, default true).
+//! - `device`: `cpu` (default, deterministic Rust path) | `gpu` | `auto`. Without the GPU kernels (feature) or an f64 adapter a GPU
+//!   request runs the CPU twin and reports the warning `EXP_GPU_FALLBACK`; contacts, fixed DOFs and shells run on the GPU path (contact
+//!   and shells as its deterministic host part, `gpu.rs`).
 //!
 //! # Events (stdout NDJSON, `llull-protocol`)
 //!

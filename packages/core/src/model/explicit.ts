@@ -38,6 +38,12 @@ export interface ExplicitFailure {
   readonly source: string;
 }
 
+/** Adiabatic heating of a Johnson–Cook material (RS-8): `Ṫ = β σ:ε̇ᵖ / (ρ c_p)`, c_p from the material's PHY-01 cp model. */
+export interface ExplicitHeating {
+  /** Taylor–Quinney coefficient β: the fraction of plastic work turned into heat. */
+  readonly taylorQuinney: NamedValue;
+}
+
 /** Penalty contact (RS-8c): two part sets checked both ways, the nodes of `a` against the surface of `b` (one way), or `a` against itself. */
 export interface ExplicitContact {
   readonly name: string;
@@ -71,6 +77,8 @@ export interface ExplicitSpec {
   readonly rigidWallOrder: readonly string[];
   /** Johnson–Cook failure constants per document material id (TR-EXP-21); never defaulted, always with their source (Q7). */
   readonly failure?: Readonly<Record<string, ExplicitFailure>>;
+  /** Adiabatic heating per document material id (RS-8); absent = isothermal at the Johnson–Cook transition temperature. */
+  readonly heating?: Readonly<Record<string, ExplicitHeating>>;
   /** Penalty contacts (RS-8c), by id `ct-<step>.<k>`. */
   readonly contacts?: Readonly<Record<string, ExplicitContact>>;
   readonly contactOrder?: readonly string[];

@@ -20,6 +20,10 @@ export const DEFAULT_BULK_QUADRATIC = (): NamedValue =>
 export const DEFAULT_PENALTY_SCALE = (): NamedValue =>
   named(0.1, 'LS-DYNA *CONTROL_CONTACT SLSFAC default (PHY-19 TECHNICAL_SPEC §13.7 [E3])');
 
+/** Taylor–Quinney coefficient β of adiabatic heating (RS-8). */
+export const DEFAULT_TAYLOR_QUINNEY = (): NamedValue =>
+  named(0.9, 'LS-DYNA R14 Keyword Manual Vol. II *MAT_107 TQC: "portion of plastic work converted into heat (normally taken to be 0.9)"');
+
 /** Hourglass / internal energy ratio above which explicit_energy_check warns (spec Q8: kept as a named default). */
 export const DEFAULT_HOURGLASS_LIMIT = (): NamedValue => named(0.1, 'S13 rule of thumb');
 

@@ -123,6 +123,12 @@ function specErrors(caseId: string, spec: unknown): string[] {
       ))
   )
     errors.push(`${where}.failure is malformed`);
+  const heating = spec['heating'];
+  if (
+    heating !== undefined &&
+    (!isRecord(heating) || !Object.values(heating).every((entry) => isRecord(entry) && isNamed(entry['taylorQuinney'])))
+  )
+    errors.push(`${where}.heating is malformed`);
   return errors;
 }
 

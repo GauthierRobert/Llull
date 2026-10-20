@@ -159,6 +159,7 @@ export const setExplicitControls = defineCommand({
       rigidWalls: spec?.rigidWalls ?? {},
       rigidWallOrder: spec?.rigidWallOrder ?? [],
       ...(spec?.failure !== undefined ? { failure: spec.failure } : {}),
+      ...(spec?.heating !== undefined ? { heating: spec.heating } : {}),
       ...(spec?.contacts !== undefined ? { contacts: spec.contacts, contactOrder: spec.contactOrder ?? [] } : {}),
       ...(spec?.shells !== undefined ? { shells: spec.shells } : {}),
       ...(spec?.results !== undefined ? { results: spec.results } : {}),

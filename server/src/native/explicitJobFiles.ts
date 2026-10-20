@@ -31,6 +31,8 @@ export function explicitJobFiles(job: ExplicitJob, device: ExplicitDevice): Reco
     files['shell4.u32'] = u32Bytes(mesh.shell4);
     files['shell_thickness.f64'] = f64Bytes(Float64Array.from(mesh.shellThickness));
   }
+  if (job.fixed.length > 0) files['fixed.u8'] = Buffer.from(Uint8Array.from(job.fixed));
+  if (job.fixedRotation.length > 0) files['fixed_rotation.u8'] = Buffer.from(Uint8Array.from(job.fixedRotation));
   if (mesh.hex8.length > 0) files['hex8.u32'] = u32Bytes(mesh.hex8);
   if (mesh.tet4.length > 0) files['tet4.u32'] = u32Bytes(mesh.tet4);
   files['job.json'] = JSON.stringify({
@@ -68,7 +70,10 @@ export function explicitJobFiles(job: ExplicitJob, device: ExplicitDevice): Reco
       ...(job.materialFailure[index] !== null && job.materialFailure[index] !== undefined
         ? { johnsonCookFailure: { d: job.materialFailure[index] } }
         : {}),
+      ...(job.materialHeating[index] ? { heating: job.materialHeating[index] } : {}),
     })),
+    ...(job.fixed.length > 0 ? { fixed: 'fixed.u8' } : {}),
+    ...(job.fixedRotation.length > 0 ? { fixedRotation: 'fixed_rotation.u8' } : {}),
     gravity: job.gravity,
     walls: job.walls,
     ...(job.contacts.length > 0
