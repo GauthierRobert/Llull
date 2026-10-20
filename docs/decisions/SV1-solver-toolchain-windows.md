@@ -15,10 +15,11 @@ the environment the server already reads. No repo default changes: the server st
 | pyNastran | 1.4.1 (pulls numpy 1.26.4) | `pip install pyNastran` in `llull-fea` | same env | PyPI |
 | CalculiX ccx | 2.21 (`calculix 2.21 h27aae45_3`, conda-forge win-64, built 2023-07-29) | in `llull-fea` | `...\envs\llull-fea\Library\bin\ccx.exe` (needs `Library\bin` and `Library\mingw-w64\bin` on PATH) | sha256 `1cfaaed97f80ef56006d3ee1b325f708ed44c51a6268565d1de943c569427b43` |
 | CadQuery | 2.8.0 | `conda create -n llull-cq python=3.12`, `pip install --only-binary :all: "cadquery>=2.4"` (server/python/requirements.txt) | `...\envs\llull-cq\python.exe` | PyPI wheels |
+| build123d | 0.12.0 (the newest on OCP 7.9: 0.13.0 needs `cadquery-ocp-proxy` 8.0, which would replace CadQuery 2.8.0's OCP 7.9.3.1.1) | in `llull-cq`: its dependencies with `ocpsvg==0.6.0 ocp_gordon==0.2.2 "cadquery-ocp-proxy==7.9.3.1.1" "cadquery-ocp==7.9.3.1.1"` pinned, then `pip install --no-deps build123d==0.12.0` (0.12.0 requires `cadquery-ocp-novtk`, the same OCP 7.9.3.1.1 without VTK; `cadquery-ocp` provides that module, so `pip check` names the missing novtk wheel and nothing else) | same env (`LLULL_TEST_BUILD123D_PYTHON` / `LLULL_PYTHON_BUILD123D`) | wheel sha256 `c3ced4e2…a234f` |
 | CMake / Ninja | 4.4.4 / 1.13.2 | `conda create -n llull-build cmake ninja` | `...\envs\llull-build\Library\bin` | conda-forge |
 | Rust | 1.97.0 (`solver/rust-toolchain.toml`), host toolchains msvc + gnu already installed | rustup (pre-existing) | `%USERPROFILE%\.cargo` | — |
 | C++ compiler | GCC 16.2.0, w64devkit 2.10.1 (pre-existing, installed by an earlier session) | `%USERPROFILE%\tools\w64devkit` | g++.exe sha256 `671ca52a…728d2`, installer `w64devkit.7z.exe` sha256 `add1edf9…2896a` |
-| OCCT | 7.9.2 shared, built from the pinned source by `node solver/scripts/build-occt.mjs` (sha256 `f6e272b6…7181`), with MinGW GCC | `LLULL_OCCT_DIR=%LOCALAPPDATA%\llull\occt-7.9.2-mingw` (NOT the default prefix, which stays for an MSVC build) | ~35 min on 22 threads |
+| OCCT | 7.9.2 shared, built from the pinned source by `node solver/scripts/build-occt.mjs` (sha256 `f6e272b6…7181`), with MinGW GCC | `LLULL_OCCT_DIR=%LOCALAPPDATA%\llull\occt-7.9.2-mingw-fix` (recipe 2, `-fno-ipa-cp-clone`; the older `occt-7.9.2-mingw` / `-mingw-iges` prefixes carry the GCC miscompile, see the last addendum; NOT the default prefix, which stays for an MSVC build) | ~25-35 min on 20-22 threads |
 | MFront / TFEL | not installed | no conda-forge win-64 build (`conda search tfel`: none); no other trivial install | — | 02 constitutive MTest transport stays unverified |
 
 **MSVC is NOT available.** `winget install Microsoft.VisualStudio.2022.BuildTools` (C++ workload) needs elevation and the UAC prompt was never
@@ -40,7 +41,7 @@ Run environment of the suites (PowerShell): `PATH` += `llull-fea`, its `Library\
 | Suite | Result |
 | --- | --- |
 | `cargo test` default members (gnu) | pass; `llull-raster` / `llull-gpu` / `llull-compute` with `--features gpu`: pass |
-| `cargo test -p llull-kernel-occt -p llull-kernel` (gnu, MinGW OCCT) | 44 / 44 and 9 / 9 when it does not crash; `shells_hollow_and_open` crashes the test process about 1 run in 2 (access violation inside `BRepOffsetAPI_MakeThickSolid`) |
+| `cargo test -p llull-kernel-occt -p llull-kernel` (gnu, MinGW OCCT) | 44 / 44 and 9 / 9 when it does not crash; `shells_hollow_and_open` crashed the test process about 1 run in 2 — a GCC 16.2 `-O3` wrong-code bug in OCCT, fixed (addendum "MinGW OCCT access violation") |
 | `cargo fmt --check`, `cargo clippy --workspace --all-targets -D warnings` | pass (after `cargo fmt` of the never-compiled SRF-3 Rust) |
 | Server FE suites without the kernel (feaPipeline, feaThermal* (6), feaThermomech*, feaNonlinear*, feaSolve*, feaRoutes, physics packs) | pass |
 | Server FE suites with the kernel (feaEigen, feaThermomechTransient incl. bimetal VC-TMC-04, feaThermomechT1 NAFEMS T1, feaMeshBridge STEP + conformal) | pass |
@@ -50,16 +51,14 @@ Run environment of the suites (PowerShell): `PATH` += `llull-fea`, its `Library\
 | pyNastran `read_bdf(xref=True)` round trip (`tests/unit/cae/bdfWriter.test.ts`) | pass |
 | Python exchange (CadQuery 2.8.0): pythonExchange, cadExchange, cliExchange, exchangeEndpoints | pass |
 
-**Not trustworthy on this toolchain (MinGW OCCT), so NOT reported as llull defects:** the `llull-kernel` sidecar dies with an access
-violation (`NATIVE_DIED 0xC0000005`) inside `BRepExtrema_DistShapeShape` on curved faces and inside `MakeThickSolid`; every remaining red
-server test follows from it: occtAnalysis (distance), occtChamferShell / nativeKernelFeatures (sealed shells), occtCheckAssembly, occtSheetMetal
-(face pick by distance), brepCodeExchange (shell). The same tests pass on the Linux CI kernel. Consequences: the FE face map (TR-FEA-32,
-`faceQuery.distance`) falls back to the nearest-surface resolution here, and `create_composite_part` on an OCC (non-entity) conical face
-could not be run (the cone face itself is exact: area 74509.412 = pi (r1 + r2) s of VC-CMP-15). Re-run these with an MSVC build
-(`npm --prefix server test` with `LLULL_REQUIRE_NATIVE_KERNEL=1`) once the Build Tools are installed.
+~~Not trustworthy on this toolchain (MinGW OCCT)~~ — **root-caused and fixed, see the addendum "MinGW OCCT access violation" below.** The
+`llull-kernel` sidecar died with an access violation (`NATIVE_DIED 0xC0000005`) in distance queries and shells; the red server tests
+(occtAnalysis, occtChamferShell, nativeKernelFeatures, occtCheckAssembly, occtSheetMetal, brepCodeExchange) all followed from it and pass
+with an OCCT built by the fixed recipe.
 
 Also red on this checkout, unrelated to the tools: `exchangeHardening` symlink confinement (EPERM: no symlink privilege for a normal Windows
-account) and the `RESULTS.md is rendered` contract test of pack 07 (CRLF working copy).
+account; the block now skips with a logged reason when the OS refuses symlinks) and the `RESULTS.md is rendered` contract test of pack 07
+(CRLF working copy).
 
 ## Defects found and fixed (each with a regression test)
 
@@ -84,3 +83,46 @@ account) and the `RESULTS.md is rendered` contract test of pack 07 (CRLF working
 Consequence: without IFCsvr `sfa-cl.exe` only offers the geometry viewer, not the semantic-PMI and validation-property spreadsheets. `server/tests/sfaPmi.test.ts` probes
 for the toolkit and skips with a logged reason until it is installed (run the `.msi` as administrator once, then `npm --prefix server test -- sfaPmi`). Override the
 binary with `LLULL_SFA`.
+
+## Addendum 2026-10-20: MinGW OCCT access violation — root cause and fix
+
+**Cause: a GCC 16.2 wrong-code bug at `-O3` (IPA-CP cloning), not the stack, the runtime DLLs or the exception model.** In
+`BRepClass3d_SClassifier.cxx` GCC emits two IPA-CP clones of the self-recursive `NCollection_UBTree<int, Bnd_Box>::Select(TreeNode,
+Selector&)`, `.constprop.0` and `.constprop.1`, both devirtualised to the line selector (`Bnd_Box::IsOut(gp_Lin)`,
+`BRepClass3d_BndBoxTreeSelectorLine::Accept`). The point query `aTree.Select(aSelectorPoint)` (`SClassifier.cxx:218`) recurses into
+`.constprop.1` (objdump of the object: `call .constprop.1` with `rdx` = the point selector), so the line selector's `Reject` / `Accept` run on
+the 48-byte point selector and read `myLC` 0xa8 bytes into it, i.e. the classifier's stack. Every solid classification is affected:
+`BRepClass3d_SolidClassifier` (distance / `faceQuery.distance` inside test, `shape_distance_json`), `BOPTools_AlgoTools::ComputeState` (every
+boolean that splits solids, so the cut of a shell, `BRepOffsetAPI_MakeThickSolid`'s result, sheet-metal face picks). Intermittent because
+whether a box survives the wrong `Reject` depends on that stack garbage and on the heap layout (ASLR; shape-map hashing by address).
+
+Evidence (gdb from w64devkit, `solver` debug test binary, `shells_hollow_and_open`):
+
+| Step | Result |
+| --- | --- |
+| Reproduce | 7 crashes in 8 runs (exit 139 = 0xC0000005); never under gdb (a process started by a debugger gets the NT debug heap); `_NO_DEBUG_HEAP=1` crashes on the first try |
+| Faulting frame | `Extrema_ExtCC::Perform` → `myC[1]->GetType()` through a vtable `0x524e7d6c914d4f2b` (the same value in every crash) ← `BRepClass3d_BndBoxTreeSelectorLine::Accept` ← `NCollection_UBTree::Select` ← `BRepClass3d_SClassifier::Perform` ← `BOPTools_AlgoTools::ComputeState` ← `BOPAlgo_BuilderSolid` (the cut in `shell_hollow`) |
+| Who wrote the "vtable" | hardware watchpoint on that slot during the failing `SClassifier::Perform`: never written by a constructor; last writer `std::mt19937::_M_gen_rand` in `BRepClass3d_SolidExplorer::InitShape` (its random-ray state), i.e. stale stack |
+| Stack size | `RUST_MIN_STACK=64 MiB`: still 6 crashes in 8; the frames are far from the guard page |
+| Runtime DLLs on PATH | none involved: the OCCT DLLs, the test binary and `llull-kernel.exe` import only `KERNEL32` / `msvcrt` / system DLLs (w64devkit links libstdc++, libgcc and winpthreads statically) |
+| Exceptions / signals | `catch throw` never fires before the fault; no structured exception is converted |
+| Optimisation level | OCCT RelWithDebInfo (`-O2 -g`): 0 crashes in 10; only `libTKTopAlgo.dll` from the Release build: crashes; TKTopAlgo rebuilt `-O3 -g`: crashes; `-O2 -DNo_Exception`: 0 in 10 |
+| Translation unit / flag | only `BRepClass3d_SClassifier.cxx` at `-O3`: 4 crashes in 8; the same with `-fno-ipa-cp-clone`: 0 in 10; with `-fno-ipa-icf`: 4 in 10 |
+
+**Fix.** `solver/scripts/build-occt.mjs` injects `add_compile_options(-fno-ipa-cp-clone)` for GCC through `CMAKE_PROJECT_INCLUDE` (MSVC and
+Clang untouched; Linux GCC builds get it too, harmless) and stamps `recipe: 2` in `llull-occt.json`, so a prefix built by the old recipe is
+rebuilt; `solver/crates/llull-kernel-occt/build.rs` passes the same flag to the cxx facade when the compiler is GCC. The Linux CI kernel is
+built by an older GCC, which is why the same tests always passed there. llvm-mingw was not needed. Noted, not changed: OCCT compiles with
+`-DOCC_CONVERT_SIGNALS -std=gnu++17`, the facade without the define and with `-std=c++17`; the only header difference is the inline no-op
+`Standard_ErrorHandler::Callback` of the facade, and the class layouts are identical (sizeof checked for the extrema / adaptor classes).
+
+Verification, with OCCT rebuilt by the fixed script (`%LOCALAPPDATA%\llull\occt-7.9.2-mingw-fix`, IGES included, ~25 min on 20 jobs):
+`shells_hollow_and_open` 30 / 30; `cargo test -p llull-kernel-occt -p llull-kernel` 62 / 62 and 13 / 13, three times; each formerly red
+server suite three times, no `NATIVE_DIED`: occtAnalysis 8 / 8, occtChamferShell 11 / 11, nativeKernelFeatures 42 / 42, occtCheckAssembly
+6 / 6, occtSheetMetal 14 / 14, brepCodeExchange.integration 5 / 5. Then once with every tool present (build123d 0.12.0 included,
+`--maxWorkers=2`, 22 min): 144 files, 1339 passed, 16 skipped, 1 todo, 1 failed — `sfaPmi` (VC-GDT-22): with IFCsvr now answering, SFA
+reports a real AP242 finding on llull's plate export, "Datum Reference Frames for 'datum_system' should be unique for the same
+product_definition_shape" (open; the test's own false match on SFA's progress line "checking for syntax errors" is fixed). Skips: symlink
+confinement (4, EPERM), nativeComputeJob (3, POSIX-only), dwgImport (3, no DWG converter), MTest (1, not installed), the build123d `#!/bin/sh`
+wrapper (1, POSIX-only). `cargo test --workspace -- --test-threads=1` (gnu): 164 passed, 2 ignored; clippy `-D warnings` and `fmt --check`
+clean.

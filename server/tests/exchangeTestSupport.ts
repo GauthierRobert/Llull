@@ -12,6 +12,19 @@ const configuredPython = process.env['LLULL_TEST_CADQUERY_PYTHON'] ?? process.en
 export const CADQUERY_PYTHON = configuredPython === 'off' ? '/nonexistent/python' : configuredPython;
 export const BUILD123D_PYTHON = process.env['LLULL_TEST_BUILD123D_PYTHON'];
 
+/** First plain Python 3 that starts: `LLULL_TEST_PYTHON`, then `python3`, then `python` (Windows installs only `python`); null when none. */
+export function findPlainPython(): string | null {
+  const candidates = [process.env['LLULL_TEST_PYTHON'], 'python3', 'python'].filter(
+    (name): name is string => name !== undefined && name !== '',
+  );
+  return (
+    candidates.find((name) => {
+      const run = spawnSync(name, ['-c', 'import sys; print(sys.version_info[0])'], { encoding: 'utf8', timeout: 30_000 });
+      return run.status === 0 && run.stdout.trim() === '3';
+    }) ?? null
+  );
+}
+
 interface ProbeResult {
   readonly cadquery: string | null;
   readonly build123d: string | null;

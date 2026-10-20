@@ -65,7 +65,9 @@ describeNative.skipIf(reason !== null)('SFA on the AP242 files llull writes (VC-
       writeFileSync(file, plateStep());
       const { status, output } = analyse(file);
       expect(status, output).toBe(0);
-      expect(output).not.toMatch(/syntax error/i);
+      // SFA always prints the progress line "<Reading STEP file and checking for syntax errors>"; only a reported error counts.
+      const syntaxErrors = output.split(/\r?\n/).filter((line) => /syntax error/i.test(line) && !/checking for syntax errors/i.test(line));
+      expect(syntaxErrors, output).toEqual([]);
       const reports = readdirSync(dir).filter((name) => name.endsWith('.csv'));
       expect(reports.length, output).toBeGreaterThan(0);
       const text = reports

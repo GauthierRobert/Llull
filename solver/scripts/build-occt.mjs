@@ -96,6 +96,16 @@ const OFF = [
   'BUILD_USE_PCH',
 ];
 const STAMP = 'llull-occt.json';
+// Bumped whenever the compile recipe changes the binaries, so a prefix built by an older recipe is rebuilt (the stamp records it).
+// 2: GCC builds pass -fno-ipa-cp-clone (docs/decisions/SV1-solver-toolchain-windows.md, "MinGW OCCT access violation").
+const RECIPE = 2;
+// GCC 16.2 at -O3 miscompiles OCCT: an IPA-CP clone of NCollection_UBTree::Select specialised (devirtualised) for one selector type
+// is called for another (BRepClass3d_SClassifier::Perform runs the line selector's Reject / Accept on its point selector), an access
+// violation in every solid classification (distance, booleans, shell). Injected after project() so it applies to GCC only.
+const GCC_WORKAROUND_CMAKE = `if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  add_compile_options(-fno-ipa-cp-clone)
+endif()
+`;
 
 export function defaultOcctPrefix() {
   const os = platform();
@@ -142,17 +152,18 @@ async function download(target) {
 function stampMatches(prefix) {
   try {
     const stamp = JSON.parse(readFileSync(join(prefix, STAMP), 'utf8'));
-    return stamp.version === OCCT_VERSION && stamp.sha256 === SOURCE_SHA256;
+    return stamp.version === OCCT_VERSION && stamp.sha256 === SOURCE_SHA256 && stamp.recipe === RECIPE;
   } catch {
     return false;
   }
 }
 
-function cmakeArgs(sourceDir, prefix) {
+function cmakeArgs(sourceDir, prefix, projectInclude) {
   const os = platform();
   const args = [
     '-S',
     sourceDir,
+    `-DCMAKE_PROJECT_INCLUDE=${projectInclude}`,
     '-DCMAKE_BUILD_TYPE=Release',
     `-DCMAKE_INSTALL_PREFIX=${prefix}`,
     '-DBUILD_LIBRARY_TYPE=Shared',
@@ -182,7 +193,9 @@ export async function buildOcct(prefix = occtPrefix()) {
   const sourceDir = join(work, SOURCE_DIR_NAME);
   if (!existsSync(join(sourceDir, 'CMakeLists.txt'))) run('tar', ['-xJf', tarball, '-C', work]);
   const buildDir = join(work, 'build');
-  run('cmake', [...cmakeArgs(sourceDir, prefix), '-B', buildDir]);
+  const projectInclude = join(work, 'llull-compiler-workarounds.cmake');
+  writeFileSync(projectInclude, GCC_WORKAROUND_CMAKE);
+  run('cmake', [...cmakeArgs(sourceDir, prefix, projectInclude.replaceAll('\\', '/')), '-B', buildDir]);
   const jobs = process.env.LLULL_OCCT_JOBS ?? String(cpus().length);
   run('cmake', ['--build', buildDir, '--config', 'Release', '--parallel', jobs]);
   rmSync(prefix, { recursive: true, force: true });
@@ -190,7 +203,7 @@ export async function buildOcct(prefix = occtPrefix()) {
   for (const notice of ['LICENSE_LGPL_21.txt', 'OCCT_LGPL_EXCEPTION.txt']) cpSync(join(sourceDir, notice), join(prefix, notice));
   writeFileSync(
     join(prefix, STAMP),
-    `${JSON.stringify({ version: OCCT_VERSION, sha256: SOURCE_SHA256, source: SOURCE_URL, toolkits: TOOLKITS }, null, 2)}\n`,
+    `${JSON.stringify({ version: OCCT_VERSION, sha256: SOURCE_SHA256, recipe: RECIPE, source: SOURCE_URL, toolkits: TOOLKITS }, null, 2)}\n`,
   );
   if (!process.env.LLULL_OCCT_KEEP_WORK) rmSync(work, { recursive: true, force: true });
   return prefix;

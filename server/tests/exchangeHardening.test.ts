@@ -4,8 +4,8 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createEmptyDocument } from '@core/model/types';
@@ -15,19 +15,24 @@ import { bridgeEnvironment, createPythonExchangePort, type PythonExchangeConfig 
 
 let scratch: string;
 
-// Windows refuses file symlinks without Developer Mode or admin (EPERM): the confinement suite needs real ones.
-function canSymlink(): boolean {
+/** Why this OS account cannot create symbolic links (Windows without Developer Mode or the privilege: EPERM), or null when it can. */
+function symlinkRefusal(): string | null {
   const probe = mkdtempSync(path.join(tmpdir(), 'llull-symlink-probe-'));
   try {
     writeFileSync(path.join(probe, 'target'), '');
     symlinkSync(path.join(probe, 'target'), path.join(probe, 'link'));
-    return true;
-  } catch {
-    return false;
+    return null;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'EPERM' || code === 'EACCES') return `the OS refuses symlink creation (${code}; on Windows enable Developer Mode)`;
+    throw error;
   } finally {
     rmSync(probe, { recursive: true, force: true });
   }
 }
+
+const symlinkSkipReason = symlinkRefusal();
+if (symlinkSkipReason !== null) console.warn(`exchange directory symlink confinement skipped: ${symlinkSkipReason}`);
 
 beforeAll(async () => {
   scratch = await mkdtemp(path.join(tmpdir(), 'llull-hardening-'));
@@ -65,7 +70,7 @@ describe('bridgeEnvironment', () => {
   });
 });
 
-describe.skipIf(!canSymlink())('exchange directory symlink confinement', () => {
+describe.skipIf(symlinkSkipReason !== null)('exchange directory symlink confinement', () => {
   let root: string;
   let outside: string;
   let port: CadExchangePort;
