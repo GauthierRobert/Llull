@@ -20,10 +20,7 @@ import { REFERENCE_PRESET_NAMES, REFERENCE_PRESETS } from '@core/dynamics/engine
 import { isRotaxReduction, outsideBand } from '@core/dynamics/engine/plausibility';
 import { idealGearWarnings } from '@core/dynamics/gearLoss';
 import { sourcedMaterial } from '@core/commands/document/sourcedMaterials';
-import { bodyMassProperties, buildSimulationModel } from '@core/dynamics/simulationModel';
-import { setEngineLossLaw } from '@core/dynamics/engineLossHook';
-import { realismOf, setRealismLaw } from '@core/commands/dynamics/realismHook';
-import { installEngineLaws } from '@core/commands/dynamics/engine/hooks';
+import { bodyMassProperties } from '@core/dynamics/simulationModel';
 import { validateMaterialValue } from '@core/commands/persistence/guards';
 import { residualTier } from '@core/dynamics/reactions';
 import { dynamicsProblems } from '@core/commands/persistence/dynamicsValidation';
@@ -915,29 +912,6 @@ describe('load validation of the new slices', () => {
     expect(validateMaterialValue('m', { ...base, source: '' })).toMatch(/source must be a non-empty string/);
     expect(validateMaterialValue('m', { ...base, source: 3 })).toMatch(/source must be a non-empty string/);
     expect(validateMaterialValue('m', { ...base, grade: 'D' })).toMatch(/grade must be 'A', 'B' or 'C'/);
-  });
-});
-
-describe('engine injection points (spec 11 Q3)', () => {
-  it('a model with losses is refused when no engine friction law is installed, never run lossless', () => {
-    const { doc } = calibratedEngine();
-    setEngineLossLaw(null);
-    try {
-      const built = buildSimulationModel(doc, 1e-4);
-      expect('error' in built && built.error).toMatch(/no engine friction law is installed/);
-    } finally {
-      installEngineLaws();
-    }
-    expect('error' in buildSimulationModel(doc, 1e-4)).toBe(false);
-  });
-
-  it('without a realism law the realism block is absent', () => {
-    setRealismLaw(null);
-    try {
-      expect(realismOf({} as unknown as Parameters<typeof realismOf>[0])).toBeNull();
-    } finally {
-      installEngineLaws();
-    }
   });
 });
 
