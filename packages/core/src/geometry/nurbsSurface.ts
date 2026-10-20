@@ -6,7 +6,8 @@ import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { add3 } from '../lib/vec3';
 import { evaluateSurface, mapSurfacePoles } from '../lib/nurbs/surface';
 import type { NurbsCurveData } from '../lib/nurbs/types';
-import type { NurbsSurfaceData } from '../lib/nurbs/surfaceTypes';
+import type { NurbsSurfaceData, UvTrimLoop } from '../lib/nurbs/surfaceTypes';
+import { trimGrid } from '../lib/nurbs/trimMesh';
 
 /** Largest number of samples per direction of a display grid. */
 const MAX_GRID = 96;
@@ -55,6 +56,31 @@ export function gridParameters(surface: NurbsSurfaceData, perSpan = 8): { us: nu
   return { us: directionSamples(surface.knotsU, perSpan), vs: directionSamples(surface.knotsV, perSpan) };
 }
 
+/** Display tessellation of a sheet: the grid of `tessellateSurface` restricted to the region of `trims` (cut cells are clipped to it); no trims = the whole patch. */
+export function tessellateSheet(
+  surface: NurbsSurfaceData,
+  trims: ReadonlyArray<UvTrimLoop> | undefined,
+  perSpan = 8,
+): { positions: number[]; indices: number[] } {
+  if (trims === undefined || trims.length === 0) return tessellateSurface(surface, perSpan);
+  const { us, vs } = gridParameters(surface, perSpan);
+  const positions: number[] = [];
+  for (const u of us) for (const v of vs) positions.push(...evaluateSurface(surface, u, v));
+  const indices: number[] = [];
+  const grid = trimGrid(trims, us, vs);
+  for (const [i, j] of grid.full) {
+    const a = i * vs.length + j;
+    const [b, c, d] = [a + 1, a + vs.length, a + vs.length + 1];
+    indices.push(a, c, b, b, c, d);
+  }
+  for (const triangle of grid.triangles)
+    for (const [u, v] of triangle) {
+      indices.push(positions.length / 3);
+      positions.push(...evaluateSurface(surface, u, v));
+    }
+  return { positions, indices };
+}
+
 export function tessellateSurface(surface: NurbsSurfaceData, perSpan = 8): SurfaceMesh {
   const us = directionSamples(surface.knotsU, perSpan);
   const vs = directionSamples(surface.knotsV, perSpan);
@@ -92,14 +118,14 @@ export function scaleSurface(surface: NurbsSurfaceData, factor: number): NurbsSu
 /** World-space triangles of a sheet (entity rotation about its position applied), for mesh export and projected-area queries. */
 export function sheetTriangles(entity: NurbsSurfaceEntity): Array<readonly [Vec3, Vec3, Vec3]> {
   const place = (point: Vec3): Vec3 => (isZeroRotation(entity.rotation) ? point : applyEulerXYZ(point, entity.position, entity.rotation));
-  return surfaceTriangles(entity.surface, entity.position, 8).map(
+  return surfaceTriangles(entity.surface, entity.position, 8, entity.trims).map(
     ([a, b, c]) => [place(a as Vec3), place(b as Vec3), place(c as Vec3)] as const,
   );
 }
 
 /** Triangles of the display tessellation, each as three vertices with `position` added (the form `render_view` rotates and paints). */
-export function surfaceTriangles(surface: NurbsSurfaceData, position: Vec3, perSpan = 4): Vec3[][] {
-  const { positions, indices } = tessellateSurface(surface, perSpan);
+export function surfaceTriangles(surface: NurbsSurfaceData, position: Vec3, perSpan = 4, trims?: ReadonlyArray<UvTrimLoop>): Vec3[][] {
+  const { positions, indices } = tessellateSheet(surface, trims, perSpan);
   const vertex = (index: number): Vec3 =>
     add3(position, [positions[3 * index] as number, positions[3 * index + 1] as number, positions[3 * index + 2] as number]);
   const triangles: Vec3[][] = [];

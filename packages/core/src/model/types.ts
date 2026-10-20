@@ -21,7 +21,7 @@ import type { ReliabilityModel } from './probabilistic';
 import type { SheetMetalModel } from './sheetMetal';
 import type { FeatureParams } from './features';
 import type { NurbsCurveData } from '../lib/nurbs/types';
-import type { NurbsSurfaceData } from '../lib/nurbs/surfaceTypes';
+import type { NurbsSurfaceData, UvTrimLoop } from '../lib/nurbs/surfaceTypes';
 import type { CurveKind, SheetKind } from './curveKinds';
 
 /** Re-exported: every model consumer reads its vectors from here. */
@@ -353,6 +353,8 @@ export interface NurbsCurveEntity extends BaseEntity {
 export interface NurbsSurfaceEntity extends BaseEntity {
   readonly kind: 'nurbs_surface';
   surface: NurbsSurfaceData;
+  /** Trim loops in the (u, v) plane (`trim_surface` by curve); absent = the natural rectangular boundary. */
+  trims?: ReadonlyArray<UvTrimLoop>;
 }
 
 /** Annotation anchored at `position`. */

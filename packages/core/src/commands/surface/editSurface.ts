@@ -1,53 +1,21 @@
-/** trim_surface (parameter rectangle), sew_surfaces (join patches along a shared edge) and thicken_surface (closed mesh solid from a sheet). */
+/** sew_surfaces (join patches along a shared edge) and thicken_surface (closed mesh solid from a sheet). */
 
-import type { Entity, NurbsSurfaceEntity, Vec3 } from '../../model/types';
+import type { Entity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed } from '../noop';
 import { newEntity } from '../entity/newEntity';
-import { replaceEntity, replaceEntities, withEntity } from '../entity/entityOps';
+import { replaceEntities, withEntity } from '../entity/entityOps';
 import { nextId } from '../../lib/id';
 import { distance3 } from '../../lib/vec3';
 import { expandKnots } from '../../lib/nurbs/knotVector';
 import { surfaceDomain } from '../../lib/nurbs/surface';
 import { surfaceSample } from '../../lib/nurbs/surfaceCurvature';
-import { commonBasis, extractSubSurface, reverseSurface, transposeSurface } from '../../lib/nurbs/surfaceEdit';
+import { commonBasis, reverseSurface, transposeSurface } from '../../lib/nurbs/surfaceEdit';
 import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import { gridParameters, placedSurface, surfacePoleExtent } from '../../geometry/nurbsSurface';
 import { refuseSrf } from './shared';
 import { isRefusal, sig, surfaceEntityOf } from './surfaceShared';
-
-/**
- * @affects replaces the surface of 1 nurbs_surface entity by the part inside the parameter rectangle (same id)
- * @invariant exact: the trimmed patch coincides with the original over the rectangle and its domain is that rectangle
- * @failure unknown id / not a surface -> SRF_ENTITY_NOT_FOUND / SRF_NOT_SURFACE; an empty or out-of-domain interval -> SRF_TRIM_RANGE
- */
-export const trimSurface = defineCommand({
-  name: 'trim_surface',
-  description:
-    'Cut a nurbs_surface down to a rectangle of its parameter domain: keep u in [u0, u1] and v in [v0, v1] (see inspect_nurbs `domain`). ' +
-    'Exact (knots are inserted at the cuts and the outer poles dropped); the sheet keeps its id and its parameter values inside the ' +
-    'rectangle. Only iso-parametric trims are available: trimming by a curve, a plane or a projected loop needs trimmed faces from the exact kernel.',
-  params: z.object({
-    id: z.string().describe('Id of a nurbs_surface entity.'),
-    u: z.array(z.number()).describe('[from, to] along u, inside the surface domain, from < to.'),
-    v: z.array(z.number()).describe('[from, to] along v, inside the surface domain, from < to.'),
-  }),
-  run: (doc, { id, u, v }): CommandResult => {
-    const entity = surfaceEntityOf(doc, 'trim_surface', id);
-    if (isRefusal(entity)) return entity;
-    if (u.length !== 2 || v.length !== 2)
-      return refuseSrf(doc, 'trim_surface', 'SRF_TRIM_RANGE', 'u and v each need [from, to]', [id], ['params.u']);
-    const result = extractSubSurface(entity.surface, [u[0] as number, u[1] as number], [v[0] as number, v[1] as number]);
-    if (typeof result === 'string') return refuseSrf(doc, 'trim_surface', 'SRF_TRIM_RANGE', result, [id], ['params.u']);
-    const next: NurbsSurfaceEntity = { ...entity, surface: result };
-    return changed(
-      replaceEntity(doc, next),
-      `trim_surface: trimmed "${id}" to u [${u[0]}, ${u[1]}], v [${v[0]}, ${v[1]}] (${result.poles.length} x ${result.poles[0]?.length ?? 0} poles).`,
-      [id],
-    );
-  },
-});
 
 type Side = 'u0' | 'u1' | 'v0' | 'v1';
 
@@ -120,6 +88,8 @@ export const sewSurfaces = defineCommand({
     ];
     if (isRefusal(first)) return first;
     if (isRefusal(second)) return second;
+    if ((first.trims?.length ?? 0) > 0 || (second.trims?.length ?? 0) > 0)
+      return refuseSrf(doc, 'sew_surfaces', 'SRF_TRIM_UNSUPPORTED', 'sheets trimmed by curves cannot be sewn', ids, ['params.ids']);
     const [a, b] = [placedSurface(first), placedSurface(second)];
     const size = Math.max(
       ...[surfacePoleExtent(a), surfacePoleExtent(b)].flatMap(({ min, max }) => [max[0] - min[0], max[1] - min[1], max[2] - min[2]]),
@@ -172,6 +142,8 @@ export const thickenSurface = defineCommand({
   run: (doc, { id, thickness, side = 'normal', quality = 8 }): CommandResult => {
     const entity = surfaceEntityOf(doc, 'thicken_surface', id);
     if (isRefusal(entity)) return entity;
+    if (entity.trims !== undefined && entity.trims.length > 0)
+      return refuseSrf(doc, 'thicken_surface', 'SRF_TRIM_UNSUPPORTED', 'a sheet trimmed by curves cannot be thickened (it would use the whole underlying patch)', [id], ['params.id']);
     const invalid = (message: string, path: string): CommandResult =>
       refuseSrf(doc, 'thicken_surface', 'SRF_PARAM_INVALID', message, [id], [`params.${path}`]);
     if (!(thickness > 0) || !Number.isFinite(thickness))

@@ -168,7 +168,7 @@ export function tessellateEntity(e: Entity): PreDepthPolygon[] {
     case 'spline':
       return tessellate2DSpline(e);
     case 'nurbs_surface':
-      return rotated(surfaceTriangles(e.surface, e.position));
+      return rotated(surfaceTriangles(e.surface, e.position, 4, e.trims));
     case 'nurbs_curve':
       return [
         stroke(

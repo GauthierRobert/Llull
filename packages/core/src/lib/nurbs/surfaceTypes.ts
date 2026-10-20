@@ -20,6 +20,17 @@ export interface NurbsSurfaceData {
   readonly multiplicitiesV: ReadonlyArray<number>;
 }
 
+/**
+ * One closed boundary of a trimmed sheet in the (u, v) parameter plane: a polygon through exact samples of the trimming curve (fine enough
+ * that its chordal error is far below the model tolerance). The trimmed region is the even-odd union of all loops of a sheet (an outer loop
+ * and the holes inside it).
+ * @invariant the vertex count is even and every vertex at an even index is also a vertex of the coarse polygon (Richardson-ready area)
+ */
+export interface UvTrimLoop {
+  readonly outer: boolean;
+  readonly polygon: ReadonlyArray<readonly [number, number]>;
+}
+
 /** Highest supported pole count per direction (a 10 000 pole curve limit would give 10^8 poles). */
 export const MAX_SURFACE_POLES = 400;
 
