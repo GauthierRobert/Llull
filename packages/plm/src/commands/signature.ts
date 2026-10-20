@@ -133,6 +133,7 @@ export const attachReleasePackage = defineCommand({
   description:
     'HUMAN GATE. Record that the host wrote the signed release package of a released revision: its manifest SHA-256 and the documentContentHash it ' +
     'states (must equal the revision content hash). Called by the desktop / `llull release pack` after writing the package; an agent caller gets PLM_HUMAN_GATE.',
+  annotations: { metaHistory: true },
   params: z.object({
     revision: z.string().describe('Released revision label.'),
     manifestSha256: z

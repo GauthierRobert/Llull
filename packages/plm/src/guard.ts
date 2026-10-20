@@ -46,7 +46,6 @@ export const releaseLockGuard: DerivationGuard = {
     if (after === undefined) return refusal('PLM_RECORD_REMOVED', 'the PLM record cannot be removed', [before.item.partNumber]);
     const broken = historyRefusal(previous, next);
     if (broken !== null) return broken;
-    if (!scopeChanged(previous, next)) return null;
     const current = after.item.revisions[after.item.currentRevision];
     if (current === undefined) return null;
     const open = current.state === 'in_work' || current.state === 'cancelled';
@@ -55,6 +54,7 @@ export const releaseLockGuard: DerivationGuard = {
     const revisedFromFrozen =
       current.basedOn === before.item.currentRevision && previousCurrent !== undefined && FROZEN.has(previousCurrent.state);
     if (open && (sameRevision || revisedFromFrozen)) return null;
+    if (!scopeChanged(previous, next)) return null;
     const hint = current.state === 'in_review' ? 'reject_review first' : 'open an ECO and revise_item';
     return refusal('PLM_LOCKED', `${after.item.partNumber} rev ${current.label} is ${current.state}; ${hint}`, [
       after.item.partNumber,
