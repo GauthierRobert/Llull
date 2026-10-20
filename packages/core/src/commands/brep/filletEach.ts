@@ -14,6 +14,9 @@ import { selectEdges } from './edgeSelection';
 import { type EdgeLawInput, type FilletMode, chordToRadius, lawOf, lawProblem, sameLaw, scaleLaw, wedgeAngle } from './filletSpec';
 import { commitKernelResult, evaluateRecipe, operandRecipe } from './kernelShape';
 import { modifyFailure, validateSolidTarget } from './modifyTarget';
+import { hasNames, namesOf, referenceProblem, resolveNames } from '../../geometry/naming/references';
+import { commandError } from '../noop';
+import { REPICK_EDGES } from './edgeReferences';
 
 export interface FilletRequest {
   readonly id: string;
@@ -23,6 +26,8 @@ export interface FilletRequest {
   readonly edgesNear: readonly Vec3[];
   readonly radius: number | undefined;
   readonly radiusEnd: number | undefined;
+  /** Persistent names of the planned edges, in plan order, recorded by an earlier run (SC-N1). */
+  readonly edgeNames?: readonly string[] | undefined;
 }
 
 interface Planned {
@@ -118,6 +123,34 @@ const lawText = (law: EdgeRadius): string =>
   `${fixed(law.size)}${law.sizeEnd === undefined ? '' : `>${fixed(law.sizeEnd)}`}${law.sizes === undefined ? '' : ` via ${law.sizes.length} control point(s)`}`;
 
 /**
+ * `request` with its edges taken from the recorded persistent names (one per planned edge, plan order), or why they no longer resolve;
+ * unchanged when there are no names or the kernel keeps none.
+ */
+function byRecordedNames(
+  topology: ShapeTopology | null,
+  request: FilletRequest,
+): FilletRequest | { readonly problem: string; readonly code: string } {
+  const names = request.edgeNames ?? [];
+  if (names.length === 0 || !hasNames(topology, 'edge')) return request;
+  const resolved = resolveNames(topology, 'edge', names);
+  if (!resolved.ok)
+    return { problem: `${referenceProblem('edge', resolved)}. ${REPICK_EDGES}`, code: resolved.lost.length > 0 ? 'REF_LOST' : 'REF_SPLIT' };
+  if (request.edges === undefined) return { ...request, edgeIndices: resolved.indices, edgesNear: [] };
+  if (resolved.indices.length !== request.edges.length) return request;
+  return {
+    ...request,
+    edges: request.edges.map(
+      (entry, at): EdgeLawInput => ({
+        size: entry.size,
+        index: resolved.indices[at] ?? 0,
+        ...(entry.sizeEnd === undefined ? {} : { sizeEnd: entry.sizeEnd }),
+        ...(entry.sizes === undefined ? {} : { sizes: entry.sizes }),
+      }),
+    ),
+  };
+}
+
+/**
  * @failure missing / non-solid target, no kernel, entry without exactly one of index/near, bad radius law, repeated or unroundable edge,
  *   chord mode without exact planar faces at an edge, kernel refusal -> unchanged doc
  */
@@ -135,7 +168,10 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
   const shape = kernel.evaluate(source);
   if (shape === null) return fail(`kernel could not build entity '${request.id}' (kind '${entity.kind}')`);
   const topology = kernel.topology(shape);
-  const resolved = request.edges === undefined ? resolveShorthand(topology, request) : resolveEntries(topology, request.edges);
+  const named = byRecordedNames(topology, request);
+  if ('problem' in named)
+    return { ...fail(`${named.problem} on '${request.id}'`), error: commandError(named.code, REPICK_EDGES, [], ['edgeNames']) };
+  const resolved = named.edges === undefined ? resolveShorthand(topology, named) : resolveEntries(topology, named.edges);
   if ('problem' in resolved) return fail(`${resolved.problem} on '${request.id}'`);
   const validated = selectEdges(
     topology,
@@ -151,7 +187,7 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
   if (typeof result === 'string') return noop(doc, modifyFailure('fillet_edge', kernel, modified, result));
   const list = sized.planned.map((entry) => `${entry.edge}: r ${lawText(entry.law)}`).join(', ');
   const chord = request.mode === 'chord' ? ' (sizes given as chord lengths, converted to radii)' : '';
-  return commitKernelResult(
+  const committed = commitKernelResult(
     doc,
     kernel,
     result,
@@ -159,4 +195,13 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
     (newId, triangles) =>
       `fillet_edge: filleted '${request.id}' (kind '${entity.kind}', ${sized.planned.length} edge(s) ${list}${chord}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.`,
   );
+  const record =
+    (request.edgeNames ?? []).length > 0
+      ? null
+      : namesOf(
+          topology,
+          'edge',
+          sized.planned.map((entry) => entry.edge),
+        );
+  return record === null || committed.document === doc ? committed : { ...committed, recordExtras: { edgeNames: record } };
 }

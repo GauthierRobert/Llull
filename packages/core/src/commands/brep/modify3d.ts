@@ -8,7 +8,7 @@ import type { CadDocument, Vec3 } from '../../model/types';
 import type { ShapeRecipe } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
-import { selectEdges } from './edgeSelection';
+import { pickEdges } from './edgeReferences';
 import { currentContext } from '../context';
 import type { ExecutionContext } from '../types';
 import { kernelUnavailable } from '../kernelRefusal';
@@ -28,6 +28,8 @@ interface EdgeModification {
   readonly edges?: readonly number[];
   /** Points naming edges by their nearest edge (`edgesNear`), resolved on the current solid. */
   readonly near?: readonly Vec3[];
+  /** Persistent edge names recorded by an earlier run (SC-N1); win over `edges` / `near` when the kernel names its edges. */
+  readonly names?: readonly string[] | undefined;
   /** The modification node over the operand's exact recipe, the resolved edges and their mid points (empty when the kernel has no topology). */
   readonly recipe: (source: ShapeRecipe, edges: readonly number[], near: readonly Vec3[]) => ShapeRecipe;
 }
@@ -39,7 +41,7 @@ interface EdgeModification {
 function modifyEdges(
   doc: CadDocument,
   ctx: ExecutionContext | undefined,
-  { command, pastTense, amountName, amount, id, edges = [], near = [], recipe }: EdgeModification,
+  { command, pastTense, amountName, amount, id, edges = [], near = [], names, recipe }: EdgeModification,
 ): CommandResult {
   if (amount <= 0) return noop(doc, `${command}: ${amountName} must be > 0 (got ${amount}).`);
   const validation = validateSolidTarget(doc, command, id);
@@ -54,22 +56,28 @@ function modifyEdges(
       doc,
       `${command}: kernel could not build entity '${id}' (kind '${entity.kind}'). The entity may have degenerate geometry or an unsupported kind for this kernel.`,
     );
-  const selection = selectEdges(kernel.topology(sourceShape), edges, near);
-  if ('problem' in selection) return noop(doc, `${command}: ${selection.problem} on '${id}'; document unchanged.`);
   const topology = kernel.topology(sourceShape);
+  const selection = pickEdges(topology, { indices: edges, near, names });
+  if ('problem' in selection) {
+    const refused = noop(doc, `${command}: ${selection.problem} on '${id}'; document unchanged.`);
+    return selection.error === undefined ? refused : { ...refused, error: selection.error };
+  }
   const mids = selection.edges.map((index) => topology?.edges[index]?.mid);
   const modified = recipe(source, selection.edges, mids.every((mid): mid is Vec3 => mid !== undefined) ? mids : []);
   const result = evaluateRecipe(kernel, modified);
   if (typeof result === 'string') return noop(doc, modifyFailure(command, kernel, modified, result));
   const picked = near.length > 0 ? ` edgesNear selected edges ${selection.edges.join(', ')}.` : '';
-  return commitKernelResult(
+  const committed = commitKernelResult(
     doc,
     kernel,
     result,
     [entity],
     (newId, triangles) =>
-      `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.${picked}`,
+      `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.${picked}${selection.note}`,
   );
+  return selection.record === null || committed.document === doc
+    ? committed
+    : { ...committed, recordExtras: { edgeNames: selection.record } };
 }
 
 /**
@@ -108,6 +116,13 @@ export const filletEdge = defineCommand({
           're-selected after an upstream edit renumbers edges. Combines with edgeIndices.',
       )
       .optional(),
+    edgeNames: z
+      .array(z.string().min(1))
+      .describe(
+        'Persistent edge names (inspect_topology lists them on the native kernel): recorded automatically from the first pick and used on regeneration, so the same ' +
+          'edge is rounded after an upstream edit; a name that is gone or split refuses the step (REF_LOST / REF_SPLIT). Wins over edgeIndices / edgesNear.',
+      )
+      .optional(),
     radius: z
       .number()
       .describe('Fillet radius in document units. Must be > 0. Required unless edges is given (then each entry carries its own size).')
@@ -136,9 +151,9 @@ export const filletEdge = defineCommand({
       )
       .optional(),
   }),
-  run: (doc, { id, edgeIndices = [], edgesNear = [], radius, radiusEnd, edges, mode = 'radius' }, ctx): CommandResult => {
+  run: (doc, { id, edgeIndices = [], edgesNear = [], edgeNames, radius, radiusEnd, edges, mode = 'radius' }, ctx): CommandResult => {
     if (edges !== undefined || mode === 'chord')
-      return filletEach(doc, ctx, { id, mode, edges, edgeIndices, edgesNear, radius, radiusEnd });
+      return filletEach(doc, ctx, { id, mode, edges, edgeIndices, edgesNear, radius, radiusEnd, edgeNames });
     if (radius === undefined) return noop(doc, 'fillet_edge: give radius (or edges with one size per edge); document unchanged.');
     if (radiusEnd !== undefined && !(radiusEnd > 0)) return noop(doc, `fillet_edge: radiusEnd must be > 0 (got ${radiusEnd}).`);
     return modifyEdges(doc, ctx, {
@@ -149,6 +164,7 @@ export const filletEdge = defineCommand({
       id,
       edges: edgeIndices,
       near: edgesNear,
+      names: edgeNames,
       recipe: (source, edgeList, near) => ({
         op: 'fillet',
         source,
@@ -194,9 +210,16 @@ export const chamferEdge = defineCommand({
           're-selected after an upstream edit renumbers edges. Combines with edgeIndices.',
       )
       .optional(),
+    edgeNames: z
+      .array(z.string().min(1))
+      .describe(
+        'Persistent edge names (inspect_topology lists them on the native kernel): recorded automatically from the first pick and used on regeneration, so the same ' +
+          'edge is rounded after an upstream edit; a name that is gone or split refuses the step (REF_LOST / REF_SPLIT). Wins over edgeIndices / edgesNear.',
+      )
+      .optional(),
     distance: z.number().describe('Chamfer distance in document units. Must be > 0.'),
   }),
-  run: (doc, { id, edgeIndices = [], edgesNear = [], distance }, ctx): CommandResult =>
+  run: (doc, { id, edgeIndices = [], edgesNear = [], edgeNames, distance }, ctx): CommandResult =>
     modifyEdges(doc, ctx, {
       command: 'chamfer_edge',
       pastTense: 'chamfered',
@@ -205,6 +228,7 @@ export const chamferEdge = defineCommand({
       id,
       edges: edgeIndices,
       near: edgesNear,
+      names: edgeNames,
       recipe: (source, edges, near) => ({ op: 'chamfer', source, edges: [...edges], size: distance, ...(near.length > 0 ? { near } : {}) }),
     }),
 });

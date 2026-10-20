@@ -250,6 +250,13 @@ fn mesh_solid(entity: &Value) -> Evaluated {
     }
 }
 
+/// Entity -> placed solid whose face names read `<entity id>:<role>` (SC-N1).
+fn named_solid(entity: &Value) -> Evaluated {
+    let Some(shape) = solid(entity)? else { return refused() };
+    let id = entity.get("id").and_then(Value::as_str).unwrap_or("solid");
+    shape_of(crate::prefixed(&shape, id))
+}
+
 /// Entity -> placed solid (`entityToOccShape`).
 fn solid(entity: &Value) -> Evaluated {
     let kind = entity.get("kind").and_then(Value::as_str).unwrap_or("");
@@ -329,7 +336,7 @@ impl Evaluator {
         let op = recipe.get("op").and_then(Value::as_str).unwrap_or("");
         match op {
             "solid" => match recipe.get("entity") {
-                Some(entity) => solid(entity),
+                Some(entity) => named_solid(entity),
                 None => refused(),
             },
             "boolean" => {
@@ -360,10 +367,12 @@ impl Evaluator {
             "featureCut" => self.feature_cut(recipe),
             "brep" => {
                 let blob = recipe.get("blob").and_then(Value::as_str).and_then(|sha256| self.blobs.get(sha256));
-                match blob {
-                    Some(text) => crate::queries::read_brep(text).map(|shape| shape.map(Rc::new)).map_err(EvalError::Failure),
-                    None => refused(),
-                }
+                let label = recipe.get("label").and_then(Value::as_str).map(str::to_string);
+                let Some(text) = blob else { return refused() };
+                let Some(shape) = crate::queries::read_brep(text).map_err(EvalError::Failure)? else { return refused() };
+                let digest = recipe.get("blob").and_then(Value::as_str).unwrap_or("");
+                let prefix = label.unwrap_or_else(|| format!("brep-{}", &digest[..digest.len().min(12)]));
+                shape_of(crate::prefixed(&shape, &prefix))
             }
             other => Err(EvalError::Unsupported(format!("recipe op '{other}'"))),
         }

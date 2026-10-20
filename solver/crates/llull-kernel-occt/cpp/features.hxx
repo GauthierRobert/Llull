@@ -5,6 +5,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include <TopoDS_Shape.hxx>
@@ -17,6 +18,7 @@ namespace llull {
 class ShapeList {
  public:
   std::vector<TopoDS_Shape> shapes;
+  std::vector<std::vector<std::string>> names;
 };
 
 std::unique_ptr<ShapeList> new_shape_list();
@@ -42,12 +44,14 @@ bool chain_wire_ok(rust::Slice<const double> chain);
 // Bicubic patches, 16 poles each (u along i, v along j), sewn at `tolerance`; null (never a throw) when OCC refuses one.
 std::unique_ptr<Shape> bspline_patch_solid(rust::Slice<const double> poles, double tolerance);
 
+// `tag` names the tool faces (SC-N1: "hole<n>.<k>", "pocket<n>").
 // BRepFeat_MakeRevol cut of the closed polygon `profile` (xyz triples) revolved 2 pi about (origin, normal).
 std::unique_ptr<Shape> feature_revol_cut(const Shape &source, rust::Slice<const double> profile, rust::Slice<const double> origin,
-                                         rust::Slice<const double> normal);
+                                         rust::Slice<const double> normal, rust::Str tag);
 // BRepFeat_MakePrism cut of the face of `chain` from the planar face of `source` on the frame plane that holds a probe point.
 std::unique_ptr<Shape> feature_prism_cut(const Shape &source, rust::Slice<const double> chain, rust::Slice<const double> origin,
-                                         rust::Slice<const double> normal, rust::Slice<const double> probes, double length);
+                                         rust::Slice<const double> normal, rust::Slice<const double> probes, double length,
+                                         rust::Str tag);
 // BRepCheck_Analyzer validity.
 bool is_valid_shape(const Shape &shape);
 // Post-boolean ShapeUpgrade_UnifySameDomain (the shape itself when it fails).

@@ -54,6 +54,7 @@
 #include <gp_Circ.hxx>
 #include <gp_Pln.hxx>
 
+#include "llull-kernel-occt/cpp/naming.hxx"
 #include "llull-kernel-occt/src/features.rs.h"
 
 namespace llull {
@@ -231,16 +232,29 @@ TopoDS_Shape supporting_face(const TopoDS_Shape &source, const gp_Pnt &origin, c
   return TopoDS_Shape();
 }
 
+// Names of a BRepFeat cut: the source's faces through the maker's history; the tool's faces, generated from the edges of the
+// profile face, are "<tag>(e(profile)#k)", so two holes of one feature, or two features, never share a name.
+template <class Maker>
+std::unique_ptr<Shape> feature_named(Maker &maker, const Shape &source, const TopoDS_Shape &profile, const std::string &tag) {
+  const TopoDS_Shape result = maker.Shape();
+  const std::vector<naming::Named> inputs{naming::named(source), naming::Named{profile, {"profile"}}};
+  return naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, maker), tag));
+}
+
 }  // namespace
 
 std::unique_ptr<ShapeList> new_shape_list() { return std::make_unique<ShapeList>(); }
 
-void shape_list_add(ShapeList &list, const Shape &shape) { list.shapes.push_back(shape.shape); }
+void shape_list_add(ShapeList &list, const Shape &shape) {
+  list.shapes.push_back(shape.shape);
+  list.names.push_back(naming::face_names(shape));
+}
 
 namespace {
 
 template <typename Maker, typename AddEdge>
-std::unique_ptr<Shape> round_edges(const TopoDS_Shape &shape, rust::Slice<const uint32_t> indices, Maker &maker, AddEdge add) {
+std::unique_ptr<Shape> round_edges(const Shape &source, rust::Slice<const uint32_t> indices, Maker &maker, AddEdge add, const char *role) {
+  const TopoDS_Shape &shape = source.shape;
   const TopTools_IndexedMapOfShape edges = unique_sub_shapes(shape, TopAbs_EDGE);
   for (uint32_t index : indices)
     if (static_cast<int>(index) >= edges.Extent()) return nullptr;
@@ -258,7 +272,11 @@ std::unique_ptr<Shape> round_edges(const TopoDS_Shape &shape, rust::Slice<const 
     }
   }
   maker.Build();
-  return maker.IsDone() ? wrap(valid_or_null(maker.Shape())) : nullptr;
+  if (!maker.IsDone()) return nullptr;
+  const TopoDS_Shape result = valid_or_null(maker.Shape());
+  if (result.IsNull()) return nullptr;
+  const std::vector<naming::Named> inputs{naming::named(source)};
+  return naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, maker), role));
 }
 
 }  // namespace
@@ -266,18 +284,21 @@ std::unique_ptr<Shape> round_edges(const TopoDS_Shape &shape, rust::Slice<const 
 std::unique_ptr<Shape> fillet_edges(const Shape &shape, rust::Slice<const uint32_t> edges, double radius, double radius_end) {
   BRepFilletAPI_MakeFillet maker(shape.shape, ChFi3d_Rational);
   const bool varying = !std::isnan(radius_end);
-  return round_edges(shape.shape, edges, maker, [&](BRepFilletAPI_MakeFillet &target, const TopoDS_Edge &edge) {
-    if (varying)
-      target.Add(radius, radius_end, edge);
-    else
-      target.Add(radius, edge);
-  });
+  return round_edges(
+      shape, edges, maker,
+      [&](BRepFilletAPI_MakeFillet &target, const TopoDS_Edge &edge) {
+        if (varying)
+          target.Add(radius, radius_end, edge);
+        else
+          target.Add(radius, edge);
+      },
+      "blend");
 }
 
 std::unique_ptr<Shape> chamfer_edges(const Shape &shape, rust::Slice<const uint32_t> edges, double distance) {
   BRepFilletAPI_MakeChamfer maker(shape.shape);
-  return round_edges(shape.shape, edges, maker,
-                     [&](BRepFilletAPI_MakeChamfer &target, const TopoDS_Edge &edge) { target.Add(distance, edge); });
+  return round_edges(
+      shape, edges, maker, [&](BRepFilletAPI_MakeChamfer &target, const TopoDS_Edge &edge) { target.Add(distance, edge); }, "chamfer");
 }
 
 std::unique_ptr<Shape> blend_union(const ShapeList &list, double radius) {
@@ -292,6 +313,9 @@ std::unique_ptr<Shape> blend_union(const ShapeList &list, double radius) {
   fuse.Build();
   if (!fuse.IsDone()) return nullptr;
   const TopoDS_Shape fused = fuse.Shape();
+  std::vector<naming::Named> inputs;
+  for (size_t i = 0; i < list.shapes.size(); ++i) inputs.push_back(naming::Named{list.shapes[i], list.names[i]});
+  const std::vector<std::string> fused_names = naming::inherit(fused, inputs, fuse.History(), "boolean");
   const TopTools_IndexedMapOfShape boundary = unique_sub_shapes(fused, TopAbs_EDGE);
   std::vector<TopoDS_Edge> joints;
   for (TopTools_ListIteratorOfListOfShape it(fuse.SectionEdges()); it.More(); it.Next()) {
@@ -299,11 +323,14 @@ std::unique_ptr<Shape> blend_union(const ShapeList &list, double radius) {
     if (BRep_Tool::Degenerated(edge)) continue;
     if (boundary.Contains(edge)) joints.push_back(edge);
   }
-  if (joints.empty()) return wrap(fused);
+  if (joints.empty()) return naming::wrap_named(fused, fused_names);
   BRepFilletAPI_MakeFillet maker(fused, ChFi3d_Rational);
   for (const TopoDS_Edge &edge : joints) maker.Add(radius, edge);
   maker.Build();
-  return maker.IsDone() ? wrap(maker.Shape()) : nullptr;
+  if (!maker.IsDone()) return nullptr;
+  const std::vector<naming::Named> joined{naming::Named{fused, fused_names}};
+  const TopoDS_Shape result = maker.Shape();
+  return naming::wrap_named(result, naming::inherit(result, joined, naming::history_of(joined, maker), "blend"));
 }
 
 std::unique_ptr<Shape> shell_hollow(const Shape &shape, double thickness) {
@@ -311,9 +338,17 @@ std::unique_ptr<Shape> shell_hollow(const Shape &shape, double thickness) {
   BRepOffsetAPI_MakeOffsetShape offset;
   offset.PerformByJoin(shape.shape, -thickness, 1e-4, BRepOffset_Skin, Standard_False, Standard_False, GeomAbs_Arc, Standard_False);
   if (!offset.IsDone()) return nullptr;
-  BRepAlgoAPI_Cut cut(shape.shape, closed_cavity(offset.Shape()));
+  const std::vector<naming::Named> source{naming::named(shape)};
+  const TopoDS_Shape skin = offset.Shape();
+  const naming::Named offset_skin{skin, naming::inherit(skin, source, naming::history_of(source, offset), "inner", naming::Images::Offset)};
+  const TopoDS_Shape cavity = closed_cavity(skin);
+  // ShapeFix_Solid wraps the same faces: the cavity keeps the skin's names face for face.
+  const naming::Named cavity_named{cavity, naming::inherit(cavity, {offset_skin}, Handle(BRepTools_History)(), "inner")};
+  BRepAlgoAPI_Cut cut(shape.shape, cavity);
   cut.Build();
-  return cut.IsDone() ? wrap(cut.Shape()) : nullptr;
+  if (!cut.IsDone()) return nullptr;
+  const TopoDS_Shape result = cut.Shape();
+  return naming::wrap_named(result, naming::inherit(result, {source[0], cavity_named}, cut.History(), "inner"));
 }
 
 std::unique_ptr<Shape> shell_open(const Shape &shape, double thickness, rust::Slice<const double> open_near) {
@@ -339,7 +374,12 @@ std::unique_ptr<Shape> shell_open(const Shape &shape, double thickness, rust::Sl
   BRepOffsetAPI_MakeThickSolid maker;
   maker.MakeThickSolidByJoin(shape.shape, closing, -thickness, 1e-3, BRepOffset_Skin, Standard_False, Standard_False, GeomAbs_Arc,
                              Standard_False);
-  return maker.IsDone() ? wrap(valid_or_null(maker.Shape())) : nullptr;
+  if (!maker.IsDone()) return nullptr;
+  const TopoDS_Shape result = valid_or_null(maker.Shape());
+  if (result.IsNull()) return nullptr;
+  const std::vector<naming::Named> source{naming::named(shape)};
+  return naming::wrap_named(result,
+                            naming::inherit(result, source, naming::history_of(source, maker), "inner", naming::Images::Offset));
 }
 
 std::unique_ptr<Shape> chain_face(rust::Slice<const double> chain) {
@@ -367,12 +407,14 @@ std::unique_ptr<Shape> circle_section(rust::Slice<const double> center, rust::Sl
 std::unique_ptr<Shape> prism_of_face(const Shape &face, rust::Slice<const double> direction) {
   if (direction.size() != 3) throw std::invalid_argument("prism: need a 3D direction");
   BRepPrimAPI_MakePrism maker(face.shape, gp_Vec(direction[0], direction[1], direction[2]), Standard_False, Standard_True);
-  return wrap(maker.Shape());
+  const TopoDS_Shape result = maker.Shape();
+  return naming::wrap_named(result, naming::swept_roles(result, face.shape, maker, "side"));
 }
 
 std::unique_ptr<Shape> revolution_of_face(const Shape &face, rust::Slice<const double> axis, double angle) {
   BRepPrimAPI_MakeRevol maker(face.shape, gp_Ax1(gp_Pnt(0, 0, 0), direction_of(axis)), angle, Standard_False);
-  return wrap(maker.Shape());
+  const TopoDS_Shape result = maker.Shape();
+  return naming::wrap_named(result, naming::swept_roles(result, face.shape, maker, "section"));
 }
 
 std::unique_ptr<Shape> skinned_solid(rust::Slice<const double> chains, rust::Slice<const uint32_t> lengths, bool ruled) {
@@ -415,17 +457,19 @@ std::unique_ptr<Shape> bspline_patch_solid(rust::Slice<const double> poles, doub
 }
 
 std::unique_ptr<Shape> feature_revol_cut(const Shape &source, rust::Slice<const double> profile, rust::Slice<const double> origin,
-                                         rust::Slice<const double> normal) {
+                                         rust::Slice<const double> normal, rust::Str tag) {
   const TopoDS_Shape face = polygon_face(profile);
   if (face.IsNull()) return nullptr;
   BRepFeat_MakeRevol maker;
   maker.Init(source.shape, face, TopoDS_Face(), gp_Ax1(point_at(origin, 0), direction_of(normal)), 0, Standard_True);
   maker.Perform(2 * M_PI);
-  return maker.IsDone() ? wrap(maker.Shape()) : nullptr;
+  if (!maker.IsDone()) return nullptr;
+  return feature_named(maker, source, face, std::string(tag));
 }
 
 std::unique_ptr<Shape> feature_prism_cut(const Shape &source, rust::Slice<const double> chain, rust::Slice<const double> origin,
-                                         rust::Slice<const double> normal, rust::Slice<const double> probes, double length) {
+                                         rust::Slice<const double> normal, rust::Slice<const double> probes, double length,
+                                         rust::Str tag) {
   const gp_Dir frame_normal = direction_of(normal);
   const TopoDS_Shape sketch = supporting_face(source.shape, point_at(origin, 0), frame_normal, probes);
   const std::unique_ptr<Shape> profile = chain_face(chain);
@@ -433,7 +477,8 @@ std::unique_ptr<Shape> feature_prism_cut(const Shape &source, rust::Slice<const 
   BRepFeat_MakePrism maker;
   maker.Init(source.shape, profile->shape, TopoDS::Face(sketch), frame_normal.Reversed(), 0, Standard_True);
   maker.Perform(length);
-  return maker.IsDone() ? wrap(maker.Shape()) : nullptr;
+  if (!maker.IsDone()) return nullptr;
+  return feature_named(maker, source, profile->shape, std::string(tag));
 }
 
 bool is_valid_shape(const Shape &shape) {
@@ -446,9 +491,11 @@ std::unique_ptr<Shape> unified_shape(const Shape &shape) {
     ShapeUpgrade_UnifySameDomain unifier(shape.shape, Standard_True, Standard_True, Standard_False);
     unifier.AllowInternalEdges(Standard_False);
     unifier.Build();
-    return wrap(unifier.Shape());
+    const std::vector<naming::Named> inputs{naming::named(shape)};
+    const TopoDS_Shape result = unifier.Shape();
+    return naming::wrap_named(result, naming::inherit(result, inputs, unifier.History(), "unify"));
   } catch (const Standard_Failure &) {
-    return wrap(shape.shape);
+    return naming::wrap_named(shape.shape, naming::face_names(shape));
   }
 }
 

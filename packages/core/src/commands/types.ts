@@ -37,6 +37,11 @@ export interface CommandResult {
   rejected?: true;
   /** Machine-readable reason of a refusal (always set with `rejected`; a command may also set it on its own no-op). */
   error?: CommandError;
+  /**
+   * Params the command resolved itself and wants replayed (SC-N1: the persistent names of the edges / faces it picked), merged into the
+   * FeatureStep `execute` records; never returned to the caller.
+   */
+  recordExtras?: Readonly<Record<string, unknown>>;
 }
 
 /**

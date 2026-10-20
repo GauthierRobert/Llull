@@ -46,11 +46,14 @@
 #include <gp_Ax1.hxx>
 #include <gp_Trsf.hxx>
 
+#include "llull-kernel-occt/cpp/naming.hxx"
 #include "llull-kernel-occt/src/lib.rs.h"
 
 namespace llull {
 
 namespace {
+
+using naming::Named;
 
 void require_length(rust::Slice<const double> values, size_t length, const char *what) {
   if (values.size() != length) throw std::invalid_argument(std::string(what) + ": wrong number of components");
@@ -98,6 +101,18 @@ TopoDS_Shape transformed_copy(const TopoDS_Shape &shape, const gp_Trsf &transfor
   return transformer.Shape();
 }
 
+// A transformed copy that keeps the face names (the copy's faces are the history images of the original's).
+std::unique_ptr<Shape> transformed_named(const Shape &shape, const gp_Trsf &transform) {
+  BRepBuilderAPI_Transform transformer(shape.shape, transform, Standard_True);
+  const std::vector<Named> inputs{naming::named(shape)};
+  const TopoDS_Shape result = transformer.Shape();
+  return naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, transformer), "transform"));
+}
+
+std::unique_ptr<Shape> with_roles(const TopoDS_Shape &shape, bool axial) {
+  return naming::wrap_named(shape, naming::primitive_roles(shape, axial));
+}
+
 Bnd_Box bounds_of(const TopoDS_Shape &shape) {
   Bnd_Box box;
   BRepBndLib::Add(shape, box, Standard_False);
@@ -130,27 +145,27 @@ std::unique_ptr<Shape> make_box(rust::Slice<const double> origin, rust::Slice<co
   require_length(origin, 3, "origin");
   require_length(size, 3, "size");
   BRepPrimAPI_MakeBox maker(gp_Pnt(origin[0], origin[1], origin[2]), size[0], size[1], size[2]);
-  return wrap(maker.Shape());
+  return with_roles(maker.Shape(), false);
 }
 
 std::unique_ptr<Shape> make_cylinder(double radius, double height) {
   BRepPrimAPI_MakeCylinder maker(radius, height);
-  return wrap(maker.Shape());
+  return with_roles(maker.Shape(), true);
 }
 
 std::unique_ptr<Shape> make_sphere(double radius) {
   BRepPrimAPI_MakeSphere maker(radius);
-  return wrap(maker.Shape());
+  return with_roles(maker.Shape(), true);
 }
 
 std::unique_ptr<Shape> make_cone(double base_radius, double top_radius, double height) {
   BRepPrimAPI_MakeCone maker(base_radius, top_radius, height);
-  return wrap(maker.Shape());
+  return with_roles(maker.Shape(), true);
 }
 
 std::unique_ptr<Shape> make_torus(double ring_radius, double tube_radius) {
   BRepPrimAPI_MakeTorus maker(ring_radius, tube_radius);
-  return wrap(maker.Shape());
+  return with_roles(maker.Shape(), true);
 }
 
 std::unique_ptr<Shape> make_prism(rust::Slice<const double> polygon, rust::Slice<const double> direction) {
@@ -158,7 +173,8 @@ std::unique_ptr<Shape> make_prism(rust::Slice<const double> polygon, rust::Slice
   const TopoDS_Shape face = polygon_face(polygon);
   if (face.IsNull()) return nullptr;
   BRepPrimAPI_MakePrism maker(face, gp_Vec(direction[0], direction[1], direction[2]), Standard_False, Standard_True);
-  return wrap(maker.Shape());
+  const TopoDS_Shape result = maker.Shape();
+  return naming::wrap_named(result, naming::swept_roles(result, face, maker, "side"));
 }
 
 std::unique_ptr<Shape> make_revolution(rust::Slice<const double> polygon, rust::Slice<const double> axis, double angle) {
@@ -166,7 +182,8 @@ std::unique_ptr<Shape> make_revolution(rust::Slice<const double> polygon, rust::
   const TopoDS_Shape face = polygon_face(polygon);
   if (face.IsNull()) return nullptr;
   BRepPrimAPI_MakeRevol maker(face, gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(axis[0], axis[1], axis[2])), angle, Standard_False);
-  return wrap(maker.Shape());
+  const TopoDS_Shape result = maker.Shape();
+  return naming::wrap_named(result, naming::swept_roles(result, face, maker, "section"));
 }
 
 std::unique_ptr<Shape> make_sewn_solid(rust::Slice<const double> positions, rust::Slice<const uint32_t> indices) {
@@ -202,42 +219,67 @@ std::unique_ptr<Shape> make_sewn_solid(rust::Slice<const double> positions, rust
 
 std::unique_ptr<Shape> placed(const Shape &shape, rust::Slice<const double> rotation, rust::Slice<const double> position,
                               rust::Slice<const double> anchor_shift) {
-  return wrap(transformed_copy(shape.shape, placement(rotation, position, anchor_shift)));
+  return transformed_named(shape, placement(rotation, position, anchor_shift));
 }
 
 std::unique_ptr<Shape> scaled(const Shape &shape, double factor) {
   gp_Trsf transform;
   transform.SetScale(gp_Pnt(0, 0, 0), factor);
-  return wrap(transformed_copy(shape.shape, transform));
+  return transformed_named(shape, transform);
 }
+
+namespace {
+
+template <class Builder>
+bool run_boolean(Builder &builder, TopoDS_Shape &result, Handle(BRepTools_History) & history) {
+  if (!builder.IsDone()) return false;
+  result = builder.Shape();
+  history = builder.History();
+  return true;
+}
+
+}  // namespace
 
 std::unique_ptr<Shape> boolean_op(const Shape &a, const Shape &b, int32_t operation, bool unify) {
   TopoDS_Shape result;
+  Handle(BRepTools_History) history;
+  bool done = false;
   if (operation == 0) {
     BRepAlgoAPI_Fuse builder(a.shape, b.shape);
-    if (!builder.IsDone()) return nullptr;
-    result = builder.Shape();
+    done = run_boolean(builder, result, history);
   } else if (operation == 1) {
     BRepAlgoAPI_Cut builder(a.shape, b.shape);
-    if (!builder.IsDone()) return nullptr;
-    result = builder.Shape();
+    done = run_boolean(builder, result, history);
   } else if (operation == 2) {
     BRepAlgoAPI_Common builder(a.shape, b.shape);
-    if (!builder.IsDone()) return nullptr;
-    result = builder.Shape();
+    done = run_boolean(builder, result, history);
   } else {
     throw std::invalid_argument("boolean: unknown operation");
   }
-  if (!unify) return wrap(result);
-  try {
-    // Merge the faces a boolean split so face / edge indices stay stable for later fillets.
-    ShapeUpgrade_UnifySameDomain unifier(result, Standard_True, Standard_True, Standard_False);
-    unifier.AllowInternalEdges(Standard_False);
-    unifier.Build();
-    return wrap(unifier.Shape());
-  } catch (const Standard_Failure &) {
-    return wrap(result);
+  if (!done) return nullptr;
+  const std::vector<Named> inputs{naming::named(a), naming::named(b)};
+  std::vector<std::string> names = naming::inherit(result, inputs, history, "boolean");
+  if (unify) {
+    try {
+      // Merge the faces a boolean split so face / edge indices stay stable for later fillets.
+      ShapeUpgrade_UnifySameDomain unifier(result, Standard_True, Standard_True, Standard_False);
+      unifier.AllowInternalEdges(Standard_False);
+      unifier.Build();
+      const TopoDS_Shape unified = unifier.Shape();
+      const std::vector<Named> split{Named{result, names}};
+      return naming::wrap_named(unified, naming::inherit(unified, split, unifier.History(), "unify"));
+    } catch (const Standard_Failure &) {
+      // fall through: the boolean result itself
+    }
   }
+  return naming::wrap_named(result, std::move(names));
+}
+
+std::unique_ptr<Shape> prefixed(const Shape &shape, rust::Str prefix) {
+  std::vector<std::string> names = naming::face_names(shape);
+  const std::string head = std::string(prefix) + ":";
+  for (std::string &name : names) name = head + name;
+  return naming::wrap_named(shape.shape, std::move(names));
 }
 
 MeshOut tessellate(const Shape &shape, double linear_deflection, double angular_deflection) {

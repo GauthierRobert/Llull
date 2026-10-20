@@ -18,6 +18,8 @@ type EdgeCurve = 'line' | 'circle' | 'ellipse' | 'bspline' | 'other';
 /** One unique edge; `index` is what `fillet_edge` / `chamfer_edge` `edgeIndices` select. */
 export interface ShapeEdge {
   readonly index: number;
+  /** Persistent name from the kernel's history (SC-N1, `geometry/naming/references`): `e(<face>|<face>)`; absent without history. */
+  readonly name?: string;
   readonly curve: EdgeCurve;
   readonly length: number;
   readonly start: Vec3;
@@ -34,6 +36,8 @@ export interface ShapeEdge {
 
 export interface ShapeFace {
   readonly index: number;
+  /** Persistent name from the kernel's history (SC-N1): `<entity>:<role>`, `blend(<edge>)`, `<face>~inner`; absent without history. */
+  readonly name?: string;
   readonly surface: FaceSurface;
   readonly area: number;
   /** Cylinder, cone and revolution faces (OCC): the axis line and, for a cylinder, its radius (document units). */

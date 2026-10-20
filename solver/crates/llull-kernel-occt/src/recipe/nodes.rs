@@ -183,7 +183,22 @@ impl Evaluator {
 }
 
 /// The BRepFeat cut of a hole (one MakeRevol per position) or a pocket (MakePrism from its sketch face); `None` = use the lowering.
+/// Feature cuts below `recipe` on its source chain: the rank `n` of the tool tags `hole<n>.<k>` / `pocket<n>` (SC-N1), stable when an
+/// upstream parameter changes.
+fn feature_rank(recipe: &Value) -> usize {
+    let mut rank = 0;
+    let mut current = recipe.get("source");
+    while let Some(node) = current {
+        if node.get("op").and_then(Value::as_str) == Some("featureCut") {
+            rank += 1;
+        }
+        current = node.get("source").or_else(|| node.get("a"));
+    }
+    rank
+}
+
 fn brep_feat(source: &Rc<Shape>, recipe: &Value) -> Result<Option<Shape>, EvalError> {
+    let rank = feature_rank(recipe);
     if let Some(holes) = recipe.get("holes") {
         let (Some(profiles), Some(origins), Some(normal)) =
             (chains(holes.get("profiles")), holes.get("origins").and_then(Value::as_array), vec3(holes, "normal"))
@@ -191,10 +206,11 @@ fn brep_feat(source: &Rc<Shape>, recipe: &Value) -> Result<Option<Shape>, EvalEr
             return Ok(None);
         };
         let mut current: Option<Shape> = None;
-        for (profile, origin) in profiles.iter().zip(origins) {
+        for (index, (profile, origin)) in profiles.iter().zip(origins).enumerate() {
             let Some(origin) = vec3_of(Some(origin)) else { return Ok(None) };
             let base: &Shape = current.as_ref().unwrap_or(source);
-            match features::feature_revol_cut(base, profile, origin, normal).map_err(EvalError::Failure)? {
+            let tag = format!("hole{rank}.{index}");
+            match features::feature_revol_cut(base, profile, origin, normal, &tag).map_err(EvalError::Failure)? {
                 Some(next) => current = Some(next),
                 None => return Ok(None),
             }
@@ -208,7 +224,7 @@ fn brep_feat(source: &Rc<Shape>, recipe: &Value) -> Result<Option<Shape>, EvalEr
         return Ok(None);
     };
     let length = number(pocket, "length").unwrap_or(f64::NAN);
-    features::feature_prism_cut(source, &chain, origin, normal, &probes, length).map_err(EvalError::Failure)
+    features::feature_prism_cut(source, &chain, origin, normal, &probes, length, &format!("pocket{rank}")).map_err(EvalError::Failure)
 }
 
 #[cfg(test)]

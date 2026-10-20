@@ -32,7 +32,7 @@ mod ffi {
         fn pipe_solid(spine: &[f64], section: &Shape) -> Result<UniquePtr<Shape>>;
         fn bspline_patch_solid(poles: &[f64], tolerance: f64) -> Result<UniquePtr<Shape>>;
 
-        fn feature_revol_cut(source: &Shape, profile: &[f64], origin: &[f64], normal: &[f64]) -> Result<UniquePtr<Shape>>;
+        fn feature_revol_cut(source: &Shape, profile: &[f64], origin: &[f64], normal: &[f64], tag: &str) -> Result<UniquePtr<Shape>>;
         fn feature_prism_cut(
             source: &Shape,
             chain: &[f64],
@@ -40,6 +40,7 @@ mod ffi {
             normal: &[f64],
             probes: &[f64],
             length: f64,
+            tag: &str,
         ) -> Result<UniquePtr<Shape>>;
         fn is_valid_shape(shape: &Shape) -> Result<bool>;
         fn unified_shape(shape: &Shape) -> Result<UniquePtr<Shape>>;
@@ -117,12 +118,14 @@ pub fn bspline_patch_solid(poles: &[f64], tolerance: f64) -> Built {
     built(ffi::bspline_patch_solid(poles, tolerance))
 }
 
-pub fn feature_revol_cut(source: &Shape, profile: &[f64], origin: [f64; 3], normal: [f64; 3]) -> Built {
-    built(ffi::feature_revol_cut(inner(source)?, profile, &origin, &normal))
+/// `tag` names the faces the cut generates (SC-N1, `hole<n>.<k>`).
+pub fn feature_revol_cut(source: &Shape, profile: &[f64], origin: [f64; 3], normal: [f64; 3], tag: &str) -> Built {
+    built(ffi::feature_revol_cut(inner(source)?, profile, &origin, &normal, tag))
 }
 
-pub fn feature_prism_cut(source: &Shape, chain: &[f64], origin: [f64; 3], normal: [f64; 3], probes: &[f64], length: f64) -> Built {
-    built(ffi::feature_prism_cut(inner(source)?, chain, &origin, &normal, probes, length))
+/// `tag` names the faces the cut generates (SC-N1, `pocket<n>`).
+pub fn feature_prism_cut(source: &Shape, chain: &[f64], origin: [f64; 3], normal: [f64; 3], probes: &[f64], length: f64, tag: &str) -> Built {
+    built(ffi::feature_prism_cut(inner(source)?, chain, &origin, &normal, probes, length, tag))
 }
 
 pub fn is_valid(shape: &Shape) -> OcctResult<bool> {
