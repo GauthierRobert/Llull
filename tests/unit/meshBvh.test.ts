@@ -175,6 +175,8 @@ describe('meshBvh against brute force', () => {
     expect(found).not.toBeNull();
     expect(found?.distance).toBeCloseTo(expected, 9);
     expect(bvhMinDistance(bvhA, bvhB, expected / 2 - 1e-9, transform)).toBeNull();
+    // a bound just above the answer: the per-triangle box test must keep the closest pair
+    expect(bvhMinDistance(bvhA, bvhB, expected + 1e-9, transform)?.distance).toBeCloseTo(expected, 9);
     expect(bvhIntersects(bvhA, bvhB, transform)).toBe(expected <= 0);
     expect(bvhIntersects(bvhA, bvhB, transform, expected + 1e-9)).toBe(true);
     const again = bvhMinDistance(buildMeshBvh(meshA), buildMeshBvh(meshB), 1e9, transform);
