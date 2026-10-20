@@ -3,6 +3,7 @@
 import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact, ResultsSummary, ThermomechTransientSummary } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
 import { significantNumber } from '@lib/compactNumber';
+import { preheatPeriodS } from './preheat';
 import { isTransientCase } from '../thermal/access';
 import { magnitude, nodeCoordinates, nodeEntities, vonMises, type ResultStep } from '../results/fields';
 
@@ -24,8 +25,8 @@ function extreme(
 
 /**
  * Series of the last CalculiX step of a transient coupled case: every written increment with DISP, STRESS and NDTEMP gives max von Mises,
- * max displacement magnitude and the temperature extremes at its time (seconds from the start of the coupled step: the increments' total time
- * minus the end time of the step, so a pre-heating step before it does not shift them), plus the peaks over time (first one wins ties).
+ * max displacement magnitude and the temperature extremes at its time (seconds from the start of the coupled step: the increments' total
+ * time minus the period of the pre-heating step written before it, 0 without one), plus the peaks over time (first one wins ties).
  * `loadCase` is the entry `resultsSummary` records for it: the PEAK over time, which is what margins must use.
  * @failure not a transient coupled case, or no increment with the three fields -> undefined
  */
@@ -35,15 +36,13 @@ export function transientResults(
   results: FeResultsArtifact,
 ): { readonly summary: ThermomechTransientSummary; readonly loadCases: ResultsSummary['loadCases'] } | undefined {
   const setup = analysis.thermomech;
-  const endTime = setup?.thermal?.step.endTimeS;
-  if (setup === undefined || endTime === undefined || !isTransientCase(analysis)) return undefined;
+  if (setup?.thermal === undefined || setup.thermal.step.endTimeS === undefined || !isTransientCase(analysis)) return undefined;
   const last = results.steps.reduce((max, step) => Math.max(max, step.step), 0);
   const steps = results.steps.filter(
     (step) => step.step === last && step.fields['DISP'] !== undefined && step.fields['STRESS'] !== undefined,
   );
-  const final = steps.at(-1);
-  if (final === undefined) return undefined;
-  const offset = final.time - endTime;
+  if (steps.length === 0) return undefined;
+  const offset = preheatPeriodS({ ...setup, thermal: setup.thermal });
   const coordinates = nodeCoordinates(mesh);
   const entities = nodeEntities(mesh);
   const at = (node: number): Vec3 => coordinates.get(node) ?? [0, 0, 0];

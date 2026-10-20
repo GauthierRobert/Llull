@@ -88,4 +88,40 @@ describe.skipIf(!READY)('transient coupled step on the restrained bar (TR-TMC-22
     const probes = await session.probes(analysisId, 3);
     expectCase('VC-TMC-01.a', probes['mid'] ?? Number.NaN, 'MPa');
   }, 600_000);
+
+  it('seeds a start temperature different from T_ref through the pre-heating step: the first increment starts at it, times from the coupled step', async () => {
+    const session = workspace.open('coupled-transient-preheat');
+    const analysisId = await session.idOf(planPath('tmc_coupled_bar'), 'an');
+    const cp = {
+      id: 'cp',
+      property: 'cp',
+      unit: 'J/(kg*K)',
+      variables: [],
+      validity: [],
+      form: { kind: 'constant', value: 480 },
+      basis: 'company',
+      source: { citation: 'test input of this validation case (not a material claim)' },
+    };
+    for (const [command, ...argv] of [
+      ['define_property_model', 'material=steel_test', `model=${JSON.stringify(cp)}`],
+      ['set_initial_temperature', `analysisId=${analysisId}`, 'value=60', 'unit=degC'],
+      ['set_thermal_step', `analysisId=${analysisId}`, 'endTimeS=10', 'initialIncrementS=0.5', 'maxIncrementS=1', 'outputEveryS=1'],
+    ] as const) {
+      const done = await session.cli(command, ...argv);
+      expect(done.code, String(done.json['summary'])).toBe(0);
+    }
+    await session.mesh(analysisId);
+    const exported = await session.cli('fea_export', `analysisId=${analysisId}`);
+    expect(String(dataOf(exported.json)['text'])).toContain('*STATIC');
+    await session.solve(analysisId);
+    const report = await session.cli('fea_report', `analysisId=${analysisId}`);
+    const results = dataOf(report.json)['results'];
+    const transient = isRecord(results) ? results['thermomechTransient'] : undefined;
+    const series = isRecord(transient) && Array.isArray(transient['series']) ? transient['series'] : [];
+    const first = series[0];
+    expect(isRecord(first), JSON.stringify(results)).toBe(true);
+    // the far part of the bar has not felt the 1 s of heating yet: it is still at the start temperature (60 degC), not at T_ref (20 degC)
+    expect(Math.abs(Number(isRecord(first) ? first['minTemperature'] : Number.NaN) - 60)).toBeLessThan(5);
+    expect(Number(isRecord(first) ? first['timeS'] : Number.NaN)).toBeLessThanOrEqual(2);
+  }, 600_000);
 });

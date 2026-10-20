@@ -126,7 +126,7 @@ export function evaluateProbes(
   const sets: { loadCase: string | null; step: ResultStep }[] = heat
     ? results.steps.map((step) => ({ loadCase: null, step }))
     : loadCasesOf(analysis).flatMap(({ name }, index) => {
-        const step = stepOfLoadCase(results, index);
+        const step = stepOfLoadCase(results, index, analysis);
         return step === undefined ? [] : [{ loadCase: name, step }];
       });
   const coordinates = nodeCoordinates(mesh);
