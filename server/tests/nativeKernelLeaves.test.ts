@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { CurveSegment } from '@core/model/curve';
 import type { Entity, MeshData, ShapeRecipe, Vec2, Vec3 } from '@core/model/types';
 import { boxCage } from '@core/geometry/subdivision';
-import { encodeChain, nativeLeaf, orientedChain } from '../src/native/kernelLeaves';
+import { encodeBspline, encodeChain, nativeLeaf, orientedChain } from '../src/native/kernelLeaves';
 import { prepareFeatures, type SourceMesher } from '../src/native/kernelFeatures';
 import { nativeRecipe } from '../src/native/kernelProtocol';
 import { box, common, leaf } from './kernelTestSupport';
@@ -94,6 +94,73 @@ describe('native leaves', () => {
     expect(curved['chain']).toEqual(orientedChain(square, lift, true));
     const revolved = nativeLeaf(entity('revolution', { profile: [], curves: square, axis: [0, 1, 0], angle: 1, segments: 8 }));
     expect((revolved as unknown as { chain: number[] }).chain.slice(0, 7)).toEqual([0, 0, 0, 0, 1, 0, 0]);
+  });
+
+  describe('B-spline loft sections (capability bsplineSections)', () => {
+    /** A closed-trailing-edge-less section: an open cubic B-spline (its ends differ, so the closing edge is a straight line). */
+    const section = (z: number, scale = 1): { degree: number; poles: Vec3[]; knots: number[]; multiplicities: number[] } => ({
+      degree: 3,
+      poles: [
+        [1 * scale, 0, z],
+        [0.5 * scale, 0.4 * scale, z],
+        [-0.5 * scale, 0.4 * scale, z],
+        [-1 * scale, 0, z],
+        [-0.5 * scale, -0.4 * scale, z],
+      ],
+      knots: [0, 0.5, 1],
+      multiplicities: [4, 1, 4],
+    });
+    const lofted = (wire?: { bsplineSections?: boolean }): { native: Record<string, unknown> } =>
+      nativeLeaf(
+        entity('loft', { rings: [[[0, 0, 0]], [[0, 0, 1]]], ruled: false, sections: [section(0), section(2, 0.5)] }),
+        wire,
+      ) as unknown as { native: Record<string, unknown> };
+
+    it('encodes degree, counts, flags, poles, weights, knots and multiplicities', () => {
+      const curve = { ...section(0), weights: [1, 2, 3, 4, 5] };
+      expect(encodeBspline(section(0), true)).toEqual([3, 5, 3, 0, 1, ...section(0).poles.flat(), 0, 0.5, 1, 4, 1, 4]);
+      const rational = encodeBspline(curve, false);
+      expect(rational.slice(0, 5)).toEqual([3, 5, 3, 1, 0]);
+      expect(rational.slice(5 + 15, 5 + 20)).toEqual([1, 2, 3, 4, 5]);
+    });
+
+    it('adds native.bsplines only when the sidecar reported the capability, keeping the Bezier chains as the fallback', () => {
+      const plain = lofted();
+      expect(plain.native['bsplines']).toBeUndefined();
+      expect(plain.native['chains']).toHaveLength(2);
+      const enabled = lofted({ bsplineSections: true });
+      const bsplines = enabled.native['bsplines'] as number[][];
+      expect(bsplines).toHaveLength(2);
+      expect(bsplines[0]!.slice(0, 5)).toEqual([3, 5, 3, 0, 1]);
+      expect(bsplines[1]!.slice(5, 8)).toEqual([0.5, 0, 2]);
+      expect(enabled.native['chains']).toEqual(plain.native['chains']);
+    });
+
+    it('a loft without exact sections (rings only) stays on chains whatever the capability', () => {
+      const ring: Vec3[] = [
+        [1, 0, 0],
+        [0, 1, 0],
+        [-1, 0, 0],
+        [0, -1, 0],
+      ];
+      const leafOf = nativeLeaf(entity('loft', { rings: [ring, ring], ruled: true }), { bsplineSections: true }) as unknown as {
+        native: Record<string, unknown>;
+      };
+      expect(leafOf.native['bsplines']).toBeUndefined();
+    });
+
+    it('is threaded through nativeRecipe', () => {
+      const recipe: ShapeRecipe = {
+        op: 'solid',
+        entity: entity('loft', { rings: [[[0, 0, 0]], [[0, 0, 1]]], ruled: false, sections: [section(0), section(2)] }),
+      };
+      const plain = nativeRecipe(recipe) as unknown as { entity: { native: Record<string, unknown> } };
+      const wired = nativeRecipe(recipe, undefined, { bsplineSections: true }) as unknown as {
+        entity: { native: Record<string, unknown> };
+      };
+      expect(plain.entity.native['bsplines']).toBeUndefined();
+      expect(wired.entity.native['bsplines']).toHaveLength(2);
+    });
   });
 
   it('sends loft, sweep and subdivision payloads', () => {

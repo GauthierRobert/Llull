@@ -15,7 +15,7 @@ import { entityTrianglePositions } from '@core/geometry/entityTriangles';
 import { orientOutward } from '@core/geometry/meshVolume';
 import { recipeKey } from '@core/geometry/shapeRecipe';
 import { clearTangentContact } from '@core/geometry/tangentGuard';
-import { nativeLeaf } from './kernelLeaves';
+import { nativeLeaf, type WireOptions } from './kernelLeaves';
 
 /** The op or recipe node is not native yet: the host answers it with the WASM kernel. */
 const NATIVE_UNSUPPORTED = 'NATIVE_UNSUPPORTED';
@@ -87,8 +87,8 @@ const NO_COMPONENTS = createEmptyDocument();
  * Pyramids are sewn from their triangles by the WASM kernel too (occtShapes.ts TRIANGULATED_KINDS): send the same triangles. Curved
  * profiles, lofts, sweeps and subdivision solids carry their host-computed geometry (`nativeLeaf`).
  */
-function asNativeLeaf(entity: Entity): Entity {
-  if (entity.kind !== 'pyramid') return nativeLeaf(entity);
+function asNativeLeaf(entity: Entity, wire: WireOptions): Entity {
+  if (entity.kind !== 'pyramid') return nativeLeaf(entity, wire);
   const positions = entityTrianglePositions(entity, NO_COMPONENTS);
   const { id, layerId, color } = entity;
   return {
@@ -145,11 +145,11 @@ const NO_LOWERINGS: FeatureLowerings = new Map();
  * The recipe the sidecar builds: the same B-rep inputs the WASM kernel would build from `recipe`. A `feature` node with an entry in
  * `features` becomes a `featureCut` node; one without stays a `feature` node, which the sidecar answers NATIVE_UNSUPPORTED.
  */
-export function nativeRecipe(recipe: ShapeRecipe, features: FeatureLowerings = NO_LOWERINGS): ShapeRecipe {
-  const child = (node: ShapeRecipe): ShapeRecipe => nativeRecipe(node, features);
+export function nativeRecipe(recipe: ShapeRecipe, features: FeatureLowerings = NO_LOWERINGS, wire: WireOptions = {}): ShapeRecipe {
+  const child = (node: ShapeRecipe): ShapeRecipe => nativeRecipe(node, features, wire);
   switch (recipe.op) {
     case 'solid': {
-      const entity = asNativeLeaf(recipe.entity);
+      const entity = asNativeLeaf(recipe.entity, wire);
       return entity === recipe.entity ? recipe : { op: 'solid', entity };
     }
     case 'boolean': {
@@ -181,10 +181,10 @@ interface WireHandle {
   readonly recipe?: ShapeRecipe;
 }
 
-function nativeHandle(handle: unknown, features: FeatureLowerings): unknown {
+function nativeHandle(handle: unknown, features: FeatureLowerings, wire: WireOptions): unknown {
   if (typeof handle !== 'object' || handle === null || !('key' in handle)) return handle;
   const { key, recipe } = handle as WireHandle;
-  return recipe === undefined ? { key } : { key, recipe: nativeRecipe(recipe, features) };
+  return recipe === undefined ? { key } : { key, recipe: nativeRecipe(recipe, features, wire) };
 }
 
 /** Ops whose first argument is a shape handle (every `faceQuery.<method>` too). */
@@ -206,7 +206,7 @@ interface WireAssembly {
   readonly occurrences: readonly WireUse[];
 }
 
-function wireAssembly(occurrences: readonly StepOccurrence<unknown>[], features: FeatureLowerings): WireAssembly {
+function wireAssembly(occurrences: readonly StepOccurrence<unknown>[], features: FeatureLowerings, wire: WireOptions): WireAssembly {
   const parts: WireAssembly['parts'][number][] = [];
   const indexOf = new Map<StepAssemblyPart<unknown>, number>();
   const placedUse = ({ part, position, rotation }: StepOccurrence<unknown>): WireUse => ({ part: partIndex(part), position, rotation });
@@ -216,7 +216,7 @@ function wireAssembly(occurrences: readonly StepOccurrence<unknown>[], features:
     const index = parts.length;
     indexOf.set(part, index);
     const children: WireUse[] = [];
-    parts.push({ shapes: part.shapes.map((handle) => nativeHandle(handle, features)), children });
+    parts.push({ shapes: part.shapes.map((handle) => nativeHandle(handle, features, wire)), children });
     for (const child of part.children ?? []) children.push(placedUse(child));
     return index;
   }
@@ -224,15 +224,20 @@ function wireAssembly(occurrences: readonly StepOccurrence<unknown>[], features:
 }
 
 /** Arguments of a `KernelOps` request rewritten for the sidecar (see the module comment); `features` lowers its feature nodes. */
-export function nativeArgs(op: string, args: readonly unknown[], features: FeatureLowerings = NO_LOWERINGS): readonly unknown[] {
+export function nativeArgs(
+  op: string,
+  args: readonly unknown[],
+  features: FeatureLowerings = NO_LOWERINGS,
+  wire: WireOptions = {},
+): readonly unknown[] {
   if (op === 'evaluate') {
     const recipe = args[0] as ShapeRecipe;
-    return [{ key: recipeKey(recipe), recipe: nativeRecipe(recipe, features) }];
+    return [{ key: recipeKey(recipe), recipe: nativeRecipe(recipe, features, wire) }];
   }
-  const handle = (value: unknown): unknown => nativeHandle(value, features);
+  const handle = (value: unknown): unknown => nativeHandle(value, features, wire);
   if (takesShapeFirst(op)) return [handle(args[0]), ...args.slice(1)];
   if (op === 'distance') return [handle(args[0]), handle(args[1]), ...args.slice(2)];
   if (op === 'exportStep' && Array.isArray(args[0])) return [args[0].map(handle)];
-  if (op === 'exportStepAssembly' && Array.isArray(args[0])) return [wireAssembly(args[0] as StepOccurrence<unknown>[], features)];
+  if (op === 'exportStepAssembly' && Array.isArray(args[0])) return [wireAssembly(args[0] as StepOccurrence<unknown>[], features, wire)];
   return args;
 }

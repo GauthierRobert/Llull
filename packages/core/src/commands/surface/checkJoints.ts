@@ -82,7 +82,7 @@ function bestJoint(
 
 /**
  * @affects none; data = { joints [{ a, b, g0Gap, g1AngleRad, g1AngleDeg, g2Gap, g2Rel, g3Gap?, order, pass, worst, samples? }], minOrder, pass, tolerances, unit, engine, provenance }
- * @invariant order = highest G-level whose measures are all within tolerance; surfaces are measured to G2, curves to G3
+ * @invariant order = highest G-level whose measures are all within tolerance; curves and surfaces are measured to G3
  * @failure unknown id -> SRF_ENTITY_NOT_FOUND; a solid / 2D shape -> SRF_NOT_ANALYSABLE; a curve paired with a surface -> SRF_CONTINUITY_MISMATCH; bad samples -> SRF_PARAM_INVALID
  */
 export const checkContinuity = defineCommand({
@@ -92,8 +92,8 @@ export const checkContinuity = defineCommand({
     'Read-only geometric continuity of joints, in numbers (not a picture). Each pair joins two nurbs_curve entities (the nearest pair of ends is ' +
     'compared) or two nurbs_surface entities (one boundary edge of each, `side` "u0" | "u1" | "v0" | "v1", detected when omitted; sampled ' +
     '`samples` times along the first edge). Measured: G0 position gap (document units); G1 angle between tangents / surface normals (radians); ' +
-    'G2 jump of curvature (curves: the curvature vectors; surfaces: the normal curvature across the edge) with its relative size; for curves ' +
-    'G3 the jump of d(curvature)/ds. `order` is the highest level within tolerance: "none", "G0", "G1", "G2" or "G3". Tolerances default to ' +
+    'G2 jump of curvature (curves: the curvature vectors; surfaces: the normal curvature across the edge) with its relative size; ' +
+    'G3 the jump of d(curvature)/ds (surfaces: of the rate of normal curvature across the edge, one-sided into each patch). `order` is the highest level within tolerance: "none", "G0", "G1", "G2" or "G3". Tolerances default to ' +
     'g0 = 1e-6 x the size of the entities, g1AngleRad 0.01 rad, g2Rel 0.1 (10 %), g2Abs 1e-9, g3Rel 0.1 and are reported with the names that ' +
     'were defaulted. `require` makes `pass` false unless every joint reaches that order. Reference: a corner is G0, line + tangent arc G1, ' +
     'line + y=x^3 G2, line + y=x^4 G3.',

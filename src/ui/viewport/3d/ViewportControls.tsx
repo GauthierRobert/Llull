@@ -4,6 +4,7 @@ import React, { useId } from 'react';
 import { type DisplayMode, type ClipAxis, type QualityOverride, useViewportStore, useStore } from '@ui/store';
 import { type IconName, Icon } from '@ui/components/Icon';
 import { NumberField } from '@ui/components/NumberField';
+import { type SurfaceMapChoice, useSurfaceOverlayStore } from '@ui/store/surfaceOverlayStore';
 
 function Divider(): React.ReactElement {
   return <span className="vp-divider" aria-hidden="true" />;
@@ -227,6 +228,59 @@ function QualityControl(): React.ReactElement {
   );
 }
 
+const SURFACE_MAPS: { value: SurfaceMapChoice; label: string; title: string }[] = [
+  { value: 'off', label: 'Off', title: 'Plain sheet colour' },
+  { value: 'gaussian', label: 'Gaussian', title: 'Gaussian curvature K: blue negative, white flat, red positive' },
+  { value: 'mean', label: 'Mean', title: 'Mean curvature H: blue negative, white flat, red positive' },
+  {
+    value: 'zebra',
+    label: 'Zebra',
+    title: 'Zebra stripes (isophotes of the normal against a light along +Z): kinks show where stripes break',
+  },
+  { value: 'draft', label: 'Draft', title: 'Draft against a pull along +Z: red undercut, amber below 3 degrees, green above' },
+];
+
+/** Analysis overlays on nurbs sheets and curves: a colour map and the curvature comb (UI-only). */
+function SurfaceOverlayControl(): React.ReactElement {
+  const map = useSurfaceOverlayStore((s) => s.map);
+  const setMap = useSurfaceOverlayStore((s) => s.setMap);
+  const comb = useSurfaceOverlayStore((s) => s.comb);
+  const setComb = useSurfaceOverlayStore((s) => s.setComb);
+  const baseId = useId();
+  return (
+    <>
+      <div className="vp-group vp-quality" role="group" aria-label="Surface analysis overlay">
+        <label htmlFor={`${baseId}-map`} className="vp-field-label vp-quality__label">
+          Surface map
+        </label>
+        <select
+          id={`${baseId}-map`}
+          className="vp-select vp-select--ghost"
+          value={map}
+          onChange={(e) => setMap(e.target.value as SurfaceMapChoice)}
+          aria-label="Surface map"
+          title="Colour nurbs_surface sheets by curvature, zebra stripes or draft"
+        >
+          {SURFACE_MAPS.map(({ value, label, title }) => (
+            <option key={value} value={value} title={title}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <ToggleButton
+        group="Comb overlay"
+        text="Comb"
+        label="Curvature comb"
+        icon="ruler"
+        pressed={comb}
+        title={comb ? 'Hide the curvature comb on nurbs curves' : 'Show the curvature comb on nurbs curves'}
+        onClick={() => setComb(!comb)}
+      />
+    </>
+  );
+}
+
 export function ViewportControls(): React.ReactElement {
   return (
     <div className="vp-overlay vp-overlay--top-left" aria-label="Viewport controls">
@@ -237,6 +291,8 @@ export function ViewportControls(): React.ReactElement {
         <Snap3DToggle />
         <Divider />
         <QualityControl />
+        <Divider />
+        <SurfaceOverlayControl />
         <AnimationTransportControls />
       </div>
       <SectionPopover />

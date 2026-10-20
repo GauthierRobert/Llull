@@ -2,17 +2,23 @@
 
 import { commandCatalog } from '../schema';
 import { analyzeDraft, analyzeSurfaceCurvature } from './analyzeSurface';
+import { blendSurfaces } from './blendSurfaces';
+import { checkSurfaceQuality } from './checkQuality';
 import { createNurbsSurface, surfaceFromPoints } from './buildSurface';
 import { checkContinuity, measureDeviation } from './checkJoints';
 import { createConic, createNurbsCurve, interpolateCurve } from './createCurve';
+import { approximateCurve } from './approximateCurve';
 import { editNurbs } from './editNurbs';
-import { sewSurfaces, thickenSurface, trimSurface } from './editSurface';
-import { fillSurface, loftSurface } from './loftSurface';
+import { sewSurfaces, thickenSurface } from './editSurface';
+import { trimSurface } from './trimSurface';
+import { fillSurface } from './fillSurface';
+import { loftSurface } from './loftSurface';
 import { analyzeCurveCurvature, inspectNurbs } from './queryCurve';
 
 export const surfaceCommands = commandCatalog(
   createNurbsCurve,
   interpolateCurve,
+  approximateCurve,
   createConic,
   editNurbs,
   inspectNurbs,
@@ -21,11 +27,13 @@ export const surfaceCommands = commandCatalog(
   surfaceFromPoints,
   loftSurface,
   fillSurface,
+  blendSurfaces,
   trimSurface,
   sewSurfaces,
   thickenSurface,
   analyzeSurfaceCurvature,
   checkContinuity,
   measureDeviation,
+  checkSurfaceQuality,
   analyzeDraft,
 );

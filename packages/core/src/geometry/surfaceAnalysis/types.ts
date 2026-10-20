@@ -25,7 +25,7 @@ export interface ContinuityTolerances {
   readonly g2Rel: number;
   /** ... or an absolute jump (1/length) below which curvatures are equal. */
   readonly g2Abs: number;
-  /** Relative jump of d(curvature)/ds still counted as G3 (curves only). */
+  /** Relative jump of d(curvature)/ds still counted as G3 (surfaces: of the cross-edge rate of normal curvature). */
   readonly g3Rel: number;
 }
 
@@ -48,7 +48,7 @@ export interface ContinuityJoint {
   readonly g2Gap: number;
   /** Largest relative curvature jump over the samples (0 when both curvatures are below `g2Abs`). */
   readonly g2Rel: number;
-  /** Curves only (surfaces: null, third-order surface continuity is not measured). */
+  /** Curves: jump of d(curvature)/ds. Surfaces: jump of the cross-edge rate of normal curvature (null when the stencil leaves the patch). */
   readonly g3Gap: number | null;
   readonly order: ContinuityOrder;
   readonly worst: { readonly t: number; readonly point: Vec3 };

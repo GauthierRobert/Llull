@@ -71,7 +71,7 @@ fn bounds_json(values: &[f64]) -> Value {
 }
 
 fn info() -> Value {
-    let capabilities: Vec<&str> = ["analyze", "massProperties", "exportStep"].into_iter().chain(QUERY_CAPABILITIES).collect();
+    let capabilities: Vec<&str> = ["analyze", "massProperties", "exportStep", "bsplineSections"].into_iter().chain(QUERY_CAPABILITIES).collect();
     json!({
         "occtVersion": occt_version(),
         "build": format!("llull-kernel@{}", env!("CARGO_PKG_VERSION")),
@@ -286,6 +286,7 @@ mod tests {
         let described = call(&mut session, "info", json!([]));
         assert_eq!(described["result"]["occtVersion"], json!("7.9.2"));
         assert_eq!(described["result"]["ops"], json!(native_ops()));
+        assert!(described["result"]["capabilities"].as_array().unwrap().contains(&json!("bsplineSections")));
     }
 
     #[test]

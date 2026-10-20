@@ -1,4 +1,5 @@
 import { closedShapeArea } from '../../geometry/shapeArea';
+import { sheetArea } from '../../geometry/sheetArea';
 import { distance, polygonArea, polygonPerimeter } from '../../lib/polygon';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
@@ -16,8 +17,8 @@ export const measureArea = defineCommand({
   name: 'measure_area',
   annotations: { readOnly: true },
   description:
-    'Compute the area of a closed 2D shape. Provide either: (a) an entityId for a closed ' +
-    'polyline, rectangle, circle, or ellipse entity; or (b) an explicit polygon as points ([[x,y],...], >= 3 points). ' +
+    'Compute the area of a closed 2D shape or of a surface sheet. Provide either: (a) an entityId for a closed ' +
+    'polyline, rectangle, circle, or ellipse entity, or for a nurbs_surface sheet (its surface area, after any trim_surface by curves); or (b) an explicit polygon as points ([[x,y],...], >= 3 points). ' +
     'Returns data: { area, unit } where unit is the squared document unit (e.g. "mm²"). ' +
     'Open polylines are rejected with an explanatory message. Does not modify the document.',
   params: z.object({
@@ -48,6 +49,7 @@ export const measureArea = defineCommand({
       if (!e.closed) return noop(doc, `measure_area: polyline '${entityId}' is not closed — cannot compute area.`);
       if (e.points.length < 3) return noop(doc, `measure_area: polyline '${entityId}' has fewer than 3 points.`);
     }
+    if (e.kind === 'nurbs_surface') return measured(sheetArea(e), ` of ${entityId}`);
     const area = closedShapeArea(e);
     if (area === null)
       return noop(

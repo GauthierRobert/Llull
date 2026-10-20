@@ -57,8 +57,11 @@ export function createKernelRouter(deps: KernelRouterDeps): KernelRouter {
     },
   });
 
+  // what the host may send beyond the baseline wire format follows the capabilities the sidecar reported
+  const wire = { bsplineSections: deps.native.capabilities.includes('bsplineSections') };
+
   const sourceMesh: SourceMesher = async (source, features) => {
-    const reply = await (await nativeSession()).request('tessellate', [{ key: recipeKey(source), recipe: nativeRecipe(source, features) }]);
+    const reply = await (await nativeSession()).request('tessellate', [{ key: recipeKey(source), recipe: nativeRecipe(source, features, wire) }]);
     if (isUnsupported(reply.error) || reply.error?.startsWith(NATIVE_DIED) === true) return 'unsupported';
     return decodeMesh(reply.result);
   };
@@ -69,7 +72,7 @@ export function createKernelRouter(deps: KernelRouterDeps): KernelRouter {
     if (!nativeOps.has(request.op)) return { result: null, error: `NATIVE_UNSUPPORTED: op ${request.op}` };
     const prepared = await prepareFeatures(request.op, request.args, sourceMesh);
     if ('unsupported' in prepared) return { result: null, error: prepared.unsupported };
-    const reply = await (await nativeSession()).request(request.op, nativeArgs(request.op, request.args, prepared.features));
+    const reply = await (await nativeSession()).request(request.op, nativeArgs(request.op, request.args, prepared.features, wire));
     const result = request.op === 'tessellate' ? decodeMesh(reply.result) : reply.result;
     return reply.error === undefined ? { result } : { result, error: reply.error };
   };

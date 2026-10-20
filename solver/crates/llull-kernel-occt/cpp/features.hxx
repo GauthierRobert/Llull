@@ -37,6 +37,10 @@ std::unique_ptr<Shape> prism_of_face(const Shape &face, rust::Slice<const double
 std::unique_ptr<Shape> revolution_of_face(const Shape &face, rust::Slice<const double> axis, double angle);
 // ThruSections through closed chains: `chains` concatenated, `lengths` = number of f64 of each chain.
 std::unique_ptr<Shape> skinned_solid(rust::Slice<const double> chains, rust::Slice<const uint32_t> lengths, bool ruled);
+// ThruSections through B-spline sections (capability bsplineSections): `curves` concatenated, `lengths` = number of f64 of each one. A section is
+// degree, pole count, distinct knot count, rational flag, closing flag, xyz poles, weights (rational only), knots, multiplicities; the closing
+// flag adds the straight edge from the last pole back to the first. Null when OCC refuses; a throw (-> Err) when the data are inconsistent.
+std::unique_ptr<Shape> skinned_solid_bsplines(rust::Slice<const double> curves, rust::Slice<const uint32_t> lengths, bool ruled);
 std::unique_ptr<Shape> pipe_solid(rust::Slice<const double> spine, const Shape &section);
 bool chain_wire_ok(rust::Slice<const double> chain);
 // Bicubic patches, 16 poles each (u along i, v along j), sewn at `tolerance`; null (never a throw) when OCC refuses one.
