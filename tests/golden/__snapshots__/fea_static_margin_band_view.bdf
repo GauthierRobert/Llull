@@ -3,6 +3,7 @@ $ llull: node and element ids are the mesh ids; results of this deck import thro
 SOL 101
 CEND
 TITLE = pull
+SUBTITLE = llull inputHash X
 ECHO = NONE
 SPC = 1
 DISPLACEMENT(SORT1,REAL) = ALL

@@ -13,7 +13,8 @@ import { BAR_NODES, X0_NODES, X2_NODES, barDocument, barMesh, facesOn, mustRun }
 import { caseIn } from './helpers';
 
 const textOf = (result: ReturnType<typeof writeBdf>): string => ('text' in result ? result.text : JSON.stringify(result));
-const normalised = (text: string): string => text.replace(/inputHash \w+ meshHash \w+/, 'inputHash H meshHash M');
+const normalised = (text: string): string =>
+  text.replace(/inputHash \w+ meshHash \w+/, 'inputHash H meshHash M').replace(/llull inputHash [0-9a-f]{16}/, 'llull inputHash X');
 
 describe('Nastran fixed-format fields', () => {
   it('writes reals in at most 8 characters, Nastran-legal, with the largest precision that fits', () => {
@@ -94,6 +95,7 @@ $ llull: node and element ids are the mesh ids; results of this deck import thro
 SOL 101
 CEND
 TITLE = bar
+SUBTITLE = llull inputHash X
 ECHO = NONE
 SPC = 1
 DISPLACEMENT(SORT1,REAL) = ALL

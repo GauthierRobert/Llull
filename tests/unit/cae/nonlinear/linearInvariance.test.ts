@@ -9,7 +9,7 @@ import { X0_NODES, barDocument, barMesh } from '../deckFixtures';
 /** Literals captured BEFORE the nonlinear lane existed (ENG-1): a linear case must keep these byte for byte. */
 const LINEAR_FULL_HASH = '3bc979c4702161d0a15176c99976424ceccb4a94b8cb24e8292f35aba59a377c';
 const LINEAR_MESH_HASH = '5bc0dc612feca6b72ebe64be6d8b2d4cc2a24d0fda8bc9a6a559b8f0b86149d2';
-const LINEAR_DECK_SHA256 = 'e3213ae0e00b0e37062769e0d3df95095e1be37974d8e4706950a9cf9eecec7e';
+const LINEAR_DECK_SHA256 = 'fdac79a992631c46a2d6cea48fc7d76db93b8b30ac6a256144c0b24c1b4a5dbc';
 
 describe('linear cases are untouched by the nonlinear lane', () => {
   it('keeps the input hashes and the deck bytes of a static case', () => {

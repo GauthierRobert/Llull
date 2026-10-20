@@ -8,6 +8,8 @@
  * been run against a real MSC / NX OP2. Double-precision files and element types other than CTETRA are reported in `warnings`, never guessed.
  */
 
+import { boundHashes } from './inputBinding';
+
 interface Op2Eigenvalue {
   readonly mode: number;
   readonly order: number;
@@ -42,6 +44,8 @@ export interface Op2SolidStress extends Op2SetHeader {
 export interface Op2Tables {
   /** Solver text of the file header (e.g. `NX 12.0`), or '' when none was found. */
   readonly producer: string;
+  /** Distinct `llull inputHash` markers (16 hex) found in the identification records (the BDF `SUBTITLE`); empty when the file has none. */
+  readonly inputHashes: readonly string[];
   readonly eigenvalues: readonly Op2Eigenvalue[];
   readonly displacements: readonly Op2Displacements[];
   readonly stresses: readonly Op2SolidStress[];
@@ -63,6 +67,10 @@ const STRESS_NODE_WORDS = 21;
 const IDENT_MIN_BYTES = 44;
 const EIGENVALUE_WORDS = 7;
 const DISPLACEMENT_WORDS = 8;
+/** Hostile-file guards: records read, bytes decoded as text (producer string, table names), identification-record bytes scanned for the input-hash marker. */
+const MAX_RECORDS = 1_000_000;
+const MAX_TEXT_BYTES = 128;
+const MAX_IDENT_SCAN_BYTES = 4096;
 
 function splitRecords(bytes: Uint8Array): { readonly records: RecordSpan[]; readonly view: DataView; readonly little: boolean } | string {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -72,6 +80,7 @@ function splitRecords(bytes: Uint8Array): { readonly records: RecordSpan[]; read
   const records: RecordSpan[] = [];
   let at = 0;
   while (at + 8 <= bytes.byteLength) {
+    if (records.length >= MAX_RECORDS) return `the file has more than ${MAX_RECORDS} records`;
     const length = view.getInt32(at, little);
     if (length < 0 || at + 8 + length > bytes.byteLength)
       return `record ${records.length} is truncated (declared ${length} bytes at offset ${at})`;
@@ -84,10 +93,17 @@ function splitRecords(bytes: Uint8Array): { readonly records: RecordSpan[]; read
   return { records, view, little };
 }
 
+/** Printable text of a short record; '' for a span above MAX_TEXT_BYTES (a hostile record is never decoded). */
 const ascii = (bytes: Uint8Array, span: RecordSpan): string =>
-  String.fromCharCode(...bytes.subarray(span.start, span.start + span.length))
-    .replace(/[^\x20-\x7e]/g, ' ')
-    .trim();
+  span.length > MAX_TEXT_BYTES
+    ? ''
+    : String.fromCharCode(...bytes.subarray(span.start, span.start + span.length))
+        .replace(/[^\x20-\x7e]/g, ' ')
+        .trim();
+
+/** Input-hash markers in the first bytes of an identification record (the title / subtitle fields; their exact offset is not relied on). */
+const markersOf = (ident: Uint8Array): string[] =>
+  boundHashes(String.fromCharCode(...ident.subarray(0, MAX_IDENT_SCAN_BYTES)).replace(/[^\x20-\x7e]/g, ' '));
 
 /** Concatenation of the byte ranges of `spans`. */
 function joined(bytes: Uint8Array, spans: readonly RecordSpan[]): Uint8Array {
@@ -141,7 +157,9 @@ function walkTables(bytes: Uint8Array, records: readonly RecordSpan[], view: Dat
         warnings.push(`table ${table.name}: a logical record announces ${value} words but the next record does not have them`);
         break;
       }
-      table.subtables.set(subtable, [...(table.subtables.get(subtable) ?? []), data]);
+      const spans = table.subtables.get(subtable);
+      if (spans === undefined) table.subtables.set(subtable, [data]);
+      else spans.push(data);
       at++;
     }
     tables.push(table);
@@ -242,8 +260,7 @@ function decodeStresses(
   };
 }
 
-function decodeEigenvalues(table: RawTable, bytes: Uint8Array, view: DataView, little: boolean): Op2Eigenvalue[] {
-  const rows: Op2Eigenvalue[] = [];
+function decodeEigenvalues(table: RawTable, view: DataView, little: boolean, rows: Op2Eigenvalue[]): void {
   for (const [k, spans] of [...table.subtables].sort((a, b) => a[0] - b[0])) {
     if (k < 4 || k % 2 === 1) continue;
     for (const span of spans) {
@@ -260,8 +277,6 @@ function decodeEigenvalues(table: RawTable, bytes: Uint8Array, view: DataView, l
         });
     }
   }
-  void bytes;
-  return rows;
 }
 
 /**
@@ -278,15 +293,18 @@ export function readOp2(bytes: Uint8Array): Op2Result {
   const eigenvalues: Op2Eigenvalue[] = [];
   const displacements: Op2Displacements[] = [];
   const stresses: Op2SolidStress[] = [];
+  const markers = new Set<string>();
   for (const table of tables) {
-    if (table.name.startsWith('LAMA') || table.name.startsWith('BLAMA')) eigenvalues.push(...decodeEigenvalues(table, bytes, view, little));
+    if (table.name.startsWith('LAMA') || table.name.startsWith('BLAMA')) decodeEigenvalues(table, view, little, eigenvalues);
     else if (table.name.startsWith('OUG'))
       for (const set of resultSets(bytes, table)) {
+        for (const marker of markersOf(set.ident)) markers.add(marker);
         const decoded = decodeDisplacements(set, little, table.name, warnings);
         if (decoded !== null) displacements.push(decoded);
       }
     else if (table.name.startsWith('OES'))
       for (const set of resultSets(bytes, table)) {
+        for (const marker of markersOf(set.ident)) markers.add(marker);
         const decoded = decodeStresses(set, little, table.name, warnings);
         if (decoded !== null) stresses.push(decoded);
       }
@@ -295,5 +313,5 @@ export function readOp2(bytes: Uint8Array): Op2Result {
     .slice(0, 6)
     .map((span) => ascii(bytes, span))
     .find((text) => !/FORT TAPE/i.test(text) && /NX|MSC|NASTRAN|SIEMENS/i.test(text));
-  return { producer: (producer ?? '').slice(0, 60), eigenvalues, displacements, stresses, warnings };
+  return { producer: (producer ?? '').slice(0, 60), inputHashes: [...markers], eigenvalues, displacements, stresses, warnings };
 }

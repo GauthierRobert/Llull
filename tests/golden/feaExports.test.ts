@@ -44,7 +44,10 @@ describe('FEA exports (golden text)', () => {
     const written = writeBdf(doc, analysisId, mesh);
     expect(written).toHaveProperty('text');
     const text = 'text' in written ? written.text : JSON.stringify(written);
-    const normalised = text.replace(/inputHash \w+ meshHash \w+/, 'inputHash H meshHash M').replace(/\r\n/g, '\n');
+    const normalised = text
+      .replace(/inputHash \w+ meshHash \w+/, 'inputHash H meshHash M')
+      .replace(/llull inputHash [0-9a-f]{16}/, 'llull inputHash X')
+      .replace(/\r\n/g, '\n');
     await expect(normalised).toMatchFileSnapshot('./__snapshots__/fea_static_margin_band_view.bdf');
   });
 

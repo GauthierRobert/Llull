@@ -18,8 +18,9 @@ export const setBucklingPreload = defineCommand({
   description:
     'Make one load case of a buckling analysis the PRELOAD: it is applied first in a static step and stays constant (dead load, thermal-free), while the ' +
     'buckling factors multiply the first OTHER load case. Without a preload the factors multiply the first load case alone. Omit preloadLoadCase to clear. ' +
-    'Needs at least one more load case as the reference load. The CalculiX deck layout (a *STATIC step, then *BUCKLE with the reference loads added) is ' +
-    'UNVERIFIED against a real ccx run; the Nastran BDF export does not support a preload.',
+    'Needs at least one more load case as the reference load. The CalculiX deck is a *STATIC step with the preload, then a *BUCKLE step that writes ' +
+    'preload + reference loads SUMMED (a later *CLOAD / *DLOAD replaces the value at the same node and dof / element face / gravity instead of adding to it); ' +
+    'that layout, and that the factors then multiply only the reference increment, is UNVERIFIED against a real ccx run; the Nastran BDF export does not support a preload.',
   params: z.object({
     analysisId: analysisIdSchema,
     preloadLoadCase: z

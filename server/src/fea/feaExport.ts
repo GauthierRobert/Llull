@@ -1,6 +1,7 @@
 /** fea_export: the CalculiX input deck, the Nastran BDF or a VTU of the mesh (+ current results) of a meshed analysis (text + sha256); nothing is run or recorded. */
 
 import type { FeResultsArtifact } from '@core/model/analysis';
+import { EXPORT_REMEDIATION, exportGate } from '@core/model/exportGate';
 import { sha256Hex } from '@lib/sha256';
 import type { FeaExportFormat, FeaHost, FeaToolResult } from '@protocol/index';
 import type { FeArtifactStore } from './artifactStore';
@@ -27,7 +28,8 @@ function currentResults(
 
 /**
  * @failure unknown analysis / missing or stale mesh -> the shared codes; a deck the writer refuses (materials, constraints, unsupported analysis type for
- *   the BDF, ids too large ...) -> its code; the document is never changed
+ *   the BDF, ids too large ...) -> its code; ITAR / EAR material records -> MAT_EXPORT_CONTROLLED for every format (the VTU leaves the machine
+ *   like the decks do); the document is never changed
  */
 export function runFeaExport(
   analysisId: string,
@@ -43,6 +45,14 @@ export function runFeaExport(
   let note = '';
   const extra: Record<string, unknown> = {};
   if (format === 'vtu') {
+    const gate = exportGate(doc, 'deck');
+    if (gate.controlled)
+      return feaFailure(
+        'fea_export',
+        'MAT_EXPORT_CONTROLLED',
+        `the document uses ${gate.marking.regime}-marked material(s) ${gate.ids.join(', ')}; no VTU was written (${EXPORT_REMEDIATION.MAT_EXPORT_CONTROLLED})`,
+        gate.ids,
+      );
     const results = currentResults(analysisId, host, current.meshHash, deps.store, deps.hooks);
     const written = deps.hooks.writeVtu(current.mesh, results, options.encoding ?? 'ascii');
     text = written.text;

@@ -140,6 +140,15 @@ function artifactItems(doc: CadDocument, analysis: AnalysisCase, trust: Trust): 
         [id],
       ),
     );
+  else if (trust.resultsArtifact?.binding === 'imported-unbound')
+    items.push(
+      item(
+        'FEA_RESULTS_UNBOUND',
+        'warning',
+        'the recorded results were imported from a file without an llull input-hash marker: only node ids tie them to this set-up',
+        [id],
+      ),
+    );
   return items;
 }
 
