@@ -37,9 +37,9 @@ function syntheticRun(job: ExplicitJob, overrides: Record<string, unknown> = {})
     device: 'cpu',
     deterministic: true,
     energy: [
-      [0, 7.85, 0, 0, 0, 0],
-      [8e-5, 0.1, 7.6, 0.07, 0.07, 0],
-      [1.6e-4, 7.7, 0.1, 0.0, 0.07, 0],
+      [0, 7.85, 0, 0, 0, 0, 0],
+      [8e-5, 0.1, 7.6, 0.07, 0.07, 0.02, 0],
+      [1.6e-4, 7.7, 0.1, 0.0, 0.07, 0, 0],
     ],
     walls: [{ name: 'anvil', t: [4e-5, 8e-5, 1.2e-4], force: [39600, 39600, 0] }],
     ...overrides,
@@ -58,7 +58,7 @@ function artifactOf(doc: CadDocument, overrides: Record<string, unknown> = {}): 
 describe('buildExplicitArtifact and explicitSummary', () => {
   it('builds the artifact and a summary with energies, wall impulse and extremes', () => {
     const artifact = artifactOf(model.doc);
-    expect(artifact.elements).toEqual({ hex8: 160, tet4: 0 });
+    expect(artifact.elements).toEqual({ hex8: 160, tet4: 0, shell4: 0 });
     expect(artifact.solver).toEqual({ job: 'explicit', name: 'llull-explicit', version: '0.1.0', device: 'cpu', deterministic: true });
     const analysisCase = model.doc.analysis?.cases[model.analysisId];
     if (analysisCase === undefined) throw new Error('no case');
@@ -67,6 +67,8 @@ describe('buildExplicitArtifact and explicitSummary', () => {
     expect(summary.energy.initialKinetic).toBe(7.85);
     expect(summary.energy.errorFinal).toBeCloseTo((7.7 + 0.1 + 0.07 - 7.85) / 7.85, 12);
     expect(summary.energy.hourglassRatioMax).toBeCloseTo(0.07 / 7.6, 12);
+    expect(summary.energy.contactRatioMax).toBeCloseTo(0.02 / 7.6, 12);
+    expect(summary.energy.finalContact).toBe(0);
     expect(summary.maxVonMises).toEqual({ value: 396, unit: 'MPa', at: [2.5, 2.5, 37.5], element: 7 });
     expect(summary.maxPlasticStrain.element).toBe(9);
     expect(summary.walls['anvil']?.peakForce).toBe(39600);
@@ -180,12 +182,13 @@ describe('record_explicit_results', () => {
     const strict = must(
       recorded.document,
       'explicit_energy_check',
-      { analysisId: model.analysisId, hourglassLimit: 0.001, energyErrorLimit: 0.001, addedMassLimit: 0.1 },
+      { analysisId: model.analysisId, hourglassLimit: 0.001, energyErrorLimit: 0.001, addedMassLimit: 0.1, contactLimit: 0.001 },
       ctx,
     );
     expect(data<{ status: string }>(strict).status).toBe('fail');
     expect(strict.summary).toContain('EXP_HOURGLASS_HIGH');
     expect(strict.summary).toContain('EXP_ENERGY_ERROR_HIGH');
+    expect(strict.summary).toContain('EXP_CONTACT_ENERGY_HIGH');
     const loose = must(recorded.document, 'explicit_energy_check', { analysisId: model.analysisId, energyErrorLimit: 0.5 }, ctx);
     expect(data<{ status: string }>(loose).status).toBe('pass');
     expect(code(execute(model.doc, 'explicit_energy_check', { analysisId: model.analysisId }, ctx))).toBe('EXP_RESULTS_MISSING');

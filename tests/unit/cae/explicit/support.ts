@@ -1,4 +1,6 @@
 /** Shared fixtures of the PHY-19 explicit tests: the bar-on-rigid-wall model (VC-EXP-50/67 set-up) and an in-memory artifact store. */
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
@@ -94,3 +96,25 @@ export function artifactStore(): { readonly port: FeArtifactPort; put(artifact: 
 }
 
 export const contextWith = (port: FeArtifactPort | null): ExecutionContext => ({ ...defaultContext(), feaArtifacts: port });
+
+const PLANS = path.resolve(__dirname, '../../../../docs/physics/19-explicit-impact/validation/plans');
+
+/** Replays a validation plan (`{ command, params, as? }` steps, `$alias` = affected[0] of the step named `alias`) on an empty document. */
+export function replayPlan(name: string): { readonly doc: CadDocument; readonly aliases: Readonly<Record<string, string>> } {
+  const steps = JSON.parse(readFileSync(`${PLANS}/${name}.plan.json`, 'utf8')) as { command: string; params: unknown; as?: string }[];
+  const aliases: Record<string, string> = {};
+  const substitute = (value: unknown): unknown => {
+    if (typeof value === 'string' && value.startsWith('$')) return aliases[value.slice(1)] ?? value;
+    if (Array.isArray(value)) return value.map(substitute);
+    if (value !== null && typeof value === 'object')
+      return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, substitute(entry)]));
+    return value;
+  };
+  let doc = createEmptyDocument();
+  for (const step of steps) {
+    const result = must(doc, step.command, substitute(step.params) as Record<string, unknown>);
+    doc = result.document;
+    if (step.as !== undefined) aliases[step.as] = result.affected[0] ?? '';
+  }
+  return { doc, aliases };
+}

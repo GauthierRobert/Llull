@@ -3,7 +3,9 @@
 import { commandCatalog } from '@core/commands/schema';
 import { explicitEnergyCheck, explicitReport } from './queries';
 import { explicitQuickCheck } from './quickCheck';
+import { addContact, deleteContact } from './contactCommands';
 import { setJohnsonCookFailure } from './failureCommand';
+import { setExplicitShell } from './shellCommand';
 import { recordExplicitResults } from './record';
 import { addRigidWall, deleteRigidWall, setExplicitControls, setInitialVelocity } from './setupCommands';
 
@@ -13,6 +15,9 @@ export const explicitCommands = commandCatalog(
   addRigidWall,
   deleteRigidWall,
   setJohnsonCookFailure,
+  addContact,
+  deleteContact,
+  setExplicitShell,
   recordExplicitResults,
   explicitReport,
   explicitEnergyCheck,

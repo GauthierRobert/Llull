@@ -18,7 +18,8 @@ const FORMULATION =
   'central-difference explicit integration with lumped (row-sum) mass and a stable step from the element characteristic length; hex8 one-point ' +
   'uniform-strain element with Flanagan-Belytschko viscous hourglass control (Flanagan & Belytschko 1981, IJNME 17:679-706); tet4 constant ' +
   'strain; hypoelastic Jaumann-rate stress update; J2 radial return with Johnson-Cook flow stress (isothermal, T = Tr); linear + quadratic bulk ' +
-  'viscosity; kinematic frictionless planar rigid walls. Decisions and citations: PHY-19 TECHNICAL_SPEC §13.';
+  'viscosity; kinematic frictionless planar rigid walls; penalty node-to-segment contact with Coulomb friction (LS-DYNA R14 Ch. 29). ' +
+  'Decisions and citations: PHY-19 TECHNICAL_SPEC §13.';
 
 const REVIEW = 'impact response supports structural and certification decisions';
 
@@ -113,7 +114,7 @@ interface CheckItem {
 
 function energyItems(
   summary: ExplicitResultsSummary,
-  limits: { hourglass: NamedValue; energy: NamedValue | null; addedMass: NamedValue | null },
+  limits: { hourglass: NamedValue; energy: NamedValue | null; addedMass: NamedValue | null; contact: NamedValue | null },
 ): CheckItem[] {
   const { energy } = summary;
   const items: CheckItem[] = [
@@ -135,6 +136,16 @@ function energyItems(
     value: energy.hourglassRatioMax,
     limit: limits.hourglass,
   });
+  if (limits.contact !== null) {
+    const high = energy.contactRatioMax > limits.contact.value;
+    items.push({
+      code: high ? 'EXP_CONTACT_ENERGY_HIGH' : null,
+      status: high ? 'warn' : 'pass',
+      message: `contact / internal energy max ${significantNumber(energy.contactRatioMax, 4)} (limit ${limits.contact.value})`,
+      value: energy.contactRatioMax,
+      limit: limits.contact,
+    });
+  }
   if (limits.energy === null)
     items.push({
       code: 'EXP_ENERGY_LIMIT_UNSET',
@@ -195,12 +206,13 @@ export const explicitEnergyCheck = defineCommand({
     analysisId: analysisIdSchema,
     hourglassLimit: z.number().optional().describe('Largest hourglass / internal energy ratio, > 0. Default 0.10 (named).'),
     energyErrorLimit: z.number().optional().describe('Largest |energy error| (fraction, e.g. 0.05). No default.'),
+    contactLimit: z.number().optional().describe('Largest |contact energy| / internal energy (warning above). No default.'),
     addedMassLimit: z
       .number()
       .optional()
       .describe('Largest added mass / model mass. Default: the case maxAddedMassRatio when mass scaling is on.'),
   }),
-  run: (doc, { analysisId, hourglassLimit, energyErrorLimit, addedMassLimit }, ctx): CommandResult => {
+  run: (doc, { analysisId, hourglassLimit, energyErrorLimit, addedMassLimit, contactLimit }, ctx): CommandResult => {
     const found = explicitCase(doc, analysisId);
     if ('code' in found) return notFound(doc, 'explicit_energy_check', analysisId, found.code, found.message);
     const trusted = trustedExplicit(doc, found.analysisCase, ctx?.feaArtifacts);
@@ -216,6 +228,7 @@ export const explicitEnergyCheck = defineCommand({
     const limits = {
       hourglass: hourglassLimit === undefined ? DEFAULT_HOURGLASS_LIMIT() : { value: hourglassLimit, source: 'caller', defaulted: false },
       energy: optionalLimit(energyErrorLimit, 'caller'),
+      contact: optionalLimit(contactLimit, 'caller'),
       addedMass:
         addedMassLimit !== undefined
           ? optionalLimit(addedMassLimit, 'caller')

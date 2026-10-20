@@ -16,6 +16,10 @@ export const DEFAULT_BULK_LINEAR = (): NamedValue =>
 export const DEFAULT_BULK_QUADRATIC = (): NamedValue =>
   named(1.5, 'LS-DYNA *CONTROL_BULK_VISCOSITY Q1 (quadratic) default (PHY-19 TECHNICAL_SPEC §13 [E4])');
 
+/** Penalty contact scale f_si (RS-8c). */
+export const DEFAULT_PENALTY_SCALE = (): NamedValue =>
+  named(0.1, 'LS-DYNA *CONTROL_CONTACT SLSFAC default (PHY-19 TECHNICAL_SPEC §13.7 [E3])');
+
 /** Hourglass / internal energy ratio above which explicit_energy_check warns (spec Q8: kept as a named default). */
 export const DEFAULT_HOURGLASS_LIMIT = (): NamedValue => named(0.1, 'S13 rule of thumb');
 

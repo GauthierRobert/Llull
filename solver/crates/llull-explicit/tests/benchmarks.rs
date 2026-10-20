@@ -43,7 +43,9 @@ fn energy_error(outcome: &Outcome) -> f64 {
     outcome
         .energy
         .iter()
-        .map(|row| (row.kinetic + row.internal + row.hourglass + row.wall - first.kinetic - row.external_work) / first.kinetic)
+        .map(|row| {
+            (row.kinetic + row.internal + row.hourglass + row.wall + row.contact - first.kinetic - row.external_work) / first.kinetic
+        })
         .fold(0.0, |worst: f64, error| worst.max(error.abs()))
 }
 

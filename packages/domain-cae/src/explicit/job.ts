@@ -33,6 +33,17 @@ export interface ExplicitJob {
   readonly materialFailure: readonly (readonly number[] | null)[];
   /** Index into `materials` per element (hex8 first, then tet4). */
   readonly elementMaterial: readonly number[];
+  /** Part index per element (position in the sorted part ids). */
+  readonly elementPart: readonly number[];
+  /** Contacts with their sides as part indices. */
+  readonly contacts: readonly {
+    readonly name: string;
+    readonly kind: 'surface_to_surface' | 'nodes_to_surface' | 'self';
+    readonly a: readonly number[];
+    readonly b: readonly number[];
+    readonly friction: { readonly static: number; readonly dynamic: number; readonly decay: number };
+    readonly penaltyScale: number;
+  }[];
   /** 3 values per node, case velocity unit. */
   readonly initialVelocity: readonly number[];
   readonly gravity: Vec3;
@@ -67,7 +78,9 @@ export function buildExplicitJob(doc: CadDocument, analysisId: string, meshArtif
     return refuse('EXP_MESH_UNSUPPORTED', `analysis '${analysisId}' has no parts (set_part_idealization)`, [analysisId]);
   const lengthToAnalysis = toMetres(doc, 1) / analysisLengthMetres(analysisCase.unitSystem);
   let mesh: ExplicitMesh | { code: string; message: string; ids: readonly string[] };
-  if (spec.mesh.kind === 'structured_hex') mesh = structuredHexMesh(doc, analysisCase, spec.mesh.size, lengthToAnalysis);
+  if (spec.mesh.kind === 'structured_hex') mesh = structuredHexMesh(doc, analysisCase, spec.mesh.size, lengthToAnalysis, spec.shells ?? {});
+  else if (spec.shells !== undefined && Object.keys(spec.shells).length > 0)
+    return refuse('EXP_MESH_UNSUPPORTED', `shell parts need the structured_hex mesh source`, [analysisId]);
   else if (meshArtifact === null)
     return refuse('EXP_MESH_MISSING', `analysis '${analysisId}' uses mesh fea_mesh but has no current mesh artifact: run fea_mesh`, [
       analysisId,
@@ -116,6 +129,22 @@ export function buildExplicitJob(doc: CadDocument, analysisId: string, meshArtif
       mesh,
       materials,
       materialFailure,
+      elementPart: mesh.elementPart.map((part) => partIds.indexOf(part)),
+      contacts: (spec.contactOrder ?? []).flatMap((id) => {
+        const contact = spec.contacts?.[id];
+        if (contact === undefined) return [];
+        const parts = (ids: readonly string[]): number[] => ids.map((entityId) => partIds.indexOf(entityId)).filter((index) => index >= 0);
+        return [
+          {
+            name: contact.name,
+            kind: contact.kind,
+            a: parts(contact.a),
+            b: parts(contact.b),
+            friction: contact.friction,
+            penaltyScale: contact.penaltyScale.value,
+          },
+        ];
+      }),
       elementMaterial: mesh.elementPart.map((part) => partMaterial.get(part) ?? 0),
       initialVelocity,
       gravity,

@@ -106,6 +106,27 @@ impl Bvh {
         best
     }
 
+    /// Every item whose box is within `radius` of `p` (box distance), in ascending item order: the candidate set of a contact search.
+    pub fn overlapping(&self, p: &Vec3, radius: f64) -> Vec<usize> {
+        let mut found = Vec::new();
+        let mut stack = vec![self.root];
+        while let Some(node) = stack.pop() {
+            let current = &self.nodes[node];
+            if box_distance(current.bounds(), p) > radius {
+                continue;
+            }
+            match current {
+                Node::Leaf { item, .. } => found.push(*item),
+                Node::Inner { left, right, .. } => {
+                    stack.push(*right);
+                    stack.push(*left);
+                }
+            }
+        }
+        found.sort_unstable();
+        found
+    }
+
     fn visit(&self, node: usize, p: &Vec3, leaf: &impl Fn(usize) -> (f64, Vec3), best: &mut Option<Hit>) {
         let current = &self.nodes[node];
         if let Some(found) = best {
@@ -156,5 +177,15 @@ mod tests {
         let hit = tree.nearest(&[20.0, 0.5, 0.5], &far).unwrap();
         assert_eq!((hit.item, hit.distance), (8, 11.0));
         assert!(Bvh::build(&[]).is_none());
+    }
+
+    #[test]
+    fn lists_every_box_within_a_radius_in_index_order() {
+        let boxes: Vec<Aabb> = (0..9).map(|i| unit_box(f64::from(i))).rev().collect();
+        let tree = Bvh::build(&boxes).unwrap();
+        // Boxes are reversed: item k spans x in [8 - k, 9 - k]. The point x = 4.5 is inside item 4; radius 1 reaches items 3, 4, 5.
+        assert_eq!(tree.overlapping(&[4.5, 0.5, 0.5], 0.0), vec![4]);
+        assert_eq!(tree.overlapping(&[4.5, 0.5, 0.5], 0.6), vec![3, 4, 5]);
+        assert!(tree.overlapping(&[50.0, 0.5, 0.5], 1.0).is_empty());
     }
 }
