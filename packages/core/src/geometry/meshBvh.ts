@@ -223,7 +223,7 @@ function dualQuery(a: MeshBvh, b: MeshBvh, transform: RigidTransform | null, max
         const triangleA = triangleAt(a, a.order[(a.start[nodeA] ?? 0) + i] ?? 0, null);
         const boxOfA = triangleBox(triangleA);
         for (let j = 0; j < trianglesB.length && !done; j++) {
-          if (boxGap(boxOfA, boxesB[j] ?? boxOfA) > bound) continue;
+          if (boxGap(boxOfA, boxesB[j] ?? boxOfA) > bound + 1e-12 * Math.max(1, bound)) continue;
           const pair = triangleDistance(triangleA, trianglesB[j] ?? triangleA);
           if (pair.distance <= bound && (best === null || pair.distance < best.distance)) {
             best = pair;

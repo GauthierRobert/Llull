@@ -24,6 +24,8 @@ export const OFFSET_ABSOLUTE_MM = 0.01;
 export const OFFSET_RELATIVE = 1e-4;
 /** A fitted surface must wrap this much of a turn (radians): a half pipe or a flat patch is not a pin or a bore. */
 const MIN_WRAP = Math.PI;
+/** Widest arc one facet may span about the axis (30 degrees): rejects the flat faces of boxes and prisms, whose corners lie on a circle. */
+const MAX_FACET_SPAN = Math.PI / 6;
 
 interface Facet {
   readonly convex: boolean;
@@ -61,16 +63,24 @@ function facetsOf(mesh: MeshData, anchor: Vec3, axis: Vec3, toleranceOf: (radius
       radial.reduce<Vec3>((sum, r) => [sum[0] + r[0], sum[1] + r[1], sum[2] + r[2]], [0, 0, 0]),
       1 / 3,
     );
+    const angles = radial.map((r) => Math.atan2(dot3(r, e2), dot3(r, e1)));
+    // a facet of a round surface spans a small angle about the axis; a box or prism face (corners at the circumradius) spans much more
+    if (angularSpan(angles) > MAX_FACET_SPAN) continue;
     facets.push({
       convex: dot3(normal, middle) > 0,
       radius: mean,
       area: doubleArea / 2,
       low: Math.min(...along),
       high: Math.max(...along),
-      angles: radial.map((r) => Math.atan2(dot3(r, e2), dot3(r, e1))),
+      angles,
     });
   }
   return facets;
+}
+
+/** Smallest arc (radians) that holds all of `angles`. */
+function angularSpan(angles: readonly number[]): number {
+  return 2 * Math.PI - largestGap(angles);
 }
 
 /** Largest empty stretch of the circle left by `angles` (radians). */
@@ -91,17 +101,29 @@ export function meshCandidates(meshes: readonly MeshData[], anchor: Vec3, axisDi
     for (const convex of [true, false]) {
       const side = facets.filter((facet) => facet.convex === convex).sort((p, q) => p.radius - q.radius);
       let group: Facet[] = [];
+      const emit = (part: readonly Facet[]): void => {
+        if (angularSpan(part.flatMap((facet) => facet.angles)) < MIN_WRAP) return;
+        const area = part.reduce((sum, facet) => sum + facet.area, 0);
+        found.push({
+          convex,
+          radius: part.reduce((sum, facet) => sum + facet.radius * facet.area, 0) / area,
+          range: [Math.min(...part.map((facet) => facet.low)), Math.max(...part.map((facet) => facet.high))],
+        });
+      };
       const flush = (): void => {
-        if (group.length === 0) return;
-        const gap = largestGap(group.flatMap((facet) => facet.angles));
-        if (2 * Math.PI - gap >= MIN_WRAP) {
-          const area = group.reduce((sum, facet) => sum + facet.area, 0);
-          found.push({
-            convex,
-            radius: group.reduce((sum, facet) => sum + facet.radius * facet.area, 0) / area,
-            range: [Math.min(...group.map((facet) => facet.low)), Math.max(...group.map((facet) => facet.high))],
-          });
+        // same-radius journals separated along the axis are separate cylinders
+        const ordered = [...group].sort((p, q) => p.low - q.low);
+        let run: Facet[] = [];
+        let reach = -Infinity;
+        for (const facet of ordered) {
+          if (run.length > 0 && facet.low - reach > toleranceOf(facet.radius)) {
+            emit(run);
+            run = [];
+          }
+          run.push(facet);
+          reach = Math.max(run.length === 1 ? -Infinity : reach, facet.high);
         }
+        if (run.length > 0) emit(run);
         group = [];
       };
       for (const facet of side) {
