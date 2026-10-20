@@ -277,12 +277,12 @@ llull receives and delivers exact geometry; the checks below tell an engineer wh
   (an assembly keeps its structure: one component per product, one instance per placed occurrence; \`assembly: false\` flattens) or \`llull import_iges file=part.igs\` (faces are sewn at
   max(file resolution, 1e-6 x diagonal); \`data.iges\` lists open shells and untranslated entity types).
 - **Bands.** green: delta <= 1e-3 relative and <= 1e-3 x bounding-box diagonal; yellow: <= 1e-2 and <= 1 mm (CATIA default); red: beyond; not-checkable: the sender gave none or all zero
-  (a placeholder). Yellow: report the numbers to the owner. Red or not-checkable: the bodies are marked unverified (\`doc.exchange.provenance\`), \`reviewRequired\` is true, and delivery needs a human.
+  (a placeholder). Yellow: report the numbers to the owner. Red or not-checkable: the bodies are marked unverified (\`doc.exchange.provenance\`), reviewRequired is true, and delivery needs a human.
   The import always completes; verify_exchange_file exits 1 on red. Never hide a red or not-checkable band from the user.
 - **Deliver.** \`llull export_step_ap242 --save part.stp\` (schema ap242 by default, ap214 / ap203 on request) writes products, placed occurrences, names, colours, layers, materials and the validation
   properties of every product and the root assembly, in the DOCUMENT unit (numbers are not converted; the file says the unit), then re-reads them (\`data.selfCheck\` must be green). Pass \`timestamp\`
   for a reproducible header; the same document and timestamp give identical bytes. \`llull export_iges --save part.igs\` writes B-rep solids (mode faces for legacy CAM). \`export_step_exact\` stays
   the AP214 form. Exporting bodies that were imported red or not-checkable needs \`acceptUnverified\` with a human signature: an agent gets XCH_HUMAN_GATE and hands the request over.
-- **Minimal sequence.** verify_exchange_file, import_step_exact (read \`data.report.exchange\` and \`reviewRequired\`), model, geometric_validation_properties (the values that will be embedded),
+- **Minimal sequence.** verify_exchange_file, import_step_exact (read \`data.report.exchange\` and reviewRequired), model, geometric_validation_properties (the values that will be embedded),
   export_step_ap242, then verify_exchange_file on the written file.
 `;
