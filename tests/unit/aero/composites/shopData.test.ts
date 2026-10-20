@@ -20,7 +20,7 @@ const { doc, part } = panel();
 
 describe('laminate sections for analysis (VC-CMP-26)', () => {
   const made = ok(doc, 'create_laminate_sections', { part });
-  const sections = Object.values(made.document.composites?.sections ?? {}) as Section[];
+  const sections = Object.values(made.document.composites?.sections ?? {}) as unknown as Section[];
 
   it('stores one section per zone whose plies equal the core sample of that zone', () => {
     expect(made.affected).toHaveLength(3);

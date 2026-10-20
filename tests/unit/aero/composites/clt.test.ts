@@ -143,7 +143,7 @@ describe('classical laminate theory against the published reference cases (VC-CM
     expect((qi['tsai_wu'] as { angleDeg: number }).angleDeg).toBe(90);
     rel((qi['tsai_wu'] as { R: number }).R, 276.119, 1e-4);
     const pm45 = analyze([45, -45, -45, 45], 'T300_5208', { Nx: 1 }).firstPlyFailure;
-    expect((pm45['max_stress'] as { mode: string }).mode).toBe('shear');
+    expect((pm45['max_stress'] as unknown as { mode: string }).mode).toBe('shear');
   });
 
   it('labels first-ply failure results as needing review and reports the F12* default', () => {

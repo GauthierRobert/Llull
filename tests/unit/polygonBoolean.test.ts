@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { polygonArea } from '@lib/polygon';
+import type { Vec2 } from '@core/model/vectors';
 import { clipToConvex, isConvex, unionPolygons } from '@lib/polygonBoolean';
 
 const rect = (x0: number, y0: number, x1: number, y1: number): [number, number][] => [
@@ -8,8 +9,7 @@ const rect = (x0: number, y0: number, x1: number, y1: number): [number, number][
   [x1, y1],
   [x0, y1],
 ];
-const total = (rings: readonly (readonly [number, number][] | readonly [number, number][])[]): number =>
-  rings.reduce((sum, ring) => sum + polygonArea(ring), 0);
+const total = (rings: readonly (readonly Vec2[])[]): number => rings.reduce((sum, ring) => sum + polygonArea(ring), 0);
 
 describe('unionPolygons', () => {
   it('returns the outer polygon when one contains the other', () => {

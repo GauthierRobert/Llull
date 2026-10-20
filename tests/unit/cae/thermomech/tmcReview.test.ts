@@ -59,7 +59,7 @@ describe('preheatPeriodS', () => {
       f.doc.analysis?.cases[f.analysisId]?.thermomech as never;
     expect(preheatPeriodS(setupOf(hot))).toBe(1);
     expect(preheatPeriodS(setupOf(same))).toBe(0);
-    const invalid = { ...setupOf(hot), referenceTemperature: { value: 1, unit: 'mm' } };
+    const invalid = { ...(setupOf(hot) as object), referenceTemperature: { value: 1, unit: 'mm' } };
     expect(preheatPeriodS(invalid as never)).toBe(0);
   });
 });

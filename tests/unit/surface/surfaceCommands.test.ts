@@ -573,8 +573,8 @@ describe('check_continuity, surfaces', () => {
       degreeU: 2,
       degreeV: 1,
       poles: xPoles.map(([x, z, dy]) => [
-        [x, (dy as number) * shear, z as number],
-        [x, 1 + (dy as number) * shear, z as number],
+        [x as number, (dy as number) * shear, z as number],
+        [x as number, 1 + (dy as number) * shear, z as number],
       ]),
       knotsU: [0, 1],
       multiplicitiesU: [3, 3],
