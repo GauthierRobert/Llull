@@ -20,6 +20,11 @@
 //!   penetrations shallower than 1e-9 of it are round-off (a node lying on a coplanar face of the other body). The segment a node was in
 //!   contact with keeps it while still penetrated; otherwise the shallowest penetration wins (llull's selection rule, measured necessary:
 //!   without it the nodes on the edges of two colliding bars picked the coplanar side faces and the bars passed through each other).
+//! - Shells (§29.8.2, Figs. 29.11–29.13, Eq. 29.19): every shell of a contact part is a two-sided segment on its mid-surface with
+//!   stiffness `k = f_si K A / max(shell diagonal)`; the contact surfaces are offset by half the shell thickness, a slave node carrying the
+//!   largest half thickness of the shells around it ("the maximum shell thickness of any shell connected to the node is taken as the
+//!   nodal thickness"). Against a shell segment the penetration is `|g| − (h_m + h_s)` pushed to the side the node is on; against a
+//!   solid face `g − h_s`. Rounded shell edges (§29.8.3) are not modelled: a node beyond a shell's edge (MAXPAR) does not contact it.
 //! - Deterministic: passes, slave nodes and candidates run in ascending order; forces are added in that order.
 
 use crate::model::{Contact, ContactKind, Model};
@@ -38,6 +43,8 @@ struct Segment {
     part: u32,
     stiffness: f64,
     depth: f64,
+    /// Half the shell thickness (0 for a solid face): a two-sided, offset segment.
+    half: f64,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -50,6 +57,8 @@ struct SlaveState {
 struct Pass {
     slaves: Vec<usize>,
     slave_stiffness: Vec<f64>,
+    /// Half the largest thickness of the shells at each slave node (0 for solid nodes).
+    slave_half: Vec<f64>,
     masters: Vec<usize>,
     self_contact: bool,
     contact: usize,
@@ -189,11 +198,17 @@ impl Contacts {
         if model.contacts.is_empty() {
             return None;
         }
-        let element_nodes: Vec<Vec<usize>> =
-            model.hex8.chunks_exact(8).chain(model.tet4.chunks_exact(4)).map(|nodes| nodes.iter().map(|&n| n as usize).collect()).collect();
+        let element_nodes: Vec<Vec<usize>> = model
+            .hex8
+            .chunks_exact(8)
+            .chain(model.tet4.chunks_exact(4))
+            .chain(model.shell4.chunks_exact(4))
+            .map(|nodes| nodes.iter().map(|&n| n as usize).collect())
+            .collect();
+        let solids = model.hex8.len() / 8 + model.tet4.len() / 4;
         let mut faces: std::collections::BTreeMap<Vec<usize>, (Vec<usize>, usize, u32)> = std::collections::BTreeMap::new();
         let mut counts: std::collections::BTreeMap<Vec<usize>, usize> = std::collections::BTreeMap::new();
-        for (element, nodes) in element_nodes.iter().enumerate() {
+        for (element, nodes) in element_nodes.iter().enumerate().take(solids) {
             let part = model.element_part.get(element).copied().unwrap_or(0);
             let local: Vec<Vec<usize>> = if nodes.len() == 8 {
                 HEX_FACES.iter().map(|face| face.iter().map(|&k| nodes[k]).collect()).collect()
@@ -214,9 +229,30 @@ impl Contacts {
                 let material = &model.materials[model.element_material[element] as usize];
                 let a = area(&nodes, x);
                 let v = volumes[element];
-                Segment { stiffness: material.bulk() * a * a / v, depth: 0.5 * v / a, nodes, element, part }
+                Segment { stiffness: material.bulk() * a * a / v, depth: 0.5 * v / a, half: 0.0, nodes, element, part }
             })
             .collect();
+        let mut node_half = vec![0.0_f64; x.len() / 3];
+        let mut segments = segments;
+        for (s, &thickness) in model.shell_thickness.iter().enumerate() {
+            let element = solids + s;
+            let nodes = element_nodes[element].clone();
+            let material = &model.materials[model.element_material[element] as usize];
+            let a = area(&nodes, x);
+            let diagonal = norm(sub(point(x, nodes[2]), point(x, nodes[0]))).max(norm(sub(point(x, nodes[3]), point(x, nodes[1]))));
+            for &node in &nodes {
+                node_half[node] = node_half[node].max(0.5 * thickness);
+            }
+            let part = model.element_part.get(element).copied().unwrap_or(0);
+            segments.push(Segment {
+                stiffness: material.bulk() * a / diagonal,
+                depth: 0.5 * thickness,
+                half: 0.5 * thickness,
+                nodes,
+                element,
+                part,
+            });
+        }
         let mut passes = Vec::new();
         for (index, contact) in model.contacts.iter().enumerate() {
             let of = |parts: &[u32]| -> Vec<usize> { (0..segments.len()).filter(|&s| parts.contains(&segments[s].part)).collect() };
@@ -235,8 +271,9 @@ impl Contacts {
                 }
                 let slaves: Vec<usize> = stiffness.keys().copied().collect();
                 let slave_stiffness = stiffness.values().copied().collect();
+                let slave_half = slaves.iter().map(|&node| node_half[node]).collect();
                 let state = vec![SlaveState::default(); slaves.len()];
-                passes.push(Pass { slaves, slave_stiffness, masters, self_contact, contact: index, state });
+                passes.push(Pass { slaves, slave_stiffness, slave_half, masters, self_contact, contact: index, state });
             }
         }
         Some(Contacts { segments, element_nodes, passes, definitions: model.contacts.clone() })
@@ -264,7 +301,8 @@ impl Contacts {
                 })
                 .collect();
             let Some(tree) = Bvh::build(&boxes) else { continue };
-            let reach = pass.masters.iter().map(|&s| self.segments[s].depth).fold(0.0, f64::max);
+            let reach = pass.masters.iter().map(|&s| self.segments[s].depth).fold(0.0, f64::max)
+                + pass.slave_half.iter().copied().fold(0.0, f64::max);
             for (position, &node) in pass.slaves.iter().enumerate() {
                 let t = point(x, node);
                 let mut best: Option<(usize, f64, f64, [f64; 3], f64)> = None;
@@ -278,8 +316,15 @@ impl Contacts {
                     if !inside(segment.nodes.len(), xi, eta) {
                         continue;
                     }
-                    let l = dot(n, sub(t, r));
-                    if !(l < -ROUND_OFF * segment.depth && l > -segment.depth) {
+                    let g = dot(n, sub(t, r));
+                    let slave_half = pass.slave_half[position];
+                    let (l, n, depth) = if segment.half > 0.0 {
+                        let reach = segment.half + slave_half;
+                        (g.abs() - reach, if g < 0.0 { n.map(|c| -c) } else { n }, reach)
+                    } else {
+                        (g - slave_half, n, segment.depth + slave_half)
+                    };
+                    if !(l < -ROUND_OFF * depth && l > -depth) {
                         continue;
                     }
                     // The segment the node was in contact with last cycle keeps it while still penetrated (LS-DYNA stores the
