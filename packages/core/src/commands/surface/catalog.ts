@@ -3,6 +3,7 @@
 import { commandCatalog } from '../schema';
 import { analyzeDraft, analyzeSurfaceCurvature } from './analyzeSurface';
 import { blendSurfaces } from './blendSurfaces';
+import { checkSurfaceQuality } from './checkQuality';
 import { createNurbsSurface, surfaceFromPoints } from './buildSurface';
 import { checkContinuity, measureDeviation } from './checkJoints';
 import { createConic, createNurbsCurve, interpolateCurve } from './createCurve';
@@ -33,5 +34,6 @@ export const surfaceCommands = commandCatalog(
   analyzeSurfaceCurvature,
   checkContinuity,
   measureDeviation,
+  checkSurfaceQuality,
   analyzeDraft,
 );
