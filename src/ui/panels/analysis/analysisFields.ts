@@ -49,3 +49,20 @@ export function resultParams(analysisCase: AnalysisCase, choice: ResultChoice): 
     ...(Number.isFinite(scaleValue) && scaleValue >= 0 && !heat && !eigen ? { deformationScale: scaleValue } : {}),
   };
 }
+
+const RECORDED_FIELDS: readonly string[] = [...STRUCTURAL_FIELDS, ...EIGEN_FIELDS];
+
+/** set_result_view parameters of the chosen result; null for the thermal fields, which that command does not accept. */
+export function resultViewParams(analysisCase: AnalysisCase, choice: ResultChoice): Record<string, unknown> | null {
+  const field = resolvedField(analysisCase, choice);
+  if (!RECORDED_FIELDS.includes(field)) return null;
+  const scaleValue = choice.scale.trim() === '' ? Number.NaN : Number(choice.scale);
+  const modal = field === 'mode';
+  return {
+    analysisId: analysisCase.id,
+    field,
+    ...(modal ? { mode: Number.isInteger(choice.mode) && choice.mode >= 1 ? choice.mode : 1 } : {}),
+    ...(choice.loadCase !== '' && !modal ? { loadCase: choice.loadCase } : {}),
+    ...(Number.isFinite(scaleValue) && scaleValue >= 0 && !modal ? { deformationScale: scaleValue } : {}),
+  };
+}

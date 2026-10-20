@@ -10,6 +10,7 @@ import { useAnalysisViewStore } from './analysisViewStore';
 import { PlotDialog } from './PlotDialog';
 import { formatQuantities, formatSignificant } from './quantityFormat';
 import { useFeaRender } from './useFeaRender';
+import { recordResultView, useSeedResultView } from './useResultView';
 
 const VIEWS = ['iso', 'front', 'back', 'left', 'right', 'top', 'bottom'] as const;
 
@@ -32,9 +33,27 @@ export function AnalysisResults({ analysisCase }: AnalysisResultsProps): React.R
   const choice = useAnalysisViewStore(
     useShallow((s) => ({ field: s.field, loadCase: s.loadCase, time: s.time, scale: s.scale, mode: s.mode })),
   );
-  const set = useAnalysisViewStore(
+  const store = useAnalysisViewStore(
     useShallow((s) => ({ setField: s.setField, setLoadCase: s.setLoadCase, setTime: s.setTime, setScale: s.setScale, setMode: s.setMode })),
   );
+  // The view store keeps the live choice the 3D overlay paints; the case records it too (set_result_view, structural fields only).
+  const record = (): void => recordResultView(analysisCase);
+  const set = {
+    ...store,
+    setField: (value: string): void => {
+      store.setField(value);
+      record();
+    },
+    setLoadCase: (value: string): void => {
+      store.setLoadCase(value);
+      record();
+    },
+    setMode: (value: number): void => {
+      store.setMode(value);
+      record();
+    },
+  };
+  useSeedResultView(analysisCase);
   const heat = isHeat(analysisCase);
   const eigen = isEigen(analysisCase);
   const fields = fieldsOf(analysisCase);
@@ -128,6 +147,7 @@ export function AnalysisResults({ analysisCase }: AnalysisResultsProps): React.R
               data-testid="analysis-scale"
               value={scale}
               onChange={(e) => set.setScale(e.target.value)}
+              onBlur={record}
             />
           </label>
         )}
