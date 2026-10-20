@@ -4,6 +4,7 @@ import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { validateEntityValue } from '@core/commands/persistence/guards';
 import { entityBounds } from '@core/geometry/bounds';
+import { surfaceTriangles } from '@core/geometry/nurbsSurface';
 import { collectExportTriangles } from '@core/geometry/entityTriangles';
 import { evaluateSurface } from '@lib/nurbs/surface';
 import { extractSubSurface } from '@lib/nurbs/surfaceEdit';
@@ -291,6 +292,25 @@ describe('measure_deviation (VC-SRF-18)', () => {
     });
     const toCurve = execute(line.doc, 'measure_deviation', { id: line.id, points: [[0.5, 3, 24]] });
     expect(data<{ max: number }>(toCurve).max).toBeCloseTo(5, 8);
+  });
+
+  it('compares a sheet or a curve with the target, and a sheet renders as polygons', () => {
+    const bigger = addSurface(sphere.doc, sphereSurface(11));
+    const result = execute(bigger.doc, 'measure_deviation', { id: sphere.id, referenceId: bigger.id, samples: 9 });
+    expect(data<{ max: number; mean: number }>(result).max).toBeCloseTo(1, 6);
+    expect(data<{ mean: number }>(result).mean).toBeCloseTo(1, 6);
+    const line = addCurve(bigger.doc, {
+      degree: 1,
+      poles: [
+        [20, 0, 0],
+        [30, 0, 0],
+      ],
+    });
+    const fromCurve = execute(line.doc, 'measure_deviation', { id: sphere.id, referenceId: line.id, samples: 5 });
+    expect(data<{ max: number }>(fromCurve).max).toBeCloseTo(20, 6);
+    const polygons = surfaceTriangles(sphereSurface(10), [1, 2, 3]);
+    expect(polygons.length).toBeGreaterThan(50);
+    expect(polygons[0]).toHaveLength(3);
   });
 
   it('refuses ambiguous or empty input', () => {
