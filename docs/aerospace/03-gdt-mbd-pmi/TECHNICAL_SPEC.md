@@ -776,8 +776,12 @@ features. Per file the numbers are in the pinned JSON. **The FUNCTIONAL_SPEC tar
 reader of 04 does not return every datum, angular or composite item: CTC-01 delivers 1 of 3 datum features), and only the 14 `unmapped` are lost here. Face numbering cannot be checked
 after healing; a wrong attachment is caught for dimensions by the nominal check (FTC-09: 5 of 56 items flagged, e.g. file 38.1 against B-rep 28.575), not for frames.
 
-**SFA (VC-GDT-22): not run.** `sfa-cl` is a Windows tool that is not installed. The offline stand-in is the entity census of the written Part 21 text with the independent reader
-(`lib/step21`), asserted in the round-trip test; the SFA CI job stays open.
+**SFA (VC-GDT-22): installed, NOT yet run.** SFA 5.51 (`sfa-cl.exe`) is unpacked user-scope (versions and sha256 in `docs/decisions/SV1-solver-toolchain-windows.md`), but it cannot read a
+STEP file until its IFCsvr toolkit (a 32-bit COM component, MSI, administrator rights) is installed; installing it unattended was refused by the permission policy. So no SFA report was
+read and no writer defect was found or fixed by it. `server/tests/sfaPmi.test.ts` (plate round trip through `includePmi`, then `sfa-cl file csv`: no syntax errors, CSV reports list the
+flatness / perpendicularity / position tolerance and datum entities) probes for the toolkit and skips with a logged reason until it is installed; its assertions on the CSV content are
+written from SFA's documentation and have never run, so treat them as unverified. The offline stand-in is the entity census of the written Part 21 text with the independent reader
+(`lib/step21`), asserted in the round-trip test. A CTC case is not exported (llull writes one product per loose solid; the NIST CTC files have no llull model behind them).
 
 **M5n: `llull-stats`, `llull-compute stats stackup`, `stackup_monte_carlo` (TR-GDT-22, VC-GDT-37).** Crate `solver/crates/llull-stats`: Philox4x32-10 (the Random123 known-answer
 vectors pass); sample `i` of contributor `j` draws from counter `[i_lo, i_hi, j, 0]` under key `[seed_lo, seed_hi]` (uniform from the top 24 bits as in TS, normal by Box-Muller
