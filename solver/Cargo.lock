@@ -602,6 +602,7 @@ dependencies = [
  "llull-post",
  "llull-protocol",
  "llull-raster",
+ "llull-stats",
  "llull-topopt",
 ]
 
@@ -672,6 +673,16 @@ dependencies = [
  "serde",
  "serde_json",
  "wgpu",
+]
+
+[[package]]
+name = "llull-stats"
+version = "0.1.0"
+dependencies = [
+ "llull-protocol",
+ "rayon",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

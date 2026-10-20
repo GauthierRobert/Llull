@@ -227,5 +227,15 @@ export function pmiProblems(value: unknown): string[] {
   const active = value['activeSavedViewId'];
   if (active !== undefined && (typeof active !== 'string' || !Object.hasOwn(views, active)))
     errors.push('pmi.activeSavedViewId must name a saved view');
+  const record = value['import'];
+  if (
+    record !== undefined &&
+    !(
+      isRecord(record) &&
+      typeof record['source'] === 'string' &&
+      ['items', 'unresolved', 'unmapped'].every((key) => Number.isInteger(record[key]) && (record[key] as number) >= 0)
+    )
+  )
+    errors.push('pmi.import must be { source: string, items, unresolved, unmapped: non-negative integers }');
   return errors;
 }

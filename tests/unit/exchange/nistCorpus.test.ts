@@ -39,7 +39,8 @@ const present = reference.filter((entry) => existsSync(path.join(CORPUS, entry.f
 if (present.length < reference.length)
   console.warn(`[NIST step21] ${reference.length - present.length}/${reference.length} corpus files missing in ${CORPUS}`);
 
-const isZero = (value: number | number[]): boolean => (Array.isArray(value) ? value.every((component) => component === 0) : value === 0);
+const isZero = (value: number | readonly number[]): boolean =>
+  Array.isArray(value) ? value.every((component) => component === 0) : value === 0;
 
 describe.skipIf(present.length === 0)('step21 reader vs the Python reference on the NIST corpus', () => {
   it('reads schema, unit, validation properties and census exactly like the reference', () => {
@@ -83,10 +84,11 @@ describe.skipIf(present.length === 0)('step21 reader vs the Python reference on 
         ? groupFileGvp(summarizeStep21(readFileSync(path.join(CORPUS, file), 'latin1')), 1)
         : null,
     );
-    if (pair[0] === null || pair[1] === null) return;
+    const [first, second] = pair;
+    if (first === null || first === undefined || second === null || second === undefined) return;
     const solid = (groups: NonNullable<(typeof pair)[number]>): NonNullable<(typeof pair)[number]>[number] =>
       groups.find((group) => group.volume !== undefined && group.centroid !== undefined && group.target === 'part')!;
-    const [ap203, ap242] = [solid(pair[0]), solid(pair[1])];
+    const [ap203, ap242] = [solid(first), solid(second)];
     expect((ap242.volume! - ap203.volume!) / ap203.volume!).toBeCloseTo(1.1168549051822634e-4, 12);
     expect(Math.hypot(...ap242.centroid!.map((value, axis) => value - ap203.centroid![axis]!))).toBeCloseTo(0.018141545708500635, 12);
   });

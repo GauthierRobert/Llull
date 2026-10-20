@@ -1,0 +1,242 @@
+{
+ "ctc_01": {
+  "reference": {
+   "tolerances": 6,
+   "dimensions": 12,
+   "datumFeatures": 3
+  },
+  "imported": {
+   "tolerances": 6,
+   "dimensions": 8,
+   "datumFeatures": 1,
+   "unresolved": 0,
+   "unmapped": 0,
+   "unverified": 3
+  }
+ },
+ "ctc_02": {
+  "reference": {
+   "tolerances": 22,
+   "dimensions": 7,
+   "datumFeatures": 6
+  },
+  "imported": {
+   "tolerances": 22,
+   "dimensions": 7,
+   "datumFeatures": 0,
+   "unresolved": 0,
+   "unmapped": 0,
+   "unverified": 20
+  }
+ },
+ "ctc_03": {
+  "reference": {
+   "tolerances": 13,
+   "dimensions": 10,
+   "datumFeatures": 6
+  },
+  "imported": {
+   "tolerances": 12,
+   "dimensions": 9,
+   "datumFeatures": 0,
+   "unresolved": 0,
+   "unmapped": 0,
+   "unverified": 20
+  }
+ },
+ "ctc_04": {
+  "reference": {
+   "tolerances": 7,
+   "dimensions": 10,
+   "datumFeatures": 8
+  },
+  "imported": {
+   "tolerances": 5,
+   "dimensions": 6,
+   "datumFeatures": 8,
+   "unresolved": 0,
+   "unmapped": 2,
+   "unverified": 0
+  }
+ },
+ "ctc_05": {
+  "reference": {
+   "tolerances": 10,
+   "dimensions": 6,
+   "datumFeatures": 2
+  },
+  "imported": {
+   "tolerances": 9,
+   "dimensions": 1,
+   "datumFeatures": 2,
+   "unresolved": 0,
+   "unmapped": 0,
+   "unverified": 3
+  }
+ },
+ "ftc_06": {
+  "reference": {
+   "tolerances": 28,
+   "dimensions": 24,
+   "datumFeatures": 6
+  },
+  "imported": {
+   "tolerances": 27,
+   "dimensions": 17,
+   "datumFeatures": 0,
+   "unresolved": 0,
+   "unmapped": 3,
+   "unverified": 41
+  }
+ },
+ "ftc_07": {
+  "reference": {
+   "tolerances": 27,
+   "dimensions": 17,
+   "datumFeatures": 5
+  },
+  "imported": {
+   "tolerances": 25,
+   "dimensions": 13,
+   "datumFeatures": 5,
+   "unresolved": 2,
+   "unmapped": 4,
+   "unverified": 14
+  }
+ },
+ "ftc_08": {
+  "reference": {
+   "tolerances": 33,
+   "dimensions": 10,
+   "datumFeatures": 11
+  },
+  "imported": {
+   "tolerances": 23,
+   "dimensions": 6,
+   "datumFeatures": 0,
+   "unresolved": 0,
+   "unmapped": 0,
+   "unverified": 27
+  }
+ },
+ "ftc_09": {
+  "reference": {
+   "tolerances": 31,
+   "dimensions": 22,
+   "datumFeatures": 8
+  },
+  "imported": {
+   "tolerances": 30,
+   "dimensions": 18,
+   "datumFeatures": 8,
+   "unresolved": 0,
+   "unmapped": 0,
+   "unverified": 5
+  }
+ },
+ "ftc_10": {
+  "reference": {
+   "tolerances": 40,
+   "dimensions": 26,
+   "datumFeatures": 11
+  },
+  "imported": {
+   "tolerances": 35,
+   "dimensions": 19,
+   "datumFeatures": 11,
+   "unresolved": 0,
+   "unmapped": 2,
+   "unverified": 0
+  }
+ },
+ "ftc_11": {
+  "reference": {
+   "tolerances": 4,
+   "dimensions": 6,
+   "datumFeatures": 2
+  },
+  "imported": {
+   "tolerances": 4,
+   "dimensions": 5,
+   "datumFeatures": 0,
+   "unresolved": 0,
+   "unmapped": 1,
+   "unverified": 5
+  }
+ },
+ "stc_06": {
+  "reference": {
+   "tolerances": 25,
+   "dimensions": 17,
+   "datumFeatures": 6
+  },
+  "imported": {
+   "tolerances": 25,
+   "dimensions": 16,
+   "datumFeatures": 6,
+   "unresolved": 0,
+   "unmapped": 1,
+   "unverified": 16
+  }
+ },
+ "stc_07": {
+  "reference": {
+   "tolerances": 22,
+   "dimensions": 39,
+   "datumFeatures": 3
+  },
+  "imported": {
+   "tolerances": 10,
+   "dimensions": 36,
+   "datumFeatures": 1,
+   "unresolved": 34,
+   "unmapped": 0,
+   "unverified": 42
+  }
+ },
+ "stc_08": {
+  "reference": {
+   "tolerances": 30,
+   "dimensions": 7,
+   "datumFeatures": 8
+  },
+  "imported": {
+   "tolerances": 28,
+   "dimensions": 7,
+   "datumFeatures": 0,
+   "unresolved": 0,
+   "unmapped": 0,
+   "unverified": 33
+  }
+ },
+ "stc_09": {
+  "reference": {
+   "tolerances": 27,
+   "dimensions": 20,
+   "datumFeatures": 6
+  },
+  "imported": {
+   "tolerances": 26,
+   "dimensions": 18,
+   "datumFeatures": 8,
+   "unresolved": 0,
+   "unmapped": 1,
+   "unverified": 18
+  }
+ },
+ "stc_10": {
+  "reference": {
+   "tolerances": 37,
+   "dimensions": 27,
+   "datumFeatures": 9
+  },
+  "imported": {
+   "tolerances": 36,
+   "dimensions": 27,
+   "datumFeatures": 0,
+   "unresolved": 0,
+   "unmapped": 0,
+   "unverified": 49
+  }
+ }
+}

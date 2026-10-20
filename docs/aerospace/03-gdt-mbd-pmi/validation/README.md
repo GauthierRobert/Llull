@@ -10,6 +10,7 @@ Machine-readable expectations: `expected_results.json` (one entry per VC id).
 | --- | --- | --- |
 | `nist_pmi_files.json` | pins of the NIST MBE PMI test files: the NIST zip (sha256 + size) and each of the 17 AP242 members, 11 AP203 geometry-only files and 11 PDF drawings; superseded 2024 hashes | downloaded 2026-10-15 from `usnistgov/SFA` Release (NIST), hashed locally |
 | `generate_nist_pmi_census.py` | stdlib Part 21 parser: counts semantic + graphical PMI entity instances per file, verifies sha256 | `python3 -I generate_nist_pmi_census.py <NIST-PMI-STEP-Files.zip>` |
+| `nist_pmi_import_expected.json` | **measured** result of `import_step_exact` on the 16 semantic files (items in `doc.pmi` vs the census); the ratchet of `server/tests/gdtPmiNistGate.test.ts` (VC-GDT-20); regenerate with `LLULL_GDT_RECORD=<path>` | recorded 2026-10-20 on the native OCCT 7.9.2 kernel |
 | `nist_pmi_census.json` | **which PMI each NIST file contains** (oracle for VC-GDT-20/23/24) | output of the script above |
 | `generate_stackup_reference.py` | analytic WC / RSS / σ / exact-corner / exact probabilities + seeded Monte Carlo (seed 20261015, N = 200 000) for 5 stacks; fastener formulas | `python3 -I generate_stackup_reference.py` (≈ 2 s) |
 | `stackup_reference.json` | its output (VC-GDT-30..36) | — |

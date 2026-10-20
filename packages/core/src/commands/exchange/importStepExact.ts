@@ -29,6 +29,7 @@ import { findComponentCycle } from '../assembly/assemblies';
 import { MAX_INSTANCE_DEPTH } from '../brep/stepTargets';
 import { describeProvenance } from './importProvenance';
 import { verifyImportedProducts } from './importVerify';
+import { type PmiImportOutcome, importProductPmi, recordPmiImport } from './importPmi';
 
 /** Largest STEP accepted (characters of Part 21 text; 64 MiB): the text is also kept in the step params for replay. */
 const MAX_STEP_CHARS = 64 * 1024 * 1024;
@@ -209,12 +210,30 @@ function run(doc: CadDocument, params: Params, ctx: ExecutionContext | undefined
     );
     exchange = { provenance: { ...doc.exchange?.provenance, ...exchangeReport.provenance, ...flagged } };
   }
-  const document: CadDocument = {
+  const assembled: CadDocument = {
     ...(doc.kernelSettings === undefined && stamp !== null ? withKernelStamp(staged, stamp) : staged),
     entities,
     order: [...doc.order, ...ids],
     components,
     ...(exchange === undefined ? {} : { exchange }),
+  };
+  const pmiOutcomes: PmiImportOutcome[] = [];
+  let withPmi = assembled;
+  if (params.importPmi !== false && exchangeReport !== null && tree !== null) {
+    for (const product of exchangeReport.report.products) {
+      if (product.pmi === undefined) continue;
+      const solids = tree.products[product.index]?.solids.map((solid) => solidIds[solid] ?? '') ?? [];
+      const outcome = importProductPmi(withPmi, kernel, product.pmi, solids, params.fileName ?? 'the STEP file');
+      withPmi = outcome.document;
+      pmiOutcomes.push(outcome);
+    }
+    withPmi = recordPmiImport(withPmi, params.fileName ?? 'the STEP file', pmiOutcomes);
+  }
+  const document = withPmi;
+  const pmiTotals = {
+    items: pmiOutcomes.reduce((sum, outcome) => sum + outcome.items, 0),
+    unresolved: pmiOutcomes.reduce((sum, outcome) => sum + outcome.unresolved, 0),
+    unmapped: pmiOutcomes.reduce((sum, outcome) => sum + outcome.unmapped, 0),
   };
   const base = stepImportReport({
     ids: solidIds,
@@ -230,6 +249,7 @@ function run(doc: CadDocument, params: Params, ctx: ExecutionContext | undefined
   const report = {
     ...base,
     ...(exchangeReport === null ? {} : { exchange: exchangeReport.report }),
+    ...(pmiOutcomes.length === 0 ? {} : { pmi: pmiTotals }),
     skipped: [
       ...base.skipped,
       ...(structure?.nonRigid ?? []).map((name) => `occurrence '${name}' is mirrored or scaled: placed without rotation`),
@@ -244,10 +264,15 @@ function run(doc: CadDocument, params: Params, ctx: ExecutionContext | undefined
         ...(exchangeReport?.reasons ?? []),
         ...((structure?.nonRigid.length ?? 0) > 0 ? ['non_rigid_occurrence'] : []),
         ...(depth > MAX_INSTANCE_DEPTH ? ['assembly_depth_limit'] : []),
+        ...(pmiTotals.items > 0 ? ['pmi_review_required'] : []),
       ];
       return { value: reasons.length > 0, reasons };
     })(),
   };
+  const pmiNote =
+    pmiOutcomes.length === 0
+      ? ''
+      : ` PMI: ${pmiTotals.items} semantic item(s) attached (review required), ${pmiTotals.unresolved} unresolved, ${pmiTotals.unmapped} unmapped.`;
   const warned = report.warnings.map((warning) => ` ${warning.code}: ${warning.message}.`).join('');
   const structured =
     tree !== null && structure !== null
@@ -258,7 +283,7 @@ function run(doc: CadDocument, params: Params, ctx: ExecutionContext | undefined
       document,
       `import_step_exact: ${bodies.length} exact solid${bodies.length === 1 ? '' : 's'} (${ids.join(', ')}); ${report.census.faces} faces in the file, ` +
         `${report.solids.filter((solid) => solid.validAfterHeal).length}/${bodies.length} valid after BRepCheck, max tolerance ${report.maxToleranceMm} mm; ` +
-        `${imported.skipped.length} item${imported.skipped.length === 1 ? '' : 's'} skipped.${structured}${warned}${report.reviewRequired.value ? ` Needs a qualified engineer: ${report.reviewRequired.reasons.join(', ')}.` : ''}`,
+        `${imported.skipped.length} item${imported.skipped.length === 1 ? '' : 's'} skipped.${structured}${pmiNote}${warned}${report.reviewRequired.value ? ` Needs a qualified engineer: ${report.reviewRequired.reasons.join(', ')}.` : ''}`,
       ids,
     ),
     data: { report },
@@ -297,6 +322,14 @@ const paramsSchema = z.object({
     .describe(
       'Compare the geometric validation properties the sender embedded (volume, surface area, centroid) with what llull recomputes from the imported B-rep, ' +
         'per product, and flag the bodies unverified when they disagree or cannot be checked. Never blocks the import. Default true.',
+    ),
+  importPmi: z
+    .boolean()
+    .optional()
+    .describe(
+      'Attach the semantic PMI of an AP242 file (datums, feature control frames, size and location dimensions on faces) to the imported solids through apply_pmi_set: ' +
+        'every item is review-required, an item whose face cannot be mapped is counted in data.report.pmi.unmapped, none is silently dropped. Default true; has no effect on a ' +
+        'file without PMI or with assembly false.',
     ),
   gvpPolicy: z
     .object({

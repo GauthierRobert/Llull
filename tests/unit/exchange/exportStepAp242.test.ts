@@ -426,7 +426,8 @@ describe('ply solids carrying a stepSlab (step-sheets behaviour through the XDE 
 });
 
 describe('TR-XCH-26: every export path goes through the unverified gate', () => {
-  const provenanceOf = (ids: readonly string[]): CadDocument['exchange'] => ({
+  const withProvenance = (doc: CadDocument, ids: readonly string[]): CadDocument => ({ ...doc, exchange: provenanceOf(ids) });
+  const provenanceOf = (ids: readonly string[]): NonNullable<CadDocument['exchange']> => ({
     provenance: Object.fromEntries(
       ids.map((id) => [
         id,
@@ -445,7 +446,7 @@ describe('TR-XCH-26: every export path goes through the unverified gate', () => 
   const flagged = (): { doc: CadDocument; id: string } => {
     const doc = boxes();
     const id = doc.order[0] as string;
-    return { doc: { ...doc, exchange: provenanceOf([id]) }, id };
+    return { doc: withProvenance(doc, [id]), id };
   };
   const refusedBy = (result: CommandResult, code: string): void => {
     expect(result.rejected).toBe(true);
@@ -493,7 +494,7 @@ describe('TR-XCH-26: every export path goes through the unverified gate', () => 
     const { doc: base, instances } = assemblyDoc();
     const component = base.components?.['comp-bolt'];
     const nested = Object.keys(component?.entities ?? {})[0] as string;
-    const doc = { ...base, exchange: provenanceOf([nested]) };
+    const doc = withProvenance(base, [nested]);
     const inner = execute(doc, 'create_component', {
       name: 'Outer',
       entityIds: [instances[0] as string],

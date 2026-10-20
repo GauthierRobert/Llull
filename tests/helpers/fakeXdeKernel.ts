@@ -73,7 +73,7 @@ export interface FakeProductSpec {
 /** Part 21 text with one PRODUCT per spec carrying geometric validation properties (volume, surface area, centre point) in `unit`. */
 export function fakeStepText(
   products: readonly FakeProductSpec[],
-  options: { unit?: 'mm' | 'inch'; schema?: string; withProperties?: boolean } = {},
+  options: { unit?: 'mm' | 'inch'; schema?: string | undefined; withProperties?: boolean } = {},
 ): string {
   const unit = options.unit ?? 'mm';
   const schema = options.schema ?? 'AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 1 1 4 }';

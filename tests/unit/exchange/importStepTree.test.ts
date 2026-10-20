@@ -90,7 +90,7 @@ describe('import_step_exact: flat part with embedded validation properties', () 
     expect(report.exchange.unitFactor).toBe(1);
     expect(report.exchange.products[0]).toMatchObject({ name: 'Block', band: 'green', solids: 1, entityIds: ['mesh-1.1'] });
     expect(report.exchange.policy.greenRel).toMatchObject({ value: 1e-3, unit: 'relative', defaulted: true });
-    expect(report.exchange.policy.yellowCentroidMm.source).toContain('CATIA');
+    expect(report.exchange.policy.yellowCentroidMm?.source).toContain('CATIA');
     expect(report.reviewRequired).toEqual({ value: false, reasons: [] });
     expect(report.warnings).toEqual([]);
     expect(result.document.exchange?.provenance['mesh-1.1']).toMatchObject({
