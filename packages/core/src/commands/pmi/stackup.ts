@@ -1,5 +1,5 @@
 import type { PmiItem } from '../../model/pmi';
-import { sizeNominal } from '../../geometry/pmiText';
+import { toleranceBasis } from '../../geometry/pmiText';
 import {
   type StackContributor,
   type StackDistribution,
@@ -69,19 +69,6 @@ interface Resolved {
   readonly verified: boolean;
   readonly source: string;
   readonly unit: 'length' | 'deg';
-}
-
-/** Nominal and deviations of a PMI dimension, or why it cannot feed a stack. */
-function fromPmi(item: PmiItem): { nominal: number; lower: number; upper: number } | string {
-  if (item.kind !== 'size_dimension' && item.kind !== 'location_dimension')
-    return `'${item.id}' is a ${item.kind}, not a size or location dimension`;
-  const tolerance = item.tolerance;
-  if (tolerance.type === 'basic') return `'${item.id}' is a basic dimension and carries no tolerance`;
-  const nominal = item.kind === 'size_dimension' ? sizeNominal(item) : item.measured;
-  if (nominal === undefined) return `'${item.id}' has no measured nominal (unresolved feature)`;
-  return tolerance.type === 'limits'
-    ? { nominal, lower: tolerance.lower - nominal, upper: tolerance.upper - nominal }
-    : { nominal, lower: tolerance.lower, upper: tolerance.upper };
 }
 
 /**
@@ -157,7 +144,7 @@ export const analyzeStackup = defineCommand({
       if (c.pmiId !== undefined) {
         const item = findPmi(doc, c.pmiId);
         if (item === undefined) return refuse(doc, command, 'GDT_PMI_UNKNOWN', `no PMI item '${c.pmiId}'`, [c.pmiId], [`${path}.pmiId`]);
-        const derived = fromPmi(item);
+        const derived = toleranceBasis(item);
         if (typeof derived === 'string')
           return refuse(doc, command, 'GDT_STACKUP_CONTRIBUTOR_UNTOLERANCED', derived, [c.pmiId], [`${path}.pmiId`]);
         ({ nominal, lower, upper } = derived);

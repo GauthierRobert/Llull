@@ -589,6 +589,8 @@ same shape. Codes are a public contract (snapshot-tested).
 | M5 V1-FAI | Characteristic numbering + `fai_report_skeleton` (JSON/CSV) | **gap 03** (GD&T/PMI entities) | 5–7 d |
 | M6 V2 | As-built/MBOM, shared server vault, AP242 PDM/TDP export, LOTAR packaging, QIF results import | **gap 04** (STEP AP242/LOTAR), server multi-user | 20+ d |
 
+**Gap 03 as built (AERO-4 part 1), what 09 can rely on:** `doc.pmi` exists (`CadDocument.pmi`, items keyed `pmi-<step>.<k>`, each with `review: { required, reason?, acceptedBy?, acceptedAt? }`, so `release_item` / `PLM_REVIEW_PENDING` can read `Object.values(doc.pmi?.items ?? {}).filter((i) => i.review.required)` today). `ctx.caller` (TR-PLM-16) does not exist yet: 03 gates `accept_pmi_review` with the existing `humanGate` + `ctx.humanSignature` port and every command-made PMI item starts review-required; when `ctx.caller` lands, `createdBy` can be added to `PmiBase` without a migration (optional field). `DocumentExtension.carry` (TR-PLM-32) is not needed by 03: its only non-regenerated slice, `pmi.activeSavedViewId`, is carried by `history/carry.ts`. `PmiItem` has no balloon / characteristic id yet (M5 V1-FAI numbers them in `doc.plm.characteristics`, keyed by pmi id). Details: [03 TECHNICAL_SPEC §13](../03-gdt-mbd-pmi/TECHNICAL_SPEC.md).
+
 ## 11. Open questions / decisions needed
 
 | # | Question | Options / recommendation |

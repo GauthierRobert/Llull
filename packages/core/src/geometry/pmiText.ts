@@ -98,6 +98,22 @@ export const sizeNominal = (item: SizeDimensionPmi): number | undefined => {
   return measured === undefined ? undefined : item.sizeKind === 'radius' ? measured / 2 : measured;
 };
 
+/**
+ * Nominal and deviations (document units, degrees for an angle) of a PMI size or location dimension, as a stack-up contributor takes them, or
+ * why the item cannot feed a stack (not a dimension, basic, no measured nominal). Limits tolerances become deviations from the measured nominal.
+ */
+export function toleranceBasis(item: PmiItem): { nominal: number; lower: number; upper: number } | string {
+  if (item.kind !== 'size_dimension' && item.kind !== 'location_dimension')
+    return `'${item.id}' is a ${item.kind}, not a size or location dimension`;
+  const tolerance = item.tolerance;
+  if (tolerance.type === 'basic') return `'${item.id}' is a basic dimension and carries no tolerance`;
+  const nominal = item.kind === 'size_dimension' ? sizeNominal(item) : item.measured;
+  if (nominal === undefined) return `'${item.id}' has no measured nominal (unresolved feature)`;
+  return tolerance.type === 'limits'
+    ? { nominal, lower: tolerance.lower - nominal, upper: tolerance.upper - nominal }
+    : { nominal, lower: tolerance.lower, upper: tolerance.upper };
+}
+
 const SIZE_PREFIX: Readonly<Record<SizeDimensionPmi['sizeKind'], string>> = {
   diameter: 'Ø',
   radius: 'R',
