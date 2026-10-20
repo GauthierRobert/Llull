@@ -1,9 +1,6 @@
 {
   "_comment": "Plans under docs/**/validation referencing commands that are not registered yet (plan path -> sorted names). Remove entries as commands get built; never add one without a board note. Regenerate: UPDATE_BLOCKED_PLANS=1 npx vitest run tests/unit/contract/validationPlanCommands.test.ts",
   "blocked": {
-    "docs/aerospace/09-plm-configuration-traceability/validation/scenarios/S3_baseline_bom_fai.json": [
-      "record_as_built"
-    ],
     "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-01-prepare-checks.json": [
       "cfd_create_case",
       "cfd_prepare"

@@ -39,6 +39,13 @@ const REMEDIATION = {
   PLM_BASELINE_MEMBER_UNRELEASED: 'Release it or leave it out.',
   PLM_BASELINE_UNKNOWN: 'plm_status lists the baselines.',
   PLM_ID_EXISTS: 'Use another id or omit it to have one assigned.',
+  PLM_SERIAL_UNKNOWN: 'plm_status lists the as-built serials.',
+  PLM_MBOM_UNKNOWN: 'manufacturing_bom lists the manufacturing BOMs; create_mbom makes one.',
+  PLM_QIF_INVALID: 'Send a QIF 3.0 file with MeasurementResults (no DOCTYPE, no entities); fix the line named in the summary.',
+  PLM_QIF_LIMIT: 'Split the results file: the size, depth or element count exceeds the import limit named in the summary.',
+  PLM_RESULTS_UNKNOWN: 'plm_status lists the imported result sets (faiResults).',
+  PLM_PDM_SELFCHECK_RED: 'The written file does not read back as the model says; report the finding, nothing was exported.',
+  PLM_LOTAR_INCOMPLETE: 'Release the revision first (a LOTAR package archives a frozen revision with its signature).',
 } as const satisfies Readonly<Record<string, string>>;
 
 export type PlmCode = keyof typeof REMEDIATION;

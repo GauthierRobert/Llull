@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<QIFDocument xmlns="http://qifstandards.org/xsd/qif3" versionQIF="3.0.0" idMax="200">
+  <QPId>11111111-1111-4111-8111-111111111111</QPId>
+  <StandardsDefinitions n="1">
+    <Standard id="1">
+      <Organization><StandardsOrganizationEnum>ANSI</StandardsOrganizationEnum></Organization>
+      <Designator>Y14.5</Designator>
+      <Year>2018</Year>
+    </Standard>
+  </StandardsDefinitions>
+  <FileUnits>
+    <PrimaryUnits>
+      <LinearUnit>
+        <UnitName>mm</UnitName>
+      </LinearUnit>
+    </PrimaryUnits>
+  </FileUnits>
+  <Characteristics>
+    <FormalStandardId>1</FormalStandardId>
+    <CharacteristicDefinitions n="2">
+      <DiameterCharacteristicDefinition id="20">
+        <Tolerance>
+          <MaxValue>0.021</MaxValue>
+          <MinValue>0</MinValue>
+          <DefinedAsLimit>false</DefinedAsLimit>
+        </Tolerance>
+      </DiameterCharacteristicDefinition>
+      <FlatnessCharacteristicDefinition id="21">
+        <ToleranceValue>0.05</ToleranceValue>
+      </FlatnessCharacteristicDefinition>
+    </CharacteristicDefinitions>
+    <CharacteristicNominals n="2">
+      <DiameterCharacteristicNominal id="10">
+        <CharacteristicDefinitionId>20</CharacteristicDefinitionId>
+        <TargetValue>20</TargetValue>
+      </DiameterCharacteristicNominal>
+      <FlatnessCharacteristicNominal id="11">
+        <CharacteristicDefinitionId>21</CharacteristicDefinitionId>
+      </FlatnessCharacteristicNominal>
+    </CharacteristicNominals>
+    <CharacteristicItems n="2">
+      <DiameterCharacteristicItem id="2">
+        <Name>2</Name>
+        <CharacteristicNominalId>10</CharacteristicNominalId>
+      </DiameterCharacteristicItem>
+      <FlatnessCharacteristicItem id="3">
+        <Name>3</Name>
+        <CharacteristicNominalId>11</CharacteristicNominalId>
+      </FlatnessCharacteristicItem>
+    </CharacteristicItems>
+  </Characteristics>
+  <Results>
+    <MeasurementResultsSet n="1">
+      <MeasurementResults id="50">
+        <MeasuredCharacteristics>
+          <CharacteristicMeasurements n="2">
+            <DiameterCharacteristicMeasurement id="101">
+              <Status><CharacteristicStatusEnum>PASS</CharacteristicStatusEnum></Status>
+              <CharacteristicItemId>2</CharacteristicItemId>
+              <Value>20.012</Value>
+            </DiameterCharacteristicMeasurement>
+            <FlatnessCharacteristicMeasurement id="102">
+              <Status><CharacteristicStatusEnum>FAIL</CharacteristicStatusEnum></Status>
+              <CharacteristicItemId>3</CharacteristicItemId>
+              <Value>0.071</Value>
+            </FlatnessCharacteristicMeasurement>
+          </CharacteristicMeasurements>
+        </MeasuredCharacteristics>
+        <InspectionStatus><InspectionStatusEnum>FAIL</InspectionStatusEnum></InspectionStatus>
+      </MeasurementResults>
+    </MeasurementResultsSet>
+  </Results>
+</QIFDocument>

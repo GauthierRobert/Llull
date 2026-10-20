@@ -5,6 +5,7 @@ import { isRecord } from '@lib/isRecord';
 import { integrityWarnings } from './integrity';
 import { LIFECYCLE_STATES, isLegalTransition } from './transitions';
 import { REVISION_LABEL } from './schemes';
+import { isSealed } from './records';
 import { membersHash } from './structure';
 
 export const PART_NUMBER = /^[A-Z0-9][A-Z0-9._\-/]{0,63}$/i;
@@ -82,6 +83,28 @@ function baselineErrors(raw: unknown): string[] {
   );
 }
 
+/** As-built records and manufacturing BOMs are never edited: each must still hash to its seal, under the key it is stored by. */
+function sealedErrors(slice: Record<string, unknown>): string[] {
+  const errors: string[] = [];
+  for (const [key, field] of [
+    ['asBuilt', 'serial'],
+    ['mbom', 'id'],
+  ] as const) {
+    const raw = slice[key];
+    if (raw === undefined) continue;
+    if (!isRecord(raw)) {
+      errors.push(`plm.${key} must be an object`);
+      continue;
+    }
+    for (const [name, record] of Object.entries(raw))
+      if (!isRecord(record) || record[field] !== name || !isSealed(record))
+        errors.push(`plm.${key}.${name} does not hash to its seal (edited by hand?)`);
+  }
+  const results = slice['faiResults'];
+  if (results !== undefined && !isRecord(results)) errors.push('plm.faiResults must be an object');
+  return errors;
+}
+
 /** `DocumentExtension` for `CadDocument.plm`: structural validation, carried across replay, integrity warnings on load. */
 export const plmDocument: DocumentExtension = {
   validate(raw) {
@@ -91,7 +114,7 @@ export const plmDocument: DocumentExtension = {
     const errors = itemErrors(slice['item']);
     if (!isRecord(slice['changes']) || !Array.isArray(slice['changeOrder']) || !isRecord(slice['policy']))
       errors.push('plm needs changes, changeOrder and policy');
-    errors.push(...baselineErrors(slice['baselines']));
+    errors.push(...baselineErrors(slice['baselines']), ...sealedErrors(slice));
     return errors;
   },
   derivedEntityIds: () => new Set(),
