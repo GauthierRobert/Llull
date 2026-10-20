@@ -18,6 +18,7 @@ mod ffi {
         fn shape_list_add(list: Pin<&mut ShapeList>, shape: &Shape);
 
         fn fillet_edges(shape: &Shape, edges: &[u32], radius: f64, radius_end: f64) -> Result<UniquePtr<Shape>>;
+        fn fillet_laws(shape: &Shape, edges: &[u32], laws: &[f64]) -> Result<UniquePtr<Shape>>;
         fn chamfer_edges(shape: &Shape, edges: &[u32], distance: f64) -> Result<UniquePtr<Shape>>;
         fn blend_union(list: &ShapeList, radius: f64) -> Result<UniquePtr<Shape>>;
         fn shell_hollow(shape: &Shape, thickness: f64) -> Result<UniquePtr<Shape>>;
@@ -48,6 +49,11 @@ mod ffi {
 }
 
 /// Fillet of the unique edges `edges` (explorer order, `[]` = all); `radius_end` varies the radius linearly along each edge.
+/// One radius law per edge (`radii`): `laws` per edge: size, sizeEnd (NaN = constant), n, then n (t, size) pairs.
+pub fn fillet_laws(shape: &Shape, edges: &[u32], laws: &[f64]) -> Built {
+    built(ffi::fillet_laws(inner(shape)?, edges, laws))
+}
+
 pub fn fillet(shape: &Shape, edges: &[u32], radius: f64, radius_end: Option<f64>) -> Built {
     built(ffi::fillet_edges(inner(shape)?, edges, radius, radius_end.unwrap_or(f64::NAN)))
 }

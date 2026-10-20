@@ -109,3 +109,26 @@ fn a_face_split_in_two_keeps_its_name_twice() {
     let faces = names(&topology(&cut), "faces");
     assert_eq!(faces.iter().filter(|face| face.as_str() == "b:z+").count(), 2, "{faces:?}");
 }
+
+#[test]
+fn per_edge_radius_laws_round_each_edge_with_its_own_radius() {
+    let base = leaf(entity("b", "box", json!({ "size": [4, 4, 4] })));
+    let top = topology(&base);
+    let (a, b) = (edge_index(&top, "e(b:x+|b:z+)"), edge_index(&top, "e(b:x-|b:z-)"));
+    let filleted = json!({ "op": "fillet", "source": base, "edges": [a, b], "size": 0, "radii": [{ "size": 1 }, { "size": 2 }] });
+    let shape = Evaluator::new(16).evaluate(&filleted).unwrap().unwrap();
+    let volume = crate::mass_properties(&shape).unwrap().volume;
+    let removed = (1.0 - std::f64::consts::FRAC_PI_4) * (1.0 + 4.0) * 4.0;
+    assert!((volume - (64.0 - removed)).abs() < 1e-6, "volume {volume}");
+    let faces = names(&crate::queries::topology(&shape).unwrap(), "faces");
+    assert!(faces.contains(&"blend(e(b:x+|b:z+))".to_string()) && faces.contains(&"blend(e(b:x-|b:z-))".to_string()), "{faces:?}");
+}
+
+#[test]
+fn radius_laws_that_do_not_match_the_edges_are_refused() {
+    let base = leaf(entity("b", "box", json!({ "size": [4, 4, 4] })));
+    let mismatched = json!({ "op": "fillet", "source": base, "edges": [0, 1], "size": 0, "radii": [{ "size": 1 }] });
+    assert!(Evaluator::new(8).evaluate(&mismatched).unwrap().is_none());
+    let backwards = json!({ "op": "fillet", "source": base, "edges": [0], "size": 0, "radii": [{ "size": 1, "sizes": [{ "t": 0.6, "size": 1.2 }, { "t": 0.4, "size": 1.1 }] }] });
+    assert!(Evaluator::new(8).evaluate(&backwards).unwrap().is_none());
+}

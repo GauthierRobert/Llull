@@ -26,6 +26,9 @@ void shape_list_add(ShapeList &list, const Shape &shape);
 
 // Edge rounding: `edges` index the unique edges in explorer order ([] = all); `radius_end` NaN = constant radius.
 std::unique_ptr<Shape> fillet_edges(const Shape &shape, rust::Slice<const uint32_t> edges, double radius, double radius_end);
+// Per-edge radius laws (SC-F3 `radii`): for edge k of `edges`, `laws` holds size, size_end (NaN = constant), n, then n (t, size) pairs
+// (t in (0, 1) along the edge, increasing).
+std::unique_ptr<Shape> fillet_laws(const Shape &shape, rust::Slice<const uint32_t> edges, rust::Slice<const double> laws);
 std::unique_ptr<Shape> chamfer_edges(const Shape &shape, rust::Slice<const uint32_t> edges, double distance);
 std::unique_ptr<Shape> blend_union(const ShapeList &list, double radius);
 std::unique_ptr<Shape> shell_hollow(const Shape &shape, double thickness);

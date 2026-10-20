@@ -109,11 +109,44 @@ pub(super) fn subdivision(entity: &Value) -> Evaluated {
     shape_of(crate::make_sewn_solid(&positions, &indices))
 }
 
+/// `radii` (one `EdgeRadius` per edge, `packages/core/src/model/types.ts`) flattened per edge as size, sizeEnd (NaN = constant), n, then
+/// n (t, size) pairs; `None` when the list does not match the edges or a law is not positive / strictly increasing inside (0, 1).
+pub(super) fn radius_laws(radii: &Value, edge_count: usize) -> Option<Vec<f64>> {
+    let laws = radii.as_array()?;
+    if laws.len() != edge_count || edge_count == 0 {
+        return None;
+    }
+    let mut flat = Vec::new();
+    for law in laws {
+        let size = number(law, "size")?;
+        let end = law.get("sizeEnd").and_then(Value::as_f64).unwrap_or(f64::NAN);
+        if !positive(size) || (!end.is_nan() && !positive(end)) {
+            return None;
+        }
+        let points = law.get("sizes").and_then(Value::as_array).cloned().unwrap_or_default();
+        flat.extend([size, end, points.len() as f64]);
+        let mut last_t = 0.0;
+        for point in &points {
+            let (t, radius) = (number(point, "t")?, number(point, "size")?);
+            if !(t > last_t && t < 1.0) || !positive(radius) {
+                return None;
+            }
+            last_t = t;
+            flat.extend([t, radius]);
+        }
+    }
+    Some(flat)
+}
+
 impl Evaluator {
     /// `fillet` / `chamfer` (`roundEdges`): unique-edge indices in explorer order, `[]` = all.
     pub(super) fn round(&mut self, recipe: &Value, chamfer: bool) -> Evaluated {
         let Some(source) = self.child(recipe, "source")? else { return refused() };
         let Some(edges) = indices(recipe.get("edges")) else { return refused() };
+        if let (false, Some(radii)) = (chamfer, recipe.get("radii").filter(|radii| !radii.is_null())) {
+            let Some(laws) = radius_laws(radii, edges.len()) else { return refused() };
+            return shape_of(features::fillet_laws(&source, &edges, &laws));
+        }
         let size = number(recipe, "size").unwrap_or(f64::NAN);
         let size_end = if chamfer { None } else { number(recipe, "sizeEnd") };
         if !positive(size) || size_end.is_some_and(|end| !positive(end)) {

@@ -42,6 +42,8 @@
 #include <TColStd_Array1OfInteger.hxx>
 #include <TColStd_Array1OfReal.hxx>
 #include <TColgp_Array1OfPnt.hxx>
+#include <TColgp_Array1OfPnt2d.hxx>
+#include <gp_Pnt2d.hxx>
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
@@ -293,6 +295,41 @@ std::unique_ptr<Shape> fillet_edges(const Shape &shape, rust::Slice<const uint32
           target.Add(radius, edge);
       },
       "blend");
+}
+
+std::unique_ptr<Shape> fillet_laws(const Shape &shape, rust::Slice<const uint32_t> edges, rust::Slice<const double> laws) {
+  const TopTools_IndexedMapOfShape unique = unique_sub_shapes(shape.shape, TopAbs_EDGE);
+  if (edges.empty()) return nullptr;
+  BRepFilletAPI_MakeFillet maker(shape.shape, ChFi3d_Rational);
+  size_t offset = 0;
+  for (uint32_t index : edges) {
+    if (static_cast<int>(index) >= unique.Extent() || offset + 3 > laws.size()) return nullptr;
+    const double start = laws[offset];
+    const double end = laws[offset + 1];
+    const size_t count = static_cast<size_t>(laws[offset + 2]);
+    if (offset + 3 + 2 * count > laws.size()) return nullptr;
+    const TopoDS_Edge edge = TopoDS::Edge(unique(static_cast<int>(index) + 1));
+    if (count == 0 && std::isnan(end)) {
+      maker.Add(start, edge);
+    } else if (count == 0) {
+      maker.Add(start, end, edge);
+    } else {
+      // Evolving radius: (relative parameter, radius) from the start through the control points to the end.
+      TColgp_Array1OfPnt2d law(1, static_cast<int>(count) + 2);
+      law.SetValue(1, gp_Pnt2d(0, start));
+      for (size_t k = 0; k < count; ++k)
+        law.SetValue(static_cast<int>(k) + 2, gp_Pnt2d(laws[offset + 3 + 2 * k], laws[offset + 4 + 2 * k]));
+      law.SetValue(static_cast<int>(count) + 2, gp_Pnt2d(1, std::isnan(end) ? start : end));
+      maker.Add(law, edge);
+    }
+    offset += 3 + 2 * count;
+  }
+  maker.Build();
+  if (!maker.IsDone()) return nullptr;
+  const TopoDS_Shape result = valid_or_null(maker.Shape());
+  if (result.IsNull()) return nullptr;
+  const std::vector<naming::Named> inputs{naming::named(shape)};
+  return naming::wrap_named(result, naming::inherit(result, inputs, naming::history_of(inputs, maker), "blend"));
 }
 
 std::unique_ptr<Shape> chamfer_edges(const Shape &shape, rust::Slice<const uint32_t> edges, double distance) {
