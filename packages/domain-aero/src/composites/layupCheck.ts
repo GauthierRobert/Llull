@@ -61,6 +61,8 @@ export function layupFindings(
     readonly loads?: readonly LoadCase[] | undefined;
     readonly thresholds?: Thresholds | undefined;
     readonly units: DocumentUnit;
+    /** Ids of the document entities, to report a deleted tool solid. */
+    readonly entityIds?: ReadonlySet<string> | undefined;
   },
 ): LayupReport {
   const findings: LayupFinding[] = [];
@@ -78,6 +80,15 @@ export function layupFindings(
       unit: found.unit,
       remediation: found.remediation,
     });
+  for (const face of part.toolFaces)
+    if (options.entityIds !== undefined && !options.entityIds.has(face.entityId))
+      findings.push({
+        code: 'CMP_TOOL_MISSING',
+        severity: 'fail',
+        message: `tool solid '${face.entityId}' of part "${part.name}" no longer exists; the stored flat frame is kept`,
+        ids: [face.entityId],
+        remediation: 'restore the tool solid or rebuild the part on a new tool face',
+      });
   const plies = pliesOf(model, part.id);
   const zones = zonesOf(model, part.id);
   const rampDefaulted = part.plyDropRules === undefined;

@@ -113,12 +113,15 @@ function unionPair(a: readonly Vec2[], b: readonly Vec2[]): Vec2[][] {
   return signedArea(a) >= signedArea(b) ? [[...a]] : [[...b]];
 }
 
+const onBoundary = (p: Vec2, polygon: readonly Vec2[]): boolean => edgesOf(polygon).some((edge) => paramOn(edge.a, edge.b, p) !== null);
+
 /** True when the polygons share interior area or a wall (so their union is one region). */
 function connected(a: readonly Vec2[], b: readonly Vec2[]): boolean {
   const walls = (p: readonly Vec2[], q: readonly Vec2[]): boolean =>
     splitAgainst(p, q).some((edge) => ['same', 'opposite'].includes(relationOf(edge, q)));
   const crossing = edgesOf(a).some((e) => edgesOf(b).some((f) => segmentsIntersect(e.a, e.b, f.a, f.b)));
-  return crossing || walls(a, b) || a.some((p) => pointInPolygon(p, b)) || b.some((p) => pointInPolygon(p, a));
+  const strict = (p: Vec2, polygon: readonly Vec2[]): boolean => pointInPolygon(p, polygon) && !onBoundary(p, polygon);
+  return crossing || walls(a, b) || a.some((p) => strict(p, b)) || b.some((p) => strict(p, a));
 }
 
 /**
@@ -127,20 +130,21 @@ function connected(a: readonly Vec2[], b: readonly Vec2[]): boolean {
  * @invariant polygons with fewer than 3 vertices are ignored; the result is ordered by first appearance
  */
 export function unionPolygons(polygons: readonly (readonly Vec2[])[]): Vec2[][] {
-  let result: Vec2[][] = [];
+  const result: Vec2[][] = [];
   for (const polygon of polygons) {
     if (polygon.length < 3) continue;
     let merged: Vec2[] = toCounterClockwise(polygon);
-    const rest: Vec2[][] = [];
-    for (const ring of result) {
-      if (!connected(ring, merged)) {
-        rest.push(ring);
-        continue;
-      }
-      const [outer] = unionPair(ring, merged);
-      merged = (outer as Vec2[] | undefined) ?? merged;
+    for (
+      let index = result.findIndex((ring) => connected(ring, merged));
+      index >= 0;
+      index = result.findIndex((ring) => connected(ring, merged))
+    ) {
+      const [ring] = result.splice(index, 1);
+      const [first, ...extra] = unionPair(ring as Vec2[], merged);
+      merged = first ?? merged;
+      result.push(...extra);
     }
-    result = [...rest, merged];
+    result.push(merged);
   }
   return result;
 }

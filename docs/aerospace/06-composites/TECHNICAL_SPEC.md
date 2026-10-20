@@ -758,3 +758,36 @@ Deviations from the sketch above:
 - `request_layup_waiver` records a pending waiver; nothing sets `approvalRef` (09 PLM not built).
 - Not built: M3 drape, M4 shop data (laser, ply book, CSV, ply solids, FEA sections), `add_core`, `mass_properties` delegation, parameter
   expressions in notation, stress unit conversion for non-mm documents (thickness is converted).
+
+### 13.1 Review fixes and M4 / M6 slices (2026-10-20)
+
+Review fixes: a deleted tool solid no longer blocks reopening the file (the part keeps its stored frame; `check_layup` reports
+`CMP_TOOL_MISSING`); `unionPolygons` keeps polygons that touch only at a corner; cone `fromFlat` / `normalAt` / fibre direction handle
+sector angles above pi (wide cones); the ramp-fit check ignores boundary edges that touch the zone union (an edge band is accepted);
+stacking-notation limits are checked before expansion (`_0`, `~` without `s` refused, `s` followed by U+0304 accepted); ply-level
+`rosette` rotates the angle on plane faces and is refused on curved ones; generated ply names that clash with manual plies are refused;
+`analyze_laminate` adds `constantsFlexural` (E = 12 / (h^3 d), D inverse) and describes `constantsFreeBending` as in-plane constants with
+bending unrestrained.
+
+Known limitations after the review: ramps on a concave tool-face outline (cone sectors) are refused with `CMP_OUTLINE_NOT_CONVEX`
+(zones with ramps need a convex face; whole-face plies are fine). The kernel (OCC) partial-cone outline is now built from the kernel's own
+boundary points with a detected azimuth direction and apex axis, but was only exercised through a stub port, never against live OCC.
+
+M6 analysis (`analyze_laminate`): `criteria` gains `larc03`, a plane-stress LaRC03-type criterion (fibre tension by maximum strain, matrix
+tension with g = GIc / GIIc, matrix compression on a searched fracture plane with alpha0 = 53 degrees, fibre compression by kinking with
+the initial misalignment phi0), following Dávila, Camanho and Rose, NASA/TM-2003-212663, as implemented from the published equations.
+It is checked only against the closed-form pure-stress strengths (Xt, Xc, Yt, Yc, S) and NOT against the paper's worked examples; in-situ
+(thin-ply) strengths are not applied, so treat results as unverified. It needs `GIc` / `GIIc` on the lamina record (refused otherwise).
+`environment { deltaT, deltaMoisture }` adds free thermal / moisture strains (alpha, beta on the lamina record, none defaulted):
+hygrothermal resultants, free mid-plane strain and curvature, `thermalExpansion` per kelvin, residual ply stresses; strength ratios then
+mean the multiplier of the mechanical loads on top of that state (0 when the state alone fails). Uniform temperature and moisture only,
+linear, no property degradation with temperature or moisture, no progressive failure.
+
+M4 slices without a live kernel: `create_laminate_sections` stores per-zone shell sections in `doc.composites.sections`
+(`LaminateSection` in `packages/core/src/model/composites.ts`: plies tool side first with material name, cured thickness, angle from the
+part rosette; lamina records stay in `composites.materials`, including E, G, nu, strengths, density, alpha, beta). `export_laminate_sections`
+returns them as JSON; the PCOMP / `*SHELL SECTION, COMPOSITE` writers belong to the analysis plugin (domain-cae must read the core types,
+not domain-aero). `export_ply_table` / `import_ply_table` use the CSV layout `ply,sequence,order,material,orientation,rosette,zones,area_mm2,mass`
+(the spec's `mass_g` column is named `mass`, in density unit x document unit^3); imported plies cover the whole face, and the round trip is
+byte-identical for whole-face plies. `ply_book_data` returns the numeric content of the ply book; the SVG / PDF sheets are not generated.
+Still not built: M3 drape (live OCC), laser projection, per-ply solids and STEP, `add_core`, `split_ply`, AP242, optimiser.

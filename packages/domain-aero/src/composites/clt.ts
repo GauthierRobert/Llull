@@ -138,18 +138,33 @@ const constantsOf = (a: Matrix, thickness: number): EngineeringConstants => {
   return { Ex: 1 / (thickness * at(0, 0)), Ey: 1 / (thickness * at(1, 1)), Gxy: 1 / (thickness * at(2, 2)), nuxy: -at(0, 1) / at(0, 0) };
 };
 
+/** Flexural constants of an equivalent homogeneous plate from D inverse: E = 12 / (h^3 d). */
+const flexuralOf = (d: Matrix, thickness: number): EngineeringConstants => {
+  const at = (i: number, j: number): number => (d[i] as number[])[j] as number;
+  const scale = 12 / thickness ** 3;
+  return { Ex: scale / at(0, 0), Ey: scale / at(1, 1), Gxy: scale / at(2, 2), nuxy: -at(0, 1) / at(0, 0) };
+};
+
 /**
- * Membrane constants (A inverse) and free-bending constants (top-left 3x3 block of the ABD inverse); equal for symmetric laminates.
+ * Membrane constants (A inverse), in-plane constants with bending unrestrained ("free bending": top-left 3x3 block of the ABD inverse) and
+ * flexural constants (D inverse); membrane and free-bending are equal for symmetric laminates.
  * @failure singular or ill-conditioned ABD -> null
  */
 export function engineeringConstants(
   laminate: Laminate,
-): { readonly abdInverse: Matrix; readonly membrane: EngineeringConstants; readonly freeBending: EngineeringConstants } | null {
+): {
+  readonly abdInverse: Matrix;
+  readonly membrane: EngineeringConstants;
+  readonly freeBending: EngineeringConstants;
+  readonly flexural: EngineeringConstants | null;
+} | null {
   const abdInverse = invert(assemble6(laminate));
   const aInverse = invert(laminate.A);
+  const dInverse = invert(laminate.D);
   if (abdInverse === null || aInverse === null) return null;
   return {
     abdInverse,
+    flexural: dInverse === null ? null : flexuralOf(dInverse, laminate.thickness),
     membrane: constantsOf(aInverse, laminate.thickness),
     freeBending: constantsOf(
       abdInverse.slice(0, 3).map((row) => row.slice(0, 3)),
@@ -177,9 +192,16 @@ export interface PlyPointStress {
 }
 
 /** Stresses at height z (mm from the mid-plane) in a ply of angle `angleDeg`. */
-export function plyStressAt(material: LaminaMaterial, angleDeg: number, strain: Triple, curvature: Triple, z: number): PlyPointStress {
+export function plyStressAt(
+  material: LaminaMaterial,
+  angleDeg: number,
+  strain: Triple,
+  curvature: Triple,
+  z: number,
+  free: Triple = [0, 0, 0],
+): PlyPointStress {
   const q = transformedStiffness(reducedStiffness(material), angleDeg);
-  const epsilon = strain.map((value, i) => value + z * (curvature[i] as number));
+  const epsilon = strain.map((value, i) => value + z * (curvature[i] as number) - (free[i] as number));
   const [sx, sy, txy] = q.map((row) => row.reduce((sum, value, j) => sum + value * (epsilon[j] as number), 0)) as [number, number, number];
   const theta = (angleDeg * Math.PI) / 180;
   const [m, n] = [Math.cos(theta), Math.sin(theta)];
@@ -191,4 +213,42 @@ export function plyStressAt(material: LaminaMaterial, angleDeg: number, strain: 
       -m * n * sx + m * n * sy + (m * m - n * n) * txy,
     ],
   };
+}
+
+/** Uniform change of temperature (K) and moisture content (mass fraction) the laminate sees relative to its stress-free state. */
+export interface Environment {
+  readonly deltaT: number;
+  readonly deltaMoisture: number;
+}
+
+/** Names of the hygrothermal coefficients `material` lacks for `env`. */
+export function missingHygrothermal(material: LaminaMaterial, env: Environment): string[] {
+  const thermal = env.deltaT !== 0 ? (['alpha1', 'alpha2'] as const).filter((name) => material[name] === undefined) : [];
+  const moisture = env.deltaMoisture !== 0 ? (['beta1', 'beta2'] as const).filter((name) => material[name] === undefined) : [];
+  return [...thermal, ...moisture];
+}
+
+/** Free (unrestrained) strain of a ply in the laminate axes (engineering shear): alpha dT + beta dC rotated by the ply angle. */
+export function freeStrainXy(material: LaminaMaterial, angleDeg: number, env: Environment): Triple {
+  const theta = (angleDeg * Math.PI) / 180;
+  const [m, n] = [Math.cos(theta), Math.sin(theta)];
+  const along = (material.alpha1 ?? 0) * env.deltaT + (material.beta1 ?? 0) * env.deltaMoisture;
+  const across = (material.alpha2 ?? 0) * env.deltaT + (material.beta2 ?? 0) * env.deltaMoisture;
+  return [along * m * m + across * n * n, along * n * n + across * m * m, 2 * (along - across) * m * n];
+}
+
+/** Hygrothermal force (N/mm) and moment (N*mm/mm) resultants of the stack: sum of Qbar e_free over the plies. */
+export function environmentResultants(stack: readonly StackPly[], laminate: Laminate, env: Environment): Load6 {
+  const load = [0, 0, 0, 0, 0, 0];
+  stack.forEach((ply, index) => {
+    const [lower, upper] = [laminate.z[index] as number, laminate.z[index + 1] as number];
+    const q = transformedStiffness(reducedStiffness(ply.material), ply.angle);
+    const free = freeStrainXy(ply.material, ply.angle, env);
+    q.forEach((row, i) => {
+      const force = row.reduce((sum, value, j) => sum + value * (free[j] as number), 0);
+      load[i] = (load[i] as number) + force * (upper - lower);
+      load[i + 3] = (load[i + 3] as number) + (force * (upper * upper - lower * lower)) / 2;
+    });
+  });
+  return load as unknown as Load6;
 }

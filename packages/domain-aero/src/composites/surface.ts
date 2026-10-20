@@ -47,9 +47,13 @@ export function fromFlat(surface: PartSurface, [u, v]: Vec2): Vec3 {
     const radial = add3(scale3(surface.xDir, Math.cos(azimuth)), scale3(yDir, Math.sin(azimuth)));
     return add3(add3(surface.origin, scale3(surface.axis, v)), scale3(radial, surface.radius));
   }
-  const rho = Math.hypot(u, v);
-  const azimuth = Math.atan2(v, u) / Math.sin(surface.semiAngle);
-  const radial = add3(scale3(surface.xDir, Math.cos(azimuth)), scale3(yDir, Math.sin(azimuth)));
+  return coneAt(surface, Math.hypot(u, v), coneTheta(surface, [u, v]));
+}
+
+/** Point of a cone at distance `rho` from the apex and flat polar angle `theta` (radians, not wrapped). */
+function coneAt(surface: Extract<PartSurface, { type: 'cone' }>, rho: number, theta: number): Vec3 {
+  const azimuth = theta / Math.sin(surface.semiAngle);
+  const radial = add3(scale3(surface.xDir, Math.cos(azimuth)), scale3(yDirOf(surface), Math.sin(azimuth)));
   const generator = add3(scale3(surface.axis, Math.cos(surface.semiAngle)), scale3(radial, Math.sin(surface.semiAngle)));
   return add3(surface.apex, scale3(generator, rho));
 }
@@ -62,7 +66,7 @@ export function normalAt(surface: PartSurface, uv: Vec2): Vec3 {
     const azimuth = uv[0] / surface.radius;
     return add3(scale3(surface.xDir, Math.cos(azimuth)), scale3(yDir, Math.sin(azimuth)));
   }
-  const azimuth = Math.atan2(uv[1], uv[0]) / Math.sin(surface.semiAngle);
+  const azimuth = coneTheta(surface, uv) / Math.sin(surface.semiAngle);
   const radial = add3(scale3(surface.xDir, Math.cos(azimuth)), scale3(yDir, Math.sin(azimuth)));
   return normalize3(sub3(scale3(radial, Math.cos(surface.semiAngle)), scale3(surface.axis, Math.sin(surface.semiAngle))));
 }
@@ -86,7 +90,26 @@ export function fibreDirection(surface: PartSurface, uv: Vec2, angleDeg: number)
 export function fibreDirection3d(surface: PartSurface, uv: Vec2, angleDeg: number): Vec3 {
   const [dx, dy] = fibreDirection(surface, uv, angleDeg);
   const step = 1e-4 * (1 + Math.hypot(uv[0], uv[1]));
+  if (surface.type === 'cone') {
+    const base = Math.atan2(uv[1], uv[0]);
+    const theta0 = coneTheta(surface, uv);
+    const at = (sign: number): Vec3 => {
+      const p: Vec2 = [uv[0] + sign * dx * step, uv[1] + sign * dy * step];
+      const delta = Math.atan2(Math.sin(Math.atan2(p[1], p[0]) - base), Math.cos(Math.atan2(p[1], p[0]) - base));
+      return coneAt(surface, Math.hypot(p[0], p[1]), theta0 + delta);
+    };
+    return normalize3(sub3(at(1), at(-1)));
+  }
   return normalize3(
     sub3(fromFlat(surface, [uv[0] + dx * step, uv[1] + dy * step]), fromFlat(surface, [uv[0] - dx * step, uv[1] - dy * step])),
   );
+}
+
+/**
+ * Flat polar angle of `uv` on the sector of a cone (0 .. 2 pi sin(half angle)); a point just before the seam keeps a small negative angle.
+ * @invariant atan2 is lifted by 2 pi only when the result still lies inside the sector, so wide cones (sector above pi) map correctly
+ */
+function coneTheta(surface: Extract<PartSurface, { type: 'cone' }>, [u, v]: Vec2): number {
+  const theta = Math.atan2(v, u);
+  return theta < 0 && theta + TWO_PI <= TWO_PI * Math.sin(surface.semiAngle) + 1e-9 ? theta + TWO_PI : theta;
 }

@@ -12,7 +12,7 @@ import { isUnverified } from './provenance';
 import { compact, compositesOf, withComposites } from './state';
 
 const positive = z.number();
-const POSITIVE_FIELDS = ['E1', 'E2', 'G12', 'G13', 'G23', 'Xt', 'Xc', 'Yt', 'Yc', 'S', 'plyThickness', 'density'] as const;
+const POSITIVE_FIELDS = ['E1', 'E2', 'G12', 'G13', 'G23', 'Xt', 'Xc', 'Yt', 'Yc', 'S', 'plyThickness', 'density', 'GIc', 'GIIc'] as const;
 
 /**
  * @affects creates or replaces doc.composites.materials[name]
@@ -54,6 +54,18 @@ export const createLaminaMaterial = defineCommand({
       .number()
       .describe('Tsai-Wu interaction factor F12* in [-1, 0]; default -0.5 when omitted (reported as a default).')
       .optional(),
+    alpha1: z.number().describe('Coefficient of thermal expansion along the fibre, 1/K (may be slightly negative for carbon).').optional(),
+    alpha2: z.number().describe('Coefficient of thermal expansion across the fibre, 1/K.').optional(),
+    beta1: z
+      .number()
+      .describe('Moisture swelling strain along the fibre per unit moisture content (mass fraction, dimensionless).')
+      .optional(),
+    beta2: z
+      .number()
+      .describe('Moisture swelling strain across the fibre per unit moisture content (mass fraction, dimensionless).')
+      .optional(),
+    GIc: positive.describe('Mode I fracture toughness, N/mm (for the LaRC03 matrix-tension criterion); must be > 0.').optional(),
+    GIIc: positive.describe('Mode II fracture toughness, N/mm (for the LaRC03 matrix-tension criterion); must be > 0.').optional(),
     basis: z.enum(['mean', 'b_basis', 'a_basis', 'unknown']).describe('What the values are; default "unknown" (unverified).').optional(),
     source: z.string().describe('Citation of the data (standard, report, supplier datasheet). Empty = unverified.'),
   }),

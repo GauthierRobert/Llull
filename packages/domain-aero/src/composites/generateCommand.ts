@@ -76,6 +76,21 @@ export const generatePliesFromZones = defineCommand({
         worst?.zoneIds ?? [],
       );
     }
+    const manual = new Set(
+      pliesOf(model, part.id)
+        .filter((ply) => ply.zoneOrigin === undefined)
+        .map((ply) => ply.name),
+    );
+    const clash = blend.plies.map((plan) => `${sequencePrefix}${plan.index + 1}`).find((label) => manual.has(label));
+    if (clash !== undefined)
+      return refuseCmp(
+        doc,
+        'generate_plies_from_zones',
+        'CMP_NAME_TAKEN',
+        `a manual ply is already named "${clash}"; use another sequencePrefix`,
+        [part.id],
+        ['params.sequencePrefix'],
+      );
     const drop = new Set(generated.map((ply) => ply.id));
     const kept: CompositesModel = {
       ...model,

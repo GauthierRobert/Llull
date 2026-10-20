@@ -36,22 +36,23 @@ const PAIR = /^(?:\+-|±)(\d+(?:\.\d+)?)(?:_(\d+))?$/;
 const SINGLE = /^([-+]?\d+(?:\.\d+)?)(?:_(\d+))?$/;
 const MAX_PLIES = 2000;
 
+/** `pattern` repeated `count` times, or null when the count is 0 or the result would exceed the ply limit. */
+function repeated(unit: readonly number[], count: number): number[] | null {
+  if (!Number.isSafeInteger(count) || count < 1 || count * unit.length > MAX_PLIES) return null;
+  return Array.from({ length: count }, () => unit).flat();
+}
+
 /** Angles of one item (an angle, a pair or a group); null when it does not parse. */
 function expandItem(item: string, depth: number): number[] | null {
   const group = GROUP.exec(item);
   if (group !== null) {
     const inner = parseItems(group[1] as string, depth + 1);
-    if (inner === null) return null;
-    return Array.from({ length: Number(group[2] ?? 1) }, () => inner).flat();
+    return inner === null ? null : repeated(inner, Number(group[2] ?? 1));
   }
   const pair = PAIR.exec(item);
-  if (pair !== null) {
-    const angle = Number(pair[1]);
-    return Array.from({ length: Number(pair[2] ?? 1) }, () => [angle, -angle]).flat();
-  }
+  if (pair !== null) return repeated([Number(pair[1]), -Number(pair[1])], Number(pair[2] ?? 1));
   const single = SINGLE.exec(item);
-  if (single !== null) return Array.from({ length: Number(single[2] ?? 1) }, () => Number(single[1]));
-  return null;
+  return single === null ? null : repeated([Number(single[1])], Number(single[2] ?? 1));
 }
 
 function parseItems(text: string, depth: number): number[] | null {
@@ -73,12 +74,15 @@ function parseItems(text: string, depth: number): number[] | null {
  */
 export function parseNotation(notation: string): NotationResult {
   const text = notation.replace(/\s+/g, '');
-  const outer = /^\[(.*)\]_?(\d*)([sT])?$/.exec(text);
+  const outer = /^\[(.*)\]_?(\d*)(s\u0304?\.?|T)?$/.exec(text);
   if (outer === null) return fail('expected [angles]s, [angles]T or [angles] (angles separated by "/")', text, 0);
   let body = outer[1] as string;
   const repeat = outer[2] === '' ? 1 : Number(outer[2]);
-  const middle = body.endsWith('~');
-  if (middle) body = body.slice(0, -1);
+  const overlined = outer[3]?.includes('\u0304') === true;
+  const symmetric = outer[3]?.startsWith('s') === true;
+  const middle = body.endsWith('~') || overlined;
+  if (body.endsWith('~')) body = body.slice(0, -1);
+  if (middle && !symmetric) return fail('~ (unduplicated middle ply) needs the symmetric suffix s', text, 0);
   const items = splitTop(body);
   if (items === null) return fail('unbalanced parentheses', body, 0);
   const angles: number[] = [];
@@ -86,10 +90,12 @@ export function parseNotation(notation: string): NotationResult {
     const expanded = expandItem(item.trim(), 0);
     if (expanded === null) return fail(`"${item}" is not an angle, +-angle or (group)_n`, item, index);
     angles.push(...expanded);
+    if (angles.length > MAX_PLIES) return fail(`more than ${MAX_PLIES} plies`, text, 0);
   }
   if (angles.length === 0 || repeat === 0) return fail('the stack is empty', text, 0);
-  const half = Array.from({ length: repeat }, () => angles).flat();
-  const stack = outer[3] === 's' ? [...half, ...(middle ? half.slice(0, -1) : half).reverse()] : half;
+  const half = repeated(angles, repeat);
+  if (half === null) return fail(`more than ${MAX_PLIES} plies`, text, 0);
+  const stack = symmetric ? [...half, ...(middle ? half.slice(0, -1) : half).reverse()] : half;
   if (stack.length > MAX_PLIES) return fail(`more than ${MAX_PLIES} plies`, text, 0);
   return { ok: true, angles: stack.map(normalizeAngle) };
 }

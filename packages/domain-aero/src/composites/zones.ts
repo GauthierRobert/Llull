@@ -38,7 +38,11 @@ export type BlendResult =
     }
   | {
       readonly ok: false;
-      readonly code: 'CMP_ZONES_NOT_BLENDABLE' | 'CMP_ZONES_EQUAL_THICKNESS_CONFLICT' | 'CMP_COVER_PLIES_DROPPED';
+      readonly code:
+        | 'CMP_ZONES_NOT_BLENDABLE'
+        | 'CMP_ZONES_EQUAL_THICKNESS_CONFLICT'
+        | 'CMP_COVER_PLIES_DROPPED'
+        | 'CMP_OUTLINE_NOT_CONVEX';
       readonly message: string;
       readonly zoneIds: readonly string[];
     };
@@ -176,6 +180,17 @@ export function blendZones(zones: readonly Zone[], part: CompositePart, rules: P
     (rules.dropOrder === 'inner_first' ? sorted : sorted.reverse()).forEach((index, k) => rankOf.set(index, k + 1));
   }
   const convexOutline = isConvex(part.outline);
+  const rampGroups = [...groups.values()].filter((members) => {
+    const zs = support[members[0] as number] as Zone[];
+    return !coversFace(unionPolygons(zs.map((zone) => zone.boundary)), part.outline);
+  });
+  if (!convexOutline && rampGroups.length > 0)
+    return {
+      ok: false,
+      code: 'CMP_OUTLINE_NOT_CONVEX',
+      message: 'ramps need a convex tool-face outline (the grown ramp regions cannot be clipped to a concave one yet)',
+      zoneIds: [],
+    };
   const conflicts: RampConflict[] = [];
   const plies = master.map((angle, index): BlendedPly => {
     const zs = support[index] as Zone[];
@@ -185,9 +200,7 @@ export function blendZones(zones: readonly Zone[], part: CompositePart, rules: P
     const dropRank = rankOf.get(index) as number;
     const extension = dropRank * step;
     const grown = unionPolygons(union.map((polygon) => offsetPolygon(polygon, extension)));
-    const polygons = convexOutline
-      ? grown.map((polygon) => clipToConvex(polygon, part.outline)).filter((polygon) => polygon.length >= 3)
-      : grown;
+    const polygons = grown.map((polygon) => clipToConvex(polygon, part.outline)).filter((polygon) => polygon.length >= 3);
     return { index, angle, zoneIds: zs.map((z) => z.id), dropRank, extension, polygons };
   });
   for (const [key, members] of groups) {
@@ -197,12 +210,17 @@ export function blendZones(zones: readonly Zone[], part: CompositePart, rules: P
     const needed = Math.max(...members.map((index) => rankOf.get(index) as number)) * step;
     const others = [...zones.filter((zone) => !key.split('|').includes(zone.id)).map((zone) => zone.boundary), part.outline];
     let worst: RampConflict | null = null;
+    const touches = (point: Vec2): boolean => union.some((polygon) => boundaryDistance(point, polygon) <= 1e-6);
     for (const boundary of others)
-      for (const point of samples(boundary, Math.max(needed / 4, 0.5))) {
-        if (union.some((polygon) => pointInPolygon(point, polygon))) continue;
-        const available = Math.min(...union.map((polygon) => boundaryDistance(point, polygon)));
-        if (available > 1e-6 && available < needed - 1e-9 && (worst === null || available < worst.available))
-          worst = { zoneIds: zs.map((zone) => zone.id), needed, available, location: point };
+      for (const [i, from] of boundary.entries()) {
+        const edge = samples([from, boundary[(i + 1) % boundary.length] as Vec2], Math.max(needed / 4, 0.5));
+        if (edge.some(touches)) continue;
+        for (const point of edge) {
+          if (union.some((polygon) => pointInPolygon(point, polygon))) continue;
+          const available = Math.min(...union.map((polygon) => boundaryDistance(point, polygon)));
+          if (available < needed - 1e-9 && (worst === null || available < worst.available))
+            worst = { zoneIds: zs.map((zone) => zone.id), needed, available, location: point };
+        }
       }
     if (worst !== null) conflicts.push(worst);
   }
