@@ -29,6 +29,7 @@ mod ffi {
         fn prism_of_face(face: &Shape, direction: &[f64]) -> Result<UniquePtr<Shape>>;
         fn revolution_of_face(face: &Shape, axis: &[f64], angle: f64) -> Result<UniquePtr<Shape>>;
         fn skinned_solid(chains: &[f64], lengths: &[u32], ruled: bool) -> Result<UniquePtr<Shape>>;
+        fn skinned_solid_bsplines(curves: &[f64], lengths: &[u32], ruled: bool) -> Result<UniquePtr<Shape>>;
         fn pipe_solid(spine: &[f64], section: &Shape) -> Result<UniquePtr<Shape>>;
         fn bspline_patch_solid(poles: &[f64], tolerance: f64) -> Result<UniquePtr<Shape>>;
 
@@ -105,6 +106,14 @@ pub fn skinned_solid(chains: &[Vec<f64>], ruled: bool) -> Built {
     let lengths: Option<Vec<u32>> = chains.iter().map(|chain| u32::try_from(chain.len()).ok()).collect();
     let Some(lengths) = lengths else { return Err("loft: chain too long".to_string()) };
     built(ffi::skinned_solid(&chains.concat(), &lengths, ruled))
+}
+
+/// BRepOffsetAPI_ThruSections solid through B-spline sections (`bsplineSections`): one Geom_BSplineCurve per encoded section (degree, counts,
+/// flags, poles, weights, knots, multiplicities; see server/src/native/kernelLeaves.ts `encodeBspline`) plus its optional closing line.
+pub fn skinned_solid_bsplines(curves: &[Vec<f64>], ruled: bool) -> Built {
+    let lengths: Option<Vec<u32>> = curves.iter().map(|curve| u32::try_from(curve.len()).ok()).collect();
+    let Some(lengths) = lengths else { return Err("loft: section too long".to_string()) };
+    built(ffi::skinned_solid_bsplines(&curves.concat(), &lengths, ruled))
 }
 
 /// BRepOffsetAPI_MakePipe of `section` along the encoded spine (corrected Frenet trihedron).

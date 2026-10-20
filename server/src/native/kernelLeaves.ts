@@ -15,7 +15,8 @@ import { orientOutward } from '@core/geometry/meshVolume';
 import { revolutionAxisIndex } from '@core/geometry/revolution';
 import { mapSegment, reverseChain, sampleProfile, segmentTangent } from '@core/geometry/curveSegments';
 import { ringCurves } from '@core/geometry/sectionRing';
-import { sectionChain } from '@core/geometry/sectionChain';
+import { hasClosingEdge, sectionChain } from '@core/geometry/sectionChain';
+import type { NurbsCurveData } from '@lib/nurbs/types';
 import { frameAtFraction, stationRingAt, sweepStartAxes } from '@core/geometry/sweep';
 import { subdivisionPatches } from '@core/geometry/subdivisionPatches';
 import { clamp } from '@lib/clamp';
@@ -112,8 +113,38 @@ function loftChains(entity: Extract<Entity, { kind: 'loft' }>): number[][] {
   return entity.rings.map((ring) => encodeChain(ringCurves(ring)));
 }
 
+/** What the host sends beyond the baseline wire format, decided by the capabilities the sidecar reported in `info`. */
+export interface WireOptions {
+  /** Capability `bsplineSections`: a loft also carries each exact section as ONE B-spline curve (`native.bsplines`). */
+  readonly bsplineSections?: boolean;
+}
+
+/**
+ * Wire form of one B-spline section: degree, pole count, distinct knot count, rational flag, closing-edge flag, then the xyz poles, the weights
+ * (rational only), the distinct knots and their multiplicities. The closing flag asks for a straight edge from the last pole back to the first.
+ */
+export function encodeBspline(curve: NurbsCurveData, closing: boolean): number[] {
+  const rational = curve.weights !== undefined;
+  return [
+    curve.degree,
+    curve.poles.length,
+    curve.knots.length,
+    rational ? 1 : 0,
+    closing ? 1 : 0,
+    ...curve.poles.flat(),
+    ...(curve.weights ?? []),
+    ...curve.knots,
+    ...curve.multiplicities,
+  ];
+}
+
+/** The exact sections of a loft as B-spline wire data, or null when the loft has none (a loft of sketches keeps the chains only). */
+function loftBsplines(entity: Extract<Entity, { kind: 'loft' }>): number[][] | null {
+  return entity.sections === undefined ? null : entity.sections.map((curve) => encodeBspline(curve, hasClosingEdge(curve)));
+}
+
 /** The leaf the sidecar builds for `entity` (see the module comment). */
-export function nativeLeaf(entity: Entity): Entity {
+export function nativeLeaf(entity: Entity, wire: WireOptions = {}): Entity {
   switch (entity.kind) {
     case 'extrusion': {
       if (entity.curves === undefined) return entity;
@@ -128,8 +159,10 @@ export function nativeLeaf(entity: Entity): Entity {
       const { curves, ...rest } = entity;
       return { ...rest, chain: orientedChain(curves, place, frame === 1) } as unknown as Entity;
     }
-    case 'loft':
-      return withPayload(entity, { chains: loftChains(entity), ruled: entity.ruled });
+    case 'loft': {
+      const bsplines = wire.bsplineSections === true ? loftBsplines(entity) : null;
+      return withPayload(entity, { chains: loftChains(entity), ruled: entity.ruled, ...(bsplines === null ? {} : { bsplines }) });
+    }
     case 'sweep':
       return withPayload(entity, sweepPayload(entity));
     case 'subdivision':

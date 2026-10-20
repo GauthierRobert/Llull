@@ -20,7 +20,7 @@ interface Harness {
   readonly nativeCalls: { op: string; args: readonly unknown[] }[];
 }
 
-function harness(answer: Answer): Harness {
+function harness(answer: Answer, native: NativeInfo = NATIVE): Harness {
   const nativeCalls: { op: string; args: readonly unknown[] }[] = [];
   const session: NativeKernelSession = {
     request: (op, args) => {
@@ -30,7 +30,7 @@ function harness(answer: Answer): Harness {
     alive: () => true,
     close: () => undefined,
   };
-  return { router: createKernelRouter({ native: NATIVE, session: () => session }), nativeCalls };
+  return { router: createKernelRouter({ native, session: () => session }), nativeCalls };
 }
 
 const cube = leaf(box([0, 0, 0], [1, 1, 1]));
@@ -107,6 +107,41 @@ describe('native kernel router', () => {
     const sent = (h.nativeCalls[1]!.args[0] as { recipe: Record<string, unknown> }).recipe;
     expect(sent).toMatchObject({ op: 'featureCut', mode: 'subtract', source: cube, holes: { normal: [0, 0, 1] } });
     expect(sent['tool']).toMatchObject({ op: 'solid', entity: { kind: 'revolution' } });
+  });
+
+  it('sends B-spline loft sections only to a sidecar that reported the bsplineSections capability', async () => {
+    const section = (z: number): Record<string, unknown> => ({
+      degree: 3,
+      poles: [
+        [1, 0, z],
+        [0.5, 0.4, z],
+        [-0.5, 0.4, z],
+        [-1, 0, z],
+        [-0.5, -0.4, z],
+      ],
+      knots: [0, 0.5, 1],
+      multiplicities: [4, 1, 4],
+    });
+    const loft = leaf({
+      id: 'loft',
+      kind: 'loft',
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      rings: [[[0, 0, 0]], [[0, 0, 1]]],
+      ruled: false,
+      sections: [section(0), section(2)],
+      layerId: 'layer-0',
+      color: '#999999',
+    } as never);
+    const payload = async (native: NativeInfo): Promise<Record<string, unknown>> => {
+      const h = harness(() => ({ result: { key: 'k' } }), native);
+      await h.router.route({ op: 'evaluate', args: [loft] });
+      return (h.nativeCalls[0]!.args[0] as { recipe: { entity: { native: Record<string, unknown> } } }).recipe.entity.native;
+    };
+    expect((await payload(NATIVE))['bsplines']).toBeUndefined();
+    const capable = await payload({ ...NATIVE, capabilities: [...NATIVE.capabilities, 'bsplineSections'] });
+    expect(capable['bsplines']).toHaveLength(2);
+    expect(capable['chains']).toHaveLength(2);
   });
 
   it('passes other native errors through (refusal or resend request)', async () => {
