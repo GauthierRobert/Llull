@@ -33,6 +33,17 @@ mod ffi {
         fn pipe_solid(spine: &[f64], section: &Shape) -> Result<UniquePtr<Shape>>;
         fn bspline_patch_solid(poles: &[f64], tolerance: f64) -> Result<UniquePtr<Shape>>;
 
+        fn surface_face(kind: i32, surface: &[f64], loops: &[f64]) -> Result<UniquePtr<Shape>>;
+        fn face_slab(
+            kind: i32,
+            surface: &[f64],
+            loops: &[f64],
+            from: f64,
+            to: f64,
+            direction: &[f64],
+            tolerance: f64,
+        ) -> Result<UniquePtr<Shape>>;
+
         fn feature_revol_cut(source: &Shape, profile: &[f64], origin: &[f64], normal: &[f64]) -> Result<UniquePtr<Shape>>;
         fn feature_prism_cut(
             source: &Shape,
@@ -126,6 +137,16 @@ pub fn bspline_patch_solid(poles: &[f64], tolerance: f64) -> Built {
     built(ffi::bspline_patch_solid(poles, tolerance))
 }
 
+/// Exact face of a surface description (B-spline, plane, cylinder, cone: see `cpp/features.hxx`) trimmed by (u, v) loops; `None` when OCC refuses.
+pub fn surface_face(kind: i32, surface: &[f64], loops: &[f64]) -> Built {
+    built(ffi::surface_face(kind, surface, loops))
+}
+
+/// Solid between the offsets `range` of such a face along `direction` (sewn base, offset face and ruled walls); `None` when OCC refuses.
+pub fn face_slab(kind: i32, surface: &[f64], loops: &[f64], range: [f64; 2], direction: [f64; 3], tolerance: f64) -> Built {
+    built(ffi::face_slab(kind, surface, loops, range[0], range[1], &direction, tolerance))
+}
+
 pub fn feature_revol_cut(source: &Shape, profile: &[f64], origin: [f64; 3], normal: [f64; 3]) -> Built {
     built(ffi::feature_revol_cut(inner(source)?, profile, &origin, &normal))
 }
@@ -186,6 +207,88 @@ mod tests {
         let section = circle_section([0.0; 3], [0.0, 0.0, 1.0], 1.0, Some(0.5)).unwrap().unwrap();
         let pipe = pipe_solid(&[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 3.0], &section).unwrap().unwrap();
         assert!((volume(&pipe) - std::f64::consts::PI * 0.75 * 3.0).abs() < 1e-6);
+    }
+
+    /// Bilinear sheet over [0, 4] x [0, 3] (degree 1 x 1, one span, 2 x 2 poles).
+    fn flat_sheet() -> Vec<f64> {
+        let mut data = vec![1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 0.0];
+        data.extend([0.0, 0.0, 0.0, 0.0, 3.0, 0.0, 4.0, 0.0, 0.0, 4.0, 3.0, 0.0]);
+        data.extend([0.0, 1.0, 2.0, 2.0, 0.0, 1.0, 2.0, 2.0]);
+        data
+    }
+
+    /// Exact quarter cylinder (radius 10, axis z, height 5) as a rational degree 2 x 1 patch: u along the arc, v along the axis.
+    fn quarter_cylinder_sheet() -> Vec<f64> {
+        let w = std::f64::consts::FRAC_1_SQRT_2;
+        let mut data = vec![2.0, 1.0, 3.0, 2.0, 2.0, 2.0, 1.0];
+        for (x, y) in [(10.0, 0.0), (10.0, 10.0), (0.0, 10.0)] {
+            data.extend([x, y, 0.0, x, y, 5.0]);
+        }
+        data.extend([1.0, 1.0, w, w, 1.0, 1.0]);
+        data.extend([0.0, 1.0, 3.0, 3.0, 0.0, 1.0, 2.0, 2.0]);
+        data
+    }
+
+    fn rectangle(u0: f64, v0: f64, u1: f64, v1: f64) -> Vec<f64> {
+        vec![1.0, 4.0, 1.0, u0, v0, u1, v0, u1, v1, u0, v1]
+    }
+
+    #[test]
+    fn a_b_spline_sheet_is_an_exact_face_with_optional_trims() {
+        let whole = surface_face(0, &flat_sheet(), &[]).unwrap().unwrap();
+        let area = crate::mass_properties(&whole).unwrap().area;
+        assert!((area - 12.0).abs() < 1e-9, "sheet area {area}");
+        let trimmed = surface_face(0, &flat_sheet(), &rectangle(0.25, 1.0 / 6.0, 0.75, 5.0 / 6.0)).unwrap().unwrap();
+        let area = crate::mass_properties(&trimmed).unwrap().area;
+        assert!((area - 4.0).abs() < 1e-9, "trimmed area {area}");
+        // the whole sheet minus the hole [0.25, 0.75] x [1/3, 2/3] (2 x 1 in space)
+        let mut with_hole = vec![2.0, 4.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0];
+        with_hole.extend([4.0, 0.0, 0.25, 1.0 / 3.0, 0.75, 1.0 / 3.0, 0.75, 2.0 / 3.0, 0.25, 2.0 / 3.0]);
+        let holed = surface_face(0, &flat_sheet(), &with_hole).unwrap().unwrap();
+        let area = crate::mass_properties(&holed).unwrap().area;
+        assert!((area - 10.0).abs() < 1e-9, "holed area {area}");
+        assert!(surface_face(0, &[1.0, 1.0], &[]).is_err(), "inconsistent data is an error");
+    }
+
+    #[test]
+    fn slabs_over_plane_cylinder_cone_and_b_spline_faces_have_the_exact_volume() {
+        let tolerance = 1e-6;
+        let plane = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0];
+        let slab = face_slab(1, &plane, &rectangle(0.0, 0.0, 4.0, 3.0), [0.0, 0.5], [0.0, 0.0, 1.0], tolerance).unwrap().unwrap();
+        let mass = crate::mass_properties(&slab).unwrap();
+        assert!((mass.volume - 6.0).abs() < 1e-7, "plane slab {}", mass.volume);
+        let lifted = face_slab(1, &plane, &rectangle(0.0, 0.0, 4.0, 3.0), [1.0, 1.5], [0.0, 0.0, 1.0], tolerance).unwrap().unwrap();
+        let top = crate::mass_properties(&lifted).unwrap().centroid[2] - 0.25;
+        assert!((top - 1.0).abs() < 1e-7, "lifted slab centroid {top}");
+        let down = face_slab(1, &plane, &rectangle(0.0, 0.0, 4.0, 3.0), [0.0, 0.5], [0.0, 0.0, -1.0], tolerance).unwrap().unwrap();
+        let bottom = crate::mass_properties(&down).unwrap().centroid[2] - 0.25;
+        assert!((bottom + 0.5).abs() < 1e-7, "lifted against the reference direction {bottom}");
+        // quarter of a cylinder shell, radius 10 -> 12, height 5
+        let cylinder = [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 10.0];
+        let arc = std::f64::consts::FRAC_PI_2;
+        let expected = 0.5 * arc * (144.0 - 100.0) * 5.0;
+        let shell = face_slab(2, &cylinder, &rectangle(0.0, 0.0, arc, 5.0), [0.0, 2.0], [1.0, 0.0, 0.0], tolerance).unwrap().unwrap();
+        let volume = crate::mass_properties(&shell).unwrap().volume;
+        assert!((volume / expected - 1.0).abs() < 1e-6, "cylinder slab {volume} vs {expected}");
+        // the same patch as a rational B-spline sheet
+        let nurbs = face_slab(0, &quarter_cylinder_sheet(), &[], [0.0, 2.0], [1.0, 0.0, 0.0], tolerance).unwrap().unwrap();
+        let volume = crate::mass_properties(&nurbs).unwrap().volume;
+        assert!((volume / expected - 1.0).abs() < 1e-5, "B-spline slab {volume} vs {expected}");
+        // full turn: the periodic seam
+        let full = std::f64::consts::TAU;
+        let ring = face_slab(2, &cylinder, &rectangle(0.0, 0.0, full, 5.0), [0.0, 2.0], [1.0, 0.0, 0.0], tolerance).unwrap().unwrap();
+        let volume = crate::mass_properties(&ring).unwrap().volume;
+        let expected_ring = std::f64::consts::PI * (144.0 - 100.0) * 5.0;
+        assert!((volume / expected_ring - 1.0).abs() < 1e-6, "full tube {volume} vs {expected_ring}");
+        // cone: apex at the origin, semi-angle 30 degrees, generators 20 .. 30, a 90-degree sector, lifted by 1
+        let half = std::f64::consts::FRAC_PI_6;
+        let cone = [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, half];
+        let cone_slab = face_slab(3, &cone, &rectangle(0.0, 20.0, arc, 30.0), [0.0, 1.0], [0.0, 1.0, 0.0], tolerance);
+        let volume = crate::mass_properties(&cone_slab.unwrap().unwrap()).unwrap().volume;
+        let area = 0.5 * arc * half.sin() * (900.0 - 400.0) + 0.5 * half.cos() * arc * 10.0;
+        assert!((volume / area - 1.0).abs() < 1e-6, "cone slab {volume} vs exact {area}");
+        assert!(crate::analyze(&ring).unwrap().valid, "the full tube is a valid solid");
+        assert!(face_slab(1, &plane, &rectangle(0.0, 0.0, 4.0, 3.0), [1.0, 1.0], [0.0, 0.0, 1.0], tolerance).unwrap().is_none());
     }
 
     /// As ONE multi-span edge per section the loft was exact but OCC's Gauss rule under-integrated its faces (square 6.963 instead of 8, circle

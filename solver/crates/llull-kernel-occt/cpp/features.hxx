@@ -46,6 +46,15 @@ bool chain_wire_ok(rust::Slice<const double> chain);
 // Bicubic patches, 16 poles each (u along i, v along j), sewn at `tolerance`; null (never a throw) when OCC refuses one.
 std::unique_ptr<Shape> bspline_patch_solid(rust::Slice<const double> poles, double tolerance);
 
+// Exact face of a surface description trimmed by (u, v) polygon loops (cpp/surfaces.cxx). `kind`: 0 B-spline (degU, degV, nU, nV, knot counts, rational
+// flag, poles i-major, weights, knots and multiplicities of u then v), 1 plane (origin, xDir, yDir), 2 cylinder (origin, axis, xDir, radius),
+// 3 cone (apex, axis, xDir, semi-angle). `loops`: count, then per loop its point count, an outer flag and u v pairs; no outer loop keeps a
+// B-spline's natural boundary. Null when OCC refuses; a throw (-> Err) for inconsistent data.
+std::unique_ptr<Shape> surface_face(int32_t kind, rust::Slice<const double> surface, rust::Slice<const double> loops);
+// The face lifted along its normal from offset `from` to `to` (> from): a sewn solid. `direction` is the lift direction at the first loop vertex.
+std::unique_ptr<Shape> face_slab(int32_t kind, rust::Slice<const double> surface, rust::Slice<const double> loops, double from, double to,
+                                 rust::Slice<const double> direction, double tolerance);
+
 // BRepFeat_MakeRevol cut of the closed polygon `profile` (xyz triples) revolved 2 pi about (origin, normal).
 std::unique_ptr<Shape> feature_revol_cut(const Shape &source, rust::Slice<const double> profile, rust::Slice<const double> origin,
                                          rust::Slice<const double> normal);

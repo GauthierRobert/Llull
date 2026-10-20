@@ -69,6 +69,42 @@ pub(super) fn loft(entity: &Value) -> Evaluated {
     place_entity(shape_of(features::skinned_solid(&rings, ruled))?, entity, [0.0; 3])
 }
 
+/// A surface sheet (`nurbs_surface` leaf, capability `nurbsSurface`): the host sends `native.surface` (encoded clamped B-spline patch) and
+/// `native.loops` (its (u, v) trim loops, absent = the natural boundary); the face is placed like any entity. Without the payload it is refused.
+pub(super) fn nurbs_surface(entity: &Value) -> Evaluated {
+    let native = entity.get("native");
+    let Some(surface) = numbers(native.and_then(|inner| inner.get("surface"))) else { return refused() };
+    let loops = numbers(native.and_then(|inner| inner.get("loops"))).unwrap_or_default();
+    place_entity(shape_of(features::surface_face(0, &surface, &loops))?, entity, [0.0; 3])
+}
+
+/// `faceSlab` (capability `faceSlab`): a trimmed face of a B-spline / plane / cylinder / cone (`surface.type` + `surface.data`, `loops`) lifted
+/// along its normal from offset `from` to `to` (a solid of constant thickness; `direction` = lift direction at the first loop vertex).
+pub(super) fn face_slab(recipe: &Value) -> Evaluated {
+    let Some(surface) = recipe.get("surface") else { return refused() };
+    let kind = match surface.get("type").and_then(Value::as_str) {
+        Some("bspline") => 0,
+        Some("plane") => 1,
+        Some("cylinder") => 2,
+        Some("cone") => 3,
+        _ => return refused(),
+    };
+    let (Some(data), Some(loops), Some(from), Some(to), Some(direction)) = (
+        numbers(surface.get("data")),
+        numbers(recipe.get("loops")),
+        number(recipe, "from"),
+        number(recipe, "to"),
+        vec3(recipe, "direction"),
+    ) else {
+        return refused();
+    };
+    let tolerance = number(recipe, "tolerance").unwrap_or(1e-6);
+    if to.partial_cmp(&from) != Some(std::cmp::Ordering::Greater) || !positive(tolerance) {
+        return refused();
+    }
+    shape_of(features::face_slab(kind, &data, &loops, [from, to], direction, tolerance))
+}
+
 /// Sweep (`sweptSolid`): the spine must make a wire; a variable sweep skins its station rings, else MakePipe of the section.
 pub(super) fn sweep(entity: &Value) -> Evaluated {
     let Some(native) = entity.get("native") else { return refused() };
@@ -268,6 +304,30 @@ mod tests {
         let nowhere =
             json!({ "radius": r, "floorDepth": 0.25, "origin": [0, 0, 1], "normal": [0, 0, 1], "xDir": [1, 0, 0], "outlines": [] });
         assert!(evaluator.evaluate(&pocket(nowhere)).unwrap().is_none(), "no floor edge = refused");
+    }
+
+    #[test]
+    fn a_sheet_leaf_and_a_face_slab_build_from_their_payloads() {
+        let mut evaluator = Evaluator::new(16);
+        // bilinear sheet over [0, 4] x [0, 3] (u, v in [0, 1]), trimmed to the middle half in u, placed 1 up in z
+        let surface = [
+            1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 3.0, 0.0, 4.0, 0.0, 0.0, 4.0, 3.0, 0.0, 0.0, 1.0, 2.0, 2.0, 0.0, 1.0,
+            2.0, 2.0,
+        ];
+        let trim = [1.0, 4.0, 1.0, 0.25, 0.0, 0.75, 0.0, 0.75, 1.0, 0.25, 1.0];
+        let sheet = |native: Value| json!({ "op": "solid", "entity": { "id": "s", "kind": "nurbs_surface", "position": [0, 0, 1], "rotation": [0, 0, 0], "native": native } });
+        let area = |evaluated: Evaluated| crate::mass_properties(&evaluated.unwrap().unwrap()).unwrap();
+        let whole = area(evaluator.evaluate(&sheet(json!({ "surface": surface }))));
+        assert!((whole.area - 12.0).abs() < 1e-9 && (whole.bounds[2] - 1.0).abs() < 1e-3, "placed sheet area {}", whole.area);
+        let trimmed = area(evaluator.evaluate(&sheet(json!({ "surface": surface, "loops": trim }))));
+        assert!((trimmed.area - 6.0).abs() < 1e-9, "trimmed sheet area {}", trimmed.area);
+        assert!(evaluator.evaluate(&sheet(json!({}))).unwrap().is_none(), "a sheet without its payload is refused");
+        let slab = json!({
+            "op": "faceSlab", "surface": { "type": "bspline", "data": surface }, "loops": trim, "from": 0.5, "to": 1.0, "direction": [0, 0, 1],
+        });
+        assert!((volume(evaluator.evaluate(&slab)) - 3.0).abs() < 1e-6, "slab = trimmed area x thickness");
+        let backwards = json!({ "op": "faceSlab", "surface": { "type": "plane", "data": [0, 0, 0, 1, 0, 0, 0, 1, 0] }, "loops": trim, "from": 1, "to": 1, "direction": [0, 0, 1] });
+        assert!(evaluator.evaluate(&backwards).unwrap().is_none());
     }
 
     #[test]
