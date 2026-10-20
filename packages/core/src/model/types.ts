@@ -1,5 +1,6 @@
 /** Domain model — the single source of truth for a CAD document; changed only by commands. */
 
+import type { Animation, AnimationChannel, AnimationMode } from './animation';
 import { isCurve3D, isSheet } from './curveKinds';
 import type { PropertyModel } from './propertyModel';
 import type { ConstitutiveSet, MaterialModel } from './materialModel';
@@ -501,33 +502,6 @@ export interface Parameter {
   error?: string;
 }
 
-/** Declarative movement clips: the document declares motion, the viewport evaluates it per frame (no physics). */
-export type AnimationChannel = 'rotation' | 'position';
-
-/** 'spin' = constant velocity; 'oscillate' = sinusoidal back-and-forth. */
-export type AnimationMode = 'spin' | 'oscillate';
-
-export interface Animation {
-  readonly id: string;
-  /** Entity or group id, per `targetKind`. */
-  targetId: EntityId;
-  targetKind: 'entity' | 'group';
-  channel: AnimationChannel;
-  /** Rotation axle or translation direction; the player normalizes it. */
-  axis: Vec3;
-  mode: AnimationMode;
-  /** spin only: rad/s (rotation) or units/s (position). */
-  speed: number;
-  /** oscillate only: radians (rotation) or units (position). */
-  amplitude: number;
-  /** oscillate only: Hz. */
-  frequency: number;
-  /** rotation only: world-space pivot; defaults to the target's position. */
-  pivot?: Vec3;
-  /** 'auto' runs under global Play; 'click' toggles on click. */
-  trigger: 'auto' | 'click';
-}
-
 /** One recorded command invocation; the history is the constructive recipe (architecture L8). Suppressed steps are skipped on replay. */
 export interface FeatureStep {
   /** `step-<n>` (`CadDocument.nextStepNumber`); legacy v1 files keep their old ids. */
@@ -707,7 +681,7 @@ export interface CadDocument {
   probabilistic?: ReliabilityModel;
 }
 
-export type { DocumentKernelSettings };
+export type { DocumentKernelSettings, Animation, AnimationChannel, AnimationMode };
 
 /**
  * Content-addressed payload referenced by `brep` recipe leaves.
