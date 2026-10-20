@@ -38,6 +38,7 @@ const FILE_PARAMS: Readonly<Record<string, { key: string; encoding: 'base64' | '
   import_dwg: { key: 'dwgBase64', encoding: 'base64' },
   import_code: { key: 'code', encoding: 'utf8' },
   fea_import_field: { key: 'csv', encoding: 'utf8' },
+  fea_import_results: { key: 'dataBase64', encoding: 'base64' },
   register_material_library: { key: 'libraryJson', encoding: 'utf8' },
 };
 

@@ -21,7 +21,8 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
                               import_code): file=PATH reads a local file into their content
   fea_mesh analysisId=ID      mesh an FE analysis (Gmsh) and record it; needs python gmsh
   fea_solve analysisId=ID     solve it with CalculiX (ccx)  [timeoutS=600]; then: fea_report analysisId=ID
-  fea_export analysisId=ID    the CalculiX .inp deck (text + sha256)  [--save deck.inp]
+  fea_export analysisId=ID [format=calculix_inp|nastran_bdf|vtu]   the solver deck (CalculiX .inp, Nastran .bdf) or a VTU of mesh + results (text + sha256)  [--save deck.inp]
+  fea_import_results analysisId=ID format=frd|op2 file=R.op2   external results of the current mesh -> record_fea_results
   fea_import_field analysisId=ID file=T.csv coordinatesUnit=mm temperatureUnit=degC   temperature table x,y,z,T -> thermo_static field
                               (works locally and with --app / --server; artifacts: $LLULL_FEA_CACHE)
   fatigue_field caseId=ID     native llull-compute: rainflow + Miner damage on every FE node, then compute_fatigue
