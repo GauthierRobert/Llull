@@ -39,6 +39,14 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   CMP_DRAPE_INCOMPLETE: 'change the seed or stepLength, or split the ply with darts so each piece drapes completely',
   CMP_CUT_INVALID: 'give a path inside the part frame that touches the ply; a splice must cross the ply boundary at both ends',
   CMP_CORE_INVALID: 'give a boundary inside the part outline, a core_honeycomb / core_foam material and thickness > 0',
+  CMP_AP242_TOOL_MISSING: 'the tool solid of the part must exist in the document (restore it or rebuild the part on a new tool face)',
+  CMP_AP242_NAME_CLASH:
+    'give the tool solid and the ply solids distinct names (set_entity_name); delete stale ply solids left by an earlier create_ply_solids',
+  CMP_AP242_WRITE_FAILED: 'run on the desktop backend or with --kernel occt-native (the XDE writer is needed), then retry',
+  CMP_AP242_SELFCHECK_RED: 'report a defect with the part id; do not deliver the file',
+  CMP_AP242_NO_COMPOSITE: 'the file carries no llull composite records: export it with export_composite_ap242 (other systems are not read)',
+  CMP_AP242_MALFORMED: 'the composite records of the file are damaged or from a newer llull; re-export the file',
+  CMP_AP242_SOLIDS_FAILED: 'import the solids separately with import_step_exact and retry with importSolids false',
   CMP_CORE_UNSUPPORTED: 'sandwich cores are not modelled by this analysis; analyse the skins separately or choose a point outside the core',
 };
 
