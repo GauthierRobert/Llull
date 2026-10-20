@@ -227,7 +227,7 @@ describe('set_buckling_preload and the preloaded buckling deck', () => {
     const written = writeInp(preloaded, analysisId, barMesh(preloaded, analysisId, boxId, sets));
     const text = 'text' in written ? written.text : JSON.stringify(written);
     const steps = text.slice(text.indexOf('** buckling preload'));
-    expect(steps).toContain('** buckling preload (not scaled): load case dead\n*STEP\n*STATIC\n*BOUNDARY, OP=NEW');
+    expect(steps).toContain('** buckling preload (ccx scales it with the reference): load case dead\n*STEP\n*STATIC\n*BOUNDARY, OP=NEW');
     expect(steps).toContain('*CLOAD, OP=NEW\n');
     expect(steps).toMatch(/\*END STEP\n\*\* buckling reference load case LC2\n\*STEP\n\*BUCKLE\n3\n\*CLOAD\n/);
     expect(steps).not.toMatch(/\*BUCKLE\n3\n\*BOUNDARY/);

@@ -74,9 +74,9 @@ describe('transient coupled deck', () => {
     const preheat = text.slice(text.indexOf('** pre-heating'), text.indexOf('*COUPLED TEMPERATURE-DISPLACEMENT'));
     expect(preheat).toContain('*STEP\n*STATIC\n1, 1\n');
     expect(preheat).toContain('*BOUNDARY, OP=NEW');
-    expect(preheat).toContain('*TEMPERATURE\n1, 90\n2, 90\n3, 90\n4, 90\n5, 90\n*END STEP');
-    expect(text).toContain('*TEMPERATURE, OP=NEW\n');
-    expect(text.indexOf('*TEMPERATURE, OP=NEW')).toBeGreaterThan(text.indexOf('*COUPLED TEMPERATURE-DISPLACEMENT'));
+    // ccx 2.21: energy output in the first step (else a later nonlinear step stops) and no *TEMPERATURE in the coupled step (refused there)
+    expect(preheat).toContain('*TEMPERATURE\n1, 90\n2, 90\n3, 90\n4, 90\n5, 90\n*EL FILE\nENER\n*END STEP');
+    expect(text.slice(text.indexOf('*COUPLED TEMPERATURE-DISPLACEMENT'))).not.toContain('*TEMPERATURE');
     expect(text).toMatch(/\*INITIAL CONDITIONS, TYPE=TEMPERATURE\n1, 20\n/);
   });
 

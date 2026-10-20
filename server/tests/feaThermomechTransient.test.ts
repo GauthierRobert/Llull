@@ -7,12 +7,15 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
+import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { isRecord } from '@lib/isRecord';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
 import { dataOf, expectCase, planPath, Workspace } from './feaThermomechSupport';
 
 const READY = HAS_GMSH && HAS_CCX && nativeKernelBinary !== null;
+/** The restrained bar is a plain box: Manifold geometry (STL) meshes it when the native kernel is absent; the conformal bimetal needs exact STEP. */
+const TRANSIENT_READY = HAS_GMSH && HAS_CCX;
 if (!READY)
   console.warn(
     `[PHY-04 M4b FE] skipped: ${[HAS_GMSH ? null : 'Gmsh (python module gmsh)', HAS_CCX ? null : 'CalculiX (ccx)', nativeKernelBinary === null ? 'llull-kernel' : null].filter((name) => name !== null).join(', ')} not available`,
@@ -23,6 +26,7 @@ let workspace: Workspace;
 beforeAll(async () => {
   workspace = new Workspace();
   if (READY) setGeometryKernel(createNativeTestKernel());
+  else if (TRANSIENT_READY) setGeometryKernel(await createManifoldKernel());
 }, 120_000);
 
 afterAll(() => {
@@ -46,7 +50,7 @@ describe.skipIf(!READY)('VC-TMC-04 bimetal cantilever as FE (two materials, conf
   }, 600_000);
 });
 
-describe.skipIf(!READY)('transient coupled step on the restrained bar (TR-TMC-22, M4b)', () => {
+describe.skipIf(!TRANSIENT_READY)('transient coupled step on the restrained bar (TR-TMC-22, M4b)', () => {
   it('writes the transient step, and the stress history ends at the steady restrained value with its peak at the end', async () => {
     const session = workspace.open('coupled-transient');
     const analysisId = await session.idOf(planPath('tmc_coupled_bar'), 'an');

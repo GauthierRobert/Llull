@@ -15,7 +15,7 @@ import type { FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import { isRecord } from '@lib/isRecord';
 import { EXIT_COMMAND_ERROR, EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 import { defaultFeArtifactStore } from '../src/fea/artifactStore';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { FEA_TOOL_ENV, HAS_CCX, HAS_GMSH } from './feaTestSupport';
 
 const AREA = 10 * 10; // mm^2
 const FORCE = 1000; // N
@@ -72,7 +72,7 @@ function io(out: string[], err: string[] = []): CliIo {
     stdout: (text) => out.push(text),
     stderr: (text) => err.push(text),
     readStdin: () => Promise.resolve(''),
-    env: {},
+    env: { ...FEA_TOOL_ENV },
     prepareKernel: () => Promise.resolve(),
   };
 }

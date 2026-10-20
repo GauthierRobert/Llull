@@ -71,7 +71,8 @@ fn bounds_json(values: &[f64]) -> Value {
 }
 
 fn info() -> Value {
-    let capabilities: Vec<&str> = ["analyze", "massProperties", "exportStep", "bsplineSections"].into_iter().chain(QUERY_CAPABILITIES).collect();
+    let capabilities: Vec<&str> =
+        ["analyze", "massProperties", "exportStep", "bsplineSections"].into_iter().chain(QUERY_CAPABILITIES).collect();
     json!({
         "occtVersion": occt_version(),
         "build": format!("llull-kernel@{}", env!("CARGO_PKG_VERSION")),

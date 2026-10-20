@@ -23,9 +23,9 @@ const MAX_STDERR_BYTES = 64 * 1024; // tail kept for error messages
 const MAX_CONCURRENT_RUNS = 2; // CadQuery processes are heavy; the rest queue
 const DEFAULT_QUEUE_MAX = 16;
 
-/** Environment the Python child may see — never the server's secrets. */
+/** Environment the Python child may see — never the server's secrets. Case-insensitive: Windows names them `Path`, `SystemRoot`, `ComSpec`. */
 const ENV_ALLOWLIST =
-  /^(PATH|HOME|USER|LOGNAME|LANG|LC_\w+|TZ|TMPDIR|TEMP|TMP|SYSTEMROOT|COMSPEC|PYTHON\w*|VIRTUAL_ENV|CONDA_\w+|LD_LIBRARY_PATH|DYLD_LIBRARY_PATH|CASROOT)$/;
+  /^(PATH|HOME|USER|LOGNAME|LANG|LC_\w+|TZ|TMPDIR|TEMP|TMP|SYSTEMROOT|COMSPEC|PYTHON\w*|VIRTUAL_ENV|CONDA_\w+|LD_LIBRARY_PATH|DYLD_LIBRARY_PATH|CASROOT)$/i;
 
 export function bridgeEnvironment(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(env).filter(([key]) => ENV_ALLOWLIST.test(key)));

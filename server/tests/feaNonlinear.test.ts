@@ -18,7 +18,7 @@ import { isRecord } from '@lib/isRecord';
 import { extractCurves } from '@cae/nonlinear/curves';
 import { EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 import { defaultFeArtifactStore } from '../src/fea/artifactStore';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { FEA_TOOL_ENV, HAS_CCX, HAS_GMSH } from './feaTestSupport';
 
 const AREA = 100; // mm^2
 const LENGTH = 40; // mm
@@ -196,7 +196,7 @@ function io(out: string[]): CliIo {
     stdout: (text) => out.push(text),
     stderr: () => undefined,
     readStdin: () => Promise.resolve(''),
-    env: {},
+    env: { ...FEA_TOOL_ENV },
     prepareKernel: () => Promise.resolve(),
   };
 }

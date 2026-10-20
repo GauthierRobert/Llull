@@ -20,7 +20,7 @@ import { extractCurves, type CurveData } from '@cae/nonlinear/curves';
 import { EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 import { defaultFeArtifactStore } from '../src/fea/artifactStore';
 import { REPO_ROOT } from './packCli';
-import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
+import { FEA_TOOL_ENV, HAS_CCX, HAS_GMSH } from './feaTestSupport';
 
 const PLANS = 'docs/physics/05-nonlinear-structural/validation/plans';
 const VALIDITY = {
@@ -38,7 +38,7 @@ function io(out: string[]): CliIo {
     stdout: (text) => out.push(text),
     stderr: () => undefined,
     readStdin: () => Promise.resolve(''),
-    env: {},
+    env: { ...FEA_TOOL_ENV },
     prepareKernel: () => Promise.resolve(),
   };
 }

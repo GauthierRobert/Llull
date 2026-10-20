@@ -10,6 +10,7 @@ import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { isRecord } from '@lib/isRecord';
 import { EXIT_OK, runCli, type CliIo } from '../src/cli/main';
+import { FEA_TOOL_ENV } from './feaTestSupport';
 
 export type PlanStep = { readonly command: string; readonly params: Record<string, unknown>; readonly as?: string };
 
@@ -42,7 +43,7 @@ function io(out: string[]): CliIo {
     stdout: (text) => out.push(text),
     stderr: () => undefined,
     readStdin: () => Promise.resolve(''),
-    env: {},
+    env: { ...FEA_TOOL_ENV },
     prepareKernel: () => Promise.resolve(),
   };
 }

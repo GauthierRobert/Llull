@@ -77,7 +77,8 @@ fn facade_sources() -> Vec<PathBuf> {
 }
 
 fn has_library(lib_dir: &Path, name: &str) -> bool {
-    ["lib{}.so", "lib{}.dylib", "{}.lib"].iter().any(|pattern| lib_dir.join(pattern.replace("{}", name)).exists())
+    // .so / .dylib (Linux, macOS), .lib (MSVC import library), .dll.a (MinGW import library: x86_64-pc-windows-gnu with a GCC-built OCCT)
+    ["lib{}.so", "lib{}.dylib", "{}.lib", "lib{}.dll.a"].iter().any(|pattern| lib_dir.join(pattern.replace("{}", name)).exists())
 }
 
 fn main() {
@@ -89,7 +90,6 @@ fn main() {
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
     for name in OCCT_LIBS {
         assert!(has_library(&lib_dir, name), "OCCT toolkit {name} missing in {} (rebuild with build-occt.mjs)", lib_dir.display());
-        println!("cargo:rustc-link-lib=dylib={name}");
     }
     // Consumed by dependents' build scripts as DEP_OCCT_LIB_DIR / DEP_OCCT_BIN_DIR (runtime search path, Windows DLLs).
     println!("cargo:lib_dir={}", lib_dir.display());
@@ -106,6 +106,11 @@ fn main() {
         build.file(source);
     }
     build.include(&include_dir).std("c++17").define("_USE_MATH_DEFINES", None).flag_if_supported("-w").compile("llull-kernel-occt-facade");
+    // After the static facade: a single-pass linker (GNU ld with MinGW import libraries) resolves the facade's OCCT symbols only from libraries
+    // named after it.
+    for name in OCCT_LIBS {
+        println!("cargo:rustc-link-lib=dylib={name}");
+    }
 
     println!("cargo:rerun-if-changed=cpp");
     for path in BRIDGES {
