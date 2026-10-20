@@ -111,13 +111,16 @@ describe('compute_margins singularityRadius override', () => {
     expect(data.rows.filter((row) => row.singular)).toHaveLength(2);
   });
 
-  it('a radius covering the whole part leaves only singular rows: no finite minimum margin', () => {
+  it('a radius covering the whole part leaves only singular rows: no finite minimum margin, and it says so loudly', () => {
     const everything = margins(bar, { singularityRadius: 50, singularityNote: 'worst case' });
     const data = dataOf(everything);
     expect(data.rows.every((row) => row.singular)).toBe(true);
     expect(data.minMs).toBeNull();
     expect(data.minMsRow).toBeNull();
     expect(everything.summary).toContain('no finite margin');
+    const warnings = (data as unknown as { warnings: string[] }).warnings;
+    expect(warnings.some((text) => text.startsWith('FEA_MS_ALL_SINGULAR:'))).toBe(true);
+    expect(warnings.some((text) => text.startsWith('FEA_SINGULAR_EXCLUSION_LARGE: 100 %'))).toBe(true);
   });
 
   it('radius 0 excludes nothing (no singular row) but still lists the sources', () => {

@@ -37,7 +37,12 @@ function sourcesOf(analysis: AnalysisCase, mesh: FeMeshArtifact): { source: Sing
     const kind = analysis.loads[id]?.kind;
     if (kind === 'force' || kind === 'moment') add('load', id, `L_${id}`);
   }
-  for (const id of analysis.constraintOrder) add('constraint', id, `C_${id}`);
+  for (const id of analysis.constraintOrder) {
+    // A shell / plane-stress support on an edge is the normal way to clamp a 2D part (a side face of the solid maps to the shell edge):
+    // its root carries the peak bending stress, which must stay in the margin, so it is not a singular source.
+    const kind = analysis.parts[analysis.constraints[id]?.target.entityId ?? '']?.kind;
+    if (kind !== 'shell' && kind !== 'plane_stress') add('constraint', id, `C_${id}`);
+  }
   return found;
 }
 
