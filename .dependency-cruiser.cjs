@@ -132,6 +132,15 @@ module.exports = {
       to: { path: '^desktop/' },
     },
     {
+      name: 'trust-grant-is-desktop-only',
+      comment:
+        '09 PLM TR-PLM-19: a signing key becomes trusted only by a user action in the desktop app. Only desktop/ issues a TrustGrant; the trust store (which ' +
+        'checks it) and tests are the other allowed files. No CLI, REST route or command can import the issuer.',
+      severity: 'error',
+      from: { path: '^(packages|src|server)/', pathNot: '^server/src/plm/trustStore\\.ts$' },
+      to: { path: '^server/src/plm/trustGrant\\.ts$' },
+    },
+    {
       name: 'desktop-is-a-host',
       comment: 'L6/KI6: the desktop shell starts the server and loads the web app over HTTP; it never imports the UI.',
       severity: 'error',

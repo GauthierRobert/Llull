@@ -9,8 +9,7 @@ import { getLiveDoc, setLiveDoc } from './liveDocument';
 import { createHash } from 'crypto';
 import type { LiveCommandSource } from '@protocol/liveSync';
 import type { CommandResponseBody } from '@protocol/restProtocol';
-import { AGENT, runHostCommand } from './plm/hostRun';
-import type { CommandCaller } from '@core/commands/types';
+import { runHostCommand } from './plm/hostRun';
 
 const MAX_UNDO_DEPTH = 100; // = the UI store's cap
 const MAX_IDEMPOTENCY_ENTRIES = 1000; // commandId -> result LRU
@@ -45,14 +44,8 @@ export function hashJson(value: unknown): string {
  * @param commandId repeated id -> cached result, not re-applied (only changing, non-readOnly results are cached;
  *   reuse with different name/params -> error result)
  */
-export function applyCommand(
-  name: string,
-  params: unknown,
-  commandId?: string,
-  source?: LiveCommandSource,
-  caller: CommandCaller = AGENT,
-): CommandResponseBody {
-  if (commandId === undefined) return runCommand(name, params, source, undefined, caller);
+export function applyCommand(name: string, params: unknown, commandId?: string, source?: LiveCommandSource): CommandResponseBody {
+  if (commandId === undefined) return runCommand(name, params, source);
   const requestHash = hashJson([name, params]);
   const cached = _resultsByCommandId.get(commandId);
   if (cached !== undefined) {
@@ -68,7 +61,7 @@ export function applyCommand(
     _resultsByCommandId.set(commandId, cached); // refresh LRU position
     return withHistoryFlags(cached.result);
   }
-  const result = runCommand(name, params, source, commandId, caller);
+  const result = runCommand(name, params, source, commandId);
   if (!result.changed || getCommand(name)?.annotations?.readOnly === true) return result;
   _resultsByCommandId.set(commandId, { requestHash, result: boundedForReplay(result) });
   if (_resultsByCommandId.size > MAX_IDEMPOTENCY_ENTRIES) {
@@ -89,15 +82,9 @@ function boundedForReplay(result: CommandResponseBody): CommandResponseBody {
   return { ...rest, summary: `${result.summary} (replay: the result data was not kept, re-query the scene)` };
 }
 
-function runCommand(
-  name: string,
-  params: unknown,
-  source: LiveCommandSource | undefined,
-  commandId: string | undefined,
-  caller: CommandCaller,
-): CommandResponseBody {
+function runCommand(name: string, params: unknown, source?: LiveCommandSource, commandId?: string): CommandResponseBody {
   const prior = getLiveDoc();
-  const { document, outcome, params: filled } = runHostCommand(prior, name, params, { caller, source: source ?? 'rest' });
+  const { document, outcome, params: filled } = runHostCommand(prior, name, params, { source: source ?? 'rest' });
   if (outcome.changed && getCommand(name)?.annotations?.session === true) {
     // Session command (resolve_material_libraries): in memory only, no undo entry, no command log; clients get a snapshot.
     setLiveDoc(document);

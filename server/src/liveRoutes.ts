@@ -15,7 +15,6 @@ import { getLiveDoc, subscribeLive, getLiveSnapshot, liveSubscriberCount, MAX_LI
 import { guardMutation, guardRead, guardTicketIssue, isLocalPeer } from './security';
 import { redactLicensedOutcome } from '@protocol/index';
 import { TICKET_TTL_MS, issueTicket } from './tickets';
-import { callerOf } from './plm/hostRun';
 
 const KEEPALIVE_MS = 25_000;
 
@@ -77,7 +76,7 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
     if (commandId !== undefined && (typeof commandId !== 'string' || commandId.length === 0)) {
       return void res.status(400).json({ error: '"commandId" must be a non-empty string when present.' });
     }
-    const applied = applyCommand(name, params ?? {}, commandId, body.client === 'cli' ? 'cli' : 'rest', callerOf(body.caller));
+    const applied = applyCommand(name, params ?? {}, commandId, body.client === 'cli' ? 'cli' : 'rest');
     res.status(200).json(isLocalPeer(req) ? applied : redactLicensedOutcome(getLiveDoc(), name, params, applied));
   });
 

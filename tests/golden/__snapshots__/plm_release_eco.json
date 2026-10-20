@@ -95,6 +95,14 @@
     "driveRelations": {},
     "driveRelationOrder": [],
     "nextStepNumber": 5,
+    "drawings": {
+      "sheets": {
+        "#6": {"id":"#6","name":"LL-1001","paper":"A3","titleBlock":{"title":"LL-1001","partNumber":"LL-1001","revision":"B","date":"2026-12-05"},"projectionAngle":"first","views":[{"id":"#7","label":"FRONT","kind":"projection","direction":"front"},{"id":"#8","label":"TOP","kind":"projection","direction":"top"},{"id":"#9","label":"RIGHT","kind":"projection","direction":"right"}]}
+      },
+      "order": [
+        "#6"
+      ]
+    },
     "plm": {
       "schema": 1,
       "item": {
@@ -110,7 +118,7 @@
       "changes": {
         "#11": {"id":"#11","kind":"eco","title":"Initial release of LL-1001","affectedItems":["LL-1001"],"purpose":"initial-release","effectivity":[{"kind":"serial","from":1}],"state":"implemented","createdAt":"2026-11-01T12:00:00Z","createdBy":"u-0005","notice":"ECN-0001","closedAt":"2026-11-02T09:30:00Z"},
         "#13": {"id":"#13","kind":"ecr","title":"Increase flange thickness 4 -> 5 mm","reason":"SN-118 negative margin","affectedItems":["LL-1001"],"purpose":"change","proposedClassification":"minor","state":"accepted","createdAt":"2026-12-01T08:00:00Z","createdBy":"u-0021"},
-        "#12": {"id":"#12","kind":"eco","title":"Change of LL-1001","affectedItems":["LL-1001"],"purpose":"change","classification":"minor","effectivity":[{"kind":"serial","from":5}],"fromRequests":["#13"],"state":"implemented","createdAt":"2026-12-03T08:00:00Z","createdBy":"u-0007","notice":"ECN-0002","closedAt":"2026-12-05T09:00:00Z"}
+        "#12": {"id":"#12","kind":"eco","title":"Change of LL-1001","affectedItems":["LL-1001"],"purpose":"change","classification":"minor","effectivity":[{"kind":"serial","from":5}],"fromRequests":["#13"],"state":"implemented","createdAt":"2026-12-03T08:00:00Z","createdBy":"","notice":"ECN-0002","closedAt":"2026-12-05T09:00:00Z"}
       },
       "changeOrder": [
         "#11",
@@ -124,14 +132,6 @@
         "humanSignatureRequired": false,
         "requireMarking": false
       }
-    },
-    "drawings": {
-      "sheets": {
-        "#6": {"id":"#6","name":"LL-1001","paper":"A3","titleBlock":{"title":"LL-1001","partNumber":"LL-1001","revision":"B","date":"2026-12-05"},"projectionAngle":"first","views":[{"id":"#7","label":"FRONT","kind":"projection","direction":"front"},{"id":"#8","label":"TOP","kind":"projection","direction":"top"},{"id":"#9","label":"RIGHT","kind":"projection","direction":"right"}]}
-      },
-      "order": [
-        "#6"
-      ]
     }
   }
 }

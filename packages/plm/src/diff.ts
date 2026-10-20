@@ -50,8 +50,7 @@ function historyDiff(
     const old = before.get(id);
     if (old === undefined) steps.push({ id, change: 'added' });
     else if (Boolean(old['suppressed']) !== Boolean(step['suppressed'])) steps.push({ id, change: 'suppressed' });
-    else if (old['name'] !== step['name'] || jcsJson(old['params']) !== jcsJson(step['params']))
-      steps.push({ id, change: 'edited' });
+    else if (old['name'] !== step['name'] || jcsJson(old['params']) !== jcsJson(step['params'])) steps.push({ id, change: 'edited' });
   }
   for (const id of before.keys()) if (!after.has(id)) steps.push({ id, change: 'removed' });
   const count = (change: string): number => steps.filter((step) => step.change === change).length;

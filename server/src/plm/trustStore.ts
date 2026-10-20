@@ -19,7 +19,7 @@ import { writeFileAtomic } from '../writeFileAtomic';
 import type { KeyRecord } from './keyStore';
 import type { TrustGrant } from './trustGrant';
 
-export interface TrustedKey {
+interface TrustedKey {
   readonly keyId: string;
   readonly userId: string;
   readonly name: string;

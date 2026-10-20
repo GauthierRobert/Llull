@@ -1,7 +1,6 @@
-/** Document fixtures for the PLM tests: a managed item driven to a chosen lifecycle state through the real commands. */
+/** Document fixtures for the PLM tests: a managed item driven to a chosen lifecycle state through the real commands (each human act signed by its user). */
 
 import type { CadDocument } from '@core/model/types';
-import type { HumanSignaturePort } from '@core/model/analysis';
 import { loadSample, run } from './scenarioRunner';
 
 export const T = '2026-11-02T09:00:00Z';
@@ -10,7 +9,11 @@ export const APPROVALS = [
   { role: 'checker', userId: 'u-2' },
 ];
 
-/** The sample document made a managed item (signature requirement off: the test host has no keystore) in state in_work. */
+/** Record every approval of `APPROVALS`, each signed by its own approver. */
+export const approveAll = (doc: CadDocument): CadDocument =>
+  APPROVALS.reduce((next, approval) => run(next, 'record_approval', approval).document, doc);
+
+/** The sample document made a managed item (signature requirement off by a signed policy override: the test host has no key store) in state in_work. */
 export function inWork(policy: Record<string, unknown> = {}, base: CadDocument = loadSample()): CadDocument {
   return run(base, 'set_item_identity', {
     partNumber: 'LL-2001',
@@ -37,7 +40,7 @@ export function reviewWithEco(policy: Record<string, unknown> = {}): CadDocument
 }
 
 export const released = (policy: Record<string, unknown> = {}): CadDocument =>
-  run(reviewWithEco(policy), 'release_item', { changeOrder: 'ECO-0100', approvals: APPROVALS, at: T, by: 'u-1' }).document;
+  run(approveAll(reviewWithEco(policy)), 'release_item', { changeOrder: 'ECO-0100', at: T, by: 'u-1' }).document;
 
 /** Revision B released (A superseded) through a classified ECO. */
 export function releasedB(): CadDocument {
@@ -53,12 +56,5 @@ export function releasedB(): CadDocument {
   doc = run(doc, 'revise_item', { changeOrder: 'ECO-0200', at: T, by: 'u-1' }).document;
   doc = run(doc, 'set_parameter', { name: 't', expression: '5' }).document;
   doc = run(doc, 'submit_for_review', { at: T, by: 'u-1' }).document;
-  return run(doc, 'release_item', { changeOrder: 'ECO-0200', approvals: APPROVALS, at: T, by: 'u-1' }).document;
+  return run(approveAll(doc), 'release_item', { changeOrder: 'ECO-0200', at: T, by: 'u-1' }).document;
 }
-
-/** A signature port whose Ed25519 check and trust are scripted by the test. */
-export const fakePort = (valid: boolean, trust: 'trusted' | 'untrusted' | 'test' = 'trusted'): HumanSignaturePort => ({
-  verify: () => null,
-  verifyEd25519: () => valid,
-  keyTrust: () => trust,
-});

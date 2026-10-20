@@ -186,7 +186,11 @@ export const recordApproval = defineCommand({
   annotations: { metaHistory: true },
   params: z.object({
     role: z.string().min(1).describe("Approval role, e.g. 'design-authority' or 'checker'."),
-    userId: z.string().min(1).optional().describe('Ignored: the approval is recorded under the signer of the confirmation (the trusted key record).'),
+    userId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Ignored: the approval is recorded under the signer of the confirmation (the trusted key record).'),
     confirmation: confirmationSchema,
     comment: z.string().optional().describe('Optional remark.'),
     at: atSchema.optional(),

@@ -13,6 +13,8 @@ export interface MenuHandlers {
   readonly installCli: () => void;
   readonly showAgentHelp: () => void;
   readonly openDataFolder: () => void;
+  /** File > Trust Signing Keys…: the user confirms enrolled signing keys one by one (the only way a key becomes trusted). */
+  readonly trustKeys: () => void;
 }
 
 export function menuTemplate(handlers: MenuHandlers, platform: NodeJS.Platform, appName: string): MenuItemConstructorOptions[] {
@@ -27,6 +29,7 @@ export function menuTemplate(handlers: MenuHandlers, platform: NodeJS.Platform, 
       { label: 'Save As…', accelerator: 'Shift+CmdOrCtrl+S', click: handlers.saveAs },
       { type: 'separator' },
       { label: 'Open Data Folder', click: handlers.openDataFolder },
+      { label: 'Trust Signing Keys…', click: handlers.trustKeys },
       ...(mac ? [] : [{ type: 'separator' } as const, { role: 'quit' } as const]),
     ],
   };

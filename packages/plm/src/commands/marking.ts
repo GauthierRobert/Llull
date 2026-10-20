@@ -37,7 +37,13 @@ export const setItemMarking = defineCommand({
       .string()
       .optional()
       .describe('Notice printed on every sheet and in the release manifest. Required for a controlled regime.'),
-    decidedBy: z.string().min(1).optional().describe('Ignored: the decision is recorded under the signer of the confirmation (the trusted key record), never a name given here.'),
+    decidedBy: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        'Ignored: the decision is recorded under the signer of the confirmation (the trusted key record), never a name given here.',
+      ),
     confirmation: confirmationSchema,
     at: atSchema.optional(),
   }),

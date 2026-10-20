@@ -81,7 +81,7 @@ function withLock<T>(dir: string, body: () => T): T {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       if (existsSync(lock) && Date.now() - statSync(lock).mtimeMs > LOCK_STALE_MS) rmSync(lock, { force: true });
-      else if (Date.now() > deadline) throw new Error('audit log is locked by another process');
+      else if (Date.now() > deadline) throw new Error('audit log is locked by another process', { cause: error });
       else sleep(10);
     }
   }
@@ -230,6 +230,5 @@ export function verifyAuditChain(dir: string): ChainVerdict {
       count += 1;
     }
   }
-  if (tornAt !== null) return { ok: true, entries: count, repairs, brokenAt: undefined };
   return { ok: true, entries: count, repairs };
 }

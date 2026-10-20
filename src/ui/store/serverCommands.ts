@@ -43,7 +43,7 @@ async function request<Body>(path: string, postBody?: unknown): Promise<Body> {
 
 /** `commandId` makes it idempotent server-side. @throws ServerCommandError (as do undo / redo / snapshot) */
 export function postCommand(name: string, params: unknown, commandId?: string): Promise<ServerCommandResponse> {
-  return request('/command', commandId === undefined ? { name, params, caller: 'human' } : { name, params, commandId, caller: 'human' });
+  return request('/command', commandId === undefined ? { name, params } : { name, params, commandId });
 }
 
 /** Host tool over POST /exchange (`topology_solve`, exchange tools): not a document command, so not in the command log. */

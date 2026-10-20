@@ -1,7 +1,9 @@
 // Semantic PMI (`document.pmi`): the items with their review state, saved views, the governing standard and the viewport toggle. The
 // document changes only through commands (`add_datum_feature`, `set_pmi_standard`, `activate_saved_view`, `delete_pmi`, ...).
 
-import React from 'react';
+import React, { useState } from 'react';
+import { humanGatePayload } from '@core/model/humanGate';
+import { SignActDialog, type SignActRequest } from '@ui/components/SignActDialog';
 import '@ui/styles/panels/pmi.css';
 import { PMI_STANDARDS } from '@core/model/pmi';
 import { pmiText } from '@core/geometry/pmiText';
@@ -24,6 +26,16 @@ export function PmiPanel({ className }: { className?: string }): React.ReactElem
   const items = (pmi?.order ?? []).flatMap((id) => pmi?.items[id] ?? []);
   const views = (pmi?.savedViewOrder ?? []).flatMap((id) => pmi?.savedViews[id] ?? []);
   const unreviewed = items.filter((item) => item.review.required).length;
+  const [signing, setSigning] = useState<SignActRequest | null>(null);
+  const requestAccept = (id: string): void => {
+    const at = new Date().toISOString().slice(0, 10);
+    setSigning({
+      title: 'Accept PMI review',
+      summary: `Sign your acceptance of ${id}: you attest that you reviewed it as the qualified engineer. Only a key trusted in the desktop app counts.`,
+      payload: (nonce) => humanGatePayload('PMI review', [id], { decision: 'accept', comment: '' }, nonce),
+      onSigned: (confirmation) => dispatch('accept_pmi_review', { pmiIds: [id], decision: 'accept', comment: '', at, confirmation }),
+    });
+  };
 
   return (
     <aside className={classNames('panel', className)} aria-label="PMI" data-testid="pmi-panel">
@@ -72,16 +84,9 @@ export function PmiPanel({ className }: { className?: string }): React.ReactElem
                       type="button"
                       className="btn btn--sm btn--ghost"
                       disabled={!item.review.required}
-                      title="Record the review of this item as the qualified engineer at this desk (a signing port, where installed, must verify it)"
+                      title="Sign the review of this item with your signing key (a human-only act: a signature by a trusted key is always required)"
                       data-testid={`pmi-accept-${item.id}`}
-                      onClick={() =>
-                        dispatch('accept_pmi_review', {
-                          pmiIds: [item.id],
-                          decision: 'accept',
-                          comment: '',
-                          at: new Date().toISOString().slice(0, 10),
-                        })
-                      }
+                      onClick={() => requestAccept(item.id)}
                     >
                       Accept
                     </button>
@@ -138,6 +143,7 @@ export function PmiPanel({ className }: { className?: string }): React.ReactElem
       <PanelSection title="Add datum" collapsible defaultOpen={false}>
         <AddDatumForm />
       </PanelSection>
+      {signing !== null && <SignActDialog request={signing} onClose={() => setSigning(null)} />}
     </aside>
   );
 }

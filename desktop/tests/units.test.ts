@@ -225,6 +225,7 @@ describe('menuTemplate', () => {
     installCli: handler('cli'),
     showAgentHelp: handler('help'),
     openDataFolder: handler('data'),
+    trustKeys: handler('trust'),
   };
 
   it('has File and Help menus wired to the handlers, an app menu only on macOS', () => {
@@ -233,7 +234,7 @@ describe('menuTemplate', () => {
     expect(menuTemplate(handlers, 'darwin', 'llull')[0]?.role).toBe('appMenu');
     const items = linux.flatMap((menu) => (Array.isArray(menu.submenu) ? menu.submenu : []));
     for (const item of items) if (typeof item.click === 'function') (item.click as () => void)();
-    expect(calls).toEqual(['new', 'open', 'save', 'saveAs', 'data', 'cli', 'help']);
+    expect(calls).toEqual(['new', 'open', 'save', 'saveAs', 'data', 'trust', 'cli', 'help']);
   });
 
   it('explains --app and points to the installer until the CLI is installed', () => {

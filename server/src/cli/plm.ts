@@ -1,15 +1,20 @@
-/** `llull keys | release | audit`: the host side of 09 PLM (signing key store, release package, audit chain). Commands themselves stay in the registry. */
+/**
+ * `llull keys | release | audit` and `--confirm-key`: the host side of 09 PLM (key enrollment, release package, audit chain, human confirmations).
+ * Commands themselves stay in the registry. This CLI can ENROLL a key and use a TRUSTED one to sign; it can never make a key trusted (desktop app only).
+ */
 
+import { randomBytes } from 'node:crypto';
 import type { CadDocument } from '@core/model/types';
+import type { CommandOutcome } from '@protocol/restProtocol';
 import { readDocumentFile } from '../documentFile';
 import { auditDir, verifyAuditChain } from '../plm/auditChain';
 import { createKeyStore } from '../plm/keyStore';
 import { isoSeconds } from '../plm/hostRun';
 import { buildReleasePackage, verifyReleasePackage, writeReleasePackage } from '../plm/releasePackage';
-import { createSignaturePort } from '../plm/signaturePort';
+import { GATE_CONTEXT, createSignaturePort } from '../plm/signaturePort';
+import { createTrustStore } from '../plm/trustStore';
 import { type ParsedArgv, booleanFlag, cliTarget, stringFlag } from './argv';
 import type { CliBackend } from './backend';
-import type { CommandOutcome } from '@protocol/restProtocol';
 
 export interface PlmCliIo {
   readonly stdout: (text: string) => void;
@@ -45,25 +50,58 @@ function passphraseOf(args: ParsedArgv, io: PlmCliIo): string {
 const print = (io: PlmCliIo, args: ParsedArgv, json: unknown, text: string): void =>
   io.stdout(booleanFlag(args, 'json') ? JSON.stringify(json) : text);
 
-function runKeys(args: ParsedArgv, io: PlmCliIo, now: () => Date): number {
+const mergedEnv = (io: PlmCliIo): NodeJS.ProcessEnv => ({ ...process.env, ...io.env });
+
+/**
+ * `params` of the human-only plm command `name` plus a `confirmation`: the key signs the act payload (`plm_act_payload` of the document the backend
+ * holds). Only a TRUSTED key's signature clears the gate; the command verifies it, so a wrong or untrusted key is simply refused.
+ * @failure no / revoked key, wrong passphrase, or the payload query refused -> throws a usage message
+ */
+export async function confirmedParams(
+  backend: CliBackend,
+  name: string,
+  params: unknown,
+  keyId: string,
+  args: ParsedArgv,
+  io: PlmCliIo,
+): Promise<unknown> {
+  const store = createKeyStore(mergedEnv(io));
+  const key = store.find(keyId);
+  if (key === undefined) throw new PlmUsage(`unknown --confirm-key ${keyId}; see: llull keys list`);
+  const nonce = randomBytes(16).toString('hex');
+  const given = typeof params === 'object' && params !== null ? (params as Record<string, unknown>) : {};
+  const payload = await backend.run('plm_act_payload', { command: name, params: given, nonce });
+  const hash = (payload.data as { payloadSha256?: string } | undefined)?.payloadSha256;
+  if (payload.isError || hash === undefined) throw new PlmUsage(`${name} is not a human-only plm command (${outcomeText(payload)})`);
+  const signature = await store.sign(key.keyId, passphraseOf(args, io), `${GATE_CONTEXT}${hash}`);
+  if (signature === null) throw new PlmUsage(`the key ${key.keyId} could not sign (wrong passphrase, or it is revoked).`);
+  return { ...given, confirmation: { alg: 'Ed25519', keyId: key.keyId, publicKey: key.publicKey, signature, nonce } };
+}
+
+async function runKeys(args: ParsedArgv, io: PlmCliIo, now: () => Date): Promise<number> {
   const action = args.positionals[1];
-  const store = createKeyStore({ ...process.env, ...io.env });
+  const env = mergedEnv(io);
+  const store = createKeyStore(env);
+  const trust = createTrustStore(env);
   if (action === 'list') {
-    const keys = store.list();
+    const keys = store.list().map((key) => ({ ...key, trusted: trust.find(key.publicKey) !== null }));
     print(
       io,
       args,
       keys,
       keys.length === 0
-        ? 'No signing keys. Create one: llull keys create --user ID --name NAME'
+        ? 'No signing keys. Enroll one: llull keys create --user ID --name NAME'
         : keys
-            .map((key) => `${key.keyId}  ${key.userId}  ${key.name}  ${key.publicKey}${key.revokedAt !== undefined ? '  REVOKED' : ''}`)
+            .map(
+              (key) =>
+                `${key.keyId}  ${key.userId}  ${key.name}  ${key.publicKey}  ${key.revokedAt !== undefined ? 'REVOKED' : key.trusted ? 'TRUSTED' : 'enrolled, NOT trusted (trust it in the llull desktop app)'}`,
+            )
             .join('\n'),
     );
     return OK;
   }
   if (action === 'create') {
-    const record = store.create({
+    const record = await store.create({
       userId: required(args, 'user'),
       name: required(args, 'name'),
       passphrase: passphraseOf(args, io),
@@ -72,8 +110,8 @@ function runKeys(args: ParsedArgv, io: PlmCliIo, now: () => Date): number {
     print(
       io,
       args,
-      record,
-      `Key ${record.keyId} created for ${record.userId}; public key ${record.publicKey}. The private key stays encrypted in ${'$LLULL_KEYS_DIR'} (default ~/.llull/keys).`,
+      { ...record, trusted: false },
+      `Key ${record.keyId} enrolled for ${record.userId}; public key ${record.publicKey}. It is NOT trusted yet: signatures by it count only after you trust it in the llull desktop app (Keys).`,
     );
     return OK;
   }
@@ -81,12 +119,8 @@ function runKeys(args: ParsedArgv, io: PlmCliIo, now: () => Date): number {
     const keyId = args.positionals[2];
     const record = keyId === undefined ? null : store.revoke(keyId, isoSeconds(now()));
     if (record === null) throw new PlmUsage(`no such key '${String(keyId)}'; see: llull keys list`);
-    print(
-      io,
-      args,
-      record,
-      `Key ${record.keyId} revoked at ${record.revokedAt ?? ''}; signatures it made keep their provenance but are no longer trusted.`,
-    );
+    trust.revoke(record.publicKey, isoSeconds(now()));
+    print(io, args, record, `Key ${record.keyId} revoked; its trust is withdrawn and it can no longer sign.`);
     return OK;
   }
   throw new PlmUsage('keys needs an action: list | create --user ID --name NAME | revoke KEYID');
@@ -95,29 +129,29 @@ function runKeys(args: ParsedArgv, io: PlmCliIo, now: () => Date): number {
 async function runSign(args: ParsedArgv, io: PlmCliIo, backend: () => Promise<CliBackend>, now: () => Date): Promise<number> {
   const revision = required(args, 'revision');
   const kind = stringFlag(args, 'kind') === 'iteration' ? 'iteration' : 'release';
-  const store = createKeyStore({ ...process.env, ...io.env });
+  const meaning = stringFlag(args, 'meaning') ?? (kind === 'release' ? 'release' : 'approval');
+  const store = createKeyStore(mergedEnv(io));
   const key = store.find(required(args, 'key'));
   if (key === undefined) throw new PlmUsage('unknown --key; see: llull keys list');
   const target = await backend();
-  const manifest = await target.run('release_manifest', { revision, kind });
-  const canonical = (manifest.data as { canonical?: string } | undefined)?.canonical;
-  if (manifest.isError || canonical === undefined) {
-    io.stderr(manifest.summary);
+  const manifest = await target.run('release_manifest', { revision, kind, meaning });
+  const data = manifest.data as { canonical?: string; body?: { item: { iteration: number } } } | undefined;
+  if (manifest.isError || data?.canonical === undefined || data.body === undefined) {
+    io.stderr(outcomeText(manifest));
     return FAILED;
   }
-  const signature = store.sign(key.keyId, passphraseOf(args, io), canonical);
+  const signature = await store.sign(key.keyId, passphraseOf(args, io), data.canonical);
   if (signature === null) {
     io.stderr(`llull: the key ${key.keyId} could not sign (wrong passphrase, or it is revoked).`);
     return FAILED;
   }
-  const iteration = (manifest.data as { body: { item: { iteration: number } } }).body.item.iteration;
   const params = {
-    target: { kind, ref: kind === 'release' ? revision : `${revision}.${iteration}` },
+    target: { kind, ref: kind === 'release' ? revision : `${revision}.${data.body.item.iteration}` },
     alg: 'Ed25519',
     keyId: key.keyId,
     publicKey: key.publicKey,
     signature,
-    meaning: stringFlag(args, 'meaning') ?? (kind === 'release' ? 'release' : 'approval'),
+    meaning,
     signer: { userId: key.userId, name: key.name },
     at: isoSeconds(now()),
   };
@@ -135,10 +169,8 @@ async function runRelease(args: ParsedArgv, io: PlmCliIo, backend: () => Promise
   if (action === 'verify') {
     const dir = args.positionals[2];
     if (dir === undefined) throw new PlmUsage('release verify needs a package folder: llull release verify DIR');
-    const verdict = verifyReleasePackage(
-      dir,
-      createSignaturePort(createKeyStore({ ...process.env, ...io.env }), { ...process.env, ...io.env }),
-    );
+    const env = mergedEnv(io);
+    const verdict = verifyReleasePackage(dir, createSignaturePort(createTrustStore(env), env));
     print(
       io,
       args,
@@ -156,16 +188,21 @@ async function runRelease(args: ParsedArgv, io: PlmCliIo, backend: () => Promise
     if (typeof pack === 'string') throw new PlmUsage(pack);
     const written = writeReleasePackage(pack, required(args, 'out'));
     const notes = pack.notes.length > 0 ? ` Notes: ${pack.notes.join('; ')}.` : '';
-    const attach = booleanFlag(args, 'attach')
-      ? await (
-          await backend()
-        ).run('attach_release_package', {
-          revision: required(args, 'revision'),
-          manifestSha256: written.manifestSha256,
-          documentContentHash: String(pack.manifest['documentContentHash']),
-          location: required(args, 'out'),
-        })
-      : null;
+    let attach: CommandOutcome | null = null;
+    if (booleanFlag(args, 'attach')) {
+      const target = await backend();
+      const params = {
+        revision: required(args, 'revision'),
+        manifestSha256: written.manifestSha256,
+        documentContentHash: String(pack.manifest['documentContentHash']),
+        location: required(args, 'out'),
+      };
+      const confirmKey = stringFlag(args, 'confirm-key');
+      attach = await target.run(
+        'attach_release_package',
+        confirmKey === undefined ? params : await confirmedParams(target, 'attach_release_package', params, confirmKey, args, io),
+      );
+    }
     print(
       io,
       args,
@@ -175,13 +212,13 @@ async function runRelease(args: ParsedArgv, io: PlmCliIo, backend: () => Promise
     return attach?.isError === true ? FAILED : OK;
   }
   throw new PlmUsage(
-    'release needs an action: pack --revision R --out DIR [--attach] | verify DIR | sign --revision R --key KEYID [--kind release|iteration] [--apply]',
+    'release needs an action: pack --revision R --out DIR [--attach --confirm-key KEYID] | verify DIR | sign --revision R --key KEYID [--kind release|iteration] [--apply]',
   );
 }
 
 function runAudit(args: ParsedArgv, io: PlmCliIo): number {
   if (args.positionals[1] !== 'verify') throw new PlmUsage('audit needs an action: verify [DIR]');
-  const dir = args.positionals[2] ?? auditDir({ ...process.env, ...io.env });
+  const dir = args.positionals[2] ?? auditDir(mergedEnv(io));
   if (dir === null) throw new PlmUsage('no audit directory: pass one or set $LLULL_AUDIT_DIR.');
   const verdict = verifyAuditChain(dir);
   print(
@@ -189,7 +226,7 @@ function runAudit(args: ParsedArgv, io: PlmCliIo): number {
     args,
     verdict,
     verdict.ok
-      ? `Audit chain intact: ${verdict.entries} entr${verdict.entries === 1 ? 'y' : 'ies'}.`
+      ? `Audit chain intact: ${verdict.entries} entr${verdict.entries === 1 ? 'y' : 'ies'}${verdict.repairs > 0 ? `, ${verdict.repairs} crash repair(s)` : ''}. The chain is unkeyed: it does not stop someone who can write the directory from rewriting it.`
       : `PLM_AUDIT_CHAIN_BROKEN at ${verdict.brokenAt?.file}:${verdict.brokenAt?.line} (${verdict.brokenAt?.reason}). Investigate tampering; do not rotate.`,
   );
   return verdict.ok ? OK : FAILED;
@@ -205,7 +242,7 @@ export async function runPlmCli(
   try {
     switch (args.positionals[0]) {
       case 'keys':
-        return runKeys(args, io, now);
+        return await runKeys(args, io, now);
       case 'release':
         return await runRelease(args, io, backend, now);
       default:
@@ -217,3 +254,5 @@ export async function runPlmCli(
     return USAGE_ERROR;
   }
 }
+
+export { PlmUsage };

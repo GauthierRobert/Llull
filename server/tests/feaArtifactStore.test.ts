@@ -101,10 +101,10 @@ describe('feaCacheDir / serverContext', () => {
     expect(feaCacheDir({})).toMatch(/\.llull[\\/]cache[\\/]fea$/);
   });
 
-  it('carries the artifact port and no human signature', () => {
+  it('carries the artifact port and the signature port of this machine (trust store, no trusted key by default)', () => {
     const context = serverContext();
     expect(context.feaArtifacts).toBeDefined();
-    expect(context.humanSignature).toBeNull();
+    expect(context.humanSignature?.keyTrust?.('ab'.repeat(32))).toBe('untrusted');
     expect(context.registry).toBeTypeOf('function');
   });
 });

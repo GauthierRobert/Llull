@@ -44,12 +44,30 @@ const BODY_KEYS = [
 ];
 
 /** The exact release body a signature covers, rebuilt from a package manifest (`tool` keeps only name and releaseScopeFormat). */
-export function signedBodyOf(manifest: Manifest): Manifest {
+export function signedBodyOf(manifest: Manifest, meaning: string): Manifest {
   const tool = isRecord(manifest['tool']) ? manifest['tool'] : {};
   return {
     ...Object.fromEntries(BODY_KEYS.map((key) => [key, manifest[key]])),
+    meaning,
     tool: { name: tool['name'], releaseScopeFormat: tool['releaseScopeFormat'] },
   };
+}
+
+/** A file-name stem of a part number: only A-Z a-z 0-9 . _ - (anything else becomes _), no leading dot, no "..". */
+function safeStem(text: string): string {
+  const cleaned = text
+    .replace(/[^A-Za-z0-9._-]/g, '_')
+    .split('..')
+    .join('_')
+    .replace(/^\.+/, '_');
+  return cleaned === '' ? '_' : cleaned;
+}
+
+/** `relative` resolved under `root`, or null when it is absolute or leaves `root` (path traversal). */
+function insideOf(root: string, relative: string): string | null {
+  if (path.isAbsolute(relative) || relative.includes('\0')) return null;
+  const target = path.resolve(root, relative);
+  return target === root || target.startsWith(root + path.sep) ? target : null;
 }
 
 export interface PackageFiles {
@@ -67,7 +85,7 @@ export function buildReleasePackage(doc: CadDocument, label: string, toolVersion
   const manifestQuery = execute(doc, 'release_manifest', { revision: label });
   const body = (manifestQuery.data as { body?: Manifest } | undefined)?.body;
   if (manifestQuery.rejected === true || body === undefined) return manifestQuery.summary;
-  const stem = `${plm.item.partNumber}_${label}`;
+  const stem = `${safeStem(plm.item.partNumber)}_${label}`;
   const modelPath = `model/${stem}.llull.json`;
   const files: { path: string; content: string }[] = [{ path: modelPath, content: revision.snapshot.canonicalJson }];
   const members: PackageMember[] = [
@@ -120,8 +138,10 @@ function frozenDocument(doc: CadDocument, label: string, snapshot: string): CadD
 export function writeReleasePackage(pack: PackageFiles, outDir: string): { readonly manifestSha256: string; readonly files: number } {
   if (existsSync(path.join(outDir, 'manifest.json'))) throw new Error(`${outDir} already holds a release package; packages are immutable`);
   const all = [...pack.files, { path: 'manifest.json', content: `${JSON.stringify(pack.manifest, null, 2)}\n` }];
+  const root = path.resolve(outDir);
   for (const file of all) {
-    const target = path.join(outDir, file.path);
+    const target = insideOf(root, file.path);
+    if (target === null) throw new Error(`refusing to write ${file.path}: it leaves the package folder`);
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, file.content, 'utf8');
     chmodSync(target, 0o444);
@@ -132,6 +152,7 @@ export function writeReleasePackage(pack: PackageFiles, outDir: string): { reado
 export interface PackageFinding {
   readonly code:
     | 'PLM_PACKAGE_MEMBER_MISMATCH'
+    | 'PLM_SIGNATURE_MISSING'
     | 'PLM_PACKAGE_MANIFEST_MISMATCH'
     | 'PLM_SIGNATURE_INVALID'
     | 'PLM_KEY_UNTRUSTED'
@@ -164,9 +185,10 @@ export function verifyReleasePackage(
     };
   }
   const members = Array.isArray(manifest['members']) ? (manifest['members'] as PackageMember[]) : [];
+  const root = path.resolve(dir);
   for (const member of members) {
-    const file = path.join(dir, member.path);
-    const content = existsSync(file) ? readFileSync(file) : null;
+    const file = insideOf(root, String(member.path));
+    const content = file !== null && existsSync(file) ? readFileSync(file) : null;
     if (content === null || sha256(content) !== member.sha256 || content.length !== member.bytes)
       findings.push({
         code: 'PLM_PACKAGE_MEMBER_MISMATCH',
@@ -183,8 +205,14 @@ export function verifyReleasePackage(
   const { manifestSha256, signatures, ...unsealed } = manifest;
   if (sha256(jcsJson(unsealed)) !== manifestSha256)
     findings.push({ code: 'PLM_PACKAGE_MANIFEST_MISMATCH', message: 'manifestSha256 does not match the manifest content' });
-  const signedBody = jcsJson(signedBodyOf(manifest));
-  for (const signature of Array.isArray(signatures) ? (signatures as SignatureRecord[]) : []) {
+  const recorded = Array.isArray(signatures) ? (signatures as SignatureRecord[]) : [];
+  if (recorded.length === 0)
+    findings.push({
+      code: 'PLM_SIGNATURE_MISSING',
+      message: 'the package carries no release signature: nothing proves a human released it',
+    });
+  for (const signature of recorded) {
+    const signedBody = jcsJson(signedBodyOf(manifest, signature.meaning));
     if (port?.verifyEd25519 === undefined) {
       findings.push({ code: 'PLM_SIGNATURE_UNVERIFIED', message: `signature by ${signature.signer.userId} not verified: no verifier` });
     } else if (sha256(signedBody) !== signature.signedSha256 || !port.verifyEd25519(signature.publicKey, signedBody, signature.signature)) {

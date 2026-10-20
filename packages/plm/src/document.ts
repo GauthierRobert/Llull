@@ -13,7 +13,8 @@ const isText = (value: unknown): value is string => typeof value === 'string' &&
 function revisionErrors(at: string, raw: unknown): string[] {
   if (!isRecord(raw)) return [`${at} must be an object`];
   const errors: string[] = [];
-  if (typeof raw['label'] !== 'string' || !REVISION_LABEL.test(raw['label'])) errors.push(`${at}.label must be 1-16 characters of A-Z, 0-9 and -`);
+  if (typeof raw['label'] !== 'string' || !REVISION_LABEL.test(raw['label']))
+    errors.push(`${at}.label must be 1-16 characters of A-Z, 0-9 and -`);
   if (!LIFECYCLE_STATES.includes(raw['state'] as never)) errors.push(`${at}.state is not a lifecycle state`);
   for (const key of ['iterations', 'effectivity', 'approvals', 'signatures', 'stateHistory'])
     if (!Array.isArray(raw[key])) errors.push(`${at}.${key} must be a list`);

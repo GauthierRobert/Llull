@@ -22,7 +22,11 @@ const seal = (body: Record<string, unknown>): SigningManifest => {
  * @invariant a pure function of the PLM record at release (deterministic: no clock, no tool version; unchanged when the revision is later superseded,
  *   so signatures stay valid)
  */
-export function releaseManifest(plm: PlmModel, revision: Revision, meaning: SignatureRecord['meaning'] = 'release'): SigningManifest | null {
+export function releaseManifest(
+  plm: PlmModel,
+  revision: Revision,
+  meaning: SignatureRecord['meaning'] = 'release',
+): SigningManifest | null {
   if (revision.contentHash === undefined) return null;
   const eco = revision.changeOrder === undefined ? undefined : plm.changes[revision.changeOrder];
   return seal({

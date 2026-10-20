@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { type ScenarioStep, loadSample, readValidation, run, runStep } from './scenarioRunner';
 import { agentContext } from './scenarioRunner';
+import { released } from './fixtures';
 import { sha256Hex } from '@lib/sha256';
 
 interface Scenario {
@@ -49,6 +50,22 @@ describe('S1 release A, ECR -> ECO -> revision B (VC-PLM-01..07, 12)', () => {
     for (const step of s1.steps.filter((candidate) => (candidate.n ?? 0) <= 12)) doc = runStep(doc, step, options);
     const replayed = run(doc, 'replay_history', {}).document;
     expect(replayed.plm).toBe(doc.plm);
+  });
+
+  it('replay_history on a released revision: allowed when it regenerates the identical definition (hash equal), refused when it would change it', () => {
+    const doc = released();
+    const same = run(doc, 'replay_history', {});
+    expect(same.rejected, same.summary).toBeUndefined();
+    expect(same.document.plm).toBe(doc.plm);
+    expect(run(same.document, 'verify_release', { revision: 'A' }).data).toMatchObject({
+      contentHashMatches: true,
+      liveDefinitionMatches: true,
+    });
+    // a history edit that WOULD change the definition is still locked
+    const boxStep = doc.featureHistory.find((step) => step.name === 'add_box');
+    const edited = run(doc, 'edit_step_params', { stepId: boxStep?.id, params: { size: [1, 1, 1] } });
+    expect(edited.error?.code).toBe('PLM_LOCKED');
+    expect(edited.document).toBe(doc);
   });
 
   it('an agent prepares but cannot approve or release (VC-PLM-26)', () => {

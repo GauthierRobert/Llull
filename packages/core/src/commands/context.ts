@@ -42,7 +42,7 @@ export function defaultContext(): ExecutionContext {
     physics: getPhysicsEngine(),
     geometryQueries: getGeometryQueryEngine(),
     libraries: getMaterialLibraryProvider(),
-    humanSignature: getSignaturePort(),
+    ...(getSignaturePort() !== null ? { humanSignature: getSignaturePort() } : {}),
     ids: counterIdSource,
     registry: getCommand,
     projectDepth: 0,

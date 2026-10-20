@@ -24,9 +24,7 @@ import { USAGE } from './usage';
 import { getGeometryKernel } from '@core/geometry/kernel';
 import { planKernelWarnings } from './planKernelWarning';
 import { benchmarkCli } from './benchmarks';
-import type { CommandCaller } from '@core/commands/types';
-import { callerOf } from '../plm/hostRun';
-import { runPlmCli } from './plm';
+import { PlmUsage, confirmedParams, runPlmCli } from './plm';
 
 export interface CliIo {
   readonly stdout: (text: string) => void;
@@ -109,23 +107,14 @@ function remoteTargetOf(server: string, args: ParsedArgv, io: CliIo): { url: str
   return { url: app.url, token: flagToken ?? app.token };
 }
 
-/** `--as human` marks the user as the caller of human-only acts (approval, release, classification); the default is an agent (09 PLM TR-PLM-16). */
-function callerOfArgs(args: ParsedArgv): CommandCaller {
-  const as = stringFlag(args, 'as');
-  if (as !== undefined && as !== 'human' && as !== 'agent') throw new UsageError('--as takes human or agent.');
-  return callerOf(as);
-}
-
 async function backendOf(args: ParsedArgv, io: CliIo, observer?: StepObserver): Promise<CliBackend> {
   const server = serverOf(args, io);
-  const caller = callerOfArgs(args);
   if (server !== undefined) {
     if (booleanFlag(args, 'dry-run')) throw new UsageError('--dry-run works on a local --doc only; the server applies every call.');
     const target = remoteTargetOf(server, args, io);
     const timeoutSeconds = timeoutOf(args);
     return createRemoteBackend(target.url, {
       token: target.token,
-      caller,
       ...(timeoutSeconds !== undefined ? { timeoutSeconds } : {}),
       ...(io.fetchImpl !== undefined ? { fetchImpl: io.fetchImpl } : {}),
     });
@@ -133,7 +122,6 @@ async function backendOf(args: ParsedArgv, io: CliIo, observer?: StepObserver): 
   await io.prepareKernel();
   return createLocalBackend(docPathOf(args, io), {
     dryRun: booleanFlag(args, 'dry-run'),
-    caller,
     ...(observer !== undefined ? { observer } : {}),
     exchangeOptions: io.exchangeOptions ?? (() => exchangeOptionsWithDwg({ ...io.env })),
   });
@@ -223,7 +211,17 @@ async function runExec(args: ParsedArgv, io: CliIo): Promise<number> {
   const params = asUsage(() => withSaveDefaults(name, takesFileParam(name) ? withFileContent(name, raw) : raw, stringFlag(args, 'save')));
   const observer = observerOf(args, io);
   const backend = await backendOf(args, io, observer);
-  const result = isExchange ? await backend.exchange(name, params) : await backend.run(name, params);
+  const confirmKey = stringFlag(args, 'confirm-key');
+  let sent: unknown = params;
+  if (confirmKey !== undefined && !isExchange) {
+    try {
+      sent = await confirmedParams(backend, name, params, confirmKey, args, io);
+    } catch (error) {
+      if (error instanceof PlmUsage) throw new UsageError(error.message);
+      throw error;
+    }
+  }
+  const result = isExchange ? await backend.exchange(name, params) : await backend.run(name, sent);
   return finish(withTimeout(observer, withFailureStatus(name, result)), args, io);
 }
 
