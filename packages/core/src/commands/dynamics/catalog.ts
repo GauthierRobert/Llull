@@ -5,6 +5,7 @@ import { addRigidBody, deleteDynamicsItem, setGravity } from './bodies';
 import { addBodyJoint, addGearCoupling } from './connections';
 import { checkDynamics } from './checkDynamics';
 import { checkMotionClearance } from './checkMotionClearance';
+import { checkPrototype } from './checkPrototype';
 import { addCylinderPressure } from './cylinders';
 import { setEngineLosses } from './engine/losses';
 import { addReferenceData } from './engine/reference';
@@ -18,6 +19,10 @@ import { engineQuickCheck } from './quickCheck';
 import { simulateMotion } from './simulate';
 import { addSpring } from './springs';
 import { setDynamicsSolver } from './solver';
+import { installEngineLaws } from './engine/hooks';
+
+// the catalog is the composition point of the engine folder (spec 11 Q3): generic dynamics reads the laws through injection points only
+installEngineLaws();
 
 export const dynamicsCommands = commandCatalog(
   addRigidBody,
@@ -39,6 +44,7 @@ export const dynamicsCommands = commandCatalog(
   simulateMotion,
   checkDynamics,
   checkMotionClearance,
+  checkPrototype,
   plotSimulation,
   renderMotion,
 );

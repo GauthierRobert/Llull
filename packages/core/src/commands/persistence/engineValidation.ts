@@ -1,9 +1,9 @@
 /** Load-time validation of the engine-realism fields (losses, gear efficiency, propeller table, reference data). */
 
-import { isRecord } from '../../../lib/isRecord';
-import { isFiniteNumber } from '../../../lib/isFiniteNumber';
-import { isReservedKey } from '../../../lib/reservedKey';
-import { REFERENCE_QUANTITIES } from '../../../model/prototype';
+import { isRecord } from '../../lib/isRecord';
+import { isFiniteNumber } from '../../lib/isFiniteNumber';
+import { isReservedKey } from '../../lib/reservedKey';
+import { REFERENCE_QUANTITIES } from '../../model/prototype';
 
 type Check = (record: Record<string, unknown>) => string | null;
 

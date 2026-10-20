@@ -5,6 +5,7 @@
 
 import { pngDataUrl } from '../helpers/imageFixtures';
 import { xy, xyz } from '../helpers/xy';
+import { referenceEnginePlan } from './referenceEnginePlan';
 
 export interface GoldenAction {
   command?: string;
@@ -854,6 +855,8 @@ export const kernelPlans: Record<string, GoldenAction[]> = {
     },
     { command: 'add_reference_data', params: { preset: 'rotax_912uls_full_throttle' } },
   ],
+  // PHY-21 reference single-cylinder engine (VC-FPR-24; validation/README §4)
+  dynamics_reference_engine: referenceEnginePlan,
   kernel_boolean_union: [
     { command: 'add_box', params: { size: [2, 2, 2] }, as: 'a' },
     { command: 'add_box', params: { size: [2, 2, 2], position: [1, 1, 1] }, as: 'b' },

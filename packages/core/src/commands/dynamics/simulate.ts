@@ -13,8 +13,8 @@ import { buildTopology, isRefusal } from '../../dynamics/topology';
 import { analyseMobility } from '../../dynamics/mobility';
 import { reactionsData, residualTier, type ReactionMode } from '../../dynamics/reactions';
 import { cycleAngleSeries, engineData } from '../../dynamics/engineReport';
-import { realismData } from '../../dynamics/engine/engineRealism';
-import { idealGearWarnings } from '../../dynamics/engine/gearLoss';
+import { realismOf } from './realismHook';
+import { idealGearWarnings } from '../../dynamics/gearLoss';
 import { errorMessage } from '../../lib/errorMessage';
 import { dynamicsOf } from './bodies';
 import { openLoopGaps } from './inspect';
@@ -249,7 +249,7 @@ export const simulateMotion = defineCommand({
       const realism =
         engineReport === null
           ? null
-          : realismData({
+          : realismOf({
               dynamics,
               runtimes: built.cylinders,
               trace,

@@ -1,18 +1,26 @@
 // Readiness checklist model (FR-FPR-50): which stable finding codes (spec §7.1) feed which row, worst-status roll-up, and the unit/threshold text.
 // Pure presentation derivation over the check envelope; no document access.
 
-import type { CheckItem, CheckName, CheckResult, CheckStatus } from './reviewTypes';
+import type { Accuracy, CheckItem, CheckName, CheckResult, CheckStatus } from './reviewTypes';
 
 /** Check status plus `stale` (the document changed after the run). */
 export type DisplayStatus = CheckStatus | 'stale';
 
-export const STATUS_GLYPH: Readonly<Record<DisplayStatus, string>> = { pass: '✔', warn: '▲', fail: '✖', not_run: '○', stale: '◌' };
+export const STATUS_GLYPH: Readonly<Record<DisplayStatus, string>> = {
+  pass: '✔',
+  warn: '▲',
+  fail: '✖',
+  not_run: '○',
+  stale: '◌',
+  info: 'ℹ',
+};
 export const STATUS_WORD: Readonly<Record<DisplayStatus, string>> = {
   pass: 'pass',
   warn: 'warn',
   fail: 'fail',
   not_run: 'not run',
   stale: 'stale',
+  info: 'info',
 };
 
 interface RowSpec {
@@ -42,7 +50,13 @@ const ROW_SPECS: readonly RowSpec[] = [
   },
   { id: 'wall', label: 'Wall thickness', check: 'assembly', codes: ['FPR_WALL_THIN'], group: 'checks' },
   { id: 'connected', label: 'Connected', check: 'assembly', codes: ['FPR_PART_FLOATING', 'FPR_PART_RESTING_ONLY'], group: 'checks' },
-  { id: 'joints', label: 'Joints realised', check: 'assembly', codes: ['FPR_JOINT_NOT_REALISED'], group: 'checks' },
+  {
+    id: 'joints',
+    label: 'Joints realised',
+    check: 'assembly',
+    codes: ['FPR_JOINT_NOT_REALISED', 'FPR_JOINT_REALISED', 'FPR_KERNEL_UNSUPPORTED'],
+    group: 'checks',
+  },
   { id: 'dof', label: 'Moves (DOF)', check: 'mechanism', group: 'checks' },
   { id: 'clearance', label: 'Clearance in motion', check: 'motion_clearance', group: 'checks' },
   {
@@ -56,7 +70,7 @@ const ROW_SPECS: readonly RowSpec[] = [
     id: 'reality',
     label: 'Matches reality',
     check: 'dynamics',
-    codes: ['FPR_REFERENCE_MISMATCH', 'FPR_CALIBRATION_FAILED', 'FPR_NO_LOSSES'],
+    codes: ['FPR_REFERENCE_MISMATCH', 'FPR_REFERENCE_MATCH', 'FPR_CALIBRATION_FAILED', 'FPR_NO_LOSSES'],
     group: 'checks',
   },
   {
@@ -81,7 +95,7 @@ export interface ChecklistRowModel {
   readonly headline: CheckItem | null;
 }
 
-const SEVERITY: Readonly<Record<CheckStatus, number>> = { pass: 0, not_run: 1, warn: 2, fail: 3 };
+const SEVERITY: Readonly<Record<CheckStatus, number>> = { info: -1, pass: 0, not_run: 1, warn: 2, fail: 3 };
 
 function worstStatus(statuses: readonly CheckStatus[]): CheckStatus {
   return statuses.reduce<CheckStatus>((worst, status) => (SEVERITY[status] > SEVERITY[worst] ? status : worst), 'pass');
@@ -92,8 +106,12 @@ export function severityOf(status: CheckStatus): number {
 }
 
 function rowStatus(result: CheckResult | undefined, items: readonly CheckItem[]): CheckStatus {
-  if (result === undefined || result.status === 'not_run') return 'not_run';
+  if (result === undefined) return 'not_run';
+  // a check that did not run at all reports one partless not_run item (its reason); a single unrun finding only affects its own row
+  if (result.status === 'not_run' && result.items.every((item) => item.status === 'not_run' && item.ids.length === 0)) return 'not_run';
   if (items.length === 0) return 'pass';
+  // calibration points and touches are information: the row says so instead of turning green
+  if (items.every((item) => item.status === 'info')) return 'info';
   // an unrun item (kernel lacks the axis) keeps the row "not run" unless something worse is known
   return worstStatus(items.map((item) => item.status));
 }
@@ -160,6 +178,13 @@ export function headlineValue(item: CheckItem): string | null {
   const first = Object.entries(item.values)[0];
   if (first === undefined) return null;
   return `${describeValueKey(first[0]).label} ${formatValue(first[0], first[1])}`;
+}
+
+/** The accuracy of the item's headline value (its first value with one), or null when the item states none. */
+export function headlineAccuracy(item: CheckItem): Accuracy | null {
+  const accuracy = item.accuracy ?? {};
+  const key = Object.keys(item.values).find((candidate) => accuracy[candidate] !== undefined);
+  return (key === undefined ? Object.values(accuracy)[0] : accuracy[key]) ?? null;
 }
 
 /** "≥ 0.794 mm (cnc_metal, Xometry; default)" style threshold text, or null. */

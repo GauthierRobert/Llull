@@ -2,12 +2,15 @@
 
 import type { EngineLosses } from '../../../model/dynamics';
 import { fmepBand } from '../../../dynamics/engine/engineLosses';
-import { bandText } from '../../../dynamics/engine/accuracy';
+import { bandText } from '../../../dynamics/accuracy';
 import type { CommandResult } from '../../types';
 import { defineCommand, z } from '../../schema';
 import { idOrNext } from '../../entity/explicitId';
 import { changed, codedRejection, failer } from '../../noop';
 import { dynamicsIdTaken, dynamicsOf, withDynamics } from '../bodies';
+
+/** Absolute peak pressure of a motored cylinder at rest (1 bar): the Chen-Flynn constants must give FMEP >= 0 there. */
+const MOTORED_PEAK_PA = 1e5;
 
 const modelSchema = z.object({
   kind: z
@@ -87,6 +90,10 @@ export const setEngineLosses = defineCommand({
       if (aPa === undefined || bRatio === undefined || cPaPerRpm === undefined || dPaPerRpm2 === undefined)
         return fail('chen_flynn needs aPa, bRatio, cPaPerRpm and dPaPerRpm2');
       if (![aPa, bRatio, cPaPerRpm, dPaPerRpm2].every(Number.isFinite)) return fail('chen_flynn constants must be finite');
+      if (aPa + bRatio * MOTORED_PEAK_PA < 0)
+        return fail(
+          `chen_flynn constants give a negative FMEP (${(aPa + bRatio * MOTORED_PEAK_PA).toPrecision(4)} Pa) at 0 rpm and 1 bar peak pressure: friction would drive the crank`,
+        );
       model = { kind: 'chen_flynn', aPa, bRatio, cPaPerRpm, dPaPerRpm2, source };
     } else {
       const points = input.points;

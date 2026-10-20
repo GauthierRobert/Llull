@@ -8,7 +8,8 @@ import { useFocusItem } from '@ui/hooks/useFocusItem';
 import { useIsFocused } from '@ui/store/focusStore';
 import { StatusMark } from './StatusMark';
 import { findingFocus } from './findingLocations';
-import { findingTitle, formatThreshold, headlineValue, itemStatusLabel } from './checklist';
+import { findingTitle, formatThreshold, headlineAccuracy, headlineValue, itemStatusLabel } from './checklist';
+import { AccuracyBadge } from './AccuracyBadge';
 import { filterFindings, flattenFindings, groupFindings, reviewerStatusOf, sortFindings, type Finding } from './findings';
 import { useReviewStore } from './reviewStore';
 import {
@@ -32,12 +33,14 @@ const REVIEWER_LABEL: Readonly<Record<DispositionStatus, string>> = {
   irrelevant: 'Irrelevant',
   accepted: 'Accepted',
 };
-const SEVERITIES: readonly CheckStatus[] = ['fail', 'warn', 'not_run', 'pass'];
+const SEVERITIES: readonly CheckStatus[] = ['fail', 'warn', 'not_run', 'info', 'pass'];
 
 export interface DispositionChange {
   readonly findingKey: string;
   readonly status: DispositionStatus;
   readonly comment: string;
+  /** Hash of the check the finding came from: the disposition goes stale when the check's inputs change. */
+  readonly inputsHash: string;
 }
 
 interface FindingRowProps {
@@ -52,6 +55,7 @@ function FindingRow({ finding, editable, onDisposition, onExplain }: FindingRowP
   const [comment, setComment] = useState(item.disposition?.comment ?? '');
   const status = reviewerStatusOf(item);
   const value = headlineValue(item);
+  const accuracy = headlineAccuracy(item);
   const threshold = formatThreshold(item);
   const document = useStore((s) => s.document);
   const focusItem = useFocusItem();
@@ -83,6 +87,7 @@ function FindingRow({ finding, editable, onDisposition, onExplain }: FindingRowP
         <span>{CHECK_LABEL[finding.check]}</span>
         {item.ids.length > 0 && <span>{item.ids.join(', ')}</span>}
         {value !== null && <span>{value}</span>}
+        {accuracy !== null && <AccuracyBadge accuracy={accuracy} testId={`finding-accuracy-${item.findingKey}`} />}
         {threshold !== null && <span>{threshold}</span>}
       </p>
       <p className="finding__remediation">{item.remediation}</p>
@@ -93,7 +98,7 @@ function FindingRow({ finding, editable, onDisposition, onExplain }: FindingRowP
           disabled={!editable}
           onChange={(e) => {
             const next = DISPOSITION_STATUSES.find((s) => s === e.target.value);
-            if (next !== undefined) onDisposition({ findingKey: item.findingKey, status: next, comment });
+            if (next !== undefined) onDisposition({ findingKey: item.findingKey, status: next, comment, inputsHash: finding.inputsHash });
           }}
         >
           {DISPOSITION_STATUSES.map((s) => (
@@ -111,7 +116,8 @@ function FindingRow({ finding, editable, onDisposition, onExplain }: FindingRowP
           disabled={!editable}
           onChange={(e) => setComment(e.target.value)}
           onBlur={() => {
-            if (comment !== (item.disposition?.comment ?? '')) onDisposition({ findingKey: item.findingKey, status, comment });
+            if (comment !== (item.disposition?.comment ?? ''))
+              onDisposition({ findingKey: item.findingKey, status, comment, inputsHash: finding.inputsHash });
           }}
         />
       </div>

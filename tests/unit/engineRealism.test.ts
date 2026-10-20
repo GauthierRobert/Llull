@@ -10,17 +10,21 @@ import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { EngineLosses, PropellerLoad } from '@core/model/dynamics';
 import { type ReferenceData } from '@core/model/prototype';
-import { accuracy, bandText, combineContributions } from '@core/dynamics/engine/accuracy';
-import { fmepAt, fmepBand, ownsCylinder } from '@core/dynamics/engine/engineLosses';
-import { advanceRatio, pchipAt, propellerCoefficients } from '@core/dynamics/engine/propellerTable';
+import { accuracy, bandText, combineContributions } from '@core/dynamics/accuracy';
+import { efficiencyBand, fmepAt, fmepBand, frictionOrigin, lossBands, ownsCylinder } from '@core/dynamics/engine/engineLosses';
+import { advanceRatio, pchipAt, propellerCoefficients } from '@core/dynamics/propellerTable';
 import { propellerOutput } from '@core/dynamics/forceLaws';
 import { combustionOrigin } from '@core/dynamics/engine/combustionOrigin';
 import { comparePoint, summariseComparison } from '@core/dynamics/engine/referenceComparison';
 import { REFERENCE_PRESET_NAMES, REFERENCE_PRESETS } from '@core/dynamics/engine/referencePresets';
 import { isRotaxReduction, outsideBand } from '@core/dynamics/engine/plausibility';
-import { idealGearWarnings } from '@core/dynamics/engine/gearLoss';
-import { sourcedMaterial } from '@core/dynamics/engine/sourcedMaterials';
-import { bodyMassProperties } from '@core/dynamics/simulationModel';
+import { idealGearWarnings } from '@core/dynamics/gearLoss';
+import { sourcedMaterial } from '@core/commands/document/sourcedMaterials';
+import { bodyMassProperties, buildSimulationModel } from '@core/dynamics/simulationModel';
+import { setEngineLossLaw } from '@core/dynamics/engineLossHook';
+import { realismOf, setRealismLaw } from '@core/commands/dynamics/realismHook';
+import { installEngineLaws } from '@core/commands/dynamics/engine/hooks';
+import { validateMaterialValue } from '@core/commands/persistence/guards';
 import { residualTier } from '@core/dynamics/reactions';
 import { dynamicsProblems } from '@core/commands/persistence/dynamicsValidation';
 import { prototypeProblems } from '@core/commands/persistence/prototypeValidation';
@@ -890,6 +894,51 @@ describe('load validation of the new slices', () => {
     expect(prototypeProblems({ intents: {}, grounded: [], references: { a: { id: 'b' } } })[0]).toMatch(/whose id is 'a'/);
     expect(prototypeProblems({ intents: {}, grounded: [], references: JSON.parse('{"__proto__": {}}') as object })[0]).toMatch(/reserved/);
   });
+
+  it('rejects a calibratedRpm that is not an array of positive numbers (a string used to load and crash engine_quick_check)', () => {
+    const breakCylinder = (value: unknown): string[] => {
+      const copy = structuredClone(doc.dynamics) as unknown as { cylinders: Record<string, { model: Record<string, unknown> }> };
+      const cylinder = Object.values(copy.cylinders)[0];
+      if (cylinder === undefined) throw new Error('no cylinder');
+      cylinder.model['calibratedRpm'] = value;
+      return dynamicsProblems(copy);
+    };
+    expect(breakCylinder([5800])).toEqual([]);
+    expect(breakCylinder('5800')[0]).toMatch(/calibratedRpm must be an array of finite numbers > 0/);
+    expect(breakCylinder([0])[0]).toMatch(/calibratedRpm/);
+    expect(breakCylinder([Number.NaN])[0]).toMatch(/calibratedRpm/);
+  });
+
+  it('rejects a material source that is empty and a grade outside A / B / C', () => {
+    const base = { name: 'm', density: 2.68, color: '#cccccc', metalness: 0.5, roughness: 0.5 };
+    expect(validateMaterialValue('m', { ...base, source: 'E-R32', grade: 'B' })).toBeNull();
+    expect(validateMaterialValue('m', { ...base, source: '' })).toMatch(/source must be a non-empty string/);
+    expect(validateMaterialValue('m', { ...base, source: 3 })).toMatch(/source must be a non-empty string/);
+    expect(validateMaterialValue('m', { ...base, grade: 'D' })).toMatch(/grade must be 'A', 'B' or 'C'/);
+  });
+});
+
+describe('engine injection points (spec 11 Q3)', () => {
+  it('a model with losses is refused when no engine friction law is installed, never run lossless', () => {
+    const { doc } = calibratedEngine();
+    setEngineLossLaw(null);
+    try {
+      const built = buildSimulationModel(doc, 1e-4);
+      expect('error' in built && built.error).toMatch(/no engine friction law is installed/);
+    } finally {
+      installEngineLaws();
+    }
+    expect('error' in buildSimulationModel(doc, 1e-4)).toBe(false);
+  });
+
+  it('without a realism law the realism block is absent', () => {
+    setRealismLaw(null);
+    try {
+      expect(realismOf({} as unknown as Parameters<typeof realismOf>[0])).toBeNull();
+    } finally {
+      installEngineLaws();
+    }
+  });
 });
 
 describe('loop residual tiers (VC-FPR-35)', () => {
@@ -900,5 +949,58 @@ describe('loop residual tiers (VC-FPR-35)', () => {
     expect(residualTier(0.5e-6, pass ?? 0, fail ?? 0)).toBe('pass');
     expect(residualTier(5e-6, pass ?? 0, fail ?? 0)).toBe('warn');
     expect(residualTier(20e-6, pass ?? 0, fail ?? 0)).toBe('fail');
+  });
+});
+
+describe('FPR-E review fixes: bands, efficiency, negative FMEP', () => {
+  it('at a calibration speed the brake band is the calibration tolerance and the indicated band adds the friction band (RSS)', () => {
+    const calibrated = lossBands({
+      calibrated: true,
+      calibrationBand: 1e-3,
+      gasBand: { rel: 1e-3 },
+      frictionBand: { rel: 0.13 },
+      indicated: 140,
+      friction: 20,
+      brake: 120,
+    });
+    expect(calibrated.brake).toEqual({ rel: 1e-3 });
+    expect(calibrated.indicated).toEqual({ rel: expect.closeTo(Math.hypot(1e-3 * 120, 0.13 * 20) / 140, 12) as number });
+    const predicted = lossBands({
+      calibrated: false,
+      calibrationBand: 1e-3,
+      gasBand: null,
+      frictionBand: { rel: 0.13 },
+      indicated: 140,
+      friction: 20,
+      brake: 120,
+    });
+    expect(predicted).toEqual({ indicated: null, brake: null });
+  });
+
+  it('the mechanical-efficiency band is rel(FMEP) (FMEP / IMEP) / eta; a table friction states none', () => {
+    const band = efficiencyBand({ rel: 0.13 }, 2e5, 12e5);
+    const eta = 1 - 2 / 12;
+    expect(band).toEqual({ rel: (0.13 * (2 / 12)) / eta });
+    expect(efficiencyBand(null, 2e5, 12e5)).toBeNull();
+    expect(efficiencyBand({ rel: 0.1 }, 0, 12e5)).toBeNull();
+    expect(
+      frictionOrigin({ id: 'l', crank: 'c', cylinders: [], oilTempFactor: 1, model: { kind: 'fmep_table', points: [], source: 's' } }),
+    ).toBe('input');
+  });
+
+  it('a Chen-Flynn FMEP below zero is clamped to 0 and flagged; constants negative at rest are refused', () => {
+    const losses: EngineLosses = {
+      id: 'l',
+      crank: 'c',
+      cylinders: [],
+      oilTempFactor: 1,
+      model: { kind: 'chen_flynn', aPa: 1000, bRatio: 0, cPaPerRpm: -1, dPaPerRpm2: 0, source: 's' },
+    };
+    expect(fmepAt(losses, 5000, 1e5)).toEqual({ pa: 0, outsideRange: false, clamped: true });
+    expect(fmepAt(losses, 100, 1e5).clamped).toBe(false);
+    const plain = sliderCrank({ rMm: 30.5, lMm: 130 }).doc;
+    const refused = execute(plain, 'set_engine_losses', { crank: 'crank_j', model: { ...CHEN_FLYNN, aPa: -1e5, bRatio: 0.1 } });
+    expect(refused.affected).toEqual([]);
+    expect(refused.summary).toMatch(/negative FMEP .* at 0 rpm and 1 bar/);
   });
 });

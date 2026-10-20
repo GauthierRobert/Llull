@@ -21,9 +21,9 @@ import {
   outsideBand,
   type PlausibilityFinding,
 } from './plausibility';
-import { accuracy, combineContributions, RIGID_BODY_WARNING, type Accuracy, type AccuracyBand } from './accuracy';
+import { accuracy, RIGID_BODY_WARNING, type Accuracy, type AccuracyBand } from '../accuracy';
 import { combustionOrigin } from './combustionOrigin';
-import { fmepAt, fmepBand, ownsCylinder } from './engineLosses';
+import { efficiencyBand, fmepAt, fmepBand, frictionOrigin, lossBands, ownsCylinder } from './engineLosses';
 import { elementAt } from '../../lib/elementAt';
 
 /** Share of the connecting-rod mass counted as reciprocating (the usual lumped-mass rule, named). */
@@ -50,6 +50,8 @@ interface LossReport {
   /** The speed governor's mean torque over the last cycle, when it is the only other load; |it| should equal the brake torque. */
   readonly governorCrossCheck: { readonly governorMeanTorqueNm: number; readonly relativeDifference: number } | null;
   readonly outsideValidatedRange: boolean;
+  /** The friction fit gave a negative FMEP at this point; it was clamped to 0. */
+  readonly fmepClamped: boolean;
 }
 
 interface ReciprocatingReport {
@@ -117,7 +119,11 @@ function lossReport(input: RealismInput, record: EngineLosses): LossReport | nul
   const own = runtimes.filter((runtime) => ownsCylinder(record, runtime.cylinder));
   const lead = own[0];
   if (cycle === null || lead === undefined || report.meanTorqueNm === null) return null;
+  // friction reads the listed cylinders; the mean torque is the whole crank's, so the MEPs are per the whole crank's displacement
   const displacement = own.reduce((total, runtime) => total + runtime.layout.displacementM3, 0);
+  const crankDisplacement = runtimes
+    .filter((runtime) => runtime.cylinder.crank === record.crank)
+    .reduce((total, runtime) => total + runtime.layout.displacementM3, 0);
   const cycleRad = lead.cylinder.cycle === 'four_stroke' ? 4 * Math.PI : 2 * Math.PI;
   const peakPa = Math.max(...own.map((runtime) => runtime.curveAt(cycle.meanRpm).peakPa));
   const fmep = fmepAt(record, cycle.meanRpm, peakPa);
@@ -130,25 +136,27 @@ function lossReport(input: RealismInput, record: EngineLosses): LossReport | nul
     governed !== null && governorIsOnlyLoad(dynamics, record.crank) && Math.abs(brake) > 0
       ? { governorMeanTorqueNm: governed, relativeDifference: Math.abs(Math.abs(governed) - Math.abs(brake)) / Math.abs(brake) }
       : null;
-  const imep = (report.meanTorqueNm * cycleRad) / displacement;
+  const imep = (report.meanTorqueNm * cycleRad) / crankDisplacement;
+  const effectiveFmep = (friction * cycleRad) / crankDisplacement;
   return {
     id: record.id,
     model: record.model.kind,
     source: record.model.source,
     crankJoint: record.crank,
     rpm: cycle.meanRpm,
-    displacementCm3: displacement * 1e6,
+    displacementCm3: crankDisplacement * 1e6,
     peakPressureBar: peakPa / 1e5,
-    fmepBar: fmep.pa / 1e5,
+    fmepBar: effectiveFmep / 1e5,
     frictionTorqueNm: friction,
     indicatedTorqueNm: report.meanTorqueNm,
     brakeTorqueNm: brake,
     brakePowerKW: (brake * cycle.meanRpm * 2 * Math.PI) / 60 / 1000,
     imepBar: imep / 1e5,
-    bmepBar: (imep - fmep.pa) / 1e5,
-    mechanicalEfficiency: imep > 0 ? (imep - fmep.pa) / imep : 0,
+    bmepBar: (imep - effectiveFmep) / 1e5,
+    mechanicalEfficiency: imep > 0 ? (imep - effectiveFmep) / imep : 0,
     governorCrossCheck: crossCheck,
     outsideValidatedRange: fmep.outsideRange,
+    fmepClamped: fmep.clamped === true,
   };
 }
 
@@ -199,27 +207,39 @@ function accuracyOf(input: RealismInput, losses: LossReport | null, record: Engi
   for (const key of ['meanTorqueNm', 'indicatedPowerKW', 'imepBar']) entries[key] = gas();
   if (record !== undefined && losses !== null) {
     const friction = fmepBand(record);
-    const frictionOrigin = record.model.kind === 'fmep_table' ? 'input' : 'predicted';
-    entries['fmepBar'] = accuracy(friction.band, friction.basis, frictionOrigin, { warnings: standing });
+    const lossOrigin = frictionOrigin(record);
+    entries['fmepBar'] = accuracy(friction.band, friction.basis, lossOrigin, { warnings: standing });
     entries['frictionTorqueNm'] = entries['fmepBar'];
-    const brakeBand = combineContributions(
-      [
-        { band: gasBand, value: losses.indicatedTorqueNm },
-        { band: friction.band, value: losses.frictionTorqueNm },
-      ],
-      losses.brakeTorqueNm,
-    );
+    const bands = lossBands({
+      calibrated,
+      calibrationBand: CALIBRATION_BAND,
+      gasBand,
+      frictionBand: friction.band,
+      indicated: losses.indicatedTorqueNm,
+      friction: losses.frictionTorqueNm,
+      brake: losses.brakeTorqueNm,
+    });
+    if (calibrated) {
+      const indicatedBasis = 'calibrated brake value plus the friction band, root-sum-square (indicated = brake + friction)';
+      for (const key of ['meanTorqueNm', 'indicatedPowerKW', 'imepBar'])
+        entries[key] = accuracy(bands.indicated, indicatedBasis, origin, { validationLevel: 1, warnings: standing });
+    }
     const brake = (): Accuracy =>
       accuracy(
-        brakeBand,
+        bands.brake,
         calibrated
-          ? 'calibrated brake target (gas side) combined with the friction band by root-sum-square'
+          ? `brake value calibrated to the target at this speed (tolerance ${CALIBRATION_BAND * 100} %); calibration is not validation evidence`
           : 'gas side and friction band, root-sum-square',
         origin === 'input' ? 'input' : calibrated ? 'calibrated' : 'predicted',
         { validationLevel: calibrated ? 1 : 0, warnings: standing },
       );
     for (const key of ['brakeTorqueNm', 'brakePowerKW', 'bmepBar']) entries[key] = brake();
-    entries['mechanicalEfficiency'] = accuracy(friction.band, `${friction.basis}; ratio BMEP / IMEP`, 'predicted', { warnings: standing });
+    entries['mechanicalEfficiency'] = accuracy(
+      efficiencyBand(friction.band, losses.fmepBar, losses.imepBar),
+      `${friction.basis}; eta = 1 - FMEP / IMEP, band rel(FMEP) (FMEP / IMEP) / eta`,
+      lossOrigin,
+      { warnings: standing },
+    );
   }
   if (report.speedRipple !== null)
     entries['speedRipple'] = accuracy(
@@ -355,6 +375,11 @@ export function realismData(input: RealismInput): RealismData | null {
     reciprocating: reciprocatingReports(input),
     accuracy: accuracyOf(input, losses, record),
     plausibility,
-    warnings: plausibility.map((item) => `${item.code}: ${item.message}`),
+    warnings: [
+      ...plausibility.map((item) => `${item.code}: ${item.message}`),
+      ...(losses?.fmepClamped === true
+        ? [`FPR_UNREALISTIC: the ${losses.model} friction constants give a negative FMEP at ${losses.rpm.toFixed(0)} rpm; it was clamped to 0 (check the constants)`]
+        : []),
+    ],
   };
 }

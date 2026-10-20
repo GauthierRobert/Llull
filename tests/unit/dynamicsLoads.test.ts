@@ -131,4 +131,52 @@ describe('dynamicsLoads', () => {
     expect(formatQuantity(0.001)).toBe('1.00e-3');
     expect(formatQuantity(0)).toBe('0');
   });
+
+  it('draws the joint reaction at the playback time on the anchor carried by the child body (reactions layer)', () => {
+    const { doc, bodyId, jointId } = rotor();
+    const result = {
+      duration: 1,
+      joints: {},
+      motors: {},
+      propellers: {},
+      gears: {},
+      poses: {
+        times: [0, 1],
+        bodies: {
+          [bodyId]: {
+            position: [
+              [0, 0, 0],
+              [0, 0, 10],
+            ],
+            orientation: [
+              [1, 0, 0, 0],
+              [1, 0, 0, 0],
+            ],
+          },
+        },
+      },
+      reactions: {
+        joints: { [jointId]: { forceN: { value: 50, timeS: 1, angleDeg: null } } },
+        series: {
+          times: [0, 1],
+          joints: {
+            [jointId]: {
+              force: [
+                [0, 0, 10],
+                [0, 0, 50],
+              ],
+              moment: [
+                [0, 0, 0],
+                [0, 0, 0],
+              ],
+            },
+          },
+        },
+      },
+    } as unknown as SimulationData;
+    const reaction = dynamicsLoads(doc, { result, time: 1 }, bodyCentres(doc)).find((item) => item.layer === 'reactions');
+    expect(reaction).toMatchObject({ id: `reaction:${jointId}`, shape: 'force', magnitude: 50, direction: [0, 0, 1], origin: [0, 0, 10] });
+    expect(reaction?.value).toBe('R 50 N');
+    expect(dynamicsLoads(doc, null, bodyCentres(doc)).some((item) => item.layer === 'reactions')).toBe(false);
+  });
 });

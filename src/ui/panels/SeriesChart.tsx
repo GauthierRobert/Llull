@@ -33,6 +33,8 @@ interface SeriesChartProps {
   readonly maxSeries?: number;
   readonly title: string;
   readonly testId?: string;
+  /** Labelled vertical marks on the x axis (e.g. TDC firing of cylinder 1 on the crank axis). */
+  readonly marks?: readonly { readonly x: number; readonly label: string }[];
 }
 
 function linePath(xs: readonly number[], values: readonly number[], x: (v: number) => number, y: (v: number) => number): string {
@@ -51,6 +53,7 @@ export function SeriesChart({
   maxSeries = DEFAULT_MAX_SERIES,
   title,
   testId = 'series-chart',
+  marks = [],
 }: SeriesChartProps): React.ReactElement | null {
   const svgRef = useRef<SVGSVGElement>(null);
   const shown = pickSeries(series, priority, maxSeries);
@@ -106,6 +109,16 @@ export function SeriesChart({
             d={linePath(xs, s.values, x, y)}
           />
         ))}
+        {marks
+          .filter((mark) => mark.x >= start && mark.x <= end)
+          .map((mark) => (
+            <g key={`${mark.label}-${mark.x}`} className="series-chart__mark" data-testid={`${testId}-mark`}>
+              <line x1={x(mark.x)} y1={PAD.top} x2={x(mark.x)} y2={HEIGHT - PAD.bottom} strokeDasharray="2 2" />
+              <text className="series-chart__tick" x={x(mark.x) + 2} y={PAD.top + 8}>
+                {mark.label}
+              </text>
+            </g>
+          ))}
         <line
           className="series-chart__cursor"
           x1={cursorX}

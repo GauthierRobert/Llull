@@ -3,7 +3,7 @@
  * cubic (PCHIP, Fritsch-Carlson) interpolation of the table, clamped at its ends. J = 0 uses the propeller's static coefficients.
  */
 
-import type { PropellerLoad } from '../../model/dynamics';
+import type { PropellerLoad } from '../model/dynamics';
 
 /** Piecewise cubic Hermite slopes that keep the data monotone (Fritsch-Carlson with the harmonic mean). */
 function pchipSlopes(xs: readonly number[], ys: readonly number[]): number[] {

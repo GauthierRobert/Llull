@@ -6,7 +6,7 @@
 import type { Motor, PropellerLoad, TorquePoint } from '../model/dynamics';
 import type { Vec3 } from '../model/vectors';
 import type { AppliedLoads, SimulationState } from './physicsEngine';
-import { propellerCoefficients } from './engine/propellerTable';
+import { propellerCoefficients } from './propellerTable';
 
 export const RAD_PER_S_PER_RPM = (2 * Math.PI) / 60;
 

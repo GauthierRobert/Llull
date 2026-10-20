@@ -6,7 +6,7 @@ import { failer, report } from '../../noop';
 import { currentContext } from '../../context';
 import { type ReviewItem, reviewItem, reviewResult, reviewSummary } from '../../inspect/reviewEnvelope';
 import { solverSettingsOf } from '../../../dynamics/simulationModel';
-import { accuracy } from '../../../dynamics/engine/accuracy';
+import { accuracy } from '../../../dynamics/accuracy';
 import { dynamicsOf } from '../bodies';
 import { crankOf, runOperatingPoint, type PointRun } from './operatingPoint';
 

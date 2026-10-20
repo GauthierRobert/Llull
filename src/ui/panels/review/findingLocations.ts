@@ -15,6 +15,7 @@ export const SEVERITY_COLORS: Readonly<Record<CheckStatus, string>> = {
   warn: '#ffb300',
   not_run: '#9e9e9e',
   pass: '#3ddc84',
+  info: '#56b4e9',
 };
 
 export interface FindingLocation {

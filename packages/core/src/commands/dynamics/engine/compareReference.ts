@@ -3,7 +3,7 @@
 import type { DynamicsModel } from '../../../model/dynamics';
 import type { ReferenceData, ReferencePoint } from '../../../model/prototype';
 import { comparePoint, summariseComparison, type PointComparison } from '../../../dynamics/engine/referenceComparison';
-import type { AccuracyBand } from '../../../dynamics/engine/accuracy';
+import type { AccuracyBand } from '../../../dynamics/accuracy';
 import type { CommandResult } from '../../types';
 import { defineCommand, z } from '../../schema';
 import { codedRejection, failer, report } from '../../noop';
@@ -227,7 +227,9 @@ export const compareToReference = defineCommand({
         notRun(entry, `${reference.quantity} is not modelled (no fuel model)`);
         continue;
       }
-      const comparison = comparePoint({ reference, point, simulated, numericalRel, inputBand });
+      // U_num comes from halving at a governed brake point: it does not describe a free-equilibrium rpm (listed missing there)
+      const pointNumerical = reference.quantity in BRAKE_KEYS ? numericalRel : null;
+      const comparison = comparePoint({ reference, point, simulated, numericalRel: pointNumerical, inputBand });
       comparisons.push(comparison);
       const where = point.rpm === undefined ? '' : `@${point.rpm}`;
       items.push(

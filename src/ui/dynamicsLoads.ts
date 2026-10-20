@@ -10,8 +10,10 @@ import type { SimulationData } from '@core/dynamics/simulationReport';
 import { toMetres } from '@core/model/units';
 import { normalize3 } from '@lib/vec3';
 import { formatSi } from '@ui/siText';
+import { pointAtPose } from '@core/dynamics/bodyPose';
+import { reactionsOf } from '@ui/panels/review/reviewTimelineModel';
 
-export const LOAD_LAYERS = ['gravity', 'joints', 'drives', 'thrust'] as const;
+export const LOAD_LAYERS = ['gravity', 'joints', 'drives', 'thrust', 'reactions'] as const;
 export type LoadLayer = (typeof LOAD_LAYERS)[number];
 
 export const LOAD_LAYER_LABELS: Readonly<Record<LoadLayer, string>> = {
@@ -19,6 +21,7 @@ export const LOAD_LAYER_LABELS: Readonly<Record<LoadLayer, string>> = {
   joints: 'Joints & gears',
   drives: 'Motor torque',
   thrust: 'Thrust',
+  reactions: 'Joint reactions',
 };
 
 /** Glyph / swatch colour per layer (viewport overlay and review list). */
@@ -27,6 +30,7 @@ export const LOAD_COLORS: Readonly<Record<LoadLayer, string>> = {
   joints: '#00b8d4',
   drives: '#64dd17',
   thrust: '#ff4081',
+  reactions: '#cc79a7',
 };
 
 /** force: arrow along `direction`; torque: ring about `direction`; axis: line through `origin`; link: dashed `origin`→`end`. */
@@ -262,6 +266,41 @@ function propellerItems(context: Context): LoadItem[] {
   return items;
 }
 
+/** Joint reaction force on the child body at the playback time (simulate_motion `reactions: series`), at the anchor carried by the child. */
+function reactionItems(context: Context): LoadItem[] {
+  const { playback, dynamics } = context;
+  if (playback === null) return [];
+  const reactions = reactionsOf(playback.result);
+  if (reactions === null) return [];
+  const index = sampleIndex(reactions.times, playback.time);
+  return Object.entries(reactions.forces).flatMap(([jointId, forces]) => {
+    const joint = dynamics.joints[jointId];
+    const force = forces[Math.min(index, forces.length - 1)];
+    if (joint === undefined || force === undefined) return [];
+    const magnitude = Math.hypot(force[0], force[1], force[2]);
+    const track = playback.result.poses?.bodies[joint.child];
+    const poseIndex = Math.min(sampleIndex(playback.result.poses?.times ?? [], playback.time), (track?.position.length ?? 1) - 1);
+    const [start, position, orientation] = [track?.position[0], track?.position[poseIndex], track?.orientation[poseIndex]];
+    const origin =
+      start === undefined || position === undefined || orientation === undefined
+        ? joint.anchor
+        : pointAtPose(joint.anchor, { start, position, orientation });
+    return [
+      {
+        id: `reaction:${jointId}`,
+        layer: 'reactions',
+        shape: 'force',
+        title: `${jointId} on ${context.bodyName(joint.child)}`,
+        value: `R ${formatSi(magnitude, 'N')}`,
+        detail: `joint reaction at ${formatQuantity(playback.time, 4)} s, world axes, force on the child body (peak ${formatSi(reactions.peaks[jointId]?.value ?? magnitude, 'N')})`,
+        origin,
+        direction: magnitude > 0 ? normalize3([force[0], force[1], force[2]]) : [0, 0, 1],
+        magnitude,
+      } satisfies LoadItem,
+    ];
+  });
+}
+
 /** Design-pose centres of mass (document units), per body; bodies whose mass cannot be computed are left out. */
 export function bodyCentres(doc: CadDocument): Record<string, Vec3> {
   const perUnit = toMetres(doc, 1);
@@ -279,5 +318,5 @@ export function dynamicsLoads(doc: CadDocument, playback: LoadPlayback | null, c
   if (dynamics === undefined) return [];
   const bodyName = (id: string): string => (id === GROUND ? 'ground' : (dynamics.bodies[id]?.name ?? id));
   const context: Context = { doc, dynamics, playback, centres, bodyName };
-  return [...weightItems(context), ...jointItems(context), ...motorItems(context), ...propellerItems(context)];
+  return [...weightItems(context), ...jointItems(context), ...motorItems(context), ...propellerItems(context), ...reactionItems(context)];
 }

@@ -14,7 +14,7 @@ import { combineMassProperties, type InertiaTensor, type MassProperties } from '
 import { RAD_PER_S_PER_RPM, appliedLoadsFor, speedServoGains } from './forceLaws';
 import type { SimulationBody, SimulationJoint, SimulationLoop, SimulationModel, SimulationServo, SimulationSpring } from './physicsEngine';
 import { prepareCylinders, withCylinderForces, type CylinderRuntime } from './cylinderLoads';
-import { withEngineLosses } from './engine/engineLosses';
+import { withInstalledLosses } from './engineLossHook';
 import { consistentSpeeds } from './mobility';
 import { announcedSpeed } from './timestep';
 import type { CurveCode } from './pressureCurve';
@@ -65,7 +65,7 @@ export function bodyMassProperties(
       return 0;
     }
     const material = density.materialId === undefined ? undefined : doc.materials[density.materialId];
-    const sourced = material?.source !== undefined && density.modelId === undefined;
+    const sourced = typeof material?.source === 'string' && material.source.trim().length > 0 && density.modelId === undefined;
     sources.add(sourced ? `material '${density.materialId}' density, source: ${material?.source}` : density.source);
     // a material that names its source (FR-FPR-73 catalogue) is not "given without a source"
     for (const reason of density.unverifiedReasons) if (!sourced) reasons.add(reason);
@@ -275,7 +275,8 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
   const cylinders = prepareCylinders(dynamics, topology, metres, announcedRpm > 0 ? announcedRpm : undefined);
   if ('error' in cylinders) return cylinders;
   const gasLoads = cylinders.length > 0 ? withCylinderForces(baseLoads, cylinders) : baseLoads;
-  const loads = withEngineLosses(gasLoads, Object.values(dynamics.losses ?? {}), cylinders);
+  const loads = withInstalledLosses(gasLoads, Object.values(dynamics.losses ?? {}), cylinders);
+  if ('error' in loads) return loads;
   const solver = {
     integrator: settings.integrator,
     loopTimeConstant: settings.loopTimeConstantSteps * timestep,

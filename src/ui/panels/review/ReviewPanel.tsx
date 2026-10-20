@@ -1,5 +1,6 @@
 // Review tab: runs check_prototype (read-only), shows the readiness checklist, the findings and the Explain drawer. Reviewer statuses go out
-// as set_review_disposition. While those commands are not registered the panel says so instead of dispatching. No sign-off in the MVP.
+// as set_review_disposition (with the check's inputsHash). Below: the mechanism graph, the motion timeline and the reference overlay.
+// No sign-off in the MVP (spec 11 Q5).
 
 import React, { useCallback } from 'react';
 import { getCommand } from '@core/commands/registry';
@@ -10,6 +11,9 @@ import { useStore } from '@ui/store';
 import { ReadinessChecklist } from './ReadinessChecklist';
 import { FindingsList, type DispositionChange } from './FindingsList';
 import { ExplainDrawer } from './ExplainDrawer';
+import { MechanismGraph } from './MechanismGraph';
+import { ReviewTimeline } from './ReviewTimeline';
+import { ReferenceChart } from './ReferenceChart';
 import { StatusMark } from './StatusMark';
 import { buildChecklist, overallStatus } from './checklist';
 import { findFinding, flattenFindings } from './findings';
@@ -56,6 +60,17 @@ function partsText(parts: readonly string[]): string {
   ];
   const runs = `Runs ${parts.map((name) => PART_LABELS[name] ?? name).join(', ')}`;
   return missing.length === 0 ? `${runs}.` : `${runs}; ${missing.join(', ')} ${missing.length === 1 ? 'reads' : 'read'} “not run” here.`;
+}
+
+/** The verdict in words; "ready for review" is not an approval, so it never reads as a pass. */
+function VerdictLine({ verdict }: { verdict: string }): React.ReactElement {
+  const ready = verdict === 'ready_for_review';
+  return (
+    <p className={`review-panel__verdict review-panel__verdict--${ready ? 'ready' : 'blocked'}`} data-testid="review-verdict">
+      <StatusMark status={ready ? 'info' : 'fail'} label={ready ? 'ready for review' : 'blocked'} />{' '}
+      {ready ? 'No failing check: a qualified engineer reviews it next.' : 'A check fails (accepted fails included): fix it, then re-run.'}
+    </p>
+  );
 }
 
 export function ReviewPanel({ className }: { className?: string }): React.ReactElement {
@@ -116,9 +131,16 @@ export function ReviewPanel({ className }: { className?: string }): React.ReactE
         />
       ) : (
         <>
+          {result.verdict !== undefined && <VerdictLine verdict={result.verdict} />}
           {result.ownerSummary !== undefined && (
             <p className="review-panel__summary" data-testid="review-summary">
               {result.ownerSummary}
+            </p>
+          )}
+          {(result.staleDispositions?.length ?? 0) > 0 && (
+            <p className="review-panel__stale" role="status" data-testid="review-stale-dispositions">
+              <span aria-hidden="true">◌</span> {result.staleDispositions?.length} disposition(s) were made on other inputs: re-review{' '}
+              {result.staleDispositions?.join(', ')}.
             </p>
           )}
           <KpiStrip
@@ -158,6 +180,15 @@ export function ReviewPanel({ className }: { className?: string }): React.ReactE
               onDisposition={onDisposition}
               onExplain={useReviewStore.getState().openExplain}
             />
+          </PanelSection>
+          <PanelSection collapsible title="Mechanism" testId="review-mechanism">
+            <MechanismGraph />
+          </PanelSection>
+          <PanelSection collapsible title="Motion" testId="review-motion">
+            <ReviewTimeline checks={checks} durationS={result.durationS ?? null} />
+          </PanelSection>
+          <PanelSection collapsible title="Matches reality" testId="review-reality">
+            <ReferenceChart checks={checks} />
           </PanelSection>
         </>
       )}

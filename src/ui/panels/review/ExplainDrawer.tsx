@@ -6,12 +6,8 @@ import { Icon } from '@ui/components/Icon';
 import { StatusMark } from './StatusMark';
 import { describeValueKey, formatThreshold, formatValue, itemStatusLabel } from './checklist';
 import { explainCliCommand } from './explainCli';
+import { bandText } from './AccuracyBadge';
 import type { Accuracy, CheckItem, CheckResult } from './reviewTypes';
-
-function bandText(band: Accuracy['band']): string {
-  if (band === null) return '± ?';
-  return 'rel' in band ? `± ${(band.rel * 100).toPrecision(2).replace(/\.?0+$/, '')} %` : `± ${band.abs} ${band.unit}`;
-}
 
 function AccuracyBlock({ valueKey, accuracy }: { valueKey: string; accuracy: Accuracy }): React.ReactElement {
   const { comparison } = accuracy;
