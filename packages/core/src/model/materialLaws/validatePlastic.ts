@@ -118,7 +118,10 @@ function hillIssues(law: LawOf<'hill48_plasticity'>, context: ValidateContext): 
       ];
 }
 
-export function validatePlastic(law: LawOf<'j2_plasticity' | 'ramberg_osgood' | 'hill48_plasticity'>, context: ValidateContext): MatlIssue[] {
+export function validatePlastic(
+  law: LawOf<'j2_plasticity' | 'ramberg_osgood' | 'hill48_plasticity'>,
+  context: ValidateContext,
+): MatlIssue[] {
   if (law.kind === 'hill48_plasticity') return hillIssues(law, context);
   if (law.kind === 'j2_plasticity') return [...isotropicIssues(law.isotropic, context), ...kinematicIssues(law.kinematic, context)];
   const issues = [

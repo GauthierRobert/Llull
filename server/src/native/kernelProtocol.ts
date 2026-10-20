@@ -250,6 +250,7 @@ export function nativeArgs(
   if (op === 'distance') return [handle(args[0]), handle(args[1]), ...args.slice(2)];
   if (op === 'exportStep' && Array.isArray(args[0])) return [args[0].map(handle)];
   if (op === 'exportStepAssembly' && Array.isArray(args[0])) return [wireAssembly(args[0] as StepOccurrence<unknown>[], features, wire)];
-  if (op === 'writeExchange' && typeof args[0] === 'object' && args[0] !== null) return [wireExchange(args[0] as ExchangeWriteRequest, features, wire)];
+  if (op === 'writeExchange' && typeof args[0] === 'object' && args[0] !== null)
+    return [wireExchange(args[0] as ExchangeWriteRequest, features, wire)];
   return args;
 }

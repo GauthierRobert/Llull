@@ -84,7 +84,7 @@ describe.skipIf(present.length === 0)('step21 reader vs the Python reference on 
         : null,
     );
     if (pair[0] === null || pair[1] === null) return;
-    const solid = (groups: NonNullable<(typeof pair)[number]>) =>
+    const solid = (groups: NonNullable<(typeof pair)[number]>): NonNullable<(typeof pair)[number]>[number] =>
       groups.find((group) => group.volume !== undefined && group.centroid !== undefined && group.target === 'part')!;
     const [ap203, ap242] = [solid(pair[0]), solid(pair[1])];
     expect((ap242.volume! - ap203.volume!) / ap203.volume!).toBeCloseTo(1.1168549051822634e-4, 12);

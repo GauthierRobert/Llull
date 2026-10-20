@@ -22,8 +22,7 @@ const unsupported = (message: string): DriverFailure => ({
   code: 'MATL_PATH_INVALID',
   path: 'kinematics',
   message,
-  remediation:
-    "small strain for elasticity, plasticity, viscoelasticity, creep and Ramberg-Osgood; 'finite' for hyperelastic laws",
+  remediation: "small strain for elasticity, plasticity, viscoelasticity, creep and Ramberg-Osgood; 'finite' for hyperelastic laws",
 });
 
 /**

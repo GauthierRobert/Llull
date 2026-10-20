@@ -329,7 +329,11 @@ export function analyseMobility(dynamics: DynamicsModel, topology: Topology, met
     if (label === undefined) {
       const gear = gears.rows[pivot.index - labels.length]?.gear;
       if (gear !== undefined)
-        redundant.push({ loop: gear, component: 'gear ratio', message: `gear coupling '${gear}' repeats a constraint already fixed by the joints and other couplings` });
+        redundant.push({
+          loop: gear,
+          component: 'gear ratio',
+          message: `gear coupling '${gear}' repeats a constraint already fixed by the joints and other couplings`,
+        });
       continue;
     }
     const by = treePath(topology, label.loop).map((id) => `'${id}'`);

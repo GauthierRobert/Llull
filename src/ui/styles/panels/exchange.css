@@ -1,0 +1,47 @@
+/* Aerospace 04 XCH review surface: validation badge, comparison table, exchange report card. */
+.exchange-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+  margin: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.exchange-line--meta {
+  color: var(--fg-muted);
+}
+
+.exchange-table {
+  width: calc(100% - 2 * var(--space-3));
+  margin: var(--space-1) var(--space-3);
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+}
+
+.exchange-table th,
+.exchange-table td {
+  padding: 2px var(--space-1);
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+
+.exchange-card {
+  max-width: 34rem;
+  font-size: var(--text-xs);
+}
+
+.exchange-issues {
+  margin: var(--space-1) var(--space-3);
+  padding-left: var(--space-3);
+}
+
+.exchange-issues li[data-severity='fail'] {
+  color: var(--danger);
+}
+
+.exchange-product {
+  margin: var(--space-2) var(--space-3) 0;
+  font-size: var(--text-xs);
+}

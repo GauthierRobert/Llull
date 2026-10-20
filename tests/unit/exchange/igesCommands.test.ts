@@ -9,11 +9,12 @@ import { createEmptyDocument, type CadDocument, type MeshSolidEntity } from '@co
 import { textToBase64 } from '@lib/base64';
 import { fakeExactKernel } from '../../helpers/fakeExactKernel';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
-import { fakeBrep, fakeIgesText, fakeXdeKernel, importedBody, type XdeFakeSpec } from '../../helpers/fakeXdeKernel';
+import type { ImportedSolid } from '@core/geometry/kernelPorts';
+import { type FakeXdeKernel, fakeBrep, fakeIgesText, fakeXdeKernel, importedBody, type XdeFakeSpec } from '../../helpers/fakeXdeKernel';
 
 const ctxOf = (kernel: GeometryKernel | null): ExecutionContext => ({ ...defaultContext(), kernel });
 const IGES = fakeIgesText([186, 514, 510, 214, 406], { unitFlag: 1, resolution: 0.001 });
-const body = (volume = 6000, area = 2200) => importedBody(fakeBrep(volume, area, [0, 0, 0]), { name: 'Block' });
+const body = (volume = 6000, area = 2200): ImportedSolid => importedBody(fakeBrep(volume, area, [0, 0, 0]), { name: 'Block' });
 const read = (extra: Partial<ImportedIges> = {}): ImportedIges => ({
   solids: [body()],
   census: { roots: 3, solids: 0, shells: 1, openShells: 0, faces: 6 },
@@ -22,11 +23,26 @@ const read = (extra: Partial<ImportedIges> = {}): ImportedIges => ({
   diagonalMm: 40,
   ...extra,
 });
-const run = (doc: CadDocument, name: string, params: Record<string, unknown>, spec: XdeFakeSpec = {}) => {
+const run = (
+  doc: CadDocument,
+  name: string,
+  params: Record<string, unknown>,
+  spec: XdeFakeSpec = {},
+): { result: CommandResult; fake: FakeXdeKernel } => {
   const fake = fakeXdeKernel(spec);
   return { result: execute(doc, name, params, ctxOf(fake.kernel)), fake };
 };
-const data = (result: CommandResult): any => result.data;
+interface IgesData {
+  readonly iges: Record<string, unknown> & { readonly untranslated: Record<string, number>; readonly policy: Record<string, unknown> };
+  readonly report: {
+    readonly warnings: readonly { readonly code: string }[];
+    readonly reviewRequired: { readonly value: boolean; readonly reasons: readonly string[] };
+    readonly solids: readonly Record<string, unknown>[];
+  };
+  readonly selfCheck: Record<string, unknown>;
+  readonly iges_text?: string;
+}
+const data = (result: CommandResult): IgesData & Record<string, unknown> => result.data as IgesData & Record<string, unknown>;
 
 describe('import_iges', () => {
   it('imports sewn solids, converts the file resolution, records census, warnings and unverified provenance', () => {

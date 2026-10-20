@@ -28,6 +28,8 @@ export interface TreeStructure {
   readonly nonRigid: readonly string[];
 }
 
+const withoutNegativeZero = ([x, y, z]: Vec3): Vec3 => [x + 0, y + 0, z + 0];
+
 /** Position (document units) and Euler rotation of a row-major 3x4 placement given in millimetres. */
 export function placementOf(matrix: ImportedOccurrence['matrix'], mmPerUnit: number): { position: Vec3; rotation: Vec3; rigid: boolean } {
   const m = (index: number): number => matrix[index] ?? 0;
@@ -37,7 +39,11 @@ export function placementOf(matrix: ImportedOccurrence['matrix'], mmPerUnit: num
     rotation[1] * (rotation[3] * rotation[8] - rotation[5] * rotation[6]) +
     rotation[2] * (rotation[3] * rotation[7] - rotation[4] * rotation[6]);
   const rigid = Math.abs(determinant - 1) < 1e-6;
-  return { position: [m(3) / mmPerUnit, m(7) / mmPerUnit, m(11) / mmPerUnit], rotation: rigid ? (eulerFromMat(rotation).map((angle) => angle + 0) as Vec3) : [0, 0, 0], rigid };
+  return {
+    position: [m(3) / mmPerUnit, m(7) / mmPerUnit, m(11) / mmPerUnit],
+    rotation: rigid ? withoutNegativeZero(eulerFromMat(rotation)) : [0, 0, 0],
+    rigid,
+  };
 }
 
 const isFlatPart = (imported: ImportedExchange, index: number): boolean => {

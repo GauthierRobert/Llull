@@ -9,10 +9,15 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { summarizeStep21 } from '@lib/step21/summary';
 import { fakeExactKernel } from '../../helpers/fakeExactKernel';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
-import { fakeStepText, fakeXdeKernel, type XdeFakeSpec } from '../../helpers/fakeXdeKernel';
+import { type FakeXdeKernel, fakeStepText, fakeXdeKernel, type XdeFakeSpec } from '../../helpers/fakeXdeKernel';
 
 const ctxOf = (kernel: GeometryKernel | null): ExecutionContext => ({ ...defaultContext(), kernel });
-const run = (doc: CadDocument, name: string, params: Record<string, unknown>, spec: XdeFakeSpec = {}) => {
+const run = (
+  doc: CadDocument,
+  name: string,
+  params: Record<string, unknown>,
+  spec: XdeFakeSpec = {},
+): { result: CommandResult; fake: FakeXdeKernel } => {
   const fake = fakeXdeKernel(spec);
   return { result: execute(doc, name, params, ctxOf(fake.kernel)), fake };
 };

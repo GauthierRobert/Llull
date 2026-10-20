@@ -5,7 +5,7 @@
  * @invariant pure; never throws (garbage yields zero entities and `valid: false`)
  */
 
-export interface IgesGlobal {
+interface IgesGlobal {
   readonly productId: string;
   readonly fileName: string;
   readonly system: string;

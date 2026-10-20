@@ -5,6 +5,7 @@ import { defaultContext } from '@core/commands/context';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { ImportedExchange } from '@core/geometry/kernelExchange';
+import type { ImportedSolid } from '@core/geometry/kernelPorts';
 import { createEmptyDocument, type CadDocument, type InstanceEntity, type MeshSolidEntity } from '@core/model/types';
 import { simplifyTree } from '@core/commands/exchange/importSimplify';
 import { placementOf } from '@core/commands/exchange/importTree';
@@ -27,7 +28,7 @@ const run = (doc: CadDocument, name: string, params: Record<string, unknown>, sp
   execute(doc, name, params, ctxOf(fakeXdeKernel(spec).kernel));
 
 const PART = { volume: 1000, area: 600, centroid: [5, 5, 5] as [number, number, number] };
-const part = (extra: Partial<Parameters<typeof importedBody>[1]> = {}) =>
+const part = (extra: Partial<Parameters<typeof importedBody>[1]> = {}): ImportedSolid =>
   importedBody(fakeBrep(PART.volume, PART.area, PART.centroid), { name: 'Block', color: '#3366cc', ...extra });
 const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0];
 const at = (x: number): number[] => [1, 0, 0, x, 0, 1, 0, 0, 0, 0, 1, 0];
@@ -48,7 +49,27 @@ function assemblyTree(matrices: readonly number[][] = [identity, rotZ]): Importe
   };
 }
 
-const reportOf = (result: CommandResult): any => (result.data as { report: any }).report;
+interface ImportReport {
+  readonly exchange: {
+    readonly gvpCheck: { readonly band: string; readonly verified: boolean; readonly unit: string };
+    readonly fileUnit: { readonly name: string; readonly mmPerUnit: number };
+    readonly unitFactor: number | null;
+    readonly products: readonly {
+      readonly name: string;
+      readonly band: string;
+      readonly solids: number;
+      readonly entityIds: readonly string[];
+    }[];
+    readonly policy: Record<
+      string,
+      { readonly value: number; readonly unit: string; readonly source: string; readonly defaulted: boolean }
+    >;
+  };
+  readonly warnings: readonly { readonly code: string; readonly severity: string; readonly entityIds: readonly string[] }[];
+  readonly reviewRequired: { readonly value: boolean; readonly reasons: readonly string[] };
+  readonly skipped: readonly string[];
+}
+const reportOf = (result: CommandResult): ImportReport => (result.data as { report: ImportReport }).report;
 const stepOf = (extra: Partial<{ volume: number; area: number; centroid: [number, number, number] }> = {}, name = 'Block'): string =>
   fakeStepText([{ name, ...PART, ...extra }]);
 
@@ -88,7 +109,7 @@ describe('import_step_exact: flat part with embedded validation properties', () 
     const tree = singlePartTree('Block', [part()]);
     const yellow = run(createEmptyDocument(), 'import_step_exact', { text: stepOf({ volume: 1005 }) }, { stepImport: tree });
     expect(reportOf(yellow).exchange.gvpCheck.band).toBe('yellow');
-    expect(reportOf(yellow).warnings.map((w: { code: string }) => w.code)).toEqual(['XCH_GVP_YELLOW']);
+    expect(reportOf(yellow).warnings.map((warning) => warning.code)).toEqual(['XCH_GVP_YELLOW']);
     expect(reportOf(yellow).reviewRequired.reasons).toEqual(['import_gvp_yellow']);
     expect(yellow.document.exchange?.provenance['mesh-1.1']?.unverified.value).toBe(false);
 
@@ -276,7 +297,7 @@ describe('simplifyTree', () => {
     occurrences,
     roots,
   });
-  const use = (parent: number, product: number, matrix: readonly number[] = identity) => ({
+  const use = (parent: number, product: number, matrix: readonly number[] = identity): ImportedExchange['occurrences'][number] => ({
     parent,
     product,
     name: `u${parent}${product}`,
@@ -362,6 +383,22 @@ describe('simplifyTree', () => {
   });
 });
 
+interface VerifyData {
+  readonly format: string;
+  readonly fileName?: string;
+  readonly schemaName?: string;
+  readonly unitFactor: number | null;
+  readonly band: string;
+  readonly products: readonly string[];
+  readonly embeddedGvp: readonly Record<string, unknown>[];
+  readonly recomputed: readonly { readonly product: string; readonly band: string }[] | null;
+  readonly unverified: { readonly value: boolean; readonly reasons: readonly string[] };
+  readonly reviewRequired: { readonly value: boolean; readonly reasons: readonly string[] };
+  readonly issues: readonly { readonly code: string; readonly severity: string; readonly productKey?: string; readonly message: string }[];
+}
+const dataOfVerify = (result: CommandResult): VerifyData => result.data as VerifyData;
+const codesOf = (result: CommandResult): string[] => dataOfVerify(result).issues.map((issue) => issue.code);
+
 describe('verify_exchange_file', () => {
   const verify = (
     params: Record<string, unknown>,
@@ -372,7 +409,7 @@ describe('verify_exchange_file', () => {
 
   it('reports the file claims without a kernel: schema, unit factor, census, embedded GVP, not-checkable', () => {
     const result = verify({ text: stepOf(), fileName: 'f.stp' }, undefined, null);
-    const data = result.data as any;
+    const data = dataOfVerify(result);
     expect(data).toMatchObject({ format: 'step', fileName: 'f.stp', unitFactor: 1, band: 'not-checkable', products: ['Block'] });
     expect(data.schemaName).toContain('AP242');
     expect(data.embeddedGvp[0]).toMatchObject({
@@ -386,40 +423,37 @@ describe('verify_exchange_file', () => {
     expect(data.reviewRequired.value).toBe(true);
     expect(data.issues).toEqual([]);
     expect(result.summary).toContain('not compared (no exact kernel)');
-    expect(result.document).toBeDefined();
   });
 
   it('compares with the recomputed geometry through the kernel: green, yellow and red with issues', () => {
     const spec = { stepImport: singlePartTree('Block', [part()]) };
-    const green = verify({ text: stepOf() }, spec).data as any;
+    const green = dataOfVerify(verify({ text: stepOf() }, spec));
     expect(green).toMatchObject({
       band: 'green',
       unverified: { value: false, reasons: [] },
       reviewRequired: { value: false, reasons: [] },
     });
-    expect(green.recomputed[0]).toMatchObject({ product: 'Block', band: 'green' });
-    const yellow = verify({ text: stepOf({ volume: 1005 }) }, spec).data as any;
+    expect(green.recomputed?.[0]).toMatchObject({ product: 'Block', band: 'green' });
+    const yellow = dataOfVerify(verify({ text: stepOf({ volume: 1005 }) }, spec));
     expect(yellow.band).toBe('yellow');
     expect(yellow.issues[0]).toMatchObject({ code: 'XCH_GVP_YELLOW', severity: 'warn', productKey: 'Block' });
-    const red = verify({ text: stepOf({ volume: 1500 }), gvpPolicy: { yellowRel: 0.2 } }, spec).data as any;
+    const red = dataOfVerify(verify({ text: stepOf({ volume: 1500 }), gvpPolicy: { yellowRel: 0.2 } }, spec));
     expect(red).toMatchObject({ band: 'red', unverified: { value: true, reasons: ['import_gvp_red'] } });
     expect(red.issues[0]).toMatchObject({ code: 'XCH_GVP_RED', severity: 'fail' });
     expect(red.reviewRequired.reasons).toEqual(['gvp_red']);
   });
 
   it('lists placeholder properties, unknown schemas and units, and kernel refusals as issues', () => {
-    const placeholder = verify({ text: stepOf({ volume: 0, area: 0, centroid: [0, 0, 0] }) }, undefined, null).data as any;
-    expect(placeholder.issues.map((issue: { code: string }) => issue.code)).toEqual(['XCH_GVP_NOT_CHECKABLE']);
-    const odd = fakeStepText([{ name: 'Block', ...PART }], { schema: 'SOMETHING_ELSE' }).replace(/^.*LENGTH_UNIT.*\n/gm, '');
-    expect((verify({ text: odd }, undefined, null).data as any).issues.map((issue: { code: string }) => issue.code)).toEqual([
-      'XCH_SCHEMA_UNKNOWN',
-      'XCH_UNIT_UNKNOWN',
+    expect(codesOf(verify({ text: stepOf({ volume: 0, area: 0, centroid: [0, 0, 0] }) }, undefined, null))).toEqual([
+      'XCH_GVP_NOT_CHECKABLE',
     ]);
-    const refused = verify({ text: stepOf() }, { stepImport: { error: 'unreadable', detail: 'bad' } }).data as any;
+    const odd = fakeStepText([{ name: 'Block', ...PART }], { schema: 'SOMETHING_ELSE' }).replace(/^.*LENGTH_UNIT.*\n/gm, '');
+    expect(codesOf(verify({ text: odd }, undefined, null))).toEqual(['XCH_SCHEMA_UNKNOWN', 'XCH_UNIT_UNKNOWN']);
+    const refused = dataOfVerify(verify({ text: stepOf() }, { stepImport: { error: 'unreadable', detail: 'bad' } }));
     expect(refused.issues[0]).toMatchObject({ code: 'KRN_STEP_UNREADABLE', severity: 'fail' });
-    expect((verify({ text: stepOf() }, { stepImport: null }).data as any).issues[0].message).toContain('could not read');
-    expect((verify({ text: stepOf() }, { noImporter: true }).data as any).band).toBe('not-checkable');
-    expect((verify({ text: stepOf() }, { stepImport: singlePartTree('Block', [part()]), noMass: true }).data as any).band).toBe(
+    expect(dataOfVerify(verify({ text: stepOf() }, { stepImport: null })).issues[0]?.message).toContain('could not read');
+    expect(dataOfVerify(verify({ text: stepOf() }, { noImporter: true })).band).toBe('not-checkable');
+    expect(dataOfVerify(verify({ text: stepOf() }, { stepImport: singlePartTree('Block', [part()]), noMass: true })).band).toBe(
       'not-checkable',
     );
   });
@@ -428,11 +462,11 @@ describe('verify_exchange_file', () => {
     const iges = fakeIgesText([186, 514, 510, 214, 406], { unitFlag: 1 });
     const result = verify({ text: iges });
     expect(result.data).toMatchObject({ format: 'iges', unitFactor: 25.4, entities: 5, geometricEntities: 3, band: 'not-checkable' });
-    expect((result.data as any).issues.map((issue: { code: string }) => issue.code)).toEqual(['XCH_IGES_UNTRANSLATED']);
-    expect((result.data as any).reviewRequired).toEqual({ value: true, reasons: ['untranslated_entities'] });
-    const unknownUnit = verify({ text: fakeIgesText([110], { unitFlag: 99 }), format: 'iges' }).data as any;
-    expect(unknownUnit.issues.map((issue: { code: string }) => issue.code)).toContain('XCH_UNIT_UNKNOWN');
-    expect(unknownUnit.reviewRequired.value).toBe(false);
+    expect(codesOf(result)).toEqual(['XCH_IGES_UNTRANSLATED']);
+    expect(dataOfVerify(result).reviewRequired).toEqual({ value: true, reasons: ['untranslated_entities'] });
+    const unknownUnit = verify({ text: fakeIgesText([110], { unitFlag: 99 }), format: 'iges' });
+    expect(codesOf(unknownUnit)).toContain('XCH_UNIT_UNKNOWN');
+    expect(dataOfVerify(unknownUnit).reviewRequired.value).toBe(false);
   });
 
   it('refuses unreadable input with a code and leaves the document alone', () => {
@@ -449,6 +483,6 @@ describe('verify_exchange_file', () => {
     refuse({ text: 'not a model at all' }, 'KRN_STEP_UNREADABLE');
     refuse({ text: fakeIgesText([186]).slice(0, 250), format: 'iges' }, 'KRN_STEP_UNREADABLE');
     const viaBase64 = execute(doc, 'verify_exchange_file', { stepBase64: textToBase64(stepOf()) }, ctxOf(null));
-    expect((viaBase64.data as any).products).toEqual(['Block']);
+    expect(dataOfVerify(viaBase64).products).toEqual(['Block']);
   });
 });

@@ -254,7 +254,7 @@ export function fakeXdeKernel(spec: XdeFakeSpec = {}): FakeXdeKernel {
 }
 
 /** The census every fake import reports. */
-export const FAKE_CENSUS = { roots: 1, solids: 1, shells: 1, openShells: 0, faces: 6 } as const;
+const FAKE_CENSUS = { roots: 1, solids: 1, shells: 1, openShells: 0, faces: 6 } as const;
 
 /** A flat single-part tree (one product holding `solids`) in millimetres. */
 export function singlePartTree(name: string, solids: readonly ImportedSolid[]): ImportedExchange {

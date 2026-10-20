@@ -230,7 +230,10 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
   const writeExchange = (request: ExchangeWriteRequest): string | null => {
     const withShapes = (map: (shape: ShapeHandle) => ShapeHandle): ExchangeWriteRequest => ({
       ...request,
-      products: request.products.map((product) => ({ ...product, solids: product.solids.map((solid) => ({ ...solid, shape: map(solid.shape) })) })),
+      products: request.products.map((product) => ({
+        ...product,
+        solids: product.solids.map((solid) => ({ ...solid, shape: map(solid.shape) })),
+      })),
     });
     const reply = exchange('writeExchange', [withShapes(keyOnlyHandle)]);
     if (reply?.error?.startsWith(SHAPE_NOT_CACHED) !== true) return (reply?.result ?? null) as string | null;

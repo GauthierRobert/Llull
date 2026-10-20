@@ -9,12 +9,12 @@
 import { entityName, parseRecords, referencesOf, stringsOf } from './records';
 
 /** The file's global length unit, with the exact factor to millimetres (25.4 for inch, 304.8 for foot, ...). */
-export interface FileLengthUnit {
+interface FileLengthUnit {
   readonly name: string;
   readonly mmPerUnit: number;
 }
 
-export interface GvpValue {
+interface GvpValue {
   readonly item: string;
   readonly measure: string;
   readonly value: number | readonly [number, number, number];
