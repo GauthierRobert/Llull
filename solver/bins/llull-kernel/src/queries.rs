@@ -298,7 +298,7 @@ mod tests {
         let mass = call(&mut session, "massProperties", json!([leaf]));
         assert!((mass["result"]["volume"].as_f64().unwrap_or(0.0) - 8.0).abs() < 1e-9);
         assert_eq!(call(&mut session, "importShapes", json!(["obj", "", options]))["result"], Value::Null);
-        if xde::iges_available() {
+        if llull_kernel_occt::xde::iges_available() {
             let request = json!({
                 "format": "iges",
                 "unit": "mm",
