@@ -50,15 +50,20 @@ describe('PmiPanel', () => {
     expect(screen.getByTestId('review-required').textContent).toContain('2 PMI item(s)');
   });
 
-  it('accept / reject are disabled: a review needs a human signature this app cannot give yet', () => {
+  it('accept dispatches accept_pmi_review for an item awaiting review; reject needs a comment so it is disabled', () => {
     const { datum } = withPmi();
     const spy = spyDispatch();
     render(<PmiPanel />);
-    const accept = screen.getByTestId(`pmi-accept-${datum}`) as HTMLButtonElement;
-    expect(accept.disabled).toBe(true);
-    expect(accept.title).toContain('signing port');
-    fireEvent.click(accept);
-    expect(spy).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId(`pmi-accept-${datum}`));
+    expect(spy).toHaveBeenCalledWith('accept_pmi_review', {
+      pmiIds: [datum],
+      decision: 'accept',
+      comment: '',
+      at: expect.stringMatching(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/),
+    });
+    const reject = screen.getByTestId(`pmi-reject-${datum}`) as HTMLButtonElement;
+    expect(reject.disabled).toBe(true);
+    expect(reject.title).toContain('comment');
   });
 
   it('dispatches set_pmi_standard, delete_pmi and the saved-view commands', () => {

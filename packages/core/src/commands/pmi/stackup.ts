@@ -138,6 +138,7 @@ export const analyzeStackup = defineCommand({
       return refuse(doc, command, 'GDT_STACKUP_INVALID', 'lowerSpecLimit exceeds upperSpecLimit', [], ['lowerSpecLimit']);
     const resolved: Resolved[] = [];
     const linked: PmiItem[] = [];
+    const linkedUnits = new Map<string, 'length' | 'deg'>();
     for (const [index, c] of params.contributors.entries()) {
       const path = `contributors.${index}`;
       let { nominal, lower, upper } = c;
@@ -149,6 +150,7 @@ export const analyzeStackup = defineCommand({
           return refuse(doc, command, 'GDT_STACKUP_CONTRIBUTOR_UNTOLERANCED', derived, [c.pmiId], [`${path}.pmiId`]);
         ({ nominal, lower, upper } = derived);
         linked.push(item);
+        linkedUnits.set(c.name, item.kind === 'location_dimension' && item.measure === 'angle' ? 'deg' : 'length');
       }
       if (
         nominal === undefined ||
@@ -179,7 +181,7 @@ export const analyzeStackup = defineCommand({
         contributor: { name: c.name, nominal, lower, upper, sensitivity: c.sensitivity ?? 1, distribution },
         verified: c.verified ?? c.pmiId !== undefined,
         source: c.pmiId === undefined ? 'typed' : `pmi ${c.pmiId}`,
-        unit: c.unit ?? 'length',
+        unit: linkedUnits.get(c.name) ?? c.unit ?? 'length',
       });
     }
     let items = resolved.map((r) => r.contributor);
@@ -262,6 +264,9 @@ export const analyzeStackup = defineCommand({
                 ...mc.acceptance,
                 ...(lowerSpecLimit !== undefined && probability !== null
                   ? { pBelow: probabilityAcceptance(probability.pBelow, samples) }
+                  : {}),
+                ...(upperSpecLimit !== undefined && probability !== null
+                  ? { pAbove: probabilityAcceptance(probability.pAbove, samples) }
                   : {}),
               },
             },

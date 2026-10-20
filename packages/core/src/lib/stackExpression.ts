@@ -198,7 +198,12 @@ export function stackGradient(tree: StackNode, point: readonly number[]): { valu
         const fn = spec(node.name);
         const x = args.map((arg) => arg.v);
         const partials = args.map((_, i) => fn.partial(i, ...x));
-        return { v: fn.value(...x), d: zeros.map((_, k) => args.reduce((sum, arg, i) => sum + (partials[i] ?? 0) * (arg.d[k] ?? 0), 0)) };
+        return {
+          v: fn.value(...x),
+          d: zeros.map((_, k) =>
+            args.reduce((sum, arg, i) => ((arg.d[k] ?? 0) === 0 ? sum : sum + (partials[i] ?? 0) * (arg.d[k] ?? 0)), 0),
+          ),
+        };
       }
     }
   };

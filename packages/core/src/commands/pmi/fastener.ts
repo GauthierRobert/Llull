@@ -19,10 +19,16 @@ export const fastenerTolerance = defineCommand({
     'bonus for an actualSize (actualSize - holeMmc), the allowed position at that size (statedPosition + bonus), the virtual condition ' +
     '(holeMmc - statedPosition) and, with holeLmc, the allowed position at LMC. Refusals: GDT_FASTENER_HOLE_LE_FASTENER, GDT_FASTENER_INVALID.',
   params: z.object({
-    holeMmc: z.number().describe('Hole size at maximum material = the smallest hole diameter, document units.'),
-    fastenerMmc: z.number().describe('Fastener size at maximum material = the largest fastener diameter, document units.'),
+    holeMmc: z.number().positive().describe('Hole size at maximum material = the smallest hole diameter, document units.'),
+    fastenerMmc: z.number().positive().describe('Fastener size at maximum material = the largest fastener diameter, document units.'),
     type: z.enum(['floating', 'fixed']).describe('floating: clearance holes in both parts; fixed: the fastener is held by one part.'),
     split: z.number().optional().describe('Fixed only: fraction of the clearance given to part 1, in (0, 1). Default 0.5 (equal).'),
+    part: z
+      .union([z.literal(1), z.literal(2)])
+      .optional()
+      .describe(
+        'Fixed only: which part statedPosition belongs to (1 or 2); its share of the clearance bounds statedWithinClearance. Default 1.',
+      ),
     holeLmc: z
       .number()
       .optional()
@@ -32,7 +38,7 @@ export const fastenerTolerance = defineCommand({
     statedPosition: z.number().optional().describe('Position tolerance diameter stated at MMC, document units, > 0.'),
     actualSize: z.number().optional().describe('Produced hole size, within [holeMmc, holeLmc]; needs statedPosition.'),
   }),
-  run: (doc, { holeMmc, fastenerMmc, type, split, holeLmc, statedPosition, actualSize }): CommandResult => {
+  run: (doc, { holeMmc, fastenerMmc, type, split, part, holeLmc, statedPosition, actualSize }): CommandResult => {
     const command = 'fastener_tolerance';
     if (!(holeMmc > fastenerMmc))
       return refuse(
@@ -67,7 +73,8 @@ export const fastenerTolerance = defineCommand({
         ? {}
         : {
             virtualCondition: holeMmc - statedPosition,
-            statedWithinClearance: statedPosition <= (type === 'floating' ? clearance : clearance * Math.max(share, 1 - share)) + 1e-12,
+            statedWithinClearance:
+              statedPosition <= (type === 'floating' ? clearance : clearance * (part === 2 ? 1 - share : share)) + 1e-12,
             ...(bonus === undefined ? {} : { bonus, allowedPosition: statedPosition + bonus }),
             ...(holeLmc === undefined ? {} : { allowedPositionAtLmc: statedPosition + (holeLmc - holeMmc) }),
           }),

@@ -1,4 +1,12 @@
-import { DATUM_TARGET_KINDS, GEOMETRIC_CHARACTERISTICS, PMI_KINDS, PMI_STANDARDS, SIZE_MODIFIERS, ZONE_MODIFIERS } from '../../model/pmi';
+import {
+  DATUM_TARGET_KINDS,
+  GEOMETRIC_CHARACTERISTICS,
+  PMI_KINDS,
+  PMI_STANDARDS,
+  PMI_SURFACES,
+  SIZE_MODIFIERS,
+  ZONE_MODIFIERS,
+} from '../../model/pmi';
 import { VIEW_DIRECTIONS } from '../../model/sheet';
 import { isRecord } from '../../lib/isRecord';
 import { isStringArray } from '../../lib/isStringArray';
@@ -21,10 +29,16 @@ function featureProblem(where: string, feature: unknown): string | null {
   const indices = feature['faceIndices'];
   if (!Array.isArray(indices) || !indices.every((i) => Number.isInteger(i) && (i as number) >= 0))
     return `${where}: feature.faceIndices must be an array of non-negative integers`;
-  if (typeof feature['surface'] !== 'string') return `${where}: feature.surface must be a string`;
+  if (!isOneOf(PMI_SURFACES, feature['surface'])) return `${where}: feature.surface must be one of ${PMI_SURFACES.join(', ')}`;
   const size = feature['ofSize'];
-  if (size !== undefined && (!isRecord(size) || !isOneOf(['cylinder', 'width', 'sphere'], size['kind']) || !isPositive(size['measured'])))
-    return `${where}: feature.ofSize needs kind cylinder|width|sphere and a positive measured`;
+  if (
+    size !== undefined &&
+    (!isRecord(size) ||
+      !isOneOf(['cylinder', 'width', 'sphere'], size['kind']) ||
+      !isPositive(size['measured']) ||
+      !isOptional(size['internal'], (v) => typeof v === 'boolean'))
+  )
+    return `${where}: feature.ofSize needs kind cylinder|width|sphere and a positive measured (internal, when present, a boolean)`;
   return null;
 }
 
@@ -56,9 +70,15 @@ function geometricProblem(where: string, item: Record<string, unknown>): string 
   if (!isOneOf(['MMC', 'LMC', 'RFS'], item['materialCondition'])) return `${where}: materialCondition must be MMC, LMC or RFS`;
   const modifiers = item['modifiers'];
   if (!Array.isArray(modifiers) || !modifiers.every((m) => isOneOf(ZONE_MODIFIERS, m))) return `${where}: modifiers must be zone modifiers`;
+  for (const key of ['diametral', 'spherical'])
+    if (!isOptional(zone[key], (v) => typeof v === 'boolean')) return `${where}: zone.${key} must be a boolean`;
   const datums = item['datums'];
-  if (!Array.isArray(datums) || datums.length > 3 || !datums.every((d) => isRecord(d) && typeof d['label'] === 'string'))
-    return `${where}: datums must be at most 3 { label } references`;
+  if (
+    !Array.isArray(datums) ||
+    datums.length > 3 ||
+    !datums.every((d) => isRecord(d) && typeof d['label'] === 'string' && isOptional(d['boundary'], (b) => b === 'MMB' || b === 'LMB'))
+  )
+    return `${where}: datums must be at most 3 { label, boundary?: MMB|LMB } references`;
   return isOptional(item['compositeOf'], (v) => typeof v === 'string') ? null : `${where}: compositeOf must be a string`;
 }
 
@@ -70,8 +90,15 @@ function kindProblem(where: string, item: Record<string, unknown>): string | nul
         ? featureProblem(where, item['feature'])
         : `${where}: datum label must match ^[A-Z]{1,2}$`;
     case 'datum_target':
-      if (typeof item['label'] !== 'string' || !Number.isInteger(item['targetNumber']) || !isOneOf(DATUM_TARGET_KINDS, item['targetKind']))
-        return `${where}: datum target needs label, integer targetNumber and targetKind point|line|area`;
+      if (
+        typeof item['label'] !== 'string' ||
+        !/^[A-Z]{1,2}$/.test(item['label']) ||
+        !Number.isInteger(item['targetNumber']) ||
+        (item['targetNumber'] as number) < 1 ||
+        !isOneOf(DATUM_TARGET_KINDS, item['targetKind']) ||
+        !isOptional(item['areaSize'], isPositive)
+      )
+        return `${where}: datum target needs a label ^[A-Z]{1,2}$, integer targetNumber >= 1, targetKind point|line|area and areaSize > 0 when present`;
       return featureProblem(where, item['feature']);
     case 'size_dimension':
       if (!isOneOf(['diameter', 'radius', 'width', 'spherical_diameter'], item['sizeKind'])) return `${where}: unknown sizeKind`;
@@ -110,11 +137,14 @@ function itemProblem(key: string, item: unknown): string | null {
     !isVec(plane['normal'], 3) ||
     !isVec(plane['xDir'], 3) ||
     !isVec(placement['position'], 2) ||
+    !isOptional(placement['leaderTo'], (v) => isVec(v, 3)) ||
     typeof placement['auto'] !== 'boolean'
   )
     return `${where}: placement needs plane { origin, normal, xDir } [x, y, z], position [x, y] and auto`;
   const review = item['review'];
   if (!isRecord(review) || typeof review['required'] !== 'boolean') return `${where}: review.required must be a boolean`;
+  for (const key of ['reason', 'acceptedBy', 'acceptedAt'])
+    if (!isOptional(review[key], (v) => typeof v === 'string')) return `${where}: review.${key} must be a string`;
   return kindProblem(where, item);
 }
 
@@ -171,6 +201,9 @@ export function pmiProblems(value: unknown): string[] {
     const target = item['target'];
     if (isRecord(target) && typeof target['pmiId'] === 'string' && !Object.hasOwn(items, target['pmiId']))
       errors.push(`pmi item '${String(item['id'])}': target.pmiId '${target['pmiId']}' is not a PMI item`);
+    const upper = item['compositeOf'];
+    if (typeof upper === 'string' && !Object.hasOwn(items, upper))
+      errors.push(`pmi item '${String(item['id'])}': compositeOf '${upper}' is not a PMI item`);
   }
   const listed = new Set(order);
   if (listed.size !== order.length) errors.push('pmi.order contains duplicate ids');
@@ -181,6 +214,7 @@ export function pmiProblems(value: unknown): string[] {
   if (!isRecord(views) || !isStringArray(viewOrder))
     return [...errors, 'pmi.savedViews must be an object and pmi.savedViewOrder an array of strings'];
   for (const [key, view] of Object.entries(views)) {
+    if (isReservedKey(key)) errors.push(`pmi.savedViews: id '${key}' is a reserved JavaScript property name`);
     const problem = savedViewProblem(key, view, items);
     if (problem !== null) errors.push(problem);
   }
