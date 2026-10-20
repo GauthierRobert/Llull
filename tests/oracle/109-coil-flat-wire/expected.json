@@ -1,0 +1,19 @@
+{
+  "id": "109-coil-flat-wire",
+  "family": "coil",
+  "description": "flat wire 2 (radial) x 1.5 (axial) on a helix of radius 10, pitch 3, 4 turns",
+  "source": "analytic",
+  "formula": "V = w h 2 pi R turns; z from 0 to pitch turns + h",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 753.982236862,
+  "area": null,
+  "centroid": [0, 0, 6.75],
+  "bbox": { "min": [-11, -11, 0], "max": [11, 11, 13.5] },
+  "tolerance": { "volume": 0.005, "area": 0.001, "centroid": 0.002, "bbox": 0.002 },
+  "meshTolerance": {
+    "volume": 0.005,
+    "area": null,
+    "reason": "faceted helical skin (32 rings per turn, radii inflated to keep the facet area of the circular sector)"
+  }
+}

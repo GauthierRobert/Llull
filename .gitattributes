@@ -1,0 +1,2 @@
+# LF in every checkout (Windows included): fixtures, CSV and generated docs are compared byte for byte, as on CI.
+* text=auto eol=lf

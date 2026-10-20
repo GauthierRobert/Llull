@@ -85,7 +85,7 @@ export const exportBcf = defineCommand({
         if (viewpoint === undefined) continue;
         const guid = nameUuid(`llull-bcf-viewpoint|${issue.guid}|${viewpoint.guid}`);
         const visinfo = bcfVisualizationXml(doc, guid, viewpoint.camera, width / height, present(issue.entityIds));
-        entries.push({ name: `${issue.guid}/${guid}.bcfv`, bytes: encoder.encode(visinfo) });
+        entries.push({ name: `${issue.guid}/${guid}.bcfv`, data: encoder.encode(visinfo) });
         viewpointCount += 1;
         if (params.snapshots === false) {
           markupViews.push({ guid, file: `${guid}.bcfv` });
@@ -95,17 +95,17 @@ export const exportBcf = defineCommand({
           snapshotCache.get(viewpointId) ??
           renderCameraPng(doc, viewpoint.camera, width, height, background, center, run?.pixels ?? rasterScenePixels);
         snapshotCache.set(viewpointId, png);
-        entries.push({ name: `${issue.guid}/${guid}.png`, bytes: png });
+        entries.push({ name: `${issue.guid}/${guid}.png`, data: png });
         markupViews.push({ guid, file: `${guid}.bcfv`, snapshot: `${guid}.png` });
       }
       entries.push({
         name: `${issue.guid}/markup.bcf`,
-        bytes: encoder.encode(bcfMarkupXml(issue, markupViews, created, params.author ?? 'llull')),
+        data: encoder.encode(bcfMarkupXml(issue, markupViews, created, params.author ?? 'llull')),
       });
     }
     entries.unshift(
-      { name: 'bcf.version', bytes: encoder.encode(bcfVersionXml()) },
-      { name: 'extensions.xml', bytes: encoder.encode(bcfExtensionsXml(issues)) },
+      { name: 'bcf.version', data: encoder.encode(bcfVersionXml()) },
+      { name: 'extensions.xml', data: encoder.encode(bcfExtensionsXml(issues)) },
     );
     const outcome = run?.result();
     if (outcome !== undefined && 'code' in outcome) return fail(outcome.code, outcome.message, [], ['snapshotRenderer']);

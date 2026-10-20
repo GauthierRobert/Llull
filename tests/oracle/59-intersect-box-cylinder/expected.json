@@ -1,0 +1,19 @@
+{
+  "id": "59-intersect-box-cylinder",
+  "family": "boolean",
+  "description": "cylinder r=4 h=20 cut to a 10-cube slab",
+  "source": "analytic",
+  "formula": "V = pi r^2 * 10; A = 2 pi r^2 + 2 pi r 10",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 502.654824574,
+  "area": 351.858377202,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-4, -4, -5], "max": [4, 4, 5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": 0.013575580213514793,
+    "area": 0.013575580213514793,
+    "reason": "inscribed n-gon cross-section of the cylinder (n from the kernel default circle resolution): loss <= k (1 - cos(pi/n)) of the feature share"
+  }
+}

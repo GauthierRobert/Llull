@@ -18,6 +18,7 @@
 #include <gp_Sphere.hxx>
 #include <gp_Torus.hxx>
 
+#include "llull-kernel-occt/cpp/naming.hxx"
 #include "llull-kernel-occt/cpp/query_support.hxx"
 #include "llull-kernel-occt/src/queries.rs.h"
 
@@ -114,8 +115,8 @@ void write_face_geometry(JsonWriter &out, const TopoDS_Face &face, const BRepAda
   }
 }
 
-void write_edge(JsonWriter &out, const TopoDS_Edge &edge, int index, int face_count) {
-  out.begin_object().key("index").integer(index);
+void write_edge(JsonWriter &out, const TopoDS_Edge &edge, int index, int face_count, const std::string &name) {
+  out.begin_object().key("index").integer(index).key("name").string(name);
   if (BRep_Tool::Degenerated(edge)) {
     const gp_Pnt at = BRep_Tool::Pnt(TopExp::FirstVertex(edge, Standard_False));
     out.key("curve").string("other").key("length").number(0);
@@ -162,6 +163,8 @@ rust::String topology_json(const Shape &shape) {
   const TopTools_IndexedMapOfShape faces = distinct(solid, TopAbs_FACE);
   const TopTools_IndexedMapOfShape edges = distinct(solid, TopAbs_EDGE);
   const std::vector<int> face_counts = adjacent_face_counts(faces, edges);
+  const std::vector<std::string> face_names = naming::face_names(shape);
+  const std::vector<std::string> edge_names = naming::edge_names(solid, face_names);
   GProp_GProps volume;
   BRepGProp::VolumeProperties(solid, volume, Standard_False, Standard_False, Standard_False);
   JsonWriter out;
@@ -170,13 +173,14 @@ rust::String topology_json(const Shape &shape) {
   for (int f = 1; f <= faces.Extent(); ++f) {
     const TopoDS_Face face = TopoDS::Face(faces(f));
     const BRepAdaptor_Surface adaptor(face, Standard_True);
-    out.begin_object().key("index").integer(f - 1).key("surface").string(query::surface_kind(adaptor.GetType()));
+    out.begin_object().key("index").integer(f - 1).key("name").string(face_names[static_cast<size_t>(f - 1)]);
+    out.key("surface").string(query::surface_kind(adaptor.GetType()));
     out.key("area").number(query::face_metric(face).area);
     write_face_geometry(out, face, adaptor);
     out.end_object();
   }
   out.end_array().key("edges").begin_array();
-  for (int e = 1; e <= edges.Extent(); ++e) write_edge(out, TopoDS::Edge(edges(e)), e - 1, face_counts[static_cast<size_t>(e - 1)]);
+  for (int e = 1; e <= edges.Extent(); ++e) write_edge(out, TopoDS::Edge(edges(e)), e - 1, face_counts[static_cast<size_t>(e - 1)], edge_names[static_cast<size_t>(e - 1)]);
   out.end_array().key("vertices").integer(distinct(solid, TopAbs_VERTEX).Extent());
   out.key("volume").number(std::fabs(volume.Mass())).end_object();
   return text_of(out);

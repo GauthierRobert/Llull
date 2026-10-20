@@ -25,6 +25,9 @@ extraResources:
   # (npm run prepare:native). The backend gets LLULL_NATIVE_DIR only when this folder holds a binary.
   - from: build/native
     to: native
+  # User-facing agent skills (SC-A1): `llull skills install` copies them from resources/skills into ~/.claude/skills.
+  - from: ../skills
+    to: skills
 fileAssociations:
   - ext: llull
     name: llull document

@@ -4,11 +4,16 @@ import { druckerScan } from '@core/model/materialLaws/drucker';
 import { resolveHyper, type HyperLaw } from '@core/model/materialLaws/hyperResolve';
 import { MPa, nl1Document, nl1Steps, pointResponse, run } from './materialFixtures';
 
+// Best of three after a warm-up: a single sample measures the machine's load as much as the code.
 const time = (work: () => void): number => {
   work();
-  const start = performance.now();
-  work();
-  return performance.now() - start;
+  let best = Number.POSITIVE_INFINITY;
+  for (let run = 0; run < 3; run += 1) {
+    const start = performance.now();
+    work();
+    best = Math.min(best, performance.now() - start);
+  }
+  return best;
 };
 
 describe('budgets (VC-MATL-18)', () => {

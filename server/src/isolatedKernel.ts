@@ -240,6 +240,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     tessellate: (shape) => shapeCall('tessellate', [shape], false) as ReturnType<GeometryKernel['tessellate']>,
     topology: (shape) => shapeCall('topology', [shape], false) as ReturnType<GeometryKernel['topology']>,
     exportStep: (shapes) => shapeCall('exportStep', shapes, true) as ReturnType<GeometryKernel['exportStep']>,
+    exportIges: (shapes) => shapeCall('exportIges', shapes, true) as string | null,
     exportStepAssembly,
     analyze: (shape) => shapeCall('analyze', [shape], false) as ShapeAnalysis | null,
     massProperties: (shape) => shapeCall('massProperties', [shape], false) as ExactMassProperties | null,

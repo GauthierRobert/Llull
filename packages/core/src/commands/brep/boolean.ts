@@ -13,6 +13,21 @@ import type { ExecutionContext } from '../types';
 import { kernelUnavailable } from '../kernelRefusal';
 import { commitKernelResult, evaluateRecipe, operandRecipe } from './kernelShape';
 import { noop } from '../noop';
+import { signedMeshVolume } from '../../geometry/meshVolume';
+
+/** Result volume (relative to its bounding box) at or below which a boolean result is treated as empty (zero-volume sliver mesh). */
+const VANISHED_VOLUME_RATIO = 1e-9;
+
+/** True when the mesh encloses no volume: it is flat (a sheet where solids only touch) or a skin of coincident faces (tangent subtract). */
+function enclosesNoVolume(positions: readonly number[], indices: readonly number[]): boolean {
+  const xyz = (axis: number): number[] => positions.filter((_, i) => i % 3 === axis);
+  const [xs, ys, zs] = [xyz(0), xyz(1), xyz(2)];
+  const span = (values: number[]): number => Math.max(...values) - Math.min(...values);
+  const [sx, sy, sz] = [span(xs), span(ys), span(zs)];
+  if (Math.min(sx, sy, sz) <= VANISHED_VOLUME_RATIO * Math.max(sx, sy, sz)) return true;
+  const boxVolume = sx * sy * sz;
+  return Math.abs(signedMeshVolume(positions, indices)) <= VANISHED_VOLUME_RATIO * boxVolume;
+}
 
 function runBoolean(
   doc: CadDocument,
@@ -39,7 +54,7 @@ function runBoolean(
   const result = evaluateRecipe(kernel, recipe);
   if (result === 'refused')
     return noop(doc, `${opName}: kernel returned null for operands '${a}' and '${b}'. The geometry may be degenerate or unsupported.`);
-  if (result === 'empty')
+  if (result === 'empty' || enclosesNoVolume(result.mesh.positions, result.mesh.indices))
     return noop(
       doc,
       `${opName}: the result of '${a}' and '${b}' has no usable mesh — it is empty (no volume remains, e.g. disjoint solids for an intersection) or its solid could not be meshed closed; operands kept.`,

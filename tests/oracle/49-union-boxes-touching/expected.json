@@ -1,0 +1,14 @@
+{
+  "id": "49-union-boxes-touching",
+  "family": "boolean",
+  "description": "two 2-cubes sharing a face",
+  "source": "analytic",
+  "formula": "V = 16; A = 2*24 - 2*4",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 16,
+  "area": 40,
+  "centroid": [1, 0, 0],
+  "bbox": { "min": [-1, -1, -1], "max": [3, 1, 1] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "entityCount": 2,
+  "kinds": {
+    "rectangle": 2
+  },
+  "boundingBox": {
+    "min": [
+      0,
+      0,
+      0
+    ],
+    "max": [
+      10,
+      7,
+      0
+    ]
+  },
+  "featureSteps": 2
+}

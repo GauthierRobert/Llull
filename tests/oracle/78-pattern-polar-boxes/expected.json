@@ -1,0 +1,14 @@
+{
+  "id": "78-pattern-polar-boxes",
+  "family": "pattern",
+  "description": "four boxes 2x1x1 on a circle of radius 4 (quarter turns turn the boxes)",
+  "source": "analytic",
+  "formula": "bodies = n; V = n V1; centroid on the axis",
+  "kernels": ["manifold", "occt"],
+  "bodies": 4,
+  "volume": 8,
+  "area": 40,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-5, -5, -0.5], "max": [5, 5, 0.5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

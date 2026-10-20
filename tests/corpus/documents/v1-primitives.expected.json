@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "entityCount": 3,
+  "kinds": {
+    "box": 1,
+    "cylinder": 1,
+    "sphere": 1
+  },
+  "boundingBox": {
+    "min": [
+      -1,
+      -1.5,
+      -2.5
+    ],
+    "max": [
+      11.5,
+      1.5,
+      2.5
+    ]
+  },
+  "featureSteps": 3
+}

@@ -9,6 +9,8 @@ Discover
   toolsets                    toolset names and command counts
   guide                       CAD modeling conventions (units, axes, ids, plans)
   status                      is the desktop app running? which document would --doc use?
+  crashes list|show ID|dir    local crash reports (document, command log, error; show latest = newest,
+                              with an issue draft link; nothing is sent)  [$LLULL_DATA_DIR/llull/crashes]
 
 Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first change)
   exec <command> [params]     run one command; params are key=value pairs (values parsed as
@@ -55,16 +57,31 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
                               (harness recipes + unit-test measurements); exit 1 on an A-grade
                               fail/error  [grades=A,B caseIds=… measurements=FILE root=DIR]
 
+Robustness fuzz (local kernel; seeded designs on a 2.5 mm grid, checked after every step)
+  fuzz [--from N] [--count K] [--jobs J] [--out DIR] [--report FILE] [--kinds join,cut,…] [--max-steps M]
+                              run seeds N..N+K-1: base (box / extrusion / revolve) + up to 8 joins, cuts, fillets,
+                              chamfers, shells, holes, patterns (fillet/chamfer/shell only on a kernel that has them);
+                              every body a valid closed solid of positive volume, cuts never add and joins never
+                              remove volume, plus V(A∪B)+V(A∩B)=V(A)+V(B) and V(A−B)=V(A)−V(A∩B) within 0.2 %.
+                              --out writes each failing seed's plan, --report the JSON report; exit 1 on a failure
+  fuzz-one <seed> [--minimise] [--out FILE]
+                              one seed step by step; --minimise delta-debugs the steps to a minimal failing
+                              build_project plan (printed, or written to FILE; replay with llull run FILE)
+
+Agent skills (for your own agent driving this CLI)
+  skills list | path          the shipped skills (llull-modeling, llull-editing, llull-checking, llull-mechanisms)
+  skills install [--dir D] [--force]   copy them into ~/.claude/skills (or D); --force replaces changed copies
+
 Flags
-  --app                       act on the running llull desktop app (what the user sees;
+  --app                      act on the running llull desktop app (what the user sees;
                               found via ~/.llull/desktop.json, token included)
   --doc FILE                  local document file
   --server URL                act on a running llull server's live document instead
                               ($LLULL_SERVER; --token T or $LLULL_TOKEN for Bearer auth)
   --dry-run                   run against the local file but never write it
   --no-fit                    run: keep the camera as it is (by default a plan that never sets it is framed with fit_view)
-  --save PATH                 write the file a command returns (export_stl, export_code,
-                              export_step_exact, sheets, export_nc_files → a directory);
+  --save PATH                 write the file a command returns (export_stl, export_3mf, export_code,
+                              export_step_exact, sheets, export_urdf, export_nc_files → a directory);
                               PATH.png rasterizes an svg (render_view)
   --json                      print one JSON object instead of text
   --quiet                     print nothing on success

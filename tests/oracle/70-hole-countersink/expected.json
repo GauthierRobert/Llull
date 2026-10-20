@@ -1,0 +1,19 @@
+{
+  "id": "70-hole-countersink",
+  "family": "hole",
+  "description": "90 degree countersink D=8 over a d=4 through hole",
+  "source": "analytic",
+  "formula": "V = abc - frustum(4,2,2) - pi r^2 (h - 2)",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 1516.2241959,
+  "area": 1135.61548341,
+  "centroid": [0, 0, -0.0303891023353],
+  "bbox": { "min": [-10, -10, -2], "max": [10, 10, 2] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": 0.0031233384733492815,
+    "area": 0.012528831758061743,
+    "reason": "bore tessellated as an inscribed n-gon (n from the kernel default circle resolution): loss <= k (1 - cos(pi/n)) of the removed share"
+  }
+}

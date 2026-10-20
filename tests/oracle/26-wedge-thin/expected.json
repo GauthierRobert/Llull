@@ -1,0 +1,14 @@
+{
+  "id": "26-wedge-thin",
+  "family": "primitive",
+  "description": "thin wedge 20x1x8",
+  "source": "analytic",
+  "formula": "V = whd/2; centroid (w/2, h/3, d/3) from the min corner",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 80,
+  "area": 349.245154966,
+  "centroid": [10, 0.333333333333, 2.66666666667],
+  "bbox": { "min": [0, 0, 0], "max": [20, 1, 8] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

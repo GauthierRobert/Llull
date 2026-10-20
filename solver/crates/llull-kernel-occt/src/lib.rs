@@ -11,6 +11,9 @@ pub mod mesh;
 pub mod queries;
 pub mod recipe;
 
+#[cfg(test)]
+mod naming_tests;
+
 pub use ffi::{AnalysisOut, MassOut, MeshOut};
 
 // cxx generates the FFI glue as unsafe code; this module is the only unsafe surface of the kernel and holds no hand-written
@@ -67,6 +70,7 @@ mod ffi {
         fn placed(shape: &Shape, rotation: &[f64], position: &[f64], anchor_shift: &[f64]) -> Result<UniquePtr<Shape>>;
         fn scaled(shape: &Shape, factor: f64) -> Result<UniquePtr<Shape>>;
         fn boolean_op(a: &Shape, b: &Shape, operation: i32, unify: bool) -> Result<UniquePtr<Shape>>;
+        fn prefixed(shape: &Shape, prefix: &str) -> Result<UniquePtr<Shape>>;
 
         fn tessellate(shape: &Shape, linear_deflection: f64, angular_deflection: f64) -> Result<MeshOut>;
         fn mass_properties(shape: &Shape) -> Result<MassOut>;
@@ -174,6 +178,11 @@ pub fn boolean(op: BooleanOp, a: &Shape, b: &Shape, unify: bool) -> Built {
         BooleanOp::Intersect => 2,
     };
     built(ffi::boolean_op(inner(a)?, inner(b)?, code, unify))
+}
+
+/// The same shape with every persistent face name prefixed `<prefix>:` (SC-N1: a leaf names its faces after its entity id).
+pub fn prefixed(shape: &Shape, prefix: &str) -> Built {
+    built(ffi::prefixed(inner(shape)?, prefix))
 }
 
 pub fn tessellate(shape: &Shape, linear_deflection: f64, angular_deflection: f64) -> OcctResult<MeshOut> {

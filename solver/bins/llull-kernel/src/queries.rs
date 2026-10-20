@@ -187,10 +187,11 @@ fn export_assembly(session: &mut Session, tree: &Value) -> Reply {
 }
 
 fn import_shapes(args: &[Value]) -> Reply {
-    if arg(args, 0).as_str() != Some("step") {
+    let format = arg(args, 0).as_str();
+    if format != Some("step") && format != Some("iges") {
         return Reply::ok(Value::Null);
     }
-    let Some(text) = arg(args, 1).as_str() else { return bad("importShapes expects the STEP text") };
+    let Some(text) = arg(args, 1).as_str() else { return bad("importShapes expects the file text") };
     let options = arg(args, 2);
     let number = |field: &str| options.get(field).and_then(Value::as_f64);
     let flag = |field: &str| options.get(field).and_then(Value::as_bool);
@@ -199,7 +200,8 @@ fn import_shapes(args: &[Value]) -> Reply {
     else {
         return bad("importShapes expects { precision, maxTolerance, heal, sew }");
     };
-    answered(queries::import_step(text, ImportOptions { precision, max_tolerance, heal, sew }))
+    let options = ImportOptions { precision, max_tolerance, heal, sew };
+    answered(if format == Some("iges") { queries::import_iges(text, options) } else { queries::import_step(text, options) })
 }
 
 fn load_blob(session: &mut Session, args: &[Value]) -> Reply {
@@ -293,7 +295,10 @@ mod tests {
         assert_eq!(call(&mut session, "loadBlob", json!([sha256, brep])), json!({ "id": 1, "result": null }));
         let mass = call(&mut session, "massProperties", json!([leaf]));
         assert!((mass["result"]["volume"].as_f64().unwrap_or(0.0) - 8.0).abs() < 1e-9);
-        assert_eq!(call(&mut session, "importShapes", json!(["iges", "", options]))["result"], Value::Null);
+        assert_eq!(call(&mut session, "importShapes", json!(["obj", "", options]))["result"], Value::Null);
+        let iges = call(&mut session, "exportIges", json!([[{ "key": "s", "recipe": box_recipe(2.0, 0.0) }]]))["result"].clone();
+        let back = call(&mut session, "importShapes", json!(["iges", iges, options]));
+        assert_eq!(back["result"]["solids"].as_array().map(Vec::len), Some(1), "an exported box reads back as one solid: {back}");
         assert!(error_of(&call(&mut session, "importShapes", json!(["step", "x", {}]))).starts_with("NATIVE_BAD_REQUEST"));
         assert!(error_of(&call(&mut session, "loadBlob", json!([1]))).starts_with("NATIVE_BAD_REQUEST"));
     }

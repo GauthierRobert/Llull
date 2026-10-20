@@ -1,0 +1,14 @@
+{
+  "id": "115-split-face-then-push-half",
+  "family": "pushpull",
+  "description": "top face of a 20x10x10 block split at x = 0, then its x > 0 half pulled up by 4",
+  "source": "analytic",
+  "formula": "V = 2000 + 10*10*4; A = 1000 + 4 * 10*4 (front, back, end and the step face); centroid = (400 (5, 0, 7)) / 2400",
+  "kernels": ["occt"],
+  "bodies": 1,
+  "volume": 2400,
+  "area": 1160,
+  "centroid": [0.833333333333, 0, 1.16666666667],
+  "bbox": { "min": [-10, -5, -5], "max": [10, 5, 9] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

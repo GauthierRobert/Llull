@@ -5,7 +5,8 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import * as registry from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 import { failedOutcome, outcomeIsFailure, runCommandOutcome } from '@protocol/commandOutcome';
 import { DOCUMENT_ACCEPT, DOCUMENT_FILE_PATTERN } from '@protocol/documentFiles';
@@ -59,6 +60,21 @@ describe('runCommandOutcome / outcomeIsFailure', () => {
 
     const unknown = runCommandOutcome(doc, 'no_such_command', {});
     expect(unknown.outcome.isError).toBe(true);
+    expect(unknown.thrown).toBeUndefined();
+    expect(added.thrown).toBeUndefined();
+  });
+
+  it('carries what a throwing command threw, stack included, outside the outcome', () => {
+    const spy = vi.spyOn(registry, 'execute').mockImplementation(() => {
+      throw new Error('ctx exploded');
+    });
+    const run = runCommandOutcome(createEmptyDocument(), 'add_box', { size: [1, 2, 3] });
+    spy.mockRestore();
+    expect(run.outcome).toMatchObject({ isError: true, changed: false });
+    expect(run.outcome.summary).toContain('ctx exploded');
+    expect(run.thrown).toBeInstanceOf(Error);
+    expect((run.thrown as Error).stack).toContain('ctx exploded');
+    expect(JSON.stringify(run.outcome)).not.toContain('stack');
   });
 
   it('counts an unchanged mutating command as a failure unless the caller allows it', () => {

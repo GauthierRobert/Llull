@@ -7,6 +7,9 @@ import { boundsCenter, entityBoundsInDoc } from '../../geometry/bounds';
 import { len3 } from '../../lib/vec3';
 import { isPositiveNumber } from '../../lib/isFiniteNumber';
 import { POSITIVE_FIELDS } from '../../model/positiveFields';
+import type { GeometryKernel } from '../../geometry/kernel';
+import { currentContext } from '../context';
+import { featureReferenceIssues } from './referenceChecks';
 
 /** Severity of a model issue. */
 type IssueSeverity = 'error' | 'warning' | 'info';
@@ -181,7 +184,7 @@ function checkParameterErrors(doc: CadDocument): Issue[] {
 }
 
 /** Run every check over the document. @pure */
-export function runModelChecks(doc: CadDocument, farThreshold: number): CheckResult {
+export function runModelChecks(doc: CadDocument, farThreshold: number, kernel: GeometryKernel | null = null): CheckResult {
   const issues = [
     ...Object.values(doc.entities).flatMap((entity) => [
       ...checkDegenerateGeometry(entity),
@@ -195,6 +198,7 @@ export function runModelChecks(doc: CadDocument, farThreshold: number): CheckRes
     ...Object.values(doc.entities).flatMap((entity) => checkDanglingComponentRef(entity, doc)),
     ...checkDanglingRelations(doc),
     ...checkParameterErrors(doc),
+    ...featureReferenceIssues(doc, kernel).map((found) => issue('error', found.code, found.message, found.entityId)),
   ];
   return { ok: !issues.some((i) => i.severity === 'error'), issues };
 }
@@ -218,7 +222,8 @@ export const checkModel = defineCommand({
     'empty_layer (layer with no entities), orphaned_group_member (group references missing entity id), ' +
     'dangling_dimension_ref (dimension entity references a missing entity id), ' +
     'dangling_reference (constraint/joint/drive relation references a missing entity or joint), ' +
-    'parameter_error (a named parameter has an evaluation error).',
+    'parameter_error (a named parameter has an evaluation error), ' +
+    'REF_LOST / REF_SPLIT / feature_step_not_applied (a fillet or chamfer step no longer applies: a recorded edge is gone or split; re-pick it with edit_step_params).',
   params: z.object({
     farThreshold: z
       .number()
@@ -228,9 +233,9 @@ export const checkModel = defineCommand({
           'as a far_from_origin warning. Units match the document units. Default: 1000000.',
       ),
   }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
     const farThreshold = params.farThreshold ?? 1e6;
-    const result = runModelChecks(doc, farThreshold);
+    const result = runModelChecks(doc, farThreshold, (ctx ?? currentContext()).kernel);
     const count = (severity: IssueSeverity): number => result.issues.filter((i) => i.severity === severity).length;
     const summary =
       result.issues.length === 0

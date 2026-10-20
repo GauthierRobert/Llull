@@ -1,0 +1,8 @@
+{
+  "actions": [
+    {
+      "command": "add_coil",
+      "params": { "radius": 10, "pitch": 3, "turns": 4, "sectionShape": "rectangle", "sectionWidth": 2, "sectionHeight": 1.5 }
+    }
+  ]
+}

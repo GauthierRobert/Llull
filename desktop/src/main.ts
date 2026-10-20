@@ -1,7 +1,9 @@
 /** Electron main: wiring only (unchanged server in a utility process + per-launch token); logic is in Electron-free modules. */
 import { app, BrowserWindow, dialog, Menu, shell, utilityProcess } from 'electron';
 import { randomBytes } from 'crypto';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
+import { crashReportsDir } from '@server/crashReports';
+import { crashReportsView, writeDesktopCrashReport } from './crashes';
 import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
 import { llullHome, removeDesktopDiscovery, writeDesktopDiscovery } from '@server/cli/desktopDiscovery';
@@ -12,6 +14,7 @@ import { createDocumentSession, type DocumentSession } from './documents';
 import { DEFAULT_SAVE_NAME, DOCUMENT_EXTENSIONS, DOCUMENT_FILE_PATTERN } from '@protocol/documentFiles';
 import { desktopLayout } from './layout';
 import { agentHelpText, menuTemplate } from './menu';
+import { type HidDeviceInfo, hidDevicePermitted, pickSpaceMouse } from './hid';
 import { navigationDecision, permissionAllowed } from './navigation';
 
 const FILE_FILTERS = [
@@ -171,6 +174,47 @@ function installCli(): void {
   }
 }
 
+const crashDirectory = crashReportsDir(process.env);
+
+/** Help > Crash Reports: open the folder, or the newest report's GitHub issue draft in the browser (only on this click). */
+async function showCrashReports(): Promise<void> {
+  const view = crashReportsView(crashDirectory);
+  const buttons = view.issueUrl !== null ? ['Open Folder', 'Draft GitHub Issue…', 'Close'] : ['Open Folder', 'Close'];
+  const { response } = await dialog.showMessageBox({
+    type: 'info',
+    message: view.message,
+    detail: view.detail,
+    buttons,
+    defaultId: buttons.length - 1,
+    cancelId: buttons.length - 1,
+  });
+  if (buttons[response] === 'Open Folder') {
+    mkdirSync(crashDirectory, { recursive: true });
+    void shell.openPath(crashDirectory);
+  } else if (buttons[response] === 'Draft GitHub Issue…' && view.issueUrl !== null) void shell.openExternal(view.issueUrl);
+}
+
+/** The main process's own uncaught errors: a crash report, then a notice (the app keeps running, as Electron's default does). */
+function onMainProcessError(error: unknown): void {
+  const report = writeDesktopCrashReport(error, {
+    directory: crashDirectory,
+    autosavePath: path.join(app.getPath('userData'), 'autosave.json'),
+    appVersion: app.getVersion(),
+  });
+  console.error('[llull-desktop] unexpected error:', error);
+  try {
+    dialog.showErrorBox(
+      'llull hit an unexpected error',
+      `${errorMessage(error)}\n\n${report !== null ? `A crash report was saved (Help > Crash Reports):\n${report}` : 'No crash report could be saved.'}`,
+    );
+  } catch {
+    // Before the app is ready on some platforms: the report and the console line remain.
+  }
+}
+
+process.on('uncaughtException', onMainProcessError);
+process.on('unhandledRejection', onMainProcessError);
+
 function createWindow(url: string): BrowserWindow {
   const created = new BrowserWindow({
     width: 1440,
@@ -193,6 +237,14 @@ function createWindow(url: string): BrowserWindow {
   created.webContents.session.setPermissionCheckHandler((_contents, permission, requestingOrigin) =>
     permissionAllowed(permission, requestingOrigin, origin),
   );
+  // 3D mouse: WebHID is allowed for 3Dconnexion devices only; the picker auto-selects one (no OS-style chooser needed).
+  created.webContents.session.setDevicePermissionHandler((details) =>
+    hidDevicePermitted({ deviceType: details.deviceType, origin: details.origin, device: details.device as HidDeviceInfo }, origin),
+  );
+  created.webContents.session.on('select-hid-device', (event, details, callback) => {
+    event.preventDefault();
+    callback(pickSpaceMouse(details.deviceList) || undefined);
+  });
   created.on('close', interceptQuit);
   void created.loadURL(`${url}/#token=${token}`);
   return created;
@@ -222,6 +274,7 @@ async function boot(): Promise<void> {
           showAgentHelp: () =>
             void dialog.showMessageBox({ type: 'info', message: 'Use llull with Claude Code', detail: agentHelpText(cliInstalled) }),
           openDataFolder: () => void shell.openPath(userData),
+          showCrashReports: () => void showCrashReports(),
         },
         process.platform,
         app.getName(),

@@ -6,7 +6,8 @@ import { fakeKernel } from '../helpers/fakeKernel';
 import { xy } from '../helpers/xy';
 
 const MESH = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
-const kernel: GeometryKernel = fakeKernel({ solid: MESH, boolean: MESH, fillet: MESH, chamfer: MESH, shell: MESH });
+const TETRA_MESH = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1], indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3] };
+const kernel: GeometryKernel = fakeKernel({ solid: MESH, boolean: TETRA_MESH, fillet: MESH, chamfer: MESH, shell: MESH });
 
 function constrainedBoxes(): { doc: CadDocument; a: string; b: string } {
   const first = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });

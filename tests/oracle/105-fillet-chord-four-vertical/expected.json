@@ -1,0 +1,14 @@
+{
+  "id": "105-fillet-chord-four-vertical",
+  "family": "fillet",
+  "description": "chord-length fillets (chord 2 sqrt 2 = r 2 on right-angle edges) on the four vertical edges of a 20x10x5 block",
+  "source": "analytic",
+  "formula": "r = c / (2 cos(theta/2)) = c / sqrt 2 = 2; V = abc - 4 (1 - pi/4) r^2 h",
+  "kernels": ["occt"],
+  "bodies": 1,
+  "volume": 982.831853072,
+  "area": 675.964594301,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-10, -5, -2.5], "max": [10, 5, 2.5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

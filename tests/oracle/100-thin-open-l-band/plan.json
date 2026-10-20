@@ -1,0 +1,17 @@
+{
+  "actions": [
+    {
+      "command": "extrude_profile",
+      "params": {
+        "profile": [
+          [0, 0],
+          [10, 0],
+          [10, 10]
+        ],
+        "openPath": true,
+        "depth": 5,
+        "thin": { "thickness": 2, "side": "centre" }
+      }
+    }
+  ]
+}

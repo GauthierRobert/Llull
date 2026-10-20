@@ -4,10 +4,13 @@
 @import './shell.css';
 @import './viewport.css';
 @import './live-fx.css';
+@import './feature-session.css';
+@import './space-mouse.css';
 @import './empty-state.css';
 @import './toolbar.css';
 @import './palette.css';
 @import './context-menu.css';
+@import './report.css';
 @import './app-error.css';
 @import './panels/common.css';
 @import './panels/properties.css';

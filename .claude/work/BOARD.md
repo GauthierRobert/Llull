@@ -11,6 +11,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - Lanes own disjoint write scopes (`.claude/rules/workflow.md` W5); one task per lane at a time, up to 4 lanes + Lane 5 review.
 
 ## NOW (auto-updated by the skill)
+- 2026-10-20 — branch `feat/sc-parity`: every SC task implemented and merged (see SolidCraft section); native C++/Rust parts await MSVC to compile (SC-NATIVE).
 - 2026-10-19 — branch `ccr-d5e76715-intlyp`: LC1 done (steps 1–6: native kernel default everywhere, opencascade.js retired, no outbox),
   RS-1 done (macOS bundle deferred by the owner), RS-2 done (native SIMP topology optimisation + plugin `topology` + `topology_solve` + UI panel).
   Next: CFD-M1, then RS-3.
@@ -25,22 +26,13 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - `[TODO]` **CFD-M1** `cfd` slice, case commands, `cfd_prepare`, `check_cfd`: `docs/aerospace/12-cfd-gpu/TECHNICAL_SPEC.md` §10. _deps: —_
 - `[TODO]` **CFD-M2** `llull-compute flow` (LBM, wgpu), `cfd_solve` transport, records: same spec §10. _deps: CFD-M1_
 
-## SolidCraft parity (spec: `docs/decisions/SC1-solidcraft-parity.md`)
-- `[TODO]` **SC-Q1** Reference parts `tests/oracle/` (analytic + FreeCAD expected values, STEP round-trip), `npm run oracle` → `docs/ORACLE.md`. _deps: —_
-- `[TODO]` **SC-Q3** `llull fuzz` / `fuzz-one --minimise`: seeded designs, solidity + volume-direction checks, boolean identities. _deps: —_
-- `[TODO]` **SC-Q2** Action matrix with baseline ratchet, PR sample + nightly shards + determinism. _deps: SC-Q1_
-- `[TODO]` **SC-Q5** `docs/FEATURES.md` generated from the registry, staleness checked. _deps: —_
-- `[TODO]` **SC-Q4** Mutation testing (Stryker) judged by oracle + golden + fuzz only, nightly. _deps: SC-Q1, SC-Q3_
-- `[TODO]` **SC-S1** Sketch solver: constructive + Levenberg–Marquardt, DOF, over-constraint refusal. _deps: —_
-- `[TODO]` **SC-S2** Constraint/dimension breadth (horizontal…G2; radius, diameter, arc length…). _deps: SC-S1_
-- `[TODO]` **SC-N1** Persistent face/edge naming from native OCCT history. _deps: LC1 step 1_
-- `[TODO]` **SC-N2** Lost/split reference reporting + re-pick. _deps: SC-N1_
-- `[TODO]` **SC-S3** Sketch on offset planes / faces, linked projection. _deps: SC-S2, SC-N1_
-- `[TODO]` **SC-F1…F4** Feature depth: draft/split/replace face/push-pull (absorbs NF7), threads/holes on points, thin extrude/variable fillets, joints check. _deps: SC-N1, SC-Q1_
-- `[TODO]` **SC-D1** `.bak` on save + kill-mid-save test. **SC-D2** old-document corpus + damaged variants. **SC-D3** local crash reports with reproducer. _deps: —_
-- `[TODO]` **SC-D4** STEP AP242 names/colours/assemblies export, 3MF, URDF, IGES check, mesh → solid. _deps: —_
-- `[TODO]` **SC-A1** User-facing agent skills shipped with the desktop app (`llull skills install`). _deps: —_
-- `[TODO]` **SC-A2…A4** Live previews + drag manipulators, 3D mouse, issue draft from feature errors. _deps: SC-D3 (A4)_
+## SolidCraft parity (spec: `docs/decisions/SC1-solidcraft-parity.md`, "As built" table)
+- Implemented on `feat/sc-parity`: SC-Q1–Q5, S1–S3, N1, N2, F1–F4, D1–D4, A1–A4.
+- `[BLOCKED]` **SC-NATIVE** Compile and verify the native parts (naming history, faceOp, `radii` laws, IGES / TKDEIGES): OCCT 7.9.2 rebuild,
+  `cargo clippy -D warnings` + `cargo test`, server native suites, oracle OCCT column (17 cases + STEP round trip), action matrix
+  `--native --bless`. _Blocked: MSVC (VS 2022 Build Tools) install waits for an admin prompt on the owner's PC; CI runs it on push._
+- `[TODO]` **SC-Q4b** New judges for the mutation survivors (`docs/MUTATION.md`): golden plans per constraint family, DOF property,
+  history meta-commands replay equality. _deps: —_
 
 ## Aerospace + physics (spec = the linked pack)
 - `[TODO]` **AERO-4** Supply chain: 03 GDT, 04 XCH (AP242), 09 PLM (`HumanSignaturePort`, `dispose_*`): `docs/aerospace/README.md`. _deps: —_
@@ -67,7 +59,6 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - `[TODO]` **S3** `hatch_region` + `region` entity. _Lane 1+3_
 - `[TODO]` **X3** 2D export DXF + SVG from 2D entities. _Lane 1/3_
 - `[TODO]` **X4** Import SVG path → 2D profile, STL → `mesh`. _deps: X3_
-- `[TODO]` **NF7** Push-pull planar faces (native kernel face topology) — now part of SC-F1. _Lane 1+2_
 - `[TODO]` **EN5** Associative dimensions + dimension styles. _Lane 1+3_
 - `[TODO]` **EN6** Polyline/spline vertex editing, multi-pick offset/trim/extend. _Lane 1+3_
 - `[TODO]` **EN7** Continuous measure mode + measurement report. _Lane 1+2/3_

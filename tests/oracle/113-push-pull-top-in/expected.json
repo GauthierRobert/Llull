@@ -1,0 +1,14 @@
+{
+  "id": "113-push-pull-top-in",
+  "family": "pushpull",
+  "description": "top face of a 10 mm cube pushed in by 3",
+  "source": "analytic",
+  "formula": "a 10 x 10 x 7 box from z = -5 to 2: V = 700, A = 2*100 + 4*70, centroid z = -1.5",
+  "kernels": ["occt"],
+  "bodies": 1,
+  "volume": 700,
+  "area": 480,
+  "centroid": [0, 0, -1.5],
+  "bbox": { "min": [-5, -5, -5], "max": [5, 5, 2] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

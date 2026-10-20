@@ -1,0 +1,6 @@
+{
+  "actions": [
+    { "command": "add_sphere", "params": { "radius": 1 }, "as": "a" },
+    { "command": "array_linear", "params": { "id": "$a", "count": 3, "offset": [4, 4, 4] } }
+  ]
+}

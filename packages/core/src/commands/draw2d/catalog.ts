@@ -6,6 +6,8 @@ import { drawEllipse, drawSpline, drawInvolute } from './curves';
 import { addText, addDimension } from './annotate';
 import { drawBeltAround } from './belt';
 import { addImageUnderlay, calibrateUnderlayCommand, setUnderlay, imageToWorld } from './underlay';
+import { createSketchPlane, placeOnSketchPlane } from './sketchPlanes';
+import { breakSketchLink, projectEdgesToSketch } from './sketchLinks';
 
 export const draw2dCommands = commandCatalog(
   drawPolyline,
@@ -22,4 +24,8 @@ export const draw2dCommands = commandCatalog(
   calibrateUnderlayCommand,
   setUnderlay,
   imageToWorld,
+  createSketchPlane,
+  placeOnSketchPlane,
+  projectEdgesToSketch,
+  breakSketchLink,
 );

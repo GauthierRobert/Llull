@@ -70,12 +70,13 @@ export function execute(doc: CadDocument, commandName: string, params: unknown, 
     );
   const stepKey = String(stepNumber);
   const stepContext: ExecutionContext = { ...ctx, ids: stepIdSource(stepKey), stepKey };
-  const result = runInContext(stepContext, () => def.run(doc, params, stepContext));
+  const { recordExtras, ...result } = runInContext(stepContext, () => def.run(doc, params, stepContext));
   if (result.document === doc) return result;
+  const recorded = recordExtras !== undefined && typeof params === 'object' && params !== null ? { ...params, ...recordExtras } : params;
   const step: FeatureStep = {
     id: `step-${stepKey}`,
     name: commandName,
-    params: withoutConfirmations(params),
+    params: withoutConfirmations(recorded),
     suppressed: false,
     affected: result.affected,
   };

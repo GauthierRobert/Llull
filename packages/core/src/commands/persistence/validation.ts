@@ -16,11 +16,22 @@ import { reviewProblems } from './reviewValidation';
 import { kernelSliceProblems } from './kernelValidation';
 import { validateCamera, validateLayer, validateEntityValue, validateMaterialValue, validateParameterValue } from './guards';
 import { materialLibraryProblems } from './materialRecordValidation';
+import { mechanismProblems } from './mechanismValidation';
+import { sketchPlaneProblems } from './sketchPlaneValidation';
 
 const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set(CONSTRAINT_KINDS);
 
 /** All legal joint kinds (must stay in sync with JointKind union in types.ts). */
-const VALID_JOINT_KINDS: ReadonlySet<string> = new Set<JointKind>(['revolute', 'prismatic']);
+const VALID_JOINT_KINDS: ReadonlySet<string> = new Set<JointKind>([
+  'revolute',
+  'prismatic',
+  'rigid',
+  'cylindrical',
+  'pin_slot',
+  'planar',
+  'ball',
+  'cam',
+]);
 
 function validateJointMateRef(id: string, field: string, v: unknown): string | null {
   if (!isRecord(v)) return `joint '${id}': ${field} must be an object`;
@@ -42,11 +53,16 @@ function validateJointValue(id: string, v: unknown): string | null {
   if (typeof v['id'] !== 'string') return `joint '${id}': id field must be a string`;
   const kind = v['kind'];
   if (typeof kind !== 'string' || !VALID_JOINT_KINDS.has(kind))
-    return `joint '${id}': unknown kind '${String(kind)}'. Allowed: revolute, prismatic.`;
+    return `joint '${id}': unknown kind '${String(kind)}'. Allowed: ${[...VALID_JOINT_KINDS].join(', ')}.`;
   const refErr = validateJointMateRef(id, 'a', v['a']) ?? validateJointMateRef(id, 'b', v['b']) ?? validateJointAxis(id, v['axis']);
   if (refErr !== null) return refErr;
   if (kind === 'revolute') return isFiniteNumber(v['angle']) ? null : `joint '${id}' (revolute): angle must be a finite number`;
-  return isFiniteNumber(v['displacement']) ? null : `joint '${id}' (prismatic): displacement must be a finite number`;
+  if (kind === 'prismatic')
+    return isFiniteNumber(v['displacement']) ? null : `joint '${id}' (prismatic): displacement must be a finite number`;
+  const values = v['values'];
+  return Array.isArray(values) && values.every(isFiniteNumber)
+    ? null
+    : `joint '${id}' (${kind}): values must be an array of finite numbers`;
 }
 
 function validateDriveRelationValue(id: string, v: unknown): string | null {
@@ -109,6 +125,10 @@ const PROTOTYPE_KEYED_RECORDS = [
   'constraints',
   'joints',
   'driveRelations',
+  'contactSets',
+  'explodedViews',
+  'sketchPlanes',
+  'sketchLinks',
 ] as const;
 
 /** Commands that rewrite or replay `featureHistory`; recorded as a step they would re-enter replay. Other legacy meta/read-only steps replay inertly. */
@@ -240,5 +260,7 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
   errors.push(...kernelSliceProblems(v));
   for (const extension of documentExtensions()) errors.push(...extension.validate(v));
   validateSection(v['driveRelations'], validateDriveRelationValue);
+  errors.push(...mechanismProblems(v));
+  errors.push(...sketchPlaneProblems(v));
   return errors;
 }

@@ -10,10 +10,12 @@
  * @failure an op returning null or throwing -> that recipe (and every recipe built on it) is null
  */
 
-import type { BooleanOp, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/types';
+import type { BooleanOp, EdgeRadius, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/types';
+import type { FaceOpParams } from '../model/faceOps';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTopology, StepAssemblyPart, StepOccurrence } from './kernel';
 import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
 import { recipeKey } from './shapeRecipe';
+import { faceOpParamsOf } from './faceOpRecipe';
 import { lowerFeature, needsReach, throughReach } from './featureLowering';
 import { floorEdgeIndices } from './featureFillet';
 import { errorMessage } from '../lib/errorMessage';
@@ -35,6 +37,8 @@ export interface KernelOps<S> {
   readonly name?: string;
   /** Recipe ops this kernel cannot perform at all (a capability gap, not a refusal of one input). */
   readonly unsupported?: ReadonlySet<ShapeRecipe['op']>;
+  /** Face draft / push-pull / split (SC-F1); absent = `faceOp` nodes are unsupported. */
+  readonly faceOp?: (source: S, params: FaceOpParams) => S | null;
   /** Grows whenever the native module may have been left degraded (cached failures are then retried). */
   failureEpoch?(): number;
   solid(entity: Entity): S | null;
@@ -48,6 +52,8 @@ export interface KernelOps<S> {
   prepareBoolean?(a: ShapeRecipe, b: ShapeRecipe): [ShapeRecipe, ShapeRecipe];
   /** `edges`: 0-based unique-edge indices ([] = all); `radiusEnd` varies the radius along each edge. */
   fillet(shape: S, edges: readonly number[], radius: number, radiusEnd?: number): S | null;
+  /** Optional per-edge radius laws (`edges[i]` rounded with `laws[i]`) in one builder; absent = only uniform laws can be built (via `fillet`). */
+  filletEach?(shape: S, edges: readonly number[], laws: readonly EdgeRadius[]): S | null;
   /** Union of `shapes` with the new intersection (joint) edges filleted by `radius`. */
   blend(shapes: readonly S[], radius: number): S | null;
   chamfer(shape: S, edges: readonly number[], distance: number): S | null;
@@ -74,7 +80,7 @@ export interface KernelOps<S> {
   /** Keep the B-rep text of blob `sha256` (idempotent) so `brep(sha256)` can build, and rebuild after a cache eviction. */
   loadBlob?(sha256: string, brep: string): void;
   /** Exact import of an exchange file (`GeometryKernel.importShapes`); the ops own the native reader, no recipe is involved. */
-  importShapes?(format: 'step', text: string, options: ImportShapesOptions): ImportShapesResult | null;
+  importShapes?(format: 'step' | 'iges', text: string, options: ImportShapesOptions): ImportShapesResult | null;
   /** Kernel description (`GeometryKernel.info`). */
   info?(): KernelInfo;
 }
@@ -113,6 +119,8 @@ export interface CachingKernel extends GeometryKernel {
   clear(): void;
 }
 
+const lawsEqual = (a: EdgeRadius, b: EdgeRadius): boolean => JSON.stringify(a) === JSON.stringify(b);
+
 function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe) => S | null): S | null {
   switch (recipe.op) {
     case 'solid':
@@ -127,9 +135,12 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
     case 'chamfer': {
       const source = child(recipe.source);
       if (source === null) return null;
-      return recipe.op === 'fillet'
-        ? ops.fillet(source, recipe.edges, recipe.size, recipe.sizeEnd)
-        : ops.chamfer(source, recipe.edges, recipe.size);
+      if (recipe.op === 'chamfer') return ops.chamfer(source, recipe.edges, recipe.size);
+      if (recipe.radii === undefined) return ops.fillet(source, recipe.edges, recipe.size, recipe.sizeEnd);
+      const [first] = recipe.radii;
+      const uniform = first !== undefined && recipe.radii.every((law) => lawsEqual(law, first));
+      if (ops.filletEach !== undefined && !uniform) return ops.filletEach(source, recipe.edges, recipe.radii);
+      return uniform && first.sizes === undefined ? ops.fillet(source, recipe.edges, first.size, first.sizeEnd) : null;
     }
     case 'blend': {
       const shapes: S[] = [];
@@ -147,6 +158,10 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
     case 'place': {
       const source = child(recipe.source);
       return source === null ? null : ops.place(source, recipe.position, recipe.rotation);
+    }
+    case 'faceOp': {
+      const source = child(recipe.source);
+      return source === null || ops.faceOp === undefined ? null : ops.faceOp(source, faceOpParamsOf(recipe));
     }
     case 'scale': {
       const source = child(recipe.source);
@@ -393,7 +408,8 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
               return first === null || second === null ? null : distanceOps(first, second, maxDistance);
             }),
         }),
-    supports: (op) => (op === 'brep' ? ops.brep !== undefined : !(ops.unsupported?.has(op) ?? false)),
+    supports: (op) =>
+      op === 'brep' ? ops.brep !== undefined : op === 'faceOp' ? ops.faceOp !== undefined : !(ops.unsupported?.has(op) ?? false),
     evaluate: (recipe) => call(() => (evaluateNative(recipe) === null ? null : handleOf(recipe))),
     tessellate: (handle) =>
       call(() => {

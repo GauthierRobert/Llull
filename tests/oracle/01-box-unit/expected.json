@@ -1,0 +1,15 @@
+{
+  "id": "01-box-unit",
+  "family": "primitive",
+  "description": "unit cube at the origin",
+  "source": "analytic",
+  "formula": "V = abc; A = 2(ab+bc+ca)",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 1,
+  "area": 6,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-0.5, -0.5, -0.5], "max": [0.5, 0.5, 0.5] },
+  "faces": 6,
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

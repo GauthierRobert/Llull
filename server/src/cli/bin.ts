@@ -41,7 +41,8 @@ function supervise(seconds: number): void {
   child.on('exit', (code) => {
     clearTimeout(timer);
     if (killed) process.stderr.write(`llull: timed out after ${seconds}s (--timeout); the run was killed, nothing was saved.\n`);
-    process.exit(killed ? 1 : (code ?? 1));
+    // Nothing else holds the loop: it drains and exits (an immediate process.exit can abort on Windows — cliProcess.ts).
+    process.exitCode = killed ? 1 : (code ?? 1);
   });
 }
 

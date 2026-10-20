@@ -5,6 +5,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include <TopoDS_Shape.hxx>
@@ -17,6 +18,7 @@ namespace llull {
 class ShapeList {
  public:
   std::vector<TopoDS_Shape> shapes;
+  std::vector<std::vector<std::string>> names;
 };
 
 std::unique_ptr<ShapeList> new_shape_list();
@@ -24,6 +26,9 @@ void shape_list_add(ShapeList &list, const Shape &shape);
 
 // Edge rounding: `edges` index the unique edges in explorer order ([] = all); `radius_end` NaN = constant radius.
 std::unique_ptr<Shape> fillet_edges(const Shape &shape, rust::Slice<const uint32_t> edges, double radius, double radius_end);
+// Per-edge radius laws (SC-F3 `radii`): for edge k of `edges`, `laws` holds size, size_end (NaN = constant), n, then n (t, size) pairs
+// (t in (0, 1) along the edge, increasing).
+std::unique_ptr<Shape> fillet_laws(const Shape &shape, rust::Slice<const uint32_t> edges, rust::Slice<const double> laws);
 std::unique_ptr<Shape> chamfer_edges(const Shape &shape, rust::Slice<const uint32_t> edges, double distance);
 std::unique_ptr<Shape> blend_union(const ShapeList &list, double radius);
 std::unique_ptr<Shape> shell_hollow(const Shape &shape, double thickness);
@@ -42,12 +47,22 @@ bool chain_wire_ok(rust::Slice<const double> chain);
 // Bicubic patches, 16 poles each (u along i, v along j), sewn at `tolerance`; null (never a throw) when OCC refuses one.
 std::unique_ptr<Shape> bspline_patch_solid(rust::Slice<const double> poles, double tolerance);
 
+// `tag` names the tool faces (SC-N1: "hole<n>.<k>", "pocket<n>").
 // BRepFeat_MakeRevol cut of the closed polygon `profile` (xyz triples) revolved 2 pi about (origin, normal).
 std::unique_ptr<Shape> feature_revol_cut(const Shape &source, rust::Slice<const double> profile, rust::Slice<const double> origin,
-                                         rust::Slice<const double> normal);
+                                         rust::Slice<const double> normal, rust::Str tag);
 // BRepFeat_MakePrism cut of the face of `chain` from the planar face of `source` on the frame plane that holds a probe point.
 std::unique_ptr<Shape> feature_prism_cut(const Shape &source, rust::Slice<const double> chain, rust::Slice<const double> origin,
-                                         rust::Slice<const double> normal, rust::Slice<const double> probes, double length);
+                                         rust::Slice<const double> normal, rust::Slice<const double> probes, double length,
+                                         rust::Str tag);
+// Face operations (SC-F1, face_ops.cxx): draft about a neutral plane, push-pull one planar face, split faces along a plane.
+std::unique_ptr<Shape> draft_faces(const Shape &shape, rust::Slice<const uint32_t> faces, double angle, rust::Slice<const double> pull,
+                                   rust::Slice<const double> origin, rust::Slice<const double> normal);
+std::unique_ptr<Shape> push_pull(const Shape &shape, uint32_t face, double distance);
+std::unique_ptr<Shape> split_faces(const Shape &shape, rust::Slice<const uint32_t> faces, rust::Slice<const double> origin,
+                                   rust::Slice<const double> normal);
+// IGES 5.3 text of the listed shapes (iges.cxx); "" when the writer refuses one.
+rust::String export_iges(const ShapeList &list);
 // BRepCheck_Analyzer validity.
 bool is_valid_shape(const Shape &shape);
 // Post-boolean ShapeUpgrade_UnifySameDomain (the shape itself when it fails).

@@ -1,74 +1,74 @@
-/**
- * Minimal zip writer (PKWARE APPNOTE 6.3): stored entries (method 0), no zip64, fixed DOS timestamp 1980-01-01 00:00 so the same entries
- * always give the same bytes. Pure; for small archives such as BCF files (PNG snapshots are already compressed).
- * @invariant entry names are unique, non-empty, use '/' and never start with '/' or contain '..'
- */
+/** Minimal ZIP writer: STORE (no compression) entries with CRC-32, UTF-8 names, no ZIP64 (entries and archive under 4 GiB). Pure. */
 
-import { crc32 } from './png';
+import { crc32 } from './crc32';
 
 export interface ZipEntry {
+  /** Path inside the archive, forward slashes, no leading slash. */
   readonly name: string;
-  readonly bytes: Uint8Array;
+  readonly data: Uint8Array;
 }
 
-const DOS_DATE = (0 << 9) | (1 << 5) | 1; // 1980-01-01
+/** DOS date 1980-01-01 00:00: a fixed timestamp keeps archives byte-reproducible. */
 const DOS_TIME = 0;
+const DOS_DATE = (0 << 9) | (1 << 5) | 1;
+const UTF8_FLAG = 0x0800;
 
-/** The zip archive of `entries` in the given order. */
+function u16(view: DataView, offset: number, value: number): void {
+  view.setUint16(offset, value, true);
+}
+
+function u32(view: DataView, offset: number, value: number): void {
+  view.setUint32(offset, value, true);
+}
+
+/** The archive bytes for `entries` in the given order. */
 export function zipStore(entries: readonly ZipEntry[]): Uint8Array {
   const encoder = new TextEncoder();
-  const locals: Uint8Array[] = [];
-  const centrals: Uint8Array[] = [];
-  let offset = 0;
-  for (const entry of entries) {
-    const name = encoder.encode(entry.name);
-    const crc = crc32(entry.bytes);
-    const size = entry.bytes.length;
-    const local = new Uint8Array(30 + name.length + size);
-    const lv = new DataView(local.buffer);
-    lv.setUint32(0, 0x04034b50, true);
-    lv.setUint16(4, 20, true);
-    lv.setUint16(6, 0x0800, true); // UTF-8 names
-    lv.setUint16(8, 0, true);
-    lv.setUint16(10, DOS_TIME, true);
-    lv.setUint16(12, DOS_DATE, true);
-    lv.setUint32(14, crc, true);
-    lv.setUint32(18, size, true);
-    lv.setUint32(22, size, true);
-    lv.setUint16(26, name.length, true);
-    local.set(name, 30);
-    local.set(entry.bytes, 30 + name.length);
-    const central = new Uint8Array(46 + name.length);
-    const cv = new DataView(central.buffer);
-    cv.setUint32(0, 0x02014b50, true);
-    cv.setUint16(4, 20, true);
-    cv.setUint16(6, 20, true);
-    cv.setUint16(8, 0x0800, true);
-    cv.setUint16(12, DOS_TIME, true);
-    cv.setUint16(14, DOS_DATE, true);
-    cv.setUint32(16, crc, true);
-    cv.setUint32(20, size, true);
-    cv.setUint32(24, size, true);
-    cv.setUint16(28, name.length, true);
-    cv.setUint32(42, offset, true);
-    central.set(name, 46);
-    locals.push(local);
-    centrals.push(central);
-    offset += local.length;
+  const prepared = entries.map((entry) => ({ ...entry, nameBytes: encoder.encode(entry.name), crc: crc32(entry.data) }));
+  const localSize = prepared.reduce((sum, e) => sum + 30 + e.nameBytes.length + e.data.length, 0);
+  const centralSize = prepared.reduce((sum, e) => sum + 46 + e.nameBytes.length, 0);
+  const out = new Uint8Array(localSize + centralSize + 22);
+  const view = new DataView(out.buffer);
+  const offsets: number[] = [];
+  let at = 0;
+  for (const e of prepared) {
+    offsets.push(at);
+    u32(view, at, 0x04034b50);
+    u16(view, at + 4, 20);
+    u16(view, at + 6, UTF8_FLAG);
+    u16(view, at + 8, 0);
+    u16(view, at + 10, DOS_TIME);
+    u16(view, at + 12, DOS_DATE);
+    u32(view, at + 14, e.crc);
+    u32(view, at + 18, e.data.length);
+    u32(view, at + 22, e.data.length);
+    u16(view, at + 26, e.nameBytes.length);
+    u16(view, at + 28, 0);
+    out.set(e.nameBytes, at + 30);
+    out.set(e.data, at + 30 + e.nameBytes.length);
+    at += 30 + e.nameBytes.length + e.data.length;
   }
-  const centralSize = centrals.reduce((sum, part) => sum + part.length, 0);
-  const end = new Uint8Array(22);
-  const ev = new DataView(end.buffer);
-  ev.setUint32(0, 0x06054b50, true);
-  ev.setUint16(8, entries.length, true);
-  ev.setUint16(10, entries.length, true);
-  ev.setUint32(12, centralSize, true);
-  ev.setUint32(16, offset, true);
-  const out = new Uint8Array(offset + centralSize + end.length);
-  let cursor = 0;
-  for (const part of [...locals, ...centrals, end]) {
-    out.set(part, cursor);
-    cursor += part.length;
-  }
+  const centralStart = at;
+  prepared.forEach((e, index) => {
+    u32(view, at, 0x02014b50);
+    u16(view, at + 4, 20);
+    u16(view, at + 6, 20);
+    u16(view, at + 8, UTF8_FLAG);
+    u16(view, at + 10, 0);
+    u16(view, at + 12, DOS_TIME);
+    u16(view, at + 14, DOS_DATE);
+    u32(view, at + 16, e.crc);
+    u32(view, at + 20, e.data.length);
+    u32(view, at + 24, e.data.length);
+    u16(view, at + 28, e.nameBytes.length);
+    u32(view, at + 42, offsets[index] ?? 0);
+    out.set(e.nameBytes, at + 46);
+    at += 46 + e.nameBytes.length;
+  });
+  u32(view, at, 0x06054b50);
+  u16(view, at + 8, prepared.length);
+  u16(view, at + 10, prepared.length);
+  u32(view, at + 12, centralSize);
+  u32(view, at + 16, centralStart);
   return out;
 }

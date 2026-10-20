@@ -1,0 +1,18 @@
+{
+  "actions": [
+    {
+      "command": "extrude_profile",
+      "params": {
+        "profile": [
+          [0, 0],
+          [6, 0],
+          [6, 2],
+          [2, 2],
+          [2, 5],
+          [0, 5]
+        ],
+        "depth": 4
+      }
+    }
+  ]
+}

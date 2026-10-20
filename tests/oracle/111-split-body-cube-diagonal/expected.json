@@ -1,0 +1,14 @@
+{
+  "id": "111-split-body-cube-diagonal",
+  "family": "split",
+  "description": "10 mm cube split through its centre by the vertical diagonal plane (normal [1, 1, 0])",
+  "source": "analytic",
+  "formula": "V = a^3; the cut is a 10 sqrt2 x 10 rectangle: A = 6 a^2 + 2 * 100 sqrt2",
+  "kernels": ["manifold", "occt"],
+  "bodies": 2,
+  "volume": 1000,
+  "area": 882.842712475,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-5, -5, -5], "max": [5, 5, 5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

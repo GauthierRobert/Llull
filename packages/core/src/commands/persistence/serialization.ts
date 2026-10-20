@@ -13,6 +13,7 @@ import { isRecord } from '../../lib/isRecord';
 import { derivedEntityIds, documentExtensions } from '../../plugins/host';
 import { validateDocumentShape, validateDocumentValues } from './validation';
 import { migrateRetiredCommands } from './retiredCommands';
+import { exceedsNestingDepth } from './nestingDepth';
 import { withoutPrivateValues } from '../materials/libraryRecords';
 
 interface DocumentEnvelope {
@@ -153,6 +154,9 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
   return { ...raw, units, displayPrecision, order: repairedOrder(raw), layerOrder: repairedLayerOrder(raw), ...collections };
 }
 
+/** Far beyond any document a command writes; well below the depth at which `JSON.stringify` overflows the stack. */
+const MAX_NESTING_DEPTH = 1000;
+
 /**
  * Parse and validate a `serializeDocument` string (old files gain defaults via `migrate()`).
  * @invariant every document a registered command produced reloads and re-serializes equal (tests/unit/persistenceRoundTrip.test.ts); the
@@ -168,6 +172,10 @@ export function deserializeDocument(json: string): CadDocument {
     throw new Error('load_document: invalid JSON — could not parse input string.');
   }
   if (!isRecord(parsed)) throw new Error('load_document: expected a JSON object at the root level.');
+  if (exceedsNestingDepth(parsed, MAX_NESTING_DEPTH))
+    throw new Error(
+      `load_document: the file has values nested deeper than ${MAX_NESTING_DEPTH} levels — refusing it (it could never be saved again).`,
+    );
   if (parsed['format'] !== 'llull-document')
     throw new Error(`load_document: unrecognized format '${String(parsed['format'])}' — expected 'llull-document'.`);
   if (!READABLE_VERSIONS.has(parsed['version']))
