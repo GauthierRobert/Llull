@@ -22,11 +22,12 @@ export const laminateMass = defineCommand({
   name: 'laminate_mass',
   annotations: { readOnly: true },
   description:
-    'Mass of a composite part: for every ply the covered area (ramp extensions included) times its cured thickness gives volume, times the ' +
-    'material density gives mass. Returns area, volume, mass, the centre of gravity [x, y, z] in the document frame (centroids mapped from ' +
-    'the flat pattern onto the tool face and lifted to each ply mid-height) and per-material totals. Lengths are document units, volume ' +
-    'is units^3, mass is in the density unit times units^3 (g when density is g/mm^3 in a mm document). Results from "mean" / "unknown" ' +
-    'material data are flagged unverified. Refused when a used material has no density. Read-only.',
+    'Laminate weight budget of a composite part (plies, prepreg, layup): for every ply the covered area (ramp extensions included) times its ' +
+    'cured thickness gives volume, times the lamina density gives the ply weight. Returns ply area, laminate volume, total laminate weight, ' +
+    'the centre of gravity [x, y, z] in the document frame (ply centroids mapped from the flat pattern onto the tool face and lifted to each ' +
+    'ply mid-height) and per-material totals. Lengths are document units, volume is units^3, weight is in the density unit times units^3 ' +
+    '(g when density is g/mm^3 in a mm document). Results from "mean" / "unknown" lamina data are flagged unverified. Refused when a used ' +
+    'material has no density. Read-only.',
   params: z.object({ part: z.string().describe('Part id or name.') }),
   run: (doc, { part: partRef }): CommandResult => {
     const model = compositesOf(doc);

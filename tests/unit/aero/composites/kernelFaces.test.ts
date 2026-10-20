@@ -15,6 +15,7 @@ interface Stub {
   distance?: { distance: number; face: number } | null;
   normal?: Vec3;
   ends?: readonly Vec3[] | null;
+  cone?: (uv: Vec2) => Vec3;
   noPort?: boolean;
   noShape?: boolean;
 }
@@ -45,7 +46,12 @@ function kernelWith(stub: Stub): GeometryKernel {
             ],
           },
     projectOnFace: nothing,
-    evaluateFace: () => stub.ends?.map((point) => ({ point, normal: [0, 0, 1] as Vec3 })) ?? null,
+    evaluateFace: (_shape: unknown, _face: unknown, uv: readonly Vec2[]) =>
+      stub.cone !== undefined
+        ? uv.map((p) => ({ point: (stub.cone as (uv: Vec2) => Vec3)(p), normal: [0, 0, 1] as Vec3 }))
+        : stub.ends === null || stub.ends === undefined
+          ? null
+          : [...stub.ends, stub.ends[1] as Vec3].map((point) => ({ point, normal: [0, 0, 1] as Vec3 })),
     tessellateFace: nothing,
     faceSamples: nothing,
     edgeSamples: nothing,

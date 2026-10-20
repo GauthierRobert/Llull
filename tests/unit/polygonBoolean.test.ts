@@ -55,6 +55,31 @@ describe('unionPolygons', () => {
   });
 });
 
+describe('unionPolygons touching cases', () => {
+  it('keeps both polygons when they touch only at a corner', () => {
+    const result = unionPolygons([rect(0, 0, 1, 1), rect(1, 1, 2, 2)]);
+    expect(result).toHaveLength(2);
+    expect(total(result)).toBeCloseTo(2, 9);
+    expect(unionPolygons([rect(0, 0, 1, 1), rect(1, 1, 2, 2), rect(2, 2, 3, 3)])).toHaveLength(3);
+  });
+
+  it('merges a T-junction (a smaller polygon sharing part of an edge) and ignores a single touching point', () => {
+    const joined = unionPolygons([rect(0, 0, 10, 10), rect(10, 3, 14, 6)]);
+    expect(joined).toHaveLength(1);
+    expect(polygonArea(joined[0] ?? [])).toBeCloseTo(100 + 12, 9);
+    const point = unionPolygons([
+      rect(0, 0, 10, 10),
+      [
+        [10, 5],
+        [14, 3],
+        [14, 7],
+      ],
+    ]);
+    expect(point).toHaveLength(2);
+    expect(total(point)).toBeCloseTo(108, 9);
+  });
+});
+
 describe('clipToConvex and isConvex', () => {
   it('clips a polygon by a convex window and reports empty results', () => {
     expect(polygonArea(clipToConvex(rect(-5, -5, 5, 5), rect(0, 0, 10, 10)))).toBeCloseTo(25, 9);

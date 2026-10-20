@@ -56,7 +56,13 @@ export const checkLayup = defineCommand({
     const part = findPart(model, partRef);
     if (part === null) return refuseCmp(doc, 'check_layup', 'CMP_REF_MISSING', `no part '${partRef}'`, [], ['params.part']);
     const cases: readonly LoadCase[] | undefined = loads;
-    const outcome = layupFindings(model, part, { purpose, loads: cases, thresholds, units: doc.units });
+    const outcome = layupFindings(model, part, {
+      purpose,
+      loads: cases,
+      thresholds,
+      units: doc.units,
+      entityIds: new Set(Object.keys(doc.entities)),
+    });
     const fails = outcome.findings.filter((finding) => finding.severity === 'fail');
     const reviewRequired = purpose === 'release' || (loads ?? []).length > 0;
     return report(

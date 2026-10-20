@@ -155,6 +155,20 @@ describe('create_wing', () => {
     expect(aeroDocument.validate(JSON.parse(JSON.stringify(doc)) as Record<string, unknown>)).toEqual([]);
   });
 
+  it('a file saved after deleting a referenced loft or airfoil curve still reopens, without the dangling definitions', () => {
+    const { doc, wing, ids } = trapezoid();
+    const noWing = execute(doc, 'delete_entities', { ids });
+    const loadedNoWing = deserializeDocument(serializeDocument(noWing.document));
+    expect(loadedNoWing.aero!.wings[wing]).toBeUndefined();
+    expect(Object.keys(loadedNoWing.aero!.airfoils)).toHaveLength(1);
+    const airfoilId = Object.values(doc.aero!.airfoils)[0]!.entityId;
+    const noAirfoil = execute(doc, 'delete_entities', { ids: [airfoilId] });
+    const loaded = deserializeDocument(serializeDocument(noAirfoil.document));
+    expect(loaded.aero!.airfoils).toEqual({});
+    expect(loaded.aero!.wings[wing]).toBeUndefined();
+    expect(loaded.entities[ids[0]!]).toBeDefined();
+  });
+
   it('scale_entity scales the exact sections together with the rings', () => {
     const { doc, ids } = trapezoid();
     const scaled = execute(doc, 'scale_entity', { id: ids[0]!, factor: 2 });

@@ -9,6 +9,8 @@ import { createLaminaMaterial, defineRosette } from './materialCommands';
 import { laminateMass } from './massCommand';
 import { createCompositePart, setLaminateRules, setPlyDropRules } from './partCommands';
 import { addPly, deletePly, editPly, reorderPlies } from './plyCommands';
+import { exportPlyTable, importPlyTable, plyBookData } from './plyTable';
+import { createLaminateSections, exportLaminateSections } from './sectionCommands';
 import { checkLaminateRules } from './rulesCommand';
 import { coreSample } from './sampleCommand';
 import { defineZone, deleteZone, editZone } from './zoneCommands';
@@ -34,4 +36,9 @@ export const compositesCommands = commandCatalog(
   checkLayup,
   requestLayupWaiver,
   exportFlatPatternsDxf,
+  createLaminateSections,
+  exportLaminateSections,
+  exportPlyTable,
+  importPlyTable,
+  plyBookData,
 );

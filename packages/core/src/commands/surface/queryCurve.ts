@@ -10,6 +10,7 @@ import { poleExtent } from '../../geometry/nurbsCurve';
 import { distance3, scale3, sub3 } from '../../lib/vec3';
 import { roundSignificant } from '../../lib/significant';
 import { curveEntityOf, refuseSrf } from './shared';
+import { inspectSurface } from './inspectSurface';
 
 const sig = (value: number): number => roundSignificant(value, 10);
 const sigVec = (v: Vec3): Vec3 => [sig(v[0]), sig(v[1]), sig(v[2])];
@@ -26,12 +27,14 @@ export const inspectNurbs = defineCommand({
   name: 'inspect_nurbs',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Read-only: report the exact NURBS definition of a nurbs_curve: degree, pole count, rational or not, knots with multiplicities, parameter ' +
+    'Read-only: report the exact NURBS definition of a nurbs_surface (degreeU / degreeV, pole grid size, knots per direction, domain, continuity at each interior knot, bounds) or of a nurbs_curve: degree, pole count, rational or not, knots with multiplicities, parameter ' +
     'domain, weights, the poles (when at most 200), the continuity class at each interior knot (C0 = corner, C1, C2 ...), whether it is ' +
     'closed, its arc length and the pole bounding box (all lengths in document units). Use it to check what create_nurbs_curve, ' +
     'interpolate_curve or create_conic produced, or before edit_nurbs.',
-  params: z.object({ id: z.string().describe('Id of a nurbs_curve entity.') }),
+  params: z.object({ id: z.string().describe('Id of a nurbs_curve or nurbs_surface entity.') }),
   run: (doc, { id }): CommandResult => {
+    const surfaceEntity = doc.entities[id];
+    if (surfaceEntity?.kind === 'nurbs_surface') return inspectSurface(doc, surfaceEntity);
     const entity = curveEntityOf(doc, 'inspect_nurbs', id);
     if (!('curve' in entity)) return entity;
     const { curve } = entity;

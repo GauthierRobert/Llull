@@ -449,6 +449,25 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'analyze_curve_curvature', params: { id: '$arc', samples: 5 } },
     { command: 'inspect_nurbs', params: { id: '$c' } },
   ],
+  // 02 SRF M4-M5: surface sheets - interpolate a grid, loft, fill, trim and analyse
+  surface_sheets: [
+    {
+      command: 'surface_from_points',
+      params: {
+        grid: [xyz(0, 0, 0, 2, 0, 0.5, 4, 0, 0), xyz(0, 2, 0.3, 2, 2, 1, 4, 2, 0.3), xyz(0, 4, 0, 2, 4, 0.5, 4, 4, 0)],
+        degreeU: 2,
+        degreeV: 2,
+      },
+      as: 'patch',
+    },
+    { command: 'analyze_surface_curvature', params: { id: '$patch', grid: [3, 3] } },
+    { command: 'trim_surface', params: { id: '$patch', u: [0.2, 0.8], v: [0, 0.5] } },
+    { command: 'inspect_nurbs', params: { id: '$patch' } },
+    { command: 'interpolate_curve', params: { points: xyz(0, 0, 0, 1, 1, 0, 2, 0, 0), degree: 2 }, as: 'bottom' },
+    { command: 'interpolate_curve', params: { points: xyz(0, 0, 3, 1, 1, 3, 2, 0, 3), degree: 2 }, as: 'top' },
+    { command: 'loft_surface', params: { sectionIds: ['$bottom', '$top'], degreeV: 1 }, as: 'skin' },
+    { command: 'measure_deviation', params: { id: '$skin', points: [[1, 0.5, 1.5]] } },
+  ],
   // 02 SRF VC-SRF-11: NACA 0012 trapezoid wing, 2 m -> 1 m chord, 5 m semi-span, volume 0.959117 m3 per half
   aero_naca_trap_wing: [
     { command: 'set_units', params: { units: 'm' } },

@@ -3,8 +3,12 @@
 import type { LaminaMaterial } from '@core/model/composites';
 import type { Triple } from './clt';
 
-export type Criterion = 'max_stress' | 'tsai_hill' | 'tsai_wu';
+export type Criterion = 'max_stress' | 'tsai_hill' | 'tsai_wu' | 'larc03';
 
+/** The closed-form criteria of `strengthRatio` (LaRC03 lives in larc03.ts). */
+export type ClosedFormCriterion = Exclude<Criterion, 'larc03'>;
+
+/** Criteria evaluated when none are requested (LaRC03 must be asked for: it needs toughness data). */
 export const CRITERIA: readonly Criterion[] = ['max_stress', 'tsai_hill', 'tsai_wu'];
 
 /** Default Tsai-Wu interaction factor F12* when no biaxial data exists (common convention). */
@@ -35,7 +39,7 @@ export interface PlyRatio {
 
 /** Strength ratio of the stress state [s1, s2, t12] (MPa, material axes). */
 export function strengthRatio(
-  criterion: Criterion,
+  criterion: ClosedFormCriterion,
   [s1, s2, t12]: Triple,
   { Xt, Xc, Yt, Yc, S }: Strengths,
   f12Star: number = DEFAULT_F12_STAR,

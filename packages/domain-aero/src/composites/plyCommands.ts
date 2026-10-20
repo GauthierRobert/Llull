@@ -3,7 +3,8 @@
 import { defineCommand, vec2, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
-import type { CompositePart, CompositesModel, Ply, PlyBoundary } from '@core/model/composites';
+import type { CompositePart, CompositesModel, Ply, PlyBoundary, Rosette } from '@core/model/composites';
+import { dot3 } from '@lib/vec3';
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { nextId } from '@lib/id';
 import { polygonArea, selfIntersects, toCounterClockwise } from '@lib/polygon';
@@ -69,6 +70,23 @@ export function insertPly(model: CompositesModel, part: CompositePart, spec: Ply
 const MAX_PLIES = 5000;
 
 /**
+ * The ply angle expressed from the part rosette: a ply rosette's 0-degree axis, projected on a plane tool face, is rotated against the part's.
+ * 'unsupported' on curved faces (their 0 degrees is the axis / meridian), 'degenerate' when the axis is normal to the face.
+ */
+function orientationInPartFrame(
+  part: CompositePart,
+  rosette: Rosette,
+  orientation: number,
+): { orientation: number } | 'degenerate' | 'unsupported' {
+  if (rosette.id === part.rosetteId) return { orientation };
+  if (part.surface.type !== 'plane') return 'unsupported';
+  const { xDir, yDir } = part.surface;
+  const [x, y] = [dot3(rosette.axis0, xDir), dot3(rosette.axis0, yDir)];
+  if (Math.hypot(x, y) < 1e-9) return 'degenerate';
+  return { orientation: orientation + (Math.atan2(y, x) * 180) / Math.PI };
+}
+
+/**
  * @affects creates doc.composites.plies[ply-<step>.<k>] and its outline polylines (planar parts)
  * @invariant orientation stored in (-90, 90]; stacking order renumbered 0..n-1 from the tool side; ids deterministic per step
  * @failure unknown part / material / rosette -> CMP_REF_MISSING; degenerate polygon -> CMP_ZONE_BOUNDARY_INVALID; duplicate name in the part -> CMP_NAME_TAKEN
@@ -107,6 +125,18 @@ export const addPly = defineCommand({
     const ros = rosette === undefined ? findRosette(model, part.rosetteId) : findRosette(model, rosette);
     if (ros === null)
       return refuseCmp(doc, 'add_ply', 'CMP_REF_MISSING', `no rosette '${rosette ?? part.rosetteId}'`, [], ['params.rosette']);
+    const frame = orientationInPartFrame(part, ros, orientation);
+    if (typeof frame === 'string')
+      return refuseCmp(
+        doc,
+        'add_ply',
+        frame === 'degenerate' ? 'CMP_ROSETTE_DEGENERATE' : 'CMP_PARAM_INVALID',
+        frame === 'degenerate'
+          ? 'the ply rosette 0-degree axis is parallel to the tool face normal'
+          : 'a ply rosette other than the part rosette is only supported on plane tool faces',
+        [part.id],
+        ['params.rosette'],
+      );
     const stored = toBoundary(boundary, part);
     if (typeof stored === 'string') return refuseCmp(doc, 'add_ply', 'CMP_ZONE_BOUNDARY_INVALID', stored, [part.id], ['params.boundary']);
     const existing = pliesOf(model, part.id);
@@ -121,7 +151,7 @@ export const addPly = defineCommand({
       {
         name,
         materialName: material,
-        orientation,
+        orientation: frame.orientation,
         sequence: sequence ?? `S${(at ?? existing.length) + 1}`,
         rosetteId: ros.id,
         boundary: stored,

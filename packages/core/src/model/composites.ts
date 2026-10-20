@@ -34,6 +34,15 @@ export interface LaminaMaterial {
   readonly lockingAngle?: number;
   readonly warningShear?: number;
   readonly tsaiWuF12Star?: number;
+  /** Coefficients of thermal expansion along / across the fibre, 1/K. */
+  readonly alpha1?: number;
+  readonly alpha2?: number;
+  /** Moisture swelling strains along / across the fibre per unit moisture content (mass fraction). */
+  readonly beta1?: number;
+  readonly beta2?: number;
+  /** Mode I / II fracture toughness, N/mm (LaRC03 matrix tension: g = GIc / GIIc). */
+  readonly GIc?: number;
+  readonly GIIc?: number;
   readonly basis: AllowableBasis;
   readonly source: string;
 }
@@ -154,7 +163,32 @@ export interface LayupWaiver {
   readonly approvalRef?: string;
 }
 
+/** One ply of a shell section: material name in `CompositesModel.materials`, cured thickness (document units) and angle (degrees from the section x axis). */
+interface SectionPly {
+  readonly material: string;
+  readonly thickness: number;
+  readonly angleDeg: number;
+}
+
+/**
+ * A laminate shell section for analysis hand-off (05 FEA reads it; plies run from the tool side, +z along the laminate normal).
+ * @invariant `thickness` = sum of ply thicknesses; angles are relative to the part rosette 0-degree direction
+ */
+export interface LaminateSection {
+  readonly id: string;
+  readonly partId: string;
+  readonly name: string;
+  /** Zone the section was sampled for (absent: the whole part). */
+  readonly zoneId?: string;
+  readonly plies: readonly SectionPly[];
+  readonly thickness: number;
+  /** Side of the tool face the laminate lies on. */
+  readonly laminateSide: 'positive_normal' | 'negative_normal';
+}
+
 export interface CompositesModel {
+  /** Analysis hand-off sections (`create_laminate_sections`); absent until the first one. */
+  readonly sections?: Record<string, LaminateSection>;
   readonly materials: Record<string, LaminaMaterial>;
   readonly rosettes: Record<string, Rosette>;
   readonly parts: Record<string, CompositePart>;

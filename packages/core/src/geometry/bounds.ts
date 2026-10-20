@@ -3,6 +3,7 @@ import { instanceToWorld } from './instanceTransform';
 import { pointsExtent, tupleExtent } from '../lib/extent';
 import { ORIGIN, add3, vec3At } from '../lib/vec3';
 import { poleExtent } from './nurbsCurve';
+import { surfacePoleExtent } from './nurbsSurface';
 import { sweepTriangles } from './sweep';
 import { loftTriangles } from './loft';
 import { subdivisionTriangles } from './subdivision';
@@ -167,6 +168,10 @@ export function localBounds(e: Entity): Bounds {
       // No own geometry: a small box sized by the witness-line offset.
       const ext = e.offset ?? 5;
       return bounds([-ext, -ext, 0], [ext, ext, 0]);
+    }
+    case 'nurbs_surface': {
+      const { min, max } = surfacePoleExtent(e.surface);
+      return bounds(min, max);
     }
     case 'nurbs_curve': {
       const { min, max } = poleExtent(e.curve);

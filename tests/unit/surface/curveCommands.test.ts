@@ -32,7 +32,7 @@ describe('create_nurbs_curve', () => {
     expect(entity.curve.multiplicities).toEqual([4, 1, 4]);
     expect(entity.curve.weights).toBeUndefined();
     expect(result.document.order).toEqual([entity.id]);
-    expect([is3D(entity), isCurve3D(entity)]).toEqual([true, true]);
+    expect([is3D(entity), isCurve3D(entity)]).toEqual([false, true]);
     expect(result.summary).toContain(entity.id);
     expect(result.summary).toContain('5 poles');
   });

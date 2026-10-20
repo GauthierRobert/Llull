@@ -8,13 +8,13 @@ import {
   type EntityKind,
   type Vec2,
   type Vec3,
-
   SHAPE2D_KINDS,
   SOLID_KINDS,
   FINISH_PATTERNS,
 } from '../../model/types';
-import { nurbsCurveProblem } from './nurbsGuard';
-import { CURVE_KINDS } from '../../model/curveKinds';
+import { exactSectionsProblem, nurbsCurveProblem, nurbsSurfaceProblem } from './nurbsGuard';
+import type { NurbsCurveData } from '../../lib/nurbs/types';
+import { CURVE_KINDS, SHEET_KINDS } from '../../model/curveKinds';
 import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber, isPositiveNumber } from '../../lib/isFiniteNumber';
 import { isVec3 } from '../../lib/vec3';
@@ -151,7 +151,7 @@ function isCurveSegment(s: unknown, dims: number): boolean {
 /** Points per curve segment type (`CurveSegment`). */
 const SEGMENT_POINT_COUNT: Readonly<Record<string, number>> = { line: 2, arc: 3, bezier: 4 };
 
-const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set([...SOLID_KINDS, ...SHAPE2D_KINDS, ...CURVE_KINDS, 'instance']);
+const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set([...SOLID_KINDS, ...SHAPE2D_KINDS, ...CURVE_KINDS, ...SHEET_KINDS, 'instance']);
 
 export function validateCamera(v: unknown): v is CameraState {
   if (!isRecord(v)) return false;
@@ -209,7 +209,7 @@ function loftProblem(v: Record<string, unknown>): string | null {
     const problem = nurbsCurveProblem(sections[i], `sections.${i}`);
     if (problem !== null) return problem;
   }
-  return null;
+  return exactSectionsProblem(sections as NurbsCurveData[]);
 }
 
 /** Optional BaseEntity fields (`name`, `tags`, `materialId`) must have their declared types, or null. */
@@ -312,6 +312,7 @@ const KIND_PROBLEMS: Readonly<Record<EntityKind, (v: Record<string, unknown>) =>
   sweep: sweepProblem,
   loft: loftProblem,
   nurbs_curve: (v) => nurbsCurveProblem(v['curve'], 'curve'),
+  nurbs_surface: (v) => nurbsSurfaceProblem(v['surface'], 'surface'),
   subdivision: subdivisionProblem,
   image: imageProblem,
   mesh: meshProblem,

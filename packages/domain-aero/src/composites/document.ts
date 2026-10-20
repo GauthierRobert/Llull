@@ -29,7 +29,7 @@ function materialErrors(name: string, m: Record<string, unknown>): string[] {
   const errors: string[] = [];
   if (m['name'] !== name) errors.push(`${at}.name must equal its key`);
   for (const field of ['E1', 'E2', 'G12', 'plyThickness']) if (!positive(m[field])) errors.push(`${at}.${field} must be > 0`);
-  for (const field of ['G13', 'G23', 'Xt', 'Xc', 'Yt', 'Yc', 'S', 'density'])
+  for (const field of ['G13', 'G23', 'Xt', 'Xc', 'Yt', 'Yc', 'S', 'density', 'GIc', 'GIIc'])
     if (m[field] !== undefined && !positive(m[field])) errors.push(`${at}.${field} must be > 0 when given`);
   if (
     !isNumber(m['nu12']) ||
@@ -37,6 +37,8 @@ function materialErrors(name: string, m: Record<string, unknown>): string[] {
     !((m['nu12'] as number) ** 2 < (m['E1'] as number) / (m['E2'] as number))
   )
     errors.push(`${at}.nu12 must satisfy nu12^2 < E1/E2`);
+  for (const field of ['alpha1', 'alpha2', 'beta1', 'beta2'])
+    if (m[field] !== undefined && !isNumber(m[field])) errors.push(`${at}.${field} must be a number when given`);
   if (!['ud_tape', 'woven', 'core_honeycomb', 'core_foam'].includes(m['form'] as string)) errors.push(`${at}.form is unknown`);
   if (!['mean', 'b_basis', 'a_basis', 'unknown'].includes(m['basis'] as string)) errors.push(`${at}.basis is unknown`);
   if (typeof m['source'] !== 'string') errors.push(`${at}.source must be text`);
@@ -44,7 +46,7 @@ function materialErrors(name: string, m: Record<string, unknown>): string[] {
 }
 
 /** Value errors of the raw `composites` slice (an empty list = valid). */
-export function compositesErrors(slice: unknown, entities: Record<string, unknown> | null): string[] {
+export function compositesErrors(slice: unknown): string[] {
   if (!isRecord(slice)) return ['composites must be an object'];
   const errors = [
     ...tableErrors(slice, 'materials', materialErrors),
@@ -66,10 +68,8 @@ export function compositesErrors(slice: unknown, entities: Record<string, unknow
         out.push(`composites.parts.${id} references a missing rosette`);
       const faces = p['toolFaces'];
       if (!Array.isArray(faces) || faces.length === 0) out.push(`composites.parts.${id}.toolFaces must list a face`);
-      else if (entities !== null)
-        for (const face of faces)
-          if (!isRecord(face) || !isText(face['entityId']) || !Object.hasOwn(entities, face['entityId']))
-            out.push(`composites.parts.${id} references a missing tool entity`);
+      else if (!faces.every((face) => isRecord(face) && isText(face['entityId'])))
+        out.push(`composites.parts.${id}.toolFaces need an entityId`);
       return out;
     }),
     ...tableErrors(slice, 'zones', (id, z) => {
@@ -100,6 +100,19 @@ export function compositesErrors(slice: unknown, entities: Record<string, unknow
         out.push(`composites.plies.${id}.boundary must be whole_face or polygons`);
       return out;
     }),
+    ...(slice['sections'] === undefined
+      ? []
+      : tableErrors(slice, 'sections', (id, s) => {
+          const out: string[] = [];
+          if (!isRecord(slice['parts']) || !isText(s['partId']) || !Object.hasOwn(slice['parts'], s['partId']))
+            out.push(`composites.sections.${id} references a missing part`);
+          if (
+            !Array.isArray(s['plies']) ||
+            !s['plies'].every((ply) => isRecord(ply) && isText(ply['material']) && positive(ply['thickness']) && isNumber(ply['angleDeg']))
+          )
+            out.push(`composites.sections.${id}.plies need material, thickness > 0 and angleDeg`);
+          return out;
+        })),
     ...tableErrors(slice, 'waivers', (id, w) =>
       isText(w['code']) && isText(w['reason']) && Array.isArray(w['ids']) ? [] : [`composites.waivers.${id} needs code, ids and reason`],
     ),
@@ -116,14 +129,12 @@ export function compositesErrors(slice: unknown, entities: Record<string, unknow
 
 /** Ply outlines regenerate from the model: omitted from saved files and re-derived on load. */
 export const compositesDocument: DocumentExtension = {
-  validate: (raw) =>
-    raw['composites'] === undefined ? [] : compositesErrors(raw['composites'], isRecord(raw['entities']) ? raw['entities'] : null),
+  validate: (raw) => (raw['composites'] === undefined ? [] : compositesErrors(raw['composites'])),
   derivedEntityIds: (doc) =>
     new Set(Object.values(doc.composites?.plies ?? {}).flatMap((ply) => outlineIdsOf(ply, doc.composites?.parts[ply.partId]))),
   restore: (raw) => {
     const saved = raw['composites'];
-    if (saved === undefined || compositesErrors(saved, null).length > 0 || !isRecord(raw['entities']) || !Array.isArray(raw['order']))
-      return raw;
+    if (saved === undefined || compositesErrors(saved).length > 0 || !isRecord(raw['entities']) || !Array.isArray(raw['order'])) return raw;
     const layers = isRecord(raw['layers']) ? raw['layers'] : {};
     const entities = raw['entities'];
     const layerOf = (part: { toolFaces: readonly { entityId: string }[] }): string => {

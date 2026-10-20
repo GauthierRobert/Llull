@@ -7,6 +7,7 @@ import type { CadDocument } from '../model/types';
 import type { GeometryKernel } from '../geometry/kernel';
 import type { PhysicsEngine } from '../dynamics/physicsEngine';
 import type { GeometryQueryEngine } from '../geometry/geometryQueries';
+import type { SurfaceAnalysisEngine } from '../geometry/surfaceAnalysis/types';
 import type { FeArtifactPort, HumanSignaturePort } from '../model/analysis';
 import type { MaterialLibrary } from '../model/materialLibrary';
 import type { IdSource } from '../lib/id';
@@ -176,6 +177,8 @@ export interface ExecutionContext {
   readonly physics?: PhysicsEngine | null;
   /** Batch mesh-query engine (distance / ray / occlusion, TR-FPR-19); null/absent = the default `meshBvh` engine. */
   readonly geometryQueries?: GeometryQueryEngine | null;
+  /** Surface-analysis engine (curvature / continuity / deviation / draft, 02 SRF M4); null/absent = the default TS NURBS engine. */
+  readonly surfaceAnalysis?: SurfaceAnalysisEngine | null;
   /** Read-only FE mesh/results artifact store (host-provided); null/absent = `record_fe_*` commands no-op with FEA_ARTIFACT_NOT_FOUND. */
   readonly feaArtifacts?: FeArtifactPort | null;
   /** Human-signature verifier (09 PLM); null/absent = human-gate commands refuse. */

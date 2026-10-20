@@ -10,6 +10,10 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   CMP_MATERIAL_NOT_POSITIVE: 'enter positive moduli, strengths and thickness (MPa, document length units)',
   CMP_MATERIAL_ALLOWABLE_MISSING: 'add Xt, Xc, Yt, Yc and S from a cited source with create_lamina_material (no default exists)',
   CMP_MATERIAL_DENSITY_MISSING: 'give the lamina density (mass per unit^3) with create_lamina_material',
+  CMP_MATERIAL_HYGROTHERMAL_MISSING:
+    'add alpha1, alpha2 (thermal) and beta1, beta2 (moisture) to the lamina record from a cited source (no default exists)',
+  CMP_CSV_PARSE:
+    'use the export_ply_table layout: a header row with ply, material, orientation (and optionally sequence, order, rosette), one ply per row',
   CMP_F12_RANGE: 'use -0.5 or a value in [-1, 0] taken from biaxial test data',
   CMP_ROSETTE_DEGENERATE: 'give a non-zero 0-degree axis and normal that are not parallel',
   CMP_FACE_NOT_FOUND: 'pick a point on the intended face (faceNear), within the tolerance of the face',
@@ -21,6 +25,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   CMP_ZONES_NOT_BLENDABLE: 'edit the thinner zone so its stack embeds in the thicker one (same angles in the same order, symmetric halves)',
   CMP_ZONES_EQUAL_THICKNESS_CONFLICT: 'make the equally thick zones identical or change a ply count',
   CMP_COVER_PLIES_DROPPED: 'keep the outer cover plies continuous: use identical outer plies in every zone or lower coverPlies',
+  CMP_OUTLINE_NOT_CONVEX: 'use a convex tool face (box, cylinder or cone cap) for zone ramps, or keep the plies whole-face',
   CMP_RAMP_CONFLICT: 'move the zone boundary, lower the ramp ratio (with a reviewer) or reduce the thickness step',
   CMP_LAMINATE_SINGULAR: 'add plies in other directions (a single angle cannot carry shear or transverse load)',
   CMP_NO_PLIES: 'add plies (add_ply or generate_plies_from_zones) at that point first',

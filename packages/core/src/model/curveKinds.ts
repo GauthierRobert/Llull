@@ -10,3 +10,15 @@ const CURVE_KIND_SET: ReadonlySet<string> = new Set(CURVE_KINDS);
 export function isCurve3D<E extends { readonly kind: string }>(entity: E): entity is Extract<E, { readonly kind: CurveKind }> {
   return CURVE_KIND_SET.has(entity.kind);
 }
+
+/** Open surface sheets: faces without a volume (`isSheet`); a closed shell would be a solid and is a mesh / B-rep kind instead. */
+export const SHEET_KINDS = ['nurbs_surface'] as const;
+
+export type SheetKind = (typeof SHEET_KINDS)[number];
+
+const SHEET_KIND_SET: ReadonlySet<string> = new Set(SHEET_KINDS);
+
+/** True for a surface sheet entity: it has area but no volume, so solid-only commands (booleans, mass, STEP solids) refuse it. */
+export function isSheet<E extends { readonly kind: string }>(entity: E): entity is Extract<E, { readonly kind: SheetKind }> {
+  return SHEET_KIND_SET.has(entity.kind);
+}

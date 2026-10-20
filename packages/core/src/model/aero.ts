@@ -63,7 +63,37 @@ export interface WingDef {
   readonly entityIds: ReadonlyArray<string>;
 }
 
+/** One fuselage cross-section in the aircraft frame (FS along +x, BL along +y, WL along +z); see `loft_fuselage`. */
+export interface FuselageSection {
+  readonly type: 'point' | 'conic' | 'circle' | 'superellipse';
+  readonly wl?: number | undefined;
+  readonly bl?: number | undefined;
+  readonly radius?: number | undefined;
+  readonly halfBreadth?: number | undefined;
+  readonly halfHeight?: number | undefined;
+  readonly exponent?: number | undefined;
+  readonly wlMaxBreadth?: number | undefined;
+  readonly upper?: { readonly wlExtreme: number; readonly rho: number } | undefined;
+  readonly lower?: { readonly wlExtreme: number; readonly rho: number } | undefined;
+}
+
+interface FuselageStation {
+  readonly fs: number;
+  readonly section: FuselageSection;
+}
+
+/** A fuselage defined by stations; its outer surface is the `nurbs_surface` entity `entityId` (the body id is that entity id). */
+export interface BodyDef {
+  readonly id: string;
+  readonly stations: ReadonlyArray<FuselageStation>;
+  readonly controlCurveIds: ReadonlyArray<string>;
+  readonly degreeV: number;
+  readonly entityId: string;
+}
+
 export interface AeroModel {
   readonly airfoils: Readonly<Record<string, AirfoilDef>>;
   readonly wings: Readonly<Record<string, WingDef>>;
+  /** Fuselage bodies (absent until the first `loft_fuselage`). */
+  readonly bodies?: Readonly<Record<string, BodyDef>>;
 }
