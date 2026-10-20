@@ -55,7 +55,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   '3d': words(
     'add_box add_cylinder add_sphere add_cone add_torus add_helix_spring add_bearing add_wedge add_pyramid extrude_profile revolve_profile sweep_profile loft_sections boolean blend_union fillet_edge chamfer_edge shell_solid inspect_topology inspect_faces add_spur_gear add_internal_gear add_planetary_gearset add_bevel_gear add_bevel_gear_pair add_spline_shaft add_keyed_shaft pattern_along_path add_decal remove_decal add_subdivision_solid edit_subdivision_cage surface_from_curves create_nurbs_curve interpolate_curve create_conic edit_nurbs inspect_nurbs analyze_curve_curvature create_nurbs_surface surface_from_points loft_surface fill_surface trim_surface sew_surfaces thicken_surface blend_surfaces approximate_curve analyze_surface_curvature check_continuity measure_deviation analyze_draft check_surface_quality',
   ),
-  measure: words('measure_distance measure_angle measure_area measure_perimeter measure_bounding_box mass_properties'),
+  measure: words('measure_distance measure_angle measure_area measure_perimeter measure_bounding_box mass_properties geometric_validation_properties'),
   parametric: words(
     'replay_history set_step_suppressed edit_step_params reorder_step delete_step insert_step create_configuration activate_configuration add_constraint delete_constraint update_constraint solve_constraints save_recipe instantiate_recipe',
   ),
@@ -70,7 +70,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   'material-lab': words('fit_material_model material_point_response export_material_cards'),
   review: words('allow_interference remove_interference_intent set_part_grounded set_review_disposition'),
   exchange: words(
-    'export_stl export_obj export_gltf export_step_exact export_code apply_code_trace import_mesh import_dxf import_step_exact export_step import_step import_dwg import_code',
+    'export_stl export_obj export_gltf export_step_exact export_step_ap242 export_iges import_iges verify_exchange_file export_code apply_code_trace import_mesh import_dxf import_step_exact export_step import_step import_dwg import_code',
   ),
   /** Core analytic checks plus the finite-element commands contributed by the installed cae plugin. */
   get analysis(): readonly string[] {

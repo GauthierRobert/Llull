@@ -45,6 +45,14 @@ export function operandRecipe(kernel: GeometryKernel, entity: Entity): ShapeReci
   return recipeOf(entity);
 }
 
+/** The exact shape of `entity`; a ply solid whose exact slab the kernel refuses is written from its own triangles instead (its mesh recipe). */
+export function exactOrMesh(kernel: GeometryKernel, entity: Entity): ShapeHandle | null {
+  const shape = kernel.evaluate(operandRecipe(kernel, entity));
+  if (shape !== null || recipeOf(entity).op !== 'faceSlab') return shape;
+  const mesh = meshRecipeOf(entity);
+  return mesh === null ? null : kernel.evaluate(mesh);
+}
+
 /** Summary suffix naming operands used as triangles because this kernel lacks an op of their tree. */
 function fallbackSuffix(kernel: GeometryKernel, operands: readonly Entity[]): string {
   const notes = operands.flatMap((entity) => {

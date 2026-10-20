@@ -84,7 +84,11 @@ describeNative('import_step_exact on the live OCC kernel', () => {
     expect(result.affected).toHaveLength(2);
     const report = reportOf(result);
     expect(report.census).toMatchObject({ solids: 2 });
-    expect(report.warnings).toEqual([]);
+    // a plain OCC export carries no validation properties: each part is reported as not checkable (04 XCH), nothing else
+    expect((report.warnings as { code: string }[]).map((warning) => warning.code)).toEqual([
+      'XCH_GVP_NOT_CHECKABLE',
+      'XCH_GVP_NOT_CHECKABLE',
+    ]);
     for (const solid of report.solids) {
       expect(solid).toMatchObject({ validAsRead: true, validAfterHeal: true, freeEdges: 0, faceted: false });
       expect(solid.maxToleranceMm).toBeLessThan(1e-3);

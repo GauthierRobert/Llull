@@ -163,7 +163,8 @@ def assembly_two_boxes(pid):
         "instanceCount": 2,
         "plan": [{"command": "set_units", "params": {"units": "mm"}},
                  {"command": "add_box", "params": {"size": list(size)}, "as": "b"},
-                 {"command": "create_component", "params": {"name": "Block", "entityIds": ["$b"], "componentId": "comp-block"}},
+                 {"command": "create_component", "params": {"name": "Block", "entityIds": ["$b"], "componentId": "comp-block"}, "as": "stray"},
+                 {"command": "delete_entities", "params": {"ids": ["$stray"]}},
                  {"command": "insert_instance", "params": {"componentId": "comp-block", "position": list(offsets[0])}, "as": "i1"},
                  {"command": "insert_instance", "params": {"componentId": "comp-block", "position": list(offsets[1])}, "as": "i2"}],
     }

@@ -8,6 +8,7 @@
 
 import type { MeshData, ShapeRecipe, Vec3 } from '../model/types';
 
+import type { ExchangeWriteRequest, ImportExchangeOptions, ImportExchangeResult } from './kernelExchange';
 import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
 import type { FaceSurface, ShapeHandle } from './kernelTypes';
 
@@ -147,6 +148,12 @@ export interface GeometryKernel {
 
   /** Read and heal an exchange file into exact solids (TR-KRN-20/24); `text` is the Part 21 file content. */
   importShapes?(format: 'step', text: string, options: ImportShapesOptions): ImportShapesResult | null;
+
+  /** STEP (AP242 / AP214 / AP203) or IGES text of a product tree with names, colours, layers and validation properties (04 XCH); null when unsupported. */
+  writeExchange?(request: ExchangeWriteRequest): string | null;
+
+  /** Read a STEP product tree (assembly structure, names, colours, healed solids) or an IGES file (04 XCH); null when unsupported. */
+  importExchange?(format: 'step' | 'iges', text: string, options: ImportExchangeOptions): ImportExchangeResult | null;
 
   /** Make a document blob (`brep` recipe leaves, `BRepTools::Write` text keyed by sha256) available to `evaluate`. Idempotent. */
   loadBlob?(sha256: string, brep: string): void;

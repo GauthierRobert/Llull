@@ -1,6 +1,7 @@
 /** Which solids `export_step_exact` writes: loose 3D solids and component instances (with the unique occurrence label of each). */
 
-import { type CadDocument, type Entity, type InstanceEntity, is3D } from '../../model/types';
+import { type CadDocument, DEFAULT_LAYER_ID, type Entity, type InstanceEntity, is3D } from '../../model/types';
+import { kgPerM3FromDocDensity } from '../../geometry/resolveDensity';
 import { isCurve3D, isSheet } from '../../model/curveKinds';
 import { expandInstance } from '../../geometry/instanceExpansion';
 import type { StepLabel } from './stepLabels';
@@ -10,12 +11,27 @@ export type StepEntry =
   | { readonly kind: 'solid'; readonly entity: Entity }
   | { readonly kind: 'instance'; readonly instance: InstanceEntity; readonly label: string; readonly baked: readonly Entity[] };
 
+/** The user entity ids behind the exported entries (a loose solid, or the instance whose solids were expanded), each once. */
+export const exportedIds = (entries: readonly StepEntry[]): string[] => [
+  ...new Set(entries.map((entry) => (entry.kind === 'solid' ? entry.entity.id : entry.instance.id))),
+];
+
 /** Product name (entity name, else id), group name as description, and color of each solid. */
 export function stepLabels(doc: CadDocument, solids: readonly Entity[]): StepLabel[] {
   const groups = Object.values(doc.groups);
   return solids.map((entity) => {
     const group = groups.find((candidate) => candidate.memberIds.includes(entity.id));
-    return { name: entity.name ?? entity.id, color: entity.color, ...(group !== undefined ? { description: group.name } : {}) };
+    const layer = entity.layerId === undefined || entity.layerId === DEFAULT_LAYER_ID ? undefined : doc.layers[entity.layerId]?.name;
+    const material = entity.materialId === undefined ? undefined : doc.materials[entity.materialId];
+    return {
+      name: entity.name ?? entity.id,
+      color: entity.color,
+      ...(group !== undefined ? { description: group.name } : {}),
+      ...(layer === undefined ? {} : { layer }),
+      ...(material !== undefined && material.density > 0
+        ? { material: { name: material.name, density: kgPerM3FromDocDensity(doc, material.density) / 1000 } }
+        : {}),
+    };
   });
 }
 

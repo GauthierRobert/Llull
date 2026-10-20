@@ -7,6 +7,7 @@
 import { MessageChannel, Worker, receiveMessageOnPort, type MessagePort } from 'node:worker_threads';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, StepOccurrence } from '@core/geometry/kernel';
 import type { ExactMassProperties, ImportShapesResult, KernelInfo } from '@core/geometry/kernelPorts';
+import type { ExchangeWriteRequest, ImportExchangeResult } from '@core/geometry/kernelExchange';
 import { errorMessage } from '@lib/errorMessage';
 import { handleOf, keyOnlyHandle, SHAPE_NOT_CACHED } from '@core/geometry/shapeKernel';
 import type { FaceQueryPort } from '@core/geometry/kernelPorts';
@@ -225,6 +226,17 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     return call('exportStepAssembly', [withShapes((shape) => shape)]) as string | null;
   };
 
+  /** Exchange write: shapes travel key-only first; on SHAPE_NOT_CACHED the request is resent with the full recipes. */
+  const writeExchange = (request: ExchangeWriteRequest): string | null => {
+    const withShapes = (map: (shape: ShapeHandle) => ShapeHandle): ExchangeWriteRequest => ({
+      ...request,
+      products: request.products.map((product) => ({ ...product, solids: product.solids.map((solid) => ({ ...solid, shape: map(solid.shape) })) })),
+    });
+    const reply = exchange('writeExchange', [withShapes(keyOnlyHandle)]);
+    if (reply?.error?.startsWith(SHAPE_NOT_CACHED) !== true) return (reply?.result ?? null) as string | null;
+    return call('writeExchange', [withShapes((shape) => shape)]) as string | null;
+  };
+
   const faceQuery = Object.fromEntries(
     FACE_QUERY_METHODS.map((method) => [
       method,
@@ -241,6 +253,8 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
     topology: (shape) => shapeCall('topology', [shape], false) as ReturnType<GeometryKernel['topology']>,
     exportStep: (shapes) => shapeCall('exportStep', shapes, true) as ReturnType<GeometryKernel['exportStep']>,
     exportStepAssembly,
+    writeExchange,
+    importExchange: (format, text, options) => call('importExchange', [format, text, options]) as ImportExchangeResult | null,
     analyze: (shape) => shapeCall('analyze', [shape], false) as ShapeAnalysis | null,
     massProperties: (shape) => shapeCall('massProperties', [shape], false) as ExactMassProperties | null,
     distance: (a, b, maxDistance) => shapeCall('distance', [a, b], false, [maxDistance]) as ShapeDistance | null,

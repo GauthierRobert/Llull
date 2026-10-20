@@ -10,6 +10,7 @@
 import type { CurveSegment } from '@core/model/curve';
 import type { Entity, MeshData, ShapeRecipe, Vec2, Vec3 } from '@core/model/types';
 import type { StepAssemblyPart, StepOccurrence } from '@core/geometry/kernel';
+import type { ExchangeWriteRequest } from '@core/geometry/kernelExchange';
 import { createEmptyDocument } from '@core/model/types';
 import { entityTrianglePositions } from '@core/geometry/entityTriangles';
 import { orientOutward } from '@core/geometry/meshVolume';
@@ -224,6 +225,15 @@ function wireAssembly(occurrences: readonly StepOccurrence<unknown>[], features:
   return { occurrences: occurrences.map(placedUse), parts };
 }
 
+/** `writeExchange` on the wire: every solid's shape handle is rewritten like any other handle. */
+function wireExchange(request: ExchangeWriteRequest, features: FeatureLowerings, wire: WireOptions): unknown {
+  const products = request.products.map((product) => ({
+    ...product,
+    solids: product.solids.map((solid) => ({ ...solid, shape: nativeHandle(solid.shape, features, wire) })),
+  }));
+  return { ...request, products };
+}
+
 /** Arguments of a `KernelOps` request rewritten for the sidecar (see the module comment); `features` lowers its feature nodes. */
 export function nativeArgs(
   op: string,
@@ -240,5 +250,6 @@ export function nativeArgs(
   if (op === 'distance') return [handle(args[0]), handle(args[1]), ...args.slice(2)];
   if (op === 'exportStep' && Array.isArray(args[0])) return [args[0].map(handle)];
   if (op === 'exportStepAssembly' && Array.isArray(args[0])) return [wireAssembly(args[0] as StepOccurrence<unknown>[], features, wire)];
+  if (op === 'writeExchange' && typeof args[0] === 'object' && args[0] !== null) return [wireExchange(args[0] as ExchangeWriteRequest, features, wire)];
   return args;
 }

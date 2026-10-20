@@ -8,7 +8,6 @@
       "add_surface_texture",
       "check_pmi",
       "create_saved_view",
-      "export_step_ap242",
       "set_pmi_standard"
     ],
     "docs/aerospace/03-gdt-mbd-pmi/validation/draft_plan_gdt_rejections.json": [
