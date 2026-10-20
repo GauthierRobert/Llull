@@ -146,6 +146,24 @@ function stateChange(a: SimulationData, b: SimulationData): { change: number; wo
   return { change, worstJoint, moved };
 }
 
+/**
+ * The run is already at the finest allowed step, so no refinement exists to compare with: an info item with the reason (not a pass, not a
+ * not_run: nothing failed to run). Engines get their convergence from check_timestep_convergence (brake torque and wrist-pin load).
+ */
+export function timestepFloorItem(timestepS: number, minimumS: number): ReviewItem {
+  return item(
+    'FPR_TIMESTEP_SENSITIVE',
+    'info',
+    [],
+    'Nothing to do for this check; for an engine read check_timestep_convergence, otherwise set_dynamics_solver with a larger timestep to compare two steps.',
+    {
+      values: { timestepS, minimumTimestepS: minimumS },
+      unverified: true,
+      note: `The run is at the finest allowed timestep (${minimumS} s), so it cannot be halved; no refinement comparison was made here.`,
+    },
+  );
+}
+
 export function timestepItem(coarse: SimulationData, fine: SimulationData | null, why: string | null): ReviewItem {
   if (fine === null)
     return item(

@@ -180,9 +180,13 @@ describe('check_dynamics with the MuJoCo engine', () => {
     expect(itemOf(dataOf(doc), 'FPR_TIMESTEP_SENSITIVE').status).toBe('not_run');
   });
 
-  it('a timestep that cannot be halved leaves FPR_TIMESTEP_SENSITIVE not_run', () => {
+  it('a timestep already at the finest allowed step is info with the reason, not a not_run and not a pass', () => {
     const data = dataOf(spinner({ massKg: 2, damping: 0.05 }), { timestep: 1e-5, duration: 0.02 });
-    expect(itemOf(data, 'FPR_TIMESTEP_SENSITIVE').status).toBe('not_run');
+    const timestep = itemOf(data, 'FPR_TIMESTEP_SENSITIVE');
+    expect(timestep.status).toBe('info');
+    expect(timestep.note).toMatch(/finest allowed timestep \(0\.00001 s\)/);
+    expect(timestep.values.minimumTimestepS).toBe(1e-5);
+    expect(data.items.some((entry) => entry.status === 'not_run')).toBe(false);
   });
 
   it('a closed slider-crank reports the loop residual', () => {

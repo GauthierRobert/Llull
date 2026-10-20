@@ -270,6 +270,27 @@ export function consistentSpeeds(
   return speeds;
 }
 
+/**
+ * One row per gear coupling whose two joints are both tree joints: q'(driven) - ratio · q'(driver) = 0 in tree coordinates (a flipped
+ * joint's tree coordinate has the opposite sense of the declared one). A coupling with a loop joint on either side adds no row.
+ */
+function gearConstraintRows(dynamics: DynamicsModel, topology: Topology): number[][] {
+  const nq = topology.tree.length;
+  const senseOf = (id: string): { index: number; sign: number } | null => {
+    const index = topology.tree.findIndex((entry) => entry.joint.id === id);
+    const entry = topology.tree[index];
+    return entry === undefined ? null : { index, sign: entry.flipped ? -1 : 1 };
+  };
+  return Object.values(dynamics.gears).flatMap((gear) => {
+    const [driver, driven] = [senseOf(gear.driver), senseOf(gear.driven)];
+    if (driver === null || driven === null) return [];
+    const row = new Array<number>(nq).fill(0);
+    row[driven.index] = driven.sign;
+    row[driver.index] = (row[driver.index] ?? 0) - gear.ratio * driver.sign;
+    return [row];
+  });
+}
+
 /** Mobility analysis of `topology` at the start pose; `metresPerUnit` converts anchors. */
 export function analyseMobility(dynamics: DynamicsModel, topology: Topology, metresPerUnit: number): MobilityResult {
   const joints = Object.values(dynamics.joints);
@@ -290,7 +311,7 @@ export function analyseMobility(dynamics: DynamicsModel, topology: Topology, met
       cursor += 2;
     }
   }
-  const columns = loopJacobian(topology, labels.length, metresPerUnit);
+  const columns = [...loopJacobian(topology, labels.length, metresPerUnit), ...gearConstraintRows(dynamics, topology)];
   const pivots = nq === 0 ? columns.map((_, index) => ({ index, size: 0 })) : pivotedColumns(columns);
   const largest = pivots[0]?.size ?? 0;
   const rank = largest > 0 ? pivots.filter((pivot) => pivot.size > RANK_TOLERANCE * largest).length : 0;
@@ -314,7 +335,7 @@ export function analyseMobility(dynamics: DynamicsModel, topology: Topology, met
   return {
     gruebler,
     treeCoordinates: nq,
-    constraintRows: labels.length,
+    constraintRows: columns.length,
     rank,
     dof: nq - rank,
     redundant,
