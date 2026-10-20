@@ -14,7 +14,7 @@ import type { NurbsSurfaceData, UvTrimLoop } from './surfaceTypes';
 import type { NurbsCurveData } from './types';
 import { domainLoop, insideRegion, loopsCross } from './trimRegion';
 
-export type TrimFailureCode = 'SRF_TRIM_MISS' | 'SRF_TRIM_AMBIGUOUS' | 'SRF_TRIM_LOOP_INVALID' | 'SRF_TRIM_UNSUPPORTED';
+type TrimFailureCode = 'SRF_TRIM_MISS' | 'SRF_TRIM_AMBIGUOUS' | 'SRF_TRIM_LOOP_INVALID' | 'SRF_TRIM_UNSUPPORTED';
 
 export type TrimBuild =
   | { readonly loops: UvTrimLoop[]; readonly note: string; readonly maxGap: number; readonly vertices: number }

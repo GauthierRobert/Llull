@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createEmptyDocument, type CadDocument, type MeshEntity } from '@core/model/types';
+import { createEmptyDocument, type CadDocument, type MeshSolidEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { extractSubSurface, transposeSurface } from '@lib/nurbs/surfaceEdit';
 import type { NurbsSurfaceData } from '@lib/nurbs/surfaceTypes';
@@ -57,7 +57,7 @@ describe('sew_surfaces into a closed solid (VC-SRF-16)', () => {
     const { doc, ids } = addSheets(empty, boxFaces(3, 4, 5));
     const result = execute(doc, 'sew_surfaces', { ids });
     expect(result.affected).toHaveLength(1);
-    const solid = result.document.entities[result.affected[0]!] as MeshEntity;
+    const solid = result.document.entities[result.affected[0]!] as MeshSolidEntity;
     expect(solid.kind).toBe('mesh');
     expect(result.document.order).toEqual(result.affected);
     expect(data(result).volume).toBeCloseTo(60, 9);
