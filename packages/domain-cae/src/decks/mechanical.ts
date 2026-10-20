@@ -244,8 +244,10 @@ export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options
         );
       if (faces.length === 0) return refusal('FEA_TARGET_UNRESOLVED', `pressure '${id}' (${load.name}) has no faces in the mesh`, [id]);
       for (const [element, face] of faces) {
-        // Shells: label P on the element; the mesher's face 1 = loaded from the top (+normal) side, 2 = from the bottom side.
-        const shellSign = face === 2 ? -1 : 1;
+        // Shells: label P on the element; the mesher's face 1 = loaded from the top (+normal) side, 2 = from the bottom side. CalculiX 2.21
+        // moves a shell ALONG its normal under a positive P (measured, server/tests/feaShellSolve.test.ts), so a load pushing into the material
+        // from the top side is -p and from the bottom side +p.
+        const shellSign = face === 2 ? 1 : -1;
         const label = kind === 'shell' ? 0 : face;
         const mapKey = `${element}:${label}`;
         const value = load.magnitude * factor * (kind === 'shell' ? shellSign : 1);

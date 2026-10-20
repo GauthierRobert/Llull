@@ -111,7 +111,8 @@ describe('INP shell deck', () => {
     expect(text).toMatch(/C_\w+, 1, 6\n/);
     expect(text).toMatch(/C_\w+, 2, 2\nC_\w+, 4, 4\nC_\w+, 6, 6\n/);
     expect(text).toMatch(/C_\w+, 4, 4, 0\.01\n/);
-    expect(text).toContain('1, P, 5\n2, P, -5\n');
+    // ccx 2.21 moves a shell along its normal under a positive P: a push from the top (into the material) is written negative
+    expect(text).toContain('1, P, -5\n2, P, 5\n');
   });
 
   it('writes OFFSET 0.5 for a top-surface shell and refuses an unresolved thickness', () => {
