@@ -3,7 +3,7 @@
  * checked by `npm run arch` (part of `npm run check`) for every change, human or agent.
  * The PreToolUse hook gives agents early feedback; this file is the authority.
  *
- * Layers (one-way): desktop → server; src/ui, server → src/app → packages/{protocol, domain-aec, domain-cae, domain-aero, design-lang, kernel-*, physics-*} → packages/core
+ * Layers (one-way): desktop → server; src/ui, server → src/app → packages/{protocol, domain-aec, domain-cae, domain-aero, design-lang, plm, kernel-*, physics-*} → packages/core
  * Inside core:      commands, codegen, plugins → dynamics → geometry → model → lib
  */
 
@@ -45,7 +45,7 @@ module.exports = {
       name: 'plugins-and-kernels-depend-on-core-only',
       comment: 'L9/L10: a domain plugin, a geometry kernel or a physics engine reaches the app only through core contracts.',
       severity: 'error',
-      from: { path: '^packages/(domain-[^/]+|kernel-[^/]+|physics-[^/]+|design-lang)/' },
+      from: { path: '^packages/(domain-[^/]+|kernel-[^/]+|physics-[^/]+|design-lang|plm)/' },
       to: { path: '^packages/(?!core/)', pathNot: '^packages/$1/' },
     },
     {
@@ -55,7 +55,7 @@ module.exports = {
         'the plugin contract and the command-authoring API (schema, types, noop, derivation, ' +
         'registry). Composing another command goes through `execute`, never its module.',
       severity: 'error',
-      from: { path: '^packages/(domain-[^/]+|kernel-[^/]+|physics-[^/]+|design-lang)/' },
+      from: { path: '^packages/(domain-[^/]+|kernel-[^/]+|physics-[^/]+|design-lang|plm)/' },
       to: {
         path: '^packages/core/src/',
         pathNot:

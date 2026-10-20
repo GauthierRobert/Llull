@@ -43,7 +43,7 @@
     },
     {
       "n": 2,
-      "command": "set_export_marking",
+      "command": "set_item_marking",
       "params": {
         "regime": "none",
         "statement": "NLR-EXAMPLE - classification decided by the export-control officer",
