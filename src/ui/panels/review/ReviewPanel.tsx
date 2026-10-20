@@ -2,7 +2,9 @@
 // as set_review_disposition (with the check's inputsHash). Below: the mechanism graph, the motion timeline and the reference overlay.
 // No sign-off in the MVP (spec 11 Q5).
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { humanGatePayload } from '@core/model/humanGate';
+import { SignActDialog, type SignActRequest } from '@ui/components/SignActDialog';
 import { getCommand } from '@core/commands/registry';
 import { classNames } from '@ui/classNames';
 import { KpiStrip, PanelEmpty, PanelHeader, PanelSection, StatusLine } from '@ui/panels/PanelParts';
@@ -96,9 +98,23 @@ export function ReviewPanel({ className }: { className?: string }): React.ReactE
   const canDispose = getCommand(DISPOSITION_COMMAND) !== undefined;
   const stale = isReviewStale(source, { entities, dynamics });
 
+  const [signing, setSigning] = useState<SignActRequest | null>(null);
   const onDisposition = (change: DispositionChange): void => {
     if (!canDispose) return;
-    dispatch(DISPOSITION_COMMAND, change);
+    if (change.status !== 'accepted') return void dispatch(DISPOSITION_COMMAND, change);
+    // Accepting a finding is a human-only act: it needs a signature by a trusted key over exactly this finding, check hash and comment.
+    setSigning({
+      title: 'Accept finding',
+      summary: `Sign your acceptance of ${change.findingKey}. An accepted fail still reads "fail (accepted)": it is recorded, never a pass.`,
+      payload: (nonce) =>
+        humanGatePayload(
+          'accept a prototype review finding',
+          [change.findingKey],
+          { inputsHash: change.inputsHash, comment: change.comment.trim() },
+          nonce,
+        ),
+      onSigned: (confirmation) => dispatch(DISPOSITION_COMMAND, { ...change, confirmation }),
+    });
   };
   const checks = result?.checks ?? [];
   const explained = explainKey === null ? undefined : findFinding(checks, explainKey);
@@ -199,6 +215,7 @@ export function ReviewPanel({ className }: { className?: string }): React.ReactE
           </PanelSection>
         </>
       )}
+      {signing !== null && <SignActDialog request={signing} onClose={() => setSigning(null)} />}
       {explained !== undefined && (
         <ExplainDrawer result={explained.result} item={explained.item} onClose={() => useReviewStore.getState().openExplain(null)} />
       )}

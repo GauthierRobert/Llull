@@ -1,64 +1,121 @@
-/** /signing endpoints and the human caller over POST /command (09 PLM TR-PLM-16, TR-PLM-08). */
+/** /signing endpoints (typed requests, rate limit) and POST /command (no caller label) - 09 PLM TR-PLM-16, TR-PLM-08. */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
 import { app } from '../src/index';
 import { _resetHistory } from '../src/commandBus';
-import { _resetLiveDoc, getLiveDoc } from '../src/liveDocument';
-import { createKeyStore } from '../src/plm/keyStore';
+import { _resetLiveDoc, getLiveDoc, setLiveDoc } from '../src/liveDocument';
 import { verifyEd25519 } from '../src/plm/ed25519';
+import { GATE_CONTEXT, createSignaturePort } from '../src/plm/signaturePort';
+import { createTrustStore } from '../src/plm/trustStore';
+import { actPayload } from '@plm/gate';
+import { PASSPHRASE, type TestHome, testHome, trustedKey } from './plmTestSupport';
+import { reviewWithEco } from '../../tests/unit/plm/fixtures';
 
-let dir = '';
+let home: TestHome;
 beforeEach(() => {
-  dir = mkdtempSync(path.join(tmpdir(), 'llull-sign-'));
-  process.env['LLULL_KEYS_DIR'] = dir;
+  home = testHome();
+  home.apply();
   _resetLiveDoc();
   _resetHistory();
 });
-afterEach(() => {
-  delete process.env['LLULL_KEYS_DIR'];
-  rmSync(dir, { recursive: true, force: true });
-});
+afterEach(() => home.cleanup());
 
 describe('/signing', () => {
-  it('lists keys and signs with the right passphrase only', async () => {
-    const record = createKeyStore().create({ userId: 'u-1', name: 'J. Example', passphrase: 'pw', at: '2026-11-02T09:00:00Z' });
+  it('lists keys with their trust and signs only typed requests built by the server', async () => {
+    const key = await trustedKey(home.env, 'u-1');
     const listed = await request(app).get('/signing/keys');
-    expect(listed.body.keys).toEqual([record]);
-    const raw = await request(app).post('/signing/sign').send({ keyId: record.keyId, passphrase: 'pw', message: 'manifest bytes' });
-    expect(raw.status).toBe(200);
-    expect(verifyEd25519(record.publicKey, 'manifest bytes', raw.body.signature)).toBe(true);
-    expect(raw.body.signer).toEqual({ userId: 'u-1', name: 'J. Example' });
+    expect(listed.body.keys).toEqual([{ ...key.record, trusted: true }]);
+
+    const payload = 'a'.repeat(64);
     const gate = await request(app)
       .post('/signing/sign')
-      .send({ keyId: record.keyId, passphrase: 'pw', payloadSha256: 'a'.repeat(64) });
-    expect(gate.body.signature).toMatchObject({ alg: 'Ed25519', keyId: record.keyId, publicKey: record.publicKey });
-    expect(verifyEd25519(record.publicKey, 'a'.repeat(64), gate.body.signature.signature)).toBe(true);
-    expect((await request(app).post('/signing/sign').send({ keyId: record.keyId, passphrase: 'nope', message: 'x' })).status).toBe(403);
-    expect((await request(app).post('/signing/sign').send({ keyId: 'k-none', passphrase: 'pw', message: 'x' })).status).toBe(400);
-    expect((await request(app).post('/signing/sign').send({ keyId: record.keyId, passphrase: 'pw' })).status).toBe(400);
+      .send({ kind: 'payload', keyId: key.record.keyId, passphrase: PASSPHRASE, payloadSha256: payload });
+    expect(gate.body.signature).toMatchObject({ alg: 'Ed25519', keyId: key.record.keyId, publicKey: key.record.publicKey });
+    expect(verifyEd25519(key.record.publicKey, `${GATE_CONTEXT}${payload}`, gate.body.signature.signature)).toBe(true);
+    expect(verifyEd25519(key.record.publicKey, payload, gate.body.signature.signature)).toBe(false);
+
+    setLiveDoc(reviewWithEco());
+    const live = getLiveDoc();
+    const act = await request(app)
+      .post('/signing/sign')
+      .send({
+        kind: 'gate',
+        keyId: key.record.keyId,
+        passphrase: PASSPHRASE,
+        command: 'release_item',
+        params: { changeOrder: 'ECO-0100' },
+        nonce: 'nonce-route-1',
+      });
+    expect(act.body.payloadSha256).toBe(actPayload(live, 'release_item', { changeOrder: 'ECO-0100' }, 'nonce-route-1'));
+    expect(act.body.signature.nonce).toBe('nonce-route-1');
+    const port = createSignaturePort(createTrustStore(home.env), home.env);
+    expect(port.verify(act.body.signature, act.body.payloadSha256)?.signer).toBe('u-1');
+
+    const manifestDoc = (await import('../../tests/unit/plm/fixtures')).released();
+    setLiveDoc(manifestDoc);
+    const manifest = await request(app)
+      .post('/signing/sign')
+      .send({ kind: 'manifest', keyId: key.record.keyId, passphrase: PASSPHRASE, revision: 'A', meaning: 'release' });
+    expect(manifest.status).toBe(200);
+    expect(manifest.body.signer).toEqual({ userId: 'u-1', name: 'J. Example' });
+
+    for (const bad of [
+      { kind: 'gate', command: 'add_box', params: {}, nonce: 'nonce-route-1' },
+      { kind: 'manifest', revision: 'Z' },
+      { kind: 'payload', payloadSha256: 'short' },
+      { kind: 'other' },
+      {},
+    ])
+      expect(
+        (
+          await request(app)
+            .post('/signing/sign')
+            .send({ keyId: key.record.keyId, passphrase: PASSPHRASE, ...bad })
+        ).status,
+      ).toBe(400);
+    expect(
+      (await request(app).post('/signing/sign').send({ kind: 'payload', keyId: 'k-none', passphrase: PASSPHRASE, payloadSha256: payload }))
+        .status,
+    ).toBe(400);
     expect((await request(app).post('/signing/sign').send({ keyId: 5 })).status).toBe(400);
+  });
+
+  it('five wrong passphrases lock the key for a minute (429), and a wrong one never signs', async () => {
+    const key = await trustedKey(home.env, 'u-1');
+    const wrong = (): request.Test =>
+      request(app)
+        .post('/signing/sign')
+        .send({ kind: 'payload', keyId: key.record.keyId, passphrase: 'wrong passphrase!', payloadSha256: 'b'.repeat(64) });
+    for (let attempt = 0; attempt < 5; attempt += 1) expect((await wrong()).status).toBe(403);
+    expect((await wrong()).status).toBe(429);
+    const right = await request(app)
+      .post('/signing/sign')
+      .send({ kind: 'payload', keyId: key.record.keyId, passphrase: PASSPHRASE, payloadSha256: 'b'.repeat(64) });
+    expect(right.status).toBe(429);
   });
 });
 
-describe('POST /command caller', () => {
-  const identity = { partNumber: 'LL-9', name: 'n', itemType: 'part', policy: { humanSignatureRequired: false } };
+describe('POST /command', () => {
+  const identity = { partNumber: 'LL-9', name: 'n', itemType: 'part' };
 
-  it('a request is an agent unless it says caller human; the filled time is what live sync replays', async () => {
-    const agent = await request(app).post('/command').send({ name: 'set_item_identity', params: identity });
-    expect(agent.body.isError).toBe(true);
-    expect(agent.body.error.code).toBe('PLM_HUMAN_GATE');
-    const human = await request(app).post('/command').send({ name: 'set_item_identity', params: identity, caller: 'human' });
-    expect(human.body.isError).toBe(false);
-    const submit = await request(app).post('/command').send({ name: 'submit_for_review', params: {}, caller: 'agent' });
+  it('there is no way to claim to be human: a caller field, a client field or a policy change without a signature is refused', async () => {
+    const withPolicy = { ...identity, policy: { humanSignatureRequired: false } };
+    for (const extra of [{}, { caller: 'human' }, { client: 'ui' }, { client: 'cli', caller: 'human' }]) {
+      const refused = await request(app)
+        .post('/command')
+        .send({ name: 'set_item_identity', params: withPolicy, ...extra });
+      expect(refused.body.error.code, JSON.stringify(extra)).toBe('PLM_HUMAN_GATE');
+    }
+    expect(getLiveDoc().plm).toBeUndefined();
+    const created = await request(app).post('/command').send({ name: 'set_item_identity', params: identity });
+    expect(created.body.isError).toBe(false);
+    const submit = await request(app).post('/command').send({ name: 'submit_for_review', params: {} });
     expect(submit.body.isError).toBe(false);
     expect(getLiveDoc().plm?.item.revisions['A']?.stateHistory.at(-1)?.at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     const approval = await request(app)
       .post('/command')
-      .send({ name: 'record_approval', params: { role: 'checker', userId: 'u-2' }, caller: 'agent' });
+      .send({ name: 'record_approval', params: { role: 'checker', userId: 'u-2' }, caller: 'human' });
     expect(approval.body.error.code).toBe('PLM_HUMAN_GATE');
   });
 });

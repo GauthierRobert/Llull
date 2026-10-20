@@ -20,8 +20,9 @@ export interface DocumentExtension {
    */
   restore(raw: Record<string, unknown>): Record<string, unknown>;
   /**
-   * Slices `replayHistory` must neither lose nor regenerate (document input state the plugin's metaHistory commands own): called with the
-   * pre-replay document and the seeded replay document, returns the seed plus those slices.
+   * Slices `replayHistory` must neither lose nor regenerate (document input state the plugin's metaHistory commands own): called AFTER the
+   * steps with the pre-replay document and the replayed document, returns the replayed document plus those slices (so a plugin guard never sees the
+   * regenerated steps as edits of its slice).
    * @invariant pure; returns `next` unchanged when the plugin has no data in `prev`
    */
   carry?(prev: CadDocument, next: CadDocument): CadDocument;

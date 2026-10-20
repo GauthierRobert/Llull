@@ -8,23 +8,57 @@ import { execute } from '@core/commands/registry';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
+import { actPayload } from '@plm/gate';
+import { GATED_COMMANDS } from '@plm/commands/status';
+import { fakePort } from './fakePort';
 
 const VALIDATION = resolve(import.meta.dirname, '../../../docs/aerospace/09-plm-configuration-traceability/validation');
 export const readValidation = (relative: string): string => readFileSync(resolve(VALIDATION, relative), 'utf8');
 
+/** A context with a signing port that trusts any confirmation signed over the exact act payload (see fakePort): the test host of a human with a trusted key. */
 export const humanContext = (overrides: Partial<ExecutionContext> = {}): ExecutionContext => ({
   ...defaultContext(),
-  caller: { kind: 'human' },
+  humanSignature: fakePort(),
   ...overrides,
 });
+/** An agent: no signing port and no key, so it can prepare acts but never clear a human gate. */
 export const agentContext = (overrides: Partial<ExecutionContext> = {}): ExecutionContext => ({
   ...defaultContext(),
-  caller: { kind: 'agent' },
+  humanSignature: null,
   ...overrides,
 });
 
-/** Run `command` and return the result (a document-replacing result carries the new document). */
-export const run = (doc: CadDocument, command: string, params: unknown, ctx: ExecutionContext = humanContext()): CommandResult =>
+/** The human-only plm commands (the same list as `plm_act_payload`). */
+const GATED = new Set(GATED_COMMANDS as readonly string[]);
+
+/** `params` of a human-only command plus a confirmation signed (by the fake key of `as`) over exactly this act on exactly this document. */
+export function confirmed(doc: CadDocument, command: string, params: Record<string, unknown>, as: string): Record<string, unknown> {
+  const nonce = `nonce-${command}-${as}`;
+  return { ...params, confirmation: { alg: 'Ed25519', signature: actPayload(doc, command, params, nonce), nonce, as } };
+}
+
+/** Run `command`; a human-only plm command on a context that holds a signing port is auto-confirmed as the user the params name (default u-1). */
+export function run(doc: CadDocument, command: string, params: unknown, ctx: ExecutionContext = humanContext()): CommandResult {
+  const given = typeof params === 'object' && params !== null ? (params as Record<string, unknown>) : {};
+  if (command === 'release_item' && Array.isArray(given['approvals'])) {
+    // Scenario text passes inline approvals; in this build each approval is recorded (and signed) by its own approver first. A refused release
+    // returns the document as it was given (the approvals recorded for the attempt are discarded).
+    const { approvals, ...rest } = given;
+    const approved = (approvals as { role: string; userId: string }[]).reduce(
+      (next, approval) => run(next, 'record_approval', approval, ctx).document,
+      doc,
+    );
+    const released = run(approved, 'release_item', rest, ctx);
+    return released.rejected === true ? { ...released, document: doc } : released;
+  }
+  if (!GATED.has(command) || ctx.humanSignature === null || ctx.humanSignature === undefined || 'confirmation' in given)
+    return execute(doc, command, params, ctx);
+  const as = String(given['userId'] ?? given['decidedBy'] ?? given['by'] ?? 'u-1');
+  return execute(doc, command, confirmed(doc, command, given, as), ctx);
+}
+
+/** Run exactly what is given: no auto-confirmation (attack tests). */
+export const runRaw = (doc: CadDocument, command: string, params: unknown, ctx: ExecutionContext = humanContext()): CommandResult =>
   execute(doc, command, params, ctx);
 
 export const loadSample = (): CadDocument =>

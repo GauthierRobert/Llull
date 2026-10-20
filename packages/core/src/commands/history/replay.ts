@@ -138,8 +138,7 @@ export function replayHistory(
     // The building identity (IFC GlobalId salt) survives replay; its content is regenerated.
     ...(base.building?.uid !== undefined ? { building: { ...createEmptyBuilding(), uid: base.building.uid } } : {}),
   };
-  // Slices an installed plugin owns as document input state (PLM record, ...) survive replay unchanged.
-  let doc: CadDocument = documentExtensions().reduce((next, extension) => extension.carry?.(base, next) ?? next, seed);
+  let doc: CadDocument = seed;
   // idMap tracks old entity id (from when the step was first recorded) → new id
   // (assigned during this replay). Subsequent steps' params are rewritten via
   // remapIds. Step-scoped ids replay identically, so this only maps legacy (pre-v2) ids.
@@ -209,5 +208,7 @@ export function replayHistory(
     stateKey = parameterFingerprint !== undefined ? nextStateKey(key, 'parameters', parameterFingerprint, null) : key;
     onStep?.({ step, rawParams: remapIds(step.params, idMap), params: remapped, before, after: doc, inert, failure });
   }
-  return withCarriedPmi(doc, base);
+  // Slices an installed plugin owns as document input state (the PLM record, ...) are re-attached AFTER the steps: carried through them, a release
+  // lock would see every regenerated step as an edit of the locked definition.
+  return documentExtensions().reduce((next, extension) => extension.carry?.(base, next) ?? next, withCarriedPmi(doc, base));
 }

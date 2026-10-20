@@ -1,5 +1,5 @@
 // 03 GDT M3 (VC-GDT-53): the PMI panel gathers params and dispatches commands; the viewport layer shows the active saved view's items.
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { createEmptyDocument } from '@core/model/types';
 import { setGeometryKernel } from '@core/geometry/kernel';
@@ -50,17 +50,43 @@ describe('PmiPanel', () => {
     expect(screen.getByTestId('review-required').textContent).toContain('2 PMI item(s)');
   });
 
-  it('accept dispatches accept_pmi_review for an item awaiting review; reject needs a comment so it is disabled', () => {
+  it('accept needs a signature: it opens the signing dialog and dispatches accept_pmi_review only with the signed confirmation; reject needs a comment so it is disabled', async () => {
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) =>
+      Promise.resolve(
+        String(url).endsWith('/signing/keys')
+          ? new Response(JSON.stringify({ keys: [{ keyId: 'k-1', userId: 'u-1', name: 'J. Example', trusted: true }] }), { status: 200 })
+          : new Response(
+              JSON.stringify({
+                signature: {
+                  alg: 'Ed25519',
+                  keyId: 'k-1',
+                  publicKey: 'a'.repeat(64),
+                  signature: 'b'.repeat(128),
+                  seen: JSON.parse(String(init?.body)).kind,
+                },
+              }),
+              { status: 200 },
+            ),
+      ),
+    );
     const { datum } = withPmi();
     const spy = spyDispatch();
     render(<PmiPanel />);
     fireEvent.click(screen.getByTestId(`pmi-accept-${datum}`));
+    expect(spy).not.toHaveBeenCalled();
+    expect(await screen.findByTestId('sign-summary')).toBeTruthy();
+    await screen.findByText(/J. Example/);
+    fireEvent.change(screen.getByTestId('sign-passphrase'), { target: { value: 'a long passphrase' } });
+    fireEvent.click(screen.getByTestId('sign-confirm'));
+    await vi.waitFor(() => expect(spy).toHaveBeenCalled());
     expect(spy).toHaveBeenCalledWith('accept_pmi_review', {
       pmiIds: [datum],
       decision: 'accept',
       comment: '',
       at: expect.stringMatching(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/),
+      confirmation: expect.objectContaining({ alg: 'Ed25519', keyId: 'k-1', nonce: expect.stringMatching(/^[0-9a-f]{24}$/) }),
     });
+    vi.unstubAllGlobals();
     const reject = screen.getByTestId(`pmi-reject-${datum}`) as HTMLButtonElement;
     expect(reject.disabled).toBe(true);
     expect(reject.title).toContain('comment');

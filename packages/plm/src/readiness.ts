@@ -17,7 +17,6 @@ export interface Finding {
 export interface ReleaseInputs {
   readonly changeOrder?: string;
   readonly effectivity?: readonly Effectivity[];
-  readonly approvals?: readonly Approval[];
 }
 
 const finding = (code: Finding['code'], severity: Finding['severity'], message: string, ids: readonly string[] = []): Finding => ({
@@ -32,13 +31,6 @@ const finding = (code: Finding['code'], severity: Finding['severity'], message: 
         ? 'Let the title block follow plm: clear the free text.'
         : remediationOf(code),
 });
-
-/** Recorded approvals plus those passed with the release, one per (role, user). */
-export function mergedApprovals(revision: Revision, extra: readonly Approval[] = []): Approval[] {
-  const merged = [...revision.approvals];
-  for (const approval of extra) if (!merged.some((m) => m.role === approval.role && m.userId === approval.userId)) merged.push(approval);
-  return merged;
-}
 
 /** Users who authored the revision: whoever checkpointed it and every design-authority approver. */
 const authorsOf = (revision: Revision, approvals: readonly Approval[]): Set<string> =>
@@ -115,7 +107,7 @@ export function releaseFindings(doc: CadDocument, plm: PlmModel, inputs: Release
   }
   const { findings: ecoFindings, eco } = changeOrderFindings(plm, revision, inputs.changeOrder);
   found.push(...ecoFindings);
-  const approvals = mergedApprovals(revision, inputs.approvals);
+  const approvals = revision.approvals;
   const missing = plm.policy.requiredApprovalRoles.filter((role) => !approvals.some((approval) => approval.role === role));
   if (missing.length > 0)
     found.push(finding('PLM_APPROVALS_MISSING', 'fail', `approvals missing for role(s): ${missing.join(', ')}`, missing));

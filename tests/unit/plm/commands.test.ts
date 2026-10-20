@@ -24,6 +24,28 @@ describe('identity and scheme (VC-PLM-01, 04, 25)', () => {
     expect(result.affected).toEqual([]);
   });
 
+  it('revision labels are file-name and ref safe: path-like or lowercase custom labels are refused, and a forged file with such a key fails validation', () => {
+    for (const labels of [['../X'], ['A/B'], ['a'], ['A.1'], ['X'.repeat(17)], ['OK', 'OK']])
+      expect(
+        code(loadSample(), 'set_item_identity', { ...identity, revisionScheme: 'custom:x', customLabels: labels }),
+        labels.join(),
+      ).toBe('PLM_SCHEME_INVALID');
+    const doc = inWork();
+    const revision = doc.plm?.item.revisions['A'];
+    const forged = {
+      ...doc,
+      plm: {
+        ...doc.plm,
+        item: { ...doc.plm?.item, currentRevision: '../x', revisionOrder: ['../x'], revisions: { '../x': { ...revision, label: '../x' } } },
+      },
+    };
+    const loaded = run(createEmptyDocument(), 'load_document', {
+      json: JSON.stringify({ format: 'llull-document', version: 3, document: forged }),
+    });
+    expect(loaded.summary).toContain('must be 1-16 characters');
+    expect(loaded.document.plm).toBeUndefined();
+  });
+
   it('is pure and may rename the item before review (marking is kept)', () => {
     const doc = inWork();
     const before = JSON.stringify(doc);

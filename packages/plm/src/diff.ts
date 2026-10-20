@@ -1,6 +1,6 @@
 /** Revision diff (FR-PLM-13, §5.4): per-category comparison of two frozen definitions (llull-document envelopes). */
 
-import { canonicalJson } from '@lib/canonicalJson';
+import { jcsJson } from '@lib/jcs';
 import { isRecord } from '@lib/isRecord';
 
 type Table = Record<string, unknown>;
@@ -19,7 +19,7 @@ function keyedDiff(from: Table, to: Table): IdDiff {
   return {
     added: Object.keys(to).filter((key) => !Object.hasOwn(from, key)),
     removed: Object.keys(from).filter((key) => !Object.hasOwn(to, key)),
-    changed: Object.keys(to).filter((key) => Object.hasOwn(from, key) && canonicalJson(from[key]) !== canonicalJson(to[key])),
+    changed: Object.keys(to).filter((key) => Object.hasOwn(from, key) && jcsJson(from[key]) !== jcsJson(to[key])),
   };
 }
 
@@ -50,8 +50,7 @@ function historyDiff(
     const old = before.get(id);
     if (old === undefined) steps.push({ id, change: 'added' });
     else if (Boolean(old['suppressed']) !== Boolean(step['suppressed'])) steps.push({ id, change: 'suppressed' });
-    else if (old['name'] !== step['name'] || canonicalJson(old['params']) !== canonicalJson(step['params']))
-      steps.push({ id, change: 'edited' });
+    else if (old['name'] !== step['name'] || jcsJson(old['params']) !== jcsJson(step['params'])) steps.push({ id, change: 'edited' });
   }
   for (const id of before.keys()) if (!after.has(id)) steps.push({ id, change: 'removed' });
   const count = (change: string): number => steps.filter((step) => step.change === change).length;

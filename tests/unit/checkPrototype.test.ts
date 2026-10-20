@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
+import type { HumanSignaturePort } from '@core/model/analysis';
+import { humanGatePayload } from '@core/model/humanGate';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { setPhysicsEngine } from '@core/dynamics/physicsEngine';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
@@ -42,7 +44,22 @@ interface Data {
   reviewRequired: boolean;
 }
 
-const ctxOf = (): ExecutionContext => ({ ...defaultContext(), kernel });
+/** A scripted signature port: it clears an act whose confirmation signature IS the payload it is asked to verify (an act-bound signature by `as`). */
+const reviewerPort: HumanSignaturePort = {
+  verify: (confirmation, payload) =>
+    typeof confirmation === 'object' && confirmation !== null && (confirmation as { signature?: unknown }).signature === payload
+      ? { signer: String((confirmation as { as?: unknown }).as), signatureId: 'reviewer' }
+      : null,
+};
+const ctxOf = (): ExecutionContext => ({ ...defaultContext(), kernel, humanSignature: reviewerPort });
+
+/** `confirmation` of the acceptance of `findingKey` signed over exactly that act by `as`. */
+const acceptance = (findingKey: string, inputsHash: string, comment: string, as = 'reviewer'): Record<string, unknown> => ({
+  alg: 'Ed25519',
+  as,
+  nonce: 'nonce-accept',
+  signature: humanGatePayload('accept a prototype review finding', [findingKey], { inputsHash, comment }, 'nonce-accept'),
+});
 
 function step(doc: CadDocument, command: string, params: Record<string, unknown>): { doc: CadDocument; id: string } {
   const result = execute(doc, command, params, ctxOf());
@@ -109,11 +126,12 @@ describe('check_prototype', () => {
       status: 'accepted',
       comment: 'known, the stop is moved in rev B',
       inputsHash: motion.inputsHash,
+      confirmation: acceptance(hit.findingKey, motion.inputsHash, 'known, the stop is moved in rev B'),
     }).doc;
     const second = run(accepted).data;
     const joined = checkOf(second, 'motion_clearance').items.find((item) => item.findingKey === hit.findingKey);
     expect(joined?.status).toBe('fail');
-    expect(joined?.disposition).toMatchObject({ status: 'accepted', stale: false, by: 'agent' });
+    expect(joined?.disposition).toMatchObject({ status: 'accepted', stale: false, by: 'human' });
     // recording the disposition does not change the check's hash
     expect(checkOf(second, 'motion_clearance').inputsHash).toBe(motion.inputsHash);
     expect(second.verdict).toBe('blocked');
@@ -197,27 +215,41 @@ describe('set_review_disposition', () => {
       by: 'agent',
     });
     expect(prototypeProblems(first.document.prototype)).toEqual([]);
-    const accepted = set(first.document, { status: 'accepted', comment: 'ok' });
+    const accepted = set(first.document, { status: 'accepted', comment: 'ok', confirmation: acceptance(key, 'h1', 'ok') });
     expect(accepted.summary).toMatch(/Recorded only: an accepted fail still reads "fail \(accepted\)"/);
     const cleared = set(accepted.document, { status: 'not_reviewed' });
     expect(cleared.document.prototype?.dispositions).toEqual({});
     expect(cleared.summary).toMatch(/Cleared the disposition/);
   });
 
-  it('acceptance is a human act: an agent caller gets FPR_HUMAN_GATE, a human is recorded as human (FR-FPR-31, VC-FPR-22)', () => {
+  it('acceptance is a human act: only a signature over THIS finding clears it (FR-FPR-31, VC-FPR-22); a label or a missing port never does', () => {
     const doc = createEmptyDocument();
-    const as = (kind: 'human' | 'agent'): ExecutionContext => ({ ...ctxOf(), caller: { kind } });
     const params = { findingKey: key, inputsHash: 'h1', status: 'accepted', comment: 'tested' };
-    const refused = execute(doc, 'set_review_disposition', params, as('agent'));
-    expect(refused.error?.code).toBe('FPR_HUMAN_GATE');
-    expect(refused.document).toBe(doc);
-    const relevant = execute(doc, 'set_review_disposition', { ...params, status: 'relevant' }, as('agent'));
+    const noPort = execute(doc, 'set_review_disposition', params, { ...ctxOf(), humanSignature: null });
+    expect(noPort.error?.code).toBe('FPR_HUMAN_GATE');
+    expect(noPort.document).toBe(doc);
+    for (const confirmation of [
+      undefined,
+      true,
+      {},
+      { ...acceptance(key, 'h1', 'tested'), signature: 'forged' },
+      acceptance(key, 'h1', 'other comment'),
+      acceptance('assembly:FPR_X:a', 'h1', 'tested'),
+    ]) {
+      const refused = execute(
+        doc,
+        'set_review_disposition',
+        { ...params, ...(confirmation === undefined ? {} : { confirmation }) },
+        ctxOf(),
+      );
+      expect(refused.document, JSON.stringify(confirmation)).toBe(doc);
+    }
+    expect(execute(doc, 'set_review_disposition', params, ctxOf()).error?.code).toBe('FPR_HUMAN_GATE');
+    const relevant = execute(doc, 'set_review_disposition', { ...params, status: 'relevant' }, { ...ctxOf(), humanSignature: null });
     expect(relevant.document.prototype?.dispositions?.[key]?.by).toBe('agent');
-    const accepted = execute(doc, 'set_review_disposition', params, as('human'));
+    const accepted = execute(doc, 'set_review_disposition', { ...params, confirmation: acceptance(key, 'h1', 'tested', 'grace') }, ctxOf());
     expect(accepted.document.prototype?.dispositions?.[key]).toMatchObject({ status: 'accepted', by: 'human' });
     expect(accepted.summary).toContain('by human');
-    const intent = execute({ ...doc, entities: {} }, 'allow_interference', { a: 'x', b: 'y', kind: 'weld', reason: 'r' }, as('human'));
-    expect(intent.affected).toEqual([]);
   });
 
   it('refuses a malformed key, an empty hash, an unchanged disposition and clearing nothing', () => {

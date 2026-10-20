@@ -2,9 +2,8 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { PlmModel, PlmPolicy, Revision } from '@core/model/plm';
-import type { CommandResult, ExecutionContext } from '@core/commands/types';
+import type { ExecutionContext } from '@core/commands/types';
 import { getCommand } from '@core/commands/registry';
-import { refusePlm } from './refusal';
 
 export const DEFAULT_POLICY: PlmPolicy = {
   requireChangeOrder: true,
@@ -37,23 +36,6 @@ export const scopeHash = (doc: CadDocument, ctx?: ExecutionContext): string => s
 export function isDirty(doc: CadDocument, plm: PlmModel, ctx?: ExecutionContext): boolean {
   const last = currentRevisionOf(plm)?.iterations.at(-1);
   return last === undefined || last.contentHash !== scopeHash(doc, ctx);
-}
-
-/** Refusal of an agent caller on a human-only act (AF-34, TR-PLM-16); null for a human or an in-process caller. */
-export function humanGateRefusal(
-  doc: CadDocument,
-  command: string,
-  ctx: ExecutionContext | undefined,
-  ids: readonly string[],
-): CommandResult | null {
-  if (ctx?.caller?.kind !== 'agent') return null;
-  return refusePlm(
-    doc,
-    command,
-    'PLM_HUMAN_GATE',
-    `${command} is a human act (approval, classification, release or marking); an agent can prepare it but not do it`,
-    ids,
-  );
 }
 
 /** Append-only state change record. */

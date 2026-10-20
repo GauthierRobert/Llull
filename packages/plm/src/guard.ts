@@ -3,7 +3,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { DerivationGuard, GuardRefusal } from '@core/commands/derivation';
 import { commandError } from '@core/commands/noop';
-import { canonicalJson } from '@lib/canonicalJson';
+import { getCommand } from '@core/commands/registry';
 import { remediationOf } from './refusal';
 
 /** Commands that replace the document wholesale (integrity is checked on load) or restore a released snapshot (checked by the command). */
@@ -12,15 +12,25 @@ const EXEMPT = new Set(['load_document', 'clear_document', 'restore_revision_sna
 /** Top-level keys outside the release scope: view state and the PLM record itself. */
 const OUTSIDE_SCOPE = new Set(['selection', 'camera', 'plm']);
 
-/** Whether any key of the release scope differs (by reference first, by canonical value when a command re-created an equal object). */
+/** The release-scope hash of `doc` (the registered document_content_hash query: derived entities and private values are outside it). */
+function hashOf(doc: CadDocument): string | null {
+  const data = getCommand('document_content_hash')?.run(doc, {}).data as { sha256?: string } | undefined;
+  return data?.sha256 ?? null;
+}
+
+/**
+ * Whether the release scope differs: reference comparison first (a handful of comparisons); only when some key was re-created, one content hash of each
+ * document decides, so a command that regenerates the identical definition (replay_history of a released revision) is allowed.
+ */
 function scopeChanged(previous: CadDocument, next: CadDocument): boolean {
   const before = previous as unknown as Record<string, unknown>;
   const after = next as unknown as Record<string, unknown>;
-  for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
-    if (OUTSIDE_SCOPE.has(key) || before[key] === after[key]) continue;
-    if (canonicalJson(before[key]) !== canonicalJson(after[key])) return true;
-  }
-  return false;
+  const recreated = [...new Set([...Object.keys(before), ...Object.keys(after)])].some(
+    (key) => !OUTSIDE_SCOPE.has(key) && before[key] !== after[key],
+  );
+  if (!recreated) return false;
+  const [a, b] = [hashOf(previous), hashOf(next)];
+  return a === null || b === null || a !== b;
 }
 
 const refusal = (

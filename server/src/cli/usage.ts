@@ -43,13 +43,14 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
                               [--validate] dry-run check  [--continue] onError=continue
   new [--force]               write an empty document
   undo | redo                 local: swap with FILE.bak (one level); server: shared history
-  keys list | create --user ID --name NAME | revoke KEYID   local signing keys (09 PLM; $LLULL_KEYS_DIR, default ~/.llull/keys;
-                              the private key is encrypted with $LLULL_KEY_PASSPHRASE, or --passphrase-env VAR)
-  release pack --revision R --out DIR [--attach]   write the signed, read-only release package of a frozen revision (--doc; --attach records
-                              its hash with attach_release_package, needs --as human)
+  keys list | create --user ID --name NAME | revoke KEYID   enroll a local signing key (09 PLM; $LLULL_KEYS_DIR, default ~/.llull/keys;
+                              private key encrypted with $LLULL_KEY_PASSPHRASE (>= 12 characters), or --passphrase-env VAR). An enrolled key is NOT trusted:
+                              only the llull desktop app can trust it (Keys); revoke withdraws trust
+  release pack --revision R --out DIR [--attach --confirm-key KEYID]   write the signed, read-only release package of a
+                              frozen revision (--doc; --attach records its hash with attach_release_package, a human-only act)
   release verify DIR          re-verify a package: member hashes, manifest hash, Ed25519 signatures, key trust (works without a document)
   release sign --revision R --key KEYID [--kind release|iteration] [--apply]   sign release_manifest with a local key; --apply records it
-                              with record_signature (needs --as human), else prints the params
+                              with record_signature (the key must be trusted), else prints the params
   audit verify [DIR]          recompute the hash-chained audit log ($LLULL_AUDIT_DIR, default ~/.llull/audit); exit 1 on a broken chain
   run_benchmarks [packs=a,b]  judge every docs/physics/*/validation/expected_results.json case
                               (harness recipes + unit-test measurements); exit 1 on an A-grade
@@ -58,9 +59,10 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
 Flags
   --app                       act on the running llull desktop app (what the user sees;
                               found via ~/.llull/desktop.json, token included)
-  --as human|agent            who is calling (default agent): human-only acts (record_approval, release_item, classify_change_order,
-                              set_item_marking, record_signature, ...) refuse an agent with PLM_HUMAN_GATE. A local convention, advisory
-                              on this machine; the signature requirement is what an agent cannot satisfy
+  --confirm-key KEYID         human-only plm acts (record_approval, release_item, classify_change_order, set_change_state, set_item_marking,
+                              set_lifecycle_state obsolete, set_item_identity policy, attach_release_package) need a signature by a TRUSTED
+                              key over the act: this flag signs it (passphrase in $LLULL_KEY_PASSPHRASE or --passphrase-env). Without it
+                              they are refused with PLM_HUMAN_GATE; there is no caller label to claim
   --doc FILE                  local document file
   --server URL                act on a running llull server's live document instead
                               ($LLULL_SERVER; --token T or $LLULL_TOKEN for Bearer auth)

@@ -7,9 +7,10 @@ import type { CadDocument } from '@core/model/types';
 import type { Iteration, PlmModel, Revision } from '@core/model/plm';
 import type { ExecutionContext } from '@core/commands/types';
 import { refusePlm } from '../refusal';
-import { NOT_MANAGED, currentRevisionOf, humanGateRefusal, revisionText, scopeHash, stateChange } from '../state';
+import { NOT_MANAGED, currentRevisionOf, revisionText, scopeHash, stateChange } from '../state';
+import { humanAct } from '../gate';
 import { withRevision } from '../revisions';
-import { atSchema, bySchema } from '../params';
+import { atSchema, bySchema, confirmationSchema } from '../params';
 
 /** The plm record and its current revision, or the refusal that explains why the command cannot start. */
 function managed(
@@ -185,13 +186,20 @@ export const recordApproval = defineCommand({
   annotations: { metaHistory: true },
   params: z.object({
     role: z.string().min(1).describe("Approval role, e.g. 'design-authority' or 'checker'."),
-    userId: z.string().min(1).describe('The approving user id.'),
+    userId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Ignored: the approval is recorded under the signer of the confirmation (the trusted key record).'),
+    confirmation: confirmationSchema,
     comment: z.string().optional().describe('Optional remark.'),
     at: atSchema.optional(),
   }),
-  run: (doc, { role, userId, comment, at }, ctx): CommandResult => {
-    const gate = humanGateRefusal(doc, 'record_approval', ctx, [role, userId]);
-    if (gate !== null) return gate;
+  run: (doc, params, ctx): CommandResult => {
+    const { role, comment, at } = params;
+    const gate = humanAct(doc, 'record_approval', params, ctx);
+    if ('refusal' in gate) return gate.refusal;
+    const userId = gate.signer;
     const found = managed(doc, 'record_approval', 'in_review', 'approvals are recorded on an in_review revision');
     if (isRefusal(found)) return found;
     const { plm, revision } = found;

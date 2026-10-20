@@ -9,6 +9,8 @@ export interface SigningKey {
   readonly userId: string;
   readonly name: string;
   readonly revokedAt?: string;
+  /** Whether the desktop app trusted this key (only a trusted key's signature counts). */
+  readonly trusted?: boolean;
 }
 
 /** The registered, not revoked signing keys of this machine; empty when the backend is unreachable. */
@@ -36,7 +38,7 @@ export async function signPayload(
     const response = await fetch(`${SERVER_BASE}/signing/sign`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...serverAuthHeaders() },
-      body: JSON.stringify({ keyId, passphrase, payloadSha256 }),
+      body: JSON.stringify({ kind: 'payload', keyId, passphrase, payloadSha256 }),
     });
     const body: unknown = await response.json();
     if (response.ok && isRecord(body) && body['signature'] !== undefined) return { signature: body['signature'] };

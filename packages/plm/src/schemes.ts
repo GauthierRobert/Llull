@@ -14,8 +14,11 @@ export function isKnownScheme(scheme: string): boolean {
 }
 
 /** Whether `labels` is a usable custom list: non-empty, non-blank, unique. */
+/** Revision labels are file-name and manifest-ref safe: upper-case letters, digits and hyphens only. */
+export const REVISION_LABEL = /^[A-Z0-9-]{1,16}$/;
+
 export function isValidCustomList(labels: readonly string[]): boolean {
-  return labels.length > 0 && labels.every((label) => label.trim() !== '') && new Set(labels).size === labels.length;
+  return labels.length > 0 && labels.every((label) => REVISION_LABEL.test(label)) && new Set(labels).size === labels.length;
 }
 
 /**

@@ -8,6 +8,7 @@ import { llullHome, removeDesktopDiscovery, writeDesktopDiscovery } from '@serve
 import { chooseBackendPort, startBackend, type RunningBackend } from './backend';
 import { backendEnv, backendOrigin, nativeBundleDir } from './backendEnv';
 import { cliShimFor, installCliShim } from './cliShim';
+import { trustPendingKeys } from './keyTrust';
 import { createDocumentSession, type DocumentSession } from './documents';
 import { DEFAULT_SAVE_NAME, DOCUMENT_EXTENSIONS, DOCUMENT_FILE_PATTERN } from '@protocol/documentFiles';
 import { desktopLayout } from './layout';
@@ -151,6 +152,32 @@ async function newDocument(): Promise<void> {
   await guarded('New', async () => session?.newDocument());
 }
 
+/** File > Trust Signing Keys…: one native dialog per enrolled, untrusted key. The only place a key becomes trusted (keyTrust.ts). */
+async function trustSigningKeys(): Promise<void> {
+  try {
+    const trusted = await trustPendingKeys({
+      confirm: async (text) =>
+        (
+          await dialog.showMessageBox({
+            type: 'question',
+            buttons: ['Trust', 'Not now'],
+            defaultId: 1,
+            cancelId: 1,
+            message: 'Trust signing key',
+            detail: text,
+          })
+        ).response === 0,
+    });
+    await dialog.showMessageBox({
+      type: 'info',
+      message: trusted.length > 0 ? `Trusted ${trusted.length} signing key(s).` : 'No signing key was trusted.',
+      detail: 'Enroll a key with: llull keys create --user ID --name NAME',
+    });
+  } catch (error) {
+    dialog.showErrorBox('llull — Trust Signing Keys failed', errorMessage(error));
+  }
+}
+
 function installCli(): void {
   const shim = cliShimFor(process.platform, process.execPath, layout.cliEntry);
   try {
@@ -222,6 +249,7 @@ async function boot(): Promise<void> {
           showAgentHelp: () =>
             void dialog.showMessageBox({ type: 'info', message: 'Use llull with Claude Code', detail: agentHelpText(cliInstalled) }),
           openDataFolder: () => void shell.openPath(userData),
+          trustKeys: () => void trustSigningKeys(),
         },
         process.platform,
         app.getName(),

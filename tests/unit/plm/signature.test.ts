@@ -1,23 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
-import { APPROVALS, T, fakePort, inReview, released, releasedB, reviewWithEco } from './fixtures';
+import { APPROVALS, T, inReview, released, releasedB, reviewWithEco } from './fixtures';
+import { fakePort } from './fakePort';
 import { agentContext, humanContext, run } from './scenarioRunner';
 
 const SIGNER = { userId: 'u-1', name: 'J. Example' };
 const KEY = 'ab'.repeat(32);
 const SIGNATURE = 'cd'.repeat(64);
 
-const sign = (
-  doc: CadDocument,
-  params: Record<string, unknown>,
-  port = fakePort(true),
-  caller: 'human' | 'agent' = 'human',
-): ReturnType<typeof run> =>
+const sign = (doc: CadDocument, params: Record<string, unknown>, port = fakePort(true)): ReturnType<typeof run> =>
   run(
     doc,
     'record_signature',
     { alg: 'Ed25519', keyId: 'k-1', publicKey: KEY, signature: SIGNATURE, meaning: 'approval', signer: SIGNER, at: T, ...params },
-    caller === 'human' ? humanContext({ humanSignature: port }) : agentContext({ humanSignature: port }),
+    humanContext({ humanSignature: port }),
   );
 
 describe('record_signature (VC-PLM-17, 26)', () => {
@@ -29,7 +25,7 @@ describe('record_signature (VC-PLM-17, 26)', () => {
     const record = signed.document.plm?.item.revisions['A']?.signatures[0];
     expect(record).toMatchObject({
       alg: 'Ed25519',
-      keyId: 'k-1',
+      keyId: 'k-test',
       meaning: 'approval',
       target: { kind: 'iteration', ref: 'A.1' },
       signedSha256: iteration.sha256,
@@ -68,16 +64,12 @@ describe('record_signature (VC-PLM-17, 26)', () => {
     expect(sign(doc, { ...target, signature: 'zz' }).error?.code).toBe('PLM_SIGNATURE_INVALID');
     expect(sign(doc, target, fakePort(true, 'untrusted')).error?.code).toBe('PLM_KEY_UNTRUSTED');
     expect(sign(doc, target, fakePort(true, 'test')).error?.code).toBe('PLM_KEY_UNTRUSTED');
-    const noPort = run(doc, 'record_signature', {
-      ...target,
-      alg: 'Ed25519',
-      keyId: 'k',
-      publicKey: KEY,
-      signature: SIGNATURE,
-      meaning: 'review',
-      signer: SIGNER,
-      at: T,
-    });
+    const noPort = run(
+      doc,
+      'record_signature',
+      { ...target, alg: 'Ed25519', keyId: 'k', publicKey: KEY, signature: SIGNATURE, meaning: 'review', signer: SIGNER, at: T },
+      agentContext(),
+    );
     expect(noPort.error?.code).toBe('PLM_SIGNATURE_PORT_MISSING');
     expect(sign(doc, target, { verify: () => null }).error?.code).toBe('PLM_SIGNATURE_PORT_MISSING');
     expect(sign(doc, { target: { kind: 'release', ref: 'Z' } }).error?.code).toBe('PLM_REVISION_UNKNOWN');
@@ -86,10 +78,20 @@ describe('record_signature (VC-PLM-17, 26)', () => {
     expect(sign(doc, target, fakePort(false)).document).toBe(doc);
   });
 
-  it('approval and release signatures are human acts; a review signature is not', () => {
+  it('the signer and key id come from the trusted key record, never from the request', () => {
     const doc = released();
-    expect(sign(doc, { target: { kind: 'release', ref: 'A' } }, fakePort(true), 'agent').error?.code).toBe('PLM_HUMAN_GATE');
-    expect(sign(doc, { target: { kind: 'release', ref: 'A' }, meaning: 'review' }, fakePort(true), 'agent').rejected).toBeUndefined();
+    const signed = sign(doc, { target: { kind: 'release', ref: 'A' }, keyId: 'k-evil', signer: { userId: 'u-boss', name: 'The Boss' } });
+    expect(signed.document.plm?.item.revisions['A']?.signatures[0]).toMatchObject({
+      keyId: 'k-test',
+      signer: { userId: 'u-1', name: 'J. Example' },
+    });
+  });
+
+  it('the meaning is part of the signed bytes: a signature made for one meaning does not verify for another', () => {
+    const doc = released();
+    const asRelease = run(doc, 'release_manifest', { revision: 'A', meaning: 'release' }).data as { sha256: string };
+    const asReview = run(doc, 'release_manifest', { revision: 'A', meaning: 'review' }).data as { sha256: string };
+    expect(asRelease.sha256).not.toBe(asReview.sha256);
   });
 });
 

@@ -11,6 +11,7 @@ import { type Finding, releaseFindings, unverifiedInScope } from '../readiness';
 import { refusePlm } from '../refusal';
 import { DEFAULT_POLICY, NOT_MANAGED, currentRevisionOf, isDirty, revisionText } from '../state';
 import { effectivitySchema } from '../params';
+import { actParts, actPayload } from '../gate';
 
 const NEXT: Readonly<Record<Revision['state'], string>> = {
   in_work: 'Nobody yet: submit_for_review when the definition is ready (an agent may do it).',
@@ -204,8 +205,14 @@ export const releaseManifestQuery = defineCommand({
   params: z.object({
     revision: z.string().describe('Revision label, e.g. "A".'),
     kind: z.enum(['release', 'iteration']).optional().describe("'release' (default) or 'iteration' (the revision's current iteration)."),
+    meaning: z
+      .enum(['authorship', 'review', 'approval', 'release'])
+      .optional()
+      .describe(
+        "What the signer will attest; it is part of the signed bytes. Default 'release' (kind release) or 'approval' (kind iteration).",
+      ),
   }),
-  run: (doc, { revision: label, kind = 'release' }): CommandResult => {
+  run: (doc, { revision: label, kind = 'release', meaning }): CommandResult => {
     const plm = doc.plm;
     if (plm === undefined) return refusePlm(doc, 'release_manifest', 'PLM_NOT_MANAGED', NOT_MANAGED);
     const revision = plm.item.revisions[label];
@@ -215,7 +222,10 @@ export const releaseManifestQuery = defineCommand({
       return refusePlm(doc, 'release_manifest', 'PLM_NOT_RELEASED', `${revisionText(plm, label)} is ${revision.state}, not released`, [
         label,
       ]);
-    const manifest = kind === 'release' ? releaseManifest(plm, revision) : iterationManifest(plm, revision, revision.iterations.length);
+    const manifest =
+      kind === 'release'
+        ? releaseManifest(plm, revision, meaning ?? 'release')
+        : iterationManifest(plm, revision, revision.iterations.length, meaning ?? 'approval');
     if (manifest === null) return refusePlm(doc, 'release_manifest', 'PLM_NOT_RELEASED', `no ${kind} manifest for ${label}`, [label]);
     return report(doc, `${revisionText(plm, label)} ${kind} manifest: sha256 ${manifest.sha256} (${manifest.canonical.length} bytes).`, {
       body: manifest.body,
@@ -251,5 +261,44 @@ export const viewRevision = defineCommand({
       `${revisionText(plm, label)} snapshot: ${revision.snapshot.canonicalJson.length} bytes.`,
       JSON.parse(revision.snapshot.canonicalJson) as unknown,
     );
+  },
+});
+
+/** The human-only PLM commands: each needs a `confirmation` signed over its own payload. */
+export const GATED_COMMANDS = [
+  'set_item_identity',
+  'set_item_marking',
+  'record_approval',
+  'release_item',
+  'create_change_order',
+  'classify_change_order',
+  'set_change_state',
+  'set_lifecycle_state',
+  'attach_release_package',
+] as const;
+
+/**
+ * @affects nothing (read-only)
+ * @invariant the hash binds the act, the item, the CURRENT PLM state hash, the params (without confirmation / at / by) and the signer-chosen nonce
+ */
+export const plmActPayload = defineCommand({
+  name: 'plm_act_payload',
+  description:
+    'The SHA-256 a human signs to authorize one human-only PLM act (set_item_identity with policy, set_item_marking, record_approval, release_item, ' +
+    'create_change_order with a classification, classify_change_order, set_change_state, set_lifecycle_state to obsolete, attach_release_package): ' +
+    'pass the command, the params you will send (without confirmation) and a fresh nonce. The signature (Ed25519 over the UTF-8 hex hash, prefixed by ' +
+    'the context string the signing host applies) goes in the command as confirmation { alg, keyId, publicKey, signature, nonce }. It is valid only ' +
+    'for the current PLM state of this document. An agent cannot sign. Read-only.',
+  annotations: { readOnly: true },
+  params: z.object({
+    command: z.enum(GATED_COMMANDS).describe('The human-only command to authorize.'),
+    params: z
+      .record(z.string(), z.unknown())
+      .describe('The params the command will be called with (confirmation, at and by are not part of the payload).'),
+    nonce: z.string().min(8).describe('A fresh random string chosen by the signer (at least 8 characters).'),
+  }),
+  run: (doc, { command, params, nonce }): CommandResult => {
+    const payload = actPayload(doc, command, params, nonce);
+    return report(doc, `Payload to sign for ${command}: sha256 ${payload}.`, { payloadSha256: payload, ...actParts(doc, command, params) });
   },
 });
