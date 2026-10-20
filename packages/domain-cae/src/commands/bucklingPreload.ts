@@ -1,4 +1,4 @@
-/** set_buckling_preload: a load case that pre-stresses a buckling analysis (a `*STATIC` step before the `*BUCKLE` step) and is not scaled by the factors. */
+/** set_buckling_preload: a load case added to the buckling reference load (a `*STATIC` step before the `*BUCKLE` step; ccx 2.21 scales the sum). */
 
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
@@ -16,11 +16,12 @@ import { analysisIdSchema } from '../shared/schemas';
 export const setBucklingPreload = defineCommand({
   name: 'set_buckling_preload',
   description:
-    'Make one load case of a buckling analysis the PRELOAD: it is applied first in a static step and stays constant (dead load, thermal-free), while the ' +
-    'buckling factors multiply the first OTHER load case. Without a preload the factors multiply the first load case alone. Omit preloadLoadCase to clear. ' +
-    'Needs at least one more load case as the reference load. The CalculiX deck is a *STATIC step with the preload, then a *BUCKLE step that writes ' +
-    'preload + reference loads SUMMED (a later *CLOAD / *DLOAD replaces the value at the same node and dof / element face / gravity instead of adding to it); ' +
-    'that layout, and that the factors then multiply only the reference increment, is UNVERIFIED against a real ccx run; the Nastran BDF export does not support a preload.',
+    'Make one load case of a buckling analysis the PRELOAD, added to the reference load (the first OTHER load case). Without a preload the factors ' +
+    'multiply the first load case alone. Omit preloadLoadCase to clear. Needs at least one more load case as the reference load. The CalculiX deck is a ' +
+    '*STATIC step with the preload, then a *BUCKLE step that writes preload + reference loads SUMMED (a later *CLOAD / *DLOAD replaces the value at the same ' +
+    'node and dof / element face / gravity instead of adding to it). CalculiX 2.21 scales the WHOLE *BUCKLE step load (measured: the stress of the static ' +
+    'step is not held as a base state), so the factors multiply preload + reference: the critical load is factor x (preload + reference), NOT preload + ' +
+    'factor x reference (fea_report data.eigen.factorsMultiply). The Nastran BDF export does not support a preload.',
   params: z.object({
     analysisId: analysisIdSchema,
     preloadLoadCase: z
@@ -52,7 +53,7 @@ export const setBucklingPreload = defineCommand({
       withCase(doc, next),
       preloadLoadCase === undefined
         ? `set_buckling_preload: cleared the preload of '${analysisId}'.`
-        : `set_buckling_preload: '${analysisId}' preload load case '${preloadLoadCase}' (applied first, not scaled); the buckling factors multiply the first other load case. Results are stale until re-solved.`,
+        : `set_buckling_preload: '${analysisId}' preload load case '${preloadLoadCase}' (added to the first other load case; CalculiX scales the sum: the factors multiply preload + reference). Results are stale until re-solved.`,
       [analysisId],
     );
   },

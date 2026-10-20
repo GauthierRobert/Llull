@@ -44,8 +44,9 @@ export function modalStep(ctx: DeckContext): DeckSections {
  * with the loads of the first OTHER load case on top (`*CLOAD` / `*DLOAD` without `OP=NEW`, so the preload stays): the preload stresses the
  * structure and is not multiplied. A modifying card REPLACES the value at the same node and dof / element and face / `GRAV` of the earlier step instead
  * of adding to it, so the BUCKLE step writes preload + reference summed (a target loaded in both cases gets the sum; one loaded in only one case gets its
- * own value, which equals the preload value when it comes from the preload). The layout follows the ccx manual's buckling example and whether the factor
- * then multiplies only the reference increment is NOT verified against a real run here. Buckling
+ * own value, which equals the preload value when it comes from the preload). Measured with ccx 2.21 (server/tests/feaBucklingPreload.test.ts): the
+ * factors multiply the WHOLE *BUCKLE step load, preload + reference; the static step's stress is not held as a base state (also not with NLGEOM or
+ * with reference-only *BUCKLE loads), so a constant preload cannot be expressed this way. Buckling
  * factors are in the `.dat` (`B U C K L I N G   F A C T O R   O U T P U T`), the mode shapes in the `.frd`.
  * @failure no load / no reference load case besides the preload -> FEA_NO_LOADS; unresolved targets -> FEA_TARGET_UNRESOLVED
  */

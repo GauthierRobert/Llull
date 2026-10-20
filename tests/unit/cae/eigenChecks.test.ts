@@ -1,5 +1,7 @@
 /** Modal / buckling hardening (FR-FEA-19 / 20): mass participation, rigid-body and buckling-factor guards, supports, adequacy, frequency band. */
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { execute } from '@core/commands/registry';
 import type { FeResultsArtifact } from '@core/model/analysis';
 import { writeInp } from '@cae/decks/inpWriter';
@@ -65,6 +67,26 @@ describe('modal mass tables of the .dat', () => {
   });
 });
 
+describe('real CalculiX 2.21 modal .dat (cantilever 200 x 10 x 10 steel, 4 modes)', () => {
+  const dat = parseDat(readFileSync(path.join(__dirname, 'fixtures', 'ccx221_modal_cantilever.dat'), 'utf8'));
+  const rows = (title: string): readonly (readonly number[])[] => dat.tables.find((table) => table.title.startsWith(title))?.rows ?? [];
+
+  it('reads the six-component participation and effective-mass rows by mode, without the TOTAL row of the effective-mass table', () => {
+    expect(dat.warnings).toBeUndefined();
+    expect(rows('participation factors').map((row) => row.length)).toEqual([7, 7, 7, 7]);
+    expect(rows('effective modal mass').map((row) => row[0])).toEqual([1, 2, 3, 4]);
+    expect(rows('participation factors')[0]?.[3]).toBeCloseTo(-0.9078463e-2, 9);
+  });
+
+  it('TOTAL EFFECTIVE MASS is the model mass (rho x V), not the sum over the extracted modes', () => {
+    const modelMass = 200 * 10 * 10 * 7.8e-9;
+    const total = rows('total effective mass')[0] ?? [];
+    for (const axis of [0, 1, 2]) expect(Math.abs((total[axis] ?? 0) / modelMass - 1)).toBeLessThan(0.01);
+    const extractedY = rows('effective modal mass').reduce((sum, row) => sum + (row[2] ?? 0), 0);
+    expect(extractedY / (total[1] ?? 1)).toBeCloseTo(0.804, 3);
+  });
+});
+
 describe('eigenReport', () => {
   it('modal: frequencies, participation, effective mass and its fraction of the total, cumulative share, mass unit', () => {
     const modal = eigenCase({ type: 'modal', dat: modalDat([100, 200, 300], PARTICIPATION, MASS, [1, 1, 1]) });
@@ -74,7 +96,7 @@ describe('eigenReport', () => {
     expect(report.modes.map((mode) => mode.frequencyHz)).toEqual([100, 200, 300]);
     expect(report.modes[0]?.participation).toEqual([0.9, 0, 0]);
     expect(report.modes[2]?.effectiveMass).toEqual([0.1, 0, 0.2]);
-    expect(report.modes[2]?.fractionOfExtractedSum).toEqual([0.1, 0, 0.2]);
+    expect(report.modes[2]?.fractionOfModelMass).toEqual([0.1, 0, 0.2]);
     expect(report.totalEffectiveMass).toEqual([1, 1, 1]);
     expect(report.massUnit).toBe('tonne');
     expect(report.rigidBodyModes).toBe(0);
@@ -96,6 +118,14 @@ describe('eigenReport', () => {
     const report = eigenReport(caseIn(buckling.recorded, buckling.bar.analysisId), buckling.results as FeResultsArtifact);
     expect(report).toMatchObject({ kind: 'buckling', criticalFactor: 4.8, criticalMode: 3, negativeFactors: 1, nearZeroFactors: 1 });
     expect(report !== null && eigenNote(report)).toContain('critical buckling load = 4.8 x the applied load (mode 3)');
+    expect(report).toMatchObject({ factorsMultiply: 'reference' });
+    // ccx 2.21 scales the whole *BUCKLE step load, so with a preload the factor multiplies preload + reference (server/tests/feaBucklingPreload)
+    const preloaded = eigenReport(
+      { ...caseIn(buckling.recorded, buckling.bar.analysisId), preloadLoadCase: 'dead' },
+      buckling.results as FeResultsArtifact,
+    );
+    expect(preloaded).toMatchObject({ factorsMultiply: 'preload_and_reference' });
+    expect(preloaded !== null && eigenNote(preloaded)).toContain('4.8 x (preload + reference)');
   });
 
   it('is null for a static case and for results without the eigenvalue table', () => {

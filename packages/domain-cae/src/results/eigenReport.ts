@@ -10,8 +10,11 @@ interface ModalMode {
   readonly participation?: Vec3;
   /** Effective modal mass per axis, in the analysis mass unit, when printed. */
   readonly effectiveMass?: Vec3;
-  /** Effective modal mass over the TOTAL EFFECTIVE MASS table of ccx, per axis (0..1). That table is the sum over the EXTRACTED modes (not the model mass), so this is a share of the extracted sum. */
-  readonly fractionOfExtractedSum?: Vec3;
+  /**
+   * Effective modal mass over the TOTAL EFFECTIVE MASS table of ccx, per axis (0..1). That table is the mass of the whole model (ccx 2.21, measured:
+   * the translational totals equal rho x V; the sum over the extracted modes is the separate TOTAL row of the effective-mass table).
+   */
+  readonly fractionOfModelMass?: Vec3;
 }
 
 export interface ModalReport {
@@ -34,6 +37,11 @@ export interface BucklingReport {
   readonly criticalMode: number | null;
   readonly negativeFactors: number;
   readonly nearZeroFactors: number;
+  /**
+   * What the factors multiply. With a preload (set_buckling_preload) CalculiX 2.21 scales the WHOLE load of the *BUCKLE step, preload + reference
+   * (measured: the stress of the preceding *STATIC step is not a base state), so the preload is not held constant.
+   */
+  readonly factorsMultiply: 'reference' | 'preload_and_reference';
 }
 
 /** llull heuristics, not solver output: a mode below 1e-4 of the highest extracted frequency (or 1e-3 Hz) is a rigid-body mode. */
@@ -73,6 +81,7 @@ export function eigenReport(analysis: AnalysisCase, results: FeResultsArtifact):
       criticalMode: critical?.mode ?? null,
       negativeFactors: factors.filter((factor) => factor < -NEAR_ZERO_FACTOR).length,
       nearZeroFactors: factors.filter((factor) => Math.abs(factor) <= NEAR_ZERO_FACTOR).length,
+      factorsMultiply: analysis.preloadLoadCase === undefined ? 'reference' : 'preload_and_reference',
     };
   }
   if (analysis.type !== 'modal') return null;
@@ -97,7 +106,7 @@ export function eigenReport(analysis: AnalysisCase, results: FeResultsArtifact):
       frequencyHz: row[3] ?? Number.NaN,
       ...(factor !== undefined ? { participation: factor } : {}),
       ...(mass !== undefined ? { effectiveMass: mass } : {}),
-      ...(share !== undefined ? { fractionOfExtractedSum: share } : {}),
+      ...(share !== undefined ? { fractionOfModelMass: share } : {}),
     };
   });
   return {
@@ -115,13 +124,13 @@ export function eigenNote(report: ModalReport | BucklingReport): string {
   if (report.kind === 'buckling')
     return report.criticalFactor === null
       ? 'no positive buckling factor (the reference load does not buckle the model in this direction)'
-      : `critical buckling load = ${Number(report.criticalFactor.toPrecision(6))} x the applied load (mode ${report.criticalMode}); linear buckling, no imperfections`;
+      : `critical buckling load = ${Number(report.criticalFactor.toPrecision(6))} x ${report.factorsMultiply === 'reference' ? 'the applied load' : '(preload + reference): CalculiX scales the whole *BUCKLE step load, the preload is not held constant'} (mode ${report.criticalMode}); linear buckling, no imperfections`;
   const parts: string[] = [];
   if (report.rigidBodyModes > 0) parts.push(`${report.rigidBodyModes} rigid-body mode(s): the model is not fully restrained`);
   if (report.totalEffectiveMass !== null && report.modes.length > 0 && report.modes.every((mode) => mode.effectiveMass !== undefined)) {
-    const shares = [0, 1, 2].map((axis) => report.modes.reduce((sum, mode) => sum + (mode.fractionOfExtractedSum?.[axis] ?? 0), 0));
+    const shares = [0, 1, 2].map((axis) => report.modes.reduce((sum, mode) => sum + (mode.fractionOfModelMass?.[axis] ?? 0), 0));
     parts.push(
-      `extracted modes carry x/y/z ${shares.map((share) => `${Math.round(share * 1000) / 10}%`).join(' / ')} of ccx's TOTAL EFFECTIVE MASS (the sum over the extracted modes, not the model mass)`,
+      `extracted modes carry x/y/z ${shares.map((share) => `${Math.round(share * 1000) / 10}%`).join(' / ')} of the model mass (ccx TOTAL EFFECTIVE MASS)`,
     );
   }
   parts.push(...report.warnings);
