@@ -8,6 +8,7 @@
 // `!(x > 0.0)` is deliberate: it rejects NaN together with non-positive values.
 #![allow(clippy::neg_cmp_op_on_partial_ord)]
 
+pub mod bwc;
 pub mod contact;
 #[cfg(feature = "gpu")]
 pub mod gpu;

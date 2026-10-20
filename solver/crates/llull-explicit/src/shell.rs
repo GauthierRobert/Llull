@@ -14,7 +14,10 @@
 //!   (Eqs. 22.3.20–22.3.22, tolerance 1e-4, at most 10) around the J2 / Johnson–Cook return of `material.rs`;
 //! - time step `L_s / c`, `L_s = A / max(L1..L4)`, `c = √(E/(ρ(1 − ν²)))` (Eqs. 25.13–25.15);
 //! - lumped mass `ρAt/4` per node and rotary inertia `αM`, `α = max(t²/12, A/8)` (Eqs. 13.51–13.57 for a mid-surface shell).
+//! - with nodal normals (model `shell_warping`): the Belytschko–Wong–Chiang element: fiber coupling and edge-based transverse shear
+//!   (`bwc.rs`, [E2] §9.6) and the Belytschko–Leviathan projection (`projection.rs`, [E2] §11.6).
 
+use crate::bwc::{edge_shear, fiber_gradients};
 use crate::material::{update, von_mises, PointState, Sym};
 use crate::model::Material;
 use crate::projection::Projection;
@@ -219,9 +222,34 @@ pub fn step(
     let sum = |b: &[f64; 4], c: &dyn Fn(usize) -> f64| (0..4).map(|k| b[k] * c(k)).sum::<f64>();
     let n = 0.25;
     let membrane = [sum(&b1, &|k| vl[k][0]), sum(&b2, &|k| vl[k][1]), sum(&b2, &|k| vl[k][0]) + sum(&b1, &|k| vl[k][1])];
-    let bending = [sum(&b1, &|k| tl[k][1]), -sum(&b2, &|k| tl[k][0]), sum(&b2, &|k| tl[k][1]) - sum(&b1, &|k| tl[k][0])];
-    let shear_xz = sum(&b1, &|k| vl[k][2]) + n * (0..4).map(|k| tl[k][1]).sum::<f64>();
-    let shear_yz = sum(&b2, &|k| vl[k][2]) - n * (0..4).map(|k| tl[k][0]).sum::<f64>();
+    // Belytschko–Wong–Chiang (with nodal normals): fibers p = the nodal normals, coupling gradients b^c, edge-based shear (bwc.rs).
+    // Without them the fibers are ẑ, b^c = 0 and the shear is the one-point form: the plain Belytschko–Tsay element.
+    let fibers: [[f64; 3]; 4] = match normals {
+        Some(normals) => normals.map(|normal| local(&f, normal)),
+        None => [[0.0, 0.0, 1.0]; 4],
+    };
+    let (c1, c2) = match normals {
+        Some(_) => fiber_gradients(&p, &fibers.map(|fiber| [fiber[0], fiber[1]])),
+        None => ([0.0; 4], [0.0; 4]),
+    };
+    let shear_operator = normals.map(|_| edge_shear(&p));
+    let pdot: [[f64; 3]; 4] = std::array::from_fn(|k| cross(tl[k], fibers[k]));
+    let bending = [
+        sum(&c1, &|k| vl[k][0]) + sum(&b1, &|k| pdot[k][0]),
+        sum(&c2, &|k| vl[k][1]) + sum(&b2, &|k| pdot[k][1]),
+        sum(&c1, &|k| vl[k][1]) + sum(&b1, &|k| pdot[k][1]) + sum(&c2, &|k| vl[k][0]) + sum(&b2, &|k| pdot[k][0]),
+    ];
+    let (shear_xz, shear_yz) = match &shear_operator {
+        Some(g) => {
+            let row =
+                |r: usize| (0..4).map(|k| g[r][3 * k] * vl[k][2] + g[r][3 * k + 1] * tl[k][0] + g[r][3 * k + 2] * tl[k][1]).sum::<f64>();
+            (row(0), row(1))
+        }
+        None => (
+            sum(&b1, &|k| vl[k][2]) + n * (0..4).map(|k| tl[k][1]).sum::<f64>(),
+            sum(&b2, &|k| vl[k][2]) - n * (0..4).map(|k| tl[k][0]).sum::<f64>(),
+        ),
+    };
     let points = thickness_points(state.points.len(), thickness);
     let mut next = state.clone();
     let (mut fr, mut mr) = ([0.0; 5], [0.0; 3]);
@@ -254,11 +282,25 @@ pub fn step(
     let kappa = SHEAR_FACTOR;
     let mut force_local = [[0.0; 3]; 4];
     let mut moment_local = [[0.0; 3]; 4];
+    // Power-conjugate forces of the rates above: S = ∫ẑσ = −m^R works on the z-linear rates (b^c on the translations, b on ṗ = ω × p, whose
+    // moment is p × c), the shear resultants on the shear operator.
+    let (sxx, syy, sxy) = (-mxx, -myy, -mxy);
     for k in 0..4 {
-        force_local[k] =
-            [area * (b1[k] * fxx + b2[k] * fxy), area * (b2[k] * fyy + b1[k] * fxy), area * kappa * (b1[k] * fxz + b2[k] * fyz)];
-        moment_local[k] =
-            [area * (b2[k] * myy + b1[k] * mxy - kappa / 4.0 * fyz), -area * (b1[k] * mxx + b2[k] * mxy - kappa / 4.0 * fxz), 0.0];
+        let c = [sxx * b1[k] + sxy * b2[k], syy * b2[k] + sxy * b1[k], 0.0];
+        let bend = cross(fibers[k], c);
+        let (shear_force, shear_moment) = match &shear_operator {
+            Some(g) => (
+                kappa * (g[0][3 * k] * fxz + g[1][3 * k] * fyz),
+                [kappa * (g[0][3 * k + 1] * fxz + g[1][3 * k + 1] * fyz), kappa * (g[0][3 * k + 2] * fxz + g[1][3 * k + 2] * fyz)],
+            ),
+            None => (kappa * (b1[k] * fxz + b2[k] * fyz), [-kappa / 4.0 * fyz, kappa / 4.0 * fxz]),
+        };
+        force_local[k] = [
+            area * (b1[k] * fxx + b2[k] * fxy + c1[k] * sxx + c2[k] * sxy),
+            area * (b2[k] * fyy + b1[k] * fxy + c2[k] * syy + c1[k] * sxy),
+            area * shear_force,
+        ];
+        moment_local[k] = [area * (bend[0] + shear_moment[0]), area * (bend[1] + shear_moment[1]), area * bend[2]];
     }
     // Belytschko-Tsay hourglass (Eqs. 9.31-9.42).
     let projection = [(0..4).map(|k| H[k] * p[k][0]).sum::<f64>(), (0..4).map(|k| H[k] * p[k][1]).sum::<f64>()];

@@ -4,8 +4,10 @@
 //!   12 × 2 shells, root clamped, suddenly applied uniform load `w` along the tip width (gravity). Closed form (Euler–Bernoulli with
 //!   Timoshenko shear, unit-load method over the rotating section): static work `W_s = ∫ w u dx = w²/(4E) ∫ (L−s)⁴ c(s) ds +
 //!   w² L³/(3 κ G A)` with the section compliance along the load `c = cos²θ/I_weak + sin²θ/I_strong`, θ = 90° s/L. Under a sudden
-//!   constant load the undamped response oscillates about the static one, so the time mean of the external work over whole periods
+//!   constant load the undamped response oscillates about the static one, so the time mean of the external work over many periods
 //!   is `W_s`. (The same integration for a tip load gives 5.426e-3 against the MacNeal–Harder 5.424e-3, a check of the closed form.)
+//!   Out of plane (load along the tip normal) the section compliance swaps: `c = sin²θ/I_weak + cos²θ/I_strong` (tip load: 1.746e-3 vs
+//!   MacNeal–Harder 1.754e-3).
 //! - A warped element in rigid rotation: the plain element makes membrane hourglass forces, the projected one none.
 //!   Synthetic density 7.3e-4 (consistent units, not a material).
 
@@ -37,7 +39,8 @@ fn material() -> Material {
 }
 
 /// 12 × 2 shells, the section at x rotated by θ = 90° x/L about the axis: width along y at the root, along z at the tip.
-fn twisted_beam(warping: bool) -> Model {
+/// `in_plane`: the load along the tip width (z); otherwise along the tip normal (y).
+fn twisted_beam(warping: bool, in_plane: bool) -> Model {
     let (nx, ny) = (12, 2);
     let mut coordinates = Vec::new();
     for j in 0..=ny {
@@ -57,8 +60,8 @@ fn twisted_beam(warping: bool) -> Model {
     }
     let nodes = coordinates.len() / 3;
     let root: Vec<bool> = (0..nodes).map(|n| coordinates[3 * n] == 0.0).collect();
-    let mut model = common::model(coordinates, vec![], vec![], material(), [0.0; 3], controls(0.05, 2e-5));
-    model.gravity = [0.0, 0.0, G_LOAD];
+    let mut model = common::model(coordinates, vec![], vec![], material(), [0.0; 3], controls(0.1, 2e-5));
+    model.gravity = if in_plane { [0.0, 0.0, G_LOAD] } else { [0.0, G_LOAD, 0.0] };
     model.shell4 = shell4;
     model.shell_thickness = vec![T; nx * ny];
     model.element_material = vec![0; nx * ny];
@@ -69,7 +72,7 @@ fn twisted_beam(warping: bool) -> Model {
     model
 }
 
-fn static_work() -> f64 {
+fn static_work(in_plane: bool) -> f64 {
     let w = RHO * G_LOAD * B * T;
     let (i_strong, i_weak) = (T * B.powi(3) / 12.0, B * T.powi(3) / 12.0);
     let n = 20_000;
@@ -77,39 +80,41 @@ fn static_work() -> f64 {
         .map(|k| {
             let s = (k as f64 + 0.5) * L / n as f64;
             let theta = std::f64::consts::FRAC_PI_2 * s / L;
-            (L - s).powi(4) * (theta.cos().powi(2) / i_weak + theta.sin().powi(2) / i_strong) * L / n as f64
+            let (weak, strong) = if in_plane { (theta.cos(), theta.sin()) } else { (theta.sin(), theta.cos()) };
+            (L - s).powi(4) * (weak.powi(2) / i_weak + strong.powi(2) / i_strong) * L / n as f64
         })
         .sum();
     let shear_modulus = E / (2.0 * (1.0 + NU));
     w * w / (4.0 * E) * bending + w * w * L.powi(3) / (3.0 * 5.0 / 6.0 * shear_modulus * B * T)
 }
 
-/// Time mean of the external work between its first and last deep minima (whole oscillation periods).
-fn mean_work(warping: bool) -> f64 {
-    let outcome = run(&twisted_beam(warping), &mut |_| {}).expect("the run succeeds");
+/// Time mean of the external work over the run (about 20 periods of the first mode: the bias of a partial period is ~1/(2π·20) of the
+/// oscillation; a window between deep minima is biased when several modes are excited).
+fn mean_work(warping: bool, in_plane: bool) -> f64 {
+    let outcome = run(&twisted_beam(warping, in_plane), &mut |_| {}).expect("the run succeeds");
     assert!(outcome.normal, "{}", outcome.message);
     let work: Vec<f64> = outcome.energy.iter().map(|row| row.external_work).collect();
-    let peak = work.iter().cloned().fold(0.0, f64::max);
-    let minima: Vec<usize> =
-        (1..work.len() - 1).filter(|&k| work[k] <= work[k - 1] && work[k] < work[k + 1] && work[k] < 0.1 * peak).collect();
-    match (minima.first(), minima.last()) {
-        (Some(&a), Some(&b)) if b > a => work[a..b].iter().sum::<f64>() / (b - a) as f64,
-        _ => peak,
-    }
+    work.iter().sum::<f64>() / work.len() as f64
 }
 
 #[test]
-fn twisted_beam_matches_beam_theory_with_the_warping_projection() {
-    let reference = static_work();
-    let with = mean_work(true);
-    let without = mean_work(false);
-    eprintln!(
-        "twisted beam: static work {reference:.6e}, projected {with:.6e} ({:+.2} %), plain {without:.6e} ({:+.2} %)",
-        100.0 * (with / reference - 1.0),
-        100.0 * (without / reference - 1.0)
-    );
-    assert!((with / reference - 1.0).abs() < 0.05, "with the projection within 5 %");
-    assert!((without / reference - 1.0).abs() > 4.0 * (with / reference - 1.0).abs(), "the plain element is far off");
+fn twisted_beam_matches_beam_theory_with_the_bwc_shell() {
+    // Belytschko–Wong–Chiang (projection, fibers, edge shear) against the plain Belytschko–Tsay element, both load directions.
+    for in_plane in [true, false] {
+        let reference = static_work(in_plane);
+        let with = mean_work(true, in_plane);
+        let without = mean_work(false, in_plane);
+        eprintln!(
+            "twisted beam ({}): static work {reference:.6e}, BWC {with:.6e} ({:+.2} %), plain BT {without:.6e} ({:+.2} %)",
+            if in_plane { "load along the tip width" } else { "load along the tip normal" },
+            100.0 * (with / reference - 1.0),
+            100.0 * (without / reference - 1.0)
+        );
+        assert!((with / reference - 1.0).abs() < 0.05, "BWC within 5 %");
+        if in_plane {
+            assert!((without / reference - 1.0).abs() > 4.0 * (with / reference - 1.0).abs(), "the plain element is far off");
+        }
+    }
 }
 
 #[test]
