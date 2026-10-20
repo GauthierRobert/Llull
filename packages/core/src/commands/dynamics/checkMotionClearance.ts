@@ -116,6 +116,8 @@ export function motionClearanceCheck(
   params: z.infer<typeof clearanceParams>,
   ctx: ExecutionContext | undefined,
   shared: CommandResult | null,
+  /** Distance evaluations the sweep may spend; counted, never timed. Only tests lower it. */
+  evaluationBudget: number = MAX_EVALUATIONS,
 ): CommandResult {
   const context = ctx ?? currentContext();
   const kernel = context.kernel;
@@ -184,9 +186,9 @@ export function motionClearanceCheck(
       `${plan.pairs.length} pairs x ${Math.ceil(plan.times.length / stride)} samples is over ${MAX_PAIR_SAMPLES} pair-samples`,
     );
 
-  const outcome = runMotion(plan, { evaluations: MAX_EVALUATIONS, classified: MAX_CLASSIFIED_TOTAL });
+  const outcome = runMotion(plan, { evaluations: evaluationBudget, classified: MAX_CLASSIFIED_TOTAL });
   if (outcome.exhausted)
-    return refuse('FPR_BUDGET_EXCEEDED', `the sweep needs more than ${MAX_EVALUATIONS} distance evaluations (fast motion, many pairs)`);
+    return refuse('FPR_BUDGET_EXCEEDED', `the sweep needs more than ${evaluationBudget} distance evaluations (fast motion, many pairs)`);
   const items: CheckItem[] = [
     ...collected.refused.map(
       ({ id }): CheckItem => ({
