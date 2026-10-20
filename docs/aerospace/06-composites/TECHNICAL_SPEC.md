@@ -861,7 +861,7 @@ golden plans `composites_hemisphere_drape` and `composites_sandwich_shop_data`.
 ### 13.5 AERO-5: exact ply solids and their STEP (2026-10-20, branch `feat/step-sheets`)
 
 `create_ply_solids` keeps its closed triangle mesh (display, `export_stl`, fallback) and now also stores the exact construction of each solid as
-`brep: { op: 'faceSlab', ... }` when the tool face is a plane, cylinder, cone or `nurbs_surface` sheet and the part has no core (a core makes the
+`stepSlab: { op: 'faceSlab', ... }` (a field of the mesh entity beside `brep`, which stays absent) when the tool face is a plane, cylinder, cone or `nurbs_surface` sheet and the part has no core (a core makes the
 underside height vary; each region is split where the plies below stop, so otherwise it is one height, checked at every vertex). The sphere cap has
 no exact parametrization here and stays mesh only. The command reports `data.exactSolids` and, per solid, `exact`.
 
@@ -892,9 +892,13 @@ The offset adds the curvature term (t / 2r on the cylinder), so "area x thicknes
 thickness. The STEP written by `export_step_exact` holds one `MANIFOLD_SOLID_BREP` per ply solid named "<ply> piece <n>" (entity names become
 product names as for any solid).
 
-**Fallback.** A kernel without the op (Manifold: `faceSlab` is in its unsupported set) or one that refuses the slab: `export_step_exact` writes the
-solid from its triangles (`meshRecipeOf`), so the export still contains every ply. Other consumers (booleans, `mass_properties`) follow the usual
-rule of `operandRecipe`: an exact tree is used when the kernel supports its ops. Not done: ply solids over a core (variable underside), the sphere cap,
+**Only the STEP export reads the slab (review fix).** `stepSlab` is deliberately not `brep`: a `brep` makes the solid an exact operand of booleans, blends,
+fillets, holes, recognition and face queries, and the native kernel reports every op supported, so a refused slab would have broken operations that
+work from the triangles. Every command except `export_step_exact` keeps using `mesh`. The export builds the slab placed like the entity (`place` with
+its position / rotation, so a moved ply solid stays exact), and writes the triangles instead when the kernel lacks the op (Manifold) or refuses the slab;
+`data.faceted` and the summary list those solids. A document holding an instance of a ply solid goes through the assembly path, which writes the
+triangles. The sidecar now also refuses an invalid or inside-out slab, a lift through a singular point (pole / apex, cone loop reaching v <= 0), and
+malformed surface / loop lists (validated in `shapeRecipe.ts`, `nodes.rs` and the C++ casts: counts must be integers in range, exactly one outer loop). Not done: ply solids over a core (variable underside), the sphere cap,
 AP242 composite (M5), regeneration of the solids when plies change (they remain a snapshot).
 Tests: `tests/unit/aero/composites/plySlab.test.ts` (recipe content per surface type, stacking, no recipe on sphere / core, validation, export
 fallback), `server/tests/nativeKernelSheets.test.ts` (the table above), `features.rs` `slabs_over_plane_cylinder_cone_and_b_spline_faces_have_the_exact_volume`.

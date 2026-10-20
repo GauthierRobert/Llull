@@ -39,7 +39,7 @@ function exactSlab(
 
 /**
  * @affects creates one mesh entity per ply piece (ids plysolid-<step>.<k>), named "<ply> piece <n>", on the layer of the tool solid
- * @invariant each solid is the piece offset along the tool-face normal from the underside height (plies below that cover the point, plus a core between) by the cured ply thickness; the laminate side is respected; closed with outward winding, so volume = area x thickness (within the mesh refinement on curved faces); on a plane / cylinder / cone / nurbs tool face without a core the entity also carries the exact `faceSlab` recipe (`brep`), which an exact kernel builds as a B-rep for export_step_exact (the mesh stays the display / fallback form); the solids are a snapshot: they are not regenerated when plies change
+ * @invariant each solid is the piece offset along the tool-face normal from the underside height (plies below that cover the point, plus a core between) by the cured ply thickness; the laminate side is respected; closed with outward winding, so volume = area x thickness (within the mesh refinement on curved faces); on a plane / cylinder / cone / nurbs tool face without a core the entity also carries the exact `faceSlab` recipe (`stepSlab`, read only by export_step_exact, which writes a B-rep when the kernel builds it and the triangles otherwise; every other command uses the mesh); the solids are a snapshot: they are not regenerated when plies change
  * @failure unknown part / ply -> CMP_REF_MISSING; no plies -> CMP_NO_PLIES; more than 400 pieces or an untriangulable piece -> CMP_PARAM_INVALID
  */
 export const createPlySolids = defineCommand({
@@ -114,7 +114,7 @@ export const createPlySolids = defineCommand({
             id,
             kind: 'mesh',
             mesh,
-            ...(brep === null ? {} : { brep }),
+            ...(brep === null ? {} : { stepSlab: brep }),
             position: [0, 0, 0],
             rotation: [0, 0, 0],
             layerId,

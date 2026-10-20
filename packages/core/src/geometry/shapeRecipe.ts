@@ -13,6 +13,7 @@ import { isRecord } from '../lib/isRecord';
 import { isFiniteNumber } from '../lib/isFiniteNumber';
 import { isVec3 } from '../lib/vec3';
 import { featureError, featureKeyText } from './featureRecipe';
+import { loopsProblem, surfaceDataProblem } from './surfaceWire';
 
 const PRESENTATION_FIELDS = new Set(['id', 'name', 'color', 'layerId', 'tags', 'materialId']);
 
@@ -57,7 +58,7 @@ function keyText(recipe: ShapeRecipe): string {
     case 'feature':
       return featureKeyText(recipe, recipeKey(recipe.source));
     case 'faceSlab':
-      return `faceSlab(${JSON.stringify(recipe)})`;
+      return `faceSlab(${recipe.surface.type}:${recipe.surface.data.join(',')}|${recipe.loops.join(',')}|${recipe.from},${recipe.to}|${recipe.direction.join(',')}|${recipe.tolerance})`;
   }
 }
 
@@ -139,6 +140,8 @@ function slabError(node: Record<string, unknown>): string | null {
     return 'faceSlab: surface.type must be bspline, plane, cylinder or cone';
   if (!isNumberList(surface['data'])) return 'faceSlab: surface.data must be a list of finite numbers';
   if (!isNumberList(node['loops'])) return 'faceSlab: loops must be a list of finite numbers';
+  const layout = surfaceDataProblem(surface['type'] as 'plane', surface['data'] as number[]) ?? loopsProblem(node['loops'] as number[]);
+  if (layout !== null) return `faceSlab: ${layout}`;
   const { from, to } = node;
   if (!isFiniteNumber(from) || !isFiniteNumber(to) || !(to > from)) return 'faceSlab: from and to must be finite with to > from';
   if (!isVec3(node['direction'])) return 'faceSlab: direction must be a finite Vec3';

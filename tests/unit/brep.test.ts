@@ -220,7 +220,15 @@ describe('export_step_exact', () => {
     const { doc, a, b } = twoBoxes();
     const result = run(doc, 'export_step_exact', {}, fakeKernel({ step: 'ISO-10303-21;' }));
     expect(result.document).toBe(doc);
-    expect(result.data).toEqual({ format: 'step', step: 'ISO-10303-21;', solidCount: 2, sheetCount: 0, entityIds: [a, b], skipped: [] });
+    expect(result.data).toEqual({
+      format: 'step',
+      step: 'ISO-10303-21;',
+      solidCount: 2,
+      sheetCount: 0,
+      entityIds: [a, b],
+      skipped: [],
+      faceted: [],
+    });
     expect(result.summary).toMatch(/2 exact solid\(s\).*13 bytes\.$/);
   });
   it('exports a subset and reports skipped ids', () => {
