@@ -167,7 +167,9 @@ describe('transient results (per time increment)', () => {
   });
 
   it('measures times from the start of the coupled step when a pre-heating step came first', () => {
-    const found = analysisCase === undefined ? undefined : transientResults(analysisCase, fixture.mesh, results(1, 2));
+    const hot = coupledFixture({ initial: 90, transient: { endTimeS: 100 } });
+    const hotCase = hot.doc.analysis?.cases[hot.analysisId];
+    const found = hotCase === undefined ? undefined : transientResults(hotCase, hot.mesh, results(1, 2));
     expect(found?.summary.series.map((row) => row.timeS)).toEqual([10, 50, 100]);
   });
 

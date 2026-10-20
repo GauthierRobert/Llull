@@ -88,7 +88,7 @@ export function selectStep(
   const cases = loadCasesOf(analysis);
   const index = loadCase === undefined ? 0 : cases.findIndex((entry) => entry.name === loadCase);
   if (index < 0) return `no load case '${loadCase ?? ''}' (load cases: ${cases.map((entry) => entry.name).join(', ')})`;
-  const step = stepOfLoadCase(results, index);
+  const step = stepOfLoadCase(results, index, analysis);
   return step === undefined
     ? `no result set for load case '${cases[index]?.name ?? ''}'`
     : { step, label: `load case ${cases[index]?.name ?? ''}` };

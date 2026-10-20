@@ -132,11 +132,11 @@ export const stackupAtTemperature = defineCommand({
         'specTemperature',
       );
     const specKelvin = temperatureIn(specTemperature, 'K');
-    if (specKelvin === null)
+    if (specKelvin === null || !(specKelvin > 0))
       return rejection(
         doc,
         'THM_UNITS_MISMATCH',
-        'specTemperature has an invalid unit',
+        'specTemperature has an invalid unit or is at or below absolute zero',
         remediationOf('THM_UNITS_MISMATCH'),
         'specTemperature.unit',
       );

@@ -178,7 +178,7 @@ export function fatigueFieldInput(
   const loadCases = loadCasesOf(analysisCase).map((entry) => entry.name);
   const mapped = mappedHistories(doc, fatigueCase, loadCases);
   if (isEvaluationFailure(mapped)) return mapped;
-  const fields = mapped.loadCaseIndex.map((index) => stepOfLoadCase(results, index)?.fields['STRESS']);
+  const fields = mapped.loadCaseIndex.map((index) => stepOfLoadCase(results, index, analysisCase)?.fields['STRESS']);
   const missing = fields.findIndex((field) => field === undefined);
   if (missing >= 0)
     return failure(

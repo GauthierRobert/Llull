@@ -188,7 +188,7 @@ function buildRows(
   const cases = loadCasesOf(analysis);
   for (const [index, { name, category }] of cases.entries()) {
     if (context.loadCaseFilter !== undefined && !context.loadCaseFilter.has(name)) continue;
-    const field = stepOfLoadCase(results, index)?.fields['STRESS'];
+    const field = stepOfLoadCase(results, index, analysis)?.fields['STRESS'];
     if (field === undefined)
       return {
         code: 'FEA_RESULTS_MISSING',

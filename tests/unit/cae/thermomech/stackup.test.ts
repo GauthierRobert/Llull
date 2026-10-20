@@ -157,6 +157,7 @@ describe('stackup_at_temperature', () => {
     };
     wrong({ specTemperature: undefined }, 'TMC_SPEC_TEMPERATURE_MISSING');
     wrong({ specTemperature: { value: 20, unit: 'mm' } }, 'THM_UNITS_MISMATCH');
+    wrong({ specTemperature: { value: -300, unit: 'degC' } }, 'THM_UNITS_MISMATCH');
     wrong({ temperatures: [] }, 'TMC_FIT_TEMPERATURES_MISSING');
     wrong({ temperatures: Array.from({ length: 51 }, () => SPEC) }, 'TMC_FIT_TEMPERATURES_MISSING');
     wrong({ temperatures: [{ value: -300, unit: 'degC' }] }, 'THM_UNITS_MISMATCH');

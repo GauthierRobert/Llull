@@ -19,8 +19,9 @@ import { planStep } from '../thermal/deckStep';
 import { propertyCards } from '../thermal/deckMaterial';
 import { indexMesh, partVolumes } from '../thermal/meshGeometry';
 import { caseTemperatureRange } from '../thermal/material';
-import { absoluteZeroOf, inScale } from '../thermal/quantities';
+import { absoluteZeroOf } from '../thermal/quantities';
 import { expansionCards, refused } from './deck';
+import { PREHEAT_PERIOD_S, startOf } from './preheat';
 import { temperatureIn } from './units';
 
 /** The thermo-mechanical set-up (with its thermal set-up) of a coupled case, else undefined. */
@@ -64,22 +65,6 @@ function unsupported(setup: NonNullable<ReturnType<typeof coupledOf>>, transient
     if (record?.bc.kind === 'film' && !('value' in record.bc.filmCoefficient)) return 'film coefficient tables';
   }
   return null;
-}
-
-/** Named deck rule: the period of the pre-heating `*STATIC` step. */
-const PREHEAT_PERIOD_S = 1;
-
-/** Uniform start temperature (case scale) of a transient and whether it differs from the reference (then a pre-heating step is written). */
-function startOf(
-  setup: NonNullable<ReturnType<typeof coupledOf>>,
-  reference: number,
-  transient: boolean,
-): { value: number; preheat: boolean } {
-  const initial =
-    transient && setup.thermal.initialTemperature !== undefined
-      ? inScale(setup.thermal.initialTemperature, setup.temperatureScale)
-      : reference;
-  return { value: initial, preheat: Math.abs(initial - reference) > 1e-9 * Math.max(1, Math.abs(reference)) };
 }
 
 /**

@@ -2,6 +2,7 @@
 
 import { isRecord } from '@lib/isRecord';
 import { nonlinearValueProblems } from '../nonlinear/shape';
+import { orientationErrors } from '../thermomech/validateOrientations';
 import { durabilityErrors } from './validateDurability';
 
 const TYPES = [
@@ -197,6 +198,7 @@ function checkCase(scope: Scope, id: string, analysisCase: Record<string, unknow
     if (!isRecord(thermomech['referenceTemperature'])) errors.push(`${where}: thermomech.referenceTemperature is required`);
     if (coupled && thermomech['thermal'] === undefined) errors.push(`${where}: thermomech.thermal is required for coupled cases`);
     if (thermomech['thermal'] !== undefined) checkThermal(scope, thermomech['thermal'], `${where}.thermomech.thermal`);
+    scope.errors.push(...orientationErrors(thermomech['orientations'], scope.entities, `${where}.thermomech`));
   }
   if (analysisCase['nonlinear'] !== undefined) checkNonlinear(scope, analysisCase, `${where}.nonlinear`);
   for (const summary of ['meshSummary', 'results'])
