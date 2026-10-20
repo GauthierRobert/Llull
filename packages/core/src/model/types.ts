@@ -688,6 +688,8 @@ export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFiel
   aero?: AeroModel;
   /** Absent until the first composites command (plugin composites, 06 CMP). */
   composites?: CompositesModel;
+  /** Absent until the first flow-case command (`cfd_create_case`, plugin `cfd`, 12 CFD). */
+  cfd?: import('./cfd').CfdDocumentSlice;
   /** Absent until the first sheet-metal command (plugin `sheetmetal`, 07 FTR M3). */
   sheetMetal?: SheetMetalModel;
   /** Absent until the first probabilistic command (`define_random_variable`; plugin `cae`, PHY-18). */

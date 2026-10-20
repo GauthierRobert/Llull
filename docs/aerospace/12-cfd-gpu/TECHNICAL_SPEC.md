@@ -413,3 +413,50 @@ MVP (M1–M5): about 22 eng-weeks. M3 also gives FEA its first 3D result overlay
 ## 12. References
 
 See FUNCTIONAL_SPEC §11 and [validation/sources.md](validation/sources.md).
+
+## 13. As built
+
+### M1 (data model, case commands, `cfd_prepare`, `check_cfd`)
+
+Delivered in `packages/domain-aero/src/cfd/` (plugin `cfd`, toolset `flow`, palette group "Flow") and `packages/core/src/model/cfd.ts`
+(slice type; `CadDocument.cfd`, cleared by `clear_document`, validated on load by the plugin `DocumentExtension`). No solver, no Rust, no
+transport, no overlay, no `CfdResultPort`, no `record_cfd_results` / `cfd_report` (M2).
+
+- **Commands (6).** `cfd_create_case`, `cfd_update_case`, `cfd_delete_case`, `cfd_set_boundary` (mutating, `affected: [caseId]`),
+  `cfd_prepare`, `check_cfd` (read-only). Case ids are chosen by the caller (`[A-Za-z0-9_.-]{1,64}`). Lengths in the case are metres.
+- **Toolset.** A new toolset `flow` (`@protocol/toolsets`), palette label "Flow"; it lists only registry commands (no MCP tool, no host
+  transport yet; M2 adds `cfd_solve` etc. to the same toolset).
+- **`cfd_prepare` is not `requiresKernel`.** §4 lists it so, but §5.1 step 2 defines the kernel-less path (display triangles, overlap test,
+  `CFD_KERNEL_REQUIRED` as a check row); `requiresKernel` would refuse the call before that path could run. The kernel is read from
+  `ctx.kernel`; with it the bodies are unioned by a boolean-union recipe (Manifold: watertight by construction), without it (or when it
+  cannot build the union) the display triangles are used and overlapping or touching bodies fail with `CFD_KERNEL_REQUIRED`.
+- **Report shape** (`data`): `status`, `solver`, `flow`, `checks[]` (`{ code, status: pass|warn|fail|not_run, message, remediation?, … }`,
+  one row per code of §5.1 that applies: `CFD_REGIME_MISMATCH`, `CFD_NO_GEOMETRY`, `CFD_KERNEL_REQUIRED`, `CFD_GEOMETRY_NOT_WATERTIGHT`,
+  `CFD_GEOMETRY_SELF_INTERSECTING`, `CFD_SMALL_FEATURE`, `CFD_BLOCKAGE_TOO_HIGH`, `CFD_MEMORY_EXCEEDED`; `CFD_PARAM_INVALID` rows for a
+  failed mirror-symmetry or custom-box containment check), `surface` (union method, counts, area, volume, bounds in the case frame, voxel
+  volume and its relative error and derived bound), `smallFeatures[]`, `domain` (box in the case frame, rule, basis), `frontalAreaM2`,
+  `blockageRatio`, `grid`, `estimate`, `geometryHash`, `caseHash`, `defaults[]` (AF-31), `warnings[]`, `notes[]`. Numbers are rounded to
+  10 significant digits. Optional params: `quality` (overrides the case) and `deviceMemoryBytes` (without it the memory row is `not_run`).
+- **Choices where §5.1 leaves room.** The domain is sized in the alpha = beta = 0 case frame (x along `flowAxis`, z along `upAxis`); for
+  `external_aero`, L is the largest body extent and the 3 % blockage limit applies to every rule; the symmetry plane is the y = 0 plane
+  of the case frame; the frontal area is a silhouette raster (exact for aligned boxes, error about half the perimeter times the cell
+  otherwise, 400 cells along the larger extent). The grid layout and throughput behind the cell, memory and time estimates (4 nested LBM
+  boxes of factor 2 spaced 0.25 body lengths; Euler octree with an 8-layer surface band; 1000 / 100 Mcell-updates/s) are named defaults
+  printed in `estimate.basis`; VC-CFD-50 and VC-CFD-54 replace them with measurements. The self-intersection test does not see coplanar
+  overlaps and is skipped above 200 000 triangles (`not_run`); small-feature rays are sampled (at most 20 000) on large surfaces.
+- **Boundary tags.** Per entity (faceRefs are stored and conflict-checked, §11.4 still open); the entity must be a body of the case; the
+  same kind merges, a different kind on the same entity or a shared face is `CFD_BOUNDARY_CONFLICT`; `cfd_update_case boundaries` replaces
+  the list.
+- **Openings (§5.1 step 8).** Open edges whose midpoint lies inside the bounding box of a body tagged `inlet` / `outlet` do not count as
+  non-watertight (reported as `openingEdges`); the attribution is by bounding box, not by face. With such openings the orientation flip,
+  voxel volume and small-feature volume figures are not computed for a surface that is not truly closed (voxel skipped).
+- **Status rules.** `not_run` is never a pass: it raises the status to `warn` (also in `check_cfd`), except the memory row without a device
+  (`neutral`). Bodies or boundary ids deleted from the document give a `CFD_ENTITY_NOT_FOUND` fail row; `cfd_update_case` tolerates ids that
+  were already missing, and `reference.momentPointM` is not recomputed when `entityIds` change (the update says so).
+- **M2 items.** `geometryHash` hashes the tessellated union and so depends on the kernel that built it (Manifold vs OCCT): M2 must record
+  the kernel name with it or hash the exported flow surface of the host transport.
+- **Validation.** VC-CFD-10, 11, 12, 14, 15 in `tests/unit/aero/cfd/prepare.test.ts`; VC-CFD-16 in `caseCommands.test.ts`; SC-CFD-01 runs
+  through `build_project` in `check.test.ts` (which also builds the setup steps of SC-CFD-02..05). VC-CFD-13 needs the solver and stays open.
+- **Surfaces.** The Flow panel and overlay (M3) do not exist; `src/ui` only gained the palette label. The tool-schema snapshot,
+  `docs/FEATURES.md`, the validation-plan allowlist (`blockedPlanCommands.json`) and the `.lld` example `flow.lld` were updated for the
+  new toolset.

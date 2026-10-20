@@ -1,6 +1,6 @@
 {
   "id": "SC-CFD-01",
-  "status": "draft — the cfd commands are specified, not implemented",
+  "status": "M1 implemented — cfd_create_case and cfd_prepare run this plan (tests/unit/aero/cfd/check.test.ts)",
   "validates": ["VC-CFD-10", "VC-CFD-11", "VC-CFD-12"],
   "description": "Geometry preparation only (no solve): a sphere passes and reports a voxel-volume error inside the derived bound; an open mesh fails the watertight check; a 1:1:2 building gets the COST 732 / AIJ domain and a 0.79 % blockage",
   "actions": [

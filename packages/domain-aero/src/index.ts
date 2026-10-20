@@ -6,3 +6,4 @@ export { aerodynamicsPlugin } from './aerodynamics/plugin';
 export { surfacingPlugin } from './surfacing/plugin';
 export { compositesPlugin } from './composites/plugin';
 export { fluidsPlugin } from './fluids/plugin';
+export { cfdPlugin } from './cfd/plugin';

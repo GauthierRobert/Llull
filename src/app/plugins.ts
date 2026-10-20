@@ -3,7 +3,15 @@
 import { installPlugin } from '@core/plugins/host';
 import { buildingPlugin, civilPlugin, industrialPlugin, pipingPlugin, scanPlugin } from '@aec/index';
 import { caePlugin, explicitPlugin, topologyPlugin } from '@cae/index';
-import { aerodynamicsPlugin, compositesPlugin, fastenersPlugin, fluidsPlugin, sheetMetalPlugin, surfacingPlugin } from '@aero/index';
+import {
+  aerodynamicsPlugin,
+  cfdPlugin,
+  compositesPlugin,
+  fastenersPlugin,
+  fluidsPlugin,
+  sheetMetalPlugin,
+  surfacingPlugin,
+} from '@aero/index';
 import { designPlugin } from '@design/index';
 import { plmPlugin } from '@plm/index';
 
@@ -21,6 +29,7 @@ export function installDefaultPlugins(): void {
   installPlugin(surfacingPlugin);
   installPlugin(compositesPlugin);
   installPlugin(fluidsPlugin);
+  installPlugin(cfdPlugin);
   installPlugin(designPlugin);
   installPlugin(plmPlugin);
   installPlugin(explicitPlugin);

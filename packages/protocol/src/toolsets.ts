@@ -21,6 +21,7 @@ export const TOOLSET_NAMES = [
   'fasteners',
   'aerodynamics',
   'fluids',
+  'flow',
   'exchange',
   'building',
   'piping',
@@ -101,6 +102,10 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   /** Contributed by the installed fluids plugin (compressible flow, rocket nozzles). */
   get fluids(): readonly string[] {
     return pluginToolNames('fluids');
+  },
+  /** Contributed by the installed cfd plugin (flow cases, geometry preparation, checks); palette group "Flow". */
+  get flow(): readonly string[] {
+    return pluginToolNames('flow');
   },
   /** Contributed by the installed building + industrial plugins. */
   get building(): readonly string[] {

@@ -31,6 +31,7 @@ const TOOLSET_GROUPS = {
   fasteners: 'Fasteners',
   aerodynamics: 'Aerodynamics',
   fluids: 'Fluids / propulsion',
+  flow: 'Flow',
   exchange: 'Import / export',
   building: 'Building',
   piping: 'Piping',

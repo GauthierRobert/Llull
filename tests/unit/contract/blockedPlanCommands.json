@@ -1,23 +1,6 @@
 {
   "_comment": "Plans under docs/**/validation referencing commands that are not registered yet (plan path -> sorted names). Remove entries as commands get built; never add one without a board note. Regenerate: UPDATE_BLOCKED_PLANS=1 npx vitest run tests/unit/contract/validationPlanCommands.test.ts",
   "blocked": {
-    "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-01-prepare-checks.json": [
-      "cfd_create_case",
-      "cfd_prepare"
-    ],
-    "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-02-sphere-lbm.json": [
-      "cfd_create_case"
-    ],
-    "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-03-wedge-supersonic.json": [
-      "cfd_create_case"
-    ],
-    "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-04-sphere-stagnation.json": [
-      "cfd_create_case"
-    ],
-    "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-05-winged-body-demo.json": [
-      "cfd_create_case",
-      "cfd_prepare"
-    ],
     "docs/physics/05-nonlinear-structural/validation/plans/nls_column_imperfection.plan.json": [
       "add_imperfection"
     ],
