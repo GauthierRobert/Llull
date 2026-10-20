@@ -32,6 +32,8 @@ export interface ExchangePlan {
   readonly faceted: readonly string[];
   /** Product names whose validation properties the kernel could not compute. */
   readonly withoutValidation: readonly string[];
+  /** Product key -> id of the single loose solid the product is (the only products PMI attaches to). */
+  readonly productEntities: Readonly<Record<string, string>>;
 }
 
 export interface PlanOptions {
@@ -116,6 +118,7 @@ function flatPlan(
   const products: ExchangeProduct[] = [];
   const withoutValidation: string[] = [];
   const faceted: string[] = [];
+  const productEntities: Record<string, string> = {};
   const labels = stepLabels(doc, solids);
   for (const [index, entity] of solids.entries()) {
     const built = exactOrMesh(kernel, entity);
@@ -126,6 +129,7 @@ function flatPlan(
     const masses = options.validation ? shapesMass(kernel, [shape]) : undefined;
     if (options.validation && masses === undefined) withoutValidation.push(label.name);
     products.push(productOf(`solid-${index}`, label.name, [shape], [label], masses === undefined ? undefined : combine(masses)));
+    if (!built.faceted) productEntities[`solid-${index}`] = entity.id;
   }
   return {
     products,
@@ -137,6 +141,7 @@ function flatPlan(
     skipped: [],
     faceted,
     withoutValidation,
+    productEntities,
   };
 }
 
@@ -154,6 +159,8 @@ function structuredPlan(
   const nested: ExchangeOccurrence[] = [];
   const masses = new Map<string, readonly Mass[] | undefined>();
   const withoutValidation: string[] = [];
+  const productEntities: Record<string, string> = {};
+  const faceted = plan.faceted;
 
   /** Placed masses of a part: its own solids plus every nested use. */
   const partMasses = (part: StepAssemblyPart, index: number): Mass[] | undefined => {
@@ -180,6 +187,7 @@ function structuredPlan(
     const name = label?.name ?? key;
     if (options.validation && measured === undefined) withoutValidation.push(name);
     products.set(index, productOf(key, name, part.shapes, label?.solids ?? [], measured === undefined ? undefined : combine(measured)));
+    if (label?.entityId !== undefined && !faceted.includes(label.entityId)) productEntities[key] = label.entityId;
     for (const [at, child] of (part.children ?? []).entries()) {
       const used = label?.occurrences?.[at];
       if (used === undefined) continue;
@@ -226,6 +234,7 @@ function structuredPlan(
     faceted: plan.faceted,
     skipped: [],
     withoutValidation,
+    productEntities,
   };
 }
 

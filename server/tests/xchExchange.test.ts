@@ -311,11 +311,11 @@ describeNative.skipIf(NIST_MISSING)(
       return { result, nist: result.data as NistLikeReport };
     };
 
-    it('CTC-01 AP242 e1: product tree, embedded GVP matches the geometry (green); only the unattached PMI asks for review (VC-XCH-05, -23)', () => {
+    it('CTC-01 AP242 e1: product tree, embedded GVP matches the geometry (green); only the unattached PMI and the imported PMI (review-required) ask for review (VC-XCH-05, -23)', () => {
       const { result, nist } = importNist('nist_ctc_01_asme1_ap242-e1.stp');
       expect(result.affected.length).toBeGreaterThan(0);
       expect(nist.report.exchange.gvpCheck.band).toBe('green');
-      expect(nist.report.reviewRequired.reasons).toEqual(['pmi_unmapped']);
+      expect(nist.report.reviewRequired.reasons).toEqual(['pmi_unmapped', 'pmi_review_required']);
     }, 180_000);
 
     it('STC-06: an all-zero placeholder GVP is not checkable and the bodies are unverified (VC-XCH-22)', () => {

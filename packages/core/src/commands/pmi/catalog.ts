@@ -13,6 +13,7 @@ import { checkPmi } from './check';
 import { acceptPmiReview } from './review';
 import { analyzeStackup } from './stackup';
 import { fastenerTolerance } from './fastener';
+import { applyPmiSet } from './applySet';
 
 export const pmiCommands = commandCatalog(
   setPmiStandard,
@@ -34,4 +35,5 @@ export const pmiCommands = commandCatalog(
   acceptPmiReview,
   analyzeStackup,
   fastenerTolerance,
+  applyPmiSet,
 );

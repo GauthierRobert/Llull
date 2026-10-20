@@ -66,6 +66,17 @@ describe('pmi persistence', () => {
     expect(deserializeDocument(serializeDocument(createEmptyDocument())).pmi).toBeUndefined();
   });
 
+  it('round-trips the import record of apply_pmi_set', () => {
+    const box = execute(createEmptyDocument(), 'add_box', { size: [120, 80, 12] });
+    const applied = execute(box.document, 'apply_pmi_set', {
+      entityId: box.affected[0],
+      source: 'a.stp',
+      items: [{ kind: 'datum_feature', label: 'A', facesNear: [[30, 10, 0]] }],
+    });
+    expect(applied.document.pmi?.import).toEqual({ source: 'a.stp', items: 1, unresolved: 0, unmapped: 0 });
+    expect(deserializeDocument(serializeDocument(applied.document)).pmi).toEqual(applied.document.pmi);
+  });
+
   it('keeps the step counter ahead of pmi ids minted by steps', () => {
     const doc = documentWithPmi();
     const raw = JSON.parse(serializeDocument(doc)) as { document: Json };
@@ -84,6 +95,7 @@ describe('pmi persistence', () => {
       ['pmi must be', ['items'], 1],
       ['pmi.standard', ['standard'], 'DIN'],
       ['generalToleranceNote', ['generalToleranceNote'], 3],
+      ['pmi.import must be', ['import'], { source: 'a.stp', items: -1, unresolved: 0, unmapped: 0 }],
       ['does not match item.id', ['items', ids[0] as string, 'id'], 'other'],
       ['unknown kind', ['items', ids[0] as string, 'kind'], 'mystery'],
       ['placement needs', ['items', ids[0] as string, 'placement'], {}],

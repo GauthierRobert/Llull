@@ -36,7 +36,7 @@ beforeEach(() => {
 });
 afterEach(() => setGeometryKernel(null));
 
-/** The plan up to the sheet: the AP242 export (M6) is not built. */
+/** The plan up to the sheet: the analytic plate kernel has no STEP writer (the AP242 export runs in server/tests/gdtPmiRoundTrip.test.ts). */
 const platePlan = (): Step[] => load('draft_plan_gdt_plate.json').filter((step) => step.command !== 'export_step_ap242');
 
 describe('draft_plan_gdt_plate.json', () => {
