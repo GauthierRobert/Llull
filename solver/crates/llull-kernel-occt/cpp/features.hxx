@@ -61,6 +61,8 @@ std::unique_ptr<Shape> draft_faces(const Shape &shape, rust::Slice<const uint32_
 std::unique_ptr<Shape> push_pull(const Shape &shape, uint32_t face, double distance);
 std::unique_ptr<Shape> split_faces(const Shape &shape, rust::Slice<const uint32_t> faces, rust::Slice<const double> origin,
                                    rust::Slice<const double> normal);
+// IGES 5.3 text of the listed shapes (iges.cxx); "" when the writer refuses one.
+rust::String export_iges(const ShapeList &list);
 // BRepCheck_Analyzer validity.
 bool is_valid_shape(const Shape &shape);
 // Post-boolean ShapeUpgrade_UnifySameDomain (the shape itself when it fails).

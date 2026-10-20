@@ -50,7 +50,7 @@ fn a_rotated_box_keeps_its_local_roles() {
 fn edges_are_named_by_the_faces_that_meet_there() {
     let edges = names(&topology(&leaf(entity("b", "box", json!({ "size": [2, 3, 4] })))), "edges");
     assert_eq!(edges.len(), 12);
-    assert!(edges.contains(&"e(b:x+|b:z+)".to_string()), "{edges:?}");
+    assert!(edges.iter().any(|name| name == "e(b:x+|b:z+)"), "{edges:?}");
     let unique: std::collections::BTreeSet<&String> = edges.iter().collect();
     assert_eq!(unique.len(), 12, "every box edge has its own pair of faces");
 }
@@ -74,9 +74,9 @@ fn a_fillet_keeps_the_faces_and_names_the_blend_after_its_edge() {
     let edge = edge_index(&topology(&base), "e(b:x+|b:z+)");
     let filleted = json!({ "op": "fillet", "source": base, "edges": [edge], "size": 0.5 });
     let faces = names(&topology(&filleted), "faces");
-    assert!(faces.contains(&"blend(e(b:x+|b:z+))".to_string()), "{faces:?}");
+    assert!(faces.iter().any(|name| name == "blend(e(b:x+|b:z+))"), "{faces:?}");
     for kept in ["b:x+", "b:x-", "b:y+", "b:y-", "b:z+", "b:z-"] {
-        assert!(faces.contains(&kept.to_string()), "{kept} lost: {faces:?}");
+        assert!(faces.iter().any(|name| name == kept), "{kept} lost: {faces:?}");
     }
 }
 
@@ -97,7 +97,7 @@ fn a_boolean_keeps_operand_names_and_a_cut_names_the_tool_wall() {
     let pin = leaf(entity("c", "cylinder", json!({ "radius": 1, "height": 10 })));
     let cut = json!({ "op": "boolean", "boolean": "subtract", "a": block, "b": pin });
     let faces = names(&topology(&cut), "faces");
-    assert!(faces.contains(&"c:side".to_string()), "the bore is the cylinder's side: {faces:?}");
+    assert!(faces.iter().any(|name| name == "c:side"), "the bore is the cylinder's side: {faces:?}");
     assert_eq!(faces.iter().filter(|face| face.as_str() == "b:z+").count(), 1);
 }
 
@@ -121,7 +121,7 @@ fn per_edge_radius_laws_round_each_edge_with_its_own_radius() {
     let removed = (1.0 - std::f64::consts::FRAC_PI_4) * (1.0 + 4.0) * 4.0;
     assert!((volume - (64.0 - removed)).abs() < 1e-6, "volume {volume}");
     let faces = names(&crate::queries::topology(&shape).unwrap(), "faces");
-    assert!(faces.contains(&"blend(e(b:x+|b:z+))".to_string()) && faces.contains(&"blend(e(b:x-|b:z-))".to_string()), "{faces:?}");
+    assert!(faces.iter().any(|name| name == "blend(e(b:x+|b:z+))") && faces.iter().any(|name| name == "blend(e(b:x-|b:z-))"), "{faces:?}");
 }
 
 #[test]
