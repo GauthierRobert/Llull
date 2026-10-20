@@ -21,11 +21,11 @@ standalone clone, or CI.
 
 ## Scores (Windows, Node 24, Manifold kernel in the judges, 2026-10-19/20)
 
-| Folder | Scored mutants | Killed | Timeout | Survived | No coverage | Score | Wall time |
-| ------ | ------- | ------ | ------- | -------- | ----------- | ----- | --------- |
-| `history` | 726 | 203 | 0 | 320 | 203 | 28.0 % | not recorded |
-| `parametric` | 2772 | 949 | 34 | 848 | 941 | 35.5 % | 34 min (concurrency 12) |
-| `brep`, `solids` | — | — | — | — | — | not run locally yet | nightly |
+| Folder           | Scored mutants | Killed | Timeout | Survived | No coverage | Score               | Wall time               |
+| ---------------- | -------------- | ------ | ------- | -------- | ----------- | ------------------- | ----------------------- |
+| `history`        | 726            | 203    | 0       | 320      | 203         | 28.0 %              | not recorded            |
+| `parametric`     | 2772           | 949    | 34      | 848      | 941         | 35.5 %              | 34 min (concurrency 12) |
+| `brep`, `solids` | —              | —      | —       | —        | —           | not run locally yet | nightly                 |
 
 The judges reach these folders through the registry, so Stryker cannot use static "related tests": every mutant runs the whole judge set
 selected by per-test coverage (`coverageAnalysis: perTest`; about 2 tests per mutant on average).
@@ -46,5 +46,17 @@ fuzz property):
   suppress steps, and never edit a material or component that later steps carry. Kill with golden plans that run each history
   meta-command on a non-trivial plan and compare to the plan rebuilt from scratch (replay equality).
 - **Configurations / parameters / recipes** (26–40 %): add an oracle part whose volume depends on a parameter edited after the fact.
+
+## Judges added for the clusters above (SC-Q4b; scores not re-measured yet)
+
+All live in `tests/golden/` so `vitest.mutation.config.mts` already picks them up; re-run `parametric` and `history` from a standalone clone.
+
+| Judge                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Targets                                                                                                  |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `golden.constraints.test.ts` + `plansConstraints.ts`: 10 `build_project` plans (one per family: coincident/fix/H/V, parallel/perpendicular/collinear/equal, tangent/point_on_curve/concentric, midpoint/symmetric, distance/angle/point_to_line, horizontal/vertical distance, radius/diameter/arc dimensions, curvature chain, parameter-driven dimension, update/delete/re-solve) with id-normalized snapshots, replay equality, `converged`, residual and the exact `dof` of each finished sketch | `solver/residuals*.ts`, `dof.ts`, `constraints.ts`, `constraintGuard.ts`, `flipGuard.ts`, `reference.ts` |
+| same file: flip / conflict / redundancy refusals on a dimensioned triangle and a signed angle                                                                                                                                                                                                                                                                                                                                                                                                        | `flipGuard.ts`, `constraintGuard.ts`                                                                     |
+| `golden.dof.test.ts`: seeded random sketches; accepted constraint lowers `dof` by its rows, refusal leaves the doc identical, deleting restores earlier `dof`, `dof` independent of insertion order, converged + idempotent solution                                                                                                                                                                                                                                                                 | `solver/dof.ts`, `rowSpace.ts`, `solve.ts`, `constraintGuard.ts`                                         |
+| `golden.history.test.ts` + `historyRecipe.ts`: `delete_step`, `set_step_suppressed`, `reorder_step`, `edit_step_params`, `insert_step`, `replay_history` on a 6-step recipe (material + assignment + move depending on earlier entities, `=expr` parameter) compared with the edited recipe rebuilt from scratch                                                                                                                                                                                     | `history/history.ts`, `carry.ts`, `replay.ts`, `replayStep.ts`, `replayParameters.ts`, `dependents.ts`   |
+| `golden.history.sketch.test.ts`: the same meta-commands on a constrained sketch (constraint and solve steps)                                                                                                                                                                                                                                                                                                                                                                                         | `history/replay.ts`, `constraints.ts`, `solve.ts`                                                        |
 
 Reports land in `reports/` (gitignored); the incremental cache (`reports/stryker-incremental-<folder>.json`) is a CI cache entry.
