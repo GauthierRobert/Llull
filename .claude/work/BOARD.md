@@ -13,7 +13,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 ## NOW (auto-updated by the skill)
 - 2026-10-20 — branch `feat/eng-depth`: DONE (reviewed, fixes merged) FEA-REST 1–3, AERO-5 (02 SRF M0–M7, 06 CMP M0–M4 + M6 incl. drape), MATL-M7, TMC-M4b,
   FPR-E, FPR-D (VC-FPR-24 passes, 394–445 s), SOLVER-VERIFY on ccx 2.21 / Gmsh 4.15.2 / pyNastran / OCCT 7.9.2 (MinGW) — 6 defects fixed (docs/decisions/SV1).
-  Next: KRN-MSVC, then CFD-M1, RS-3.
+  Next: AERO-4 (owner 2026-10-20: all of 03 GDT + 04 XCH + 09 PLM, then 06 CMP M5) — WIP: 03 M1–M5/M7, 09 M0–M2, STEP of sheets/ply solids; then 04 XCH, KRN-MSVC.
 - 2026-10-19 — branch `ccr-d5e76715-intlyp`: LC1 done (steps 1–6: native kernel default everywhere, opencascade.js retired, no outbox),
   RS-1 done (macOS bundle deferred by the owner), RS-2 done (native SIMP topology optimisation + plugin `topology` + `topology_solve` + UI panel).
   Next: CFD-M1, then RS-3.
@@ -48,7 +48,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
   brepCodeExchange), the FE face map TR-FEA-32 and the CMP live-OCC cone pick (SV1, 05 §13, 06 §13.4). _deps: —_
 - `[TODO]` **AERO-5c** Left of AERO-5: 06 CMP M5 AP242 composite export/import (needs AERO-4), STEP of ply solids and of sheets (B-spline face leaf),
   Nastran-side checks (PLOAD4 sign, PCOMP/MAT8, a real OP2), MFront run (no win-64 package). _deps: AERO-4, KRN-MSVC_
-- `[TODO]` **AERO-4** Supply chain: 03 GDT, 04 XCH (AP242), 09 PLM (`HumanSignaturePort`, `dispose_*`): `docs/aerospace/README.md`. _deps: —_
+- `[WIP]` **AERO-4** Supply chain: 03 GDT, 04 XCH (AP242), 09 PLM (`HumanSignaturePort`, `dispose_*`): `docs/aerospace/README.md`. _deps: —_
 - `[BLOCKED]` **VNV-M3** Convergence studies + `check_verification`: `docs/physics/00-vv-harness/`. _deps: FEA artifact store, AERO-4 (09 PLM signing)_
 - `[TODO]` **VNV-M4** Time-step/order refinement, least-squares order, UI: `docs/physics/00-vv-harness/`. _deps: VNV-M3_
 - `[BLOCKED]` **PROP-M6** Seed NIST property library: `docs/physics/01-property-models/` (OQ-PROP-03, needs trc.nist.gov access). _deps: —_
