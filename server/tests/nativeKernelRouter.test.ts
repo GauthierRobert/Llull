@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { createKernelRouter, type KernelRouter } from '../src/native/kernelRouter';
 import type { NativeKernelSession } from '../src/native/kernelSession';
 import type { NativeInfo } from '../src/native/kernelProtocol';
+import type { Entity } from '@core/model/types';
 import { box, leaf } from './kernelTestSupport';
 
 const NATIVE: NativeInfo = {
@@ -142,6 +143,44 @@ describe('native kernel router', () => {
     const capable = await payload({ ...NATIVE, capabilities: [...NATIVE.capabilities, 'bsplineSections'] });
     expect(capable['bsplines']).toHaveLength(2);
     expect(capable['chains']).toHaveLength(2);
+  });
+
+  it('sends a sheet leaf with its surface only to a sidecar that reported the nurbsSurface capability', async () => {
+    const sheet = leaf({
+      id: 'sheet',
+      kind: 'nurbs_surface',
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      layerId: 'l',
+      color: '#888',
+      surface: {
+        degreeU: 1,
+        degreeV: 1,
+        poles: [
+          [
+            [0, 0, 0],
+            [0, 1, 0],
+          ],
+          [
+            [1, 0, 0],
+            [1, 1, 0],
+          ],
+        ],
+        knotsU: [0, 1],
+        multiplicitiesU: [2, 2],
+        knotsV: [0, 1],
+        multiplicitiesV: [2, 2],
+      },
+    } as unknown as Entity);
+    const payload = async (native: NativeInfo): Promise<Record<string, unknown>> => {
+      const h = harness(() => ({ result: { key: 'k' } }), native);
+      await h.router.route({ op: 'evaluate', args: [sheet] });
+      return (h.nativeCalls[0]!.args[0] as { recipe: { entity: Record<string, unknown> } }).recipe.entity;
+    };
+    expect((await payload(NATIVE))['native']).toBeUndefined();
+    const capable = await payload({ ...NATIVE, capabilities: [...NATIVE.capabilities, 'nurbsSurface'] });
+    expect(capable['native']).toMatchObject({ loops: [] });
+    expect((capable['native'] as { surface: number[] }).surface).toHaveLength(7 + 12 + 8);
   });
 
   it('passes other native errors through (refusal or resend request)', async () => {

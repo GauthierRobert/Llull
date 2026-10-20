@@ -7,6 +7,7 @@
  */
 
 import { type Entity, type MeshSolidEntity, type ShapeRecipe, type Vec3, SOLID_KINDS } from '../model/types';
+import { SHEET_KINDS } from '../model/curveKinds';
 import { hashText } from '../lib/hash';
 import { isRecord } from '../lib/isRecord';
 import { isFiniteNumber } from '../lib/isFiniteNumber';
@@ -55,6 +56,8 @@ function keyText(recipe: ShapeRecipe): string {
       return `brep(${recipe.blob})`;
     case 'feature':
       return featureKeyText(recipe, recipeKey(recipe.source));
+    case 'faceSlab':
+      return `faceSlab(${JSON.stringify(recipe)})`;
   }
 }
 
@@ -114,8 +117,8 @@ const isPointList = (v: unknown): boolean =>
 /** A leaf must be a 3D solid (not an instance); a mesh leaf needs well-formed triangle arrays. */
 function leafError(entity: Record<string, unknown>, validateLeaf: LeafValidator): string | null {
   const kind = entity['kind'];
-  if (typeof kind !== 'string' || !(SOLID_KINDS as readonly string[]).includes(kind))
-    return `solid leaf has kind '${String(kind)}', expected a 3D solid kind`;
+  if (typeof kind !== 'string' || !([...SOLID_KINDS, ...SHEET_KINDS] as readonly string[]).includes(kind))
+    return `solid leaf has kind '${String(kind)}', expected a 3D solid kind or a surface sheet`;
   if (kind === 'mesh') {
     const mesh = entity['mesh'];
     const positions = isRecord(mesh) ? mesh['positions'] : undefined;
@@ -125,6 +128,22 @@ function leafError(entity: Record<string, unknown>, validateLeaf: LeafValidator)
       return 'mesh leaf indices must be integers within the vertex range';
   }
   return validateLeaf(entity);
+}
+
+const isNumberList = (v: unknown): boolean => Array.isArray(v) && v.every(isFiniteNumber);
+
+/** Checks a `faceSlab` node; returns an error text or null. */
+function slabError(node: Record<string, unknown>): string | null {
+  const surface = node['surface'];
+  if (!isRecord(surface) || !['bspline', 'plane', 'cylinder', 'cone'].includes(String(surface['type'])))
+    return 'faceSlab: surface.type must be bspline, plane, cylinder or cone';
+  if (!isNumberList(surface['data'])) return 'faceSlab: surface.data must be a list of finite numbers';
+  if (!isNumberList(node['loops'])) return 'faceSlab: loops must be a list of finite numbers';
+  const { from, to } = node;
+  if (!isFiniteNumber(from) || !isFiniteNumber(to) || !(to > from)) return 'faceSlab: from and to must be finite with to > from';
+  if (!isVec3(node['direction'])) return 'faceSlab: direction must be a finite Vec3';
+  const tolerance = node['tolerance'];
+  return isFiniteNumber(tolerance) && tolerance > 0 ? null : 'faceSlab: tolerance must be > 0';
 }
 
 function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: LeafValidator): string | null {
@@ -173,6 +192,8 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
       return node['label'] === undefined || typeof node['label'] === 'string' ? null : 'brep: label must be a string';
     case 'feature':
       return featureError(node) ?? child(node['source']);
+    case 'faceSlab':
+      return slabError(node);
     default:
       return `unknown recipe op '${String(node['op'])}'`;
   }

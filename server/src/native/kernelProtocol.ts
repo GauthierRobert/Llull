@@ -159,6 +159,7 @@ export function nativeRecipe(recipe: ShapeRecipe, features: FeatureLowerings = N
     case 'blend':
       return { ...recipe, sources: recipe.sources.map(child) };
     case 'brep':
+    case 'faceSlab':
       return recipe;
     case 'feature': {
       const lowering = features.get(recipe);

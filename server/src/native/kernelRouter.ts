@@ -58,7 +58,10 @@ export function createKernelRouter(deps: KernelRouterDeps): KernelRouter {
   });
 
   // what the host may send beyond the baseline wire format follows the capabilities the sidecar reported
-  const wire = { bsplineSections: deps.native.capabilities.includes('bsplineSections') };
+  const wire = {
+    bsplineSections: deps.native.capabilities.includes('bsplineSections'),
+    nurbsSurface: deps.native.capabilities.includes('nurbsSurface'),
+  };
 
   const sourceMesh: SourceMesher = async (source, features) => {
     const reply = await (

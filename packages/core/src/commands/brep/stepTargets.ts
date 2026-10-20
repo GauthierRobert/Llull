@@ -36,14 +36,18 @@ export function instanceSolids(doc: CadDocument, instance: InstanceEntity, label
   });
 }
 
-/** The exportable entries in `entityIds` (or the whole document), their flat solids, plus the ids skipped and why. */
+/**
+ * The exportable entries in `entityIds` (or the whole document), their flat solids, the surface sheets (written as faces when the kernel can build
+ * them), plus the ids skipped and why.
+ */
 export function stepTargets(
   doc: CadDocument,
   entityIds: readonly string[] | undefined,
-): { solids: Entity[]; skipped: string[]; entries: StepEntry[] } {
+): { solids: Entity[]; sheets: Entity[]; skipped: string[]; entries: StepEntry[] } {
   const ids = entityIds !== undefined && entityIds.length > 0 ? entityIds : doc.order;
   const entries: StepEntry[] = [];
   const skipped: string[] = [];
+  const sheets: Entity[] = [];
   const baseOf = (instance: InstanceEntity): string => instance.name ?? doc.components[instance.componentId]?.name ?? 'instance';
   const bases = ids.flatMap((id) => {
     const entity = doc.entities[id];
@@ -62,9 +66,9 @@ export function stepTargets(
       if (baked.length === 0) skipped.push(`${id} (instance without solids)`);
       else entries.push({ kind: 'instance', instance: entity, label, baked });
     } else if (is3D(entity)) entries.push({ kind: 'solid', entity });
-    else if (entityIds !== undefined && entityIds.length > 0)
-      skipped.push(`${id} (${isSheet(entity) ? 'surface sheet: STEP export needs solids' : isCurve3D(entity) ? '3D curve' : '2D'})`);
+    else if (isSheet(entity)) sheets.push(entity);
+    else if (entityIds !== undefined && entityIds.length > 0) skipped.push(`${id} (${isCurve3D(entity) ? '3D curve' : '2D'})`);
   }
   const solids = entries.flatMap((entry) => (entry.kind === 'solid' ? [entry.entity] : [...entry.baked]));
-  return { solids, skipped, entries };
+  return { solids, sheets, skipped, entries };
 }

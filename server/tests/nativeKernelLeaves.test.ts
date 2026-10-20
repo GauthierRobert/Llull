@@ -163,6 +163,77 @@ describe('native leaves', () => {
     });
   });
 
+  describe('surface sheets (capability nurbsSurface)', () => {
+    const surface = {
+      degreeU: 1,
+      degreeV: 1,
+      poles: [
+        [
+          [0, 0, 0],
+          [0, 3, 0],
+        ],
+        [
+          [4, 0, 0],
+          [4, 3, 0],
+        ],
+      ],
+      knotsU: [0, 1],
+      multiplicitiesU: [2, 2],
+      knotsV: [0, 1],
+      multiplicitiesV: [2, 2],
+    };
+    const trims = [
+      {
+        outer: true,
+        polygon: [
+          [0.25, 0.25],
+          [0.75, 0.25],
+          [0.75, 0.75],
+          [0.25, 0.75],
+        ],
+      },
+    ];
+    const sheet = (fields: Record<string, unknown> = {}): Entity => entity('nurbs_surface', { surface, position: [0, 0, 1], ...fields });
+
+    it('is sent unchanged to a sidecar without the capability (it refuses the kind: the sheet stays unexported)', () => {
+      const plain = sheet();
+      expect(nativeLeaf(plain)).toBe(plain);
+      expect(nativeLeaf(plain, { bsplineSections: true })).toBe(plain);
+    });
+
+    it('carries the encoded surface and its trim loops when the capability is there, keeping the placement', () => {
+      const trimmed = nativeLeaf(sheet({ trims }), { nurbsSurface: true }) as unknown as Record<string, unknown>;
+      expect(trimmed['position']).toEqual([0, 0, 1]);
+      expect(trimmed['surface']).toBeUndefined();
+      const native = trimmed['native'] as { surface: number[]; loops: number[] };
+      expect(native.surface.slice(0, 7)).toEqual([1, 1, 2, 2, 2, 2, 0]);
+      expect(native.loops).toEqual([1, 4, 1, 0.25, 0.25, 0.75, 0.25, 0.75, 0.75, 0.25, 0.75]);
+      const whole = nativeLeaf(sheet(), { nurbsSurface: true }) as unknown as { native: { loops: number[] } };
+      expect(whole.native.loops).toEqual([]);
+    });
+
+    it('is threaded through nativeRecipe', () => {
+      const recipe: ShapeRecipe = { op: 'solid', entity: sheet() };
+      expect((nativeRecipe(recipe) as unknown as { entity: Entity }).entity.kind).toBe('nurbs_surface');
+      const wired = nativeRecipe(recipe, undefined, { nurbsSurface: true }) as unknown as { entity: { native: Record<string, unknown> } };
+      expect(wired.entity.native['surface']).toHaveLength(7 + 12 + 8);
+    });
+
+    it('passes a faceSlab recipe through to the sidecar untouched', () => {
+      const slab: ShapeRecipe = {
+        op: 'faceSlab',
+        surface: { type: 'plane', data: [0, 0, 0, 1, 0, 0, 0, 1, 0] },
+        loops: [1, 4, 1, 0, 0, 1, 0, 1, 1, 0, 1],
+        from: 0,
+        to: 0.5,
+        direction: [0, 0, 1],
+        tolerance: 1e-6,
+      };
+      expect(nativeRecipe(slab)).toBe(slab);
+      expect(nativeRecipe({ op: 'place', source: slab, position: [1, 0, 0], rotation: [0, 0, 0] })).toMatchObject({ source: slab });
+    });
+  });
+
   it('sends loft, sweep and subdivision payloads', () => {
     const ring: Vec3[] = [
       [1, 0, 0],

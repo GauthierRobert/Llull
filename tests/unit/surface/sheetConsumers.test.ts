@@ -43,9 +43,12 @@ describe('surface sheets in the consumers that used to drop them silently', () =
     expect(stl.summary).toMatch(/non-solid.*3D curves/);
   });
 
-  it('STEP export names a skipped sheet as such', () => {
+  it('STEP export collects a sheet as a face to write (a kernel that cannot build it names it as skipped)', () => {
     const { doc, id } = sheet();
-    expect(stepTargets(doc, [id]).skipped[0]).toMatch(/surface sheet/);
+    const targets = stepTargets(doc, [id]);
+    expect(targets.sheets.map((entity) => entity.id)).toEqual([id]);
+    expect(targets.solids).toEqual([]);
+    expect(targets.skipped).toEqual([]);
   });
 
   it('code export says that sheets and curves were not exported', () => {
