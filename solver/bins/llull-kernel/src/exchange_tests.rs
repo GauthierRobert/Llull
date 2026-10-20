@@ -85,3 +85,36 @@ fn writes_iges_when_the_build_has_the_translator() {
         assert_eq!(written["result"], Value::Null);
     }
 }
+
+#[test]
+fn carries_pmi_modifiers_through_the_json_vocabulary() {
+    let _guard = serial();
+    let mut session = Session::new();
+    let mut tree = request("step");
+    tree["products"][0]["pmi"] = json!({
+        "datums": [{ "label": "A", "faces": [4], "modifiers": ["maximum_material_requirement"] }],
+        "tolerances": [{
+            "characteristic": "position", "value": 0.2, "diameterZone": true, "faces": [3], "datums": ["A"],
+            "materialRequirement": "maximum", "modifiers": ["common_zone"]
+        }],
+        "dimensions": [{ "type": "size_diameter", "value": 8.0, "faces": [2], "modifiers": ["two_point_size"], "range": { "lower": 7.9, "upper": 8.1 } }]
+    });
+    let written = call(&mut session, "writeExchange", json!([tree]));
+    let step = written["result"].as_str().unwrap_or("");
+    assert!(!step.is_empty(), "{written}");
+    let read = call(&mut session, "importExchange", json!(["step", step, options()]));
+    let products = read["result"]["products"].as_array().unwrap();
+    let pmi = &products.iter().find(|product| product["name"] == json!("Block")).expect("the Block product")["pmi"];
+    assert_eq!(pmi["tolerances"][0]["materialRequirement"], json!("maximum"), "{pmi}");
+    assert_eq!(pmi["tolerances"][0]["modifiers"], json!(["common_zone"]), "{pmi}");
+    assert_eq!(pmi["datums"][0]["modifiers"], json!(["maximum_material_requirement"]), "{pmi}");
+    assert_eq!(pmi["dimensions"][0]["range"], json!({ "lower": 7.9, "upper": 8.1 }), "{pmi}");
+
+    let mut refused = request("step");
+    refused["products"][0]["pmi"] = json!({
+        "datums": [], "dimensions": [],
+        "tolerances": [{ "characteristic": "flatness", "value": 0.05, "faces": [5], "modifiers": ["all_around"] }]
+    });
+    let reply = call(&mut session, "writeExchange", json!([refused]));
+    assert!(reply["error"].is_object() || reply["result"].is_null(), "an unwritable modifier is refused loudly: {reply}");
+}

@@ -565,3 +565,29 @@ Deferred: JT (converter port, `XCH_CONVERTER_MISSING`), QIF, LOTAR archive packa
 - **Hostile input.** The Part 21 reader is linear (no backtracking regex over unbounded runs; census over leading entity names of unquoted text); 1 MB strings and digit runs parse in under a second; `canonicalizeStep21` is iterative and falls back to the input text. Base64 payloads are length-capped; IGES file resolution is clamped to the import ceiling; the XDE reader caps product nesting at 64 levels; `simplifyTree` is linear.
 - **Document.** `doc.exchange` is validated on load (`exchangeProblems`) and its provenance leaves with the bodies it describes (`withoutEntities`). Non-rigid occurrences mark their component unverified (`non_rigid_occurrence`); assemblies nested deeper than the instance limit raise `assembly_depth_limit`; a product tree that contains itself is refused.
 Deferred: JT (converter port, `XCH_CONVERTER_MISSING`), QIF, LOTAR archive package, tessellated read/write modes, SFA gate, presentation PMI, IGES header timestamp non-determinism. The `llull-kernel` bin tests can fail in parallel (shared OCCT statics); run with `--test-threads=1`.
+
+### 13.2 PMI transport v2 (review request from 03 GD&T M6)
+
+Vocabulary (all optional, additive; `ExchangePmi` in `geometry/kernelExchange.ts`, written by the sidecar `pmi_of` / `xde_product_pmi_attr`, read by `xde_pmi.cxx`):
+- tolerance: `sphericalZone`, `materialRequirement` ('maximum' | 'least', the M / L condition of the zone), `zoneModifier` ('projected' | 'runout' | 'non_uniform') with `zoneModifierValue`, `modifiers` (any_cross_section, common_zone, each_radial_element, free_state, line_element, major / minor / pitch_diameter, not_convex, reciprocity_requirement, separate_requirement, statistical_tolerance, tangent_plane, all_around, all_over), `maxValue`;
+- datum: `modifiers` (the boundary MMB / LMB is `maximum_ / least_material_requirement`; contacting_feature, dof_constraint_u..z, free_state, orientation, translation, ...), `modifierWithValue` { circular_or_cylindrical | distance | projected | spherical, value };
+- dimension: `qualifier` (min | max | avg), `modifiers` (ISO 14405-1: two_point_size, local_size_defined_by_sphere, least_squares_association, maximum_inscribed_association, circumference_diameter, average_size, range_of_sizes, ... and between), `range` { lower, upper }, `classOfTolerance` { hole, variance, grade } (ISO 286).
+Lengths of the new fields convert with the rest (`pmiInUnit`).
+
+Read results measured against OCC 7.9.2, and what the writer therefore carries (everything else is refused loudly with a message, never dropped): written and read back verified: tolerance modifiers except all_around / all_over, material requirement (maximum / least, also through the two material-requirement modifiers), spherical zone, datum modifiers (not the one with a value: it aborts the process), dimension modifiers except between, range, fit class (the writer shifts the grade: OCC writes enum + 1 and reads string + 1, so a written IT7 would read back IT9). Refused on write: projected / non_uniform zone modifiers (only the runout zone is written), maxValue, datum modifierWithValue, qualifier, between, all_around / all_over, IT0 and IT1.
+
+Defects found and fixed in the transport itself: OCC writes a tolerance magnitude in an invented SI metre unit when the product holds no dimension or datum (0.05 mm read as 0.05 m in every other reader, and as 50 mm by OCC for a modified tolerance): the writer now points every such length at the file's own length unit.
+
+Reader recall, NIST CAx-IF PMI files (17 AP242 files, reader level, against the independent entity census of 03 `nist_pmi_census.json`):
+
+| | XCAF only (first delivery) | now (XCAF + STEP entities + Part 21 text) |
+| --- | --- | --- |
+| geometric tolerances | 327 / 362 | 353 / 362 |
+| dimensions | 229 / 260 | 229 / 260 (unchanged: the missing ones reference edges / vertices, not faces) |
+| datum features | 51 / 100 | 96 / 100 |
+
+Through the 03 import (`gdtPmiNistGate`, VC-GDT-20): tolerances 323 -> 349 of 362, datum features 50 -> 95 of 100, dimensions 213 of 260 (03 does not map size_curve_length, size_spherical_radius and size_angular, and cannot attach dimensions to edges); `nist_pmi_import_expected.json` raised accordingly.
+
+How the recovery works (the XCAF reader binds a tolerance to faces only through sub-shape labels it created, and drops what it cannot): (1) every GEOMETRIC_TOLERANCE entity is followed through its shape aspect (composites, derived aspects via SHAPE_ASPECT_DERIVING_RELATIONSHIP, ITEM_IDENTIFIED_REPRESENTATION_USAGE and GEOMETRIC_ITEM_SPECIFIC_USAGE items) to the transferred face shapes, without needing a label; (2) a magnitude written as a complex record (NIST CAD exports) comes back null from OCC and as 0 from XCAF: its true value, in the file's unit, is read from the Part 21 text; (3) datum features are found through the DATUM records and their relationships. Tolerances found by two paths are paired by product, characteristic and datums (exact values first), the text value wins. Items that name no face of a product (datum targets, edges, annotations) are counted in `pmiUnmapped`, never attached to a guess.
+
+Not carried (deferred): composite frames (the lower segment of a composite feature control frame is its own tolerance in the file; the census counts them, the transport has no segment link), unequally disposed zones (read from the file as a plain tolerance), datum targets (points / lines / areas: no vocabulary, V2), dimension qualifiers on write, tolerance maximum values on write, dimensions on edges.

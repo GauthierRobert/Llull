@@ -679,3 +679,69 @@ describe('import provenance leaves with the imported bodies and is validated on 
     expect(exchangeProblems('x')).not.toEqual([]);
   });
 });
+
+describe('import_step_exact: the PMI vocabulary (modifiers, material requirement, boundary, ranges) reaches the report in document units', () => {
+  it('converts every length of the extended vocabulary and leaves names and angles untouched', () => {
+    const tree = singlePartTree('Block', [part()]);
+    const pmi = {
+      datums: [
+        {
+          label: 'A',
+          faces: [4],
+          modifiers: ['maximum_material_requirement' as const],
+          modifierWithValue: { kind: 'distance' as const, value: 25.4 },
+        },
+      ],
+      tolerances: [
+        {
+          characteristic: 'position' as const,
+          value: 0.254,
+          diameterZone: true,
+          faces: [3],
+          datums: ['A'],
+          materialRequirement: 'maximum' as const,
+          zoneModifier: 'projected' as const,
+          zoneModifierValue: 12.7,
+          modifiers: ['common_zone' as const],
+          maxValue: 0.508,
+        },
+      ],
+      dimensions: [
+        {
+          type: 'size_diameter' as const,
+          value: 25.4,
+          faces: [2],
+          range: { lower: 25.3, upper: 25.5 },
+          qualifier: 'min' as const,
+          modifiers: ['two_point_size' as const],
+          classOfTolerance: { hole: true, variance: 'H', grade: 'IT7' },
+        },
+        { type: 'location_angular' as const, value: 90, faces: [0], facesSecond: [1], range: { lower: 89, upper: 91 } },
+      ],
+    };
+    const withPmi: ImportedExchange = { ...tree, products: [{ ...(tree.products[0] as ImportedExchange['products'][number]), pmi }] };
+    const doc = { ...createEmptyDocument(), units: 'in' as const };
+    const result = run(doc, 'import_step_exact', { text: stepOf() }, { stepImport: withPmi });
+    const [product] = reportOf(result).exchange.products as unknown as { pmi: typeof pmi }[];
+    expect(product?.pmi.datums[0]).toMatchObject({
+      modifiers: ['maximum_material_requirement'],
+      modifierWithValue: { kind: 'distance', value: 1 },
+    });
+    expect(product?.pmi.tolerances[0]).toMatchObject({
+      value: 0.01,
+      materialRequirement: 'maximum',
+      zoneModifier: 'projected',
+      zoneModifierValue: 0.5,
+      maxValue: 0.02,
+      modifiers: ['common_zone'],
+    });
+    expect(product?.pmi.dimensions[0]).toMatchObject({
+      value: 1,
+      range: { lower: 25.3 / 25.4, upper: 25.5 / 25.4 },
+      qualifier: 'min',
+      modifiers: ['two_point_size'],
+      classOfTolerance: { hole: true, variance: 'H', grade: 'IT7' },
+    });
+    expect(product?.pmi.dimensions[1]).toMatchObject({ value: 90, range: { lower: 89, upper: 91 } });
+  });
+});

@@ -27,9 +27,17 @@ struct XdeSolid {
 };
 
 // Semantic PMI of one product, attached to faces of its shape (0-based `TopExp::MapShapes` indices over the product's shape).
+// One extra attribute of a PMI item (modifiers, material requirement, ...): `key` names it, `text` / `number` carry its value.
+struct XdePmiAttr {
+  std::string key;
+  std::string text;
+  double number = 0;
+};
+
 struct XdePmiDatum {
   std::string label;
   std::vector<int> faces;
+  std::vector<XdePmiAttr> attrs;
 };
 
 struct XdePmiTolerance {
@@ -38,6 +46,7 @@ struct XdePmiTolerance {
   bool diameter_zone = false;
   std::vector<int> faces;
   std::vector<std::string> datums;  // labels in reference order (primary first)
+  std::vector<XdePmiAttr> attrs;
 };
 
 struct XdePmiDimension {
@@ -48,6 +57,7 @@ struct XdePmiDimension {
   double minus = 0;
   std::vector<int> faces;
   std::vector<int> faces_second;  // locations: the second feature set
+  std::vector<XdePmiAttr> attrs;
 };
 
 struct XdeProduct {
@@ -97,6 +107,8 @@ void xde_product_pmi_tolerance(XdeDoc &doc, int32_t product, rust::Str character
                                rust::Slice<const int32_t> faces, rust::Str datums);
 void xde_product_pmi_dimension(XdeDoc &doc, int32_t product, rust::Str type, double value, bool has_tolerance, double plus, double minus,
                                rust::Slice<const int32_t> faces, rust::Slice<const int32_t> faces_second);
+// `item` = "datum" | "tolerance" | "dimension"; `index` = position of the item in its product list (the one just added).
+void xde_product_pmi_attr(XdeDoc &doc, int32_t product, rust::Str item, int32_t index, rust::Str key, rust::Str text, double number);
 void xde_use(XdeDoc &doc, int32_t parent, int32_t product, rust::Str name, rust::Slice<const double> rotation,
              rust::Slice<const double> position);
 
@@ -105,7 +117,8 @@ void xde_use(XdeDoc &doc, int32_t parent, int32_t product, rust::Str name, rust:
 void write_product_pmi(const Handle(XCAFDoc_ShapeTool) & shapes, const TDF_Label &main, const TDF_Label &product, const TopoDS_Shape &shape,
                        const XdeProduct &spec);
 std::map<int, std::string> read_pmi(const Handle(XCAFDoc_DimTolTool) & tool, const std::map<std::string, int> &products,
-                                    const std::map<int, TopoDS_Shape> &shape_of, int &unmapped);
+                                    const std::map<int, TopoDS_Shape> &shape_of, const Handle(XSControl_WorkSession) & session, const std::string &content,
+                                    int &unmapped);
 
 // One AP242 / AP214 / AP203 file (`schema` = DESTEP_Parameters::WriteMode_StepSchema 3, 4 or 5) written in `unit` (mm, cm, m, in, ft; the
 // numbers are the document's own). `root_name` names the root assembly when any use has parent -1; `root_validation` is its GVP (volume,

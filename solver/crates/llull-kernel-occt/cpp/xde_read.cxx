@@ -13,6 +13,7 @@
 #include <Quantity_Color.hxx>
 #include <STEPCAFControl_Reader.hxx>
 #include <TCollection_AsciiString.hxx>
+#include <XSControl_WorkSession.hxx>
 #include <TCollection_ExtendedString.hxx>
 #include <TColStd_HSequenceOfExtendedString.hxx>
 #include <TDF_LabelSequence.hxx>
@@ -63,6 +64,8 @@ class TreeReader {
         colors_(XCAFDoc_DocumentTool::ColorTool(document->Main())),
         layers_(XCAFDoc_DocumentTool::LayerTool(document->Main())) {}
 
+  const std::string *content_ = nullptr;   // the Part 21 text, for magnitudes OCC cannot type
+  Handle(XSControl_WorkSession) session_;  // the STEP side of the reader (null: XCAF only)
   std::vector<int> roots;
   std::vector<std::string> skipped;
   int tessellated = 0;
@@ -79,7 +82,7 @@ class TreeReader {
     std::map<int, TopoDS_Shape> shape_of;
     for (size_t index = 0; index < products_.size(); ++index)
       if (!products_[index].assembly) shape_of[static_cast<int>(index)] = XCAFDoc_ShapeTool::GetShape(labels_[index]);
-    for (auto &entry : read_pmi(dimtol_, known_, shape_of, pmi_unmapped)) products_[static_cast<size_t>(entry.first)].pmi = entry.second;
+    for (auto &entry : read_pmi(dimtol_, known_, shape_of, session_, content_ == nullptr ? std::string() : *content_, pmi_unmapped)) products_[static_cast<size_t>(entry.first)].pmi = entry.second;
   }
 
   rust::String finish(int file_roots) {
@@ -338,6 +341,8 @@ rust::String xde_import_json(rust::Str text, double precision, double max_tolera
     return error_json("unreadable", std::to_string(file_roots) + " root entities, none transferred to a shape");
   }
   TreeReader tree(document, options);
+  tree.session_ = reader.Reader().WS();
+  tree.content_ = &content;
   tree.read();
   return tree.finish(file_roots);
 }

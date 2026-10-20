@@ -384,6 +384,26 @@ describeNative.skipIf(NIST_MISSING)(
       expect(verified.band).toBe('red');
     }, 240_000);
 
+    it('tolerances and datum features XCAF cannot bind are recovered from the STEP entities and the text, with their true values (VC-XCH-07)', () => {
+      const pmiOf = (file: string): PmiView[] =>
+        importNist(file).nist.report.exchange.products.flatMap((product) => (product.pmi === undefined ? [] : [product.pmi]));
+      const tolerances = (pmi: readonly PmiView[]): PmiView['tolerances'][number][] => pmi.flatMap((entry) => [...entry.tolerances]);
+      // FTC-08 and STC-07 write their magnitudes as complex records (OCC reads 0) and bind position tolerances through unnamed features (XCAF drops them)
+      const ftc08 = pmiOf('nist_ftc_08_asme1_ap242-e2.stp');
+      expect(tolerances(ftc08)).toHaveLength(33);
+      expect(tolerances(ftc08).filter((entry) => entry.value === 0)).toEqual([]);
+      expect(ftc08.flatMap((entry) => entry.datums)).toHaveLength(11);
+      const stc07 = pmiOf('nist_stc_07_asme1_ap242-e3.stp');
+      expect(tolerances(stc07)).toHaveLength(22);
+      expect(tolerances(stc07).filter((entry) => entry.characteristic === 'position')).toHaveLength(9);
+      // CTC-02: the datum features reach faces through ITEM_IDENTIFIED_REPRESENTATION_USAGE; a modified perpendicularity keeps the file's 0.1 mm
+      const ctc02 = pmiOf('nist_ctc_02_asme1_ap242-e2.stp');
+      // A..D are datum targets (points), K lies on a sheet product the import folds away: the solid carries the five datum features E, F, G, H, J
+      expect(ctc02.flatMap((entry) => entry.datums.map((datum) => datum.label)).sort()).toEqual(['E', 'F', 'G', 'H', 'J']);
+      expect(ctc02.flatMap((entry) => entry.datums).every((datum) => datum.faces.length > 0)).toBe(true);
+      expect(tolerances(ctc02).filter((entry) => entry.value === 0)).toEqual([]);
+    }, 600_000);
+
     it('CTC-01: the semantic PMI the XDE reader attaches to faces matches the census categories (VC-XCH-07)', () => {
       const { result, nist } = importNist('nist_ctc_01_asme1_ap242-e1.stp');
       expect(result.affected.length).toBeGreaterThan(0);

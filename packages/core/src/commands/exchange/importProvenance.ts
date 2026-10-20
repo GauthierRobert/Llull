@@ -70,8 +70,17 @@ const scaleMm = (value: number | undefined, unit: DocumentUnit, power: number): 
 function pmiInUnit(pmi: ExchangePmi, unit: DocumentUnit): ExchangePmi {
   const length = (value: number): number => value / MM_PER_UNIT[unit];
   return {
-    datums: pmi.datums,
-    tolerances: pmi.tolerances.map((tolerance) => ({ ...tolerance, value: length(tolerance.value) })),
+    datums: pmi.datums.map((datum) =>
+      datum.modifierWithValue === undefined
+        ? datum
+        : { ...datum, modifierWithValue: { ...datum.modifierWithValue, value: length(datum.modifierWithValue.value) } },
+    ),
+    tolerances: pmi.tolerances.map((tolerance) => ({
+      ...tolerance,
+      value: length(tolerance.value),
+      ...(tolerance.zoneModifierValue === undefined ? {} : { zoneModifierValue: length(tolerance.zoneModifierValue) }),
+      ...(tolerance.maxValue === undefined ? {} : { maxValue: length(tolerance.maxValue) }),
+    })),
     dimensions: pmi.dimensions.map((dimension) => {
       const angular = dimension.type === 'size_angular' || dimension.type === 'location_angular';
       const scale = (value: number): number => (angular ? value : length(value));
@@ -81,6 +90,7 @@ function pmiInUnit(pmi: ExchangePmi, unit: DocumentUnit): ExchangePmi {
         ...(dimension.tolerance === undefined
           ? {}
           : { tolerance: { plus: scale(dimension.tolerance.plus), minus: scale(dimension.tolerance.minus) } }),
+        ...(dimension.range === undefined ? {} : { range: { lower: scale(dimension.range.lower), upper: scale(dimension.range.upper) } }),
       };
     }),
   };

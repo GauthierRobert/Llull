@@ -60,24 +60,129 @@ type PmiDimensionType =
   | 'location_linear_distance'
   | 'location_angular';
 
+/** Tolerance modifiers of the transport (ISO 1101 / ASME Y14.5 symbols that follow the zone value or the frame). */
+type PmiToleranceModifier =
+  | 'any_cross_section'
+  | 'common_zone'
+  | 'each_radial_element'
+  | 'free_state'
+  | 'least_material_requirement'
+  | 'line_element'
+  | 'major_diameter'
+  | 'maximum_material_requirement'
+  | 'minor_diameter'
+  | 'not_convex'
+  | 'pitch_diameter'
+  | 'reciprocity_requirement'
+  | 'separate_requirement'
+  | 'statistical_tolerance'
+  | 'tangent_plane'
+  | 'all_around'
+  | 'all_over';
+
+/** Datum modifiers: boundary (maximum / least material requirement = MMB / LMB), contacting feature, degrees-of-freedom constraints, ... */
+type PmiDatumModifier =
+  | 'any_cross_section'
+  | 'any_longitudinal_section'
+  | 'basic'
+  | 'contacting_feature'
+  | 'dof_constraint_u'
+  | 'dof_constraint_v'
+  | 'dof_constraint_w'
+  | 'dof_constraint_x'
+  | 'dof_constraint_y'
+  | 'dof_constraint_z'
+  | 'distance_variable'
+  | 'free_state'
+  | 'least_material_requirement'
+  | 'line'
+  | 'major_diameter'
+  | 'maximum_material_requirement'
+  | 'minor_diameter'
+  | 'orientation'
+  | 'pitch_diameter'
+  | 'plane'
+  | 'point'
+  | 'translation';
+
+/** Size-dimension modifiers (ISO 14405-1 specification modifiers and ASME qualifiers). */
+type PmiDimensionModifier =
+  | 'controlled_radius'
+  | 'square'
+  | 'statistical_tolerance'
+  | 'continuous_feature'
+  | 'two_point_size'
+  | 'local_size_defined_by_sphere'
+  | 'least_squares_association'
+  | 'maximum_inscribed_association'
+  | 'minimum_circumscribed_association'
+  | 'circumference_diameter'
+  | 'area_diameter'
+  | 'volume_diameter'
+  | 'maximum_size'
+  | 'minimum_size'
+  | 'average_size'
+  | 'median_size'
+  | 'mid_range_size'
+  | 'range_of_sizes'
+  | 'any_restricted_portion'
+  | 'any_cross_section'
+  | 'specific_fixed_cross_section'
+  | 'common_tolerance'
+  | 'free_state_condition'
+  | 'between';
+
+interface ExchangePmiDatum {
+  readonly label: string;
+  /** Faces of the datum feature. Empty when the file's feature is not a face of the product (a datum target: point, line, area; or an edge). */
+  readonly faces: readonly number[];
+  /** Datum modifiers; `maximum_material_requirement` / `least_material_requirement` are the datum boundary MMB / LMB. */
+  readonly modifiers?: readonly PmiDatumModifier[];
+  /** Modifier that carries a value: a sphere / cylinder of that size, a distance, a projected length. */
+  readonly modifierWithValue?: {
+    readonly kind: 'circular_or_cylindrical' | 'distance' | 'projected' | 'spherical';
+    readonly value: number;
+  };
+}
+
+interface ExchangePmiTolerance {
+  readonly characteristic: PmiCharacteristic;
+  readonly value: number;
+  readonly diameterZone: boolean;
+  /** A spherical zone (SR / S diameter); with `diameterZone` false. */
+  readonly sphericalZone?: boolean;
+  readonly faces: readonly number[];
+  /** Datum labels in reference order, primary first; each must be one of `datums`. */
+  readonly datums: readonly string[];
+  /** Material condition of the tolerance zone: M (maximum) / L (least); absent = regardless of feature size. */
+  readonly materialRequirement?: 'maximum' | 'least';
+  /** Zone modifier: P (projected, with `zoneModifierValue` the projected length), runout, non-uniform. */
+  readonly zoneModifier?: 'projected' | 'runout' | 'non_uniform';
+  readonly zoneModifierValue?: number;
+  readonly modifiers?: readonly PmiToleranceModifier[];
+  /** Maximum value of the tolerance when the frame states one ("0.1 MAX"). */
+  readonly maxValue?: number;
+}
+
+interface ExchangePmiDimension {
+  readonly type: PmiDimensionType;
+  readonly value: number;
+  readonly tolerance?: { readonly plus: number; readonly minus: number };
+  readonly faces: readonly number[];
+  /** Locations: the second feature set. */
+  readonly facesSecond?: readonly number[];
+  readonly qualifier?: 'min' | 'max' | 'avg';
+  readonly modifiers?: readonly PmiDimensionModifier[];
+  /** Dimension given as limits (lower / upper bound) instead of a nominal with deviations. */
+  readonly range?: { readonly lower: number; readonly upper: number };
+  /** ISO 286 fit class: hole / shaft, form variance letters (H, js, ...) and IT grade. */
+  readonly classOfTolerance?: { readonly hole: boolean; readonly variance: string; readonly grade: string };
+}
+
 export interface ExchangePmi {
-  readonly datums: readonly { readonly label: string; readonly faces: readonly number[] }[];
-  readonly tolerances: readonly {
-    readonly characteristic: PmiCharacteristic;
-    readonly value: number;
-    readonly diameterZone: boolean;
-    readonly faces: readonly number[];
-    /** Datum labels in reference order, primary first; each must be one of `datums`. */
-    readonly datums: readonly string[];
-  }[];
-  readonly dimensions: readonly {
-    readonly type: PmiDimensionType;
-    readonly value: number;
-    readonly tolerance?: { readonly plus: number; readonly minus: number };
-    readonly faces: readonly number[];
-    /** Locations: the second feature set. */
-    readonly facesSecond?: readonly number[];
-  }[];
+  readonly datums: readonly ExchangePmiDatum[];
+  readonly tolerances: readonly ExchangePmiTolerance[];
+  readonly dimensions: readonly ExchangePmiDimension[];
 }
 
 /** One STEP product (a component, or one free solid): its solids, written once however often it is placed. */

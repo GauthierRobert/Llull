@@ -4,7 +4,9 @@
 
 use crate::session::{Reply, Session, BAD_REQUEST, OCC_FAILURE};
 use llull_kernel_occt::queries::ImportOptions;
-use llull_kernel_occt::xde::{self, ExchangePmi, ExchangeProduct, ExchangeSolid, ExchangeUse, PmiDimension, PmiTolerance, WriteRequest};
+use llull_kernel_occt::xde::{
+    self, ExchangePmi, ExchangeProduct, ExchangeSolid, ExchangeUse, PmiAttr, PmiDatum, PmiDimension, PmiTolerance, WriteRequest,
+};
 use llull_kernel_occt::Shape;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -50,12 +52,58 @@ fn faces(value: Option<&Value>) -> Vec<i32> {
         .map_or(Vec::new(), |list| list.iter().filter_map(|face| face.as_i64().and_then(|face| i32::try_from(face).ok())).collect())
 }
 
+/// Extra attributes of a PMI item from its optional JSON fields (names of the TECHNICAL_SPEC "PMI transport" vocabulary).
+fn attrs_of(item: &Value) -> Vec<PmiAttr> {
+    let mut out: Vec<PmiAttr> = Vec::new();
+    let mut text_field = |key: &str, field: &str| {
+        if let Some(found) = item.get(field).and_then(Value::as_str) {
+            out.push((key.to_string(), found.to_string(), 0.0));
+        }
+    };
+    text_field("material_requirement", "materialRequirement");
+    text_field("zone_modifier", "zoneModifier");
+    text_field("qualifier", "qualifier");
+    let number_field = |key: &str, field: &str, out: &mut Vec<PmiAttr>| {
+        if let Some(found) = item.get(field).and_then(Value::as_f64) {
+            out.push((key.to_string(), String::new(), found));
+        }
+    };
+    number_field("zone_modifier_value", "zoneModifierValue", &mut out);
+    number_field("max_value", "maxValue", &mut out);
+    if item.get("sphericalZone").and_then(Value::as_bool) == Some(true) {
+        out.push(("spherical_zone".to_string(), "true".to_string(), 0.0));
+    }
+    for modifier in item.get("modifiers").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str) {
+        out.push(("modifier".to_string(), modifier.to_string(), 0.0));
+    }
+    if let Some(with_value) = item.get("modifierWithValue") {
+        let kind = text(with_value, "kind").to_string();
+        out.push(("modifier_with_value".to_string(), kind, with_value.get("value").and_then(Value::as_f64).unwrap_or(0.0)));
+    }
+    if let Some(range) = item.get("range") {
+        if let (Some(lower), Some(upper)) = (range.get("lower").and_then(Value::as_f64), range.get("upper").and_then(Value::as_f64)) {
+            out.push(("range_lower".to_string(), String::new(), lower));
+            out.push(("range_upper".to_string(), String::new(), upper));
+        }
+    }
+    if let Some(class) = item.get("classOfTolerance") {
+        let hole = class.get("hole").and_then(Value::as_bool).unwrap_or(false);
+        out.push(("class_hole".to_string(), hole.to_string(), 0.0));
+        out.push(("class_variance".to_string(), text(class, "variance").to_string(), 0.0));
+        out.push(("class_grade".to_string(), text(class, "grade").to_string(), 0.0));
+    }
+    out
+}
+
 /// `{ datums: [{ label, faces }], tolerances: [{ characteristic, value, diameterZone?, faces, datums? }], dimensions: [{ type, value, tolerance?, faces, facesSecond? }] }`.
 fn pmi_of(value: Option<&Value>) -> ExchangePmi {
     let Some(value) = value else { return ExchangePmi::default() };
     let list = |field: &str| value.get(field).and_then(Value::as_array).map_or(&[][..], Vec::as_slice);
     ExchangePmi {
-        datums: list("datums").iter().map(|datum| (text(datum, "label").to_string(), faces(datum.get("faces")))).collect(),
+        datums: list("datums")
+            .iter()
+            .map(|datum| PmiDatum { label: text(datum, "label").to_string(), faces: faces(datum.get("faces")), attrs: attrs_of(datum) })
+            .collect(),
         tolerances: list("tolerances")
             .iter()
             .map(|tolerance| PmiTolerance {
@@ -67,6 +115,7 @@ fn pmi_of(value: Option<&Value>) -> ExchangePmi {
                     .get("datums")
                     .and_then(Value::as_array)
                     .map_or(Vec::new(), |datums| datums.iter().filter_map(Value::as_str).map(str::to_string).collect()),
+                attrs: attrs_of(tolerance),
             })
             .collect(),
         dimensions: list("dimensions")
@@ -79,6 +128,7 @@ fn pmi_of(value: Option<&Value>) -> ExchangePmi {
                     .and_then(|tolerance| Some((tolerance.get("plus")?.as_f64()?, tolerance.get("minus")?.as_f64()?))),
                 faces: faces(dimension.get("faces")),
                 faces_second: faces(dimension.get("facesSecond")),
+                attrs: attrs_of(dimension),
             })
             .collect(),
     }
