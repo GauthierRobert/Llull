@@ -12,7 +12,7 @@ import { elasticConstants, isElasticRefusal, propertyTemperatureK } from '../dec
 import { lengthUnitName, stressPerMpa, stressUnitName } from '../decks/units';
 import { nodeCoordinates, nodeEntities, stepOfLoadCase, vonMises } from '../results/fields';
 import { appliedOverFibres, type Applied } from './fibreStress';
-import { PLY_FRAME_UNVERIFIED, plyMarginRows } from './plyMargins';
+import { plyMarginRows } from './plyMargins';
 import { compositeWarnings, exclusionWarnings, isCompositeEntity, orphanSingularKeys } from './screenWarnings';
 import { caseOf } from '../shared/access';
 import { analysisIdSchema } from '../shared/schemas';
@@ -418,11 +418,7 @@ export function marginTable(
   if ('code' in built) return refuse(built.code, built.message);
   const { rows, skipped } = built;
   const withRows = new Set(rows.map((row) => String(row['part'])));
-  const composite = compositeWarnings(
-    analysis,
-    new Map([...skipped].filter(([entityId]) => !withRows.has(entityId))),
-  );
-  const plyWarning = rows.some((row) => row['criterion'] === 'ply_failure') ? [`FEA_COMPOSITE_PLY_UNVERIFIED: ${PLY_FRAME_UNVERIFIED}`] : [];
+  const composite = compositeWarnings(analysis, new Map([...skipped].filter(([entityId]) => !withRows.has(entityId))));
   if (rows.length === 0 && composite.length > 0)
     return refuse(
       'FEA_COMPOSITE_MARGINS_UNSUPPORTED',
@@ -455,7 +451,6 @@ export function marginTable(
     warnings: [
       ...(marginalBand === undefined ? ['FEA_MARGINAL_BAND_UNSET: no marginalBand given, so no row is MARGINAL'] : []),
       ...composite,
-      ...plyWarning,
       ...exclusionWarnings(trust.meshArtifact, screen.excluded),
       ...orphanSingularKeys(rows).map(
         (key) => `FEA_MS_ALL_SINGULAR: group ${key} lies entirely in a singular zone: it has only a singular row and no margin`,

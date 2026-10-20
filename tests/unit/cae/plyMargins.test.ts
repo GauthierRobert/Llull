@@ -13,7 +13,6 @@ import {
 import { DEFAULT_F12_STAR, strengthRatio, strengthsOf, type Strengths } from '@lib/laminate/failure';
 import { recoverPlyStresses } from '@lib/laminate/recover';
 import { plyMarginRows, type PlyMarginInput } from '@cae/margins/plyMargins';
-import { PLY_FRAME_UNVERIFIED } from '@cae/margins/plyMargins';
 import { factorReport } from '@cae/margins/marginMath';
 import type { AnalysisCase } from '@core/model/analysis';
 import { TAPE, compositeShell } from './plyMarginsFixtures';
@@ -124,7 +123,7 @@ describe('compute_margins on composite shells (ply failure)', () => {
       expect(row.ms).toBeCloseTo(expected / 1.5 - 1, 8);
       expect(row.criterion).toBe('ply_failure');
       expect(row.reviewRequired).toBe(true);
-      expect(row.unverified).toBe(true);
+      expect(row.unverified).toBe(false);
       expect(row.allowable.tsaiWuF12Star).toEqual({ value: DEFAULT_F12_STAR, defaulted: true });
       expect(row.rowKey).toContain(`|ply_failure|p${row.ply.index + 1}`);
       expect(row.ply.angleDeg).toBe(angles[row.ply.index]);
@@ -173,7 +172,7 @@ describe('compute_margins on composite shells (ply failure)', () => {
     });
     const row = (execute(shell.recorded, 'compute_margins', { analysisId: shell.analysisId }, shell.ctx).data as Margins).rows[0] as Row;
     expect(row.unverified).toBe(true);
-    expect(row['unverifiedReasons']).toHaveLength(2);
+    expect(row['unverifiedReasons']).toHaveLength(1);
     expect(row.allowable.tsaiWuF12Star).toEqual({ value: -0.2, defaulted: false });
   });
 
@@ -278,15 +277,14 @@ describe('ply rows: frame verification flag and per-ply rosettes', () => {
   const angles = [0, 90, 90, 0];
   const truth = clt(angles, [300, 20, 5, 25, 3, 1]);
 
-  it('flags every ply row unverified with the ccx frame reason, in the rows, the provenance and one table warning', () => {
+  it('states the ccx-confirmed frame in the provenance and adds no frame warning (verified lamina data stays verified)', () => {
     const shell = compositeShell({ top: truth.top, bottom: truth.bottom, angles });
     const data = execute(shell.recorded, 'compute_margins', { analysisId: shell.analysisId }, shell.ctx).data as Margins;
     for (const row of data.rows) {
-      expect(row.unverified).toBe(true);
-      expect(row['unverifiedReasons'] as string[]).toContain(PLY_FRAME_UNVERIFIED);
-      expect((row['provenance'] as { method: string }).method).toContain(PLY_FRAME_UNVERIFIED);
+      expect((row['provenance'] as { method: string }).method).toContain('confirmed against CalculiX 2.21');
+      expect((row['unverifiedReasons'] as string[]).some((text) => text.includes('STRESS_TOP/BOT frame'))).toBe(false);
     }
-    expect(data.warnings.filter((text) => text.startsWith('FEA_COMPOSITE_PLY_UNVERIFIED'))).toHaveLength(1);
+    expect(data.warnings.some((text) => text.startsWith('FEA_COMPOSITE_PLY_UNVERIFIED'))).toBe(false);
   });
 
   it('measures every ply angle from its own rosette: ro-2 at 0 degrees equals ro-1 at 90', () => {

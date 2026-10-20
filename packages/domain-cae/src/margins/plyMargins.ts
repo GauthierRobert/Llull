@@ -50,9 +50,8 @@ export interface PlyMarginInput {
 
 export type PlyOutcome = { readonly rows: PlyRow[] } | { readonly skipped: string };
 
-/** Until a real ccx composite run confirms the fibre-stress frame and the outer-ply values (SOLVER-VERIFY), every ply row is unverified. One place to remove. */
-export const PLY_FRAME_UNVERIFIED =
-  'STRESS_TOP/BOT frame and outer-ply extrapolation for *SHELL SECTION, COMPOSITE not verified against ccx (05 spec)';
+/** ccx 2.21 writes *SHELL SECTION, COMPOSITE STRESS_TOP / STRESS_BOT in the global frame as outer-ply stresses (SOLVER-VERIFY, 05 spec §13). */
+const PLY_FRAME_CONFIRMED = 'STRESS_TOP/BOT frame confirmed against CalculiX 2.21 ([90/0/0/90] strip vs CLT, 05 spec)';
 
 /** Signed angle (degrees, about `normal`) from the shell frame axis `e1` to `axis`. */
 function angleFromFrame(e1: Vec3, axis: Vec3, normal: Vec3): number {
@@ -176,7 +175,6 @@ export function plyMarginRows(input: PlyMarginInput): PlyOutcome {
         ? []
         : ['thermal strain is not recovered (no laminae expansion in the deck): ply stresses of a thermo-mechanical case are not valid'];
     const reasons = [
-      PLY_FRAME_UNVERIFIED,
       ...thermal,
       ...(isUnverified(material) ? [`lamina '${ply.materialName}': ${material.basis} data, source "${material.source}"`] : []),
     ];
@@ -224,12 +222,11 @@ export function plyMarginRows(input: PlyMarginInput): PlyOutcome {
         provenance: {
           formula:
             'MS = R / (FoS x prod(extra)) - 1, R = first-ply strength ratio (lower of max stress and Tsai-Wu) of the ply stresses recovered through the laminate',
-          method:
-            `CLT (Kirchhoff-Love): strains at the outer surfaces from STRESS_TOP / STRESS_BOT through the Qbar of the outer plies, linear through the thickness; in-plane stresses only, first-ply failure, no hygrothermal state, no interlaminar stresses. UNVERIFIED: ${PLY_FRAME_UNVERIFIED}`,
+          method: `CLT (Kirchhoff-Love): strains at the outer surfaces from STRESS_TOP / STRESS_BOT through the Qbar of the outer plies, linear through the thickness; in-plane stresses only, first-ply failure, no hygrothermal state, no interlaminar stresses. ${PLY_FRAME_CONFIRMED}`,
           standard: ['NASA-STD-5001B', '14 CFR 25.303', '14 CFR 25.305(a)'],
           ...(ms === null ? { note: 'no stress in this ply: no finite margin' } : {}),
         },
-        unverified: true,
+        unverified: reasons.length > 0,
         unverifiedReasons: reasons,
         reviewRequired: true,
         reviewReason: 'margin of safety supports a structural substantiation decision',
