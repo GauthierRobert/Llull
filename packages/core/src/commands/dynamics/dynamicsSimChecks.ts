@@ -4,6 +4,7 @@ import { type CheckThreshold, findingKey } from '../../model/checkResult';
 import type { SimulationData } from '../../dynamics/simulationReport';
 import { type ReviewItem, reviewItem } from '../inspect/reviewEnvelope';
 import { MAX_TIP_MACH } from './dynamicsStaticChecks';
+import { phaseAlignedChange } from './phaseCompare';
 
 /** Closure of the cycle energy: 0.5 % (named, FR-FPR-16). */
 const ENERGY_GATE: CheckThreshold = {
@@ -173,7 +174,8 @@ export function timestepItem(coarse: SimulationData, fine: SimulationData | null
       'The run at half the timestep did not complete; pass a larger timestep, or fix the model (simulate_motion).',
       { unverified: true, ...(why === null ? {} : { note: why }) },
     );
-  const { change, worstJoint, moved } = stateChange(coarse, fine);
+  const phase = phaseAlignedChange(coarse, fine);
+  const { change, worstJoint, moved } = phase ?? stateChange(coarse, fine);
   if (!moved)
     return item(
       'FPR_TIMESTEP_SENSITIVE',
@@ -189,10 +191,21 @@ export function timestepItem(coarse: SimulationData, fine: SimulationData | null
     worstJoint === null ? [] : [worstJoint],
     ok ? 'None.' : 'Halving the timestep changes the result: use a smaller timestep (or set_dynamics_solver) for this mechanism.',
     {
-      values: { maxChangeFraction: change, timestepS: coarse.timestep, halfTimestepS: fine.timestep },
+      values: {
+        maxChangeFraction: change,
+        timestepS: coarse.timestep,
+        halfTimestepS: fine.timestep,
+        ...(phase === null ? {} : { comparedTurnDeg: (phase.spanRad * 180) / Math.PI }),
+        ...(coarse.energy === undefined || fine.energy === undefined
+          ? {}
+          : { energyBalanceErrorCoarse: coarse.energy.balanceErrorFraction, energyBalanceErrorFine: fine.energy.balanceErrorFraction }),
+      },
       threshold: TIMESTEP_GATE,
       ...(ok ? {} : { unverified: true }),
-      note: 'Compared: final speed (relative to the peak speed) and final position of every joint, at dt and dt/2.',
+      note:
+        phase === null
+          ? 'Compared: final speed (relative to the peak speed) and final position of every joint, at dt and dt/2 (no joint turns a half turn, so there is no phase to align on).'
+          : `Compared over the last turn of joint '${phase.drivingJoint}', both runs resampled at the same joint angle: RMS difference of speed and position of every joint (relative to the peak / excursion) and the cycle-mean |speed|; the energy-balance residual of each run is listed.`,
     },
   );
 }
