@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createEmptyDocument, type MeshSolidEntity } from '@core/model/types';
 import type { FaceOpParams } from '@core/model/faceOps';
 import { execute } from '@core/commands/registry';
+import type { CommandResult } from '@core/commands/types';
 import { setGeometryKernel, type GeometryKernel, type ShapeTopology } from '@core/geometry/kernel';
 import { kernelFromOps, type FaceQueryOps } from '@core/geometry/shapeKernel';
 import { validateShapeRecipe } from '@core/geometry/shapeRecipe';
@@ -55,7 +56,7 @@ function exactKernel(): { ops: FaceOpParams[] } {
   return { ops };
 }
 
-const boxDoc = () => execute(createEmptyDocument(), 'add_box', { size: [10, 10, 10] });
+const boxDoc = (): CommandResult => execute(createEmptyDocument(), 'add_box', { size: [10, 10, 10] });
 
 describe('face operations on an exact kernel', () => {
   it('draft_faces drafts the picked faces about the lowest point along pull by default, and records their names', () => {
