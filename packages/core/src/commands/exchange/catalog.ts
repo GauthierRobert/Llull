@@ -9,6 +9,7 @@ import { applyCodeTrace } from './codeTrace';
 import { importMesh } from './importMesh';
 import { importDxf } from './importDxf';
 import { importStepExact } from './importStepExact';
+import { exportBcf } from './bcf/exportBcf';
 
 export const exchangeCommands = commandCatalog(
   exportStl,
@@ -19,4 +20,5 @@ export const exchangeCommands = commandCatalog(
   importMesh,
   importDxf,
   importStepExact,
+  exportBcf,
 );

@@ -70,7 +70,9 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
       'define_property_model remove_property_model evaluate_property sample_property fit_property_model check_property_models add_material_model remove_material_model define_constitutive_set check_material_models',
   ),
   'material-lab': words('fit_material_model material_point_response export_material_cards'),
-  review: words('allow_interference remove_interference_intent set_part_grounded'),
+  review: words(
+    'allow_interference remove_interference_intent set_part_grounded save_viewpoint list_viewpoints delete_viewpoint create_walkthrough delete_walkthrough render_walkthrough create_review_issue delete_review_issue export_bcf',
+  ),
   exchange: words(
     'export_stl export_obj export_gltf export_step_exact export_code apply_code_trace import_mesh import_dxf import_step_exact export_step import_step import_dwg import_code',
   ),

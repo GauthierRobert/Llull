@@ -9,6 +9,7 @@ import type { AnalysisModel } from './analysis';
 import type { DrawingsModel } from './sheet';
 import type { DynamicsModel } from './dynamics';
 import type { PrototypeModel } from './prototype';
+import type { ReviewModel } from './review';
 import type { CurveSegment } from './curve';
 import type { FastenerModel, PartRef } from './fasteners';
 import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary';
@@ -652,6 +653,8 @@ export interface CadDocument {
   dynamics?: DynamicsModel;
   /** Absent until the first prototype-review command (`allow_interference`, `set_part_grounded`). */
   prototype?: PrototypeModel;
+  /** Absent until the first model-review command (`save_viewpoint`, `create_review_issue`; plant 09 VIS). */
+  review?: ReviewModel;
   /** Absent until a kernel-provenance command or a v3 save stamps it (`set_modeling_tolerance`, `import_step_exact`). */
   kernelSettings?: DocumentKernelSettings;
   /** Content-addressed binary payloads keyed by sha256 (healed B-rep, original STEP); absent until the first exact import. */
