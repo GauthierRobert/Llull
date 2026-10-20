@@ -9,7 +9,7 @@ import { currentContext } from '../context';
 import { documentExtensions } from '../../plugins/host';
 import type { CommandDefinition, CommandError, CommandResult } from '../types';
 import { commandError } from '../noop';
-import { orphanState, withActiveSavedView } from './carry';
+import { orphanState, withCarriedPmi } from './carry';
 import { kernelRefusal } from '../kernelRefusal';
 import { nextStateKey } from './replayCache';
 import { hashText } from '../../lib/hash';
@@ -209,5 +209,5 @@ export function replayHistory(
     stateKey = parameterFingerprint !== undefined ? nextStateKey(key, 'parameters', parameterFingerprint, null) : key;
     onStep?.({ step, rawParams: remapIds(step.params, idMap), params: remapped, before, after: doc, inert, failure });
   }
-  return withActiveSavedView(doc, base);
+  return withCarriedPmi(doc, base);
 }

@@ -9,7 +9,9 @@
  * seeded into the fresh document.
  */
 
+import type { PmiItem } from '../../model/pmi';
 import type { CadDocument, FeatureStep } from '../../model/types';
+import { canonicalJson } from '../../lib/canonicalJson';
 
 function affectedIds(history: FeatureStep[]): Set<string> {
   const ids = new Set<string>();
@@ -87,9 +89,29 @@ export function orphanState(
   };
 }
 
-/** `doc` with the active saved PMI view of `base` carried over (view state is set by a metaHistory command, so no step regenerates it). */
-export function withActiveSavedView(doc: CadDocument, base: CadDocument): CadDocument {
-  const active = base.pmi?.activeSavedViewId;
-  if (active === undefined || doc.pmi === undefined || !Object.hasOwn(doc.pmi.savedViews, active)) return doc;
-  return { ...doc, pmi: { ...doc.pmi, activeSavedViewId: active } };
+/** What identifies a PMI item for review purposes: everything except its review, derived face indices and an automatic placement. */
+function reviewKey(item: PmiItem): string {
+  const replacer = (key: string, value: unknown): unknown =>
+    key === 'review' || key === 'faceIndices' || (key === 'placement' && (value as { auto?: boolean } | null)?.auto === true)
+      ? undefined
+      : value;
+  return canonicalJson(JSON.parse(JSON.stringify(item, replacer)));
+}
+
+/**
+ * The document with the PMI state no step regenerates carried over from base: the active saved view, and the sign-off (review) of every item whose
+ * replayed content is unchanged (same id, same data apart from review, face indices and automatic placement). A changed item needs a new review.
+ */
+export function withCarriedPmi(doc: CadDocument, base: CadDocument): CadDocument {
+  if (doc.pmi === undefined || base.pmi === undefined) return doc;
+  const items = Object.fromEntries(
+    Object.entries(doc.pmi.items).map(([id, item]) => {
+      const before = Object.hasOwn(base.pmi?.items ?? {}, id) ? base.pmi?.items[id] : undefined;
+      const signed = before !== undefined && !before.review.required && reviewKey(before) === reviewKey(item);
+      return [id, signed && before !== undefined ? { ...item, review: before.review } : item];
+    }),
+  );
+  const active = base.pmi.activeSavedViewId;
+  const view = active !== undefined && Object.hasOwn(doc.pmi.savedViews, active) ? { activeSavedViewId: active } : {};
+  return { ...doc, pmi: { ...doc.pmi, items, ...view } };
 }

@@ -7,7 +7,7 @@ import { changed, noop } from '../noop';
 import { facesNearField, placementField, placementFor } from './featureOps';
 import { REVIEW_REQUIRED, cleanDatums, cleanZone, findPmi, pmiItems, pmiOf, refuse, withItem, withoutItems } from './pmiOps';
 import { autoPlacementOf, createSolidLookup, refreshItem } from './refresh';
-import { toleranceFindings } from './rules';
+import { toleranceEntity, toleranceFindings } from './rules';
 import { toleranceField, toleranceProblem } from './dimension';
 import { currentContext } from '../context';
 
@@ -170,8 +170,7 @@ export const updatePmi = defineCommand({
       for (const other of pmiItems(doc)) {
         const rename = (label: string): string => (label === original.label ? next.label : label);
         if (other.kind === 'geometric_tolerance' && other.datums.some((d) => d.label === original.label) && other.target !== undefined) {
-          const entity = 'feature' in other.target ? other.target.feature.entityId : undefined;
-          if (entity !== undefined && entity !== original.feature.entityId) continue;
+          if (toleranceEntity(other, pmiOf(doc).items) !== original.feature.entityId) continue;
           document = withItem(document, { ...other, datums: other.datums.map((d) => ({ ...d, label: rename(d.label) })) });
           touched.push(other.id);
         }
@@ -184,6 +183,17 @@ export const updatePmi = defineCommand({
     if (next.kind === 'geometric_tolerance') {
       const problem = toleranceFindings(next, { ...pmiOf(document).items, [next.id]: next }).find((f) => f.severity === 'error');
       if (problem !== undefined) return refuse(doc, command, problem.code, problem.message, problem.pmiIds, problem.paths);
+      // Lower segments of a composite frame follow its target (a re-attach moves them too) and must stay valid against the edited upper frame.
+      const lowers = pmiItems(doc).flatMap((other) =>
+        other.kind === 'geometric_tolerance' && other.compositeOf === pmiId ? [{ ...other, target: next.target }] : [],
+      );
+      for (const lower of lowers) {
+        const broken = toleranceFindings(lower, { ...pmiOf(document).items, [next.id]: next }).find((f) => f.severity === 'error');
+        if (broken !== undefined)
+          return refuse(doc, command, broken.code, `lower segment ${lower.id}: ${broken.message}`, [lower.id], broken.paths);
+        document = withItem(document, lower);
+        touched.push(lower.id);
+      }
     }
     return changed(
       withItem(document, next),
@@ -214,8 +224,7 @@ function datumReferrers(doc: CadDocument, datum: Extract<PmiItem, { kind: 'datum
   return pmiItems(doc).flatMap((item) => {
     if (item.kind === 'datum_target' && item.label === datum.label && item.feature.entityId === datum.feature.entityId) return [item.id];
     if (item.kind !== 'geometric_tolerance' || !item.datums.some((d) => d.label === datum.label)) return [];
-    const entity = 'feature' in item.target ? item.target.feature.entityId : undefined;
-    return entity === undefined || entity === datum.feature.entityId ? [item.id] : [];
+    return toleranceEntity(item, pmiOf(doc).items) === datum.feature.entityId ? [item.id] : [];
   });
 }
 

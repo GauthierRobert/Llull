@@ -13,8 +13,8 @@ import { DeleteButton, ListRow, PanelEmpty, PanelHeader, PanelSection } from '@u
 import { ReviewBanner } from '@ui/panels/ReviewBanner';
 import { AddDatumForm } from './AddDatumForm';
 
-/** The app has no signing port yet, so a review cannot be signed here (the command refuses an unsigned decision). */
-const NO_SIGNING_PORT = 'Accepting or rejecting PMI is a human decision that needs a signature; this app has no signing port yet.';
+/** A rejection needs a reviewer comment, which this panel does not gather yet: it is a command (accept_pmi_review decision reject). */
+const REJECT_NEEDS_COMMENT = 'A rejection needs a comment: use the accept_pmi_review command (decision reject).';
 
 export function PmiPanel({ className }: { className?: string }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
@@ -71,9 +71,17 @@ export function PmiPanel({ className }: { className?: string }): React.ReactElem
                     <button
                       type="button"
                       className="btn btn--sm btn--ghost"
-                      disabled
-                      title={NO_SIGNING_PORT}
+                      disabled={!item.review.required}
+                      title="Record the review of this item as the qualified engineer at this desk (a signing port, where installed, must verify it)"
                       data-testid={`pmi-accept-${item.id}`}
+                      onClick={() =>
+                        dispatch('accept_pmi_review', {
+                          pmiIds: [item.id],
+                          decision: 'accept',
+                          comment: '',
+                          at: new Date().toISOString().slice(0, 10),
+                        })
+                      }
                     >
                       Accept
                     </button>
@@ -81,7 +89,7 @@ export function PmiPanel({ className }: { className?: string }): React.ReactElem
                       type="button"
                       className="btn btn--sm btn--ghost"
                       disabled
-                      title={NO_SIGNING_PORT}
+                      title={REJECT_NEEDS_COMMENT}
                       data-testid={`pmi-reject-${item.id}`}
                     >
                       Reject
