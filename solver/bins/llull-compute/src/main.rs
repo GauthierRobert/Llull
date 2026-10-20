@@ -45,7 +45,9 @@ fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Outpu
         ("cloud", [task, folder, ..]) => {
             llull_cloud::job::run(task, Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message))
         }
-        ("post" | "raster" | "topopt" | "route" | "stats" | "panel" | "explicit" | "cloud", _) => Err(("NATIVE_USAGE".to_string(), USAGE.to_string())),
+        ("post" | "raster" | "topopt" | "route" | "stats" | "panel" | "explicit" | "cloud", _) => {
+            Err(("NATIVE_USAGE".to_string(), USAGE.to_string()))
+        }
         _ => Err(("NATIVE_JOB_UNKNOWN".to_string(), format!("unknown job '{job}'"))),
     }
 }
