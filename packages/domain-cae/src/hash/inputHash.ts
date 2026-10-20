@@ -7,6 +7,8 @@ import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { caseOf } from '../shared/access';
 import { keyedTargets } from './targets';
+import { laminateOf } from '../shell/laminate';
+import { sheetMetalPartOf } from '../shell/sheetMetalMid';
 
 const geometryHashes = new WeakMap<Entity, string>();
 
@@ -34,7 +36,28 @@ const meshInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string
   documentUnit: doc.units,
   controls: analysisCase.mesh,
   targets: keyedTargets(analysisCase),
+  ...(analysisCase.defeature !== undefined ? { defeature: analysisCase.defeature } : {}),
+  ...sheetMetalInputs(doc, analysisCase),
 });
+
+/** Sheet-metal parts meshed as shells read their midsurface from `CadDocument.sheetMetal` (not from the solid's geometry key). */
+function sheetMetalInputs(doc: CadDocument, analysisCase: AnalysisCase): Record<string, unknown> {
+  const shells = Object.entries(analysisCase.parts).flatMap(([entityId, idealization]) => {
+    const part = idealization.kind === 'shell' ? sheetMetalPartOf(doc, entityId) : undefined;
+    return part === undefined ? [] : [[entityId, { part, rule: doc.sheetMetal?.rules[part.rule] ?? null }]];
+  });
+  return shells.length === 0 ? {} : { sheetMetal: Object.fromEntries(shells) };
+}
+
+/** Composite shells: the laminate (plies, lamina materials, rosettes) is what the deck writes instead of the part material. */
+function laminateInputs(doc: CadDocument, analysisCase: AnalysisCase): Record<string, unknown> {
+  const laminates = Object.entries(analysisCase.parts).flatMap(([entityId, idealization]) =>
+    idealization.kind === 'shell' && idealization.laminate !== undefined
+      ? [[entityId, laminateOf(doc, idealization.laminate.compositePartId, entityId, idealization.laminate.sectionId)]]
+      : [],
+  );
+  return laminates.length === 0 ? {} : { laminates: Object.fromEntries(laminates) };
+}
 
 /** The physical part of a material: what a solve reads. Name, colour, PBR values and finish are presentation and never part of a hash. */
 function physicalMaterial(material: Material | null | undefined): Record<string, unknown> | null {
@@ -112,6 +135,7 @@ const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string
       : { ...analysisCase.thermomech, thermal: withoutDispositions(analysisCase.thermomech.thermal) },
   sourceResultsHash: sourceResultsHash(doc, analysisCase),
   ...(analysisCase.nonlinear !== undefined ? { nonlinear: withoutNames(analysisCase.nonlinear) } : {}),
+  ...laminateInputs(doc, analysisCase),
 });
 
 /**

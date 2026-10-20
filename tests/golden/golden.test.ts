@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { plans } from './plans';
+import { feaPlans } from './feaPlans';
 import { describePlans } from './describePlans';
 import { execute } from '@core/commands/registry';
 import { runPlan } from './runPlan';
 import type { CadDocument } from '@core/model/types';
 import type { GoldenAction } from './plans';
 
-describe('golden replay corpus', () => describePlans(plans));
+describe('golden replay corpus', () => describePlans({ ...plans, ...feaPlans }));
 
 describe('loops_polar_pattern parametric regeneration', () => {
   const cylinderCount = (doc: CadDocument): number => Object.values(doc.entities).filter((e) => e.kind === 'cylinder').length;

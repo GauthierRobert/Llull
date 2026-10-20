@@ -214,7 +214,7 @@ describe('set_part_idealization', () => {
     expectRefused(
       run(doc, 'set_part_idealization', { analysisId, entityId: boxId, idealization: 'shell' }),
       doc,
-      'FEA_IDEALIZATION_UNSUPPORTED',
+      'FEA_MIDSURFACE_NOT_A_PLATE',
     );
   });
 });

@@ -231,8 +231,8 @@ describe('static deck: model block', () => {
     const text = deckOf(bar, bar.doc, {});
     const lines = text.split('\n');
     expect(lines[0]).toMatch(/^\*\* llull analysis bar units N-mm-t-s inputHash [0-9a-f]{64} meshHash [0-9a-f]{64}$/);
-    expect(lines[1]).toBe('*NODE, NSET=NALL');
-    expect(lines[2]).toBe('1, 0, 0, 0');
+    expect(lines.slice(1, 4)).toEqual(['*HEADING', expect.stringMatching(/^llull inputHash [0-9a-f]{16}$/), '*NODE, NSET=NALL']);
+    expect(lines[4]).toBe('1, 0, 0, 0');
     expect(BAR_NODES.length).toBe(8);
     expect(text).toContain('*ELEMENT, TYPE=C3D4, ELSET=P_');
     expect(text).toContain('*ELSET, ELSET=EALL\nP_');

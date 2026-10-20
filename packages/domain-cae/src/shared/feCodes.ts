@@ -17,6 +17,9 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   FEA_MESH_INVERTED: 'refine the mesh (set_mesh_controls globalSize / refinements) or change order, then run fea_mesh',
   FEA_RESULTS_MISSING: 'run fea_solve',
   FEA_RESULTS_STALE: 'run fea_mesh then fea_solve',
+  FEA_RESULTS_UNBOUND:
+    'solve the deck written by fea_export (it carries the marker), or confirm by other means that the file belongs to this set-up',
+  FEA_RESULTS_INPUT_MISMATCH: 'the file was computed from other inputs: re-export the deck (fea_export), solve it and import that result',
   FEA_PART_INVALID: 'add the 3D solids to analyse with set_part_idealization',
   FEA_MATERIAL_MISSING: 'assign a material to the part (assign_material) with create_material',
   FEA_MATERIAL_NO_ELASTIC:

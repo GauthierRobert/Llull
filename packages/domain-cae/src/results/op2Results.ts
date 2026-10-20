@@ -3,8 +3,10 @@
 import type { FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { analysisInputHash } from '../hash/inputHash';
+import { largest } from '../shared/largest';
 import { caseOf } from '../shared/access';
 import { firstNonFinite } from './frdReader';
+import { bindingOf, mismatchMessage, UNBOUND_WARNING } from './inputBinding';
 import type { Op2Displacements, Op2SolidStress, Op2Tables } from './op2Reader';
 
 type Steps = FeResultsArtifact['steps'];
@@ -56,10 +58,12 @@ function stressField(set: Op2SolidStress, corners: ReadonlyMap<number, readonly 
  * Results artifact of an OP2 written by Nastran for the BDF of `analysisId` (grid ids = mesh node ids). static: one step per subcase (subcase order = load
  * case order) with DISP and, when the file has CTETRA stresses, STRESS; modal: one step per mode (`time` = frequency in Hz) with DISP and the eigenvalue table in
  * `dat`; buckling: one step per buckled mode (`time` = factor) with DISP and the factor table.
+ * @invariant a file whose `llull inputHash` marker (BDF SUBTITLE) differs from the current input hash is refused; one without a marker is imported with
+ *   `binding: 'imported-unbound'` and a FEA_RESULTS_UNBOUND warning (check_analysis flags it)
  * @invariant the artifact carries the CURRENT mesh hash and analysis input hash: the caller has checked that the OP2 was computed on this mesh (every mesh node
  *   has a displacement; grid ids above the mesh ids are the reference grids of moment loads and are dropped)
  * @failure unknown analysis / type -> FEA_ANALYSIS_NOT_FOUND / FEA_ANALYSIS_TYPE_UNSUPPORTED; no displacement table of the right kind -> FEA_OP2_NO_RESULTS; a mesh
- *   node without a displacement or a grid below the mesh ids that the mesh lacks -> FEA_OP2_MESH_MISMATCH; non-finite values -> FEA_SOLVER_FAILED
+ *   node without a displacement or a grid below the mesh ids that the mesh lacks -> FEA_OP2_MESH_MISMATCH; marker of another set-up -> FEA_RESULTS_INPUT_MISMATCH; non-finite values -> FEA_SOLVER_FAILED
  */
 export function op2ToResults(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact, meshHash: string, op2: Op2Tables): Op2Import {
   const analysis = caseOf(doc, analysisId);
@@ -69,6 +73,9 @@ export function op2ToResults(doc: CadDocument, analysisId: string, mesh: FeMeshA
       'FEA_ANALYSIS_TYPE_UNSUPPORTED',
       `OP2 results are imported for static, modal and buckling analyses, not '${analysis.type}'`,
     );
+  const inputHash = analysisInputHash(doc, analysisId, 'full');
+  const binding = bindingOf(op2.inputHashes, inputHash);
+  if (binding.kind === 'mismatch') return refuse('FEA_RESULTS_INPUT_MISMATCH', mismatchMessage(binding.found));
   const wanted = analysis.type === 'static' ? 1 : analysis.type === 'modal' ? 2 : 8;
   const displacements = op2.displacements.filter((set) => set.analysisCode === wanted);
   if (displacements.length === 0)
@@ -77,7 +84,7 @@ export function op2ToResults(doc: CadDocument, analysisId: string, mesh: FeMeshA
       `the OP2 has no displacement table of the kind a ${analysis.type} analysis needs (analysis code ${wanted})`,
     );
   const known = new Set(mesh.nodes.map((node) => node[0]));
-  const highest = Math.max(0, ...known);
+  const highest = largest(known);
   for (const set of displacements) {
     for (const node of set.nodes.keys())
       if (!known.has(node) && node <= highest)
@@ -91,7 +98,7 @@ export function op2ToResults(doc: CadDocument, analysisId: string, mesh: FeMeshA
   }
   const cornerNodes = new Map<number, readonly number[]>();
   for (const block of mesh.blocks) for (const element of block.elements) cornerNodes.set(element[0] ?? -1, element.slice(1, 5));
-  const warnings = [...op2.warnings];
+  const warnings = [...op2.warnings, ...(binding.kind === 'unbound' ? [UNBOUND_WARNING] : [])];
   const steps: Steps[number][] = [];
   const stressOf = (subcase: number, mode: number | undefined): Op2SolidStress | undefined =>
     op2.stresses.find((set) => set.analysisCode === wanted && set.subcase === subcase && set.mode === mode);
@@ -136,9 +143,10 @@ export function op2ToResults(doc: CadDocument, analysisId: string, mesh: FeMeshA
     artifact: {
       kind: 'fe_results',
       meshHash,
-      inputHash: analysisInputHash(doc, analysisId, 'full'),
+      inputHash,
       solver: 'nastran',
       solverVersion: op2.producer === '' ? 'op2' : op2.producer,
+      ...(binding.kind === 'unbound' ? { binding: 'imported-unbound' as const } : {}),
       steps,
       ...(dat === undefined ? {} : { dat }),
     },

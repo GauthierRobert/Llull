@@ -55,6 +55,8 @@ export interface Op2Set {
   /** Data words, split into `chunks` logical records (default one). */
   readonly data: readonly Word[];
   readonly chunks?: number;
+  /** Text written into the identification record (where Nastran puts the title / subtitle), from word 60. */
+  readonly title?: string;
 }
 
 export class Op2Builder {
@@ -104,6 +106,7 @@ export class Op2Builder {
       ident[5] = f(set.eigenvalue ?? 0);
       ident[8] = i(1);
       ident[9] = i(set.numWide);
+      wordsOf(set.title ?? '').forEach((entry, at) => void (ident[60 + at] = entry));
       this.marker(-3 - 2 * index);
       this.marker(1);
       this.marker(0);

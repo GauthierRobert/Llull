@@ -7,6 +7,7 @@ import { addFeaConstraint, deleteFeaConstraint, updateFeaConstraint } from './co
 import { addFeaLoad, deleteFeaLoad, updateFeaLoad } from './loads';
 import { setMeshControls } from './mesh';
 import { setPartIdealization } from './parts';
+import { defeatureForAnalysis, extractMidsurface } from './shellCommands';
 import { addResultProbe, deleteResultProbe } from './probes';
 import { probeHistory } from './probeHistory';
 import { recordFeMesh, recordFeaResults } from './record';
@@ -22,6 +23,8 @@ export const feaCommands = commandCatalog(
   deleteAnalysis,
   describeAnalysis,
   setPartIdealization,
+  extractMidsurface,
+  defeatureForAnalysis,
   addFeaConstraint,
   updateFeaConstraint,
   deleteFeaConstraint,

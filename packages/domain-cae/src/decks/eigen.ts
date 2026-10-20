@@ -9,7 +9,7 @@ const DEFAULT_MODES = 6;
 
 const modesOf = (ctx: DeckContext): number => Math.max(1, Math.round(ctx.analysis.modes ?? DEFAULT_MODES));
 
-/** Lower bound (Hz) written for a case without supports: the stiffness matrix is singular, so the eigenproblem is shifted below zero. A llull choice, not verified against a real ccx run. */
+/** Lower bound (Hz) written as the second field of `*FREQUENCY` for a case without supports (singular stiffness matrix). A llull choice: the shift semantics of a negative lower bound are UNVERIFIED (ccx may read it as the shift sigma = (2 pi fmin)^2, i.e. +0.4 for -1 Hz, not as a bound below zero). */
 const FREE_FREE_LOWER_BOUND_HZ = -1;
 
 /** Data line of `*FREQUENCY`: `n`, or `n, [min], [max]` for a band (cycles/time = Hz); a supportless case without a stated minimum gets a small negative one. */
@@ -41,8 +41,11 @@ export function modalStep(ctx: DeckContext): DeckSections {
 /**
  * Buckling. Without a `preloadLoadCase`: ONE `*BUCKLE, <n>` step holding the constraints and the loads of the first load case (the reference load,
  * which the factors multiply). With one: a `*STATIC` step first (constraints and the loads of the preload case, no output), then the `*BUCKLE` step
- * with the loads of the first OTHER load case added on top (`*CLOAD` / `*DLOAD` without `OP=NEW`, so the preload stays): the preload stresses the
- * structure and is not multiplied. The preload layout follows the ccx manual's buckling example and is NOT verified against a real run here. Buckling
+ * with the loads of the first OTHER load case on top (`*CLOAD` / `*DLOAD` without `OP=NEW`, so the preload stays): the preload stresses the
+ * structure and is not multiplied. A modifying card REPLACES the value at the same node and dof / element and face / `GRAV` of the earlier step instead
+ * of adding to it, so the BUCKLE step writes preload + reference summed (a target loaded in both cases gets the sum; one loaded in only one case gets its
+ * own value, which equals the preload value when it comes from the preload). The layout follows the ccx manual's buckling example and whether the factor
+ * then multiplies only the reference increment is NOT verified against a real run here. Buckling
  * factors are in the `.dat` (`B U C K L I N G   F A C T O R   O U T P U T`), the mode shapes in the `.frd`.
  * @failure no load / no reference load case besides the preload -> FEA_NO_LOADS; unresolved targets -> FEA_TARGET_UNRESOLVED
  */
@@ -70,7 +73,7 @@ export function bucklingSteps(ctx: DeckContext): DeckSections {
   const mechanical =
     preload === undefined
       ? mechanicalStepLines(ctx, loadCase)
-      : mechanicalStepLines(ctx, loadCase, { scale: () => 1, parameters: '', boundary: false });
+      : mechanicalStepLines(ctx, loadCase, { scale: () => 1, parameters: '', boundary: false, addLoadCases: [preload] });
   if (isDeckRefusal(mechanical)) return mechanical;
   lines.push(`** buckling reference load case ${commentText(loadCase)}`, '*STEP', '*BUCKLE', num(modesOf(ctx)));
   lines.push(...mechanical.text.split('\n').filter((line) => line !== ''));

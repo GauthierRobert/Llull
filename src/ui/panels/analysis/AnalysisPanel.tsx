@@ -8,7 +8,12 @@ import { useStore } from '@ui/store';
 import { execute } from '@core/commands/registry';
 import { ListRow, PanelEmpty, PanelHeader, PanelSection, StatusLine } from '@ui/panels/PanelParts';
 import { eigenOf, parseAnalysisList, parseCheck, parseDescribe } from './analysisData';
+import { AnalysisActions } from './AnalysisActions';
 import { AnalysisChecks } from './AnalysisChecks';
+import { AnalysisMargins } from './AnalysisMargins';
+import { AnalysisResultSummary } from './AnalysisResultSummary';
+import { AnalysisStateBadge } from './AnalysisStateBadge';
+import { recordResultView } from './useResultView';
 import { AnalysisKpis } from './AnalysisKpis';
 import { AnalysisOnModel } from './AnalysisOnModel';
 import { buildSetupItems } from './analysisItems';
@@ -56,7 +61,8 @@ export function AnalysisPanel({ className }: { className?: string }): React.Reac
     () => (detail?.described == null ? null : buildSetupItems(document, detail.described.analysisCase)),
     [document, detail?.described],
   );
-  const eigen = detail?.described == null ? null : eigenOf(detail.described.analysisCase);
+  const openCase = detail?.described?.analysisCase;
+  const eigen = openCase === undefined ? null : eigenOf(openCase);
 
   return (
     <aside className={classNames('panel', className)} aria-label="Analysis" data-testid="analysis-panel">
@@ -84,7 +90,7 @@ export function AnalysisPanel({ className }: { className?: string }): React.Reac
               >
                 <span className="panel__row-main">{item.name}</span>
                 <span className="panel__row-meta">
-                  {item.type} · {item.state}
+                  {item.type} · <AnalysisStateBadge state={item.state} testId={`analysis-state-${item.id}`} />
                 </span>
               </ListRow>
             ))}
@@ -101,13 +107,27 @@ export function AnalysisPanel({ className }: { className?: string }): React.Reac
           <PanelSection title="Case" hint="Case set-up as recorded in the document.">
             <p className="analysis__line" data-testid="analysis-meta">
               {detail.described.analysisCase.type} · {detail.described.analysisCase.solver} · {detail.described.analysisCase.unitSystem} ·{' '}
-              {detail.described.state}
+              <AnalysisStateBadge state={detail.described.state} withMeaning testId="analysis-state-badge" />
             </p>
             {detail.described.problem !== null && <StatusLine text={detail.described.problem} />}
           </PanelSection>
           <AnalysisSetup analysisCase={detail.described.analysisCase} document={document} />
           <AnalysisChecks check={detail.check} summary={detail.checkSummary} partIds={Object.keys(detail.described.analysisCase.parts)} />
-          {eigen !== null && detail.described.state === 'solved' && <AnalysisModes eigen={eigen} selectedMode={mode} onSelect={setMode} />}
+          {eigen !== null && openCase !== undefined && detail.described.state === 'solved' && (
+            <AnalysisModes
+              eigen={eigen}
+              selectedMode={mode}
+              onSelect={(next) => {
+                setMode(next);
+                recordResultView(openCase);
+              }}
+            />
+          )}
+          {detail.described.state === 'solved' && <AnalysisResultSummary analysisCase={detail.described.analysisCase} />}
+          {detail.described.state === 'solved' &&
+            (detail.described.analysisCase.type === 'static' || detail.described.analysisCase.type === 'thermo_static') && (
+              <AnalysisMargins analysisCase={detail.described.analysisCase} />
+            )}
           {detail.described.state === 'solved' && Object.keys(detail.described.analysisCase.probes ?? {}).length > 0 && (
             <AnalysisProbes
               analysisId={detail.described.analysisCase.id}
@@ -115,10 +135,11 @@ export function AnalysisPanel({ className }: { className?: string }): React.Reac
               items={Object.fromEntries((items?.probes ?? []).map((item) => [item.id, item]))}
             />
           )}
-          <AnalysisResults key={detail.described.analysisCase.id} analysisCase={detail.described.analysisCase} />
+          <AnalysisResults key={`results-${detail.described.analysisCase.id}`} analysisCase={detail.described.analysisCase} />
           {detail.described.analysisCase.type === 'static' && (
-            <TopologyPanel key={detail.described.analysisCase.id} analysisId={detail.described.analysisCase.id} />
+            <TopologyPanel key={`topology-${detail.described.analysisCase.id}`} analysisId={detail.described.analysisCase.id} />
           )}
+          <AnalysisActions key={`actions-${detail.described.analysisCase.id}`} analysisCase={detail.described.analysisCase} />
         </>
       )}
     </aside>

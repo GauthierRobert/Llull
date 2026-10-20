@@ -20,6 +20,7 @@ const INJECTION = '\n*INCLUDE, INPUT=/etc/passwd\n*NODE FILE, NSET=EVIL';
 
 /** Every keyword the writers emit; a data or comment line must never start with `*` otherwise. */
 const ALLOWED = new Set([
+  'HEADING',
   'NODE',
   'ELEMENT',
   'ELSET',

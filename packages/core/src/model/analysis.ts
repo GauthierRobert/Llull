@@ -56,17 +56,33 @@ export type ProbeQuantity =
   | 's_axial'
   | 'u_radial';
 
-/** Only `solid` is built; the other kinds are 05 backlog and exist so documents stay forward-compatible. */
+/**
+ * How a part is meshed. solid: 3D tets; shell: shell elements on its midsurface (FEA-REST part 3, 05 §5.2); plane_stress: 2D elements on one planar
+ * face lying in z = 0; beam: 05 V2 backlog (refused). Lengths in document units.
+ */
 export type Idealization =
   | { readonly kind: 'solid' }
   | { readonly kind: 'plane_stress'; readonly thickness: number; readonly sourceFacesNear: readonly Vec3[] }
   | {
       readonly kind: 'shell';
+      /** Stored resolved (a number) by set_part_idealization; 'auto' (older documents) is resolved from the midsurface at mesh time. */
       readonly thickness: number | 'auto';
+      /** Meshed reference surface: the midsurface, or the top / bottom surface of the wall (CalculiX OFFSET +0.5 / -0.5). */
       readonly offset: 'mid' | 'top' | 'bottom';
-      readonly midsurface: { readonly maxThickness: number; readonly angularTolDeg: number };
+      /** minCoverage: paired-area fraction a face-paired midsurface needs (absent = 0.98, 05 §5.2 step 5). */
+      readonly midsurface: { readonly maxThickness: number; readonly angularTolDeg: number; readonly minCoverage?: number };
+      /** Composite shell: a 06 CMP laminate section (`create_laminate_sections`, sectionId) or the whole-face plies of the part replaces the part material. */
+      readonly laminate?: { readonly compositePartId: string; readonly sectionId?: string };
     }
   | { readonly kind: 'beam'; readonly section: string };
+
+/** Features removed from one analysed part before meshing (Gmsh `occ.defeature`, STEP parts only). Lengths in document units. */
+export interface DefeatureSpec {
+  /** Remove cylinder / torus faces of radius <= this: fillets, rounds and small holes. */
+  readonly maxFeatureSize?: number;
+  /** Remove the faces nearest to these points. */
+  readonly facesNear?: readonly Vec3[];
+}
 
 /** Points that identify faces / edges / vertices of `entityId`; the mesher resolves them to the nearest topology (never ids). */
 export interface FeaTarget {
@@ -498,6 +514,8 @@ export interface AnalysisCase {
   readonly preloadLoadCase?: string;
   /** Marginal band in margin-of-safety units stated by the owner (`set_margin_band`); absent = none (no default, FR-FEA-31). */
   readonly marginalBand?: number;
+  /** Per part: features removed before meshing (`defeature_for_analysis`); part of the mesh input hash. Absent = none. */
+  readonly defeature?: Readonly<Record<EntityId, DefeatureSpec>>;
 }
 
 export interface AnalysisModel {
@@ -541,6 +559,8 @@ export interface FeResultsArtifact {
   readonly inputHash: string;
   readonly solver: string;
   readonly solverVersion: string;
+  /** Imported OP2 / FRD whose file carried no llull input-hash marker: stamped with the current hash without proof the file belongs to this set-up. */
+  readonly binding?: 'imported-unbound';
   readonly steps: readonly {
     readonly step: number;
     readonly time: number;

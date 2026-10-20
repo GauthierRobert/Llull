@@ -6,6 +6,10 @@ import { elasticConstants, isElasticRefusal, propertyTemperatureK } from '../ela
 import { commentText } from '../format';
 import { densityToAnalysis, stressPerMpa } from '../units';
 import { cardLines, intField, realField, roundingError } from './fields';
+import { isCompositePart } from '../../shell/shellDeck';
+
+/** CORD2R id of the material system (MCID) of composite property `pid` is this + pid. */
+export const COMPOSITE_CID_BASE = 100;
 
 /** CalculiX / Abaqus element type -> Nastran card. C3D10 and S6 / S8 keep their node order (mid-edge nodes after the corners, same convention in both codes). */
 export const ELEMENT_CARDS: Readonly<Partial<Record<FeElementType, { readonly card: string; readonly shell: boolean }>>> = {
@@ -82,8 +86,12 @@ export function elementCards(ctx: DeckContext, property: ReadonlyMap<string, num
     const mapped = ELEMENT_CARDS[block.type];
     if (mapped === undefined) return refusal('FEA_PART_INVALID', `element type ${block.type} has no Nastran card`, [block.entityId]);
     const pid = property.get(block.entityId) ?? 0;
+    // Composite parts name their material system (MCID = the rosette CORD2R): after the grids, past T1..T4 on a CQUAD8.
+    const mcid = isCompositePart(ctx, block.entityId)
+      ? [...(mapped.card === 'CQUAD8' ? ['', '', '', ''] : []), String(COMPOSITE_CID_BASE + pid)]
+      : [];
     for (const [id = 0, ...nodes] of block.elements) {
-      const fields = [integer(id, 'element id'), String(pid), ...nodes.map((node) => integer(node, 'node id'))];
+      const fields = [integer(id, 'element id'), String(pid), ...nodes.map((node) => integer(node, 'node id')), ...mcid];
       const bad = fields.find(failed);
       if (bad !== undefined) return bad as DeckRefusal;
       lines.push(...cardLines(mapped.card, fields as string[]));
@@ -105,7 +113,14 @@ export function propertyCards(ctx: DeckContext, track: Rounding): { readonly lin
   for (const [entityId, pid] of property) {
     const mid = material.get(ctx.materialName(entityId)) ?? 0;
     const idealization = ctx.analysis.parts[entityId];
+    if (isCompositePart(ctx, entityId)) continue;
     if (shellTypes.has(entityId)) {
+      if (idealization?.kind === 'shell' && idealization.offset !== 'mid')
+        return refusal(
+          'FEA_BDF_UNSUPPORTED',
+          `shell '${entityId}' with offset ${idealization.offset}: element ZOFFS is not written (mid only)`,
+          [entityId],
+        );
       const thickness = idealization?.kind === 'shell' ? idealization.thickness : undefined;
       if (typeof thickness !== 'number' || !(thickness > 0))
         return refusal('FEA_PART_INVALID', `shell part '${entityId}' needs a numeric thickness (an 'auto' thickness is not resolved)`, [
@@ -120,7 +135,7 @@ export function propertyCards(ctx: DeckContext, track: Rounding): { readonly lin
   const done = new Set<number>();
   for (const [entityId] of property) {
     const mid = material.get(ctx.materialName(entityId)) ?? 0;
-    if (done.has(mid)) continue;
+    if (done.has(mid) || isCompositePart(ctx, entityId)) continue;
     done.add(mid);
     const found = ctx.materialOf(entityId);
     if (found === null) return refusal('FEA_MATERIAL_MISSING', `part '${entityId}' has no material`, [entityId]);

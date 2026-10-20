@@ -9,7 +9,7 @@ import { refuseCode } from '../shared/codes';
 import { loadCaseNameProblem } from '../shared/names';
 import { analysisIdSchema } from '../shared/schemas';
 
-const FIELDS = ['von_mises', 'u_mag', 'u_x', 'u_y', 'u_z', 's_xx', 's_yy', 's_zz', 'mode'] as const;
+export const RESULT_VIEW_FIELDS = ['von_mises', 'u_mag', 'u_x', 'u_y', 'u_z', 's_xx', 's_yy', 's_zz', 'mode'] as const;
 
 /**
  * @affects doc.analysis.cases[analysisId].view (presentation only: not part of the analysis input hash, results stay valid)
@@ -26,7 +26,7 @@ export const setResultView = defineCommand({
   params: z.object({
     analysisId: analysisIdSchema,
     field: z
-      .enum(FIELDS)
+      .enum(RESULT_VIEW_FIELDS)
       .describe('Field to show: von_mises | u_mag | u_x | u_y | u_z | s_xx | s_yy | s_zz | mode (modal / buckling mode shape).'),
     loadCase: z.string().optional().describe('Load case to show (1-40 letters, digits or underscores). Omit for the first.'),
     mode: z.number().int().min(1).optional().describe('field mode only: mode number, 1-based (default 1).'),

@@ -8,6 +8,7 @@ import { meshOf, nonlinearBar, pressureBar, pulledBar, step } from './support';
 const normalised = (text: string): string =>
   text
     .replace(/inputHash \w+ meshHash \w+/, 'inputHash H meshHash M')
+    .replace(/llull inputHash [0-9a-f]{16}/, 'llull inputHash X')
     .replace(/(stp|prb)[-_]\d+[._]\d+/g, (_match, kind: string) => `${kind.toUpperCase()}_X`)
     .replace(/sha256=\w+/, 'sha256=S');
 
@@ -22,6 +23,8 @@ describe('nonlinear_static deck', () => {
     const bar = pulledBar();
     const text = normalised(deck(bar.doc, bar.analysisId, meshOf(bar)));
     expect(text).toBe(`** llull analysis bar units N-mm-t-s inputHash H meshHash M
+*HEADING
+llull inputHash X
 *NODE, NSET=NALL
 1, 0, 0, 0
 2, 2, 0, 0

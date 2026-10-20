@@ -115,7 +115,12 @@ export async function runFeaSolve(
         [analysisId],
       );
     }
-    const steps = deps.hooks.parseFrd(await readOptional(frdPath));
+    const frdText = await readOptional(frdPath);
+    const parsed = deps.hooks.parseFrd(frdText);
+    const shellMapped =
+      parsed.length === 0 ? { steps: parsed } : deps.hooks.mapShellResults(doc, analysisId, current.mesh, parsed, frdText);
+    if ('code' in shellMapped) return feaFailure('fea_solve', shellMapped.code, shellMapped.message, [analysisId]);
+    const steps = shellMapped.steps;
     if (steps.length === 0) {
       return feaFailure(
         'fea_solve',

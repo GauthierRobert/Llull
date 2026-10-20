@@ -11,7 +11,7 @@ import { feaTargetSchema, targetProblem, toTarget } from '../shared/target';
 
 /**
  * @affects doc.analysis.cases[analysisId].mesh (given fields replace the current controls; the recorded mesh summary stays and reads as stale)
- * @invariant bonding 'separate' (default, stored as absent) or 'conformal'; tet elements only; order 1 (C3D4) or 2 (C3D10); globalSize > 0; 0 < minSize <= globalSize; every refinement size <= globalSize
+ * @invariant bonding 'separate' (default, stored as absent) or 'conformal'; solids are tets, shell / plane-stress parts tri or quad (elementFamily); order 1 (C3D4) or 2 (C3D10); globalSize > 0; 0 < minSize <= globalSize; every refinement size <= globalSize
  *   and its target is a part of the case
  * @failure unknown analysis, non-positive / inconsistent sizes, order not 1|2, bad refinement target -> refusal, unchanged doc
  */
@@ -39,7 +39,13 @@ export const setMeshControls = defineCommand({
       )
       .optional()
       .describe('Replaces the whole refinement list (empty array clears it).'),
-    elementFamily: z.enum(['tet']).optional().describe('Only "tet" is built (default).'),
+    elementFamily: z
+      .enum(['tet', 'shell_tri', 'shell_quad'])
+      .optional()
+      .describe(
+        'Element shape of shell / plane-stress parts: shell_tri (triangles, S3 / S6, CPS3 / CPS6) or shell_quad (all quadrilaterals by subdivision, ' +
+          'S4 / S8, CPS4 / CPS8; needed for composite shells: order 2). Solid parts are always tetrahedra; "tet" (default) meshes 2D parts with triangles.',
+      ),
     optimize: z.enum(['default', 'netgen', 'high_order', 'none']).optional().describe('Mesh optimisation pass; default "default".'),
     bonding: z
       .enum(['separate', 'conformal'])
@@ -93,7 +99,7 @@ export const setMeshControls = defineCommand({
     const next: AnalysisCase = { ...analysisCase, mesh };
     return changed(
       withCase(doc, next),
-      `set_mesh_controls: '${params.analysisId}' tet order ${mesh.order}, globalSize ${mesh.globalSize} ${doc.units}` +
+      `set_mesh_controls: '${params.analysisId}' ${mesh.elementFamily} order ${mesh.order}, globalSize ${mesh.globalSize} ${doc.units}` +
         `${mesh.minSize === undefined ? '' : `, minSize ${mesh.minSize}`}, ${mesh.refinements.length} refinement(s)${mesh.bonding === 'conformal' ? ', conformal bonding' : ''}.`,
       [params.analysisId],
     );

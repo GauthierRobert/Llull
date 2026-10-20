@@ -9,6 +9,9 @@ import type {
   ResultsSummary,
 } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
+import type { GeometryKernel } from '@core/geometry/kernel';
+import { partMidsurfaceGeometry, type MidsurfaceGeometry } from '@cae/shell/meshGeometry';
+import { mapShellResults } from '@cae/shell/shellResults';
 import { analysisInputHash, meshRequest, type MeshRequest } from '@cae/index';
 import { writeBdf, type BdfResult } from '@cae/decks/bdfWriter';
 import { writeInp } from '@cae/decks/inpWriter';
@@ -28,6 +31,21 @@ export interface CaeCode {
 
 export interface CaeHooks {
   meshRequest(doc: CadDocument, analysisId: string): MeshRequest | CaeCode;
+  /** Midsurface / plane-stress geometry of a 2D part for the mesher, null for a solid part. */
+  partMidsurface(
+    doc: CadDocument,
+    analysisId: string,
+    entityId: string,
+    kernel: GeometryKernel | null,
+  ): MidsurfaceGeometry | CaeCode | null;
+  /** Shell / plane-stress results read back from the CalculiX 3D expansion onto the mesh nodes, with top / bottom fibre stresses (05 OQ 7). */
+  mapShellResults(
+    doc: CadDocument,
+    analysisId: string,
+    mesh: FeMeshArtifact,
+    steps: FeResultsArtifact['steps'],
+    frdText: string,
+  ): { readonly steps: FeResultsArtifact['steps'] } | CaeCode;
   analysisInputHash(doc: CadDocument, analysisId: string, scope: 'mesh' | 'full'): string;
   writeInp(
     doc: CadDocument,
@@ -67,6 +85,8 @@ export interface CaeHooks {
 
 export const caeHooks: CaeHooks = {
   meshRequest,
+  partMidsurface: partMidsurfaceGeometry,
+  mapShellResults,
   analysisInputHash,
   writeInp,
   writeBdf,

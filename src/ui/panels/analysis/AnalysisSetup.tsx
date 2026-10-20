@@ -8,6 +8,8 @@ import { PanelSection } from '@ui/panels/PanelParts';
 import { buildSetupItems, loadValueText, type SetupItem } from './analysisItems';
 import { constraintText, factorsText, loadText, stepText, thermalBcText, type NameOf } from './analysisText';
 import { SetupRow } from './SetupRow';
+import { idealizationText, meshControlsText } from './idealizationText';
+import { lengthUnitName } from '@cae/decks/units';
 
 interface RowSpec {
   readonly item: SetupItem;
@@ -38,7 +40,11 @@ export function AnalysisSetup({ analysisCase, document }: AnalysisSetupProps): R
     const entityId = item.entityIds[0] ?? '';
     const materialId = document.entities[entityId]?.materialId;
     const material = materialId === undefined ? undefined : document.materials[materialId]?.name;
-    return { item, meta: `${analysisCase.parts[entityId]?.kind ?? 'solid'} · ${material ?? 'no material'}`, detail: '' };
+    return {
+      item,
+      meta: material ?? 'no material',
+      detail: idealizationText(analysisCase.parts[entityId], lengthUnitName(analysisCase.unitSystem)),
+    };
   });
   const constraints: RowSpec[] = items.constraints.flatMap((item) => {
     const constraint = analysisCase.constraints[item.id];
@@ -106,10 +112,7 @@ export function AnalysisSetup({ analysisCase, document }: AnalysisSetupProps): R
         </p>
       </PanelSection>
       <PanelSection title="Mesh" collapsible>
-        <p className="analysis__line">
-          {mesh.mesher} · {mesh.elementFamily} · order {mesh.order} · size {mesh.globalSize}
-          {mesh.refinements.length > 0 ? ` · ${mesh.refinements.length} refinements` : ''}
-        </p>
+        <p className="analysis__line">{meshControlsText(mesh)}</p>
         <p className="analysis__line">
           {meshSummary === undefined ? 'Not meshed.' : `${meshSummary.nodes} nodes${elements !== '' ? `, ${elements}` : ''}`}
         </p>

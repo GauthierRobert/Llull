@@ -4,6 +4,7 @@ import { isRecord } from '@lib/isRecord';
 import { nonlinearValueProblems } from '../nonlinear/shape';
 import { orientationErrors } from '../thermomech/validateOrientations';
 import { durabilityErrors } from './validateDurability';
+import { settingsErrors } from './validateSettings';
 
 const TYPES = [
   'static',
@@ -201,6 +202,7 @@ function checkCase(scope: Scope, id: string, analysisCase: Record<string, unknow
     scope.errors.push(...orientationErrors(thermomech['orientations'], scope.entities, `${where}.thermomech`));
   }
   if (analysisCase['nonlinear'] !== undefined) checkNonlinear(scope, analysisCase, `${where}.nonlinear`);
+  errors.push(...settingsErrors(analysisCase, where));
   for (const summary of ['meshSummary', 'results'])
     if (
       analysisCase[summary] !== undefined &&

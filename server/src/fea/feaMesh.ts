@@ -93,14 +93,31 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
   const doc = host.getDoc();
   const request = deps.hooks.meshRequest(doc, analysisId);
   if (isCode(request)) return feaFailure('fea_mesh', request.code, request.message, [analysisId]);
-  const parts: { entityId: string; geometry: unknown; faces?: unknown }[] = [];
+  const parts: { entityId: string; geometry: unknown; faces?: unknown; defeature?: unknown }[] = [];
   const kernelFaces = new Map<string, ReturnType<typeof partFaces>>();
+  const defeature = doc.analysis?.cases[analysisId]?.defeature ?? {};
+  const warnings: string[] = [];
   for (const entityId of request.entityIds) {
+    const midsurface = deps.hooks.partMidsurface(doc, analysisId, entityId, deps.kernel());
+    if (midsurface !== null && 'code' in midsurface)
+      return feaFailure('fea_mesh', midsurface.code, midsurface.message, [analysisId, entityId]);
+    if (midsurface !== null) {
+      warnings.push(...midsurface.warnings.map((warning) => `${entityId}: ${warning}`));
+      parts.push({ entityId, geometry: midsurface });
+      kernelFaces.set(entityId, null);
+      continue;
+    }
     const geometry = partGeometry(doc, entityId, deps.kernel());
     if ('code' in geometry) return feaFailure('fea_mesh', geometry.code, geometry.message, [analysisId, entityId]);
     const faces = geometry.kind === 'step' && request.controls.bonding === undefined ? partFaces(doc, entityId, deps.kernel()) : null;
     kernelFaces.set(entityId, faces);
-    parts.push({ entityId, geometry, ...(faces === null ? {} : { faces: faces.faces }) });
+    const removed = Object.hasOwn(defeature, entityId) ? defeature[entityId] : undefined;
+    parts.push({
+      entityId,
+      geometry,
+      ...(faces === null ? {} : { faces: faces.faces }),
+      ...(removed === undefined ? {} : { defeature: removed }),
+    });
   }
   let response: MeshBridgeResponse;
   try {
@@ -118,6 +135,7 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
       })),
       controls: {
         order: request.controls.order,
+        elementFamily: request.controls.elementFamily,
         ...(request.controls.bonding !== undefined ? { bonding: request.controls.bonding } : {}),
         globalSize: request.controls.globalSize,
         ...(request.controls.minSize !== undefined ? { minSize: request.controls.minSize } : {}),
@@ -156,9 +174,19 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
   return {
     summary: `fea_mesh: ${mesh.nodes.length} nodes, ${Object.entries(counts)
       .map(([type, n]) => `${n} ${type}`)
-      .join(', ')} (${mesh.mesher} ${mesh.mesherVersion}). ${recorded.summary}${facetedNote}`,
+      .join(
+        ', ',
+      )} (${mesh.mesher} ${mesh.mesherVersion}). ${recorded.summary}${facetedNote}${warnings.length > 0 ? ` WARNING: ${warnings.join('; ')}` : ''}`,
     affected: recorded.affected,
     isError: recorded.isError,
-    data: { meshHash, nodes: mesh.nodes.length, elements: counts, targets: Object.keys(mesh.nodeSets).length, facetedParts: faceted },
+    data: {
+      meshHash,
+      nodes: mesh.nodes.length,
+      elements: counts,
+      targets: Object.keys(mesh.nodeSets).length,
+      facetedParts: faceted,
+      ...(warnings.length > 0 ? { warnings } : {}),
+      ...(Array.isArray(response['defeatured']) ? { defeatured: response['defeatured'] } : {}),
+    },
   };
 }

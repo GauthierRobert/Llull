@@ -133,7 +133,10 @@ describe('partRestraints on odd supports', () => {
     expect(ctx === null ? [] : partRestraints(ctx).map((group) => group.entityIds)).toEqual([[bar.boxId, 'other']]);
     const lone: FeMeshArtifact = {
       ...base,
-      blocks: [...base.blocks, { type: 'C3D4', entityId: 'other', elements: [[7, 1, 2, 4, 8]] }].slice(0, 1),
+      blocks: [
+        ...base.blocks,
+        { type: 'C3D4', entityId: 'other', elements: [[7, 1, 2, 4, 8]] } as unknown as FeMeshArtifact['blocks'][number],
+      ].slice(0, 1),
     };
     const loneCtx = buildDeckContext(second, bar.analysisId, lone);
     expect(loneCtx === null ? [] : partRestraints(loneCtx).map((group) => group.entityIds)).toEqual([[bar.boxId], ['other']]);

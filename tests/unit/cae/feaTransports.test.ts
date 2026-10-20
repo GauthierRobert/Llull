@@ -7,6 +7,7 @@ import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
 import { uint8ArrayToBase64 } from '@lib/base64';
+import { isRecord } from '@lib/isRecord';
 import { applyExchangeToolCall, type FeaHost, type FeaToolResult, type FeaToolsPort } from '@protocol/index';
 import { createFeArtifactStore, type FeArtifactStore } from '../../../server/src/fea/artifactStore';
 import { caeHooks } from '../../../server/src/fea/caeHooks';
@@ -15,6 +16,8 @@ import { runFeaImportResults } from '../../../server/src/fea/feaImportResults';
 import { meshSummary } from '@cae/results/summary';
 import { X0_NODES, barDocument, barMesh } from './deckFixtures';
 import { Op2Builder, displacementRow, tetStressElement } from './op2Fixture';
+
+const textOf = (data: unknown): string => (isRecord(data) ? String(data['text']) : '');
 
 let directory = '';
 let store: FeArtifactStore;
@@ -81,14 +84,14 @@ describe('fea_export formats', () => {
     const result = runFeaExport(analysisId, host(), deps());
     expect(result.isError).toBe(false);
     expect(result.data).toMatchObject({ format: 'inp', fileName: `${analysisId}.inp`, meshHash });
-    expect(String(result.data?.['text'])).toContain('*STEP');
+    expect(textOf(result.data)).toContain('*STEP');
   });
 
   it('nastran_bdf writes the bulk data with its warnings and a sha256', () => {
     const result = runFeaExport(analysisId, host(), deps(), { format: 'nastran_bdf' });
     expect(result.isError).toBe(false);
     expect(result.data).toMatchObject({ format: 'bdf', fileName: `${analysisId}.bdf`, warnings: [] });
-    expect(String(result.data?.['text'])).toContain('SOL 101');
+    expect(textOf(result.data)).toContain('SOL 101');
     expect(result.summary).toContain('.bdf');
   });
 
@@ -100,9 +103,9 @@ describe('fea_export formats', () => {
     expect(imported.isError).toBe(false);
     const after = runFeaExport(analysisId, host(), deps(), { format: 'vtu' });
     expect(after.data).toMatchObject({ withResults: true });
-    expect(String(after.data?.['text'])).toContain('Name="von_mises_1"');
+    expect(textOf(after.data)).toContain('Name="von_mises_1"');
     const binary = runFeaExport(analysisId, host(), deps(), { format: 'vtu', encoding: 'base64' });
-    expect(String(binary.data?.['text'])).toContain('format="binary"');
+    expect(textOf(binary.data)).toContain('format="binary"');
   });
 
   it('refuses an unknown analysis and a deck the writer cannot write', () => {
@@ -214,6 +217,8 @@ describe('the protocol tools', () => {
     const result = await applyExchangeToolCall(name, args, {
       getDoc: () => doc,
       applyCommand: () => ({ summary: '', affected: [], isError: false }),
+      port: null,
+      allowCodeExecution: false,
       fea: port(),
       ...extra,
     });

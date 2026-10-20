@@ -85,7 +85,12 @@ export function resultsSummary(
   const loadCases: ResultsSummary['loadCases'][number][] = [];
   loadCasesOf(analysis).forEach(({ name, category }, index) => {
     const step = stepOfLoadCase(results, index);
-    const stress = maxOverNodes(step?.fields.STRESS, vonMises);
+    // Shells: the fibre stresses (top / bottom surface) bound the membrane value of STRESS.
+    const stress = [step?.fields.STRESS, step?.fields.STRESS_TOP, step?.fields.STRESS_BOT]
+      .map((field) => maxOverNodes(field, vonMises))
+      .reduce<
+        ReturnType<typeof maxOverNodes>
+      >((best, candidate) => (candidate !== null && (best === null || candidate.value > best.value) ? candidate : best), null);
     const displacement = maxOverNodes(step?.fields.DISP, magnitude);
     if (stress === null || displacement === null) return;
     loadCases.push({

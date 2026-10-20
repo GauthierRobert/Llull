@@ -13,7 +13,8 @@ const supportSets = (constraints: Record<string, string>): Record<string, number
   [`C_${constraints['nodeB']}`]: [3],
 });
 
-const normalised = (text: string): string => text.replace(/inputHash \w+ meshHash \w+/, 'inputHash H meshHash M');
+const normalised = (text: string): string =>
+  text.replace(/inputHash \w+ meshHash \w+/, 'inputHash H meshHash M').replace(/llull inputHash [0-9a-f]{16}/, 'llull inputHash X');
 
 describe('writeInp golden deck', () => {
   it('writes the model block, material, section and static step of a gravity case', () => {
@@ -22,6 +23,8 @@ describe('writeInp golden deck', () => {
     const mesh = barMesh(doc, bar.analysisId, bar.boxId, supportSets(bar.constraints));
     const written = writeInp(doc, bar.analysisId, mesh);
     expect('text' in written && normalised(written.text)).toBe(`** llull analysis bar units N-mm-t-s inputHash H meshHash M
+*HEADING
+llull inputHash X
 *NODE, NSET=NALL
 1, 0, 0, 0
 2, 2, 0, 0

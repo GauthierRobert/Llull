@@ -9,8 +9,11 @@ import { fromKelvin, kelvinOf } from '../thermomech/units';
 import { caseTemperatureRange } from '../thermal/material';
 import { commentText, linesText, num, row } from './format';
 import { consistentWeights, momentForces } from './loadDistribution';
+import { targetKind } from '../shell/shellDeck';
 
 const DOF_NUMBER = { ux: 1, uy: 2, uz: 3 } as const;
+/** Shell nodes carry rotations (radians): CalculiX dofs 4-6. */
+const ROTATION_NUMBER = { rx: 4, ry: 5, rz: 6 } as const;
 
 const refusal = (code: string, message: string, ids: readonly string[] = []): DeckRefusal => ({ code, message, ids });
 
@@ -90,7 +93,9 @@ export function planeAxis(ctx: DeckContext, nodeIds: readonly number[]): number 
   }
   const size = Math.hypot(...meshHi.map((value, axis) => value - (meshLo[axis] ?? 0)));
   const tolerance = 1e-6 * size;
-  const flat = [0, 1, 2].filter((axis) => (hi[axis] ?? 0) - (lo[axis] ?? 0) <= tolerance);
+  // An axis the whole mesh is flat in (a planar shell / plane-stress mesh) says nothing about the symmetry plane.
+  const meshFlat = (axis: number): boolean => (meshHi[axis] ?? 0) - (meshLo[axis] ?? 0) <= tolerance;
+  const flat = [0, 1, 2].filter((axis) => (hi[axis] ?? 0) - (lo[axis] ?? 0) <= tolerance && !meshFlat(axis));
   if (flat.length === 1) return flat[0] ?? null;
   if (flat.length > 0) return null;
   const paired = [0, 1, 2].filter((axis) => levelCount(nodeIds, coordinates, axis, tolerance) <= 2);
@@ -114,17 +119,26 @@ function constraintLines(ctx: DeckContext, constraint: FeaConstraint): string[] 
   if (nodes.length === 0)
     return refusal('FEA_TARGET_UNRESOLVED', `constraint '${constraint.id}' (${constraint.name}) has no nodes in the mesh`, [constraint.id]);
   const set = ctx.nset(key);
-  if (constraint.kind === 'fixed' || constraint.kind === 'pinned') return [row(set, 1, 3)];
+  const kind = targetKind(ctx, constraint.target.entityId);
+  if (constraint.kind === 'fixed') return [kind === 'shell' ? row(set, 1, 6) : kind === 'plane_stress' ? row(set, 1, 2) : row(set, 1, 3)];
+  if (constraint.kind === 'pinned') return [kind === 'plane_stress' ? row(set, 1, 2) : row(set, 1, 3)];
   if (constraint.kind === 'symmetry') {
     const axis = planeAxis(ctx, nodes);
     if (axis === null)
       return refusal('FEA_CONSTRAINT_INVALID', `symmetry constraint '${constraint.id}' is not an axis-aligned plane in the mesh`, [
         constraint.id,
       ]);
-    return [row(set, axis + 1, axis + 1)];
+    // Shells: the normal translation and the rotations about the two in-plane axes of the symmetry plane.
+    const rotations = kind === 'shell' ? [0, 1, 2].filter((other) => other !== axis).map((other) => row(set, other + 4, other + 4)) : [];
+    return [row(set, axis + 1, axis + 1), ...rotations];
   }
   const lines: string[] = [];
   for (const [dof, value] of Object.entries(constraint.dofs ?? {})) {
+    if (kind === 'shell' && dof in ROTATION_NUMBER) {
+      const number = ROTATION_NUMBER[dof as keyof typeof ROTATION_NUMBER];
+      lines.push(value === 0 ? row(set, number, number) : row(set, number, number, value));
+      continue;
+    }
     if (!(dof in DOF_NUMBER))
       return refusal('FEA_CONSTRAINT_INVALID', `constraint '${constraint.id}': solid elements have no rotational dof '${dof}'`, [
         constraint.id,
@@ -162,6 +176,8 @@ export interface StepLoadOptions {
   readonly parameters: string;
   /** Write the constraint `*BOUNDARY` block (first step only). */
   readonly boundary: boolean;
+  /** Load cases summed into `loadCase` at equal targets (buckling: the preload + the reference load, since a modifying card REPLACES the value of an earlier step). */
+  readonly addLoadCases?: readonly string[];
 }
 
 /**
@@ -185,7 +201,8 @@ export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options
   const gravityDirection = [0, 0, 0];
   for (const id of ctx.analysis.loadOrder) {
     const load = ctx.analysis.loads[id];
-    if (load === undefined || (loadCase !== undefined && load.loadCase !== loadCase)) continue;
+    if (load === undefined || (loadCase !== undefined && load.loadCase !== loadCase && !options?.addLoadCases?.includes(load.loadCase)))
+      continue;
     const factor = options === undefined ? 1 : options.scale(load);
     const key = `L_${id}`;
     if (load.kind === 'gravity' && load.vector !== undefined) {
@@ -218,10 +235,21 @@ export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options
         });
     } else if (load.kind === 'pressure' && load.magnitude !== undefined) {
       const faces = ctx.faces(key);
+      const kind = targetKind(ctx, load.target?.entityId);
+      if (kind === 'plane_stress')
+        return refusal(
+          'FEA_LOAD_INVALID',
+          `pressure '${id}' (${load.name}) on a plane-stress part is not built: apply a force on the edge`,
+          [id],
+        );
       if (faces.length === 0) return refusal('FEA_TARGET_UNRESOLVED', `pressure '${id}' (${load.name}) has no faces in the mesh`, [id]);
       for (const [element, face] of faces) {
-        const mapKey = `${element}:${face}`;
-        pressures.set(mapKey, [element, face, (pressures.get(mapKey)?.[2] ?? 0) + load.magnitude * factor]);
+        // Shells: label P on the element; the mesher's face 1 = loaded from the top (+normal) side, 2 = from the bottom side.
+        const shellSign = face === 2 ? -1 : 1;
+        const label = kind === 'shell' ? 0 : face;
+        const mapKey = `${element}:${label}`;
+        const value = load.magnitude * factor * (kind === 'shell' ? shellSign : 1);
+        pressures.set(mapKey, [element, label, (pressures.get(mapKey)?.[2] ?? 0) + value]);
       }
     }
   }
@@ -229,7 +257,9 @@ export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options
   if (boundary.length > 0) lines.push('*BOUNDARY, OP=NEW', ...boundary);
   const parameters = options === undefined ? ', OP=NEW' : options.parameters;
   const cloads = [...forces.values()].filter((entry) => options !== undefined || entry[2] !== 0).sort(byNumbers);
-  const dloads = [...pressures.values()].sort(byNumbers).map(([element, face, value]) => row(element, `P${face}`, value));
+  const dloads = [...pressures.values()]
+    .sort(byNumbers)
+    .map(([element, face, value]) => row(element, face === 0 ? 'P' : `P${face}`, value));
   const magnitude = Math.hypot(gravity[0] ?? 0, gravity[1] ?? 0, gravity[2] ?? 0);
   const directionLength = Math.hypot(gravityDirection[0] ?? 0, gravityDirection[1] ?? 0, gravityDirection[2] ?? 0);
   if (magnitude > 0)

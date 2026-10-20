@@ -1,0 +1,47 @@
+$ llull analysis pull units N-mm-t-s inputHash H meshHash M
+$ llull: node and element ids are the mesh ids; results of this deck import through fea_import_results (op2)
+SOL 101
+CEND
+TITLE = pull
+SUBTITLE = llull inputHash X
+ECHO = NONE
+SPC = 1
+DISPLACEMENT(SORT1,REAL) = ALL
+STRESS(SORT1,REAL,VONMISES,CUBIC) = ALL
+SUBCASE 1
+  LABEL = LC1
+  LOAD = 100
+BEGIN BULK
+PARAM,POST,-1
+$ llull: property 1 = part 'box-2.1'
+$ llull: material 1 = 'steel' (constitutive set set (elastic_isotropic))
+$ llull: load case 1 = 'LC1' -> LOAD 100
+$ llull: load 'fl-10.1' force in load case LC1
+$ llull: load 'fl-11.1' moment in load case LC1
+$ llull: moment 'fl-11.1' on reference grid 9 (RBE3 7 over 4 nodes)
+GRID    1               0.      0.      0.
+GRID    2               2.      0.      0.
+GRID    3               0.      1.      0.
+GRID    4               2.      1.      0.
+GRID    5               0.      0.      1.
+GRID    6               2.      0.      1.
+GRID    7               0.      1.      1.
+GRID    8               2.      1.      1.
+GRID    9               300.    5.      5.
+RBE3    7               9       123456  1.      123     2       4
+        6       8
+CTETRA  1       1       1       2       4       8
+CTETRA  2       1       1       6       2       8
+CTETRA  3       1       1       4       3       8
+CTETRA  4       1       1       3       7       8
+CTETRA  5       1       1       5       6       8
+CTETRA  6       1       1       7       5       8
+PSOLID  1       1
+MAT1    1       210000.         .3      7.8E-9
+SPC1    1       123     1       3       5       7
+MOMENT  100     9               500.    0.      0.      1.
+FORCE   100     2               166.66670.      -1.     0.
+FORCE   100     4               83.333330.      -1.     0.
+FORCE   100     6               83.333330.      -1.     0.
+FORCE   100     8               166.66670.      -1.     0.
+ENDDATA
