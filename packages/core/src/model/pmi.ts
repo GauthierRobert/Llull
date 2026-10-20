@@ -80,7 +80,19 @@ export const DATUM_TARGET_KINDS = ['point', 'line', 'area'] as const;
 type DatumTargetKind = (typeof DATUM_TARGET_KINDS)[number];
 
 /** Surface type of a feature as the kernel reports it, or `mixed` for a set of faces of different types. */
-export type PmiSurface = 'plane' | 'cylinder' | 'cone' | 'sphere' | 'torus' | 'bspline' | 'revolution' | 'extrusion' | 'other' | 'mixed';
+export const PMI_SURFACES = [
+  'plane',
+  'cylinder',
+  'cone',
+  'sphere',
+  'torus',
+  'bspline',
+  'revolution',
+  'extrusion',
+  'other',
+  'mixed',
+] as const;
+export type PmiSurface = (typeof PMI_SURFACES)[number];
 
 export const SURFACE_PARAMETERS = ['Ra', 'Rz', 'Rq', 'Rsk', 'Rku', 'Rmax', 'Sa', 'Sz'] as const;
 

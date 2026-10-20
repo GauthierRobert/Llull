@@ -92,9 +92,18 @@ export function uniformSumCdf(halves: readonly number[], x: number): number {
   const widths = halves.filter((h) => h > 0).map((h) => 2 * h);
   const n = widths.length;
   if (n === 0) return x >= 0 ? 1 : 0;
-  const shifted = x + widths.reduce((sum, w) => sum + w / 2, 0);
+  const span = widths.reduce((sum, w) => sum + w, 0);
+  const shifted = x + span / 2;
   if (shifted <= 0) return 0;
-  if (shifted >= widths.reduce((sum, w) => sum + w, 0)) return 1;
+  if (shifted >= span) return 1;
+  // The terms alternate in sign: above the middle fold with the symmetry F(x) = 1 - F(-x), so only the small lower tail is summed.
+  if (shifted > span / 2) return 1 - subsetSum(widths, span - shifted);
+  return subsetSum(widths, shifted);
+}
+
+/** Inclusion-exclusion sum of the Irwin-Hall CDF at `shifted` (0 < shifted <= half the span). */
+function subsetSum(widths: readonly number[], shifted: number): number {
+  const n = widths.length;
   let total = 0;
   for (let mask = 0; mask < 2 ** n; mask++) {
     let arg = shifted;
@@ -142,7 +151,7 @@ export function exactProbabilities(
     const halves = items.map((c) => Math.abs(c.sensitivity) * halfOf(c));
     return {
       pBelow: lower === undefined ? 0 : uniformSumCdf(halves, lower - yMean),
-      pAbove: upper === undefined ? 0 : 1 - uniformSumCdf(halves, upper - yMean),
+      pAbove: upper === undefined ? 0 : uniformSumCdf(halves, yMean - upper),
       method: 'exact generalised Irwin-Hall CDF of the sum of independent uniforms',
     };
   }

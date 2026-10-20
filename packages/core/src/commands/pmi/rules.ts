@@ -49,6 +49,22 @@ function targetsFeatureOfSize(item: GeometricTolerancePmi, items: Items): boolea
 const isProfile = (item: GeometricTolerancePmi): boolean =>
   item.characteristic === 'profile_surface' || item.characteristic === 'profile_line';
 
+/** Identity of what a frame applies to: the same size dimension, or the same solid and face points (derived face indices ignored). */
+function targetKey(target: GeometricTolerancePmi['target']): string {
+  return 'pmiId' in target ? `pmi:${target.pmiId}` : `${target.feature.entityId}|${JSON.stringify(target.feature.facesNear)}`;
+}
+
+/** Whether `lower` lists some of `upper` datums, in the same order. */
+function isOrderedSubset(lower: GeometricTolerancePmi['datums'], upper: GeometricTolerancePmi['datums']): boolean {
+  let at = 0;
+  for (const datum of lower) {
+    const found = upper.findIndex((candidate, index) => index >= at && candidate.label === datum.label);
+    if (found < 0) return false;
+    at = found + 1;
+  }
+  return true;
+}
+
 /** Findings of one geometric tolerance against the other PMI `items` (datums are looked up there; `item` itself need not be in it). */
 export function toleranceFindings(item: GeometricTolerancePmi, items: Items): Finding[] {
   const out: Finding[] = [];
@@ -91,12 +107,13 @@ export function toleranceFindings(item: GeometricTolerancePmi, items: Items): Fi
       upper.compositeOf === undefined &&
       upper.characteristic === item.characteristic &&
       (item.characteristic === 'position' || isProfile(item)) &&
-      JSON.stringify(upper.target) === JSON.stringify(item.target) &&
-      item.zone.value <= upper.zone.value;
+      targetKey(upper.target) === targetKey(item.target) &&
+      item.zone.value < upper.zone.value &&
+      isOrderedSubset(item.datums, upper.datums);
     if (!valid)
       error(
         'GDT_COMPOSITE_INVALID',
-        `composite lower segment of '${item.compositeOf}' must share its characteristic (position or profile) and target, and have a zone <= the upper one`,
+        `composite lower segment of '${item.compositeOf}' must share its characteristic (position or profile) and target (same solid and facesNear, or the same size dimension), have a zone smaller than the upper one, and reference only datums of the upper frame in the same order`,
         ['compositeOf'],
       );
   }

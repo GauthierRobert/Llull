@@ -1,6 +1,7 @@
 /**
- * Complementary error function and the standard normal CDF in double precision (relative error below 1e-12 over the tested range, tails
- * included: 03 GDT TR-GDT-11). Series of positive terms below 2.5, Lentz continued fraction above (no cancellation on either side).
+ * Complementary error function and the standard normal CDF in double precision (03 GDT TR-GDT-11). x < 2.5: 1 - erf(x) from a series of
+ * positive terms (absolute error ~1e-16, relative error ~3e-13 at x = 2.5, the worst point of the branch); x >= 2.5: Lentz
+ * continued fraction (relative error ~1e-15). Checked against reference values up to x = 5 (relative error < 1e-12). Negative x: 2 - erfc(-x).
  */
 
 const SQRT_PI = Math.sqrt(Math.PI);

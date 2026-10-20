@@ -128,6 +128,22 @@ describe('pmi persistence', () => {
       ['must match its key', view('id'), 'other'],
       ['savedViewOrder must list', ['savedViewOrder'], []],
       ['activeSavedViewId', ['activeSavedViewId'], 'ghost'],
+      ['feature.surface must be one of', item('datum_feature', 'feature', 'surface'), 'blob'],
+      [
+        'internal, when present, a boolean',
+        item('size_dimension', 'feature', 'ofSize'),
+        { kind: 'cylinder', measured: 6, internal: 'yes' },
+      ],
+      ['datums must be at most 3', item('geometric_tolerance', 'datums'), [{ label: 'A', boundary: 'XXB' }]],
+      ['datum target needs a label', item('datum_target', 'label'), 'a1'],
+      ['datum target needs a label', item('datum_target', 'targetNumber'), 0],
+      ['datum target needs a label', item('datum_target', 'areaSize'), -1],
+      ['zone.diametral must be a boolean', item('geometric_tolerance', 'zone'), { value: 1, diametral: 'yes' }],
+      ['zone.spherical must be a boolean', item('geometric_tolerance', 'zone'), { value: 1, spherical: 1 }],
+      ['placement needs', item('datum_feature', 'placement', 'leaderTo'), [1, 2]],
+      ['review.reason must be a string', item('datum_feature', 'review', 'reason'), 3],
+      ['review.acceptedBy must be a string', item('datum_feature', 'review', 'acceptedBy'), 3],
+      ["compositeOf 'ghost' is not a PMI item", item('geometric_tolerance', 'compositeOf'), 'ghost'],
     ];
     for (const [expected, path, value] of cases) {
       const raw = JSON.parse(serializeDocument(doc)) as { document: { pmi: Json } };

@@ -89,6 +89,8 @@ function resolveContributor(doc: CadDocument, given: Given): Contributor | strin
   }
   const item = doc.pmi !== undefined && Object.hasOwn(doc.pmi.items, pmiId) ? doc.pmi.items[pmiId] : undefined;
   if (item === undefined) return `contributor '${given.name}': no PMI item '${pmiId}' (list_pmi shows the ids)`;
+  if (item.kind === 'location_dimension' && item.measure === 'angle')
+    return `contributor '${given.name}': '${pmiId}' is an angle; a length chain cannot take it`;
   const basis = toleranceBasis(item);
   if (typeof basis === 'string') return `contributor '${given.name}': ${basis}`;
   return { ...rest, ...basis, verified: verified ?? true };
