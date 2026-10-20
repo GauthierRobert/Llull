@@ -31,8 +31,8 @@ import { mapSegment } from '../../geometry/curveSegments';
 /**
  * @affects creates 1 extrusion entity; sources (id/ids) are kept
  * @invariant depth > 0; exactly one of profile (>= 3 finite [x,y] points), id, ids
- * @invariant sketch sources store their exact `curves` and sit at the (first) source position unless `position` is given; the source
- *   rotation is not inherited
+ * @invariant sketch sources store their exact `curves` and sit at the (first) source position unless `position` is given; without
+ *   rotation / axis / plane they inherit the source rotation (the extrusion runs along the sketch's work-plane normal)
  * @failure no/ambiguous source, profile < 3 points or non-finite, open/unsupported sketch, pieces that do not close, depth <= 0,
  *   zero-length axis -> no-op, affected:[]
  * @failure malformed rotation -> entity still created with rotation [0,0,0]
@@ -47,7 +47,8 @@ export const extrudeProfile = defineCommand({
     'open spline) that join end to end into one closed loop, in any order and direction. A drawn sketch ' +
     'keeps its curved boundaries exact (true arcs and Bézier splines for the exact kernel and STEP export; ' +
     'the polygon is only the display tessellation), is placed at the (first) source entity position ' +
-    '(override with `position`), does not inherit the source rotation, and stays in the document. ' +
+    '(override with `position`), inherits the source rotation (it extrudes along its work-plane normal) unless rotation, axis or plane ' +
+    'is given (the profile keeps the source in-plane [x, y]; an explicit rotation / axis re-orients that plane), and stays in the document. ' +
     'The solid spans from the position along +Z for depth units (depth must be > 0). ' +
     'Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = the extrusion direction ' +
     '(the profile plane normal; local +Z maps to it). axis wins when both are given; the derived Euler angles are stored. ' +
@@ -80,8 +81,8 @@ export const extrudeProfile = defineCommand({
     plane: z
       .string()
       .describe(
-        'Sketch plane id (create_sketch_plane): extrude along the plane normal, the profile in the plane axes (use it for a sketch placed with ' +
-          'place_on_sketch_plane; without it the source rotation is not inherited). Excludes rotation and axis.',
+        'Sketch plane id (create_sketch_plane): extrude along the plane normal, the profile in the plane axes. Without it a drawn source ' +
+          'already extrudes along its own work plane (its rotation). Excludes rotation and axis.',
       )
       .optional(),
     color: colorField(EXTRUSION_COLOR),
@@ -133,7 +134,7 @@ export const extrudeProfile = defineCommand({
       profile: loop.profile,
       depth,
       position: position ?? loop.origin,
-      rotation,
+      rotation: rotation ?? (axis === undefined ? loop.rotation : undefined),
       axis,
       color,
       curves: loop.curves,

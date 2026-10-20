@@ -101,6 +101,21 @@ describe('feature plans', () => {
     expect(plan?.commit.params).toMatchObject({ depth: 6, axis: [0, 0, 1] });
   });
 
+  it('drags a rotated sketch along its own work-plane normal, as a plain extrude_profile of it would', () => {
+    const rect = execute(createEmptyDocument(), 'draw_rectangle', { width: 10, height: 4 });
+    const id = rect.affected[0] as string;
+    const sketch = rect.document.entities[id]!;
+    const doc: CadDocument = {
+      ...rect.document,
+      entities: { ...rect.document.entities, [id]: { ...sketch, rotation: [Math.PI / 2, 0, 0] } },
+    };
+    const normal = handleFrame(doc, 'extrude', id)?.axis ?? [0, 0, 0];
+    expect(normal.map((v) => Number(v.toFixed(9)) + 0)).toEqual([0, -1, 0]);
+    const plan = planForSession(doc, { kind: 'extrude', targetId: id, value: -2, modeChoice: 'auto' });
+    const axis = (plan?.commit.params as { axis: number[] }).axis;
+    expect(axis.map((v) => Number(v.toFixed(9)) + 0)).toEqual([0, 1, 0]);
+  });
+
   it('joins outward and cuts inward as ONE build_project (extrude then boolean)', () => {
     const { doc, rectId, boxId } = docWithProfileAndBody();
     const join = planForSession(doc, { kind: 'extrude', targetId: rectId, value: 3, modeChoice: 'auto' });
