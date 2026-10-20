@@ -33,13 +33,14 @@ export function laminateValidation(
   return { plyCount: plies.length, thickness: plies.reduce((sum, ply) => sum + ply.thickness, 0), ...(mass === undefined ? {} : { mass }) };
 }
 
-type Band = 'green' | 'yellow' | 'red' | 'not_checkable';
+export type Band = 'green' | 'yellow' | 'red' | 'not_checkable';
 
 export interface ValidationFinding {
-  readonly property: 'number of plies' | 'ply area' | 'ply table area' | 'laminate thickness' | 'laminate mass';
+  /** The property name (the practice's own for the CAx-IF ones, prefixed `structure:` for the structure checks). */
+  readonly property: string;
   readonly subject: string;
-  readonly embedded: number | null;
-  readonly recomputed: number;
+  readonly embedded: number | string | null;
+  readonly recomputed: number | string;
   readonly relativeDifference: number | null;
   readonly band: Band;
 }
@@ -54,13 +55,17 @@ const GREEN = 1e-6;
 const YELLOW = 1e-3;
 const RANK: Readonly<Record<Band, number>> = { green: 0, not_checkable: 1, yellow: 2, red: 3 };
 
-function compare(
+export function compare(
   property: ValidationFinding['property'],
   subject: string,
-  embedded: number | undefined,
-  recomputed: number,
+  embedded: number | string | undefined,
+  recomputed: number | string,
 ): ValidationFinding {
   if (embedded === undefined) return { property, subject, embedded: null, recomputed, relativeDifference: null, band: 'not_checkable' };
+  if (typeof embedded === 'string' || typeof recomputed === 'string') {
+    const same = embedded === recomputed;
+    return { property, subject, embedded, recomputed, relativeDifference: same ? 0 : null, band: same ? 'green' : 'red' };
+  }
   const relative = Math.abs(embedded - recomputed) / Math.max(Math.abs(recomputed), 1e-300);
   const exact = embedded === recomputed;
   const band: Band = exact || relative <= GREEN ? 'green' : relative <= YELLOW ? 'yellow' : 'red';
@@ -92,10 +97,13 @@ export function checkValidation(
       compare('ply table area', ply.name, ply.area, areas[index] as number),
     ]),
   ];
-  const band = findings.reduce<Band>((worst, finding) => (RANK[finding.band] > RANK[worst] ? finding.band : worst), 'green');
+  const band = worstBand(findings);
   return {
     band,
     findings,
     policy: `relative difference <= ${GREEN} green, <= ${YELLOW} yellow, else red; absent property not checkable (${record.units}, ${MM_PER_UNIT[record.units]} mm per unit)`,
   };
 }
+
+export const worstBand = (findings: readonly ValidationFinding[]): Band =>
+  findings.reduce<Band>((worst, finding) => (RANK[finding.band] > RANK[worst] ? finding.band : worst), 'green');

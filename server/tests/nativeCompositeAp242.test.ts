@@ -5,11 +5,15 @@
  * linked by name. Skipped without the llull-kernel binary.
  */
 
+import { existsSync } from 'node:fs';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
 import type { CompositePart, CompositesModel, Ply } from '@core/model/composites';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import { parseRecords } from '@lib/step21/records';
 import { summarizeStep21 } from '@lib/step21/summary';
+import { checkRecords, loadSchema } from '../../tests/helpers/expressSchema';
+import { withoutCompositeUsages } from '@aero/composites/ap242/standardReader';
 import { apply, data, ok } from '../../tests/helpers/commandAssertions';
 import { WOVEN } from '../../tests/unit/aero/composites/drapeFixtures';
 import { AS4, ROSETTE, withMaterials } from '../../tests/unit/aero/composites/fixtures';
@@ -112,6 +116,12 @@ describeNative('composite AP242 round trip on the native kernel', () => {
 
   const volumeOf = (doc: CadDocument, id: string): number => data<{ volume: number }>(doc, 'mass_properties', { entityId: id }).volume;
   const rel = (actual: number, expected: number): number => Math.abs(actual / expected - 1);
+  const productsOf = (text: string): string[] => {
+    const tree = kernel.importExchange?.('step', text, { precision: 0.01, maxTolerance: 1, heal: true, sew: true }) as unknown as {
+      products?: { name: string }[];
+    };
+    return (tree.products ?? []).map((product) => product.name);
+  };
 
   it('round-trips a flat panel: exact ply solids, ply table, validation properties green', () => {
     const doc = panel();
@@ -125,10 +135,16 @@ describeNative('composite AP242 round trip on the native kernel', () => {
     expect(census.products).toEqual(expect.arrayContaining(['Panel tool', 'P1 piece 1', 'P2 piece 1', 'P3 piece 1']));
     expect(exported.step).toContain("'composite validation property'");
 
+    // OpenCascade's STEP reader loses the ply solids that hang under the shapeless ply products; the import reads the solids without those usages
+    expect(productsOf(exported.step)).toEqual(['Panel tool']);
+    expect(productsOf(withoutCompositeUsages(exported.step))).toEqual(
+      expect.arrayContaining(['Panel tool', 'P1 piece 1', 'P2 piece 1', 'P3 piece 1']),
+    );
     const imported = ok(createEmptyDocument(), 'import_composite_ap242', { text: exported.step });
     const result = imported.data as ImportData;
     expect(result.validation.band).toBe('green');
-    expect(result.validation.findings.filter((finding) => finding.band === 'green')).toHaveLength(9);
+    expect(result.validation.findings.filter((finding) => finding.band === 'green')).toHaveLength(result.validation.findings.length);
+    expect(result.validation.findings.length).toBeGreaterThan(40);
     expect(result.solids.unlinked).toBe(0);
     expect(result.tool.imported).toBe(true);
     expect(result.reviewRequired.value).toBe(true);
@@ -187,4 +203,20 @@ describeNative('composite AP242 round trip on the native kernel', () => {
     console.warn(`dome ply areas ${areas.join(', ')} recomputed ${recomputed.join(', ')}; faceted ${exported.solids.faceted.length}`);
     expect(Math.max(...areas.map((area, k) => rel(area, recomputed[k] as number)))).toBeLessThan(1e-9);
   });
+
+  // LLULL_AP242_MIM = path of the ISO/TS 10303-442 MIM long form (mim_lf.exp, public); without it the check is skipped
+  const mim = process.env['LLULL_AP242_MIM'];
+  it.skipIf(mim === undefined || !existsSync(mim))(
+    'every record of the file (OpenCascade base and composite records) conforms to the AP242 ed4 MIM',
+    () => {
+      const exported = data<ExportData>(panel(), 'export_composite_ap242', { part: 'Panel' });
+      const { bodies } = parseRecords(exported.step);
+      const { checked, violations } = checkRecords(loadSchema(mim as string), bodies, bodies.keys());
+      console.warn(
+        `MIM check: ${checked} records (${(exported as unknown as { records: number }).records} composite), ${exported.step.length} bytes, ${violations.length} violations ${JSON.stringify(violations.slice(0, 5))}`,
+      );
+      expect(checked).toBeGreaterThan(1000);
+      expect(violations.slice(0, 10)).toEqual([]);
+    },
+  );
 });

@@ -14,8 +14,9 @@ import { syncOutlines } from '../derive';
 import { insertPly } from '../plyCommands';
 import { compositesOf, findPart, withComposites } from '../state';
 import { readComposite } from './reader';
+import { withoutCompositeUsages } from './standardReader';
 import { rebuildPart } from './rebuild';
-import { checkValidation } from './validation';
+import { checkComposite } from './standardCheck';
 
 const MAX_STEP_CHARS = 64 * 1024 * 1024;
 const NAME = 'import_composite_ap242';
@@ -40,9 +41,11 @@ export const importCompositeAp242 = defineCommand({
     'stacking order with name, sequence, material, orientation (part frame, degrees), rosette and boundary polygons, the rosettes, and the lamina materials the document ' +
     'does not have yet (created with basis "unknown", so every result computed from them is unverified). With importSolids (default) the exact solids of the file (the tool ' +
     'solid and the ply solids) are imported first through import_step_exact and the part is attached to the imported tool solid. The validation properties embedded in the ' +
-    'file (number of plies, area of each ply, summed thickness, mass) are recomputed from the rebuilt plies and compared: data.validation lists property, subject, embedded, ' +
+    'file (the CAx-IF composite validation properties: counts, total ply surface area, orientation values, sequence order, curve lengths, areas per material and rosette; and ' +
+    'llull own area of each ply, summed thickness, mass) are recomputed from the rebuilt plies and compared, and the CAx-IF structure of the file (laminate table, sequences, ' +
+    'plies, materials, orientation angles, ply pieces) is read back and compared with the plies (properties named "structure: ..."): data.validation lists property, subject, embedded, ' +
     'recomputed, relative difference and band green / yellow / red / not_checkable. Nothing imported is verified: data.reviewRequired is true. Files without llull composite ' +
-    'records (from other systems) are refused with CMP_AP242_NO_COMPOSITE. Give the file as `text` or `stepBase64`. Needs the OCC kernel when importSolids is true.',
+    'records (from other systems, or the CAx-IF structure alone) are refused with CMP_AP242_NO_COMPOSITE. Give the file as `text` or `stepBase64`. Needs the OCC kernel when importSolids is true.',
   params: z.object({
     text: z.string().describe('ISO 10303-21 text of the file (or give stepBase64).').optional(),
     stepBase64: z.string().describe('The file as base64 (or give text).').optional(),
@@ -72,7 +75,7 @@ export const importCompositeAp242 = defineCommand({
     let solidIds: string[] = [];
     let solidsReport: unknown;
     if (params.importSolids !== false) {
-      const imported = execute(doc, 'import_step_exact', { text }, ctx);
+      const imported = execute(doc, 'import_step_exact', { text: withoutCompositeUsages(text) }, ctx);
       if (imported.error !== undefined || imported.affected.length === 0)
         return fail('CMP_AP242_SOLIDS_FAILED', `import_step_exact answered: ${imported.summary}`);
       base = imported.document;
@@ -143,7 +146,7 @@ export const importCompositeAp242 = defineCommand({
     const next = syncOutlines(withComposites(base, working));
 
     const rebuilt = rebuildPart(record);
-    const validation = checkValidation(record, rebuilt.part, rebuilt.plies, embedded);
+    const validation = checkComposite(record, rebuilt.part, rebuilt.plies, embedded, read.standard);
     const reasons = ['composite_import_unverified', ...(validation.band === 'green' ? [] : [`validation_${validation.band}`])];
     const linked = record.plies.map((entry) => ({
       ply: plies.find((ply) => ply.name === entry.name)?.id ?? '',
