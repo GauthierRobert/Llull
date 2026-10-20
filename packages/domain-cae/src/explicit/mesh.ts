@@ -15,7 +15,11 @@ export interface ExplicitMesh {
   readonly hex8: readonly number[];
   /** 4 node indices per tet4 element. */
   readonly tet4: readonly number[];
-  /** Part (entity id) per element: hex8 elements first, then tet4. */
+  /** 4 node indices per Belytschko–Tsay shell. */
+  readonly shell4: readonly number[];
+  /** Thickness per shell, case length unit. */
+  readonly shellThickness: readonly number[];
+  /** Part (entity id) per element: hex8 elements first, then tet4, then shells. */
   readonly elementPart: readonly string[];
   /** Part per node (the first element that uses it). */
   readonly nodePart: readonly string[];
@@ -39,7 +43,8 @@ const CORNERS: readonly (readonly [number, number, number])[] = [
 ];
 
 /**
- * Structured hex8 grid over every part (each part meshed on its own: no shared nodes between parts).
+ * Structured hex8 grid over every part (each part meshed on its own: no shared nodes between parts); the parts in `shells` become a grid of
+ * shells on their mid-surface across the two largest dimensions (thickness = the smallest one, normal along it).
  * @failure a part that is not an unrotated box, or a grid above MAX_STRUCTURED_NODES -> EXP_MESH_UNSUPPORTED
  */
 export function structuredHexMesh(
@@ -47,9 +52,13 @@ export function structuredHexMesh(
   analysisCase: AnalysisCase,
   size: number,
   lengthToAnalysis: number,
+  shells: Readonly<Record<string, unknown>> = {},
 ): ExplicitMesh | MeshRefusal {
   const nodes: number[] = [];
   const hex8: number[] = [];
+  const shell4: number[] = [];
+  const shellThickness: number[] = [];
+  const shellPart: string[] = [];
   const elementPart: string[] = [];
   const nodePart: string[] = [];
   for (const entityId of Object.keys(analysisCase.parts).sort()) {
@@ -60,6 +69,30 @@ export function structuredHexMesh(
         message: `structured_hex meshes unrotated boxes only; '${entityId}' is ${entity === undefined ? 'missing' : entity.kind === 'box' ? 'rotated' : entity.kind}`,
         ids: [entityId],
       };
+    const min = entity.position.map((centre, axis) => centre - (entity.size[axis] ?? 0) / 2);
+    if (Object.hasOwn(shells, entityId)) {
+      const thin = [0, 1, 2].reduce((best, axis) => ((entity.size[axis] ?? 0) < (entity.size[best] ?? 0) ? axis : best), 0);
+      const [u, v] = thin === 2 ? [0, 1] : thin === 0 ? [1, 2] : [2, 0];
+      const [nu, nv] = [u, v].map((axis) => Math.max(1, Math.round((entity.size[axis] ?? 0) / size)));
+      const base = nodes.length / 3;
+      for (let j = 0; j <= (nv ?? 1); j++)
+        for (let i = 0; i <= (nu ?? 1); i++) {
+          const point = [0, 0, 0];
+          point[u] = (min[u] ?? 0) + (i * (entity.size[u] ?? 0)) / (nu ?? 1);
+          point[v] = (min[v] ?? 0) + (j * (entity.size[v] ?? 0)) / (nv ?? 1);
+          point[thin] = (min[thin] ?? 0) + (entity.size[thin] ?? 0) / 2;
+          nodes.push(...point.map((value) => value * lengthToAnalysis));
+          nodePart.push(entityId);
+        }
+      const at = (i: number, j: number): number => base + i + ((nu ?? 1) + 1) * j;
+      for (let j = 0; j < (nv ?? 1); j++)
+        for (let i = 0; i < (nu ?? 1); i++) {
+          shell4.push(at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1));
+          shellThickness.push((entity.size[thin] ?? 0) * lengthToAnalysis);
+          shellPart.push(entityId);
+        }
+      continue;
+    }
     const counts = entity.size.map((extent) => Math.max(1, Math.round(extent / size)));
     const [nx = 1, ny = 1, nz = 1] = counts;
     if (nodes.length / 3 + (nx + 1) * (ny + 1) * (nz + 1) > MAX_STRUCTURED_NODES)
@@ -69,7 +102,6 @@ export function structuredHexMesh(
         ids: [entityId],
       };
     const base = nodes.length / 3;
-    const min = entity.position.map((centre, axis) => centre - (entity.size[axis] ?? 0) / 2);
     const node = (i: number, j: number, k: number): number => base + i + (nx + 1) * (j + (ny + 1) * k);
     for (let k = 0; k <= nz; k++)
       for (let j = 0; j <= ny; j++)
@@ -88,7 +120,7 @@ export function structuredHexMesh(
           elementPart.push(entityId);
         }
   }
-  return { nodes, hex8, tet4: [], elementPart, nodePart };
+  return { nodes, hex8, tet4: [], shell4, shellThickness, elementPart: [...elementPart, ...shellPart], nodePart };
 }
 
 /**
@@ -121,5 +153,5 @@ export function feaTetMesh(mesh: FeMeshArtifact): ExplicitMesh | MeshRefusal {
       }
       elementPart.push(block.entityId);
     }
-  return { nodes, hex8: [], tet4, elementPart, nodePart };
+  return { nodes, hex8: [], tet4, shell4: [], shellThickness: [], elementPart, nodePart };
 }

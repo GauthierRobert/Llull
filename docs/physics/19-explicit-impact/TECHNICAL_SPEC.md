@@ -559,7 +559,8 @@ Test material constants are synthetic (validation pack inputs, Q7): no Johnson�
   - Johnson–Cook failure and erosion: **built 2026-10-19** on the CPU path (`set_johnson_cook_failure`, §13.1). Moving D1–D5 into a
     PHY-02 failure law kind is open.
   - Temperature (adiabatic heating) for T*.
-- **RS-8c:** penalty contact on `llull-bvh`, self contact and Coulomb friction: **built 2026-10-20** (§13.7). Shells: §13.8.
+- **RS-8c:** penalty contact on `llull-bvh`, self contact and Coulomb friction, Belytschko–Tsay shells with Johnson–Cook: **built
+  2026-10-20** (§13.7, §13.8).
 - **Hand-off MVP (M2–M4):** deck writers, readers, OpenCourant run, import (unchanged plan).
 
 ### 13.6 As built: RS-8b GPU kernels (2026-10-20)
@@ -645,3 +646,38 @@ deceleration μg, stop at v₀²/(2μg), t = v₀/(μg) (abaqus-docs.mit.edu 201
 commands: 50 mm aluminium-like box 1.2 m above a rigid floor, gravity, `structured_hex` 12.5 mm, `llull_explicit`.
 `explicitRunNative.test.ts` runs it through `explicit_run`: first floor contact within 0.5 % of √(2h/g) = 0.4947 s; kinetic energy
 and gravity work before contact equal ½m(gt)² within 0.5 %.
+
+### 13.8 As built: RS-8c Belytschko–Tsay shells (2026-10-20)
+
+Source: [E2] Ch. 9 (pp. 9-1 to 9-11), §13.4, §22.3 and §25.3, read from rendered pages; [E3] *SECTION_SHELL, *CONTROL_SHELL and
+*HOURGLASS for defaults. Code: `solver/crates/llull-explicit/src/shell.rs` (element) and `shells.rs` (time-loop driver). CPU path only;
+a GPU request falls back with `EXP_GPU_FALLBACK`.
+
+| Item | As built | Source |
+| ---- | -------- | ------ |
+| Frame | corotational `ê3 = (r31 × r42)/\|…\|`, `ê1 = (r21 − (r21·ê3)ê3)/\|…\|`, `ê2 = ê3 × ê1`, at the mid-step geometry; stresses live in it, so no Jaumann rotation | Eqs. 9.1–9.6 |
+| Rates | one point at the centre: `d̂x = B1 v̂x + ẑ B1 θ̂y`, `d̂y = B2 v̂y − ẑ B2 θ̂x`, `2d̂xy = B2 v̂x + B1 v̂y + ẑ(B2 θ̂y − B1 θ̂x)`, `2d̂xz = B1 v̂z + ¼Σθ̂y`, `2d̂yz = B2 v̂z − ¼Σθ̂x` | Eqs. 9.22a–g |
+| `B1`, `B2` | `∂N/∂x̂`, `∂N/∂ŷ` at ξ = η = 0 from the centre Jacobian. A unit test proves it equals the closed form `(1/2A)[ŷ24, ŷ31, ŷ42, ŷ13]` that the research reconstructed | Eqs. 9.18–9.22; the closed form is not printed in [E2] |
+| Thickness | Gauss–Legendre, `points` 1–5 (default 2, NIP) | [E3] *SECTION_SHELL |
+| Resultants, forces | `f^R = Σwσ̂`, `m^R = −Σwẑσ̂`; nodal forces / moments Eqs. 9.25–9.30 with κ = 5/6 | Eqs. 9.23–9.30; κ = 5/6 is the SHRF value [E3] suggests for isotropic materials (its default is 1) |
+| Hourglass | Belytschko–Tsay: `τ_I = h_I − (h·x̂_a)B_aI`, rates Eqs. 9.33–9.35, `Q̇` Eqs. 9.36–9.38 with r = 0.1 (QM default, QB = QW = QM), `Q^{n+1} = Q^n + ΔtQ̇` (Eq. 9.39, implemented as printed), forces Eqs. 9.40–9.42 | [E2] §9.4. The manual calls these "viscosity stresses" but Eq. 9.39 integrates them like a stiffness (flagged) |
+| Plane stress | `Δε̂zz` from the elastic estimate (Eq. 22.3.18); when the point yields, secant iterations on it around the J2 / Johnson–Cook return (Eqs. 22.3.20–22.3.22, tolerance 1e-4, ≤ 10) | [E2] §22.3; *CONTROL_SHELL MITER |
+| Time step | `L_s/c`, `L_s = A/max(L1..L4)`, `c = √(E/(ρ(1 − ν²)))` | Eqs. 25.13–25.15 |
+| Mass, inertia | `ρAt/4` per node; rotary inertia `αM`, `α = max(t²/12, A/8)`; angular velocities by central difference on the lumped scalar inertia; rotational kinetic energy in the balance | Eqs. 13.51–13.57 (mid-surface specialisation) |
+
+Not built: warping correction (BWC), Lobatto points, shells in contacts, shell failure / erosion, shell thickness change.
+
+**Set-up.** `set_explicit_shell {analysisId, entityId, shell, points?}` marks an unrotated box part whose smallest dimension is at
+most 1/4 of the others. It is meshed on its mid-surface across the two largest dimensions under `structured_hex`; `fea_mesh` with shells
+is `EXP_MESH_UNSUPPORTED`. The job contract adds `shell4`, `shellThickness`, `shellPoints` and `fixedRotation`;
+`result.json` `elements` adds `shell4`.
+
+**Verification:**
+
+| Case | Closed form | Measured | Asserted |
+| ---- | ----------- | -------- | -------- |
+| Cantilever strip 100 × 10 × 1 mm, ν = 0, 20 × 2 shells, root fixed, gravity applied suddenly | Euler–Bernoulli f₁ = (1.8751²/2π)√(EI/(ρAL⁴)) = 81.54 Hz (standard beam theory, not read from a source this session) | 82.03 Hz (+0.6 %) from twice the first kinetic-energy minimum; energy error 6.9e-6 | 3 % |
+| Membrane stretch (unit test) | σxx = E/(1−ν²)·ε, σyy = νσxx, σzz = 0 | exact to 1e-6 | 1e-6 |
+| Spinning strip (1 mrad) | stress free | < 0.5 MPa (E θ²/2 = 0.1) | 0.5 MPa |
+| Johnson–Cook membrane, plane stress | von Mises = flow stress, σzz = 0 | within 1e-3 | 1e-3 |
+| Shell plate falling flat on the floor (`exp_shell_plate_llull` plan through `explicit_run`) | wall impulse = m·v | 0.03925 N·s = m·v | 2 % |

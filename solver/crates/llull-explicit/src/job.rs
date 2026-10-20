@@ -22,6 +22,9 @@
 //! - Units are consistent and never converted (N-mm-t-s: mm, s, t, MPa, mJ; N-m-kg-s: SI).
 //! - Binary arrays are little-endian: `nodes` 3 × f64 per node, `hex8` 8 × u32 per element, `tet4` 4 × u32 per element (either may be
 //!   absent, not both), `elementMaterial` one u32 per element (hex8 first, then tet4), `initialVelocity` 3 × f64 per node.
+//! - Optional shells (RS-8c): `shell4` (4 × u32 per Belytschko–Tsay shell, after hex8 and tet4 in `elementMaterial` order),
+//!   `shellThickness` (f64 per shell), `shellPoints` (Gauss points through the thickness, 1..5, default 2), `fixedRotation` (u8 per
+//!   rotational DOF).
 //! - Optional (RS-8c): `elementPart` (u32 per element, parts 0..), `fixed` (u8 per DOF, non-zero = velocity held at 0) and `contacts`:
 //!   `[{ "name", "kind": "surface_to_surface" | "nodes_to_surface" | "self", "a": [parts] (the slaves of
 //!   nodes_to_surface), "b": [parts], "staticFriction", "dynamicFriction", "decay",
@@ -206,6 +209,10 @@ struct JobSpec {
     device: DeviceName,
     element_part: Option<String>,
     fixed: Option<String>,
+    shell4: Option<String>,
+    shell_thickness: Option<String>,
+    shell_points: Option<usize>,
+    fixed_rotation: Option<String>,
     #[serde(default)]
     contacts: Vec<ContactSpec>,
 }
@@ -358,6 +365,19 @@ pub fn load(folder: &Path) -> Result<(Model, bool), JobError> {
             Some(name) => read_bytes(folder, name)?.into_iter().map(|byte| byte != 0).collect(),
             None => Vec::new(),
         },
+        shell4: match &spec.shell4 {
+            Some(name) => read_u32(folder, name)?,
+            None => Vec::new(),
+        },
+        shell_thickness: match &spec.shell_thickness {
+            Some(name) => read_f64(folder, name)?,
+            None => Vec::new(),
+        },
+        shell_points: spec.shell_points.unwrap_or(2),
+        fixed_rotation: match &spec.fixed_rotation {
+            Some(name) => read_bytes(folder, name)?.into_iter().map(|byte| byte != 0).collect(),
+            None => Vec::new(),
+        },
     };
     validate(&model)?;
     Ok((model, spec.device != DeviceName::Cpu))
@@ -372,7 +392,15 @@ pub fn validate(model: &Model) -> Result<(), JobError> {
     if !model.hex8.len().is_multiple_of(8) || !model.tet4.len().is_multiple_of(4) || model.element_count() == 0 {
         return Err(input("hex8 needs 8 and tet4 4 indices per element, and there must be at least one element"));
     }
-    if model.hex8.iter().chain(model.tet4.iter()).any(|&node| node as usize >= nodes) {
+    if !model.shell4.len().is_multiple_of(4)
+        || model.shell_thickness.len() != model.shell_count()
+        || model.shell_thickness.iter().any(|&t| !(t > 0.0 && t.is_finite()))
+        || !(1..=5).contains(&model.shell_points)
+        || (!model.fixed_rotation.is_empty() && model.fixed_rotation.len() != 3 * nodes)
+    {
+        return Err(input("shell4 needs 4 indices and one thickness > 0 per shell, shellPoints 1..5, fixedRotation one byte per DOF"));
+    }
+    if model.hex8.iter().chain(model.tet4.iter()).chain(model.shell4.iter()).any(|&node| node as usize >= nodes) {
         return Err(input("an element references a node that does not exist"));
     }
     if model.element_material.len() != model.element_count()
@@ -396,6 +424,7 @@ pub fn validate(model: &Model) -> Result<(), JobError> {
 struct ElementCounts {
     hex8: usize,
     tet4: usize,
+    shell4: usize,
 }
 
 #[derive(Serialize)]
@@ -438,7 +467,7 @@ pub fn outputs(model: &Model, outcome: &Outcome, adapter: Option<&str>) -> Resul
         min_time_step: outcome.min_time_step,
         initial_mass: outcome.initial_mass,
         added_mass: outcome.added_mass,
-        elements: ElementCounts { hex8: model.hex_count(), tet4: model.tet_count() },
+        elements: ElementCounts { hex8: model.hex_count(), tet4: model.tet_count(), shell4: model.shell_count() },
         device: if adapter.is_some() { "gpu" } else { "cpu" },
         adapter,
         deterministic: true,

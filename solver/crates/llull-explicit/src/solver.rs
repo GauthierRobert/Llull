@@ -21,6 +21,7 @@ use crate::contact::Contacts;
 use crate::hex8;
 use crate::material::{split, update, von_mises, PointState, Sym};
 use crate::model::{Material, Model};
+use crate::shells::Shells;
 use crate::stability::omega_squared;
 use crate::tet4;
 use rayon::prelude::*;
@@ -285,8 +286,12 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
     let controls = &model.controls;
     let settings = Settings { hourglass: controls.hourglass_coefficient, linear: controls.bulk_linear, quadratic: controls.bulk_quadratic };
     let mut x = model.coordinates.clone();
-    let (elements, initial_mass, added_mass) = elements_of(model, &x)?;
-    let masses = nodal_masses(model, &elements);
+    let (elements, mut initial_mass, added_mass) = elements_of(model, &x)?;
+    let mut masses = nodal_masses(model, &elements);
+    let mut shells = Shells::new(model, &x, &mut masses).map(|(set, mass)| {
+        initial_mass += mass;
+        set
+    });
     if masses.iter().any(|&mass| !(mass > 0.0)) {
         return Err("a node belongs to no element (zero mass)".to_string());
     }
@@ -314,6 +319,9 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
     for element in &elements {
         let (b, volume) = kinematics(&element.nodes, &x);
         element_dt = element_dt.min(eigen_step(&b, volume, &element.node_masses, &model.materials[element.material]));
+    }
+    if let Some(set) = &shells {
+        element_dt = element_dt.min(set.initial_step(model, &x));
     }
     let mut dt_prev = 0.0;
     let mut time = 0.0;
@@ -371,12 +379,20 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
                 v_new[k] = 0.0;
             }
         }
+        let omega_previous = shells.as_ref().map(|set| set.omega.clone());
+        if let Some(set) = shells.as_mut() {
+            set.kick(dt_prev, dt, &model.fixed_rotation);
+        }
         if let Some(forces) = &contact_force {
             // Work of the contact forces at step n over the central-difference step, f·½(Δx^{n−½} + Δx^{n+½}).
             contact_energy -= (0..3 * nodes).map(|k| forces[k] * 0.5 * (dt_prev * v_half[k] + dt * v_new[k])).sum::<f64>();
         }
         if cycles > 0 && time >= next_sample * (1.0 - 1e-12) {
-            let kinetic: f64 = (0..3 * nodes).map(|k| 0.5 * masses[k / 3] * (0.5 * (v_half[k] + v_new[k])).powi(2)).sum();
+            let rotation = match (&shells, &omega_previous) {
+                (Some(set), Some(previous)) => set.kinetic(previous),
+                _ => 0.0,
+            };
+            let kinetic: f64 = rotation + (0..3 * nodes).map(|k| 0.5 * masses[k / 3] * (0.5 * (v_half[k] + v_new[k])).powi(2)).sum::<f64>();
             energy.push(EnergyRow { time, kinetic, internal, hourglass, wall: wall_energy, contact: contact_energy, external_work });
             sample_walls(&mut walls, &mut wall_impulse, time, last_sample);
             last_sample = time;
@@ -404,6 +420,15 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
             element_dt = element_dt.min(step.dt);
             states[index] = step.state;
         }
+        if let Some(set) = shells.as_mut() {
+            let cycle = set.cycle(model, &x, &x_new, &v_new, dt);
+            for (k, force) in cycle.forces.iter().enumerate() {
+                f_int[k] += force;
+            }
+            internal += cycle.internal_work;
+            hourglass += cycle.hourglass_work;
+            element_dt = element_dt.min(cycle.dt);
+        }
         time += dt;
         dt_prev = dt;
         x = x_new;
@@ -418,7 +443,8 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
     }
     // Final kinetic energy at the last integer step: half kick with the last forces.
     let v_end: Vec<f64> = (0..3 * nodes).map(|k| v_half[k] + 0.5 * dt_prev * (external[k] - f_int[k]) / masses[k / 3]).collect();
-    let kinetic: f64 = (0..3 * nodes).map(|k| 0.5 * masses[k / 3] * v_end[k] * v_end[k]).sum();
+    let rotation = shells.as_ref().map_or(0.0, |set| set.kinetic(&set.omega));
+    let kinetic: f64 = rotation + (0..3 * nodes).map(|k| 0.5 * masses[k / 3] * v_end[k] * v_end[k]).sum::<f64>();
     energy.push(EnergyRow { time, kinetic, internal, hourglass, wall: wall_energy, contact: contact_energy, external_work });
     if time > last_sample {
         sample_walls(&mut walls, &mut wall_impulse, time, last_sample);
@@ -428,6 +454,9 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
         let c = centroid(&element.nodes, &x);
         let failed = if state.failed { 1.0 } else { 0.0 };
         fields.extend_from_slice(&[von_mises(&state.stress), state.plastic_strain, failed, c[0], c[1], c[2]]);
+    }
+    if let Some(set) = &shells {
+        fields.extend(set.fields(&x));
     }
     Ok(Outcome {
         normal,

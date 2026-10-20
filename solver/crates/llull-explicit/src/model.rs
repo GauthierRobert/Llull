@@ -150,6 +150,14 @@ pub struct Model {
     pub contacts: Vec<Contact>,
     /// Fixed degrees of freedom (3 per node, velocity held at 0); empty = none.
     pub fixed: Vec<bool>,
+    /// 4 node indices per Belytschko–Tsay shell (after hex8 and tet4 in the element order).
+    pub shell4: Vec<u32>,
+    /// Thickness per shell.
+    pub shell_thickness: Vec<f64>,
+    /// Gauss points through the shell thickness (default 2).
+    pub shell_points: usize,
+    /// Fixed rotations (3 per node, angular velocity held at 0); empty = none.
+    pub fixed_rotation: Vec<bool>,
 }
 
 impl Model {
@@ -165,7 +173,11 @@ impl Model {
         self.tet4.len() / 4
     }
 
+    pub fn shell_count(&self) -> usize {
+        self.shell4.len() / 4
+    }
+
     pub fn element_count(&self) -> usize {
-        self.hex_count() + self.tet_count()
+        self.hex_count() + self.tet_count() + self.shell_count()
     }
 }

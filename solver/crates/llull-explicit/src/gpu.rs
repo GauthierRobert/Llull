@@ -122,8 +122,8 @@ fn material_table(model: &Model) -> Vec<f64> {
 
 /// Integrates `model` on the GPU. `Err` when no adapter with SHADER_F64 exists (the caller runs the CPU twin) or a GPU call fails.
 pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcome, String), String> {
-    if !model.contacts.is_empty() || model.fixed.iter().any(|&held| held) {
-        return Err("contact and fixed supports run on the CPU path only (RS-8c)".to_string());
+    if !model.contacts.is_empty() || model.fixed.iter().any(|&held| held) || !model.shell4.is_empty() {
+        return Err("contact, fixed supports and shells run on the CPU path only (RS-8c)".to_string());
     }
     let gpu = acquire_with("llull-explicit", wgpu::Features::SHADER_F64)?;
     let controls = &model.controls;

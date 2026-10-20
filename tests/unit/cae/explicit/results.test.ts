@@ -58,7 +58,7 @@ function artifactOf(doc: CadDocument, overrides: Record<string, unknown> = {}): 
 describe('buildExplicitArtifact and explicitSummary', () => {
   it('builds the artifact and a summary with energies, wall impulse and extremes', () => {
     const artifact = artifactOf(model.doc);
-    expect(artifact.elements).toEqual({ hex8: 160, tet4: 0 });
+    expect(artifact.elements).toEqual({ hex8: 160, tet4: 0, shell4: 0 });
     expect(artifact.solver).toEqual({ job: 'explicit', name: 'llull-explicit', version: '0.1.0', device: 'cpu', deterministic: true });
     const analysisCase = model.doc.analysis?.cases[model.analysisId];
     if (analysisCase === undefined) throw new Error('no case');

@@ -80,7 +80,8 @@ export function buildExplicitArtifact(
     return 'result.json lacks termination, cycles, finalTime, minTimeStep, masses, device, deterministic, energy or walls';
   const hex8 = job.mesh.hex8.length / 8;
   const tet4 = job.mesh.tet4.length / 4;
-  const count = hex8 + tet4;
+  const shell4 = job.mesh.shell4.length / 4;
+  const count = hex8 + tet4 + shell4;
   if (fields.length !== FIELD_STRIDE * count) return `fields.f64 holds ${fields.length} values, expected ${FIELD_STRIDE * count}`;
   const column = (offset: number): number[] => Array.from({ length: count }, (_, element) => fields[FIELD_STRIDE * element + offset] ?? 0);
   const centroids: number[] = [];
@@ -98,7 +99,7 @@ export function buildExplicitArtifact(
     minTimeStepS: minTimeStep,
     initialMass,
     addedMass,
-    elements: { hex8, tet4 },
+    elements: { hex8, tet4, shell4 },
     energy,
     walls,
     vonMises: column(0),

@@ -74,6 +74,8 @@ export interface ExplicitSpec {
   /** Penalty contacts (RS-8c), by id `ct-<step>.<k>`. */
   readonly contacts?: Readonly<Record<string, ExplicitContact>>;
   readonly contactOrder?: readonly string[];
+  /** Parts meshed as Belytschko–Tsay shells (thin boxes: mid-surface, thickness = the smallest dimension), by entity id (RS-8c). */
+  readonly shells?: Readonly<Record<string, { readonly points: number }>>;
   readonly results?: ExplicitResultsSummary;
 }
 
@@ -125,7 +127,7 @@ export interface FeExplicitArtifact {
   readonly minTimeStepS: number;
   readonly initialMass: number;
   readonly addedMass: number;
-  readonly elements: { readonly hex8: number; readonly tet4: number };
+  readonly elements: { readonly hex8: number; readonly tet4: number; readonly shell4: number };
   readonly energy: readonly ExplicitEnergyRow[];
   readonly walls: readonly ExplicitWallHistory[];
   readonly vonMises: readonly number[];
@@ -152,7 +154,7 @@ export interface ExplicitResultsSummary {
   readonly cycles: number;
   readonly finalTimeS: number;
   readonly minTimeStepS: number;
-  readonly elements: { readonly hex8: number; readonly tet4: number };
+  readonly elements: { readonly hex8: number; readonly tet4: number; readonly shell4: number };
   readonly energyUnit: string;
   readonly energy: {
     readonly initialKinetic: number;

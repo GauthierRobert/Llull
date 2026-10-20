@@ -27,6 +27,10 @@ export function explicitJobFiles(job: ExplicitJob, device: ExplicitDevice): Reco
     'velocity.f64': f64Bytes(Float64Array.from(job.initialVelocity)),
   };
   if (job.contacts.length > 0) files['part.u32'] = u32Bytes(job.elementPart);
+  if (mesh.shell4.length > 0) {
+    files['shell4.u32'] = u32Bytes(mesh.shell4);
+    files['shell_thickness.f64'] = f64Bytes(Float64Array.from(mesh.shellThickness));
+  }
   if (mesh.hex8.length > 0) files['hex8.u32'] = u32Bytes(mesh.hex8);
   if (mesh.tet4.length > 0) files['tet4.u32'] = u32Bytes(mesh.tet4);
   files['job.json'] = JSON.stringify({
@@ -34,6 +38,13 @@ export function explicitJobFiles(job: ExplicitJob, device: ExplicitDevice): Reco
     nodes: 'nodes.f64',
     ...(mesh.hex8.length > 0 ? { hex8: 'hex8.u32' } : {}),
     ...(mesh.tet4.length > 0 ? { tet4: 'tet4.u32' } : {}),
+    ...(mesh.shell4.length > 0
+      ? {
+          shell4: 'shell4.u32',
+          shellThickness: 'shell_thickness.f64',
+          shellPoints: Math.max(...Object.values(spec.shells ?? {}).map((shell) => shell.points)),
+        }
+      : {}),
     elementMaterial: 'elmat.u32',
     initialVelocity: 'velocity.f64',
     materials: job.materials.map((material, index) => ({

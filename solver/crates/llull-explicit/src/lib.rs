@@ -15,6 +15,8 @@ pub mod hex8;
 pub mod job;
 pub mod material;
 pub mod model;
+pub mod shell;
+pub mod shells;
 pub mod solver;
 pub mod stability;
 pub mod tet4;

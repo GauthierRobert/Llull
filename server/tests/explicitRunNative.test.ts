@@ -66,7 +66,7 @@ describe('explicit_run with the real llull-compute', () => {
       const artifact = store.get(first.hash) as FeExplicitArtifact;
       expect(artifact.termination).toBe('normal');
       expect(artifact.solver).toMatchObject({ name: 'llull-explicit', device: 'cpu', deterministic: true });
-      expect(artifact.elements).toEqual({ hex8: 4 * 4 * 80, tet4: 0 });
+      expect(artifact.elements).toEqual({ hex8: 4 * 4 * 80, tet4: 0, shell4: 0 });
       const wall = artifact.walls[0];
       if (wall === undefined) throw new Error('no wall history');
       const peak = Math.max(...wall.force);
@@ -238,6 +238,29 @@ describe('explicit_run with the real llull-compute', () => {
       expect(Math.abs(plateau / expected - 1)).toBeLessThan(0.1);
       const summary = doc.analysis?.cases[model.analysisId]?.explicit?.results as ExplicitResultsSummary;
       expect(Math.abs(summary.energy.errorMaxAbs)).toBeLessThan(0.03);
+    },
+    600_000,
+  );
+  native(
+    'a shell plate falling flat on the rigid floor gives the wall an impulse m v (Belytschko-Tsay shells, RS-8c)',
+    async () => {
+      const { doc: start, aliases } = replayPlan('exp_shell_plate_llull');
+      const analysisId = aliases['an'] ?? '';
+      let doc = start;
+      const host: FeaHost = {
+        getDoc: () => doc,
+        applyCommand: (name, params) => {
+          const result = execute(doc, name, params, { ...defaultContext(), feaArtifacts: store });
+          if (result.rejected !== true) doc = result.document;
+          return { summary: result.summary, affected: result.affected, isError: result.rejected === true, data: result.data };
+        },
+      };
+      const result = await runExplicitRun(analysisId, { timeoutS: 600 }, host, { store, runner: createComputeRunner({}, BINARY) });
+      expect(result.isError, result.summary).toBe(false);
+      const summary = doc.analysis?.cases[analysisId]?.explicit?.results as ExplicitResultsSummary;
+      expect(summary.elements).toEqual({ hex8: 0, tet4: 0, shell4: 25 });
+      const mass = 7.85e-9 * 50 * 50 * 2;
+      expect(Math.abs((summary.walls['floor']?.impulse ?? 0) / (mass * 1000) - 1)).toBeLessThan(0.02);
     },
     600_000,
   );

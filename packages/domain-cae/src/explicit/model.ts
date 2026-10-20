@@ -106,6 +106,9 @@ function specErrors(caseId: string, spec: unknown): string[] {
       ))
   )
     errors.push(`${where}.contacts / contactOrder are malformed`);
+  const shells = spec['shells'];
+  if (shells !== undefined && (!isRecord(shells) || !Object.values(shells).every((entry) => isRecord(entry) && finite(entry['points']))))
+    errors.push(`${where}.shells is malformed`);
   const failure = spec['failure'];
   if (
     failure !== undefined &&

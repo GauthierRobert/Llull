@@ -78,7 +78,9 @@ export function buildExplicitJob(doc: CadDocument, analysisId: string, meshArtif
     return refuse('EXP_MESH_UNSUPPORTED', `analysis '${analysisId}' has no parts (set_part_idealization)`, [analysisId]);
   const lengthToAnalysis = toMetres(doc, 1) / analysisLengthMetres(analysisCase.unitSystem);
   let mesh: ExplicitMesh | { code: string; message: string; ids: readonly string[] };
-  if (spec.mesh.kind === 'structured_hex') mesh = structuredHexMesh(doc, analysisCase, spec.mesh.size, lengthToAnalysis);
+  if (spec.mesh.kind === 'structured_hex') mesh = structuredHexMesh(doc, analysisCase, spec.mesh.size, lengthToAnalysis, spec.shells ?? {});
+  else if (spec.shells !== undefined && Object.keys(spec.shells).length > 0)
+    return refuse('EXP_MESH_UNSUPPORTED', `shell parts need the structured_hex mesh source`, [analysisId]);
   else if (meshArtifact === null)
     return refuse('EXP_MESH_MISSING', `analysis '${analysisId}' uses mesh fea_mesh but has no current mesh artifact: run fea_mesh`, [
       analysisId,

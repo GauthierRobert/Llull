@@ -17,4 +17,13 @@ describe('exp_drop_box_llull plan', () => {
     expect(built.job.materials[0]).toMatchObject({ E: 70000, nu: 0.33 });
     expect(built.job.initialVelocity.every((value) => value === 0)).toBe(true);
   });
+
+  it('exp_shell_plate_llull meshes the 2 mm plate as 25 Belytschko-Tsay shells falling at 1 m/s', () => {
+    const { doc, aliases } = replayPlan('exp_shell_plate_llull');
+    const built = buildExplicitJob(doc, aliases['an'] ?? '', null);
+    if (!built.ok) throw new Error(built.message);
+    expect(built.job.mesh.shell4.length / 4).toBe(25);
+    expect(built.job.mesh.hex8).toEqual([]);
+    expect(built.job.initialVelocity.slice(0, 3)).toEqual([0, 0, -1000]);
+  });
 });
