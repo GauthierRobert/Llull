@@ -32,6 +32,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   AERO_VSP_PARSE: 'pass the whole text of the .vsp3 file (OpenVSP XML), not a path',
   AERO_VSP_NO_WING: 'the file needs a wing geometry (XSec_n groups with Span, Root_Chord, Tip_Chord); list wings with the geomName error message',
   AERO_VSP_UNSUPPORTED: 'give fallbackNaca to substitute a NACA section, or import the airfoil with import_airfoil and use create_wing',
+  AERO_MASTER_INCONSISTENT: 'at every station the crown WL must be above the max-breadth WL, above the keel WL, with a half breadth > 0 (or all three coincide at the apex)',
   AERO_FS_OUT_OF_RANGE: 'give an fs between the first and the last station of the body (see fuselage_section_at data.fsRange)',
 };
 
