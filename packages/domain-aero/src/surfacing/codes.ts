@@ -27,6 +27,9 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   SRF_LOFT_GUIDE_NOT_CONTAINED: 'use fewer or better aligned control curves, or add stations where they bend',
   SRF_NURBS_INVALID: 'check the station sections: every fs and dimension must be finite',
   SRF_POINTS_INSUFFICIENT: 'give at least 2 stations',
+  AERO_FRAME_NOT_ORTHONORMAL: 'use unit, mutually perpendicular, right-handed axes (default +X aft, +Y right, +Z up; wlAxis = fsAxis x blAxis)',
+  AERO_BODY_NOT_FOUND: 'create it first with loft_fuselage; the id is affected[0] of that command',
+  AERO_FS_OUT_OF_RANGE: 'give an fs between the first and the last station of the body (see fuselage_section_at data.fsRange)',
 };
 
 export const refuseAero = tableRejection(REMEDIATION);

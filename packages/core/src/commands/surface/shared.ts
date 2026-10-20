@@ -21,6 +21,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   SRF_NURBS_INVALID: 'fix the named array; omit `knots` for clamped uniform knots, give end multiplicities degree + 1',
   SRF_POINTS_INSUFFICIENT: 'add points or lower `degree`',
   SRF_POINTS_COINCIDENT: 'remove the duplicate point',
+  SRF_TOLERANCE_UNREACHABLE: 'raise tolerance or maxPoles, or allow a higher degreeMax; noisy data needs a tolerance above the noise',
   SRF_CONIC_RHO_RANGE: 'use 0 < rho < 1 (0.4142 = circle quarter for perpendicular tangents, 0.5 = parabola)',
   SRF_CONIC_COLLINEAR: 'move the apex off the chord',
   SRF_ENTITY_NOT_FOUND: 'list ids with describe_scene or find_entities',

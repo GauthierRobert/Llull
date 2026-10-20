@@ -91,7 +91,17 @@ export interface BodyDef {
   readonly entityId: string;
 }
 
+/** Aircraft coordinate frame: document position = datum + fs * fsAxis + bl * blAxis + wl * wlAxis (right-handed, orthonormal, in document units). */
+export interface AircraftFrame {
+  readonly datum: Vec3;
+  readonly fsAxis: Vec3;
+  readonly blAxis: Vec3;
+  readonly wlAxis: Vec3;
+}
+
 export interface AeroModel {
+  /** Set by set_aircraft_frame; absent = identity (FS along +x, BL along +y, WL along +z, datum at the origin). */
+  readonly frame?: AircraftFrame;
   readonly airfoils: Readonly<Record<string, AirfoilDef>>;
   readonly wings: Readonly<Record<string, WingDef>>;
   /** Fuselage bodies (absent until the first `loft_fuselage`). */
