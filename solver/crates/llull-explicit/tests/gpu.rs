@@ -48,8 +48,8 @@ fn elastic_bar_gpu_matches_the_cpu_twin_and_the_closed_form() {
     let force_error = max_relative(&wall_forces(&gpu), &wall_forces(&reference), peak);
     let speed_error = max_relative(&gpu.velocities, &reference.velocities, 10_000.0);
     let stress_error = max_relative(
-        &gpu.fields.chunks_exact(6).map(|f| f[0]).collect::<Vec<_>>(),
-        &reference.fields.chunks_exact(6).map(|f| f[0]).collect::<Vec<_>>(),
+        &gpu.fields.chunks_exact(7).map(|f| f[0]).collect::<Vec<_>>(),
+        &reference.fields.chunks_exact(7).map(|f| f[0]).collect::<Vec<_>>(),
         400.0,
     );
     eprintln!(
@@ -94,8 +94,8 @@ fn tet4_and_johnson_cook_erosion_gpu_match_the_cpu_twin() {
     eroding.walls.push(floor("anvil"));
     let gpu = gpu_or_skip(&eroding).expect("adapter");
     let reference = cpu(&eroding);
-    let failed = |outcome: &Outcome| outcome.fields.chunks_exact(6).filter(|f| f[2] == 1.0).count();
-    let plastic = |outcome: &Outcome| outcome.fields.chunks_exact(6).map(|f| f[1]).collect::<Vec<_>>();
+    let failed = |outcome: &Outcome| outcome.fields.chunks_exact(7).filter(|f| f[2] == 1.0).count();
+    let plastic = |outcome: &Outcome| outcome.fields.chunks_exact(7).map(|f| f[1]).collect::<Vec<_>>();
     let strain_gap = plastic(&gpu).iter().zip(plastic(&reference)).map(|(a, b)| (a - b).abs()).fold(0.0, f64::max);
     let wall_error =
         max_relative(&wall_forces(&gpu), &wall_forces(&reference), wall_forces(&reference).iter().cloned().fold(0.0, f64::max));

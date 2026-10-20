@@ -1,7 +1,7 @@
 //! The explicit model in consistent units (the solver never converts): mesh, materials, initial and boundary conditions, controls.
 
-/// Johnson–Cook strength (Johnson & Cook 1983): σ_y = (A + B ε_pⁿ)(1 + C ln max(ε̇_p/ε̇_0, 1))(1 − T*ᵐ). The solver is isothermal at the
-/// transition temperature (T* = 0) in RS-8a, so `m`, `melt_k` and `transition_k` are carried for provenance and checked only.
+/// Johnson–Cook strength (Johnson & Cook 1983): σ_y = (A + B ε_pⁿ)(1 + C ln max(ε̇_p/ε̇_0, 1))(1 − T*ᵐ), T* = (T − T_r)/(T_m − T_r)
+/// clamped to [0, 1] (LS-DYNA R14 Theory Manual §22.15 Eq. 22.15.1; below the transition temperature the thermal term is 1).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct JohnsonCook {
     pub a: f64,
@@ -21,11 +21,30 @@ impl JohnsonCook {
         let rate_term = 1.0 + self.c * (rate / self.reference_rate).max(1.0).ln();
         hardening * rate_term
     }
+
+    /// Homologous temperature T* clamped to [0, 1].
+    pub fn homologous(&self, temperature: f64) -> f64 {
+        ((temperature - self.transition_k) / (self.melt_k - self.transition_k)).clamp(0.0, 1.0)
+    }
+
+    /// Flow stress with the thermal term (1 − T*ᵐ).
+    pub fn flow_stress_at(&self, eps_p: f64, rate: f64, t_star: f64) -> f64 {
+        let thermal = if t_star > 0.0 { 1.0 - t_star.powf(self.m) } else { 1.0 };
+        self.flow_stress(eps_p, rate) * thermal
+    }
+}
+
+/// Adiabatic heating of plastic work: `Ṫ = β σ : ε̇ᵖ / (ρ c_p)` with β the Taylor–Quinney coefficient (LS-DYNA R14 Keyword Manual Vol. II
+/// *MAT_MODIFIED_JOHNSON_COOK Eq. 107.21: "portion of plastic work converted into heat (normally taken to be 0.9)").
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Heating {
+    pub taylor_quinney: f64,
+    pub specific_heat: f64,
 }
 
 /// Johnson–Cook (1985) failure strain `ε_f = [D1 + D2 exp(D3 σ*)][1 + D4 ln max(ε̇_p/ε̇_0, 1)][1 + D5 T*]` with `σ*` = mean stress / von Mises
 /// (positive in tension, the 1985 convention: D3 is normally negative) and damage `D = Σ Δε_p / ε_f`; the element erodes at `D ≥ 1`
-/// (LS-DYNA R14 Theory Manual §22.15 Eqs. 22.15.2–22.15.4). `ε_f` is floored at `EFMIN` = 1e-6 (LS-DYNA *MAT_015). Isothermal: T* = 0.
+/// (LS-DYNA R14 Theory Manual §22.15 Eqs. 22.15.2–22.15.4). `ε_f` is floored at `EFMIN` = 1e-6 (LS-DYNA *MAT_015).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct JohnsonCookFailure {
     pub d: [f64; 5],
@@ -36,9 +55,9 @@ pub struct JohnsonCookFailure {
 const EFMIN: f64 = 1e-6;
 
 impl JohnsonCookFailure {
-    pub fn failure_strain(&self, triaxiality: f64, rate: f64) -> f64 {
-        let [d1, d2, d3, d4, _] = self.d;
-        let strain = (d1 + d2 * (d3 * triaxiality).exp()) * (1.0 + d4 * (rate / self.reference_rate).max(1.0).ln());
+    pub fn failure_strain(&self, triaxiality: f64, rate: f64, t_star: f64) -> f64 {
+        let [d1, d2, d3, d4, d5] = self.d;
+        let strain = (d1 + d2 * (d3 * triaxiality).exp()) * (1.0 + d4 * (rate / self.reference_rate).max(1.0).ln()) * (1.0 + d5 * t_star);
         strain.max(EFMIN)
     }
 }
@@ -50,6 +69,8 @@ pub struct Material {
     pub poisson: f64,
     pub johnson_cook: Option<JohnsonCook>,
     pub failure: Option<JohnsonCookFailure>,
+    /// Adiabatic heating (None: isothermal).
+    pub heating: Option<Heating>,
 }
 
 impl Material {
@@ -158,6 +179,8 @@ pub struct Model {
     pub shell_points: usize,
     /// Fixed rotations (3 per node, angular velocity held at 0); empty = none.
     pub fixed_rotation: Vec<bool>,
+    /// Initial temperature, K (None: each Johnson–Cook material starts at its transition temperature, others at 293.15 K).
+    pub initial_temperature: Option<f64>,
 }
 
 impl Model {
@@ -175,6 +198,13 @@ impl Model {
 
     pub fn shell_count(&self) -> usize {
         self.shell4.len() / 4
+    }
+
+    /// Initial temperature of material `index`: the model's, else the Johnson–Cook transition temperature, else 293.15 K.
+    pub fn initial_temperature_of(&self, index: usize) -> f64 {
+        self.initial_temperature
+            .or_else(|| self.materials.get(index).and_then(|material| material.johnson_cook).map(|jc| jc.transition_k))
+            .unwrap_or(293.15)
     }
 
     pub fn element_count(&self) -> usize {

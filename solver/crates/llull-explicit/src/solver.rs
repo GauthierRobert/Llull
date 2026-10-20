@@ -26,6 +26,9 @@ use crate::stability::omega_squared;
 use crate::tet4;
 use rayon::prelude::*;
 
+/// Values per element in `Outcome::fields`.
+pub const FIELD_STRIDE: usize = 7;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Progress {
     pub cycle: u64,
@@ -64,7 +67,7 @@ pub struct Outcome {
     pub added_mass: f64,
     pub energy: Vec<EnergyRow>,
     pub walls: Vec<WallHistory>,
-    /// Per element `[von Mises, plastic strain, failed, centroid x, y, z]`.
+    /// Per element `[von Mises, plastic strain, failed, temperature, centroid x, y, z]`.
     pub fields: Vec<f64>,
     /// Final nodal coordinates (3 per node).
     pub coordinates: Vec<f64>,
@@ -296,7 +299,10 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
         return Err("a node belongs to no element (zero mass)".to_string());
     }
     let nodes = model.node_count();
-    let mut states = vec![PointState::default(); elements.len()];
+    let mut states: Vec<PointState> = elements
+        .iter()
+        .map(|element| PointState { temperature: model.initial_temperature_of(element.material), ..PointState::default() })
+        .collect();
     let mut v_half = model.initial_velocity.clone();
     let mut f_int = vec![0.0; 3 * nodes];
     let external: Vec<f64> = (0..3 * nodes).map(|k| masses[k / 3] * model.gravity[k % 3]).collect();
@@ -449,11 +455,11 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
     if time > last_sample {
         sample_walls(&mut walls, &mut wall_impulse, time, last_sample);
     }
-    let mut fields = Vec::with_capacity(6 * elements.len());
+    let mut fields = Vec::with_capacity(FIELD_STRIDE * elements.len());
     for (element, state) in elements.iter().zip(&states) {
         let c = centroid(&element.nodes, &x);
         let failed = if state.failed { 1.0 } else { 0.0 };
-        fields.extend_from_slice(&[von_mises(&state.stress), state.plastic_strain, failed, c[0], c[1], c[2]]);
+        fields.extend_from_slice(&[von_mises(&state.stress), state.plastic_strain, failed, state.temperature, c[0], c[1], c[2]]);
     }
     if let Some(set) = &shells {
         fields.extend(set.fields(&x));

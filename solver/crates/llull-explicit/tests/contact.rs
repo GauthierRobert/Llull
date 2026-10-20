@@ -79,7 +79,7 @@ fn self_contact_never_acts_inside_one_body() {
         penalty_scale: 0.1,
     });
     let outcome = solve(&plate);
-    assert!(outcome.fields.chunks_exact(6).all(|f| f[0] < 1e-6), "a translating one-element-thick plate stays stress free");
+    assert!(outcome.fields.chunks_exact(7).all(|f| f[0] < 1e-6), "a translating one-element-thick plate stays stress free");
     assert!(outcome.energy.iter().all(|row| row.contact == 0.0));
 }
 

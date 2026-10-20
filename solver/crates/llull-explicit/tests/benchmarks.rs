@@ -110,14 +110,14 @@ fn rigid_translation_and_spin_are_stress_free() {
     let mut moving = model(coordinates.clone(), hex8.clone(), vec![], steel(0.3, None), [1000.0, -500.0, 250.0], controls(1e-5, 1e-6));
     moving.controls.hourglass_coefficient = 0.1;
     let outcome = solve(&moving);
-    assert!(outcome.fields.chunks_exact(6).all(|f| f[0] < 1e-9), "translation is stress free");
+    assert!(outcome.fields.chunks_exact(7).all(|f| f[0] < 1e-9), "translation is stress free");
     // Small rigid spin about z: v = ω × x. Jaumann keeps it stress free to O(Δθ²).
     let omega = 10.0;
     let velocity: Vec<f64> = coordinates.chunks_exact(3).flat_map(|x| [-omega * x[1], omega * x[0], 0.0]).collect();
     let mut spinning = model(coordinates, hex8, vec![], steel(0.3, None), [0.0; 3], controls(1e-4, 1e-5));
     spinning.initial_velocity = velocity;
     let spun = solve(&spinning);
-    let peak = spun.fields.chunks_exact(6).map(|f| f[0]).fold(0.0, f64::max);
+    let peak = spun.fields.chunks_exact(7).map(|f| f[0]).fold(0.0, f64::max);
     // Straight-line nodal paths stretch the body by O(θ²/2) = 5e-7: E θ²/2 = 0.1 MPa, against E θ = 200 MPa for a small-strain update.
     assert!(peak < 0.5, "rigid rotation of {} rad makes {peak} MPa", omega * 1e-4);
 }
@@ -131,11 +131,11 @@ fn johnson_cook_bar_yields_at_the_wall_and_caps_the_elastic_wave() {
     plastic.walls.push(floor("anvil"));
     let outcome = solve(&plastic);
     // v = 50 m/s exceeds the yield velocity A/(ρc₀) = 7.6 m/s: the elements at the wall deform plastically, the far end stays elastic.
-    let near = outcome.fields.chunks_exact(6).filter(|f| f[5] < 5.0).map(|f| f[1]).fold(0.0, f64::max);
-    let far = outcome.fields.chunks_exact(6).filter(|f| f[5] > 80.0).map(|f| f[1]).fold(0.0, f64::max);
+    let near = outcome.fields.chunks_exact(7).filter(|f| f[6] < 5.0).map(|f| f[1]).fold(0.0, f64::max);
+    let far = outcome.fields.chunks_exact(7).filter(|f| f[6] > 80.0).map(|f| f[1]).fold(0.0, f64::max);
     assert!(near > 1e-3, "plastic strain at the wall {near}");
     assert_eq!(far, 0.0);
-    for f in outcome.fields.chunks_exact(6) {
+    for f in outcome.fields.chunks_exact(7) {
         let flow = jc.flow_stress(f[1], 0.0);
         assert!(f[0] <= flow * (1.0 + 1e-9) + 1e-9, "von Mises {} above the flow stress {flow}", f[0]);
     }
@@ -205,8 +205,8 @@ fn johnson_cook_failure_erodes_the_elements_at_the_wall_and_the_run_continues() 
     eroding.walls.push(floor("anvil"));
     let outcome = solve(&eroding);
     assert!(outcome.normal, "{}", outcome.message);
-    let failed: Vec<&[f64]> = outcome.fields.chunks_exact(6).filter(|f| f[2] == 1.0).collect();
+    let failed: Vec<&[f64]> = outcome.fields.chunks_exact(7).filter(|f| f[2] == 1.0).collect();
     assert!(!failed.is_empty(), "elements erode");
     assert!(failed.iter().all(|f| f[0] == 0.0 && f[1] >= 0.02 * (1.0 - 1e-9)), "eroded elements are stress free past ε_f");
-    assert!(outcome.fields.chunks_exact(6).filter(|f| f[5] > 40.0).all(|f| f[2] == 0.0), "the far end survives");
+    assert!(outcome.fields.chunks_exact(7).filter(|f| f[6] > 40.0).all(|f| f[2] == 0.0), "the far end survives");
 }

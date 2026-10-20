@@ -5,7 +5,7 @@ use llull_explicit::model::{Controls, JohnsonCook, Material, Model, Wall};
 
 /// Test material (NOT a material claim): E 200 GPa, 7850 kg/m³, `poisson` as given.
 pub fn steel(poisson: f64, johnson_cook: Option<JohnsonCook>) -> Material {
-    Material { density: 7.85e-9, youngs_modulus: 200_000.0, poisson, johnson_cook, failure: None }
+    Material { density: 7.85e-9, youngs_modulus: 200_000.0, poisson, johnson_cook, failure: None, heating: None }
 }
 
 pub fn controls(end_time: f64, history_interval: f64) -> Controls {
@@ -77,6 +77,7 @@ pub fn model(coordinates: Vec<f64>, hex8: Vec<u32>, tet4: Vec<u32>, material: Ma
         shell_thickness: vec![],
         shell_points: 2,
         fixed_rotation: vec![],
+        initial_temperature: None,
     }
 }
 

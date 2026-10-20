@@ -42,7 +42,9 @@ impl Shells {
             corners: model.shell4.chunks_exact(4).map(|c| [c[0] as usize, c[1] as usize, c[2] as usize, c[3] as usize]).collect(),
             material: (0..model.shell4.len() / 4).map(|s| model.element_material[solids + s] as usize).collect(),
             thickness: model.shell_thickness.clone(),
-            states: vec![ShellState::new(model.shell_points); model.shell4.len() / 4],
+            states: (0..model.shell4.len() / 4)
+                .map(|s| ShellState::new(model.shell_points, model.initial_temperature_of(model.element_material[solids + s] as usize)))
+                .collect(),
             inertia: vec![0.0; nodes],
             omega: vec![0.0; 3 * nodes],
             moments: vec![0.0; 3 * nodes],
@@ -118,15 +120,18 @@ impl Shells {
         ShellCycle { forces, internal_work, hourglass_work, dt: smallest }
     }
 
-    /// Per-shell fields `[von Mises, plastic strain, failed, centroid x, y, z]` (largest over the thickness points).
+    /// Per-shell fields `[von Mises, plastic strain, failed, temperature, centroid x, y, z]` (largest over the thickness points; failed
+    /// when every point failed).
     pub fn fields(&self, x: &[f64]) -> Vec<f64> {
-        let mut fields = Vec::with_capacity(6 * self.corners.len());
+        let mut fields = Vec::with_capacity(crate::solver::FIELD_STRIDE * self.corners.len());
         for (s, corners) in self.corners.iter().enumerate() {
             let c = corners_of(corners, x);
             let centre: [f64; 3] = std::array::from_fn(|i| (c[0][i] + c[1][i] + c[2][i] + c[3][i]) / 4.0);
             let vm = self.states[s].points.iter().map(|p| crate::material::von_mises(&p.stress)).fold(0.0, f64::max);
             let eps = self.states[s].points.iter().map(|p| p.plastic_strain).fold(0.0, f64::max);
-            fields.extend_from_slice(&[vm, eps, 0.0, centre[0], centre[1], centre[2]]);
+            let temperature = self.states[s].points.iter().map(|p| p.temperature).fold(f64::NEG_INFINITY, f64::max);
+            let failed = if self.states[s].points.iter().all(|p| p.failed) { 1.0 } else { 0.0 };
+            fields.extend_from_slice(&[vm, eps, failed, temperature, centre[0], centre[1], centre[2]]);
         }
         fields
     }

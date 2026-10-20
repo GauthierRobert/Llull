@@ -74,7 +74,7 @@ fn a_spinning_shell_strip_stays_stress_free() {
     spinning.initial_velocity = spinning.coordinates.chunks_exact(3).flat_map(|x| [-omega * x[1], omega * x[0], 0.0]).collect();
     spinning.controls.end_time = 1e-4;
     let outcome = run(&spinning, &mut |_| {}).expect("the run succeeds");
-    let peak = outcome.fields.chunks_exact(6).map(|f| f[0]).fold(0.0, f64::max);
+    let peak = outcome.fields.chunks_exact(7).map(|f| f[0]).fold(0.0, f64::max);
     // Straight-line nodal paths stretch the strip by O(θ²/2) = 5e-7 of 1 mrad: E θ²/2 = 0.1 MPa, against E θ = 200 MPa without the frame.
     assert!(peak < 0.5, "rigid spin of 1 mrad makes {peak} MPa");
 }
@@ -87,7 +87,7 @@ fn johnson_cook_membrane_returns_to_the_flow_stress_under_plane_stress() {
     // Membrane rates: stretch along x at 1/s, contraction along y at 0.5/s (no bending, no rotation).
     let v = x0.map(|p| [p[0], -0.5 * p[1], 0.0]);
     let dt = 1e-4;
-    let mut state = ShellState::new(2);
+    let mut state = ShellState::new(2, 293.0);
     let mut x = x0;
     for _ in 0..300 {
         let x1: [[f64; 3]; 4] = std::array::from_fn(|k| [x[k][0] + dt * v[k][0], x[k][1] + dt * v[k][1], 0.0]);
@@ -101,4 +101,29 @@ fn johnson_cook_membrane_returns_to_the_flow_stress_under_plane_stress() {
     let flow = jc.flow_stress(point.plastic_strain, 0.0);
     assert!((vm / flow - 1.0).abs() < 1e-3, "von Mises {vm} vs flow {flow}");
     assert!(point.stress[2].abs() < 1e-3 * flow, "plane stress: σzz {}", point.stress[2]);
+}
+
+#[test]
+fn johnson_cook_failure_erodes_shells_like_the_solids() {
+    use llull_explicit::model::JohnsonCookFailure;
+    // Synthetic inputs: perfectly plastic A = 300 MPa, failure at ε_p = 0.01 (D2 = 0); the strip is stretched at 1000 /s
+    // (it reaches ε_p ≈ 0.018 before the waves from the free end slow it).
+    let jc = JohnsonCook { a: 300.0, b: 0.0, n: 1.0, c: 0.0, reference_rate: 1.0, m: 1.0, melt_k: 1800.0, transition_k: 293.0 };
+    let mut material = steel(0.3, Some(jc));
+    material.failure = Some(JohnsonCookFailure { d: [0.01, 0.0, 0.0, 0.0, 0.0], reference_rate: 1.0 });
+    let mut pulled = strip(40.0, 10.0, 1.0, 8, 2, material);
+    let nodes = pulled.coordinates.len() / 3;
+    let root: Vec<bool> = (0..nodes).map(|n| pulled.coordinates[3 * n] == 0.0).collect();
+    pulled.fixed = (0..3 * nodes).map(|k| root[k / 3]).collect();
+    pulled.fixed_rotation = pulled.fixed.clone();
+    pulled.initial_velocity = pulled.coordinates.chunks_exact(3).flat_map(|x| [1000.0 * x[0], 0.0, 0.0]).collect();
+    pulled.controls.end_time = 6e-5;
+    pulled.controls.history_interval = 1e-6;
+    let outcome = run(&pulled, &mut |_| {}).expect("the run succeeds");
+    assert!(outcome.normal, "{}", outcome.message);
+    let failed: Vec<&[f64]> = outcome.fields.chunks_exact(7).filter(|f| f[2] == 1.0).collect();
+    let max_eps = outcome.fields.chunks_exact(7).map(|f| f[1]).fold(0.0, f64::max);
+    eprintln!("eroded shells: {} of {}, max plastic strain {max_eps}", failed.len(), outcome.fields.len() / 7);
+    assert!(!failed.is_empty(), "shells erode");
+    assert!(failed.iter().all(|f| f[0] == 0.0 && f[1] >= 0.01 * (1.0 - 1e-9)), "eroded shells are stress free past ε_f");
 }

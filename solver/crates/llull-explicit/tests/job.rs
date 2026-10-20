@@ -65,7 +65,7 @@ fn writes_hashed_outputs_events_and_is_byte_identical() {
         assert_eq!(result["device"] == "gpu", round == 2 && !fell_back);
         assert_eq!(result["elements"]["hex8"], 1);
         assert_eq!(result["walls"][0]["name"], "floor");
-        assert_eq!(fs::read(dir.join("fields.f64")).expect("read").len(), 6 * 8);
+        assert_eq!(fs::read(dir.join("fields.f64")).expect("read").len(), 7 * 8);
         // The cube reaches the floor after ~1 ms and the wall records a force.
         let peak = result["walls"][0]["force"].as_array().expect("forces").iter().filter_map(|f| f.as_f64()).fold(0.0, f64::max);
         assert!(peak > 0.0);

@@ -157,6 +157,15 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
         incidence.extend_from_slice(list);
         incidence_start[node + 1] = incidence.len() as u32;
     }
+    // State: stress (6), plastic strain, damage, failed, temperature.
+    let initial_state: Vec<f64> = elements
+        .iter()
+        .flat_map(|element| {
+            let mut row = [0.0; 10];
+            row[9] = model.initial_temperature_of(element.material);
+            row
+        })
+        .collect();
     let walls: Vec<f64> = model.walls.iter().flat_map(|wall| [wall.point, wall.normal].concat()).collect();
     let g = model.gravity;
     let scalars_init = [0.0, 0.0, controls.hourglass_coefficient, controls.bulk_linear, controls.bulk_quadratic, g[0], g[1], g[2]];
@@ -173,7 +182,7 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
         f_int: buffer(&gpu, "f_int", f64_bytes(&vec![0.0; 3 * nodes])),
         wall_impulse: buffer(&gpu, "wall_impulse", f64_bytes(&vec![0.0; walls_count * nodes])),
         node_energy: buffer(&gpu, "node_energy", f64_bytes(&vec![0.0; 2 * nodes])),
-        state: buffer(&gpu, "state", f64_bytes(&vec![0.0; 10 * count])),
+        state: buffer(&gpu, "state", f64_bytes(&initial_state)),
         elem_energy: buffer(&gpu, "elem_energy", f64_bytes(&vec![0.0; 3 * count])),
         reduced: buffer(&gpu, "reduced", f64_bytes(&[0.0])),
     };
@@ -331,11 +340,19 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
     }
     let x = read_f64(&gpu, &b.x, 3 * nodes)?;
     let state = read_f64(&gpu, &b.state, 10 * count)?;
-    let mut fields = Vec::with_capacity(6 * count);
+    let mut fields = Vec::with_capacity(crate::solver::FIELD_STRIDE * count);
     for (e, element) in elements.iter().enumerate() {
         let c = centroid(&element.nodes, &x);
         let s: [f64; 6] = std::array::from_fn(|k| state[10 * e + k]);
-        fields.extend_from_slice(&[crate::material::von_mises(&s), state[10 * e + 6], state[10 * e + 8], c[0], c[1], c[2]]);
+        fields.extend_from_slice(&[
+            crate::material::von_mises(&s),
+            state[10 * e + 6],
+            state[10 * e + 8],
+            state[10 * e + 9],
+            c[0],
+            c[1],
+            c[2],
+        ]);
     }
     let outcome = Outcome {
         normal,

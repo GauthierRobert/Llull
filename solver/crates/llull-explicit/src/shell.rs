@@ -116,8 +116,13 @@ pub struct ShellState {
 }
 
 impl ShellState {
-    pub fn new(points: usize) -> ShellState {
-        ShellState { points: vec![PointState::default(); points], hourglass: [0.0; 5] }
+    pub fn new(points: usize, temperature: f64) -> ShellState {
+        ShellState { points: vec![PointState { temperature, ..PointState::default() }; points], hourglass: [0.0; 5] }
+    }
+
+    /// Eroded: every point through the thickness failed (llull rule, §13.9).
+    pub fn failed(&self) -> bool {
+        self.points.iter().all(|point| point.failed)
     }
 }
 
@@ -178,6 +183,19 @@ pub fn step(
     w: &[[f64; 3]; 4],
     dt: f64,
 ) -> ShellStep {
+    if state.failed() {
+        // Eroded (every point reached Johnson-Cook damage 1): no forces, no moments, out of the step computation; the nodes keep their mass.
+        return ShellStep {
+            state: state.clone(),
+            forces: [[0.0; 3]; 4],
+            moments: [[0.0; 3]; 4],
+            internal_work: 0.0,
+            hourglass_work: 0.0,
+            dt: f64::INFINITY,
+            von_mises: 0.0,
+            plastic_strain: state.points.iter().map(|point| point.plastic_strain).fold(0.0, f64::max),
+        };
+    }
     let mid: [[f64; 3]; 4] = std::array::from_fn(|k| std::array::from_fn(|i| 0.5 * (x0[k][i] + x1[k][i])));
     let f = frame(&mid);
     let p: [[f64; 2]; 4] = std::array::from_fn(|k| {
@@ -303,13 +321,14 @@ mod tests {
 
     #[test]
     fn membrane_stretch_gives_the_plane_stress_modulus() {
-        let material = Material { density: 7.85e-9, youngs_modulus: 200_000.0, poisson: 0.3, johnson_cook: None, failure: None };
+        let material =
+            Material { density: 7.85e-9, youngs_modulus: 200_000.0, poisson: 0.3, johnson_cook: None, failure: None, heating: None };
         let x0 = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]];
         // v = (x, 0, 0): unit strain rate along x for dt.
         let v = x0.map(|p| [p[0], 0.0, 0.0]);
         let dt = 1e-6;
         let x1 = std::array::from_fn(|k| [x0[k][0] + dt * v[k][0], x0[k][1], 0.0]);
-        let state = ShellState::new(2);
+        let state = ShellState::new(2, 293.15);
         let result = step(&material, 0.1, &state, &x0, &x1, &v, &[[0.0; 3]; 4], dt);
         let s = result.state.points[0].stress;
         let modulus = 200_000.0 / (1.0 - 0.09);

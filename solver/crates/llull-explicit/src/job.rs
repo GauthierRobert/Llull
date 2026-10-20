@@ -46,7 +46,9 @@
 //! - `fields.f64`: per element `[von Mises, equivalent plastic strain, failed (0/1), centroid x, y, z]` at the end, little-endian f64.
 //!   Every output is byte-identical across runs and thread counts.
 
-use crate::model::{Contact, ContactKind, Controls, Friction, JohnsonCook, JohnsonCookFailure, MassScaling, Material, Model, Wall};
+use crate::model::{
+    Contact, ContactKind, Controls, Friction, Heating, JohnsonCook, JohnsonCookFailure, MassScaling, Material, Model, Wall,
+};
 use crate::solver::{run, Outcome, Progress};
 use llull_protocol::{emit, sha256_hex, Event, Output};
 use serde::{Deserialize, Serialize};
@@ -90,6 +92,14 @@ struct MaterialSpec {
     poisson: f64,
     johnson_cook: Option<JohnsonCookSpec>,
     johnson_cook_failure: Option<FailureSpec>,
+    heating: Option<HeatingSpec>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct HeatingSpec {
+    taylor_quinney: f64,
+    specific_heat: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -212,6 +222,7 @@ struct JobSpec {
     shell4: Option<String>,
     shell_thickness: Option<String>,
     shell_points: Option<usize>,
+    initial_temperature: Option<f64>,
     fixed_rotation: Option<String>,
     #[serde(default)]
     contacts: Vec<ContactSpec>,
@@ -280,7 +291,14 @@ fn material_of(spec: MaterialSpec) -> Result<Material, JobError> {
         }
         (Some(_), _) => return Err(input("johnsonCookFailure needs five finite D values and a johnsonCook strength (its plastic strain)")),
     };
-    Ok(Material { density: spec.density, youngs_modulus: spec.youngs_modulus, poisson: spec.poisson, johnson_cook, failure })
+    let heating = match spec.heating {
+        None => None,
+        Some(heat) if (0.0..=1.0).contains(&heat.taylor_quinney) && heat.specific_heat > 0.0 && heat.specific_heat.is_finite() => {
+            Some(Heating { taylor_quinney: heat.taylor_quinney, specific_heat: heat.specific_heat })
+        }
+        Some(_) => return Err(input("heating needs taylorQuinney in [0, 1] and specificHeat > 0")),
+    };
+    Ok(Material { density: spec.density, youngs_modulus: spec.youngs_modulus, poisson: spec.poisson, johnson_cook, failure, heating })
 }
 
 fn controls_of(spec: ControlsSpec) -> Result<Controls, JobError> {
@@ -374,6 +392,7 @@ pub fn load(folder: &Path) -> Result<(Model, bool), JobError> {
             None => Vec::new(),
         },
         shell_points: spec.shell_points.unwrap_or(2),
+        initial_temperature: spec.initial_temperature,
         fixed_rotation: match &spec.fixed_rotation {
             Some(name) => read_bytes(folder, name)?.into_iter().map(|byte| byte != 0).collect(),
             None => Vec::new(),
@@ -479,7 +498,7 @@ pub fn outputs(model: &Model, outcome: &Outcome, adapter: Option<&str>) -> Resul
         walls: outcome.walls.iter().map(|wall| WallOutput { name: &wall.name, t: &wall.times, force: &wall.forces }).collect(),
     };
     let json = serde_json::to_vec(&result).map_err(|error| io(format!("result.json: {error}")))?;
-    let mut fields = Vec::with_capacity(model.element_count() * 6 * 8);
+    let mut fields = Vec::with_capacity(model.element_count() * crate::solver::FIELD_STRIDE * 8);
     for value in &outcome.fields {
         fields.extend_from_slice(&value.to_le_bytes());
     }

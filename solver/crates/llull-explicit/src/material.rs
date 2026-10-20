@@ -23,6 +23,8 @@ pub struct PointState {
     pub damage: f64,
     /// Eroded: the element carries no stress from now on.
     pub failed: bool,
+    /// Temperature, K (adiabatic heating raises it; isothermal otherwise).
+    pub temperature: f64,
 }
 
 /// Rate of deformation `D` and spin `ω` of a velocity gradient `L`.
@@ -77,10 +79,11 @@ pub fn update(material: &Material, state: &PointState, d: &Sym, w: &[f64; 3], dt
     };
     let equivalent = von_mises(&trial);
     let eps = state.plastic_strain;
-    if equivalent <= jc.flow_stress(eps, 0.0) {
+    let t_star = jc.homologous(state.temperature);
+    if equivalent <= jc.flow_stress_at(eps, 0.0, t_star) {
         return PointState { stress: trial, ..*state };
     }
-    let residual = |increment: f64| equivalent - 3.0 * mu * increment - jc.flow_stress(eps + increment, increment / dt);
+    let residual = |increment: f64| equivalent - 3.0 * mu * increment - jc.flow_stress_at(eps + increment, increment / dt, t_star);
     let (mut low, mut high) = (0.0, equivalent / (3.0 * mu));
     for _ in 0..200 {
         let middle = 0.5 * (low + high);
@@ -105,16 +108,21 @@ pub fn update(material: &Material, state: &PointState, d: &Sym, w: &[f64; 3], dt
         trial[4] * scale,
         trial[5] * scale,
     ];
+    // Adiabatic heating (explicit in T): plastic work per volume of the J2 return is σ_y Δε_p.
+    let temperature = match material.heating {
+        Some(heat) => state.temperature + heat.taylor_quinney * yield_stress * increment / (material.density * heat.specific_heat),
+        None => state.temperature,
+    };
     let Some(failure) = material.failure else {
-        return PointState { stress, plastic_strain: eps + increment, ..*state };
+        return PointState { stress, plastic_strain: eps + increment, temperature, ..*state };
     };
     // σ* = mean stress / von Mises after the return (the von Mises stress is the yield stress there).
     let triaxiality = pressure / yield_stress;
-    let damage = state.damage + increment / failure.failure_strain(triaxiality, increment / dt);
+    let damage = state.damage + increment / failure.failure_strain(triaxiality, increment / dt, t_star);
     if damage >= 1.0 {
-        return PointState { stress: [0.0; 6], plastic_strain: eps + increment, damage, failed: true };
+        return PointState { stress: [0.0; 6], plastic_strain: eps + increment, damage, failed: true, temperature };
     }
-    PointState { stress, plastic_strain: eps + increment, damage, failed: false }
+    PointState { stress, plastic_strain: eps + increment, damage, failed: false, temperature }
 }
 
 #[cfg(test)]
@@ -123,7 +131,7 @@ mod tests {
     use crate::model::JohnsonCook;
 
     fn steel(jc: Option<JohnsonCook>) -> Material {
-        Material { density: 7.85e-9, youngs_modulus: 200_000.0, poisson: 0.3, johnson_cook: jc, failure: None }
+        Material { density: 7.85e-9, youngs_modulus: 200_000.0, poisson: 0.3, johnson_cook: jc, failure: None, heating: None }
     }
 
     #[test]
@@ -167,11 +175,11 @@ mod tests {
         assert_eq!(update(&material, &state, &d, &[0.0; 3], 1e-6), state);
         // The rate term: ε_f = D1 (1 + D4 ln(rate / rate0)) above the reference rate, D1 below it (clamped).
         let rated = JohnsonCookFailure { d: [0.05, 0.0, 0.0, 0.1, 0.0], reference_rate: 1.0 };
-        assert!((rated.failure_strain(0.3, 1000.0) - 0.05 * (1.0 + 0.1 * 1000.0_f64.ln())).abs() < 1e-15);
-        assert_eq!(rated.failure_strain(0.3, 1e-3), 0.05);
+        assert!((rated.failure_strain(0.3, 1000.0, 0.0) - 0.05 * (1.0 + 0.1 * 1000.0_f64.ln())).abs() < 1e-15);
+        assert_eq!(rated.failure_strain(0.3, 1e-3, 0.0), 0.05);
         // VC-EXP-21.a: the pack's test inputs at triaxiality 1/3 give ε_f = 1.74690296571 (generate_explicit_reference.py).
         let pack = JohnsonCookFailure { d: [0.05, 3.44, -2.12, 0.002, 0.61], reference_rate: 1.0 };
-        assert!((pack.failure_strain(1.0 / 3.0, 1.0) / 1.74690296571 - 1.0).abs() < 1e-9);
+        assert!((pack.failure_strain(1.0 / 3.0, 1.0, 0.0) / 1.74690296571 - 1.0).abs() < 1e-9);
     }
 
     #[test]
