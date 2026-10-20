@@ -94,6 +94,9 @@ describe('host runner', () => {
     });
     expect(fillHostParams('submit_for_review', {}, HUMAN, now, { LLULL_USER: 'alice' })).toMatchObject({ by: 'alice' });
     expect(fillHostParams('add_box', { size: [1, 1, 1] }, HUMAN, now)).toEqual({ size: [1, 1, 1] });
+    // add_door and edit_nurbs declare their own `at` / `by`: only the plm toolset is host-filled
+    expect(fillHostParams('add_door', { wallId: 'w' }, HUMAN, now)).toEqual({ wallId: 'w' });
+    expect(fillHostParams('edit_nurbs', { id: 'c' }, HUMAN, now)).toEqual({ id: 'c' });
     expect(fillHostParams('no_such_command', 5, HUMAN, now)).toBe(5);
     expect(callerOf('human')).toBe(HUMAN);
     expect(callerOf('agent')).toBe(AGENT);

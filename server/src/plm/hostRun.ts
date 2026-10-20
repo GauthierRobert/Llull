@@ -8,6 +8,7 @@ import { getCommand } from '@core/commands/registry';
 import type { CommandCaller } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
 import { type CommandRun, runCommandOutcome } from '@protocol/commandOutcome';
+import { toolsetOf } from '@protocol/toolsets';
 import { isRecord } from '@lib/isRecord';
 import { serverContext } from '../fea/context';
 import { type AuditLog, auditDir, createAuditLog, paramsHash } from './auditChain';
@@ -41,6 +42,8 @@ export function fillHostParams(
   now: Date,
   env: NodeJS.ProcessEnv = process.env,
 ): unknown {
+  // Only the plm toolset: other commands declare their own `at` / `by` params (add_door, edit_nurbs, ...).
+  if (toolsetOf(name) !== 'plm') return params;
   const properties = getCommand(name)?.paramsSchema.properties;
   if (properties === undefined || !FILLED.some((key) => key in properties)) return params;
   const given = isRecord(params) ? params : {};
