@@ -25,6 +25,7 @@ import { motionCommands } from './motion/catalog';
 import { exchangeCommands } from './exchange/catalog';
 import { persistenceCommands } from './persistence/catalog';
 import { drawingsCommands } from './drawings/catalog';
+import { pmiCommands } from './pmi/catalog';
 import { dynamicsCommands } from './dynamics/catalog';
 import { reviewCommands } from './review/catalog';
 import { vnvCommands } from './vnv/catalog';
@@ -52,6 +53,7 @@ registerCommands('core', [
   ...exchangeCommands,
   ...persistenceCommands,
   ...drawingsCommands,
+  ...pmiCommands,
   ...dynamicsCommands,
   ...reviewCommands,
   ...vnvCommands,

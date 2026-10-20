@@ -2,21 +2,7 @@
   "_comment": "Plans under docs/**/validation referencing commands that are not registered yet (plan path -> sorted names). Remove entries as commands get built; never add one without a board note. Regenerate: UPDATE_BLOCKED_PLANS=1 npx vitest run tests/unit/contract/validationPlanCommands.test.ts",
   "blocked": {
     "docs/aerospace/03-gdt-mbd-pmi/validation/draft_plan_gdt_plate.json": [
-      "add_datum_feature",
-      "add_geometric_tolerance",
-      "add_size_dimension",
-      "add_surface_texture",
-      "check_pmi",
-      "create_saved_view",
-      "export_step_ap242",
-      "set_pmi_standard"
-    ],
-    "docs/aerospace/03-gdt-mbd-pmi/validation/draft_plan_gdt_rejections.json": [
-      "add_datum_feature",
-      "add_geometric_tolerance"
-    ],
-    "docs/aerospace/03-gdt-mbd-pmi/validation/draft_plan_stackup_su01.json": [
-      "analyze_stackup"
+      "export_step_ap242"
     ],
     "docs/aerospace/09-plm-configuration-traceability/validation/plans/plm_release_eco_revB.plan.json": [
       "create_change_order",
@@ -72,10 +58,6 @@
     "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-05-winged-body-demo.json": [
       "cfd_create_case",
       "cfd_prepare"
-    ],
-    "docs/physics/04-thermo-mechanical/validation/plans/tmc_fit_al_steel.plan.json": [
-      "add_size_dimension",
-      "set_pmi_standard"
     ],
     "docs/physics/05-nonlinear-structural/validation/plans/nls_column_imperfection.plan.json": [
       "add_imperfection"

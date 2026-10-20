@@ -9,6 +9,7 @@ import { composeSheet, sheetArea } from './sheetFrame';
 import { DrawingPainter, n, paperDimension, svgLine, svgText } from '../../geometry/drawingSvg';
 import { escapeXml } from '../../lib/escapeXml';
 import { scaleText } from './sheetOps';
+import { type PmiSkipReason, type SheetPmiReport, paintViewPmi, pmiReport, sheetShowsPmi } from './pmiPainter';
 
 export interface SheetViewInfo {
   readonly id: string;
@@ -32,6 +33,8 @@ export interface RenderedSheet {
   readonly warnings: string[];
   /** Whether every view lies inside the drawing area at this scale. */
   readonly fits: boolean;
+  /** PMI placed per view and skipped (present only when the sheet draws PMI). */
+  readonly pmi?: SheetPmiReport;
 }
 
 interface Drawn {
@@ -153,6 +156,9 @@ export function renderSheet(doc: CadDocument, sheet: DrawingSheet, options: { re
   const defs: string[] = [];
   const groups: string[] = [];
   const views: SheetViewInfo[] = [];
+  const showsPmi = sheetShowsPmi(sheet);
+  const pmiPlaced: SheetPmiReport['placed'] = [];
+  const pmiReasons: Array<Map<string, PmiSkipReason>> = [];
   layout.placed.forEach((placed, index) => {
     const entry = drawn[index] as Drawn;
     const { view } = placed;
@@ -166,7 +172,12 @@ export function renderSheet(doc: CadDocument, sheet: DrawingSheet, options: { re
     const own = view.scale !== undefined || view.kind === 'detail';
     const caption = own ? `${view.label} (${scaleText(placed.denominator)})` : view.label;
     const [x, y] = placed.center;
-    const parts = painter.parts;
+    const pmi = showsPmi ? paintViewPmi(doc, sheet, view, map) : null;
+    if (pmi !== null) {
+      pmiPlaced.push({ viewId: view.id, pmiIds: pmi.placedIds });
+      pmiReasons.push(pmi.reasons);
+    }
+    const parts = [...painter.parts, ...(pmi?.parts ?? [])];
     const viewKey = escapeXml(view.id);
     const body = [`<g id="view-${viewKey}" data-kind="${view.kind}" data-label="${escapeXml(view.label)}">`];
     if (view.kind === 'detail') {
@@ -207,5 +218,14 @@ export function renderSheet(doc: CadDocument, sheet: DrawingSheet, options: { re
       bounds[3] <= area.y + area.height + 0.01,
   );
   if (!fits) warnings.push(overflowWarning(views, area, layout.scale, layoutViews(items, { ...layoutOptions, scale: undefined }).scale));
-  return { svg: composeSheet(sheet, layout.scale, groups.join('\n'), defs.join('')), scale: layout.scale, views, skipped, warnings, fits };
+  const pmi = showsPmi ? { pmi: pmiReport(doc, sheet, pmiPlaced, pmiReasons) } : {};
+  return {
+    svg: composeSheet(sheet, layout.scale, groups.join('\n'), defs.join('')),
+    scale: layout.scale,
+    views,
+    skipped,
+    warnings,
+    fits,
+    ...pmi,
+  };
 }

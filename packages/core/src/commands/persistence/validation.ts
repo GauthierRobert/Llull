@@ -10,6 +10,7 @@ import { corruptionReason } from '../guard';
 import { getCommand, listCommands } from '../commandTable';
 import { validateAnimationValue, validateComponentValue, validateConfigurationValue, validateGroupValue } from './collections';
 import { drawingsProblems } from './drawingsValidation';
+import { pmiProblems } from './pmiValidation';
 import { dynamicsProblems } from './dynamicsValidation';
 import { prototypeProblems } from './prototypeValidation';
 import { kernelSliceProblems } from './kernelValidation';
@@ -233,6 +234,7 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
   validateSection(v['constraints'], validateConstraintValue);
   validateSection(v['joints'], validateJointValue);
   errors.push(...drawingsProblems(v['drawings']));
+  errors.push(...pmiProblems(v['pmi']));
   errors.push(...dynamicsProblems(v['dynamics']));
   errors.push(...prototypeProblems(v['prototype']));
   errors.push(...kernelSliceProblems(v));

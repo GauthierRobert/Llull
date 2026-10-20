@@ -30,6 +30,11 @@ export const updateDrawingView = defineCommand({
     offset: z.number().optional().describe('Section views: new cutting-plane coordinate on the viewing axis.'),
     center: vec2("Detail views: new circle centre in the parent view's model coordinates.").optional(),
     radius: z.number().positive().optional().describe('Detail views: new circle radius.'),
+    pmiIds: z
+      .array(z.string())
+      .optional()
+      .describe('PMI item ids drawn on this view (explicit list: overrides the sheet pmiMode auto selection). Ids must exist (list_pmi).'),
+    pmiAuto: z.boolean().optional().describe('true = drop the explicit PMI list (back to the sheet pmiMode selection).'),
   }),
   run: (doc, params): CommandResult => {
     const sheet = requireSheet(doc, 'update_drawing_view', params.sheetId);
@@ -46,13 +51,17 @@ export const updateDrawingView = defineCommand({
     if ((center !== undefined || radius !== undefined) && view.kind !== 'detail') return fail('center / radius only apply to detail views');
     const problem = params.entityIds === undefined ? null : entityProblem(doc, params.entityIds);
     if (problem !== null) return fail(problem);
-    const rest = omitKeys(view, ['position', 'scale']);
+    const unknownPmi = (params.pmiIds ?? []).filter((id) => doc.pmi === undefined || !Object.hasOwn(doc.pmi.items, id));
+    if (unknownPmi.length > 0) return fail(`GDT_PMI_UNKNOWN: no PMI item ${unknownPmi.join(', ')} (list_pmi shows the ids)`);
+    const rest = omitKeys(view, ['position', 'scale', 'pmiIds']);
+    const keepPmi = params.pmiAuto === true ? {} : defined({ pmiIds: params.pmiIds ?? view.pmiIds });
     const keepPosition = params.autoPosition === true ? {} : defined({ position: params.paperPosition ?? view.position });
     const keepScale = params.autoScale === true ? {} : defined({ scale: params.scale ?? view.scale });
     const next: DrawingView = {
       ...rest,
       ...keepPosition,
       ...keepScale,
+      ...keepPmi,
       ...defined({ label: params.label, direction, entityIds: params.entityIds }),
       ...(offset !== undefined && view.section ? { section: { ...view.section, offset } } : {}),
       ...(view.detail && (center !== undefined || radius !== undefined)
@@ -115,6 +124,12 @@ export const updateSheet = defineCommand({
     partNumber: z.string().optional().describe('Title block part number.'),
     revision: z.string().optional().describe('Title block revision.'),
     date: z.string().optional().describe('Title block date text, printed as given.'),
+    pmiMode: z
+      .enum(['off', 'auto'])
+      .optional()
+      .describe(
+        '"auto" draws the PMI (frames, datums, sizes) whose annotation plane faces each projection view; "off" (default) draws none.',
+      ),
   }),
   run: (doc, params): CommandResult => {
     const sheet = requireSheet(doc, 'update_sheet', params.sheetId);
@@ -127,7 +142,7 @@ export const updateSheet = defineCommand({
     const next: DrawingSheet = {
       ...kept,
       ...(autoScale === true ? {} : defined({ scale: scale ?? sheet.scale })),
-      ...defined({ name: fields.name, paper: fields.paper, projectionAngle: fields.projectionAngle }),
+      ...defined({ name: fields.name, paper: fields.paper, projectionAngle: fields.projectionAngle, pmiMode: fields.pmiMode }),
       titleBlock: {
         ...sheet.titleBlock,
         ...defined({
