@@ -5,10 +5,6 @@
       "loft_fuselage",
       "set_aircraft_frame"
     ],
-    "docs/aerospace/02-advanced-surfacing/validation/plans/target_torus_surface_analysis.json": [
-      "analyze_draft",
-      "analyze_surface_curvature"
-    ],
     "docs/aerospace/03-gdt-mbd-pmi/validation/draft_plan_gdt_plate.json": [
       "add_datum_feature",
       "add_geometric_tolerance",

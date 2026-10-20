@@ -7,6 +7,7 @@ import type { Entity, SplineEntity, Vec2, Vec3 } from '../../model/types';
 import { applyEulerXYZ, isZeroRotation } from '../../lib/eulerRotation';
 import { ORIGIN, add3 } from '../../lib/vec3';
 import { curveDisplayPoints } from '../../geometry/nurbsCurve';
+import { surfaceTriangles } from '../../geometry/nurbsSurface';
 import { revolutionPolygons } from '../../geometry/revolution';
 import { sweepTriangles } from '../../geometry/sweep';
 import { loftTriangles } from '../../geometry/loft';
@@ -166,6 +167,8 @@ export function tessellateEntity(e: Entity): PreDepthPolygon[] {
       return strokeEllipseArc(e, e.radiusX, e.radiusY, 0, 2 * Math.PI);
     case 'spline':
       return tessellate2DSpline(e);
+    case 'nurbs_surface':
+      return rotated(surfaceTriangles(e.surface, e.position));
     case 'nurbs_curve':
       return [
         stroke(

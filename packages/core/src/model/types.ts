@@ -1,6 +1,6 @@
 /** Domain model — the single source of truth for a CAD document; changed only by commands. */
 
-import { isCurve3D } from './curveKinds';
+import { isCurve3D, isSheet } from './curveKinds';
 import type { PropertyModel } from './propertyModel';
 import type { ConstitutiveSet, MaterialModel } from './materialModel';
 import type { Vec2, Vec3 } from './vectors';
@@ -19,7 +19,8 @@ import type { ReliabilityModel } from './probabilistic';
 import type { SheetMetalModel } from './sheetMetal';
 import type { FeatureParams } from './features';
 import type { NurbsCurveData } from '../lib/nurbs/types';
-import type { CurveKind } from './curveKinds';
+import type { NurbsSurfaceData } from '../lib/nurbs/surfaceTypes';
+import type { CurveKind, SheetKind } from './curveKinds';
 
 /** Re-exported: every model consumer reads its vectors from here. */
 export type { Vec2, Vec3 };
@@ -65,7 +66,7 @@ export const SHAPE2D_KINDS = [
 
 export type Shape2DKind = (typeof SHAPE2D_KINDS)[number];
 
-export type EntityKind = SolidKind | Shape2DKind | CurveKind | 'instance';
+export type EntityKind = SolidKind | Shape2DKind | CurveKind | SheetKind | 'instance';
 
 export interface BaseEntity {
   readonly id: EntityId;
@@ -342,6 +343,16 @@ export interface NurbsCurveEntity extends BaseEntity {
   curve: NurbsCurveData;
 }
 
+/**
+ * Open NURBS surface sheet (not a solid: no volume, no kernel leaf); poles are local to `position` / `rotation`.
+ * @invariant `surfaceViolation(surface) === null`
+ * @see loft_surface, surface_from_points, fill_surface, trim_surface, sew_surfaces, thicken_surface, loft_fuselage
+ */
+export interface NurbsSurfaceEntity extends BaseEntity {
+  readonly kind: 'nurbs_surface';
+  surface: NurbsSurfaceData;
+}
+
 /** Annotation anchored at `position`. */
 export interface TextEntity extends BaseEntity {
   readonly kind: 'text';
@@ -427,6 +438,7 @@ export type Entity =
   | EllipseEntity
   | SplineEntity
   | NurbsCurveEntity
+  | NurbsSurfaceEntity
   | TextEntity
   | DimensionEntity
   | ImageEntity
@@ -440,7 +452,7 @@ export function is2D(e: Entity): e is Extract<Entity, { kind: Shape2DKind }> {
 
 /** True for solids, meshes, instances and images; false for planar shapes and 3D curves (no volume, no kernel leaf). */
 export function is3D(e: Entity): boolean {
-  return !SHAPE2D_KIND_SET.has(e.kind) && !isCurve3D(e);
+  return !SHAPE2D_KIND_SET.has(e.kind) && !isCurve3D(e) && !isSheet(e);
 }
 
 export interface Layer {

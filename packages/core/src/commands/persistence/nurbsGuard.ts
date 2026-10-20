@@ -1,10 +1,11 @@
-/** Saved-document checks for NURBS curve data (entity `nurbs_curve`, loft `sections`). */
+/** Saved-document checks for NURBS curve and surface data (entities `nurbs_curve`, `nurbs_surface`, loft `sections`). */
 
 import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isVec3 } from '../../lib/vec3';
 import { nurbsViolation } from '../../lib/nurbs/knotVector';
 import type { NurbsCurveData } from '../../lib/nurbs/types';
+import { MAX_SURFACE_POLES, surfaceViolation, type NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import { MAX_SPLINE_CONTROL_POINTS } from '../limits';
 import { hasClosingEdge, sectionChain } from '../../geometry/sectionChain';
 
@@ -36,4 +37,33 @@ export function exactSectionsProblem(curves: ReadonlyArray<NurbsCurveData>): str
       (chains[i] as typeof first).length !== first.length || hasClosingEdge(curve) !== hasClosingEdge(curves[0] as NurbsCurveData),
   );
   return mismatch > 0 ? `sections.${mismatch} must have the same Bézier span count and closing edge as sections.0` : null;
+}
+
+/** First structural problem of a stored NURBS surface (`label` names it in the message), or null when it is a valid clamped patch. */
+export function nurbsSurfaceProblem(value: unknown, label: string): string | null {
+  if (!isRecord(value)) return `${label} must be an object`;
+  const { degreeU, degreeV, poles, weights, knotsU, multiplicitiesU, knotsV, multiplicitiesV } = value;
+  if (!isFiniteNumber(degreeU) || !isFiniteNumber(degreeV)) return `${label}.degreeU and ${label}.degreeV must be finite numbers`;
+  const grid =
+    (cell: (item: unknown) => boolean) =>
+    (list: unknown): boolean =>
+      Array.isArray(list) &&
+      list.length <= MAX_SURFACE_POLES &&
+      list.every((row) => Array.isArray(row) && row.length <= MAX_SURFACE_POLES && row.every(cell));
+  if (!grid(isVec3)(poles)) return `${label}.poles must be a grid of [x, y, z] points (at most ${MAX_SURFACE_POLES} per direction)`;
+  if (weights !== undefined && !grid(isFiniteNumber)(weights)) return `${label}.weights must be a grid of finite numbers`;
+  if (![knotsU, multiplicitiesU, knotsV, multiplicitiesV].every(numberArray))
+    return `${label} knots and multiplicities (u and v) must be lists of finite numbers`;
+  const surface = {
+    degreeU,
+    degreeV,
+    poles,
+    ...(weights === undefined ? {} : { weights }),
+    knotsU,
+    multiplicitiesU,
+    knotsV,
+    multiplicitiesV,
+  } as NurbsSurfaceData;
+  const violation = surfaceViolation(surface);
+  return violation === null ? null : `${label}.${violation.path}: ${violation.message}`;
 }
