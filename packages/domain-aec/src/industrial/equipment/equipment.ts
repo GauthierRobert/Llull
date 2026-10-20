@@ -119,8 +119,15 @@ export const addPipeRun = defineCommand({
     service: z.string().optional().describe('Fluid / service. Default "process".'),
     material: z.string().optional().describe('Pipe material. Default "steel".'),
     levelId: levelIdParam,
+    asBuilt: z
+      .object({
+        extractionId: z.string().describe('Extraction record id in doc.scan.extractions.'),
+        unverified: z.boolean().describe('Whether the scan-derived geometry is unverified.'),
+      })
+      .optional()
+      .describe('Set by commit_asbuilt_extraction: marks the run as scan-derived (as-built). Do not set it by hand.'),
   }),
-  run: (doc, { points, diameter, dn, line, from, to, service, material, levelId }): CommandResult => {
+  run: (doc, { points, diameter, dn, line, from, to, service, material, levelId, asBuilt }): CommandResult => {
     const path = routeOrFailure('add_pipe_run', points, 'line');
     if (typeof path === 'string') return noop(doc, path);
     if (dn !== undefined && !(Number.isInteger(dn) && dn > 0))
@@ -158,6 +165,7 @@ export const addPipeRun = defineCommand({
       ...(dn !== undefined ? { dn } : {}),
       ...(origin !== undefined ? { from: origin } : {}),
       ...(destination !== undefined ? { to: destination } : {}),
+      ...(asBuilt !== undefined ? { asBuilt } : {}),
     };
     const length = routeLength(path);
     const label = `${lineNumber !== undefined ? ` line ${lineNumber}` : ''}${dn !== undefined ? ` DN${dn}` : ''}`;

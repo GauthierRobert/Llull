@@ -5,7 +5,7 @@
 //! GDT stack-up Monte Carlo, contract in `llull_stats`), `panel <folder>` (crate `llull-panel`, AER vortex-lattice influence + LU, faer),
 //! `explicit <folder>` (crate `llull-explicit`, PHY-19 RS-8a; contract in `llull_explicit::job`).
 //! An unknown job ends with an `error`
-//! event and exit code 2. The raster job reports a `warning` event when it was asked for the GPU but drew with the CPU twin.
+//! event and exit code 2. `cloud import|op <folder>`: crate `llull-cloud` (plant 10 point clouds, RS-3 / RS-4). The raster job reports a `warning` event when it was asked for the GPU but drew with the CPU twin.
 
 use llull_protocol::{emit, Event, Output};
 use llull_raster::Produced;
@@ -14,7 +14,7 @@ use std::path::Path;
 use std::process::ExitCode;
 
 const USAGE: &str =
-    "usage: llull-compute post <fatigue|map|random> <job-folder> | llull-compute raster <job-folder> | llull-compute topopt <job-folder> | llull-compute stats <job-folder> | llull-compute panel <job-folder> | llull-compute route <job-folder> | llull-compute explicit <job-folder>";
+    "usage: llull-compute post <fatigue|map|random> <job-folder> | llull-compute raster <job-folder> | llull-compute topopt <job-folder> | llull-compute stats <job-folder> | llull-compute panel <job-folder> | llull-compute route <job-folder> | llull-compute explicit <job-folder> | llull-compute cloud <import|op> <job-folder>";
 
 fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Output>, (String, String)> {
     match (job, rest) {
@@ -42,7 +42,10 @@ fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Outpu
         ("explicit", [folder, ..]) => {
             llull_explicit::job::run_job(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message))
         }
-        ("post" | "raster" | "topopt" | "route" | "stats" | "panel" | "explicit", _) => Err(("NATIVE_USAGE".to_string(), USAGE.to_string())),
+        ("cloud", [task, folder, ..]) => {
+            llull_cloud::job::run(task, Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message))
+        }
+        ("post" | "raster" | "topopt" | "route" | "stats" | "panel" | "explicit" | "cloud", _) => Err(("NATIVE_USAGE".to_string(), USAGE.to_string())),
         _ => Err(("NATIVE_JOB_UNKNOWN".to_string(), format!("unknown job '{job}'"))),
     }
 }

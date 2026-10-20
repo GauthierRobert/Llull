@@ -8,6 +8,7 @@
  *   stackup_monte_carlo  analyze_stackup with the Monte Carlo above the TS cap in llull-compute stats (GDT TR-GDT-22)
  *   vortex_lattice_solve analyze_vortex_lattice with the influence build + dense LU in llull-compute panel (AER M3)
  *   explicit_run   explicit_dynamics case -> llull-compute explicit -> fe_explicit artifact -> record_explicit_results (PHY-19 RS-8)
+ *   scan_import / scan_list  point-cloud file -> llull-compute cloud import -> asset store (`../scan/scanTools.ts`, plant 10)
  */
 
 import type { ToolDefinition } from '@protocol/tools';
@@ -26,6 +27,7 @@ import { DEFAULT_AUTO_ROUTE_TIMEOUT_S, NATIVE_EXPANSIONS_CEILING, NATIVE_MAX_EXP
 import { runStackupTool, stackupToolDefinition } from './stackupMonteCarlo';
 import { runVortexLatticeTool, vortexLatticeToolDefinition } from './vortexLattice';
 import { DEFAULT_EXPLICIT_TIMEOUT_S, runExplicitRun, type ExplicitRunOptions } from './explicitRun';
+import { defaultScanDeps, isScanTool, runScanTool, scanToolDefinitions } from '../scan/scanTools';
 
 const TIMEOUT = {
   type: 'number' as const,
@@ -78,6 +80,7 @@ export function nativeToolDefinitions(): ToolDefinition[] {
     stackupToolDefinition(),
     vortexLatticeToolDefinition(),
     explicitToolDefinition(),
+    ...scanToolDefinitions(),
   ];
 }
 
@@ -222,6 +225,7 @@ export async function runNativeTool(
   host: FeaHost & { readonly onProgress?: (line: string) => void },
   deps: NativeDeps = defaultDeps(process.env, host.onProgress),
 ): Promise<CommandOutcome | null> {
+  if (isScanTool(name)) return runScanTool(name, params, defaultScanDeps(deps.env, host.onProgress));
   if (!isNativeTool(name)) return null;
   if (name === 'fea_render') return { ...(await runFeaRender(params, host, deps)), changed: false };
   if (name === 'stackup_monte_carlo') return { ...(await runStackupTool(params, host, deps)), changed: false };

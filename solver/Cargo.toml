@@ -17,6 +17,7 @@ default-members = [
   "crates/llull-stats",
   "crates/llull-panel",
   "crates/llull-explicit",
+  "crates/llull-cloud",
   "bins/llull-compute",
 ]
 
@@ -57,6 +58,10 @@ opt-level = 3
 
 # The explicit benchmarks integrate tens of thousands of cycles (bar wave, drop).
 [profile.dev.package.llull-explicit]
+opt-level = 3
+
+# Plant 10 point clouds: the fit / ICP tests run on the pack's real clouds (bunny 30 571 points, CYL-B 8 000).
+[profile.dev.package.llull-cloud]
 opt-level = 3
 
 [profile.release]

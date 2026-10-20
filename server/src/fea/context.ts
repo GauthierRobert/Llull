@@ -4,7 +4,14 @@ import { defaultContext } from '@core/commands/context';
 import type { ExecutionContext } from '@core/commands/types';
 import { createLibraryProvider } from '../libraries/libraryStore';
 import { defaultFeArtifactStore } from './artifactStore';
+import { defaultPointCloudPort } from '../scan/pointCloudPort';
 
 export function serverContext(): ExecutionContext {
-  return { ...defaultContext(), feaArtifacts: defaultFeArtifactStore(), humanSignature: null, libraries: createLibraryProvider() };
+  return {
+    ...defaultContext(),
+    feaArtifacts: defaultFeArtifactStore(),
+    humanSignature: null,
+    libraries: createLibraryProvider(),
+    pointClouds: defaultPointCloudPort(),
+  };
 }

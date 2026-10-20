@@ -16,6 +16,7 @@ import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary
 import type { ReliabilityModel } from './probabilistic';
 import type { SheetMetalModel } from './sheetMetal';
 import type { PlantModel } from './plant';
+import type { ScanModel } from './pointCloud';
 import type { FeatureParams } from './features';
 
 /** Re-exported: every model consumer reads its vectors from here. */
@@ -671,6 +672,8 @@ export interface CadDocument {
   probabilistic?: ReliabilityModel;
   /** Absent until the first plant command (plugin `piping`, plant 02 RTE: `add_tie_in_point`, `create_pipeline`). */
   plant?: PlantModel;
+  /** Point-cloud references, registrations and extractions (plugin `scan`, plant 10); absent until the first scan command. No points. */
+  scan?: ScanModel;
 }
 
 /** Kernel provenance and modelling tolerance of a document (aerospace 01 KRN, TR-KRN-11/61). */
