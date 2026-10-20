@@ -147,6 +147,7 @@ export function composites(entityId: string, zoned = false, core = false): Compo
         E1: 135000,
         E2: 10000,
         G12: 5000,
+        G23: 3500,
         nu12: 0.3,
         plyThickness: 0.125,
         density: 0.0016,

@@ -5,6 +5,7 @@ import { nonlinearValueProblems } from '../nonlinear/shape';
 import { orientationErrors } from '../thermomech/validateOrientations';
 import { durabilityErrors } from './validateDurability';
 import { settingsErrors } from './validateSettings';
+import { defeatureErrors, idealizationErrors } from './validateIdealization';
 
 const TYPES = [
   'static',
@@ -163,7 +164,9 @@ function checkCase(scope: Scope, id: string, analysisCase: Record<string, unknow
       if (!Object.hasOwn(scope.entities, entityId)) errors.push(`${where}: part '${entityId}' does not exist`);
       if (!isRecord(idealization) || !oneOf(IDEALIZATION_KINDS, idealization['kind']))
         errors.push(`${where}: part '${entityId}' has an invalid idealization`);
+      else errors.push(...idealizationErrors(idealization, `${where}: part '${entityId}'`));
     }
+  errors.push(...defeatureErrors(analysisCase['defeature'], isRecord(parts) ? parts : {}, where));
   checkBag(scope, `${where}.constraints`, analysisCase['constraints'], analysisCase['constraintOrder'], (cid, constraint) => {
     if (!oneOf(CONSTRAINT_KINDS, constraint['kind'])) errors.push(`${where}: constraint '${cid}' has an unknown kind`);
     checkTarget(scope, constraint['target'], `${where}: constraint '${cid}'`);

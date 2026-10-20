@@ -139,10 +139,54 @@ describe('INP shell deck', () => {
     const nodes: FeMeshArtifact['nodes'] = [...NODES, [7, 25, 0, 1], [8, 50, 25, 1], [9, 25, 50, 1], [10, 0, 25, 1]];
     const text = deckText(c.doc, c.analysisId, shellMesh(c, 'S8', [[1, 1, 2, 5, 4, 7, 8, 9, 10]], nodes));
     expect(text).toContain('TYPE=S8R');
-    expect(text).toContain('*ELASTIC, TYPE=ENGINEERING CONSTANTS\n135000, 10000, 10000, 0.3, 0.3, 0, 5000, 5000\n5000\n');
+    expect(text).toContain('*ELASTIC, TYPE=ENGINEERING CONSTANTS\n135000, 10000, 10000, 0.3, 0.3, 0.428571428571, 5000, 5000\n3500\n');
     expect(text).toMatch(/\*ORIENTATION, NAME=OR_\w+_2\n1, 0, 0, 0, 1, 0\n3, 90\n/);
     expect(text).toMatch(/\*SHELL SECTION, ELSET=P_\w+, COMPOSITE, OFFSET=0\n0\.125, , L_\w+_1, OR_\w+_1\n0\.125, , L_\w+_1, OR_\w+_2\n/);
     expect(text).not.toContain('*MATERIAL, NAME=M_1');
+  });
+
+  it('projects a tilted rosette axis on the shell and refuses non-planar parts, a missing G23 and an implausible density', () => {
+    const tilted = (doc: CadDocument, id: string): CadDocument => {
+      const model = composites(id);
+      return { ...doc, composites: { ...model, rosettes: { 'ro-1': { ...model.rosettes['ro-1']!, axis0: [1, 0, 1] } } } };
+    };
+    const c = shellCase({ idealization: 'shell', compositePartId: 'cp-1', maxThickness: 3 }, tilted);
+    const nodes: FeMeshArtifact['nodes'] = [
+      ...NODES,
+      [7, 25, 0, 1],
+      [8, 50, 25, 1],
+      [9, 25, 50, 1],
+      [10, 0, 25, 1],
+      [11, 75, 0, 1],
+      [12, 100, 25, 1],
+      [13, 75, 50, 1],
+    ];
+    const flat = deckText(c.doc, c.analysisId, shellMesh(c, 'S8', [[1, 1, 2, 5, 4, 7, 8, 9, 10]], nodes));
+    expect(flat).toMatch(/\*ORIENTATION, NAME=OR_\w+_1\n1, 0, 0, 0, 1, 0\n/);
+    const bent: FeMeshArtifact['nodes'] = nodes.map(([id, x, y, z]) => [id, x, y, x > 50 ? z + (x - 50) : z]);
+    const twoFaces = shellMesh(
+      c,
+      'S8',
+      [
+        [1, 1, 2, 5, 4, 7, 8, 9, 10],
+        [2, 2, 3, 6, 5, 11, 12, 13, 8],
+      ],
+      bent,
+    );
+    expect(writeInp(c.doc, c.analysisId, twoFaces)).toMatchObject({ code: 'FEA_COMPOSITE_NOT_PLANAR' });
+    expect(writeBdf(c.doc, c.analysisId, twoFaces)).toMatchObject({ code: 'FEA_COMPOSITE_NOT_PLANAR' });
+    const lamina =
+      (change: Record<string, unknown>) =>
+      (doc: CadDocument, id: string): CadDocument => {
+        const model = composites(id);
+        return { ...doc, composites: { ...model, materials: { tape: { ...model.materials['tape']!, ...change } } } };
+      };
+    for (const change of [{ G23: undefined }, { density: 1600 }]) {
+      const bad = shellCase({ idealization: 'shell', compositePartId: 'cp-1', maxThickness: 3 }, lamina(change));
+      const mesh = shellMesh(bad, 'S8', [[1, 1, 2, 5, 4, 7, 8, 9, 10]], nodes);
+      expect(writeInp(bad.doc, bad.analysisId, mesh)).toMatchObject({ code: 'FEA_COMPOSITE_INVALID' });
+      expect(writeBdf(bad.doc, bad.analysisId, mesh)).toMatchObject({ code: 'FEA_COMPOSITE_INVALID' });
+    }
   });
 
   it('writes plane-stress sections and refuses pressure on them', () => {
@@ -222,7 +266,7 @@ describe('BDF shell deck', () => {
     if ('code' in result) throw new Error(result.message);
     expect(result.text).toMatch(/^CQUAD4 {2}1 {7}1 {7}1 {7}2 {7}5 {7}4 {7}101\s*$/m);
     expect(result.text).toMatch(/^CORD2R {2}101 {13}0\. {6}0\. {6}0\. {6}0\. {6}0\. {6}1\./m);
-    expect(result.text).toMatch(/^MAT8 {4}2 {7}135000. 10000. {2}\.3 {6}5000\. {3}5000\. {3}5000\. {3}1\.6E-9/m);
+    expect(result.text).toMatch(/^MAT8 {4}2 {7}135000. 10000. {2}\.3 {6}5000\. {3}5000\. {3}3500\. {3}1\.6E-9/m);
     expect(result.text).toMatch(/^PCOMP {3}1 {7}-\.125/m);
     expect(result.text).toMatch(/^\s+2 {7}.125 {4}0. {6}YES {5}2 {7}.125 {4}90. {5}YES/m);
     expect(result.text).not.toContain('MAT1');

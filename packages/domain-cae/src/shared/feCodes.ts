@@ -44,6 +44,14 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   FEA_MS_NEGATIVE:
     'redesign (thicker section, stiffer load path, better material); only a qualified reviewer can disposition a negative margin (dispose_margin)',
   FEA_MS_MARGINAL: 'a qualified reviewer dispositions marginal rows (dispose_margin) or the part is strengthened',
+  FEA_MS_SINGULAR_FAIL:
+    'a peak inside a singular zone fails: refine the mesh there or spread the load / support over a face, and have a qualified reviewer judge it',
+  FEA_MS_ALL_SINGULAR:
+    'every node of the group lies in a singular zone, so it has no margin: lower singularityRadius (with a note), refine the mesh, or support / load over faces',
+  FEA_SINGULAR_EXCLUSION_LARGE:
+    'a large share of the part is excluded as singular: lower singularityRadius (with a note) or refine the mesh (smaller globalSize)',
+  FEA_COMPOSITE_MARGINS_UNSUPPORTED:
+    'composite shells need ply failure criteria (not built): assess them with the 06 CMP laminate analysis; their rows are left out',
   FEA_MARGINAL_BAND_UNSET: 'ask the owner / company rule for a marginal band and pass marginalBand to compute_margins',
   FEA_DISPOSITION_PENDING:
     'hand the FAIL / MARGINAL rows to the qualified reviewer, who dispositions them with dispose_margin in the desktop app',

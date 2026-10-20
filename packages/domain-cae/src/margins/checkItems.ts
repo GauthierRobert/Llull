@@ -5,6 +5,7 @@ import type { ExecutionContext } from '@core/commands/types';
 import { feRemediation } from '../shared/feCodes';
 import { caseOf } from '../shared/access';
 import { marginTable, type MarginRow } from './computeMargins';
+import { orphanSingularKeys } from './screenWarnings';
 
 export interface MarginCheckItem {
   readonly code: string;
@@ -54,6 +55,25 @@ export function marginItems(doc: CadDocument, analysisId: string, ctx: Execution
         [analysisId],
       ),
     );
+  const singularFails = table.rows.filter((row) => row.status === 'FAIL' && row['singular'] === true);
+  if (singularFails.length > 0)
+    items.push(
+      item(
+        'FEA_MS_SINGULAR_FAIL',
+        'warning',
+        `${singularFails.length} singular-zone row(s) with MS < 0 (excluded from minMs, still a finding): ${singularFails.map(describeRow).join('; ')}`,
+        [analysisId, ...singularFails.map((row) => row.rowId)],
+      ),
+    );
+  const orphans = orphanSingularKeys(table.rows);
+  if (orphans.length > 0)
+    items.push(
+      item('FEA_MS_ALL_SINGULAR', 'error', `group(s) with no margin outside the singular zone: ${orphans.join('; ')}`, [analysisId]),
+    );
+  const warnings = Array.isArray(table.data['warnings']) ? table.data['warnings'].filter((text) => typeof text === 'string') : [];
+  for (const text of warnings)
+    for (const code of ['FEA_SINGULAR_EXCLUSION_LARGE', 'FEA_COMPOSITE_MARGINS_UNSUPPORTED'])
+      if (text.startsWith(`${code}: `)) items.push(item(code, 'warning', text.slice(code.length + 2), [analysisId]));
   if (pending.length > 0)
     items.push(
       item(

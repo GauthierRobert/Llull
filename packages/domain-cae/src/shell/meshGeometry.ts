@@ -45,7 +45,12 @@ export function partMidsurfaceGeometry(
     return { kind: 'midsurface', element: 'plane_stress', thickness: idealization.thickness, faces: domain.faces, warnings: [] };
   }
   if (idealization?.kind !== 'shell') return null;
-  const mid = midsurfaceOf(doc, entityId, idealization.midsurface, kernel);
+  const mid = midsurfaceOf(
+    doc,
+    entityId,
+    { ...idealization.midsurface, stripLength: caseOf(doc, analysisId)?.mesh.globalSize ?? 0 },
+    kernel,
+  );
   if (isMidsurfaceRefusal(mid)) return mid;
   const minCoverage = idealization.midsurface.minCoverage ?? DEFAULT_MIN_COVERAGE;
   if (mid.coverage < minCoverage)

@@ -99,6 +99,10 @@ describe('sheet-metal fast path', () => {
     expect(flat?.holes).toHaveLength(1);
     const strips = mid.faces.filter((face) => face.source.startsWith('bend b1'));
     expect(strips).toHaveLength(6);
+    const coarse = midsurfaceOf(doc, plateId, { stripLength: 10 }, null);
+    expect('faces' in coarse ? coarse.faces.filter((face) => face.source.startsWith('bend b1')) : []).toHaveLength(1);
+    const fine = midsurfaceOf(doc, plateId, { stripLength: 1 }, null);
+    expect('faces' in fine ? fine.faces.filter((face) => face.source.startsWith('bend b1')) : []).toHaveLength(4);
     expect(strips[0]?.outer.some((point) => near(point, [0, 0, 0.5]))).toBe(true);
     expect(strips.at(-1)?.outer.some((point) => near(point, [0, 2.5, 3]))).toBe(true);
     for (const strip of strips) for (const point of strip.outer) expect(Math.hypot(point[1], point[2] - 3)).toBeCloseTo(2.5, 9);

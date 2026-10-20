@@ -10,7 +10,9 @@ import { significantNumber } from '@lib/compactNumber';
 import { loadCasesOf } from '../decks/context';
 import { elasticConstants, isElasticRefusal, propertyTemperatureK } from '../decks/elastic';
 import { lengthUnitName, stressPerMpa, stressUnitName } from '../decks/units';
-import { maxOverNodes, nodeCoordinates, nodeEntities, stepOfLoadCase, vonMises } from '../results/fields';
+import { nodeCoordinates, nodeEntities, stepOfLoadCase, vonMises } from '../results/fields';
+import { appliedOverFibres, type Applied } from './fibreStress';
+import { compositeWarnings, exclusionWarnings, isCompositeEntity, orphanSingularKeys } from './screenWarnings';
 import { caseOf } from '../shared/access';
 import { analysisIdSchema } from '../shared/schemas';
 import { trustedRecord } from '../shared/trust';
@@ -89,17 +91,15 @@ function groupsOf(analysis: AnalysisCase, mesh: FeMeshArtifact, groupBy: 'part' 
   return groups;
 }
 
-/** Largest criterion value over `nodes` of a STRESS field (component criteria: largest magnitude). */
+/** Largest criterion value over `nodes` of the step's STRESS (and shell fibre) fields; component criteria: largest magnitude. */
 function appliedOver(
-  stress: NonNullable<ReturnType<typeof stepOfLoadCase>>['fields'][string] | undefined,
+  fields: NonNullable<ReturnType<typeof stepOfLoadCase>>['fields'],
   nodes: readonly number[],
   criterion: Criterion,
-): { readonly node: number; readonly value: number } | null {
-  const wanted = new Set(nodes);
+): Applied | null {
   const scalar = (values: readonly number[]): number =>
     criterion === 'von_mises' ? vonMises(values) : Math.abs(values[COMPONENT[criterion]] ?? Number.NaN);
-  const subset = Object.fromEntries(Object.entries(stress?.values ?? {}).filter(([id]) => wanted.has(Number(id))));
-  return maxOverNodes({ values: subset }, scalar);
+  return appliedOverFibres(fields, nodes, scalar);
 }
 
 export interface MarginRow {
@@ -193,19 +193,20 @@ function buildRows(
   const cases = loadCasesOf(analysis);
   for (const [index, { name, category }] of cases.entries()) {
     if (context.loadCaseFilter !== undefined && !context.loadCaseFilter.has(name)) continue;
-    const field = stepOfLoadCase(results, index, analysis)?.fields['STRESS'];
-    if (field === undefined)
+    const fields = stepOfLoadCase(results, index, analysis)?.fields;
+    if (fields?.['STRESS'] === undefined)
       return {
         code: 'FEA_RESULTS_MISSING',
         message: `the results have no STRESS field for load case '${name}' (solver step ${index + 1})`,
       };
     for (const group of groups) {
+      if (isCompositeEntity(analysis, group.entityId)) continue;
       const parts = [
         { nodes: group.nodes.filter((node) => !context.singular.has(node)), singular: false },
         { nodes: group.nodes.filter((node) => context.singular.has(node)), singular: true },
       ];
       for (const { nodes, singular } of parts) {
-        const applied = appliedOver(field, nodes, criterion);
+        const applied = appliedOver(fields, nodes, criterion);
         if (applied === null) continue;
         const materialId = Object.hasOwn(context.doc.entities, group.entityId)
           ? context.doc.entities[group.entityId]?.materialId
@@ -244,6 +245,7 @@ function buildRows(
             status,
             ...(status === 'FAIL' ? { code: 'FEA_MS_NEGATIVE' } : status === 'MARGINAL' ? { code: 'FEA_MS_MARGINAL' } : {}),
             node: applied.node,
+            ...(applied.fibre !== undefined ? { fibre: applied.fibre } : {}),
             [`at${length}`]: at,
             singular,
             ...(singular
@@ -389,6 +391,12 @@ export function marginTable(
   const built = buildRows(context);
   if ('code' in built) return refuse(built.code, built.message);
   const { rows } = built;
+  const composite = compositeWarnings(analysis);
+  if (rows.length === 0 && composite.length > 0)
+    return refuse(
+      'FEA_COMPOSITE_MARGINS_UNSUPPORTED',
+      composite.map((text) => text.replace(/^FEA_COMPOSITE_MARGINS_UNSUPPORTED: /, '')).join('; '),
+    );
   if (rows.length === 0)
     return refuse(
       'FEA_MARGIN_PARAM_INVALID',
@@ -415,6 +423,11 @@ export function marginTable(
     singularScreening: screen.data,
     warnings: [
       ...(marginalBand === undefined ? ['FEA_MARGINAL_BAND_UNSET: no marginalBand given, so no row is MARGINAL'] : []),
+      ...composite,
+      ...exclusionWarnings(trust.meshArtifact, screen.excluded),
+      ...orphanSingularKeys(rows).map(
+        (key) => `FEA_MS_ALL_SINGULAR: group ${key} lies entirely in a singular zone: it has only a singular row and no margin`,
+      ),
       ...(analysis.type === 'thermo_static' ? temperatureWarnings(context.temperatures, propertyTemperatureK(analysis), rows) : []),
     ],
     reviewRequired: true,
@@ -453,8 +466,8 @@ export const computeMargins = defineCommand({
     '(create_analysis factors, or factor = one number for both; defaults 1.5 per 14 CFR 25.303 and 1.0 apply silently unless the user states a safety factor, so map "SF 2" to factor 2 there) and are listed with source and defaulted. Status: FAIL if MS < 0, ' +
     'MARGINAL only when marginalBand is given and MS < band (no default band), else PASS; FAIL / MARGINAL rows are disposition ' +
     'pending_human until a qualified human records dispose_margin (an agent cannot: FEA_HUMAN_GATE); a disposition never changes the status ' +
-    '(statusLabel "FAIL (accepted)") and every row has a stable rowKey. Every row has reviewRequired: true and unverified = OR of the input flags. Singularity policy: nodes within a radius of a point / edge ' +
-    'force or moment load and of a point / edge support (targets with no mesh face) are excluded from the part / target rows and reported in ' +
+    '(statusLabel "FAIL (accepted)") and every row has a stable rowKey. Shell / plane-stress nodes use the largest of the membrane and the top / bottom fibre stress (row fibre). Composite shells get no row (FEA_COMPOSITE_MARGINS_UNSUPPORTED: no ply criteria). Every row has reviewRequired: true and unverified = OR of the input flags. Singularity policy: nodes within a radius of a point / edge ' +
+    'force or moment load and of a point / edge support of a SOLID part (targets with no mesh face; shell / plane-stress edge supports are not sources) are excluded from the part / target rows (FEA_MS_ALL_SINGULAR / FEA_SINGULAR_EXCLUSION_LARGE warnings when that swallows a group or > 25 % of a part) and reported in ' +
     'separate rows (region "singular", singular true, a note) that never count towards minMs / minMsRow (status still computed and shown). ' +
     'Radius default = 2 x mesh globalSize (named llull default, defaulted true in data.singularScreening.radius); singularityRadius ' +
     '(document length units, 0 = exclude nothing) overrides it and REQUIRES singularityNote (engineer justification, echoed in data), else ' +

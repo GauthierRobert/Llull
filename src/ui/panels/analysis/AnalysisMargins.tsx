@@ -6,7 +6,7 @@ import type { AnalysisCase } from '@core/model/analysis';
 import { classNames } from '@ui/classNames';
 import { PanelSection, StatusChip, StatusLine } from '@ui/panels/PanelParts';
 import { useStore } from '@ui/store';
-import { dispositionText, parseMargins, statusToneOf, type MarginRowView, type MarginsView } from './marginsData';
+import { dispositionText, minMsTone, parseMargins, statusToneOf, type MarginRowView, type MarginsView } from './marginsData';
 import { formatSignificant } from './quantityFormat';
 import { useHostQuery } from './useHostQuery';
 
@@ -66,7 +66,8 @@ function MarginTable({ view }: { view: MarginsView }): React.ReactElement {
           <tbody className="analysis__margins-singular" data-testid="analysis-margins-singular">
             <tr>
               <th colSpan={COLUMNS.length} scope="colgroup">
-                Singular zones: peak stress at a point load, support or re-entrant corner. Judge these by hand; do not trust the margin.
+                Singular zones: peak stress next to a point / edge load or a point / edge support of a solid. Judge these by hand; do not
+                trust the margin.
               </th>
             </tr>
             {singular.map((row) => (
@@ -94,7 +95,7 @@ export function AnalysisMargins({ analysisCase }: { analysisCase: AnalysisCase }
         <>
           <div className="analysis__margins-head">
             <StatusChip
-              tone={view.minMs === null ? 'info' : view.minMs < 0 ? 'bad' : 'ok'}
+              tone={minMsTone(view)}
               text={view.minMs === null ? 'No finite margin' : `Min MS ${formatSignificant(view.minMs, 3)}`}
               testId="analysis-margins-min"
             />
@@ -110,6 +111,11 @@ export function AnalysisMargins({ analysisCase }: { analysisCase: AnalysisCase }
                 <li key={warning}>{warning}</li>
               ))}
             </ul>
+          )}
+          {view.singularScreening !== '' && (
+            <p className="analysis__hint" data-testid="analysis-margins-screening">
+              {view.singularScreening}
+            </p>
           )}
           <MarginTable view={view} />
         </>

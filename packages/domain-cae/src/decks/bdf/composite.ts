@@ -8,7 +8,7 @@ import { dot3 } from '@lib/vec3';
 import type { DeckContext, DeckRefusal } from '../context';
 import { densityToAnalysis, stressPerMpa } from '../units';
 import { SHELL_OFFSET } from '../../shell/meshGeometry';
-import { firstElementNormal } from '../../shell/shellDeck';
+import { compositePlane, laminaProblem, projectedAxis } from '../../shell/shellDeck';
 import { isLaminateRefusal, laminateOf } from '../../shell/laminate';
 import { cardLines } from './fields';
 import { COMPOSITE_CID_BASE, failed, real, refusal, type Rounding } from './model';
@@ -29,9 +29,16 @@ export function compositeCards(
     return refusal('FEA_PART_INVALID', `'${entityId}' is no composite shell`);
   const laminate = laminateOf(ctx.doc, idealization.laminate.compositePartId, entityId, idealization.laminate.sectionId);
   if (isLaminateRefusal(laminate)) return refusal(laminate.code, laminate.message, [entityId]);
-  const normal = firstElementNormal(ctx, entityId) ?? laminate.stackNormal;
+  const normal = compositePlane(ctx, entityId);
+  if (typeof normal === 'string') return refusal('FEA_COMPOSITE_NOT_PLANAR', normal, [entityId]);
   const plies = dot3(normal, laminate.stackNormal) < 0 ? [...laminate.plies].reverse() : laminate.plies;
-  const axis0 = plies[0]?.axis0 ?? [1, 0, 0];
+  const axis0 = projectedAxis(plies[0]?.axis0 ?? [1, 0, 0], normal);
+  if (axis0 === null) return refusal('FEA_COMPOSITE_INVALID', 'the rosette 0-degree axis is normal to the shell', [entityId]);
+  for (const name of new Set(plies.map((ply) => ply.materialName))) {
+    const lamina = laminate.materials[name];
+    const problem = lamina === undefined ? `lamina material '${name}' is missing` : laminaProblem(ctx.doc, name, lamina);
+    if (problem !== null) return refusal('FEA_COMPOSITE_INVALID', problem, [entityId]);
+  }
   const values = (entries: readonly (readonly [number, string])[]): string[] | DeckRefusal => {
     const out: (string | DeckRefusal)[] = entries.map(([value, what]) => real(value, what, track));
     const bad = out.find(failed);

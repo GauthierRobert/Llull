@@ -230,6 +230,28 @@ describe('AnalysisPanel FEA-REST UI', () => {
     expect(within(singular).getByTestId('analysis-margin-r4')).toBeTruthy();
     expect(singular.textContent).toContain('Singular zones');
     expect(within(screen.getByTestId('analysis-margins-table')).getByTestId('analysis-margin-r1').closest('tbody')).not.toBe(singular);
+    expect(singular.textContent).not.toContain('re-entrant');
+  });
+
+  it('reads the singularity screening object and warns when only a singular row fails', () => {
+    seedAnalysis();
+    solvedStatic();
+    mocks.margins = {
+      isError: false,
+      summary: 'compute_margins: ok',
+      data: {
+        minMs: 0.4,
+        reviewRequired: true,
+        warnings: [],
+        singularScreening: { radius: { value: 0.2, unit: 'mm', defaulted: true }, excludedNodes: 3 },
+        rows: [marginRow({ rowId: 'r1' }), marginRow({ rowId: 'r2', singular: true, ms: -0.5, status: 'FAIL', statusLabel: 'FAIL' })],
+      },
+    };
+    render(<AnalysisPanel />);
+    expect(screen.getByTestId('analysis-margins-min').className).toContain('panel__status--warn');
+    const screening = screen.getByTestId('analysis-margins-screening').textContent ?? '';
+    expect(screening).toContain('radius 0.2 mm (llull default), 3 node(s) excluded');
+    expect(screening).toContain('Re-entrant corners are not screened');
   });
 
   it('shows the refusal of compute_margins', () => {

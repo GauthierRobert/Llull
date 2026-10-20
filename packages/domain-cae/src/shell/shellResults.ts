@@ -104,7 +104,7 @@ function nearestFinder(nodes: ReadonlyMap<number, Vec3>, cell: number): (point: 
 /**
  * Result steps on the mesh nodes for a mesh with 2D parts (unchanged steps when it has none).
  * @invariant only mesh node ids remain in every field; STRESS_TOP / STRESS_BOT exist iff a 2D node was matched to its expanded fibres
- * @failure a 2D node with neither expanded fibre nodes nor values under its own number -> FEA_SHELL_RESULTS_UNMAPPED
+ * @failure a 2D node with neither its own expanded fibre nodes (candidates: non-mesh node numbers, each used once) nor STRESS under its own number -> FEA_SHELL_RESULTS_UNMAPPED
  */
 export function mapShellResults(
   doc: CadDocument,
@@ -115,26 +115,32 @@ export function mapShellResults(
 ): { readonly steps: Steps } | { readonly code: string; readonly message: string } {
   const planar = planarNodes(doc, analysisId, mesh);
   if (planar.size === 0) return { steps };
-  const frdNodes = parseFrdNodes(frdText);
+  // Candidates are expanded nodes only (numbers that are not mesh nodes: never a solid node or a node of another part), each used once.
+  const meshNodeIds = new Set(mesh.nodes.map(([id]) => id));
+  const frdNodes = new Map([...parseFrdNodes(frdText)].filter(([id]) => !meshNodeIds.has(id)));
   let thinnest = Infinity;
   for (const node of planar.values()) if (node.thickness > 0) thinnest = Math.min(thinnest, node.thickness);
   const find = nearestFinder(frdNodes, Number.isFinite(thinnest) ? thinnest : 1);
   const coordinates = new Map(mesh.nodes.map(([id, x, y, z]) => [id, [x, y, z] as Vec3]));
   const fibres = new Map<number, readonly [top: number, bottom: number]>();
+  const taken = new Set<number>();
   const unmapped: number[] = [];
-  const firstFields = steps[0]?.fields ?? {};
+  const ownStress = steps[0]?.fields['STRESS']?.values ?? {};
   for (const [node, { normal, thickness, offset }] of planar) {
     const x = coordinates.get(node) ?? [0, 0, 0];
     const tolerance = MATCH_FRACTION * thickness;
     const top = thickness > 0 ? find(add3(x, scale3(normal, (0.5 - offset) * thickness)), tolerance) : null;
     const bottom = thickness > 0 ? find(sub3(x, scale3(normal, (0.5 + offset) * thickness)), tolerance) : null;
-    if (top !== null && bottom !== null && top !== bottom) fibres.set(node, [top, bottom]);
-    else if (!Object.values(firstFields).some((field) => Object.hasOwn(field.values, String(node)))) unmapped.push(node);
+    if (top !== null && bottom !== null && top !== bottom && !taken.has(top) && !taken.has(bottom)) {
+      fibres.set(node, [top, bottom]);
+      taken.add(top);
+      taken.add(bottom);
+    } else if (!Object.hasOwn(ownStress, String(node))) unmapped.push(node);
   }
   if (unmapped.length > 0)
     return {
       code: 'FEA_SHELL_RESULTS_UNMAPPED',
-      message: `${unmapped.length} shell / plane-stress node(s) (first ${unmapped.slice(0, 5).join(', ')}) have no expanded fibre nodes in the .frd and no values of their own`,
+      message: `${unmapped.length} shell / plane-stress node(s) (first ${unmapped.slice(0, 5).join(', ')}) have no expanded fibre nodes of their own in the .frd (a kink, or a node shared with another part) and no STRESS under their own number`,
     };
   const meshIds = mesh.nodes.map(([id]) => String(id));
   const mapped = steps.map((step) => {

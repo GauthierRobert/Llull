@@ -23,6 +23,8 @@ export const DEFAULT_MIN_COVERAGE = 0.98;
 export interface MidsurfaceRequest {
   readonly maxThickness?: number;
   readonly angularTolDeg?: number;
+  /** Sheet-metal bends: no strip shorter than this (the mesh globalSize, document units); absent = 15-degree strips only. */
+  readonly stripLength?: number;
 }
 
 /**
@@ -40,7 +42,7 @@ export function midsurfaceOf(
   if (entity === undefined || !is3D(entity))
     return { code: 'FEA_PART_INVALID', message: `'${entityId}' is not a 3D solid of the document` };
   const sheet = sheetMetalPartOf(doc, entityId);
-  if (sheet !== undefined) return sheetMetalMidsurface(doc, entityId, sheet);
+  if (sheet !== undefined) return sheetMetalMidsurface(doc, entityId, sheet, request.stripLength);
   const angularTolDeg = request.angularTolDeg ?? DEFAULT_ANGULAR_TOL_DEG;
   if (entity.kind === 'box') {
     const thinnest = Math.min(...entity.size);
