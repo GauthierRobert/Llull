@@ -73,3 +73,14 @@ account) and the `RESULTS.md is rendered` contract test of pack 07 (CRLF working
 6. B-spline loft sections (02 SRF-3, first compile): exact solid but OCC's Gauss rule under-integrated faces bounded by one multi-span edge
    (NACA wing 12 % low); each knot span is now its own edge. A first fix in mass properties was reverted because it moved the NIST
    reference (VC-KRN-25) by up to 1.3e-4.
+
+## Addendum 2026-10-20: NIST STEP File Analyzer (SFA) for 03 GD&T VC-GDT-22
+
+| Tool | Version (pin) | Source | Where | Provenance |
+| --- | --- | --- | --- | --- |
+| SFA (`sfa-cl.exe`, `STEP-File-Analyzer.exe`) | 5.51 (updated 14 Sep 2026) | `https://raw.githubusercontent.com/usnistgov/SFA/master/Release/SFA-5.51.zip`, unzipped | `%USERPROFILE%\tools\sfa-5.51` (user scope, no installer) | zip sha256 `d7d06e24…a13c` (76 988 894 bytes); `sfa-cl.exe` sha256 `df1202ea…7dca`; `STEP-File-Analyzer.exe` sha256 `5bfa1382…4ba6`; NIST public-domain software, redistribution terms in its README FIRST |
+| IFCsvr toolkit (SFA's STEP reader, a 32-bit ActiveX component) | 3.0.0.8 (`ifcsvrr300_setup_1008_en-update.msi`, unpacked by SFA into `%TEMP%\SFA`) | shipped inside `sfa-cl.exe` | **NOT installed** | the installer registers a COM component under `C:\Program Files (x86)\IFCsvrR300` and needs administrator rights; running it unattended was refused by the permission policy, so it is left for the owner |
+
+Consequence: without IFCsvr `sfa-cl.exe` only offers the geometry viewer, not the semantic-PMI and validation-property spreadsheets. `server/tests/sfaPmi.test.ts` probes
+for the toolkit and skips with a logged reason until it is installed (run the `.msi` as administrator once, then `npm --prefix server test -- sfaPmi`). Override the
+binary with `LLULL_SFA`.

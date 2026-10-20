@@ -187,6 +187,95 @@ export interface Characteristic {
   readonly retiredIn?: string;
 }
 
+/** One part installed in a serial that differs from the as-designed baseline, with the authority that allowed it (a request for variance, a waiver). */
+export interface AsBuiltDeviation {
+  readonly partNumber: string;
+  readonly installedRevision: string;
+  readonly authority: string;
+}
+
+/**
+ * What was built for one serial (FR-PLM-28): the baseline it was designed to and the deviations from it. Recorded by a human (the record asserts
+ * what is physically installed); `sha256` covers every other field, so a hand edit of the saved file is detected on load.
+ */
+export interface AsBuiltRecord {
+  readonly serial: string;
+  readonly partNumber: string;
+  readonly asDesignedBaseline: string;
+  /** The manufacturing BOM this serial was built from (same baseline), when one was used. */
+  readonly mbom?: string;
+  readonly deviations: readonly AsBuiltDeviation[];
+  readonly at?: string;
+  readonly by: string;
+  readonly sha256: string;
+}
+
+/** One line of a manufacturing BOM: an engineering BOM row kept as is, changed, or a manufacturing-only line. */
+export interface MbomLine {
+  readonly partNumber: string;
+  readonly revision: string;
+  readonly quantity: number;
+  readonly origin: 'ebom' | 'ebom-quantity' | 'manufacturing';
+  /** Manufacturing-only lines: what the line is (a consumable, tooling, a process material, a phantom assembly). */
+  readonly kind?: 'consumable' | 'tooling' | 'process-material' | 'phantom';
+  readonly name?: string;
+  readonly reason?: string;
+}
+
+/** An engineering BOM row left out of the manufacturing BOM (design-only items) with why. */
+export interface MbomOmission {
+  readonly partNumber: string;
+  readonly reason: string;
+}
+
+/** The manufacturing BOM of a product baseline (M6): frozen once created; `sha256` covers the other fields. */
+export interface MbomRecord {
+  readonly id: string;
+  readonly name: string;
+  readonly baseline: string;
+  readonly lines: readonly MbomLine[];
+  readonly omitted: readonly MbomOmission[];
+  readonly at?: string;
+  readonly by?: string;
+  readonly sha256: string;
+}
+
+export type FaiResultStatus =
+  | 'PASS'
+  | 'FAIL'
+  | 'REWORK'
+  | 'SYSERROR'
+  | 'INDETERMINATE'
+  | 'NOT_ANALYZED'
+  | 'BASIC_OR_TED'
+  | 'UNDEFINED'
+  | 'OTHER';
+
+/** The measured result of one characteristic, as the measuring system reported it (the status is the system's verdict, not llull's). */
+export interface FaiResult {
+  readonly charNo: number;
+  readonly status: FaiResultStatus;
+  readonly value?: number;
+  readonly maxValue?: number;
+  readonly unit?: string;
+  /** The QIF element that carried it, e.g. `DiameterCharacteristicMeasurement`, and its id. */
+  readonly source: { readonly element: string; readonly qifId: string };
+}
+
+/** Measured results imported for one revision (QIF 3.0 MeasurementResults): kept with the hash of the exact file and who attested the import. */
+export interface FaiResultSet {
+  readonly id: string;
+  readonly revision: string;
+  readonly serial?: string;
+  readonly source: { readonly format: 'QIF 3.0 MeasurementResults'; readonly sha256: string; readonly bytes: number };
+  readonly results: readonly FaiResult[];
+  /** Results of the file that match no characteristic of the register, and characteristic numbers the file has no result for. */
+  readonly unmatched: readonly string[];
+  readonly missing: readonly number[];
+  readonly importedBy: string;
+  readonly at?: string;
+}
+
 export interface PlmPolicy {
   readonly requireChangeOrder: boolean;
   readonly requireIndependentChecker: boolean;
@@ -208,5 +297,9 @@ export interface PlmModel {
   readonly baselines?: Readonly<Record<string, Baseline>>;
   /** V1-FAI: keyed by PMI item id. */
   readonly characteristics?: Readonly<Record<string, Characteristic>>;
+  /** M6: as-built records keyed by serial, manufacturing BOMs keyed by id, imported FAI results keyed by id. */
+  readonly asBuilt?: Readonly<Record<string, AsBuiltRecord>>;
+  readonly mbom?: Readonly<Record<string, MbomRecord>>;
+  readonly faiResults?: Readonly<Record<string, FaiResultSet>>;
   readonly policy: PlmPolicy;
 }

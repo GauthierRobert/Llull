@@ -408,7 +408,7 @@ rust::String xde_write(XdeDoc &doc, int32_t schema, rust::Str unit, rust::Str fi
   header.Apply(model);
   std::ostringstream text;
   if (writer.WriteStream(text) != IFSelect_RetDone) return rust::String();
-  return rust::String(text.str());
+  return rust::String(step_ascii(text.str()));
 }
 
 }  // namespace llull

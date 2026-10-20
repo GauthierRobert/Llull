@@ -161,3 +161,16 @@ fn iges_availability_matches_the_build() {
     assert!((mass_properties(&solid).unwrap().volume - 1000.0).abs() < 1e-3);
     assert_eq!(import_iges("not iges", options(), 0.0).unwrap()["error"], json!("unreadable"));
 }
+
+#[test]
+fn names_round_trip_as_ascii_part_21_whatever_their_characters() {
+    let _guard = serial();
+    let shape = block(10.0);
+    for name in ["Équerre", "Bracket \u{1F600} ø", "back\\slash", "tab'quote", "日本語 \\X\\41"] {
+        let text = write_exchange(&request(vec![product(name, &shape, "", None)], vec![], 5, "mm")).unwrap().unwrap();
+        assert!(text.is_ascii(), "{name:?}: ISO 10303-21 text is ASCII, non-ASCII characters are \\X2\\ / \\X4\\ escapes");
+        let tree = import_exchange(&text, options()).unwrap_or_else(|error| panic!("{name:?}: {error}"));
+        assert_eq!(tree["products"][0]["name"], json!(name), "{name:?}");
+        assert_eq!(tree["solids"][0]["name"], json!(name), "{name:?}");
+    }
+}

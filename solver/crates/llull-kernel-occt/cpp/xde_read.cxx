@@ -42,8 +42,7 @@ namespace {
 std::string name_of(const TDF_Label &label) {
   Handle(TDataStd_Name) name;
   if (label.IsNull() || !label.FindAttribute(TDataStd_Name::GetID(), name)) return "";
-  const TCollection_AsciiString ascii(name->Get(), '?');
-  return std::string(ascii.ToCString());
+  return utf8_of(name->Get());
 }
 
 std::string hex_of(const Quantity_Color &color) {
@@ -226,7 +225,7 @@ class TreeReader {
     Handle(TColStd_HSequenceOfExtendedString) layer_names;
     if (layers_->GetLayers(label, layer_names) && !layer_names.IsNull()) {
       for (Standard_Integer i = 1; i <= layer_names->Length(); ++i)
-        products_[index].layers.push_back(std::string(TCollection_AsciiString(layer_names->Value(i), '?').ToCString()));
+        products_[index].layers.push_back(utf8_of(layer_names->Value(i)));
     }
     Product probe;
     read_validation(label, probe);

@@ -112,6 +112,43 @@ describe('import_step_exact PMI stage', () => {
     expect(reportOf(skipped).reviewRequired.reasons).not.toContain('pmi_review_required');
   });
 
+  it('keeps an item unresolved when no sample of its face resolves, and counts everything unmapped when the solid cannot be opened or is inside a component', () => {
+    const tree = withPmi(PMI);
+    const base = kernelFor(tree);
+    const analytic = plateKernel();
+    const lost = Object.assign(base, {
+      faceQuery: {
+        ...analytic.faceQuery!,
+        faceDetails: () =>
+          analytic
+            .faceQuery!.faceDetails({} as never)!
+            .map((face) => ({ ...face, samples: [], centroid: [999, 999, 999] as [number, number, number] })),
+      },
+    });
+    const far = execute(createEmptyDocument(), 'import_step_exact', { text, fileName: 'plate.stp' }, { ...defaultContext(), kernel: lost });
+    expect(far.document.pmi?.import).toMatchObject({ items: 5, unresolved: 5 });
+    const closed = Object.assign(kernelFor(tree), { topology: () => null });
+    const shut = execute(
+      createEmptyDocument(),
+      'import_step_exact',
+      { text, fileName: 'plate.stp' },
+      { ...defaultContext(), kernel: closed },
+    );
+    expect(shut.document.pmi?.import).toMatchObject({ items: 0, unmapped: 5 });
+    const single = withPmi(PMI);
+    const asComponent: ImportedExchange = {
+      ...single,
+      products: [
+        { name: 'Asm', assembly: true, layers: [], solids: [] },
+        { ...(single.products[0] as ImportedExchange['products'][number]), name: 'Part' },
+      ],
+      occurrences: [1, 2].map((n) => ({ parent: 0, product: 1, name: `Part ${n}`, matrix: [1, 0, 0, n * 10, 0, 1, 0, 0, 0, 0, 1, 0] })),
+      roots: [0],
+    };
+    const inside = run(asComponent);
+    expect(inside.document.pmi?.import).toMatchObject({ items: 0, unmapped: 5 });
+  });
+
   it('a product without PMI leaves the document without a pmi model', () => {
     const result = run(singlePartTree('Plate', [body()]));
     expect(result.document.pmi).toBeUndefined();

@@ -279,6 +279,8 @@ export const GATED_COMMANDS = [
   'attach_release_package',
   'bind_component_item',
   'unbind_component_item',
+  'record_as_built',
+  'import_qif_results',
 ] as const;
 
 /**
@@ -289,7 +291,7 @@ export const plmActPayload = defineCommand({
   name: 'plm_act_payload',
   description:
     'The SHA-256 a human signs to authorize one human-only PLM act (set_item_identity with policy, set_item_marking, record_approval, release_item, ' +
-    'create_change_order with a classification, classify_change_order, set_change_state, set_lifecycle_state to obsolete, attach_release_package, bind_component_item, unbind_component_item): ' +
+    'create_change_order with a classification, classify_change_order, set_change_state, set_lifecycle_state to obsolete, attach_release_package, bind_component_item, unbind_component_item, record_as_built, import_qif_results): ' +
     'pass the command, the params you will send (without confirmation) and a fresh nonce. The signature (Ed25519 over the UTF-8 hex hash, prefixed by ' +
     'the context string the signing host applies) goes in the command as confirmation { alg, keyId, publicKey, signature, nonce }. It is valid only ' +
     'for the current PLM state of this document. An agent cannot sign. Read-only.',

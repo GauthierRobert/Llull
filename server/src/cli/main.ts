@@ -396,6 +396,7 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
         return runVault(args, io);
       case 'keys':
       case 'release':
+      case 'lotar':
       case 'audit':
         return await runPlmCli(args, io, () => backendOf(args, io));
       case 'run_benchmarks': {

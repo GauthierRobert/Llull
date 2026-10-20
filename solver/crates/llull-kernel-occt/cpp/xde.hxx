@@ -3,11 +3,13 @@
 // product list + placed uses (`XdeDoc`, no OCAF types cross the bridge) and the C++ side writes the document; reads answer JSON text.
 #pragma once
 
+#include <cstdio>
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include <TCollection_ExtendedString.hxx>
 #include <TDF_Label.hxx>
 #include <TDocStd_Document.hxx>
 #include <XCAFDoc_DimTolTool.hxx>
@@ -17,6 +19,79 @@
 #include <gp_Trsf.hxx>
 
 #include "llull-kernel-occt/cpp/facade.hxx"
+
+namespace llull {
+
+// `text` as UTF-8 (OCC strings are UTF-16: a surrogate pair is one code point).
+inline std::string utf8_of(const TCollection_ExtendedString &text) {
+  std::string out;
+  for (Standard_Integer i = 1; i <= text.Length(); ++i) {
+    unsigned int code = text.Value(i);
+    if (code >= 0xD800 && code < 0xDC00 && i < text.Length()) {
+      const unsigned int low = text.Value(i + 1);
+      if (low >= 0xDC00 && low < 0xE000) {
+        code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00);
+        ++i;
+      }
+    }
+    if (code < 0x80) out += static_cast<char>(code);
+    else if (code < 0x800) {
+      out += static_cast<char>(0xC0 | (code >> 6));
+      out += static_cast<char>(0x80 | (code & 0x3F));
+    } else if (code < 0x10000) {
+      out += static_cast<char>(0xE0 | (code >> 12));
+      out += static_cast<char>(0x80 | ((code >> 6) & 0x3F));
+      out += static_cast<char>(0x80 | (code & 0x3F));
+    } else {
+      out += static_cast<char>(0xF0 | (code >> 18));
+      out += static_cast<char>(0x80 | ((code >> 12) & 0x3F));
+      out += static_cast<char>(0x80 | ((code >> 6) & 0x3F));
+      out += static_cast<char>(0x80 | (code & 0x3F));
+    }
+  }
+  return out;
+}
+
+// ISO 10303-21 is ASCII: every non-ASCII UTF-8 character of `text` becomes \X2\hhhh\X0\ (BMP) or \X4\hhhhhhhh\X0\ (beyond it), runs grouped.
+inline std::string step_ascii(const std::string &text) {
+  std::string out;
+  size_t at = 0;
+  const auto code_at = [&](size_t index, size_t &length) -> unsigned int {
+    const unsigned char lead = static_cast<unsigned char>(text[index]);
+    length = lead < 0x80 ? 1 : lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
+    if (length == 1 || index + length > text.size()) {
+      length = 1;
+      return lead;
+    }
+    unsigned int code = lead & (0xFF >> (length + 1));
+    for (size_t k = 1; k < length; ++k) code = (code << 6) | (static_cast<unsigned char>(text[index + k]) & 0x3F);
+    return code;
+  };
+  while (at < text.size()) {
+    if (static_cast<unsigned char>(text[at]) < 0x80) {
+      out += text[at++];
+      continue;
+    }
+    // a run of non-ASCII characters of the same width class
+    size_t length = 0;
+    const bool wide = code_at(at, length) > 0xFFFF;
+    std::string run;
+    char digits[12];
+    while (at < text.size() && static_cast<unsigned char>(text[at]) >= 0x80) {
+      const unsigned int code = code_at(at, length);
+      if ((code > 0xFFFF) != wide) break;
+      std::snprintf(digits, sizeof digits, wide ? "%08X" : "%04X", code);
+      run += digits;
+      at += length;
+    }
+    out += wide ? "\\X4\\" : "\\X2\\";
+    out += run;
+    out += "\\X0\\";
+  }
+  return out;
+}
+
+}  // namespace llull
 
 namespace llull {
 

@@ -6,6 +6,7 @@
  * @invariant pure; units are NOT converted here: values are in the file's own length unit (`lengthUnit.mmPerUnit` converts)
  */
 
+import { unescapeStep } from './decode';
 import { entityName, leadingNames, parseRecords, referencesOf, stringsOf } from './records';
 
 /** The file's global length unit, with the exact factor to millimetres (25.4 for inch, 304.8 for foot, ...). */
@@ -180,7 +181,7 @@ function productOf(bodies: ReadonlyMap<number, string>, target: number, depth = 
     const product = formationBody === undefined ? undefined : referencesOf(formationBody)[0];
     const productBody = product === undefined ? undefined : bodies.get(product);
     if (productBody === undefined) return null;
-    const [id = '', name = ''] = stringsOf(productBody);
+    const [id = '', name = ''] = stringsOf(productBody).map(unescapeStep);
     return name !== '' ? name : id;
   }
   for (const next of referencesOf(body)) {
@@ -228,7 +229,7 @@ export function summarizeStep21(text: string): Step21Summary {
     }
     const kind = entityName(body);
     if (kind === 'PRODUCT') {
-      const [productId = '', productName = ''] = stringsOf(body);
+      const [productId = '', productName = ''] = stringsOf(body).map(unescapeStep);
       products.push(productName !== '' ? productName : productId);
     }
     if (kind !== 'PROPERTY_DEFINITION') continue;
@@ -250,7 +251,7 @@ export function summarizeStep21(text: string): Step21Summary {
     }
     properties.push({
       propertyDefinition: id,
-      description: strings[1] ?? '',
+      description: unescapeStep(strings[1] ?? ''),
       definitionTarget: target === undefined ? null : entityName(bodies.get(target) ?? ''),
       target: target ?? null,
       product: target === undefined ? null : productOf(bodies, target),
