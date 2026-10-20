@@ -93,6 +93,10 @@ export const inspectDynamics = defineCommand({
       if (isRefusal(topology)) return null;
       const mobility = analyseMobility(dynamics, topology, metres);
       for (const row of mobility.redundant) warnings.push(`FPR_REDUNDANT_CONSTRAINT: ${row.message}`);
+      for (const gear of mobility.skippedGears)
+        warnings.push(
+          `FPR_GEAR_ON_LOOP_JOINT: gear coupling '${gear}' has a loop-closing joint on one side, so the mobility count does not include it`,
+        );
       for (const suggestion of mobility.suggestions) warnings.push(`FPR_REDUNDANT_CONSTRAINT: suggestion — ${suggestion}`);
       for (const [id, gap] of Object.entries(openLoopGaps(mobility)))
         problems.push(`FPR_LOOP_OPEN: loop joint '${id}' is open by ${(gap * 1000).toPrecision(4)} mm at the start pose`);

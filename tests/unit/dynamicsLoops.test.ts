@@ -103,6 +103,31 @@ describe('mobility and redundancy (VC-FPR-20)', () => {
     expect(mobility.suggestions).toEqual([]);
   });
 
+  it('a gear on a flipped tree joint uses the declared sense: the kinematically consistent ratio is redundant, its negative locks the mechanism', () => {
+    const [r, l, phi] = [49.2125, 150, (40 * Math.PI) / 180];
+    const [px, py] = [r * Math.cos(phi), r * Math.sin(phi)];
+    const lx = Math.sqrt(l * l - py * py);
+    // unit crank rate: wrist pin x speed from the rigid rod, rod rate, and the wrist joint (piston relative to rod) = - rod rate
+    const vwx = -py - (px * py) / lx;
+    const rodRate = (lx * -px + py * (vwx + py)) / (l * l);
+    const ratio = -rodRate;
+    const { doc } = sliderCrank({ wrist: 'revolute', startDeg: 40, order: ['slide_j', 'wrist_j', 'crank_j', 'rod_j'] });
+    expect(topologyOf(doc).tree.find((entry) => entry.joint.id === 'wrist_j')?.flipped).toBe(true);
+    const base = inspect(doc).mobility;
+    const consistent = execute(doc, 'add_gear_coupling', { id: 'g', driver: 'crank_j', driven: 'wrist_j', ratio });
+    const same = inspect(consistent.document).mobility;
+    expect(same.dof).toBe(base.dof);
+    expect(same.redundant.length).toBe(base.redundant.length + 1);
+    const opposite = execute(doc, 'add_gear_coupling', { id: 'g', driver: 'crank_j', driven: 'wrist_j', ratio: -ratio });
+    expect(inspect(opposite.document).mobility.dof).toBe(base.dof - 1);
+  });
+
+  it('a coupling to a loop-closing joint adds no row and is reported', () => {
+    const { doc } = sliderCrank({ wrist: 'revolute', startDeg: 40 });
+    const coupled = execute(doc, 'add_gear_coupling', { id: 'g', driver: 'crank_j', driven: 'wrist_j', ratio: 2 });
+    expect(inspect(coupled.document).warnings.some((w) => w.startsWith("FPR_GEAR_ON_LOOP_JOINT: gear coupling 'g'"))).toBe(true);
+  });
+
   it('a gear coupling between two tree joints is one more constraint row (DOF - 1); a loop joint on either side adds none', () => {
     const { doc } = sliderCrank({ wrist: 'spherical', startDeg: 40 });
     const solid = execute(doc, 'add_cylinder', { radius: 10, height: 5, axis: [0, 0, 1], position: [0, 300, 0] });
