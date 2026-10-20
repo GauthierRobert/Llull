@@ -11,7 +11,7 @@ import { noop, report } from '../noop';
 import { resolveMassProperties, type MassContext } from '../../geometry/resolveMassProperties';
 import { entityBoundsInDoc } from '../../geometry/bounds';
 import { expandInstance } from '../../geometry/instanceExpansion';
-import { operandRecipe } from '../brep/kernelShape';
+import { exactOrMesh } from '../brep/kernelShape';
 
 interface GvpItem {
   readonly id: string;
@@ -48,7 +48,7 @@ const MAX_NESTING = 4;
 function solidPiece(doc: CadDocument, entity: Entity, ctx: MassContext): Piece | null {
   const kernel = ctx.kernel ?? null;
   if (kernel?.massProperties !== undefined) {
-    const shape = kernel.evaluate(operandRecipe(kernel, entity));
+    const shape = exactOrMesh(kernel, entity).shape;
     const exact = shape === null ? null : kernel.massProperties(shape);
     if (exact !== null && exact.volume > 0)
       return {

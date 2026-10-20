@@ -4,6 +4,7 @@
 #include <cmath>
 #include <functional>
 #include <map>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -18,7 +19,15 @@
 #include <Interface_Static.hxx>
 #include <Quantity_Color.hxx>
 #include <STEPCAFControl_Writer.hxx>
+#include <StepBasic_ConversionBasedUnitAndLengthUnit.hxx>
+#include <StepBasic_HArray1OfNamedUnit.hxx>
+#include <StepBasic_LengthMeasureWithUnit.hxx>
+#include <StepBasic_NamedUnit.hxx>
 #include <StepBasic_Product.hxx>
+#include <StepBasic_SiUnitAndLengthUnit.hxx>
+#include <StepBasic_Unit.hxx>
+#include <StepGeom_GeomRepContextAndGlobUnitAssCtxAndGlobUncertaintyAssCtx.hxx>
+#include <StepGeom_GeometricRepresentationContextAndGlobalUnitAssignedContext.hxx>
 #include <StepData_StepModel.hxx>
 #include <TCollection_AsciiString.hxx>
 #include <TCollection_ExtendedString.hxx>
@@ -295,6 +304,58 @@ void xde_product_pmi_dimension(XdeDoc &doc, int32_t product, rust::Str type, dou
   product_at(doc, product).pmi_dimensions.push_back(std::move(dimension));
 }
 
+// OCC 7.9.2 writes a tolerance magnitude in the unit of the representation context it can find; when it finds none (a product whose PMI holds no
+// dimension or datum) it invents an unprefixed SI metre: 0.05 mm would then read as 0.05 m in every other reader. Point every such length at the
+// file's own length unit.
+static void repair_pmi_length_units(const Handle(StepData_StepModel) &model) {
+  Handle(StepBasic_NamedUnit) context_unit;
+  for (Standard_Integer i = 1; i <= model->NbEntities() && context_unit.IsNull(); ++i) {
+    Handle(StepBasic_HArray1OfNamedUnit) units;
+    const Handle(Standard_Transient) entity = model->Value(i);
+    if (const auto plain = Handle(StepGeom_GeometricRepresentationContextAndGlobalUnitAssignedContext)::DownCast(entity); !plain.IsNull())
+      units = plain->Units();
+    else if (const auto rich = Handle(StepGeom_GeomRepContextAndGlobUnitAssCtxAndGlobUncertaintyAssCtx)::DownCast(entity); !rich.IsNull())
+      units = rich->Units();
+    if (units.IsNull()) continue;
+    for (Standard_Integer k = units->Lower(); k <= units->Upper(); ++k)
+      if (!Handle(StepBasic_SiUnitAndLengthUnit)::DownCast(units->Value(k)).IsNull() ||
+          units->Value(k)->IsKind(STANDARD_TYPE(StepBasic_ConversionBasedUnitAndLengthUnit))) {
+        context_unit = units->Value(k);
+        break;
+      }
+  }
+  if (context_unit.IsNull()) return;
+  // the definition of a conversion-based unit (INCH = 25.4 mm) is a length measure too: it keeps its own unit
+  std::set<Handle(StepBasic_LengthMeasureWithUnit)> definitions;
+  for (Standard_Integer i = 1; i <= model->NbEntities(); ++i) {
+    const auto conversion = Handle(StepBasic_ConversionBasedUnitAndLengthUnit)::DownCast(model->Value(i));
+    if (conversion.IsNull()) continue;
+    if (const auto factor = Handle(StepBasic_LengthMeasureWithUnit)::DownCast(conversion->ConversionFactor()); !factor.IsNull())
+      definitions.insert(factor);
+  }
+  for (Standard_Integer i = 1; i <= model->NbEntities(); ++i) {
+    const Handle(StepBasic_LengthMeasureWithUnit) measure = Handle(StepBasic_LengthMeasureWithUnit)::DownCast(model->Value(i));
+    if (measure.IsNull() || definitions.count(measure) > 0) continue;
+    const Handle(StepBasic_SiUnitAndLengthUnit) invented = Handle(StepBasic_SiUnitAndLengthUnit)::DownCast(measure->UnitComponent().NamedUnit());
+    if (invented.IsNull() || invented == context_unit) continue;
+    StepBasic_Unit unit;
+    unit.SetValue(context_unit);
+    measure->SetUnitComponent(unit);
+  }
+}
+
+void xde_product_pmi_attr(XdeDoc &doc, int32_t product, rust::Str item, int32_t index, rust::Str key, rust::Str text, double number) {
+  XdeProduct &target = product_at(doc, product);
+  const std::string kind = text_of(item);
+  const size_t at = static_cast<size_t>(index);
+  std::vector<XdePmiAttr> *list = nullptr;
+  if (index >= 0 && kind == "datum" && at < target.pmi_datums.size()) list = &target.pmi_datums[at].attrs;
+  if (index >= 0 && kind == "tolerance" && at < target.pmi_tolerances.size()) list = &target.pmi_tolerances[at].attrs;
+  if (index >= 0 && kind == "dimension" && at < target.pmi_dimensions.size()) list = &target.pmi_dimensions[at].attrs;
+  if (list == nullptr) throw std::invalid_argument("pmi attribute: no " + kind + " at index " + std::to_string(index));
+  list->push_back({text_of(key), text_of(text), number});
+}
+
 void xde_use(XdeDoc &doc, int32_t parent, int32_t product, rust::Str name, rust::Slice<const double> rotation,
              rust::Slice<const double> position) {
   doc.uses.push_back({parent, product, text_of(name), placement_of(rotation, position)});
@@ -338,6 +399,7 @@ rust::String xde_write(XdeDoc &doc, int32_t schema, rust::Str unit, rust::Str fi
     const auto found = descriptions.find(step_product->Id()->ToCString());
     if (found != descriptions.end()) step_product->SetDescription(new TCollection_HAsciiString(found->second.c_str()));
   }
+  repair_pmi_length_units(model);
   APIHeaderSection_MakeHeader header(model);
   header.SetName(new TCollection_HAsciiString(text_of(file_name).c_str()));
   if (!timestamp.empty()) header.SetTimeStamp(new TCollection_HAsciiString(text_of(timestamp).c_str()));
@@ -346,7 +408,7 @@ rust::String xde_write(XdeDoc &doc, int32_t schema, rust::Str unit, rust::Str fi
   header.Apply(model);
   std::ostringstream text;
   if (writer.WriteStream(text) != IFSelect_RetDone) return rust::String();
-  return rust::String(text.str());
+  return rust::String(step_ascii(text.str()));
 }
 
 }  // namespace llull

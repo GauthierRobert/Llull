@@ -41,7 +41,7 @@ export interface GvpCheck {
   readonly policy: GvpPolicy;
 }
 
-export type UnverifiedReason = 'import_gvp_red' | 'import_gvp_not_checkable' | 'verify_skipped';
+export type UnverifiedReason = 'import_gvp_red' | 'import_gvp_not_checkable' | 'verify_skipped' | 'non_rigid_occurrence';
 
 /** What the sender said and what llull measured for one imported product (TR-XCH-24). */
 export interface ImportProvenance {

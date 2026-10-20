@@ -39,7 +39,9 @@ export const requestOf = (names: readonly string[]): Pick<ExchangeWriteRequest, 
 
 export const ctxOf = (spec: XdeFakeSpec = {}): { ctx: ExecutionContext; kernel: GeometryKernel } => {
   const { kernel } = fakeXdeKernel({ writeStep, ...spec });
-  return { ctx: { ...defaultContext(), kernel }, kernel };
+  // ply solids the fake kernel cannot build exactly are faceted bodies: their export needs a human's signature (aerospace 04 TR-XCH-26)
+  const humanSignature = { verify: () => ({ signer: 'reviewer', signatureId: 's' }), spend: () => true };
+  return { ctx: { ...defaultContext(), kernel, humanSignature }, kernel };
 };
 
 export const rect = (x0: number, y0: number, x1: number, y1: number): number[][] => [
@@ -104,7 +106,7 @@ export const exportOf = (
   spec: XdeFakeSpec = {},
 ): { result: CommandResult; data: Exported } => {
   const { ctx } = ctxOf(spec);
-  const result = execute(doc, 'export_composite_ap242', { part: 'Panel', ...params }, ctx);
+  const result = execute(doc, 'export_composite_ap242', { part: 'Panel', acceptUnverified: { nonce: 'composites' }, ...params }, ctx);
   return { result, data: result.data as Exported };
 };
 

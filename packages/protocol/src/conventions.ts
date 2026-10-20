@@ -282,7 +282,7 @@ llull receives and delivers exact geometry; the checks below tell an engineer wh
 - **Deliver.** \`llull export_step_ap242 --save part.stp\` (schema ap242 by default, ap214 / ap203 on request) writes products, placed occurrences, names, colours, layers, materials and the validation
   properties of every product and the root assembly, in the DOCUMENT unit (numbers are not converted; the file says the unit), then re-reads them (\`data.selfCheck\` must be green). Pass \`timestamp\`
   for a reproducible header; the same document and timestamp give identical bytes. \`llull export_iges --save part.igs\` writes B-rep solids (mode faces for legacy CAM). \`export_step_exact\` stays
-  the AP214 form. Exporting bodies that were imported red or not-checkable needs \`acceptUnverified\` with a human signature: an agent gets XCH_HUMAN_GATE and hands the request over.
+  the AP214 form. Exporting bodies that were imported red or not-checkable (or ply solids written from triangles) needs \`acceptUnverified\` with a human signature on export_step_ap242, export_step_exact and export_iges alike: an agent gets XCH_HUMAN_GATE and hands the request over.
 - **Minimal sequence.** verify_exchange_file, import_step_exact (read \`data.report.exchange\` and reviewRequired), model, geometric_validation_properties (the values that will be embedded),
   export_step_ap242, then verify_exchange_file on the written file.
 `;

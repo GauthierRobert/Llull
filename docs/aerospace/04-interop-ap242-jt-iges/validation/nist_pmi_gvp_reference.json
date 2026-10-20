@@ -1,5 +1,5 @@
 {
- "$comment": "Geometric validation properties embedded by the originating CAD systems in the official NIST MBE PMI STEP files, plus an entity census (records instantiating each PMI / tessellation / B-rep / assembly type, simple or complex). Extracted with extract_validation_properties.py (stdlib, independent of OCC). A llull importer must recompute GVP from the imported B-rep and compare (VC-XCH-05/06), and its semantic PMI import must account for every census item (VC-XCH-07). lengthUnitDetected = first LENGTH_UNIT in the file: confirm per file. GVP entries whose values are all 0 (placeholders, e.g. STC 06) are dropped and counted in placeholderGvpDropped.",
+ "$comment": "Geometric validation properties embedded by the originating CAD systems in the official NIST MBE PMI STEP files, plus an entity census (records instantiating each PMI / tessellation / B-rep / assembly type, simple or complex). Extracted with extract_validation_properties.py (stdlib, independent of OCC). A llull importer must recompute GVP from the imported B-rep and compare (VC-XCH-05/06), and its semantic PMI import must account for every census item (VC-XCH-07). lengthUnitDetected = the length unit of the representation context that holds the geometry / validation properties (GLOBAL_UNIT_ASSIGNED_CONTEXT), converted-unit factor times its own unit; entries listing lengthUnitCorrection were first extracted as the first LENGTH_UNIT record of the file, which was wrong for files that declare several units. GVP entries whose values are all 0 (placeholders, e.g. STC 06) are dropped and counted in placeholderGvpDropped.",
  "source": {
   "archive": "https://raw.githubusercontent.com/usnistgov/SFA/72375d17c09cf7072c30d9393b5c08b7aa272285/Release/NIST-PMI-STEP-Files.zip",
   "archiveSha256": "1fb91bb8ff0fe02032b948fda0775bc74591cd0bebc0988347d32574e5884f90",
@@ -582,7 +582,8 @@
    "bytes": 1478375,
    "sha256": "aa8115c12e12a99cc439477cbfd222916f9ec629fbb3c9002b18e0c264c9a892",
    "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }",
-   "lengthUnitDetected": "mm",
+   "lengthUnitDetected": "inch",
+  "lengthUnitCorrection": "was 'mm' (first LENGTH_UNIT record); the shape / validation-property representation context of this file assigns inch (04 review, 2026-10-20)",
    "validationPropertyCounts": {
     "geometric": 2,
     "pmi": 135,
@@ -929,7 +930,8 @@
    "bytes": 1945387,
    "sha256": "2dddf9b8894bc241f7ffddf3dc4502baa3d49c374e8784039d14b86473d54832",
    "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF {1 0 10303 442 4 1 4}",
-   "lengthUnitDetected": "mm",
+   "lengthUnitDetected": "inch",
+  "lengthUnitCorrection": "was 'mm' (first LENGTH_UNIT record); the shape / validation-property representation context of this file assigns inch (04 review, 2026-10-20)",
    "validationPropertyCounts": {
     "geometric": 0,
     "pmi": 116,
@@ -1101,7 +1103,8 @@
    "bytes": 968495,
    "sha256": "41026b1f0d81830c6092b5147e0e084d2fa163169161c31af4ce06493d3c7d33",
    "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 7 1 4 }",
-   "lengthUnitDetected": "mm",
+   "lengthUnitDetected": "inch",
+  "lengthUnitCorrection": "was 'mm' (first LENGTH_UNIT record); the shape / validation-property representation context of this file assigns inch (04 review, 2026-10-20)",
    "validationPropertyCounts": {
     "geometric": 0,
     "pmi": 0,
@@ -1532,7 +1535,8 @@
    "bytes": 402531,
    "sha256": "a0bc551656780b26d7a0ee1beedbc07d43f41efa092f74f3c2d8383417f04481",
    "fileSchema": "CONFIG_CONTROL_DESIGN",
-   "lengthUnitDetected": "cm",
+   "lengthUnitDetected": "inch",
+  "lengthUnitCorrection": "was 'cm' (first LENGTH_UNIT record); the shape / validation-property representation context of this file assigns inch (04 review, 2026-10-20)",
    "validationPropertyCounts": {
     "geometric": 0,
     "pmi": 0,
@@ -1552,7 +1556,8 @@
    "bytes": 450741,
    "sha256": "4b7011b0b86cf6301058aa954b76a9587d23478b6dee2660f4a80caf0dfe8b73",
    "fileSchema": "AP203_CONFIGURATION_CONTROLLED_3D_DESIGN_OF_MECHANICAL_PARTS_AND_ASSEMBLIES_MIM_LF { 1 0 10303 403 3 1 4}",
-   "lengthUnitDetected": "mm",
+   "lengthUnitDetected": "inch",
+  "lengthUnitCorrection": "was 'mm' (first LENGTH_UNIT record); the shape / validation-property representation context of this file assigns inch (04 review, 2026-10-20)",
    "validationPropertyCounts": {
     "geometric": 0,
     "pmi": 0,

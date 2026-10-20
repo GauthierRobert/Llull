@@ -3,11 +3,13 @@
 // product list + placed uses (`XdeDoc`, no OCAF types cross the bridge) and the C++ side writes the document; reads answer JSON text.
 #pragma once
 
+#include <cstdio>
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include <TCollection_ExtendedString.hxx>
 #include <TDF_Label.hxx>
 #include <TDocStd_Document.hxx>
 #include <XCAFDoc_DimTolTool.hxx>
@@ -20,6 +22,79 @@
 
 namespace llull {
 
+// `text` as UTF-8 (OCC strings are UTF-16: a surrogate pair is one code point).
+inline std::string utf8_of(const TCollection_ExtendedString &text) {
+  std::string out;
+  for (Standard_Integer i = 1; i <= text.Length(); ++i) {
+    unsigned int code = text.Value(i);
+    if (code >= 0xD800 && code < 0xDC00 && i < text.Length()) {
+      const unsigned int low = text.Value(i + 1);
+      if (low >= 0xDC00 && low < 0xE000) {
+        code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00);
+        ++i;
+      }
+    }
+    if (code < 0x80) out += static_cast<char>(code);
+    else if (code < 0x800) {
+      out += static_cast<char>(0xC0 | (code >> 6));
+      out += static_cast<char>(0x80 | (code & 0x3F));
+    } else if (code < 0x10000) {
+      out += static_cast<char>(0xE0 | (code >> 12));
+      out += static_cast<char>(0x80 | ((code >> 6) & 0x3F));
+      out += static_cast<char>(0x80 | (code & 0x3F));
+    } else {
+      out += static_cast<char>(0xF0 | (code >> 18));
+      out += static_cast<char>(0x80 | ((code >> 12) & 0x3F));
+      out += static_cast<char>(0x80 | ((code >> 6) & 0x3F));
+      out += static_cast<char>(0x80 | (code & 0x3F));
+    }
+  }
+  return out;
+}
+
+// ISO 10303-21 is ASCII: every non-ASCII UTF-8 character of `text` becomes \X2\hhhh\X0\ (BMP) or \X4\hhhhhhhh\X0\ (beyond it), runs grouped.
+inline std::string step_ascii(const std::string &text) {
+  std::string out;
+  size_t at = 0;
+  const auto code_at = [&](size_t index, size_t &length) -> unsigned int {
+    const unsigned char lead = static_cast<unsigned char>(text[index]);
+    length = lead < 0x80 ? 1 : lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
+    if (length == 1 || index + length > text.size()) {
+      length = 1;
+      return lead;
+    }
+    unsigned int code = lead & (0xFF >> (length + 1));
+    for (size_t k = 1; k < length; ++k) code = (code << 6) | (static_cast<unsigned char>(text[index + k]) & 0x3F);
+    return code;
+  };
+  while (at < text.size()) {
+    if (static_cast<unsigned char>(text[at]) < 0x80) {
+      out += text[at++];
+      continue;
+    }
+    // a run of non-ASCII characters of the same width class
+    size_t length = 0;
+    const bool wide = code_at(at, length) > 0xFFFF;
+    std::string run;
+    char digits[12];
+    while (at < text.size() && static_cast<unsigned char>(text[at]) >= 0x80) {
+      const unsigned int code = code_at(at, length);
+      if ((code > 0xFFFF) != wide) break;
+      std::snprintf(digits, sizeof digits, wide ? "%08X" : "%04X", code);
+      run += digits;
+      at += length;
+    }
+    out += wide ? "\\X4\\" : "\\X2\\";
+    out += run;
+    out += "\\X0\\";
+  }
+  return out;
+}
+
+}  // namespace llull
+
+namespace llull {
+
 struct XdeSolid {
   TopoDS_Shape shape;
   std::string name;
@@ -27,9 +102,17 @@ struct XdeSolid {
 };
 
 // Semantic PMI of one product, attached to faces of its shape (0-based `TopExp::MapShapes` indices over the product's shape).
+// One extra attribute of a PMI item (modifiers, material requirement, ...): `key` names it, `text` / `number` carry its value.
+struct XdePmiAttr {
+  std::string key;
+  std::string text;
+  double number = 0;
+};
+
 struct XdePmiDatum {
   std::string label;
   std::vector<int> faces;
+  std::vector<XdePmiAttr> attrs;
 };
 
 struct XdePmiTolerance {
@@ -38,6 +121,7 @@ struct XdePmiTolerance {
   bool diameter_zone = false;
   std::vector<int> faces;
   std::vector<std::string> datums;  // labels in reference order (primary first)
+  std::vector<XdePmiAttr> attrs;
 };
 
 struct XdePmiDimension {
@@ -48,6 +132,7 @@ struct XdePmiDimension {
   double minus = 0;
   std::vector<int> faces;
   std::vector<int> faces_second;  // locations: the second feature set
+  std::vector<XdePmiAttr> attrs;
 };
 
 struct XdeProduct {
@@ -97,6 +182,8 @@ void xde_product_pmi_tolerance(XdeDoc &doc, int32_t product, rust::Str character
                                rust::Slice<const int32_t> faces, rust::Str datums);
 void xde_product_pmi_dimension(XdeDoc &doc, int32_t product, rust::Str type, double value, bool has_tolerance, double plus, double minus,
                                rust::Slice<const int32_t> faces, rust::Slice<const int32_t> faces_second);
+// `item` = "datum" | "tolerance" | "dimension"; `index` = position of the item in its product list (the one just added).
+void xde_product_pmi_attr(XdeDoc &doc, int32_t product, rust::Str item, int32_t index, rust::Str key, rust::Str text, double number);
 void xde_use(XdeDoc &doc, int32_t parent, int32_t product, rust::Str name, rust::Slice<const double> rotation,
              rust::Slice<const double> position);
 
@@ -105,7 +192,8 @@ void xde_use(XdeDoc &doc, int32_t parent, int32_t product, rust::Str name, rust:
 void write_product_pmi(const Handle(XCAFDoc_ShapeTool) & shapes, const TDF_Label &main, const TDF_Label &product, const TopoDS_Shape &shape,
                        const XdeProduct &spec);
 std::map<int, std::string> read_pmi(const Handle(XCAFDoc_DimTolTool) & tool, const std::map<std::string, int> &products,
-                                    const std::map<int, TopoDS_Shape> &shape_of, int &unmapped);
+                                    const std::map<int, TopoDS_Shape> &shape_of, const Handle(XSControl_WorkSession) & session, const std::string &content,
+                                    int &unmapped);
 
 // One AP242 / AP214 / AP203 file (`schema` = DESTEP_Parameters::WriteMode_StepSchema 3, 4 or 5) written in `unit` (mm, cm, m, in, ft; the
 // numbers are the document's own). `root_name` names the root assembly when any use has parent -1; `root_validation` is its GVP (volume,

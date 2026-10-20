@@ -8,10 +8,10 @@
   "imported": {
    "tolerances": 6,
    "dimensions": 8,
-   "datumFeatures": 1,
+   "datumFeatures": 3,
    "unresolved": 0,
    "unmapped": 0,
-   "unverified": 3
+   "unverified": 0
   }
  },
  "ctc_02": {
@@ -23,10 +23,10 @@
   "imported": {
    "tolerances": 22,
    "dimensions": 7,
-   "datumFeatures": 0,
+   "datumFeatures": 5,
    "unresolved": 0,
    "unmapped": 0,
-   "unverified": 20
+   "unverified": 14
   }
  },
  "ctc_03": {
@@ -36,12 +36,12 @@
    "datumFeatures": 6
   },
   "imported": {
-   "tolerances": 12,
+   "tolerances": 13,
    "dimensions": 9,
-   "datumFeatures": 0,
+   "datumFeatures": 4,
    "unresolved": 0,
    "unmapped": 0,
-   "unverified": 20
+   "unverified": 14
   }
  },
  "ctc_04": {
@@ -83,10 +83,10 @@
   "imported": {
    "tolerances": 27,
    "dimensions": 17,
-   "datumFeatures": 0,
+   "datumFeatures": 2,
    "unresolved": 0,
    "unmapped": 3,
-   "unverified": 41
+   "unverified": 40
   }
  },
  "ftc_07": {
@@ -96,7 +96,7 @@
    "datumFeatures": 5
   },
   "imported": {
-   "tolerances": 25,
+   "tolerances": 26,
    "dimensions": 13,
    "datumFeatures": 5,
    "unresolved": 2,
@@ -111,12 +111,12 @@
    "datumFeatures": 11
   },
   "imported": {
-   "tolerances": 23,
+   "tolerances": 33,
    "dimensions": 6,
-   "datumFeatures": 0,
+   "datumFeatures": 11,
    "unresolved": 0,
    "unmapped": 0,
-   "unverified": 27
+   "unverified": 6
   }
  },
  "ftc_09": {
@@ -141,7 +141,7 @@
    "datumFeatures": 11
   },
   "imported": {
-   "tolerances": 35,
+   "tolerances": 36,
    "dimensions": 19,
    "datumFeatures": 11,
    "unresolved": 0,
@@ -158,10 +158,10 @@
   "imported": {
    "tolerances": 4,
    "dimensions": 5,
-   "datumFeatures": 0,
+   "datumFeatures": 2,
    "unresolved": 0,
    "unmapped": 1,
-   "unverified": 5
+   "unverified": 3
   }
  },
  "stc_06": {
@@ -186,12 +186,12 @@
    "datumFeatures": 3
   },
   "imported": {
-   "tolerances": 10,
+   "tolerances": 22,
    "dimensions": 36,
-   "datumFeatures": 1,
+   "datumFeatures": 5,
    "unresolved": 34,
    "unmapped": 0,
-   "unverified": 42
+   "unverified": 38
   }
  },
  "stc_08": {
@@ -203,7 +203,7 @@
   "imported": {
    "tolerances": 28,
    "dimensions": 7,
-   "datumFeatures": 0,
+   "datumFeatures": 6,
    "unresolved": 0,
    "unmapped": 0,
    "unverified": 33
@@ -231,12 +231,12 @@
    "datumFeatures": 9
   },
   "imported": {
-   "tolerances": 36,
+   "tolerances": 37,
    "dimensions": 27,
-   "datumFeatures": 0,
+   "datumFeatures": 9,
    "unresolved": 0,
    "unmapped": 0,
-   "unverified": 49
+   "unverified": 16
   }
  }
 }

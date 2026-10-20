@@ -5,7 +5,7 @@
 
 import { type CadDocument, type Entity, type Vec3, is3D } from '../../model/types';
 import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/kernel';
-import type { CommandResult } from '../types';
+import type { CommandResult, ExecutionContext } from '../types';
 import { confirmExportControlled, defineCommand, z } from '../schema';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
@@ -15,6 +15,7 @@ import { labelStepAssembly } from './stepAssemblyLabels';
 import { planStepAssembly } from './stepAssembly';
 import { exportedIds, stepLabels, stepTargets } from './stepTargets';
 import { buildStepExport } from '../exchange/exportStepAp242';
+import { ACCEPT_UNVERIFIED, gateResult, unverifiedGate } from '../exchange/unverifiedGate';
 import { exportRefusal, noop, report } from '../noop';
 import { fixedNumber } from '../../lib/compactNumber';
 
@@ -74,15 +75,30 @@ export const inspectTopology = defineCommand({
 });
 
 /** AP214 export through the kernel's XDE writer (aerospace 04 TR-XCH-19): the data of the legacy path, with names, colours and structure written by the writer. */
-function exportThroughXde(doc: CadDocument, kernel: GeometryKernel, entityIds: readonly string[] | undefined): CommandResult {
+function exportThroughXde(
+  doc: CadDocument,
+  kernel: GeometryKernel,
+  entityIds: readonly string[] | undefined,
+  confirmation: unknown,
+  ctx: ExecutionContext | undefined,
+): CommandResult {
   const outcome = buildStepExport(doc, kernel, entityIds, {
     schema: 'ap214',
     validation: false,
     structured: true,
     fileName: 'llull.stp',
     timestamp: '1970-01-01T00:00:00',
+    gate: { command: 'export_step_exact', confirmation, ctx },
   });
-  if (!outcome.ok) return noop(doc, `export_step_exact: ${outcome.message}; nothing exported.`);
+  if (!outcome.ok) {
+    return outcome.code === 'XCH_UNVERIFIED_BODIES' || outcome.code === 'XCH_HUMAN_GATE'
+      ? gateResult(
+          doc,
+          { code: outcome.code, message: outcome.message, remediation: outcome.remediation, ids: outcome.ids ?? [] },
+          'export_step_exact',
+        )
+      : noop(doc, `export_step_exact: ${outcome.message}; nothing exported.`);
+  }
   const { data } = outcome;
   const exact: ExportStepExactData = {
     format: 'step',
@@ -150,6 +166,7 @@ export const exportStepExact = defineCommand({
       .array(z.string())
       .optional()
       .describe('Ids of the 3D solids to export. Omit or pass [] to export every 3D solid of the document.'),
+    acceptUnverified: confirmExportControlled.describe(ACCEPT_UNVERIFIED),
     confirmExportControlled,
   }),
   run: (doc, params, ctx): CommandResult => {
@@ -158,7 +175,7 @@ export const exportStepExact = defineCommand({
     if (refused !== null) return refused;
     const kernel = (ctx ?? currentContext()).kernel;
     if (!kernel) return noop(doc, kernelUnavailable('export_step_exact'));
-    if (kernel.writeExchange !== undefined) return exportThroughXde(doc, kernel, entityIds);
+    if (kernel.writeExchange !== undefined) return exportThroughXde(doc, kernel, entityIds, params.acceptUnverified, ctx);
     const { solids, sheets, skipped, entries } = stepTargets(doc, entityIds);
     if (solids.length === 0 && sheets.length === 0) return noop(doc, 'export_step_exact: no 3D solids to export.');
     if (kernel.exportStepAssembly !== undefined && entries.some((entry) => entry.kind === 'instance')) {
@@ -167,6 +184,14 @@ export const exportStepExact = defineCommand({
       const assemblyStep = kernel.exportStepAssembly(plan.occurrences);
       if (assemblyStep === null) return noop(doc, `export_step_exact: the kernel could not write the assembly; nothing exported.`);
       const exported = exportedIds(entries);
+      const blocked = unverifiedGate(
+        doc,
+        { entityIds: exported, faceted: plan.faceted },
+        params.acceptUnverified,
+        ctx,
+        'export_step_exact',
+      );
+      if (blocked !== null) return gateResult(doc, blocked, 'export_step_exact');
       const step = labelStepAssembly(assemblyStep, plan.labels);
       const assembly = { products: plan.partCount, occurrences: plan.occurrences.length };
       const left = sheets.map((sheet) => `${sheet.id} (surface sheet: not written into an assembly file)`);
@@ -184,6 +209,9 @@ export const exportStepExact = defineCommand({
         doc,
         `export_step_exact: ${solids.length} exact solid(s) from ${exported.join(', ')} → STEP AP214 assembly, ${assembly.products} product(s), ` +
           `${assembly.occurrences} occurrence(s), ${step.length} bytes` +
+          (plan.faceted.length > 0
+            ? `; ${plan.faceted.length} ply solid(s) written from triangles (exact slab refused): ${plan.faceted.join(', ')}`
+            : '') +
           (data.skipped.length > 0 ? `; skipped ${data.skipped.join(', ')}.` : '.'),
         data,
       );
@@ -210,10 +238,12 @@ export const exportStepExact = defineCommand({
     }
     if (shapes.length === 0)
       return noop(doc, `export_step_exact: nothing the kernel can write; skipped ${[...skipped, ...notBuilt].join(', ')}.`);
+    const exported = [...exportedIds(entries), ...faces.map((sheet) => sheet.id)];
+    const blocked = unverifiedGate(doc, { entityIds: exported, faceted }, params.acceptUnverified, ctx, 'export_step_exact');
+    if (blocked !== null) return gateResult(doc, blocked, 'export_step_exact');
     const exactStep = kernel.exportStep(shapes);
     const step = exactStep === null ? null : labelStep(exactStep, stepLabels(doc, [...solids, ...faces]));
     if (step === null) return noop(doc, `export_step_exact: this kernel cannot write exact STEP; use ${OCC_HINT}.`);
-    const exported = [...exportedIds(entries), ...faces.map((sheet) => sheet.id)];
     const left = [...skipped, ...notBuilt];
     const data: ExportStepExactData = {
       format: 'step',

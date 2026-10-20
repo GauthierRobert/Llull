@@ -16,6 +16,24 @@ export interface FileGvpGroup extends GvpSample {
   readonly product: string | null;
   readonly target: EmbeddedGvp['target'];
   readonly placeholder: boolean;
+  /** Record type the property is attached to: PRODUCT_DEFINITION_SHAPE = the whole product, SHAPE_ASPECT = one sub-shape (a solid or a sheet). */
+  readonly definition: string | null;
+}
+
+/**
+ * The group that describes the solids of `names` by record linkage, never by value: the only unused sub-shape group (SHAPE_ASPECT, the solid body)
+ * of that product that carries a volume, else the property attached to the product itself (PRODUCT_DEFINITION_SHAPE, which some senders extend
+ * with their sheet areas), else none. Two candidates that both fit are never told apart by which value is nearer.
+ */
+export function groupOfProduct(
+  groups: readonly FileGvpGroup[],
+  names: readonly string[],
+  used: ReadonlySet<FileGvpGroup>,
+): FileGvpGroup | undefined {
+  const candidates = groups.filter((group) => group.product !== null && names.includes(group.product) && !used.has(group));
+  const bodies = candidates.filter((group) => group.definition === 'SHAPE_ASPECT' && group.volume !== undefined);
+  if (bodies.length === 1) return bodies[0];
+  return candidates.find((group) => group.definition === 'PRODUCT_DEFINITION_SHAPE');
 }
 
 const isVolume = (item: string): boolean => item.toLowerCase().includes('volume');
@@ -30,12 +48,11 @@ function targetOf(group: readonly FileGvp[]): EmbeddedGvp['target'] {
 
 /**
  * One group per target of a `geometric validation property`: volume (volume measure), area (surface / wetted / independent area measure) and
- * centre point, in `mmPerUnit` millimetres. Values of an unknown file unit stay unconverted (factor 1).
+ * centre point, in `mmPerUnit` millimetres. Each group uses the length unit of its own representation context, else the global one; an unknown unit stays unconverted.
  */
 export function groupFileGvp(summary: Step21Summary, mmPerUnit: number): FileGvpGroup[] {
-  const fileFactor =
+  const globalFactor =
     summary.lengthUnit !== null && Number.isFinite(summary.lengthUnit.mmPerUnit) ? summary.lengthUnit.mmPerUnit : mmPerUnit;
-  const length = fileFactor / mmPerUnit;
   const byTarget = new Map<string, FileGvp[]>();
   for (const entry of summary.geometricValidationProperties) {
     const key = `${entry.target ?? `own-${entry.propertyDefinition}`}`;
@@ -44,6 +61,9 @@ export function groupFileGvp(summary: Step21Summary, mmPerUnit: number): FileGvp
   const groups: FileGvpGroup[] = [];
   for (const entries of byTarget.values()) {
     const values = entries.flatMap((entry) => entry.values);
+    // the unit of the representation that carries the values (its own GLOBAL_UNIT_ASSIGNED_CONTEXT), else the file's global one
+    const own = entries.find((entry) => entry.lengthUnit !== null && Number.isFinite(entry.lengthUnit.mmPerUnit))?.lengthUnit;
+    const length = (own?.mmPerUnit ?? globalFactor) / mmPerUnit;
     const volume = values.find((value) => typeof value.value === 'number' && isVolume(value.item));
     const area = values.find((value) => typeof value.value === 'number' && isArea(value.item));
     const centre = values.find((value) => Array.isArray(value.value) && isCentre(value.item));
@@ -52,7 +72,13 @@ export function groupFileGvp(summary: Step21Summary, mmPerUnit: number): FileGvp
       ...(area === undefined ? {} : { area: (area.value as number) * length ** 2 }),
       ...(centre === undefined ? {} : { centroid: (centre.value as Vec3).map((component) => component * length) as unknown as Vec3 }),
     };
-    groups.push({ ...sample, product: entries[0]?.product ?? null, target: targetOf(entries), placeholder: isPlaceholder(sample) });
+    groups.push({
+      ...sample,
+      product: entries[0]?.product ?? null,
+      target: targetOf(entries),
+      placeholder: isPlaceholder(sample),
+      definition: entries[0]?.definitionTarget ?? null,
+    });
   }
   return groups;
 }
@@ -91,14 +117,7 @@ export function selfCheckGvp(
   const comparisons: GvpComparison[] = [];
   const missing: string[] = [];
   for (const want of expected) {
-    const candidates = groups.filter((group) => group.product === want.name && !used.has(group));
-    const best = candidates.reduce<FileGvpGroup | undefined>(
-      (current, group) =>
-        current === undefined || Math.abs((group.volume ?? 0) - (want.volume ?? 0)) < Math.abs((current.volume ?? 0) - (want.volume ?? 0))
-          ? group
-          : current,
-      undefined,
-    );
+    const best = groupOfProduct(groups, [want.name], used);
     if (best === undefined) {
       missing.push(want.name);
       continue;

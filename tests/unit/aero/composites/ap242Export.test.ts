@@ -41,7 +41,9 @@ describe('export_composite_ap242', () => {
     expect(data.step).toContain("'number of plies'");
     expect(data.step).toContain("CONVERSION_BASED_UNIT('DEGREE'");
     expect(result.summary).toContain('3 ply(ies) in the table');
-    expectPure(doc, () => execute(doc, 'export_composite_ap242', { part: 'Panel' }, ctxOf().ctx));
+    expectPure(doc, () =>
+      execute(doc, 'export_composite_ap242', { part: 'Panel', acceptUnverified: { nonce: 'composites' } }, ctxOf().ctx),
+    );
   });
 
   it('is deterministic: the same document and timestamp give the same bytes', () => {

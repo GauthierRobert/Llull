@@ -43,6 +43,15 @@ mod ffi {
             faces: &[i32],
             faces_second: &[i32],
         ) -> Result<()>;
+        fn xde_product_pmi_attr(
+            doc: Pin<&mut XdeDoc>,
+            product: i32,
+            item: &str,
+            index: i32,
+            key: &str,
+            text: &str,
+            number: f64,
+        ) -> Result<()>;
         fn xde_use(doc: Pin<&mut XdeDoc>, parent: i32, product: i32, name: &str, rotation: &[f64], position: &[f64]) -> Result<()>;
         #[allow(clippy::too_many_arguments)]
         fn xde_write(
@@ -75,10 +84,20 @@ pub struct ExchangeSolid<'a> {
 /// Semantic PMI of one product (faces: 0-based indices over the product's shape, `TopExp::MapShapes` order); written in AP242 only.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ExchangePmi {
-    /// `(label, faces)`
-    pub datums: Vec<(String, Vec<i32>)>,
+    pub datums: Vec<PmiDatum>,
     pub tolerances: Vec<PmiTolerance>,
     pub dimensions: Vec<PmiDimension>,
+}
+
+/// One extra attribute of a PMI item: `(key, text, number)` - modifiers, material requirement, zone modifier, qualifier, class of tolerance (see
+/// docs/aerospace/04-interop-ap242-jt-iges/TECHNICAL_SPEC.md "PMI transport").
+pub type PmiAttr = (String, String, f64);
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PmiDatum {
+    pub label: String,
+    pub faces: Vec<i32>,
+    pub attrs: Vec<PmiAttr>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -89,6 +108,7 @@ pub struct PmiTolerance {
     pub faces: Vec<i32>,
     /// Datum labels in reference order, primary first.
     pub datums: Vec<String>,
+    pub attrs: Vec<PmiAttr>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -99,6 +119,7 @@ pub struct PmiDimension {
     pub tolerance: Option<(f64, f64)>,
     pub faces: Vec<i32>,
     pub faces_second: Vec<i32>,
+    pub attrs: Vec<PmiAttr>,
 }
 
 pub struct ExchangeProduct<'a> {
@@ -138,6 +159,16 @@ pub struct WriteRequest<'a> {
 
 const NOT_CREATED: &str = "exchange document not created";
 
+/// Attach every extra attribute of the item just added (`item` kind, position `at` in its product list).
+fn attrs(doc: &mut cxx::UniquePtr<ffi::XdeDoc>, product: i32, item: &str, at: usize, list: &[PmiAttr]) -> OcctResult<()> {
+    let index = i32::try_from(at).map_err(|_| "pmi: too many items".to_string())?;
+    for (key, text, number) in list {
+        let Some(pinned) = doc.as_mut() else { return Err(NOT_CREATED.to_string()) };
+        occt(ffi::xde_product_pmi_attr(pinned, product, item, index, key, text, *number))?;
+    }
+    Ok(())
+}
+
 fn build(products: &[ExchangeProduct<'_>], uses: &[ExchangeUse]) -> OcctResult<cxx::UniquePtr<ffi::XdeDoc>> {
     let mut doc = ffi::new_xde_doc();
     for product in products {
@@ -155,11 +186,12 @@ fn build(products: &[ExchangeProduct<'_>], uses: &[ExchangeUse]) -> OcctResult<c
             let Some(pinned) = doc.as_mut() else { return Err(NOT_CREATED.to_string()) };
             occt(ffi::xde_product_solid(pinned, index, inner(solid.shape)?, &solid.name, &solid.color))?;
         }
-        for (label, faces) in &product.pmi.datums {
+        for (at, datum) in product.pmi.datums.iter().enumerate() {
             let Some(pinned) = doc.as_mut() else { return Err(NOT_CREATED.to_string()) };
-            occt(ffi::xde_product_pmi_datum(pinned, index, label, faces))?;
+            occt(ffi::xde_product_pmi_datum(pinned, index, &datum.label, &datum.faces))?;
+            attrs(&mut doc, index, "datum", at, &datum.attrs)?;
         }
-        for tolerance in &product.pmi.tolerances {
+        for (at, tolerance) in product.pmi.tolerances.iter().enumerate() {
             let Some(pinned) = doc.as_mut() else { return Err(NOT_CREATED.to_string()) };
             let datums = tolerance.datums.join("|");
             occt(ffi::xde_product_pmi_tolerance(
@@ -171,8 +203,9 @@ fn build(products: &[ExchangeProduct<'_>], uses: &[ExchangeUse]) -> OcctResult<c
                 &tolerance.faces,
                 &datums,
             ))?;
+            attrs(&mut doc, index, "tolerance", at, &tolerance.attrs)?;
         }
-        for dimension in &product.pmi.dimensions {
+        for (at, dimension) in product.pmi.dimensions.iter().enumerate() {
             let Some(pinned) = doc.as_mut() else { return Err(NOT_CREATED.to_string()) };
             let (plus, minus) = dimension.tolerance.unwrap_or((0.0, 0.0));
             occt(ffi::xde_product_pmi_dimension(
@@ -186,6 +219,7 @@ fn build(products: &[ExchangeProduct<'_>], uses: &[ExchangeUse]) -> OcctResult<c
                 &dimension.faces,
                 &dimension.faces_second,
             ))?;
+            attrs(&mut doc, index, "dimension", at, &dimension.attrs)?;
         }
         if let Some(values) = product.validation {
             let Some(pinned) = doc.as_mut() else { return Err(NOT_CREATED.to_string()) };

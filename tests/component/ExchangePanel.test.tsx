@@ -1,4 +1,5 @@
 /** Aerospace 04 XCH review surface: badge, comparison table, provenance in the properties panel, report overlay, import / verify / export controls. */
+import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useStore } from '@ui/store';
@@ -170,6 +171,14 @@ describe('ExchangeImport', () => {
     dispatch.mockClear();
     await pick(/step or iges file to import/i, new File(['iges text'], 'part.IGS'));
     expect(dispatch.mock.calls[0]?.[0]).toBe('import_iges');
+  });
+
+  it('hashes the file BYTES, not the decoded text (a latin-1 byte would change the text hash)', async () => {
+    render(<ExchangeImport />);
+    const bytes = new Uint8Array([0x49, 0x53, 0x4f, 0xe9, 0x0a]);
+    await pick(/step or iges file to import/i, new File([bytes], 'bytes.stp'));
+    const sent = dispatch.mock.calls[0]?.[1] as { sha256?: string };
+    expect(sent.sha256).toBe(createHash('sha256').update(bytes).digest('hex'));
   });
 
   it('verifies a file through the read-only command without importing it', async () => {

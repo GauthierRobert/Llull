@@ -8,7 +8,7 @@
  * @failure a reference cycle -> the records outside the walk keep their relative order after the others
  */
 
-import { parseRecords } from './records';
+import { dataSectionStart, parseRecords } from './records';
 
 /** `body` with every `#n` reference (outside quoted strings) replaced by `fn(n)`. */
 function mapReferences(body: string, replace: (id: number) => string): string {
@@ -62,14 +62,22 @@ function hashOf(text: string): number {
   return 4294967296 * (2097151 & h2) + (h1 >>> 0);
 }
 
-/** The text with its DATA records renumbered and ordered canonically; the input when it has no records. */
+/** The text with its DATA records renumbered and ordered canonically; the input when it has no records or cannot be walked. */
 export function canonicalizeStep21(text: string): string {
+  try {
+    return canonicalize(text);
+  } catch {
+    return text;
+  }
+}
+
+function canonicalize(text: string): string {
   const { bodies } = parseRecords(text);
   if (bodies.size === 0) return text;
-  const dataStart = /(?:^|\n|;)\s*DATA\s*;/.exec(text);
+  const dataStart = dataSectionStart(text);
   const dataEnd = text.lastIndexOf('ENDSEC;');
-  if (dataStart === null || dataEnd < 0) return text;
-  const head = text.slice(0, dataStart.index + dataStart[0].length).replace(/\s+$/, '');
+  if (dataStart < 0 || dataEnd < 0) return text;
+  const head = text.slice(0, dataStart).replace(/\s+$/, '');
   const tail = text.slice(dataEnd);
   const children = new Map<number, number[]>();
   const referenced = new Set<number>();
@@ -79,29 +87,43 @@ export function canonicalizeStep21(text: string): string {
     for (const ref of refs) referenced.add(ref);
   }
   const signature = new Map<number, number>();
-  const visiting = new Set<number>();
-  const signatureOf = (id: number): number => {
-    const known = signature.get(id);
-    if (known !== undefined) return known;
-    if (visiting.has(id)) return 0;
-    visiting.add(id);
-    const body = bodies.get(id) ?? '';
-    const flat = mapReferences(body, (ref) => `#${bodies.has(ref) ? signatureOf(ref) : 'x'}`);
-    visiting.delete(id);
-    const value = hashOf(flat);
-    signature.set(id, value);
-    return value;
+  /** Structural hash of a record, children first (explicit stack: no recursion depth limit); a reference cycle reads as 0 at its back edge. */
+  const signatureOf = (start: number): number => {
+    const visiting = new Set<number>();
+    const stack: number[] = [start];
+    while (stack.length > 0) {
+      const id = stack[stack.length - 1] as number;
+      if (signature.has(id)) {
+        stack.pop();
+        continue;
+      }
+      if (!visiting.has(id)) {
+        visiting.add(id);
+        for (const child of children.get(id) ?? []) if (!signature.has(child) && !visiting.has(child)) stack.push(child);
+        continue;
+      }
+      const flat = mapReferences(bodies.get(id) ?? '', (ref) => `#${bodies.has(ref) ? (signature.get(ref) ?? 0) : 'x'}`);
+      signature.set(id, hashOf(flat));
+      visiting.delete(id);
+      stack.pop();
+    }
+    return signature.get(start) ?? 0;
   };
   const roots = [...bodies.keys()].filter((id) => !referenced.has(id)).sort((a, b) => signatureOf(a) - signatureOf(b) || a - b);
   const order: number[] = [];
   const seen = new Set<number>();
-  const visit = (id: number): void => {
-    if (seen.has(id)) return;
-    seen.add(id);
-    order.push(id);
-    for (const child of children.get(id) ?? []) visit(child);
+  /** Depth-first pre-order from `start` (explicit stack, children in reference order). */
+  const visit = (start: number): void => {
+    const stack: number[] = [start];
+    while (stack.length > 0) {
+      const id = stack.pop() as number;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      order.push(id);
+      const kids = children.get(id) ?? [];
+      for (let k = kids.length - 1; k >= 0; k--) stack.push(kids[k] as number);
+    }
   };
-  // an iterative walk would be safer on very deep graphs; STEP graphs are shallow (< 100 levels)
   for (const root of roots) visit(root);
   for (const id of [...bodies.keys()].sort((a, b) => a - b)) visit(id);
   const renumbered = new Map(order.map((id, index) => [id, index + 1] as const));

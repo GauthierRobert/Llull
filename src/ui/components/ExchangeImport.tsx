@@ -4,11 +4,31 @@
 import React, { useRef } from 'react';
 import { useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
-import { readChosenFile } from '@ui/chosenFile';
-import { sha256Hex } from '@lib/sha256';
+import { readChosenFile, takeChosenFile } from '@ui/chosenFile';
 
 const IGES_FILE = /\.(igs|iges)$/i;
 const ACCEPT = '.stp,.step,.p21,.igs,.iges';
+
+/** sha256 (hex) of the file BYTES (what the provenance records), or undefined where the platform has no SubtleCrypto: the command then hashes the text. */
+async function fileSha256(buffer: ArrayBuffer): Promise<string | undefined> {
+  const subtle = globalThis.crypto?.subtle;
+  if (subtle === undefined) return undefined;
+  const digest = new Uint8Array(await subtle.digest('SHA-256', buffer));
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/** Reads the picked file once: its text for the command and the hash of its bytes for the provenance. */
+function readExchangeFile(
+  event: React.ChangeEvent<HTMLInputElement>,
+  onRead: (text: string, fileName: string, sha256: string | undefined) => void,
+): void {
+  const file = takeChosenFile(event);
+  if (!file) return;
+  file
+    .arrayBuffer()
+    .then(async (buffer) => onRead(new TextDecoder().decode(buffer), file.name, await fileSha256(buffer)))
+    .catch(() => useStore.getState().setStatusMessage(`Could not read ${file.name}.`));
+}
 
 export function ExchangeImport(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
@@ -16,8 +36,8 @@ export function ExchangeImport(): React.ReactElement {
   const verifyInput = useRef<HTMLInputElement | null>(null);
 
   const onImport = (event: React.ChangeEvent<HTMLInputElement>): void =>
-    readChosenFile(event, (text, fileName) => {
-      const common = { text, fileName, sha256: sha256Hex(text) };
+    readExchangeFile(event, (text, fileName, sha256) => {
+      const common = { text, fileName, ...(sha256 === undefined ? {} : { sha256 }) };
       dispatch(IGES_FILE.test(fileName) ? 'import_iges' : 'import_step_exact', common, { selectAffected: true });
     });
   const onVerify = (event: React.ChangeEvent<HTMLInputElement>): void =>

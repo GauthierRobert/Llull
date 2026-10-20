@@ -101,7 +101,11 @@ export const verifyExchangeFile = defineCommand({
     'stepBase64 (IGES too). Does not modify the document.',
   params: z.object({
     text: z.string().max(MAX_TEXT).optional().describe('The file content (Part 21 or IGES text). Give exactly one of text or stepBase64.'),
-    stepBase64: z.string().optional().describe('The file bytes, base64 encoded (ASCII text). Give exactly one of text or stepBase64.'),
+    stepBase64: z
+      .string()
+      .max(Math.ceil((MAX_TEXT * 4) / 3) + 4)
+      .optional()
+      .describe('The file bytes, base64 encoded (ASCII text). Give exactly one of text or stepBase64.'),
     format: z.enum(['step', 'iges']).optional().describe('File format. Default: detected from the content.'),
     fileName: z.string().optional().describe('Original file name, echoed in the report.'),
     gvpPolicy: z

@@ -22,6 +22,7 @@ import { MAX_IMPORT_BODIES } from '../limits';
 import { buildBodies } from './importBodies';
 import { stepImportReport } from './stepImportReport';
 import { planExchange } from './stepPlan';
+import { ACCEPT_UNVERIFIED, acceptedReasons, gateResult, unverifiedGate } from './unverifiedGate';
 
 const MAX_IGES_CHARS = 64 * 1024 * 1024;
 
@@ -53,7 +54,11 @@ export const importIges = defineCommand({
     'Give the file as text or igesBase64. Refusals carry error.code KRN_STEP_UNREADABLE, KRN_STEP_NO_SOLID, XCH_WRITER_UNAVAILABLE, KRN_NO_EXACT_KERNEL.',
   params: z.object({
     text: z.string().max(MAX_IGES_CHARS).optional().describe('The IGES file as text. Give exactly one of text or igesBase64.'),
-    igesBase64: z.string().optional().describe('The IGES file bytes, base64 encoded (ASCII). Give exactly one of text or igesBase64.'),
+    igesBase64: z
+      .string()
+      .max(Math.ceil((MAX_IGES_CHARS * 4) / 3) + 4)
+      .optional()
+      .describe('The IGES file bytes, base64 encoded (ASCII). Give exactly one of text or igesBase64.'),
     fileName: z.string().optional().describe('Original file name, kept in the report and provenance only.'),
     sha256: z
       .string()
@@ -225,9 +230,10 @@ export const exportIges = defineCommand({
       .enum(['brep', 'faces'])
       .optional()
       .describe("'brep' (default): solid B-rep entities. 'faces': trimmed parametric surfaces for legacy CAM."),
+    acceptUnverified: confirmExportControlled.describe(ACCEPT_UNVERIFIED),
     confirmExportControlled,
   }),
-  run: (doc, { entityIds, mode, confirmExportControlled: confirmation }, ctx): CommandResult => {
+  run: (doc, { entityIds, mode, acceptUnverified, confirmExportControlled: confirmation }, ctx): CommandResult => {
     const refused = exportRefusal(doc, 'export_iges', 'step', confirmation, ctx);
     if (refused !== null) return refused;
     const kernel = (ctx ?? currentContext()).kernel;
@@ -240,6 +246,8 @@ export const exportIges = defineCommand({
     if ('empty' in plan) return fail('XCH_NO_SOLIDS', 'nothing exportable', 'pass 3D solid ids (find_entities) or build solids first');
     if ('failed' in plan)
       return fail('XCH_NO_SOLIDS', `the kernel could not build ${plan.failed}`, 'check the entity with inspect_topology');
+    const blocked = unverifiedGate(doc, plan, acceptUnverified, ctx, 'export_iges');
+    if (blocked !== null) return gateResult(doc, blocked, 'export_iges');
     const written = plan.products.filter((product) => product.validation !== undefined);
     const text = kernel.writeExchange({
       format: 'iges',
@@ -301,10 +309,11 @@ export const exportIges = defineCommand({
           'report a defect; do not deliver the file',
         );
     }
+    const accepted = acceptedReasons(doc, plan);
     return report(
       doc,
       `export_iges: ${plan.solidCount} exact solid(s) from ${plan.entityIds.join(', ')} → IGES 5.3 ${mode ?? 'brep'}, unit ${doc.units}, ${summary.entities} entities, ${text.length} bytes; ` +
-        `self-check ${selfCheck.band}${plan.skipped.length > 0 ? `; skipped ${plan.skipped.join(', ')}` : ''}.`,
+        `self-check ${selfCheck.band}${plan.skipped.length > 0 ? `; skipped ${plan.skipped.join(', ')}` : ''}.${accepted.length > 0 ? ` Review required: ${accepted.join(', ')}.` : ''}`,
       {
         format: 'iges',
         iges: text,
@@ -315,6 +324,7 @@ export const exportIges = defineCommand({
         skipped: plan.skipped,
         entities: summary.entities,
         selfCheck,
+        reviewRequired: { value: accepted.length > 0, reasons: accepted },
       },
     );
   },

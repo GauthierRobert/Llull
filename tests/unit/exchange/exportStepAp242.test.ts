@@ -53,6 +53,15 @@ function assemblyDoc(): { doc: CadDocument; instances: string[]; loose: string }
 
 const dataOf = <T>(result: CommandResult): T => result.data as T;
 
+/** A signing port with a single-use ledger: verifies every signature once. */
+function ledgerPort(): NonNullable<ExecutionContext['humanSignature']> {
+  const spent = new Set<string>();
+  return {
+    verify: () => ({ signer: 'reviewer', signatureId: 's1' }),
+    spend: (_signature, payload) => (spent.has(payload) ? false : (spent.add(payload), true)),
+  };
+}
+
 describe('export_step_ap242: flat document', () => {
   it('writes one product per solid with its validation properties and a green self-check', () => {
     const doc = boxes();
@@ -285,7 +294,7 @@ describe('export_step_ap242: unverified imported bodies (TR-XCH-26)', () => {
   it('exports and asks for review when the signing port verifies the human signature', () => {
     const { doc } = flagged();
     const fake = fakeXdeKernel();
-    const ctx: ExecutionContext = { ...ctxOf(fake.kernel), humanSignature: { verify: () => ({ signer: 'reviewer', signatureId: 's1' }) } };
+    const ctx: ExecutionContext = { ...ctxOf(fake.kernel), humanSignature: ledgerPort() };
     const accepted = execute(doc, 'export_step_ap242', { acceptUnverified: { nonce: 'n1' } }, ctx);
     expect(accepted.data).toBeDefined();
     expect(dataOf<{ reviewRequired: { value: boolean; reasons: string[] } }>(accepted).reviewRequired).toEqual({
@@ -297,7 +306,7 @@ describe('export_step_ap242: unverified imported bodies (TR-XCH-26)', () => {
       doc,
       'export_step_ap242',
       { acceptUnverified: { nonce: 'n1' } },
-      { ...ctx, humanSignature: { verify: () => null } },
+      { ...ctx, humanSignature: { verify: () => null, spend: () => true } },
     );
     expect(rejectedSignature.error?.code).toBe('XCH_HUMAN_GATE');
   });
@@ -406,10 +415,153 @@ describe('ply solids carrying a stepSlab (step-sheets behaviour through the XDE 
         },
       },
     } as unknown as CadDocument;
-    const { result } = run(doc, 'export_step_exact', {});
+    const fake = fakeXdeKernel();
+    const ctx: ExecutionContext = { ...ctxOf(fake.kernel), humanSignature: ledgerPort() };
+    const result = execute(doc, 'export_step_exact', { acceptUnverified: { nonce: 'f' } }, ctx);
     const data = result.data as { faceted: string[]; solidCount: number } | undefined;
     expect(data?.solidCount).toBe(1);
     expect(data?.faceted).toEqual([id]);
     expect(result.summary).toContain('written from triangles');
+  });
+});
+
+describe('TR-XCH-26: every export path goes through the unverified gate', () => {
+  const withProvenance = (doc: CadDocument, ids: readonly string[]): CadDocument => ({ ...doc, exchange: provenanceOf(ids) });
+  const provenanceOf = (ids: readonly string[]): NonNullable<CadDocument['exchange']> => ({
+    provenance: Object.fromEntries(
+      ids.map((id) => [
+        id,
+        {
+          format: 'step' as const,
+          schemaName: null,
+          fileName: 'x.stp',
+          sha256: 'abc',
+          productName: 'P',
+          sourceUnit: 'mm' as const,
+          unverified: { value: true, reasons: ['import_gvp_red' as const] },
+        },
+      ]),
+    ),
+  });
+  const flagged = (): { doc: CadDocument; id: string } => {
+    const doc = boxes();
+    const id = doc.order[0] as string;
+    return { doc: withProvenance(doc, [id]), id };
+  };
+  const refusedBy = (result: CommandResult, code: string): void => {
+    expect(result.rejected).toBe(true);
+    expect(result.error?.code).toBe(code);
+    expect(result.data).toBeUndefined();
+  };
+
+  it.each(['export_step_ap242', 'export_step_exact', 'export_iges'])('%s refuses a red imported body without a human signature', (name) => {
+    const { doc, id } = flagged();
+    const plain = run(doc, name, {}, {
+      igesImport: { solids: [], census: { roots: 0, solids: 0, shells: 0, openShells: 0, faces: 0 } },
+    } as never).result;
+    refusedBy(plain, 'XCH_UNVERIFIED_BODIES');
+    expect(plain.error?.ids).toEqual([id]);
+    refusedBy(run(doc, name, { acceptUnverified: true }).result, 'XCH_HUMAN_GATE');
+  });
+
+  it('export_step_exact on the legacy (non-XDE) path refuses too, and a cleared signature lets it reach the writer', () => {
+    const { doc } = flagged();
+    const kernel = fakeExactKernel().kernel;
+    refusedBy(execute(doc, 'export_step_exact', {}, ctxOf(kernel)), 'XCH_UNVERIFIED_BODIES');
+    const cleared = execute(
+      doc,
+      'export_step_exact',
+      { acceptUnverified: { nonce: 'n' } },
+      { ...ctxOf(kernel), humanSignature: ledgerPort() },
+    );
+    expect(cleared.summary).toContain('cannot write exact STEP');
+  });
+
+  it('a signature is spent once; a port without a single-use ledger never clears', () => {
+    const { doc } = flagged();
+    const fake = fakeXdeKernel();
+    const port = ledgerPort();
+    const ctx: ExecutionContext = { ...ctxOf(fake.kernel), humanSignature: port };
+    expect(execute(doc, 'export_step_exact', { acceptUnverified: { nonce: 'n1' } }, ctx).data).toBeDefined();
+    refusedBy(execute(doc, 'export_step_exact', { acceptUnverified: { nonce: 'n1' } }, ctx), 'XCH_HUMAN_GATE');
+    const noLedger = { ...ctx, humanSignature: { verify: () => ({ signer: 'r', signatureId: 's' }) } };
+    const refused = execute(doc, 'export_step_ap242', { acceptUnverified: { nonce: 'n2' } }, noLedger);
+    refusedBy(refused, 'XCH_HUMAN_GATE');
+    expect(refused.summary).toContain('single-use ledger');
+  });
+
+  it('a red body two component levels down makes the instance (and the export of it) unverified', () => {
+    const { doc: base, instances } = assemblyDoc();
+    const component = base.components?.['comp-bolt'];
+    const nested = Object.keys(component?.entities ?? {})[0] as string;
+    const doc = withProvenance(base, [nested]);
+    const inner = execute(doc, 'create_component', {
+      name: 'Outer',
+      entityIds: [instances[0] as string],
+      componentId: 'comp-outer',
+    }).document;
+    const outerInstance = execute(inner, 'insert_instance', { componentId: 'comp-outer', position: [0, 0, 100] });
+    const refused = run(outerInstance.document, 'export_step_ap242', { entityIds: outerInstance.affected }).result;
+    refusedBy(refused, 'XCH_UNVERIFIED_BODIES');
+    expect(refused.error?.ids).toEqual(outerInstance.affected);
+  });
+
+  it('a ply solid written from triangles (faceted) needs acceptUnverified and is named in the refusal', () => {
+    const base = execute(createEmptyDocument(), 'add_box', { size: [10, 10, 2] }).document;
+    const id = base.order[0] as string;
+    const box = base.entities[id] as unknown as Record<string, unknown>;
+    const slab = {
+      op: 'faceSlab',
+      surface: { type: 'plane', data: [0, 0, 0, 0, 0, 1] },
+      loops: [4, 0, 0, 10, 0, 10, 10, 0, 10],
+      from: 0,
+      to: 2,
+      direction: [0, 0, 1],
+      tolerance: 1e-6,
+    };
+    const doc = {
+      ...base,
+      entities: { ...base.entities, [id]: { ...box, kind: 'mesh', mesh: TETRA, stepSlab: slab } },
+    } as unknown as CadDocument;
+    for (const name of ['export_step_ap242', 'export_step_exact']) {
+      const refused = run(doc, name, {}).result;
+      refusedBy(refused, 'XCH_UNVERIFIED_BODIES');
+      expect(refused.summary).toContain(id);
+      expect(refused.summary).toContain('faceted_body');
+    }
+    const fake = fakeXdeKernel();
+    const accepted = execute(
+      doc,
+      'export_step_ap242',
+      { acceptUnverified: { nonce: 'f' } },
+      { ...ctxOf(fake.kernel), humanSignature: ledgerPort() },
+    );
+    expect(dataOf<{ reviewRequired: { reasons: string[] } }>(accepted).reviewRequired.reasons).toContain('faceted_body');
+  });
+});
+
+describe('a scaled instance of a component holding a ply slab', () => {
+  it('still reaches the gate as faceted (the slab recipe is wrapped in the scale, the triangles are the fallback)', () => {
+    const base = execute(createEmptyDocument(), 'add_box', { size: [10, 10, 2] }).document;
+    const id = base.order[0] as string;
+    const box = base.entities[id] as unknown as Record<string, unknown>;
+    const slab = {
+      op: 'faceSlab',
+      surface: { type: 'plane', data: [0, 0, 0, 0, 0, 1] },
+      loops: [4, 0, 0, 10, 0, 10, 10, 0, 10],
+      from: 0,
+      to: 2,
+      direction: [0, 0, 1],
+      tolerance: 1e-6,
+    };
+    const ply = {
+      ...base,
+      entities: { ...base.entities, [id]: { ...box, kind: 'mesh', mesh: TETRA, stepSlab: slab } },
+    } as unknown as CadDocument;
+    const made = execute(ply, 'create_component', { name: 'Ply', entityIds: [id], componentId: 'comp-ply' });
+    const placed = execute(made.document, 'insert_instance', { componentId: 'comp-ply', scale: [2, 2, 2] });
+    const refused = run(placed.document, 'export_step_ap242', {}).result;
+    expect(refused.error?.code).toBe('XCH_UNVERIFIED_BODIES');
+    expect(refused.error?.ids).toEqual(expect.arrayContaining([id]));
   });
 });

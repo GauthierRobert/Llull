@@ -104,6 +104,8 @@ export function withoutEntities(
   for (const id of removed) delete entities[id];
   const { nextGroups, dissolvedGroups } = pruneGroupMembers(doc.groups, removed);
   const { references, prunedReferences } = pruneReferences(doc, removed);
+  const provenance = doc.exchange?.provenance;
+  const stale = provenance === undefined ? [] : Object.keys(provenance).filter((id) => removed.has(id));
   const document: CadDocument = {
     ...doc,
     entities,
@@ -111,6 +113,8 @@ export function withoutEntities(
     selection: doc.selection.filter((id) => !removed.has(id)),
     groups: nextGroups,
     ...references,
+    // import provenance describes imported bodies: it leaves with them
+    ...(provenance === undefined || stale.length === 0 ? {} : { exchange: { provenance: withoutKeys(provenance, new Set(stale)) } }),
   };
   return { document, dissolvedGroups, prunedReferences };
 }

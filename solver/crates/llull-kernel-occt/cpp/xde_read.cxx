@@ -1,6 +1,7 @@
 // XDE reader (XCH 04 M3, TR-XCH-08): STEPCAFControl_Reader into an XCAF document, then the product tree as JSON: products (simple shapes
 // holding healed solids, or assemblies), the placed occurrences between them, names, colours, layers and the geometric validation properties
 // OCCT attached to each product label. Solids are healed exactly like `import_step_json` (import_support.hxx); lengths are millimetres.
+#include <stdexcept>
 #include <cstdio>
 #include <map>
 #include <sstream>
@@ -12,6 +13,7 @@
 #include <Quantity_Color.hxx>
 #include <STEPCAFControl_Reader.hxx>
 #include <TCollection_AsciiString.hxx>
+#include <XSControl_WorkSession.hxx>
 #include <TCollection_ExtendedString.hxx>
 #include <TColStd_HSequenceOfExtendedString.hxx>
 #include <TDF_LabelSequence.hxx>
@@ -40,8 +42,7 @@ namespace {
 std::string name_of(const TDF_Label &label) {
   Handle(TDataStd_Name) name;
   if (label.IsNull() || !label.FindAttribute(TDataStd_Name::GetID(), name)) return "";
-  const TCollection_AsciiString ascii(name->Get(), '?');
-  return std::string(ascii.ToCString());
+  return utf8_of(name->Get());
 }
 
 std::string hex_of(const Quantity_Color &color) {
@@ -62,6 +63,8 @@ class TreeReader {
         colors_(XCAFDoc_DocumentTool::ColorTool(document->Main())),
         layers_(XCAFDoc_DocumentTool::LayerTool(document->Main())) {}
 
+  const std::string *content_ = nullptr;   // the Part 21 text, for magnitudes OCC cannot type
+  Handle(XSControl_WorkSession) session_;  // the STEP side of the reader (null: XCAF only)
   std::vector<int> roots;
   std::vector<std::string> skipped;
   int tessellated = 0;
@@ -78,7 +81,7 @@ class TreeReader {
     std::map<int, TopoDS_Shape> shape_of;
     for (size_t index = 0; index < products_.size(); ++index)
       if (!products_[index].assembly) shape_of[static_cast<int>(index)] = XCAFDoc_ShapeTool::GetShape(labels_[index]);
-    for (auto &entry : read_pmi(dimtol_, known_, shape_of, pmi_unmapped)) products_[static_cast<size_t>(entry.first)].pmi = entry.second;
+    for (auto &entry : read_pmi(dimtol_, known_, shape_of, session_, content_ == nullptr ? std::string() : *content_, pmi_unmapped)) products_[static_cast<size_t>(entry.first)].pmi = entry.second;
   }
 
   rust::String finish(int file_roots) {
@@ -193,7 +196,20 @@ class TreeReader {
     }
   }
 
+  // a product tree nests a handful of levels; a hostile file must not recurse the stack away
+  static constexpr int kMaxDepth = 64;
+  int depth_ = 0;
+
+  struct Depth {
+    int &level;
+    explicit Depth(int &value) : level(value) {
+      if (++level > kMaxDepth) throw std::runtime_error("the product tree nests deeper than 64 levels");
+    }
+    ~Depth() { --level; }
+  };
+
   int visit(const TDF_Label &label) {
+    const Depth guard(depth_);
     TCollection_AsciiString entry;
     TDF_Tool::Entry(label, entry);
     const std::string key(entry.ToCString());
@@ -209,7 +225,7 @@ class TreeReader {
     Handle(TColStd_HSequenceOfExtendedString) layer_names;
     if (layers_->GetLayers(label, layer_names) && !layer_names.IsNull()) {
       for (Standard_Integer i = 1; i <= layer_names->Length(); ++i)
-        products_[index].layers.push_back(std::string(TCollection_AsciiString(layer_names->Value(i), '?').ToCString()));
+        products_[index].layers.push_back(utf8_of(layer_names->Value(i)));
     }
     Product probe;
     read_validation(label, probe);
@@ -324,6 +340,8 @@ rust::String xde_import_json(rust::Str text, double precision, double max_tolera
     return error_json("unreadable", std::to_string(file_roots) + " root entities, none transferred to a shape");
   }
   TreeReader tree(document, options);
+  tree.session_ = reader.Reader().WS();
+  tree.content_ = &content;
   tree.read();
   return tree.finish(file_roots);
 }

@@ -148,12 +148,33 @@ export const methodReasons = (resolved: ResolvedMass): string[] => [
  * TR-XCH-24), undefined for a body that was not imported.
  */
 export function importedBodyStatus(
-  doc: Pick<CadDocument, 'exchange'>,
+  doc: Pick<CadDocument, 'exchange' | 'components'>,
   e: Entity,
 ): { readonly value: boolean; readonly reasons: readonly string[] } | undefined {
   const provenance = doc.exchange?.provenance;
-  const record = provenance?.[e.id] ?? (e.kind === 'instance' ? provenance?.[e.componentId] : undefined);
-  return record === undefined ? undefined : record.unverified;
+  if (provenance === undefined) return undefined;
+  const reasons = new Set<string>();
+  let seen = false;
+  const visited = new Set<string>();
+  /** An entity counts through its own record, an instance through its component, a component through everything it holds (any depth, cycle-safe). */
+  const visit = (entity: Entity): void => {
+    const own = provenance[entity.id];
+    if (own !== undefined) {
+      seen = true;
+      for (const reason of own.unverified.reasons) reasons.add(reason);
+    }
+    if (entity.kind !== 'instance' || visited.has(entity.componentId)) return;
+    visited.add(entity.componentId);
+    const component = (doc as Pick<CadDocument, 'components'>).components?.[entity.componentId];
+    const record = provenance[entity.componentId];
+    if (record !== undefined) {
+      seen = true;
+      for (const reason of record.unverified.reasons) reasons.add(reason);
+    }
+    for (const child of Object.values(component?.entities ?? {})) visit(child);
+  };
+  visit(e);
+  return seen ? { value: reasons.size > 0, reasons: [...reasons] } : undefined;
 }
 
 export interface ReviewRequired {

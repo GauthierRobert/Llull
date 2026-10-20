@@ -70,8 +70,17 @@ const scaleMm = (value: number | undefined, unit: DocumentUnit, power: number): 
 function pmiInUnit(pmi: ExchangePmi, unit: DocumentUnit): ExchangePmi {
   const length = (value: number): number => value / MM_PER_UNIT[unit];
   return {
-    datums: pmi.datums,
-    tolerances: pmi.tolerances.map((tolerance) => ({ ...tolerance, value: length(tolerance.value) })),
+    datums: pmi.datums.map((datum) =>
+      datum.modifierWithValue === undefined
+        ? datum
+        : { ...datum, modifierWithValue: { ...datum.modifierWithValue, value: length(datum.modifierWithValue.value) } },
+    ),
+    tolerances: pmi.tolerances.map((tolerance) => ({
+      ...tolerance,
+      value: length(tolerance.value),
+      ...(tolerance.zoneModifierValue === undefined ? {} : { zoneModifierValue: length(tolerance.zoneModifierValue) }),
+      ...(tolerance.maxValue === undefined ? {} : { maxValue: length(tolerance.maxValue) }),
+    })),
     dimensions: pmi.dimensions.map((dimension) => {
       const angular = dimension.type === 'size_angular' || dimension.type === 'location_angular';
       const scale = (value: number): number => (angular ? value : length(value));
@@ -81,6 +90,7 @@ function pmiInUnit(pmi: ExchangePmi, unit: DocumentUnit): ExchangePmi {
         ...(dimension.tolerance === undefined
           ? {}
           : { tolerance: { plus: scale(dimension.tolerance.plus), minus: scale(dimension.tolerance.minus) } }),
+        ...(dimension.range === undefined ? {} : { range: { lower: scale(dimension.range.lower), upper: scale(dimension.range.upper) } }),
       };
     }),
   };
@@ -137,21 +147,35 @@ export function describeProvenance(input: ProvenanceInput): ProvenanceResult {
     const parent = parentOf.get(index);
     return own !== 'not-checkable' || parent === undefined || depth > 8 ? own : effectiveBand(parent, depth + 1);
   };
+  const childrenOf = new Map<number, number[]>();
+  for (const use of imported.occurrences) childrenOf.set(use.parent, [...(childrenOf.get(use.parent) ?? []), use.product]);
+  const RANK: Readonly<Record<GvpBand, number>> = { 'not-checkable': 0, green: 1, yellow: 2, red: 3 };
+  /** A part: its effective band. An assembly: the worst band of itself and its whole subtree, so a red child makes every ancestor red. */
+  const subtreeBand = (index: number, depth = 0): GvpBand => {
+    let worst = effectiveBand(index);
+    if (isPart(imported, index) || depth > 32) return worst;
+    for (const child of childrenOf.get(index) ?? []) {
+      const childBand = subtreeBand(child, depth + 1);
+      if (RANK[childBand] > RANK[worst]) worst = childBand;
+    }
+    return worst;
+  };
+  /** The unverified reasons of a product; an assembly carries those of every part below it. */
+  const reasonsOf = (index: number, band: GvpBand, depth = 0): UnverifiedReason[] => {
+    if (verifications === null) return ['verify_skipped'];
+    if (band === 'red') return ['import_gvp_red'];
+    if (isPart(imported, index)) return band === 'not-checkable' ? ['import_gvp_not_checkable'] : [];
+    if (depth > 32) return [];
+    const inherited = (childrenOf.get(index) ?? []).flatMap((child) => reasonsOf(child, subtreeBand(child), depth + 1));
+    return [...new Set(inherited)];
+  };
   for (const [index, product] of imported.products.entries()) {
     const verification = verifications?.find((entry) => entry.product === index);
     const placement = placements.get(index);
     const componentId = placement?.componentId;
     const entityIds = placement === undefined ? [] : componentId === undefined ? placement.topLevel : [componentId, ...placement.topLevel];
-    const band: GvpBand = effectiveBand(index);
-    const part = isPart(imported, index);
-    const unverifiedReasons: UnverifiedReason[] =
-      verifications === null
-        ? ['verify_skipped']
-        : band === 'red'
-          ? ['import_gvp_red']
-          : band === 'not-checkable' && part
-            ? ['import_gvp_not_checkable']
-            : [];
+    const band: GvpBand = subtreeBand(index);
+    const unverifiedReasons: UnverifiedReason[] = reasonsOf(index, band);
     products.push({
       index,
       name: product.name,
@@ -208,7 +232,7 @@ export function describeProvenance(input: ProvenanceInput): ProvenanceResult {
         entityIds: where,
         remediation: 'do not deliver; a qualified reviewer decides (the import completed and the bodies are marked unverified)',
       });
-    } else if (band === 'not-checkable' && part) {
+    } else if (band === 'not-checkable' && isPart(imported, index)) {
       reasons.add('import_gvp_not_checkable');
       warnings.push({
         code: 'XCH_GVP_NOT_CHECKABLE',

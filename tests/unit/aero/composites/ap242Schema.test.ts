@@ -21,7 +21,7 @@ const available = path !== undefined && path !== '' && existsSync(path);
 
 /** The exported text and the ids of the records the composite writer appended (the last `records` ones: the writer's own base text is renumbered densely). */
 const exportText = (doc: CadDocument, part: string): { text: string; appended: number[] } => {
-  const result = execute(doc, 'export_composite_ap242', { part }, ctxOf().ctx);
+  const result = execute(doc, 'export_composite_ap242', { part, acceptUnverified: { nonce: 'composites' } }, ctxOf().ctx);
   expect(result.rejected, result.summary).toBeUndefined();
   const data = result.data as { step: string; records: number };
   const last = Math.max(...parseRecords(data.step).bodies.keys());

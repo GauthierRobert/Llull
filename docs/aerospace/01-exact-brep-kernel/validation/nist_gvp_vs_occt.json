@@ -22,9 +22,9 @@
      -32.29744177870255
     ]
    },
-   "volumeRelDiff": 4.5737924230961405e-08,
-   "areaRelDiff": 2.4465742287910283e-08,
-   "centroidAbsDiffMm": 5.383731886965393e-07,
+   "volumeRelDiff": 4.5737924230961405e-8,
+   "areaRelDiff": 2.4465742287910283e-8,
+   "centroidAbsDiffMm": 5.383731886965393e-7,
    "verdict": "agree (<=1e-4 rel)"
   },
   {
@@ -51,7 +51,15 @@
    "volumeRelDiff": 0.034774361307115254,
    "areaRelDiff": 0.0040683626800236275,
    "centroidAbsDiffMm": 11.94809697346085,
-   "verdict": "DISAGREE - investigate (file GVP may be stale or scoped to a shape aspect)"
+   "verdict": "DISAGREE - investigate (file GVP may be stale or scoped to a shape aspect)",
+   "remeasuredAtGroupScope": {
+    "verdict": "agree (green): product-level recompute of all solids matches the PartBody / product property",
+    "deltas": {
+     "volume": 4.924454357531354e-9,
+     "area": 1.1543287222287917e-7,
+     "centroid": 0.00023863756637694888
+    }
+   }
   },
   {
    "file": "nist_ctc_03_asme1_ap242-e2.stp",
@@ -76,7 +84,7 @@
    },
    "volumeRelDiff": 9.195860622676855e-13,
    "areaRelDiff": 1.6406337955873005e-16,
-   "centroidAbsDiffMm": 1.1999929938610876e-09,
+   "centroidAbsDiffMm": 1.1999929938610876e-9,
    "verdict": "agree (<=1e-4 rel)"
   },
   {
@@ -100,7 +108,7 @@
      -7.876229433149141
     ]
    },
-   "volumeRelDiff": 7.466498762652013e-05,
+   "volumeRelDiff": 0.00007466498762652013,
    "areaRelDiff": 0.0009409438764965427,
    "centroidAbsDiffMm": 0.006446288194494807,
    "verdict": "agree (<=1e-4 rel)"
@@ -126,7 +134,7 @@
     "volume": 3323556.50526143,
     "area": 283413.011089723,
     "centroid": [
-     8.44667839028049e-05,
+     0.0000844667839028049,
      29.008906494,
      -109.600480952032
     ]
@@ -135,14 +143,14 @@
     "volume": 3323557.2211351795,
     "area": 283413.057351207,
     "centroid": [
-     8.45078655174785e-05,
+     0.0000845078655174785,
      29.00891873677964,
      -109.60046816559968
     ]
    },
-   "volumeRelDiff": 2.153938855342899e-07,
-   "areaRelDiff": 1.632299232076421e-07,
-   "centroidAbsDiffMm": 1.2786432321831853e-05,
+   "volumeRelDiff": 2.153938855342899e-7,
+   "areaRelDiff": 1.632299232076421e-7,
+   "centroidAbsDiffMm": 0.000012786432321831853,
    "verdict": "agree (<=1e-4 rel)"
   },
   {
@@ -167,7 +175,7 @@
     ]
    },
    "volumeRelDiff": 0.00021482360075973663,
-   "areaRelDiff": 3.944177262872104e-05,
+   "areaRelDiff": 0.00003944177262872104,
    "centroidAbsDiffMm": 0.021497427796231962,
    "gvpUnitInferred": "inch (volume ratio 16390.6 ~ 25.4^3)",
    "gvpMm": {
@@ -250,7 +258,7 @@
     "area": 283414.45165870804,
     "centroid": [
      109.60007546014094,
-     -8.448395405966779e-05,
+     -0.00008448395405966779,
      29.008735141817485
     ]
    }
@@ -293,7 +301,15 @@
    "volumeRelDiff": 0.22922785084546993,
    "areaRelDiff": 0.017770785576608543,
    "centroidAbsDiffMm": 22.894504263537076,
-   "verdict": "DISAGREE - investigate (file GVP may be stale or scoped to a shape aspect)"
+   "verdict": "DISAGREE - investigate (file GVP may be stale or scoped to a shape aspect)",
+   "remeasuredAtGroupScope": {
+    "verdict": "agree (green): product-level recompute of all solids matches the PartBody / product property",
+    "deltas": {
+     "volume": 5.3989946954735254e-9,
+     "area": 3.697629014784098e-9,
+     "centroid": 4.2415223896489844e-7
+    }
+   }
   },
   {
    "file": "nist_stc_09_asme1_ap242-e4.stp",
@@ -330,9 +346,9 @@
      37.49900523744882
     ]
    },
-   "volumeRelDiff": 3.0275386581042796e-06,
-   "areaRelDiff": 3.884806947005011e-06,
-   "centroidAbsDiffMm": 3.117578658162756e-05,
+   "volumeRelDiff": 0.0000030275386581042796,
+   "areaRelDiff": 0.000003884806947005011,
+   "centroidAbsDiffMm": 0.00003117578658162756,
    "verdict": "agree (<=1e-4 rel)"
   },
   {
@@ -451,7 +467,7 @@
     "volume": 3323546.070780445,
     "area": 283415.4228714473,
     "centroid": [
-     8.448372593796222e-05,
+     0.00008448372593796222,
      29.0088382768177,
      -109.6000727039093
     ]
@@ -508,7 +524,7 @@
    },
    "volumeRelDiff": 9.75300188606727e-11,
    "areaRelDiff": 6.546207219430344e-11,
-   "centroidAbsDiffMm": 9.127067168712699e-07,
+   "centroidAbsDiffMm": 9.127067168712699e-7,
    "gvpUnitInferred": "inch (volume ratio 16387.1 ~ 25.4^3)",
    "gvpMm": {
     "volume": 136445.10481135413,
@@ -549,5 +565,1233 @@
     ]
    }
   }
- ]
+ ],
+ "groupScopeRemeasure": {
+  "$comment": "04 XCH review 2026-10-20: every GVP group of every pinned NIST file measured against ITS target. The kernel (native OCCT 7.9.2 XDE reader, solids healed, product-level mass properties) integrates the solids of the product the group is attached to; the sender property is chosen by record linkage (the only SHAPE_ASPECT solid-body group with a volume, else the PRODUCT_DEFINITION_SHAPE group), never by nearest value. The first-pass rows above measured only the first solid of the file and compared it with the product-level property, which is why CTC-02 e2 and STC-08 e3 read as gross disagreements: they are not. Bands per TECHNICAL_SPEC 5.3 (green <= 1e-3 relative and <= 1e-3 of the bbox diagonal).",
+  "files": [
+   {
+    "file": "nist_ctc_01_asme1_ap242-e1.stp",
+    "lengthUnit": {
+     "name": "mm",
+     "mmPerUnit": 1
+    },
+    "gvpGroups": [
+     {
+      "product": "NIST Complex Test Case 1",
+      "definition": "PRODUCT_DEFINITION_SHAPE",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 14644822.6361138,
+      "areaMm2": 807080.802199914,
+      "centroidMm": [
+       -2.29264395139875,
+       -1.36345168588643,
+       -32.2974419857648
+      ]
+     }
+    ],
+    "import": {
+     "band": "green",
+     "products": [
+      {
+       "name": "NIST Complex Test Case 1",
+       "band": "green",
+       "recomputedMm": {
+        "volume": 14644823.3056,
+        "area": 807080.821946,
+        "centroid": [
+         -2.29264450617,
+         -1.36345167079,
+         -32.2974417786
+        ]
+       },
+       "comparisons": [
+        {
+         "property": "volume",
+         "delta": 4.5715735273435684e-8,
+         "band": "green"
+        },
+        {
+         "property": "area",
+         "delta": 2.4465742287910283e-8,
+         "band": "green"
+        },
+        {
+         "property": "centroid",
+         "delta": 5.923809336496075e-7,
+         "band": "green"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "file": "nist_ctc_01_asme1_rd.stp",
+    "lengthUnit": {
+     "name": "mm",
+     "mmPerUnit": 1
+    },
+    "gvpGroups": [],
+    "import": {
+     "band": "not-checkable",
+     "products": []
+    }
+   },
+   {
+    "file": "nist_ctc_02_asme1_ap242-e2.stp",
+    "lengthUnit": {
+     "name": "mm",
+     "mmPerUnit": 1
+    },
+    "gvpGroups": [
+     {
+      "product": "Test Case 2 Baseline",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 47106788.0321802,
+      "areaMm2": 2480624.4791306,
+      "centroidMm": [
+       -0.00415567842900755,
+       358.620787544608,
+       -178.169662485763
+      ]
+     },
+     {
+      "product": "Test Case 2 Baseline",
+      "definition": "SHAPE_ASPECT",
+      "target": "independent-surface",
+      "placeholder": false,
+      "areaMm2": 5674.50173054656,
+      "centroidMm": [
+       -2.56443929693986e-15,
+       812,
+       -140
+      ]
+     },
+     {
+      "product": "Test Case 2 Baseline",
+      "definition": "SHAPE_ASPECT",
+      "target": "independent-surface",
+      "placeholder": false,
+      "areaMm2": 4417.86466911065,
+      "centroidMm": [
+       -2.57334360005423e-15,
+       812,
+       -140
+      ]
+     },
+     {
+      "product": "Test Case 2 Baseline",
+      "definition": "PRODUCT_DEFINITION_SHAPE",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 47106788.0321802,
+      "areaMm2": 2480624.4791306,
+      "centroidMm": [
+       -0.00415567842900755,
+       358.620787544608,
+       -178.169662485763
+      ]
+     }
+    ],
+    "import": {
+     "band": "green",
+     "products": [
+      {
+       "name": "Test Case 2 Baseline",
+       "band": "green",
+       "recomputedMm": {
+        "volume": 47106787.8002,
+        "area": 2480624.19278,
+        "centroid": [
+         -0.00397158897269,
+         358.620936421,
+         -178.169632575
+        ]
+       },
+       "comparisons": [
+        {
+         "property": "volume",
+         "delta": 4.924454357531354e-9,
+         "band": "green"
+        },
+        {
+         "property": "area",
+         "delta": 1.1543287222287917e-7,
+         "band": "green"
+        },
+        {
+         "property": "centroid",
+         "delta": 0.00023863756637694888,
+         "band": "green"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "file": "nist_ctc_02_asme1_rc.stp",
+    "lengthUnit": {
+     "name": "mm",
+     "mmPerUnit": 1
+    },
+    "gvpGroups": [
+     {
+      "product": "NIST_CTC_02_ASME1_RC",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 47101527.47498,
+      "areaMm2": 2481847.636045,
+      "centroidMm": [
+       -0.000876966143434,
+       358.6349444541,
+       -178.1588021156
+      ]
+     },
+     {
+      "product": "NIST_CTC_02_ASME1_RC",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": false,
+      "areaMm2": 4417.488569853
+     },
+     {
+      "product": "NIST_CTC_02_ASME1_RC",
+      "definition": "PRODUCT_DEFINITION_SHAPE",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 47101527.47498,
+      "areaMm2": 2486265.124614,
+      "centroidMm": [
+       -0.000876966143434,
+       358.6349444541,
+       -178.1588021156
+      ]
+     }
+    ],
+    "import": {
+     "band": "green",
+     "products": [
+      {
+       "name": "NIST_CTC_02_ASME1_RC",
+       "band": "green",
+       "recomputedMm": {
+        "volume": 47100535.4928,
+        "area": 2481842.14208,
+        "centroid": [
+         -0.000168650195865,
+         358.637149705,
+         -178.16958182
+        ]
+       },
+       "comparisons": [
+        {
+         "property": "volume",
+         "delta": 0.00002106050954361026,
+         "band": "green"
+        },
+        {
+         "property": "area",
+         "delta": 0.000002213658121991108,
+         "band": "green"
+        },
+        {
+         "property": "centroid",
+         "delta": 0.011025736772326758,
+         "band": "green"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "file": "nist_ctc_03_asme1_ap242-e2.stp",
+    "lengthUnit": {
+     "name": "mm",
+     "mmPerUnit": 1
+    },
+    "gvpGroups": [
+     {
+      "product": "Test Case 3 Baseline",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 332122.9076263,
+      "areaMm2": 354787.650175344,
+      "centroidMm": [
+       -118.329746932968,
+       242.86422820302,
+       69.31685776493
+      ]
+     },
+     {
+      "product": "Test Case 3 Baseline",
+      "definition": "PRODUCT_DEFINITION_SHAPE",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 332122.9076263,
+      "areaMm2": 354787.650175344,
+      "centroidMm": [
+       -118.329746932968,
+       242.86422820302,
+       69.31685776493
+      ]
+     }
+    ],
+    "import": {
+     "band": "green",
+     "products": [
+      {
+       "name": "Test Case 3 Baseline",
+       "band": "green",
+       "recomputedMm": {
+        "volume": 332122.907627,
+        "area": 354787.650175,
+        "centroid": [
+         -118.329746933,
+         242.864228203,
+         69.3168577661
+        ]
+       },
+       "comparisons": [
+        {
+         "property": "volume",
+         "delta": 9.127509457385374e-13,
+         "band": "green"
+        },
+        {
+         "property": "area",
+         "delta": 4.921901386761902e-16,
+         "band": "green"
+        },
+        {
+         "property": "centroid",
+         "delta": 1.2002411955172861e-9,
+         "band": "green"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "file": "nist_ctc_03_asme1_rc.stp",
+    "lengthUnit": {
+     "name": "inch",
+     "mmPerUnit": 25.4
+    },
+    "gvpGroups": [],
+    "import": {
+     "band": "not-checkable",
+     "products": []
+    }
+   },
+   {
+    "file": "nist_ctc_04_asme1_ap242-e2.stp",
+    "lengthUnit": {
+     "name": "mm",
+     "mmPerUnit": 1
+    },
+    "gvpGroups": [
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 17519780.220394,
+      "areaMm2": 1022497.095954,
+      "centroidMm": [
+       -0.0079803627,
+       360.9458561866,
+       -7.8767441293
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "NIST PMI Test Case 4 Complex Model",
+      "definition": "PRODUCT_DEFINITION_SHAPE",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 17519780.220394,
+      "areaMm2": 1022497.095954,
+      "centroidMm": [
+       -0.0079803627,
+       360.9458561866,
+       -7.8767441293
+      ]
+     }
+    ],
+    "import": {
+     "band": "green",
+     "products": [
+      {
+       "name": "NIST PMI Test Case 4 Complex Model",
+       "band": "green",
+       "recomputedMm": {
+        "volume": 17519780.2188,
+        "area": 1022497.09559,
+        "centroid": [
+         -0.00798057353027,
+         360.945855953,
+         -7.87674413489
+        ]
+       },
+       "comparisons": [
+        {
+         "property": "volume",
+         "delta": 9.348214453679739e-11,
+         "band": "green"
+        },
+        {
+         "property": "area",
+         "delta": 3.608692813227685e-10,
+         "band": "green"
+        },
+        {
+         "property": "centroid",
+         "delta": 3.143836121710436e-7,
+         "band": "green"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "file": "nist_ctc_04_asme1_rd.stp",
+    "lengthUnit": {
+     "name": "mm",
+     "mmPerUnit": 1
+    },
+    "gvpGroups": [],
+    "import": {
+     "band": "not-checkable",
+     "products": []
+    }
+   },
+   {
+    "file": "nist_ctc_05_asme1_ap242-e1.stp",
+    "lengthUnit": {
+     "name": "inch",
+     "mmPerUnit": 25.4
+    },
+    "gvpGroups": [],
+    "import": {
+     "band": "not-checkable",
+     "products": []
+    }
+   },
+   {
+    "file": "nist_ctc_05_asme1_rd.stp",
+    "lengthUnit": {
+     "name": "inch",
+     "mmPerUnit": 25.4
+    },
+    "gvpGroups": [
+     {
+      "product": "NIST_CTC_05_ASME1_RD",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 12694914.68692222,
+      "areaMm2": 861242.9165391091,
+      "centroidMm": [
+       -0.00444232975083708,
+       -1.0106082709285138,
+       99.72360139103179
+      ]
+     },
+     {
+      "product": "NIST_CTC_05_ASME1_RD",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": false,
+      "areaMm2": 1612.8999999999999
+     },
+     {
+      "product": "NIST_CTC_05_ASME1_RD",
+      "definition": "PRODUCT_DEFINITION_SHAPE",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 12694914.68692222,
+      "areaMm2": 862855.816539109,
+      "centroidMm": [
+       -0.00444232975083708,
+       -1.0106082709285138,
+       99.72360139103179
+      ]
+     }
+    ],
+    "import": {
+     "band": "green",
+     "products": [
+      {
+       "name": "NIST_CTC_05_ASME1_RD",
+       "band": "green",
+       "recomputedMm": {
+        "volume": 12694921.7301,
+        "area": 861242.945579,
+        "centroid": [
+         -0.00440796815952,
+         -1.01060089301,
+         99.7235437757
+        ]
+       },
+       "comparisons": [
+        {
+         "property": "volume",
+         "delta": 5.548027404770809e-7,
+         "band": "green"
+        },
+        {
+         "property": "area",
+         "delta": 3.371861581610886e-8,
+         "band": "green"
+        },
+        {
+         "property": "centroid",
+         "delta": 0.00006748837587646639,
+         "band": "green"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "file": "nist_ftc_06_asme1_ap242-e2.stp",
+    "lengthUnit": {
+     "name": "mm",
+     "mmPerUnit": 1
+    },
+    "gvpGroups": [
+     {
+      "product": "NIST PMI FTC 06 ASME1",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 3323556.50526143,
+      "areaMm2": 283413.011089723,
+      "centroidMm": [
+       0.0000844667839028049,
+       29.008906494,
+       -109.600480952032
+      ]
+     },
+     {
+      "product": "NIST PMI FTC 06 ASME1",
+      "definition": "PRODUCT_DEFINITION_SHAPE",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 3323556.50526143,
+      "areaMm2": 283413.011089723,
+      "centroidMm": [
+       0.0000844667839028049,
+       29.008906494,
+       -109.600480952032
+      ]
+     }
+    ],
+    "import": {
+     "band": "green",
+     "products": [
+      {
+       "name": "NIST PMI FTC 06 ASME1",
+       "band": "green",
+       "recomputedMm": {
+        "volume": 3323557.22394,
+        "area": 283413.057351,
+        "centroid": [
+         0.0000844990321728,
+         29.0089188017,
+         -109.600468192
+        ]
+       },
+       "comparisons": [
+        {
+         "property": "volume",
+         "delta": 2.1623643189133296e-7,
+         "band": "green"
+        },
+        {
+         "property": "area",
+         "delta": 1.6322992259149896e-7,
+         "band": "green"
+        },
+        {
+         "property": "centroid",
+         "delta": 0.00001772876083753649,
+         "band": "green"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "file": "nist_ftc_06_asme1_rd.stp",
+    "lengthUnit": {
+     "name": "inch",
+     "mmPerUnit": 25.4
+    },
+    "gvpGroups": [],
+    "import": {
+     "band": "not-checkable",
+     "products": []
+    }
+   },
+   {
+    "file": "nist_ftc_07_asme1_ap242-e2.stp",
+    "lengthUnit": {
+     "name": "inch",
+     "mmPerUnit": 25.4
+    },
+    "gvpGroups": [
+     {
+      "product": "nist_ftc_07_asme1",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 1726247.5707237597,
+      "areaMm2": 391371.39402984,
+      "centroidMm": [
+       0.76753038264,
+       -64.55628822524,
+       0.035132517999999995
+      ]
+     },
+     {
+      "product": "nist_ftc_07_asme1",
+      "definition": "PRODUCT_DEFINITION_SHAPE",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 1726247.5707237597,
+      "areaMm2": 391371.39402984,
+      "centroidMm": [
+       0.76753038264,
+       -64.55628822524,
+       0.035132517999999995
+      ]
+     }
+    ],
+    "import": {
+     "band": "green",
+     "products": [
+      {
+       "name": "nist_ftc_07_asme1",
+       "band": "green",
+       "recomputedMm": {
+        "volume": 1726244.1336,
+        "area": 391371.238088,
+        "centroid": [
+         0.767581379003,
+         -64.556619683,
+         0.0350626243277
+        ]
+       },
+       "comparisons": [
+        {
+         "property": "volume",
+         "delta": 0.0000019910961357743265,
+         "band": "green"
+        },
+        {
+         "property": "area",
+         "delta": 3.984501037787765e-7,
+         "band": "green"
+        },
+        {
+         "property": "centroid",
+         "delta": 0.0003425638285579267,
+         "band": "green"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "file": "nist_ftc_07_asme1_rd.stp",
+    "lengthUnit": {
+     "name": "inch",
+     "mmPerUnit": 25.4
+    },
+    "gvpGroups": [],
+    "import": {
+     "band": "not-checkable",
+     "products": []
+    }
+   },
+   {
+    "file": "nist_ftc_08_asme1_ap242-e2.stp",
+    "lengthUnit": {
+     "name": "inch",
+     "mmPerUnit": 25.4
+    },
+    "gvpGroups": [],
+    "import": {
+     "band": "not-checkable",
+     "products": []
+    }
+   },
+   {
+    "file": "nist_ftc_08_asme1_ap242-e4-tg.stp",
+    "lengthUnit": {
+     "name": "mm",
+     "mmPerUnit": 1
+    },
+    "gvpGroups": [],
+    "import": {
+     "error": "KRN_STEP_NO_SOLID",
+     "products": []
+    }
+   },
+   {
+    "file": "nist_ftc_08_asme1_rc.stp",
+    "lengthUnit": {
+     "name": "inch",
+     "mmPerUnit": 25.4
+    },
+    "gvpGroups": [],
+    "import": {
+     "band": "not-checkable",
+     "products": []
+    }
+   },
+   {
+    "file": "nist_ftc_09_asme1_ap242-e1.stp",
+    "lengthUnit": {
+     "name": "mm",
+     "mmPerUnit": 1
+    },
+    "gvpGroups": [],
+    "import": {
+     "band": "not-checkable",
+     "products": []
+    }
+   },
+   {
+    "file": "nist_ftc_09_asme1_rd.stp",
+    "lengthUnit": {
+     "name": "inch",
+     "mmPerUnit": 25.4
+    },
+    "gvpGroups": [
+     {
+      "product": "NIST_FTC_09_ASME1_RD",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 136445.10481135413,
+      "areaMm2": 96614.23380695238,
+      "centroidMm": [
+       2.185934719329844,
+       1.5150352387139119,
+       4.554269753453959
+      ]
+     },
+     {
+      "product": "NIST_FTC_09_ASME1_RD",
+      "definition": "PRODUCT_DEFINITION_SHAPE",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 136445.10481135413,
+      "areaMm2": 96614.23380695238,
+      "centroidMm": [
+       2.185934719329844,
+       1.5150352387139119,
+       4.554269753453959
+      ]
+     }
+    ],
+    "import": {
+     "band": "green",
+     "products": [
+      {
+       "name": "NIST_FTC_09_ASME1_RD",
+       "band": "green",
+       "recomputedMm": {
+        "volume": 136445.104825,
+        "area": 96614.2338006,
+        "centroid": [
+         2.18593563204,
+         1.51503523865,
+         4.55426980806
+        ]
+       },
+       "comparisons": [
+        {
+         "property": "volume",
+         "delta": 9.753087206329941e-11,
+         "band": "green"
+        },
+        {
+         "property": "area",
+         "delta": 6.546297590680966e-11,
+         "band": "green"
+        },
+        {
+         "property": "centroid",
+         "delta": 9.143387682339285e-7,
+         "band": "green"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "file": "nist_ftc_10_asme1_ap242-e2.stp",
+    "lengthUnit": {
+     "name": "mm",
+     "mmPerUnit": 1
+    },
+    "gvpGroups": [],
+    "import": {
+     "band": "not-checkable",
+     "products": []
+    }
+   },
+   {
+    "file": "nist_ftc_10_asme1_rb.stp",
+    "lengthUnit": {
+     "name": "mm",
+     "mmPerUnit": 1
+    },
+    "gvpGroups": [],
+    "import": {
+     "band": "not-checkable",
+     "products": []
+    }
+   },
+   {
+    "file": "nist_ftc_11_asme1_ap242-e3.stp",
+    "lengthUnit": {
+     "name": "mm",
+     "mmPerUnit": 1
+    },
+    "gvpGroups": [],
+    "import": {
+     "band": "not-checkable",
+     "products": []
+    }
+   },
+   {
+    "file": "nist_ftc_11_asme1_rb.stp",
+    "lengthUnit": {
+     "name": "mm",
+     "mmPerUnit": 1
+    },
+    "gvpGroups": [],
+    "import": {
+     "band": "not-checkable",
+     "products": []
+    }
+   },
+   {
+    "file": "nist_stc_06_asme1_ap242-e3.stp",
+    "lengthUnit": {
+     "name": "mm",
+     "mmPerUnit": 1
+    },
+    "gvpGroups": [
+     {
+      "product": "nist_stc_06_asme1",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": true,
+      "volumeMm3": 0,
+      "areaMm2": 0,
+      "centroidMm": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "product": "nist_stc_06_asme1",
+      "definition": "PRODUCT_DEFINITION_SHAPE",
+      "target": "independent-surface",
+      "placeholder": false,
+      "centroidMm": [
+       129.6711766783,
+       0.6180553292,
+       29.05125
+      ]
+     }
+    ],
+    "import": {
+     "band": "not-checkable",
+     "products": []
+    }
+   },
+   {
+    "file": "nist_stc_07_asme1_ap242-e3.stp",
+    "lengthUnit": {
+     "name": "inch",
+     "mmPerUnit": 25.4
+    },
+    "gvpGroups": [],
+    "import": {
+     "band": "not-checkable",
+     "products": []
+    }
+   },
+   {
+    "file": "nist_stc_08_asme1_ap242-e3.stp",
+    "lengthUnit": {
+     "name": "mm",
+     "mmPerUnit": 1
+    },
+    "gvpGroups": [
+     {
+      "product": "NIST PMI STC 08 ASME1",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 503592.175239539,
+      "areaMm2": 191687.873141661,
+      "centroidMm": [
+       2.53109307374693,
+       -0.0591847313749045,
+       25.3789167065934
+      ]
+     },
+     {
+      "product": "NIST PMI STC 08 ASME1",
+      "definition": "SHAPE_ASPECT",
+      "target": "independent-surface",
+      "placeholder": false,
+      "areaMm2": 3406.44480002725,
+      "centroidMm": [
+       -1.21249769820208e-14,
+       -102.45725000041,
+       28.4480000001138
+      ]
+     },
+     {
+      "product": "NIST PMI STC 08 ASME1",
+      "definition": "PRODUCT_DEFINITION_SHAPE",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 503592.175239539,
+      "areaMm2": 191687.873141661,
+      "centroidMm": [
+       2.53109307374693,
+       -0.0591847313749045,
+       25.3789167065934
+      ]
+     }
+    ],
+    "import": {
+     "band": "green",
+     "products": [
+      {
+       "name": "NIST PMI STC 08 ASME1",
+       "band": "green",
+       "recomputedMm": {
+        "volume": 503592.177958,
+        "area": 191687.872433,
+        "centroid": [
+         2.53109265743,
+         -0.0591847156044,
+         25.3789167862
+        ]
+       },
+       "comparisons": [
+        {
+         "property": "volume",
+         "delta": 5.3989946954735254e-9,
+         "band": "green"
+        },
+        {
+         "property": "area",
+         "delta": 3.697629014784098e-9,
+         "band": "green"
+        },
+        {
+         "property": "centroid",
+         "delta": 4.2415223896489844e-7,
+         "band": "green"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "file": "nist_stc_09_asme1_ap242-e4.stp",
+    "lengthUnit": {
+     "name": "inch",
+     "mmPerUnit": 25.4
+    },
+    "gvpGroups": [],
+    "import": {
+     "band": "not-checkable",
+     "products": []
+    }
+   },
+   {
+    "file": "nist_stc_10_asme1_ap242-e2.stp",
+    "lengthUnit": {
+     "name": "mm",
+     "mmPerUnit": 1
+    },
+    "gvpGroups": [
+     {
+      "product": "nist_stc_10_asme1",
+      "definition": "SHAPE_ASPECT",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 188312.244641244,
+      "areaMm2": 48486.2744665371,
+      "centroidMm": [
+       84.0076805122325,
+       14.6087293037364,
+       37.4990364132354
+      ]
+     },
+     {
+      "product": "nist_stc_10_asme1",
+      "definition": "PRODUCT_DEFINITION_SHAPE",
+      "target": "part",
+      "placeholder": false,
+      "volumeMm3": 188312.244641244,
+      "areaMm2": 48486.2744665371,
+      "centroidMm": [
+       84.0076805122325,
+       14.6087293037364,
+       37.4990364132354
+      ]
+     }
+    ],
+    "import": {
+     "band": "green",
+     "products": [
+      {
+       "name": "nist_stc_10_asme1",
+       "band": "green",
+       "recomputedMm": {
+        "volume": 188312.813117,
+        "area": 48486.4628264,
+        "centroid": [
+         84.0076647446,
+         14.6087466958,
+         37.4990052332
+        ]
+       },
+       "comparisons": [
+        {
+         "property": "volume",
+         "delta": 0.000003018793240423412,
+         "band": "green"
+        },
+        {
+         "property": "area",
+         "delta": 0.000003884806947005011,
+         "band": "green"
+        },
+        {
+         "property": "centroid",
+         "delta": 0.00003902942366816398,
+         "band": "green"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  ]
+ }
 }

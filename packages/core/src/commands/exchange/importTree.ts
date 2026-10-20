@@ -26,6 +26,28 @@ export interface TreeStructure {
   readonly placements: ReadonlyMap<number, ProductPlacement>;
   /** Occurrences whose placement is not a rigid motion (mirrored / scaled): placed unrotated, named here. */
   readonly nonRigid: readonly string[];
+  /** Component ids that hold such an occurrence: their placed geometry is wrong, so they are unverified. */
+  readonly nonRigidParents: readonly string[];
+}
+
+/** Longest chain of instances below the top-level entities (cycle-safe; a cycle counts as the depth reached). */
+export function instanceDepth(components: Readonly<Record<string, Component>>, topLevel: readonly Entity[]): number {
+  const memo = new Map<string, number>();
+  const walk = (componentId: string, trail: ReadonlySet<string>): number => {
+    const known = memo.get(componentId);
+    if (known !== undefined) return known;
+    if (trail.has(componentId)) return 0;
+    const next = new Set(trail).add(componentId);
+    let deepest = 0;
+    for (const entity of Object.values(components[componentId]?.entities ?? {}))
+      if (entity.kind === 'instance') deepest = Math.max(deepest, 1 + walk(entity.componentId, next));
+    memo.set(componentId, deepest);
+    return deepest;
+  };
+  return topLevel.reduce(
+    (deepest, entity) => (entity.kind === 'instance' ? Math.max(deepest, 1 + walk(entity.componentId, new Set())) : deepest),
+    0,
+  );
 }
 
 const withoutNegativeZero = ([x, y, z]: Vec3): Vec3 => [x + 0, y + 0, z + 0];
@@ -61,6 +83,7 @@ export function buildTreeStructure(imported: ImportedExchange, entities: readonl
   const placements = new Map<number, ProductPlacement>();
   const topLevel: Entity[] = [];
   const nonRigid: string[] = [];
+  const nonRigidParents = new Set<string>();
   const solidEntities = (index: number): Entity[] =>
     (imported.products[index]?.solids ?? []).flatMap((solid) => {
       const entity = entities[solid];
@@ -84,7 +107,10 @@ export function buildTreeStructure(imported: ImportedExchange, entities: readonl
       const child = componentOf.get(use.product);
       if (child === undefined) continue;
       const placement = placementOf(use.matrix, mmPerUnit);
-      if (!placement.rigid) nonRigid.push(use.name);
+      if (!placement.rigid) {
+        nonRigid.push(use.name);
+        nonRigidParents.add(id);
+      }
       members.push({ ...instanceEntity(nextId('instance'), child, placement.position, placement.rotation), name: use.name });
     }
     components[id] = {
@@ -107,5 +133,5 @@ export function buildTreeStructure(imported: ImportedExchange, entities: readonl
       placements.set(root, { componentId: component, topLevel: [named.id] });
     }
   }
-  return { topLevel, components, placements, nonRigid };
+  return { topLevel, components, placements, nonRigid, nonRigidParents: [...nonRigidParents] };
 }

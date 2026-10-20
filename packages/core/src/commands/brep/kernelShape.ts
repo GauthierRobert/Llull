@@ -52,17 +52,22 @@ const isZero = (v: Vec3): boolean => v.every((component) => component === 0);
  * `faceted` is true for a solid that carries a slab the kernel could not use.
  */
 export function exactOrMesh(kernel: GeometryKernel, entity: Entity): { shape: ShapeHandle | null; faceted: boolean } {
+  const { recipe, faceted } = exactRecipe(kernel, entity);
+  return { shape: kernel.evaluate(recipe), faceted };
+}
+
+/** The recipe `exactOrMesh` evaluates (so a caller can wrap it, e.g. scale a placed slab), with the same `faceted` flag. */
+export function exactRecipe(kernel: GeometryKernel, entity: Entity): { recipe: ShapeRecipe; faceted: boolean } {
   if (entity.kind === 'mesh' && entity.stepSlab !== undefined && entity.brep === undefined) {
     const slab = entity.stepSlab;
     const recipe: ShapeRecipe =
       isZero(entity.position) && isZero(entity.rotation)
         ? slab
         : { op: 'place', source: slab, position: entity.position, rotation: entity.rotation };
-    const exact = kernel.supports('faceSlab') ? kernel.evaluate(recipe) : null;
-    if (exact !== null) return { shape: exact, faceted: false };
-    return { shape: kernel.evaluate(operandRecipe(kernel, entity)), faceted: true };
+    if (kernel.supports('faceSlab') && kernel.evaluate(recipe) !== null) return { recipe, faceted: false };
+    return { recipe: operandRecipe(kernel, entity), faceted: true };
   }
-  return { shape: kernel.evaluate(operandRecipe(kernel, entity)), faceted: false };
+  return { recipe: operandRecipe(kernel, entity), faceted: false };
 }
 
 /** Summary suffix naming operands used as triangles because this kernel lacks an op of their tree. */
