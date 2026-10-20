@@ -106,11 +106,28 @@ export function compositesErrors(slice: unknown): string[] {
           const out: string[] = [];
           if (!isRecord(slice['parts']) || !isText(s['partId']) || !Object.hasOwn(slice['parts'], s['partId']))
             out.push(`composites.sections.${id} references a missing part`);
+          const plies = s['plies'];
+          const valid =
+            Array.isArray(plies) &&
+            plies.every((ply) => isRecord(ply) && isText(ply['material']) && positive(ply['thickness']) && isNumber(ply['angleDeg']));
+          if (!valid) out.push(`composites.sections.${id}.plies need material, thickness > 0 and angleDeg`);
+          else {
+            const total = (plies as { thickness: number }[]).reduce((sum, ply) => sum + ply.thickness, 0);
+            if (!isNumber(s['thickness']) || Math.abs((s['thickness'] as number) - total) > 1e-6 * Math.max(total, 1e-9))
+              out.push(`composites.sections.${id}.thickness must equal the sum of its plies`);
+            const materials = isRecord(slice['materials']) ? slice['materials'] : {};
+            for (const ply of plies as { material: string }[])
+              if (!Object.hasOwn(materials, ply.material))
+                out.push(`composites.sections.${id} references missing material '${ply.material}'`);
+          }
+          if (!isText(s['name'])) out.push(`composites.sections.${id}.name must be text`);
+          if (s['laminateSide'] !== 'positive_normal' && s['laminateSide'] !== 'negative_normal')
+            out.push(`composites.sections.${id}.laminateSide is unknown`);
           if (
-            !Array.isArray(s['plies']) ||
-            !s['plies'].every((ply) => isRecord(ply) && isText(ply['material']) && positive(ply['thickness']) && isNumber(ply['angleDeg']))
+            s['zoneId'] !== undefined &&
+            (!isRecord(slice['zones']) || !isText(s['zoneId']) || !Object.hasOwn(slice['zones'], s['zoneId']))
           )
-            out.push(`composites.sections.${id}.plies need material, thickness > 0 and angleDeg`);
+            out.push(`composites.sections.${id} references a missing zone`);
           return out;
         })),
     ...tableErrors(slice, 'waivers', (id, w) =>

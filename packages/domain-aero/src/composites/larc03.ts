@@ -1,7 +1,9 @@
 /**
- * LaRC03-type plane-stress failure criterion (06 CMP M6): fibre tension by maximum strain, matrix tension with the fracture-toughness
- * ratio, matrix compression on a searched fracture plane (alpha0 = 53 degrees), fibre compression by kinking with the initial misalignment.
- * Dávila, Camanho, Rose, NASA/TM-2003-212663 (2003). In-situ strengths (thin-ply effect) are NOT applied.
+ * LaRC04-style plane-stress failure criterion (06 CMP M6), named LaRC03 after the family: fibre tension by maximum strain, matrix tension
+ * with the fracture-toughness ratio, matrix compression by a Mohr-Coulomb (Puck-type) fracture-plane search with alpha0 = 53 degrees,
+ * fibre compression by kinking with the initial misalignment. Dávila, Camanho, Rose, NASA/TM-2003-212663 (2003) and the LaRC04 follow-up.
+ * It is NOT the LaRC03 matrix-compression form <|tau| + eta sigma_n>/S, and the case sigma1 < -Yc with the misalignment frame is not
+ * separated. In-situ strengths (thin-ply effect) are NOT applied.
  */
 
 import type { LaminaMaterial } from '@core/model/composites';
@@ -42,7 +44,10 @@ export function larc03Constants(material: LaminaMaterial): Constants | { readonl
   const muL = (-S * Math.cos(2 * ALPHA0)) / (Yc * Math.cos(ALPHA0) ** 2);
   const ST = Yc * Math.cos(ALPHA0) * (Math.sin(ALPHA0) + Math.cos(ALPHA0) / Math.tan(2 * ALPHA0));
   const q = S / Xc + muL;
-  const phi0 = Math.atan((1 - Math.sqrt(1 - 4 * q * (S / Xc))) / (2 * q));
+  const discriminant = 1 - 4 * q * (S / Xc);
+  if (!(q > 0) || discriminant < 0)
+    return { missing: ['a consistent Xc, S and Yc (the fibre kink angle is undefined for this strength ratio)'] };
+  const phi0 = Math.atan((1 - Math.sqrt(discriminant)) / (2 * q));
   return { ...strengths, E1: material.E1, G12: material.G12, nu12: material.nu12, g: material.GIc / material.GIIc, muT, muL, ST, phi0 };
 }
 
@@ -89,6 +94,9 @@ const worstOf = (values: Record<Larc03Mode, number>): { index: number; mode: Lar
  * Strength ratio R: the load multiplier at which the governing LaRC03 index reaches 1 (bisection on the stress scale).
  * @invariant Infinity when no index reaches 1 up to a 1e9 multiplier (a stress state with no load)
  */
+/** Worst failure index of the stress state (>= 1: failed). */
+export const larc03Index = (constants: Constants, stress: Triple): number => worstOf(indices(constants, stress)).index;
+
 export function larc03Ratio(constants: Constants, stress: Triple): { readonly R: number; readonly mode: Larc03Mode } {
   const at = (scale: number): { index: number; mode: Larc03Mode } =>
     worstOf(indices(constants, [stress[0] * scale, stress[1] * scale, stress[2] * scale]));

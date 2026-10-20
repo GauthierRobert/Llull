@@ -3,6 +3,7 @@
 import { confirmExportControlled, defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed, exportRefusal, report } from '@core/commands/noop';
+import type { Rosette } from '@core/model/composites';
 import { MM_PER_UNIT } from '@core/model/units';
 import { polygonArea, polygonPerimeter } from '@lib/polygon';
 import { sig } from '../shared/results';
@@ -10,11 +11,19 @@ import { refuseCmp } from './codes';
 import { syncOutlines } from './derive';
 import { piecesOf } from './geometry2d';
 import { normalizeAngle } from './notation';
+import { frameRefusal, orientationInPartFrame, orientationInRosette } from './plyFrame';
 import { insertPly } from './plyCommands';
 import { isUnverified } from './provenance';
 import { compositesOf, findPart, findRosette, pliesOf, withComposites, zonesOf } from './state';
 
+const MAX_ROWS = 5000;
 const COLUMNS = ['ply', 'sequence', 'order', 'material', 'orientation', 'rosette', 'zones', 'area_mm2', 'mass'] as const;
+
+const FORMULA = /^[=+\-@\t\r]/;
+
+/** A text cell safe for spreadsheets: a leading formula character is prefixed with an apostrophe (read back by `unguard`). */
+const guard = (cell: string): string => (FORMULA.test(cell) || /^'+[=+\-@\t\r]/.test(cell) ? `'${cell}` : cell);
+const unguard = (cell: string): string => (/^'+[=+\-@\t\r]/.test(cell) ? cell.slice(1) : cell);
 
 const quote = (cell: string): string => (/[",\n\r]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell);
 
@@ -62,7 +71,7 @@ export const exportPlyTable = defineCommand({
   annotations: { readOnly: true },
   description:
     'Export the plies of a composite part, tool side first, as a CSV text (data.files[0].content, text/csv): columns ply (name), sequence, order ' +
-    '(0 = tool side), material, orientation (degrees from the rosette), rosette (name), zones (names joined by |), area_mm2 (covered area in ' +
+    '(0 = tool side), material, orientation (degrees from the ply rosette named in the rosette column), rosette (name), zones (names joined by |), area_mm2 (covered area in ' +
     'mm^2, ramps included) and mass (area x cured thickness x density, density unit x document unit^3; empty when the material has no density). ' +
     'import_ply_table reads the same layout back. Read-only.',
   params: z.object({ part: z.string().describe('Part id or name.'), confirmExportControlled }),
@@ -82,13 +91,13 @@ export const exportPlyTable = defineCommand({
       const names = (ply.zoneOrigin?.zoneIds ?? []).map((id) => model.zones[id]?.name ?? id).join('|');
       const mass = material?.density === undefined ? '' : String(sig(area * material.plyThickness * material.density));
       return [
-        ply.name,
-        ply.sequence,
+        guard(ply.name),
+        guard(ply.sequence),
         String(ply.order),
-        ply.materialName,
-        String(ply.orientation),
-        model.rosettes[ply.rosetteId]?.name ?? ply.rosetteId,
-        names,
+        guard(ply.materialName),
+        String(Math.round(normalizeAngle(orientationInRosette(part, model.rosettes[ply.rosetteId], ply.orientation)) * 1e9) / 1e9 + 0),
+        guard(model.rosettes[ply.rosetteId]?.name ?? ply.rosetteId),
+        guard(names),
         String(sig(area * scale)),
         mass,
       ]
@@ -126,7 +135,7 @@ export const importPlyTable = defineCommand({
     let model = compositesOf(doc);
     const part = findPart(model, partRef);
     if (part === null) return refuseCmp(doc, 'import_ply_table', 'CMP_REF_MISSING', `no part '${partRef}'`, [], ['params.part']);
-    const rows = parseCsv(csv);
+    const rows = parseCsv(csv.replace(/^\uFEFF/, ''));
     const header = rows?.[0]?.map((cell) => cell.trim());
     if (rows === null || header === undefined)
       return refuseCmp(
@@ -150,16 +159,18 @@ export const importPlyTable = defineCommand({
         [part.id],
         ['params.replace'],
       );
-    const cell = (row: readonly string[], name: string): string => (row[column(name)] ?? '').trim();
+    if (rows.length - 1 > MAX_ROWS)
+      return refuseCmp(doc, 'import_ply_table', 'CMP_CSV_PARSE', `more than ${MAX_ROWS} rows`, [part.id], ['params.csv']);
+    const cell = (row: readonly string[], name: string): string => unguard((row[column(name)] ?? '').trim());
     const parsed = rows
       .slice(1)
       .map((row, k) => ({
         line: k + 2,
         name: cell(row, 'ply'),
         material: cell(row, 'material'),
-        orientation: Number(cell(row, 'orientation')),
+        orientation: cell(row, 'orientation') === '' ? NaN : Number(cell(row, 'orientation')),
         sequence: cell(row, 'sequence'),
-        order: column('order') < 0 ? k : Number(cell(row, 'order')),
+        order: column('order') < 0 ? k : cell(row, 'order') === '' ? NaN : Number(cell(row, 'order')),
         rosette: cell(row, 'rosette'),
       }));
     const bad = parsed.find((row) => row.name === '' || !Number.isFinite(row.orientation) || !Number.isFinite(row.order));
@@ -197,10 +208,13 @@ export const importPlyTable = defineCommand({
     const ids: string[] = [];
     for (const row of [...parsed].sort((a, b) => a.order - b.order || a.line - b.line)) {
       const rosette = row.rosette === '' ? null : findRosette(model, row.rosette);
+      const frame = orientationInPartFrame(part, rosette ?? (findRosette(model, part.rosetteId) as Rosette), row.orientation);
+      const refusal = frameRefusal(doc, 'import_ply_table', frame, part, 'params.csv');
+      if (refusal !== null) return refusal;
       const result = insertPly(model, part, {
         name: row.name,
         materialName: row.material,
-        orientation: normalizeAngle(row.orientation),
+        orientation: normalizeAngle((frame as { orientation: number }).orientation),
         sequence: row.sequence === '' ? `S${ids.length + 1}` : row.sequence,
         rosetteId: rosette?.id ?? part.rosetteId,
         boundary: { kind: 'whole_face' },

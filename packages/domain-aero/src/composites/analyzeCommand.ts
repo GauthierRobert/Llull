@@ -67,7 +67,7 @@ export const analyzeLaminate = defineCommand({
     criteria: z
       .array(z.enum(['max_stress', 'tsai_hill', 'tsai_wu', 'larc03']))
       .describe(
-        'Failure criteria to evaluate; default max_stress, tsai_hill and tsai_wu. "larc03" (plane-stress LaRC03) needs GIc and GIIc on the material.',
+        'Failure criteria to evaluate; default max_stress, tsai_hill and tsai_wu. "larc03" is a LaRC04-style plane-stress criterion (Mohr-Coulomb matrix compression, fibre kinking; no in-situ strengths, unverified) and needs GIc and GIIc on the material.',
       )
       .optional(),
   }),
