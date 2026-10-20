@@ -674,8 +674,8 @@ Forces on edges / points are split equally over the target nodes (faces: area-co
 (temperature: element interpolation). Case lengths are in document units, loads in the case unit system. The FE tools run synchronously in the
 server process (no ticket cancel yet).
 
-**Not built (05 backlog):** shells / plane stress / beams, midsurface, defeature (BDF, OP2, VTU, `set_result_view`, `fea_import_results`, `fea_result_field` and the face map are built in FEA-REST part 2, below),
-`*DISTRIBUTING COUPLING` for CalculiX, UI panels, `.llullz` result bundling. Modal, buckling,
+**Not built (05 backlog):** beams, `*DISTRIBUTING COUPLING` for CalculiX, `.llullz` result bundling (shells, plane stress, midsurface, defeature,
+composite shells and the UI panels are built in FEA-REST part 3; BDF, OP2, VTU, `set_result_view`, `fea_import_results`, `fea_result_field` and the face map in part 2, below). Modal, buckling,
 `dispose_margin`, `analytic_check`, moment loads, area-consistent forces and a Verdict subset (the metrics listed under "Verdict quality" below) are built (FEA-REST part 1, below).
 
 **FEA-REST part 1 (2026-10-19): modal, buckling, human gate, analytic checks, loads, quality.**
@@ -835,3 +835,86 @@ what is verified is stated per item.
   `fractionOfExtractedSum` instead of "of the model mass", force weights only when every target node is a face node, a `-1 Hz` lower bound for supportless modal cases,
   `set_margin_band`, `inputHash` in the signed disposition payload, a bounding-box note on `FEA_MESH_ADEQUACY`, element-type guard in `meshQuality`.
 - **Not done:** large-field BDF, `*DISTRIBUTING COUPLING`, Netgen, foreign-mesh review-only imports, double-precision OP2, OP2 shell / hex stresses, `.llullz` result bundling, UI panels (part 3).
+
+**FEA-REST part 3 (2026-10-20): M6 shells, plane stress, composites, M4 leftovers, UI, part-2 review fixes.** No Gmsh, CalculiX, Nastran or Python on the dev
+machine: every deck is proven by text tests, every reader by hand-built fixtures, and the Python side (`server/python/llull_shell.py`, the `llull_mesh.py`
+changes) was **not run or even compiled**. Real-tool tests skip with a logged reason.
+
+- **Shell idealization** (`set_part_idealization idealization=shell`, `shell/idealize.ts`). Optional `thickness`, `offset` mid | top | bottom, `maxThickness`,
+  `angularTolDeg` (default 1), `midsurfaceMinCoverage` (default 0.98), `compositePartId` + `laminateSectionId`. The thickness is stored resolved (given, the laminate's,
+  or the single wall thickness of the midsurface; several walls without an explicit thickness -> `FEA_MIDSURFACE_THICKNESS_VARIES`); a thick shell (t / span > 0.1)
+  is a summary warning. Shell and plane-stress parts are for static, modal and buckling cases (`FEA_PART_INVALID` otherwise; the thermal / nonlinear decks stay tet-only).
+- **Midsurface (TR-FEA-20, deviation).** Not a `ShapeRecipe` node evaluated by the kernel (core geometry is outside this plugin's write scope): `shell/midsurface.ts`
+  computes planar mid faces (polygons with holes, document frame, normal = top of the wall) and the mesher builds OCC plane surfaces from them. Order: (1) **sheet-metal
+  fast path** from `CadDocument.sheetMetal` (core data; the `sheetmetal` plugin is not imported): each flat's outline + cutouts on the mid plane (zBottom + T/2), each
+  bend as faceted mid-radius strips of at most 15 degrees joining the two flats (an arc that misses its child flat -> `FEA_MIDSURFACE_FAILED`); forms (flanged holes,
+  beads) are not on the midsurface (warning). (2) **box-plate fast path**: the mid rectangle across the single thinnest side (`FEA_MIDSURFACE_NOT_THIN`,
+  `FEA_MIDSURFACE_NOT_A_PLATE`). (3) **face pairing** on the exact kernel (`faceQuery`): planar faces with reversed outward normals within angularTolDeg, depth
+  0 < t <= maxThickness, overlapping projections (`faceContains` of projected samples), smallest gap first; the mid face is the SMALLER face's outline (boundary loops
+  of `tessellateFace`) projected on the mid plane. Coverage = paired area / area of the faces that are not edge strips (area <= maxThickness x extent); below
+  minCoverage -> `FEA_MIDSURFACE_COVERAGE` at set time and at `fea_mesh`. Not built: cylinder pairs (curved walls stay unpaired, warning), step 4 extension / sewing
+  (warning: mid faces join only where their edges coincide, so the two mid faces of a face-paired L-bracket do NOT meet; the sheet-metal path has no such gap),
+  `BRepAlgoAPI_Common` overlap regions. No kernel -> `FEA_KERNEL_OCC_REQUIRED`. `extract_midsurface` (read-only) previews it: `data { method, faces [{ source,
+  thickness, normal, area, outer, holes }], thicknesses, coverage, unpairedFaces, warnings }`. The sheet-metal part and its rule are in the mesh input hash.
+- **Plane stress** (`idealization=plane_stress`, `thickness`, `sourceFacesNear`): the faces near the points (boxes analytically, other solids through `faceQuery`) must
+  lie in z = 0 with normal +-Z (CalculiX plane elements live in the global x-y plane; `FEA_PLANE_STRESS_NOT_XY`), meshed CPS3 / CPS6 / CPS4 / CPS8 oriented +Z,
+  `*SOLID SECTION` with the thickness line; fixed / pinned write dofs 1-2. Pressure on a plane-stress part is refused (`FEA_LOAD_INVALID`: edge labels are not built;
+  use a force). plane_strain is not in the 05 data model: not built.
+- **Meshing (`llull_shell.py`, geometry kind `midsurface`).** All mid faces of a part are fragmented together (`occ.fragment`) so shared edges are conformal, then
+  meshed in 2D: triangles (S3 / S6, CPS3 / CPS6) or, with `set_mesh_controls elementFamily=shell_quad`, all quadrilaterals by subdivision (S4 / S8, CPS4 / CPS8);
+  every element is re-ordered so its corner normal follows the face normal. A `facesNear` point resolves to the nearest mid face, or to the nearest boundary curve
+  when that curve is as near (a point on a side wall of the solid = the shell edge there); tolerance max(1e-3 x size, 0.75 t). Face targets carry a side label
+  (1 = point on the +normal side, 2 = below) used for pressure. Conformal bonding with 2D parts -> `FEA_BONDING_UNSUPPORTED`; 2D and solid parts are meshed
+  separately (no shell-solid coupling).
+- **Decks.** INP: `*SHELL SECTION, ELSET, MATERIAL, OFFSET=0 | 0.5 | -0.5` + thickness; shells fixed = dofs 1-6, pinned 1-3, symmetry = the normal translation + the
+  rotations about the two in-plane axes (the symmetry-plane test now ignores an axis the whole mesh is flat in), displacement rx / ry / rz allowed on shells (radians);
+  pressure `*DLOAD elem, P, +-p` (label 1 -> +p, label 2 -> -p: Abaqus convention "positive acts against the shell normal", **unverified against ccx**); forces on shell
+  faces are split equally over the target nodes. An element type that does not fit the part idealization is refused (`FEA_PART_INVALID`). BDF: PSHELL (plain shells:
+  offset mid only, else `FEA_BDF_UNSUPPORTED`), shell `PLOAD4 SID EID P` with P = -p for label 1 (Nastran: positive along the element normal, **unverified**),
+  shell symmetry adds the rotations.
+- **Composite shells** (06 CMP through core data only). `compositePartId` = a composite part laid up on the entity; its laminate is a stored `LaminateSection`
+  (`laminateSectionId`, from `create_laminate_sections`, merged from feat/eng-depth: per-zone sections, angles from the part rosette) or the part's plies when all
+  are whole-face (`FEA_COMPOSITE_ZONES_UNSUPPORTED` otherwise); core plies -> `FEA_COMPOSITE_CORE_UNSUPPORTED`. Plies are written bottom to top along the element
+  normal (reversed when the stacking direction, rosette normal x laminateSide, opposes the first element's normal). INP: per lamina `*MATERIAL` + `*ELASTIC,
+  TYPE=ENGINEERING CONSTANTS` (transversely isotropic: E3 = E2, nu13 = nu12, G13 = G13 ?? G12, G23 = G23 ?? G13, nu23 = E2 / (2 G23) - 1; assumptions in a deck
+  comment), per ply `*ORIENTATION` (rosette 0-degree axis, normal x axis, `3, angle`), `*SHELL SECTION, COMPOSITE, OFFSET` with `t,, material, orientation` lines;
+  S8 elements are written `S8R` (other types -> `FEA_COMPOSITE_ELEMENT`: use shell_quad, order 2). BDF: MAT8 per lamina, PCOMP (Z0 = -(1/2 + offset) t, SOUT YES),
+  CORD2R 100 + pid (x = rosette axis, z = element normal) named as MCID on the part's elements. Lamina density is read as grams per cubic document unit (assumption).
+  None of the composite cards ran in ccx or Nastran.
+- **Shell results (open question 7, decided).** CalculiX expands shells into volume elements and writes the .frd on the expanded nodes. `shell/shellResults.ts`
+  reads the .frd node block and finds, for each 2D mesh node, the expanded nodes at x + (1/2 - offset) t n (top fibre) and x - (1/2 + offset) t n (bottom) within t / 4
+  (n = averaged element normal): geometric, independent of the expansion numbering. The node gets the mean of both (midsurface displacement, membrane stress) and
+  the fibre stresses in `STRESS_TOP` / `STRESS_BOT`; values under the original numbers (2D output) are kept; neither -> `FEA_SHELL_RESULTS_UNMAPPED`. The results
+  summary takes the max von Mises over STRESS and both fibres. The deck keeps the default `*NODE FILE` (no OUTPUT=): that the default is the expanded output is
+  **unverified** against ccx 2.21. **Margins on shells:** `compute_margins` reads the membrane STRESS per node; fibre-wise margin rows are **deferred**, so a shell in
+  bending is UNDER-estimated by the margins table (the results summary shows the fibre peak).
+- **Defeaturing** (`defeature_for_analysis { analysisId, entityId, maxFeatureSize?, facesNear?, clear? }`, `AnalysisCase.defeature`, in the mesh input hash). The
+  kernel path (`BRepAlgoAPI_Defeaturing` as a recipe node) is not reachable through the kernel interface: Gmsh `occ.defeature` in the bridge on STEP parts removes
+  cylinder / torus faces of radius <= maxFeatureSize (principal curvature at the parametric centre) and the faces nearest to `facesNear`; a failure is
+  `FEA_DEFEATURE_FAILED` naming the faces; STL parts are refused; the face map is skipped for a defeatured part; `fea_mesh` reports `data.defeatured`. Chamfer strips
+  are not detected. **Unverified** (no Gmsh here).
+- **Singularity policy (open question 8, decided)** in `compute_margins` / `dispose_margin`: sources = nodes of force / moment loads and of supports whose target has no
+  mesh face (points, edges); default exclusion radius 2 x mesh globalSize (`data.singularScreening.radius`, named llull default, `defaulted: true`); override
+  `singularityRadius` (document units, 0 = none) REQUIRES `singularityNote` (else `FEA_MARGIN_PARAM_INVALID`). Excluded nodes form separate rows (region `singular`,
+  `singular: true`, rowKey + `|singular`) that never set minMs; `check_analysis` ignores them for FEA_MS_NEGATIVE / FEA_DISPOSITION_PENDING. Re-entrant edges are
+  not screened (needs geometry): deferred.
+- **M4 leftovers.** Golden plans `fea_buckling_preload_view` (preload, moment with referencePoint, result view) and `fea_static_margin_band_view`; golden text of the
+  BDF and the VTU (with and without results) in `tests/golden/feaExports.test.ts`; `llull guide` section 11 "Structural analysis".
+- **UI** (`src/ui/panels/analysis/*`, presentation only): state badges (not meshed, meshed, solved, stale, missing, untrusted, with their meaning), idealization per
+  part, mesh line with element family and bonding, per-load-case peaks, the margins table of `compute_margins` (statusLabel such as "FAIL (accepted)", disposition,
+  singular rows apart, min MS, review notice), field / load case / mode / deformation changes dispatched as `set_result_view`, `set_margin_band` and
+  `delete_analysis` actions; the disposition stays a disabled affordance (no signing port). Component tests `tests/component/AnalysisRest.test.tsx` (no Playwright).
+- **Part-2 review fixes.** `Math.max(...array)` replaced by loops (BDF ids, OP2). Preloaded `*BUCKLE`: the reference step writes preload + reference summed per node /
+  dof, element / face and GRAV (a modifying `*CLOAD` / `*DLOAD` replaces the earlier value); that the factor multiplies only the reference increment is unverified.
+  A supportless modal case writes a lower bound of -1 Hz; shift semantics unverified (ccx may read it as sigma = (2 pi fmin)^2). Decks carry `llull inputHash <16 hex>`
+  (INP `*HEADING`, BDF `SUBTITLE`); import refuses a different marker (`FEA_RESULTS_INPUT_MISMATCH`), a file without one is `binding: 'imported-unbound'` with
+  `FEA_RESULTS_UNBOUND` (import and `check_analysis` warnings); unverified: that ccx copies `*HEADING` into the .frd header, where Nastran puts SUBTITLE in the OP2.
+  Plugin validation of `preloadLoadCase`, `marginalBand` and `view`. RBE3 needs >= 3 nodes that carry the moment (`FEA_LOAD_INVALID`). OP2: at most 1e6 records,
+  text decoded only from records <= 128 bytes. The VTU export applies the deck export-control gate (`MAT_EXPORT_CONTROLLED`). The face map raises
+  `AMBIGUOUS_FACE_MAP` only for a target that names the ambiguous face. Adding inputHash to the `dispose_margin` payload (part 2) makes dispositions signed before it
+  fail verification on replay.
+- **Tests.** `tests/unit/cae/{shellSetup,shellDeck,shellTransports,marginsSingularity,reviewFixesPart2}.test.ts`, `tests/golden/feaExports.test.ts`,
+  `tests/component/AnalysisRest.test.tsx`. Not run anywhere: a real shell / plane-stress / composite solve, the shell pressure signs, the expansion mapping on a real
+  .frd, Gmsh 2D meshing and defeaturing, PCOMP / MAT8 / CORD2R in Nastran.
+- **Not done:** beams (V2), cylinder pairing and mid-face extension / sewing, fibre-wise margin rows, shell-solid coupling, pressure on plane-stress edges, plane
+  strain, chamfer detection, offsets of plain PSHELL in the BDF, sandwich cores, `*DISTRIBUTING COUPLING`, Netgen, large-field BDF, `.llullz` bundling.
