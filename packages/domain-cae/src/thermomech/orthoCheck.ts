@@ -3,7 +3,7 @@
 import type { ThermoMechSetup } from '@core/model/analysis';
 import { isCteRefusal } from '@core/model/materialCte';
 import type { CadDocument } from '@core/model/types';
-import { providerFor, REFERENCE_PROBE_KELVIN } from './cte';
+import { elasticUnverifiedReasons, providerFor, REFERENCE_PROBE_KELVIN } from './cte';
 import { incompleteOrthoRefusal, ORTHO_DIRECTIONS } from './orthoCte';
 
 export interface CheckProblem {
@@ -41,6 +41,7 @@ export function orthoPartProblems(
     }
     reasons.push(...probe.unverifiedReasons.map((reason) => `direction ${direction}: ${reason}`));
   }
+  reasons.push(...elasticUnverifiedReasons(doc, materialId));
   if (reasons.length > 0)
     problems.push({
       code: 'TMC_MATERIAL_UNVERIFIED',
