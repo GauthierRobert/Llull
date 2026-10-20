@@ -17,7 +17,7 @@ export interface FixtureCloud {
   readonly attributes?: CloudManifest['attributes'];
 }
 
-export function manifestOf(cloud: FixtureCloud): CloudManifest {
+function manifestOf(cloud: FixtureCloud): CloudManifest {
   const axis = (a: number, pick: (x: number, y: number) => number): number =>
     cloud.points.map((p) => p[a] ?? 0).reduce((x, y) => pick(x, y));
   const n = cloud.points.length;

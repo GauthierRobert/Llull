@@ -6,13 +6,13 @@
 
 import type { Vec3 } from './vectors';
 
-export type CloudFormat = 'e57' | 'las' | 'laz' | 'xyz' | 'pts' | 'csv';
-export type CloudAttribute = 'intensity' | 'rgb' | 'classification' | 'returnNumber' | 'numberOfReturns' | 'gpsTime' | 'normal';
+type CloudFormat = 'e57' | 'las' | 'laz' | 'xyz' | 'pts' | 'csv';
+type CloudAttribute = 'intensity' | 'rgb' | 'classification' | 'returnNumber' | 'numberOfReturns' | 'gpsTime' | 'normal';
 
 /** Row-major 4 × 4 rigid transform (16 numbers), translation in metres (column 3). */
 export type Mat4 = readonly number[];
 
-export interface CloudScan {
+interface CloudScan {
   readonly guid: string | null;
   readonly name: string | null;
   readonly pointCount: number;
@@ -100,7 +100,7 @@ export interface CloudOp {
 }
 
 /** A failed op: stable code (SCN_*, NATIVE_*) and message. */
-export interface CloudOpFailure {
+interface CloudOpFailure {
   readonly ok: false;
   readonly code: string;
   readonly message: string;
@@ -130,7 +130,7 @@ export interface PointCloudPort {
   compute(op: CloudOp): CloudOpResult | null;
 }
 
-export type ColorBy = 'rgb' | 'intensity' | 'elevation' | 'classification' | 'single';
+type ColorBy = 'rgb' | 'intensity' | 'elevation' | 'classification' | 'single';
 
 export interface CloudReference {
   /** Step-scoped id `cloud-<step>.<k>` (L8). */
@@ -145,9 +145,9 @@ export interface CloudReference {
   readonly display: { readonly visible: boolean; readonly colorBy: ColorBy; readonly pointSize: number };
 }
 
-export type RegistrationMethod = 'targets' | 'icp_point_to_point' | 'icp_point_to_plane' | 'targets+icp' | 'supplied';
+type RegistrationMethod = 'targets' | 'icp_point_to_point' | 'icp_point_to_plane' | 'targets+icp' | 'supplied';
 
-export interface RegistrationQuality {
+interface RegistrationQuality {
   readonly targetResiduals?: readonly { readonly name: string; readonly residual: number }[] | undefined;
   /** Metres. */
   readonly rms: number;
@@ -156,7 +156,7 @@ export interface RegistrationQuality {
   readonly converged: boolean;
 }
 
-export interface ScanProvenance {
+interface ScanProvenance {
   readonly method: string;
   readonly algorithmVersion: string;
   readonly seed?: number | undefined;

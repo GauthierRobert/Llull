@@ -12,7 +12,7 @@ import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 
 /** Layout version of the asset (`llull-cloud` `ASSET_VERSION`). */
-export const ASSET_VERSION = 1;
+const ASSET_VERSION = 1;
 
 const KEY = /^[0-9a-f]{64}$/;
 
