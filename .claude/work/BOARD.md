@@ -16,11 +16,10 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
   Next: CFD-M1, then RS-3.
 
 ## Priority
-- `[REVIEW]` **RS** wave RS-3, RS-4, RS-5, RS-7, RS-8a on branch `feat/rs-native-wave` (worktree `.claude/worktrees/rs-integration`): `docs/decisions/RS1-native-compute.md`. _deps: —_
-- `[TODO]` **RS-8b/c** wgpu explicit kernels (needs MSVC Build Tools or the dlltool shim), penalty contact, shells: physics 19 TECHNICAL_SPEC §13. _deps: RS wave_
+- `[REVIEW]` **RS** wave RS-3, RS-4, RS-5, RS-7, RS-8 (a/b/c) on branch `feat/rs-native-wave` (worktree `.claude/worktrees/rs-integration`): `docs/decisions/RS1-native-compute.md`. _deps: —_
 - `[TODO]` **RS-MSVC** Temporary `solver/scripts/dlltool-shim` (owner 2026-10-20): delete it and its notes (plant 09 §12, plant 10 §13.6, physics 19 §13) once MSVC Build Tools are installed; then run `npm run native:check` in full. _deps: owner installs MSVC_
 - `[TODO]` **RS-6** clearance / thickness / view factors on `llull-geomq`. _deps: —_
-- `[TODO]` **RS follow-ups** plant 10 M3 viewport, plant 02 V1 (route_pipe, fittings, check_piping), PHY-09 M4/M5, GDT M1–M4, AER 3D panel, PHY-19 hand-off (OpenCourant). _deps: RS wave_
+- `[TODO]` **RS follow-ups** plant 10 M3 viewport, plant 02 V1 (route_pipe, fittings, check_piping), PHY-09 M4/M5, GDT M1–M4, AER 3D panel, PHY-19 hand-off (OpenCourant); RS-8 leftovers: contact / fixed DOFs / shells on the GPU path, shells in contact, shell erosion, BWC warping, 05 `fixed` → job fixed DOFs, adiabatic heating, D1–D5 as a PHY-02 failure law (physics 19 §13). _deps: RS wave_
 - `[TODO]` **TOP-V1** Topology V1 (PHY-17 §10 M4): MMA, projection, extrusion / min member size, `min_volume`, pressure / gravity loads in the
   mapping and the compliance ratio, a timeout checkpoint (`deadlineS`) so a killed run resumes, VC-TOP-34 on a hardware GPU (GPU cap): `docs/physics/17-topology-optimization/TECHNICAL_SPEC.md` §13–§14. _deps: —_
 - `[TODO]` **CFD-M1** `cfd` slice, case commands, `cfd_prepare`, `check_cfd`: `docs/aerospace/12-cfd-gpu/TECHNICAL_SPEC.md` §10. _deps: —_
