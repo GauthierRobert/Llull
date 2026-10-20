@@ -88,6 +88,13 @@ class JsonWriter {
     return *this;
   }
 
+  // An already formatted JSON value (a report built by another writer).
+  JsonWriter &raw(const std::string &json) {
+    separate();
+    text_ += json;
+    return *this;
+  }
+
   JsonWriter &vec3(double x, double y, double z) { return begin_array().number(x).number(y).number(z).end_array(); }
   JsonWriter &point(const gp_Pnt &p) { return vec3(p.X(), p.Y(), p.Z()); }
   JsonWriter &direction(const gp_Dir &d) { return vec3(d.X(), d.Y(), d.Z()); }

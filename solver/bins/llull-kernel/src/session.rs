@@ -7,6 +7,7 @@
 //! "indices": <u32[]>}`. Error codes: `NATIVE_UNSUPPORTED` (op / recipe node not native yet: the host falls back), `NATIVE_BAD_REQUEST`,
 //! `NATIVE_OCC_FAILURE` (OCCT threw; result null), `NATIVE_PANIC`.
 
+use crate::exchange::{self, EXCHANGE_OPS};
 use crate::queries::{self, QUERY_CAPABILITIES, QUERY_OPS};
 use base64::Engine;
 use llull_kernel_occt::lru::Lru;
@@ -27,7 +28,7 @@ pub const OPS: [&str; 6] = ["info", "evaluate", "tessellate", "massProperties", 
 
 /// Every op the session answers (`info().ops`).
 pub fn native_ops() -> Vec<&'static str> {
-    OPS.iter().chain(QUERY_OPS.iter()).copied().collect()
+    OPS.iter().chain(QUERY_OPS.iter()).chain(EXCHANGE_OPS.iter()).copied().collect()
 }
 
 /// Shapes kept alive by recipe (sub-recipes) and by host key (handles).
@@ -74,6 +75,7 @@ fn info() -> Value {
     let capabilities: Vec<&str> = ["analyze", "massProperties", "exportStep", "bsplineSections", "nurbsSurface", "faceSlab"]
         .into_iter()
         .chain(QUERY_CAPABILITIES)
+        .chain(exchange::capabilities())
         .collect();
     json!({
         "occtVersion": occt_version(),
@@ -161,7 +163,9 @@ impl Session {
                 }))
             }),
             "exportStep" => self.export_step(first),
-            other => queries::dispatch(self, other, args).unwrap_or_else(|| Reply::fail(UNSUPPORTED, format!("op '{other}'"))),
+            other => exchange::dispatch(self, other, args)
+                .or_else(|| queries::dispatch(self, other, args))
+                .unwrap_or_else(|| Reply::fail(UNSUPPORTED, format!("op '{other}'"))),
         }
     }
 

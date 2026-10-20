@@ -38,7 +38,11 @@ const OCCT_LIBS: &[&str] = &[
 ];
 
 /// Rust modules holding a `#[cxx::bridge]`.
-const BRIDGES: [&str; 3] = ["src/lib.rs", "src/features.rs", "src/queries.rs"];
+const BRIDGES: [&str; 4] = ["src/lib.rs", "src/features.rs", "src/queries.rs", "src/xde.rs"];
+
+/// IGES translator (XCH M4): linked and compiled in (`LLULL_HAS_IGES`) only when the prefix holds it, so a prefix built before TKDEIGES joined
+/// `build-occt.mjs` still builds the kernel (STEP only); `iges_available()` tells the host which it got.
+const IGES_LIB: &str = "TKDEIGES";
 
 /// Mirrors `defaultOcctPrefix()` of `solver/scripts/build-occt.mjs`.
 fn default_prefix() -> Option<PathBuf> {
@@ -105,10 +109,14 @@ fn main() {
     for source in sources.iter().filter(|path| path.extension().is_some_and(|extension| extension == "cxx")) {
         build.file(source);
     }
+    let has_iges = has_library(&lib_dir, IGES_LIB);
+    if has_iges {
+        build.define("LLULL_HAS_IGES", None);
+    }
     build.include(&include_dir).std("c++17").define("_USE_MATH_DEFINES", None).flag_if_supported("-w").compile("llull-kernel-occt-facade");
     // After the static facade: a single-pass linker (GNU ld with MinGW import libraries) resolves the facade's OCCT symbols only from libraries
     // named after it.
-    for name in OCCT_LIBS {
+    for name in OCCT_LIBS.iter().copied().chain(has_iges.then_some(IGES_LIB)) {
         println!("cargo:rustc-link-lib=dylib={name}");
     }
 
