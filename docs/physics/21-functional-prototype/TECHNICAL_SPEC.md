@@ -931,23 +931,45 @@ Validation cases automated (`tests/unit/engineRealism.test.ts`, `tests/unit/mujo
 - `set_review_disposition` (`commands/review/dispositions.ts`, toolset `review`): `{ findingKey, status, comment?, inputsHash }`, stored in
   `doc.prototype.dispositions` (`Disposition`, load-validated), `by: 'agent'` (no caller in the context, like intents), `not_reviewed` with an
   empty comment clears it. Stale = the check's hash changed or the finding is gone (`data.staleDispositions`). No sign-off (Q5).
-- Joint realisation: unchanged from FPR-A (exact cylinder faces of the native kernel; Manifold → `FPR_KERNEL_UNSUPPORTED` not_run). VC-09 is
-  the native-kernel server test `server/tests/occtCheckAssembly.test.ts`.
+- Joint realisation: exact cylinder faces of the native kernel (VC-09 is the native-kernel server test `server/tests/occtCheckAssembly.test.ts`).
+  Without exact faces (Manifold) the joint is fitted to the tessellation (`geometry/assemblyCheck/jointCandidates.ts`, FR-FPR-08): triangles
+  whose normal is perpendicular to the joint axis and whose corners sit at one distance from it are grouped by distance and orientation (pin =
+  normal away from the axis, bore = towards it); a group that wraps at least half a turn is a cylinder. The item is `pass` / `warn` as on exact
+  faces but always `unverified` with the note "approximate". Accuracy: corners of a tessellated cylinder lie on the true surface, so radii are
+  exact to the clustering tolerance (0.01 mm + 1e-4 r), axial ranges exact to the vertices; two journals of one radius on one part read as one
+  (engagement can be over-reported). A body with no tessellation at all stays `FPR_KERNEL_UNSUPPORTED` not_run. So on Manifold the assembly
+  joint rows are `pass` (approximate), and the native kernel gives them exactly.
 - Reference engine: `tests/golden/referenceEnginePlan.ts`, golden plan `dynamics_reference_engine` (crankcase main bearing, crankshaft
   journal / web / pin, rod with both bores, piston + wrist pin, 21/51 at η 0.99, propeller with 12 mm blades, sourced materials, Chen-Flynn
   test constants, single zone calibrated to the rated point, a `bmep_bar` calibration reference). The 0.02 mm fits are declared with
   `allow_interference` because the faceted tessellation of a 0.02 mm fit overlaps. **Deviations:** the plan lives in the golden corpus, not in
   `plans/reference_single_cylinder.plan.json`; the crankcase has no cylinder bore and the gear pair is a coupling without gear solids; the
   seeded-defect corpus is not built.
-- **VC-24 partly shown, heavy gate.** `tests/unit/referenceEngine.test.ts` runs only with `LLULL_HEAVY_GATES=1`. One run (2026-10-20,
-  Manifold + MuJoCo, after the shared simulation run) took **1781 s (about 30 min; 33 min before the shared run, one measurement each, not
-  profiled per check)**. Result: verdict `ready_for_review`, no fail, motion clearance clean (closest approach 2 mm), the rated-point
-  reference item `info` with origin `calibrated`, the timestep item pass. Not every row passes, so VC-24 as written is **not met**: the
-  assembly check is not_run on Manifold (joint realisation needs the native kernel's cylinder faces), the dynamics check holds a not_run item
-  (not identified in that run), and the mobility reads **2 DOF** (the rank DOF does not count the crank-to-propeller gear coupling as a
-  constraint). That run also exposed an owner-summary bug (absolute-only bands read as "no accuracy statement"), fixed with a unit test; the
-  gate was not re-run after the fix (30 min). Per-check profiling, gear couplings in the rank DOF and RS-6 (native `geomq`) come next. VC-34
-  is partial: only the reference and timestep items carry `accuracy`.
+- **VC-24 shown, heavy gate (FPR-V24, 2026-10-21).** `tests/unit/referenceEngine.test.ts` runs only with `LLULL_HEAVY_GATES=1` (Manifold +
+  MuJoCo, plan build + `check_prototype`). Measured **274 s for check_prototype (286 s for the whole test file)**, down from 1781 s. Profile
+  per sub-check on the plan (duration 0.062 s = settle + 1 cycle at 5800 rpm): plan build 0.08 s, check_assembly 0.17 s, inspect_dynamics
+  0.01 s, simulate_motion 0.5 s, check_dynamics 0.7 s, check_timestep_convergence 1.7 s, compare_to_reference 1.5 s, **check_motion_clearance
+  1199 s** (31 pairs x 2159 samples): essentially all of the time. Its cost was the BVH leaf loop running the full triangle-triangle distance
+  on every pair of two leaves (140 x 308 triangle meshes with box-shaped leaves that never prune); a per-triangle box test before the exact
+  distance (same results, `meshBvh.ts`) made it 4.6x faster, and `check_prototype` now evaluates at most 720 samples of the shared run
+  (`CLEARANCE_MAX_SAMPLES`; the sweep still adds substeps from the travel bound, so thin obstacles are not skipped; the run keeps every sample
+  for the engine report). A Lipschitz skip of far moments was tried and dropped: the closest pairs sit at a constant gap, nothing to skip.
+  Rows (all `pass` unless noted): assembly = 3 x FPR_JOINT_REALISED (approximate fit on Manifold); mechanism = FPR_MECH_OK, **1 DOF** (the
+  rank mobility now counts a gear coupling between two tree joints as one constraint row: crank + propeller coordinates - rod loop - gear);
+  motion_clearance = 4 x FPR_MOTION_ALLOWED (the declared pin fits; closest approach 2 mm); dynamics = FPR_MASS_DEFAULTED, FPR_UNREALISTIC,
+  FPR_NO_LOSSES, FPR_LOOP_OPEN, FPR_LOOP_DRIFT, FPR_ENERGY_CLOSURE, FPR_TIMESTEP_SENSITIVE (check_timestep_convergence, with accuracy), all pass;
+  FPR_TIMESTEP_SENSITIVE (check_dynamics) `info`; FPR_REFERENCE_MATCH `info` (origin `calibrated`); **FPR_REDUNDANT_CONSTRAINT `warn`** on
+  `wrist_j`. Nothing is not_run. The previously unidentified not_run was FPR_TIMESTEP_SENSITIVE of check_dynamics: the engine runs at the
+  finest allowed step (1e-5 s floor), which cannot be halved; it is now an `info` item stating that (the engine convergence is the
+  check_timestep_convergence item). A comparison against a doubled step was rejected: it read 36 % on the instantaneous piston speed of a
+  fast periodic motion, a phase-sensitive metric, not a convergence statement. The remaining warn is the planar slider-crank itself: pin
+  position z of the wrist is fixed by the parallel-axis joints, so out-of-plane reactions are indeterminate; the gate asserts exactly this
+  one warn. The plan gained a propeller shaft stub in a bearing block (`prop_j` has `crankcase` as parent) because the propeller had no
+  bearing and the joint could not be realised. VC-24 as written ("every checklist row pass") is therefore met except that one declared warn.
+  Native-kernel rows (exact faces) are VC-09. `check_motion_clearance` stays on `meshBvh` rather than `ctx.geometryQueries.minDistanceBatch`:
+  the sweep is sequential (a running bound per pair, adaptive substeps, contact bisection), a batch over all poses up front would lose the
+  early-outs and be slower on the TS engine; the wiring belongs to the native `geomq` (RS-6) where a batch is cheaper than the sweep.
+  VC-34 is partial: only the reference and timestep items carry `accuracy`.
 
 **M5 (UI, `src/ui/panels/review/`).** Verdict line and stale dispositions; dispositions sent with the check's `inputsHash`; `info` status
 never shown as a pass; `AccuracyBadge` ("± 5 %" / "± ?" + origin, calibrated hatched) on checklist rows and findings (FR-FPR-62);

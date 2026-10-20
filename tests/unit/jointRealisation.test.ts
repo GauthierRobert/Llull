@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GeometryKernel, ShapeFace, ShapeHandle, ShapeTopology } from '@core/geometry/kernel';
 import { realiseJoint } from '@core/geometry/assemblyCheck/jointRealisation';
-import type { Vec3 } from '@core/model/types';
+import type { MeshData, Vec3 } from '@core/model/types';
 
 const handle = (name: string): ShapeHandle => name as unknown as ShapeHandle;
 
@@ -27,7 +27,14 @@ function kernelOf(faces: Record<string, readonly ShapeFace[] | null>): GeometryK
   };
 }
 
-const joint = { id: 'hinge', anchor: [0, 0, 0] as Vec3, axis: [0, 0, 1] as Vec3, mmPerUnit: 1 };
+const joint = {
+  id: 'hinge',
+  anchor: [0, 0, 0] as Vec3,
+  axis: [0, 0, 1] as Vec3,
+  mmPerUnit: 1,
+  parentMeshes: [] as MeshData[],
+  childMeshes: [] as MeshData[],
+};
 
 describe('realiseJoint', () => {
   it('reports clearance and engagement of a coaxial pin in a bore', () => {
@@ -90,5 +97,85 @@ describe('realiseJoint', () => {
     const item = realiseJoint(kernel, { ...joint, parentShapes: [handle('housing')], childShapes: [handle('pin')] });
     expect(item.code).toBe('FPR_KERNEL_UNSUPPORTED');
     expect(item.status).toBe('not_run');
+  });
+});
+
+/** Side surface of a faceted cylinder about the axis through `centre` (z along the joint axis); `outward` = pin, else bore (inward normals). */
+function tube(
+  radius: number,
+  z: [number, number],
+  options: { outward: boolean; centre?: [number, number]; segments?: number; arc?: number },
+): MeshData {
+  const { outward, centre = [0, 0], segments = 24, arc = 2 * Math.PI } = options;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (let k = 0; k <= segments; k++) {
+    const theta = (arc * k) / segments;
+    for (const height of z) positions.push(centre[0] + radius * Math.cos(theta), centre[1] + radius * Math.sin(theta), height);
+  }
+  for (let k = 0; k < segments; k++) {
+    const [p0, q0, p1, q1] = [2 * k, 2 * k + 1, 2 * k + 2, 2 * k + 3];
+    indices.push(...(outward ? [p0, p1, q1, p0, q1, q0] : [p0, q1, p1, p0, q0, q1]));
+  }
+  return { positions, indices } as MeshData;
+}
+
+describe('realiseJoint on the tessellation (kernel without exact faces)', () => {
+  const blind = kernelOf({ p: null, c: null });
+  const meshed = (parentMeshes: MeshData[], childMeshes: MeshData[]): Parameters<typeof realiseJoint>[1] => ({
+    ...joint,
+    parentShapes: [handle('p')],
+    childShapes: [handle('c')],
+    parentMeshes,
+    childMeshes,
+  });
+
+  it('fits a pin in a bore: realised, unverified, noted approximate, radii and engagement from the vertices', () => {
+    const item = realiseJoint(blind, meshed([tube(5.01, [-20, 20], { outward: false })], [tube(5, [-10, 10], { outward: true })]));
+    expect(item.code).toBe('FPR_JOINT_REALISED');
+    expect(item.status).toBe('pass');
+    expect(item.unverified).toBe(true);
+    expect(item.note).toMatch(/approximate/);
+    expect(item.values['diametralClearanceMm']).toBeCloseTo(0.02, 9);
+    expect(item.values['engagementMm']).toBeCloseTo(20, 9);
+    expect(item.values['pinDiameterMm']).toBeCloseTo(10, 9);
+  });
+
+  it('works with the bore on the child side too', () => {
+    const item = realiseJoint(blind, meshed([tube(5, [-10, 10], { outward: true })], [tube(5.01, [-20, 20], { outward: false })]));
+    expect(item.code).toBe('FPR_JOINT_REALISED');
+  });
+
+  it('a bore off the joint axis is not realised', () => {
+    const item = realiseJoint(
+      blind,
+      meshed([tube(5.01, [-20, 20], { outward: false, centre: [1, 0] })], [tube(5, [-10, 10], { outward: true })]),
+    );
+    expect(item.code).toBe('FPR_JOINT_NOT_REALISED');
+    expect(item.status).toBe('warn');
+    expect(item.note).toMatch(/approximate/);
+  });
+
+  it('a partial arc is not a pin or a bore, and a pin alone has no counterpart', () => {
+    const half = tube(5.01, [-20, 20], { outward: false, arc: Math.PI / 2 });
+    expect(realiseJoint(blind, meshed([half], [tube(5, [-10, 10], { outward: true })])).code).toBe('FPR_JOINT_NOT_REALISED');
+    const alone = realiseJoint(blind, meshed([], [tube(5, [-10, 10], { outward: true })]));
+    expect(alone.code).toBe('FPR_JOINT_NOT_REALISED');
+    expect(alone.note).toContain('no coaxial');
+  });
+
+  it('a bore smaller than the pin is interference; a surface tilted from the axis is ignored', () => {
+    const interference = realiseJoint(blind, meshed([tube(4.9, [-20, 20], { outward: false })], [tube(5, [-10, 10], { outward: true })]));
+    expect(interference.note).toContain('interference');
+    const tilted = { ...tube(5.01, [-20, 20], { outward: false }) };
+    const tiltedMesh = {
+      ...tilted,
+      positions: tilted.positions.map((value, i) => (i % 3 === 0 ? value + (tilted.positions[i + 2] ?? 0) * 0.1 : value)),
+    } as MeshData;
+    expect(realiseJoint(blind, meshed([tiltedMesh], [tube(5, [-10, 10], { outward: true })])).code).toBe('FPR_JOINT_NOT_REALISED');
+  });
+
+  it('without any tessellation the joint stays not_run', () => {
+    expect(realiseJoint(blind, meshed([], [])).status).toBe('not_run');
   });
 });
