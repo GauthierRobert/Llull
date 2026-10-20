@@ -40,13 +40,6 @@ export function filletDepthCases(out) {
       },
     ],
     kernels: EXACT_ONLY,
-    knownFailure: {
-      fields: ['plan'],
-      kernels: ['occt'],
-      measured: 'plan refused: the native sidecar does not read recipe radii yet',
-      diagnosis:
-        'fillet_edge edges[] with differing radii emits a fillet node with radii[] (size 0 placeholder); the native llull-kernel (solver/, Rust nodes.rs fillet) must read radii and add one radius per edge to BRepFilletAPI_MakeFillet. Until then it refuses, and this case stays a documented known failure.',
-    },
     p: part(
       volume,
       blockArea - perEdgeArea(r1) - perEdgeArea(r2),

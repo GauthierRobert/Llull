@@ -16,6 +16,7 @@ import { closedFormVolume } from './closedFormVolume';
 import { combineMassProperties, meshMassProperties, type InertiaTensor, type MassProperties } from './massProperties';
 import { primitiveArea, primitiveMassProperties } from './primitiveMass';
 import { solidTriangles } from './solidTriangles';
+import { recipeOf } from './shapeRecipe';
 import type { Triangle } from './triangles';
 
 type MassMethod = 'exact' | 'closed-form' | 'mesh';
@@ -68,7 +69,7 @@ function scaledToVolume(props: MassProperties, volume: number): MassProperties {
 
 function exactMass(e: Entity, density: number, kernel: GeometryKernel): ResolvedMass | null {
   if (e.kind !== 'mesh' || e.brep === undefined) return null;
-  const shape = kernel.evaluate(e.brep);
+  const shape = kernel.evaluate(recipeOf(e));
   if (shape === null) return null;
   const exact = kernel.massProperties?.(shape) ?? null;
   if (exact !== null && exact.volume > 0) {
@@ -111,7 +112,7 @@ function solidMass(e: Entity, density: number, ctx: MassContext): ResolvedMass |
   const mesh = meshMassProperties(triangles, density);
   if (mesh === null) return null;
   const closed = closedFormVolume(e);
-  const area = triangleArea(triangles);
+  const area = primitiveArea(e) ?? triangleArea(triangles);
   if (closed !== null && closed.analytic && closed.approximation === undefined)
     return { method: 'closed-form', properties: scaledToVolume(mesh, closed.volume), area, inertiaFromMesh: true, facetedBody: false };
   return {

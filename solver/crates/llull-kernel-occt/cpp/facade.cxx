@@ -113,9 +113,10 @@ std::unique_ptr<Shape> with_roles(const TopoDS_Shape &shape, bool axial) {
   return naming::wrap_named(shape, naming::primitive_roles(shape, axial));
 }
 
+// Tight box from the exact geometry: BRepBndLib::Add bounds curved faces by their control polygons and widens by the tolerances.
 Bnd_Box bounds_of(const TopoDS_Shape &shape) {
   Bnd_Box box;
-  BRepBndLib::Add(shape, box, Standard_False);
+  BRepBndLib::AddOptimal(shape, box, Standard_False, Standard_False);
   return box;
 }
 

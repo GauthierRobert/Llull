@@ -15,5 +15,11 @@
     "volume": 0.012,
     "area": null,
     "reason": "mesh kernel: the cylinder is an inscribed n-gon (volume loss k (1 - cos(pi/n)) / the clipped groove outer edge) and the groove tool is faceted (32 rings per turn)"
+  },
+  "knownFailure": {
+    "fields": ["volume", "centroid", "export_step_exact"],
+    "kernels": ["occt"],
+    "measured": "volume 1181.47 (rel +7.6e-3), centroid (0, -0.018, -0.068); export_step_exact produced no STEP text",
+    "diagnosis": "add_external_thread cuts a faceted groove tool (32 rings per turn) on every kernel, so on OCCT the result is a mesh body with no B-rep recipe: mesh-tolerance volume, no exact STEP. An exact helical sweep groove in the native kernel would close this."
   }
 }

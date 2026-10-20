@@ -110,7 +110,7 @@ describe.skipIf(nativeKernelBinary === null)('native STEP import + healing', () 
     // A well-formed AP242 tessellated solid: OCCT 7.9 transfers it (a face with a triangulation and no surface).
     const tetrahedron = readFileSync(path.join(__dirname, 'fixtures', 'tessellated-tetrahedron.stp'), 'utf8');
     expect(((await harness.call('importShapes', ['step', tetrahedron, OPTIONS])) as { error: string }).error).toEqual(expect.any(String));
-    expect(await harness.call('importShapes', ['iges', 'x', OPTIONS])).toBeNull();
+    expect(((await harness.call('importShapes', ['iges', 'x', OPTIONS])) as { error: string }).error).toBe('unreadable');
   });
 
   it('round-trips its own exports of primitives and booleans', async () => {

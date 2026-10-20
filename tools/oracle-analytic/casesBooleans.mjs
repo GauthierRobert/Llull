@@ -22,6 +22,7 @@ export function booleanCases(out) {
     'V = V1 + V2; A = A1 + A2',
     [addBox('a', [2, 2, 2]), addBox('b', [2, 2, 2], [5, 0, 0]), op('union')],
     union([box([2, 2, 2]), box([2, 2, 2], [5, 0, 0])]),
+    { stepBodies: 2 },
   );
   cases(
     'union-boxes-touching',

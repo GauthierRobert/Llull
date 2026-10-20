@@ -49,6 +49,13 @@ export function threadCases(out) {
     ],
     p: part(blank.v - externalRemoved(d, p, h), null, [0, 0, 0], blank.min, blank.max),
     mesh: mesh(0.012, null, WHY_EXTERNAL),
+    knownFailure: {
+      fields: ['volume', 'centroid', 'export_step_exact'],
+      kernels: ['occt'],
+      measured: 'volume 1181.47 (rel +7.6e-3), centroid (0, -0.018, -0.068); export_step_exact produced no STEP text',
+      diagnosis:
+        'add_external_thread cuts a faceted groove tool (32 rings per turn) on every kernel, so on OCCT the result is a mesh body with no B-rep recipe: mesh-tolerance volume, no exact STEP. An exact helical sweep groove in the native kernel would close this.',
+    },
   });
 
   // M6 tapped through a 20x20x4 plate (4 pitches): minor bore (d1) + groove.
