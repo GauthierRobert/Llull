@@ -174,13 +174,6 @@ export function featureCases(out) {
     polar,
     {
       bodies: 6,
-      knownFailure: {
-        fields: ['bbox'],
-        measured: { bboxY: [-5.013139720814415, 5.013139720814413] },
-        diagnosis:
-          'measure_bounding_box returns the AABB of the rotated local box (entityBoundsInDoc), not the tight box of the rotated cylinder: ' +
-          '0.5 sin60 + 0.5 cos60 + 5 sin60 = 5.013 instead of 5 sin60 + 0.5 = 4.830 for a cylinder turned 60 degrees about Z',
-      },
     },
   );
   pattern(

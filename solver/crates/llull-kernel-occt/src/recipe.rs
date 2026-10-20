@@ -18,7 +18,8 @@ use std::rc::Rc;
 mod floor;
 mod nodes;
 
-pub const RECIPE_OPS: [&str; 10] = ["solid", "boolean", "place", "scale", "brep", "fillet", "chamfer", "blend", "shell", "featureCut"];
+pub const RECIPE_OPS: [&str; 11] =
+    ["solid", "boolean", "place", "scale", "brep", "fillet", "chamfer", "blend", "shell", "featureCut", "faceOp"];
 pub const SOLID_KINDS: [&str; 12] =
     ["box", "cylinder", "sphere", "cone", "torus", "wedge", "extrusion", "revolution", "mesh", "loft", "sweep", "subdivision"];
 
@@ -365,6 +366,7 @@ impl Evaluator {
             "blend" => self.blend(recipe),
             "shell" => self.shell(recipe),
             "featureCut" => self.feature_cut(recipe),
+            "faceOp" => self.face_op(recipe),
             "brep" => {
                 let blob = recipe.get("blob").and_then(Value::as_str).and_then(|sha256| self.blobs.get(sha256));
                 let label = recipe.get("label").and_then(Value::as_str).map(str::to_string);

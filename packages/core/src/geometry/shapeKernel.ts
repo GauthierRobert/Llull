@@ -11,9 +11,11 @@
  */
 
 import type { BooleanOp, EdgeRadius, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/types';
+import type { FaceOpParams } from '../model/faceOps';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTopology, StepAssemblyPart, StepOccurrence } from './kernel';
 import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
 import { recipeKey } from './shapeRecipe';
+import { faceOpParamsOf } from './faceOpRecipe';
 import { lowerFeature, needsReach, throughReach } from './featureLowering';
 import { floorEdgeIndices } from './featureFillet';
 import { errorMessage } from '../lib/errorMessage';
@@ -35,6 +37,8 @@ export interface KernelOps<S> {
   readonly name?: string;
   /** Recipe ops this kernel cannot perform at all (a capability gap, not a refusal of one input). */
   readonly unsupported?: ReadonlySet<ShapeRecipe['op']>;
+  /** Face draft / push-pull / split (SC-F1); absent = `faceOp` nodes are unsupported. */
+  readonly faceOp?: (source: S, params: FaceOpParams) => S | null;
   /** Grows whenever the native module may have been left degraded (cached failures are then retried). */
   failureEpoch?(): number;
   solid(entity: Entity): S | null;
@@ -154,6 +158,10 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
     case 'place': {
       const source = child(recipe.source);
       return source === null ? null : ops.place(source, recipe.position, recipe.rotation);
+    }
+    case 'faceOp': {
+      const source = child(recipe.source);
+      return source === null || ops.faceOp === undefined ? null : ops.faceOp(source, faceOpParamsOf(recipe));
     }
     case 'scale': {
       const source = child(recipe.source);
@@ -400,7 +408,8 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
               return first === null || second === null ? null : distanceOps(first, second, maxDistance);
             }),
         }),
-    supports: (op) => (op === 'brep' ? ops.brep !== undefined : !(ops.unsupported?.has(op) ?? false)),
+    supports: (op) =>
+      op === 'brep' ? ops.brep !== undefined : op === 'faceOp' ? ops.faceOp !== undefined : !(ops.unsupported?.has(op) ?? false),
     evaluate: (recipe) => call(() => (evaluateNative(recipe) === null ? null : handleOf(recipe))),
     tessellate: (handle) =>
       call(() => {

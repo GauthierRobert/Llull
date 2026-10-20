@@ -55,6 +55,12 @@ std::unique_ptr<Shape> feature_revol_cut(const Shape &source, rust::Slice<const 
 std::unique_ptr<Shape> feature_prism_cut(const Shape &source, rust::Slice<const double> chain, rust::Slice<const double> origin,
                                          rust::Slice<const double> normal, rust::Slice<const double> probes, double length,
                                          rust::Str tag);
+// Face operations (SC-F1, face_ops.cxx): draft about a neutral plane, push-pull one planar face, split faces along a plane.
+std::unique_ptr<Shape> draft_faces(const Shape &shape, rust::Slice<const uint32_t> faces, double angle, rust::Slice<const double> pull,
+                                   rust::Slice<const double> origin, rust::Slice<const double> normal);
+std::unique_ptr<Shape> push_pull(const Shape &shape, uint32_t face, double distance);
+std::unique_ptr<Shape> split_faces(const Shape &shape, rust::Slice<const uint32_t> faces, rust::Slice<const double> origin,
+                                   rust::Slice<const double> normal);
 // BRepCheck_Analyzer validity.
 bool is_valid_shape(const Shape &shape);
 // Post-boolean ShapeUpgrade_UnifySameDomain (the shape itself when it fails).

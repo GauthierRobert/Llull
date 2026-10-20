@@ -9,6 +9,7 @@ import { featureCases } from './casesFeatures.mjs';
 import { featureDepthCases } from './casesFeatureDepth.mjs';
 import { filletDepthCases } from './casesFilletDepth.mjs';
 import { threadCases } from './casesThreads.mjs';
+import { faceOpCases } from './casesFaceOps.mjs';
 import { primitiveCases } from './casesPrimitives.mjs';
 import { sheetMetalCases } from './casesSheetMetal.mjs';
 import { profileCases } from './casesProfiles.mjs';
@@ -25,6 +26,7 @@ for (const build of [
   featureDepthCases,
   filletDepthCases,
   threadCases,
+  faceOpCases,
 ])
   build(cases);
 

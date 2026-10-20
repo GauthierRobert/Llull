@@ -1,0 +1,11 @@
+{
+  "actions": [
+    { "command": "add_box", "params": { "size": [20, 10, 10] }, "as": "a" },
+    {
+      "command": "split_face",
+      "params": { "id": "$a", "facesNear": [[5, 0, 5]], "plane": { "origin": [0, 0, 0], "normal": [1, 0, 0] } },
+      "as": "b"
+    },
+    { "command": "push_pull_face", "params": { "id": "$b", "faceNear": [5, 0, 5], "distance": 4 } }
+  ]
+}

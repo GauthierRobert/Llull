@@ -18,6 +18,7 @@ import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary
 import type { ReliabilityModel } from './probabilistic';
 import type { SheetMetalModel } from './sheetMetal';
 import type { FeatureParams } from './features';
+import type { FaceOpParams } from './faceOps';
 
 /** Re-exported: every model consumer reads its vectors from here. */
 export type { Vec2, Vec3 };
@@ -826,4 +827,6 @@ export type ShapeRecipe =
   /** An exact B-rep held in `CadDocument.blobs[blob]` (`BRepTools::Write` text): imported geometry (01 KRN TR-KRN-21). */
   | { readonly op: 'brep'; readonly blob: string; readonly format: 'occt-brep-v1'; readonly label?: string }
   /** A hole group or pocket cut into a face of `source` (07 FTR); kernels lower it to boolean subtracts (`geometry/featureLowering`). */
-  | ({ readonly op: 'feature'; readonly source: ShapeRecipe } & FeatureParams);
+  | ({ readonly op: 'feature'; readonly source: ShapeRecipe } & FeatureParams)
+  /** Draft, push-pull or split of faces of `source` on its exact B-rep (SC-F1, `model/faceOps`); exact kernels only. */
+  | ({ readonly op: 'faceOp'; readonly source: ShapeRecipe } & FaceOpParams);

@@ -1,0 +1,6 @@
+{
+  "actions": [
+    { "command": "add_box", "params": { "size": [10, 10, 10] }, "as": "a" },
+    { "command": "split_body", "params": { "id": "$a", "plane": { "origin": [0, 0, 0], "normal": [1, 1, 0] } } }
+  ]
+}

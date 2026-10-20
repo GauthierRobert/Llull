@@ -30,17 +30,6 @@ function bracket(Lb, W, T, R, F, mirrored = false) {
 }
 
 /** The folded solid is a mesh union that keeps the two coincident faces at each flat/bend junction, so mass_properties area is too large by 2 T W per junction. */
-const interior = (junctions, T, W, area) => ({
-  fields: ['area'],
-  kernels: ['manifold'],
-  measured: { areaApprox: area + 2 * junctions * T * W },
-  diagnosis:
-    'the folded mesh keeps both coincident faces at each flat/bend junction (' +
-    junctions +
-    ' junctions): area is overstated by 2 T W per junction (' +
-    2 * junctions * T * W +
-    ')',
-});
 
 export function sheetMetalCases(out) {
   const rule = (name, thickness, insideRadius) => ({
@@ -74,7 +63,6 @@ export function sheetMetalCases(out) {
     [rule('R1', 1.6, 4.8), ...baseActions('R1', 33.6, 50), flange([33.6, 25, 0], 30)],
     l1.p,
     {
-      knownFailure: interior(2, 1.6, 50, l1.p.a),
       mesh: { volume: null, area: 0.02, reason: 'area is summed over the display triangles of the tessellated bend' },
     },
   );
@@ -86,7 +74,6 @@ export function sheetMetalCases(out) {
     [rule('R2', 3, 2), ...baseActions('R2', 40, 30), flange([40, 15, 0], 20)],
     l2.p,
     {
-      knownFailure: interior(2, 3, 30, l2.p.a),
       mesh: { volume: null, area: 0.02, reason: 'area is summed over the display triangles of the tessellated bend' },
     },
   );
@@ -98,7 +85,6 @@ export function sheetMetalCases(out) {
     [rule('R3', 1, 1), ...baseActions('R3', 60, 25), flange([60, 12.5, 0], 15)],
     l3.p,
     {
-      knownFailure: interior(2, 1, 25, l3.p.a),
       mesh: { volume: null, area: 0.02, reason: 'area is summed over the display triangles of the tessellated bend' },
     },
   );
@@ -110,7 +96,6 @@ export function sheetMetalCases(out) {
     [rule('R1', 1.6, 4.8), ...baseActions('R1', 33.6, 50), flange([33.6, 25, 0], 30), flange([0, 25, 0], 30)],
     u.p,
     {
-      knownFailure: interior(4, 1.6, 50, u.p.a),
       mesh: { volume: null, area: 0.02, reason: 'area is summed over the display triangles of the tessellated bends' },
     },
   );

@@ -43,6 +43,9 @@ mod ffi {
             length: f64,
             tag: &str,
         ) -> Result<UniquePtr<Shape>>;
+        fn draft_faces(shape: &Shape, faces: &[u32], angle: f64, pull: &[f64], origin: &[f64], normal: &[f64]) -> Result<UniquePtr<Shape>>;
+        fn push_pull(shape: &Shape, face: u32, distance: f64) -> Result<UniquePtr<Shape>>;
+        fn split_faces(shape: &Shape, faces: &[u32], origin: &[f64], normal: &[f64]) -> Result<UniquePtr<Shape>>;
         fn is_valid_shape(shape: &Shape) -> Result<bool>;
         fn unified_shape(shape: &Shape) -> Result<UniquePtr<Shape>>;
     }
@@ -132,6 +135,21 @@ pub fn feature_revol_cut(source: &Shape, profile: &[f64], origin: [f64; 3], norm
 /// `tag` names the faces the cut generates (SC-N1, `pocket<n>`).
 pub fn feature_prism_cut(source: &Shape, chain: &[f64], origin: [f64; 3], normal: [f64; 3], probes: &[f64], length: f64, tag: &str) -> Built {
     built(ffi::feature_prism_cut(inner(source)?, chain, &origin, &normal, probes, length, tag))
+}
+
+/// Draft `faces` by `angle` radians along `pull` about the neutral plane (`origin`, `normal`).
+pub fn draft(shape: &Shape, faces: &[u32], angle: f64, pull: [f64; 3], origin: [f64; 3], normal: [f64; 3]) -> Built {
+    built(ffi::draft_faces(inner(shape)?, faces, angle, &pull, &origin, &normal))
+}
+
+/// Move planar `face` along its outward normal by `distance` (> 0 adds material).
+pub fn push_pull(shape: &Shape, face: u32, distance: f64) -> Built {
+    built(ffi::push_pull(inner(shape)?, face, distance))
+}
+
+/// Split `faces` along the plane (`origin`, `normal`); the body stays one solid.
+pub fn split_faces(shape: &Shape, faces: &[u32], origin: [f64; 3], normal: [f64; 3]) -> Built {
+    built(ffi::split_faces(inner(shape)?, faces, &origin, &normal))
 }
 
 pub fn is_valid(shape: &Shape) -> OcctResult<bool> {

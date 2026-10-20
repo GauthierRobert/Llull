@@ -12,6 +12,7 @@ import { isRecord } from '../lib/isRecord';
 import { isFiniteNumber } from '../lib/isFiniteNumber';
 import { isVec3 } from '../lib/vec3';
 import { featureError, featureKeyText } from './featureRecipe';
+import { faceOpParamsOf, faceOpProblem } from './faceOpRecipe';
 
 const PRESENTATION_FIELDS = new Set(['id', 'name', 'color', 'layerId', 'tags', 'materialId']);
 
@@ -55,6 +56,8 @@ function keyText(recipe: ShapeRecipe): string {
       return `brep(${recipe.blob})`;
     case 'feature':
       return featureKeyText(recipe, recipeKey(recipe.source));
+    case 'faceOp':
+      return `faceOp(${recipeKey(recipe.source)},${JSON.stringify(faceOpParamsOf(recipe))})`;
   }
 }
 
@@ -191,6 +194,8 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
     case 'place':
       if (!isVec3(node['position']) || !isVec3(node['rotation'])) return 'place: position and rotation must be finite Vec3';
       return child(node['source']);
+    case 'faceOp':
+      return faceOpProblem(node) ?? child(node['source']);
     case 'scale':
       if (!isFiniteNumber(node['factor']) || node['factor'] <= 0) return 'scale: factor must be > 0';
       return child(node['source']);
