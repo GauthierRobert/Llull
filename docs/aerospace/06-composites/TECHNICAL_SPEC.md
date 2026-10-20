@@ -857,3 +857,44 @@ golden plans `composites_hemisphere_drape` and `composites_sandwich_shop_data`.
 - **Live-OCC cone (face-query path of `create_composite_part`)**: not verified. The conical face of a revolved frustum (r 100 -> 50 over 150 mm)
   comes back from `faceDetails` as `cone` with area 74509.412 = pi (r1 + r2) s exactly, but picking the face calls `faceQuery.distance`, which
   crashes the MinGW-built sidecar used on the verification machine (`docs/decisions/SV1-solver-toolchain-windows.md`). Still only the stub-port tests.
+
+### 13.5 AERO-5: exact ply solids and their STEP (2026-10-20, branch `feat/step-sheets`)
+
+`create_ply_solids` keeps its closed triangle mesh (display, `export_stl`, fallback) and now also stores the exact construction of each solid as
+`brep: { op: 'faceSlab', ... }` when the tool face is a plane, cylinder, cone or `nurbs_surface` sheet and the part has no core (a core makes the
+underside height vary; each region is split where the plies below stop, so otherwise it is one height, checked at every vertex). The sphere cap has
+no exact parametrization here and stays mesh only. The command reports `data.exactSolids` and, per solid, `exact`.
+
+**Recipe (`packages/domain-aero/src/composites/plySlab.ts`).** The face of the tool surface bounded by the region's chart polygon (outer + holes),
+lifted along the tool normal (towards the laminate side) from `from` = the stack below to `to` = `from` + the cured thickness. The polygon is
+mapped to surface parameters: plane `(x, y)`; cylinder `(x / r, y)` (azimuth, axial: a straight chart edge is exactly a straight parameter edge);
+cone `(-theta / sin a, rho)` with polar edges cut into 24 pieces (the slab then sews to a valid solid; the cone case below agrees with its triangle solid to 1.7e-4); NURBS `(u0 + x / scale0, v0 + y / scale1)`. Sewing tolerance = min(1e-5 max(1, extent), thickness / 50).
+
+**Kernel (`solver/crates/llull-kernel-occt/cpp/surfaces.cxx`, capability `faceSlab`).** Base face and lifted face over the same loops, one ruled
+wall (`BRepFill::Face`) per loop edge, `BRepBuilderAPI_Sewing`, `MakeSolid`, `ShapeFix_Solid`. `BRepOffsetAPI_MakeThickSolid` and
+`BRepExtrema_DistShapeShape` are not used (they crash the MinGW build, SV1). The lifted surface stays analytic: plane moved, cylinder radius + d,
+cone with apex moved by d / sin a and v shifted by d cot a; a B-spline becomes a `Geom_OffsetSurface` (STEP carries it as an OFFSET_SURFACE of the basis, checked in
+the test; for a cone `Geom_OffsetSurface` raised "infinite parameters", hence the analytic form). A full-turn periodic face has two
+coincident boundary edges: their walls are not built and sewing glues the seam. The sign of the lift comes from the reference direction at the
+first loop vertex.
+
+**Measured (`server/tests/nativeKernelSheets.test.ts`, 0.25 mm woven ply, `analyze` valid, STEP re-import volume equals the exact one):**
+
+| Tool face | Exact volume | Reference | Triangle solid |
+| --- | --- | --- | --- |
+| plane, polygon 160 x 80 | 3200 (1e-16) | area x t = 3200 | 3200 |
+| cylinder r 50, h 200, full turn (seam) | 15747.233167 | A t (1 + t / 2r) = 15747.233176 (6e-10) | 15738.84 (5.3e-4 low) |
+| cylinder r 50, partial 140 x 140 | 4912.249999992 | 4912.25 (2e-12) | 4909.65 |
+| cone r 100 / h 100, patch away from the apex | 300.4129 | triangle solid 300.3629 (1.7e-4) | 300.3629 |
+| NURBS sphere patch R 100, polar 30..90 | 3409.38305 | closed form 3409.38308 (8e-9) | 3408.09 (3.8e-4 low) |
+
+The offset adds the curvature term (t / 2r on the cylinder), so "area x thickness" is the first-order value; the plane case is exactly area x
+thickness. The STEP written by `export_step_exact` holds one `MANIFOLD_SOLID_BREP` per ply solid named "<ply> piece <n>" (entity names become
+product names as for any solid).
+
+**Fallback.** A kernel without the op (Manifold: `faceSlab` is in its unsupported set) or one that refuses the slab: `export_step_exact` writes the
+solid from its triangles (`meshRecipeOf`), so the export still contains every ply. Other consumers (booleans, `mass_properties`) follow the usual
+rule of `operandRecipe`: an exact tree is used when the kernel supports its ops. Not done: ply solids over a core (variable underside), the sphere cap,
+AP242 composite (M5), regeneration of the solids when plies change (they remain a snapshot).
+Tests: `tests/unit/aero/composites/plySlab.test.ts` (recipe content per surface type, stacking, no recipe on sphere / core, validation, export
+fallback), `server/tests/nativeKernelSheets.test.ts` (the table above), `features.rs` `slabs_over_plane_cylinder_cone_and_b_spline_faces_have_the_exact_volume`.

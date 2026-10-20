@@ -3,12 +3,14 @@
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
-import { type CadDocument, DEFAULT_LAYER_ID, type Entity } from '@core/model/types';
+import type { CompositePart } from '@core/model/composites';
+import { type CadDocument, DEFAULT_LAYER_ID, type Entity, type ShapeRecipe, type Vec2 } from '@core/model/types';
 import { nextId } from '@lib/id';
 import { sig } from '../shared/results';
 import { refuseCmp } from './codes';
 import { piecesOf } from './geometry2d';
 import { meshVolume, plyPieceMesh } from './plySolid';
+import { plySlabRecipe } from './plySlab';
 import { autoStepLength } from './drape/plyDrape';
 import { stackRegions } from './plyRegions';
 import { coresOf, heightBelow } from './sandwich';
@@ -17,9 +19,27 @@ import { compositesOf, findPart, findPly, pliesOf } from './state';
 const MAX_SOLIDS = 400;
 const SOLID_COLOR = '#c8a46a';
 
+/** The exact `faceSlab` recipe of a region whose underside is one height (the stack below is constant there), else null. */
+function exactSlab(
+  part: CompositePart,
+  region: { readonly outer: readonly Vec2[]; readonly holes: readonly (readonly Vec2[])[] },
+  heightAt: (uv: Vec2) => number,
+  thickness: number,
+): ShapeRecipe | null {
+  const outline = [...region.outer, ...region.holes.flat()];
+  const first = outline[0];
+  if (first === undefined) return null;
+  const base = heightAt(first);
+  if (outline.some((uv) => Math.abs(heightAt(uv) - base) > 1e-9 * (1 + Math.abs(base)))) return null;
+  const xs = region.outer.map(([x]) => x);
+  const ys = region.outer.map(([, y]) => y);
+  const extent = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  return plySlabRecipe(part, region, base, thickness, Math.min(1e-5 * Math.max(1, extent), thickness / 50));
+}
+
 /**
  * @affects creates one mesh entity per ply piece (ids plysolid-<step>.<k>), named "<ply> piece <n>", on the layer of the tool solid
- * @invariant each solid is the piece offset along the tool-face normal from the underside height (plies below that cover the point, plus a core between) by the cured ply thickness; the laminate side is respected; closed with outward winding, so volume = area x thickness (within the mesh refinement on curved faces); the solids are a snapshot: they are not regenerated when plies change
+ * @invariant each solid is the piece offset along the tool-face normal from the underside height (plies below that cover the point, plus a core between) by the cured ply thickness; the laminate side is respected; closed with outward winding, so volume = area x thickness (within the mesh refinement on curved faces); on a plane / cylinder / cone / nurbs tool face without a core the entity also carries the exact `faceSlab` recipe (`brep`), which an exact kernel builds as a B-rep for export_step_exact (the mesh stays the display / fallback form); the solids are a snapshot: they are not regenerated when plies change
  * @failure unknown part / ply -> CMP_REF_MISSING; no plies -> CMP_NO_PLIES; more than 400 pieces or an untriangulable piece -> CMP_PARAM_INVALID
  */
 export const createPlySolids = defineCommand({
@@ -32,7 +52,9 @@ export const createPlySolids = defineCommand({
     'mesh STEP path export them; mass_properties measures them. `plies` selects plies by id or name (default all). `maxEdge` (document ' +
     'length units, default the outline diagonal / 16) bounds the triangle edge on curved faces: smaller is smoother and heavier (at most ' +
     '4 refinement levels). The solids are a snapshot of the model now: re-run after editing plies (delete the old ones first). The core ' +
-    'itself is not meshed. Computed by llull, not approved.',
+    'itself is not meshed. On a plane, cylinder, cone or NURBS tool face without a core, each solid also carries its exact construction (the piece of the tool ' +
+    'face lifted by the cured thickness): export_step_exact writes it as a true B-rep solid named "<ply> piece <n>" with the OCC kernel, and ' +
+    'falls back to the mesh when the kernel cannot build it. Computed by llull, not approved.',
   params: z.object({
     part: z.string().describe('Part id or name.'),
     plies: z.array(z.string().describe('Ply id or name.')).describe('Plies to mesh; default every ply of the part.').optional(),
@@ -60,7 +82,8 @@ export const createPlySolids = defineCommand({
     const layerId = doc.entities[part.toolFaces[0]?.entityId ?? '']?.layerId ?? DEFAULT_LAYER_ID;
     const entities: Record<string, Entity> = { ...doc.entities };
     const order = [...doc.order];
-    const created: { id: string; ply: string; volume: number; triangles: number }[] = [];
+    const created: { id: string; ply: string; volume: number; triangles: number; exact: boolean }[] = [];
+    const exactAllowed = coresOf(model, part.id).length === 0;
     for (const ply of plies) {
       const thickness = model.materials[ply.materialName]?.plyThickness;
       if (thickness === undefined)
@@ -86,10 +109,12 @@ export const createPlySolids = defineCommand({
               ply.id,
             ]);
           const id = nextId('plysolid');
+          const brep = exactAllowed ? exactSlab(part, region, (uv) => heightBelow(model, part, ply, uv), thickness) : null;
           entities[id] = {
             id,
             kind: 'mesh',
             mesh,
+            ...(brep === null ? {} : { brep }),
             position: [0, 0, 0],
             rotation: [0, 0, 0],
             layerId,
@@ -97,7 +122,7 @@ export const createPlySolids = defineCommand({
             name: regions.length === 1 ? `${ply.name} piece ${index + 1}` : `${ply.name} piece ${index + 1}.${regionIndex + 1}`,
           } as Entity;
           order.push(id);
-          created.push({ id, ply: ply.id, volume: Math.abs(meshVolume(mesh)), triangles: mesh.indices.length / 3 });
+          created.push({ id, ply: ply.id, volume: Math.abs(meshVolume(mesh)), triangles: mesh.indices.length / 3, exact: brep !== null });
         }
       }
     }
@@ -106,7 +131,7 @@ export const createPlySolids = defineCommand({
     return {
       ...changed(
         result,
-        `create_ply_solids: part "${part.name}": ${created.length} solid(s) for ${plies.length} ply(ies), ${created.reduce((n, s) => n + s.triangles, 0)} triangles, total volume ${sig(volume)} ${doc.units}^3 (${created.map((s) => s.id).join(', ')}). Computed by llull, not approved.`,
+        `create_ply_solids: part "${part.name}": ${created.length} solid(s) for ${plies.length} ply(ies), ${created.reduce((n, s) => n + s.triangles, 0)} triangles, total volume ${sig(volume)} ${doc.units}^3, ${created.filter((s) => s.exact).length} with an exact recipe (${created.map((s) => s.id).join(', ')}). Computed by llull, not approved.`,
         created.map((solid) => solid.id),
       ),
       data: {
@@ -114,6 +139,7 @@ export const createPlySolids = defineCommand({
         lengthUnit: doc.units,
         maxEdge: sig(edge),
         solids: created.map((solid) => ({ ...solid, volume: sig(solid.volume) })),
+        exactSolids: created.filter((solid) => solid.exact).length,
         totalVolume: sig(volume),
         reviewRequired: true,
       },
