@@ -26,9 +26,14 @@ describe('poseAt', () => {
     expect(poseAt(moving, 1, 0.5).orientation).toEqual(QUARTER_Z);
   });
 
-  it('lerps the centre of mass and slerps the orientation between samples', () => {
+  it('follows the screw motion between samples (the centre stays on its arc) and slerps the orientation', () => {
     const mid = poseAt(moving, 0, 0.5);
-    expect(mid.position).toEqual([5, 0, 0]);
+    // 90 deg about +Z carrying (0, 0, 0) to (10, 0, 0) is a rotation about (5, 5, 0): halfway is on that arc, not on the chord
+    expect(mid.position[0]).toBeCloseTo(5, 9);
+    expect(mid.position[1]).toBeCloseTo(5 - 5 * Math.SQRT2, 9);
+    expect(mid.position[2]).toBeCloseTo(0, 9);
+    const end = poseAt(moving, 0, 1 - 1e-12);
+    expect(end.position[0]).toBeCloseTo(10, 6);
     expect(mid.orientation[0]).toBeCloseTo(Math.cos(Math.PI / 8), 9);
     expect(mid.orientation[3]).toBeCloseTo(Math.sin(Math.PI / 8), 9);
   });
