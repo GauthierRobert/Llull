@@ -44,6 +44,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   SRF_BLEND_FOLD: 'choose the edges that face each other (each sheet must leave its edge towards the other one), or flip / reorder the sheets',
   SRF_TRIM_RANGE: 'give u and v intervals [from, to] inside the surface domain (see inspect_surface)',
   SRF_SEW_NOT_MERGEABLE: 'the surfaces must share one whole edge within `tolerance`; fill or move the edges, or raise `tolerance`',
+  SRF_SEW_FREE_EDGES: 'raise tolerance within the model accuracy, or fill / blend the gap first; the message says where the free edges are',
+  SRF_SEW_NONMANIFOLD: 'sew only sheets where each edge is shared by at most two of them',
   SRF_THICKEN_FAILED: 'thicken a surface with at least one non-degenerate normal',
   SRF_THICKEN_SELF_INTERSECT: 'reduce thickness below the radius of curvature reported, or thicken the other side',
   SRF_CONTINUITY_MISMATCH: 'give two curves or two surfaces (a curve cannot be joined to a surface here)',
