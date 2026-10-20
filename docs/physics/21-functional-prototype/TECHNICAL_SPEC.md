@@ -919,9 +919,15 @@ Validation cases automated (`tests/unit/engineRealism.test.ts`, `tests/unit/mujo
   dynamics check**, their items carry their `accuracy`). The mechanism row uses the **rank DOF of `inspect_dynamics`** (a Gruebler count
   calls every slider-crank locked); `check_mechanism` only for kinematic joints without a dynamics model. Stops before the motion checks on
   `FPR_PART_INVALID` / `FPR_PART_FLOATING` fails or an open loop (`FPR_CHECK_SKIPPED`, not_run with the reason; `FPR_NO_MOTION` without
-  bodies). Duration: two settling cycles + `cycles` four-stroke cycles at the announced crank speed, else 2 s. The checks run on the
-  document **without its dispositions**, so recording one does not change the hashes. Verdict: `blocked` while any item fails (accepted
-  included, Q5) or nothing could be checked (no parts / no kernel); a not_run item alone does not block. `ownerSummary` per §5.7.
+  bodies). An open loop is also reported as a mechanism item `FPR_LOOP_OPEN` (fail, with the gap), so the verdict is blocked. Duration: two
+  settling cycles + `cycles` four-stroke cycles at the announced crank speed, else 2 s. **One shared `simulate_motion` run** (poses +
+  energy) feeds check_motion_clearance and check_dynamics (`motionClearanceCheck` / `dynamicsCheck` take it); the timestep-halving runs of
+  check_dynamics, check_timestep_convergence and compare_to_reference stay separate. Every check hashes `checkedPrototype()` (the prototype
+  slice **without the dispositions**: check_assembly, check_motion_clearance and check_prototype alike), so recording a disposition never
+  changes a hash; the stand-alone checks still hash their own parameters, so dispositions are made on the check_prototype
+  `checks[].inputsHash`. Verdict: `blocked` while any item fails (accepted included, Q5) or nothing could be checked (no parts / no kernel); a
+  not_run item alone does not block. `ownerSummary` per §5.7 ("Passed" lists only pass checks; info is never read as a pass). Without an
+  installed realism law a model with losses gets a warning-only realism block (no silent drop).
 - `set_review_disposition` (`commands/review/dispositions.ts`, toolset `review`): `{ findingKey, status, comment?, inputsHash }`, stored in
   `doc.prototype.dispositions` (`Disposition`, load-validated), `by: 'agent'` (no caller in the context, like intents), `not_reviewed` with an
   empty comment clears it. Stale = the check's hash changed or the finding is gone (`data.staleDispositions`). No sign-off (Q5).
@@ -933,17 +939,24 @@ Validation cases automated (`tests/unit/engineRealism.test.ts`, `tests/unit/mujo
   `allow_interference` because the faceted tessellation of a 0.02 mm fit overlaps. **Deviations:** the plan lives in the golden corpus, not in
   `plans/reference_single_cylinder.plan.json`; the crankcase has no cylinder bore and the gear pair is a coupling without gear solids; the
   seeded-defect corpus is not built.
-- **VC-24 not proven.** `tests/unit/referenceEngine.test.ts` asserts `ready_for_review` but is a heavy gate (`LLULL_HEAVY_GATES=1`): the
-  plan plus the sub-checks took about 33 min on the TypeScript path (one measurement, not profiled per check); it has not been run to
-  completion against `check_prototype`. Per-check profiling and RS-6 (native `geomq`) come first. VC-34 is partial: only the reference and
-  timestep items carry `accuracy`.
+- **VC-24 partly shown, heavy gate.** `tests/unit/referenceEngine.test.ts` runs only with `LLULL_HEAVY_GATES=1`. One run (2026-10-20,
+  Manifold + MuJoCo, after the shared simulation run) took **1781 s (about 30 min; 33 min before the shared run, one measurement each, not
+  profiled per check)**. Result: verdict `ready_for_review`, no fail, motion clearance clean (closest approach 2 mm), the rated-point
+  reference item `info` with origin `calibrated`, the timestep item pass. Not every row passes, so VC-24 as written is **not met**: the
+  assembly check is not_run on Manifold (joint realisation needs the native kernel's cylinder faces), the dynamics check holds a not_run item
+  (not identified in that run), and the mobility reads **2 DOF** (the rank DOF does not count the crank-to-propeller gear coupling as a
+  constraint). That run also exposed an owner-summary bug (absolute-only bands read as "no accuracy statement"), fixed with a unit test; the
+  gate was not re-run after the fix (30 min). Per-check profiling, gear couplings in the rank DOF and RS-6 (native `geomq`) come next. VC-34
+  is partial: only the reference and timestep items carry `accuracy`.
 
 **M5 (UI, `src/ui/panels/review/`).** Verdict line and stale dispositions; dispositions sent with the check's `inputsHash`; `info` status
 never shown as a pass; `AccuracyBadge` ("± 5 %" / "± ?" + origin, calibrated hatched) on checklist rows and findings (FR-FPR-62);
 `MechanismGraph` (FR-FPR-52, loop joints dashed, gears dotted with ratio, DOF badge, body click shares the Mechanisms focus); `ReviewTimeline`
 (FR-FPR-53/54: one read-only `simulate_motion` with reaction series, shared cursor, crank axis with TDC-1 marks, crank speed and joint
 reaction charts, collision and peak events); reaction layer of the loads overlay (FR-FPR-55); `ReferenceChart` (FR-FPR-63). Component tests
-`tests/component/ReviewPrototype.test.tsx` (VC-22 reduced per Q5, VC-25, VC-26 on the component level; browser e2e is legacy, LC1).
+`tests/component/ReviewPrototype.test.tsx` (VC-22 reduced per Q5, VC-25, VC-26 on the component level; browser e2e is legacy, LC1). A
+disposition edit only dispatches `set_review_disposition`: the tab joins `doc.prototype.dispositions` over the stored result
+(`joinDispositions.ts`) and re-runs the checks only on request.
 **Not built:** thickness map (FR-FPR-56: check_assembly reports one minimum per part, no per-vertex samples), isolate-and-ghost with the
 overlap volume mesh, trace paths and joint glyph overlay, gas-force arrows, torque-per-cylinder / pressure / gear-mesh / clearance-vs-time
 charts and CSV export, opening a saved `check_prototype --save` file, run cancellation.
