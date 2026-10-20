@@ -12,6 +12,9 @@ import { defineCommand, z } from '../schema';
 import { report } from '../noop';
 import { currentContext } from '../context';
 import { dynamicsOf } from './bodies';
+import { simulateMotion } from './simulate';
+import { motionClearanceCheck } from './checkMotionClearance';
+import { dynamicsCheck as runDynamicsCheck } from './checkDynamics';
 import { mechanismCheck, mobilityOf } from './prototypeMechanism';
 import {
   isCheck,
@@ -182,11 +185,11 @@ export const checkPrototype = defineCommand({
       motion = skippedCheck('motion_clearance', stopCode, stopReason, fix);
       dynamicsCheck = skippedCheck('dynamics', stopCode, stopReason, fix);
     } else {
-      const motionRun = runSub(context, checked, 'check_motion_clearance', {
-        duration: durationS,
-        ...shared,
-        ...(crankAxis === undefined || dynamics.joints[crankAxis]?.kind !== 'revolute' ? {} : { crankAxis }),
-      });
+      // one simulate_motion run (poses + energy) feeds both motion checks (spec 5.7); check_dynamics still halves the timestep on its own
+      const crank = crankAxis === undefined || dynamics.joints[crankAxis]?.kind !== 'revolute' ? {} : { crankAxis };
+      const sharedRun = simulateMotion.run(checked, { duration: durationS, detail: 'poses', energy: true, ...crank }, context);
+      const motionResult = motionClearanceCheck(checked, { duration: durationS, ...shared, ...crank }, context, sharedRun);
+      const motionRun: Sub = { result: motionResult, check: isCheck(motionResult.data) ? motionResult.data : null };
       motion =
         motionRun?.check ??
         skippedCheck(
@@ -197,7 +200,8 @@ export const checkPrototype = defineCommand({
         );
       const minimum = isRecord(motionRun?.result.data) ? motionRun.result.data['minClearance'] : null;
       closestMm = isRecord(minimum) && typeof minimum['mm'] === 'number' ? minimum['mm'] : null;
-      const dynamicsRun = runSub(context, checked, 'check_dynamics', { duration: durationS });
+      const dynamicsResult = runDynamicsCheck(checked, { duration: durationS }, context, sharedRun);
+      const dynamicsRun: Sub = { result: dynamicsResult, check: isCheck(dynamicsResult.data) ? dynamicsResult.data : null };
       const base =
         dynamicsRun?.check ??
         skippedCheck('dynamics', 'FPR_NO_MOTION', reasonOf(dynamicsRun?.result.summary ?? 'check_dynamics is not registered'), fix);

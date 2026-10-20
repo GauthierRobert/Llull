@@ -1,6 +1,7 @@
 /** check_dynamics: read-only review of the realism of the dynamics inputs and of the simulation's own self-checks. */
 
-import type { CommandResult } from '../types';
+import type { CadDocument } from '../../model/types';
+import type { CommandResult, ExecutionContext } from '../types';
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
 import { currentContext } from '../context';
@@ -17,6 +18,26 @@ const MIN_TIMESTEP = 1e-5;
 const reasonOf = (summary: string): string => summary.replace(/^simulate_motion:\s*/, '').replace(/;\s*no-op\.$/, '');
 const asRun = (data: unknown): SimulationRun | null =>
   typeof data === 'object' && data !== null && 'joints' in data && 'timestep' in data ? (data as SimulationRun) : null;
+
+const dynamicsParams = z.object({
+  duration: z
+    .number()
+    .positive()
+    .max(600)
+    .optional()
+    .describe(`Simulated seconds of each run. Default ${DEFAULT_DURATION}. Cover at least one full cycle.`),
+  timestep: z
+    .number()
+    .min(MIN_TIMESTEP)
+    .max(0.01)
+    .optional()
+    .describe('Integration step in seconds of the first run (the second uses half of it); default as simulate_motion.'),
+  sampleRate: z
+    .number()
+    .positive()
+    .optional()
+    .describe('Recorded samples per second; default as simulate_motion (36 per crank turn for loops). At most 6001 samples per run.'),
+});
 
 /**
  * @affects nothing — read-only; returns the review envelope (check 'dynamics') in data
@@ -44,97 +65,84 @@ export const checkDynamics = defineCommand({
     'Approximate: all thresholds are llull named defaults (grade C), the timestep test compares only final joint states, and a run shorter ' +
     'than the motion cycle can hide drift. Read-only. Next: fix warnings, then check_prototype. Computed by llull, not approved: a ' +
     'qualified engineer must review.',
-  params: z.object({
-    duration: z
-      .number()
-      .positive()
-      .max(600)
-      .optional()
-      .describe(`Simulated seconds of each run. Default ${DEFAULT_DURATION}. Cover at least one full cycle.`),
-    timestep: z
-      .number()
-      .min(MIN_TIMESTEP)
-      .max(0.01)
-      .optional()
-      .describe('Integration step in seconds of the first run (the second uses half of it); default as simulate_motion.'),
-    sampleRate: z
-      .number()
-      .positive()
-      .optional()
-      .describe('Recorded samples per second; default as simulate_motion (36 per crank turn for loops). At most 6001 samples per run.'),
-  }),
-  run: (doc, params, ctx): CommandResult => {
-    const context = ctx ?? currentContext();
-    const dynamics = dynamicsOf(doc);
-    const hash = { dynamics: doc.dynamics ?? null, entities: Object.keys(doc.entities).length, units: doc.units };
-    const provenance = (engine: string | undefined): ReviewResult['provenance'] => ({
-      method: 'static checks of doc.dynamics + simulate_motion at dt and dt/2 (energy balance, loop residual)',
-      ...(engine === undefined ? {} : { engine }),
-      tolerances: { timestepChangeFraction: TIMESTEP_GATE.value, energyClosureFraction: 0.005, loopPassUm: 1, loopFailUm: 10 },
-      params: { ...params },
-    });
-    if (Object.keys(dynamics.bodies).length === 0) {
-      const none = reviewResult(
-        'dynamics',
-        [
-          reviewItem(
-            'dynamics',
-            'FPR_NO_MOTION',
-            'not_run',
-            [],
-            'Add rigid bodies and joints (add_rigid_body, add_body_joint) and a drive (add_motor), then retry; see inspect_dynamics.',
-            { unverified: true },
-          ),
-        ],
-        provenance(undefined),
-        hash,
-      );
-      return report(doc, reviewSummary(NAME, none, 'Next: build the dynamics model.'), none);
-    }
-    const stat = staticChecks(doc, context.kernel);
-    const items: ReviewItem[] = [...stat.items];
-    let engine: string | undefined;
-    if (!stat.simulatable.ok) items.push(...notRunItems(stat.simulatable.why, false));
-    else {
-      const common = {
-        duration: params.duration ?? DEFAULT_DURATION,
-        ...(params.sampleRate !== undefined ? { sampleRate: params.sampleRate } : {}),
-      };
-      const first = simulateMotion.run(
-        doc,
-        { ...common, energy: true, ...(params.timestep !== undefined ? { timestep: params.timestep } : {}) },
-        ctx,
-      );
-      const run = asRun(first.data);
-      if (run === null) items.push(...notRunItems(reasonOf(first.summary), stat.simulatable.loops > 0));
-      else {
-        engine = run.engine;
-        const half = run.timestep / 2;
-        const second = half < MIN_TIMESTEP ? null : simulateMotion.run(doc, { ...common, timestep: half }, ctx);
-        const fine = second === null ? null : asRun(second.data);
-        items.push(
-          ...loopDriftItem(run),
-          energyItem(run),
-          timestepItem(
-            run,
-            fine,
-            second === null
-              ? `the timestep ${run.timestep} s cannot be halved (minimum ${MIN_TIMESTEP} s)`
-              : fine === null
-                ? reasonOf(second.summary)
-                : null,
-          ),
-          ...tipMachItems(run),
-        );
-      }
-    }
-    const result = reviewResult('dynamics', items, provenance(engine), {
-      ...hash,
-      engine: engine ?? null,
-      kernel: context.kernel?.name ?? null,
-    });
-    const next =
-      result.status === 'pass' ? 'Next: check_prototype.' : 'Next: fix the failing / warned items (see remediation), then re-run.';
-    return report(doc, reviewSummary(NAME, result, next), result);
-  },
+  params: dynamicsParams,
+  run: (doc, params, ctx): CommandResult => dynamicsCheck(doc, params, ctx, null),
 });
+
+/** The check with `shared` as its first run (a simulate_motion result with energy, from check_prototype) or, when null, its own run. */
+export function dynamicsCheck(
+  doc: CadDocument,
+  params: z.infer<typeof dynamicsParams>,
+  ctx: ExecutionContext | undefined,
+  shared: CommandResult | null,
+): CommandResult {
+  const context = ctx ?? currentContext();
+  const dynamics = dynamicsOf(doc);
+  const hash = { dynamics: doc.dynamics ?? null, entities: Object.keys(doc.entities).length, units: doc.units };
+  const provenance = (engine: string | undefined): ReviewResult['provenance'] => ({
+    method: 'static checks of doc.dynamics + simulate_motion at dt and dt/2 (energy balance, loop residual)',
+    ...(engine === undefined ? {} : { engine }),
+    tolerances: { timestepChangeFraction: TIMESTEP_GATE.value, energyClosureFraction: 0.005, loopPassUm: 1, loopFailUm: 10 },
+    params: { ...params },
+  });
+  if (Object.keys(dynamics.bodies).length === 0) {
+    const none = reviewResult(
+      'dynamics',
+      [
+        reviewItem(
+          'dynamics',
+          'FPR_NO_MOTION',
+          'not_run',
+          [],
+          'Add rigid bodies and joints (add_rigid_body, add_body_joint) and a drive (add_motor), then retry; see inspect_dynamics.',
+          { unverified: true },
+        ),
+      ],
+      provenance(undefined),
+      hash,
+    );
+    return report(doc, reviewSummary(NAME, none, 'Next: build the dynamics model.'), none);
+  }
+  const stat = staticChecks(doc, context.kernel);
+  const items: ReviewItem[] = [...stat.items];
+  let engine: string | undefined;
+  if (!stat.simulatable.ok) items.push(...notRunItems(stat.simulatable.why, false));
+  else {
+    const common = {
+      duration: params.duration ?? DEFAULT_DURATION,
+      ...(params.sampleRate !== undefined ? { sampleRate: params.sampleRate } : {}),
+    };
+    const first =
+      shared ??
+      simulateMotion.run(doc, { ...common, energy: true, ...(params.timestep !== undefined ? { timestep: params.timestep } : {}) }, ctx);
+    const run = asRun(first.data);
+    if (run === null) items.push(...notRunItems(reasonOf(first.summary), stat.simulatable.loops > 0));
+    else {
+      engine = run.engine;
+      const half = run.timestep / 2;
+      const second = half < MIN_TIMESTEP ? null : simulateMotion.run(doc, { ...common, timestep: half }, ctx);
+      const fine = second === null ? null : asRun(second.data);
+      items.push(
+        ...loopDriftItem(run),
+        energyItem(run),
+        timestepItem(
+          run,
+          fine,
+          second === null
+            ? `the timestep ${run.timestep} s cannot be halved (minimum ${MIN_TIMESTEP} s)`
+            : fine === null
+              ? reasonOf(second.summary)
+              : null,
+        ),
+        ...tipMachItems(run),
+      );
+    }
+  }
+  const result = reviewResult('dynamics', items, provenance(engine), {
+    ...hash,
+    engine: engine ?? null,
+    kernel: context.kernel?.name ?? null,
+  });
+  const next = result.status === 'pass' ? 'Next: check_prototype.' : 'Next: fix the failing / warned items (see remediation), then re-run.';
+  return report(doc, reviewSummary(NAME, result, next), result);
+}
