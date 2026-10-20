@@ -4,6 +4,11 @@
  *   fatigue_field  FE fatigue case -> llull-compute post fatigue (every node) -> FatigueField artifact -> compute_fatigue
  *   fea_map_field  thermo_static interpolate field -> llull-compute post map -> mapped-field artifact (read by the fea_solve deck)
  *   fea_render     render_fea_results with the pixel raster in llull-compute raster (raster=auto|ts|cpu|gpu)
+ *   auto_route     route_problem -> llull-compute route (plant 02 RTE V2 A*) -> auto_route_pipe { solution } (validated, then committed)
+ *   stackup_monte_carlo  analyze_stackup with the Monte Carlo above the TS cap in llull-compute stats (GDT TR-GDT-22)
+ *   vortex_lattice_solve analyze_vortex_lattice with the influence build + dense LU in llull-compute panel (AER M3)
+ *   explicit_run   explicit_dynamics case -> llull-compute explicit -> fe_explicit artifact -> record_explicit_results (PHY-19 RS-8)
+ *   scan_import / scan_list  point-cloud file -> llull-compute cloud import -> asset store (`../scan/scanTools.ts`, plant 10)
  */
 
 import type { ToolDefinition } from '@protocol/tools';
@@ -18,6 +23,11 @@ import { runFatigueField, type NativeDeps } from './fatigueField';
 import { runMapField } from './mapField';
 import { DEFAULT_TOPOLOGY_TIMEOUT_S, runTopologySolve, type TopologySolveOptions } from './topologySolve';
 import { runFeaRender } from './renderField';
+import { DEFAULT_AUTO_ROUTE_TIMEOUT_S, NATIVE_EXPANSIONS_CEILING, NATIVE_MAX_EXPANSIONS, runAutoRoute } from './autoRoute';
+import { runStackupTool, stackupToolDefinition } from './stackupMonteCarlo';
+import { runVortexLatticeTool, vortexLatticeToolDefinition } from './vortexLattice';
+import { DEFAULT_EXPLICIT_TIMEOUT_S, runExplicitRun, type ExplicitRunOptions } from './explicitRun';
+import { defaultScanDeps, isScanTool, runScanTool, scanToolDefinitions } from '../scan/scanTools';
 
 const TIMEOUT = {
   type: 'number' as const,
@@ -66,7 +76,41 @@ export function nativeToolDefinitions(): ToolDefinition[] {
     },
     renderToolDefinition(),
     topologyToolDefinition(),
+    autoRouteToolDefinition(),
+    stackupToolDefinition(),
+    vortexLatticeToolDefinition(),
+    explicitToolDefinition(),
+    ...scanToolDefinitions(),
   ];
+}
+
+/** auto_route: the params of route_problem plus the transport's own (read from the registry, so both stay one schema). */
+function autoRouteToolDefinition(): ToolDefinition {
+  const schema = getCommand('route_problem')?.paramsSchema ?? { type: 'object' as const, properties: {}, required: [] };
+  return {
+    name: 'auto_route',
+    description:
+      'Auto-route a pipe line between two ports with the native router (llull-compute route, plant 02 RTE V2): route_problem builds the ' +
+      'lattice problem from the document, the native sparse 3D A* searches it (up to maxExpansions, default 2e6) and auto_route_pipe validates ' +
+      'the solution against the current document (problem hash, legs, clearance, length / bends / cost) and adds the pipe run. Same params as ' +
+      'route_problem / auto_route_pipe. data = auto_route_pipe data + native { version, elapsedMs }. Errors: route_problem refusals, ' +
+      'RTE_AUTOROUTE_NO_PATH, RTE_AUTOROUTE_BUDGET, RTE_AUTOROUTE_SOLUTION_INVALID, NATIVE_TOOL_MISSING (then auto_route_pipe alone runs the ' +
+      'TypeScript search on small grids), NATIVE_TIMEOUT.',
+    inputSchema: {
+      ...schema,
+      properties: {
+        ...schema.properties,
+        timeoutS: { ...TIMEOUT, description: `Wall-clock limit of the native job in seconds (default ${DEFAULT_AUTO_ROUTE_TIMEOUT_S}).` },
+        maxExpansions: {
+          type: 'integer',
+          minimum: 1,
+          maximum: NATIVE_EXPANSIONS_CEILING,
+          description: `Native expansion budget (default ${NATIVE_MAX_EXPANSIONS}); above it RTE_AUTOROUTE_BUDGET.`,
+        },
+      },
+    },
+    annotations: {},
+  };
 }
 
 /** fea_render: the params of render_fea_results plus `raster` (read from the registry, so both stay one schema). */
@@ -124,7 +168,44 @@ function topologyToolDefinition(): ToolDefinition {
   };
 }
 
-const NAMES: ReadonlySet<string> = new Set(['fatigue_field', 'fea_map_field', 'fea_render', 'topology_solve']);
+const NAMES: ReadonlySet<string> = new Set([
+  'fatigue_field',
+  'fea_map_field',
+  'fea_render',
+  'topology_solve',
+  'stackup_monte_carlo',
+  'vortex_lattice_solve',
+  'auto_route',
+  'explicit_run',
+]);
+/** explicit_run: the transport of the explicit plugin (PHY-19 RS-8); the case itself is set up with the explicit commands. */
+function explicitToolDefinition(): ToolDefinition {
+  return {
+    name: 'explicit_run',
+    description:
+      'Run an explicit_dynamics case (create_analysis analysisType=explicit_dynamics, set_part_idealization, set_explicit_controls, set_initial_velocity, ' +
+      'add_rigid_wall) in the native llull-compute explicit solver (central difference, lumped mass, hex8 with Flanagan-Belytschko hourglass ' +
+      'control, tet4, elastic or Johnson-Cook plasticity, planar rigid walls; progress with --progress) and record the result with ' +
+      'record_explicit_results (fe_explicit artifact; numbers are recomputed from it). Read it with explicit_report and explicit_energy_check. ' +
+      'Screening only: review required, never certification evidence. Errors: EXP_TOOL_MISSING (no llull-compute), EXP_SOLVER_FAILED, ' +
+      'EXP_RUN_TIMEOUT and the set-up codes (EXP_NO_EXCITATION, EXP_MESH_UNSUPPORTED, EXP_MATERIAL_INCOMPLETE, ...).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        analysisId: { type: 'string', description: 'Id of the explicit_dynamics analysis (affected[0] of create_analysis).' },
+        timeoutS: { ...TIMEOUT, description: `Wall-clock limit of the native job in seconds (default ${DEFAULT_EXPLICIT_TIMEOUT_S}).` },
+        device: {
+          type: 'string',
+          enum: ['cpu', 'gpu', 'auto'],
+          description:
+            'cpu (default, deterministic Rust CPU path), gpu or auto (a GPU build of llull-compute; else the CPU twin with a warning).',
+        },
+      },
+      required: ['analysisId'],
+    },
+    annotations: { idempotentHint: true },
+  };
+}
 
 export const isNativeTool = (name: string): boolean => NAMES.has(name);
 
@@ -144,8 +225,11 @@ export async function runNativeTool(
   host: FeaHost & { readonly onProgress?: (line: string) => void },
   deps: NativeDeps = defaultDeps(process.env, host.onProgress),
 ): Promise<CommandOutcome | null> {
+  if (isScanTool(name)) return runScanTool(name, params, defaultScanDeps(deps.env, host.onProgress));
   if (!isNativeTool(name)) return null;
   if (name === 'fea_render') return { ...(await runFeaRender(params, host, deps)), changed: false };
+  if (name === 'stackup_monte_carlo') return { ...(await runStackupTool(params, host, deps)), changed: false };
+  if (name === 'vortex_lattice_solve') return { ...(await runVortexLatticeTool(params, host, deps)), changed: false };
   const args = isRecord(params) ? params : {};
   if (name === 'topology_solve') {
     const studyId = nonEmptyString(args['studyId']);
@@ -161,6 +245,25 @@ export async function runNativeTool(
     return { ...result, changed: host.getDoc() !== before };
   }
   const timeout = typeof args['timeoutS'] === 'number' && Number.isFinite(args['timeoutS']) ? { timeoutS: args['timeoutS'] } : {};
+  if (name === 'auto_route') {
+    const maxExpansions = args['maxExpansions'];
+    const options = {
+      ...timeout,
+      ...(typeof maxExpansions === 'number' && Number.isInteger(maxExpansions) && maxExpansions > 0 ? { maxExpansions } : {}),
+    };
+    const before = host.getDoc();
+    const result = await runAutoRoute(args, options, host, deps);
+    return { ...result, changed: host.getDoc() !== before };
+  }
+  if (name === 'explicit_run') {
+    const analysisId = nonEmptyString(args['analysisId']);
+    if (analysisId === undefined) return failure('explicit_run: analysisId is required.');
+    const device = args['device'];
+    const options: ExplicitRunOptions = { ...timeout, ...(device === 'cpu' || device === 'gpu' || device === 'auto' ? { device } : {}) };
+    const before = host.getDoc();
+    const result = await runExplicitRun(analysisId, options, host, deps);
+    return { ...result, changed: host.getDoc() !== before };
+  }
   if (name === 'fatigue_field') {
     const caseId = nonEmptyString(args['caseId']);
     if (caseId === undefined) return failure('fatigue_field: caseId is required.');

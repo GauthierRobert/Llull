@@ -110,7 +110,15 @@ const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string
       : { ...analysisCase.thermomech, thermal: withoutDispositions(analysisCase.thermomech.thermal) },
   sourceResultsHash: sourceResultsHash(doc, analysisCase),
   ...(analysisCase.nonlinear !== undefined ? { nonlinear: withoutNames(analysisCase.nonlinear) } : {}),
+  ...(analysisCase.dynamics !== undefined ? { dynamics: analysisCase.dynamics, spectrum: baseSpectrum(doc, analysisCase) } : {}),
 });
+
+/** PHY-09: the spectrum a random case is driven by (its levels change the post-processed results, TR-DYN-70). */
+function baseSpectrum(doc: CadDocument, analysisCase: AnalysisCase): unknown {
+  const name = analysisCase.dynamics?.base?.spectrum;
+  const spectra = doc.analysis?.vibration?.spectra;
+  return name === undefined || spectra === undefined || !Object.hasOwn(spectra, name) ? null : spectra[name];
+}
 
 /**
  * Hash of what an artifact depends on. `mesh`: part geometry + idealization, mesh controls and the targets (a mesh holds their node/face

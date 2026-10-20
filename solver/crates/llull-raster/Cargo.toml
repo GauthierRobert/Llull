@@ -1,6 +1,6 @@
 [package]
 name = "llull-raster"
-description = "Offscreen field-plot raster of llull-compute: bit-exact CPU twin of fieldRaster.ts, optional wgpu path (RS1 RS-5)"
+description = "Offscreen raster of llull-compute (field plots and render_view scenes): bit-exact CPU twins of the TypeScript rasters, optional wgpu path (RS1 RS-5)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

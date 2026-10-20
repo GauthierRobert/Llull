@@ -8,6 +8,7 @@ import { magnitude, nodeCoordinates, stepOfLoadCase, vonMises, type ResultStep }
 import { systemToSi } from '@lib/thermalUnits';
 import { axisFrame, CYLINDRICAL_FIELDS, CYLINDRICAL_QUANTITIES, type AxisFrame, type CylindricalQuantity } from './cylindrical';
 import { locatePoint, type PointWeights } from './probeInterpolation';
+import { isDynamicType, type DynamicProbeQuantity } from '../dynamics/quantities';
 
 interface ProbeValue {
   /** Load case name (static / thermo_static) or null for a time series (heat_*). */
@@ -31,7 +32,10 @@ export interface ProbeReading {
 }
 
 export const QUANTITY_FIELDS: Readonly<
-  Record<Exclude<ProbeQuantity, CylindricalQuantity>, { readonly field: string; readonly scalar: (values: readonly number[]) => number }>
+  Record<
+    Exclude<ProbeQuantity, CylindricalQuantity | DynamicProbeQuantity>,
+    { readonly field: string; readonly scalar: (values: readonly number[]) => number }
+  >
 > = {
   temperature: { field: 'NDTEMP', scalar: (values) => values[0] ?? Number.NaN },
   heat_flux: { field: 'FLUX', scalar: magnitude },
@@ -55,7 +59,7 @@ export function quantityUnit(analysis: AnalysisCase, quantity: ProbeQuantity): s
   return quantity.startsWith('u_') ? lengthUnitName(analysis.unitSystem) : stressUnitName(analysis.unitSystem);
 }
 
-function nearestNode(
+export function nearestNode(
   mesh: FeMeshArtifact,
   probeId: string,
   point: readonly [number, number, number],
@@ -121,7 +125,7 @@ export function evaluateProbes(
   results: FeResultsArtifact,
   lengthToAnalysis: number,
 ): ProbeReading[] {
-  if (analysis.type === 'modal' || analysis.type === 'buckling') return [];
+  if (analysis.type === 'modal' || analysis.type === 'buckling' || isDynamicType(analysis.type)) return [];
   const heat = analysis.type === 'heat_steady' || analysis.type === 'heat_transient';
   const sets: { loadCase: string | null; step: ResultStep }[] = heat
     ? results.steps.map((step) => ({ loadCase: null, step }))

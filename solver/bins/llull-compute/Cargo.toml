@@ -7,15 +7,20 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+llull-cloud = { path = "../../crates/llull-cloud", default-features = false }
 llull-post = { path = "../../crates/llull-post" }
 llull-protocol = { path = "../../crates/llull-protocol" }
 llull-raster = { path = "../../crates/llull-raster" }
+llull-route = { path = "../../crates/llull-route" }
 llull-topopt = { path = "../../crates/llull-topopt", default-features = false }
+llull-stats = { path = "../../crates/llull-stats" }
+llull-panel = { path = "../../crates/llull-panel" }
+llull-explicit = { path = "../../crates/llull-explicit" }
 
 [features]
 # wgpu paths: offscreen raster (`llull-compute raster` with engine "gpu") and the topopt GPU solves (settings.device "gpu" / "auto").
 # Off by default (keeps the release build short); without it the CPU twins answer and a GPU request reports a warning.
-gpu = ["llull-raster/gpu", "llull-topopt/gpu"]
+gpu = ["llull-raster/gpu", "llull-topopt/gpu", "llull-cloud/gpu", "llull-explicit/gpu"]
 
 [lints]
 workspace = true

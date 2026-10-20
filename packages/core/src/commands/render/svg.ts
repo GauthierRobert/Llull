@@ -1,9 +1,15 @@
 import type { ImageEntity, Vec3 } from '../../model/types';
-import { type Polygon3D } from './types';
+import type { PixelStage, Polygon3D } from './types';
 import { add3, dot3, scale3 } from '../../lib/vec3';
 import { type Camera, type Projector, cameraBasis, makeProjector, shade } from './camera';
 import { underlaySvg } from './underlays';
 import { rasterLayer } from './raster';
+
+/** Raster mode of buildSvg: the scene radius (outline / bias scale) and an optional replacement of the reference per-pixel stage. */
+export interface RasterSettings {
+  readonly radius: number;
+  readonly pixels?: PixelStage;
+}
 
 /** Round to 2 decimals (SVG coordinates and labels). */
 export function r2(n: number): number {
@@ -44,9 +50,10 @@ export function buildSvg(
   viewName: string,
   entityCount: number,
   background: string | null = DEFAULT_BACKGROUND,
-  rasterRadius: number | null = null,
+  raster: RasterSettings | null = null,
   caption = true,
 ): string {
+  const perspective = cam.fovDeg !== undefined;
   const project = makeProjector(cam, orthoHalf, width, height);
   // Painter's algorithm: `depth` grows away from the camera, so draw farthest first so nearer
   // faces paint on top. Strokes (2D) always draw on top; image underlays sit below everything.
@@ -56,22 +63,21 @@ export function buildSvg(
   const facingAway = (p: Polygon3D): number => (p.loops === undefined && dot3(p.normal, fwd) > 1e-9 ? 1 : 0);
   const filled = polygons.filter((p) => !p.stroke).sort((a, b) => facingAway(b) - facingAway(a) || b.depth - a.depth);
   const stroked = polygons.filter((p) => p.stroke);
-  const hasCap = rasterRadius === null && filled.some((p) => p.loops !== undefined);
+  const hasCap = raster === null && filled.some((p) => p.loops !== undefined);
   return svgDocument(
     width,
     height,
     [
       ...(hasCap ? [HATCH_PATTERN] : []),
-      buildGroundGrid(project, cam.target, orthoHalf),
-      ...underlays.map((image) => underlaySvg(image, project)),
-      ...(rasterRadius === null
+      ...(perspective ? [] : [buildGroundGrid(project, cam.target, orthoHalf), ...underlays.map((image) => underlaySvg(image, project))]),
+      ...(raster === null
         ? [...filled, ...stroked].map((poly) => polygonSvg(poly, project))
-        : filled.length === 0
+        : filled.length === 0 && !perspective && raster.pixels === undefined
           ? stroked.map((poly) => polygonSvg(poly, project))
-          : [rasterLayer([...filled, ...stroked], cam, orthoHalf, width, height, rasterRadius)]),
+          : [rasterLayer([...filled, ...stroked], cam, orthoHalf, width, height, raster.radius, raster.pixels)]),
       ...(caption
         ? [
-            buildAxisTriad(project, cam.target, width, height, orthoHalf),
+            ...(perspective ? [] : [buildAxisTriad(project, cam.target, width, height, orthoHalf)]),
             `  <text x="8" y="20" font-family="monospace" font-size="13" fill="#aaaacc">${viewName.toUpperCase()} | ${entityCount} entit${entityCount === 1 ? 'y' : 'ies'}</text>`,
           ]
         : []),

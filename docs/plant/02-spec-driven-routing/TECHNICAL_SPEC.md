@@ -635,3 +635,95 @@ Total MVP (M0-M3) ≈ 21 developer-days.
 - [R14] Stanczak M. et al., ICORES 2020 — https://www.scitepress.org/Papers/2020/89233/ [S32]; Marriott K. et al., Diagrams 2014 [S33]; Wu H. et al., BIT improved A\* [S31]
 - [R15] CADMATIC PCF export; SST CAEPIPE PCF data types — https://www.sstusa.com/docs/users_manual/data_types_from_caepipe.htm (accessed 2026-10) [S26]
 - [R16] RS1 native compute programme — [../../decisions/RS1-native-compute.md](../../decisions/RS1-native-compute.md)
+
+## 13. As built (RS1 RS-7 plant slice, 2026-10-19)
+
+Built: the V2 auto-router (§2.A, §5.12) end to end, on the smallest slice of M0 / M1 it needs. Not built: `route_pipe`,
+fittings / joint-stack derivation, flanges, inline components, branches, `check_piping`, `piping_takeoff`, stretch, slope,
+insulation clashes, heat loss, `convert_pipe_run` (M1–V1 stay open; SC-RTE-08 step 4 `check_piping` is still blocked).
+
+### 13.1 What exists
+
+| Part | Where | Notes |
+| ---- | ----- | ----- |
+| `CadDocument.plant` (`PlantModel { piping? }`) | `packages/core/src/model/plant.ts` | Types only. `PipingModel` = tie-ins, lines, runs (+ order lists); `clear_document` removes the slice |
+| Plugin `piping`, toolset `piping` | `packages/domain-aec/src/plant/piping/` (installed in `src/app/plugins.ts`) | Toolset getter = legacy `PIPING_TOOLS` + plugin commands + the `auto_route` transport |
+| `add_tie_in_point`, `create_pipeline` | `commands/tieIn.ts`, `commands/pipeline.ts` | §4 params subset; `RTE_INVALID_PORT`, `RTE_DUPLICATE_TAG`, `RTE_DUPLICATE_LINE_NUMBER`, `RTE_SPEC_NO_COMPONENT` (DN without a pipe row); line number from the §5.9 template (named in `data.template`) |
+| `route_problem` (query) | `commands/autoRoute.ts`, `autoRoute/problem.ts` | `data = { problem, problemHash, defaults, elbowCentreToEnd, portOwners, unverified, tsMaxExpansions }`; `problemHash` = sha256 of the canonical problem JSON |
+| `auto_route_pipe` (mutating) | `commands/autoRoute.ts`, `autoRoute/search.ts`, `autoRoute/solution.ts` | TS A* under `TS_MAX_EXPANSIONS` = 200 000, or `solution` checked by `checkSolution` (§2.A list) and committed; `data` per SC-RTE-08 (`centrelineToPiLengthMm`, `bends`, `cost`, `optimal`, `expansions`, `engine`, `problemHash`) |
+| Run geometry | `derive.ts` | One derived read-only mesh per run (id = run id, layer `P-PIPE`, 16-segment tube per leg, mitred look as legacy pipes); omitted from saved files, re-derived on load; derivation guard |
+| Native search | `solver/crates/llull-route` (`llull-compute route <folder>`) | Contract in `llull_route::job` (job.json `{ problemHash, problem, maxExpansions }` → result.json `{ status, pisUm, lengthUm, bends, cost, optimal, expansions, engine, version }`) |
+| Transport `auto_route` (CLI `llull auto_route lineId=… from=… to=…`) | `server/src/native/autoRoute.ts`, `tools.ts` | `route_problem` → job → `auto_route_pipe { …, solution }`; `NATIVE_TOOL_MISSING` without the binary |
+| Tests | `tests/unit/plant/piping/*.test.ts`, `server/tests/routeNativeParity.test.ts`, cargo tests of `llull-route` | VC-RTE-18 (SC-RTE-08 data), VC-RTE-25 (parity, validation, budget) |
+
+### 13.2 Algorithm as built (both engines)
+
+- **Lattice and units.** Every length of the problem is an integer number of µm (`round(mm × 1000)`; inflated boxes rounded
+  outward). Lattice points = `originUm + cell × cellUm`; origin = end of the `from` stub. A problem whose two stub ends are not
+  on one lattice is refused (`RTE_AUTOROUTE_NO_PATH`, path `grid`). Ports must face an axis (`RTE_PORT_DIRECTION`).
+- **Stubs and minimum legs.** Stub = LR 90 elbow centre-to-end A (+ `flangeSetLength` on an FL port), rounded up to whole
+  cells. A turn moves `minLegCells = ceil(2A / cell)` cells along the new axis in one step, so every leg that starts with a
+  bend holds two elbows; straight moves are one cell. Reversals are never generated. This replaces "force a straight stub" of
+  §5.12 with an exact graph: the search is optimal over routes whose legs fit their elbows.
+- **State, cost, heuristic.** State = (cell, incoming axis). `g` = lattice length + `bendCost × bends` +
+  `offElevationPenaltyPerCell × horizontal cells off every preferred elevation` (stubs are a constant and are not counted).
+  `h` = Manhattan µm + `bendCost × b_min`, `b_min` = number of signed directions still needed (each non-zero axis offset
+  plus the arrival direction) minus 1 when the current direction is one of them (a lower bound ⇒ admissible).
+- **Determinism (AF-13).** Moves in axis order +X, −X, +Y, −Y, +Z, −Z; the open set is ordered by the total key
+  (f, h, i, j, k, axis); an entry is stale when its g is not the state's best g; a state's best g / parent change only on a
+  strictly smaller g (re-expansion allowed, so optimality does not need a consistent heuristic). `expansions` counts states
+  whose moves were generated; the budget stops before the next expansion. TS and Rust give identical PIs, cost and expansion
+  count on every tested problem (VC-RTE-25).
+- **Obstacles.** Every 3D entity's world AABB (run meshes excluded), every leg of an existing run (inflated by both radii,
+  so lines routed one after the other avoid each other — the "multi-line ordering" of V2 is sequential calls in the agent's
+  order), `keepOut` entity ids and `keepOutBoxes`, all inflated by OD/2 + insulation + clearance. A move is blocked when the
+  segment enters the open box (touching a face is clear). An obstacle whose inflated box strictly contains a port point is
+  that port's owner: it is listed in `portOwners` and ignored for the stub check only (the search still avoids it); a
+  `keepOut` entity is never an owner. A stub that runs into another obstacle is refused before searching. The TS search scans
+  the boxes linearly; `llull-route` uses an integer AABB tree (same boolean) and a paged sparse state store (4×4×4-cell pages,
+  nothing allocated for unvisited space). The problem keeps every obstacle that touches the lattice box or either stub;
+  inverted `keepOutBoxes` corners are normalised.
+- **Limits and trust.** A grid box of more than 2⁵³ − 1 states (cells × 6) is refused (`RTE_AUTOROUTE_BUDGET`, path
+  `gridMargin`; the TS keys are exact numbers only up to there, and `llull-route` validates the same limit). Every route,
+  the in-process search's included, passes `checkSolution` before it is committed; committed PIs are snapped to whole µm.
+  `optimal`, `expansions` and `engine` of a supplied solution are caller-asserted and recorded as given (the route itself is
+  checked). Native `maxExpansions` is clamped to 2·10⁷. A route may bend at the start cell (leg 0 lattice length 0) but not
+  at the goal cell, as in the search graph.
+
+### 13.3 Measured (2026-10-19, development laptop, Windows 11, `compute` profile, GNU toolchain 1.97.0)
+
+| Case | Expansions | Time |
+| ---- | ---------- | ---- |
+| SC-RTE-08 free space (TS and native) | 110 | < 1 s incl. process start |
+| 200 × 100 × 100 m box at 50 mm (1.6·10¹⁰ cells), wall at x = 50 m with a window 1 m off the port line | 1 761 410 | native 3.65–3.98 s; TS refuses `RTE_AUTOROUTE_BUDGET` at 200 000 (≈ 1.7 s) |
+
+The TS cap (§8 "TBD") is set to 200 000 expansions: ≈ 1.7 s in Node 24 on the same machine. Native ≈ 2.1–2.3 µs per
+expansion, so 2·10⁶ expansions ≈ 4.5 s (inside the 5 s budget here; the reference-machine time stays TBD).
+
+### 13.4 Decisions (provisional unless stated)
+
+- **D2 (one plant home), provisional.** Followed the README recommendation with the least commitment: one optional core slice
+  `doc.plant` holding `piping` only; folder `packages/domain-aec/src/plant/piping/`; plugin `piping`. Other plant areas add
+  their own sub-record and plugin. Revisit when 01 PSC / 03 EQP land.
+- **D1 (`pipeSizes.ts` ASME / EN mix): not needed by routing.** The router reads only the OD of the line DN (DN50–200 are equal
+  in EN 10220 and B36.10M; DN65 / DN125 differ by ≤ 3.1 / 1.6 mm, which only shifts the clearance envelope). Walls are not
+  used. The bug stays open for its own fix (README D1).
+- **Spec catalogue absent (01 PSC not built), provisional.** `create_pipeline` stores the spec name unresolved; every routing
+  result says `unverified: true`. Elbow A comes from the grade-A ASME B16.9 rows of `validation/data/b16_9_fitting_dimensions.json`
+  (DN 50, 80, 100, 150, 200; `sizes.ts`) or the `elbowCentreToEnd` param — never `1.5 × NPS`. FL ports need `flangeSetLength`
+  (`RTE_SPEC_NO_COMPONENT` otherwise). `SpecLookup` (§3.3) replaces both when 01 lands.
+- **Data model subset.** `PipingModel` has no `counters` / `entityIds` (ids come from `nextId`, one derived entity per run with
+  the run id); `PortRef` has only `tieIn`; `PipeRun` has no `inline` / `branches` / `legDn` / `legSlopes` yet; `PipeLine` has
+  no `runIds` (derivable). Tie-ins have no marker geometry yet. Runs record `autoRoute { problemHash, cost, bends,
+  expansions, optimal, engine }`.
+- **CLI verb.** The transport is `llull auto_route …` (one tool name like the other native transports), not the two-word
+  `llull route auto` of §2.A.
+- **Rack preference.** `preferElevations` (z list, mm) + `elevationPenalty` (extra cost per mm of horizontal pipe off every
+  preferred elevation, named default 0.5). Penalties are ≥ 0, so the heuristic stays admissible.
+- **Not done in V2:** parallel candidate searches (rayon) and automatic ordering of several lines (the agent routes them in
+  sequence); orthogonal visibility graphs [S33].
+
+### 13.5 Open questions answered
+
+- §11.3 weld gap: not reached (no joint stack yet).
+- §11.7 toolset size: `piping` holds 10 tools; no split needed yet.

@@ -15,8 +15,9 @@ import { composeOverlays } from './overlays';
 import { appendBeforeClose } from './svg';
 import { renderNotes, resolveRenderOptions } from './options';
 import { buildTurntableSvg, buildIsolateSvg, buildSectionSvg } from './multiPass';
-import { report } from '../noop';
 import { is2D } from '../../model/types';
+import { reviewRejection } from '../review/reviewModel';
+import { prepareView, viewParams } from './viewRequest';
 import type { CadDocument } from '../../model/types';
 import { clamp } from '../../lib/clamp';
 
@@ -182,15 +183,19 @@ export const renderView = defineCommand({
           'orange=point, cyan=2D curve, purple=3D solid, yellow=annotation. ' +
           'A legend appears in the top-right corner. Default: false (opt in to avoid clutter).',
       ),
+    ...viewParams,
   }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
     const scene = params.hide2D === true ? withoutEntities2D(doc) : doc;
     const resolved = resolveRenderOptions(scene, params);
     if ('error' in resolved) return { document: doc, summary: `render_view rejected: ${resolved.error}.`, affected: [] };
     const { options } = resolved;
-    const view: ViewName = options.direction ? 'custom' : (params.view ?? 'iso');
+    const view: ViewName = options.direction || params.viewpointId !== undefined ? 'custom' : (params.view ?? 'iso');
     const width = clampPixels(params.width, 800);
     const height = clampPixels(params.height, 600);
+    const setup = prepareView(scene, params, options, width, height, ctx);
+    if ('code' in setup) return reviewRejection(doc, 'render_view', setup.code, setup.message, [], setup.paths);
+    const { perspective, finish } = setup;
     const base = renderDocument(scene, view, width, height, options);
     const notes = renderNotes(base, options.cut);
     const withNotes = (text: string): string => (notes === '' ? text : `${text} ${notes}`);
@@ -208,7 +213,7 @@ export const renderView = defineCommand({
     if (params.turntable) {
       const frames = clamp(params.turntable.frames, 1, 12);
       const strip = buildTurntableSvg(scene, frames, view, width, height, options);
-      return report(doc, withNotes(`Rendered turntable strip: ${frames} frame(s), ${strip.width}×${height}.`), {
+      return finish(doc, withNotes(`Rendered turntable strip: ${frames} frame(s), ${strip.width}×${height}.`), {
         ...base,
         width: strip.width,
         svg: decorate(strip.svg),
@@ -227,11 +232,11 @@ export const renderView = defineCommand({
       summary = `Rendered section view: cut at ${axis}=${offset}, ${width}×${height}.`;
     }
     svg = composeOverlays(svg, base, scene, {
-      showDimensions: params.showDimensions === true,
-      showAxes: params.showAxes !== false,
-      showGrid: params.showGrid !== false,
-      showLabels: params.showLabels === true,
+      showDimensions: !perspective && params.showDimensions === true,
+      showAxes: !perspective && params.showAxes !== false,
+      showGrid: !perspective && params.showGrid !== false,
+      showLabels: !perspective && params.showLabels === true,
     });
-    return report(doc, withNotes(summary), { ...base, svg: decorate(svg) });
+    return finish(doc, withNotes(summary), { ...base, svg: decorate(svg) });
   },
 });

@@ -258,6 +258,13 @@ function elementErrors(key: string, element: unknown, levels: Record<string, unk
     if (dn !== undefined && !(typeof dn === 'number' && Number.isInteger(dn) && dn > 0)) {
       errors.push(`building element ${key}: dn must be a positive integer`);
     }
+    const asBuilt = element['asBuilt'];
+    if (
+      asBuilt !== undefined &&
+      !(isRecord(asBuilt) && typeof asBuilt['extractionId'] === 'string' && typeof asBuilt['unverified'] === 'boolean')
+    ) {
+      errors.push(`building element ${key}: asBuilt must be { extractionId, unverified }`);
+    }
   }
   for (const [field, minimum] of [
     ['corners', 3],

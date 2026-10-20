@@ -1,0 +1,40 @@
+{
+  "$comment": "M3 vortex-lattice and drag build-up references (sources S14-S17 in ../sources.md). No value was produced by running llull.",
+  "bertin_smith_swept_wing": {
+    "source": "S14: Bertin J. J., Smith M. L., Aerodynamics for Engineers, 3rd ed., Prentice Hall 1998, VLM worked example (p. 291 in that edition); value quoted by Melin T., A Vortex Lattice MATLAB Implementation for Linear Aerodynamic Wing Applications (KTH 2000), whose Tornado code reproduces it",
+    "grade": "B",
+    "geometry": {
+      "aspectRatio": 5,
+      "taperRatio": 1,
+      "quarterChordSweepDeg": 45,
+      "dihedralDeg": 0,
+      "twistDeg": 0,
+      "spanwisePanelsPerSide": 4,
+      "chordwisePanels": 1,
+      "spacing": "uniform",
+      "horseshoe": "bound vortex on the quarter-chord line, control point at three-quarter chord, trailing legs parallel to the x axis"
+    },
+    "liftSlopePerRad": 3.443,
+    "tolerance": { "relative": 0.002, "why": "the book rounds its circulations to 4 digits; the method and lattice are the same" }
+  },
+  "elliptic_wing_lifting_line": {
+    "source": "S7: Prandtl / Glauert lifting line, elliptic loading: CL_alpha = a0 / (1 + a0 / (pi AR)), e = 1; a0 = 2 pi (thin airfoil)",
+    "grade": "A (closed form)",
+    "use": "asymptotic check: lifting-surface (VLM) results approach lifting-line theory as AR grows; span efficiency -> 1 with spanwise refinement",
+    "aspectRatio": 20,
+    "liftSlopeRelativeTolerance": 0.015,
+    "spanEfficiencyTolerance": 0.005
+  },
+  "quarter_chord_aerodynamic_centre": {
+    "source": "S6/S7: thin-airfoil theory, the aerodynamic centre of a flat-plate section is at the quarter chord; an unswept, untapered high-aspect-ratio wing has its neutral point there",
+    "grade": "A (closed form)",
+    "aspectRatio": 20,
+    "neutralPointOverChord": 0.25,
+    "tolerance": 0.01
+  },
+  "drag_buildup": {
+    "source": "S15: Raymer D. P., Aircraft Design: A Conceptual Approach (AIAA), eq. 12.26 (laminar Cf 1.328/sqrt(Re)), eq. 12.27 (turbulent Cf 0.455 / (log10 Re)^2.58 / (1 + 0.144 M^2)^0.65), eq. 12.30 (wing / tail form factor [1 + 0.6/(x/c)_m (t/c) + 100 (t/c)^4][1.34 M^0.18 (cos Lambda_m)^0.28]), as implemented and cited in OpenAeroStruct viscous_drag.py; S16: OpenVSP parasite-drag documentation for Hoerner 1965 (wing 1 + 2 t/c + 60 (t/c)^4; body 1 + 1.5/FR^1.5 + 7/FR^3) and Torenbeek 1982 (wing 1 + 2.7 t/c + 100 (t/c)^4; body 1 + 2.2/FR^1.5 + 3.8/FR^3); mixed laminar / turbulent friction: OpenAeroStruct (S15) Cf = (Cf_lam(k Re) - Cf_turb(k Re)) k + Cf_turb(Re)",
+    "grade": "A (formulas cross-checked in two places: Raymer quotes + OpenAeroStruct source; Hoerner / Torenbeek: OpenVSP documentation)",
+    "notVerified": "Raymer fuselage (1 + 60/f^3 + f/400) and nacelle (1 + 0.35/f) form factors and the interference factor Q tables were not confirmed from a readable source: not built; Q is an input (default 1, flagged)"
+  }
+}
