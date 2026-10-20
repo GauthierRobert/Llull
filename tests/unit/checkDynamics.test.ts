@@ -187,6 +187,15 @@ describe('check_dynamics with the MuJoCo engine', () => {
     expect(timestep.note).toMatch(/finest allowed timestep \(0\.00001 s\)/);
     expect(timestep.values.minimumTimestepS).toBe(1e-5);
     expect(data.items.some((entry) => entry.status === 'not_run')).toBe(false);
+    // nothing was compared: the result stays unverified even though no item is not_run
+    expect(data.unverified).toBe(true);
+  });
+
+  it('a timestep just above the floor is compared against the finest allowed step, not skipped', () => {
+    const data = dataOf(spinner({ massKg: 2, damping: 0.05 }), { timestep: 1.5e-5, duration: 0.02 });
+    const timestep = itemOf(data, 'FPR_TIMESTEP_SENSITIVE');
+    expect(['pass', 'warn']).toContain(timestep.status);
+    expect(timestep.values.halfTimestepS).toBeCloseTo(1e-5, 12);
   });
 
   it('a closed slider-crank reports the loop residual', () => {
