@@ -6,7 +6,8 @@
 
 import type { LaminaMaterial, PlyBoundary, PlyCut, PlyDrape } from '@core/model/composites';
 import type { DocumentUnit, Vec2, Vec3 } from '@core/model/types';
-import { entityName, parseRecords, referencesOf, stringsOf } from '@lib/step21/records';
+import { entityName, parseRecords, stringsOf } from '@lib/step21/records';
+import { itemValue, numberList, referencesOutsideStrings as referencesOf } from './lex';
 import type { CompositeRecord, PlyRecord, RosetteRecord } from './interchange';
 import { unquoted } from './part21';
 import { ENCODING, LEGACY_ENCODING, PROPERTY } from './writer';
@@ -33,8 +34,6 @@ export type ReadOutcome =
     }
   | { readonly ok: false; readonly code: 'no_composite' | 'malformed'; readonly reason: string };
 
-const NUMBER = String.raw`[-+]?(?:\d+\.?\d*|\.\d+)(?:[Ee][-+]?\d+)?`;
-
 interface Item {
   readonly kind: string;
   readonly name: string;
@@ -46,10 +45,12 @@ interface Item {
 
 type Bodies = ReadonlyMap<number, string>;
 
-const numbersOf = (body: string): number[] => {
-  const list = /\(\s*((?:[-+]?[\d.]+(?:[Ee][-+]?\d+)?\s*,?\s*)+)\)\s*\)?$/.exec(body)?.[1];
-  return list === undefined ? [] : (list.match(new RegExp(NUMBER, 'g')) ?? []).map(Number);
-};
+/** Limits that keep a hostile file from building an unbounded model: vertices per boundary polygon, plies per file. */
+const MAX_VERTICES = 50_000;
+const MAX_PLIES = 10_000;
+const ROSETTE_METHODS: readonly string[] = ['translational', 'cylindrical', 'radial', 'edge'];
+
+const numbersOf = (body: string): number[] => numberList(body);
 
 function itemOf(bodies: Bodies, id: number): Item | null {
   const body = bodies.get(id);
@@ -59,12 +60,13 @@ function itemOf(bodies: Bodies, id: number): Item | null {
   const name = strings[0] ?? '';
   if (kind === 'DESCRIPTIVE_REPRESENTATION_ITEM') return { kind, name, text: strings[1] ?? '' };
   if (kind === 'VALUE_REPRESENTATION_ITEM' || kind === 'MEASURE_REPRESENTATION_ITEM') {
-    const match = new RegExp(String.raw`,\s*[A-Z_]+\(\s*(${NUMBER})\s*\)`).exec(body);
-    return match?.[1] === undefined ? null : { kind, name, number: Number(match[1]) };
+    const number = itemValue(body);
+    return number === undefined ? null : { kind, name, number };
   }
   if (kind === 'CARTESIAN_POINT' || kind === 'DIRECTION') return { kind, name, numbers: numbersOf(body) };
   if (kind === 'POLYLINE') {
-    const points = referencesOf(body).map((reference) => numbersOf(bodies.get(reference) ?? ''));
+    const references = referencesOf(body);
+    const points = references.length > MAX_VERTICES ? [] : references.map((reference) => numbersOf(bodies.get(reference) ?? ''));
     return { kind, name, points };
   }
   return null;
@@ -137,9 +139,15 @@ function plyOf(items: readonly Item[]): PlyRecord | string {
     return `a ply record lacks name, material, order, orientation, thickness or area (ply "${name ?? '?'}")`;
   const polygons = items
     .filter((item) => item.kind === 'POLYLINE' && /^ply boundary \d+$/.test(item.name))
-    .map((item) => (item.points ?? []).map((point): Vec2 => [point[0] ?? 0, point[1] ?? 0]));
+    .map((item) => (item.points ?? []).map((point): Vec2 => [point[0] ?? Number.NaN, point[1] ?? Number.NaN]));
   const boundary: PlyBoundary = textOf(items, 'boundary') === 'polygons' ? { kind: 'polygons', polygons } : { kind: 'whole_face' };
-  if (boundary.kind === 'polygons' && (polygons.length === 0 || polygons.some((polygon) => polygon.length < 3)))
+  if (
+    boundary.kind === 'polygons' &&
+    (polygons.length === 0 ||
+      polygons.some(
+        (polygon) => polygon.length < 3 || polygon.some((vertex) => !Number.isFinite(vertex[0]) || !Number.isFinite(vertex[1])),
+      ))
+  )
     return `ply "${name}" has a degenerate boundary`;
   const data = parseJson<{ drape?: PlyDrape; cuts?: PlyCut[]; solids?: string[] }>(textOf(items, 'data')) ?? {};
   return {
@@ -187,6 +195,8 @@ export function readComposite(text: string): ReadOutcome {
   if (
     data?.surface === undefined ||
     data.outline === undefined ||
+    !Array.isArray(data.outline) ||
+    data.outline.length > MAX_VERTICES ||
     (side !== 'positive_normal' && side !== 'negative_normal') ||
     !['mm', 'cm', 'm', 'in', 'ft'].includes(unit ?? '') ||
     toolName === undefined ||
@@ -199,7 +209,14 @@ export function readComposite(text: string): ReadOutcome {
     const [origin, axis0, normal, axis] = [find('origin'), find('axis0'), find('normal'), find('axis')];
     const method = textOf(entry.items, 'method');
     const name = textOf(entry.items, 'name');
-    if (!isVec3(origin) || !isVec3(axis0) || !isVec3(normal) || name === undefined || method === undefined)
+    if (
+      !isVec3(origin) ||
+      !isVec3(axis0) ||
+      !isVec3(normal) ||
+      name === undefined ||
+      method === undefined ||
+      !ROSETTE_METHODS.includes(method)
+    )
       return { ok: false, code: 'malformed', reason: `rosette record "${entry.description}" is incomplete` };
     rosettes.push({
       name,
@@ -219,6 +236,7 @@ export function readComposite(text: string): ReadOutcome {
   }
   const plies: PlyRecord[] = [];
   for (const entry of properties.filter((property) => property.name === PROPERTY.ply)) {
+    if (plies.length >= MAX_PLIES) return { ok: false, code: 'malformed', reason: `more than ${MAX_PLIES} plies` };
     const ply = plyOf(entry.items);
     if (typeof ply === 'string') return { ok: false, code: 'malformed', reason: ply };
     plies.push(ply);

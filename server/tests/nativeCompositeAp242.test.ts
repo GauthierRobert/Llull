@@ -204,6 +204,54 @@ describeNative('composite AP242 round trip on the native kernel', () => {
     expect(Math.max(...areas.map((area, k) => rel(area, recomputed[k] as number)))).toBeLessThan(1e-9);
   });
 
+  /** A panel whose upper ply is split into several exact solids over a smaller lower ply, with names Part 21 has to escape. */
+  const stacked = (tool: string, part: string, plies: [string, string]): CadDocument => {
+    let doc = apply(withMaterials(), 'create_lamina_material', WOVEN);
+    const box = ok(doc, 'add_box', { size: [200, 100, 10], anchor: 'min', position: [0, 0, -10] });
+    doc = apply(box.document, 'set_entity_name', { id: box.affected[0], name: tool });
+    doc = apply(doc, 'define_rosette', ROSETTE);
+    const created = ok(doc, 'create_composite_part', {
+      name: part,
+      toolSurface: { entityId: box.affected[0], faceNear: [100, 50, 0] },
+      rosette: 'R0',
+    });
+    const lower = [
+      [20, 10],
+      [100, 10],
+      [100, 90],
+      [20, 90],
+    ];
+    doc = apply(created.document, 'add_ply', {
+      part,
+      name: plies[0],
+      material: WOVEN.name,
+      orientation: 0,
+      boundary: { kind: 'polygon', polygons: [lower] },
+    });
+    doc = apply(doc, 'add_ply', { part, name: plies[1], material: WOVEN.name, orientation: 90, boundary: { kind: 'whole_face' } });
+    return apply(doc, 'create_ply_solids', { part });
+  };
+
+  it('round-trips a ply with several exact solids and tool, part and ply names with #, quotes and backslashes', () => {
+    // non-ASCII names are covered by the unit suite: the native reader answers null for any non-ASCII product name (04 XCH / sidecar, also for export_step_exact files)
+    const names = { tool: "Tool #1 'q' \\ x", part: "Part #7 'z' \\\\", plies: ["P#1 'a' \\ ", 'B #3 \\ y'] as [string, string] };
+    const doc = stacked(names.tool, names.part, names.plies);
+    const exported = data<ExportData>(doc, 'export_composite_ap242', { part: names.part });
+    expect(exported.selfCheck.band).toBe('green');
+    expect(exported.solids.exact + exported.solids.faceted.length).toBeGreaterThanOrEqual(3);
+    const upper = (exported as unknown as { plies: { name: string; solids: string[] }[] }).plies.find((ply) => ply.name === names.plies[1]);
+    expect(upper?.solids.length).toBeGreaterThanOrEqual(2);
+    // OpenCascade's reader, given the text without the composite usages, yields every solid under its (decoded) name
+    const products = productsOf(withoutCompositeUsages(exported.step));
+    expect(products).toEqual(expect.arrayContaining([names.tool, ...(upper?.solids ?? [])]));
+    const imported = ok(createEmptyDocument(), 'import_composite_ap242', { text: exported.step });
+    const result = imported.data as ImportData;
+    expect(result.tool.imported).toBe(true);
+    expect(result.solids.unlinked).toBe(0);
+    expect(result.validation.findings.filter((finding) => finding.band !== 'green')).toEqual([]);
+    expect(partOf(imported.document, names.part).plies.map((ply) => ply.name)).toEqual(names.plies);
+  });
+
   // LLULL_AP242_MIM = path of the ISO/TS 10303-442 MIM long form (mim_lf.exp, public); without it the check is skipped
   const mim = process.env['LLULL_AP242_MIM'];
   it.skipIf(mim === undefined || !existsSync(mim))(

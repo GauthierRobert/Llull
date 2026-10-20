@@ -10,7 +10,7 @@
 import type { PartSurface } from '@core/model/composites';
 import type { Vec3 } from '@core/model/types';
 import { len3, sub3 } from '@lib/vec3';
-import { referencesOf } from '@lib/step21/records';
+import { referencesOutsideStrings as referencesOf } from './lex';
 import { type Builder, attach, integer, measure, point, text } from './emit';
 import type { CompositeRecord, PlyRecord } from './interchange';
 import { quoted, real } from './part21';
@@ -145,8 +145,10 @@ export function writeStandard(input: StandardInput): string | null {
   const definition = (entity: string, id: string, formation: number): number =>
     out.add(`${entity}(${quoted(id)},'',#${formation},#${ctx.definition})`);
   let usage = 0;
-  const nauo = (relating: number, related: number): number =>
-    out.add(`NEXT_ASSEMBLY_USAGE_OCCURRENCE(${quoted(String(++usage))},'',$,#${relating},#${related},$)`);
+  const nauo = (relating: number, related: number, designator?: string): number =>
+    out.add(
+      `NEXT_ASSEMBLY_USAGE_OCCURRENCE(${quoted(String(++usage))},'',$,#${relating},#${related},${designator === undefined ? '$' : quoted(designator)})`,
+    );
 
   const one = out.add(`MEASURE_WITH_UNIT(COUNT_MEASURE(1.),#${units.ratio})`);
   const laminate = product(`${record.name} laminate`, 'part', 'ply_laminate');
@@ -192,7 +194,7 @@ export function writeStandard(input: StandardInput): string | null {
       const made = product(ply.name, 'ply');
       const plyDefinition = definition('PRODUCT_DEFINITION', 'design', made.formation);
       plyDefinitions.set(ply.name, plyDefinition);
-      nauo(sequenceDefinitions[k] as number, plyDefinition);
+      nauo(sequenceDefinitions[k] as number, plyDefinition, String(ply.order));
       const material = materialDefinitions.get(ply.material);
       if (material !== undefined) out.add(`MAKE_FROM_USAGE_OPTION('','','',#${plyDefinition},#${material},1,'',#${one})`);
       attach(b, 'thickness', '', plyDefinition, [measure('thickness', 'LENGTH_MEASURE', ply.thickness, units.length)]);
@@ -206,13 +208,10 @@ export function writeStandard(input: StandardInput): string | null {
         const orientation = out.add(`PROPERTY_DEFINITION('orientation','',#${plyDefinition})`);
         out.add(`PROPERTY_DEFINITION_REPRESENTATION(#${orientation},#${angleRepresentation})`);
       }
-      let previous = plyDefinition;
-      for (const solid of ply.solids) {
+      ply.solids.forEach((solid, index) => {
         const piece = definitions.get(solid);
-        if (piece === undefined) continue;
-        nauo(previous, piece);
-        previous = piece;
-      }
+        if (piece !== undefined) nauo(plyDefinition, piece, String(index + 1));
+      });
       if (ply.curves3d !== undefined && ply.curves3d.length > 0) {
         const geometric = ply.curves3d.map((curve) => {
           const ids = curve.map((vertex) => out.add(point('', vertex)));

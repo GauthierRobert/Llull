@@ -5,11 +5,10 @@
  * @invariant pure; never throws; absent structure answers `present: false`
  */
 
-import { entityName, parseRecords, referencesOf, stringsOf } from '@lib/step21/records';
+import { entityName, parseRecords, stringsOf } from '@lib/step21/records';
+import { itemValue, referencesOutsideStrings as referencesOf } from './lex';
 import { unquoted } from './part21';
 import { RECPRAC_ID } from './standard';
-
-const NUMBER = String.raw`[-+]?(?:\d+\.?\d*|\.\d+)(?:[Ee][-+]?\d+)?`;
 
 export interface StandardPly {
   readonly name: string;
@@ -86,24 +85,30 @@ export function readStandard(text: string): StandardRead {
   }
   const categoryOf = (definition: number): Set<string> => categories.get(productOfDefinition(definition) ?? -1) ?? new Set();
 
-  const children = new Map<number, number[]>();
-  for (const [, body] of [...bodies].sort(([a], [b]) => a - b)) {
+  const usages = new Map<number, { related: number; designator: number; id: number }[]>();
+  for (const [id, body] of [...bodies].sort(([a], [b]) => a - b)) {
     if (entityName(body) !== 'NEXT_ASSEMBLY_USAGE_OCCURRENCE') continue;
     const [relating, related] = referencesOf(body);
-    if (relating !== undefined && related !== undefined) children.set(relating, [...(children.get(relating) ?? []), related]);
+    const designator = Number(unquoted(stringsOf(body)[2] ?? ''));
+    if (relating !== undefined && related !== undefined)
+      usages.set(relating, [
+        ...(usages.get(relating) ?? []),
+        { related, designator: Number.isFinite(designator) ? designator : Number.POSITIVE_INFINITY, id },
+      ]);
   }
+  const children = new Map<number, number[]>();
+  for (const [relating, list] of usages)
+    children.set(
+      relating,
+      [...list].sort((a, b) => a.designator - b.designator || a.id - b.id).map((entry) => entry.related),
+    );
   const materialOf = new Map<number, string>();
   for (const body of bodies.values()) {
     if (entityName(body) !== 'MAKE_FROM_USAGE_OPTION') continue;
     const [relating, related] = referencesOf(body);
     if (relating !== undefined && related !== undefined) materialOf.set(relating, nameOf(related));
   }
-  const valueOf = (item: number): number | undefined => {
-    const body = bodies.get(item) ?? '';
-    const integer = entityName(body) === 'INTEGER_REPRESENTATION_ITEM' ? new RegExp(String.raw`,\s*(${NUMBER})\s*\)$`).exec(body) : null;
-    const match = integer ?? new RegExp(String.raw`,\s*[A-Z_]+\(\s*(${NUMBER})\s*\)`).exec(body);
-    return match?.[1] === undefined ? undefined : Number(match[1]);
-  };
+  const valueOf = (item: number): number | undefined => itemValue(bodies.get(item) ?? '');
   const itemsOf = (representation: number): number[] => referencesOf(bodies.get(representation) ?? '').slice(0, -1);
   const representationOfProperty = new Map<number, number>();
   for (const body of bodies.values()) {
@@ -144,12 +149,7 @@ export function readStandard(text: string): StandardRead {
       const [thickness] = propertiesOf(member, 'thickness');
       const thicknessRepresentation = thickness === undefined ? undefined : representationOfProperty.get(thickness);
       const [thicknessItem] = thicknessRepresentation === undefined ? [] : itemsOf(thicknessRepresentation);
-      const pieces: string[] = [];
-      let piece = children.get(member)?.[0];
-      while (piece !== undefined) {
-        pieces.push(nameOf(piece));
-        piece = children.get(piece)?.[0];
-      }
+      const pieces = (children.get(member) ?? []).map(nameOf);
       const angle = angleItem === undefined ? undefined : valueOf(angleItem);
       const thick = thicknessItem === undefined ? undefined : valueOf(thicknessItem);
       const material = materialOf.get(member);
@@ -249,8 +249,14 @@ export function withoutCompositeUsages(text: string): string {
     if (product !== undefined && (productCategories.get(product) ?? []).includes('ply')) structural.add(id);
   }
   if (structural.size === 0) return text;
-  return text.replace(/^#(\d+)\s*=\s*NEXT_ASSEMBLY_USAGE_OCCURRENCE\([^\n]*\);[ \t]*\r?\n?/gm, (line, id: string) => {
-    const relating = referencesOf(bodies.get(Number(id)) ?? '')[0];
-    return relating !== undefined && structural.has(relating) ? '' : line;
-  });
+  const head = /^#(\d+)\s*=\s*NEXT_ASSEMBLY_USAGE_OCCURRENCE\(/;
+  return text
+    .split('\n')
+    .filter((line) => {
+      const found = line.length < 100_000 ? head.exec(line) : null;
+      if (found?.[1] === undefined) return true;
+      const relating = referencesOf(bodies.get(Number(found[1])) ?? '')[0];
+      return !(relating !== undefined && structural.has(relating));
+    })
+    .join('\n');
 }

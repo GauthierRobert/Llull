@@ -7,18 +7,25 @@ import { changed } from '@core/commands/noop';
 import type { CompositePart, LaminaMaterial, Ply, Rosette } from '@core/model/composites';
 import type { CadDocument } from '@core/model/types';
 import { base64ToText } from '@lib/base64';
+import { MM_PER_UNIT } from '@core/model/units';
 import { nextId } from '@lib/id';
 import { sig } from '../../shared/results';
 import { refuseCmp } from '../codes';
 import { syncOutlines } from '../derive';
 import { insertPly } from '../plyCommands';
+import { compositesErrors } from '../document';
 import { compositesOf, findPart, withComposites } from '../state';
 import { readComposite } from './reader';
 import { withoutCompositeUsages } from './standardReader';
 import { rebuildPart } from './rebuild';
 import { checkComposite } from './standardCheck';
+import { type ValidationFinding, compare, plyArea, worstBand } from './validation';
 
 const MAX_STEP_CHARS = 64 * 1024 * 1024;
+
+/** Relative difference between a ply solid's volume and area x thickness: green up to 1 % (curvature of the offset, faceting), yellow up to 5 %. */
+const VOLUME_GREEN = 0.01;
+const VOLUME_YELLOW = 0.05;
 const NAME = 'import_composite_ap242';
 
 /** An imported lamina record: the original data with its basis reset to unknown (nobody verified it here) and the origin in the source. */
@@ -35,7 +42,6 @@ const unverifiedMaterial = (material: LaminaMaterial): LaminaMaterial => ({
  */
 export const importCompositeAp242 = defineCommand({
   name: NAME,
-  annotations: { requiresKernel: true },
   description:
     'Import the composite laminate of a STEP AP242 file written by export_composite_ap242: a composite part (tool surface frame, laminate side, rules), its plies in ' +
     'stacking order with name, sequence, material, orientation (part frame, degrees), rosette and boundary polygons, the rosettes, and the lamina materials the document ' +
@@ -45,7 +51,7 @@ export const importCompositeAp242 = defineCommand({
     'llull own area of each ply, summed thickness, mass) are recomputed from the rebuilt plies and compared, and the CAx-IF structure of the file (laminate table, sequences, ' +
     'plies, materials, orientation angles, ply pieces) is read back and compared with the plies (properties named "structure: ..."): data.validation lists property, subject, embedded, ' +
     'recomputed, relative difference and band green / yellow / red / not_checkable. Nothing imported is verified: data.reviewRequired is true. Files without llull composite ' +
-    'records (from other systems, or the CAx-IF structure alone) are refused with CMP_AP242_NO_COMPOSITE. Give the file as `text` or `stepBase64`. Needs the OCC kernel when importSolids is true.',
+    'records (from other systems, or the CAx-IF structure alone) are refused with CMP_AP242_NO_COMPOSITE. Give the file as `text` or `stepBase64`. Needs the OCC kernel only when importSolids is true. A ply solid the file lists but the import did not yield under its name, a tool solid that did not import, and a ply solid whose volume differs from ply area x thickness are red findings (reasons solids_unlinked, tool_not_imported, validation_red).',
   params: z.object({
     text: z.string().describe('ISO 10303-21 text of the file (or give stepBase64).').optional(),
     stepBase64: z.string().describe('The file as base64 (or give text).').optional(),
@@ -60,6 +66,8 @@ export const importCompositeAp242 = defineCommand({
   run: (doc, params, ctx): CommandResult => {
     const fail = (code: string, message: string, ids: readonly string[] = [], paths: readonly string[] = []): CommandResult =>
       refuseCmp(doc, NAME, code, message, ids, paths);
+    if (params.stepBase64 !== undefined && params.stepBase64.length > Math.ceil((MAX_STEP_CHARS * 4) / 3))
+      return fail('CMP_PARAM_INVALID', 'the file is larger than 64 MiB', [], ['params.stepBase64']);
     const text = params.text ?? (params.stepBase64 === undefined ? undefined : base64ToText(params.stepBase64));
     if (text === undefined || text === null || text.length === 0)
       return fail('CMP_PARAM_INVALID', 'give the file as text or stepBase64', [], ['params.text']);
@@ -143,11 +151,18 @@ export const importCompositeAp242 = defineCommand({
       working = inserted.model;
       plies.push(inserted.ply);
     }
+    const invalid = compositesErrors(working);
+    if (invalid.length > 0)
+      return fail(
+        'CMP_AP242_MALFORMED',
+        `the composite data of the file is not valid: ${invalid.slice(0, 5).join('; ')}`,
+        [],
+        invalid.slice(0, 5).map((message) => message.split(' ')[0] ?? message),
+      );
     const next = syncOutlines(withComposites(base, working));
 
     const rebuilt = rebuildPart(record);
-    const validation = checkComposite(record, rebuilt.part, rebuilt.plies, embedded, read.standard);
-    const reasons = ['composite_import_unverified', ...(validation.band === 'green' ? [] : [`validation_${validation.band}`])];
+    const checked = checkComposite(record, rebuilt.part, rebuilt.plies, embedded, read.standard);
     const linked = record.plies.map((entry) => ({
       ply: plies.find((ply) => ply.name === entry.name)?.id ?? '',
       name: entry.name,
@@ -155,6 +170,58 @@ export const importCompositeAp242 = defineCommand({
       expectedSolids: entry.solids.length,
     }));
     const unlinked = linked.reduce((sum, entry) => sum + entry.expectedSolids - entry.solids.length, 0);
+    const wantSolids = params.importSolids !== false;
+    const geometry: ValidationFinding[] = [];
+    /** Volume (document units^3) of the products the entities belong to, from the import report's recomputed values (millimetres); undefined when not reported. */
+    const reported =
+      (solidsReport as { exchange?: { products?: { entityIds?: string[]; recomputed?: { volume: number } }[] } } | undefined)?.exchange
+        ?.products ?? [];
+    const cubic = MM_PER_UNIT[base.units] ** 3;
+    const volumesOf = (ids: readonly string[]): (number | undefined)[] => {
+      const products = [...new Set(ids.map((id) => reported.find((product) => product.entityIds?.includes(id))))];
+      return products.map((product) => (product?.recomputed === undefined ? undefined : product.recomputed.volume / cubic));
+    };
+    if (wantSolids) {
+      geometry.push(compare('structure: tool solid imported', record.tool.name, 1, toolEntity === undefined ? 0 : 1));
+      for (const entry of linked)
+        if (entry.expectedSolids > 0)
+          geometry.push(compare('structure: ply solids linked', entry.name, entry.expectedSolids, entry.solids.length));
+      for (const entry of linked) {
+        const rebuiltPly = rebuilt.plies.find((candidate) => candidate.record.name === entry.name);
+        if (rebuiltPly === undefined || entry.solids.length === 0 || entry.solids.length < entry.expectedSolids) continue;
+        const volumes = volumesOf(entry.solids);
+        const expected = plyArea(rebuilt.part, rebuiltPly.ply) * rebuiltPly.record.thickness;
+        if (volumes.some((volume) => typeof volume !== 'number')) {
+          geometry.push({
+            property: 'structure: ply solid volume',
+            subject: entry.name,
+            embedded: null,
+            recomputed: expected,
+            relativeDifference: null,
+            band: 'not_checkable',
+          });
+          continue;
+        }
+        const total = (volumes as number[]).reduce((sum, volume) => sum + volume, 0);
+        const relative = Math.abs(total - expected) / Math.max(expected, 1e-300);
+        geometry.push({
+          property: 'structure: ply solid volume',
+          subject: entry.name,
+          embedded: total,
+          recomputed: expected,
+          relativeDifference: relative,
+          band: relative <= VOLUME_GREEN ? 'green' : relative <= VOLUME_YELLOW ? 'yellow' : 'red',
+        });
+      }
+    }
+    const findings = [...checked.findings, ...geometry];
+    const validation = { ...checked, findings, band: worstBand(findings) };
+    const reasons = [
+      'composite_import_unverified',
+      ...(wantSolids && unlinked > 0 ? ['solids_unlinked'] : []),
+      ...(wantSolids && toolEntity === undefined ? ['tool_not_imported'] : []),
+      ...(validation.band === 'green' ? [] : [`validation_${validation.band}`]),
+    ];
     const data = {
       part: partId,
       name: partName,
