@@ -45,6 +45,9 @@ export interface ShellOptions {
   readonly material?: LaminaMaterial;
   /** Ply angles bottom to top (default [0, 90, 90, 0]). */
   readonly angles?: readonly number[];
+  /** Rosette id of each ply (default ro-1, x axis; ro-2 has its 0-degree axis along y). */
+  readonly rosettes?: readonly string[];
+  readonly analysisType?: 'static' | 'thermo_static';
   /** Global stress [xx, yy, zz, xy, yz, zx] at the top / bottom fibre of every node; null = the field is absent. */
   readonly top: readonly number[] | null;
   readonly bottom: readonly number[] | null;
@@ -61,7 +64,7 @@ const NODES: FeMeshArtifact['nodes'] = [
 const COMPONENTS = ['SXX', 'SYY', 'SZZ', 'SXY', 'SYZ', 'SZX'];
 
 export function compositeShell(options: ShellOptions): CompositeShell {
-  const bar = barDocument();
+  const bar = barDocument(options.analysisType === undefined ? {} : { analysisType: options.analysisType });
   let doc = bar.doc;
   const analysis = doc.analysis?.cases[bar.analysisId] as AnalysisCase;
   const shell: AnalysisCase = {
@@ -84,6 +87,10 @@ export function compositeShell(options: ShellOptions): CompositeShell {
   const model: CompositesModel = {
     ...base,
     materials: { tape: material },
+    rosettes: {
+      ...base.rosettes,
+      'ro-2': { id: 'ro-2', name: 'ro2', origin: [0, 0, 2], axis0: [0, 1, 0], normal: [0, 0, 1], method: 'translational' },
+    },
     plies: Object.fromEntries(
       angles.map((angle, order) => [
         `p${order + 1}`,
@@ -95,7 +102,7 @@ export function compositeShell(options: ShellOptions): CompositeShell {
           sequence: 'A',
           materialName: 'tape',
           orientation: angle,
-          rosetteId: 'ro-1',
+          rosetteId: options.rosettes?.[order] ?? 'ro-1',
           boundary: { kind: 'whole_face' as const },
         },
       ]),

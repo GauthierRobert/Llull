@@ -6,6 +6,7 @@ import { polygonArea, polygonCentroid } from '@lib/polygon';
 import { normalize3, sub3 } from '@lib/vec3';
 import { boundaryDistance, insideOrOn, piecesOf } from '../geometry2d';
 import { fibreDirection, fromFlat } from '../surface';
+import { netFlattener } from './flatten';
 import { type DrapeNet, buildNet } from './net';
 import { type ShearLimits, type ShearSummary, summarizeShear } from './shear';
 import { type DrapeSurface, drapeSurfaceOf } from './surfaceQuery';
@@ -16,6 +17,8 @@ export interface PieceDrape {
   readonly seedUv: Vec2;
   readonly net: DrapeNet;
   readonly summary: ShearSummary;
+  /** Fraction of interior chart samples of the piece that fall in a complete net cell (ok or locked); below ~0.99 the drape is incomplete. */
+  readonly coverage: number;
 }
 
 export interface PlyDrapeSet {
@@ -27,6 +30,8 @@ export interface PlyDrapeOptions {
   readonly stepLength?: number | undefined;
   readonly limits: ShearLimits;
   readonly allowOverLock: boolean;
+  /** Node budget of the net (default 400 000). */
+  readonly maxNodes?: number | undefined;
 }
 
 export type PlyDrapeResult =
@@ -39,6 +44,25 @@ const bounds = (polygon: readonly Vec2[]): { min: Vec2; max: Vec2 } => ({
   min: [Math.min(...polygon.map(([x]) => x)), Math.min(...polygon.map(([, y]) => y))],
   max: [Math.max(...polygon.map(([x]) => x)), Math.max(...polygon.map(([, y]) => y))],
 });
+
+/**
+ * Share of a regular chart grid (30 x 30 over the bounding box, interior points only) that lies in a net cell whose four corners exist. A failed node
+ * (off face, inverted, non-converged) or a truncated net leaves cells missing, so coverage falls below 1; a cell over the lock still counts (it is mapped).
+ */
+export function pieceCoverage(net: DrapeNet, piece: readonly Vec2[]): number {
+  const lookup = netFlattener(net);
+  const { min, max } = bounds(piece);
+  let inside = 0;
+  let mapped = 0;
+  for (let i = 0; i < 30; i++)
+    for (let j = 0; j < 30; j++) {
+      const p: Vec2 = [min[0] + ((max[0] - min[0]) * (i + 0.5)) / 30, min[1] + ((max[1] - min[1]) * (j + 0.5)) / 30];
+      if (!insideOrOn(p, piece, 0)) continue;
+      inside++;
+      if (lookup(p).kind !== 'miss') mapped++;
+    }
+  return inside === 0 ? 1 : mapped / inside;
+}
 
 /** Automatic fishnet step: the outline diagonal over 200. */
 export function autoStepLength(part: CompositePart): number {
@@ -141,6 +165,7 @@ export function drapePly(part: CompositePart, ply: Ply, options: PlyDrapeOptions
       warp,
       lockingAngle: options.limits.lock,
       allowOverLock: options.allowOverLock,
+      ...(options.maxNodes === undefined ? {} : { maxNodes: options.maxNodes }),
       extent: Math.hypot(max[0] - min[0], max[1] - min[1]) * 1.5,
     });
     pieces.push({
@@ -148,6 +173,7 @@ export function drapePly(part: CompositePart, ply: Ply, options: PlyDrapeOptions
       piece,
       seedUv,
       net,
+      coverage: pieceCoverage(net, piece),
       summary: summarizeShear(net, options.limits, (node) => insideOrOn(node.hit.uv, piece, 1e-6 * (1 + Math.hypot(...node.hit.uv)))),
     });
   }

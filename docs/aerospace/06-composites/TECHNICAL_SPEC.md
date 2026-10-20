@@ -831,6 +831,9 @@ Known limits: the tow step is a CHORD (as in the reference), so shear on a devel
 (1.99x per halving at 45 degrees on r = 50); near a cone apex shear is large whatever d; locking is evaluated on the whole-face net, not per piece; the net spans the
 whole face, so cost does not shrink for small pieces; a lone dart stays a recorded slit (the wedge is not opened); `drape.generators` curves, `projection` flats and
 UD-specific mapping are not built; kinematic drape has no fabric mechanics (the §5.4 limits stand).
+A failed node (off the face, folded, or Newton not converged) silently stops its quadrant, so each piece now reports `coverage` (share of a 30 x 30 interior chart sample
+that falls in a complete net cell); `check_producibility` fails with `CMP_DRAPE_INCOMPLETE` below 99 % or when the node budget truncated the net, and `drape_ply` reports
+coverage and the outside / inverted counts per piece. Statistics of an incomplete net describe only the part that was draped.
 
 **Shop data (M4).** `export_laser_projection` (plain-text point lists on the tool face, mm, counter-clockwise from the laminate side, gap <= `spacing`, every corner >=
 `cornerAngle` kept), `export_ply_book` (one SVG per sequence: flat patterns with fibre arrow, a location view in the part frame (not a 3D view), table with mm2 areas

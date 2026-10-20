@@ -45,6 +45,52 @@ function materialErrors(name: string, m: Record<string, unknown>): string[] {
   return errors;
 }
 
+/** Errors of the sphere / nurbs surface records of a part (the plane / cylinder / cone records are validated by their type only). */
+function surfaceErrors(at: string, surface: Record<string, unknown>): string[] {
+  if (surface['type'] === 'sphere') {
+    const ok = isVec3(surface['center']) && isVec3(surface['axis']) && isVec3(surface['xDir']) && positive(surface['radius']);
+    return ok ? [] : [`${at} (sphere) needs center, axis, xDir and radius > 0`];
+  }
+  if (surface['type'] !== 'nurbs') return [];
+  const domain = surface['domain'];
+  const range = (value: unknown): boolean =>
+    Array.isArray(value) && value.length === 2 && value.every(isNumber) && (value[0] as number) < (value[1] as number);
+  const scale = surface['scale'];
+  const errors: string[] = [];
+  if (!isRecord(surface['surface'])) errors.push(`${at}.surface (nurbs) must be a surface record`);
+  if (!Array.isArray(domain) || domain.length !== 2 || !domain.every(range))
+    errors.push(`${at}.domain must be [[u0, u1], [v0, v1]] with u0 < u1 and v0 < v1`);
+  if (!Array.isArray(scale) || scale.length !== 2 || !scale.every(positive)) errors.push(`${at}.scale must be two numbers > 0`);
+  return errors;
+}
+
+/** Errors of the optional drape settings and cuts of a ply. */
+function plyExtraErrors(at: string, ply: Record<string, unknown>): string[] {
+  const errors: string[] = [];
+  const drape = ply['drape'];
+  if (drape !== undefined) {
+    if (!isRecord(drape) || !['developable', 'projection', 'kinematic'].includes(drape['method'] as string))
+      errors.push(`${at}.drape.method must be developable, projection or kinematic`);
+    else {
+      if (drape['stepLength'] !== undefined && !positive(drape['stepLength'])) errors.push(`${at}.drape.stepLength must be > 0 when given`);
+      if (drape['seed'] !== undefined && !(Array.isArray(drape['seed']) && drape['seed'].length === 2 && drape['seed'].every(isNumber)))
+        errors.push(`${at}.drape.seed must be [x, y]`);
+    }
+  }
+  const cuts = ply['cuts'];
+  if (cuts !== undefined) {
+    if (!Array.isArray(cuts)) return [...errors, `${at}.cuts must be a list`];
+    cuts.forEach((cut, k) => {
+      const valid =
+        isRecord(cut) && (cut['kind'] === 'dart' || cut['kind'] === 'splice') && isVec2List(cut['path']) && cut['path'].length >= 2;
+      if (!valid) errors.push(`${at}.cuts.${k} needs kind dart / splice and a path of at least 2 [x, y] points`);
+      else if (cut['overlap'] !== undefined && !(isNumber(cut['overlap']) && cut['overlap'] >= 0))
+        errors.push(`${at}.cuts.${k}.overlap must be >= 0`);
+    });
+  }
+  return errors;
+}
+
 /** Value errors of the raw `composites` slice (an empty list = valid). */
 export function compositesErrors(slice: unknown): string[] {
   if (!isRecord(slice)) return ['composites must be an object'];
@@ -62,6 +108,7 @@ export function compositesErrors(slice: unknown): string[] {
       if (p['id'] !== id) out.push(`composites.parts.${id}.id must equal its key`);
       if (!isRecord(surface) || !['plane', 'cylinder', 'cone', 'sphere', 'nurbs'].includes(surface['type'] as string))
         out.push(`composites.parts.${id}.surface.type must be plane, cylinder, cone, sphere or nurbs`);
+      else out.push(...surfaceErrors(`composites.parts.${id}.surface`, surface));
       if (!isVec2List(p['outline']) || p['outline'].length < 3)
         out.push(`composites.parts.${id}.outline must be at least 3 [x, y] vertices`);
       if (!isRecord(slice['rosettes']) || !isText(p['rosetteId']) || !Object.hasOwn(slice['rosettes'], p['rosetteId']))
@@ -98,6 +145,7 @@ export function compositesErrors(slice: unknown): string[] {
           !(boundary['kind'] === 'polygons' && Array.isArray(boundary['polygons']) && boundary['polygons'].every(isVec2List)))
       )
         out.push(`composites.plies.${id}.boundary must be whole_face or polygons`);
+      out.push(...plyExtraErrors(`composites.plies.${id}`, p));
       return out;
     }),
     ...(slice['sections'] === undefined
