@@ -26,18 +26,20 @@ describe('ReviewPanel dispositions', () => {
     const status = screen.getByLabelText('Reviewer status for FPR_PAIR_HARD');
     expect(status).toBeEnabled();
     fireEvent.change(status, { target: { value: 'accepted' } });
-    expect(dispatch).toHaveBeenCalledWith(
-      'set_review_disposition',
-      { findingKey: hardOverlap.findingKey, status: 'accepted', comment: '', inputsHash: 'hash-assembly' },
-      expect.anything(),
-    );
+    expect(dispatch).toHaveBeenCalledWith('set_review_disposition', {
+      findingKey: hardOverlap.findingKey,
+      status: 'accepted',
+      comment: '',
+      inputsHash: 'hash-assembly',
+    });
     const comment = screen.getByLabelText('Comment for FPR_PAIR_HARD');
     fireEvent.change(comment, { target: { value: 'press fit' } });
     fireEvent.blur(comment);
-    expect(dispatch).toHaveBeenLastCalledWith(
-      'set_review_disposition',
-      { findingKey: hardOverlap.findingKey, status: 'not_reviewed', comment: 'press fit', inputsHash: 'hash-assembly' },
-      expect.anything(),
-    );
+    expect(dispatch).toHaveBeenLastCalledWith('set_review_disposition', {
+      findingKey: hardOverlap.findingKey,
+      status: 'not_reviewed',
+      comment: 'press fit',
+      inputsHash: 'hash-assembly',
+    });
   });
 });

@@ -116,11 +116,48 @@ describe('Review tab on a check_prototype result', () => {
     render(<ReviewPanel />);
     show();
     fireEvent.change(screen.getByLabelText('Reviewer status for FPR_WALL_THIN'), { target: { value: 'irrelevant' } });
-    expect(dispatch).toHaveBeenCalledWith(
-      'set_review_disposition',
-      { findingKey: thinWall.findingKey, status: 'irrelevant', comment: '', inputsHash: 'hash-assembly' },
-      expect.anything(),
-    );
+    expect(dispatch).toHaveBeenCalledWith('set_review_disposition', {
+      findingKey: thinWall.findingKey,
+      status: 'irrelevant',
+      comment: '',
+      inputsHash: 'hash-assembly',
+    });
+  });
+
+  it('joins the document dispositions over the stored result at once, without re-running the checks', async () => {
+    render(<ReviewPanel />);
+    show();
+    const disposed = (hash: string): void =>
+      act(() =>
+        useStore.setState({
+          document: {
+            ...useStore.getState().document,
+            prototype: {
+              intents: {},
+              grounded: [],
+              dispositions: {
+                [thinWall.findingKey]: {
+                  findingKey: thinWall.findingKey,
+                  status: 'accepted',
+                  comment: 'ok',
+                  inputsHash: hash,
+                  by: 'agent',
+                },
+              },
+            },
+          },
+        }),
+      );
+    disposed('hash-assembly');
+    const row = await screen.findByTestId(`finding-${thinWall.findingKey}`);
+    expect(within(row).getByText('warn (accepted)')).toBeInTheDocument();
+    expect(useReviewStore.getState().busy).toBe(false);
+    // the fixture's own accepted disposition is not in the document any more: it is cleared, and the stale list is recomputed
+    expect(within(screen.getByTestId(`finding-${accepted.findingKey}`)).queryByText('fail (accepted)')).toBeNull();
+    expect(screen.queryByTestId('review-stale-dispositions')).toBeNull();
+    disposed('older-hash');
+    expect(await screen.findByTestId('review-stale-dispositions')).toHaveTextContent(thinWall.findingKey);
+    expect(within(screen.getByTestId(`finding-${thinWall.findingKey}`)).getByText('stale')).toBeInTheDocument();
   });
 
   it('VC-FPR-25: a checklist row shows icon + word + value + threshold with its source; calibrated values are information with a badge', () => {
