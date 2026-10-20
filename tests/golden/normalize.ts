@@ -72,6 +72,12 @@ export function normalize(doc: CadDocument): unknown {
   return normalizeJson(JSON.parse(serializeDocument(doc, { includeDerived: true })));
 }
 
+/** Everything replay regenerates (carry.ts): entities, order, materials, components, constraints — what a history edit must reproduce. */
+export function normalizeRegenerated(doc: CadDocument): unknown {
+  const { entities, order, materials, components, constraints, constraintOrder } = doc;
+  return normalizeJson({ entities, order, materials, components, constraints, constraintOrder });
+}
+
 /** Entities + draw order only — the part that must survive `replay_history`. */
 export function normalizeGeometry(doc: CadDocument): unknown {
   return normalizeJson({ entities: doc.entities, order: doc.order });
