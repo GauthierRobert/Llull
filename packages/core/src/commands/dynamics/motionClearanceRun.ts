@@ -44,10 +44,12 @@ export interface MotionPlan {
   readonly kernel: GeometryKernel;
   readonly parts: readonly MotionPart[];
   readonly pairs: ReadonlyArray<readonly [MotionPart, MotionPart]>;
-  /** Strided run: sample times (s), unwrapped crank angle (deg, or null) and the pose tracks per body. */
+  /** Every recorded sample: times (s), unwrapped crank angle (deg, or null) and the pose tracks per body. The stride only picks coarse anchors. */
   readonly times: readonly number[];
   readonly crankDeg: readonly number[] | null;
   readonly tracks: Readonly<Record<string, PoseTrack>>;
+  /** Recorded samples between two coarse anchors of the sweep. */
+  readonly stride: number;
   /** Document units: touch tolerance, required clearance. */
   readonly eps: number;
   readonly clearance: number;
@@ -70,17 +72,8 @@ export interface MotionPlanInput {
 }
 
 export function planMotion(input: MotionPlanInput): MotionPlan {
-  const { poses, stride } = input;
-  const keep = poses.times.map((_, i) => i).filter((i) => i % stride === 0 || i === poses.times.length - 1);
-  const tracks = Object.fromEntries(
-    Object.entries(poses.bodies).map(([id, track]) => [
-      id,
-      {
-        position: keep.map((i) => track.position[i] ?? STATIC_POSE.position),
-        orientation: keep.map((i) => track.orientation[i] ?? STATIC_POSE.orientation),
-      },
-    ]),
-  );
+  const { poses } = input;
+  const tracks = poses.bodies;
   const movingBodies = new Set(
     Object.entries(tracks)
       .filter(([, track]) => isMoving(track))
@@ -110,9 +103,7 @@ export function planMotion(input: MotionPlanInput): MotionPlan {
       pairs.push([a, b]);
     }
   });
-  const times = keep.flatMap((i) => poses.times[i] ?? []);
-  const crankDeg = input.crankDeg === null ? null : keep.flatMap((i) => input.crankDeg?.[i] ?? []);
-  return { ...input, parts, pairs, times, crankDeg, tracks };
+  return { ...input, parts, pairs, times: poses.times, tracks };
 }
 
 /** A place on the strided run: `u` = sample index plus fraction. */
@@ -232,11 +223,17 @@ interface Sweep {
   readonly exhausted: boolean;
 }
 
+/**
+ * One pair over the whole run. The sweep probes coarse anchors (every `plan.stride` recorded samples) and certifies the gap between two
+ * anchors clear only when the distance cannot dip to the best-so-far / contact bound inside it: the distance changes by at most the
+ * travel of both parts, summed from the per-sample travel bounds of the UNTHINNED track, so d(u) >= (d_from + d_to - travel) / 2.
+ * An interval that is not certified is split down to single recorded samples, which get the substep treatment of the finest step.
+ * @invariant no moment is skipped on a guess: a skipped stretch is certified, so thinning never hides a short contact
+ */
 function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart, budget: Budget): Sweep {
   const lowBound = plan.clearance + plan.eps;
   const limit = Math.max(Math.min(a.thin, b.thin) / 2, 1e-9);
-  const state: { best: Closest | null; bound: number; open: Interval | null } = { best: null, bound: Infinity, open: null };
-  const intervals: Interval[] = [];
+  const state: { best: Closest | null; bound: number } = { best: null, bound: Infinity };
   let evaluations = 0;
   const closestAt = (u: number, bound: number): Closest | null => {
     evaluations++;
@@ -248,36 +245,88 @@ function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart, budget: Budget): 
       : { distance: hit.distance, moment: momentAt(plan, u), witness: [pointAtPose(hit.pointA, poseA), pointAtPose(hit.pointB, poseA)] };
   };
   const inContact = (u: number): boolean => (closestAt(u, plan.eps)?.distance ?? Infinity) <= plan.eps;
-  let previous: { u: number; contact: boolean } | null = null;
-  const evaluate = (u: number): number => {
-    const hit = closestAt(u, state.bound);
-    const moment = momentAt(plan, u);
+  const last = plan.times.length - 1;
+  // travel of both parts over each recorded step, cumulative: prefix[k] = travel from sample 0 to sample k
+  const prefix = [0];
+  for (let i = 0; i < last; i++) {
+    const travel = [a, b].reduce((sum, part) => {
+      const track = part.body === null ? undefined : plan.tracks[part.body];
+      return track === undefined ? sum : sum + travelBound(track, i, part.radius);
+    }, 0);
+    prefix.push((prefix[i] ?? 0) + travel);
+  }
+  const travelBetween = (from: number, to: number): number => (prefix[to] ?? 0) - (prefix[from] ?? 0);
+  const probes: { u: number; contact: boolean }[] = [];
+  /** Probes moment `u`, looking `reach` beyond the bound; returns the distance there, or a lower bound of it when it is farther. */
+  const probe = (u: number, reach: number): number => {
+    const horizon = state.bound + reach;
+    const seen = closestAt(u, horizon);
+    const hit = seen !== null && seen.distance <= state.bound ? seen : null;
     if (hit !== null && (state.best === null || hit.distance < state.best.distance)) {
       state.best = hit;
       state.bound = Math.max(hit.distance, lowBound);
     }
-    const contact = hit !== null && hit.distance <= plan.eps;
+    probes.push({ u, contact: hit !== null && hit.distance <= plan.eps });
+    return seen?.distance ?? horizon;
+  };
+  let undersampled = false;
+  let maxStep = 0;
+  /** One recorded step: substeps sized by the travel against half the thinnest side of the pair. */
+  const fine = (from: number, nearestEnd: number): void => {
+    const travel = travelBetween(from, from + 1);
+    const substeps = Math.min(MAX_SUBSTEPS, Math.max(1, Math.ceil(travel / limit)));
+    const stepSize = travel / substeps;
+    maxStep = Math.max(maxStep, stepSize);
+    let nearest = nearestEnd;
+    for (let k = 1; k < substeps; k++) nearest = Math.min(nearest, probe(from + k / substeps, 0));
+    if (stepSize > Math.min(a.thin, b.thin) && nearest < stepSize) undersampled = true;
+  };
+  const refine = (from: number, distanceFrom: number, to: number, distanceTo: number): void => {
+    if (budget.evaluations < 0) return;
+    const travel = travelBetween(from, to);
+    if ((distanceFrom + distanceTo - travel) / 2 > state.bound) return;
+    if (to - from <= 1) {
+      fine(from, Math.min(distanceFrom, distanceTo));
+      return;
+    }
+    const middle = Math.floor((from + to) / 2);
+    const distanceMiddle = probe(middle, travel);
+    refine(from, distanceFrom, middle, distanceMiddle);
+    refine(middle, distanceMiddle, to, distanceTo);
+  };
+  let from = 0;
+  let distanceFrom = probe(0, travelBetween(0, Math.min(plan.stride, last)));
+  while (from < last && budget.evaluations >= 0) {
+    const to = Math.min(from + plan.stride, last);
+    const distanceTo = probe(to, travelBetween(from, to));
+    refine(from, distanceFrom, to, distanceTo);
+    [from, distanceFrom] = [to, distanceTo];
+  }
+  if (budget.evaluations < 0) return { best: state.best, intervals: [], undersampled, evaluations, maxStepMm: 0, exhausted: true };
+  // contact intervals from the probed moments in time order; the edges are bisected inside the certified-clear stretches
+  const intervals: Interval[] = [];
+  let open: Interval | null = null;
+  let previous: { u: number; contact: boolean } | null = null;
+  for (const { u, contact } of [...probes].sort((p, q) => p.u - q.u)) {
+    const moment = momentAt(plan, u);
     if (contact) {
-      if (state.open === null) {
-        const from = previous === null || previous.contact ? moment : momentAt(plan, bisectEdge(inContact, previous.u, u));
-        state.open = { from, to: moment, evaluations: 0, kind: 'unknown', volume: null, depth: null, worst: null };
-        intervals.push(state.open);
+      if (open === null) {
+        const start = previous === null || previous.contact ? moment : momentAt(plan, bisectEdge(inContact, previous.u, u));
+        open = { from: start, to: moment, evaluations: 0, kind: 'unknown', volume: null, depth: null, worst: null };
+        intervals.push(open);
       }
-      state.open.to = moment;
-      state.open.evaluations++;
+      open.to = moment;
+      open.evaluations++;
     } else {
-      if (state.open !== null && previous !== null) state.open.to = momentAt(plan, bisectEdge(inContact, u, previous.u));
-      state.open = null;
+      if (open !== null && previous !== null) open.to = momentAt(plan, bisectEdge(inContact, u, previous.u));
+      open = null;
     }
     previous = { u, contact };
-    return hit?.distance ?? state.bound;
-  };
+  }
   /** The closest approach between samples: golden-section search within one sample of the best sampled moment. */
-  const refineClosest = (): void => {
-    const best = state.best;
-    if (best === null || best.distance <= plan.eps) return;
+  const best = state.best;
+  if (best !== null && best.distance > plan.eps) {
     const bound = 2 * best.distance + plan.eps;
-    const last = plan.times.length - 1;
     const found = goldenMinimum(
       (u) => closestAt(u, bound)?.distance ?? Infinity,
       Math.max(0, best.moment.u - 1),
@@ -285,24 +334,7 @@ function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart, budget: Budget): 
       { u: best.moment.u, value: best.distance },
     );
     if (found.u !== best.moment.u) state.best = closestAt(found.u, bound) ?? best;
-  };
-  let undersampled = false;
-  let maxStep = 0;
-  evaluate(0);
-  for (let i = 0; i + 1 < plan.times.length; i++) {
-    const travel = [a, b].reduce((sum, part) => {
-      const track = part.body === null ? undefined : plan.tracks[part.body];
-      return track === undefined ? sum : sum + travelBound(track, i, part.radius);
-    }, 0);
-    const substeps = Math.min(MAX_SUBSTEPS, Math.max(1, Math.ceil(travel / limit)));
-    const stepSize = travel / substeps;
-    maxStep = Math.max(maxStep, stepSize);
-    let nearest = Infinity;
-    for (let k = 1; k <= substeps; k++) nearest = Math.min(nearest, evaluate(i + k / substeps));
-    if (stepSize > Math.min(a.thin, b.thin) && nearest < stepSize) undersampled = true;
-    if (budget.evaluations < 0) return { best: state.best, intervals, undersampled, evaluations, maxStepMm: 0, exhausted: true };
   }
-  refineClosest();
   const used = classify(plan, a, b, intervals, budget.classified);
   budget.classified -= used;
   return { best: state.best, intervals, undersampled, evaluations, maxStepMm: maxStep * plan.mmPerUnit, exhausted: false };

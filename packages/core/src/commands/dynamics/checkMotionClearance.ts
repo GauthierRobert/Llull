@@ -78,7 +78,9 @@ const clearanceParams = z.object({
     .min(2)
     .max(6001)
     .optional()
-    .describe(`Most samples evaluated; a longer run is thinned evenly. Default ${DEFAULT_MAX_SAMPLES}.`),
+    .describe(
+      `Most coarse anchors probed first (default ${DEFAULT_MAX_SAMPLES}). Stretches between anchors are skipped only when the part travel proves them clear, otherwise the recorded samples between are checked: this changes the time, not the findings.`,
+    ),
 });
 
 /**
@@ -176,10 +178,10 @@ export function motionClearanceCheck(
     mmPerUnit,
   });
   if (plan.pairs.length > MAX_PAIRS) return refuse('FPR_BUDGET_EXCEEDED', `${plan.pairs.length} candidate pairs, limit ${MAX_PAIRS}`);
-  if (plan.pairs.length * plan.times.length > MAX_PAIR_SAMPLES)
+  if (plan.pairs.length * Math.ceil(plan.times.length / stride) > MAX_PAIR_SAMPLES)
     return refuse(
       'FPR_BUDGET_EXCEEDED',
-      `${plan.pairs.length} pairs x ${plan.times.length} samples is over ${MAX_PAIR_SAMPLES} pair-samples`,
+      `${plan.pairs.length} pairs x ${Math.ceil(plan.times.length / stride)} samples is over ${MAX_PAIR_SAMPLES} pair-samples`,
     );
 
   const outcome = runMotion(plan, { evaluations: MAX_EVALUATIONS, classified: MAX_CLASSIFIED_TOTAL });
@@ -253,7 +255,7 @@ export function motionClearanceCheck(
         : { mm: closest.minClearanceMm, a: closest.a, b: closest.b, timeS: closest.timeS, crankDeg: closest.crankDeg },
     samples: {
       simulated: sim.samples,
-      evaluated: plan.times.length,
+      evaluated: Math.ceil(plan.times.length / stride),
       stride,
       resolutionS,
       durationS: sim.duration,

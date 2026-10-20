@@ -40,7 +40,7 @@ const dynamicsParams = z.object({
     .min(MIN_TIMESTEP)
     .max(0.01)
     .optional()
-    .describe('Integration step in seconds of the first run (the second uses half of it); default as simulate_motion.'),
+    .describe('Integration step in seconds of the first run (the second uses half of it, never below 1e-5 s); default as simulate_motion.'),
   sampleRate: z
     .number()
     .positive()
@@ -128,8 +128,9 @@ export function dynamicsCheck(
     if (run === null) items.push(...notRunItems(reasonOf(first.summary), stat.simulatable.loops > 0));
     else {
       engine = run.engine;
-      const half = run.timestep / 2;
-      const atFloor = half < MIN_TIMESTEP;
+      // refine as far as the finest allowed step allows; only a run already at (within 25 % of) that floor has nothing to compare with
+      const half = Math.max(run.timestep / 2, MIN_TIMESTEP);
+      const atFloor = run.timestep <= MIN_TIMESTEP * 1.25;
       const second = atFloor ? null : simulateMotion.run(doc, { ...common, timestep: half }, ctx);
       const fine = second === null ? null : asRun(second.data);
       items.push(

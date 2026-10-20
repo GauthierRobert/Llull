@@ -57,7 +57,7 @@ export function reviewResult(
     items,
     provenance,
     inputsHash: hashText(canonicalJson({ check, inputs: hashedInputs, params: provenance.params })),
-    unverified: items.some((entry) => entry.status === 'not_run'),
+    unverified: items.some((entry) => entry.status === 'not_run' || entry.unverified === true),
     reviewRequired: true,
   };
   return roundDeep(result);

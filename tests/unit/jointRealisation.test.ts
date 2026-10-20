@@ -175,6 +175,31 @@ describe('realiseJoint on the tessellation (kernel without exact faces)', () => 
     expect(realiseJoint(blind, meshed([tiltedMesh], [tube(5, [-10, 10], { outward: true })])).code).toBe('FPR_JOINT_NOT_REALISED');
   });
 
+  it('a square or hexagonal pocket is not a bore: a round pin in it is not a realised joint', () => {
+    const pin = tube(5, [-10, 10], { outward: true });
+    for (const sides of [4, 6]) {
+      const pocket = tube(5.01, [-20, 20], { outward: false, segments: sides });
+      expect(realiseJoint(blind, meshed([pocket], [pin])).code).toBe('FPR_JOINT_NOT_REALISED');
+    }
+    // and a square or hexagonal prism is not a pin in a round bore
+    for (const sides of [4, 6]) {
+      const prism = tube(5, [-10, 10], { outward: true, segments: sides });
+      expect(realiseJoint(blind, meshed([tube(5.01, [-20, 20], { outward: false })], [prism])).code).toBe('FPR_JOINT_NOT_REALISED');
+    }
+  });
+
+  it('same-radius journals separated along the axis are separate cylinders: engagement is that of one journal', () => {
+    const [low, high] = [tube(5, [-10, -5], { outward: true }), tube(5, [5, 10], { outward: true })];
+    const offset = low.positions.length / 3;
+    const pin = {
+      positions: [...low.positions, ...high.positions],
+      indices: [...low.indices, ...high.indices.map((i) => i + offset)],
+    } as MeshData;
+    const item = realiseJoint(blind, meshed([tube(5.01, [-20, 20], { outward: false })], [pin]));
+    expect(item.code).toBe('FPR_JOINT_REALISED');
+    expect(item.values['engagementMm']).toBeCloseTo(5, 9);
+  });
+
   it('without any tessellation the joint stays not_run', () => {
     expect(realiseJoint(blind, meshed([], [])).status).toBe('not_run');
   });

@@ -181,6 +181,8 @@ export interface MobilityResult {
   readonly suggestions: readonly string[];
   /** Start-pose distance (m) between the two pins of each loop. */
   readonly loopGapsM: Readonly<Record<string, number>>;
+  /** Gear couplings with a loop joint on one side: no tree coordinate to constrain, so they add no row. */
+  readonly skippedGears: readonly string[];
 }
 
 const CONSTRAINTS: Readonly<Record<DynamicJoint['kind'], number>> = { revolute: 5, prismatic: 5, spherical: 3 };
@@ -271,24 +273,28 @@ export function consistentSpeeds(
 }
 
 /**
- * One row per gear coupling whose two joints are both tree joints: q'(driven) - ratio · q'(driver) = 0 in tree coordinates (a flipped
- * joint's tree coordinate has the opposite sense of the declared one). A coupling with a loop joint on either side adds no row.
+ * One unit-norm row per gear coupling whose two joints are both tree joints: q'(driven) - ratio · q'(driver) = 0 (tree coordinates are
+ * in the declared sense of their joint). A coupling with a loop joint on either side has no tree coordinate to constrain and is returned
+ * in `skipped`.
  */
-function gearConstraintRows(dynamics: DynamicsModel, topology: Topology): number[][] {
+function gearConstraintRows(dynamics: DynamicsModel, topology: Topology): { rows: { gear: string; row: number[] }[]; skipped: string[] } {
   const nq = topology.tree.length;
-  const senseOf = (id: string): { index: number; sign: number } | null => {
-    const index = topology.tree.findIndex((entry) => entry.joint.id === id);
-    const entry = topology.tree[index];
-    return entry === undefined ? null : { index, sign: entry.flipped ? -1 : 1 };
-  };
-  return Object.values(dynamics.gears).flatMap((gear) => {
-    const [driver, driven] = [senseOf(gear.driver), senseOf(gear.driven)];
-    if (driver === null || driven === null) return [];
+  const indexOf = (id: string): number => topology.tree.findIndex((entry) => entry.joint.id === id);
+  const rows: { gear: string; row: number[] }[] = [];
+  const skipped: string[] = [];
+  for (const gear of Object.values(dynamics.gears)) {
+    const [driver, driven] = [indexOf(gear.driver), indexOf(gear.driven)];
+    if (driver < 0 || driven < 0) {
+      skipped.push(gear.id);
+      continue;
+    }
     const row = new Array<number>(nq).fill(0);
-    row[driven.index] = driven.sign;
-    row[driver.index] = (row[driver.index] ?? 0) - gear.ratio * driver.sign;
-    return [row];
-  });
+    const norm = Math.hypot(1, gear.ratio);
+    row[driven] = 1 / norm;
+    row[driver] = (row[driver] ?? 0) - gear.ratio / norm;
+    rows.push({ gear: gear.id, row });
+  }
+  return { rows, skipped };
 }
 
 /** Mobility analysis of `topology` at the start pose; `metresPerUnit` converts anchors. */
@@ -311,7 +317,8 @@ export function analyseMobility(dynamics: DynamicsModel, topology: Topology, met
       cursor += 2;
     }
   }
-  const columns = [...loopJacobian(topology, labels.length, metresPerUnit), ...gearConstraintRows(dynamics, topology)];
+  const gears = gearConstraintRows(dynamics, topology);
+  const columns = [...loopJacobian(topology, labels.length, metresPerUnit), ...gears.rows.map((entry) => entry.row)];
   const pivots = nq === 0 ? columns.map((_, index) => ({ index, size: 0 })) : pivotedColumns(columns);
   const largest = pivots[0]?.size ?? 0;
   const rank = largest > 0 ? pivots.filter((pivot) => pivot.size > RANK_TOLERANCE * largest).length : 0;
@@ -319,7 +326,12 @@ export function analyseMobility(dynamics: DynamicsModel, topology: Topology, met
   const suggestions = new Set<string>();
   for (const pivot of pivots.slice(rank).sort((a, b) => a.index - b.index)) {
     const label = labels[pivot.index];
-    if (label === undefined) continue;
+    if (label === undefined) {
+      const gear = gears.rows[pivot.index - labels.length]?.gear;
+      if (gear !== undefined)
+        redundant.push({ loop: gear, component: 'gear ratio', message: `gear coupling '${gear}' repeats a constraint already fixed by the joints and other couplings` });
+      continue;
+    }
     const by = treePath(topology, label.loop).map((id) => `'${id}'`);
     const through = by.length > 0 ? ` by ${by.join(', ')}` : '';
     redundant.push({
@@ -341,5 +353,6 @@ export function analyseMobility(dynamics: DynamicsModel, topology: Topology, met
     redundant,
     suggestions: [...suggestions],
     loopGapsM,
+    skippedGears: gears.skipped,
   };
 }

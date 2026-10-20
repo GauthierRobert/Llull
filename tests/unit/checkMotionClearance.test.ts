@@ -201,15 +201,29 @@ describe('check_motion_clearance on a rotating arm', () => {
     expect(data.status).toBe('warn');
   });
 
-  it('thins long runs with maxSamples and warns that a thin obstacle can be skipped', () => {
+  it('thinning the anchors with maxSamples never hides a thin obstacle or a short clip: the result equals the full sweep', () => {
     const scene = armScene({ obstacleY: 150 });
     const needle = step(scene.doc, 'add_box', { size: [2, 2, 2], position: [0, -104, 0] });
-    const data = check(needle.doc, { duration: 0.75, maxSamples: 4 }).data as Data;
-    expect(data.samples.stride).toBeGreaterThan(1);
-    expect(data.samples.evaluated).toBeLessThanOrEqual(5);
-    expect(codes(data)).toContain('FPR_MOTION_UNDERSAMPLED');
-    expect(data.status).toBe('warn');
-    expect(data.unverified).toBe(true);
+    const thin = check(needle.doc, { duration: 0.75, maxSamples: 4, clearanceMm: 4 }).data as Data;
+    const full = check(needle.doc, { duration: 0.75, clearanceMm: 4 }).data as Data;
+    expect(thin.samples.stride).toBeGreaterThan(1);
+    expect(thin.samples.evaluated).toBeLessThanOrEqual(5);
+    expect(codes(thin)).not.toContain('FPR_MOTION_UNDERSAMPLED');
+    const statuses = (data: Data): string[] => data.pairs.map((pair) => `${pair.a}/${pair.b}:${pair.status}`);
+    expect(statuses(thin)).toEqual(statuses(full));
+    expect(statuses(thin).some((entry) => entry.endsWith(':clearance_low'))).toBe(true);
+    for (const [index, pair] of thin.pairs.entries())
+      expect(pair.minClearanceMm ?? 0).toBeCloseTo(full.pairs[index]?.minClearanceMm ?? 0, 1);
+  });
+
+  it('a 1 mm clip lasting a few milliseconds between two anchors at the thinned cap is found', () => {
+    const { doc } = armScene({ obstacleY: 109 });
+    const full = check(doc, { duration: 0.75 }).data as Data;
+    const thin = check(doc, { duration: 0.75, maxSamples: 4 }).data as Data;
+    expect(full.pairs[0]?.status).toBe('interference');
+    expect(thin.pairs[0]?.status).toBe('interference');
+    expect(thin.samples.evaluated).toBeLessThanOrEqual(5);
+    expect(thin.pairs[0]?.collisions.length).toBe(full.pairs[0]?.collisions.length);
   });
 
   it('limits the check to pairs that include the focus ids, and pairs "all" adds static pairs', () => {

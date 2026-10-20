@@ -32,8 +32,9 @@ const NAME = 'check_prototype';
 const DEFAULT_DURATION_S = 2;
 const MAX_DURATION_S = 600;
 /**
- * Most samples of the shared run the clearance sweep evaluates (the run itself keeps every sample for the engine report). The sweep adds
- * substeps wherever a part moves farther than half its thinnest side between two samples, so thinning does not let a thin obstacle through.
+ * Coarse anchors of the shared run the clearance sweep probes first (the run keeps every sample for the engine report). A stretch between
+ * two anchors is skipped only when the part travel summed over the recorded samples proves the distance cannot reach the contact / best
+ * bound there; otherwise it is split down to the recorded samples, so the cap changes the time, not the findings.
  */
 const CLEARANCE_MAX_SAMPLES = 720;
 /** Settling cycles before the measured ones when the duration comes from the crank speed. */
