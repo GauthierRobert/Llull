@@ -141,6 +141,8 @@ export interface FeExplicitArtifact {
   readonly vonMises: readonly number[];
   readonly plasticStrain: readonly number[];
   readonly failed: readonly number[];
+  /** Element temperature, K (adiabatic heating; the initial temperature without it). */
+  readonly temperature: readonly number[];
   readonly centroids: readonly number[];
 }
 
@@ -182,6 +184,8 @@ export interface ExplicitResultsSummary {
   };
   readonly maxVonMises: ExplicitExtreme;
   readonly maxPlasticStrain: ExplicitExtreme;
+  /** Hottest element, K (RS-8 adiabatic heating). */
+  readonly maxTemperature: ExplicitExtreme;
   readonly failedElements: number;
   readonly walls: Readonly<Record<string, { readonly peakForce: number; readonly impulse: number; readonly forceUnit: string }>>;
   readonly unverified: boolean;

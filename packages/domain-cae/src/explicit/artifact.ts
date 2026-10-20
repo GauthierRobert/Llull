@@ -17,8 +17,8 @@ import { explicitMaterial } from './laws';
 import { supportedUnits } from './model';
 import type { ExplicitJob } from './job';
 
-/** Values per element in `fields.f64`: von Mises, equivalent plastic strain, failed flag, centroid x, y, z. */
-const FIELD_STRIDE = 6;
+/** Values per element in `fields.f64`: von Mises, equivalent plastic strain, failed flag, temperature (K), centroid x, y, z. */
+const FIELD_STRIDE = 7;
 
 const isNumberList = (value: unknown): value is number[] => Array.isArray(value) && value.every((entry) => typeof entry === 'number');
 
@@ -86,7 +86,7 @@ export function buildExplicitArtifact(
   const column = (offset: number): number[] => Array.from({ length: count }, (_, element) => fields[FIELD_STRIDE * element + offset] ?? 0);
   const centroids: number[] = [];
   for (let element = 0; element < count; element++)
-    for (let axis = 0; axis < 3; axis++) centroids.push(fields[FIELD_STRIDE * element + 3 + axis] ?? 0);
+    for (let axis = 0; axis < 3; axis++) centroids.push(fields[FIELD_STRIDE * element + 4 + axis] ?? 0);
   return {
     kind: 'fe_explicit',
     inputHash: job.inputHash,
@@ -105,6 +105,7 @@ export function buildExplicitArtifact(
     vonMises: column(0),
     plasticStrain: column(1),
     failed: column(2),
+    temperature: column(3),
     centroids,
   };
 }
@@ -201,6 +202,7 @@ export function explicitSummary(
     },
     maxVonMises: extreme(artifact.vonMises, artifact.centroids, units.stress),
     maxPlasticStrain: extreme(artifact.plasticStrain, artifact.centroids, '-'),
+    maxTemperature: extreme(artifact.temperature, artifact.centroids, 'K'),
     failedElements: artifact.failed.filter((flag) => flag > 0).length,
     walls,
     unverified: reasons.length > 0,

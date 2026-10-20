@@ -264,4 +264,65 @@ describe('explicit_run with the real llull-compute', () => {
     },
     600_000,
   );
+  native(
+    'a held face, adiabatic heating and the GPU path through commands (RS-8): the bar heats, the GPU matches the CPU twin',
+    async () => {
+      const model = barModel({ plastic: true, size: 5 });
+      let start = must(model.doc, 'define_property_model', {
+        material: 'steel_like',
+        model: {
+          id: 'cp_const',
+          property: 'cp',
+          unit: 'J/(kg*K)',
+          variables: [],
+          validity: [],
+          form: { kind: 'constant', value: 460 },
+          basis: 'company',
+          source: { citation: 'synthetic test input of the PHY-19 validation pack (not a material claim)' },
+        },
+      }).document;
+      start = must(start, 'set_adiabatic_heating', { analysisId: model.analysisId, material: 'steel_like' }).document;
+      start = must(start, 'add_fea_constraint', {
+        analysisId: model.analysisId,
+        name: 'top held',
+        kind: 'fixed',
+        target: { entityId: model.barId, facesNear: [[5, 5, 200]] },
+      }).document;
+      const solve = async (device: 'cpu' | 'gpu'): Promise<{ artifact: FeExplicitArtifact; warnings: string }> => {
+        let doc = start;
+        const host: FeaHost = {
+          getDoc: () => doc,
+          applyCommand: (name, params) => {
+            const result = execute(doc, name, params, { ...defaultContext(), feaArtifacts: store });
+            if (result.rejected !== true) doc = result.document;
+            return { summary: result.summary, affected: result.affected, isError: result.rejected === true, data: result.data };
+          },
+        };
+        const result = await runExplicitRun(model.analysisId, { timeoutS: 300, device }, host, {
+          store,
+          runner: createComputeRunner({}, BINARY),
+        });
+        expect(result.isError, result.summary).toBe(false);
+        const data = result.data as { artifactHash: string; warnings?: { code: string }[] };
+        return {
+          artifact: store.get(data.artifactHash) as FeExplicitArtifact,
+          warnings: (data.warnings ?? []).map((warning) => warning.code).join(','),
+        };
+      };
+      const cpu = await solve('cpu');
+      expect(cpu.artifact.termination).toBe('normal');
+      const rise = Math.max(...cpu.artifact.temperature) - 293.15;
+      // 10 m/s on the wall: rho c0 v = 396 MPa > A = 300 MPa, the bar yields and heats (the held end doubles the reflected stress).
+      expect(rise).toBeGreaterThan(0.1);
+      const gpu = await solve('gpu');
+      if (gpu.warnings.includes('EXP_GPU_FALLBACK')) {
+        console.warn('explicitRunNative: no GPU kernels or SHADER_F64 adapter: the CPU twin ran for the held, heated bar');
+        return;
+      }
+      expect(gpu.artifact.solver.device).toBe('gpu');
+      const gap = Math.max(...gpu.artifact.temperature.map((value, element) => Math.abs(value - (cpu.artifact.temperature[element] ?? 0))));
+      expect(gap).toBeLessThan(1e-4 * rise);
+    },
+    600_000,
+  );
 });

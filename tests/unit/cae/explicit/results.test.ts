@@ -17,13 +17,14 @@ function jobOf(doc: CadDocument): ExplicitJob {
 /** A synthetic run: KE 392.5 mJ turned into internal energy, a 1 % hourglass share, one wall force pulse, peak stress in element 7. */
 function syntheticRun(job: ExplicitJob, overrides: Record<string, unknown> = {}): { text: string; fields: Float64Array } {
   const elements = job.mesh.hex8.length / 8;
-  const fields = new Float64Array(6 * elements);
+  const fields = new Float64Array(7 * elements);
   for (let element = 0; element < elements; element++) {
-    fields[6 * element] = element === 7 ? 396 : 10;
-    fields[6 * element + 1] = element === 9 ? 0.02 : 0;
-    fields[6 * element + 3] = 2.5;
-    fields[6 * element + 4] = 2.5;
-    fields[6 * element + 5] = 2.5 + 5 * element;
+    fields[7 * element] = element === 7 ? 396 : 10;
+    fields[7 * element + 1] = element === 9 ? 0.02 : 0;
+    fields[7 * element + 3] = element === 9 ? 300 : 293.15;
+    fields[7 * element + 4] = 2.5;
+    fields[7 * element + 5] = 2.5;
+    fields[7 * element + 6] = 2.5 + 5 * element;
   }
   const result = {
     version: 1,
@@ -71,6 +72,7 @@ describe('buildExplicitArtifact and explicitSummary', () => {
     expect(summary.energy.finalContact).toBe(0);
     expect(summary.maxVonMises).toEqual({ value: 396, unit: 'MPa', at: [2.5, 2.5, 37.5], element: 7 });
     expect(summary.maxPlasticStrain.element).toBe(9);
+    expect(summary.maxTemperature).toMatchObject({ value: 300, unit: 'K', element: 9 });
     expect(summary.walls['anvil']?.peakForce).toBe(39600);
     expect(summary.walls['anvil']?.impulse).toBeCloseTo(39600 * 8e-5, 9);
     expect(summary).toMatchObject({ reviewRequired: true, certificationEvidence: false, energyUnit: 'mJ', failedElements: 0 });

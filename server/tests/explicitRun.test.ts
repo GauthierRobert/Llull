@@ -63,7 +63,7 @@ function fakeRunner(fail?: { code: string; message: string }): ComputeRunner & {
       if (fail !== undefined) return Promise.resolve<JobRun>({ ok: false, outputs: [], ...fail, warnings: [], log: 'tail', elapsedMs: 1 });
       const job = JSON.parse(files['job.json']?.toString('utf8') ?? '{}') as { hex8?: string };
       const elements = (files[job.hex8 ?? '']?.length ?? 0) / 32;
-      const fields = Buffer.from(new Float64Array(6 * elements).fill(100).buffer);
+      const fields = Buffer.from(new Float64Array(7 * elements).fill(100).buffer);
       const result = Buffer.from(
         JSON.stringify({
           version: 1,
