@@ -207,7 +207,7 @@
       },
       {
         "id": "#36",
-        "name": "add_#19eller",
+        "name": "add_propeller",
         "params": {"joint":"#29","diameter":1.75,"thrustCoefficient":0.1,"powerCoefficient":0.05,"airspeedMps":20,"inertiaKgM2":0.25,"table":{"points":[[0,0.1,0.05],[0.4,0.08,0.055],[0.8,0.02,0.04]],"source":"synthetic test table","grade":"C"}},
         "suppressed": false,
         "affected": ["#37"]
@@ -275,7 +275,7 @@
         "#31": {"id":"#31","driver":"#21","driven":"#29","ratio":0.411764706,"efficiency":0.99,"teeth":[21,51]}
       },
       "motors": {},
-      "#19ellers": {
+      "propellers": {
         "#37": {"id":"#37","joint":"#29","diameter":1.75,"thrustCoefficient":0.1,"powerCoefficient":0.05,"airDensity":1.225,"thrustDirection":[0,0,1],"airspeedMps":20,"table":{"points":[[0,0.1,0.05],[0.4,0.08,0.055],[0.8,0.02,0.04]],"source":"synthetic test table","grade":"C"},"inertiaKgM2":0.25}
       },
       "losses": {

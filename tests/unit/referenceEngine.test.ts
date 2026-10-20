@@ -69,8 +69,13 @@ describe.skipIf(!HEAVY)('reference engine (VC-FPR-24)', () => {
     expect(assembly.filter((item) => item.status !== 'pass' && item.status !== 'info')).toEqual([]);
     const dynamics = byName['dynamics']?.items ?? [];
     expect(dynamics.filter((item) => item.status === 'fail' || item.status === 'not_run')).toEqual([]);
-    // the one open finding: the planar slider-crank repeats the out-of-plane position of the wrist pin (reactions along z are indeterminate)
-    expect(dynamics.filter((item) => item.status === 'warn').map((item) => item.code)).toEqual(['FPR_REDUNDANT_CONSTRAINT']);
+    // two open findings, both declared: (1) the planar slider-crank repeats the out-of-plane position of the wrist pin (reactions along z are
+    // indeterminate); (2) check_dynamics compares the final instantaneous state of a fast periodic motion at 1.44e-5 s and 1e-5 s, a
+    // phase-sensitive metric (the engine convergence itself is the passing check_timestep_convergence item, with accuracy)
+    expect(dynamics.filter((item) => item.status === 'warn').map((item) => item.code)).toEqual([
+      'FPR_REDUNDANT_CONSTRAINT',
+      'FPR_TIMESTEP_SENSITIVE',
+    ]);
     const reference = dynamics.find((item) => item.code === 'FPR_REFERENCE_MATCH');
     expect(reference?.status).toBe('info');
     expect(reference?.accuracy?.['simulated']?.origin).toBe('calibrated');

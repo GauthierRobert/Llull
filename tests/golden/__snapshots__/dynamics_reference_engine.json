@@ -415,7 +415,7 @@
       {
         "id": "#72",
         "name": "allow_interference",
-        "params": {"a":"#16","b":"#17","kind":"overlap_by_design","reason":"#51eller shaft in its bearing bore, 0.02 mm diametral clearance"},
+        "params": {"a":"#16","b":"#17","kind":"overlap_by_design","reason":"propeller shaft in its bearing bore, 0.02 mm diametral clearance"},
         "suppressed": false,
         "affected": ["#73"]
       },
@@ -435,7 +435,7 @@
       },
       {
         "id": "#78",
-        "name": "add_#51eller",
+        "name": "add_propeller",
         "params": {"joint":"#61","diameter":1.75,"thrustCoefficient":0.1,"powerCoefficient":0.05,"airspeedMps":20,"inertiaKgM2":0.25,"table":{"points":[[0,0.1,0.05],[0.4,0.08,0.055],[0.8,0.02,0.04]],"source":"synthetic test table","grade":"C"}},
         "suppressed": false,
         "affected": ["#79"]
@@ -506,7 +506,7 @@
       "motors": {
         "#65": {"id":"#65","kind":"speed","joint":"#53","rpm":5800,"maxTorque":1000000}
       },
-      "#51ellers": {
+      "propellers": {
         "#79": {"id":"#79","joint":"#61","diameter":1.75,"thrustCoefficient":0.1,"powerCoefficient":0.05,"airDensity":1.225,"thrustDirection":[0,0,1],"airspeedMps":20,"table":{"points":[[0,0.1,0.05],[0.4,0.08,0.055],[0.8,0.02,0.04]],"source":"synthetic test table","grade":"C"},"inertiaKgM2":0.25}
       },
       "losses": {
@@ -521,7 +521,7 @@
         "#67": {"id":"#67","a":"#7","b":"#8","kind":"overlap_by_design","reason":"#45 pin in the big-end bore, 0.02 mm diametral clearance","declaredBy":"agent"},
         "#69": {"id":"#69","a":"#12","b":"#8","kind":"overlap_by_design","reason":"wrist pin in the small-end bore, 0.02 mm diametral clearance","declaredBy":"agent"},
         "#71": {"id":"#71","a":"#5","b":"#1","kind":"overlap_by_design","reason":"main journal in the main bearing bore, 0.02 mm diametral clearance","declaredBy":"agent"},
-        "#73": {"id":"#73","a":"#16","b":"#17","kind":"overlap_by_design","reason":"#51eller shaft in its bearing bore, 0.02 mm diametral clearance","declaredBy":"agent"}
+        "#73": {"id":"#73","a":"#16","b":"#17","kind":"overlap_by_design","reason":"propeller shaft in its bearing bore, 0.02 mm diametral clearance","declaredBy":"agent"}
       },
       "grounded": [],
       "references": {

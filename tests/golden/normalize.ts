@@ -41,7 +41,9 @@ function normalizeJson(parsed: unknown): unknown {
   const known = new Set<string>();
   collectStructuralIds(parsed, known);
   const alternatives = [...known].sort((a, b) => b.length - a.length).map(escapeRegExp);
-  const pattern = new RegExp([...alternatives, NEXT_ID_PATTERN.source].join('|'), 'g');
+  // a known id matches only as a whole id: never inside a longer word ("prop" in "propeller", "add_" + id)
+  const whole = alternatives.length === 0 ? [] : [`(?<![A-Za-z0-9_.-])(?:${alternatives.join('|')})(?![A-Za-z0-9_-])`];
+  const pattern = new RegExp([...whole, NEXT_ID_PATTERN.source].join('|'), 'g');
   const tokens = new Map<string, string>();
   const tokenFor = (id: string): string => {
     let token = tokens.get(id);

@@ -945,31 +945,39 @@ Validation cases automated (`tests/unit/engineRealism.test.ts`, `tests/unit/mujo
   `allow_interference` because the faceted tessellation of a 0.02 mm fit overlaps. **Deviations:** the plan lives in the golden corpus, not in
   `plans/reference_single_cylinder.plan.json`; the crankcase has no cylinder bore and the gear pair is a coupling without gear solids; the
   seeded-defect corpus is not built.
-- **VC-24 shown, heavy gate (FPR-V24, 2026-10-21).** `tests/unit/referenceEngine.test.ts` runs only with `LLULL_HEAVY_GATES=1` (Manifold +
-  MuJoCo, plan build + `check_prototype`). Measured **274 s for check_prototype (286 s for the whole test file)**, down from 1781 s. Profile
-  per sub-check on the plan (duration 0.062 s = settle + 1 cycle at 5800 rpm): plan build 0.08 s, check_assembly 0.17 s, inspect_dynamics
-  0.01 s, simulate_motion 0.5 s, check_dynamics 0.7 s, check_timestep_convergence 1.7 s, compare_to_reference 1.5 s, **check_motion_clearance
-  1199 s** (31 pairs x 2159 samples): essentially all of the time. Its cost was the BVH leaf loop running the full triangle-triangle distance
-  on every pair of two leaves (140 x 308 triangle meshes with box-shaped leaves that never prune); a per-triangle box test before the exact
-  distance (same results, `meshBvh.ts`) made it 4.6x faster, and `check_prototype` now evaluates at most 720 samples of the shared run
-  (`CLEARANCE_MAX_SAMPLES`; the sweep still adds substeps from the travel bound, so thin obstacles are not skipped; the run keeps every sample
-  for the engine report). A Lipschitz skip of far moments was tried and dropped: the closest pairs sit at a constant gap, nothing to skip.
+- **VC-24 shown, heavy gate (FPR-V24, 2026-10-21, review fixes).** `tests/unit/referenceEngine.test.ts` runs only with `LLULL_HEAVY_GATES=1`
+  (Manifold + MuJoCo, plan build + `check_prototype`). Measured **532 s and 774 s for check_prototype in two runs of the same code on this
+  machine (532 s / 785 s for the test file)**, down from 1781 s; the spread is machine load. Profile per sub-check before the fixes (duration
+  0.062 s): plan build 0.08 s, check_assembly 0.17 s, inspect_dynamics 0.01 s, simulate_motion 0.5 s, check_dynamics 0.7 s,
+  check_timestep_convergence 1.7 s, compare_to_reference 1.5 s, **check_motion_clearance 1199 s** (31 pairs x 2159 samples): essentially all
+  of the time. The BVH leaf loop ran the full triangle-triangle distance on every pair of two leaves; a per-triangle box test before it (same
+  results, `meshBvh.ts`) made it 4.6x faster. A first version also thinned the sweep to 720 samples (274 s); that was not conservative (a
+  short clip between thinned samples could read `allowed`) and was replaced: the sweep keeps the **unthinned** track, probes coarse anchors
+  (`maxSamples`) and skips the stretch between two anchors only when d(u) >= (d_from + d_to - travel) / 2 > the contact / best bound, with
+  the travel summed from the per-recorded-sample travel bounds of both parts; otherwise it splits down to single recorded samples (then the
+  substeps of the finest step). So `maxSamples` changes the time, not the findings (tests: a 1 mm clip and a thin needle at a 4-anchor cap
+  equal the full sweep). Pairs at a near-constant gap (pins in bores, parts 2 mm apart) cannot be certified and are evaluated at every
+  recorded sample, which is why the time is back up. A Lipschitz skip alone could not help those pairs; a tighter relative-motion travel
+  bound is the next lever.
   Rows (all `pass` unless noted): assembly = 3 x FPR_JOINT_REALISED (approximate fit on Manifold); mechanism = FPR_MECH_OK, **1 DOF** (the
-  rank mobility now counts a gear coupling between two tree joints as one constraint row: crank + propeller coordinates - rod loop - gear);
+  rank mobility counts a gear coupling between two tree joints as one unit-norm constraint row on the declared-sense coordinates: crank +
+  propeller - rod loop - gear; a coupling to a loop joint is reported FPR_GEAR_ON_LOOP_JOINT, a redundant coupling row is reported);
   motion_clearance = 4 x FPR_MOTION_ALLOWED (the declared pin fits; closest approach 2 mm); dynamics = FPR_MASS_DEFAULTED, FPR_UNREALISTIC,
-  FPR_NO_LOSSES, FPR_LOOP_OPEN, FPR_LOOP_DRIFT, FPR_ENERGY_CLOSURE, FPR_TIMESTEP_SENSITIVE (check_timestep_convergence, with accuracy), all pass;
-  FPR_TIMESTEP_SENSITIVE (check_dynamics) `info`; FPR_REFERENCE_MATCH `info` (origin `calibrated`); **FPR_REDUNDANT_CONSTRAINT `warn`** on
-  `wrist_j`. Nothing is not_run. The previously unidentified not_run was FPR_TIMESTEP_SENSITIVE of check_dynamics: the engine runs at the
-  finest allowed step (1e-5 s floor), which cannot be halved; it is now an `info` item stating that (the engine convergence is the
-  check_timestep_convergence item). A comparison against a doubled step was rejected: it read 36 % on the instantaneous piston speed of a
-  fast periodic motion, a phase-sensitive metric, not a convergence statement. The remaining warn is the planar slider-crank itself: pin
-  position z of the wrist is fixed by the parallel-axis joints, so out-of-plane reactions are indeterminate; the gate asserts exactly this
-  one warn. The plan gained a propeller shaft stub in a bearing block (`prop_j` has `crankcase` as parent) because the propeller had no
-  bearing and the joint could not be realised. VC-24 as written ("every checklist row pass") is therefore met except that one declared warn.
-  Native-kernel rows (exact faces) are VC-09. `check_motion_clearance` stays on `meshBvh` rather than `ctx.geometryQueries.minDistanceBatch`:
-  the sweep is sequential (a running bound per pair, adaptive substeps, contact bisection), a batch over all poses up front would lose the
-  early-outs and be slower on the TS engine; the wiring belongs to the native `geomq` (RS-6) where a batch is cheaper than the sweep.
-  VC-34 is partial: only the reference and timestep items carry `accuracy`.
+  FPR_NO_LOSSES, FPR_LOOP_OPEN, FPR_LOOP_DRIFT, FPR_ENERGY_CLOSURE, FPR_TIMESTEP_SENSITIVE (check_timestep_convergence, with accuracy), all
+  pass; FPR_REFERENCE_MATCH `info` (origin `calibrated`); **two `warn`**: FPR_REDUNDANT_CONSTRAINT on `wrist_j` (the planar slider-crank
+  repeats the out-of-plane position of the wrist pin: z reactions are indeterminate; not from the gear row, which is independent) and
+  FPR_TIMESTEP_SENSITIVE of check_dynamics (compared at 1.44e-5 s and 1e-5 s: a run is only treated as at the floor within 25 % of 1e-5 s, so
+  it is refined as far as allowed; the instantaneous final piston speed of a fast periodic motion is a phase-sensitive metric and reads
+  about 36 %, while the engine convergence, brake torque 0.004 %, is the passing check_timestep_convergence item). A run truly at the floor
+  gives an `info` item and the result stays `unverified` (item-level `unverified` now counts in the envelope). Nothing is not_run. The
+  previously unidentified not_run was that same check_dynamics item. The gate asserts exactly these two warns. The plan gained a propeller
+  shaft stub in a bearing block (`prop_j` now has parent `crankcase` and anchor [0, 0, 550] instead of the world and [0, 0, 600]) because
+  the propeller had no bearing and the joint could not be realised. VC-24 as written ("every checklist row pass") is therefore met except
+  those two declared warns. The tessellation fit rejects boxes and prisms (a facet must span at most 30 degrees about the axis) and splits
+  same-radius journals at axial gaps. Native-kernel rows (exact faces) are VC-09. `check_motion_clearance` stays on `meshBvh` rather than
+  `ctx.geometryQueries.minDistanceBatch`: the sweep is sequential (a running bound per pair, adaptive refinement, contact bisection), a batch
+  over all poses up front would lose the early-outs; the wiring belongs to the native `geomq` (RS-6). VC-34 is partial: only the reference
+  and timestep items carry `accuracy`.
 
 **M5 (UI, `src/ui/panels/review/`).** Verdict line and stale dispositions; dispositions sent with the check's `inputsHash`; `info` status
 never shown as a pass; `AccuracyBadge` ("± 5 %" / "± ?" + origin, calibrated hatched) on checklist rows and findings (FR-FPR-62);
