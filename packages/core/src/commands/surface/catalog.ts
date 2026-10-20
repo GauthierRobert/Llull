@@ -2,6 +2,7 @@
 
 import { commandCatalog } from '../schema';
 import { analyzeDraft, analyzeSurfaceCurvature } from './analyzeSurface';
+import { blendSurfaces } from './blendSurfaces';
 import { createNurbsSurface, surfaceFromPoints } from './buildSurface';
 import { checkContinuity, measureDeviation } from './checkJoints';
 import { createConic, createNurbsCurve, interpolateCurve } from './createCurve';
@@ -25,6 +26,7 @@ export const surfaceCommands = commandCatalog(
   surfaceFromPoints,
   loftSurface,
   fillSurface,
+  blendSurfaces,
   trimSurface,
   sewSurfaces,
   thickenSurface,

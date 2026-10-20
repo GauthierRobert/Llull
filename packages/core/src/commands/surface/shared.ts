@@ -39,6 +39,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   SRF_TRIM_LOOP_INVALID: 'give curves that chain end to end within tolerance, without self-crossings; an open curve must cross the sheet edge to edge',
   SRF_TRIM_AMBIGUOUS: 'give keepPoint, a point on the side of the cut to keep',
   SRF_TRIM_UNSUPPORTED: 'trim an untrimmed sheet, or add holes inside the kept region of a trimmed one',
+  SRF_BLEND_DEGENERATE: 'blend two edges with a gap between them and a regular (non-pole) surface along them; use check_continuity if they already touch',
+  SRF_BLEND_FOLD: 'choose the edges that face each other (each sheet must leave its edge towards the other one), or flip / reorder the sheets',
   SRF_TRIM_RANGE: 'give u and v intervals [from, to] inside the surface domain (see inspect_surface)',
   SRF_SEW_NOT_MERGEABLE: 'the surfaces must share one whole edge within `tolerance`; fill or move the edges, or raise `tolerance`',
   SRF_THICKEN_FAILED: 'thicken a surface with at least one non-degenerate normal',

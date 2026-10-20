@@ -2,16 +2,16 @@
 
 import { useMemo } from 'react';
 import type { NurbsSurfaceEntity } from '@core/model/types';
-import { tessellateSurface } from '@core/geometry/nurbsSurface';
+import { tessellateSheet } from '@core/geometry/nurbsSurface';
 import { SolidMeshShell, type SolidMeshKindProps } from './SolidMeshShell';
 import { buildMeshSolidGeometry } from './meshSolidGeometry';
 
 export function NurbsSurfaceMesh({ entity, ...shell }: SolidMeshKindProps<NurbsSurfaceEntity>): React.ReactElement {
-  const { surface } = entity;
+  const { surface, trims } = entity;
   // `surface` is a new reference only when the patch changes (pure commands, L3).
   const geometry = useMemo(() => {
-    const { positions, indices } = tessellateSurface(surface, 10);
+    const { positions, indices } = tessellateSheet(surface, trims, 10);
     return buildMeshSolidGeometry({ positions, indices });
-  }, [surface]);
+  }, [surface, trims]);
   return <SolidMeshShell entity={entity} geometry={geometry} doubleSided {...shell} />;
 }
