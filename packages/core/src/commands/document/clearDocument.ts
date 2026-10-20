@@ -57,6 +57,7 @@ export const clearDocument = defineCommand({
       doc.materialLibraries === undefined &&
       doc.fasteners === undefined &&
       doc.sheetMetal === undefined &&
+      doc.cfd === undefined &&
       doc.probabilistic === undefined &&
       doc.plant === undefined &&
       doc.scan === undefined &&
@@ -80,6 +81,7 @@ export const clearDocument = defineCommand({
     delete nextDoc.materialLibraries;
     delete nextDoc.fasteners;
     delete nextDoc.sheetMetal;
+    delete nextDoc.cfd;
     delete nextDoc.probabilistic;
     delete nextDoc.plant;
     delete nextDoc.scan;

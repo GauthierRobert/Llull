@@ -101,23 +101,6 @@
       "fai_report_skeleton",
       "record_as_built"
     ],
-    "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-01-prepare-checks.json": [
-      "cfd_create_case",
-      "cfd_prepare"
-    ],
-    "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-02-sphere-lbm.json": [
-      "cfd_create_case"
-    ],
-    "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-03-wedge-supersonic.json": [
-      "cfd_create_case"
-    ],
-    "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-04-sphere-stagnation.json": [
-      "cfd_create_case"
-    ],
-    "docs/aerospace/12-cfd-gpu/validation/plans/sc-cfd-05-winged-body-demo.json": [
-      "cfd_create_case",
-      "cfd_prepare"
-    ],
     "docs/physics/04-thermo-mechanical/validation/plans/tmc_fit_al_steel.plan.json": [
       "add_size_dimension",
       "set_pmi_standard"

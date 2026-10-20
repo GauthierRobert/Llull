@@ -1,0 +1,11 @@
+# Wind around a 1:1:2 tower: flow case with the COST 732 / AIJ domain and blockage from the geometry preparation (nothing is solved)
+design tower_wind units=m
+param width = 1
+param height = 2
+add_box tower size=[width,width,height] position=[10,0,0] anchor="min"
+cfd_create_case _ id="wind" entityIds=[tower] freestream={"speedMS":10} reference={"areaM2":2,"lengthM":2} domain={"rule":"buildings"} ground={"enabled":true,"moving":false} quality="draft"
+cfd_set_boundary _ caseId="wind" kind="wall" entityId=tower
+check cfd_prepare caseId="wind" path=solver expect == "lbm"
+check cfd_prepare caseId="wind" path=domain.box.max.2 expect ~= 6*height
+check cfd_prepare caseId="wind" path=blockageRatio expect ~= width*height/((width+10*height)*6*height) ± 0.01%
+check check_cfd path=status expect == "pass"

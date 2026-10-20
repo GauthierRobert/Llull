@@ -14,6 +14,7 @@ import type { DynamicsModel } from './dynamics';
 import type { PrototypeModel } from './prototype';
 import type { ReviewModel } from './review';
 import type { CurveSegment } from './curve';
+import type { CfdDocumentSlice } from './cfd';
 import type { FastenerModel, PartRef } from './fasteners';
 import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary';
 import type { MaterialFinish } from './materialFinish';
@@ -664,6 +665,8 @@ export interface CadDocument {
   materialLibraries?: Record<string, MaterialLibraryEntry>;
   /** Absent until the first fastener command (plugin `fasteners`, 08 MAT M5). */
   fasteners?: FastenerModel;
+  /** Absent until the first flow-case command (`cfd_create_case`, plugin `cfd`, 12 CFD). */
+  cfd?: CfdDocumentSlice;
   /** Absent until the first sheet-metal command (plugin `sheetmetal`, 07 FTR M3). */
   sheetMetal?: SheetMetalModel;
   /** Absent until the first probabilistic command (`define_random_variable`; plugin `cae`, PHY-18). */
