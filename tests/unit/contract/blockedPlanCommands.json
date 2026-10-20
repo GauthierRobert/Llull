@@ -2,7 +2,6 @@
   "_comment": "Plans under docs/**/validation referencing commands that are not registered yet (plan path -> sorted names). Remove entries as commands get built; never add one without a board note. Regenerate: UPDATE_BLOCKED_PLANS=1 npx vitest run tests/unit/contract/validationPlanCommands.test.ts",
   "blocked": {
     "docs/aerospace/02-advanced-surfacing/validation/plans/target_sears_haack_conic_fuselage.json": [
-      "loft_fuselage",
       "set_aircraft_frame"
     ],
     "docs/aerospace/03-gdt-mbd-pmi/validation/draft_plan_gdt_plate.json": [

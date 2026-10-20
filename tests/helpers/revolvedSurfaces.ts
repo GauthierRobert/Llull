@@ -29,7 +29,7 @@ interface ProfilePole {
  * The patch swept by turning `profile` (a rational NURBS curve in the (radius, z) half-plane given by its poles and the curve's knots)
  * a full turn about z: u = the turn, v = the profile parameter.
  */
-export function revolveProfile(
+function revolveProfile(
   profile: ReadonlyArray<ProfilePole>,
   degreeV: number,
   knotsV: ReadonlyArray<number>,

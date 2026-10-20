@@ -131,6 +131,13 @@ export function gordonSurface(
       (v[j] ??= []).push(tb);
     }
   }
+  // a collapsed section (a point, e.g. a nose tip) has no meaningful position along itself: it takes the mean of the others
+  const collapsed = sections.map((section) => section.poles.every((pole) => distance3(pole, section.poles[0] as Vec3) < 1e-9));
+  const live = u.filter((_, i) => !collapsed[i]);
+  if (live.length === 0) return { code: 'SRF_NURBS_INVALID', message: 'every section is collapsed to a point' };
+  u.forEach((row, i) => {
+    if (collapsed[i]) for (let j = 0; j < J; j++) row[j] = live.reduce((sum, other) => sum + (other[j] as number), 0) / live.length;
+  });
   const ordered = (list: ReadonlyArray<number>): boolean => list.every((x, k) => k === 0 || x > (list[k - 1] as number) + 1e-9);
   if (!v.every(ordered))
     return {

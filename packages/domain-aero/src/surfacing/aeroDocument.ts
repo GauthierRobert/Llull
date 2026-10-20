@@ -69,6 +69,27 @@ function wingErrors(key: string, raw: unknown, aero: Record<string, unknown>, en
   return errors;
 }
 
+function bodyErrors(key: string, raw: unknown, entities: Record<string, unknown> | null): string[] {
+  const at = `aero.bodies.${key}`;
+  if (!isRecord(raw)) return [`${at} must be an object`];
+  const errors: string[] = [];
+  if (raw['id'] !== key) errors.push(`${at}.id must equal its key`);
+  const stations = raw['stations'];
+  if (
+    !Array.isArray(stations) ||
+    stations.length < 2 ||
+    !stations.every((s) => isRecord(s) && isNumber(s['fs']) && isRecord(s['section']) && isText(s['section']['type']))
+  )
+    errors.push(`${at}.stations needs at least 2 stations with fs and section.type`);
+  if (!Array.isArray(raw['controlCurveIds']) || !raw['controlCurveIds'].every(isText))
+    errors.push(`${at}.controlCurveIds must be a list of ids`);
+  if (!isNumber(raw['degreeV'])) errors.push(`${at}.degreeV must be a number`);
+  if (!isText(raw['entityId'])) errors.push(`${at}.entityId must be text`);
+  else if (entities !== null && !Object.hasOwn(entities, raw['entityId']))
+    errors.push(`${at} references missing surface '${raw['entityId']}'`);
+  return errors;
+}
+
 /** Drops definitions whose entities were deleted (airfoil curve, wing lofts) so a saved file always reopens; malformed data is left for `validate`. */
 function pruneDanglingAero(raw: Record<string, unknown>): Record<string, unknown> {
   const slice = raw['aero'];
@@ -87,11 +108,17 @@ function pruneDanglingAero(raw: Record<string, unknown>): Record<string, unknown
     const sectionsOk = wing['sections'].every((s) => !isRecord(s) || !isText(s['airfoilId']) || Object.hasOwn(airfoils, s['airfoilId']));
     if (entityIds.length > 0 && sectionsOk) wings[key] = entityIds.length === wing['entityIds'].length ? wing : { ...wing, entityIds };
   }
+  const bodies = isRecord(slice['bodies'])
+    ? Object.fromEntries(
+        Object.entries(slice['bodies']).filter(([, b]) => !isRecord(b) || !isText(b['entityId']) || Object.hasOwn(entities, b['entityId'])),
+      )
+    : undefined;
   const unchanged =
+    (bodies === undefined || Object.keys(bodies).length === Object.keys(slice['bodies'] as Record<string, unknown>).length) &&
     Object.keys(airfoils).length === Object.keys(slice['airfoils']).length &&
     Object.keys(wings).length === Object.keys(slice['wings']).length &&
     Object.entries(wings).every(([key, wing]) => wing === (slice['wings'] as Record<string, unknown>)[key]);
-  return unchanged ? raw : { ...raw, aero: { ...slice, airfoils, wings } };
+  return unchanged ? raw : { ...raw, aero: { ...slice, airfoils, wings, ...(bodies === undefined ? {} : { bodies }) } };
 }
 
 export const aeroDocument: DocumentExtension = {
@@ -103,6 +130,11 @@ export const aeroDocument: DocumentExtension = {
     return [
       ...Object.entries(slice['airfoils']).flatMap(([key, value]) => airfoilErrors(key, value, entities)),
       ...Object.entries(slice['wings']).flatMap(([key, value]) => wingErrors(key, value, slice, entities)),
+      ...(slice['bodies'] === undefined
+        ? []
+        : isRecord(slice['bodies'])
+          ? Object.entries(slice['bodies']).flatMap(([key, value]) => bodyErrors(key, value, entities))
+          : ['aero.bodies must be an object']),
     ];
   },
   derivedEntityIds: () => new Set(),

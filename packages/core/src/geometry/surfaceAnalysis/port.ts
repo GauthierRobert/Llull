@@ -13,7 +13,7 @@ import { analyzeDraft } from './draft';
 import type { SurfaceAnalysisEngine } from './types';
 
 /** The always-available TS engine. */
-export const tsSurfaceAnalysis: SurfaceAnalysisEngine = {
+const tsSurfaceAnalysis: SurfaceAnalysisEngine = {
   provenance: { engine: 'ts-nurbs', exact: true },
   curvature: (surface, parameters) => parameters.map(([u, v]) => surfaceSample(surface, u, v)),
   continuity: analyzeContinuity,

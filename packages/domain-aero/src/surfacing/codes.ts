@@ -20,6 +20,12 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'drop the surplus value: exactly 3 independent planform values are needed, and they must not contradict each other',
   AERO_SECTIONS_INCOMPATIBLE: 'use the same trailing-edge type and the same `points` for every airfoil of one wing',
   SRF_LOFT_SECTIONS_TOO_FEW: 'give at least 2 sections',
+  AERO_FS_NOT_INCREASING: 'sort the stations by fs, strictly increasing',
+  SRF_CONIC_RHO_RANGE: 'use 0 < rho < 1 (0.4142 = circle, 0.5 = parabola)',
+  SRF_NOT_NURBS: 'pass the id of a nurbs_curve (interpolate_curve, create_conic, create_nurbs_curve)',
+  SRF_LOFT_GUIDE_MISSES_SECTION: 'snap the control curve to the section curves, list the stations along it, or raise controlTolerance',
+  SRF_NURBS_INVALID: 'check the station sections: every fs and dimension must be finite',
+  SRF_POINTS_INSUFFICIENT: 'give at least 2 stations',
 };
 
 export const refuseAero = tableRejection(REMEDIATION);
