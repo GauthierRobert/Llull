@@ -99,6 +99,10 @@ describeNative('AP242 PMI round trip on the native kernel (VC-GDT-21, 25)', () =
     expect(census['POSITION_TOLERANCE']).toBe(2);
     expect(census['DATUM']).toBeGreaterThanOrEqual(3);
     expect(census['DIMENSIONAL_SIZE']).toBeGreaterThanOrEqual(2);
+    // one datum_system per reference frame of the product (SFA, AP242 PMI rec. practice 6.9.7): both positions share A|B|C, the
+    // perpendicularity has its own; OCC alone wrote one frame per tolerance (3 systems, 7 compartments)
+    expect(census['DATUM_SYSTEM']).toBe(2);
+    expect(census['DATUM_REFERENCE_COMPARTMENT']).toBe(4);
 
     const back = run(createEmptyDocument(), 'import_step_exact', { text: data.step, fileName: 'plate-roundtrip.stp' });
     expect(back.rejected, back.summary).toBeUndefined();

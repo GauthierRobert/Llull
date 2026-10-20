@@ -794,6 +794,15 @@ flatness / perpendicularity / position tolerance and datum entities) probes for 
 written from SFA's documentation and have never run, so treat them as unverified. The offline stand-in is the entity census of the written Part 21 text with the independent reader
 (`lib/step21`), asserted in the round-trip test. A CTC case is not exported (llull writes one product per loose solid; the NIST CTC files have no llull model behind them).
 
+**SFA run, first writer defect fixed (2026-10-20, branch `fix/ap242-drf`).** With the IFCsvr toolkit installed, SFA reported on the plate: "Datum Reference Frames for
+'datum_system' should be unique for the same product_definition_shape" (AP242 PMI rec. practice §6.9.7). Cause: OCC 7.9.2's `STEPCAFControl_Writer` (`WriteDatumSystem`) builds a
+new DATUM_SYSTEM with its own DATUM_REFERENCE_COMPARTMENTs for every tolerance, so the two positions on A|B|C wrote two identical frames (3 systems, 7 compartments). Fix:
+`llull-kernel-occt/cpp/xde_drf.cxx` `merge_datum_systems`, run by `xde_write` after the transfer and before the file is written: identical frames (same
+product_definition_shape, same compartments in order, same datums and modifiers) are merged, every tolerance refers to the first, and the duplicates leave the model (2 systems,
+4 compartments; asserted in `gdtPmiRoundTrip.test.ts` and `cargo test` `writes_one_datum_system_per_distinct_reference_frame_of_a_product`). The reader is unchanged (one shared frame is
+also what other systems write; the NIST gate passes). `sfaPmi.test.ts` now reads the CSV reports from SFA's `<name>-sfa-csv` folder. Known, not fixed: OCC's writer keys datums by
+label across the whole document, so two products that both define a datum "A" share the first product's DATUM entities (the second product's datum features are not written).
+
 **M5n.** Our M5n build (xoshiro TS sampler, a separate Philox native sampler, not bit-equal) was replaced in the merge with main by main's RS-7 build, which is bit-equal between TypeScript and `llull-compute stats` (§13.6). What we kept: the PMI-linked contributors, the `contributors[]` echo, the `lowerSpecLimit <= upperSpecLimit` check (`GDT_LIMITS_INVERTED`), the review reason for linked items awaiting review, and on `fastener_tolerance` the `part`, `statedWithinClearance` and `allowedPositionAtLmc` fields.
 
 Tests: `tests/unit/pmi/ap242.test.ts` (apply_pmi_set, xcafMapping tables, write stage on the analytic plate), `tests/unit/exchange/importPmi.test.ts` (read stage),

@@ -68,7 +68,8 @@ describeNative.skipIf(reason !== null)('SFA on the AP242 files llull writes (VC-
       // SFA always prints the progress line "<Reading STEP file and checking for syntax errors>"; only a reported error counts.
       const syntaxErrors = output.split(/\r?\n/).filter((line) => /syntax error/i.test(line) && !/checking for syntax errors/i.test(line));
       expect(syntaxErrors, output).toEqual([]);
-      const reports = readdirSync(dir).filter((name) => name.endsWith('.csv'));
+      // SFA saves the CSV reports in a "<name>-sfa-csv" folder next to the file
+      const reports = readdirSync(dir, { recursive: true, encoding: 'utf8' }).filter((name) => name.endsWith('.csv'));
       expect(reports.length, output).toBeGreaterThan(0);
       const text = reports
         .map((name) => readFileSync(path.join(dir, name), 'utf8'))

@@ -10,6 +10,7 @@
 #include <vector>
 
 #include <TCollection_ExtendedString.hxx>
+#include <StepData_StepModel.hxx>
 #include <TDF_Label.hxx>
 #include <TDocStd_Document.hxx>
 #include <XCAFDoc_DimTolTool.hxx>
@@ -194,6 +195,10 @@ void write_product_pmi(const Handle(XCAFDoc_ShapeTool) & shapes, const TDF_Label
 std::map<int, std::string> read_pmi(const Handle(XCAFDoc_DimTolTool) & tool, const std::map<std::string, int> &products,
                                     const std::map<int, TopoDS_Shape> &shape_of, const Handle(XSControl_WorkSession) & session, const std::string &content,
                                     int &unmapped);
+
+// AP242 PMI (xde_drf.cxx): merge the identical DATUM_SYSTEMs OCC's writer emits once per tolerance into one per datum reference frame and
+// product_definition_shape, every tolerance referring to it; returns how many records left the model.
+int merge_datum_systems(const Handle(StepData_StepModel) & model);
 
 // One AP242 / AP214 / AP203 file (`schema` = DESTEP_Parameters::WriteMode_StepSchema 3, 4 or 5) written in `unit` (mm, cm, m, in, ft; the
 // numbers are the document's own). `root_name` names the root assembly when any use has parent -1; `root_validation` is its GVP (volume,

@@ -220,3 +220,64 @@ fn an_inch_document_writes_its_tolerance_in_inches() {
     let value = back["products"][0]["pmi"]["tolerances"][0]["value"].as_f64().unwrap();
     assert!((value - 0.002 * 25.4).abs() < 1e-9, "read in millimetres: {value}");
 }
+
+/// Datums `[a, b, c]` and four tolerances: two positions on the same frame a|b|c, a perpendicularity on a, a flatness without datum.
+fn framed_pmi([a, b, c]: [&str; 3]) -> ExchangePmi {
+    let datum = |label: &str, face: i32| PmiDatum { label: label.to_string(), faces: vec![face], attrs: vec![] };
+    let tolerance = |characteristic: &str, face: i32, datums: &[&str]| PmiTolerance {
+        characteristic: characteristic.to_string(),
+        value: 0.1,
+        diameter_zone: characteristic == "position",
+        faces: vec![face],
+        datums: datums.iter().map(|name| name.to_string()).collect(),
+        attrs: vec![],
+    };
+    ExchangePmi {
+        datums: vec![datum(a, 4), datum(b, 0), datum(c, 2)],
+        tolerances: vec![
+            tolerance("position", 1, &[a, b, c]),
+            tolerance("position", 3, &[a, b, c]),
+            tolerance("perpendicularity", 1, &[a]),
+            tolerance("flatness", 5, &[]),
+        ],
+        dimensions: vec![],
+    }
+}
+
+#[test]
+fn writes_one_datum_system_per_distinct_reference_frame_of_a_product() {
+    let _guard = serial();
+    let first = make_box([0.0, 0.0, 0.0], [10.0, 20.0, 30.0]).unwrap().unwrap();
+    let second = make_box([0.0, 0.0, 0.0], [5.0, 5.0, 5.0]).unwrap().unwrap();
+    let labels = [["A", "B", "C"], ["D", "E", "F"]];
+    let mut plate = product("Plate", &first, "", None);
+    plate.pmi = framed_pmi(labels[0]);
+    let mut lug = product("Lug", &second, "", None);
+    lug.pmi = framed_pmi(labels[1]);
+    let uses = vec![
+        ExchangeUse { parent: -1, product: 0, name: "Plate 1".to_string(), rotation: [0.0; 3], position: [0.0; 3] },
+        ExchangeUse { parent: -1, product: 1, name: "Lug 1".to_string(), rotation: [0.0; 3], position: [50.0, 0.0, 0.0] },
+    ];
+    let text = write_exchange(&request(vec![plate, lug], uses, 5, "mm")).unwrap().unwrap();
+    // per product: a|b|c (shared by both positions) and a (the perpendicularity), each compartment once per frame (OCC wrote 6 and 14)
+    assert_eq!(text.matches("DATUM_SYSTEM(").count(), 4, "one datum_system per frame and product");
+    assert_eq!(text.matches("DATUM_REFERENCE_COMPARTMENT(").count(), 8);
+    let tree = import_exchange(&text, options()).unwrap();
+    for (name, [a, b, c]) in [("Plate", labels[0]), ("Lug", labels[1])] {
+        let products = tree["products"].as_array().unwrap();
+        let pmi = &products.iter().find(|entry| entry["name"] == json!(name)).unwrap()["pmi"];
+        let tolerances = pmi["tolerances"].as_array().unwrap();
+        let read: Vec<_> =
+            tolerances.iter().map(|entry| (entry["characteristic"].clone(), entry["faces"].clone(), entry["datums"].clone())).collect();
+        for expected in [
+            (json!("position"), json!([1]), json!([a, b, c])),
+            (json!("position"), json!([3]), json!([a, b, c])),
+            (json!("perpendicularity"), json!([1]), json!([a])),
+            (json!("flatness"), json!([5]), json!([])),
+        ] {
+            assert!(read.contains(&expected), "{expected:?} in {pmi}");
+        }
+        assert_eq!(pmi["datums"].as_array().unwrap().len(), 3, "{pmi}");
+    }
+    assert_eq!(tree["pmiUnmapped"], json!(0));
+}

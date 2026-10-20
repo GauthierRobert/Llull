@@ -400,6 +400,7 @@ rust::String xde_write(XdeDoc &doc, int32_t schema, rust::Str unit, rust::Str fi
     if (found != descriptions.end()) step_product->SetDescription(new TCollection_HAsciiString(found->second.c_str()));
   }
   repair_pmi_length_units(model);
+  if (has_pmi) merge_datum_systems(model);
   APIHeaderSection_MakeHeader header(model);
   header.SetName(new TCollection_HAsciiString(text_of(file_name).c_str()));
   if (!timestamp.empty()) header.SetTimeStamp(new TCollection_HAsciiString(text_of(timestamp).c_str()));
