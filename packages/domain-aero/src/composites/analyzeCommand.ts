@@ -23,8 +23,8 @@ export const analyzeLaminate = defineCommand({
   annotations: { readOnly: true },
   description:
     'Classical Laminate Theory of a stack: reduced stiffness Q of the first ply material, A (N/mm), B (N), D (N*mm), the 6x6 ABD inverse, ' +
-    'engineering constants Ex, Ey, Gxy (MPa) and nuxy reported both as membrane constants (A inverse) and free-bending constants (ABD ' +
-    'inverse; equal when the laminate is symmetric). Stacking runs bottom (tool side) to top, +z along the laminate normal, engineering ' +
+    'engineering constants Ex, Ey, Gxy (MPa) and nuxy reported as membrane constants (A inverse), in-plane constants with bending unrestrained ' +
+    '("free bending", from the ABD inverse; equal to membrane when symmetric) and flexural constants (constantsFlexural, from D inverse: E = 12 / (h^3 d)). Stacking runs bottom (tool side) to top, +z along the laminate normal, engineering ' +
     'shear strain, N-mm-MPa (thickness converted from document units). Give EITHER `part` + `point` (the stack of the part at that world ' +
     'point, see core_sample) OR `angles` (degrees, bottom to top) / `laminate` (stacking string, e.g. "[0/+-45/90]s") + `material`. ' +
     'With `loads` (Nx, Ny, Nxy in N/mm; Mx, My, Mxy in N*mm/mm) it adds mid-plane strains, ply stresses at the bottom and top of every ply ' +

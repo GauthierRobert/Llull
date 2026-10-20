@@ -91,8 +91,16 @@ export function analyzeStack(
     constantsFreeBending: {
       ...Object.fromEntries(Object.entries(constants.freeBending).map(([k, v]) => [k, sig(v)])),
       unit: 'MPa (nuxy dimensionless)',
-      definition: 'top-left 3x3 of the ABD inverse',
+      definition: 'in-plane constants with bending unrestrained: top-left 3x3 of the ABD inverse',
     },
+    constantsFlexural:
+      constants.flexural === null
+        ? null
+        : {
+            ...Object.fromEntries(Object.entries(constants.flexural).map(([k, v]) => [k, sig(v)])),
+            unit: 'MPa (nuxy dimensionless)',
+            definition: 'equivalent homogeneous plate in bending: E = 12 / (h^3 d), d = D inverse',
+          },
     unverified,
     unverifiedMaterials: materials.filter(isUnverified).map((material) => material.name),
     defaults: f12Defaulted

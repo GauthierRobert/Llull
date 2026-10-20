@@ -4,7 +4,9 @@ import type { PartSurface, Rosette } from '@core/model/composites';
 import type { Entity, Vec2, Vec3 } from '@core/model/types';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { recipeOf } from '@core/geometry/shapeRecipe';
+import { toCounterClockwise } from '@lib/polygon';
 import { cross3, dot3, len3, normalize3, scale3, sub3 } from '@lib/vec3';
+import { toFlat } from './surface';
 import {
   type CylinderFace,
   type FaceCandidate,
@@ -14,6 +16,8 @@ import {
   distanceToFace,
   primitiveFaces,
 } from './faceCandidates';
+
+const TWO_PI = 2 * Math.PI;
 
 export type FaceResolution =
   | { readonly ok: true; readonly surface: PartSurface; readonly outline: Vec2[]; readonly faceIndex?: number }
@@ -64,20 +68,22 @@ function cylinderPart(face: CylinderFace): FaceResolution {
 }
 
 /** Developed sector of a cone face: apex (or the inner arc) and the outer arc, arcs cut at `tolerance` (document units). */
-function conePart(face: ConeFace, tolerance: number): FaceResolution {
+function conePart(face: ConeFace, tolerance: number, mirrored = false): FaceResolution {
   const [u0, u1] = face.uRange;
   const k = Math.sin(face.semiAngle);
   const [rho0, rho1] = face.rhoRange;
   const arc = (rho: number, reverse: boolean): Vec2[] => {
     const n = arcSteps(rho, (u1 - u0) * k, tolerance);
     const points = Array.from({ length: n + 1 }, (_, i): Vec2 => {
-      const theta = (u0 + ((u1 - u0) * i) / n) * k;
+      const u = u0 + ((u1 - u0) * i) / n;
+      const theta = (mirrored ? TWO_PI * Math.ceil(u1 / TWO_PI - 1e-12) - u : u) * k;
       return [rho * Math.cos(theta), rho * Math.sin(theta)];
     });
     return reverse ? points.reverse() : points;
   };
   const outer = arc(rho1, false);
-  const outline = rho0 < 1e-9 ? [[0, 0] as Vec2, ...outer] : [...outer, ...arc(rho0, true)];
+  const ring = rho0 < 1e-9 ? [[0, 0] as Vec2, ...outer] : [...outer, ...arc(rho0, true)];
+  const outline = mirrored ? toCounterClockwise(ring) : ring;
   return { ok: true, surface: { type: 'cone', apex: face.apex, axis: face.axis, xDir: face.xDir, semiAngle: face.semiAngle }, outline };
 }
 
@@ -150,26 +156,24 @@ function kernelFace(kernel: GeometryKernel, entity: Entity, near: Vec3, rosette:
     );
   }
   if (surface.type === 'cone') {
-    const ends = port.evaluateFace(shape, index, [
+    const um = (u0 + u1) / 2;
+    const probes = port.evaluateFace(shape, index, [
       [u0, v0],
       [u0, v1],
+      [um, v1],
     ]);
-    if (ends === null || ends.length < 2) return fail('CMP_FACE_UNSUPPORTED', 'the kernel could not evaluate the cone face');
-    const [rhoA, rhoB] = ends.map((end) => len3(sub3(end.point, surface.apex))) as [number, number];
-    return withIndex(
-      conePart(
-        {
-          type: 'cone',
-          apex: surface.apex,
-          axis: normalize3(surface.axis),
-          xDir: normalize3(surface.xDir),
-          semiAngle: surface.semiAngle,
-          uRange: [u0, u1],
-          rhoRange: [Math.min(rhoA, rhoB), Math.max(rhoA, rhoB)],
-        },
-        tolerance,
-      ),
-    );
+    if (probes === null || probes.length < 3) return fail('CMP_FACE_UNSUPPORTED', 'the kernel could not evaluate the cone face');
+    const [rhoA, rhoB] = probes.slice(0, 2).map((probe) => len3(sub3(probe.point, surface.apex))) as [number, number];
+    const kernelAxis = normalize3(surface.axis);
+    // The part axis points from the apex into the solid; the azimuth runs counter-clockwise about the kernel's own axis.
+    const axis = dot3(sub3((probes[1] as { point: Vec3 }).point, surface.apex), kernelAxis) < 0 ? scale3(kernelAxis, -1) : kernelAxis;
+    const frame = { type: 'cone', apex: surface.apex, axis, xDir: normalize3(surface.xDir), semiAngle: surface.semiAngle } as const;
+    const hit = toFlat(frame, (probes[2] as { point: Vec3 }).point).uv;
+    const measured = Math.atan2(hit[1], hit[0]) / Math.sin(surface.semiAngle);
+    const wrapped = (angle: number): number => ((angle % TWO_PI) + TWO_PI) % TWO_PI;
+    const gap = (a: number, b: number): number => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+    const mirrored = gap(wrapped(measured), um) > gap(wrapped(measured), -um);
+    return withIndex(conePart({ ...frame, uRange: [u0, u1], rhoRange: [Math.min(rhoA, rhoB), Math.max(rhoA, rhoB)] }, tolerance, mirrored));
   }
   return fail('CMP_FACE_UNSUPPORTED', `face ${index} is a ${surface.type} surface; only plane, cylinder and cone faces are supported`);
 }

@@ -56,7 +56,7 @@ describe('composites document extension', () => {
     rejects((m) => ((m['parts'] as Model[string])[first(m['parts'])]!['surface'] = { type: 'torus' }), /surface\.type/);
     rejects((m) => ((m['parts'] as Model[string])[first(m['parts'])]!['rosetteId'] = 'x'), /missing rosette/);
     rejects((m) => ((m['parts'] as Model[string])[first(m['parts'])]!['toolFaces'] = []), /toolFaces/);
-    rejects((m) => ((m['parts'] as Model[string])[first(m['parts'])]!['toolFaces'] = [{ entityId: 'ghost' }]), /missing tool entity/);
+    rejects((m) => ((m['parts'] as Model[string])[first(m['parts'])]!['toolFaces'] = [{}]), /need an entityId/);
     rejects((m) => ((m['zones'] as Model[string])[first(m['zones'])]!['partId'] = 'x'), /missing part/);
     rejects((m) => ((m['zones'] as Model[string])[first(m['zones'])]!['boundary'] = [[0, 0]]), /boundary/);
     rejects((m) => ((m['zones'] as Model[string])[first(m['zones'])]!['angles'] = []), /angles/);

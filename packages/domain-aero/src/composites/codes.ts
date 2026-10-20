@@ -21,6 +21,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   CMP_ZONES_NOT_BLENDABLE: 'edit the thinner zone so its stack embeds in the thicker one (same angles in the same order, symmetric halves)',
   CMP_ZONES_EQUAL_THICKNESS_CONFLICT: 'make the equally thick zones identical or change a ply count',
   CMP_COVER_PLIES_DROPPED: 'keep the outer cover plies continuous: use identical outer plies in every zone or lower coverPlies',
+  CMP_OUTLINE_NOT_CONVEX: 'use a convex tool face (box, cylinder or cone cap) for zone ramps, or keep the plies whole-face',
   CMP_RAMP_CONFLICT: 'move the zone boundary, lower the ramp ratio (with a reviewer) or reduce the thickness step',
   CMP_LAMINATE_SINGULAR: 'add plies in other directions (a single angle cannot carry shear or transverse load)',
   CMP_NO_PLIES: 'add plies (add_ply or generate_plies_from_zones) at that point first',

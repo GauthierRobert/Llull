@@ -44,7 +44,7 @@ function materialErrors(name: string, m: Record<string, unknown>): string[] {
 }
 
 /** Value errors of the raw `composites` slice (an empty list = valid). */
-export function compositesErrors(slice: unknown, entities: Record<string, unknown> | null): string[] {
+export function compositesErrors(slice: unknown): string[] {
   if (!isRecord(slice)) return ['composites must be an object'];
   const errors = [
     ...tableErrors(slice, 'materials', materialErrors),
@@ -66,10 +66,8 @@ export function compositesErrors(slice: unknown, entities: Record<string, unknow
         out.push(`composites.parts.${id} references a missing rosette`);
       const faces = p['toolFaces'];
       if (!Array.isArray(faces) || faces.length === 0) out.push(`composites.parts.${id}.toolFaces must list a face`);
-      else if (entities !== null)
-        for (const face of faces)
-          if (!isRecord(face) || !isText(face['entityId']) || !Object.hasOwn(entities, face['entityId']))
-            out.push(`composites.parts.${id} references a missing tool entity`);
+      else if (!faces.every((face) => isRecord(face) && isText(face['entityId'])))
+        out.push(`composites.parts.${id}.toolFaces need an entityId`);
       return out;
     }),
     ...tableErrors(slice, 'zones', (id, z) => {
@@ -116,14 +114,12 @@ export function compositesErrors(slice: unknown, entities: Record<string, unknow
 
 /** Ply outlines regenerate from the model: omitted from saved files and re-derived on load. */
 export const compositesDocument: DocumentExtension = {
-  validate: (raw) =>
-    raw['composites'] === undefined ? [] : compositesErrors(raw['composites'], isRecord(raw['entities']) ? raw['entities'] : null),
+  validate: (raw) => (raw['composites'] === undefined ? [] : compositesErrors(raw['composites'])),
   derivedEntityIds: (doc) =>
     new Set(Object.values(doc.composites?.plies ?? {}).flatMap((ply) => outlineIdsOf(ply, doc.composites?.parts[ply.partId]))),
   restore: (raw) => {
     const saved = raw['composites'];
-    if (saved === undefined || compositesErrors(saved, null).length > 0 || !isRecord(raw['entities']) || !Array.isArray(raw['order']))
-      return raw;
+    if (saved === undefined || compositesErrors(saved).length > 0 || !isRecord(raw['entities']) || !Array.isArray(raw['order'])) return raw;
     const layers = isRecord(raw['layers']) ? raw['layers'] : {};
     const entities = raw['entities'];
     const layerOf = (part: { toolFaces: readonly { entityId: string }[] }): string => {

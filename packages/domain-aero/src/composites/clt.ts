@@ -138,18 +138,33 @@ const constantsOf = (a: Matrix, thickness: number): EngineeringConstants => {
   return { Ex: 1 / (thickness * at(0, 0)), Ey: 1 / (thickness * at(1, 1)), Gxy: 1 / (thickness * at(2, 2)), nuxy: -at(0, 1) / at(0, 0) };
 };
 
+/** Flexural constants of an equivalent homogeneous plate from D inverse: E = 12 / (h^3 d). */
+const flexuralOf = (d: Matrix, thickness: number): EngineeringConstants => {
+  const at = (i: number, j: number): number => (d[i] as number[])[j] as number;
+  const scale = 12 / thickness ** 3;
+  return { Ex: scale / at(0, 0), Ey: scale / at(1, 1), Gxy: scale / at(2, 2), nuxy: -at(0, 1) / at(0, 0) };
+};
+
 /**
- * Membrane constants (A inverse) and free-bending constants (top-left 3x3 block of the ABD inverse); equal for symmetric laminates.
+ * Membrane constants (A inverse), in-plane constants with bending unrestrained ("free bending": top-left 3x3 block of the ABD inverse) and
+ * flexural constants (D inverse); membrane and free-bending are equal for symmetric laminates.
  * @failure singular or ill-conditioned ABD -> null
  */
 export function engineeringConstants(
   laminate: Laminate,
-): { readonly abdInverse: Matrix; readonly membrane: EngineeringConstants; readonly freeBending: EngineeringConstants } | null {
+): {
+  readonly abdInverse: Matrix;
+  readonly membrane: EngineeringConstants;
+  readonly freeBending: EngineeringConstants;
+  readonly flexural: EngineeringConstants | null;
+} | null {
   const abdInverse = invert(assemble6(laminate));
   const aInverse = invert(laminate.A);
+  const dInverse = invert(laminate.D);
   if (abdInverse === null || aInverse === null) return null;
   return {
     abdInverse,
+    flexural: dInverse === null ? null : flexuralOf(dInverse, laminate.thickness),
     membrane: constantsOf(aInverse, laminate.thickness),
     freeBending: constantsOf(
       abdInverse.slice(0, 3).map((row) => row.slice(0, 3)),
