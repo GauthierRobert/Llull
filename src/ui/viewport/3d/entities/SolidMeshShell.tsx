@@ -38,6 +38,8 @@ interface SolidMeshShellProps {
   doubleSided?: boolean;
   /** BVH for raycasting (default true). */
   boundsTree?: boolean;
+  /** Colours come from the geometry's `color` attribute (analysis colour maps). */
+  vertexColors?: boolean;
 }
 
 export function SolidMeshShell({
@@ -49,6 +51,7 @@ export function SolidMeshShell({
   surface = DEFAULT_SOLID_SURFACE,
   doubleSided = false,
   boundsTree = true,
+  vertexColors = false,
 }: SolidMeshShellProps): React.ReactElement {
   const { position, rotation, color } = entity;
 
@@ -114,6 +117,7 @@ export function SolidMeshShell({
           // transparent / depthWrite only take effect on a fresh material: rebuild it when the ghost state flips
           key={ghosted ? 'ghost' : 'solid'}
           {...matProps}
+          {...(vertexColors ? { vertexColors: true, color: '#ffffff' } : {})}
           side={doubleSided ? THREE.DoubleSide : matProps.side}
           polygonOffset
           polygonOffsetFactor={1}

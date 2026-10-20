@@ -56,14 +56,15 @@ export function gridParameters(surface: NurbsSurfaceData, perSpan = 8): { us: nu
   return { us: directionSamples(surface.knotsU, perSpan), vs: directionSamples(surface.knotsV, perSpan) };
 }
 
-/** Display tessellation of a sheet: the grid of `tessellateSurface` restricted to the region of `trims` (cut cells are clipped to it); no trims = the whole patch. */
+/** Display tessellation of a sheet (with the (u, v) of every vertex, for colour maps): the grid of `tessellateSurface` restricted to the region of `trims` (cut cells are clipped to it); no trims = the whole patch. */
 export function tessellateSheet(
   surface: NurbsSurfaceData,
   trims: ReadonlyArray<UvTrimLoop> | undefined,
   perSpan = 8,
-): { positions: number[]; indices: number[] } {
-  if (trims === undefined || trims.length === 0) return tessellateSurface(surface, perSpan);
+): { positions: number[]; indices: number[]; uvs: number[] } {
   const { us, vs } = gridParameters(surface, perSpan);
+  const uvs = us.flatMap((u) => vs.flatMap((v) => [u, v]));
+  if (trims === undefined || trims.length === 0) return { ...tessellateSurface(surface, perSpan), uvs };
   const positions: number[] = [];
   for (const u of us) for (const v of vs) positions.push(...evaluateSurface(surface, u, v));
   const indices: number[] = [];
@@ -76,9 +77,10 @@ export function tessellateSheet(
   for (const triangle of grid.triangles)
     for (const [u, v] of triangle) {
       indices.push(positions.length / 3);
+      uvs.push(u, v);
       positions.push(...evaluateSurface(surface, u, v));
     }
-  return { positions, indices };
+  return { positions, indices, uvs };
 }
 
 export function tessellateSurface(surface: NurbsSurfaceData, perSpan = 8): SurfaceMesh {
