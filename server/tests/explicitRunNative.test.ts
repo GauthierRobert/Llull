@@ -325,4 +325,54 @@ describe('explicit_run with the real llull-compute', () => {
     },
     600_000,
   );
+  native(
+    'a bar pulled by add_imposed_motion carries rho c0 v behind the front (RS-8, through commands and the job contract)',
+    async () => {
+      const model = barModel({ size: 2.5 });
+      let start = must(model.doc, 'delete_rigid_wall', { analysisId: model.analysisId, wallId: model.wallId }).document;
+      start = must(start, 'set_initial_velocity', {
+        analysisId: model.analysisId,
+        entityId: model.barId,
+        velocity: { vector: [0, 0, 0], unit: 'mm/s' },
+      }).document;
+      start = must(start, 'set_explicit_controls', {
+        analysisId: model.analysisId,
+        endTime: { value: (0.6 * DURATION) / 2, unit: 's' },
+        historyInterval: { value: 1e-6, unit: 's' },
+        mesh: { kind: 'structured_hex', size: 2.5 },
+      }).document;
+      start = must(start, 'add_imposed_motion', {
+        analysisId: model.analysisId,
+        name: 'pull',
+        target: { entityId: model.barId, facesNear: [[5, 5, 0]] },
+        dof: 'z',
+        curve: [
+          [0, -10],
+          [1, -10],
+        ],
+        unit: 'm/s',
+      }).document;
+      let doc = start;
+      const host: FeaHost = {
+        getDoc: () => doc,
+        applyCommand: (name, params) => {
+          const result = execute(doc, name, params, { ...defaultContext(), feaArtifacts: store });
+          if (result.rejected !== true) doc = result.document;
+          return { summary: result.summary, affected: result.affected, isError: result.rejected === true, data: result.data };
+        },
+      };
+      const result = await runExplicitRun(model.analysisId, { timeoutS: 300 }, host, { store, runner: createComputeRunner({}, BINARY) });
+      expect(result.isError, result.summary).toBe(false);
+      const artifact = store.get((result.data as { artifactHash: string }).artifactHash) as FeExplicitArtifact;
+      expect(artifact.termination).toBe('normal');
+      // Behind the front (c0 t = 120 mm), away from the pulled end: centroids 20..100 mm.
+      const behind = artifact.vonMises.filter((_, element) => {
+        const z = artifact.centroids[3 * element + 2] ?? 0;
+        return z > 20 && z < 100;
+      });
+      const mean = behind.reduce((sum, value) => sum + value, 0) / behind.length;
+      expect(Math.abs(mean / (FORCE / 100) - 1)).toBeLessThan(0.05);
+    },
+    300_000,
+  );
 });
