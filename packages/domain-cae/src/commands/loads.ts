@@ -19,13 +19,14 @@ interface LoadFields {
   readonly vector?: Vec3 | undefined;
   readonly magnitude?: number | undefined;
   readonly distribution?: 'total' | 'per_node' | undefined;
+  readonly referencePoint?: Vec3 | undefined;
 }
 
 const RELEVANT: Readonly<Record<LoadKind, readonly (keyof LoadFields)[]>> = {
   force: ['target', 'vector', 'distribution'],
   pressure: ['target', 'magnitude'],
   gravity: ['vector'],
-  moment: ['target', 'vector'],
+  moment: ['target', 'vector', 'referencePoint'],
 };
 
 const UNITS_NOTE =
@@ -48,6 +49,9 @@ const loadFieldsSchema = {
     .enum(['total', 'per_node'])
     .optional()
     .describe('force only: "total" (default) spreads the vector over the target; "per_node" applies it at every target node.'),
+  referencePoint: vec3(
+    'moment only: point [x, y, z] in document units the moment acts about; the Nastran BDF export puts an RBE3 reference node there. Default: the centroid of the target nodes. The CalculiX deck applies a pure couple, which has no reference point, so it ignores this.',
+  ).optional(),
 };
 
 /** Params the kind does not use (an explicit unused param is an error, never silently dropped). */
@@ -79,6 +83,7 @@ function problemOf(doc: CadDocument, analysisCase: AnalysisCase, load: FeaLoad):
     (load.target.pointsNear?.length ?? 0) < 3
   )
     return invalid('a moment needs a face (facesNear), an edge (edgesNear) or at least three pointsNear: it is carried by several nodes');
+  if (load.referencePoint !== undefined && !load.referencePoint.every(Number.isFinite)) return invalid('referencePoint must be finite');
   if (load.kind === 'pressure' && (load.magnitude === undefined || !Number.isFinite(load.magnitude) || load.magnitude === 0))
     return invalid('pressure needs a non-zero finite magnitude');
   return null;
@@ -101,7 +106,7 @@ export const addFeaLoad = defineCommand({
     '"total" spreads it, "per_node" applies it at each node), pressure (magnitude normal to the target faces, positive = into the ' +
     'material) or gravity (acceleration vector, no target). Magnitudes are in the unit system of the analysis (see describe_analysis, ' +
     'case.unitSystem; N-mm-t-s: N, MPa and gravity 9810 mm/s^2). loadCase groups loads solved together; category limit | ultimate ' +
-    'drives later margin factors. A moment (kind moment, vector = [mx, my, mz]) is applied as a statically equivalent couple of nodal forces on the target face / edge nodes, not as a rigid coupling. The target is given as points near the topology (see add_fea_constraint).',
+    'drives later margin factors. A moment (kind moment, vector = [mx, my, mz], optional referencePoint) is applied in the CalculiX deck as a statically equivalent couple of nodal forces on the target face / edge nodes (no rigid coupling) and in the Nastran BDF export as a MOMENT on an RBE3 reference node. The target is given as points near the topology (see add_fea_constraint).',
   params: z.object({
     analysisId: analysisIdSchema,
     name: z.string().min(1).describe('Display name, e.g. "tip load".'),
@@ -130,6 +135,7 @@ export const addFeaLoad = defineCommand({
       ...(fields.vector !== undefined ? { vector: fields.vector } : {}),
       ...(fields.magnitude !== undefined ? { magnitude: fields.magnitude } : {}),
       ...(kind === 'force' ? { distribution: fields.distribution ?? 'total' } : {}),
+      ...(fields.referencePoint !== undefined ? { referencePoint: fields.referencePoint } : {}),
     };
     const problem = problemOf(doc, analysisCase, load);
     if (problem !== null) return fail(problem.code, problem.message, [analysisId, ...(load.target ? [load.target.entityId] : [])]);
@@ -186,6 +192,7 @@ export const updateFeaLoad = defineCommand({
       ...(fields.vector !== undefined ? { vector: fields.vector } : {}),
       ...(fields.magnitude !== undefined ? { magnitude: fields.magnitude } : {}),
       ...(fields.distribution !== undefined ? { distribution: fields.distribution } : {}),
+      ...(fields.referencePoint !== undefined ? { referencePoint: fields.referencePoint } : {}),
     };
     const problem = problemOf(doc, analysisCase, updated);
     if (problem !== null) return fail(problem.code, problem.message);

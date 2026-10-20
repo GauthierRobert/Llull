@@ -61,7 +61,16 @@ function nameCollision(ctx: DeckContext): DeckRefusal | null {
   return null;
 }
 
-function precheck(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact, ctx: DeckContext): DeckRefusal | null {
+const SOLID_TETS: ReadonlySet<string> = new Set(['C3D4', 'C3D10']);
+
+/** Refusals shared by every deck writer (export gate, stale mesh, units, parts, materials, name collisions, constraints); `writable` = element types the writer handles. */
+export function precheck(
+  doc: CadDocument,
+  analysisId: string,
+  mesh: FeMeshArtifact,
+  ctx: DeckContext,
+  writable: ReadonlySet<string> = SOLID_TETS,
+): DeckRefusal | null {
   const { analysis } = ctx;
   const gate = exportGate(doc, 'deck');
   if (gate.controlled)
@@ -79,10 +88,12 @@ function precheck(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact, ct
     ]);
   const blockEntities = new Set<string>();
   for (const block of mesh.blocks) {
-    if (block.type !== 'C3D4' && block.type !== 'C3D10')
-      return refuse('FEA_PART_INVALID', `element type ${block.type} of '${block.entityId}' is not written (C3D4 and C3D10 only)`, [
-        block.entityId,
-      ]);
+    if (!writable.has(block.type))
+      return refuse(
+        'FEA_PART_INVALID',
+        `element type ${block.type} of '${block.entityId}' is not written (${[...writable].join(', ')} only)`,
+        [block.entityId],
+      );
     if (!Object.hasOwn(analysis.parts, block.entityId))
       return refuse('FEA_PART_INVALID', `the mesh has elements of '${block.entityId}', which is not a part of the analysis`, [
         block.entityId,
