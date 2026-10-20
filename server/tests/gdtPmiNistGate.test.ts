@@ -14,7 +14,7 @@ import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { createEmptyDocument } from '@core/model/types';
-import { describeNative, liveKernels } from './kernelTestSupport';
+import { describeNativeWhen, liveKernels } from './kernelTestSupport';
 
 const kernels = liveKernels();
 const PACK = path.resolve(__dirname, '../../docs/aerospace/03-gdt-mbd-pmi/validation');
@@ -81,7 +81,11 @@ function importCensus(id: string): Entry {
 const measured: Record<string, Entry> = {};
 const missing = !existsSync(NIST) || files.some((id) => !existsSync(path.join(NIST, (census[id] as Census).file)));
 
-describeNative.skipIf(missing)('NIST PMI import census (VC-GDT-20)', () => {
+describeNativeWhen({
+  capabilities: ['writeExchange', 'importExchange'],
+  unless: missing ? `${NIST} lacks the NIST PMI files` : null,
+  label: 'GDT NIST PMI',
+})('NIST PMI import census (VC-GDT-20)', () => {
   for (const id of files) {
     it(`${id}: the semantic PMI imported into doc.pmi matches the pinned census`, () => {
       const entry = importCensus(id);

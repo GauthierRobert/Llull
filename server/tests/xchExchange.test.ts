@@ -19,9 +19,12 @@ import type { ShapeHandle } from '@core/geometry/kernelTypes';
 import { canonicalizeStep21 } from '@lib/step21/canonical';
 import { summarizeStep21 } from '@lib/step21/summary';
 import { groupFileGvp } from '@core/commands/exchange/fileGvp';
-import { describeNative, liveKernels } from './kernelTestSupport';
+import { describeNativeWhen, liveKernels } from './kernelTestSupport';
 
 const kernels = liveKernels();
+/** The ops this suite drives; an older native build without them skips the suites instead of failing. */
+const XDE = ['writeExchange', 'importExchange'] as const;
+const describeXde = describeNativeWhen({ capabilities: XDE, label: 'XCH exchange' });
 const PACK = path.resolve(__dirname, '../../docs/aerospace/04-interop-ap242-jt-iges/validation');
 const NIST = process.env['LLULL_NIST_STEP_DIR'] || path.join(os.homedir(), '.cache', 'llull', 'nist-pmi-step-files');
 const TIMESTAMP = '2026-10-20T00:00:00';
@@ -79,7 +82,7 @@ function built(planFile: string): CadDocument {
 const relative = (value: number, expected: number): number => Math.abs(value - expected) / Math.max(Math.abs(expected), 1e-12);
 const dataOf = <T>(result: CommandResult): T => result.data as T;
 
-describeNative('XCH geometric validation properties and AP242 export (analytic parts)', () => {
+describeXde('XCH geometric validation properties and AP242 export (analytic parts)', () => {
   it('geometric_validation_properties reproduces the analytic volume, area and centroid of the 9 reference parts (VC-XCH-01)', () => {
     for (const expected of references) {
       const doc = built(expected.plan);
@@ -260,7 +263,7 @@ describeNative('XCH geometric validation properties and AP242 export (analytic p
   }, 120_000);
 });
 
-describeNative('XCH verify_exchange_file and hostile input', () => {
+describeXde('XCH verify_exchange_file and hostile input', () => {
   it('reads the file claims without a kernel and compares them with a kernel (VC-XCH-05 on an own file)', () => {
     const doc = built(reference('xch-torus').plan);
     const step = dataOf<{ step: string }>(run(doc, 'export_step_ap242', { timestamp: TIMESTAMP })).step;
@@ -302,7 +305,7 @@ if (NIST_MISSING)
     `[XCH NIST] skipped: ${NIST} is empty; run python3 -I docs/aerospace/01-exact-brep-kernel/validation/fetch_nist_step_files.py`,
   );
 
-describeNative.skipIf(NIST_MISSING)(
+describeNativeWhen({ capabilities: XDE, unless: NIST_MISSING ? `${NIST} has no NIST files` : null, label: 'XCH NIST' })(
   'XCH NIST CAx-IF files (provenance: docs/aerospace/04-interop-ap242-jt-iges/validation/xch_corpus.json)',
   () => {
     const importNist = (file: string): { result: CommandResult; nist: NistLikeReport } => {
@@ -431,7 +434,7 @@ describeNative.skipIf(NIST_MISSING)(
   },
 );
 
-describeNative('XCH semantic PMI on faces (AP242 transport hook for 03 GD&T)', () => {
+describeXde('XCH semantic PMI on faces (AP242 transport hook for 03 GD&T)', () => {
   const plateShape = (): ShapeHandle =>
     kernels.occt.evaluate({
       op: 'solid',
@@ -504,7 +507,7 @@ describeNative('XCH semantic PMI on faces (AP242 transport hook for 03 GD&T)', (
   }, 120_000);
 });
 
-describeNative('XCH IGES (OCCT IGES translator)', () => {
+describeXde('XCH IGES (OCCT IGES translator)', () => {
   const available = (): boolean => (kernels.occt?.info?.().capabilities ?? []).includes('igesExchange');
 
   it('export_iges then import_iges rebuilds the plate and the L-bracket within the provisional 1e-6 (VC-XCH-11)', () => {
