@@ -129,3 +129,26 @@ kernel default (LC1 step 1) for N1; S1/S2 do not and can start now. C and D afte
 Done when: the oracle suite has ≥ 80 cases all passing on the native kernel, the action matrix and fuzz run nightly with a
 ratchet, fillets/sketches survive the upstream-edit cases SolidCraft documents (split, merge, mirror, shrink a face) by name, the
 sketch solver reports DOF and refuses over-constraint, and a killed save never loses a file.
+
+## As built (2026-10-20, branch `feat/sc-parity`)
+
+| Task | What exists | Verified | Open |
+| ---- | ----------- | -------- | ---- |
+| SC-Q1 | `tests/oracle/` 115 analytic cases (generator `tools/oracle-analytic/`, Node; FreeCAD stub only), `npm run oracle` → `docs/ORACLE.md` | Manifold 98/98 pass, 0 known failures | 17 OCCT-only cases + STEP round trip need the native binary; FreeCAD-sourced cases |
+| SC-Q2 | `tests/action_matrix/` (165 designs, 4821 actions), baseline ratchet per kernel, PR sample, nightly shards + determinism | Manifold column: 2793 ok, 0 error | `occt` column empty until the binary runs `--native --bless` |
+| SC-Q3 | `llull fuzz` / `fuzz-one --minimise` (`packages/protocol/src/fuzz`), 20-seed sample in `npm test` | 3000 seeds; 2 boolean bugs found and fixed (tangent / sliver results) | fillet / chamfer / shell steps need the native kernel |
+| SC-Q4 | Stryker (`npm run mutation`), judged by oracle + golden + fuzz + matrix; nightly workflow | history 28.0 %, parametric 35.5 % (`docs/MUTATION.md`) | brep / solids folders; new judges for the survivor clusters |
+| SC-Q5 | `npm run features` → `docs/FEATURES.md`, staleness contract test | yes | — |
+| SC-S1/S2 | constructive + Levenberg–Marquardt solver, DOF, conflict / redundancy / flip refusal, 25 constraint and dimension kinds, per-cluster solve | unit + golden + precision + perf tests | rigid clusters in the constructive pass; G2 only arc–arc |
+| SC-S3 | `create_sketch_plane` (world / face + offset + spin), `place_on_sketch_plane`, `project_edges_to_sketch` (linked, by name), `break_sketch_link`; `extrude_profile plane` | fake-kernel + Manifold tests | the default extrusion still ignores a sketch's rotation (2D rotation semantics: open owner decision) |
+| SC-N1 | face names in the native kernel (`cpp/naming.*`: roles at creation, OCCT history through every op), edge names from adjacent faces; core resolves / records names (`CommandResult.recordExtras`) for fillet, chamfer, face ops, sketch planes, projections | fake-kernel tests (renumbering, plans) | **C++/Rust not compiled yet** (MSVC); then `cargo test` naming suite + native suites |
+| SC-N2 | REF_LOST / REF_SPLIT refusals with re-pick hint during regeneration; `check_model` reports steps that no longer apply and lost sketch links | unit tests | a failed step leaves the model without it (no "keep last result") |
+| SC-F1 | `draft_faces`, `push_pull_face`, `split_face`, `replace_face` (one `faceOp` node), `split_body` (booleans, any kernel) | split_body on Manifold + oracle; others on a fake kernel | native ops not compiled yet; replace_face only onto parallel planes |
+| SC-F2/F3 | holes on sketch points, ISO M3–M20 tapped / external threads, `add_coil`, thin extrude, per-edge / variable / chord fillets (native `radii` laws written) | oracle + unit tests | native `radii` not compiled yet |
+| SC-F4 | joint kinds rigid … cam, closed-loop solve, contact sets, exploded views | Freudenstein / slider-crank / cam analytic tests | cam knife-edge only; AABB contact |
+| SC-D1–D3 | `.bak` on every save (atomic, Windows retries), 25-run kill test; v1–v3 corpus + 327 damaged variants; crash reports + `llull crashes` + Help → Crash Reports | yes | power-loss (fsync) untested |
+| SC-D4 | AP242 schema, `export_3mf`, `export_urdf`, `mesh_to_solid`, `export_iges` + `import_step_exact format iges` | unit tests; IGES native round-trip test written | IGES native part not compiled yet (OCCT rebuild with TKDEIGES) |
+| SC-A1–A4 | user skills + `llull skills install`; live previews + drag manipulators; 3D mouse (WebHID); reviewed issue draft | component tests, previews checked live | 3D mouse not tried on hardware |
+
+Deviation from the plan: the native kernel names faces itself (C++ `Shape::names`, propagated with `BRepTools_History`) and reports
+names in `topology`, instead of shipping raw history for core to compose; core owns resolution, recording and refusals.
