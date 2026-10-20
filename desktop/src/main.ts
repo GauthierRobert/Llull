@@ -8,6 +8,9 @@ import { llullHome, removeDesktopDiscovery, writeDesktopDiscovery } from '@serve
 import { chooseBackendPort, startBackend, type RunningBackend } from './backend';
 import { backendEnv, backendOrigin, nativeBundleDir } from './backendEnv';
 import { cliShimFor, installCliShim } from './cliShim';
+import { trustPendingKeys } from './keyTrust';
+import { partNumberOf, vaultCheckIn, vaultCheckOut, type VaultDeps } from './vault';
+import { currentHolder } from '@server/plm/vault/vault';
 import { createDocumentSession, type DocumentSession } from './documents';
 import { DEFAULT_SAVE_NAME, DOCUMENT_EXTENSIONS, DOCUMENT_FILE_PATTERN } from '@protocol/documentFiles';
 import { desktopLayout } from './layout';
@@ -151,6 +154,73 @@ async function newDocument(): Promise<void> {
   await guarded('New', async () => session?.newDocument());
 }
 
+/** File > Trust Signing Keys…: one native dialog per enrolled, untrusted key. The only place a key becomes trusted (keyTrust.ts). */
+async function trustSigningKeys(): Promise<void> {
+  try {
+    const trusted = await trustPendingKeys({
+      confirm: async (text) =>
+        (
+          await dialog.showMessageBox({
+            type: 'question',
+            buttons: ['Trust', 'Not now'],
+            defaultId: 1,
+            cancelId: 1,
+            message: 'Trust signing key',
+            detail: text,
+          })
+        ).response === 0,
+    });
+    await dialog.showMessageBox({
+      type: 'info',
+      message: trusted.length > 0 ? `Trusted ${trusted.length} signing key(s).` : 'No signing key was trusted.',
+      detail: 'Enroll a key with: llull keys create --user ID --name NAME',
+    });
+  } catch (error) {
+    dialog.showErrorBox('llull — Trust Signing Keys failed', errorMessage(error));
+  }
+}
+
+/** The vault of this machine: $LLULL_VAULT, else ~/.llull/vault (created on first use). */
+const configuredVault = process.env['LLULL_VAULT'];
+const vaultDir = configuredVault !== undefined && configuredVault !== '' ? path.resolve(configuredVault) : path.join(home, 'vault');
+const vaultHolder = currentHolder(process.env, `desktop-${randomBytes(4).toString('hex')}`);
+
+function vaultDeps(): VaultDeps | null {
+  if (session === null) return null;
+  const live = session;
+  return {
+    dir: vaultDir,
+    holder: vaultHolder,
+    currentDocument: () => live.currentDocument(),
+    loadDocument: (json) => live.loadDocument(json),
+  };
+}
+
+/** File > Vault: Check Out…: pick the item folder in the vault, lock it, open its head. A new item is locked by its first check-in. */
+async function vaultCheckOutItem(): Promise<void> {
+  const deps = vaultDeps();
+  if (deps === null || !(await confirmDiscard())) return;
+  const result = await dialog.showOpenDialog({
+    title: 'Check out an item from the vault',
+    defaultPath: path.join(vaultDir, 'items'),
+    properties: ['openDirectory'],
+  });
+  const chosen = result.canceled ? undefined : result.filePaths[0];
+  if (chosen === undefined) return;
+  const message = await vaultCheckOut(deps, partNumberOf(path.basename(chosen)));
+  refreshTitleAndDiscovery();
+  void dialog.showMessageBox({ type: 'info', message: 'Vault', detail: message });
+}
+
+/** File > Vault: Check In: the open managed item (checkpoint, snapshots to the vault, refs); the lock is freed. */
+async function vaultCheckInDocument(): Promise<void> {
+  const deps = vaultDeps();
+  if (deps === null) return;
+  const message = await vaultCheckIn(deps);
+  refreshTitleAndDiscovery();
+  void dialog.showMessageBox({ type: 'info', message: 'Vault', detail: message });
+}
+
 function installCli(): void {
   const shim = cliShimFor(process.platform, process.execPath, layout.cliEntry);
   try {
@@ -206,7 +276,7 @@ async function boot(): Promise<void> {
   backend = await startBackend(
     (entry, env) => utilityProcess.fork(entry, [], { env, serviceName: 'llull-backend', stdio: 'inherit' }),
     layout.serverEntry,
-    backendEnv({ port, token, layout, userDataDir: userData, baseEnv: process.env, nativeDir }),
+    backendEnv({ port, token, layout, userDataDir: userData, baseEnv: process.env, nativeDir, vaultDir }),
     url,
   );
   session = createDocumentSession({ url, token });
@@ -222,6 +292,9 @@ async function boot(): Promise<void> {
           showAgentHelp: () =>
             void dialog.showMessageBox({ type: 'info', message: 'Use llull with Claude Code', detail: agentHelpText(cliInstalled) }),
           openDataFolder: () => void shell.openPath(userData),
+          trustKeys: () => void trustSigningKeys(),
+          vaultCheckOut: () => void vaultCheckOutItem(),
+          vaultCheckIn: () => void vaultCheckInDocument(),
         },
         process.platform,
         app.getName(),

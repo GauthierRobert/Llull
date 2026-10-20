@@ -3,12 +3,24 @@ import { plans } from './plans';
 import { feaPlans } from './feaPlans';
 import { compositePlans } from './compositePlans';
 import { describePlans } from './describePlans';
+import { plmPlans } from './plmPlans';
+import { setSignaturePort } from '@core/commands/signaturePort';
+import { afterAll, beforeAll } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { runPlan } from './runPlan';
 import type { CadDocument } from '@core/model/types';
 import type { GoldenAction } from './plans';
 
-describe('golden replay corpus', () => describePlans({ ...plans, ...feaPlans, ...compositePlans }));
+// The golden plm plan checks the lifecycle and replay with a scripted port that accepts any confirmation naming its signer (the gate is attacked in tests/unit/plm/humanGate.test.ts).
+beforeAll(() =>
+  setSignaturePort({
+    verify: (c) =>
+      typeof c === 'object' && c !== null && 'as' in c ? { signer: String((c as { as: unknown }).as), signatureId: 'golden' } : null,
+  }),
+);
+afterAll(() => setSignaturePort(null));
+
+describe('golden replay corpus', () => describePlans({ ...plans, ...feaPlans, ...compositePlans, ...plmPlans }));
 
 describe('loops_polar_pattern parametric regeneration', () => {
   const cylinderCount = (doc: CadDocument): number => Object.values(doc.entities).filter((e) => e.kind === 'cylinder').length;

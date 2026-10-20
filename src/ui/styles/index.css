@@ -23,5 +23,6 @@
 @import './panels/building.css';
 @import './panels/civil.css';
 @import './panels/review.css';
+@import './panels/pmi.css';
 @import './panels/manufacturing.css';
 @import './panels/analysis.css';

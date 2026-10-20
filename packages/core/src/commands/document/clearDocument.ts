@@ -51,6 +51,7 @@ export const clearDocument = defineCommand({
       doc.building === undefined &&
       doc.civil === undefined &&
       doc.drawings === undefined &&
+      doc.pmi === undefined &&
       doc.dynamics === undefined &&
       doc.prototype === undefined &&
       doc.analysis === undefined &&
@@ -72,6 +73,7 @@ export const clearDocument = defineCommand({
     delete nextDoc.building;
     delete nextDoc.civil;
     delete nextDoc.drawings;
+    delete nextDoc.pmi;
     delete nextDoc.dynamics;
     delete nextDoc.prototype;
     delete nextDoc.analysis;

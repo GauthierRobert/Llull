@@ -24,6 +24,8 @@ import { USAGE } from './usage';
 import { getGeometryKernel } from '@core/geometry/kernel';
 import { planKernelWarnings } from './planKernelWarning';
 import { benchmarkCli } from './benchmarks';
+import { PlmUsage, confirmedParams, runPlmCli } from './plm';
+import { runVault } from './vault';
 
 export interface CliIo {
   readonly stdout: (text: string) => void;
@@ -34,6 +36,7 @@ export interface CliIo {
   readonly exchangeOptions?: () => ExchangeOptions; // default: from `env`
   readonly fetchImpl?: (url: string, init: RequestInit) => Promise<Response>;
   readonly now?: () => number; // ms clock for step timing and `--timeout`
+  readonly readPassphrase?: (prompt: string) => Promise<string | null>; // signing passphrase: an interactive no-echo prompt only (never env, flag or stdin)
   readonly stderrIsTty?: boolean; // stream per-step progress without `--progress`
 }
 
@@ -210,7 +213,17 @@ async function runExec(args: ParsedArgv, io: CliIo): Promise<number> {
   const params = asUsage(() => withSaveDefaults(name, takesFileParam(name) ? withFileContent(name, raw) : raw, stringFlag(args, 'save')));
   const observer = observerOf(args, io);
   const backend = await backendOf(args, io, observer);
-  const result = isExchange ? await backend.exchange(name, params) : await backend.run(name, params);
+  const confirmKey = stringFlag(args, 'confirm-key');
+  let sent: unknown = params;
+  if (confirmKey !== undefined && !isExchange) {
+    try {
+      sent = await confirmedParams(backend, name, params, confirmKey, io);
+    } catch (error) {
+      if (error instanceof PlmUsage) throw new UsageError(error.message);
+      throw error;
+    }
+  }
+  const result = isExchange ? await backend.exchange(name, params) : await backend.run(name, sent);
   return finish(withTimeout(observer, withFailureStatus(name, result)), args, io);
 }
 
@@ -379,6 +392,12 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
       case 'undo':
       case 'redo':
         return await runHistory(subcommand, args, io);
+      case 'vault':
+        return runVault(args, io);
+      case 'keys':
+      case 'release':
+      case 'audit':
+        return await runPlmCli(args, io, () => backendOf(args, io));
       case 'run_benchmarks': {
         const save = stringFlag(args, 'save');
         return benchmarkCli(

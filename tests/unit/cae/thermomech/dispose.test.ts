@@ -4,7 +4,9 @@ import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { HumanSignaturePort } from '@core/model/analysis';
 import { canonicalJson } from '@lib/canonicalJson';
+import { jcsJson } from '@lib/jcs';
 import { sha256Hex } from '@lib/sha256';
+import { G6, H7, SPEC_20C, explicitCte } from '../../physics/thermomech/thermomechFixtures';
 import { expectNoOp, expectPure } from '../../../helpers/expectNoOp';
 import { thermoFixture } from './fixtures';
 
@@ -16,7 +18,15 @@ const params = {
   signature: 'good',
 };
 const payload = (): string =>
-  sha256Hex(canonicalJson({ rowKey: params.rowKey, decision: 'accepted', justification: 'checked by hand', inputsHash: 'h1' }));
+  sha256Hex(
+    canonicalJson({
+      act: 'dispose_fit_result',
+      rowKey: params.rowKey,
+      decision: 'accepted',
+      justification: 'checked by hand',
+      inputsHash: 'h1',
+    }),
+  );
 
 const port = (seen: string[] = []): HumanSignaturePort => ({
   verify: (signature, hash) => {
@@ -74,6 +84,32 @@ describe('dispose_fit_result (human gate)', () => {
     const empty = execute(doc, 'dispose_fit_result', { ...params, justification: '  ', signature: 'good' }, withPort());
     expectNoOp(empty, doc);
     expect(empty.error?.code).toBe('FEA_PARAM_INVALID');
+  });
+
+  it('with fitParams the command recomputes the row itself: the hash must be the row of THAT fit, whatever the client says', () => {
+    const fitParams = {
+      hole: H7,
+      shaft: G6,
+      holeCte: explicitCte(23e-6),
+      shaftCte: explicitCte(12e-6),
+      specTemperature: SPEC_20C,
+      temperatures: [{ value: 80, unit: 'degC' }],
+    };
+    const fit = execute(doc, 'fit_at_temperature', fitParams);
+    const row = (fit.data as { rows: { rowKey: string }[] }).rows[0];
+    if (row === undefined) throw new Error('no fit row');
+    const honest = { ...params, rowKey: row.rowKey, inputsHash: sha256Hex(jcsJson(row)), fitParams };
+    expect(execute(doc, 'dispose_fit_result', honest, withPort()).affected).toEqual([row.rowKey]);
+    const stale = execute(doc, 'dispose_fit_result', { ...honest, inputsHash: 'h1', currentInputsHash: 'h1' }, withPort());
+    expectNoOp(stale, doc);
+    expect(stale.error?.code).toBe('TMC_FIT_INPUTS_CHANGED');
+    const changed = execute(
+      doc,
+      'dispose_fit_result',
+      { ...honest, fitParams: { ...fitParams, temperatures: [{ value: 90, unit: 'degC' }] } },
+      withPort(),
+    );
+    expect(changed.error?.code).toBe('TMC_FIT_INPUTS_CHANGED');
   });
 
   it('keeps earlier dispositions when recording another row', () => {

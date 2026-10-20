@@ -141,8 +141,9 @@ function checkedRun(def: CommandDefinition<unknown>, doc: CadDocument, params: u
   if (violation !== null)
     return rejection(
       doc,
-      violation,
-      commandError('CMD_DERIVED_GEOMETRY', 'Edit the domain object that derives this geometry instead of the derived entities.'),
+      violation.summary,
+      violation.error ??
+        commandError('CMD_DERIVED_GEOMETRY', 'Edit the domain object that derives this geometry instead of the derived entities.'),
     );
   if (result.document !== doc) {
     for (const id of result.affected) {

@@ -19,6 +19,18 @@ export interface DocumentExtension {
    * @invariant returns `raw` unchanged when the domain data is absent or invalid
    */
   restore(raw: Record<string, unknown>): Record<string, unknown>;
+  /**
+   * Slices `replayHistory` must neither lose nor regenerate (document input state the plugin's metaHistory commands own): called AFTER the
+   * steps with the pre-replay document and the replayed document, returns the replayed document plus those slices (so a plugin guard never sees the
+   * regenerated steps as edits of its slice).
+   * @invariant pure; returns `next` unchanged when the plugin has no data in `prev`
+   */
+  carry?(prev: CadDocument, next: CadDocument): CadDocument;
+  /**
+   * Warnings about a loaded, validated document (e.g. a PLM integrity mismatch); `load_document` appends each to its summary.
+   * @invariant a pure query: cannot modify the document
+   */
+  afterLoad?(doc: CadDocument): readonly string[];
 }
 
 export interface CadPlugin {

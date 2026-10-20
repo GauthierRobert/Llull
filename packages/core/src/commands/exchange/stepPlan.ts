@@ -28,6 +28,8 @@ export interface ExchangePlan {
   /** Selected loose-solid / instance / sheet ids written, each once. */
   readonly entityIds: readonly string[];
   readonly skipped: readonly string[];
+  /** Ply solids written from triangles because the kernel refused their exact slab. */
+  readonly faceted: readonly string[];
   /** Product names whose validation properties the kernel could not compute. */
   readonly withoutValidation: readonly string[];
 }
@@ -113,9 +115,12 @@ function flatPlan(
 ): ExchangePlan | { readonly failed: string } {
   const products: ExchangeProduct[] = [];
   const withoutValidation: string[] = [];
+  const faceted: string[] = [];
   const labels = stepLabels(doc, solids);
   for (const [index, entity] of solids.entries()) {
-    const shape = exactOrMesh(kernel, entity);
+    const built = exactOrMesh(kernel, entity);
+    const shape = built.shape;
+    if (built.faceted) faceted.push(entity.id);
     if (shape === null) return { failed: `'${entity.id}' (kind '${entity.kind}')` };
     const label = labels[index] ?? { name: entity.id };
     const masses = options.validation ? shapesMass(kernel, [shape]) : undefined;
@@ -130,6 +135,7 @@ function flatPlan(
     sheetCount: 0,
     entityIds: [],
     skipped: [],
+    faceted,
     withoutValidation,
   };
 }
@@ -217,6 +223,7 @@ function structuredPlan(
     solidCount: 0,
     sheetCount: 0,
     entityIds: [],
+    faceted: plan.faceted,
     skipped: [],
     withoutValidation,
   };

@@ -11,9 +11,27 @@ describe('derivationViolation', () => {
   it('formats the first violation and skips identical documents', () => {
     const before = createEmptyDocument();
     const after = { ...before, units: 'm' as const };
-    expect(derivationViolation([alwaysAllows, alwaysRejects], 'x_cmd', before, after)).toBe('x_cmd rejected: nope.');
+    expect(derivationViolation([alwaysAllows, alwaysRejects], 'x_cmd', before, after)).toEqual({
+      summary: 'x_cmd rejected: nope.',
+      error: null,
+    });
     expect(derivationViolation([alwaysRejects], 'x_cmd', before, before)).toBeNull();
     expect(derivationViolation([alwaysAllows], 'x_cmd', before, after)).toBeNull();
+  });
+  it('passes the command name to the guard and keeps a coded refusal', () => {
+    const before = createEmptyDocument();
+    const after = { ...before, units: 'm' as const };
+    const coded: DerivationGuard = {
+      domain: 'coded',
+      check: (_previous, _next, commandName) => ({
+        reason: `no ${commandName}`,
+        error: { code: 'X_LOCKED', ids: ['a'], paths: [], remediation: 'unlock it' },
+      }),
+    };
+    expect(derivationViolation([coded], 'x_cmd', before, after)).toEqual({
+      summary: 'x_cmd rejected: no x_cmd',
+      error: { code: 'X_LOCKED', ids: ['a'], paths: [], remediation: 'unlock it' },
+    });
   });
   it('execute rejects a direct edit of building-generated geometry', () => {
     const doc = execute(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 5000, 0) }).document;

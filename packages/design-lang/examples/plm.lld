@@ -1,0 +1,12 @@
+# Bracket whose definition is hashed for release: the content hash depends only on the geometry and parameters, and the document is not yet a managed item
+# (PLM commands edit the release record, not the geometry, so they run outside a design: set_item_identity, submit_for_review, release_item)
+design bracket_for_release units=mm
+param w = 60
+param t = 4
+
+add_box plate size=[w, 40, t] anchor=min color="#6b8f9c"
+
+check plm_status path=managed expect == false
+check document_content_hash path=bytes expect >= 100
+check bbox of=plate expect == [w, 40, t]
+check volume of=plate expect ~= w*40*t ± 0.1%

@@ -8,9 +8,8 @@ import { getCommand } from '@core/commands/registry';
 import { getLiveDoc, setLiveDoc } from './liveDocument';
 import { createHash } from 'crypto';
 import type { LiveCommandSource } from '@protocol/liveSync';
-import { runCommandOutcome } from '@protocol/commandOutcome';
 import type { CommandResponseBody } from '@protocol/restProtocol';
-import { serverContext } from './fea/context';
+import { runHostCommand } from './plm/hostRun';
 
 const MAX_UNDO_DEPTH = 100; // = the UI store's cap
 const MAX_IDEMPOTENCY_ENTRIES = 1000; // commandId -> result LRU
@@ -85,14 +84,14 @@ function boundedForReplay(result: CommandResponseBody): CommandResponseBody {
 
 function runCommand(name: string, params: unknown, source?: LiveCommandSource, commandId?: string): CommandResponseBody {
   const prior = getLiveDoc();
-  const { document, outcome } = runCommandOutcome(prior, name, params, serverContext());
+  const { document, outcome, params: filled } = runHostCommand(prior, name, params, { source: source ?? 'rest' });
   if (outcome.changed && getCommand(name)?.annotations?.session === true) {
     // Session command (resolve_material_libraries): in memory only, no undo entry, no command log; clients get a snapshot.
     setLiveDoc(document);
   } else if (outcome.changed) {
     history.undo = pushCapped(history.undo, prior);
     history.redo = [];
-    setLiveDoc(document, { name, params, source: source ?? 'rest', ...(commandId !== undefined ? { commandId } : {}) });
+    setLiveDoc(document, { name, params: filled, source: source ?? 'rest', ...(commandId !== undefined ? { commandId } : {}) });
   }
   return withHistoryFlags(outcome);
 }

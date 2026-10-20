@@ -71,6 +71,10 @@ describe('backendEnv', () => {
     const optedIn = backendEnv({ port: 1, token: 't', layout, userDataDir: '/u', baseEnv: { LLULL_ALLOW_CODE_EXECUTION: '1' } });
     expect(optedIn['LLULL_ALLOW_CODE_EXECUTION']).toBe('1');
     expect('EMPTY' in env).toBe(false);
+    expect('LLULL_VAULT' in env).toBe(false);
+    expect(
+      backendEnv({ port: 1, token: 't', layout, userDataDir: '/u', baseEnv: { LLULL_VAULT: '/leak' }, vaultDir: '/v' })['LLULL_VAULT'],
+    ).toBe('/v');
     expect(backendOrigin(1)).toBe('http://127.0.0.1:1');
   });
 });
@@ -225,6 +229,9 @@ describe('menuTemplate', () => {
     installCli: handler('cli'),
     showAgentHelp: handler('help'),
     openDataFolder: handler('data'),
+    trustKeys: handler('trust'),
+    vaultCheckOut: handler('checkout'),
+    vaultCheckIn: handler('checkin'),
   };
 
   it('has File and Help menus wired to the handlers, an app menu only on macOS', () => {
@@ -233,7 +240,7 @@ describe('menuTemplate', () => {
     expect(menuTemplate(handlers, 'darwin', 'llull')[0]?.role).toBe('appMenu');
     const items = linux.flatMap((menu) => (Array.isArray(menu.submenu) ? menu.submenu : []));
     for (const item of items) if (typeof item.click === 'function') (item.click as () => void)();
-    expect(calls).toEqual(['new', 'open', 'save', 'saveAs', 'data', 'cli', 'help']);
+    expect(calls).toEqual(['new', 'open', 'save', 'saveAs', 'checkout', 'checkin', 'data', 'trust', 'cli', 'help']);
   });
 
   it('explains --app and points to the installer until the CLI is installed', () => {

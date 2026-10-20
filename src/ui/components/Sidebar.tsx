@@ -16,6 +16,7 @@ import { FeatureHistoryPanel } from '@ui/panels/FeatureHistoryPanel';
 import { ConfigurationsPanel } from '@ui/panels/ConfigurationsPanel';
 import { MaterialsPanel } from '@ui/panels/MaterialsPanel';
 import { SheetsPanel } from '@ui/panels/SheetsPanel';
+import { PmiPanel } from '@ui/panels/pmi/PmiPanel';
 import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
 import { CivilPanel } from '@ui/panels/civil/CivilPanel';
 import { ManufacturingPanel } from '@ui/panels/manufacturing/ManufacturingPanel';
@@ -32,6 +33,7 @@ const TAB_PANELS: Readonly<Record<SidebarTab, React.ComponentType<{ className?: 
   civil: CivilPanel,
   layers: LayersPanel,
   sheets: SheetsPanel,
+  pmi: PmiPanel,
   assembly: AssemblyPanel,
   mechanisms: MechanismsPanel,
   parameters: ParametersPanel,

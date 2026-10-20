@@ -4,7 +4,8 @@ import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { stepTargets } from '@core/commands/brep/stepTargets';
 import { kernelFromOps, type CachingKernel } from '@core/geometry/shapeKernel';
-import { encodeLoops, encodeSurface } from '@core/geometry/surfaceWire';
+import { encodeLoops, encodeSurface, loopsProblem, surfaceDataProblem } from '@core/geometry/surfaceWire';
+import { validateEntityValue } from '@core/commands/persistence/guards';
 import { TETRA } from '../helpers/fakeKernel';
 import { expectPure } from '../helpers/expectNoOp';
 
@@ -198,5 +199,64 @@ describe('surfaceWire', () => {
         },
       ]),
     ).toEqual([2, 3, 1, 0, 0, 1, 0, 1, 1, 3, 0, 0.2, 0.2, 0.4, 0.2, 0.4, 0.4]);
+  });
+
+  it('validates loop lists: counts must be integers in range, one outer loop, nothing trailing', () => {
+    const square = [1, 4, 1, 0, 0, 1, 0, 1, 1, 0, 1];
+    expect(loopsProblem([])).toBeNull();
+    expect(loopsProblem(square)).toBeNull();
+    for (const bad of [
+      [0],
+      [1e19, 4, 1],
+      [1, 1e19, 1, 0, 0],
+      [1, 2.5, 1, 0, 0, 1, 0],
+      [1, 4, 1, 0, 0],
+      [1, 4, 2, 0, 0, 1, 0, 1, 1, 0, 1],
+      [1, 4, 0, 0, 0, 1, 0, 1, 1, 0, 1],
+      [...square, 9],
+      [2, 4, 1, 0, 0, 1, 0, 1, 1, 0, 1, 4, 1, 0, 0, 1, 0, 1, 1, 0, 1],
+      [Number.NaN],
+    ])
+      expect(loopsProblem(bad), JSON.stringify(bad)).not.toBeNull();
+  });
+
+  it('validates surface data lengths and counts', () => {
+    expect(surfaceDataProblem('plane', new Array(9).fill(0))).toBeNull();
+    expect(surfaceDataProblem('plane', [0])).not.toBeNull();
+    expect(surfaceDataProblem('cylinder', [0, 0, 0, 0, 0, 1, 1, 0, 0, 5])).toBeNull();
+    expect(surfaceDataProblem('cone', [0, 0, 0, 0, 0, 1, 1, 0, 0, -1])).not.toBeNull();
+    const sheet = [1, 1, 2, 2, 2, 2, 0, 0, 0, 0, 0, 3, 0, 4, 0, 0, 4, 3, 0, 0, 1, 2, 2, 0, 1, 2, 2];
+    expect(surfaceDataProblem('bspline', sheet)).toBeNull();
+    expect(surfaceDataProblem('bspline', sheet.slice(1))).not.toBeNull();
+    expect(surfaceDataProblem('bspline', [1e19, ...sheet.slice(1)])).not.toBeNull();
+    expect(surfaceDataProblem('bspline', [...sheet.slice(0, 6), 2, ...sheet.slice(7)])).not.toBeNull();
+    expect(surfaceDataProblem('bspline', [...sheet.slice(0, -1), Number.NaN])).not.toBeNull();
+  });
+});
+
+describe('stored ply solids', () => {
+  it('rejects a stepSlab that is not a valid recipe (it would reach the kernel)', () => {
+    const solid = {
+      id: 'm',
+      kind: 'mesh',
+      layerId: 'layer-default',
+      color: '#888888',
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      mesh: { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] },
+    };
+    expect(validateEntityValue(solid)).toBeNull();
+    const slab = {
+      op: 'faceSlab',
+      surface: { type: 'plane', data: new Array(9).fill(0) },
+      loops: [],
+      from: 0,
+      to: 1,
+      direction: [0, 0, 1],
+      tolerance: 1e-6,
+    };
+    expect(validateEntityValue({ ...solid, stepSlab: slab })).toBeNull();
+    expect(validateEntityValue({ ...solid, stepSlab: { ...slab, loops: [1e19, 4, 1] } })).toMatch(/stepSlab recipe invalid/);
+    expect(validateEntityValue({ ...solid, stepSlab: { ...slab, from: 2 } })).toMatch(/stepSlab recipe invalid/);
   });
 });

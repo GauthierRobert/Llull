@@ -26,6 +26,8 @@ export const TOOLSET_NAMES = [
   'piping',
   'civil',
   'design',
+  'pmi',
+  'plm',
 ] as const;
 
 export type ToolsetName = (typeof TOOLSET_NAMES)[number];
@@ -47,7 +49,7 @@ const PIPING_TOOLS = words('add_pipe_run add_pipe_support add_cable_tray check_p
 /** Tool names per toolset; `building` / `civil` / the FE part of `analysis` come from their plugins. */
 export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   core: words(
-    'describe_scene find_entities build_project check_model render_view set_units load_document clear_document move_entities rotate_entity scale_entity mirror_entity duplicate_entities delete_entities array_linear array_polar group_entities ungroup_entities set_entity_name align distribute stack_on set_parameter delete_parameter add_layer update_layer set_entity_layer delete_layer set_camera fit_view kernel_info set_modeling_tolerance',
+    'describe_scene find_entities build_project check_model render_view set_units load_document document_content_hash clear_document move_entities rotate_entity scale_entity mirror_entity duplicate_entities delete_entities array_linear array_polar group_entities ungroup_entities set_entity_name align distribute stack_on set_parameter delete_parameter add_layer update_layer set_entity_layer delete_layer set_camera fit_view kernel_info set_modeling_tolerance',
   ),
   '2d': words(
     'draw_polyline draw_arc draw_rectangle draw_point draw_ellipse draw_spline draw_involute draw_belt_around explode_polyline offset_2d trim extend fillet_2d chamfer_2d add_text add_dimension add_image_underlay calibrate_underlay set_underlay image_to_world create_sheet create_drawing_view add_section_view add_detail_view update_drawing_view delete_drawing_view update_sheet delete_sheet export_sheet_svg',
@@ -57,6 +59,9 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   ),
   measure: words(
     'measure_distance measure_angle measure_area measure_perimeter measure_bounding_box mass_properties geometric_validation_properties',
+  ),
+  pmi: words(
+    'set_pmi_standard add_datum_feature add_datum_target add_size_dimension add_location_dimension add_geometric_tolerance add_surface_texture add_pmi_note update_pmi delete_pmi create_saved_view update_saved_view delete_saved_view activate_saved_view list_pmi check_pmi accept_pmi_review analyze_stackup fastener_tolerance',
   ),
   parametric: words(
     'replay_history set_step_suppressed edit_step_params reorder_step delete_step insert_step create_configuration activate_configuration add_constraint delete_constraint update_constraint solve_constraints save_recipe instantiate_recipe',
@@ -105,6 +110,10 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   /** Contributed by the installed civil (site / terrain / roads / drainage) plugin. */
   get civil(): readonly string[] {
     return pluginToolNames('civil');
+  },
+  /** Contributed by the installed PLM plugin (revisions, release, change control, effectivity, traceability). */
+  get plm(): readonly string[] {
+    return pluginToolNames('plm');
   },
   /** Contributed by the installed design-language plugin (`.lld`). */
   get design(): readonly string[] {

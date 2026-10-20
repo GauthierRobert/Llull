@@ -170,6 +170,16 @@ export interface MaterialLibraryProvider {
   get(libraryId: string, version: string): MaterialLibrary | null;
 }
 
+/**
+ * Content-addressed objects of this machine's local vault (09 PLM M3): an object is the exact text whose SHA-256 names it. Absent / null = no vault, and
+ * a frozen revision whose snapshot was externalized cannot be read (the commands that need it refuse with PLM_VAULT_OBJECT_MISSING).
+ */
+export interface ObjectStorePort {
+  has(sha256: string): boolean;
+  /** The object's text, re-hashed by the store: null when absent or damaged. */
+  get(sha256: string): string | null;
+}
+
 export interface ExecutionContext {
   /** Geometry kernel for booleans/fillets; null while none is installed or loaded. */
   readonly kernel: GeometryKernel | null;
@@ -181,8 +191,10 @@ export interface ExecutionContext {
   readonly surfaceAnalysis?: SurfaceAnalysisEngine | null;
   /** Read-only FE mesh/results artifact store (host-provided); null/absent = `record_fe_*` commands no-op with FEA_ARTIFACT_NOT_FOUND. */
   readonly feaArtifacts?: FeArtifactPort | null;
-  /** Human-signature verifier (09 PLM); null/absent = human-gate commands refuse. */
+  /** The signature port (verification of human signatures, Ed25519; 05/08/09); null/absent = human-gate commands refuse. */
   readonly humanSignature?: HumanSignaturePort | null;
+  /** The local vault's content-addressed objects (externalized release snapshots); null/absent = no vault. */
+  readonly objects?: ObjectStorePort | null;
   /** Material library files of this machine (`import_material_library` by reference, `resolve_material_libraries`); null/absent = none. */
   readonly libraries?: MaterialLibraryProvider | null;
   /** Mints every id the command creates. */

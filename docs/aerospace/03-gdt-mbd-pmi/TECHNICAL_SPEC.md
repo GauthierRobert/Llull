@@ -658,3 +658,84 @@ Total MVP (M1–M5) ≈ 11 eng-weeks; V1 ≈ +8 (incl. M5n 1.5, RS1).
 - [RS1] Native compute programme — [../../decisions/RS1-native-compute.md](../../decisions/RS1-native-compute.md) (owner decision 2026-10-18)
 - [R36] usnistgov/SFA source: `sfa-nist.tcl` (expected-PMI coverage logic), `sfa-cl.tcl` (command line) — https://github.com/usnistgov/SFA/tree/master/source (accessed 2026-10)
 - llull internal: `docs/decisions/KI5-shape-kernel-boundary.md`, `docs/decisions/KI6-desktop-app-cli-first.md`, `.claude/rules/architecture.md`.
+
+## 13. Implementation status (as built, AERO-4 part 1, 2026-10-20)
+
+Built: M1 (face resolution, model, persistence), M2 (all commands below), M3 (viewport layer, panel, saved views), M4 (sheets), M5 (stack-up math,
+`analyze_stackup`, `fastener_tolerance`), M7 (composite FCF, datum targets, all-around / all-over, ISO 14405 modifiers, PMI-linked stacks). Not built (later,
+with 04 XCH / RS-7): M6 (AP242 PMI read / write, `apply_pmi_set`, `xcafMapping.ts`, the NIST quality gate, SFA CI), M5n (`llull-stats`, native Monte Carlo), V2.
+
+### 13.1 What exists
+
+| Area | Path |
+| --- | --- |
+| Model | `packages/core/src/model/pmi.ts` (`PmiModel`, 7 item kinds, saved views, `activeSavedViewId`); `CadDocument.pmi?`; `DrawingSheet.pmiMode?`, `DrawingView.pmiIds?` |
+| Face resolution + measurement | `geometry/pmiFeatures.ts` (`openSolid`, `resolveIn`, `resolveFeature`), `geometry/pmiMeasure.ts` (size, location, angle), `geometry/pmiPlacement.ts`, `geometry/pmiText.ts` (grammar §5.4, `toleranceBasis`), `geometry/pmiSymbols.ts` (glyph strokes) |
+| Commands (toolset `pmi`, catalog `commands/pmi/catalog.ts`) | `set_pmi_standard`, `add_datum_feature`, `add_datum_target`, `add_size_dimension`, `add_location_dimension`, `add_geometric_tolerance`, `add_surface_texture`, `add_pmi_note`, `update_pmi`, `delete_pmi`, `create_saved_view`, `update_saved_view`, `delete_saved_view`, `activate_saved_view`, `list_pmi`, `check_pmi`, `accept_pmi_review`, `analyze_stackup`, `fastener_tolerance`; extended `update_sheet` (`pmiMode`), `update_drawing_view` (`pmiIds`, `pmiAuto`), `export_sheet_svg` (`data.pmi`) |
+| Stack-up math | `lib/prng.ts` (xoshiro128** / SplitMix32 / Box-Muller), `lib/erfc.ts`, `lib/stackExpression.ts` (parser + dual-number gradient), `lib/stackup.ts` (WC, corners, RSS, sigma, normal and Irwin-Hall CDF, Monte Carlo) |
+| Sheets | `commands/drawings/pmiPainter.ts` (selection, projection, FCF / datum / callout painting, skip report) |
+| Persistence | `commands/persistence/pmiValidation.ts`; `pmi-<step>.<k>` ids keep the step counter safe (`serialization.ts`) |
+| UI | `src/ui/viewport/3d/PmiLayer.tsx` + `pmiViewStore.ts`, `src/ui/panels/pmi/PmiPanel.tsx`, sidebar tab `pmi` |
+| Tests | `tests/unit/pmi/{plate,commands,sheet,geometry,persistence,stackupCommand}.test.ts`, `tests/unit/lib/stackup.test.ts`, `tests/component/PmiPanel.test.tsx`, analytic kernel `tests/helpers/pmiPlateKernel.ts` |
+
+Coverage of the pmi files (unit suite): `commands/pmi/**` 95.4 % statements / 89.9 % branches / 100 % functions / 97.1 % lines; `geometry/pmi*.ts` 95-100 %
+statements (branches 91-99 %); `lib/stackup.ts`, `lib/erfc.ts`, `lib/stackExpression.ts` 100 % lines.
+
+### 13.2 Deviations from §3-§10 (as built)
+
+| Spec | As built | Why |
+| --- | --- | --- |
+| `createdBy.caller` from `ctx.caller` (gap 09 TR-PLM-16) | `createdBy` is not stored. Every command-made item starts `review.required = true` ("created through a command (agent or script) — not approved by a qualified engineer"); `update_pmi` sets it again | the conservative default is never wrong; `createdBy` can be added as an optional field now that `ctx.caller` exists |
+| `accept_pmi_review { pmiIds, decision, comment, at, by }` refused for `ctx.caller.kind === 'agent'` | **There is no `ctx.caller`** (09 §13: a caller label is self-asserted, so it cannot be a gate). The command ALWAYS needs `confirmation`, a verified Ed25519 signature by a TRUSTED key over this act (the TR-MAT-51 `humanGate`: act `PMI review`, the ids, `{ decision, comment }`, a nonce); `acceptedBy` is the signer taken from the trust record. With no signing port installed it refuses (`GDT_REVIEW_HUMAN_ONLY`): the earlier rule "a `human` caller is enough where no port is installed" is withdrawn. The PMI panel Accept button opens the signing dialog (`SignActDialog`: key + passphrase, signed by the local backend, key trusted in the desktop app). `at` is caller-supplied text. `metaHistory`: not replayed (a signature is never stored). **Replay:** `history/carry.ts` `withCarriedPmi` keeps the sign-off of an item whose replayed content (everything except `review`, derived `faceIndices` and an automatic placement) is unchanged; an edited or changed item is review-required again | agent gate through `ctx.caller` (09); the carry keeps a parameter edit or configuration switch from wiping sign-offs that still apply |
+| `data.error = { code, ids, paths, remediation }` | `result.error` (the registry's `CommandError`, AF-11) **and** `data.error` with the same object; summary `<command>: <CODE> — <message>; no-op.` | the registry already carries machine-readable refusals on `CommandResult.error` |
+| `doc.pmi.import`, `apply_pmi_set`, `unverified` set by import | `unverified` exists on every item and propagates to `check_pmi`; nothing sets it yet (no import) | M6 |
+| `DocumentExtension.carry` (TR-PLM-32) | not used. `pmi.activeSavedViewId` (set by `activate_saved_view`) and the review carry above are applied by `history/carry.ts` `withCarriedPmi` (core change, needs `cad-reviewer`). Items are regenerated by their own steps; there are no orphan PMI items (all are made by commands) | the generic hook is 09's; this keeps the one piece of PMI view state that no step produces |
+| `faceIndices` refreshed by a post-replay hook (TR-GDT-06) | replay re-runs every PMI command, which resolves again; `check_pmi` re-resolves every feature on the CURRENT B-rep (`GDT_FEATURE_UNRESOLVED`, `GDT_SURFACE_TYPE_CHANGED`) and `update_pmi` refreshes `faceIndices`, size, count and measured values | no separate hook needed |
+| Face data from "gap 01 face-query port" | `GeometryKernel.faceQuery` (`faceDetails` with 64 samples, `faceContains`) + `ShapeTopology.faces[].convex` for bore vs pin; `topology()` is required too | what exists today |
+| `ofSize` | `internal` added (optional): `convex === false` on the exact topology = bore / slot | §5.2 needs hole vs shaft for MMC |
+| `add_pmi_note` K | not `requiresKernel`: a free note needs no kernel; attached notes (`entityId` + `facesNear`) do | spec table says "mutating", not K |
+| `add_geometric_tolerance` target forms | exactly one of `entityId` + `facesNear`, `targetPmiId` (size dimension), `compositeOf` (inherits the upper frame's target) | M7 composite |
+| M7 composite FCF | lower segment: same characteristic (position or profile), same target, zone value <= the upper's, upper not itself a lower segment (`GDT_COMPOSITE_INVALID`); `delete_pmi` of the upper removes the lower segments | rules are logical consistency, not quoted clauses |
+| M7 datum targets | item kind `datum_target` (`add_datum_target`: point / line / area with `areaSize`, numbered per datum, the datum must exist); drawn as a circle `A1` | |
+| M7 all-around / all-over | zone modifiers `all_around` / `all_over`, accepted on profile characteristics only (`GDT_MODIFIER_NOT_APPLICABLE`); text `ALL AROUND` | no ALL_AROUND_SHAPE_ASPECT export (M6) |
+| M7 ISO 14405 | `sizeModifiers` codes E LP LS GG GX GN GC CC CA CM CV SX SN SA SM SD SR stored and rendered (`Ⓔ`, `(LP)`); a symbolic list, no standard text | |
+| M7 PMI-linked stacks | `analyze_stackup` contributor `{ pmiId }`: measured nominal + tolerance (limits become deviations), verified by default; `stackup_at_temperature` (04 §16) takes the same link and uses the same WC / RSS / share formulas | |
+| Stack-up expression grammar | the 03 spec says "over the `parametric/expression` grammar"; as built `lib/stackExpression.ts` is its own small parser (same grammar: + - * / unary minus, parentheses, numbers, names, calls) because the existing evaluator folds values while parsing and has no tree to differentiate. Differentiable functions only: sin cos tan asin acos atan sqrt abs exp ln pow hypot, constants pi tau; floor, ceil, round, mod, min, max are refused (`GDT_STACKUP_EXPRESSION`) | forward-mode dual numbers need a tree |
+| `analyze_stackup` `methods` | default `["worstCase","rss"]`; the closed forms are always in `data`, `monteCarlo` only when listed; no sensitivities and no expression = every contributor +1 (named in `provenance.note`) | |
+| `check_pmi` | adds `requireCoverage` (opt-in `GDT_FEATURE_UNTOLERANCED`); `rules: builtin+table` is accepted but no table exists (`GDT_TABLE_RULE` warning); `ruleTable` is always `none`; an always-on `GDT_UNVERIFIED_INPUT` warning says characteristic / modifier permissions per standard are NOT checked | §5.6 rule tables are customer data; nothing is shipped |
+| Sheet PMI | frames at the projected frame anchor, leader to the projected `leaderTo`, greedy right-shift on overlap; skip reasons `GDT_SHEET_PLANE_NOT_PARALLEL`, `GDT_SHEET_SOLID_NOT_IN_VIEW`, `GDT_SHEET_VIEW_KIND_UNSUPPORTED`, `GDT_PMI_UNKNOWN` (explicit id deleted since); section-cut symbols and a warning for unavoidable collisions are not built | §5.8 items 4-5 |
+| Viewport | DOM label (`ScreenAnchor`) at the frame anchor + a drei `Line` leader; `pmi` sidebar tab with items, review state, standard, saved views (open / delete), "show PMI" toggle, and an add-datum form that gathers a **point** (x, y, z) | face picking in the 3D view is not built: the form takes typed coordinates (the command contract is unchanged: points, never indices) |
+| Error codes added to §7.2 | `GDT_TARGET_FORM`, `GDT_SIZE_KIND_MISMATCH`, `GDT_LOCATION_AMBIGUOUS`, `GDT_LOCATION_INVALID`, `GDT_LOCATION_SAME_FEATURE`, `GDT_MODIFIER_NOT_APPLICABLE`, `GDT_COMPOSITE_INVALID`, `GDT_NOTE_EMPTY`, `GDT_STACKUP_INVALID`, `GDT_FASTENER_INVALID` | gaps in §7.2 found while building |
+
+### 13.3 Validation cases reached (automated)
+
+| VC | Where | Result |
+| --- | --- | --- |
+| VC-GDT-01, 05, 50, 56 | `tests/unit/pmi/plate.test.ts` (the plate plan through `build_project` on the analytic plate kernel) | 3 datums, 2 sizes (4X Ø6.6, Ø20), 4 FCFs, texture, saved view; text `⌖ \| Ø0.3 Ⓜ \| A \| B \| C`; 0 errors; 10 / 10 items review-required with the "not approved" summary; replay and save / load identical |
+| VC-GDT-02 | same | thickness 12 -> 16: every item resolves, Ø 6.6 / 20, 0 errors (replay on the regenerated plate) |
+| VC-GDT-03, 54 | same (`draft_plan_gdt_rejections.json`, `onError: continue`) | 1 accepted, 5 refused with `GDT_DATUM_DUPLICATE`, `GDT_DATUM_UNDEFINED`, `GDT_MC_ON_NON_FOS`, `GDT_ZONE_NON_POSITIVE`, `GDT_POINT_NOT_ON_FACE`, each with remediation and path |
+| VC-GDT-04 | `commands.test.ts` | input deep-equal before / after for the add commands; the others are read-only or return a new document |
+| VC-GDT-06 | `plate.test.ts` | plane to axis 20, plane to plane 80, basic (`[20]`), angle 90 |
+| VC-GDT-07, 08 | `commands.test.ts`, `persistence.test.ts` | composite link stored and validated, all-around accepted on profile, ISO 14405 `Ⓔ` stored and rendered. The AP242 side (1 ALL_AROUND_SHAPE_ASPECT) is M6 |
+| VC-GDT-10, 11 | `sheet.test.ts` | TOP = hole size, bore size, both position FCFs; FRONT = flatness, datum A, texture, datum C; RIGHT = datum B, perpendicularity; `fits`; placed + skipped cover every item |
+| VC-GDT-30..34 | `tests/unit/lib/stackup.test.ts`, `stackupCommand.test.ts` | mean, WC, RSS, sigma to 1e-9; normal P 1.43809451e-4 and SU-03 2.765e-9 to 1e-12 absolute; uniform P = 29/2400 to 1e-12; SU-05 exact corners 49.193113654 / 50.804590132 and autodiff WC 49.194250265; MC deterministic per seed and inside the 5-sigma bounds (SU-01, 02, 04) |
+| VC-GDT-35 | `stackupCommand.test.ts` | FF-01..03 to 1e-12 |
+| VC-GDT-36 | same | bore `pmiId` + typed pin: WC [0.007, 0.041], RSS 0.012349089; after `update_pmi` upper 0.025: max 0.045 |
+| VC-GDT-51 | `commands.test.ts` | a kernel without the face-query port refuses every feature-attaching command with `GDT_KERNEL_NO_TOPOLOGY` (analytic fake kernel; the real Manifold kernel is not exercised) |
+| VC-GDT-52 | `tests/unit/contract/toolSchemaSnapshot.test.ts` | the 19 new tools and the 3 extended ones are in the reviewed snapshot (the CLI `describe` itself was not run) |
+| VC-GDT-53 | `tests/component/PmiPanel.test.tsx` | the add-datum form dispatches `add_datum_feature` with `facesNear` = the typed point |
+| VC-GDT-55, 57, 58 | `stackupCommand.test.ts`, `commands.test.ts` | `unverified.contributors = ["C"]` + `GDT_UNVERIFIED_INPUT`; agent -> `GDT_REVIEW_HUMAN_ONLY`, document unchanged; with a verified signature `review.required` false and `acceptedBy` set; default `sigmaPerHalfTolerance` {3, defaulted, source} and `sensitivitySource: autodiff` |
+
+### 13.4 Unverified, not reached, deferred
+
+- **Real OCC kernel.** Every PMI test runs on an analytic fake kernel (`pmiPlateKernel.ts`: exact planes / cylinders, `faceContains` by closed form). The face-resolution
+  logic is verified against the plate's closed-form faces, not against OCC `faceDetails` on a real plate. The OCC worker test of the spec (`server/tests/occtPmiFeatures.test.ts`,
+  VC-GDT-02 on the real kernel) and the CLI scripts (`server/tests/cli-pmi.test.ts`, VC-GDT-54..58 through `llull ... --json`) are **not written**: `server/` is another lane and the
+  native kernel binary is not present in this environment. The CLI path is the same `execute`, so the unit tests cover the logic, not the transport.
+- **Sphere / cone faces.** `FaceDetail` has no sphere centre or cone apex: spheres resolve through `axis.origin` when the kernel gives it, else by sample points; cones by samples.
+- **VC-GDT-09** (inch plate Ø 0.259842519685 in), **VC-GDT-40** (surface-texture parameter computation from profiles: the commands only store the requirement), **VC-GDT-37** (native Monte Carlo),
+  VC-GDT-20..26 (AP242 / NIST) and VC-GDT-27 (V2) are not reached.
+- **Face picking in the 3D view** (§7.1 UI) is not built; `render_view` does not draw PMI frames yet (AF-22 for the CLI: `list_pmi` returns the plane data instead).
+- **`llull guide` GD&T section** (FR-GDT-36, AF-03) is not written (protocol / CLI lane).
+- **Review sign-offs are data, not signatures.** A saved file whose `review.required` is hand-edited to `false` is loaded as is: persistence validation checks the shape, not a signature (a signature is never stored). The sign-off is trustworthy only through `accept_pmi_review` (agent callers refused, signature verified where a port is installed) and the content-equality carry across replay.
+- **Undo / redo** of PMI steps (VC-GDT-50) is covered by replay equality, not by the store's undo stack.

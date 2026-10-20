@@ -72,7 +72,8 @@ function named(statement: string, label: StepLabel): string {
 export function addColors(step: string, styled: readonly { items: string[]; rgb: [number, number, number] }[], context: string): string {
   const end = step.lastIndexOf('ENDSEC;');
   if (end < 0 || styled.length === 0) return step;
-  let next = Math.max(...[...step.matchAll(/^#(\d+) = /gm)].map((m) => Number(m[1]))) + 1;
+  // reduce, not Math.max(...ids): a faceted solid written as B-rep has far more entities than a call can take as arguments
+  let next = [...step.matchAll(/^#(\d+) = /gm)].reduce((largest, m) => Math.max(largest, Number(m[1])), 0) + 1;
   const lines: string[] = [];
   const styleOfColor = new Map<string, number>();
   const allItems: number[] = [];

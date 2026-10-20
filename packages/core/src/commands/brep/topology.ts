@@ -91,6 +91,7 @@ function exportThroughXde(doc: CadDocument, kernel: GeometryKernel, entityIds: r
     sheetCount: data.sheetCount,
     entityIds: data.entityIds,
     skipped: data.skipped,
+    faceted: data.faceted,
     ...(data.assembly === undefined ? {} : { assembly: data.assembly }),
   };
   const sheets = data.sheetCount > 0 ? ` and ${data.sheetCount} surface sheet(s)` : '';
@@ -98,7 +99,7 @@ function exportThroughXde(doc: CadDocument, kernel: GeometryKernel, entityIds: r
   const left = data.skipped.length > 0 ? `; skipped ${data.skipped.join(', ')}.` : '.';
   return report(
     doc,
-    `export_step_exact: ${data.solidCount} exact solid(s)${sheets} from ${data.entityIds.join(', ')} → STEP AP214${data.assembly === undefined ? '' : ' assembly'}${structure}, ${data.step.length} bytes${left}`,
+    `export_step_exact: ${data.solidCount} exact solid(s)${sheets} from ${data.entityIds.join(', ')} → STEP AP214${data.assembly === undefined ? '' : ' assembly'}${structure}, ${data.step.length} bytes${data.faceted.length > 0 ? `; ${data.faceted.length} ply solid(s) written from triangles (exact slab refused): ${data.faceted.join(', ')}` : ''}${left}`,
     exact,
   );
 }
@@ -111,6 +112,8 @@ export interface ExportStepExactData {
   readonly sheetCount: number;
   readonly entityIds: readonly string[];
   readonly skipped: readonly string[];
+  /** Ply solids written from their triangles because the kernel could not build their exact slab. */
+  readonly faceted: readonly string[];
   /** Present when the file has assembly structure: STEP products (one per component / loose solid) and placed occurrences. */
   readonly assembly?: { readonly products: number; readonly occurrences: number };
 }
@@ -120,6 +123,7 @@ export interface ExportStepExactData {
  * @invariant data = { format:'step', step (ISO 10303-21 text), solidCount, sheetCount, entityIds, skipped }; every solid is
  *   written from the kernel's exact B-rep (true planes, cylinders, fillet surfaces — never triangles,
  *   except for imported meshes that have no exact form); a surface sheet is one product holding its (trimmed) B-spline face
+ * @invariant a ply solid carrying `stepSlab` is written exact when the kernel builds it; otherwise from its triangles and listed in `data.faceted`
  * @failure no solids or sheets, no kernel, mesh-only kernel, or a solid the kernel cannot build -> no-op, no data; a sheet the kernel
  *   cannot build is skipped (named in `skipped`), it never fails the export
  */
@@ -133,7 +137,7 @@ export const exportStepExact = defineCommand({
     '(use export_step via the Python bridge, or export_stl, instead). ' +
     'Each solid becomes one STEP product named after its entity (set_entity_name, else the id; the group ' +
     'name goes in the product description) and carries its entity color as a surface style. ' +
-    'Surface sheets (nurbs_surface entities, trimmed ones included) are written as exact B-spline faces, one product each, after the solids, ' +
+    'Ply solids (create_ply_solids) are written as exact B-rep slabs when the kernel builds them, else from their triangles (data.faceted lists those). Surface sheets (nurbs_surface entities, trimmed ones included) are written as exact B-spline faces, one product each, after the solids, ' +
     'when the kernel builds them (the native OCC kernel does); a sheet it cannot build is listed in skipped. Sheets are not placed into an assembly file. ' +
     'Returns data: { format, step (the file text), solidCount (the expanded solids written), sheetCount (sheets written), entityIds (the selected loose-solid / instance / sheet ids written, each once; never internal expanded ids), skipped, assembly? }. When the selection holds component instances ' +
     '(assembly parts, fasteners) the file has real assembly structure: one root product, ONE product per component (its solids written once) ' +
@@ -173,6 +177,7 @@ export const exportStepExact = defineCommand({
         sheetCount: 0,
         entityIds: exported,
         skipped: [...skipped, ...left],
+        faceted: plan.faceted,
         assembly,
       };
       return report(
@@ -184,8 +189,11 @@ export const exportStepExact = defineCommand({
       );
     }
     const shapes: ShapeHandle[] = [];
+    const faceted: string[] = [];
     for (const entity of solids) {
-      const shape = exactOrMesh(kernel, entity);
+      const built = exactOrMesh(kernel, entity);
+      const shape = built.shape;
+      if (built.faceted) faceted.push(entity.id);
       if (shape === null)
         return noop(doc, `export_step_exact: the kernel could not build '${entity.id}' (kind '${entity.kind}'); nothing exported.`);
       shapes.push(shape);
@@ -214,10 +222,12 @@ export const exportStepExact = defineCommand({
       sheetCount: faces.length,
       entityIds: exported,
       skipped: left,
+      faceted,
     };
     return report(
       doc,
       `export_step_exact: ${solids.length} exact solid(s)${faces.length > 0 ? ` and ${faces.length} surface sheet(s)` : ''} from ${exported.join(', ')} → STEP AP214, ${step.length} bytes` +
+        (faceted.length > 0 ? `; ${faceted.length} ply solid(s) written from triangles (exact slab refused): ${faceted.join(', ')}` : '') +
         (left.length > 0 ? `; skipped ${left.join(', ')}.` : '.'),
       data,
     );

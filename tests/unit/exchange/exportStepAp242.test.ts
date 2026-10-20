@@ -9,6 +9,7 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { summarizeStep21 } from '@lib/step21/summary';
 import { fakeExactKernel } from '../../helpers/fakeExactKernel';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
+import { TETRA } from '../../helpers/fakeKernel';
 import { type FakeXdeKernel, fakeStepText, fakeXdeKernel, type XdeFakeSpec } from '../../helpers/fakeXdeKernel';
 
 const ctxOf = (kernel: GeometryKernel | null): ExecutionContext => ({ ...defaultContext(), kernel });
@@ -377,5 +378,38 @@ describe('geometric_validation_properties', () => {
       ctxOf(null),
     );
     expect(text.data).toBeUndefined();
+  });
+});
+
+describe('ply solids carrying a stepSlab (step-sheets behaviour through the XDE path)', () => {
+  it('lists a ply solid whose exact slab the kernel refuses in data.faceted, and still writes it from its triangles', () => {
+    const base = execute(createEmptyDocument(), 'add_box', { size: [10, 10, 2] }).document;
+    const id = base.order[0] as string;
+    const box = base.entities[id] as unknown as Record<string, unknown>;
+    const doc = {
+      ...base,
+      entities: {
+        ...base.entities,
+        [id]: {
+          ...box,
+          kind: 'mesh',
+          mesh: TETRA,
+          stepSlab: {
+            op: 'faceSlab',
+            surface: { type: 'plane', data: [0, 0, 0, 0, 0, 1] },
+            loops: [4, 0, 0, 10, 0, 10, 10, 0, 10],
+            from: 0,
+            to: 2,
+            direction: [0, 0, 1],
+            tolerance: 1e-6,
+          },
+        },
+      },
+    } as unknown as CadDocument;
+    const { result } = run(doc, 'export_step_exact', {});
+    const data = result.data as { faceted: string[]; solidCount: number } | undefined;
+    expect(data?.solidCount).toBe(1);
+    expect(data?.faceted).toEqual([id]);
+    expect(result.summary).toContain('written from triangles');
   });
 });

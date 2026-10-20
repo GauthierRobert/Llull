@@ -9,7 +9,7 @@
 
 import { type CadDocument, type Component, type Entity, type InstanceEntity, type Vec3, is3D } from '../../model/types';
 import type { GeometryKernel, ShapeHandle, StepAssemblyPart, StepOccurrence } from '../../geometry/kernel';
-import { operandRecipe } from './kernelShape';
+import { exactOrMesh, operandRecipe } from './kernelShape';
 import type { AssemblyStepLabels, NestedOccurrence } from './stepAssemblyLabels';
 import { MAX_INSTANCE_DEPTH, type StepEntry, instanceSolids, stepLabels } from './stepTargets';
 
@@ -18,6 +18,8 @@ export interface StepAssemblyPlan {
   readonly labels: AssemblyStepLabels;
   /** Distinct parts (STEP products) besides the root. */
   readonly partCount: number;
+  /** Ply solids written from triangles because the kernel refused their exact slab. */
+  readonly faceted: readonly string[];
 }
 
 const ORIGIN: [number, number, number] = [0, 0, 0];
@@ -60,6 +62,7 @@ export function planStepAssembly(
   const parts: PartLabels[] = [];
   const labeled: NestedOccurrence[] = [];
   const sharedOf = new Map<string, { part: StepAssemblyPart; index: number }>();
+  const faceted: string[] = [];
 
   const scalable = kernel.supports('scale');
 
@@ -70,6 +73,13 @@ export function planStepAssembly(
   const build = (solids: readonly Entity[], factor = 1): ShapeHandle[] | { failed: string; unscalable: boolean } => {
     const shapes: ShapeHandle[] = [];
     for (const entity of solids) {
+      if (factor === 1) {
+        const built = exactOrMesh(kernel, entity);
+        if (built.faceted && !faceted.includes(entity.id)) faceted.push(entity.id);
+        if (built.shape === null) return { failed: `'${entity.id}' (kind '${entity.kind}')`, unscalable: false };
+        shapes.push(built.shape);
+        continue;
+      }
       const recipe = operandRecipe(kernel, entity);
       const shape = kernel.evaluate(factor === 1 ? recipe : { op: 'scale', source: recipe, factor });
       if (shape === null) {
@@ -185,5 +195,5 @@ export function planStepAssembly(
     labeled.push({ name: entry.label, part: parts.length - 1 });
     occurrences.push({ part: { shapes }, position: ORIGIN, rotation: ORIGIN });
   }
-  return { occurrences, labels: { rootName: 'Assembly', parts, occurrences: labeled }, partCount: parts.length };
+  return { occurrences, labels: { rootName: 'Assembly', parts, occurrences: labeled }, partCount: parts.length, faceted };
 }

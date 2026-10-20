@@ -11,6 +11,7 @@ const SIDEBAR_TABS = [
   'civil',
   'layers',
   'sheets',
+  'pmi',
   'assembly',
   'mechanisms',
   'parameters',

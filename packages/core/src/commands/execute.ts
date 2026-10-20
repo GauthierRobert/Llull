@@ -6,6 +6,8 @@ import { currentContext, runInContext } from './context';
 import { getCommand } from './commandTable';
 import { kernelUnavailable } from './kernelRefusal';
 import { commandError, rejection, unknownCommandError } from './noop';
+import { derivationViolation } from './derivation';
+import { pluginGuards } from '../plugins/host';
 import { stepIdSource } from '../lib/id';
 import { withoutConfirmations } from '../lib/withoutConfirmations';
 import type { GeometryKernel } from '../geometry/kernel';
@@ -79,12 +81,20 @@ export function execute(doc: CadDocument, commandName: string, params: unknown, 
     suppressed: false,
     affected: result.affected,
   };
-  return {
-    ...result,
-    document: {
-      ...result.document,
-      featureHistory: [...result.document.featureHistory, step],
-      nextStepNumber: Math.max(result.document.nextStepNumber ?? 1, stepNumber + 1),
-    },
+  const recorded: CadDocument = {
+    ...result.document,
+    featureHistory: [...result.document.featureHistory, step],
+    nextStepNumber: Math.max(result.document.nextStepNumber ?? 1, stepNumber + 1),
   };
+  // The recorded step is itself a change of the definition: guards see the final document (a release lock must not be bypassed by a
+  // command whose own result equals its input).
+  const violation = derivationViolation(pluginGuards(), commandName, doc, recorded);
+  if (violation !== null)
+    return rejection(
+      doc,
+      violation.summary,
+      violation.error ??
+        commandError('CMD_DERIVED_GEOMETRY', 'Edit the domain object that derives this geometry instead of the derived entities.'),
+    );
+  return { ...result, document: recorded };
 }

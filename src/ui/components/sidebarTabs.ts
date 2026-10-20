@@ -63,6 +63,7 @@ export const SIDEBAR_TAB_SPECS: readonly SidebarTabSpec[] = [
     section: 'domain',
     description: 'Paper layouts and views',
   },
+  { tab: 'pmi', label: 'PMI', shortLabel: 'PMI', icon: 'ruler', section: 'domain', description: 'Datums, tolerances, sizes, saved views' },
   { tab: 'assembly', label: 'Assembly', shortLabel: 'Parts', icon: 'assembly', section: 'domain', description: 'Components and instances' },
   {
     tab: 'mechanisms',
@@ -122,6 +123,7 @@ export const SIDEBAR_TAB_COUNTS: Readonly<Record<SidebarTab, (doc: CadDocument) 
   civil: (doc) => doc.civil?.order.length ?? 0,
   layers: (doc) => doc.layerOrder.length,
   sheets: (doc) => doc.drawings?.order.length ?? 0,
+  pmi: (doc) => doc.pmi?.order.length ?? 0,
   assembly: (doc) => Object.keys(doc.components).length,
   mechanisms: (doc) => doc.constraintOrder.length + doc.jointOrder.length + doc.driveRelationOrder.length,
   parameters: (doc) => Object.keys(doc.parameters).length,

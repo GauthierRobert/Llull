@@ -16,7 +16,9 @@
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepBuilderAPI_Sewing.hxx>
+#include <BRepCheck_Analyzer.hxx>
 #include <BRepFill.hxx>
+#include <BRepGProp.hxx>
 #include <BRepLib.hxx>
 #include <BRep_Tool.hxx>
 #include <GCE2d_MakeSegment.hxx>
@@ -26,6 +28,7 @@
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_OffsetSurface.hxx>
 #include <Geom_Plane.hxx>
+#include <GProp_GProps.hxx>
 #include <ShapeFix_Face.hxx>
 #include <ShapeFix_Solid.hxx>
 #include <Standard_Failure.hxx>
@@ -61,14 +64,20 @@ gp_Dir dir_at(rust::Slice<const double> values, size_t offset) {
   return gp_Dir(values[offset], values[offset + 1], values[offset + 2]);
 }
 
+// An integer count read from untrusted data: finite, integral and within [minimum, 100000] (a cast of anything else is undefined behaviour).
+int count_of(double value, int minimum) {
+  if (!(value >= minimum && value <= 100000.0) || value != std::floor(value)) throw std::invalid_argument("surface: a count is not an integer in range");
+  return static_cast<int>(value);
+}
+
 enum SurfaceKind { kBSpline = 0, kPlane = 1, kCylinder = 2, kCone = 3 };
 
 // Layout (see features.hxx): bspline = degU, degV, nU, nV, knotCountU, knotCountV, rational, poles (i-major), weights?, knotsU, multsU, knotsV, multsV.
 Handle(Geom_Surface) bspline_surface(rust::Slice<const double> d) {
   if (d.size() < 7) throw std::invalid_argument("bspline surface: header too short");
-  const int degree_u = static_cast<int>(d[0]), degree_v = static_cast<int>(d[1]);
-  const int count_u = static_cast<int>(d[2]), count_v = static_cast<int>(d[3]);
-  const int knots_u = static_cast<int>(d[4]), knots_v = static_cast<int>(d[5]);
+  const int degree_u = count_of(d[0], 1), degree_v = count_of(d[1], 1);
+  const int count_u = count_of(d[2], 2), count_v = count_of(d[3], 2);
+  const int knots_u = count_of(d[4], 2), knots_v = count_of(d[5], 2);
   const bool rational = d[6] != 0.0;
   if (degree_u < 1 || degree_v < 1 || count_u < degree_u + 1 || count_v < degree_v + 1 || knots_u < 2 || knots_v < 2)
     throw std::invalid_argument("bspline surface: bad counts");
@@ -94,7 +103,7 @@ Handle(Geom_Surface) bspline_surface(rust::Slice<const double> d) {
     TColStd_Array1OfInteger values(1, count);
     int total = 0;
     for (int k = 0; k < count; ++k) {
-      values.SetValue(k + 1, static_cast<int>(d[offset + static_cast<size_t>(k)]));
+      values.SetValue(k + 1, count_of(d[offset + static_cast<size_t>(k)], 1));
       total += values(k + 1);
     }
     offset += static_cast<size_t>(count);
@@ -140,18 +149,22 @@ std::vector<Loop> read_loops(rust::Slice<const double> d) {
   std::vector<Loop> loops;
   if (d.empty()) return loops;
   size_t offset = 1;
-  const size_t count = static_cast<size_t>(d[0]);
+  const size_t count = static_cast<size_t>(count_of(d[0], 1));
+  size_t outer_loops = 0;
   for (size_t k = 0; k < count; ++k) {
     if (offset + 2 > d.size()) throw std::invalid_argument("loops: truncated");
-    const size_t n = static_cast<size_t>(d[offset]);
-    const bool outer = d[offset + 1] != 0.0;
+    const size_t n = static_cast<size_t>(count_of(d[offset], 3));
+    if (d[offset + 1] != 0.0 && d[offset + 1] != 1.0) throw std::invalid_argument("loops: the outer flag must be 0 or 1");
+    const bool outer = d[offset + 1] == 1.0;
+    if (outer) ++outer_loops;
     offset += 2;
-    if (n < 3 || offset + 2 * n > d.size()) throw std::invalid_argument("loops: bad point count");
+    if (offset + 2 * n > d.size()) throw std::invalid_argument("loops: bad point count");
     Loop loop{outer, {}};
     for (size_t i = 0; i < n; ++i) loop.points.emplace_back(d[offset + 2 * i], d[offset + 2 * i + 1]);
     offset += 2 * n;
     loops.push_back(loop);
   }
+  if (offset != d.size() || outer_loops != 1) throw std::invalid_argument("loops: exactly one outer loop and no trailing data");
   return loops;
 }
 
@@ -297,12 +310,22 @@ std::unique_ptr<Shape> face_slab(int32_t kind, rust::Slice<const double> surface
     gp_Pnt at;
     gp_Vec du, dv;
     base->D1(start.X(), start.Y(), at, du, dv);
-    const double sign = du.Crossed(dv).Dot(gp_Vec(direction[0], direction[1], direction[2])) >= 0 ? 1.0 : -1.0;
+    const gp_Vec normal = du.Crossed(dv);
+    // a singular point (a pole, an apex) has no normal: the sign of the lift would be arbitrary
+    if (normal.Magnitude() <= 1e-9 * (du.Magnitude() * dv.Magnitude()) || normal.Magnitude() < 1e-300) return nullptr;
+    const double sign = normal.Dot(gp_Vec(direction[0], direction[1], direction[2])) >= 0 ? 1.0 : -1.0;
     const Lift low = lift(kind, surface, base, sign * from);
     const Lift high = lift(kind, surface, base, sign * to);
+    const std::vector<Loop> low_loops = shifted(boundary, low.v_shift);
+    const std::vector<Loop> high_loops = shifted(boundary, high.v_shift);
+    if (kind == kCone)
+      for (const std::vector<Loop> *loops_of : {&low_loops, &high_loops})
+        for (const Loop &loop : *loops_of)
+          for (const gp_Pnt2d &p : loop.points)
+            if (!(p.Y() > 0)) return nullptr;  // the lift would carry a loop through (or past) the apex
     std::vector<std::vector<TopoDS_Edge>> bottom_edges, top_edges;
-    const TopoDS_Face bottom = trimmed_face(low.surface, shifted(boundary, low.v_shift), &bottom_edges);
-    const TopoDS_Face top = trimmed_face(high.surface, shifted(boundary, high.v_shift), &top_edges);
+    const TopoDS_Face bottom = trimmed_face(low.surface, low_loops, &bottom_edges);
+    const TopoDS_Face top = trimmed_face(high.surface, high_loops, &top_edges);
     if (bottom.IsNull() || top.IsNull()) return nullptr;
     BRepBuilderAPI_Sewing sewing(tolerance, Standard_True, Standard_True, Standard_True, Standard_False);
     sewing.Add(bottom);
@@ -347,7 +370,13 @@ std::unique_ptr<Shape> face_slab(int32_t kind, rust::Slice<const double> surface
     if (!solid.IsDone()) return nullptr;
     ShapeFix_Solid fix(solid.Solid());
     fix.Perform();
-    return wrap(fix.Solid());
+    const TopoDS_Shape result = fix.Solid();
+    // never hand back a broken or inside-out slab: the host falls back to the triangles
+    if (!BRepCheck_Analyzer(result, Standard_True).IsValid()) return nullptr;
+    GProp_GProps properties;
+    BRepGProp::VolumeProperties(result, properties);
+    if (!(properties.Mass() > 0)) return nullptr;
+    return wrap(result);
   } catch (const Standard_Failure &) {
     return nullptr;
   }

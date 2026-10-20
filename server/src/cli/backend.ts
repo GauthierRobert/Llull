@@ -2,14 +2,14 @@
 import fs from 'fs';
 import path from 'path';
 import type { CadDocument } from '@core/model/types';
-import { failedOutcome, runCommandOutcome } from '@protocol/commandOutcome';
+import { failedOutcome } from '@protocol/commandOutcome';
 import { parseCommandResponse, type CommandOutcome } from '@protocol/restProtocol';
 import { errorMessage } from '@lib/errorMessage';
 import type { StepObserver } from './progress';
 import type { ExchangeOptions } from '../pythonExchange';
 import { runLocalExchange } from './exchange';
 import { requestJson, type FetchLike } from '../restClient';
-import { serverContext } from '../fea/context';
+import { runHostCommand } from '../plm/hostRun';
 import { readDocumentFile, writeDocumentFile } from '../documentFile';
 
 export interface CliBackend {
@@ -43,12 +43,10 @@ export function createLocalBackend(docPath: string, options: LocalOptions): CliB
   const runCommand = (name: string, params: unknown): CommandOutcome => {
     try {
       const prior = currentDoc();
-      const { document, outcome } = runCommandOutcome(
-        prior,
-        name,
-        params,
-        options.observer !== undefined ? { ...serverContext(), onStep: options.observer.onStep } : serverContext(),
-      );
+      const { document, outcome } = runHostCommand(prior, name, params, {
+        source: 'cli',
+        ...(options.observer !== undefined ? { onStep: options.observer.onStep } : {}),
+      });
       doc = document;
       if (outcome.changed && !options.dryRun) saveDocumentWithBackup(docPath, document);
       return outcome.data !== undefined ? { ...outcome, data: options.observer?.withDurations(outcome.data) ?? outcome.data } : outcome;

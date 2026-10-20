@@ -69,12 +69,72 @@ pub(super) fn loft(entity: &Value) -> Evaluated {
     place_entity(shape_of(features::skinned_solid(&rings, ruled))?, entity, [0.0; 3])
 }
 
+/// Largest count a surface description may declare (mirrors `packages/core/src/geometry/surfaceWire.ts`).
+const MAX_COUNT: f64 = 100_000.0;
+
+/// An integer in `[minimum, MAX_COUNT]` stored as a double, or `None` (NaN, fractional, out of range).
+fn count_of(value: Option<&f64>, minimum: f64) -> Option<usize> {
+    let value = *value?;
+    (value >= minimum && value <= MAX_COUNT && value.fract() == 0.0).then_some(value as usize)
+}
+
+/// Whether `data` is a consistent description of the surface `kind` (0 B-spline, 1 plane, 2 cylinder, 3 cone): the layout the C++ reads.
+fn surface_data_ok(kind: i32, data: &[f64]) -> bool {
+    match kind {
+        1 => data.len() == 9,
+        2 | 3 => data.len() == 10 && data[9] > 0.0,
+        0 => {
+            let (Some(_), Some(_)) = (count_of(data.first(), 1.0), count_of(data.get(1), 1.0)) else { return false };
+            let (Some(count_u), Some(count_v)) = (count_of(data.get(2), 2.0), count_of(data.get(3), 2.0)) else { return false };
+            let (Some(knots_u), Some(knots_v)) = (count_of(data.get(4), 2.0), count_of(data.get(5), 2.0)) else { return false };
+            let rational = match data.get(6) {
+                Some(flag) if *flag == 0.0 => 0,
+                Some(flag) if *flag == 1.0 => 1,
+                _ => return false,
+            };
+            let poles = count_u * count_v;
+            let head = 7 + 3 * poles + rational * poles;
+            data.len() == head + 2 * (knots_u + knots_v)
+                && data[head + knots_u..head + 2 * knots_u]
+                    .iter()
+                    .chain(&data[head + 2 * knots_u + knots_v..])
+                    .all(|m| count_of(Some(m), 1.0).is_some())
+        }
+        _ => false,
+    }
+}
+
+/// Whether `loops` is empty (the natural boundary) or a list of exactly one outer loop plus holes, each with >= 3 points, and nothing else.
+fn loops_ok(loops: &[f64]) -> bool {
+    if loops.is_empty() {
+        return true;
+    }
+    let Some(count) = count_of(loops.first(), 1.0) else { return false };
+    let (mut offset, mut outer) = (1_usize, 0_usize);
+    for _ in 0..count {
+        let Some(points) = count_of(loops.get(offset), 3.0) else { return false };
+        match loops.get(offset + 1) {
+            Some(flag) if *flag == 1.0 => outer += 1,
+            Some(flag) if *flag == 0.0 => {}
+            _ => return false,
+        }
+        offset += 2 + 2 * points;
+        if offset > loops.len() {
+            return false;
+        }
+    }
+    offset == loops.len() && outer == 1
+}
+
 /// A surface sheet (`nurbs_surface` leaf, capability `nurbsSurface`): the host sends `native.surface` (encoded clamped B-spline patch) and
 /// `native.loops` (its (u, v) trim loops, absent = the natural boundary); the face is placed like any entity. Without the payload it is refused.
 pub(super) fn nurbs_surface(entity: &Value) -> Evaluated {
     let native = entity.get("native");
     let Some(surface) = numbers(native.and_then(|inner| inner.get("surface"))) else { return refused() };
     let loops = numbers(native.and_then(|inner| inner.get("loops"))).unwrap_or_default();
+    if !surface_data_ok(0, &surface) || !loops_ok(&loops) {
+        return refused();
+    }
     place_entity(shape_of(features::surface_face(0, &surface, &loops))?, entity, [0.0; 3])
 }
 
@@ -98,6 +158,9 @@ pub(super) fn face_slab(recipe: &Value) -> Evaluated {
     ) else {
         return refused();
     };
+    if !surface_data_ok(kind, &data) || !loops_ok(&loops) || !from.is_finite() || !to.is_finite() {
+        return refused();
+    }
     let tolerance = number(recipe, "tolerance").unwrap_or(1e-6);
     if to.partial_cmp(&from) != Some(std::cmp::Ordering::Greater) || !positive(tolerance) {
         return refused();
@@ -328,6 +391,32 @@ mod tests {
         assert!((volume(evaluator.evaluate(&slab)) - 3.0).abs() < 1e-6, "slab = trimmed area x thickness");
         let backwards = json!({ "op": "faceSlab", "surface": { "type": "plane", "data": [0, 0, 0, 1, 0, 0, 0, 1, 0] }, "loops": trim, "from": 1, "to": 1, "direction": [0, 0, 1] });
         assert!(evaluator.evaluate(&backwards).unwrap().is_none());
+    }
+
+    #[test]
+    fn malformed_payloads_are_refused_before_the_kernel_reads_them() {
+        let mut evaluator = Evaluator::new(16);
+        let plane = json!({ "type": "plane", "data": [0, 0, 0, 1, 0, 0, 0, 1, 0] });
+        let square = json!([1, 4, 1, 0, 0, 1, 0, 1, 1, 0, 1]);
+        let slab = |surface: Value, loops: Value| json!({ "op": "faceSlab", "surface": surface, "loops": loops, "from": 0, "to": 1, "direction": [0, 0, 1] });
+        assert!((volume(evaluator.evaluate(&slab(plane.clone(), square.clone()))) - 1.0).abs() < 1e-9);
+        let refused = [
+            slab(plane.clone(), json!([1, 1e19, 1, 0, 0])),
+            slab(plane.clone(), json!([1, 4, 1, 0, 0])),
+            slab(plane.clone(), json!([2, 4, 1, 0, 0, 1, 0, 1, 1, 0, 1, 4, 1, 0, 0, 1, 0, 1, 1, 0, 1])),
+            slab(plane.clone(), json!([1, 4, 0, 0, 0, 1, 0, 1, 1, 0, 1])),
+            slab(plane.clone(), json!([])),
+            slab(json!({ "type": "plane", "data": [0, 0, 0] }), square.clone()),
+            slab(json!({ "type": "cylinder", "data": [0, 0, 0, 0, 0, 1, 1, 0, 0, -1] }), square.clone()),
+            slab(json!({ "type": "bspline", "data": [1, 1, 1e19, 2, 2, 2, 0] }), square.clone()),
+            slab(json!({ "type": "bspline", "data": [] }), square.clone()),
+            slab(json!({ "type": "torus", "data": [] }), square.clone()),
+        ];
+        for recipe in &refused {
+            assert!(evaluator.evaluate(recipe).unwrap().is_none(), "{recipe}");
+        }
+        let sheet = json!({ "op": "solid", "entity": { "id": "s", "kind": "nurbs_surface", "position": [0, 0, 0], "rotation": [0, 0, 0], "native": { "surface": [1, 1, 2, 2, 2, 2, 0], "loops": [] } } });
+        assert!(evaluator.evaluate(&sheet).unwrap().is_none());
     }
 
     #[test]

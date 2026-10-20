@@ -49,7 +49,19 @@ export function parseArgv(argv: readonly string[]): ParsedArgv {
 }
 
 /** Flags that need a value; `--save` alone is a mistake, never "on". */
-const VALUE_FLAGS = ['doc', 'server', 'token', 'save', 'kernel', 'toolset', 'limit', 'timeout'] as const;
+const VALUE_FLAGS = [
+  'doc',
+  'server',
+  'token',
+  'save',
+  'kernel',
+  'toolset',
+  'limit',
+  'timeout',
+  'confirm-key',
+  'passphrase-env',
+  'manifest-sha256',
+] as const;
 
 export function missingValueFlag(parsed: ParsedArgv): string | undefined {
   return VALUE_FLAGS.find((name) => parsed.flags[name] === true);

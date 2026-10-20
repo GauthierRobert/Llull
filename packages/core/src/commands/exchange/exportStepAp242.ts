@@ -42,6 +42,8 @@ export interface StepExportData {
   readonly sheetCount: number;
   readonly entityIds: readonly string[];
   readonly skipped: readonly string[];
+  /** Ply solids written from triangles because the kernel refused their exact slab. */
+  readonly faceted: readonly string[];
   readonly assembly?: { readonly products: number; readonly occurrences: number };
   readonly gvp: readonly {
     readonly product: string;
@@ -176,6 +178,7 @@ export function buildStepExport(
     sheetCount: plan.sheetCount,
     entityIds: plan.entityIds,
     skipped: plan.skipped,
+    faceted: plan.faceted,
     ...(plan.hasRoot ? { assembly: { products: plan.products.length - plan.sheetCount, occurrences: topLevel } } : {}),
     gvp,
     ...(selfCheck === undefined ? {} : { selfCheck }),

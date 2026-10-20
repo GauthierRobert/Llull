@@ -250,6 +250,46 @@ mod tests {
         assert!(surface_face(0, &[1.0, 1.0], &[]).is_err(), "inconsistent data is an error");
     }
 
+    /// Loop and surface lists come from stored documents: counts that are fractional, huge, negative or NaN must be errors, never an out-of-range read.
+    #[test]
+    fn malformed_surface_and_loop_data_is_an_error_not_a_crash() {
+        let plane = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0];
+        let good = rectangle(0.0, 0.0, 1.0, 1.0);
+        let bad_loops: Vec<Vec<f64>> = vec![
+            vec![1e19, 4.0, 1.0],
+            vec![1.0, 1e19, 1.0, 0.0, 0.0],
+            vec![1.0, -1.0, 1.0, 0.0, 0.0],
+            vec![f64::NAN, 4.0, 1.0],
+            vec![1.0, f64::NAN, 1.0],
+            vec![1.0, 4.5, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0],
+            vec![1.0, 2.0, 1.0, 0.0, 0.0, 1.0, 0.0],
+            vec![1.0, 4.0, 2.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0],
+            vec![1.0, 4.0, 1.0, 0.0, 0.0],
+            vec![2.0, 4.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 4.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0],
+            vec![0.0],
+        ];
+        for loops in &bad_loops {
+            assert!(surface_face(1, &plane, loops).is_err(), "loops {loops:?}");
+            assert!(face_slab(1, &plane, loops, [0.0, 1.0], [0.0, 0.0, 1.0], 1e-6).is_err(), "slab loops {loops:?}");
+        }
+        let mut trailing = good.clone();
+        trailing.push(7.0);
+        assert!(surface_face(1, &plane, &trailing).is_err(), "trailing data");
+        let mut sheet = flat_sheet();
+        for (index, value) in [(0, 1e19), (2, f64::NAN), (3, -4.0), (4, 2.5), (6, 2.0)] {
+            let previous = sheet[index];
+            sheet[index] = value;
+            assert!(surface_face(0, &sheet, &[]).is_err(), "sheet field {index} = {value}");
+            sheet[index] = previous;
+        }
+        let mut multiplicity = flat_sheet();
+        let last = multiplicity.len() - 1;
+        multiplicity[last] = f64::NAN;
+        assert!(surface_face(0, &multiplicity, &[]).is_err());
+        assert!(surface_face(2, &[0.0; 9], &[]).is_err() && surface_face(7, &[], &[]).is_err());
+        assert!(surface_face(0, &flat_sheet(), &[]).unwrap().is_some(), "the untouched data still builds");
+    }
+
     #[test]
     fn slabs_over_plane_cylinder_cone_and_b_spline_faces_have_the_exact_volume() {
         let tolerance = 1e-6;

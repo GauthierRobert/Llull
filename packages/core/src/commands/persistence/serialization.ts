@@ -50,7 +50,7 @@ export function serializeDocument(doc: CadDocument, options: SerializeOptions = 
   return JSON.stringify(envelope);
 }
 
-function withoutDerivedEntities(doc: CadDocument): CadDocument {
+export function withoutDerivedEntities(doc: CadDocument): CadDocument {
   const derived = derivedEntityIds(doc);
   if (derived.size === 0) return doc;
   const entities = Object.entries(doc.entities).filter(([id]) => !derived.has(id));
@@ -89,6 +89,9 @@ function withSafeStepCounter(raw: Record<string, unknown>): Record<string, unkno
     for (const view of views)
       if (isRecord(view) && typeof view['id'] === 'string') noteStepNumber(STEP_SCOPED_ID.exec(view['id'])?.[1], `view id '${view['id']}'`);
   }
+  const pmi = raw['pmi'];
+  for (const table of isRecord(pmi) ? [pmi['items'], pmi['savedViews']] : [])
+    for (const id of Object.keys(isRecord(table) ? table : {})) noteStepNumber(STEP_SCOPED_ID.exec(id)?.[1], `pmi id '${id}'`);
   const stored = raw['nextStepNumber'];
   if (stored !== undefined && (typeof stored !== 'number' || !Number.isSafeInteger(stored) || stored < 1))
     throw new Error(`load_document: nextStepNumber must be a safe integer >= 1, got ${String(stored)}.`);
@@ -209,9 +212,11 @@ export const loadDocument = defineCommand({
     }
     const entityCount = Object.keys(parsed.entities).length;
     const layerCount = Object.keys(parsed.layers).length;
+    const warnings = documentExtensions().flatMap((extension) => extension.afterLoad?.(parsed) ?? []);
     return changed(
       parsed,
-      `Loaded document: ${entityCount} ${entityCount === 1 ? 'entity' : 'entities'}, ${layerCount} ${layerCount === 1 ? 'layer' : 'layers'}.`,
+      `Loaded document: ${entityCount} ${entityCount === 1 ? 'entity' : 'entities'}, ${layerCount} ${layerCount === 1 ? 'layer' : 'layers'}.` +
+        warnings.map((warning) => ` Warning: ${warning}.`).join(''),
       parsed.order,
     );
   },

@@ -25,6 +25,7 @@ function viewProblem(sheetId: string, index: number, view: unknown, viewIds: Rea
   if (!isOptional(view['position'], isPair)) return `${where}: position must be [x, y] of finite numbers`;
   if (!isOptional(view['scale'], isPositive)) return `${where}: scale must be a positive number`;
   if (!isOptional(view['mark'], (v) => typeof v === 'string')) return `${where}: mark must be a string`;
+  if (!isOptional(view['pmiIds'], (v) => isStringArray(v) && v.every(isSafeId))) return `${where}: pmiIds must be an array of PMI ids`;
   const section = view['section'];
   if (kind === 'section') {
     if (view['direction'] === 'iso') return `${where}: a section view cannot be iso`;
@@ -53,6 +54,7 @@ function sheetProblem(key: string, sheet: unknown): string | null {
   if (!isOneOf(PAPER_SIZES, sheet['paper'])) return `sheet '${key}': paper must be one of ${PAPER_SIZES.join(', ')}`;
   if (!isOneOf(PROJECTION_ANGLES, sheet['projectionAngle'])) return `sheet '${key}': projectionAngle must be first or third`;
   if (!isOptional(sheet['scale'], isPositive)) return `sheet '${key}': scale must be a positive number`;
+  if (!isOptional(sheet['pmiMode'], (value) => isOneOf(['off', 'auto'], value))) return `sheet '${key}': pmiMode must be off or auto`;
   const block = sheet['titleBlock'];
   const fields = ['title', 'drawnBy', 'partNumber', 'revision', 'date'];
   if (!isRecord(block) || typeof block['title'] !== 'string' || !fields.every((f) => isOptional(block[f], (v) => typeof v === 'string')))

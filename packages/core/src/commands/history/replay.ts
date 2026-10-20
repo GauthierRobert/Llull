@@ -6,9 +6,10 @@
 import { type CadDocument, type FeatureStep, createEmptyDocument } from '../../model/types';
 import { createEmptyBuilding } from '../../model/building';
 import { currentContext } from '../context';
+import { documentExtensions } from '../../plugins/host';
 import type { CommandDefinition, CommandError, CommandResult } from '../types';
 import { commandError } from '../noop';
-import { orphanState } from './carry';
+import { orphanState, withCarriedPmi } from './carry';
 import { kernelRefusal } from '../kernelRefusal';
 import { nextStateKey } from './replayCache';
 import { hashText } from '../../lib/hash';
@@ -115,7 +116,7 @@ export function replayHistory(
     return base;
   }
   // Start from empty geometry but preserve document-level settings.
-  let doc: CadDocument = {
+  const seed: CadDocument = {
     ...createEmptyDocument(),
     camera: base.camera,
     units: base.units,
@@ -137,6 +138,7 @@ export function replayHistory(
     // The building identity (IFC GlobalId salt) survives replay; its content is regenerated.
     ...(base.building?.uid !== undefined ? { building: { ...createEmptyBuilding(), uid: base.building.uid } } : {}),
   };
+  let doc: CadDocument = seed;
   // idMap tracks old entity id (from when the step was first recorded) → new id
   // (assigned during this replay). Subsequent steps' params are rewritten via
   // remapIds. Step-scoped ids replay identically, so this only maps legacy (pre-v2) ids.
@@ -206,5 +208,7 @@ export function replayHistory(
     stateKey = parameterFingerprint !== undefined ? nextStateKey(key, 'parameters', parameterFingerprint, null) : key;
     onStep?.({ step, rawParams: remapIds(step.params, idMap), params: remapped, before, after: doc, inert, failure });
   }
-  return doc;
+  // Slices an installed plugin owns as document input state (the PLM record, ...) are re-attached AFTER the steps: carried through them, a release
+  // lock would see every regenerated step as an edit of the locked definition.
+  return documentExtensions().reduce((next, extension) => extension.carry?.(base, next) ?? next, withCarriedPmi(doc, base));
 }

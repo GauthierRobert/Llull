@@ -12,6 +12,7 @@ import { type GizmoMode, useStore, useToolStore } from '@ui/store';
 import { Entities } from './Entities';
 import { TransformGizmo } from './TransformGizmo';
 import { DimensionLens } from './DimensionLens';
+import { PmiLayer } from './PmiLayer';
 import { ViewOptionsToggle } from './ViewOptionsToggle';
 import { useChromeStore } from '@ui/store/chromeStore';
 import { RenderOriginSyncer } from '../RenderOriginSyncer';
@@ -133,6 +134,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <StructuralOverlay />
         <FindingsOverlay />
         <DimensionLens />
+        <PmiLayer />
         <AnalysisOverlay />
         <FocusOverlay />
       </group>

@@ -11,8 +11,14 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { setGeometryKernel, type GeometryKernel, type ShapeHandle } from '@core/geometry/kernel';
 import type { ExactMassProperties, ImportShapesOptions, ImportedShapes } from '@core/geometry/kernelPorts';
-import { createEmptyDocument, type CadDocument, type MeshSolidEntity, type NurbsSurfaceEntity, type Vec2 } from '@core/model/types';
-import { recipeOf } from '@core/geometry/shapeRecipe';
+import {
+  createEmptyDocument,
+  type CadDocument,
+  type MeshSolidEntity,
+  type NurbsSurfaceEntity,
+  type ShapeRecipe,
+  type Vec2,
+} from '@core/model/types';
 import { sha256Hex } from '@lib/sha256';
 import type { NurbsSurfaceData } from '@lib/nurbs/surfaceTypes';
 import { meshVolume } from '@aero/composites/plySolid';
@@ -211,17 +217,61 @@ describeNative('exact sheets and ply slabs on the native kernel', () => {
     [x0, y1],
   ];
 
+  /** The exact solid against the triangle solid: same bounding box (within 2 % of its size) and centroid (within 1 % of its size). */
+  const sameGeometry = (solid: MeshSolidEntity, shape: ShapeHandle): void => {
+    const exactMesh = kernel.tessellate(shape);
+    expect(exactMesh, `${solid.name} tessellates`).not.toBeNull();
+    const box = (positions: readonly number[]): { min: number[]; max: number[] } => {
+      const min = [Infinity, Infinity, Infinity];
+      const max = [-Infinity, -Infinity, -Infinity];
+      for (let k = 0; k < positions.length; k++) {
+        min[k % 3] = Math.min(min[k % 3] as number, positions[k] as number);
+        max[k % 3] = Math.max(max[k % 3] as number, positions[k] as number);
+      }
+      return { min, max };
+    };
+    const [a, b] = [box(exactMesh?.positions ?? []), box(solid.mesh.positions)];
+    const size = Math.max(...b.max.map((value, k) => value - (b.min[k] as number)));
+    for (let k = 0; k < 3; k++) {
+      expect(Math.abs((a.min[k] as number) - (b.min[k] as number)), `${solid.name} min ${k}`).toBeLessThan(0.02 * size);
+      expect(Math.abs((a.max[k] as number) - (b.max[k] as number)), `${solid.name} max ${k}`).toBeLessThan(0.02 * size);
+    }
+    const centroid = mass(shape).centroid;
+    const middle = b.max.map((value, k) => (value + (b.min[k] as number)) / 2);
+    // the triangle solid's own centroid by tetrahedra from the origin
+    let weighted = [0, 0, 0];
+    let volume = 0;
+    const { positions, indices } = solid.mesh;
+    for (let t = 0; t < indices.length; t += 3) {
+      const p = [0, 1, 2].map((k) => [0, 1, 2].map((axis) => positions[3 * (indices[t + k] as number) + axis] as number));
+      const [p0, p1, p2] = p as [number[], number[], number[]];
+      const v =
+        (p0[0]! * (p1[1]! * p2[2]! - p1[2]! * p2[1]!) -
+          p0[1]! * (p1[0]! * p2[2]! - p1[2]! * p2[0]!) +
+          p0[2]! * (p1[0]! * p2[1]! - p1[1]! * p2[0]!)) /
+        6;
+      volume += v;
+      weighted = weighted.map((w, axis) => w + (v * (p0[axis]! + p1[axis]! + p2[axis]!)) / 4);
+    }
+    for (let k = 0; k < 3; k++)
+      expect(
+        Math.abs((centroid[k] as number) - (weighted[k] as number) / volume),
+        `${solid.name} centroid ${k} (box middle ${middle[k]})`,
+      ).toBeLessThan(0.01 * size);
+  };
+
   /** The exact solids of `slab` against its triangle solids and `expectedVolume`, and the STEP file under the ply names. */
   const check = (slab: ReturnType<typeof slabs>, expectedVolume: number, tolerance: number, meshTolerance: number): void => {
     expect(slab.solids.length).toBeGreaterThan(0);
     let exact = 0;
     for (const solid of slab.solids) {
-      expect(recipeOf(solid).op, `${solid.name} carries its exact recipe`).toBe('faceSlab');
-      const shape = kernel.evaluate(recipeOf(solid));
+      expect(solid.stepSlab?.op, `${solid.name} carries its exact recipe`).toBe('faceSlab');
+      const shape = kernel.evaluate(solid.stepSlab as ShapeRecipe);
       expect(shape, `${solid.name} builds`).not.toBeNull();
       const volume = mass(shape).volume;
       expect(rel(volume, meshVolume(solid.mesh)), `${solid.name} exact ${volume} vs mesh`).toBeLessThan(meshTolerance);
       exact += volume;
+      sameGeometry(solid, shape as ShapeHandle);
       expect(kernel.analyze?.(shape as ShapeHandle)?.valid, `${solid.name} valid`).toBe(true);
     }
     expect(rel(exact, expectedVolume), `exact volume ${exact} vs ${expectedVolume}`).toBeLessThan(tolerance);
@@ -267,6 +317,26 @@ describeNative('exact sheets and ply slabs on the native kernel', () => {
     check(slabs(part.document, part.affected[0] as string, { kind: 'whole_face' }), area * t * (1 + t / (2 * radius)), 1e-6, 2e-3);
     const partial = slabs(part.document, part.affected[0] as string, { kind: 'polygon', polygons: [rect(20, 30, 160, 170)] });
     check(partial, 140 * 140 * t * (1 + t / (2 * radius)), 1e-6, 2e-3);
+
+    // moved and rotated after creation: the exact slab follows the entity placement (no fallback to triangles)
+    const id = partial.ids[0] as string;
+    const moved = apply(partial.doc, 'move_entities', { ids: [id], delta: [30, -20, 5] });
+    const turned = apply(moved, 'rotate_entity', { id, delta: [0, 0, 0.7] });
+    const exported = data<{ faceted: string[]; solidCount: number; step: string }>(turned, 'export_step_exact', { entityIds: [id] });
+    expect(exported.faceted).toEqual([]);
+    const placed = turned.entities[id] as MeshSolidEntity;
+    expect(placed.position).not.toEqual([0, 0, 0]);
+    const [volume] = importedVolumes(exported.step);
+    expect(rel(volume as number, mass(kernel.evaluate(partial.solids[0]?.stepSlab as ShapeRecipe)).volume)).toBeLessThan(1e-9);
+    const box = (positions: readonly number[], axis: number): number => Math.max(...positions.filter((_, k) => k % 3 === axis));
+    const shifted = kernel.tessellate(
+      kernel.evaluate({ op: 'brep', blob: sha256Hex(solidOf(exported.step).solids[0]?.brep ?? ''), format: 'occt-brep-v1' }) as ShapeHandle,
+    );
+    expect(box(shifted?.positions ?? [], 2)).toBeGreaterThan(5);
+
+    // a document holding an instance of the ply solid exports through the assembly path (triangles) without failing
+    const withInstance = apply(partial.doc, 'create_component', { name: 'Ply', entityIds: [id] });
+    expect(data<{ solidCount: number }>(withInstance, 'export_step_exact', {}).solidCount).toBeGreaterThan(0);
   });
 
   it('lifts a ply of a cone, away from the apex', () => {
@@ -296,8 +366,10 @@ describeNative('exact sheets and ply slabs on the native kernel', () => {
     const slab = slabs(part.document, part.affected[0] as string, { kind: 'polygon', polygons: [polygon] });
     expect(slab.solids.length).toBeGreaterThan(0);
     for (const solid of slab.solids) {
-      expect(recipeOf(solid).op).toBe('faceSlab');
-      const exact = mass(kernel.evaluate(recipeOf(solid))).volume;
+      expect(solid.stepSlab?.op).toBe('faceSlab');
+      const cone = kernel.evaluate(solid.stepSlab as ShapeRecipe);
+      sameGeometry(solid, cone as ShapeHandle);
+      const exact = mass(cone).volume;
       expect(rel(exact, meshVolume(solid.mesh)), `${solid.name}: exact ${exact}`).toBeLessThan(0.01);
     }
   });
