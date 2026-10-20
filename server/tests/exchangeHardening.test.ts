@@ -37,6 +37,17 @@ describe('bridgeEnvironment', () => {
     });
     expect(Object.keys(env).sort()).toEqual(['HOME', 'LANG', 'LC_ALL', 'PATH', 'PYTHONPATH', 'VIRTUAL_ENV'].sort());
   });
+
+  it('keeps the Windows spelling of the essentials (Path, SystemRoot, ComSpec), so ccx finds its DLLs and Python starts', () => {
+    const env = bridgeEnvironment({
+      Path: 'C:\\tools',
+      SystemRoot: 'C:\\Windows',
+      ComSpec: 'cmd.exe',
+      TEMP: 't',
+      LLULL_AUTH_TOKEN: 'secret',
+    });
+    expect(Object.keys(env).sort()).toEqual(['ComSpec', 'Path', 'SystemRoot', 'TEMP']);
+  });
 });
 
 describe('exchange directory symlink confinement', () => {

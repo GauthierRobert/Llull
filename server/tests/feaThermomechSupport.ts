@@ -11,6 +11,7 @@ import { judgeCase, type Measured } from '@core/commands/vnv/judge';
 import type { JsonValue } from '@core/commands/vnv/expected';
 import { isRecord } from '@lib/isRecord';
 import { EXIT_OK, runCli, type CliIo } from '../src/cli/main';
+import { FEA_TOOL_ENV } from './feaTestSupport';
 
 export const PACK = '04-thermo-mechanical';
 const PACK_FILE = path.resolve(__dirname, `../../docs/physics/${PACK}/validation/expected_results.json`);
@@ -52,7 +53,7 @@ export class Session {
       stdout: (text) => out.push(text),
       stderr: () => undefined,
       readStdin: () => Promise.resolve(''),
-      env: {},
+      env: { ...FEA_TOOL_ENV },
       prepareKernel: () => Promise.resolve(),
     };
     const code = await runCli([...argv, '--doc', this.docPath, '--json'], io);
