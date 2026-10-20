@@ -10,6 +10,7 @@ import { pdmModelOf } from '../pdm/model';
 import { readPdm } from '../pdm/read';
 import { PDM_SCHEMA, writePdm } from '../pdm/write';
 import { unmanagedComponents } from '../structure';
+import { own } from '../records';
 
 /** Timestamp of the header when the host passes none: a fixed instant, so the same document always yields the same bytes. */
 const EPOCH_TIMESTAMP = '1970-01-01T00:00:00';
@@ -68,7 +69,7 @@ export const exportStepPdm = defineCommand({
     const plm = doc.plm;
     if (plm === undefined) return refusePlm(doc, 'export_step_pdm', 'PLM_NOT_MANAGED', NOT_MANAGED);
     const label = params.revision ?? plm.item.currentRevision;
-    if (plm.item.revisions[label] === undefined)
+    if (own(plm.item.revisions, label) === undefined)
       return refusePlm(
         doc,
         'export_step_pdm',
@@ -77,8 +78,22 @@ export const exportStepPdm = defineCommand({
         [label],
         ['revision'],
       );
-    if (params.mbom !== undefined && plm.mbom?.[params.mbom] === undefined)
+    if (params.mbom !== undefined && own(plm.mbom, params.mbom) === undefined)
       return refusePlm(doc, 'export_step_pdm', 'PLM_MBOM_UNKNOWN', `unknown MBOM '${params.mbom}'`, [params.mbom], ['mbom']);
+    const mbomRecord = params.mbom === undefined ? undefined : own(plm.mbom, params.mbom);
+    const baselineRoot =
+      mbomRecord === undefined
+        ? undefined
+        : own(plm.baselines, mbomRecord.baseline)?.members.find((member) => member.partNumber === plm.item.partNumber)?.revision;
+    if (mbomRecord !== undefined && baselineRoot !== label)
+      return refusePlm(
+        doc,
+        'export_step_pdm',
+        'PLM_PARAM_INVALID',
+        `MBOM '${mbomRecord.id}' was made from baseline ${mbomRecord.baseline} (rev ${baselineRoot ?? '?'} of ${plm.item.partNumber}), not rev ${label}`,
+        [mbomRecord.id, label],
+        ['mbom'],
+      );
     const organization = params.organization ?? DEFAULT_ORGANIZATION;
     const model = pdmModelOf(doc, plm, label, { organization, ...(params.mbom !== undefined ? { mbom: params.mbom } : {}) });
     if (typeof model === 'string') return refusePlm(doc, 'export_step_pdm', 'PLM_REVISION_UNKNOWN', model, [label]);

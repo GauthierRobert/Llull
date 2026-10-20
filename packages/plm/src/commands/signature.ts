@@ -140,6 +140,12 @@ export const attachReleasePackage = defineCommand({
       .describe('SHA-256 (64 hex) of the canonical package manifest.'),
     documentContentHash: z.string().describe("The package manifest's documentContentHash; must equal the revision's content hash."),
     location: z.string().optional().describe('Where the package was written (informational).'),
+    package: z
+      .enum(['release', 'lotar'])
+      .optional()
+      .describe(
+        'Which package this is: release (default, the signed release package) or lotar (the EN 9300-style archive package); each has its own anchor, and an anchor is never replaced.',
+      ),
     confirmation: confirmationSchema,
   }),
   run: (doc, params, ctx): CommandResult => {
@@ -167,9 +173,22 @@ export const attachReleasePackage = defineCommand({
         `package content hash ${documentContentHash.slice(0, 12)}… differs from ${revisionText(plm, label)} (${revision.contentHash.slice(0, 12)}…)`,
         [label],
       );
+    const kind = params.package ?? 'release';
+    const existing = kind === 'lotar' ? revision.lotarPackageSha256 : revision.packageSha256;
+    if (existing !== undefined && existing !== manifestSha256)
+      return refusePlm(
+        doc,
+        'attach_release_package',
+        'PLM_ID_EXISTS',
+        `${revisionText(plm, label)} already has a ${kind} package anchor (${existing.slice(0, 12)}…); anchors are never replaced`,
+        [label],
+      );
     return changed(
-      withRevision(doc, plm, label, { ...revision, packageSha256: manifestSha256 }),
-      `${revisionText(plm, label)}: release package ${manifestSha256.slice(0, 12)}…${location !== undefined ? ` at ${location}` : ''} attached.`,
+      withRevision(doc, plm, label, {
+        ...revision,
+        ...(kind === 'lotar' ? { lotarPackageSha256: manifestSha256 } : { packageSha256: manifestSha256 }),
+      }),
+      `${revisionText(plm, label)}: ${kind} package ${manifestSha256.slice(0, 12)}…${location !== undefined ? ` at ${location}` : ''} attached.`,
       [],
     );
   },

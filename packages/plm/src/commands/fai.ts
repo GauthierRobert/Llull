@@ -13,12 +13,13 @@ import { refusePlm } from '../refusal';
 import { snapshotText, unreadableSnapshot } from '../snapshot';
 import { NOT_MANAGED, revisionText } from '../state';
 import { liveStructure } from '../structure';
+import { own } from '../records';
 
 type Cell = string | number | null;
 
 /** The PMI items of revision `label`: the live document for the current revision, else its frozen snapshot (a reason string when unreadable). */
 function itemsOf(doc: CadDocument, plm: PlmModel, label: string, ctx: ExecutionContext | undefined): Record<string, PmiItem> | string {
-  const revision = plm.item.revisions[label];
+  const revision = own(plm.item.revisions, label);
   if (revision === undefined) return `${plm.item.partNumber} has no revision '${label}'`;
   if (label === plm.item.currentRevision && revision.snapshot === undefined) return doc.pmi?.items ?? {};
   const text = snapshotText(revision, ctx);
@@ -123,7 +124,7 @@ export const faiReportSkeleton = defineCommand({
         [params.partNumber],
         ['partNumber'],
       );
-    const revision = plm.item.revisions[label];
+    const revision = own(plm.item.revisions, label);
     if (revision === undefined)
       return refusePlm(doc, 'fai_report_skeleton', 'PLM_REVISION_UNKNOWN', `${plm.item.partNumber} has no revision '${label}'`, [label]);
     if (faiType === 'partial' && (baselineRevision === undefined || reason === undefined || reason.trim() === ''))
@@ -135,7 +136,7 @@ export const faiReportSkeleton = defineCommand({
         [],
         ['baselineRevision', 'reason'],
       );
-    const resultSet = params.resultsId === undefined ? undefined : plm.faiResults?.[params.resultsId];
+    const resultSet = params.resultsId === undefined ? undefined : own(plm.faiResults, params.resultsId);
     if (params.resultsId !== undefined && (resultSet === undefined || resultSet.revision !== label))
       return refusePlm(
         doc,

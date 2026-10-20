@@ -50,7 +50,7 @@ export function writePdm(model: PdmModel, file: PdmFileOptions): string {
 
   const context = out.add("APPLICATION_CONTEXT('mechanical design')");
   out.add(
-    `APPLICATION_PROTOCOL_DEFINITION('international standard','ap242_managed_model_based_3d_engineering_mim_lf',2020,${ref(context)})`,
+    `APPLICATION_PROTOCOL_DEFINITION('international standard','ap242_managed_model_based_3d_engineering_mim_lf',2022,${ref(context)})`,
   );
   const productContext = out.add(`PRODUCT_CONTEXT('',${ref(context)},'mechanical')`);
   const designContext = out.add(`PRODUCT_DEFINITION_CONTEXT('part definition',${ref(context)},'design')`);
@@ -60,7 +60,7 @@ export function writePdm(model: PdmModel, file: PdmFileOptions): string {
 
   const people = (userId: string): number =>
     once(`person:${userId}`, () => {
-      const person = out.add(`PERSON(${quoted(userId)},$,$,$,$,$)`);
+      const person = out.add(`PERSON(${quoted(userId)},${quoted(userId)},$,$,$,$)`);
       return out.add(`PERSON_AND_ORGANIZATION(${ref(person)},${ref(organization)})`);
     });
   const dateAndTime = (iso: string, dateOnly: boolean): number | null => {
@@ -141,9 +141,6 @@ export function writePdm(model: PdmModel, file: PdmFileOptions): string {
     }
   };
   usages(view, model.structure);
-  const partCategory = out.add(`PRODUCT_RELATED_PRODUCT_CATEGORY('part',$,${refs([...products.values()])})`);
-  const subCategory = out.add(`PRODUCT_RELATED_PRODUCT_CATEGORY(${quoted(model.category)},$,${refs([top])})`);
-  out.add(`PRODUCT_CATEGORY_RELATIONSHIP('',$,${ref(partCategory)},${ref(subCategory)})`);
   if (model.structure.some((row) => row.quantity > 0)) {
     const assembly = out.add(`PRODUCT_DEFINITION_CONTEXT('assembly definition',${ref(context)},'')`);
     const role = out.add("PRODUCT_DEFINITION_CONTEXT_ROLE('part definition type',$)");
@@ -155,6 +152,10 @@ export function writePdm(model: PdmModel, file: PdmFileOptions): string {
     usages(mbomView, model.mbom.lines);
     property('llull manufacturing bom', model.mbom.id, mbomView, [['id', model.mbom.id]]);
   }
+  // Categories last: every product, including those only the MBOM uses, is a part.
+  const partCategory = out.add(`PRODUCT_RELATED_PRODUCT_CATEGORY('part',$,${refs([...products.values()])})`);
+  const subCategory = out.add(`PRODUCT_RELATED_PRODUCT_CATEGORY(${quoted(model.category)},$,${refs([top])})`);
+  out.add(`PRODUCT_CATEGORY_RELATIONSHIP('',$,${ref(partCategory)},${ref(subCategory)})`);
 
   // Approval (13.2): one APPROVAL per recorded role approval, one for the release.
   const approvalRole = once('approval-role', () => out.add("APPROVAL_ROLE('approver')"));
@@ -174,8 +175,10 @@ export function writePdm(model: PdmModel, file: PdmFileOptions): string {
     approve(model.approvalStatus, 'release', model.release?.by ?? null, model.release?.at ?? null);
 
   // Security classification (13.4) of the version and its view.
-  const level = out.add(`SECURITY_CLASSIFICATION_LEVEL(${quoted(model.marking.regime)})`);
-  const classification = out.add(`SECURITY_CLASSIFICATION('export control',${quoted(model.marking.statement ?? '')},${ref(level)})`);
+  const level = out.add(`SECURITY_CLASSIFICATION_LEVEL(${quoted(model.marking.classification ?? 'unclassified')})`);
+  const classification = out.add(
+    `SECURITY_CLASSIFICATION(${quoted(model.marking.regime)},${quoted(model.marking.statement ?? '')},${ref(level)})`,
+  );
   out.add(`APPLIED_SECURITY_CLASSIFICATION_ASSIGNMENT(${ref(classification)},${refs([current, view])})`);
 
   // Effectivity: dated ranges as general validity periods (14.3); serial / msn / lot as an llull property.
@@ -183,7 +186,7 @@ export function writePdm(model: PdmModel, file: PdmFileOptions): string {
     const start = dateAndTime(range.from, true);
     const end = range.to === null ? null : dateAndTime(range.to, true);
     const effectivity = out.add(
-      `DATED_EFFECTIVITY('eff-${index + 1}',${start === null ? '$' : ref(start)},${end === null ? '$' : ref(end)})`,
+      `DATED_EFFECTIVITY('eff-${index + 1}',${end === null ? '$' : ref(end)},${start === null ? '$' : ref(start)})`,
     );
     const assignment = out.add(`APPLIED_EFFECTIVITY_ASSIGNMENT(${ref(effectivity)},${refs([current])})`);
     out.add(`ROLE_ASSOCIATION(${ref(objectRole('planned period'))},${ref(assignment)})`);
@@ -198,7 +201,7 @@ export function writePdm(model: PdmModel, file: PdmFileOptions): string {
 
   // Signatures and integrity (llull properties).
   for (const signature of model.signatures)
-    property(PROPERTY.signature, `Ed25519 signature (${signature.meaning}) of ${signature.target}`, current, [
+    property(PROPERTY.signature, `Ed25519 signature (${signature.meaning}) of ${signature.target}`, view, [
       ['algorithm', 'Ed25519'],
       ['keyId', signature.keyId],
       ['publicKey', signature.publicKey],
@@ -209,7 +212,7 @@ export function writePdm(model: PdmModel, file: PdmFileOptions): string {
       ['signedSha256', signature.signedSha256],
       ['signature', signature.signature],
     ]);
-  property(PROPERTY.integrity, 'lifecycle state and release hashes of the version', current, [
+  property(PROPERTY.integrity, 'lifecycle state and release hashes of the version', view, [
     ['state', model.state],
     ...(model.integrity.contentHash === null ? [] : ([['contentHash', model.integrity.contentHash]] as const)),
     ...(model.integrity.packageSha256 === null ? [] : ([['packageSha256', model.integrity.packageSha256]] as const)),

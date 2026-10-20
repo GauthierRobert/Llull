@@ -7,6 +7,7 @@ import { documentOfSnapshot, validationPropertiesOf } from '../lotar/validation'
 import { refusePlm } from '../refusal';
 import { snapshotText, unreadableSnapshot } from '../snapshot';
 import { NOT_MANAGED, revisionText, scopeHash } from '../state';
+import { own } from '../records';
 
 /**
  * @affects nothing (read-only)
@@ -17,7 +18,7 @@ import { NOT_MANAGED, revisionText, scopeHash } from '../state';
 export const lotarValidationProperties = defineCommand({
   name: 'lotar_validation_properties',
   description:
-    'The validation properties of one revision as a LOTAR (EN 9300) archive stores them: per 3D entity the volume, area and centroid with the method that computed them (mass_properties), and ' +
+    'The validation properties of one revision as a LOTAR-style archive (modelled on EN 9300, not conformant to it) stores them: per 3D entity the volume, area and centroid with the method that computed them (mass_properties), and ' +
     'counts of entities, solids, components, drawing sheets and PMI items. A frozen revision (released, superseded, obsolete) is measured from its release snapshot, the open current ' +
     'revision from the live definition. An archive keeps these figures so a later re-derivation from the archived content can be compared (llull lotar verify). Returns data ' +
     '{ revision, definitionHash, source, validation }. Read-only.',
@@ -27,7 +28,7 @@ export const lotarValidationProperties = defineCommand({
     const plm = doc.plm;
     if (plm === undefined) return refusePlm(doc, 'lotar_validation_properties', 'PLM_NOT_MANAGED', NOT_MANAGED);
     const label = requested ?? plm.item.currentRevision;
-    const revision = plm.item.revisions[label];
+    const revision = own(plm.item.revisions, label);
     if (revision === undefined)
       return refusePlm(
         doc,

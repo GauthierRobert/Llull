@@ -1,6 +1,6 @@
 /** Sealed M6 records: as-built records and manufacturing BOMs carry a SHA-256 over their other fields, so a hand edit of a saved file is found on load. */
 
-import type { AsBuiltRecord, MbomRecord, PlmModel } from '@core/model/plm';
+import type { AsBuiltRecord, FaiResultSet, MbomRecord, PlmModel } from '@core/model/plm';
 import { jcsJson } from '@lib/jcs';
 import { sha256Hex } from '@lib/sha256';
 
@@ -10,10 +10,19 @@ export const SERIAL = /^[A-Za-z0-9][A-Za-z0-9._\-/]{0,63}$/;
 type Unsealed<T extends { readonly sha256: string }> = Omit<T, 'sha256'>;
 
 /** The hash a record of this kind must carry: SHA-256 of the canonical JSON of everything but `sha256`. */
-const sealOf = (record: Unsealed<AsBuiltRecord> | Unsealed<MbomRecord>): string => sha256Hex(jcsJson(record));
+const sealOf = (record: Unsealed<AsBuiltRecord> | Unsealed<MbomRecord> | Unsealed<FaiResultSet>): string => sha256Hex(jcsJson(record));
 
 export function sealAsBuilt(record: Unsealed<AsBuiltRecord>): AsBuiltRecord {
   return { ...record, sha256: sealOf(record) };
+}
+
+export function sealResults(record: Unsealed<FaiResultSet>): FaiResultSet {
+  return { ...record, sha256: sealOf(record) };
+}
+
+/** The own entry `key` of `table` (ids such as "constructor" or "toString" are not entries), or undefined. */
+export function own<T>(table: Readonly<Record<string, T>> | undefined, key: string): T | undefined {
+  return table !== undefined && Object.hasOwn(table, key) ? table[key] : undefined;
 }
 
 export function sealMbom(record: Unsealed<MbomRecord>): MbomRecord {

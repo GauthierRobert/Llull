@@ -83,12 +83,66 @@ function baselineErrors(raw: unknown): string[] {
   );
 }
 
-/** As-built records and manufacturing BOMs are never edited: each must still hash to its seal, under the key it is stored by. */
+const isTexts = (value: unknown): boolean => Array.isArray(value) && value.every((item) => typeof item === 'string');
+const isCount = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value) && value > 0;
+
+/** The shape of one as-built record, MBOM or result set (what the commands read without re-checking), as error strings. */
+function shapeErrors(kind: 'asBuilt' | 'mbom' | 'faiResults', at: string, record: Record<string, unknown>): string[] {
+  const bad = (what: string): string[] => [`${at}: ${what}`];
+  const rows = (key: string): Record<string, unknown>[] | null =>
+    Array.isArray(record[key]) && (record[key] as unknown[]).every(isRecord) ? (record[key] as Record<string, unknown>[]) : null;
+  if (kind === 'asBuilt') {
+    const deviations = rows('deviations');
+    const fine =
+      isText(record['serial']) &&
+      isText(record['partNumber']) &&
+      isText(record['asDesignedBaseline']) &&
+      isText(record['by']) &&
+      deviations !== null &&
+      deviations.every((d) => isText(d['partNumber']) && isText(d['installedRevision']) && isText(d['authority']));
+    return fine ? [] : bad('is not an as-built record (serial, partNumber, asDesignedBaseline, by, deviations[])');
+  }
+  if (kind === 'mbom') {
+    const [lines, omitted] = [rows('lines'), rows('omitted')];
+    const fine =
+      isText(record['id']) &&
+      isText(record['name']) &&
+      isText(record['baseline']) &&
+      lines !== null &&
+      lines.every(
+        (l) =>
+          isText(l['partNumber']) &&
+          isText(l['revision']) &&
+          isCount(l['quantity']) &&
+          ['ebom', 'ebom-quantity', 'manufacturing'].includes(String(l['origin'])),
+      ) &&
+      omitted !== null &&
+      omitted.every((o) => isText(o['partNumber']) && typeof o['reason'] === 'string');
+    return fine ? [] : bad('is not a manufacturing BOM (id, name, baseline, lines[], omitted[])');
+  }
+  const results = rows('results');
+  const source = record['source'];
+  const fine =
+    isText(record['id']) &&
+    isText(record['revision']) &&
+    isText(record['importedBy']) &&
+    isRecord(source) &&
+    isText(source['sha256']) &&
+    results !== null &&
+    results.every((r) => Number.isInteger(r['charNo']) && isText(r['status'])) &&
+    isTexts(record['unmatched']) &&
+    Array.isArray(record['missing']) &&
+    (record['missing'] as unknown[]).every((n) => Number.isInteger(n));
+  return fine ? [] : bad('is not an imported result set (id, revision, importedBy, source, results[], unmatched[], missing[])');
+}
+
+/** As-built records, manufacturing BOMs and imported result sets are never edited: each must still hash to its seal, under the key it is stored by. */
 function sealedErrors(slice: Record<string, unknown>): string[] {
   const errors: string[] = [];
   for (const [key, field] of [
     ['asBuilt', 'serial'],
     ['mbom', 'id'],
+    ['faiResults', 'id'],
   ] as const) {
     const raw = slice[key];
     if (raw === undefined) continue;
@@ -96,12 +150,12 @@ function sealedErrors(slice: Record<string, unknown>): string[] {
       errors.push(`plm.${key} must be an object`);
       continue;
     }
-    for (const [name, record] of Object.entries(raw))
-      if (!isRecord(record) || record[field] !== name || !isSealed(record))
-        errors.push(`plm.${key}.${name} does not hash to its seal (edited by hand?)`);
+    for (const [name, record] of Object.entries(raw)) {
+      if (!isRecord(record) || record[field] !== name) errors.push(`plm.${key}.${name} is not a record stored under its own ${field}`);
+      else if (shapeErrors(key, `plm.${key}.${name}`, record).length > 0) errors.push(...shapeErrors(key, `plm.${key}.${name}`, record));
+      else if (!isSealed(record)) errors.push(`plm.${key}.${name} does not hash to its seal (edited by hand?)`);
+    }
   }
-  const results = slice['faiResults'];
-  if (results !== undefined && !isRecord(results)) errors.push('plm.faiResults must be an object');
   return errors;
 }
 
