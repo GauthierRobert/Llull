@@ -265,7 +265,8 @@ export const massProperties = defineCommand({
     'supplier_unstated / unspecified (unverified is about the density only). ' +
     "reviewRequired.value is true for purpose weight-and-balance, any unverified density, a mesh-integrated figure ('method_mesh'), a mesh body " +
     "without a B-rep ('faceted_body'), or a part outside the precision envelope; the summary " +
-    'then says the figure is computed by llull, not approved, and needs a qualified engineer. Does not modify the document.',
+    'then says the figure is computed by llull, not approved, and needs a qualified engineer. A composite part id (create_composite_part) is not an entity: ' +
+    'it is delegated to laminate_mass (ply and core mass of the laminate; its data shape applies). Does not modify the document.',
   params: z.object({
     entityId: z
       .string()
@@ -318,7 +319,19 @@ export const massProperties = defineCommand({
     const fallback = densityParam(doc, density);
     if (fallback !== undefined && 'error' in fallback) return failed(fallback);
     const e = doc.entities[entityId];
-    if (!e) return noop(doc, `mass_properties: entity '${entityId}' not found.`);
+    if (!e) {
+      const composites = doc.composites;
+      const part = composites?.parts[entityId] ?? Object.values(composites?.parts ?? {}).find((candidate) => candidate.name === entityId);
+      const laminateMass = part === undefined ? undefined : (ctx ?? currentContext()).registry('laminate_mass');
+      if (part !== undefined && laminateMass !== undefined) {
+        const delegated = laminateMass.run(doc, { part: part.id }, ctx);
+        return {
+          ...delegated,
+          summary: `mass_properties: '${entityId}' is a composite part, delegated to laminate_mass. ${delegated.summary}`,
+        };
+      }
+      return noop(doc, `mass_properties: entity '${entityId}' not found.`);
+    }
     const volumeUnit = `${doc.units}³`;
     let total: MassTotal | MassFailure;
     if (e.kind === 'instance') total = instanceMass(doc, e, undefined, fallback, ctx);

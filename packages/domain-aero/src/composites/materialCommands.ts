@@ -8,10 +8,23 @@ import { nextId } from '@lib/id';
 import { dot3, len3, normalize3, scale3, sub3 } from '@lib/vec3';
 import { sig } from '../shared/results';
 import { refuseCmp } from './codes';
-import { isUnverified } from './provenance';
+import { isUnverified } from '@lib/laminate/provenance';
 import { compact, compositesOf, withComposites } from './state';
 
 const positive = z.number();
+
+/** Stress / modulus units accepted by create_lamina_material, as MPa per unit. */
+const STRESS_UNIT_TO_MPA = {
+  Pa: 1e-6,
+  kPa: 1e-3,
+  MPa: 1,
+  GPa: 1e3,
+  psi: 0.006894757293168,
+  ksi: 6.894757293168,
+  Msi: 6894.757293168,
+} as const;
+type StressUnit = keyof typeof STRESS_UNIT_TO_MPA;
+const STRESS_FIELDS: ReadonlySet<string> = new Set(['E1', 'E2', 'G12', 'G13', 'G23', 'Xt', 'Xc', 'Yt', 'Yc', 'S']);
 const POSITIVE_FIELDS = ['E1', 'E2', 'G12', 'G13', 'G23', 'Xt', 'Xc', 'Yt', 'Yc', 'S', 'plyThickness', 'density', 'GIc', 'GIIc'] as const;
 
 /**
@@ -23,7 +36,7 @@ export const createLaminaMaterial = defineCommand({
   name: 'create_lamina_material',
   description:
     'Create or replace a composite lamina material record (the input of laminate analysis, zones and plies). Elastic constants E1 (fibre), E2 ' +
-    '(transverse), G12 (in-plane shear) in MPa, nu12 (major Poisson ratio, dimensionless); optional strengths Xt, Xc (fibre tension / ' +
+    '(transverse), G12 (in-plane shear) in MPa (or in `stressUnit`, e.g. psi / ksi in inch documents: stored converted to MPa), nu12 (major Poisson ratio, dimensionless); optional strengths Xt, Xc (fibre tension / ' +
     'compression), Yt, Yc (transverse), S (in-plane shear), all MPa and positive magnitudes: failure criteria are refused when one is missing ' +
     '(no default exists). plyThickness is the cured ply thickness in document length units; density is mass per unit^3 (needed by laminate_mass). ' +
     'basis states what the numbers are: "mean" / "unknown" values or an empty source make every result computed from this material UNVERIFIED; ' +
@@ -68,9 +81,19 @@ export const createLaminaMaterial = defineCommand({
     GIIc: positive.describe('Mode II fracture toughness, N/mm (for the LaRC03 matrix-tension criterion); must be > 0.').optional(),
     basis: z.enum(['mean', 'b_basis', 'a_basis', 'unknown']).describe('What the values are; default "unknown" (unverified).').optional(),
     source: z.string().describe('Citation of the data (standard, report, supplier datasheet). Empty = unverified.'),
+    stressUnit: z
+      .enum(Object.keys(STRESS_UNIT_TO_MPA) as [StressUnit, ...StressUnit[]])
+      .describe(
+        'Unit of E1, E2, G12, G13, G23, Xt, Xc, Yt, Yc and S: Pa, kPa, MPa (default), GPa, psi, ksi or Msi. The record is stored in MPa; use psi / ksi / Msi for data given in US customary units (inch documents).',
+      )
+      .optional(),
   }),
   run: (doc, params): CommandResult => {
-    const { name, nu12, tsaiWuF12Star, basis = 'unknown', ...rest } = params;
+    const { name, nu12, tsaiWuF12Star, basis = 'unknown', stressUnit = 'MPa', ...given } = params;
+    const factor = STRESS_UNIT_TO_MPA[stressUnit];
+    const rest = Object.fromEntries(
+      Object.entries(given).map(([key, value]) => [key, STRESS_FIELDS.has(key) && typeof value === 'number' ? value * factor : value]),
+    ) as typeof given;
     const bad = POSITIVE_FIELDS.filter((field) => params[field] !== undefined && !(params[field] > 0));
     if (bad.length > 0)
       return refuseCmp(

@@ -74,7 +74,7 @@ const ctx = (kernel: GeometryKernel | null): ExecutionContext => ({ ...defaultCo
 
 function setup(): { doc: CadDocument; solid: string } {
   const base = apply(withMaterials(), 'define_rosette', ROSETTE);
-  const sphere = ok(base, 'add_sphere', { radius: 10 });
+  const sphere = ok(base, 'add_torus', { ringRadius: 10, tubeRadius: 3 });
   return { doc: sphere.document, solid: sphere.affected[0] as string };
 }
 

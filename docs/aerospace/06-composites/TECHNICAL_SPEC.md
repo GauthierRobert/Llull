@@ -756,7 +756,7 @@ Deviations from the sketch above:
 - Derived outline polylines exist for planar parts only. DXF is R12 (closed POLYLINE, mm), not LWPOLYLINE; no nesting.
 - Rule checks use the plies actually laid where each zone governs (the zone stack until plies exist).
 - `request_layup_waiver` records a pending waiver; nothing sets `approvalRef` (09 PLM not built).
-- Not built: M3 drape, M4 shop data (laser, ply book, CSV, ply solids, FEA sections), `add_core`, `mass_properties` delegation, parameter
+- Not built at M0-M2 (superseded by §13.3 for everything except the parameter expressions): M3 drape, M4 shop data (laser, ply book, CSV, ply solids, FEA sections), `add_core`, `mass_properties` delegation, parameter
   expressions in notation, stress unit conversion for non-mm documents (thickness is converted).
 
 ### 13.1 Review fixes and M4 / M6 slices (2026-10-20)
@@ -790,7 +790,7 @@ returns them as JSON; the PCOMP / `*SHELL SECTION, COMPOSITE` writers belong to 
 not domain-aero). `export_ply_table` / `import_ply_table` use the CSV layout `ply,sequence,order,material,orientation,rosette,zones,area_mm2,mass`
 (the spec's `mass_g` column is named `mass`, in density unit x document unit^3); imported plies cover the whole face, and the round trip is
 byte-identical for whole-face plies. `ply_book_data` returns the numeric content of the ply book; the SVG / PDF sheets are not generated.
-Still not built: M3 drape (live OCC), laser projection, per-ply solids and STEP, `add_core`, `split_ply`, AP242, optimiser.
+Still not built after §13.1 (see §13.3 for what the next slice built): M3 drape (live OCC), laser projection, per-ply solids and STEP, `add_core`, `split_ply`, AP242, optimiser.
 
 ### 13.2 Re-review fixes (2026-10-20)
 
@@ -804,3 +804,44 @@ which the kink angle is undefined (4 (S/Xc + muL) S/Xc > 1) is refused instead o
 `environment` the ratio is a single bisection on the worst failure index. Stored sections are validated on load (name, thickness equal to
 the ply sum, side, zone and materials). Kernel partial cone faces start the part azimuth at the face start (no straddling of the
 development seam), with the azimuth direction read from a third probe point; still verified only through a stub port, never live OCC.
+
+### 13.3 CMP-2: M3 drape, M4 shop data, cores, ply margins in 05 FEA (2026-10-20)
+
+Built in `packages/domain-aero/src/composites/` (plugin `composites`, toolset `manufacturing`); the pure CLT, failure criteria and provenance moved to
+`packages/core/src/lib/laminate/` (`clt.ts`, `failure.ts`, `provenance.ts`, new `recover.ts`) so that `@cae` can use them without importing `@aero`.
+
+**Tool faces.** `PartSurface` gained `sphere` (the hemisphere centred on the direction of `faceNear`; chart = azimuthal equidistant about the pole, azimuth 0 along the
+rosette axis) and `nurbs` (a `nurbs_surface` sheet copied in world coordinates; chart = parameter rectangle scaled by the arc length of the mid iso-curves; positive
+normal = Su x Sv, so use `laminateSide: negative_normal` on a sheet whose normal points inward). Zone / ply polygons on these faces are chart coordinates: metric at the
+centre only, so areas and masses on them use the true surface area (`pieceSurfaceArea`).
+
+**Fishnet drape (M3, `drape/`).** Pure TypeScript over a projection port (closed form on plane / cylinder / cone / sphere, warm-started Newton on a NURBS sheet): no
+OCC and no `requiresKernel` (the sketch in §5.4-5.5 assumed OCC face queries). Seed = `drape.seed` (chart point; default the sphere pole, else an interior point), warp
+along the fibre at the seed, geodesic generators by discrete geodesics, nodes by Newton on |X-A| = |X-B| = d in the tangent plane, quadrants filled in a fixed order;
+shear = |90 deg - crossing angle|; a node over the material `lockingAngle` is kept but not propagated (unless over-lock is allowed); crossing angle under 1 degree =
+inverted cell. Validated against `drape_reference.json` (the pin-jointed hemisphere of `generate_drape_reference.py`): the diagonal profile, maximum shear, interior-node
+count and the 30 / 40 / 50 degree counts of d = 4 and d = 2 match to the printed digits, d = 1 meets VC-CMP-12 (diagonal 15.726 within 0.6, maximum 51.894 within 1,
+Gauss-Bonnet within 0.5) and VC-CMP-13 (0.2149 / 0.0852 / 0.0053 within 0.01); VC-CMP-33 (four darts at the pole, each wedge re-draped along its bisector: its edge
+diagonal reproduces the reference diagonal) passes at d = 4. A NURBS patch of a sphere gives the same net as the analytic sphere (positions within 1e-5).
+Commands: `drape_ply` (query), `check_producibility` (query; over-lock fails, warning shear warns, no `lockingAngle` is a failing finding, dart / splice suggestions),
+`split_ply` (dart / splice cuts on a chart polyline or a line / polyline / nurbs_curve entity; cuts form a planar graph, `piecesOf` returns its faces; a splice overlap
+grows the left piece clipped to a convex neighbour; closed loops that touch nothing are refused; every piece is draped from the ply seed or, when the seed is a vertex of
+the piece, along its bisector), `export_flat_patterns_dxf` on doubly curved faces (net node (i, j) -> (i d, j d), warp along +x, refused over the lock unless `allowOverLock`).
+Known limits: the tow step is a CHORD (as in the reference), so shear on a developable face is 0 only along the axis of a cylinder and falls about linearly with d elsewhere
+(1.99x per halving at 45 degrees on r = 50); near a cone apex shear is large whatever d; locking is evaluated on the whole-face net, not per piece; the net spans the
+whole face, so cost does not shrink for small pieces; a lone dart stays a recorded slit (the wedge is not opened); `drape.generators` curves, `projection` flats and
+UD-specific mapping are not built; kinematic drape has no fabric mechanics (the §5.4 limits stand).
+
+**Shop data (M4).** `export_laser_projection` (plain-text point lists on the tool face, mm, counter-clockwise from the laminate side, gap <= `spacing`, every corner >=
+`cornerAngle` kept), `export_ply_book` (one SVG per sequence: flat patterns with fibre arrow, a location view in the part frame (not a 3D view), table with mm2 areas
+equal to the DXF piece areas; PDF is not written), `create_ply_solids` (one closed triangle-mesh entity per ply piece and constant-stack region, i.e. split where the
+plies below stop, so every solid is flat at one height and stacks without interference; mesh from a clipped structured grid (annular regions: longest-edge bisection);
+volume = area x thickness within the mesh tolerance; a snapshot, not re-derived). Export through the existing mesh paths: `export_stl` (perEntity) is tested; STEP of the
+mesh solids and AP242 are NOT done (a per-ply B-rep / `ply_solid` recipe node still needs the kernel). `add_core` (chamfered region, linear ramp from the edge, `afterPly`
+or the lower half of the stack; `core_sample` lists it and lifts the plies above; `laminate_mass` adds its mass; the analysis commands refuse points over a core with
+`CMP_CORE_UNSUPPORTED`; the core is not meshed in `create_ply_solids`; `delete_ply` / `reorder_plies` do not renumber `afterOrder`). `mass_properties` delegates a composite
+part id to `laminate_mass`. `create_lamina_material` takes `stressUnit` (Pa, kPa, MPa, GPa, psi, ksi, Msi) and stores MPa. Not done: parameter expressions in notation.
+
+**05 FEA.** `compute_margins` now gives ply-failure rows for composite shells (05 TECHNICAL_SPEC, "Ply-failure margins of composite shells").
+**M5 AP242 composite stays deferred** (needs the AERO-4 STEP infrastructure). Tests: `tests/unit/aero/composites/{drapeNet,drape,meshing,shopData2,cores,cutsAndUnits}.test.ts`,
+golden plans `composites_hemisphere_drape` and `composites_sandwich_shop_data`.

@@ -9,6 +9,7 @@ import { syncOutlines } from './derive';
 import { insertPly } from './plyCommands';
 import { DEFAULT_DROP_RULES } from './rules';
 import { compositesOf, findPart, pliesOf, withComposites, zonesOf } from './state';
+import { isDoublyCurved } from './surface';
 import { blendZones } from './zones';
 
 /**
@@ -107,7 +108,7 @@ export const generatePliesFromZones = defineCommand({
         sequence: label,
         rosetteId: part.rosetteId,
         boundary: { kind: 'polygons', polygons: plan.polygons },
-        drape: { method: 'developable' },
+        drape: { method: isDoublyCurved(part.surface) ? 'kinematic' : 'developable' },
         zoneOrigin: { zoneIds: plan.zoneIds, dropRank: plan.dropRank },
       });
       next = result.model;

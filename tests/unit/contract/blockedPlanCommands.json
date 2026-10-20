@@ -21,12 +21,6 @@
     "docs/aerospace/03-gdt-mbd-pmi/validation/draft_plan_stackup_su01.json": [
       "analyze_stackup"
     ],
-    "docs/aerospace/06-composites/validation/plans/cmp-flat-panel-zones.json": [
-      "export_ply_book"
-    ],
-    "docs/aerospace/06-composites/validation/plans/cmp-hemisphere-drape.json": [
-      "check_producibility"
-    ],
     "docs/aerospace/09-plm-configuration-traceability/validation/plans/plm_release_eco_revB.plan.json": [
       "create_change_order",
       "create_change_request",
