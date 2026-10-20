@@ -6,6 +6,7 @@
 import '../plugins';
 import { parseArgv, stringFlag } from './argv';
 import { runCli } from './main';
+import { ttyPassphrase } from './ttyPrompt';
 
 function readStdin(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -33,6 +34,7 @@ runCli(process.argv.slice(2), {
   env: process.env,
   prepareKernel,
   stderrIsTty: process.stderr.isTTY === true,
+  readPassphrase: ttyPassphrase,
 })
   .then((code) => {
     // Kernel workers / wasm handles would otherwise keep the process alive.

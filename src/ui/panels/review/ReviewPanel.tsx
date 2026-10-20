@@ -106,6 +106,7 @@ export function ReviewPanel({ className }: { className?: string }): React.ReactE
     setSigning({
       title: 'Accept finding',
       summary: `Sign your acceptance of ${change.findingKey}. An accepted fail still reads "fail (accepted)": it is recorded, never a pass.`,
+      act: DISPOSITION_COMMAND,
       payload: (nonce) =>
         humanGatePayload(
           'accept a prototype review finding',

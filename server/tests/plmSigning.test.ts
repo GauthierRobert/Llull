@@ -6,7 +6,7 @@ import path from 'node:path';
 import { generateEd25519, signEd25519, verifyEd25519 } from '../src/plm/ed25519';
 import { MIN_PASSPHRASE_LENGTH, createKeyStore } from '../src/plm/keyStore';
 import { GATE_CONTEXT, createSignaturePort } from '../src/plm/signaturePort';
-import { createTrustStore, trustDir } from '../src/plm/trustStore';
+import { createTrustStore } from '../src/plm/trustStore';
 import { issueTrustGrant } from '../src/plm/trustGrant';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
@@ -104,8 +104,8 @@ describe('key enrollment (not trust)', () => {
 describe('trust is separate from enrollment and cannot be minted by an agent', () => {
   it('an enrolled key is untrusted; only a trust grant (issued by the desktop) trusts it', async () => {
     const record = await createKeyStore(home.env).create({ userId: 'u-1', name: 'J', passphrase: PASSPHRASE, at: T });
-    const trust = createTrustStore(home.env);
-    const port = createSignaturePort(trust, home.env);
+    const trust = createTrustStore(home.trust);
+    const port = createSignaturePort(trust);
     expect(port.keyTrust?.(record.publicKey)).toBe('untrusted');
     expect(port.signerOf?.(record.publicKey)).toBeNull();
     expect(() => trust.trust(record, { userConfirmed: false } as never, T)).toThrow('desktop');
@@ -118,25 +118,40 @@ describe('trust is separate from enrollment and cannot be minted by an agent', (
   });
 
   it('LLULL_KEYS_DIR cannot swap the trust store: another keys directory with a self-made key trusts nothing', async () => {
-    const mine = await trustedKey(home.env, 'u-1');
+    const mine = await trustedKey(home, 'u-1');
     const attackerEnv = { ...home.env, LLULL_KEYS_DIR: path.join(home.dir, 'attacker-keys') };
     const planted = await createKeyStore(attackerEnv).create({ userId: 'u-1', name: 'J. Example', passphrase: PASSPHRASE, at: T });
-    expect(trustDir(attackerEnv)).toBe(trustDir(home.env));
-    const port = createSignaturePort(createTrustStore(attackerEnv), attackerEnv);
+    const port = createSignaturePort(createTrustStore());
     expect(port.keyTrust?.(planted.publicKey)).toBe('untrusted');
     expect(port.keyTrust?.(mine.record.publicKey)).toBe('trusted');
   });
 
-  it('outside a test run the trust directory is the fixed per-user profile and ignores LLULL_TRUST_DIR', () => {
-    const production = { LLULL_TRUST_DIR: path.join(home.dir, 'elsewhere') } as NodeJS.ProcessEnv;
-    expect(trustDir(production)).not.toBe(path.resolve(home.dir, 'elsewhere'));
-    expect(trustDir(production)).toContain(path.join('.llull', 'trust'));
-    expect(trustDir({ VITEST: '1', LLULL_TRUST_DIR: path.join(home.dir, 'elsewhere') })).toBe(path.resolve(home.dir, 'elsewhere'));
+  it('no environment variable moves the trust store, accepts test keys or sets a test mode: only in-process test configuration does', async () => {
+    const mine = await trustedKey(home, 'u-1');
+    const saved = { ...process.env };
+    // an agent-controlled environment: TEST=true, a trust directory of its own with a hand-made store, test keys switched on
+    process.env['TEST'] = 'true';
+    process.env['VITEST'] = '1';
+    process.env['LLULL_PLM_TEST_KEYS'] = '1';
+    process.env['LLULL_TRUST_DIR'] = path.join(home.dir, 'attacker-trust');
+    try {
+      const planted = await createKeyStore(home.env).create({ userId: 'u-evil', name: 'evil', passphrase: PASSPHRASE, at: T });
+      createTrustStore(path.join(home.dir, 'attacker-trust')).trust(planted, issueTrustGrant('attacker'), T);
+      const port = createSignaturePort();
+      expect(port.keyTrust?.(planted.publicKey)).toBe('untrusted');
+      expect(port.keyTrust?.(vectors.rfc8032[0]?.publicKey ?? '')).toBe('test');
+      expect(port.keyTrust?.(mine.record.publicKey)).toBe('trusted');
+    } finally {
+      for (const name of ['TEST', 'VITEST', 'LLULL_PLM_TEST_KEYS', 'LLULL_TRUST_DIR']) {
+        if (saved[name] === undefined) delete process.env[name];
+        else process.env[name] = saved[name];
+      }
+    }
   });
 
   it('an edited or unkeyed trust file trusts nothing', async () => {
-    const mine = await trustedKey(home.env, 'u-1');
-    const file = path.join(home.env['LLULL_TRUST_DIR'] as string, 'trust.json');
+    const mine = await trustedKey(home, 'u-1');
+    const file = path.join(home.trust, 'trust.json');
     const parsed = JSON.parse(readFileSync(file, 'utf8')) as { keys: { userId: string }[]; mac: string };
     const planted = await createKeyStore(home.env).create({ userId: 'u-evil', name: 'evil', passphrase: PASSPHRASE, at: T });
     writeFileSync(
@@ -146,30 +161,27 @@ describe('trust is separate from enrollment and cannot be minted by an agent', (
         keys: [...parsed.keys, { keyId: planted.keyId, userId: 'u-evil', name: 'evil', publicKey: planted.publicKey, trustedAt: T }],
       }),
     );
-    const port = createSignaturePort(createTrustStore(home.env), home.env);
+    const port = createSignaturePort(createTrustStore(home.trust));
     expect(port.keyTrust?.(planted.publicKey)).toBe('untrusted');
     expect(port.keyTrust?.(mine.record.publicKey)).toBe('untrusted');
     writeFileSync(file, '{ not json');
-    expect(createTrustStore(home.env).list()).toEqual([]);
-    chmodSync(path.join(home.env['LLULL_TRUST_DIR'] as string, 'trust.secret'), 0o600);
+    expect(createTrustStore(home.trust).list()).toEqual([]);
+    chmodSync(path.join(home.trust, 'trust.secret'), 0o600);
   });
 
-  it('the RFC 8032 test keys are trusted only inside a test run that asks for them (never by the variable alone)', () => {
+  it('the RFC 8032 test keys are trusted only when test code says so in-process (never from the environment)', () => {
     const testKey = vectors.rfc8032[0]?.publicKey ?? '';
-    const trust = createTrustStore(home.env);
-    expect(createSignaturePort(trust, { ...home.env, LLULL_PLM_TEST_KEYS: '1', VITEST: '1' }).keyTrust?.(testKey)).toBe('trusted');
-    expect(createSignaturePort(trust, { ...home.env, VITEST: '1' }).keyTrust?.(testKey)).toBe('test');
-    const production: NodeJS.ProcessEnv = { ...home.env, LLULL_PLM_TEST_KEYS: '1' };
-    delete production['VITEST'];
-    delete production['TEST'];
-    expect(createSignaturePort(trust, production).keyTrust?.(testKey)).toBe('test');
+    const trust = createTrustStore(home.trust);
+    expect(createSignaturePort(trust, { acceptTestKeys: true }).keyTrust?.(testKey)).toBe('trusted');
+    expect(createSignaturePort(trust, { acceptTestKeys: false }).keyTrust?.(testKey)).toBe('test');
+    expect(createSignaturePort(trust).keyTrust?.(testKey)).toBe('test');
   });
 });
 
 describe('signature port', () => {
   it('verifies a human-gate signature over the context-prefixed payload and names the signer from the trust record', async () => {
-    const mine = await trustedKey(home.env, 'u-7');
-    const port = createSignaturePort(createTrustStore(home.env), home.env);
+    const mine = await trustedKey(home, 'u-7');
+    const port = createSignaturePort(createTrustStore(home.trust));
     const payload = sha256Hex('act');
     const confirmation = { alg: 'Ed25519', publicKey: mine.record.publicKey, signature: await mine.gate(payload) };
     expect(port.verify(confirmation, payload)?.signer).toBe('u-7');
@@ -182,9 +194,19 @@ describe('signature port', () => {
     expect(GATE_CONTEXT).toBe('llull-gate-v1:');
   });
 
+  it('a signature is single-use: resent, replayed after an undo or presented to a fresh port it is refused', async () => {
+    const mine = await trustedKey(home, 'u-7');
+    const payload = sha256Hex('act-once');
+    const confirmation = { alg: 'Ed25519', publicKey: mine.record.publicKey, signature: await mine.gate(payload) };
+    expect(createSignaturePort(createTrustStore(home.trust)).verify(confirmation, payload)?.signer).toBe('u-7');
+    expect(createSignaturePort(createTrustStore(home.trust)).verify(confirmation, payload)).toBeNull();
+    const again = { ...confirmation, signature: await mine.gate(sha256Hex('act-twice')) };
+    expect(createSignaturePort(createTrustStore(home.trust)).verify(again, sha256Hex('act-twice'))?.signer).toBe('u-7');
+  });
+
   it('the same port clears the 08 / 05 human gates (one port for every gap)', async () => {
-    const mine = await trustedKey(home.env, 'u-7');
-    const port = createSignaturePort(createTrustStore(home.env), home.env);
+    const mine = await trustedKey(home, 'u-7');
+    const port = createSignaturePort(createTrustStore(home.trust));
     const details = { lowered: [] };
     const payload = sha256Hex('{"act":"lowering an export marking","details":{"lowered":[]},"ids":["m"],"nonce":"n1"}');
     const confirmation = { alg: 'Ed25519', publicKey: mine.record.publicKey, signature: await mine.gate(payload), nonce: 'n1' };
@@ -197,9 +219,9 @@ describe('signature port', () => {
 
 describe('the real gate end to end (VC-PLM-17, 26)', () => {
   it('a trusted key releases; an enrolled-only key, a foreign act and a missing signature do not', async () => {
-    const mine = await trustedKey(home.env, 'u-1');
+    const mine = await trustedKey(home, 'u-1');
     const stranger = await createKeyStore(home.env).create({ userId: 'u-2', name: 'S', passphrase: PASSPHRASE, at: T });
-    const port = createSignaturePort(createTrustStore(home.env), home.env);
+    const port = createSignaturePort(createTrustStore(home.trust));
     const ctx = { ...defaultContext(), humanSignature: port };
     const doc = approveAll(reviewWithEco());
     const params = { changeOrder: 'ECO-0100', at: T };
@@ -236,8 +258,8 @@ describe('the real gate end to end (VC-PLM-17, 26)', () => {
   });
 
   it('a signature over a release manifest is recorded with the signer of the trusted key record, and verify_release re-verifies it', async () => {
-    const mine = await trustedKey(home.env, 'u-1', 'J. Example');
-    const ctx = { ...defaultContext(), humanSignature: createSignaturePort(createTrustStore(home.env), home.env) };
+    const mine = await trustedKey(home, 'u-1', 'J. Example');
+    const ctx = { ...defaultContext(), humanSignature: createSignaturePort(createTrustStore(home.trust)) };
     const doc = (await import('../../tests/unit/plm/fixtures')).released();
     const manifest = execute(doc, 'release_manifest', { revision: 'A', meaning: 'release' }, ctx).data as { canonical: string };
     const params = {
@@ -259,7 +281,7 @@ describe('the real gate end to end (VC-PLM-17, 26)', () => {
     const asReview = execute(doc, 'record_signature', { ...params, meaning: 'review' }, ctx);
     expect(asReview.error?.code).toBe('PLM_SIGNATURE_INVALID');
     await createKeyStore(home.env).revoke(mine.record.keyId, T);
-    createTrustStore(home.env).revoke(mine.record.publicKey, T);
+    createTrustStore(home.trust).revoke(mine.record.publicKey, T);
     expect(execute(doc, 'record_signature', params, ctx).error?.code).toBe('PLM_KEY_UNTRUSTED');
   });
 });

@@ -5,15 +5,19 @@
 
 import { defaultContext } from '@core/commands/context';
 import type { ExecutionContext, PlanStepEvent } from '@core/commands/types';
+import type { HumanSignaturePort } from '@core/model/analysis';
 import { createLibraryProvider } from '../libraries/libraryStore';
 import { createSignaturePort } from '../plm/signaturePort';
 import { defaultFeArtifactStore } from './artifactStore';
 
-export function serverContext(onStep?: (event: PlanStepEvent) => void): ExecutionContext {
+export function serverContext(
+  onStep?: (event: PlanStepEvent) => void,
+  humanSignature: HumanSignaturePort = createSignaturePort(),
+): ExecutionContext {
   return {
     ...defaultContext(),
     feaArtifacts: defaultFeArtifactStore(),
-    humanSignature: createSignaturePort(),
+    humanSignature,
     libraries: createLibraryProvider(),
     ...(onStep !== undefined ? { onStep } : {}),
   };

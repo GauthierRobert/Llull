@@ -29,16 +29,31 @@ export async function fetchSigningKeys(): Promise<SigningKey[]> {
  * A human-gate confirmation: the key signs the UTF-8 hex `payloadSha256` after the user typed the key passphrase.
  * @failure a wrong passphrase or an unreachable backend -> { error }
  */
-export async function signPayload(
+export function signPayload(
   keyId: string,
   passphrase: string,
+  act: string,
   payloadSha256: string,
 ): Promise<{ readonly signature: unknown } | { readonly error: string }> {
+  return postSign({ kind: 'payload', keyId, passphrase, act, payloadSha256 });
+}
+
+/** PMI review signature: the server computes the payload (with a hash of the reviewed items) from the live document. */
+export function signPmiReview(
+  keyId: string,
+  passphrase: string,
+  review: { readonly pmiIds: readonly string[]; readonly decision: 'accept' | 'reject'; readonly comment: string },
+  nonce: string,
+): Promise<{ readonly signature: unknown } | { readonly error: string }> {
+  return postSign({ kind: 'pmi_review', keyId, passphrase, nonce, ...review });
+}
+
+async function postSign(request: Record<string, unknown>): Promise<{ readonly signature: unknown } | { readonly error: string }> {
   try {
     const response = await fetch(`${SERVER_BASE}/signing/sign`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...serverAuthHeaders() },
-      body: JSON.stringify({ kind: 'payload', keyId, passphrase, payloadSha256 }),
+      body: JSON.stringify(request),
     });
     const body: unknown = await response.json();
     if (response.ok && isRecord(body) && body['signature'] !== undefined) return { signature: body['signature'] };

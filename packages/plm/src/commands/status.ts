@@ -294,11 +294,14 @@ export const plmActPayload = defineCommand({
     command: z.enum(GATED_COMMANDS).describe('The human-only command to authorize.'),
     params: z
       .record(z.string(), z.unknown())
-      .describe('The params the command will be called with (confirmation, at and by are not part of the payload).'),
+      .describe('The params the command will be called with (confirmation, at and by are not part of the payload; the host sets at).'),
     nonce: z.string().min(8).describe('A fresh random string chosen by the signer (at least 8 characters).'),
   }),
-  run: (doc, { command, params, nonce }): CommandResult => {
-    const payload = actPayload(doc, command, params, nonce);
-    return report(doc, `Payload to sign for ${command}: sha256 ${payload}.`, { payloadSha256: payload, ...actParts(doc, command, params) });
+  run: (doc, { command, params, nonce }, ctx): CommandResult => {
+    const payload = actPayload(doc, command, params, nonce, ctx);
+    return report(doc, `Payload to sign for ${command}: sha256 ${payload}.`, {
+      payloadSha256: payload,
+      ...actParts(doc, command, params, ctx),
+    });
   },
 });

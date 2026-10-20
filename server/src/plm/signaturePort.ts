@@ -2,8 +2,8 @@
 
 import type { HumanSignaturePort } from '@core/model/analysis';
 import { isRecord } from '@lib/isRecord';
-import { isTestRun } from '../env';
 import { verifyEd25519 } from './ed25519';
+import { acceptsTestKeys } from './hostConfig';
 import { type TrustStore, createTrustStore } from './trustStore';
 
 /** Domain-separation prefix of human-gate signatures: a signature over a manifest can never be replayed as a gate confirmation. */
@@ -18,11 +18,14 @@ const RFC8032_TEST_KEYS: ReadonlySet<string> = new Set([
 
 /**
  * Port backed by `trust`: a key is trusted only when the desktop app trusted it and it was not revoked. The RFC 8032 test keys are `test` (refused),
- * trusted only when `isTestRun(env)` AND LLULL_PLM_TEST_KEYS=1 (a production run ignores the variable).
+ * trusted only when `options.acceptTestKeys` is set by test code (never from an environment variable: they are agent-controlled).
  * @invariant `verify` accepts only { alg: 'Ed25519', publicKey, signature } over GATE_CONTEXT + the payload hash by a trusted key; the signer is the trust record's user
  */
-export function createSignaturePort(trust: TrustStore = createTrustStore(), env: NodeJS.ProcessEnv = process.env): HumanSignaturePort {
-  const testMode = isTestRun(env) && env['LLULL_PLM_TEST_KEYS'] === '1';
+export function createSignaturePort(
+  trust: TrustStore = createTrustStore(),
+  options: { readonly acceptTestKeys?: boolean } = {},
+): HumanSignaturePort {
+  const testMode = options.acceptTestKeys ?? acceptsTestKeys();
   const trustOf = (publicKey: string): 'trusted' | 'untrusted' | 'test' => {
     if (RFC8032_TEST_KEYS.has(publicKey)) return testMode ? 'trusted' : 'test';
     return trust.find(publicKey) === null ? 'untrusted' : 'trusted';
@@ -39,6 +42,7 @@ export function createSignaturePort(trust: TrustStore = createTrustStore(), env:
       const { publicKey, signature: value } = signature;
       if (typeof publicKey !== 'string' || typeof value !== 'string') return null;
       if (trustOf(publicKey) !== 'trusted' || !verifyEd25519(publicKey, `${GATE_CONTEXT}${payloadSha256}`, value)) return null;
+      if (!trust.consume(`${publicKey.slice(0, 16)}:${payloadSha256}:${value}`)) return null;
       const record = trust.find(publicKey);
       return {
         signer: record?.userId ?? publicKey.slice(0, 16),

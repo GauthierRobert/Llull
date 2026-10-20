@@ -4,6 +4,8 @@
  */
 
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import type { CadDocument } from '@core/model/types';
 import type { CommandOutcome } from '@protocol/restProtocol';
 import { readDocumentFile } from '../documentFile';
@@ -20,6 +22,8 @@ export interface PlmCliIo {
   readonly stdout: (text: string) => void;
   readonly stderr: (text: string) => void;
   readonly env: Readonly<Record<string, string | undefined>>;
+  /** Interactive no-echo prompt (a real terminal only); absent or null = no terminal. */
+  readonly readPassphrase?: (prompt: string) => Promise<string | null>;
 }
 
 const OK = 0;
@@ -38,13 +42,29 @@ const required = (args: ParsedArgv, flag: string): string => {
   return value;
 };
 
-/** The key passphrase: the environment variable named by `--passphrase-env` (default LLULL_KEY_PASSPHRASE); never an argument, never printed. */
-function passphraseOf(args: ParsedArgv, io: PlmCliIo): string {
+/**
+ * The passphrase to ENROLL a key: the environment variable named by `--passphrase-env` (default LLULL_KEY_PASSPHRASE). Enrolling a key
+ * trusts nothing, so this is the only place an environment passphrase is accepted.
+ */
+function enrollmentPassphrase(args: ParsedArgv, io: PlmCliIo): string {
   const variable = stringFlag(args, 'passphrase-env') ?? 'LLULL_KEY_PASSPHRASE';
   const value = io.env[variable];
   if (value === undefined || value === '')
     throw new PlmUsage(`set $${variable} to the key passphrase (or name another variable with --passphrase-env).`);
   return value;
+}
+
+/**
+ * The SIGNING passphrase: typed at an interactive no-echo prompt, never taken from the environment, a flag or stdin (an agent in the user's shell would
+ * find it there and sign as the human). With no terminal the signature is refused: use the desktop app (Sign dialog) instead.
+ */
+async function signingPassphrase(keyName: string, io: PlmCliIo): Promise<string> {
+  const typed = io.readPassphrase === undefined ? null : await io.readPassphrase(`Passphrase of the signing key of ${keyName}: `);
+  if (typed === null || typed === '')
+    throw new PlmUsage(
+      'signing needs the key passphrase typed at an interactive terminal (it is never read from the environment); use the llull desktop app otherwise.',
+    );
+  return typed;
 }
 
 const print = (io: PlmCliIo, args: ParsedArgv, json: unknown, text: string): void =>
@@ -57,14 +77,7 @@ const mergedEnv = (io: PlmCliIo): NodeJS.ProcessEnv => ({ ...process.env, ...io.
  * holds). Only a TRUSTED key's signature clears the gate; the command verifies it, so a wrong or untrusted key is simply refused.
  * @failure no / revoked key, wrong passphrase, or the payload query refused -> throws a usage message
  */
-export async function confirmedParams(
-  backend: CliBackend,
-  name: string,
-  params: unknown,
-  keyId: string,
-  args: ParsedArgv,
-  io: PlmCliIo,
-): Promise<unknown> {
+export async function confirmedParams(backend: CliBackend, name: string, params: unknown, keyId: string, io: PlmCliIo): Promise<unknown> {
   const store = createKeyStore(mergedEnv(io));
   const key = store.find(keyId);
   if (key === undefined) throw new PlmUsage(`unknown --confirm-key ${keyId}; see: llull keys list`);
@@ -73,7 +86,7 @@ export async function confirmedParams(
   const payload = await backend.run('plm_act_payload', { command: name, params: given, nonce });
   const hash = (payload.data as { payloadSha256?: string } | undefined)?.payloadSha256;
   if (payload.isError || hash === undefined) throw new PlmUsage(`${name} is not a human-only plm command (${outcomeText(payload)})`);
-  const signature = await store.sign(key.keyId, passphraseOf(args, io), `${GATE_CONTEXT}${hash}`);
+  const signature = await store.sign(key.keyId, await signingPassphrase(key.name, io), `${GATE_CONTEXT}${hash}`);
   if (signature === null) throw new PlmUsage(`the key ${key.keyId} could not sign (wrong passphrase, or it is revoked).`);
   return { ...given, confirmation: { alg: 'Ed25519', keyId: key.keyId, publicKey: key.publicKey, signature, nonce } };
 }
@@ -82,7 +95,7 @@ async function runKeys(args: ParsedArgv, io: PlmCliIo, now: () => Date): Promise
   const action = args.positionals[1];
   const env = mergedEnv(io);
   const store = createKeyStore(env);
-  const trust = createTrustStore(env);
+  const trust = createTrustStore();
   if (action === 'list') {
     const keys = store.list().map((key) => ({ ...key, trusted: trust.find(key.publicKey) !== null }));
     print(
@@ -104,7 +117,7 @@ async function runKeys(args: ParsedArgv, io: PlmCliIo, now: () => Date): Promise
     const record = await store.create({
       userId: required(args, 'user'),
       name: required(args, 'name'),
-      passphrase: passphraseOf(args, io),
+      passphrase: enrollmentPassphrase(args, io),
       at: isoSeconds(now()),
     });
     print(
@@ -140,7 +153,7 @@ async function runSign(args: ParsedArgv, io: PlmCliIo, backend: () => Promise<Cl
     io.stderr(outcomeText(manifest));
     return FAILED;
   }
-  const signature = await store.sign(key.keyId, passphraseOf(args, io), data.canonical);
+  const signature = await store.sign(key.keyId, await signingPassphrase(key.name, io), data.canonical);
   if (signature === null) {
     io.stderr(`llull: the key ${key.keyId} could not sign (wrong passphrase, or it is revoked).`);
     return FAILED;
@@ -164,13 +177,26 @@ async function runSign(args: ParsedArgv, io: PlmCliIo, backend: () => Promise<Cl
   return applied.isError ? FAILED : OK;
 }
 
+/** The manifest hash a human attached: `--manifest-sha256`, else `packageSha256` of the package's revision in the managed document (`--doc`). */
+function packageAnchor(dir: string, args: ParsedArgv, io: PlmCliIo): string | null {
+  const given = stringFlag(args, 'manifest-sha256');
+  if (given !== undefined) return given;
+  try {
+    const manifest = JSON.parse(readFileSync(path.join(dir, 'manifest.json'), 'utf8')) as { item?: { revision?: unknown } };
+    const label = manifest.item?.revision;
+    const doc = readDocumentFile(cliTarget(args, io.env).doc);
+    return typeof label === 'string' ? (doc.plm?.item.revisions[label]?.packageSha256 ?? null) : null;
+  } catch {
+    return null;
+  }
+}
+
 async function runRelease(args: ParsedArgv, io: PlmCliIo, backend: () => Promise<CliBackend>, now: () => Date): Promise<number> {
   const action = args.positionals[1];
   if (action === 'verify') {
     const dir = args.positionals[2];
     if (dir === undefined) throw new PlmUsage('release verify needs a package folder: llull release verify DIR');
-    const env = mergedEnv(io);
-    const verdict = verifyReleasePackage(dir, createSignaturePort(createTrustStore(env), env));
+    const verdict = verifyReleasePackage(dir, createSignaturePort(createTrustStore()), packageAnchor(dir, args, io));
     print(
       io,
       args,
@@ -200,7 +226,7 @@ async function runRelease(args: ParsedArgv, io: PlmCliIo, backend: () => Promise
       const confirmKey = stringFlag(args, 'confirm-key');
       attach = await target.run(
         'attach_release_package',
-        confirmKey === undefined ? params : await confirmedParams(target, 'attach_release_package', params, confirmKey, args, io),
+        confirmKey === undefined ? params : await confirmedParams(target, 'attach_release_package', params, confirmKey, io),
       );
     }
     print(
@@ -218,7 +244,7 @@ async function runRelease(args: ParsedArgv, io: PlmCliIo, backend: () => Promise
 
 function runAudit(args: ParsedArgv, io: PlmCliIo): number {
   if (args.positionals[1] !== 'verify') throw new PlmUsage('audit needs an action: verify [DIR]');
-  const dir = args.positionals[2] ?? auditDir(mergedEnv(io));
+  const dir = args.positionals[2] ?? auditDir();
   if (dir === null) throw new PlmUsage('no audit directory: pass one or set $LLULL_AUDIT_DIR.');
   const verdict = verifyAuditChain(dir);
   print(

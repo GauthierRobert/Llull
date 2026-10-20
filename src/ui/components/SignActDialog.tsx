@@ -5,14 +5,18 @@
 
 import React, { useEffect, useId, useState } from 'react';
 import { ModalDialog } from '@ui/components/ModalDialog';
-import { type SigningKey, fetchSigningKeys, signPayload } from '@ui/services/signing';
+import { type SigningKey, fetchSigningKeys, signPayload, signPmiReview } from '@ui/services/signing';
 
 export interface SignActRequest {
   /** What the user is about to sign, in plain words. */
   readonly title: string;
   readonly summary: string;
-  /** The SHA-256 to sign for a fresh nonce (the act payload the command will verify). */
-  readonly payload: (nonce: string) => string;
+  /** The command the act belongs to (recorded in the audit chain with the payload). */
+  readonly act: string;
+  /** The SHA-256 to sign for a fresh nonce (the act payload the command will verify); absent when the server computes it (`pmiReview`). */
+  readonly payload?: (nonce: string) => string;
+  /** A PMI review: the local backend computes the payload from the live document. */
+  readonly pmiReview?: { readonly pmiIds: readonly string[]; readonly decision: 'accept' | 'reject'; readonly comment: string };
   /** Called with the confirmation object { alg, keyId, publicKey, signature, nonce } after a successful signature. */
   readonly onSigned: (confirmation: Record<string, unknown>) => void;
 }
@@ -34,7 +38,10 @@ export function SignActDialog({ request, onClose }: { request: SignActRequest; o
   async function submit(): Promise<void> {
     if (key === undefined) return;
     const nonce = freshNonce();
-    const signed = await signPayload(key.keyId, passphrase, request.payload(nonce));
+    const signed =
+      request.pmiReview !== undefined
+        ? await signPmiReview(key.keyId, passphrase, request.pmiReview, nonce)
+        : await signPayload(key.keyId, passphrase, request.act, request.payload?.(nonce) ?? '');
     if ('error' in signed) return setMessage(signed.error);
     setPassphrase('');
     request.onSigned({ ...(signed.signature as Record<string, unknown>), nonce });

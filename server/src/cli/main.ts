@@ -35,6 +35,7 @@ export interface CliIo {
   readonly exchangeOptions?: () => ExchangeOptions; // default: from `env`
   readonly fetchImpl?: (url: string, init: RequestInit) => Promise<Response>;
   readonly now?: () => number; // ms clock for step timing and `--timeout`
+  readonly readPassphrase?: (prompt: string) => Promise<string | null>; // signing passphrase: an interactive no-echo prompt only (never env, flag or stdin)
   readonly stderrIsTty?: boolean; // stream per-step progress without `--progress`
 }
 
@@ -215,7 +216,7 @@ async function runExec(args: ParsedArgv, io: CliIo): Promise<number> {
   let sent: unknown = params;
   if (confirmKey !== undefined && !isExchange) {
     try {
-      sent = await confirmedParams(backend, name, params, confirmKey, args, io);
+      sent = await confirmedParams(backend, name, params, confirmKey, io);
     } catch (error) {
       if (error instanceof PlmUsage) throw new UsageError(error.message);
       throw error;

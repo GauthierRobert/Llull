@@ -154,6 +154,7 @@ export interface PackageFinding {
     | 'PLM_PACKAGE_MEMBER_MISMATCH'
     | 'PLM_SIGNATURE_MISSING'
     | 'PLM_PACKAGE_MANIFEST_MISMATCH'
+    | 'PLM_PACKAGE_UNANCHORED'
     | 'PLM_SIGNATURE_INVALID'
     | 'PLM_KEY_UNTRUSTED'
     | 'PLM_PACKAGE_UNREADABLE'
@@ -165,11 +166,15 @@ export interface PackageFinding {
 /**
  * Verify a package folder: every member hash and size, the document content hash, the manifest hash and every signature over the rebuilt
  * canonical release body (with the port's trust of the signing key).
+ * `anchor` is the manifest hash a human attached (`revision.packageSha256`, set by the human-gated attach_release_package) or received out-of-band: the
+ * release signature covers the definition hash, not every member, so without the anchor an attacker who swaps a drawing and recomputes every hash
+ * would still pass. No anchor => PLM_PACKAGE_UNANCHORED (not ok).
  * @invariant read-only; flipping one byte of any member or of the manifest yields a finding
  */
 export function verifyReleasePackage(
   dir: string,
   port: HumanSignaturePort | null,
+  anchor: string | null = null,
 ): { readonly ok: boolean; readonly findings: readonly PackageFinding[]; readonly members: number } {
   const findings: PackageFinding[] = [];
   let manifest: Manifest;
@@ -205,6 +210,17 @@ export function verifyReleasePackage(
   const { manifestSha256, signatures, ...unsealed } = manifest;
   if (sha256(jcsJson(unsealed)) !== manifestSha256)
     findings.push({ code: 'PLM_PACKAGE_MANIFEST_MISMATCH', message: 'manifestSha256 does not match the manifest content' });
+  if (anchor === null)
+    findings.push({
+      code: 'PLM_PACKAGE_UNANCHORED',
+      message:
+        'the manifest hash was not compared to a value a human attached (pass --doc of the managed document, or --manifest-sha256 HASH)',
+    });
+  else if (anchor !== manifestSha256)
+    findings.push({
+      code: 'PLM_PACKAGE_MANIFEST_MISMATCH',
+      message: 'manifestSha256 differs from the hash a human attached to this revision',
+    });
   const recorded = Array.isArray(signatures) ? (signatures as SignatureRecord[]) : [];
   if (recorded.length === 0)
     findings.push({

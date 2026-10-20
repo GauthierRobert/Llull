@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
-import { humanGatePayload } from '@core/model/humanGate';
+import { pmiReviewPayload } from '@core/commands/pmi/review';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { exactProbabilities, uniformSumCdf, type StackContributor } from '@lib/stackup';
 import { parseStackExpression, stackGradient } from '@lib/stackExpression';
@@ -154,10 +154,10 @@ describe('accept_pmi_review: a verified signature, never a caller label', () => 
         ? { signer: String((confirmation as { as?: unknown }).as), signatureId: 's' }
         : null,
   };
-  const signed = (id: string, as: string, comment = ''): Record<string, unknown> => ({
+  const signed = (doc: CadDocument, id: string, as: string, comment = ''): Record<string, unknown> => ({
     nonce: 'n-accept',
     as,
-    signature: humanGatePayload('PMI review', [id], { decision: 'accept', comment }, 'n-accept'),
+    signature: pmiReviewPayload(doc, [id], 'accept', comment, 'n-accept'),
   });
   const accept = (
     doc: CadDocument,
@@ -186,16 +186,28 @@ describe('accept_pmi_review: a verified signature, never a caller label', () => 
     for (const [ctx, confirmation] of [
       [withPort, undefined],
       [labelled, undefined],
-      [{ ...defaultContext(), humanSignature: null }, signed(id, 'grace')],
-      [withPort, { ...signed(id, 'grace'), signature: 'forged' }],
-      [withPort, signed('another-id', 'grace')],
+      [{ ...defaultContext(), humanSignature: null }, signed(doc, id, 'grace')],
+      [withPort, { ...signed(doc, id, 'grace'), signature: 'forged' }],
+      [withPort, { ...signed(doc, id, 'grace'), signature: pmiReviewPayload(doc, [id], 'accept', 'other comment', 'n-accept') }],
     ] as const) {
       const result = accept(doc, id, ctx, confirmation);
       expect(result.error?.code).toBe('GDT_REVIEW_HUMAN_ONLY');
       expect(result.document).toBe(doc);
     }
-    const ok = accept(doc, id, withPort, signed(id, 'Ada'));
+    const ok = accept(doc, id, withPort, signed(doc, id, 'Ada'));
     expect(ok.document.pmi?.items[id]?.review).toMatchObject({ required: false, acceptedBy: 'Ada' });
+  });
+
+  it('a signature binds the content of the reviewed items: edit the item after signing and the old signature no longer clears', () => {
+    const { doc, id } = oneDatum();
+    const confirmation = signed(doc, id, 'grace');
+    const edited = execute(doc, 'update_pmi', { pmiId: id, label: 'B' }).document;
+    expect(edited.pmi?.items[id]).not.toEqual(doc.pmi?.items[id]);
+    const refused = accept(edited, id, { ...defaultContext(), humanSignature: signer }, confirmation);
+    expect(refused.error?.code).toBe('GDT_REVIEW_HUMAN_ONLY');
+    expect(accept(doc, id, { ...defaultContext(), humanSignature: signer }, confirmation).document.pmi?.items[id]?.review.required).toBe(
+      false,
+    );
   });
 
   it('keeps a sign-off across a replay while the item is unchanged, and drops it when its content changed', () => {
@@ -208,7 +220,12 @@ describe('accept_pmi_review: a verified signature, never a caller label', () => 
       tolerance: { type: 'plusMinus', upper: 0.1, lower: -0.1 },
     });
     const id = size.affected[0] as string;
-    const accepted = accept(size.document, id, { ...defaultContext(), humanSignature: signer }, signed(id, 'grace')).document;
+    const accepted = accept(
+      size.document,
+      id,
+      { ...defaultContext(), humanSignature: signer },
+      signed(size.document, id, 'grace'),
+    ).document;
     expect(accepted.pmi?.items[id]?.review.required).toBe(false);
     const replayed = execute(accepted, 'replay_history', {}).document;
     expect(replayed.pmi?.items[id]?.review).toMatchObject({ required: false, acceptedBy: 'grace' });

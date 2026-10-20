@@ -8,7 +8,8 @@ import { EXIT_COMMAND_ERROR, EXIT_OK, EXIT_USAGE, runCli, type CliIo } from '../
 import { createKeyStore } from '../src/plm/keyStore';
 import { createTrustStore } from '../src/plm/trustStore';
 import { issueTrustGrant } from '../src/plm/trustGrant';
-import { T, type TestHome, testHome } from './plmTestSupport';
+import { PASSPHRASE, T, type TestHome, testHome } from './plmTestSupport';
+import { verifyAuditChain } from '../src/plm/auditChain';
 
 const SAMPLE = path.resolve(__dirname, '../../docs/aerospace/09-plm-configuration-traceability/validation/sample_document.json');
 
@@ -19,6 +20,7 @@ beforeEach(() => {
   docPath = path.join(home.dir, 'part.llull.json');
   copyFileSync(SAMPLE, docPath);
   home.apply();
+  typed = PASSPHRASE;
 });
 afterEach(() => home.cleanup());
 
@@ -27,15 +29,21 @@ interface Run {
   readonly out: string;
   readonly err: string;
 }
+/** The terminal: a typed passphrase is only available through this injected prompt (the real one needs a TTY). */
+let typed: string | null = PASSPHRASE;
 async function llull(...argv: string[]): Promise<Run> {
+  return llullWith({}, ...argv);
+}
+async function llullWith(extraEnv: Record<string, string>, ...argv: string[]): Promise<Run> {
   const out: string[] = [];
   const err: string[] = [];
   const io: CliIo = {
     stdout: (text) => out.push(text),
     stderr: (text) => err.push(text),
     readStdin: () => Promise.resolve(''),
-    env: { ...process.env },
+    env: { ...process.env, ...extraEnv },
     prepareKernel: () => Promise.resolve(),
+    readPassphrase: () => Promise.resolve(typed),
   };
   const code = await runCli([...argv, '--doc', docPath], io);
   return { code, out: out.join('\n'), err: err.join('\n') };
@@ -52,11 +60,48 @@ async function enrolledAndTrusted(user: string): Promise<string> {
   const created = await llull('keys', 'create', '--user', user, '--name', `User ${user}`, '--json');
   expect(created.code).toBe(EXIT_OK);
   const key = JSON.parse(created.out) as { keyId: string; publicKey: string };
-  createTrustStore(home.env).trust(createKeyStore(home.env).find(key.keyId) as never, issueTrustGrant('test'), T);
+  createTrustStore(home.trust).trust(createKeyStore(home.env).find(key.keyId) as never, issueTrustGrant('test'), T);
   return key.keyId;
 }
 
 describe('PLM through the CLI', () => {
+  it('an agent controlling the environment gains nothing: TEST=true, test keys, its own trust directory and an exported passphrase all fail, and the audit log is written', async () => {
+    const mine = await enrolledAndTrusted('u-1');
+    const identity = { partNumber: 'LL-1001', name: 'Bracket', itemType: 'part', policy: { humanSignatureRequired: false } };
+    const attackerTrust = path.join(home.dir, 'attacker-trust');
+    createTrustStore(attackerTrust).trust(createKeyStore(home.env).find(mine) as never, issueTrustGrant('attacker'), T);
+    const agentEnv = {
+      TEST: 'true',
+      VITEST: '1',
+      LLULL_PLM_TEST_KEYS: '1',
+      LLULL_TRUST_DIR: attackerTrust,
+      LLULL_AUDIT_DIR: path.join(home.dir, 'nowhere'),
+    };
+    typed = null; // an agent has no terminal
+    const refused = await llullWith(agentEnv, 'exec', 'set_item_identity', JSON.stringify(identity), '--json', '--confirm-key', mine);
+    expect(refused.code).toBe(EXIT_USAGE);
+    expect(refused.err).toContain('interactive terminal');
+    const noConfirm = await llullWith(agentEnv, 'exec', 'set_item_identity', JSON.stringify(identity), '--json');
+    expect(json(noConfirm).error?.code).toBe('PLM_HUMAN_GATE');
+    const log = readFileSync(path.join(home.audit, 'audit-000001.jsonl'), 'utf8');
+    expect(log).toContain('PLM_HUMAN_GATE');
+    expect(verifyAuditChain(home.audit).ok).toBe(true);
+    // the exported passphrase and stdin cannot sign either
+    const exported = await llullWith(
+      { ...agentEnv, LLULL_KEY_PASSPHRASE: PASSPHRASE },
+      'exec',
+      'set_item_identity',
+      JSON.stringify(identity),
+      '--json',
+      '--confirm-key',
+      mine,
+      '--passphrase-env',
+      'LLULL_KEY_PASSPHRASE',
+    );
+    expect(exported.code).toBe(EXIT_USAGE);
+    expect(plm()).toBeUndefined();
+  });
+
   it('an agent cannot clear a human act by any flag, label or param; a trusted key can', async () => {
     const identity = { partNumber: 'LL-1001', name: 'Bracket', itemType: 'part', policy: { humanSignatureRequired: false } };
     for (const flags of [[], ['--as', 'human']]) {
