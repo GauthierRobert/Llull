@@ -27,6 +27,59 @@ export interface ExchangeSolid {
   readonly color?: string;
 }
 
+/**
+ * Semantic PMI transport (04 XCH V1 hook for 03 GD&T M6): a product's datums, dimensions and geometric tolerances attached to FACES of its shape. `faces` are
+ * 0-based indices of the product's shape in `TopExp::MapShapes` order (the `ShapeTopology.faces` numbering of a single-solid product); values are in the
+ * document unit when written and in millimetres when read. AP242 only; a dimension deviation is a magnitude (nominal - minus <= x <= nominal + plus).
+ */
+type PmiCharacteristic =
+  | 'angularity'
+  | 'circular_runout'
+  | 'circularity'
+  | 'coaxiality'
+  | 'concentricity'
+  | 'cylindricity'
+  | 'flatness'
+  | 'parallelism'
+  | 'perpendicularity'
+  | 'position'
+  | 'profile_line'
+  | 'profile_surface'
+  | 'straightness'
+  | 'symmetry'
+  | 'total_runout';
+
+type PmiDimensionType =
+  | 'size_diameter'
+  | 'size_radius'
+  | 'size_spherical_diameter'
+  | 'size_spherical_radius'
+  | 'size_thickness'
+  | 'size_curve_length'
+  | 'size_angular'
+  | 'location_linear_distance'
+  | 'location_angular';
+
+export interface ExchangePmi {
+  readonly datums: readonly { readonly label: string; readonly faces: readonly number[] }[];
+  readonly tolerances: readonly {
+    readonly characteristic: PmiCharacteristic;
+    readonly value: number;
+    readonly diameterZone: boolean;
+    readonly faces: readonly number[];
+    /** Datum labels in reference order, primary first; each must be one of `datums`. */
+    readonly datums: readonly string[];
+  }[];
+  readonly dimensions: readonly {
+    readonly type: PmiDimensionType;
+    readonly value: number;
+    readonly tolerance?: { readonly plus: number; readonly minus: number };
+    readonly faces: readonly number[];
+    /** Locations: the second feature set. */
+    readonly facesSecond?: readonly number[];
+  }[];
+}
+
 /** One STEP product (a component, or one free solid): its solids, written once however often it is placed. */
 export interface ExchangeProduct {
   /** Stable key (component id or entity id) the occurrences refer to. */
@@ -40,6 +93,8 @@ export interface ExchangeProduct {
   readonly material?: { readonly name: string; readonly density: number };
   readonly solids: readonly ExchangeSolid[];
   readonly validation?: ExchangeValidation;
+  /** Semantic PMI attached to faces of the product's shape (AP242 only). */
+  readonly pmi?: ExchangePmi;
 }
 
 /** One placed use of `product` inside `parent` (a product key; null = the root assembly): NEXT_ASSEMBLY_USAGE_OCCURRENCE. */
@@ -78,6 +133,8 @@ export interface ImportedProduct {
   readonly layers: readonly string[];
   /** Indices into `ImportedExchange.solids`. */
   readonly solids: readonly number[];
+  /** Semantic PMI read from the file (lengths in millimetres); faces number the product's shape as read, before healing. */
+  readonly pmi?: ExchangePmi;
   /** The validation attributes OCCT attached to the product, in millimetres (mm, mm2, mm3). */
   readonly validation?: { readonly volume: number; readonly area: number; readonly centroid?: Vec3 };
 }
@@ -94,6 +151,8 @@ export interface ImportedExchange extends ImportedShapes {
   readonly solids: readonly ImportedSolid[];
   readonly products: readonly ImportedProduct[];
   readonly occurrences: readonly ImportedOccurrence[];
+  /** PMI items the file holds that name no product face or an unknown characteristic. */
+  readonly pmiUnmapped?: number;
   /** Free products (indices), the roots of the tree. */
   readonly roots: readonly number[];
 }

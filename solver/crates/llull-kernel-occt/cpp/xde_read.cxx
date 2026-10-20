@@ -58,12 +58,14 @@ class TreeReader {
   TreeReader(const Handle(TDocStd_Document) & document, const Options &options)
       : options_(options),
         shapes_(XCAFDoc_DocumentTool::ShapeTool(document->Main())),
+        dimtol_(XCAFDoc_DocumentTool::DimTolTool(document->Main())),
         colors_(XCAFDoc_DocumentTool::ColorTool(document->Main())),
         layers_(XCAFDoc_DocumentTool::LayerTool(document->Main())) {}
 
   std::vector<int> roots;
   std::vector<std::string> skipped;
   int tessellated = 0;
+  int pmi_unmapped = 0;
   int solid_count = 0;
   int shell_count = 0;
   int open_shells = 0;
@@ -73,6 +75,10 @@ class TreeReader {
     TDF_LabelSequence free_shapes;
     shapes_->GetFreeShapes(free_shapes);
     for (Standard_Integer i = 1; i <= free_shapes.Length(); ++i) roots.push_back(visit(free_shapes.Value(i)));
+    std::map<int, TopoDS_Shape> shape_of;
+    for (size_t index = 0; index < products_.size(); ++index)
+      if (!products_[index].assembly) shape_of[static_cast<int>(index)] = XCAFDoc_ShapeTool::GetShape(labels_[index]);
+    for (auto &entry : read_pmi(dimtol_, known_, shape_of, pmi_unmapped)) products_[static_cast<size_t>(entry.first)].pmi = entry.second;
   }
 
   rust::String finish(int file_roots) {
@@ -102,6 +108,7 @@ class TreeReader {
     for (const int root : roots) out.integer(root);
     out.end_array().key("census").begin_object().key("roots").integer(file_roots).key("solids").integer(solid_count);
     out.key("shells").integer(shell_count).key("openShells").integer(open_shells).key("faces").integer(face_count).end_object();
+    out.key("pmiUnmapped").integer(pmi_unmapped);
     out.key("skipped").begin_array();
     for (const std::string &item : skipped) out.string(item);
     out.end_array().end_object();
@@ -119,6 +126,7 @@ class TreeReader {
     double volume = 0, area = 0;
     bool has_centroid = false;
     double centroid[3] = {0, 0, 0};
+    std::string pmi;  // JSON of the product's semantic PMI (xde_pmi.cxx), empty when none
   };
   struct Occurrence {
     int parent;
@@ -131,6 +139,8 @@ class TreeReader {
   Handle(XCAFDoc_ShapeTool) shapes_;
   Handle(XCAFDoc_ColorTool) colors_;
   Handle(XCAFDoc_LayerTool) layers_;
+  Handle(XCAFDoc_DimTolTool) dimtol_;
+  std::vector<TDF_Label> labels_;
   std::map<std::string, int> known_;
   std::vector<Product> products_;
   std::vector<Occurrence> occurrences_;
@@ -144,6 +154,7 @@ class TreeReader {
     out.end_array().key("solids").begin_array();
     for (const int solid : product.solids) out.integer(solid);
     out.end_array();
+    if (!product.pmi.empty()) out.key("pmi").raw(product.pmi);
     if (product.has_validation) {
       out.key("validation").begin_object().key("volume").number(product.volume).key("area").number(product.area);
       if (product.has_centroid)
@@ -191,6 +202,7 @@ class TreeReader {
     const int index = static_cast<int>(products_.size());
     known_[key] = index;
     products_.emplace_back();
+    labels_.push_back(label);
     products_[index].name = name_of(label);
     products_[index].assembly = XCAFDoc_ShapeTool::IsAssembly(label);
     products_[index].color = colour_of(label, XCAFDoc_ShapeTool::GetShape(label));
@@ -297,7 +309,7 @@ rust::String xde_import_json(rust::Str text, double precision, double max_tolera
   reader.SetLayerMode(Standard_True);
   reader.SetPropsMode(Standard_True);
   reader.SetMatMode(Standard_False);
-  reader.SetGDTMode(Standard_False);
+  reader.SetGDTMode(Standard_True);
   reader.SetSHUOMode(Standard_False);
   std::istringstream stream(content);
   if (reader.ReadStream("in.step", stream) != IFSelect_RetDone)

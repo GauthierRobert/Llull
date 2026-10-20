@@ -41,6 +41,7 @@ export function simplifyTree(tree: ImportedExchange): ImportedExchange {
         layers: [...new Set([...outer.layers, ...child.layers])],
         ...(outer.color === undefined && child.color !== undefined ? { color: child.color } : {}),
         ...(outer.validation === undefined && child.validation !== undefined ? { validation: child.validation } : {}),
+        ...(outer.pmi === undefined && child.pmi !== undefined ? { pmi: child.pmi } : {}),
       };
       products[only.product] = null;
       uses = uses.filter((use) => use !== only).map((use) => (use.parent === only.product ? { ...use, parent: index } : use));

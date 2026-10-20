@@ -188,11 +188,15 @@ class Builder {
         const TDF_Label solids = shapes_->AddShape(own, Standard_False, Standard_False);
         set_name(solids, product.name + " (solids)");
         decorate_solids(solids, product);
+        write_product_pmi(shapes_, main_, solids, own, product);
         set_name(shapes_->AddComponent(label, solids, TopLoc_Location()), product.name);
       }
     }
     set_name(label, product.name);
-    if (children.empty()) decorate_solids(label, product);
+    if (children.empty()) {
+      decorate_solids(label, product);
+      write_product_pmi(shapes_, main_, label, own, product);
+    }
     if (!product.color.empty()) colour(label, product.color);
     if (!product.layer.empty()) layers_->SetLayer(label, TCollection_ExtendedString(product.layer.c_str(), Standard_True));
     if (!product.material.empty() && product.density > 0)
@@ -247,6 +251,50 @@ void xde_product_validation(XdeDoc &doc, int32_t product, rust::Slice<const doub
   doc.products[static_cast<size_t>(product)].validation.assign(values.begin(), values.end());
 }
 
+namespace {
+
+XdeProduct &product_at(XdeDoc &doc, int32_t product) {
+  if (product < 0 || static_cast<size_t>(product) >= doc.products.size()) throw std::invalid_argument("product: unknown index");
+  return doc.products[static_cast<size_t>(product)];
+}
+
+std::vector<int> faces_of(rust::Slice<const int32_t> faces) { return std::vector<int>(faces.begin(), faces.end()); }
+
+}  // namespace
+
+void xde_product_pmi_datum(XdeDoc &doc, int32_t product, rust::Str label, rust::Slice<const int32_t> faces) {
+  product_at(doc, product).pmi_datums.push_back({text_of(label), faces_of(faces)});
+}
+
+void xde_product_pmi_tolerance(XdeDoc &doc, int32_t product, rust::Str characteristic, double value, bool diameter_zone,
+                               rust::Slice<const int32_t> faces, rust::Str datums) {
+  XdePmiTolerance tolerance;
+  tolerance.characteristic = text_of(characteristic);
+  tolerance.value = value;
+  tolerance.diameter_zone = diameter_zone;
+  tolerance.faces = faces_of(faces);
+  std::string rest = text_of(datums);
+  while (!rest.empty()) {
+    const size_t bar = rest.find('|');
+    tolerance.datums.push_back(rest.substr(0, bar));
+    rest = bar == std::string::npos ? "" : rest.substr(bar + 1);
+  }
+  product_at(doc, product).pmi_tolerances.push_back(std::move(tolerance));
+}
+
+void xde_product_pmi_dimension(XdeDoc &doc, int32_t product, rust::Str type, double value, bool has_tolerance, double plus, double minus,
+                               rust::Slice<const int32_t> faces, rust::Slice<const int32_t> faces_second) {
+  XdePmiDimension dimension;
+  dimension.type = text_of(type);
+  dimension.value = value;
+  dimension.has_tolerance = has_tolerance;
+  dimension.plus = plus;
+  dimension.minus = minus;
+  dimension.faces = faces_of(faces);
+  dimension.faces_second = faces_of(faces_second);
+  product_at(doc, product).pmi_dimensions.push_back(std::move(dimension));
+}
+
 void xde_use(XdeDoc &doc, int32_t parent, int32_t product, rust::Str name, rust::Slice<const double> rotation,
              rust::Slice<const double> position) {
   doc.uses.push_back({parent, product, text_of(name), placement_of(rotation, position)});
@@ -273,7 +321,11 @@ rust::String xde_write(XdeDoc &doc, int32_t schema, rust::Str unit, rust::Str fi
   writer.SetLayerMode(Standard_True);
   writer.SetPropsMode(Standard_True);
   writer.SetMaterialMode(Standard_True);
-  writer.SetDimTolMode(Standard_False);
+  bool has_pmi = false;
+  for (const XdeProduct &product : doc.products)
+    has_pmi = has_pmi || !product.pmi_datums.empty() || !product.pmi_tolerances.empty() || !product.pmi_dimensions.empty();
+  if (has_pmi && schema != 5) throw std::invalid_argument("semantic PMI is written in AP242 only");
+  writer.SetDimTolMode(has_pmi ? Standard_True : Standard_False);
   if (!writer.Transfer(document, parameters, STEPControl_AsIs)) return rust::String();
   const Handle(StepData_StepModel) model = writer.ChangeWriter().Model();
   // the writer leaves the PRODUCT description empty: it carries the host's (an entity's group name)

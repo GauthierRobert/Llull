@@ -486,3 +486,51 @@ describe('verify_exchange_file', () => {
     expect(dataOfVerify(viaBase64).products).toEqual(['Block']);
   });
 });
+
+describe('import_step_exact: semantic PMI transport (04 V1 hook for 03 GD&T)', () => {
+  const pmi = {
+    datums: [{ label: 'A', faces: [4] }],
+    tolerances: [{ characteristic: 'flatness' as const, value: 0.05, diameterZone: false, faces: [5], datums: [] }],
+    dimensions: [
+      { type: 'size_diameter' as const, value: 25.4, tolerance: { plus: 0.254, minus: 0.254 }, faces: [2] },
+      { type: 'location_angular' as const, value: 90, faces: [0], facesSecond: [1] },
+    ],
+  };
+
+  it('hands the PMI of a product to the report in the document unit (angles unchanged) and keeps it through a folded wrapper', () => {
+    const tree = singlePartTree('Block', [part()]);
+    const withPmi: ImportedExchange = {
+      ...tree,
+      products: [{ ...(tree.products[0] as ImportedExchange['products'][number]), pmi }],
+      pmiUnmapped: 0,
+    };
+    const doc = { ...createEmptyDocument(), units: 'in' as const };
+    const result = run(doc, 'import_step_exact', { text: stepOf() }, { stepImport: withPmi });
+    const [product] = reportOf(result).exchange.products as unknown as { pmi: typeof pmi }[];
+    expect(product?.pmi.tolerances[0]).toMatchObject({ characteristic: 'flatness', value: 0.05 / 25.4, faces: [5] });
+    expect(product?.pmi.dimensions[0]).toMatchObject({ type: 'size_diameter', value: 1, tolerance: { plus: 0.01, minus: 0.01 } });
+    expect(product?.pmi.dimensions[1]).toMatchObject({ type: 'location_angular', value: 90, facesSecond: [1] });
+    expect(product?.pmi.datums).toEqual([{ label: 'A', faces: [4] }]);
+    expect(reportOf(result).warnings).toEqual([]);
+
+    const wrapped: ImportedExchange = {
+      ...tree,
+      products: [
+        { name: 'Outer', assembly: true, layers: [], solids: [] },
+        { name: 'SOLID', assembly: false, layers: [], solids: [0], pmi },
+      ],
+      occurrences: [{ parent: 0, product: 1, name: 'SOLID', matrix: identity }],
+      roots: [0],
+    };
+    expect(simplifyTree(wrapped).products[0]?.pmi).toEqual(pmi);
+  });
+
+  it('warns about PMI items that name no face of an imported product', () => {
+    const tree = { ...singlePartTree('Block', [part()]), pmiUnmapped: 3 };
+    const result = run(createEmptyDocument(), 'import_step_exact', { text: stepOf() }, { stepImport: tree });
+    expect(reportOf(result).warnings.map((warning) => warning.code)).toContain('XCH_PMI_UNMAPPED');
+    expect(reportOf(result).reviewRequired.reasons).toContain('pmi_unmapped');
+    expect((reportOf(result).exchange as unknown as { pmiUnmapped: number }).pmiUnmapped).toBe(3);
+    expect(result.summary).toContain('3 PMI item(s)');
+  });
+});

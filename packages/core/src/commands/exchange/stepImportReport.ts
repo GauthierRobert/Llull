@@ -6,7 +6,7 @@ import type { ModelingTolerance } from '../../model/kernelSettings';
 import { MM_PER_UNIT } from '../../model/units';
 
 interface ImportWarning {
-  readonly code: 'KRN_IMPORT_TOLERANCE_HIGH' | 'XCH_GVP_YELLOW' | 'XCH_GVP_RED' | 'XCH_GVP_NOT_CHECKABLE';
+  readonly code: 'KRN_IMPORT_TOLERANCE_HIGH' | 'XCH_GVP_YELLOW' | 'XCH_GVP_RED' | 'XCH_GVP_NOT_CHECKABLE' | 'XCH_PMI_UNMAPPED';
   readonly severity: 'warn' | 'fail';
   readonly message: string;
   readonly entityIds: readonly string[];

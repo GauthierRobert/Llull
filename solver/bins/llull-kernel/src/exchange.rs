@@ -4,7 +4,7 @@
 
 use crate::session::{Reply, Session, BAD_REQUEST, OCC_FAILURE};
 use llull_kernel_occt::queries::ImportOptions;
-use llull_kernel_occt::xde::{self, ExchangeProduct, ExchangeSolid, ExchangeUse, WriteRequest};
+use llull_kernel_occt::xde::{self, ExchangePmi, ExchangeProduct, ExchangeSolid, ExchangeUse, PmiDimension, PmiTolerance, WriteRequest};
 use llull_kernel_occt::Shape;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -42,6 +42,46 @@ fn validation(value: Option<&Value>) -> Option<[f64; 5]> {
     let value = value?;
     let centroid = triple(value.get("centroid"))?;
     Some([value.get("volume")?.as_f64()?, value.get("area")?.as_f64()?, centroid[0], centroid[1], centroid[2]])
+}
+
+fn faces(value: Option<&Value>) -> Vec<i32> {
+    value
+        .and_then(Value::as_array)
+        .map_or(Vec::new(), |list| list.iter().filter_map(|face| face.as_i64().and_then(|face| i32::try_from(face).ok())).collect())
+}
+
+/// `{ datums: [{ label, faces }], tolerances: [{ characteristic, value, diameterZone?, faces, datums? }], dimensions: [{ type, value, tolerance?, faces, facesSecond? }] }`.
+fn pmi_of(value: Option<&Value>) -> ExchangePmi {
+    let Some(value) = value else { return ExchangePmi::default() };
+    let list = |field: &str| value.get(field).and_then(Value::as_array).map_or(&[][..], Vec::as_slice);
+    ExchangePmi {
+        datums: list("datums").iter().map(|datum| (text(datum, "label").to_string(), faces(datum.get("faces")))).collect(),
+        tolerances: list("tolerances")
+            .iter()
+            .map(|tolerance| PmiTolerance {
+                characteristic: text(tolerance, "characteristic").to_string(),
+                value: tolerance.get("value").and_then(Value::as_f64).unwrap_or(0.0),
+                diameter_zone: tolerance.get("diameterZone").and_then(Value::as_bool).unwrap_or(false),
+                faces: faces(tolerance.get("faces")),
+                datums: tolerance
+                    .get("datums")
+                    .and_then(Value::as_array)
+                    .map_or(Vec::new(), |datums| datums.iter().filter_map(Value::as_str).map(str::to_string).collect()),
+            })
+            .collect(),
+        dimensions: list("dimensions")
+            .iter()
+            .map(|dimension| PmiDimension {
+                kind: text(dimension, "type").to_string(),
+                value: dimension.get("value").and_then(Value::as_f64).unwrap_or(0.0),
+                tolerance: dimension
+                    .get("tolerance")
+                    .and_then(|tolerance| Some((tolerance.get("plus")?.as_f64()?, tolerance.get("minus")?.as_f64()?))),
+                faces: faces(dimension.get("faces")),
+                faces_second: faces(dimension.get("facesSecond")),
+            })
+            .collect(),
+    }
 }
 
 /// Answers `op` when it is an exchange op, else `None`.
@@ -108,6 +148,7 @@ fn write_exchange(session: &mut Session, request: &Value) -> Reply {
                 })
                 .collect(),
             validation: validation(product.get("validation")),
+            pmi: pmi_of(product.get("pmi")),
         });
     }
     let mut uses = Vec::new();

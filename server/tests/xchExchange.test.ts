@@ -15,6 +15,7 @@ import { defaultContext } from '@core/commands/context';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { MM_PER_UNIT } from '@core/model/units';
+import type { ShapeHandle } from '@core/geometry/kernelTypes';
 import { canonicalizeStep21 } from '@lib/step21/canonical';
 import { summarizeStep21 } from '@lib/step21/summary';
 import { groupFileGvp } from '@core/commands/exchange/fileGvp';
@@ -36,9 +37,26 @@ interface Reference {
 const references = (JSON.parse(readFileSync(path.join(PACK, 'analytic_gvp_reference.json'), 'utf8')) as { cases: Reference[] }).cases;
 const reference = (id: string): Reference => references.find((entry) => entry.id === id)!;
 
+interface PmiView {
+  readonly datums: readonly { label: string; faces: readonly number[] }[];
+  readonly tolerances: readonly {
+    characteristic: string;
+    value: number;
+    diameterZone: boolean;
+    faces: readonly number[];
+    datums: readonly string[];
+  }[];
+  readonly dimensions: readonly { type: string; value: number; faces: readonly number[]; tolerance?: { plus: number; minus: number } }[];
+}
+
 interface NistLikeReport {
   readonly report: {
-    readonly exchange: { gvpCheck: { band: string }; unitFactor: number | null; products: { name: string; band: string }[] };
+    readonly exchange: {
+      gvpCheck: { band: string };
+      unitFactor: number | null;
+      pmiUnmapped: number;
+      products: { name: string; band: string; pmi?: PmiView }[];
+    };
     readonly warnings: { code: string }[];
     readonly reviewRequired: { value: boolean; reasons: string[] };
   };
@@ -293,11 +311,11 @@ describeNative.skipIf(NIST_MISSING)(
       return { result, nist: result.data as NistLikeReport };
     };
 
-    it('CTC-01 AP242 e1: product tree, embedded GVP matches the geometry (green), nothing to review (VC-XCH-05, -23)', () => {
+    it('CTC-01 AP242 e1: product tree, embedded GVP matches the geometry (green); only the unattached PMI asks for review (VC-XCH-05, -23)', () => {
       const { result, nist } = importNist('nist_ctc_01_asme1_ap242-e1.stp');
       expect(result.affected.length).toBeGreaterThan(0);
       expect(nist.report.exchange.gvpCheck.band).toBe('green');
-      expect(nist.report.reviewRequired.value).toBe(false);
+      expect(nist.report.reviewRequired.reasons).toEqual(['pmi_unmapped']);
     }, 180_000);
 
     it('STC-06: an all-zero placeholder GVP is not checkable and the bodies are unverified (VC-XCH-22)', () => {
@@ -322,6 +340,21 @@ describeNative.skipIf(NIST_MISSING)(
       expect(nist.report.exchange.gvpCheck.band).toBe('green');
     }, 240_000);
 
+    it('CTC-01: the semantic PMI the XDE reader attaches to faces matches the census categories (VC-XCH-07)', () => {
+      const { result, nist } = importNist('nist_ctc_01_asme1_ap242-e1.stp');
+      expect(result.affected.length).toBeGreaterThan(0);
+      const pmi = nist.report.exchange.products.flatMap((product) => (product.pmi === undefined ? [] : [product.pmi]));
+      expect(pmi).toHaveLength(1);
+      const count = (characteristic: string): number =>
+        pmi[0]!.tolerances.filter((entry) => entry.characteristic === characteristic).length;
+      // nist_pmi_gvp_reference.json census of this file: 1 flatness, 1 perpendicularity, 2 position, 2 surface profile tolerances
+      expect([count('flatness'), count('perpendicularity'), count('position'), count('profile_surface')]).toEqual([1, 1, 2, 2]);
+      expect(pmi[0]!.tolerances.every((entry) => entry.faces.length > 0)).toBe(true);
+      expect(pmi[0]!.dimensions.filter((entry) => entry.type === 'size_diameter').length).toBeGreaterThan(0);
+      expect(nist.report.exchange.pmiUnmapped).toBeGreaterThan(0);
+      expect(nist.report.warnings.map((warning) => warning.code)).toContain('XCH_PMI_UNMAPPED');
+    }, 180_000);
+
     it('truncated NIST files never throw and never change the document (VC-XCH-14)', () => {
       const text = readFileSync(path.join(NIST, 'nist_ctc_01_asme1_ap242-e1.stp'), 'latin1');
       const doc = createEmptyDocument();
@@ -333,6 +366,79 @@ describeNative.skipIf(NIST_MISSING)(
     }, 240_000);
   },
 );
+
+describeNative('XCH semantic PMI on faces (AP242 transport hook for 03 GD&T)', () => {
+  const plateShape = (): ShapeHandle =>
+    kernels.occt.evaluate({
+      op: 'solid',
+      entity: {
+        id: 'b',
+        kind: 'box',
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        size: [10, 20, 30],
+        layerId: 'layer-default',
+        color: '#888888',
+      } as never,
+    })!;
+
+  it('writes datums, tolerances and a toleranced dimension on faces and reads them back with the faces they name', () => {
+    const pmi = {
+      datums: [{ label: 'A', faces: [4] }],
+      tolerances: [
+        { characteristic: 'flatness', value: 0.05, diameterZone: false, faces: [5], datums: [] },
+        { characteristic: 'position', value: 0.2, diameterZone: true, faces: [3], datums: ['A'] },
+      ],
+      dimensions: [{ type: 'location_linear_distance', value: 10, tolerance: { plus: 0.1, minus: 0.2 }, faces: [0], facesSecond: [1] }],
+    };
+    const step = kernels.occt.writeExchange!({
+      format: 'step',
+      schema: 'ap242',
+      unit: 'mm',
+      products: [{ key: 'p', name: 'Plate', solids: [{ shape: plateShape() }], pmi }],
+      occurrences: [],
+      header: { fileName: 'plate.stp', originatingSystem: 'llull', timestamp: TIMESTAMP },
+    } as never);
+    expect(step).toBeTypeOf('string');
+    const census = summarizeStep21(step!).entityCensus;
+    expect([census['FLATNESS_TOLERANCE'], census['POSITION_TOLERANCE'], census['DIMENSIONAL_LOCATION'], census['DATUM']]).toEqual([
+      1, 1, 1, 1,
+    ]);
+    const back = run(createEmptyDocument(), 'import_step_exact', { text: step! });
+    const product = dataOf<NistLikeReport>(back).report.exchange.products[0]!;
+    expect(product.pmi?.datums).toEqual([{ label: 'A', faces: [4] }]);
+    expect(product.pmi?.tolerances.find((entry) => entry.characteristic === 'position')).toMatchObject({
+      value: 0.2,
+      diameterZone: true,
+      faces: [3],
+      datums: ['A'],
+    });
+    expect(product.pmi?.dimensions[0]).toMatchObject({
+      type: 'location_linear_distance',
+      value: 10,
+      faces: [0],
+      tolerance: { plus: 0.1, minus: 0.2 },
+    });
+    expect(dataOf<NistLikeReport>(back).report.exchange.pmiUnmapped).toBe(0);
+  }, 120_000);
+
+  it('refuses PMI the writer cannot attach (unknown face, unknown datum, non-AP242 schema) without a file', () => {
+    const write = (pmi: unknown, schema = 'ap242'): string | null =>
+      kernels.occt.writeExchange!({
+        format: 'step',
+        schema,
+        unit: 'mm',
+        products: [{ key: 'p', name: 'Plate', solids: [{ shape: plateShape() }], pmi }],
+        occurrences: [],
+        header: { fileName: 'x.stp', originatingSystem: 'llull', timestamp: TIMESTAMP },
+      } as never);
+    const flat = { characteristic: 'flatness', value: 0.05, diameterZone: false, faces: [5], datums: [] };
+    expect(write({ datums: [], tolerances: [flat], dimensions: [] })).toBeTypeOf('string');
+    expect(write({ datums: [], tolerances: [{ ...flat, faces: [99] }], dimensions: [] })).toBeNull();
+    expect(write({ datums: [], tolerances: [{ ...flat, datums: ['Z'] }], dimensions: [] })).toBeNull();
+    expect(write({ datums: [], tolerances: [flat], dimensions: [] }, 'ap214')).toBeNull();
+  }, 120_000);
+});
 
 describeNative('XCH IGES (OCCT IGES translator)', () => {
   const available = (): boolean => (kernels.occt?.info?.().capabilities ?? []).includes('igesExchange');

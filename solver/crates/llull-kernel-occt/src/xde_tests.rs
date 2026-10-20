@@ -7,19 +7,19 @@ use std::sync::{Mutex, MutexGuard};
 /// OCCT's STEP writer, XCAF application and Interface_Static are process-global: these tests run one at a time.
 static SERIAL: Mutex<()> = Mutex::new(());
 
-fn serial() -> MutexGuard<'static, ()> {
+pub(super) fn serial() -> MutexGuard<'static, ()> {
     SERIAL.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-fn block(size: f64) -> Shape {
+pub(super) fn block(size: f64) -> Shape {
     make_box([0.0, 0.0, 0.0], [size, size, size]).unwrap().unwrap()
 }
 
-fn options() -> ImportOptions {
+pub(super) fn options() -> ImportOptions {
     ImportOptions { precision: 1e-4, max_tolerance: 0.1, heal: true, sew: true }
 }
 
-fn product<'a>(name: &str, shape: &'a Shape, color: &str, validation: Option<[f64; 5]>) -> ExchangeProduct<'a> {
+pub(super) fn product<'a>(name: &str, shape: &'a Shape, color: &str, validation: Option<[f64; 5]>) -> ExchangeProduct<'a> {
     ExchangeProduct {
         name: name.to_string(),
         description: String::new(),
@@ -29,10 +29,11 @@ fn product<'a>(name: &str, shape: &'a Shape, color: &str, validation: Option<[f6
         density: -1.0,
         solids: vec![ExchangeSolid { shape, name: name.to_string(), color: color.to_string() }],
         validation,
+        pmi: Default::default(),
     }
 }
 
-fn request<'a>(products: Vec<ExchangeProduct<'a>>, uses: Vec<ExchangeUse>, schema: i32, unit: &'a str) -> WriteRequest<'a> {
+pub(super) fn request<'a>(products: Vec<ExchangeProduct<'a>>, uses: Vec<ExchangeUse>, schema: i32, unit: &'a str) -> WriteRequest<'a> {
     WriteRequest {
         products,
         uses,

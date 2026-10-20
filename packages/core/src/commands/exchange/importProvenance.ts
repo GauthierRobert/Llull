@@ -5,7 +5,7 @@
  */
 
 import type { DocumentUnit, Vec3 } from '../../model/types';
-import type { ImportedExchange } from '../../geometry/kernelExchange';
+import type { ExchangePmi, ImportedExchange } from '../../geometry/kernelExchange';
 import type { EmbeddedGvp, GvpBand, GvpPolicy, ImportProvenance, UnverifiedReason } from '../../model/exchange';
 import type { Step21Summary } from '../../lib/step21/summary';
 import { MM_PER_UNIT } from '../../model/units';
@@ -14,7 +14,7 @@ import type { ProductVerification } from './importVerify';
 import type { ProductPlacement } from './importTree';
 
 export interface GvpWarning {
-  readonly code: 'XCH_GVP_YELLOW' | 'XCH_GVP_RED' | 'XCH_GVP_NOT_CHECKABLE';
+  readonly code: 'XCH_GVP_YELLOW' | 'XCH_GVP_RED' | 'XCH_GVP_NOT_CHECKABLE' | 'XCH_PMI_UNMAPPED';
   readonly severity: 'warn' | 'fail';
   readonly message: string;
   readonly entityIds: readonly string[];
@@ -36,6 +36,8 @@ export interface ExchangeReport {
     readonly band: GvpBand;
     readonly embedded?: EmbeddedGvp;
     readonly recomputed?: { readonly volume: number; readonly area: number; readonly centroid: Vec3 };
+    /** Semantic PMI the file attaches to this product (lengths in the document unit; faces number the product shape as read). */
+    readonly pmi?: ExchangePmi;
     readonly comparisons: readonly {
       readonly property: string;
       readonly sender: unknown;
@@ -44,6 +46,7 @@ export interface ExchangeReport {
       readonly band: GvpBand;
     }[];
   }[];
+  readonly pmiUnmapped: number;
   readonly gvpCheck: { readonly band: GvpBand; readonly verified: boolean; readonly unit: DocumentUnit };
   readonly policy: Readonly<
     Record<keyof GvpPolicy, { readonly value: number; readonly unit: string; readonly source: string; readonly defaulted: boolean }>
@@ -62,6 +65,26 @@ const UNIT_NAMES: Readonly<Record<string, ImportProvenance['sourceUnit']>> = {
 
 const scaleMm = (value: number | undefined, unit: DocumentUnit, power: number): number | undefined =>
   value === undefined ? undefined : value / MM_PER_UNIT[unit] ** power;
+
+/** PMI read in millimetres, expressed in the document unit (angles and the zone / face data are unchanged). */
+function pmiInUnit(pmi: ExchangePmi, unit: DocumentUnit): ExchangePmi {
+  const length = (value: number): number => value / MM_PER_UNIT[unit];
+  return {
+    datums: pmi.datums,
+    tolerances: pmi.tolerances.map((tolerance) => ({ ...tolerance, value: length(tolerance.value) })),
+    dimensions: pmi.dimensions.map((dimension) => {
+      const angular = dimension.type === 'size_angular' || dimension.type === 'location_angular';
+      const scale = (value: number): number => (angular ? value : length(value));
+      return {
+        ...dimension,
+        value: scale(dimension.value),
+        ...(dimension.tolerance === undefined
+          ? {}
+          : { tolerance: { plus: scale(dimension.tolerance.plus), minus: scale(dimension.tolerance.minus) } }),
+      };
+    }),
+  };
+}
 
 /** An embedded record converted from millimetres into the document unit. */
 function inDocumentUnit(embedded: EmbeddedGvp, unit: DocumentUnit): EmbeddedGvp {
@@ -139,6 +162,7 @@ export function describeProvenance(input: ProvenanceInput): ProvenanceResult {
       band,
       ...(verification?.embedded === undefined ? {} : { embedded: verification.embedded }),
       ...(verification?.recomputed === undefined ? {} : { recomputed: verification.recomputed }),
+      ...(product.pmi === undefined ? {} : { pmi: pmiInUnit(product.pmi, unit) }),
       comparisons: verification?.check.comparisons ?? [],
     });
     if (placement === undefined) continue;
@@ -195,6 +219,16 @@ export function describeProvenance(input: ProvenanceInput): ProvenanceResult {
       });
     }
   }
+  if ((imported.pmiUnmapped ?? 0) > 0) {
+    reasons.add('pmi_unmapped');
+    warnings.push({
+      code: 'XCH_PMI_UNMAPPED',
+      severity: 'warn',
+      message: `${imported.pmiUnmapped} PMI item(s) in the file name no face of an imported product or an unsupported characteristic`,
+      entityIds: [],
+      remediation: 'listed for the reviewer; no PMI is silently dropped (the unsupported items stay in the original file)',
+    });
+  }
   const factors = (['greenRel', 'yellowRel', 'greenCentroidPerDiag', 'yellowCentroidMm'] as const).map((key) => [
     key,
     {
@@ -211,6 +245,7 @@ export function describeProvenance(input: ProvenanceInput): ProvenanceResult {
       fileUnit,
       unitFactor: fileUnit !== null && Number.isFinite(fileUnit.mmPerUnit) ? fileUnit.mmPerUnit : null,
       products,
+      pmiUnmapped: imported.pmiUnmapped ?? 0,
       gvpCheck: {
         band: verifications === null ? 'not-checkable' : worstBand(products.filter((entry) => !entry.assembly).map((entry) => entry.band)),
         verified: verifications !== null,

@@ -21,6 +21,28 @@ mod ffi {
             -> i32;
         fn xde_product_solid(doc: Pin<&mut XdeDoc>, product: i32, shape: &Shape, name: &str, color: &str) -> Result<()>;
         fn xde_product_validation(doc: Pin<&mut XdeDoc>, product: i32, values: &[f64]) -> Result<()>;
+        fn xde_product_pmi_datum(doc: Pin<&mut XdeDoc>, product: i32, label: &str, faces: &[i32]) -> Result<()>;
+        fn xde_product_pmi_tolerance(
+            doc: Pin<&mut XdeDoc>,
+            product: i32,
+            characteristic: &str,
+            value: f64,
+            diameter_zone: bool,
+            faces: &[i32],
+            datums: &str,
+        ) -> Result<()>;
+        #[allow(clippy::too_many_arguments)]
+        fn xde_product_pmi_dimension(
+            doc: Pin<&mut XdeDoc>,
+            product: i32,
+            kind: &str,
+            value: f64,
+            has_tolerance: bool,
+            plus: f64,
+            minus: f64,
+            faces: &[i32],
+            faces_second: &[i32],
+        ) -> Result<()>;
         fn xde_use(doc: Pin<&mut XdeDoc>, parent: i32, product: i32, name: &str, rotation: &[f64], position: &[f64]) -> Result<()>;
         #[allow(clippy::too_many_arguments)]
         fn xde_write(
@@ -50,7 +72,37 @@ pub struct ExchangeSolid<'a> {
 
 /// A STEP product: its solids and the attributes written with it. `density` below zero = no material; `validation` = volume, area and the
 /// centroid in the document unit.
+/// Semantic PMI of one product (faces: 0-based indices over the product's shape, `TopExp::MapShapes` order); written in AP242 only.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ExchangePmi {
+    /// `(label, faces)`
+    pub datums: Vec<(String, Vec<i32>)>,
+    pub tolerances: Vec<PmiTolerance>,
+    pub dimensions: Vec<PmiDimension>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PmiTolerance {
+    pub characteristic: String,
+    pub value: f64,
+    pub diameter_zone: bool,
+    pub faces: Vec<i32>,
+    /// Datum labels in reference order, primary first.
+    pub datums: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PmiDimension {
+    pub kind: String,
+    pub value: f64,
+    /// `(plus, minus)` tolerance values when toleranced.
+    pub tolerance: Option<(f64, f64)>,
+    pub faces: Vec<i32>,
+    pub faces_second: Vec<i32>,
+}
+
 pub struct ExchangeProduct<'a> {
+    pub pmi: ExchangePmi,
     pub name: String,
     pub description: String,
     pub color: String,
@@ -102,6 +154,38 @@ fn build(products: &[ExchangeProduct<'_>], uses: &[ExchangeUse]) -> OcctResult<c
         for solid in &product.solids {
             let Some(pinned) = doc.as_mut() else { return Err(NOT_CREATED.to_string()) };
             occt(ffi::xde_product_solid(pinned, index, inner(solid.shape)?, &solid.name, &solid.color))?;
+        }
+        for (label, faces) in &product.pmi.datums {
+            let Some(pinned) = doc.as_mut() else { return Err(NOT_CREATED.to_string()) };
+            occt(ffi::xde_product_pmi_datum(pinned, index, label, faces))?;
+        }
+        for tolerance in &product.pmi.tolerances {
+            let Some(pinned) = doc.as_mut() else { return Err(NOT_CREATED.to_string()) };
+            let datums = tolerance.datums.join("|");
+            occt(ffi::xde_product_pmi_tolerance(
+                pinned,
+                index,
+                &tolerance.characteristic,
+                tolerance.value,
+                tolerance.diameter_zone,
+                &tolerance.faces,
+                &datums,
+            ))?;
+        }
+        for dimension in &product.pmi.dimensions {
+            let Some(pinned) = doc.as_mut() else { return Err(NOT_CREATED.to_string()) };
+            let (plus, minus) = dimension.tolerance.unwrap_or((0.0, 0.0));
+            occt(ffi::xde_product_pmi_dimension(
+                pinned,
+                index,
+                &dimension.kind,
+                dimension.value,
+                dimension.tolerance.is_some(),
+                plus,
+                minus,
+                &dimension.faces,
+                &dimension.faces_second,
+            ))?;
         }
         if let Some(values) = product.validation {
             let Some(pinned) = doc.as_mut() else { return Err(NOT_CREATED.to_string()) };
@@ -165,3 +249,7 @@ pub fn export_iges(products: &[ExchangeProduct<'_>], brep_mode: bool, unit: &str
 #[cfg(test)]
 #[path = "xde_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "xde_pmi_tests.rs"]
+mod pmi_tests;
