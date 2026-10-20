@@ -176,7 +176,7 @@ export const loftFuselage = defineCommand({
     const id = created.affected[0] as string;
     const closed = stations[0]?.section.type === 'point' && stations[stations.length - 1]?.section.type === 'point';
     const volume = closed ? enclosedVolume(surface) : null;
-    const body: BodyDef = { id, stations, controlCurveIds, degreeV: skinDegree, entityId: id };
+    const body: BodyDef = { id, stations, controlCurveIds, degreeV: skinDegree, entityId: id, frame };
     return {
       ...changed(
         withBody(created.document, body),

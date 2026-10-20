@@ -57,7 +57,7 @@ export function sewIntoSolid(
       doc,
       'sew_surfaces',
       'SRF_SEW_NONMANIFOLD',
-      `${shell.nonManifoldEdges} edge(s) are shared by more than two sheets (e.g. near ${shell.nonManifoldAt.map((p) => `[${sigVec(p).join(", ")}]`).join(" ")}): the shell is not a manifold solid`,
+      `${shell.nonManifoldEdges} edge(s) are shared by more than two sheets (e.g. near ${shell.nonManifoldAt.map((p) => `[${sigVec(p).join(', ')}]`).join(' ')}): the shell is not a manifold solid`,
       [...ids],
       ['params.ids'],
     );

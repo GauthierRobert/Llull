@@ -134,7 +134,8 @@ function crossingPoint(
 function polylineCrosses(points: ReadonlyArray<Uv>): boolean {
   for (let i = 0; i + 1 < points.length; i++)
     for (let j = i + 2; j + 1 < points.length; j++)
-      if (segmentsIntersect(asPoint(points[i] as Uv), asPoint(points[i + 1] as Uv), asPoint(points[j] as Uv), asPoint(points[j + 1] as Uv))) return true;
+      if (segmentsIntersect(asPoint(points[i] as Uv), asPoint(points[i + 1] as Uv), asPoint(points[j] as Uv), asPoint(points[j + 1] as Uv)))
+        return true;
   return false;
 }
 

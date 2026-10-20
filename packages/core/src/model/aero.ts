@@ -89,6 +89,8 @@ export interface BodyDef {
   readonly controlCurveIds: ReadonlyArray<string>;
   readonly degreeV: number;
   readonly entityId: string;
+  /** Aircraft frame the stations were mapped through at loft time (absent = identity, older documents). */
+  readonly frame?: AircraftFrame;
 }
 
 /** Aircraft coordinate frame: document position = datum + fs * fsAxis + bl * blAxis + wl * wlAxis (right-handed, orthonormal, in document units). */

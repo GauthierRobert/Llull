@@ -111,7 +111,10 @@ describe('fuselage_section_at', () => {
 describe('target_sears_haack_conic_fuselage.json (VC-SRF-13)', () => {
   it('runs: set_aircraft_frame then the 19-station conic body (its closing mass_properties targets a sheet and is refused)', () => {
     const plan = JSON.parse(
-      readFileSync(join(process.cwd(), 'docs/aerospace/02-advanced-surfacing/validation/plans/target_sears_haack_conic_fuselage.json'), 'utf8'),
+      readFileSync(
+        join(process.cwd(), 'docs/aerospace/02-advanced-surfacing/validation/plans/target_sears_haack_conic_fuselage.json'),
+        'utf8',
+      ),
     ) as GoldenAction[];
     expect(runPlan(plan).failedSteps).toHaveLength(1);
     const outcome = runPlan(plan.filter((action) => action.command !== 'mass_properties'));
@@ -121,5 +124,30 @@ describe('target_sears_haack_conic_fuselage.json (VC-SRF-13)', () => {
     expect(id).toBeDefined();
     const mid = execute(outcome.document, 'fuselage_section_at', { bodyId: id, fs: 5 }).data as { area: number };
     expect(mid.area).toBeCloseTo(Math.PI * 0.5 ** 2, 3);
+  });
+});
+
+describe('frame stored on the body', () => {
+  it('a section is cut in the frame of the loft: setting another frame afterwards changes nothing', () => {
+    const lofted = execute(empty, 'loft_fuselage', { stations: cylinderStations });
+    const id = lofted.affected[0]!;
+    const before = sectionData(lofted.document, id, 4);
+    const moved = execute(lofted.document, 'set_aircraft_frame', {
+      datum: [7, 0, 0],
+      fsAxis: [0, 1, 0],
+      blAxis: [0, 0, 1],
+      wlAxis: [1, 0, 0],
+      units: 'mm',
+    });
+    expect(sectionData(moved.document, id, 4)).toEqual(before);
+    expect(moved.document.aero!.bodies![id]!.frame?.fsAxis).toEqual([1, 0, 0]);
+  });
+
+  it('rejects a stored body frame that is not orthonormal on load', () => {
+    const lofted = execute(empty, 'loft_fuselage', { stations: cylinderStations });
+    const id = lofted.affected[0]!;
+    const json = JSON.parse(serializeDocument(lofted.document)) as { document: { aero: { bodies: Record<string, { frame: { fsAxis: number[] } }> } } };
+    json.document.aero.bodies[id]!.frame.fsAxis = [2, 0, 0];
+    expect(() => deserializeDocument(JSON.stringify(json))).toThrow();
   });
 });

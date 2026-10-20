@@ -9,7 +9,7 @@ import { interpolatePoints } from '@lib/nurbs/interpolate';
 import { evaluateSurface, surfaceDomain } from '@lib/nurbs/surface';
 import type { NurbsSurfaceData } from '@lib/nurbs/surfaceTypes';
 import { briefNumbers, sig } from '../shared/results';
-import { frameOf, toAircraft } from './aircraftFrame';
+import { IDENTITY_FRAME, toAircraft } from './aircraftFrame';
 import { aeroOf } from './aeroState';
 import { refuseAero } from './codes';
 
@@ -80,7 +80,7 @@ export const fuselageSectionAt = defineCommand({
     const slack = 1e-9 * Math.max(1, Math.abs(range[1] - range[0]));
     if (fs < range[0] - slack || fs > range[1] + slack)
       return refuse('AERO_FS_OUT_OF_RANGE', `fs ${fs} is outside the body stations ${range[0]}..${range[1]}`, 'fs');
-    const frame = frameOf(doc);
+    const frame = body.frame ?? IDENTITY_FRAME;
     const toFrame = (point: Vec3): Vec3 => toAircraft(frame, point);
     // the stations are in frame coordinates: the cutting plane is FS = fs in that frame
     const surface = placedSurface(entity);
