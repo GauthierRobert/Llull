@@ -3,6 +3,7 @@
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
+import { verifyAndSpend } from '@core/model/humanGate';
 import { analysisIdSchema } from '../shared/schemas';
 import { isProblem, thermalCaseOf, withThermal } from './access';
 import { refuseThermal } from './codes';
@@ -64,7 +65,7 @@ export const disposeThermalLimit = defineCommand({
     )
       return fail(artifacts.code, artifacts.message, artifacts.ids);
     const resultsHash = record?.resultsHash ?? '';
-    const signed = port.verify(signature, dispositionPayload(analysisId, rowId, decision, justification, resultsHash));
+    const signed = verifyAndSpend(port, signature, dispositionPayload(analysisId, rowId, decision, justification, resultsHash));
     if (signed === null)
       return fail('THM_HUMAN_GATE', 'the signature does not verify for this disposition: hand over to the qualified reviewer');
     const disposition = { decision, justification, resultsHash, signer: signed.signer, signatureId: signed.signatureId, signature };

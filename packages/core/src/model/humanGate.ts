@@ -7,6 +7,16 @@ import { jcsJson } from '../lib/jcs';
 import { sha256Hex } from '../lib/sha256';
 import type { HumanSignaturePort } from './analysis';
 
+/** Verify AND spend a signature at a mutating gate: the signer, or null when it does not verify or was already used. */
+export function verifyAndSpend(
+  port: HumanSignaturePort,
+  signature: unknown,
+  payloadSha256: string,
+): { readonly signer: string; readonly signatureId: string } | null {
+  const signer = port.verify(signature, payloadSha256);
+  return signer === null || port.spend?.(signature, payloadSha256) === false ? null : signer;
+}
+
 export type HumanGateOutcome = { readonly cleared: true; readonly signer: string } | { readonly cleared: false; readonly reason: string };
 
 /** The payload a human signs for `act`: the act, the ids it touches, its details (from / to markings, document hash) and the confirmation nonce. */
@@ -33,6 +43,6 @@ export function humanGate(
   const nonce = typeof confirmation === 'object' && confirmation !== null ? (confirmation as { nonce?: unknown }).nonce : undefined;
   if (typeof nonce !== 'string' || nonce === '')
     return { cleared: false, reason: `the confirmation for ${act} needs a non-empty nonce string` };
-  const signer = port.verify(confirmation, humanGatePayload(act, ids, details, nonce));
+  const signer = verifyAndSpend(port, confirmation, humanGatePayload(act, ids, details, nonce));
   return signer === null ? { cleared: false, reason: `the signature did not verify for ${act}` } : { cleared: true, signer: signer.signer };
 }

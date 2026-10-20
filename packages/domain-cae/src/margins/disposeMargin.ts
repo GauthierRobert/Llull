@@ -7,6 +7,7 @@ import type { CommandResult } from '@core/commands/types';
 import { caseOf, withCase } from '../shared/access';
 import { analysisIdSchema } from '../shared/schemas';
 import { analysisInputHash } from '../hash/inputHash';
+import { verifyAndSpend } from '@core/model/humanGate';
 import { marginDispositionPayload } from './disposition';
 import { marginQueryShape, marginTable } from './computeMargins';
 import { refuseMarginsAs } from './refusal';
@@ -54,7 +55,8 @@ export const disposeMargin = defineCommand({
       return fail('FEA_MARGIN_PARAM_INVALID', `row '${rowId}' is PASS: only FAIL and MARGINAL rows are dispositioned`);
     const rowKey = String(row['rowKey']);
     const resultsHash = String(table.data['resultsHash']);
-    const signed = port.verify(
+    const signed = verifyAndSpend(
+      port,
       signature,
       marginDispositionPayload(
         analysisId,

@@ -4,7 +4,7 @@
  * audit off. The only way to change any of this is `configureHostForTests`, called by test code in the same process.
  */
 
-import { homedir } from 'node:os';
+import { userInfo } from 'node:os';
 import path from 'node:path';
 
 export interface HostOverrides {
@@ -16,6 +16,9 @@ export interface HostOverrides {
   readonly acceptTestKeys?: boolean;
 }
 
+/** The account's home from the OS user database, NOT `os.homedir()` (which honours HOME / USERPROFILE, i.e. the agent-controlled environment). */
+export const accountHome = (): string => userInfo().homedir;
+
 let overrides: HostOverrides = {};
 
 /** Tests only: replace the overrides (`{}` restores the production locations). */
@@ -23,7 +26,7 @@ export function configureHostForTests(next: HostOverrides): void {
   overrides = next;
 }
 
-export const trustDirectory = (): string => overrides.trustDir ?? path.join(homedir(), '.llull', 'trust');
+export const trustDirectory = (): string => overrides.trustDir ?? path.join(accountHome(), '.llull', 'trust');
 export const auditDirectory = (): string | null =>
-  overrides.auditDir === undefined ? path.join(homedir(), '.llull', 'audit') : overrides.auditDir;
+  overrides.auditDir === undefined ? path.join(accountHome(), '.llull', 'audit') : overrides.auditDir;
 export const acceptsTestKeys = (): boolean => overrides.acceptTestKeys === true;

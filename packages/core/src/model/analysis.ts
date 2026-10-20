@@ -598,6 +598,8 @@ type KeyTrust = 'trusted' | 'untrusted' | 'test';
 export interface HumanSignaturePort {
   /** Human gate: the signer when `signature` (an Ed25519 signature object signed over the UTF-8 hex `payloadSha256`) verifies and its key is trusted, else null. */
   verify(signature: unknown, payloadSha256: string): { readonly signer: string; readonly signatureId: string } | null;
+  /** Spend a verified signature (single use): false when it was already spent. Called ONLY by mutating gate paths; `verify` itself stays pure so stored dispositions can be re-checked. Absent = no single-use ledger. */
+  spend?(signature: unknown, payloadSha256: string): boolean;
   /** Raw Ed25519 (RFC 8032 PureEdDSA) verification of `signatureHex` over the UTF-8 bytes of `message`; absent = this host cannot verify. */
   verifyEd25519?(publicKeyHex: string, message: string, signatureHex: string): boolean;
   /** Trust of a public key (64 hex chars); absent = every key is treated as untrusted. */

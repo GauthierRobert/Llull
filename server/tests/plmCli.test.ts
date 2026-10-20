@@ -5,6 +5,9 @@ import { chmodSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { deserializeDocument } from '@core/commands/persistence/serialization';
 import { EXIT_COMMAND_ERROR, EXIT_OK, EXIT_USAGE, runCli, type CliIo } from '../src/cli/main';
+import { humanGatePayload } from '@core/model/humanGate';
+import type { CliBackend } from '../src/cli/backend';
+import { confirmedParams } from '../src/cli/plm';
 import { createKeyStore } from '../src/plm/keyStore';
 import { createTrustStore } from '../src/plm/trustStore';
 import { issueTrustGrant } from '../src/plm/trustGrant';
@@ -63,6 +66,70 @@ async function enrolledAndTrusted(user: string): Promise<string> {
   createTrustStore(home.trust).trust(createKeyStore(home.env).find(key.keyId) as never, issueTrustGrant('test'), T);
   return key.keyId;
 }
+
+describe('a hostile backend cannot make the CLI sign another act', () => {
+  const fakeBackend = (data: unknown): CliBackend =>
+    ({ target: 'fake', run: () => Promise.resolve({ isError: false, summary: 'ok', data }) }) as unknown as CliBackend;
+  const io = (): Parameters<typeof confirmedParams>[4] => ({
+    stdout: () => undefined,
+    stderr: () => undefined,
+    env: { ...home.env },
+    readPassphrase: () => Promise.resolve(typed),
+  });
+
+  it('refuses another act, other params, or a hash that is not the act it describes; signs only a locally rebuilt payload', async () => {
+    const key = await enrolledAndTrusted('u-1');
+    const params = { changeOrder: 'ECO-1' };
+    const details = { stateHash: 'a'.repeat(64), contentHash: 'b'.repeat(64), params };
+    const honest = { act: 'plm:release_item', ids: ['LL-1'], details };
+    const hashOf = (act: string, d: Record<string, unknown>): string => humanGatePayload(act, ['LL-1'], d, 'x');
+    // another act's hash (a backend asking for a signature over set_item_marking)
+    await expect(
+      confirmedParams(
+        fakeBackend({ ...honest, act: 'plm:set_item_marking', payloadSha256: hashOf('plm:set_item_marking', details) }),
+        'release_item',
+        params,
+        key,
+        io(),
+      ),
+    ).rejects.toThrow('another act');
+    // other params under the same act
+    await expect(
+      confirmedParams(
+        fakeBackend({ ...honest, details: { ...details, params: { changeOrder: 'ECO-9' } }, payloadSha256: 'c'.repeat(64) }),
+        'release_item',
+        params,
+        key,
+        io(),
+      ),
+    ).rejects.toThrow('another act');
+    // a hash that is not the hash of what it described
+    await expect(
+      confirmedParams(fakeBackend({ ...honest, payloadSha256: 'd'.repeat(64) }), 'release_item', params, key, io()),
+    ).rejects.toThrow('not the hash');
+    // an honest description is signed over the payload the CLI rebuilt itself (with its own nonce)
+    let nonceSeen = '';
+    const echo = {
+      target: 'fake',
+      run: (_n: string, p: { nonce: string }) => (
+        (nonceSeen = p.nonce),
+        Promise.resolve({
+          isError: false,
+          summary: '',
+          data: {
+            ...honest,
+            payloadSha256: hashOf('plm:release_item', details).replace(
+              /.*/,
+              humanGatePayload('plm:release_item', ['LL-1'], details, p.nonce),
+            ),
+          },
+        })
+      ),
+    } as unknown as CliBackend;
+    const signed = (await confirmedParams(echo, 'release_item', params, key, io())) as { confirmation: { nonce: string } };
+    expect(signed.confirmation.nonce).toBe(nonceSeen);
+  });
+});
 
 describe('PLM through the CLI', () => {
   it('an agent controlling the environment gains nothing: TEST=true, test keys, its own trust directory and an exported passphrase all fail, and the audit log is written', async () => {

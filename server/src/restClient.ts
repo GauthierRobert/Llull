@@ -4,6 +4,8 @@
  * `CommandOutcome` through `parseCommandResponse` (`@protocol/restProtocol`).
  */
 
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 
 const globalFetch: FetchLike = (url, init) => fetch(url, init);
@@ -46,11 +48,21 @@ export async function requestJson(url: string, request: RestRequest = {}): Promi
   return { status: response.status, ok: response.ok, body };
 }
 
-/** `GET <url>/health` answers 2xx within `timeoutMs`. */
-export async function isHealthy(url: string, fetchImpl?: FetchLike, timeoutMs = 2_000): Promise<boolean> {
+/** `GET <url>/health` answers 2xx within `timeoutMs`; with `token` it must also answer the HMAC challenge. */
+export async function isHealthy(url: string, fetchImpl?: FetchLike, timeoutMs = 2_000, token?: string): Promise<boolean> {
   try {
-    const response = await (fetchImpl ?? globalFetch)(`${url}/health`, { signal: AbortSignal.timeout(timeoutMs) });
-    return response.ok;
+    const challenge = token === undefined ? '' : randomBytes(16).toString('hex');
+    const query = token === undefined ? '' : `?challenge=${challenge}`;
+    const response = await (fetchImpl ?? globalFetch)(`${url}/health${query}`, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!response.ok || token === undefined) return response.ok;
+    // the answerer must prove it knows the per-launch token (HMAC of our challenge), else it is not our backend
+    const body = (await response.json()) as { proof?: unknown };
+    const expected = createHmac('sha256', token).update(challenge).digest('hex');
+    return (
+      typeof body.proof === 'string' &&
+      body.proof.length === expected.length &&
+      timingSafeEqual(Buffer.from(body.proof), Buffer.from(expected))
+    );
   } catch {
     return false;
   }
