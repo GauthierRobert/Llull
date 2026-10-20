@@ -104,6 +104,8 @@ struct MaterialSpec {
 struct HeatingSpec {
     taylor_quinney: f64,
     specific_heat: f64,
+    #[serde(default)]
+    specific_heat_table: Vec<[f64; 2]>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -298,10 +300,24 @@ fn material_of(spec: MaterialSpec) -> Result<Material, JobError> {
     };
     let heating = match spec.heating {
         None => None,
-        Some(heat) if (0.0..=1.0).contains(&heat.taylor_quinney) && heat.specific_heat > 0.0 && heat.specific_heat.is_finite() => {
-            Some(Heating { taylor_quinney: heat.taylor_quinney, specific_heat: heat.specific_heat })
+        Some(heat)
+            if (0.0..=1.0).contains(&heat.taylor_quinney)
+                && heat.specific_heat > 0.0
+                && heat.specific_heat.is_finite()
+                && heat.specific_heat_table.iter().all(|[t, c]| t.is_finite() && *c > 0.0 && c.is_finite())
+                && heat.specific_heat_table.windows(2).all(|pair| pair[0][0] < pair[1][0]) =>
+        {
+            Some(Heating {
+                taylor_quinney: heat.taylor_quinney,
+                specific_heat: heat.specific_heat,
+                specific_heat_table: heat.specific_heat_table,
+            })
         }
-        Some(_) => return Err(input("heating needs taylorQuinney in [0, 1] and specificHeat > 0")),
+        Some(_) => {
+            return Err(input(
+                "heating needs taylorQuinney in [0, 1], specificHeat > 0 and a specificHeatTable increasing in T with c_p > 0",
+            ))
+        }
     };
     Ok(Material { density: spec.density, youngs_modulus: spec.youngs_modulus, poisson: spec.poisson, johnson_cook, failure, heating })
 }

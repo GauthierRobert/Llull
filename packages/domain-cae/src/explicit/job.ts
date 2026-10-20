@@ -141,7 +141,7 @@ export function buildExplicitJob(doc: CadDocument, analysisId: string, meshArtif
       mesh,
       materials,
       materialFailure,
-      materialHeating: heated.heating,
+      materialHeating: heated,
       fixed: held.fixed,
       fixedRotation: held.fixedRotation,
       elementPart: mesh.elementPart.map((part) => partIds.indexOf(part)),
@@ -165,7 +165,7 @@ export function buildExplicitJob(doc: CadDocument, analysisId: string, meshArtif
       gravity,
       walls,
       spec,
-      unverifiedReasons: [...new Set([...materials.flatMap((material) => material.unverifiedReasons), ...heated.notes])],
+      unverifiedReasons: [...new Set(materials.flatMap((material) => material.unverifiedReasons))],
     },
   };
 }

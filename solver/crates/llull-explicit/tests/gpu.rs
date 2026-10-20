@@ -222,11 +222,13 @@ fn shells_and_adiabatic_heating_gpu_match_the_cpu_twin() {
     assert_eq!(gpu.cycles, reference.cycles);
     assert!(speed_error < 1e-9 && (e_gpu.internal - e_cpu.internal).abs() < 1e-9 * e_cpu.internal);
 
-    // Heating: synthetic J-C with T_m 600 K, Taylor-Quinney β = 0.9, c_p = 4.6e8 mJ/(t K) (not a material), 100 m/s on the wall.
+    // Heating: synthetic J-C with T_m 600 K, Taylor-Quinney β = 0.9, c_p linear from 4.6e8 at 293 K to 6e8 mJ/(t K) at 600 K (not a
+    // material), 100 m/s on the wall.
     use llull_explicit::model::Heating;
     let jc = JohnsonCook { a: 300.0, b: 500.0, n: 0.5, c: 0.0, reference_rate: 1.0, m: 1.0, melt_k: 600.0, transition_k: 293.0 };
     let mut material = steel(0.3, Some(jc));
-    material.heating = Some(Heating { taylor_quinney: 0.9, specific_heat: 4.6e8 });
+    material.heating =
+        Some(Heating { taylor_quinney: 0.9, specific_heat: 4.6e8, specific_heat_table: vec![[293.0, 4.6e8], [600.0, 6.0e8]] });
     let (coordinates, hex8) = hex_grid([0.0, 0.0, 0.0], [10.0, 10.0, 50.0], [2, 2, 20]);
     let mut heated = model(coordinates, hex8, vec![], material, [0.0, 0.0, -100_000.0], controls(1e-5, 1e-7));
     heated.walls.push(floor("anvil"));

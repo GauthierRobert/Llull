@@ -24,8 +24,8 @@ const SHADER: &str = include_str!("explicit.wgsl");
 const WORKGROUP: u32 = 64;
 /// Group count per dispatch row the shader folds linear indices with (`counts.groups_x`).
 const GROUPS_X: u32 = 65_535;
-const READ_ONLY: [u32; 11] = [1, 2, 8, 11, 12, 13, 14, 18, 19, 21, 22];
-const BINDINGS: u32 = 23;
+const READ_ONLY: [u32; 12] = [1, 2, 8, 11, 12, 13, 14, 18, 19, 21, 22, 23];
+const BINDINGS: u32 = 24;
 
 fn f64_bytes(values: &[f64]) -> Vec<u8> {
     let mut bytes: Vec<u8> = values.iter().flat_map(|value| value.to_le_bytes()).collect();
@@ -93,9 +93,10 @@ fn pass(encoder: &mut wgpu::CommandEncoder, pipeline: &wgpu::ComputePipeline, bi
     compute.dispatch_workgroups(x, y, 1);
 }
 
-/// Material table: 24 f64 per material (layout in explicit.wgsl).
-fn material_table(model: &Model) -> Vec<f64> {
-    model
+/// Material table: 26 f64 per material (layout in explicit.wgsl), and the c_p tables it points into.
+fn material_table(model: &Model) -> (Vec<f64>, Vec<f64>) {
+    let mut cp_table = Vec::new();
+    let rows: Vec<f64> = model
         .materials
         .iter()
         .flat_map(|material| {
@@ -123,13 +124,19 @@ fn material_table(model: &Model) -> Vec<f64> {
             row.extend_from_slice(&[j.a, j.b, j.n, j.c, j.reference_rate, j.m, if failure.is_some() { 1.0 } else { 0.0 }]);
             row.extend_from_slice(&failure.map(|f| f.d).unwrap_or([0.0; 5]));
             row.extend_from_slice(&[j.melt_k, j.transition_k]);
-            match material.heating {
-                Some(heat) => row.extend_from_slice(&[1.0, heat.taylor_quinney, heat.specific_heat]),
-                None => row.extend_from_slice(&[0.0, 0.0, 1.0]),
+            match &material.heating {
+                Some(heat) => {
+                    let start = (cp_table.len() / 2) as f64;
+                    cp_table.extend(heat.specific_heat_table.iter().flatten());
+                    let count = heat.specific_heat_table.len() as f64;
+                    row.extend_from_slice(&[1.0, heat.taylor_quinney, heat.specific_heat, start, count]);
+                }
+                None => row.extend_from_slice(&[0.0, 0.0, 1.0, 0.0, 0.0]),
             }
             row
         })
-        .collect()
+        .collect();
+    (rows, cp_table)
 }
 
 /// Integrates `model` on the GPU. `Err` when no adapter with SHADER_F64 exists (the caller runs the CPU twin) or a GPU call fails.
@@ -208,7 +215,9 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
     let elem_nodes_buffer = buffer(&gpu, "elem_nodes", u32_bytes(&elem_nodes));
     let elem_info_buffer = buffer(&gpu, "elem_info", u32_bytes(&elem_info));
     let elem_mass_buffer = buffer(&gpu, "elem_mass", f64_bytes(&elem_mass));
-    let materials = buffer(&gpu, "materials", f64_bytes(&material_table(model)));
+    let (material_rows, cp_rows) = material_table(model);
+    let materials = buffer(&gpu, "materials", f64_bytes(&material_rows));
+    let cp_table_buffer = buffer(&gpu, "cp_table", f64_bytes(&cp_rows));
     let elem_force = buffer(&gpu, "elem_force", f64_bytes(&vec![0.0; 24 * count]));
     let start_buffer = buffer(&gpu, "incidence_start", u32_bytes(&incidence_start));
     let incidence_buffer = buffer(&gpu, "incidence", u32_bytes(&incidence));
@@ -243,6 +252,7 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
         &b.reduced,
         &host_force_buffer,
         &fixed_buffer,
+        &cp_table_buffer,
     ];
     let bind_entries: Vec<wgpu::BindGroupEntry> = resources
         .iter()

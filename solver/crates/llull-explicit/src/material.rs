@@ -109,8 +109,11 @@ pub fn update(material: &Material, state: &PointState, d: &Sym, w: &[f64; 3], dt
         trial[5] * scale,
     ];
     // Adiabatic heating (explicit in T): plastic work per volume of the J2 return is σ_y Δε_p.
-    let temperature = match material.heating {
-        Some(heat) => state.temperature + heat.taylor_quinney * yield_stress * increment / (material.density * heat.specific_heat),
+    let temperature = match &material.heating {
+        Some(heat) => {
+            state.temperature
+                + heat.taylor_quinney * yield_stress * increment / (material.density * heat.specific_heat_at(state.temperature))
+        }
         None => state.temperature,
     };
     let Some(failure) = material.failure else {

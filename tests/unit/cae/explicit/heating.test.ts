@@ -164,9 +164,9 @@ describe('05 supports in the explicit job', () => {
 });
 
 describe('adiabatic heating with a temperature-dependent c_p', () => {
-  it('holds c_p at its value at the Johnson-Cook transition temperature and reports it', () => {
+  it('passes the c_p(T) table in K to the solver', () => {
     const plastic = barModel({ plastic: true, size: 10 });
-    // Synthetic table: 400 J/(kg K) at 200 K, 600 at 400 K; T_r = 293.15 K (support.ts) -> 493.15 J/(kg K).
+    // Synthetic table: 400 J/(kg K) at 200 K, 600 at 400 K and 2000 K.
     const doc = must(plastic.doc, 'define_property_model', {
       material: 'steel_like',
       model: {
@@ -192,7 +192,13 @@ describe('adiabatic heating with a temperature-dependent c_p', () => {
     const heated = must(doc, 'set_adiabatic_heating', { analysisId: plastic.analysisId, material: 'steel_like' }).document;
     const built = buildExplicitJob(heated, plastic.analysisId, null);
     if (!built.ok) throw new Error(built.message);
-    expect(built.job.materialHeating[0]?.specificHeat).toBeCloseTo(493.15e6, -3);
-    expect(built.job.unverifiedReasons.some((reason) => reason.includes('held at its value at T_r'))).toBe(true);
+    const table = built.job.materialHeating[0]?.specificHeatTable ?? [];
+    expect(table.length).toBeGreaterThan(1);
+    // Linear in [200, 400] K: c_p(293.15 K) = 493.15 J/(kg K) = 493.15e6 mJ/(t K); the table is in K, increasing.
+    const above = table.findIndex(([temperature]) => temperature > 293.15);
+    const [t0, c0] = table[above - 1] ?? [0, 0];
+    const [t1, c1] = table[above] ?? [1, 0];
+    expect(c0 + ((c1 - c0) * (293.15 - t0)) / (t1 - t0)).toBeCloseTo(493.15e6, -3);
+    expect(table.every(([temperature], k) => k === 0 || temperature > (table[k - 1]?.[0] ?? 0))).toBe(true);
   });
 });

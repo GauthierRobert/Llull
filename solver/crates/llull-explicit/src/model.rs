@@ -36,10 +36,31 @@ impl JohnsonCook {
 
 /// Adiabatic heating of plastic work: `Ṫ = β σ : ε̇ᵖ / (ρ c_p)` with β the Taylor–Quinney coefficient (LS-DYNA R14 Keyword Manual Vol. II
 /// *MAT_MODIFIED_JOHNSON_COOK Eq. 107.21: "portion of plastic work converted into heat (normally taken to be 0.9)").
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// c_p is a constant or a (T in K, c_p) table read by linear interpolation at the point temperature each update, clamped at its ends.
+#[derive(Debug, Clone, PartialEq)]
 pub struct Heating {
     pub taylor_quinney: f64,
+    /// Constant c_p (used when `specific_heat_table` is empty).
     pub specific_heat: f64,
+    /// (temperature K, c_p) points in increasing temperature; empty = constant.
+    pub specific_heat_table: Vec<[f64; 2]>,
+}
+
+impl Heating {
+    /// c_p at `temperature`.
+    pub fn specific_heat_at(&self, temperature: f64) -> f64 {
+        let table = &self.specific_heat_table;
+        let (Some(first), Some(last)) = (table.first(), table.last()) else { return self.specific_heat };
+        if temperature <= first[0] {
+            return first[1];
+        }
+        if temperature >= last[0] {
+            return last[1];
+        }
+        let k = table.partition_point(|point| point[0] <= temperature).max(1);
+        let ([t0, c0], [t1, c1]) = (table[k - 1], table[k]);
+        c0 + (c1 - c0) * (temperature - t0) / (t1 - t0)
+    }
 }
 
 /// Johnson–Cook (1985) failure strain `ε_f = [D1 + D2 exp(D3 σ*)][1 + D4 ln max(ε̇_p/ε̇_0, 1)][1 + D5 T*]` with `σ*` = mean stress / von Mises

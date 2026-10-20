@@ -17,7 +17,7 @@ fn material(melt_k: f64) -> Material {
         poisson: 0.3,
         johnson_cook: Some(jc),
         failure: None,
-        heating: Some(Heating { taylor_quinney: BETA, specific_heat: CP }),
+        heating: Some(Heating { taylor_quinney: BETA, specific_heat: CP, specific_heat_table: vec![] }),
     }
 }
 
@@ -62,4 +62,24 @@ fn without_heating_the_point_stays_at_its_initial_temperature() {
     let point = deform(&isothermal, 500);
     assert!(point.plastic_strain > 0.0);
     assert_eq!(point.temperature, 293.0);
+}
+
+#[test]
+fn a_linear_specific_heat_table_gives_the_closed_form_rise() {
+    // c_p = c0 + c1 (T − 293), T_m far: ρ ∫ c_p dT = β A ε_p ⇒ ΔT = (−c0 + √(c0² + 2 c1 β A ε_p / ρ)) / c1.
+    // Synthetic: c1 = 1e8 per K makes c_p vary by ~50 % over the rise.
+    let c1 = 1e8;
+    let mut heated = material(1e12);
+    if let Some(heat) = heated.heating.as_mut() {
+        heat.specific_heat_table = vec![[293.0, CP], [2000.0, CP + c1 * 1707.0]];
+    }
+    let point = deform(&heated, 3000);
+    let work = BETA * 300.0 * point.plastic_strain / RHO;
+    let expected = (-CP + (CP * CP + 2.0 * c1 * work).sqrt()) / c1;
+    let constant = work / CP;
+    let rise = point.temperature - 293.0;
+    eprintln!("cp(T): ΔT {rise:.5} K, closed form {expected:.5} K, constant c_p {constant:.5} K");
+    assert!((rise / expected - 1.0).abs() < 1e-3, "explicit-in-T c_p(T) within 0.1 %");
+    assert!((constant / expected - 1.0) > 0.1, "the table matters");
+    assert_eq!(heated.heating.as_ref().map(|heat| heat.specific_heat_at(100.0)), Some(CP), "clamped below the table");
 }
