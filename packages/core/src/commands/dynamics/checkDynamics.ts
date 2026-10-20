@@ -123,7 +123,11 @@ export function dynamicsCheck(
     };
     const first =
       shared ??
-      simulateMotion.run(doc, { ...common, energy: true, ...(params.timestep !== undefined ? { timestep: params.timestep } : {}) }, ctx);
+      simulateMotion.run(
+        doc,
+        { ...common, detail: 'series', energy: true, ...(params.timestep !== undefined ? { timestep: params.timestep } : {}) },
+        ctx,
+      );
     const run = asRun(first.data);
     if (run === null) items.push(...notRunItems(reasonOf(first.summary), stat.simulatable.loops > 0));
     else {
@@ -131,7 +135,7 @@ export function dynamicsCheck(
       // refine as far as the finest allowed step allows; only a run already at (within 25 % of) that floor has nothing to compare with
       const half = Math.max(run.timestep / 2, MIN_TIMESTEP);
       const atFloor = run.timestep <= MIN_TIMESTEP * 1.25;
-      const second = atFloor ? null : simulateMotion.run(doc, { ...common, timestep: half }, ctx);
+      const second = atFloor ? null : simulateMotion.run(doc, { ...common, detail: 'series', energy: true, timestep: half }, ctx);
       const fine = second === null ? null : asRun(second.data);
       items.push(
         ...loopDriftItem(run),

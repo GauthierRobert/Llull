@@ -12,7 +12,15 @@ import type { AssemblyPart } from '../../geometry/assemblyCheck/partTypes';
 import { overlapOf } from '../../geometry/assemblyCheck/pairClassify';
 import { type CheckItem, findingKey } from '../../model/checkResult';
 import { type BodyPoseAt, documentAtPose, pointAtPose } from '../../dynamics/bodyPose';
-import { STATIC_POSE, type PoseTrack, isMoving, poseAt, relativeTransform, travelBound } from '../../dynamics/motionPoses';
+import {
+  STATIC_POSE,
+  type PoseTrack,
+  isMoving,
+  poseAt,
+  relativeTransform,
+  relativeTravelBound,
+  travelBound,
+} from '../../dynamics/motionPoses';
 import { collectParts } from '../inspect/assemblyParts';
 import { intentOf } from '../inspect/assemblyGraph';
 import { bisectEdge, goldenMinimum } from './motionRefine';
@@ -246,16 +254,34 @@ function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart, budget: Budget): 
   };
   const inContact = (u: number): boolean => (closestAt(u, plan.eps)?.distance ?? Infinity) <= plan.eps;
   const last = plan.times.length - 1;
-  // travel of both parts over each recorded step, cumulative: prefix[k] = travel from sample 0 to sample k
+  // cumulative travel over the recorded steps: prefix[k] = from sample 0 to sample k. `prefix` is the sum of both parts' absolute travel (sizes
+  // the substeps of one step); `certified` is the smaller of that and the RELATIVE motion of b in a's frame (the frame the distance is
+  // measured in), which proves a stretch clear for pairs that move together or turn about a common axis
   const prefix = [0];
+  const certified = [0];
+  const half = (min: Vec3, max: Vec3): { centre: Vec3; radius: number } => ({
+    centre: [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2],
+    radius: Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2,
+  });
+  const { centre: centreB, radius: radiusB } = half(b.part.min, b.part.max);
   for (let i = 0; i < last; i++) {
     const travel = [a, b].reduce((sum, part) => {
       const track = part.body === null ? undefined : plan.tracks[part.body];
       return track === undefined ? sum : sum + travelBound(track, i, part.radius);
     }, 0);
     prefix.push((prefix[i] ?? 0) + travel);
+    const relative = relativeTravelBound(
+      poseOf(plan, a, i),
+      poseOf(plan, a, i + 1),
+      poseOf(plan, b, i),
+      poseOf(plan, b, i + 1),
+      centreB,
+      radiusB,
+    );
+    certified.push((certified[i] ?? 0) + Math.min(travel, relative));
   }
   const travelBetween = (from: number, to: number): number => (prefix[to] ?? 0) - (prefix[from] ?? 0);
+  const certifiedBetween = (from: number, to: number): number => (certified[to] ?? 0) - (certified[from] ?? 0);
   const probes: { u: number; contact: boolean }[] = [];
   /** Probes moment `u`, looking `reach` beyond the bound; returns the distance there, or a lower bound of it when it is farther. */
   const probe = (u: number, reach: number): number => {
@@ -283,7 +309,7 @@ function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart, budget: Budget): 
   };
   const refine = (from: number, distanceFrom: number, to: number, distanceTo: number): void => {
     if (budget.evaluations < 0) return;
-    const travel = travelBetween(from, to);
+    const travel = certifiedBetween(from, to);
     if ((distanceFrom + distanceTo - travel) / 2 > state.bound) return;
     if (to - from <= 1) {
       fine(from, Math.min(distanceFrom, distanceTo));
@@ -295,10 +321,10 @@ function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart, budget: Budget): 
     refine(middle, distanceMiddle, to, distanceTo);
   };
   let from = 0;
-  let distanceFrom = probe(0, travelBetween(0, Math.min(plan.stride, last)));
+  let distanceFrom = probe(0, certifiedBetween(0, Math.min(plan.stride, last)));
   while (from < last && budget.evaluations >= 0) {
     const to = Math.min(from + plan.stride, last);
-    const distanceTo = probe(to, travelBetween(from, to));
+    const distanceTo = probe(to, certifiedBetween(from, to));
     refine(from, distanceFrom, to, distanceTo);
     [from, distanceFrom] = [to, distanceTo];
   }

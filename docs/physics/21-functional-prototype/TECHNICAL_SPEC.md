@@ -946,8 +946,9 @@ Validation cases automated (`tests/unit/engineRealism.test.ts`, `tests/unit/mujo
   `plans/reference_single_cylinder.plan.json`; the crankcase has no cylinder bore and the gear pair is a coupling without gear solids; the
   seeded-defect corpus is not built.
 - **VC-24 shown, heavy gate (FPR-V24, 2026-10-21, review fixes).** `tests/unit/referenceEngine.test.ts` runs only with `LLULL_HEAVY_GATES=1`
-  (Manifold + MuJoCo, plan build + `check_prototype`). Measured **532 s and 774 s for check_prototype in two runs of the same code on this
-  machine (532 s / 785 s for the test file)**, down from 1781 s; the spread is machine load. Profile per sub-check before the fixes (duration
+  (Manifold + MuJoCo, plan build + `check_prototype`). Measured **445 s and 394 s for check_prototype in two runs of the same code on this
+  machine (457 s / 401 s for the test file)**, down from 1781 s (a thinned version measured 274 s but was not conservative; the sum-of-absolute-
+  travel certificate measured 532 s and 774 s; the spread between runs is machine load). Profile per sub-check before the fixes (duration
   0.062 s): plan build 0.08 s, check_assembly 0.17 s, inspect_dynamics 0.01 s, simulate_motion 0.5 s, check_dynamics 0.7 s,
   check_timestep_convergence 1.7 s, compare_to_reference 1.5 s, **check_motion_clearance 1199 s** (31 pairs x 2159 samples): essentially all
   of the time. The BVH leaf loop ran the full triangle-triangle distance on every pair of two leaves; a per-triangle box test before it (same
@@ -956,25 +957,31 @@ Validation cases automated (`tests/unit/engineRealism.test.ts`, `tests/unit/mujo
   (`maxSamples`) and skips the stretch between two anchors only when d(u) >= (d_from + d_to - travel) / 2 > the contact / best bound, with
   the travel summed from the per-recorded-sample travel bounds of both parts; otherwise it splits down to single recorded samples (then the
   substeps of the finest step). So `maxSamples` changes the time, not the findings (tests: a 1 mm clip and a thin needle at a 4-anchor cap
-  equal the full sweep). Pairs at a near-constant gap (pins in bores, parts 2 mm apart) cannot be certified and are evaluated at every
-  recorded sample, which is why the time is back up. A Lipschitz skip alone could not help those pairs; a tighter relative-motion travel
-  bound is the next lever.
+  equal the full sweep). The certificate takes the smaller of the sum of both parts' absolute travel and the **relative** motion of the
+  second part in the first part's frame (`relativeTravelBound`: step of its centre under the relative transform + relative rotation x its
+  radius, the chord inflated by 1 + (thetaA + thetaB)^2 / 4 for the arc inside a recorded step; both bound the same distance change, so the
+  minimum is conservative). It helps pairs that move together or turn about a common axis through a part centre. Pairs in contact or at a
+  near-constant gap (pins in bores, parts 2 mm apart) cannot be certified by any travel bound (d_from + d_to - travel must exceed 2 x the
+  bound), so they are evaluated at every recorded sample: that is why the time stays above the 274 s of the thinned version.
   Rows (all `pass` unless noted): assembly = 3 x FPR_JOINT_REALISED (approximate fit on Manifold); mechanism = FPR_MECH_OK, **1 DOF** (the
   rank mobility counts a gear coupling between two tree joints as one unit-norm constraint row on the declared-sense coordinates: crank +
   propeller - rod loop - gear; a coupling to a loop joint is reported FPR_GEAR_ON_LOOP_JOINT, a redundant coupling row is reported);
   motion_clearance = 4 x FPR_MOTION_ALLOWED (the declared pin fits; closest approach 2 mm); dynamics = FPR_MASS_DEFAULTED, FPR_UNREALISTIC,
-  FPR_NO_LOSSES, FPR_LOOP_OPEN, FPR_LOOP_DRIFT, FPR_ENERGY_CLOSURE, FPR_TIMESTEP_SENSITIVE (check_timestep_convergence, with accuracy), all
-  pass; FPR_REFERENCE_MATCH `info` (origin `calibrated`); **two `warn`**: FPR_REDUNDANT_CONSTRAINT on `wrist_j` (the planar slider-crank
-  repeats the out-of-plane position of the wrist pin: z reactions are indeterminate; not from the gear row, which is independent) and
-  FPR_TIMESTEP_SENSITIVE of check_dynamics (compared at 1.44e-5 s and 1e-5 s: a run is only treated as at the floor within 25 % of 1e-5 s, so
-  it is refined as far as allowed; the instantaneous final piston speed of a fast periodic motion is a phase-sensitive metric and reads
-  about 36 %, while the engine convergence, brake torque 0.004 %, is the passing check_timestep_convergence item). A run truly at the floor
-  gives an `info` item and the result stays `unverified` (item-level `unverified` now counts in the envelope). Nothing is not_run. The
-  previously unidentified not_run was that same check_dynamics item. The gate asserts exactly these two warns. The plan gained a propeller
-  shaft stub in a bearing block (`prop_j` now has parent `crankcase` and anchor [0, 0, 550] instead of the world and [0, 0, 600]) because
-  the propeller had no bearing and the joint could not be realised. VC-24 as written ("every checklist row pass") is therefore met except
-  those two declared warns. The tessellation fit rejects boxes and prisms (a facet must span at most 30 degrees about the axis) and splits
-  same-radius journals at axial gaps. Native-kernel rows (exact faces) are VC-09. `check_motion_clearance` stays on `meshBvh` rather than
+  FPR_NO_LOSSES, FPR_LOOP_OPEN, FPR_LOOP_DRIFT, FPR_ENERGY_CLOSURE, both FPR_TIMESTEP_SENSITIVE (check_timestep_convergence with accuracy,
+  and check_dynamics) all pass; FPR_REFERENCE_MATCH `info` (origin `calibrated`); **one `warn`**: FPR_REDUNDANT_CONSTRAINT on `wrist_j` (the
+  planar slider-crank repeats the out-of-plane position of the wrist pin: z reactions are indeterminate; not from the gear row, which is
+  independent). The check_dynamics timestep item compares the two runs (1.44e-5 s and 1e-5 s: a run is only treated as at the floor within
+  25 % of 1e-5 s) **phase-aligned**, not at the final instant (which read about 36 % on the piston speed, a phase-sensitive metric): both runs
+  are resampled onto 144 points of the driving joint angle over the last turn (`phaseCompare.ts`; needs a joint turning monotonically through
+  at least half a turn, else the final-state comparison stays) and compared by the RMS difference of speed and position of every joint
+  (relative to peak / excursion) and the cycle-mean |speed|; each run's energy-balance residual is listed. It stays a warn when that exceeds
+  1 %; tests cover a converged (300 rpm, 2e-4 s) and a too-coarse (1500 rpm, 0.01 s) slider-crank. A run truly at the floor gives an `info`
+  item and the result stays `unverified`. Nothing is not_run. The previously unidentified not_run was that same check_dynamics item. The gate
+  asserts exactly the one warn. The plan gained a propeller shaft stub in a bearing block (`prop_j` now has parent `crankcase` and anchor
+  [0, 0, 550] instead of the world and [0, 0, 600]) because the propeller had no bearing and the joint could not be realised. VC-24 as
+  written ("every checklist row pass") is therefore met except that one declared warn.
+  The tessellation fit rejects boxes and prisms (a facet must span at most 30 degrees about the axis) and splits same-radius journals at axial
+  gaps. Native-kernel rows (exact faces) are VC-09. `check_motion_clearance` stays on `meshBvh` rather than
   `ctx.geometryQueries.minDistanceBatch`: the sweep is sequential (a running bound per pair, adaptive refinement, contact bisection), a batch
   over all poses up front would lose the early-outs; the wiring belongs to the native `geomq` (RS-6). VC-34 is partial: only the reference
   and timestep items carry `accuracy`.

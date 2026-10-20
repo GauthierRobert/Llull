@@ -198,6 +198,20 @@ describe('check_dynamics with the MuJoCo engine', () => {
     expect(timestep.values.halfTimestepS).toBeCloseTo(1e-5, 12);
   });
 
+  it('a periodic mechanism is compared phase-aligned over the last turn: converged passes, a too-coarse step that changes the cycle warns', () => {
+    const { doc } = sliderCrank({ crankRpm: 300 });
+    const converged = itemOf(dataOf(doc, { duration: 0.6, timestep: 2e-4 }), 'FPR_TIMESTEP_SENSITIVE');
+    expect(converged.note).toMatch(/last turn of joint/);
+    expect(converged.values.comparedTurnDeg).toBeGreaterThan(179);
+    expect(converged.values.maxChangeFraction).toBeLessThan(0.01);
+    expect(converged.status).toBe('pass');
+    const fast = sliderCrank({ crankRpm: 1500 }).doc;
+    const coarse = itemOf(dataOf(fast, { duration: 0.3, timestep: 0.01 }), 'FPR_TIMESTEP_SENSITIVE');
+    expect(coarse.note).toMatch(/last turn of joint/);
+    expect(coarse.values.maxChangeFraction).toBeGreaterThan(0.01);
+    expect(coarse.status).toBe('warn');
+  });
+
   it('a closed slider-crank reports the loop residual', () => {
     const { doc } = sliderCrank({ crankRpm: 300 });
     const data = dataOf(doc, { duration: 0.2 });
