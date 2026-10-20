@@ -55,7 +55,7 @@ describe('create_nurbs_surface', () => {
     expect(entityBounds(scaled.document.entities[id]!).max[0]).toBeCloseTo(20, 9);
     const loaded = deserializeDocument(serializeDocument(doc));
     expect(JSON.stringify((loaded.entities[id] as NurbsSurfaceEntity).surface)).toBe(JSON.stringify(entity.surface));
-    expect(collectExportTriangles(doc, undefined).tris).toHaveLength(0);
+    expect(collectExportTriangles(doc, undefined).tris.length).toBeGreaterThan(100);
   });
 
   it.each([

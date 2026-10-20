@@ -422,6 +422,15 @@ function historyMismatch(doc: CadDocument, replayed: CadDocument): string | null
   return differing === undefined ? null : `featureHistory regenerates solid '${differing.id}' with different geometry`;
 }
 
+/** Curves and surface sheets have no solid to rebuild: say so instead of dropping them silently. */
+function skippedSurfaceNote(doc: CadDocument): string[] {
+  const skipped = doc.order.filter((id) => {
+    const entity = doc.entities[id];
+    return entity !== undefined && (isCurve3D(entity) || isSheet(entity));
+  });
+  return skipped.length === 0 ? [] : [`not exported to code (curves and surface sheets have no solid form): ${skipped.join(', ')}.`];
+}
+
 /**
  * Lower a document to a FeatureProgram. Prefers the featureHistory (parametric, ordered); falls
  * back to the current geometry when there is no history or replay does not reproduce the document.
@@ -437,7 +446,7 @@ export function buildFeatureProgram(
   const namer = new Namer();
   const { parameters, identifiers } = lowerParameters(doc, namer);
   const ctx: LowerContext = { identifiers, env: buildParamEnv(doc.parameters), kernel };
-  const notes: string[] = [];
+  const notes: string[] = skippedSurfaceNote(doc);
   const activeSteps: FeatureStep[] = doc.featureHistory.filter((s) => s.suppressed !== true);
   if (activeSteps.length === 0) return lowerSnapshot(doc, parameters, ctx, namer, notes);
   const features: Feature[] = [];

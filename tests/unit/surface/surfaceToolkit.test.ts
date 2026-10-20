@@ -7,6 +7,8 @@ import { closestOnSurface } from '@lib/nurbs/closest';
 import type { NurbsSurfaceData } from '@lib/nurbs/surfaceTypes';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
 import { sphereSurface } from '../../helpers/revolvedSurfaces';
+import { setGeometryKernel } from '@core/geometry/kernel';
+import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 
 const empty = createEmptyDocument();
 const S = Math.SQRT1_2;
@@ -219,6 +221,23 @@ describe('thicken_surface (VC-SRF-24)', () => {
     expect(Math.abs(far / inward - 1)).toBeLessThan(0.02);
     const both = execute(base.document, 'thicken_surface', { id, thickness: 1, side: 'both' });
     expect(Math.abs(volumeOf(both.document, both.affected[0]!) / ((2 / 3) * Math.PI * (10.5 ** 3 - 9.5 ** 3)) - 1)).toBeLessThan(0.02);
+  });
+
+  it('the thickened u-closed hemisphere is a manifold solid a kernel boolean accepts (no seam fins)', async () => {
+    const kernel = await createManifoldKernel();
+    setGeometryKernel(kernel);
+    try {
+      const shell = execute(base.document, 'thicken_surface', { id, thickness: 1, side: 'both' });
+      const solidId = shell.affected[0]!;
+      const withTool = execute(shell.document, 'add_box', { size: [4, 4, 4], position: [0, 0, 10] });
+      const cut = execute(withTool.document, 'boolean', { op: 'subtract', a: solidId, b: withTool.affected[0]! });
+      expect(cut.affected).toHaveLength(1);
+      const remaining = volumeOf(cut.document, cut.affected[0]!);
+      expect(remaining).toBeGreaterThan(0);
+      expect(remaining).toBeLessThan(volumeOf(shell.document, solidId));
+    } finally {
+      setGeometryKernel(null);
+    }
   });
 
   it('refuses an offset past the centre of curvature, bad thickness and non-surfaces', () => {

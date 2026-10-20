@@ -1,6 +1,7 @@
 /** Which solids `export_step_exact` writes: loose 3D solids and component instances (with the unique occurrence label of each). */
 
 import { type CadDocument, type Entity, type InstanceEntity, is3D } from '../../model/types';
+import { isCurve3D, isSheet } from '../../model/curveKinds';
 import { expandInstance } from '../../geometry/instanceExpansion';
 import type { StepLabel } from './stepLabels';
 
@@ -61,7 +62,8 @@ export function stepTargets(
       if (baked.length === 0) skipped.push(`${id} (instance without solids)`);
       else entries.push({ kind: 'instance', instance: entity, label, baked });
     } else if (is3D(entity)) entries.push({ kind: 'solid', entity });
-    else if (entityIds !== undefined && entityIds.length > 0) skipped.push(`${id} (2D)`);
+    else if (entityIds !== undefined && entityIds.length > 0)
+      skipped.push(`${id} (${isSheet(entity) ? 'surface sheet: STEP export needs solids' : isCurve3D(entity) ? '3D curve' : '2D'})`);
   }
   const solids = entries.flatMap((entry) => (entry.kind === 'solid' ? [entry.entity] : [...entry.baked]));
   return { solids, skipped, entries };

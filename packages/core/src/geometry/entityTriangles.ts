@@ -1,4 +1,6 @@
 import { type CadDocument, type Entity, is3D } from '../model/types';
+import { isSheet } from '../model/curveKinds';
+import { sheetTriangles } from './nurbsSurface';
 import { expandInstance } from './instanceExpansion';
 import { solidTriangles } from './solidTriangles';
 import type { Triangle } from './triangles';
@@ -10,6 +12,7 @@ export function entityToTriangles(e: Entity, doc: Pick<CadDocument, 'components'
     if (!component) return [];
     return expandInstance(e, component).flatMap((child) => entityToTriangles(child, doc));
   }
+  if (isSheet(e)) return sheetTriangles(e);
   return solidTriangles(e);
 }
 
@@ -49,7 +52,7 @@ export function collectExportParts(
   for (const id of idsToProcess) {
     const entity = doc.entities[id];
     if (!entity) continue;
-    if (!is3D(entity)) {
+    if (!is3D(entity) && !isSheet(entity)) {
       skipped2D++;
       continue;
     }
@@ -74,7 +77,7 @@ export function exportSummary(
   { tris, skipped2D, unknownIds }: ReturnType<typeof collectExportTriangles>,
 ): string {
   const parts = [`${command}: ${tris.length} triangle${tris.length !== 1 ? 's' : ''} exported (format=${format}).`];
-  if (skipped2D > 0) parts.push(`${skipped2D} 2D entit${skipped2D !== 1 ? 'ies' : 'y'} skipped.`);
+  if (skipped2D > 0) parts.push(`${skipped2D} non-solid entit${skipped2D !== 1 ? 'ies' : 'y'} (2D shapes, 3D curves) skipped.`);
   if (unknownIds.length > 0) parts.push(`Unknown ids skipped: ${unknownIds.join(', ')}.`);
   return parts.join(' ');
 }
