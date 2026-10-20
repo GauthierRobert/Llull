@@ -45,6 +45,8 @@ export function maxCurveDeviation(surface: NurbsSurfaceData, curves: ReadonlyArr
 
 export interface OrientedLoop {
   readonly curves: NurbsCurveData[];
+  /** Index in the input list of each chained curve. */
+  readonly order: number[];
   readonly gap: number;
 }
 
@@ -56,13 +58,14 @@ export const endOf = (curve: NurbsCurveData, which: 0 | 1): Vec3 => evaluateCurv
  * null when a link or the closure exceeds `tolerance`.
  */
 export function chainCurves(curves: ReadonlyArray<NurbsCurveData>, tolerance: number, closed: boolean): OrientedLoop | null {
-  const remaining = curves.slice(1);
+  const remaining = curves.slice(1).map((curve, index) => ({ curve, original: index + 1 }));
   const loop: NurbsCurveData[] = [curves[0] as NurbsCurveData];
+  const order = [0];
   let gap = 0;
   while (remaining.length > 0) {
     const tail = endOf(loop[loop.length - 1] as NurbsCurveData, 1);
     let best: { index: number; reversed: boolean; distance: number } | null = null;
-    remaining.forEach((curve, index) => {
+    remaining.forEach(({ curve }, index) => {
       for (const [reversed, which] of [
         [false, 0],
         [true, 1],
@@ -74,12 +77,13 @@ export function chainCurves(curves: ReadonlyArray<NurbsCurveData>, tolerance: nu
     const pick = best as { index: number; reversed: boolean; distance: number } | null;
     if (pick === null || pick.distance > tolerance) return null;
     gap = Math.max(gap, pick.distance);
-    const [curve] = remaining.splice(pick.index, 1) as [NurbsCurveData];
+    const [{ curve, original }] = remaining.splice(pick.index, 1) as [{ curve: NurbsCurveData; original: number }];
     loop.push(pick.reversed ? reverseCurve(curve) : curve);
+    order.push(original);
   }
-  if (!closed) return { curves: loop, gap };
+  if (!closed) return { curves: loop, order, gap };
   const close = distance3(endOf(loop[loop.length - 1] as NurbsCurveData, 1), endOf(loop[0] as NurbsCurveData, 0));
-  return close > tolerance ? null : { curves: loop, gap: Math.max(gap, close) };
+  return close > tolerance ? null : { curves: loop, order, gap: Math.max(gap, close) };
 }
 
 /** A zero-length curve at `point` (the collapsed fourth side of a triangular patch). */

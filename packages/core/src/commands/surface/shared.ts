@@ -33,8 +33,9 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   SRF_LOFT_GUIDE_MISSES_SECTION:
     'snap the guide to the section curves (interpolate_curve through section points) or raise `guideTolerance`',
   SRF_LOFT_GUIDE_NOT_CONTAINED: 'use fewer or better aligned guides, or add sections near where the guides bend',
-  SRF_FILL_LOOP_OPEN: 'give 3 or 4 curves whose ends meet end to end; `tolerance` is the largest gap bridged',
-  SRF_FILL_UNSUPPORTED: 'fill 3 or 4 boundary curves of the same kind (all rational or all not)',
+  SRF_FILL_LOOP_OPEN: 'give 3 to 12 curves whose ends meet end to end; `tolerance` is the largest gap bridged',
+  SRF_FILL_UNSUPPORTED: 'fill 3 to 12 boundary curves of the same kind (all non-rational) whose ends meet',
+  SRF_FILL_NEIGHBOUR_MISMATCH: 'name a curve of boundaryIds that IS a boundary edge of the sheet, within tolerance (e.g. made by interpolating that edge)',
   SRF_TRIM_MISS: 'the curve must project onto the sheet: use projectAlong with a direction that hits it, or move the curve onto the sheet',
   SRF_TRIM_LOOP_INVALID: 'give curves that chain end to end within tolerance, without self-crossings; an open curve must cross the sheet edge to edge',
   SRF_TRIM_AMBIGUOUS: 'give keepPoint, a point on the side of the cut to keep',
