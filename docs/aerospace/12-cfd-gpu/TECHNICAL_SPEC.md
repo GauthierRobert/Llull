@@ -447,6 +447,14 @@ transport, no overlay, no `CfdResultPort`, no `record_cfd_results` / `cfd_report
 - **Boundary tags.** Per entity (faceRefs are stored and conflict-checked, §11.4 still open); the entity must be a body of the case; the
   same kind merges, a different kind on the same entity or a shared face is `CFD_BOUNDARY_CONFLICT`; `cfd_update_case boundaries` replaces
   the list.
+- **Openings (§5.1 step 8).** Open edges whose midpoint lies inside the bounding box of a body tagged `inlet` / `outlet` do not count as
+  non-watertight (reported as `openingEdges`); the attribution is by bounding box, not by face. With such openings the orientation flip,
+  voxel volume and small-feature volume figures are not computed for a surface that is not truly closed (voxel skipped).
+- **Status rules.** `not_run` is never a pass: it raises the status to `warn` (also in `check_cfd`), except the memory row without a device
+  (`neutral`). Bodies or boundary ids deleted from the document give a `CFD_ENTITY_NOT_FOUND` fail row; `cfd_update_case` tolerates ids that
+  were already missing, and `reference.momentPointM` is not recomputed when `entityIds` change (the update says so).
+- **M2 items.** `geometryHash` hashes the tessellated union and so depends on the kernel that built it (Manifold vs OCCT): M2 must record
+  the kernel name with it or hash the exported flow surface of the host transport.
 - **Validation.** VC-CFD-10, 11, 12, 14, 15 in `tests/unit/aero/cfd/prepare.test.ts`; VC-CFD-16 in `caseCommands.test.ts`; SC-CFD-01 runs
   through `build_project` in `check.test.ts` (which also builds the setup steps of SC-CFD-02..05). VC-CFD-13 needs the solver and stays open.
 - **Surfaces.** The Flow panel and overlay (M3) do not exist; `src/ui` only gained the palette label. The tool-schema snapshot,
