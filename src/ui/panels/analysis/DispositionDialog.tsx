@@ -57,7 +57,7 @@ export function DispositionDialog({ analysisCase, onClose }: Props): React.React
       justification,
       resultsHash,
     );
-    const signed = await signPayload(key.keyId, passphrase, payload);
+    const signed = await signPayload(key.keyId, passphrase, 'dispose_margin', payload);
     if ('error' in signed) return setMessage(signed.error);
     setPassphrase('');
     await dispatch('dispose_margin', {

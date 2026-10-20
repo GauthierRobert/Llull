@@ -44,7 +44,7 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
   new [--force]               write an empty document
   undo | redo                 local: swap with FILE.bak (one level); server: shared history
   keys list | create --user ID --name NAME | revoke KEYID   enroll a local signing key (09 PLM; $LLULL_KEYS_DIR, default ~/.llull/keys;
-                              private key encrypted with $LLULL_KEY_PASSPHRASE (>= 12 characters), or --passphrase-env VAR). An enrolled key is NOT trusted:
+                              private key encrypted with the passphrase in $LLULL_KEY_PASSPHRASE or --passphrase-env VAR, >= 12 characters). An enrolled key is NOT trusted:
                               only the llull desktop app can trust it (Keys); revoke withdraws trust
   release pack --revision R --out DIR [--attach --confirm-key KEYID]   write the signed, read-only release package of a
                               frozen revision (--doc; --attach records its hash with attach_release_package, a human-only act)
@@ -61,7 +61,7 @@ Flags
                               found via ~/.llull/desktop.json, token included)
   --confirm-key KEYID         human-only plm acts (record_approval, release_item, classify_change_order, set_change_state, set_item_marking,
                               set_lifecycle_state obsolete, set_item_identity policy, attach_release_package) need a signature by a TRUSTED
-                              key over the act: this flag signs it (passphrase in $LLULL_KEY_PASSPHRASE or --passphrase-env). Without it
+                              key over the act: this flag signs it, the passphrase typed at an interactive terminal (never read from the environment). Without it
                               they are refused with PLM_HUMAN_GATE; there is no caller label to claim
   --doc FILE                  local document file
   --server URL                act on a running llull server's live document instead

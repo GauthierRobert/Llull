@@ -2,7 +2,6 @@
 // document changes only through commands (`add_datum_feature`, `set_pmi_standard`, `activate_saved_view`, `delete_pmi`, ...).
 
 import React, { useState } from 'react';
-import { humanGatePayload } from '@core/model/humanGate';
 import { SignActDialog, type SignActRequest } from '@ui/components/SignActDialog';
 import '@ui/styles/panels/pmi.css';
 import { PMI_STANDARDS } from '@core/model/pmi';
@@ -32,7 +31,8 @@ export function PmiPanel({ className }: { className?: string }): React.ReactElem
     setSigning({
       title: 'Accept PMI review',
       summary: `Sign your acceptance of ${id}: you attest that you reviewed it as the qualified engineer. Only a key trusted in the desktop app counts.`,
-      payload: (nonce) => humanGatePayload('PMI review', [id], { decision: 'accept', comment: '' }, nonce),
+      act: 'accept_pmi_review',
+      pmiReview: { pmiIds: [id], decision: 'accept', comment: '' },
       onSigned: (confirmation) => dispatch('accept_pmi_review', { pmiIds: [id], decision: 'accept', comment: '', at, confirmation }),
     });
   };

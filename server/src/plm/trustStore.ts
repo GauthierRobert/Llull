@@ -2,22 +2,21 @@
  * The trust store (09 PLM TR-PLM-19): which enrolled public keys may make signatures that COUNT (approvals, releases, human gates).
  * - Trust is added only with a `TrustGrant`, which only the desktop app issues after the user confirmed in a native dialog (`trustGrant.ts`, imported by
  *   desktop/ only, enforced by dependency-cruiser). The CLI and REST routes can enroll a key but never trust it; they can only REVOKE trust.
- * - The location is fixed per user profile (~/.llull/trust); `LLULL_KEYS_DIR` and every other environment variable cannot redirect it. The only
- *   override is `LLULL_TRUST_DIR` inside a test run (`isTestRun`).
+ * - The location is fixed per user profile (~/.llull/trust). NO environment variable can redirect it (a process environment is agent-controlled);
+ *   only test code in the same process can (`hostConfig.configureHostForTests`, or the `dir` argument).
  * - `trust.json` carries an HMAC-SHA256 under `trust.secret` (0600, created at the first grant): a file edited without the secret trusts nothing.
  * Honest limit: a process running as the same OS user can read the secret; this separates the desktop confirmation from agent-reachable surfaces
  * (CLI, REST, command params), it is not a defence against arbitrary code with the user's file access.
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { jcsJson } from '@lib/jcs';
-import { isTestRun } from '../env';
 import { writeFileAtomic } from '../writeFileAtomic';
 import type { KeyRecord } from './keyStore';
 import type { TrustGrant } from './trustGrant';
+import { trustDirectory } from './hostConfig';
 
 interface TrustedKey {
   readonly keyId: string;
@@ -31,11 +30,6 @@ interface TrustedKey {
 interface TrustFile {
   readonly keys: readonly TrustedKey[];
   readonly mac: string;
-}
-
-export function trustDir(env: NodeJS.ProcessEnv = process.env): string {
-  const override = env['LLULL_TRUST_DIR'];
-  return isTestRun(env) && override !== undefined && override !== '' ? path.resolve(override) : path.join(homedir(), '.llull', 'trust');
 }
 
 const macOf = (secret: Buffer, keys: readonly TrustedKey[]): string => createHmac('sha256', secret).update(jcsJson(keys)).digest('hex');
@@ -79,10 +73,12 @@ export interface TrustStore {
   trust(record: KeyRecord, grant: TrustGrant, at: string): TrustedKey;
   /** Withdraw trust (allowed from the CLI: it can only reduce what counts). */
   revoke(publicKey: string, at: string): boolean;
+  /** Record a signature as spent (single use); false when it was already spent (replay after undo / resend / document swap). */
+  consume(signatureKey: string): boolean;
 }
 
-export function createTrustStore(env: NodeJS.ProcessEnv = process.env): TrustStore {
-  const dir = (): string => trustDir(env);
+export function createTrustStore(directory?: string): TrustStore {
+  const dir = (): string => directory ?? trustDirectory();
   return {
     list: () => readTrusted(dir()),
     find: (publicKey) => readTrusted(dir()).find((key) => key.publicKey === publicKey && key.revokedAt === undefined) ?? null,
@@ -98,6 +94,14 @@ export function createTrustStore(env: NodeJS.ProcessEnv = process.env): TrustSto
       };
       write(dir(), [...others, entry]);
       return entry;
+    },
+    consume(signatureKey) {
+      const file = path.join(dir(), 'consumed.txt');
+      const spent = existsSync(file) ? readFileSync(file, 'utf8').split('\n') : [];
+      if (spent.includes(signatureKey)) return false;
+      mkdirSync(dir(), { recursive: true, mode: 0o700 });
+      appendFileSync(file, `${signatureKey}\n`, { mode: 0o600 });
+      return true;
     },
     revoke(publicKey, at) {
       const keys = readTrusted(dir());

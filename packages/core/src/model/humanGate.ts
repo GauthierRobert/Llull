@@ -3,7 +3,7 @@
  * with a signature that the signing port (09 PLM) verifies over the payload hash; a bare `true` from an agent, or no port, refuses.
  */
 
-import { canonicalJson } from '../lib/canonicalJson';
+import { jcsJson } from '../lib/jcs';
 import { sha256Hex } from '../lib/sha256';
 import type { HumanSignaturePort } from './analysis';
 
@@ -11,7 +11,7 @@ export type HumanGateOutcome = { readonly cleared: true; readonly signer: string
 
 /** The payload a human signs for `act`: the act, the ids it touches, its details (from / to markings, document hash) and the confirmation nonce. */
 export const humanGatePayload = (act: string, ids: readonly string[], details: Readonly<Record<string, unknown>>, nonce: string): string =>
-  sha256Hex(canonicalJson({ act, ids: [...ids].sort(), details, nonce }));
+  sha256Hex(jcsJson({ act, ids: [...ids].sort(), details, nonce }));
 
 /**
  * Whether `confirmation` clears the gate for `act` on `ids`.

@@ -36,14 +36,14 @@ export function fillHostParams(name: string, params: unknown, now: Date, env: No
   const properties = getCommand(name)?.paramsSchema.properties;
   if (properties === undefined || !FILLED.some((key) => key in properties)) return params;
   const filled: Record<string, unknown> = { ...(isRecord(params) ? params : {}) };
-  if ('at' in properties && filled['at'] === undefined) filled['at'] = isoSeconds(now);
+  if ('at' in properties) filled['at'] = isoSeconds(now); // the host clock always: a caller-supplied time is never trusted on a gated act
   if ('by' in properties && filled['by'] === undefined) filled['by'] = hostUser(env);
   return filled;
 }
 
 const logs = new Map<string, AuditLog>();
-function auditLogOf(env: NodeJS.ProcessEnv): AuditLog | null {
-  const dir = auditDir(env);
+export function auditLogOf(): AuditLog | null {
+  const dir = auditDir();
   if (dir === null) return null;
   try {
     let log = logs.get(dir);
@@ -80,7 +80,7 @@ export function runHostCommand(
   const run = runCommandOutcome(prior, name, filled, serverContext(options.onStep));
   const loggable = withoutConfirmations(filled);
   const readOnly = getCommand(name)?.annotations?.readOnly === true;
-  const log = !readOnly || run.outcome.isError ? auditLogOf(env) : null;
+  const log = !readOnly || run.outcome.isError ? auditLogOf() : null;
   if (log !== null)
     appendSafely(log, {
       ts: now().toISOString(),

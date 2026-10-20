@@ -1,7 +1,7 @@
 /**
  * Hash-chained audit log of every host command (09 PLM FR-PLM-19, §5.8): JSONL segments `audit-NNNNNN.jsonl`, each entry carries the SHA-256 of
  * the previous entry and its own, so an edited, removed or reordered line breaks the chain. Rotation starts a new segment and NEVER deletes.
- * Environment: LLULL_AUDIT_DIR (default ~/.llull/audit; off in test runs unless set).
+ * Location: ~/.llull/audit, fixed (no environment variable moves or disables it: an agent controls its process environment).
  * Honest limit: the chain is UNKEYED. It detects accidental damage and a partial rewrite; whoever can write the directory can rewrite the whole
  * chain consistently (and truncate its tail). Anchor it outside this machine (a signed head hash) to detect that.
  * Concurrency: appends take an exclusive lock file (`audit.lock`) so the CLI and the server can share the directory; a torn last line (crash during a write)
@@ -9,11 +9,10 @@
  */
 
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeSync } from 'node:fs';
-import { homedir } from 'node:os';
 import path from 'node:path';
 import { jcsJson } from '@lib/jcs';
 import { sha256Hex } from '@lib/sha256';
-import { isTestRun } from '../env';
+import { auditDirectory } from './hostConfig';
 
 export interface AuditEvent {
   readonly ts: string;
@@ -41,11 +40,8 @@ const BREAK = 'audit_chain_break';
 const LOCK_STALE_MS = 10_000;
 const LOCK_WAIT_MS = 5_000;
 
-export function auditDir(env: NodeJS.ProcessEnv = process.env): string | null {
-  const configured = env['LLULL_AUDIT_DIR'];
-  if (configured !== undefined && configured !== '') return path.resolve(configured);
-  return isTestRun(env) ? null : path.join(homedir(), '.llull', 'audit');
-}
+/** The audit directory of this machine (fixed; null only when test code disabled it). */
+export const auditDir = (): string | null => auditDirectory();
 
 const SEGMENT = /^audit-(\d{6})\.jsonl$/;
 const segmentName = (n: number): string => `audit-${String(n).padStart(6, '0')}.jsonl`;

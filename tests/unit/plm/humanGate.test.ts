@@ -102,6 +102,20 @@ describe('a confirmation is bound to its act, its params and the document state'
     expect(runRaw(doc, 'release_item', signedNow).document.plm?.item.revisions['A']?.state).toBe('released');
   });
 
+  it('a release signature binds the document definition: changing the model after signing invalidates it', () => {
+    const doc = approveAll(reviewWithEco());
+    const params = { changeOrder: 'ECO-0100', at: T, by: 'u-1' };
+    const signedNow = confirmed(doc, 'release_item', params, 'u-1');
+    const changed = { ...doc, units: doc.units === 'in' ? 'mm' : 'in' } as CadDocument;
+    expect(code(runRaw(changed, 'release_item', signedNow))).toBe('PLM_HUMAN_GATE');
+    expect(runRaw(doc, 'release_item', signedNow).document.plm?.item.revisions['A']?.state).toBe('released');
+    // the payload query exposes the content hash it binds
+    const data = run(doc, 'plm_act_payload', { command: 'release_item', params, nonce: 'abcdefgh' }).data as {
+      details: { contentHash?: string };
+    };
+    expect(data.details.contentHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
   it('a used confirmation cannot be replayed: the PLM state it bound has moved on', () => {
     const doc = inReview();
     const signed = confirmed(doc, 'record_approval', { role: 'checker' }, 'u-2');

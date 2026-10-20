@@ -115,7 +115,7 @@ export const recordSignature = defineCommand({
     const next = withRevision(doc, plm, label, { ...revision, signatures: [...revision.signatures, record] });
     return changed(
       next,
-      `${revisionText(plm, label)}: ${params.meaning} signature by ${params.signer.userId} (key ${params.keyId}) recorded over ${params.target.kind} ${params.target.ref}, sha256 ${manifest.sha256.slice(0, 12)}…`,
+      `${revisionText(plm, label)}: ${params.meaning} signature by ${known.userId} (key ${known.keyId}) recorded over ${params.target.kind} ${params.target.ref}, sha256 ${manifest.sha256.slice(0, 12)}…`,
       [],
     );
   },

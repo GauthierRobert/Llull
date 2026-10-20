@@ -1,9 +1,26 @@
-import { humanGate } from '../../model/humanGate';
+import { humanGate, humanGatePayload } from '../../model/humanGate';
+import { jcsJson } from '../../lib/jcs';
+import { sha256Hex } from '../../lib/sha256';
+import type { CadDocument } from '../../model/types';
 import type { PmiItem } from '../../model/pmi';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed } from '../noop';
 import { findPmi, pmiOf, refuse, withItem } from './pmiOps';
+
+const PMI_REVIEW_ACT = 'PMI review';
+
+/** The details a PMI review signature binds: the decision, the comment and a hash of the reviewed items (their content, without the review state). */
+function pmiReviewDetails(doc: CadDocument, pmiIds: readonly string[], decision: string, comment: string): Record<string, unknown> {
+  const items = [...pmiIds].sort().map((id) => {
+    return Object.fromEntries(Object.entries(findPmi(doc, id) as PmiItem).filter(([key]) => key !== 'review'));
+  });
+  return { decision, comment: comment.trim(), itemsHash: sha256Hex(jcsJson(items)) };
+}
+
+/** The SHA-256 a human signs to accept / reject PMI items on this document (shared with the signing endpoint, which computes it server-side). */
+export const pmiReviewPayload = (doc: CadDocument, pmiIds: readonly string[], decision: string, comment: string, nonce: string): string =>
+  humanGatePayload(PMI_REVIEW_ACT, pmiIds, pmiReviewDetails(doc, pmiIds, decision, comment), nonce);
 
 /**
  * @affects sets `review` on each listed item (accept: required false with acceptedBy / acceptedAt; reject: stays required, reason extended)
@@ -37,7 +54,13 @@ export const acceptPmiReview = defineCommand({
     if (unknown.length > 0) return refuse(doc, command, 'GDT_PMI_UNKNOWN', `no PMI item ${unknown.join(', ')}`, unknown, ['pmiIds']);
     if (decision === 'reject' && comment.trim() === '')
       return refuse(doc, command, 'GDT_NOTE_EMPTY', 'a rejection needs a comment', [], ['comment']);
-    const gate = humanGate(ctx?.humanSignature ?? null, 'PMI review', pmiIds, confirmation, { decision, comment: comment.trim() });
+    const gate = humanGate(
+      ctx?.humanSignature ?? null,
+      PMI_REVIEW_ACT,
+      pmiIds,
+      confirmation,
+      pmiReviewDetails(doc, pmiIds, decision, comment),
+    );
     if (!gate.cleared) return refuse(doc, command, 'GDT_REVIEW_HUMAN_ONLY', gate.reason, pmiIds, ['confirmation']);
     let next = doc;
     for (const id of pmiIds) {

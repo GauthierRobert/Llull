@@ -8,6 +8,7 @@ import { fillHostParams, isoSeconds, runHostCommand } from '../src/plm/hostRun';
 import { createEmptyDocument } from '@core/model/types';
 import { applyCommand, _resetHistory } from '../src/commandBus';
 import { _resetLiveDoc, getLiveDoc } from '../src/liveDocument';
+import { configureHostForTests } from '../src/plm/hostConfig';
 import { type TestHome, testHome } from './plmTestSupport';
 
 let home: TestHome;
@@ -116,21 +117,30 @@ describe('audit chain', () => {
     expect(paramsHash(undefined)).toBe(paramsHash(null));
   });
 
-  it('is off in test runs unless LLULL_AUDIT_DIR is set', () => {
-    expect(auditDir({ VITEST: '1' })).toBeNull();
-    expect(auditDir({ LLULL_AUDIT_DIR: dir })).toBe(path.resolve(dir));
-    expect(auditDir({})).toContain('.llull');
+  it('the audit directory is fixed: no environment variable moves it or switches it off', () => {
+    const saved = { ...process.env };
+    process.env['TEST'] = 'true';
+    process.env['VITEST'] = '1';
+    process.env['LLULL_AUDIT_DIR'] = path.join(home.dir, 'elsewhere');
+    try {
+      expect(auditDir()).toBe(dir);
+    } finally {
+      for (const name of ['TEST', 'LLULL_AUDIT_DIR']) {
+        if (saved[name] === undefined) delete process.env[name];
+        else process.env[name] = saved[name];
+      }
+    }
   });
 });
 
 describe('host runner', () => {
-  it('fills the time and user a plm command declares, never overrides, and leaves other commands alone', () => {
+  it('fills the time and user a plm command declares (the host clock always wins over a caller `at`) and leaves other commands alone', () => {
     const now = new Date('2026-11-02T09:30:00.123Z');
     expect(isoSeconds(now)).toBe('2026-11-02T09:30:00Z');
     expect(fillHostParams('submit_for_review', {}, now, { LLULL_USER: 'alice' })).toEqual({ at: '2026-11-02T09:30:00Z', by: 'alice' });
     expect(fillHostParams('submit_for_review', { by: 'u-1', at: '2026-01-01T00:00:00Z' }, now, {})).toEqual({
       by: 'u-1',
-      at: '2026-01-01T00:00:00Z',
+      at: '2026-11-02T09:30:00Z',
     });
     expect(fillHostParams('add_box', { size: [1, 1, 1] }, now)).toEqual({ size: [1, 1, 1] });
     // add_door and edit_nurbs declare their own `at` / `by`: only the plm toolset is host-filled
@@ -174,8 +184,8 @@ describe('host runner', () => {
 
   it('a broken audit directory never fails the command', () => {
     writeFileSync(path.join(home.dir, 'blocker'), 'x');
-    const env = { ...home.env, LLULL_AUDIT_DIR: path.join(home.dir, 'blocker', 'nested') };
-    const run = runHostCommand(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }, { source: 'rest', env });
+    configureHostForTests({ trustDir: home.trust, auditDir: path.join(home.dir, 'blocker', 'nested') });
+    const run = runHostCommand(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }, { source: 'rest' });
     expect(run.outcome.isError).toBe(false);
   });
 
