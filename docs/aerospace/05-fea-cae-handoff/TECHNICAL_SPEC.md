@@ -686,8 +686,8 @@ composite shells and the UI panels are built in FEA-REST part 3; BDF, OP2, VTU, 
   rigid-body). Not run against a real `ccx` (none is installed on the dev machine): a solver refusal of a singular free model would surface as `FEA_SOLVER_FAILED`.
   Readers: the `.dat` eigenvalue table gives `frequenciesHz`; the participation-factor, effective-modal-mass and total-effective-mass tables
   (`P A R T I C I P A T I O N  F A C T O R S`, `E F F E C T I V E  M O D A L  M A S S`, `T O T A L  E F F E C T I V E  M A S S`, translations x / y / z) are parsed
-  tolerantly into `dat.tables`; their exact layout was hand-built from the CalculiX documentation and must be confirmed against a real run (a heading without rows is
-  dropped). The mode shapes are the `.frd` result sets (`render_fea_results mode=n`). `fea_report` returns `data.eigen`
+  tolerantly into `dat.tables`; the layout (six components per row, mode number first, a `TOTAL` row after the effective masses that is not a mode) is confirmed
+  against a real ccx 2.21 run (SOLVER-VERIFY below; fixture `tests/unit/cae/fixtures/ccx221_modal_cantilever.dat`) (a heading without rows is dropped). The mode shapes are the `.frd` result sets (`render_fea_results mode=n`). `fea_report` returns `data.eigen`
   `{ kind: 'modal', modes [{ mode, frequencyHz, participation?, effectiveMass?, effectiveMassFraction? }], totalEffectiveMass, cumulativeMassFraction, massUnit, rigidBodyModes }`,
   recomputed from the verified artifact (it is not part of the trusted summary, so records made earlier stay trusted); the `describe_analysis` and `fea_report` summaries list the
   frequencies. Rigid-body modes = frequency <= max(1e-3 Hz, 1e-4 x the highest extracted frequency) (a llull heuristic).
@@ -830,7 +830,7 @@ what is verified is stated per item.
   even compiled here (no Python, no Gmsh)**; the TS side is tested with a fake kernel and a fake bridge (`tests/unit/cae/faceMapRequest.test.ts`). `edgesNear` / `intersectPlane` unchanged.
 - **Result access.** `set_result_view` (presentation data on the case, not in the input hash), `fea_result_field` (read-only registry query: a field at the extreme nodes, named nodes,
   nearest nodes of points or probes, with min / max / mean over the whole result set, from the verified artifact), and `set_buckling_preload` (a load case applied in a `*STATIC` step
-  before `*BUCKLE`, not scaled; the reference is the first other load case; unverified against ccx; the preload is in the input hash). Without a preload the deck is unchanged (one `*BUCKLE` step).
+  before `*BUCKLE`; the reference is the first other load case; measured with ccx 2.21: the factors multiply preload + reference, see SOLVER-VERIFY; the preload is in the input hash). Without a preload the deck is unchanged (one `*BUCKLE` step).
 - **Other part-1 review follow-ups** (`fix(cae)` commit): six-component ccx mass tables with a warning for unreadable ones (layout still unconfirmed against a real run),
   `fractionOfExtractedSum` instead of "of the model mass", force weights only when every target node is a face node, a `-1 Hz` lower bound for supportless modal cases,
   `set_margin_band`, `inputHash` in the signed disposition payload, a bounding-box note on `FEA_MESH_ADEQUACY`, element-type guard in `meshQuality`.
@@ -868,7 +868,8 @@ changes) was **not run or even compiled**. Real-tool tests skip with a logged re
   separately (no shell-solid coupling).
 - **Decks.** INP: `*SHELL SECTION, ELSET, MATERIAL, OFFSET=0 | 0.5 | -0.5` + thickness; shells fixed = dofs 1-6, pinned 1-3, symmetry = the normal translation + the
   rotations about the two in-plane axes (the symmetry-plane test now ignores an axis the whole mesh is flat in), displacement rx / ry / rz allowed on shells (radians);
-  pressure `*DLOAD elem, P, +-p` (label 1 -> +p, label 2 -> -p: Abaqus convention "positive acts against the shell normal", **unverified against ccx**); forces on shell
+  pressure `*DLOAD elem, P, -+p` (label 1 -> -p, label 2 -> +p: ccx 2.21 moves a shell ALONG its normal under a positive P, **measured**, SOLVER-VERIFY; the first
+  build wrote the opposite sign); forces on shell
   faces are split equally over the target nodes. An element type that does not fit the part idealization is refused (`FEA_PART_INVALID`). BDF: PSHELL (plain shells:
   offset mid only, else `FEA_BDF_UNSUPPORTED`), shell `PLOAD4 SID EID P` with P = -p for label 1 (Nastran: positive along the element normal, **unverified**),
   shell symmetry adds the rotations.
@@ -891,8 +892,8 @@ changes) was **not run or even compiled**. Real-tool tests skip with a logged re
   node of another part) and each is used once. The node gets the mean of both (midsurface displacement, membrane stress) and the fibre stresses in `STRESS_TOP` /
   `STRESS_BOT`; a node without its own pair (a kink, where ccx may join nodes into a knot) keeps STRESS written under its own number; with neither ->
   `FEA_SHELL_RESULTS_UNMAPPED`. `fea_solve` and `fea_import_results` (`.frd`) both map before any mesh check. The results summary takes the max von Mises over
-  STRESS and both fibres. The deck keeps the default `*NODE FILE` (no OUTPUT=): that the default is the expanded output, and the knot behaviour at kinks, are
-  **unverified** against ccx 2.21. **Margins on shells:** for 2D-part nodes `compute_margins` takes the largest of STRESS, STRESS_TOP and STRESS_BOT per node
+  STRESS and both fibres. The deck keeps the default `*NODE FILE` (no OUTPUT=): the default is the expanded output (**measured** with ccx 2.21, SOLVER-VERIFY); the knot
+  behaviour at kinks is still unverified (only flat parts were run). **Margins on shells:** for 2D-part nodes `compute_margins` takes the largest of STRESS, STRESS_TOP and STRESS_BOT per node
   (criterion evaluated on each; the row names the governing `fibre`), so bending is not averaged away.
 - **Defeaturing** (`defeature_for_analysis { analysisId, entityId, maxFeatureSize?, facesNear?, clear? }`, `AnalysisCase.defeature`, in the mesh input hash). The
   kernel path (`BRepAlgoAPI_Defeaturing` as a recipe node) is not reachable through the kernel interface: Gmsh `occ.defeature` in the bridge on STEP parts removes
@@ -919,10 +920,10 @@ changes) was **not run or even compiled**. Real-tool tests skip with a logged re
   singular rows apart, min MS, review notice), field / load case / mode / deformation changes dispatched as `set_result_view`, `set_margin_band` and
   `delete_analysis` actions; the disposition stays a disabled affordance (no signing port). Component tests `tests/component/AnalysisRest.test.tsx` (no Playwright).
 - **Part-2 review fixes.** `Math.max(...array)` replaced by loops (BDF ids, OP2). Preloaded `*BUCKLE`: the reference step writes preload + reference summed per node /
-  dof, element / face and GRAV (a modifying `*CLOAD` / `*DLOAD` replaces the earlier value); that the factor multiplies only the reference increment is unverified.
-  A supportless modal case writes a lower bound of -1 Hz; shift semantics unverified (ccx may read it as sigma = (2 pi fmin)^2). Decks carry `llull inputHash <16 hex>`
+  dof, element / face and GRAV (a modifying `*CLOAD` / `*DLOAD` replaces the earlier value); measured with ccx 2.21: the factor multiplies the WHOLE *BUCKLE step load (preload + reference), see SOLVER-VERIFY.
+  A supportless modal case writes a lower bound of -1 Hz; measured with ccx 2.21: accepted, six rigid-body modes at about 0 Hz then the free-free modes. Decks carry `llull inputHash <16 hex>`
   (INP `*HEADING`, BDF `SUBTITLE`); import refuses a different marker (`FEA_RESULTS_INPUT_MISMATCH`), a file without one is `binding: 'imported-unbound'` with
-  `FEA_RESULTS_UNBOUND` (import and `check_analysis` warnings); unverified: that ccx copies `*HEADING` into the .frd header, where Nastran puts SUBTITLE in the OP2.
+  `FEA_RESULTS_UNBOUND` (import and `check_analysis` warnings); measured: ccx 2.21 copies `*HEADING` into the .frd header (`1U` record), so a re-import of its own .frd binds; unverified: where Nastran puts SUBTITLE in the OP2.
   Plugin validation of `preloadLoadCase`, `marginalBand` and `view`. RBE3 needs >= 3 nodes that carry the moment (`FEA_LOAD_INVALID`). OP2: at most 1e6 records,
   text decoded only from records <= 128 bytes. The VTU export applies the deck export-control gate (`MAT_EXPORT_CONTROLLED`). The face map raises
   `AMBIGUOUS_FACE_MAP` only for a target that names the ambiguous face. Adding inputHash to the `dispose_margin` payload (part 2) makes dispositions signed before it
@@ -951,6 +952,30 @@ laminate (`packages/domain-cae/src/margins/plyMargins.ts`), per load case and no
   warning; the command refuses with the same code only when no other row exists.
 - **Limits.** First-ply failure only, linear, in-plane stresses (no interlaminar / transverse-shear failure, no wrinkling or buckling), no hygrothermal state, no
   progressive failure. The section forces are not used; the fibre stresses are. Whether CalculiX writes the expanded composite shell stresses of the outer plies
-  in the global frame for `*SHELL SECTION, COMPOSITE` is ASSUMED (the same field handling as plain shells) and was not checked against a real ccx composite run.
+  in the global frame for `*SHELL SECTION, COMPOSITE` is CONFIRMED with ccx 2.21 (SOLVER-VERIFY: [90/0/0/90] strip, top-fibre sigma_x / sigma_y in the global frame
+  within 0.5 % / 1.2 % of CLT; the expansion is one layer of nodes per ply, so the outer-surface node carries the outer ply).
 - **Tests.** `tests/unit/cae/plyMargins.test.ts` (+ `plyMarginsFixtures.ts`): recovery against CLT, rows against `strengthRatio` on the CLT truth, factors, FAIL
   / disposition, refusals and the skip reasons.
+
+**SOLVER-VERIFY (2026-10-20): measured with Gmsh 4.15.2 (pip wheel) + CalculiX 2.21 (conda-forge `calculix 2.21 h27aae45_3`) + pyNastran 1.4.1 on Windows 11**
+(install record `docs/decisions/SV1-solver-toolchain-windows.md`). Every FE suite in `server/tests/` that needs only Gmsh + ccx now runs (the native-kernel ones: see
+that record). Findings, each with a test that runs when the tools are present:
+
+| Item (was unverified) | Measured | Consequence |
+| --- | --- | --- |
+| `.dat` participation / effective-mass layout | six components per row (x, y, z, rx, ry, rz), mode number first; the effective-mass table ends with a `TOTAL` row; parsed as built | fixture `ccx221_modal_cantilever.dat`, `tests/unit/cae/eigenChecks.test.ts` |
+| `TOTAL EFFECTIVE MASS` | it is the MODEL mass (rho V: 1.555e-4 t for a 200 x 10 x 10 steel bar), not the sum over the extracted modes | **defect fixed**: the per-mode share is `fractionOfModelMass` (was `fractionOfExtractedSum`), summary "of the model mass" |
+| `*FREQUENCY n, -1` (supportless modal) | accepted; 6 rigid-body modes (<= 0.004 Hz), then the free-free bending pair at 1321.7 Hz (Euler-Bernoulli 1333 Hz, -0.8 %) | `server/tests/feaBucklingPreload.test.ts` |
+| Cantilever modal / Euler column | f1 209.73 Hz (EB 209.5), P_cr factor 4.8025 x 1000 N (pi^2 E I / 4 L^2 = 4797.8 N) | as `feaEigen` (that suite also needs the native kernel) |
+| Buckling preload + `*BUCKLE` | 2000 N preload + 1000 N reference: factor 1.6008 = P_cr / 3000 N. The factor scales the WHOLE `*BUCKLE` step load; the preceding `*STATIC` stress is not a base state (same with NLGEOM, and a reference-only `*BUCKLE` load gives 4.80, ignoring the preload) | **defect fixed (semantics)**: `data.eigen.factorsMultiply = preload_and_reference`, summary "x (preload + reference)", `set_buckling_preload` description; a constant preload is NOT expressible with ccx `*BUCKLE` |
+| Shell expansion mapping | ccx writes the .frd on the expanded nodes only (none of the 2D ids); the geometric top / bottom mapping finds them for S8 and composite S8R; plate cantilever tip 3.503 mm between plate and beam bounds (beam 3.571), top fibre +, bottom -, membrane about 0 | `server/tests/feaShellSolve.test.ts` |
+| Shell pressure sign | a positive `P` moves the shell ALONG its element normal | **defect fixed**: label 1 (load from the +normal side) writes -p, label 2 +p (`decks/mechanical.ts`) |
+| `*HEADING` in the .frd | copied as the `1U` header record; `fea_import_results` of the solver's own .frd binds (no `FEA_RESULTS_UNBOUND`) | `feaShellSolve` |
+| Composite S8R section | `*SHELL SECTION, COMPOSITE` with `*ELASTIC, TYPE=ENGINEERING CONSTANTS` and per-ply `*ORIENTATION` runs; [90/0/0/90] strip (E1 140, E2 10, G12 5 GPa, ply 0.25 mm), 1 N tip load, at x = 50: top sigma_x 5.6964 (CLT 5.694), sigma_y -0.2234 (CLT -0.226), u_z -2.3647 mm (CLT -2.371); stresses are in the GLOBAL frame (the 90-degree outer ply shows its transverse stress as sigma_x), one node layer per ply | the ply-failure margin assumption above holds |
+| Thermal suites (PHY-03), restrained / coupled thermo-mechanical (PHY-04) | pass unchanged | `server/tests/feaThermal*.test.ts`, `feaThermomech*.test.ts` |
+| pyNastran `read_bdf(xref=True)` round trip | passes (pyNastran 1.4.1) | `tests/unit/cae/bdfWriter.test.ts` |
+| Harness / host on Windows | the child-process environment allowlist was case-sensitive, so ccx ran without `Path` (DLLs not found) and Python without `SystemRoot`; the FE suites ran a bare `python3` / `ccx` instead of the probed tools | **defects fixed** (`server/src/pythonExchange.ts`, `server/tests/feaTestSupport.ts`) |
+
+With the native kernel (MinGW build, see the record): `feaEigen`, conformal bonding (`feaMeshBridge`, bimetal, NAFEMS T1) pass. Still not run here: Nastran itself
+(PLOAD4 sign, PCOMP / MAT8 / CORD2R, OP2 from a real solver), ParaView on the VTU, defeaturing, and the face map (TR-FEA-32): its `faceQuery.distance` call
+crashes the MinGW-built sidecar (`NATIVE_DIED`), so meshing fell back to the nearest-surface resolution; re-run on an MSVC or Linux kernel.

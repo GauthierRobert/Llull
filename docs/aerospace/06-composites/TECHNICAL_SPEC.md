@@ -845,3 +845,12 @@ part id to `laminate_mass`. `create_lamina_material` takes `stressUnit` (Pa, kPa
 **05 FEA.** `compute_margins` now gives ply-failure rows for composite shells (05 TECHNICAL_SPEC, "Ply-failure margins of composite shells").
 **M5 AP242 composite stays deferred** (needs the AERO-4 STEP infrastructure). Tests: `tests/unit/aero/composites/{drapeNet,drape,meshing,shopData2,cores,cutsAndUnits}.test.ts`,
 golden plans `composites_hemisphere_drape` and `composites_sandwich_shop_data`.
+
+### 13.4 SOLVER-VERIFY (2026-10-20)
+
+- **Composite shells in CalculiX 2.21** (05 deck, `*SHELL SECTION, COMPOSITE` on S8R): a [90/0/0/90] strip of this pack's lamina form runs and matches
+  CLT at mid span within 0.5 % (top-fibre stresses in the GLOBAL frame, one expanded node layer per ply): the ply-failure margins of 05 read the
+  outer plies correctly (`server/tests/feaShellSolve.test.ts`, 05 §13 SOLVER-VERIFY).
+- **Live-OCC cone (face-query path of `create_composite_part`)**: not verified. The conical face of a revolved frustum (r 100 -> 50 over 150 mm)
+  comes back from `faceDetails` as `cone` with area 74509.412 = pi (r1 + r2) s exactly, but picking the face calls `faceQuery.distance`, which
+  crashes the MinGW-built sidecar used on the verification machine (`docs/decisions/SV1-solver-toolchain-windows.md`). Still only the stub-port tests.

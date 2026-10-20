@@ -12,7 +12,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import { setGeometryKernel, type ShapeHandle } from '@core/geometry/kernel';
 import type { FaceQueryPort } from '@core/geometry/kernelPorts';
 import { deserializeDocument } from '@core/commands/persistence/serialization';
-import { sampleCurve } from '@core/lib/nurbs/evaluate';
+import { sampleCurve } from '@lib/nurbs/evaluate';
 import type { Entity, Vec3 } from '@core/model/types';
 import type { IsolatedKernel } from '../src/isolatedKernel';
 import { createNativeTestKernel, describeNative } from './kernelTestSupport';

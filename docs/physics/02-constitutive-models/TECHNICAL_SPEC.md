@@ -657,3 +657,6 @@ J2 8 × 1000 increments ≈ 40 ms, Drucker scan ≈ 4 ms, card export ≈ 0.6 ms
 libraries (08 MAT, 09 signing). Deferred inside M7: a generator-backed (Python) entry for VC-MATL-19…25; an `engine: 'mtest'` switch on `material_point_response`
 (the transport is a separate tool); Hill-48 kinematic hardening and rate dependence; a real-MFront run of the transport. The "Driver limits" line above
 ("compressible ⇒ `MATL_PATH_INVALID`") is lifted by M7.
+
+**SOLVER-VERIFY (2026-10-20):** MFront / MTest not installed: TFEL has no conda-forge win-64 package and no other trivial install on the Windows
+verification machine, so the MTest transport stays verified with the injected runner only (`docs/decisions/SV1-solver-toolchain-windows.md`).
