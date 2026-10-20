@@ -1,6 +1,6 @@
 /** Resolves a `faceNear` reference to a part surface + outline (the developed frame, 06 CMP §5.7): analytic primitives on any kernel, other solids via the face-query port. */
 
-import type { PartSurface, Rosette } from '@core/model/composites';
+import type { Rosette } from '@core/model/composites';
 import type { Entity, Vec2, Vec3 } from '@core/model/types';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { recipeOf } from '@core/geometry/shapeRecipe';
@@ -15,16 +15,10 @@ import {
   distanceToFace,
   primitiveFaces,
 } from './faceCandidates';
+import { curvedFace } from './curvedFace';
+import type { FaceResolution } from './faceResolution';
 
 const TWO_PI = 2 * Math.PI;
-
-export type FaceResolution =
-  | { readonly ok: true; readonly surface: PartSurface; readonly outline: Vec2[]; readonly faceIndex?: number }
-  | {
-      readonly ok: false;
-      readonly code: 'CMP_FACE_NOT_FOUND' | 'CMP_FACE_AMBIGUOUS' | 'CMP_FACE_UNSUPPORTED' | 'CMP_ROSETTE_DEGENERATE';
-      readonly message: string;
-    };
 
 const fail = (code: Extract<FaceResolution, { ok: false }>['code'], message: string): FaceResolution => ({ ok: false, code, message });
 
@@ -196,6 +190,8 @@ export function resolveToolFace(
   arcTolerance: number,
 ): FaceResolution {
   const tolerance = pickTolerance(entity, near);
+  const curved = curvedFace(entity, near, rosette, tolerance, arcTolerance);
+  if (curved !== null) return curved;
   const faces = primitiveFaces(entity, arcTolerance);
   if (faces !== null) {
     const picked = pickPrimitive(faces, near, tolerance);

@@ -7,6 +7,7 @@
 import type { PartSurface } from '@core/model/composites';
 import type { Vec2, Vec3 } from '@core/model/types';
 import { add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '@lib/vec3';
+import { nurbsFromFlat, nurbsHit, nurbsNormalAtFlat, sphereDirection, sphereFromFlat, sphereHit } from './curved';
 
 const TWO_PI = 2 * Math.PI;
 
@@ -22,7 +23,15 @@ export interface FlatHit {
   readonly offset: number;
 }
 
+/** True for the faces whose chart is not isometric (sphere cap, NURBS sheet): their flat patterns come from drape, not from the chart. */
+export const isDoublyCurved = (surface: PartSurface): boolean => surface.type === 'sphere' || surface.type === 'nurbs';
+
 export function toFlat(surface: PartSurface, point: Vec3): FlatHit {
+  if (surface.type === 'sphere' || surface.type === 'nurbs') {
+    const hit = surface.type === 'sphere' ? sphereHit(surface, point) : nurbsHit(surface, point);
+    if (hit === null) return { uv: [0, 0], offset: 0 };
+    return { uv: hit.uv, offset: dot3(sub3(point, hit.point), hit.normal) };
+  }
   if (surface.type === 'plane') {
     const rel = sub3(point, surface.origin);
     return { uv: [dot3(rel, surface.xDir), dot3(rel, surface.yDir)], offset: dot3(rel, surface.normal) };
@@ -40,6 +49,8 @@ export function toFlat(surface: PartSurface, point: Vec3): FlatHit {
 }
 
 export function fromFlat(surface: PartSurface, [u, v]: Vec2): Vec3 {
+  if (surface.type === 'sphere') return sphereFromFlat(surface, [u, v]);
+  if (surface.type === 'nurbs') return nurbsFromFlat(surface, [u, v]);
   if (surface.type === 'plane') return add3(surface.origin, add3(scale3(surface.xDir, u), scale3(surface.yDir, v)));
   const yDir = yDirOf(surface);
   if (surface.type === 'cylinder') {
@@ -60,6 +71,8 @@ function coneAt(surface: Extract<PartSurface, { type: 'cone' }>, rho: number, th
 
 /** Unit tool-outward normal at the flat point. */
 export function normalAt(surface: PartSurface, uv: Vec2): Vec3 {
+  if (surface.type === 'sphere') return sphereDirection(surface, uv);
+  if (surface.type === 'nurbs') return nurbsNormalAtFlat(surface, uv);
   if (surface.type === 'plane') return surface.normal;
   const yDir = yDirOf(surface);
   if (surface.type === 'cylinder') {
@@ -73,7 +86,7 @@ export function normalAt(surface: PartSurface, uv: Vec2): Vec3 {
 
 /** Unit 0-degree direction in the flat frame at `uv`: +x on a plane, the axis (+y) on a cylinder, the meridian (radial) on a cone. */
 export function zeroDirection(surface: PartSurface, uv: Vec2): Vec2 {
-  if (surface.type === 'plane') return [1, 0];
+  if (surface.type === 'plane' || surface.type === 'sphere' || surface.type === 'nurbs') return [1, 0];
   if (surface.type === 'cylinder') return [0, 1];
   const rho = Math.hypot(uv[0], uv[1]);
   return rho === 0 ? [1, 0] : [uv[0] / rho, uv[1] / rho];

@@ -9,8 +9,9 @@ import { lerp3 } from '@lib/vec3';
 import { sig } from '../shared/results';
 import { refuseCmp } from './codes';
 import { printNotation } from './notation';
-import { isUnverified } from './provenance';
+import { isUnverified } from '@lib/laminate/provenance';
 import { type StackEntry, locate, stackAt } from './sample';
+import { coreAt } from './sandwich';
 import { compositesOf, findPart } from './state';
 import { fibreDirection3d } from './surface';
 
@@ -19,11 +20,18 @@ export function sampleData(
   model: CompositesModel,
   part: CompositePart,
   point: Vec3,
-  entries: readonly StackEntry[],
+  stacked: readonly StackEntry[],
   lengthUnit: string,
 ): Record<string, unknown> {
   const uv = locate(part, point);
-  const thickness = entries.length === 0 ? 0 : (entries[entries.length - 1] as StackEntry).z1;
+  const slice = uv === null ? null : coreAt(model, part, uv);
+  const entries =
+    slice === null
+      ? stacked
+      : stacked.map((entry) =>
+          entry.ply.order >= slice.core.afterOrder ? { ...entry, z0: entry.z0 + slice.thickness, z1: entry.z1 + slice.thickness } : entry,
+        );
+  const thickness = Math.max(entries.length === 0 ? 0 : (entries[entries.length - 1] as StackEntry).z1, slice === null ? 0 : slice.z1);
   return {
     point: [...point],
     flatPoint: uv === null ? null : uv.map(sig),
@@ -31,6 +39,18 @@ export function sampleData(
     plyCount: entries.length,
     thickness: sig(thickness),
     laminate: printNotation(entries.map((entry) => entry.ply.orientation)),
+    core:
+      slice === null
+        ? null
+        : {
+            id: slice.core.id,
+            name: slice.core.name,
+            material: slice.core.materialName,
+            z0: sig(slice.z0),
+            z1: sig(slice.z1),
+            thickness: sig(slice.thickness),
+            pliesBelow: entries.filter((entry) => entry.ply.order < slice.core.afterOrder).length,
+          },
     plies: entries.map((entry) => {
       const direction = uv === null ? null : fibreDirection3d(part.surface, uv, entry.ply.orientation);
       return {

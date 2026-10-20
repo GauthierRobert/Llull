@@ -4,11 +4,13 @@ import { defineCommand, vec3, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { report } from '@core/commands/noop';
 import { analyzeStack } from './analysis';
-import type { StackPly } from './clt';
+import type { LaminaMaterial } from '@core/model/composites';
+import type { StackPly } from '@lib/laminate/clt';
 import { refuseCmp } from './codes';
-import { CRITERIA } from './failure';
+import { CRITERIA } from '@lib/laminate/failure';
 import { parseNotation } from './notation';
 import { locate, stackAt } from './sample';
+import { coreAt } from './sandwich';
 import { compositesOf, findPart } from './state';
 
 const load = (description: string): z.ZodOptional<z.ZodNumber> => z.number().describe(description).optional();
@@ -73,7 +75,7 @@ export const analyzeLaminate = defineCommand({
   }),
   run: (doc, { part: partRef, point, angles, laminate, material, loads, criteria, environment }): CommandResult => {
     const model = compositesOf(doc);
-    let stack: StackPly[];
+    let stack: StackPly<LaminaMaterial>[];
     let inputs: Record<string, unknown>;
     if (partRef !== undefined || point !== undefined) {
       const part = partRef === undefined ? null : findPart(model, partRef);
@@ -85,6 +87,15 @@ export const analyzeLaminate = defineCommand({
           'analyze_laminate',
           'CMP_POINT_OFF_PART',
           'give a point on the part (it projects outside its outline)',
+          [part.id],
+          ['params.point'],
+        );
+      if (coreAt(model, part, uv) !== null)
+        return refuseCmp(
+          doc,
+          'analyze_laminate',
+          'CMP_CORE_UNSUPPORTED',
+          `a sandwich core lies at [${point?.join(', ')}]; analyze_laminate treats the stack as a plain laminate`,
           [part.id],
           ['params.point'],
         );

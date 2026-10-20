@@ -152,7 +152,7 @@ describe('create_composite_part', () => {
 
   it('refuses solids that need the OCC kernel on a mesh kernel', () => {
     let doc = apply(withMaterials(), 'define_rosette', ROSETTE);
-    const sphere = ok(doc, 'add_sphere', { radius: 10 });
+    const sphere = ok(doc, 'add_torus', { ringRadius: 10, tubeRadius: 3 });
     doc = sphere.document;
     expectRefusal(
       doc,

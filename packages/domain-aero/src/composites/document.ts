@@ -60,8 +60,8 @@ export function compositesErrors(slice: unknown): string[] {
       const surface = p['surface'];
       const out: string[] = [];
       if (p['id'] !== id) out.push(`composites.parts.${id}.id must equal its key`);
-      if (!isRecord(surface) || !['plane', 'cylinder', 'cone'].includes(surface['type'] as string))
-        out.push(`composites.parts.${id}.surface.type must be plane, cylinder or cone`);
+      if (!isRecord(surface) || !['plane', 'cylinder', 'cone', 'sphere', 'nurbs'].includes(surface['type'] as string))
+        out.push(`composites.parts.${id}.surface.type must be plane, cylinder, cone, sphere or nurbs`);
       if (!isVec2List(p['outline']) || p['outline'].length < 3)
         out.push(`composites.parts.${id}.outline must be at least 3 [x, y] vertices`);
       if (!isRecord(slice['rosettes']) || !isText(p['rosetteId']) || !Object.hasOwn(slice['rosettes'], p['rosetteId']))
@@ -128,6 +128,22 @@ export function compositesErrors(slice: unknown): string[] {
             (!isRecord(slice['zones']) || !isText(s['zoneId']) || !Object.hasOwn(slice['zones'], s['zoneId']))
           )
             out.push(`composites.sections.${id} references a missing zone`);
+          return out;
+        })),
+    ...(slice['cores'] === undefined
+      ? []
+      : tableErrors(slice, 'cores', (id, c) => {
+          const out: string[] = [];
+          if (!isRecord(slice['parts']) || !isText(c['partId']) || !Object.hasOwn(slice['parts'], c['partId']))
+            out.push(`composites.cores.${id} references a missing part`);
+          if (!isRecord(slice['materials']) || !isText(c['materialName']) || !Object.hasOwn(slice['materials'], c['materialName']))
+            out.push(`composites.cores.${id} references a missing material`);
+          if (!isVec2List(c['boundary']) || c['boundary'].length < 3)
+            out.push(`composites.cores.${id}.boundary must be at least 3 [x, y] vertices`);
+          if (!positive(c['thickness'])) out.push(`composites.cores.${id}.thickness must be > 0`);
+          if (!positive(c['chamferAngle']) || (c['chamferAngle'] as number) > 90)
+            out.push(`composites.cores.${id}.chamferAngle must be in (0, 90]`);
+          if (!isNumber(c['afterOrder']) || (c['afterOrder'] as number) < 0) out.push(`composites.cores.${id}.afterOrder must be >= 0`);
           return out;
         })),
     ...tableErrors(slice, 'waivers', (id, w) =>

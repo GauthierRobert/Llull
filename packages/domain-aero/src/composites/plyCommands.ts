@@ -3,7 +3,7 @@
 import { defineCommand, vec2, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
-import type { CompositePart, CompositesModel, Ply, PlyBoundary, Rosette } from '@core/model/composites';
+import type { CompositePart, CompositesModel, Ply, PlyBoundary, PlyDrape, Rosette } from '@core/model/composites';
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { nextId } from '@lib/id';
 import { polygonArea, selfIntersects, toCounterClockwise } from '@lib/polygon';
@@ -12,6 +12,7 @@ import { syncOutlines } from './derive';
 import { frameRefusal, orientationInPartFrame } from './plyFrame';
 import { insideOrOn } from './geometry2d';
 import { normalizeAngle } from './notation';
+import { isDoublyCurved } from './surface';
 import { compact, compositesOf, findPart, findPly, findRosette, pliesOf, withComposites } from './state';
 
 const boundaryParam = z
@@ -42,7 +43,39 @@ function toBoundary(boundary: BoundaryParam, part: CompositePart): PlyBoundary |
   return { kind: 'polygons', polygons: boundary.polygons.map((polygon): Vec2[] => toCounterClockwise(polygon)) };
 }
 
-/** `plies` renumbered 0..n-1 in their current stacking order (immutably). */
+const drapeParam = z
+  .object({
+    method: z
+      .enum(['developable', 'projection', 'kinematic'])
+      .describe(
+        'Flattening method: "developable" (default on plane / cylinder / cone), "projection" (no shear model), "kinematic" (fishnet drape; the only method on sphere / nurbs_surface faces and their default).',
+      )
+      .optional(),
+    stepLength: z.number().describe('Fishnet cell size, document length units, > 0; default the outline diagonal / 200.').optional(),
+    seed: vec2('Chart point [x, y] where the drape starts; default the pole of a sphere cap / centre of a nurbs sheet.').optional(),
+    allowOverLock: z.boolean().describe('Allow flat patterns over the material locking angle (default false).').optional(),
+  })
+  .describe('Drape settings.');
+
+type DrapeParam = z.output<typeof drapeParam>;
+
+/** The stored drape settings, or the refusal reason. */
+function toDrape(drape: DrapeParam | undefined, part: CompositePart): PlyDrape | undefined | string {
+  const curved = isDoublyCurved(part.surface);
+  const method = drape?.method ?? (curved ? 'kinematic' : undefined);
+  if (drape === undefined && !curved) return undefined;
+  if (curved && method !== 'kinematic') return 'a sphere or nurbs_surface tool face is doubly curved: only the kinematic drape applies';
+  if (drape?.stepLength !== undefined && !(Number.isFinite(drape.stepLength) && drape.stepLength > 0))
+    return 'drape.stepLength must be a number > 0';
+  return compact<PlyDrape>({
+    method: method ?? 'developable',
+    stepLength: drape?.stepLength,
+    seed: drape?.seed === undefined ? undefined : [drape.seed[0], drape.seed[1]],
+    allowOverLock: drape?.allowOverLock,
+  });
+}
+
+/** The plies renumbered 0..n-1 in their current stacking order (immutably). */
 function renumbered(plies: Readonly<Record<string, Ply>>, ordered: readonly Ply[]): Record<string, Ply> {
   return { ...plies, ...Object.fromEntries(ordered.map((ply, order) => [ply.id, { ...ply, order }])) };
 }
@@ -81,7 +114,7 @@ export const addPly = defineCommand({
     'direction, about the tool-face normal; on cylinders / cones 0 degrees is along the axis / meridian) over a boundary on the tool ' +
     'face. By default it goes on top of the stack (stacking runs from the tool side); `order` (0 = tool side) inserts it elsewhere. ' +
     '`sequence` is the ply-book label (default "S<n>"). boundary { kind: "whole_face" } covers the whole face; { kind: "polygon", ' +
-    'polygons } uses regions in the part frame. `drape.method` "developable" (default) or "projection" (no shear model yet). Planar ' +
+    'polygons } uses regions in the part frame. `drape.method` "developable" (default on plane / cylinder / cone), "projection" or "kinematic" (fishnet drape, the only method on sphere / nurbs_surface faces; with optional stepLength, seed, allowOverLock). Planar ' +
     'parts get a derived outline polyline per piece. Prefer define_zone + generate_plies_from_zones for thickness-varying skins.',
   params: z.object({
     part: z.string().describe('Part id or name.'),
@@ -94,10 +127,7 @@ export const addPly = defineCommand({
     order: z.number().describe('Stacking index to insert at, 0 = tool side (integer); default on top.').optional(),
     boundary: boundaryParam,
     rosette: z.string().describe('Rosette id or name; default the part rosette.').optional(),
-    drape: z
-      .object({ method: z.enum(['developable', 'projection']).describe('Flattening method; default "developable".') })
-      .describe('Drape settings.')
-      .optional(),
+    drape: drapeParam.optional(),
   }),
   run: (doc, { part: partRef, name, material, orientation, sequence, order, boundary, rosette, drape }): CommandResult => {
     const model = compositesOf(doc);
@@ -113,6 +143,8 @@ export const addPly = defineCommand({
     if (frameRefused !== null) return frameRefused;
     const stored = toBoundary(boundary, part);
     if (typeof stored === 'string') return refuseCmp(doc, 'add_ply', 'CMP_ZONE_BOUNDARY_INVALID', stored, [part.id], ['params.boundary']);
+    const storedDrape = toDrape(drape, part);
+    if (typeof storedDrape === 'string') return refuseCmp(doc, 'add_ply', 'CMP_PARAM_INVALID', storedDrape, [part.id], ['params.drape']);
     const existing = pliesOf(model, part.id);
     if (existing.some((ply) => ply.name === name))
       return refuseCmp(doc, 'add_ply', 'CMP_NAME_TAKEN', `part "${part.name}" already has a ply "${name}"`, [], ['params.name']);
@@ -129,7 +161,7 @@ export const addPly = defineCommand({
         sequence: sequence ?? `S${(at ?? existing.length) + 1}`,
         rosetteId: ros.id,
         boundary: stored,
-        ...(drape === undefined ? {} : { drape }),
+        ...(storedDrape === undefined ? {} : { drape: storedDrape }),
       },
       at,
     );

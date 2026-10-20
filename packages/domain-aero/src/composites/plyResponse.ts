@@ -14,8 +14,8 @@ import {
   missingHygrothermal,
   plyStressAt,
   strainsFor,
-} from './clt';
-import { type Criterion, DEFAULT_F12_STAR, type Strengths, strengthRatio, strengthsOf } from './failure';
+} from '@lib/laminate/clt';
+import { type Criterion, DEFAULT_F12_STAR, type Strengths, strengthRatio, strengthsOf } from '@lib/laminate/failure';
 import { larc03Constants, larc03Index, larc03Ratio } from './larc03';
 
 type Outcome<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly code: string; readonly message: string };
@@ -83,7 +83,7 @@ export interface Response {
  * @failure criteria without their material data -> CMP_MATERIAL_ALLOWABLE_MISSING; an environment without alpha / beta -> CMP_MATERIAL_HYGROTHERMAL_MISSING
  */
 export function respond(
-  stack: readonly StackPly[],
+  stack: readonly StackPly<LaminaMaterial>[],
   laminate: Laminate,
   abdInverse: Matrix,
   load: Load6,
@@ -187,7 +187,7 @@ export function respond(
 
 /** Effective laminate expansion per kelvin (unrestrained, no moisture): mid-plane strain and curvature, or null without alpha data. */
 export function thermalExpansion(
-  stack: readonly StackPly[],
+  stack: readonly StackPly<LaminaMaterial>[],
   laminate: Laminate,
   abdInverse: Matrix,
 ): { strain: number[]; curvature: number[] } | null {

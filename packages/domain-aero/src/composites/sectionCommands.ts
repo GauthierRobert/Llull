@@ -8,15 +8,18 @@ import { nextId } from '@lib/id';
 import { sig } from '../shared/results';
 import { refuseCmp } from './codes';
 import { representativePoint, stackAt } from './sample';
+import { coreAt } from './sandwich';
 import { compositesOf, findPart, withComposites, zonesOf } from './state';
 
 /** One section per zone (the plies laid where the zone governs), or one for the whole part when it has no zones. */
-function sectionsOf(model: CompositesModel, part: CompositePart): Omit<LaminateSection, 'id'>[] {
+function sectionsOf(model: CompositesModel, part: CompositePart): Omit<LaminateSection, 'id'>[] | string {
   const zones = zonesOf(model, part.id);
   const stations =
     zones.length === 0
       ? [{ name: part.name, zoneId: undefined, uv: representativePointOfPart(part) }]
       : zones.map((zone) => ({ name: zone.name, zoneId: zone.id as string | undefined, uv: representativePoint(model, part, zone) }));
+  const cored = stations.find((station) => coreAt(model, part, station.uv) !== null);
+  if (cored !== undefined) return cored.name;
   return stations.flatMap((station) => {
     const entries = stackAt(model, part, station.uv);
     if (entries.length === 0) return [];
@@ -61,6 +64,15 @@ export const createLaminateSections = defineCommand({
     const part = findPart(model, partRef);
     if (part === null) return refuseCmp(doc, 'create_laminate_sections', 'CMP_REF_MISSING', `no part '${partRef}'`, [], ['params.part']);
     const built = sectionsOf(model, part);
+    if (typeof built === 'string')
+      return refuseCmp(
+        doc,
+        'create_laminate_sections',
+        'CMP_CORE_UNSUPPORTED',
+        `zone "${built}" of part "${part.name}" lies over a core; sandwich sections are not written`,
+        [part.id],
+        ['params.part'],
+      );
     if (built.length === 0)
       return refuseCmp(doc, 'create_laminate_sections', 'CMP_NO_PLIES', `part "${part.name}" has no plies`, [part.id], ['params.part']);
     const kept = Object.fromEntries(Object.entries(model.sections ?? {}).filter(([, section]) => section.partId !== part.id));
