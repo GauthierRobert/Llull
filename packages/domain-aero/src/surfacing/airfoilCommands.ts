@@ -166,14 +166,14 @@ export const importAirfoil = defineCommand({
       return refuse('AERO_AIRFOIL_HASH_MISMATCH', `sha256 of the text is ${hash}, not ${expectedSha256}`, 'params.expectedSha256');
     const normalised = normalize === 'chord' ? normalizeToChord(parsed.points) : [...parsed.points];
     const shaped = trailingEdge === 'closed' ? [...normalised.slice(0, -1), normalised[0] as Vec2] : normalised;
-    const crossing = crossingIndex(normalizeToChord(parsed.points));
+    const crossing = crossingIndex(normalizeToChord(shaped));
     if (crossing >= 0)
       return refuse('AERO_AIRFOIL_SELF_INTERSECT', `the lower surface crosses the upper surface at point ${crossing}`, `params.text`);
     const gap = trailingEdgeGap(normalizeToChord(parsed.points));
     if (trailingEdge === 'closed' && gap > 1e-4)
       return refuse('AERO_AIRFOIL_TE_GAP', `trailing-edge gap ${sig(gap)} chord exceeds 1e-4`, 'params.trailingEdge');
     const verified = expectedSha256 !== undefined;
-    return registerAirfoil(
+    const created = registerAirfoil(
       doc,
       'import_airfoil',
       { type: 'points', format: parsed.format, name: parsed.name, sha256: hash, points: parsed.points },
@@ -186,6 +186,9 @@ export const importAirfoil = defineCommand({
       position,
       ctx,
     );
+    return trailingEdge === 'closed' && gap > 0 && created.affected.length > 0
+      ? { ...created, summary: `${created.summary} Closed trailing edge: the last point moved ${sig(gap)} chord onto the first.` }
+      : created;
   },
 });
 

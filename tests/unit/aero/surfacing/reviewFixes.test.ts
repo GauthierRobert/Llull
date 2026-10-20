@@ -4,6 +4,7 @@ import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { evaluateCurve } from '@lib/nurbs/evaluate';
 import { nacaOrdinates, parseNaca } from '@aero/aerodynamics/naca';
+import { expectNoOp } from '../../../helpers/expectNoOp';
 
 const empty = createEmptyDocument();
 const naca = execute(empty, 'airfoil_from_naca', { designation: '0012' });
@@ -59,6 +60,13 @@ describe('import_airfoil trailingEdge closed', () => {
     const closed = execute(empty, 'import_airfoil', { text, trailingEdge: 'closed' });
     expect(ends(kept.document, kept.affected[1]!)).toBeGreaterThan(4e-5);
     expect(ends(closed.document, closed.affected[1]!)).toBeLessThan(1e-9);
+    expect(closed.summary).toContain('Closed trailing edge');
+    const wide = execute(empty, 'import_airfoil', {
+      text: `blunt\n${(naca.document.entities[curveId] as NurbsCurveEntity).curve.poles.map(([x, y]) => `${x} ${y}`).join('\n')}\n`,
+      trailingEdge: 'closed',
+    });
+    expectNoOp(wide, empty);
+    expect(wide.error?.code).toBe('AERO_AIRFOIL_TE_GAP');
   });
 });
 
