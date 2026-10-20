@@ -167,6 +167,13 @@ describe('route_problem', () => {
     expectRefusal(routed, 'route_problem', params(s), 'RTE_PORT_IN_USE', 'from.portId');
   });
 
+  it('refuses a document that is not in mm (RTE_UNITS_UNSUPPORTED): ODs and the lattice are mm', () => {
+    const s = scenario();
+    const metres: CadDocument = { ...s.doc, units: 'm' };
+    expectRefusal(metres, 'route_problem', params(s), 'RTE_UNITS_UNSUPPORTED');
+    expectRefusal(metres, 'auto_route_pipe', params(s), 'RTE_UNITS_UNSUPPORTED');
+  });
+
   it('refuses a stub that runs into an obstacle', () => {
     const s = scenario();
     const blocked = apply(s.doc, 'add_box', { size: [100, 400, 400], position: [250, 0, 0] });

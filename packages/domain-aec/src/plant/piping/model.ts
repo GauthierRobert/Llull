@@ -14,12 +14,15 @@ export const withPiping = (doc: CadDocument, piping: PipingModel): CadDocument =
 const REMEDIATION: Readonly<Record<string, string>> = {
   RTE_UNKNOWN_LINE: 'Create the line first with create_pipeline and pass its id (affected[0]).',
   RTE_UNKNOWN_PORT: 'Pass the id of a tie-in point (add_tie_in_point) or { point, direction } for an open end.',
-  RTE_PORT_IN_USE: 'Route from a free tie-in point; a tie-in takes one run (branches come with add_branch, 02 M2).',
+  RTE_UNKNOWN_RUN: 'Pass the id of a routed run (affected[0] of auto_route_pipe; plant.piping.runOrder).',
+  RTE_PORT_IN_USE:
+    'Route from a free tie-in point; a tie-in takes one run (delete_pipe_run frees it; branches come with add_branch, 02 M2).',
   RTE_INVALID_PORT: 'Give a non-zero direction pointing from the connection face toward the pipe.',
   RTE_DUPLICATE_TAG: 'Choose another tag; tie-in tags are unique.',
   RTE_DUPLICATE_LINE_NUMBER: 'Choose another sequence or pass an explicit unique lineNumber.',
   RTE_SPEC_NO_COMPONENT: 'Use a tabulated size, or pass the dimension explicitly (elbowCentreToEnd, flangeSetLength).',
   RTE_SIZE_MISMATCH: 'Route between ports of the line size, or change the line DN.',
+  RTE_UNITS_UNSUPPORTED: 'Route in a mm document (plant lengths, ODs and the lattice are in mm until unit conversion lands): set_units mm.',
   RTE_PORT_DIRECTION: 'Auto-routing needs ports facing along +X, -X, +Y, -Y, +Z or -Z.',
   RTE_UNKNOWN_KEEPOUT: 'Pass ids of existing entities in keepOut (find_entities), or boxes in keepOutBoxes.',
   RTE_AUTOROUTE_NO_PATH: 'Widen the grid box (gridMargin), lower the clearance, use a finer grid or move the ports onto a common grid.',

@@ -110,7 +110,7 @@ export const pipingDerivationGuard: DerivationGuard = {
     if (edited.length === 0) return null;
     return (
       `it would edit the derived geometry of pipe run(s) ${edited.join(', ')}. ` +
-      'Pipe runs change through the piping commands (auto_route_pipe); derived geometry is read-only.'
+      'Pipe runs change through the piping commands (auto_route_pipe, delete_pipe_run); derived geometry is read-only.'
     );
   },
 };

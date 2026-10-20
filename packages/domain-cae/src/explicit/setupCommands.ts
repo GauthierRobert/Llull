@@ -6,7 +6,7 @@ import type { Vec3 } from '@core/model/vectors';
 import type { CadDocument } from '@core/model/types';
 import type { AnalysisCase } from '@core/model/analysis';
 import { defineCommand, z } from '@core/commands/schema';
-import { changed } from '@core/commands/noop';
+import { changed, noop } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { convertValue, isUnitFailure } from '@lib/quantity';
 import { nextId } from '@lib/id';
@@ -233,6 +233,8 @@ export const setInitialVelocity = defineCommand({
     const existing = Object.entries(spec.initialVelocities).find(([, entry]) => entry.entityId === entityId)?.[0];
     const rest = Object.fromEntries(Object.entries(spec.initialVelocities).filter(([id]) => id !== existing));
     const zero = vector.every((component) => component === 0);
+    if (zero && existing === undefined)
+      return noop(doc, `set_initial_velocity: ${entityId} already has no initial velocity in ${analysisId}.`);
     const id = existing ?? nextId('iv');
     const initialVelocities = zero ? rest : { ...spec.initialVelocities, [id]: { entityId, velocity: vector } };
     return changed(

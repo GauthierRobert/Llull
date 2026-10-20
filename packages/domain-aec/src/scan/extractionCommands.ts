@@ -3,7 +3,7 @@
  * run through add_pipe_run (L10: composed with execute); the commit holds every value, so replay never reads the cloud (TR-SCN-04).
  */
 
-import type { ExtractionRecord } from '@core/model/pointCloud';
+import type { ExtractionRecord, Mat4 } from '@core/model/pointCloud';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
@@ -16,6 +16,7 @@ import { getBuilding, resolveLevel } from '../building/model';
 import { levelIdParam } from '../building/levelParams';
 import { refuseScan } from './codes';
 import { extractionHash, unverifiedReasons, type PendingExtraction } from './extraction';
+import { sameTransform } from './mat4';
 import { findCloud, fromM, scanOf, withScan } from './model';
 import { regionSpec } from './region';
 import { regionParam } from './schemas';
@@ -96,6 +97,15 @@ export const commitAsbuiltExtraction = defineCommand({
         `no attached cloud '${extraction.cloudId}'`,
         [extraction.cloudId],
         ['extraction.cloudId'],
+      );
+    if (!sameTransform(cloud.transform, extraction.cloudTransform as Mat4))
+      return refuseScan(
+        doc,
+        command,
+        'SCN_EXTRACTION_STALE',
+        `cloud ${cloud.id} moved since the fit: the extraction is in its old frame`,
+        [cloud.id],
+        ['extraction.cloudTransform'],
       );
     const scan = scanOf(doc);
     const twin = Object.values(scan.extractions).find((e) => e.extractionHash === extraction.extractionHash);

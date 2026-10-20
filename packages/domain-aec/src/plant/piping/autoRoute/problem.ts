@@ -178,6 +178,8 @@ const strictlyInside = (p: Int3, box: ObstacleBox): boolean =>
  *   common lattice or a blocked port stub -> ProblemRefusal (RTE_* code, ids, param paths)
  */
 export function buildRouteProblem(doc: CadDocument, request: RouteRequest): BuiltProblem | ProblemRefusal {
+  if (doc.units !== 'mm')
+    return refusal('RTE_UNITS_UNSUPPORTED', `auto-routing reads plant lengths in mm; this document is in ${doc.units}`, []);
   const piping = getPiping(doc);
   const line = piping.lines[request.lineId];
   if (line === undefined) return refusal('RTE_UNKNOWN_LINE', `no pipe line "${request.lineId}"`, ['lineId']);

@@ -32,7 +32,7 @@ export const routeProblem = defineCommand({
     'integer-micrometre costs (bend cost, rack-elevation penalty) and every obstacle box inflated by pipe radius + insulation + clearance ' +
     '(3D entities, legs of existing runs, keep-outs). data = { problem, problemHash, defaults, elbowCentreToEnd, portOwners, unverified }; ' +
     'the native router (llull auto_route, llull-compute route) solves it and auto_route_pipe checks the solution against the same hash. ' +
-    'Refusals: RTE_UNKNOWN_LINE, RTE_UNKNOWN_PORT, RTE_PORT_IN_USE, RTE_SIZE_MISMATCH, RTE_PORT_DIRECTION, RTE_SPEC_NO_COMPONENT, ' +
+    'Refusals: RTE_UNITS_UNSUPPORTED (non-mm document), RTE_UNKNOWN_LINE, RTE_UNKNOWN_PORT, RTE_PORT_IN_USE, RTE_SIZE_MISMATCH, RTE_PORT_DIRECTION, RTE_SPEC_NO_COMPONENT, ' +
     'RTE_UNKNOWN_KEEPOUT, RTE_AUTOROUTE_NO_PATH.',
   annotations: { readOnly: true },
   params: z.object(routeParamsShape),

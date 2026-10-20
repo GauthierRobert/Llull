@@ -219,6 +219,8 @@ describe('commit_asbuilt_extraction / accept_asbuilt_extraction', () => {
     expect(code(committed, { extraction })).toBe('SCN_EXTRACTION_DUPLICATE');
     const detached = execute(doc, 'detach_point_cloud', { cloudId }).document;
     expect(code(detached, { extraction })).toBe('SCN_CLOUD_NOT_FOUND');
+    const moved = execute(doc, 'update_point_cloud', { cloudId, transform: [1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] }).document;
+    expect(code(moved, { extraction })).toBe('SCN_EXTRACTION_STALE');
     expectPure(doc, () => execute(doc, 'commit_asbuilt_extraction', { extraction }, ctx));
   });
 

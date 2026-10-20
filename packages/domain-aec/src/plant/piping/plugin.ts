@@ -8,12 +8,13 @@ import { commandCatalog } from '@core/commands/schema';
 import { addTieInPoint } from './commands/tieIn';
 import { createPipeline } from './commands/pipeline';
 import { autoRoutePipe, routeProblem } from './commands/autoRoute';
+import { deletePipeRun } from './commands/deleteRun';
 import { pipingDerivationGuard, pipingDocument } from './derive';
 
 export const pipingPlugin: CadPlugin = {
   name: 'piping',
   toolset: 'piping',
-  commands: commandCatalog(addTieInPoint, createPipeline, routeProblem, autoRoutePipe),
+  commands: commandCatalog(addTieInPoint, createPipeline, routeProblem, autoRoutePipe, deletePipeRun),
   guards: [pipingDerivationGuard],
   document: pipingDocument,
 };

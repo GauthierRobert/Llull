@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FeMeshArtifact } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
+import { execute } from '@core/commands/registry';
 import { buildExplicitJob, type ExplicitJob } from '@cae/index';
 import { explicitInputHash } from '@cae/explicit/hash';
 import { barModel, must } from './support';
@@ -103,6 +104,13 @@ describe('buildExplicitJob', () => {
       velocity: { vector: [0, 0, 0], unit: 'mm/s' },
     });
     expect(refusal(noVelocity.document, model.analysisId)).toBe('EXP_NO_EXCITATION');
+    const again = execute(noVelocity.document, 'set_initial_velocity', {
+      analysisId: model.analysisId,
+      entityId: model.barId,
+      velocity: { vector: [0, 0, 0], unit: 'mm/s' },
+    });
+    expect(again.document).toBe(noVelocity.document);
+    expect(again.affected).toEqual([]);
     const bare = must(model.doc, 'add_box', { size: [5, 5, 5], position: [50, 0, 0] });
     const withBare = must(bare.document, 'set_part_idealization', { analysisId: model.analysisId, entityId: bare.affected[0] });
     expect(refusal(withBare.document, model.analysisId)).toBe('EXP_MATERIAL_INCOMPLETE');
