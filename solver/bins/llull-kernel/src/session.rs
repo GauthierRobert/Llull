@@ -23,7 +23,7 @@ pub const PANIC: &str = "NATIVE_PANIC";
 pub const NOT_CACHED: &str = "shape not cached";
 
 /// Operations answered natively besides `queries::QUERY_OPS`; every other op replies `NATIVE_UNSUPPORTED`.
-pub const OPS: [&str; 6] = ["info", "evaluate", "tessellate", "massProperties", "analyze", "exportStep"];
+pub const OPS: [&str; 7] = ["info", "evaluate", "tessellate", "massProperties", "analyze", "exportStep", "exportIges"];
 
 /// Every op the session answers (`info().ops`).
 pub fn native_ops() -> Vec<&'static str> {
@@ -71,7 +71,7 @@ fn bounds_json(values: &[f64]) -> Value {
 }
 
 fn info() -> Value {
-    let capabilities: Vec<&str> = ["analyze", "massProperties", "exportStep"].into_iter().chain(QUERY_CAPABILITIES).collect();
+    let capabilities: Vec<&str> = ["analyze", "massProperties", "exportStep", "exportIges"].into_iter().chain(QUERY_CAPABILITIES).collect();
     json!({
         "occtVersion": occt_version(),
         "build": format!("llull-kernel@{}", env!("CARGO_PKG_VERSION")),
@@ -157,13 +157,15 @@ impl Session {
                     "freeFaces": report.free_faces,
                 }))
             }),
-            "exportStep" => self.export_step(first),
+            "exportStep" => self.export_with(first, "exportStep", export_step),
+            "exportIges" => self.export_with(first, "exportIges", llull_kernel_occt::features::export_iges),
             other => queries::dispatch(self, other, args).unwrap_or_else(|| Reply::fail(UNSUPPORTED, format!("op '{other}'"))),
         }
     }
 
-    fn export_step(&mut self, handles: &Value) -> Reply {
-        let Some(list) = handles.as_array() else { return Reply::fail(BAD_REQUEST, "exportStep expects [handles]") };
+    /// `exportStep` / `exportIges`: the exchange text of the resolved handles, null when one is refused or the writer refuses.
+    fn export_with(&mut self, handles: &Value, op: &str, write: fn(&[&Shape]) -> Result<Option<String>, String>) -> Reply {
+        let Some(list) = handles.as_array() else { return Reply::fail(BAD_REQUEST, format!("{op} expects [handles]")) };
         let mut shapes = Vec::with_capacity(list.len());
         for handle in list {
             match self.resolve(handle) {
@@ -173,7 +175,7 @@ impl Session {
             }
         }
         let borrowed: Vec<&Shape> = shapes.iter().map(Rc::as_ref).collect();
-        match export_step(&borrowed) {
+        match write(&borrowed) {
             Ok(text) => Reply::ok(text.map_or(Value::Null, Value::String)),
             Err(error) => Reply::fail(OCC_FAILURE, error),
         }

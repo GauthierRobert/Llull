@@ -1,0 +1,1 @@
+{ "actions": [{ "command": "add_box", "params": { "size": [1, 1, 1] } }] }

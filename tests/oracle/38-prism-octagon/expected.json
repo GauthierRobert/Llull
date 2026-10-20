@@ -1,0 +1,14 @@
+{
+  "id": "38-prism-octagon",
+  "family": "prism",
+  "description": "regular octagon R=3 extruded 0.5",
+  "source": "analytic",
+  "formula": "V = A_polygon * depth (shoelace); centroid = polygon centroid, depth/2; A = 2 A_polygon + perimeter * depth",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 12.7279220614,
+  "area": 60.0960906222,
+  "centroid": [0, 0, 0.25],
+  "bbox": { "min": [-3, -3, 0], "max": [3, 3, 0.5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

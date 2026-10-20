@@ -1,0 +1,19 @@
+{
+  "id": "103-hole-on-sketch-points",
+  "family": "hole",
+  "description": "four d=3 through holes in a 20x20x4 plate placed on 2 point entities and the 2 vertices of a polyline sketched on the top face",
+  "source": "analytic",
+  "formula": "V = abc - 4 pi r^2 h; A = A0 + 4 (2 pi r h - 2 pi r^2)",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 1486.90266447,
+  "area": 1214.24777961,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-10, -10, -2], "max": [10, 10, 2] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": 0.00618352458321573,
+    "area": 0.021444504226559014,
+    "reason": "bore tessellated as an inscribed n-gon (n from the kernel default circle resolution): loss <= k (1 - cos(pi/n)) of the removed share"
+  }
+}

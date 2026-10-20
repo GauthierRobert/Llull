@@ -8,6 +8,7 @@ import { defineCommand, vec3, z } from '../schema';
 import { idOrNext } from '../entity/explicitId';
 import { changed, commandError, failer, rejection } from '../noop';
 import { dynamicsIdTaken, dynamicsOf, withDynamics } from './bodies';
+import { BODY_JOINT_KINDS, bodyJointKind } from './kinematicKinds';
 
 const RAD_PER_S_PER_RPM = (2 * Math.PI) / 60;
 
@@ -43,8 +44,11 @@ export const addBodyJoint = defineCommand({
     'Spring energy counts in the potential energy of simulate_motion (energy: true). A spring needs a tree joint (not a loop-closing one). Returns the joint id in affected[0].',
   params: z.object({
     kind: z
-      .enum(['revolute', 'prismatic', 'spherical'])
-      .describe('"revolute" = rotation about the axis; "prismatic" = translation along it; "spherical" = ball pin, loop closure only.'),
+      .enum(BODY_JOINT_KINDS)
+      .describe(
+        '"revolute" = rotation about the axis (MuJoCo hinge); "prismatic" = translation along it (slide); "spherical" or "ball" = ball pin, loop closure only. ' +
+          'rigid, cylindrical, pin_slot, planar and cam exist as kinematic joints (add_joint) but have no single MuJoCo joint: they are refused here with the composition to use.',
+      ),
     child: z.string().describe('Id of the moving body.'),
     parent: z.string().optional().describe(`Body the child is mounted on, or "${GROUND}" (default) for the fixed world.`),
     anchor: vec3('World point on the joint axis (the pin centre for spherical), document units, e.g. the shaft centre [0, 200, 800].'),
@@ -79,7 +83,9 @@ export const addBodyJoint = defineCommand({
     if (child.fixed) return fail(`body '${child.id}' is fixed to the ground and cannot move`);
     if (parent !== GROUND && dynamics.bodies[parent] === undefined) return fail(`parent body '${parent}' not found`);
     if (parent === child.id) return fail(`a body cannot be jointed to itself ('${parent}')`);
-    const spherical = params.kind === 'spherical';
+    const kind = bodyJointKind(params.kind);
+    if (typeof kind === 'object') return fail(kind.refusal);
+    const spherical = kind === 'spherical';
     const axis: Vec3 = params.axis ?? [0, 0, 1];
     if (!spherical && (params.axis === undefined || Math.hypot(...axis) < 1e-12)) return fail('axis must be a non-zero vector');
     const requestedSpeed = params.initialRpm !== undefined || (params.initialVelocity ?? 0) !== 0;
@@ -91,10 +97,10 @@ export const addBodyJoint = defineCommand({
     const jointId = idOrNext(params.id, 'bjoint');
     if (dynamicsIdTaken(dynamics, jointId)) return fail(`id '${jointId}' is already used`);
     const initialVelocity =
-      params.initialRpm !== undefined && params.kind === 'revolute' ? params.initialRpm * RAD_PER_S_PER_RPM : (params.initialVelocity ?? 0);
+      params.initialRpm !== undefined && kind === 'revolute' ? params.initialRpm * RAD_PER_S_PER_RPM : (params.initialVelocity ?? 0);
     const joint: DynamicJoint = {
       id: jointId,
-      kind: params.kind,
+      kind,
       parent,
       child: child.id,
       anchor: params.anchor,
@@ -127,10 +133,10 @@ export const addBodyJoint = defineCommand({
     const spring =
       joint.stiffness === undefined
         ? ''
-        : `, spring ${joint.stiffness} ${params.kind === 'revolute' ? 'N·m/rad' : 'N/m'} relaxed at ${joint.springReference ?? 0} ${params.kind === 'revolute' ? 'rad' : 'm'}`;
+        : `, spring ${joint.stiffness} ${kind === 'revolute' ? 'N·m/rad' : 'N/m'} relaxed at ${joint.springReference ?? 0} ${kind === 'revolute' ? 'rad' : 'm'}`;
     return changed(
       withDynamics(doc, next),
-      `add_body_joint: ${params.kind} '${jointId}' — '${child.id}' on '${parent}', ${sense}${spring}; ${role}.`,
+      `add_body_joint: ${kind} '${jointId}' — '${child.id}' on '${parent}', ${sense}${spring}; ${role}.`,
       [jointId],
     );
   },

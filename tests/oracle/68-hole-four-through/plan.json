@@ -1,0 +1,21 @@
+{
+  "actions": [
+    { "command": "add_box", "params": { "size": [20, 20, 4] }, "as": "p" },
+    {
+      "command": "add_hole",
+      "params": {
+        "target": "$p",
+        "face": { "near": [0, 0, 2] },
+        "points": [
+          [5, 5],
+          [-5, 5],
+          [5, -5],
+          [-5, -5]
+        ],
+        "pointsFrame": "world_xy",
+        "hole": { "kind": "simple", "diameter": 3 },
+        "extent": { "kind": "through_all" }
+      }
+    }
+  ]
+}

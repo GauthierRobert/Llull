@@ -1,0 +1,19 @@
+{
+  "id": "44-revolve-stepped-shaft",
+  "family": "revolve",
+  "description": "stepped shaft: cylinder r2 h3 + cylinder r1 h2",
+  "source": "analytic",
+  "formula": "V = pi (r1^2 h1 + r2^2 h2)",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 43.9822971503,
+  "area": null,
+  "centroid": [0, 0, 1.85714285714],
+  "bbox": { "min": [-2, -2, 0], "max": [2, 2, 5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": null,
+    "area": null,
+    "reason": "area of a revolved curved face is summed over display triangles; the volume is closed-form"
+  }
+}

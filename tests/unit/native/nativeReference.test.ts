@@ -18,6 +18,9 @@ import { gridMesh, seeded } from '../cae/gridMesh';
 
 const SOLVER = path.resolve(__dirname, '../../../solver/crates');
 const WRITE = process.env['LLULL_WRITE_NATIVE_FIXTURES'] === '1';
+// Fixtures sampling V8 Math (pow/log10/hypot) are pinned to the Node major CI generates them with: another V8 can differ in the last ulp.
+const FIXTURE_NODE_MAJOR = 22;
+const v8Pinned = it.skipIf(!WRITE && Number(process.versions.node.split('.')[0]) !== FIXTURE_NODE_MAJOR);
 
 function fixture(relative: string, value: unknown): void {
   const file = path.join(SOLVER, relative);
@@ -198,10 +201,11 @@ function mapCases(): unknown[] {
 }
 
 describe('native reference fixtures (TS = oracle)', () => {
-  it('V8 Math samples for llull-jsmath', () => fixture('llull-jsmath/tests/fixtures/jsmath.json', jsmathCases()));
+  v8Pinned('V8 Math samples for llull-jsmath', () => fixture('llull-jsmath/tests/fixtures/jsmath.json', jsmathCases()));
   it('rainflow cycles for llull-post', () => fixture('llull-post/tests/fixtures/rainflow.json', rainflowCases()));
   it('stress measures for llull-post', () => fixture('llull-post/tests/fixtures/stress.json', stressCases()));
-  it('all-node fatigue fields for llull-post (VC-FAT-43 at crate level)', () =>
-    fixture('llull-post/tests/fixtures/fatigue_jobs.json', fatigueJobCases()));
+  v8Pinned('all-node fatigue fields for llull-post (VC-FAT-43 at crate level)', () =>
+    fixture('llull-post/tests/fixtures/fatigue_jobs.json', fatigueJobCases()),
+  );
   it('mesh mappings for llull-post (VC-TMC-10 at crate level)', () => fixture('llull-post/tests/fixtures/map.json', mapCases()));
 });

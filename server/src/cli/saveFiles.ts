@@ -65,6 +65,12 @@ export function withSaveDefaults(name: string, params: unknown, save: string | u
   return { ...(isRecord(params) ? params : {}), binary: extension === '.glb' };
 }
 
+/** The safe relative path segments of a suggested name: `meshes/a.stl` keeps its folder (URDF references it), `..`, `.` and absolute prefixes are dropped. */
+function relativeParts(name: string): string[] {
+  const parts = name.split(/[\\/]+/).filter((part) => part !== '' && part !== '.' && part !== '..' && !/^[A-Za-z]:$/.test(part));
+  return parts.length > 0 ? parts : [path.basename(name)];
+}
+
 export interface SavedFile {
   readonly path: string;
   readonly bytes: number;
@@ -105,7 +111,8 @@ export function saveDataFiles(data: unknown, target: string): SavedFile[] {
   if (targetIsDirectory) fs.mkdirSync(target, { recursive: true });
   else fs.mkdirSync(path.dirname(path.resolve(target)), { recursive: true });
   return files.map((file, index) => {
-    const filePath = targetIsDirectory ? path.join(target, path.basename(file.name ?? `file-${index + 1}`)) : target;
+    const filePath = targetIsDirectory ? path.join(target, ...relativeParts(file.name ?? `file-${index + 1}`)) : target;
+    fs.mkdirSync(path.dirname(path.resolve(filePath)), { recursive: true });
     fs.writeFileSync(filePath, file.bytes);
     return { path: filePath, bytes: file.bytes.length };
   });

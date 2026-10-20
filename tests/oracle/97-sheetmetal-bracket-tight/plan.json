@@ -1,0 +1,21 @@
+{
+  "actions": [
+    {
+      "command": "create_sheet_metal_rule",
+      "params": { "name": "R3", "material": "2024-T3", "temper": "T3", "thickness": 1, "insideRadius": 1, "kFactor": 0.44 }
+    },
+    { "command": "draw_rectangle", "params": { "width": 60, "height": 25, "position": [0, 0, 0] }, "as": "prof" },
+    { "command": "add_sheet_metal_base", "params": { "profileId": "$prof", "rule": "R3", "side": "up" }, "as": "part" },
+    {
+      "command": "add_flange",
+      "params": {
+        "id": "$part",
+        "edge": { "near": [60, 12.5, 0] },
+        "angle": 90,
+        "length": 15,
+        "lengthReference": "outside_mold_line",
+        "position": "material_outside"
+      }
+    }
+  ]
+}

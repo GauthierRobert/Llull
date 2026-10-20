@@ -1,0 +1,14 @@
+{
+  "id": "79-mirror-box",
+  "family": "pattern",
+  "description": "box mirrored across the Y axis (position negated)",
+  "source": "analytic",
+  "formula": "bbox follows the mirrored position",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 24,
+  "area": 52,
+  "centroid": [3, -2, 1],
+  "bbox": { "min": [2, -3.5, -1], "max": [4, -0.5, 3] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

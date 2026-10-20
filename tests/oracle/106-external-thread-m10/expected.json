@@ -1,0 +1,19 @@
+{
+  "id": "106-external-thread-m10",
+  "family": "thread",
+  "description": "M10 coarse (P 1.5) external thread over the whole length of a r=5 h=18 cylinder (12 pitches)",
+  "source": "analytic",
+  "formula": "V = pi r^2 h - (h/p) int w(r) 2 pi r dr, w = p/4 + 2 (r - r1) tan 30, r1 = d/2 - 5H/8, H = sqrt3/2 p (ISO 68-1)",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 1172.54755035,
+  "area": null,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-5, -5, -9], "max": [5, 5, 9] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": 0.012,
+    "area": null,
+    "reason": "mesh kernel: the cylinder is an inscribed n-gon (volume loss k (1 - cos(pi/n)) / the clipped groove outer edge) and the groove tool is faceted (32 rings per turn)"
+  }
+}

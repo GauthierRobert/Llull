@@ -1,0 +1,14 @@
+{
+  "id": "27-pyramid-basic",
+  "family": "primitive",
+  "description": "pyramid base 2x3 height 4",
+  "source": "analytic",
+  "formula": "V = w d h / 3; centroid at h/4 above the base",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 8,
+  "area": 26.9133206222,
+  "centroid": [0, 0, 1],
+  "bbox": { "min": [-1, -1.5, 0], "max": [1, 1.5, 4] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

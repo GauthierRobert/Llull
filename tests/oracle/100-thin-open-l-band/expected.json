@@ -1,0 +1,14 @@
+{
+  "id": "100-thin-open-l-band",
+  "family": "thin",
+  "description": "open L path (10+10 long) thickened 2 centred, extruded 5",
+  "source": "analytic",
+  "formula": "band polygon from the mitred offsets (shoelace): A = t (L1 + L2) = 40; V = A depth; A_surf = 2A + perimeter depth",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 200,
+  "area": 300,
+  "centroid": [7.525, 2.475, 2.5],
+  "bbox": { "min": [0, -1, 0], "max": [11, 10, 5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

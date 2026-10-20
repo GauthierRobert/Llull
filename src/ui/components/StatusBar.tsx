@@ -3,6 +3,7 @@
 import React from 'react';
 import { useStore } from '@ui/store';
 import { useKernelStatusStore } from '@ui/store/kernelStatus';
+import { useFailureStore } from '@ui/report/failureStore';
 
 function StatusItem({
   label,
@@ -49,6 +50,19 @@ function KernelIndicator(): React.ReactElement | null {
   );
 }
 
+/** Offered only while the status text is the summary of an internal failure (not for invalid params, guards or "not supported"). */
+function ReportOffer(): React.ReactElement | null {
+  const failure = useFailureStore((s) => s.failure);
+  const openDialog = useFailureStore((s) => s.openDialog);
+  const lastSummary = useStore((s) => s.lastSummary);
+  if (failure === null || failure.summary !== lastSummary) return null;
+  return (
+    <button type="button" className="status-report-link" onClick={openDialog} title="Review and report this internal error">
+      Report this…
+    </button>
+  );
+}
+
 export function StatusBar(): React.ReactElement {
   const units = useStore((s) => s.document.units);
   const displayPrecision = useStore((s) => s.document.displayPrecision);
@@ -77,6 +91,7 @@ export function StatusBar(): React.ReactElement {
             {lastSummary}
           </span>
         )}
+        <ReportOffer />
       </div>
       <div className="status-bar-bottom__right">
         <StatusItem label="Entities" value={entityLabel} aria-label={`Entities: ${entityLabel}`} />

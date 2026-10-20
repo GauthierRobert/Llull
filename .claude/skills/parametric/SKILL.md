@@ -24,7 +24,7 @@ A full CAD stores HOW a model was built, not just final geometry. Commands are p
 | Parameters + `=expr` step params (`set_parameter`, `delete_parameter`) | `parametric/parameters.ts`, `parametric/expression.ts` |
 | Parameter → step dependencies: regenerate only when a step reads a changed parameter | `history/dependents.ts` |
 | Configurations (design tables), recipes | `parametric/configurations.ts`, `parametric/recipes.ts` |
-| Constraints + pure solver (`add_constraint`, `solve_constraints`, …) | `parametric/constraints.ts`, `parametric/constraintSolver.ts` |
+| Constraints + pure solver (`add_constraint`, `solve_constraints`, …) | `parametric/constraints.ts`, `parametric/solver/` |
 | Constructive vs evaluated split | `derivedEntityIds` in `@core/plugins/host` |
 
 ## The core distinction (decide before coding)

@@ -31,6 +31,7 @@ const OCCT_LIBS: &[&str] = &[
     "TKXSBase",
     "TKDE",
     "TKDESTEP",
+    "TKDEIGES",
     "TKCDF",
     "TKLCAF",
     "TKCAF",

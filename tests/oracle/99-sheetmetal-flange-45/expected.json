@@ -1,0 +1,15 @@
+{
+  "id": "99-sheetmetal-flange-45",
+  "family": "sheetmetal",
+  "description": "base 33.6x50 with a 45 degree flange, 30 to the OML (setback (R+T) tan(22.5))",
+  "source": "analytic",
+  "formula": "V = W [Lb T + (alpha/2)((R+T)^2 - R^2) + T (F - (R+T) tan(alpha/2))]",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 5227.78103327,
+  "area": null,
+  "centroid": null,
+  "bbox": null,
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "stepRoundTrip": false
+}

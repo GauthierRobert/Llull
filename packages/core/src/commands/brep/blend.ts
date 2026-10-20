@@ -10,7 +10,7 @@ import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
 import { noop, failer } from '../noop';
 import { commitKernelResult, evaluateRecipe, operandRecipe } from './kernelShape';
-import { OCC_KERNEL_HINT } from './modify3d';
+import { OCC_KERNEL_HINT } from './modifyTarget';
 
 const MAX_BLEND_OPERANDS = 200;
 

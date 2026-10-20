@@ -1,0 +1,14 @@
+{
+  "id": "81-scale-sphere",
+  "family": "transform",
+  "description": "sphere r=2 scaled by 0.5",
+  "source": "analytic",
+  "formula": "V scales with f^3",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 4.18879020479,
+  "area": 12.5663706144,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-1, -1, -1], "max": [1, 1, 1] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

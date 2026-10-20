@@ -16,6 +16,7 @@ import { Toolbar } from '@ui/components/toolbar/Toolbar';
 import { ViewportContextMenu } from '@ui/components/ViewportContextMenu';
 import { HintBar } from '@ui/components/HintBar';
 import { ShortcutsDialog } from '@ui/components/ShortcutsDialog';
+import { ReportIssueDialog } from '@ui/components/ReportIssueDialog';
 import { CommandPalette } from '@ui/components/commandPalette/CommandPalette';
 import { PaletteResultToast } from '@ui/components/commandPalette/PaletteResultToast';
 import { useLiveDocument } from '@ui/hooks/useLiveDocument';
@@ -77,6 +78,7 @@ export function App(): React.ReactElement {
       <Toolbar />
       <StatusBar />
       <ShortcutsDialog />
+      <ReportIssueDialog />
       <CommandPalette />
     </div>
   );

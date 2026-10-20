@@ -64,7 +64,7 @@ function withoutKeys<T>(record: Readonly<Record<string, T>>, dropped: ReadonlySe
 function pruneReferences(doc: CadDocument, removed: ReadonlySet<string>): { references: Partial<CadDocument>; prunedReferences: number } {
   const droppedConstraints = new Set(
     Object.values(doc.constraints)
-      .filter((c) => removed.has(c.a.entityId) || removed.has(c.b.entityId))
+      .filter((c) => removed.has(c.a.entityId) || removed.has(c.b.entityId) || ('axis' in c && removed.has(c.axis.entityId)))
       .map((c) => c.id),
   );
   const droppedJoints = new Set(

@@ -1,0 +1,14 @@
+{
+  "id": "31-prism-rectangle-offset",
+  "family": "prism",
+  "description": "rectangle 5x2 extruded 3 from (1,2,3)",
+  "source": "analytic",
+  "formula": "V = A_polygon * depth (shoelace); centroid = polygon centroid, depth/2; A = 2 A_polygon + perimeter * depth",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 30,
+  "area": 62,
+  "centroid": [3.5, 3, 4.5],
+  "bbox": { "min": [1, 2, 3], "max": [6, 4, 6] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}

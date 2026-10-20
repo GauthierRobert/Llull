@@ -11,12 +11,14 @@
 
 import type { HoleExtent, HoleSpec } from '../model/features';
 import type { MeshData } from '../model/types';
-import { type InternalThreadForm, internalThreadForm } from '../lib/threadForm';
+import { type ExternalThreadForm, type InternalThreadForm, internalThreadForm } from '../lib/threadForm';
 
 /** Facet rings per helix turn. */
 const RINGS_PER_TURN = 32;
 const INNER_MARGIN = 0.05;
 const MAX_FILL = 0.98;
+/** How far (x pitch) an external groove tool reaches beyond the major radius so it opens through the cylinder surface. */
+const OUTER_MARGIN = 0.05;
 /** Longest modelled thread (turns): past it the groove skin has too many faces for the OpenCascade booleans to stay responsive. */
 export const MAX_THREAD_TURNS = 60;
 
@@ -88,17 +90,65 @@ export function threadGroove(hole: HoleSpec, extent: HoleExtent, reach: number):
     [form.majorRadius, outerWidth / 2],
     [innerRadius, innerWidth / 2],
   ] as const;
+  return { mesh: screwMesh(corners, form.pitch, turns, thread.handedness === 'left'), startDepth: -bottomCenter };
+}
+
+/**
+ * The 4 corners [radius, axial offset] of a section in the axial plane screwed `turns` turns up the z axis (one `pitch` per turn, start at z = 0).
+ * `radialShift(t)` (t in 0..1 along the screw) is added to every corner radius: a conical screw that keeps the section size.
+ */
+export function screwMesh(
+  corners: ReadonlyArray<readonly [number, number]>,
+  pitch: number,
+  turns: number,
+  left: boolean,
+  radialShift?: (t: number) => number,
+): MeshData {
   const ringCount = Math.max(2, Math.ceil(turns * RINGS_PER_TURN) + 1);
   const step = (2 * Math.PI * turns) / (ringCount - 1);
   const inflate = Math.sqrt(step / Math.sin(step));
   const rings = Array.from({ length: ringCount }, (_, index): Corner[] => {
     const angle = (2 * Math.PI * turns * index) / (ringCount - 1);
-    const lift = (form.pitch * angle) / (2 * Math.PI);
-    return corners.map(
-      ([radius, offset]): Corner => [radius * inflate * Math.cos(angle), radius * inflate * Math.sin(angle), lift + offset],
-    );
+    const lift = (pitch * angle) / (2 * Math.PI);
+    const shift = radialShift === undefined ? 0 : radialShift(index / (ringCount - 1));
+    return corners.map(([base, offset]): Corner => {
+      const radius = (base + shift) * inflate;
+      return [radius * Math.cos(angle), radius * Math.sin(angle), lift + offset];
+    });
   });
   const right = skinMesh(rings);
-  const mesh = thread.handedness === 'left' ? mirrored(right) : right;
-  return { mesh, startDepth: -bottomCenter };
+  return left ? mirrored(right) : right;
+}
+
+/**
+ * Groove tool of a modelled EXTERNAL thread on a cylinder whose end face is at `endZ` and which the thread covers over `length` from it
+ * (`direction` +1 = thread at the top end, the helix starting inside the cylinder and running out through the end; -1 = bottom end).
+ * The groove outer edge reaches `OUTER_MARGIN` x pitch beyond the major radius so it opens through the cylinder surface; it stays narrower than the pitch.
+ * @invariant the tool runs out through the end face (no cap in the material at that end); its other end is a flat cap inside the material
+ * @failure length shorter than one pitch, more than MAX_THREAD_TURNS turns, non-positive sizes -> null
+ */
+export function externalThreadGroove(
+  form: ExternalThreadForm,
+  length: number,
+  endZ: number,
+  direction: 1 | -1,
+  left: boolean,
+): MeshData | null {
+  if (!(form.pitch > 0) || !(length >= form.pitch) || !(form.minorRadius > 0)) return null;
+  const outerRadius = form.majorRadius + OUTER_MARGIN * form.pitch;
+  const innerRadius = form.minorRadius;
+  const [innerWidth, outerWidth] = [form.widthAt(innerRadius), form.widthAt(outerRadius)];
+  if (!(outerWidth < MAX_FILL * form.pitch)) return null;
+  const innerEdgeDepth = length - outerWidth / 2;
+  const turns = (innerEdgeDepth + outerWidth) / form.pitch;
+  if (!(turns > 0.5) || turns > MAX_THREAD_TURNS) return null;
+  const corners = [
+    [innerRadius, -innerWidth / 2],
+    [outerRadius, -outerWidth / 2],
+    [outerRadius, outerWidth / 2],
+    [innerRadius, innerWidth / 2],
+  ] as const;
+  const mesh = screwMesh(corners, form.pitch, turns, left);
+  const startZ = direction === 1 ? endZ - innerEdgeDepth : endZ - outerWidth;
+  return { positions: mesh.positions.map((value, index) => (index % 3 === 2 ? value + startZ : value)), indices: mesh.indices };
 }

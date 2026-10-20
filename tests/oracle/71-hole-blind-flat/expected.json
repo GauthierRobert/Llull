@@ -1,0 +1,19 @@
+{
+  "id": "71-hole-blind-flat",
+  "family": "hole",
+  "description": "flat-bottom blind hole d=4 depth 2",
+  "source": "analytic",
+  "formula": "V = abc - pi r^2 depth",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 1574.86725877,
+  "area": 1145.13274123,
+  "centroid": [0, 0, -0.0159586410148],
+  "bbox": { "min": [-10, -10, -2], "max": [10, 10, 2] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": 0.0016132816244903941,
+    "area": 0.012528831758061743,
+    "reason": "bore tessellated as an inscribed n-gon (n from the kernel default circle resolution): loss <= k (1 - cos(pi/n)) of the removed share"
+  }
+}

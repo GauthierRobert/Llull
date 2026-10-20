@@ -1,0 +1,1 @@
+{ "actions": [{ "command": "add_box", "params": { "size": [2, 3, 4], "rotation": [1.5707963267948966, 0, 0] } }] }

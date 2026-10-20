@@ -1,0 +1,19 @@
+{
+  "id": "16-cone-axis-y",
+  "family": "primitive",
+  "description": "cone r=2 h=3 with its apex towards +Y",
+  "source": "analytic",
+  "formula": "V = pi r^2 h / 3; A = pi r (r + sqrt(r^2+h^2)); centroid at h/4 from the base",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 12.5663706144,
+  "area": 35.2207174126,
+  "centroid": [0, 0.75, 0],
+  "bbox": { "min": [-2, 0, -2], "max": [2, 3, 2] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": null,
+    "area": 0.02,
+    "reason": "area is summed over display triangles of a curved face; the volume is closed-form"
+  }
+}

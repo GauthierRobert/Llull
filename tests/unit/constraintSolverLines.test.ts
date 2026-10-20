@@ -71,8 +71,17 @@ describe('solve_constraints on line orientation constraints', () => {
     expect(solved.document.entities[idA]).toEqual(constrained.entities[idA]);
   });
   it('conflicting constraints report non-convergence with a residual describing the returned document', () => {
-    let conflicted = constrain(doc, 'parallel', idA, idB);
-    conflicted = constrain(conflicted, 'perpendicular', idA, idB);
+    const parallel = constrain(doc, 'parallel', idA, idB);
+    const refused = execute(parallel, 'add_constraint', {
+      constraint: { kind: 'perpendicular', a: { entityId: idA }, b: { entityId: idB } },
+    });
+    expect(refused.affected).toEqual([]);
+    expect(refused.summary).toContain('conflicts');
+    const conflicted: CadDocument = {
+      ...parallel,
+      constraints: { ...parallel.constraints, forced: { id: 'forced', kind: 'perpendicular', a: { entityId: idA }, b: { entityId: idB } } },
+      constraintOrder: [...parallel.constraintOrder, 'forced'],
+    };
     const solved = solve(conflicted);
     expect(solved.data.converged).toBe(false);
     expect(solved.data.residual).toBeGreaterThan(1e-3);
@@ -131,7 +140,7 @@ describe('update_constraint input validation', () => {
     expect(result.summary).toContain('not a valid expression');
   });
   it('still applies a valid patch', () => {
-    const result = execute(added.document, 'update_constraint', { id: constraintId, patch: { value: 8, b: { entityId: a } } });
+    const result = execute(added.document, 'update_constraint', { id: constraintId, patch: { value: 8 } });
     expect(result.document.constraints[constraintId]).toMatchObject({ value: 8 });
   });
 });

@@ -1,0 +1,10 @@
+{
+  "actions": [
+    {
+      "command": "create_sheet_metal_rule",
+      "params": { "name": "R1", "material": "2024-T3", "temper": "T3", "thickness": 1.6, "insideRadius": 4.8, "kFactor": 0.44 }
+    },
+    { "command": "draw_rectangle", "params": { "width": 33.6, "height": 50, "position": [0, 0, 0] }, "as": "prof" },
+    { "command": "add_sheet_metal_base", "params": { "profileId": "$prof", "rule": "R1", "side": "up" }, "as": "part" }
+  ]
+}

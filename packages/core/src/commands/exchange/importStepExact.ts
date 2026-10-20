@@ -107,7 +107,7 @@ function run(doc: CadDocument, params: Params, ctx: ExecutionContext | undefined
     heal,
     sew: params.sew !== false,
   };
-  const imported = kernel.importShapes('step', text, options);
+  const imported = kernel.importShapes(params.format ?? 'step', text, options);
   if (imported === null) return refuse(doc, ...IMPORT_ERRORS.unreadable, 'the kernel could not read the file', [source]);
   if ('error' in imported) {
     const [code, remediation] = IMPORT_ERRORS[imported.error];
@@ -140,7 +140,7 @@ function run(doc: CadDocument, params: Params, ctx: ExecutionContext | undefined
     );
 
   const stamp = kernelStampOf(kernel);
-  const original = params.keepOriginal === true ? makeBlob('model/step', text) : null;
+  const original = params.keepOriginal === true ? makeBlob(params.format === 'iges' ? 'model/iges' : 'model/step', text) : null;
   const staged = bodies.reduce((next, body) => withBlob(next, body.blob), original === null ? doc : withBlob(doc, original));
   const ids = bodies.map((body) => body.entity.id);
   const entities = { ...staged.entities, ...Object.fromEntries(bodies.map((body) => [body.entity.id, body.entity])) };
@@ -181,6 +181,12 @@ const paramsSchema = z.object({
     .describe('The STEP file bytes, base64 encoded (ISO 10303-21 text, UTF-8/ASCII). Give exactly one of stepBase64 or text.'),
   text: z.string().max(MAX_STEP_CHARS).optional().describe('The STEP file as Part 21 text. Give exactly one of stepBase64 or text.'),
   fileName: z.string().optional().describe('Original file name, kept in the report only.'),
+  format: z
+    .enum(['step', 'iges'])
+    .optional()
+    .describe(
+      '"step" (default, ISO 10303-21) or "iges" (IGES 5.3; same healing, report and refusal codes). The file goes in text / stepBase64 either way.',
+    ),
   heal: z.boolean().optional().describe('Run shape healing (ShapeFix) on every solid at the document linear tolerance. Default true.'),
   sew: z.boolean().optional().describe('Sew loose shells and faces into closed solids. Default true.'),
   name: z.string().optional().describe('Entity name; several solids get a numeric suffix. Default: none.'),
@@ -204,7 +210,7 @@ export const importStepExact = defineCommand({
     'Needs the exact OCC kernel (kernel_info); otherwise use import_step for a mesh. Give the file as stepBase64 or text. Lengths are converted from millimetres into the ' +
     'document unit. data.report lists per solid validAsRead / validAfterHeal / actions / maxToleranceMm / freeEdges / faces / faceted, the root census, skipped items and ' +
     'warnings (KRN_IMPORT_TOLERANCE_HIGH above kernelSettings maxImportTolerance). Refusals carry error.code: KRN_NO_EXACT_KERNEL, KRN_STEP_UNREADABLE, ' +
-    'KRN_STEP_TESSELLATED_ONLY, KRN_STEP_NO_SOLID, KRN_HEAL_FAILED. Names and colours of the STEP are not read yet (use name).',
+    'KRN_STEP_TESSELLATED_ONLY, KRN_STEP_NO_SOLID, KRN_HEAL_FAILED. Names and colours of the STEP are not read yet (use name). format: "iges" reads an IGES file the same way.',
   params: paramsSchema,
   run,
 });

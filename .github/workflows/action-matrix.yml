@@ -1,0 +1,70 @@
+# Nightly action matrix (SC-Q2, docs/ACTION_MATRIX.md): every design of the corpus x every applicable command, checked against the
+# tests/action_matrix/baseline.json ratchet (an action that was `ok` must stay `ok`; throws and invalid solids fail). Shards are balanced
+# with the per-design cost file of the previous run; a determinism job runs a sample twice and compares outcomes and volumes bit for bit.
+# The native OCCT column (server/tests/actionMatrix.test.ts) runs in check.yml's native-kernel job once its baseline column is blessed.
+name: action-matrix
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The latest merged cost file (ms per design) balances this run's shards; absent on the first run (shards split by hash).
+      - uses: actions/cache/restore@v4
+        with:
+          path: action-matrix-costs.json
+          key: action-matrix-costs-restore-only
+          restore-keys: action-matrix-costs-
+      - run: node scripts/actionMatrix.mjs --shard ${{ matrix.shard }}/4 --costs action-matrix-costs.json --cost-out cost-${{ matrix.shard }}.json --report report-${{ matrix.shard }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: action-matrix-shard-${{ matrix.shard }}
+          path: |
+            cost-${{ matrix.shard }}.json
+            report-${{ matrix.shard }}.json
+
+  costs:
+    needs: shards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: action-matrix-shard-*
+          merge-multiple: true
+      - run: node scripts/actionMatrixMergeCosts.mjs action-matrix-costs.json cost-*.json
+      - uses: actions/cache/save@v4
+        with:
+          path: action-matrix-costs.json
+          key: action-matrix-costs-${{ github.run_id }}
+
+  determinism:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/actionMatrix.mjs --determinism --design-sample 8

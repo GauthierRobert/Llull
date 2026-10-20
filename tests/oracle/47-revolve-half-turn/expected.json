@@ -1,0 +1,19 @@
+{
+  "id": "47-revolve-half-turn",
+  "family": "revolve",
+  "description": "washer revolved a half turn: V = pi xbar A; centroid and bbox not checked",
+  "source": "analytic",
+  "formula": "V = angle * xbar * A",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 7.85398163397,
+  "area": null,
+  "centroid": null,
+  "bbox": null,
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": null,
+    "area": 0.02,
+    "reason": "area of a revolved curved face is summed over display triangles; the volume is closed-form"
+  }
+}

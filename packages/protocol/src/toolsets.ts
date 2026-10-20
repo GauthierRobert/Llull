@@ -38,7 +38,7 @@ const ANALYSIS_CORE_TOOLS = words(
 
 /** Core part-modelling features (07 FTR §4.1); the sheet-metal plugin adds its commands to the same toolset. */
 const MANUFACTURING_CORE_TOOLS: readonly string[] = words(
-  'add_hole add_pocket add_rib set_thread recognize_features holes_from_recognition check_machining hole_table',
+  'add_hole add_tapped_hole add_external_thread add_pocket add_rib set_thread recognize_features holes_from_recognition check_machining hole_table',
 );
 
 /** Industrial piping commands: contributed by the `building` (industrial) plugin, exposed as their own small toolset. */
@@ -50,17 +50,17 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'describe_scene find_entities build_project check_model render_view set_units load_document clear_document move_entities rotate_entity scale_entity mirror_entity duplicate_entities delete_entities array_linear array_polar group_entities ungroup_entities set_entity_name align distribute stack_on set_parameter delete_parameter add_layer update_layer set_entity_layer delete_layer set_camera fit_view kernel_info set_modeling_tolerance',
   ),
   '2d': words(
-    'draw_polyline draw_arc draw_rectangle draw_point draw_ellipse draw_spline draw_involute draw_belt_around explode_polyline offset_2d trim extend fillet_2d chamfer_2d add_text add_dimension add_image_underlay calibrate_underlay set_underlay image_to_world create_sheet create_drawing_view add_section_view add_detail_view update_drawing_view delete_drawing_view update_sheet delete_sheet export_sheet_svg',
+    'draw_polyline draw_arc draw_rectangle draw_point draw_ellipse draw_spline draw_involute draw_belt_around create_sketch_plane place_on_sketch_plane project_edges_to_sketch break_sketch_link explode_polyline offset_2d trim extend fillet_2d chamfer_2d add_text add_dimension add_image_underlay calibrate_underlay set_underlay image_to_world create_sheet create_drawing_view add_section_view add_detail_view update_drawing_view delete_drawing_view update_sheet delete_sheet export_sheet_svg',
   ),
   '3d': words(
-    'add_box add_cylinder add_sphere add_cone add_torus add_helix_spring add_bearing add_wedge add_pyramid extrude_profile revolve_profile sweep_profile loft_sections boolean blend_union fillet_edge chamfer_edge shell_solid inspect_topology inspect_faces add_spur_gear add_internal_gear add_planetary_gearset add_bevel_gear add_bevel_gear_pair add_spline_shaft add_keyed_shaft pattern_along_path add_decal remove_decal add_subdivision_solid edit_subdivision_cage surface_from_curves',
+    'add_box add_cylinder add_sphere add_cone add_torus add_helix_spring add_coil add_bearing add_wedge add_pyramid extrude_profile revolve_profile sweep_profile loft_sections boolean blend_union fillet_edge chamfer_edge shell_solid draft_faces push_pull_face split_face replace_face split_body inspect_topology inspect_faces add_spur_gear add_internal_gear add_planetary_gearset add_bevel_gear add_bevel_gear_pair add_spline_shaft add_keyed_shaft pattern_along_path add_decal remove_decal add_subdivision_solid edit_subdivision_cage surface_from_curves',
   ),
   measure: words('measure_distance measure_angle measure_area measure_perimeter measure_bounding_box mass_properties'),
   parametric: words(
     'replay_history set_step_suppressed edit_step_params reorder_step delete_step insert_step create_configuration activate_configuration add_constraint delete_constraint update_constraint solve_constraints save_recipe instantiate_recipe',
   ),
   assembly: words(
-    'create_component insert_instance explode_instance bill_of_materials add_joint delete_joint set_joint_value add_drive_relation delete_drive_relation evaluate_motion bake_motion motion_study animate stop_animation ' +
+    'create_component insert_instance explode_instance bill_of_materials add_joint delete_joint set_joint_value add_drive_relation delete_drive_relation evaluate_motion bake_motion motion_study create_contact_set delete_contact_set drive_joint_to create_exploded_view set_active_exploded_view delete_exploded_view animate stop_animation ' +
       'add_rigid_body add_body_joint add_gear_coupling add_spring add_motor add_propeller add_cylinder_pressure set_gravity delete_dynamics_item set_dynamics_solver inspect_dynamics simulate_motion plot_simulation render_motion',
   ),
   materials: words(
@@ -70,7 +70,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   'material-lab': words('fit_material_model material_point_response export_material_cards'),
   review: words('allow_interference remove_interference_intent set_part_grounded'),
   exchange: words(
-    'export_stl export_obj export_gltf export_step_exact export_code apply_code_trace import_mesh import_dxf import_step_exact export_step import_step import_dwg import_code',
+    'export_stl export_obj export_gltf export_3mf export_urdf mesh_to_solid export_step_exact export_iges export_code apply_code_trace import_mesh import_dxf import_step_exact export_step import_step import_dwg import_code',
   ),
   /** Core analytic checks plus the finite-element commands contributed by the installed cae plugin. */
   get analysis(): readonly string[] {

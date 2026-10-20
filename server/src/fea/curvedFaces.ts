@@ -43,6 +43,7 @@ function recipeCurved(recipe: ShapeRecipe): boolean {
     case 'place':
     case 'scale':
     case 'feature':
+    case 'faceOp':
       return recipeCurved(recipe.source);
     default:
       return false;

@@ -1,0 +1,15 @@
+{
+  "id": "94-sheetmetal-flat-plate",
+  "family": "sheetmetal",
+  "description": "sheet-metal base flat 33.6x50, T=1.6",
+  "source": "analytic",
+  "formula": "V = Lb W T",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 2688,
+  "area": 3627.52,
+  "centroid": [16.8, 25, 0.8],
+  "bbox": { "min": [0, 0, 0], "max": [33.6, 50, 1.6] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "stepRoundTrip": false
+}

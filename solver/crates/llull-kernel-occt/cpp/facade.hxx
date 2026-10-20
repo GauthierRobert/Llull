@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <STEPControl_Writer.hxx>
 #include <Standard_Failure.hxx>
@@ -39,6 +40,8 @@ class Shape {
  public:
   explicit Shape(TopoDS_Shape shape) : shape(std::move(shape)) {}
   TopoDS_Shape shape;
+  // Persistent face names (SC-N1, naming.hxx), aligned with the distinct faces of `shape`; empty = unnamed.
+  std::vector<std::string> names;
 };
 
 class StepWriter {
@@ -62,6 +65,8 @@ std::unique_ptr<Shape> placed(const Shape &shape, rust::Slice<const double> rota
                               rust::Slice<const double> anchor_shift);
 std::unique_ptr<Shape> scaled(const Shape &shape, double factor);
 std::unique_ptr<Shape> boolean_op(const Shape &a, const Shape &b, int32_t operation, bool unify);
+// The same shape with every face name prefixed "<prefix>:" (a leaf entity id).
+std::unique_ptr<Shape> prefixed(const Shape &shape, rust::Str prefix);
 
 MeshOut tessellate(const Shape &shape, double linear_deflection, double angular_deflection);
 MassOut mass_properties(const Shape &shape);

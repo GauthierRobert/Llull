@@ -1,0 +1,16 @@
+{
+  "id": "97-sheetmetal-bracket-tight",
+  "family": "sheetmetal",
+  "description": "L-bracket 60x25, T=1, R=1, flange 15 to the OML",
+  "source": "analytic",
+  "formula": "folded solid: V = W [Lb T + (pi/4)((R+T)^2 - R^2) + T (F - (R+T))]; area = perimeter x W + 2 section",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 1883.90486225,
+  "area": 3968.52211349,
+  "centroid": [36.4031785483, 12.5, 1.89604924471],
+  "bbox": { "min": [0, 0, 0], "max": [62, 25, 15] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": { "volume": null, "area": 0.02, "reason": "area is summed over the display triangles of the tessellated bend" },
+  "stepRoundTrip": false
+}

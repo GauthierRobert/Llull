@@ -92,14 +92,14 @@ pip install -r server/python/requirements.txt     # CadQuery (OpenCascade)
 LLULL_PYTHON=python3 npm --prefix server run dev   # python3 is the default
 ```
 
-| Variable                     | Default        | Meaning                                                                                                                                  |
-| ---------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `LLULL_PYTHON`               | `python3`      | Python that has CadQuery. `off` disables the bridge.                                                                                     |
-| `LLULL_PYTHON_BUILD123D`     | `LLULL_PYTHON` | Python that has build123d. build123d and CadQuery pin different OCP versions, so give each its own virtualenv.                           |
-| `LLULL_PYTHON_TIMEOUT_MS`    | `120000`       | Per-request timeout. The process is killed after it.                                                                                     |
-| `LLULL_EXCHANGE_DIR`         | unset          | Directory that the tools' `path` arguments resolve inside (no `..` or absolute paths). `export_step` also saves `<name>.step` there.     |
-| `LLULL_ALLOW_CODE_EXECUTION` | unset          | `1` enables `import_code`. **It runs arbitrary Python with server privileges.** Enable it only on a machine you trust. |
-| `LLULL_BODY_LIMIT`           | `2mb`          | Raise it to send large STEP files inline as base64, or use `path` instead.                                                               |
+| Variable                     | Default        | Meaning                                                                                                                              |
+| ---------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `LLULL_PYTHON`               | `python3`      | Python that has CadQuery. `off` disables the bridge.                                                                                 |
+| `LLULL_PYTHON_BUILD123D`     | `LLULL_PYTHON` | Python that has build123d. build123d and CadQuery pin different OCP versions, so give each its own virtualenv.                       |
+| `LLULL_PYTHON_TIMEOUT_MS`    | `120000`       | Per-request timeout. The process is killed after it.                                                                                 |
+| `LLULL_EXCHANGE_DIR`         | unset          | Directory that the tools' `path` arguments resolve inside (no `..` or absolute paths). `export_step` also saves `<name>.step` there. |
+| `LLULL_ALLOW_CODE_EXECUTION` | unset          | `1` enables `import_code`. **It runs arbitrary Python with server privileges.** Enable it only on a machine you trust.               |
+| `LLULL_BODY_LIMIT`           | `2mb`          | Raise it to send large STEP files inline as base64, or use `path` instead.                                                           |
 
 Each bridge process runs with these limits:
 
@@ -117,12 +117,12 @@ a hostile document loaded with `load_document` cannot inject code into `export_s
 
 ### Exchange tools
 
-| Tool          | What it does                                                                                                                             |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `export_code` | Registry command (works offline, also in the UI). Returns `data.text`.                                                                   |
+| Tool          | What it does                                                                                                                                               |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `export_code` | Registry command (works offline, also in the UI). Returns `data.text`.                                                                                     |
 | `export_step` | `export_code` (CadQuery), evaluated by OpenCascade. Returns `data.stepBase64` (`--save part.step` writes it) and saves into `LLULL_EXCHANGE_DIR` when set. |
-| `import_step` | `stepBase64` or `path`, producing `import_mesh` (undoable).                                                                              |
-| `import_code` | `code` or `path`, `language`, `mode: replace / append`. Produces `apply_code_trace` (undoable).                                          |
+| `import_step` | `stepBase64` or `path`, producing `import_mesh` (undoable).                                                                                                |
+| `import_code` | `code` or `path`, `language`, `mode: replace / append`. Produces `apply_code_trace` (undoable).                                                            |
 
 HTTP downloads for the browser: `GET /export/code?language=cadquery|build123d|openscad|freecad`
 and `GET /export/step` (503 when the bridge is not configured).
@@ -163,6 +163,20 @@ conversion; every request uses a private temp dir that is always removed.
   400 not a DWG (`AC10xx` header), 413 too large, 503 no converter installed, 504 timeout.
 - CLI: `llull exec import_dwg file=plan.dwg target=drawing …` (`dwgBase64 | path`, `target`, `sourceUnit`, `layers`, …; toolset `exchange`).
 - UI: Civil / Site panel › DWG file inputs (needs the server).
+
+## 3MF, URDF, AP242 and mesh-to-solid (SC-D4)
+
+Registry commands (work offline, UI and CLI; `--save` writes the file):
+
+| Command                               | Result                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `export_3mf`                          | 3MF package (ZIP: `[Content_Types].xml`, `_rels/.rels`, `3D/3dmodel.model`), one object per body with its name and colour (base material), build items, units millimetre, welded indexed mesh; `data.objects[].manifold` says whether each body is a closed shell. `--save part.3mf`.                                                                                    |
+| `export_urdf`                         | URDF tree + one STL per link (`--save DIR` keeps `meshes/`). Bodies and joints come from the dynamics model, else from assembly instances + `add_joint`. Inertial from `mass_properties`; revolute joints are `continuous` (no angle limits are stored), prismatic joints get a `prismaticTravel` limit. Spherical and loop-closing joints are reported in `data.notes`. |
+| `export_step_exact` `schema: "ap242"` | Same exact B-rep, names, colours and assembly structure, with the AP242 `FILE_SCHEMA` / application protocol declarations (text-level; AP214 stays the default).                                                                                                                                                                                                         |
+| `mesh_to_solid`                       | Rebuilds a constant-section prism mesh (two parallel cap planes, side faces parallel to the axis) as `extrude_profile`, holes as subtracted extruded tools (needs the kernel). Refuses spheres, tapers and multi-region parts.                                                                                                                                           |
+
+IGES needs the native OCCT sidecar and is not covered here. Limits: 3MF carries identity build transforms (geometry is baked in
+world space) and no textures; URDF joint frames are world-aligned; `mesh_to_solid` recovers polygons, not arcs.
 
 ## Limits and known gaps
 

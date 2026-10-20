@@ -109,11 +109,44 @@ pub(super) fn subdivision(entity: &Value) -> Evaluated {
     shape_of(crate::make_sewn_solid(&positions, &indices))
 }
 
+/// `radii` (one `EdgeRadius` per edge, `packages/core/src/model/types.ts`) flattened per edge as size, sizeEnd (NaN = constant), n, then
+/// n (t, size) pairs; `None` when the list does not match the edges or a law is not positive / strictly increasing inside (0, 1).
+pub(super) fn radius_laws(radii: &Value, edge_count: usize) -> Option<Vec<f64>> {
+    let laws = radii.as_array()?;
+    if laws.len() != edge_count || edge_count == 0 {
+        return None;
+    }
+    let mut flat = Vec::new();
+    for law in laws {
+        let size = number(law, "size")?;
+        let end = law.get("sizeEnd").and_then(Value::as_f64).unwrap_or(f64::NAN);
+        if !positive(size) || (!end.is_nan() && !positive(end)) {
+            return None;
+        }
+        let points = law.get("sizes").and_then(Value::as_array).cloned().unwrap_or_default();
+        flat.extend([size, end, points.len() as f64]);
+        let mut last_t = 0.0;
+        for point in &points {
+            let (t, radius) = (number(point, "t")?, number(point, "size")?);
+            if !(t > last_t && t < 1.0) || !positive(radius) {
+                return None;
+            }
+            last_t = t;
+            flat.extend([t, radius]);
+        }
+    }
+    Some(flat)
+}
+
 impl Evaluator {
     /// `fillet` / `chamfer` (`roundEdges`): unique-edge indices in explorer order, `[]` = all.
     pub(super) fn round(&mut self, recipe: &Value, chamfer: bool) -> Evaluated {
         let Some(source) = self.child(recipe, "source")? else { return refused() };
         let Some(edges) = indices(recipe.get("edges")) else { return refused() };
+        if let (false, Some(radii)) = (chamfer, recipe.get("radii").filter(|radii| !radii.is_null())) {
+            let Some(laws) = radius_laws(radii, edges.len()) else { return refused() };
+            return shape_of(features::fillet_laws(&source, &edges, &laws));
+        }
         let size = number(recipe, "size").unwrap_or(f64::NAN);
         let size_end = if chamfer { None } else { number(recipe, "sizeEnd") };
         if !positive(size) || size_end.is_some_and(|end| !positive(end)) {
@@ -123,6 +156,38 @@ impl Evaluator {
             shape_of(features::chamfer(&source, &edges, size))
         } else {
             shape_of(features::fillet(&source, &edges, size, size_end))
+        }
+    }
+
+    /// `faceOp` (SC-F1, `packages/core/src/model/faceOps.ts`): draft, pushPull or splitFace on the source's unique faces.
+    pub(super) fn face_op(&mut self, recipe: &Value) -> Evaluated {
+        let Some(source) = self.child(recipe, "source")? else { return refused() };
+        let Some(faces) = indices(recipe.get("faces")).filter(|faces| !faces.is_empty()) else { return refused() };
+        let plane = |field: &str| {
+            let plane = recipe.get(field)?;
+            Some((vec3_of(plane.get("origin"))?, vec3_of(plane.get("normal"))?))
+        };
+        match recipe.get("kind").and_then(Value::as_str) {
+            Some("draft") => {
+                let (Some(pull), Some((origin, normal))) = (vec3(recipe, "pull"), plane("neutral")) else { return refused() };
+                let angle = number(recipe, "angle").unwrap_or(f64::NAN);
+                if !angle.is_finite() || angle == 0.0 {
+                    return refused();
+                }
+                shape_of(features::draft(&source, &faces, angle, pull, origin, normal))
+            }
+            Some("pushPull") => {
+                let distance = number(recipe, "distance").unwrap_or(f64::NAN);
+                match faces.as_slice() {
+                    [face] if distance.is_finite() && distance != 0.0 => shape_of(features::push_pull(&source, *face, distance)),
+                    _ => refused(),
+                }
+            }
+            Some("splitFace") => match plane("plane") {
+                Some((origin, normal)) => shape_of(features::split_faces(&source, &faces, origin, normal)),
+                None => refused(),
+            },
+            other => Err(EvalError::Unsupported(format!("faceOp kind '{}'", other.unwrap_or("")))),
         }
     }
 
@@ -183,7 +248,22 @@ impl Evaluator {
 }
 
 /// The BRepFeat cut of a hole (one MakeRevol per position) or a pocket (MakePrism from its sketch face); `None` = use the lowering.
+/// Feature cuts below `recipe` on its source chain: the rank `n` of the tool tags `hole<n>.<k>` / `pocket<n>` (SC-N1), stable when an
+/// upstream parameter changes.
+fn feature_rank(recipe: &Value) -> usize {
+    let mut rank = 0;
+    let mut current = recipe.get("source");
+    while let Some(node) = current {
+        if node.get("op").and_then(Value::as_str) == Some("featureCut") {
+            rank += 1;
+        }
+        current = node.get("source").or_else(|| node.get("a"));
+    }
+    rank
+}
+
 fn brep_feat(source: &Rc<Shape>, recipe: &Value) -> Result<Option<Shape>, EvalError> {
+    let rank = feature_rank(recipe);
     if let Some(holes) = recipe.get("holes") {
         let (Some(profiles), Some(origins), Some(normal)) =
             (chains(holes.get("profiles")), holes.get("origins").and_then(Value::as_array), vec3(holes, "normal"))
@@ -191,10 +271,11 @@ fn brep_feat(source: &Rc<Shape>, recipe: &Value) -> Result<Option<Shape>, EvalEr
             return Ok(None);
         };
         let mut current: Option<Shape> = None;
-        for (profile, origin) in profiles.iter().zip(origins) {
+        for (index, (profile, origin)) in profiles.iter().zip(origins).enumerate() {
             let Some(origin) = vec3_of(Some(origin)) else { return Ok(None) };
             let base: &Shape = current.as_ref().unwrap_or(source);
-            match features::feature_revol_cut(base, profile, origin, normal).map_err(EvalError::Failure)? {
+            let tag = format!("hole{rank}.{index}");
+            match features::feature_revol_cut(base, profile, origin, normal, &tag).map_err(EvalError::Failure)? {
                 Some(next) => current = Some(next),
                 None => return Ok(None),
             }
@@ -208,7 +289,7 @@ fn brep_feat(source: &Rc<Shape>, recipe: &Value) -> Result<Option<Shape>, EvalEr
         return Ok(None);
     };
     let length = number(pocket, "length").unwrap_or(f64::NAN);
-    features::feature_prism_cut(source, &chain, origin, normal, &probes, length).map_err(EvalError::Failure)
+    features::feature_prism_cut(source, &chain, origin, normal, &probes, length, &format!("pocket{rank}")).map_err(EvalError::Failure)
 }
 
 #[cfg(test)]

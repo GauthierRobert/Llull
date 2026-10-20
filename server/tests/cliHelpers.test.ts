@@ -142,6 +142,22 @@ describe('saveFiles', () => {
     expect(readFileSync(single[0]?.path ?? '', 'utf8')).toBe('ISO-10303');
     const many = saveDataFiles({ files: [{ name: 'a.nc1', content: 'A' }, { content: 'B' }] }, path.join(root, 'nc'));
     expect(many.map((f) => path.basename(f.path))).toEqual(['a.nc1', 'file-2']);
+    const robot = saveDataFiles(
+      {
+        files: [
+          { name: 'r.urdf', content: 'U' },
+          { name: 'meshes/base.stl', content: 'S' },
+          { name: '../../escape.stl', content: 'E' },
+        ],
+      },
+      path.join(root, 'robot'),
+    );
+    expect(robot.map((f) => path.relative(root, f.path).replace(/\\/g, '/'))).toEqual([
+      'robot/r.urdf',
+      'robot/meshes/base.stl',
+      'robot/escape.stl',
+    ]);
+    expect(readFileSync(path.join(root, 'robot', 'meshes', 'base.stl'), 'utf8')).toBe('S');
     const intoDir = saveDataFiles({ text: 'x', fileName: 'm.scad' }, `${root}/`);
     expect(intoDir[0]?.path).toBe(path.join(root, 'm.scad'));
   });

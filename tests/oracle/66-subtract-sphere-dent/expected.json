@@ -1,0 +1,19 @@
+{
+  "id": "66-subtract-sphere-dent",
+  "family": "boolean",
+  "description": "hemispherical dent r=3 in the top of a 10-cube",
+  "source": "analytic",
+  "formula": "V = 1000 - 2/3 pi r^3; A = 600 - pi r^2 + 2 pi r^2",
+  "kernels": ["manifold", "occt"],
+  "bodies": 1,
+  "volume": 943.451332235,
+  "area": 628.274333882,
+  "centroid": [0, 0, -0.232260086028],
+  "bbox": { "min": [-5, -5, -5], "max": [5, 5, 5] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 },
+  "meshTolerance": {
+    "volume": 0.002799003216265629,
+    "area": 0.004,
+    "reason": "sphere tessellated at 32 segments: volume loss <= 3 % of the sphere share (measured about 2 %)"
+  }
+}

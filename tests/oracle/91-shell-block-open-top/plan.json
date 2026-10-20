@@ -1,0 +1,6 @@
+{
+  "actions": [
+    { "command": "add_box", "params": { "size": [20, 10, 6] }, "as": "a" },
+    { "command": "shell_solid", "params": { "id": "$a", "thickness": 1.5, "openFacesNear": [[0, 0, 3]] } }
+  ]
+}

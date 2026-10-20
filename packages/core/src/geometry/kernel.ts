@@ -18,6 +18,8 @@ type EdgeCurve = 'line' | 'circle' | 'ellipse' | 'bspline' | 'other';
 /** One unique edge; `index` is what `fillet_edge` / `chamfer_edge` `edgeIndices` select. */
 export interface ShapeEdge {
   readonly index: number;
+  /** Persistent name from the kernel's history (SC-N1, `geometry/naming/references`): `e(<face>|<face>)`; absent without history. */
+  readonly name?: string;
   readonly curve: EdgeCurve;
   readonly length: number;
   readonly start: Vec3;
@@ -34,6 +36,8 @@ export interface ShapeEdge {
 
 export interface ShapeFace {
   readonly index: number;
+  /** Persistent name from the kernel's history (SC-N1): `<entity>:<role>`, `blend(<edge>)`, `<face>~inner`; absent without history. */
+  readonly name?: string;
   readonly surface: FaceSurface;
   readonly area: number;
   /** Cylinder, cone and revolution faces (OCC): the axis line and, for a cylinder, its radius (document units). */
@@ -146,7 +150,10 @@ export interface GeometryKernel {
   massProperties?(shape: ShapeHandle): ExactMassProperties | null;
 
   /** Read and heal an exchange file into exact solids (TR-KRN-20/24); `text` is the Part 21 file content. */
-  importShapes?(format: 'step', text: string, options: ImportShapesOptions): ImportShapesResult | null;
+  importShapes?(format: 'step' | 'iges', text: string, options: ImportShapesOptions): ImportShapesResult | null;
+
+  /** IGES 5.3 text of the shapes as exact B-rep solids (SC-D4); absent or null when the kernel cannot write IGES. */
+  exportIges?(shapes: readonly ShapeHandle[]): string | null;
 
   /** Make a document blob (`brep` recipe leaves, `BRepTools::Write` text keyed by sha256) available to `evaluate`. Idempotent. */
   loadBlob?(sha256: string, brep: string): void;

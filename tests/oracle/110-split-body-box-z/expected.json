@@ -1,0 +1,14 @@
+{
+  "id": "110-split-body-box-z",
+  "family": "split",
+  "description": "20x10x6 block split by the plane z = 1 into two bodies",
+  "source": "analytic",
+  "formula": "V = abc; A = 2(ab + bc + ca) + 2 ab (the two new cut faces); centroid and bbox unchanged",
+  "kernels": ["manifold", "occt"],
+  "bodies": 2,
+  "volume": 1200,
+  "area": 1160,
+  "centroid": [0, 0, 0],
+  "bbox": { "min": [-10, -5, -3], "max": [10, 5, 3] },
+  "tolerance": { "volume": 0.001, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
+}
