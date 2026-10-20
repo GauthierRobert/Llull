@@ -72,7 +72,7 @@ describe('import_composite_ap242', () => {
     const tampered = (value: string): string => step.replace(`'ply area',AREA_MEASURE(12800.)`, `'ply area',AREA_MEASURE(${value})`);
     const findingOf = (text: string, property: string, subject: string): { band: string } | undefined =>
       (
-        (importOf(createEmptyDocument(), { text, importSolids: false }).data as Imported).validation.findings as {
+        (importOf(createEmptyDocument(), { text, importSolids: false }).data as Imported).validation.findings as unknown as {
           property: string;
           subject: string;
           band: string;

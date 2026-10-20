@@ -20,7 +20,7 @@ const examples = parseRecords(fixture).bodies;
 const mim = process.env['LLULL_AP242_MIM'];
 
 describe('CAx-IF practice examples', () => {
-  const written = (): Map<number, string> => parseRecords(exportOf(panelDoc().doc).data.step).bodies;
+  const written = (): ReadonlyMap<number, string> => parseRecords(exportOf(panelDoc().doc).data.step).bodies;
 
   it('every entity the practice shows and llull writes is written with the same number of attributes', () => {
     const mine = written();
@@ -60,7 +60,7 @@ describe('CAx-IF practice examples', () => {
   });
 
   it('the validation property item names of the practice that llull writes are the practice names (not llull ones)', () => {
-    const itemNames = (bodies: Map<number, string>): Set<string> =>
+    const itemNames = (bodies: ReadonlyMap<number, string>): Set<string> =>
       new Set(
         [...bodies.values()]
           .filter((body) => /^(INTEGER|MEASURE|DESCRIPTIVE)_REPRESENTATION_ITEM|^ROW_REPRESENTATION_ITEM/.test(body))
