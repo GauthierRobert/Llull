@@ -196,6 +196,8 @@ describe('create_ply_solids: the exact faceSlab recipe', () => {
     expect(validateShapeRecipe({ ...recipe, surface: { type: 'plane', data: [Number.NaN] } })).toMatch(/surface.data/);
   });
 
+  const signer = { verify: () => ({ signer: 'reviewer', signatureId: 's' }), spend: () => true };
+
   it('exports a ply solid from its triangles when the kernel refuses the exact slab, or lacks the op', () => {
     const [solid] = plySolids('add_cylinder', { radius: 50, height: 200 }, [50, 0, 0], { kind: 'whole_face' });
     const entity = solid as MeshSolidEntity;
@@ -205,7 +207,16 @@ describe('create_ply_solids: the exact faceSlab recipe', () => {
     for (const source of [doc, moved])
       for (const unsupported of [[], ['faceSlab' as const]]) {
         const kernel = fakeKernel({ step: 'ISO-10303-21;\nEND-ISO-10303-21;\n', unsupported });
-        const result = execute(source, 'export_step_exact', {}, { ...defaultContext(), kernel });
+        // a ply solid written from triangles is a faceted body: it leaves only with a human's signature (aerospace 04 TR-XCH-26)
+        const refused = execute(source, 'export_step_exact', {}, { ...defaultContext(), kernel });
+        expect(refused.error?.code).toBe('XCH_UNVERIFIED_BODIES');
+        expect(refused.summary).toContain(entity.id);
+        const result = execute(
+          source,
+          'export_step_exact',
+          { acceptUnverified: { nonce: 'n' } },
+          { ...defaultContext(), kernel, humanSignature: signer },
+        );
         expect(result.data, result.summary).toBeDefined();
         expect(result.data).toMatchObject({ solidCount: 1, faceted: [entity.id] });
         expect(result.summary).toContain('written from triangles');
@@ -223,7 +234,12 @@ describe('create_ply_solids: the exact faceSlab recipe', () => {
       ...fakeKernel({ step: 'ISO-10303-21;\nEND-ISO-10303-21;\n' }),
       exportStepAssembly: () => 'ISO-10303-21;\nEND-ISO-10303-21;\n',
     };
-    const result = execute(doc, 'export_step_exact', {}, { ...defaultContext(), kernel });
+    const result = execute(
+      doc,
+      'export_step_exact',
+      { acceptUnverified: { nonce: 'n' } },
+      { ...defaultContext(), kernel, humanSignature: signer },
+    );
     expect(result.data, result.summary).toBeDefined();
   });
 
