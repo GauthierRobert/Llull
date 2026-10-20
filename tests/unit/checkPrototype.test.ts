@@ -239,4 +239,21 @@ describe('owner summary', () => {
     expect(text).toMatch(/Passed: mechanism\./);
     expect(text).not.toMatch(/clearance in motion/);
   });
+
+  it('states calibrated values and absolute-only bands (the reference engine reported "no accuracy statement" before)', () => {
+    const skipped = skippedCheck('dynamics', 'FPR_X', 'why', 'fix');
+    const accuracy = {
+      band: { abs: 0.01, unit: 'bar' },
+      basis: 'b',
+      origin: 'calibrated' as const,
+      validationLevel: 1 as const,
+      warnings: [],
+    };
+    const item = { ...skipped.items[0], code: 'FPR_REFERENCE_MATCH', status: 'info' as const, accuracy: { simulated: accuracy } };
+    const check = { ...skipped, status: 'info' as const, items: [item as (typeof skipped.items)[number]] };
+    const text = ownerSummary([check], { parts: 1, dof: 1, durationS: 1, closestMm: null, stale: 0 }, 'ready_for_review');
+    expect(text).toMatch(
+      /Trust: some values are calibrated \(matched by construction, not validation evidence\); bands stated in absolute units only/,
+    );
+  });
 });
