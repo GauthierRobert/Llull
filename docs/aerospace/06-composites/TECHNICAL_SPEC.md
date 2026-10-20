@@ -729,3 +729,32 @@ infrastructure).
 - [R16] PTC Creo Composite Design, Draping Simulation: https://support.ptc.com/help/creo/creo_pma/r13/usascii/composite_design/about_draping_simulation.html (accessed 2026-10)
 
 Material data sources (T300/5208, AS4/3501-6) and every other external fact: [`validation/sources.md`](validation/sources.md).
+
+## 13. As built (M0-M2, 2026-10-20) and deviations
+
+Built in `packages/domain-aero/src/composites/` (plugin `composites`), model in `packages/core/src/model/composites.ts`
+(`CadDocument.composites`), `@lib/polygonBoolean` (union by edge splitting, convex clip). `@lib/dxfWriter` already existed in core.
+
+Commands: `create_lamina_material`, `define_rosette`, `create_composite_part`, `define_zone`, `edit_zone`, `delete_zone`,
+`set_ply_drop_rules`, `set_laminate_rules`, `generate_plies_from_zones`, `add_ply`, `edit_ply`, `delete_ply`, `reorder_plies`,
+`core_sample`, `check_laminate_rules`, `analyze_laminate`, `laminate_mass`, `check_layup`, `request_layup_waiver`,
+`export_flat_patterns_dxf`. Validated against `clt_reference.json` (all 14 cases: ABD, constants, FPF ratios) and
+`layup_rules_reference.json` (VC-CMP-01..11, 14..16, 18, 25, 31, 34..37 in part).
+
+Deviations from the sketch above:
+
+- Toolset is `manufacturing` (not `composites`): avoids a new toolset and its design-language example.
+- The part 2D frame is the developed frame of the tool face (plane frame; cylinder (arc length, axial); cone polar about the apex), so zone
+  and ply polygons are flat-pattern coordinates. Cylinders and cones use 0 degrees along the axis / meridian whatever the rosette method.
+- Faces of box / cylinder / cone entities resolve analytically on any kernel; other solids use the face-query port (plane, cylinder, cone
+  only; plane outline = parameter bounding rectangle). The kernel path is tested with a stub port only, not against live OCC.
+- `PlyBoundary` is `whole_face | polygons` (union of polygons); `curves`, `surface_region` and `split_ply` are not built.
+- Lamina strengths and density are optional; missing ones refuse the dependent analysis (`CMP_MATERIAL_ALLOWABLE_MISSING`, `CMP_MATERIAL_DENSITY_MISSING`).
+- Ramp rank is per group of plies with identical zone support; the ramp-fit check samples other zone boundaries. A thicker zone overlapping a
+  thinner one must have the higher priority (no polygon difference), else `CMP_ZONES_NOT_BLENDABLE`.
+- `generate_plies_from_zones` uses a shared helper instead of nested `add_ply`.
+- Derived outline polylines exist for planar parts only. DXF is R12 (closed POLYLINE, mm), not LWPOLYLINE; no nesting.
+- Rule checks use the plies actually laid where each zone governs (the zone stack until plies exist).
+- `request_layup_waiver` records a pending waiver; nothing sets `approvalRef` (09 PLM not built).
+- Not built: M3 drape, M4 shop data (laser, ply book, CSV, ply solids, FEA sections), `add_core`, `mass_properties` delegation, parameter
+  expressions in notation, stress unit conversion for non-mm documents (thickness is converted).
