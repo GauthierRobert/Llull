@@ -129,10 +129,15 @@ export function coupledSections(ctx: DeckContext): DeckSections {
       ...mechanicalText.split('\n').filter((line) => line !== ''),
       '*TEMPERATURE',
       ...ctx.mesh.nodes.map(([id]) => row(id, start.value)),
+      // ccx 2.21 stops a later nonlinear (coupled) step unless energy output is requested in the FIRST step ("energy output requests, if any, must be
+      // specified in the first step"); the step temperatures carry over as the start of the coupled step, and a *TEMPERATURE card in the coupled step
+      // is refused ("no thermal *INITIAL CONDITIONS"), so none is written there (measured, server/tests/feaThermomechTransient.test.ts).
+      '*EL FILE',
+      'ENER',
       '*END STEP',
     );
   const output = plan.output === '' ? '' : `, ${plan.output}`;
-  const stepLines = [...plan.notes, ...plan.stepLines, ...(start.preheat ? ['*TEMPERATURE, OP=NEW'] : [])];
+  const stepLines = [...plan.notes, ...plan.stepLines];
   const outputs = [`*NODE FILE${output}`, 'U, NT', `*EL FILE${output}`, 'S, HFL', '*END STEP'];
   return { text: `${linesText([...lines, ...stepLines])}${mechanicalText}${linesText([...bcBlocks.lines, ...outputs])}` };
 }
