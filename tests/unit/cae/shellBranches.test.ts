@@ -100,7 +100,7 @@ describe('laminate sections', () => {
 });
 
 describe('composite deck helpers', () => {
-  const mesh = (doc: CadDocument, plateId: string, nodes: FeMeshArtifact['nodes']): FeMeshArtifact => ({
+  const mesh = (_doc: CadDocument, plateId: string, nodes: FeMeshArtifact['nodes']): FeMeshArtifact => ({
     kind: 'fe_mesh',
     unitSystem: 'N-mm-t-s',
     mesher: 't',
@@ -139,7 +139,7 @@ describe('composite deck helpers', () => {
     expect(compositeCards(verticalCtx, upright.plateId, 1, 2, { worst: 0 })).toMatchObject({ code: 'FEA_COMPOSITE_INVALID' });
     expect(compositePlane(verticalCtx, 'ghost')).toContain('has no shell element');
     expect(projectedAxis([0, 0, 1], [0, 0, 1])).toBeNull();
-    expect(laminaProblem(vertical, 'tape', { ...model.materials['tape']!, density: undefined })).toBeNull();
+    expect(laminaProblem(vertical, 'tape', (({ density: _density, ...rest }) => rest)(model.materials['tape']!))).toBeNull();
   });
 });
 
