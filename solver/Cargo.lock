@@ -610,6 +610,7 @@ dependencies = [
 name = "llull-explicit"
 version = "0.1.0"
 dependencies = [
+ "llull-bvh",
  "llull-gpu",
  "llull-protocol",
  "rayon",

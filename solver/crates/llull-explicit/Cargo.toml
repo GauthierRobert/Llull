@@ -12,6 +12,7 @@ default = []
 gpu = ["llull-gpu/wgpu"]
 
 [dependencies]
+llull-bvh = { path = "../llull-bvh" }
 llull-gpu = { path = "../llull-gpu" }
 llull-protocol = { path = "../llull-protocol" }
 rayon.workspace = true

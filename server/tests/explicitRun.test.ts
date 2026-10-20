@@ -77,8 +77,8 @@ function fakeRunner(fail?: { code: string; message: string }): ComputeRunner & {
           device: 'cpu',
           deterministic: true,
           energy: [
-            [0, 7.85, 0, 0, 0, 0],
-            [1.6e-4, 7.8, 0.04, 0, 0.01, 0],
+            [0, 7.85, 0, 0, 0, 0, 0],
+            [1.6e-4, 7.8, 0.04, 0, 0.01, 0, 0],
           ],
           walls: [{ name: 'anvil', t: [8e-5], force: [39600] }],
         }),

@@ -26,9 +26,9 @@ function energyRows(value: unknown): ExplicitEnergyRow[] | null {
   if (!Array.isArray(value)) return null;
   const rows: ExplicitEnergyRow[] = [];
   for (const row of value) {
-    if (!isNumberList(row) || row.length !== 6) return null;
-    const [t = 0, kinetic = 0, internal = 0, hourglass = 0, wall = 0, externalWork = 0] = row;
-    rows.push({ t, kinetic, internal, hourglass, wall, externalWork });
+    if (!isNumberList(row) || row.length !== 7) return null;
+    const [t = 0, kinetic = 0, internal = 0, hourglass = 0, wall = 0, contact = 0, externalWork = 0] = row;
+    rows.push({ t, kinetic, internal, hourglass, wall, contact, externalWork });
   }
   return rows;
 }
@@ -126,7 +126,7 @@ function extreme(values: readonly number[], centroids: readonly number[], unit: 
 
 /** Energy error of one sample (TR-EXP-40 with the stonewall term). */
 export const energyError = (row: ExplicitEnergyRow, initialKinetic: number): number =>
-  (row.kinetic + row.internal + row.hourglass + row.wall - initialKinetic - row.externalWork) /
+  (row.kinetic + row.internal + row.hourglass + row.wall + row.contact - initialKinetic - row.externalWork) /
   Math.max(Math.abs(initialKinetic + row.externalWork), TINY);
 
 /** Unverified reasons of the current materials of the case (the summary flags them). */
@@ -188,10 +188,14 @@ export function explicitSummary(
       finalInternal: last.internal,
       finalHourglass: last.hourglass,
       finalWall: last.wall,
+      finalContact: last.contact,
       externalWork: last.externalWork,
       errorFinal: errors[errors.length - 1] ?? 0,
       errorMaxAbs: maxOf(errors.map(Math.abs)),
       hourglassRatioMax,
+      contactRatioMax: maxOf(
+        artifact.energy.map((row) => (Math.abs(row.internal) > TINY ? Math.abs(row.contact) / Math.abs(row.internal) : 0)),
+      ),
       addedMassRatio: artifact.initialMass > 0 ? artifact.addedMass / artifact.initialMass : 0,
     },
     maxVonMises: extreme(artifact.vonMises, artifact.centroids, units.stress),

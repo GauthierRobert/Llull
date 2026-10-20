@@ -22,7 +22,11 @@
 //! - Units are consistent and never converted (N-mm-t-s: mm, s, t, MPa, mJ; N-m-kg-s: SI).
 //! - Binary arrays are little-endian: `nodes` 3 × f64 per node, `hex8` 8 × u32 per element, `tet4` 4 × u32 per element (either may be
 //!   absent, not both), `elementMaterial` one u32 per element (hex8 first, then tet4), `initialVelocity` 3 × f64 per node.
-//! - `device`: `cpu` (default, deterministic Rust path) | `gpu` | `auto`. RS-8a has no GPU kernels: a GPU request runs the CPU twin and
+//! - Optional (RS-8c): `elementPart` (u32 per element, parts 0..), `fixed` (u8 per DOF, non-zero = velocity held at 0) and `contacts`:
+//!   `[{ "name", "kind": "surface_to_surface" | "nodes_to_surface" | "self", "a": [parts] (the slaves of
+//!   nodes_to_surface), "b": [parts], "staticFriction", "dynamicFriction", "decay",
+//!   "penaltyScale" }]` (friction 0 by default, dynamic = static when absent, penalty scale 0.1 = LS-DYNA SLSFAC).
+//! - `device`: `cpu` (default, deterministic Rust path) | `gpu` | `auto`. Without the GPU kernels (feature) or an f64 adapter, or with contacts / fixed DOFs, a GPU request runs the CPU twin and
 //!   reports the warning `EXP_GPU_FALLBACK`.
 //!
 //! # Events (stdout NDJSON, `llull-protocol`)
@@ -33,13 +37,13 @@
 //! # Outputs
 //!
 //! - `result.json`: `version`, `termination` (`normal` | `abnormal`), `message`, `cycles`, `finalTime`, `minTimeStep`, `initialMass`,
-//!   `addedMass`, `elements` {hex8, tet4}, `device` (`cpu`), `deterministic` (true), `energy` (rows `[t, kinetic, internal, hourglass,
-//!   wall, externalWork]`, one per history interval plus t = 0 and the end), `walls` ([{name, t[], force[]}], the normal force averaged
+//!   `addedMass`, `elements` {hex8, tet4}, `device` (`cpu` | `gpu`), `adapter` (GPU only), `deterministic` (true), `energy` (rows
+//!   `[t, kinetic, internal, hourglass, wall, contact, externalWork]`, one per history interval plus t = 0 and the end), `walls` ([{name, t[], force[]}], the normal force averaged
 //!   over each history interval = impulse / interval).
 //! - `fields.f64`: per element `[von Mises, equivalent plastic strain, failed (0/1), centroid x, y, z]` at the end, little-endian f64.
 //!   Every output is byte-identical across runs and thread counts.
 
-use crate::model::{Controls, JohnsonCook, JohnsonCookFailure, MassScaling, Material, Model, Wall};
+use crate::model::{Contact, ContactKind, Controls, Friction, JohnsonCook, JohnsonCookFailure, MassScaling, Material, Model, Wall};
 use crate::solver::{run, Outcome, Progress};
 use llull_protocol::{emit, sha256_hex, Event, Output};
 use serde::{Deserialize, Serialize};
@@ -130,6 +134,60 @@ enum DeviceName {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ContactKindName {
+    SurfaceToSurface,
+    NodesToSurface,
+    #[serde(rename = "self")]
+    SelfContact,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ContactSpec {
+    name: String,
+    kind: ContactKindName,
+    a: Vec<u32>,
+    #[serde(default)]
+    b: Vec<u32>,
+    #[serde(default)]
+    static_friction: f64,
+    dynamic_friction: Option<f64>,
+    #[serde(default)]
+    decay: f64,
+    penalty_scale: Option<f64>,
+}
+
+/// LS-DYNA SLSFAC default ([E3] *CONTROL_CONTACT).
+const DEFAULT_PENALTY_SCALE: f64 = 0.1;
+
+fn contact_of(spec: ContactSpec) -> Result<Contact, JobError> {
+    let dynamic = spec.dynamic_friction.unwrap_or(spec.static_friction);
+    let penalty = spec.penalty_scale.unwrap_or(DEFAULT_PENALTY_SCALE);
+    if !(spec.static_friction >= 0.0 && dynamic >= 0.0 && spec.decay >= 0.0 && penalty > 0.0)
+        || !finite(&[spec.static_friction, dynamic, spec.decay, penalty])
+    {
+        return Err(input(format!("contact '{}' needs friction and decay >= 0 and penaltyScale > 0", spec.name)));
+    }
+    let kind = match spec.kind {
+        ContactKindName::SurfaceToSurface if !spec.a.is_empty() && !spec.b.is_empty() => {
+            ContactKind::SurfaceToSurface { a: spec.a, b: spec.b }
+        }
+        ContactKindName::NodesToSurface if !spec.a.is_empty() && !spec.b.is_empty() => {
+            ContactKind::NodesToSurface { slave: spec.a, master: spec.b }
+        }
+        ContactKindName::SelfContact if !spec.a.is_empty() => ContactKind::SelfContact { parts: spec.a },
+        _ => return Err(input(format!("contact '{}' needs parts in a (and b for surface_to_surface / nodes_to_surface)", spec.name))),
+    };
+    Ok(Contact {
+        name: spec.name,
+        kind,
+        friction: Friction { static_coefficient: spec.static_friction, dynamic_coefficient: dynamic, decay: spec.decay },
+        penalty_scale: penalty,
+    })
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct JobSpec {
     version: u32,
@@ -146,6 +204,10 @@ struct JobSpec {
     controls: ControlsSpec,
     #[serde(default)]
     device: DeviceName,
+    element_part: Option<String>,
+    fixed: Option<String>,
+    #[serde(default)]
+    contacts: Vec<ContactSpec>,
 }
 
 /// Default cap on cycles when the job gives none.
@@ -287,6 +349,15 @@ pub fn load(folder: &Path) -> Result<(Model, bool), JobError> {
         gravity: spec.gravity,
         walls,
         controls: controls_of(spec.controls)?,
+        element_part: match &spec.element_part {
+            Some(name) => read_u32(folder, name)?,
+            None => Vec::new(),
+        },
+        contacts: spec.contacts.into_iter().map(contact_of).collect::<Result<Vec<_>, _>>()?,
+        fixed: match &spec.fixed {
+            Some(name) => read_bytes(folder, name)?.into_iter().map(|byte| byte != 0).collect(),
+            None => Vec::new(),
+        },
     };
     validate(&model)?;
     Ok((model, spec.device != DeviceName::Cpu))
@@ -308,6 +379,11 @@ pub fn validate(model: &Model) -> Result<(), JobError> {
         || model.element_material.iter().any(|&index| index as usize >= model.materials.len())
     {
         return Err(input("elementMaterial needs one valid material index per element"));
+    }
+    if (!model.element_part.is_empty() && model.element_part.len() != model.element_count())
+        || (!model.fixed.is_empty() && model.fixed.len() != 3 * nodes)
+    {
+        return Err(input("elementPart needs one value per element and fixed one byte per DOF"));
     }
     if model.initial_velocity.len() != 3 * nodes || !finite(&model.initial_velocity) || !finite(&model.gravity) {
         return Err(input("initialVelocity needs 3 finite values per node and gravity 3 finite values"));
@@ -346,7 +422,7 @@ struct ResultFile<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     adapter: Option<&'a str>,
     deterministic: bool,
-    energy: Vec<[f64; 6]>,
+    energy: Vec<[f64; 7]>,
     walls: Vec<WallOutput<'a>>,
 }
 
@@ -369,7 +445,7 @@ pub fn outputs(model: &Model, outcome: &Outcome, adapter: Option<&str>) -> Resul
         energy: outcome
             .energy
             .iter()
-            .map(|row| [row.time, row.kinetic, row.internal, row.hourglass, row.wall, row.external_work])
+            .map(|row| [row.time, row.kinetic, row.internal, row.hourglass, row.wall, row.contact, row.external_work])
             .collect(),
         walls: outcome.walls.iter().map(|wall| WallOutput { name: &wall.name, t: &wall.times, force: &wall.forces }).collect(),
     };

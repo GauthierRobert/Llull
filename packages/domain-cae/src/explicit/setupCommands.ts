@@ -159,6 +159,7 @@ export const setExplicitControls = defineCommand({
       rigidWalls: spec?.rigidWalls ?? {},
       rigidWallOrder: spec?.rigidWallOrder ?? [],
       ...(spec?.failure !== undefined ? { failure: spec.failure } : {}),
+      ...(spec?.contacts !== undefined ? { contacts: spec.contacts, contactOrder: spec.contactOrder ?? [] } : {}),
       ...(spec?.results !== undefined ? { results: spec.results } : {}),
     };
     const defaults = [timeStepScale, hourglass, linear, quadratic].filter((value) => value.defaulted).length;

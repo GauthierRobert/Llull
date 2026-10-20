@@ -89,6 +89,23 @@ function specErrors(caseId: string, spec: unknown): string[] {
     )
   )
     errors.push(`${where}.rigidWalls / rigidWallOrder are malformed`);
+  const contacts = spec['contacts'];
+  const contactOrder = spec['contactOrder'];
+  if (
+    contacts !== undefined &&
+    (!isRecord(contacts) ||
+      !Array.isArray(contactOrder) ||
+      contactOrder.some((id) => typeof id !== 'string' || !Object.hasOwn(contacts, id)) ||
+      !Object.values(contacts).every(
+        (entry) =>
+          isRecord(entry) &&
+          typeof entry['name'] === 'string' &&
+          Array.isArray(entry['a']) &&
+          Array.isArray(entry['b']) &&
+          isNamed(entry['penaltyScale']),
+      ))
+  )
+    errors.push(`${where}.contacts / contactOrder are malformed`);
   const failure = spec['failure'];
   if (
     failure !== undefined &&

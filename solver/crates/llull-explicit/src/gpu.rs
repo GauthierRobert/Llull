@@ -122,6 +122,9 @@ fn material_table(model: &Model) -> Vec<f64> {
 
 /// Integrates `model` on the GPU. `Err` when no adapter with SHADER_F64 exists (the caller runs the CPU twin) or a GPU call fails.
 pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcome, String), String> {
+    if !model.contacts.is_empty() || model.fixed.iter().any(|&held| held) {
+        return Err("contact and fixed supports run on the CPU path only (RS-8c)".to_string());
+    }
     let gpu = acquire_with("llull-explicit", wgpu::Features::SHADER_F64)?;
     let controls = &model.controls;
     let x0 = model.coordinates.clone();
@@ -232,7 +235,8 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
         element_dt = element_dt.min(eigen_step(&gradients, volume, &element.node_masses, &model.materials[element.material]));
     }
     let initial_kinetic: f64 = (0..3 * nodes).map(|k| 0.5 * masses[k / 3] * model.initial_velocity[k] * model.initial_velocity[k]).sum();
-    let mut energy = vec![EnergyRow { time: 0.0, kinetic: initial_kinetic, internal: 0.0, hourglass: 0.0, wall: 0.0, external_work: 0.0 }];
+    let mut energy =
+        vec![EnergyRow { time: 0.0, kinetic: initial_kinetic, internal: 0.0, hourglass: 0.0, wall: 0.0, contact: 0.0, external_work: 0.0 }];
     let mut walls_history: Vec<WallHistory> =
         model.walls.iter().map(|wall| WallHistory { name: wall.name.clone(), times: vec![], forces: vec![] }).collect();
     let mut last_sample = 0.0;
@@ -282,7 +286,7 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
                 message = format!("the solution became non-finite at t = {time:e} s");
                 break;
             }
-            energy.push(EnergyRow { time, kinetic, internal, hourglass, wall, external_work });
+            energy.push(EnergyRow { time, kinetic, internal, hourglass, wall, contact: 0.0, external_work });
             sample_walls(&mut walls_history, &mut impulse, time, last_sample);
             gpu.queue.write_buffer(&b.wall_impulse, 0, &f64_bytes(&vec![0.0; walls_count * nodes]));
             last_sample = time;
@@ -321,7 +325,7 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
     let v_end: Vec<f64> = (0..3 * nodes).map(|k| v_half[k] + 0.5 * dt_prev * (external[k] - f_int[k]) / masses[k / 3]).collect();
     let kinetic: f64 = (0..3 * nodes).map(|k| 0.5 * masses[k / 3] * v_end[k] * v_end[k]).sum();
     let (internal, hourglass, wall, external_work, mut impulse) = totals(&gpu, &b)?;
-    energy.push(EnergyRow { time, kinetic, internal, hourglass, wall, external_work });
+    energy.push(EnergyRow { time, kinetic, internal, hourglass, wall, contact: 0.0, external_work });
     if time > last_sample {
         sample_walls(&mut walls_history, &mut impulse, time, last_sample);
     }

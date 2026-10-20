@@ -18,7 +18,7 @@ import { createFeArtifactStore, type FeArtifactCache } from '../src/fea/artifact
 import { createComputeRunner } from '../src/native/computeJob';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { runExplicitRun } from '../src/native/explicitRun';
-import { barModel } from '../../tests/unit/cae/explicit/support';
+import { barModel, must, replayPlan } from '../../tests/unit/cae/explicit/support';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null)
@@ -160,5 +160,85 @@ describe('explicit_run with the real llull-compute', () => {
       expect((await solve('gpu')).hash).toBe(first.hash);
     },
     300_000,
+  );
+  native(
+    'drop-test template on the own solver: first contact at sqrt(2h/g) and kinetic energy m g h before it (VC-EXP-51 / 67b)',
+    async () => {
+      const { doc: start, aliases } = replayPlan('exp_drop_box_llull');
+      const analysisId = aliases['an'] ?? '';
+      let doc = start;
+      const host: FeaHost = {
+        getDoc: () => doc,
+        applyCommand: (name, params) => {
+          const result = execute(doc, name, params, { ...defaultContext(), feaArtifacts: store });
+          if (result.rejected !== true) doc = result.document;
+          return { summary: result.summary, affected: result.affected, isError: result.rejected === true, data: result.data };
+        },
+      };
+      const result = await runExplicitRun(analysisId, { timeoutS: 600 }, host, { store, runner: createComputeRunner({}, BINARY) });
+      expect(result.isError, result.summary).toBe(false);
+      const artifact = store.get((result.data as { artifactHash: string }).artifactHash) as FeExplicitArtifact;
+      expect(artifact.termination).toBe('normal');
+      const wall = artifact.walls[0];
+      if (wall === undefined) throw new Error('no floor history');
+      const first = wall.force.findIndex((force) => force > 0);
+      const contact = Math.sqrt((2 * 1200) / 9806.65);
+      expect(Math.abs((wall.t[first] ?? 0) - contact)).toBeLessThan(0.005 * contact);
+      const before = artifact.energy.filter((row) => row.t < contact - 0.001).at(-1);
+      if (before === undefined) throw new Error('no energy row');
+      const mass = 2.7e-9 * 50 ** 3;
+      const expected = 0.5 * mass * (9806.65 * before.t) ** 2;
+      expect(Math.abs(before.kinetic / expected - 1)).toBeLessThan(0.005);
+      expect(Math.abs(before.externalWork / expected - 1)).toBeLessThan(0.005);
+    },
+    600_000,
+  );
+  native(
+    'two boxes colliding through add_contact transmit rho c0 v / 2 into the struck bar (RS-8c, through commands)',
+    async () => {
+      const model = barModel({ size: 2.5 });
+      // Bar B on top of the bar of the model, 0.5 mm above it; the wall goes, bar A keeps its -10 m/s, B starts at rest.
+      const box = must(model.doc, 'add_box', { size: [10, 10, 200], position: [0, 0, -200.5], anchor: 'min' });
+      const struck = box.affected[0] ?? '';
+      let doc = must(box.document, 'assign_material', { materialName: 'steel_like', entityIds: [struck] }).document;
+      doc = must(doc, 'set_part_idealization', { analysisId: model.analysisId, entityId: struck }).document;
+      doc = must(doc, 'delete_rigid_wall', { analysisId: model.analysisId, wallId: model.wallId }).document;
+      const c0 = Math.sqrt(200_000 / 7.85e-9);
+      const end = 0.5 / 10_000 + 200 / c0;
+      doc = must(doc, 'set_explicit_controls', {
+        analysisId: model.analysisId,
+        endTime: { value: end, unit: 's' },
+        historyInterval: { value: 1e-6, unit: 's' },
+        mesh: { kind: 'structured_hex', size: 2.5 },
+      }).document;
+      doc = must(doc, 'add_contact', {
+        analysisId: model.analysisId,
+        name: 'impact',
+        kind: 'surface_to_surface',
+        a: [model.barId],
+        b: [struck],
+      }).document;
+      const host: FeaHost = {
+        getDoc: () => doc,
+        applyCommand: (name, params) => {
+          const result = execute(doc, name, params, { ...defaultContext(), feaArtifacts: store });
+          if (result.rejected !== true) doc = result.document;
+          return { summary: result.summary, affected: result.affected, isError: result.rejected === true, data: result.data };
+        },
+      };
+      const result = await runExplicitRun(model.analysisId, { timeoutS: 600 }, host, { store, runner: createComputeRunner({}, BINARY) });
+      expect(result.isError, result.summary).toBe(false);
+      const artifact = store.get((result.data as { artifactHash: string }).artifactHash) as FeExplicitArtifact;
+      // Stresses in the struck bar (z < -0.5): the plateau half a contact time after impact.
+      const struckStress = artifact.vonMises.filter((_, element) => (artifact.centroids[3 * element + 2] ?? 0) < -0.5);
+      const plateau =
+        struckStress.filter((value) => value > 50).reduce((sum, value) => sum + value, 0) /
+        struckStress.filter((value) => value > 50).length;
+      const expected = (7.85e-9 * c0 * 10_000) / 2;
+      expect(Math.abs(plateau / expected - 1)).toBeLessThan(0.1);
+      const summary = doc.analysis?.cases[model.analysisId]?.explicit?.results as ExplicitResultsSummary;
+      expect(Math.abs(summary.energy.errorMaxAbs)).toBeLessThan(0.03);
+    },
+    600_000,
   );
 });

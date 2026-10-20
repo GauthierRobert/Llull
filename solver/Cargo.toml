@@ -48,8 +48,11 @@ opt-level = 3
 [profile.dev.package.llull-gpu]
 opt-level = 3
 
-# The explicit benchmarks integrate tens of thousands of cycles (bar wave, drop).
+# The explicit benchmarks integrate tens of thousands of cycles (bar wave, drop, contact search on llull-bvh).
 [profile.dev.package.llull-explicit]
+opt-level = 3
+
+[profile.dev.package.llull-bvh]
 opt-level = 3
 
 [profile.release]

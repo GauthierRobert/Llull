@@ -70,6 +70,9 @@ pub fn model(coordinates: Vec<f64>, hex8: Vec<u32>, tet4: Vec<u32>, material: Ma
         gravity: [0.0; 3],
         walls: vec![],
         controls,
+        element_part: vec![],
+        contacts: vec![],
+        fixed: vec![],
     }
 }
 

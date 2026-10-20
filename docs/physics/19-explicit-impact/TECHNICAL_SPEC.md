@@ -489,7 +489,7 @@ stiffness hourglass form (LS-DYNA types 4 / 5) and its eigenvalue estimate were 
 **Tet4 variant.** Constant strain only. Volumetric locking of tet4 in nearly incompressible plastic flow is a known limit. Hex8 is
 llull's own mesh for impact (structured_hex); tet4 reads the 05 Gmsh mesh.
 
-**Contact (RS-8c).** Not decided and not built. Candidates to pin from [E2] §23 (penalty node-to-surface) when RS-8c starts.
+**Contact (RS-8c).** Decided 2026-10-20 from [E2] Ch. 29 (rendered pages): penalty node-to-segment with Coulomb friction (§13.7).
 
 ### 13.2 Decision Q8: hourglass limit
 
@@ -559,7 +559,7 @@ Test material constants are synthetic (validation pack inputs, Q7): no Johnson�
   - Johnson–Cook failure and erosion: **built 2026-10-19** on the CPU path (`set_johnson_cook_failure`, §13.1). Moving D1–D5 into a
     PHY-02 failure law kind is open.
   - Temperature (adiabatic heating) for T*.
-- **RS-8c:** penalty contact on `llull-bvh`, self contact, friction, shells.
+- **RS-8c:** penalty contact on `llull-bvh`, self contact and Coulomb friction: **built 2026-10-20** (§13.7). Shells: §13.8.
 - **Hand-off MVP (M2–M4):** deck writers, readers, OpenCourant run, import (unchanged plan).
 
 ### 13.6 As built: RS-8b GPU kernels (2026-10-20)
@@ -595,3 +595,53 @@ eroding front differs locally. Hence the looser bounds for that case.
 Reproduce with `cargo test --release --features gpu --test gpu -- --ignored --nocapture`.
 
 Build note: on Windows without MSVC the GNU toolchain needs a `dlltool` stand-in (`-C dlltool=…`) for `windows-sys` raw-dylib.
+
+### 13.7 As built: RS-8c penalty contact (2026-10-20)
+
+Source: [E2] Ch. 29, with every equation read from rendered page images (PDF pages 650–690), plus [E3] for keyword defaults. Code:
+`solver/crates/llull-explicit/src/contact.rs` (CPU path; a model with contacts or fixed DOFs falls back from the GPU with
+`EXP_GPU_FALLBACK`).
+
+| Item | As built | Source |
+| ---- | -------- | ------ |
+| Surfaces | exterior faces of the solid elements of the parts (hex8 quads, tet4 triangles), oriented outward | [E2] §29.6 (segments) |
+| Search | `llull-bvh` box tree over the master segments, rebuilt every cycle; new query `Bvh::overlapping` (all boxes within a radius, ascending) | the manual re-sorts every 10–15 cycles (§29.12); every cycle is conservative |
+| Contact point | `∂r/∂ξ·(t − r) = ∂r/∂η·(t − r) = 0`: 3 least-squares, then ≤ 10 Newton iterations; `MAXPAR` 1.025 | Eqs. 29.10–29.13; [E3] *CONTACT MAXPAR |
+| Penalty | `l = n·(t − r) < 0`; `f_s = −l k n` on the slave, `−φ_i f_s` on the master nodes; `k = f_si K A²/V` (solids), `f_si` = SLSFAC 0.1 (named default), stiffness = min(master, slave) | Eqs. 29.14–29.18; [E3] *CONTROL_CONTACT SLSFAC, PENOPT |
+| Kinds | `surface_to_surface` (both ways, symmetric); `nodes_to_surface` (one way, slaves → master); `self` | [E3] *CONTACT Remark 4; [E2] p. 29-15 (type 5); §29.13 |
+| Self exclusion | a node never contacts a segment of an element it belongs to | stricter than [E2] §29.12.1 (segments containing the node) |
+| Friction | `F_y = μ\|f_n\|`, `Δe = r^{n+1}(ξ^{n+1}) − r^{n+1}(ξ^n)`, `f* = f^n − kΔe`, return to `F_y f*/\|f*\|`, `μ = μ_d + (μ_s − μ_d)e^{−c\|v\|}` | Eqs. 29.25–29.31 |
+| Contact energy | `−Σ f_c·½(Δx^{n−½} + Δx^{n+½})`; enters the energy balance (`contact` column, `contactRatioMax`, optional `contactLimit`) | central-difference work, same form as the wall energy; [E2] Eq. 29.23 is the solver's own form |
+
+**Deviations from the printed equations, flagged.**
+- The printed Newton Hessian term is `r·r,ξη`; the exact `(r − t)·r,ξη` is used.
+- The printed least-squares right-hand side `r − t` is applied with the descent sign.
+- The printed `n × [t − r]` in Eq. 29.14 is a dot product.
+- Projecting the old friction force and the slip onto the current tangent plane is llull's choice; the manual does not say.
+
+**Selection rule (llull, measured necessary).**
+- A penetration counts only when it is deeper than 1e-9 × the master element's thickness `V/A` and shallower than half of it.
+- The segment a node touched last cycle keeps it while still penetrated; otherwise the shallowest penetration wins.
+- Without the round-off tolerance, the edge nodes of two colliding bars picked the coplanar side faces of the other bar. Only about 22 % of the momentum transferred, and the bars passed through each other.
+- Symmetric contact of a body sliding on a flat surface lets the surface nodes in its bottom plane catch its leading face. Use `nodes_to_surface` with the sliding body as slave, the usual set-up for that case.
+
+**Verification** (`tests/contact.rs`, `tests/unit/cae/explicit/contact.test.ts`, `server/tests/explicitRunNative.test.ts`):
+
+| Case | Closed form | Measured | Asserted |
+| ---- | ----------- | -------- | -------- |
+| Two identical bars, ν = 0, 10 m/s, 0.1 mm gap | velocities exchange (A → 0, B → 10 m/s); momentum conserved | A 142 mm/s, B 9 858 mm/s; momentum to round-off; energy error 1.4e-4; contact energy left 1.3e-4 of KE₀ | exchange 5 %, momentum 1e-6 |
+| Self contact on the same bars (one part) | the two-surface answer | same mean velocities to 1e-6 | 1e-6 |
+| Translating one-element-thick plate with self contact and friction | stress free, no contact | contact energy 0, von Mises < 1e-6 MPa | as stated |
+| Coulomb block, μ = 0.5, v₀ = 0.15 m/s, gravity, fixed plate, `nodes_to_surface` | stopping distance v₀²/(2μg) = 2.294 mm, then at rest | 2.294 mm, 0.00 mm/s (v₀ = 0.5 m/s: 25.493 vs 25.493 mm) | 5 %; < 2 % of v₀ |
+| Two boxes through commands (`add_contact`, `explicit_run`) | σ = ρc₀v/2 = 198 MPa in the struck bar half a contact time after impact | plateau within 10 %, energy error < 3 % | 10 %, 3 % |
+
+The Coulomb block is the classical result that the Abaqus 2017 Verification Manual problem "Friction models in Abaqus/Explicit" checks:
+deceleration μg, stop at v₀²/(2μg), t = v₀/(μg) (abaqus-docs.mit.edu 2017, simaver-c-expfricmodels, page summary read).
+
+**Fixed DOFs.** `fixed` (u8 per DOF, velocity held at 0) is part of the job contract and is used by the friction benchmark. Mapping the
+05 `fixed` constraints onto it from the commands is not built.
+
+**Drop-test template on the own solver.** `validation/plans/exp_drop_box_llull.plan.json` builds the VC-EXP-51 set-up from built
+commands: 50 mm aluminium-like box 1.2 m above a rigid floor, gravity, `structured_hex` 12.5 mm, `llull_explicit`.
+`explicitRunNative.test.ts` runs it through `explicit_run`: first floor contact within 0.5 % of √(2h/g) = 0.4947 s; kinetic energy
+and gravity work before contact equal ½m(gt)² within 0.5 %.

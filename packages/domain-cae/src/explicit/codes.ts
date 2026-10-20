@@ -23,6 +23,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   EXP_ARTIFACT_NOT_FOUND: 'run explicit_run on a machine with the artifact store; never hand-write results',
   EXP_SUMMARY_MISMATCH: 'pass the summary exactly as the transport returned it, or omit it; never hand-write results',
   EXP_INPUT_MISSING: 'supply the named input with its unit',
+  EXP_CONTACT_INVALID: 'give parts of the case for a (and b except for self), a unique name, friction >= 0 and a penalty scale > 0',
+  EXP_CONTACT_NOT_FOUND: 'list the contacts with explicit_report',
 };
 
 export const refuseExplicit = tableRejection(REMEDIATION);

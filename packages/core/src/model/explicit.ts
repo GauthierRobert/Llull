@@ -38,6 +38,20 @@ export interface ExplicitFailure {
   readonly source: string;
 }
 
+/** Penalty contact (RS-8c): two part sets checked both ways, the nodes of `a` against the surface of `b` (one way), or `a` against itself. */
+export interface ExplicitContact {
+  readonly name: string;
+  readonly kind: 'surface_to_surface' | 'nodes_to_surface' | 'self';
+  /** Entity ids (parts of the case); the slave side of nodes_to_surface. */
+  readonly a: readonly string[];
+  /** Entity ids of the other side (empty for self). */
+  readonly b: readonly string[];
+  /** Coulomb friction: static, dynamic and the exponential decay constant (s/length) of μ(v). */
+  readonly friction: { readonly static: number; readonly dynamic: number; readonly decay: number };
+  /** Penalty scale f_si (LS-DYNA SLSFAC). */
+  readonly penaltyScale: NamedValue;
+}
+
 export interface ExplicitSpec {
   readonly endTimeS: number;
   readonly historyIntervalS: number;
@@ -57,6 +71,9 @@ export interface ExplicitSpec {
   readonly rigidWallOrder: readonly string[];
   /** Johnson–Cook failure constants per document material id (TR-EXP-21); never defaulted, always with their source (Q7). */
   readonly failure?: Readonly<Record<string, ExplicitFailure>>;
+  /** Penalty contacts (RS-8c), by id `ct-<step>.<k>`. */
+  readonly contacts?: Readonly<Record<string, ExplicitContact>>;
+  readonly contactOrder?: readonly string[];
   readonly results?: ExplicitResultsSummary;
 }
 
@@ -78,6 +95,8 @@ export interface ExplicitEnergyRow {
   readonly hourglass: number;
   /** Kinetic energy removed by the kinematic rigid-wall constraint (stonewall energy). */
   readonly wall: number;
+  /** Energy taken by contact forces (penalty springs + friction). */
+  readonly contact: number;
   readonly externalWork: number;
 }
 
@@ -141,11 +160,14 @@ export interface ExplicitResultsSummary {
     readonly finalInternal: number;
     readonly finalHourglass: number;
     readonly finalWall: number;
+    readonly finalContact: number;
     readonly externalWork: number;
-    /** (E_kin + E_int + E_hg + E_wall - E_kin0 - W_ext) / max(E_kin0 + W_ext, tiny), TR-EXP-40, at the last sample. */
+    /** (E_kin + E_int + E_hg + E_wall + E_contact - E_kin0 - W_ext) / max(E_kin0 + W_ext, tiny), TR-EXP-40, at the last sample. */
     readonly errorFinal: number;
     readonly errorMaxAbs: number;
     readonly hourglassRatioMax: number;
+    /** Max |contact energy| / internal energy over the history. */
+    readonly contactRatioMax: number;
     readonly addedMassRatio: number;
   };
   readonly maxVonMises: ExplicitExtreme;

@@ -84,6 +84,32 @@ pub struct Wall {
     pub normal: [f64; 3],
 }
 
+/// Coulomb friction of a contact: `μ = μ_d + (μ_s − μ_d) exp(−c |v|)` (LS-DYNA R14 Theory Manual Eq. 29.30).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Friction {
+    pub static_coefficient: f64,
+    pub dynamic_coefficient: f64,
+    pub decay: f64,
+}
+
+/// Which surfaces a penalty contact pairs: two part sets checked both ways (symmetric), the nodes of one set against the segments of
+/// another (one way, LS-DYNA type 5 node-to-surface), or one set against itself.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ContactKind {
+    SurfaceToSurface { a: Vec<u32>, b: Vec<u32> },
+    NodesToSurface { slave: Vec<u32>, master: Vec<u32> },
+    SelfContact { parts: Vec<u32> },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Contact {
+    pub name: String,
+    pub kind: ContactKind,
+    pub friction: Friction,
+    /// Penalty scale `f_si` (SLSFAC × SFS; LS-DYNA default 0.1).
+    pub penalty_scale: f64,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MassScaling {
     pub target_time_step: f64,
@@ -119,6 +145,11 @@ pub struct Model {
     pub gravity: [f64; 3],
     pub walls: Vec<Wall>,
     pub controls: Controls,
+    /// Part index per element (contacts select surfaces by part); empty = every element in part 0.
+    pub element_part: Vec<u32>,
+    pub contacts: Vec<Contact>,
+    /// Fixed degrees of freedom (3 per node, velocity held at 0); empty = none.
+    pub fixed: Vec<bool>,
 }
 
 impl Model {

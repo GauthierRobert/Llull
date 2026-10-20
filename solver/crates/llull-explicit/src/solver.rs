@@ -17,6 +17,7 @@
 //! Determinism: element work runs in parallel (rayon) but every reduction and every nodal assembly runs sequentially in element order, so
 //! the outputs are bit-identical across runs and thread counts.
 
+use crate::contact::Contacts;
 use crate::hex8;
 use crate::material::{split, update, von_mises, PointState, Sym};
 use crate::model::{Material, Model};
@@ -38,6 +39,8 @@ pub struct EnergyRow {
     pub internal: f64,
     pub hourglass: f64,
     pub wall: f64,
+    /// Energy taken by the contact forces: penalty springs plus friction (minus their work on the nodes).
+    pub contact: f64,
     pub external_work: f64,
 }
 
@@ -296,8 +299,12 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
     let mut hourglass = 0.0;
     let mut wall_energy = 0.0;
     let mut external_work = 0.0;
+    let mut contact_energy = 0.0;
+    let volumes: Vec<f64> = elements.iter().map(|element| kinematics(&element.nodes, &x).1).collect();
+    let mut contacts = Contacts::new(model, &x, &volumes);
     let initial_kinetic: f64 = (0..3 * nodes).map(|k| 0.5 * masses[k / 3] * v_half[k] * v_half[k]).sum();
-    let mut energy = vec![EnergyRow { time: 0.0, kinetic: initial_kinetic, internal: 0.0, hourglass: 0.0, wall: 0.0, external_work: 0.0 }];
+    let mut energy =
+        vec![EnergyRow { time: 0.0, kinetic: initial_kinetic, internal: 0.0, hourglass: 0.0, wall: 0.0, contact: 0.0, external_work: 0.0 }];
     let mut walls: Vec<WallHistory> =
         model.walls.iter().map(|wall| WallHistory { name: wall.name.clone(), times: vec![], forces: vec![] }).collect();
     let mut wall_impulse = vec![0.0; model.walls.len()];
@@ -331,8 +338,13 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
         }
         min_dt = min_dt.min(dt);
         dt = dt.min(end - time);
-        let mut v_new: Vec<f64> =
-            (0..3 * nodes).map(|k| v_half[k] + 0.5 * (dt_prev + dt) * (external[k] - f_int[k]) / masses[k / 3]).collect();
+        let contact_force = contacts.as_mut().map(|set| set.forces(&x, dt_prev));
+        let mut v_new: Vec<f64> = (0..3 * nodes)
+            .map(|k| {
+                let contact = contact_force.as_ref().map_or(0.0, |forces| forces[k]);
+                v_half[k] + 0.5 * (dt_prev + dt) * (external[k] + contact - f_int[k]) / masses[k / 3]
+            })
+            .collect();
         for (index, wall) in model.walls.iter().enumerate() {
             let n = wall.normal;
             for node in 0..nodes {
@@ -354,9 +366,18 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
                 }
             }
         }
+        for (k, held) in model.fixed.iter().enumerate() {
+            if *held {
+                v_new[k] = 0.0;
+            }
+        }
+        if let Some(forces) = &contact_force {
+            // Work of the contact forces at step n over the central-difference step, f·½(Δx^{n−½} + Δx^{n+½}).
+            contact_energy -= (0..3 * nodes).map(|k| forces[k] * 0.5 * (dt_prev * v_half[k] + dt * v_new[k])).sum::<f64>();
+        }
         if cycles > 0 && time >= next_sample * (1.0 - 1e-12) {
             let kinetic: f64 = (0..3 * nodes).map(|k| 0.5 * masses[k / 3] * (0.5 * (v_half[k] + v_new[k])).powi(2)).sum();
-            energy.push(EnergyRow { time, kinetic, internal, hourglass, wall: wall_energy, external_work });
+            energy.push(EnergyRow { time, kinetic, internal, hourglass, wall: wall_energy, contact: contact_energy, external_work });
             sample_walls(&mut walls, &mut wall_impulse, time, last_sample);
             last_sample = time;
             next_sample = (((time / controls.history_interval) + 1e-9).floor() + 1.0) * controls.history_interval;
@@ -398,7 +419,7 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
     // Final kinetic energy at the last integer step: half kick with the last forces.
     let v_end: Vec<f64> = (0..3 * nodes).map(|k| v_half[k] + 0.5 * dt_prev * (external[k] - f_int[k]) / masses[k / 3]).collect();
     let kinetic: f64 = (0..3 * nodes).map(|k| 0.5 * masses[k / 3] * v_end[k] * v_end[k]).sum();
-    energy.push(EnergyRow { time, kinetic, internal, hourglass, wall: wall_energy, external_work });
+    energy.push(EnergyRow { time, kinetic, internal, hourglass, wall: wall_energy, contact: contact_energy, external_work });
     if time > last_sample {
         sample_walls(&mut walls, &mut wall_impulse, time, last_sample);
     }
