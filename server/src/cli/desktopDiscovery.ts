@@ -25,7 +25,7 @@ export interface DesktopDiscovery {
 
 /** `$LLULL_HOME` (tests, portable installs) or `~/.llull`. */
 export function llullHome(env: Readonly<Record<string, string | undefined>> = process.env): string {
-  return env['LLULL_HOME'] ?? path.join(os.homedir(), '.llull');
+  return env['LLULL_HOME'] ?? path.join(os.userInfo().homedir, '.llull');
 }
 
 export function desktopDiscoveryPath(home: string): string {

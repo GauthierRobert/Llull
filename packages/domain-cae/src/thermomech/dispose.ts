@@ -8,6 +8,7 @@ import { canonicalJson } from '@lib/canonicalJson';
 import { jcsJson } from '@lib/jcs';
 import { sha256Hex } from '@lib/sha256';
 import { execute } from '@core/commands/registry';
+import { verifyAndSpend } from '@core/model/humanGate';
 import { analysisOf } from '../shared/access';
 import { refuseTmc } from './refusal';
 
@@ -51,7 +52,8 @@ export const disposeFitResult = defineCommand({
         'TMC_HUMAN_GATE',
         'no signing port is installed; only a human signature verified by the signing port can disposition a fit',
       );
-    const signer = port.verify(
+    const signer = verifyAndSpend(
+      port,
       signature,
       sha256Hex(canonicalJson({ act: 'dispose_fit_result', rowKey, decision, justification, inputsHash })),
     );

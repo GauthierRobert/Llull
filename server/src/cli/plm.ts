@@ -4,6 +4,8 @@
  */
 
 import { randomBytes } from 'node:crypto';
+import { humanGatePayload } from '@core/model/humanGate';
+import { jcsJson } from '@lib/jcs';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { CadDocument } from '@core/model/types';
@@ -58,7 +60,8 @@ function enrollmentPassphrase(args: ParsedArgv, io: PlmCliIo): string {
  * The SIGNING passphrase: typed at an interactive no-echo prompt, never taken from the environment, a flag or stdin (an agent in the user's shell would
  * find it there and sign as the human). With no terminal the signature is refused: use the desktop app (Sign dialog) instead.
  */
-async function signingPassphrase(keyName: string, io: PlmCliIo): Promise<string> {
+async function signingPassphrase(keyName: string, io: PlmCliIo, shown: string): Promise<string> {
+  io.stderr(shown);
   const typed = io.readPassphrase === undefined ? null : await io.readPassphrase(`Passphrase of the signing key of ${keyName}: `);
   if (typed === null || typed === '')
     throw new PlmUsage(
@@ -84,9 +87,20 @@ export async function confirmedParams(backend: CliBackend, name: string, params:
   const nonce = randomBytes(16).toString('hex');
   const given = typeof params === 'object' && params !== null ? (params as Record<string, unknown>) : {};
   const payload = await backend.run('plm_act_payload', { command: name, params: given, nonce });
-  const hash = (payload.data as { payloadSha256?: string } | undefined)?.payloadSha256;
-  if (payload.isError || hash === undefined) throw new PlmUsage(`${name} is not a human-only plm command (${outcomeText(payload)})`);
-  const signature = await store.sign(key.keyId, await signingPassphrase(key.name, io), `${GATE_CONTEXT}${hash}`);
+  const data = payload.data as
+    | { payloadSha256?: string; act?: string; ids?: string[]; details?: { params?: unknown; contentHash?: string; stateHash?: string } }
+    | undefined;
+  if (payload.isError || data?.payloadSha256 === undefined || data.act === undefined || data.details === undefined)
+    throw new PlmUsage(`${name} is not a human-only plm command (${outcomeText(payload)})`);
+  // The backend is NOT trusted (--server / desktop.json are agent-writable): check it describes THIS act and rebuild the payload locally.
+  const expected = Object.fromEntries(Object.entries(given).filter(([field]) => !['confirmation', 'at', 'by'].includes(field)));
+  if (data.act !== `plm:${name}` || jcsJson(data.details.params ?? null) !== jcsJson(expected))
+    throw new PlmUsage(`the backend described another act than ${name} with your params; nothing was signed.`);
+  const hash = humanGatePayload(data.act, data.ids ?? [], data.details, nonce);
+  if (hash !== data.payloadSha256)
+    throw new PlmUsage('the backend payload hash is not the hash of the act it described; nothing was signed.');
+  const shown = `Signing ${data.act} on part ${(data.ids ?? []).join(',')}; params ${jcsJson(expected)}; document content ${data.details.contentHash ?? '(not bound)'}\n`;
+  const signature = await store.sign(key.keyId, await signingPassphrase(key.name, io, shown), `${GATE_CONTEXT}${hash}`);
   if (signature === null) throw new PlmUsage(`the key ${key.keyId} could not sign (wrong passphrase, or it is revoked).`);
   return { ...given, confirmation: { alg: 'Ed25519', keyId: key.keyId, publicKey: key.publicKey, signature, nonce } };
 }
@@ -153,7 +167,16 @@ async function runSign(args: ParsedArgv, io: PlmCliIo, backend: () => Promise<Cl
     io.stderr(outcomeText(manifest));
     return FAILED;
   }
-  const signature = await store.sign(key.keyId, await signingPassphrase(key.name, io), data.canonical);
+  // The backend is not trusted: the manifest it returned must be the revision and meaning asked for, and the human sees what is signed.
+  const body = JSON.parse(data.canonical) as {
+    item?: { partNumber?: string; revision?: string };
+    meaning?: string;
+    documentContentHash?: string;
+  };
+  if (body.item?.revision !== revision || body.meaning !== meaning)
+    throw new PlmUsage('the backend returned a manifest for another revision or meaning than requested; nothing was signed.');
+  const shown = `Signing ${meaning} of ${body.item.partNumber} rev ${body.item.revision}; document content ${body.documentContentHash}\n`;
+  const signature = await store.sign(key.keyId, await signingPassphrase(key.name, io, shown), data.canonical);
   if (signature === null) {
     io.stderr(`llull: the key ${key.keyId} could not sign (wrong passphrase, or it is revoked).`);
     return FAILED;
@@ -245,7 +268,7 @@ async function runRelease(args: ParsedArgv, io: PlmCliIo, backend: () => Promise
 function runAudit(args: ParsedArgv, io: PlmCliIo): number {
   if (args.positionals[1] !== 'verify') throw new PlmUsage('audit needs an action: verify [DIR]');
   const dir = args.positionals[2] ?? auditDir();
-  if (dir === null) throw new PlmUsage('no audit directory: pass one or set $LLULL_AUDIT_DIR.');
+  if (dir === null) throw new PlmUsage('no audit directory: pass one (the default location is fixed; no environment variable sets it).');
   const verdict = verifyAuditChain(dir);
   print(
     io,

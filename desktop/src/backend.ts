@@ -71,19 +71,25 @@ export interface RunningBackend {
   stop(): Promise<void>;
 }
 
-async function waitForHealth(url: string, exited: () => string | null): Promise<void> {
+async function waitForHealth(url: string, exited: () => string | null, token?: string): Promise<void> {
   const deadline = Date.now() + HEALTH_TIMEOUT_MS;
   for (;;) {
     const exitReason = exited();
     if (exitReason !== null) throw new Error(exitReason);
-    if (await isHealthy(url)) return;
+    if (await isHealthy(url, undefined, undefined, token)) return;
     if (Date.now() > deadline) throw new Error(`the local backend did not answer ${url}/health within ${HEALTH_TIMEOUT_MS} ms`);
     await new Promise((resolve) => setTimeout(resolve, HEALTH_POLL_MS));
   }
 }
 
-/** Resolves once `/health` answers. @failure exits or never answers -> rejects (process killed) */
-export async function startBackend(fork: ForkBackend, entry: string, env: Record<string, string>, url: string): Promise<RunningBackend> {
+/** Resolves once `/health` answers (and, given the per-launch `token`, proves it knows it: a process that took the port in the gap is not accepted). @failure exits or never answers -> rejects (process killed) */
+export async function startBackend(
+  fork: ForkBackend,
+  entry: string,
+  env: Record<string, string>,
+  url: string,
+  token?: string,
+): Promise<RunningBackend> {
   if (!fs.existsSync(entry)) throw new Error(`backend bundle missing: ${entry} (run npm run build in desktop/)`);
   const child = fork(entry, env);
   let exitReason: string | null = null;
@@ -94,7 +100,7 @@ export async function startBackend(fork: ForkBackend, entry: string, env: Record
     });
   });
   try {
-    await waitForHealth(url, () => exitReason);
+    await waitForHealth(url, () => exitReason, token);
   } catch (error) {
     child.kill();
     throw new Error(errorMessage(error), { cause: error });

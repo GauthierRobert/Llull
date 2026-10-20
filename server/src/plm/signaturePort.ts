@@ -37,12 +37,15 @@ export function createSignaturePort(
       const record = trust.find(publicKey);
       return record === null ? null : { keyId: record.keyId, userId: record.userId, name: record.name };
     },
+    spend(signature, payloadSha256) {
+      if (!isRecord(signature) || typeof signature['publicKey'] !== 'string' || typeof signature['signature'] !== 'string') return false;
+      return trust.consume(`${signature['publicKey'].slice(0, 16)}:${payloadSha256}:${signature['signature']}`);
+    },
     verify(signature, payloadSha256) {
       if (!isRecord(signature) || signature['alg'] !== 'Ed25519') return null;
       const { publicKey, signature: value } = signature;
       if (typeof publicKey !== 'string' || typeof value !== 'string') return null;
       if (trustOf(publicKey) !== 'trusted' || !verifyEd25519(publicKey, `${GATE_CONTEXT}${payloadSha256}`, value)) return null;
-      if (!trust.consume(`${publicKey.slice(0, 16)}:${payloadSha256}:${value}`)) return null;
       const record = trust.find(publicKey);
       return {
         signer: record?.userId ?? publicKey.slice(0, 16),

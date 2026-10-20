@@ -7,6 +7,8 @@ import { generateEd25519, signEd25519, verifyEd25519 } from '../src/plm/ed25519'
 import { MIN_PASSPHRASE_LENGTH, createKeyStore } from '../src/plm/keyStore';
 import { GATE_CONTEXT, createSignaturePort } from '../src/plm/signaturePort';
 import { createTrustStore } from '../src/plm/trustStore';
+import { verifyAndSpend } from '@core/model/humanGate';
+import { accountHome, auditDirectory, configureHostForTests, trustDirectory } from '../src/plm/hostConfig';
 import { issueTrustGrant } from '../src/plm/trustGrant';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
@@ -198,10 +200,37 @@ describe('signature port', () => {
     const mine = await trustedKey(home, 'u-7');
     const payload = sha256Hex('act-once');
     const confirmation = { alg: 'Ed25519', publicKey: mine.record.publicKey, signature: await mine.gate(payload) };
-    expect(createSignaturePort(createTrustStore(home.trust)).verify(confirmation, payload)?.signer).toBe('u-7');
-    expect(createSignaturePort(createTrustStore(home.trust)).verify(confirmation, payload)).toBeNull();
+    const fresh = (): ReturnType<typeof createSignaturePort> => createSignaturePort(createTrustStore(home.trust));
+    // verify is PURE: stored dispositions are re-checked with it again and again
+    expect(fresh().verify(confirmation, payload)?.signer).toBe('u-7');
+    expect(fresh().verify(confirmation, payload)?.signer).toBe('u-7');
+    // only a mutating gate spends: the first spend works, every later one (resend, undo, another port) is refused
+    expect(fresh().spend?.(confirmation, payload)).toBe(true);
+    expect(fresh().spend?.(confirmation, payload)).toBe(false);
+    expect(verifyAndSpend(fresh(), confirmation, payload)).toBeNull();
+    expect(fresh().verify(confirmation, payload)?.signer).toBe('u-7');
     const again = { ...confirmation, signature: await mine.gate(sha256Hex('act-twice')) };
-    expect(createSignaturePort(createTrustStore(home.trust)).verify(again, sha256Hex('act-twice'))?.signer).toBe('u-7');
+    expect(verifyAndSpend(fresh(), again, sha256Hex('act-twice'))?.signer).toBe('u-7');
+  });
+
+  it('the account home comes from the OS user database: HOME, USERPROFILE and LLULL_HOME cannot relocate trust or audit', () => {
+    const saved = { ...process.env };
+    configureHostForTests({});
+    try {
+      const real = trustDirectory();
+      process.env['HOME'] = path.join(home.dir, 'evil');
+      process.env['USERPROFILE'] = path.join(home.dir, 'evil');
+      process.env['LLULL_HOME'] = path.join(home.dir, 'evil');
+      expect(trustDirectory()).toBe(real);
+      expect(auditDirectory()).toBe(path.join(accountHome(), '.llull', 'audit'));
+      expect(real.startsWith(path.join(home.dir, 'evil'))).toBe(false);
+    } finally {
+      for (const name of ['HOME', 'USERPROFILE', 'LLULL_HOME']) {
+        if (saved[name] === undefined) delete process.env[name];
+        else process.env[name] = saved[name];
+      }
+      configureHostForTests({ trustDir: home.trust, auditDir: home.audit });
+    }
   });
 
   it('the same port clears the 08 / 05 human gates (one port for every gap)', async () => {

@@ -235,6 +235,7 @@ async function boot(): Promise<void> {
     layout.serverEntry,
     backendEnv({ port, token, layout, userDataDir: userData, baseEnv: process.env, nativeDir }),
     url,
+    token,
   );
   session = createDocumentSession({ url, token });
   Menu.setApplicationMenu(

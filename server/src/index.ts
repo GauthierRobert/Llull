@@ -12,6 +12,7 @@
 import './plugins'; // must stay first: installs domain plugins before liveDocument loads
 import './loadEnv';
 import path from 'path';
+import { createHmac } from 'node:crypto';
 import express from 'express';
 import cors from 'cors';
 import { exchangeOptionsWithDwg } from './dwgConvert';
@@ -45,7 +46,17 @@ app.use(
   }),
 );
 // Before the Host allowlist: a liveness probe needs no Host check.
-app.get('/health', (_req, res) => void res.json({ status: 'ok', kernel: getActiveKernelName() }));
+app.get('/health', (req, res) => {
+  // With ?challenge=<hex> the answer carries HMAC-SHA256(token, challenge): proof that this process knows the per-launch token (the desktop uses it so a
+  // process that grabbed the port first is never taken for the backend).
+  const token = process.env['LLULL_AUTH_TOKEN'];
+  const challenge = req.query['challenge'];
+  const proof =
+    typeof challenge === 'string' && challenge !== '' && token !== undefined && token !== ''
+      ? createHmac('sha256', token).update(challenge).digest('hex')
+      : undefined;
+  res.json({ status: 'ok', kernel: getActiveKernelName(), ...(proof !== undefined ? { proof } : {}) });
+});
 app.use(hostAllowlist());
 const jsonBody = express.json({ limit: process.env['LLULL_BODY_LIMIT'] ?? '2mb' });
 // /import/dwg parses its own (much larger) body.

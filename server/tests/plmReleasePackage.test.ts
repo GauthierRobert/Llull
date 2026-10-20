@@ -122,7 +122,7 @@ describe('release package', () => {
     writeFileSync(path.join(out, drawing.path), forged);
     drawing.sha256 = createHash('sha256').update(forged).digest('hex');
     drawing.bytes = Buffer.byteLength(forged);
-    const { manifestSha256: _old, signatures, ...unsealed } = manifest;
+    const { signatures, ...unsealed } = { ...manifest, manifestSha256: undefined };
     chmodSync(manifestFile, 0o644);
     writeFileSync(
       manifestFile,
