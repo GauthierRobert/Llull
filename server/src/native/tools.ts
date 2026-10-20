@@ -19,6 +19,7 @@ import { runFatigueField, type NativeDeps } from './fatigueField';
 import { runMapField } from './mapField';
 import { DEFAULT_TOPOLOGY_TIMEOUT_S, runTopologySolve, type TopologySolveOptions } from './topologySolve';
 import { runFeaRender } from './renderField';
+import { MAX_NATIVE_SAMPLES, runStackupMonteCarlo } from './stackupMonteCarlo';
 import { MTEST_TOOL, mtestToolDefinition, runMtestTool } from '../mfront/mtestTool';
 
 const TIMEOUT = {
@@ -67,6 +68,7 @@ export function nativeToolDefinitions(): ToolDefinition[] {
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
     renderToolDefinition(),
+    stackupToolDefinition(),
     topologyToolDefinition(),
     mtestToolDefinition(),
   ];
@@ -88,6 +90,44 @@ function renderToolDefinition(): ToolDefinition {
       properties: {
         ...schema.properties,
         raster: { type: 'string', enum: ['auto', 'ts', 'cpu', 'gpu'], description: 'Raster engine (default auto).' },
+      },
+    },
+    annotations: { readOnlyHint: true, idempotentHint: true },
+  };
+}
+
+const STACKUP_TOOL = 'stackup_monte_carlo';
+
+/** stackup_monte_carlo: the params of analyze_stackup (read from the registry, one schema) with a native sample range and a timeout. */
+function stackupToolDefinition(): ToolDefinition {
+  const schema = getCommand('analyze_stackup')?.paramsSchema ?? { type: 'object' as const, properties: {}, required: [] };
+  const properties = Object.fromEntries(Object.entries(schema.properties).filter(([key]) => key !== 'methods'));
+  return {
+    name: STACKUP_TOOL,
+    description:
+      'analyze_stackup with its Monte Carlo run natively above the 2000000-sample TypeScript cap: llull-compute stats (counter-based Philox4x32-10 streams, ' +
+      'fixed-order block reductions on every core). Same params as analyze_stackup (contributors, expression, lowerSpecLimit, upperSpecLimit, sigmaPerHalfTolerance; ' +
+      `no methods) with samples 1 to ${MAX_NATIVE_SAMPLES} (default 10000000) and seed. Answers the data of analyze_stackup (closed forms, contributions, exact pBelow / ` +
+      'pAbove, review flags) plus data.monteCarlo { seed, samples, prng, engine native-cpu, deterministic true, mean, std, min, max, pBelow, pAbove, acceptance }. ' +
+      'The result is bit-identical for the same (seed, samples, inputs) on any number of threads; it agrees with the TypeScript Monte Carlo within the 5-sigma ' +
+      'acceptance bounds, not bit for bit (another generator). Typed contributor limits stay unverified; results need engineer review. Without llull-compute: ' +
+      'NATIVE_TOOL_MISSING (analyze_stackup still runs up to 2000000 samples). Refusals: the GDT_STACKUP_* codes of analyze_stackup, GDT_STACKUP_SAMPLES.',
+    inputSchema: {
+      ...schema,
+      properties: {
+        ...properties,
+        samples: {
+          type: 'integer',
+          minimum: 1,
+          maximum: MAX_NATIVE_SAMPLES,
+          description: `Monte Carlo samples, 1 to ${MAX_NATIVE_SAMPLES}. Default 10000000.`,
+        },
+        seed: {
+          type: 'integer',
+          description:
+            'Monte Carlo seed (counter-based: sample i of contributor j draws from counter [i, j] under this key). Default 20261020.',
+        },
+        timeoutS: TIMEOUT,
       },
     },
     annotations: { readOnlyHint: true, idempotentHint: true },
@@ -127,7 +167,7 @@ function topologyToolDefinition(): ToolDefinition {
   };
 }
 
-const NAMES: ReadonlySet<string> = new Set(['fatigue_field', 'fea_map_field', 'fea_render', 'topology_solve', MTEST_TOOL]);
+const NAMES: ReadonlySet<string> = new Set(['fatigue_field', 'fea_map_field', 'fea_render', 'topology_solve', STACKUP_TOOL, MTEST_TOOL]);
 
 export const isNativeTool = (name: string): boolean => NAMES.has(name);
 
@@ -151,6 +191,15 @@ export async function runNativeTool(
   if (name === MTEST_TOOL) return runMtestTool(params);
   if (name === 'fea_render') return { ...(await runFeaRender(params, host, deps)), changed: false };
   const args = isRecord(params) ? params : {};
+  if (name === STACKUP_TOOL) {
+    const { samples, seed, timeoutS, ...stack } = args;
+    const options = {
+      ...(typeof samples === 'number' ? { samples } : {}),
+      ...(typeof seed === 'number' ? { seed } : {}),
+      ...(typeof timeoutS === 'number' && Number.isFinite(timeoutS) ? { timeoutS } : {}),
+    };
+    return { ...(await runStackupMonteCarlo(stack, options, host, deps)), changed: false };
+  }
   if (name === 'topology_solve') {
     const studyId = nonEmptyString(args['studyId']);
     if (studyId === undefined) return failure('topology_solve: studyId is required.');
