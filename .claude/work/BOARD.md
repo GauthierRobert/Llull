@@ -11,8 +11,9 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - Lanes own disjoint write scopes (`.claude/rules/workflow.md` W5); one task per lane at a time, up to 4 lanes + Lane 5 review.
 
 ## NOW (auto-updated by the skill)
-- 2026-10-19 — integration branch `feat/eng-depth`: wave 1 WIP = FEA-REST part 1 (modal, buckling, dispose_margin, analytic_check), AERO-5 02 SRF (M0–M3),
-  MATL-M7, FPR-E. Next: TMC-M4b, FEA-REST part 2 (BDF/OP2/VTU, face map), 06 CMP, then FEA-REST part 3 (shells, UI), FPR-D.
+- 2026-10-20 — branch `feat/eng-depth`: DONE (reviewed, fixes merged) FEA-REST parts 1–3, AERO-5 (02 SRF M0–M6, 06 CMP M0–M2 + M4 data + M6), MATL-M7,
+  TMC-M4b, FPR-E, FPR-D. Full suite = main baseline (23 env failures), coverage 97.2/88.6/98.8/98.8. Solver/kernel numbers unmeasured here
+  (no ccx/gmsh/cargo/python). Next: SOLVER-VERIFY, then CFD-M1, RS-3.
 - 2026-10-19 — branch `ccr-d5e76715-intlyp`: LC1 done (steps 1–6: native kernel default everywhere, opencascade.js retired, no outbox),
   RS-1 done (macOS bundle deferred by the owner), RS-2 done (native SIMP topology optimisation + plugin `topology` + `topology_solve` + UI panel).
   Next: CFD-M1, then RS-3.
@@ -42,14 +43,18 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - `[TODO]` **SC-A2…A4** Live previews + drag manipulators, 3D mouse, issue draft from feature errors. _deps: SC-D3 (A4)_
 
 ## Aerospace + physics (spec = the linked pack)
+- `[TODO]` **SOLVER-VERIFY** On a machine with ccx 2.21 + Gmsh 4.15.2 + Python/pyNastran + the native llull-kernel, run every server FE / kernel test that skips here
+  (FEA-REST 1–3, TMC-M4b, SRF VC-SRF-11/15/16/22–24, CMP live-OCC cones, BDF read_bdf, a real OP2); fix deck defects, never widen tolerances. Unverified items are
+  listed in 05 §13, 04 §16, 02 §13.4–13.6, 06 §13. _deps: —_
+- `[TODO]` **AERO-5b** Deferred depth: 02 SRF M7 (G3, blend, .vsp3, CRM), B-spline section payload in the sidecar, curvature/zebra/draft overlays, trim by curve,
+  fill >4 / G1–G2, sew to shells/solids, exact OCC thicken; 06 CMP M3 drape (live OCC), M4 laser projection / ply solids / STEP, M5 AP242, ply-failure margins on
+  composite shells; 05 beams, *DISTRIBUTING COUPLING, Netgen, large-field BDF, re-entrant edge screening. _deps: SOLVER-VERIFY (kernel parts), AERO-4 (CMP M5)_
+- `[TODO]` **FPR-V24** VC-FPR-24 reference engine: per-check profiling (~30 min run), gear couplings in the rank DOF, joint realisation on the native kernel, the
+  unidentified dynamics not_run item, RS-6 geomq wiring of check_motion_clearance (21 §12). _deps: —_
 - `[TODO]` **AERO-4** Supply chain: 03 GDT, 04 XCH (AP242), 09 PLM (`HumanSignaturePort`, `dispose_*`): `docs/aerospace/README.md`. _deps: —_
-- `[WIP]` **AERO-5** Engineering depth: 05 FEA-REST, 02 SRF, 06 CMP: `docs/aerospace/README.md`. _deps: —_
-- `[WIP]` **FEA-REST** Modal/buckling/shell/margins rest, BDF/OP2, face map, UI: `docs/aerospace/05-fea-cae-handoff/` §10. _deps: —_
 - `[BLOCKED]` **VNV-M3** Convergence studies + `check_verification`: `docs/physics/00-vv-harness/`. _deps: FEA artifact store, AERO-4 (09 PLM signing)_
 - `[TODO]` **VNV-M4** Time-step/order refinement, least-squares order, UI: `docs/physics/00-vv-harness/`. _deps: VNV-M3_
 - `[BLOCKED]` **PROP-M6** Seed NIST property library: `docs/physics/01-property-models/` (OQ-PROP-03, needs trc.nist.gov access). _deps: —_
-- `[REVIEW]` **FPR-E** Realism: accuracy envelope, losses, brake calibration, gear efficiency, propeller table: `docs/physics/21-functional-prototype/`. _deps: —_
-- `[WIP]` **FPR-D** Review tab wiring + `check_prototype` + dispositions: same spec. _deps: FPR-E_
 - `[TODO]` **FPR-MJ** MuJoCo 3.14.0 → 3.16.0, re-run VC-FPR-10…17: same spec §11 Q7. _deps: —_
 - Plant packs `docs/plant/` (10 packs, specs only): first fix `pipeSizes.ts` ASME/EN mix (README D1), settle D2, then PSC + EQP M1.
 
