@@ -1,7 +1,15 @@
 /** Pose interpolation, motion detection and relative transforms of the motion-clearance check. */
 import { describe, expect, it } from 'vitest';
-import { posesAtSample } from '@core/dynamics/bodyPose';
-import { STATIC_POSE, isMoving, poseAt, relativeTransform, travelBound, type PoseTrack } from '@core/dynamics/motionPoses';
+import { type BodyPoseAt, posesAtSample } from '@core/dynamics/bodyPose';
+import {
+  STATIC_POSE,
+  isMoving,
+  poseAt,
+  relativeTransform,
+  relativeTravelBound,
+  travelBound,
+  type PoseTrack,
+} from '@core/dynamics/motionPoses';
 import type { Quaternion } from '@core/dynamics/physicsEngine';
 
 const IDENTITY: Quaternion = [1, 0, 0, 0];
@@ -141,5 +149,38 @@ describe('posesAtSample', () => {
     };
     expect(Object.keys(posesAtSample(poses, 1))).toEqual(['full']);
     expect(Object.keys(posesAtSample(poses, 0)).sort()).toEqual(['full', 'short']);
+  });
+});
+
+describe('relativeTravelBound', () => {
+  const pose = (position: [number, number, number], orientation: Quaternion, start: [number, number, number] = [0, 0, 0]): BodyPoseAt => ({
+    start,
+    position,
+    orientation,
+  });
+  const small: Quaternion = [Math.cos(0.01), 0, 0, Math.sin(0.01)];
+
+  it('is zero when both parts are still or move together', () => {
+    expect(relativeTravelBound(STATIC_POSE, STATIC_POSE, STATIC_POSE, STATIC_POSE, [5, 0, 0], 3)).toBe(0);
+    const a0 = pose([0, 0, 0], IDENTITY);
+    const a1 = pose([2, 0, 0], IDENTITY);
+    const b0 = pose([10, 0, 0], IDENTITY, [10, 0, 0]);
+    const b1 = pose([12, 0, 0], IDENTITY, [10, 0, 0]);
+    expect(relativeTravelBound(a0, a1, b0, b1, [10, 0, 0], 4)).toBeCloseTo(0, 12);
+  });
+
+  it('a part turning about its own centre against a still one costs angle x radius, far less than the absolute travel of a far centre', () => {
+    const b0 = pose([30, 0, 0], IDENTITY, [30, 0, 0]);
+    const b1 = pose([30, 0, 0], small, [30, 0, 0]);
+    const bound = relativeTravelBound(STATIC_POSE, STATIC_POSE, b0, b1, [30, 0, 0], 5);
+    expect(bound).toBeGreaterThan(0.02 * 5 * 0.99);
+    expect(bound).toBeLessThan(0.02 * 5 * 1.01);
+  });
+
+  it('a part orbiting a centre (its centre of mass moves) is bounded by the chord of that move plus the turn', () => {
+    const b0 = pose([30, 0, 0], IDENTITY);
+    const b1 = pose([30 * Math.cos(0.02), 30 * Math.sin(0.02), 0], small);
+    const bound = relativeTravelBound(STATIC_POSE, STATIC_POSE, b0, b1, [30, 0, 0], 5);
+    expect(bound).toBeGreaterThanOrEqual(30 * 0.02 * 0.99);
   });
 });
