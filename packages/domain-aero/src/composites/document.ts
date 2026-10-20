@@ -29,7 +29,7 @@ function materialErrors(name: string, m: Record<string, unknown>): string[] {
   const errors: string[] = [];
   if (m['name'] !== name) errors.push(`${at}.name must equal its key`);
   for (const field of ['E1', 'E2', 'G12', 'plyThickness']) if (!positive(m[field])) errors.push(`${at}.${field} must be > 0`);
-  for (const field of ['G13', 'G23', 'Xt', 'Xc', 'Yt', 'Yc', 'S', 'density'])
+  for (const field of ['G13', 'G23', 'Xt', 'Xc', 'Yt', 'Yc', 'S', 'density', 'GIc', 'GIIc'])
     if (m[field] !== undefined && !positive(m[field])) errors.push(`${at}.${field} must be > 0 when given`);
   if (
     !isNumber(m['nu12']) ||
@@ -37,6 +37,8 @@ function materialErrors(name: string, m: Record<string, unknown>): string[] {
     !((m['nu12'] as number) ** 2 < (m['E1'] as number) / (m['E2'] as number))
   )
     errors.push(`${at}.nu12 must satisfy nu12^2 < E1/E2`);
+  for (const field of ['alpha1', 'alpha2', 'beta1', 'beta2'])
+    if (m[field] !== undefined && !isNumber(m[field])) errors.push(`${at}.${field} must be a number when given`);
   if (!['ud_tape', 'woven', 'core_honeycomb', 'core_foam'].includes(m['form'] as string)) errors.push(`${at}.form is unknown`);
   if (!['mean', 'b_basis', 'a_basis', 'unknown'].includes(m['basis'] as string)) errors.push(`${at}.basis is unknown`);
   if (typeof m['source'] !== 'string') errors.push(`${at}.source must be text`);
@@ -98,6 +100,19 @@ export function compositesErrors(slice: unknown): string[] {
         out.push(`composites.plies.${id}.boundary must be whole_face or polygons`);
       return out;
     }),
+    ...(slice['sections'] === undefined
+      ? []
+      : tableErrors(slice, 'sections', (id, s) => {
+          const out: string[] = [];
+          if (!isRecord(slice['parts']) || !isText(s['partId']) || !Object.hasOwn(slice['parts'], s['partId']))
+            out.push(`composites.sections.${id} references a missing part`);
+          if (
+            !Array.isArray(s['plies']) ||
+            !s['plies'].every((ply) => isRecord(ply) && isText(ply['material']) && positive(ply['thickness']) && isNumber(ply['angleDeg']))
+          )
+            out.push(`composites.sections.${id}.plies need material, thickness > 0 and angleDeg`);
+          return out;
+        })),
     ...tableErrors(slice, 'waivers', (id, w) =>
       isText(w['code']) && isText(w['reason']) && Array.isArray(w['ids']) ? [] : [`composites.waivers.${id} needs code, ids and reason`],
     ),

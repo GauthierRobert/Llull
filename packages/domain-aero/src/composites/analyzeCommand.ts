@@ -27,7 +27,7 @@ export const analyzeLaminate = defineCommand({
     '("free bending", from the ABD inverse; equal to membrane when symmetric) and flexural constants (constantsFlexural, from D inverse: E = 12 / (h^3 d)). Stacking runs bottom (tool side) to top, +z along the laminate normal, engineering ' +
     'shear strain, N-mm-MPa (thickness converted from document units). Give EITHER `part` + `point` (the stack of the part at that world ' +
     'point, see core_sample) OR `angles` (degrees, bottom to top) / `laminate` (stacking string, e.g. "[0/+-45/90]s") + `material`. ' +
-    'With `loads` (Nx, Ny, Nxy in N/mm; Mx, My, Mxy in N*mm/mm) it adds mid-plane strains, ply stresses at the bottom and top of every ply ' +
+    'With `environment` (deltaT, deltaMoisture) it adds the hygrothermal resultants and free laminate strains, effective expansion per kelvin and residual ply stresses. With `loads` (Nx, Ny, Nxy in N/mm; Mx, My, Mxy in N*mm/mm) it adds mid-plane strains, ply stresses at the bottom and top of every ply ' +
     'in material axes and the first-ply failure strength ratio R (load multiplier to failure) for each criterion (max_stress, tsai_hill, ' +
     'tsai_wu; default all) with the critical ply: R below 1 means failure. Tsai-Wu uses F12* = -0.5 unless the material gives one ' +
     '(reported under defaults). Results from "mean" / "unknown" material data are flagged unverified; failure results are flagged ' +
@@ -49,12 +49,29 @@ export const analyzeLaminate = defineCommand({
       })
       .describe('Resultant loads per unit width; omitted components are 0.')
       .optional(),
+    environment: z
+      .object({
+        deltaT: z
+          .number()
+          .describe('Temperature change from the stress-free (cure) state, kelvin; needs alpha1 and alpha2 on the material.')
+          .optional(),
+        deltaMoisture: z
+          .number()
+          .describe('Moisture content change, mass fraction (0.01 = 1%); needs beta1 and beta2 on the material.')
+          .optional(),
+      })
+      .describe(
+        'Hygrothermal state: free thermal and moisture strains of every ply (alpha dT + beta dM). Adds laminate resultants, curvature and residual ply stresses; strength ratios then mean the multiplier of the mechanical loads on top of that state (0: the state alone fails).',
+      )
+      .optional(),
     criteria: z
-      .array(z.enum(['max_stress', 'tsai_hill', 'tsai_wu']))
-      .describe('Failure criteria to evaluate; default all three.')
+      .array(z.enum(['max_stress', 'tsai_hill', 'tsai_wu', 'larc03']))
+      .describe(
+        'Failure criteria to evaluate; default max_stress, tsai_hill and tsai_wu. "larc03" (plane-stress LaRC03) needs GIc and GIIc on the material.',
+      )
       .optional(),
   }),
-  run: (doc, { part: partRef, point, angles, laminate, material, loads, criteria }): CommandResult => {
+  run: (doc, { part: partRef, point, angles, laminate, material, loads, criteria, environment }): CommandResult => {
     const model = compositesOf(doc);
     let stack: StackPly[];
     let inputs: Record<string, unknown>;
@@ -103,7 +120,14 @@ export const analyzeLaminate = defineCommand({
       stack = list.map((angle) => ({ material: lamina, angle }));
       inputs = { material, angles: list };
     }
-    const outcome = analyzeStack(stack, doc.units, loads, criteria ?? CRITERIA, inputs);
+    const outcome = analyzeStack(
+      stack,
+      doc.units,
+      loads,
+      criteria ?? CRITERIA,
+      inputs,
+      environment === undefined ? undefined : { deltaT: environment.deltaT ?? 0, deltaMoisture: environment.deltaMoisture ?? 0 },
+    );
     if (!outcome.ok) return refuseCmp(doc, 'analyze_laminate', outcome.code, outcome.message, [], ['params']);
     const { data } = outcome;
     const failure = data['firstPlyFailure'] as Record<string, { R: number | null; ply?: number }> | undefined;

@@ -11,11 +11,11 @@ import {
   type StackPly,
   engineeringConstants,
   laminateStiffness,
-  plyStressAt,
   reducedStiffness,
-  strainsFor,
+  type Environment,
 } from './clt';
-import { CRITERIA, type Criterion, DEFAULT_F12_STAR, strengthRatio, strengthsOf } from './failure';
+import { CRITERIA, type Criterion, DEFAULT_F12_STAR } from './failure';
+import { respond, thermalExpansion } from './plyResponse';
 import { isUnverified } from './provenance';
 
 export interface Loads {
@@ -54,6 +54,7 @@ export function analyzeStack(
   loads: Loads | undefined,
   criteria: readonly Criterion[] = CRITERIA,
   inputs: Record<string, unknown> = {},
+  environment?: Environment,
 ): AnalysisOutcome {
   const mm = toMillimetres(stack, units);
   const laminate: Laminate = laminateStiffness(mm);
@@ -114,7 +115,7 @@ export function analyzeStack(
         } satisfies Record<string, NamedDefault>)
       : {},
     provenance: {
-      method: 'CLT, first-ply failure, linear, no hygrothermal',
+      method: 'CLT, first-ply failure, linear (hygrothermal as uniform free strains when an environment is given)',
       reference: 'NASA RP-1351; Jones, Mechanics of Composite Materials (1999)',
       inputs: {
         materials: materials.map((material) => ({ name: material.name, basis: material.basis, source: material.source })),
@@ -122,62 +123,22 @@ export function analyzeStack(
       },
     },
   };
-  if (loads === undefined) return { ok: true, data: base };
-  const missing = materials.filter((material) => !('Xt' in strengthsOf(material)) && criteria.length > 0);
-  if (missing.length > 0)
-    return {
-      ok: false,
-      code: 'CMP_MATERIAL_ALLOWABLE_MISSING',
-      message: `material(s) ${missing.map((material) => `"${material.name}"`).join(', ')} lack strengths (${[...new Set(missing.flatMap((m) => (strengthsOf(m) as { missing: readonly string[] }).missing))].join(', ')})`,
+  const expansion = thermalExpansion(mm, laminate, constants.abdInverse);
+  if (expansion !== null)
+    base['thermalExpansion'] = {
+      perKelvin: { strain: expansion.strain.map(sig), curvature: expansion.curvature.map(sig) },
+      unit: '1/K (strain), 1/(mm K) (curvature)',
+      note: 'unrestrained laminate, mid-plane',
     };
-  const load: Load6 = [loads.Nx ?? 0, loads.Ny ?? 0, loads.Nxy ?? 0, loads.Mx ?? 0, loads.My ?? 0, loads.Mxy ?? 0];
-  const { strain, curvature } = strainsFor(constants.abdInverse, load);
-  type Best = { R: number; ply: number; angleDeg: number; position: 'bottom' | 'top'; mode?: string };
-  const best = new Map<Criterion, Best>();
-  const plies = mm.map((ply, index) => {
-    const z0 = laminate.z[index] as number;
-    const z1 = laminate.z[index + 1] as number;
-    const strengths = strengthsOf(ply.material) as Exclude<ReturnType<typeof strengthsOf>, { missing: readonly string[] }>;
-    const f12 = ply.material.tsaiWuF12Star ?? DEFAULT_F12_STAR;
-    const at = (z: number, position: 'bottom' | 'top'): Record<string, unknown> => {
-      const stress = plyStressAt(ply.material, ply.angle, strain, curvature, z);
-      const ratios: Record<string, number | null> = {};
-      for (const criterion of criteria) {
-        const ratio = strengthRatio(criterion, stress.material, strengths, f12);
-        ratios[criterion] = Number.isFinite(ratio.R) ? sig(ratio.R) : null;
-        const current = best.get(criterion);
-        if (Number.isFinite(ratio.R) && (current === undefined || ratio.R < current.R))
-          best.set(criterion, {
-            R: ratio.R,
-            ply: index,
-            angleDeg: ply.angle,
-            position,
-            ...(ratio.mode === undefined ? {} : { mode: ratio.mode }),
-          });
-      }
-      return { zMm: sig(z), stressXyMpa: stress.xy.map(sig), stress12Mpa: stress.material.map(sig), strengthRatios: ratios };
-    };
-    return { index, angleDeg: ply.angle, material: ply.material.name, bottom: at(z0, 'bottom'), top: at(z1, 'top') };
-  });
-  const failure = Object.fromEntries(
-    criteria.map((criterion) => {
-      const hit = best.get(criterion);
-      return [
-        criterion,
-        hit === undefined
-          ? { R: null, note: 'no stress: the load does not stress any ply' }
-          : { ...hit, R: sig(hit.R), unit: 'load multiplier' },
-      ];
-    }),
-  );
+  if (loads === undefined && environment === undefined) return { ok: true, data: base };
+  const load: Load6 = [loads?.Nx ?? 0, loads?.Ny ?? 0, loads?.Nxy ?? 0, loads?.Mx ?? 0, loads?.My ?? 0, loads?.Mxy ?? 0];
+  const outcome = respond(mm, laminate, constants.abdInverse, load, environment, criteria);
+  if (!outcome.ok) return outcome;
   return {
     ok: true,
     data: {
       ...base,
-      loads: { Nx: load[0], Ny: load[1], Nxy: load[2], Mx: load[3], My: load[4], Mxy: load[5], forceUnit: 'N/mm', momentUnit: 'N*mm/mm' },
-      midplane: { strain: strain.map(Number), curvature: curvature.map(Number), curvatureUnit: '1/mm' },
-      plies,
-      firstPlyFailure: failure,
+      ...outcome.value.data,
       reviewRequired: true,
       reviewReason: 'computed by llull, not approved: first-ply failure margins need a qualified engineer',
     },
