@@ -41,12 +41,14 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## Aerospace + physics (spec = the linked pack)
 - `[TODO]` **AERO-6** Left after AERO-4/5 (each in its spec §13): CAx-IF composite conformance with a second CAD system / CAx-IF test files, JT (deferred by
-  spec), QIF beyond MeasurementResults, EN 9300 LOTAR conformance (paid standard not read), SFA run (needs the IFCsvr MSI installed as admin), PMI on
-  edge/vertex-referenced dimensions (217/260), composite frames + datum targets in the AP242 transport, Windows Hello/TPM key for the PLM trust root. _deps: —_
-- `[TODO]` **KRN-MSVC** Build llull-kernel with MSVC (VS Build Tools, needs an elevated install) or on Linux CI and re-run the OCC suites that crash on the
-  MinGW build in BRepExtrema_DistShapeShape / MakeThickSolid (occtAnalysis, occtChamferShell, nativeKernelFeatures, occtCheckAssembly, occtSheetMetal,
-  brepCodeExchange), the FE face map TR-FEA-32 and the CMP live-OCC cone pick (SV1, 05 §13, 06 §13.4). _deps: —_
-- `[BLOCKED]` **VNV-M3** Convergence studies + `check_verification`: `docs/physics/00-vv-harness/`. _deps: FEA artifact store, AERO-4 (09 PLM signing)_
+  spec), QIF beyond MeasurementResults, EN 9300 LOTAR conformance (paid standard not read), PMI on
+  edge/vertex-referenced dimensions (217/260), composite frames + datum targets in the AP242 transport, Windows Hello/TPM key for the PLM trust root; AP242 writer (OCC): same datum
+  label on two products resolves to the first product, frame B|A written in datum order A|B, SFA ST-Developer warnings (attribute count, select type,
+  external mapping) unexamined (03 §13.5). _deps: —_
+- `[TODO]` **KRN-MSVC** Build llull-kernel with MSVC (VS Build Tools, needs an elevated install) for shipping parity. The MinGW crashes are fixed
+  (GCC 16.2 -O3 miscompile of BRepClass3d_SClassifier, built with -fno-ipa-cp-clone; SV1); still to re-check on MSVC: FE face map TR-FEA-32 and the
+  CMP live-OCC cone pick (05 §13, 06 §13.4). _deps: —_
+- `[TODO]` **VNV-M3** Convergence studies + `check_verification`: `docs/physics/00-vv-harness/`. _deps: FEA artifact store, AERO-4 (09 PLM signing) — both built_
 - `[TODO]` **VNV-M4** Time-step/order refinement, least-squares order, UI: `docs/physics/00-vv-harness/`. _deps: VNV-M3_
 - `[BLOCKED]` **PROP-M6** Seed NIST property library: `docs/physics/01-property-models/` (OQ-PROP-03, needs trc.nist.gov access). _deps: —_
 - `[TODO]` **FPR-MJ** MuJoCo 3.14.0 → 3.16.0, re-run VC-FPR-10…17: same spec §11 Q7. _deps: —_
