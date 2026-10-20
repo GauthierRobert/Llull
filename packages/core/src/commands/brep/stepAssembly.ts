@@ -9,7 +9,7 @@
 
 import { type CadDocument, type Component, type Entity, type InstanceEntity, type Vec3, is3D } from '../../model/types';
 import type { GeometryKernel, ShapeHandle, StepAssemblyPart, StepOccurrence } from '../../geometry/kernel';
-import { exactOrMesh, operandRecipe } from './kernelShape';
+import { exactOrMesh, exactRecipe } from './kernelShape';
 import type { AssemblyStepLabels, NestedOccurrence } from './stepAssemblyLabels';
 import { MAX_INSTANCE_DEPTH, type StepEntry, instanceSolids, stepLabels } from './stepTargets';
 
@@ -80,10 +80,11 @@ export function planStepAssembly(
         shapes.push(built.shape);
         continue;
       }
-      const recipe = operandRecipe(kernel, entity);
-      const shape = kernel.evaluate(factor === 1 ? recipe : { op: 'scale', source: recipe, factor });
+      const { recipe, faceted: usedTriangles } = exactRecipe(kernel, entity);
+      if (usedTriangles && !faceted.includes(entity.id)) faceted.push(entity.id);
+      const shape = kernel.evaluate({ op: 'scale', source: recipe, factor });
       if (shape === null) {
-        const unscalable = factor !== 1 && kernel.evaluate(recipe) !== null;
+        const unscalable = kernel.evaluate(recipe) !== null;
         return { failed: `'${entity.id}' (kind '${entity.kind}')`, unscalable };
       }
       shapes.push(shape);

@@ -1,6 +1,7 @@
 // XDE reader (XCH 04 M3, TR-XCH-08): STEPCAFControl_Reader into an XCAF document, then the product tree as JSON: products (simple shapes
 // holding healed solids, or assemblies), the placed occurrences between them, names, colours, layers and the geometric validation properties
 // OCCT attached to each product label. Solids are healed exactly like `import_step_json` (import_support.hxx); lengths are millimetres.
+#include <stdexcept>
 #include <cstdio>
 #include <map>
 #include <sstream>
@@ -193,7 +194,20 @@ class TreeReader {
     }
   }
 
+  // a product tree nests a handful of levels; a hostile file must not recurse the stack away
+  static constexpr int kMaxDepth = 64;
+  int depth_ = 0;
+
+  struct Depth {
+    int &level;
+    explicit Depth(int &value) : level(value) {
+      if (++level > kMaxDepth) throw std::runtime_error("the product tree nests deeper than 64 levels");
+    }
+    ~Depth() { --level; }
+  };
+
   int visit(const TDF_Label &label) {
+    const Depth guard(depth_);
     TCollection_AsciiString entry;
     TDF_Tool::Entry(label, entry);
     const std::string key(entry.ToCString());

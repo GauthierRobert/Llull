@@ -24,7 +24,9 @@ import { buildBodies } from './importBodies';
 import { simplifyTree } from './importSimplify';
 import { stepImportReport } from './stepImportReport';
 import { gvpPolicy } from './gvpBands';
-import { buildTreeStructure, type TreeStructure } from './importTree';
+import { buildTreeStructure, instanceDepth, type TreeStructure } from './importTree';
+import { findComponentCycle } from '../assembly/assemblies';
+import { MAX_INSTANCE_DEPTH } from '../brep/stepTargets';
 import { describeProvenance } from './importProvenance';
 import { verifyImportedProducts } from './importVerify';
 
@@ -145,6 +147,17 @@ function run(doc: CadDocument, params: Params, ctx: ExecutionContext | undefined
           bodies.map((body) => body.entity),
           mmPerUnit,
         );
+  const cyclic =
+    structure === null ? undefined : Object.keys(structure.components).find((id) => findComponentCycle(structure.components, id) !== null);
+  if (cyclic !== undefined)
+    return refuse(
+      doc,
+      'KRN_STEP_UNREADABLE',
+      'the file is malformed: report it to its sender',
+      `the product tree contains itself (component ${cyclic}); nothing imported`,
+      [source],
+    );
+  const depth = structure === null ? 0 : instanceDepth(structure.components, structure.topLevel);
   const topLevel = structure?.topLevel ?? bodies.map((body) => body.entity);
   const stamp = kernelStampOf(kernel);
   const original = params.keepOriginal === true ? makeBlob('model/step', text) : null;
@@ -181,7 +194,20 @@ function run(doc: CadDocument, params: Params, ctx: ExecutionContext | undefined
       fileName: params.fileName,
       sha256: params.sha256 ?? sha256Hex(text),
     });
-    exchange = { provenance: { ...doc.exchange?.provenance, ...exchangeReport.provenance } };
+    const flagged = Object.fromEntries(
+      structure.nonRigidParents.flatMap((id) => {
+        const record = exchangeReport?.provenance[id];
+        return record === undefined || record.unverified.reasons.includes('non_rigid_occurrence')
+          ? []
+          : [
+              [
+                id,
+                { ...record, unverified: { value: true, reasons: [...record.unverified.reasons, 'non_rigid_occurrence' as const] } },
+              ] as const,
+            ];
+      }),
+    );
+    exchange = { provenance: { ...doc.exchange?.provenance, ...exchangeReport.provenance, ...flagged } };
   }
   const document: CadDocument = {
     ...(doc.kernelSettings === undefined && stamp !== null ? withKernelStamp(staged, stamp) : staged),
@@ -207,10 +233,18 @@ function run(doc: CadDocument, params: Params, ctx: ExecutionContext | undefined
     skipped: [
       ...base.skipped,
       ...(structure?.nonRigid ?? []).map((name) => `occurrence '${name}' is mirrored or scaled: placed without rotation`),
+      ...(depth > MAX_INSTANCE_DEPTH
+        ? [`the assembly nests ${depth} instance levels: levels below ${MAX_INSTANCE_DEPTH} are not expanded by export or display`]
+        : []),
     ],
     warnings: [...base.warnings, ...(exchangeReport?.warnings ?? [])],
     reviewRequired: (() => {
-      const reasons = [...base.reviewRequired.reasons, ...(exchangeReport?.reasons ?? [])];
+      const reasons = [
+        ...base.reviewRequired.reasons,
+        ...(exchangeReport?.reasons ?? []),
+        ...((structure?.nonRigid.length ?? 0) > 0 ? ['non_rigid_occurrence'] : []),
+        ...(depth > MAX_INSTANCE_DEPTH ? ['assembly_depth_limit'] : []),
+      ];
       return { value: reasons.length > 0, reasons };
     })(),
   };
@@ -224,7 +258,7 @@ function run(doc: CadDocument, params: Params, ctx: ExecutionContext | undefined
       document,
       `import_step_exact: ${bodies.length} exact solid${bodies.length === 1 ? '' : 's'} (${ids.join(', ')}); ${report.census.faces} faces in the file, ` +
         `${report.solids.filter((solid) => solid.validAfterHeal).length}/${bodies.length} valid after BRepCheck, max tolerance ${report.maxToleranceMm} mm; ` +
-        `${imported.skipped.length} item${imported.skipped.length === 1 ? '' : 's'} skipped.${structured}${warned}`,
+        `${imported.skipped.length} item${imported.skipped.length === 1 ? '' : 's'} skipped.${structured}${warned}${report.reviewRequired.value ? ` Needs a qualified engineer: ${report.reviewRequired.reasons.join(', ')}.` : ''}`,
       ids,
     ),
     data: { report },

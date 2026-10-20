@@ -340,6 +340,50 @@ describeNative.skipIf(NIST_MISSING)(
       expect(nist.report.exchange.gvpCheck.band).toBe('green');
     }, 240_000);
 
+    it('FTC-07 e2 declares inch in the representation context of its validation properties: ratio 25.4^3 is gone, green (VC-XCH-12)', () => {
+      const { nist } = importNist('nist_ftc_07_asme1_ap242-e2.stp');
+      expect(nist.report.exchange.unitFactor).toBe(25.4);
+      expect(nist.report.exchange.gvpCheck.band).toBe('green');
+    }, 240_000);
+
+    it('every pinned NIST AP242 / AP203 file with a real GVP is green at group scope: no sender disagrees with its own geometry (VC-XCH-05)', () => {
+      const green = [
+        'nist_ctc_01_asme1_ap242-e1.stp',
+        'nist_ctc_02_asme1_ap242-e2.stp',
+        'nist_ctc_02_asme1_rc.stp',
+        'nist_ctc_03_asme1_ap242-e2.stp',
+        'nist_ctc_04_asme1_ap242-e2.stp',
+        'nist_ctc_05_asme1_rd.stp',
+        'nist_ftc_06_asme1_ap242-e2.stp',
+        'nist_ftc_07_asme1_ap242-e2.stp',
+        'nist_ftc_09_asme1_rd.stp',
+        'nist_stc_08_asme1_ap242-e3.stp',
+        'nist_stc_10_asme1_ap242-e2.stp',
+      ];
+      for (const file of green) expect(importNist(file).nist.report.exchange.gvpCheck.band, file).toBe('green');
+    }, 900_000);
+
+    it('a NIST file whose sender volume is overwritten by 1.5 is red: reviewRequired, unverified bodies, and every export path refuses (VC-XCH-21, -23, -24)', () => {
+      const original = readFileSync(path.join(NIST, 'nist_ctc_01_asme1_ap242-e1.stp'), 'latin1');
+      const volume = /VOLUME_MEASURE\(\s*([-+0-9.Ee]+)\s*\)/g;
+      const tampered = original.replace(volume, (_match, value: string) => `VOLUME_MEASURE(${Number(value) * 1.5})`);
+      expect(tampered).not.toBe(original);
+      const result = run(createEmptyDocument(), 'import_step_exact', { text: tampered, fileName: 'ctc01-tampered.stp' });
+      const report = dataOf<NistLikeReport>(result).report;
+      expect(report.exchange.gvpCheck.band).toBe('red');
+      expect(report.reviewRequired.reasons).toContain('import_gvp_red');
+      expect(report.warnings.map((warning) => warning.code)).toContain('XCH_GVP_RED');
+      for (const name of ['export_step_ap242', 'export_step_exact', 'export_iges']) {
+        const refused = run(result.document, name, {});
+        expect(refused.error?.code, name).toBe('XCH_UNVERIFIED_BODIES');
+        expect(refused.data, name).toBeUndefined();
+        const agent = run(result.document, name, { acceptUnverified: true });
+        expect(agent.error?.code, name).toBe('XCH_HUMAN_GATE');
+      }
+      const verified = dataOf<{ band: string }>(run(createEmptyDocument(), 'verify_exchange_file', { text: tampered }));
+      expect(verified.band).toBe('red');
+    }, 240_000);
+
     it('CTC-01: the semantic PMI the XDE reader attaches to faces matches the census categories (VC-XCH-07)', () => {
       const { result, nist } = importNist('nist_ctc_01_asme1_ap242-e1.stp');
       expect(result.affected.length).toBeGreaterThan(0);

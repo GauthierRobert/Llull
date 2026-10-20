@@ -11,11 +11,10 @@ import type { CommandResult, ExecutionContext } from '../types';
 import { confirmExportControlled, defineCommand, z } from '../schema';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
-import { exportDocumentHash } from '../../model/exportGate';
-import { humanGate } from '../../model/humanGate';
 import { canonicalizeStep21 } from '../../lib/step21/canonical';
 import { summarizeStep21 } from '../../lib/step21/summary';
 import { commandError, exportRefusal, noop, rejection, report } from '../noop';
+import { ACCEPT_UNVERIFIED, acceptedReasons, unverifiedGate } from './unverifiedGate';
 import { kernelStampOf } from '../persistence/kernelStamp';
 import { type ExpectedGvp, groupFileGvp, selfCheckGvp } from './fileGvp';
 import { type ExchangePlan, planExchange } from './stepPlan';
@@ -30,6 +29,8 @@ export interface StepExportOptions {
   readonly structured: boolean;
   readonly fileName: string;
   readonly timestamp: string;
+  /** The human gate of the export (TR-XCH-26): unverified or faceted bodies leave only with a signed `confirmation`. */
+  readonly gate?: { readonly command: string; readonly confirmation: unknown; readonly ctx: ExecutionContext | undefined };
 }
 
 export interface StepExportData {
@@ -82,12 +83,6 @@ const fail = (code: string, message: string, remediation: string, ids?: readonly
   ...(ids === undefined ? {} : { ids }),
 });
 
-/** Ids among `ids` whose import left them unverified (a sender GVP that disagrees with the geometry, or none to compare). */
-function unverifiedIds(doc: CadDocument, ids: readonly string[]): string[] {
-  const provenance = doc.exchange?.provenance ?? {};
-  return ids.filter((id) => provenance[id]?.unverified.value === true);
-}
-
 /**
  * Plans, writes and self-checks one STEP file. Pure; never throws.
  * @failure no writer / nothing exportable / kernel cannot build or write / self-check red -> `{ ok: false, code, … }`
@@ -117,6 +112,11 @@ export function buildStepExport(
       `the kernel could not build ${plan.failed}`,
       'check the entity with inspect_topology; nothing was exported',
     );
+  if (options.gate !== undefined) {
+    const blocked = unverifiedGate(doc, plan, options.gate.confirmation, options.gate.ctx, options.gate.command);
+    if (blocked !== null) return fail(blocked.code, blocked.message, blocked.remediation, blocked.ids);
+  }
+  const reasons = options.gate === undefined ? [] : acceptedReasons(doc, plan);
   const originatingSystem = 'llull';
   const request: ExchangeWriteRequest = {
     format: 'step',
@@ -196,7 +196,7 @@ export function buildStepExport(
       schemaName: summary.fileSchema,
       timestamp: options.timestamp,
     },
-    reviewRequired: { value: false, reasons: [] },
+    reviewRequired: { value: reasons.length > 0, reasons },
   };
   return { ok: true, data, plan };
 }
@@ -207,40 +207,6 @@ const refusal = (doc: CadDocument, outcome: Extract<StepExportOutcome, { ok: fal
     `${command}: ${outcome.code} — ${outcome.message}; nothing was exported; no-op.`,
     commandError(outcome.code, outcome.remediation, outcome.ids ?? []),
   );
-
-/** Refusal for unverified bodies unless a human cleared `acceptUnverified` (TR-XCH-26); null when the export may proceed. */
-function unverifiedRefusal(
-  doc: CadDocument,
-  ids: readonly string[],
-  confirmation: unknown,
-  ctx: ExecutionContext | undefined,
-  command: string,
-): CommandResult | null {
-  if (ids.length === 0) return null;
-  const why = `${ids.join(', ')} ${ids.length === 1 ? 'was' : 'were'} imported with a validation property that disagrees with the geometry or could not be checked`;
-  if (confirmation === undefined || confirmation === false)
-    return rejection(
-      doc,
-      `${command}: XCH_UNVERIFIED_BODIES — ${why}; nothing was exported; no-op.`,
-      commandError(
-        'XCH_UNVERIFIED_BODIES',
-        'a qualified reviewer verifies the bodies, then passes acceptUnverified with a human signature',
-        ids,
-        ['acceptUnverified'],
-      ),
-    );
-  const outcome = humanGate(ctx?.humanSignature ?? null, 'export of unverified bodies', ids, confirmation, {
-    command,
-    documentHash: exportDocumentHash(doc),
-  });
-  return outcome.cleared
-    ? null
-    : rejection(
-        doc,
-        `${command}: XCH_HUMAN_GATE — ${outcome.reason}; nothing was exported; no-op.`,
-        commandError('XCH_HUMAN_GATE', 'hand the prepared request to a qualified reviewer in the desktop app', ids, ['acceptUnverified']),
-      );
-}
 
 /**
  * @affects nothing — read-only
@@ -291,10 +257,7 @@ export const exportStepAp242 = defineCommand({
       .describe(
         'ISO 8601 time recorded in the header (e.g. 2026-10-15T12:00:00); hosts pass the current time. Default 1970-01-01T00:00:00 so the output is reproducible.',
       ),
-    acceptUnverified: confirmExportControlled.describe(
-      'Human confirmation to export imported bodies whose validation properties were red or not checkable: a signature object with a nonce produced in the ' +
-        'desktop app. An agent cannot give it (XCH_HUMAN_GATE).',
-    ),
+    acceptUnverified: confirmExportControlled.describe(ACCEPT_UNVERIFIED),
     confirmExportControlled,
   }),
   run: (doc, params, ctx): CommandResult => {
@@ -308,13 +271,11 @@ export const exportStepAp242 = defineCommand({
       structured: params.assembly !== 'flat',
       fileName: params.fileName ?? 'llull.stp',
       timestamp: params.timestamp ?? EPOCH_TIMESTAMP,
+      gate: { command: 'export_step_ap242', confirmation: params.acceptUnverified, ctx },
     });
     if (!outcome.ok) return refusal(doc, outcome, 'export_step_ap242');
-    const blocked = unverifiedRefusal(doc, unverifiedIds(doc, outcome.data.entityIds), params.acceptUnverified, ctx, 'export_step_ap242');
-    if (blocked !== null) return blocked;
     const { data } = outcome;
-    const unverified = unverifiedIds(doc, data.entityIds);
-    const reviewRequired = unverified.length > 0 ? { value: true, reasons: ['unverified_bodies_accepted'] } : data.reviewRequired;
+    const { reviewRequired } = data;
     const checked =
       data.selfCheck === undefined
         ? 'validation properties not written'
@@ -323,7 +284,7 @@ export const exportStepAp242 = defineCommand({
       doc,
       `export_step_ap242: ${data.solidCount} exact solid(s)${data.sheetCount > 0 ? ` and ${data.sheetCount} sheet(s)` : ''} from ${data.entityIds.join(', ')} → STEP ${SCHEMA_NAMES[data.schema]}` +
         `${data.assembly === undefined ? '' : `, ${data.assembly.products} product(s), ${data.assembly.occurrences} occurrence(s)`}, unit ${data.unit}, ${data.step.length} bytes; ${checked}` +
-        `${data.skipped.length > 0 ? `; skipped ${data.skipped.join(', ')}` : ''}.${reviewRequired.value ? ' Review required: unverified bodies accepted.' : ''}`,
+        `${data.skipped.length > 0 ? `; skipped ${data.skipped.join(', ')}` : ''}.${reviewRequired.value ? ` Review required: ${reviewRequired.reasons.join(', ')}.` : ''}`,
       { ...data, reviewRequired },
     );
   },

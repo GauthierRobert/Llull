@@ -6,7 +6,7 @@
  * @invariant pure; units are NOT converted here: values are in the file's own length unit (`lengthUnit.mmPerUnit` converts)
  */
 
-import { entityName, parseRecords, referencesOf, stringsOf } from './records';
+import { entityName, leadingNames, parseRecords, referencesOf, stringsOf } from './records';
 
 /** The file's global length unit, with the exact factor to millimetres (25.4 for inch, 304.8 for foot, ...). */
 interface FileLengthUnit {
@@ -30,6 +30,8 @@ export interface FileGvp {
   /** The product (name, else id) the property describes; null when the chain of references could not be followed. */
   readonly product: string | null;
   readonly values: readonly GvpValue[];
+  /** The length unit of the representation that carries the values (its GLOBAL_UNIT_ASSIGNED_CONTEXT); null when it names none, so the file's global unit applies. */
+  readonly lengthUnit: FileLengthUnit | null;
 }
 
 export interface Step21Summary {
@@ -43,10 +45,18 @@ export interface Step21Summary {
 }
 
 /** A Part 21 REAL: `8.`, `1.E+03`, `.5`, `-0.25E-2`. */
-const NUMBER = String.raw`[-+]?(?:\d+\.?\d*|\.\d+)(?:[Ee][-+]?\d+)?`;
+const NUMBER = String.raw`[-+]?(?:\d{1,64}(?:\.\d{0,64})?|\.\d{1,64})(?:[Ee][-+]?\d{1,6})?`;
 
 const SI_PREFIX_MM: Readonly<Record<string, number>> = { $: 1000, KILO: 1_000_000, CENTI: 10, MILLI: 1, MICRO: 0.001, NANO: 1e-6 };
 const CONVERSION_NAME_MM: Readonly<Record<string, number>> = { INCH: 25.4, FOOT: 304.8, MILE: 1_609_344, MIL: 0.0254 };
+const CONVERSION_ALIAS: Readonly<Record<string, string>> = {
+  MILLIMETRE: 'mm',
+  MILLIMETER: 'mm',
+  CENTIMETRE: 'cm',
+  CENTIMETER: 'cm',
+  METRE: 'm',
+  METER: 'm',
+};
 const UNIT_LABEL: Readonly<Record<string, string>> = { $: 'm', MILLI: 'mm', CENTI: 'cm', MICRO: 'um', KILO: 'km', NANO: 'nm' };
 
 /** The PMI / tessellation / B-rep / assembly types the census counts (same list as the Python reference). */
@@ -94,27 +104,67 @@ const CENSUS_TYPES: ReadonlySet<string> = new Set([
 
 /** First string of FILE_SCHEMA, whitespace collapsed (`AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }`). */
 export function fileSchemaOf(text: string): string | null {
-  const match = /FILE_SCHEMA\s*\(\s*\(\s*'([^']*)'/.exec(text);
+  const match = /FILE_SCHEMA\s{0,64}\(\s{0,64}\(\s{0,64}'([^']{0,1024})'/.exec(text);
   return match?.[1] === undefined ? null : match[1].split(/\s+/).filter(Boolean).join(' ');
 }
 
+const MAX_UNIT_DEPTH = 4;
+
+/** The length unit a unit record denotes (`( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) )` or a CONVERSION_BASED_UNIT), or null. */
+function unitOfBody(bodies: ReadonlyMap<number, string>, body: string | undefined, depth = 0): FileLengthUnit | null {
+  if (body === undefined || depth > MAX_UNIT_DEPTH || !body.startsWith('(') || !body.includes('LENGTH_UNIT')) return null;
+  const si = /SI_UNIT\(\s{0,16}(\$|\.[A-Z]{1,16}\.)\s{0,16},\s{0,16}\.METRE\.\s{0,16}\)/.exec(body);
+  if (si?.[1] !== undefined) {
+    const prefix = si[1].replaceAll('.', '');
+    return { name: UNIT_LABEL[prefix] ?? `${prefix} m`, mmPerUnit: SI_PREFIX_MM[prefix] ?? Number.NaN };
+  }
+  const conversion = /CONVERSION_BASED_UNIT\(\s{0,16}'([^']{0,128})'\s{0,16},\s{0,16}#(\d{1,16})/.exec(body);
+  if (conversion?.[1] === undefined) return null;
+  const name = conversion[1].toUpperCase();
+  const measure = bodies.get(Number(conversion[2]));
+  const value =
+    measure === undefined ? undefined : new RegExp(String.raw`LENGTH_MEASURE\(\s{0,16}(${NUMBER})\s{0,16}\)`).exec(measure)?.[1];
+  const own = measure === undefined ? null : unitOfBody(bodies, bodies.get(referencesOf(measure).at(-1) ?? -1), depth + 1);
+  const known = CONVERSION_NAME_MM[name];
+  // the factor is a LENGTH_MEASURE in the unit of its own measure (0.0254 + METRE), never a bare millimetre count
+  const factor = value !== undefined && own !== null && Number.isFinite(own.mmPerUnit) ? Number(value) * own.mmPerUnit : known;
+  return { name: CONVERSION_ALIAS[name] ?? name.toLowerCase(), mmPerUnit: factor ?? Number.NaN };
+}
+
+/** The length unit of a representation context (`GLOBAL_UNIT_ASSIGNED_CONTEXT((#unit, ...))`), or null. */
+function contextUnit(bodies: ReadonlyMap<number, string>, contextId: number | undefined): FileLengthUnit | null {
+  const context = contextId === undefined ? undefined : bodies.get(contextId);
+  if (context === undefined) return null;
+  const assigned = /GLOBAL_UNIT_ASSIGNED_CONTEXT\s{0,16}\(\s{0,16}\(([^)]{0,2048})\)/.exec(context)?.[1];
+  if (assigned === undefined) return null;
+  for (const unit of referencesOf(assigned)) {
+    const found = unitOfBody(bodies, bodies.get(unit));
+    if (found !== null) return found;
+  }
+  return null;
+}
+
+/**
+ * The file's global length unit: the unit of the shape representation's context (SHAPE_DEFINITION_REPRESENTATION, the geometry itself), else the
+ * first representation context that names one, else the first length unit record.
+ */
 function lengthUnitOf(bodies: ReadonlyMap<number, string>): FileLengthUnit | null {
-  for (const body of bodies.values()) {
-    if (!body.startsWith('(') || !body.includes('LENGTH_UNIT')) continue;
-    const si = /SI_UNIT\(\s*(\$|\.[A-Z]+\.)\s*,\s*\.METRE\.\s*\)/.exec(body);
-    if (si?.[1] !== undefined) {
-      const prefix = si[1].replaceAll('.', '');
-      const factor = SI_PREFIX_MM[prefix];
-      return { name: UNIT_LABEL[prefix] ?? `${prefix} m`, mmPerUnit: factor ?? Number.NaN };
-    }
-    const conversion = /CONVERSION_BASED_UNIT\(\s*'([^']*)'\s*,\s*#(\d+)/.exec(body);
-    if (conversion?.[1] !== undefined) {
-      const name = conversion[1].toUpperCase();
-      const measure = bodies.get(Number(conversion[2]));
-      const value = measure === undefined ? null : new RegExp(String.raw`LENGTH_MEASURE\(\s*(${NUMBER})\s*\)`).exec(measure)?.[1];
-      const factor = value === null || value === undefined ? CONVERSION_NAME_MM[name] : Number(value);
-      return { name: name.toLowerCase(), mmPerUnit: factor ?? Number.NaN };
-    }
+  const ordered = [...bodies].sort(([a], [b]) => a - b);
+  for (const [, body] of ordered) {
+    if (!body.startsWith('SHAPE_DEFINITION_REPRESENTATION(')) continue;
+    const shape = referencesOf(body)[1];
+    const references = referencesOf(bodies.get(shape ?? -1) ?? '');
+    const found = contextUnit(bodies, references.at(-1));
+    if (found !== null) return found;
+  }
+  for (const [id, body] of ordered) {
+    if (!body.includes('GLOBAL_UNIT_ASSIGNED_CONTEXT')) continue;
+    const found = contextUnit(bodies, id);
+    if (found !== null) return found;
+  }
+  for (const [, body] of ordered) {
+    const found = unitOfBody(bodies, body);
+    if (found !== null) return found;
   }
   return null;
 }
@@ -173,7 +223,7 @@ export function summarizeStep21(text: string): Step21Summary {
   const census: Record<string, number> = {};
   const products: string[] = [];
   for (const [id, body] of [...bodies].sort(([a], [b]) => a - b)) {
-    for (const name of new Set([...body.matchAll(/([A-Z][A-Z0-9_]*)\s*\(/g)].map((match) => match[1] ?? ''))) {
+    for (const name of new Set(leadingNames(body))) {
       if (CENSUS_TYPES.has(name)) census[name] = (census[name] ?? 0) + 1;
     }
     const kind = entityName(body);
@@ -189,8 +239,11 @@ export function summarizeStep21(text: string): Step21Summary {
     const references = referencesOf(body);
     const target = references[references.length - 1];
     const values: GvpValue[] = [];
+    let lengthUnit: FileLengthUnit | null = null;
     for (const representation of representationsOf.get(id) ?? []) {
-      for (const itemId of referencesOf(bodies.get(representation) ?? '')) {
+      const references = referencesOf(bodies.get(representation) ?? '');
+      lengthUnit = lengthUnit ?? contextUnit(bodies, references.at(-1));
+      for (const itemId of references) {
         const value = measureValue(bodies.get(itemId) ?? '');
         if (value !== null) values.push(value);
       }
@@ -202,6 +255,7 @@ export function summarizeStep21(text: string): Step21Summary {
       target: target ?? null,
       product: target === undefined ? null : productOf(bodies, target),
       values,
+      lengthUnit,
     });
   }
   return {

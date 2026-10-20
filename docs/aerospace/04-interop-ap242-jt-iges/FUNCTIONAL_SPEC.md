@@ -191,7 +191,7 @@ Phrased as CLI invocations with JSON assertions (AF-23). `ER(VC)` = the case in 
 | AC-2 | the drilled plate with an offset hole | `llull export_step_ap242 '{"includeValidationProperties":true}' --save p.stp`; `python3 -I extract_validation_properties.py p.stp` | one 'geometric validation property' set with volume 113716.81469282041, area 19028.31853071796, centroid x −1.3813228334244487 (mm) ≈ `ER(VC-XCH-02)` | VC-XCH-02 |
 | AC-3 | any llull-written AP242 file | `llull verify_exchange_file file=p.stp --json`; NIST SFA | `.data.schemaName` starts with `AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF`; SFA 0 syntax errors | VC-XCH-03, VC-XCH-17 |
 | AC-4 | `plans/xch-assembly-2x.json` | export → `import_step_exact … --json` | `.data.products` length 1, occurrences 2; assembly volume 2000 mm³, centroid (50, 0, 0) | VC-XCH-04 |
-| AC-5 | pinned NIST AP242 parts with GVP | `llull import_step_exact file=<f> verify=true --json $K` | `.data.gvpCheck.band == "green"` except the knownIssue entries of `ER(VC-XCH-05)` (CTC-02 e2, STC-08 e3 → `"red"`, code `XCH_GVP_RED`, exit 0, geometry imported); STC-06 → `"not-checkable"` | VC-XCH-05 |
+| AC-5 | pinned NIST AP242 parts with GVP | `llull import_step_exact file=<f> verify=true --json $K` | `.data.gvpCheck.band == "green"` for every file whose GVP is real (measured at group scope, 2026-10-20: CTC-02 e2 and STC-08 e3 are green, the earlier red came from measuring only the first solid); STC-06 → `"not-checkable"`; a tampered file (CTC-01 e1, volume x1.5) → `"red"`, code `XCH_GVP_RED`, exit 0, geometry imported | VC-XCH-05 |
 | AC-6 | NIST CTC-02 AP203 + AP242 | `verify_exchange_file --json` on both (no kernel) | sender-to-sender spread reproduces 1.12e-4 / −4.93e-4 / 0.0181 mm (1e-12 rel) | VC-XCH-06 |
 | AC-7 | NIST CTC-01 AP242 (V1) | `import_step_exact … --json` with PMI | every census record of `ER(VC-XCH-07)` mapped or listed with `XCH_PMI_UNMAPPED` | VC-XCH-07 |
 | AC-8 | toleranced llull part (V1) | export → import | PMI identical; SFA semantic PMI report clean | VC-XCH-08 |
@@ -203,7 +203,7 @@ Phrased as CLI invocations with JSON assertions (AF-23). `ER(VC)` = the case in 
 | AC-14 | truncated / garbage / oversize file | `llull import_step_exact file=<bad> --json` | exit 1, `affected: []`, document unchanged; code `KRN_STEP_UNREADABLE` / `XCH_FILE_TOO_LARGE` with remediation | VC-XCH-14 |
 | AC-15 | deliberately wrong calls | each in `ER(VC-XCH-21)` | exit 1; `.data` code and remediation as listed | VC-XCH-21 |
 | AC-16 | STC-06 (placeholder GVP) imported, then measured | `import_step_exact … --json`; `llull mass_properties entityId=<id> --json` | provenance `unverified: true` (`import_gvp_not_checkable`); `mass_properties` `.data.unverified.reasons` contains `import_gvp_not_checkable`; `verify_exchange_file` warning `XCH_GVP_NOT_CHECKABLE` | VC-XCH-22 |
-| AC-17 | CTC-02 e2 import; any archive package | `import_step_exact … --json`; `create_archive_package … --json` | `.data.reviewRequired.value == true` (reasons `import_gvp_red`, `archive_record`); summary contains "needs a qualified engineer" | VC-XCH-23 |
+| AC-17 | tampered CTC-01 e1 (volume x1.5) import; any archive package | `import_step_exact … --json`; `create_archive_package … --json` | `.data.reviewRequired.value == true` (reasons `import_gvp_red`, `archive_record`); summary contains "needs a qualified engineer" | VC-XCH-23 |
 | AC-18 | a document with a red-band body, agent caller | `llull export_step_ap242 '{"acceptUnverified":true}' --save x.stp --json` | exit 1, `XCH_HUMAN_GATE`, `x.stp` not written | VC-XCH-24 |
 | AC-19 | any export / import | `--json` | `.data.policy.greenRel == {value: 1e-3, source: …, defaulted: true}`; `.data.schema == {value: "ap242", defaulted: true}`; `.data.provenance` (sha256, originating system, kernel version) present | VC-XCH-25 |
 | AC-20 | NIST CTC-02 AP242 (largest, 637 faces) | `import_step_exact … --dry-run --json`; `--progress` | dry run `.changed == false`, document untouched; progress lines per stage | VC-XCH-26 |
@@ -224,7 +224,7 @@ Phrased as CLI invocations with JSON assertions (AF-23). `ER(VC)` = the case in 
 | KPI | Target | Measured by |
 | --- | ------ | ----------- |
 | NIST AP242 parts imported as exact solids | 100 % of the pinned AP242 B-rep files | VC-XCH-05 gate |
-| GVP agreement on import (NIST, files with GVP) | 100 % green except the known GVP/geometry disagreements (CTC-02 e2, STC-08 e3), which are reported red | VC-XCH-05 |
+| GVP agreement on import (NIST, files with GVP) | 100 % green (no pinned file disagrees with its own geometry at group scope; CTC-02 e2 and STC-08 e3 included); a sender that lies (tampered file) is reported red | VC-XCH-05 |
 | Self round-trip GVP agreement | 100 % within 1e-9 relative | VC-XCH-01 |
 | SFA syntax errors on llull-written AP242 | 0 | VC-XCH-17 |
 | Semantic PMI mapped (NIST CTC/FTC/STC, V1) | ≥ 90 % of census records mapped, 100 % accounted for | VC-XCH-07 |

@@ -3,6 +3,7 @@
 // without it `iges_available()` is false and the reader answers `unavailable`. IGES calls are not thread-safe in OCCT: the sidecar is
 // single-threaded, so they are serialised by construction.
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -103,7 +104,9 @@ rust::String iges_import_json(rust::Str text, double precision, double max_toler
   BRepBndLib::Add(shape, box);
   const double diagonal = box.IsVoid() ? 0.0 : std::sqrt(box.SquareExtent());
   // TR-XCH-12: sewing at max(the file's own resolution, 1e-6 * diagonal), never below the document tolerance.
-  const double sewing = std::max({file_resolution, 1e-6 * diagonal, precision});
+  // the file's own resolution is untrusted: never sew coarser than the caller's import ceiling
+  const double resolution = std::isfinite(file_resolution) ? std::min(std::max(file_resolution, 0.0), max_tolerance) : 0.0;
+  const double sewing = std::max({resolution, 1e-6 * diagonal, precision});
   std::vector<std::string> skipped;
   std::vector<Candidate> candidates;
   for (int i = 1; i <= solids.Extent(); ++i) candidates.push_back({solids(i), is_valid(solids(i)), false});

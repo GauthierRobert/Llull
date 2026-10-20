@@ -9,6 +9,8 @@ import type { ImportedSolid } from '@core/geometry/kernelPorts';
 import { createEmptyDocument, type CadDocument, type InstanceEntity, type MeshSolidEntity } from '@core/model/types';
 import { simplifyTree } from '@core/commands/exchange/importSimplify';
 import { placementOf } from '@core/commands/exchange/importTree';
+import { exchangeProblems } from '@core/commands/persistence/exchangeValidation';
+import type { ImportProvenance } from '@core/model/exchange';
 import { sha256Hex } from '@lib/sha256';
 import { textToBase64 } from '@lib/base64';
 import { fakeExactKernel } from '../../helpers/fakeExactKernel';
@@ -200,7 +202,7 @@ describe('import_step_exact: assembly structure', () => {
     const partComponent = components.find((component) => component.name === 'Part');
     expect(Object.values(partComponent?.entities ?? {})[0]).toMatchObject({ kind: 'mesh', name: 'Block' });
     expect(reportOf(result).exchange.products.map((product: { name: string; band: string }) => [product.name, product.band])).toEqual([
-      ['Asm', 'not-checkable'],
+      ['Asm', 'green'],
       ['Part', 'green'],
     ]);
     expect(result.document.exchange?.provenance[Object.keys(result.document.components)[0] ?? '']).toBeDefined();
@@ -532,5 +534,148 @@ describe('import_step_exact: semantic PMI transport (04 V1 hook for 03 GD&T)', (
     expect(reportOf(result).reviewRequired.reasons).toContain('pmi_unmapped');
     expect((reportOf(result).exchange as unknown as { pmiUnmapped: number }).pmiUnmapped).toBe(3);
     expect(result.summary).toContain('3 PMI item(s)');
+  });
+});
+
+describe('import_step_exact: review fixes (assemblies, depth, cycles, non-rigid)', () => {
+  /** root -> level 1 -> ... -> leaf part, `levels` assemblies deep. */
+  function nested(levels: number): ImportedExchange {
+    const products = [
+      ...Array.from({ length: levels }, (_, index) => ({ name: `L${index}`, assembly: true, layers: [], solids: [] as number[] })),
+      { name: 'Leaf', assembly: false, layers: [], solids: [0] },
+    ];
+    return {
+      solids: [part()],
+      census: { roots: 1, solids: 1, shells: 1, openShells: 0, faces: 6 },
+      skipped: [],
+      products,
+      occurrences: products
+        .slice(0, -1)
+        .map((_, index) => ({ parent: index, product: index + 1, name: `use ${index}`, matrix: at(index + 1) })),
+      roots: [0],
+    };
+  }
+
+  it('a red part below two assembly levels makes every ancestor red and unverified (2-level red child)', () => {
+    const red = { ...part(), name: 'Block' };
+    const tree: ImportedExchange = { ...nested(2), solids: [red] };
+    const result = run(createEmptyDocument(), 'import_step_exact', { text: stepOf({ volume: 1500 }, 'Leaf') }, { stepImport: tree });
+    const products = reportOf(result).exchange.products;
+    expect(products.map((product) => [product.name, product.band])).toEqual([
+      ['L0', 'red'],
+      ['L1', 'red'],
+      ['Leaf', 'red'],
+    ]);
+    const provenance = result.document.exchange?.provenance ?? {};
+    expect(Object.values(provenance).length).toBeGreaterThanOrEqual(3);
+    expect(
+      Object.values(provenance).every((record) => record.unverified.value && record.unverified.reasons.includes('import_gvp_red')),
+    ).toBe(true);
+  });
+
+  it('an assembly nested deeper than the instance limit asks for review and says so', () => {
+    const result = run(createEmptyDocument(), 'import_step_exact', { text: stepOf({}, 'Leaf') }, { stepImport: nested(5) });
+    expect(reportOf(result).reviewRequired.reasons).toContain('assembly_depth_limit');
+    expect(reportOf(result).skipped.some((line) => line.includes('nests'))).toBe(true);
+    const shallow = run(createEmptyDocument(), 'import_step_exact', { text: stepOf({}, 'Leaf') }, { stepImport: nested(2) });
+    expect(reportOf(shallow).reviewRequired.reasons).not.toContain('assembly_depth_limit');
+  });
+
+  it('a mirrored occurrence marks the component that holds it unverified (non_rigid_occurrence)', () => {
+    const mirrored = [-1, 0, 0, 7, 0, 1, 0, 0, 0, 0, 1, 0];
+    const result = run(
+      createEmptyDocument(),
+      'import_step_exact',
+      { text: stepOf({}, 'Part') },
+      { stepImport: assemblyTree([identity, mirrored]) },
+    );
+    expect(reportOf(result).reviewRequired.reasons).toContain('non_rigid_occurrence');
+    const flagged = Object.entries(result.document.exchange?.provenance ?? {}).filter(([, record]) =>
+      record.unverified.reasons.includes('non_rigid_occurrence'),
+    );
+    expect(flagged.length).toBe(1);
+    expect(result.document.components?.[flagged[0]?.[0] ?? '']?.name).toBe('Asm');
+  });
+
+  it('a product tree that contains itself is refused with nothing imported', () => {
+    const cyclic: ImportedExchange = {
+      ...assemblyTree([identity]),
+      products: [
+        { name: 'A', assembly: true, layers: [], solids: [0] },
+        { name: 'B', assembly: true, layers: [], solids: [] },
+      ],
+      occurrences: [
+        { parent: 0, product: 1, name: 'ab', matrix: identity },
+        { parent: 1, product: 0, name: 'ba', matrix: identity },
+      ],
+    };
+    const doc = createEmptyDocument();
+    const result = run(doc, 'import_step_exact', { text: stepOf({}, 'A') }, { stepImport: cyclic });
+    expect(result.error?.code).toBe('KRN_STEP_UNREADABLE');
+    expect(result.document).toBe(doc);
+  });
+
+  it('simplifyTree is linear on a long wrapper chain', () => {
+    const levels = 3000;
+    const products = [
+      ...Array.from({ length: levels }, (_, index) => ({ name: `W${index}`, assembly: true, layers: [], solids: [] as number[] })),
+      { name: 'Leaf', assembly: false, layers: [], solids: [0] },
+    ];
+    const tree: ImportedExchange = {
+      ...nested(1),
+      products,
+      occurrences: products.slice(0, -1).map((_, index) => ({ parent: index, product: index + 1, name: `w${index}`, matrix: identity })),
+      roots: [0],
+    };
+    const started = performance.now();
+    const simple = simplifyTree(tree);
+    expect(performance.now() - started).toBeLessThan(2000);
+    expect(simple.products.map((product) => product.solids.length).reduce((a, b) => a + b, 0)).toBe(1);
+  });
+
+  it('refuses base64 payloads beyond the size limit before reading them (import_step_exact, verify_exchange_file, import_iges)', () => {
+    const huge = 'A'.repeat(90 * 1024 * 1024);
+    const doc = createEmptyDocument();
+    for (const [name, key] of [
+      ['import_step_exact', 'stepBase64'],
+      ['verify_exchange_file', 'stepBase64'],
+      ['import_iges', 'igesBase64'],
+    ] as const) {
+      const result = execute(doc, name, { [key]: huge }, ctxOf(fakeXdeKernel().kernel));
+      expect(result.rejected, name).toBe(true);
+      expect(result.summary, name).toContain('invalid params');
+      expect(result.document, name).toBe(doc);
+    }
+  });
+});
+
+describe('import provenance leaves with the imported bodies and is validated on load', () => {
+  it('delete_entities drops the provenance of the deleted entity and keeps the others', () => {
+    const imported = run(
+      createEmptyDocument(),
+      'import_step_exact',
+      { text: stepOf() },
+      { stepImport: singlePartTree('Block', [part(), part()]) },
+    );
+    const [first, second] = imported.affected as [string, string];
+    expect(Object.keys(imported.document.exchange?.provenance ?? {})).toEqual(expect.arrayContaining([first, second]));
+    const next = execute(imported.document, 'delete_entities', { ids: [first] });
+    expect(Object.keys(next.document.exchange?.provenance ?? {})).not.toContain(first);
+    expect(Object.keys(next.document.exchange?.provenance ?? {})).toContain(second);
+  });
+
+  it('load validation accepts what import writes and rejects a malformed exchange slice', () => {
+    const imported = run(createEmptyDocument(), 'import_step_exact', { text: stepOf() }, { stepImport: singlePartTree('Block', [part()]) });
+    expect(exchangeProblems(imported.document.exchange)).toEqual([]);
+    expect(exchangeProblems(undefined)).toEqual([]);
+    const id = imported.affected[0] as string;
+    const record = imported.document.exchange?.provenance[id] as ImportProvenance;
+    expect(exchangeProblems({ provenance: { [id]: { ...record, format: 'jt' } } })[0]).toContain('format');
+    expect(exchangeProblems({ provenance: { [id]: { ...record, unverified: { value: true, reasons: ['bogus'] } } } })[0]).toContain(
+      'unverified',
+    );
+    expect(exchangeProblems({ provenance: { __proto__x: 1 } })).not.toEqual([]);
+    expect(exchangeProblems({ provenance: [] })).not.toEqual([]);
+    expect(exchangeProblems('x')).not.toEqual([]);
   });
 });

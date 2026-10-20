@@ -47,7 +47,7 @@ function combine(parts: readonly Mass[]): ExchangeValidation | undefined {
   const volume = parts.reduce((sum, part) => sum + part.volume, 0);
   if (parts.length === 0 || !(volume > 0)) return undefined;
   const centroid: Vec3 = [0, 1, 2].map(
-    (axis) => parts.reduce((sum, part) => sum + part.volume * part.centroid[axis]!, 0) / volume,
+    (axis) => parts.reduce((sum, part) => sum + part.volume * (part.centroid[axis] ?? 0), 0) / volume,
   ) as unknown as Vec3;
   return { volume, area: parts.reduce((sum, part) => sum + part.area, 0), centroid };
 }

@@ -72,7 +72,7 @@ geometric one.
 | VC-XCH-20 | FR-21, FR-22, TR-03 | any | identical `data` from UI dispatch, CLI, MCP; 0 network calls | exact | L1/L5/L6, KI6 | integration |
 | VC-XCH-21 | FR-23, FR-24, TR-20, TR-21 | deliberately wrong calls (`expected_results.json`) | each exits 1 with the listed `XCH_*` / `KRN_*` code and a remediation; document unchanged | exact (codes) | requirement; CTC-02 e2 red measured | CLI script |
 | VC-XCH-22 | FR-27, TR-24 | STC-06 (placeholder solid GVP) | provenance `unverified` (`import_gvp_not_checkable`); `mass_properties` `.data.unverified.reasons` contains it; `XCH_GVP_NOT_CHECKABLE` warning | exact | pinned file | CLI script |
-| VC-XCH-23 | FR-28, TR-25 | CTC-02 e2 import; L-bracket archive; CTC-01 e1 (green) | `reviewRequired.value` true / true / false with reasons; summary wording | exact | requirement + measured bands | CLI script |
+| VC-XCH-23 | FR-28, TR-25 | tampered CTC-01 e1 (volume x1.5) import; L-bracket archive; CTC-01 e1 (green) | `reviewRequired.value` true / true / false with reasons; summary wording | exact | requirement + measured bands | CLI script |
 | VC-XCH-24 | FR-29, TR-26 | agent `export_step_ap242 {acceptUnverified}` with a red body | exit 1, `XCH_HUMAN_GATE`, no file; human caller proceeds | exact | requirement | unit + desktop test |
 | VC-XCH-25 | FR-25, FR-26, TR-22, TR-23 | any import / export | named `policy` / `schema` defaults with sources; GVP unit fields; FTC-09 `fileUnit` inch, `unitFactor` 25.4; provenance fields | exact | §5.3, [R14] | CLI script |
 | VC-XCH-26 | FR-30, TR-27 | CTC-02 AP242 | `--dry-run` → `.changed == false`; progress stages; JT without converter → `XCH_CONVERTER_MISSING` | exact | requirement | CLI script |

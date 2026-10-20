@@ -10,7 +10,7 @@ import type { ExactMassProperties } from '../../geometry/kernelPorts';
 import type { Vec3 } from '../../model/types';
 import type { EmbeddedGvp, GvpCheck, GvpPolicy } from '../../model/exchange';
 import type { Step21Summary } from '../../lib/step21/summary';
-import { type FileGvpGroup, embeddedOf, groupFileGvp } from './fileGvp';
+import { type FileGvpGroup, embeddedOf, groupFileGvp, groupOfProduct } from './fileGvp';
 import { type GvpSample, compareGvp, worstBand } from './gvpBands';
 
 /** One integrated piece: volume, area, centroid and its axis-aligned box (mm). */
@@ -64,7 +64,7 @@ function sum(pieces: readonly Piece[]): Piece | undefined {
   const volume = pieces.reduce((total, piece) => total + piece.volume, 0);
   if (pieces.length === 0 || !(volume > 0)) return undefined;
   const centroid = [0, 1, 2].map(
-    (k) => pieces.reduce((total, piece) => total + piece.volume * piece.centroid[k]!, 0) / volume,
+    (k) => pieces.reduce((total, piece) => total + piece.volume * (piece.centroid[k] ?? 0), 0) / volume,
   ) as unknown as Vec3;
   const lowest = (k: 0 | 1 | 2): number => Math.min(...pieces.map((piece) => piece.min[k]));
   const highest = (k: 0 | 1 | 2): number => Math.max(...pieces.map((piece) => piece.max[k]));
@@ -75,21 +75,6 @@ function sum(pieces: readonly Piece[]): Piece | undefined {
     min: [lowest(0), lowest(1), lowest(2)],
     max: [highest(0), highest(1), highest(2)],
   };
-}
-
-/** Group matching the product: same name, nearest volume among the not yet used ones. */
-function matchGroup(
-  names: readonly string[],
-  volume: number | undefined,
-  groups: readonly FileGvpGroup[],
-  used: Set<FileGvpGroup>,
-): FileGvpGroup | undefined {
-  const candidates = groups.filter((group) => group.product !== null && names.includes(group.product) && !used.has(group));
-  return candidates.reduce<FileGvpGroup | undefined>(
-    (best, group) =>
-      best === undefined || Math.abs((group.volume ?? 0) - (volume ?? 0)) < Math.abs((best.volume ?? 0) - (volume ?? 0)) ? group : best,
-    undefined,
-  );
 }
 
 /**
@@ -133,7 +118,7 @@ export function verifyImportedProducts(
 
   return imported.products.map((product, index): ProductVerification => {
     const piece = pieceOf(index);
-    const group = matchGroup(product.aliases ?? [product.name], piece?.volume, groups, used);
+    const group = groupOfProduct(groups, product.aliases ?? [product.name], used);
     if (group !== undefined) used.add(group);
     const diagonal =
       piece === undefined ? 1 : Math.hypot(piece.max[0] - piece.min[0], piece.max[1] - piece.min[1], piece.max[2] - piece.min[2]);
