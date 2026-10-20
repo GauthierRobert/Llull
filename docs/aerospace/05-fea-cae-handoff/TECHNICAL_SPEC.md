@@ -874,30 +874,44 @@ changes) was **not run or even compiled**. Real-tool tests skip with a logged re
   shell symmetry adds the rotations.
 - **Composite shells** (06 CMP through core data only). `compositePartId` = a composite part laid up on the entity; its laminate is a stored `LaminateSection`
   (`laminateSectionId`, from `create_laminate_sections`, merged from feat/eng-depth: per-zone sections, angles from the part rosette) or the part's plies when all
-  are whole-face (`FEA_COMPOSITE_ZONES_UNSUPPORTED` otherwise); core plies -> `FEA_COMPOSITE_CORE_UNSUPPORTED`. Plies are written bottom to top along the element
-  normal (reversed when the stacking direction, rosette normal x laminateSide, opposes the first element's normal). INP: per lamina `*MATERIAL` + `*ELASTIC,
-  TYPE=ENGINEERING CONSTANTS` (transversely isotropic: E3 = E2, nu13 = nu12, G13 = G13 ?? G12, G23 = G23 ?? G13, nu23 = E2 / (2 G23) - 1; assumptions in a deck
-  comment), per ply `*ORIENTATION` (rosette 0-degree axis, normal x axis, `3, angle`), `*SHELL SECTION, COMPOSITE, OFFSET` with `t,, material, orientation` lines;
+  are whole-face (`FEA_COMPOSITE_ZONES_UNSUPPORTED` otherwise); core plies -> `FEA_COMPOSITE_CORE_UNSUPPORTED`. ONE ply frame is written per part, so the part's
+  elements must be coplanar and consistently oriented (within 1 degree; a sheet-metal bend or an L-shaped face-paired part -> `FEA_COMPOSITE_NOT_PLANAR`, split it);
+  plies are written bottom to top along that common element normal (reversed when the stacking direction, rosette normal x laminateSide, opposes it). The rosette
+  0-degree axis is projected on the shell plane (normal to it -> `FEA_COMPOSITE_INVALID`). INP: per lamina `*MATERIAL` + `*ELASTIC, TYPE=ENGINEERING CONSTANTS`
+  (transversely isotropic: E3 = E2, nu13 = nu12, G13 = G13 ?? G12, nu23 = E2 / (2 G23) - 1 with G23 REQUIRED: a defaulted G23 gives a negative nu23 for CFRP),
+  per ply `*ORIENTATION` (projected rosette axis, normal x axis, `3, angle`), `*SHELL SECTION, COMPOSITE, OFFSET` with `t,, material, orientation` lines;
   S8 elements are written `S8R` (other types -> `FEA_COMPOSITE_ELEMENT`: use shell_quad, order 2). BDF: MAT8 per lamina, PCOMP (Z0 = -(1/2 + offset) t, SOUT YES),
-  CORD2R 100 + pid (x = rosette axis, z = element normal) named as MCID on the part's elements. Lamina density is read as grams per cubic document unit (assumption).
-  None of the composite cards ran in ccx or Nastran.
+  CORD2R 100 + pid (x = projected rosette axis, z = element normal) named as MCID on the part's elements. Lamina density is read as grams per cubic document unit and
+  must lie in [50, 25 000] kg/m^3 (else `FEA_COMPOSITE_INVALID`: entered in another unit). None of the composite cards ran in ccx or Nastran. **Composite parts get
+  no margin rows** (`FEA_COMPOSITE_MARGINS_UNSUPPORTED` warning, refusal when nothing else is left): an isotropic von Mises margin against the entity's Ftu / Fty would
+  be meaningless; ply failure criteria in `compute_margins` are deferred (use the 06 CMP laminate analysis).
 - **Shell results (open question 7, decided).** CalculiX expands shells into volume elements and writes the .frd on the expanded nodes. `shell/shellResults.ts`
   reads the .frd node block and finds, for each 2D mesh node, the expanded nodes at x + (1/2 - offset) t n (top fibre) and x - (1/2 + offset) t n (bottom) within t / 4
-  (n = averaged element normal): geometric, independent of the expansion numbering. The node gets the mean of both (midsurface displacement, membrane stress) and
-  the fibre stresses in `STRESS_TOP` / `STRESS_BOT`; values under the original numbers (2D output) are kept; neither -> `FEA_SHELL_RESULTS_UNMAPPED`. The results
-  summary takes the max von Mises over STRESS and both fibres. The deck keeps the default `*NODE FILE` (no OUTPUT=): that the default is the expanded output is
-  **unverified** against ccx 2.21. **Margins on shells:** `compute_margins` reads the membrane STRESS per node; fibre-wise margin rows are **deferred**, so a shell in
-  bending is UNDER-estimated by the margins table (the results summary shows the fibre peak).
+  (n = averaged element normal): geometric, independent of the expansion numbering. Candidates are .frd node numbers that are NOT mesh nodes (never a solid node or a
+  node of another part) and each is used once. The node gets the mean of both (midsurface displacement, membrane stress) and the fibre stresses in `STRESS_TOP` /
+  `STRESS_BOT`; a node without its own pair (a kink, where ccx may join nodes into a knot) keeps STRESS written under its own number; with neither ->
+  `FEA_SHELL_RESULTS_UNMAPPED`. `fea_solve` and `fea_import_results` (`.frd`) both map before any mesh check. The results summary takes the max von Mises over
+  STRESS and both fibres. The deck keeps the default `*NODE FILE` (no OUTPUT=): that the default is the expanded output, and the knot behaviour at kinks, are
+  **unverified** against ccx 2.21. **Margins on shells:** for 2D-part nodes `compute_margins` takes the largest of STRESS, STRESS_TOP and STRESS_BOT per node
+  (criterion evaluated on each; the row names the governing `fibre`), so bending is not averaged away.
 - **Defeaturing** (`defeature_for_analysis { analysisId, entityId, maxFeatureSize?, facesNear?, clear? }`, `AnalysisCase.defeature`, in the mesh input hash). The
   kernel path (`BRepAlgoAPI_Defeaturing` as a recipe node) is not reachable through the kernel interface: Gmsh `occ.defeature` in the bridge on STEP parts removes
   cylinder / torus faces of radius <= maxFeatureSize (principal curvature at the parametric centre) and the faces nearest to `facesNear`; a failure is
   `FEA_DEFEATURE_FAILED` naming the faces; STL parts are refused; the face map is skipped for a defeatured part; `fea_mesh` reports `data.defeatured`. Chamfer strips
   are not detected. **Unverified** (no Gmsh here).
-- **Singularity policy (open question 8, decided)** in `compute_margins` / `dispose_margin`: sources = nodes of force / moment loads and of supports whose target has no
-  mesh face (points, edges); default exclusion radius 2 x mesh globalSize (`data.singularScreening.radius`, named llull default, `defaulted: true`); override
-  `singularityRadius` (document units, 0 = none) REQUIRES `singularityNote` (else `FEA_MARGIN_PARAM_INVALID`). Excluded nodes form separate rows (region `singular`,
-  `singular: true`, rowKey + `|singular`) that never set minMs; `check_analysis` ignores them for FEA_MS_NEGATIVE / FEA_DISPOSITION_PENDING. Re-entrant edges are
-  not screened (needs geometry): deferred.
+- **Singularity policy (open question 8, decided)** in `compute_margins` / `dispose_margin`: sources = nodes of force / moment loads and of SOLID-part supports whose
+  target has no mesh face (points, edges). Supports of shell / plane-stress parts are never sources: a side-wall point resolves to the shell edge, and the clamped root
+  is where the peak bending is (the first build excluded it: review finding, fixed). Default exclusion radius 2 x mesh globalSize (`data.singularScreening.radius`,
+  named llull default, `defaulted: true`); override `singularityRadius` (document units, 0 = none) REQUIRES `singularityNote` (else `FEA_MARGIN_PARAM_INVALID`).
+  Excluded nodes form separate rows (region `singular`, `singular: true`, rowKey + `|singular`) that never set minMs. They are not silent: `check_analysis` keeps
+  FEA_MS_NEGATIVE / FEA_DISPOSITION_PENDING for regular rows and adds `FEA_MS_SINGULAR_FAIL` (warning) for failing singular rows, `FEA_MS_ALL_SINGULAR` (error) for a
+  group whose every node is excluded (it has no margin), and `FEA_SINGULAR_EXCLUSION_LARGE` (warning) when more than 25 % of a part's nodes are excluded (also in
+  `data.warnings`). Re-entrant edges are not screened (needs geometry): deferred. The default radius can still cover a small part entirely; it is then flagged, not
+  hidden.
+- **Part-3 review fixes (2026-10-20).** Besides the three items above: idealization values (shell thickness / offset / midsurface / laminate, plane-stress thickness
+  and source points) and `defeature` are validated on load; sheet-metal bends use min(15-degree strips, arc length / mesh globalSize) strips, at least one (no
+  slivers below the element size); the Analysis panel reads `singularScreening` as the object it is, no longer claims re-entrant corners are screened, and turns the
+  min-MS chip to a warning when only a singular row fails.
 - **M4 leftovers.** Golden plans `fea_buckling_preload_view` (preload, moment with referencePoint, result view) and `fea_static_margin_band_view`; golden text of the
   BDF and the VTU (with and without results) in `tests/golden/feaExports.test.ts`; `llull guide` section 11 "Structural analysis".
 - **UI** (`src/ui/panels/analysis/*`, presentation only): state badges (not meshed, meshed, solved, stale, missing, untrusted, with their meaning), idealization per
@@ -916,5 +930,5 @@ changes) was **not run or even compiled**. Real-tool tests skip with a logged re
 - **Tests.** `tests/unit/cae/{shellSetup,shellDeck,shellTransports,marginsSingularity,reviewFixesPart2}.test.ts`, `tests/golden/feaExports.test.ts`,
   `tests/component/AnalysisRest.test.tsx`. Not run anywhere: a real shell / plane-stress / composite solve, the shell pressure signs, the expansion mapping on a real
   .frd, Gmsh 2D meshing and defeaturing, PCOMP / MAT8 / CORD2R in Nastran.
-- **Not done:** beams (V2), cylinder pairing and mid-face extension / sewing, fibre-wise margin rows, shell-solid coupling, pressure on plane-stress edges, plane
+- **Not done:** beams (V2), cylinder pairing and mid-face extension / sewing, ply failure margins of composite shells, composites on non-planar parts, shell-solid coupling, pressure on plane-stress edges, plane
   strain, chamfer detection, offsets of plain PSHELL in the BDF, sandwich cores, `*DISTRIBUTING COUPLING`, Netgen, large-field BDF, `.llullz` bundling.
