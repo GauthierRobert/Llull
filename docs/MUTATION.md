@@ -21,14 +21,24 @@ standalone clone, or CI.
 
 ## Scores (Windows, Node 24, Manifold kernel in the judges, 2026-10-19/20)
 
-| Folder | Scored mutants | Killed | Timeout | Survived | No coverage | Score | Wall time |
-| ------ | ------- | ------ | ------- | -------- | ----------- | ----- | --------- |
-| `history` | 726 | 203 | 0 | 320 | 203 | 28.0 % | not recorded |
-| `parametric` | 2772 | 949 | 34 | 848 | 941 | 35.5 % | 34 min (concurrency 12) |
-| `brep`, `solids` | — | — | — | — | — | not run locally yet | nightly |
+| Folder                                            | Scored mutants | Killed | Timeout | Survived | No coverage | Score               | Wall time                        |
+| ------------------------------------------------- | -------------- | ------ | ------- | -------- | ----------- | ------------------- | -------------------------------- |
+| `history` (2026-10-20, with the SC-Q4b judges)    | 736            | 267    | 3       | 338      | 128         | 36.7 %              | 11 min (concurrency 16, Node 22) |
+| `history` (before SC-Q4b)                         | 726            | 203    | 0       | 320      | 203         | 28.0 %              | not recorded                     |
+| `parametric` (2026-10-20, with the SC-Q4b judges) | 3022           | 1647   | 42      | 984      | 349         | 55.9 %              | 131 min (concurrency 6, Node 22) |
+| `parametric` (before SC-Q4b)                      | 2772           | 949    | 34      | 848      | 941         | 35.5 %              | 34 min (concurrency 12)          |
+| `brep`, `solids`                                  | —              | —      | —       | —        | —           | not run locally yet | nightly                          |
 
 The judges reach these folders through the registry, so Stryker cannot use static "related tests": every mutant runs the whole judge set
 selected by per-test coverage (`coverageAnalysis: perTest`; about 2 tests per mutant on average).
+
+## SC-Q4b judges (2026-10-20)
+
+`tests/golden/sketchOracle.ts` (independent constraint residuals + DOF by finite-difference rank), `sketchPlans.ts` / `sketchJudges.test.ts`(one plan per constraint family), `sketchGuards.test.ts` (conflict / redundant / flip refusals, triangle orientation, 40-seed DOF
+property) and `historyJudges.test.ts` (replay equality of every history meta-command, a carried material edit, a late parameter edit).
+History: `history.ts` 14 -> 43 %, `record.ts` 69 %, `regenerate.ts` 54 %; `carry.ts` (19 %) and `replay.ts` (25 %) remain the weakest.
+Parametric: `solver/` 62.6 % (`residuals.ts` 86 %, `residualsDimensional.ts` 76 %, `residualsCurves.ts` 0 -> 61 %, `residualsGeometric.ts`
+55 %, `dof.ts` 15 -> 41 %), `constraintGuard.ts` 51 %; `flipGuard.ts` (23 %) remains the weakest.
 
 ## What survives, and what would kill it
 

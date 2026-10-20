@@ -5,33 +5,35 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 (`git log -p .claude/work/BOARD.md`) and each spec's TECHNICAL_SPEC §13+ "as built".
 
 ## Conventions
+
 - Status tokens at line start: `[TODO]` · `[WIP]` (agent on it) · `[REVIEW]` (cad-reviewer + `npm run check`) · `[BLOCKED]` (see note).
   A task is deleted from the board when it reaches `[DONE]`.
 - Deps name task ids; an id no longer on the board is done. A task is eligible when it is `[TODO]` and no dep is still listed.
 - Lanes own disjoint write scopes (`.claude/rules/workflow.md` W5); one task per lane at a time, up to 4 lanes + Lane 5 review.
 
 ## NOW (auto-updated by the skill)
-- 2026-10-20 — branch `feat/sc-parity`: every SC task implemented and merged (see SolidCraft section); native C++/Rust parts await MSVC to compile (SC-NATIVE).
+
+- 2026-10-20 — branch `feat/sc-remaining`: SC1 closed — SC-NATIVE verified on Windows/MSVC (native oracle 114/115 + 1 known failure,
+  native action-matrix baseline), SC-Q4b judges (mutation history 36.7 %, parametric 55.9 %), extrude_profile follows the sketch rotation (owner): `docs/decisions/SC1-remaining.md`.
 - 2026-10-19 — branch `ccr-d5e76715-intlyp`: LC1 done (steps 1–6: native kernel default everywhere, opencascade.js retired, no outbox),
   RS-1 done (macOS bundle deferred by the owner), RS-2 done (native SIMP topology optimisation + plugin `topology` + `topology_solve` + UI panel).
   Next: CFD-M1, then RS-3.
 
 ## Priority
+
 - `[TODO]` **RS** Native compute RS-3 → RS-8 (RS-1, RS-2 done): `docs/decisions/RS1-native-compute.md`. Next RS-3 point clouds. _deps: —_
 - `[TODO]` **TOP-V1** Topology V1 (PHY-17 §10 M4): MMA, projection, extrusion / min member size, `min_volume`, pressure / gravity loads in the
   mapping and the compliance ratio, a timeout checkpoint (`deadlineS`) so a killed run resumes, VC-TOP-34 on a hardware GPU (GPU cap): `docs/physics/17-topology-optimization/TECHNICAL_SPEC.md` §13–§14. _deps: —_
 - `[TODO]` **CFD-M1** `cfd` slice, case commands, `cfd_prepare`, `check_cfd`: `docs/aerospace/12-cfd-gpu/TECHNICAL_SPEC.md` §10. _deps: —_
 - `[TODO]` **CFD-M2** `llull-compute flow` (LBM, wgpu), `cfd_solve` transport, records: same spec §10. _deps: CFD-M1_
 
-## SolidCraft parity (spec: `docs/decisions/SC1-solidcraft-parity.md`, "As built" table)
-- Implemented on `feat/sc-parity`: SC-Q1–Q5, S1–S3, N1, N2, F1–F4, D1–D4, A1–A4.
-- `[BLOCKED]` **SC-NATIVE** Compile and verify the native parts (naming history, faceOp, `radii` laws, IGES / TKDEIGES): OCCT 7.9.2 rebuild,
-  `cargo clippy -D warnings` + `cargo test`, server native suites, oracle OCCT column (17 cases + STEP round trip), action matrix
-  `--native --bless`. _Blocked: MSVC (VS 2022 Build Tools) install waits for an admin prompt on the owner's PC; CI runs it on push._
-- `[TODO]` **SC-Q4b** New judges for the mutation survivors (`docs/MUTATION.md`): golden plans per constraint family, DOF property,
-  history meta-commands replay equality. _deps: —_
+## SolidCraft parity (spec: `docs/decisions/SC1-solidcraft-parity.md`)
+
+- All SC tasks done (SC-NATIVE, SC-Q4b closed 2026-10-20: `docs/decisions/SC1-remaining.md`). Follow-up idea: exact helical thread
+  groove in the native kernel (oracle 106 known failure).
 
 ## Aerospace + physics (spec = the linked pack)
+
 - `[TODO]` **AERO-4** Supply chain: 03 GDT, 04 XCH (AP242), 09 PLM (`HumanSignaturePort`, `dispose_*`): `docs/aerospace/README.md`. _deps: —_
 - `[TODO]` **AERO-5** Engineering depth: 05 FEA-REST, 02 SRF, 06 CMP: `docs/aerospace/README.md`. _deps: —_
 - `[TODO]` **FEA-REST** Modal/buckling/shell/margins rest, BDF/OP2, face map, UI: `docs/aerospace/05-fea-cae-handoff/` §10. _deps: —_
@@ -46,6 +48,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - Plant packs `docs/plant/` (10 packs, specs only): first fix `pipeSizes.ts` ASME/EN mix (README D1), settle D2, then PSC + EQP M1.
 
 ## Engineering-audit follow-ups (detail in each line; lists kept here because they have no spec of their own)
+
 - `[TODO]` **ENG-4** Blocked validation plans in `tests/unit/contract/blockedPlanCommands.json`; next: pack 09 frequency response, 11 creep, 19 impact, 17 topology, aero 06/03/09/02.
 - `[TODO]` **ENG-5** Fatigue/fracture: FE hot-spot stress (`FAT_RESULTS_MISSING`), `fe_seam` cracks + interaction integral, `compute_k_from_fe`, retardation, surface cracks.
 - `[TODO]` **ENG-6** Dynamics: body inertia override, spring end offsets, propeller thrust energy on translating bodies, Coulomb stop time.
@@ -53,6 +56,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - `[TODO]` **ENG-10** Density unit convention (`create_material` vs `add_rigid_body`); "unverified" noise on user densities; modal search.
 
 ## Product backlog (no spec yet — write one before starting)
+
 - `[TODO]` **S3** `hatch_region` + `region` entity. _Lane 1+3_
 - `[TODO]` **X3** 2D export DXF + SVG from 2D entities. _Lane 1/3_
 - `[TODO]` **X4** Import SVG path → 2D profile, STL → `mesh`. _deps: X3_
@@ -66,6 +70,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - Lane 5, continuous: hold the coverage gate; `cad-reviewer` on every `[REVIEW]` diff.
 
 ## Open decisions
+
 - CFD-D3 one artifact store for FEA + CFD.
 - Lock policy is UI-only (core edit commands ignore locked layers) — decide for the CLI.
 - 2D rotation semantics, AutoCAD mouse mapping — owner to decide.
