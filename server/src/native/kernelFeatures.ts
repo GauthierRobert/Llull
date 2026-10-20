@@ -15,6 +15,7 @@ import { polygonCentroid } from '@lib/polygon';
 import { add3, scale3 } from '@lib/vec3';
 import { orientedChain } from './kernelLeaves';
 import type { StepAssemblyPart, StepOccurrence } from '@core/geometry/kernel';
+import type { ExchangeWriteRequest } from '@core/geometry/kernelExchange';
 import { takesShapeFirst, type FeatureLowering, type FeatureLowerings } from './kernelProtocol';
 
 type FeatureRecipe = Extract<ShapeRecipe, { op: 'feature' }>;
@@ -105,6 +106,8 @@ function requestRecipes(op: string, args: readonly unknown[]): ShapeRecipe[] {
   if (op === 'distance') return [...ofHandle(args[0]), ...ofHandle(args[1])];
   if (op === 'exportStep' && Array.isArray(args[0])) return args[0].flatMap(ofHandle);
   if (op === 'exportStepAssembly' && Array.isArray(args[0])) return assemblyHandles(args[0] as StepOccurrence<unknown>[]).flatMap(ofHandle);
+  if (op === 'writeExchange' && typeof args[0] === 'object' && args[0] !== null)
+    return (args[0] as ExchangeWriteRequest).products.flatMap((product) => product.solids.flatMap((solid) => ofHandle(solid.shape)));
   return [];
 }
 

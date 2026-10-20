@@ -3,17 +3,18 @@
  * straight from the kernel shapes.
  */
 
-import { type Entity, type ShapeRecipe, type Vec3, is3D } from '../../model/types';
+import { type CadDocument, type Entity, type Vec3, is3D } from '../../model/types';
 import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/kernel';
 import type { CommandResult } from '../types';
 import { confirmExportControlled, defineCommand, z } from '../schema';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
-import { operandRecipe } from './kernelShape';
+import { exactOrMesh, operandRecipe } from './kernelShape';
 import { labelStep } from './stepLabels';
 import { labelStepAssembly } from './stepAssemblyLabels';
 import { planStepAssembly } from './stepAssembly';
-import { type StepEntry, stepLabels, stepTargets } from './stepTargets';
+import { exportedIds, stepLabels, stepTargets } from './stepTargets';
+import { buildStepExport } from '../exchange/exportStepAp242';
 import { exportRefusal, noop, report } from '../noop';
 import { fixedNumber } from '../../lib/compactNumber';
 
@@ -72,30 +73,36 @@ export const inspectTopology = defineCommand({
   },
 });
 
-const isZero = (v: Vec3): boolean => v.every((component) => component === 0);
-
-/**
- * The shape to write for `entity`: a ply solid's exact slab (placed like the entity) when the kernel builds it, else its operand recipe (the triangles).
- * `faceted` is true for a solid that carries a slab the kernel could not use.
- */
-function exactOrMesh(kernel: GeometryKernel, entity: Entity): { shape: ShapeHandle | null; faceted: boolean } {
-  if (entity.kind === 'mesh' && entity.stepSlab !== undefined && entity.brep === undefined) {
-    const slab = entity.stepSlab;
-    const recipe: ShapeRecipe =
-      isZero(entity.position) && isZero(entity.rotation)
-        ? slab
-        : { op: 'place', source: slab, position: entity.position, rotation: entity.rotation };
-    const exact = kernel.supports('faceSlab') ? kernel.evaluate(recipe) : null;
-    if (exact !== null) return { shape: exact, faceted: false };
-    return { shape: kernel.evaluate(operandRecipe(kernel, entity)), faceted: true };
-  }
-  return { shape: kernel.evaluate(operandRecipe(kernel, entity)), faceted: false };
+/** AP214 export through the kernel's XDE writer (aerospace 04 TR-XCH-19): the data of the legacy path, with names, colours and structure written by the writer. */
+function exportThroughXde(doc: CadDocument, kernel: GeometryKernel, entityIds: readonly string[] | undefined): CommandResult {
+  const outcome = buildStepExport(doc, kernel, entityIds, {
+    schema: 'ap214',
+    validation: false,
+    structured: true,
+    fileName: 'llull.stp',
+    timestamp: '1970-01-01T00:00:00',
+  });
+  if (!outcome.ok) return noop(doc, `export_step_exact: ${outcome.message}; nothing exported.`);
+  const { data } = outcome;
+  const exact: ExportStepExactData = {
+    format: 'step',
+    step: data.step,
+    solidCount: data.solidCount,
+    sheetCount: data.sheetCount,
+    entityIds: data.entityIds,
+    skipped: data.skipped,
+    faceted: data.faceted,
+    ...(data.assembly === undefined ? {} : { assembly: data.assembly }),
+  };
+  const sheets = data.sheetCount > 0 ? ` and ${data.sheetCount} surface sheet(s)` : '';
+  const structure = data.assembly === undefined ? '' : `, ${data.assembly.products} product(s), ${data.assembly.occurrences} occurrence(s)`;
+  const left = data.skipped.length > 0 ? `; skipped ${data.skipped.join(', ')}.` : '.';
+  return report(
+    doc,
+    `export_step_exact: ${data.solidCount} exact solid(s)${sheets} from ${data.entityIds.join(', ')} → STEP AP214${data.assembly === undefined ? '' : ' assembly'}${structure}, ${data.step.length} bytes${data.faceted.length > 0 ? `; ${data.faceted.length} ply solid(s) written from triangles (exact slab refused): ${data.faceted.join(', ')}` : ''}${left}`,
+    exact,
+  );
 }
-
-/** The user entity ids behind the exported entries (a loose solid, or the instance whose solids were expanded), each once. */
-const exportedIds = (entries: readonly StepEntry[]): string[] => [
-  ...new Set(entries.map((entry) => (entry.kind === 'solid' ? entry.entity.id : entry.instance.id))),
-];
 
 export interface ExportStepExactData {
   readonly format: 'step';
@@ -151,6 +158,7 @@ export const exportStepExact = defineCommand({
     if (refused !== null) return refused;
     const kernel = (ctx ?? currentContext()).kernel;
     if (!kernel) return noop(doc, kernelUnavailable('export_step_exact'));
+    if (kernel.writeExchange !== undefined) return exportThroughXde(doc, kernel, entityIds);
     const { solids, sheets, skipped, entries } = stepTargets(doc, entityIds);
     if (solids.length === 0 && sheets.length === 0) return noop(doc, 'export_step_exact: no 3D solids to export.');
     if (kernel.exportStepAssembly !== undefined && entries.some((entry) => entry.kind === 'instance')) {
@@ -169,7 +177,7 @@ export const exportStepExact = defineCommand({
         sheetCount: 0,
         entityIds: exported,
         skipped: [...skipped, ...left],
-        faceted: [],
+        faceted: plan.faceted,
         assembly,
       };
       return report(

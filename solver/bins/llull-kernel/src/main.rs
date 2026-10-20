@@ -5,6 +5,7 @@
 //! answered, then the process exits (`llull-kernel < requests.ndjson` works). With `--exit-on-eof` (what the server passes) it exits
 //! at once: the host is gone, and a long or hung OCCT call must not outlive it.
 
+mod exchange;
 mod queries;
 mod session;
 

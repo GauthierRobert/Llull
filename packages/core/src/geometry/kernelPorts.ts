@@ -13,7 +13,7 @@ export interface KernelInfo {
   readonly occtVersion?: string;
   /** Binary identity, e.g. "llull-kernel@0.1.0". */
   readonly build?: string;
-  /** Optional capabilities present: 'topology', 'analyze', 'distance', 'massProperties', 'importShapes', 'faceQuery', 'brepBlobs', 'exportStep'. */
+  /** Optional capabilities present: 'topology', 'analyze', 'distance', 'massProperties', 'importShapes', 'faceQuery', 'brepBlobs', 'exportStep', 'writeExchange', 'importExchange', 'igesExchange'. */
   readonly capabilities: readonly string[];
   /** How the host runs the kernel: a worker thread, the host process itself, or a separate OS process (native sidecar, RS-1). */
   readonly isolation?: 'worker' | 'in-process' | 'process';

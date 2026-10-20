@@ -14,7 +14,7 @@ const kernels = liveKernels();
 /** x translation of the occurrence named `name`: NAUO -> placement shape -> context-dependent representation -> item transformation. */
 function placementX(step: string, name: string): number {
   const flat = step.replace(/\n/g, ' ');
-  const nauo = new RegExp(`#(\\d+) = NEXT_ASSEMBLY_USAGE_OCCURRENCE\\('${name}'`).exec(flat)?.[1];
+  const nauo = new RegExp(`#(\\d+) = NEXT_ASSEMBLY_USAGE_OCCURRENCE\\('\\d+','${name}'`).exec(flat)?.[1];
   const shape = new RegExp(`#(\\d+) = PRODUCT_DEFINITION_SHAPE\\('Placement','Placement of an item',#${nauo}\\s*\\)`).exec(flat)?.[1];
   const relation = new RegExp(`CONTEXT_DEPENDENT_SHAPE_REPRESENTATION\\(#(\\d+),#${shape}\\)`).exec(flat)?.[1];
   const transformation = new RegExp(`#${relation} = [^;]*?WITH_TRANSFORMATION\\(#(\\d+)\\)`).exec(flat)?.[1];
@@ -40,9 +40,9 @@ describeNative('occt export_step_exact labels', () => {
     expect(step).toContain("PRODUCT('Bearing 1','Bearing 1','Pump'");
     expect(step).toContain(`PRODUCT('${cylinder}','${cylinder}','Pump'`);
     expect(step).not.toContain('Open CASCADE STEP translator');
-    expect(step).toContain("MANIFOLD_SOLID_BREP('Bearing 1'");
-    expect(step).toContain("COLOUR_RGB('',1.000,0.000,0.000)");
-    expect(step).toContain("COLOUR_RGB('',0.000,0.000,1.000)");
+    // the XDE writer names pure red / blue as predefined STEP colours (any other colour is a COLOUR_RGB)
+    expect(step).toContain("DRAUGHTING_PRE_DEFINED_COLOUR('red')");
+    expect(step).toContain("DRAUGHTING_PRE_DEFINED_COLOUR('blue')");
     expect(step.match(/STYLED_ITEM\('color'/g)).toHaveLength(2);
     expect(step.indexOf('MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION')).toBeLessThan(step.lastIndexOf('ENDSEC;'));
   }, 120_000);
@@ -62,7 +62,7 @@ describeNative('occt export_step_exact labels', () => {
     expect(data.skipped).toEqual([]);
     // one shared 'Bolt' product, placed twice; the second occurrence sits 50 mm along x
     expect(data.step.match(/PRODUCT\('Bolt','Bolt'/g)).toHaveLength(1);
-    expect(data.step.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE\('Bolt [12]'/g)).toHaveLength(2);
+    expect(data.step.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE\('\d+','Bolt [12]'/g)).toHaveLength(2);
     expect(data.step).toMatch(/CARTESIAN_POINT\('',\(50\.,0\.,0\.\)\)/);
   }, 120_000);
 
@@ -90,19 +90,19 @@ describeNative('occt export_step_exact labels', () => {
     expect(data.solidCount).toBe(11);
     expect(result.summary).toContain('assembly, 2 product(s), 6 occurrence(s)');
     const step = data.step;
-    expect(step.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE\(/g)).toHaveLength(8); // 6 placed + the 2 solids inside 'Tie rod'
-    for (const name of ['Tie rod 1', 'Tie rod 2', 'Tie rod 3', 'Tie rod 4', 'Tie rod 5', 'Base plate', 'Head', 'Shank'])
-      expect(step).toContain(`NEXT_ASSEMBLY_USAGE_OCCURRENCE('${name}'`);
+    // the 6 placed uses; the two solids of 'Tie rod' are solids of one product (named sub-shapes), not occurrences
+    expect(step.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE\(/g)).toHaveLength(6);
+    for (const name of ['Tie rod 1', 'Tie rod 2', 'Tie rod 3', 'Tie rod 4', 'Tie rod 5', 'Base plate'])
+      expect(step).toMatch(new RegExp(`NEXT_ASSEMBLY_USAGE_OCCURRENCE\\('\\d+','${name}'`));
     // each occurrence carries its own placement, in input order
     expect([2, 3, 4, 5].map((k) => placementX(step, `Tie rod ${k}`))).toEqual([0, 40, 80, 120]);
-    // root + 'Tie rod' written once (5 uses) + its 2 solids + 'Base plate'
-    expect(step.match(/PRODUCT\('/g)).toHaveLength(5);
+    // root + 'Tie rod' written once (5 uses) + 'Base plate'
+    expect(step.match(/PRODUCT\('/g)).toHaveLength(3);
     expect(step).toContain("PRODUCT('Tie rod','Tie rod'");
     expect(step).toContain("PRODUCT('Assembly','Assembly'");
-    expect(step).toContain("PRODUCT('Head','Head'");
     expect(step).toContain("MANIFOLD_SOLID_BREP('Shank'");
     expect(step.match(/MANIFOLD_SOLID_BREP\(/g)).toHaveLength(3);
-    expect(step).toContain("COLOUR_RGB('',1.000,0.000,0.000)");
+    expect(step).toContain("DRAUGHTING_PRE_DEFINED_COLOUR('red')");
     expect(step).not.toContain('Open CASCADE STEP translator');
 
     const imported = execute(createEmptyDocument(), 'import_step_exact', { text: step }, ctx);
@@ -129,16 +129,17 @@ describeNative('occt export_step_exact labels', () => {
     const exported = execute(doc, 'export_step_exact', {}, ctx);
     const step = (exported.data as { step: string }).step;
     expect(exported.data).toMatchObject({ assembly: { products: 2, occurrences: 3 } });
-    // 3 uses of Pair + 2 uses of Bolt inside Pair + the 2 solids inside Bolt
-    expect(step.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE\(/g)).toHaveLength(7);
+    // 3 uses of Pair + 2 uses of Bolt inside Pair (the 2 solids of Bolt are solids of its product)
+    expect(step.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE\(/g)).toHaveLength(5);
     expect(step.match(/PRODUCT\('Bolt'/g)).toHaveLength(1);
     expect(step.match(/PRODUCT\('Pair'/g)).toHaveLength(1);
     expect(step.match(/MANIFOLD_SOLID_BREP\(/g)).toHaveLength(2);
     for (const name of ['Pair 1', 'Pair 2', 'Pair 3', 'Bolt 1', 'Bolt 2'])
-      expect(step).toContain(`NEXT_ASSEMBLY_USAGE_OCCURRENCE('${name}'`);
+      expect(step).toMatch(new RegExp(`NEXT_ASSEMBLY_USAGE_OCCURRENCE\\('\\d+','${name}'`));
 
     const imported = execute(createEmptyDocument(), 'import_step_exact', { text: step }, ctx);
-    expect(imported.affected).toHaveLength(12);
+    // the file's root assembly comes back as one component with one top-level instance holding the 12 solids
+    expect(imported.affected).toHaveLength(1);
     const volume = (document: typeof doc, id: string): number => {
       const measured = execute(document, 'mass_properties', { entityId: id }, ctx).data as { volume: number };
       return measured.volume;

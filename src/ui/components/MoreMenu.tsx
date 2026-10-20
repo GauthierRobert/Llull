@@ -10,6 +10,7 @@ import { ThemeToggle } from '@ui/components/ThemeToggle';
 import { ProjectIO } from '@ui/components/ProjectIO';
 import { ModelExport } from '@ui/components/ModelExport';
 import { ImageUnderlayImport } from '@ui/components/ImageUnderlayImport';
+import { ExchangeImport } from '@ui/components/ExchangeImport';
 
 function InspectorToggle(): React.ReactElement {
   const inspectorOpen = useLayoutStore((s) => s.inspectorOpen);
@@ -45,6 +46,7 @@ export function MoreMenu(): React.ReactElement {
         <span className="more-menu__title">File</span>
         <ProjectIO />
         <ImageUnderlayImport />
+        <ExchangeImport />
         <span className="more-menu__title">Export</span>
         <ModelExport />
         <span className="more-menu__title">View</span>

@@ -17,6 +17,7 @@ import { entityBoundsInDoc } from '@core/geometry/bounds';
 import { AxisFields, CommitInput, PropRow } from './propertyFields';
 import { dimensionRows } from './entityDimensions';
 import { ElementInspector } from './building/ElementInspector';
+import { ExchangeProvenanceSection } from './exchange/ExchangeReport';
 import { buildingElementOf } from '@aec/index';
 
 function axisDelta(current: readonly number[], axisIndex: number, target: number): number[] {
@@ -85,6 +86,7 @@ function EntityHeadline({ entity }: { entity: Entity }): React.ReactElement | nu
 
 function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
+  const provenance = useStore((s) => s.document.exchange?.provenance[entity.id]);
   const geometryRows = dimensionRows(entity);
   return (
     <section className="props-detail" aria-label="Selection">
@@ -150,6 +152,12 @@ function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
           </span>
         </PropRow>
       </PanelSection>
+
+      {provenance !== undefined && (
+        <PanelSection title="Exchange">
+          <ExchangeProvenanceSection provenance={provenance} />
+        </PanelSection>
+      )}
 
       <SelectionActions />
     </section>

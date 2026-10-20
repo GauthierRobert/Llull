@@ -378,7 +378,9 @@ export function realismData(input: RealismInput): RealismData | null {
     warnings: [
       ...plausibility.map((item) => `${item.code}: ${item.message}`),
       ...(losses?.fmepClamped === true
-        ? [`FPR_UNREALISTIC: the ${losses.model} friction constants give a negative FMEP at ${losses.rpm.toFixed(0)} rpm; it was clamped to 0 (check the constants)`]
+        ? [
+            `FPR_UNREALISTIC: the ${losses.model} friction constants give a negative FMEP at ${losses.rpm.toFixed(0)} rpm; it was clamped to 0 (check the constants)`,
+          ]
         : []),
     ],
   };

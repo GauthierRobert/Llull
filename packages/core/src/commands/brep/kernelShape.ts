@@ -3,7 +3,7 @@
  * evaluation, and the `mesh` result entity that carries the recipe.
  */
 
-import type { CadDocument, Entity } from '../../model/types';
+import type { CadDocument, Entity, Vec3 } from '../../model/types';
 import type { GeometryKernel, ShapeHandle } from '../../geometry/kernel';
 import type { MeshData } from '../../model/types';
 import { meshRecipeOf, recipeOf } from '../../geometry/shapeRecipe';
@@ -43,6 +43,26 @@ export function operandRecipe(kernel: GeometryKernel, entity: Entity): ShapeReci
   const fallback = meshRecipeOf(entity);
   if (fallback !== null && unsupportedOp(kernel, recipeOf(entity)) !== null) return fallback;
   return recipeOf(entity);
+}
+
+const isZero = (v: Vec3): boolean => v.every((component) => component === 0);
+
+/**
+ * The shape to write for `entity`: a ply solid's exact slab (placed like the entity) when the kernel builds it, else its operand recipe (the triangles).
+ * `faceted` is true for a solid that carries a slab the kernel could not use.
+ */
+export function exactOrMesh(kernel: GeometryKernel, entity: Entity): { shape: ShapeHandle | null; faceted: boolean } {
+  if (entity.kind === 'mesh' && entity.stepSlab !== undefined && entity.brep === undefined) {
+    const slab = entity.stepSlab;
+    const recipe: ShapeRecipe =
+      isZero(entity.position) && isZero(entity.rotation)
+        ? slab
+        : { op: 'place', source: slab, position: entity.position, rotation: entity.rotation };
+    const exact = kernel.supports('faceSlab') ? kernel.evaluate(recipe) : null;
+    if (exact !== null) return { shape: exact, faceted: false };
+    return { shape: kernel.evaluate(operandRecipe(kernel, entity)), faceted: true };
+  }
+  return { shape: kernel.evaluate(operandRecipe(kernel, entity)), faceted: false };
 }
 
 /** Summary suffix naming operands used as triangles because this kernel lacks an op of their tree. */

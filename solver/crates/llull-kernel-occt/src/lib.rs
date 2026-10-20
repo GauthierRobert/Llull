@@ -10,6 +10,7 @@ pub mod lru;
 pub mod mesh;
 pub mod queries;
 pub mod recipe;
+pub mod xde;
 
 pub use ffi::{AnalysisOut, MassOut, MeshOut};
 

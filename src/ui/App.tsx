@@ -9,6 +9,7 @@ import { Viewport2D } from '@ui/viewport/2d/Viewport2D';
 import { StatusBar } from '@ui/components/StatusBar';
 import { PropertiesPanel } from '@ui/panels/PropertiesPanel';
 import { MeasurementHUD } from '@ui/components/MeasurementHUD';
+import { ExchangeReportHUD } from '@ui/components/ExchangeReportHUD';
 import { EmptyState } from '@ui/components/EmptyState';
 import { TopBar } from '@ui/components/TopBar';
 import { Sidebar } from '@ui/components/Sidebar';
@@ -61,6 +62,7 @@ export function App(): React.ReactElement {
     >
       <main className="app-viewport" aria-label="Viewport">
         <MeasurementHUD />
+        <ExchangeReportHUD />
         <EmptyState />
         <RestoredBanner />
         {!sheetOpen && <ViewportErrorBoundary key={viewMode}>{viewMode === '3d' ? <Viewport3D /> : <Viewport2D />}</ViewportErrorBoundary>}

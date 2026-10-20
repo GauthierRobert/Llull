@@ -20,6 +20,7 @@ import { currentContext } from '../context';
 import {
   NOT_APPROVED,
   massDetail,
+  importedBodyStatus,
   massProvenance,
   methodReasons,
   precisionWarnings,
@@ -100,6 +101,8 @@ interface MassPropertiesData extends Partial<MassDetail> {
   frame?: 'document' | 'entity';
   provenance?: MassProvenance;
   reviewRequired?: ReviewRequired;
+  /** The body came from an imported file whose validation properties disagreed or could not be checked (aerospace 04 TR-XCH-24); its reasons are also in reviewRequired. */
+  importUnverified?: { readonly value: boolean; readonly reasons: readonly string[] };
   warnings?: MassWarning[];
   /** Implausible-density warning (probably a wrong density unit); absent when the density is plausible. */
   densityWarnings?: string[];
@@ -264,7 +267,8 @@ export const massProperties = defineCommand({
     'A plain material density or a param is always unverified (no basis or source); a density model is unverified when its basis is typical / ' +
     'supplier_unstated / unspecified (unverified is about the density only). ' +
     "reviewRequired.value is true for purpose weight-and-balance, any unverified density, a mesh-integrated figure ('method_mesh'), a mesh body " +
-    "without a B-rep ('faceted_body'), or a part outside the precision envelope; the summary " +
+    "without a B-rep ('faceted_body'), a body imported from STEP / IGES whose sender validation properties were red or not checkable " +
+    '(data.importUnverified = { value, reasons } with import_gvp_red / import_gvp_not_checkable / verify_skipped, also in reviewRequired.reasons), or a part outside the precision envelope; the summary ' +
     'then says the figure is computed by llull, not approved, and needs a qualified engineer. A composite part id (create_composite_part) is not an entity: ' +
     'it is delegated to laminate_mass (ply and core mass of the laminate; its data shape applies). Does not modify the document.',
   params: z.object({
@@ -353,7 +357,12 @@ export const massProperties = defineCommand({
     const method = resolved?.method ?? total.method;
     const unverifiedReasons = [...total.unverifiedReasons];
     const warnings = resolved === null ? [] : precisionWarnings(doc, e, resolved);
-    const review = reviewRequired(purpose, union(unverifiedReasons, resolved === null ? [] : methodReasons(resolved)), warnings);
+    const imported = importedBodyStatus(doc, e);
+    const review = reviewRequired(
+      purpose,
+      union(unverifiedReasons, [...(resolved === null ? [] : methodReasons(resolved)), ...(imported?.reasons ?? [])]),
+      warnings,
+    );
     const detail: MassDetail | null = resolved === null ? null : massDetail(doc, e, resolved, frame, about, weighted);
     const densitySource = sources.length === 1 ? (sources[0] ?? '') : sources.length === 0 ? 'none' : 'several (see densitySources)';
     const volumeData: MassPropertiesData = {
@@ -363,6 +372,7 @@ export const massProperties = defineCommand({
       ...(detail ?? {}),
       ...(resolved === null ? {} : { frame, provenance: massProvenance(e, resolved, context, densitySource) }),
       reviewRequired: review,
+      ...(imported === undefined ? {} : { importUnverified: imported }),
       ...(warnings.length > 0 ? { warnings } : {}),
     };
     const shown = volume.toFixed(doc.displayPrecision);

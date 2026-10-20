@@ -30,7 +30,12 @@ describeNative('occt export_step_exact nested oblique rotations', () => {
     const oracle: Vec3[] = [[5, 1, -2], inner, shift(inner, [0.4, -0.9, 0.2], [3, -1, 2])];
 
     const exported = execute(outer.document, 'export_step_exact', {}, ctx);
-    const imported = execute(createEmptyDocument(), 'import_step_exact', { text: (exported.data as { step: string }).step }, ctx);
+    const imported = execute(
+      createEmptyDocument(),
+      'import_step_exact',
+      { text: (exported.data as { step: string }).step, assembly: false },
+      ctx,
+    );
     expect(imported.affected).toHaveLength(3);
     oracle.forEach((expected, index) => {
       const viewport = centroidOf(outer.document, outer.document.order[index]!);

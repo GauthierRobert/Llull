@@ -9,9 +9,9 @@
   "command": "add_box",
   "params": {
    "size": [
-    20.0,
-    10.0,
-    5.0
+    20,
+    10,
+    5
    ]
   },
   "as": "b"
@@ -24,6 +24,15 @@
     "$b"
    ],
    "componentId": "comp-block"
+  },
+  "as": "stray"
+ },
+ {
+  "command": "delete_entities",
+  "params": {
+   "ids": [
+    "$stray"
+   ]
   }
  },
  {
@@ -31,9 +40,9 @@
   "params": {
    "componentId": "comp-block",
    "position": [
-    0.0,
-    0.0,
-    0.0
+    0,
+    0,
+    0
    ]
   },
   "as": "i1"
@@ -43,9 +52,9 @@
   "params": {
    "componentId": "comp-block",
    "position": [
-    100.0,
-    0.0,
-    0.0
+    100,
+    0,
+    0
    ]
   },
   "as": "i2"

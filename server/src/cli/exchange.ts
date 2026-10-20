@@ -35,6 +35,8 @@ export function exchangeTool(name: string): ToolDefinition | undefined {
 const FILE_PARAMS: Readonly<Record<string, { key: string; encoding: 'base64' | 'utf8' }>> = {
   import_step: { key: 'stepBase64', encoding: 'base64' },
   import_step_exact: { key: 'stepBase64', encoding: 'base64' },
+  import_iges: { key: 'igesBase64', encoding: 'base64' },
+  verify_exchange_file: { key: 'stepBase64', encoding: 'base64' },
   import_dwg: { key: 'dwgBase64', encoding: 'base64' },
   import_code: { key: 'code', encoding: 'utf8' },
   fea_import_field: { key: 'csv', encoding: 'utf8' },
@@ -42,7 +44,7 @@ const FILE_PARAMS: Readonly<Record<string, { key: string; encoding: 'base64' | '
   register_material_library: { key: 'libraryJson', encoding: 'utf8' },
 };
 
-/** Whether `file=<path>` fills a content parameter of `name` (the exchange tools and `import_step_exact`, a registry command). */
+/** Whether `file=<path>` fills a content parameter of `name` (the exchange tools and the registry commands that read a file: `import_step_exact`, `import_iges`, `verify_exchange_file`). */
 export function takesFileParam(name: string): boolean {
   return FILE_PARAMS[name] !== undefined;
 }

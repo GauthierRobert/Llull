@@ -143,6 +143,19 @@ export const methodReasons = (resolved: ResolvedMass): string[] => [
   ...(resolved.facetedBody ? ['faceted_body'] : []),
 ];
 
+/**
+ * Import provenance of an entity (an instance counts through its component): the unverified reasons recorded by import_step_exact / import_iges (aerospace 04
+ * TR-XCH-24), undefined for a body that was not imported.
+ */
+export function importedBodyStatus(
+  doc: Pick<CadDocument, 'exchange'>,
+  e: Entity,
+): { readonly value: boolean; readonly reasons: readonly string[] } | undefined {
+  const provenance = doc.exchange?.provenance;
+  const record = provenance?.[e.id] ?? (e.kind === 'instance' ? provenance?.[e.componentId] : undefined);
+  return record === undefined ? undefined : record.unverified;
+}
+
 export interface ReviewRequired {
   readonly value: boolean;
   readonly reasons: readonly string[];

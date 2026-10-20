@@ -16,6 +16,10 @@ export interface StepLabel {
   readonly description?: string;
   /** Hex color "#rrggbb" for the solid's surface style. */
   readonly color?: string;
+  /** Layer name (not the default layer); written as a presentation layer by the XDE writer. */
+  readonly layer?: string;
+  /** Material name and density in g/cm3; written as a material property by the XDE writer. */
+  readonly material?: { readonly name: string; readonly density: number };
 }
 
 const PRODUCT_PATTERN = /PRODUCT\('Open CASCADE STEP translator [\d.]+ (\d+)',\s*'Open CASCADE STEP translator [\d.]+ \1',''/g;

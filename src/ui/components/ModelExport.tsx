@@ -5,9 +5,9 @@ import React, { useState } from 'react';
 import { runQuery } from '@ui/services/localQuery';
 import { downloadBlob as download, downloadText } from '@ui/download';
 import { isCodeExportData, isStlExportData } from '@ui/resultData';
-import { fetchStepExport } from '@ui/services/serverFiles';
+import { type ExactExportCommand, fetchExactExport, fetchStepExport } from '@ui/services/serverFiles';
 
-type ExportFormat = 'stl' | 'cadquery' | 'build123d' | 'openscad' | 'freecad' | 'step';
+type ExportFormat = 'stl' | 'cadquery' | 'build123d' | 'openscad' | 'freecad' | 'step' | 'ap242' | 'iges';
 
 const FORMATS: ReadonlyArray<{ value: ExportFormat; label: string }> = [
   { value: 'stl', label: 'STL mesh (.stl)' },
@@ -16,13 +16,20 @@ const FORMATS: ReadonlyArray<{ value: ExportFormat; label: string }> = [
   { value: 'openscad', label: 'OpenSCAD (.scad)' },
   { value: 'freecad', label: 'FreeCAD macro' },
   { value: 'step', label: 'STEP (.step)' },
+  { value: 'ap242', label: 'STEP AP242 + validation properties (.stp)' },
+  { value: 'iges', label: 'IGES 5.3 (.igs)' },
 ];
+
+const EXACT: Readonly<Record<'ap242' | 'iges', ExactExportCommand>> = {
+  ap242: { command: 'export_step_ap242', field: 'step', fileName: 'model.stp' },
+  iges: { command: 'export_iges', field: 'iges', fileName: 'model.igs' },
+};
 
 export function ModelExport(): React.ReactElement {
   const [format, setFormat] = useState<ExportFormat>('stl');
   const [status, setStatus] = useState('');
 
-  const exportCode = (language: Exclude<ExportFormat, 'step' | 'stl'>): void => {
+  const exportCode = (language: Exclude<ExportFormat, 'step' | 'stl' | 'ap242' | 'iges'>): void => {
     const result = runQuery('export_code', { language, name: 'model' });
     if (!isCodeExportData(result.data)) {
       setStatus(result.summary);
@@ -49,8 +56,17 @@ export function ModelExport(): React.ReactElement {
     setStatus(result.message);
   };
 
+  const exportExact = async (kind: 'ap242' | 'iges'): Promise<void> => {
+    setStatus('Exporting…');
+    const spec = EXACT[kind];
+    const result = await fetchExactExport(spec, new Date().toISOString().slice(0, 19));
+    if (result.ok) download(result.blob, spec.fileName);
+    setStatus(result.message);
+  };
+
   const handleExport = (): void => {
-    if (format === 'step') void exportStep();
+    if (format === 'ap242' || format === 'iges') void exportExact(format);
+    else if (format === 'step') void exportStep();
     else if (format === 'stl') exportStl();
     else exportCode(format);
   };
@@ -62,7 +78,7 @@ export function ModelExport(): React.ReactElement {
         value={format}
         onChange={(e) => setFormat(e.target.value as ExportFormat)}
         aria-label="Export format"
-        title="Export the 3D model as script code or STEP. Building drawings, DXF and IFC are in the Building panel › Deliverables."
+        title="Export the 3D model as script code, STEP (AP242 with validation properties) or IGES. Building drawings, DXF and IFC are in the Building panel › Deliverables."
       >
         {FORMATS.map((f) => (
           <option key={f.value} value={f.value}>

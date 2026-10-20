@@ -1,7 +1,7 @@
 /** Domain model — the single source of truth for a CAD document; changed only by commands. */
 
 import type { Animation, AnimationChannel, AnimationMode } from './animation';
-import { isCurve3D, isSheet } from './curveKinds';
+import { type CurveKind, type SheetKind, isCurve3D, isSheet } from './curveKinds';
 import type { PropertyModel } from './propertyModel';
 import type { ConstitutiveSet, MaterialModel } from './materialModel';
 import type { Vec2, Vec3 } from './vectors';
@@ -25,7 +25,6 @@ import type { PlmModel } from './plm';
 import type { FeatureParams } from './features';
 import type { NurbsCurveData } from '../lib/nurbs/types';
 import type { NurbsSurfaceData, UvTrimLoop } from '../lib/nurbs/surfaceTypes';
-import type { CurveKind, SheetKind } from './curveKinds';
 
 /** Re-exported: every model consumer reads its vectors from here. */
 export type { Vec2, Vec3 };
@@ -674,6 +673,8 @@ export interface CadDocument {
   kernelSettings?: DocumentKernelSettings;
   /** Content-addressed binary payloads keyed by sha256 (healed B-rep, original STEP); absent until the first exact import. */
   blobs?: Record<string, DocumentBlob>;
+  /** Absent until the first exact import with provenance (`import_step_exact`, `import_iges`; aerospace 04 XCH). */
+  exchange?: import('./exchange').ExchangeModel;
   /** Absent until the first analysis command (`create_analysis`, plugin `cae`). */
   analysis?: AnalysisModel;
   /** Imported material libraries by id (08 MAT M3); absent until `import_material_library`. */

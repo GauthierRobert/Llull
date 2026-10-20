@@ -72,7 +72,7 @@ Flags
   --dry-run                   run against the local file but never write it
   --no-fit                    run: keep the camera as it is (by default a plan that never sets it is framed with fit_view)
   --save PATH                 write the file a command returns (export_stl, export_code,
-                              export_step_exact, sheets, export_nc_files → a directory);
+                              export_step_exact, export_step_ap242, export_iges, sheets, export_nc_files → a directory);
                               PATH.png rasterizes an svg (render_view)
   --json                      print one JSON object instead of text
   --quiet                     print nothing on success
