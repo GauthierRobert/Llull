@@ -14,6 +14,8 @@ export interface AssemblyStepLabels {
     readonly name: string;
     readonly description?: string;
     readonly solids: readonly StepLabel[];
+    /** The loose solid this part is (its own entity written alone): PMI of that entity attaches to the part. */
+    readonly entityId?: string;
     /** Uses of other parts inside this one (sub-assembly), in kernel input order. */
     readonly occurrences?: readonly NestedOccurrence[];
   }[];

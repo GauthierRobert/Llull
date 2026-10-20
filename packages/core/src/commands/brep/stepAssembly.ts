@@ -173,6 +173,7 @@ export function planStepAssembly(
         name: label?.name ?? entry.entity.id,
         ...(label?.description === undefined ? {} : { description: label.description }),
         solids: label ? [label] : [],
+        entityId: entry.entity.id,
       });
       labeled.push({ name: label?.name ?? entry.entity.id, part: parts.length - 1 });
       occurrences.push({ part: { shapes }, position: ORIGIN, rotation: ORIGIN });

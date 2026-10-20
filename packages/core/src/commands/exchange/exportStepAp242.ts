@@ -19,6 +19,7 @@ import { commandError, exportRefusal, noop, rejection, report } from '../noop';
 import { kernelStampOf } from '../persistence/kernelStamp';
 import { type ExpectedGvp, groupFileGvp, selfCheckGvp } from './fileGvp';
 import { type ExchangePlan, planExchange } from './stepPlan';
+import { type PmiWriteReport, attachPmi } from './pmiExport';
 import { MM_PER_UNIT } from '../../model/units';
 
 /** Timestamp of the header when the host passes none: a fixed instant, so the same document always yields the same bytes (TR-XCH-05). */
@@ -30,6 +31,8 @@ export interface StepExportOptions {
   readonly structured: boolean;
   readonly fileName: string;
   readonly timestamp: string;
+  /** Attach the document's semantic PMI to the products (AP242 only). */
+  readonly includePmi?: boolean;
 }
 
 export interface StepExportData {
@@ -60,6 +63,8 @@ export interface StepExportData {
     readonly timestamp: string;
   };
   readonly reviewRequired: { readonly value: boolean; readonly reasons: readonly string[] };
+  /** Present with includePmi: what happened to every PMI item of the document. */
+  readonly pmi?: PmiWriteReport;
 }
 
 interface NamedDefault<T> {
@@ -117,12 +122,19 @@ export function buildStepExport(
       `the kernel could not build ${plan.failed}`,
       'check the entity with inspect_topology; nothing was exported',
     );
+  if (options.includePmi === true && options.schema !== 'ap242')
+    return fail(
+      'XCH_PMI_SCHEMA',
+      `semantic PMI is written in AP242 only, not ${SCHEMA_NAMES[options.schema]}`,
+      "use schema 'ap242' or drop includePmi",
+    );
+  const pmiWrite = options.includePmi === true ? attachPmi(doc, kernel, plan) : null;
   const originatingSystem = 'llull';
   const request: ExchangeWriteRequest = {
     format: 'step',
     schema: options.schema,
     unit: doc.units,
-    products: plan.products,
+    products: pmiWrite === null ? plan.products : pmiWrite.products,
     occurrences: plan.occurrences,
     rootName: 'Assembly',
     ...(plan.rootValidation === undefined ? {} : { rootValidation: plan.rootValidation }),
@@ -196,7 +208,11 @@ export function buildStepExport(
       schemaName: summary.fileSchema,
       timestamp: options.timestamp,
     },
-    reviewRequired: { value: false, reasons: [] },
+    reviewRequired:
+      pmiWrite !== null && pmiWrite.report.reviewRequired.length > 0
+        ? { value: true, reasons: ['pmi_review_required'] }
+        : { value: false, reasons: [] },
+    ...(pmiWrite === null ? {} : { pmi: pmiWrite.report }),
   };
   return { ok: true, data, plan };
 }
@@ -295,6 +311,14 @@ export const exportStepAp242 = defineCommand({
       'Human confirmation to export imported bodies whose validation properties were red or not checkable: a signature object with a nonce produced in the ' +
         'desktop app. An agent cannot give it (XCH_HUMAN_GATE).',
     ),
+    includePmi: z
+      .boolean()
+      .optional()
+      .describe(
+        'Write the semantic PMI of the document (doc.pmi: datum features, feature control frames, size and location dimensions with tolerances) on the faces of the ' +
+          'solids, AP242 only (XCAF GD&T). Only a loose solid written as its own product carries PMI; every item not written is listed in data.pmi.skipped with its reason ' +
+          'and attributes the transport lacks (material condition, modifiers, composite frames) in data.pmi.lossy. Unreviewed items are written but data.reviewRequired says so. Default false.',
+      ),
     confirmExportControlled,
   }),
   run: (doc, params, ctx): CommandResult => {
@@ -308,13 +332,17 @@ export const exportStepAp242 = defineCommand({
       structured: params.assembly !== 'flat',
       fileName: params.fileName ?? 'llull.stp',
       timestamp: params.timestamp ?? EPOCH_TIMESTAMP,
+      includePmi: params.includePmi === true,
     });
     if (!outcome.ok) return refusal(doc, outcome, 'export_step_ap242');
     const blocked = unverifiedRefusal(doc, unverifiedIds(doc, outcome.data.entityIds), params.acceptUnverified, ctx, 'export_step_ap242');
     if (blocked !== null) return blocked;
     const { data } = outcome;
     const unverified = unverifiedIds(doc, data.entityIds);
-    const reviewRequired = unverified.length > 0 ? { value: true, reasons: ['unverified_bodies_accepted'] } : data.reviewRequired;
+    const reviewRequired =
+      unverified.length > 0
+        ? { value: true, reasons: ['unverified_bodies_accepted', ...data.reviewRequired.reasons] }
+        : data.reviewRequired;
     const checked =
       data.selfCheck === undefined
         ? 'validation properties not written'
@@ -323,6 +351,7 @@ export const exportStepAp242 = defineCommand({
       doc,
       `export_step_ap242: ${data.solidCount} exact solid(s)${data.sheetCount > 0 ? ` and ${data.sheetCount} sheet(s)` : ''} from ${data.entityIds.join(', ')} → STEP ${SCHEMA_NAMES[data.schema]}` +
         `${data.assembly === undefined ? '' : `, ${data.assembly.products} product(s), ${data.assembly.occurrences} occurrence(s)`}, unit ${data.unit}, ${data.step.length} bytes; ${checked}` +
+        `${data.pmi === undefined ? '' : `; PMI ${data.pmi.written.length}/${data.pmi.requested} item(s) written${data.pmi.skipped.length > 0 ? `, ${data.pmi.skipped.length} skipped (${data.pmi.skipped.map((entry) => `${entry.id}: ${entry.reason}`).join('; ')})` : ''}`}` +
         `${data.skipped.length > 0 ? `; skipped ${data.skipped.join(', ')}` : ''}.${reviewRequired.value ? ' Review required: unverified bodies accepted.' : ''}`,
       { ...data, reviewRequired },
     );

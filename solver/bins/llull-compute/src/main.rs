@@ -1,6 +1,7 @@
 //! `llull-compute <job> [<task>] <job-folder>`: dispatches one job (RS1 §2). `llull-compute --version` prints the version.
 //! Jobs: `post fatigue|map <folder>` (crate `llull-post`), `raster <folder>` (crate `llull-raster`), `topopt <folder>` (crate
-//! `llull-topopt`, PHY-17 SIMP; one `progress` event per iteration, contract in `llull_topopt::job`). An unknown job ends with an `error`
+//! `llull-topopt`, PHY-17 SIMP; one `progress` event per iteration, contract in `llull_topopt::job`), `stats stackup <folder>` (crate
+//! `llull-stats`, 03 GDT M5n Monte Carlo, Philox4x32-10). An unknown job ends with an `error`
 //! event and exit code 2. The raster job reports a `warning` event when it was asked for the GPU but drew with the CPU twin.
 
 use llull_protocol::{emit, Event, Output};
@@ -10,7 +11,7 @@ use std::path::Path;
 use std::process::ExitCode;
 
 const USAGE: &str =
-    "usage: llull-compute post <fatigue|map> <job-folder> | llull-compute raster <job-folder> | llull-compute topopt <job-folder>";
+    "usage: llull-compute post <fatigue|map> <job-folder> | llull-compute raster <job-folder> | llull-compute topopt <job-folder> | llull-compute stats stackup <job-folder>";
 
 fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Output>, (String, String)> {
     match (job, rest) {
@@ -32,7 +33,8 @@ fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Outpu
             Ok(outputs)
         }
         ("topopt", [folder, ..]) => llull_topopt::job::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
-        ("post" | "raster" | "topopt", _) => Err(("NATIVE_USAGE".to_string(), USAGE.to_string())),
+        ("stats", [task, folder, ..]) => llull_stats::run(task, Path::new(folder)).map_err(|error| (error.code.to_string(), error.message)),
+        ("post" | "raster" | "topopt" | "stats", _) => Err(("NATIVE_USAGE".to_string(), USAGE.to_string())),
         _ => Err(("NATIVE_JOB_UNKNOWN".to_string(), format!("unknown job '{job}'"))),
     }
 }

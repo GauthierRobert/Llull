@@ -258,6 +258,18 @@ export interface SavedView {
   readonly section?: { readonly direction: ViewDirection; readonly offset: number };
 }
 
+/** What the latest AP242 / `apply_pmi_set` import brought in (03 TR-GDT-13): counts, never silently dropped. */
+export interface PmiImportRecord {
+  /** File name or caller-given source label. */
+  readonly source: string;
+  /** Items created. */
+  readonly items: number;
+  /** Items kept with no resolved face (`faceIndices: []`, unverified). */
+  readonly unresolved: number;
+  /** Source items the model cannot represent (unknown characteristic or dimension type), not created. */
+  readonly unmapped: number;
+}
+
 /** Absent on the document until the first PMI command. */
 export interface PmiModel {
   readonly standard: PmiStandard;
@@ -269,4 +281,6 @@ export interface PmiModel {
   readonly savedViewOrder: string[];
   /** View-state: the saved view `activate_saved_view` last applied (the viewport shows only its PMI); carried across replay. */
   readonly activeSavedViewId?: string;
+  /** Totals of the latest import (`apply_pmi_set`, the PMI stage of `import_step_exact`). */
+  readonly import?: PmiImportRecord;
 }

@@ -61,7 +61,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'measure_distance measure_angle measure_area measure_perimeter measure_bounding_box mass_properties geometric_validation_properties',
   ),
   pmi: words(
-    'set_pmi_standard add_datum_feature add_datum_target add_size_dimension add_location_dimension add_geometric_tolerance add_surface_texture add_pmi_note update_pmi delete_pmi create_saved_view update_saved_view delete_saved_view activate_saved_view list_pmi check_pmi accept_pmi_review analyze_stackup fastener_tolerance',
+    'set_pmi_standard add_datum_feature add_datum_target add_size_dimension add_location_dimension add_geometric_tolerance add_surface_texture add_pmi_note update_pmi delete_pmi create_saved_view update_saved_view delete_saved_view activate_saved_view list_pmi check_pmi accept_pmi_review analyze_stackup fastener_tolerance apply_pmi_set',
   ),
   parametric: words(
     'replay_history set_step_suppressed edit_step_params reorder_step delete_step insert_step create_configuration activate_configuration add_constraint delete_constraint update_constraint solve_constraints save_recipe instantiate_recipe',

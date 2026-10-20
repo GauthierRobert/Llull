@@ -29,6 +29,9 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
                               [timeoutS=600 verify=true]  (--doc, --app, --server: runs where the document lives; $LLULL_COMPUTE)
   fea_map_field analysisId=ID native llull-compute: interpolate the thermal result onto the mechanical mesh
                               (fea_solve does it itself from $LLULL_NATIVE_MAP_MIN_NODES nodes)
+  stackup_monte_carlo contributors=[..] [expression=.. samples=1e7 seed=N lowerSpecLimit=.. upperSpecLimit=..]
+                              analyze_stackup with the Monte Carlo native (llull-compute stats, Philox4x32-10, up to 1e10 samples,
+                              bit-identical on any thread count); without llull-compute: NATIVE_TOOL_MISSING
   fea_render analysisId=ID [render_fea_results params] raster=auto|ts|cpu|gpu --save plot.png
                               the same plot with the pixel raster in llull-compute (cpu = bit-identical twin, gpu = picture)
   topology_solve studyId=ID   native llull-compute topology optimization of a study (create_topology_study), recorded with
