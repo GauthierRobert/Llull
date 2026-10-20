@@ -187,4 +187,35 @@ mod tests {
         let pipe = pipe_solid(&[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 3.0], &section).unwrap().unwrap();
         assert!((volume(&pipe) - std::f64::consts::PI * 0.75 * 3.0).abs() < 1e-6);
     }
+
+    /// A B-spline loft section is ONE multi-span edge; OCC's Gauss rule under-integrated such faces (square 6.963 instead of 8, circle 0.9 % high)
+    /// although the solid was exact (its fine tessellation gives 8 and 2 pi). Mass properties now integrate span by span.
+    #[test]
+    fn b_spline_sections_integrate_to_the_exact_volume() {
+        let square = |z: f64| -> Vec<f64> {
+            let corners = [[1.0, 1.0], [-1.0, 1.0], [-1.0, -1.0], [1.0, -1.0], [1.0, 1.0]];
+            let mut data = vec![1.0, 5.0, 5.0, 0.0, 0.0];
+            data.extend(corners.iter().flat_map(|corner| [corner[0], corner[1], z]));
+            data.extend([0.0, 1.0, 2.0, 3.0, 4.0, 2.0, 1.0, 1.0, 1.0, 2.0]);
+            data
+        };
+        let prism = skinned_solid_bsplines(&[square(0.0), square(2.0)], true).unwrap().unwrap();
+        let mass = crate::mass_properties(&prism).unwrap();
+        assert!((mass.volume - 8.0).abs() < 1e-9, "square loft volume {}", mass.volume);
+        assert!((mass.area - 24.0).abs() < 1e-9, "square loft area {}", mass.area);
+        let lumps = crate::analyze(&prism).unwrap().lumps;
+        assert!((lumps[0] - 8.0).abs() < 1e-9, "analyze lump volume {}", lumps[0]);
+        let circle = |z: f64| -> Vec<f64> {
+            let w = std::f64::consts::FRAC_1_SQRT_2;
+            let poles = [[1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [-1.0, 1.0], [-1.0, 0.0], [-1.0, -1.0], [0.0, -1.0], [1.0, -1.0], [1.0, 0.0]];
+            let mut data = vec![2.0, 9.0, 5.0, 1.0, 0.0];
+            data.extend(poles.iter().flat_map(|pole| [pole[0], pole[1], z]));
+            data.extend([1.0, w, 1.0, w, 1.0, w, 1.0, w, 1.0]);
+            data.extend([0.0, 1.0, 2.0, 3.0, 4.0, 3.0, 2.0, 2.0, 2.0, 3.0]);
+            data
+        };
+        let cylinder = skinned_solid_bsplines(&[circle(0.0), circle(2.0)], true).unwrap().unwrap();
+        let mass = crate::mass_properties(&cylinder).unwrap();
+        assert!((mass.volume - 2.0 * std::f64::consts::PI).abs() < 1e-7, "rational circle loft volume {}", mass.volume);
+    }
 }

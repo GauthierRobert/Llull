@@ -290,7 +290,8 @@ mod tests {
         };
         let exact = json!({ "kind": "loft", "native": { "bsplines": [bspline_square(0.0), bspline_square(2.0)], "chains": [square(0.0), square(2.0)], "ruled": true } });
         assert!((volume(evaluator.evaluate(&leaf(exact))) - 8.0).abs() < 1e-6, "B-spline sections");
-        let malformed = json!({ "kind": "loft", "native": { "bsplines": [[1.0, 5.0], [1.0]], "chains": [square(0.0), square(2.0)], "ruled": true } });
+        let malformed =
+            json!({ "kind": "loft", "native": { "bsplines": [[1.0, 5.0], [1.0]], "chains": [square(0.0), square(2.0)], "ruled": true } });
         assert!((volume(evaluator.evaluate(&leaf(malformed))) - 8.0).abs() < 1e-6, "fallback to the chains");
         let sweep = json!({ "kind": "sweep", "native": { "spine": [0, 0, 0, 0, 0, 0, 2], "chain": square(0.0) } });
         assert!((volume(evaluator.evaluate(&leaf(sweep))) - 8.0).abs() < 1e-6);
