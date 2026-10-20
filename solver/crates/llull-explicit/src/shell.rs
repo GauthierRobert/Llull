@@ -17,6 +17,7 @@
 
 use crate::material::{update, von_mises, PointState, Sym};
 use crate::model::Material;
+use crate::projection::Projection;
 
 /// Transverse shear factor κ (SHRF value suggested for isotropic materials, [E3] *SECTION_SHELL).
 pub const SHEAR_FACTOR: f64 = 5.0 / 6.0;
@@ -182,6 +183,7 @@ pub fn step(
     v: &[[f64; 3]; 4],
     w: &[[f64; 3]; 4],
     dt: f64,
+    normals: Option<&[[f64; 3]; 4]>,
 ) -> ShellStep {
     if state.failed() {
         // Eroded (every point reached Johnson-Cook damage 1): no forces, no moments, out of the step computation; the nodes keep their mass.
@@ -205,6 +207,15 @@ pub fn step(
     let (b1, b2, area) = gradients(&p);
     let vl: [[f64; 3]; 4] = std::array::from_fn(|k| local(&f, v[k]));
     let tl: [[f64; 3]; 4] = std::array::from_fn(|k| local(&f, w[k]));
+    // Warping stiffness (BWC = 1, full projection): project the nodal velocities before the rates (§11.6 Eq. 11.28).
+    let warp = normals.map(|normals| {
+        let centre: [f64; 3] = std::array::from_fn(|i| 0.25 * (0..4).map(|k| mid[k][i]).sum::<f64>());
+        Projection::new(&std::array::from_fn(|k| local(&f, sub(mid[k], centre))), &normals.map(|n| local(&f, n)))
+    });
+    let (vl, tl) = match &warp {
+        Some(warp) => warp.apply(&vl, &tl),
+        None => (vl, tl),
+    };
     let sum = |b: &[f64; 4], c: &dyn Fn(usize) -> f64| (0..4).map(|k| b[k] * c(k)).sum::<f64>();
     let n = 0.25;
     let membrane = [sum(&b1, &|k| vl[k][0]), sum(&b2, &|k| vl[k][1]), sum(&b2, &|k| vl[k][0]) + sum(&b1, &|k| vl[k][1])];
@@ -279,6 +290,9 @@ pub fn step(
         force_local[k][0] += tau[k] * q[3];
         force_local[k][1] += tau[k] * q[4];
     }
+    if let Some(warp) = &warp {
+        (force_local, moment_local) = warp.apply(&force_local, &moment_local);
+    }
     let forces = std::array::from_fn(|k| global(&f, force_local[k]));
     let moments = std::array::from_fn(|k| global(&f, moment_local[k]));
     // Time step (Eqs. 25.13-25.15) on the end-of-step geometry.
@@ -329,7 +343,7 @@ mod tests {
         let dt = 1e-6;
         let x1 = std::array::from_fn(|k| [x0[k][0] + dt * v[k][0], x0[k][1], 0.0]);
         let state = ShellState::new(2, 293.15);
-        let result = step(&material, 0.1, &state, &x0, &x1, &v, &[[0.0; 3]; 4], dt);
+        let result = step(&material, 0.1, &state, &x0, &x1, &v, &[[0.0; 3]; 4], dt, None);
         let s = result.state.points[0].stress;
         let modulus = 200_000.0 / (1.0 - 0.09);
         assert!((s[0] / (modulus * dt) - 1.0).abs() < 1e-6, "σxx {}", s[0]);

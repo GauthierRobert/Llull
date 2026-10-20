@@ -78,6 +78,7 @@ pub fn model(coordinates: Vec<f64>, hex8: Vec<u32>, tet4: Vec<u32>, material: Ma
         shell_points: 2,
         fixed_rotation: vec![],
         initial_temperature: None,
+        shell_warping: true,
     }
 }
 

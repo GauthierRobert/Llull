@@ -222,6 +222,7 @@ struct JobSpec {
     shell4: Option<String>,
     shell_thickness: Option<String>,
     shell_points: Option<usize>,
+    shell_warping: Option<bool>,
     initial_temperature: Option<f64>,
     fixed_rotation: Option<String>,
     #[serde(default)]
@@ -392,6 +393,7 @@ pub fn load(folder: &Path) -> Result<(Model, bool), JobError> {
             None => Vec::new(),
         },
         shell_points: spec.shell_points.unwrap_or(2),
+        shell_warping: spec.shell_warping.unwrap_or(true),
         initial_temperature: spec.initial_temperature,
         fixed_rotation: match &spec.fixed_rotation {
             Some(name) => read_bytes(folder, name)?.into_iter().map(|byte| byte != 0).collect(),

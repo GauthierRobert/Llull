@@ -91,7 +91,7 @@ fn johnson_cook_membrane_returns_to_the_flow_stress_under_plane_stress() {
     let mut x = x0;
     for _ in 0..300 {
         let x1: [[f64; 3]; 4] = std::array::from_fn(|k| [x[k][0] + dt * v[k][0], x[k][1] + dt * v[k][1], 0.0]);
-        let result = step(&material, 0.1, &state, &x, &x1, &v, &[[0.0; 3]; 4], dt);
+        let result = step(&material, 0.1, &state, &x, &x1, &v, &[[0.0; 3]; 4], dt, None);
         state = result.state;
         x = x1;
     }

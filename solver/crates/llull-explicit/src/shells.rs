@@ -68,9 +68,35 @@ impl Shells {
         (0..self.corners.len())
             .map(|s| {
                 let c = corners_of(&self.corners[s], x);
-                step(&model.materials[self.material[s]], self.thickness[s], &self.states[s], &c, &c, &zero, &zero, 1e-30).dt
+                step(&model.materials[self.material[s]], self.thickness[s], &self.states[s], &c, &c, &zero, &zero, 1e-30, None).dt
             })
             .fold(f64::INFINITY, f64::min)
+    }
+
+    /// Unit nodal normals of the mid-step shell surface: the sum of the adjacent shells' diagonal cross products (area weighted).
+    fn nodal_normals(&self, x0: &[f64], x1: &[f64]) -> Vec<[f64; 3]> {
+        let mut sum = vec![[0.0; 3]; x0.len() / 3];
+        for corners in &self.corners {
+            let p = corners.map(|n| std::array::from_fn::<f64, 3, _>(|i| 0.5 * (x0[3 * n + i] + x1[3 * n + i])));
+            let d1: [f64; 3] = std::array::from_fn(|i| p[2][i] - p[0][i]);
+            let d2: [f64; 3] = std::array::from_fn(|i| p[3][i] - p[1][i]);
+            let n = [d1[1] * d2[2] - d1[2] * d2[1], d1[2] * d2[0] - d1[0] * d2[2], d1[0] * d2[1] - d1[1] * d2[0]];
+            for &node in corners {
+                for i in 0..3 {
+                    sum[node][i] += n[i];
+                }
+            }
+        }
+        sum.into_iter()
+            .map(|n| {
+                let length = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
+                if length > 0.0 {
+                    n.map(|c| c / length)
+                } else {
+                    n
+                }
+            })
+            .collect()
     }
 
     /// Updates the angular velocities to n+½ from the moments of the last cycle (central difference, lumped scalar inertia).
@@ -94,12 +120,23 @@ impl Shells {
     /// One step of every shell from `x0` to `x1` with translational velocities `v` (n+½); stores the new moments.
     pub fn cycle(&mut self, model: &Model, x0: &[f64], x1: &[f64], v: &[f64], dt: f64) -> ShellCycle {
         let omega = &self.omega;
+        let normals = model.shell_warping.then(|| self.nodal_normals(x0, x1));
         let steps: Vec<_> = (0..self.corners.len())
             .into_par_iter()
             .map(|s| {
                 let corners = &self.corners[s];
                 let at = |values: &[f64]| corners_of(corners, values);
-                step(&model.materials[self.material[s]], self.thickness[s], &self.states[s], &at(x0), &at(x1), &at(v), &at(omega), dt)
+                step(
+                    &model.materials[self.material[s]],
+                    self.thickness[s],
+                    &self.states[s],
+                    &at(x0),
+                    &at(x1),
+                    &at(v),
+                    &at(omega),
+                    dt,
+                    normals.as_ref().map(|normals| corners.map(|node| normals[node])).as_ref(),
+                )
             })
             .collect();
         let mut forces = vec![0.0; x0.len()];

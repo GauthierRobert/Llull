@@ -15,6 +15,7 @@ pub mod hex8;
 pub mod job;
 pub mod material;
 pub mod model;
+pub mod projection;
 pub mod shell;
 pub mod shells;
 pub mod solver;

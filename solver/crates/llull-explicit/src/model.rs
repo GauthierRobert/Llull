@@ -177,6 +177,8 @@ pub struct Model {
     pub shell_thickness: Vec<f64>,
     /// Gauss points through the shell thickness (default 2).
     pub shell_points: usize,
+    /// Belytschko–Tsay warping stiffness (Belytschko–Leviathan full projection, §11.6); off: the plain flat-element formulation.
+    pub shell_warping: bool,
     /// Fixed rotations (3 per node, angular velocity held at 0); empty = none.
     pub fixed_rotation: Vec<bool>,
     /// Initial temperature, K (None: each Johnson–Cook material starts at its transition temperature, others at 293.15 K).
