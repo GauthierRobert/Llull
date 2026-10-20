@@ -68,7 +68,7 @@ export function bucklingSteps(ctx: DeckContext): DeckSections {
   if (preload !== undefined) {
     const preloaded = mechanicalStepLines(ctx, preload);
     if (isDeckRefusal(preloaded)) return preloaded;
-    lines.push(`** buckling preload (not scaled): load case ${commentText(preload)}`, '*STEP', '*STATIC');
+    lines.push(`** buckling preload (ccx scales it with the reference): load case ${commentText(preload)}`, '*STEP', '*STATIC');
     lines.push(...preloaded.text.split('\n').filter((line) => line !== ''), '*END STEP');
   }
   const mechanical =
