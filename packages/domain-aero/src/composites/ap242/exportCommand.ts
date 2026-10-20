@@ -9,12 +9,15 @@ import type { CadDocument, Vec3 } from '@core/model/types';
 import { sig } from '../../shared/results';
 import { refuseCmp } from '../codes';
 import { piecesOf } from '../geometry2d';
+import { normalizeAngle } from '../notation';
+import { orientationInRosette } from '../plyFrame';
 import { fromFlat } from '../surface';
 import { compositesOf, findPart, pliesOf } from '../state';
 import type { CompositeRecord, PlyRecord, RosetteRecord } from './interchange';
 import { readComposite } from './reader';
 import { rebuildPart } from './rebuild';
-import { checkValidation, laminateValidation, plyArea } from './validation';
+import { checkComposite } from './standardCheck';
+import { laminateValidation, plyArea } from './validation';
 import { appendComposite } from './writer';
 
 const EPOCH_TIMESTAMP = '1970-01-01T00:00:00';
@@ -40,7 +43,7 @@ function solidsOfPly(doc: CadDocument, ply: Ply): string[] {
 
 /**
  * @affects nothing (read-only)
- * @invariant data.step is an AP242 file with the tool solid and the ply solids (exact where the kernel builds them) from export_step_ap242, followed by the composite records (ply table with sequence, order, material, orientation, rosette, boundary curves; rosettes; lamina materials; part frame; validation properties: number of plies, per-ply area, laminate thickness, mass); the written text is read back and its validation properties are compared with the model (data.selfCheck)
+ * @invariant data.step is an AP242 file with the tool solid and the ply solids (exact where the kernel builds them) from export_step_ap242, followed by the CAx-IF composite structure (ply_laminate_table, sequences, plies, material and orientation links, ply pieces, base surface, composite validation properties) and the llull records (part frame, chart polygons, lamina data, area / thickness / mass); the written text is read back and everything is compared with the model (data.selfCheck)
  * @failure unknown part -> CMP_REF_MISSING; no plies -> CMP_NO_PLIES; tool solid gone -> CMP_AP242_TOOL_MISSING; clashing names -> CMP_AP242_NAME_CLASH; kernel / writer refusal -> its XCH_* code; self-check red -> CMP_AP242_SELFCHECK_RED
  */
 export const exportCompositeAp242 = defineCommand({
@@ -49,11 +52,14 @@ export const exportCompositeAp242 = defineCommand({
   description:
     'Export a composite part to STEP AP242 (ISO 10303-21): the exact tool solid and, when create_ply_solids made them, the explicit per-ply solids ("<ply> piece <n>"; ' +
     'exact B-reps where the kernel builds the slab, triangles otherwise) go through export_step_ap242 (named products, flat, geometric validation properties); llull then ' +
-    'appends the implicit laminate definition as property records of the tool product: the ply table (name, sequence, stacking order, material, orientation in the part ' +
-    'frame, rosette, boundary polygons in the part frame and as curves on the tool surface), the rosettes, the lamina material records, the part frame (tool surface, ' +
-    'outline, laminate side, rules) and the composite validation properties (number of plies, area of each ply, summed cured thickness, mass when every material has a ' +
-    'density), and links each ply solid to its ply. The written text is read back and the validation properties are compared with the model (data.selfCheck). ' +
-    'Only the llull encoding is written (the CAx-IF composite entity names could not be checked offline); import_composite_ap242 reads it back. Returns data: { format, ' +
+    'appends the implicit laminate definition as the CAx-IF composite structure (Recommended Practices for Composite Materials v4.4): a ply_laminate_table with its ' +
+    'ply_laminate_sequence_definitions in stacking order, one product per ply (category "ply") with its material (make_from_usage_option to a stock-material product), ' +
+    'thickness, orientation (ply_orientation_angle against a reinforcement_orientation_basis rosette) and boundary curves, the ply solids as ply pieces under their ply, ' +
+    'the base surface (plane, cylinder, cone, sphere; not a NURBS sheet) and the composite validation properties named as the CAx-IF validation practice names them ' +
+    '(number of tables / sequences / plies / cores / materials / orientations / rosettes, total ply surface area, ordered orientation values, ordered sequences per ' +
+    'laminate table, curve length and ply-piece count per ply, boundary length per rosette, area per material). llull also writes its own lossless records (part frame, ' +
+    'chart polygons, lamina data, per-ply area, thickness, mass) as property records of the tool product. The written text is read back and everything is compared with ' +
+    'the model (data.selfCheck). import_composite_ap242 reads it back. Returns data: { format, ' +
     'step, schema, part, tool, plies[{ ply, name, order, area, thickness, solids }], validation, selfCheck, solids: { exact, faceted }, records, policy, reviewRequired }. ' +
     'Needs the OCC kernel. Does not modify the document.',
   params: z.object({
@@ -137,6 +143,8 @@ export const exportCompositeAp242 = defineCommand({
         order: ply.order,
         material: ply.materialName,
         orientation: ply.orientation,
+        rosetteOrientation:
+          Math.round(normalizeAngle(orientationInRosette(part, model.rosettes[ply.rosetteId], ply.orientation)) * 1e9) / 1e9 + 0,
         rosette: model.rosettes[ply.rosetteId]?.name ?? '',
         boundary: ply.boundary,
         ...(ply.drape === undefined ? {} : { drape: ply.drape }),
@@ -180,7 +188,7 @@ export const exportCompositeAp242 = defineCommand({
     if (!readBack.ok)
       return fail('CMP_AP242_SELFCHECK_RED', `the written composite records cannot be read back: ${readBack.reason}`, [part.id]);
     const rebuilt = rebuildPart(readBack.record);
-    const selfCheck = checkValidation(readBack.record, rebuilt.part, rebuilt.plies, readBack.embedded);
+    const selfCheck = checkComposite(readBack.record, rebuilt.part, rebuilt.plies, readBack.embedded, readBack.standard);
     if (selfCheck.band !== 'green')
       return fail('CMP_AP242_SELFCHECK_RED', `the validation properties read back from the file are ${selfCheck.band}`, [part.id]);
 
@@ -219,7 +227,7 @@ export const exportCompositeAp242 = defineCommand({
         records: appended.records,
         policy: {
           encoding:
-            'llull-composite-1: property records on the tool product; the CAx-IF composite entity set is not written (see 06 TECHNICAL_SPEC 13.6)',
+            'CAx-IF Recommended Practices for Composite Materials v4.4 structure plus the llull-composite-2 records (see 06 TECHNICAL_SPEC 13.6 for what is and is not written)',
           selfCheck: selfCheck.policy,
         },
         reviewRequired: { value: false, reasons: [] },

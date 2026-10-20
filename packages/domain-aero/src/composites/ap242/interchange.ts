@@ -31,6 +31,8 @@ export interface PlyRecord {
   readonly drape?: PlyDrape;
   readonly cuts?: readonly PlyCut[];
   readonly thickness: number;
+  /** Degrees measured from the ply's own rosette (what the CAx-IF ply_orientation_angle carries); absent in files of encoding 1. */
+  readonly rosetteOrientation?: number;
   /** Covered area on the tool surface, document units squared. */
   readonly area: number;
   /** Names of the explicit solids (products of the same file) of this ply. */

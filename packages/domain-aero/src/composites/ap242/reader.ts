@@ -9,7 +9,8 @@ import type { DocumentUnit, Vec2, Vec3 } from '@core/model/types';
 import { entityName, parseRecords, referencesOf, stringsOf } from '@lib/step21/records';
 import type { CompositeRecord, PlyRecord, RosetteRecord } from './interchange';
 import { unquoted } from './part21';
-import { ENCODING, PROPERTY } from './writer';
+import { ENCODING, LEGACY_ENCODING, PROPERTY } from './writer';
+import { readStandard, type StandardRead } from './standardReader';
 
 /** The validation properties the file carries; a missing one is absent (not checkable). */
 export interface EmbeddedValidation {
@@ -27,6 +28,8 @@ export type ReadOutcome =
       /** Plies whose explicit solids are linked from the solids' own products (names), as written on the solid side. */
       readonly linkedSolids: Readonly<Record<string, readonly string[]>>;
       readonly laminates: number;
+      /** The CAx-IF structure of the file (absent in files of the first encoding). */
+      readonly standard: StandardRead;
     }
   | { readonly ok: false; readonly code: 'no_composite' | 'malformed'; readonly reason: string };
 
@@ -163,7 +166,8 @@ export function readComposite(text: string): ReadOutcome {
   const laminate = laminates[0];
   if (laminate === undefined) return { ok: false, code: 'no_composite', reason: 'the file has no composite laminate record' };
   const { items } = laminate;
-  if (textOf(items, 'encoding') !== ENCODING)
+  const encoding = textOf(items, 'encoding');
+  if (encoding !== ENCODING && encoding !== LEGACY_ENCODING)
     return {
       ok: false,
       code: 'malformed',
@@ -223,7 +227,9 @@ export function readComposite(text: string): ReadOutcome {
   let plyCount: number | undefined;
   let thickness: number | undefined;
   let mass: number | undefined;
-  for (const entry of properties.filter((property) => property.name === PROPERTY.validation)) {
+  for (const entry of properties.filter(
+    (property) => property.name === (encoding === LEGACY_ENCODING ? PROPERTY.validation : PROPERTY.extension),
+  )) {
     if (entry.description === 'ply area') {
       const ply = textOf(entry.items, 'ply');
       const area = numberOf(entry.items, 'ply area');
@@ -266,5 +272,6 @@ export function readComposite(text: string): ReadOutcome {
     },
     linkedSolids,
     laminates: laminates.length,
+    standard: readStandard(text),
   };
 }

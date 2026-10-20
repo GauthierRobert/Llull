@@ -8,154 +8,32 @@
 import { describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
-import type { CommandResult, ExecutionContext } from '@core/commands/types';
-import type { GeometryKernel } from '@core/geometry/kernel';
-import type { ExchangeWriteRequest, ImportedExchange } from '@core/geometry/kernelExchange';
-import type { CompositePart, CompositesModel, Ply } from '@core/model/composites';
-import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { appendComposite } from '@aero/composites/ap242/writer';
 import { readComposite } from '@aero/composites/ap242/reader';
 import { quoted, real, unquoted } from '@aero/composites/ap242/part21';
+import { readStandard, withoutCompositeUsages } from '@aero/composites/ap242/standardReader';
+import { spherePatch } from './drapeFixtures';
 import { expectNoOp, expectPure } from '../../../helpers/expectNoOp';
-import { fakeBrep, fakeStepText, fakeXdeKernel, importedBody, type XdeFakeSpec } from '../../../helpers/fakeXdeKernel';
 import { apply, ok } from '../../../helpers/commandAssertions';
+
+import { createEmptyDocument } from '@core/model/types';
+import { fakeStepText } from '../../../helpers/fakeXdeKernel';
 import { WOVEN } from './drapeFixtures';
-import { AS4, ROSETTE, withMaterials } from './fixtures';
-
-/** The fake writer's text plus a geometric context with global units, the one the composite records borrow. */
-const writeStep = (request: Pick<ExchangeWriteRequest, 'products'>): string => {
-  const base = fakeStepText(
-    request.products.map((product) => ({
-      name: product.name,
-      volume: product.validation?.volume ?? 1,
-      area: product.validation?.area ?? 1,
-      centroid: product.validation?.centroid ?? [0, 0, 0],
-    })),
-  );
-  const context = [
-    "#9000 = ( GEOMETRIC_REPRESENTATION_CONTEXT(3) GLOBAL_UNIT_ASSIGNED_CONTEXT((#1)) REPRESENTATION_CONTEXT('ctx','3D') );",
-    "#9001 = REPRESENTATION('',(#9002),#9000);",
-    "#9002 = MEASURE_REPRESENTATION_ITEM('x',VOLUME_MEASURE(1.),#1);",
-  ].join('\n');
-  return base.replace('ENDSEC;\nEND-ISO', `${context}\nENDSEC;\nEND-ISO`);
-};
-
-const requestOf = (names: readonly string[]): Pick<ExchangeWriteRequest, 'products'> => ({
-  products: names.map((name) => ({ key: name, name, solids: [] })),
-});
-
-const ctxOf = (spec: XdeFakeSpec = {}): { ctx: ExecutionContext; kernel: GeometryKernel } => {
-  const { kernel } = fakeXdeKernel({ writeStep, ...spec });
-  return { ctx: { ...defaultContext(), kernel }, kernel };
-};
-
-const rect = (x0: number, y0: number, x1: number, y1: number): number[][] => [
-  [x0, y0],
-  [x1, y0],
-  [x1, y1],
-  [x0, y1],
-];
-
-/** A 200 x 100 panel on a named tool box: a full ply, a +45 polygon of another material and a -45 polygon; with ply solids when asked. */
-function panelDoc(withSolids = true): { doc: CadDocument; part: string; tool: string } {
-  let doc = apply(withMaterials(), 'create_lamina_material', WOVEN);
-  const tool = ok(doc, 'add_box', { size: [200, 100, 10], anchor: 'min', position: [0, 0, -10] });
-  doc = apply(tool.document, 'set_entity_name', { id: tool.affected[0], name: 'Panel tool' });
-  doc = apply(doc, 'define_rosette', ROSETTE);
-  const part = ok(doc, 'create_composite_part', {
-    name: 'Panel',
-    toolSurface: { entityId: tool.affected[0], faceNear: [100, 50, 0] },
-    rosette: 'R0',
-  });
-  doc = part.document;
-  const id = part.affected[0] as string;
-  doc = apply(doc, 'add_ply', { part: id, name: 'P1', material: WOVEN.name, orientation: 0, boundary: { kind: 'whole_face' } });
-  doc = apply(doc, 'add_ply', {
-    part: id,
-    name: 'P2',
-    material: AS4.name,
-    orientation: 45,
-    boundary: { kind: 'polygon', polygons: [rect(20, 10, 180, 90)] },
-  });
-  doc = apply(doc, 'add_ply', {
-    part: id,
-    name: 'P3',
-    material: WOVEN.name,
-    orientation: -45,
-    boundary: { kind: 'polygon', polygons: [rect(60, 20, 140, 80)] },
-  });
-  if (withSolids) doc = apply(doc, 'create_ply_solids', { part: id });
-  return { doc, part: id, tool: tool.affected[0] as string };
-}
-
-interface Exported {
-  readonly step: string;
-  readonly selfCheck: { readonly band: string; readonly findings: readonly unknown[] };
-  readonly plies: readonly {
-    readonly name: string;
-    readonly order: number;
-    readonly area: number;
-    readonly thickness: number;
-    readonly solids: string[];
-  }[];
-  readonly validation: { readonly plyCount: number; readonly thickness: number; readonly mass?: number };
-  readonly solids: { readonly exact: number; readonly faceted: readonly string[] };
-  readonly records: number;
-}
-
-const exportOf = (
-  doc: CadDocument,
-  params: Record<string, unknown> = {},
-  spec: XdeFakeSpec = {},
-): { result: CommandResult; data: Exported } => {
-  const { ctx } = ctxOf(spec);
-  const result = execute(doc, 'export_composite_ap242', { part: 'Panel', ...params }, ctx);
-  return { result, data: result.data as Exported };
-};
-
-const importOf = (doc: CadDocument, params: Record<string, unknown>, spec: XdeFakeSpec = {}): CommandResult =>
-  execute(doc, 'import_composite_ap242', params, ctxOf(spec).ctx);
-
-interface Imported {
-  readonly part: string;
-  readonly validation: {
-    readonly band: string;
-    readonly findings: readonly {
-      readonly property: string;
-      readonly subject: string;
-      readonly band: string;
-      readonly embedded: number | null;
-    }[];
-  };
-  readonly materials: { readonly created: string[]; readonly reused: string[] };
-  readonly rosettes: { readonly created: string[] };
-  readonly tool: { readonly entityId: string; readonly imported: boolean };
-  readonly solids: { readonly imported: string[]; readonly unlinked: number; readonly perPly: { readonly solids: string[] }[] };
-  readonly reviewRequired: { readonly value: boolean; readonly reasons: string[] };
-}
-
-/** The solids an import_step_exact of the exported file would yield: one product per name, a tetra B-rep each. */
-const treeOf = (names: readonly string[]): ImportedExchange => ({
-  solids: names.map((name) => importedBody(fakeBrep(10, 10, [0, 0, 0]), { name })),
-  census: { roots: names.length, solids: names.length, shells: names.length, openShells: 0, faces: 6 * names.length },
-  skipped: [],
-  products: names.map((name, index) => ({ name, assembly: false, layers: [], solids: [index] })),
-  occurrences: [],
-  roots: names.map((_, index) => index),
-});
-
-const modelOf = (doc: CadDocument): CompositesModel => doc.composites as CompositesModel;
-const pliesOfPart = (doc: CadDocument, name: string): { part: CompositePart; plies: Ply[] } => {
-  const model = modelOf(doc);
-  const part = Object.values(model.parts).find((candidate) => candidate.name === name) as CompositePart;
-  return {
-    part,
-    plies: model.plyOrder
-      .map((id) => model.plies[id] as Ply)
-      .filter((ply) => ply.partId === part.id)
-      .sort((a, b) => a.order - b.order),
-  };
-};
+import type { CadDocument } from '@core/model/types';
+import { AS4, withMaterials } from './fixtures';
+import {
+  ctxOf,
+  exportOf,
+  importOf,
+  modelOf,
+  panelDoc,
+  pliesOfPart,
+  rect,
+  requestOf,
+  treeOf,
+  writeStep,
+  type Imported,
+} from './ap242Support';
 
 describe('Part 21 values', () => {
   it('writes reals the reader accepts and strings with quotes, backslashes and non-ASCII characters', () => {
@@ -180,7 +58,7 @@ describe('export_composite_ap242', () => {
     expect(result.affected).toEqual([]);
     expect(result.document).toBe(doc);
     expect(data.selfCheck.band).toBe('green');
-    expect(data.selfCheck.findings).toHaveLength(9);
+    expect(data.selfCheck.findings).toHaveLength(56);
     expect(data.plies.map((ply) => [ply.name, ply.order, ply.solids])).toEqual([
       ['P1', 0, ['P1 piece 1']],
       ['P2', 1, ['P2 piece 1']],
@@ -320,7 +198,7 @@ describe('import_composite_ap242', () => {
     expect(result.rejected).toBeUndefined();
     const data = result.data as Imported;
     expect(data.validation.band).toBe('green');
-    expect(data.validation.findings).toHaveLength(9);
+    expect(data.validation.findings).toHaveLength(56);
     expect(data.tool.imported).toBe(true);
     expect(data.solids.imported).toHaveLength(4);
     expect(data.solids.unlinked).toBe(0);
@@ -373,7 +251,7 @@ describe('import_composite_ap242', () => {
     expect((red.data as Imported).validation.band).toBe('red');
     expect((red.data as Imported).reviewRequired.reasons).toContain('validation_red');
     expect(findingOf(tampered('12800.5'), 'ply area', 'P2')?.band).toBe('yellow');
-    const removed = step.replaceAll("'composite validation property','ply area'", "'composite validation property','other'");
+    const removed = step.replaceAll("'llull composite validation','ply area'", "'llull composite validation','other'");
     expect(findingOf(removed, 'ply area', 'P2')?.band).toBe('not_checkable');
   });
 
@@ -385,7 +263,7 @@ describe('import_composite_ap242', () => {
     expect(importOf(empty, { text: plain, importSolids: false }).error?.code).toBe('CMP_AP242_NO_COMPOSITE');
     expect(importOf(empty, { text: 'not a step file', importSolids: false }).error?.code).toBe('CMP_AP242_NO_COMPOSITE');
     const damaged: [string, (text: string) => string][] = [
-      ['an unknown encoding', (text) => text.replace('llull-composite-1', 'llull-composite-9')],
+      ['an unknown encoding', (text) => text.replace('llull-composite-2', 'llull-composite-9')],
       ['no tool name', (text) => text.replace("DESCRIPTIVE_REPRESENTATION_ITEM('tool'", "DESCRIPTIVE_REPRESENTATION_ITEM('toll'")],
       ['no part frame', (text) => text.replace('{"surface":', '{"surfacx":')],
       [
@@ -507,5 +385,213 @@ describe('composite records that carry optional data', () => {
     expect(back.part.plyDropRules).toMatchObject({ rampRatio: 10 });
     expect((imported.data as Imported).validation.band).toBe('green');
     expect(Object.values(modelOf(imported.document).rosettes)[0]?.axis).toEqual([1, 0, 0]);
+  });
+});
+
+describe('the CAx-IF structure of the file', () => {
+  const exportedText = (): string => exportOf(panelDoc().doc).data.step;
+
+  it('writes the practice identification, the ply laminate table with ordered sequences, plies with material / angle / thickness and the practice validation property names', () => {
+    const step = exportedText();
+    expect(step).toContain("'CAx-IF Rec.Pracs.---Composite Materials---4.3---2025-10-02'");
+    for (const entity of [
+      'PLY_LAMINATE_TABLE(',
+      'PLY_LAMINATE_SEQUENCE_DEFINITION(',
+      'MAKE_FROM_USAGE_OPTION(',
+      'NEXT_ASSEMBLY_USAGE_OCCURRENCE(',
+      'REINFORCEMENT_ORIENTATION_BASIS(',
+      'PLY_ORIENTATION_ANGLE(',
+      'PLY_ANGLE_REPRESENTATION(',
+      'CARTESIAN_11()',
+      'ITEM_IDENTIFIED_REPRESENTATION_USAGE(',
+      'ROW_REPRESENTATION_ITEM(',
+      'GEOMETRICALLY_BOUNDED_SURFACE_SHAPE_REPRESENTATION(',
+    ])
+      expect(step, entity).toContain(entity);
+    for (const category of ['part', 'ply_laminate', 'ply', 'woven_assembly', 'filament_assembly'])
+      expect(step).toContain(`PRODUCT_RELATED_PRODUCT_CATEGORY('${category}'`);
+    for (const name of [
+      'number of tables',
+      'number of sequences',
+      'number of plies',
+      'number of cores',
+      'number of materials',
+      'number of orientations',
+      'number of rosettes',
+      'total ply surface area',
+      'ordered list of orientation values',
+      'ordered sequences per laminate table',
+      'curve length measure',
+      'number of ply pieces per ply',
+      'total boundary curve length',
+    ])
+      expect(step, name).toContain(`'${name}'`);
+    expect(step).toMatch(/INTEGER_REPRESENTATION_ITEM\('number of plies',3\.\)/);
+    expect(step).toContain("'ordered list of orientation values','-45 0 45'");
+    const std = readComposite(step);
+    if (!std.ok) throw new Error(std.reason);
+    expect(std.standard.present).toBe(true);
+    expect(std.standard.recPracId).toBe(true);
+    expect(std.standard.table).toBe('Panel');
+    expect(std.standard.sequences.map((sequence) => [sequence.name, sequence.plies])).toEqual([
+      ['S1', ['P1']],
+      ['S2', ['P2']],
+      ['S3', ['P3']],
+    ]);
+    expect(std.standard.plies.map((ply) => [ply.name, ply.material, ply.rosette, ply.angle, ply.thickness, ply.pieces])).toEqual([
+      ['P1', 'Woven', 'R0', 0, 0.25, ['P1 piece 1']],
+      ['P2', 'AS4_3501_6', 'R0', 45, 0.125, ['P2 piece 1']],
+      ['P3', 'Woven', 'R0', -45, 0.25, ['P3 piece 1']],
+    ]);
+    expect(std.standard.rosettes).toEqual(['R0']);
+  });
+
+  it('flags a changed number of plies, a changed ply angle and a changed sequence name red, and a removed property not checkable', () => {
+    const step = exportedText();
+    const bandOf = (text: string, property: string): string | undefined => {
+      const bands = (importOf(createEmptyDocument(), { text, importSolids: false }).data as Imported).validation.findings
+        .filter((finding) => finding.property === property)
+        .map((finding) => finding.band);
+      return bands.includes('red') ? 'red' : bands.includes('not_checkable') ? 'not_checkable' : bands[0];
+    };
+    const tamper = (from: string | RegExp, to: string): string => {
+      const text = step.replace(from, to);
+      expect(text).not.toBe(step);
+      return text;
+    };
+    expect(
+      bandOf(
+        tamper("INTEGER_REPRESENTATION_ITEM('number of plies',3.)", "INTEGER_REPRESENTATION_ITEM('number of plies',4.)"),
+        'number of plies',
+      ),
+    ).toBe('red');
+    expect(
+      bandOf(
+        tamper(
+          /MEASURE_REPRESENTATION_ITEM\('orientation',PLANE_ANGLE_MEASURE\(45\.\)/,
+          "MEASURE_REPRESENTATION_ITEM('orientation',PLANE_ANGLE_MEASURE(40.)",
+        ),
+        'structure: ply orientation angle',
+      ),
+    ).toBe('red');
+    expect(
+      bandOf(
+        tamper("DESCRIPTIVE_REPRESENTATION_ITEM('sequence name','S2')", "DESCRIPTIVE_REPRESENTATION_ITEM('sequence name','SX')"),
+        'ordered sequences per laminate table',
+      ),
+    ).toBe('red');
+    expect(
+      bandOf(
+        tamper("'ordered list of orientation values','-45 0 45'", "'ordered list of orientation values','-45 0 46'"),
+        'ordered list of orientation values',
+      ),
+    ).toBe('red');
+    expect(bandOf(tamper("'total ply surface area'", "'total ply surface areas'"), 'total ply surface area')).toBe('not_checkable');
+    expect(bandOf(step, 'structure: ply material')).toBe('green');
+  });
+
+  it('reads files of the first encoding (no CAx-IF structure) and answers no structure for text without a table', () => {
+    const step = exportedText();
+    const legacy = step
+      .replace('llull-composite-2', 'llull-composite-1')
+      .replaceAll("'llull composite validation'", "'composite validation property'");
+    const read = readComposite(legacy);
+    expect(read.ok && read.embedded.plyCount).toBe(3);
+    const stripped = legacy
+      .split('\n')
+      .filter((line) => !/PLY_LAMINATE|REINFORCEMENT_ORIENTATION|PLY_ORIENTATION_ANGLE|PLY_ANGLE_REP/.test(line))
+      .join('\n');
+    expect(readStandard(stripped).present).toBe(false);
+    expect(readStandard('not a step file').present).toBe(false);
+    const result = importOf(createEmptyDocument(), { text: stripped, importSolids: false });
+    expect(result.rejected).toBeUndefined();
+    expect((result.data as Imported).validation.band).toBe('green');
+    expect(withoutCompositeUsages("ISO-10303-21;\nDATA;\n#1=PRODUCT('a','a','',());\nENDSEC;\n")).toContain('PRODUCT');
+    expect(withoutCompositeUsages(step)).not.toContain('NEXT_ASSEMBLY_USAGE_OCCURRENCE');
+  });
+
+  it('writes the base surface of plane, cylinder, cone and sphere tools and none for a NURBS sheet; a radial rosette is a polar_11', () => {
+    const surfaceOf = (doc: CadDocument, part: string): string => exportOf(doc, { part }).data.step;
+    const panel = surfaceOf(panelDoc().doc, 'Panel');
+    expect(panel).toMatch(/PLANE\('base_surface'/);
+    expect(panel).toContain("DIRECTION('material side'");
+
+    let doc = apply(withMaterials(), 'create_lamina_material', WOVEN);
+    doc = apply(doc, 'define_rosette', {
+      name: 'Rax',
+      origin: [0, 0, 0],
+      axis0: [0, 0, 1],
+      normal: [1, 0, 0],
+      method: 'cylindrical',
+      axis: [0, 0, 1],
+    });
+    const tube = ok(doc, 'add_cylinder', { radius: 50, height: 200, position: [0, 0, 0] });
+    const withTube = ok(tube.document, 'create_composite_part', {
+      name: 'Tube',
+      rosette: 'Rax',
+      toolSurface: { entityId: tube.affected[0], faceNear: [50, 0, 0] },
+    });
+    doc = apply(withTube.document, 'add_ply', {
+      part: 'Tube',
+      name: 'T1',
+      material: WOVEN.name,
+      orientation: 0,
+      boundary: { kind: 'whole_face' },
+    });
+    expect(surfaceOf(doc, 'Tube')).toMatch(/CYLINDRICAL_SURFACE\('base_surface'/);
+
+    const cone = ok(doc, 'add_cone', { radius: 100, height: 100, position: [0, 0, 0] });
+    const withCone = ok(cone.document, 'create_composite_part', {
+      name: 'Funnel',
+      rosette: 'Rax',
+      toolSurface: { entityId: cone.affected[0], faceNear: [50, 0, 50] },
+    });
+    doc = apply(withCone.document, 'add_ply', {
+      part: 'Funnel',
+      name: 'F1',
+      material: WOVEN.name,
+      orientation: 0,
+      boundary: { kind: 'whole_face' },
+    });
+    expect(surfaceOf(doc, 'Funnel')).toMatch(/CONICAL_SURFACE\('base_surface'/);
+
+    let dome = apply(withMaterials(), 'create_lamina_material', WOVEN);
+    dome = apply(dome, 'define_rosette', { name: 'R0', origin: [0, 0, 0], axis0: [1, 0, 0], normal: [0, 0, 1], method: 'radial' });
+    const ball = ok(dome, 'add_sphere', { radius: 100, position: [0, 0, 0] });
+    const withBall = ok(ball.document, 'create_composite_part', {
+      name: 'Dome',
+      rosette: 'R0',
+      toolSurface: { entityId: ball.affected[0], faceNear: [0, 0, 100] },
+    });
+    dome = apply(withBall.document, 'add_ply', {
+      part: 'Dome',
+      name: 'D1',
+      material: WOVEN.name,
+      orientation: 0,
+      boundary: { kind: 'whole_face' },
+    });
+    const domeText = surfaceOf(dome, 'Dome');
+    expect(domeText).toMatch(/SPHERICAL_SURFACE\('base_surface'/);
+    expect(domeText).toContain('POLAR_11()');
+
+    let sheet = apply(withMaterials(), 'create_lamina_material', WOVEN);
+    sheet = apply(sheet, 'define_rosette', { name: 'R0', origin: [0, 0, 0], axis0: [1, 0, 0], normal: [0, 0, 1], method: 'translational' });
+    const patch = ok(sheet, 'create_nurbs_surface', spherePatch(100, 30, 90));
+    const near = [100 * Math.sin(Math.PI / 3) * Math.SQRT1_2, 100 * Math.sin(Math.PI / 3) * Math.SQRT1_2, 50];
+    const onPatch = ok(patch.document, 'create_composite_part', {
+      name: 'Skin',
+      rosette: 'R0',
+      toolSurface: { entityId: patch.affected[0], faceNear: near },
+    });
+    sheet = apply(onPatch.document, 'add_ply', {
+      part: 'Skin',
+      name: 'K1',
+      material: WOVEN.name,
+      orientation: 0,
+      boundary: { kind: 'whole_face' },
+    });
+    const nurbsText = surfaceOf(sheet, 'Skin');
+    expect(nurbsText).not.toContain("'base_surface'");
+    expect(nurbsText).toContain('PLY_LAMINATE_TABLE(');
   });
 });
