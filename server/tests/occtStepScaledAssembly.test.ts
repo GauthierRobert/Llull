@@ -49,7 +49,7 @@ describeNative('occt export_step_exact nested scaled assembly', () => {
     expect(new Set(data.entityIds).size).toBe(data.entityIds.length);
     expect(data.entityIds).toEqual(doc.order.filter((id) => doc.entities[id]?.kind === 'instance'));
 
-    const imported = run(createEmptyDocument(), 'import_step_exact', { text: data.step });
+    const imported = run(createEmptyDocument(), 'import_step_exact', { text: data.step, assembly: false });
     const props = (d: CadDocument, id: string): { volume: number; centroid: Vec3 } =>
       run(d, 'mass_properties', { entityId: id }).data as { volume: number; centroid: Vec3 };
     expect(imported.affected).toHaveLength(7);
