@@ -193,8 +193,8 @@ describe('xcafMapping', () => {
     const { pmi } = transportOf(next);
     expect(pmi?.dimensions[0]?.type).toBe('size_radius');
     expect(pmi?.dimensions[0]?.value).toBe(10);
-    expect(pmi?.dimensions[0]?.tolerance?.plus).toBeCloseTo(0.2, 12);
-    expect(pmi?.dimensions[0]?.tolerance?.minus).toBeCloseTo(0.1, 12);
+    expect(pmi?.dimensions[0]?.range).toEqual({ lower: 9.9, upper: 10.2 });
+    expect(pmi?.dimensions[0]?.tolerance).toBeUndefined();
     expect(pmi?.tolerances[0]?.characteristic).toBe('circularity');
   });
 
@@ -217,13 +217,15 @@ describe('xcafMapping', () => {
       datums: [{ label: 'B', boundary: 'MMB' }],
       modifiers: ['tangent_plane'],
     }).document;
-    const { skipped, lossy, written: ids } = transportOf(next);
+    const { skipped, lossy, pmi } = transportOf(next);
     expect(skipped.map((entry) => entry.reason)).toEqual([
       'the feature resolves to no face',
       'datum A is not a written datum feature',
       'a note has no semantic AP242 transport form',
     ]);
-    expect(lossy).toEqual([{ id: ids[ids.length - 1], lost: ['modifiers', 'datum boundary'] }]);
+    expect(lossy).toEqual([]);
+    expect(pmi?.datums).toEqual([{ label: 'B', faces: [2], modifiers: ['maximum_material_requirement'] }]);
+    expect(pmi?.tolerances[0]).toMatchObject({ characteristic: 'perpendicularity', modifiers: ['tangent_plane'] });
   });
 
   it('reads a transport set back into the same semantic items (ids aside), counting what has no model form', () => {
@@ -239,7 +241,7 @@ describe('xcafMapping', () => {
       ...(pmi as ExchangePmi),
       dimensions: [
         ...(pmi as ExchangePmi).dimensions,
-        { type: 'size_curve_length', value: 5, faces: [0] },
+        { type: 'size_curve_length', value: 5, faces: [] },
         { type: 'size_diameter', value: 1, faces: [99] },
       ],
     };

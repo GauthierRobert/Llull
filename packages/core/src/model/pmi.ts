@@ -164,14 +164,20 @@ export type PmiTolerance =
   | { readonly type: 'fit'; readonly code: string; readonly upper: number; readonly lower: number }
   | { readonly type: 'basic' };
 
+/** Sizes the B-rep measures (cylinder, two planes, sphere) and the two it cannot (angle of a feature, length of a curve), which carry the stated `nominal`. */
+export type SizeKind = 'diameter' | 'radius' | 'width' | 'spherical_diameter' | 'spherical_radius' | 'angular' | 'curve_length';
+export type MeasuredSizeKind = Exclude<SizeKind, 'angular' | 'curve_length'>;
+
 export interface SizeDimensionPmi extends PmiBase {
   readonly kind: 'size_dimension';
   readonly feature: PmiFeature;
-  readonly sizeKind: 'diameter' | 'radius' | 'width' | 'spherical_diameter';
+  readonly sizeKind: SizeKind;
   readonly tolerance: PmiTolerance;
   /** Pattern count nX = resolved feature count. */
   readonly count: number;
   readonly sizeModifiers?: readonly SizeModifier[];
+  /** Nominal stated by the source, for the kinds the B-rep cannot measure (angular, curve_length); degrees for an angle. */
+  readonly nominal?: number;
 }
 
 export interface LocationDimensionPmi extends PmiBase {

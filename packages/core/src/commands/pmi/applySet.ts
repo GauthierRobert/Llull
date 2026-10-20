@@ -16,7 +16,7 @@ import type {
   PmiTolerance,
   SizeDimensionPmi,
 } from '../../model/pmi';
-import { GEOMETRIC_CHARACTERISTICS } from '../../model/pmi';
+import { GEOMETRIC_CHARACTERISTICS, SIZE_MODIFIERS, ZONE_MODIFIERS, type MeasuredSizeKind } from '../../model/pmi';
 import type { CadDocument, Vec3 } from '../../model/types';
 import { featureElement, locate, measureSize } from '../../geometry/pmiMeasure';
 import { type ResolvedFeature, type SolidFaces, openSolid, isFeatureProblem, resolveIn } from '../../geometry/pmiFeatures';
@@ -30,10 +30,18 @@ import { toleranceField, toleranceProblem } from './dimension';
 
 const NO_FACE = 'the feature resolves to no face of the solid';
 
+const unmodelledField = z
+  .array(z.string())
+  .optional()
+  .describe(
+    'Attributes of the source this model cannot carry (e.g. "dimension qualifier min"); listed in the item unverified reason, never dropped silently.',
+  );
+
 const draftSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('datum_feature').describe('A datum feature (datum A, B, ...).'),
     label: z.string().describe('Datum letter(s), 1-2 capitals, unique on the solid.'),
+    unmodelled: unmodelledField,
     facesNear: facesNearField,
   }),
   z.object({
@@ -43,19 +51,46 @@ const draftSchema = z.discriminatedUnion('kind', [
       .object({
         value: z.number().describe('Zone width or diameter, document length units.'),
         diametral: z.boolean().optional().describe('true = cylindrical zone (diameter symbol).'),
+        spherical: z.boolean().optional().describe('true = spherical zone (SØ).'),
+        projectedLength: z.number().optional().describe('Projected zone length, document units.'),
+        unequallyDisposed: z.number().optional().describe('Profile unequally disposed zone value (UZ), document units.'),
+        maxValue: z.number().optional().describe('Maximum value the frame states, document units.'),
       })
       .describe('The tolerance zone.'),
-    datums: z.array(z.string()).optional().describe('Datum labels in reference order, primary first.'),
+    materialCondition: z.enum(['MMC', 'LMC', 'RFS']).optional().describe('Material condition of the zone. Default RFS.'),
+    modifiers: z
+      .array(z.enum(ZONE_MODIFIERS))
+      .optional()
+      .describe('Zone modifiers (free_state, tangent_plane, all_around, ...). Default none.'),
+    datums: z
+      .array(
+        z.union([
+          z.string(),
+          z.object({
+            label: z.string().describe('Datum label.'),
+            boundary: z.enum(['MMB', 'LMB']).optional().describe('Datum boundary modifier.'),
+          }),
+        ]),
+      )
+      .optional()
+      .describe('Datum references in order, primary first: a label, or { label, boundary }.'),
+    unmodelled: unmodelledField,
     facesNear: facesNearField,
   }),
   z.object({
     kind: z.literal('size_dimension').describe('A size dimension on a feature of size.'),
-    sizeKind: z.enum(['diameter', 'radius', 'width', 'spherical_diameter']).describe('Kind of size.'),
+    sizeKind: z
+      .enum(['diameter', 'radius', 'width', 'spherical_diameter', 'spherical_radius', 'angular', 'curve_length'])
+      .describe('Kind of size. angular (degrees) and curve_length cannot be measured from the B-rep: they keep the stated nominal.'),
     tolerance: toleranceField,
     nominal: z
       .number()
       .optional()
-      .describe('Nominal the source states (document units); compared with the B-rep, a difference marks the item unverified.'),
+      .describe(
+        'Nominal the source states (document units, degrees for angular); compared with the B-rep, a difference marks the item unverified; kept for angular and curve_length.',
+      ),
+    sizeModifiers: z.array(z.enum(SIZE_MODIFIERS)).optional().describe('ISO 14405 size modifier codes.'),
+    unmodelled: unmodelledField,
     facesNear: facesNearField,
   }),
   z.object({
@@ -63,6 +98,7 @@ const draftSchema = z.discriminatedUnion('kind', [
     measure: z.enum(['distance', 'angle']).describe('distance in document units, or angle in degrees.'),
     tolerance: toleranceField.optional().describe('Tolerance; omitted = basic.'),
     nominal: z.number().optional().describe('Nominal the source states; kept when the B-rep cannot measure the two features.'),
+    unmodelled: unmodelledField,
     from: facesNearField,
     to: facesNearField,
   }),
@@ -84,6 +120,9 @@ const NOMINAL_MISMATCH = 1e-4;
 
 const mismatch = (stated: number | undefined, measured: number): stated is number =>
   stated !== undefined && Math.abs(stated - measured) > NOMINAL_MISMATCH * Math.max(1, Math.abs(stated));
+
+const lost = (attributes: readonly string[] | undefined): string[] =>
+  attributes === undefined || attributes.length === 0 ? [] : [`not modelled: ${attributes.join(', ')}`];
 
 const differs = (stated: number, measured: number): string =>
   `the file states nominal ${stated} but the B-rep measures ${Number(measured.toPrecision(9))}`;
@@ -130,7 +169,7 @@ export function applyPmiDrafts(doc: CadDocument, target: SolidTarget, drafts: re
         placement: placement(at.faces),
         review,
       };
-      add(item, at.faces === null ? [at.why] : [], at.faces === null);
+      add(item, [...(at.faces === null ? [at.why] : []), ...lost(draft.unmodelled)], at.faces === null);
     } else if (draft.kind === 'geometric_tolerance') {
       const at = feature(draft.facesNear);
       const defined = new Set(
@@ -138,16 +177,28 @@ export function applyPmiDrafts(doc: CadDocument, target: SolidTarget, drafts: re
           existing.kind === 'datum_feature' && existing.feature.entityId === entityId ? [existing.label] : [],
         ),
       );
-      const missing = (draft.datums ?? []).filter((label) => !defined.has(label));
+      const references = (draft.datums ?? []).map((reference) => (typeof reference === 'string' ? { label: reference } : reference));
+      const missing = references.map((reference) => reference.label).filter((label) => !defined.has(label));
+      const { zone } = draft;
       const item: GeometricTolerancePmi = {
         id,
         kind: 'geometric_tolerance',
         characteristic: draft.characteristic,
         target: { feature: at.feature },
-        zone: { value: draft.zone.value, ...(draft.zone.diametral === true ? { diametral: true } : {}) },
-        materialCondition: 'RFS',
-        modifiers: [],
-        datums: (draft.datums ?? []).map((label) => ({ label })),
+        zone: {
+          value: zone.value,
+          ...(zone.diametral === true ? { diametral: true } : {}),
+          ...(zone.spherical === true ? { spherical: true } : {}),
+          ...(zone.projectedLength === undefined ? {} : { projectedLength: zone.projectedLength }),
+          ...(zone.unequallyDisposed === undefined ? {} : { unequallyDisposed: zone.unequallyDisposed }),
+          ...(zone.maxValue === undefined ? {} : { maxValue: zone.maxValue }),
+        },
+        materialCondition: draft.materialCondition ?? 'RFS',
+        modifiers: draft.modifiers ?? [],
+        datums: references.map((reference) => ({
+          label: reference.label,
+          ...(reference.boundary === undefined ? {} : { boundary: reference.boundary }),
+        })),
         placement: placement(at.faces),
         review,
       };
@@ -156,6 +207,7 @@ export function applyPmiDrafts(doc: CadDocument, target: SolidTarget, drafts: re
         [
           ...(at.faces === null ? [at.why] : []),
           ...(missing.length > 0 ? [`datum ${missing.join(', ')} is not defined on the solid`] : []),
+          ...lost(draft.unmodelled),
         ],
         at.faces === null,
       );
@@ -164,27 +216,32 @@ export function applyPmiDrafts(doc: CadDocument, target: SolidTarget, drafts: re
       const problems: string[] = at.faces === null ? [at.why] : [];
       let size: PmiFeature['ofSize'];
       let count = 1;
-      if (at.faces !== null) {
-        const measured = measureSize(at.faces.faces, draft.sizeKind, at.faces.topology, at.faces.tolerance);
+      const unmeasured = draft.sizeKind === 'angular' || draft.sizeKind === 'curve_length';
+      if (at.faces !== null && !unmeasured) {
+        const measured = measureSize(at.faces.faces, draft.sizeKind as MeasuredSizeKind, at.faces.topology, at.faces.tolerance);
         if ('code' in measured) problems.push(`${measured.code}: ${measured.message}`);
         else {
           size = measured.ofSize;
           count = measured.count;
-          const nominal = draft.sizeKind === 'radius' ? measured.ofSize.measured / 2 : measured.ofSize.measured;
+          const half = draft.sizeKind === 'radius' || draft.sizeKind === 'spherical_radius';
+          const nominal = half ? measured.ofSize.measured / 2 : measured.ofSize.measured;
           if (mismatch(draft.nominal, nominal)) problems.push(differs(draft.nominal, nominal));
         }
       }
+      if (unmeasured && draft.nominal === undefined) problems.push(`a ${draft.sizeKind} size has no nominal`);
       const item: SizeDimensionPmi = {
         id,
         kind: 'size_dimension',
         sizeKind: draft.sizeKind,
         tolerance: draft.tolerance as PmiTolerance,
+        ...(draft.sizeModifiers === undefined || draft.sizeModifiers.length === 0 ? {} : { sizeModifiers: draft.sizeModifiers }),
+        ...(unmeasured && draft.nominal !== undefined ? { nominal: draft.nominal } : {}),
         count,
         feature: size === undefined ? at.feature : { ...at.feature, ofSize: size },
         placement: placement(at.faces),
         review,
       };
-      add(item, problems, at.faces === null);
+      add(item, [...problems, ...lost(draft.unmodelled)], at.faces === null);
     } else {
       const from = feature(draft.from);
       const to = feature(draft.to);
@@ -211,7 +268,7 @@ export function applyPmiDrafts(doc: CadDocument, target: SolidTarget, drafts: re
         placement: placement(to.faces),
         review,
       };
-      add(item, problems, from.faces === null || to.faces === null);
+      add(item, [...problems, ...lost(draft.unmodelled)], from.faces === null || to.faces === null);
     }
   }
   return { document: next, ids, unresolved, unverified };

@@ -78,7 +78,7 @@ describe('import_step_exact PMI stage', () => {
     const odd: ExchangePmi = {
       ...PMI,
       tolerances: [...PMI.tolerances, { characteristic: 'flatness', value: 0.1, diameterZone: false, faces: [99], datums: [] }],
-      dimensions: [...PMI.dimensions, { type: 'size_curve_length', value: 5, faces: [0] }],
+      dimensions: [...PMI.dimensions, { type: 'size_curve_length', value: 5, faces: [] }],
     };
     const result = run(withPmi(odd));
     expect(items(result)).toHaveLength(5);
