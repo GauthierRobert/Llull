@@ -2,14 +2,15 @@
 import fs from 'fs';
 import path from 'path';
 import type { CadDocument } from '@core/model/types';
-import { failedOutcome, runCommandOutcome } from '@protocol/commandOutcome';
+import { failedOutcome } from '@protocol/commandOutcome';
 import { parseCommandResponse, type CommandOutcome } from '@protocol/restProtocol';
 import { errorMessage } from '@lib/errorMessage';
 import type { StepObserver } from './progress';
 import type { ExchangeOptions } from '../pythonExchange';
 import { runLocalExchange } from './exchange';
 import { requestJson, type FetchLike } from '../restClient';
-import { serverContext } from '../fea/context';
+import { AGENT, runHostCommand } from '../plm/hostRun';
+import type { CommandCaller } from '@core/commands/types';
 import { readDocumentFile, writeDocumentFile } from '../documentFile';
 
 export interface CliBackend {
@@ -29,6 +30,8 @@ export function saveDocumentWithBackup(docPath: string, doc: CadDocument): void 
 
 interface LocalOptions {
   readonly dryRun: boolean;
+  /** Who runs the commands (09 PLM TR-PLM-16): an agent unless the user says `--as human`. */
+  readonly caller?: CommandCaller;
   readonly observer?: StepObserver; // build_project progress, per-step timing, `--timeout`
   readonly exchangeOptions: () => ExchangeOptions; // created on first use
 }
@@ -43,12 +46,11 @@ export function createLocalBackend(docPath: string, options: LocalOptions): CliB
   const runCommand = (name: string, params: unknown): CommandOutcome => {
     try {
       const prior = currentDoc();
-      const { document, outcome } = runCommandOutcome(
-        prior,
-        name,
-        params,
-        options.observer !== undefined ? { ...serverContext(), onStep: options.observer.onStep } : serverContext(),
-      );
+      const { document, outcome } = runHostCommand(prior, name, params, {
+        caller: options.caller ?? AGENT,
+        source: 'cli',
+        ...(options.observer !== undefined ? { onStep: options.observer.onStep } : {}),
+      });
       doc = document;
       if (outcome.changed && !options.dryRun) saveDocumentWithBackup(docPath, document);
       return outcome.data !== undefined ? { ...outcome, data: options.observer?.withDurations(outcome.data) ?? outcome.data } : outcome;
@@ -100,6 +102,7 @@ const REMOTE_TIMEOUT_MS = 120_000; // a server that never answers must not hang 
 
 interface RemoteOptions {
   readonly token: string | undefined;
+  readonly caller?: CommandCaller;
   readonly timeoutSeconds?: number; // `--timeout`, per call
   readonly fetchImpl?: FetchLike;
 }
@@ -121,7 +124,7 @@ export function createRemoteBackend(serverUrl: string, options: RemoteOptions): 
   };
   return {
     target: base,
-    run: (name, params) => post('/command', { name, params, client: 'cli' }),
+    run: (name, params) => post('/command', { name, params, client: 'cli', caller: options.caller?.kind ?? 'agent' }),
     exchange: (name, params) => post('/exchange', { name, params, client: 'cli' }),
     undo: () => post('/undo', {}),
     redo: () => post('/redo', {}),

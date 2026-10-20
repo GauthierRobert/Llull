@@ -7,7 +7,12 @@ const SIGNER = { userId: 'u-1', name: 'J. Example' };
 const KEY = 'ab'.repeat(32);
 const SIGNATURE = 'cd'.repeat(64);
 
-const sign = (doc: CadDocument, params: Record<string, unknown>, port = fakePort(true), caller: 'human' | 'agent' = 'human') =>
+const sign = (
+  doc: CadDocument,
+  params: Record<string, unknown>,
+  port = fakePort(true),
+  caller: 'human' | 'agent' = 'human',
+): ReturnType<typeof run> =>
   run(
     doc,
     'record_signature',

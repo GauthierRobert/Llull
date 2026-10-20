@@ -14,8 +14,8 @@ export function prototypeOf(doc: CadDocument): PrototypeModel {
 
 /**
  * @affects adds 1 intent to doc.prototype.intents (affected: [intentId], id `fit-<step>.<k>`)
- * @invariant stored pair is sorted (a < b); declaredBy is 'agent': ExecutionContext carries no caller yet, so the conservative value is
- *   recorded (a human badge needs the interim human gate, spec 11 Q5)
+ * @invariant stored pair is sorted (a < b); declaredBy is the host-declared caller kind ('human' from the desktop UI) and 'agent' for an agent or
+ *   when the context carries no caller (the conservative value, spec 11 Q5)
  * @failure a = b, unknown or 2D id, empty reason, pair already declared -> no-op
  */
 export const allowInterference = defineCommand({
@@ -35,7 +35,7 @@ export const allowInterference = defineCommand({
       .string()
       .describe('Why the overlap is intended, e.g. "pin pressed into piston boss, 0.02 mm interference". Must be non-empty.'),
   }),
-  run: (doc, { a, b, kind, reason }): CommandResult => {
+  run: (doc, { a, b, kind, reason }, ctx): CommandResult => {
     const fail = failer(doc, 'allow_interference');
     if (a === b) return fail('a and b must be two different parts');
     for (const id of [a, b]) {
@@ -50,9 +50,10 @@ export const allowInterference = defineCommand({
     if (existing !== undefined)
       return fail(`pair ${first} / ${second} already has intent '${existing.id}' (${existing.kind}); remove_interference_intent first`);
     const id = nextId('fit');
-    const intent: InterferenceIntent = { id, a: first, b: second, kind, reason: reason.trim(), declaredBy: 'agent' };
+    const declaredBy = ctx?.caller?.kind === 'human' ? 'human' : 'agent';
+    const intent: InterferenceIntent = { id, a: first, b: second, kind, reason: reason.trim(), declaredBy };
     const document = { ...doc, prototype: { ...prototype, intents: { ...prototype.intents, [id]: intent } } };
-    return changed(document, `Declared ${kind} between '${first}' and '${second}' as ${id} (by agent): ${intent.reason}.`, [id]);
+    return changed(document, `Declared ${kind} between '${first}' and '${second}' as ${id} (by ${declaredBy}): ${intent.reason}.`, [id]);
   },
 });
 

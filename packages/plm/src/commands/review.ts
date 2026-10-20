@@ -190,11 +190,11 @@ export const recordApproval = defineCommand({
     at: atSchema.optional(),
   }),
   run: (doc, { role, userId, comment, at }, ctx): CommandResult => {
+    const gate = humanGateRefusal(doc, 'record_approval', ctx, [role, userId]);
+    if (gate !== null) return gate;
     const found = managed(doc, 'record_approval', 'in_review', 'approvals are recorded on an in_review revision');
     if (isRefusal(found)) return found;
     const { plm, revision } = found;
-    const gate = humanGateRefusal(doc, 'record_approval', ctx, [plm.item.partNumber, revision.label]);
-    if (gate !== null) return gate;
     if (!plm.policy.requiredApprovalRoles.includes(role))
       return refusePlm(
         doc,

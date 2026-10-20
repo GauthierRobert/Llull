@@ -1,10 +1,11 @@
-// Case actions: set the marginal band, delete the case (confirmed), and the human disposition gate (not available here).
+// Case actions: set the marginal band, delete the case (confirmed), and the signed human disposition of a margin row.
 // Each button only gathers params and dispatches the registered command.
 
 import React, { useId, useState } from 'react';
 import type { AnalysisCase } from '@core/model/analysis';
 import { ConfirmDialog } from '@ui/components/ConfirmDialog';
 import { PanelSection } from '@ui/panels/PanelParts';
+import { DispositionDialog } from './DispositionDialog';
 import { useStore } from '@ui/store';
 
 /** The band typed in the field: undefined = empty (clears the band), null = not a finite number >= 0. */
@@ -19,6 +20,7 @@ export function AnalysisActions({ analysisCase }: { analysisCase: AnalysisCase }
   const dispatch = useStore((s) => s.dispatch);
   const [band, setBand] = useState(analysisCase.marginalBand === undefined ? '' : String(analysisCase.marginalBand));
   const [confirming, setConfirming] = useState(false);
+  const [dispositioning, setDispositioning] = useState(false);
   const parsed = parseBand(band);
 
   return (
@@ -55,16 +57,19 @@ export function AnalysisActions({ analysisCase }: { analysisCase: AnalysisCase }
           type="button"
           className="btn btn--ghost"
           data-testid="analysis-disposition"
-          disabled
-          title="A margin disposition is a human decision that needs a signature; this app has no signing port yet."
+          title="Record your signed decision on a FAIL or MARGINAL row (needs a signing key of this machine, held by the local backend)."
+          onClick={() => setDispositioning(true)}
         >
           Disposition…
         </button>
-        <p className="analysis__hint">Dispositioning a FAIL / MARGINAL row is a signed human decision: not available in the app yet.</p>
+        <p className="analysis__hint">
+          Dispositioning a FAIL / MARGINAL row is a signed human decision with a key of this machine; it never turns a FAIL into a PASS.
+        </p>
         <button type="button" className="btn btn--danger" data-testid="analysis-delete" onClick={() => setConfirming(true)}>
           Delete analysis
         </button>
       </div>
+      {dispositioning && <DispositionDialog analysisCase={analysisCase} onClose={() => setDispositioning(false)} />}
       {confirming && (
         <ConfirmDialog
           title="Delete analysis?"
