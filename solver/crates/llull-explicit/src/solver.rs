@@ -70,13 +70,13 @@ pub struct Outcome {
 
 /// One element's constant data.
 #[derive(Debug, Clone)]
-struct Element {
-    nodes: Vec<usize>,
-    material: usize,
+pub(crate) struct Element {
+    pub(crate) nodes: Vec<usize>,
+    pub(crate) material: usize,
     /// Mass after mass scaling (density = mass / current volume).
-    mass: f64,
+    pub(crate) mass: f64,
     /// The element's lumped (row-sum) contribution to each of its nodes, after mass scaling.
-    node_masses: Vec<f64>,
+    pub(crate) node_masses: Vec<f64>,
 }
 
 /// What one element contributes in a step.
@@ -93,7 +93,7 @@ fn node_coordinates<const N: usize>(nodes: &[usize], x: &[f64]) -> [[f64; 3]; N]
 }
 
 /// Gradients (unnormalised) and volume of an element at coordinates `x`.
-fn kinematics(nodes: &[usize], x: &[f64]) -> (Vec<[f64; 3]>, f64) {
+pub(crate) fn kinematics(nodes: &[usize], x: &[f64]) -> (Vec<[f64; 3]>, f64) {
     if nodes.len() == 8 {
         let (b, volume) = hex8::gradients(&node_coordinates(nodes, x));
         (b.to_vec(), volume)
@@ -104,7 +104,7 @@ fn kinematics(nodes: &[usize], x: &[f64]) -> (Vec<[f64; 3]>, f64) {
 }
 
 /// Undamped stable step 2/ω_max of an element (stability.rs).
-fn eigen_step(b: &[[f64; 3]], volume: f64, node_masses: &[f64], material: &Material) -> f64 {
+pub(crate) fn eigen_step(b: &[[f64; 3]], volume: f64, node_masses: &[f64], material: &Material) -> f64 {
     2.0 / omega_squared(b, volume, node_masses, material).sqrt()
 }
 
@@ -220,7 +220,7 @@ fn step_element(
     })
 }
 
-fn elements_of(model: &Model, coordinates: &[f64]) -> Result<(Vec<Element>, f64, f64), String> {
+pub(crate) fn elements_of(model: &Model, coordinates: &[f64]) -> Result<(Vec<Element>, f64, f64), String> {
     let mut elements = Vec::with_capacity(model.element_count());
     let mut initial_mass = 0.0;
     let mut added_mass = 0.0;
@@ -262,7 +262,7 @@ fn element_masses(nodes: &[usize], coordinates: &[f64], density: f64, volume: f6
 }
 
 /// Nodal lumped masses assembled in element order.
-fn nodal_masses(model: &Model, elements: &[Element]) -> Vec<f64> {
+pub(crate) fn nodal_masses(model: &Model, elements: &[Element]) -> Vec<f64> {
     let mut masses = vec![0.0; model.node_count()];
     for element in elements {
         for (&node, &mass) in element.nodes.iter().zip(&element.node_masses) {
@@ -272,7 +272,7 @@ fn nodal_masses(model: &Model, elements: &[Element]) -> Vec<f64> {
     masses
 }
 
-fn centroid(nodes: &[usize], x: &[f64]) -> [f64; 3] {
+pub(crate) fn centroid(nodes: &[usize], x: &[f64]) -> [f64; 3] {
     let count = nodes.len() as f64;
     std::array::from_fn(|i| nodes.iter().map(|&node| x[3 * node + i]).sum::<f64>() / count)
 }
@@ -424,7 +424,7 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
     })
 }
 
-fn sample_walls(walls: &mut [WallHistory], impulse: &mut [f64], time: f64, last: f64) {
+pub(crate) fn sample_walls(walls: &mut [WallHistory], impulse: &mut [f64], time: f64, last: f64) {
     let span = time - last;
     for (wall, accumulated) in walls.iter_mut().zip(impulse.iter_mut()) {
         wall.times.push(time);

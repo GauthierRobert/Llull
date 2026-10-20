@@ -46,27 +46,32 @@ fn job(device: &str) -> serde_json::Value {
 #[test]
 fn writes_hashed_outputs_events_and_is_byte_identical() {
     let mut hashes = Vec::new();
-    for round in 0..2 {
+    for round in 0..3 {
         let dir = folder(&format!("ok{round}"));
-        write_job(&dir, job(if round == 0 { "gpu" } else { "cpu" }));
+        write_job(&dir, job(if round == 2 { "gpu" } else { "cpu" }));
         let mut events = Vec::new();
         let outputs = run_job(&dir, &mut events).expect("the job runs");
         let text = String::from_utf8(events).expect("utf8");
         assert!(text.lines().any(|line| line.contains("\"type\":\"progress\"") && line.contains("\"cycle\"")));
-        assert_eq!(round == 0, text.contains("EXP_GPU_FALLBACK"));
         assert_eq!(outputs.iter().map(|output| output.path.as_str()).collect::<Vec<_>>(), ["fields.f64", "result.json"]);
         for output in &outputs {
             assert_eq!(sha256_hex(&fs::read(dir.join(&output.path)).expect("read")), output.sha256);
         }
         let result: serde_json::Value = serde_json::from_slice(&fs::read(dir.join("result.json")).expect("read")).expect("json");
         assert_eq!(result["termination"], "normal");
+        // A GPU request runs the kernels (device gpu) or falls back to the CPU twin with EXP_GPU_FALLBACK; CPU runs never warn.
+        let fell_back = text.contains("EXP_GPU_FALLBACK");
+        assert_eq!(fell_back, round == 2 && result["device"] == "cpu");
+        assert_eq!(result["device"] == "gpu", round == 2 && !fell_back);
         assert_eq!(result["elements"]["hex8"], 1);
         assert_eq!(result["walls"][0]["name"], "floor");
         assert_eq!(fs::read(dir.join("fields.f64")).expect("read").len(), 6 * 8);
         // The cube reaches the floor after ~1 ms and the wall records a force.
         let peak = result["walls"][0]["force"].as_array().expect("forces").iter().filter_map(|f| f.as_f64()).fold(0.0, f64::max);
         assert!(peak > 0.0);
-        hashes.push(outputs.iter().map(|output| output.sha256.clone()).collect::<Vec<_>>());
+        if round < 2 {
+            hashes.push(outputs.iter().map(|output| output.sha256.clone()).collect::<Vec<_>>());
+        }
         let _ = fs::remove_dir_all(&dir);
     }
     assert_eq!(hashes[0], hashes[1]);

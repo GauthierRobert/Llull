@@ -555,11 +555,43 @@ Test material constants are synthetic (validation pack inputs, Q7): no Johnson�
 ### 13.5 Remaining (RS-8b, RS-8c)
 
 - **RS-8b:**
-  - wgpu kernels for element forces and the nodal update, with fixed-order reductions and GPU-vs-CPU-twin tests. Not started. On the
-    2026-10-19 build machine the wgpu crates do not link (no MSVC `link.exe`; the GNU toolchain lacks `dlltool` for `windows-sys`
-    raw-dylib). `llull-voxfe` / `llull-topopt` tests fail there for the same reason.
+  - wgpu kernels: **built 2026-10-20** (§13.6).
   - Johnson–Cook failure and erosion: **built 2026-10-19** on the CPU path (`set_johnson_cook_failure`, §13.1). Moving D1–D5 into a
     PHY-02 failure law kind is open.
   - Temperature (adiabatic heating) for T*.
 - **RS-8c:** penalty contact on `llull-bvh`, self contact, friction, shells.
 - **Hand-off MVP (M2–M4):** deck writers, readers, OpenCourant run, import (unchanged plan).
+
+### 13.6 As built: RS-8b GPU kernels (2026-10-20)
+
+`solver/crates/llull-explicit/src/explicit.wgsl` + `gpu.rs` (feature `gpu`; `llull-compute --features gpu`). Per cycle:
+
+1. `kick`: per-node velocity, stonewalls, positions.
+2. `element`: hex8 / tet4 kinematics, Jaumann + J–C return + failure, bulk viscosity, hourglass, element eigen step.
+3. `gather`: per-node internal force over a precomputed node → (element, local node) incidence in element order.
+4. `min_step`: one-workgroup fixed tree.
+5. `commit`: external work, x ← x_new, v ← v_new.
+
+| Topic | As built |
+| ----- | -------- |
+| Precision and operations | f64 throughout (wgpu `SHADER_F64`; an adapter without it is a reason, not an error). exp / log / pow run in f32 because SPIR-V GLSL.std.450 has no 64-bit form: Johnson–Cook terms, `V^{1/3}`, `V^{2/3}`. No atomics. |
+| Host step control | Same as the CPU path. One f64 read-back per cycle (the minimum step). History samples read the per-node / per-element accumulators and add them in node / element order. |
+| `device` handling | `gpu` or `auto` runs the kernels when the binary has the feature and the adapter has `SHADER_F64`; otherwise the CPU twin runs with warning `EXP_GPU_FALLBACK` (reason in the message). `result.json` records `device` and `adapter`. |
+| Determinism | Two GPU runs are bit-identical on one device and driver (`deterministic: true`; tested in the crate and through `explicit_run`). They are **not** bit-identical to the CPU twin, which stays the reference (RS1 §2 rule 3). |
+
+**GPU vs CPU twin** (`tests/gpu.rs`, RTX 4080 Laptop, Vulkan), relative to the peak:
+
+| Case | Agreement | Asserted |
+| ---- | --------- | -------- |
+| Elastic bar (2 × 2 × 80 hex8) | same cycle count; wall force 1.8e-9, velocity 2.5e-9, von Mises 1.6e-9 | 1e-7 |
+| tet4 bar | 6.8e-9 | 1e-7 |
+| Johnson–Cook erosion | same 8 eroded elements, wall force 1.3e-8 | wall force 1e-3; plastic-strain gap ≤ 4 % of ε_f |
+| Through `explicit_run` (`explicitRunNative.test.ts`) | wall force < 1e-7, same artifact hash twice | as stated |
+
+Erosion is a threshold event: the f32 rate log can move a D = 1 crossing by one step (one plastic increment, 7.3e-4), after which the
+eroding front differs locally. Hence the looser bounds for that case.
+
+**Wall time (VC-EXP-67, measured):** 10 240 hex8, 754 cycles, release build: CPU twin 35.5 s, GPU 4.96 s (including set-up).
+Reproduce with `cargo test --release --features gpu --test gpu -- --ignored --nocapture`.
+
+Build note: on Windows without MSVC the GNU toolchain needs a `dlltool` stand-in (`-C dlltool=…`) for `windows-sys` raw-dylib.

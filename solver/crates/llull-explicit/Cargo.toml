@@ -6,7 +6,13 @@ edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+default = []
+# wgpu kernels (`device: gpu | auto`): f64 compute shaders, needs an adapter with SHADER_F64. Without it the CPU twin runs.
+gpu = ["llull-gpu/wgpu"]
+
 [dependencies]
+llull-gpu = { path = "../llull-gpu" }
 llull-protocol = { path = "../llull-protocol" }
 rayon.workspace = true
 serde.workspace = true

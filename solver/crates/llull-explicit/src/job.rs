@@ -342,14 +342,17 @@ struct ResultFile<'a> {
     initial_mass: f64,
     added_mass: f64,
     elements: ElementCounts,
-    device: &'static str,
+    device: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    adapter: Option<&'a str>,
     deterministic: bool,
     energy: Vec<[f64; 6]>,
     walls: Vec<WallOutput<'a>>,
 }
 
 /// The bytes of `result.json` and `fields.f64` for an outcome.
-pub fn outputs(model: &Model, outcome: &Outcome) -> Result<(Vec<u8>, Vec<u8>), JobError> {
+/// `adapter` is the GPU that ran the kernels, `None` for the CPU path. Both paths are deterministic (no atomics, fixed-order sums).
+pub fn outputs(model: &Model, outcome: &Outcome, adapter: Option<&str>) -> Result<(Vec<u8>, Vec<u8>), JobError> {
     let result = ResultFile {
         version: 1,
         termination: if outcome.normal { "normal" } else { "abnormal" },
@@ -360,7 +363,8 @@ pub fn outputs(model: &Model, outcome: &Outcome) -> Result<(Vec<u8>, Vec<u8>), J
         initial_mass: outcome.initial_mass,
         added_mass: outcome.added_mass,
         elements: ElementCounts { hex8: model.hex_count(), tet4: model.tet_count() },
-        device: "cpu",
+        device: if adapter.is_some() { "gpu" } else { "cpu" },
+        adapter,
         deterministic: true,
         energy: outcome
             .energy
@@ -377,18 +381,29 @@ pub fn outputs(model: &Model, outcome: &Outcome) -> Result<(Vec<u8>, Vec<u8>), J
     Ok((json, fields))
 }
 
+/// The run on the requested device: `(outcome, adapter, fallback reason)`.
+#[allow(clippy::type_complexity)]
+fn solve(model: &Model, wants_gpu: bool, report: &mut impl FnMut(Progress)) -> Result<(Outcome, Option<String>, Option<String>), JobError> {
+    let failed = |message: String| JobError { code: "EXP_SOLVER_FAILED", message };
+    if !wants_gpu {
+        return Ok((run(model, report).map_err(failed)?, None, None));
+    }
+    #[cfg(feature = "gpu")]
+    {
+        match crate::gpu::run(model, report) {
+            Ok((outcome, adapter)) => Ok((outcome, Some(adapter), None)),
+            Err(reason) => Ok((run(model, report).map_err(failed)?, None, Some(reason))),
+        }
+    }
+    #[cfg(not(feature = "gpu"))]
+    {
+        Ok((run(model, report).map_err(failed)?, None, Some("this llull-compute was built without the gpu feature".to_string())))
+    }
+}
+
 /// Runs the job in `folder`: progress events to `out`, outputs written next to `job.json`.
 pub fn run_job(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobError> {
     let (model, wants_gpu) = load(folder)?;
-    if wants_gpu {
-        let _ = emit(
-            out,
-            &Event::Warning {
-                code: "EXP_GPU_FALLBACK",
-                message: "no GPU kernels in this build of llull-explicit: the deterministic CPU twin ran",
-            },
-        );
-    }
     let mut last_step = 0u64;
     let end_time = model.controls.end_time;
     let mut report = |progress: Progress| {
@@ -403,8 +418,12 @@ pub fn run_job(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobEr
             let _ = emit(out, &Event::Progress { step, total: 100, message: "explicit", detail: Some(detail) });
         }
     };
-    let outcome = run(&model, &mut report).map_err(|message| JobError { code: "EXP_SOLVER_FAILED", message })?;
-    let (json, fields) = outputs(&model, &outcome)?;
+    let (outcome, adapter, fallback) = solve(&model, wants_gpu, &mut report)?;
+    if let Some(reason) = fallback {
+        let message = format!("GPU kernels not used ({reason}): the deterministic CPU twin ran");
+        let _ = emit(out, &Event::Warning { code: "EXP_GPU_FALLBACK", message: &message });
+    }
+    let (json, fields) = outputs(&model, &outcome, adapter.as_deref())?;
     let mut written = Vec::new();
     for (name, bytes) in [("fields.f64", fields), ("result.json", json)] {
         fs::write(folder.join(name), &bytes).map_err(|error| io(format!("cannot write {name}: {error}")))?;

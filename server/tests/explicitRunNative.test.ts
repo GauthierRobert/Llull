@@ -122,4 +122,43 @@ describe('explicit_run with the real llull-compute', () => {
     },
     300_000,
   );
+  native(
+    'device gpu runs the wgpu kernels (or falls back with EXP_GPU_FALLBACK) and matches the CPU twin (RS-8b)',
+    async () => {
+      const model = barModel({ size: 2.5 });
+      const solve = async (device: 'cpu' | 'gpu'): Promise<{ hash: string; warnings: string }> => {
+        let doc = model.doc;
+        const host: FeaHost = {
+          getDoc: () => doc,
+          applyCommand: (name, params) => {
+            const result = execute(doc, name, params, { ...defaultContext(), feaArtifacts: store });
+            if (result.rejected !== true) doc = result.document;
+            return { summary: result.summary, affected: result.affected, isError: result.rejected === true, data: result.data };
+          },
+        };
+        const result = await runExplicitRun(model.analysisId, { timeoutS: 300, device }, host, {
+          store,
+          runner: createComputeRunner({}, BINARY),
+        });
+        expect(result.isError, result.summary).toBe(false);
+        const data = result.data as { artifactHash: string; warnings?: { code: string }[] };
+        return { hash: data.artifactHash, warnings: (data.warnings ?? []).map((warning) => warning.code).join(',') };
+      };
+      const cpu = store.get((await solve('cpu')).hash) as FeExplicitArtifact;
+      const first = await solve('gpu');
+      const gpu = store.get(first.hash) as FeExplicitArtifact;
+      if (first.warnings.includes('EXP_GPU_FALLBACK')) {
+        console.warn('explicitRunNative: llull-compute without GPU kernels or without a SHADER_F64 adapter: the CPU twin ran');
+        expect(gpu.solver.device).toBe('cpu');
+        return;
+      }
+      expect(gpu.solver).toMatchObject({ device: 'gpu', deterministic: true });
+      const cpuForce = cpu.walls[0]?.force ?? [];
+      const peak = Math.max(...cpuForce);
+      const gap = Math.max(...(gpu.walls[0]?.force ?? []).map((force, index) => Math.abs(force - (cpuForce[index] ?? 0)) / peak));
+      expect(gap).toBeLessThan(1e-7);
+      expect((await solve('gpu')).hash).toBe(first.hash);
+    },
+    300_000,
+  );
 });
