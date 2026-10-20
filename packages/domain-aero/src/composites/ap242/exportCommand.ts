@@ -12,6 +12,8 @@ import { piecesOf } from '../geometry2d';
 import { normalizeAngle } from '../notation';
 import { orientationInRosette } from '../plyFrame';
 import { fromFlat } from '../surface';
+import { isUnverified } from '@lib/laminate/provenance';
+import { coresOf } from '../sandwich';
 import { compositesOf, findPart, pliesOf } from '../state';
 import type { CompositeRecord, PlyRecord, RosetteRecord } from './interchange';
 import { readComposite } from './reader';
@@ -36,7 +38,7 @@ function solidsOfPly(doc: CadDocument, ply: Ply): string[] {
       entity !== undefined &&
       entity.kind === 'mesh' &&
       entity.name?.startsWith(prefix) === true &&
-      /^\d+$/.test(entity.name.slice(prefix.length))
+      /^\d+(?:\.\d+)?$/.test(entity.name.slice(prefix.length))
     );
   });
 }
@@ -61,6 +63,8 @@ export const exportCompositeAp242 = defineCommand({
     'chart polygons, lamina data, per-ply area, thickness, mass) as property records of the tool product. The written text is read back and everything is compared with ' +
     'the model (data.selfCheck). import_composite_ap242 reads it back. Returns data: { format, ' +
     'step, schema, part, tool, plies[{ ply, name, order, area, thickness, solids }], validation, selfCheck, solids: { exact, faceted }, records, policy, reviewRequired }. ' +
+    'Ply pieces hang under their ply by next_assembly_usage_occurrence as the practice prescribes, so a reader built on OpenCascade sees only the tool solid in the raw file (import_composite_ap242 compensates). ' +
+    'Cores are not written: data.notWritten.cores counts them and data.reviewRequired lists cores_not_written (and unverified_material_basis for lamina data of mean / unknown basis). ' +
     'Needs the OCC kernel. Does not modify the document.',
   params: z.object({
     part: z.string().describe('Part id or name.'),
@@ -181,7 +185,14 @@ export const exportCompositeAp242 = defineCommand({
       plies: plyRecords,
       validation: laminateValidation(plyRecords, model.materials),
     };
-    const appended = appendComposite(base.step, record);
+    let appended: ReturnType<typeof appendComposite>;
+    try {
+      appended = appendComposite(base.step, record);
+    } catch (error) {
+      return fail('CMP_AP242_WRITE_FAILED', error instanceof Error ? error.message : 'the composite records could not be written', [
+        part.id,
+      ]);
+    }
     if (!appended.ok) return fail('CMP_AP242_WRITE_FAILED', appended.reason, [part.id]);
 
     const readBack = readComposite(appended.text);
@@ -200,6 +211,11 @@ export const exportCompositeAp242 = defineCommand({
     const faceted = solidIds.filter((id) => !isExact(id));
     const exactCount = solidIds.length - faceted.length;
     const { validation } = record;
+    const coreCount = coresOf(model, part.id).length;
+    const reasons = [
+      ...(coreCount > 0 ? ['cores_not_written'] : []),
+      ...(materials.some((material) => isUnverified(material)) ? ['unverified_material_basis'] : []),
+    ];
     return report(
       doc,
       `export_composite_ap242: part "${part.name}" (${part.id}) -> STEP AP242, tool '${nameOf(tool)}' + ${solidIds.length} ply solid(s) (${exactCount} exact, ${faceted.length} faceted), ${plies.length} ply(ies) in the table, thickness ${sig(validation.thickness)}${validation.mass === undefined ? '' : `, mass ${sig(validation.mass)}`}, ${appended.records} composite record(s), ${appended.text.length} bytes; self-check ${selfCheck.band} (${selfCheck.findings.length} comparisons).`,
@@ -230,7 +246,8 @@ export const exportCompositeAp242 = defineCommand({
             'CAx-IF Recommended Practices for Composite Materials v4.4 structure plus the llull-composite-2 records (see 06 TECHNICAL_SPEC 13.6 for what is and is not written)',
           selfCheck: selfCheck.policy,
         },
-        reviewRequired: { value: false, reasons: [] },
+        notWritten: { cores: coreCount },
+        reviewRequired: { value: reasons.length > 0, reasons },
       },
     );
   },

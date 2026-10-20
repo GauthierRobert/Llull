@@ -1,7 +1,8 @@
 /** Part 21 record emitter and the representation-item / unit builders shared by the llull records and the CAx-IF composite entity writer. */
 
-import { entityName, referencesOf, stringsOf } from '@lib/step21/records';
-import { quoted, real } from './part21';
+import { entityName, stringsOf } from '@lib/step21/records';
+import { referencesOutsideStrings as referencesOf } from './lex';
+import { quoted, real, unquoted } from './part21';
 
 /** Hands out record ids after the highest existing one and collects the `#n=BODY;` lines. */
 export class Emitter {
@@ -22,7 +23,7 @@ export function definitionsByName(bodies: ReadonlyMap<number, string>): Map<stri
   const productOfFormation = new Map<number, string>();
   const nameOfProduct = new Map<number, string>();
   for (const [id, body] of bodies) {
-    if (entityName(body) === 'PRODUCT') nameOfProduct.set(id, stringsOf(body)[1] || stringsOf(body)[0] || '');
+    if (entityName(body) === 'PRODUCT') nameOfProduct.set(id, unquoted(stringsOf(body)[1] ?? '') || unquoted(stringsOf(body)[0] ?? ''));
   }
   for (const [id, body] of bodies) {
     if (!entityName(body).startsWith('PRODUCT_DEFINITION_FORMATION')) continue;

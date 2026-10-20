@@ -51,6 +51,24 @@ function surfaceErrors(at: string, surface: Record<string, unknown>): string[] {
     const ok = isVec3(surface['center']) && isVec3(surface['axis']) && isVec3(surface['xDir']) && positive(surface['radius']);
     return ok ? [] : [`${at} (sphere) needs center, axis, xDir and radius > 0`];
   }
+  if (surface['type'] === 'plane') {
+    const ok = isVec3(surface['origin']) && isVec3(surface['xDir']) && isVec3(surface['yDir']) && isVec3(surface['normal']);
+    return ok ? [] : [`${at} (plane) needs origin, xDir, yDir and normal`];
+  }
+  if (surface['type'] === 'cylinder') {
+    const ok = isVec3(surface['origin']) && isVec3(surface['axis']) && isVec3(surface['xDir']) && positive(surface['radius']);
+    return ok ? [] : [`${at} (cylinder) needs origin, axis, xDir and radius > 0`];
+  }
+  if (surface['type'] === 'cone') {
+    const ok =
+      isVec3(surface['apex']) &&
+      isVec3(surface['axis']) &&
+      isVec3(surface['xDir']) &&
+      isNumber(surface['semiAngle']) &&
+      surface['semiAngle'] > 0 &&
+      surface['semiAngle'] < Math.PI / 2;
+    return ok ? [] : [`${at} (cone) needs apex, axis, xDir and a semiAngle in (0, pi/2)`];
+  }
   if (surface['type'] !== 'nurbs') return [];
   const domain = surface['domain'];
   const range = (value: unknown): boolean =>

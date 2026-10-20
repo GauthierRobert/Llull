@@ -10,7 +10,7 @@ import { MM_PER_UNIT } from '@core/model/units';
 import { parseRecords } from '@lib/step21/records';
 import type { CompositeRecord, PlyRecord, RosetteRecord } from './interchange';
 import { type Builder, Emitter, attach, definitionsByName, makeUnits, measure, measureContext, point, text, value } from './emit';
-import { quoted, real } from './part21';
+import { asciiOnly, quoted, real } from './part21';
 import { withRecPracId, writeStandard } from './standard';
 
 /** Format tag of the llull composite records (the lossless extension next to the CAx-IF structure), written as `encoding` in the laminate property. */
@@ -136,5 +136,6 @@ export function appendComposite(base: string, record: CompositeRecord): WriteOut
     attach(b, PROPERTY.extension, 'ply area', anchor, [text('ply', ply.name), measure('ply area', 'AREA_MEASURE', ply.area, units.area)]);
   const failure = writeStandard({ b, record, anchor, bodies, definitions });
   if (failure !== null) return { ok: false, reason: failure };
-  return { ok: true, text: `${withRecPracId(base.slice(0, end))}${out.lines.join('\n')}\n${base.slice(end)}`, records: out.lines.length };
+  const combined = `${withRecPracId(base.slice(0, end))}${out.lines.join('\n')}\n${base.slice(end)}`;
+  return { ok: true, text: asciiOnly(combined), records: out.lines.length };
 }

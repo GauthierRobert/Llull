@@ -1,5 +1,6 @@
 /** Fixtures of the composite AP242 suites: a scripted XDE kernel whose writer returns a synthetic Part 21 base, a small panel and the export / import helpers. */
 
+import { quoted } from '@aero/composites/ap242/part21';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
@@ -16,7 +17,7 @@ import { AS4, ROSETTE, withMaterials } from './fixtures';
 export const writeStep = (request: Pick<ExchangeWriteRequest, 'products'>): string => {
   const base = fakeStepText(
     request.products.map((product) => ({
-      name: product.name,
+      name: quoted(product.name).slice(1, -1),
       volume: product.validation?.volume ?? 1,
       area: product.validation?.area ?? 1,
       centroid: product.validation?.centroid ?? [0, 0, 0],
@@ -93,6 +94,8 @@ export interface Exported {
   readonly validation: { readonly plyCount: number; readonly thickness: number; readonly mass?: number };
   readonly solids: { readonly exact: number; readonly faceted: readonly string[] };
   readonly records: number;
+  readonly notWritten: { readonly cores: number };
+  readonly reviewRequired: { readonly value: boolean; readonly reasons: readonly string[] };
 }
 
 export const exportOf = (
@@ -127,8 +130,8 @@ export interface Imported {
 }
 
 /** The solids an import_step_exact of the exported file would yield: one product per name, a tetra B-rep each. */
-export const treeOf = (names: readonly string[]): ImportedExchange => ({
-  solids: names.map((name) => importedBody(fakeBrep(10, 10, [0, 0, 0]), { name })),
+export const treeOf = (names: readonly string[], volumes: Readonly<Record<string, number>> = {}): ImportedExchange => ({
+  solids: names.map((name) => importedBody(fakeBrep(volumes[name] ?? 10, 10, [0, 0, 0]), { name })),
   census: { roots: names.length, solids: names.length, shells: names.length, openShells: 0, faces: 6 * names.length },
   skipped: [],
   products: names.map((name, index) => ({ name, assembly: false, layers: [], solids: [index] })),
