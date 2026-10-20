@@ -674,8 +674,8 @@ Forces on edges / points are split equally over the target nodes (faces: area-co
 (temperature: element interpolation). Case lengths are in document units, loads in the case unit system. The FE tools run synchronously in the
 server process (no ticket cancel yet).
 
-**Not built (05 backlog):** shells / plane stress / beams, midsurface, defeature, Nastran BDF, OP2, `set_result_view`, `fea_import_results`,
-`fea_result_field`, VTU, the face map (TR-FEA-32), `*DISTRIBUTING COUPLING` / RBE3 remote loads, UI panels, `.llullz` result bundling. Modal, buckling,
+**Not built (05 backlog):** shells / plane stress / beams, midsurface, defeature (BDF, OP2, VTU, `set_result_view`, `fea_import_results`, `fea_result_field` and the face map are built in FEA-REST part 2, below),
+`*DISTRIBUTING COUPLING` for CalculiX, UI panels, `.llullz` result bundling. Modal, buckling,
 `dispose_margin`, `analytic_check`, moment loads, area-consistent forces and a Verdict subset (the metrics listed under "Verdict quality" below) are built (FEA-REST part 1, below).
 
 **FEA-REST part 1 (2026-10-19): modal, buckling, human gate, analytic checks, loads, quality.**
@@ -797,3 +797,41 @@ llvmpipe (software Vulkan, lavapipe) differs from the twin on 0.000–0.001 % of
 adapter the GPU tests skip with the logged reason. Measured raster stage (4 vCPU, a 16k-node block): TS 0.21 / 0.42–0.53 / 1.30–1.35 s vs native
 CPU 0.06–0.08 / 0.22–0.42 / 0.52–0.55 s (incl. process start) at 480×320 / 960×640 / 2000×2000; `auto` goes native from 1e6 supersampled pixels.
 The whole render is 2–4 s, dominated by the TS plot set-up (artifact trust, faces), which stays in TS.
+
+**FEA-REST part 2 (2026-10-20): M5 interop, face map, result access.** None of this ran against Nastran, ParaView, ccx or Gmsh on the dev machine (none installed);
+what is verified is stated per item.
+
+- **Nastran BDF** (`decks/bdfWriter.ts`, `decks/bdf/{fields,model,loads}.ts`; `fea_export format=nastran_bdf`). Small-field fixed format (8-character fields, blank
+  continuation markers). SOL 101 / 103 / 105 for static / modal / buckling. Cards: GRID, CTETRA (4 / 10 nodes), CTRIA3 / CQUAD4 / CTRIA6 / CQUAD8 (shell element types,
+  PSHELL with a numeric thickness; the mesher produces tets only today), PSOLID, MAT1 (G left blank), SPC1, SPCD (enforced displacements, selected by `LOAD`), FORCE,
+  PLOAD4 (CTETRA: `G1` = a corner of the face, `G4` = the corner not on it), GRAV, MOMENT, EIGRL (modes, `frequencyRangeHz` as V1 / V2). Buckling is a preload-free
+  pair of subcases (LOAD, then METHOD + STATSUB 1); a case with `set_buckling_preload` is refused (`FEA_BDF_UNSUPPORTED`). Node and element ids are the mesh ids.
+  Reals use at most 8 characters (`.3`, `7.85E-9`, `-9.81-12`); `data.warnings` `FEA_BDF_ROUNDED` when that rounds a value by more than 1e-6 (large-field `GRID*` is not
+  written). Golden text in `tests/unit/cae/bdfWriter.test.ts`; the pyNastran `read_bdf(xref=True)` round trip is in the same file and **skips with a logged reason**
+  when Python or pyNastran is absent (it was skipped here). PLOAD4 sign (positive = into the element) and the STRESS request (`CUBIC`) are from memory of the QRG, unchecked.
+- **Moments with `referencePoint`.** `add_fea_load` / `update_fea_load` accept `referencePoint` for a moment. The BDF writes a reference GRID there (default: centroid of the
+  target nodes), an RBE3 over the target nodes and a MOMENT on it. The CalculiX deck **keeps the part-1 nodal couple** and ignores the point: `*DISTRIBUTING COUPLING`
+  could not be checked against a real ccx run (deferred, not replaced).
+- **OP2 import** (`results/op2Reader.ts`, `results/op2Results.ts`; `fea_import_results format=op2|frd`). Pure TS reader of the pyNastran record / marker layout:
+  `LAMA` eigenvalues, `OUG*` displacements / eigenvectors, `OES*` CTETRA stresses (element type 39, 109 words), single precision, either endianness; anything else
+  (double precision, other element types, a broken marker) is a `warnings` entry, never a guess. Hand-built fixtures only (`tests/unit/cae/op2Fixture.ts`): **not verified against
+  a real MSC / NX OP2**. The OP2 must belong to the current mesh (every mesh node has a displacement; grid ids above the mesh ids are the moment reference grids and are dropped),
+  else `FEA_OP2_MESH_MISMATCH`; the result is recorded through `record_fea_results` (the §4.1 trust path), solver `nastran`. A foreign-mesh, review-only import is **not** built.
+  `.frd` goes the same way (`FEA_RESULTS_MESH_MISMATCH`). The CLI reads a local file with `file=<path>`.
+- **VTU** (`results/vtuWriter.ts`; `fea_export format=vtu [encoding=base64]`): UnstructuredGrid with points, cells (tets, quadratic tets, shells), `part` and `element_id`
+  cell arrays and, when current verified results are recorded, `U_k`, `S_k`, `von_mises_k` per result set; ASCII or inline base64 binary (header and data encoded separately).
+  Not opened in ParaView here.
+- **Netgen mesher: deferred.** The bridge only knows Gmsh; `MeshControls.mesher` stays `gmsh`.
+- **Face map (TR-FEA-32).** The server asks `kernel.faceQuery.faceDetails` for each STEP part's faces (area, centroid) and `faceQuery.distance` for the kernel face nearest to each
+  `facesNear` point (`server/src/fea/faceRefs.ts`); the bridge request carries `parts[].faces` and `targets[].faceIndices`. `llull_mesh.py` matches faces to Gmsh surfaces by area and
+  centroid (1e-6, `AMBIGUOUS_FACE_MAP` when two match), resolves such a target to the mapped surfaces and returns `faceMap` (stored in the mesh artifact, shown in `MeshSummary.faceMap`).
+  Fallbacks, all to today's nearest-surface resolution: no face query (Manifold), a point farther than 1e-3 of the diagonal from every face, a face with no Gmsh match, conformal bonding
+  (fragmentation splits faces), STL parts. The point resolution still runs first, so `FEA_TARGET_UNRESOLVED` / `FEA_TARGET_AMBIGUOUS` are unchanged. **The Python side could not be run or
+  even compiled here (no Python, no Gmsh)**; the TS side is tested with a fake kernel and a fake bridge (`tests/unit/cae/faceMapRequest.test.ts`). `edgesNear` / `intersectPlane` unchanged.
+- **Result access.** `set_result_view` (presentation data on the case, not in the input hash), `fea_result_field` (read-only registry query: a field at the extreme nodes, named nodes,
+  nearest nodes of points or probes, with min / max / mean over the whole result set, from the verified artifact), and `set_buckling_preload` (a load case applied in a `*STATIC` step
+  before `*BUCKLE`, not scaled; the reference is the first other load case; unverified against ccx; the preload is in the input hash). Without a preload the deck is unchanged (one `*BUCKLE` step).
+- **Other part-1 review follow-ups** (`fix(cae)` commit): six-component ccx mass tables with a warning for unreadable ones (layout still unconfirmed against a real run),
+  `fractionOfExtractedSum` instead of "of the model mass", force weights only when every target node is a face node, a `-1 Hz` lower bound for supportless modal cases,
+  `set_margin_band`, `inputHash` in the signed disposition payload, a bounding-box note on `FEA_MESH_ADEQUACY`, element-type guard in `meshQuality`.
+- **Not done:** large-field BDF, `*DISTRIBUTING COUPLING`, Netgen, foreign-mesh review-only imports, double-precision OP2, OP2 shell / hex stresses, `.llullz` result bundling, UI panels (part 3).

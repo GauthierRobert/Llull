@@ -11,6 +11,9 @@ import { addResultProbe, deleteResultProbe } from './probes';
 import { probeHistory } from './probeHistory';
 import { recordFeMesh, recordFeaResults } from './record';
 import { setMarginBand } from '../margins/marginBandCommand';
+import { setBucklingPreload } from './bucklingPreload';
+import { feaResultField } from './resultField';
+import { setResultView } from './resultView';
 import { feaReport } from './report';
 import { renderFeaResults } from './renderResults';
 
@@ -35,4 +38,7 @@ export const feaCommands = commandCatalog(
   renderFeaResults,
   checkAnalysis,
   setMarginBand,
+  setBucklingPreload,
+  feaResultField,
+  setResultView,
 );

@@ -30,10 +30,15 @@ export const setMarginBand = defineCommand({
     if (found === undefined)
       return refuseMarginsAs(doc, 'set_margin_band', 'FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`, [analysisId]);
     if (marginalBand !== undefined && !(Number.isFinite(marginalBand) && marginalBand >= 0))
-      return refuseMarginsAs(doc, 'set_margin_band', 'FEA_MARGIN_PARAM_INVALID', `marginalBand ${marginalBand} must be a finite number >= 0`, [
-        analysisId,
-      ]);
+      return refuseMarginsAs(
+        doc,
+        'set_margin_band',
+        'FEA_MARGIN_PARAM_INVALID',
+        `marginalBand ${marginalBand} must be a finite number >= 0`,
+        [analysisId],
+      );
     const { marginalBand: _previous, ...rest } = found;
+    void _previous;
     const next = marginalBand === undefined ? rest : { ...rest, marginalBand };
     return changed(
       withCase(doc, next),

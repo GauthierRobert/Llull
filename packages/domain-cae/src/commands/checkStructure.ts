@@ -49,7 +49,11 @@ function eigenSetupItems(analysis: AnalysisCase): StructureItem[] {
       items.push(item('FEA_NO_CONSTRAINTS', 'error', 'no support: a buckling analysis of a free model is singular', [id]));
     if (analysis.loadOrder.length === 0)
       items.push(item('FEA_NO_LOADS', 'error', 'no load: the buckling factor multiplies the applied reference load', [id]));
-    const cases = [...new Set(analysis.loadOrder.flatMap((loadId) => analysis.loads[loadId]?.loadCase ?? []))];
+    const cases = [...new Set(analysis.loadOrder.flatMap((loadId) => analysis.loads[loadId]?.loadCase ?? []))].filter(
+      (name) => name !== analysis.preloadLoadCase,
+    );
+    if (analysis.preloadLoadCase !== undefined && cases.length === 0)
+      items.push(item('FEA_NO_LOADS', 'error', `no load case besides the preload '${analysis.preloadLoadCase}': nothing to scale`, [id]));
     if (cases.length > 1)
       items.push(
         item(
