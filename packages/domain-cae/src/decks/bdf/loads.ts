@@ -3,12 +3,13 @@
 import type { FeaConstraint, FeaLoad } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
 import type { DeckContext, DeckRefusal } from '../context';
-import { consistentWeights } from '../loadDistribution';
+import { consistentWeights, momentForces } from '../loadDistribution';
 import { planeAxis } from '../mechanical';
 import { cardLines } from './fields';
 import { failed, integer, real, refusal, type Rounding } from './model';
 
 const DOF_COMPONENT = { ux: 1, uy: 2, uz: 3, rx: 4, ry: 5, rz: 6 } as const;
+const SHELL_CARDS: ReadonlySet<string> = new Set(['S3', 'S4', 'S6', 'S8']);
 /** Corner positions (0-based) of the tetrahedron faces in CalculiX numbering and the corner NOT on each face (PLOAD4 `G4` of a CTETRA). */
 const TET_FACES: readonly (readonly [number, number])[] = [
   [0, 3],
@@ -35,7 +36,7 @@ function constraintComponents(
       ? refusal('FEA_CONSTRAINT_INVALID', `symmetry constraint '${constraint.id}' is not an axis-aligned plane in the mesh`, [
           constraint.id,
         ])
-      : [[axis + 1, 0]];
+      : [[axis + 1, 0], ...(shells ? [0, 1, 2].filter((other) => other !== axis).map((other): [number, number] => [other + 4, 0]) : [])];
   }
   const out: [number, number][] = [];
   for (const [dof, value] of Object.entries(constraint.dofs ?? {})) {
@@ -109,7 +110,7 @@ export interface FreeIds {
  * Loads of one load case under `sid`: forces split like the INP writer (area-consistent over faces, else equal over the target nodes, or `per_node`),
  * pressure as PLOAD4 (+ into the material, the Nastran solid convention), gravity as one GRAV, and each moment as a MOMENT on a reference GRID held to
  * the target nodes by an RBE3 (at `referencePoint`, else the centroid of the target nodes).
- * @failure target without nodes / faces -> FEA_TARGET_UNRESOLVED; pressure on a non-tetrahedron element or a bad face -> FEA_LOAD_INVALID; id overflow -> FEA_BDF_ID_TOO_LARGE
+ * @failure target without nodes / faces -> FEA_TARGET_UNRESOLVED; a moment on fewer than 3 nodes, or on nodes that cannot carry it (collinear about their line) -> FEA_LOAD_INVALID; pressure on a non-tetrahedron element or a bad face -> FEA_LOAD_INVALID; id overflow -> FEA_BDF_ID_TOO_LARGE
  */
 export function loadCards(ctx: DeckContext, loadCase: string, sid: number, ids: FreeIds, track: Rounding): LoadCards | DeckRefusal {
   const forces = new Map<number, Vec3>();
@@ -137,8 +138,11 @@ export function loadCards(ctx: DeckContext, loadCase: string, sid: number, ids: 
         weights !== null ? [...weights] : nodes.map((node) => [node, load.distribution === 'per_node' ? 1 : 1 / nodes.length]);
       for (const [node, share] of shares) add(forces, node, [load.vector[0] * share, load.vector[1] * share, load.vector[2] * share]);
     } else if (load.kind === 'moment' && load.vector !== undefined) {
-      if (nodes.length < 2)
-        return refusal('FEA_LOAD_INVALID', `moment '${id}' (${load.name}) needs at least 2 target nodes for its RBE3`, [id]);
+      if (nodes.length < 3)
+        return refusal('FEA_LOAD_INVALID', `moment '${id}' (${load.name}) needs at least 3 non-collinear target nodes for its RBE3`, [id]);
+      const carried = momentForces(ctx.mesh, nodes, load.vector);
+      if ('refusal' in carried)
+        return refusal('FEA_LOAD_INVALID', `moment '${id}' (${load.name}) cannot be held by an RBE3: ${carried.refusal}`, [id]);
       const centre: Vec3 =
         load.referencePoint !== undefined
           ? [
@@ -183,6 +187,13 @@ export function loadCards(ctx: DeckContext, loadCase: string, sid: number, ids: 
       if (faces.length === 0) return refusal('FEA_TARGET_UNRESOLVED', `pressure '${id}' (${load.name}) has no faces in the mesh`, [id]);
       for (const [elementId, label] of faces) {
         const element = elements.get(elementId);
+        if (element !== undefined && SHELL_CARDS.has(element.type)) {
+          // PLOAD4 on a shell acts along the element normal: the mesher's face 1 (loaded from the top side) pushes along -normal.
+          const pressure = real(label === 2 ? load.magnitude : -load.magnitude, 'pressure', track);
+          if (failed(pressure)) return pressure;
+          out.loads.push(...cardLines('PLOAD4', [sidText, String(elementId), pressure]));
+          continue;
+        }
         const corners = TET_FACES[label - 1];
         if (element === undefined || (element.type !== 'C3D4' && element.type !== 'C3D10') || corners === undefined)
           return refusal('FEA_LOAD_INVALID', `pressure '${id}': face ${label} of element ${elementId} is not a tetrahedron face`, [id]);

@@ -49,7 +49,7 @@ export function consistentWeights(ctx: DeckContext, targetKey: string): Readonly
   for (const [elementId, label] of faces) {
     const element = elements.get(elementId);
     const corners = TET_FACES[label - 1];
-    if (element === undefined || corners === undefined) return null;
+    if (element === undefined || corners === undefined || (element.type !== 'C3D4' && element.type !== 'C3D10')) return null;
     const points = corners.map((corner) => position.get(element.nodes[corner] ?? -1));
     if (points.some((point) => point === undefined)) return null;
     const [a, b, c] = points as [Vec3, Vec3, Vec3];

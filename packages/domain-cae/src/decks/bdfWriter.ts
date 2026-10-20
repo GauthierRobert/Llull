@@ -8,9 +8,13 @@ import type { CadDocument } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { analysisInputHash } from '../hash/inputHash';
+import { bindingMarker } from '../results/inputBinding';
+import { largest } from '../shared/largest';
 import { buildDeckContext, loadCasesOf, type DeckContext, type DeckRefusal } from './context';
 import { precheck } from './deckBuilder';
 import { cardLines } from './bdf/fields';
+import { compositeCards } from './bdf/composite';
+import { isCompositePart } from '../shell/shellDeck';
 import { constraintCards, loadCards, type FreeIds } from './bdf/loads';
 import {
   BDF_ELEMENT_TYPES,
@@ -84,14 +88,24 @@ export function writeBdf(doc: CadDocument, analysisId: string, mesh: FeMeshArtif
   const { property } = numbering(ctx);
   const elements = elementCards(ctx, property);
   if (!Array.isArray(elements)) return elements;
-  const properties = propertyCards(ctx, track);
-  if ('code' in properties) return properties;
+  const plain = propertyCards(ctx, track);
+  if ('code' in plain) return plain;
+  const properties = { lines: [...plain.lines], comments: [...plain.comments] };
+  let nextMid = numbering(ctx).material.size + 1;
+  for (const [entityId, pid] of numbering(ctx).property) {
+    if (!isCompositePart(ctx, entityId)) continue;
+    const laminate = compositeCards(ctx, entityId, pid, nextMid, track);
+    if ('code' in laminate) return laminate;
+    properties.lines.push(...laminate.lines);
+    properties.comments.push(...laminate.comments);
+    nextMid += laminate.materials;
+  }
   const supports = analysis.type === 'modal' && analysis.constraintOrder.length === 0 ? null : constraintCards(ctx, SPC_SET, shells);
   if (supports !== null && 'code' in supports) return supports;
 
   const ids: FreeIds = {
-    nextGrid: Math.max(0, ...mesh.nodes.map((node) => node[0])) + 1,
-    nextElement: Math.max(0, ...mesh.blocks.flatMap((block) => block.elements.map((element) => element[0] ?? 0))) + 1,
+    nextGrid: largest(mesh.nodes.map((node) => node[0])) + 1,
+    nextElement: largest(mesh.blocks.flatMap((block) => block.elements.map((element) => element[0] ?? 0))) + 1,
   };
   const cases = analysis.type === 'modal' ? [] : loadCasesOf(analysis).slice(0, analysis.type === 'buckling' ? 1 : undefined);
   if (analysis.type === 'buckling' && analysis.loadOrder.length === 0)
@@ -123,14 +137,16 @@ export function writeBdf(doc: CadDocument, analysisId: string, mesh: FeMeshArtif
   if (analysis.type === 'buckling') control.push('SUBCASE 2', '  LABEL = buckling', `  METHOD = ${METHOD_SET}`, '  STATSUB = 1');
   const solution = SOLUTIONS[analysis.type];
   const meshHash = sha256Hex(canonicalJson(mesh));
+  const inputHash = analysisInputHash(doc, analysisId, 'full');
   const header = [
-    `$ llull analysis ${commentText(analysis.name)} units ${analysis.unitSystem} inputHash ${analysisInputHash(doc, analysisId, 'full')} meshHash ${meshHash}`,
+    `$ llull analysis ${commentText(analysis.name)} units ${analysis.unitSystem} inputHash ${inputHash} meshHash ${meshHash}`,
     '$ llull: node and element ids are the mesh ids; results of this deck import through fea_import_results (op2)',
   ];
   const caseControl = [
     `SOL ${solution}`,
     'CEND',
     `TITLE = ${commentText(analysis.name, 60)}`,
+    `SUBTITLE = ${bindingMarker(inputHash)}`,
     'ECHO = NONE',
     ...(supports === null ? [] : [`SPC = ${SPC_SET}`]),
     ...OUTPUT_REQUESTS,

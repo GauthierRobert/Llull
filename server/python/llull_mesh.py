@@ -168,13 +168,14 @@ def _faces_of(gmsh, region_of, points, key, entity_id):
 
 def _face_map(gmsh, region_of, refs, scale, entity_id):
     """Kernel face index -> (Gmsh surface tag, centroid residual) by area and centroid (TR-FEA-32). A face with no candidate is left out
-    (its targets fall back to the nearest-surface resolution); more than one candidate is AMBIGUOUS_FACE_MAP."""
+    (its targets fall back to the nearest-surface resolution); a face with more than one candidate is left out too and listed in the
+    returned `ambiguous` dict (index -> candidate tags): only a target that names it fails with AMBIGUOUS_FACE_MAP."""
     box = gmsh.model.getBoundingBox(-1, -1)
     diag = _dist(box[:3], box[3:]) or 1.0
     surfaces = []
     for surface in region_of:
         surfaces.append((surface, gmsh.model.occ.getMass(2, surface), gmsh.model.occ.getCenterOfMass(2, surface)))
-    mapped = {}
+    mapped, ambiguous = {}, {}
     for ref in refs:
         area = float(ref["area"]) * scale * scale
         centre = [float(c) * scale for c in ref["centroid"]]
@@ -184,13 +185,10 @@ def _face_map(gmsh, region_of, refs, scale, entity_id):
             if abs(surface_area - area) <= FACE_MAP_REL * area and distance <= FACE_MAP_REL * diag:
                 found.append((surface, distance))
         if len(found) > 1:
-            raise MeshError(
-                "AMBIGUOUS_FACE_MAP",
-                "face %s of '%s' matches Gmsh surfaces %s by area and centroid" % (ref["index"], entity_id, [s for s, _ in found]),
-            )
-        if found:
+            ambiguous[int(ref["index"])] = [s for s, _ in found]
+        elif found:
             mapped[int(ref["index"])] = found[0]
-    return mapped
+    return mapped, ambiguous
 
 
 def _edges_of(gmsh, points, key, entity_id, curves=None):
@@ -218,9 +216,12 @@ def _size_fields(gmsh, controls, refinements, scale):
     fields.append(base)
     for item in refinements:
         size = float(item["size"]) * scale
-        if item["surfaces"]:
+        if item["surfaces"] or item.get("curves"):
             distance = field.add("Distance")
-            field.setNumbers(distance, "SurfacesList", item["surfaces"])
+            if item["surfaces"]:
+                field.setNumbers(distance, "SurfacesList", item["surfaces"])
+            if item.get("curves"):
+                field.setNumbers(distance, "CurvesList", item["curves"])
             field.setNumber(distance, "Sampling", 24)
             threshold = field.add("Threshold")
             field.setNumber(threshold, "InField", distance)
@@ -247,14 +248,21 @@ def _size_fields(gmsh, controls, refinements, scale):
         gmsh.option.setNumber("Mesh.MeshSizeMin", float(controls["minSize"]) * scale)
 
 
-def _resolve_targets(gmsh, geometry_kind, region_of, curves, targets, controls, scale, entity_id, face_map=None):
+def _resolve_targets(gmsh, geometry_kind, region_of, curves, targets, controls, scale, entity_id, face_map=None, ambiguous=None):
     """Targets of one entity -> resolved faces / edges / points + the refinement fields they define. With a `face_map` a target that names
-    kernel `faceIndices` all of which are mapped takes those surfaces instead of the nearest surface of its `facesNear` points."""
+    kernel `faceIndices` all of which are mapped takes those surfaces instead of the nearest surface of its `facesNear` points; a target that
+    names a face the map found ambiguous fails with AMBIGUOUS_FACE_MAP."""
     resolved = {}
     for target in targets:
         key = target["key"]
         faces, residual, edges = set(), 0.0, set()
         indices = target.get("faceIndices") or []
+        clash = [int(i) for i in indices if ambiguous and int(i) in ambiguous]
+        if clash:
+            raise MeshError(
+                "AMBIGUOUS_FACE_MAP",
+                "target %s: face %s of '%s' matches Gmsh surfaces %s by area and centroid" % (key, clash[0], entity_id, ambiguous[clash[0]]),
+            )
         if target.get("facesNear"):
             # always run the point resolution: it still reports FEA_TARGET_UNRESOLVED / FEA_TARGET_AMBIGUOUS and gives the residual
             faces, residual = _faces_of(gmsh, region_of, [[c * scale for c in p] for p in target["facesNear"]], key, entity_id)
@@ -328,29 +336,53 @@ def _extract(gmsh, volumes, region_of, controls, entity_id, resolved):
     curve_nodes = {}
     for _, curve in gmsh.model.getEntities(1):
         curve_nodes[curve] = {int(n) for n in gmsh.model.mesh.getNodes(1, curve, True)[0]}
-    return {"coords": coords, "tets": tets, "resolved": resolved, "region_nodes": region_nodes, "region_faces": region_faces, "curve_nodes": curve_nodes}
+    element_type = "C3D10" if int(controls["order"]) == 2 else "C3D4"
+    return {
+        "coords": coords,
+        "tets": tets,
+        "blocks": [(element_type, tets)],
+        "resolved": resolved,
+        "region_nodes": region_nodes,
+        "region_faces": region_faces,
+        "curve_nodes": curve_nodes,
+    }
 
 
 def _mesh_part(gmsh, part, targets, controls, scale, workdir):
     """Mesh one entity in a fresh model; returns its raw mesh + target sets keyed by tags of this model."""
     entity_id = part["entityId"]
     geometry = part["geometry"]
+    if geometry.get("kind") == "midsurface":
+        import llull_shell  # noqa: PLC0415 - llull_shell imports this module
+
+        return llull_shell.mesh_midsurface_part(gmsh, part, targets, controls, scale)
     gmsh.model.add("part_" + str(entity_id))
     path = os.path.join(workdir, "part_%d" % len(os.listdir(workdir)))
+    removed = []
     if geometry["kind"] == "step":
         with open(path + ".step", "wb") as handle:
             handle.write(base64.b64decode(geometry["stepBase64"]))
         region_of = _load_step(gmsh, path + ".step", scale)
+        if part.get("defeature"):
+            import llull_shell  # noqa: PLC0415
+
+            removed = llull_shell.defeature(gmsh, part["defeature"], scale, entity_id)
+            region_of = {tag: tag for _, tag in gmsh.model.getEntities(2)}
+    elif part.get("defeature"):
+        raise MeshError("FEA_DEFEATURE_FAILED", "defeaturing '%s' needs exact STEP geometry (use the OCC kernel)" % entity_id)
     elif geometry["kind"] == "stl":
         _scaled_stl(base64.b64decode(geometry["stlBase64"]), scale, path + ".stl")
         region_of = _load_stl(gmsh, path + ".stl")
     else:
         raise MeshError("FEA_MESH_FAILED", "unknown geometry kind %r" % geometry.get("kind"))
-    refs = part.get("faces") or []
-    face_map = _face_map(gmsh, region_of, refs, scale, entity_id) if refs and geometry["kind"] == "step" else None
-    resolved, refinements = _resolve_targets(gmsh, geometry["kind"], region_of, None, targets, controls, scale, entity_id, face_map)
+    refs = [] if removed else (part.get("faces") or [])
+    face_map, ambiguous = _face_map(gmsh, region_of, refs, scale, entity_id) if refs and geometry["kind"] == "step" else (None, None)
+    resolved, refinements = _resolve_targets(
+        gmsh, geometry["kind"], region_of, None, targets, controls, scale, entity_id, face_map, ambiguous
+    )
     _generate(gmsh, controls, refinements, scale, entity_id)
     raw = _extract(gmsh, [tag for _, tag in gmsh.model.getEntities(3)], region_of, controls, entity_id, resolved)
+    raw["defeatured"] = removed
     raw["face_map"] = [
         {"entityId": entity_id, "faceIndex": index, "tag": tag, "residual": residual} for index, (tag, residual) in sorted((face_map or {}).items())
     ]
@@ -448,9 +480,9 @@ def op_mesh(request):
         gmsh.option.setNumber("Mesh.MaxNumThreads2D", 1)
         gmsh.option.setNumber("Mesh.MaxNumThreads3D", 1)
         version = gmsh.__version__
-        element_type = "C3D10" if int(controls["order"]) == 2 else "C3D4"
         nodes_out, blocks, node_sets, face_sets, residuals = [], [], {}, {}, {}
         node_counter = element_counter = 0
+        defeatured = []
         part_nodes = {}
         conformal = controls.get("bonding") == "conformal"
         with tempfile.TemporaryDirectory(prefix="llull-mesh-") as workdir:
@@ -470,7 +502,7 @@ def op_mesh(request):
                     shared[tag] = node_counter
                     nodes_out.append([node_counter, *raws[0]["coords"][tag]])
             for part, raw in zip(parts, raws):
-                used = sorted({n for tet in raw["tets"] for n in tet})
+                used = sorted({n for _, rows in raw["blocks"] for row in rows for n in row})
                 renumber = shared
                 if renumber is None:
                     renumber = {}
@@ -479,18 +511,24 @@ def op_mesh(request):
                         renumber[tag] = node_counter
                         nodes_out.append([node_counter, *raw["coords"][tag]])
                 part_nodes[part["entityId"]] = (used, renumber, raw["coords"])
-                elements, element_ids = [], []
-                for tet in raw["tets"]:
-                    element_counter += 1
-                    element_ids.append(element_counter)
-                    elements.append([element_counter, *(renumber[n] for n in tet)])
-                blocks.append({"type": element_type, "entityId": part["entityId"], "elements": elements})
+                element_ids = []
+                for block_type, rows in raw["blocks"]:
+                    elements = []
+                    for row in rows:
+                        element_counter += 1
+                        element_ids.append(element_counter)
+                        elements.append([element_counter, *(renumber[n] for n in row)])
+                    blocks.append({"type": block_type, "entityId": part["entityId"], "elements": elements})
+                if raw.get("defeatured"):
+                    defeatured.append({"entityId": part["entityId"], "faces": raw["defeatured"]})
                 for key, item in raw["resolved"].items():
                     nodes = set()
                     faces = []
                     for region in item["faces"]:
                         nodes |= raw["region_nodes"].get(region, set())
                         faces += [[element_ids[position], label] for position, label in raw["region_faces"].get(region, [])]
+                    if "target_faces" in raw:
+                        faces = [[element_ids[position], label] for position, label in raw["target_faces"].get(key, [])]
                     for curve in item["edges"]:
                         nodes |= raw["curve_nodes"].get(curve, set())
                     residual = item["residual"]
@@ -529,6 +567,7 @@ def op_mesh(request):
             "faceSets": face_sets,
             "targets": residuals,
             "faceMap": [entry for raw in raws for entry in raw.get("face_map", [])],
+            "defeatured": defeatured,
         }
     finally:
         gmsh.finalize()

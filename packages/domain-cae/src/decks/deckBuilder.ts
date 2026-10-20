@@ -6,12 +6,15 @@ import type { CadDocument } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { analysisInputHash } from '../hash/inputHash';
+import { bindingMarker } from '../results/inputBinding';
 import { ALL_ELEMENTS, ALL_NODES, buildDeckContext, isDeckRefusal, type DeckContext, type DeckRefusal, type DeckSections } from './context';
 import type { MaterialCardWriter } from './constitutive';
 import { commentText, idLines, linesText, row } from './format';
 import { bucklingSteps, modalStep } from './eigen';
 import { mechanicalMaterialLines, staticStep } from './mechanical';
 import { nonlinearSteps } from '../nonlinear/deck';
+import { deckElementType, isCompositePart, planarSectionCards } from '../shell/shellDeck';
+import { PLANAR_TYPES } from '../shell/shellResults';
 
 /** The discipline functions of the thermal and thermo-mechanical lanes (FE_PIPELINE_DESIGN §5 table). */
 export interface DisciplineTable {
@@ -64,6 +67,9 @@ function nameCollision(ctx: DeckContext): DeckRefusal | null {
 }
 
 const SOLID_TETS: ReadonlySet<string> = new Set(['C3D4', 'C3D10']);
+/** Static, modal and buckling decks also write shells and plane-stress elements (M6); the thermal and nonlinear lanes stay solid-only. */
+const INP_ELEMENTS: ReadonlySet<string> = new Set([...SOLID_TETS, ...PLANAR_TYPES]);
+const STRUCTURAL_2D: ReadonlySet<string> = new Set(['static', 'modal', 'buckling']);
 
 /** Refusals shared by every deck writer (export gate, stale mesh, units, parts, materials, name collisions, constraints); `writable` = element types the writer handles. */
 export function precheck(
@@ -100,10 +106,19 @@ export function precheck(
       return refuse('FEA_PART_INVALID', `the mesh has elements of '${block.entityId}', which is not a part of the analysis`, [
         block.entityId,
       ]);
+    const kind = analysis.parts[block.entityId]?.kind;
+    const expected = kind === 'shell' ? 'S' : kind === 'plane_stress' ? 'CPS' : 'C3D';
+    if (!block.type.startsWith(expected) || (expected === 'S' && block.type.startsWith('C')))
+      return refuse(
+        'FEA_PART_INVALID',
+        `element type ${block.type} does not fit the ${kind ?? 'solid'} idealization of '${block.entityId}'`,
+        [block.entityId],
+      );
     blockEntities.add(block.entityId);
   }
   for (const entityId of Object.keys(analysis.parts)) {
     if (!blockEntities.has(entityId)) return refuse('FEA_PART_INVALID', `part '${entityId}' has no elements in the mesh`, [entityId]);
+    if (isCompositePart(ctx, entityId)) continue;
     const material = ctx.materialOf(entityId);
     if (material === null) return refuse('FEA_MATERIAL_MISSING', `part '${entityId}' has no material`, [entityId]);
     if (material.record?.unresolved !== undefined)
@@ -125,7 +140,7 @@ function modelBlock(ctx: DeckContext): string[] {
   const { mesh } = ctx;
   const lines = [`*NODE, NSET=${ALL_NODES}`, ...mesh.nodes.map(([id, x, y, z]) => row(id, x, y, z))];
   for (const block of mesh.blocks) {
-    lines.push(`*ELEMENT, TYPE=${block.type}, ELSET=${ctx.elset(block.entityId)}`);
+    lines.push(`*ELEMENT, TYPE=${deckElementType(ctx, block.type, block.entityId)}, ELSET=${ctx.elset(block.entityId)}`);
     lines.push(...block.elements.map((element) => row(...element)));
   }
   const elsets = [...new Set(mesh.blocks.map((block) => ctx.elset(block.entityId)))];
@@ -155,17 +170,20 @@ export function buildInp(
 ): InpResult {
   const ctx = buildDeckContext(doc, analysisId, mesh, artifacts);
   if (ctx === null) return refuse('FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`, [analysisId]);
-  const problem = precheck(doc, analysisId, mesh, ctx);
+  const problem = precheck(doc, analysisId, mesh, ctx, STRUCTURAL_2D.has(ctx.analysis.type) ? INP_ELEMENTS : SOLID_TETS);
   if (problem !== null) return problem;
   const { analysis } = ctx;
   const heat = analysis.type === 'heat_steady' || analysis.type === 'heat_transient';
   const lines = [
     `** llull analysis ${commentText(analysis.name)} units ${analysis.unitSystem} inputHash ${analysisInputHash(doc, analysisId, 'full')} meshHash ${sha256Hex(canonicalJson(mesh))}`,
+    '*HEADING',
+    bindingMarker(analysisInputHash(doc, analysisId, 'full')),
     ...modelBlock(ctx),
   ];
   const materialOwners = new Map<string, string>();
   for (const entityId of Object.keys(analysis.parts))
-    if (!materialOwners.has(ctx.materialName(entityId))) materialOwners.set(ctx.materialName(entityId), entityId);
+    if (!isCompositePart(ctx, entityId) && !materialOwners.has(ctx.materialName(entityId)))
+      materialOwners.set(ctx.materialName(entityId), entityId);
   for (const [name, entityId] of materialOwners) {
     const constitutive = heat ? null : (disciplines.materialCardWriter?.(ctx, entityId) ?? null);
     if (constitutive !== null && 'code' in constitutive) return constitutive;
@@ -193,6 +211,12 @@ export function buildInp(
     orientations.set(entityId, block.name);
   }
   for (const entityId of Object.keys(analysis.parts)) {
+    const planar = planarSectionCards(ctx, entityId);
+    if (planar !== null) {
+      if (isDeckRefusal(planar)) return planar;
+      lines.push(...planar.text.split('\n').filter((line) => line !== ''));
+      continue;
+    }
     const orientation = orientations.get(entityId);
     lines.push(
       `*SOLID SECTION, ELSET=${ctx.elset(entityId)}, MATERIAL=${ctx.materialName(entityId)}${orientation === undefined ? '' : `, ORIENTATION=${orientation}`}`,
