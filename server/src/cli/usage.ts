@@ -54,6 +54,12 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
   release verify DIR          re-verify a package: member hashes, manifest hash, Ed25519 signatures, key trust (works without a document)
   release sign --revision R --key KEYID [--kind release|iteration] [--apply]   sign release_manifest with a local key; --apply records it
                               with record_signature (the key must be trusted), else prints the params
+  lotar pack --revision R --out DIR [--organization-id ID --organization-name NAME] [--export-confirmation FILE] [--attach --confirm-key KEYID]
+                              EN 9300 archive package of a frozen revision (--doc): the release package plus the AP242 PDM file, validation properties,
+                              PLM records (baselines, as-built, MBOM, FAI results) and VERIFY.txt
+  lotar verify DIR [--manifest-sha256 HASH | --doc FILE]   everything release verify checks, plus the validation properties re-derived from the
+                              archived definition, the PDM read-back and the sealed records
+  (import a QIF 3.0 results file as FAI results: llull exec import_qif_results xml=@text:results.qif revision=A --confirm-key KEYID)
   vault init | status [PN] | checkout PN | checkin | renew PN | break-lock PN | verify   the local vault (09 PLM; --vault DIR or $LLULL_VAULT, --doc FILE):
                               checkout takes the exclusive lock and writes the head document, checkin checkpoints, stores frozen snapshots as
                               content-addressed objects, updates refs and frees the lock; PLM_VAULT_LOCKED names the holder; break-lock only a stale lock

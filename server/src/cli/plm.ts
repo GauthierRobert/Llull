@@ -14,6 +14,7 @@ import { readDocumentFile } from '../documentFile';
 import { auditDir, verifyAuditChain } from '../plm/auditChain';
 import { createKeyStore } from '../plm/keyStore';
 import { isoSeconds } from '../plm/hostRun';
+import { buildLotarPackage, verifyLotarPackage } from '../plm/lotarPackage';
 import { buildReleasePackage, verifyReleasePackage, writeReleasePackage } from '../plm/releasePackage';
 import { GATE_CONTEXT, createSignaturePort } from '../plm/signaturePort';
 import { createTrustStore } from '../plm/trustStore';
@@ -214,6 +215,21 @@ function packageAnchor(dir: string, args: ParsedArgv, io: PlmCliIo): string | nu
   }
 }
 
+/** `attach_release_package` for a package just written (its manifest hash and location), confirmed with `--confirm-key` when given. */
+async function attachWritten(
+  args: ParsedArgv,
+  io: PlmCliIo,
+  backend: () => Promise<CliBackend>,
+  params: Record<string, unknown>,
+): Promise<CommandOutcome> {
+  const target = await backend();
+  const confirmKey = stringFlag(args, 'confirm-key');
+  return target.run(
+    'attach_release_package',
+    confirmKey === undefined ? params : await confirmedParams(target, 'attach_release_package', params, confirmKey, io),
+  );
+}
+
 async function runRelease(args: ParsedArgv, io: PlmCliIo, backend: () => Promise<CliBackend>, now: () => Date): Promise<number> {
   const action = args.positionals[1];
   if (action === 'verify') {
@@ -238,20 +254,13 @@ async function runRelease(args: ParsedArgv, io: PlmCliIo, backend: () => Promise
     const written = writeReleasePackage(pack, required(args, 'out'));
     const notes = pack.notes.length > 0 ? ` Notes: ${pack.notes.join('; ')}.` : '';
     let attach: CommandOutcome | null = null;
-    if (booleanFlag(args, 'attach')) {
-      const target = await backend();
-      const params = {
+    if (booleanFlag(args, 'attach'))
+      attach = await attachWritten(args, io, backend, {
         revision: required(args, 'revision'),
         manifestSha256: written.manifestSha256,
         documentContentHash: String(pack.manifest['documentContentHash']),
         location: required(args, 'out'),
-      };
-      const confirmKey = stringFlag(args, 'confirm-key');
-      attach = await target.run(
-        'attach_release_package',
-        confirmKey === undefined ? params : await confirmedParams(target, 'attach_release_package', params, confirmKey, io),
-      );
-    }
+      });
     print(
       io,
       args,
@@ -262,6 +271,61 @@ async function runRelease(args: ParsedArgv, io: PlmCliIo, backend: () => Promise
   }
   throw new PlmUsage(
     'release needs an action: pack --revision R --out DIR [--attach --confirm-key KEYID] | verify DIR | sign --revision R --key KEYID [--kind release|iteration] [--apply]',
+  );
+}
+
+/** The export-control confirmation of a LOTAR pack: a JSON file made by the human who signed it (`--export-confirmation FILE`); the CLI never makes one. */
+function exportConfirmation(args: ParsedArgv): unknown {
+  const file = stringFlag(args, 'export-confirmation');
+  return file === undefined ? undefined : (JSON.parse(readFileSync(file, 'utf8')) as unknown);
+}
+
+async function runLotar(args: ParsedArgv, io: PlmCliIo, backend: () => Promise<CliBackend>): Promise<number> {
+  const action = args.positionals[1];
+  if (action === 'verify') {
+    const dir = args.positionals[2];
+    if (dir === undefined) throw new PlmUsage('lotar verify needs a package folder: llull lotar verify DIR');
+    const verdict = verifyLotarPackage(dir, createSignaturePort(createTrustStore()), packageAnchor(dir, args, io));
+    print(
+      io,
+      args,
+      verdict,
+      verdict.ok
+        ? `LOTAR package verified: ${verdict.members} member(s), signatures, validation properties ${verdict.rederived ? 're-derived' : 'not re-derived'}, PDM read-back and records consistent.`
+        : verdict.findings.map((finding) => `${finding.code}: ${finding.message}`).join('\n'),
+    );
+    return verdict.ok ? OK : FAILED;
+  }
+  if (action === 'pack') {
+    const doc: CadDocument = readDocumentFile(cliTarget(args, io.env).doc);
+    const id = stringFlag(args, 'organization-id');
+    const name = stringFlag(args, 'organization-name');
+    const confirmExportControlled = exportConfirmation(args);
+    const pack = buildLotarPackage(doc, required(args, 'revision'), io.env['LLULL_VERSION'] ?? 'dev', undefined, {
+      ...(id !== undefined && name !== undefined ? { organization: { id, name } } : {}),
+      ...(confirmExportControlled === undefined ? {} : { confirmExportControlled }),
+    });
+    if (typeof pack === 'string') throw new PlmUsage(pack);
+    const written = writeReleasePackage(pack, required(args, 'out'));
+    let attach: CommandOutcome | null = null;
+    if (booleanFlag(args, 'attach'))
+      attach = await attachWritten(args, io, backend, {
+        revision: required(args, 'revision'),
+        manifestSha256: written.manifestSha256,
+        documentContentHash: String(pack.manifest['documentContentHash']),
+        location: required(args, 'out'),
+      });
+    const notes = pack.notes.length > 0 ? ` Notes: ${pack.notes.join('; ')}.` : '';
+    print(
+      io,
+      args,
+      { ...written, notes: pack.notes, attached: attach === null ? null : outcomeText(attach) },
+      `LOTAR package written: ${written.files} file(s), manifest sha256 ${written.manifestSha256}.${notes}${attach !== null ? ` ${outcomeText(attach)}` : ''}`,
+    );
+    return attach?.isError === true ? FAILED : OK;
+  }
+  throw new PlmUsage(
+    'lotar needs an action: pack --revision R --out DIR [--organization-id ID --organization-name NAME] [--export-confirmation FILE] [--attach --confirm-key KEYID] | verify DIR [--manifest-sha256 HASH | --doc FILE]',
   );
 }
 
@@ -294,6 +358,8 @@ export async function runPlmCli(
         return await runKeys(args, io, now);
       case 'release':
         return await runRelease(args, io, backend, now);
+      case 'lotar':
+        return await runLotar(args, io, backend);
       default:
         return runAudit(args, io);
     }

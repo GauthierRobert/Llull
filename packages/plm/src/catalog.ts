@@ -13,6 +13,11 @@ import { assignCharacteristicIds } from './commands/characteristics';
 import { faiReportSkeleton } from './commands/fai';
 import { bindComponentItem, compareBaselines, createBaseline, engineeringBom, unbindComponentItem } from './commands/structure';
 import { externalizeSnapshots } from './commands/vault';
+import { asBuiltVsAsDesigned, recordAsBuilt } from './commands/asBuilt';
+import { createMbom, manufacturingBom } from './commands/mbom';
+import { importQifResults } from './commands/qif';
+import { exportStepPdm } from './commands/pdm';
+import { lotarValidationProperties } from './commands/lotar';
 
 export const plmCommands = commandCatalog(
   setItemIdentity,
@@ -48,4 +53,11 @@ export const plmCommands = commandCatalog(
   compareBaselines,
   assignCharacteristicIds,
   faiReportSkeleton,
+  recordAsBuilt,
+  asBuiltVsAsDesigned,
+  createMbom,
+  manufacturingBom,
+  importQifResults,
+  exportStepPdm,
+  lotarValidationProperties,
 );

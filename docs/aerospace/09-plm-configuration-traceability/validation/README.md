@@ -26,6 +26,7 @@ The proposed commands do not exist yet. Files that use them are **contracts** fo
 | `scenarios/S1_release_eco_revB.json` | scenario | Release A → ECR → ECO (serial effectivity ≥ 5) → revise B → edit → release B (A superseded) → resolve effectivity → verify | VC-PLM-01, 02, 03, 04, 05, 06, 07, 12 |
 | `scenarios/S2_lifecycle_guards.json` | scenario | Illegal transitions, checker ≠ author, edit locks, view-state exemption, obsolescence, undo, tamper on load, bad signature | VC-PLM-02, 03, 08, 09, 13, 17 |
 | `scenarios/S3_baseline_bom_fai.json` | scenario | Multi-item EBOM, product baseline + compare, as-built deviation, characteristic numbering, partial FAI skeleton | VC-PLM-10, 11, 14, 15 |
+| `qif/plate_results.sample.qif` | input (M6) | QIF 3.0 MeasurementResults for characteristics 2 (diameter, PASS) and 3 (flatness, FAIL) of the GD&T plate; valid against the QIF 3.0 XSD (sources R43); read by `import_qif_results` in `tests/unit/plm/qif.test.ts` | VC-PLM-24 |
 | `lifecycle_transitions.csv` | table | Allowed/refused state transitions with preconditions and side effects | VC-PLM-08 |
 | `as9102_field_mapping.csv` | table | AS9102 Forms 1–3 fields (publicly described names) → llull data paths, auto-fill status | VC-PLM-15 |
 | `plans/plm_release_eco_revB.plan.json` | draft plan | `build_project` actions reproducing S1 from an empty document, including title-block sync via `update_sheet` | VC-PLM-06, golden |

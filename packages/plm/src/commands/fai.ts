@@ -1,13 +1,14 @@
-/** fai_report_skeleton (FR-PLM-27): AS9102 Forms 1-3 data prefilled from PLM, the EBOM, materials and characteristics; every measured result stays null. */
+/** fai_report_skeleton (FR-PLM-27): AS9102 Forms 1-3 data prefilled from PLM, the EBOM, materials and characteristics; measured results stay null unless an imported result set (import_qif_results) is named. */
 
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import { pmiText } from '@core/geometry/pmiText';
 import type { PmiItem } from '@core/model/pmi';
-import type { Characteristic, PlmModel } from '@core/model/plm';
+import type { Characteristic, FaiResult, PlmModel } from '@core/model/plm';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
+import { inRevision } from '../register';
 import { refusePlm } from '../refusal';
 import { snapshotText, unreadableSnapshot } from '../snapshot';
 import { NOT_MANAGED, revisionText } from '../state';
@@ -24,15 +25,6 @@ function itemsOf(doc: CadDocument, plm: PlmModel, label: string, ctx: ExecutionC
   if (text === null) return `${revisionText(plm, label)}: ${unreadableSnapshot(revision)}`;
   const pmi = (JSON.parse(text) as { document?: { pmi?: { items?: unknown } } }).document?.pmi?.items;
   return isRecord(pmi) ? (pmi as Record<string, PmiItem>) : {};
-}
-
-/** Whether characteristic `c` belongs to revision `label`: introduced at or before it, not retired at or before it. */
-function inRevision(plm: PlmModel, c: Characteristic, label: string): boolean {
-  const order = plm.item.revisionOrder;
-  const at = order.indexOf(label);
-  const born = order.indexOf(c.introducedIn);
-  const retired = c.retiredIn === undefined ? -1 : order.indexOf(c.retiredIn);
-  return born !== -1 && born <= at && (retired === -1 || retired > at);
 }
 
 /** RFC 4180 field. */
@@ -74,6 +66,12 @@ function form2Rows(doc: CadDocument, items: Readonly<Record<string, PmiItem>>): 
   return [...materials, ...processes];
 }
 
+/** The Form 3 results cell of an imported result: value with its unit, else the verdict alone; null when the file had no result for the characteristic. */
+function resultCell(result: FaiResult | undefined): string | null {
+  if (result === undefined) return null;
+  return result.value === undefined ? result.status : `${result.value}${result.unit === undefined ? '' : ` ${result.unit}`}`;
+}
+
 const row2 = (name: string, spec: string | null): Record<string, Cell> => ({
   materialOrProcessName: name,
   specificationNumber: spec,
@@ -85,10 +83,10 @@ const row2 = (name: string, spec: string | null): Record<string, Cell> => ({
 
 /**
  * @affects nothing (read-only)
- * @invariant results (and tooling, nonconformance, signatures) are always null: llull prepares the form, people measure and sign; a partial FAI lists only
+ * @invariant results are null unless `resultsId` names an imported result set (the measuring system's value and verdict, copied as imported); tooling, nonconformance and signatures are always null: llull prepares the form, people measure and sign; a partial FAI lists only
  *   the characteristics that are new or whose rendered requirement differs from the baseline revision
  * @failure not managed / unknown part number or revision -> PLM_NOT_MANAGED / PLM_PARAM_INVALID / PLM_REVISION_UNKNOWN; partial without reason or
- *   baselineRevision -> PLM_PARAM_INVALID; a needed snapshot unreadable -> PLM_VAULT_OBJECT_MISSING (refusals, unchanged doc)
+ *   baselineRevision -> PLM_PARAM_INVALID; a needed snapshot unreadable -> PLM_VAULT_OBJECT_MISSING; unknown resultsId or one imported for another revision -> PLM_RESULTS_UNKNOWN (refusals, unchanged doc)
  */
 export const faiReportSkeleton = defineCommand({
   name: 'fai_report_skeleton',
@@ -98,7 +96,7 @@ export const faiReportSkeleton = defineCommand({
     'Form 2 (materials with their specifications and special processes from surface-texture PMI) and Form 3 rows { charNo, referenceLocation, ' +
     'characteristicDesignator, requirement, results: null } from the characteristic register (assign_characteristic_ids first). A partial FAI needs ' +
     'baselineRevision and reason and lists only characteristics new or changed since that revision, plus the numbers retired. Measured results, tooling, ' +
-    'nonconformance numbers and the approval signatures are always null: people fill them. Field mapping: validation/as9102_field_mapping.csv. Read-only.',
+    'nonconformance numbers and the approval signatures are always null: people fill them. With resultsId (a set made by import_qif_results for this revision) Form 3 rows also carry the imported measured value and the verdict of the measuring system (resultStatus) and Form 1 the serial number; llull does not judge them. Field mapping: validation/as9102_field_mapping.csv. Read-only.',
   annotations: { readOnly: true },
   params: z.object({
     partNumber: z.string().optional().describe("Part number; default and only valid value: this document's managed item."),
@@ -106,6 +104,10 @@ export const faiReportSkeleton = defineCommand({
     faiType: z.enum(['full', 'partial']).describe('full = every characteristic; partial = only those changed since baselineRevision.'),
     baselineRevision: z.string().optional().describe('Partial only: the revision the previous first article was accepted against.'),
     reason: z.string().optional().describe('Partial only: why a partial FAI (e.g. "ECO-0002 design change").'),
+    resultsId: z
+      .string()
+      .optional()
+      .describe('Id of an imported result set (import_qif_results) for this revision: its measured values fill Form 3 results.'),
     format: z.enum(['json', 'csv']).describe('json = structured forms; csv = the same data also as one flat table in data.csv.'),
   }),
   run: (doc, params, ctx): CommandResult => {
@@ -133,6 +135,17 @@ export const faiReportSkeleton = defineCommand({
         [],
         ['baselineRevision', 'reason'],
       );
+    const resultSet = params.resultsId === undefined ? undefined : plm.faiResults?.[params.resultsId];
+    if (params.resultsId !== undefined && (resultSet === undefined || resultSet.revision !== label))
+      return refusePlm(
+        doc,
+        'fai_report_skeleton',
+        'PLM_RESULTS_UNKNOWN',
+        `no result set '${params.resultsId}' for revision ${label}`,
+        [params.resultsId],
+        ['resultsId'],
+      );
+    const resultOf = new Map((resultSet?.results ?? []).map((result) => [result.charNo, result]));
     const items = itemsOf(doc, plm, label, ctx);
     const baseItems = faiType === 'partial' && baselineRevision !== undefined ? itemsOf(doc, plm, baselineRevision, ctx) : {};
     for (const side of [items, baseItems])
@@ -158,7 +171,8 @@ export const faiReportSkeleton = defineCommand({
         referenceLocation: c.sheetId ?? null,
         characteristicDesignator: c.designator ?? null,
         requirement: requirement(id, c),
-        results: null,
+        results: resultCell(resultOf.get(c.charNo)),
+        ...(resultSet === undefined ? {} : { resultStatus: resultOf.get(c.charNo)?.status ?? null }),
         tooling: null,
         nonconformanceNumber: null,
       }));
@@ -180,7 +194,7 @@ export const faiReportSkeleton = defineCommand({
       partName: plm.item.name,
       drawingNumber: plm.item.partNumber,
       drawingRevision: label,
-      serialNumber: null,
+      serialNumber: resultSet?.serial ?? null,
       reportId: `FAI-${plm.item.partNumber}-${label}-1`,
       additionalChanges: changes.length === 0 ? null : changes.map((change) => `${change.id} (${change.state})`).join('; '),
       detailOrAssembly: plm.item.itemType === 'assembly' ? 'assembly' : 'detail',
