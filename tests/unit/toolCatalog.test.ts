@@ -143,6 +143,9 @@ const allToolNames = [
   'topology_solve',
   // server-side native transport listed in the piping toolset (server/src/native/autoRoute.ts; covered by server/tests/routeNativeParity.test.ts)
   'auto_route',
+  // GDT / aero native transports (server/src/native/{stackupMonteCarlo,vortexLattice}.ts; server/tests/{stackupNative,aeroPanelNative}.test.ts)
+  'stackup_monte_carlo',
+  'vortex_lattice_solve',
   // point-cloud host transports listed in the scan toolset (server/src/scan/scanTools.ts; covered by server/tests/scanImport.test.ts)
   'scan_import',
   'scan_list',
