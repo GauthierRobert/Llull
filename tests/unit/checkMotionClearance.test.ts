@@ -2,6 +2,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
+import { motionClearanceCheck } from '@core/commands/dynamics/checkMotionClearance';
 import type { CheckItem, CheckResult } from '@core/model/checkResult';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { ExecutionContext } from '@core/commands/types';
@@ -413,16 +414,17 @@ describe('check_motion_clearance failures', () => {
   });
 
   it('stops a sweep that needs too many distance evaluations', () => {
-    const { doc } = armScene({ obstacleY: 150, rpm: 6000 });
-    const batch = Array.from({ length: 30 }, (_, k) => ({
-      command: 'add_box',
-      params: { size: [1, 1, 1], position: [1000 + 5 * k, 1000, 0] },
-    }));
-    const crowded = execute(doc, 'build_project', { actions: batch }, ctxOf()).document;
-    const result = check(crowded, { duration: 1, timestep: 1e-4, sampleRate: 3000 });
+    // the budget is a count (no timing): the sweep passes with the evaluations it spent and is refused with half of them
+    const { doc } = armScene({ obstacleY: 150 });
+    const params = { crankAxis: 'arm_j', duration: 0.5, sampleRate: 360 };
+    const spent = ((motionClearanceCheck(doc, params, ctxOf(), null).data as Data).samples as unknown as { evaluations: number })
+      .evaluations;
+    expect(spent).toBeGreaterThan(2);
+    expect(motionClearanceCheck(doc, params, ctxOf(), null, spent).rejected).toBeUndefined();
+    const result = motionClearanceCheck(doc, params, ctxOf(), null, Math.floor(spent / 2));
     expect(result.rejected, result.summary).toBe(true);
     expect(result.error?.code).toBe('FPR_BUDGET_EXCEEDED');
-    expect(result.summary).toContain('distance evaluations');
+    expect(result.summary).toContain(`more than ${Math.floor(spent / 2)} distance evaluations`);
   });
 
   it('reports a part the kernel cannot build as FPR_PART_INVALID (not_run)', () => {
