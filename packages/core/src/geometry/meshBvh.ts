@@ -176,6 +176,18 @@ function nodeBox(bvh: MeshBvh, node: number, transform: RigidTransform | null): 
 
 type Box = ReturnType<typeof nodeBox>;
 
+function triangleBox(triangle: Triangle): Box {
+  const [p, q, r] = triangle;
+  return [
+    Math.min(p[0], q[0], r[0]),
+    Math.min(p[1], q[1], r[1]),
+    Math.min(p[2], q[2], r[2]),
+    Math.max(p[0], q[0], r[0]),
+    Math.max(p[1], q[1], r[1]),
+    Math.max(p[2], q[2], r[2]),
+  ];
+}
+
 function boxGap(a: Box, b: Box): number {
   let sum = 0;
   for (let axis = 0; axis < 3; axis++) {
@@ -202,10 +214,17 @@ function dualQuery(a: MeshBvh, b: MeshBvh, transform: RigidTransform | null, max
     const leafA = (a.left[nodeA] ?? -1) < 0;
     const leafB = (b.left[nodeB] ?? -1) < 0;
     if (leafA && leafB) {
+      // each triangle pair is tested against its own boxes first: a pair whose boxes are farther apart than `bound` cannot improve the best
+      const trianglesB = Array.from({ length: b.count[nodeB] ?? 0 }, (_, j) =>
+        triangleAt(b, b.order[(b.start[nodeB] ?? 0) + j] ?? 0, transform),
+      );
+      const boxesB = trianglesB.map(triangleBox);
       for (let i = 0; i < (a.count[nodeA] ?? 0) && !done; i++) {
         const triangleA = triangleAt(a, a.order[(a.start[nodeA] ?? 0) + i] ?? 0, null);
-        for (let j = 0; j < (b.count[nodeB] ?? 0) && !done; j++) {
-          const pair = triangleDistance(triangleA, triangleAt(b, b.order[(b.start[nodeB] ?? 0) + j] ?? 0, transform));
+        const boxOfA = triangleBox(triangleA);
+        for (let j = 0; j < trianglesB.length && !done; j++) {
+          if (boxGap(boxOfA, boxesB[j] ?? boxOfA) > bound) continue;
+          const pair = triangleDistance(triangleA, trianglesB[j] ?? triangleA);
           if (pair.distance <= bound && (best === null || pair.distance < best.distance)) {
             best = pair;
             bound = pair.distance;

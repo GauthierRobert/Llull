@@ -52,15 +52,24 @@ export const referenceEnginePlan: PlanAction[] = [
   // propeller: hub and two blades of real thickness
   { command: 'add_cylinder', params: { radius: 40, height: 40, axis: [0, 0, 1], position: [0, 0, 600] }, as: 'hub' },
   { command: 'add_box', params: { size: [1750, 120, 12], position: [0, 0, 600] }, as: 'blades' },
+  // propeller shaft stub under the hub, running in a bearing block (so the propeller joint is physically realised)
+  { command: 'add_cylinder', params: { radius: 15, height: 60, axis: [0, 0, 1], position: [0, 0, 550] }, as: 'propShaft' },
+  { command: 'add_box', params: { size: [60, 60, 20], position: [0, 0, 550] }, as: 'propBearingBlank' },
+  {
+    command: 'add_cylinder',
+    params: { radius: 15 + CLEARANCE_RADIAL, height: 30, axis: [0, 0, 1], position: [0, 0, 550] },
+    as: 'propBearingBore',
+  },
+  { command: 'boolean', params: { op: 'subtract', a: '$propBearingBlank', b: '$propBearingBore' }, as: 'propBearing' },
   // materials [E-R31][E-R32]
   { command: 'assign_material', params: { materialName: 'steel_4340', entityIds: ['$journal', '$web', '$crankPin', '$rod', '$wristPin'] } },
   { command: 'assign_material', params: { materialName: 'al_4032', entityIds: ['$piston'] } },
   // rigid bodies and joints
-  { command: 'add_rigid_body', params: { entityIds: ['$crankcase'], fixed: true, massKg: 5, id: 'crankcase' } },
+  { command: 'add_rigid_body', params: { entityIds: ['$crankcase', '$propBearing'], fixed: true, massKg: 5, id: 'crankcase' } },
   { command: 'add_rigid_body', params: { entityIds: ['$journal', '$web', '$crankPin'], id: 'crank' } },
   { command: 'add_rigid_body', params: { entityIds: ['$rod'], id: 'rod' } },
   { command: 'add_rigid_body', params: { entityIds: ['$wristPin', '$piston'], id: 'piston' } },
-  { command: 'add_rigid_body', params: { entityIds: ['$hub', '$blades'], massKg: 2, id: 'prop' } },
+  { command: 'add_rigid_body', params: { entityIds: ['$hub', '$blades', '$propShaft'], massKg: 2, id: 'prop' } },
   {
     command: 'add_body_joint',
     params: { id: 'crank_j', kind: 'revolute', child: 'crank', parent: 'crankcase', anchor: [0, 0, 0], axis: [0, 0, 1], initialRpm: 5800 },
@@ -76,7 +85,15 @@ export const referenceEnginePlan: PlanAction[] = [
   },
   {
     command: 'add_body_joint',
-    params: { id: 'prop_j', kind: 'revolute', child: 'prop', anchor: [0, 0, 600], axis: [0, 0, 1], initialRpm: (5800 * 21) / 51 },
+    params: {
+      id: 'prop_j',
+      kind: 'revolute',
+      child: 'prop',
+      parent: 'crankcase',
+      anchor: [0, 0, 550],
+      axis: [0, 0, 1],
+      initialRpm: (5800 * 21) / 51,
+    },
   },
   { command: 'add_gear_coupling', params: { id: 'reduction', driver: 'crank_j', driven: 'prop_j', teeth: [21, 51], efficiency: 0.99 } },
   { command: 'add_motor', params: { joint: 'crank_j', kind: 'speed', rpm: 5800, maxTorque: 1e6 } },
@@ -101,6 +118,15 @@ export const referenceEnginePlan: PlanAction[] = [
       b: '$crankcase',
       kind: 'overlap_by_design',
       reason: 'main journal in the main bearing bore, 0.02 mm diametral clearance',
+    },
+  },
+  {
+    command: 'allow_interference',
+    params: {
+      a: '$propShaft',
+      b: '$propBearing',
+      kind: 'overlap_by_design',
+      reason: 'propeller shaft in its bearing bore, 0.02 mm diametral clearance',
     },
   },
   // engine model: losses, calibrated cylinder, propeller, reference

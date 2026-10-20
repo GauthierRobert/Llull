@@ -261,7 +261,7 @@ describe('check_assembly envelope, kernels and refusals', () => {
     expect(data.unverified).toBe(true);
   });
 
-  it('revolute joints are not_run on a mesh kernel (exact faces needed)', () => {
+  it('revolute joints on a mesh kernel are fitted to the tessellation: a bare rotor has no bore, so the approximate fit warns', () => {
     const s = scene();
     const frame = s.run('add_box', cube([0, 0, 0]));
     const rotor = s.run('add_cylinder', { radius: 5, height: 10, position: [0, 0, 30] });
@@ -269,8 +269,9 @@ describe('check_assembly envelope, kernels and refusals', () => {
     s.run('add_rigid_body', { entityIds: [rotor], id: 'rotor' });
     s.run('add_body_joint', { id: 'shaft', kind: 'revolute', child: 'rotor', anchor: [0, 0, 30], axis: [0, 0, 1] });
     const joint = s.check().items.find((item) => item.ids.includes('shaft'));
-    expect(joint?.code).toBe('FPR_KERNEL_UNSUPPORTED');
-    expect(joint?.status).toBe('not_run');
+    expect(joint?.code).toBe('FPR_JOINT_NOT_REALISED');
+    expect(joint?.status).toBe('warn');
+    expect(joint?.note).toMatch(/approximate/);
   });
 
   it('without a kernel the registry rejects the call', () => {

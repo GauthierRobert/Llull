@@ -103,6 +103,38 @@ describe('mobility and redundancy (VC-FPR-20)', () => {
     expect(mobility.suggestions).toEqual([]);
   });
 
+  it('a gear coupling between two tree joints is one more constraint row (DOF - 1); a loop joint on either side adds none', () => {
+    const { doc } = sliderCrank({ wrist: 'spherical', startDeg: 40 });
+    const solid = execute(doc, 'add_cylinder', { radius: 10, height: 5, axis: [0, 0, 1], position: [0, 300, 0] });
+    const body = execute(solid.document, 'add_rigid_body', { entityIds: [solid.affected[0]], id: 'shaft', massKg: 1 });
+    const spun = execute(body.document, 'add_body_joint', {
+      id: 'shaft_j',
+      kind: 'revolute',
+      child: 'shaft',
+      anchor: [0, 300, 0],
+      axis: [0, 0, 1],
+    });
+    const free = inspect(spun.document).mobility as InspectData['mobility'] & { constraintRows: number };
+    expect(free.dof).toBe(2);
+    for (const [driver, driven] of [
+      ['crank_j', 'shaft_j'],
+      ['shaft_j', 'crank_j'],
+    ] as const) {
+      const geared = execute(spun.document, 'add_gear_coupling', { id: 'g', driver, driven, ratio: 0.5 });
+      expect(geared.affected).toEqual(['g']);
+      const mobility = inspect(geared.document).mobility as InspectData['mobility'] & { constraintRows: number };
+      expect(mobility.dof).toBe(1);
+      expect(mobility.rank).toBe(free.rank + 1);
+      expect(mobility.constraintRows).toBe(free.constraintRows + 1);
+    }
+    // a revolute wrist closes the loop (not a tree joint): a coupling to it has no tree coordinate to constrain and adds no row
+    const closed = sliderCrank({ wrist: 'revolute', startDeg: 40 }).doc;
+    const before = inspect(closed).mobility;
+    const coupled = execute(closed, 'add_gear_coupling', { id: 'g', driver: 'crank_j', driven: 'wrist_j', ratio: 2 });
+    expect(coupled.affected).toEqual(['g']);
+    expect(inspect(coupled.document).mobility).toMatchObject({ dof: before.dof, rank: before.rank });
+  });
+
   it('a four-bar has 1 DOF and no redundancy in a spatial-free planar set', () => {
     let doc = createEmptyDocument();
     const make = (id: string, position: number[]): void => {

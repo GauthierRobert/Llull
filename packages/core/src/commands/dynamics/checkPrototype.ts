@@ -31,6 +31,11 @@ import {
 const NAME = 'check_prototype';
 const DEFAULT_DURATION_S = 2;
 const MAX_DURATION_S = 600;
+/**
+ * Most samples of the shared run the clearance sweep evaluates (the run itself keeps every sample for the engine report). The sweep adds
+ * substeps wherever a part moves farther than half its thinnest side between two samples, so thinning does not let a thin obstacle through.
+ */
+const CLEARANCE_MAX_SAMPLES = 720;
 /** Settling cycles before the measured ones when the duration comes from the crank speed. */
 const SETTLE_CYCLES = 2;
 
@@ -188,7 +193,12 @@ export const checkPrototype = defineCommand({
       // one simulate_motion run (poses + energy) feeds both motion checks (spec 5.7); check_dynamics still halves the timestep on its own
       const crank = crankAxis === undefined || dynamics.joints[crankAxis]?.kind !== 'revolute' ? {} : { crankAxis };
       const sharedRun = simulateMotion.run(checked, { duration: durationS, detail: 'poses', energy: true, ...crank }, context);
-      const motionResult = motionClearanceCheck(checked, { duration: durationS, ...shared, ...crank }, context, sharedRun);
+      const motionResult = motionClearanceCheck(
+        checked,
+        { duration: durationS, maxSamples: CLEARANCE_MAX_SAMPLES, ...shared, ...crank },
+        context,
+        sharedRun,
+      );
       const motionRun: Sub = { result: motionResult, check: isCheck(motionResult.data) ? motionResult.data : null };
       motion =
         motionRun?.check ??
