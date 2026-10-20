@@ -12,6 +12,7 @@ import { elasticConstants, isElasticRefusal, propertyTemperatureK } from '../dec
 import { lengthUnitName, stressPerMpa, stressUnitName } from '../decks/units';
 import { nodeCoordinates, nodeEntities, stepOfLoadCase, vonMises } from '../results/fields';
 import { appliedOverFibres, type Applied } from './fibreStress';
+import { plyMarginRows } from './plyMargins';
 import { compositeWarnings, exclusionWarnings, isCompositeEntity, orphanSingularKeys } from './screenWarnings';
 import { caseOf } from '../shared/access';
 import { analysisIdSchema } from '../shared/schemas';
@@ -180,7 +181,10 @@ function temperatureColumns(context: Context, found: Allowable, nodes: readonly 
 
 function buildRows(
   context: Context,
-): { readonly rows: MarginRow[] } | AllowableRefusal | { readonly code: string; readonly message: string } {
+):
+  | { readonly rows: MarginRow[]; readonly skipped: ReadonlyMap<string, string> }
+  | AllowableRefusal
+  | { readonly code: string; readonly message: string } {
   const { analysis, mesh, results, criterion, marginalBand } = context;
   const factors = factorReport(analysis);
   const stress = stressUnitName(analysis.unitSystem);
@@ -189,6 +193,7 @@ function buildRows(
   const coordinates = nodeCoordinates(mesh);
   const rows: MarginRow[] = [];
   const singularRows: MarginRow[] = [];
+  const skipped = new Map<string, string>();
   const groups = groupsOf(analysis, mesh, context.groupBy);
   const cases = loadCasesOf(analysis);
   for (const [index, { name, category }] of cases.entries()) {
@@ -200,11 +205,32 @@ function buildRows(
         message: `the results have no STRESS field for load case '${name}' (solver step ${index + 1})`,
       };
     for (const group of groups) {
-      if (isCompositeEntity(analysis, group.entityId)) continue;
       const parts = [
         { nodes: group.nodes.filter((node) => !context.singular.has(node)), singular: false },
         { nodes: group.nodes.filter((node) => context.singular.has(node)), singular: true },
       ];
+      if (isCompositeEntity(analysis, group.entityId)) {
+        for (const { nodes, singular } of parts) {
+          if (nodes.length === 0) continue;
+          const plyRows = plyMarginRows({
+            doc: context.doc,
+            analysis,
+            mesh,
+            fields,
+            entityId: group.entityId,
+            region: group.region,
+            nodes,
+            singular,
+            loadCase: { name, category },
+            factors,
+            marginalBand,
+            port: context.port,
+          });
+          if ('skipped' in plyRows) skipped.set(group.entityId, plyRows.skipped);
+          else (singular ? singularRows : rows).push(...plyRows.rows.map((row) => ({ rowId: '', ...row })));
+        }
+        continue;
+      }
       for (const { nodes, singular } of parts) {
         const applied = appliedOver(fields, nodes, criterion);
         if (applied === null) continue;
@@ -272,7 +298,7 @@ function buildRows(
       }
     }
   }
-  return { rows: [...rows, ...singularRows].map((row, index) => ({ ...row, rowId: `r${index + 1}` })) };
+  return { rows: [...rows, ...singularRows].map((row, index) => ({ ...row, rowId: `r${index + 1}` })), skipped };
 }
 
 /** Parameters that choose which margin table is computed (shared by compute_margins and dispose_margin, so a row id means the same row in both). */
@@ -390,8 +416,8 @@ export function marginTable(
   };
   const built = buildRows(context);
   if ('code' in built) return refuse(built.code, built.message);
-  const { rows } = built;
-  const composite = compositeWarnings(analysis);
+  const { rows, skipped } = built;
+  const composite = compositeWarnings(analysis, skipped);
   if (rows.length === 0 && composite.length > 0)
     return refuse(
       'FEA_COMPOSITE_MARGINS_UNSUPPORTED',
@@ -466,7 +492,7 @@ export const computeMargins = defineCommand({
     '(create_analysis factors, or factor = one number for both; defaults 1.5 per 14 CFR 25.303 and 1.0 apply silently unless the user states a safety factor, so map "SF 2" to factor 2 there) and are listed with source and defaulted. Status: FAIL if MS < 0, ' +
     'MARGINAL only when marginalBand is given and MS < band (no default band), else PASS; FAIL / MARGINAL rows are disposition ' +
     'pending_human until a qualified human records dispose_margin (an agent cannot: FEA_HUMAN_GATE); a disposition never changes the status ' +
-    '(statusLabel "FAIL (accepted)") and every row has a stable rowKey. Shell / plane-stress nodes use the largest of the membrane and the top / bottom fibre stress (row fibre). Composite shells get no row (FEA_COMPOSITE_MARGINS_UNSUPPORTED: no ply criteria). Every row has reviewRequired: true and unverified = OR of the input flags. Singularity policy: nodes within a radius of a point / edge ' +
+    '(statusLabel "FAIL (accepted)") and every row has a stable rowKey. Shell / plane-stress nodes use the largest of the membrane and the top / bottom fibre stress (row fibre). Composite shells (a laminate in the part idealization) get one row PER PLY (criterion ply_failure, rowKey ending in the ply id): the ply stresses are recovered through the 06 CMP laminate from the STRESS_TOP / STRESS_BOT fibre stresses (CLT, linear through the thickness, in-plane first-ply failure, no hygrothermal state, ultimate check only, allowable and criterion params do not apply) and MS = R / (factor) - 1 with R the lower of the max-stress and Tsai-Wu strength ratios (both reported, plus the governing one); a laminate whose lamina lacks Xt, Xc, Yt, Yc or S, a non-planar shell or results without both fibre stresses get no rows (warning FEA_COMPOSITE_MARGINS_UNSUPPORTED with the reason; a refusal when nothing else is left). Every row has reviewRequired: true and unverified = OR of the input flags. Singularity policy: nodes within a radius of a point / edge ' +
     'force or moment load and of a point / edge support of a SOLID part (targets with no mesh face; shell / plane-stress edge supports are not sources) are excluded from the part / target rows (FEA_MS_ALL_SINGULAR / FEA_SINGULAR_EXCLUSION_LARGE warnings when that swallows a group or > 25 % of a part) and reported in ' +
     'separate rows (region "singular", singular true, a note) that never count towards minMs / minMsRow (status still computed and shown). ' +
     'Radius default = 2 x mesh globalSize (named llull default, defaulted true in data.singularScreening.radius); singularityRadius ' +

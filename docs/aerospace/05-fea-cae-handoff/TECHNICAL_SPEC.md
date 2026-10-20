@@ -883,8 +883,8 @@ changes) was **not run or even compiled**. Real-tool tests skip with a logged re
   S8 elements are written `S8R` (other types -> `FEA_COMPOSITE_ELEMENT`: use shell_quad, order 2). BDF: MAT8 per lamina, PCOMP (Z0 = -(1/2 + offset) t, SOUT YES),
   CORD2R 100 + pid (x = projected rosette axis, z = element normal) named as MCID on the part's elements. Lamina density is read as grams per cubic document unit and
   must lie in [50, 25 000] kg/m^3 (else `FEA_COMPOSITE_INVALID`: entered in another unit). None of the composite cards ran in ccx or Nastran. **Composite parts get
-  no margin rows** (`FEA_COMPOSITE_MARGINS_UNSUPPORTED` warning, refusal when nothing else is left): an isotropic von Mises margin against the entity's Ftu / Fty would
-  be meaningless; ply failure criteria in `compute_margins` are deferred (use the 06 CMP laminate analysis).
+  ply-failure rows, not an isotropic von Mises row** (see "Ply-failure margins of composite shells (CMP-2, 2026-10-20)" below; they were refused with
+  `FEA_COMPOSITE_MARGINS_UNSUPPORTED` before that).
 - **Shell results (open question 7, decided).** CalculiX expands shells into volume elements and writes the .frd on the expanded nodes. `shell/shellResults.ts`
   reads the .frd node block and finds, for each 2D mesh node, the expanded nodes at x + (1/2 - offset) t n (top fibre) and x - (1/2 + offset) t n (bottom) within t / 4
   (n = averaged element normal): geometric, independent of the expansion numbering. Candidates are .frd node numbers that are NOT mesh nodes (never a solid node or a
@@ -930,5 +930,27 @@ changes) was **not run or even compiled**. Real-tool tests skip with a logged re
 - **Tests.** `tests/unit/cae/{shellSetup,shellDeck,shellTransports,marginsSingularity,reviewFixesPart2}.test.ts`, `tests/golden/feaExports.test.ts`,
   `tests/component/AnalysisRest.test.tsx`. Not run anywhere: a real shell / plane-stress / composite solve, the shell pressure signs, the expansion mapping on a real
   .frd, Gmsh 2D meshing and defeaturing, PCOMP / MAT8 / CORD2R in Nastran.
-- **Not done:** beams (V2), cylinder pairing and mid-face extension / sewing, ply failure margins of composite shells, composites on non-planar parts, shell-solid coupling, pressure on plane-stress edges, plane
+- **Not done:** beams (V2), cylinder pairing and mid-face extension / sewing, composites on non-planar parts, shell-solid coupling, pressure on plane-stress edges, plane
   strain, chamfer detection, offsets of plain PSHELL in the BDF, sandwich cores, `*DISTRIBUTING COUPLING`, Netgen, large-field BDF, `.llullz` bundling.
+
+**Ply-failure margins of composite shells (CMP-2, 2026-10-20).** `compute_margins` no longer leaves composite shells out. For a part whose idealization carries a
+laminate (`packages/domain-cae/src/margins/plyMargins.ts`), per load case and node group it gives ONE ROW PER PLY (criterion `ply_failure`, rowKey
+`<case>|<entity>|<region>|ultimate|ply_failure|<plyId>`), each with `reviewRequired: true`, `unverified` from the lamina basis, the standard disposition flow
+(`pending_human` for FAIL / MARGINAL) and the singular split.
+- **Recovery.** The laminate is read from core data (`laminateOf`, `CadDocument.composites`; no import of the composites plugin). The pure math moved to `@lib/laminate`
+  (`clt.ts`, `failure.ts`, `provenance.ts`, new `recover.ts`; `@aero` and `@cae` both import it). From the global `STRESS_TOP` / `STRESS_BOT` of the shell nodes
+  (components [xx, yy, zz, xy, yz, zx], analysis stress unit) the in-plane stress is rotated into the ply frame (rosette 0-degree axis projected on the planar shell,
+  `compositePlane`), converted to MPa, and mapped to strains at z = +-h/2 through the Qbar of the top and bottom plies; strain is linear through the thickness
+  (Kirchhoff-Love), so every ply stress at its two surfaces follows from CLT (`recoverPlyStresses`, verified to reproduce a CLT solution to round-off). Plies are
+  taken bottom to top along the shell element normal (reversed when the laminate stacks the other way), as in the deck writers.
+- **Margin.** R = the lower of the max-stress and Tsai-Wu strength ratios (both reported, plus `plyCriterion`, `failureMode`, the ply stresses, F12* with its default
+  flag) over the group's nodes and the ply's two surfaces; MS = R / (FoS x extras) - 1 with the ULTIMATE factor of the case category (strengths are failure strengths:
+  there is no yield check, and the `allowable` / `criterion` params do not apply to these rows). No stress in a ply gives `ms: null`.
+- **Still refused.** A laminate whose lamina lacks any of Xt, Xc, Yt, Yc, S (no default exists), a non-planar shell, a rosette normal to the shell, a zoned laminate
+  without a section (the deck refusals), or results without both fibre stresses leave the part out with `FEA_COMPOSITE_MARGINS_UNSUPPORTED` and the reason in the
+  warning; the command refuses with the same code only when no other row exists.
+- **Limits.** First-ply failure only, linear, in-plane stresses (no interlaminar / transverse-shear failure, no wrinkling or buckling), no hygrothermal state, no
+  progressive failure. The section forces are not used; the fibre stresses are. Whether CalculiX writes the expanded composite shell stresses of the outer plies
+  in the global frame for `*SHELL SECTION, COMPOSITE` is ASSUMED (the same field handling as plain shells) and was not checked against a real ccx composite run.
+- **Tests.** `tests/unit/cae/plyMargins.test.ts` (+ `plyMarginsFixtures.ts`): recovery against CLT, rows against `strengthRatio` on the CLT truth, factors, FAIL
+  / disposition, refusals and the skip reasons.
