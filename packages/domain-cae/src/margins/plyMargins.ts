@@ -50,6 +50,15 @@ export interface PlyMarginInput {
 
 export type PlyOutcome = { readonly rows: PlyRow[] } | { readonly skipped: string };
 
+/** Until a real ccx composite run confirms the fibre-stress frame and the outer-ply values (SOLVER-VERIFY), every ply row is unverified. One place to remove. */
+export const PLY_FRAME_UNVERIFIED =
+  'STRESS_TOP/BOT frame and outer-ply extrapolation for *SHELL SECTION, COMPOSITE not verified against ccx (05 spec)';
+
+/** Signed angle (degrees, about `normal`) from the shell frame axis `e1` to `axis`. */
+function angleFromFrame(e1: Vec3, axis: Vec3, normal: Vec3): number {
+  return (Math.atan2(dot3(normal, cross3(e1, axis)), dot3(e1, axis)) * 180) / Math.PI;
+}
+
 /** Global stress components [xx, yy, zz, xy, yz, zx] in the shell frame (e1, e2): [s1, s2, t12]. */
 function inPlane(stress: readonly number[], e1: Vec3, e2: Vec3): Triple {
   const [xx = 0, yy = 0, zz = 0, xy = 0, yz = 0, zx = 0] = stress;
@@ -92,18 +101,20 @@ export function plyMarginRows(input: PlyMarginInput): PlyOutcome {
     return 'missing' in strengths ? [`"${material.name}" lacks ${strengths.missing.join(', ')}`] : [];
   });
   if (lacking.length > 0) return { skipped: `the laminate has no ply allowables (Xt, Xc, Yt, Yc, S): ${lacking.join('; ')}` };
-  const e1 = projectedAxis(laminate.plies[0]?.axis0 ?? [1, 0, 0], normal);
+  const ordered = dot3(normal, laminate.stackNormal) < 0 ? [...laminate.plies].reverse() : laminate.plies;
+  const e1 = projectedAxis(ordered[0]?.axis0 ?? [1, 0, 0], normal);
   if (e1 === null) return { skipped: 'the rosette 0-degree axis is normal to the shell' };
+  const plyAxes = ordered.map((ply) => projectedAxis(ply.axis0, normal));
+  if (plyAxes.some((axis) => axis === null)) return { skipped: 'a ply rosette 0-degree axis is normal to the shell' };
   const e2 = normalize3(cross3(normal, e1));
   const top = fields['STRESS_TOP'];
   const bottom = fields['STRESS_BOT'];
   if (top === undefined || bottom === undefined)
     return { skipped: 'the results have no STRESS_TOP / STRESS_BOT fibre stresses of this shell (ply stresses need both outer surfaces)' };
-  const ordered = dot3(normal, laminate.stackNormal) < 0 ? [...laminate.plies].reverse() : laminate.plies;
   const mmPerUnit = toMetres(doc, 1) * 1000;
-  const stack: StackPly<LaminaMaterial>[] = ordered.map((ply) => ({
+  const stack: StackPly<LaminaMaterial>[] = ordered.map((ply, index) => ({
     material: { ...(laminate.materials[ply.materialName] as LaminaMaterial), plyThickness: ply.thickness * mmPerUnit },
-    angle: ply.angleDeg,
+    angle: ply.angleDeg + angleFromFrame(e1, plyAxes[index] as Vec3, normal),
   }));
   const perMpa = stressPerMpa(analysis.unitSystem);
   const worst = new Map<number, Worst>();
@@ -160,7 +171,15 @@ export function plyMarginRows(input: PlyMarginInput): PlyOutcome {
       input.port,
       analysis.results?.resultsHash ?? '',
     );
-    const unverified = isUnverified(material);
+    const thermal =
+      analysis.type === 'static'
+        ? []
+        : ['thermal strain is not recovered (no laminae expansion in the deck): ply stresses of a thermo-mechanical case are not valid'];
+    const reasons = [
+      PLY_FRAME_UNVERIFIED,
+      ...thermal,
+      ...(isUnverified(material) ? [`lamina '${ply.materialName}': ${material.basis} data, source "${material.source}"`] : []),
+    ];
     const at: Vec3 = coordinates.get(hit.node) ?? [0, 0, 0];
     const finite = (value: number): number | null => (Number.isFinite(value) ? value : null);
     return [
@@ -206,12 +225,12 @@ export function plyMarginRows(input: PlyMarginInput): PlyOutcome {
           formula:
             'MS = R / (FoS x prod(extra)) - 1, R = first-ply strength ratio (lower of max stress and Tsai-Wu) of the ply stresses recovered through the laminate',
           method:
-            'CLT (Kirchhoff-Love): strains at the outer surfaces from STRESS_TOP / STRESS_BOT through the Qbar of the outer plies, linear through the thickness; in-plane stresses only, first-ply failure, no hygrothermal state, no interlaminar stresses',
+            `CLT (Kirchhoff-Love): strains at the outer surfaces from STRESS_TOP / STRESS_BOT through the Qbar of the outer plies, linear through the thickness; in-plane stresses only, first-ply failure, no hygrothermal state, no interlaminar stresses. UNVERIFIED: ${PLY_FRAME_UNVERIFIED}`,
           standard: ['NASA-STD-5001B', '14 CFR 25.303', '14 CFR 25.305(a)'],
           ...(ms === null ? { note: 'no stress in this ply: no finite margin' } : {}),
         },
-        unverified,
-        unverifiedReasons: unverified ? [`lamina '${ply.materialName}': ${material.basis} data, source "${material.source}"`] : [],
+        unverified: true,
+        unverifiedReasons: reasons,
         reviewRequired: true,
         reviewReason: 'margin of safety supports a structural substantiation decision',
         disposition: decided.disposition,

@@ -101,16 +101,23 @@ export function plyPieceMesh(
 
 /** Welds coincident points (quantum 1e-9 of the extent): the welded positions and the welded index of each input point. */
 function weldPoints(points: readonly Vec3[]): { positions: number[]; remap: number[] } {
-  const quantum = Math.max(1e-9, ...points.flatMap((p) => p.map(Math.abs))) * 1e-9;
-  const index = new Map<string, number>();
+  const tolerance = Math.max(1e-9, ...points.flatMap((p) => p.map(Math.abs))) * 1e-7;
+  const cell = (v: number): number => Math.floor(v / tolerance);
+  const buckets = new Map<string, number[]>();
   const positions: number[] = [];
+  const near = (id: number, p: Vec3): boolean =>
+    Math.hypot((positions[3 * id] as number) - p[0], (positions[3 * id + 1] as number) - p[1], (positions[3 * id + 2] as number) - p[2]) <=
+    tolerance;
   const remap = points.map((p) => {
-    const key = p.map((v) => Math.round(v / quantum)).join(',');
-    const known = index.get(key);
-    if (known !== undefined) return known;
+    const [cx, cy, cz] = [cell(p[0]), cell(p[1]), cell(p[2])];
+    for (let dx = -1; dx <= 1; dx++)
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dz = -1; dz <= 1; dz++) for (const id of buckets.get(`${cx + dx},${cy + dy},${cz + dz}`) ?? []) if (near(id, p)) return id;
     positions.push(p[0], p[1], p[2]);
-    index.set(key, positions.length / 3 - 1);
-    return positions.length / 3 - 1;
+    const id = positions.length / 3 - 1;
+    const key = `${cx},${cy},${cz}`;
+    buckets.set(key, [...(buckets.get(key) ?? []), id]);
+    return id;
   });
   return { positions, remap };
 }

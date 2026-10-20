@@ -121,7 +121,7 @@ export const exportLaserProjection = defineCommand({
         const points = reverse ? [...ordered].reverse() : ordered;
         const gap = Math.max(...points.map((p, k) => distance3(p, points[(k + 1) % points.length] as Vec3))) * scale;
         lines.push(
-          `PLY ${ply.name.replace(/\s+/g, '_')} SEQ ${ply.sequence} MATERIAL ${ply.materialName} ANGLE ${ply.orientation} POINTS ${points.length}`,
+          `PLY ${ply.name.replace(/\s+/g, '_')} SEQ ${ply.sequence} MATERIAL ${ply.materialName.replace(/\s+/g, '_')} ANGLE ${ply.orientation} POINTS ${points.length}`,
         );
         for (const p of points) lines.push(`${(p[0] * scale).toFixed(4)} ${(p[1] * scale).toFixed(4)} ${(p[2] * scale).toFixed(4)}`);
         lines.push('END');

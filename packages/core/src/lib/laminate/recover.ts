@@ -34,8 +34,10 @@ export function recoverPlyStresses(stack: readonly StackPly[], bottomXy: Triple,
   if (!(laminate.thickness > 0)) return null;
   const [epsBottom, epsTop] = [strainOf(first, bottomXy), strainOf(last, topXy)];
   if (epsBottom === null || epsTop === null) return null;
-  const strain = epsTop.map((value, i) => (value + (epsBottom[i] as number)) / 2) as unknown as Triple;
-  const curvature = epsTop.map((value, i) => (value - (epsBottom[i] as number)) / laminate.thickness) as unknown as Triple;
+  const mean = (k: 0 | 1 | 2): number => ((epsTop[k] as number) + (epsBottom[k] as number)) / 2;
+  const slope = (k: 0 | 1 | 2): number => ((epsTop[k] as number) - (epsBottom[k] as number)) / laminate.thickness;
+  const strain: Triple = [mean(0), mean(1), mean(2)];
+  const curvature: Triple = [slope(0), slope(1), slope(2)];
   return stack.map((ply, index) => ({
     bottom: plyStressAt(ply.material, ply.angle, strain, curvature, laminate.z[index] as number).material,
     top: plyStressAt(ply.material, ply.angle, strain, curvature, laminate.z[index + 1] as number).material,

@@ -36,6 +36,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'add lockingAngle (degrees, from a cited drape test) to the lamina record or pass lockingAngle explicitly (no default exists)',
   CMP_PRODUCIBILITY_OVER_LOCK:
     'split the ply with a dart or splice (split_ply), change its orientation or seed, or set drape.allowOverLock with a reviewer',
+  CMP_DRAPE_INCOMPLETE: 'change the seed or stepLength, or split the ply with darts so each piece drapes completely',
   CMP_CUT_INVALID: 'give a path inside the part frame that touches the ply; a splice must cross the ply boundary at both ends',
   CMP_CORE_INVALID: 'give a boundary inside the part outline, a core_honeycomb / core_foam material and thickness > 0',
   CMP_CORE_UNSUPPORTED: 'sandwich cores are not modelled by this analysis; analyse the skins separately or choose a point outside the core',
