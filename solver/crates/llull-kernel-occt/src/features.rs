@@ -134,7 +134,15 @@ pub fn feature_revol_cut(source: &Shape, profile: &[f64], origin: [f64; 3], norm
 }
 
 /// `tag` names the faces the cut generates (SC-N1, `pocket<n>`).
-pub fn feature_prism_cut(source: &Shape, chain: &[f64], origin: [f64; 3], normal: [f64; 3], probes: &[f64], length: f64, tag: &str) -> Built {
+pub fn feature_prism_cut(
+    source: &Shape,
+    chain: &[f64],
+    origin: [f64; 3],
+    normal: [f64; 3],
+    probes: &[f64],
+    length: f64,
+    tag: &str,
+) -> Built {
     built(ffi::feature_prism_cut(inner(source)?, chain, &origin, &normal, probes, length, tag))
 }
 
