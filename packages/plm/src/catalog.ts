@@ -9,6 +9,10 @@ import { checkpointIteration, recordApproval, rejectReview, submitForReview } fr
 import { attachReleasePackage, recordSignature } from './commands/signature';
 import { checkReleaseReadiness, plmActPayload, plmStatus, releaseManifestQuery, resolveEffectivity, viewRevision } from './commands/status';
 import { plmDiff, restoreRevisionSnapshot, verifyRelease } from './commands/verify';
+import { assignCharacteristicIds } from './commands/characteristics';
+import { faiReportSkeleton } from './commands/fai';
+import { bindComponentItem, compareBaselines, createBaseline, engineeringBom, unbindComponentItem } from './commands/structure';
+import { externalizeSnapshots } from './commands/vault';
 
 export const plmCommands = commandCatalog(
   setItemIdentity,
@@ -36,4 +40,12 @@ export const plmCommands = commandCatalog(
   plmDiff,
   verifyRelease,
   restoreRevisionSnapshot,
+  externalizeSnapshots,
+  bindComponentItem,
+  unbindComponentItem,
+  engineeringBom,
+  createBaseline,
+  compareBaselines,
+  assignCharacteristicIds,
+  faiReportSkeleton,
 );

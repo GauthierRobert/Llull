@@ -33,6 +33,11 @@ const REMEDIATION = {
   PLM_NOT_RELEASED: 'plm_status lists the revisions and their states.',
   PLM_NO_SNAPSHOT: 'Only released, superseded and obsolete revisions keep a snapshot; the current revision can be compared as itself.',
   PLM_INTEGRITY_MISMATCH: 'restore_revision_snapshot or open an ECO.',
+  PLM_VAULT_OBJECT_MISSING:
+    'Point LLULL_VAULT at the vault that holds the object (llull vault verify), or restore it from a release package.',
+  PLM_CHILDREN_UNRELEASED: 'Release the children first, then bind their released revision (bind_component_item, human).',
+  PLM_BASELINE_MEMBER_UNRELEASED: 'Release it or leave it out.',
+  PLM_BASELINE_UNKNOWN: 'plm_status lists the baselines.',
   PLM_ID_EXISTS: 'Use another id or omit it to have one assigned.',
 } as const satisfies Readonly<Record<string, string>>;
 

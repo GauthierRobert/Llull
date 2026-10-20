@@ -28,8 +28,9 @@ function mintId(plm: PlmModel, prefix: 'ECR' | 'ECO'): string {
 const addChange = (doc: CadDocument, plm: PlmModel, record: ChangeRecord): CadDocument =>
   withPlm(doc, { ...plm, changes: { ...plm.changes, [record.id]: record }, changeOrder: [...plm.changeOrder, record.id] });
 
-/** The unknown item numbers of `items` (only the document's own managed item exists in this build). */
-const unknownItems = (plm: PlmModel, items: readonly string[]): string[] => items.filter((pn) => pn !== plm.item.partNumber);
+/** The unknown item numbers of `items` (the document's own managed item and its bound sub-items exist). */
+const unknownItems = (plm: PlmModel, items: readonly string[]): string[] =>
+  items.filter((pn) => pn !== plm.item.partNumber && plm.subItems?.[pn] === undefined);
 
 /**
  * @affects doc.plm.changes[id] (adds an open ECR), doc.plm.changeOrder

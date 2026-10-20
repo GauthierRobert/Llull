@@ -19,7 +19,12 @@ export function integrityOf(doc: CadDocument, plm: PlmModel, ctx?: ExecutionCont
   for (const label of plm.item.revisionOrder) {
     const revision = plm.item.revisions[label];
     if (revision === undefined || !FROZEN.has(revision.state)) continue;
-    const snapshotOk = revision.snapshot !== undefined && sha256Hex(revision.snapshot.canonicalJson) === revision.contentHash;
+    const snapshot = revision.snapshot;
+    const snapshotOk =
+      snapshot !== undefined &&
+      (snapshot.kind === 'vault'
+        ? snapshot.objectSha256 === revision.contentHash && (ctx?.objects?.has(snapshot.objectSha256) ?? true)
+        : sha256Hex(snapshot.canonicalJson) === revision.contentHash);
     const liveOk = label !== plm.item.currentRevision || revision.state !== 'released' || scopeHash(doc, ctx) === revision.contentHash;
     result[label] = snapshotOk && liveOk ? 'ok' : 'mismatch';
   }

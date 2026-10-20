@@ -22,6 +22,10 @@ export interface DocumentSession {
   /** Save As `filePath`, or to the current path. @failure no path -> rejects */
   save(filePath?: string): Promise<string>;
   newDocument(): Promise<void>;
+  /** The live document of the app (what Save would write). */
+  currentDocument(): Promise<CadDocument>;
+  /** Replace the live document with a serialized one (Vault check-out / check-in); the result counts as saved, with no file path. */
+  loadDocument(json: string): Promise<void>;
   hasUnsavedChanges(): Promise<boolean>;
 }
 
@@ -73,6 +77,14 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
     },
     async newDocument() {
       await command('clear_document', {}, true);
+      currentPath = null;
+      savedHash = (await snapshot()).stateHash;
+    },
+    async currentDocument() {
+      return (await snapshot()).document;
+    },
+    async loadDocument(json) {
+      await command('load_document', { json });
       currentPath = null;
       savedHash = (await snapshot()).stateHash;
     },

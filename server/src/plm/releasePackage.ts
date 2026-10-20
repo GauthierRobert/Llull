@@ -9,6 +9,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execute } from '@core/commands/registry';
 import type { HumanSignaturePort } from '@core/model/analysis';
+import type { ObjectStorePort } from '@core/commands/types';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import type { SignatureRecord } from '@core/model/plm';
 import { jcsJson } from '@lib/jcs';
@@ -41,13 +42,14 @@ const BODY_KEYS = [
   'documentContentHash',
   'reviewRequired',
   'unverified',
+  'structure',
 ];
 
 /** The exact release body a signature covers, rebuilt from a package manifest (`tool` keeps only name and releaseScopeFormat). */
 export function signedBodyOf(manifest: Manifest, meaning: string): Manifest {
   const tool = isRecord(manifest['tool']) ? manifest['tool'] : {};
   return {
-    ...Object.fromEntries(BODY_KEYS.map((key) => [key, manifest[key]])),
+    ...Object.fromEntries(BODY_KEYS.flatMap((key) => (manifest[key] === undefined ? [] : [[key, manifest[key]]]))),
     meaning,
     tool: { name: tool['name'], releaseScopeFormat: tool['releaseScopeFormat'] },
   };
@@ -77,29 +79,38 @@ export interface PackageFiles {
 }
 
 /** The package of released revision `label` of `doc`: files in memory, none written. @failure not a frozen revision -> a reason string */
-export function buildReleasePackage(doc: CadDocument, label: string, toolVersion: string): PackageFiles | string {
+export function buildReleasePackage(
+  doc: CadDocument,
+  label: string,
+  toolVersion: string,
+  objects?: ObjectStorePort | null,
+): PackageFiles | string {
   const plm = doc.plm;
   const revision = plm?.item.revisions[label];
   if (plm === undefined || revision?.snapshot === undefined || revision.contentHash === undefined)
     return `revision '${label}' is not a frozen (released, superseded or obsolete) revision of a managed item`;
+  const snapshotJson =
+    revision.snapshot.kind === 'inline' ? revision.snapshot.canonicalJson : (objects?.get(revision.snapshot.objectSha256) ?? null);
+  if (snapshotJson === null)
+    return `the snapshot of revision '${label}' is in the vault and no vault object is reachable (set LLULL_VAULT)`;
   const manifestQuery = execute(doc, 'release_manifest', { revision: label });
   const body = (manifestQuery.data as { body?: Manifest } | undefined)?.body;
   if (manifestQuery.rejected === true || body === undefined) return manifestQuery.summary;
   const stem = `${safeStem(plm.item.partNumber)}_${label}`;
   const modelPath = `model/${stem}.llull.json`;
-  const files: { path: string; content: string }[] = [{ path: modelPath, content: revision.snapshot.canonicalJson }];
+  const files: { path: string; content: string }[] = [{ path: modelPath, content: snapshotJson }];
   const members: PackageMember[] = [
     {
       path: modelPath,
       role: 'native-definition',
       mediaType: 'application/json',
       canonical: true,
-      sha256: sha256(revision.snapshot.canonicalJson),
-      bytes: byteLength(revision.snapshot.canonicalJson),
+      sha256: sha256(snapshotJson),
+      bytes: byteLength(snapshotJson),
     },
   ];
   const notes: string[] = [];
-  const frozen = frozenDocument(doc, label, revision.snapshot.canonicalJson);
+  const frozen = frozenDocument(doc, label, snapshotJson);
   for (const [index, sheetId] of (frozen?.drawings?.order ?? []).entries()) {
     const sheet = frozen === null ? undefined : execute(frozen, 'export_sheet_svg', { sheetId });
     const svg = (sheet?.data as { svg?: string } | undefined)?.svg;
