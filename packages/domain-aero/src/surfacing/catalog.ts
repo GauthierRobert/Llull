@@ -4,6 +4,7 @@ import { commandCatalog } from '@core/commands/schema';
 import { setAircraftFrame } from './aircraftFrame';
 import { fuselageSectionAt } from './fuselageSectionAt';
 import { airfoilFromNaca, airfoilProperties, importAirfoil } from './airfoilCommands';
+import { importOpenvspWing } from './openvspWing';
 import { loftFuselage } from './fuselageCommand';
 import { createWing, wingProperties } from './wingCommands';
 
@@ -16,4 +17,5 @@ export const surfacingCommands = commandCatalog(
   loftFuselage,
   setAircraftFrame,
   fuselageSectionAt,
+  importOpenvspWing,
 );
