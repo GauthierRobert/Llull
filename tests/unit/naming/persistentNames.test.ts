@@ -171,3 +171,33 @@ describe('persistent names: fillet_edge', () => {
     expectPure(box.document, () => execute(box.document, 'fillet_edge', { id: box.affected[0], edgeIndices: [0], radius: 0.5 }));
   });
 });
+
+describe('persistent names: regeneration and check_model (SC-N2)', () => {
+  it('a regeneration that loses the named edge fails the step loudly, and check_model reports REF_LOST with the re-pick', () => {
+    namedBoxKernel({ names: (size) => ((size[0] ?? 0) > 5 ? ['e(b:x+|b:w+)', ...BOX_EDGES.slice(1)] : BOX_EDGES) });
+    const { doc, boxStep, filletStep } = filletedBox();
+    const edited = execute(doc, 'edit_step_params', { stepId: boxStep, params: { size: [8, 4, 4] } });
+    expect(edited.summary).toContain(`FAILED during regeneration — the model is incomplete: ${filletStep} (fillet_edge)`);
+    expect(edited.summary).toContain('REF_LOST edge e(b:x+|b:z+)');
+    const check = execute(edited.document, 'check_model', {});
+    const data = check.data as { ok: boolean; issues: { code: string; message: string }[] };
+    expect(data.ok).toBe(false);
+    expect(data.issues.find((found) => found.code === 'REF_LOST')?.message).toMatch(/edit_step_params/);
+  });
+
+  it('check_model says the step did not apply when it cannot tell why (no kernel)', () => {
+    namedBoxKernel({ names: (size) => ((size[0] ?? 0) > 5 ? ['e(b:x+|b:w+)', ...BOX_EDGES.slice(1)] : BOX_EDGES) });
+    const { doc, boxStep } = filletedBox();
+    const edited = execute(doc, 'edit_step_params', { stepId: boxStep, params: { size: [8, 4, 4] } });
+    setGeometryKernel(null);
+    const codes = (execute(edited.document, 'check_model', {}).data as { issues: { code: string }[] }).issues.map((found) => found.code);
+    expect(codes).toContain('feature_step_not_applied');
+  });
+
+  it('check_model stays clean while the named edges still resolve', () => {
+    namedBoxKernel();
+    const { doc, boxStep } = filletedBox();
+    const edited = execute(doc, 'edit_step_params', { stepId: boxStep, params: { size: [8, 4, 4] } });
+    expect(execute(edited.document, 'check_model', {}).summary).toMatch(/clean/);
+  });
+});
