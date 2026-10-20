@@ -119,4 +119,10 @@ built by an older GCC, which is why the same tests always passed there. llvm-min
 Verification, with OCCT rebuilt by the fixed script (`%LOCALAPPDATA%\llull\occt-7.9.2-mingw-fix`, IGES included, ~25 min on 20 jobs):
 `shells_hollow_and_open` 30 / 30; `cargo test -p llull-kernel-occt -p llull-kernel` 62 / 62 and 13 / 13, three times; each formerly red
 server suite three times, no `NATIVE_DIED`: occtAnalysis 8 / 8, occtChamferShell 11 / 11, nativeKernelFeatures 42 / 42, occtCheckAssembly
-6 / 6, occtSheetMetal 14 / 14, brepCodeExchange.integration 5 / 5.
+6 / 6, occtSheetMetal 14 / 14, brepCodeExchange.integration 5 / 5. Then once with every tool present (build123d 0.12.0 included,
+`--maxWorkers=2`, 22 min): 144 files, 1339 passed, 16 skipped, 1 todo, 1 failed — `sfaPmi` (VC-GDT-22): with IFCsvr now answering, SFA
+reports a real AP242 finding on llull's plate export, "Datum Reference Frames for 'datum_system' should be unique for the same
+product_definition_shape" (open; the test's own false match on SFA's progress line "checking for syntax errors" is fixed). Skips: symlink
+confinement (4, EPERM), nativeComputeJob (3, POSIX-only), dwgImport (3, no DWG converter), MTest (1, not installed), the build123d `#!/bin/sh`
+wrapper (1, POSIX-only). `cargo test --workspace -- --test-threads=1` (gnu): 164 passed, 2 ignored; clippy `-D warnings` and `fmt --check`
+clean.
