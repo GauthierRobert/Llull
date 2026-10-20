@@ -20,6 +20,43 @@ if (nativeKernelBinary === null) console.warn(`[native kernel tests] skipped: ${
 /** `describe` for suites that run the real native kernel: skipped (with the reason logged above) when the binary is not built. */
 export const describeNative: typeof describe = describe.skipIf(nativeKernelBinary === null) as typeof describe;
 
+let probedCapabilities: readonly string[] | undefined;
+
+/** What the installed native binary can do (`info().capabilities`), probed once by starting it; empty when it is absent or does not start. */
+export function nativeCapabilities(): readonly string[] {
+  if (nativeKernelBinary === null) return [];
+  if (probedCapabilities === undefined) {
+    const probe = createNativeKernel(nativeKernelBinary, { callTimeoutMs: 60_000 });
+    try {
+      probedCapabilities = probe.start() ? (probe.info?.().capabilities ?? []) : [];
+    } finally {
+      probe.dispose();
+    }
+  }
+  return probedCapabilities;
+}
+
+/**
+ * `describe` for suites that need the native kernel AND the given capabilities (e.g. the XDE exchange ops): skipped, with the reason logged, when the
+ * binary is absent, lacks a capability (an older build), or `unless` names another reason (missing fixtures). One combined condition: chaining
+ * `describeNative.skipIf(x)` would REPLACE the binary condition (vitest builds the chain from the last `skipIf`), and the suite would run with no kernel.
+ */
+export function describeNativeWhen(options: {
+  readonly capabilities?: readonly string[];
+  readonly unless?: string | null;
+  readonly label: string;
+}): typeof describe {
+  const missing = (options.capabilities ?? []).filter((capability) => !nativeCapabilities().includes(capability));
+  const reason =
+    nativeKernelBinary === null
+      ? `no native llull-kernel binary (${nativeInstallHint('llull-kernel')})`
+      : missing.length > 0
+        ? `the native kernel build lacks ${missing.join(', ')} (rebuild solver/)`
+        : (options.unless ?? null);
+  if (reason !== null && nativeKernelBinary !== null) console.warn(`[${options.label}] skipped: ${reason}`);
+  return describe.skipIf(reason !== null) as typeof describe;
+}
+
 /** A started native kernel (the sidecar behind its synchronous worker proxy). Dispose it when done (or let the process exit). */
 export function createNativeTestKernel(options: { readonly testHooks?: boolean; readonly callTimeoutMs?: number } = {}): IsolatedKernel {
   if (nativeKernelBinary === null) throw new Error(nativeInstallHint('llull-kernel'));
