@@ -19,6 +19,7 @@ import type { ReliabilityModel } from './probabilistic';
 import type { SheetMetalModel } from './sheetMetal';
 import type { FeatureParams } from './features';
 import type { FaceOpParams } from './faceOps';
+import type { SketchLink, SketchPlane } from './sketchPlanes';
 
 /** Re-exported: every model consumer reads its vectors from here. */
 export type { Vec2, Vec3 };
@@ -666,6 +667,10 @@ export interface CadDocument {
   explodedViews?: Record<string, ExplodedView>;
   /** Exploded view the viewport draws; absent = none. */
   activeExplodedView?: ActiveExplodedView;
+  /** Absent until the first `create_sketch_plane` (SC-S3). */
+  sketchPlanes?: Record<string, SketchPlane>;
+  /** 2D entities linked to solid edges by `project_edges_to_sketch`, keyed by entity id; absent until the first. */
+  sketchLinks?: Record<string, SketchLink>;
 }
 
 /** Kernel provenance and modelling tolerance of a document (aerospace 01 KRN, TR-KRN-11/61). */

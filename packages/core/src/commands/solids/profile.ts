@@ -1,3 +1,4 @@
+import { placementOf } from '../draw2d/sketchPlanes';
 import { idOrNext } from '../entity/explicitId';
 import type { CadDocument, Vec2, Vec3 } from '../../model/types';
 import type { CurveSegment } from '../../model/curve';
@@ -76,6 +77,13 @@ export const extrudeProfile = defineCommand({
     ).optional(),
     rotation: rotationField(),
     axis: axisField('is the extrusion direction (local +Z)'),
+    plane: z
+      .string()
+      .describe(
+        'Sketch plane id (create_sketch_plane): extrude along the plane normal, the profile in the plane axes (use it for a sketch placed with ' +
+          'place_on_sketch_plane; without it the source rotation is not inherited). Excludes rotation and axis.',
+      )
+      .optional(),
     color: colorField(EXTRUSION_COLOR),
     thin: thinSchema.optional(),
     openPath: z
@@ -83,7 +91,12 @@ export const extrudeProfile = defineCommand({
       .describe('Only with thin: true means the inline `profile` is an OPEN path (not implicitly closed). Default false.')
       .optional(),
   }),
-  run: (doc, { profile, id, ids, depth, position, rotation, axis, color = EXTRUSION_COLOR, thin, openPath }, ctx) => {
+  run: (doc, { profile, id, ids, depth, position, rotation: given, axis, plane, color = EXTRUSION_COLOR, thin, openPath }, ctx) => {
+    const sketchPlane = plane === undefined ? undefined : doc.sketchPlanes?.[plane];
+    if (plane !== undefined && sketchPlane === undefined) return noop(doc, `extrude_profile: no sketch plane '${plane}'; no-op.`);
+    if (sketchPlane !== undefined && (given !== undefined || axis !== undefined))
+      return noop(doc, 'extrude_profile: give plane OR rotation / axis, not both; no-op.');
+    const rotation = sketchPlane === undefined ? given : placementOf(sketchPlane.frame).rotation;
     if (thin !== undefined) return thinExtrude(doc, { profile, openPath, id, ids, depth, position, rotation, axis, color, thin }, ctx);
     if (openPath === true) return noop(doc, 'extrude_profile: openPath needs thin (a solid prism needs a closed profile); no-op.');
     const sources = [profile, id, ids].filter((source) => source !== undefined).length;
@@ -96,7 +109,7 @@ export const extrudeProfile = defineCommand({
       return extrusionResult(doc, {
         profile,
         depth,
-        position: position ?? ORIGIN,
+        position: position ?? sketchPlane?.frame.origin ?? ORIGIN,
         rotation,
         axis,
         color,

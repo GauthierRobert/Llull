@@ -12,10 +12,10 @@ import { isStringArray } from '../../lib/isStringArray';
 import { operandRecipe } from '../brep/kernelShape';
 import { REPICK_EDGES } from '../brep/edgeReferences';
 
-const EDGE_PICKING_STEPS: ReadonlySet<string> = new Set(['fillet_edge', 'chamfer_edge']);
+const EDGE_PICKING_STEPS: ReadonlySet<string> = new Set(['fillet_edge', 'chamfer_edge', 'project_edges_to_sketch']);
 
 export interface ReferenceIssue {
-  readonly code: 'REF_LOST' | 'REF_SPLIT' | 'feature_step_not_applied';
+  readonly code: 'REF_LOST' | 'REF_SPLIT' | 'feature_step_not_applied' | 'sketch_link_lost';
   readonly message: string;
   readonly entityId: string;
 }
@@ -53,10 +53,30 @@ function stepIssue(doc: CadDocument, kernel: GeometryKernel | null, step: Featur
   );
 }
 
-/** One issue per edge-picking step that no longer applies (see the module doc). */
+/** Linked sketch geometry (SC-S3) whose solid is gone, or whose recorded edges no longer resolve on it. */
+function sketchLinkIssues(doc: CadDocument, kernel: GeometryKernel | null): ReferenceIssue[] {
+  return Object.values(doc.sketchLinks ?? {}).flatMap((link): ReferenceIssue[] => {
+    const { entityId, edgeNames } = link.source;
+    if (!Object.hasOwn(doc.entities, entityId))
+      return [
+        {
+          code: 'sketch_link_lost',
+          message: `Sketch entity '${link.id}' is linked to '${entityId}', which is gone; break_sketch_link keeps its geometry.`,
+          entityId: link.id,
+        },
+      ];
+    const problem = nameProblem(kernel, doc, entityId, edgeNames);
+    return problem === null
+      ? []
+      : [{ ...problem, code: 'sketch_link_lost', message: `Sketch entity '${link.id}': ${problem.message}`, entityId: link.id }];
+  });
+}
+
+/** One issue per edge-picking step that no longer applies and per broken sketch link (see the module doc). */
 export function featureReferenceIssues(doc: CadDocument, kernel: GeometryKernel | null): ReferenceIssue[] {
-  return doc.featureHistory.flatMap((step) => {
+  const steps = doc.featureHistory.flatMap((step) => {
     const found = stepIssue(doc, kernel, step);
     return found === null ? [] : [found];
   });
+  return [...steps, ...sketchLinkIssues(doc, kernel)];
 }
