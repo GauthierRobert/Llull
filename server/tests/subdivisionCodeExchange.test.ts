@@ -1,6 +1,6 @@
 /**
  * Subdivision solids in generated code. The pure Python port of Catmull-Clark + Bézier patches
- * (codegen/pythonSubdivision.ts) must reproduce the TypeScript patches (any python3). With
+ * (codegen/pythonSubdivision.ts) must reproduce the TypeScript patches (any Python 3: LLULL_TEST_PYTHON, python3 or python). With
  * CadQuery available, the exported script builds exact B-spline faces (STEP) and its trace
  * round-trips into an editable subdivision solid (skipped in CI otherwise:
  * LLULL_TEST_CADQUERY_PYTHON=/path/to/venv/bin/python).
@@ -16,9 +16,9 @@ import { subdivisionPatches } from '@core/geometry/subdivisionPatches';
 import { SUBDIVISION_PY } from '@core/codegen/pythonSubdivision';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 import { createPythonExchangePort } from '../src/pythonExchange';
-import { BRIDGE_SCRIPT, CADQUERY_PYTHON, probePython } from './exchangeTestSupport';
+import { BRIDGE_SCRIPT, CADQUERY_PYTHON, findPlainPython, probePython } from './exchangeTestSupport';
 
-const hasPython = spawnSync('python3', ['--version']).status === 0;
+const PYTHON = findPlainPython();
 const hasCadQuery = probePython(CADQUERY_PYTHON).cadquery !== null;
 
 /** A creased cylinder cage (valence-6 cap centres after refinement, crease rings). */
@@ -28,7 +28,7 @@ function creasedCage(): Pick<SubdivisionEntity, 'vertices' | 'faces' | 'creases'
   return { ...cage, vertices: cage.vertices.map(([x, y, z]) => [x + 0.3 * z, y, z]), creases: rim };
 }
 
-describe.skipIf(!hasPython)('python subdivision port', () => {
+describe.skipIf(PYTHON === null)('python subdivision port', () => {
   it('reproduces the TypeScript Bézier patches', () => {
     const cage = creasedCage();
     const driver = [
@@ -37,7 +37,7 @@ describe.skipIf(!hasPython)('python subdivision port', () => {
       'cage = json.load(sys.stdin)',
       "print(json.dumps(_subdivision_patches(cage['vertices'], cage['faces'], cage['creases'])))",
     ].join('\n');
-    const run = spawnSync('python3', ['-c', driver], { input: JSON.stringify(cage), encoding: 'utf8' });
+    const run = spawnSync(PYTHON ?? 'python3', ['-c', driver], { input: JSON.stringify(cage), encoding: 'utf8' });
     expect(run.status, run.stderr).toBe(0);
     const fromPython = JSON.parse(run.stdout) as number[][][];
     const fromTypeScript = subdivisionPatches(cage);
@@ -48,7 +48,7 @@ describe.skipIf(!hasPython)('python subdivision port', () => {
   });
 });
 
-describe.skipIf(!hasPython)('exported subdivision code', () => {
+describe.skipIf(PYTHON === null)('exported subdivision code', () => {
   const cage = creasedCage();
   const doc = execute(createEmptyDocument(), 'add_subdivision_solid', { ...cage, levels: 2, position: [5, 0, 0], name: 'grip' }).document;
 
@@ -57,7 +57,7 @@ describe.skipIf(!hasPython)('exported subdivision code', () => {
     expect(text).toMatch(/= subdivision\(\[/);
     expect(text).toContain('levels=2');
     expect(text).not.toMatch(/= mesh\(\[/);
-    const parse = spawnSync('python3', ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], { input: text, encoding: 'utf8' });
+    const parse = spawnSync(PYTHON ?? 'python3', ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], { input: text, encoding: 'utf8' });
     expect(parse.status, parse.stderr).toBe(0);
   });
 
