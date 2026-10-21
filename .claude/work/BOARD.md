@@ -28,6 +28,14 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## Priority
 
+- `[TODO]` **LIM-1** (owner 2026-10-21, next priority) Gaps found building the LLR-845 rocket-engine demo via the CLI, each fix test-first (`fix-bug`):
+  (1) `array_polar` / `array_linear` copies lose the source material → silent low `mass_properties`; (2) copies get an id prefix unlike their source
+  (`cylinder-` vs alias kind); (3) `rotate_entity` rotates about the world origin, not the entity (no `pivot`); (4) `render_view` ignores the active
+  exploded view; (5) no `set_entity_color` command, `design_nozzle` ignores `color`, no per-face color; (6) Windows `llull-kernel.exe` needs
+  `occt-7.9.2/bin` on PATH (0xC0000135, `DEP_OCCT_BIN_DIR` unused: copy the DLLs next to the exe or set PATH in `nativeKernel.ts`); (7) `mass_properties`
+  of lofts uses the display mesh, not the exact B-rep; (8) `add_external_thread` / `add_tapped_hole` stop at M20; (9) closed hollow sweeps
+  (`sweep_profile` innerRadius on a closed path) give an invalid B-rep; (10) scale untested: measure plan time / glTF size past ~160 parts
+  (v5 = 25 MB .glb), hundreds of patterned booleans (coolant channels). _deps: —_
 - `[REVIEW]` **RS** wave RS-3, RS-4, RS-5, RS-7, RS-8 on branch `feat/rs-native-wave`, PR #98 (merged with main 2026-10-20): `docs/decisions/RS1-native-compute.md`. Verified on the owner PC (GNU toolchain + dlltool shim, RTX 4080): TS gates, unit + server suites, native parity suites 67/67, coverage gate (sharded) 97.25 / 88.58 / 98.8 / 98.89, two cad-reviewer passes fixed. `npm run native:check` passes with MSVC (2026-10-21, KRN-MSVC).
 - `[TODO]` **RS-6** clearance / thickness / view factors on `llull-geomq`. _deps: —_
 - `[TODO]` **RS follow-ups** plant 10 M3 viewport, plant 02 V1 (route*pipe, fittings, check_piping), PHY-09 M4/M5, AER 3D panel, PHY-19 hand-off (OpenCourant); physics 19 options outside RS-8 (rounded shell edges in contact §29.8.3, shell thickness change §29.8.2; §13.10). \_deps: RS wave*
