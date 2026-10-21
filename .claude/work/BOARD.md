@@ -12,6 +12,8 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - Lanes own disjoint write scopes (`.claude/rules/workflow.md` W5); one task per lane at a time, up to 4 lanes + Lane 5 review.
 
 ## NOW (auto-updated by the skill)
+- 2026-10-21 — main: KRN-MSVC merged unverified in full (owner): llull-kernel built with MSVC, dlltool stand-in removed (RS-MSVC), PMI
+  tolerance pairing by faces. Pending: full native server suite + `npm run check` + TR-FEA-32 on MSVC.
 - 2026-10-21 — merge of origin/main (SC parity, RS native wave) into `feat/eng-depth`: one implementation per capability (stack-up engine = main's Philox
   bit-exact TS/native sampler with our PMI-linked contributors; IGES = our XDE import_iges / export_iges, main's import_step_exact format iges kept).
 - 2026-10-21 — branch `feat/eng-depth`: DONE (reviewed, fixes merged) FEA-REST, AERO-5 (02 SRF M0–M7, 06 CMP M0–M6 incl. drape + AP242 CAx-IF set),
@@ -26,8 +28,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## Priority
 
-- `[REVIEW]` **RS** wave RS-3, RS-4, RS-5, RS-7, RS-8 on branch `feat/rs-native-wave`, PR #98 (merged with main 2026-10-20): `docs/decisions/RS1-native-compute.md`. Verified on the owner PC (GNU toolchain + dlltool shim, RTX 4080): TS gates, unit + server suites, native parity suites 67/67, coverage gate (sharded) 97.25 / 88.58 / 98.8 / 98.89, two cad-reviewer passes fixed. _Open: `npm run native:check` with MSVC (CI on push, or RS-MSVC)._
-- `[TODO]` **RS-MSVC** Temporary `solver/scripts/dlltool-shim` (owner 2026-10-20): delete it and its notes (plant 09 §12, plant 10 §13.6, physics 19 §13) once MSVC Build Tools are installed; then run `npm run native:check` in full. _deps: owner installs MSVC_
+- `[REVIEW]` **RS** wave RS-3, RS-4, RS-5, RS-7, RS-8 on branch `feat/rs-native-wave`, PR #98 (merged with main 2026-10-20): `docs/decisions/RS1-native-compute.md`. Verified on the owner PC (GNU toolchain + dlltool shim, RTX 4080): TS gates, unit + server suites, native parity suites 67/67, coverage gate (sharded) 97.25 / 88.58 / 98.8 / 98.89, two cad-reviewer passes fixed. `npm run native:check` passes with MSVC (2026-10-21, KRN-MSVC).
 - `[TODO]` **RS-6** clearance / thickness / view factors on `llull-geomq`. _deps: —_
 - `[TODO]` **RS follow-ups** plant 10 M3 viewport, plant 02 V1 (route*pipe, fittings, check_piping), PHY-09 M4/M5, AER 3D panel, PHY-19 hand-off (OpenCourant); physics 19 options outside RS-8 (rounded shell edges in contact §29.8.3, shell thickness change §29.8.2; §13.10). \_deps: RS wave*
 - `[TODO]` **TOP-V1** Topology V1 (PHY-17 §10 M4): MMA, projection, extrusion / min member size, `min_volume`, pressure / gravity loads in the
@@ -45,9 +46,10 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
   edge/vertex-referenced dimensions (217/260), composite frames + datum targets in the AP242 transport, Windows Hello/TPM key for the PLM trust root; AP242 writer (OCC): same datum
   label on two products resolves to the first product, frame B|A written in datum order A|B, SFA ST-Developer warnings (attribute count, select type,
   external mapping) unexamined (03 §13.5). _deps: —_
-- `[TODO]` **KRN-MSVC** Build llull-kernel with MSVC (VS Build Tools, needs an elevated install) for shipping parity. The MinGW crashes are fixed
-  (GCC 16.2 -O3 miscompile of BRepClass3d_SClassifier, built with -fno-ipa-cp-clone; SV1); still to re-check on MSVC: FE face map TR-FEA-32 and the
-  CMP live-OCC cone pick (05 §13, 06 §13.4). _deps: —_
+- `[REVIEW]` **KRN-MSVC** (needs verification) llull-kernel builds with MSVC (VS Build Tools 17.14; merged 2026-10-21, commits 40353cf6 + 200bd473; dlltool stand-in removed = RS-MSVC done).
+  Verified on MSVC: `native:check`, NIST PMI suites 41/41, CMP live-OCC cone pick (06 §13.4, new native test), GPU raster 3/3. Fixed: STEP-side PMI
+  tolerances now pair with XCAF ones on the same faces first (stc_07 gave 23 instead of 22 on MSVC). _Still to verify (runs killed by low memory):
+  full `LLULL_REQUIRE_NATIVE_KERNEL=1 npm --prefix server test`, `npm run check`, FE face map TR-FEA-32 (05 §13)._ _deps: —_
 - `[TODO]` **VNV-M3** Convergence studies + `check_verification`: `docs/physics/00-vv-harness/`. _deps: FEA artifact store, AERO-4 (09 PLM signing) — both built_
 - `[TODO]` **VNV-M4** Time-step/order refinement, least-squares order, UI: `docs/physics/00-vv-harness/`. _deps: VNV-M3_
 - `[BLOCKED]` **PROP-M6** Seed NIST property library: `docs/physics/01-property-models/` (OQ-PROP-03, needs trc.nist.gov access). _deps: —_
