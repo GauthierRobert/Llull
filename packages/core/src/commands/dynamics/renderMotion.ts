@@ -1,5 +1,6 @@
 /** Looking at a simulated pose without a screen (render_motion): runs simulate_motion and draws the mechanism at chosen times. */
 
+import { round6 } from '../../lib/compactNumber';
 import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
@@ -29,8 +30,7 @@ const LABEL_HEIGHT = 22;
 const CELL_CLIP = 'motion-cell';
 
 const formatTime = (time: number): string => `t = ${+time.toFixed(3)} s`;
-const round = (value: number): number => Math.round(value * 1e6) / 1e6;
-const roundVec = (v: Vec3): Vec3 => [round(v[0]), round(v[1]), round(v[2])];
+const roundVec = (v: Vec3): Vec3 => [round6(v[0]), round6(v[1]), round6(v[2])];
 
 /** Index of the sample closest to `time`. */
 function nearestSample(times: readonly number[], time: number): number {
@@ -192,7 +192,7 @@ export const renderMotion = defineCommand({
         `  <text x="${x + 8}" y="${y + 16}" font-family="monospace" font-size="14" fill="#e8e8f4">${escapeXml(formatTime(time))}</text>`,
       );
       return {
-        time: round(time),
+        time: round6(time),
         bodies: Object.fromEntries(
           Object.entries(posesAtSample(poses, index)).map(([id, pose]) => [
             id,
@@ -207,7 +207,7 @@ export const renderMotion = defineCommand({
                   {
                     a: roundVec(end.a),
                     b: roundVec(end.b),
-                    length: round(Math.hypot(end.a[0] - end.b[0], end.a[1] - end.b[1], end.a[2] - end.b[2])),
+                    length: round6(Math.hypot(end.a[0] - end.b[0], end.a[1] - end.b[1], end.a[2] - end.b[2])),
                   },
                 ]),
               ),

@@ -7,6 +7,8 @@
 import type { Vec2, Vec3 } from '../model/types';
 import { applyMat3, eulerFromMat, matFromAxis, matFromEulerXYZ, type Mat3 } from '../lib/axisRotation';
 import { polygonArea, signedArea } from '../lib/polygon';
+import { quantizedKey } from '../lib/quantize';
+import { cross3, sub3 } from '../lib/vec3';
 import { signedMeshVolume } from './meshVolume';
 import type { Triangle } from './triangles';
 
@@ -29,21 +31,17 @@ const VOLUME_TOLERANCE = 1e-4;
 
 const transpose = (m: Mat3): Mat3 => [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]];
 
-function cross(a: Vec3, b: Vec3): Vec3 {
-  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-}
-
 /** Distinct face normals (up to sign), largest-area first. */
 function candidateAxes(tris: readonly Triangle[]): Vec3[] {
   const byKey = new Map<string, { axis: Vec3; area: number }>();
   for (const [a, b, c] of tris) {
-    const n = cross([b[0] - a[0], b[1] - a[1], b[2] - a[2]], [c[0] - a[0], c[1] - a[1], c[2] - a[2]]);
+    const n = cross3(sub3(b, a), sub3(c, a));
     const length = Math.hypot(n[0], n[1], n[2]);
     if (length < 1e-12) continue;
     let unit: Vec3 = [n[0] / length, n[1] / length, n[2] / length];
     const lead = unit.find((v) => Math.abs(v) > 1e-6) ?? 0;
     if (lead < 0) unit = [-unit[0], -unit[1], -unit[2]];
-    const key = unit.map((v) => Math.round(v * 1e5) + 0).join(',');
+    const key = quantizedKey(unit, 1e-5);
     const known = byKey.get(key);
     byKey.set(key, { axis: unit, area: (known?.area ?? 0) + length / 2 });
   }
@@ -146,7 +144,7 @@ function sectionAlong(tris: readonly Triangle[], axis: Vec3, size: number): Pris
       if (levels.has('low')) caps.push(tri);
       continue;
     }
-    const n = cross(
+    const n = cross3(
       [tri[1][0] - tri[0][0], tri[1][1] - tri[0][1], tri[1][2] - tri[0][2]],
       [tri[2][0] - tri[0][0], tri[2][1] - tri[0][1], tri[2][2] - tri[0][2]],
     );

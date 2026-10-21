@@ -7,23 +7,15 @@
  *
  * Safety: private temp dir per request (always removed), argv-only spawn with fixed file names, allowlisted env, timeout, size caps.
  */
-import { spawn } from 'node:child_process';
 import { mkdtemp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { DwgConverterPort } from '@protocol/index';
-import {
-  bridgeEnvironment,
-  captureStderrTail,
-  concurrencyLimiter,
-  confinedPath,
-  exchangeOptionsFromEnv,
-  type ExchangeOptions,
-} from './pythonExchange';
+import { bridgeEnvironment, concurrencyLimiter, confinedPath, exchangeOptionsFromEnv, type ExchangeOptions } from './pythonExchange';
 import { exchangeDirOf, positiveInteger } from './env';
 import { createFeaToolsPort } from './fea/transports';
 import { createLibraryStorePort } from './libraries/libraryStore';
-import { trackChild } from './childProcesses';
+import { runProcess } from './processRunner';
 
 const DEFAULT_MAX_BYTES = 50 * 1024 * 1024;
 const MAX_DXF_BYTES = 200 * 1024 * 1024; // read as one UTF-8 string (V8 limit ~512 MB)
@@ -72,28 +64,15 @@ const hasDwgMagic = (bytes: Uint8Array): boolean =>
 
 type RunOutcome = { kind: 'missing' } | { kind: 'timeout' } | { kind: 'done'; code: number | null; stderr: string };
 
-/** Spawn `command args` (no shell); resolves, never rejects. */
-function runConverter(command: string, args: string[], timeoutMs: number): Promise<RunOutcome> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = (outcome: RunOutcome): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(outcome);
-    };
-    const child = trackChild(spawn(command, args, { stdio: ['ignore', 'ignore', 'pipe'], env: bridgeEnvironment(), shell: false }));
-    const stderr = captureStderrTail(child.stderr, MAX_STDERR_BYTES);
-    const timer = setTimeout(() => {
-      child.kill('SIGKILL');
-      finish({ kind: 'timeout' });
-    }, timeoutMs);
-    child.on('error', (error: NodeJS.ErrnoException) => {
-      if (error.code === 'ENOENT' || error.code === 'EACCES') finish({ kind: 'missing' });
-      else finish({ kind: 'done', code: null, stderr: error.message });
-    });
-    child.on('close', (code) => finish({ kind: 'done', code, stderr: stderr() }));
-  });
+/** Run `command args` (no shell, tree-kill on timeout); resolves, never rejects. */
+async function runConverter(command: string, args: string[], timeoutMs: number): Promise<RunOutcome> {
+  const run = await runProcess({ executable: command, args, env: bridgeEnvironment(), timeoutMs, tailBytes: MAX_STDERR_BYTES });
+  if (run.startError !== undefined) {
+    return run.startErrorCode === 'ENOENT' || run.startErrorCode === 'EACCES'
+      ? { kind: 'missing' }
+      : { kind: 'done', code: null, stderr: run.startError };
+  }
+  return run.timedOut ? { kind: 'timeout' } : { kind: 'done', code: run.exitCode, stderr: run.stderr };
 }
 
 async function readDxfIn(dir: string, preferred: string): Promise<string | null> {

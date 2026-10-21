@@ -2,6 +2,7 @@
 // Okabe-Ito category colours come from CSS tokens (--cat-N); each series also gets a distinct dash so colour is never the only cue.
 
 import React, { useRef } from 'react';
+import { ChartAxes } from './ChartAxes';
 import { decimatedIndices, formatTick, interpolate, pickSeries } from './seriesMath';
 
 const WIDTH = 260;
@@ -90,17 +91,15 @@ export function SeriesChart({
         }}
         data-testid={`${testId}-plot`}
       >
-        <line className="series-chart__axis" x1={PAD.left} y1={y(0)} x2={WIDTH - PAD.right} y2={y(0)} />
-        <line className="series-chart__axis" x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={HEIGHT - PAD.bottom} />
-        <text className="series-chart__tick" x={PAD.left - 4} y={y(high) + 4} textAnchor="end">
-          {formatTick(high)}
-        </text>
-        <text className="series-chart__tick" x={PAD.left - 4} y={y(low) + 4} textAnchor="end">
-          {formatTick(low)}
-        </text>
-        <text className="series-chart__tick" x={WIDTH - PAD.right} y={HEIGHT - 4} textAnchor="end">
-          {formatTick(end)} {xUnit}
-        </text>
+        <ChartAxes
+          frame={{ width: WIDTH, height: HEIGHT, pad: PAD }}
+          baselineY={y(0)}
+          yHigh={y(high)}
+          yLow={y(low)}
+          highLabel={formatTick(high)}
+          lowLabel={formatTick(low)}
+          endLabel={`${formatTick(end)} ${xUnit}`}
+        />
         {shown.map((s, index) => (
           <path
             key={s.id}

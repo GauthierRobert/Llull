@@ -80,7 +80,7 @@ describeNative('occt export_step_ap242 labels', () => {
     doc = created.document;
     const componentId = Object.keys(doc.components)[0] ?? '';
     for (let k = 0; k < 4; k += 1) {
-      doc = execute(doc, 'insert_instance', { componentId, position: [k * 40, 0, 0], name: 'Tie rod M10' }).document;
+      doc = execute(doc, 'insert_instance', { componentId, position: [k * 40, 0, 0] }).document;
     }
     const ctx = { ...defaultContext(), kernel: kernels.occt };
     const result = execute(doc, 'export_step_ap242', { schema: 'ap214', includeValidationProperties: false }, ctx);
@@ -88,7 +88,7 @@ describeNative('occt export_step_ap242 labels', () => {
 
     expect(data.assembly).toEqual({ products: 2, occurrences: 6 });
     expect(data.solidCount).toBe(11);
-    expect(result.summary).toContain('assembly, 2 product(s), 6 occurrence(s)');
+    expect(result.summary).toContain('2 product(s), 6 occurrence(s)');
     const step = data.step;
     // the 6 placed uses; the two solids of 'Tie rod' are solids of one product (named sub-shapes), not occurrences
     expect(step.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE\(/g)).toHaveLength(6);

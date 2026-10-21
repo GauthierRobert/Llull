@@ -3,32 +3,11 @@
 import type { AnalysisCase, FeArtifactPort } from '@core/model/analysis';
 import type { ExplicitResultsSummary, FeExplicitArtifact } from '@core/model/explicit';
 import type { CadDocument } from '@core/model/types';
-import { canonicalJson } from '@lib/canonicalJson';
-import { sha256Hex } from '@lib/sha256';
-import { differingKeys } from '../shared/trust';
+import { differingKeys, fetchArtifact } from '../shared/trust';
 import { explicitSummary } from './artifact';
 import { explicitInputHash } from './hash';
 
 type ExplicitState = 'unsolved' | 'solved' | 'stale' | 'missing' | 'untrusted';
-
-/**
- * The `fe_explicit` artifact of `hash`.
- * @failure absent / other kind -> EXP_ARTIFACT_NOT_FOUND; content not hashing to `hash` -> EXP_SUMMARY_MISMATCH
- */
-export function fetchExplicitArtifact(
-  port: FeArtifactPort | null | undefined,
-  hash: string,
-): { readonly artifact: FeExplicitArtifact } | { readonly code: string; readonly message: string } {
-  const found = port?.get(hash) ?? null;
-  if (found === null || found.kind !== 'fe_explicit')
-    return {
-      code: 'EXP_ARTIFACT_NOT_FOUND',
-      message: port ? `no fe_explicit artifact for hash ${hash}` : `no artifact store available for ${hash}`,
-    };
-  if (sha256Hex(canonicalJson(found)) !== hash)
-    return { code: 'EXP_SUMMARY_MISMATCH', message: `the sha256 of the fe_explicit artifact is not ${hash}` };
-  return { artifact: found };
-}
 
 export interface ExplicitTrust {
   readonly state: ExplicitState;
@@ -56,7 +35,7 @@ export function trustedExplicit(doc: CadDocument, analysisCase: AnalysisCase, po
       code: 'EXP_ARTIFACT_NOT_FOUND',
       message: 'the result was recorded without its artifact: re-run explicit_run',
     });
-  const fetched = fetchExplicitArtifact(port, recorded.artifactHash);
+  const fetched = fetchArtifact(port, recorded.artifactHash, 'fe_explicit', 'EXP');
   if ('code' in fetched) return none(fetched.code === 'EXP_SUMMARY_MISMATCH' ? 'untrusted' : 'missing', fetched);
   const summary = explicitSummary(doc, analysisCase, fetched.artifact, recorded.artifactHash);
   if (typeof summary === 'string') return none('untrusted', { code: 'EXP_SUMMARY_MISMATCH', message: summary });

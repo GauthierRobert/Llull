@@ -33,6 +33,8 @@ vi.mock('@ui/services/localQuery', async (importOriginal) => {
         const { summary, data, isError } = mocks.margins;
         return { document: useStore.getState().document, summary, affected: [], data, ...(isError ? { rejected: true } : {}) };
       }
+      if (command === 'margin_disposition_payload' && mocks.margins !== null)
+        return { document: useStore.getState().document, summary: 'ok', affected: [], data: { payloadSha256: 'c'.repeat(64) } };
       if (command === 'describe_analysis' && mocks.state !== null) {
         const real = actual.runQuery(command, params);
         const data = real.data as { analyses?: Patch[]; case?: { parts: Record<string, unknown> } };

@@ -12,7 +12,8 @@ import { boundsExtent, entityBoundsInDoc, mergeBounds, type Bounds } from '@core
 import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
 import { isLoadDrawn, useLoadOverlayStore } from '@ui/store/loadOverlayStore';
-import { LOAD_COLORS, type LoadItem } from '@ui/dynamicsLoads';
+import type { LoadItem } from '@core/dynamics/dynamicsLoads';
+import { LOAD_COLORS } from '@ui/dynamicsLoads';
 import { useDynamicsLoads } from '@ui/hooks/useDynamicsLoads';
 import { useDisposable } from '../useDisposable';
 import { ProjectedLabel } from './ProjectedLabel';

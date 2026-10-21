@@ -1,3 +1,4 @@
+import { roundTo } from '@lib/compactNumber';
 import { type CadDocument, type Entity, type Layer, type Vec2 } from '@core/model/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
@@ -13,7 +14,7 @@ import { isRefusal } from '../partLookup';
 /** Outline vertices returned inline before `outlineTruncated` is set (AF-12). */
 const MAX_OUTLINE_POINTS = 200;
 
-const round = (value: number): number => Math.round(value * 1e9) / 1e9 + 0;
+const round = (value: number): number => roundTo(value, 9) + 0;
 
 const hemOf = (geometry: FlatBuild['geometry'], bendId: string): string | null =>
   geometry.hems.find((hem) => hem.bend === bendId)?.id ?? null;

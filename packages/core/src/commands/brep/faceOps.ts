@@ -3,6 +3,7 @@
  * native OCC kernel; faces are picked by index, point or persistent name (recorded for regeneration, SC-N1).
  */
 
+import { round6 } from '../../lib/compactNumber';
 import type { Vec3 } from '../../model/types';
 import type { PlaneSpec } from '../../model/faceOps';
 import type { CommandResult } from '../types';
@@ -29,7 +30,7 @@ const planeSchema = z
   .describe('A plane by a point and its normal.');
 
 const DEFAULT_PULL: Vec3 = [0, 0, 1];
-const degrees = (radians: number): string => `${Math.round(((radians * 180) / Math.PI) * 1e6) / 1e6}°`;
+const degrees = (radians: number): string => `${round6((radians * 180) / Math.PI)}°`;
 const unit = (v: Vec3): Vec3 | null => (Math.hypot(...v) > 0 ? normalize3(v) : null);
 
 /** Lowest point of the solid along `direction` (the default neutral plane of a draft: the parting line at the bottom). */

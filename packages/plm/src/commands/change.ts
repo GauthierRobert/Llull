@@ -1,5 +1,6 @@
 /** Change control (FR-PLM-08/09): change requests (ECR), change orders (ECO), their classification and closing. */
 
+import { nextFreeId } from '@lib/id';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
@@ -20,9 +21,7 @@ const tagsSchema = z
 /** Next free id `<PREFIX>-nnnn` (4 digits, after every existing id of that prefix). */
 function mintId(plm: PlmModel, prefix: 'ECR' | 'ECO'): string {
   const used = plm.changeOrder.filter((id) => id.startsWith(`${prefix}-`)).length;
-  let n = used + 1;
-  while (Object.hasOwn(plm.changes, `${prefix}-${String(n).padStart(4, '0')}`)) n += 1;
-  return `${prefix}-${String(n).padStart(4, '0')}`;
+  return nextFreeId(prefix, (id) => Object.hasOwn(plm.changes, id), { pad: 4, start: used + 1 });
 }
 
 const addChange = (doc: CadDocument, plm: PlmModel, record: ChangeRecord): CadDocument =>

@@ -1,9 +1,7 @@
 /** PHY-09 §7.1 stable codes: remediation texts for refusals and check items (AF-11). */
 
-import type { CadDocument } from '@core/model/types';
-import type { CommandResult } from '@core/commands/types';
-import { codedRejection } from '@core/commands/noop';
-import { refuseCode } from '../shared/codes';
+import { tableRejection } from '@core/commands/noop';
+import { codeRemediation } from '../shared/codes';
 import { feRemediation } from '../shared/feCodes';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
@@ -47,17 +45,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
 const dynRemediation = (code: string): string => REMEDIATION[code] ?? feRemediation(code);
 
 /** Refusal with the remediation of `code` (DYN_* here, FEA_* set-up codes from the shared table). */
-export function refuseDyn(
-  doc: CadDocument,
-  command: string,
-  code: string,
-  message: string,
-  ids: readonly string[] = [],
-  paths: readonly string[] = [],
-): CommandResult {
-  if (Object.hasOwn(REMEDIATION, code)) return codedRejection(doc, command, code, message, dynRemediation(code), ids, paths);
-  return refuseCode(doc, command, code, message, ids, paths);
-}
+export const refuseDyn = tableRejection(REMEDIATION, codeRemediation);
 
 export interface DynamicCheckItem {
   readonly code: string;

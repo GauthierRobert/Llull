@@ -13,4 +13,17 @@ describe('replay tolerates unknown keys recorded before they were rejected', () 
     expect(replayed.rejected).not.toBe(true);
     expect(Object.keys(replayed.document.entities)).toEqual(Object.keys(built.entities));
   });
+
+  it('build_project tolerates plan-file metadata keys, but each step stays strict', () => {
+    const meta = { id: 'p1', status: 'RUNNABLE', expected: 'one box', notes: ['x'] };
+    const ok = execute(createEmptyDocument(), 'build_project', { ...meta, actions: [{ command: 'add_box', params: { size: [1, 1, 1] } }] });
+    expect(ok.rejected).not.toBe(true);
+    expect(ok.affected).toHaveLength(1);
+    const typo = execute(createEmptyDocument(), 'build_project', {
+      ...meta,
+      actions: [{ command: 'add_box', params: { size: [1, 1, 1], positon: [1, 0, 0] } }],
+    });
+    expect(typo.document.order).toHaveLength(0);
+    expect(typo.summary).toContain("unknown param 'positon'");
+  });
 });

@@ -3,11 +3,9 @@
 
 import type { Vec2, Vec3 } from '@core/model/types';
 import { boundsCenter, boundsCorners, type Bounds } from '@core/geometry/bounds';
+import { add3, cross3, dot3, scale3, sub3 } from '@lib/vec3';
 
-const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const add = (a: Vec3, b: Vec3, scale: number): Vec3 => [a[0] + b[0] * scale, a[1] + b[1] * scale, a[2] + b[2] * scale];
-const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const add = (a: Vec3, b: Vec3, k: number): Vec3 => add3(a, scale3(b, k));
 
 export function normalized(direction: Vec3): Vec3 {
   const length = Math.hypot(...direction);
@@ -17,8 +15,8 @@ export function normalized(direction: Vec3): Vec3 {
 /** Two unit axes spanning the plane normal to the unit flow direction. */
 function planeAxes(flow: Vec3): { u: Vec3; v: Vec3 } {
   const helper: Vec3 = Math.abs(flow[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
-  const u = normalized(cross(helper, flow));
-  return { u, v: cross(flow, u) };
+  const u = normalized(cross3(helper, flow));
+  return { u, v: cross3(flow, u) };
 }
 
 export interface FlowFrame {
@@ -36,12 +34,12 @@ export interface FlowFrame {
 export function flowFrame(bounds: Bounds, flow: Vec3): FlowFrame {
   const center = boundsCenter(bounds);
   const { u, v } = planeAxes(flow);
-  const offsets = boundsCorners(bounds).map((corner) => sub(corner, center));
+  const offsets = boundsCorners(bounds).map((corner) => sub3(corner, center));
   const range = (axis: Vec3): [number, number] => [
-    Math.min(...offsets.map((o) => dot(o, axis))),
-    Math.max(...offsets.map((o) => dot(o, axis))),
+    Math.min(...offsets.map((o) => dot3(o, axis))),
+    Math.max(...offsets.map((o) => dot3(o, axis))),
   ];
-  return { center, depth: Math.max(...offsets.map((o) => Math.abs(dot(o, flow)))), uRange: range(u), vRange: range(v), u, v };
+  return { center, depth: Math.max(...offsets.map((o) => Math.abs(dot3(o, flow)))), uRange: range(u), vRange: range(v), u, v };
 }
 
 /** Closed loop of the bounding rectangle normal to the flow, `gap` downstream of the body (the "A = …" frontal-area plane). */

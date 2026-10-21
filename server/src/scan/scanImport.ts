@@ -5,8 +5,8 @@
  * Proprietary formats are refused here, before any native work (VC-SCN-11).
  */
 
-import { createReadStream, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs';
-import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs';
+import { sha256File } from '../sha256';
 import path from 'node:path';
 import type { CloudManifest } from '@core/model/pointCloud';
 import { isRecord } from '@lib/isRecord';
@@ -45,12 +45,6 @@ export type ScanImportResult =
   | { readonly ok: false; readonly code: string; readonly message: string };
 
 const fail = (code: string, message: string): ScanImportResult => ({ ok: false, code, message });
-
-async function sha256File(file: string): Promise<string> {
-  const hash = createHash('sha256');
-  for await (const chunk of createReadStream(file)) hash.update(chunk as Buffer);
-  return hash.digest('hex');
-}
 
 /** Import options from tool params (defaults filled in; they are part of the asset key). */
 export function importOptionsOf(params: Readonly<Record<string, unknown>>): ImportOptions | string {

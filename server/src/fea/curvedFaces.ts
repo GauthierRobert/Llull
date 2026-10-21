@@ -8,6 +8,7 @@
 
 import { recipeOf } from '@core/geometry/shapeRecipe';
 import type { Entity, MeshData, ShapeRecipe, SolidKind } from '@core/model/types';
+import { cross3, dot3, sub3 } from '@lib/vec3';
 
 /** Dihedral angle (degrees) below which two adjacent triangles are one planar region. */
 const COPLANAR_DEGREES = 0.5;
@@ -56,10 +57,6 @@ export function isCurvedPart(entity: Entity, mesh: MeshData): boolean {
 }
 
 type Vec = readonly [number, number, number];
-
-const minus = (a: Vec, b: Vec): Vec => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const cross = (a: Vec, b: Vec): Vec => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const dot = (a: Vec, b: Vec): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
 class DisjointSet {
   private readonly parent: number[];
@@ -112,7 +109,7 @@ function hasCurvedFaces(mesh: MeshData): boolean {
   for (let t = 0; t < triangles; t++) {
     const corners = [0, 1, 2].map((c) => mesh.indices[3 * t + c] ?? 0);
     const [a, b, c] = corners.map(point) as [Vec, Vec, Vec];
-    const normal = cross(minus(b, a), minus(c, a));
+    const normal = cross3(sub3(b, a), sub3(c, a));
     const length = Math.hypot(...normal);
     normals.push(length > 0 ? [normal[0] / length, normal[1] / length, normal[2] / length] : null);
     const ids = corners.map(weld);
@@ -127,7 +124,7 @@ function hasCurvedFaces(mesh: MeshData): boolean {
   const angleOf = (first: number, second: number): number | null => {
     const n1 = normals[first];
     const n2 = normals[second];
-    return n1 == null || n2 == null ? null : (Math.acos(Math.max(-1, Math.min(1, dot(n1, n2)))) * 180) / Math.PI;
+    return n1 == null || n2 == null ? null : (Math.acos(Math.max(-1, Math.min(1, dot3(n1, n2)))) * 180) / Math.PI;
   };
   const planar = new DisjointSet(triangles);
   const shared: [number, number, number][] = [];

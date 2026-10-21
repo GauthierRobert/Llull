@@ -7,7 +7,7 @@ import { expressionSyntaxError, extractReferences, isBuiltinConstant } from '@li
 import { nextId } from '@lib/id';
 import { distributionIssue, distributionSchema } from './distributions';
 import { refuseReliability } from './codes';
-import { cholesky } from './numerics';
+import { cholesky } from '@lib/denseLinalg';
 import type { LimitState, RandomVariable } from '@core/model/probabilistic';
 import { limitStateOf, reliabilityOf, variableOf, withReliability } from './model';
 

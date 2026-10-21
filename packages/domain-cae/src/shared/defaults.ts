@@ -2,6 +2,7 @@
 
 import type { FactorSet, MeshControls, TemperatureScale, ThermalSetup, UnitSystem } from '@core/model/analysis';
 import type { DocumentUnit } from '@core/model/types';
+import { unitSystemFactors } from '../decks/units';
 
 /** Unit system consistent with the document unit: mm/cm -> N-mm-t-s, m -> N-m-kg-s, in/ft -> lbf-in-slinch-s. */
 export function unitSystemOf(unit: DocumentUnit): UnitSystem {
@@ -11,8 +12,7 @@ export function unitSystemOf(unit: DocumentUnit): UnitSystem {
 
 /** Metres in one length unit of the analysis unit system. */
 export function analysisLengthMetres(unitSystem: UnitSystem): number {
-  if (unitSystem === 'N-m-kg-s') return 1;
-  return unitSystem === 'N-mm-t-s' ? 0.001 : 0.0254;
+  return unitSystemFactors(unitSystem).metresPerLength;
 }
 
 const DEFAULT_GLOBAL_SIZE: Readonly<Record<DocumentUnit, number>> = { mm: 10, cm: 1, m: 0.01, in: 0.5, ft: 0.04 };

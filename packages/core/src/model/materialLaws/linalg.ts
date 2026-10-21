@@ -1,52 +1,17 @@
 /** Small dense linear algebra for the constitutive kernels: Gauss elimination with partial pivoting and a pivot-checked LDLᵀ. */
 
+import { invertDense, solveDense } from '../../lib/denseLinalg';
+
 export type Matrix = number[][];
 
 /** Solve A x = b (A square); null when A is singular. Inputs are not modified. */
 export function solveLinear(a: readonly (readonly number[])[], b: readonly number[]): number[] | null {
-  const n = b.length;
-  const m: number[][] = a.map((row, i) => [...row, b[i] ?? 0]);
-  for (let c = 0; c < n; c += 1) {
-    let pivot = c;
-    for (let r = c + 1; r < n; r += 1) if (Math.abs(m[r]?.[c] ?? 0) > Math.abs(m[pivot]?.[c] ?? 0)) pivot = r;
-    const pivotRow = m[pivot];
-    const head = m[c];
-    if (pivotRow === undefined || head === undefined) return null;
-    const diagonal = pivotRow[c] ?? 0;
-    if (Math.abs(diagonal) < 1e-300) return null;
-    m[c] = pivotRow;
-    m[pivot] = head;
-    for (let r = c + 1; r < n; r += 1) {
-      const row = m[r];
-      if (row === undefined) return null;
-      const factor = (row[c] ?? 0) / diagonal;
-      if (factor !== 0) for (let k = c; k <= n; k += 1) row[k] = (row[k] ?? 0) - factor * (pivotRow[k] ?? 0);
-    }
-  }
-  const x = new Array<number>(n).fill(0);
-  for (let r = n - 1; r >= 0; r -= 1) {
-    const row = m[r];
-    if (row === undefined) return null;
-    let sum = row[n] ?? 0;
-    for (let k = r + 1; k < n; k += 1) sum -= (row[k] ?? 0) * (x[k] ?? 0);
-    x[r] = sum / (row[r] ?? 1);
-  }
-  return x;
+  return solveDense(a, b);
 }
 
 /** Inverse of a square matrix (column by column); null when singular. */
 export function invertMatrix(a: readonly (readonly number[])[]): Matrix | null {
-  const n = a.length;
-  const columns: number[][] = [];
-  for (let j = 0; j < n; j += 1) {
-    const column = solveLinear(
-      a,
-      Array.from({ length: n }, (_, i) => (i === j ? 1 : 0)),
-    );
-    if (column === null) return null;
-    columns.push(column);
-  }
-  return Array.from({ length: n }, (_, i) => columns.map((column) => column[i] ?? 0));
+  return invertDense(a);
 }
 
 export interface PivotReport {

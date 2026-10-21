@@ -5,16 +5,8 @@ import { defineCommand, z, confirmExportControlled } from '@core/commands/schema
 import { elementsOf, existingLevelId, fileSlug, getBuilding } from '../../building/model';
 import { noop, report, exportRefusal } from '@core/commands/noop';
 import { distance } from '@lib/polygon';
-import {
-  MARGIN,
-  PAPER_FIELD,
-  sheetFitWarning,
-  composeSheetSvg,
-  TITLE_HEIGHT,
-  fitScale,
-  sheetDrawingArea,
-  type Viewport,
-} from '../../shared/sheetFrame';
+import { PAPER_FIELD, sheetFitWarning, composeSheetSvg, fitScale, type Viewport } from '../../shared/sheetFrame';
+import { SHEET_MARGIN, SHEET_TITLE_HEIGHT, sheetDrawingArea } from '@core/geometry/sheetLayout';
 import { PAPER_MM, type PaperSize } from '@core/model/sheet';
 import { n } from '@core/geometry/drawingSvg';
 import { boltSize } from '../evaluate';
@@ -232,9 +224,9 @@ export const exportAnchorPlan = defineCommand({
     canvas.parts.push(`</g>`);
     rows.sort((a, b) => compareMark(a[0] as string, b[0] as string));
 
-    const tableX = width - MARGIN - TABLE_WIDTH - 2;
-    const tableY = MARGIN + 8;
-    const capacity = Math.max(1, Math.floor((height - 2 * MARGIN - TITLE_HEIGHT - 20) / ROW_HEIGHT) - 1);
+    const tableX = width - SHEET_MARGIN - TABLE_WIDTH - 2;
+    const tableY = SHEET_MARGIN + 8;
+    const capacity = Math.max(1, Math.floor((height - 2 * SHEET_MARGIN - SHEET_TITLE_HEIGHT - 20) / ROW_HEIGHT) - 1);
     const shown = rows.slice(0, capacity);
     const clipped =
       rows.length > shown.length

@@ -9,14 +9,12 @@
  *   LLULL_ALLOW_CODE_EXECUTION=1   enables import_code (arbitrary Python execution)
  */
 
-import { spawn } from 'node:child_process';
 import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Readable } from 'node:stream';
 import type { PythonBackend } from '@core/codegen/pythonRuntime';
 import type { CadExchangePort, DwgConverterPort, FeaToolsPort, MaterialLibraryStorePort, ProgramRun } from '@protocol/index';
 import { exchangeDirOf, positiveInteger } from './env';
-import { trackChild } from './childProcesses';
+import { runProcess } from './processRunner';
 
 const MAX_OUTPUT_BYTES = 128 * 1024 * 1024; // JSON.parse'd in memory; ~96 MB of base64 STEP
 const MAX_STDERR_BYTES = 64 * 1024; // tail kept for error messages
@@ -72,60 +70,36 @@ export function codeExecutionAllowed(env: NodeJS.ProcessEnv = process.env): bool
   return env['LLULL_ALLOW_CODE_EXECUTION'] === '1';
 }
 
-/** Keep the last `maxBytes` of a child's stderr; the getter returns them as UTF-8. */
-export function captureStderrTail(stderr: Readable, maxBytes: number): () => string {
-  let tail = Buffer.alloc(0);
-  stderr.on('data', (chunk: Buffer) => {
-    tail = Buffer.concat([tail, chunk]).subarray(-maxBytes);
-  });
-  return () => tail.toString('utf8');
-}
-
-export function callBridge(
+export async function callBridge(
   python: string,
   bridgeScript: string,
   request: Record<string, unknown>,
   timeoutMs: number,
 ): Promise<BridgeResponse> {
-  return new Promise((resolve, reject) => {
-    const child = trackChild(spawn(python, [bridgeScript], { stdio: ['pipe', 'pipe', 'pipe'], env: bridgeEnvironment() }));
-    const stdout: Buffer[] = [];
-    const stderr = captureStderrTail(child.stderr, MAX_STDERR_BYTES);
-    let size = 0;
-    let settled = false;
-    const finish = (error: Error | null, value?: BridgeResponse): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      if (error !== null) reject(error);
-      else resolve(value as BridgeResponse);
-    };
-    const timer = setTimeout(() => {
-      child.kill('SIGKILL');
-      finish(new Error(`Python bridge timed out after ${timeoutMs} ms`));
-    }, timeoutMs);
-    child.stdout.on('data', (chunk: Buffer) => {
+  const stdout: Buffer[] = [];
+  let size = 0;
+  const run = await runProcess({
+    executable: python,
+    args: [bridgeScript],
+    env: bridgeEnvironment(),
+    timeoutMs,
+    input: JSON.stringify(request),
+    tailBytes: MAX_STDERR_BYTES,
+    onStdout: (chunk) => {
       size += chunk.length;
-      if (size > MAX_OUTPUT_BYTES) {
-        child.kill('SIGKILL');
-        finish(new Error(`Python bridge output exceeded ${MAX_OUTPUT_BYTES / 1024 / 1024} MB`));
-        return;
-      }
+      if (size > MAX_OUTPUT_BYTES) return false;
       stdout.push(chunk);
-    });
-    child.on('error', (error) =>
-      finish(new Error(`cannot start Python "${python}": ${error.message}. Set LLULL_PYTHON to a python with CadQuery.`)),
-    );
-    child.on('close', (code) => {
-      try {
-        finish(null, JSON.parse(Buffer.concat(stdout).toString('utf8')) as BridgeResponse);
-      } catch {
-        finish(new Error(`Python bridge exited with code ${String(code)} without a response. ${stderr().trim().slice(-2000)}`));
-      }
-    });
-    child.stdin.on('error', () => undefined); // the close handler reports the failure
-    child.stdin.end(JSON.stringify(request));
+    },
   });
+  if (run.startError !== undefined)
+    throw new Error(`cannot start Python "${python}": ${run.startError}. Set LLULL_PYTHON to a python with CadQuery.`);
+  if (run.timedOut) throw new Error(`Python bridge timed out after ${timeoutMs} ms`);
+  if (run.aborted) throw new Error(`Python bridge output exceeded ${MAX_OUTPUT_BYTES / 1024 / 1024} MB`);
+  try {
+    return JSON.parse(Buffer.concat(stdout).toString('utf8')) as BridgeResponse;
+  } catch {
+    throw new Error(`Python bridge exited with code ${String(run.exitCode)} without a response. ${run.stderr.trim().slice(-2000)}`);
+  }
 }
 
 function bridgeError(response: BridgeResponse): Error {

@@ -1,5 +1,6 @@
 /** import_qif_results (M6, VC-PLM-24): QIF 3.0 MeasurementResults to FAI characteristic results. */
 
+import { nextFreeId } from '@lib/id';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
@@ -17,11 +18,8 @@ import { NOT_MANAGED } from '../state';
 const MAX_UNMATCHED = 200;
 const BALLOON = /^[1-9]\d{0,8}$/;
 
-const nextSetId = (ids: readonly string[], revision: string): string => {
-  let n = ids.length + 1;
-  while (ids.includes(`FRS-${revision}-${n}`)) n += 1;
-  return `FRS-${revision}-${n}`;
-};
+const nextSetId = (ids: readonly string[], revision: string): string =>
+  nextFreeId(`FRS-${revision}`, (id) => ids.includes(id), { start: ids.length + 1 });
 
 /**
  * @affects doc.plm.faiResults[id] (adds the measured results of one QIF file for one revision, with the SHA-256 of the exact file)

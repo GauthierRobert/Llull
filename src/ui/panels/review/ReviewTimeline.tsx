@@ -11,7 +11,8 @@ import { runSimulation } from '@ui/services/simulationRun';
 import { TimelineDock } from '@ui/components/TimelineDock';
 import { SeriesChart } from '@ui/panels/SeriesChart';
 import { StatusLine } from '@ui/panels/PanelParts';
-import { crankDegrees, crankJointOf, reactionMagnitude, reactionsOf, tdcMarks, timelineEvents } from './reviewTimelineModel';
+import { reactionsOf } from '@core/dynamics/reactionsView';
+import { crankDegrees, crankJointOf, reactionMagnitude, tdcMarks, timelineEvents } from './reviewTimelineModel';
 import type { CheckResult } from './reviewTypes';
 
 const RPM_PER_RAD_S = 60 / (2 * Math.PI);

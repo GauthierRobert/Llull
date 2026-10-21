@@ -41,5 +41,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   THM_UNITS_MISMATCH: 'give { value, unit } with a temperature unit (degC, K, degF)',
 };
 
+/** Remediation registered for `code` in the shared table. */
+export const codeRemediation = (code: string): string => REMEDIATION[code] ?? 'see the command description';
+
 /** `codedRejection` with the remediation registered for `code`. */
 export const refuseCode = tableRejection(REMEDIATION);

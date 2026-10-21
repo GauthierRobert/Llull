@@ -1,26 +1,13 @@
 /** Closed-form heat-transfer solutions in SI scalars (PHY-03 TR-THM-40): the formulas of docs/physics/03-thermal-analysis/validation/generate_thermal_reference.py. */
 
+import { erf } from './specialFunctions';
+
 const H_PLANCK = 6.62607015e-34;
 const K_BOLTZMANN = 1.380649e-23;
 const C_LIGHT = 299792458;
 
 /** Stefan-Boltzmann constant in W/(m^2 K^4) from the exact 2019 SI defining constants. */
 export const STEFAN_BOLTZMANN: number = (2 * Math.PI ** 5 * K_BOLTZMANN ** 4) / (15 * H_PLANCK ** 3 * C_LIGHT ** 2);
-
-/** Error function by the all-positive series erf(x) = 2/sqrt(pi) e^(-x^2) sum x^(2n+1) 2^n / (2n+1)!!; |x| >= 6 returns ±1. */
-function erf(x: number): number {
-  if (x === 0 || Number.isNaN(x)) return x;
-  const a = Math.abs(x);
-  if (a >= 6) return Math.sign(x);
-  let term = a;
-  let sum = a;
-  for (let n = 1; n < 1000 && term > sum * 1e-17; n += 1) {
-    term *= (2 * a * a) / (2 * n + 1);
-    sum += term;
-  }
-  const value = (2 / Math.sqrt(Math.PI)) * Math.exp(-a * a) * sum;
-  return x < 0 ? -value : value;
-}
 
 export interface WallResult {
   readonly flux: number;

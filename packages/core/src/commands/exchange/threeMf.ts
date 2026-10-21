@@ -5,6 +5,7 @@
 
 import { escapeXml } from '../../lib/escapeXml';
 import { isHexColor } from '../../lib/isHexColor';
+import { quantizedKey } from '../../lib/quantize';
 import { zipStore } from '../../lib/zip';
 import type { Triangle } from '../../geometry/triangles';
 
@@ -25,7 +26,7 @@ export interface ThreeMfObjectReport {
 }
 
 const DEFAULT_COLOR = '#9AA5B1';
-const WELD_SCALE = 1e6;
+const WELD_UNIT = 1e-6;
 const IDENTITY_TRANSFORM = '1 0 0 0 1 0 0 0 1 0 0 0';
 const NUMBER_DIGITS = 6;
 
@@ -42,7 +43,7 @@ function indexTriangles(tris: readonly Triangle[]): IndexedMesh {
   const vertices: Array<readonly [number, number, number]> = [];
   const triangles: Array<readonly [number, number, number]> = [];
   const indexOf = (corner: readonly [number, number, number]): number => {
-    const key = corner.map((c) => Math.round(c * WELD_SCALE) + 0).join(',');
+    const key = quantizedKey(corner, WELD_UNIT);
     const known = ids.get(key);
     if (known !== undefined) return known;
     ids.set(key, vertices.length);

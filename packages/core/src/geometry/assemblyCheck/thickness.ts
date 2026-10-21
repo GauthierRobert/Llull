@@ -6,6 +6,7 @@
  */
 
 import type { MeshData, Vec3 } from '../../model/types';
+import { quantizedKey } from '../../lib/quantize';
 import { add3, cross3, dot3, len3, scale3, sub3 } from '../../lib/vec3';
 import { type GeometryQueryEngine, type MeshRay, resolveGeometryQueries } from '../geometryQueries';
 
@@ -42,15 +43,13 @@ interface Edge {
   readonly b: Vec3;
 }
 
-const quantize = (v: Vec3): string => v.map((c) => Math.round(c * 1e6)).join(',');
-
 function sharpEdges(corners: readonly Vec3[][], normals: readonly Vec3[]): Edge[] {
   const byEdge = new Map<string, { a: Vec3; b: Vec3; normals: Vec3[] }>();
   corners.forEach((triangle, index) => {
     for (let k = 0; k < 3; k++) {
       const a = triangle[k] as Vec3;
       const b = triangle[(k + 1) % 3] as Vec3;
-      const [ka, kb] = [quantize(a), quantize(b)];
+      const [ka, kb] = [quantizedKey(a, 1e-6), quantizedKey(b, 1e-6)];
       const key = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
       const entry = byEdge.get(key) ?? { a, b, normals: [] };
       entry.normals.push(normals[index] as Vec3);

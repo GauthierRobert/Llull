@@ -11,25 +11,23 @@ import { caseOf, withCase } from '../shared/access';
 import { analysisIdSchema } from '../shared/schemas';
 import { isOrthotropicCte } from './orthoCte';
 import { refuseTmc } from './refusal';
+import { dot3, len3 } from '@lib/vec3';
 
 /** Relative size of |a x b| below which two axes count as parallel. */
 const PARALLEL_TOLERANCE = 1e-9;
-
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const norm = (a: Vec3): number => Math.sqrt(dot(a, a));
 
 /**
  * Unit `axis1` and the unit part of `axis2` orthogonal to it, or a reason string.
  * @invariant deterministic: Gram-Schmidt, no rounding beyond double precision
  */
 export function orthonormalAxes(axis1: Vec3, axis2: Vec3): MaterialOrientation | string {
-  const length1 = norm(axis1);
+  const length1 = len3(axis1);
   if (![...axis1, ...axis2].every(Number.isFinite) || !(length1 > 0)) return 'axis1 must be a finite non-zero vector';
   const unit1: Vec3 = [axis1[0] / length1, axis1[1] / length1, axis1[2] / length1];
-  const along = dot(axis2, unit1);
+  const along = dot3(axis2, unit1);
   const rest: Vec3 = [axis2[0] - along * unit1[0], axis2[1] - along * unit1[1], axis2[2] - along * unit1[2]];
-  const restLength = norm(rest);
-  if (!(restLength > PARALLEL_TOLERANCE * Math.max(1, norm(axis2)))) return 'axis2 must be a finite vector not parallel to axis1';
+  const restLength = len3(rest);
+  if (!(restLength > PARALLEL_TOLERANCE * Math.max(1, len3(axis2)))) return 'axis2 must be a finite vector not parallel to axis1';
   return { axis1: unit1, axis2: [rest[0] / restLength, rest[1] / restLength, rest[2] / restLength] };
 }
 

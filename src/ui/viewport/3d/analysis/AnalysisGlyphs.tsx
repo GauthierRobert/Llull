@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import type { Vec3 } from '@core/model/types';
 import type { SetupItem } from '@ui/panels/analysis/analysisItems';
 import { useDisposable } from '../../useDisposable';
+import { ArrowShape } from '../ArrowShape';
 import { ProjectedLabel } from '../ProjectedLabel';
 
 const RENDER_ORDER = 998;
@@ -42,12 +43,7 @@ function Arrow({ item, point, size, opacity }: GlyphProps): React.ReactElement {
       : [point[0] - direction[0] * length, point[1] - direction[1] * length, point[2] - direction[2] * length];
   return (
     <group position={tail} quaternion={quaternion}>
-      <mesh material={material} position={[0, (length - head) / 2, 0]} renderOrder={RENDER_ORDER}>
-        <cylinderGeometry args={[radius, radius, length - head, 8]} />
-      </mesh>
-      <mesh material={material} position={[0, length - head / 2, 0]} renderOrder={RENDER_ORDER}>
-        <coneGeometry args={[radius * 3, head, 12]} />
-      </mesh>
+      <ArrowShape material={material} length={length} head={head} radius={radius} renderOrder={RENDER_ORDER} />
     </group>
   );
 }

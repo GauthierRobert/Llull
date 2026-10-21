@@ -2,7 +2,8 @@
 
 import { z } from '@core/commands/schema';
 import type { Distribution } from '@core/model/probabilistic';
-import { gamma, normalCdf, normalInv } from './numerics';
+import { normalCdf } from '@lib/specialFunctions';
+import { gamma, normalInv } from './numerics';
 
 export const distributionSchema = z.discriminatedUnion('kind', [
   z.object({

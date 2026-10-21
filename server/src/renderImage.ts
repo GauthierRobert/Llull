@@ -3,10 +3,10 @@
  * (napi-rs, prebuilt binaries). Server-side because it is a native-binary side effect: it MUST NOT move to a package (L2).
  */
 
-import { spawn, spawnSync } from 'child_process';
 import { createRequire } from 'module';
 import { Resvg } from '@resvg/resvg-js';
 import { isRecord } from '@lib/isRecord';
+import { runProcess, runProcessSync } from './processRunner';
 
 /** An image content block; `data` is base64 PNG with NO `data:` URI prefix. */
 interface ImageContentBlock {
@@ -50,41 +50,36 @@ function renderChild(): { command: string; args: string[]; env: NodeJS.ProcessEn
  */
 function renderIsolated(svg: string, fitWidth: number): Buffer | null {
   const child = renderChild();
-  const result = spawnSync(child.command, child.args, {
-    input: JSON.stringify({ svg, fitWidth }),
-    timeout: RASTER_TIMEOUT_MS,
-    maxBuffer: RASTER_MAX_BUFFER,
-    stdio: ['pipe', 'pipe', 'ignore'],
+  const run = runProcessSync({
+    executable: child.command,
+    args: child.args,
     env: child.env,
+    timeoutMs: RASTER_TIMEOUT_MS,
+    maxBuffer: RASTER_MAX_BUFFER,
+    input: JSON.stringify({ svg, fitWidth }),
   });
-  return result.status === 0 && result.stdout.length > 0 ? result.stdout : null;
+  return run.exitCode === 0 && !run.timedOut && !run.aborted && run.stdoutBytes.length > 0 ? run.stdoutBytes : null;
 }
 
 /** `renderIsolated` without blocking the event loop (the backend keeps serving other clients while a render runs). */
-function renderIsolatedAsync(svg: string, fitWidth: number): Promise<Buffer | null> {
-  return new Promise((resolve) => {
-    const child = renderChild();
-    const process_ = spawn(child.command, child.args, { stdio: ['pipe', 'pipe', 'ignore'], env: child.env });
-    const chunks: Buffer[] = [];
-    let size = 0;
-    const timer = setTimeout(() => process_.kill('SIGKILL'), RASTER_TIMEOUT_MS);
-    process_.stdout.on('data', (chunk: Buffer) => {
+async function renderIsolatedAsync(svg: string, fitWidth: number): Promise<Buffer | null> {
+  const child = renderChild();
+  const chunks: Buffer[] = [];
+  let size = 0;
+  const run = await runProcess({
+    executable: child.command,
+    args: child.args,
+    env: child.env,
+    timeoutMs: RASTER_TIMEOUT_MS,
+    input: JSON.stringify({ svg, fitWidth }),
+    onStdout: (chunk) => {
       size += chunk.length;
-      if (size > RASTER_MAX_BUFFER) process_.kill('SIGKILL');
-      else chunks.push(chunk);
-    });
-    process_.on('error', () => {
-      clearTimeout(timer);
-      resolve(null);
-    });
-    process_.on('close', (code) => {
-      clearTimeout(timer);
-      const png = Buffer.concat(chunks);
-      resolve(code === 0 && png.length > 0 && size <= RASTER_MAX_BUFFER ? png : null);
-    });
-    process_.stdin.on('error', () => undefined);
-    process_.stdin.end(JSON.stringify({ svg, fitWidth }));
+      if (size > RASTER_MAX_BUFFER) return false;
+      chunks.push(chunk);
+    },
   });
+  const png = Buffer.concat(chunks);
+  return run.exitCode === 0 && !run.timedOut && !run.aborted && run.startError === undefined && png.length > 0 ? png : null;
 }
 
 /** The sanitized svg and the pixel width to render it at, or null when resvg cannot even parse it. */

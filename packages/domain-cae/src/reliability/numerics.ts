@@ -1,29 +1,7 @@
-/** Pure numerics of the reliability pack: Φ and Φ⁻¹ in double precision, Gamma, Cholesky and a symmetric eigen solver. */
+/** Pure numerics of the reliability pack: Φ and Φ⁻¹ in double precision, Gamma and a symmetric eigen solver. */
 
-const SQRT2 = Math.SQRT2;
-const SQRT_PI = Math.sqrt(Math.PI);
-
-/** erfc(x) for x >= 0: positive power series below 2 (no cancellation), continued fraction above. Relative error ~1e-14. */
-function erfcPositive(x: number): number {
-  if (x < 2) {
-    let term = x;
-    let sum = x;
-    for (let n = 1; n < 200; n += 1) {
-      term *= (2 * x * x) / (2 * n + 1);
-      sum += term;
-      if (term < 1e-18 * sum) break;
-    }
-    return 1 - (2 / SQRT_PI) * Math.exp(-x * x) * sum;
-  }
-  let fraction = x;
-  for (let k = 160; k >= 1; k -= 1) fraction = x + k / 2 / fraction;
-  return Math.exp(-x * x) / SQRT_PI / fraction;
-}
-
-const erfc = (x: number): number => (x >= 0 ? erfcPositive(x) : 2 - erfcPositive(-x));
-
-/** Standard normal CDF Φ(x) (relative error < 1e-12 on [-37, 8]). */
-export const normalCdf = (x: number): number => 0.5 * erfc(-x / SQRT2);
+import { jacobiRotate } from '@lib/symmetricEigen';
+import { normalCdf } from '@lib/specialFunctions';
 
 const ACKLAM_A = [
   -3.969683028665376e1, 2.209460984245205e2, -2.759285104469687e2, 1.38357751867269e2, -3.066479806614716e1, 2.506628277459239,
@@ -77,24 +55,6 @@ export function gamma(z: number): number {
   return Math.sqrt(2 * Math.PI) * Math.pow(t, x + 0.5) * Math.exp(-t) * sum;
 }
 
-/** Lower Cholesky factor of a symmetric matrix, or null when it is not positive definite. */
-export function cholesky(matrix: readonly (readonly number[])[]): number[][] | null {
-  const n = matrix.length;
-  const lower = Array.from({ length: n }, () => new Array<number>(n).fill(0));
-  for (let i = 0; i < n; i += 1) {
-    const row = lower[i] as number[];
-    for (let j = 0; j <= i; j += 1) {
-      let sum = matrix[i]?.[j] ?? 0;
-      for (let k = 0; k < j; k += 1) sum -= (row[k] ?? 0) * (lower[j]?.[k] ?? 0);
-      if (i === j) {
-        if (!(sum > 1e-12)) return null;
-        row[j] = Math.sqrt(sum);
-      } else row[j] = sum / (lower[j]?.[j] ?? 1);
-    }
-  }
-  return lower;
-}
-
 /** Eigenvalues of a symmetric matrix (cyclic Jacobi rotations), ascending. */
 export function symmetricEigenvalues(matrix: readonly (readonly number[])[]): number[] {
   const n = matrix.length;
@@ -107,22 +67,7 @@ export function symmetricEigenvalues(matrix: readonly (readonly number[])[]): nu
     for (let p = 0; p < n - 1; p += 1) {
       for (let q = p + 1; q < n; q += 1) {
         if (Math.abs(at(p, q)) < 1e-300) continue;
-        const theta = (at(q, q) - at(p, p)) / (2 * at(p, q));
-        const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
-        const c = 1 / Math.sqrt(t * t + 1);
-        const s = t * c;
-        for (let k = 0; k < n; k += 1) {
-          const akp = at(k, p);
-          const akq = at(k, q);
-          (a[k] as number[])[p] = c * akp - s * akq;
-          (a[k] as number[])[q] = s * akp + c * akq;
-        }
-        for (let k = 0; k < n; k += 1) {
-          const apk = at(p, k);
-          const aqk = at(q, k);
-          (a[p] as number[])[k] = c * apk - s * aqk;
-          (a[q] as number[])[k] = s * apk + c * aqk;
-        }
+        jacobiRotate(a, null, p, q);
       }
     }
   }

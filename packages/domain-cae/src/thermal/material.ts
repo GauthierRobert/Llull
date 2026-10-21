@@ -8,6 +8,7 @@ import { curveOf, SOLVER_TABLE_REL_TOL, tabulateModel } from '@core/model/proper
 import { convertValue, isUnitFailure } from '@lib/quantity';
 import { siToSystem, siUnitOf, type ThermalKind } from '@lib/thermalUnits';
 import { isTransientCase, problem, type Problem, type ThermalCase } from './access';
+import { interp1Pairs } from '@lib/interp1';
 import { amplitudeRange } from './amplitudeRange';
 import { inScale } from './quantities';
 
@@ -103,20 +104,9 @@ export const orthotropicRotationProblem = (entityId: string, rotation: readonly 
     ? `part '${entityId}' is rotated but its material k is orthotropic: the directions 1 / 2 / 3 are the document X / Y / Z axes`
     : null;
 
-/** Value of a piecewise-linear table at `temperature` (end values held, as the solver does); a constant table ignores it. */
-const valueAt = (table: PropertyTable, temperature: number): number => {
-  if (table.constant !== null) return table.constant;
-  const points = table.points;
-  const first = points[0];
-  const last = points[points.length - 1];
-  if (first === undefined || last === undefined) return Number.NaN;
-  if (temperature <= first[0]) return first[1];
-  if (temperature >= last[0]) return last[1];
-  const upper = points.findIndex((point) => point[0] >= temperature);
-  const [t1, v1] = points[upper - 1] ?? first;
-  const [t2, v2] = points[upper] ?? last;
-  return v1 + ((v2 - v1) * (temperature - t1)) / (t2 - t1);
-};
+/** Value of a piecewise-linear table at `temperature` (end values held, as the solver does); a constant table ignores it; `empty` for no points. */
+export const valueAt = (table: PropertyTable, temperature: number, empty = Number.NaN): number =>
+  table.constant !== null ? table.constant : interp1Pairs(table.points, temperature, empty);
 
 /** Rows `[k1, k2, k3, T]` (T last, absent for constants) of an orthotropic table, on the union of the directional temperature grids. */
 export function orthotropicRows(table: PropertyTable): readonly (readonly number[])[] {

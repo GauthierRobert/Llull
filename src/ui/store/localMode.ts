@@ -6,12 +6,12 @@
 
 import { execute } from '@core/commands/registry';
 import { fillHostParams } from '@protocol/hostParams';
+import { historySummary, recordChange, stepHistory } from '@protocol/history';
 import { withMonotonicStepCounter } from '@core/model/stepCounter';
 import type { EntityId } from '@core/model/types';
 import { measureAfter, statusSummaryFor } from './feedback';
 import type { CadStoreState, DispatchOptions, StoreGet, StoreSet } from './storeTypes';
 
-const LOCAL_HISTORY_LIMIT = 100;
 const OFFLINE_USER = 'local';
 const LOCAL_SUFFIX = ' (ran locally — backend offline)';
 
@@ -42,12 +42,12 @@ export function runLocally(set: StoreSet, get: StoreGet, name: string, params: u
     options?.onResult?.({ summary, changed: false });
     return;
   }
-  const coalesce = options?.coalesce === true && state.localUndoStack.length > 0;
+  const history = recordChange({ undo: state.localUndoStack, redo: state.localRedoStack }, state.document, options?.coalesce === true);
   set({
     document: { ...result.document, selection: selectionAfter(result.document.selection, result.affected, options) },
     lastSummary: shown,
     lastMeasure,
-    localUndoStack: coalesce ? state.localUndoStack : [...state.localUndoStack, state.document].slice(-LOCAL_HISTORY_LIMIT),
+    localUndoStack: [...history.undo],
     localRedoStack: [],
     canUndo: true,
     canRedo: false,
@@ -57,22 +57,18 @@ export function runLocally(set: StoreSet, get: StoreGet, name: string, params: u
 
 export function stepLocalHistory(set: StoreSet, get: StoreGet, direction: 'undo' | 'redo'): void {
   const state = get();
-  const source = direction === 'undo' ? state.localUndoStack : state.localRedoStack;
-  const target = source[source.length - 1];
-  if (target === undefined) {
-    set({ lastSummary: `Nothing to ${direction}.${LOCAL_SUFFIX}` });
+  const step = stepHistory({ undo: state.localUndoStack, redo: state.localRedoStack }, direction, state.document);
+  if (step === null) {
+    set({ lastSummary: `${historySummary(direction, false)}${LOCAL_SUFFIX}` });
     return;
   }
-  const remaining = source.slice(0, -1);
-  const other = [...(direction === 'undo' ? state.localRedoStack : state.localUndoStack), state.document];
-  const undoStack = direction === 'undo' ? remaining : other.slice(-LOCAL_HISTORY_LIMIT);
-  const redoStack = direction === 'undo' ? other : remaining;
+  const { target, history } = step;
   set({
     document: { ...withMonotonicStepCounter(target, state.document), selection: target.selection.filter((id) => id in target.entities) },
-    localUndoStack: undoStack,
-    localRedoStack: redoStack,
-    canUndo: undoStack.length > 0,
-    canRedo: redoStack.length > 0,
-    lastSummary: `${direction === 'undo' ? 'Undid' : 'Redid'} last step.${LOCAL_SUFFIX}`,
+    localUndoStack: [...history.undo],
+    localRedoStack: [...history.redo],
+    canUndo: history.undo.length > 0,
+    canRedo: history.redo.length > 0,
+    lastSummary: `${historySummary(direction, true)}${LOCAL_SUFFIX}`,
   });
 }

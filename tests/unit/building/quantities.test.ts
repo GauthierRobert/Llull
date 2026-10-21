@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { type TakeoffLine } from '@aec/building/quantities/takeoffBasics';
-import { toCsv } from '@aec/shared/csv';
+import { toCsv } from '@lib/csv';
 import { rateFor, type CostLine } from '@aec/building/quantities/costing';
 import { drawHouseWalls, run } from '../../helpers/runFixtures';
 import { xy } from '../../helpers/xy';

@@ -5,19 +5,17 @@
  * Environment: LLULL_SCAN_CACHE (store), LLULL_COMPUTE / LLULL_NATIVE_DIR (binary), LLULL_SCAN_OP_TIMEOUT_S (default 600), LLULL_NATIVE_KEEP=1.
  */
 
-import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
 import type { CloudNearest, CloudOp, CloudOpResult, CloudPoints, CloudQuery, PointCloudPort } from '@core/model/pointCloud';
 import type { Vec3 } from '@core/model/vectors';
 import { isRecord } from '@lib/isRecord';
+import { computeVersionSync, readOutputSync, runComputeSync, withJobFolderSync } from '../native/computeJob';
 import { nativeBinaryPath, nativeInstallHint } from '../native/nativeBinary';
 import { AssetReader, boxDistance, boxesMeet } from './assetReader';
 import { assetDir, isAssetKey, scanCacheDir } from './scanStore';
 
 const DEFAULT_OP_TIMEOUT_S = 600;
+/** Named guard: stdout of a cloud op is a stream of small events. */
+const MAX_OP_OUTPUT_BYTES = 64 * 1024 * 1024;
 
 export interface PointCloudPortOptions {
   readonly store?: string;
@@ -126,88 +124,43 @@ function runNearest(reader: AssetReader, point: Vec3, maxDistance: number): Clou
 
 const failure = (code: string, message: string): CloudOpResult => ({ ok: false, code, message });
 
-/** Parses the NDJSON events of a finished `llull-compute` run: the `done` outputs or the `error`. */
-function terminal(stdout: string): { outputs: { path: string; sha256: string }[] } | { code: string; message: string } | null {
-  let found: { outputs: { path: string; sha256: string }[] } | { code: string; message: string } | null = null;
-  for (const line of stdout.split('\n')) {
-    if (line.trim() === '') continue;
-    let event: unknown;
-    try {
-      event = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    if (!isRecord(event)) continue;
-    if (event['type'] === 'error') found = { code: String(event['code']), message: String(event['message']) };
-    if (event['type'] === 'done' && Array.isArray(event['outputs']))
-      found = { outputs: event['outputs'].filter(isRecord).map((o) => ({ path: String(o['path']), sha256: String(o['sha256']) })) };
-  }
-  return found;
-}
-
-/** The `warning` events of a run (e.g. SCN_GPU_FALLBACK). */
-function warningsOf(stdout: string): { code: string; message: string }[] {
-  return stdout.split('\n').flatMap((line) => {
-    try {
-      const event: unknown = JSON.parse(line);
-      return isRecord(event) && event['type'] === 'warning' ? [{ code: String(event['code']), message: String(event['message']) }] : [];
-    } catch {
-      return [];
-    }
-  });
-}
-
 function runCompute(store: string, binary: string | null, env: NodeJS.ProcessEnv, op: CloudOp): CloudOpResult | null {
   if (!op.clouds.every((cloud) => isAssetKey(cloud.assetKey) && AssetReader.open(assetDir(store, cloud.assetKey), cloud.assetKey) !== null))
     return null;
   if (binary === null) return failure('NATIVE_TOOL_MISSING', nativeInstallHint('llull-compute'));
-  const folder = mkdtempSync(path.join(tmpdir(), 'llull-cloud-op-'));
-  try {
-    const job = {
-      version: 1,
-      kind: op.kind,
-      clouds: op.clouds.map((c) => ({ ...c, dir: assetDir(store, c.assetKey) })),
-      params: op.params,
-    };
-    writeFileSync(path.join(folder, 'job.json'), JSON.stringify(job));
-    const seconds = Number(env['LLULL_SCAN_OP_TIMEOUT_S'] ?? DEFAULT_OP_TIMEOUT_S);
-    const started = Date.now();
-    const run = spawnSync(binary, ['cloud', 'op', folder], {
-      cwd: folder,
-      env,
-      encoding: 'utf8',
-      timeout: (Number.isFinite(seconds) && seconds > 0 ? seconds : DEFAULT_OP_TIMEOUT_S) * 1000,
-      maxBuffer: 64 * 1024 * 1024,
-      windowsHide: true,
-    });
-    const elapsedMs = Date.now() - started;
-    if (run.error !== undefined) {
-      const timedOut = (run.error as NodeJS.ErrnoException).code === 'ETIMEDOUT';
-      return failure(timedOut ? 'NATIVE_TIMEOUT' : 'NATIVE_TOOL_MISSING', `llull-compute cloud op: ${run.error.message}`);
-    }
-    const end = terminal(run.stdout);
-    if (end === null)
-      return failure('NATIVE_PROTOCOL', `llull-compute exited with ${String(run.status)} without a final event: ${run.stderr.slice(-500)}`);
-    if ('code' in end) return failure(end.code, end.message);
-    const output = end.outputs.find((o) => o.path === 'result.json');
-    if (output === undefined) return failure('NATIVE_PROTOCOL', 'the op did not report result.json');
-    const bytes = readFileSync(path.join(folder, 'result.json'));
-    if (createHash('sha256').update(bytes).digest('hex') !== output.sha256)
-      return failure('NATIVE_PROTOCOL', 'result.json does not match its reported sha256');
-    const result: unknown = JSON.parse(bytes.toString('utf8'));
-    if (!isRecord(result)) return failure('NATIVE_PROTOCOL', 'result.json is not an object');
-    const device = result['device'] === 'gpu' ? 'gpu' : 'cpu';
-    const version = /llull-compute\s+(\S+)/.exec(spawnSync(binary, ['--version'], { encoding: 'utf8' }).stdout ?? '')?.[1] ?? 'unknown';
-    const warnings = warningsOf(run.stdout);
-    return {
-      ok: true,
-      result,
-      provenance: { binary: `llull-compute ${version}`, device, deterministic: result['deterministic'] !== false, elapsedMs },
-      ...(warnings.length > 0 ? { warnings } : {}),
-    };
-  } finally {
-    if (env['LLULL_NATIVE_KEEP'] !== '1') rmSync(folder, { recursive: true, force: true });
-  }
+  const job = { version: 1, kind: op.kind, clouds: op.clouds.map((c) => ({ ...c, dir: assetDir(store, c.assetKey) })), params: op.params };
+  const seconds = Number(env['LLULL_SCAN_OP_TIMEOUT_S'] ?? DEFAULT_OP_TIMEOUT_S);
+  const timeoutMs = (Number.isFinite(seconds) && seconds > 0 ? seconds : DEFAULT_OP_TIMEOUT_S) * 1000;
+  return withJobFolderSync(
+    { 'job.json': JSON.stringify(job) },
+    (folder) => {
+      const run = runComputeSync(binary, ['cloud', 'op', folder], folder, timeoutMs, env, MAX_OP_OUTPUT_BYTES);
+      if (!run.ok) return failure(run.code ?? 'NATIVE_PROTOCOL', run.message ?? 'llull-compute cloud op failed');
+      if (!run.outputs.some((o) => o.path === 'result.json')) return failure('NATIVE_PROTOCOL', 'the op did not report result.json');
+      let bytes: Buffer;
+      try {
+        bytes = readOutputSync(folder, run, 'result.json');
+      } catch {
+        return failure('NATIVE_PROTOCOL', 'result.json does not match its reported sha256');
+      }
+      const result: unknown = JSON.parse(bytes.toString('utf8'));
+      if (!isRecord(result)) return failure('NATIVE_PROTOCOL', 'result.json is not an object');
+      const device = result['device'] === 'gpu' ? 'gpu' : 'cpu';
+      const warnings = [...run.warnings];
+      return {
+        ok: true,
+        result,
+        provenance: {
+          binary: `llull-compute ${computeVersionSync(binary)}`,
+          device,
+          deterministic: result['deterministic'] !== false,
+          elapsedMs: run.elapsedMs,
+        },
+        ...(warnings.length > 0 ? { warnings } : {}),
+      };
+    },
+    env,
+  );
 }
 
 let shared: { readonly key: string; readonly port: PointCloudPort } | null = null;

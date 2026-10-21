@@ -4,6 +4,7 @@
  * laws use `radii` (a kernel that does not read it refuses).
  */
 
+import { round6 } from '../../lib/compactNumber';
 import type { CadDocument, EdgeRadius, ShapeRecipe, Vec3 } from '../../model/types';
 import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/kernel';
 import type { CommandResult, ExecutionContext } from '../types';
@@ -36,8 +37,6 @@ interface Planned {
 }
 
 type Resolution = { readonly planned: Planned[] } | { readonly problem: string };
-
-const fixed = (value: number): number => Math.round(value * 1e6) / 1e6;
 
 /** Edge index of each `edges` entry (index, or the roundable edge nearest `near`) with its law. */
 function resolveEntries(topology: ShapeTopology | null, entries: readonly EdgeLawInput[]): Resolution {
@@ -120,7 +119,7 @@ function recipeOfPlan(source: ShapeRecipe, planned: readonly Planned[], topology
 }
 
 const lawText = (law: EdgeRadius): string =>
-  `${fixed(law.size)}${law.sizeEnd === undefined ? '' : `>${fixed(law.sizeEnd)}`}${law.sizes === undefined ? '' : ` via ${law.sizes.length} control point(s)`}`;
+  `${round6(law.size)}${law.sizeEnd === undefined ? '' : `>${round6(law.sizeEnd)}`}${law.sizes === undefined ? '' : ` via ${law.sizes.length} control point(s)`}`;
 
 /**
  * `request` with its edges taken from the recorded persistent names (one per planned edge, plan order), or why they no longer resolve;

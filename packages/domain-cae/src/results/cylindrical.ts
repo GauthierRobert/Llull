@@ -1,6 +1,7 @@
 /** Cylindrical components (radial, hoop, axial) of a nodal stress tensor and radial displacement about an axis. */
 
 import type { Vec3 } from '@core/model/vectors';
+import { cross3, dot3 } from '@lib/vec3';
 
 export interface AxisFrame {
   readonly point: Vec3;
@@ -8,8 +9,6 @@ export interface AxisFrame {
   readonly direction: Vec3;
 }
 
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 /** On-axis tolerance relative to the distance from the axis point: closer than this the radial direction is undefined. */
 const ON_AXIS = 1e-9;
 
@@ -23,7 +22,7 @@ export function axisFrame(point: Vec3, direction: Vec3): AxisFrame | null {
 /** Unit radial vector of `at` (perpendicular to the axis, away from it), or null on the axis. */
 function radialOf(at: Vec3, axis: AxisFrame): Vec3 | null {
   const offset: Vec3 = [at[0] - axis.point[0], at[1] - axis.point[1], at[2] - axis.point[2]];
-  const along = dot(offset, axis.direction);
+  const along = dot3(offset, axis.direction);
   const radial: Vec3 = [
     offset[0] - along * axis.direction[0],
     offset[1] - along * axis.direction[1],
@@ -52,7 +51,7 @@ export function cylindricalStress(
   const axial = quadratic(tensor, axis.direction);
   const radial = radialOf(at, axis);
   if (radial === null) return { radial: Number.NaN, hoop: Number.NaN, axial };
-  return { radial: quadratic(tensor, radial), hoop: quadratic(tensor, cross(axis.direction, radial)), axial };
+  return { radial: quadratic(tensor, radial), hoop: quadratic(tensor, cross3(axis.direction, radial)), axial };
 }
 
 /** Displacement component along the radial direction at `at` (NaN on the axis). */

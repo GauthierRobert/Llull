@@ -1,5 +1,6 @@
 /** Product structure commands (FR-PLM-23/24): bind components to managed items, the EBOM, baselines and their comparison. */
 
+import { nextFreeId } from '@lib/id';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, report } from '@core/commands/noop';
@@ -187,11 +188,7 @@ export const engineeringBom = defineCommand({
   },
 });
 
-const nextBaselineId = (ids: readonly string[]): string => {
-  let n = ids.length + 1;
-  while (ids.includes(`BL-${String(n).padStart(4, '0')}`)) n += 1;
-  return `BL-${String(n).padStart(4, '0')}`;
-};
+const nextBaselineId = (ids: readonly string[]): string => nextFreeId('BL', (id) => ids.includes(id), { pad: 4, start: ids.length + 1 });
 
 /**
  * @affects doc.plm.baselines[id] (adds a baseline: the item's latest released revision plus every bound sub-item, sorted by part number, hash = sha256(jcs(members)))

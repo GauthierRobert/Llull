@@ -1,5 +1,6 @@
 /** Manufacturing BOM (M6, FR-PLM-28): the engineering BOM of a product baseline made buildable, frozen with a hash, and its difference from the EBOM. */
 
+import { nextFreeId } from '@lib/id';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, report } from '@core/commands/noop';
@@ -12,11 +13,7 @@ import { withPlm } from '../revisions';
 import { NOT_MANAGED } from '../state';
 import { membersHash } from '../structure';
 
-const nextMbomId = (ids: readonly string[]): string => {
-  let n = ids.length + 1;
-  while (ids.includes(`MBOM-${String(n).padStart(4, '0')}`)) n += 1;
-  return `MBOM-${String(n).padStart(4, '0')}`;
-};
+const nextMbomId = (ids: readonly string[]): string => nextFreeId('MBOM', (id) => ids.includes(id), { pad: 4, start: ids.length + 1 });
 
 const reasonSchema = z.string().describe('Why, non-empty: it is kept in the MBOM (e.g. "supplied as a kit", "design-only item").');
 

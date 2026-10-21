@@ -8,7 +8,7 @@ import { toMetres } from '@core/model/units';
 import { civilAffected, civilObjectsOf, getCivil } from '../model';
 import { regenerateCivil } from '../evaluate';
 import { briefList } from '../../shared/briefList';
-import { csvLines } from '../../shared/csv';
+import { csvLines } from '@lib/csv';
 import { analyseNetwork } from './drainageNetwork';
 import { pipePlanLength, pipeSlope } from './drainageTopology';
 import { DEFAULT_CRITERIA, idfError, type DrainageCriteria, type Idf } from './drainageCriteria';

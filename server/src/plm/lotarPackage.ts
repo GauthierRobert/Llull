@@ -5,7 +5,7 @@
  * archive checks: the validation properties re-derived from the archived definition, the PDM file read back and compared with the manifest, the sealed records.
  */
 
-import { createHash } from 'node:crypto';
+import { sha256Hex } from '../sha256';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { execute } from '@core/commands/registry';
@@ -20,7 +20,6 @@ import { isSealed } from '@plm/records';
 import { serverContext } from '../fea/context';
 import { type PackageFiles, type PackageFinding, buildReleasePackage, verifyReleasePackage } from './releasePackage';
 
-const sha256 = (data: string | Buffer): string => createHash('sha256').update(data).digest('hex');
 const byteLength = (text: string): number => Buffer.byteLength(text, 'utf8');
 
 const LOTAR_SCHEMA = 'llull-lotar-1';
@@ -136,7 +135,7 @@ export function buildLotarPackage(
       role: file.role,
       mediaType: file.mediaType,
       canonical: false,
-      sha256: sha256(file.content),
+      sha256: sha256Hex(file.content),
       bytes: byteLength(file.content),
     })),
   ];
@@ -153,7 +152,7 @@ export function buildLotarPackage(
     verification: VERIFICATION_STEPS,
   };
   const next = { ...unsealed, members, lotar };
-  const manifest = { ...next, manifestSha256: sha256(jcsJson(next)), signatures: release.manifest['signatures'] };
+  const manifest = { ...next, manifestSha256: sha256Hex(jcsJson(next)), signatures: release.manifest['signatures'] };
   return {
     manifest,
     files: [...release.files, ...added.map(({ path: file, content }) => ({ path: file, content }))],

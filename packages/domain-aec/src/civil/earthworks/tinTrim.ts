@@ -3,6 +3,7 @@
 import type { Vec2, Vec3 } from '@core/model/types';
 import type { CivilModel, PlatformObject, SurfaceObject } from '@core/model/civil';
 import { triangulatePolygon } from '@lib/triangulate';
+import { orient2 } from '@lib/vec2';
 import { daylightPoints } from './platformDaylight';
 import { tinMesh, type Tin } from '../surface/tin';
 import { surfaceTin } from '../surface/surfaceTin';
@@ -15,8 +16,6 @@ const MIN_AREA = 1e-9;
 const EDGE_TOLERANCE = 1e-9;
 /** Clipped contour parts shorter than this (m) are slivers at a footprint corner and dropped. */
 const MIN_PART_LENGTH = 1e-3;
-
-const cross = (a: Vec2, b: Vec2, c: Vec2): number => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
 
 /** Plan triangles covered by a pad: the pad itself plus its batter quads (pad edge -> daylight). */
 export function platformFootprint(tin: Tin, platform: PlatformObject): Triangle[] {
@@ -33,12 +32,12 @@ export function platformFootprint(tin: Tin, platform: PlatformObject): Triangle[
     const next = points[(i + 1) % points.length] ?? current;
     triangles.push([current.edge, next.edge, next.daylight], [current.edge, next.daylight, current.daylight]);
   });
-  return triangles.filter((triangle) => Math.abs(cross(...triangle)) > MIN_AREA).map((t) => (cross(...t) > 0 ? t : [t[0], t[2], t[1]]));
+  return triangles.filter((triangle) => Math.abs(orient2(...triangle)) > MIN_AREA).map((t) => (orient2(...t) > 0 ? t : [t[0], t[2], t[1]]));
 }
 
 /** Part of `polygon` on the left (keepLeft) or right of the directed line a->b; z is interpolated along cut edges. */
 function clipHalfPlane(polygon: Polygon, a: Vec2, b: Vec2, keepLeft: boolean): Polygon {
-  const side = (p: Vec3): number => (keepLeft ? 1 : -1) * cross(a, b, [p[0], p[1]]);
+  const side = (p: Vec3): number => (keepLeft ? 1 : -1) * orient2(a, b, [p[0], p[1]]);
   const result: Polygon = [];
   polygon.forEach((current, i) => {
     const next = polygon[(i + 1) % polygon.length] as Vec3;
@@ -129,7 +128,7 @@ function insideInterval(a: Vec2, b: Vec2, triangle: Triangle): [number, number] 
   for (let i = 0; i < 3; i++) {
     const p = triangle[i] as Vec2;
     const q = triangle[(i + 1) % 3] as Vec2;
-    const raw = [cross(p, q, a), cross(p, q, b)] as const;
+    const raw = [orient2(p, q, a), orient2(p, q, b)] as const;
     const [sa, sb] = raw.map((value) => (Math.abs(value) <= EDGE_TOLERANCE ? 0 : value)) as [number, number];
     if (sa <= 0 && sb <= 0 && (sa < 0 || sb < 0)) return null;
     if (sa < 0 || sb < 0) {

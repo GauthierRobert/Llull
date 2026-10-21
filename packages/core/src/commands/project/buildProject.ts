@@ -56,7 +56,8 @@ export const buildProject = defineCommand({
     validate: z.boolean().optional().describe('When true, dry-run only: validate every step without modifying the document.'),
   }),
   // Each inner step is recorded in featureHistory by `execute`; recording the plan itself too would replay every step twice.
-  annotations: { metaHistory: true },
+  // Plan files carry descriptive top-level keys (id, status, expected, notes, …); every step's own params stay strict.
+  annotations: { metaHistory: true, metadataKeys: true },
   run: (doc, params, ctx): CommandResult => {
     const context = ctx ?? currentContext();
     if (context.projectDepth >= MAX_PROJECT_DEPTH)

@@ -4,7 +4,7 @@ import type { CadDocument } from '@core/model/types';
 import type { LimitState, RandomVariable, ReliabilityModel } from '@core/model/probabilistic';
 import { isRecord } from '@lib/isRecord';
 import { distributionIssue } from './distributions';
-import { cholesky } from './numerics';
+import { cholesky } from '@lib/denseLinalg';
 
 const EMPTY: ReliabilityModel = { variables: {}, variableOrder: [], limitStates: {}, limitStateOrder: [] };
 

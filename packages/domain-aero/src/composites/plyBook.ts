@@ -1,5 +1,6 @@
 /** export_ply_book: one SVG ply-book sheet per sequence label (06 CMP FR-CMP-51, VC-CMP-28): flat patterns, location on the part, ply table. */
 
+import { escapeXml } from '@lib/escapeXml';
 import { confirmExportControlled, defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { exportRefusal, report } from '@core/commands/noop';
@@ -18,7 +19,6 @@ const SHEETS = { A4: [297, 210], A3: [420, 297], A2: [594, 420] } as const;
 const MARGIN = 10;
 const PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0891b2'];
 
-const escape = (text: string): string => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const path = (points: readonly Vec2[], map: (p: Vec2) => Vec2): string =>
   `${points.map((p, k) => `${k === 0 ? 'M' : 'L'}${map(p)[0].toFixed(3)} ${map(p)[1].toFixed(3)}`).join(' ')} Z`;
 
@@ -58,7 +58,7 @@ function sheetSvg(
   const out: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}" font-family="sans-serif" font-size="3.2">`,
     `<rect x="${MARGIN / 2}" y="${MARGIN / 2}" width="${width - MARGIN}" height="${height - MARGIN}" fill="none" stroke="#111" stroke-width="0.4"/>`,
-    `<text x="${MARGIN}" y="${MARGIN + 5}" font-size="5" font-weight="bold">${escape(part.name)} - ply book sequence ${escape(sequence)}</text>`,
+    `<text x="${MARGIN}" y="${MARGIN + 5}" font-size="5" font-weight="bold">${escapeXml(part.name)} - ply book sequence ${escapeXml(sequence)}</text>`,
     `<g id="flat-patterns">`,
   ];
   for (const { row, piece, color } of flats) {
@@ -73,13 +73,13 @@ function sheetSvg(
       `<line x1="${centre[0].toFixed(3)}" y1="${centre[1].toFixed(3)}" x2="${tip[0].toFixed(3)}" y2="${tip[1].toFixed(3)}" stroke="${color}" stroke-width="0.5"/>`,
     );
     out.push(
-      `<text x="${centre[0].toFixed(3)}" y="${(centre[1] + 6).toFixed(3)}" text-anchor="middle" fill="${color}">${escape(`${row.ply.name} ${row.ply.orientation}deg`)}</text>`,
+      `<text x="${centre[0].toFixed(3)}" y="${(centre[1] + 6).toFixed(3)}" text-anchor="middle" fill="${color}">${escapeXml(`${row.ply.name} ${row.ply.orientation}deg`)}</text>`,
     );
   }
   for (const row of rows)
     if (!row.flat.ok)
       out.push(
-        `<text x="${area.x}" y="${area.y + 6 + 5 * rows.indexOf(row)}" fill="#b91c1c">${escape(`${row.ply.name}: no flat pattern (${row.flat.message})`)}</text>`,
+        `<text x="${area.x}" y="${area.y + 6 + 5 * rows.indexOf(row)}" fill="#b91c1c">${escapeXml(`${row.ply.name}: no flat pattern (${row.flat.message})`)}</text>`,
       );
   out.push(
     '</g>',
@@ -96,7 +96,7 @@ function sheetSvg(
   );
   rows.forEach((row, k) => {
     out.push(
-      `<text x="${MARGIN}" y="${height - 34 + 5 * k}">${escape(`${row.ply.name} | ${materialOf(row.ply)} | ${row.ply.orientation} | ${sig(row.areaMm2)} | ${piecesOf(row.ply, part).length} | ${sig(row.boundaryMm)}`)}</text>`,
+      `<text x="${MARGIN}" y="${height - 34 + 5 * k}">${escapeXml(`${row.ply.name} | ${materialOf(row.ply)} | ${row.ply.orientation} | ${sig(row.areaMm2)} | ${piecesOf(row.ply, part).length} | ${sig(row.boundaryMm)}`)}</text>`,
     );
   });
   out.push(

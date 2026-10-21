@@ -14,15 +14,14 @@ import { DrawingPainter } from '@core/geometry/drawingSvg';
 import {
   composeSheetSvg,
   fitPaperOrientation,
-  MARGIN,
   paperMap,
   northArrow,
   PAPER_FIELD,
   SCALE_FIELD,
   sheetFitWarning,
-  sheetDrawingArea,
   type SheetOrientation,
 } from '../../shared/sheetFrame';
+import { SHEET_MARGIN, sheetDrawingArea } from '@core/geometry/sheetLayout';
 import { PAPER_MM, type PaperSize } from '@core/model/sheet';
 
 export interface PlanSheet {
@@ -67,7 +66,7 @@ function buildPlanSheet(
     caption: `${title} · 1:${scale} · dimensions in mm`,
     bodyId: 'plan',
     body: painter.parts.join(''),
-    overlays: [northArrow(width - MARGIN - 12, MARGIN + 12)],
+    overlays: [northArrow(width - SHEET_MARGIN - 12, SHEET_MARGIN + 12)],
   });
   const project = fileSlug(getBuilding(doc).project.name, 'project');
   return {

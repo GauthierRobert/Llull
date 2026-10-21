@@ -46,11 +46,14 @@ type TableRejection = (
   paths?: readonly string[],
 ) => CommandResult;
 
-/** `codedRejection` with the remediation registered for the code in `table`, else `fallback`. */
+/** `codedRejection` with the remediation registered for the code in `table`, else `fallback` (a text, or a lookup of the code in a parent table). */
 export const tableRejection =
-  (table: Readonly<Record<string, string>>, fallback = 'see the command description'): TableRejection =>
+  (
+    table: Readonly<Record<string, string>>,
+    fallback: string | ((code: string) => string) = 'see the command description',
+  ): TableRejection =>
   (doc, command, code, message, ids = [], paths = []) =>
-    codedRejection(doc, command, code, message, table[code] ?? fallback, ids, paths);
+    codedRejection(doc, command, code, message, table[code] ?? (typeof fallback === 'string' ? fallback : fallback(code)), ids, paths);
 
 /** Reporter for a command's rejections: `fail(why)` -> no-op "<command>: <why>; no-op.". */
 export const failer =

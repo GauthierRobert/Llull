@@ -1,6 +1,7 @@
 /** Least-squares plane of a point cloud and flatness (PHY-04 §5.4, TR-TMC-16): cyclic Jacobi on the 3 x 3 covariance, deterministic. */
 
 import type { Vec3 } from '@core/model/vectors';
+import { jacobiRotate } from '@lib/symmetricEigen';
 
 export interface PlaneFit {
   readonly centroid: Vec3;
@@ -32,30 +33,7 @@ function jacobi(input: Matrix3): { values: Vec3; vectors: Matrix3 } {
   for (let sweep = 0; sweep < SWEEPS; sweep += 1) {
     if (Math.hypot(at(0, 1), at(0, 2), at(1, 2)) <= 1e-16 * scale) break;
     for (const [p, q] of PAIRS) {
-      const apq = at(p, q);
-      if (apq === 0) continue;
-      const theta = (at(q, q) - at(p, p)) / (2 * apq);
-      const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
-      const c = 1 / Math.sqrt(t * t + 1);
-      const s = t * c;
-      for (let k = 0; k < 3; k += 1) {
-        const akp = at(k, p);
-        const akq = at(k, q);
-        (a[k] as number[])[p] = c * akp - s * akq;
-        (a[k] as number[])[q] = s * akp + c * akq;
-      }
-      for (let k = 0; k < 3; k += 1) {
-        const apk = at(p, k);
-        const aqk = at(q, k);
-        (a[p] as number[])[k] = c * apk - s * aqk;
-        (a[q] as number[])[k] = s * apk + c * aqk;
-      }
-      for (let k = 0; k < 3; k += 1) {
-        const vkp = v[k]?.[p] ?? 0;
-        const vkq = v[k]?.[q] ?? 0;
-        (v[k] as number[])[p] = c * vkp - s * vkq;
-        (v[k] as number[])[q] = s * vkp + c * vkq;
-      }
+      jacobiRotate(a, v, p, q);
     }
   }
   return { values: [at(0, 0), at(1, 1), at(2, 2)], vectors: v };

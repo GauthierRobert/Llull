@@ -6,11 +6,12 @@
  * @invariant directories are 0o700 and files 0o600; the seed never leaves this module except to sign; no network
  */
 
-import { createCipheriv, createDecipheriv, createHash, createPrivateKey, createPublicKey, randomBytes, scrypt } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createPrivateKey, createPublicKey, randomBytes, scrypt } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { sha256Hex } from '../sha256';
 import { writeFileAtomic } from '../writeFileAtomic';
 import { generateEd25519, signEd25519 } from './ed25519';
 
@@ -148,7 +149,7 @@ export function createKeyStore(env: NodeJS.ProcessEnv = process.env): KeyStore {
     async create({ userId, name, passphrase, at }) {
       if (passphrase.length < MIN_PASSPHRASE_LENGTH) throw new Error(`a key passphrase needs at least ${MIN_PASSPHRASE_LENGTH} characters`);
       const pair = generateEd25519();
-      const keyId = `k-${createHash('sha256').update(pair.publicKeyHex).digest('hex').slice(0, 12)}`;
+      const keyId = `k-${sha256Hex(pair.publicKeyHex).slice(0, 12)}`;
       const record: KeyRecord = { keyId, userId, name, publicKey: pair.publicKeyHex, createdAt: at };
       privateDir(dir());
       writeFileAtomic(keyFile(dir(), keyId), `${JSON.stringify(await seal(pair.seedHex, passphrase, keyId, pair.publicKeyHex))}\n`, 0o600);

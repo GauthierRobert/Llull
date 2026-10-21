@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
-import { normalCdf } from '@cae/reliability/numerics';
+import { normalCdf } from '@lib/specialFunctions';
 import { code, data, lognormal, modelDoc, normal, relative, rMinusS, type Json } from './support';
 
 const PF_EXACT = 0.0227501319482;

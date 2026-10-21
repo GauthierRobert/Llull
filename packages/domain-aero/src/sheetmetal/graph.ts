@@ -1,5 +1,6 @@
 /** Read and edit helpers of the sheet-metal model (`CadDocument.sheetMetal`): lookups, node queries, immutable updates. */
 
+import { nextFreeId } from '@lib/id';
 import type { CadDocument } from '@core/model/types';
 import type { SheetMetalModel, SheetMetalPart, SheetMetalRule, SheetNode } from '@core/model/sheetMetal';
 
@@ -74,9 +75,7 @@ type NodePrefix = 'f' | 'b' | 'j' | 'r' | 'c' | 'm' | 'h';
 
 /** Next free node id with the given prefix (`f1`, `f2`, … / `b1` …). */
 export function nextNodeId(part: SheetMetalPart, prefix: NodePrefix): string {
-  let n = 1;
-  while (part.nodes[`${prefix}${n}`] !== undefined) n += 1;
-  return `${prefix}${n}`;
+  return nextFreeId(prefix, (id) => part.nodes[id] !== undefined, { sep: '' });
 }
 
 /** The next `count` free node ids with the given prefix. */

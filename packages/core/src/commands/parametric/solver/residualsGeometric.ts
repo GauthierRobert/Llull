@@ -1,11 +1,10 @@
 import type { EntityRef } from '../../../model/types';
+import { cross2, dot2 } from '../../../lib/vec2';
 import { at } from './linalg';
 import { directionOf, pointOf, subKindOf, type Pt } from './layout';
 import {
   build,
   circleFn,
-  cross,
-  dot,
   fail,
   isLineForm,
   lineFn,
@@ -70,7 +69,7 @@ export function compileDirectionRelation(ctx: CompileContext, perpendicular: boo
   return build(ctx, 1, (x, out, row) => {
     const da = directionOf(la(x));
     const db = directionOf(lb(x));
-    out[row] = perpendicular ? dot(da, db) : cross(da, db);
+    out[row] = perpendicular ? dot2(da, db) : cross2(da, db);
   });
 }
 
@@ -146,7 +145,7 @@ export function compileSymmetric(ctx: CompileContext): CompileOutcome {
       const axis = axisLine(x);
       const dir = directionOf(axis);
       out[row] = lineOffset(axis.start, dir, [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]);
-      out[row + 1] = dot([q[0] - p[0], q[1] - p[1]], dir);
+      out[row + 1] = dot2([q[0] - p[0], q[1] - p[1]], dir);
     });
   }
   const center = pointFn(ctx, constraint.axis);

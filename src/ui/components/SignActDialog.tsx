@@ -3,9 +3,10 @@
 // TRUSTED counts: an untrusted key yields a refused command, never a recorded act. Used by every human gate of the app (PMI review, review
 // dispositions, margin dispositions).
 
-import React, { useEffect, useId, useState } from 'react';
+import React from 'react';
 import { ModalDialog } from '@ui/components/ModalDialog';
-import { type SigningKey, fetchSigningKeys, signPayload, signPmiReview } from '@ui/services/signing';
+import { NoSigningKeyHint, SigningFields, useSigningFields } from '@ui/components/SigningFields';
+import { signPayload, signPmiReview } from '@ui/services/signing';
 
 export interface SignActRequest {
   /** What the user is about to sign, in plain words. */
@@ -25,15 +26,8 @@ const freshNonce = (): string =>
   Array.from(crypto.getRandomValues(new Uint8Array(12)), (byte) => byte.toString(16).padStart(2, '0')).join('');
 
 export function SignActDialog({ request, onClose }: { request: SignActRequest; onClose: () => void }): React.ReactElement {
-  const ids = useId();
-  const [keys, setKeys] = useState<SigningKey[] | null>(null);
-  const [keyId, setKeyId] = useState('');
-  const [passphrase, setPassphrase] = useState('');
-  const [message, setMessage] = useState('');
-  useEffect(() => {
-    void fetchSigningKeys().then(setKeys);
-  }, []);
-  const key = keys?.find((candidate) => candidate.keyId === (keyId || keys[0]?.keyId));
+  const signing = useSigningFields();
+  const { key, passphrase } = signing;
 
   async function submit(): Promise<void> {
     if (key === undefined) return;
@@ -42,8 +36,8 @@ export function SignActDialog({ request, onClose }: { request: SignActRequest; o
       request.pmiReview !== undefined
         ? await signPmiReview(key.keyId, passphrase, request.pmiReview, nonce)
         : await signPayload(key.keyId, passphrase, request.act, request.payload?.(nonce) ?? '');
-    if ('error' in signed) return setMessage(signed.error);
-    setPassphrase('');
+    if ('error' in signed) return signing.setMessage(signed.error);
+    signing.setPassphrase('');
     request.onSigned({ ...(signed.signature as Record<string, unknown>), nonce });
     onClose();
   }
@@ -62,37 +56,10 @@ export function SignActDialog({ request, onClose }: { request: SignActRequest; o
       <p className="analysis__hint" data-testid="sign-summary">
         {request.summary}
       </p>
-      {keys !== null && keys.length === 0 && (
-        <p className="analysis__hint" data-testid="sign-no-key">
-          No signing key on this machine. Enroll one (llull keys create) and trust it in the desktop app (Keys).
-        </p>
-      )}
-      <label className="field" htmlFor={`${ids}-key`}>
-        <span className="field__label">Signing key</span>
-        <select id={`${ids}-key`} data-testid="sign-key" value={key?.keyId ?? ''} onChange={(e) => setKeyId(e.target.value)}>
-          {(keys ?? []).map((candidate) => (
-            <option key={candidate.keyId} value={candidate.keyId}>
-              {candidate.name} ({candidate.userId}){candidate.trusted === false ? ' - not trusted yet' : ''}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="field" htmlFor={`${ids}-pass`}>
-        <span className="field__label">Key passphrase</span>
-        <input
-          id={`${ids}-pass`}
-          type="password"
-          autoComplete="off"
-          data-testid="sign-passphrase"
-          value={passphrase}
-          onChange={(e) => setPassphrase(e.target.value)}
-        />
-      </label>
-      {message !== '' && (
-        <p className="analysis__hint" role="alert" data-testid="sign-error">
-          {message}
-        </p>
-      )}
+      <NoSigningKeyHint prefix="sign" keys={signing.keys}>
+        No signing key on this machine. Enroll one (llull keys create) and trust it in the desktop app (Keys).
+      </NoSigningKeyHint>
+      <SigningFields prefix="sign" signing={signing} />
       <div className="confirm-dialog__actions">
         <button type="button" className="btn btn--ghost" onClick={onClose}>
           Cancel

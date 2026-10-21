@@ -16,8 +16,7 @@ import { base, colorForMaterial, MEMBER_LAYER, meshEntity, orientedBox } from '.
 import { prismMesh, sweepMesh } from '../shared/mesh';
 import { circlePolygon } from '@lib/arc';
 import { findProfile, profileOutline } from '../steel/profiles';
-import { cross3, dot3, sub3 } from '@lib/vec3';
-import { normalize } from '../shared/vec3';
+import { cross3, dot3, normalize3OrZero, sub3 } from '@lib/vec3';
 import { shapeOf } from './equipment/equipmentShape';
 
 // prettier-ignore
@@ -75,9 +74,9 @@ export function polygonNormal(points: ReadonlyArray<Vec3>): Vec3 {
 export function panelFrame(corners: ReadonlyArray<Vec3>): { origin: Vec3; e1: Vec3; e2: Vec3; normal: Vec3 } | null {
   const normalVector = polygonNormal(corners);
   if (Math.hypot(...normalVector) < 1e-9 || corners.length < 3) return null;
-  const normal = normalize(normalVector);
+  const normal = normalize3OrZero(normalVector);
   const origin = corners[0] as Vec3;
-  const e1 = normalize(sub3(corners[1] as Vec3, origin));
+  const e1 = normalize3OrZero(sub3(corners[1] as Vec3, origin));
   const e2 = cross3(normal, e1);
   return { origin, e1, e2, normal };
 }

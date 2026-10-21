@@ -68,6 +68,7 @@ const MAX_KNOWN_LISTED = 14;
 
 /** Rejection for top-level keys the command does not declare (a typo would otherwise be silently dropped); null when every key is known. */
 function unknownParamsRejection(def: CommandDefinition<unknown>, doc: CadDocument, params: object): CommandResult | null {
+  if (def.annotations?.metadataKeys) return null;
   const known = Object.keys(def.paramsSchema.properties);
   const unknown = Object.keys(params).filter((key) => !known.includes(key));
   if (unknown.length === 0) return null;
@@ -100,7 +101,7 @@ export function corruptionReason(entity: unknown): string | null {
  * @failure run throws (warned with stack), id-like params equal an Object.prototype key
  * (would alias entity-bag lookups), or affected entities contain NaN/Infinity/undefined vector
  * components or a non-Vec3 position -> no-op, affected:[]
- * @failure a top-level param key the schema does not declare -> rejected: unknown param 'k' (closest declared key suggested), CMD_UNKNOWN_PARAM
+ * @failure a top-level param key the schema does not declare -> rejected: unknown param 'k' (closest declared key suggested), CMD_UNKNOWN_PARAM (unless annotations.metadataKeys: tolerated, stripped)
  * @invariant non-object params are coerced to {} so field destructuring cannot throw;
  * a 2-number `position` is padded to [x, y, 0]; free-text params are never rejected
  */

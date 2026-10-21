@@ -7,6 +7,7 @@
 import { GROUND, type DynamicJoint, type DynamicsModel } from '../model/dynamics';
 import type { Vec3 } from '../model/vectors';
 import type { Topology } from './topology';
+import { applyMat3, mulMat3 } from '../lib/axisRotation';
 import { elementAt } from '../lib/elementAt';
 import { cross3, dot3, scale3 } from '../lib/vec3';
 
@@ -25,30 +26,8 @@ interface Pose {
 
 const IDENTITY: Pose = { rotation: [1, 0, 0, 0, 1, 0, 0, 0, 1], translation: [0, 0, 0] };
 
-const apply = (m: Mat3, v: Vec3): Vec3 => [
-  m[0] * v[0] + m[1] * v[1] + m[2] * v[2],
-  m[3] * v[0] + m[4] * v[1] + m[5] * v[2],
-  m[6] * v[0] + m[7] * v[1] + m[8] * v[2],
-];
-
-function multiply(a: Mat3, b: Mat3): Mat3 {
-  const [a0, a1, a2, a3, a4, a5, a6, a7, a8] = a;
-  const [b0, b1, b2, b3, b4, b5, b6, b7, b8] = b;
-  return [
-    a0 * b0 + a1 * b3 + a2 * b6,
-    a0 * b1 + a1 * b4 + a2 * b7,
-    a0 * b2 + a1 * b5 + a2 * b8,
-    a3 * b0 + a4 * b3 + a5 * b6,
-    a3 * b1 + a4 * b4 + a5 * b7,
-    a3 * b2 + a4 * b5 + a5 * b8,
-    a6 * b0 + a7 * b3 + a8 * b6,
-    a6 * b1 + a7 * b4 + a8 * b7,
-    a6 * b2 + a7 * b5 + a8 * b8,
-  ];
-}
-
 const transform = (pose: Pose, point: Vec3): Vec3 => {
-  const v = apply(pose.rotation, point);
+  const v = applyMat3(pose.rotation, point);
   return [v[0] + pose.translation[0], v[1] + pose.translation[1], v[2] + pose.translation[2]];
 };
 
@@ -81,7 +60,7 @@ function jointMotion(joint: DynamicJoint, q: number, metresPerUnit: number): Pos
   if (joint.kind === 'prismatic') return { rotation: IDENTITY.rotation, translation: [axis[0] * q, axis[1] * q, axis[2] * q] };
   const anchor = scale3(joint.anchor, metresPerUnit);
   const rotation = rotationAbout(axis, q);
-  const turned = apply(rotation, anchor);
+  const turned = applyMat3(rotation, anchor);
   return { rotation, translation: [anchor[0] - turned[0], anchor[1] - turned[1], anchor[2] - turned[2]] };
 }
 
@@ -97,9 +76,9 @@ function bodyPoses(topology: Topology, q: readonly number[], metresPerUnit: numb
     const parent = entry.parent === GROUND ? IDENTITY : (poses.get(entry.parent) ?? IDENTITY);
     const value = elementAt(q, topology.tree.indexOf(entry)) * (entry.flipped ? -1 : 1);
     const motion = jointMotion(entry.joint, value, metresPerUnit);
-    const rotated = apply(parent.rotation, motion.translation);
+    const rotated = applyMat3(parent.rotation, motion.translation);
     poses.set(id, {
-      rotation: multiply(parent.rotation, motion.rotation),
+      rotation: mulMat3(parent.rotation, motion.rotation),
       translation: [rotated[0] + parent.translation[0], rotated[1] + parent.translation[1], rotated[2] + parent.translation[2]],
     });
   }
@@ -126,8 +105,8 @@ function loopResidual(topology: Topology, q: readonly number[], metresPerUnit: n
     rows.push(pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]);
     if (loop.kind === 'revolute') {
       const axis = unit(loop.axis);
-      const axisB = apply(b.rotation, axis);
-      for (const e of orthogonalPair(axis)) rows.push(dot3(apply(a.rotation, e), axisB));
+      const axisB = applyMat3(b.rotation, axis);
+      for (const e of orthogonalPair(axis)) rows.push(dot3(applyMat3(a.rotation, e), axisB));
     }
   }
   return rows;

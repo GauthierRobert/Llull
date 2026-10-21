@@ -18,3 +18,8 @@ export function significantNumber(v: number, digits: number): string {
 export function vecText(v: ReadonlyArray<number>): string {
   return `[${v.map(compactNumber).join(', ')}]`;
 }
+
+/** `roundTo(v, 6)`: micro-unit rounding used for reported lengths and angles. */
+export function round6(v: number): number {
+  return roundTo(v, 6);
+}

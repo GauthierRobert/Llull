@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
-import { bodyCentres, dynamicsLoads, type LoadItem } from '@ui/dynamicsLoads';
+import { bodyCentres, dynamicsLoads, type LoadItem } from '@core/dynamics/dynamicsLoads';
 
 interface DynamicsLoads {
   /** Design values (no run). */

@@ -6,6 +6,23 @@ import { postCommand } from '@ui/store/serverCommands';
 import { runQuery } from '@ui/services/localQuery';
 import { errorMessage } from '@lib/errorMessage';
 
+/** One-shot answer of a read-only command: through the server when online, else on the local document. */
+export async function runHostQuery(
+  command: string,
+  params: Record<string, unknown>,
+): Promise<{ data: unknown; summary: string; isError: boolean }> {
+  if (useStore.getState().liveStatus === 'connected') {
+    try {
+      const response = await postCommand(command, params);
+      return { data: response.data, summary: response.summary, isError: response.isError };
+    } catch (err) {
+      return { data: null, summary: `${command} failed: ${errorMessage(err)}`, isError: true };
+    }
+  }
+  const result = runQuery(command, params);
+  return { data: result.data, summary: result.summary, isError: result.rejected === true };
+}
+
 export type HostQueryState =
   | { readonly status: 'loading' }
   | { readonly status: 'done'; readonly data: unknown; readonly summary: string; readonly isError: boolean };

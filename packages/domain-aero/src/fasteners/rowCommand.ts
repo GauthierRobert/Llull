@@ -1,5 +1,6 @@
 /** insert_fastener_row (08 MAT FR-MAT-18, M7): a straight row of stacks with pitch and edge-distance rules. */
 
+import { round6 } from '@lib/compactNumber';
 import { defineCommand, vec3, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
@@ -123,7 +124,7 @@ export const insertFastenerRow = defineCommand({
         ? null
         : inches(params.minEdgeDistance);
     const violations: Violation[] = [];
-    const pitchIn = count > 1 ? Math.round(docToInches(doc, stepDoc) * 1e6) / 1e6 : null;
+    const pitchIn = count > 1 ? round6(docToInches(doc, stepDoc)) : null;
     if (pitchIn !== null && minPitchIn !== null && pitchIn < minPitchIn - 1e-9)
       violations.push({
         code: 'FAST_PITCH',

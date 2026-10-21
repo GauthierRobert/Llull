@@ -1,12 +1,11 @@
 import type { DimensionConstraintKind } from '../../../model/types';
 import { positiveSweep } from '../../../lib/angle';
+import { cross2, dot2 } from '../../../lib/vec2';
 import { at } from './linalg';
 import { directionOf, type Pt } from './layout';
 import {
   build,
   circleFn,
-  cross,
-  dot,
   fail,
   isLineForm,
   lineFn,
@@ -57,8 +56,8 @@ function compileAngle(ctx: CompileContext, target: number): CompileOutcome {
     const da = directionOf(la(x));
     const db = directionOf(lb(x));
     out[row] = Math.atan2(
-      cross(da, db) * Math.cos(target) - dot(da, db) * Math.sin(target),
-      dot(da, db) * Math.cos(target) + cross(da, db) * Math.sin(target),
+      cross2(da, db) * Math.cos(target) - dot2(da, db) * Math.sin(target),
+      dot2(da, db) * Math.cos(target) + cross2(da, db) * Math.sin(target),
     );
   });
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
-import { normalCdf } from '@cae/reliability/numerics';
+import { normalCdf } from '@lib/specialFunctions';
 import { code, data, lognormal, modelDoc, normal, relative, rMinusS, type Json } from './support';
 
 /** run_reliability_study with FORM (and SORM when sorm is set); data is the FORM study (data.form). */

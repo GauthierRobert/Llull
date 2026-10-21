@@ -1,9 +1,7 @@
 /** PHY-03 §7.1 stable codes: remediation texts for refusals and check items. */
 
-import type { CadDocument } from '@core/model/types';
-import type { CommandResult } from '@core/commands/types';
-import { refuseCode } from '../shared/codes';
-import { codedRejection } from '@core/commands/noop';
+import { tableRejection } from '@core/commands/noop';
+import { codeRemediation } from '../shared/codes';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
   THM_CASE_TYPE: 'create a heat_steady / heat_transient analysis with create_analysis and use its id',
@@ -58,14 +56,4 @@ const REMEDIATION: Readonly<Record<string, string>> = {
 export const remediationOf = (code: string): string => REMEDIATION[code] ?? 'see the command description';
 
 /** `refuse` with the remediation of `code` (THM_* and results codes here, FEA_* set-up codes from the shared table). */
-export function refuseThermal(
-  doc: CadDocument,
-  command: string,
-  code: string,
-  message: string,
-  ids: readonly string[] = [],
-  paths: readonly string[] = [],
-): CommandResult {
-  if (Object.hasOwn(REMEDIATION, code)) return codedRejection(doc, command, code, message, remediationOf(code), ids, paths);
-  return refuseCode(doc, command, code, message, ids, paths);
-}
+export const refuseThermal = tableRejection(REMEDIATION, codeRemediation);

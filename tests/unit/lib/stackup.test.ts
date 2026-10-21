@@ -9,10 +9,8 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   contributions,
-  erfc,
   halfToleranceOf,
   monteCarloAcceptance,
-  normalCdf,
   probabilityBelow,
   rssHalf,
   sigmaOf,
@@ -21,6 +19,7 @@ import {
   worstCaseHalf,
   type StackContributor,
 } from '@lib/stackup';
+import { erfc, normalCdf } from '@lib/specialFunctions';
 import { compileExpression, linearProgram, programFunction, programGradient, type Program } from '@lib/expressionProgram';
 
 interface Reference {

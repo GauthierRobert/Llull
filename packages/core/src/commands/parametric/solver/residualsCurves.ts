@@ -1,18 +1,8 @@
 import type { EntityRef } from '../../../model/types';
+import { cross2 } from '../../../lib/vec2';
 import { at } from './linalg';
 import { directionOf, subKindOf, type Pt } from './layout';
-import {
-  build,
-  circleFn,
-  cross,
-  fail,
-  lineFn,
-  lineOffset,
-  pointFn,
-  signOf,
-  type CompileContext,
-  type CompileOutcome,
-} from './compileContext';
+import { build, circleFn, fail, lineFn, lineOffset, pointFn, signOf, type CompileContext, type CompileOutcome } from './compileContext';
 
 const distance = (p: Pt, q: Pt): number => Math.hypot(p[0] - q[0], p[1] - q[1]);
 
@@ -97,7 +87,7 @@ export function compileCurvature(ctx: CompileContext): CompileOutcome {
     const q = pb(x);
     out[row] = p[0] - q[0];
     out[row + 1] = p[1] - q[1];
-    out[row + 2] = cross(ja.tangent(x), jb.tangent(x));
+    out[row + 2] = cross2(ja.tangent(x), jb.tangent(x));
     if (radiusA && radiusB) out[row + 3] = ja.orientation * radiusB(x) - jb.orientation * radiusA(x);
   });
 }

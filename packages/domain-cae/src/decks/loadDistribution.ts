@@ -5,6 +5,7 @@
 
 import type { FeMeshArtifact } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
+import { jacobiRotate } from '@lib/symmetricEigen';
 import { cross3, len3, sub3 } from '@lib/vec3';
 import type { DeckContext } from './context';
 
@@ -94,27 +95,7 @@ function eigenSymmetric(matrix: Matrix3): { values: number[]; vectors: number[][
       [0, 2],
       [1, 2],
     ] as const) {
-      const apq = at(a, p, q);
-      if (apq === 0) continue;
-      const theta = (at(a, q, q) - at(a, p, p)) / (2 * apq);
-      const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
-      const c = 1 / Math.sqrt(t * t + 1);
-      const s = t * c;
-      for (let k = 0; k < 3; k++) {
-        const [akp, akq] = [at(a, k, p), at(a, k, q)];
-        put(a, k, p, c * akp - s * akq);
-        put(a, k, q, s * akp + c * akq);
-      }
-      for (let k = 0; k < 3; k++) {
-        const [apk, aqk] = [at(a, p, k), at(a, q, k)];
-        put(a, p, k, c * apk - s * aqk);
-        put(a, q, k, s * apk + c * aqk);
-      }
-      for (let k = 0; k < 3; k++) {
-        const [vkp, vkq] = [at(v, k, p), at(v, k, q)];
-        put(v, k, p, c * vkp - s * vkq);
-        put(v, k, q, s * vkp + c * vkq);
-      }
+      jacobiRotate(a, v, p, q);
     }
   }
   return { values: [at(a, 0, 0), at(a, 1, 1), at(a, 2, 2)], vectors: [0, 1, 2].map((j) => [at(v, 0, j), at(v, 1, j), at(v, 2, j)]) };

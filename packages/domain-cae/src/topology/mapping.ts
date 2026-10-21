@@ -6,6 +6,7 @@ import { closestPointOnTriangle, closestPointsOfSegments } from '@core/geometry/
 import type { Vec3 } from '@core/model/types';
 import { cross3, distance3, dot3, len3, normalize3, sub3 } from '@lib/vec3';
 import { projectOntoSegment } from '@lib/polygon';
+import { quantizedKey } from '@lib/quantize';
 import { nodePosition, type TopologyGrid } from './voxel';
 
 /** Node (i, j, k) -> index; dof c of node n is `components * n + c`. */
@@ -85,7 +86,7 @@ function distanceToSegment(grid: TopologyGrid, point: Vec3, a: Vec3, b: Vec3): n
 }
 
 const normalOf = ([a, b, c]: Triangle): Vec3 => normalize3(cross3(sub3(b, a), sub3(c, a)));
-const vertexKey = (p: Vec3): string => p.map((value) => Math.round(value * 1e6)).join(',');
+const VERTEX_UNIT = 1e-6;
 const scaleOf = (triangles: readonly Triangle[]): number =>
   Math.max(1e-12, ...triangles.flatMap((t) => t.map((p) => Math.max(...p.map(Math.abs)))));
 
@@ -96,7 +97,7 @@ function planarGroup(triangles: readonly Triangle[], seed: number): number[] {
   const tolerance = 1e-7 * scaleOf(triangles);
   const byVertex = new Map<string, number[]>();
   triangles.forEach((triangle, index) =>
-    triangle.forEach((p) => byVertex.set(vertexKey(p), [...(byVertex.get(vertexKey(p)) ?? []), index])),
+    triangle.forEach((p) => byVertex.set(quantizedKey(p, VERTEX_UNIT), [...(byVertex.get(quantizedKey(p, VERTEX_UNIT)) ?? []), index])),
   );
   const coplanar = (index: number): boolean => {
     const triangle = triangles[index] as Triangle;
@@ -107,7 +108,7 @@ function planarGroup(triangles: readonly Triangle[], seed: number): number[] {
   while (queue.length > 0) {
     const current = queue.shift() as number;
     for (const p of triangles[current] as Triangle)
-      for (const next of byVertex.get(vertexKey(p)) ?? [])
+      for (const next of byVertex.get(quantizedKey(p, VERTEX_UNIT)) ?? [])
         if (!group.has(next) && coplanar(next)) {
           group.add(next);
           queue.push(next);
@@ -129,7 +130,7 @@ function featureEdges(triangles: readonly Triangle[]): Edge[] {
     for (let i = 0; i < 3; i += 1) {
       const a = triangle[i] as Vec3;
       const b = triangle[(i + 1) % 3] as Vec3;
-      const [ka, kb] = [vertexKey(a), vertexKey(b)];
+      const [ka, kb] = [quantizedKey(a, VERTEX_UNIT), quantizedKey(b, VERTEX_UNIT)];
       const key = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
       const entry = edges.get(key) ?? { edge: { a, b }, normals: [] };
       entry.normals.push(normal);

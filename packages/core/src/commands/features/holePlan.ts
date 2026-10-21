@@ -1,5 +1,6 @@
 /** `add_hole` plan steps for recognised holes (07 FTR FR-FTR-25): holes with the same spec, extent and entrance plane become one step. */
 
+import { round6 } from '../../lib/compactNumber';
 import type { RecognizedHole } from '../../geometry/recognition/types';
 import { dot3 } from '../../lib/vec3';
 
@@ -8,8 +9,6 @@ export interface HolePlanAction {
   readonly params: Readonly<Record<string, unknown>>;
   readonly as: string;
 }
-
-const round = (value: number): number => Math.round(value * 1e6) / 1e6;
 
 /** The `hole` and `extent` params of `add_hole` that rebuild `hole` (a cone atop a counterbore = counterdrill, whose depth is from the face). */
 function holeParams(hole: RecognizedHole): { hole: Record<string, unknown>; extent: Record<string, unknown> } {
@@ -31,7 +30,7 @@ function holeParams(hole: RecognizedHole): { hole: Record<string, unknown>; exte
 export function holePlan(holes: readonly RecognizedHole[], stock: string): HolePlanAction[] {
   const groups = new Map<string, { first: RecognizedHole; points: Array<readonly [number, number, number]> }>();
   for (const hole of holes) {
-    const key = JSON.stringify([holeParams(hole), hole.axis.map(round), round(dot3(hole.axis, hole.axisPoint))]);
+    const key = JSON.stringify([holeParams(hole), hole.axis.map(round6), round6(dot3(hole.axis, hole.axisPoint))]);
     const group = groups.get(key);
     if (group === undefined) groups.set(key, { first: hole, points: [hole.axisPoint] });
     else group.points.push(hole.axisPoint);

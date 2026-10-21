@@ -10,6 +10,7 @@ import { entityToTriangles } from '@core/geometry/entityTriangles';
 import { entityLocalToWorld } from '@core/geometry/entityFrame';
 import { is3D } from '@core/model/types';
 import { toM, vecToM } from './model';
+import { sub3 } from '@lib/vec3';
 
 export type Primitive =
   | { readonly kind: 'cylinder'; readonly start: Vec3; readonly end: Vec3; readonly radius: number }
@@ -32,8 +33,6 @@ export type Resolved =
   | { readonly ok: true; readonly entity: DesignEntity }
   | { readonly ok: false; readonly code: string; readonly message: string };
 
-const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-
 /** Unit vectors u, w completing axis `a` (unit). */
 function frame(a: Vec3): [Vec3, Vec3] {
   const helper: Vec3 = Math.abs(a[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
@@ -45,7 +44,7 @@ function frame(a: Vec3): [Vec3, Vec3] {
 
 /** Triangles of a tube of `segments` facets (vertices on the circle), counter-clockwise from outside, with end caps when `capped`. */
 export function tubeTriangles(start: Vec3, end: Vec3, radius: number, segments: number, capped: boolean): number[] {
-  const d = sub(end, start);
+  const d = sub3(end, start);
   const length = Math.hypot(...d);
   const a: Vec3 = [d[0] / length, d[1] / length, d[2] / length];
   const [u, w] = frame(a);
@@ -96,7 +95,7 @@ function pipeElement(doc: CadDocument, id: string, tessellated: boolean, segment
 
 function solidEntity(doc: CadDocument, entity: Entity, tessellated: boolean, segments: number): Resolved {
   const world = (local: Vec3): Vec3 => vecToM(doc, entityLocalToWorld(entity, local));
-  const direction = (local: Vec3): Vec3 => sub(entityLocalToWorld(entity, local), entityLocalToWorld(entity, [0, 0, 0]));
+  const direction = (local: Vec3): Vec3 => sub3(entityLocalToWorld(entity, local), entityLocalToWorld(entity, [0, 0, 0]));
   const id = entity.id;
   if (entity.kind === 'cylinder') {
     const [start, end] = [world([0, 0, -entity.height / 2]), world([0, 0, entity.height / 2])];

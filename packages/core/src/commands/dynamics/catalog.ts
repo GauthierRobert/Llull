@@ -13,6 +13,7 @@ import { compareToReference } from './engine/compareReference';
 import { checkTimestepConvergence } from './engine/timestepConvergence';
 import { addMotor, addPropeller } from './drives';
 import { inspectDynamics } from './inspect';
+import { listDynamicsLoads } from './loads';
 import { plotSimulation } from './plot';
 import { renderMotion } from './renderMotion';
 import { engineQuickCheck } from './quickCheck';
@@ -38,6 +39,7 @@ export const dynamicsCommands = commandCatalog(
   deleteDynamicsItem,
   setDynamicsSolver,
   inspectDynamics,
+  listDynamicsLoads,
   engineQuickCheck,
   compareToReference,
   checkTimestepConvergence,

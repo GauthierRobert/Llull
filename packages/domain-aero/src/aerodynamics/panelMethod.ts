@@ -3,7 +3,7 @@
  * "Foundations of Aerodynamics", §5.10 program VORTEX; Katz & Plotkin §11.4), plus thin-airfoil theory integrals of the mean line.
  */
 
-import { luFactor, luSolve } from './denseLu';
+import { luFactor, luSolve } from '@lib/denseLinalg';
 
 export interface PanelSolution {
   readonly cl: number;

@@ -3,6 +3,7 @@
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
+import { csvCell } from '@lib/csv';
 import { pmiText } from '@core/geometry/pmiText';
 import type { PmiItem } from '@core/model/pmi';
 import type { Characteristic, FaiResult, PlmModel } from '@core/model/plm';
@@ -28,21 +29,15 @@ function itemsOf(doc: CadDocument, plm: PlmModel, label: string, ctx: ExecutionC
   return isRecord(pmi) ? (pmi as Record<string, PmiItem>) : {};
 }
 
-/** RFC 4180 field. */
-const field = (cell: Cell): string => {
-  const text = cell === null ? '' : String(cell);
-  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-};
-
 /** One flat table `form,row,field,value` (every form, every row): the same data as the JSON, for spreadsheets. */
 function toCsv(forms: { form1: Record<string, Cell>; form2: Record<string, Cell>[]; form3: Record<string, Cell>[] }): string {
   const lines = ['form,row,field,value'];
-  for (const [key, value] of Object.entries(forms.form1)) lines.push(['1', '', key, value].map(field).join(','));
+  for (const [key, value] of Object.entries(forms.form1)) lines.push(['1', '', key, value].map(csvCell).join(','));
   forms.form2.forEach((row, index) =>
-    Object.entries(row).forEach(([key, value]) => lines.push(['2', index + 1, key, value].map(field).join(','))),
+    Object.entries(row).forEach(([key, value]) => lines.push(['2', index + 1, key, value].map(csvCell).join(','))),
   );
   for (const row of forms.form3)
-    Object.entries(row).forEach(([key, value]) => lines.push(['3', row['charNo'] ?? '', key, value].map(field).join(',')));
+    Object.entries(row).forEach(([key, value]) => lines.push(['3', row['charNo'] ?? '', key, value].map(csvCell).join(',')));
   return `${lines.join('\n')}\n`;
 }
 

@@ -2,7 +2,7 @@
 // the load picked in the review list (drawn emphasised, the others dimmed).
 
 import { create } from 'zustand';
-import type { LoadLayer } from '@ui/dynamicsLoads';
+import type { LoadLayer } from '@core/dynamics/dynamicsLoads';
 import { toggledInList } from '@ui/toggleMember';
 
 interface LoadOverlayState {

@@ -1,5 +1,6 @@
 /** add_external_thread (SC-F2): modelled ISO metric external thread M3-M20 on a cylinder (bolt / stud / threaded shaft end). */
 
+import { round6 } from '../../lib/compactNumber';
 import type { ShapeRecipe } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
@@ -13,7 +14,6 @@ import { externalThreadForm, externalThreadRemovedVolume, isoBasicDiameters, par
 import { MAX_THREAD_TURNS, externalThreadGroove } from '../../geometry/threadTool';
 import { refuse } from './ftr';
 
-const round = (value: number): number => Math.round(value * 1e6) / 1e6;
 /** The cylinder radius must equal the thread major radius within this fraction of the major diameter. */
 const DIAMETER_TOLERANCE = 1e-3;
 
@@ -71,8 +71,8 @@ export const addExternalThread = defineCommand({
     if (Math.abs(2 * cylinder.radius - major) > DIAMETER_TOLERANCE * major)
       return fail(
         'FTR_HOLE_DIAMETERS_INCONSISTENT',
-        `cylinder Ø${round(2 * cylinder.radius)} does not match ${iso.designation} major Ø${round(major)}`,
-        `recreate the cylinder with diameter ${round(major)}`,
+        `cylinder Ø${round6(2 * cylinder.radius)} does not match ${iso.designation} major Ø${round6(major)}`,
+        `recreate the cylinder with diameter ${round6(major)}`,
         ['target'],
       );
     const threadLength = length ?? cylinder.height;
@@ -89,7 +89,7 @@ export const addExternalThread = defineCommand({
     if (groove === null)
       return fail(
         'FTR_FEATURE_BUILD_FAILED',
-        `thread length ${threadLength} is shorter than one pitch (${round(pitch)}) or needs more than ${MAX_THREAD_TURNS} turns`,
+        `thread length ${threadLength} is shorter than one pitch (${round6(pitch)}) or needs more than ${MAX_THREAD_TURNS} turns`,
         'use a length between one pitch and the turn limit',
         ['length'],
       );
@@ -129,8 +129,8 @@ export const addExternalThread = defineCommand({
       result,
       [cylinder],
       (newId, triangles) =>
-        `add_external_thread: ${iso.designation}${iso.coarse ? ' (coarse)' : ''} ${handedness}-hand thread, length ${round(threadLength)} at the ${end} end of '${target}' ` +
-        `(d1 Ø${round(basic.minorDiameter)}, d2 Ø${round(basic.pitchDiameter)}) → mesh '${newId}' (${triangles} triangles). Target consumed.`,
+        `add_external_thread: ${iso.designation}${iso.coarse ? ' (coarse)' : ''} ${handedness}-hand thread, length ${round6(threadLength)} at the ${end} end of '${target}' ` +
+        `(d1 Ø${round6(basic.minorDiameter)}, d2 Ø${round6(basic.pitchDiameter)}) → mesh '${newId}' (${triangles} triangles). Target consumed.`,
     );
     return { ...committed, data };
   },

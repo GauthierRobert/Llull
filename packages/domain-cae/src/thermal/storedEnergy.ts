@@ -1,30 +1,16 @@
 /** Stored thermal energy of a temperature field (transient heat balance, PHY-03 §5.5): E = integral of rho * enthalpy(T) dV. */
 
 import { nodalWeights, elementVolume, type MeshIndex } from './meshGeometry';
-import type { PropertyTable } from './material';
+import { valueAt, type PropertyTable } from './material';
 
 export type Enthalpy = (temperature: number) => number;
-
-function valueAt(table: PropertyTable, temperature: number): number {
-  if (table.constant !== null) return table.constant;
-  const points = table.points;
-  const first = points[0];
-  const last = points[points.length - 1];
-  if (first === undefined || last === undefined) return 0;
-  if (temperature <= first[0]) return first[1];
-  if (temperature >= last[0]) return last[1];
-  const upper = points.findIndex(([t]) => t >= temperature);
-  const lo = points[upper - 1] ?? first;
-  const hi = points[upper] ?? last;
-  return lo[1] + ((hi[1] - lo[1]) * (temperature - lo[0])) / (hi[0] - lo[0]);
-}
 
 /**
  * Volumetric enthalpy H(T) = integral of rho(tau) cp(tau) d tau from the lowest table temperature, for tables that the solver reads
  * piecewise-linearly with end values held (exact: Simpson on each interval between table temperatures, where the product is quadratic).
  */
 export function enthalpyFunction(density: PropertyTable, specificHeat: PropertyTable): Enthalpy {
-  const product = (temperature: number): number => valueAt(density, temperature) * valueAt(specificHeat, temperature);
+  const product = (temperature: number): number => valueAt(density, temperature, 0) * valueAt(specificHeat, temperature, 0);
   const breaks = [...new Set([...density.points, ...specificHeat.points].map(([t]) => t))].sort((a, b) => a - b);
   const first = breaks[0];
   const last = breaks[breaks.length - 1];

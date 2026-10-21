@@ -7,7 +7,8 @@ import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { significantNumber } from '@lib/compactNumber';
 import { nextId } from '@lib/id';
-import { differingKeys, fetchArtifact } from '../shared/trust';
+import { fetchArtifact } from '../shared/trust';
+import { verifyAndRecord } from '../shared/verifyRecord';
 import { decodeField, topologySummary } from './artifact';
 import { refuseTopology } from './codes';
 import { deriveTopologyMesh } from './derive';
@@ -77,11 +78,22 @@ export const recordTopologyResult = defineCommand({
     const found = findStudy(doc, studyId);
     if (found === undefined) return fail('TOP_STUDY_NOT_FOUND', `no topology study '${studyId}'`);
     const { study } = found;
-    const fetched = fetchArtifact(ctx?.feaArtifacts, fieldHash, 'fe_topology');
-    if ('code' in fetched) {
-      if (fetched.code === 'FEA_SUMMARY_MISMATCH') return fail('TOP_SUMMARY_MISMATCH', fetched.message, [studyId, fieldHash]);
-      if (summary === undefined || summary.fieldHash !== fieldHash || !hasTextHash(summary))
-        return fail('TOP_ARTIFACT_NOT_FOUND', fetched.message, [studyId, fieldHash]);
+    const ids = [studyId, fieldHash];
+    const verified = verifyAndRecord({
+      fetched: fetchArtifact(ctx?.feaArtifacts, fieldHash, 'fe_topology'),
+      summary,
+      keepable: summary !== undefined && summary.fieldHash === fieldHash && hasTextHash(summary),
+      mismatchCode: 'TOP_SUMMARY_MISMATCH',
+      notFoundCode: 'TOP_ARTIFACT_NOT_FOUND',
+      stale: (artifact) =>
+        artifact.inputHash === topologyInputHash(doc, study) && artifact.settingsHash === topologySettingsHash(study.settings)
+          ? null
+          : { code: 'TOP_RESULT_STALE', message: 'the artifact was built for other inputs or settings than the current study' },
+      recompute: (artifact) => topologySummary(doc, study, artifact, fieldHash),
+      fail: (code, message) => fail(code, message, ids),
+    });
+    if (verified.outcome === 'refused') return verified.result;
+    if (verified.outcome === 'unverified') {
       const flagged: TopologyStudy = { ...study, result: { ...summary, verified: false } as unknown as TopologyResultSummary };
       return changed(
         withStudy(doc, flagged),
@@ -89,19 +101,9 @@ export const recordTopologyResult = defineCommand({
         [studyId],
       );
     }
-    const { artifact } = fetched;
-    if (artifact.inputHash !== topologyInputHash(doc, study) || artifact.settingsHash !== topologySettingsHash(study.settings))
-      return fail('TOP_RESULT_STALE', 'the artifact was built for other inputs or settings than the current study', [studyId, fieldHash]);
-    const expected = topologySummary(doc, study, artifact, fieldHash);
-    if (typeof expected === 'string') return fail('TOP_SUMMARY_MISMATCH', expected, [studyId, fieldHash]);
-    const differing = summary === undefined ? [] : differingKeys(summary, expected);
-    if (differing.length > 0)
-      return fail('TOP_SUMMARY_MISMATCH', `the summary differs from the one recomputed from the artifact in: ${differing.join(', ')}`, [
-        studyId,
-        fieldHash,
-      ]);
+    const { artifact, expected } = verified;
     const field = decodeField(artifact);
-    if (field === null) return fail('TOP_SUMMARY_MISMATCH', 'the density field of the artifact does not decode', [studyId, fieldHash]);
+    if (field === null) return fail('TOP_SUMMARY_MISMATCH', 'the density field of the artifact does not decode', ids);
 
     const mesh = deriveTopologyMesh(artifact, field, study.settings.threshold.value, study.manufacturing.symmetry);
     const hasMesh = mesh.indices.length > 0;

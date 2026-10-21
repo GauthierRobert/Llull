@@ -7,6 +7,7 @@ import type { FeTopologyArtifact, SymmetryPlane } from '@core/model/topology';
 import type { MeshData, Vec3 } from '@core/model/types';
 import { elementAt } from '@lib/elementAt';
 import { pointInPolygon } from '@lib/polygon';
+import { quantizedKey } from '@lib/quantize';
 import { cross3 as cross, dot3 as dot, sub3 as sub } from '@lib/vec3';
 import { triangulatePolygon } from '@lib/triangulate';
 import { marchingSquares, nodeGridOfVoxels, type Point } from './contours';
@@ -50,7 +51,7 @@ class MeshBuilder {
   private readonly byKey = new Map<string, number>();
 
   vertex(point: Vec3): number {
-    const key = point.map((value) => Math.round(value * 1e9)).join(',');
+    const key = quantizedKey(point, 1e-9);
     const known = this.byKey.get(key);
     if (known !== undefined) return known;
     const index = this.positions.length / 3;

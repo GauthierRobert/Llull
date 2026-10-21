@@ -7,7 +7,7 @@ import { useIsFocused } from '@ui/store/focusStore';
 import { ListRow, type Kpi, KpiStrip } from '@ui/panels/PanelParts';
 import { AERO_COLORS } from '@ui/viewport/3d/aero/aeroGeometry';
 import { formatArea, formatQuantity } from './aeroData';
-import { formatSi } from '@ui/siText';
+import { formatSi } from '@lib/siText';
 import type { BodyAnalysis } from './useAeroAnalysis';
 
 interface ResultItem {

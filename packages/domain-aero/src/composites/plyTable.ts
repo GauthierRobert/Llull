@@ -2,6 +2,7 @@
 
 import { confirmExportControlled, defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
+import { csvCell } from '@lib/csv';
 import { changed, exportRefusal, report } from '@core/commands/noop';
 import type { Rosette } from '@core/model/composites';
 import { MM_PER_UNIT } from '@core/model/units';
@@ -24,8 +25,6 @@ const FORMULA = /^[=+\-@\t\r]/;
 /** A text cell safe for spreadsheets: a leading formula character is prefixed with an apostrophe (read back by `unguard`). */
 const guard = (cell: string): string => (FORMULA.test(cell) || /^'+[=+\-@\t\r]/.test(cell) ? `'${cell}` : cell);
 const unguard = (cell: string): string => (/^'+[=+\-@\t\r]/.test(cell) ? cell.slice(1) : cell);
-
-const quote = (cell: string): string => (/[",\n\r]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell);
 
 /** Rows of cells of an RFC 4180 CSV text (quotes, doubled quotes, CRLF / LF); null on an unterminated quote. */
 function parseCsv(text: string): string[][] | null {
@@ -101,7 +100,7 @@ export const exportPlyTable = defineCommand({
         String(sig(area * scale)),
         mass,
       ]
-        .map(quote)
+        .map(csvCell)
         .join(',');
     });
     const content = `${COLUMNS.join(',')}\n${lines.join('\n')}\n`;

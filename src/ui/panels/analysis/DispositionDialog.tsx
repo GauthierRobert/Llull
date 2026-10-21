@@ -1,15 +1,14 @@
 // Human disposition of a FAIL / MARGINAL margin row (05 §5.8, 09 PLM signing): the reviewer picks the row, the decision and a justification, types the
 // key passphrase, the local backend signs the row's payload hash, and the signed `dispose_margin` is dispatched. It never turns a FAIL into a PASS.
 
-import React, { useEffect, useId, useMemo, useState } from 'react';
+import React, { useId, useMemo, useState } from 'react';
 import type { AnalysisCase, Decision } from '@core/model/analysis';
-import { analysisInputHash } from '@cae/hash/inputHash';
-import { marginDispositionPayload } from '@cae/margins/disposition';
 import { ModalDialog } from '@ui/components/ModalDialog';
-import { type SigningKey, fetchSigningKeys, signPayload } from '@ui/services/signing';
+import { NoSigningKeyHint, SigningFields, useSigningFields } from '@ui/components/SigningFields';
+import { signPayload } from '@ui/services/signing';
 import { useStore } from '@ui/store';
 import { parseMargins } from './marginsData';
-import { useHostQuery } from './useHostQuery';
+import { runHostQuery, useHostQuery } from './useHostQuery';
 
 const DECISIONS: readonly Decision[] = ['accepted', 'rejected', 'redesign'];
 
@@ -33,33 +32,22 @@ export function DispositionDialog({ analysisCase, onClose }: Props): React.React
     answer.status === 'done' && answer.data !== null && typeof answer.data === 'object'
       ? String((answer.data as Record<string, unknown>)['resultsHash'] ?? '')
       : '';
-  const [keys, setKeys] = useState<SigningKey[] | null>(null);
   const [rowId, setRowId] = useState('');
   const [decision, setDecision] = useState<Decision>('accepted');
   const [justification, setJustification] = useState('');
-  const [keyId, setKeyId] = useState('');
-  const [passphrase, setPassphrase] = useState('');
-  const [message, setMessage] = useState('');
-
-  useEffect(() => {
-    void fetchSigningKeys().then(setKeys);
-  }, []);
+  const signing = useSigningFields();
+  const { key, passphrase } = signing;
   const row = pending.find((candidate) => candidate.rowId === (rowId || pending[0]?.rowId));
-  const key = keys?.find((candidate) => candidate.keyId === (keyId || keys[0]?.keyId));
   const ready = row !== undefined && key !== undefined && justification.trim() !== '' && passphrase !== '' && resultsHash !== '';
 
   async function submit(): Promise<void> {
     if (row === undefined || key === undefined) return;
-    const payload = marginDispositionPayload(
-      id,
-      { rowKey: row.rowKey, status: row.status, ms: row.ms, inputHash: analysisInputHash(document, id, 'full') },
-      decision,
-      justification,
-      resultsHash,
-    );
+    const payloadAnswer = await runHostQuery('margin_disposition_payload', { ...params, rowId: row.rowId, decision, justification });
+    const payload = (payloadAnswer.data as { payloadSha256?: unknown } | null)?.payloadSha256;
+    if (payloadAnswer.isError || typeof payload !== 'string') return signing.setMessage(payloadAnswer.summary);
     const signed = await signPayload(key.keyId, passphrase, 'dispose_margin', payload);
-    if ('error' in signed) return setMessage(signed.error);
-    setPassphrase('');
+    if ('error' in signed) return signing.setMessage(signed.error);
+    signing.setPassphrase('');
     await dispatch('dispose_margin', {
       analysisId: id,
       rowId: row.rowId,
@@ -87,11 +75,9 @@ export function DispositionDialog({ analysisCase, onClose }: Props): React.React
           No FAIL or MARGINAL row to disposition.
         </p>
       )}
-      {keys !== null && keys.length === 0 && (
-        <p className="analysis__hint" data-testid="disposition-no-key">
-          No signing key on this machine. Create one: llull keys create --user ID --name NAME
-        </p>
-      )}
+      <NoSigningKeyHint prefix="disposition" keys={signing.keys}>
+        No signing key on this machine. Create one: llull keys create --user ID --name NAME
+      </NoSigningKeyHint>
       <label className="field" htmlFor={`${ids}-row`}>
         <span className="field__label">Row</span>
         <select id={`${ids}-row`} data-testid="disposition-row" value={row?.rowId ?? ''} onChange={(e) => setRowId(e.target.value)}>
@@ -126,32 +112,7 @@ export function DispositionDialog({ analysisCase, onClose }: Props): React.React
           onChange={(e) => setJustification(e.target.value)}
         />
       </label>
-      <label className="field" htmlFor={`${ids}-key`}>
-        <span className="field__label">Signing key</span>
-        <select id={`${ids}-key`} data-testid="disposition-key" value={key?.keyId ?? ''} onChange={(e) => setKeyId(e.target.value)}>
-          {(keys ?? []).map((candidate) => (
-            <option key={candidate.keyId} value={candidate.keyId}>
-              {candidate.name} ({candidate.userId})
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="field" htmlFor={`${ids}-pass`}>
-        <span className="field__label">Key passphrase</span>
-        <input
-          id={`${ids}-pass`}
-          type="password"
-          autoComplete="off"
-          data-testid="disposition-passphrase"
-          value={passphrase}
-          onChange={(e) => setPassphrase(e.target.value)}
-        />
-      </label>
-      {message !== '' && (
-        <p className="analysis__hint" role="alert" data-testid="disposition-error">
-          {message}
-        </p>
-      )}
+      <SigningFields prefix="disposition" signing={signing} />
       <p className="analysis__hint">
         The decision never changes the row status: a FAIL stays FAIL ("FAIL (accepted)"). It ends when the case is solved again.
       </p>

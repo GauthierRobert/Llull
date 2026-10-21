@@ -3,9 +3,8 @@
 import type { Entity, MeshData, Vec3 } from '@core/model/types';
 import type { ManholeObject, PipeObject } from '@core/model/civil';
 import { circlePolygon } from '@lib/arc';
-import { cross3 } from '@lib/vec3';
+import { cross3, normalize3OrZero } from '@lib/vec3';
 import { toMm } from '@core/model/units';
-import { normalize } from '../../shared/vec3';
 import { civilLine, civilMesh, civilPolyline, civilText } from '../entities';
 import { labelHeight, type CivilContext } from '../context';
 import { civilObject } from '../model';
@@ -15,9 +14,9 @@ const PIPE_SIDES = 12;
 
 /** Closed prism of `sides` facets and `radius` about the axis `bottom` -> `top` (outward normals). */
 function axisPrismMesh(bottom: Vec3, top: Vec3, radius: number, sides: number): MeshData {
-  const axis = normalize([top[0] - bottom[0], top[1] - bottom[1], top[2] - bottom[2]]);
+  const axis = normalize3OrZero([top[0] - bottom[0], top[1] - bottom[1], top[2] - bottom[2]]);
   const reference: Vec3 = Math.abs(axis[2]) > 0.9 ? [1, 0, 0] : [0, 0, 1];
-  const u = normalize(cross3(axis, reference));
+  const u = normalize3OrZero(cross3(axis, reference));
   const v = cross3(axis, u);
   const positions: number[] = [];
   for (const centre of [bottom, top]) {

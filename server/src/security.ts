@@ -4,6 +4,7 @@
  * away from the document; there are no named users or roles (LC1: one local backend per machine).
  */
 import crypto from 'crypto';
+import { sha256Digest } from './sha256';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { positiveInteger } from './env';
@@ -25,8 +26,6 @@ const csv = (raw: string): string[] =>
     .split(',')
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
-
-const sha256Digest = (value: string): Buffer => crypto.createHash('sha256').update(value).digest();
 
 /** `Authorization: Bearer <token>` (scheme case-insensitive). */
 function bearerToken(req: Request): string | undefined {

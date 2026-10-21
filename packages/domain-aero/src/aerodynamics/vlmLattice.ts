@@ -7,6 +7,7 @@
 
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { entityLocalToWorld } from '@core/geometry/entityFrame';
+import { add3, cross3, lerp3, scale3, sub3 } from '@lib/vec3';
 
 export interface LatticeSection {
   readonly leadingEdge: Vec3;
@@ -40,12 +41,7 @@ export interface Lattice {
   readonly span: readonly number[];
 }
 
-const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-const scale = (a: Vec3, k: number): Vec3 => [a[0] * k, a[1] * k, a[2] * k];
-const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const length = (a: Vec3): number => Math.hypot(a[0], a[1], a[2]);
-const lerp = (a: Vec3, b: Vec3, t: number): Vec3 => add(a, scale(sub(b, a), t));
 
 interface Station {
   readonly le: Vec3;
@@ -59,7 +55,7 @@ interface Station {
 function spanDirection(a: Vec3, b: Vec3): Vec3 {
   const d: Vec3 = [0, b[1] - a[1], b[2] - a[2]];
   const n = length(d);
-  return n === 0 ? [0, 1, 0] : scale(d, 1 / n);
+  return n === 0 ? [0, 1, 0] : scale3(d, 1 / n);
 }
 
 function station(sections: readonly LatticeSection[], cumulative: readonly number[], s: number): Station {
@@ -72,16 +68,16 @@ function station(sections: readonly LatticeSection[], cumulative: readonly numbe
   const t = s1 > s0 ? Math.min(1, Math.max(0, (s - s0) / (s1 - s0))) : 0;
   const incidence = a.incidence + (b.incidence - a.incidence) * t;
   const span = spanDirection(a.leadingEdge, b.leadingEdge);
-  const up = cross([1, 0, 0], span);
+  const up = cross3([1, 0, 0], span);
   return {
-    le: lerp(a.leadingEdge, b.leadingEdge, t),
+    le: lerp3(a.leadingEdge, b.leadingEdge, t),
     chord: a.chord + (b.chord - a.chord) * t,
     incidence,
-    chordDir: sub(scale([1, 0, 0], Math.cos(incidence)), scale(up, Math.sin(incidence))),
+    chordDir: sub3(scale3([1, 0, 0], Math.cos(incidence)), scale3(up, Math.sin(incidence))),
   };
 }
 
-const at = (st: Station, xi: number): Vec3 => add(st.le, scale(st.chordDir, st.chord * xi));
+const at = (st: Station, xi: number): Vec3 => add3(st.le, scale3(st.chordDir, st.chord * xi));
 
 /** Spanwise station fractions 0..1: uniform, or sine spacing (cosine spacing of the full span, clustered at the tip). */
 const fractions = (count: number, spacing: 'cosine' | 'uniform', mirror: boolean): number[] =>
@@ -127,10 +123,10 @@ export function buildLattice(surfaces: readonly LatticeSurface[]): Lattice {
         const x1 = (i + 1) / surface.chordwisePanels;
         const a = at(left, x0 + 0.25 * (x1 - x0));
         const b = at(right, x0 + 0.25 * (x1 - x0));
-        const c = lerp(at(left, x0 + 0.75 * (x1 - x0)), at(right, x0 + 0.75 * (x1 - x0)), 0.5);
-        const diagonal = cross(sub(at(right, x1), at(left, x0)), sub(at(left, x1), at(right, x0)));
+        const c = lerp3(at(left, x0 + 0.75 * (x1 - x0)), at(right, x0 + 0.75 * (x1 - x0)), 0.5);
+        const diagonal = cross3(sub3(at(right, x1), at(left, x0)), sub3(at(left, x1), at(right, x0)));
         const normalLength = length(diagonal);
-        const normal = scale(diagonal, -1 / normalLength);
+        const normal = scale3(diagonal, -1 / normalLength);
         const panelArea = normalLength / 2;
         for (const side of sides) {
           const m = (p: Vec3): Vec3 => [p[0], side * p[1], p[2]];

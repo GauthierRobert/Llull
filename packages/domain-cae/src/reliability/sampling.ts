@@ -1,7 +1,8 @@
 /** Seeded Monte Carlo / Latin hypercube sampling of the standard normal space, sample statistics, Pf estimate and FOSM moments. */
 
 import { createPrng } from './prng';
-import { normalCdf, normalInv } from './numerics';
+import { normalCdf } from '@lib/specialFunctions';
+import { normalInv } from './numerics';
 
 export type SamplingMethod = 'mc' | 'lhs' | 'lhs_centred';
 

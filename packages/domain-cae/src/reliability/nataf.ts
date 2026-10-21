@@ -2,7 +2,7 @@
 
 import type { Distribution } from '@core/model/probabilistic';
 import { fromStandardNormal, momentsOf } from './distributions';
-import { cholesky } from './numerics';
+import { cholesky } from '@lib/denseLinalg';
 import type { RandomVariable, ReliabilityModel } from '@core/model/probabilistic';
 
 export interface Transform {

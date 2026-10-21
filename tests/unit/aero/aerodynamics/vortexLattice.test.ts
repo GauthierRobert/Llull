@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { solveLinear } from '@core/model/materialLaws/linalg';
-import { luFactor, luSolve } from '@aero/aerodynamics/denseLu';
+import { luFactor, luSolve } from '@lib/denseLinalg';
 import { influenceMatrix, solveBasis } from '@aero/aerodynamics/vlmKernel';
 import { buildLattice } from '@aero/aerodynamics/vlmLattice';
 import refs from '../../../../docs/aerospace/10-aerodynamics/validation/data/vlm_references.json';

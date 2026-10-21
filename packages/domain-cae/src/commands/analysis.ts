@@ -1,5 +1,6 @@
 /** create_analysis / delete_analysis / describe_analysis: the lifecycle of an analysis case. */
 
+import { round6 } from '@lib/compactNumber';
 import type { AnalysisCase, AnalysisType, FactorSet, ThermoMechSetup } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -78,7 +79,7 @@ function bandValid(band: { readonly min?: number | undefined; readonly max?: num
   return max === undefined || (Number.isFinite(max) && max > (min ?? 0));
 }
 
-const plain = (value: number): string => String(Math.round(value * 1e6) / 1e6);
+const plain = (value: number): string => String(round6(value));
 
 /**
  * @affects doc.analysis.cases (adds 1 case; affected: [analysisId])

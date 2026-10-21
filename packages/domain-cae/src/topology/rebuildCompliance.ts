@@ -1,15 +1,13 @@
 /** Compliance ratio of a rebuilt solid (TR-TOP-10): F^T u from its current 05 results artifact over the compliance of the optimum. */
 
-import type { AnalysisCase, FeArtifactPort, FeMeshArtifact, FeResultsArtifact, UnitSystem } from '@core/model/analysis';
+import type { AnalysisCase, FeArtifactPort, FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import type { TopologyStudy } from '@core/model/topology';
 import type { CadDocument } from '@core/model/types';
+import { unitSystemFactors } from '../decks/units';
 import { loadCasesOf } from '../decks/context';
 import { analysisOf } from '../shared/access';
 import { trustedRecord } from '../shared/trust';
 import { stepOfLoadCase } from '../results/fields';
-
-/** Newton-millimetres in one force-length unit of each unit system. */
-const NMM_PER_UNIT: Readonly<Record<UnitSystem, number>> = { 'N-mm-t-s': 1, 'N-m-kg-s': 1000, 'lbf-in-slinch-s': 4.4482216152605 * 25.4 };
 
 export interface RebuildCompliance {
   readonly available: true;
@@ -100,8 +98,8 @@ export function rebuildCompliance(
     if (typeof work === 'string') return unavailable('unsupported', work);
     rebuild += (study.objective.loadCaseWeights[name] ?? 1) * work;
   }
-  const optimumNmm = optimumCompliance * NMM_PER_UNIT[model.cases[study.analysisId]?.unitSystem ?? 'N-mm-t-s'];
+  const optimumNmm = optimumCompliance * unitSystemFactors(model.cases[study.analysisId]?.unitSystem ?? 'N-mm-t-s').nmmPerForceLength;
   if (!(optimumNmm > 0)) return unavailable('optimum_zero', 'the compliance of the optimum is not positive');
-  const rebuildNmm = rebuild * NMM_PER_UNIT[analysis.unitSystem];
+  const rebuildNmm = rebuild * unitSystemFactors(analysis.unitSystem).nmmPerForceLength;
   return { available: true, analysisId: analysis.id, rebuildNmm, optimumNmm, ratio: rebuildNmm / optimumNmm };
 }
