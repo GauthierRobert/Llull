@@ -1,5 +1,5 @@
 import type { CadDocument } from '@core/model/types';
-import type { SteelMemberElement } from '@core/model/building';
+import type { SteelMemberElement } from '@aec/building/types';
 import { findProfile, sectionProperties } from '@aec/steel/profiles';
 import { G, step, twoLevels } from './steelFixtures';
 import { xy } from '../../helpers/xy';

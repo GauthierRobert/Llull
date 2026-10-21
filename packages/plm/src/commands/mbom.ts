@@ -4,7 +4,7 @@ import { nextFreeId } from '@lib/id';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, report } from '@core/commands/noop';
-import type { MbomLine, MbomOmission, MbomRecord } from '@core/model/plm';
+import type { MbomLine, MbomOmission, MbomRecord } from '@plm/types';
 import { PART_NUMBER } from '../document';
 import { atSchema, bySchema } from '../params';
 import { refusePlm } from '../refusal';

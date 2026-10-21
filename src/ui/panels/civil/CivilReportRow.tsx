@@ -1,7 +1,7 @@
 // Civil object row with its live read-only report, one number field and one action (contour interval, swell factor).
 
 import React, { useState } from 'react';
-import type { CivilObject } from '@core/model/civil';
+import type { CivilObject } from '@aec/civil/types';
 import { CivilObjectRow, NumberTextField } from './CivilParts';
 import { useCivilReport } from './civilQuery';
 

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { BuildingLevel } from '@core/model/building';
+import type { BuildingLevel } from '@aec/building/types';
 import { useStore } from '@ui/store';
 import { orderedValues } from '@ui/panels/orderedValues';
 

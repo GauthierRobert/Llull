@@ -5,7 +5,7 @@
  * @see docs/CONSTRUCTION.md, packages/domain-aec/src/evaluate.ts
  */
 
-import type { Vec2, Vec3 } from './vectors';
+import type { Vec2, Vec3 } from '@core/model/vectors';
 
 /** Building element categories (Revit/IFC-like). */
 export type BimCategory =
@@ -404,4 +404,11 @@ export function createEmptyBuilding(): BuildingModel {
     elements: {},
     elementOrder: [],
   };
+}
+
+declare module '@core/model/documentExtensions' {
+  interface DocumentExtensions {
+    /** Absent until the first building command. */
+    building?: BuildingModel;
+  }
 }

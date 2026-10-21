@@ -1,9 +1,9 @@
 /** Nataf transform: standard independent normals u -> correlated normals z (Cholesky of the corrected correlation) -> marginals x. */
 
-import type { Distribution } from '@core/model/probabilistic';
+import type { Distribution } from '@cae/reliability/types';
 import { fromStandardNormal, momentsOf } from './distributions';
 import { cholesky } from '@lib/denseLinalg';
-import type { RandomVariable, ReliabilityModel } from '@core/model/probabilistic';
+import type { RandomVariable, ReliabilityModel } from '@cae/reliability/types';
 
 export interface Transform {
   readonly names: readonly string[];

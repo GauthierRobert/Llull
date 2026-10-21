@@ -1,6 +1,6 @@
 /** Superelevation design command for a road alignment (the geometry lives in superelevation.ts). */
 
-import type { AlignmentObject } from '@core/model/civil';
+import type { AlignmentObject } from '@aec/civil/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';

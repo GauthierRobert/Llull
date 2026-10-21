@@ -1,5 +1,5 @@
 import type { Vec2 } from '@core/model/types';
-import type { StairElement } from '@core/model/building';
+import type { StairElement } from '@aec/building/types';
 import type { DrawingPrimitive } from '@core/model/drawing';
 import { fromMm } from '@core/model/units';
 import { type StairFlight, flightPoint, stairFlights, stairLanding, stairPoint } from '../geometry/stairGeometry';

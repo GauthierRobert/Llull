@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { portalHall } from '../../helpers/portalHall';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import type { BuildingElement, MomentConnectionElement, PanelElement, SteelMemberElement } from '@core/model/building';
+import type { BuildingElement, MomentConnectionElement, PanelElement, SteelMemberElement } from '@aec/building/types';
 import { execute } from '@core/commands/registry';
 import { framesOf } from '@aec/industrial/frames/frameModelFrames';
 import { baseReactions } from '@aec/industrial/frames/frameModelSolve';

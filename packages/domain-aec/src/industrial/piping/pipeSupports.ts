@@ -1,6 +1,6 @@
 /** Pipe supports: shoes / guides / anchors on steel below, hangers from steel above. */
 
-import type { PipeSupportElement } from '@core/model/building';
+import type { PipeSupportElement } from '@aec/building/types';
 import type { Vec3 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';

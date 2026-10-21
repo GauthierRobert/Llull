@@ -1,6 +1,6 @@
 /** Steel connections: column base plates with anchor bolts. */
 
-import type { BasePlateElement } from '@core/model/building';
+import type { BasePlateElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { unknownLevelFailure } from '../../building/levelLookup';

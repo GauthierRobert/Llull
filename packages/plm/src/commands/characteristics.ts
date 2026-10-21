@@ -5,7 +5,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { changed, report } from '@core/commands/noop';
 import { pmiText } from '@core/geometry/pmiText';
 import type { PmiItem } from '@core/model/pmi';
-import type { Characteristic } from '@core/model/plm';
+import type { Characteristic } from '@plm/types';
 import type { CadDocument } from '@core/model/types';
 import { refusePlm } from '../refusal';
 import { withPlm } from '../revisions';

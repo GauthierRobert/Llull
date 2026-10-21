@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { EffectivityKind, ManagedItem, Revision } from '@core/model/plm';
+import type { EffectivityKind, ManagedItem, Revision } from '@plm/types';
 import { closeForCutIn, containsUnit, effectivityProblem, isUnitOfKind, resolveRevision } from '@plm/effectivity';
 import { isKnownScheme, isValidCustomList, revisionLabel } from '@plm/schemes';
 import { isLegalTransition, transitionRefusal } from '@plm/transitions';

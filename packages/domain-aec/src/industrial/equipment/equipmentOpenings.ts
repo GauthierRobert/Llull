@@ -1,5 +1,5 @@
 import type { Vec2 } from '@core/model/types';
-import type { SlabElement } from '@core/model/building';
+import type { SlabElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';

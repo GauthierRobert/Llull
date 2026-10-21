@@ -9,8 +9,6 @@ import type { FaceSlabRecipe } from './faceSlab';
 import type { AssemblyPresentationFields, Joint } from './joints';
 
 export type { Joint, JointKind, JointMateRef } from './joints';
-import type { BuildingModel } from './building';
-import type { CivilModel } from './civil';
 import type { AnalysisModel } from './analysis';
 import type { DrawingsModel } from './sheet';
 import type { PmiModel } from './pmi';
@@ -18,21 +16,16 @@ import type { DynamicsModel } from './dynamics';
 import type { PrototypeModel } from './prototype';
 import type { ReviewModel } from './review';
 import type { CurveSegment } from './curve';
-import type { FastenerModel, PartRef } from './fasteners';
-import type { AeroModel } from './aero';
 import type { CompositesModel } from './composites';
+import type { DocumentExtensions } from './documentExtensions';
 import type { DocumentKernelSettings } from './documentKernelSettings';
 import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary';
 import type { MaterialFinish } from './materialFinish';
 export { FINISH_PATTERNS, type FinishPattern, type MaterialFinish } from './materialFinish';
-import type { ReliabilityModel } from './probabilistic';
 import type { SheetMetalModel } from './sheetMetal';
-import type { PlmModel } from './plm';
-import type { FeatureParams } from './features';
+import type { FeatureParams, PartRef } from './features';
 import type { NurbsCurveData } from '../lib/nurbs/types';
 import type { NurbsSurfaceData, UvTrimLoop } from '../lib/nurbs/surfaceTypes';
-import type { PlantModel } from './plant';
-import type { ScanModel } from './pointCloud';
 import type { FaceOpParams } from './faceOps';
 import type { SketchPlaneFields } from './sketchPlanes';
 
@@ -620,7 +613,7 @@ export interface DriveRelation {
 }
 
 /** Document units default to 'mm'; every map/list below is initialized empty by createEmptyDocument. */
-export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFields {
+export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFields, DocumentExtensions {
   entities: Record<EntityId, Entity>;
   /** Z-order / creation order of entity ids. */
   order: EntityId[];
@@ -658,10 +651,6 @@ export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFiel
   /** Keyed by drive relation id; `driveRelationOrder` lists ids in creation order. */
   driveRelations: Record<string, DriveRelation>;
   driveRelationOrder: string[];
-  /** Absent until the first building command. */
-  building?: BuildingModel;
-  /** Absent until the first civil (site / terrain / road / drainage) command. */
-  civil?: CivilModel;
   /** Absent until the first sheet command (`create_sheet`). */
   drawings?: DrawingsModel;
   /** Absent until the first PMI command (`set_pmi_standard`, `add_datum_feature`, ...). */
@@ -682,24 +671,10 @@ export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFiel
   analysis?: AnalysisModel;
   /** Imported material libraries by id (08 MAT M3); absent until `import_material_library`. */
   materialLibraries?: Record<string, MaterialLibraryEntry>;
-  /** Absent until the first fastener command (plugin `fasteners`, 08 MAT M5). */
-  fasteners?: FastenerModel;
-  /** Absent until the first airfoil or wing command (plugin `surfacing`, 02 SRF). */
-  aero?: AeroModel;
   /** Absent until the first composites command (plugin composites, 06 CMP). */
   composites?: CompositesModel;
-  /** Absent until the first flow-case command (`create_cfd_case`, plugin `cfd`, 12 CFD). */
-  cfd?: import('./cfd').CfdDocumentSlice;
   /** Absent until the first sheet-metal command (plugin `sheetmetal`, 07 FTR M3). */
   sheetMetal?: SheetMetalModel;
-  /** Absent until the first probabilistic command (`define_random_variable`; plugin `cae`, PHY-18). */
-  probabilistic?: ReliabilityModel;
-  /** Absent until `set_item_identity` (plugin `plm`, 09): the managed item, revisions, change records. Outside the release scope. */
-  plm?: PlmModel;
-  /** Absent until the first plant command (plugin `piping`, plant 02 RTE: `add_tie_in_point`, `create_pipeline`). */
-  plant?: PlantModel;
-  /** Point-cloud references, registrations and extractions (plugin `scan`, plant 10); absent until the first scan command. No points. */
-  scan?: ScanModel;
   /** Contact sets / exploded views (`AssemblyPresentationFields`) and sketch planes / links (`SketchPlaneFields`) are inherited. */
 }
 

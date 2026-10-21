@@ -5,7 +5,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CadDocument } from '@core/model/types';
-import type { ChangeRecord, PlmModel } from '@core/model/plm';
+import type { ChangeRecord, PlmModel } from '@plm/types';
 import { effectivityProblem } from '../effectivity';
 import { refusePlm } from '../refusal';
 import { NOT_MANAGED } from '../state';

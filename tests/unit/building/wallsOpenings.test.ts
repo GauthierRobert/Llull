@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type BoxEntity, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { endAdjustment, wallPieces } from '@aec/building/geometry/wallGeometry';
-import type { WallElement } from '@core/model/building';
+import type { WallElement } from '@aec/building/types';
 import { run } from '../../helpers/runFixtures';
 import { expectNoOp } from '../../helpers/expectNoOp';
 import { xy } from '../../helpers/xy';

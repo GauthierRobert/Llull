@@ -6,7 +6,7 @@ import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelecti
 import { runQuery } from '@ui/services/localQuery';
 import type { Clash } from '@aec/industrial/clash/clash';
 import { toMetres } from '@core/model/units';
-import type { BuildingModel } from '@core/model/building';
+import type { BuildingModel } from '@aec/building/types';
 import { KpiStrip, ListRow, PanelSection, StatusChip, StatusLine } from '@ui/panels/PanelParts';
 import { useFocusItem } from '@ui/hooks/useFocusItem';
 import { useFocusStore } from '@ui/store/focusStore';

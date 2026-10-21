@@ -4,7 +4,7 @@ import { nextFreeId } from '@lib/id';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
-import type { FaiResult, FaiResultSet } from '@core/model/plm';
+import type { FaiResult, FaiResultSet } from '@plm/types';
 import { sha256Hex } from '@lib/sha256';
 import { humanAct } from '../gate';
 import { atSchema, bySchema, confirmationSchema } from '../params';

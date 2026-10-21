@@ -1,5 +1,5 @@
 import type { CadDocument, Vec3 } from '@core/model/types';
-import type { SteelMemberElement } from '@core/model/building';
+import type { SteelMemberElement } from '@aec/building/types';
 import type { CheckOutcome, Criterion, GradeContext } from '../contract';
 import { absolute, distance, elementsOf, levelsByElevation, round } from '../oracle/geometry';
 import { section } from '../oracle/steel';

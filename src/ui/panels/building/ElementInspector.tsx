@@ -3,7 +3,7 @@
 import React from 'react';
 import { useStore } from '@ui/store';
 import { deleteSelection } from '@ui/actions/selectionActions';
-import type { BuildingElement, BuildingModel } from '@core/model/building';
+import type { BuildingElement, BuildingModel } from '@aec/building/types';
 import { Icon } from '@ui/components/Icon';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { PropRow } from '@ui/panels/propertyFields';

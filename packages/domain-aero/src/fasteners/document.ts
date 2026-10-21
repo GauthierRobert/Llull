@@ -4,8 +4,9 @@ import type { DerivationGuard } from '@core/commands/derivation';
 import type { DocumentExtension } from '@core/plugins/plugin';
 import { isRecord } from '@lib/isRecord';
 import { checkFamily } from './catalogFile';
+import { fastenerProjections } from './projections';
 import { fastenerModel } from './fastenerDoc';
-import type { FastenerStack } from '@core/model/fasteners';
+import type { FastenerStack } from '@aero/fasteners/types';
 
 const HOLE_MODES: readonly unknown[] = ['cut_close_tolerance', 'cut_clearance', 'none'];
 
@@ -86,6 +87,7 @@ export const fastenersDocument: DocumentExtension = {
   },
   derivedEntityIds: () => new Set(),
   restore: (raw) => raw,
+  projections: fastenerProjections,
 };
 
 /** Fastener instances belong to their stack: deleting or exploding one directly is refused (use delete_fastener_stack). */

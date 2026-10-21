@@ -1,6 +1,6 @@
 /** Ground-slab weight and horizontal-thrust sharing for footing sliding. */
 
-import type { BuildingModel, SteelMemberElement } from '@core/model/building';
+import type { BuildingModel, SteelMemberElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import { toMetres } from '@core/model/units';
 import { getBuilding } from '../../building/model';

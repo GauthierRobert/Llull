@@ -5,6 +5,7 @@
  *   local y = normal x xDir
  */
 
+import type { Quantity } from './quantity';
 import type { Vec2, Vec3 } from './vectors';
 
 export const HOLE_KINDS = ['simple', 'counterbore', 'countersink', 'counterdrill'] as const;
@@ -26,6 +27,16 @@ export interface ThreadSpec {
   readonly modelled?: true;
   readonly pitch?: number;
   readonly majorDiameter?: number;
+}
+
+/** Standard-part reference on a `Component` (generic: the BOM groups by part number without importing the plugin). */
+export interface PartRef {
+  readonly family: string;
+  readonly partNumber: string;
+  readonly description?: string;
+  readonly unitMass?: Quantity;
+  /** Built from placeholder proportions: excluded from mass (TR-MAT-24). */
+  readonly representative?: boolean;
 }
 
 /** Standard-part reference resolved against `doc.fasteners.catalogs` (family id + part number). */

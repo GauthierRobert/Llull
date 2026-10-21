@@ -4,7 +4,7 @@
  */
 
 import { type Vec3, DOCUMENT_UNITS } from '@core/model/types';
-import type { SurveyPoint } from '@core/model/civil';
+import type { SurveyPoint } from '@aec/civil/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';

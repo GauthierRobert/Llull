@@ -1,7 +1,7 @@
 /** bill_of_materials: read-only count of component instances, standard parts (by part number) and raw materials (orphan instances reported, never thrown). */
 
 import type { CadDocument, EntityKind, InstanceEntity } from '../../model/types';
-import type { PartRef } from '../../model/fasteners';
+import type { PartRef } from '../../model/features';
 import type { Quantity } from '../../model/quantity';
 import type { CommandResult, ExecutionContext } from '../types';
 import { defineCommand, z } from '../schema';

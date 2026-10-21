@@ -3,7 +3,7 @@
  * units; grades are ratios (0.025 = 2.5 %).
  */
 
-import type { ProfilePvi } from '@core/model/civil';
+import type { ProfilePvi } from '@aec/civil/types';
 
 export interface VerticalCurve {
   readonly pviIndex: number;

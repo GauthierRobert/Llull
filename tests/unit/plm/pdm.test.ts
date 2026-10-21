@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
-import type { SignatureRecord } from '@core/model/plm';
+import type { SignatureRecord } from '@plm/types';
 import type { CadDocument } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
 import { parseBody } from '@plm/pdm/args';

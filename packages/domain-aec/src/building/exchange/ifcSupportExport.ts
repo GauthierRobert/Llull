@@ -4,7 +4,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import type { BuildingModel, PipeElement, PipeSupportElement } from '@core/model/building';
+import type { BuildingModel, PipeElement, PipeSupportElement } from '@aec/building/types';
 import { supportShape } from '../../industrial/piping/supportParts';
 import { type Context, addPropertySet, circleProfile, extrusion, ifcReal, ifcString, placement, rectangleProfile, shape } from './ifcStep';
 import type { Exported } from './ifcElementExport';

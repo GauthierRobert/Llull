@@ -10,7 +10,7 @@ import type {
   PanelElement,
   PipeElement,
   SteelMemberElement,
-} from '@core/model/building';
+} from '@aec/building/types';
 import { fromMm, toMm } from '@core/model/units';
 import { base, colorForMaterial, MEMBER_LAYER, meshEntity, orientedBox } from '../building/evaluate/entities';
 import { prismMesh, sweepMesh } from '../shared/mesh';

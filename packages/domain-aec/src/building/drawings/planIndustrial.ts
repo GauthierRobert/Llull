@@ -1,7 +1,7 @@
 import { planPoint } from '@lib/vec2';
 import { shapeOf } from '../../industrial/equipment/equipmentShape';
 import type { Vec2 } from '@core/model/types';
-import type { BuildingElement, BuildingLevel } from '@core/model/building';
+import type { BuildingElement, BuildingLevel } from '@aec/building/types';
 import { distance } from '@lib/polygon';
 import { fromMm } from '@core/model/units';
 import { getBuilding } from '../model';

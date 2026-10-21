@@ -4,7 +4,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import type { AlignmentObject } from '@core/model/civil';
+import type { AlignmentObject } from '@aec/civil/types';
 import { escapeXml } from '@lib/escapeXml';
 import { niceStep } from '@lib/niceStep';
 import { composeSheetSvg, fitScale, northArrow } from '../../shared/sheetFrame';

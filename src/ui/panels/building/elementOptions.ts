@@ -1,4 +1,4 @@
-import type { BuildingModel } from '@core/model/building';
+import type { BuildingModel } from '@aec/building/types';
 import type { ElementListKind } from './elementToolForm';
 
 interface ElementOption {

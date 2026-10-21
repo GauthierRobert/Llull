@@ -3,7 +3,7 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, report } from '@core/commands/noop';
-import type { Revision } from '@core/model/plm';
+import type { Revision } from '@plm/types';
 import { refusePlm } from '../refusal';
 import { NOT_MANAGED } from '../state';
 import { withPlm } from '../revisions';

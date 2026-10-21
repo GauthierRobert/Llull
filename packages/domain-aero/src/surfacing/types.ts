@@ -5,7 +5,7 @@
  * The wing frame is x aft, y to the right, z up.
  */
 
-import type { Vec2, Vec3 } from './vectors';
+import type { Vec2, Vec3 } from '@core/model/vectors';
 
 export type AirfoilSource =
   | { readonly type: 'naca4' | 'naca5'; readonly designation: string; readonly closedTrailingEdge: boolean; readonly pointsPerSide: number }
@@ -108,4 +108,11 @@ export interface AeroModel {
   readonly wings: Readonly<Record<string, WingDef>>;
   /** Fuselage bodies (absent until the first `loft_fuselage`). */
   readonly bodies?: Readonly<Record<string, BodyDef>>;
+}
+
+declare module '@core/model/documentExtensions' {
+  interface DocumentExtensions {
+    /** Absent until the first airfoil or wing command (plugin `surfacing`, 02 SRF). */
+    aero?: AeroModel;
+  }
 }

@@ -53,3 +53,10 @@ export interface ReliabilityModel {
   readonly limitStates: Readonly<Record<string, LimitState>>;
   readonly limitStateOrder: readonly string[];
 }
+
+declare module '@core/model/documentExtensions' {
+  interface DocumentExtensions {
+    /** Absent until the first probabilistic command (`define_random_variable`; plugin `cae`, PHY-18). */
+    probabilistic?: ReliabilityModel;
+  }
+}

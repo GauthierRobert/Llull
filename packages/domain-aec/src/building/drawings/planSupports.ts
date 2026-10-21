@@ -6,7 +6,7 @@
 
 import { planPoint } from '@lib/vec2';
 import type { Vec2 } from '@core/model/types';
-import type { BuildingModel, PipeSupportElement } from '@core/model/building';
+import type { BuildingModel, PipeSupportElement } from '@aec/building/types';
 import { fromMm } from '@core/model/units';
 import { type PlanSource, annotationText, layerName, thinLine } from './planModel';
 import type { DrawingPrimitive } from '@core/model/drawing';

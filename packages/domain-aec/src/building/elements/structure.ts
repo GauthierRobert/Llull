@@ -1,7 +1,7 @@
 /** Slabs, columns, beams and stairs. */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
-import type { BeamElement, BuildingModel, ColumnElement, SlabElement, StairElement, StairShape, WallElement } from '@core/model/building';
+import type { BeamElement, BuildingModel, ColumnElement, SlabElement, StairElement, StairShape, WallElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { distance, isValidPolygon, offsetPolygon } from '@lib/polygon';

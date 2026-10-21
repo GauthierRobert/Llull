@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { wallLoop, gridIntersections } from '@aec/building/elements/structure';
-import type { WallElement } from '@core/model/building';
+import type { WallElement } from '@aec/building/types';
 import { run } from '../../helpers/runFixtures';
 import { xy } from '../../helpers/xy';
 

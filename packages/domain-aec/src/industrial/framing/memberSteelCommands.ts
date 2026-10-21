@@ -1,5 +1,5 @@
 import type { CadDocument, Vec3 } from '@core/model/types';
-import type { SteelMemberElement } from '@core/model/building';
+import type { SteelMemberElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, looseVec3, z } from '@core/commands/schema';
 import { fromMm, toMetres } from '@core/model/units';

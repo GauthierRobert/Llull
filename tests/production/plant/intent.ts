@@ -1,5 +1,5 @@
 import type { Vec2, Vec3 } from '@core/model/types';
-import type { MemberRole } from '@core/model/building';
+import type { MemberRole } from '@aec/building/types';
 
 /**
  * Design intent of a process-plant structure job, in absolute millimetres. One intent feeds the

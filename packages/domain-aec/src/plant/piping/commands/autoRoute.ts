@@ -2,7 +2,7 @@ import { defineCommand, vec3, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed, report } from '@core/commands/noop';
 import type { CadDocument } from '@core/model/types';
-import type { PipeRun } from '@core/model/plant';
+import type { PipeRun } from '@aec/plant/types';
 import type { Vec3 } from '@core/model/vectors';
 import { nextId } from '@lib/id';
 import { buildRouteProblem, type BuiltProblem, type RouteRequest } from '../autoRoute/problem';

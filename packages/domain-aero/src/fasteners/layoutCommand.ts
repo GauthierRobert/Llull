@@ -4,7 +4,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import type { CadDocument, Vec3 } from '@core/model/types';
-import type { FastenerStack } from '@core/model/fasteners';
+import type { FastenerStack } from '@aero/fasteners/types';
 import { add3, cross3, distance3, normalize3, scale3 } from '@lib/vec3';
 import { fastenerError, remediationFor } from './codes';
 import { familyOf, fastenerModel } from './fastenerDoc';

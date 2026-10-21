@@ -1,7 +1,7 @@
 /** Coordinate reference system commands: declare the CRS, calibrate the site (local <-> grid) and transform points between the two. */
 
 import type { CadDocument } from '@core/model/types';
-import type { CivilCrs } from '@core/model/civil';
+import type { CivilCrs } from '@aec/civil/types';
 import type { CommandResult } from '@core/commands/types';
 import { commandCatalog, defineCommand, z, vec2 } from '@core/commands/schema';
 import { noop, report } from '@core/commands/noop';

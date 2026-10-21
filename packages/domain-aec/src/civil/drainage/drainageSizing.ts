@@ -4,7 +4,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import type { CivilModel } from '@core/model/civil';
+import type { CivilModel } from '@aec/civil/types';
 import { fromMm } from '@core/model/units';
 import { civilObjectsOf, withObject } from '../model';
 import { solvePartialFlow } from './hydraulics';

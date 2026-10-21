@@ -1,6 +1,7 @@
 /** Running a heavy op through the port (TECHNICAL_SPEC §2.A): build the CloudOp, map a failed op to its coded refusal. */
 
-import type { CloudOp, CloudOpSuccess, CloudReference, PointCloudPort } from '@core/model/pointCloud';
+import type { CloudOp, CloudOpSuccess, PointCloudPort } from '@core/model/pointCloud';
+import type { CloudReference } from '@aec/scan/types';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { refuseScan } from './codes';

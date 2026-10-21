@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { SteelMemberElement } from '@core/model/building';
+import type { SteelMemberElement } from '@aec/building/types';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 

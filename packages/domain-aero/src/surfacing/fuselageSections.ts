@@ -4,7 +4,7 @@
  * type shares one pole / knot layout and the skin through them stays exact.
  */
 
-import type { FuselageSection } from '@core/model/aero';
+import type { FuselageSection } from '@aero/surfacing/types';
 import type { Vec3 } from '@core/model/types';
 import { conicWeight } from '@lib/nurbs/conic';
 import { evaluateCurve } from '@lib/nurbs/evaluate';

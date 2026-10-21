@@ -1,6 +1,6 @@
 /** export_drainage_long_section: SVG long section of a pipe run with the hydraulic grade line. */
 
-import type { CivilModel, PipeObject } from '@core/model/civil';
+import type { CivilModel, PipeObject } from '@aec/civil/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, confirmExportControlled } from '@core/commands/schema';
 import { noop, report, exportRefusal } from '@core/commands/noop';

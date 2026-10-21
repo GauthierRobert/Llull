@@ -3,7 +3,7 @@
  * nearest steel in reach (else they become unattached), a moved pipe or member re-runs the reach test at the new position.
  */
 
-import type { BuildingModel, PipeSupportElement } from '@core/model/building';
+import type { BuildingModel, PipeSupportElement } from '@aec/building/types';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { fromMm } from '@core/model/units';
 import { elementsOf } from '../../building/model';

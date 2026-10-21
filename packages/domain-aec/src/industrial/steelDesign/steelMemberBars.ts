@@ -4,7 +4,7 @@
  */
 
 import type { CadDocument, Vec3 } from '@core/model/types';
-import type { BaseFixity, BuildingModel, JointFixity, MemberRole } from '@core/model/building';
+import type { BaseFixity, BuildingModel, JointFixity, MemberRole } from '@aec/building/types';
 import { fromMm } from '@core/model/units';
 import { elementsOf, getBuilding } from '../../building/model';
 import { weightKnPerMetre } from '../../shared/numeric';

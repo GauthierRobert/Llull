@@ -1,6 +1,6 @@
 // Equipment form spec: element → texts → changed `update_equipment` params (untouched fields omitted: exact revision).
 
-import type { EquipmentElement } from '@core/model/building';
+import type { EquipmentElement } from '@aec/building/types';
 import { toDegrees, toRadians } from '@lib/angle';
 import { FieldReader, result } from './elementToolForm';
 

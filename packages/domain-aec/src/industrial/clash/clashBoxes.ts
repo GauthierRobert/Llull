@@ -1,7 +1,7 @@
 /** Oriented boxes of building elements (swept members, pipes, trays, curved walls, equipment, solids) and their SAT overlap. */
 
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
-import type { BuildingElement, BuildingLevel, BuildingModel } from '@core/model/building';
+import type { BuildingElement, BuildingLevel, BuildingModel } from '@aec/building/types';
 import { fromMm } from '@core/model/units';
 import { sweepFrame } from '../../shared/mesh';
 import { distance } from '@lib/polygon';

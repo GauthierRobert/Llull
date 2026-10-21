@@ -1,7 +1,7 @@
 // `add_platform` (typed or selected-polyline outline), cut / fill + Balance per platform, `compare_surfaces` volumes.
 
 import React, { useState } from 'react';
-import type { PlatformObject } from '@core/model/civil';
+import type { PlatformObject } from '@aec/civil/types';
 import { useStore } from '@ui/store';
 import { PanelSection, FormError, StatusLine } from '@ui/panels/PanelParts';
 import {

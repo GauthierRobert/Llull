@@ -1,4 +1,4 @@
-import type { BuildingModel, CurvedWallElement, OpeningElement, WallElement } from '@core/model/building';
+import type { BuildingModel, CurvedWallElement, OpeningElement, WallElement } from '@aec/building/types';
 import { orderedElements } from '../model';
 import { openingsOf, wallExtent, wallFrame } from '../geometry/wallGeometry';
 import type { WallExtent } from '../geometry/wallExtent';

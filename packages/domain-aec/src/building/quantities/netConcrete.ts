@@ -1,7 +1,7 @@
 /** Net (measured) concrete volumes: slab > column > beam; each solid is counted once where members overlap. */
 
 import type { Vec2 } from '@core/model/types';
-import type { BuildingElement, BuildingModel } from '@core/model/building';
+import type { BuildingElement, BuildingModel } from '@aec/building/types';
 import { distance, polygonArea, toCounterClockwise } from '@lib/polygon';
 import { columnSectionArea } from './takeoffBasics';
 import { elementsOf } from '../model';

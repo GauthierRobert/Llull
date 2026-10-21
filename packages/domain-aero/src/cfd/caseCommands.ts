@@ -6,7 +6,7 @@ import type { CommandResult } from '@core/commands/types';
 import { entityBoundsInDoc, mergeBounds } from '@core/geometry/bounds';
 import { toMetres } from '@core/model/units';
 import { is3D, type CadDocument, type Vec3 } from '@core/model/types';
-import type { CfdBoundaryTag, CfdCase } from '@core/model/cfd';
+import type { CfdBoundaryTag, CfdCase } from '@aero/cfd/types';
 import { briefNumbers } from '../shared/results';
 import { caseHashOf, caseOf, cfdSlice, withCfd } from './caseDoc';
 import {

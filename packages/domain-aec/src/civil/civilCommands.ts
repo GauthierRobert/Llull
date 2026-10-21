@@ -3,7 +3,7 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop, report } from '@core/commands/noop';
-import { CIVIL_CATEGORIES } from '@core/model/civil';
+import { CIVIL_CATEGORIES } from '@aec/civil/types';
 import { getCivil, withoutObjects } from './model';
 import { dependentsOf, referencesOf } from './integrity';
 import { regenerateCivil } from './evaluate';

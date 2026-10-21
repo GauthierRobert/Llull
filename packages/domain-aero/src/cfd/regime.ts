@@ -1,6 +1,6 @@
 /** Free stream -> Mach number -> regime -> solver (TECHNICAL_SPEC §5.1 step 12, FR-CFD-06); refusal outside the solver ranges. */
 
-import type { CfdCase, CfdSolver } from '@core/model/cfd';
+import type { CfdCase, CfdSolver } from '@aero/cfd/types';
 import { US1976 } from '../shared/atmosphere';
 import { isAirState, resolveAirState } from '../shared/airState';
 

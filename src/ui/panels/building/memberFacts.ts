@@ -1,4 +1,4 @@
-import type { SteelMemberElement } from '@core/model/building';
+import type { SteelMemberElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import { fixedNumber } from '@lib/compactNumber';
 import { toMetres, toMm } from '@core/model/units';

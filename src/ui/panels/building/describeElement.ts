@@ -1,6 +1,6 @@
 /** Category labels and one-line descriptors of building elements (element list + inspector). */
 
-import type { BuildingElement } from '@core/model/building';
+import type { BuildingElement } from '@aec/building/types';
 import type { DocumentUnit } from '@core/model/types';
 import { boltSize } from '@aec/industrial/evaluate';
 

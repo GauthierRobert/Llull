@@ -2,7 +2,7 @@
 
 import type { CadDocument, Entity } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
-import type { BuildingElement, BuildingModel, GridElement, OpeningElement, SteelMemberElement } from '@core/model/building';
+import type { BuildingElement, BuildingModel, GridElement, OpeningElement, SteelMemberElement } from '@aec/building/types';
 import { curvedWallExtent, tangentWall } from '../geometry/curvedWallGeometry';
 import { evaluateEquipment, evaluateFooting, evaluateMember, evaluatePanel, evaluatePipe, evaluateTray } from '../../industrial/evaluate';
 import { evaluatePlate, evaluateConnection } from '../../industrial/connections/evaluateConnections';

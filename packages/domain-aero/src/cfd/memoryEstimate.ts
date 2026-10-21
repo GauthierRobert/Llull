@@ -4,7 +4,7 @@
  * defaults, reported as such, to be confirmed by VC-CFD-50 (allocation) and VC-CFD-54 (throughput).
  */
 
-import type { CfdQuality, CfdSolver } from '@core/model/cfd';
+import type { CfdQuality, CfdSolver } from '@aero/cfd/types';
 import type { Vec3 } from '@core/model/types';
 import type { Box } from './domainSizing';
 

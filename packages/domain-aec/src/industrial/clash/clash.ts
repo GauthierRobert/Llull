@@ -2,7 +2,7 @@
 
 import { clamp01 } from '@lib/clamp';
 import type { CadDocument, Vec3 } from '@core/model/types';
-import type { BimCategory, BuildingElement, BuildingModel } from '@core/model/building';
+import type { BimCategory, BuildingElement, BuildingModel } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { unknownLevelFailure } from '../../building/levelLookup';
 import { defineCommand, z } from '@core/commands/schema';

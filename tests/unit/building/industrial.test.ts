@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applied as run } from '../../helpers/runFixtures';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import type { BuildingElement } from '@core/model/building';
+import type { BuildingElement } from '@aec/building/types';
 import { findProfile, profileOutline, STEEL_PROFILES } from '@aec/steel/profiles';
 import { boxOverlap, type OrientedBox } from '@aec/industrial/clash/clashBoxes';
 import type { Clash } from '@aec/industrial/clash/clash';

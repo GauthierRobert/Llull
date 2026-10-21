@@ -1,6 +1,6 @@
 /** Portal frame moment connections: bolted end plates at eaves (with haunch) and apex joints. */
 
-import type { BuildingModel, MomentConnectionElement } from '@core/model/building';
+import type { BuildingModel, MomentConnectionElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { unknownLevelFailure } from '../../building/levelLookup';

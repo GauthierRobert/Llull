@@ -1,4 +1,4 @@
-import type { FootingElement } from '@core/model/building';
+import type { FootingElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import { toMetres } from '@core/model/units';
 import {

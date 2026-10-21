@@ -1,7 +1,7 @@
 /** Pure geometry of grid axes, shared by evaluation (3D bubbles) and plan drawings. */
 
 import type { Vec2 } from '@core/model/types';
-import type { GridElement } from '@core/model/building';
+import type { GridElement } from '@aec/building/types';
 import { wallFrame } from './wallGeometry';
 
 /** Bubble centres of a grid axis: one `radius` beyond each end, along the axis. */

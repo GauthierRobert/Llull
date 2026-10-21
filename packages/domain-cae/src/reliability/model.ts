@@ -1,7 +1,7 @@
 /** Access to and validation of the probabilistic slice of the document (`CadDocument.probabilistic`, plugin `cae`). */
 
 import type { CadDocument } from '@core/model/types';
-import type { LimitState, RandomVariable, ReliabilityModel } from '@core/model/probabilistic';
+import type { LimitState, RandomVariable, ReliabilityModel } from '@cae/reliability/types';
 import { isRecord } from '@lib/isRecord';
 import { distributionIssue } from './distributions';
 import { cholesky } from '@lib/denseLinalg';

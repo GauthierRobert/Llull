@@ -8,7 +8,7 @@ import { nextId } from '@lib/id';
 import { distributionIssue, distributionSchema } from './distributions';
 import { refuseReliability } from './codes';
 import { cholesky } from '@lib/denseLinalg';
-import type { LimitState, RandomVariable } from '@core/model/probabilistic';
+import type { LimitState, RandomVariable } from '@cae/reliability/types';
 import { limitStateOf, reliabilityOf, variableOf, withReliability } from './model';
 
 const IDENTIFIER = /^[A-Za-z_]\w*$/;

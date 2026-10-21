@@ -6,7 +6,7 @@ import { report } from '@core/commands/noop';
 import { csvCell } from '@lib/csv';
 import { pmiText } from '@core/geometry/pmiText';
 import type { PmiItem } from '@core/model/pmi';
-import type { Characteristic, FaiResult, PlmModel } from '@core/model/plm';
+import type { Characteristic, FaiResult, PlmModel } from '@plm/types';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
 import { inRevision } from '../register';

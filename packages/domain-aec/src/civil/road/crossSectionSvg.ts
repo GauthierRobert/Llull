@@ -4,7 +4,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import type { AlignmentObject, CivilModel } from '@core/model/civil';
+import type { AlignmentObject, CivilModel } from '@aec/civil/types';
 import { designAtOffset, groundAtOffset, sectionOffsets } from './roadSection';
 import { surfaceTinById } from '../surface/surfaceTin';
 import type { StationAnalysis } from './roadReport';

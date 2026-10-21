@@ -16,7 +16,7 @@ import {
   type SpiralElement,
 } from '@aec/civil/alignment/alignmentGeometry';
 import { designElevation, grades, validateProfile, verticalCurves, verticalCurveStations } from '@aec/civil/alignment/profileGeometry';
-import type { AlignmentObject } from '@core/model/civil';
+import type { AlignmentObject } from '@aec/civil/types';
 import { clothoidLocal, spiralCurve } from '@aec/civil/alignment/alignmentSpiral';
 import { crossSlopesAt, superelevationRate, superelevationStations } from '@aec/civil/alignment/superelevation';
 import { crossSectionAt } from '@aec/civil/road/roadSection';

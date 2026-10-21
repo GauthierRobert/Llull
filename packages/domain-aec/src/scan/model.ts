@@ -1,6 +1,6 @@
 /** Access to `CadDocument.scan` (plugin `scan`) and unit conversion between document units and asset metres. */
 
-import type { CloudReference, ScanModel } from '@core/model/pointCloud';
+import type { CloudReference, ScanModel } from '@aec/scan/types';
 import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import { MM_PER_UNIT } from '@core/model/units';

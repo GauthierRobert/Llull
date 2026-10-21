@@ -1,4 +1,4 @@
-import type { BasePlateElement, BuildingLevel, GridElement, SteelMemberElement } from '@core/model/building';
+import type { BasePlateElement, BuildingLevel, GridElement, SteelMemberElement } from '@aec/building/types';
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { elementsOf, getBuilding } from '../../building/model';
 import { plateLayout } from '../connections/evaluateConnections';

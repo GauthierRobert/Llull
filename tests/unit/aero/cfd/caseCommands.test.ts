@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
-import type { CfdCase } from '@core/model/cfd';
+import type { CfdCase } from '@aero/cfd/types';
 import type { CadDocument } from '@core/model/types';
 import { expectPure } from '../../../helpers/expectNoOp';
 import { expectRefusal } from '../../../helpers/commandAssertions';

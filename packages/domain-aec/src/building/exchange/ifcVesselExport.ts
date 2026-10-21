@@ -1,6 +1,6 @@
 /** IFC body of a cylindrical vessel: extruded IfcCircleProfileDef. */
 
-import type { EquipmentElement } from '@core/model/building';
+import type { EquipmentElement } from '@aec/building/types';
 import { circleProfile, direction, ifcReal, point3, type Context } from './ifcStep';
 import { shapeOf } from '../../industrial/equipment/equipmentShape';
 

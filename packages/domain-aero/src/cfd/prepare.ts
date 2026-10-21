@@ -2,7 +2,7 @@
 
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { CadDocument, Vec3 } from '@core/model/types';
-import type { CfdCase, CfdQuality, CfdSolver } from '@core/model/cfd';
+import type { CfdCase, CfdQuality, CfdSolver } from '@aero/cfd/types';
 import { caseHashOf } from './caseDoc';
 import type { DefaultNote } from './caseParams';
 import { CFD_REMEDIATION } from './codes';

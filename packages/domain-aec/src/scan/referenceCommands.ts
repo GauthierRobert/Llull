@@ -1,6 +1,7 @@
 /** Cloud references (TECHNICAL_SPEC §4.1): attach, update, detach. Numbers only; no point enters the document (TR-SCN-04). */
 
-import type { CloudReference, Mat4 } from '@core/model/pointCloud';
+import type { CloudReference } from '@aec/scan/types';
+import type { Mat4 } from '@core/model/pointCloud';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';

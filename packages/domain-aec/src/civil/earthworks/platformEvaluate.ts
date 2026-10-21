@@ -1,7 +1,7 @@
 /** Evaluates a graded platform (pad): pad mesh and outline, daylight line, batter meshes, label. */
 
 import type { Entity, Vec2 } from '@core/model/types';
-import type { PlatformObject } from '@core/model/civil';
+import type { PlatformObject } from '@aec/civil/types';
 import { polygonCentroid } from '@lib/polygon';
 import { triangulatePolygon } from '@lib/triangulate';
 import { civilMesh, civilPolyline, civilText } from '../entities';

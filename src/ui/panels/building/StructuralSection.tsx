@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { useStore } from '@ui/store';
 import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { runQuery } from '@ui/services/localQuery';
-import type { BuildingModel } from '@core/model/building';
+import type { BuildingModel } from '@aec/building/types';
 import { getCommand } from '@core/commands/registry';
 import { KpiStrip, ListRow, PanelSection, StatusChip, StatusLine, type Kpi } from '@ui/panels/PanelParts';
 import { useFocusItem } from '@ui/hooks/useFocusItem';

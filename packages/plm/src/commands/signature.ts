@@ -3,7 +3,7 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
-import type { SignatureRecord } from '@core/model/plm';
+import type { SignatureRecord } from '@plm/types';
 import { manifestFor } from '../manifest';
 import { refusePlm } from '../refusal';
 import { NOT_MANAGED, revisionText } from '../state';

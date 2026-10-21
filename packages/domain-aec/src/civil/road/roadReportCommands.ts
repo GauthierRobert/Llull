@@ -4,7 +4,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import type { AlignmentObject } from '@core/model/civil';
+import type { AlignmentObject } from '@aec/civil/types';
 import type { CommandResult } from '@core/commands/types';
 import { commandCatalog, defineCommand, z, confirmExportControlled } from '@core/commands/schema';
 import { noop, report, exportRefusal } from '@core/commands/noop';

@@ -7,6 +7,7 @@ import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
+import { documentProjection } from '../../plugins/host';
 import { exportGate } from '../../model/exportGate';
 import { markingText } from './marking';
 import { materialsInUse } from '../../model/materialsInUse';
@@ -150,13 +151,14 @@ export const checkMaterials = defineCommand({
         ),
       );
     const representative = Object.values(doc.components).filter((component) => component.partRef?.representative === true);
+    const stackCount = documentProjection('fastenerStackCount')?.(doc);
     if (representative.length > 0)
       items.push(
         item(
           'FAST_GEOMETRY_REPRESENTATIVE',
           'warning',
           representative.map((component) => component.partRef?.partNumber ?? component.id),
-          `${representative.length} standard part(s) are built from placeholder proportions and excluded from mass${doc.fasteners !== undefined ? ` (${Object.keys(doc.fasteners.stacks).length} fastener stack(s))` : ''}`,
+          `${representative.length} standard part(s) are built from placeholder proportions and excluded from mass${stackCount !== undefined ? ` (${stackCount} fastener stack(s))` : ''}`,
           'import the catalogue dimensions of the part',
         ),
       );

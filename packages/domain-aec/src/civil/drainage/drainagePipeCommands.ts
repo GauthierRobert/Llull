@@ -1,6 +1,6 @@
 /** Drainage pipe commands: connect manholes with gravity pipes and edit them. */
 
-import type { PipeObject } from '@core/model/civil';
+import type { PipeObject } from '@aec/civil/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';

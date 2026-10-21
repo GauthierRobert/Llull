@@ -16,7 +16,7 @@ import { craneActions, valleyLines, craneCapacityOf, DOWNWIND_ROOF_FACTOR } from
 import { baseReactions } from '@aec/industrial/frames/frameModelSolve';
 import { frameRoofAverage } from '@aec/industrial/common/windCoefficients';
 import { findProfile, sectionProperties } from '@aec/steel/profiles';
-import type { SteelMemberElement, MomentConnectionElement } from '@core/model/building';
+import type { SteelMemberElement, MomentConnectionElement } from '@aec/building/types';
 import { GRAVITY } from '@aec/shared/numeric';
 import { hall } from './hallFixtures';
 import { xyz } from '../../helpers/xy';

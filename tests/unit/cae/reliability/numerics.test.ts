@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { Distribution } from '@core/model/probabilistic';
+import type { Distribution } from '@cae/reliability/types';
 import { cdf, distributionIssue, fromStandardNormal, invCdf, momentsOf } from '@cae/reliability/distributions';
 import { equivalentCorrelation } from '@cae/reliability/nataf';
 import { cholesky } from '@lib/denseLinalg';

@@ -1,7 +1,7 @@
 /** Trims the existing-ground TIN mesh under graded pads so the pad, its batters and the daylight line stay visible. */
 
 import type { Vec2, Vec3 } from '@core/model/types';
-import type { CivilModel, PlatformObject, SurfaceObject } from '@core/model/civil';
+import type { CivilModel, PlatformObject, SurfaceObject } from '@aec/civil/types';
 import { triangulatePolygon } from '@lib/triangulate';
 import { orient2 } from '@lib/vec2';
 import { daylightPoints } from './platformDaylight';

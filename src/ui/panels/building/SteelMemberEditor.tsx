@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
-import type { SteelMemberElement } from '@core/model/building';
+import type { SteelMemberElement } from '@aec/building/types';
 import {
   buildSteelMemberUpdate,
   isHorizontalMember,

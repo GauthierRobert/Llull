@@ -3,7 +3,7 @@
  * `DocumentExtension`). Lengths in the case are metres; heavy result data (fields, streamlines, residuals) never enters the document.
  */
 
-import type { Vec3 } from './vectors';
+import type { Vec3 } from '@core/model/vectors';
 
 type CfdRegime = 'auto' | 'low_speed' | 'compressible';
 export type CfdSolver = 'lbm' | 'euler';
@@ -112,4 +112,11 @@ interface CfdResultSummary {
 export interface CfdDocumentSlice {
   readonly cases: Readonly<Record<string, CfdCase>>;
   readonly results: Readonly<Record<string, CfdResultSummary>>;
+}
+
+declare module '@core/model/documentExtensions' {
+  interface DocumentExtensions {
+    /** Absent until the first flow-case command (`create_cfd_case`, plugin `cfd`, 12 CFD). */
+    cfd?: CfdDocumentSlice;
+  }
 }

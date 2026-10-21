@@ -5,7 +5,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import type { PipeElement, PipeSupportElement } from '@core/model/building';
+import type { PipeElement, PipeSupportElement } from '@aec/building/types';
 import { fromMm } from '@core/model/units';
 import { hangerRodDiameter, pipeSpanLimit } from './pipeSpans';
 import { RISER_SLOPE, nearestOnRoute } from './routeSupport';

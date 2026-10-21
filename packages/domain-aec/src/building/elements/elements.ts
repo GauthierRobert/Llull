@@ -1,7 +1,7 @@
 /** Rooms, and generic edits on any building element (delete, move, copy to levels). */
 
 import type { Vec2, Vec3 } from '@core/model/types';
-import type { BuildingElement, BuildingModel, RoomElement } from '@core/model/building';
+import type { BuildingElement, BuildingModel, RoomElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { planAreaM2 } from '../../shared/planArea';

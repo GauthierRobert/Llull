@@ -5,7 +5,7 @@
  */
 
 import { parseRecords } from '@lib/step21/records';
-import type { LifecycleState } from '@core/model/plm';
+import type { LifecycleState } from '@plm/types';
 import { type Arg, type Call, asNumber, asRef, asRefs, asString, parseBody } from './args';
 import type { ApprovalStatus, PdmModel, PdmSignature, PdmUnitEffectivity } from './model';
 import { isoOf } from './part21';

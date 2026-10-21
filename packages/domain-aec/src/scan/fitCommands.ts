@@ -1,6 +1,6 @@
 /** fit_primitive and extract_pipes (TECHNICAL_SPEC §4.2, §5.5, §5.6): native RANSAC + LM fits; queries only (TR-SCN-04). */
 
-import type { RegionSpec } from '@core/model/pointCloud';
+import type { RegionSpec } from '@aec/scan/types';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';

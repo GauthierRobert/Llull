@@ -3,7 +3,7 @@
 import type { DocumentExtension } from '@core/plugins/plugin';
 import { isRecord } from '@lib/isRecord';
 import { isVec3 } from '@lib/vec3';
-import type { AircraftFrame } from '@core/model/aero';
+import type { AircraftFrame } from '@aero/surfacing/types';
 import { frameViolation } from './aircraftFrame';
 
 const isText = (value: unknown): value is string => typeof value === 'string' && value !== '';

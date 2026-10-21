@@ -1,4 +1,4 @@
-import type { BuildingModel, SteelMemberElement } from '@core/model/building';
+import type { BuildingModel, SteelMemberElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import type { FrameNode } from '@lib/frame2d';
 import { toMm } from '@core/model/units';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
-import type { MomentConnectionElement } from '@core/model/building';
+import type { MomentConnectionElement } from '@aec/building/types';
 import { execute } from '@core/commands/registry';
 import { solveFrame } from '@lib/frame2d';
 import { framesOf } from '@aec/industrial/frames/frameModelFrames';

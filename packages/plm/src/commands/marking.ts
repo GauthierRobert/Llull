@@ -3,7 +3,7 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
-import type { ExportMarking } from '@core/model/plm';
+import type { ExportMarking } from '@plm/types';
 import { refusePlm } from '../refusal';
 import { NOT_MANAGED } from '../state';
 import { humanAct } from '../gate';

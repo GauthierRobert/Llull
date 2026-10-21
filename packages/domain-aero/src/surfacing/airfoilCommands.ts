@@ -6,7 +6,7 @@ import { changed } from '@core/commands/noop';
 import { execute } from '@core/commands/registry';
 import { nextId } from '@lib/id';
 import { sha256Hex } from '@lib/sha256';
-import type { AirfoilDef, AirfoilSource } from '@core/model/aero';
+import type { AirfoilDef, AirfoilSource } from '@aero/surfacing/types';
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { briefReport, sig } from '../shared/results';
 import { nacaOrdinates, parseNaca } from '../aerodynamics/naca';

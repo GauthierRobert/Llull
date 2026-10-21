@@ -4,7 +4,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
 import { execute } from '@core/commands/registry';
-import type { BodyDef, FuselageSection } from '@core/model/aero';
+import type { BodyDef, FuselageSection } from '@aero/surfacing/types';
 import type { NurbsCurveData } from '@lib/nurbs/types';
 import { placedCurve, tessellateSurface } from '@core/geometry/nurbsSurface';
 import { gordonSurface } from '@lib/nurbs/gordon';

@@ -1,7 +1,7 @@
 /** insert_fastener_stack cuts plates in place: plate ids and order slots survive, so a build_project loop can reuse the plate aliases. */
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { GeometryKernel } from '@core/geometry/kernel';
-import type { FastenerStack } from '@core/model/fasteners';
+import type { FastenerStack } from '@aero/fasteners/types';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { ctxWith, dataOf, docWith, ok } from './fixtures';
 import { isoMetricCatalogFile } from './isoMetric';

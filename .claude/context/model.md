@@ -91,7 +91,9 @@ interface CadDocument {
   constraints: Record<string, Constraint>;      constraintOrder: string[];
   joints: Record<string, Joint>;                jointOrder: string[];
   driveRelations: Record<string, DriveRelation>; driveRelationOrder: string[];
-  building?: BuildingModel;                     // building plugin's constructive model
+  // + plugin slices (all optional): `CadDocument extends DocumentExtensions` (model/documentExtensions.ts); each plugin augments it from its
+  //   own types file: building, civil, plant, scan (@aec/*/types), aero, cfd, fasteners (@aero/*/types), probabilistic (@cae/reliability/types),
+  //   plm (@plm/types). composites, sheetMetal, analysis stay in core (shared by two plugins / core command ports).
 }
 
 interface FeatureStep {
@@ -150,7 +152,7 @@ recipe leaves reference; checked on load: KRN_BLOB_MISSING / KRN_BLOB_HASH_MISMA
 
 ## Building (AEC/BIM) — `CadDocument.building?`
 
-Types in `packages/core/src/model/building.ts` (levels, elements, project info, cost rates).
+Types in `packages/domain-aec/src/building/types.ts` (`@aec/building/types`) (levels, elements, project info, cost rates).
 Commands live in the building / industrial plugins (`packages/domain-aec/src`, `@aec/*`;
 industrial in `industrial/`, steel profiles in `steel/`). They edit the model and call
 `regenerateBuilding()` (`@aec/building/evaluate/evaluateElements`), which replaces the evaluated entities (ids

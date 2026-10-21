@@ -1,7 +1,7 @@
 /** Product structure (09 PLM FR-PLM-23/24): the EBOM of the assembly from its bound sub-items, and the baseline member sets compared against it. */
 
 import type { CadDocument } from '@core/model/types';
-import type { BaselineMember, PlmModel, Revision, StructureRow } from '@core/model/plm';
+import type { BaselineMember, PlmModel, Revision, StructureRow } from '@plm/types';
 import { jcsJson } from '@lib/jcs';
 import { sha256Hex } from '@lib/sha256';
 import { currentRevisionOf } from './state';

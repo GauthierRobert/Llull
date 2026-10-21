@@ -3,7 +3,7 @@
  * @invariant installation is idempotent per plugin name; order of installation is preserved
  */
 
-import type { CadPlugin, DocumentExtension } from './plugin';
+import type { CadPlugin, DocumentExtension, DocumentProjections } from './plugin';
 import type { DerivationGuard } from '../commands/derivation';
 import type { RetiredCommandRewrite } from '../commands/types';
 import type { CadDocument } from '../model/types';
@@ -42,6 +42,15 @@ export function pluginRetiredCommands(): Record<string, RetiredCommandRewrite> {
 
 export function documentExtensions(): DocumentExtension[] {
   return installed.flatMap((plugin) => (plugin.document ? [plugin.document] : []));
+}
+
+/** The first installed plugin projection named `key`, or undefined (core then behaves as if the domain were absent). */
+export function documentProjection<K extends keyof DocumentProjections>(key: K): DocumentProjections[K] {
+  for (const extension of documentExtensions()) {
+    const projection = extension.projections?.[key];
+    if (projection !== undefined) return projection;
+  }
+  return undefined;
 }
 
 /**

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
-import type { WallElement } from '@core/model/building';
+import type { WallElement } from '@aec/building/types';
 import { CommandForm } from '@ui/panels/CommandForm';
 import { LabeledInput } from '@ui/panels/LabeledInput';
 import { changedNumber, changedText } from '@ui/panels/changedParams';

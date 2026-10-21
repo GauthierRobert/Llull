@@ -1,5 +1,5 @@
 import type { CadDocument, Vec3 } from '@core/model/types';
-import type { BaseFixity, BuildingModel, JointFixity, MemberRole, SteelMemberElement } from '@core/model/building';
+import type { BaseFixity, BuildingModel, JointFixity, MemberRole, SteelMemberElement } from '@aec/building/types';
 import { z } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
 import { getBuilding, markAfter, nextElementId, withElement, levelElementsOf } from '../../building/model';

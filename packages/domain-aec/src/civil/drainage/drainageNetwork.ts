@@ -4,7 +4,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import type { CivilModel, ManholeObject, PipeObject } from '@core/model/civil';
+import type { CivilModel, ManholeObject, PipeObject } from '@aec/civil/types';
 import { toMetres, toMm } from '@core/model/units';
 import { round } from '../../shared/numeric';
 import { civilObjectsOf, civilObject } from '../model';

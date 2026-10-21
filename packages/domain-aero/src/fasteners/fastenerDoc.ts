@@ -1,7 +1,7 @@
 /** Access to the plugin's document slice (`CadDocument.fasteners`). */
 
 import type { CadDocument } from '@core/model/types';
-import type { FastenerFamily, FastenerModel, FastenerSize } from '@core/model/fasteners';
+import type { FastenerFamily, FastenerModel, FastenerSize } from '@aero/fasteners/types';
 
 const EMPTY_MODEL: FastenerModel = { catalogs: {}, stacks: {} };
 

@@ -1,7 +1,7 @@
 /** Access to the plugin's document slice (`CadDocument.cfd`) and the canonical hash of a case. */
 
 import type { CadDocument } from '@core/model/types';
-import type { CfdCase, CfdDocumentSlice } from '@core/model/cfd';
+import type { CfdCase, CfdDocumentSlice } from '@aero/cfd/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 

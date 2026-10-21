@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { portalHall } from '../../helpers/portalHall';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import type { SteelMemberElement } from '@core/model/building';
+import type { SteelMemberElement } from '@aec/building/types';
 import { execute } from '@core/commands/registry';
 import { findProfile } from '@aec/steel/profiles';
 import { nextSecondaryProfile } from '@aec/industrial/purlins/purlinDesign';

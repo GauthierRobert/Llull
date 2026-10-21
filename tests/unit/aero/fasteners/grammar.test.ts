@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
-import type { PartNumberField } from '@core/model/fasteners';
+import type { PartNumberField } from '@aero/fasteners/types';
 import { decodeWithGrammar, defaultedCodes, formatWithGrammar } from '@aero/fasteners/partNumber';
 import { convertTo, quantityToDoc, ticksToInches, toTicks } from '@aero/fasteners/units';
 import { sampleCatalogFile } from './fixtures';

@@ -6,7 +6,8 @@
 import { describe, expect, it } from 'vitest';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import { execute } from '@core/commands/registry';
-import type { FastenerStack, PartRef } from '@core/model/fasteners';
+import type { FastenerStack } from '@aero/fasteners/types';
+import type { PartRef } from '@core/model/features';
 import { type CadDocument, createEmptyDocument, type Entity } from '@core/model/types';
 
 const COUNT = 10_000;

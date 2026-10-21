@@ -5,7 +5,7 @@ import { arcThrough, curvedWallBand, curvedWallLength } from '@aec/building/geom
 import { buildPlanDrawing } from '@aec/building/drawings/planDrawing';
 import { buildingErrors } from '@aec/building/validate';
 import { serializeDocument } from '@core/commands/persistence/serialization';
-import type { CurvedWallElement } from '@core/model/building';
+import type { CurvedWallElement } from '@aec/building/types';
 import type { TakeoffLine } from '@aec/building/quantities/takeoffBasics';
 import type { IfcExport } from '@aec/building/exchange/ifcBuild';
 import type { DxfExport } from '@aec/building/exchange/dxfExport';

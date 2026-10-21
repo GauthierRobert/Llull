@@ -5,7 +5,7 @@
 
 import { round6 } from '@lib/compactNumber';
 import type { CadDocument, Vec3 } from '@core/model/types';
-import type { FastenerFamily, FastenerSize } from '@core/model/fasteners';
+import type { FastenerFamily, FastenerSize } from '@aero/fasteners/types';
 import { unitAxisOrNull } from '@lib/axisRotation';
 import { familyOf, sizeOf } from './fastenerDoc';
 import { remediationFor } from './codes';

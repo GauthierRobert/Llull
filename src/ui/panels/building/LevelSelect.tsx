@@ -1,7 +1,7 @@
 // Select over building levels (id → name), optional blank choice and visible label.
 
 import React from 'react';
-import type { BuildingLevel } from '@core/model/building';
+import type { BuildingLevel } from '@aec/building/types';
 import { LabeledSelect } from '@ui/panels/LabeledSelect';
 import { PairSelect } from '@ui/panels/OptionSelect';
 

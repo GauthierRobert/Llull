@@ -1,7 +1,7 @@
 /** Survey and terrain commands: import survey points, build / edit existing-ground TIN surfaces. */
 
 import { type Vec2, type Vec3, DOCUMENT_UNITS } from '@core/model/types';
-import type { SurfaceObject, SurveyPoint } from '@core/model/civil';
+import type { SurfaceObject, SurveyPoint } from '@aec/civil/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2, vec3 } from '@core/commands/schema';
 import { briefList } from '../../shared/briefList';

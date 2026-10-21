@@ -1,6 +1,6 @@
 /** Read / write access to `CadDocument.aero` (absent until the first airfoil or wing command). */
 
-import type { AeroModel, AircraftFrame, AirfoilDef, BodyDef, WingDef } from '@core/model/aero';
+import type { AeroModel, AircraftFrame, AirfoilDef, BodyDef, WingDef } from '@aero/surfacing/types';
 import type { CadDocument } from '@core/model/types';
 
 const EMPTY: AeroModel = { airfoils: {}, wings: {} };

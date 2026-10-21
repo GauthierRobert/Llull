@@ -1,5 +1,5 @@
 /** Iterative sizing loop of design_portal_frames: sway-driven column stiffening, rafter strength up-sizing, pinned / fixed base variants. */
-import type { BuildingModel } from '@core/model/building';
+import type { BuildingModel } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import { toMetres } from '@core/model/units';
 import { elementsOf, getBuilding, withElement } from '../../building/model';

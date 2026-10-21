@@ -1,4 +1,4 @@
-import type { BuildingElement, SteelMemberElement } from '@core/model/building';
+import type { BuildingElement, SteelMemberElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 
 function buildingOf(doc: CadDocument): NonNullable<CadDocument['building']> {

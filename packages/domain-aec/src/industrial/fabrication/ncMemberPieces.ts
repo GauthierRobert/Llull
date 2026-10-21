@@ -1,7 +1,7 @@
 /** DSTV NC1 pieces for steel members: end-plate cutback, rafter pitch cut, eaves bolt holes. Millimetres. */
 
 import { toDegrees } from '@lib/angle';
-import type { BuildingLevel, MomentConnectionElement, SteelMemberElement } from '@core/model/building';
+import type { BuildingLevel, MomentConnectionElement, SteelMemberElement } from '@aec/building/types';
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import { toMm } from '@core/model/units';
 import { round } from '../../shared/numeric';

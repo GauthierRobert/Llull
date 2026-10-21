@@ -4,7 +4,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, noop } from '@core/commands/noop';
 import type { CadDocument } from '@core/model/types';
-import type { Iteration, PlmModel, Revision } from '@core/model/plm';
+import type { Iteration, PlmModel, Revision } from '@plm/types';
 import type { ExecutionContext } from '@core/commands/types';
 import { refusePlm } from '../refusal';
 import { NOT_MANAGED, currentRevisionOf, revisionText, scopeHash, stateChange } from '../state';

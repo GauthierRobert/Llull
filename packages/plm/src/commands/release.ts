@@ -3,7 +3,7 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
-import type { ChangeRecord, PlmModel, Revision } from '@core/model/plm';
+import type { ChangeRecord, PlmModel, Revision } from '@plm/types';
 import { closeForCutIn } from '../effectivity';
 import { plannedEffectivity, releaseFindings, unverifiedInScope } from '../readiness';
 import { type PlmCode, refusePlm } from '../refusal';

@@ -3,7 +3,7 @@
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { toMetres } from '@core/model/units';
 import type { CadDocument, Vec3 } from '@core/model/types';
-import type { CfdCase } from '@core/model/cfd';
+import type { CfdCase } from '@aero/cfd/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { add3, scale3 } from '@lib/vec3';

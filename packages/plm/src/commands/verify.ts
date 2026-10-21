@@ -4,7 +4,7 @@ import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, report } from '@core/commands/noop';
 import type { CadDocument } from '@core/model/types';
-import type { PlmModel, Revision } from '@core/model/plm';
+import type { PlmModel, Revision } from '@plm/types';
 import { sha256Hex } from '@lib/sha256';
 import { diffDocuments } from '../diff';
 import { integrityOf } from '../integrity';

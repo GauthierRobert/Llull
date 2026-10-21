@@ -307,3 +307,10 @@ export interface PlmModel {
   readonly faiResults?: Readonly<Record<string, FaiResultSet>>;
   readonly policy: PlmPolicy;
 }
+
+declare module '@core/model/documentExtensions' {
+  interface DocumentExtensions {
+    /** Absent until `set_item_identity` (plugin `plm`, 09): the managed item, revisions, change records. Outside the release scope. */
+    plm?: PlmModel;
+  }
+}

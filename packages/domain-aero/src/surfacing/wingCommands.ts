@@ -5,7 +5,7 @@ import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
 import { nextId } from '@lib/id';
 import { DEFAULT_LAYER_ID, type CadDocument, type LoftEntity, type NurbsCurveEntity, type Vec3 } from '@core/model/types';
-import type { WingDef, WingSection, WingSegment } from '@core/model/aero';
+import type { WingDef, WingSection, WingSegment } from '@aero/surfacing/types';
 import { hasClosingEdge, sectionChain, sectionRing } from '@core/geometry/sectionChain';
 import type { NurbsCurveData } from '@lib/nurbs/types';
 import { briefReport, sig } from '../shared/results';

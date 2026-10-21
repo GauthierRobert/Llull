@@ -4,7 +4,7 @@
  */
 
 import type { Entity, Vec2 } from '@core/model/types';
-import type { AlignmentObject } from '@core/model/civil';
+import type { AlignmentObject } from '@aec/civil/types';
 import { civilLine, civilPoint, civilPolyline, civilText } from '../entities';
 import { readableAngle } from '@lib/angle';
 import { centrelinePoints, elementPointAt, endStation, horizontalElements, pointAtStation } from './alignmentGeometry';

@@ -1,7 +1,7 @@
 /** bill_of_materials standard-part and material sections (08 MAT FR-MAT-16, VC-MAT-11) on the core alone: no fastener plugin involved. */
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
-import type { PartRef } from '@core/model/fasteners';
+import type { PartRef } from '@core/model/features';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { expectPure } from '../../helpers/expectNoOp';
 

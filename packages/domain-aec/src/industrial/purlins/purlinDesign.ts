@@ -3,7 +3,7 @@
  * rafters / columns.
  */
 
-import type { BuildingModel } from '@core/model/building';
+import type { BuildingModel } from '@aec/building/types';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { PURLIN_LOAD_SHAPE } from './purlinLoadParams';
 import type { CommandResult } from '@core/commands/types';

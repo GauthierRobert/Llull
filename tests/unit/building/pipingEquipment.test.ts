@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applied as run } from '../../helpers/runFixtures';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import type { BuildingElement, EquipmentElement, PipeElement } from '@core/model/building';
+import type { BuildingElement, EquipmentElement, PipeElement } from '@aec/building/types';
 import { buildPlanDrawing } from '@aec/building/drawings/planDrawing';
 import { outsideDiameterMm } from '@aec/industrial/piping/pipeSizes';
 import { buildingErrors } from '@aec/building/validate';

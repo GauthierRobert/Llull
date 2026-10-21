@@ -3,7 +3,7 @@
  * member (unattached when that member was not copied).
  */
 
-import type { BuildingModel } from '@core/model/building';
+import type { BuildingModel } from '@aec/building/types';
 import { elementsOf, nextElementId, nextMark, withElement } from '../../building/model';
 
 /** Copies the supports of every pipe in `copiedIds` (source id → copy id) onto `levelId`. */

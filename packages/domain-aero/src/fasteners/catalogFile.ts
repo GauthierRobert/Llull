@@ -5,7 +5,7 @@
 
 import { z } from '@core/commands/schema';
 import { LICENCE_FLAGS } from '@core/model/materialLibrary';
-import type { FastenerFamily } from '@core/model/fasteners';
+import type { FastenerFamily } from '@aero/fasteners/types';
 import { parseUnit, isUnitFailure } from '@lib/quantity';
 
 export const CATALOG_FORMAT = 'llull-fastener-catalog';

@@ -3,7 +3,7 @@
  * other pipes. Shared by the support loads and the span check.
  */
 
-import type { PipeElement, PipeSupportElement } from '@core/model/building';
+import type { PipeElement, PipeSupportElement } from '@aec/building/types';
 import type { Vec3 } from '@core/model/types';
 import { elementsOf } from '../../building/model';
 import type { ModelUnits } from '../steelDesign/steelMemberBars';

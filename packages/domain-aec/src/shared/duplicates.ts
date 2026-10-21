@@ -1,6 +1,6 @@
 /** Exact-duplicate detection for add_* commands (a twin element double-counts takeoff and clashes). */
 
-import type { BuildingElement, BuildingModel } from '@core/model/building';
+import type { BuildingElement, BuildingModel } from '@aec/building/types';
 
 type Point = ReadonlyArray<number>;
 

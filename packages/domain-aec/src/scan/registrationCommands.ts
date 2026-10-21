@@ -1,6 +1,6 @@
 /** Registration records (TECHNICAL_SPEC §4.1, FR-SCN-10): apply a computed record, mark pre-registered data, the human acceptance gate. */
 
-import type { CloudReference, RegistrationRecord } from '@core/model/pointCloud';
+import type { CloudReference, RegistrationRecord } from '@aec/scan/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';

@@ -3,6 +3,7 @@
 import type { DocumentExtension } from '@core/plugins/plugin';
 import { isRecord } from '@lib/isRecord';
 import { integrityWarnings } from './integrity';
+import { plmProjections } from './projections';
 import { LIFECYCLE_STATES, isLegalTransition } from './transitions';
 import { REVISION_LABEL } from './schemes';
 import { isSealed } from './records';
@@ -175,4 +176,6 @@ export const plmDocument: DocumentExtension = {
   restore: (raw) => raw,
   carry: (prev, next) => (prev.plm === undefined ? next : { ...next, plm: prev.plm }),
   afterLoad: integrityWarnings,
+  outsideReleaseScope: ['plm'],
+  projections: plmProjections,
 };

@@ -5,7 +5,7 @@
 
 import { toRadians } from '@lib/angle';
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
-import type { CivilModel, CivilObject, SiteCalibration } from '@core/model/civil';
+import type { CivilModel, CivilObject, SiteCalibration } from '@aec/civil/types';
 
 export type CoordinateFrame = 'local' | 'grid';
 

@@ -1,5 +1,5 @@
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
-import type { BuildingModel, GridElement, SteelMemberElement } from '@core/model/building';
+import type { BuildingModel, GridElement, SteelMemberElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';

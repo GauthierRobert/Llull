@@ -1,7 +1,7 @@
 /** Equipment or a stair passing through a floor without an opening (a grating / slab not cut around it). */
 
 import type { Vec2 } from '@core/model/types';
-import type { BuildingModel, EquipmentElement, SlabElement, StairElement } from '@core/model/building';
+import type { BuildingModel, EquipmentElement, SlabElement, StairElement } from '@aec/building/types';
 import { blockPoint, stairBlocks, stairPoint } from '../../building/geometry/stairGeometry';
 import { pointInPolygon, rotatePoint2 } from '@lib/polygon';
 

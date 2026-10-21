@@ -1,7 +1,7 @@
 /** Doors and windows hosted by walls. */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
-import type { BuildingModel, CurvedWallElement, OpeningElement, WallElement } from '@core/model/building';
+import type { BuildingModel, CurvedWallElement, OpeningElement, WallElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { projectOntoSegment } from '@lib/polygon';

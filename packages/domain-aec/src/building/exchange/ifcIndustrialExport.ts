@@ -11,7 +11,7 @@ import type {
   BuildingLevel,
   BuildingModel,
   MemberRole,
-} from '@core/model/building';
+} from '@aec/building/types';
 import { sweepFrame } from '../../shared/mesh';
 import { panelFrame, trayOutline } from '../../industrial/evaluate';
 import { buildingConnectionSolids, plateLayout, type ConnectionSolid } from '../../industrial/connections/evaluateConnections';

@@ -1,6 +1,6 @@
 /** Bolt-group sizing of the moment connections: smallest bolt diameter / row count that passes every connection of a kind (EN 1993-1-8). */
 
-import type { BuildingModel, MomentConnectionElement } from '@core/model/building';
+import type { BuildingModel, MomentConnectionElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import { fromMm, toMm } from '@core/model/units';
 import { withElement } from '../../building/model';

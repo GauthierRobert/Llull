@@ -4,7 +4,7 @@
  */
 
 import type { Vec3 } from '@core/model/types';
-import type { CfdCase } from '@core/model/cfd';
+import type { CfdCase } from '@aero/cfd/types';
 import type { DefaultNote } from './caseParams';
 
 /** Blockage (frontal area / domain cross-section) above which a case is refused. */

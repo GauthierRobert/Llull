@@ -32,7 +32,7 @@ Not fixed: use the best-suited language / library for each task (e.g. Rust + wgp
 ```
 packages/core/src/        @core  framework-agnostic: NO react/DOM/window/fetch
   lib/                    @lib   pure leaf helpers (id, hash, polygon, triangulate, lruCache)
-  model/                         types.ts (CadDocument, Entity, MeshData, ShapeRecipe) · vectors · units · building · civil
+  model/                         types.ts (CadDocument, Entity, MeshData, ShapeRecipe) · documentExtensions.ts (plugin slice extension point) · vectors · units
   geometry/                      kernel.ts (GeometryKernel) · shapeRecipe · shapeKernel · tessellation, bounds, instanceExpansion, massProperties
   dynamics/                      physicsEngine.ts (PhysicsEngine port only; the rigid-body domain is packages/domain-dynamics)
   commands/                      engine: types · schema (defineCommand, commandCatalog) · context · commandTable · execute · guard · registry

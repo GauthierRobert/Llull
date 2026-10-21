@@ -3,7 +3,7 @@
  * into ordinary entities. Lengths and elevations are in document units; slopes are ratios (horizontal per 1 vertical for side slopes).
  */
 
-import type { Vec2, Vec3 } from './vectors';
+import type { Vec2, Vec3 } from '@core/model/vectors';
 
 export const CIVIL_CATEGORIES = ['pointGroup', 'surface', 'platform', 'alignment', 'manhole', 'pipe'] as const;
 
@@ -179,4 +179,11 @@ export interface CivilModel {
 
 export function createEmptyCivil(): CivilModel {
   return { objects: {}, order: [], counters: {} };
+}
+
+declare module '@core/model/documentExtensions' {
+  interface DocumentExtensions {
+    /** Absent until the first civil (site / terrain / road / drainage) command. */
+    civil?: CivilModel;
+  }
 }

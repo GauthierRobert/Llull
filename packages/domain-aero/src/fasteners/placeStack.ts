@@ -5,7 +5,7 @@
  */
 
 import { type CadDocument, type Component, type Entity, type CylinderEntity, DEFAULT_LAYER_ID, type Vec3 } from '@core/model/types';
-import type { FastenerStack } from '@core/model/fasteners';
+import type { FastenerStack } from '@aero/fasteners/types';
 import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
 import { eulerFromAxis } from '@lib/axisRotation';

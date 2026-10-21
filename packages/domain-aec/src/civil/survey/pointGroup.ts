@@ -1,7 +1,7 @@
 /** New survey point group shared by every survey import command. */
 
 import type { CadDocument } from '@core/model/types';
-import type { CivilModel, PointGroupObject, SurveyPoint } from '@core/model/civil';
+import type { CivilModel, PointGroupObject, SurveyPoint } from '@aec/civil/types';
 import { civilObjectsOf, getCivil, nextCivilId } from '../model';
 
 /** Point group with the next free id; name defaults to `<defaultLabel> <n>`. */

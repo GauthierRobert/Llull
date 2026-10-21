@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import type { BuildingElement, FootingElement } from '@core/model/building';
+import type { BuildingElement, FootingElement } from '@aec/building/types';
 import { execute } from '@core/commands/registry';
 import { type FootingDesignRow } from '@aec/industrial/foundations/footingModel';
 import { designMat } from '@aec/industrial/foundations/footingMat';

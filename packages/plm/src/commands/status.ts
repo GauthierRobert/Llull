@@ -3,7 +3,7 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
-import type { PlmModel, PlmPolicy, Revision } from '@core/model/plm';
+import type { PlmModel, PlmPolicy, Revision } from '@plm/types';
 import { resolveRevision, isUnitOfKind } from '../effectivity';
 import { integrityOf } from '../integrity';
 import { iterationManifest, releaseManifest } from '../manifest';

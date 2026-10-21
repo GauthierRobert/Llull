@@ -1,7 +1,7 @@
 /** Structural grid axes (column lines) with labelled bubbles. */
 
 import type { Vec2 } from '@core/model/types';
-import type { BuildingModel, GridElement } from '@core/model/building';
+import type { BuildingModel, GridElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { fromMm } from '@core/model/units';

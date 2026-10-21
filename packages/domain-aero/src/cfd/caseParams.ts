@@ -2,7 +2,7 @@
 
 import { vec3, z } from '@core/commands/schema';
 import type { Vec3 } from '@core/model/types';
-import type { CfdBoundaryTag, CfdCase, CfdFreestream, CfdSlice } from '@core/model/cfd';
+import type { CfdBoundaryTag, CfdCase, CfdFreestream, CfdSlice } from '@aero/cfd/types';
 
 const entityIds = z
   .array(z.string())

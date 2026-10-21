@@ -3,7 +3,8 @@
  * run through add_pipe_run (L10: composed with execute); the commit holds every value, so replay never reads the cloud (TR-SCN-04).
  */
 
-import type { ExtractionRecord, Mat4 } from '@core/model/pointCloud';
+import type { ExtractionRecord } from '@aec/scan/types';
+import type { Mat4 } from '@core/model/pointCloud';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';

@@ -3,7 +3,7 @@
  * profile-cutting lines. All lengths are millimetres.
  */
 
-import type { BasePlateElement, MomentConnectionElement, SteelMemberElement } from '@core/model/building';
+import type { BasePlateElement, MomentConnectionElement, SteelMemberElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { unknownLevelFailure } from '../../building/levelLookup';

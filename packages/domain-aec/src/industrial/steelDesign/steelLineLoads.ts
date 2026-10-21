@@ -5,7 +5,7 @@
  */
 
 import { clamp } from '@lib/clamp';
-import type { CableTrayElement, PipeElement } from '@core/model/building';
+import type { CableTrayElement, PipeElement } from '@aec/building/types';
 import { orderedElements } from '../../building/model';
 import { GRAVITY, round } from '../../shared/numeric';
 import { type ModelUnits, type SteelBar } from './steelMemberBars';

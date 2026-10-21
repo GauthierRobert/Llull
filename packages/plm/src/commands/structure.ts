@@ -4,7 +4,7 @@ import { nextFreeId } from '@lib/id';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, report } from '@core/commands/noop';
-import type { Baseline, SubItem } from '@core/model/plm';
+import type { Baseline, SubItem } from '@plm/types';
 import { PART_NUMBER } from '../document';
 import { humanAct } from '../gate';
 import { atSchema, bySchema, confirmationSchema } from '../params';

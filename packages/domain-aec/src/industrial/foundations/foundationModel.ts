@@ -1,4 +1,4 @@
-import type { FootingElement } from '@core/model/building';
+import type { FootingElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import type { BaseReaction } from '../frames/frameModelSolve';
 import type { LoadCase } from '../frames/frameModelTypes';

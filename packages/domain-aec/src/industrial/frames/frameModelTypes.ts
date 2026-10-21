@@ -1,5 +1,5 @@
 import { clamp } from '@lib/clamp';
-import type { SteelMemberElement } from '@core/model/building';
+import type { SteelMemberElement } from '@aec/building/types';
 import type { FrameMember, FrameNode } from '@lib/frame2d';
 import type { SteelProfile } from '../../steel/profiles';
 import type { CoefficientSet } from '../common/windCoefficients';

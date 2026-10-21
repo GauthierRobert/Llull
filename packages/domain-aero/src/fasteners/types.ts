@@ -3,10 +3,10 @@
  * (`CadDocument.fasteners`, validated by its `DocumentExtension`).
  */
 
-import type { Quantity } from './quantity';
-import type { Provenance } from './propertyModel';
-import type { LicenceFlag } from './materialLibrary';
-import type { Vec3 } from './vectors';
+import type { Quantity } from '@core/model/quantity';
+import type { Provenance } from '@core/model/propertyModel';
+import type { LicenceFlag } from '@core/model/materialLibrary';
+import type { Vec3 } from '@core/model/vectors';
 
 type FastenerKind = 'bolt' | 'hi_lok_pin' | 'solid_rivet' | 'blind_rivet' | 'lockbolt' | 'nut' | 'washer' | 'collar' | 'insert';
 
@@ -86,12 +86,9 @@ export interface FastenerModel {
   readonly stacks: Readonly<Record<string, FastenerStack>>;
 }
 
-/** Standard-part reference on a `Component` (generic: the BOM groups by part number without importing the plugin). */
-export interface PartRef {
-  readonly family: string;
-  readonly partNumber: string;
-  readonly description?: string;
-  readonly unitMass?: Quantity;
-  /** Built from placeholder proportions: excluded from mass (TR-MAT-24). */
-  readonly representative?: boolean;
+declare module '@core/model/documentExtensions' {
+  interface DocumentExtensions {
+    /** Absent until the first fastener command (plugin `fasteners`, 08 MAT M5). */
+    fasteners?: FastenerModel;
+  }
 }

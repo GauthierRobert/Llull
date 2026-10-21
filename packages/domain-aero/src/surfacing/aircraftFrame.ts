@@ -3,7 +3,7 @@
 import { defineCommand, vec3, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
-import type { AircraftFrame } from '@core/model/aero';
+import type { AircraftFrame } from '@aero/surfacing/types';
 import { DOCUMENT_UNITS, type CadDocument, type Vec3 } from '@core/model/types';
 import type { NurbsCurveData } from '@lib/nurbs/types';
 import { add3, cross3, dot3, len3, scale3, sub3 } from '@lib/vec3';

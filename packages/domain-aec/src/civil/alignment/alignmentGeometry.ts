@@ -6,7 +6,7 @@
 import { clamp } from '@lib/clamp';
 import { toDegrees } from '@lib/angle';
 import type { Vec2 } from '@core/model/types';
-import type { AlignmentObject } from '@core/model/civil';
+import type { AlignmentObject } from '@aec/civil/types';
 import { normalize2, sub2 } from '@lib/vec2';
 import { nearestAlongSpiral, spiralCurve, spiralPointAt, spiralSweep, type SpiralCurve, type SpiralElement } from './alignmentSpiral';
 import { distance } from '@lib/polygon';

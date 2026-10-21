@@ -8,7 +8,7 @@ import type {
   RoomElement,
   SlabElement,
   WallElement,
-} from '@core/model/building';
+} from '@aec/building/types';
 import { polygonCentroid } from '@lib/polygon';
 import { curvedBandBetween, curvedWallExtent, tangentWall } from '../geometry/curvedWallGeometry';
 import { fromMm, toMetres } from '@core/model/units';

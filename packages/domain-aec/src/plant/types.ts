@@ -4,7 +4,7 @@
  * tie-in ports, lines, runs). Lengths in the document unit (mm in plant documents), directions are unit vectors.
  */
 
-import type { Vec3 } from './vectors';
+import type { Vec3 } from '@core/model/vectors';
 
 /** Butt weld, flanged, socket weld, screwed, plain end, wafer, lug (02 RTE §3.1). */
 type EndType = 'BW' | 'FL' | 'SW' | 'SC' | 'PL' | 'WAF' | 'LUG';
@@ -90,4 +90,11 @@ export interface PipingModel {
 
 export interface PlantModel {
   readonly piping?: PipingModel;
+}
+
+declare module '@core/model/documentExtensions' {
+  interface DocumentExtensions {
+    /** Absent until the first plant command (plugin `piping`, plant 02 RTE: `add_tie_in_point`, `create_pipeline`). */
+    plant?: PlantModel;
+  }
 }

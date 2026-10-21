@@ -6,7 +6,7 @@
 import { toRadians } from '@lib/angle';
 import type { CadDocument, Entity, Vec2, Vec3 } from '@core/model/types';
 import { DxfWriter } from '../../building/exchange/dxfWriter';
-import type { SiteCalibration } from '@core/model/civil';
+import type { SiteCalibration } from '@aec/civil/types';
 import { assembleAecDxf } from '../../building/exchange/dxfExport';
 import { localToGrid, resolveFrame, type CoordinateFrame } from '../crs/crs';
 import { entityPlanPoint } from '@core/geometry/entityFrame';

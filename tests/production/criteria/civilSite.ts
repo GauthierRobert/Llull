@@ -7,7 +7,7 @@ import type {
   PlatformObject,
   PointGroupObject,
   SurfaceObject,
-} from '@core/model/civil';
+} from '@aec/civil/types';
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { CheckOutcome, Criterion, GradeContext } from '../contract';
 import { surveyRows, type CivilIntent } from '../civil/intent';

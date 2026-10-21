@@ -1,6 +1,6 @@
 /** Effectivity ranges (FR-PLM-11/12, §5.6): inclusive serial / MSN / date ranges, cut-in closing, overlap and resolution. */
 
-import type { Effectivity, EffectivityKind, ManagedItem } from '@core/model/plm';
+import type { Effectivity, EffectivityKind, ManagedItem } from '@plm/types';
 
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 

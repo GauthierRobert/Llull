@@ -1,4 +1,4 @@
-import type { BuildingModel } from '@core/model/building';
+import type { BuildingModel } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import { solveFrame, type FrameResult } from '@lib/frame2d';
 import type { FrameLoads, FrameModel, LoadCase } from './frameModelTypes';
