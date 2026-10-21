@@ -76,9 +76,9 @@ User stories:
   name in comments, SPC1 sets named after the llull constraints, FORCE/PLOAD4 per load case) for the stress office.
 - **US-4 (operator).** For a thin sheet-metal clip the agent idealizes it as a shell on its midsurface, checks the coverage number
   returned by `extract_midsurface`, and refuses shell export below 98 % coverage unless a human accepts it.
-- **US-5 (operator).** The agent runs modal and buckling analyses and compares them with `analytic_check` in the same JSON report
+- **US-5 (operator).** The agent runs modal and buckling analyses and compares them with `hand_check` in the same JSON report
   (FE value, analytic value, ratio).
-- **US-6 (operator).** After a parameter change the agent sees `state: "stale"` in `fea_report` and `FEA_RESULTS_STALE` from
+- **US-6 (operator).** After a parameter change the agent sees `state: "stale"` in `analysis_report` and `FEA_RESULTS_STALE` from
   `compute_margins`, and loops back to `fea_mesh`.
 - **US-7 (reviewer).** The reviewer imports an OP2 or FRD from the stress office's own run and reviews it in the desktop app as
   review-only results, with the design revision recorded.
@@ -113,7 +113,7 @@ User stories:
 | FR-FEA-14 | SHOULD | Import **Nastran OP2** results (displacement, stress, eigenvectors) through pyNastran in the bundled Python. | Review of results from the stress office | [R14] |
 | FR-FEA-15 | SHOULD | Export the mesh and results to **VTU** (ParaView) through meshio. | An open post-processing hand-off | [R13] |
 | FR-FEA-16 | MUST | **Solve locally** on desktop with the bundled CalculiX as a separate process. Fully offline, with cancel, a timeout, a log and the exit status. On the server or cloud it is disabled unless configured. | KI6: offline desktop first | [R30], L1 (KI6) |
-| FR-FEA-17 | MUST | **Results as data first** (AF-21): `fea_report` and `fea_result_field` return max von Mises, displacement magnitude and components with their location and unit, probe values at named points, mode frequencies and buckling factors in `data`. `render_view … --save` can draw the field for multimodal agents (AF-22). | The operator and owner read numbers, not plots | AF-21, AF-22 |
+| FR-FEA-17 | MUST | **Results as data first** (AF-21): `analysis_report` and `fea_result_field` return max von Mises, displacement magnitude and components with their location and unit, probe values at named points, mode frequencies and buckling factors in `data`. `render_view … --save` can draw the field for multimodal agents (AF-22). | The operator and owner read numbers, not plots | AF-21, AF-22 |
 | FR-FEA-17b | SHOULD | **UI result overlays** for the qualified reviewer: contours, deformed shape with a scale factor, animated mode shapes, legend with min/max and units, built on the FR-FEA-17 data. | Review surface only | — |
 | FR-FEA-18 | MUST | A **margin-of-safety table** returned in `data`: MS = allowable / (applied_limit × FoS) − 1. Each row gives part, region, load case, criterion, applied value and allowable with units, the factors used, MS, status (`PASS`, `MARGINAL`, `FAIL`), location, provenance (formula, inputs, sources), `unverified`, `reviewRequired` and `disposition`. Exports as JSON, CSV or a sheet table. | 14 CFR 25.303 and NASA-STD-5001B | [R1], [R3], AF-10, AF-35 |
 | FR-FEA-19 | MUST | **Modal analysis**: the n lowest frequencies, mode shapes, and mass participation where the solver gives it. | Panel and equipment-bracket frequencies | [R30] |
@@ -142,7 +142,7 @@ User stories:
 
 Proposed commands are those of TECHNICAL_SPEC §4. FEA transports (`fea_mesh`, `fea_solve`, `fea_import_results`,
 `fea_export`) are called like the existing exchange tools (`llull import_step file=…`): no CLI special case (AF-01).
-The analysis id comes from the `run --json` report (`affected`), or from `fea_report`.
+The analysis id comes from the `run --json` report (`affected`), or from `analysis_report`.
 
 ```bash
 llull search fea margin                                  # discover (AF-01)
@@ -161,8 +161,8 @@ llull fea_solve analysisId=an-5.1 --doc bracket.llull.json --progress --timeout 
 # 3. numbers first (AF-21): margins, probes, analytic sanity check
 llull compute_margins analysisId=an-5.1 --doc bracket.llull.json --json    # rows[] with units, factors, provenance,
                                                                            # reviewRequired, disposition
-llull fea_report analysisId=an-5.1 --doc bracket.llull.json --json         # state, max values + locations, probes
-llull analytic_check check=cantilever 'inputs={"P_N":9,"L_mm":8,"E_MPa":210000,"b_mm":1,"h_mm":1}' --json
+llull analysis_report analysisId=an-5.1 --doc bracket.llull.json --json         # state, max values + locations, probes
+llull hand_check check=cantilever 'inputs={"P_N":9,"L_mm":8,"E_MPa":210000,"b_mm":1,"h_mm":1}' --json
 
 # 4. look (multimodal agents, AF-22) and hand off (AF-12: heavy artefacts only via --save)
 llull render_view view=iso analysisId=an-5.1 field=von_mises --save out/vm.png --doc bracket.llull.json
@@ -206,9 +206,9 @@ The UI shows what the commands produced; it adds no capability of its own.
 | Analysis set-up | `llull run plan.json`, `llull <command> …` | registry tools (toolset `analysis`) | tree + glyphs | pure commands, replayable |
 | Midsurface preview / defeature | `llull extract_midsurface … --json` | same | translucent overlay | OCC kernel needed, else `FEA_KERNEL_OCC_REQUIRED` |
 | Mesh (Gmsh) | `llull fea_mesh` | `fea_mesh` when the host has Python + gmsh | progress | external process |
-| Quality / readiness check | `llull check_analysis --json`, `llull fea_report --json` | same | histogram panel | read-only, codes |
+| Quality / readiness check | `llull check_analysis --json`, `llull analysis_report --json` | same | histogram panel | read-only, codes |
 | Solve (CalculiX) | `llull fea_solve` | `fea_solve` when the host has `ccx` | progress, log | desktop default. Server needs opt-in |
-| Results | `llull fea_report`, `llull fea_result_field`, probes | same | contours (optional) | numbers first |
+| Results | `llull analysis_report`, `llull fea_result_field`, probes | same | contours (optional) | numbers first |
 | Margins | `llull compute_margins --json` | same | table | refuses stale results; every row `reviewRequired` |
 | Disposition of negative / marginal MS | prepare only (`FEA_HUMAN_GATE` on completion) | prepare only | **complete** (signature) | human gate |
 | Deck export INP / BDF / VTU | `llull fea_export … --save` | `fea_export` (exchange dir) | Export menu | byte-identical across surfaces |
@@ -249,17 +249,17 @@ column; tolerances there). `D` = `--doc case.llull.json --kernel occt --json`.
 
 | # | Given | When (CLI) | Then (JSON) | VC |
 | - | ----- | ---------- | ----------- | -- |
-| AC-1 | `plans/fea_cantilever_static_beamp.plan.json` | `llull run <plan> D` (`$an` = analysis id from `affected`); `llull fea_mesh analysisId=$an D`; `llull fea_solve analysisId=$an D`; `llull fea_report analysisId=$an D` | probe `tip` `u_y` (mm) within 2 % of VC-FEA-10.a = 0.0877714 mm | VC-FEA-10, 40 |
-| AC-2 | `plans/fea_cantilever_modal_beamf.plan.json` | same with `modes=4`, then `llull fea_report D` | `data.results.frequenciesHz[0]` within 1 % of VC-FEA-11.a = 13096.7 and of the CalculiX ref 13096.03 | VC-FEA-11, 41 |
-| AC-3 | `plans/fea_nafems_le1.plan.json` | run, mesh, solve, `fea_report` | probe `D` `s_yy` (MPa) within 2 % of 92.7 | VC-FEA-30 |
-| AC-4 | `plans/fea_nafems_le10.plan.json` | run, mesh, solve, `fea_report` | probe `D` `s_yy` (MPa) within 3 % of −5.38 | VC-FEA-31 |
+| AC-1 | `plans/fea_cantilever_static_beamp.plan.json` | `llull run <plan> D` (`$an` = analysis id from `affected`); `llull fea_mesh analysisId=$an D`; `llull fea_solve analysisId=$an D`; `llull analysis_report analysisId=$an D` | probe `tip` `u_y` (mm) within 2 % of VC-FEA-10.a = 0.0877714 mm | VC-FEA-10, 40 |
+| AC-2 | `plans/fea_cantilever_modal_beamf.plan.json` | same with `modes=4`, then `llull analysis_report D` | `data.results.frequenciesHz[0]` within 1 % of VC-FEA-11.a = 13096.7 and of the CalculiX ref 13096.03 | VC-FEA-11, 41 |
+| AC-3 | `plans/fea_nafems_le1.plan.json` | run, mesh, solve, `analysis_report` | probe `D` `s_yy` (MPa) within 2 % of 92.7 | VC-FEA-30 |
+| AC-4 | `plans/fea_nafems_le10.plan.json` | run, mesh, solve, `analysis_report` | probe `D` `s_yy` (MPa) within 3 % of −5.38 | VC-FEA-31 |
 | AC-5 | the four allowable/limit pairs of VC-FEA-20, no factors given | `llull compute_margins analysisId=$an D` | `rows[*].ms` = 0, 0.5, 0, −0.0666667; row 4 `status: "FAIL"`, `code: "FEA_MS_NEGATIVE"`; `data.factors.ultimate` = `{value: 1.5, source: "14 CFR 25.303", defaulted: true}` | VC-FEA-20, 60 |
 | AC-6 | a mesh artifact with one inverted element | `llull fea_export analysisId=$an format=calculix_inp --save x.inp D` | exit 1, `data.code: "FEA_MESH_INVERTED"`, `data.elementIds` non-empty, no file written | VC-FEA-08, 65 |
 | AC-7 | an exported BDF | `fea_export … --save` then pyNastran `read_bdf(xref=True)` | no error, card counts match the mesh, Σ FORCE = applied total | VC-FEA-15 |
 | AC-8 | solved results | `llull set_parameter name=L expression=10 D`; `llull compute_margins analysisId=$an D` | exit 1, `data.code: "FEA_RESULTS_STALE"` | VC-FEA-50 |
 | AC-9 | a 100×60×40 box shelled to 2 mm | `llull extract_midsurface entityId=$box maxThickness=3 D` | `data.areaMm2` = 23 224 ±0.1 %, `data.coverage` = 1 | VC-FEA-03 |
 | AC-10 | the same plan | run from CLI, MCP `build_project` and UI dispatch | same document hash and deck sha256 | VC-FEA-51 |
-| AC-11 | `plans/fea_plate_hole_kirsch.plan.json` | run, mesh, solve, `fea_report` | peak `s_xx` at the hole within 5 % of 300 MPa | VC-FEA-14 |
+| AC-11 | `plans/fea_plate_hole_kirsch.plan.json` | run, mesh, solve, `analysis_report` | peak `s_xx` at the hole within 5 % of 300 MPa | VC-FEA-14 |
 | AC-12 | the desktop installer | `npm --prefix desktop test` | GPL texts and source offers for Gmsh and CalculiX present | VC-FEA-52 |
 | AC-13 | any solved analysis | `llull compute_margins … D` | every row has `reviewRequired: true` and a `reviewReason`; `summary` contains "not approved" | VC-FEA-61 |
 | AC-14 | a negative-MS row | agent calls `llull dispose_margin analysisId=$an rowId=r4 decision=accepted justification="…" D` | exit 1, `data.code: "FEA_HUMAN_GATE"`, document unchanged; `check_analysis` still `fail` | VC-FEA-62, 63 |

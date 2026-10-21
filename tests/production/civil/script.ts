@@ -58,7 +58,10 @@ export function civilScript(intent: CivilIntent): ToolCall[] {
     });
   }
   for (const [from, to] of drainage.pipes) {
-    calls.push({ tool: 'add_pipe', args: { fromId: `manhole-${from + 1}`, toId: `manhole-${to + 1}`, manningN: drainage.manningN } });
+    calls.push({
+      tool: 'add_drainage_pipe',
+      args: { fromId: `manhole-${from + 1}`, toId: `manhole-${to + 1}`, manningN: drainage.manningN },
+    });
   }
   calls.push(
     { tool: 'size_drainage_pipes', args: { idf: drainage.idf, minVelocity: drainage.minVelocity, diameters: drainage.diametersMm } },

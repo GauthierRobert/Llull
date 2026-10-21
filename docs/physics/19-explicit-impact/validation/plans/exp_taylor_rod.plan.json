@@ -156,18 +156,13 @@
     "value": 6e-05,
     "unit": "s"
    },
-   "animationInterval": {
-    "value": 5e-06,
-    "unit": "s"
-   },
    "historyInterval": {
     "value": 5.000000000000001e-07,
     "unit": "s"
    },
    "massScaling": {
     "mode": "none"
-   },
-   "precision": "double"
+   }
   }
  },
  {
@@ -207,8 +202,7 @@
     0,
     0,
     1
-   ],
-   "friction": 0.0
+   ]
   }
  },
  {
@@ -230,8 +224,7 @@
     0,
     25.4
    ],
-   "quantity": "u_z",
-   "history": true
+   "quantity": "u_z"
   }
  }
 ]

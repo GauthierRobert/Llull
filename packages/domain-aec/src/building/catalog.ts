@@ -9,7 +9,7 @@ import { drawWalls, updateWall } from './elements/walls';
 import { addDoor, addWindow, updateOpening } from './elements/openings';
 import { addSlab, addColumn, addBeam, addStair } from './elements/structure';
 import { addRoom, deleteBuildingElement, moveBuildingElement, copyLevelElements } from './elements/elements';
-import { exportDxf } from './exchange/dxfExport';
+import { exportBuildingDxf } from './exchange/dxfExport';
 import { exportPlanSheet } from './drawings/sheet';
 import { exportElevationSheet } from './drawings/elevation';
 import { exportIfc } from './exchange/ifcBuild';
@@ -23,6 +23,6 @@ import { quantityTakeoff, buildingSchedule, setCostRates, estimateCost } from '.
 export const buildingCommands = commandCatalog(
   addLevel, updateLevel, deleteLevel, setActiveLevel, setProjectInfo, describeBuilding, addGridLine, addGridSystem, drawWalls, updateWall,
   addDoor, addWindow, updateOpening, addSlab, addColumn, addBeam, addStair, addSlabOpening, deleteSlabOpening, addRoom,
-  deleteBuildingElement, moveBuildingElement, copyLevelElements, quantityTakeoff, buildingSchedule, setCostRates, estimateCost, exportDxf,
+  deleteBuildingElement, moveBuildingElement, copyLevelElements, quantityTakeoff, buildingSchedule, setCostRates, estimateCost, exportBuildingDxf,
   exportPlanSheet, exportElevationSheet, exportIfc, addBuildingTemplate, addCurvedWall, setWallLayers,
 );

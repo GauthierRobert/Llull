@@ -83,7 +83,7 @@ function chordsToRadii(
 ): { readonly planned: Planned[] } | { readonly problem: string } {
   const graph = kernel.faceQuery?.faceGraph(shape) ?? null;
   if (topology === null || graph === null)
-    return { problem: 'mode "chord" needs the exact face adjacency of an exact kernel (the default Manifold kernel has none)' };
+    return { problem: 'mode "chord" needs the exact face adjacency of an exact kernel (the mesh kernel has none)' };
   const converted: Planned[] = [];
   for (const { edge, law } of planned) {
     const faces = graph.edgeFaces[edge] ?? [];

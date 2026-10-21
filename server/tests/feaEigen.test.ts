@@ -65,7 +65,7 @@ async function solved(name: string, plan: Record<string, unknown>[]): Promise<{ 
   const analysisId = await session.idOf(file, 'an');
   await session.mesh(analysisId);
   await session.solve(analysisId);
-  const { json } = await session.cli('fea_report', `analysisId=${analysisId}`);
+  const { json } = await session.cli('analysis_report', `analysisId=${analysisId}`);
   return { session, analysisId, summary: String(json['summary']) };
 }
 
@@ -78,7 +78,7 @@ describe.skipIf(!READY)('modal and buckling analyses', () => {
   it('cantilever first natural frequency matches the Euler-Bernoulli value within 2 %', async () => {
     const length = 200;
     const { session, analysisId, summary } = await solved('modal', barPlan(length, { analysisType: 'modal', modes: 4 }, []));
-    const { json } = await session.cli('fea_report', `analysisId=${analysisId}`);
+    const { json } = await session.cli('analysis_report', `analysisId=${analysisId}`);
     const frequencies = resultsOf(json)['frequenciesHz'] as number[];
     const beam =
       (1.8751 ** 2 / (2 * Math.PI)) * Math.sqrt((E * 1e6 * (INERTIA * 1e-12)) / (7800 * (SIDE * SIDE * 1e-6) * (length * 1e-3) ** 4));
@@ -95,7 +95,7 @@ describe.skipIf(!READY)('modal and buckling analyses', () => {
     expect(isRecord(modes[0]) && Array.isArray(modes[0]['participation'])).toBe(true);
     expect(isRecord(eigen) && eigen['warnings']).toEqual([]);
     const closedForm = await session.cli(
-      'analytic_check',
+      'hand_check',
       'check=cantilever_frequency',
       `inputs={"E_MPa":${E},"rho_t_per_mm3":7.8e-9,"b_mm":${SIDE},"h_mm":${SIDE},"L_mm":${length}}`,
       `compare={"quantity":"frequency_weak_axis_Hz","value":${String(frequencies[0])},"toleranceRel":0.02}`,
@@ -120,7 +120,7 @@ describe.skipIf(!READY)('modal and buckling analyses', () => {
       'buckling',
       barPlan(length, { analysisType: 'buckling', modes: 2 }, [{ command: 'add_fea_load', params: load }]),
     );
-    const { json } = await session.cli('fea_report', `analysisId=${analysisId}`);
+    const { json } = await session.cli('analysis_report', `analysisId=${analysisId}`);
     const factors = resultsOf(json)['bucklingFactors'] as number[];
     const critical = (Math.PI ** 2 * E * INERTIA) / (4 * length ** 2);
     expect(factors).toHaveLength(2);
@@ -128,7 +128,7 @@ describe.skipIf(!READY)('modal and buckling analyses', () => {
     expect((factors[0] ?? 0) * 1000).toBeLessThan(critical * 1.03);
     expect(dataOf(json)['eigen']).toMatchObject({ kind: 'buckling', criticalMode: 1 });
     const column = await session.cli(
-      'analytic_check',
+      'hand_check',
       'check=euler_column',
       `inputs={"L_mm":${length},"E_MPa":${E},"b_mm":${SIDE},"h_mm":${SIDE},"K":2}`,
       `compare={"quantity":"critical_load_N","value":${(factors[0] ?? 0) * 1000},"toleranceRel":0.03}`,

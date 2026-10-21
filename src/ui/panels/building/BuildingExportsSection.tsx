@@ -107,7 +107,7 @@ export function BuildingExportsSection(): React.ReactElement {
       <div className="building-actions">
         <QueryDownloadButton
           label="DXF (AutoCAD)"
-          command="export_dxf"
+          command="export_building_dxf"
           params={{ ...levelParams }}
           field="dxf"
           fallbackName={null}

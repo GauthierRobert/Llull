@@ -1,4 +1,4 @@
-/** Regression guards for evaluate_motion / bake_motion (kinematic instance joints): chains and tilted axes. */
+/** Regression guards for evaluate_motion (apply false | true) (kinematic instance joints): chains and tilted axes. */
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument, type Vec3 } from '@core/model/types';

@@ -115,7 +115,7 @@ export const exportPlyBook = defineCommand({
   name: 'export_ply_book',
   annotations: { readOnly: true },
   description:
-    'Ply book of a composite part as SVG sheets (one per sequence label): each sheet shows the flat pattern of the plies of that sequence ' +
+    'SHEETS form of the ply book (same plies as ply_book_data = numbers): ply book of a composite part as SVG sheets (one per sequence label): each sheet shows the flat pattern of the plies of that sequence ' +
     '(with the fibre arrow and the ply label), a location view of the pieces on the tool-face outline (the part frame), and a table with ply, ' +
     'material, orientation, area in mm2, piece count and boundary length in mm. On doubly curved faces (sphere cap, nurbs_surface) the flat ' +
     'pattern comes from the fishnet drape and is omitted, with a note, where the shear exceeds the material locking angle. `sheetSize` A4, ' +

@@ -5,7 +5,7 @@ B-rep import), 03 GDT (semantic PMI model) · Feeds: 09 PLM (LOTAR archive, rele
 
 ## 1. Summary
 
-llull writes STEP **AP214** only: `export_step` (CadQuery, through the Python bridge) and `export_step_exact` (OCC
+llull writes STEP **AP214** only: `export_step` (CadQuery, through the Python bridge) and `export_step_ap242` (OCC
 `STEPControl_Writer`, one product per solid, names and colours stamped afterwards by text rewriting). It reads STEP
 **as meshes** (`import_step` → `import_mesh`), plus DXF, STL/OBJ/glTF. It has no **AP242** output, no **assembly
 structure** in STEP (instances are skipped), no **geometric validation properties** (volume / area / centroid) written
@@ -103,7 +103,7 @@ Operator model: [`../AGENT_FIRST.md`](../AGENT_FIRST.md) (authoritative).
 | FR-XCH-01 | MUST | Export the document's 3D solids to STEP **AP242** (Part 21) as exact B-rep, selectable schema AP242 / AP214 / AP203, AP242 default once VC-XCH-03 passes. | AP242 is the aerospace exchange and archive format | [R1][R8][R16] |
 | FR-XCH-02 | MUST | The exported model, re-imported by llull, reproduces each solid's volume, surface area, centroid and bounding box within the same-kernel tolerance. | Exchange must be lossless for our own data | [R11] |
 | FR-XCH-03 | MUST | Every exported solid (and assembly node) carries CAx-IF geometric validation properties: volume, surface area, centroid; assembly GVP for assembly nodes; bounding box SHOULD. | Receivers verify transfers with GVP; LOTAR level-1 validation uses volume, centroid, area | [R11][R17] |
-| FR-XCH-04 | MUST | Export and import the assembly structure: components ↔ products, instances ↔ occurrences with placements; product names and colours preserved; instances no longer skipped. | Aircraft parts are delivered in assemblies; `export_step_exact` skips instances today | [R15][R16] |
+| FR-XCH-04 | MUST | Export and import the assembly structure: components ↔ products, instances ↔ occurrences with placements; product names and colours preserved; instances no longer skipped. | Aircraft parts are delivered in assemblies; `export_step_ap242` skips instances today | [R15][R16] |
 | FR-XCH-05 | MUST | Import STEP AP242/AP214/AP203 as exact B-rep (from 01 KRN) with assembly tree, names, colours, units, and the file's embedded validation properties stored as provenance. | Supplier must work on exact geometry | [R8] |
 | FR-XCH-06 | MUST | On import, recompute GVP from the imported B-rep and compare with the embedded GVP; report per solid green / yellow / red with deltas; never block the import on a yellow/red. | CAx-IF three-tier result practice; vendor default thresholds | [R13][R14] |
 | FR-XCH-07 | SHOULD (V1) | Import AP242 **semantic PMI** (dimensions, tolerances, datums, datum systems, datum targets) into the gap-03 PMI model, linked to the B-rep faces/edges; fall back to graphic presentation (tessellated annotation curves) when semantics are absent; list every unmapped item. | MBD: the PMI is the authority, not a drawing | [R12][R4] |

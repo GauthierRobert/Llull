@@ -41,7 +41,7 @@ const refuse = (doc: CadDocument, code: string, remediation: string, why: string
 
 const IMPORT_ERRORS: Readonly<Record<'unreadable' | 'no_solid' | 'tessellated_only' | 'unavailable', readonly [string, string]>> = {
   unreadable: ['KRN_STEP_UNREADABLE', 'check the file (size, sha256, truncated?) and that it is an ISO 10303-21 STEP file'],
-  tessellated_only: ['KRN_STEP_TESSELLATED_ONLY', "import it as a mesh with import_step (mode 'mesh')"],
+  tessellated_only: ['KRN_STEP_TESSELLATED_ONLY', "import it as a mesh with the CLI tool import_step (mode 'mesh')"],
   no_solid: [
     'KRN_STEP_NO_SOLID',
     'retry with sew: true and a larger linear tolerance (set_modeling_tolerance, mm); else import the surfaces separately',
@@ -372,7 +372,7 @@ export const importStepExact = defineCommand({
     'The geometric validation properties the sender embedded (volume, surface area, centroid) are compared with the recomputed ones per product (verify): ' +
     'data.report.exchange lists product, band green / yellow / red / not-checkable, both values and the exact file-unit factor (25.4 for inch); a red or ' +
     'not-checkable body is flagged unverified and the report asks for review, but the import still completes. ' +
-    'Needs the exact OCC kernel (kernel_info); otherwise use import_step for a mesh. Give the file as stepBase64 or text. Lengths are converted from millimetres into the ' +
+    'Needs the exact OCC kernel (kernel_info); otherwise use the CLI tool import_step for a mesh. Give the file as stepBase64 or text. Lengths are converted from millimetres into the ' +
     'document unit. data.report lists per solid validAsRead / validAfterHeal / actions / maxToleranceMm / freeEdges / faces / faceted, the root census, skipped items and ' +
     'warnings (KRN_IMPORT_TOLERANCE_HIGH above kernelSettings maxImportTolerance; XCH_GVP_YELLOW / XCH_GVP_RED / XCH_GVP_NOT_CHECKABLE). Refusals carry error.code: ' +
     'KRN_NO_EXACT_KERNEL, KRN_STEP_UNREADABLE, KRN_STEP_TESSELLATED_ONLY, KRN_STEP_NO_SOLID, KRN_HEAL_FAILED. format: "iges" reads an IGES file the same way (import_iges adds the IGES census, sewing report and unit handling).',

@@ -63,6 +63,25 @@ const SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   vibration: ['modal', 'frequency'],
   eigenfrequency: ['modal', 'frequency'],
   stiffness: ['fea', 'solve'],
+  pattern: ['array'],
+  circular: ['polar'],
+  radial: ['polar'],
+  grid: ['array', 'linear'],
+  symmetry: ['mirror'],
+  flip: ['mirror'],
+  translate: ['move'],
+  shift: ['move'],
+  smooth: ['fillet'],
+  taper: ['draft'],
+  lathe: ['revolve'],
+  subtract: ['boolean'],
+  difference: ['boolean'],
+  intersect: ['boolean'],
+  cutout: ['pocket'],
+  centroid: ['mass', 'properties'],
+  volume: ['mass', 'properties'],
+  print: ['export', 'stl', '3mf'],
+  bom: ['bill', 'materials'],
 };
 
 /** Engineering phrases (stemmed, in order) -> tool vocabulary; the phrase's words lose their single-word synonyms. */
@@ -73,6 +92,15 @@ const PHRASES: readonly { readonly words: readonly string[]; readonly expansion:
   { words: ['stress', 'plot'], expansion: ['fea', 'results'] },
   { words: ['stress', 'contour'], expansion: ['fea', 'results'] },
   { words: ['head', 'loss'], expansion: ['hydraulics', 'pipe'] },
+  { words: ['bolt', 'circle'], expansion: ['array', 'polar'] },
+  { words: ['bolt', 'pattern'], expansion: ['array', 'polar'] },
+  { words: ['hole', 'pattern'], expansion: ['array', 'polar', 'linear'] },
+  { words: ['polar', 'pattern'], expansion: ['array', 'polar'] },
+  { words: ['circular', 'pattern'], expansion: ['array', 'polar'] },
+  { words: ['linear', 'pattern'], expansion: ['array', 'linear'] },
+  { words: ['rectangular', 'pattern'], expansion: ['array', 'linear'] },
+  { words: ['center', 'gravity'], expansion: ['mass', 'properties'] },
+  { words: ['bill', 'material'], expansion: ['bill', 'materials'] },
 ];
 
 interface QueryTerm {

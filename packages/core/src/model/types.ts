@@ -165,7 +165,7 @@ export interface MeshSolidEntity extends BaseEntity {
   mesh: MeshData;
   /** Exact shape recipe of a kernel result; absent for imported / triangle-only meshes. */
   brep?: ShapeRecipe;
-  /** Exact `faceSlab` of a ply solid (before `position` / `rotation`); read ONLY by `export_step_exact` (B-rep if the kernel builds it, else `mesh`). */
+  /** Exact `faceSlab` of a ply solid (before `position` / `rotation`); read ONLY by `export_step_ap242` (B-rep if the kernel builds it, else `mesh`). */
   stepSlab?: ShapeRecipe;
   /** Set only on the groove tool of a modelled thread (feature lowering): kernels skip post-boolean face merging on results built from it. */
   threadTool?: true;
@@ -688,7 +688,7 @@ export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFiel
   aero?: AeroModel;
   /** Absent until the first composites command (plugin composites, 06 CMP). */
   composites?: CompositesModel;
-  /** Absent until the first flow-case command (`cfd_create_case`, plugin `cfd`, 12 CFD). */
+  /** Absent until the first flow-case command (`create_cfd_case`, plugin `cfd`, 12 CFD). */
   cfd?: import('./cfd').CfdDocumentSlice;
   /** Absent until the first sheet-metal command (plugin `sheetmetal`, 07 FTR M3). */
   sheetMetal?: SheetMetalModel;

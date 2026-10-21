@@ -70,9 +70,6 @@
         "height": 900,
         "projection": "perspective",
         "fovDeg": 45,
-        "shading": "review",
-        "edges": true,
-        "shadows": true,
         "showGrid": false,
         "showAxes": false
       }
@@ -85,9 +82,6 @@
         "height": 900,
         "projection": "perspective",
         "fovDeg": 45,
-        "shading": "review",
-        "edges": true,
-        "shadows": true,
         "showGrid": false,
         "showAxes": false
       }

@@ -10,7 +10,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   VIS_VIEWPOINT_IN_USE: 'delete the walkthroughs (delete_walkthrough) / issues (delete_review_issue) that reference the viewpoint first',
   VIS_WALKTHROUGH_INVALID: 'give 2..500 keys of one projection with seconds > 0, and fps × duration within maxFrames',
   VIS_WALKTHROUGH_NOT_FOUND: 'create one with create_walkthrough',
-  VIS_ENTITY_NOT_FOUND: 'pass ids from list_entities',
+  VIS_ENTITY_NOT_FOUND: 'pass ids from find_entities',
   VIS_ISSUE_INVALID: 'give a non-empty title',
   VIS_ISSUE_NOT_FOUND: 'create one with create_review_issue',
   VIS_RENDER_BUDGET: 'lower width / height / fps or the frame count',

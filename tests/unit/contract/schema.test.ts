@@ -170,7 +170,7 @@ function seeded(): { doc: CadDocument; entityId: string } {
   let doc = createEmptyDocument();
   const box = execute(doc, 'add_box', { size: [10, 10, 10] });
   doc = box.document;
-  doc = execute(doc, 'draw_rectangle', { corner: [0, 0], width: 10, height: 5 }).document;
+  doc = execute(doc, 'draw_rectangle', { position: [0, 0], width: 10, height: 5 }).document;
   return { doc, entityId: box.affected[0] ?? 'missing' };
 }
 

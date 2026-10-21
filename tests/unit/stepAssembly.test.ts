@@ -1,4 +1,4 @@
-/** export_step_exact assembly structure: planning (shared parts vs baked), labeling of the kernel text, refusals. */
+/** export_step_ap242 assembly structure: planning (shared parts vs baked), labeling of the kernel text, refusals. */
 import { describe, expect, it } from 'vitest';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
@@ -8,7 +8,7 @@ import { labelStepAssembly } from '@core/commands/brep/stepAssemblyLabels';
 import { type FakeKernel, type FakeShape, fakeKernel } from '../helpers/fakeKernel';
 
 const step = (doc: CadDocument, kernel: FakeKernel | null): ReturnType<typeof execute> =>
-  execute(doc, 'export_step_exact', {}, { ...defaultContext(), kernel });
+  execute(doc, 'export_step_ap242', { includeValidationProperties: false }, { ...defaultContext(), kernel });
 
 /** Kernel STEP text for a root with `nauos` placed uses (part index each) over `parts` single-solid products, plus optional inner NAUOs. */
 function fakeText(placed: readonly number[], innerSolids: Record<number, number> = {}, nested: Record<number, number[]> = {}): string {
@@ -86,7 +86,7 @@ const assemblyKernel = (placedParts: (occurrences: readonly StepOccurrence<FakeS
     },
   });
 
-describe('export_step_exact assembly', () => {
+describe('export_step_ap242 assembly', () => {
   it('shares one part across the rigid instances of a component and names products and occurrences', () => {
     const doc = rodsAndPlate(3);
     const result = step(
@@ -108,7 +108,12 @@ describe('export_step_exact assembly', () => {
     expect(text).toContain("MANIFOLD_SOLID_BREP('Rod'");
     expect(text).not.toContain('Open CASCADE STEP translator');
     expect(
-      execute(doc, 'export_step_exact', {}, { ...defaultContext(), kernel: assemblyKernel(() => fakeText([0, 0, 0, 1])) }).document,
+      execute(
+        doc,
+        'export_step_ap242',
+        { includeValidationProperties: false },
+        { ...defaultContext(), kernel: assemblyKernel(() => fakeText([0, 0, 0, 1])) },
+      ).document,
     ).toBe(doc);
   });
 
@@ -164,7 +169,7 @@ describe('export_step_exact assembly', () => {
   });
 
   it('writes a sub-assembly once: a component of two instances used three times shares its nested part', () => {
-    let doc = execute(createEmptyDocument(), 'add_box', { size: [4, 4, 4], name: 'Bolt body' }).document;
+    let doc = execute(createEmptyDocument(), 'add_box', { size: [4, 4, 4] }).document;
     doc = execute(doc, 'create_component', { name: 'Bolt', entityIds: [...doc.order] }).document;
     const bolt = Object.keys(doc.components)[0] ?? '';
     const first = Object.keys(doc.entities).find((id) => doc.entities[id]?.kind === 'instance') ?? '';
@@ -293,8 +298,8 @@ describe('export_step_exact assembly', () => {
   });
 
   it('names the solids of a multi-solid component as sub-products', () => {
-    let doc = execute(createEmptyDocument(), 'add_box', { size: [4, 4, 4], name: 'Head' }).document;
-    doc = execute(doc, 'add_cylinder', { radius: 1, height: 10, name: 'Shank' }).document;
+    let doc = execute(createEmptyDocument(), 'add_box', { size: [4, 4, 4] }).document;
+    doc = execute(doc, 'add_cylinder', { radius: 1, height: 10 }).document;
     doc = execute(doc, 'create_component', { name: 'Screw', entityIds: [...doc.order] }).document;
     const result = step(
       doc,

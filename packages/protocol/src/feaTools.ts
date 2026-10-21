@@ -82,8 +82,8 @@ export function buildFeaToolDefinitions(): ToolDefinition[] {
       name: 'fea_solve',
       description:
         'Solve a meshed analysis with CalculiX (ccx): writes the input deck from the document, runs the solver, reads the results into ' +
-        'a content-addressed artifact and records their summary with record_fea_results (then use fea_report / check_analysis / ' +
-        'thermal_report). Refuses a missing or stale mesh (run fea_mesh). Needs ccx on the server (LLULL_CCX).',
+        'a content-addressed artifact and records their summary with record_fea_results (then use analysis_report / check_analysis). ' +
+        'Refuses a missing or stale mesh (run fea_mesh). Needs ccx on the server (LLULL_CCX).',
       inputSchema: {
         type: 'object',
         properties: {
@@ -127,7 +127,7 @@ export function buildFeaToolDefinitions(): ToolDefinition[] {
         'Import the results of an external solver run for the CURRENT mesh: format frd (CalculiX) or op2 (Nastran, single-precision, CTETRA stress ' +
         'and displacement / eigenvalue tables; run the BDF of fea_export format nastran_bdf so the grid ids are the mesh ids). The file must belong to ' +
         'the current mesh (every mesh node has a result), else FEA_RESULTS_MESH_MISMATCH / FEA_OP2_MESH_MISMATCH: a foreign mesh is not imported. The ' +
-        'results are stored as a content-addressed artifact and recorded with record_fea_results (the same trust path as fea_solve), so fea_report, ' +
+        'results are stored as a content-addressed artifact and recorded with record_fea_results (the same trust path as fea_solve), so analysis_report, ' +
         'compute_margins and check_analysis read them. Give the file inline (dataBase64) or as a file in the server exchange directory (path); the ' +
         'llull CLI reads a local file with file=<path>. The OP2 layout is that of pyNastran and is NOT verified against a real MSC / NX file.',
       inputSchema: {

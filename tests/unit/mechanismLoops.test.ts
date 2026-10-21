@@ -95,19 +95,19 @@ describe('closed loops', () => {
     expect(data.instanceRotations[bar.rocker]?.[2]).toBeCloseTo(expected, 8);
   });
 
-  it('refuses when the loop cannot close (crank past the reach of coupler + rocker) and bake_motion leaves the document unchanged', () => {
+  it('refuses when the loop cannot close (crank past the reach of coupler + rocker) and evaluate_motion apply=true leaves the document unchanged', () => {
     const bar = fourBar(2, 2, 2, 5);
     const limit = Math.acos((25 + 4 - 16) / 20);
     const open = execute(bar.doc, 'set_joint_value', { id: bar.crankJoint, value: limit + 0.1 }).document;
     const evaluated = execute(open, 'evaluate_motion', {});
     expect((evaluated.data as { loop: { closed: boolean } }).loop.closed).toBe(false);
     expect(evaluated.summary).toContain('cannot close');
-    const baked = execute(open, 'bake_motion', {});
+    const baked = execute(open, 'evaluate_motion', { apply: true });
     expect(baked.affected).toEqual([]);
     expect(baked.document).toBe(open);
     expect(baked.summary).toContain('refused');
     const closed = execute(bar.doc, 'set_joint_value', { id: bar.crankJoint, value: limit - 0.1 }).document;
-    expect(execute(closed, 'bake_motion', {}).affected.length).toBeGreaterThan(0);
+    expect(execute(closed, 'evaluate_motion', { apply: true }).affected.length).toBeGreaterThan(0);
   });
 
   it('drive_joint_to stops where the loop stops closing (acos(13/20))', () => {

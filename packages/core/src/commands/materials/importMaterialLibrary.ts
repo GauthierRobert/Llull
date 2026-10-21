@@ -1,4 +1,4 @@
-/** import_material_library / remove_material_library (08 MAT M3): material libraries with licence, export marking and content hash. */
+/** import_material_library / delete_material_library (08 MAT M3): material libraries with licence, export marking and content hash. */
 
 import { humanGate } from '../../model/humanGate';
 import { markingRank, type ExportMarking, type MaterialLibraryEntry } from '../../model/materialLibrary';
@@ -163,14 +163,14 @@ export const importMaterialLibrary = defineCommand({
  * @failure unknown library MAT_RECORD_NOT_FOUND; a record still assigned MAT_RECORD_IN_USE with the entity ids (rejections)
  */
 export const removeMaterialLibrary = defineCommand({
-  name: 'remove_material_library',
+  name: 'delete_material_library',
   annotations: { destructive: true },
   description:
     'Remove an imported material library and its records from the document. Refused while an entity still uses one of its records ' +
     '(MAT_RECORD_IN_USE lists the entity ids): reassign them with assign_material first.',
   params: z.object({ libraryId: z.string().describe('Id of the imported library (get_material shows record.libraryRef).') }),
   run: (doc, { libraryId }): CommandResult => {
-    const command = 'remove_material_library';
+    const command = 'delete_material_library';
     if (doc.materialLibraries?.[libraryId] === undefined)
       return refuseMaterial(doc, command, 'MAT_RECORD_NOT_FOUND', `no imported library '${libraryId}'`, {
         ids: [libraryId],
@@ -189,6 +189,6 @@ export const removeMaterialLibrary = defineCommand({
     const next: CadDocument = { ...doc, materials };
     if (Object.keys(libraries).length > 0) next.materialLibraries = libraries;
     else delete next.materialLibraries;
-    return changed(next, `remove_material_library '${libraryId}': removed ${records.size} record(s) (${[...records].join(', ')}).`, []);
+    return changed(next, `delete_material_library '${libraryId}': removed ${records.size} record(s) (${[...records].join(', ')}).`, []);
   },
 });

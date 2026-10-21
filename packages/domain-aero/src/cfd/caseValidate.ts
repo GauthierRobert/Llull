@@ -1,4 +1,4 @@
-/** Semantic validation of a whole `CfdCase` against the document (shared by cfd_create_case, cfd_update_case, cfd_set_boundary). */
+/** Semantic validation of a whole `CfdCase` against the document (shared by create_cfd_case, update_cfd_case, set_cfd_boundary). */
 
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { CfdBoundaryTag, CfdCase } from '@core/model/cfd';

@@ -5,7 +5,7 @@ import { segmentPiercesTriangle } from '@core/geometry/triangleQueries';
 import type { IndexedSurface } from './weld';
 import { MAX_REPORTED_POINTS, surfaceBounds } from './topology';
 
-/** Above this many triangles the test is skipped (reported as not run) to keep `cfd_prepare` interactive. */
+/** Above this many triangles the test is skipped (reported as not run) to keep `prepare_cfd_case` interactive. */
 export const MAX_INTERSECTION_TRIANGLES = 200_000;
 
 export interface IntersectionReport {

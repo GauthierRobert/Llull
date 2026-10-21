@@ -429,8 +429,7 @@
    "convergence": {
     "name": "ccx_default"
    },
-   "outputIncrements": "last_per_step",
-   "thresholds": {}
+   "outputIncrements": "last_per_step"
   }
  },
  {

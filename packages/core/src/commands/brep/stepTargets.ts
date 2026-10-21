@@ -1,4 +1,4 @@
-/** Which solids `export_step_exact` writes: loose 3D solids and component instances (with the unique occurrence label of each). */
+/** Which solids `export_step_ap242` writes: loose 3D solids and component instances (with the unique occurrence label of each). */
 
 import { type CadDocument, DEFAULT_LAYER_ID, type Entity, type InstanceEntity, is3D } from '../../model/types';
 import { kgPerM3FromDocDensity } from '../../geometry/resolveDensity';

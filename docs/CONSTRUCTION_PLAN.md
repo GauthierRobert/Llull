@@ -25,7 +25,7 @@ Revit / ArchiCAD (levels, hosted openings, schedules, IFC), AutoCAD Architecture
   (ends extended to close the corner).
 - Quantities, schedules, costs, DXF, IFC and plan sheets are **pure functions of the
   building model**, exposed as read-only query commands returning `data`. Everything is
-  one command ⇒ one UI action + one MCP tool.
+  one command ⇒ one UI action + one CLI tool.
 
 ## Steps
 
@@ -48,7 +48,7 @@ Playwright end-to-end suite (`npm run test:e2e`).
 - [x] **S7 — Quantities & cost.** `quantity_takeoff` (lengths, areas, volumes, counts by
       material — metric m/m²/m³), `building_schedule` (wall / door / window / room /
       column schedules, CSV), `estimate_cost` (unit rates → priced bill of quantities).
-- [x] **S8 — DXF export.** `export_dxf` — AutoCAD-readable plan per level (wall poché,
+- [x] **S8 — DXF export.** `export_building_dxf` — AutoCAD-readable plan per level (wall poché,
       openings, door swings, grids, rooms, plus the document's 2D drafting).
 - [x] **S9 — Plan sheets.** `export_plan_sheet` — scaled (1:20…1:500) SVG floor plan on
       ISO paper (A4…A0) with title block, north arrow, scale bar, grid bubbles, room
@@ -59,7 +59,7 @@ Playwright end-to-end suite (`npm run test:e2e`).
       tools with parameter forms, quantity / cost table, schedule CSV, DXF / IFC / sheet
       downloads.
 - [x] **S12 — Verification.** Unit tests for every command, Playwright e2e covering the
-      full workflow in a real browser, MCP prompt + docs (`docs/CONSTRUCTION.md`).
+      full workflow in a real browser, an agent prompt (MCP; removed with the MCP server, LC1) + docs (`docs/CONSTRUCTION.md`).
 
 ## Phase 2 — remaining gaps
 

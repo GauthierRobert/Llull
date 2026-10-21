@@ -12,7 +12,7 @@ build, and the acceptance criteria the office checks before anything leaves the 
 ```bash
 npx vitest run tests/production   # in-process scripted run, part of npm run check (seconds)
 npm run production:scripted       # the same calls sent to the real backend the way the llull CLI sends them
-npm run production:ui             # a human-like flow in the browser (Playwright)
+npm run production:ui             # a human-like UI flow (browser Playwright: legacy, being retargeted to Electron, LC1)
 npm run production:agent          # Claude gets only the brief and works through the CLI tools (API credentials, costs money)
 # agent env: PRODUCTION_SCENARIOS, PRODUCTION_AGENT_MODEL (claude-opus-5-5), PRODUCTION_AGENT_EFFORT (high),
 #            PRODUCTION_AGENT_MAX_TURNS (150), PRODUCTION_AGENT_TRIALS (1), PRODUCTION_AGENT_MAX_USD (20 per trial)
@@ -91,7 +91,7 @@ the project reopens and replays identically; a revision keeps every id, mark and
 
 The civil scenario (added with the [pilot kit](PILOT.md)) passes all 11 criteria in-process
 (`npx vitest run tests/production`), through the CLI backend calls (`npm run production:scripted`, 23 calls) and in
-the browser (`npm run production:ui`, 23 / 23 calls through Civil / Site panel controls, no palette
+the UI driver (`npm run production:ui`, 23 / 23 calls through Civil / Site panel controls, no palette
 detour). Its UI report still lists four `uiGaps`: the panel has no field for `minVelocity` /
 `diameters` on sizing or `minCoverM` / `minVelocity` on the check — the defaults equal the brief's
 values here, so the outcome is unaffected. Balance residual 0.01 %; design checks at 40 km/h all
@@ -112,7 +112,7 @@ inputs (Playwright strict mode). The UI driver now scopes the editor to the Equi
 | 2   | No structural verification outside portal frames (0 / 117 and 0 / 48 members)            | `structural-coverage` | `check_steel_members` (EN 1993, loads from the model — see INDUSTRIAL.md)                                        |
 | 3   | IFC equipment had no property set (operating weight)                                     | `ifc-equipment-data`  | `Pset_llullEquipment` (operating weight, clearance), GlobalIds stable across revisions                           |
 | 4   | Upper-floor plans did not draw the columns passing through                               | `dxf-plans`           | plans / DXF draw every column crossing the level's cut height                                                    |
-| 5   | The default rate limit (60 / min / IP, then on `/mcp`) throttled a real job (140–300 calls) | —                     | default 600 / min (now the REST limit); the gate asserts every job fits it                                                 |
+| 5   | The default rate limit (60 / min / IP, then on the since-removed `/mcp`) throttled a real job (140–300 calls) | —                     | default 600 / min (now the REST limit); the gate asserts every job fits it                                                 |
 | 6   | UI: no slab material, no equipment tag, no equipment editing, no level picker on exports | (UI driver)           | Building panel fields, Equipment section editor (`update_equipment`), "Export level" picker; no palette fallback |
 | 7   | Design: IPE450 main beams under the 60 t extractor fail deflection (1.05)                | `structural-coverage` | the scenario design was corrected (IPE500), as an engineer would — the check was not weakened                    |
 | 8   | No pipe supports: line weight never reached the steel, spans unchecked                   | `pipe-supports`       | `add_pipe_support` (shoe / hanger / guide / anchor on steel) and `check_pipe_supports` (MSS SP-69 spans)         |

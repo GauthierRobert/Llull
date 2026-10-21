@@ -1,4 +1,4 @@
-/** 12 CFD M1: the pure building blocks of cfd_prepare — regime, domain sizing, estimate, weld, edge topology, voxel cast, symmetry, intersections. */
+/** 12 CFD M1: the pure building blocks of prepare_cfd_case — regime, domain sizing, estimate, weld, edge topology, voxel cast, symmetry, intersections. */
 import { describe, expect, it } from 'vitest';
 import type { CfdCase } from '@core/model/cfd';
 import { sizeDomain, blockageRatio, boxContains } from '@aero/cfd/domainSizing';

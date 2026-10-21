@@ -130,7 +130,7 @@ The throat is at axial 0 and the flow goes to +axial.
 
 ## 6. Interop
 
-The nozzle solid exports like any solid (STL, glTF, STEP through `export_step` / `export_step_exact` on OCC).
+The nozzle solid exports like any solid (STL, glTF, STEP through `export_step` / `export_step_ap242` on OCC).
 Through `revolve_profile` it keeps an exact revolution recipe on the OCC kernel. No new file format. V1: a CEA
 input deck (`.inp`) writer and output parser in the server transport.
 

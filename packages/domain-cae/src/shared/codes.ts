@@ -31,6 +31,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'give an existing 3D entityId and at least one point in facesNear / edgesNear / pointsNear on the intended topology',
   FEA_CONSTRAINT_NOT_FOUND: 'list constraints with describe_analysis',
   FEA_CONSTRAINT_INVALID: 'fixed / pinned / symmetry need a target; displacement also needs dofs with finite values',
+  FEA_ITEM_NOT_FOUND: 'list the constraints, loads, probes and thermal / explicit records with describe_analysis (or analysis_report)',
   FEA_LOAD_NOT_FOUND: 'list loads with describe_analysis',
   FEA_LOAD_INVALID: 'force needs target + vector, pressure needs target + magnitude, gravity needs vector and no target',
   FEA_MESH_CONTROLS_INVALID: 'order must be 1 or 2, sizes > 0, minSize <= globalSize, refinement size <= globalSize',

@@ -254,7 +254,7 @@ llull sets up, meshes and solves (CalculiX) and reports numbers; it never approv
 - **Minimal static plan.** \`create_analysis\` → \`set_part_idealization\` (the solid) → a material with E and nu (\`add_material_model\` + \`define_constitutive_set\`, then
   \`assign_material\`; add Ftu / Fty with \`define_property_model\` when margins are wanted) → \`add_fea_constraint\` + \`add_fea_load\` (a moment may carry
   \`referencePoint\`) → \`set_mesh_controls\` → transports \`llull fea_mesh analysisId=ID\` then \`llull fea_solve analysisId=ID\` (they run the mesher / solver and record the
-  artifacts) → \`fea_report\` / \`compute_margins\`. \`set_result_view\` picks the field the desktop app shows; \`fea_result_field\` reads node values from the verified results.
+  artifacts) → \`analysis_report\` / \`compute_margins\`. \`set_result_view\` picks the field the desktop app shows; \`fea_result_field\` reads node values from the verified results.
 - **Shells.** \`set_part_idealization\` with idealization=shell, thickness=… (default: the wall thickness found), offset=mid|top|bottom; preview the surface with
   \`extract_midsurface\`; mesh with \`set_mesh_controls\` elementFamily=shell_tri or shell_quad.
 - **Modal / buckling.** analysisType modal or buckling with \`modes\`; a buckling case multiplies its first non-preload load case, and \`set_buckling_preload\` names a constant
@@ -281,8 +281,8 @@ llull receives and delivers exact geometry; the checks below tell an engineer wh
   The import always completes; verify_exchange_file exits 1 on red. Never hide a red or not-checkable band from the user.
 - **Deliver.** \`llull export_step_ap242 --save part.stp\` (schema ap242 by default, ap214 / ap203 on request) writes products, placed occurrences, names, colours, layers, materials and the validation
   properties of every product and the root assembly, in the DOCUMENT unit (numbers are not converted; the file says the unit), then re-reads them (\`data.selfCheck\` must be green). Pass \`timestamp\`
-  for a reproducible header; the same document and timestamp give identical bytes. \`llull export_iges --save part.igs\` writes B-rep solids (mode faces for legacy CAM). \`export_step_exact\` is
-  the simple AP214 form (schema ap242 only relabels the header; import_step_exact format iges reads an IGES file without the IGES census). Exporting bodies that were imported red or not-checkable (or ply solids written from triangles) needs \`acceptUnverified\` with a human signature on export_step_ap242, export_step_exact and export_iges alike: an agent gets XCH_HUMAN_GATE and hands the request over.
+  for a reproducible header; the same document and timestamp give identical bytes. \`llull export_iges --save part.igs\` writes B-rep solids (mode faces for legacy CAM). \`export_step_ap242\` with schema ap214 and includeValidationProperties false
+  is the simple AP214 form (without validation properties, PMI or self-check; import_step_exact format iges reads an IGES file without the IGES census). Exporting bodies that were imported red or not-checkable (or ply solids written from triangles) needs \`acceptUnverified\` with a human signature on export_step_ap242 and export_iges alike: an agent gets XCH_HUMAN_GATE and hands the request over.
 - **Minimal sequence.** verify_exchange_file, import_step_exact (read \`data.report.exchange\` and reviewRequired), model, geometric_validation_properties (the values that will be embedded),
   export_step_ap242, then verify_exchange_file on the written file.
 ## 13. Structural dynamics: frequency and random response (toolset analysis, PHY-09)
@@ -297,7 +297,7 @@ peak factor is a named default stated in every result; Miles' equation is a quic
   \`set_part_idealization\` → \`add_fea_constraint\` fixed on the base faces → \`set_dynamic_damping\` (cited) → \`set_base_excitation\` (direction +
   spectrum) → \`set_frequency_sweep\` → \`add_result_probe\` (a_x/y/z in g, u_x/y/z_rel, s_xx/yy/zz) → \`check_structural_dynamics\` (no error) →
   the fea_mesh and fea_solve transports (modes by CalculiX, response by llull; the nodal rms field runs in llull-compute when installed) →
-  \`dynamic_report\` → \`equivalent_static_load_case\` into a static case → \`compute_margins\` → \`check_structural_dynamics\`.
-  frequency_response: same set-up with loads or \`set_base_excitation\` amplitudeG; \`dynamic_report\` gives the peaks and half-power Q.
+  \`analysis_report\` view dynamic → \`equivalent_static_load_case\` into a static case → \`compute_margins\` → \`check_structural_dynamics\`.
+  frequency_response: same set-up with loads or \`set_base_excitation\` amplitudeG; \`analysis_report\` view dynamic gives the peaks and half-power Q.
 - Report results as "computed by llull, not approved": every dynamic result carries reviewRequired and its unverified reasons.
 `;

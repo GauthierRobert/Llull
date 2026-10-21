@@ -181,7 +181,7 @@ export const createMbom = defineCommand({
 export const manufacturingBom = defineCommand({
   name: 'manufacturing_bom',
   description:
-    'Read a manufacturing BOM made by create_mbom: data { id, name, baseline, lines, omitted, differences: { omitted, quantityChanged: [{ partNumber, ebom, mbom }], manufacturingOnly }, ' +
+    'Read a manufacturing BOM made by create_mbom (the as-built, sealed variant of the engineering_bom; not the building quantity_takeoff): data { id, name, baseline, lines, omitted, differences: { omitted, quantityChanged: [{ partNumber, ebom, mbom }], manufacturingOnly }, ' +
     'totalQuantity, sealOk }. Without id: the list of MBOM ids with their baseline and line count. Read-only.',
   annotations: { readOnly: true },
   params: z.object({ id: z.string().optional().describe('MBOM id; omitted = list every MBOM.') }),

@@ -90,7 +90,7 @@ packages/kernel-occt/src  occtMidsurface.ts, occtDefeature.ts (KernelOps), face 
 | TR-FEA-60 | MUST | `@cae/results/margins.ts` implements §5.8. There is no averaging across parts, and singular zones are reported separately. |
 | TR-FEA-70 | MUST | `server/src/feaSolve.ts` spawns `ccx` with `trackChild`, a timeout, cancel, and log capture (§5.9). |
 | TR-FEA-80 | SHOULD | Performance budgets in §8 are enforced by the production-gate scenario VC-FEA-53. |
-| TR-FEA-90 | MUST | Agent-first result contract (AF-10/11/31–35): `compute_margins`, `check_analysis` and `fea_report` follow §5.8/§7.1; factors carry `source`/`defaulted`; `unverified` is the OR of all gap 08 inputs' flags; `reviewRequired` is always true on margins. |
+| TR-FEA-90 | MUST | Agent-first result contract (AF-10/11/31–35): `compute_margins`, `check_analysis` and `analysis_report` follow §5.8/§7.1; factors carry `source`/`defaulted`; `unverified` is the OR of all gap 08 inputs' flags; `reviewRequired` is always true on margins. |
 | TR-FEA-91 | MUST | `dispose_margin` verifies a human-held signature through the gap 09 signing port; the CLI/MCP agent path cannot supply one (AF-34). |
 | TR-FEA-92 | SHOULD (V1, RS-5) | Headless field plots (`render_fea_results … --save plot.png`) get a GPU raster path through `llull-compute raster` (crate `llull-raster`, wgpu offscreen) per §2.1. The TS z-buffer `packages/domain-cae/src/results/fieldRaster.ts` stays the reference, the hash path and the small-case path. Native vs TS pixel agreement: VC-FEA-29. |
 
@@ -233,19 +233,19 @@ pure commands in the table.
 | `set_part_idealization` | mutating | `{ analysisId, entityId, idealization: 'solid'\|'plane_stress'\|'shell', thickness?, sourceFacesNear?, offset?, midsurface? }` | @affects case.parts · @failure non-3D entity, plane_stress source face not planar, shell on Manifold |
 | `extract_midsurface` | query (requiresKernel) | `{ entityId, maxThickness, angularTolDeg?=1 }` → `data { faces, coverage, unpairedFaces[], thicknesses[] }` | preview for UI/agents. The geometry is derived when idealization = shell |
 | `defeature_for_analysis` | mutating (requiresKernel) | `{ analysisId, entityId, maxFeatureSize?, facesNear? }` | @affects case.parts[e].defeature (recipe node) · @invariant design entity untouched · @failure OCC Defeaturing refused → summary names the faces |
-| `add_fea_constraint` / `update_fea_constraint` / `delete_fea_constraint` | mutating | `{ analysisId, name, kind, dofs?, target }` | @affects case.constraints · @failure target unresolved / ambiguous |
-| `add_fea_load` / `update_fea_load` / `delete_fea_load` | mutating | `{ analysisId, name, kind, loadCase, category, target?, vector?, magnitude?, distribution?, referencePoint? }` | @failure vector missing for force/gravity, magnitude missing for pressure |
+| `add_fea_constraint` / `update_fea_constraint` / `delete_analysis_item` | mutating | `{ analysisId, name, kind, dofs?, target }` | @affects case.constraints · @failure target unresolved / ambiguous |
+| `add_fea_load` / `update_fea_load` / `delete_analysis_item` | mutating | `{ analysisId, name, kind, loadCase, category, target?, vector?, magnitude?, distribution?, referencePoint? }` | @failure vector missing for force/gravity, magnitude missing for pressure |
 | `set_analysis_factors` | mutating | `{ analysisId, ultimate?, yield?, extra? }` | @invariant every factor ≥ 1, extra needs a justification |
 | `set_mesh_controls` | mutating | `{ analysisId, mesher?, elementFamily, order, globalSize, minSize?, refinements?, optimize? }` | @invariant globalSize > 0, refinement size ≤ globalSize |
 | `record_fe_mesh` | mutating (registry; validated, §4.1) | `{ analysisId, summary: MeshSummary }` | @affects case.meshSummary, clears results · @invariant artifact for `meshHash` exists in the store, its sha256 = `meshHash`, summary = recomputed summary · @failure artifact missing / hash or summary mismatch / inputHash ≠ current → no-op |
 | `record_fea_results` | mutating (registry; validated, §4.1) | `{ analysisId, summary: ResultsSummary }` | @invariant as `record_fe_mesh` for `resultsHash` · @failure no mesh, meshHash mismatch, artifact missing, hash or summary mismatch → no-op |
 | `set_result_view` | mutating (presentation, like `set_camera`) | `{ analysisId, field, loadCase?, mode?, deformationScale? }` | — |
-| `add_result_probe` / `delete_result_probe` | mutating | `{ analysisId, name, point, quantity }` | — |
-| `fea_report` | query | `{ analysisId }` (all values with units, AF-10) → `data { state: 'unmeshed'\|'meshed'\|'solved'\|'stale'\|'missing', mesh, quality, results, probes }` | read-only |
+| `add_result_probe` / `delete_analysis_item` | mutating | `{ analysisId, name, point, quantity }` | — |
+| `analysis_report` | query | `{ analysisId }` (all values with units, AF-10) → `data { state: 'unmeshed'\|'meshed'\|'solved'\|'stale'\|'missing', mesh, quality, results, probes }` | read-only |
 | `compute_margins` | query | `{ analysisId, criterion?='von_mises', allowable?: 'ftu'\|'fty'\|{ value, unit }, groupBy?: 'part'\|'target', loadCases?, marginalBand?: number (MS units, no default) }` → `data` shape §5.8 | @invariant every factor named with `source` + `defaulted` (AF-31); every row `reviewRequired: true` (AF-33); `unverified` propagated from gap 08 inputs (AF-32) · @failure `FEA_RESULTS_STALE`, `FEA_RESULTS_MISSING`, `FEA_MATERIAL_NO_ALLOWABLE` (unless an explicit allowable is given) |
 | `check_analysis` | query | `{ analysisId }` → `data { status: 'pass'\|'warn'\|'fail', items: [{ code, severity, ids[], path?, message, remediation }], reviewRequired: true }` | read-only readiness check (AF-20) over set-up, mesh, results and margins; codes §7.1. The agent ends every FEA job with it |
 | `dispose_margin` | mutating, **human gate** | `{ analysisId, rowId, decision: 'accepted'\|'rejected'\|'redesign', justification, signature }` | @affects case.dispositions · @invariant `signature` must verify against a human-held key through the gap 09 signing port (`humanSignatureRequired`); the disposition records rowId, the results hash and the signer · @failure agent caller or no valid human signature → `FEA_HUMAN_GATE`, doc unchanged; stale results → `FEA_RESULTS_STALE` |
-| `analytic_check` | query | `{ check: 'cantilever'\|'ss_beam'\|'ss_plate_buckling'\|'kirsch_kt', inputs }` → value + formula | pure. Matches `generate_fea_analytic.py` |
+| `hand_check` | query | `{ check: 'cantilever'\|'ss_beam'\|'ss_plate_buckling'\|'kirsch_kt', inputs }` → value + formula | pure. Matches `generate_fea_analytic.py` |
 | ✱ `fea_mesh` | transport | `{ analysisId }` | runs the Gmsh op, stores the artifact, dispatches `record_fe_mesh` |
 | ✱ `fea_solve` | transport | `{ analysisId, timeoutS?=600, threads? }` | writes the INP, runs `ccx`, parses FRD/DAT, stores the artifact, dispatches `record_fea_results` |
 | ✱ `fea_import_results` | transport | `{ analysisId, path, format: 'frd'\|'op2' }` | external results. They must match `meshHash`, or they are imported as a review-only `foreign` mesh |
@@ -547,7 +547,7 @@ Check items from `check_analysis` use the same codes with a severity.
 | AF-02, AF-03 | command descriptions state units and the next command; `llull guide` FEA section (§7) |
 | AF-04 | FR-FEA-37; analysis unit system fixed at `create_analysis` (TR-FEA-07); `{value, unit}` for explicit allowables |
 | AF-05 | all set-up in one plan (`validation/plans/*`), `llull run --validate` |
-| AF-10 | `fea_report`, `compute_margins` (§5.8 shape), `check_analysis`: unit-suffixed fields |
+| AF-10 | `analysis_report`, `compute_margins` (§5.8 shape), `check_analysis`: unit-suffixed fields |
 | AF-11 | §7.1 codes (FR-FEA-36; VC-FEA-65) |
 | AF-12 | decks and meshes only via `fea_export --save` / the artifact store |
 | AF-13 | TR-FEA-30/40 determinism (VC-FEA-06, 51) |
@@ -560,7 +560,7 @@ Check items from `check_analysis` use the same codes with a severity.
 | AF-32 | FR-FEA-34 (VC-FEA-64) |
 | AF-33 | FR-FEA-32 (VC-FEA-61) |
 | AF-34 | FR-FEA-33, `dispose_margin`, TR-FEA-91 (VC-FEA-62, 63) |
-| AF-35 | `provenance` in every margin row (§5.8); method and inputs in `analytic_check` |
+| AF-35 | `provenance` in every margin row (§5.8); method and inputs in `hand_check` |
 | AF-36 | `compute_margins.summary`: done, passed, needs a human |
 | AF-40 | `fea_mesh` / `fea_solve` progress, `--timeout`, content-hash cache (TR-FEA-05) |
 | AF-41 | bundled ccx/gmsh; `FEA_TOOL_MISSING` |
@@ -610,7 +610,7 @@ Coverage 90/85/90/90 extends to `packages/domain-cae/src/**` (CLAUDE.md non-nego
 | M7 (V1, RS-5) | `llull-compute raster` field-plot job (crate `llull-raster`, shared with plant 09 VIS), CLI selection + provenance, VC-FEA-29 | M3; RS-0 (`solver/` workspace); RS-5 renderer | 1 w (the renderer itself is costed in RS-5) |
 | V2 | beams (CBAR/B32), composites (06 CMP → PCOMP / `*SHELL SECTION, COMPOSITE`), tied contact, user Nastran/MYSTRAN runner | 06 CMP, 08 MAT | — |
 
-**Status (2026-10-17):** the static-solid part of M1–M3 is built (§13) as the minimal slice for PHY-03 / PHY-04: data model, plugin `cae`, Gmsh mesh op, artifact store, INP writer, ccx solve, FRD/DAT readers, record commands, margins. The remaining items (face map, M4 prompt + golden plans, M5, M6) form **FEA-REST** (part 1, 2026-10-19: modal / buckling hardening, `dispose_margin`, `analytic_check`, moment loads, consistent forces and a Verdict subset (the metrics listed in §13), see §13), in step **AERO-5** of the aerospace story (`../README.md`). The face map needs the 01 `FaceQueryPort` (AERO-2). The `FeaMaterialView` over 08 records needs 08 M2 (AERO-3); until then the decks read PHY-01 / PHY-02 models on `Material`.
+**Status (2026-10-17):** the static-solid part of M1–M3 is built (§13) as the minimal slice for PHY-03 / PHY-04: data model, plugin `cae`, Gmsh mesh op, artifact store, INP writer, ccx solve, FRD/DAT readers, record commands, margins. The remaining items (face map, M4 prompt + golden plans, M5, M6) form **FEA-REST** (part 1, 2026-10-19: modal / buckling hardening, `dispose_margin`, `hand_check`, moment loads, consistent forces and a Verdict subset (the metrics listed in §13), see §13), in step **AERO-5** of the aerospace story (`../README.md`). The face map needs the 01 `FaceQueryPort` (AERO-2). The `FeaMaterialView` over 08 records needs 08 M2 (AERO-3); until then the decks read PHY-01 / PHY-02 models on `Material`.
 
 Cross-gap: **08 MAT** owns the material record (E, ν, G, density, allowables with basis and provenance); FEA M1 depends on 08 M1–M2. **01 KRN** supplies stable
 exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results with the revision.
@@ -658,7 +658,7 @@ exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results w
 | Item | Where |
 | ---- | ----- |
 | Analysis types, artifacts, ports (`feaArtifacts`, `humanSignature` on `ExecutionContext`) | `packages/core/src/model/analysis.ts`, `commands/types.ts` |
-| Plugin `cae` (toolset `analysis`): `create_analysis` (static, heat_*, thermo_static), `delete_analysis`, `describe_analysis`, `set_part_idealization` (solid), constraints, loads (force, pressure, gravity), `set_mesh_controls` (tet 1/2), probes, `record_fe_mesh` / `record_fea_results` (§4.1 trust model), `fea_report`, `check_analysis` | `packages/domain-cae/src/commands/` |
+| Plugin `cae` (toolset `analysis`): `create_analysis` (static, heat_*, thermo_static), `delete_analysis`, `describe_analysis`, `set_part_idealization` (solid), constraints, loads (force, pressure, gravity), `set_mesh_controls` (tet 1/2), probes, `record_fe_mesh` / `record_fea_results` (§4.1 trust model), `analysis_report`, `check_analysis` | `packages/domain-cae/src/commands/` |
 | INP writer §5.6 (model block, mechanical cards, `*STATIC` per load case), FRD / DAT readers §5.7, summaries, staleness TR-FEA-06 | `packages/domain-cae/src/{decks,results,hash}/` |
 | Transports `fea_mesh` (bridge op `mesh`, Gmsh 4.15.2), `fea_solve` (ccx), `fea_export`; content-addressed `FeArtifactStore` | `server/src/fea/`, `server/python/llull_mesh.py`, `packages/mcp/src/feaTools.ts` |
 
@@ -676,7 +676,7 @@ server process (no ticket cancel yet).
 
 **Not built (05 backlog):** beams, `*DISTRIBUTING COUPLING` for CalculiX, `.llullz` result bundling (shells, plane stress, midsurface, defeature,
 composite shells and the UI panels are built in FEA-REST part 3; BDF, OP2, VTU, `set_result_view`, `fea_import_results`, `fea_result_field` and the face map in part 2, below). Modal, buckling,
-`dispose_margin`, `analytic_check`, moment loads, area-consistent forces and a Verdict subset (the metrics listed under "Verdict quality" below) are built (FEA-REST part 1, below).
+`dispose_margin`, `hand_check`, moment loads, area-consistent forces and a Verdict subset (the metrics listed under "Verdict quality" below) are built (FEA-REST part 1, below).
 
 **FEA-REST part 1 (2026-10-19): modal, buckling, human gate, analytic checks, loads, quality.**
 
@@ -687,9 +687,9 @@ composite shells and the UI panels are built in FEA-REST part 3; BDF, OP2, VTU, 
   Readers: the `.dat` eigenvalue table gives `frequenciesHz`; the participation-factor, effective-modal-mass and total-effective-mass tables
   (`P A R T I C I P A T I O N  F A C T O R S`, `E F F E C T I V E  M O D A L  M A S S`, `T O T A L  E F F E C T I V E  M A S S`, translations x / y / z) are parsed
   tolerantly into `dat.tables`; the layout (six components per row, mode number first, a `TOTAL` row after the effective masses that is not a mode) is confirmed
-  against a real ccx 2.21 run (SOLVER-VERIFY below; fixture `tests/unit/cae/fixtures/ccx221_modal_cantilever.dat`) (a heading without rows is dropped). The mode shapes are the `.frd` result sets (`render_fea_results mode=n`). `fea_report` returns `data.eigen`
+  against a real ccx 2.21 run (SOLVER-VERIFY below; fixture `tests/unit/cae/fixtures/ccx221_modal_cantilever.dat`) (a heading without rows is dropped). The mode shapes are the `.frd` result sets (`render_fea_results mode=n`). `analysis_report` returns `data.eigen`
   `{ kind: 'modal', modes [{ mode, frequencyHz, participation?, effectiveMass?, effectiveMassFraction? }], totalEffectiveMass, cumulativeMassFraction, massUnit, rigidBodyModes }`,
-  recomputed from the verified artifact (it is not part of the trusted summary, so records made earlier stay trusted); the `describe_analysis` and `fea_report` summaries list the
+  recomputed from the verified artifact (it is not part of the trusted summary, so records made earlier stay trusted); the `describe_analysis` and `analysis_report` summaries list the
   frequencies. Rigid-body modes = frequency <= max(1e-3 Hz, 1e-4 x the highest extracted frequency) (a llull heuristic).
 - **Buckling** (`analysisType: 'buckling'`). One `*BUCKLE` step with the constraints and the loads of the FIRST load case as the reference (deviation from "after a static
   preload": no `*STATIC` pre-stress step is written; a second load case is ignored and flagged `FEA_BUCKLING_LOAD_CASE_IGNORED`). Factors come from the `.dat`
@@ -712,7 +712,7 @@ composite shells and the UI panels are built in FEA-REST part 3; BDF, OP2, VTU, 
   `FEA_RESULTS_STALE` / `FEA_RESULTS_MISSING`, `FEA_MARGIN_ROW_NOT_FOUND`, `FEA_MARGIN_PARAM_INVALID` (a PASS row). A stored disposition is a claim: `compute_margins` honours it only
   while it binds to the current results hash and its signature still verifies over the row as computed now; otherwise the row stays `pending_human` with a
   `dispositionNote`. It never changes `status`: the row reads `statusLabel: 'FAIL (accepted)'`, `disposition: accepted` and carries `dispositionRecord`. Case dispositions are not part of the input hash.
-- **`analytic_check`** (registry query, pure, `analytic/`). `{ check, inputs, compare?: { quantity, value, toleranceRel? } }` with checks `cantilever` (tip deflection EB and
+- **`hand_check`** (registry query, pure, `analytic/`). `{ check, inputs, compare?: { quantity, value, toleranceRel? } }` with checks `cantilever` (tip deflection EB and
   Timoshenko, root moment and stress, stiffness; VC-FEA-10), `cantilever_frequency` (n-th clamped-free bending frequency, weak and strong axis; VC-FEA-11), `ss_beam` (central point
   and / or uniform load), `euler_column` (`K` stated, no default; VC-FEA-12), `ss_plate_buckling` (k(a/b), half waves, sigma_cr; VC-FEA-13), `kirsch_kt` (Kt = 3, transverse profile and
   hoop stress; VC-FEA-14). Rectangular sections, N-mm-t-s units in the key suffix; every result has its unit and formula, and the data lists assumptions and sources (AF-35);
@@ -729,13 +729,13 @@ composite shells and the UI panels are built in FEA-REST part 3; BDF, OP2, VTU, 
   (open question 10) and never counts as outside. `inverted` counts tets and quads with SJ <= 0 and zero-area triangles (the export / solve gate). Checked against `validation/mesh_quality_reference.json`
   (VC-FEA-07). The solid-tet deck still refuses 2D element types; the 2D metrics are ready for the shell / plane-stress part. The quality summary stays a diagnostic outside the trust comparison.
 - **Tests.** `tests/unit/cae/{verdict,eigenChecks,disposeMargin,analyticCheck,loadDistribution}.test.ts`, golden plans `fea_modal_cantilever` and `fea_buckling_column_moment`,
-  `server/tests/feaEigen.test.ts` (real Gmsh + ccx, skipped without them; it now also cross-checks `data.eigen` and `analytic_check`). Not run on this machine (no `ccx` / `gmsh`): VC-FEA-11 / 12 / 41 / 42 against
+  `server/tests/feaEigen.test.ts` (real Gmsh + ccx, skipped without them; it now also cross-checks `data.eigen` and `hand_check`). Not run on this machine (no `ccx` / `gmsh`): VC-FEA-11 / 12 / 41 / 42 against
   a real solver, the free-free modal deck, the participation-table layout and the `*FREQUENCY n, min, max` band.
 
 **Review fixes (2026-10-17), documented behaviour changes:**
 
 - **Trust model §4.1 completed on the read side.** A recorded summary in the document (also one that arrived through `load_document` or a
-  live snapshot) is a *claim*. `fea_report`, `check_analysis`, `describe_analysis` and the thermal / thermo-mechanical read paths call
+  live snapshot) is a *claim*. `analysis_report`, `check_analysis`, `describe_analysis` and the thermal / thermo-mechanical read paths call
   `trustedRecord` (`domain-cae/src/shared/trust.ts`): the summary is recomputed from the artifact in `ctx.feaArtifacts` with the same
   summariser the record commands use. State `solved` / `meshed` only when it matches; a difference gives state **`untrusted`** with
   `FEA_SUMMARY_MISMATCH` (`data.problem`), no port / artifact absent / recorded without it gives **`missing`**. In both cases the mesh and

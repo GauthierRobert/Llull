@@ -13,7 +13,7 @@ describe('aerodynamics / fluids review regressions', () => {
       { span: 5, rootChord: 1, speed: 50, altitudeM: 11000, temperatureOffsetK: -150 },
       'AER_PARAM_INVALID',
     );
-    expectRefusal(doc, 'aero_drag', { speed: 10, cdA: 1, temperatureOffsetK: -200 }, 'AER_PARAM_INVALID');
+    expectRefusal(doc, 'compute_aero_drag', { speed: 10, cdA: 1, temperatureOffsetK: -200 }, 'AER_PARAM_INVALID');
   });
 
   it('caps polyline airfoils at 801 points and solves many angles from one factorisation', () => {
@@ -110,13 +110,13 @@ describe('aerodynamics / fluids review regressions', () => {
     expect([explicit.divergence.defaulted, explicit.cStarEfficiency.defaulted, explicit.ambient.defaulted]).toEqual([false, false, false]);
   });
 
-  it('aero_drag adds the unrounded friction drag to the pressure drag', () => {
+  it('compute_aero_drag adds the unrounded friction drag to the pressure drag', () => {
     const result = data<{
       dragN: number;
       pressureDragN: number;
       friction: { cf: number; wettedAreaM2: number };
       dynamicPressurePa: number;
-    }>(doc, 'aero_drag', { speed: 30, cdA: 0.3, frictionModel: 'turbulent_prandtl_schlichting', wettedAreaM2: 7, lengthM: 4 });
+    }>(doc, 'compute_aero_drag', { speed: 30, cdA: 0.3, frictionModel: 'turbulent_prandtl_schlichting', wettedAreaM2: 7, lengthM: 4 });
     expect(result.dragN).toBeCloseTo(result.pressureDragN + result.friction.cf * result.dynamicPressurePa * 7, 6);
   });
 });

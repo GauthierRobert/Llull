@@ -1,4 +1,4 @@
-/** add_fea_load / update_fea_load / delete_fea_load: mechanical loads of an analysis (force, pressure, gravity). */
+/** add_fea_load / update_fea_load: mechanical loads of an analysis (force, pressure, gravity). */
 
 import type { AnalysisCase, FeaLoad, LoadCategory } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
@@ -202,29 +202,5 @@ export const updateFeaLoad = defineCommand({
       `update_fea_load: '${loadId}' (${updated.name}) now ${summarize(updated)} in '${analysisId}'.${fields.target !== undefined ? targetDistanceWarning(doc, fields.target) : ''}`,
       [loadId],
     );
-  },
-});
-
-/**
- * @affects doc.analysis.cases[analysisId].loads (removes 1; affected: [loadId])
- * @failure unknown analysis / load -> refusal, unchanged doc
- */
-export const deleteFeaLoad = defineCommand({
-  name: 'delete_fea_load',
-  description: 'Remove a load from an analysis.',
-  annotations: { destructive: true },
-  params: z.object({ analysisId: analysisIdSchema, loadId: z.string().describe('Load id to remove.') }),
-  run: (doc, { analysisId, loadId }): CommandResult => {
-    const analysisCase = caseOf(doc, analysisId);
-    if (analysisCase === undefined)
-      return refuseCode(doc, 'delete_fea_load', 'FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`, [analysisId], ['analysisId']);
-    if (!Object.hasOwn(analysisCase.loads, loadId))
-      return refuseCode(doc, 'delete_fea_load', 'FEA_LOAD_NOT_FOUND', `no load '${loadId}' in '${analysisId}'`, [analysisId, loadId]);
-    const next: AnalysisCase = {
-      ...analysisCase,
-      loads: Object.fromEntries(Object.entries(analysisCase.loads).filter(([id]) => id !== loadId)),
-      loadOrder: analysisCase.loadOrder.filter((id) => id !== loadId),
-    };
-    return changed(withCase(doc, next), `delete_fea_load: removed '${loadId}' from '${analysisId}'.`, [loadId]);
   },
 });

@@ -167,8 +167,8 @@
       },
       {
         "id": "#24",
-        "name": "bake_motion",
-        "params": {},
+        "name": "evaluate_motion",
+        "params": {"apply":true},
         "suppressed": false,
         "affected": ["#5","#6","#7"]
       },

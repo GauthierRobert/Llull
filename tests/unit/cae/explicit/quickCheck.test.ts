@@ -15,7 +15,7 @@ const expected = new Map(
 );
 const doc = createEmptyDocument();
 const quick = (check: string, inputs: Record<string, number>): Record<string, number> =>
-  data<{ values: Record<string, number> }>(execute(doc, 'explicit_quick_check', { check, inputs })).values;
+  data<{ values: Record<string, number> }>(execute(doc, 'hand_check', { check, inputs })).values;
 const close = (actual: number | undefined, id: string): void => {
   const value = expected.get(id) ?? Number.NaN;
   expect(Math.abs((actual ?? Number.NaN) / value - 1)).toBeLessThan(1e-9);
@@ -23,7 +23,7 @@ const close = (actual: number | undefined, id: string): void => {
 const STEEL = { E_Pa: 2e11, nu: 0.3, rho_kg_m3: 7850 };
 const TI = { A_Pa: 1098e6, B_Pa: 1092e6, n: 0.93, C: 0.014, m: 1.1, eps_p: 0.1, rate_per_s: 1000, ref_rate_per_s: 1 };
 
-describe('explicit_quick_check', () => {
+describe('hand_check', () => {
   it('matches the generator for wave speeds, time step and mass scaling (VC-EXP-10, 11)', () => {
     const waves = quick('wave_speed', STEEL);
     close(waves['c0_m_s'], 'VC-EXP-10.a');
@@ -59,9 +59,9 @@ describe('explicit_quick_check', () => {
   });
 
   it('refuses a missing input and is read-only', () => {
-    const result = execute(doc, 'explicit_quick_check', { check: 'bar_impact', inputs: { E_Pa: 1 } });
+    const result = execute(doc, 'hand_check', { check: 'bar_impact', inputs: { E_Pa: 1 } });
     expect(code(result)).toBe('EXP_INPUT_MISSING');
     expect(result.summary).toContain('rho_kg_m3, v_m_s, L_m');
-    expect(execute(doc, 'explicit_quick_check', { check: 'wave_speed', inputs: STEEL }).document).toBe(doc);
+    expect(execute(doc, 'hand_check', { check: 'wave_speed', inputs: STEEL }).document).toBe(doc);
   });
 });

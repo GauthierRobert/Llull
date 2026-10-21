@@ -1,11 +1,8 @@
-/** draw_naca_airfoil (2D section into the sketch) and analyze_airfoil (inviscid panel method + thin-airfoil theory). */
+/** analyze_airfoil: inviscid panel method + thin-airfoil theory. Sections come from airfoil_from_naca (as "polyline") / draw_polyline. */
 
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
-import { changed } from '@core/commands/noop';
-import { execute } from '@core/commands/registry';
 import { briefReport, sig } from '../shared/results';
-import { nacaOrdinates, parseNaca } from './naca';
 import { refuseAero } from './codes';
 import { nacaContour, polylineContour } from './airfoilContour';
 import { solveVortexPanels, thinAirfoil } from './panelMethod';
@@ -13,55 +10,6 @@ import { solveVortexPanels, thinAirfoil } from './panelMethod';
 const RAD = Math.PI / 180;
 const MIN_PANELS = 20;
 const MAX_PANELS = 400;
-
-/**
- * @affects creates 1 closed polyline (the section, chord along local +x, leading edge at `position`)
- * @invariant ordinates of NACA Report 824 (closed trailing edge by default), cosine spacing, Selig order; composes draw_polyline
- * @failure unsupported designation -> AER_AIRFOIL_INVALID; chord <= 0 or pointsPerSide outside 10..400 -> AER_PARAM_INVALID
- */
-export const drawNacaAirfoil = defineCommand({
-  name: 'draw_naca_airfoil',
-  description:
-    'Draw a NACA 4-digit (e.g. "0012", "2412", "4415") or 230-series 5-digit ("23012") airfoil section as one closed 2D polyline ' +
-    '(NACA Report 824 ordinates, cosine spacing, upper trailing edge -> leading edge -> lower trailing edge). `chord` in document units; ' +
-    'leading edge at `position`, chord along +x; `incidenceDeg` rotates the section nose-up about the leading edge. `closedTrailingEdge` ' +
-    '(default true) uses the 0.1036 last thickness coefficient (sharp TE); false gives the original open TE. Next: analyze_airfoil ' +
-    '{ entityId } for lift / moment, extrude_profile for a constant-chord wing panel, loft_sections between sections for a tapered wing.',
-  params: z.object({
-    naca: z.string().describe('NACA designation, e.g. "2412" or "NACA 23012".'),
-    chord: z.number().describe('Chord length in document units, > 0.'),
-    pointsPerSide: z.number().int().optional().describe('Points per surface (10..400). Default 60.'),
-    closedTrailingEdge: z.boolean().optional().describe('Sharp closed trailing edge (default true).'),
-    incidenceDeg: z.number().optional().describe('Nose-up rotation about the leading edge in degrees. Default 0.'),
-    position: z
-      .array(z.number())
-      .length(3)
-      .optional()
-      .describe('Leading-edge position [x, y, z] of the sketch plane in document units. Default origin.'),
-  }),
-  run: (doc, params, ctx): CommandResult => {
-    const section = parseNaca(params.naca);
-    if (typeof section === 'string') return refuseAero(doc, 'draw_naca_airfoil', 'AER_AIRFOIL_INVALID', section, [], ['naca']);
-    const perSide = params.pointsPerSide ?? 60;
-    if (!(params.chord > 0) || !(perSide >= 10 && perSide <= MAX_PANELS))
-      return refuseAero(doc, 'draw_naca_airfoil', 'AER_PARAM_INVALID', 'chord must be > 0 and pointsPerSide within 10..400', [], ['chord']);
-    const closed = params.closedTrailingEdge ?? true;
-    const incidence = (params.incidenceDeg ?? 0) * RAD;
-    const ordinates = nacaOrdinates(section, perSide, closed);
-    const unique = closed ? ordinates.slice(0, -1) : ordinates;
-    const points = unique.map(([x, y]) => {
-      const [sx, sy] = [x * params.chord, y * params.chord];
-      return [sx * Math.cos(incidence) + sy * Math.sin(incidence), -sx * Math.sin(incidence) + sy * Math.cos(incidence)];
-    });
-    const drawn = execute(doc, 'draw_polyline', { points, closed: true, ...(params.position ? { position: params.position } : {}) }, ctx);
-    if (drawn.affected.length === 0) return drawn;
-    return changed(
-      drawn.document,
-      `Drew ${section.designation} (t/c ${section.maxThickness}, chord ${params.chord}, ${points.length} points${incidence !== 0 ? `, incidence ${params.incidenceDeg}°` : ''}) as ${drawn.affected[0]}.`,
-      drawn.affected,
-    );
-  },
-});
 
 /**
  * @affects none; data = { airfoil, method, panels, polar [{ alphaDeg, cl, clCirculation, cm, cdPressure }], liftSlopePerDeg, zeroLiftAngleDeg, thinAirfoil?, surface?, warnings, provenance }
@@ -81,7 +29,10 @@ export const analyzeAirfoil = defineCommand({
     'lift slope and zero-lift angle.',
   params: z.object({
     naca: z.string().optional().describe('NACA designation, e.g. "0012", "2412", "23012". Give this or entityId.'),
-    entityId: z.string().optional().describe('Id of a closed 2D polyline airfoil (e.g. from draw_naca_airfoil). Give this or naca.'),
+    entityId: z
+      .string()
+      .optional()
+      .describe('Id of a closed 2D polyline airfoil (e.g. from airfoil_from_naca as "polyline"). Give this or naca.'),
     alphasDeg: z.array(z.number()).optional().describe('Angles of attack in degrees, each within -20..20, at most 41. Default [0, 5].'),
     panelsPerSide: z.number().int().optional().describe('NACA only: panels per surface, 20..400. Default 100.'),
     closedTrailingEdge: z.boolean().optional().describe('NACA only: sharp closed trailing edge (default true).'),

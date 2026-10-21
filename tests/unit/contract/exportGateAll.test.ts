@@ -46,7 +46,7 @@ const exportNames = listCommands()
 
 describe('every export_* command is behind the export gate (TR-MAT-30 / 51)', () => {
   it('finds the export commands of core and every plugin', () => {
-    for (const name of ['export_stl', 'export_sheet_svg', 'export_material_cards', 'export_dxf', 'export_ifc', 'export_nc_files'])
+    for (const name of ['export_stl', 'export_sheet_svg', 'export_material_cards', 'export_building_dxf', 'export_ifc', 'export_nc_files'])
       expect(exportNames).toContain(name);
     expect(exportNames.length).toBeGreaterThanOrEqual(21);
   });

@@ -1,4 +1,4 @@
-/** Surface stage of cfd_prepare (TECHNICAL_SPEC §5.1 steps 2-5): union, case frame in metres, weld, watertight, orientation, self-intersection, hash. */
+/** Surface stage of prepare_cfd_case (TECHNICAL_SPEC §5.1 steps 2-5): union, case frame in metres, weld, watertight, orientation, self-intersection, hash. */
 
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { toMetres } from '@core/model/units';

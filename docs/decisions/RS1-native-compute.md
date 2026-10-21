@@ -27,10 +27,10 @@ solver/                         one Cargo workspace (sibling of server/ and desk
   crates/llull-bvh              deterministic AABB / triangle BVH, ray and distance queries (CPU + GPU traversal)
   crates/llull-raster           offscreen renderer (wgpu) for render_view, walkthroughs, BCF snapshots, CAE field plots
   crates/llull-voxfe            matrix-free voxel finite elements (Q8 / Q4), PCG + multigrid — shared by topopt and CFD tooling
-  crates/llull-flow-{core,lbm,euler}   12 CFD solvers (were `solver/flow/`)
+  crates/llull-flow-{core,lbm,euler}   12 CFD solvers (planned, NOT BUILT: no such crates exist)
   crates/llull-topopt           physics 17 SIMP loop on llull-voxfe
   crates/llull-cloud            plant 10 point-cloud I/O (E57, LAS, LAZ, COPC), octree, kd-tree, ICP, RANSAC, normals, deviation
-  crates/llull-geomq            clearance, wall thickness, view factors (physics 21, 03) on llull-bvh
+  crates/llull-geomq            clearance, wall thickness, view factors (physics 21, 03) on llull-bvh (planned = RS-6, NOT BUILT)
   crates/llull-post             FE post-processing: rainflow + damage (07), random / SSD response (09), field mapping (04)
   crates/llull-route            plant 02 V2 auto-router (sparse 3D A*)
   crates/llull-stats            aerospace 03 Monte Carlo stack-up (counter-based RNG streams)
@@ -56,9 +56,14 @@ Rules:
    fixed order (`llull-gpu`), so a run is bit-reproducible on one device and driver. GPU-only fast paths are allowed for exploration
    and pictures and say so in provenance (`device`, `deterministic: false`). Where a pack requires identical hashes across
    machines (plant 09 `svgSha256`, plant 10 TR-SCN-08), the TypeScript or Rust-CPU path stays the reference.
-4. **References stay.** Existing TypeScript implementations (`meshBvh.ts`, `computeViewFactors.ts`, `fieldRaster.ts`, the fatigue
-   loops, `renderPlan`) remain as the small-case path and the test oracle; native results must match them within each pack's VC
-   tolerance (one "native vs reference" VC per row).
+4. **TS references are removed where Rust is the only runtime path** (owner decision 2026-10-21: "Rust is kept"). Removed: the 2D SIMP
+   reference (`@lib/topology`, `bandedCholesky`, `runTopologyReference`; `topology_solve` refuses with TOP_TOOL_MISSING +
+   NATIVE_TOOL_MISSING when `llull-compute` is absent) and `fatigueFieldReference` (now a test oracle, `tests/helpers/fatigueFieldOracle.ts`;
+   `fatigue_field` lost its `verify` option). Frozen goldens (`tests/unit/cae/topology/referenceArtifacts.json`) replace the live reference
+   in tests. TypeScript paths that remain, and why: `meshBvh.ts` / `computeViewFactors.ts` / clearance (RS-6 not built, so TS is the only
+   implementation); stack-up Monte Carlo, vortex lattice, auto-route, field mapping and the software rasterisers (`fieldRaster.ts`,
+   `renderPlan`) (small-case path + cross-machine determinism / hash reference); rainflow, damage and life math in `domain-cae` (the runtime
+   path of `compute_fatigue`). Native results of these must still match them within each pack's VC tolerance.
 5. **Offline and bundled (AF-41).** `desktop/scripts/prepare-native.mjs` builds or fetches the two binaries per OS / arch (like
    CPython and `ccx`); missing binaries refuse with `NATIVE_TOOL_MISSING` and an install hint. llull stays fully usable without them
    (TypeScript paths, smaller caps). Bundle layout `resources/native/{llull-compute,llull-kernel,occt/lib/*,licenses/}`; the desktop

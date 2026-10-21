@@ -7,5 +7,5 @@
  { "command": "create_composite_part", "params": { "name": "Cone skin", "toolSurface": { "entityId": "$tool", "faceNear": [50, 0, 50] }, "rosette": "Rax" }, "as": "part" },
  { "command": "add_ply", "params": { "part": "$part", "name": "C1", "material": "AS4_3501_6", "orientation": 0, "sequence": "S1",
    "boundary": { "kind": "whole_face" }, "drape": { "method": "developable" } }, "as": "c1" },
- { "command": "export_flat_patterns_dxf", "params": { "part": "$part", "plies": ["$c1"] } }
+ { "command": "export_ply_flat_patterns_dxf", "params": { "part": "$part", "plies": ["$c1"] } }
 ]

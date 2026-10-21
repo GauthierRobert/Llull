@@ -16,6 +16,14 @@ import { crossingIndex, normalizeToChord, parseAirfoilText, trailingEdgeGap, wit
 import { airfoilMetrics } from './airfoilMetrics';
 
 const MAX_IMPORT_POINTS = 2_000;
+const RAD = Math.PI / 180;
+
+/** Scales the chord-normalised ordinates to `chord` and rotates them nose-up by `incidenceDeg` about the leading edge. */
+function placeSection(ordinates: readonly Vec2[], chord: number, incidenceDeg: number): Vec2[] {
+  if (chord === 1 && incidenceDeg === 0) return [...ordinates];
+  const [cos, sin] = [Math.cos(incidenceDeg * RAD), Math.sin(incidenceDeg * RAD)];
+  return ordinates.map(([x, y]) => [(x * cos + y * sin) * chord, (-x * sin + y * cos) * chord]);
+}
 
 /** Creates the planar curve through `points` (z = 0) with the core `interpolate_curve` and registers the airfoil definition. */
 function registerAirfoil(
@@ -51,9 +59,9 @@ function registerAirfoil(
 }
 
 /**
- * @affects creates doc.aero.airfoils[id] and 1 planar nurbs_curve (chord 1, leading edge at the origin, chord along +x)
- * @invariant the curve passes through every generated ordinate (NACA Report 824, cosine spacing by default); closed trailing edge uses a4 = 0.1036
- * @failure unknown designation -> AERO_NACA_DESIGNATION_UNKNOWN; points not odd in 21..801 -> AERO_PARAM_INVALID
+ * @affects as "nurbs": creates doc.aero.airfoils[id] and 1 planar nurbs_curve; as "polyline": creates 1 closed polyline (no airfoil id)
+ * @invariant the section passes through every generated ordinate (NACA Report 824, cosine spacing by default); closed trailing edge uses a4 = 0.1036; chord 1 and incidence 0 by default
+ * @failure unknown designation -> AERO_NACA_DESIGNATION_UNKNOWN; points not odd in 21..801 or chord <= 0 -> AERO_PARAM_INVALID
  */
 export const airfoilFromNaca = defineCommand({
   name: 'airfoil_from_naca',
@@ -63,7 +71,9 @@ export const airfoilFromNaca = defineCommand({
     'edge at the origin, chord along +x, thickness along +y, drawn from the upper trailing edge round the leading edge to the lower one. ' +
     '`trailingEdge` "open" (default, the original definition, blunt 0.00252 chord for t = 12 %) or "closed" (sharp, a4 = 0.1036). `points` ' +
     'is the total ordinate count, odd, 21..801 (default 161 = 81 cosine stations per surface); `spacing` "cosine" (default) or "uniform". ' +
-    'Returns the airfoil id (use it in create_wing / airfoil_properties) and the curve id. Place several airfoils with `position`.',
+    'Returns the airfoil id (use it in create_wing / airfoil_properties) and the curve id. Place several airfoils with `position`. `chord` (default 1) scales the section to document units and `incidenceDeg` (default 0) rotates it ' +
+    'nose-up about the leading edge. `as` "nurbs" (default) makes the exact curve plus the airfoil id; `as` "polyline" instead draws one plain closed ' +
+    '2D polyline (no airfoil id; affected[0] is the polyline) for analyze_airfoil { entityId }, extrude_profile or loft_sections.',
   params: z.object({
     designation: z
       .string()
@@ -77,11 +87,23 @@ export const airfoilFromNaca = defineCommand({
       .enum(['cosine', 'uniform'])
       .describe('Chordwise station spacing: "cosine" (default, dense at the nose) or "uniform".')
       .optional(),
+    chord: z.number().describe('Chord length in document units, > 0. Default 1 (chord-normalised).').optional(),
+    incidenceDeg: z.number().describe('Nose-up rotation about the leading edge in degrees. Default 0.').optional(),
+    as: z
+      .enum(['nurbs', 'polyline'])
+      .describe('"nurbs" (default): exact NURBS curve + airfoil id; "polyline": one closed 2D polyline, no airfoil id.')
+      .optional(),
     position: vec3(
       'Where to place the curve [x, y, z] in document units (the section stays in the local XY plane). Default [0, 0, 0].',
     ).optional(),
   }),
-  run: (doc, { designation, trailingEdge = 'open', points = 161, spacing = 'cosine', position }, ctx): CommandResult => {
+  run: (
+    doc,
+    { designation, trailingEdge = 'open', points = 161, spacing = 'cosine', chord = 1, incidenceDeg = 0, as = 'nurbs', position },
+    ctx,
+  ): CommandResult => {
+    if (!(chord > 0) || !Number.isFinite(incidenceDeg))
+      return refuseAero(doc, 'airfoil_from_naca', 'AERO_PARAM_INVALID', 'chord must be > 0 and incidenceDeg finite', [], ['params.chord']);
     if (!Number.isInteger(points) || points < 21 || points > 801 || points % 2 === 0)
       return refuseAero(
         doc,
@@ -96,7 +118,17 @@ export const airfoilFromNaca = defineCommand({
       return refuseAero(doc, 'airfoil_from_naca', 'AERO_NACA_DESIGNATION_UNKNOWN', section, [], ['params.designation']);
     const pointsPerSide = (points - 1) / 2;
     const closedTrailingEdge = trailingEdge === 'closed';
-    const ordinates: Vec2[] = nacaOrdinates(section, pointsPerSide, closedTrailingEdge, spacing);
+    const ordinates = placeSection(nacaOrdinates(section, pointsPerSide, closedTrailingEdge, spacing), chord, incidenceDeg);
+    if (as === 'polyline') {
+      const unique = closedTrailingEdge ? ordinates.slice(0, -1) : ordinates;
+      const drawn = execute(doc, 'draw_polyline', { points: unique, closed: true, ...(position ? { position } : {}) }, ctx);
+      if (drawn.affected.length === 0) return drawn;
+      return changed(
+        drawn.document,
+        `airfoil_from_naca: drew ${section.designation} (t/c ${section.maxThickness}, chord ${chord}, ${unique.length} points${incidenceDeg !== 0 ? `, incidence ${incidenceDeg}°` : ''}) as polyline ${drawn.affected[0]}.`,
+        drawn.affected,
+      );
+    }
     return registerAirfoil(
       doc,
       'airfoil_from_naca',

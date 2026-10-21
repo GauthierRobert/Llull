@@ -1,7 +1,6 @@
 /**
- * Freeform leaves of the native kernel (RS-1): the pure geometry the WASM OCC kernel computes in TypeScript before it calls OCCT
- * (occtCurves.ts, occtShapes.ts, occtPatches.ts) is computed here with the same core helpers, so the sidecar runs the same OCCT
- * builders on the same numbers (solver/crates/llull-kernel-occt/src/recipe/nodes.rs). Exact profile `curves` become an oriented
+ * Freeform leaves of the native kernel (RS-1): the pure geometry computed in TypeScript (core helpers) before the OCCT call is
+ * computed here, so the sidecar's OCCT builders receive ready numbers (solver/crates/llull-kernel-occt/src/recipe/nodes.rs). Exact profile `curves` become an oriented
  * 3D `chain`; loft, sweep and subdivision entities carry a `native` payload (ring curves, spine and section, Bézier patches plus
  * the fallback triangles), a `nurbs_surface` sheet its encoded surface and trim loops.
  * @invariant pure: no process, no I/O; an entity the sidecar builds without help is returned unchanged
@@ -31,7 +30,7 @@ export function encodeChain(chain: ReadonlyArray<CurveSegment<Vec3>>): number[] 
   return chain.flatMap((segment) => [SEGMENT_CODES[segment.type], ...segment.points.flat()]);
 }
 
-/** occtCurves.ts `chainFace` up to OCCT: the closed 2D chain oriented (counter-clockwise or not) then lifted by `place`. */
+/** Face-chain geometry up to OCCT: the closed 2D chain oriented (counter-clockwise or not) then lifted by `place`. */
 export function orientedChain(
   curves: ReadonlyArray<CurveSegment<Vec2>>,
   place: (point: Vec2) => Vec3,
@@ -44,10 +43,10 @@ export function orientedChain(
 
 type SweepEntity = Extract<Entity, { kind: 'sweep' }>;
 
-/** occtCurves.ts SKIN_SECTIONS_PER_SEGMENT. */
+/** Skin sections per spine segment. */
 const SKIN_SECTIONS_PER_SEGMENT = 8;
 
-/** occtCurves.ts `stationSweep`: the station rings placed in the sweep frame at the skin fractions. */
+/** Sweep stations: the station rings placed in the sweep frame at the skin fractions. */
 function stationRings(entity: SweepEntity): number[][] {
   const stations = entity.stations ?? [];
   const count = clamp(entity.path.length * SKIN_SECTIONS_PER_SEGMENT, 8, 64);
@@ -61,7 +60,7 @@ function stationRings(entity: SweepEntity): number[][] {
   });
 }
 
-/** occtCurves.ts `sectionFace` inputs: a circle (with its bore) or the oriented profile chain in the start frame. */
+/** Section-face inputs: a circle (with its bore) or the oriented profile chain in the start frame. */
 function sectionPayload(entity: SweepEntity): Record<string, unknown> {
   const first = entity.path[0];
   if (first === undefined) return {};
@@ -91,7 +90,7 @@ function sweepPayload(entity: SweepEntity): Record<string, unknown> {
 
 const NO_COMPONENTS = createEmptyDocument();
 
-/** occtShapes.ts subdivision branch: exact patches for a smooth cage (sewing tolerance from its span), the triangles always. */
+/** Subdivision branch: exact patches for a smooth cage (sewing tolerance from its span), the triangles always. */
 function subdivisionPayload(entity: Extract<Entity, { kind: 'subdivision' }>): Record<string, unknown> {
   const positions = entityTrianglePositions(entity, NO_COMPONENTS);
   const triangles = { positions, indices: orientOutward(positions, []) };

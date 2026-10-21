@@ -1,4 +1,4 @@
-/** add_fea_constraint / update_fea_constraint / delete_fea_constraint: supports of an analysis. */
+/** add_fea_constraint / update_fea_constraint: supports of an analysis. */
 
 import type { AnalysisCase, FeaConstraint } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
@@ -143,39 +143,5 @@ export const updateFeaConstraint = defineCommand({
       `update_fea_constraint: '${constraintId}' now ${describeConstraint(updated)} (${updated.name}) in '${analysisId}'.${target !== undefined ? targetDistanceWarning(doc, target) : ''}`,
       [constraintId],
     );
-  },
-});
-
-/**
- * @affects doc.analysis.cases[analysisId].constraints (removes 1; affected: [constraintId])
- * @failure unknown analysis / constraint -> refusal, unchanged doc
- */
-export const deleteFeaConstraint = defineCommand({
-  name: 'delete_fea_constraint',
-  description: 'Remove a constraint from an analysis.',
-  annotations: { destructive: true },
-  params: z.object({ analysisId: analysisIdSchema, constraintId: z.string().describe('Constraint id to remove.') }),
-  run: (doc, { analysisId, constraintId }): CommandResult => {
-    const analysisCase = caseOf(doc, analysisId);
-    if (analysisCase === undefined)
-      return refuseCode(
-        doc,
-        'delete_fea_constraint',
-        'FEA_ANALYSIS_NOT_FOUND',
-        `no analysis '${analysisId}'`,
-        [analysisId],
-        ['analysisId'],
-      );
-    if (!Object.hasOwn(analysisCase.constraints, constraintId))
-      return refuseCode(doc, 'delete_fea_constraint', 'FEA_CONSTRAINT_NOT_FOUND', `no constraint '${constraintId}' in '${analysisId}'`, [
-        analysisId,
-        constraintId,
-      ]);
-    const next: AnalysisCase = {
-      ...analysisCase,
-      constraints: Object.fromEntries(Object.entries(analysisCase.constraints).filter(([id]) => id !== constraintId)),
-      constraintOrder: analysisCase.constraintOrder.filter((id) => id !== constraintId),
-    };
-    return changed(withCase(doc, next), `delete_fea_constraint: removed '${constraintId}' from '${analysisId}'.`, [constraintId]);
   },
 });

@@ -27,7 +27,7 @@ returns data with units, provenance, named defaults and the review flag; probabi
 | Context | Today (who / which tools) | What llull adds | Source |
 | ------- | ------------------------- | --------------- | ------ |
 | Statistical allowables | MMPDS: A-basis = value that at least 99 % of the population equals or exceeds with 95 % confidence; B-basis = 90 % with 95 % confidence. CMH-17 frames them as 95 % lower confidence bounds on the 1st / 10th percentile | Shows what a basis value means statistically (tolerance factor k(n)), and lets scatter on properties enter a reliability study; computing allowables from test data stays in 08 MAT V3 | [R8] |
-| Structural reliability | FORM / SORM are the classical methods; the Hasofer–Lind index is invariant to the formulation of the limit state; Breitung's asymptotic formula corrects FORM with curvatures | `reliability_form` returning β, Pf, design point, importance factors, SORM correction | [R1]–[R3] |
+| Structural reliability | FORM / SORM are the classical methods; the Hasofer–Lind index is invariant to the formulation of the limit state; Breitung's asymptotic formula corrects FORM with curvatures | `run_reliability_study` returning β, Pf, design point, importance factors, SORM correction | [R1]–[R3] |
 | Sampling | Monte Carlo with a fixed seed for reproducibility; Latin hypercube sampling (McKay, Beckman, Conover 1979) reduces variance for the same budget | Seeded MC and LHS on any registry response (pure queries in MVP, FE responses through 05 transports in V1) | [R4], 03 GDT |
 | Global sensitivity | Sobol indices with the Saltelli / Jansen estimators are standard (SALib MIT, OpenTURNS LGPL, UQpy MIT, Chaospy MIT); the Ishigami function is the usual benchmark with closed-form indices | `sensitivity_indices` with bootstrap confidence intervals, validated on Ishigami | [R5]–[R7] |
 | Parametric CAD | Parameters drive the feature history; `set_parameter` regenerates dependent steps | Local derivatives and elasticities of any query result with respect to any document parameter | [L1] |
@@ -39,7 +39,7 @@ methods are classical and openly implemented [R1]–[R7]. No claimed savings.
 
 | Role | Who | Uses | Main need |
 | ---- | --- | ---- | --------- |
-| **Operator (primary)** | AI agent on the `llull` CLI (MCP for cloud) | `llull define_random_variable`, `llull define_limit_state`, `llull propagate_uncertainty`, `llull reliability_form`, `llull sensitivity_indices`, `llull parameter_sensitivity`, `llull check_probabilistic` | Reproducible statistics with units and confidence bounds, stable codes, a check to close the job |
+| **Operator (primary)** | AI agent on the `llull` CLI (MCP for cloud) | `llull define_random_variable`, `llull define_limit_state`, `llull propagate_uncertainty`, `llull run_reliability_study`, `llull sensitivity_indices`, `llull parameter_sensitivity`, `llull check_probabilistic` | Reproducible statistics with units and confidence bounds, stable codes, a check to close the job |
 | **Owner** | Not an engineer | Natural language | "The mass stays under 22 g with 99.9 % probability; thickness drives 80 % of the scatter"; "this probability needs a qualified engineer before it supports any safety claim" |
 | **Qualified reviewer** | Stress / reliability engineer | Desktop review: distributions, correlation, method, convergence | Approves the probabilistic model and any use of a Pf in a safety argument (human gate) |
 
@@ -52,7 +52,7 @@ User stories:
   `sensitivity_indices` gives Sobol shares when the response is non-linear.
 - **US-3.** "What is the probability that the lug fails?" With 05 margins available, the agent defines
   g = allowable − applied, binds the allowable to the PHY-01 `PropertyModel.uncertainty` of the 08 record (statistical band with its coverage and provenance) and the load
-  scale, runs `reliability_form` and checks it with Monte Carlo; it reports β, Pf, design point and importance
+  scale, runs `run_reliability_study` and checks it with Monte Carlo; it reports β, Pf, design point and importance
   factors, and says that a qualified engineer must review before the number is used.
 - **US-4.** A variable is bound to an 08 `typical` value: every result carries `unverified` and
   `PRB_INPUT_UNVERIFIED`.
@@ -78,7 +78,7 @@ User stories:
 | FR-PRB-01a | MUST | **Material scatter comes from PHY-01**: a `materialProperty` binding names the 08 record and a PHY-01 `PropertyModel` id; its distribution is derived from `PropertyModel.uncertainty` (`statistical` with `coverage` → normal sd = half-band / Φ⁻¹((1 + coverage)/2); `measurement` only with an explicit caller coverage, named; `fitErrorVsData` is **refused** as a distribution, `PRB_SCATTER_KIND_UNSUITABLE`, mirroring PHY-01 `PROP_UNCERTAINTY_KIND`). A caller-supplied distribution for a material property is allowed but marked `scatterSource: 'caller'` and needs a citation, else `PRB_SCATTER_UNSOURCED`. PRB defines no material data of its own (README §6.2). | One owner of material data; PHY-01 OQ-PROP-10 defers propagation to PHY-18 | PHY-01 TECHNICAL_SPEC §3, §5.5 |
 | FR-PRB-02 | MUST | `propagate_uncertainty` runs **seeded Monte Carlo** or **LHS** (N, seed) over the variables and returns per response: mean, sd, min, max, quantiles (named list), histogram bins, and for each limit state Pf with a confidence interval; deterministic for (seed, N, method, model). | Reproducible statistics (AF-13) | [R4], 03 GDT |
 | FR-PRB-03 | MUST | Moments of a response must match closed forms where they exist within statistical acceptance bounds (mean ± 5 sd/√N, sd ± 5 sd/√(2N), p ± max(5√(p(1−p)/N), 1e-5)), as 03 GDT does. | Self-verification | 03 GDT §5.7 |
-| FR-PRB-04 | MUST | `reliability_form`: HL-RF iteration in standard normal space (independent marginals by Rosenblatt; correlated normals by Cholesky), returns β, Pf_FORM = Φ(−β), design point in u and x space with units, importance factors α² (sum 1), iterations, convergence flag; exact on linear limit states in normal variables. | Classical reliability method | [R1], [R2] |
+| FR-PRB-04 | MUST | `run_reliability_study`: HL-RF iteration in standard normal space (independent marginals by Rosenblatt; correlated normals by Cholesky), returns β, Pf_FORM = Φ(−β), design point in u and x space with units, importance factors α² (sum 1), iterations, convergence flag; exact on linear limit states in normal variables. | Classical reliability method | [R1], [R2] |
 | FR-PRB-05 | MUST | Probabilities are computed with a double-precision Φ (relative error < 1e-12 in the tested range); β ↔ Pf conversions are exposed in `data`. | Small probabilities | 03 GDT §5.7 (same rule) |
 | FR-PRB-06 | MUST | FORM reports the **design point** (most probable failure point) and **importance factors** so the owner learns which variable drives failure. | Explanation (AF-35) | [R1] |
 | FR-PRB-07 | SHOULD | **SORM** (Breitung): principal curvatures at the design point by finite differences, Pf_SORM = Φ(−β) Π(1 + β κ_i)^(−1/2), refused when 1 + β κ_i ≤ 0. | FORM error on curved limit states | [R3] |
@@ -102,7 +102,7 @@ User stories:
 
 ```bash
 llull search probability sensitivity reliability
-llull describe define_random_variable propagate_uncertainty reliability_form sensitivity_indices parameter_sensitivity
+llull describe define_random_variable propagate_uncertainty run_reliability_study sensitivity_indices parameter_sensitivity
 
 # 1. model in a plan (variables bound to parameters; responses are registry queries)
 llull run plans/prb_box_mass.plan.json --validate --doc box.llull.json
@@ -112,7 +112,7 @@ llull run plans/prb_box_mass.plan.json --doc box.llull.json --kernel occt --json
 llull propagate_uncertainty method=lhs samples=10000 seed=7 --doc box.llull.json --json
 llull parameter_sensitivity parameters='["w","h","d"]' response=mass --doc box.llull.json --json
 llull sensitivity_indices response=mass samples=4096 seed=7 --doc box.llull.json --json
-llull reliability_form limitState=mass_budget --doc box.llull.json --json
+llull run_reliability_study limitState=mass_budget --doc box.llull.json --json
 llull check_probabilistic --doc box.llull.json --json          # ends the job (AF-20)
 ```
 
@@ -168,11 +168,11 @@ Values: `validation/expected_results.json`. `D` = `--doc case.llull.json --json`
 
 | # | Given | When (CLI) | Then (JSON) | VC |
 | - | ----- | ---------- | ----------- | -- |
-| AC-1 | R ~ N(300, 30), S ~ N(200, 40) MPa, g = R − S | `llull reliability_form limitState=g D` | β = 2.0, Pf = 0.0227501319482 (rel 1e-9), α² = [0.36, 0.64] | VC-PRB-01 |
+| AC-1 | R ~ N(300, 30), S ~ N(200, 40) MPa, g = R − S | `llull run_reliability_study limitState=g D` | β = 2.0, Pf = 0.0227501319482 (rel 1e-9), α² = [0.36, 0.64] | VC-PRB-01 |
 | AC-2 | same, `propagate_uncertainty method=mc samples=200000 seed=…` | — | Pf within ±1.67e-3 of 0.0227501319482 | VC-PRB-01.d |
-| AC-3 | lognormal R, S (same means / sd) | `reliability_form` | β = 1.89451599469 (rel 1e-6) | VC-PRB-02 |
-| AC-4 | OpenTURNS stressed beam model | `reliability_form`, `propagate_uncertainty` (MC 1e6) | β_FORM = 1.88104651853; MC Pf within 5σ of the exact 0.0291981946248 | VC-PRB-03 |
-| AC-5 | g = 3 − u1 + 0.1 u2² | `reliability_form sorm=true` | β = 3; Pf_SORM = 0.00106718809723 (rel 1e-6); exact 0.00104359875879 reported for reference | VC-PRB-04 |
+| AC-3 | lognormal R, S (same means / sd) | `run_reliability_study` | β = 1.89451599469 (rel 1e-6) | VC-PRB-02 |
+| AC-4 | OpenTURNS stressed beam model | `run_reliability_study`, `propagate_uncertainty` (MC 1e6) | β_FORM = 1.88104651853; MC Pf within 5σ of the exact 0.0291981946248 | VC-PRB-03 |
+| AC-5 | g = 3 − u1 + 0.1 u2² | `run_reliability_study sorm=true` | β = 3; Pf_SORM = 0.00106718809723 (rel 1e-6); exact 0.00104359875879 reported for reference | VC-PRB-04 |
 | AC-6 | Ishigami, N = 8192 | `sensitivity_indices` | S1 0.3139, S2 0.4424, S3 0, ST1 0.5576, ST2 0.4424, ST3 0.2437 within ±0.03 | VC-PRB-05 |
 | AC-7 | `plans/prb_box_mass.plan.json` | `parameter_sensitivity parameters=["w","h","d"] response=mass` | ∂m/∂w = 0.54, ∂m/∂h = 1.08, ∂m/∂d = 2.16 g/mm (rel 1e-6); elasticities 1 | VC-PRB-06 |
 | AC-8 | same with normal w, h, d | `propagate_uncertainty method=lhs samples=10000` | mean 21.6 g, sd 0.16200135 g within the acceptance bounds | VC-PRB-06 |

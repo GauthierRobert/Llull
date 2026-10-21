@@ -11,7 +11,8 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { FeaHost } from '@protocol/index';
 import { createComputeRunner } from '../src/native/computeJob';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
-import { isNativeTool, nativeToolDefinitions, runNativeTool } from '../src/native/tools';
+import { isNativeTool, runNativeTool } from '../src/native/tools';
+import { buildNativeToolDefinitions } from '@protocol/nativeTools';
 import { runVortexLatticeSolve } from '../src/native/vortexLattice';
 
 const BINARY = nativeBinaryPath('llull-compute');
@@ -75,7 +76,7 @@ interface Vlm {
 describe('vortex_lattice_solve transport', () => {
   it('is a native tool whose schema is analyze_vortex_lattice plus timeoutS / verify', () => {
     expect(isNativeTool('vortex_lattice_solve')).toBe(true);
-    const tool = nativeToolDefinitions().find((definition) => definition.name === 'vortex_lattice_solve');
+    const tool = buildNativeToolDefinitions().find((definition) => definition.name === 'vortex_lattice_solve');
     expect(Object.keys(tool?.inputSchema.properties ?? {})).toEqual(
       expect.arrayContaining(['surfaces', 'alphasDeg', 'timeoutS', 'verify']),
     );

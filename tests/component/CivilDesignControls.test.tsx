@@ -21,7 +21,7 @@ function site(): void {
   });
   localDispatch('add_manhole', { location: [20, 50], invertElevation: 9, surfaceId: 'surface-1' });
   localDispatch('add_manhole', { location: [60, 50], invertElevation: 8.5, surfaceId: 'surface-1' });
-  localDispatch('add_pipe', { fromId: 'manhole-1', toId: 'manhole-2' });
+  localDispatch('add_drainage_pipe', { fromId: 'manhole-1', toId: 'manhole-2' });
 }
 
 setupCivilStore();

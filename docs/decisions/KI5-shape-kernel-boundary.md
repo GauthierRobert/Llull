@@ -27,7 +27,7 @@ was mostly decorative.
   The next operation resumes the exact tree (`recipeOf`). When the current kernel cannot rebuild
   the tree, the stored triangles are the fallback (`operandRecipe`).
 - New read-only commands: `inspect_topology`, which lists exact faces and unique edges (its
-  indices are what `fillet_edge` / `chamfer_edge` select), and `export_step_exact`, which writes
+  indices are what `fillet_edge` / `chamfer_edge` select), and `export_step_ap242`, which writes
   STEP AP214 straight from the B-rep with no Python.
 
 ## Consequences

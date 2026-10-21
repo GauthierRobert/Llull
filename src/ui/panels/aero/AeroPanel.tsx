@@ -1,5 +1,5 @@
 // Aerodynamics browser: drag of the selected solids (frontal area, CdA, force, power, q, Re) and lift / pressure of an airfoil section.
-// Read-only: every number comes from frontal_area / aero_drag / standard_atmosphere / analyze_airfoil / analyze_wing run locally; what
+// Read-only: every number comes from frontal_area / compute_aero_drag / standard_atmosphere / analyze_airfoil / analyze_wing run locally; what
 // is shown here is drawn on the model by AeroOverlay (wind arrows, drag arrow, Cp-coloured airfoil) and rows highlight their place.
 
 import React, { useEffect, useMemo, useState } from 'react';

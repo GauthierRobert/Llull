@@ -86,7 +86,7 @@ function solvedChain(): Chain {
 describe('VC-TMC-50 staleness chain thermal -> thermo_static', () => {
   it('is solved, with a margin, before the thermal case is edited', () => {
     const { doc, ctx, analysisId } = solvedChain();
-    expect((execute(doc, 'fea_report', { analysisId }, ctx).data as Report).state).toBe('solved');
+    expect((execute(doc, 'analysis_report', { analysisId }, ctx).data as Report).state).toBe('solved');
     const margins = execute(doc, 'compute_margins', { analysisId, allowable: 'ftu' }, ctx);
     expect(margins.rejected).not.toBe(true);
     // max sxx = 105 MPa at the largest node id, thermal load case limit: MS = 400 / (105 x 1.5) - 1
@@ -99,7 +99,7 @@ describe('VC-TMC-50 staleness chain thermal -> thermo_static', () => {
   it('judges fea_report state, compute_margins code and check_thermo_mechanical items after editing the thermal case (all three keys)', () => {
     const { doc, ctx, analysisId, source } = solvedChain();
     const edited = mustRun(doc, 'add_result_probe', { analysisId: source.thermalId, name: 'p', point: [1, 1, 1], quantity: 'temperature' });
-    const report = execute(edited, 'fea_report', { analysisId }, ctx);
+    const report = execute(edited, 'analysis_report', { analysisId }, ctx);
     const margins = execute(edited, 'compute_margins', { analysisId }, ctx);
     const check = execute(edited, 'check_thermo_mechanical', { analysisId }, ctx);
     expect(margins.document).toBe(edited);

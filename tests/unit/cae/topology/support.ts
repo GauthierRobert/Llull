@@ -9,7 +9,7 @@ import type { FeTopologyArtifact, TopologyStudy } from '@core/model/topology';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
-import { buildTopologyJob, runTopologyReference, type TopologyJob } from '@cae/index';
+import { buildTopologyJob, type TopologyJob } from '@cae/index';
 
 const PACK = path.resolve(__dirname, '../../../../docs/physics/17-topology-optimization/validation');
 
@@ -82,14 +82,16 @@ export function jobOf(model: Model): TopologyJob {
   return built.job;
 }
 
-/** Reference runs are pure, so equal jobs share one artifact (a 60 x 20 solve takes seconds, much more under coverage). */
-const solvedJobs = new Map<string, FeTopologyArtifact>();
+/** Frozen solver outputs of the MBB 60 x 20 jobs (`inputHash:settingsHash` -> artifact), generated once from the former TypeScript SIMP reference. */
+const frozenArtifacts = JSON.parse(readFileSync(path.join(__dirname, 'referenceArtifacts.json'), 'utf8')) as Record<
+  string,
+  FeTopologyArtifact
+>;
 
-/** The host's steps for a small 2D study: build the job, run the TypeScript reference (once per distinct job unless `fresh`), store the artifact, record it. */
+/** The host's steps for an MBB study: build the job, look up its frozen solver artifact, store it, record it. */
 export function solveAndRecord(
   model: Model,
   store = artifactStore(),
-  fresh = false,
 ): {
   readonly doc: CadDocument;
   readonly hash: string;
@@ -99,10 +101,8 @@ export function solveAndRecord(
 } {
   const job = jobOf(model);
   const key = `${job.inputHash}:${job.settingsHash}`;
-  const known = fresh ? undefined : solvedJobs.get(key);
-  const artifact = known ?? runTopologyReference(job);
-  if (typeof artifact === 'string') throw new Error(artifact);
-  solvedJobs.set(key, artifact);
+  const artifact = frozenArtifacts[key];
+  if (artifact === undefined) throw new Error(`no frozen artifact for job ${key}`);
   const hash = store.put(artifact);
   const result = execute(model.doc, 'record_topology_result', { studyId: model.studyId, fieldHash: hash }, contextWith(store.port));
   return { doc: result.document, hash, artifact, store, result };

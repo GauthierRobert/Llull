@@ -217,7 +217,7 @@ export const createChangeOrder = defineCommand({
 export const classifyChangeOrder = defineCommand({
   name: 'classify_change_order',
   description:
-    "HUMAN GATE. Record the minor / major classification (with a justification) of an open ECO. It is the applicant's decision: llull shows nothing " +
+    "Record the minor / major classification (with a justification) of an open ECO. HUMAN GATE. It is the applicant's decision: llull shows nothing " +
     'and infers nothing. An agent caller gets PLM_HUMAN_GATE. A "change" ECO needs it before release_item.',
   annotations: { metaHistory: true },
   params: z.object({
@@ -269,7 +269,7 @@ export const classifyChangeOrder = defineCommand({
 export const setChangeState = defineCommand({
   name: 'set_change_state',
   description:
-    'HUMAN GATE. Close an ECR or ECO as rejected or cancelled, with a reason. Implemented records are terminal. An agent caller gets PLM_HUMAN_GATE.',
+    'Close an ECR or ECO as rejected or cancelled, with a reason. HUMAN GATE. Implemented records are terminal. An agent caller gets PLM_HUMAN_GATE.',
   annotations: { metaHistory: true },
   params: z.object({
     id: z.string().describe('ECR or ECO id.'),

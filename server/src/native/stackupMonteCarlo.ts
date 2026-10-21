@@ -7,8 +7,6 @@
  */
 
 import type { FeaHost, FeaToolResult } from '@protocol/index';
-import type { ToolDefinition } from '@protocol/tools';
-import { getCommand } from '@core/commands/registry';
 import { programFunction } from '@lib/expressionProgram';
 import { isRecord } from '@lib/isRecord';
 import { sampleStackup, type SamplingStats } from '@lib/stackupSampling';
@@ -81,35 +79,6 @@ function verification(model: StackupModel, native: SamplingStats): Record<string
         (key) => Math.abs(reference[key] - native[key]) / Math.max(Math.abs(reference[key]), Math.abs(native[key]), Number.MIN_VALUE),
       ),
     ),
-  };
-}
-
-/** stackup_monte_carlo: the analyze_stackup params (read from the registry, one schema) plus timeoutS and verify. */
-export function stackupToolDefinition(): ToolDefinition {
-  const schema = getCommand('analyze_stackup')?.paramsSchema ?? { type: 'object' as const, properties: {}, required: [] };
-  return {
-    name: TOOL,
-    description:
-      'analyze_stackup (same params, same data) with the Monte Carlo run by the native llull-compute binary (crate llull-stats, rayon): ' +
-      `for samples above the 2000000 TypeScript cap, up to 2^40 (default ${NATIVE_STACKUP_DEFAULT_SAMPLES}). It draws the same ` +
-      'Philox4x32-10 samples as analyze_stackup and reduces them in the same fixed order, so the numbers do not depend on the thread count ' +
-      'and equal the TypeScript ones bit for bit for expressions without trigonometric functions (data.monteCarlo.bitExactWithTs). ' +
-      'monteCarlo is always run; data.monteCarlo.engine "native", provenance { tool, version, threads, deterministic }. verify: true also ' +
-      'runs the TypeScript sampler (samples <= 2000000) and reports the agreement. Without llull-compute: NATIVE_TOOL_MISSING.',
-    inputSchema: {
-      ...schema,
-      properties: {
-        ...schema.properties,
-        timeoutS: {
-          type: 'number',
-          minimum: 1,
-          maximum: 86400,
-          description: 'Wall-clock limit of the native job in seconds (default 600).',
-        },
-        verify: { type: 'boolean', description: 'Also run the TypeScript sampler (samples <= 2000000) and compare. Default false.' },
-      },
-    },
-    annotations: { readOnlyHint: true, idempotentHint: true },
   };
 }
 

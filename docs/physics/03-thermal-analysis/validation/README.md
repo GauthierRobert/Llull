@@ -66,7 +66,7 @@ Status: **P** (proposed). "FE" = run through `fea_mesh` / `fea_solve` on the des
 | VC-THM-14 | FR-THM-05, 11, 12; TR-THM-14, 30, 31 | run the pinned CalculiX `test/oneel8ra.inp` (sha256 in JSON) and parse | radiating face −0.950739 °C; Σ RFL 47.5369 W (CalculiX ref −9.507386E-01, 4 × 11.88423) | 1e-4 | A | integration |
 | VC-THM-30 | FR-THM-06; TR-THM-20, 21 | VC-THM-09.a geometry: CalculiX cavity F12 (inferred from the cavity heat flow) vs llull | 0.199824895698 (ccx 2.21: 0.1998337 converged) | 0.0005 abs | A (pinned 2026-10-17) | integration (V1) |
 | VC-THM-50 | FR-THM-15, 18; TR-THM-32 | solved T3, then `set_parameter` on the bar length | `state: "stale"`; limits refused with `FEA_RESULTS_STALE`; dependent PHY-04 case stale | exact | A | golden |
-| VC-THM-60 | FR-THM-20; TR-THM-50 | any radiation case, `thermal_report` | `physicalConstants` equals the JSON (σ, absolute zero, sources, `defaulted: true`) | exact | A | unit + CLI |
+| VC-THM-60 | FR-THM-20; TR-THM-50 | any radiation case, `analysis_report` | `physicalConstants` equals the JSON (σ, absolute zero, sources, `defaulted: true`) | exact | A | unit + CLI |
 | VC-THM-61 | FR-THM-21; TR-THM-51 | `plans/thm_rejections.plan.json` + the listed variants | each returns its code, non-empty `remediation`, ids or path | exact | A | unit + CLI |
 | VC-THM-62 | FR-THM-13, 22, 23; TR-THM-52 | VC-THM-01 with a 150 °C max limit (test input) | row FAIL, margin −20.8108 K, `reviewRequired`, `pending_human`; agent disposition → `THM_HUMAN_GATE`, doc unchanged | exact (margin 1e-6) | A | unit + CLI |
 | VC-THM-63 | FR-THM-22; TR-THM-50 | VC-THM-01 with k at basis `typical` | `unverified: true` on report and rows; `THM_MATERIAL_UNVERIFIED` | exact | A | unit |
@@ -80,7 +80,7 @@ an=$(llull run plans/thm_nafems_t3.plan.json $D | jq -r '.data.aliases.an[0]')  
 llull fea_mesh analysisId=$an $D --timeout 300 > mesh.json
 llull check_thermal analysisId=$an $D > check.json             # no severity "error"
 llull fea_solve analysisId=$an $D --timeout 900 > solve.json
-llull thermal_report analysisId=$an $D > report.json           # probes[x080].series at t = 32
+llull analysis_report analysisId=$an $D > report.json           # probes[x080].series at t = 32
 # compare with expected_results.json VC-THM-03 through the PHY-00 benchmark runner (command name owned by PHY-00)
 ```
 

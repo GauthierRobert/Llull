@@ -36,9 +36,16 @@ describe('live command log', () => {
   });
 
   it('a top-level confirmation on the sent command is redacted in the event too', () => {
+    applyCommand('define_material_record', {
+      id: 'r',
+      designation: 'x',
+      specs: [],
+      licence: 'company-proprietary',
+      exportMarking: { regime: 'none' },
+    });
     const response = makeFakeRes();
     const unsubscribe = subscribeLive(response);
-    applyCommand('add_box', { size: [1, 1, 1], confirmation: SIGNATURE });
+    applyCommand('set_export_marking', { material: 'r', marking: { regime: 'ITAR' }, confirmation: SIGNATURE });
     unsubscribe();
     const frames = response.written.slice(1);
     expect(frames.join('')).not.toContain('SECRET-SIGNATURE-BYTES');

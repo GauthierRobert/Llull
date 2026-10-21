@@ -81,7 +81,7 @@ describe('add_curved_wall', () => {
     const plan = buildPlanDrawing(doc, undefined)!;
     const cut = plan.primitives.find((p) => p.type === 'polygon' && p.layer === 'A-WALL');
     expect(cut?.type === 'polygon' && cut.fill).toBe('hatch');
-    expect((execute(doc, 'export_dxf', {}).data as DxfExport).layers).toContain('A-WALL-PATT');
+    expect((execute(doc, 'export_building_dxf', {}).data as DxfExport).layers).toContain('A-WALL-PATT');
     expect((execute(doc, 'export_ifc', {}).data as IfcExport).ifc).toMatch(/IFCWALL\('[^']+',\$,'W1'/);
     doc = execute(doc, 'add_pipe_run', { points: xyz(0, 0, 1000, 0, 8000, 1000) }).document;
     const clashes = (execute(doc, 'check_clashes', {}).data as { clashes: Clash[] }).clashes;

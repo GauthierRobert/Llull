@@ -39,7 +39,7 @@ function exactSlab(
 
 /**
  * @affects creates one mesh entity per ply piece (ids plysolid-<step>.<k>), named "<ply> piece <n>", on the layer of the tool solid
- * @invariant each solid is the piece offset along the tool-face normal from the underside height (plies below that cover the point, plus a core between) by the cured ply thickness; the laminate side is respected; closed with outward winding, so volume = area x thickness (within the mesh refinement on curved faces); on a plane / cylinder / cone / nurbs tool face without a core the entity also carries the exact `faceSlab` recipe (`stepSlab`, read only by export_step_exact, which writes a B-rep when the kernel builds it and the triangles otherwise; every other command uses the mesh); the solids are a snapshot: they are not regenerated when plies change
+ * @invariant each solid is the piece offset along the tool-face normal from the underside height (plies below that cover the point, plus a core between) by the cured ply thickness; the laminate side is respected; closed with outward winding, so volume = area x thickness (within the mesh refinement on curved faces); on a plane / cylinder / cone / nurbs tool face without a core the entity also carries the exact `faceSlab` recipe (`stepSlab`, read only by export_step_ap242, which writes a B-rep when the kernel builds it and the triangles otherwise; every other command uses the mesh); the solids are a snapshot: they are not regenerated when plies change
  * @failure unknown part / ply -> CMP_REF_MISSING; no plies -> CMP_NO_PLIES; more than 400 pieces or an untriangulable piece -> CMP_PARAM_INVALID
  */
 export const createPlySolids = defineCommand({
@@ -53,7 +53,7 @@ export const createPlySolids = defineCommand({
     'length units, default the outline diagonal / 16) bounds the triangle edge on curved faces: smaller is smoother and heavier (at most ' +
     '4 refinement levels). The solids are a snapshot of the model now: re-run after editing plies (delete the old ones first). The core ' +
     'itself is not meshed. On a plane, cylinder, cone or NURBS tool face without a core, each solid also carries its exact construction (the piece of the tool ' +
-    'face lifted by the cured thickness): export_step_exact writes it as a true B-rep solid named "<ply> piece <n>" with the OCC kernel, and ' +
+    'face lifted by the cured thickness): export_step_ap242 writes it as a true B-rep solid named "<ply> piece <n>" with the OCC kernel, and ' +
     'falls back to the mesh when the kernel cannot build it. Computed by llull, not approved.',
   params: z.object({
     part: z.string().describe('Part id or name.'),

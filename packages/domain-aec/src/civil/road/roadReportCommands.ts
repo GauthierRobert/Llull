@@ -91,10 +91,10 @@ export const alignmentReport = defineCommand({
  * @affects none (read-only)
  * @failure unknown alignment / no valid profile -> no-op
  */
-export const exportLongSection = defineCommand({
-  name: 'export_long_section',
+export const exportRoadLongSection = defineCommand({
+  name: 'export_road_long_section',
   description:
-    'Long section (profile) drawing of an alignment as SVG text in `data.svg` (alias `data.text`) (`data.fileName`): ground line, design line, PVIs with ' +
+    'Long section (profile) drawing of a road ALIGNMENT (drainage pipe runs: use export_drainage_long_section) as SVG text in `data.svg` (alias `data.text`) (`data.fileName`): ground line, design line, PVIs with ' +
     'vertical-curve length / K / high-low point, grades, and a table band (station, ground, design, cut/fill) under the plot. Needs ' +
     'set_alignment_profile; ground needs a linked surface. Vertical exaggeration scales the vertical axis against the horizontal one.',
   annotations: { readOnly: true, idempotent: true },
@@ -105,21 +105,21 @@ export const exportLongSection = defineCommand({
     interval: intervalField('Table column', 'the station interval'),
   }),
   run: (doc, params, ctx): CommandResult => {
-    const refused = exportRefusal(doc, 'export_long_section', 'sheet', params.confirmExportControlled, ctx);
+    const refused = exportRefusal(doc, 'export_road_long_section', 'sheet', params.confirmExportControlled, ctx);
     if (refused !== null) return refused;
-    const checked = checkedAlignment(doc, params, 'export_long_section');
+    const checked = checkedAlignment(doc, params, 'export_road_long_section');
     if ('summary' in checked) return checked;
     const { alignment, interval } = checked;
     const exaggeration = params.verticalExaggeration ?? 10;
-    if (!(exaggeration > 0)) return noop(doc, 'export_long_section failed: verticalExaggeration must be > 0.');
+    if (!(exaggeration > 0)) return noop(doc, 'export_road_long_section failed: verticalExaggeration must be > 0.');
     if (validateProfile(alignment.profile) !== null) {
-      return noop(doc, `export_long_section failed: ${alignment.name} has no design profile (set_alignment_profile).`);
+      return noop(doc, `export_road_long_section failed: ${alignment.name} has no design profile (set_alignment_profile).`);
     }
     const civil = getCivil(doc);
     const stations = reportStations(alignment, interval);
     const rows = reportRows(doc, alignment, analyseStations(doc, civil, alignment, stations));
     const text = longSectionSvg(doc, civil, alignment, rows, exaggeration);
-    if (text === null) return noop(doc, 'export_long_section failed: the profile has no stations on the alignment.');
+    if (text === null) return noop(doc, 'export_road_long_section failed: the profile has no stations on the alignment.');
     const fileName = `${safeFileName(alignment.name, alignment.id)}_long_section.svg`;
     return report(doc, `Long section of ${alignment.name}: ${fileName} (${text.length} bytes, VE x${exaggeration}).`, {
       text,
@@ -171,4 +171,4 @@ export const exportCrossSections = defineCommand({
   },
 });
 
-export const roadReportCommands = commandCatalog(alignmentReport, exportLongSection, exportCrossSections);
+export const roadReportCommands = commandCatalog(alignmentReport, exportRoadLongSection, exportCrossSections);

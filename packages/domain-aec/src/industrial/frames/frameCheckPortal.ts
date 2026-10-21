@@ -25,7 +25,7 @@ export const checkPortalFrames = defineCommand({
     'flanges assumed fly-braced at purlins / rails), frame sway stability (αcr ≥ 3), end-plate bolt groups (EN 1993-1-8, grade 8.8) and ' +
     'SLS deflections (rafters span/200 under snow, eaves h/150 under wind, rail level h/400 under crane). Returns the worst utilisation ' +
     'per element; values > 1 fail. Bracing, foundations and crane runway beams are checked by check_bracing, check_foundations and ' +
-    'check_crane_runways. A preliminary design check, not a substitute for the engineer of record.',
+    'check_crane_runways. To resize failing sections use design_portal_frames (same loads; this command never modifies the model). A preliminary design check, not a substitute for the engineer of record.',
   params: z.object(FRAME_LOAD_SHAPE),
   run: (doc, params): CommandResult => {
     const resolved = resolveFrameLoads(doc, params);

@@ -206,7 +206,8 @@ describe('frame analysis with haunches', () => {
 });
 
 describe('design_portal_frames tries a haunch before up-sizing the rafters', () => {
-  const loads = { snowLoad: 0.8, windPressure: 0.6, allowFixedBases: false };
+  const checkLoads = { snowLoad: 0.8, windPressure: 0.6 };
+  const loads = { ...checkLoads, allowFixedBases: false };
   const rafterProfiles = (doc: CadDocument): string[] => [
     ...new Set(
       Object.values(doc.building!.elements).flatMap((element) =>
@@ -217,7 +218,7 @@ describe('design_portal_frames tries a haunch before up-sizing the rafters', () 
 
   it('lengthens the eaves haunch instead of a heavier rafter when the eaves moment governs', () => {
     const start = hall({ haunch: { eavesLength: 0 }, rafterProfile: 'IPE400', columnProfile: 'HEB500', columnBase: 'fixed' });
-    const before = (execute(start, 'check_portal_frames', loads).data as { failures: string[] }).failures;
+    const before = (execute(start, 'check_portal_frames', checkLoads).data as { failures: string[] }).failures;
     expect(before.length).toBeGreaterThan(0);
     const result = execute(start, 'design_portal_frames', loads);
     expect(result.summary).toMatch(/eaves haunches 0 → 20 % of the rafter length \(12 connection\(s\)\)/);
@@ -225,7 +226,7 @@ describe('design_portal_frames tries a haunch before up-sizing the rafters', () 
     const eaves = connectionsOf(result.document).filter((c) => c.kind === 'eaves');
     expect(eaves.every((c) => Math.abs(c.haunchLength - 2400) < 1)).toBe(true);
     expect(result.affected).toEqual(expect.arrayContaining(eaves.map((c) => c.id)));
-    expect((execute(result.document, 'check_portal_frames', loads).data as { failures: string[] }).failures).toEqual([]);
+    expect((execute(result.document, 'check_portal_frames', checkLoads).data as { failures: string[] }).failures).toEqual([]);
   });
   it('leaves the haunches alone when the frames already pass', () => {
     const start = hall({ rafterProfile: 'IPE450', columnProfile: 'HEB500', columnBase: 'fixed' });

@@ -393,7 +393,7 @@ and leaves for `nurbs_surface`/`nurbs_curve`/`loft` v3 entities. `recipeKey` get
 | Airfoil import | UIUC `.dat` Selig / Lednicer (text) | auto-detect: second non-empty line has two numbers > 1 ⇒ Lednicer counts [R6]; Latin-1 tolerant; raw points + sha256 stored in `AirfoilSource` |
 | Airfoil export | Selig `.dat` (COULD), CSV | from the exact curve at requested spacing |
 | OpenVSP | `.vsp3` XML (COULD read: WingGeom `Span`, `Root_Chord`, `Tip_Chord`, `Sweep`, `Sweep_Location`, `Dihedral`, `Twist`, `Twist_Location`, XSec NACA/AF) [R8]; `.af` airfoil (header `Sym Flag`, `Num Pnts Upper/Lower`) | note: the pinned `TR1208.vsp3` stores root chord 16.672 in (the MAC) and tip 7.5024 in, total area 1538.217 in², i.e. **not** the README table values — use the file's own values in import tests (VC-SRF-20) |
-| STEP | AP214 now (KI5 `export_step_exact`), AP242 (gap 04) | `B_SPLINE_CURVE_WITH_KNOTS`, `B_SPLINE_SURFACE_WITH_KNOTS`, rational complex entities; trimmed faces as `ADVANCED_FACE` |
+| STEP | AP214 now (KI5 `export_step_ap242`), AP242 (gap 04) | `B_SPLINE_CURVE_WITH_KNOTS`, `B_SPLINE_SURFACE_WITH_KNOTS`, rational complex entities; trimmed faces as `ADVANCED_FACE` |
 | IGES 128 (rational B-spline surface) | gap 04 | many lofting shops still use IGES |
 | Code export | CadQuery: `Workplane.spline(...)`, `.loft(ruled=...)`, `cq.Solid.makeLoft`; raw `Geom_BSplineSurface` via OCP for others (`codegen/recipeLowering.ts` pattern) | FR-SRF-28 |
 | Document | `CadDocument.aero`, entity kinds `nurbs_curve`, `nurbs_surface`, `loft` v3 fields | §3 |
@@ -404,7 +404,7 @@ and leaves for `nurbs_surface`/`nurbs_curve`/`loft` v3 entities. `recipeKey` get
   `llull search airfoil wing curvature continuity` · `llull describe create_wing` · `llull list aero` ·
   `llull run plan.json --validate` then `llull run plan.json --json --progress` · `llull <query> … --json` ·
   `llull check_surface_quality … --json` · `llull render_view isolate=<id> --save view.png` ·
-  `llull export_step_exact --save out.step` / `export_code language=cadquery --save out/`. `import_airfoil` and
+  `llull export_step_ap242 --save out.step` / `export_code language=cadquery --save out/`. `import_airfoil` and
   `measure_deviation pointsCsv` read files with `file=PATH` through the exchange path (`/exchange`, KI6); in core
   they take `text`. Long kernel steps (`create_wing` with many sections, CRM analysis) honour `--progress` and
   `--timeout` (AF-40); every mutating SRF command works with `--dry-run` (AF-42). `llull guide` gains the aero /
@@ -675,7 +675,7 @@ Built: **M0, M1, M2, M3** (AERO-5), in SRF-2 **M4, M5 (without kernel trimming) 
 - **Patch continuity** compares the normal curvature of both patches along one common direction (the in-plane perpendicular to the edge, Pegna-Wolter) and measures G1 between the outward direction of A and the inward direction of B, so a sheared parametrisation of the same surface is G2 and a fold-back is not G1.
 - **Superellipse stations** are the four-conic approximation stated in §13.5; the maximum radial error is returned as `superellipseDeviation`.
 - **Aero definitions** are validated structurally only; `restore` is the identity. A definition whose curve, loft or surface was deleted is a stale record that commands refuse at use, so `doc` and `load(save(doc))` are equal.
-- **Sheets in consumers**: mesh exports (STL / OBJ / glTF), `frontal_area` and `aero_drag` use the sheet tessellation; STEP export lists a skipped sheet as "surface sheet"; code export notes the curves and sheets it cannot lower. `thicken_surface` welds seams of u- or v-closed sheets and collapsed edges and builds no wall there (a kernel boolean on a thickened hemisphere is tested).
+- **Sheets in consumers**: mesh exports (STL / OBJ / glTF), `frontal_area` and `compute_aero_drag` use the sheet tessellation; STEP export lists a skipped sheet as "surface sheet"; code export notes the curves and sheets it cannot lower. `thicken_surface` welds seams of u- or v-closed sheets and collapsed edges and builds no wall there (a kernel boolean on a thickened hemisphere is tested).
 
 
 ### 13.7 SRF-3 status: M5 gaps and M7 (2026-10-20, branch `feat/srf-3`)
@@ -744,7 +744,7 @@ Built and run on the native kernel (OCCT 7.9.2, MinGW, SV1). Two sidecar capabil
 | --- | --- |
 | `nurbs_surface` recipe leaf (capability `nurbsSurface`) | `packages/core/src/geometry/surfaceWire.ts` (`encodeSurface`, `encodeLoops`, pure), `server/src/native/kernelLeaves.ts` (payload `native.surface` + `native.loops`, entity placement kept), `solver/crates/llull-kernel-occt/src/recipe/nodes.rs` `nurbs_surface`, `cpp/surfaces.cxx` `surface_face` |
 | `faceSlab` recipe op (capability `faceSlab`, see 06 §13.5) | `packages/core/src/model/types.ts` `ShapeRecipe`, `shapeRecipe.ts` (key, validation), `nodes.rs` `face_slab`, `cpp/surfaces.cxx` `face_slab` |
-| STEP of sheets | `export_step_exact` (`commands/brep/topology.ts`, `stepTargets.ts`): sheets are written after the solids, one product each (entity name, color), `data.sheetCount`; a sheet the kernel cannot build is listed in `skipped` and never fails the export; not placed into an assembly file |
+| STEP of sheets | `export_step_ap242` (`commands/brep/topology.ts`, `stepTargets.ts`): sheets are written after the solids, one product each (entity name, color), `data.sheetCount`; a sheet the kernel cannot build is listed in `skipped` and never fails the export; not placed into an assembly file |
 
 **Face construction (`surface_face`).** `Geom_BSplineSurface` (clamped, rational or not; multiplicity totals checked) and
 `BRepBuilderAPI_MakeFace`. Without trims the sheet keeps its natural boundary (`MakeFace(surface, tol)`, no p-curve approximation). Trims are

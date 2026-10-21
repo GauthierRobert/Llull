@@ -25,7 +25,7 @@ const RAD_PER_S_PER_RPM = (2 * Math.PI) / 60;
 export const addBodyJoint = defineCommand({
   name: 'add_body_joint',
   description:
-    'Connect a rigid body (child) to the ground or to another body (parent), for simulate_motion. "revolute": the child spins about ' +
+    'Connect a rigid body (child) to the ground or to another body (parent), for simulate_motion (physics joint with mass, forces and time; for a kinematic pose between component instances use add_joint + evaluate_motion instead). "revolute": the child spins about ' +
     '`axis` through `anchor` (a shaft in its bearings, a propeller hub, a crank pin, a hinge). "prismatic": the child slides along ' +
     '`axis` (a piston in its bore). "spherical": a ball pin at `anchor` (three rotations); it can only CLOSE A LOOP, never be the only ' +
     'connection of a body. `anchor` is a world point on the axis in DOCUMENT units (e.g. the shaft centre); `axis` a world direction ' +
@@ -150,11 +150,11 @@ export const addBodyJoint = defineCommand({
 export const addGearCoupling = defineCommand({
   name: 'add_gear_coupling',
   description:
-    'Couple two joints rigidly, like meshing gears, a belt or a chain: speed(driven) = ratio × speed(driver), enforced by the physics ' +
+    'Couple two physics joints (add_body_joint) rigidly, like meshing gears, a belt or a chain: speed(driven) = ratio × speed(driver), enforced by the physics ' +
     "engine, so each side feels the other's inertia and load. ratio = -teeth(driver)/teeth(driven) for an external spur mesh (opposite " +
     'rotation), +teeth(driver)/teeth(driven) for a belt or an internal ring gear. Planetary with fixed ring, sun → carrier: ' +
     'ratio = sunTeeth / (sunTeeth + ringTeeth). Planets relative to the carrier: -ringTeeth / planetTeeth (driver = carrier joint). ' +
-    'Returns the coupling id in affected[0].',
+    'Kinematic-only equivalent for add_joint joints: add_drive_relation. Returns the coupling id in affected[0].',
   params: z.object({
     driver: z.string().describe('Joint id whose speed drives the other (e.g. the crankshaft joint).'),
     driven: z.string().describe('Joint id that follows (e.g. the propeller joint).'),

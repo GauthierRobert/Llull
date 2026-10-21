@@ -1,5 +1,5 @@
 /**
- * PHY-04 thermo-mechanical benchmarks through the real pipeline (plan -> fea_mesh (Gmsh) -> fea_solve (CalculiX) -> fea_report probes),
+ * PHY-04 thermo-mechanical benchmarks through the real pipeline (plan -> fea_mesh (Gmsh) -> fea_solve (CalculiX) -> analysis_report probes),
  * judged against docs/physics/04-thermo-mechanical/validation/expected_results.json with the PHY-00 judge. The plans are the pack's drafts
  * adapted to the built commands (fixtures/thermomech/*.plan.json). The OCC kernel gives exact STEP geometry (LE11 needs it: the Manifold
  * facets of its spheres are rejected by Gmsh). Skipped without Gmsh or CalculiX.
@@ -85,7 +85,7 @@ describe.skipIf(!READY)('VC-TMC-05 thick cylinder, heat_steady then thermo_stati
     const stale = await session.cli('fea_solve', `analysisId=${mechanical}`);
     expect(stale.code).toBe(EXIT_COMMAND_ERROR);
     expect(String(stale.json['summary'])).toContain('TMC_THERMAL_RESULT_STALE');
-    const report = await session.cli('fea_report', `analysisId=${mechanical}`);
+    const report = await session.cli('analysis_report', `analysisId=${mechanical}`);
     const margins = await session.cli('compute_margins', `analysisId=${mechanical}`);
     const check = await session.cli('check_thermo_mechanical', `analysisId=${mechanical}`);
     const items = dataOf(check.json)['items'];
@@ -93,7 +93,7 @@ describe.skipIf(!READY)('VC-TMC-05 thick cylinder, heat_steady then thermo_stati
       isRecord(item) && item['severity'] === 'error' ? [String(item['code'])] : [],
     );
     expectCase('VC-TMC-50', {
-      'fea_report(ms).state': String(dataOf(report.json)['state']),
+      'analysis_report(ms).state': String(dataOf(report.json)['state']),
       'compute_margins(ms).code': /: ([A-Z][A-Z0-9_]+) —/.exec(String(margins.json['summary']))?.[1] ?? null,
       'check_thermo_mechanical(ms).items': errorCodes,
     });

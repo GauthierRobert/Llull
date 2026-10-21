@@ -24,8 +24,8 @@ function network(catchments = true): CadDocument {
     { location: [100, 0], invertElevation: 97, rimElevation: 100, ...(catchments ? { inflowLps: 5 } : {}) },
   ];
   for (const params of manholes) doc = run(doc, 'add_manhole', params).document;
-  doc = run(doc, 'add_pipe', { fromId: 'manhole-1', toId: 'manhole-2' }).document;
-  doc = run(doc, 'add_pipe', { fromId: 'manhole-2', toId: 'manhole-3' }).document;
+  doc = run(doc, 'add_drainage_pipe', { fromId: 'manhole-1', toId: 'manhole-2' }).document;
+  doc = run(doc, 'add_drainage_pipe', { fromId: 'manhole-2', toId: 'manhole-3' }).document;
   return doc;
 }
 
@@ -90,7 +90,7 @@ describe('drainage commands', () => {
   it('refuses self-loops, unknown ends, duplicates, cycles and coincident ends', () => {
     const doc = network();
     const refused = (params: Record<string, unknown>): string => {
-      const result = run(doc, 'add_pipe', params);
+      const result = run(doc, 'add_drainage_pipe', params);
       expectNoOp(result, doc);
       return result.summary;
     };
@@ -101,22 +101,22 @@ describe('drainage commands', () => {
     expect(refused({ fromId: 'manhole-3', toId: 'manhole-1' })).toContain('loop');
     expect(refused({ fromId: 'manhole-1', toId: 'manhole-3', diameter: -1 })).toContain('diameter');
     const twin = run(doc, 'add_manhole', { location: [0, 0], invertElevation: 90, rimElevation: 95 }).document;
-    expect(run(twin, 'add_pipe', { fromId: 'manhole-1', toId: 'manhole-4' }).summary).toContain('same plan');
+    expect(run(twin, 'add_drainage_pipe', { fromId: 'manhole-1', toId: 'manhole-4' }).summary).toContain('same plan');
   });
   it('warns on adverse slope', () => {
     const doc = network();
-    const result = run(doc, 'add_pipe', { fromId: 'manhole-1', toId: 'manhole-3', invertFrom: 96, invertTo: 97 });
+    const result = run(doc, 'add_drainage_pipe', { fromId: 'manhole-1', toId: 'manhole-3', invertFrom: 96, invertTo: 97 });
     expect(result.summary).toContain('adverse');
     expect(result.affected).toContain('pipe-3');
   });
   it('updates pipes and manholes, keeping connections', () => {
     const doc = network();
-    const pipe = run(doc, 'update_pipe', { pipeId: 'pipe-1', diameter: 0.45, material: 'Concrete', name: 'Main' });
+    const pipe = run(doc, 'update_drainage_pipe', { pipeId: 'pipe-1', diameter: 0.45, material: 'Concrete', name: 'Main' });
     expect(pipe.document.civil?.objects['pipe-1']).toMatchObject({ diameter: 0.45, material: 'Concrete', name: 'Main' });
-    expect(run(doc, 'update_pipe', { pipeId: 'pipe-1' }).affected).toEqual([]);
-    expect(run(doc, 'update_pipe', { pipeId: 'pipe-9', diameter: 1 }).summary).toContain('no pipe');
-    expect(run(doc, 'update_pipe', { pipeId: 'pipe-1', manningN: 0 }).affected).toEqual([]);
-    expect(run(doc, 'update_pipe', { pipeId: 'pipe-1', invertTo: 99 }).summary).toContain('adverse');
+    expect(run(doc, 'update_drainage_pipe', { pipeId: 'pipe-1' }).affected).toEqual([]);
+    expect(run(doc, 'update_drainage_pipe', { pipeId: 'pipe-9', diameter: 1 }).summary).toContain('no pipe');
+    expect(run(doc, 'update_drainage_pipe', { pipeId: 'pipe-1', manningN: 0 }).affected).toEqual([]);
+    expect(run(doc, 'update_drainage_pipe', { pipeId: 'pipe-1', invertTo: 99 }).summary).toContain('adverse');
     const raised = run(doc, 'update_manhole', {
       manholeId: 'manhole-2',
       invertElevation: 97.8,
@@ -158,8 +158,8 @@ describe('drainage commands', () => {
     const before = JSON.stringify(doc);
     for (const [name, params] of [
       ['add_manhole', { location: [5, 5], invertElevation: 90, rimElevation: 99 }],
-      ['add_pipe', { fromId: 'manhole-1', toId: 'manhole-3' }],
-      ['update_pipe', { pipeId: 'pipe-1', diameter: 0.6 }],
+      ['add_drainage_pipe', { fromId: 'manhole-1', toId: 'manhole-3' }],
+      ['update_drainage_pipe', { pipeId: 'pipe-1', diameter: 0.6 }],
       ['update_manhole', { manholeId: 'manhole-1', invertElevation: 97 }],
       ['check_drainage_network', {}],
       ['drainage_schedule', {}],
@@ -221,8 +221,8 @@ describe('drainage analysis', () => {
       pipes: Array<{ reasons: string[] }>;
     };
     expect(slow.pipes[0]?.reasons.join()).toContain('< 5');
-    doc = run(doc, 'update_pipe', { pipeId: 'pipe-1', invertTo: 99 }).document;
-    doc = run(doc, 'update_pipe', { pipeId: 'pipe-2', invertFrom: 99.5 }).document;
+    doc = run(doc, 'update_drainage_pipe', { pipeId: 'pipe-1', invertTo: 99 }).document;
+    doc = run(doc, 'update_drainage_pipe', { pipeId: 'pipe-2', invertFrom: 99.5 }).document;
     const adverse = run(doc, 'check_drainage_network', {}).data as {
       pipes: Array<{ reasons: string[] }>;
       manholes: Array<{ reasons: string[] }>;
@@ -263,7 +263,7 @@ describe('drainage analysis', () => {
     expect(again.summary).toContain('no diameter change');
     const limited = run(doc, 'size_drainage_pipes', { diameters: [150], minVelocity: 0.1 });
     expect(limited.summary).toContain('Cannot size');
-    const adverse = run(doc, 'update_pipe', { pipeId: 'pipe-1', invertTo: 99 }).document;
+    const adverse = run(doc, 'update_drainage_pipe', { pipeId: 'pipe-1', invertTo: 99 }).document;
     expect(run(adverse, 'size_drainage_pipes', {}).summary).toContain('pipe-1');
   });
 });
@@ -299,7 +299,7 @@ const FULL_AREA = (Math.PI * 0.3 * 0.3) / 4;
 function build(manholes: Array<Record<string, unknown>>, pipes: Array<Record<string, unknown>>): CadDocument {
   let doc = run(createEmptyDocument(), 'set_units', { units: 'm' }).document;
   for (const params of manholes) doc = run(doc, 'add_manhole', params).document;
-  for (const params of pipes) doc = run(doc, 'add_pipe', params).document;
+  for (const params of pipes) doc = run(doc, 'add_drainage_pipe', params).document;
   return doc;
 }
 

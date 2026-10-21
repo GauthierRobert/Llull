@@ -18,7 +18,7 @@ export const quantityTakeoff = defineCommand({
   name: 'quantity_takeoff',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Read-only bill of quantities of the building model, metric: wall length / net face area / volume, slab area / volume, column and ' +
+    'Read-only bill of QUANTITIES (m, m2, m3 of construction) of the building model; for the parts list of a mechanical assembly use bill_of_materials (or plm engineering_bom / manufacturing_bom), metric: wall length / net face area / volume, slab area / volume, column and ' +
     'beam volume, stair volume, door and window counts and areas, room floor area — grouped by category and material. Each line has a ' +
     'key like "wall.concrete.m3" used by estimate_cost. data.csv is spreadsheet-ready. Column and beam volumes are NET (measured once ' +
     'where members meet: slab > column > beam — columns run to the slab soffit, beams are measured below the slab soffit and between ' +
@@ -60,7 +60,7 @@ export const buildingSchedule = defineCommand({
   name: 'building_schedule',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Read-only schedule table (like Revit schedules) for one element category: wall, door, window, room, slab, column, beam, stair, ' +
+    'Read-only BUILDING schedule table (like Revit schedules; not a mechanical BOM: see bill_of_materials) for one element category: wall, door, window, room, slab, column, beam, stair, ' +
     'member (steel cut list), footing, panel, equipment, pipe (line list), tray, plate, connection or support (pipe supports: mark, ' +
     'line, pipe, type, steel it bears on, position, hanger rod length, attached / UNATTACHED) — one row per element with mark, level, ' +
     'dimensions, material and quantities. Column and beam rows give the NET volume (same rule as quantity_takeoff: slab > column > beam, overlaps counted once) in "Volume (m³)" and the raw prism in "Gross volume (m³)". data.csv is spreadsheet-ready.',

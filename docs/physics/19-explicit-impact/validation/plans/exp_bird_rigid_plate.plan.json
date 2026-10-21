@@ -126,18 +126,13 @@
     "value": 0.0025,
     "unit": "s"
    },
-   "animationInterval": {
-    "value": 0.0001,
-    "unit": "s"
-   },
    "historyInterval": {
     "value": 1e-05,
     "unit": "s"
    },
    "massScaling": {
     "mode": "none"
-   },
-   "precision": "double"
+   }
   }
  },
  {
@@ -145,11 +140,7 @@
   "params": {
    "analysisId": "$an",
    "entityId": "$bird",
-   "idealization": "sph",
-   "particleSpacing": {
-    "value": 5,
-    "unit": "mm"
-   }
+   "idealization": "sph"
   }
  },
  {
@@ -181,8 +172,7 @@
     0,
     0,
     1
-   ],
-   "friction": 0.0
+   ]
   }
  },
  {

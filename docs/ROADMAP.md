@@ -43,7 +43,7 @@ AI control — there is no in-app AI bridge): the `llull` CLI since LC1 (the MCP
 - [ ] Constructive vs evaluated geometry split (`entities` becomes a derived cache)
 - See the `parametric` skill, architecture L8.
 
-## v0.6 — Measurement & inspection (read-only MCP tools)
+## v0.6 — Measurement & inspection (read-only query tools)
 
 - [ ] `measure_distance` / `measure_angle` / `area_of` / `perimeter_of` / `volume_of`
 - [ ] `bounding_box`, `mass_properties` (needs material density), `check_interference`
@@ -55,12 +55,13 @@ AI control — there is no in-app AI bridge): the `llull` CLI since LC1 (the MCP
 - [x] `GeometryKernel` interface; start mesh-based (three.js / Manifold)
 - [ ] Exact boolean operations (union / subtract / intersect)
 - [ ] Fillet / chamfer / shell; later NURBS surfaces
-- [x] Swap-in path for OpenCascade.js (B-rep) without touching commands (`?kernel=occt`, `LLULL_KERNEL=occt`)
+- [x] Swap-in path for an exact B-rep kernel without touching commands (then OpenCascade.js via `?kernel=occt`; today the native
+      `llull-kernel` sidecar, `LLULL_KERNEL` / `llull --kernel occt-native`)
 
 ## v0.8 — Interop & persistence
 
 - [x] Native save/load + document versioning (llull-document v2; v1 still read)
-- [x] 2D: DXF import (`import_dxf`) + export (`export_dxf`, `export_civil_dxf`); DWG still open
+- [x] 2D: DXF import (`import_dxf`) + export (`export_building_dxf`, `export_civil_dxf`); DWG still open
 - [x] 3D exchange: STEP export (exact B-rep, via CadQuery/OpenCascade) + STEP import (as meshes) — docs/CAD_EXCHANGE.md
 - [x] Parametric code exchange: CadQuery / build123d (round-trip), OpenSCAD + FreeCAD macro (export)
 - [ ] IGES; STEP feature recognition (import as editable primitives)
@@ -112,14 +113,14 @@ AI control — there is no in-app AI bridge): the `llull` CLI since LC1 (the MCP
 ## Target architecture migration (Wave 7; plan in git history: docs/MIGRATION_PLAN.md)
 
 - [x] Golden replay corpus, schema conformance and tool-schema snapshot tests
-- [x] Execution context: kernel, ids and registry injected per `execute`; one kernel choice for browser and server
-- [x] One zod schema per command (`defineCommand`): TS type, MCP JSON Schema and runtime validation
+- [x] Execution context: kernel, ids and registry injected per `execute`; one kernel choice for renderer and server
+- [x] One zod schema per command (`defineCommand`): TS type, tool JSON Schema (`llull describe`) and runtime validation
 - [x] Step-scoped deterministic ids; replay re-mints identical ids
 - [x] Replay prefix cache; parameter edits regenerate only dependent steps; kernel memoization
 - [x] Derivation guards; saved files omit plugin-derived geometry (llull-document v2)
 - [ ] Kernel (boolean / fillet) mesh results as a derived cache, not stored in files
 - [x] Command-log live sync (`/live`); UI bridge retired (the offline outbox was removed in LC1 step 6)
-- [x] Plugins (building, industrial); npm workspaces; MCP tool discovery (`search_tools` / `enable_toolset`)
+- [x] Plugins (building, industrial); npm workspaces; tool discovery (then MCP `search_tools` / `enable_toolset`; now `llull search` / `llull list <toolset>`)
 - [x] Every source file under 500 code lines
 - [ ] History-based undo (MG5.4)
 

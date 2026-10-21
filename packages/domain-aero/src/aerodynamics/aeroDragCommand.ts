@@ -1,4 +1,4 @@
-/** aero_drag: drag force and power from CdA, Cd x a reference area or Cd x the frontal area of solids, plus flat-plate skin friction. */
+/** compute_aero_drag: drag force and power from CdA, Cd x a reference area or Cd x the frontal area of solids, plus flat-plate skin friction. */
 
 import { defineCommand, z } from '@core/commands/schema';
 import type { CadDocument } from '@core/model/types';
@@ -121,7 +121,7 @@ function resolveFriction(model: FrictionModel, wetted: number | undefined, reyno
  * @failure area sources conflicting / missing -> AER_AREA_SOURCE_CONFLICT; bad air state -> AER_* of resolveAirState; geometry errors as frontal_area
  */
 export const aeroDrag = defineCommand({
-  name: 'aero_drag',
+  name: 'compute_aero_drag',
   annotations: { readOnly: true, idempotent: true },
   description:
     'Read-only aerodynamic drag force and the power to overcome it: D = ½ρV²·CdA, P = D·V. Give exactly one area source: `cdA` (m², ' +
@@ -133,7 +133,7 @@ export const aeroDrag = defineCommand({
   params: aeroDragParams,
   run: (doc, params): CommandResult => {
     const fail = ({ code, message, paths, ids = [] }: Refusal): CommandResult =>
-      refuseAero(doc, 'aero_drag', code, message, [...ids], [...paths]);
+      refuseAero(doc, 'compute_aero_drag', code, message, [...ids], [...paths]);
     const speed = toMetresPerSecond(params.speed, params.speedUnit ?? 'm/s');
     if (!(speed >= 0)) return fail({ code: 'AER_PARAM_INVALID', message: 'speed must be >= 0', paths: ['speed'] });
     const area = resolveDragArea(doc, params);
@@ -157,7 +157,7 @@ export const aeroDrag = defineCommand({
   },
 });
 
-/** `data` of aero_drag (forces N, power W, pressures Pa, areas m², speeds m/s). */
+/** `data` of compute_aero_drag (forces N, power W, pressures Pa, areas m², speeds m/s). */
 interface DragData {
   readonly air: { readonly densityKgM3: number; readonly viscosityPaS: number; readonly source: string; readonly defaulted: boolean };
   readonly speedMS: number;

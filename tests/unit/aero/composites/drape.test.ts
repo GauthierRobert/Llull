@@ -145,7 +145,7 @@ describe('draped flat patterns of a sphere cap', () => {
   it('flattens a 30 degree cap to about its spherical area (low shear)', () => {
     const result = data<{ pieces: { areaMm2: number }[]; files: { content: string }[]; provenance: { method: string } }>(
       patch,
-      'export_flat_patterns_dxf',
+      'export_ply_flat_patterns_dxf',
       { part: base.part },
     );
     const spherical = 2 * Math.PI * 100 * 100 * (1 - Math.cos((30 * Math.PI) / 180));
@@ -156,8 +156,8 @@ describe('draped flat patterns of a sphere cap', () => {
 
   it('refuses the whole hemisphere at the locking angle unless over-lock is allowed', () => {
     const whole = withPly(base, { drape: { stepLength: 4 } });
-    expectRefusal(whole, 'export_flat_patterns_dxf', { part: base.part }, 'CMP_PRODUCIBILITY_OVER_LOCK');
-    const allowed = data<{ pieces: unknown[] }>(whole, 'export_flat_patterns_dxf', { part: base.part, allowOverLock: true });
+    expectRefusal(whole, 'export_ply_flat_patterns_dxf', { part: base.part }, 'CMP_PRODUCIBILITY_OVER_LOCK');
+    const allowed = data<{ pieces: unknown[] }>(whole, 'export_ply_flat_patterns_dxf', { part: base.part, allowOverLock: true });
     expect(allowed.pieces).toHaveLength(1);
   });
 
@@ -193,8 +193,10 @@ describe('draped flat patterns of a sphere cap', () => {
       boundary: { kind: 'polygon', polygons: [cap(20)] },
       drape: { stepLength: 3 },
     });
-    expectRefusal(small, 'export_flat_patterns_dxf', { part: base.part }, 'CMP_DRAPE_LIMIT_MISSING');
-    expect(data<{ pieces: unknown[] }>(small, 'export_flat_patterns_dxf', { part: base.part, allowOverLock: true }).pieces).toHaveLength(1);
+    expectRefusal(small, 'export_ply_flat_patterns_dxf', { part: base.part }, 'CMP_DRAPE_LIMIT_MISSING');
+    expect(
+      data<{ pieces: unknown[] }>(small, 'export_ply_flat_patterns_dxf', { part: base.part, allowOverLock: true }).pieces,
+    ).toHaveLength(1);
   });
 });
 

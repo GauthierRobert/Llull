@@ -56,7 +56,7 @@ describe('fea_solve gating on THM_BC_CONFLICT', () => {
     const outcome = await result;
     expect(outcome.isError).toBe(true);
     expect(outcome.summary).toContain('THM_BC_CONFLICT');
-    expect(outcome.summary).toContain('delete_thermal_bc');
+    expect(outcome.summary).toContain('delete_analysis_item');
     expect(outcome.affected).toEqual(expect.arrayContaining([analysisId]));
     for (const id of ids) expect(outcome.summary).toContain(id);
     expect(ccx).not.toHaveBeenCalled();

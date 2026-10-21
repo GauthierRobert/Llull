@@ -99,7 +99,7 @@ seeded Monte Carlo of 200 000 samples).
 
 1. No releasable part definition: an aerospace part without tolerances cannot be quoted, made or
    inspected (Boeing D6-51991 §7.5 assumes the dataset carries manufacturing/inspection information [R23]).
-2. No AP242 PMI exchange: llull's STEP export (`export_step_exact`, AP214 B-rep) drops every
+2. No AP242 PMI exchange: llull's STEP export (`export_step_ap242`, AP214 B-rep) drops every
    requirement; imported supplier models lose their PMI.
 3. No tolerance analysis: fit/clearance decisions are made on nominal geometry only.
 4. Drawings without GD&T: `export_sheet_svg` can only add overall width/height (`showDimensions`).

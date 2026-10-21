@@ -28,7 +28,7 @@ export const foundationCheck = defineCommand({
   name: 'check_foundations',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Preliminary foundation check of the portal-frame columns of a level, from the characteristic base reactions of the same frame ' +
+    'Preliminary foundation check of the portal-frame columns of a level (read-only; to size and reinforce the pads that fail use design_footings, same inputs), from the characteristic base reactions of the same frame ' +
     'analysis as check_portal_frames (same deadLoad / snowLoad / windPressure / craneCapacity inputs). For every column with a pad ' +
     'footing (location at the column base) and/or a base plate: (1) soil bearing under SLS G+S, G+S+0.6W (either way), G+W, G+C, ' +
     'pressure = (V + footing 25 kN/m³ + backfill 18 kN/m³ above the footing up to the level) / area, with load eccentricity from H × ' +

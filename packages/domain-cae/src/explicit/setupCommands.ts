@@ -1,4 +1,4 @@
-/** set_explicit_controls / set_initial_velocity / add_rigid_wall / delete_rigid_wall: the set-up of an explicit dynamics case (PHY-19). */
+/** set_explicit_controls / set_initial_velocity / add_rigid_wall: the set-up of an explicit dynamics case (PHY-19). */
 
 import type { ExplicitMassScaling, ExplicitMeshSource, ExplicitSpec } from '@core/model/explicit';
 import type { NamedValue } from '@core/model/topology';
@@ -259,7 +259,7 @@ export const addRigidWall = defineCommand({
   name: 'add_rigid_wall',
   description:
     'Add a fixed, frictionless planar rigid wall to an explicit_dynamics case: `point` on the plane (document units) and `normal` pointing toward ' +
-    'the model. Nodes are not allowed to cross the plane; the wall force history is reported by explicit_report. Returns the wall id in affected[1].',
+    'the model. Nodes are not allowed to cross the plane; the wall force history is reported by analysis_report. Returns the wall id in affected[1].',
   params: z.object({
     analysisId: analysisIdSchema,
     name: z.string().min(1).describe('Unique wall name, e.g. "anvil".'),
@@ -286,31 +286,6 @@ export const addRigidWall = defineCommand({
       withSpec(doc, analysisCase, next),
       `add_rigid_wall: ${id} '${name}' through [${point.join(', ')}] ${doc.units}, normal [${normal.join(', ')}] in ${analysisId}.`,
       [analysisId, id],
-    );
-  },
-});
-
-/**
- * @affects doc.analysis.cases[analysisId].explicit.rigidWalls (removes 1 wall)
- * @failure no controls -> EXP_CONTROLS_MISSING; unknown wall -> EXP_RIGID_WALL_NOT_FOUND
- */
-export const deleteRigidWall = defineCommand({
-  name: 'delete_rigid_wall',
-  description: 'Remove a rigid wall (by id, affected[1] of add_rigid_wall) from an explicit_dynamics case.',
-  params: z.object({ analysisId: analysisIdSchema, wallId: z.string().describe('Wall id, e.g. rw-12.1.') }),
-  run: (doc, { analysisId, wallId }): CommandResult => {
-    const fail: Fail = (code, message, ids = [analysisId], paths = []) =>
-      refuseExplicit(doc, 'delete_rigid_wall', code, message, ids, paths);
-    const found = requireSpec(doc, analysisId, fail);
-    if ('document' in found) return found;
-    const { analysisCase, spec } = found;
-    if (!Object.hasOwn(spec.rigidWalls, wallId))
-      return fail('EXP_RIGID_WALL_NOT_FOUND', `no wall '${wallId}' in '${analysisId}'`, [wallId]);
-    const rigidWalls = Object.fromEntries(Object.entries(spec.rigidWalls).filter(([id]) => id !== wallId));
-    return changed(
-      withSpec(doc, analysisCase, { ...spec, rigidWalls, rigidWallOrder: spec.rigidWallOrder.filter((id) => id !== wallId) }),
-      `delete_rigid_wall: ${wallId} removed from ${analysisId}.`,
-      [analysisId],
     );
   },
 });

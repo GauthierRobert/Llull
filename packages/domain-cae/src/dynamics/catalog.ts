@@ -12,7 +12,7 @@ import {
 import { dampingCoefficients, psdRms, sdofResponse } from './quickChecks';
 import { setBaseExcitation, setDynamicBasis, setDynamicDamping, setFrequencySweep } from './setupCommands';
 import { shockResponseSpectrum } from './srsCommand';
-import { dynamicReport, equivalentStaticLoadCase } from './reportCommands';
+import { equivalentStaticLoadCase } from './reportCommands';
 
 export const dynamicsCommands = commandCatalog(
   setDynamicDamping,
@@ -29,6 +29,5 @@ export const dynamicsCommands = commandCatalog(
   psdRms,
   dampingCoefficients,
   shockResponseSpectrum,
-  dynamicReport,
   equivalentStaticLoadCase,
 );

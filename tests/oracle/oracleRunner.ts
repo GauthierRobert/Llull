@@ -186,11 +186,11 @@ function compare(expected: OracleExpected, measured: Measured, kernel: OracleKer
   return problems;
 }
 
-/** Exports every solid with `export_step_exact`, re-imports it into an empty document with `import_step_exact` and returns that document. */
+/** Exports every solid with `export_step_ap242`, re-imports it into an empty document with `import_step_exact` and returns that document. */
 function stepRoundTrip(doc: CadDocument): CadDocument {
-  const exported = dataOf(doc, 'export_step_exact', {});
+  const exported = dataOf(doc, 'export_step_ap242', { schema: 'ap214', includeValidationProperties: false });
   const step = exported?.['step'];
-  if (typeof step !== 'string') throw new Error('export_step_exact produced no STEP text');
+  if (typeof step !== 'string') throw new Error('export_step_ap242 produced no STEP text');
   const imported = execute(createEmptyDocument(), 'import_step_exact', { text: step });
   if (imported.affected.length === 0) throw new Error(`import_step_exact failed: ${imported.summary}`);
   return imported.document;

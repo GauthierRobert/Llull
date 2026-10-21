@@ -1,4 +1,4 @@
-/** define_property_model / remove_property_model (PHY-01): property laws with units, ranges and provenance on a document material. */
+/** define_property_model / delete_property_model (PHY-01): property laws with units, ranges and provenance on a document material. */
 
 import { canonicalJson } from '../../lib/canonicalJson';
 import { sha256Hex } from '../../lib/sha256';
@@ -24,7 +24,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   MAT_UNIT_DIMENSION: 'use a unit of the property / variable dimension',
   MAT_UNIT_INVALID: "write units like 'W/(m*K)', 'J/(kg*K)', 'GPa', 'K', 'degC', '1e-5'",
   MAT_PROVENANCE_MISSING: 'give source.citation (and locator / url / accessed)',
-  MAT_PREFERRED_CONFLICT: 'drop preferred on one of them (remove_property_model or replace)',
+  MAT_PREFERRED_CONFLICT: 'drop preferred on one of them (delete_property_model or replace)',
 };
 
 export const refuseWith = (
@@ -187,7 +187,7 @@ export const definePropertyModel = defineCommand({
  * @failure unknown material -> MAT_RECORD_NOT_FOUND; library record -> MAT_RECORD_READONLY; unknown id -> PROP_MODEL_NOT_FOUND; base of a ratioOf model -> PROP_MODEL_IN_USE
  */
 export const removePropertyModel = defineCommand({
-  name: 'remove_property_model',
+  name: 'delete_property_model',
   annotations: { destructive: true },
   description:
     'Remove one property model from a material. Refused while another model of the material is a ratioOf of it, or a material law reads it (PROP_MODEL_IN_USE).',
@@ -196,7 +196,7 @@ export const removePropertyModel = defineCommand({
     modelId: z.string().describe('Id of the model to remove.'),
   }),
   run: (doc, { material: materialId, modelId }): CommandResult => {
-    const name = 'remove_property_model';
+    const name = 'delete_property_model';
     const editable = editableMaterial(doc, name, materialId, refuseWith);
     if ('refusal' in editable) return editable.refusal;
     const { material } = editable;
@@ -216,7 +216,7 @@ export const removePropertyModel = defineCommand({
         material,
         models.filter((m) => m.id !== modelId),
       ),
-      `remove_property_model '${materialId}/${modelId}': removed.`,
+      `delete_property_model '${materialId}/${modelId}': removed.`,
       [],
     );
   },

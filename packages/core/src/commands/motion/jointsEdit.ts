@@ -57,8 +57,8 @@ export const setJointValue = defineCommand({
     'take "dof" = index of the coordinate (0-based, order: cylindrical/pin_slot [angle, slide]; planar [u, v, angle]; ball [rx, ry, rz]). ' +
     'rigid and cam joints have no settable value (a cam follows its camJoint). The value is clamped into the joint limit when one is set. ' +
     '"value" may be a plain number or a parameter expression string (e.g. "=spoke_angle * 2" or "gap / 3"). ' +
-    'Expression strings are stored as-is and evaluated when evaluate_motion or bake_motion is called. ' +
-    'Call evaluate_motion (query) or bake_motion (mutates doc) to apply the new value to instance transforms.',
+    'Expression strings are stored as-is and evaluated when evaluate_motion is called. ' +
+    'Call evaluate_motion (query; apply=true mutates the doc) to apply the new value to instance transforms.',
   params: z.object({
     id: z.string().describe('Id of the joint to update. Must exist in doc.joints.'),
     value: z

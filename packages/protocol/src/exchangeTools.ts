@@ -198,9 +198,14 @@ interface StepFile {
 
 const NO_STEP_BACKEND = 'STEP export needs the Python bridge (LLULL_PYTHON is off) or the exact OCC kernel (LLULL_KERNEL=occt-native).';
 
-/** Without the Python bridge the exact kernel writes the STEP (`export_step_exact`). */
+/** Without the Python bridge the exact kernel writes the STEP (`export_step_ap242`). */
 function exportStepExact(getDoc: () => CadDocument, name?: string, confirmation?: unknown): StepFile | { error: string } {
-  const exact = execute(getDoc(), 'export_step_exact', confirmation === undefined ? {} : { confirmExportControlled: confirmation });
+  const simple = { schema: 'ap214', includeValidationProperties: false };
+  const exact = execute(
+    getDoc(),
+    'export_step_ap242',
+    confirmation === undefined ? simple : { ...simple, confirmExportControlled: confirmation },
+  );
   const data = exact.data as { step?: string; solidCount?: number } | undefined;
   if (data?.step === undefined) return { error: `${NO_STEP_BACKEND} Kernel export: ${exact.summary}` };
   const fileName = `${safeFileName(name, 'model')}.step`;

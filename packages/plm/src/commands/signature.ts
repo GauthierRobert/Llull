@@ -24,9 +24,9 @@ const HEX_SIGNATURE = /^[0-9a-f]{128}$/;
 export const recordSignature = defineCommand({
   name: 'record_signature',
   description:
-    'HUMAN GATE. Record an Ed25519 signature made by a human with the host key store (desktop "Approve & sign") over the canonical manifest of a target: ' +
+    'Record an Ed25519 signature made by a human with the host key store (desktop "Approve & sign") over the canonical manifest of a target: ' +
     '{ kind: "iteration", ref: "A.2" } (what an approver signs before release; the bytes are release_manifest with kind "iteration") or ' +
-    '{ kind: "release", ref: "A" } (a released revision). The signature is verified with the host verifier and the key must be registered; it never ' +
+    '{ kind: "release", ref: "A" } (a released revision). HUMAN GATE. The signature is verified with the host verifier and the key must be registered; it never ' +
     'signs. An agent caller gets PLM_HUMAN_GATE for approval / release meanings.',
   annotations: { destructive: true, metaHistory: true },
   params: z.object({
@@ -129,8 +129,8 @@ export const recordSignature = defineCommand({
 export const attachReleasePackage = defineCommand({
   name: 'attach_release_package',
   description:
-    'HUMAN GATE. Record that the host wrote the signed release package of a released revision: its manifest SHA-256 and the documentContentHash it ' +
-    'states (must equal the revision content hash). Called by the desktop / `llull release pack` after writing the package; needs `confirmation` (a trusted human signature): an agent gets PLM_HUMAN_GATE.',
+    'Record that the host wrote the signed release package of a released revision: its manifest SHA-256 and the documentContentHash it ' +
+    'states (must equal the revision content hash). HUMAN GATE. Called by the desktop / `llull release pack` after writing the package; needs `confirmation` (a trusted human signature): an agent gets PLM_HUMAN_GATE.',
   annotations: { metaHistory: true },
   params: z.object({
     revision: z.string().describe('Released revision label.'),

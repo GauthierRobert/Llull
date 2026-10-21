@@ -21,7 +21,7 @@ export const setBucklingPreload = defineCommand({
     '*STATIC step with the preload, then a *BUCKLE step that writes preload + reference loads SUMMED (a later *CLOAD / *DLOAD replaces the value at the same ' +
     'node and dof / element face / gravity instead of adding to it). CalculiX 2.21 scales the WHOLE *BUCKLE step load (measured: the stress of the static ' +
     'step is not held as a base state), so the factors multiply preload + reference: the critical load is factor x (preload + reference), NOT preload + ' +
-    'factor x reference (fea_report data.eigen.factorsMultiply). The Nastran BDF export does not support a preload.',
+    'factor x reference (analysis_report data.eigen.factorsMultiply). The Nastran BDF export does not support a preload.',
   params: z.object({
     analysisId: analysisIdSchema,
     preloadLoadCase: z

@@ -200,9 +200,9 @@ export function gridIntersections(building: BuildingModel): Vec2[] {
 export const addColumn = defineCommand({
   name: 'add_column',
   description:
-    'Add a structural column standing on a level, at a plan location or (atGridIntersections: true) ' +
+    'Add a CONCRETE structural column (rectangular / circular section) standing on a level, at a plan location or (atGridIntersections: true) ' +
     'at every structural grid intersection. Rectangular width × depth, or circular with diameter = width. ' +
-    'Locations that already hold a column on the level are skipped (listed in the summary); refused when all are occupied.',
+    'Locations that already hold a column on the level are skipped (listed in the summary); refused when all are occupied. For steel columns (profile sections) use add_grid_columns (every grid intersection) or add_steel_member (single).',
   params: z.object({
     location: vec2('Column center [x, y].').optional(),
     atGridIntersections: z.boolean().optional().describe('Place one column at every grid-axis intersection instead of at location.'),

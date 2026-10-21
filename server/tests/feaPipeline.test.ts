@@ -1,6 +1,6 @@
 /**
  * FE pipeline end to end through the `llull` CLI on a temp document: set-up plan -> fea_mesh (Gmsh via the Python bridge) -> fea_solve
- * (CalculiX) -> fea_report. An axial steel bar must carry sigma_zz = F / A (1 %). Also fea_export, the stale-mesh refusal and the
+ * (CalculiX) -> analysis_report. An axial steel bar must carry sigma_zz = F / A (1 %). Also fea_export, the stale-mesh refusal and the
  * missing-tool codes. Skipped without the `gmsh` Python module or `ccx`.
  */
 
@@ -144,7 +144,7 @@ describe.skipIf(!HAS_GMSH || !HAS_CCX)('FE pipeline (gmsh + ccx)', () => {
     const mean = midspan.reduce((sum, node) => sum + (stress?.values[String(node[0])]?.[szz] ?? 0), 0) / midspan.length;
     expect(Math.abs(mean / (FORCE / AREA) - 1)).toBeLessThan(0.01);
 
-    const report = await cli('fea_report', `analysisId=${analysisId}`);
+    const report = await cli('analysis_report', `analysisId=${analysisId}`);
     expect(report.code, String(report.json['summary'])).toBe(EXIT_OK);
     expect(JSON.stringify(report.json)).toContain('solved');
   }, 240_000);

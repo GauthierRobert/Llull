@@ -17,7 +17,7 @@ export const driveJointTo = defineCommand({
     'Drive a joint from its current value to a target value and store the value reached. With contactSetId the motion STOPS at the first ' +
     'contact of any pair in that contact set (create_contact_set), located by bisection to "tolerance"; closed loops with passive joints also stop ' +
     'where the loop can no longer close. The result data is { requested, reached, stopped, reason?, pair?, from }. ' +
-    'Instance placements are not changed: run bake_motion or evaluate_motion afterwards.',
+    'Instance placements are not changed: run evaluate_motion with apply=true afterwards.',
   params: z.object({
     jointId: z.string().describe('Id of the joint to drive (doc.joints).'),
     target: z.union([z.number(), z.string()]).describe('Target value (radians / document units) or a parameter expression.'),

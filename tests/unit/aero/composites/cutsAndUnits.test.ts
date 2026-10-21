@@ -157,7 +157,7 @@ describe('split_ply on a flat part', () => {
     });
     const ply = Object.values(cut.composites?.plies ?? {})[0];
     expect(ply?.cuts).toHaveLength(1);
-    const dxf = data<{ pieces: { areaMm2: number }[] }>(cut, 'export_flat_patterns_dxf', { part: base.part });
+    const dxf = data<{ pieces: { areaMm2: number }[] }>(cut, 'export_ply_flat_patterns_dxf', { part: base.part });
     expect(dxf.pieces).toHaveLength(2);
     expect(Math.round(dxf.pieces.reduce((sum, piece) => sum + piece.areaMm2, 0))).toBe(600 * 400 + 8 * 400);
     const outlines = Object.keys(cut.entities).filter((id) => id.startsWith('ply-') && id.includes('.o'));

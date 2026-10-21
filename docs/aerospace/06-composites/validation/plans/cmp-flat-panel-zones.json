@@ -17,6 +17,6 @@
  { "command": "check_laminate_rules", "params": { "part": "$part" } },
  { "command": "analyze_laminate", "params": { "part": "$part", "point": [50, 50, 0], "loads": { "Nx": 1 }, "criteria": ["max_stress", "tsai_hill", "tsai_wu"] } },
  { "command": "check_layup", "params": { "part": "$part", "purpose": "design" } },
- { "command": "export_flat_patterns_dxf", "params": { "part": "$part", "nest": false, "labels": ["name", "orientation", "sequence"] } },
+ { "command": "export_ply_flat_patterns_dxf", "params": { "part": "$part", "labels": ["name", "orientation", "sequence"] } },
  { "command": "export_ply_book", "params": { "part": "$part", "format": "svg" } }
 ]

@@ -44,10 +44,13 @@
   }
  },
  {
-  "command": "reliability_form",
+  "command": "run_reliability_study",
   "params": {
    "limitState": "g",
-   "sorm": true
+   "methods": [
+    "form",
+    "sorm"
+   ]
   }
  },
  {

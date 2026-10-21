@@ -3,7 +3,7 @@
   "validates": ["VC-AER-11", "VC-AER-13"],
   "description": "Sketch a NACA 2412 section (chord 1000 mm), analyse it, extrude a constant-chord panel, then a 10 m x 1 m rectangular wing by lifting line",
   "actions": [
-    { "command": "draw_naca_airfoil", "params": { "naca": "2412", "chord": 1000 }, "as": "section" },
+    { "command": "airfoil_from_naca", "params": { "designation": "2412", "chord": 1000, "points": 121, "trailingEdge": "closed", "as": "polyline" }, "as": "section" },
     { "command": "analyze_airfoil", "params": { "entityId": "$section", "alphasDeg": [0, 4] } },
     { "command": "extrude_profile", "params": { "id": "$section", "depth": 2000 }, "as": "panel" },
     { "command": "analyze_wing", "params": { "span": 10, "rootChord": 1, "naca": "2412", "alphasDeg": [0, 4] } }

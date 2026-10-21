@@ -18,7 +18,7 @@ export const frontalArea = defineCommand({
     'Read-only frontal (projected) area of 3D solids seen along the flow direction — the reference area A of drag D = ½ρV²·Cd·A — plus the ' +
     'wetted (surface) area for skin friction and the body length along the flow. Overlapping parts count once (silhouette union by ' +
     'rasterisation; `uncertaintyM2` = half the boundary cells). Lengths are converted from the document units to metres. Default flow ' +
-    'direction [1, 0, 0]. Use for a cyclist + bike model, a fuselage, a car or any assembly; then aero_drag { cd, entityIds } or road_load_power.',
+    'direction [1, 0, 0]. Use for a cyclist + bike model, a fuselage, a car or any assembly; then compute_aero_drag { cd, entityIds } or road_load_power.',
   params: z.object({ entityIds: z.array(z.string()).min(1).describe('Ids of the 3D solids / instances to project.'), ...flowParams }),
   run: (doc, params): CommandResult => {
     const measured = geometryArea(doc, params.entityIds, params.flowDirection, params.resolution);

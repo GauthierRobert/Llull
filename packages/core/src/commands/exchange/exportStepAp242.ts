@@ -1,7 +1,7 @@
 /**
  * export_step_ap242 (aerospace 04 XCH M2): STEP AP242 / AP214 / AP203 through the kernel's XDE writer, with the product structure of the model,
  * names, colours, layers, materials and the CAx-IF geometric validation properties, then a self-check that re-reads the written text with the
- * independent Part 21 reader and compares the embedded properties with the model. `buildStepExport` is shared with `export_step_exact`.
+ * independent Part 21 reader and compares the embedded properties with the model. The only STEP export command of the registry (the former `export_step_ap242` is retired onto it; kernels without an XDE writer fall back to the direct shape writer).
  */
 
 import type { CadDocument } from '../../model/types';
@@ -20,6 +20,7 @@ import { type ExpectedGvp, groupFileGvp, selfCheckGvp } from './fileGvp';
 import { type ExchangePlan, planExchange } from './stepPlan';
 import { type PmiWriteReport, attachPmi } from './pmiExport';
 import { MM_PER_UNIT } from '../../model/units';
+import { exportLegacyStep } from '../brep/stepLegacy';
 
 /** Timestamp of the header when the host passes none: a fixed instant, so the same document always yields the same bytes (TR-XCH-05). */
 const EPOCH_TIMESTAMP = '1970-01-01T00:00:00';
@@ -241,8 +242,9 @@ export const exportStepAp242 = defineCommand({
     'properties are compared with the model (data.selfCheck, tolerance 1e-9 relative); a disagreement refuses the export with XCH_SELFCHECK_RED. Surface sheets ' +
     '(nurbs_surface) are written as B-spline face products. Returns data: { format, step, schema, schemaName, unit, solidCount, sheetCount, entityIds, skipped, ' +
     'assembly?, gvp[{ product, volume, area, centroid }], selfCheck, policy, provenance, reviewRequired }. Same document and same timestamp give identical bytes. ' +
-    'Imported bodies whose sender validation properties were red or not checkable need acceptUnverified (a human signature). Requires the OCC kernel; the ' +
-    'Manifold kernel refuses with XCH_WRITER_UNAVAILABLE. Does not modify the document.',
+    'Imported bodies whose sender validation properties were red or not checkable need acceptUnverified (a human signature). Needs the exact kernel (kernel_info); the ' +
+    'mesh kernel refuses with XCH_WRITER_UNAVAILABLE. A kernel that only writes shapes directly (no XDE writer) exports through a simpler writer only when you pass includeValidationProperties:false (AP214 or AP242 header, no validation properties, PMI or self-check; data then has no gvp/selfCheck/policy); otherwise it refuses with XCH_WRITER_UNAVAILABLE. ' +
+    'This is the in-process kernel export (needs ctx.kernel); the CLI tool export_step (llull export_step --save part.stp) is the file-writing entry point that calls it (or the Python bridge) and saves the result. Does not modify the document.',
   params: z.object({
     entityIds: z
       .array(z.string())
@@ -287,8 +289,19 @@ export const exportStepAp242 = defineCommand({
     if (refused !== null) return refused;
     const kernel = (ctx ?? currentContext()).kernel;
     if (!kernel) return noop(doc, kernelUnavailable('export_step_ap242'));
+    const schema = params.schema ?? 'ap242';
+    if (
+      kernel.writeExchange === undefined &&
+      kernel.exportStep !== undefined &&
+      params.includeValidationProperties === false &&
+      params.includePmi !== true
+    ) {
+      return schema === 'ap203'
+        ? noop(doc, 'export_step_ap242: this kernel has no XDE writer and cannot write AP203; use schema ap214 or ap242.')
+        : exportLegacyStep(doc, kernel, params.entityIds, schema, params.acceptUnverified, ctx);
+    }
     const outcome = buildStepExport(doc, kernel, params.entityIds, {
-      schema: params.schema ?? 'ap242',
+      schema,
       validation: params.includeValidationProperties !== false,
       structured: params.assembly !== 'flat',
       fileName: params.fileName ?? 'llull.stp',
@@ -308,7 +321,7 @@ export const exportStepAp242 = defineCommand({
       `export_step_ap242: ${data.solidCount} exact solid(s)${data.sheetCount > 0 ? ` and ${data.sheetCount} sheet(s)` : ''} from ${data.entityIds.join(', ')} → STEP ${SCHEMA_NAMES[data.schema]}` +
         `${data.assembly === undefined ? '' : `, ${data.assembly.products} product(s), ${data.assembly.occurrences} occurrence(s)`}, unit ${data.unit}, ${data.step.length} bytes; ${checked}` +
         `${data.pmi === undefined ? '' : `; PMI ${data.pmi.written.length}/${data.pmi.requested} item(s) written${data.pmi.skipped.length > 0 ? `, ${data.pmi.skipped.length} skipped (${data.pmi.skipped.map((entry) => `${entry.id}: ${entry.reason}`).join('; ')})` : ''}`}` +
-        `${data.skipped.length > 0 ? `; skipped ${data.skipped.join(', ')}` : ''}.${reviewRequired.value ? ` Review required: ${reviewRequired.reasons.join(', ')}.` : ''}`,
+        `${data.faceted.length > 0 ? `; ${data.faceted.length} ply solid(s) written from triangles (exact slab refused): ${data.faceted.join(', ')}` : ''}${data.skipped.length > 0 ? `; skipped ${data.skipped.join(', ')}` : ''}.${reviewRequired.value ? ` Review required: ${reviewRequired.reasons.join(', ')}.` : ''}`,
       { ...data, reviewRequired },
     );
   },

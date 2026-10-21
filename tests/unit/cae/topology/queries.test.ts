@@ -357,9 +357,9 @@ describe('check_topology', () => {
   });
 
   it('reports set-up problems of the 05 analysis and the keep-in budget', () => {
-    const broken = execute(model.doc, 'delete_fea_load', {
+    const broken = execute(model.doc, 'delete_analysis_item', {
       analysisId: model.analysisId,
-      loadId: model.doc.analysis?.cases[model.analysisId]?.loadOrder[0] ?? '',
+      itemId: model.doc.analysis?.cases[model.analysisId]?.loadOrder[0] ?? '',
     });
     expect(items(check(broken.document, null))).toContain('TOP_SETUP_INVALID');
     const heavy = execute(model.doc, 'set_topology_settings', { studyId: model.studyId, protectLoadSupport: true });

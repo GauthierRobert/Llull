@@ -6,6 +6,7 @@ import { useStore } from '@ui/store';
 import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { runQuery } from '@ui/services/localQuery';
 import type { BuildingModel } from '@core/model/building';
+import { getCommand } from '@core/commands/registry';
 import { KpiStrip, ListRow, PanelSection, StatusChip, StatusLine, type Kpi } from '@ui/panels/PanelParts';
 import { useFocusItem } from '@ui/hooks/useFocusItem';
 import { useIsFocused } from '@ui/store/focusStore';
@@ -37,6 +38,13 @@ const CHECKS = [
 type CheckCommand = (typeof CHECKS)[number]['command'];
 
 /** Multi-storey / rack check: its loads come from the model (slabs, equipment, pipes), not the form. */
+/** The load form is shared by every check; each command receives only the keys it declares (the registry rejects unknown params). */
+function declaredLoads(command: string, loads: Record<string, number>): Record<string, number> {
+  const declared = getCommand(command)?.paramsSchema.properties ?? {};
+  const named = command === 'check_purlins' ? { ...loads, roofDeadLoad: loads['deadLoad'] ?? 0 } : loads;
+  return Object.fromEntries(Object.entries(named).filter(([key]) => key in declared));
+}
+
 const loadsFromModel: ReadonlySet<CheckCommand> = new Set(['check_steel_members', 'check_pipe_supports']);
 
 function MemberRow({ row }: { row: ReportRow }): React.ReactElement {
@@ -107,7 +115,7 @@ export function StructuralSection(): React.ReactElement {
   const loads = { deadLoad: Number(deadLoad), snowLoad: Number(snowLoad), windPressure: Number(windPressure) };
 
   const runCheck = (command: CheckCommand): void => {
-    const result = runQuery(command, loadsFromModel.has(command) ? {} : loads);
+    const result = runQuery(command, loadsFromModel.has(command) ? {} : declaredLoads(command, loads));
     setReport({
       summary: result.summary,
       rows: worstRows(result.data),

@@ -151,7 +151,7 @@ export class CivilUiDriver {
         await this.fill('Manhole name', text(args['name']));
         return this.act('add manhole', 'Add manhole');
       }
-      case 'add_pipe':
+      case 'add_drainage_pipe':
         await this.page.getByLabel('Pipe from').selectOption(text(args['fromId']));
         await this.page.getByLabel('Pipe to').selectOption(text(args['toId']));
         await this.fill('Pipe Manning n', text(args['manningN']));

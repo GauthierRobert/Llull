@@ -16,7 +16,8 @@ import { createEmptyDocument } from '@core/model/types';
 import { createComputeRunner } from '../src/native/computeJob';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { runScanImport, type ScanDeps } from '../src/scan/scanImport';
-import { runScanTool, scanToolDefinitions } from '../src/scan/scanTools';
+import { runScanTool } from '../src/scan/scanTools';
+import { buildNativeToolDefinitions } from '@protocol/nativeTools';
 import { assetKey, DEFAULT_IMPORT_OPTIONS, hasAsset, importerVersion, listAssets } from '../src/scan/scanStore';
 import { createPointCloudPort } from '../src/scan/pointCloudPort';
 import { AssetReader, crc32 } from '../src/scan/assetReader';
@@ -64,7 +65,11 @@ describe('scan_import transport', () => {
     expect(tool).toMatchObject({ isError: true, changed: false, data: { code: 'SCN_FORMAT_PROPRIETARY' } });
     expect((await runScanTool('scan_import', { path: rcp, sourceUnit: 'yd' }, deps()))?.data).toEqual({ code: 'SCN_PARAM_INVALID' });
     expect(await runScanTool('add_box', {}, deps())).toBeNull();
-    expect(scanToolDefinitions().map((tool) => tool.name)).toEqual(['scan_import', 'scan_list']);
+    expect(
+      buildNativeToolDefinitions()
+        .filter((tool) => tool.name.startsWith('scan_'))
+        .map((tool) => tool.name),
+    ).toEqual(['scan_import', 'scan_list']);
   });
 
   native('imports into a content-addressed asset, atomically and idempotently', async () => {

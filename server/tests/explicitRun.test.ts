@@ -17,7 +17,8 @@ import type { FeaHost } from '@protocol/index';
 import { createFeArtifactStore, type FeArtifactCache } from '../src/fea/artifactStore';
 import type { ComputeRunner, JobRun } from '../src/native/computeJob';
 import { runExplicitRun } from '../src/native/explicitRun';
-import { isNativeTool, nativeToolDefinitions, runNativeTool } from '../src/native/tools';
+import { isNativeTool, runNativeTool } from '../src/native/tools';
+import { buildNativeToolDefinitions } from '@protocol/nativeTools';
 import { barModel, type BarModel } from '../../tests/unit/cae/explicit/support';
 
 let dir = '';
@@ -139,8 +140,8 @@ describe('explicit_run transport', () => {
     expect(host.current().analysis?.cases[model.analysisId]?.explicit?.results?.artifactHash).toBe(hash);
     const report = execute(
       host.current(),
-      'explicit_report',
-      { analysisId: model.analysisId },
+      'analysis_report',
+      { analysisId: model.analysisId, view: 'explicit' },
       { ...defaultContext(), feaArtifacts: store },
     );
     expect((report.data as { state: string }).state).toBe('solved');
@@ -172,7 +173,7 @@ describe('explicit_run transport', () => {
 
   it('is a registered native tool with a schema', async () => {
     expect(isNativeTool('explicit_run')).toBe(true);
-    const definition = nativeToolDefinitions().find((tool) => tool.name === 'explicit_run');
+    const definition = buildNativeToolDefinitions().find((tool) => tool.name === 'explicit_run');
     expect(definition?.inputSchema.required).toEqual(['analysisId']);
     const model = barModel({ size: 5 });
     const outcome = await runNativeTool('explicit_run', {}, hostOf(model), { store, runner: fakeRunner() });

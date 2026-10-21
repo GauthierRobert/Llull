@@ -16,7 +16,7 @@ import { levelIdParam } from '../../building/levelParams';
 export const addFooting = defineCommand({
   name: 'add_footing',
   description:
-    'Add concrete pad footings: one at a plan location, or (underColumns: true) one under every steel and concrete column foot of the ' +
+    'Add concrete pad footings with default sizes (to size and reinforce them from the loads, run design_footings afterwards; to verify them, check_foundations): one at a plan location, or (underColumns: true) one under every steel and concrete column foot of the ' +
     'level (underColumns wins over location). With underColumns, feet that already carry a footing on the level (within 10 mm) are ' +
     'skipped and the command is refused when none is left; an explicit location that already carries a footing on the level (within 10 ' +
     'mm) is refused. Top of footing at level + topOffset (default −300 mm); default 1500 × 1500 × 600 mm.',

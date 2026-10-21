@@ -128,7 +128,7 @@ export function pairItem(pair: PairClass, ids: readonly [string, string], tolera
       'FPR_PAIR_ALLOWED',
       'pass',
       ids,
-      `Declared ${intent.kind}: ${intent.reason}. Remove with remove_interference_intent when it no longer applies.`,
+      `Declared ${intent.kind}: ${intent.reason}. Remove with delete_interference_intent when it no longer applies.`,
       { values, witness, intent },
     );
   const code = CODES[pair.kind];

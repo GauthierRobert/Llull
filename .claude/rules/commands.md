@@ -6,35 +6,12 @@ paths:
 
 # RULE: commands (command-layer detail — loads when touching packages/ or tests/)
 
-Exact signatures: `.claude/context/command-layer.md`. Entity schema: `.claude/context/model.md`.
+Laws only. Exact signatures + skeleton to copy: `.claude/context/command-layer.md`. Entity schema: `.claude/context/model.md`.
+Procedure: `add-command` skill. Human intro: `docs/ADD_A_TOOL.md`.
 
-## Command shape (copy this skeleton)
+## Command laws
 
-```ts
-import type { CommandResult } from './types';
-import { defineCommand, z, vec3 } from './schema'; // plugins: '@core/commands/schema'
-
-/**
- * @affects modifies 1 entity
- * @failure missing id -> no-op, affected:[]
- */
-export const fooThing = defineCommand({
-  name: 'foo_thing',
-  description: 'One line, imperative, says what the op does to the document.',
-  annotations: { idempotent: true }, // readOnly / destructive / idempotent / metaHistory / requiresKernel
-  params: z.object({
-    id: z.string().describe('Target entity id'),
-    amount: z.number().describe('How much, in document units; must be > 0'),
-    offset: vec3('Optional [x, y, z] offset. Defaults to [0, 0, 0].').optional(),
-  }),
-  run: (doc, { id, amount, offset = [0, 0, 0] }, ctx): CommandResult => {
-    const target = doc.entities[id];
-    if (!target) return { document: doc, summary: `No entity ${id}.`, affected: [] };
-    // build NEW doc; ids via nextId(prefix) from @lib/id; kernel via ctx?.kernel
-  },
-});
-```
-
+- Annotations: `readOnly` / `destructive` / `idempotent` / `metaHistory` / `requiresKernel` (L9; kernel-optional commands omit it).
 - Doc-comment tags (only those that apply): `@affects @invariant @failure` (path = layer, name = command; all commands are pure).
   No narrative comments; delete any that restate the code.
 - Schema helpers (`@core/commands/schema`): `vec2`/`vec3` (exact tuples), `looseVec2`/`looseVec3`
@@ -48,7 +25,7 @@ export const fooThing = defineCommand({
   `commands`. Never edit `registry.ts` for a new command.
 - Tests (`tests/unit/**`): happy path + failure path + `is pure`. Assert `affected`, `summary`,
   observable entities — not internals. Coverage gate 90/85/90/90 on
-  `packages/core/src/{commands,geometry}/**` + `packages/domain-aec/src/**`.
+  `packages/core/src/{commands,geometry,dynamics}/**` + `packages/{domain-aec,domain-cae,domain-aero,design-lang,plm}/src/**`.
 - Tool-schema snapshot (`tests/unit/contract/__snapshots__`) and golden corpus
   (`tests/golden/__snapshots__`) diffs must be intended; never `-u` to make red go green.
 

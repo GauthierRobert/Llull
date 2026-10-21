@@ -1,4 +1,4 @@
-/** add_contact / delete_contact: penalty contacts of an explicit case (RS1 RS-8c, PHY-19 TECHNICAL_SPEC §13.7). */
+/** add_contact: penalty contacts of an explicit case (RS1 RS-8c, PHY-19 TECHNICAL_SPEC §13.7). */
 
 import type { ExplicitContact, ExplicitSpec } from '@core/model/explicit';
 import type { AnalysisCase } from '@core/model/analysis';
@@ -95,31 +95,6 @@ export const addContact = defineCommand({
       withSpec(doc, analysisCase, next),
       `add_contact: ${id} '${params.name}' ${params.kind} [${params.a.join(', ')}]${b.length > 0 ? ` / [${b.join(', ')}]` : ''}, friction ${friction.static} / ${friction.dynamic}, penalty scale ${contact.penaltyScale.value}${contact.penaltyScale.defaulted ? ' (default)' : ''} in ${params.analysisId}.`,
       [params.analysisId, id],
-    );
-  },
-});
-
-/**
- * @affects doc.analysis.cases[analysisId].explicit.contacts (removes 1 contact)
- * @failure no controls -> EXP_CONTROLS_MISSING; unknown contact -> EXP_CONTACT_NOT_FOUND
- */
-export const deleteContact = defineCommand({
-  name: 'delete_contact',
-  description: 'Remove a penalty contact (by id, affected[1] of add_contact) from an explicit_dynamics case.',
-  params: z.object({ analysisId: analysisIdSchema, contactId: z.string().describe('Contact id, e.g. ct-12.1.') }),
-  run: (doc, { analysisId, contactId }): CommandResult => {
-    const fail: Fail = (code, message, paths = []) => refuseExplicit(doc, 'delete_contact', code, message, [analysisId], paths);
-    const found = controlled(doc, analysisId, fail);
-    if ('document' in found) return found;
-    const { analysisCase, spec } = found;
-    if (spec.contacts === undefined || !Object.hasOwn(spec.contacts, contactId))
-      return fail('EXP_CONTACT_NOT_FOUND', `no contact '${contactId}' in '${analysisId}'`, ['contactId']);
-    const contacts = Object.fromEntries(Object.entries(spec.contacts).filter(([id]) => id !== contactId));
-    const order = (spec.contactOrder ?? []).filter((id) => id !== contactId);
-    return changed(
-      withSpec(doc, analysisCase, { ...spec, contacts, contactOrder: order }),
-      `delete_contact: ${contactId} removed from ${analysisId}.`,
-      [analysisId],
     );
   },
 });

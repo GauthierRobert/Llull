@@ -29,14 +29,14 @@ const KIND_HELP =
 export const addJoint = defineCommand({
   name: 'add_joint',
   description:
-    'Add a kinematic joint between two InstanceEntity frames to model a mechanism. Kinds: ' +
+    'Add a kinematic joint between two InstanceEntity frames to model a mechanism (poses only, no forces; for rigid-body physics with masses and forces use add_body_joint + simulate_motion instead). Kinds: ' +
     KIND_HELP +
     ' "a" and "b" are MateRef objects { instanceId, frame? }; b moves relative to a about pivot (default: a\'s origin; give pivot to ' +
     'put the pin elsewhere, e.g. the far end of a link). "axis" is "x"|"y"|"z" or a [x,y,z] vector. ' +
     'Closed loops (four-bar, slider-crank): add every joint, mark the joints whose value should be SOLVED passive:true, drive the others with set_joint_value; ' +
-    'evaluate_motion / bake_motion then solve the loop (Levenberg-Marquardt) and refuse when it cannot close. ' +
+    'evaluate_motion then solves the loop (Levenberg-Marquardt) and refuse when it cannot close. ' +
     '"values" are initial DOF values (default 0; for passive joints the initial guess, which picks the assembly branch); "limits" one {min,max} per DOF. ' +
-    'Use set_joint_value to drive the joint; evaluate_motion or bake_motion apply it. Returns the new joint id in affected[0].',
+    'Use set_joint_value to drive the joint; evaluate_motion (apply=true to move the instances) applies it. For gear/belt ratios between kinematic joints use add_drive_relation (add_gear_coupling is the physics equivalent). Returns the new joint id in affected[0].',
   params: z.object({
     kind: z
       .enum(['revolute', 'prismatic', 'rigid', 'cylindrical', 'pin_slot', 'planar', 'ball', 'cam'])

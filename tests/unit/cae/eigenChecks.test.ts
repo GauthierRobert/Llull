@@ -141,7 +141,7 @@ describe('eigenReport', () => {
 describe('fea_report of eigenvalue analyses', () => {
   it('modal: data.eigen holds the modes with mass participation and the summary names the rigid-body modes', () => {
     const modal = eigenCase({ type: 'modal', dat: modalDat([0.0002, 120, 340], PARTICIPATION, MASS, [1, 1, 1]) });
-    const result = execute(modal.recorded, 'fea_report', { analysisId: modal.bar.analysisId }, modal.ctx);
+    const result = execute(modal.recorded, 'analysis_report', { analysisId: modal.bar.analysisId }, modal.ctx);
     const eigen = (result.data as { eigen: { kind: string; modes: unknown[]; rigidBodyModes: number } }).eigen;
     expect(eigen).toMatchObject({ kind: 'modal', rigidBodyModes: 1 });
     expect(eigen.modes).toHaveLength(3);
@@ -151,11 +151,11 @@ describe('fea_report of eigenvalue analyses', () => {
 
   it('buckling: data.eigen holds the critical factor; a static case has eigen null', () => {
     const buckling = eigenCase({ type: 'buckling', load: true, dat: bucklingDat([3.2, 5]) });
-    const result = execute(buckling.recorded, 'fea_report', { analysisId: buckling.bar.analysisId }, buckling.ctx);
+    const result = execute(buckling.recorded, 'analysis_report', { analysisId: buckling.bar.analysisId }, buckling.ctx);
     expect((result.data as { eigen: unknown }).eigen).toMatchObject({ kind: 'buckling', criticalFactor: 3.2, criticalMode: 1 });
     expect(result.summary).toContain('critical buckling load = 3.2 x the applied load');
     const staticBar = barDocument();
-    expect((execute(staticBar.doc, 'fea_report', { analysisId: staticBar.analysisId }).data as { eigen: unknown }).eigen).toBeNull();
+    expect((execute(staticBar.doc, 'analysis_report', { analysisId: staticBar.analysisId }).data as { eigen: unknown }).eigen).toBeNull();
   });
 
   it('describe_analysis names the frequencies of a verified modal result', () => {

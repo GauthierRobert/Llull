@@ -5,12 +5,14 @@
  */
 
 import { execute } from '@core/commands/registry';
+import { fillHostParams } from '@protocol/hostParams';
 import { withMonotonicStepCounter } from '@core/model/stepCounter';
 import type { EntityId } from '@core/model/types';
 import { measureAfter, statusSummaryFor } from './feedback';
 import type { CadStoreState, DispatchOptions, StoreGet, StoreSet } from './storeTypes';
 
 const LOCAL_HISTORY_LIMIT = 100;
+const OFFLINE_USER = 'local';
 const LOCAL_SUFFIX = ' (ran locally — backend offline)';
 
 /** Commands must run locally (never POST) in this state. */
@@ -29,7 +31,9 @@ export function selectionAfter(current: EntityId[], affected: readonly EntityId[
 /** Pushes history only when the document changed. */
 export function runLocally(set: StoreSet, get: StoreGet, name: string, params: unknown, options?: DispatchOptions): void {
   const state = get();
-  const result = execute(state.document, name, params);
+  // The renderer is the host while offline: plm `at` / `by` are filled like the backend does. These acts are NOT audited (the audit chain is
+  // server-only) and the offline work is replaced by the backend's document on reconnect.
+  const result = execute(state.document, name, fillHostParams(name, params, { now: new Date(), user: () => OFFLINE_USER }));
   const summary = `${result.summary}${LOCAL_SUFFIX}`;
   const lastMeasure = measureAfter(name, result.data, state.lastMeasure);
   const shown = statusSummaryFor(name, summary, options) ?? state.lastSummary;

@@ -259,7 +259,7 @@ describe('thermalResultsSummary: transient storage and ranges', () => {
         source: { citation: 'test' },
       },
     }).document;
-    const removed = must(doc, 'remove_property_model', { material: 'steel', modelId: 'cp_const' }).document;
+    const removed = must(doc, 'delete_property_model', { material: 'steel', modelId: 'cp_const' }).document;
     const tabled = withDoc(fixture, removed);
     const results = resultsFor(tabled, mesh, [{ time: 2, temperature: uniform(60) }]);
     const { heatBalance } = thermalResultsSummary(tabled.doc, tabled.analysisId, mesh, results);

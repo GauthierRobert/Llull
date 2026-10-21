@@ -155,8 +155,8 @@ export const registrationPayload = (record: RegistrationRecord): string =>
 export const acceptRegistration = defineCommand({
   name: 'accept_registration',
   description:
-    'HUMAN-ONLY. Accept a registration record for fabrication use (AF-34a): recorded only when the signature verifies against the signing port. ' +
-    'An agent has no signature and always gets SCN_HUMAN_GATE with the document unchanged: hand the record to a reviewer.',
+    'Accept a registration record for fabrication use (AF-34a): recorded only when the signature verifies against the signing port. ' +
+    'HUMAN-ONLY. An agent has no signature and always gets SCN_HUMAN_GATE with the document unchanged: hand the record to a reviewer.',
   params: z.object({
     registrationId: z.string().describe('Registration record id (affected[0] of apply_registration).'),
     signature: z.unknown().describe('Human signature object from the signing system over the record payload; agents cannot produce one.'),

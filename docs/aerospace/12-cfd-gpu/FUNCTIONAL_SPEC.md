@@ -13,7 +13,7 @@ Status: specification written 2026-10-18, not implemented. Authoring rules: [`..
    TypeScript are allowed for speed and quality.
 
 This pack takes over the flow-field solvers that 10 AER and 11 FLD had planned as an OpenFOAM / SU2 hand-off. 10 AER keeps the
-formula-level methods as the fast first pass and three links to this pack: CFD drag area into `aero_drag` / `road_load_power`
+formula-level methods as the fast first pass and three links to this pack: CFD drag area into `compute_aero_drag` / `road_load_power`
 (FR-AER-14), a compressibility cross-check against the Euler solver (FR-AER-15), and an optional export of a case prepared here to
 an OpenFOAM / SU2 the user runs locally (FR-AER-13). 11 FLD nozzle / plume flows are a V2 item here (FR-FLD-11).
 
@@ -57,7 +57,7 @@ This gap adds a **local, GPU-accelerated CFD capability** driven from the CLI:
 
 User stories:
 
-1. As an agent, I run `cfd_prepare` on an assembly and get, before any solve, a pass / warn / fail list: watertight or not, which
+1. As an agent, I run `prepare_cfd_case` on an assembly and get, before any solve, a pass / warn / fail list: watertight or not, which
    edges are open, which features are smaller than two cells, the domain size, the cell count and the GPU memory needed (FR-CFD-01..06).
 2. As an agent, I solve a winged body at Mach 2 and get Cd, Cl, Cm, the peak surface Mach and the stagnation pressure, plus a PNG of
    the body coloured by Mach with streamlines (FR-CFD-10, 20..24).
@@ -72,7 +72,7 @@ User stories:
 
 | Phase | Content |
 | ----- | ------- |
-| **MVP** | `cfd_create_case` / `cfd_prepare` (watertight union, checks, small-feature report, domain sizing, memory estimate); native GPU sidecar (Rust + wgpu: Vulkan / Metal / DX12; CPU fallback); low-speed LBM D3Q19 with Smagorinsky LES, half-way bounce-back walls, uniform grid with nested refinement boxes; compressible Euler cut-cell solver, HLLC + MUSCL, octree refinement, local time stepping for steady states; forces and coefficients; surface fields (Cp, Mach, speed); streamlines from rakes; slices; viewport overlay with legend; `render_view` PNG; progress, timeout, cache by content hash; stale results after geometry edits |
+| **MVP** | `create_cfd_case` / `prepare_cfd_case` (watertight union, checks, small-feature report, domain sizing, memory estimate); native GPU sidecar (Rust + wgpu: Vulkan / Metal / DX12; CPU fallback); low-speed LBM D3Q19 with Smagorinsky LES, half-way bounce-back walls, uniform grid with nested refinement boxes; compressible Euler cut-cell solver, HLLC + MUSCL, octree refinement, local time stepping for steady states; forces and coefficients; surface fields (Cp, Mach, speed); streamlines from rakes; slices; viewport overlay with legend; `render_view` PNG; progress, timeout, cache by content hash; stale results after geometry edits |
 | V1 | cumulant collision (D3Q27) and interpolated bounce-back walls; atmospheric boundary-layer inlet and pedestrian comfort maps; automatic defeaturing through 07 FTR feature recognition; adaptive refinement driven by error indicators in the LBM solver; time-accurate runs with animations; surface "oil-flow" lines; viscous drag estimate added to Euler forces (flat-plate friction from 10 AER) |
 | V2 | optional high-accuracy body-fitted mode with **PyFR** (BSD-3, GPU backends CUDA / HIP / OpenCL / Metal) on a Gmsh mesh, for RANS-like viscous detail; nozzle and plume flows (11 FLD); propeller / rotor actuator disks |
 | Out of scope | cloud or remote solving; MCP tools; certification-grade results; combustion, multiphase, conjugate heat transfer, aeroelasticity; FluidX3D or any solver whose licence forbids commercial or defence use (§10) |
@@ -109,8 +109,8 @@ User stories:
 CLI first (`llull-cli` skill). The document changes go through commands; the solve is a host transport, like `fea_solve` today.
 
 ```bash
-llull cfd_create_case '{"id":"m2","entityIds":["body"],"regime":"auto","freestream":{"mach":2,"altitudeM":20000,"alphaDeg":2},"reference":{"areaM2":12,"lengthM":8}}' --file model.llull
-llull cfd_prepare caseId=m2 --json --file model.llull      # pass / warn / fail list, memory estimate; nothing is solved
+llull create_cfd_case '{"id":"m2","entityIds":["body"],"regime":"auto","freestream":{"mach":2,"altitudeM":20000,"alphaDeg":2},"reference":{"areaM2":12,"lengthM":8}}' --file model.llull
+llull prepare_cfd_case caseId=m2 --json --file model.llull      # pass / warn / fail list, memory estimate; nothing is solved
 llull cfd_solve caseId=m2 --progress --timeout 1800 --file model.llull
 llull cfd_report caseId=m2 --json --file model.llull       # forces, coefficients, peaks, convergence, provenance
 llull cfd_streamlines caseId=m2 rake='{"kind":"plane","origin":[-1,0,-1],"u":[0,4,0],"v":[0,0,2],"count":[24,8]}' --file model.llull
@@ -125,9 +125,9 @@ computation from the CLI path.
 
 | Given | When | Then | VC |
 | ----- | ---- | ---- | -- |
-| a sphere of radius R voxelised at 16, 32, 64 cells per radius | `cfd_prepare` | volume error within the derived bound and decreasing with h | VC-CFD-10 |
-| a box with one face removed | `cfd_prepare` | fail `CFD_GEOMETRY_NOT_WATERTIGHT` with the open-edge count | VC-CFD-11 |
-| a 1:1:2 building block | `cfd_prepare` regime `buildings` | domain 5H / 5H / 15H, blockage 0.79 % (closed form) | VC-CFD-12 |
+| a sphere of radius R voxelised at 16, 32, 64 cells per radius | `prepare_cfd_case` | volume error within the derived bound and decreasing with h | VC-CFD-10 |
+| a box with one face removed | `prepare_cfd_case` | fail `CFD_GEOMETRY_NOT_WATERTIGHT` with the open-edge count | VC-CFD-11 |
+| a 1:1:2 building block | `prepare_cfd_case` regime `buildings` | domain 5H / 5H / 15H, blockage 0.79 % (closed form) | VC-CFD-12 |
 | plane Poiseuille flow at 16 / 32 / 64 cells | LBM | profile error falls with observed order ≥ 1.8 | VC-CFD-20 |
 | a sphere at Re 20 / 50 / 100 / 200 | LBM | Cd within 10 % of Schiller-Naumann | VC-CFD-21 |
 | the Sod shock tube | Euler | wave positions within 2 cells of the exact solution | VC-CFD-30 |

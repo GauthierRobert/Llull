@@ -127,16 +127,6 @@
      1,
      0
     ]
-   },
-   "location": {
-    "entityId": "$plate",
-    "edgesNear": [
-     [
-      5,
-      0,
-      1
-     ]
-    ]
    }
   },
   "as": "cr"
@@ -221,11 +211,6 @@
       ]
      },
      "size": 0.2
-    }
-   ],
-   "crackSeams": [
-    {
-     "crackId": "$cr"
     }
    ]
   }

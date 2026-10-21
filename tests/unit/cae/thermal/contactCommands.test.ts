@@ -64,21 +64,21 @@ describe('update_thermal_contact', () => {
   });
 });
 
-describe('delete_thermal_contact', () => {
+describe('delete_analysis_item', () => {
   it('removes the contact and nothing else', () => {
     const { doc, analysisId, contactId } = withContact();
-    const result = run(doc, 'delete_thermal_contact', { analysisId, contactId });
+    const result = run(doc, 'delete_analysis_item', { analysisId, itemId: contactId });
     expect(result.affected).toEqual([contactId]);
     expect(caseOf(result.document, analysisId).thermal?.contacts).toEqual({});
     expect(Object.keys(caseOf(result.document, analysisId).parts)).toHaveLength(2);
-    expectPure(doc, () => run(doc, 'delete_thermal_contact', { analysisId, contactId }));
+    expectPure(doc, () => run(doc, 'delete_analysis_item', { analysisId, itemId: contactId }));
   });
 
   it('refuses an unknown contact, a second delete and an unknown analysis', () => {
     const { doc, analysisId, contactId } = withContact();
-    expectRefused(run(doc, 'delete_thermal_contact', { analysisId, contactId: 'nope' }), doc, 'THM_CONTACT_NOT_FOUND');
-    const deleted = run(doc, 'delete_thermal_contact', { analysisId, contactId }).document;
-    expectRefused(run(deleted, 'delete_thermal_contact', { analysisId, contactId }), deleted, 'THM_CONTACT_NOT_FOUND');
-    expectRefused(run(doc, 'delete_thermal_contact', { analysisId: 'ghost', contactId }), doc, 'FEA_ANALYSIS_NOT_FOUND');
+    expectRefused(run(doc, 'delete_analysis_item', { analysisId, itemId: 'nope' }), doc, 'FEA_ITEM_NOT_FOUND');
+    const deleted = run(doc, 'delete_analysis_item', { analysisId, itemId: contactId }).document;
+    expectRefused(run(deleted, 'delete_analysis_item', { analysisId, itemId: contactId }), deleted, 'FEA_ITEM_NOT_FOUND');
+    expectRefused(run(doc, 'delete_analysis_item', { analysisId: 'ghost', itemId: contactId }), doc, 'FEA_ANALYSIS_NOT_FOUND');
   });
 });

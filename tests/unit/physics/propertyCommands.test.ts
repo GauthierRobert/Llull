@@ -19,7 +19,7 @@ const codeOf = (document: CadDocument, command: string, params: Record<string, u
   return result.error?.code ?? 'accepted';
 };
 
-describe('define_property_model / remove_property_model', () => {
+describe('define_property_model / delete_property_model', () => {
   it('adds a model with a recomputed hash, records a step and is pure', () => {
     const base = withMaterial(createEmptyDocument(), 'al');
     const snapshot = structuredClone(base);
@@ -45,7 +45,7 @@ describe('define_property_model / remove_property_model', () => {
       roughness: 0.3,
     });
     expect(recreated.document.materials['al']?.propertyModels).toHaveLength(1);
-    const removed = execute(recreated.document, 'remove_property_model', { material: 'al', modelId: 'k' });
+    const removed = execute(recreated.document, 'delete_property_model', { material: 'al', modelId: 'k' });
     expect(removed.document.materials['al']?.propertyModels).toEqual([]);
   });
 
@@ -102,8 +102,8 @@ describe('define_property_model / remove_property_model', () => {
     expect(codeOf(once, 'define_property_model', { material: 'al', model: { ...k6061, id: 'k2', preferred: true } })).toBe(
       'MAT_PREFERRED_CONFLICT',
     );
-    expect(codeOf(once, 'remove_property_model', { material: 'al', modelId: 'zz' })).toBe('PROP_MODEL_NOT_FOUND');
-    expect(codeOf(once, 'remove_property_model', { material: 'zz', modelId: 'k' })).toBe('MAT_RECORD_NOT_FOUND');
+    expect(codeOf(once, 'delete_property_model', { material: 'al', modelId: 'zz' })).toBe('PROP_MODEL_NOT_FOUND');
+    expect(codeOf(once, 'delete_property_model', { material: 'zz', modelId: 'k' })).toBe('MAT_RECORD_NOT_FOUND');
   });
 
   it('returns the stable codes of VC-PROP-19', () => {

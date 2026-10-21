@@ -1,77 +1,24 @@
 # How to add a tool
 
-Adding a tool gives you a UI button and a `llull` CLI tool (drivable by Claude Code or any
-script) — both at once. Four steps.
+In llull a "tool" is a **command**: one `defineCommand({ name, description, params, run })` in the registry. Adding one gives
+the desktop app an action and the `llull` CLI a tool (drivable by Claude Code or any script) at once — no CLI or UI wiring.
 
-## 1. Write the command
+The short version:
 
-CAD operations live in `packages/core/src/commands/` (pick the domain file, or start a
-new one). Domain operations — building, industrial — live in their plugin package
-(`packages/domain-aec/src/`), never in the core. Declare the command with
-`defineCommand` and one zod schema; keep it pure.
+1. **Write the command** — pure (returns a new document, never mutates the input), one zod `params` schema with a
+   `.describe(...)` on every field (agents read it with `llull describe`), `snake_case` name. Core operations live in a feature
+   folder of `packages/core/src/commands/`; domain operations (building, analysis, aero, PLM, …) live in their plugin package,
+   never in core. Exact-geometry commands read the kernel from `ctx.kernel`.
+2. **Register it** — list it in its folder's `catalog.ts` (core: also one toolset in `packages/protocol/src/toolsets.ts`;
+   plugin: its catalog joins the plugin's toolset). `registry.ts` is never edited.
+3. **Test it** — happy path, failure path, purity; review the tool-schema snapshot diff (`npx vitest run tests/unit/contract -u`):
+   it is exactly what agents will read.
+4. **(Optional) UI** — a dedicated panel in `src/ui/panels` only when a generic action is not enough.
 
-```ts
-import type { CommandResult } from './types';
-import { defineCommand, z } from './schema';
+Then `llull search <words>` finds it, `llull describe <name>` prints its schema and `llull exec <name> …` (or a plan step) runs it.
 
-export const scaleUniform = defineCommand({
-  name: 'scale_uniform',
-  description: 'Scale an entity uniformly about its origin by a positive factor.',
-  params: z.object({
-    id: z.string().describe('Id of the entity to scale'),
-    factor: z.number().describe('Scale factor; must be > 0 (1 = unchanged)'),
-  }),
-  run: (doc, { id, factor }): CommandResult => {
-    const target = doc.entities[id];
-    if (!target || factor <= 0) {
-      return { document: doc, summary: `scale_uniform: no entity ${id} or factor ≤ 0.`, affected: [] };
-    }
-    // ...build a NEW document; return { document, summary, affected: [id] }
-  },
-});
-```
+Where the details live:
 
-The schema is the single source of truth: it types `run`'s parameters, becomes the JSON
-Schema that agents read with `llull describe` (so every field needs a `.describe(...)` written for someone who
-cannot read the code), and is checked by `execute` before `run` is called. Helpers such as
-`vec2()` / `vec3()` cover points and vectors. Commands that need the geometry kernel read it
-from the execution context (`ctx.kernel`) and declare `annotations: { requiresKernel: true }`;
-read-only queries declare `annotations: { readOnly: true }` and return their value in `data`.
-
-## 2. Register it
-
-Core command — put it in the feature folder it belongs to (`packages/core/src/commands/<feature>/`,
-e.g. `edit/` for transforms) and list it in that folder's `catalog.ts`, then add its name to one
-toolset in `packages/protocol/src/toolsets.ts` (CLI listings, UI palette):
-
-```ts
-// packages/core/src/commands/edit/catalog.ts
-import { scaleUniform } from './transform';
-
-export const editCommands = commandCatalog(
-  // ...
-  scaleUniform,
-);
-```
-
-`registry.ts` registers every feature catalog; you never edit it for a new command.
-
-Plugin command — list it in its domain's catalog (for the AEC plugins,
-`packages/domain-aec/src/<building|industrial|civil>/catalog.ts`, the same shape as a core feature
-folder); installing the plugin registers it and places it in the plugin's toolset.
-
-That's it for agents — the CLI reads the registry, so `scale_uniform` is now a callable
-tool automatically: `llull search scale` finds it, `llull describe scale_uniform` prints its
-schema, and `llull exec scale_uniform …` or a `build_project` plan step runs it.
-
-## 3. (Optional) surface it in the UI
-
-If you want a dedicated button, add it in `src/ui/panels`. Most tools don't even
-need this — the toolbar can iterate `listCommands()` and render generically.
-
-## 4. Test it
-
-Add a test file in `tests/unit/` (plugin commands: `tests/unit/building/`). Cover the happy
-path and the missing-id / invalid-input path. Update the tool-schema snapshot
-(`npx vitest run tests/unit/contract -u`) and review the diff — it is exactly what agents
-will read. The coverage gate will remind you if you skip a branch.
+- Step-by-step procedure: `.claude/skills/add-command/SKILL.md`
+- Skeleton to copy and exact signatures: `.claude/context/command-layer.md`
+- The laws a command must satisfy: `.claude/rules/commands.md` and `.claude/rules/architecture.md`

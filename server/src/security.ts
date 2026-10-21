@@ -9,7 +9,7 @@ import rateLimit from 'express-rate-limit';
 import { positiveInteger } from './env';
 import { consumeTicket } from './tickets';
 
-const DEFAULT_ALLOWED_ORIGINS: readonly string[] = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
+const DEFAULT_ALLOWED_ORIGINS: readonly string[] = ['http://localhost:5173'];
 
 /** JSON body of every 401. */
 const UNAUTHORIZED_BODY = { error: 'Unauthorized — valid Bearer token required.' };

@@ -171,7 +171,7 @@ function staleReferenceItem(doc: CadDocument): CheckItem[] {
           'FPR_STALE_REFERENCE',
           'info',
           stale,
-          'These ids no longer exist: remove their intents with remove_interference_intent or release them with set_part_grounded.',
+          'These ids no longer exist: remove their intents with delete_interference_intent or release them with set_part_grounded.',
           { note: 'prototype intents / grounded parts refer to deleted entities; they were ignored' },
         ),
       ];

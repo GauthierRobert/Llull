@@ -96,8 +96,8 @@ export const filletEdge = defineCommand({
     'robust to parametric edits); with neither, ALL edges are filleted. ' +
     'To give each edge its own radius (optionally varying along the edge) pass edges: [{ index | near, size, sizeEnd?, sizes? }] instead; ' +
     'mode "chord" reads every size as the chord between the tangent points (planar faces, converted per edge to a radius). ' +
-    `Requires a geometry kernel that supports fillets (${OCC_KERNEL_HINT}). ` +
-    'With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). ' +
+    `Needs the exact kernel (check kernel_info): ${OCC_KERNEL_HINT}. ` +
+    'With the mesh kernel it no-ops (unchanged doc). ' +
     'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).',
   params: z.object({
     id: z.string().describe('Id of the 3D solid entity to fillet. Must exist and be a 3D solid kind.'),
@@ -190,8 +190,8 @@ export const chamferEdge = defineCommand({
     'that keeps the exact construction (its brep recipe). The source entity is consumed. ' +
     'Select edges with edgeIndices (indices from inspect_topology) and/or edgesNear (points near the edges, ' +
     'robust to parametric edits); with neither, ALL edges are chamfered. ' +
-    `Requires a geometry kernel that supports chamfers (${OCC_KERNEL_HINT}); ` +
-    'with the default Manifold kernel this command gracefully no-ops. ' +
+    `Needs the exact kernel (check kernel_info): ${OCC_KERNEL_HINT}; ` +
+    'with the mesh kernel it no-ops. ' +
     'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).',
   params: z.object({
     id: z.string().describe('Id of the 3D solid entity to chamfer. Must exist and be a 3D solid kind.'),

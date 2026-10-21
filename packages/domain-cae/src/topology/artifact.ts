@@ -1,5 +1,5 @@
 /**
- * The topology artifact (TR-TOP-07): encoding of the density field, assembly from a solver output, the pure TypeScript reference run and
+ * The topology artifact (TR-TOP-07): encoding of the density field, assembly from a solver output and
  * the summary recomputed from an artifact (the trust model of 05 4.1: a recorded summary is a claim about an artifact).
  */
 
@@ -12,13 +12,12 @@ import type {
 } from '@core/model/topology';
 import type { CadDocument } from '@core/model/types';
 import { base64ToUint8Array, uint8ArrayToBase64 } from '@lib/base64';
-import { runSimp2d } from '@lib/topology';
 import { caseOf } from '../shared/access';
-import { HISTORY_ROW_CAP, TS_REFERENCE_MAX_ELEMENTS, TS_REFERENCE_VERSION } from './defaults';
+import { HISTORY_ROW_CAP } from './defaults';
 import { type TopologyJob } from './job';
 import { elasticOf } from './material';
 
-/** What the solver reports (`result.json` of `llull-compute topopt`; the TypeScript reference fills the same fields). */
+/** What the solver reports (`result.json` of `llull-compute topopt`). */
 export interface TopologySolveOutput {
   readonly compliance: number;
   readonly perLoadCase: Readonly<Record<string, number>>;
@@ -79,52 +78,6 @@ export function buildTopologyArtifact(
   return decodeField(artifact) === null
     ? `field.bin is not ${4 * job.grid.nx * job.grid.ny * job.grid.nz} bytes of float32 densities in [0, 1]`
     : artifact;
-}
-
-/**
- * The pure TypeScript reference run of a small 2D job (`solver.job: 'ts-reference'`). It lives in the host transport's path, never in a
- * command: the artifact is stored by the host and enters the document only through `record_topology_result`.
- * @failure 3D job, more than TS_REFERENCE_MAX_ELEMENTS voxels, or a singular system -> an explanation instead of an artifact
- */
-export function runTopologyReference(job: TopologyJob): FeTopologyArtifact | string {
-  const { nx, ny, nz } = job.grid;
-  if (job.dimension !== 2 || nz !== 1) return 'the TypeScript reference solves 2D studies only: use llull-compute topopt';
-  if (nx * ny > TS_REFERENCE_MAX_ELEMENTS)
-    return `${nx * ny} voxels exceed the TypeScript reference cap of ${TS_REFERENCE_MAX_ELEMENTS}: use llull-compute topopt`;
-  const result = runSimp2d({
-    nx,
-    ny,
-    active: job.active,
-    keepIn: job.keepIn,
-    keepOut: job.keepOut,
-    fixedDofs: job.fixedDofs,
-    loadCases: job.loadCases,
-    stiffness: job.material.youngsModulus * job.thickness,
-    poisson: job.material.poisson,
-    volumeFraction: job.volumeFraction,
-    penal: job.settings.penal,
-    eminRatio: job.settings.eminRatio,
-    move: job.settings.move,
-    changeTol: job.settings.changeTol,
-    maxIterations: job.settings.maxIterations,
-    filter: { kind: job.settings.filter.kind, radius: job.settings.filter.radiusVoxels },
-  });
-  if (!result.ok) return result.reason;
-  return buildTopologyArtifact(
-    job,
-    fieldBytes(Float32Array.from(result.xPhys)),
-    {
-      compliance: result.compliance,
-      perLoadCase: result.perLoadCase,
-      iterations: result.iterations,
-      status: result.status,
-      history: result.history,
-      device: 'cpu',
-      deterministic: true,
-      version: TS_REFERENCE_VERSION,
-    },
-    'ts-reference',
-  );
 }
 
 const FORCE_LENGTH_UNIT = { 'N-mm-t-s': 'N*mm', 'N-m-kg-s': 'N*m', 'lbf-in-slinch-s': 'lbf*in' } as const;

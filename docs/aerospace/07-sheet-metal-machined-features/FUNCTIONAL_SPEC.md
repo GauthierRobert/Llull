@@ -237,7 +237,7 @@ llull check_machining id=<part> --doc plate.llull.json --kernel occt --json     
 llull mass_properties entityId=<part> --doc plate.llull.json --kernel occt --json  # data.volume 55978.529153, volumeUnit mm³
 llull hole_table id=<part> --doc plate.llull.json --json
 llull render_view view=iso --save plate.png --doc plate.llull.json
-llull export_step_exact --save plate.step --doc plate.llull.json --kernel occt
+llull export_step_ap242 --save plate.step --doc plate.llull.json --kernel occt
 ```
 
 **Job C — supplier STEP intake (UC-4).** Needs gap 01 `import_step_exact` (TECHNICAL_SPEC M0).

@@ -142,13 +142,13 @@ describe('record_explicit_results', () => {
       contextWith(null),
     );
     expect(replay.summary).toContain('UNVERIFIED');
-    const report = must(replay.document, 'explicit_report', { analysisId: model.analysisId }, ctx);
+    const report = must(replay.document, 'analysis_report', { view: 'explicit', analysisId: model.analysisId }, ctx);
     expect(data(report)['state']).toBe('missing');
     expect(data(report)['result']).toBeNull();
   });
 
   it('explicit_report shows verified numbers, thinned histories and the review flags (VC-EXP-61)', () => {
-    const report = must(recorded.document, 'explicit_report', { analysisId: model.analysisId, maxPoints: 2 }, ctx);
+    const report = must(recorded.document, 'analysis_report', { view: 'explicit', analysisId: model.analysisId, maxPoints: 2 }, ctx);
     const view = data<{
       state: string;
       result: ExplicitResultsSummary;
@@ -163,16 +163,16 @@ describe('record_explicit_results', () => {
     expect(view.reviewRequired).toBe(true);
     expect(view.certificationEvidence).toBe(false);
     expect(report.summary).toContain('not approved');
-    const unsolved = must(model.doc, 'explicit_report', { analysisId: model.analysisId }, ctx);
+    const unsolved = must(model.doc, 'analysis_report', { view: 'explicit', analysisId: model.analysisId }, ctx);
     expect(data(unsolved)['state']).toBe('unsolved');
     const untrusted = must(
       recorded.document,
-      'explicit_report',
-      { analysisId: model.analysisId },
+      'analysis_report',
+      { view: 'explicit', analysisId: model.analysisId },
       contextWith({ get: () => ({ ...artifact, cycles: 9 }) }),
     );
     expect(data(untrusted)['state']).toBe('untrusted');
-    expect(code(execute(model.doc, 'explicit_report', { analysisId: 'an-404' }))).toBe('FEA_ANALYSIS_NOT_FOUND');
+    expect(code(execute(model.doc, 'analysis_report', { view: 'explicit', analysisId: 'an-404' }))).toBe('FEA_ANALYSIS_NOT_FOUND');
   });
 
   it('explicit_energy_check names the hourglass default and warns on unset limits (VC-EXP-40, 41, 60)', () => {
@@ -228,8 +228,8 @@ describe('record_explicit_results', () => {
         historyInterval: { value: 1e-6, unit: 's' },
         mesh: { kind: 'structured_hex', size: 5 },
       }).document,
-      'explicit_report',
-      { analysisId: model.analysisId },
+      'analysis_report',
+      { view: 'explicit', analysisId: model.analysisId },
       contextWith(own.port),
     );
     expect(data(noLimit)['state']).toBe('stale');

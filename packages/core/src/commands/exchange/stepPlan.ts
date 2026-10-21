@@ -2,7 +2,7 @@
  * Plan of an `export_step_ap242` write (aerospace 04 XCH M2): the document's solids, component instances and surface sheets become the
  * product tree the kernel's XDE writer takes (`ExchangeWriteRequest`), with the geometric validation properties of every product and of the
  * root assembly computed from the same shapes the writer receives.
- * Structured mode reuses the shared-part assembly plan of `export_step_exact` (one product per component and uniform scale, nested uses);
+ * Structured mode reuses the shared-part assembly plan of `export_step_ap242` (one product per component and uniform scale, nested uses);
  * flat mode writes every solid in world space as its own product.
  * @invariant a validation property is written only from `kernel.massProperties` of the shape the file holds; a product the kernel cannot
  *   integrate carries none and is listed in `unverified`

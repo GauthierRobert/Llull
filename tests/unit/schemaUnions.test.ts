@@ -37,18 +37,27 @@ describe('union params publish every branch', () => {
   });
 });
 
-describe('unknown params are named in the summary', () => {
-  it('a misspelled key is ignored but reported, with the known keys', () => {
-    const r = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1], colour: '#ffffff' });
-    expect(r.affected).toHaveLength(1);
-    expect(r.summary).toContain('ignored unknown param(s): colour (known: size');
+describe('unknown params are rejected', () => {
+  it('a misspelled key rejects the call and suggests the closest declared key', () => {
+    const doc = createEmptyDocument();
+    const r = execute(doc, 'add_box', { size: [1, 1, 1], positon: [5, 0, 0] });
+    expect(r.rejected).toBe(true);
+    expect(r.affected).toEqual([]);
+    expect(r.document).toBe(doc);
+    expect(r.summary).toContain("add_box rejected: unknown param 'positon' — did you mean 'position'?");
+    expect(r.error).toMatchObject({ code: 'CMD_UNKNOWN_PARAM', paths: ['positon'] });
   });
 
-  it('is also reported on a rejected call, and absent when every key is known', () => {
-    const rejected = execute(createEmptyDocument(), 'add_box', { sizes: [1, 1, 1] });
-    expect(rejected.rejected).toBe(true);
-    expect(rejected.summary).toContain('ignored unknown param(s): sizes');
-    expect(execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).summary).not.toContain('ignored unknown');
+  it('lists the known keys when nothing is close, and passes when every key is declared', () => {
+    const r = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1], zzzzzzzzzz: 1 });
+    expect(r.summary).toContain("unknown param 'zzzzzzzzzz' (known: size");
+    expect(execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).affected).toHaveLength(1);
+  });
+
+  it('invalid-params remediation names the failing paths and the command', () => {
+    const r = execute(createEmptyDocument(), 'add_box', { size: 'big' });
+    expect(r.error?.code).toBe('CMD_INVALID_PARAMS');
+    expect(r.error?.remediation).toBe('Fix the params at `size`; the schema of the command: `llull describe add_box`.');
   });
 });
 

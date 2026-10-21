@@ -28,7 +28,7 @@ describe('check_analysis on a nonlinear_static case', () => {
   it('is clean for a complete set-up and flags a probe whose constraint was deleted', () => {
     const bar = pulledBar();
     expect(checkCodes(bar.doc, bar.analysisId).filter((code) => code.startsWith('NLS_'))).toEqual([]);
-    const gone = mustRun(bar.doc, 'delete_fea_constraint', { analysisId: bar.analysisId, constraintId: bar.constraints['x0'] });
+    const gone = mustRun(bar.doc, 'delete_analysis_item', { analysisId: bar.analysisId, itemId: bar.constraints['x0'] });
     expect(checkCodes(gone, bar.analysisId)).toContain('NLS_PROBE_REFERENCE_UNKNOWN');
   });
 

@@ -335,7 +335,7 @@ export const plans: Record<string, GoldenAction[]> = {
       params: { kind: 'revolute', a: { instanceId: '$ground' }, b: { instanceId: '$rocker' }, axis: 'z', pivot: [4, 0, 0], passive: true },
     },
     { command: 'set_joint_value', params: { id: '$drive', value: 0.5 } },
-    { command: 'bake_motion', params: {} },
+    { command: 'evaluate_motion', params: { apply: true } },
     { command: 'create_contact_set', params: { name: 'links', pairs: [['$crank', '$rocker']] } },
     {
       command: 'create_exploded_view',
@@ -409,7 +409,7 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'set_road_section', params: { alignmentId: 'alignment-1' } },
     { command: 'add_manhole', params: { location: [10, 50], invertElevation: 99.5, surfaceId: 'surface-1' } },
     { command: 'add_manhole', params: { location: [40, 50], invertElevation: 99.2, surfaceId: 'surface-1' } },
-    { command: 'add_pipe', params: { fromId: 'manhole-1', toId: 'manhole-2' } },
+    { command: 'add_drainage_pipe', params: { fromId: 'manhole-1', toId: 'manhole-2' } },
     { command: 'size_drainage_pipes', params: {} },
   ],
   building_walls_openings_slab: [
@@ -777,7 +777,7 @@ export const plans: Record<string, GoldenAction[]> = {
       params: { part: '$part', point: [50, 50, 0], loads: { Nx: 1 }, criteria: ['max_stress', 'tsai_hill', 'tsai_wu'] },
     },
     { command: 'check_layup', params: { part: '$part', purpose: 'design' } },
-    { command: 'export_flat_patterns_dxf', params: { part: '$part', labels: ['name', 'orientation', 'sequence'] } },
+    { command: 'export_ply_flat_patterns_dxf', params: { part: '$part', labels: ['name', 'orientation', 'sequence'] } },
   ],
   composites_cone_flat_pattern: [
     { command: 'set_units', params: { units: 'mm' } },
@@ -825,7 +825,7 @@ export const plans: Record<string, GoldenAction[]> = {
       as: 'c1',
     },
     { command: 'laminate_mass', params: { part: '$part' } },
-    { command: 'export_flat_patterns_dxf', params: { part: '$part', plies: ['$c1'] } },
+    { command: 'export_ply_flat_patterns_dxf', params: { part: '$part', plies: ['$c1'] } },
   ],
 };
 

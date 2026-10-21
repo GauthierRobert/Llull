@@ -181,7 +181,7 @@ export const rejectReview = defineCommand({
 export const recordApproval = defineCommand({
   name: 'record_approval',
   description:
-    "HUMAN GATE. Record a role's approval of the in_review revision (roles: policy.requiredApprovalRoles, default design-authority and checker). One " +
+    "Record a role's approval of the in_review revision (roles: policy.requiredApprovalRoles, default design-authority and checker). HUMAN GATE. One " +
     'approval per (role, user). An agent caller gets PLM_HUMAN_GATE: hand over to the responsible person in the desktop app.',
   annotations: { metaHistory: true },
   params: z.object({

@@ -1,4 +1,4 @@
-/** define_amplitude / delete_amplitude: time curves that scale thermal BC values (table, sine, ramp sampled to tables). */
+/** define_amplitude: time curves that scale thermal BC values (table, sine, ramp sampled to tables). */
 
 import type { Amplitude } from '@core/model/analysis';
 import { defineCommand, vec2, z } from '@core/commands/schema';
@@ -127,39 +127,5 @@ export const defineAmplitude = defineCommand({
       `define_amplitude: '${record.id}' (${name}) ${kind}, ${points.length} points over ${points[points.length - 1]?.[0]} s in '${analysisId}'.`,
       [record.id],
     );
-  },
-});
-
-/**
- * @affects doc.analysis.cases[analysisId].thermal.amplitudes (removes 1; affected: [amplitudeId])
- * @failure unknown analysis / amplitude -> refusal; amplitude still referenced by a BC -> THM_AMPLITUDE_IN_USE (unchanged doc)
- */
-export const deleteAmplitude = defineCommand({
-  name: 'delete_amplitude',
-  description: 'Remove an amplitude from a heat_* analysis. Refused while a thermal BC still references it.',
-  annotations: { destructive: true },
-  params: z.object({ analysisId: analysisIdSchema, amplitudeId: z.string().describe('Amplitude id (affected[0] of define_amplitude).') }),
-  run: (doc, { analysisId, amplitudeId }): CommandResult => {
-    const fail = (found: Problem): CommandResult =>
-      refuseThermal(doc, 'delete_amplitude', found.code, found.message, found.ids, found.paths);
-    const found = thermalCaseOf(doc, analysisId);
-    if (isProblem(found)) return fail(found);
-    if (!Object.hasOwn(found.thermal.amplitudes, amplitudeId))
-      return fail(
-        problem('THM_AMPLITUDE_NOT_FOUND', `no amplitude '${amplitudeId}' in '${analysisId}'`, [analysisId, amplitudeId], ['amplitudeId']),
-      );
-    const users = Object.values(found.thermal.bcs).filter((record) => record.amplitude === amplitudeId);
-    if (users.length > 0)
-      return fail(
-        problem('THM_AMPLITUDE_IN_USE', `amplitude '${amplitudeId}' is used by ${users.map((u) => u.id).join(', ')}`, [
-          amplitudeId,
-          ...users.map((u) => u.id),
-        ]),
-      );
-    const thermal = {
-      ...found.thermal,
-      amplitudes: Object.fromEntries(Object.entries(found.thermal.amplitudes).filter(([id]) => id !== amplitudeId)),
-    };
-    return changed(withThermal(doc, found, thermal), `delete_amplitude: removed '${amplitudeId}' from '${analysisId}'.`, [amplitudeId]);
   },
 });

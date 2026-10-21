@@ -263,7 +263,7 @@ export const sizeDrainagePipes = defineCommand({
     'Automatic pipe sizing: sets each pipe diameter to the smallest commercial size that carries its accumulated design flow at its ' +
     'current slope within `maxDepthRatio` (and `minVelocity` when given). Flows follow the modified rational method of ' +
     'check_drainage_network (entry times, travel times, optional `idf` curve, diverging manholes split by capacity share); sizing and ' +
-    'velocities are iterated to convergence (max 10 passes). Only diameters change: inverts stay, so a larger outgoing pipe may end up with its crown above the incoming one - these manholes are reported as WARNING / data.crownWarnings (fix with update_pipe invertFrom for soffit matching). Pipes that fail even at the largest size, or have no downhill slope, are ' +
+    'velocities are iterated to convergence (max 10 passes). Only diameters change: inverts stay, so a larger outgoing pipe may end up with its crown above the incoming one - these manholes are reported as WARNING / data.crownWarnings (fix with update_drainage_pipe invertFrom for soffit matching). Pipes that fail even at the largest size, or have no downhill slope, are ' +
     'reported and left unchanged.',
   params: z.object({
     rainfallIntensityMmH: intensityField,

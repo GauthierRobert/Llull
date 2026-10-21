@@ -7,7 +7,7 @@ catalogue, tonnage), pre-engineered-building software (portal frame generators),
 (equipment, pipe runs, clash detection) and Revit (elevations / sections from the model).
 
 Builds on the construction module ([`CONSTRUCTION.md`](CONSTRUCTION.md)): same constructive building
-model, same "one command = UI + MCP" law, new element categories evaluated into ordinary entities
+model, same "one command = UI + CLI" law, new element categories evaluated into ordinary entities
 (exact cross-sections as watertight meshes).
 
 ## Steps
@@ -37,8 +37,8 @@ Each step ships with unit tests and is covered by the Playwright suite.
       cut sections) — hidden-line drawings projected from the 3D model on a scaled sheet with title
       block.
 - [x] **I10 — UI + verification.** Industrial tools in the Building panel (hall generator, member,
-      equipment, pipe, clash check, steel list, elevations), Playwright workflow tests, docs and MCP
-      prompt.
+      equipment, pipe, clash check, steel list, elevations), Playwright workflow tests, docs and an agent
+      prompt (MCP; removed with the MCP server, LC1).
 
 ## Phase 2 — closing the remaining gaps
 
@@ -51,7 +51,7 @@ Each step ships with unit tests and is covered by the Playwright suite.
 - [x] **I14 — Steel connections.** `add_base_plates`: base plates with anchor bolts under every steel
       column foot; plate steel mass and bolt counts in the takeoff; IFC `IfcPlate` /
       `IfcMechanicalFastener`.
-- [x] **I15 — DXF hatches.** Cut walls, concrete columns and steel sections in `export_dxf` plans
+- [x] **I15 — DXF hatches.** Cut walls, concrete columns and steel sections in `export_building_dxf` plans
       get ANSI31 / solid hatch patterns (R12-compatible LINE / SOLID entities on `*-PATT` layers).
 - [x] **I16 — Curved walls.** `add_curved_wall` (arc through start / mid / end): evaluation, plan,
       quantities, DXF arcs and IFC.
@@ -142,7 +142,7 @@ Each step ships with unit tests and is covered by the Playwright suite.
 ## Phase 9 — crane actions per EN 1991-3, multi-span wind, schema strictness
 
 - [x] **I35 — Nested schema `required`.** Object parameters (e.g. `clayLayer`, `crane`) declare
-      their required fields in the MCP tool schema, not only in prose.
+      their required fields in the tool schema (`llull describe`), not only in prose.
 - [ ] **I36 — Crane load groups.** EN 1991-3 §2: dynamic factors φ1, φ2 (hoisting class HC1–HC4),
       φ4, φ5; drive forces HL (longitudinal) and HT (transverse, from the acceleration of the
       drive), skewing forces HS (§2.7.4); load groups 1–6 (Tab. 2.2) as crane cases of the frame and

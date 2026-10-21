@@ -243,7 +243,7 @@ column). `D` = `--doc case.llull.json --json`.
 | AC-11 | a model with 2 stacks | `llull bill_of_materials D` | `standardParts`: NAS6203-9 ×2, MS21042L3 ×2, NAS1149(.063) ×2; raw-material rows | VC-MAT-11 |
 | AC-12 | a row at 2.5 D pitch | `llull insert_fastener_row … D` | exit 1, `data.code: "FAST_PITCH"` citing min pitch 3 D (or warnings with `allowViolations`) | VC-MAT-12 |
 | AC-13 | a library flagged licensed-no-redistribution, storage private | save, snapshot, `export_code`, live-sync log | outputs contain only library id, version and hash | VC-MAT-14 |
-| AC-14 | a record flagged ITAR | agent runs `llull export_step_exact --save x.step D` | exit 1, `data.code: "MAT_EXPORT_CONTROLLED"`; with `confirmExportControlled=true` from the agent: `MAT_HUMAN_GATE`; nothing written | VC-MAT-15, 25 |
+| AC-14 | a record flagged ITAR | agent runs `llull export_step_ap242 --save x.step D` | exit 1, `data.code: "MAT_EXPORT_CONTROLLED"`; with `confirmExportControlled=true` from the agent: `MAT_HUMAN_GATE`; nothing written | VC-MAT-15, 25 |
 | AC-15 | the 7075 block with the **typical** MatWeb density (basis `typical`) | `mass_properties D`; FEA `compute_margins` on a typical E; `get_material_allowable` on a typical Ftu | each result `unverified: true` with reasons; `check_materials` warning `MAT_VALUE_UNVERIFIED` | VC-MAT-22, 23 |
 | AC-16 | the deliberately wrong inputs of VC-MAT-24 | the failing command | each returns the documented code and remediation (TECHNICAL_SPEC §7.1) | VC-MAT-24 |
 

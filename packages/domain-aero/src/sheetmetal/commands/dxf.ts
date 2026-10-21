@@ -15,7 +15,7 @@ import { isRefusal } from '../partLookup';
 export const exportFlatPatternDxf = defineCommand({
   name: 'export_flat_pattern_dxf',
   description:
-    'Export the flat pattern of a sheet-metal part as an AutoCAD R12 DXF text (data.dxf; save it with the CLI --save option): outline and cutouts as LINE / CIRCLE entities on layers OUTLINE and CUTOUT, ' +
+    'FILE form of the flat pattern (same pattern as flat_pattern = data and materialize_flat_pattern = 2D entities; composite plies use export_ply_flat_patterns_dxf): export the flat pattern of a sheet-metal part as an AutoCAD R12 DXF text (data.dxf; save it with the CLI --save option): outline and cutouts as LINE / CIRCLE entities on layers OUTLINE and CUTOUT, ' +
     'bend lines on BEND_UP and BEND_DOWN, and TEXT notes on NOTES (the "not approved — a qualified person must review" note, every unverified input and, optionally, one bend note per bend). ' +
     'The pattern is shifted so its bounding box starts at the origin; $INSUNITS follows `units` (default: the document length unit, echoed in data.unit). ' +
     'Refusals: FTR_PART_NOT_FOUND, FTR_NON_DEVELOPABLE. Run check_sheet_metal first.',

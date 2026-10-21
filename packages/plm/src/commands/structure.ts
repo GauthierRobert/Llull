@@ -33,8 +33,8 @@ const HASH = /^[0-9a-f]{64}$/;
 export const bindComponentItem = defineCommand({
   name: 'bind_component_item',
   description:
-    'HUMAN GATE. Bind a component of this assembly (doc.components) to a managed item of another document: part number, revision, lifecycle state and, ' +
-    'for a released / superseded / obsolete child, its release content hash (64 hex). The signer attests these facts; llull cannot read the child ' +
+    'Bind a component of this assembly (doc.components) to a managed item of another document: part number, revision, lifecycle state and, ' +
+    'for a released / superseded / obsolete child, its release content hash (64 hex). HUMAN GATE. The signer attests these facts; llull cannot read the child ' +
     'document from here, and an agent can never declare a child released. Re-binding the same part number replaces its record (e.g. a new revision). ' +
     'Allowed only while this assembly revision is in_work. Needs `confirmation` (plm_act_payload): an agent gets PLM_HUMAN_GATE and hands over.',
   annotations: { metaHistory: true },
@@ -108,7 +108,7 @@ export const bindComponentItem = defineCommand({
 export const unbindComponentItem = defineCommand({
   name: 'unbind_component_item',
   description:
-    'HUMAN GATE. Remove the binding of a sub-item (by part number) from this assembly. Allowed only while the assembly revision is in_work. Needs `confirmation` ' +
+    'Remove the binding of a sub-item (by part number) from this assembly. HUMAN GATE. Allowed only while the assembly revision is in_work. Needs `confirmation` ' +
     '(plm_act_payload): an agent gets PLM_HUMAN_GATE.',
   annotations: { destructive: true, metaHistory: true },
   params: z.object({
@@ -146,7 +146,7 @@ export const unbindComponentItem = defineCommand({
 export const engineeringBom = defineCommand({
   name: 'engineering_bom',
   description:
-    'Engineering bill of materials of the managed assembly: one row per bound sub-item { level, partNumber, revision, state, quantity } where quantity is ' +
+    'Engineering bill of materials of the managed PLM assembly (by part number and revision; for a plain parts/mass count of any document use bill_of_materials, for building quantities quantity_takeoff): one row per bound sub-item { level, partNumber, revision, state, quantity } where quantity is ' +
     'the number of instances of its component placed in this document, the total, how many children are not released and the components with instances ' +
     "that no sub-item covers. Only level 1 is available from one document (a child's own structure is in its own document). For a released revision the " +
     'structure frozen at release is returned. Extends bill_of_materials, which counts components and materials. Read-only.',

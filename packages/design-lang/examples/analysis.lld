@@ -24,6 +24,6 @@ define_crack crack name=root_crack geometry={"kind":"edge_through","a":{"value":
 check check_analysis analysisId=case path=items.length expect == 1
 check check_analysis analysisId=case path=items.0.code expect == "FEA_MESH_MISSING"
 check describe_analysis analysisId=case path=case.loadOrder.length expect == 1
-check fea_report analysisId=case path=state expect == "unmeshed"
+check analysis_report analysisId=case path=state expect == "unmeshed"
 check stress_intensity crackId=crack stress.value=6*tip*len/(b*h*h) stress.unit=MPa path=KMPaSqrtM expect ~= 0.09478*6*tip*len/(b*h*h)
 check check_assembly path=status expect == "pass"

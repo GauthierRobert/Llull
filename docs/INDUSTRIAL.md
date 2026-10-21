@@ -4,7 +4,7 @@ For companies that design and build **factories, warehouses and process halls**:
 frames, crane runways, foundations, cladding, machines and utilities — delivered as steel
 tonnage, cut lists, clash reports, elevations / sections, plans, DXF and IFC. It extends the
 building workspace ([`CONSTRUCTION.md`](CONSTRUCTION.md)): same constructive building model, same
-"one command = Building panel tool + MCP tool" rule. Plan and status:
+"one command = Building panel tool + `llull` CLI tool" rule. Plan and status:
 [`INDUSTRIAL_PLAN.md`](INDUSTRIAL_PLAN.md).
 
 ## Elements
@@ -209,7 +209,7 @@ the new position (the current member is kept while still in reach); moving or ed
 updated, re-attached, or detached). Supports that were unattached are only re-attached when their
 pipe moves. The summary of the edit lists them: `kept`, `re-attached SB1 -> SB2`, `DETACHED from SB1`.
 
-**Plan symbols** (`export_dxf`, `export_plan_sheet`, the 2D building view): the supports of the
+**Plan symbols** (`export_building_dxf`, `export_plan_sheet`, the 2D building view): the supports of the
 plotted level (the level of their pipe, as pipes are drawn) at their plan position, 300 mm symbols on
 layer `P-SUPP` with the mark as text: shoe = filled square, hanger = circle with a cross, guide =
 square with a tick along each side of the pipe, anchor = hatched square with both diagonals. Fills
@@ -281,7 +281,7 @@ kinds `member` (cut list: mark, role, profile, length, mass, grade), `footing`, 
 | ----------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Elevation   | `export_elevation_sheet` { direction }        | North / south / east / west (+Y is north), hidden lines removed, level datums, grid bubbles, scale bar, title block. `exclude: ["panel"]` shows the frame behind the cladding.                      |
 | Section     | `export_elevation_sheet` { direction, cutAt } | The model nearer than the cut plane is removed; cut faces are filled (steel solid, concrete hatched, others grey) with heavy outlines.                                                              |
-| Floor plan  | `export_plan_sheet`, `export_dxf`             | Columns cut at 1.2 m as sections, beams / bracing as hidden axis lines, equipment with clearance zone and name, pipes with service, footings hidden. Roof framing belongs to elevations.            |
+| Floor plan  | `export_plan_sheet`, `export_building_dxf`             | Columns cut at 1.2 m as sections, beams / bracing as hidden axis lines, equipment with clearance zone and name, pipes with service, footings hidden. Roof framing belongs to elevations.            |
 | IFC4        | `export_ifc`                                  | IfcColumn / IfcBeam / IfcMember with IfcIShapeProfileDef / IfcRectangleHollowProfileDef / IfcCircleHollowProfileDef…, IfcFooting, IfcCovering, IfcBuildingElementProxy (equipment), IfcPipeSegment. |
 
 ## Building panel
@@ -290,4 +290,4 @@ _Steel hall_ (starter) generates a default 24 × 48 m hall. The tool picker's **
 group has forms for the hall generator (with optional crane), steel member, pad footing, cladding
 panel, crane runway, machine / equipment and pipe run (route as `x,y,z; x,y,z`). _Clash
 detection_, the takeoff (kg lines), schedules and _Deliverables → Elevation / Section sheet_ sit
-below. MCP agents get the same workflow from the `design_factory` prompt.
+below. Agents run the same workflow through the `llull` CLI (toolset `building`: `llull list building`).

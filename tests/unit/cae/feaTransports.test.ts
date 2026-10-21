@@ -128,7 +128,7 @@ describe('fea_import_results', () => {
     const imported = runFeaImportResults(analysisId, { format: 'op2', bytes: op2Bytes() }, host(), deps());
     expect(imported).toMatchObject({ isError: false, data: { format: 'op2', steps: 1, solver: 'nastran' } });
     expect(imported.summary).toContain('record_fea_results');
-    const report = execute(doc, 'fea_report', { analysisId }, { ...defaultContext(), feaArtifacts: store });
+    const report = execute(doc, 'analysis_report', { analysisId }, { ...defaultContext(), feaArtifacts: store });
     expect((report.data as { state: string }).state).toBe('solved');
     expect(report.summary).toContain('105');
   });

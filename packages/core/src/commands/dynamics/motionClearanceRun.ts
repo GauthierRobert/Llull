@@ -449,7 +449,7 @@ export function runMotion(plan: MotionPlan, budget: Budget): MotionOutcome {
             'FPR_MOTION_ALLOWED',
             'pass',
             ids,
-            `Declared ${intent.kind}: ${intent.reason}. Remove with remove_interference_intent when it no longer applies.`,
+            `Declared ${intent.kind}: ${intent.reason}. Remove with delete_interference_intent when it no longer applies.`,
             { values, witness, intent: { id: intent.id, kind: intent.kind, reason: intent.reason, declaredBy: intent.declaredBy } },
           ),
         );

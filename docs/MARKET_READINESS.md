@@ -13,7 +13,7 @@ open the DXF drawings every civil project starts from.
 
 **After this review: sellable as a focused product to small and mid-size site / civil offices, and technically credible for road and drainage design offices**
 (site development, platforms and access roads, storm drainage, early design and tender
-quantities), and to firms that want AI agents to drive design through MCP. It is **not yet** a
+quantities), and to firms that want AI agents to drive design through the local `llull` CLI. It is **not yet** a
 replacement for Civil 3D / 12d on large highway or utility projects, and it has not yet been
 validated by a pilot customer (see gaps).
 
@@ -27,12 +27,12 @@ validated by a pilot customer (see gaps).
 | Platform cut / fill, balance level    | Ready  | `add_platform`, `platform_earthworks`, `balance_platform` |
 | Surface-to-surface volumes            | Ready  | `compare_surfaces` |
 | Access road: alignment, profile, template, volumes, mass haul | Ready (spirals, superelevation) | `add_alignment`, `set_alignment_profile`, `set_road_section`, `alignment_report` |
-| Long section and cross-section sheets | Ready (SVG) | `export_long_section`, `export_cross_sections` |
-| Storm network design and check        | Ready (Tc / IDF, HGL, surcharge) | `add_manhole`, `add_pipe`, `check_drainage_network`, `size_drainage_pipes`, `drainage_schedule` |
+| Long section and cross-section sheets | Ready (SVG) | `export_road_long_section`, `export_cross_sections` |
+| Storm network design and check        | Ready (Tc / IDF, HGL, surcharge) | `add_manhole`, `add_drainage_pipe`, `check_drainage_network`, `size_drainage_pipes`, `drainage_schedule` |
 | Exchange with Civil 3D / 12d / TBC    | Ready  | `export_landxml`, `export_civil_dxf` |
 | Buildings on the site (BIM, IFC4)     | Ready  | building workspace ([`CONSTRUCTION.md`](CONSTRUCTION.md)) |
 | Steel halls, footings, checks         | Ready  | industrial workspace ([`INDUSTRIAL.md`](INDUSTRIAL.md)) |
-| AI agent drives the whole workflow    | Ready  | MCP toolset `civil`, prompt `design_site` |
+| AI agent drives the whole workflow    | Ready  | `llull` CLI, toolset `civil` (`llull list civil`) |
 
 Quality evidence: every capability is a pure command with unit tests (survey parsing, Delaunay
 invariants, analytic volumes within 2 %, Manning / rational method against hand calculations,
@@ -43,13 +43,16 @@ geometry, save / load round trips, and the repository's coverage gate (≥ 90 / 
 
 | Former gap | Now |
 | ---------- | --- |
-| DWG | `POST /import/dwg` + MCP `import_dwg` via LibreDWG / ODA File Converter on the server (503 with install steps when absent) |
+| DWG | `import_dwg` (`llull import_dwg file=…`, `POST /import/dwg` on the local backend) via LibreDWG / ODA File Converter (503 with install steps when absent) |
 | Highway geometry | clothoid spirals, superelevation runoff / runout, spiral-length and e-demand checks, LandXML spirals |
 | Coordinate systems | CRS metadata, Helmert site calibration, grid-coordinate import / export |
 | Civil drawings | true-scale civil plan sheets and plan-profile sheets with title block |
 | Drainage depth | time of concentration, IDF curves, iterated sizing, HGL with surcharge / flooding, drainage long sections |
 
-## Deployment verification (2026-10-09)
+## Deployment verification (2026-10-09, historical)
+
+> The Docker / web deployment verified here was removed by LC1 (`docs/decisions/LC1-local-only.md`): llull now ships as
+> the local desktop app + `llull` CLI. The DWG findings below still apply to the local converter.
 
 - **Docker image built and run** (`docker build` with `WITH_DWG=0`; base images from a registry
   mirror): the image serves the web app, `/health` is healthy, `/license` reports evaluation mode,

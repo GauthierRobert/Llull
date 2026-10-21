@@ -17,7 +17,8 @@ import { createFeArtifactStore, type FeArtifactCache } from '../src/fea/artifact
 import { createComputeRunner, f64Bytes, readOutput, withJobFolder } from '../src/native/computeJob';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { runFeaRender } from '../src/native/renderField';
-import { runNativeTool, nativeToolDefinitions } from '../src/native/tools';
+import { runNativeTool } from '../src/native/tools';
+import { buildNativeToolDefinitions } from '@protocol/nativeTools';
 import { feFatigue } from '../../tests/unit/cae/fatigue/feFixtures';
 import { rasterCases } from '../../tests/unit/native/rasterCases';
 
@@ -73,7 +74,7 @@ describe('fea_render', () => {
     });
     const unsolved = await runFeaRender({ analysisId: 'nope' }, host(), { store, runner: createComputeRunner({}, null) });
     expect(unsolved.isError).toBe(true);
-    expect(nativeToolDefinitions().find((tool) => tool.name === 'fea_render')?.inputSchema.properties).toHaveProperty('raster');
+    expect(buildNativeToolDefinitions().find((tool) => tool.name === 'fea_render')?.inputSchema.properties).toHaveProperty('raster');
   });
 
   native('the native CPU twin gives the identical SVG (VC-FEA-29), auto stays in TS for small plots, gpu reports its engine', async () => {

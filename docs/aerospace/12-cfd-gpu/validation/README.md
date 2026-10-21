@@ -13,7 +13,7 @@ fail gates; grade B and TBD values are documentation until their primary data is
 All cases run automatically once built:
 
 - Solver-level cases (Poiseuille, Taylor-Green, Sod, streamlines in an analytic field) are Rust tests in `solver/crates/llull-flow-*/tests`.
-- Command-level cases (`cfd_prepare`, records, stale flags) are Vitest tests in `tests/unit/aero/cfd/` and `server/tests/cfd/`.
+- Command-level cases (`prepare_cfd_case`, records, stale flags) are Vitest tests in `tests/unit/aero/cfd/` and `server/tests/cfd/`.
 - Scenario plans in `plans/` are CLI scripts (AF-23): `actions` are `build_project` steps, `cli` lines run the transports, and
   `expected` rows are compared with the JSON the CLI writes, by the benchmark runner (`llull run_benchmarks`, PHY-00).
 

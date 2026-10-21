@@ -1,4 +1,4 @@
-/** add_thermal_bc / update_thermal_bc / delete_thermal_bc: thermal boundary conditions and loads of a heat_* analysis. */
+/** add_thermal_bc / update_thermal_bc: thermal boundary conditions and loads of a heat_* analysis. */
 
 import type { ThermalBc, ThermalBcRecord } from '@core/model/analysis';
 import { defineCommand, z } from '@core/commands/schema';
@@ -165,35 +165,5 @@ export const updateThermalBc = defineCommand({
       `update_thermal_bc: '${updated.id}' (${updated.name}) now ${describeBc(bc)} in '${params.analysisId}'.${params.target !== undefined ? targetDistanceWarning(doc, params.target) : ''}`,
       [updated.id],
     );
-  },
-});
-
-/**
- * @affects doc.analysis.cases[analysisId].thermal.bcs (removes 1; affected: [bcId])
- * @failure unknown analysis / BC -> refusal, unchanged doc
- */
-export const deleteThermalBc = defineCommand({
-  name: 'delete_thermal_bc',
-  description: 'Remove a thermal boundary condition from a heat_* analysis.',
-  annotations: { destructive: true },
-  params: z.object({ analysisId: analysisIdSchema, bcId: z.string().describe('BC id to remove.') }),
-  run: (doc, { analysisId, bcId }): CommandResult => {
-    const found = thermalCaseOf(doc, analysisId);
-    if (isProblem(found)) return refuseThermal(doc, 'delete_thermal_bc', found.code, found.message, found.ids, found.paths);
-    if (recordOf(found, bcId) === undefined)
-      return refuseThermal(
-        doc,
-        'delete_thermal_bc',
-        'THM_BC_NOT_FOUND',
-        `no thermal BC '${bcId}' in '${analysisId}'`,
-        [analysisId, bcId],
-        ['bcId'],
-      );
-    const thermal = {
-      ...found.thermal,
-      bcs: Object.fromEntries(Object.entries(found.thermal.bcs).filter(([id]) => id !== bcId)),
-      bcOrder: found.thermal.bcOrder.filter((id) => id !== bcId),
-    };
-    return changed(withThermal(doc, found, thermal), `delete_thermal_bc: removed '${bcId}' from '${analysisId}'.`, [bcId]);
   },
 });

@@ -53,11 +53,11 @@ Rules are already in context (`rules/react.md` loads for `src/ui/`). Read
 1. Confirm the command(s) you need exist in the registry (`listCommands()`); request
    any missing ones from `command-author` first.
 2. Build/modify the component; wire interactions to `dispatch`.
-3. Verify in the running app — use the `verify-llull` skill (Playwright) to load the
-   page, exercise the interaction, and screenshot. Console must be error-free.
+3. Verify in the desktop app — `verify-llull` skill §4: drive it with `llull --app`, check the
+   document with `render_view --save shot.png`, no new `llull crashes` report.
 4. `npm run check` green.
 
 ## Done means
 
-Feature visible and interactive in `npm run dev`, driven only through commands,
+Feature visible and interactive in the desktop app, driven only through commands,
 selection/camera/layer state consistent with the document, checks green.

@@ -99,7 +99,7 @@ export const compositePlans: Record<string, GoldenAction[]> = {
       as: 'p2',
     },
     { command: 'check_producibility', params: { part: '$part', plies: ['$p2'] } },
-    { command: 'export_flat_patterns_dxf', params: { part: '$part', plies: ['$p2'] } },
+    { command: 'export_ply_flat_patterns_dxf', params: { part: '$part', plies: ['$p2'] } },
     { command: 'export_laser_projection', params: { part: '$part', plies: ['$p2'] } },
     { command: 'laminate_mass', params: { part: '$part' } },
   ],

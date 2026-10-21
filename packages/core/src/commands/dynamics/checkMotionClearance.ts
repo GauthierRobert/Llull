@@ -30,7 +30,7 @@ const NAME = 'check_motion_clearance';
 
 const FIXES: Readonly<Record<string, string>> = {
   FPR_NO_MOTION: 'Add rigid bodies and joints (add_rigid_body, add_body_joint) and a drive (add_motor), then retry; see inspect_dynamics.',
-  FPR_UNKNOWN_ID: 'Use ids from the document (list_entities) and a revolute joint id from inspect_dynamics for crankAxis.',
+  FPR_UNKNOWN_ID: 'Use ids from the document (find_entities) and a revolute joint id from inspect_dynamics for crankAxis.',
   FPR_BUDGET_EXCEEDED: 'Narrow the request with ids, use pairs "moving", or lower maxSamples / duration.',
 };
 

@@ -18,15 +18,15 @@ function solved(): ReturnType<typeof solvedRandom> & { analysisId: string; stati
 describe('dynamic_report', () => {
   it('returns the verified summary, filters probes and refuses stale / missing / non-dynamic cases', () => {
     const s = solved();
-    const result = execute(s.doc, 'dynamic_report', { analysisId: s.analysisId, probes: ['tip'] }, s.ctx);
+    const result = execute(s.doc, 'analysis_report', { view: 'dynamic', analysisId: s.analysisId, probes: ['tip'] }, s.ctx);
     expect(result.data).toMatchObject({ state: 'solved', summary: { type: 'random_response', probes: [{ probe: 'tip', unit: 'g' }] } });
     expect(result.summary).toContain('computed by llull, not approved');
     expect(result.summary).toContain('UNVERIFIED');
-    expect(codeOf(execute(s.doc, 'dynamic_report', { analysisId: s.analysisId }))).toBe('DYN_RESULTS_MISSING');
+    expect(codeOf(execute(s.doc, 'analysis_report', { view: 'dynamic', analysisId: s.analysisId }))).toBe('DYN_RESULTS_MISSING');
     const stale = mustRun(s.doc, 'set_frequency_sweep', { analysisId: s.analysisId, fMinHz: 20, fMaxHz: 1000 });
-    expect(codeOf(execute(stale, 'dynamic_report', { analysisId: s.analysisId }, s.ctx))).toBe('DYN_RESULTS_STALE');
-    expect(codeOf(execute(s.doc, 'dynamic_report', { analysisId: s.staticId }, s.ctx))).toBe('DYN_CASE_TYPE');
-    expect(codeOf(execute(s.doc, 'dynamic_report', { analysisId: 'nope' }, s.ctx))).toBe('FEA_ANALYSIS_NOT_FOUND');
+    expect(codeOf(execute(stale, 'analysis_report', { view: 'dynamic', analysisId: s.analysisId }, s.ctx))).toBe('DYN_RESULTS_STALE');
+    expect(codeOf(execute(s.doc, 'analysis_report', { view: 'dynamic', analysisId: s.staticId }, s.ctx))).toBe('DYN_CASE_TYPE');
+    expect(codeOf(execute(s.doc, 'analysis_report', { view: 'dynamic', analysisId: 'nope' }, s.ctx))).toBe('FEA_ANALYSIS_NOT_FOUND');
   });
 });
 

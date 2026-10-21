@@ -42,8 +42,7 @@
       "command": "attach_point_cloud",
       "params": {
         "sourceSha256": "72e1a6923f8898841d8d24aa2d7679afc3fe7cc5a40e85c75a8fc993c02476f4",
-        "name": "posed",
-        "applyStationPoses": true
+        "name": "posed"
       },
       "as": "posed"
     },
@@ -77,9 +76,7 @@
       "command": "attach_point_cloud",
       "params": {
         "sourceSha256": "f4e840920885fc175ab90c0a50778165e64e3f9ccb049ea5e360f3e30bb932b1",
-        "name": "lidar tile",
-        "coordinates": "grid",
-        "sourceUnit": "m"
+        "name": "lidar tile"
       },
       "as": "tile"
     },

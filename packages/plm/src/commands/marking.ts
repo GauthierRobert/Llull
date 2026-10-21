@@ -20,8 +20,8 @@ const CONTROLLED = new Set(['ITAR', 'EAR', 'EU-dual-use', 'national', 'other']);
 export const setItemMarking = defineCommand({
   name: 'set_item_marking',
   description:
-    "HUMAN GATE. Record the managed item's export-control marking: regime (none, undetermined, ITAR, EAR, EU-dual-use, national, other), the user's own " +
-    'classification text (e.g. ECCN or USML category) and the notice to print. llull never classifies: the export-control officer decides. A controlled ' +
+    "Record the managed item's export-control marking: regime (none, undetermined, ITAR, EAR, EU-dual-use, national, other), the user's own " +
+    'classification text (e.g. ECCN or USML category) and the notice to print. HUMAN GATE. llull never classifies: the export-control officer decides. A controlled ' +
     'regime needs a statement. With policy.requireMarking, submit_for_review is refused while the regime is undetermined. Not the material-record ' +
     'marking (set_export_marking). An agent caller gets PLM_HUMAN_GATE.',
   annotations: { idempotent: true, metaHistory: true },

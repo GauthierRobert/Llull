@@ -1,4 +1,4 @@
-/** PHY-21 slice A: allow_interference, remove_interference_intent, set_part_grounded, doc.prototype persistence and the pure helpers. */
+/** PHY-21 slice A: allow_interference, delete_interference_intent, set_part_grounded, doc.prototype persistence and the pure helpers. */
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
@@ -75,19 +75,19 @@ describe('allow_interference', () => {
   });
 });
 
-describe('remove_interference_intent', () => {
+describe('delete_interference_intent', () => {
   it('removes a declared intent and no-ops on an unknown id', () => {
     const { doc, a, b } = twoBoxes();
     const declared = execute(doc, 'allow_interference', { a, b, kind: 'thread', reason: 'bolt' });
     const id = declared.affected[0] ?? '';
-    const removed = execute(declared.document, 'remove_interference_intent', { id });
+    const removed = execute(declared.document, 'delete_interference_intent', { id });
     expect(removed.affected).toEqual([id]);
     expect(removed.document.prototype?.intents).toEqual({});
     expect(declared.document.prototype?.intents[id]).toBeDefined();
-    const missing = execute(removed.document, 'remove_interference_intent', { id });
+    const missing = execute(removed.document, 'delete_interference_intent', { id });
     expect(missing.affected).toEqual([]);
     expect(missing.document).toBe(removed.document);
-    expect(execute(doc, 'remove_interference_intent', { id: 'fit-1.1' }).affected).toEqual([]);
+    expect(execute(doc, 'delete_interference_intent', { id: 'fit-1.1' }).affected).toEqual([]);
   });
 });
 

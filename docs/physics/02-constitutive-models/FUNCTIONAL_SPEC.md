@@ -163,7 +163,7 @@ reviewer.
 
 ### 6.2 MCP (cloud)
 
-Toolset `materials` (08) gains `add_material_model`, `remove_material_model`, `define_constitutive_set`,
+Toolset `materials` (08) gains `add_material_model`, `delete_material_model`, `define_constitutive_set`,
 `check_material_models`. The `@phys` plugin toolset `material-lab` exposes `fit_material_model`,
 `material_point_response`, `export_material_cards` (read-only).
 

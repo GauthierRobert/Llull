@@ -1,4 +1,4 @@
-/** export_step_exact assembly edges: depth/cycle parity with the flat export, factor rounding, kernels that cannot scale, baked labels. */
+/** export_step_ap242 assembly edges: depth/cycle parity with the flat export, factor rounding, kernels that cannot scale, baked labels. */
 import { describe, expect, it } from 'vitest';
 import { type CadDocument, type Component, type Entity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
@@ -22,7 +22,7 @@ const assemblyKernel = (spec: { unsupported?: readonly ['scale']; scaleFails?: b
 };
 
 const step = (doc: CadDocument, kernel: FakeKernel): ReturnType<typeof execute> =>
-  execute(doc, 'export_step_exact', {}, { ...defaultContext(), kernel });
+  execute(doc, 'export_step_ap242', { includeValidationProperties: false }, { ...defaultContext(), kernel });
 
 /** Document with component `Bolt` (one box) and an unscaled instance of it; returns the box and instance prototypes. */
 function boltDoc(): { doc: CadDocument; bolt: string; box: Entity; instance: Entity } {
@@ -64,7 +64,7 @@ function chain(levels: number, cyclic: boolean): CadDocument {
   return execute(withComponents(doc, made), 'insert_instance', { componentId: ids[0] ?? '' }).document;
 }
 
-describe('export_step_exact assembly depth and cycles', () => {
+describe('export_step_ap242 assembly depth and cycles', () => {
   it.each([
     ['too deep', chain(7, false)],
     ['cyclic', chain(2, true)],
@@ -79,7 +79,7 @@ describe('export_step_exact assembly depth and cycles', () => {
   });
 });
 
-describe('export_step_exact scale factors', () => {
+describe('export_step_ap242 scale factors', () => {
   it('shares one product between x3 inside x0.1 and a top-level x0.3', () => {
     const { doc: base, bolt, instance } = boltDoc();
     const inner = { ...instance, id: 'inner', componentId: bolt, scale: [3, 3, 3] } as Entity;
@@ -130,7 +130,7 @@ describe('export_step_exact scale factors', () => {
   });
 });
 
-describe('export_step_exact baked nested labels', () => {
+describe('export_step_ap242 baked nested labels', () => {
   const skewed = (instance: Entity, id: string, componentId: string): Entity =>
     ({ ...instance, id, componentId, scale: [2, 1, 1] }) as Entity;
 

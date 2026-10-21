@@ -1,6 +1,6 @@
 /**
  * Contact conductance through the real pipeline (plan -> fea_mesh (two separate volumes) -> fea_solve (tied *CONTACT PAIR with *GAP CONDUCTANCE)
- * -> thermal_report), judged with the PHY-00 judge: VC-THM-11.a/b (two slabs, interface conductance 2000 W/(m^2*K)). Skipped without gmsh / ccx.
+ * -> analysis_report), judged with the PHY-00 judge: VC-THM-11.a/b (two slabs, interface conductance 2000 W/(m^2*K)). Skipped without gmsh / ccx.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

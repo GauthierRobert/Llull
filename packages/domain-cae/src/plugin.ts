@@ -15,6 +15,7 @@ import { reliabilityCommands } from './reliability/catalog';
 import { reliabilityErrors } from './reliability/model';
 import { thermalCommands } from './thermal/catalog';
 import { thermomechCommands } from './thermomech/catalog';
+import { caeRetiredCommands } from './retired';
 
 /** The analysis slice is pure definition data: nothing is derived, nothing is restored. */
 const analysisDocument: DocumentExtension = {
@@ -40,4 +41,5 @@ export const caePlugin: CadPlugin = {
   ],
   guards: [analysisReferenceGuard, durabilityReferenceGuard],
   document: analysisDocument,
+  retiredCommands: caeRetiredCommands,
 };

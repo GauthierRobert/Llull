@@ -64,8 +64,8 @@ Placement and laws:
 ```
 packages/domain-aero/src/cfd/
   catalog.ts plugin.ts codes.ts          plugin `cfd`, palette group "Flow", CFD_* codes + remediation
-  caseCommands.ts                        cfd_create_case, cfd_update_case, cfd_delete_case, cfd_set_boundary
-  prepareCommand.ts                      cfd_prepare (query): runs the checks below, returns the report
+  caseCommands.ts                        create_cfd_case, update_cfd_case, delete_cfd_case, set_cfd_boundary
+  prepareCommand.ts                      prepare_cfd_case (query): runs the checks below, returns the report
   regime.ts                              free stream -> regime -> solver; refusal ranges
   domainSizing.ts                        COST 732 / AIJ and aero defaults -> domain box; blockage
   watertight.ts                          edge-manifold, orientation, signed volume on indexed triangles
@@ -170,11 +170,11 @@ A result is **stale** when the current `caseHash` or `geometryHash` differs from
 
 | Name | Kind | Params (sketch) | data | Failure codes |
 | ---- | ---- | --------------- | ---- | ------------- |
-| `cfd_create_case` | mutating | `id`, `entityIds[]`, `regime`, `freestream`, `reference`, `domain`, `ground`, `quality`, `solver?`, `outputs?` | case, defaults named | `CFD_PARAM_INVALID`, `CFD_ENTITY_NOT_FOUND`, `CFD_CASE_EXISTS`, `CFD_REGIME_MISMATCH` |
-| `cfd_update_case` | mutating | `caseId` + any case field | case, results now stale | as above + `CFD_CASE_NOT_FOUND` |
-| `cfd_delete_case` | mutating | `caseId` | — | `CFD_CASE_NOT_FOUND` |
-| `cfd_set_boundary` | mutating | `caseId`, `kind`, `entityId`, `faceRefs?` | boundary list | `CFD_ENTITY_NOT_FOUND`, `CFD_BOUNDARY_CONFLICT` |
-| `cfd_prepare` | query, `requiresKernel` | `caseId`, `quality?` | §5.1 report: checks[], surface stats, small features[], domain, blockage, cells, memory, time estimate, solver | `CFD_GEOMETRY_NOT_WATERTIGHT`, `CFD_GEOMETRY_SELF_INTERSECTING`, `CFD_BLOCKAGE_TOO_HIGH`, `CFD_NO_GEOMETRY` (as check rows, not a refusal) |
+| `create_cfd_case` | mutating | `id`, `entityIds[]`, `regime`, `freestream`, `reference`, `domain`, `ground`, `quality`, `solver?`, `outputs?` | case, defaults named | `CFD_PARAM_INVALID`, `CFD_ENTITY_NOT_FOUND`, `CFD_CASE_EXISTS`, `CFD_REGIME_MISMATCH` |
+| `update_cfd_case` | mutating | `caseId` + any case field | case, results now stale | as above + `CFD_CASE_NOT_FOUND` |
+| `delete_cfd_case` | mutating | `caseId` | — | `CFD_CASE_NOT_FOUND` |
+| `set_cfd_boundary` | mutating | `caseId`, `kind`, `entityId`, `faceRefs?` | boundary list | `CFD_ENTITY_NOT_FOUND`, `CFD_BOUNDARY_CONFLICT` |
+| `prepare_cfd_case` | query, `requiresKernel` | `caseId`, `quality?` | §5.1 report: checks[], surface stats, small features[], domain, blockage, cells, memory, time estimate, solver | `CFD_GEOMETRY_NOT_WATERTIGHT`, `CFD_GEOMETRY_SELF_INTERSECTING`, `CFD_BLOCKAGE_TOO_HIGH`, `CFD_NO_GEOMETRY` (as check rows, not a refusal) |
 | `record_cfd_results` | mutating, validated | `caseId`, `summary` | — | `CFD_RESULT_MISSING`, `CFD_RESULT_HASH_MISMATCH`, `CFD_INPUT_STALE` (no-op with reason) |
 | `cfd_report` | query | `caseId`, `include?: ('forces'\|'peaks'\|'convergence'\|'probes'\|'provenance')[]` | summary, stale, warnings, `reviewRequired` | `CFD_CASE_NOT_FOUND`, `CFD_NO_RESULT`, `CFD_RESULT_STALE` (warning) |
 | `check_cfd` | query | `caseIds?` | pass / warn / fail per case (AF-20) | — |
@@ -183,7 +183,7 @@ Host transports (CLI, desktop; not registry commands):
 
 | Name | Params | What it does |
 | ---- | ------ | ------------ |
-| `cfd_solve` | `caseId`, `timeoutS?=3600`, `device?: 'auto'\|'gpu'\|'cpu'`, `gridStudy?: boolean` | runs `cfd_prepare`; refuses on any fail row; exports the surface; runs `llull-compute flow`; streams progress; stores the bundle; dispatches `record_cfd_results`. `gridStudy` runs three resolutions (ratio 2) and records the GCI |
+| `cfd_solve` | `caseId`, `timeoutS?=3600`, `device?: 'auto'\|'gpu'\|'cpu'`, `gridStudy?: boolean` | runs `prepare_cfd_case`; refuses on any fail row; exports the surface; runs `llull-compute flow`; streams progress; stores the bundle; dispatches `record_cfd_results`. `gridStudy` runs three resolutions (ratio 2) and records the GCI |
 | `cfd_streamlines` | `caseId`, `rake` (`line` \| `plane` \| `sphere`), `count`, `field?`, `maxLengthM?` | traces on the stored field (no re-solve), adds a streamline set to the bundle under a new hash, re-records |
 | `cfd_slice` | `caseId`, `plane: { origin, normal }`, `field` | samples a plane, stores it, re-records |
 | `cfd_probe` | `caseId`, `points[]`, `heightAboveGroundM?` | values at points; speed-up ratio U/U_ref when the case has a ground |
@@ -194,7 +194,7 @@ the case is tagged `designLoad: true` (AF-33).
 
 ## 5. Algorithms
 
-### 5.1 Geometry preparation (TR-CFD-01..06): `cfd_prepare`
+### 5.1 Geometry preparation (TR-CFD-01..06): `prepare_cfd_case`
 
 Preparation is the step that turns any llull model into a valid flow body. The owner asked for advice here, and the choice of
 Cartesian solvers is driven by it: an immersed or cut-cell grid needs only a closed surface, while a body-fitted mesh needs a clean,
@@ -220,7 +220,7 @@ sewn B-rep with no slivers. The steps:
    Each row gives entity id, size, position and the remedy: exclude the entity, raise the resolution, or (V1) defeature through 07 FTR
    `recognize_features`. Features below h vanish or close on the grid; the report makes that visible instead of silent.
 8. **Openings.** Faces tagged `inlet` / `outlet` become boundary patches; an untagged open nozzle or intake fails the watertight check
-   and the remediation names `cfd_set_boundary`.
+   and the remediation names `set_cfd_boundary`.
 9. **Symmetry.** If `domain.symmetryPlane` is set, the body is checked mirror-symmetric within 1e-4 L (Hausdorff on vertices); the
    domain and cells are halved.
 10. **Domain sizing** (`domainSizing.ts`), in the free-stream frame:
@@ -363,7 +363,7 @@ each case come from `memoryEstimate.ts` and are checked against measured allocat
 | ---------------------------------- | ----- |
 | LBM throughput, mid-range 8 GB GPU | ≥ 1000 M cell-updates / s (D3Q19 float32) |
 | Draft case, 16 M cells, steady | ≤ 10 min |
-| `cfd_prepare` on a 1 M-triangle model | ≤ 5 s |
+| `prepare_cfd_case` on a 1 M-triangle model | ≤ 5 s |
 | Streamlines, 4096 seeds | ≤ 2 s |
 | Overlay frame rate, 1 M surface vertices + 4096 lines | ≥ 30 fps |
 
@@ -388,7 +388,7 @@ CPU backend runs everywhere, so every VC has a CI path. Coverage 90/85/90/90 app
 
 | Milestone | Content | Depends on | Effort |
 | --------- | ------- | ---------- | ------ |
-| M1 | Data model, case commands, `cfd_prepare` (§5.1 complete), `check_cfd`, VC-CFD-10..16 | 01 KRN union (done) | 3 eng-weeks |
+| M1 | Data model, case commands, `prepare_cfd_case` (§5.1 complete), `check_cfd`, VC-CFD-10..16 | 01 KRN union (done) | 3 eng-weeks |
 | M2 | = RS-0: `solver/` workspace, shared `llull-gpu` / `llull-protocol`, voxeliser, LBM D3Q19 BGK + LES, forces, CPU backend, bundling, `cfd_solve` transport, `record_cfd_results`, `cfd_report`, VC-CFD-20..22, 26, 50..52, 55 | M1 | 6 eng-weeks |
 | M3 | Viewport overlay + legend, `render_view` overlay, streamlines, slices, probes, Flow panel, VC-CFD-40..43 | M2 | 3 eng-weeks |
 | M4 | Euler cut-cell octree solver, adaptation, VC-CFD-30..35, shuttle-like CLI scenario | M2 | 7 eng-weeks |
@@ -416,17 +416,17 @@ See FUNCTIONAL_SPEC §11 and [validation/sources.md](validation/sources.md).
 
 ## 13. As built
 
-### M1 (data model, case commands, `cfd_prepare`, `check_cfd`)
+### M1 (data model, case commands, `prepare_cfd_case`, `check_cfd`)
 
 Delivered in `packages/domain-aero/src/cfd/` (plugin `cfd`, toolset `flow`, palette group "Flow") and `packages/core/src/model/cfd.ts`
 (slice type; `CadDocument.cfd`, cleared by `clear_document`, validated on load by the plugin `DocumentExtension`). No solver, no Rust, no
 transport, no overlay, no `CfdResultPort`, no `record_cfd_results` / `cfd_report` (M2).
 
-- **Commands (6).** `cfd_create_case`, `cfd_update_case`, `cfd_delete_case`, `cfd_set_boundary` (mutating, `affected: [caseId]`),
-  `cfd_prepare`, `check_cfd` (read-only). Case ids are chosen by the caller (`[A-Za-z0-9_.-]{1,64}`). Lengths in the case are metres.
+- **Commands (6).** `create_cfd_case`, `update_cfd_case`, `delete_cfd_case`, `set_cfd_boundary` (mutating, `affected: [caseId]`),
+  `prepare_cfd_case`, `check_cfd` (read-only). Case ids are chosen by the caller (`[A-Za-z0-9_.-]{1,64}`). Lengths in the case are metres.
 - **Toolset.** A new toolset `flow` (`@protocol/toolsets`), palette label "Flow"; it lists only registry commands (no MCP tool, no host
   transport yet; M2 adds `cfd_solve` etc. to the same toolset).
-- **`cfd_prepare` is not `requiresKernel`.** §4 lists it so, but §5.1 step 2 defines the kernel-less path (display triangles, overlap test,
+- **`prepare_cfd_case` is not `requiresKernel`.** §4 lists it so, but §5.1 step 2 defines the kernel-less path (display triangles, overlap test,
   `CFD_KERNEL_REQUIRED` as a check row); `requiresKernel` would refuse the call before that path could run. The kernel is read from
   `ctx.kernel`; with it the bodies are unioned by a boolean-union recipe (Manifold: watertight by construction), without it (or when it
   cannot build the union) the display triangles are used and overlapping or touching bodies fail with `CFD_KERNEL_REQUIRED`.
@@ -445,13 +445,13 @@ transport, no overlay, no `CfdResultPort`, no `record_cfd_results` / `cfd_report
   printed in `estimate.basis`; VC-CFD-50 and VC-CFD-54 replace them with measurements. The self-intersection test does not see coplanar
   overlaps and is skipped above 200 000 triangles (`not_run`); small-feature rays are sampled (at most 20 000) on large surfaces.
 - **Boundary tags.** Per entity (faceRefs are stored and conflict-checked, §11.4 still open); the entity must be a body of the case; the
-  same kind merges, a different kind on the same entity or a shared face is `CFD_BOUNDARY_CONFLICT`; `cfd_update_case boundaries` replaces
+  same kind merges, a different kind on the same entity or a shared face is `CFD_BOUNDARY_CONFLICT`; `update_cfd_case boundaries` replaces
   the list.
 - **Openings (§5.1 step 8).** Open edges whose midpoint lies inside the bounding box of a body tagged `inlet` / `outlet` do not count as
   non-watertight (reported as `openingEdges`); the attribution is by bounding box, not by face. With such openings the orientation flip,
   voxel volume and small-feature volume figures are not computed for a surface that is not truly closed (voxel skipped).
 - **Status rules.** `not_run` is never a pass: it raises the status to `warn` (also in `check_cfd`), except the memory row without a device
-  (`neutral`). Bodies or boundary ids deleted from the document give a `CFD_ENTITY_NOT_FOUND` fail row; `cfd_update_case` tolerates ids that
+  (`neutral`). Bodies or boundary ids deleted from the document give a `CFD_ENTITY_NOT_FOUND` fail row; `update_cfd_case` tolerates ids that
   were already missing, and `reference.momentPointM` is not recomputed when `entityIds` change (the update says so).
 - **M2 items.** `geometryHash` hashes the tessellated union and so depends on the kernel that built it (Manifold vs OCCT): M2 must record
   the kernel name with it or hash the exported flow surface of the host transport.

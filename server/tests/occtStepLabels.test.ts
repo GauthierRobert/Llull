@@ -1,5 +1,5 @@
 /**
- * Live OpenCascade: export_step_exact stamps entity names, group names and colors on the STEP the
+ * Live OpenCascade: export_step_ap242 stamps entity names, group names and colors on the STEP the
  * kernel writes (the product names and solid ids the kernel would otherwise number itself).
  */
 
@@ -24,7 +24,7 @@ function placementX(step: string, name: string): number {
   return Number(x);
 }
 
-describeNative('occt export_step_exact labels', () => {
+describeNative('occt export_step_ap242 labels', () => {
   it('names products after entities and styles them with the entity color', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'add_box', { size: [10, 10, 10], color: '#ff0000' }).document;
@@ -34,7 +34,7 @@ describeNative('occt export_step_exact labels', () => {
     doc = execute(doc, 'group_entities', { ids: [box, cylinder], name: 'Pump' }).document;
 
     const ctx = { ...defaultContext(), kernel: kernels.occt };
-    const result = execute(doc, 'export_step_exact', {}, ctx);
+    const result = execute(doc, 'export_step_ap242', { schema: 'ap214', includeValidationProperties: false }, ctx);
     const step = (result.data as { step: string }).step;
 
     expect(step).toContain("PRODUCT('Bearing 1','Bearing 1','Pump'");
@@ -56,7 +56,7 @@ describeNative('occt export_step_exact labels', () => {
     const componentId = Object.keys(created.document.components)[0] ?? '';
     const second = execute(created.document, 'insert_instance', { componentId, position: [50, 0, 0] });
     const ctx = { ...defaultContext(), kernel: kernels.occt };
-    const result = execute(second.document, 'export_step_exact', {}, ctx);
+    const result = execute(second.document, 'export_step_ap242', { schema: 'ap214', includeValidationProperties: false }, ctx);
     const data = result.data as { step: string; solidCount: number; skipped: string[] };
     expect(data.solidCount).toBe(2);
     expect(data.skipped).toEqual([]);
@@ -83,7 +83,7 @@ describeNative('occt export_step_exact labels', () => {
       doc = execute(doc, 'insert_instance', { componentId, position: [k * 40, 0, 0], name: 'Tie rod M10' }).document;
     }
     const ctx = { ...defaultContext(), kernel: kernels.occt };
-    const result = execute(doc, 'export_step_exact', {}, ctx);
+    const result = execute(doc, 'export_step_ap242', { schema: 'ap214', includeValidationProperties: false }, ctx);
     const data = result.data as { step: string; solidCount: number; assembly?: { products: number; occurrences: number } };
 
     expect(data.assembly).toEqual({ products: 2, occurrences: 6 });
@@ -126,7 +126,7 @@ describeNative('occt export_step_exact labels', () => {
     doc = execute(doc, 'insert_instance', { componentId: pair, position: [0, 120, 0] }).document;
 
     const ctx = { ...defaultContext(), kernel: kernels.occt };
-    const exported = execute(doc, 'export_step_exact', {}, ctx);
+    const exported = execute(doc, 'export_step_ap242', { schema: 'ap214', includeValidationProperties: false }, ctx);
     const step = (exported.data as { step: string }).step;
     expect(exported.data).toMatchObject({ assembly: { products: 2, occurrences: 3 } });
     // 3 uses of Pair + 2 uses of Bolt inside Pair (the 2 solids of Bolt are solids of its product)
@@ -152,7 +152,12 @@ describeNative('occt export_step_exact labels', () => {
   it('keeps the flat list when no instance is exported', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'add_box', { size: [10, 10, 10] }).document;
-    const result = execute(doc, 'export_step_exact', {}, { ...defaultContext(), kernel: kernels.occt });
+    const result = execute(
+      doc,
+      'export_step_ap242',
+      { schema: 'ap214', includeValidationProperties: false },
+      { ...defaultContext(), kernel: kernels.occt },
+    );
     expect((result.data as { assembly?: unknown }).assembly).toBeUndefined();
     expect((result.data as { step: string }).step).not.toContain('NEXT_ASSEMBLY_USAGE_OCCURRENCE');
   }, 120_000);

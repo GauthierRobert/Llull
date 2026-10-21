@@ -208,13 +208,13 @@ describe('create_ply_solids: the exact faceSlab recipe', () => {
       for (const unsupported of [[], ['faceSlab' as const]]) {
         const kernel = fakeKernel({ step: 'ISO-10303-21;\nEND-ISO-10303-21;\n', unsupported });
         // a ply solid written from triangles is a faceted body: it leaves only with a human's signature (aerospace 04 TR-XCH-26)
-        const refused = execute(source, 'export_step_exact', {}, { ...defaultContext(), kernel });
+        const refused = execute(source, 'export_step_ap242', { includeValidationProperties: false }, { ...defaultContext(), kernel });
         expect(refused.error?.code).toBe('XCH_UNVERIFIED_BODIES');
         expect(refused.summary).toContain(entity.id);
         const result = execute(
           source,
-          'export_step_exact',
-          { acceptUnverified: { nonce: 'n' } },
+          'export_step_ap242',
+          { includeValidationProperties: false, acceptUnverified: { nonce: 'n' } },
           { ...defaultContext(), kernel, humanSignature: signer },
         );
         expect(result.data, result.summary).toBeDefined();
@@ -236,8 +236,8 @@ describe('create_ply_solids: the exact faceSlab recipe', () => {
     };
     const result = execute(
       doc,
-      'export_step_exact',
-      { acceptUnverified: { nonce: 'n' } },
+      'export_step_ap242',
+      { includeValidationProperties: false, acceptUnverified: { nonce: 'n' } },
       { ...defaultContext(), kernel, humanSignature: signer },
     );
     expect(result.data, result.summary).toBeDefined();

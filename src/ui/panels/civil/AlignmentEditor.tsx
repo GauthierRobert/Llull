@@ -125,7 +125,7 @@ export function AlignmentEditor({ alignment }: { alignment: AlignmentObject }): 
             />
             <QueryDownloadButton
               label="Long section SVG"
-              command="export_long_section"
+              command="export_road_long_section"
               params={params}
               field="text"
               fallbackName={`${alignment.id}-long-section.svg`}

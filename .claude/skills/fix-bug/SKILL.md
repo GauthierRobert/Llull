@@ -12,8 +12,8 @@ description: Fix a bug or regression in llull test-first — reproduce it as a f
   - Multi-step / replay / parametric regeneration wrong → a plan in `tests/golden/plans.ts`
     (plus `golden.kernel.test.ts` if it needs `ctx.kernel`).
   - Store / undo / live sync / local fallback → `tests/integration/`.
-  - Panel or param-gathering → `tests/component/`. Rendering only → reproduce in `npm run dev`
-    (`verify-llull` §4) and unit-test the pure helper behind it.
+  - Panel or param-gathering → `tests/component/`. Rendering only → reproduce in the desktop app
+    (`llull --app` + `render_view`, `verify-llull` §4) and unit-test the pure helper behind it.
 - Run it: `npx vitest run <file>` — it MUST fail for the reported reason. If it passes, the
   reproduction is wrong; keep digging before fixing anything.
 

@@ -123,7 +123,7 @@
   },
   {
     "command": "set_mesh_controls",
-    "params": { "analysisId": "$an", "mesher": "gmsh", "elementFamily": "tet", "order": 2, "globalSize": 0.01 }
+    "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 0.01 }
   },
   {
     "command": "add_result_probe",

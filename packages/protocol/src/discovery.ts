@@ -6,6 +6,7 @@ import { buildCommandTools, type ToolDefinition } from './tools';
 import { buildExchangeToolDefinitions } from './exchangeTools';
 import { buildFeaToolDefinitions } from './feaTools';
 import { buildLibraryToolDefinitions } from './libraryTools';
+import { buildNativeToolDefinitions } from './nativeTools';
 import { parseQuery, scoreTool, toolIndex } from './discoveryRank';
 import { toolsetOf, type ToolsetName } from './toolsets';
 
@@ -18,9 +19,15 @@ interface ToolSearchResult {
 /** Hits scoring below this fraction of the best hit are noise and dropped. */
 const MIN_RELATIVE_SCORE = 0.12;
 
-/** Every tool the CLI can run: registry commands + exchange + FE + material-library tools. */
+/** Every tool the CLI can run: registry commands + exchange + FE + material-library + native-transport tools. */
 export function buildAllTools(): ToolDefinition[] {
-  return [...buildCommandTools(), ...buildExchangeToolDefinitions(), ...buildFeaToolDefinitions(), ...buildLibraryToolDefinitions()];
+  return [
+    ...buildCommandTools(),
+    ...buildExchangeToolDefinitions(),
+    ...buildFeaToolDefinitions(),
+    ...buildLibraryToolDefinitions(),
+    ...buildNativeToolDefinitions(),
+  ];
 }
 
 /**

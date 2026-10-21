@@ -98,7 +98,7 @@ export class Session {
   }
 
   async probes(analysisId: string, maxNodeDistance = 1e-6): Promise<Record<string, number>> {
-    const { code, json } = await this.cli('fea_report', `analysisId=${analysisId}`);
+    const { code, json } = await this.cli('analysis_report', `analysisId=${analysisId}`);
     expect(code, String(json['summary'])).toBe(EXIT_OK);
     const list = dataOf(json)['probes'];
     const found: Record<string, number> = {};

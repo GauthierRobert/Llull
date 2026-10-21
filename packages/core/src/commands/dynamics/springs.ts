@@ -21,7 +21,7 @@ const MIN_LENGTH_M = 1e-6;
 export const addSpring = defineCommand({
   name: 'add_spring',
   description:
-    'Add a linear spring-damper between a point on one rigid body and a point on another body or the ground, for simulate_motion ' +
+    'Add a spring-damper force element (physics, for simulate_motion; NOT the add_coil solid geometry) between a point on one rigid body and a point on another body or the ground, for simulate_motion ' +
     '(a coil spring, a gas strut, a bungee, an engine-valve spring). Force along the line joining the two points: ' +
     'F = stiffness · (length - freeLength) + damping · d(length)/dt, positive = pulling the ends together; it works in any direction and ' +
     'for any joint arrangement (a rocker, a four-bar link, a falling body). `pointA` / `pointB` are WORLD points in DOCUMENT units at the ' +

@@ -10,7 +10,7 @@ import { liveKernels, describeNative } from './kernelTestSupport';
 const kernels = liveKernels();
 const ORIGIN: Vec3 = [0, 0, 0];
 
-describeNative('occt export_step_exact nested oblique rotations', () => {
+describeNative('occt export_step_ap242 nested oblique rotations', () => {
   it('re-imports each box at the world centroid mass_properties reports (relative error < 1e-6)', () => {
     const box = execute(createEmptyDocument(), 'add_box', { size: [2, 3, 4], position: [5, 1, -2], rotation: [0.3, 0, 0] });
     const a = execute(box.document, 'create_component', { name: 'A', entityIds: [box.affected[0]!], componentId: 'comp-a' });
@@ -29,7 +29,7 @@ describeNative('occt export_step_exact nested oblique rotations', () => {
     // Document order: instance of A at the origin, instance of B at the origin (holding the rotated A), the outer rotated B.
     const oracle: Vec3[] = [[5, 1, -2], inner, shift(inner, [0.4, -0.9, 0.2], [3, -1, 2])];
 
-    const exported = execute(outer.document, 'export_step_exact', {}, ctx);
+    const exported = execute(outer.document, 'export_step_ap242', { schema: 'ap214', includeValidationProperties: false }, ctx);
     const imported = execute(
       createEmptyDocument(),
       'import_step_exact',

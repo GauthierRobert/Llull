@@ -4,7 +4,7 @@
   "cases": [
     {
       "id": "VC-CFD-10",
-      "command": "cfd_prepare",
+      "command": "prepare_cfd_case",
       "reference": "data/analytic_references.json voxelSphere",
       "tolerance": "|V_vox - V| / V <= derived bound (0.162 / 0.0812 / 0.0406 at 16 / 32 / 64 cells per radius) and decreasing with h",
       "grade": "closed form",
@@ -16,7 +16,7 @@
     },
     {
       "id": "VC-CFD-11",
-      "command": "cfd_prepare",
+      "command": "prepare_cfd_case",
       "inputs": {
         "openBox": "unit box without its top face",
         "overlap": "two boxes 1 m sharing 0.5 m"
@@ -38,7 +38,7 @@
     },
     {
       "id": "VC-CFD-12",
-      "command": "cfd_prepare",
+      "command": "prepare_cfd_case",
       "reference": "data/analytic_references.json blockage",
       "expected": {
         "domainTopM": 12,
@@ -53,7 +53,7 @@
     },
     {
       "id": "VC-CFD-13",
-      "command": "cfd_prepare + cfd_solve",
+      "command": "prepare_cfd_case + cfd_solve",
       "inputs": {
         "case": "sphere Re 100, external_aero domain at 1x and 1.5x the default extents"
       },
@@ -69,7 +69,7 @@
     },
     {
       "id": "VC-CFD-14",
-      "command": "cfd_prepare",
+      "command": "prepare_cfd_case",
       "expected": {
         "geometryHash": "identical after save / load and after build_project replay"
       },
@@ -82,7 +82,7 @@
     },
     {
       "id": "VC-CFD-15",
-      "command": "cfd_prepare",
+      "command": "prepare_cfd_case",
       "inputs": {
         "body": "1 m box with a 2 mm through hole (add_hole)",
         "cellsPerReferenceLength": 100
@@ -101,7 +101,7 @@
     },
     {
       "id": "VC-CFD-16",
-      "command": "cfd_set_boundary + cfd_create_case",
+      "command": "set_cfd_boundary + create_cfd_case",
       "inputs": {
         "tags": "inlet on a cylinder end cap entity; replay through build_project",
         "forced": "solver lbm at Mach 0.5"

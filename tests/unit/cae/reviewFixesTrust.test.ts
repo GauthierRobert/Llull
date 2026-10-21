@@ -68,7 +68,7 @@ describe('tampered and unverifiable summaries (review finding 4)', () => {
   it('fea_report recomputes from the artifact: a tampered results summary is untrusted and its numbers are withheld', () => {
     const bar = solvedBar();
     const solved = recordedBar(bar);
-    const honest = data<ReportData>(solved, 'fea_report', { analysisId: bar.analysisId }, ctxOf(bar));
+    const honest = data<ReportData>(solved, 'analysis_report', { analysisId: bar.analysisId }, ctxOf(bar));
     expect(honest.state).toBe('solved');
     const tampered = patchedCase(solved, bar.analysisId, (analysisCase) => ({
       ...analysisCase,
@@ -77,7 +77,7 @@ describe('tampered and unverifiable summaries (review finding 4)', () => {
         loadCases: analysisCase.results!.loadCases.map((lc) => ({ ...lc, maxVonMises: { ...lc.maxVonMises, value: 1 } })),
       },
     }));
-    const report = execute(tampered, 'fea_report', { analysisId: bar.analysisId }, ctxOf(bar));
+    const report = execute(tampered, 'analysis_report', { analysisId: bar.analysisId }, ctxOf(bar));
     expect(report.data).toMatchObject({ state: 'untrusted', results: null, probes: [], problem: { code: 'FEA_SUMMARY_MISMATCH' } });
     expect(report.summary).toContain('FEA_SUMMARY_MISMATCH');
     expect(JSON.stringify(report.data)).not.toContain('"value":1,');
@@ -106,13 +106,18 @@ describe('tampered and unverifiable summaries (review finding 4)', () => {
       ...analysisCase,
       meshSummary: { ...analysisCase.meshSummary!, nodes: 9999 },
     }));
-    expect(data<ReportData>(inflated, 'fea_report', { analysisId: bar.analysisId }, ctxOf(bar))).toMatchObject({
+    expect(data<ReportData>(inflated, 'analysis_report', { analysisId: bar.analysisId }, ctxOf(bar))).toMatchObject({
       state: 'untrusted',
       mesh: null,
       results: null,
     });
     const lying = { get: (hash: string) => (hash === bar.resultsHash ? { ...bar.results, solver: 'forged' } : bar.port.get(hash)) };
-    const altered = data<ReportData>(solved, 'fea_report', { analysisId: bar.analysisId }, { ...defaultContext(), feaArtifacts: lying });
+    const altered = data<ReportData>(
+      solved,
+      'analysis_report',
+      { analysisId: bar.analysisId },
+      { ...defaultContext(), feaArtifacts: lying },
+    );
     expect(altered).toMatchObject({ state: 'untrusted', results: null, problem: { code: 'FEA_SUMMARY_MISMATCH' } });
   });
 
@@ -120,7 +125,7 @@ describe('tampered and unverifiable summaries (review finding 4)', () => {
     const bar = solvedBar();
     const solved = recordedBar(bar);
     for (const ctx of [undefined, { ...defaultContext(), feaArtifacts: portOf() }]) {
-      const report = data<ReportData>(solved, 'fea_report', { analysisId: bar.analysisId }, ctx);
+      const report = data<ReportData>(solved, 'analysis_report', { analysisId: bar.analysisId }, ctx);
       expect(report).toMatchObject({ state: 'missing', mesh: null, results: null, probes: [] });
       const check = data<{ state: string; items: { code: string }[] }>(solved, 'check_analysis', { analysisId: bar.analysisId }, ctx);
       expect(check.state).toBe('missing');
@@ -138,8 +143,8 @@ describe('tampered and unverifiable summaries (review finding 4)', () => {
     const wall = solvedWall();
     const honest = data<{ state: string; maxT: { value: number } }>(
       wall.solved,
-      'thermal_report',
-      { analysisId: wall.analysisId },
+      'analysis_report',
+      { view: 'thermal', analysisId: wall.analysisId },
       machineContext(),
     );
     expect(honest.state).toBe('solved');
@@ -151,7 +156,12 @@ describe('tampered and unverifiable summaries (review finding 4)', () => {
         thermal: { ...analysisCase.results!.thermal!, maxT: { ...analysisCase.results!.thermal!.maxT, value: 20 } },
       },
     }));
-    const report = data<Record<string, unknown>>(tampered, 'thermal_report', { analysisId: wall.analysisId }, machineContext());
+    const report = data<Record<string, unknown>>(
+      tampered,
+      'analysis_report',
+      { view: 'thermal', analysisId: wall.analysisId },
+      machineContext(),
+    );
     expect(report).toMatchObject({ state: 'untrusted', problem: { code: 'FEA_SUMMARY_MISMATCH' } });
     expect(report).not.toHaveProperty('maxT');
     const check = data<{ state: string; items: { code: string }[] }>(
@@ -174,7 +184,7 @@ describe('tampered and unverifiable summaries (review finding 4)', () => {
       execute(tamperedLimits, 'check_temperature_limits', { analysisId: withLimit.wall.analysisId }, machineContext()).error?.code,
     ).toBe('FEA_SUMMARY_MISMATCH');
     for (const ctx of [defaultContext(), { ...defaultContext(), feaArtifacts: portOf() }]) {
-      const missing = data<Record<string, unknown>>(wall.solved, 'thermal_report', { analysisId: wall.analysisId }, ctx);
+      const missing = data<Record<string, unknown>>(wall.solved, 'analysis_report', { view: 'thermal', analysisId: wall.analysisId }, ctx);
       expect(missing).toMatchObject({ state: 'missing' });
       expect(missing).not.toHaveProperty('maxT');
       const check2 = data<{ state: string }>(wall.solved, 'check_thermal', { analysisId: wall.analysisId }, ctx);
@@ -285,12 +295,12 @@ describe('replay without artifacts ends missing, not unmeshed (review finding 6)
     expect(stateOf(replayed.document, analysisCase)).toBe('missing');
     expect(replayed.document.featureHistory.map((step) => step.name)).toEqual(solved.featureHistory.map((step) => step.name));
     // not even a machine that HAS the artifacts reads numbers from a flagged record
-    const report = data<ReportData>(replayed.document, 'fea_report', { analysisId: bar.analysisId }, ctxOf(bar));
+    const report = data<ReportData>(replayed.document, 'analysis_report', { analysisId: bar.analysisId }, ctxOf(bar));
     expect(report).toMatchObject({ state: 'missing', mesh: null, results: null, probes: [] });
     // replayed where the store is, the same history verifies completely
     const again = execute(replayed.document, 'replay_history', {}, ctxOf(bar));
     expect(caseIn(again.document, bar.analysisId).results?.verified).toBeUndefined();
-    expect(data<ReportData>(again.document, 'fea_report', { analysisId: bar.analysisId }, ctxOf(bar)).state).toBe('solved');
+    expect(data<ReportData>(again.document, 'analysis_report', { analysisId: bar.analysisId }, ctxOf(bar)).state).toBe('solved');
   });
 
   it('with a port and the artifacts the full checks still refuse a mismatching summary', () => {

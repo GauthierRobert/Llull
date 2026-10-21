@@ -126,7 +126,7 @@ coating colours with α/ε labels, zone labels, disposition dialog.
 | AC-3 | — | skin depth queries | 8.5315 mm (60 Hz), 66.085 µm (1 MHz), 0.79577 mm (μr 100) | VC-EOP-03 |
 | AC-4 | `plans/eop_radiator_coating.plan.json` | `optical_balance` step | T = 270.245 K, α/ε = 0.2222 | VC-EOP-08 |
 | AC-5 | the invalid values of VC-EOP-10 | `set_material_property` | each refused with its code | VC-EOP-10 |
-| AC-6 | PHY-03 radiation BC with `emissivity: 'material'` | `fea_export` / `thermal_report` | deck uses the coating ε; flags propagate | VC-EOP-11 |
+| AC-6 | PHY-03 radiation BC with `emissivity: 'material'` | `fea_export` / `analysis_report` | deck uses the coating ε; flags propagate | VC-EOP-11 |
 | AC-7 | failed path p2 | agent `dispose_bond_check` | `EOP_HUMAN_GATE`, doc unchanged | VC-EOP-12 |
 
 ## 8. Standards & regulatory alignment

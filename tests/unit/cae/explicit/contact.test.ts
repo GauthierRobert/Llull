@@ -75,7 +75,7 @@ describe('add_contact / delete_contact', () => {
     ]);
     expect(new Set(built.job.elementPart)).toEqual(new Set([0, 1]));
     expect(explicitErrors(JSON.parse(JSON.stringify(controls.document)) as Record<string, unknown>)).toEqual([]);
-    const removed = must(controls.document, 'delete_contact', { analysisId: model.analysisId, contactId });
+    const removed = must(controls.document, 'delete_analysis_item', { analysisId: model.analysisId, itemId: contactId });
     expect(removed.document.analysis?.cases[model.analysisId]?.explicit?.contactOrder).toHaveLength(1);
   });
 
@@ -91,11 +91,11 @@ describe('add_contact / delete_contact', () => {
     expect(refused({ analysisId: 'an-404' })).toBe('FEA_ANALYSIS_NOT_FOUND');
     const once = must(model.doc, 'add_contact', base).document;
     expect(code(execute(once, 'add_contact', base))).toBe('EXP_CONTACT_INVALID');
-    expect(code(execute(model.doc, 'delete_contact', { analysisId: model.analysisId, contactId: 'ct-404' }))).toBe('EXP_CONTACT_NOT_FOUND');
+    expect(code(execute(model.doc, 'delete_analysis_item', { analysisId: model.analysisId, itemId: 'ct-404' }))).toBe('FEA_ITEM_NOT_FOUND');
     const fresh = must(model.doc, 'create_analysis', { name: 'b', analysisType: 'explicit_dynamics' });
     expect(code(execute(fresh.document, 'add_contact', { ...base, analysisId: fresh.affected[0] }))).toBe('EXP_CONTROLS_MISSING');
-    expect(code(execute(fresh.document, 'delete_contact', { analysisId: fresh.affected[0], contactId: 'ct-1' }))).toBe(
-      'EXP_CONTROLS_MISSING',
+    expect(code(execute(fresh.document, 'delete_analysis_item', { analysisId: fresh.affected[0], itemId: 'ct-1' }))).toBe(
+      'FEA_ITEM_NOT_FOUND',
     );
   });
 

@@ -18,7 +18,7 @@ describe('durability reference guard', () => {
       const [ref] = refs(document);
       expect(ref).toBeDefined();
       if (ref === undefined) return;
-      const result = execute(document, 'remove_material_model', ref);
+      const result = execute(document, 'delete_material_model', ref);
       expect(result.document).toBe(document);
       expect(result.affected).toEqual([]);
       expect(result.summary).toMatch(/is used by (fatigue|crack growth) case/);

@@ -5,9 +5,9 @@
 1. Locate the layer (architecture.md decision shortcuts).
 2. Write the change **and its test in the same change** (`packages/*` logic always). A bug fix
    starts with a failing test or golden plan (`fix-bug` skill).
-3. `npm run check` (typecheck + arch + deadcode + lint + format:check + test) → green. While iterating, run the
+3. `npm run check` (typecheck + arch + deadcode + lint + format:check + native:check + test) → green. While iterating, run the
    slice: `npx vitest run <file>` or `npx vitest related --run <changed files>`.
-4. Viewport/UI work: verify in the running app (`verify-llull` skill).
+4. Viewport/UI work: verify in the desktop app (`verify-llull` skill).
 
 A Stop hook blocks once if `packages/*/src` changed without a test change, or a snapshot changed —
 answer it (add the test, or state why none is needed / why the snapshot diff is intended).
@@ -28,7 +28,8 @@ answer it (add the test, or state why none is needed / why the snapshot diff is 
 | `tests/golden/` | `build_project` plans → id-normalized snapshots + replay equality; one plan per regression |
 | `tests/integration/` | `store.dispatch` end-to-end (undo, live sync, local fallback) |
 | `tests/component/` | panels & param-gathering (Testing Library), never geometry math |
-| `tests/e2e/`, `server/tests/` | Playwright (`npm run test:e2e`); server + CLI (`npm --prefix server test`) |
+| `server/tests/` | server + CLI (`npm --prefix server test`) |
+| `tests/e2e/` | LEGACY browser Playwright (`npm run test:e2e`), being retargeted to Electron (LC1): do not extend |
 | `desktop/tests/` | desktop app without Electron: real backend, File ops, CLI `--app` (`npm --prefix desktop test`) |
 
 `tests/unit` + `tests/golden` run in node with one shared module graph per worker (vitest project `node`); a suite that
@@ -38,7 +39,7 @@ mocks modules, stubs globals, uses the DOM or registers test commands goes in `t
 
 ## W4 — Definition of done
 
-- [ ] Works in `npm run dev` (user-facing changes).
+- [ ] User-facing changes verified in the desktop app, or via `llull --app` + `render_view` (`verify-llull` skill).
 - [ ] New command registered, happy + failure tests; golden corpus green.
 - [ ] `npm run check` green; coverage gate satisfied.
 - [ ] Docs updated **only if** behavior/architecture changed.
@@ -54,7 +55,7 @@ Lanes own disjoint write scopes (`.claude/work/BOARD.md` is the ledger):
 
 | Lane | Agent | Owns |
 | ---- | ----- | ---- |
-| 1 Core | `command-author` | `packages/core/src/**`, `packages/domain-{aec,cae,aero}/src/**`, `packages/kernel-*/src/**` |
+| 1 Core | `command-author` | `packages/core/src/**`, `packages/{domain-aec,domain-cae,domain-aero,design-lang,plm}/src/**`, `packages/kernel-*/src/**` |
 | 2 3D+Shell | `viewport-engineer` | `src/ui/viewport/3d/**`, `src/ui/{components,panels,store}/**`, `src/app/**` |
 | 3 2D | `viewport-engineer` | `src/ui/viewport/2d/**`, snapping/tracking helpers |
 | 4 CLI | `cli-engineer` | `packages/protocol/src/**`, `server/**` |

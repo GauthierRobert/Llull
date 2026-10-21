@@ -1,4 +1,4 @@
-/** add_thermal_contact / update_thermal_contact / delete_thermal_contact (PHY-03 V1): contact conductances between two parts, recorded as data. */
+/** add_thermal_contact / update_thermal_contact (PHY-03 V1): contact conductances between two parts, recorded as data. */
 
 import type { FeaTarget, Q, ThermalContact } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
@@ -76,8 +76,8 @@ export const addThermalContact = defineCommand({
     'plate); returns the contact id in affected[0]. conductance: { value, unit "W/(m^2*K)" } or { points: [[W/(m^2*K), pressureMPa, T], ...] }. ' +
     'The deck ties the two faces thermally (CalculiX tied *CONTACT PAIR with *GAP CONDUCTANCE); the parts are meshed separately, so the ' +
     'two face meshes need not match. A table is evaluated at the mean temperature of the two faces (temperature on the case scale) and at ' +
-    'zero contact pressure, so give the pressure column 0 unless it varies nothing. Check the result with thermal_report. Change it later ' +
-    'with update_thermal_contact, remove it with delete_thermal_contact.',
+    'zero contact pressure, so give the pressure column 0 unless it varies nothing. Check the result with analysis_report. Change it later ' +
+    'with update_thermal_contact, remove it with delete_analysis_item.',
   params: z.object({
     analysisId: analysisIdSchema,
     name: z.string().min(1).describe('Display name, e.g. "box to plate".'),
@@ -154,35 +154,5 @@ export const updateThermalContact = defineCommand({
       `update_thermal_contact: '${contactId}' (${next.name}) between '${next.master.entityId}' and '${next.slave.entityId}' in '${analysisId}' updated.`,
       [contactId],
     );
-  },
-});
-
-/**
- * @affects doc.analysis.cases[analysisId].thermal.contacts (removes 1)
- * @failure unknown analysis / contact -> refusal (THM_CONTACT_NOT_FOUND), unchanged doc
- */
-export const deleteThermalContact = defineCommand({
-  name: 'delete_thermal_contact',
-  description:
-    'Remove a thermal contact (id = affected[0] of add_thermal_contact) from a heat_* analysis. The recorded mesh stays, the results become stale.',
-  annotations: { destructive: true },
-  params: z.object({ analysisId: analysisIdSchema, contactId: z.string().describe('Contact id (affected[0] of add_thermal_contact).') }),
-  run: (doc, { analysisId, contactId }): CommandResult => {
-    const found = thermalCaseOf(doc, analysisId);
-    if (isProblem(found)) return refuseThermal(doc, 'delete_thermal_contact', found.code, found.message, found.ids, found.paths);
-    if (!Object.hasOwn(found.thermal.contacts, contactId))
-      return refuseThermal(
-        doc,
-        'delete_thermal_contact',
-        'THM_CONTACT_NOT_FOUND',
-        `no thermal contact '${contactId}' in '${analysisId}'`,
-        [analysisId, contactId],
-        ['contactId'],
-      );
-    const thermal = {
-      ...found.thermal,
-      contacts: Object.fromEntries(Object.entries(found.thermal.contacts).filter(([id]) => id !== contactId)),
-    };
-    return changed(withThermal(doc, found, thermal), `delete_thermal_contact: removed '${contactId}' from '${analysisId}'.`, [contactId]);
   },
 });

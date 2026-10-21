@@ -57,8 +57,8 @@ export const inspectFaces = defineCommand({
     'reversed, its loops (edge indices, outer loop first) and uv box; per edge the faces it joins and whether the edge is convex, ' +
     'concave, smooth (tangent faces) or unknown. Use it to pick faces for holes, datums, tolerances or meshing: sample points and ' +
     'centroids are positions in the document frame. All lengths are document units and areas their square. ' +
-    `Requires ${OCC_HINT}; the default Manifold kernel has no B-rep and the command is refused with error.code KRN_NO_EXACT_KERNEL. ` +
-    'Does not modify the document.',
+    `Needs the exact kernel (check kernel_info): ${OCC_HINT}; the mesh kernel has no B-rep and the command is refused with error.code KRN_NO_EXACT_KERNEL. ` +
+    'For edges, edge indices and vertex counts (the fillet_edge / chamfer_edge selectors) use inspect_topology. Does not modify the document.',
   params: z.object({
     entityId: z.string().describe('Id of the 3D solid entity to inspect (a primitive, or a boolean / fillet / chamfer / shell result).'),
     faces: z

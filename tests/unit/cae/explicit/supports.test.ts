@@ -138,7 +138,7 @@ describe('add_imposed_motion / delete_imposed_motion', () => {
         [1e-4, 0.5],
       ],
     });
-    const removed = must(added.document, 'delete_imposed_motion', { analysisId: bar.analysisId, motionId });
+    const removed = must(added.document, 'delete_analysis_item', { analysisId: bar.analysisId, itemId: motionId });
     expect(removed.document.analysis?.cases[bar.analysisId]?.explicit?.imposedMotions).toEqual({});
   });
 
@@ -169,13 +169,11 @@ describe('add_imposed_motion / delete_imposed_motion', () => {
     expect(run({ kind: 'displacement', unit: 'm/s' })).toBe('EXP_PARAM_INVALID');
     expect(run({ target: { entityId: bar.barId } })).toBe('EXP_PARAM_INVALID');
     expect(run({ target: { entityId: 'nope', facesNear: [[0, 0, 0]] } })).toBe('EXP_TARGET_NOT_IN_CASE');
-    expect(code(execute(bar.doc, 'delete_imposed_motion', { analysisId: bar.analysisId, motionId: 'im-0.0' }))).toBe(
-      'EXP_IMPOSED_MOTION_NOT_FOUND',
-    );
+    expect(code(execute(bar.doc, 'delete_analysis_item', { analysisId: bar.analysisId, itemId: 'im-0.0' }))).toBe('FEA_ITEM_NOT_FOUND');
     const fresh = must(bar.doc, 'create_analysis', { name: 'b', analysisType: 'explicit_dynamics' });
     expect(code(execute(fresh.document, 'add_imposed_motion', { ...params, analysisId: fresh.affected[0] }))).toBe('EXP_CONTROLS_MISSING');
-    expect(code(execute(fresh.document, 'delete_imposed_motion', { analysisId: fresh.affected[0], motionId: 'x' }))).toBe(
-      'EXP_CONTROLS_MISSING',
+    expect(code(execute(fresh.document, 'delete_analysis_item', { analysisId: fresh.affected[0], itemId: 'x' }))).toBe(
+      'FEA_ITEM_NOT_FOUND',
     );
     const twice = must(must(bar.doc, 'add_imposed_motion', params).document, 'add_imposed_motion', { ...params, name: 'again' }).document;
     expect(refusal(twice, bar.analysisId)).toBe('EXP_CONSTRAINT_UNSUPPORTED');
@@ -191,7 +189,7 @@ describe('add_imposed_motion / delete_imposed_motion', () => {
   it('delete_imposed_motion is pure', () => {
     const added = must(bar.doc, 'add_imposed_motion', params);
     const before = structuredClone(added.document);
-    must(added.document, 'delete_imposed_motion', { analysisId: bar.analysisId, motionId: added.affected[1] ?? '' });
+    must(added.document, 'delete_analysis_item', { analysisId: bar.analysisId, itemId: added.affected[1] ?? '' });
     expect(added.document).toEqual(before);
   });
 });

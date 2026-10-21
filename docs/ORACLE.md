@@ -17,11 +17,11 @@ Cases: 115 (primitive 29, prism 9, revolve 9, boolean 19, hole 7, pattern 7, tra
 
 ## Known failures (real findings, not loosened)
 
-- `106-external-thread-m10` (volume, centroid; occt only): add_external_thread cuts a faceted groove tool (32 rings per turn) on every kernel, so on OCCT the result is a mesh body with no B-rep recipe: mesh-tolerance volume (export_step_exact now writes it as a faceted solid). An exact helical sweep groove in the native kernel would close this.
+- `106-external-thread-m10` (volume, centroid; occt only): add_external_thread cuts a faceted groove tool (32 rings per turn) on every kernel, so on OCCT the result is a mesh body with no B-rep recipe: mesh-tolerance volume (export_step_ap242 now writes it as a faceted solid). An exact helical sweep groove in the native kernel would close this.
 
 ## Cases
 
-V = volume. Relative errors are |measured - expected| / expected. `STEP` is the export_step_exact / import_step_exact round trip (OCCT only).
+V = volume. Relative errors are |measured - expected| / expected. `STEP` is the export_step_ap242 / import_step_exact round trip (OCCT only).
 
 | id | source | V expected | Manifold V | rel err | Manifold | OCCT V | rel err | OCCT | STEP |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

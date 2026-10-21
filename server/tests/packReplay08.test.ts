@@ -475,15 +475,15 @@ describe('VC-MAT-15 / 25 through the CLI (local file and live backend): export-c
   };
 
   it.skipIf(nativeKernelBinary === null)(
-    '(a) the CLI agent: export_step_exact --save is refused (MAT_EXPORT_CONTROLLED), an agent confirmation is MAT_HUMAN_GATE, nothing is saved',
+    '(a) the CLI agent: export_step_ap242 --save is refused (MAT_EXPORT_CONTROLLED), an agent confirmation is MAT_HUMAN_GATE, nothing is saved',
     async () => {
       const session = newSession();
       await controlled(session, 'ITAR');
       const target = path.join(session.dir, 'x.step');
-      const refused = await cliCall(session, ['export_step_exact', '--save', target, '--kernel', 'occt']);
+      const refused = await cliCall(session, ['export_step_ap242', '--save', target, '--kernel', 'occt']);
       expect([refused.code, errorOf(refused).code]).toEqual([spec[0]?.exitCode, spec[0]?.code]);
       expect(existsSync(target)).toBe(false);
-      const confirmed = await cliExec(session, 'export_step_exact', { confirmExportControlled: true }, [
+      const confirmed = await cliExec(session, 'export_step_ap242', { confirmExportControlled: true }, [
         '--save',
         target,
         '--kernel',
@@ -501,7 +501,7 @@ describe('VC-MAT-15 / 25 through the CLI (local file and live backend): export-c
       const session = newSession();
       await controlled(session, 'none');
       const target = path.join(session.dir, 'y.step');
-      const exported = await cliCall(session, ['export_step_exact', '--save', target, '--kernel', 'occt']);
+      const exported = await cliCall(session, ['export_step_ap242', '--save', target, '--kernel', 'occt']);
       expect(exported.code, exported.stdout.slice(0, 300)).toBe(0);
       expect(existsSync(target)).toBe(true);
     },
@@ -532,7 +532,7 @@ describe('VC-MAT-15 / 25 through the CLI (local file and live backend): export-c
       _resetHistory();
     });
 
-    it('export_step_exact on an ITAR-marked live document is refused over REST, with or without an agent confirmation', async () => {
+    it('export_step_ap242 on an ITAR-marked live document is refused over REST, with or without an agent confirmation', async () => {
       applyCommand('define_material_record', {
         id: 'secret',
         designation: 'X',
@@ -543,7 +543,7 @@ describe('VC-MAT-15 / 25 through the CLI (local file and live backend): export-c
       const box = applyCommand('add_box', { size: [2, 2, 2], position: [0, 0, 0] });
       applyCommand('assign_material', { materialName: 'secret', entityIds: box.affected });
       const call = async (params: Record<string, unknown>): Promise<request.Response> =>
-        request(app).post('/command').send({ name: 'export_step_exact', params, client: 'cli' });
+        request(app).post('/command').send({ name: 'export_step_ap242', params, client: 'cli' });
       const plain = await call({});
       expect(plain.body.isError).toBe(true);
       expect(JSON.stringify(plain.body)).toContain('MAT_EXPORT_CONTROLLED');

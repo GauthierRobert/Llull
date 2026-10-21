@@ -39,7 +39,7 @@ export const checkPurlins = defineCommand({
     'compression: χLT as for purlin uplift), and pressure D +0.8 with cpi -0.3 (restrained, χLT = 1); bending, shear, deflection under ' +
     'characteristic wind ≤ span/150. Cold-formed C sections use an effective section modulus (EN 1993-1-3 §5.5 / 1993-1-5 §4.4, ' +
     'simplified: flange kσ 4 with 0.9 when λp > 0.673, web ψ -1, lips fully effective, no distortional buckling); weak-axis, torsion and ' +
-    'cladding self-weight on rails are not checked. Returns one row per member with its governing check; values > 1 fail. Preliminary - ' +
+    'cladding self-weight on rails are not checked. Returns one row per member with its governing check; values > 1 fail. This command never modifies the model: to up-size failing members use design_purlins (same loads). Preliminary - ' +
     'not a substitute for the engineer of record.',
   params: z.object({ ...PURLIN_LOAD_SHAPE }),
   run: (doc: CadDocument, params): CommandResult => {

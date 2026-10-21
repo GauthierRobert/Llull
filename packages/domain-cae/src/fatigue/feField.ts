@@ -1,7 +1,6 @@
 /**
  * FatigueField (PHY-07 TR-FAT-41, RS1 RS-7): the all-node fatigue damage of an FE-driven case. Pure: builds the `llull-compute post fatigue`
- * job (superposed load cases, measure, counting, resolved curve) from a trusted results artifact, computes the same field in TypeScript
- * (the reference, `fatigueFieldReference`), encodes the native field as a content-addressed `fe_results` artifact bound to the case input
+ * job (superposed load cases, measure, counting, resolved curve) from a trusted results artifact, encodes the native field as a content-addressed `fe_results` artifact bound to the case input
  * hash (`fatigueInputHash`) and reads it back with every binding checked. The host runs the job; nothing here touches native code.
  */
 
@@ -15,7 +14,7 @@ import { stressPerMpa } from '../decks/units';
 import { stepOfLoadCase } from '../results/fields';
 import { caseOf } from '../shared/access';
 import { trustedRecord } from '../shared/trust';
-import { damageOf, damageSetupOf, isEvaluationFailure, type DamageSetup, type Failure } from './evaluate';
+import { damageSetupOf, isEvaluationFailure, type DamageSetup, type Failure } from './evaluate';
 import { measureSpecOf, nodeSeries, type MeasureSpec, type Tensor } from './feStress';
 import { toMpa } from './lifeMath';
 import { countCycles, type CountingMethod, type ResidueRule } from './rainflow';
@@ -241,18 +240,6 @@ const seriesOfNode = (input: FatigueFieldInput, index: number): number[] =>
 export function cyclesOfNode(input: FatigueFieldInput, index: number): ReturnType<typeof countCycles> {
   const { method, residue, gate } = input.job.counting;
   return countCycles(seriesOfNode(input, index), method, residue, gate);
-}
-
-/** The TypeScript reference of the native field: `[D, cycles, maxEquivalentAmplitude, flags]` per node, node order. */
-export function fatigueFieldReference(input: FatigueFieldInput): Float64Array {
-  const out = new Float64Array(input.nodeIds.length * FIELD_COMPONENTS.length);
-  for (let index = 0; index < input.nodeIds.length; index += 1) {
-    const sum = damageOf(cyclesOfNode(input, index), input.damage);
-    let flags = sum.extrapolated ? FLAG_BITS.extrapolated : 0;
-    for (const flag of sum.flags) flags |= FLAG_BITS[flag];
-    out.set([sum.damage, sum.cyclesCounted, sum.maxEquivalentAmplitude, flags], index * FIELD_COMPONENTS.length);
-  }
-  return out;
 }
 
 /**

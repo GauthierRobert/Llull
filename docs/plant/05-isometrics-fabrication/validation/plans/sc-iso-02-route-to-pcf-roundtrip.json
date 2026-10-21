@@ -9,7 +9,7 @@
     { "command": "import_pipe_spec", "params": { "spec": "<01-piping-specs-catalog/validation/data/sample_spec_cs150.json>" } },
     {
       "command": "add_pipe_run",
-      "params": { "points": [[0, 0, 3000], [5000, 0, 3000], [5000, 4000, 3000], [5000, 4000, 1000], [8000, 4000, 1000]], "dn": 100, "spec": "CS150-A1", "line": "L-101", "service": "process" },
+      "params": { "points": [[0, 0, 3000], [5000, 0, 3000], [5000, 4000, 3000], [5000, 4000, 1000], [8000, 4000, 1000]], "dn": 100, "line": "L-101", "service": "process" },
       "as": "main"
     },
     { "command": "add_branch", "params": { "pipeId": "$main", "at": [7105, 4000, 1000], "to": [7105, 4000, 1500], "fitting": "tee" }, "as": "branch" },

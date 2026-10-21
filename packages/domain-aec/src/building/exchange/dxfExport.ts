@@ -168,11 +168,11 @@ function buildDxf(doc: CadDocument, levelId: string | undefined, includeDrafting
  * @affects none; data = { filename, dxf, entityCount, layers, dimensions }
  * @failure unknown level / nothing to export -> no data
  */
-export const exportDxf = defineCommand({
-  name: 'export_dxf',
+export const exportBuildingDxf = defineCommand({
+  name: 'export_building_dxf',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Export a DXF (AutoCAD R12 ASCII, opens in AutoCAD, BricsCAD, DraftSight, LibreCAD, Revit…) of a level floor plan: wall poché cut at ' +
+    'Export a BUILDING floor-plan DXF of one level (civil entities: use export_civil_dxf) (AutoCAD R12 ASCII, opens in AutoCAD, BricsCAD, DraftSight, LibreCAD, Revit…) of a level floor plan: wall poché cut at ' +
     '1.2 m, door swings, windows, columns, beams (dashed), stairs, room tags, grid bubbles and overall / grid dimensions on AIA layers ' +
     '(A-WALL, A-DOOR, A-GLAZ, S-GRID…), plus the document’s own 2D drafting and its 3D solids as a technical top view (visible edges on ' +
     'OBJ-VISIBLE, hidden edges dashed on OBJ-HIDDEN, centre lines on OBJ-CENTER). Drafting dimensions (linear, aligned, radial, diameter, ' +
@@ -189,11 +189,12 @@ export const exportDxf = defineCommand({
       ),
   }),
   run: (doc, { confirmExportControlled, levelId, includeDrafting = true }, ctx): CommandResult => {
-    const refused = exportRefusal(doc, 'export_dxf', 'data', confirmExportControlled, ctx);
+    const refused = exportRefusal(doc, 'export_building_dxf', 'data', confirmExportControlled, ctx);
     if (refused !== null) return refused;
     const result = buildDxf(doc, levelId, includeDrafting);
-    if (!result) return noop(doc, `export_dxf failed: no level '${levelId ?? ''}'.`);
-    if (result.entityCount === 0) return noop(doc, 'export_dxf: nothing to export (no building elements, 2D drafting or 3D solids).');
+    if (!result) return noop(doc, `export_building_dxf failed: no level '${levelId ?? ''}'.`);
+    if (result.entityCount === 0)
+      return noop(doc, 'export_building_dxf: nothing to export (no building elements, 2D drafting or 3D solids).');
     const dimensionNote =
       result.dimensions > 0
         ? ` ${result.dimensions} dimension(s) written as lines + text on their own layer (R12 has no associative DIMENSION).`

@@ -7,7 +7,7 @@
   "actions": [
     { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },
     { "command": "import_pipe_spec", "params": { "spec": "<data/sample_spec_cs150.json>" } },
-    { "command": "add_pipe_run", "params": { "points": [[0, 0, 3000], [6000, 0, 3000], [6000, 4000, 3000]], "spec": "CS150-A1", "nps": 2.5, "line": "P-1001", "service": "naphtha" }, "as": "line1001" },
+    { "command": "add_pipe_run", "params": { "points": [[0, 0, 3000], [6000, 0, 3000], [6000, 4000, 3000]], "line": "P-1001", "service": "naphtha" }, "as": "line1001" },
     { "command": "add_pipe_run", "params": { "points": [[0, 2000, 3000], [6000, 2000, 3000]], "dn": 65, "line": "U-2001", "service": "cooling water" }, "as": "legacy" },
     { "command": "pipe_section_properties", "params": { "pipeId": "$line1001" } },
     { "command": "check_pipe_spec", "params": { "specId": "CS150-A1", "scope": "document" } },

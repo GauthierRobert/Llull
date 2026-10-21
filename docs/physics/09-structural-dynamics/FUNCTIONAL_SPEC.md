@@ -58,7 +58,7 @@ results feed qualification and test decisions, so every response that can size a
 
 | Role | Who | Uses | Main need |
 | ---- | --- | ---- | --------- |
-| **Operator (primary)** | AI agent through the `llull` CLI (MCP for cloud agents) | `llull run`, `fea_mesh`, `fea_solve`, `dynamic_report`, `sdof_response`, `check_dynamics --json` | Commands with units in every param, deterministic JSON, stable codes |
+| **Operator (primary)** | AI agent through the `llull` CLI (MCP for cloud agents) | `llull run`, `fea_mesh`, `fea_solve`, `analysis_report`, `sdof_response`, `check_dynamics --json` | Commands with units in every param, deterministic JSON, stable codes |
 | **Owner** | Person asking "will this survive the shake test?" (CubeSat team, supplier designer). **Not assumed to be an engineer** | Natural language; may watch the desktop app | A plain answer: peak response, margin, what needs a qualified engineer |
 | **Qualified reviewer** | Dynamics / stress engineer, test-programme authority | Desktop review panels, exported decks, response tables | Accepts damping assumptions, spectra and test-level derivations; signs |
 
@@ -126,7 +126,7 @@ new analysis types. `D="--doc box.llull.json --kernel occt --json"`.
 
 ```bash
 llull search random vibration                      # discover (AF-01)
-llull describe set_dynamic_damping define_vibration_spectrum dynamic_report
+llull describe set_dynamic_damping define_vibration_spectrum analysis_report
 llull guide                                        # dynamics section: units, g, damping must be explicit, 3-sigma
 
 # 0. quick check before any FE (pure queries)
@@ -141,7 +141,7 @@ llull fea_mesh analysisId=$an $D --timeout 300
 llull check_dynamics analysisId=$an $D            # must have no severity "error"
 llull fea_solve analysisId=$an $D --progress --timeout 900
 # 3. numbers first
-llull dynamic_report analysisId=$an $D            # modes kept, mass participation, damping per mode, rms, 3-sigma, peaks
+llull analysis_report analysisId=$an $D            # modes kept, mass participation, damping per mode, rms, 3-sigma, peaks
 llull equivalent_static_load_case analysisId=$an probe=feet peakFactor=3 targetAnalysisId=$static $D
 llull compute_margins analysisId=$static $D       # 05
 llull check_dynamics analysisId=$an $D
@@ -200,12 +200,12 @@ badges; the 05 disposition dialog for human gates. No capability exists only in 
 | AC-2 | — | `llull sdof_response fnHz=100 Q=10 'input={"kind":"random","asdG2PerHz":0.04}' $D` | `data.milesGrms` = 7.92665459521, `data.exactGrms` = 7.96618927735, `data.answerOfRecord` = "exact" | VC-DYN-07 |
 | AC-3 | — | `llull psd_rms spectrum=gevs_component_qual $D` | `data.grms` = 14.1356137191 ±1e-9 rel, `data.grade` = "B", `data.unverified` = true | VC-DYN-10 |
 | AC-4 | — | `llull shock_response_spectrum 'input={"kind":"half_sine","peakG":1,"durationS":0.011}' Q=10 'frequenciesHz=[10,…,2000]' $D` | `data.maximax[*]` within 0.5 % of VC-DYN-13 | VC-DYN-13 |
-| AC-5 | `plans/dyn_beamdy8_ssd.plan.json` | run, `fea_mesh`, `fea_solve`, `dynamic_report` | 9 frequency points; tip u_x amplitude peak at 13 096 Hz ±1 %; the native FRF at the CalculiX points within 2 % of the pinned beamdy8 run | VC-DYN-06, 20 |
+| AC-5 | `plans/dyn_beamdy8_ssd.plan.json` | run, `fea_mesh`, `fea_solve`, `analysis_report` | 9 frequency points; tip u_x amplitude peak at 13 096 Hz ±1 %; the native FRF at the CalculiX points within 2 % of the pinned beamdy8 run | VC-DYN-06, 20 |
 | AC-6 | a random case without damping | `llull fea_solve analysisId=$an $D` | exit 1, `data.code` = `DYN_DAMPING_UNSET` | VC-DYN-40 |
-| AC-7 | `plans/dyn_cantilever_random_gevs.plan.json` | run, mesh, solve, `dynamic_report` | tip acceleration rms within 5 % of the modal-SDOF estimate; `data.massParticipation` reported; `reviewRequired: true` | VC-DYN-21 |
+| AC-7 | `plans/dyn_cantilever_random_gevs.plan.json` | run, mesh, solve, `analysis_report` | tip acceleration rms within 5 % of the modal-SDOF estimate; `data.massParticipation` reported; `reviewRequired: true` | VC-DYN-21 |
 | AC-8 | solved random case | `llull equivalent_static_load_case … peakFactor=3` | 05 load case created with `provenance.peakFactor` = {value 3, defaulted false}; omitting it gives {value 3, defaulted true, rationale "Gaussian 3-sigma"} | VC-DYN-09, 41 |
 | AC-9 | the deliberately wrong set-ups of VC-DYN-42 | `llull run … --validate` then the failing command | each returns its code and remediation (TECHNICAL_SPEC §7.1) | VC-DYN-42 |
-| AC-10 | spectrum from the library (grade B) | `dynamic_report` and `check_dynamics` | `unverified: true`, warning `DYN_SPECTRUM_UNVERIFIED` | VC-DYN-43 |
+| AC-10 | spectrum from the library (grade B) | `analysis_report` and `check_dynamics` | `unverified: true`, warning `DYN_SPECTRUM_UNVERIFIED` | VC-DYN-43 |
 
 ## 8. Standards & regulatory alignment
 

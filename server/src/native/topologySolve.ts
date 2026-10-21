@@ -1,15 +1,15 @@
 /**
  * `topology_solve` transport (PHY-17 RS-2, TECHNICAL_SPEC §4 / §13 / §14): `buildTopologyJob` (@cae) turns the study into a grid, masks, nodal loads
  * and fixed dofs; `llull-compute topopt` runs the SIMP loop (progress per iteration) and writes `field.bin` / `design.f64` / `result.json`; the field
- * becomes an `fe_topology` artifact in the store and `record_topology_result` recomputes and records its summary. Without the binary a small 2D job
- * (<= TS_REFERENCE_MAX_ELEMENTS voxels) runs the pure TypeScript reference instead (`solver.job: 'ts-reference'`); anything else is TOP_TOOL_MISSING.
+ * becomes an `fe_topology` artifact in the store and `record_topology_result` recomputes and records its summary. Without the binary the tool
+ * refuses with TOP_TOOL_MISSING (+ NATIVE_TOOL_MISSING install hint): there is no TypeScript fallback.
  * The document is only ever changed by `record_topology_result`.
  */
 
 import type { FeTopologyArtifact, TopologyHistoryRow, TopologyStudy } from '@core/model/topology';
 import { FEA_SOLVE_TIMEOUT_S, type FeaHost, type FeaToolResult } from '@protocol/index';
 import { isRecord } from '@lib/isRecord';
-import { buildTopologyArtifact, buildTopologyJob, runTopologyReference, TS_REFERENCE_MAX_ELEMENTS, type TopologyJob } from '@cae/index';
+import { buildTopologyArtifact, buildTopologyJob, type TopologyJob } from '@cae/index';
 import { topologySummary } from '@cae/topology/artifact';
 import { findStudy } from '@cae/topology/model';
 import { feaFailure } from '../fea/feaCommon';
@@ -72,15 +72,10 @@ function topCode(run: JobRun): string {
   return run.code === 'TOP_GRID_TOO_LARGE' ? 'TOP_GRID_TOO_LARGE' : 'TOP_SOLVER_FAILED';
 }
 
-function missingTool(job: TopologyJob, studyId: string): FeaToolResult {
-  const { nx, ny, nz } = job.grid;
-  const reason =
-    job.dimension === 3
-      ? 'a 3D study needs the native solver'
-      : `${nx * ny} voxels exceed the TypeScript reference cap of ${TS_REFERENCE_MAX_ELEMENTS}`;
+function missingTool(studyId: string): FeaToolResult {
   return failure(
     'TOP_TOOL_MISSING',
-    `llull-compute is not installed and ${reason} (${nx} x ${ny}${job.dimension === 3 ? ` x ${nz}` : ''}). NATIVE_TOOL_MISSING: ${nativeInstallHint('llull-compute')}; or use a coarser 2D grid (voxel).`,
+    `llull-compute is not installed: topology_solve has no TypeScript fallback. NATIVE_TOOL_MISSING: ${nativeInstallHint('llull-compute')}.`,
     [studyId],
     { nativeCode: 'NATIVE_TOOL_MISSING' },
   );
@@ -150,7 +145,7 @@ async function solveNatively(
   const { outputs } = outcome;
   if (outputs === null) {
     const code = topCode(run);
-    if (code === 'TOP_TOOL_MISSING') return missingTool(job, studyId);
+    if (code === 'TOP_TOOL_MISSING') return missingTool(studyId);
     const hint =
       code === 'TOP_SOLVER_TIMEOUT'
         ? ` after ${seconds} s: the run is lost (no checkpoint is written on a kill); use a coarser voxel or a larger timeoutS. resumeFromLast continues a run that finished`
@@ -184,7 +179,7 @@ async function solveNatively(
 }
 
 /**
- * @failure unknown study -> TOP_STUDY_NOT_FOUND; job refusals -> their TOP_* code; no binary and not a small 2D grid -> TOP_TOOL_MISSING
+ * @failure unknown study -> TOP_STUDY_NOT_FOUND; job refusals -> their TOP_* code; no binary -> TOP_TOOL_MISSING
  *   (+ NATIVE_TOOL_MISSING hint); native errors -> TOP_GRID_TOO_LARGE / TOP_SOLVER_FAILED, timeout -> TOP_SOLVER_TIMEOUT (data.nativeCode keeps the
  *   job's code); record refusals (TOP_RESULT_STALE, ...) -> their code from `record_topology_result`
  */
@@ -202,29 +197,13 @@ export async function runTopologySolve(
   if (!built.ok) return failure(built.code, built.message, built.ids.length > 0 ? built.ids : [studyId]);
   const { job } = built;
 
-  const native = deps.runner.binary !== null;
-  const small = job.dimension === 2 && job.grid.nz === 1 && job.grid.nx * job.grid.ny <= TS_REFERENCE_MAX_ELEMENTS;
-  if (!native && !small) return missingTool(job, studyId);
-
-  let solved: Solved | FeaToolResult;
-  let note = '';
-  if (native) {
-    const resume = options.resumeFromLast === true ? loadResume(deps.store.directory, studyId, job) : null;
-    if (options.resumeFromLast === true && resume === null)
-      note = ' (resumeFromLast: no saved run of this study for these inputs, started from the uniform design)';
-    solved = await solveNatively(job, doc, studyId, options, deps, resume);
-    if (
-      !('artifact' in solved) &&
-      solved.data !== undefined &&
-      isRecord(solved.data) &&
-      solved.data['code'] === 'TOP_TOOL_MISSING' &&
-      small
-    ) {
-      solved = referenceRun(job, studyId);
-    }
-  } else {
-    solved = referenceRun(job, studyId);
-  }
+  if (deps.runner.binary === null) return missingTool(studyId);
+  const resume = options.resumeFromLast === true ? loadResume(deps.store.directory, studyId, job) : null;
+  const note =
+    options.resumeFromLast === true && resume === null
+      ? ' (resumeFromLast: no saved run of this study for these inputs, started from the uniform design)'
+      : '';
+  const solved = await solveNatively(job, doc, studyId, options, deps, resume);
   if (!('artifact' in solved)) return solved;
 
   const { artifact } = solved;
@@ -253,11 +232,4 @@ export async function runTopologySolve(
       record: recorded.data,
     },
   };
-}
-
-function referenceRun(job: TopologyJob, studyId: string): Solved | FeaToolResult {
-  const started = Date.now();
-  const artifact = runTopologyReference(job);
-  if (typeof artifact === 'string') return failure('TOP_SOLVER_FAILED', artifact, [studyId]);
-  return { artifact, elapsedMs: Date.now() - started, warnings: [], resumedFrom: 0, state: null };
 }

@@ -38,7 +38,7 @@ function crownMismatches(doc: CadDocument, civil: CivilModel): string[] {
       warnings.push(
         `${outgoing.id} (Ø${Math.round(outgoing.diameter / fromMm(doc, 1))}) leaves ${outgoing.fromId} with its crown ${lower} mm above ` +
           `the crown of ${incoming.id} (Ø${Math.round(incoming.diameter / fromMm(doc, 1))}) - inverts were kept, not soffits; ` +
-          `lower ${outgoing.id} invertFrom by ${lower} mm (update_pipe) to match soffits`,
+          `lower ${outgoing.id} invertFrom by ${lower} mm (update_drainage_pipe) to match soffits`,
       );
     }
   }

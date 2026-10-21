@@ -23,8 +23,8 @@ const ROW_PATTERN = /^(.+):(max|min)$/;
 export const disposeThermalLimit = defineCommand({
   name: 'dispose_thermal_limit',
   description:
-    "HUMAN GATE. Record a qualified reviewer's decision (accepted | rejected | redesign) on a FAIL or MARGINAL row of check_temperature_limits " +
-    '(rowId "<limitId>:max|min"). Only a human-held signature over the payload verifies (09 PLM signing port): an agent has none and gets ' +
+    "Record a qualified reviewer's decision (accepted | rejected | redesign) on a FAIL or MARGINAL row of check_temperature_limits " +
+    '(rowId "<limitId>:max|min"). HUMAN GATE. Only a human-held signature over the payload verifies (09 PLM signing port): an agent has none and gets ' +
     'THM_HUMAN_GATE with the document unchanged. Do not try to work around it: hand the row over to the reviewer, who dispositions it in the ' +
     'desktop app. The disposition binds to the results hash and ends when the case is solved again.',
   params: z.object({

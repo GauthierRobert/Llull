@@ -95,7 +95,7 @@ export const addDecal = defineCommand({
  * @failure missing entity or decal -> no-op, affected:[]
  */
 export const removeDecal = defineCommand({
-  name: 'remove_decal',
+  name: 'delete_decal',
   description: 'Remove one decal (by its id, from add_decal) from a solid.',
   params: z.object({
     id: z.string().describe('Id of the solid carrying the decal.'),
@@ -103,13 +103,13 @@ export const removeDecal = defineCommand({
   }),
   run: (doc, { id, decalId }): CommandResult => {
     const entity = doc.entities[id];
-    if (entity === undefined) return noop(doc, `remove_decal: entity '${id}' not found; no-op.`);
+    if (entity === undefined) return noop(doc, `delete_decal: entity '${id}' not found; no-op.`);
     const decals = entity.decals ?? [];
-    if (!decals.some((decal) => decal.id === decalId)) return noop(doc, `remove_decal: '${id}' has no decal '${decalId}'; no-op.`);
+    if (!decals.some((decal) => decal.id === decalId)) return noop(doc, `delete_decal: '${id}' has no decal '${decalId}'; no-op.`);
     const rest = decals.filter((decal) => decal.id !== decalId);
     const updated = (
       rest.length > 0 ? { ...entity, decals: rest } : Object.fromEntries(Object.entries(entity).filter(([key]) => key !== 'decals'))
     ) as Entity;
-    return changed(replaceEntity(doc, updated), `remove_decal: removed ${decalId} from '${id}'.`, [id]);
+    return changed(replaceEntity(doc, updated), `delete_decal: removed ${decalId} from '${id}'.`, [id]);
   },
 });

@@ -39,7 +39,7 @@ const EXPORTS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
   ['export_obj', {}],
   ['export_gltf', {}],
   ['export_code', { language: 'cadquery' }],
-  ['export_step_exact', {}],
+  ['export_step_ap242', {}],
 ];
 
 describe('exportGate', () => {
@@ -144,7 +144,7 @@ describe('VC-MAT-15 / VC-MAT-25: exports of controlled content', () => {
 
   it('an unmarked document exports as before (VC-MAT-15 core part)', () => {
     const { doc } = markedBox({ regime: 'EAR99' });
-    for (const [name, params] of EXPORTS.filter(([exportName]) => exportName !== 'export_step_exact')) {
+    for (const [name, params] of EXPORTS.filter(([exportName]) => exportName !== 'export_step_ap242')) {
       const result = call(doc, name, params, NO_PORT);
       expect(result.rejected, name).toBeUndefined();
       expect(result.data, name).toBeDefined();

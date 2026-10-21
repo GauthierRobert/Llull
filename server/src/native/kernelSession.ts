@@ -7,6 +7,7 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { encodeRequest, NATIVE_DIED, parseReplyLine, type NativeReply } from './kernelProtocol';
+import { nativeRuntimeEnv } from './nativeBinary';
 
 /** The process as the session sees it (a fake in unit tests). */
 export interface KernelChild {
@@ -66,7 +67,11 @@ export function createKernelSession(child: KernelChild): NativeKernelSession {
 
 /** `binary --exit-on-eof` with piped stdin/stdout; stderr (OCCT messages) goes to the server's stderr. */
 export function spawnKernelChild(binary: string): KernelChild {
-  const kernelProcess = spawn(binary, ['--exit-on-eof'], { stdio: ['pipe', 'pipe', 'inherit'], windowsHide: true });
+  const kernelProcess = spawn(binary, ['--exit-on-eof'], {
+    stdio: ['pipe', 'pipe', 'inherit'],
+    windowsHide: true,
+    env: nativeRuntimeEnv(binary),
+  });
   const exitListeners: ((reason: string) => void)[] = [];
   let exited = false;
   const exit = (reason: string): void => {

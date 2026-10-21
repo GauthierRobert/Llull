@@ -172,8 +172,8 @@ export const extractionPayload = (record: ExtractionRecord): string =>
 export const acceptAsbuiltExtraction = defineCommand({
   name: 'accept_asbuilt_extraction',
   description:
-    'HUMAN-ONLY. Accept a committed as-built extraction for fabrication use (field-verified tie-in): recorded only when the signature verifies ' +
-    'against the signing port. An agent always gets SCN_HUMAN_GATE with the document unchanged: hand it to the reviewer.',
+    'Accept a committed as-built extraction for fabrication use (field-verified tie-in): recorded only when the signature verifies ' +
+    'against the signing port. HUMAN-ONLY. An agent always gets SCN_HUMAN_GATE with the document unchanged: hand it to the reviewer.',
   params: z.object({
     extractionId: z.string().describe('Extraction id (affected[0] of commit_asbuilt_extraction).'),
     signature: z.unknown().describe('Human signature object over the extraction payload; agents cannot produce one.'),

@@ -9,7 +9,6 @@
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import type { ToolDefinition } from '@protocol/tools';
 import type { CommandOutcome } from '@protocol/restProtocol';
 import { isRecord } from '@lib/isRecord';
 import { nonEmptyString } from '@lib/nonEmptyString';
@@ -26,46 +25,6 @@ export interface MtestDeps {
   readonly env?: NodeJS.ProcessEnv;
   readonly runner?: ProcessRunner;
   readonly tools?: MfrontTools;
-}
-
-export function mtestToolDefinition(): ToolDefinition {
-  return {
-    name: MTEST_TOOL,
-    description:
-      'OPTIONAL MFront / MTest transport (not bundled: install TFEL / MFront yourself and set LLULL_MTEST, and LLULL_MFRONT to compile; ' +
-      'see docs/physics/02-constitutive-models TECHNICAL_SPEC §11 OQ-MATL-05). Runs an MTest script on a behaviour outside the built-in law ' +
-      'set and returns the result table (time, strains, stresses, state variables) as data; the document is never changed. ' +
-      'mtest = the text of the .mtest script. mfront = { name, source } compiles that MFront behaviour first with ' +
-      '`mfront --obuild --interface=generic name.mfront` in the job folder; the token {{library}} in the script is replaced by ' +
-      "src/lib<library>.<so|dll|dylib> (library defaults to 'Behaviour'; give the same name as @Library in the source). " +
-      'Running needs LLULL_ALLOW_CODE_EXECUTION=1 (native code is compiled and loaded). probe: true only reports which tools were found. ' +
-      'Errors: MFRONT_TOOL_MISSING (with the reason), MFRONT_CODE_EXECUTION_DISABLED, MFRONT_BUILD_FAILED, MTEST_FAILED, MTEST_TIMEOUT, ' +
-      'MTEST_RESULT_MISSING. Compare with material_point_response for the same path; MTest results are not llull-validated values.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        mtest: { type: 'string', description: 'Text of the MTest script (.mtest). May contain the token {{library}}.' },
-        mfront: {
-          type: 'object',
-          properties: {
-            name: { type: 'string', description: 'Behaviour file name without extension: letters, digits, underscore.' },
-            source: { type: 'string', description: 'Text of the .mfront source.' },
-            library: { type: 'string', description: "Library name (default 'Behaviour'); the one the source declares with @Library." },
-          },
-          required: ['name', 'source'],
-          description: 'MFront behaviour to compile before the run (needs mfront).',
-        },
-        timeoutS: {
-          type: 'number',
-          minimum: 1,
-          maximum: 86400,
-          description: `Wall-clock limit per process in seconds (default ${DEFAULT_TIMEOUT_S}).`,
-        },
-        probe: { type: 'boolean', description: 'Report the detected tools and run nothing.' },
-      },
-      required: [],
-    },
-  };
 }
 
 const outcome = (isError: boolean, summary: string, data: unknown, code?: string, remediation?: string): CommandOutcome => ({

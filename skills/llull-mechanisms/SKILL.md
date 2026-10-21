@@ -9,7 +9,7 @@ llull has two motion models. Pick one per question:
 
 | Question | Model | Commands |
 | -------- | ----- | -------- |
-| "Where is part B when the hinge is at 30°?" (poses, no forces) | kinematic joints between component instances | `add_joint` `set_joint_value` `add_drive_relation` `evaluate_motion` `bake_motion` |
+| "Where is part B when the hinge is at 30°?" (poses, no forces) | kinematic joints between component instances | `add_joint` `set_joint_value` `add_drive_relation` `evaluate_motion` |
 | "How fast does it spin / how long does it take / what forces?" | rigid-body dynamics (MuJoCo) | `add_rigid_body` `add_body_joint` `add_spring` `add_motor` `add_gear_coupling` `add_propeller` `set_gravity` `simulate_motion` |
 
 Discover details with `llull describe <command>`; list them with `llull list assembly`. Units: document lengths (mm) for anchors and
@@ -23,7 +23,7 @@ positions, SI for dynamics (kg, N·m, rad/s, rpm, s). Angles in RADIANS.
 3. `set_joint_value` (radians or mm, or `"=expr"` over parameters), couple joints with `add_drive_relation`
    (`driven = driver * ratio + offset`, e.g. a 2:1 gear pair).
 4. `evaluate_motion` (read-only: `data.instancePositions`, `data.instanceRotations`) — check a pose against your own trigonometry
-   (a point at radius r on a revolute joint at angle θ is at `(r cos θ, r sin θ)` about the axis). `bake_motion` writes the pose.
+   (a point at radius r on a revolute joint at angle θ is at `(r cos θ, r sin θ)` about the axis). `evaluate_motion` with `apply: true` writes the pose.
 5. `check_mechanism` reports mobility (Grübler-Kutzbach count): `FPR_MECH_LOCKED` = nothing can move, `FPR_MECH_UNDERCONSTRAINED` =
    more freedoms than drives.
 
@@ -78,6 +78,6 @@ llull plot_simulation --save speed.png --doc mech.llull.json       # see describ
 - Joint `anchor` is a WORLD point in document units (mm), on the axis; `axis` need not be unit length.
 - Motors, gear couplings, springs and propellers must sit on tree joints, not on the joint that closes a loop.
 - Kinematic joints (`add_joint`) only move component INSTANCES; dynamics bodies (`add_rigid_body`) take plain 3D entities.
-- `evaluate_motion` changes nothing; `bake_motion` moves the instances (and is undoable).
+- `evaluate_motion` changes nothing unless `apply: true`, which moves the instances (and is undoable).
 - Simulate long enough: at least a few time constants, or two crank turns for a four-stroke engine; read `steady` and `warnings`.
 - Every result here is computed by llull and marked for engineering review; say so when you report it.

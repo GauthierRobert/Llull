@@ -1,4 +1,4 @@
-/** Fixtures of the cfd tests: metre documents, bodies, a case builder and typed access to the cfd_prepare report. */
+/** Fixtures of the cfd tests: metre documents, bodies, a case builder and typed access to the prepare_cfd_case report. */
 
 import { expect } from 'vitest';
 import { defaultContext } from '@core/commands/context';
@@ -79,7 +79,7 @@ export const caseParams = (entityIds: string[], overrides: Record<string, unknow
 
 /** A document with one case `c1` over `entityIds`. */
 export function withCase(doc: CadDocument, entityIds: string[], overrides: Record<string, unknown> = {}): CadDocument {
-  return ok(doc, 'cfd_create_case', caseParams(entityIds, overrides)).document;
+  return ok(doc, 'create_cfd_case', caseParams(entityIds, overrides)).document;
 }
 
 export interface Check {
@@ -113,7 +113,7 @@ export interface PrepareData {
 }
 
 export function prepare(doc: CadDocument, params: Record<string, unknown> = {}, ctx?: ExecutionContext): PrepareData {
-  const result = ok(doc, 'cfd_prepare', { caseId: 'c1', ...params }, ctx);
+  const result = ok(doc, 'prepare_cfd_case', { caseId: 'c1', ...params }, ctx);
   return result.data as PrepareData;
 }
 

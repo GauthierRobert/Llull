@@ -25,7 +25,7 @@ const holed = meshes.affected[0] as string;
 describe('check_cfd', () => {
   it('lists pass / warn / fail per case with the failing codes', () => {
     let doc = withCase(meshes.document, [block.id]);
-    doc = ok(doc, 'cfd_create_case', {
+    doc = ok(doc, 'create_cfd_case', {
       id: 'broken',
       entityIds: [holed],
       freestream: { speedMS: 1 },
@@ -50,7 +50,7 @@ describe('check_cfd', () => {
 
   it('warns on a stale recorded result and on small features', () => {
     const doc = withCase(meshes.document, [block.id]);
-    const prepared = ok(doc, 'cfd_prepare', { caseId: 'c1' }).data as { caseHash: string; geometryHash: string };
+    const prepared = ok(doc, 'prepare_cfd_case', { caseId: 'c1' }).data as { caseHash: string; geometryHash: string };
     const record = (caseHash: string, geometryHash: string): CadDocument => ({
       ...doc,
       cfd: {
@@ -129,7 +129,7 @@ describe('document slice', () => {
 });
 
 describe('registration', () => {
-  const names = ['cfd_create_case', 'cfd_update_case', 'cfd_delete_case', 'cfd_set_boundary', 'cfd_prepare', 'check_cfd'];
+  const names = ['create_cfd_case', 'update_cfd_case', 'delete_cfd_case', 'set_cfd_boundary', 'prepare_cfd_case', 'check_cfd'];
 
   it('lists the six commands in the flow toolset, 1:1 with the tool schemas', () => {
     expect([...TOOLSETS.flow].sort()).toEqual([...names].sort());
@@ -146,8 +146,8 @@ describe('registration', () => {
         .map((command) => command.name)
         .sort(),
     );
-    expect(getCommand('cfd_prepare')?.annotations?.readOnly).toBe(true);
-    expect(getCommand('cfd_create_case')?.paramsSchema.properties['id']?.description).toContain('Returned in affected[0]');
+    expect(getCommand('prepare_cfd_case')?.annotations?.readOnly).toBe(true);
+    expect(getCommand('create_cfd_case')?.paramsSchema.properties['id']?.description).toContain('Returned in affected[0]');
   });
 
   it('clear_document removes the cfd slice', () => {

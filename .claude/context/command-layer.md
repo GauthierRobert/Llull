@@ -6,6 +6,33 @@ signatures exactly. Engine (root of `commands/`): `types.ts` (contracts), `schem
 `guard.ts`; commands live in feature folders, each with a `catalog.ts`. Helpers:
 `entity/entityOps.ts`, `entity/commitEntity.ts`; ids in `packages/core/src/lib/id.ts`; plugins in `packages/core/src/plugins/`.
 
+## Command skeleton (copy this)
+
+```ts
+import type { CommandResult } from './types';
+import { defineCommand, z, vec3 } from './schema'; // plugins: '@core/commands/schema'
+
+/**
+ * @affects modifies 1 entity
+ * @failure missing id -> no-op, affected:[]
+ */
+export const fooThing = defineCommand({
+  name: 'foo_thing',
+  description: 'One line, imperative, says what the op does to the document.',
+  annotations: { idempotent: true }, // readOnly / destructive / idempotent / metaHistory / requiresKernel
+  params: z.object({
+    id: z.string().describe('Target entity id'),
+    amount: z.number().describe('How much, in document units; must be > 0'),
+    offset: vec3('Optional [x, y, z] offset. Defaults to [0, 0, 0].').optional(),
+  }),
+  run: (doc, { id, amount, offset = [0, 0, 0] }, ctx): CommandResult => {
+    const target = doc.entities[id];
+    if (!target) return { document: doc, summary: `No entity ${id}.`, affected: [] };
+    // build NEW doc; ids via nextId(prefix) from @lib/id; kernel via ctx?.kernel
+  },
+});
+```
+
 ## Contracts (`types.ts`)
 
 ```ts
@@ -106,8 +133,8 @@ toToolSchemas(): Array<{ name; description; input_schema: ParamsSchema;
 
 Registration: core — list the const in its feature folder's `catalog.ts`
 (`commandCatalog(...)`); `registry.ts` registers every catalog (a contract test fails on an
-exported command no catalog lists). Domain — list it in its domain's `catalog.ts` (`packages/domain-aec/src/<domain>/catalog.ts`,
-consumed by that domain's `plugin.ts`; `index.ts` exports the plugins); `installPlugin` appends
+exported command no catalog lists). Domain — list it in its domain's `catalog.ts` (e.g. `packages/domain-aec/src/<domain>/catalog.ts`, `packages/domain-aero/src/<plugin>/`,
+`packages/plm/src/catalog.ts`; consumed by that domain's `plugin.ts`; the package `index.ts` exports the plugins); `installPlugin` appends
 them (name clash throws). `toToolSchemas()` length MUST equal `listCommands()` length (test-guarded), and its
 output is snapshotted (`tests/unit/contract/__snapshots__`).
 
@@ -171,7 +198,7 @@ No id-counter reset exists; tests rely on step-scoped determinism.
 
 ## How the surfaces consume this (do not bypass)
 
-- UI: `store.dispatch(name, params)` → online `POST /command` (server `execute`, result arrives on
+- UI: `store.dispatch(name, params)` → with the backend connected (desktop app) `POST /command` (server `execute`, result arrives on
   `/live`) or, while the backend is unreachable, local `execute` → swap doc → undo snapshot (no outbox: LC1 step 6).
 - CLI (`server/src/cli` + `packages/protocol`): `llull list / search / describe` read `toToolSchemas()` (`buildCommandTools()`);
   `llull exec` / `run` call `execute` in-process on a document file, or `POST /command` on the local backend, which runs

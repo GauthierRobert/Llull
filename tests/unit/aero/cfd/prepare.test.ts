@@ -1,5 +1,5 @@
 /**
- * 12 CFD M1: cfd_prepare (TECHNICAL_SPEC §5.1) — VC-CFD-10 voxel volume, VC-CFD-11 watertight check and union, VC-CFD-12 buildings domain
+ * 12 CFD M1: prepare_cfd_case (TECHNICAL_SPEC §5.1) — VC-CFD-10 voxel volume, VC-CFD-11 watertight check and union, VC-CFD-12 buildings domain
  * and blockage, VC-CFD-14 determinism, VC-CFD-15 small-feature report; plus the remaining check rows. The Manifold kernel is the mesh kernel.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -55,7 +55,7 @@ describe('VC-CFD-11: watertight check and union', () => {
     expect(row.status).toBe('fail');
     expect(row['openEdges']).toBe(4);
     expect(row['openAt']).toHaveLength(4);
-    expect(row['remediation']).toContain('cfd_set_boundary');
+    expect(row['remediation']).toContain('set_cfd_boundary');
     expect(report.status).toBe('fail');
     expect(rowOf(report, 'CFD_SMALL_FEATURE').status).toBe('not_run');
     expect(rowOf(report, 'CFD_BLOCKAGE_TOO_HIGH').status).toBe('not_run');
@@ -230,7 +230,7 @@ describe('VC-CFD-14: preparation is deterministic', () => {
       { command: 'set_units', params: { units: 'm' } },
       { command: 'add_sphere', params: { radius: 0.5, position: [0, 0, 0] }, as: 'ball' },
       {
-        command: 'cfd_create_case',
+        command: 'create_cfd_case',
         params: { id: 'c1', entityIds: ['$ball'], freestream: { speedMS: 1 }, reference: { areaM2: 1, lengthM: 1 } },
       },
     ];
@@ -317,7 +317,7 @@ describe('solver choice, memory and options', () => {
 
   it('reports a regime error as a fail row without a solver', () => {
     const doc = withCase(block.doc, [block.id], { freestream: { speedMS: 50 } });
-    const forced = ok(doc, 'cfd_update_case', { caseId: 'c1', freestream: { speedMS: 50 } }).document;
+    const forced = ok(doc, 'update_cfd_case', { caseId: 'c1', freestream: { speedMS: 50 } }).document;
     const broken = {
       ...forced,
       cfd: { ...forced.cfd!, cases: { c1: { ...forced.cfd!.cases['c1']!, freestream: { alphaDeg: 0, betaDeg: 0 } } } },
@@ -366,28 +366,28 @@ describe('solver choice, memory and options', () => {
   });
 });
 
-describe('cfd_prepare command', () => {
+describe('prepare_cfd_case command', () => {
   const body = addBody(metreDocument(), 'add_box', { size: [1, 1, 1], position: [0, 0, 0], anchor: 'min' });
   const doc = withCase(body.doc, [body.id]);
 
   it('is pure and read-only', () => {
-    expectPure(doc, () => execute(doc, 'cfd_prepare', { caseId: 'c1' }));
-    const result = execute(doc, 'cfd_prepare', { caseId: 'c1' });
+    expectPure(doc, () => execute(doc, 'prepare_cfd_case', { caseId: 'c1' }));
+    const result = execute(doc, 'prepare_cfd_case', { caseId: 'c1' });
     expect(result.document).toBe(doc);
     expect(result.affected).toEqual([]);
-    expect(result.summary).toContain('cfd_prepare c1: pass');
+    expect(result.summary).toContain('prepare_cfd_case c1: pass');
   });
 
   it('refuses an unknown case and a bad device memory', () => {
-    expectRefusal(doc, 'cfd_prepare', { caseId: 'nope' }, 'CFD_CASE_NOT_FOUND', 'caseId');
-    expectRefusal(doc, 'cfd_prepare', { caseId: 'c1', deviceMemoryBytes: -1 }, 'CFD_PARAM_INVALID', 'deviceMemoryBytes');
-    expectNoOp(execute(doc, 'cfd_prepare', { caseId: 'nope' }), doc);
+    expectRefusal(doc, 'prepare_cfd_case', { caseId: 'nope' }, 'CFD_CASE_NOT_FOUND', 'caseId');
+    expectRefusal(doc, 'prepare_cfd_case', { caseId: 'c1', deviceMemoryBytes: -1 }, 'CFD_PARAM_INVALID', 'deviceMemoryBytes');
+    expectNoOp(execute(doc, 'prepare_cfd_case', { caseId: 'nope' }), doc);
   });
 
   it('summarises failures by code', () => {
     const open = boxMesh([0, 0, 0], [1, 1, 1]);
     const meshes = meshDoc([{ positions: open.positions, indices: open.indices.slice(0, 30) }]);
-    const result = execute(withCase(meshes.doc, meshes.ids), 'cfd_prepare', { caseId: 'c1' });
+    const result = execute(withCase(meshes.doc, meshes.ids), 'prepare_cfd_case', { caseId: 'c1' });
     expect(result.summary).toContain('CFD_GEOMETRY_NOT_WATERTIGHT');
   });
 });

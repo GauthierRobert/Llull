@@ -73,7 +73,9 @@ describeNative('blend_union on the live OCC kernel', () => {
     expect(solids).toBe(1);
     expect(volume).toBeGreaterThan(0);
     expect(blended.summary).toContain('welded 3 solids');
-    const step = execute(blended.document, 'export_step_exact', {}).data as { step: string };
+    const step = execute(blended.document, 'export_step_ap242', { schema: 'ap214', includeValidationProperties: false }).data as {
+      step: string;
+    };
     expect(step.step).toMatch(/B_SPLINE_SURFACE|SURFACE_OF_REVOLUTION|TOROIDAL_SURFACE/);
   }, 60_000); // live OCC union + fillets + STEP: ~10 s
 

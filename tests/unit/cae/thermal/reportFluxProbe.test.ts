@@ -48,7 +48,7 @@ function steadyWithProbes(type: 'heat_steady' | 'heat_transient' = 'heat_steady'
 
 describe('thermal_report heat-flux probes and steady wording', () => {
   const { doc, analysisId } = steadyWithProbes();
-  const result = execute(doc, 'thermal_report', { analysisId }, machineContext());
+  const result = execute(doc, 'analysis_report', { view: 'thermal', analysisId }, machineContext());
   const data = result.data as {
     heatFluxProbes: { name: string; unit?: string; quantity: string; values: { time: number; value: number | null }[] }[];
     probes: { name: string }[];
@@ -69,7 +69,7 @@ describe('thermal_report heat-flux probes and steady wording', () => {
   });
 
   it('the probes filter also selects heat-flux probes (an unknown id selects none)', () => {
-    const none = execute(doc, 'thermal_report', { analysisId, probes: ['nope'] }, machineContext());
+    const none = execute(doc, 'analysis_report', { view: 'thermal', analysisId, probes: ['nope'] }, machineContext());
     expect((none.data as { heatFluxProbes: unknown[] }).heatFluxProbes).toEqual([]);
     expect(none.summary).not.toContain('heat flux probe');
   });

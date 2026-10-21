@@ -4,6 +4,9 @@ This directory is a first-class project artifact. It makes agentic development o
 llull systematic and consistent. Inspired by the ECC "harness-native operator system"
 pattern, scoped tightly to this app (no context bloat).
 
+> Human-oriented overview: agents never load this file. What agents read is `CLAUDE.md`, the rules, and
+> the skill/agent descriptions (below).
+
 ## Map
 
 ```
@@ -33,7 +36,9 @@ CLAUDE.md            (repo root) entrypoint; imports the rules; read this first
     measure/             read-only measurement/inspection query tools
     design-model/        use llull AS a CAD tool: build_project plans end-to-end
     viewport-feature/    implement/change 2D/3D viewport behavior
-    verify-llull/        full verification loop (+ Playwright for UI)
+    llull-cli/           drive llull from the shell (`llull`, `--app`); defers syntax to `llull help` / `llull guide`
+    drawing-to-model/    rebuild a part from a 2D drawing and prove it matches
+    verify-llull/        full verification loop (+ desktop app via `llull --app` + render_view for UI)
     continue-working/    resume the build from work/BOARD.md
   context/           deep references, loaded on demand (not auto-injected)
     command-layer.md     exact signatures of the command system
@@ -50,7 +55,8 @@ CLAUDE.md            (repo root) entrypoint; imports the rules; read this first
 
 ## How it fits together
 
-- **Context budget.** Always loaded: CLAUDE.md + 3 rules (~4.5k tokens). Path-scoped rules load
+- **Context budget.** Always loaded: CLAUDE.md + 3 rules (~5.5k tokens) plus every skill and agent
+  `description` (~2k tokens), so ~7.5k in all. Path-scoped rules load
   only when a matching file is touched; `context/` and skills load only on demand. Keep it so:
   new guidance goes in a path-scoped rule or a skill, not in an always-on file.
 - **Hooks** enforce what is cheap to check mechanically (layering, `any`, skipped tests,
@@ -66,8 +72,8 @@ CLAUDE.md            (repo root) entrypoint; imports the rules; read this first
 `.mcp.json` enables **context7** for up-to-date three.js / react-three-fiber / drei
 API docs while building the viewport. It runs via `npx` (you'll be prompted to approve
 the server on first use). Remove the entry if you don't want it — it is a convenience,
-not a requirement. The **Playwright** MCP server (browser automation for `verify-llull`)
-is provided by the harness plugin and needs no config here.
+not a requirement. UI verification no longer uses a browser: see `verify-llull` §4 (desktop app,
+`llull --app` and `render_view`).
 
 > llull itself has no MCP server any more (LC1 step 4): agents drive it through the `llull` CLI
 > (`llull-cli` skill, `cli-engineer` agent).

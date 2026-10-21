@@ -80,7 +80,7 @@ const VALID_AXES: ReadonlySet<string> = new Set(['x', 'y', 'z']);
 export const mirrorEntity = defineCommand({
   name: 'mirror_entity',
   description:
-    "Mirror an entity across the origin along a world axis by negating that axis component of its position. axis must be 'x', 'y', or 'z'.",
+    "Mirror an entity across the origin plane normal to a world axis by negating that axis component of its position ONLY: the entity's shape, size and rotation are not reflected (a handed part keeps its handedness; only its location moves to the other side). axis must be 'x', 'y', or 'z'.",
   params: z.object({
     id: z.string().describe('Id of the entity to mirror.'),
     axis: z.string().describe("World axis to mirror across: 'x' negates the X position component, 'y' negates Y, 'z' negates Z."),

@@ -1,4 +1,4 @@
-/** cfd_prepare: the §5.1 geometry-preparation report of a case (read-only). */
+/** prepare_cfd_case: the §5.1 geometry-preparation report of a case (read-only). */
 
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
@@ -14,7 +14,7 @@ import { prepareCase } from './prepare';
  * @failure unknown case -> CFD_CASE_NOT_FOUND; every geometry problem is a check row (status fail / warn), not a refusal
  */
 export const cfdPrepare = defineCommand({
-  name: 'cfd_prepare',
+  name: 'prepare_cfd_case',
   description:
     'Read-only preparation report of a flow case, before any solve. Unions the bodies into one surface (through the kernel when installed), ' +
     'checks it is watertight and not self-intersecting (open / non-manifold edge counts with positions), finds features smaller than two cells of ' +
@@ -24,7 +24,7 @@ export const cfdPrepare = defineCommand({
     '`deviceMemoryBytes` to also check the memory against a device.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
-    caseId: z.string().describe('Id of the case (cfd_create_case).'),
+    caseId: z.string().describe('Id of the case (create_cfd_case).'),
     quality: z
       .enum(['draft', 'standard', 'fine'])
       .optional()
@@ -37,9 +37,16 @@ export const cfdPrepare = defineCommand({
   run: (doc, params, ctx): CommandResult => {
     const cfdCase = caseOf(doc, params.caseId);
     if (cfdCase === undefined)
-      return refuseCfd(doc, 'cfd_prepare', 'CFD_CASE_NOT_FOUND', `no case '${params.caseId}'`, [params.caseId], ['caseId']);
+      return refuseCfd(doc, 'prepare_cfd_case', 'CFD_CASE_NOT_FOUND', `no case '${params.caseId}'`, [params.caseId], ['caseId']);
     if (params.deviceMemoryBytes !== undefined && !(params.deviceMemoryBytes > 0))
-      return refuseCfd(doc, 'cfd_prepare', 'CFD_PARAM_INVALID', 'deviceMemoryBytes must be > 0', [params.caseId], ['deviceMemoryBytes']);
+      return refuseCfd(
+        doc,
+        'prepare_cfd_case',
+        'CFD_PARAM_INVALID',
+        'deviceMemoryBytes must be > 0',
+        [params.caseId],
+        ['deviceMemoryBytes'],
+      );
     const prepared = prepareCase(doc, cfdCase, ctx?.kernel ?? null, {
       quality: params.quality,
       deviceMemoryBytes: params.deviceMemoryBytes,
@@ -47,7 +54,7 @@ export const cfdPrepare = defineCommand({
     const counts = (status: string): number => prepared.checks.filter((check) => check.status === status).length;
     const worst = prepared.checks.filter((check) => check.status === 'fail').map((check) => check.code);
     const summary =
-      `cfd_prepare ${params.caseId}: ${prepared.status} — ${counts('pass')} pass, ${counts('warn')} warn, ${counts('fail')} fail, ${counts('not_run')} not run` +
+      `prepare_cfd_case ${params.caseId}: ${prepared.status} — ${counts('pass')} pass, ${counts('warn')} warn, ${counts('fail')} fail, ${counts('not_run')} not run` +
       (worst.length > 0 ? ` (${worst.join(', ')})` : '') +
       (prepared.estimate !== null ? `; ${prepared.estimate.cells.toExponential(2)} cells, solver ${prepared.solver}` : '') +
       '.';

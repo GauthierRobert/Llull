@@ -309,12 +309,12 @@ describe('columns on upper-floor plans', () => {
     const upper = twoLevel.building?.levelOrder[1] as string;
     expect(buildPlanDrawing(twoLevel, upper)!.primitives.some((p) => p.layer === 'S-COLS')).toBe(false);
   });
-  it('shows them in export_dxf and export_plan_sheet of the upper level', () => {
-    const dxf = (execute(doc, 'export_dxf', { levelId: second }).data as DxfExport).dxf;
+  it('shows them in export_building_dxf and export_plan_sheet of the upper level', () => {
+    const dxf = (execute(doc, 'export_building_dxf', { levelId: second }).data as DxfExport).dxf;
     expect(dxf).toContain('S-COLS');
     const sheet = (execute(doc, 'export_plan_sheet', { levelId: second }).data as PlanSheet).svg;
     expect(sheet).toContain('class="cut"');
-    const base = (execute(doc, 'export_dxf', { levelId: ground }).data as DxfExport).dxf;
+    const base = (execute(doc, 'export_building_dxf', { levelId: ground }).data as DxfExport).dxf;
     expect(base.length).toBeGreaterThan(dxf.length);
   });
   it('ignores a column whose home level is unknown', () => {

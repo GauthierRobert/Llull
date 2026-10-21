@@ -166,7 +166,7 @@ describe('05 supports in the explicit job', () => {
       kind: 'symmetry',
       target: { entityId: bar.barId, facesNear: [[5, 5, 0]] },
     });
-    const withoutFixed = must(symmetric.document, 'delete_fea_constraint', { analysisId: bar.analysisId, constraintId }).document;
+    const withoutFixed = must(symmetric.document, 'delete_analysis_item', { analysisId: bar.analysisId, itemId: constraintId }).document;
     const symmetryId = symmetric.affected[0] ?? '';
     const planar = buildExplicitJob(withoutFixed, bar.analysisId, { ...mesh, nodeSets: { [`C_${symmetryId}`]: [11, 12, 13] } });
     if (!planar.ok) throw new Error(planar.message);

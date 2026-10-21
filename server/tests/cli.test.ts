@@ -68,6 +68,24 @@ describe('llull CLI — discovery', () => {
     }
   });
 
+  it('keeps help short and moves niche sections to topics', async () => {
+    const core = capture();
+    await runCli(['help'], core.io);
+    const text = core.out.join('');
+    expect(text.length).toBeLessThan(5000);
+    expect(text).toMatch(/llull help native | plm | fuzz/);
+    expect(text.match(/stackup_monte_carlo/g) ?? []).toHaveLength(0);
+    const native = capture();
+    expect(await runCli(['help', 'native'], native.io)).toBe(EXIT_OK);
+    expect(native.out.join('').match(/^\s*stackup_monte_carlo/gm)).toHaveLength(1);
+    const plm = capture();
+    expect(await runCli(['help', 'vault'], plm.io)).toBe(EXIT_OK);
+    expect(plm.out.join('')).toMatch(/audit verify/);
+    expect(plm.out.join('')).not.toMatch(/LLULL_AUDIT_DIR/);
+    const bad = capture();
+    expect(await runCli(['help', 'nope'], bad.io)).toBe(EXIT_USAGE);
+  });
+
   it('lists, searches, describes and prints toolsets and the guide', async () => {
     const list = capture();
     expect(await runCli(['list', '2d'], list.io)).toBe(EXIT_OK);
@@ -420,7 +438,7 @@ describe('llull CLI — reviewer regressions', () => {
   it('still reports the result when --save fails', async () => {
     await runCli(['add_box', 'size=[1,1,1]', ...docFlag()], capture().io);
     const c = capture();
-    expect(await runCli(['measure_bounding_box', 'id=box-1.1', '--save', path.join(workDir, 'b.txt'), ...docFlag()], c.io)).toBe(
+    expect(await runCli(['measure_bounding_box', 'entityId=box-1.1', '--save', path.join(workDir, 'b.txt'), ...docFlag()], c.io)).toBe(
       EXIT_COMMAND_ERROR,
     );
     expect(c.err.join('\n')).toMatch(/--save: .*no file payload/);

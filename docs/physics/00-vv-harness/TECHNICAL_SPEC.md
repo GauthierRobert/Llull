@@ -248,7 +248,7 @@ for k from coarsest to finest:                                     (coarse first
     controls_k = { ...case.mesh, globalSize: size_k, refinements scaled by ratio^k }
     mesh_k   = 05 mesh op (Gmsh, NumThreads=1)       -> FeArtifactStore (cache by content hash)
     result_k = 05 solve (CalculiX)                    -> FeArtifactStore
-    value_k  = extract(quantity, result_k)            (probe interpolation identical to 05 fea_report)
+    value_k  = extract(quantity, result_k)            (probe interpolation identical to 05 analysis_report)
     h_k      = (measure / elements_k)^(1/dimension)   measure = analysed volume (3D) or area (2D) from 05 MeshSummary
 dispatch record_convergence_study { levels }          (record recomputes the report; TR-VNV-09)
 ```
@@ -318,7 +318,7 @@ No pack needs a schema change. Proposal (not a requirement): new packs prefer `{
 
 ```json
 { "id": "VC-FEA-10.a", "harness": { "plan": "plans/fea_cantilever_static_beamp.plan.json",
-  "calls": ["fea_mesh analysisId=$an", "fea_solve analysisId=$an", "fea_report analysisId=$an"],
+  "calls": ["fea_mesh analysisId=$an", "fea_solve analysisId=$an", "analysis_report analysisId=$an"],
   "pointer": "/data/probes/tip/value", "kernel": "occt" } }
 ```
 

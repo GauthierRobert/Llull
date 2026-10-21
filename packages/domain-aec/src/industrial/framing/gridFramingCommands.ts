@@ -94,7 +94,7 @@ const selected = (lines: ReadonlyArray<GridElement>, axes: ReadonlyArray<string>
 export const addGridColumns = defineCommand({
   name: 'add_grid_columns',
   description:
-    'Place one vertical steel column at every intersection of the structural grid (add_grid_line): the ' +
+    'Place one vertical STEEL column (profile section) at every intersection of the structural grid (add_grid_line); for concrete columns, single or per grid intersection, use add_column: the ' +
     'way to start framing a building. The column runs from the base level FFL up to topLevelId (a ' +
     'continuous column through intermediate floors) or, by default, to the top of the base level. ' +
     'Restrict with axes (both crossing lines must be listed) and exclude. Intersections that already ' +

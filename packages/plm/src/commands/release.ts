@@ -27,9 +27,9 @@ const ecnOf = (id: string): string => (id.startsWith('ECO-') ? `ECN-${id.slice(4
 export const releaseItem = defineCommand({
   name: 'release_item',
   description:
-    'HUMAN GATE. Release the in_review revision: freezes its content (SHA-256 of the canonical definition + an inline snapshot), uses the approvals recorded with record_approval, change ' +
+    'Release the in_review revision: freezes its content (SHA-256 of the canonical definition + an inline snapshot), uses the approvals recorded with record_approval, change ' +
     'order and effectivity, supersedes the previously released revision (its open effectivity closes the day / serial before this one starts) and ' +
-    'implements the ECO. Needs submit_for_review first, the policy roles approved (checker different from the author), an open ECO listing the item ' +
+    'implements the ECO. HUMAN GATE. Needs submit_for_review first, the policy roles approved (checker different from the author), an open ECO listing the item ' +
     '(after the first release) and, by default, a human approval signature (record_signature). check_release_readiness lists every blocker without ' +
     'changing anything. Needs `confirmation`, a trusted human signature over this exact act (plm_act_payload): an agent gets PLM_HUMAN_GATE; prepare with check_release_readiness and hand over to the humans.',
   annotations: { destructive: true, metaHistory: true },

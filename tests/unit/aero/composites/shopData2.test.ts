@@ -141,7 +141,7 @@ describe('export_ply_book (VC-CMP-28)', () => {
       expect(file.content).toContain('<path');
       expect(file.content).toContain('not approved');
     }
-    const dxf = data<{ pieces: { name: string; areaMm2: number }[] }>(doc, 'export_flat_patterns_dxf', { part });
+    const dxf = data<{ pieces: { name: string; areaMm2: number }[] }>(doc, 'export_ply_flat_patterns_dxf', { part });
     for (const sheet of book.sheets)
       for (const row of sheet.plies) {
         const expected = dxf.pieces.filter((piece) => piece.name === row.name).reduce((sum, piece) => sum + piece.areaMm2, 0);
@@ -193,7 +193,7 @@ describe('create_ply_solids (VC-CMP-30)', () => {
     const result = ok(doc, 'create_ply_solids', { part, plies: ['S1', 'S2'] });
     const info = result.data as Solids;
     expect(info.solids).toHaveLength(2);
-    const areas = data<{ pieces: { name: string; areaMm2: number }[] }>(doc, 'export_flat_patterns_dxf', {
+    const areas = data<{ pieces: { name: string; areaMm2: number }[] }>(doc, 'export_ply_flat_patterns_dxf', {
       part,
       plies: ['S1', 'S2'],
     }).pieces;
@@ -218,7 +218,7 @@ describe('create_ply_solids (VC-CMP-30)', () => {
     const result = ok(doc, 'create_ply_solids', { part });
     const info = result.data as Solids;
     expect(info.solids.length).toBeGreaterThanOrEqual(24);
-    const areas = data<{ pieces: { areaMm2: number }[] }>(doc, 'export_flat_patterns_dxf', { part }).pieces;
+    const areas = data<{ pieces: { areaMm2: number }[] }>(doc, 'export_ply_flat_patterns_dxf', { part }).pieces;
     const expected = areas.reduce((sum, piece) => sum + piece.areaMm2, 0) * 0.125;
     expect(Math.abs(info.totalVolume / expected - 1)).toBeLessThan(0.005);
     const top = Math.max(

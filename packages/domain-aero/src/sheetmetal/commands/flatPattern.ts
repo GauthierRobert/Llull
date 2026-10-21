@@ -83,7 +83,7 @@ function flatPatternData(build: FlatBuild): Record<string, unknown> {
 export const flatPattern = defineCommand({
   name: 'flat_pattern',
   description:
-    'Compute the analytic flat pattern of a sheet-metal part (BA = theta*(R+K*T) added at every bend, unfolded from the base flat) without changing the document. ' +
+    'DATA form of the flat pattern (same pattern as materialize_flat_pattern = 2D entities and export_flat_pattern_dxf = DXF file): compute the analytic flat pattern of a sheet-metal part (BA = theta*(R+K*T) added at every bend, unfolded from the base flat) without changing the document. ' +
     'Returns data { extents [x, y], area, outline (vertices, bounded), bends[] with angleDeg, insideRadius, direction up/down, ba, bd, ossb and the K-factor used with its source, joggles[] with allowance/run/inclinedStraight, hems[] (add_hem: gap, returnLeg, developedLength = pi*(gap/2+K*T)+leg, unverified model; a hem bend has ossb/bd null), formingNotes[] (beads are excluded from the pattern; a flanged hole is developed to an approximate, unverified cut diameter), ' +
     'provenance (formulas, inputs, sources), unverified + unverifiedInputs, reviewRequired }. Lengths are in the document length unit, angles in degrees. ' +
     'The result is computed by llull, not approved: a qualified person must review it. Refusal: FTR_PART_NOT_FOUND, FTR_NON_DEVELOPABLE. Next: export_flat_pattern_dxf, materialize_flat_pattern, check_sheet_metal.',
@@ -126,7 +126,7 @@ function ensureLayer(layers: Record<string, Layer>, order: string[], name: strin
 export const materializeFlatPattern = defineCommand({
   name: 'materialize_flat_pattern',
   description:
-    'Draw the flat pattern of a sheet-metal part as plain 2D entities (outline polyline, cutouts, bend lines) on layers FLAT-<id>, FLAT-<id>-CUT, FLAT-<id>-BEND-UP and FLAT-<id>-BEND-DOWN, so it can be seen (render_view view=top) and drafted on. ' +
+    'ENTITIES form of the flat pattern (same pattern as flat_pattern = data and export_flat_pattern_dxf = DXF file): draw the flat pattern of a sheet-metal part as plain 2D entities (outline polyline, cutouts, bend lines) on layers FLAT-<id>, FLAT-<id>-CUT, FLAT-<id>-BEND-UP and FLAT-<id>-BEND-DOWN, so it can be seen (render_view view=top) and drafted on. ' +
     'It is a snapshot: re-running replaces the previous snapshot of the same part. Lengths are in the document length unit. ' +
     'Refusal: FTR_PART_NOT_FOUND, FTR_NON_DEVELOPABLE. Use flat_pattern for the numbers and export_flat_pattern_dxf for the file.',
   params: z.object({

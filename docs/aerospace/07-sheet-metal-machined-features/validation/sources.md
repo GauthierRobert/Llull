@@ -32,10 +32,10 @@ Verification level, as achieved from this authoring sandbox:
 ## Internal llull sources (read in the repository)
 
 `packages/core/src/geometry/kernel.ts` (GeometryKernel), `packages/core/src/model/types.ts` (`ShapeRecipe`, `CadDocument`,
-`SOLID_KINDS`), `packages/core/src/commands/brep/*` (boolean, fillet/chamfer/shell, inspect_topology, export_step_exact),
+`SOLID_KINDS`), `packages/core/src/commands/brep/*` (boolean, fillet/chamfer/shell, inspect_topology, export_step_ap242),
 `packages/core/src/commands/solids/*` (extrude/revolve/sweep/loft, primitives), `packages/core/src/commands/edit/*`
 (array_linear/array_polar/pattern_along_path), `packages/kernel-occt/src/*` (opencascade.js@1.1.1 kernel),
-`packages/domain-aec/src/building/exchange/dxfWriter.ts` + `dxfExport.ts` (`export_dxf`), `packages/mcp/src/exchangeTools.ts`
+`packages/domain-aec/src/building/exchange/dxfWriter.ts` + `dxfExport.ts` (`export_building_dxf`), `packages/mcp/src/exchangeTools.ts`
 (`import_step`/`export_step` via CadQuery), `server/src/cli/usage.ts`, `docs/decisions/KI4…KI6`.
 
 ## NOT VERIFIED (no claim taken; to source before the V1 gate)

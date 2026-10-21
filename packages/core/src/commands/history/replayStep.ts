@@ -33,13 +33,20 @@ export function unresolvedExpressionsNote(warnings: readonly string[]): string {
   return warnings.length > 0 ? ` Unresolved expressions (${warnings.length}): ${warnings.join('; ')}.` : '';
 }
 
+/** Recorded params without the top-level keys `cmd` does not declare: steps saved while unknown keys were tolerated must still replay. */
+function withoutUnknownKeys(cmd: CommandDefinition<unknown>, params: unknown): unknown {
+  if (typeof params !== 'object' || params === null || Array.isArray(params)) return params;
+  const known = cmd.paramsSchema.properties;
+  return Object.fromEntries(Object.entries(params).filter(([key]) => key in known));
+}
+
 /**
  * Run `cmd` for a replayed `step`; a throw yields `null` (step skipped). On success the id map
  * is extended by zipping the step's recorded `affected` with the result's.
  *
  * @param scopeIds true ⇒ ids are minted from the step's own scope (history replay); false ⇒ the
  *   caller's context is used unchanged (recipes mint from the enclosing `instantiate_recipe` step)
- * @invariant never throws
+ * @invariant never throws; unknown top-level params are dropped (fresh calls through `execute` reject them)
  */
 export function runReplayStep(
   cmd: CommandDefinition<unknown>,
@@ -51,12 +58,13 @@ export function runReplayStep(
   scopeIds: boolean,
 ): CommandResult | null {
   try {
+    const recorded = withoutUnknownKeys(cmd, params);
     let result: CommandResult;
     if (scopeIds) {
       const stepKey = stepKeyOf(step.id);
       const stepContext: ExecutionContext = { ...context, ids: stepIdSource(stepKey), stepKey };
-      result = runInContext(stepContext, () => cmd.run(doc, params, stepContext));
-    } else result = cmd.run(doc, params, context);
+      result = runInContext(stepContext, () => cmd.run(doc, recorded, stepContext));
+    } else result = cmd.run(doc, recorded, context);
     extendIdMap(idMap, step.affected, result.affected);
     return result;
   } catch {

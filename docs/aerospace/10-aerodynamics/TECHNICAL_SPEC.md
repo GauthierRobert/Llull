@@ -18,7 +18,7 @@ Companion of [FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md). Laws: `.claude/rules/arch
   package, one `CadPlugin` per discipline) with MCP toolset `aerodynamics`. It is installed by
   `src/app/plugins.ts`, and its commands are listed by the `aerodynamics` getter in `packages/mcp/src/toolsets.ts`.
 - Pure maths lives in the plugin: no React, DOM or network (L2). The commands are read-only queries (L1), except
-  `draw_naca_airfoil`, which composes `draw_polyline` through `execute` (L10).
+  `airfoil_from_naca` (02 SRF) with `as: "polyline"`, which composes `draw_polyline` through `execute` (L10); the former `draw_naca_airfoil` is retired onto it.
 - No kernel is needed (L9). The frontal area works on display triangles, so it works on both kernels.
 - The atmosphere, air state, speed units and result helpers live in `domain-aero/src/shared/`, which both
   plugins import. Neither plugin imports the other's modules.
@@ -59,7 +59,7 @@ the influence matrices in `Float64Array`. VC-AER-10..12 must stay green unchange
 
 ## 3. Data model
 
-No new document data. All commands are queries, and `draw_naca_airfoil` creates a standard `polyline` entity, so
+No new document data. All commands are queries, and `airfoil_from_naca` with `as: "polyline"` creates a standard `polyline` entity, so
 the document version and migrations are unchanged. FR-AER-14 reads the 12 CFD document slice (`cfd.results`,
 `model/cfd.ts`) read-only; it adds no data of its own. A future persistent "aero model" (wing definition with
 sections, a polar cache) would be a plugin `DocumentExtension`. It is not needed for the MVP.
@@ -69,11 +69,10 @@ sections, a polar cache) would be a plugin `DocumentExtension`. It is not needed
 | Name                  | Kind                                | Params (sketch)                                                                                                                                                                                                                                                                                                                            | data                                                                                              | Failure codes                                                                                      |
 | --------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `standard_atmosphere` | query                               | `altitude`, `altitudeUnit m\|ft\|km`, `altitudeType geometric\|geopotential`, `temperatureOffsetK`, `speed`+`speedUnit`, `referenceLengthM`                                                                                                                                                                                                | T, p, ρ, a, μ, ν, g, ratios, flow {Mach, q, EAS, Re}, provenance                                  | `AER_ALTITUDE_OUT_OF_RANGE`, `AER_PARAM_INVALID`                                                   |
-| `draw_naca_airfoil`   | mutating (composes `draw_polyline`) | `naca`, `chord`, `pointsPerSide`, `closedTrailingEdge`, `incidenceDeg`, `position`                                                                                                                                                                                                                                                         | — (1 polyline)                                                                                    | `AER_AIRFOIL_INVALID`, `AER_PARAM_INVALID`                                                         |
 | `analyze_airfoil`     | query                               | `naca` \| `entityId`, `alphasDeg[]`, `panelsPerSide`, `momentReference`, `includeSurface`                                                                                                                                                                                                                                                  | polar [{α, cl, clCirculation, cm, cdPressure}], liftSlope, zeroLiftAngle, thinAirfoil, surface Cp | `AER_AIRFOIL_SOURCE_CONFLICT`, `AER_AIRFOIL_INVALID`, `AER_PARAM_INVALID`, `AER_SOLVER_FAILED`     |
 | `analyze_wing`        | query                               | `span`, `rootChord`, `tipChord`, `planform`, `twistDeg`, `naca` \| `sectionLiftSlopePerRad`+`zeroLiftAngleDeg`, `alphasDeg[]`, `terms`, speed + air state                                                                                                                                                                                  | geometry {S, AR, λ, c̄}, polar [{CL, CDi, e, lift N, Di N}], CL*α, Helmbold CL*α, stations         | `AER_PARAM_INVALID`, `AER_AIRFOIL_INVALID`, `AER_SOLVER_FAILED`, air-state codes                   |
 | `frontal_area`        | query                               | `entityIds[]`, `flowDirection`, `resolution`                                                                                                                                                                                                                                                                                               | frontal m² ± uncertainty, wetted m², length m, extents                                            | `AER_ENTITY_NOT_FOUND`, `AER_NO_GEOMETRY`, `AER_PARAM_INVALID`                                     |
-| `aero_drag`           | query                               | speed, `cdA` \| `cd`+`referenceAreaM2` \| `cd`+`entityIds`, `frictionModel`+`wettedAreaM2`+`lengthM`, air state                                                                                                                                                                                                                            | drag N, power W, q, Mach, Re, friction {Cf, N}, warnings                                          | `AER_AREA_SOURCE_CONFLICT`, `AER_PARAM_INVALID`, geometry and air-state codes                      |
+| `compute_aero_drag`           | query                               | speed, `cdA` \| `cd`+`referenceAreaM2` \| `cd`+`entityIds`, `frictionModel`+`wettedAreaM2`+`lengthM`, air state                                                                                                                                                                                                                            | drag N, power W, q, Mach, Re, friction {Cf, N}, warnings                                          | `AER_AREA_SOURCE_CONFLICT`, `AER_PARAM_INVALID`, geometry and air-state codes                      |
 | `road_load_power`     | query                               | `model road_load\|bassett_1999`, `speed` \| `powerW`; road_load: `vehicle generic\|bicycle`, `massKg`, `cdA` \| `cd`+`entityIds`, `crr` (required for generic), `gradePercent`, `headwindMS`, `wheelAreaM2`, `drivetrainEfficiency`, `bearingLosses`; bassett: `riderHeightM`, `riderMassKg`, `bikeMassKg`, `k1` \| factors, `trackFactor` | speed, power, breakdown, 1 h distance, inputs with `defaulted`                                    | `AER_SPEED_SOURCE_CONFLICT`, `AER_AREA_SOURCE_CONFLICT`, `AER_NO_EQUILIBRIUM`, `AER_PARAM_INVALID` |
 
 Every command carries `@affects / @invariant / @failure` tags in its source (C2).
@@ -196,7 +195,7 @@ P = K(0.00953 M_t V + 0.00775 V² + K1 A_f 0.007551 V³), with V in km/h.
 No new file format in the MVP. Plans in `validation/plans/*.json` are standard `build_project` actions. A Cp /
 polar CSV export and the XFOIL hand-off are V1 items (§10).
 
-**Link to 12 CFD (FR-AER-14).** `aero_drag` and `road_load_power` get a third drag-area source, `cfdCaseId`,
+**Link to 12 CFD (FR-AER-14).** `compute_aero_drag` and `road_load_power` get a third drag-area source, `cfdCaseId`,
 mutually exclusive with `cdA` and `cd` + area (`AER_AREA_SOURCE_CONFLICT` as today). The command reads
 `doc.cfd.results[caseId]`: it refuses `AER_CFD_RESULT_UNUSABLE` when the result is missing, stale (case or geometry
 hash changed) or `converged: false`, and otherwise uses `forces.cdAM2`. The CFD free stream must match the requested
@@ -204,7 +203,7 @@ speed within 1 %, or the command warns that CdA is being reused at another Reyno
 names the case, its `resultsHash`, solver and resolution, and an `unverified` CFD result stays `unverified`.
 
 **External-solver export (FR-AER-13, V2).** A host transport `cfd_export_case` (12 CFD `server/src/cfd/`, local
-files only) takes the surface and domain from `cfd_prepare`, so watertightness, patches and domain sizing are
+files only) takes the surface and domain from `prepare_cfd_case`, so watertightness, patches and domain sizing are
 checked once, by 12 CFD. It writes:
 
 - OpenFOAM: `constant/triSurface/body.stl` (one solid per boundary tag), `system/blockMeshDict` (the farfield box),
@@ -275,7 +274,7 @@ The coverage gate on `packages/domain-aero/src/**` is 90/85/90/90 (CLAUDE.md).
 | M3        | Vortex-lattice (horseshoe VLM) over a wing / tail definition read from lofts; neutral point; drag build-up tables with sources. Large N: influence build + dense LU in `llull-compute panel` (crate `llull-panel`, faer, RS1 §2.1), VC-AER-33 | **done 2026-10-19** (§14) |
 | M4        | External-solver export / import (`cfd_export_case`, `cfd_import_external`) on the case prepared by 12 CFD; the built-in solvers moved to [12 CFD](../12-cfd-gpu/TECHNICAL_SPEC.md) §10 | todo, ≈ 3 eng-weeks (after 12 CFD M1; was 6–8 before preparation was shared) |
 | M5        | UI: Cp and span-loading plots in the Analysis tab (same pattern as `plot_simulation`)                                                             | todo                  |
-| M6        | `cfdCaseId` drag-area source in `aero_drag` / `road_load_power` (FR-AER-14), VC-AER-30                                                            | todo, ≈ 1 eng-week, after 12 CFD M2 |
+| M6        | `cfdCaseId` drag-area source in `compute_aero_drag` / `road_load_power` (FR-AER-14), VC-AER-30                                                            | todo, ≈ 1 eng-week, after 12 CFD M2 |
 | M7        | Prandtl-Glauert / Kármán-Tsien corrections and the cross-check against the 12 CFD Euler solver (FR-AER-15), VC-AER-31                             | todo, ≈ 1 eng-week, after 12 CFD M4 |
 
 ## 11. Open questions
@@ -285,7 +284,7 @@ The coverage gate on `packages/domain-aero/src/**` is 90/85/90/90 (CLAUDE.md).
    the section-ring fix of 02 SRF (24-point resampling).
 3. Should rider CdA presets (Defraeye 2010) be shipped as a sourced table? They are B-grade, and a choice for the
    owner. They are kept as documentation only for now.
-4. When the 12 CFD free stream and the `aero_drag` speed differ, should CdA be reused with a warning (proposed) or
+4. When the 12 CFD free stream and the `compute_aero_drag` speed differ, should CdA be reused with a warning (proposed) or
    refused? Reynolds effects on CdA are small for bluff bodies above the drag crisis but not for streamlined ones.
 5. Is the external-solver export (M4) still wanted now that llull has its own solvers (12 CFD)? It serves users who
    already run OpenFOAM / SU2 locally and want a second opinion; it is COULD and can be dropped without affecting 12 CFD.
@@ -298,8 +297,8 @@ See FUNCTIONAL_SPEC §11 and [validation/sources.md](validation/sources.md). Sta
 
 M1 is built and green:
 
-- Plugin `aerodynamicsPlugin` with 7 commands (`standard_atmosphere`, `draw_naca_airfoil`, `analyze_airfoil`,
-  `analyze_wing`, `frontal_area`, `aero_drag`, `road_load_power`), toolset `aerodynamics`, palette group.
+- Plugin `aerodynamicsPlugin` with 6 commands (the NACA section drawing moved to `airfoil_from_naca`, `as: "polyline"`) (`standard_atmosphere`, `analyze_airfoil`,
+  `analyze_wing`, `frontal_area`, `compute_aero_drag`, `road_load_power`), toolset `aerodynamics`, palette group.
 - Tests: `tests/unit/aero/aerodynamics/*.test.ts` and `tests/unit/aero/scenarioPlans.test.ts`. Every VC listed in
   `validation/README.md` passes, against data pinned in `validation/data/`.
 

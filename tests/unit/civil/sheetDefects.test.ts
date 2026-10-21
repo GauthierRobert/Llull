@@ -39,7 +39,7 @@ describe('civil SVG exports', () => {
 
   it('prints a real 1:N scale in the long section, cross sections and plan-profile sheet', () => {
     const { doc, id } = designedRoad();
-    const long = svgOf(doc, 'export_long_section', { alignmentId: id });
+    const long = svgOf(doc, 'export_road_long_section', { alignmentId: id });
     const horizontal = /Scale H 1:(\d+) {2}V 1:(\d+)/.exec(long);
     expect(Number(horizontal?.[1])).toBeGreaterThan(100);
     expect(Number(horizontal?.[2])).toBe(Math.round(Number(horizontal?.[1]) / 10));
@@ -52,7 +52,7 @@ describe('civil SVG exports', () => {
   it('returns every civil drawing under data.svg (rasterizable) and keeps data.text', () => {
     const { doc, id } = designedRoad();
     for (const [name, params] of [
-      ['export_long_section', { alignmentId: id }],
+      ['export_road_long_section', { alignmentId: id }],
       ['export_cross_sections', { alignmentId: id }],
       ['export_plan_profile_sheet', { alignmentId: id }],
       ['export_civil_plan_sheet', {}],
@@ -72,7 +72,7 @@ describe('civil SVG exports', () => {
 
   it('long section data band keeps columns apart and off the row labels', () => {
     const { doc, id } = designedRoad();
-    const svg = svgOf(doc, 'export_long_section', { alignmentId: id, interval: 30 });
+    const svg = svgOf(doc, 'export_road_long_section', { alignmentId: id, interval: 30 });
     const stationCells = [...svg.matchAll(/<text x="([\d.]+)" y="[\d.]+"[^>]*text-anchor="(\w+)"[^>]*>(\d\+\d{3}\.\d{2})<\/text>/g)];
     expect(stationCells.length).toBeGreaterThan(2);
     expect(stationCells[0]?.[2]).toBe('start');
@@ -133,7 +133,7 @@ describe('civil SVG exports', () => {
       rimElevation: 100,
     }).document;
     doc = execute(doc, 'add_manhole', { location: [0, 0], invertElevation: 97, rimElevation: 100 }).document;
-    doc = execute(doc, 'add_pipe', { fromId: 'manhole-1', toId: 'manhole-2' }).document;
+    doc = execute(doc, 'add_drainage_pipe', { fromId: 'manhole-1', toId: 'manhole-2' }).document;
     const label = doc.entities['pipe-1:label'];
     expect(label?.kind === 'text' && label.rotation[2]).toBeCloseTo(0, 9);
     const rotated = {

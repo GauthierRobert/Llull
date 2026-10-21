@@ -88,7 +88,7 @@
   },
   {
     "command": "set_mesh_controls",
-    "params": { "analysisId": "$an", "mesher": "gmsh", "elementFamily": "tet", "order": 2, "globalSize": 2.5 }
+    "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 2.5 }
   },
   { "command": "add_result_probe", "params": { "analysisId": "$an", "name": "tip", "point": [250, 5, 2.5], "quantity": "u_z" } },
   { "command": "add_result_probe", "params": { "analysisId": "$an", "name": "stress_mid", "point": [125.0, 5, 5], "quantity": "s_xx" } }

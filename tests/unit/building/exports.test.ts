@@ -82,7 +82,7 @@ describe('plan drawing', () => {
   });
 });
 
-describe('export_dxf', () => {
+describe('export_building_dxf', () => {
   it('writes an R12 DXF with AIA layers, entities and the 2D drafting', () => {
     let doc = house();
     doc = run(doc, 'draw_polyline', { points: xy(0, -3000, 10000, -3000) });
@@ -95,7 +95,7 @@ describe('export_dxf', () => {
     doc = run(doc, 'draw_point', { position: [5, 5] });
     doc = run(doc, 'add_text', { content: 'Note ²', position: [0, -6000, 0], height: 200 });
     const snapshot = structuredClone(doc);
-    const result = execute(doc, 'export_dxf', {});
+    const result = execute(doc, 'export_building_dxf', {});
     expect(doc).toEqual(snapshot);
     expect(result.document).toBe(doc);
     const data = result.data as DxfExport;
@@ -114,12 +114,12 @@ describe('export_dxf', () => {
   it('exports 3D solids as their technical top view (visible, hidden dashed, centre chain)', () => {
     let doc = run(createEmptyDocument(), 'add_box', { size: [10, 10, 1], position: [0, 0, 5] });
     doc = run(doc, 'add_cylinder', { radius: 2, height: 2, position: [0, 0, 0] });
-    const data = execute(doc, 'export_dxf', {}).data as DxfExport;
+    const data = execute(doc, 'export_building_dxf', {}).data as DxfExport;
     expect(data.layers).toEqual(expect.arrayContaining(['OBJ-VISIBLE', 'OBJ-HIDDEN', 'OBJ-CENTER']));
     expect(data.dxf).toMatch(/\nLAYER\n2\nOBJ-HIDDEN\n70\n0\n62\n8\n6\nDASHED/);
     expect(data.dxf).toMatch(/\nLAYER\n2\nOBJ-CENTER\n70\n0\n62\n1\n6\nCENTER/);
     expect(data.dxf).toContain('\nLTYPE\n2\nCENTER\n');
-    expect(execute(doc, 'export_dxf', { includeDrafting: false }).summary).toMatch(/nothing/);
+    expect(execute(doc, 'export_building_dxf', { includeDrafting: false }).summary).toMatch(/nothing/);
   });
   it('exports dimensions as lines and measured text, and says so', () => {
     let doc = run(createEmptyDocument(), 'draw_polyline', { points: xy(0, 0, 100, 0) });
@@ -130,9 +130,10 @@ describe('export_dxf', () => {
     doc = run(doc, 'add_dimension', { dimensionKind: 'aligned', entityIds: ['line-1.1', 'line-3.1'], offset: 5, label: 'REF 60' });
     doc = run(doc, 'add_dimension', { dimensionKind: 'radial', entityIds: ['circ-4.1'] });
     doc = run(doc, 'add_dimension', { dimensionKind: 'angular', entityIds: ['line-1.1', 'line-3.1'] });
-    const bare = (execute(run(createEmptyDocument(), 'draw_polyline', { points: xy(0, 0, 100, 0) }), 'export_dxf', {}).data as DxfExport)
-      .entityCount;
-    const result = execute(doc, 'export_dxf', {});
+    const bare = (
+      execute(run(createEmptyDocument(), 'draw_polyline', { points: xy(0, 0, 100, 0) }), 'export_building_dxf', {}).data as DxfExport
+    ).entityCount;
+    const result = execute(doc, 'export_building_dxf', {});
     const data = result.data as DxfExport;
     expect(data.dimensions).toBe(4);
     expect(data.entityCount).toBeGreaterThan(bare + 4 * 2);
@@ -141,15 +142,15 @@ describe('export_dxf', () => {
     expect(data.dxf).toMatch(/\n1\n90\.0\\U\+00B0\n/);
     const orphan = structuredClone(doc);
     delete orphan.entities['line-3.1'];
-    expect((execute(orphan, 'export_dxf', {}).data as DxfExport).dimensions).toBe(2);
+    expect((execute(orphan, 'export_building_dxf', {}).data as DxfExport).dimensions).toBe(2);
   });
   it('exports drafting-only documents and fails cleanly', () => {
     const drafting = run(createEmptyDocument(), 'draw_polyline', { points: xy(0, 0, 1, 0) });
-    const result = execute(drafting, 'export_dxf', {});
+    const result = execute(drafting, 'export_building_dxf', {});
     expect((result.data as DxfExport).filename).toBe('Untitled_project_drafting.dxf');
-    expect(execute(drafting, 'export_dxf', { levelId: 'level-1' }).summary).toMatch(/no level/);
-    expect(execute(createEmptyDocument(), 'export_dxf', {}).summary).toMatch(/nothing to export/);
-    expect(execute(drafting, 'export_dxf', { includeDrafting: false }).summary).toMatch(/nothing/);
+    expect(execute(drafting, 'export_building_dxf', { levelId: 'level-1' }).summary).toMatch(/no level/);
+    expect(execute(createEmptyDocument(), 'export_building_dxf', {}).summary).toMatch(/nothing to export/);
+    expect(execute(drafting, 'export_building_dxf', { includeDrafting: false }).summary).toMatch(/nothing/);
   });
   it('name and text helpers', () => {
     expect(dxfLayerName('Layer 0 / walls')).toBe('Layer_0___walls');
@@ -318,7 +319,7 @@ describe('DXF drafting text and extents', () => {
       rotation: [0, 0, Math.PI / 2],
       anchor: 'right',
     });
-    const dxf = (execute(doc, 'export_dxf', {}).data as DxfExport).dxf;
+    const dxf = (execute(doc, 'export_building_dxf', {}).data as DxfExport).dxf;
     expect(dxf).toMatch(/Far note\n50\n90\n72\n2\n11\n50000/);
     expect(dxf).toMatch(/\$EXTMAX\n10\n50000\n20\n20000/);
   });
@@ -392,7 +393,7 @@ describe('extreme model sizes', () => {
   it('DXF hatch density is capped for a 500 km wall', () => {
     let doc = run(createEmptyDocument(), 'add_level', { name: 'L' });
     doc = run(doc, 'draw_walls', { points: xy(0, 0, 500_000_000, 0), thickness: 10_000_000 });
-    const data = execute(doc, 'export_dxf', {}).data as DxfExport;
+    const data = execute(doc, 'export_building_dxf', {}).data as DxfExport;
     expect(data.entityCount).toBeLessThan(5000);
   });
 });
@@ -444,7 +445,7 @@ describe('cut fills (hatches)', () => {
     let doc = house();
     doc = run(doc, 'add_steel_member', { profile: 'HEA300', role: 'column', start: [25000, 20000, 0], end: [25000, 20000, 3000] });
     doc = run(doc, 'add_column', { location: [30000, 20000], shape: 'circular', width: 400 });
-    const data = execute(doc, 'export_dxf', { levelId: 'level-1' }).data as DxfExport;
+    const data = execute(doc, 'export_building_dxf', { levelId: 'level-1' }).data as DxfExport;
     expect(data.layers).toEqual(expect.arrayContaining(['A-WALL-PATT', 'S-COLS-PATT']));
     for (const s of [/0\nSOLID\n8\nS-COLS-PATT\n/, /0\nLINE\n8\nA-WALL-PATT\n/, /2\nA-WALL-PATT\n70\n0\n62\n8\n/])
       expect(data.dxf).toMatch(s);

@@ -34,7 +34,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   THM_CAVITY_INVALID: 'give a unique cavity name of at most 3 characters and at least 2 faces',
   THM_CONTACT_INVALID: 'give master and slave targets on different parts and a positive conductance in W/(m^2*K)',
   THM_CONTACT_NOT_FOUND: 'list the contacts with describe_analysis (ids are tc-<step>.<k>)',
-  THM_BC_CONFLICT: 'keep one temperature BC per face (delete_thermal_bc), or move one to other faces, then re-mesh',
+  THM_BC_CONFLICT: 'keep one temperature BC per face (delete_analysis_item), or move one to other faces, then re-mesh',
   THM_HEAT_BALANCE: 'refine the mesh or time step and check the boundary conditions; do not report the result as final',
   THM_NO_LIMITS: 'add_temperature_limit with a datasheet or rule citation',
   THM_LIMIT_SOURCE_REQUIRED: 'add source: { citation } (component datasheet, company rule or material record)',

@@ -9,7 +9,7 @@ import { liveKernels, describeNative } from './kernelTestSupport';
 
 const kernels = liveKernels();
 
-describeNative('occt export_step_exact nested scaled assembly', () => {
+describeNative('occt export_step_ap242 nested scaled assembly', () => {
   it('shares the scaled sub-part across instances, bakes only the non-uniform instance, and re-imports at the same volumes and centroids', () => {
     const ctx = { ...defaultContext(), kernel: kernels.occt };
     const run = (doc: CadDocument, name: string, params: Record<string, unknown>): CommandResult => {
@@ -40,7 +40,7 @@ describeNative('occt export_step_exact nested scaled assembly', () => {
     const pair = run(holder.document, 'create_component', { name: 'Pair', entityIds: holder.affected, componentId: 'comp-pair' });
     doc = run(pair.document, 'insert_instance', { componentId: 'comp-pair', scale: [2, 2, 2], position: [0, -100, 0] }).document;
 
-    const exported = run(doc, 'export_step_exact', {});
+    const exported = run(doc, 'export_step_ap242', { schema: 'ap214', includeValidationProperties: false });
     const data = exported.data as { step: string; entityIds: string[]; assembly: { products: number; occurrences: number } };
     // products: Rod, Big, Rod x2 (shared by every Big and by Pair x2), Rod 2x1x3 (baked), Pair, Pair x2
     // occurrences: Rod, 3 x Big, the skewed Rod, Pair, Pair x2

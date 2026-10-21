@@ -1,7 +1,7 @@
 /**
  * 03 GDT VC-GDT-22: the NIST STEP File Analyzer (SFA 5.51, `sfa-cl.exe`) on the AP242 files llull writes with `includePmi`. Runs only where
  * `sfa-cl` is installed AND its IFCsvr toolkit is registered (SFA refuses to read a STEP file without it); otherwise skips with the reason
- * logged. Override the binary with LLULL_SFA. Install record: docs/decisions/SV1-solver-toolchain-windows.md.
+ * logged. Opt-in with LLULL_SFA_RUN=1; override the binary with LLULL_SFA. Install record: docs/decisions/SV1-solver-toolchain-windows.md.
  * Checks: no syntax-error report, the spreadsheet (CSV) reports exist and list the semantic PMI the file carries.
  */
 
@@ -24,8 +24,16 @@ function analyse(file: string): { status: number | null; output: string } {
   return { status: run.status, output: `${run.stdout ?? ''}${run.stderr ?? ''}` };
 }
 
+/** Where the IFCsvr installer registers its COM component (docs/decisions/SV1-solver-toolchain-windows.md). */
+const IFCSVR_DIR = path.join(process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)', 'IFCsvrR300');
+
 function unavailable(): string | null {
+  // On this machine sfa-cl relaunched itself in an endless chain that the spawn timeout cannot reap (2026-10-21: 3k processes, 85 GB,
+  // with and without the IFCsvr toolkit), so the suite never starts it unless asked to.
+  if (process.env['LLULL_SFA_RUN'] !== '1') return 'opt-in: set LLULL_SFA_RUN=1 (sfa-cl can relaunch itself endlessly; watch it)';
   if (!existsSync(SFA)) return `sfa-cl not found at ${SFA} (download SFA-5.nn.zip from github.com/usnistgov/SFA, set LLULL_SFA)`;
+  if (!existsSync(IFCSVR_DIR))
+    return `the IFCsvr toolkit of SFA is not installed at ${IFCSVR_DIR} (run the .msi SFA unpacks into %TEMP%\\SFA; it needs administrator rights)`;
   const dir = mkdtempSync(path.join(os.tmpdir(), 'llull-sfa-probe-'));
   try {
     const probe = path.join(dir, 'probe.stp');

@@ -79,9 +79,9 @@ function civilStarterActions(surveyText: string): PlanAction[] {
     manhole('MH2', at(180, 40), 104.3, { areaHa: 0.12, c: 0.85 }),
     manhole('MH3', at(120, 12), 101.8, { areaHa: 0.6, c: 0.4 }),
     manhole('Outfall', at(72, 12), 100.45),
-    { command: 'add_pipe', params: { fromId: 'manhole-1', toId: 'manhole-2' } },
-    { command: 'add_pipe', params: { fromId: 'manhole-2', toId: 'manhole-3' } },
-    { command: 'add_pipe', params: { fromId: 'manhole-3', toId: 'manhole-4' } },
+    { command: 'add_drainage_pipe', params: { fromId: 'manhole-1', toId: 'manhole-2' } },
+    { command: 'add_drainage_pipe', params: { fromId: 'manhole-2', toId: 'manhole-3' } },
+    { command: 'add_drainage_pipe', params: { fromId: 'manhole-3', toId: 'manhole-4' } },
     { command: 'size_drainage_pipes', params: { idf: CIVIL_STARTER_IDF, minVelocity: 0.6 } },
     { command: 'fit_view', params: { direction: 'iso' } },
   ];

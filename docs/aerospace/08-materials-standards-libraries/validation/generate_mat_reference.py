@@ -280,8 +280,8 @@ def agent_first_cases(materials: dict, catalog: dict) -> list[dict]:
          "derivation": "TECHNICAL_SPEC 7.1"},
         {"id": "VC-MAT-25", "quantity": "human gates refuse an agent caller (AF-34)",
          "expected": [
-             {"call": "export_step_exact on an ITAR-marked document", "exitCode": 1, "code": "MAT_EXPORT_CONTROLLED", "saved": []},
-             {"call": "export_step_exact confirmExportControlled=true (agent, no human token)", "exitCode": 1, "code": "MAT_HUMAN_GATE", "saved": []},
+             {"call": "export_step_ap242 on an ITAR-marked document", "exitCode": 1, "code": "MAT_EXPORT_CONTROLLED", "saved": []},
+             {"call": "export_step_ap242 confirmExportControlled=true (agent, no human token)", "exitCode": 1, "code": "MAT_HUMAN_GATE", "saved": []},
              {"call": "lower marking ITAR -> none (agent)", "exitCode": 1, "code": "MAT_HUMAN_GATE", "documentChanged": False},
              {"call": "raise marking none -> EAR99 (agent)", "exitCode": 0, "documentChanged": True}],
          "derivation": "FR-MAT-30, TR-MAT-51"},

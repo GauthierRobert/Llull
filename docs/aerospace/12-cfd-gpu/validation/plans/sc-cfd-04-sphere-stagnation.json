@@ -7,11 +7,11 @@
     { "command": "set_units", "params": { "units": "m" } },
     { "command": "add_sphere", "params": { "radius": 0.5 }, "as": "ball" },
     {
-      "command": "cfd_create_case",
+      "command": "create_cfd_case",
       "params": { "id": "m08", "entityIds": ["$ball"], "regime": "compressible", "freestream": { "mach": 0.8, "altitudeM": 0, "alphaDeg": 0, "betaDeg": 0 }, "reference": { "areaM2": 0.7853981634, "lengthM": 1, "momentPointM": [0, 0, 0] }, "domain": { "rule": "external_aero" }, "ground": { "enabled": false, "moving": false }, "quality": "standard" }
     },
     {
-      "command": "cfd_create_case",
+      "command": "create_cfd_case",
       "params": { "id": "m2", "entityIds": ["$ball"], "regime": "compressible", "freestream": { "mach": 2, "altitudeM": 0, "alphaDeg": 0, "betaDeg": 0 }, "reference": { "areaM2": 0.7853981634, "lengthM": 1, "momentPointM": [0, 0, 0] }, "domain": { "rule": "external_aero" }, "ground": { "enabled": false, "moving": false }, "quality": "standard" }
     }
   ],

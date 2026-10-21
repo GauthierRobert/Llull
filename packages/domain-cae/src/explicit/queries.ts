@@ -1,11 +1,11 @@
-/** explicit_report / explicit_energy_check: read-only views of an explicit case and its verified result (PHY-19 §5.4, §5.5, AF-20/21/33). */
+/** View 'explicit' of analysis_report, and explicit_energy_check: read-only views of an explicit case and its verified result (PHY-19 §5.4, §5.5, AF-20/21/33). */
 
 import type { ExplicitResultsSummary } from '@core/model/explicit';
 import type { NamedValue } from '@core/model/topology';
 import type { CadDocument } from '@core/model/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
-import type { CommandResult } from '@core/commands/types';
+import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { significantNumber } from '@lib/compactNumber';
 import { analysisIdSchema } from '../shared/schemas';
 import { energyError } from './artifact';
@@ -41,66 +41,57 @@ const notFound = (doc: CadDocument, command: string, analysisId: string, code: s
  *   certificationEvidence false on every report (VC-EXP-61)
  * @failure unknown / non-explicit case -> FEA_ANALYSIS_NOT_FOUND / EXP_CASE_TYPE (rejected no-op)
  */
-export const explicitReport = defineCommand({
-  name: 'explicit_report',
-  annotations: { readOnly: true },
-  description:
-    'Read-only report of an explicit_dynamics case: state (unsolved | solved | stale | missing | untrusted), controls with their named defaults, ' +
-    'initial velocities, rigid walls and - when solved - the verified result: termination, cycles, final time, minimum step, energies and the ' +
-    'energy error, hourglass ratio, added mass ratio, max von Mises and plastic strain with their location, failed elements, per-wall peak force ' +
-    'and impulse, and the energy and wall-force histories (at most maxPoints samples each). Always reviewRequired, never certification evidence.',
-  params: z.object({
-    analysisId: analysisIdSchema,
-    maxPoints: z.number().int().optional().describe('Most samples per history, 2 to 500. Default 200.'),
-  }),
-  run: (doc, { analysisId, maxPoints = 200 }, ctx): CommandResult => {
-    const found = explicitCase(doc, analysisId);
-    if ('code' in found) return notFound(doc, 'explicit_report', analysisId, found.code, found.message);
-    const { analysisCase, spec } = found;
-    const trusted = trustedExplicit(doc, analysisCase, ctx?.feaArtifacts);
-    const limit = Math.max(2, Math.min(MAX_HISTORY_POINTS, maxPoints));
-    const artifact = trusted.artifact;
-    const summary = trusted.summary;
-    const { results, ...setup } = spec ?? { results: undefined };
-    void results;
-    const data = {
-      analysisId,
-      state: trusted.state,
-      unitSystem: analysisCase.unitSystem,
-      setup: spec === undefined ? null : setup,
-      result: summary,
-      histories:
-        artifact === null || summary === null
-          ? null
-          : {
-              energy: thin(artifact.energy, limit).map((row) => ({ ...row, error: energyError(row, summary.energy.initialKinetic) })),
-              walls: artifact.walls.map((wall) => {
-                const indices = thin(
-                  wall.t.map((_, index) => index),
-                  limit,
-                );
-                return {
-                  name: wall.name,
-                  t: indices.map((index) => wall.t[index] ?? 0),
-                  force: indices.map((index) => wall.force[index] ?? 0),
-                };
-              }),
-            },
-      provenance: { formulation: FORMULATION, solver: summary?.solver ?? null, artifactHash: spec?.results?.artifactHash ?? null },
-      problem: trusted.problem,
-      unverified: summary?.unverified ?? false,
-      unverifiedReasons: summary?.unverifiedReasons ?? [],
-      reviewRequired: true,
-      certificationEvidence: false,
-      reviewReason: REVIEW,
-    };
-    const text =
-      summary === null
-        ? `explicit_report: ${analysisId} state ${trusted.state}${trusted.problem === null ? '' : ` (${trusted.problem.code}: ${trusted.problem.message})`}.`
-        : `explicit_report: ${analysisId} ${summary.termination} termination, ${summary.cycles} cycles to ${significantNumber(summary.finalTimeS, 6)} s; energy error ${significantNumber(100 * summary.energy.errorFinal, 3)} %; max von Mises ${significantNumber(summary.maxVonMises.value, 6)} ${summary.maxVonMises.unit}. Computed by llull, not approved — needs a qualified engineer.`;
-    return report(doc, text, data);
-  },
-});
+export function explicitResultsReport(
+  doc: CadDocument,
+  { analysisId, maxPoints = 200 }: { analysisId: string; maxPoints?: number | undefined },
+  ctx?: ExecutionContext,
+): CommandResult {
+  const found = explicitCase(doc, analysisId);
+  if ('code' in found) return notFound(doc, 'analysis_report', analysisId, found.code, found.message);
+  const { analysisCase, spec } = found;
+  const trusted = trustedExplicit(doc, analysisCase, ctx?.feaArtifacts);
+  const limit = Math.max(2, Math.min(MAX_HISTORY_POINTS, maxPoints));
+  const artifact = trusted.artifact;
+  const summary = trusted.summary;
+  const { results, ...setup } = spec ?? { results: undefined };
+  void results;
+  const data = {
+    analysisId,
+    state: trusted.state,
+    unitSystem: analysisCase.unitSystem,
+    setup: spec === undefined ? null : setup,
+    result: summary,
+    histories:
+      artifact === null || summary === null
+        ? null
+        : {
+            energy: thin(artifact.energy, limit).map((row) => ({ ...row, error: energyError(row, summary.energy.initialKinetic) })),
+            walls: artifact.walls.map((wall) => {
+              const indices = thin(
+                wall.t.map((_, index) => index),
+                limit,
+              );
+              return {
+                name: wall.name,
+                t: indices.map((index) => wall.t[index] ?? 0),
+                force: indices.map((index) => wall.force[index] ?? 0),
+              };
+            }),
+          },
+    provenance: { formulation: FORMULATION, solver: summary?.solver ?? null, artifactHash: spec?.results?.artifactHash ?? null },
+    problem: trusted.problem,
+    unverified: summary?.unverified ?? false,
+    unverifiedReasons: summary?.unverifiedReasons ?? [],
+    reviewRequired: true,
+    certificationEvidence: false,
+    reviewReason: REVIEW,
+  };
+  const text =
+    summary === null
+      ? `analysis_report: ${analysisId} state ${trusted.state}${trusted.problem === null ? '' : ` (${trusted.problem.code}: ${trusted.problem.message})`}.`
+      : `analysis_report: ${analysisId} ${summary.termination} termination, ${summary.cycles} cycles to ${significantNumber(summary.finalTimeS, 6)} s; energy error ${significantNumber(100 * summary.energy.errorFinal, 3)} %; max von Mises ${significantNumber(summary.maxVonMises.value, 6)} ${summary.maxVonMises.unit}. Computed by llull, not approved — needs a qualified engineer.`;
+  return report(doc, text, data);
+}
 
 type Status = 'pass' | 'warn' | 'fail';
 

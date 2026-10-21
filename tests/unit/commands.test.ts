@@ -687,19 +687,19 @@ describe('joints, drive relations, motion', () => {
     expect([!!dr.joints[jid1], !!dr.joints[jid2]]).toEqual([true, true]);
   });
 
-  it('evaluate_motion / bake_motion: queries are pure, prismatic offsets move B, bake writes positions', () => {
+  it('evaluate_motion (apply false | true): queries are pure, prismatic offsets move B, bake writes positions', () => {
     const doc = empty();
     const r = execute(doc, 'evaluate_motion', {});
     expectNoOp(r, doc);
     expect(r.data).toEqual(expect.objectContaining({ resolvedJoints: {}, instancePositions: {} }));
-    expectNoOp(execute(doc, 'bake_motion', {}), doc);
+    expectNoOp(execute(doc, 'evaluate_motion', { apply: true }), doc);
     const rev = joint(idoc, idA, idB, 'revolute', 'z', Math.PI / 4).doc;
     expectPure(rev, () => expect(execute(rev, 'evaluate_motion', {}).document).toBe(rev));
-    expectPure(rev, () => execute(rev, 'bake_motion', {}));
+    expectPure(rev, () => execute(rev, 'evaluate_motion', { apply: true }));
     const px = joint(idoc, idA, idB, 'prismatic', 'x', 5).doc;
     const pos = (execute(px, 'evaluate_motion', {}).data as { instancePositions: Record<string, number[]> }).instancePositions;
     expect(pos[idB]![0]).toBeCloseTo(5, 5);
-    const baked = execute(joint(idoc, idA, idB, 'prismatic', 'y', 3).doc, 'bake_motion', {});
+    const baked = execute(joint(idoc, idA, idB, 'prismatic', 'y', 3).doc, 'evaluate_motion', { apply: true });
     expect(baked.affected).toContain(idB);
     expect(baked.document.entities[idB]!.position[1]).toBeCloseTo(3, 5);
   });

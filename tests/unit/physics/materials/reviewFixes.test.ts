@@ -80,14 +80,14 @@ describe('H2 property models read by material laws', () => {
   };
   it('refuses to remove or re-dimension a property model a law reads', () => {
     const d = doc();
-    expect(codeOf(d, 'remove_property_model', { material: 'aa6061_t6', modelId: 'E' })).toBe('PROP_MODEL_IN_USE');
+    expect(codeOf(d, 'delete_property_model', { material: 'aa6061_t6', modelId: 'E' })).toBe('PROP_MODEL_IN_USE');
     const wrong = execute(d, 'define_property_model', { material: 'aa6061_t6', model: nistModel('aa6061_t6.k', 'E'), replace: true });
     expect(wrong.error?.code).toBe('PROP_MODEL_IN_USE');
     expect(wrong.document).toBe(d);
     expect(
       execute(d, 'define_property_model', { material: 'aa6061_t6', model: nistModel('aa6061_t6.E', 'E'), replace: true }).error,
     ).toBeUndefined();
-    expect(execute(d, 'remove_property_model', { material: 'aa6061_t6', modelId: 'k' }).error).toBeUndefined();
+    expect(execute(d, 'delete_property_model', { material: 'aa6061_t6', modelId: 'k' }).error).toBeUndefined();
   });
 });
 

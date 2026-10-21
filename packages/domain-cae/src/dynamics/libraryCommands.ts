@@ -156,7 +156,7 @@ export const defineTimeHistory = defineCommand({
   name: 'define_time_history',
   description:
     'Define a time history (s, value) for PHY-09 dynamics: an input to shock_response_spectrum by name, and (V1) to transient cases. unit: ' +
-    'factor | N | N*mm | mm | g. Times strictly increasing, values finite, source { citation }. (PHY-07 fatigue histories are define_load_history.)',
+    'factor | N | N*mm | mm | g. Times strictly increasing, values finite, source { citation }. Fatigue and crack-growth load histories (id-keyed series or blocks of cycles, stress / load_factor / strain) are a different record: use define_load_history.',
   params: z.object({
     name: nameSchema,
     unit: z.enum(['factor', 'N', 'N*mm', 'mm', 'g']).describe('Unit of the values.'),

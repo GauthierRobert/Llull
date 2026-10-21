@@ -3,5 +3,12 @@
 import type { CadPlugin } from '@core/plugins/plugin';
 import { cfdCommands } from './catalog';
 import { cfdDocument } from './document';
+import { cfdRetiredCommands } from './retired';
 
-export const cfdPlugin: CadPlugin = { name: 'cfd', toolset: 'flow', commands: cfdCommands, document: cfdDocument };
+export const cfdPlugin: CadPlugin = {
+  name: 'cfd',
+  toolset: 'flow',
+  commands: cfdCommands,
+  document: cfdDocument,
+  retiredCommands: cfdRetiredCommands,
+};

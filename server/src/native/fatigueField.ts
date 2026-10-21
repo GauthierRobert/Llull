@@ -6,7 +6,7 @@
 
 import type { FeaHost, FeaToolResult } from '@protocol/index';
 import { isEvaluationFailure } from '@cae/fatigue/evaluate';
-import { fatigueFieldArtifact, fatigueFieldInput, fatigueFieldReference, FIELD_COMPONENTS, readFatigueField } from '@cae/fatigue/feField';
+import { fatigueFieldArtifact, fatigueFieldInput, FIELD_COMPONENTS, readFatigueField } from '@cae/fatigue/feField';
 import type { FeArtifactCache } from '../fea/artifactStore';
 import { feaFailure } from '../fea/feaCommon';
 import { f64Bytes, f64Values, readOutput, withJobFolder, type ComputeRunner } from './computeJob';
@@ -24,19 +24,6 @@ export interface NativeDeps {
 
 export interface FatigueFieldOptions {
   readonly timeoutS?: number;
-  /** Also run the TypeScript reference on every node and report the agreement (VC-FAT-43); slower. */
-  readonly verify?: boolean;
-}
-
-/** Largest relative difference between two fields, per value (0 when identical). */
-function largestDifference(native: Float64Array, reference: Float64Array): number {
-  let worst = 0;
-  native.forEach((value, index) => {
-    const wanted = reference[index] ?? Number.NaN;
-    if (value === wanted) return;
-    worst = Math.max(worst, Math.abs(value - wanted) / Math.max(Math.abs(value), Math.abs(wanted), Number.MIN_VALUE));
-  });
-  return worst;
 }
 
 /**
@@ -81,16 +68,6 @@ export async function runFatigueField(
   const stored = readFatigueField(deps.store, input);
   if (isEvaluationFailure(stored))
     return feaFailure(TOOL, stored.code, `the stored field cannot be read back: ${stored.message}`, [caseId]);
-  let verification: Record<string, unknown> | undefined;
-  if (options.verify === true) {
-    const started = Date.now();
-    const reference = fatigueFieldReference(input);
-    verification = {
-      referenceMs: Date.now() - started,
-      largestRelativeDifference: largestDifference(field, reference),
-      identical: largestDifference(field, reference) === 0,
-    };
-  }
   const hotSpots = host.applyCommand('compute_fatigue', { caseId });
   return {
     summary: `fatigue_field ${caseId}: llull-compute damaged all ${input.nodeIds.length} nodes in ${run.elapsedMs} ms (field ${fieldHash.slice(0, 12)}, input ${input.key.slice(0, 12)}). ${hotSpots.summary}`,
@@ -106,7 +83,6 @@ export async function runFatigueField(
       elapsedMs: run.elapsedMs,
       engine: 'native-cpu',
       deterministic: true,
-      ...(verification !== undefined ? { verification } : {}),
       computeFatigue: hotSpots.data,
     },
   };

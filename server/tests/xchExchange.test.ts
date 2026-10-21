@@ -376,7 +376,7 @@ describeNativeWhen({ capabilities: XDE, unless: NIST_MISSING ? `${NIST} has no N
       expect(report.exchange.gvpCheck.band).toBe('red');
       expect(report.reviewRequired.reasons).toContain('import_gvp_red');
       expect(report.warnings.map((warning) => warning.code)).toContain('XCH_GVP_RED');
-      for (const name of ['export_step_ap242', 'export_step_exact', 'export_iges']) {
+      for (const name of ['export_step_ap242', 'export_iges']) {
         const refused = run(result.document, name, {});
         expect(refused.error?.code, name).toBe('XCH_UNVERIFIED_BODIES');
         expect(refused.data, name).toBeUndefined();

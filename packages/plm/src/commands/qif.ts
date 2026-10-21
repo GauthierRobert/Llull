@@ -34,10 +34,10 @@ const nextSetId = (ids: readonly string[], revision: string): string => {
 export const importQifResults = defineCommand({
   name: 'import_qif_results',
   description:
-    'HUMAN GATE. Import the measured results of a QIF 3.0 file (MeasurementResults / MeasuredCharacteristics / CharacteristicMeasurements, ANSI/DMSC QIF 3.0) as the FAI ' +
+    'Import the measured results of a QIF 3.0 file (MeasurementResults / MeasuredCharacteristics / CharacteristicMeasurements, ANSI/DMSC QIF 3.0) as the FAI ' +
     'results of one revision: each characteristic measurement is matched to a characteristic number of the register (assign_characteristic_ids) through the Name of its ' +
     'CharacteristicItem (the balloon number) or, when the file carries no items, its CharacteristicItemId; its Value, unit and Status (PASS, FAIL, ...) are stored as the ' +
-    'measuring system wrote them (llull does not judge them). The file is parsed safely: DOCTYPE and entities are refused, size (8 MB), nesting (48) and element count are ' +
+    'measuring system wrote them (llull does not judge them). HUMAN GATE. The file is parsed safely: DOCTYPE and entities are refused, size (8 MB), nesting (48) and element count are ' +
     'limited. The result set keeps the SHA-256 of the exact file. Read it back with fai_report_skeleton { resultsId }. Matches and gaps are in the summary. Needs ' +
     '`confirmation` (plm_act_payload) over exactly these params, the file included: an agent gets PLM_HUMAN_GATE and hands over.',
   annotations: { metaHistory: true },

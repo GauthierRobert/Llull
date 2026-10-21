@@ -122,7 +122,7 @@
    "assert": "data.plies[0].nodesOverLock / interior nodes"
   },
   "VC-CMP-14": {
-   "run": "llull export_flat_patterns_dxf part=$cyl --doc t.llull.json --kernel occt --json",
+   "run": "llull export_ply_flat_patterns_dxf part=$cyl --doc t.llull.json --kernel occt --json",
    "assert": "data pieces width, helix pitch, turn length"
   },
   "VC-CMP-15": {
@@ -130,7 +130,7 @@
    "assert": "flat piece outer radius, sector angle, area"
   },
   "VC-CMP-16": {
-   "run": "llull export_flat_patterns_dxf part=$part plies=[$c1] --save cone.dxf --doc t.llull.json --kernel occt --json; llull import_dxf file=cone.dxf --doc t.llull.json --kernel occt --json; llull measure_area --doc t.llull.json --kernel occt --json",
+   "run": "llull export_ply_flat_patterns_dxf part=$part plies=[$c1] --save cone.dxf --doc t.llull.json --kernel occt --json; llull import_dxf file=cone.dxf --doc t.llull.json --kernel occt --json; llull measure_area --doc t.llull.json --kernel occt --json",
    "assert": "data.area; DXF header $INSUNITS"
   },
   "VC-CMP-17": {
