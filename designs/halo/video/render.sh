@@ -32,12 +32,12 @@ caption() {
   filters+=",drawtext=fontfile=$fontLight:text='$sub':fontcolor=0xcfe3ff:fontsize=23:expansion=none:x=62:y=h-70:alpha='$alpha':enable='between(t,$a,$b)'"
 }
 if [ "$design" = v3 ]; then
-caption 0.3 5 "HALO v3 test article  -  no arms, no open propellers" "one ring is the duct, the wing, the guard and the landing gear   |   440 mm   |   1.22 kg"
-caption 5 12 "Inside — hollow CFRP ring, 80 g hub motors, 8 x 21700 cells" "144 Wh split around the motors: static margin +7 %  |  rotor loops in 7075 root sockets"
-caption 12 20 "Hover — two contra-rotating toroidal rotors inside a duct" "~27 m/s tips (a quad ~75 m/s)  |  est. ~104 W, ~70 min  |  8 flaps: ~27 rad/s2 authority"
+caption 0.3 5 "HALO v3 test article  -  no arms, no open propellers" "one ring is the duct, the wing, the guard and the landing gear   |   440 mm   |   1.28 kg"
+caption 5 12 "Inside — hollow CFRP ring, 80 g hub motors, 8 x 21700 cells" "144 Wh split around the motors - static margin +7 %  |  rotor loops in 7075 root sockets"
+caption 12 20 "Hover — two contra-rotating toroidal rotors inside a duct" "~28 m/s tips (a quad ~75 m/s)  |  est. ~111 W, ~66 min  |  8 flaps, ~27 rad/s2 authority"
 caption 20 27 "Transition — eight exit flaps pitch it 90 degrees nose-first" "the duct becomes an annular wing   |   no tilting mechanism, no extra motors"
-caption 27 34 "Cruise — the ring is the wing  -  span efficiency ~2" "25 m/s cruise at L/D ~6.6 (est.)   |   shown slowed down"
-caption 34 42 "Landing — back to hover, it stands on four CFRP legs" "test envelope - crosswind under 3.8 m/s (est.), see TEST_PLAN.md"
+caption 27 34 "Cruise — the ring is the wing  -  span efficiency ~2" "25 m/s cruise at L/D ~6.9 (est.)   |   shown slowed down"
+caption 34 42 "Landing — back to hover, it stands on four CFRP legs" "first test envelope - wind up to 2-3 m/s (est. limit 3.9 m/s), see TEST_READINESS.md"
 caption 42 46.8 "HALO v3  -  designed, analysed and rendered in llull" "13 design checks  |  CalculiX FEA margins positive  |  estimates in designs/halo/analysis"
 else
 caption 0.3 5 "HALO  -  a drone with no arms and no open propellers" "one ring is the duct, the wing, the guard and the landing gear   |   440 mm   |   1.10 kg"
