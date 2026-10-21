@@ -195,6 +195,8 @@ create_sheet ga name="HALO v2 GA" paper=A2 title="HALO v2 - general arrangement"
 add_section_view _ sheetId=ga direction=front offset=0
 
 # --- checks ------------------------------------------------------------------------------
+# all 12 pass on the mesh kernel; on the native OCC kernel the two check_assembly lines run out of time on the
+# 35-part pairwise pass (FPR_KERNEL_UNSUPPORTED / evaluation timeout), every other line passes
 check check_assembly thickness=off path=status expect == "pass"
 check check_assembly clearanceMm=0.35 thickness=off path=status expect == "pass"   # tightest gaps: 0.4 mm between cells, 0.5 mm motor air gap
 check max of=rotorUpper path=0 expect <= throatR-tipGap+0.5        # tip clearance to the duct throat

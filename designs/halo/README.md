@@ -1,4 +1,61 @@
-# HALO — a ring-wing, toroidal-rotor tail-sitter (concept, gen 1)
+# HALO — a ring-wing, toroidal-rotor tail-sitter
+
+## v2: production model + "how it works" film
+
+▶ **[video/halo_how_it_works.mp4](video/halo_how_it_works.mp4)** (47 s): the parts, then a cutaway, then hover, transition, cruise and landing.
+
+![HALO v2](v2_t3.png)
+
+v2 (`halo_v2.lld`) replaces v1's effective-density blocks with the parts you would actually build. Every part is a
+component, and every repeated part is an instance of one component, so `bill_of_materials` gives a real parts list:
+
+| Item | Production intent (as modelled) |
+| --- | --- |
+| Ring wing | Hollow thin-ply CFRP shell (3 × 0.1 mm, ±45/0), the NACA 4412 duct section, 4 internal ribs at the vane stations, solid laminate close-out 8 mm ahead of the trailing edge, and one Ø2 mm pressure-equalisation vent per rib bay |
+| Pod | 0.6 mm CFRP shell. The barrel laminate (`pod_barrel_layup.lld`) is 8 × 75 µm T700 thin-ply [45/−45/0/90]s on a Ø58.8 mm mandrel. It **passes llull's laminate rules** (symmetric, balanced, ply families, ±45 outer plies). The barrel weighs 42.9 g, and the ply table is in `pod_barrel_plies.csv` |
+| Propulsion | Two hub motors: the stators sit inside the pod skin, and 7075 bells outside it carry the loops. The upper rotor has 3 toroidal loops and the lower rotor 4, contra-rotating. The motor air gap is 0.5 mm |
+| Battery | 8 × 21700 (4S2P, 144 Wh). One layer sits between the motors and one above the avionics, which sets the CG |
+| Avionics | Dual FOC ESC, H7 flight controller, GNSS / telemetry radio, camera behind a PC dome |
+| Control | 4 vane struts, each with a hinged flap (`flapDeg`) driven by a linear micro servo in the tail cone |
+| Landing | 4 TPU 95A feet on the struts, outboard of the flaps (`production/foot_tpu95a.3mf` is ready to print) |
+
+**Checked in llull** (12 `check` lines in `halo_v2.lld`, all passing on the mesh kernel):
+- `check_assembly` passes, with every intended joint declared (`allow_interference`, `set_part_grounded`).
+- No gap is under 0.35 mm. The tightest are 0.4 mm between cells and the 0.5 mm motor air gap.
+- The rotor tips clear the duct throat by 3 mm.
+- The two rotors are at least 23 mm apart axially, and the lower rotor clears the struts by more than 5 mm.
+- The BOM has 15 components and 35 instances.
+- `check_model` is clean.
+
+**On the exact OCC kernel** (`llull-kernel`, built here; this needed the one-line GCC fix in `surfaces.cxx`):
+- The whole model rebuilds as exact B-rep, and `export_step_exact` writes `production/halo_v2.step`, a valid AP242
+  assembly: 15 named parts, 35 occurrences, mm, 0 issues (`verify_exchange_file`).
+- The exact mass is **1107.9 g** (`production/bom.csv`).
+- Limit: the full 35-part pairwise `check_assembly` is too slow on this kernel to finish. The lower rotor alone needs
+  8.6 minutes and passes, and pair classification reports `FPR_KERNEL_UNSUPPORTED`. The clearance gate therefore runs
+  on the mesh kernel.
+
+| Pitch stability (VLM, `vlm_v2.json`, CG 33.6 mm aft of the ring LE) | neutral point 48.1 mm → **static margin +8.5 %** |
+| --- | --- |
+
+`production/HALO-GA-001.svg` / `.png` is the general-arrangement drawing: an A2 sheet, first-angle projection,
+1:5, with front, top, section A-A and iso views, overall dimensions and a title block. The sheet is defined in the
+design itself, so it regenerates with any parameter change.
+
+![GA](production/HALO-GA-001.png)
+
+**How the film is made:** `video/renderFrames.ts` builds each of the 1128 frames by running registered commands on
+`halo_v2.llull.json`: `rotate_entity` / `move_entities` place the vehicle, spin the rotors and deflect the flaps, and
+`add_sphere` adds the airflow tracers. llull's own `render_view` then draws each frame, with a raster cutaway through
+the ring and pod in the inside scene. `video/render.sh` renders the frames, adds the captions and encodes with ffmpeg.
+The motion is choreographed, not simulated. Cruise is shown slowed down. The performance figures in the captions are
+the hand estimates below.
+
+![inside](v2_t9.png) ![cruise](v2_t30.png)
+
+---
+
+## v1 concept
 
 ![iso](iso.png)
 
