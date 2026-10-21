@@ -1,29 +1,26 @@
-/** The `FeaToolsPort` of the server and CLI: Gmsh through llull-mesh (else the Python bridge), CalculiX through a tracked child, artifacts in the store. */
+/** The `FeaToolsPort` of the server and CLI: Gmsh through the llull-mesh sidecar, CalculiX through a tracked child, artifacts in the store. */
 
 import type { FeaToolsPort } from '@protocol/index';
 import { getGeometryKernel } from '@core/geometry/kernel';
 import { positiveInteger } from '../env';
-import { callBridge, pythonExchangeConfigFromEnv } from '../pythonExchange';
 import { defaultFeArtifactStore } from './artifactStore';
 import { caeHooks } from './caeHooks';
 import { createCcxRunner } from './ccxProcess';
 import { runFeaExport } from './feaExport';
 import { runFeaImportField } from './feaImportField';
 import { runFeaImportResults } from './feaImportResults';
-import { runFeaMesh, type MeshBridgeResponse } from './feaMesh';
+import { runFeaMesh, type MesherResponse } from './feaMesh';
 import { runFeaSolve } from './feaSolve';
-import { callNativeMesher, chooseMesher } from './nativeMesher';
+import { callNativeMesher } from './nativeMesher';
+import { nativeBinaryPath, nativeInstallHint } from '../native/nativeBinary';
 import { createComputeRunner } from '../native/computeJob';
 import { nativeMappingStep } from '../native/mapField';
 import { randomPostStep } from '../native/randomField';
 
 const DEFAULT_MESH_TIMEOUT_MS = 600_000;
 
-/** Without llull-mesh and with `LLULL_PYTHON=off` meshing answers FEA_TOOL_MISSING; solving and exporting an existing mesh still work. */
+/** Without llull-mesh meshing answers FEA_TOOL_MISSING; solving and exporting an existing mesh still work. */
 export function createFeaToolsPort(env: NodeJS.ProcessEnv = process.env): FeaToolsPort {
-  const config = pythonExchangeConfigFromEnv(env);
-  const python = env['LLULL_GMSH_PYTHON'] ?? config?.python ?? 'python3';
-  const bridgeScript = config?.bridgeScript;
   const timeoutMs = positiveInteger(env['LLULL_FEA_MESH_TIMEOUT_MS'], DEFAULT_MESH_TIMEOUT_MS);
   const store = defaultFeArtifactStore();
   const ccx = createCcxRunner(env);
@@ -31,19 +28,13 @@ export function createFeaToolsPort(env: NodeJS.ProcessEnv = process.env): FeaToo
   const runner = createComputeRunner(env);
   const beforeDeck = nativeMappingStep({ store, runner, env }, env);
   const randomPost = randomPostStep(runner, env);
-  const mesher = chooseMesher(env);
-  const viaPython = async (request: Record<string, unknown>): Promise<MeshBridgeResponse> => {
-    if (bridgeScript === undefined) throw new Error('cannot start Python: the bridge is disabled (LLULL_PYTHON=off); FEA_TOOL_MISSING');
-    return callBridge(python, bridgeScript, request, timeoutMs);
-  };
-  // llull-mesh without a loadable Gmsh library hands over to the bridge (a Python with the gmsh module still meshes)
-  const bridge = async (request: Record<string, unknown>): Promise<MeshBridgeResponse> => {
-    if (mesher.kind === 'python') return viaPython(request);
-    const response = await callNativeMesher(mesher.binary, request, timeoutMs, env);
-    return response.code === 'FEA_TOOL_MISSING' && bridgeScript !== undefined ? viaPython(request) : response;
+  const mesher = async (request: Record<string, unknown>): Promise<MesherResponse> => {
+    const binary = nativeBinaryPath('llull-mesh', env);
+    if (binary === null) throw new Error(`${nativeInstallHint('llull-mesh')}; FEA_TOOL_MISSING`);
+    return callNativeMesher(binary, request, timeoutMs, env);
   };
   return {
-    mesh: (analysisId, host) => runFeaMesh(analysisId, host, { bridge, store, hooks: caeHooks, kernel: getGeometryKernel }),
+    mesh: (analysisId, host) => runFeaMesh(analysisId, host, { mesher, store, hooks: caeHooks, kernel: getGeometryKernel }),
     solve: (analysisId, options, host) =>
       runFeaSolve(analysisId, options.timeoutS, host, { store, hooks: caeHooks, ccx, keepJobs, beforeDeck, randomPost }),
     exportDeck: (analysisId, host, options) => Promise.resolve(runFeaExport(analysisId, host, { store, hooks: caeHooks }, options)),

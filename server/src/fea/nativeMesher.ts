@@ -1,32 +1,18 @@
 /**
- * The FE mesher behind `fea_mesh`: the native `llull-mesh` sidecar (solver/bins/llull-mesh, Gmsh through its C API) when it is built or
- * bundled, else the Python bridge op `mesh` (server/python/llull_mesh.py). Both take the same request and answer the same response.
- * Environment: LLULL_MESHER = native | python (default: native when `llull-mesh` is found), LLULL_MESH_BIN / LLULL_NATIVE_DIR (binary),
- * LLULL_GMSH_LIB (the Gmsh shared library, read by llull-mesh).
+ * The FE mesher behind `fea_mesh`: the native `llull-mesh` sidecar (solver/bins/llull-mesh, Gmsh through its C API). One JSON request on
+ * stdin, one JSON response line on stdout (documented in solver/bins/llull-mesh/src/main.rs).
+ * Environment: LLULL_MESH_BIN / LLULL_NATIVE_DIR (binary, nativeBinary.ts), LLULL_GMSH_LIB (the Gmsh shared library, read by llull-mesh).
  */
 
 import { runProcess } from '../processRunner';
-import { nativeBinaryPath } from '../native/nativeBinary';
-import type { MeshBridgeResponse } from './feaMesh';
+import type { MesherResponse } from './feaMesh';
 
 const MAX_STDERR_BYTES = 64 * 1024;
 /** Below V8's longest string (2^29 - 24 UTF-16 units), so the response still decodes. */
 const MAX_OUTPUT_BYTES = 500 * 1024 * 1024;
 
-export type MesherChoice = { readonly kind: 'native'; readonly binary: string } | { readonly kind: 'python' };
-
-/** `LLULL_MESHER=python` forces the bridge; `native` (or unset) takes `llull-mesh` when found, else the bridge. */
-export function chooseMesher(
-  env: NodeJS.ProcessEnv,
-  find: (env: NodeJS.ProcessEnv) => string | null = (e) => nativeBinaryPath('llull-mesh', e),
-): MesherChoice {
-  if (env['LLULL_MESHER'] === 'python') return { kind: 'python' };
-  const binary = find(env);
-  return binary === null ? { kind: 'python' } : { kind: 'native', binary };
-}
-
 /** The response line of llull-mesh: the last non-empty line of its stdout (anything Gmsh printed before it is ignored). */
-export function parseMesherOutput(stdout: string): MeshBridgeResponse | null {
+export function parseMesherOutput(stdout: string): MesherResponse | null {
   const line = stdout
     .split('\n')
     .map((part) => part.trim())
@@ -36,20 +22,20 @@ export function parseMesherOutput(stdout: string): MeshBridgeResponse | null {
   try {
     const parsed: unknown = JSON.parse(line);
     return typeof parsed === 'object' && parsed !== null && typeof (parsed as { ok?: unknown }).ok === 'boolean'
-      ? (parsed as MeshBridgeResponse)
+      ? (parsed as MesherResponse)
       : null;
   } catch {
     return null;
   }
 }
 
-/** One mesh request through `llull-mesh`; rejects (like the bridge) when the process cannot run or answers nothing. */
+/** One mesh request through `llull-mesh`; rejects when the process cannot run or answers nothing. */
 export async function callNativeMesher(
   binary: string,
   request: Record<string, unknown>,
   timeoutMs: number,
   env: NodeJS.ProcessEnv,
-): Promise<MeshBridgeResponse> {
+): Promise<MesherResponse> {
   const stdout: Buffer[] = [];
   let size = 0;
   const run = await runProcess({

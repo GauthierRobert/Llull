@@ -61,7 +61,7 @@ nothing · 2 bad usage or unreadable input
 More: llull help native | plm | fuzz   (vault is under plm)`;
 
 const NATIVE = `Native solvers and file tools (run where the document lives: --doc, --app, --server)
-  fea_mesh analysisId=ID      mesh an FE analysis (Gmsh) and record it; needs python gmsh
+  fea_mesh analysisId=ID      mesh an FE analysis (Gmsh) and record it; needs llull-mesh + Gmsh
   fea_solve analysisId=ID     solve it with CalculiX (ccx)  [timeoutS=600]; then: analysis_report analysisId=ID
   fea_export analysisId=ID [format=calculix_inp|nastran_bdf|vtu]   the solver deck (CalculiX .inp, Nastran .bdf) or a VTU of mesh + results (text + sha256)  [--save deck.inp]
   fea_import_results analysisId=ID format=frd|op2 file=R.op2   external results of the current mesh -> record_fea_results

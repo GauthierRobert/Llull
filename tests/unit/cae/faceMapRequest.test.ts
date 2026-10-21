@@ -8,7 +8,7 @@ import { meshSummary } from '@cae/results/summary';
 import { createFeArtifactStore } from '../../../server/src/fea/artifactStore';
 import { caeHooks } from '../../../server/src/fea/caeHooks';
 import { partFaces } from '../../../server/src/fea/faceRefs';
-import { runFeaMesh, type MeshBridgeResponse } from '../../../server/src/fea/feaMesh';
+import { runFeaMesh, type MesherResponse } from '../../../server/src/fea/feaMesh';
 import { X0_NODES, barDocument, barMesh } from './deckFixtures';
 
 const directory = mkdtempSync(path.join(tmpdir(), 'llull-facemap-'));
@@ -78,7 +78,7 @@ describe('fea_mesh with the face map', () => {
   ): Promise<{ request: Record<string, unknown>; artifact: { faceMap?: unknown } }> => {
     let request: Record<string, unknown> = {};
     const store = createFeArtifactStore(mkdtempSync(path.join(directory, 's-')));
-    const bridge = (sent: Record<string, unknown>): Promise<MeshBridgeResponse> => {
+    const mesher = (sent: Record<string, unknown>): Promise<MesherResponse> => {
       request = sent;
       return Promise.resolve({
         ok: true,
@@ -100,7 +100,7 @@ describe('fea_mesh with the face map', () => {
         return { summary: 'recorded', affected: [], isError: false };
       },
     };
-    await runFeaMesh(bar.analysisId, host, { bridge, store, hooks: caeHooks, kernel: () => kernel });
+    await runFeaMesh(bar.analysisId, host, { mesher, store, hooks: caeHooks, kernel: () => kernel });
     return { request, artifact: recorded };
   };
 

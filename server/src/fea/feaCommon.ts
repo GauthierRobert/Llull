@@ -8,8 +8,8 @@ import type { CaeHooks } from './caeHooks';
 
 export const INSTALL_HINT: Readonly<Record<'gmsh' | 'ccx', string>> = {
   gmsh:
-    'Build llull-mesh (`cargo build --release -p llull-mesh` in solver/) with the Gmsh 4.x library (`pip install gmsh` installs it; LLULL_GMSH_LIB names the file), ' +
-    'or install Gmsh for the server Python (LLULL_MESHER=python; LLULL_GMSH_PYTHON / LLULL_PYTHON name the interpreter).',
+    'Build llull-mesh (`cargo build --release -p llull-mesh` in solver/) and install the Gmsh 4.x library (`pip install gmsh` installs it; ' +
+    'LLULL_GMSH_LIB names the file, LLULL_MESH_BIN the binary).',
   ccx: 'Install CalculiX (`apt install calculix-ccx`, or conda `calculix`); LLULL_CCX names the executable.',
 };
 

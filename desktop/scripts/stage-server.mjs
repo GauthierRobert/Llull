@@ -23,8 +23,7 @@ cpSync(path.join(server, 'dist'), path.join(target, 'dist'), {
   filter: (source) => !path.basename(source).startsWith('llull-cli.cjs'),
 });
 for (const file of ['package.json', 'package-lock.json']) cpSync(path.join(server, file), path.join(target, file));
-for (const file of ['llull_bridge.py', 'llull_mesh.py', 'llull_shell.py', 'requirements.txt'])
-  cpSync(path.join(server, 'python', file), path.join(target, 'python', file));
+for (const file of ['llull_bridge.py', 'requirements.txt']) cpSync(path.join(server, 'python', file), path.join(target, 'python', file));
 
 execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['ci', '--omit=dev', '--no-audit', '--no-fund'], {
   cwd: target,

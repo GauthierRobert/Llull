@@ -1,5 +1,5 @@
 /**
- * fea_mesh: the analysed solids -> mesher (llull-mesh, or the Python bridge op `mesh`; both Gmsh) -> FeMeshArtifact -> store -> `record_fe_mesh`. The server only gathers
+ * fea_mesh: the analysed solids -> mesher (llull-mesh: Gmsh) -> FeMeshArtifact -> store -> `record_fe_mesh`. The server only gathers
  * geometry, forwards the request and records the artifact; target resolution and meshing are the bridge's, summaries are @cae's.
  */
 
@@ -13,7 +13,7 @@ import { feaFailure, INSTALL_HINT } from './feaCommon';
 import { partFaces } from './faceRefs';
 import { partGeometry } from './feaGeometry';
 
-export interface MeshBridgeResponse {
+export interface MesherResponse {
   readonly ok: boolean;
   readonly code?: string;
   readonly error?: string;
@@ -22,7 +22,7 @@ export interface MeshBridgeResponse {
 
 export interface FeaMeshDeps {
   /** Sends one request to the mesher (nativeMesher.ts); rejects with an Error when the process cannot run. */
-  readonly bridge: (request: Record<string, unknown>) => Promise<MeshBridgeResponse>;
+  readonly mesher: (request: Record<string, unknown>) => Promise<MesherResponse>;
   readonly store: FeArtifactStore;
   readonly hooks: CaeHooks;
   readonly kernel: () => GeometryKernel | null;
@@ -30,14 +30,14 @@ export interface FeaMeshDeps {
 
 const isCode = (value: object): value is CaeCode => 'code' in value && 'message' in value;
 
-function bridgeFailure(message: string): FeaToolResult {
-  const missing = /No module named '?gmsh|cannot start Python|FEA_TOOL_MISSING|Gmsh library was not found/.test(message);
+function mesherFailure(message: string): FeaToolResult {
+  const missing = /FEA_TOOL_MISSING|Gmsh library was not found/.test(message);
   return missing
     ? feaFailure('fea_mesh', 'FEA_TOOL_MISSING', `${message} ${INSTALL_HINT.gmsh}`)
     : feaFailure('fea_mesh', 'FEA_MESH_FAILED', message);
 }
 
-/** The `faceMap` entries of a bridge response that have the expected shape (anything else is dropped). */
+/** The `faceMap` entries of a mesher response that have the expected shape (anything else is dropped). */
 function faceMapOf(value: unknown): NonNullable<FeMeshArtifact['faceMap']> {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry: unknown) =>
@@ -52,7 +52,7 @@ function faceMapOf(value: unknown): NonNullable<FeMeshArtifact['faceMap']> {
 }
 
 function meshArtifact(
-  response: MeshBridgeResponse,
+  response: MesherResponse,
   request: { unitSystem: FeMeshArtifact['unitSystem']; inputHash: string },
   facetedParts: readonly string[],
 ): FeMeshArtifact | null {
@@ -119,9 +119,9 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
       ...(removed === undefined ? {} : { defeature: removed }),
     });
   }
-  let response: MeshBridgeResponse;
+  let response: MesherResponse;
   try {
-    response = await deps.bridge({
+    response = await deps.mesher({
       op: 'mesh',
       lengthScale: request.lengthToAnalysis,
       parts,
@@ -143,14 +143,12 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
       },
     });
   } catch (error) {
-    return bridgeFailure(error instanceof Error ? error.message : String(error));
+    return mesherFailure(error instanceof Error ? error.message : String(error));
   }
   if (!response.ok) {
     const message = response.error ?? 'unknown error';
     if (response.code === 'FEA_TOOL_MISSING') return feaFailure('fea_mesh', 'FEA_TOOL_MISSING', `${message} ${INSTALL_HINT.gmsh}`);
-    return response.code === undefined || /No module named/.test(message)
-      ? bridgeFailure(message)
-      : feaFailure('fea_mesh', response.code, message, [analysisId]);
+    return response.code === undefined ? mesherFailure(message) : feaFailure('fea_mesh', response.code, message, [analysisId]);
   }
   const faceted = parts
     .filter(

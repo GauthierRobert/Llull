@@ -21,8 +21,9 @@
  *   LLULL_NATIVE_GPU=0          build llull-compute without the `gpu` feature (CPU twin only)
  *   LLULL_NATIVE_KERNEL=0       bundle llull-compute only (no llull-kernel, no OCCT)
  *   LLULL_OCCT_DIR              OCCT install prefix (else solver/scripts/build-occt.mjs builds or reuses its default prefix)
- *   LLULL_NATIVE_MESH=0         bundle no llull-mesh / Gmsh (fea_mesh then needs the Python bridge with gmsh, LLULL_MESHER=python)
- *   LLULL_GMSH_LIB              the Gmsh shared library to bundle (else asked from LLULL_GMSH_PYTHON / python3: `gmsh.libpath`)
+ *   LLULL_NATIVE_MESH=0         bundle no llull-mesh / Gmsh (fea_mesh then answers FEA_TOOL_MISSING)
+ *   LLULL_GMSH_LIB              the Gmsh shared library to bundle (else the one `pip install gmsh` put next to the build Python named by
+ *                               LLULL_GMSH_PYTHON, default python3: its `gmsh.libpath`; build time only, the app runs no Python for meshing)
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
