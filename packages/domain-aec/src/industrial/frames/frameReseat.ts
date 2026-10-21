@@ -3,7 +3,7 @@ import { fromMm } from '@core/model/units';
 import { withElement } from '../../building/model';
 import { findProfile } from '../../steel/profiles';
 import { membersOf } from '../common/memberSupport';
-import type { BuildingModel, SteelMemberElement } from '@core/model/building';
+import type { BuildingModel, SteelMemberElement } from '@aec/building/types';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { add3, scale3 } from '@lib/vec3';
 import { sweepFrame } from '../../shared/mesh';

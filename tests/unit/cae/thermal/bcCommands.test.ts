@@ -293,11 +293,11 @@ describe('update_thermal_bc / delete_thermal_bc', () => {
 
   it('deletes a BC and refuses unknown ones', () => {
     const { doc, analysisId, id } = base();
-    const removed = run(doc, 'delete_thermal_bc', { analysisId, bcId: id });
+    const removed = run(doc, 'delete_analysis_item', { analysisId, itemId: id });
     expect(removed.affected).toEqual([id]);
     expect(caseOf(removed.document, analysisId).thermal).toMatchObject({ bcs: {}, bcOrder: [] });
-    expectPure(doc, () => run(doc, 'delete_thermal_bc', { analysisId, bcId: id }));
-    expectRefused(run(doc, 'delete_thermal_bc', { analysisId, bcId: 'ghost' }), doc, 'THM_BC_NOT_FOUND');
-    expectRefused(run(doc, 'delete_thermal_bc', { analysisId: 'ghost', bcId: id }), doc, 'FEA_ANALYSIS_NOT_FOUND');
+    expectPure(doc, () => run(doc, 'delete_analysis_item', { analysisId, itemId: id }));
+    expectRefused(run(doc, 'delete_analysis_item', { analysisId, itemId: 'ghost' }), doc, 'FEA_ITEM_NOT_FOUND');
+    expectRefused(run(doc, 'delete_analysis_item', { analysisId: 'ghost', itemId: id }), doc, 'FEA_ANALYSIS_NOT_FOUND');
   });
 });

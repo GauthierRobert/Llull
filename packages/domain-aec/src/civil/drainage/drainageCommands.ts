@@ -1,7 +1,7 @@
 /** Gravity drainage network commands: manholes, pipes, hydraulic checks and sizing. */
 
 import type { Vec2 } from '@core/model/types';
-import type { ManholeObject } from '@core/model/civil';
+import type { ManholeObject } from '@aec/civil/types';
 import type { CommandResult } from '@core/commands/types';
 import { commandCatalog, defineCommand, z, vec2 } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
@@ -72,7 +72,7 @@ export const addManhole = defineCommand({
   description:
     'Add a drainage manhole / inspection chamber / outfall at a plan position. Give `invertElevation` ' +
     'and either `rimElevation` or a `surfaceId` (rim = ground level there). Optional catchment ' +
-    '(area in ha, runoff coefficient), point inflow and `entryTimeMin` (inlet time, default 5 min) feed the network check. Connect manholes with add_pipe.',
+    '(area in ha, runoff coefficient), point inflow and `entryTimeMin` (inlet time, default 5 min) feed the network check. Connect manholes with add_drainage_pipe.',
   params: z.object({ location: vec2('Plan position [x, y] of the chamber centre, document units.'), ...manholeFields }),
   run: (doc, params): CommandResult => {
     const problem = checkOptions(params);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import type { FootingElement } from '@core/model/building';
+import type { FootingElement } from '@aec/building/types';
 import { footingRebarMass, scaleFor, stairVolume } from '@aec/building/quantities/takeoffBasics';
 import { xyz } from '../../helpers/xy';
 

@@ -6,6 +6,7 @@
  *   untouched (never throws, never corrupts)
  */
 
+import { encodeStepString } from '../../lib/step21/encode';
 import { isHexColor, parseHexRgb } from '../../lib/isHexColor';
 
 /** What to stamp on the n-th transferred shape. */
@@ -28,23 +29,7 @@ export const REPRESENTATION_PATTERN =
 
 /** STEP string literal body: quotes and backslashes doubled, non-ASCII as \X2\…\X0\, no control characters. */
 export function stepString(text: string): string {
-  let out = '';
-  let wide = '';
-  const flush = (): void => {
-    if (wide !== '') out += `\\X2\\${wide}\\X0\\`;
-    wide = '';
-  };
-  for (const char of text.replace(/[\p{Cc}\u2028\u2029]+/gu, ' ')) {
-    const code = char.codePointAt(0) ?? 0;
-    if (code > 126) {
-      for (let i = 0; i < char.length; i++) wide += char.charCodeAt(i).toString(16).toUpperCase().padStart(4, '0');
-      continue;
-    }
-    flush();
-    out += char === "'" ? "''" : char === '\\' ? '\\\\' : char;
-  }
-  flush();
-  return out;
+  return encodeStepString(text.replace(/[\p{Cc}\u2028\u2029]+/gu, ' '), true);
 }
 
 export function rgbOf(hex: string | undefined): [number, number, number] | null {

@@ -1,6 +1,7 @@
 /** Regions and frames: a RegionSpec (document units) as a document-frame region in metres, and its asset-frame bounding box for the port. */
 
-import type { CloudBounds, CloudReference, PointCloudPort, RegionSpec } from '@core/model/pointCloud';
+import type { CloudBounds, PointCloudPort } from '@core/model/pointCloud';
+import type { CloudReference, RegionSpec } from '@aec/scan/types';
 import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import { applyPoint, invertAffine } from './mat4';

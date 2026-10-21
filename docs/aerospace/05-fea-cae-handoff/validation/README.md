@@ -109,7 +109,7 @@ an=$(llull run plans/fea_cantilever_static_beamp.plan.json $D | jq -r '.data.ste
 llull fea_mesh analysisId=$an $D --timeout 300 > mesh.json
 llull check_analysis analysisId=$an $D > check.json            # must not contain severity "error"
 llull fea_solve analysisId=$an $D --timeout 900 > solve.json
-llull fea_report analysisId=$an $D > report.json               # probe "tip" u_y vs VC-FEA-10.a (2 %)
+llull analysis_report analysisId=$an $D > report.json               # probe "tip" u_y vs VC-FEA-10.a (2 %)
 llull compute_margins analysisId=$an $D > margins.json         # VC-FEA-60/61 shape
 python3 -I compare.py report.json fea_analytic_expected.json VC-FEA-10.a   # value, tolerance, unit
 ```

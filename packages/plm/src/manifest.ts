@@ -1,6 +1,6 @@
 /** The canonical manifests a human signs (FR-PLM-20/21, §5.7, §6.1): the release manifest of a frozen revision and the manifest of an iteration. */
 
-import type { PlmModel, Revision, SignatureRecord } from '@core/model/plm';
+import type { PlmModel, Revision, SignatureRecord } from '@plm/types';
 import { jcsJson } from '@lib/jcs';
 import { sha256Hex } from '@lib/sha256';
 

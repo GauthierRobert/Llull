@@ -1,7 +1,7 @@
 /** Curved (arc) walls: centreline arc through start, a point on the arc and end. */
 
 import { toDegrees } from '@lib/angle';
-import type { CurvedWallElement } from '@core/model/building';
+import type { CurvedWallElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { fromMm, toMetres } from '@core/model/units';

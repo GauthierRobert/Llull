@@ -7,7 +7,8 @@ import { clamp } from '@lib/clamp';
 import { toDegrees } from '@lib/angle';
 import type { CadDocument, Entity, Vec2 } from '@core/model/types';
 import { escapeXml } from '@lib/escapeXml';
-import { composeSheetSvg, fitScale, MARGIN, paperMap, northArrow, sheetDrawingArea, type Viewport } from '../../shared/sheetFrame';
+import { composeSheetSvg, fitScale, paperMap, northArrow, type Viewport } from '../../shared/sheetFrame';
+import { SHEET_MARGIN, sheetDrawingArea } from '@core/geometry/sheetLayout';
 import { n, svgPoints } from '@core/geometry/drawingSvg';
 import { PAPER_MM, type PaperSize } from '@core/model/sheet';
 import { toMetres, toMm } from '@core/model/units';
@@ -175,7 +176,10 @@ export function buildCivilPlanSheet(doc: CadDocument, options: CivilSheetOptions
       `<clipPath id="${clipId}"><rect x="${n(viewport.x)}" y="${n(viewport.y)}" width="${n(viewport.width)}" height="${n(viewport.height)}"/></clipPath>` +
       `<g clip-path="url(#${clipId})">${body.join('')}${gridTicks(doc, scale, viewport, center, toPaper).join('')}</g>` +
       `<rect x="${n(viewport.x)}" y="${n(viewport.y)}" width="${n(viewport.width)}" height="${n(viewport.height)}" class="frame-thin"/>`,
-    overlays: [northArrow(width - MARGIN - 12, MARGIN + 12), legend(viewport.x + viewport.width + 2, MARGIN + 28, layers)],
+    overlays: [
+      northArrow(width - SHEET_MARGIN - 12, SHEET_MARGIN + 12),
+      legend(viewport.x + viewport.width + 2, SHEET_MARGIN + 28, layers),
+    ],
   });
   return { text: `${text}\n`, scale, center, drawn: items.length - clipped, clipped, counts, layers };
 }

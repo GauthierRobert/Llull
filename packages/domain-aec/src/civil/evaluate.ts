@@ -2,7 +2,7 @@
 
 import type { CadDocument, Entity } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
-import type { CivilModel, CivilObject } from '@core/model/civil';
+import type { CivilModel, CivilObject } from '@aec/civil/types';
 import { CIVIL_LAYER_COLOR } from './entities';
 import { regenerateOwned } from '../shared/derived';
 import { civilAffected } from './model';

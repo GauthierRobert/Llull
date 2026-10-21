@@ -3,7 +3,7 @@
  * vertical reach.
  */
 
-import type { PipeSupportType } from '@core/model/building';
+import type { PipeSupportType } from '@aec/building/types';
 import type { Vec3 } from '@core/model/types';
 import { projectOntoSegment } from '@lib/polygon';
 import { HORIZONTAL_RATIO, VERTICAL_RATIO, type SteelBar } from '../steelDesign/steelMemberBars';

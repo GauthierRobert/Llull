@@ -8,7 +8,7 @@ import { noop, report } from '@core/commands/noop';
 import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { round, roundedMetres } from '../../shared/numeric';
 import { metres as shown } from '../steelDesign/steelMemberRows';
-import { toCsv } from '../../shared/csv';
+import { toCsv } from '@lib/csv';
 import { briefList } from '../../shared/briefList';
 import { collectSteelBars, modelUnits, type ModelUnits } from '../steelDesign/steelMemberBars';
 import { spanCoordinate } from './routeSupport';

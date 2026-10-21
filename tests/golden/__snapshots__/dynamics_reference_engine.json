@@ -443,7 +443,7 @@
       {
         "id": "#80",
         "name": "add_reference_data",
-        "params": {"id":"#81","quantity":"bmep_bar","condition":{"throttle":"full","altitudeM":0},"points":[{"rpm":5800,"value":11.2477}],"source":"Rotax 912 ULS datasheet, 73.5 kW at 5800 rpm [C-R23]","grade":"B","calibrationRpm":[5800]},
+        "params": {"id":"#81","quantity":"bmep_bar","throttle":"full","altitudeM":0,"points":[{"rpm":5800,"value":11.2477}],"source":"Rotax 912 ULS datasheet, 73.5 kW at 5800 rpm [C-R23]","grade":"B","calibrationRpm":[5800]},
         "suppressed": false,
         "affected": ["#81"]
       }

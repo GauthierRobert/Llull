@@ -1,8 +1,9 @@
 /** Marginal distributions of the random variables: parameter validation, moments, CDF, inverse CDF and the map from a standard normal. */
 
 import { z } from '@core/commands/schema';
-import type { Distribution } from '@core/model/probabilistic';
-import { gamma, normalCdf, normalInv } from './numerics';
+import type { Distribution } from '@cae/reliability/types';
+import { normalCdf } from '@lib/specialFunctions';
+import { gamma, normalInv } from './numerics';
 
 export const distributionSchema = z.discriminatedUnion('kind', [
   z.object({

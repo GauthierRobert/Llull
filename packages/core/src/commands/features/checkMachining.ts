@@ -14,7 +14,7 @@ import { meshDiagonal } from '../../geometry/meshExtent';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { currentContext } from '../context';
-import { operandRecipe } from '../brep/kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { report } from '../noop';
 import { machinedPart } from './machined';
 import { refuse, resultMeta } from './ftr';

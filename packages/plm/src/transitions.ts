@@ -1,6 +1,6 @@
 /** The revision lifecycle as data (validation/lifecycle_transitions.csv): which state changes exist and why the others are refused. */
 
-import type { LifecycleState } from '@core/model/plm';
+import type { LifecycleState } from '@plm/types';
 
 export const LIFECYCLE_STATES: readonly LifecycleState[] = ['in_work', 'in_review', 'released', 'superseded', 'obsolete', 'cancelled'];
 

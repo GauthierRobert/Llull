@@ -1,7 +1,7 @@
 /** Release integrity (FR-PLM-15/16, §5.5): recompute the hashes of released revisions; nothing is stored, every caller recomputes on demand. */
 
 import type { CadDocument } from '@core/model/types';
-import type { PlmModel } from '@core/model/plm';
+import type { PlmModel } from '@plm/types';
 import type { ExecutionContext } from '@core/commands/types';
 import { sha256Hex } from '@lib/sha256';
 import { scopeHash } from './state';

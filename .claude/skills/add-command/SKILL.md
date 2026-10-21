@@ -10,35 +10,28 @@ both gain it (the CLI being how Claude Code or any script drives llull). Delegat
 to the `command-author` agent unless the change is trivial.
 
 ## References
-- Skeleton & rules: `.claude/rules/commands.md`, `.claude/context/command-layer.md`
+- Skeleton to copy + signatures: `.claude/context/command-layer.md` · Laws: `.claude/rules/commands.md`
 - Schema: `.claude/context/model.md` · Plugins: `.claude/rules/commands.md` (Plugins)
-- Prose recipe: `docs/ADD_A_TOOL.md`
 
 ## Steps
 
 ### 0. Pick the home
-- CAD core op (geometry, 2D, transform, measure, parametric, assembly…) ⇒
-  `packages/core/src/commands/<domain>.ts` (new file if the domain is new or the file nears
-  500 code lines).
-- Domain op (building, industrial, …) ⇒ that plugin's package (`packages/domain-aec/src/…`).
-  Never put domain commands in `packages/core`.
+- CAD core op (geometry, 2D, transform, measure, parametric, assembly…) ⇒ its feature folder
+  `packages/core/src/commands/<feature>/` (new file if the concern is new or the file nears 500 code lines).
+- Domain op ⇒ that plugin's package: `packages/domain-aec/src/…` (building, industrial, civil, piping, scan),
+  `domain-cae` (analysis), `domain-aero` (aerodynamics, surfacing, sheetmetal, composites, fasteners, fluids, cfd), `domain-dynamics` (rigid-body dynamics),
+  `design-lang`, `plm`. Never put domain commands in `packages/core`.
 
 ### 1. Define (pure) with `defineCommand`
-```ts
-export const arrayGrid = defineCommand({
-  name: 'array_grid',
-  description: 'One imperative line, written for an agent that cannot see the code.',
-  params: z.object({ id: z.string().describe('Source entity id'), /* … */ }),
-  run: (doc, params, ctx): CommandResult => { /* … */ },
-});
-```
+Copy the skeleton in `.claude/context/command-layer.md` (Command skeleton).
 - Import `defineCommand, z, vec2, vec3, looseVec3, untypedArray, tolerant` from `./schema`
   (plugins: `@core/commands/schema`). Every property `.describe(...)`d; optional ⇒ `.optional()`.
 - No `<X>Params` interface, no `paramsSchema` literal — both are derived from `params`.
 - `execute` rejects schema-invalid params for you. `run` still checks semantics → unchanged doc,
   `affected: []`, explanatory summary. Never throw, never mutate.
 - Ids: `nextId(prefix)` from `@lib/id` (step-scoped automatically). Kernel: `ctx?.kernel` only,
-  plus `annotations: { requiresKernel: true }`. Queries: `annotations: { readOnly: true }`, value in `data`.
+  plus `annotations: { requiresKernel: true }` — or kernel-optional (architecture L9: exact path with a
+  kernel, clean fallback without, both tested). Queries: `annotations: { readOnly: true }`, value in `data`.
 - Structured doc-comment tags (`@affects @invariant @failure` only).
 
 ### 2. New geometry? (only if needed)
@@ -52,13 +45,13 @@ union, and note that the viewport needs a matching render branch (hand to `viewp
 - Core: define it in its feature folder (`packages/core/src/commands/<feature>/`) and list the
   const in that folder's `catalog.ts` (never `registry.ts`), then list its name in exactly one toolset in `packages/protocol/src/toolsets.ts`
   (`core` only if every agent needs it up front; a test asserts one toolset per tool).
-- Plugin: list it in its domain's `catalog.ts` (`packages/domain-aec/src/<building|industrial|civil>/catalog.ts`,
-  consumed by that domain's `plugin.ts`); it joins the plugin's `toolset` automatically
+- Plugin: list it in its domain's `catalog.ts` (e.g. `packages/domain-aec/src/<building|industrial|civil>/catalog.ts`,
+  `packages/plm/src/catalog.ts`; consumed by that domain's `plugin.ts`); it joins the plugin's `toolset` automatically
   (`pluginToolNames`).
 That is the entire AI + CLI wiring — `toToolSchemas()` exposes it automatically.
 
 ### 4. Test (same change)
-`tests/unit/<domain>.test.ts` (plugins: `tests/unit/building/`): happy path (assert `affected`,
+`tests/unit/<domain>.test.ts` (plugin commands: the plugin's folder under `tests/unit/`, e.g. `tests/unit/building/`): happy path (assert `affected`,
 entity `kind`/props, `document.order`) + failure path (missing id / invalid input ⇒ no-op,
 incl. a schema-rejected param). Purity check. No id reset (ids are step-scoped and deterministic).
 Then update the tool-schema snapshot (`npx vitest run tests/unit/contract -u`) and review the
@@ -69,8 +62,7 @@ Most tools need no bespoke button — a generic toolbar can iterate `listCommand
 Add a panel in `src/ui/panels` only for a richer affordance (gizmo, form).
 
 ### 6. Verify
-`npm run check` green; coverage gate (90/85/90/90 on `packages/core/src/commands/**` and
-`packages/domain-aec/src/**`) holds.
+`npm run check` green; `npm run test:coverage` gate (90/85/90/90, scope in CLAUDE.md non-negotiable 3) holds.
 
 ## Done checklist
 - [ ] Pure `defineCommand`, registered (core or plugin), snake_case name

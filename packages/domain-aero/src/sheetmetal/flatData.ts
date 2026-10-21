@@ -4,7 +4,7 @@ import type { CadDocument } from '@core/model/types';
 import type { FtrResultMeta, FtrUnverifiedInput } from '@core/model/manufacturing';
 import type { SheetMetalPart, SheetMetalRule } from '@core/model/sheetMetal';
 import { toDegrees } from '@lib/angle';
-import { FORMULAS } from '@lib/sheetMath';
+import { FORMULAS } from './sheetMath';
 import { FLANGED_HOLE_SOURCE, HEM_SOURCE } from './provenance';
 import { resultMeta, refuser } from './result';
 import { ruleUnverifiedInputs } from './rules';

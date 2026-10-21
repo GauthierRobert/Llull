@@ -7,6 +7,15 @@ import type { CadDocument, Vec2 } from '@core/model/types';
 import { LINE_PATTERNS, dashArray } from '@core/model/drawing';
 import { z } from '@core/commands/schema';
 import { n } from '@core/geometry/drawingSvg';
+import {
+  type SheetArea,
+  SHEET_BINDING_MARGIN,
+  SHEET_MARGIN,
+  sheetDrawingArea,
+  sheetFrameRect,
+  titleBlockGrid,
+  titleCell,
+} from '@core/geometry/sheetLayout';
 import { PAPER_MM, PAPER_SIZES, type PaperSize } from '@core/model/sheet';
 import { escapeXml } from '@lib/escapeXml';
 import { niceStep } from '@lib/niceStep';
@@ -29,20 +38,6 @@ export const sheetFitWarning = (fits: boolean, what: string): string =>
 
 const STANDARD_SCALES: ReadonlyArray<number> = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000];
 
-export const MARGIN = 10;
-const BINDING_MARGIN = 20;
-export const TITLE_HEIGHT = 42;
-
-/** Drawing area of a `width`×`height` mm sheet: inside the frame margins, above the title block. @pure */
-export function sheetDrawingArea(width: number, height: number): Viewport {
-  return {
-    x: BINDING_MARGIN + 4,
-    y: MARGIN + 4,
-    width: width - BINDING_MARGIN - MARGIN - 8,
-    height: height - 2 * MARGIN - TITLE_HEIGHT - 8,
-  };
-}
-
 /** Model point to paper mm: `center` lands at the viewport middle, +Y flipped, `perUnit` paper mm per model unit. */
 export const paperMap =
   (viewport: Viewport, center: Vec2, perUnit: number) =>
@@ -51,7 +46,7 @@ export const paperMap =
     viewport.y + viewport.height / 2 - (y - center[1]) * perUnit,
   ];
 
-export type Viewport = { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+export type Viewport = SheetArea;
 
 /** Smallest standard scale 1:N at which the model extents fit the viewport. */
 export function fitScale(widthMm: number, heightMm: number, viewport: Viewport): number {
@@ -102,27 +97,23 @@ const SHEET_DEFS =
 
 function titleBlock(doc: CadDocument, sheet: { width: number; height: number; title: string; scale: number; paper: PaperSize }): string {
   const { project } = getBuilding(doc);
-  const width = Math.min(180, sheet.width - BINDING_MARGIN - MARGIN);
-  const x = sheet.width - MARGIN - width;
-  const y = sheet.height - MARGIN - TITLE_HEIGHT;
-  const cell = (cx: number, cy: number, label: string, value: string, size = 3.2): string =>
-    `<text x="${n(cx + 2)}" y="${n(cy + 3.5)}" font-size="2" class="label">${escapeXml(label)}</text>` +
-    `<text x="${n(cx + 2)}" y="${n(cy + 9)}" font-size="${size}" text-anchor="start">${escapeXml(value)}</text>`;
-  const column = width / 3;
+  const { x, y, column, lines } = titleBlockGrid(sheet.width, sheet.height);
   return [
     `<g id="title-block">`,
-    `<rect x="${n(x)}" y="${n(y)}" width="${n(width)}" height="${TITLE_HEIGHT}" class="frame"/>`,
-    `<line x1="${n(x)}" y1="${n(y + 14)}" x2="${n(x + width)}" y2="${n(y + 14)}" class="frame-thin"/>`,
-    `<line x1="${n(x)}" y1="${n(y + 28)}" x2="${n(x + width)}" y2="${n(y + 28)}" class="frame-thin"/>`,
-    `<line x1="${n(x + column)}" y1="${n(y + 14)}" x2="${n(x + column)}" y2="${n(y + TITLE_HEIGHT)}" class="frame-thin"/>`,
-    `<line x1="${n(x + 2 * column)}" y1="${n(y + 14)}" x2="${n(x + 2 * column)}" y2="${n(y + TITLE_HEIGHT)}" class="frame-thin"/>`,
-    cell(x, y, 'PROJECT', project.name, 4.5),
-    cell(x, y + 14, 'CLIENT', project.client || '—'),
-    cell(x + column, y + 14, 'DRAWING', sheet.title),
-    cell(x + 2 * column, y + 14, 'ADDRESS', project.address || '—', 2.6),
-    cell(x, y + 28, 'DRAWN BY', project.author || '—'),
-    cell(x + column, y + 28, 'SCALE · SHEET', `1:${sheet.scale} @ ${sheet.paper}`),
-    cell(x + 2 * column, y + 28, 'DWG NO · REV · DATE', `${project.drawingNumber} · ${project.revision} · ${project.date || '—'}`, 2.8),
+    ...lines,
+    titleCell(x, y, 'PROJECT', project.name, 4.5),
+    titleCell(x, y + 14, 'CLIENT', project.client || '—'),
+    titleCell(x + column, y + 14, 'DRAWING', sheet.title),
+    titleCell(x + 2 * column, y + 14, 'ADDRESS', project.address || '—', 2.6),
+    titleCell(x, y + 28, 'DRAWN BY', project.author || '—'),
+    titleCell(x + column, y + 28, 'SCALE · SHEET', `1:${sheet.scale} @ ${sheet.paper}`),
+    titleCell(
+      x + 2 * column,
+      y + 28,
+      'DWG NO · REV · DATE',
+      `${project.drawingNumber} · ${project.revision} · ${project.date || '—'}`,
+      2.8,
+    ),
     `</g>`,
   ].join('');
 }
@@ -184,11 +175,11 @@ export function composeSheetSvg(
     ...(sheet.style ? [`<style>${sheet.style}</style>`] : []),
     SHEET_DEFS,
     `<rect width="${width}" height="${height}" fill="#fff"/>`,
-    `<rect x="${BINDING_MARGIN}" y="${MARGIN}" width="${width - BINDING_MARGIN - MARGIN}" height="${height - 2 * MARGIN}" class="frame"/>`,
+    sheetFrameRect(width, height),
     `<g id="${sheet.bodyId}">${sheet.body}</g>`,
     ...sheet.overlays,
-    scaleBar(BINDING_MARGIN + 8, height - MARGIN - 12, scale),
-    `<text x="${BINDING_MARGIN + 8}" y="${n(height - MARGIN - 16)}" font-size="2.6" text-anchor="start">${escapeXml(sheet.caption)}</text>`,
+    scaleBar(SHEET_BINDING_MARGIN + 8, height - SHEET_MARGIN - 12, scale),
+    `<text x="${SHEET_BINDING_MARGIN + 8}" y="${n(height - SHEET_MARGIN - 16)}" font-size="2.6" text-anchor="start">${escapeXml(sheet.caption)}</text>`,
     titleBlock(doc, { width, height, title, scale, paper }),
     `</svg>`,
   ].join('\n');

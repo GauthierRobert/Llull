@@ -3,11 +3,9 @@
 
 import { type Bounds, boundsOverlap } from '@core/geometry/bounds';
 import { is3D, type CadDocument, type EntityId } from '@core/model/types';
+import { dot3, sub3 } from '@lib/vec3';
 
 export type Vec3 = readonly [number, number, number];
-
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 
 /**
  * Parameter t (distance along the unit `axis` from `origin`) of the point of the axis line closest to the pointer ray; null when the
@@ -15,12 +13,12 @@ const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
  * @pure
  */
 export function axisParamFromRay(origin: Vec3, axis: Vec3, rayOrigin: Vec3, rayDirection: Vec3): number | null {
-  const w = sub(origin, rayOrigin);
-  const b = dot(axis, rayDirection);
+  const w = sub3(origin, rayOrigin);
+  const b = dot3(axis, rayDirection);
   const denominator = 1 - b * b;
   if (denominator < 1e-6) return null;
-  const d = dot(axis, w);
-  const e = dot(rayDirection, w);
+  const d = dot3(axis, w);
+  const e = dot3(rayDirection, w);
   return (b * e - d) / denominator;
 }
 

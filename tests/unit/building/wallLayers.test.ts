@@ -6,7 +6,7 @@ import { buildingErrors } from '@aec/building/validate';
 import { layerBoundaries, parseWallLayers } from '@aec/building/elements/wallLayers';
 import type { TakeoffLine } from '@aec/building/quantities/takeoffBasics';
 import type { IfcExport } from '@aec/building/exchange/ifcBuild';
-import type { WallElement } from '@core/model/building';
+import type { WallElement } from '@aec/building/types';
 import { rawBuilding } from './elementEdits';
 import { xy } from '../../helpers/xy';
 

@@ -12,7 +12,8 @@ import {
   type ExtrusionEntity,
   DEFAULT_LAYER_ID,
 } from '@core/model/types';
-import type { FastenerFamily, FastenerSize, PartRef } from '@core/model/fasteners';
+import type { FastenerFamily, FastenerSize } from '@aero/fasteners/types';
+import type { PartRef } from '@core/model/features';
 import { nextId } from '@lib/id';
 import { inchesToDoc, quantityToDoc } from './units';
 import type { Resolved } from './selection';

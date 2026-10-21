@@ -1,7 +1,7 @@
 // Pilot feedback mailto: app version, anonymous statistics (entity count, unit, civil counts) + the user's text; never
 // document content.
 
-import { CIVIL_CATEGORIES, type CivilCategory } from '@core/model/civil';
+import { CIVIL_CATEGORIES, type CivilCategory } from '@aec/index';
 import type { CadDocument } from '@core/model/types';
 import { version as APP_VERSION } from '../../../../package.json';
 

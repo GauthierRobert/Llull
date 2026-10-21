@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import type { CivilModel, ManholeObject, PipeObject } from '@core/model/civil';
+import type { CivilModel, ManholeObject, PipeObject } from '@aec/civil/types';
 import { execute } from '@core/commands/registry';
 import { gridSurvey, metricDocument, surveyedDocument } from './fixtures';
 import { expectNoOp } from '../../helpers/expectNoOp';

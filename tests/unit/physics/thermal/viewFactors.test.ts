@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { CommandResult } from '@core/commands/types';
 import { createEmptyDocument } from '@core/model/types';
-import { viewFactorCoaxialDiscs, viewFactorParallel, viewFactorPerpendicular } from '@lib/thermalClosedForms';
+import { viewFactorCoaxialDiscs, viewFactorParallel, viewFactorPerpendicular } from '@cae/thermal/thermalClosedForms';
 import { expectCase } from '../benchmarkCases';
 
 const PACK = '03-thermal-analysis';

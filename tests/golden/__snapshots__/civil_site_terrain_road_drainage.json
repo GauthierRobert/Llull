@@ -925,7 +925,7 @@
       },
       {
         "id": "#89",
-        "name": "add_pipe",
+        "name": "add_drainage_pipe",
         "params": {"fromId":"#66","toId":"#70"},
         "suppressed": false,
         "affected": ["#75","#73","#76","#77"]

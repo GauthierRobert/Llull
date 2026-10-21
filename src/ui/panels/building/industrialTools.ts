@@ -1,7 +1,7 @@
 // Declarative industrial (steel hall / plant) tool specs: form values → ONE command + params.
 
 import { toRadians } from '@lib/angle';
-import { PIPE_OUTSIDE_DIAMETER_MM } from '@aec/industrial/piping/pipeSizes';
+import { PIPE_OUTSIDE_DIAMETER_MM } from '@aec/index';
 import { PIPE_SUPPORT_TOOL } from './pipeSupportTool';
 import { ALL_PROFILES, BASE_OPTIONS as BASES, I_PROFILES, JOINT_OPTIONS as JOINTS, MEMBER_ROLE_OPTIONS } from './steelProfileOptions';
 import {

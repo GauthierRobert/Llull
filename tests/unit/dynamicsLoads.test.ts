@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
-import type { SimulationData } from '@core/dynamics/simulationReport';
-import { bodyCentres, dynamicsLoads, formatQuantity } from '@ui/dynamicsLoads';
+import type { SimulationData } from '@dynamics/sim/simulationReport';
+import { bodyCentres, dynamicsLoads, formatQuantity } from '@dynamics/sim/dynamicsLoads';
 
 function run(doc: CadDocument, name: string, params: Record<string, unknown>): { doc: CadDocument; id: string } {
   const result = execute(doc, name, params);

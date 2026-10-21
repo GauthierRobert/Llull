@@ -44,7 +44,7 @@ Roles follow [`AGENT_FIRST.md`](../../aerospace/AGENT_FIRST.md) §1.
 
 | Role | Who | Uses | Main need |
 | ---- | --- | ---- | --------- |
-| **Operator (primary)** | AI agent through the `llull` CLI (`--doc`, `--app`); cloud agent through MCP | `llull run`, `llull fea_mesh`, `llull fea_solve`, `llull thermal_report --json`, `llull check_thermal --json` | Commands with units on every parameter, temperatures and heat flows as JSON, stable codes, analytic checks |
+| **Operator (primary)** | AI agent through the `llull` CLI (`--doc`, `--app`); cloud agent through MCP | `llull run`, `llull fea_mesh`, `llull fea_solve`, `llull analysis_report --json`, `llull check_thermal --json` | Commands with units on every parameter, temperatures and heat flows as JSON, stable codes, analytic checks |
 | **Owner** | The person who asks ("will the box stay below 85 °C in a 55 °C bay?"). **Not assumed to be an engineer** | Natural language; may watch the desktop app | A plain answer: hottest point, by how much it clears the limit, what was assumed, what needs an engineer |
 | **Qualified reviewer** | Thermal or stress engineer, design-organisation signatory | Desktop review surfaces (temperature map, margins table, disposition dialog), exported INP | Audits boundary conditions (film coefficients, emissivities, sinks), dispositions negative or marginal temperature margins, signs |
 
@@ -71,7 +71,7 @@ User stories:
 
 | Phase | In scope |
 | ----- | -------- |
-| **MVP** | Analysis types `heat_steady`, `heat_transient` (05 `AnalysisCase`). Thermal BCs on exact faces / points: prescribed temperature, surface heat flux, volumetric heat generation, concentrated flux, film convection (constant h, sink T), radiation to ambient (constant ε, sink T). Initial temperature. Amplitudes (tables; sine/ramp sampled to tables). Time step control (fixed or automatic with DELTMX). Materials k, cp, ρ from 08 records with temperature tables / PHY-01 property models. Gmsh mesh + bundled CalculiX `*HEAT TRANSFER`. FRD/DAT import of NT, HFL, RFL. Results as data: T extremes with location, probes and time histories, per-BC heat flow, heat balance. Temperature limits with margins, `reviewRequired`, human disposition. `check_thermal`, `thermal_report`, `thermal_analytic_check`. Validation: NAFEMS T2/T3/T4, analytic cases, CalculiX `oneel8ra`. |
+| **MVP** | Analysis types `heat_steady`, `heat_transient` (05 `AnalysisCase`). Thermal BCs on exact faces / points: prescribed temperature, surface heat flux, volumetric heat generation, concentrated flux, film convection (constant h, sink T), radiation to ambient (constant ε, sink T). Initial temperature. Amplitudes (tables; sine/ramp sampled to tables). Time step control (fixed or automatic with DELTMX). Materials k, cp, ρ from 08 records with temperature tables / PHY-01 property models. Gmsh mesh + bundled CalculiX `*HEAT TRANSFER`. FRD/DAT import of NT, HFL, RFL. Results as data: T extremes with location, probes and time histories, per-BC heat flow, heat balance. Temperature limits with margins, `reviewRequired`, human disposition. `check_thermal`, `analysis_report`, `thermal_analytic_check`. Validation: NAFEMS T2/T3/T4, analytic cases, CalculiX `oneel8ra`. |
 | **V1** | Cavity radiation (`RxCR`, cavities, environment temperature, closed cavities) and a read-only `compute_view_factors` query. Thermal contact conductance between parts (tied contact pair + `*GAP CONDUCTANCE`). Temperature-dependent film coefficient and emissivity tables. Orthotropic conductivity (`TYPE=ORTHO`, e.g. from 06 laminates). Thermal result export to VTU. `render_view` temperature field. |
 | **V2** | Phase change through an apparent-heat-capacity table generated from latent heat (CalculiX has no latent-heat card, [R7]). Forced convection with fluid network elements (`FxFC`). Nastran thermal deck (SOL 153/159) export. Orbital heat loads as a hand-off (solar / albedo / planet IR from a dedicated orbital-thermal tool). Thermal-electrical (Joule) heating, with PHY-15 resistivity. |
 | **Out of scope** | CFD and conjugate heat transfer with resolved flow (separate product line, `../README.md` "Not in this list"). Computing film coefficients from correlations as a certified value (llull may offer a cited correlation as a quick check, never as a silent default). Thermal-vacuum test correlation. Certification sign-off. |
@@ -127,7 +127,7 @@ llull check_thermal analysisId=$an --doc box.llull.json --json          # must h
 llull fea_solve analysisId=$an --doc box.llull.json --progress --timeout 900 --json
 
 # 3. numbers first
-llull thermal_report analysisId=$an --doc box.llull.json --json         # extremes, probes, heat flows, balance
+llull analysis_report analysisId=$an --doc box.llull.json --json         # extremes, probes, heat flows, balance
 llull check_temperature_limits analysisId=$an --doc box.llull.json --json   # margins, reviewRequired, disposition
 llull thermal_analytic_check check=plane_wall 'inputs={"L_m":0.05,"k_W_mK":15,"h1_W_m2K":50,"Tinf1_degC":200,"h2_W_m2K":10,"Tinf2_degC":20}' --json
 
@@ -158,7 +158,7 @@ and probes, time slider for transients, heat-balance panel, limits table with ba
 | Thermal set-up | `llull run`, `llull add_thermal_bc …` | registry tools | tree, glyphs |
 | View factors (V1) | `llull compute_view_factors --json` | same | matrix panel |
 | Mesh / solve | `llull fea_mesh`, `llull fea_solve` | when hosted | progress |
-| Results | `llull thermal_report --json` | same | map, slider |
+| Results | `llull analysis_report --json` | same | map, slider |
 | Readiness | `llull check_thermal --json` | same | badges |
 | Limits / margins | `llull check_temperature_limits --json` | same | table |
 | Disposition | prepare only (`THM_HUMAN_GATE`) | prepare only | **complete** (signature) |
@@ -194,7 +194,7 @@ and probes, time slider for transients, heat-balance panel, limits table with ba
 
 | # | Given | When (CLI) | Then (JSON) | VC |
 | - | ----- | ---------- | ----------- | -- |
-| AC-1 | `plans/thm_nafems_t3.plan.json` | `llull run <plan> D`; `fea_mesh`; `fea_solve`; `thermal_report analysisId=$an D` | probe `x080` at t = 32 s within 2 % of 36.6 °C | VC-THM-03 |
+| AC-1 | `plans/thm_nafems_t3.plan.json` | `llull run <plan> D`; `fea_mesh`; `fea_solve`; `analysis_report analysisId=$an D` | probe `x080` at t = 32 s within 2 % of 36.6 °C | VC-THM-03 |
 | AC-2 | `plans/thm_nafems_t4.plan.json` | same | probe `E` within 1 % of 18.2538 °C | VC-THM-04 |
 | AC-3 | `plans/thm_wall_convection.plan.json` | same | probes `hot_face` 170.81 °C and `cold_face` 165.95 °C (±0.05 K); film heat flows 1459.46 W in / out; `data.heatBalance.residualRel` ≤ 1e-3 | VC-THM-01 |
 | AC-4 | the CalculiX test deck `oneel8ra.inp` (pinned) | `fea_import_results format=frd` of its run | radiating-face T = −0.950739 °C, Σ RFL = 47.5369 W | VC-THM-14 |
@@ -202,8 +202,8 @@ and probes, time slider for transients, heat-balance panel, limits table with ba
 | AC-6 | `thermal_analytic_check` with the inputs of VC-THM-06…12 | one call each | values equal the generator to the stated tolerance; `data.formula` and `data.inputs` present | VC-THM-06…12 |
 | AC-7 | `plans/thm_rejections.plan.json` | `llull run <plan> D`, then `check_thermal` | `THM_EMISSIVITY_INVALID` at the radiation step; `check_thermal` items `THM_MATERIAL_NO_CP`, `THM_INITIAL_TEMPERATURE_MISSING`, `THM_NO_HEAT_PATH` | VC-THM-61 |
 | AC-8 | a solved case with a 85 °C limit exceeded | `check_temperature_limits D`; agent calls `dispose_thermal_limit … D` | row `status: "FAIL"`, `reviewRequired: true`, `disposition: "pending_human"`; disposition exits 1 with `THM_HUMAN_GATE`, doc hash unchanged | VC-THM-62 |
-| AC-9 | any radiation case | `thermal_report D` | `data.physicalConstants` equals VC-THM-60 (σ and absolute zero, `defaulted: true`, sources) | VC-THM-60 |
-| AC-10 | solved T3 | `set_parameter` on the bar length; `thermal_report D` | `state: "stale"`; `check_temperature_limits` exits 1 with `FEA_RESULTS_STALE` | VC-THM-50 |
+| AC-9 | any radiation case | `analysis_report D` | `data.physicalConstants` equals VC-THM-60 (σ and absolute zero, `defaulted: true`, sources) | VC-THM-60 |
+| AC-10 | solved T3 | `set_parameter` on the bar length; `analysis_report D` | `state: "stale"`; `check_temperature_limits` exits 1 with `FEA_RESULTS_STALE` | VC-THM-50 |
 
 ## 8. Standards & regulatory alignment
 

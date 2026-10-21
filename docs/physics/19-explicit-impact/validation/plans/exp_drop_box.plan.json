@@ -113,10 +113,6 @@
     "value": 0.5,
     "unit": "s"
    },
-   "animationInterval": {
-    "value": 0.01,
-    "unit": "s"
-   },
    "historyInterval": {
     "value": 0.001,
     "unit": "s"
@@ -124,7 +120,6 @@
    "massScaling": {
     "mode": "none"
    },
-   "precision": "double",
    "gravity": {
     "vector": [
      0,
@@ -157,8 +152,7 @@
     0,
     0,
     1
-   ],
-   "friction": 0.0
+   ]
   }
  },
  {
@@ -193,8 +187,7 @@
     25,
     1225
    ],
-   "quantity": "v_z",
-   "history": true
+   "quantity": "v_z"
   }
  }
 ]

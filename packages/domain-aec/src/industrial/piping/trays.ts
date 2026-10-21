@@ -1,6 +1,6 @@
 /** Cable trays (electrical / data cable carriers): open U sections routed through 3D points. */
 
-import type { CableTrayElement } from '@core/model/building';
+import type { CableTrayElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm, toMetres } from '@core/model/units';

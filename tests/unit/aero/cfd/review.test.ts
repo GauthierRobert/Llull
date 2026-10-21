@@ -42,13 +42,13 @@ describe('bodies deleted after the case was made', () => {
   });
 
   it('an update is not blocked by an excluded or already-missing id, but a new unknown id is refused', () => {
-    const withExcluded = ok(doc, 'cfd_update_case', { caseId: 'c1', excludedEntityIds: [two.id] }).document;
+    const withExcluded = ok(doc, 'update_cfd_case', { caseId: 'c1', excludedEntityIds: [two.id] }).document;
     const gone = ok(withExcluded, 'delete_entities', { ids: [two.id] }).document;
-    expect(ok(gone, 'cfd_update_case', { caseId: 'c1', quality: 'draft' }).document.cfd?.cases['c1']?.quality).toBe('draft');
+    expect(ok(gone, 'update_cfd_case', { caseId: 'c1', quality: 'draft' }).document.cfd?.cases['c1']?.quality).toBe('draft');
     expect(prepare(gone).checks.some((check) => check.code === 'CFD_ENTITY_NOT_FOUND')).toBe(false);
-    expectRefusal(gone, 'cfd_update_case', { caseId: 'c1', excludedEntityIds: ['ghost'] }, 'CFD_ENTITY_NOT_FOUND');
+    expectRefusal(gone, 'update_cfd_case', { caseId: 'c1', excludedEntityIds: ['ghost'] }, 'CFD_ENTITY_NOT_FOUND');
     const missingBody = without(unit.id);
-    expect(ok(missingBody, 'cfd_update_case', { caseId: 'c1', entityIds: [two.id] }).affected).toEqual(['c1']);
+    expect(ok(missingBody, 'update_cfd_case', { caseId: 'c1', entityIds: [two.id] }).affected).toEqual(['c1']);
   });
 });
 
@@ -60,11 +60,11 @@ describe('inlet / outlet openings (§5.1 step 8)', () => {
   it('open edges of a body tagged inlet do not count as non-watertight', () => {
     const untagged = withCase(mesh.document, [id]);
     expect(rowOf(prepare(untagged), 'CFD_GEOMETRY_NOT_WATERTIGHT').status).toBe('fail');
-    const tagged = ok(untagged, 'cfd_set_boundary', { caseId: 'c1', kind: 'inlet', entityId: id }).document;
+    const tagged = ok(untagged, 'set_cfd_boundary', { caseId: 'c1', kind: 'inlet', entityId: id }).document;
     const row = rowOf(prepare(tagged), 'CFD_GEOMETRY_NOT_WATERTIGHT');
     expect(row.status).toBe('pass');
     expect(row['openingEdges']).toBe(4);
-    const walled = ok(untagged, 'cfd_set_boundary', { caseId: 'c1', kind: 'wall', entityId: id }).document;
+    const walled = ok(untagged, 'set_cfd_boundary', { caseId: 'c1', kind: 'wall', entityId: id }).document;
     expect(rowOf(prepare(walled), 'CFD_GEOMETRY_NOT_WATERTIGHT').status).toBe('fail');
   });
 });
@@ -86,7 +86,7 @@ describe('case validation', () => {
   it('refuses a body listed twice', () => {
     expectRefusal(
       unit.doc,
-      'cfd_create_case',
+      'create_cfd_case',
       { id: 'c1', entityIds: [unit.id, unit.id], freestream: { speedMS: 1 }, reference: { areaM2: 1, lengthM: 1 } },
       'CFD_PARAM_INVALID',
       'entityIds',
@@ -104,10 +104,10 @@ describe('case validation', () => {
   it('notes that the moment point is not recomputed when the bodies change', () => {
     const doc = withCase(unit.doc, [unit.id]);
     const other = addBody(doc, 'add_box', { size: [1, 1, 1], position: [9, 9, 9], anchor: 'min' });
-    const result = execute(other.doc, 'cfd_update_case', { caseId: 'c1', entityIds: [other.id] });
+    const result = execute(other.doc, 'update_cfd_case', { caseId: 'c1', entityIds: [other.id] });
     expect((result.data as { notes: string[] }).notes[0]).toContain('momentPointM');
     expect(result.summary).toContain('not recomputed');
-    const given = execute(other.doc, 'cfd_update_case', { caseId: 'c1', entityIds: [other.id], reference: { momentPointM: [9, 9, 9] } });
+    const given = execute(other.doc, 'update_cfd_case', { caseId: 'c1', entityIds: [other.id], reference: { momentPointM: [9, 9, 9] } });
     expect((given.data as { notes: string[] }).notes).toEqual([]);
   });
 });

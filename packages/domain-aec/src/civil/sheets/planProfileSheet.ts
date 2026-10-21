@@ -4,10 +4,11 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import type { AlignmentObject } from '@core/model/civil';
+import type { AlignmentObject } from '@aec/civil/types';
 import { escapeXml } from '@lib/escapeXml';
 import { niceStep } from '@lib/niceStep';
-import { composeSheetSvg, fitScale, MARGIN, northArrow, sheetDrawingArea } from '../../shared/sheetFrame';
+import { composeSheetSvg, fitScale, northArrow } from '../../shared/sheetFrame';
+import { SHEET_MARGIN, sheetDrawingArea } from '@core/geometry/sheetLayout';
 import { n } from '@core/geometry/drawingSvg';
 import { PAPER_MM, type PaperSize } from '@core/model/sheet';
 import { toMetres, toMm } from '@core/model/units';
@@ -109,7 +110,7 @@ export function buildPlanProfileSheet(
     caption: `${title} · H 1:${scale} · V 1:${n(scale / options.verticalExaggeration)} · stations and levels in m`,
     bodyId: 'plan-profile',
     body,
-    overlays: [northArrow(width - MARGIN - 12, MARGIN + 12)],
+    overlays: [northArrow(width - SHEET_MARGIN - 12, SHEET_MARGIN + 12)],
   });
   return { text: `${text}\n`, scale, fits };
 }

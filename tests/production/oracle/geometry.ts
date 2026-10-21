@@ -1,5 +1,5 @@
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
-import type { BuildingElement, BuildingLevel, BuildingModel, EquipmentElement } from '@core/model/building';
+import type { BuildingElement, BuildingLevel, BuildingModel, EquipmentElement } from '@aec/building/types';
 
 /**
  * Plain-maths geometry over the building model (absolute coordinates, document units = mm).

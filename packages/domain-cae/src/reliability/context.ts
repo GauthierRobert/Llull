@@ -3,7 +3,7 @@
 import { evaluateExpression, extractReferences, isBuiltinConstant } from '@lib/expression';
 import type { CadDocument } from '@core/model/types';
 import { item, type Item } from '../fatigue/items';
-import type { LimitState, RandomVariable, ReliabilityModel } from '@core/model/probabilistic';
+import type { LimitState, RandomVariable, ReliabilityModel } from '@cae/reliability/types';
 import { reliabilityOf, limitStateOf } from './model';
 import { buildTransform, type Transform } from './nataf';
 

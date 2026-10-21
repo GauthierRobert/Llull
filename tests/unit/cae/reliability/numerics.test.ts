@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { Distribution } from '@core/model/probabilistic';
+import type { Distribution } from '@cae/reliability/types';
 import { cdf, distributionIssue, fromStandardNormal, invCdf, momentsOf } from '@cae/reliability/distributions';
 import { equivalentCorrelation } from '@cae/reliability/nataf';
-import { cholesky, gamma, normalCdf, normalInv, symmetricEigenvalues } from '@cae/reliability/numerics';
+import { cholesky } from '@lib/denseLinalg';
+import { normalCdf } from '@lib/specialFunctions';
+import { gamma, normalInv, symmetricEigenvalues } from '@cae/reliability/numerics';
 import { createPrng } from '@cae/reliability/prng';
 import { estimatePf, sampleStats, standardNormalSamples } from '@cae/reliability/sampling';
 import { relative } from './support';

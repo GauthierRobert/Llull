@@ -51,7 +51,7 @@ export const setDynamicDamping = defineCommand({
     'Set the damping of a frequency_response / random_response case (there is NO default damping). model: modal (ratios [{ fromMode, toMode, ' +
     'zeta }], zeta = fraction of critical, e.g. 0.02), rayleigh (alpha 1/s, beta s: zeta_j = alpha/(2 w_j) + beta w_j/2), ' +
     'rayleigh_from_ratios (zeta1 at f1Hz and zeta2 at f2Hz -> alpha, beta resolved and stored; zeta dips between the anchors and grows outside, ' +
-    'dynamic_report lists the ratio applied per mode) or structural_material (loss factor eta from the structuralLossFactor property model of ' +
+    'analysis_report lists the ratio applied per mode) or structural_material (loss factor eta from the structuralLossFactor property model of ' +
     'each part material, written as *DAMPING,STRUCTURAL; zeta_eq = eta/2 at resonance). Every model except structural_material needs ' +
     'source { citation }. Replaces any earlier damping of the case.',
   params: z.object({

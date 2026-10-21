@@ -4,7 +4,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import type { CivilModel, PipeObject } from '@core/model/civil';
+import type { CivilModel, PipeObject } from '@aec/civil/types';
 import { toMetres } from '@core/model/units';
 import { civilObjectsOf } from '../model';
 import { fullArea, manningFullFlow, rationalFlowLps, solvePartialFlow } from './hydraulics';

@@ -3,7 +3,8 @@
  * RegistrationRecord ready for apply_registration. Never changes the document (TR-SCN-04).
  */
 
-import type { CloudReference, Mat4, RegistrationRecord } from '@core/model/pointCloud';
+import type { CloudReference, RegistrationRecord } from '@aec/scan/types';
+import type { Mat4 } from '@core/model/pointCloud';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';

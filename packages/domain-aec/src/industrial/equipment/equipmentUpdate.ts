@@ -1,4 +1,4 @@
-import type { EquipmentElement } from '@core/model/building';
+import type { EquipmentElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, looseVec2, vec3, z } from '@core/commands/schema';
 import { elementsOf, getBuilding, isVec2, resolveLevel, toVec2, withElement } from '../../building/model';

@@ -11,7 +11,6 @@ import { addSubdivisionSolid } from './subdivision';
 import { editSubdivisionCage } from './subdivisionCage';
 import { surfaceFromCurves } from './surfaceFromCurves';
 import { addSpurGear } from './gears';
-import { addHelixSpring } from './helixSpring';
 import { addCoil } from './coil';
 import { addBearing } from './bearings';
 import { addInternalGear } from './gearsInternal';
@@ -35,7 +34,6 @@ export const solidsCommands = commandCatalog(
   editSubdivisionCage,
   surfaceFromCurves,
   addSpurGear,
-  addHelixSpring,
   addCoil,
   addBearing,
   addInternalGear,

@@ -214,7 +214,7 @@ llull check_layup part=part-5.1 --doc panel.llull.json --kernel occt --json
 # 4. look at it
 llull render_view view=iso isolate=part-5.1 --doc panel.llull.json --kernel occt --save out/panel.png
 # 5. deliver
-llull export_flat_patterns_dxf part=part-5.1 --doc panel.llull.json --kernel occt --save out/flats.dxf
+llull export_ply_flat_patterns_dxf part=part-5.1 --doc panel.llull.json --kernel occt --save out/flats.dxf
 llull export_ply_table part=part-5.1 --doc panel.llull.json --save out/plies.csv
 llull export_ply_book part=part-5.1 format=svg --doc panel.llull.json --kernel occt --save out/plybook/
 ```
@@ -241,7 +241,7 @@ that is `request_layup_waiver` plus a human approval in 09 PLM. `--dry-run` trie
 1. `search_tools laminate ply`, then `enable_toolset composites`.
 2. `build_project` with the same plan; loop `check_layup` (read-only) and `analyze_laminate` (read-only); edit
    zone stacks with `edit_zone` until no failure remains.
-3. `export_flat_patterns_dxf` returns the DXF text or a resource link.
+3. `export_ply_flat_patterns_dxf` returns the DXF text or a resource link.
 4. Every step lands in the feature history; the user can undo any agent step in the desktop app.
 
 ### 6.4 UI (review and approval surface)
@@ -265,10 +265,10 @@ Each criterion is a CLI call with `--json` and an assertion against `validation/
 | AC-5 | 10 stacking strings | `define_zone` + `check_laminate_rules` per string | expansion and R1-R5 verdicts equal `layup_rules_reference.json`; failing rules carry `CMP_RULE_*` codes | VC-CMP-08, 09 |
 | AC-6 | `cmp-flat-panel-zones` plan | `llull run … D`; `core_sample` at two points | 8 plies / `thicknessMm` 1.0 and 24 plies / 3.0; ramp widths n·t·20 | VC-CMP-10, 11 |
 | AC-7 | hemisphere R = 100, seed at the pole, step 1 mm | `llull drape_ply ply=$p1 output=summary D` | shear at polar 45° on the diagonal 15.7 ± 0.6°; Gauss-Bonnet residual ≤ 0.5°; `data.maxShearDeg` 51.9 ± 1.0 | VC-CMP-12 |
-| AC-8 | locking angle 40° | `check_producibility` / `check_layup` | ≈ 8.5 % of the quadrant flagged; finding `CMP_DRAPE_OVER_LOCK`; `export_flat_patterns_dxf` refused with `CMP_FLAT_OVER_LOCK` unless `allowOverLock` | VC-CMP-13 |
+| AC-8 | locking angle 40° | `check_producibility` / `check_layup` | ≈ 8.5 % of the quadrant flagged; finding `CMP_DRAPE_OVER_LOCK`; `export_ply_flat_patterns_dxf` refused with `CMP_FLAT_OVER_LOCK` unless `allowOverLock` | VC-CMP-13 |
 | AC-8b | hemisphere ply split by 4 darts along the generators | `split_ply` ×4, then `drape_ply` per piece along its bisector | 4 pieces; shear 0 ± 0.05° on each bisector, 15.7 ± 0.6° at the piece-edge node near polar 45° | VC-CMP-33 |
-| AC-9 | cylinder and cone plies | `export_flat_patterns_dxf … --save` + `data` | width 2πr; cone sector angle 254.558°, area 44 428.8 mm² | VC-CMP-14, 15 |
-| AC-10 | cone flat pattern | `export_flat_patterns_dxf --save cone.dxf`, `import_dxf file=cone.dxf`, `measure_area` | area within 0.2 %; layer per ply; `$INSUNITS = 4` | VC-CMP-16 |
+| AC-9 | cylinder and cone plies | `export_ply_flat_patterns_dxf … --save` + `data` | width 2πr; cone sector angle 254.558°, area 44 428.8 mm² | VC-CMP-14, 15 |
+| AC-10 | cone flat pattern | `export_ply_flat_patterns_dxf --save cone.dxf`, `import_dxf file=cone.dxf`, `measure_area` | area within 0.2 %; layer per ply; `$INSUNITS = 4` | VC-CMP-16 |
 | AC-11 | any ply | `export_laser_projection --save laser.txt` | point spacing ≤ 75 mm, corners present, consistent winding | VC-CMP-17 |
 | AC-12 | any plan in `validation/plans` | CLI, MCP `build_project`, UI dispatch | identical documents and query data; commands pure | VC-CMP-20, 21 |
 | AC-13 | a plan with `[45/-45/0/9O]s` (letter O), ν12 = 1.1 with E1 = E2, and unblendable zones | `llull run bad.plan.json --validate D` / run | exit 1; codes `CMP_NOTATION_PARSE`, `CMP_MATERIAL_NOT_POSITIVE_DEFINITE`, `CMP_ZONES_NOT_BLENDABLE` with path and remediation | VC-CMP-34 |

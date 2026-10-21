@@ -2,7 +2,7 @@
 
 import type { FeMeshArtifact, ThermalBcRecord, ThermalSetup, UnitSystem } from '@core/model/analysis';
 import { stefanBoltzmannOf } from './constants';
-import { systemToSi } from '@lib/thermalUnits';
+import { systemToSi } from './thermalUnits';
 import { analysisLengthMetres } from '../shared/defaults';
 import { amplitudeAt } from './amplitude';
 import { elementVolume, faceNodes, integrateFace, nodalWeights, type MeshIndex } from './meshGeometry';

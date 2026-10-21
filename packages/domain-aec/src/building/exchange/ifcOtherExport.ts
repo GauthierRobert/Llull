@@ -1,4 +1,4 @@
-import type { BuildingElement, BuildingLevel, SlabElement } from '@core/model/building';
+import type { BuildingElement, BuildingLevel, SlabElement } from '@aec/building/types';
 import { wallFrame } from '../geometry/wallGeometry';
 import { exportStair } from './ifcStairExport';
 import {

@@ -2,7 +2,7 @@
 
 import type { AnalysisCase, FeMeshArtifact } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
-import { toMetres, toMm } from '@core/model/units';
+import { toAnalysisLength } from '../decks/units';
 
 interface SingularSource {
   readonly kind: 'load' | 'constraint';
@@ -17,12 +17,6 @@ export interface SingularScreen {
 }
 
 const DEFAULT_RADIUS_SOURCE = 'llull default (05 OQ 8): 2 x mesh globalSize';
-
-/** A length in document units expressed in the length unit of the analysis unit system. */
-function toAnalysisLength(doc: CadDocument, analysis: AnalysisCase, value: number): number {
-  if (analysis.unitSystem === 'N-mm-t-s') return toMm(doc, value);
-  return analysis.unitSystem === 'N-m-kg-s' ? toMetres(doc, value) : toMm(doc, value) / 25.4;
-}
 
 const hasFaces = (mesh: FeMeshArtifact, key: string): boolean => Object.hasOwn(mesh.faceSets, key) && (mesh.faceSets[key]?.length ?? 0) > 0;
 
@@ -84,7 +78,7 @@ export function screenSingularities(
 ): SingularScreen {
   const sources = sourcesOf(analysis, mesh);
   const radiusDocument = override?.radius ?? 2 * analysis.mesh.globalSize;
-  const radiusAnalysis = toAnalysisLength(doc, analysis, radiusDocument);
+  const radiusAnalysis = toAnalysisLength(doc, analysis.unitSystem, radiusDocument);
   const excluded = nodesWithin(mesh, new Set(sources.flatMap((entry) => entry.nodes)), radiusAnalysis);
   const radius =
     override === undefined

@@ -49,3 +49,33 @@ export function nativeBinaryPath(
 export function nativeInstallHint(binary: NativeBinary): string {
   return `${binary} not found: build it with "cargo build --release" in solver/ or set ${OVERRIDE_VARIABLE[binary]} / LLULL_NATIVE_DIR`;
 }
+
+/** OCCT version `llull-kernel` is built against (solver/scripts/build-occt.mjs: the default prefix is `<cache>/llull/occt-<version>`). */
+const OCCT_VERSION = '7.9.2';
+
+/**
+ * Environment to run a native binary with. A dev-built `llull-kernel.exe` links the OCCT toolkits dynamically and finds the `TK*.dll` files
+ * only through PATH (the desktop bundle puts them next to the exe). On Windows the OCCT `bin/` is therefore prepended to PATH:
+ * `LLULL_OCCT_DIR/bin`, else the default prefix `%LOCALAPPDATA%\llull\occt-<version>\bin`, when it exists and the binary has no DLLs of its own.
+ * Without that the process dies on start with STATUS_DLL_NOT_FOUND (0xC0000135, exit code 3221225781).
+ */
+export function nativeRuntimeEnv(
+  binary: string,
+  env: NodeJS.ProcessEnv = process.env,
+  exists: (file: string) => boolean = existsSync,
+  platform: NodeJS.Platform = process.platform,
+): NodeJS.ProcessEnv {
+  if (platform !== 'win32' || exists(path.join(path.dirname(binary), 'TKernel.dll'))) return env;
+  const occtDir = env['LLULL_OCCT_DIR'];
+  const localAppData = env['LOCALAPPDATA'];
+  const prefix =
+    occtDir !== undefined && occtDir !== ''
+      ? occtDir
+      : localAppData !== undefined && localAppData !== ''
+        ? path.join(localAppData, 'llull', `occt-${OCCT_VERSION}`)
+        : null;
+  const bin = prefix === null ? null : path.join(prefix, 'bin');
+  if (bin === null || !exists(path.join(bin, 'TKernel.dll'))) return env;
+  const key = Object.keys(env).find((name) => name.toLowerCase() === 'path') ?? 'PATH';
+  return { ...env, [key]: [bin, env[key]].filter((part) => part !== undefined && part !== '').join(path.delimiter) };
+}

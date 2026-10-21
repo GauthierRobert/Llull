@@ -4,7 +4,7 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { exportNcFiles, type NcExport } from '@aec/industrial/fabrication/ncExport';
 import type { NcFile } from '@aec/industrial/fabrication/ncFiles';
-import type { MomentConnectionElement, SteelMemberElement } from '@core/model/building';
+import type { MomentConnectionElement, SteelMemberElement } from '@aec/building/types';
 import { findProfile } from '@aec/steel/profiles';
 import { expectNoOp } from '../../helpers/expectNoOp';
 

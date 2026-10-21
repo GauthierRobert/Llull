@@ -753,13 +753,13 @@
    "quantity": "human gates refuse an agent caller (AF-34)",
    "expected": [
     {
-     "call": "export_step_exact on an ITAR-marked document",
+     "call": "export_step_ap242 on an ITAR-marked document",
      "exitCode": 1,
      "code": "MAT_EXPORT_CONTROLLED",
      "saved": []
     },
     {
-     "call": "export_step_exact confirmExportControlled=true (agent, no human token)",
+     "call": "export_step_ap242 confirmExportControlled=true (agent, no human token)",
      "exitCode": 1,
      "code": "MAT_HUMAN_GATE",
      "saved": []

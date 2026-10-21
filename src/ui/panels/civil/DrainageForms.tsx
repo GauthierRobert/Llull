@@ -1,4 +1,4 @@
-// `add_manhole` (position, invert, rim or ground, catchment, entry time) and `add_pipe` (manholes, diameter, material, n).
+// `add_manhole` (position, invert, rim or ground, catchment, entry time) and `add_drainage_pipe` (manholes, diameter, material, n).
 
 import React from 'react';
 import { useStore } from '@ui/store';
@@ -92,7 +92,7 @@ export function PipeForm(): React.ReactElement {
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
     if (fromId === '' || toId === '' || fromId === toId) return;
-    dispatch('add_pipe', {
+    dispatch('add_drainage_pipe', {
       fromId,
       toId,
       ...optionalNumber('diameter', values.diameter),

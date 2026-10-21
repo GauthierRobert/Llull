@@ -5,7 +5,7 @@
  */
 
 import { is3D, type CadDocument } from '@core/model/types';
-import type { PipeLine, PipingModel, PortRef } from '@core/model/plant';
+import type { PipeLine, PipingModel, PortRef } from '@aec/plant/types';
 import type { Vec3 } from '@core/model/vectors';
 import { entityBoundsInDoc } from '@core/geometry/bounds';
 import { sha256Hex } from '@lib/sha256';

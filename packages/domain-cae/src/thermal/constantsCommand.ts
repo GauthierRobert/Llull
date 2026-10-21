@@ -7,11 +7,11 @@ import type { CommandResult } from '@core/commands/types';
 import { analysisIdSchema } from '../shared/schemas';
 import { isProblem, problem, thermalCaseOf, withThermal, type Problem } from './access';
 import { refuseThermal } from './codes';
-import { STEFAN_BOLTZMANN } from '@lib/thermalClosedForms';
+import { STEFAN_BOLTZMANN } from './thermalClosedForms';
 
 /**
  * @affects doc.analysis.cases[analysisId].thermal.stefanBoltzmann (set, or cleared to the SI default when no value is given)
- * @invariant stored as { value (W/(m^2 K^4)), source, defaulted: false }; deck, heat flows and thermal_report use it
+ * @invariant stored as { value (W/(m^2 K^4)), source, defaulted: false }; deck, heat flows and analysis_report use it
  * @failure unknown analysis / non-thermal case -> refusal; value not finite and positive, or no source -> THM_CONSTANT_INVALID (unchanged doc)
  */
 export const setThermalPhysicalConstants = defineCommand({
@@ -19,7 +19,7 @@ export const setThermalPhysicalConstants = defineCommand({
   description:
     'Override the Stefan-Boltzmann constant of a heat_* analysis (W/(m^2*K^4)) with a sourced value, e.g. to reproduce a published ' +
     'benchmark that rounds sigma (5.67e-8). Without stefanBoltzmann the override is removed and the exact SI value 5.670374419e-8 applies. ' +
-    'The override is recorded with defaulted: false and its source in thermal_report.physicalConstants and enters the input hash.',
+    'The override is recorded with defaulted: false and its source in analysis_report.physicalConstants and enters the input hash.',
   params: z.object({
     analysisId: analysisIdSchema,
     stefanBoltzmann: z

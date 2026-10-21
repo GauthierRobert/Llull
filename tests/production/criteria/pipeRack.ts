@@ -1,4 +1,4 @@
-import type { CableTrayElement, PipeElement } from '@core/model/building';
+import type { CableTrayElement, PipeElement } from '@aec/building/types';
 import type { Vec3 } from '@core/model/types';
 import type { CheckOutcome, Criterion, GradeContext } from '../contract';
 import { absolute, distance, elementsOf, polylineLength, round, sameEnds } from '../oracle/geometry';

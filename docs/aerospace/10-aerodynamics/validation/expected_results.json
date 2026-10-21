@@ -29,7 +29,7 @@
     },
     {
       "id": "VC-AER-04",
-      "command": "aero_drag",
+      "command": "compute_aero_drag",
       "inputs": { "speed_ms": 10, "cd": 1.28, "area_m2": 1, "rho": 1.225 },
       "expected": { "drag_N": 78.4, "power_W": 784 },
       "tolerance": "1e-6 rel",
@@ -38,7 +38,7 @@
     },
     {
       "id": "VC-AER-05",
-      "command": "aero_drag",
+      "command": "compute_aero_drag",
       "reference": "data/airfoil_wing_references.json skin_friction.checkValues",
       "tolerance": "5e-4 rel",
       "test": "drag.test.ts"
@@ -73,7 +73,7 @@
     },
     {
       "id": "VC-AER-14",
-      "command": "draw_naca_airfoil",
+      "command": "airfoil_from_naca",
       "reference": "../02-advanced-surfacing/validation/data/naca_2412_selig_81.csv",
       "tolerance": "1e-7 chord",
       "test": "airfoil.test.ts"
@@ -107,7 +107,7 @@
     {
       "id": "VC-AER-30",
       "status": "planned (M6, after 12 CFD M2)",
-      "command": "aero_drag / road_load_power with cfdCaseId",
+      "command": "compute_aero_drag / road_load_power with cfdCaseId",
       "expected": "drag = 1/2 rho V^2 * forces.cdAM2 of the recorded 12 CFD result; stale or converged:false -> AER_CFD_RESULT_UNUSABLE",
       "tolerance": "1e-6 rel",
       "source": "closed form",

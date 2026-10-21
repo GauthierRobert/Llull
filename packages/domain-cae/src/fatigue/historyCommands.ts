@@ -22,7 +22,8 @@ export const defineLoadHistory = defineCommand({
     'Define a load, stress or strain history for fatigue and crack growth. data.form "series" is a time-ordered list of values (peaks and valleys ' +
     'are extracted on use); "blocks" lists constant-amplitude cycles {max, min, cycles} per block. kind "stress" carries stresses in `unit` (MPa, ksi, ...), ' +
     '"load_factor" is dimensionless (unit "-") and scales an FE load case, "strain" is a strain. repeats "repeating" means the block is repeated until failure ' +
-    '(ASTM E1049 5.4.5). source.citation is mandatory. Returns the history id in affected[0]. Next: count_cycles, create_fatigue_case or create_crack_growth_case.',
+    '(ASTM E1049 5.4.5). source.citation is mandatory. Returns the history id in affected[0]. Next: count_cycles, create_fatigue_case or create_crack_growth_case. ' +
+    'For structural-dynamics inputs (shock_response_spectrum, transient cases: named (time s, value) samples) use define_time_history instead.',
   params: z.object({
     name: z.string().min(1).describe('Display name of the history, e.g. "flight block 1".'),
     kind: z.enum(HISTORY_KINDS).describe('stress | load_factor | strain.'),

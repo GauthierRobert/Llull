@@ -3,7 +3,7 @@
  * checked by `npm run arch` (part of `npm run check`) for every change, human or agent.
  * The PreToolUse hook gives agents early feedback; this file is the authority.
  *
- * Layers (one-way): desktop → server; src/ui, server → src/app → packages/{protocol, domain-aec, domain-cae, domain-aero, design-lang, plm, kernel-*, physics-*} → packages/core
+ * Layers (one-way): desktop → server; src/ui, server → src/app → packages/{protocol, domain-aec, domain-cae, domain-aero, domain-dynamics, design-lang, plm, kernel-*, physics-*} → packages/core
  * Inside core:      commands, codegen, plugins → dynamics → geometry → model → lib
  */
 
@@ -73,6 +73,15 @@ module.exports = {
       severity: 'error',
       from: { path: '^(packages|src|server)/', pathNot: '^(packages/design-lang/|src/app/plugins\.ts$)' },
       to: { path: '^packages/design-lang/' },
+    },
+    {
+      name: 'hosts-use-plugins-through-their-index',
+      comment:
+        'L6/L10: hosts (server, desktop, the app and its UI) reach a plugin package only through its src/index.ts API, never its internals, ' +
+        'so a plugin can change its layout or be removed without breaking a host. tests/** are exempt.',
+      severity: 'error',
+      from: { path: '^(server/src|desktop/src|src)/' },
+      to: { path: '^packages/(domain-[^/]+|plm|design-lang)/src/', pathNot: '^packages/[^/]+/src/index\\.ts$' },
     },
     {
       name: 'protocol-is-a-view-of-the-registry',

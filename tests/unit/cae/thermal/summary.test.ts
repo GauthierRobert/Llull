@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { thermalResultsSummary } from '@cae/thermal/summary';
-import { STEFAN_BOLTZMANN } from '@lib/thermalClosedForms';
+import { STEFAN_BOLTZMANN } from '@cae/thermal/thermalClosedForms';
 import { addBc, must, resultsFor, thermalFixture, twoTetMesh, type ThermalFixture } from './fixtures';
 
 /** Face 1 of element 2 (nodes 2-3-4): the shared face of the two tets counted once. */
@@ -259,7 +259,7 @@ describe('thermalResultsSummary: transient storage and ranges', () => {
         source: { citation: 'test' },
       },
     }).document;
-    const removed = must(doc, 'remove_property_model', { material: 'steel', modelId: 'cp_const' }).document;
+    const removed = must(doc, 'delete_property_model', { material: 'steel', modelId: 'cp_const' }).document;
     const tabled = withDoc(fixture, removed);
     const results = resultsFor(tabled, mesh, [{ time: 2, temperature: uniform(60) }]);
     const { heatBalance } = thermalResultsSummary(tabled.doc, tabled.analysisId, mesh, results);

@@ -62,3 +62,17 @@ export function nextId(prefix = 'e'): string {
 export function uniqueId(prefix: string): string {
   return counterIdSource.next(prefix);
 }
+
+/**
+ * Readable id `<prefix><sep><n>` for the first `n >= start` that `taken` does not claim; `n` is zero-padded to `pad` digits.
+ * Not replay-stable across documents on its own: callers pass the document's own ids to `taken`.
+ */
+export function nextFreeId(
+  prefix: string,
+  taken: (id: string) => boolean,
+  { pad = 0, sep = '-', start = 1 }: { readonly pad?: number; readonly sep?: string; readonly start?: number } = {},
+): string {
+  let n = start;
+  while (taken(`${prefix}${sep}${String(n).padStart(pad, '0')}`)) n += 1;
+  return `${prefix}${sep}${String(n).padStart(pad, '0')}`;
+}

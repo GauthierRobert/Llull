@@ -18,7 +18,7 @@ What exists and is reused:
 | Part sheets | `packages/core/src/model/sheet.ts` (`DrawingsModel`, `DrawingSheet`, `DrawingView` with `direction: 'iso'`), `commands/drawings/*` (`create_sheet`, `create_drawing_view`, `add_section_view`, `export_sheet_svg`) | title block, paper sizes, ISO 216 frames | the `iso` view is a hidden-line projection of solids, to scale; no piping symbols, no not-to-scale layout |
 | Iso frame | `packages/core/src/geometry/viewDirections.ts` `AXES.iso` (right = (1,1,0)/√2, viewer at (+X, −Y, +Z)) | true isometric: +X → −30°, +Y (north) → +30°, +Z → 90°, scale √(2/3) (derived in `validation/data/pcf_reference_parse.py`) | — |
 | SVG painter | `packages/core/src/geometry/drawingSvg.ts` (`DrawingPainter`, `svgText`, `paperDimension`) | iso sheet painting | — |
-| DXF writer | `packages/core/src/lib/dxfWriter.ts`, `domain-aec/src/building/exchange/dxfWriter.ts` (`export_dxf`) | iso DXF | — |
+| DXF writer | `packages/core/src/lib/dxfWriter.ts`, `domain-aec/src/building/exchange/dxfWriter.ts` (`export_building_dxf`) | iso DXF | — |
 | Fabrication export | `industrial/fabrication/ncExport.ts` `export_nc_files` (DSTV NC1, one file per distinct piece, `data.files[]` with `content`, grouped quantities) | pattern for `export_pcf` (files[], determinism, `confirmExportControlled` + `exportRefusal`) | steel only |
 | Clash | `industrial/clash/clash.ts` `check_clashes` | — | — |
 | CLI file I/O | `server/src/cli/saveFiles.ts` (`--save` writes `data.files[]`, text keys incl. `content`, `svg`, `dxf`), `server/src/cli/exchange.ts` `FILE_PARAMS` (`file=` → content param) | PCF / SVG out; PCF in needs one `FILE_PARAMS` row (`import_pcf: { key: 'text', encoding: 'utf8' }`) | — |

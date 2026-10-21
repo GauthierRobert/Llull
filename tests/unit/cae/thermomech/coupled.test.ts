@@ -142,7 +142,7 @@ describe('coupled_temperature_displacement set-up', () => {
     const reference = execute(doc, 'set_reference_temperature', { analysisId, value: 25, unit: 'degC' });
     expect(reference.document.analysis?.cases[analysisId]?.thermomech).toMatchObject({ referenceTemperature: { value: 25 } });
     expect(reference.document.analysis?.cases[analysisId]?.thermomech?.thermal?.bcOrder).toEqual([bcId]);
-    const removed = execute(doc, 'delete_thermal_bc', { analysisId, bcId });
+    const removed = execute(doc, 'delete_analysis_item', { analysisId, itemId: bcId });
     expect(removed.document.analysis?.cases[analysisId]?.thermomech?.thermal?.bcOrder).toEqual([]);
   });
 
@@ -320,7 +320,7 @@ describe('coupled deck', () => {
     const conflicting = second(80);
     const refused = writeInp(conflicting.doc, base.analysisId, conflicting.mesh);
     expect(refused).toMatchObject({ code: 'THM_BC_CONFLICT', ids: [base.bcId, conflicting.id] });
-    expect('message' in refused && refused.message).toContain('delete_thermal_bc');
+    expect('message' in refused && refused.message).toContain('delete_analysis_item');
     const equal = second(120);
     expect(writeInp(equal.doc, base.analysisId, equal.mesh)).toHaveProperty('text');
   });

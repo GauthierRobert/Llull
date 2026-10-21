@@ -55,7 +55,7 @@ src/app installDefaultPlugins() + caePlugin + physicsDynamicsPlugin
 packages/domain-physics/src/dynamics   (@phys/dynamics)   CadPlugin "physics-dynamics", toolset "analysis"
    commands/: set_dynamic_damping, set_frequency_sweep, set_base_excitation, define_vibration_spectrum,
               define_load_history, set_transient_controls, assign_load_history (V1),
-              equivalent_static_load_case, dynamic_report, check_dynamics,
+              equivalent_static_load_case, analysis_report, check_dynamics,
               sdof_response, psd_rms, shock_response_spectrum, damping_coefficients
    decks/:    inpDynamics.ts         (extends @cae inpWriter: STORAGE=YES, SSD / MODAL DYNAMIC / DYNAMIC steps)
    results/:  datParticipation.ts    (participation + effective mass tables), frdComplex.ts (PU / PHS blocks)
@@ -226,7 +226,7 @@ Plugin `physics-dynamics`, toolset `analysis`. All are pure `defineCommand`s; �
 | `assign_load_history` | mutating (V1) | `{ analysisId, loadId, history }` | @affects case.dynamics.loadHistories · @failure unknown load / history |
 | (PHY-10) `export_joint_load_history` | mutating (V1), owned by PHY-10 | `{ study, jointId, component: 'Fx'\|…\|'Mz', name }` | @affects physics.dynamics.histories · @invariant the PHY-10 study is re-computed and its `studyHash` matches (PHY-10 TR-RBD-60); the history keeps `source.fromPhy10` and the `unverified` flag · @failure `RBD_STUDY_STALE` (PHY-10 code) |
 | `equivalent_static_load_case` | mutating | `{ analysisId, probe? \| nodalMax?: true, peakFactor?: number, targetAnalysisId, direction?, loadCase }` | @affects target static case loads (05 `FeaLoad` gravity kind, category `limit`) · @invariant source results not stale; provenance records case, spectrum, damping, peak factor (named, AF-31) · @failure `DYN_RESULTS_STALE`, `DYN_MILES_NOT_ANSWER`, `DYN_TARGET_NOT_STATIC` |
-| `dynamic_report` | query | `{ analysisId, probes?: string[] }` → `data: DynamicSummary` + state (05 states) | read-only |
+| `analysis_report` | query | `{ analysisId, probes?: string[] }` → `data: DynamicSummary` + state (05 states) | read-only |
 | `export_response_psd` | ✱ transport-read (V1) | `{ analysisId, probe, quantity, path? }` → CSV (Hz, ASD, unit) | heavy output only via `--save` (AF-12); input to PHY-07 |
 | `check_dynamics` | query | `{ analysisId }` → `{ status, items[{ code, severity, ids, message, remediation }], reviewRequired: true }` | AF-20, codes §7.1 |
 | `sdof_response` | query | `{ fnHz, zeta? \| Q?, input: { kind: 'harmonic' } \| { kind: 'random', asdG2PerHz? \| spectrum? \| points? } \| { kind: 'shock', halfSine \| history } , bandHz? }` | pure; returns FRF peak, Miles and exact rms (answerOfRecord: 'exact'), relative displacement rms (mm), 3σ; @failure `DYN_DAMPING_UNSET` when neither zeta nor Q |
@@ -541,8 +541,8 @@ Total MVP ≈ 9 weeks of one engineer-equivalent agent lane (Lane 1 core/plugin 
 (acceleration only; `kind` accepted for the plans), **`set_dynamic_basis`** (new: modes, fMaxHz, modalTruncationThreshold),
 `define_vibration_spectrum`, **`delete_vibration_spectrum`**, **`define_time_history`** / **`delete_time_history`** (PHY-07 owns
 `define_load_history`), **`describe_vibration_library`**, `sdof_response`, `psd_rms`, `damping_coefficients`, `shock_response_spectrum`,
-`dynamic_report`, `equivalent_static_load_case`, **`check_structural_dynamics`** (the rigid-body `check_dynamics` of
-`core/commands/dynamics` owns that name). `create_analysis` takes the two types with `modes` or `fMaxHz` (`DYN_BASIS_MISSING` without
+`analysis_report`, `equivalent_static_load_case`, **`check_structural_dynamics`** (the rigid-body `check_dynamics` of
+`domain-dynamics/src/commands` owns that name). `create_analysis` takes the two types with `modes` or `fMaxHz` (`DYN_BASIS_MISSING` without
 either; `fMaxHz` alone extracts 100 modes and keeps those up to fMaxHz — CalculiX computes the requested count, not a range, manual
 `*FREQUENCY`). `add_result_probe` refuses quantities of the wrong case type (`DYN_PROBE_QUANTITY`).
 

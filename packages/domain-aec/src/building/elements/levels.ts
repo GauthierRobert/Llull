@@ -2,7 +2,7 @@
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import type { BuildingLevel, BuildingModel, ProjectInfo } from '@core/model/building';
+import type { BuildingLevel, BuildingModel, ProjectInfo } from '@aec/building/types';
 import { fromMm } from '@core/model/units';
 import {
   elementsOnLevel,

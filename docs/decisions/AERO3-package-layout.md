@@ -15,8 +15,9 @@ Status: decided 2026-10-17 (owner directive: "execute AERO-3"), applying the rec
 - Generic part features stay in **core** (07 §2.1): `add_hole`, `add_pocket`, `set_thread`, `recognize_features`, `check_machining`,
   `hole_table`, the `feature` recipe node, `lib/holeMath.ts`, `lib/sheetMath.ts`. Generic materials stay in core (08 §2.1): records,
   libraries, allowables, `check_materials`, `ctx.libraries`.
-- Plugin data types live in core `model/` (as `building`, `civil`, `analysis` do): `model/sheetMetal.ts`, `model/fasteners.ts`,
-  `model/materialLibrary.ts`; the plugins validate their slice through `DocumentExtension`.
+- Plugin data types live in the plugin package and extend `CadDocument` by module augmentation of `DocumentExtensions` (`building`, `civil`,
+  `fasteners`, `aero`, ... ); `sheetMetal`, `composites` (shared with cae) and `analysis` stay in core `model/`, as does `model/materialLibrary.ts`;
+  the plugins validate their slice through `DocumentExtension`.
 - Toolset `manufacturing` mixes core and plugin commands (getter in `packages/mcp/src/toolsets.ts`, like `analysis`).
 
 ## Wiring

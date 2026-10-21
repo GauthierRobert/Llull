@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { GridElement } from '@core/model/building';
+import type { GridElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
-import type { SteelMemberElement } from '@core/model/building';
+import type { SteelMemberElement } from '@aec/building/types';
 import { execute } from '@core/commands/registry';
 import { crossGridLines, crossingsOnLine, parseCrossingName } from '@aec/industrial/framing/gridFraming';
 import { findProfile } from '@aec/steel/profiles';

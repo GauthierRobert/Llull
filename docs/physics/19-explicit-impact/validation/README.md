@@ -47,7 +47,7 @@ skipped with a reason when `LLULL_OPENCOURANT` is unset), `CLI` (agent driver, A
 | -- | ------ | ----- | -------- | --------- | -------------- | ---- |
 | VC-EXP-01 | FR-EXP-01, 02, 20; TR-EXP-01, 02 | Run each plan, save, load, `replay_history`. | `analysis` slice deep-equal; ids identical; `is pure` for every new command. | exact | L1 | unit + golden |
 | VC-EXP-02 | FR-EXP-04 | `export_explicit_deck` on a case whose part has no elastic constants, or a J–C law without a valid strain-rate range. | Refused `EXP_MATERIAL_INCOMPLETE` / `EXP_LAW_OUT_OF_RANGE`, nothing written. | exact | — | unit |
-| VC-EXP-10 | FR-EXP-11; TR-EXP-30 | `explicit_quick_check check=wave_speed`, steel-like test material. | c0 = **5047.54465125 m/s**; cd = **5856.35665562 m/s**. | 1e-9 | (b) · **A** | unit |
+| VC-EXP-10 | FR-EXP-11; TR-EXP-30 | `hand_check check=wave_speed`, steel-like test material. | c0 = **5047.54465125 m/s**; cd = **5856.35665562 m/s**. | 1e-9 | (b) · **A** | unit |
 | VC-EXP-11 | FR-EXP-11, 12; TR-EXP-30, 31 | `check=critical_time_step` (L_e = 2 mm) and `check=mass_scaling` (target 1e-6 s). | dt = **3.4150925526e-7 s**; added-mass ratio **7.57422831945**. | 1e-9 | (b) · **A** | unit |
 | VC-EXP-12 | FR-EXP-11, 15; TR-EXP-32 | `check=bar_impact`, v = 10 m/s, L = 0.2 m, σy = 500 MPa. | σ = **396.232255123 MPa** (wall); t_c = **79.2464510246 µs**; two bars **198.116127562 MPa**; v_y = **12.6188616281 m/s**. | 1e-9 (quick check) | (b) · **A** | unit |
 | VC-EXP-20 | FR-EXP-05; TR-EXP-20 | `check=johnson_cook_flow` with the Ti-6Al-4V set [S9], ε_p = 0.1, 1000 s⁻¹, ε̇0 = 1 s⁻¹. | **1344.89242239 MPa** (T = Tr); **1127.16040566 MPa** at 600 K with test-input Tm = 1900 K; rate below ε̇0 clamped (factor 1). | 1e-9 | (b) with **B** inputs | unit (reported) |
@@ -59,16 +59,16 @@ skipped with a reason when `LLULL_OPENCOURANT` is unset), `CLI` (agent driver, A
 | VC-EXP-40 | FR-EXP-09; TR-EXP-40 | `explicit_energy_check` on `energy_balance_sample.csv`. | energy error **−0.002**; hourglass/internal **0.05**; contact/internal **0.03**; status `pass` against the named hourglass limit 0.10 [S13]. | 1e-12 | fixture · **A** | unit |
 | VC-EXP-41 | FR-EXP-09, 22; TR-EXP-40 | Same fixture with hourglass energy ×3 (ratio 0.15), and with `energyErrorLimit` unset. | `EXP_HOURGLASS_HIGH` warning naming `{value: 0.10, source: "S13 rule of thumb", defaulted: true}`; `EXP_ENERGY_LIMIT_UNSET` warning. | exact | (b) | unit |
 | VC-EXP-42 | FR-EXP-09; TR-EXP-41 | Parse `engine_listing_sample.txt`. | last energy error **−0.2 %**, 21 cycle lines, `normalTermination: true`, max added mass 0. | 0.05 % abs | fixture · **A** | unit |
-| VC-EXP-50 | FR-EXP-03, 07, 08, 10, 15 | `plans/exp_bar_rigid_wall.plan.json` → `explicit_run` → `explicit_import_results` → `explicit_report`. | rigid-wall force plateau **39 623 N** (396.23 MPa × 100 mm²); contact duration **79.2 µs**; mid-bar σzz plateau 396.2 MPa; energy error within the user limit. | 3 % (plateau mean), 3 % (duration) | (b) · **A** | integration |
+| VC-EXP-50 | FR-EXP-03, 07, 08, 10, 15 | `plans/exp_bar_rigid_wall.plan.json` → `explicit_run` → `explicit_import_results` → `analysis_report`. | rigid-wall force plateau **39 623 N** (396.23 MPa × 100 mm²); contact duration **79.2 µs**; mid-bar σzz plateau 396.2 MPa; energy error within the user limit. | 3 % (plateau mean), 3 % (duration) | (b) · **A** | integration |
 | VC-EXP-51 | FR-EXP-03, 07, 17 | `plans/exp_drop_box.plan.json`. | first contact at **0.4947 s**, centre v_z just before contact **−4851.4 mm/s**. | 0.5 % | (b) · **A** | integration |
-| VC-EXP-52 | FR-EXP-05, 15 | `plans/exp_taylor_rod.plan.json`. | TBD: final length L1 and undeformed length X measured from the imported mesh; `explicit_quick_check check=taylor_dynamic_yield` on them reported next to the J–C flow stress. No gate (B inputs). | — | TBD | integration |
+| VC-EXP-52 | FR-EXP-05, 15 | `plans/exp_taylor_rod.plan.json`. | TBD: final length L1 and undeformed length X measured from the imported mesh; `hand_check check=taylor_dynamic_yield` on them reported next to the J–C flow stress. No gate (B inputs). | — | TBD | integration |
 | VC-EXP-53 | FR-EXP-09, 13, 16 | `plans/exp_bird_rigid_plate.plan.json` (V1, needs the PHY-02 EOS model). | total plate impulse = 272.155 N·s (m·v). | 5 % | (b) · **A** (bird model TBD) | integration (V1) |
 | VC-EXP-54 | FR-EXP-04, 05, 06, 14; TR-EXP-10, 11 | Deck writers on a one-element model with the Ti J–C set and test D1–D5. | `.rad`: OpenCourant Starter exits normally and its `_0000.out` echoes a, b, n, c, m, D1–D5; `.k` (COULD): PyDyna parses `*MAT_JOHNSON_COOK` with identical field values. | exact | S1, S8 | integration / unit (PyDyna in CI Python) |
 | VC-EXP-55 | FR-EXP-08, 10 | Import the VC-EXP-50 run (`th_to_csv`, `anim_to_vtk`). | time histories with units, `maxPlasticStrain`, `failedElements[]` (empty here), energies; artifact hash recorded. TBD freeze after the first M3 run. | exact (structure) | (c) TBD | integration |
 | VC-EXP-56 | FR-EXP-04; TR-EXP-12 | Export the same plan twice. | identical deck sha256. | exact | — | unit |
 | VC-EXP-57 | FR-EXP-19 | Host without OpenCourant (e.g. macOS, no container runtime). | `explicit_run` → `EXP_TOOL_MISSING` with install hint; export still works. | exact | S1 platforms | unit |
 | VC-EXP-60 | FR-EXP-22 | `explicit_energy_check` with no limits given. | hourglass limit named and `defaulted: true`; no energy-error or added-mass default (warnings). | exact | AF-31 | unit + CLI |
-| VC-EXP-61 | FR-EXP-23 | Any `explicit_report` or scenario result. | `reviewRequired: true`, `certificationEvidence: false`, summary contains "not approved". | exact | AF-33 | unit + CLI |
+| VC-EXP-61 | FR-EXP-23 | Any `analysis_report` or scenario result. | `reviewRequired: true`, `certificationEvidence: false`, summary contains "not approved". | exact | AF-33 | unit + CLI |
 | VC-EXP-62 | FR-EXP-24 | J–C law with basis `typical` or grade-B provenance. | `unverified: true` on every result; `check_explicit` warning `EXP_LAW_UNVERIFIED`. | exact | AF-32 | unit |
 | VC-EXP-63 | FR-EXP-25 | Agent calls `dispose_margin` on a bird-strike row (`EXP_FAILED_ELEMENTS` or penetration). | Exit 1, `FEA_HUMAN_GATE`, document unchanged. | exact | AF-34 | unit + CLI |
 | VC-EXP-64 | FR-EXP-26 | The wrong set-ups of TECHNICAL_SPEC §7.1 (no end time, no initial condition or load, rigid wall normal zero, mass scaling above the limit, run results from another deck hash, ABNORMAL termination listing). | Each returns its code, ids/path and remediation. | exact | §7.1 | unit + CLI |
@@ -85,9 +85,9 @@ an=$(llull run plans/exp_bar_rigid_wall.plan.json $D | jq -r '.data.aliases.an[0
 llull check_explicit analysisId=$an $D > check.json
 llull fea_mesh analysisId=$an $D --timeout 300 > mesh.json
 llull explicit_run analysisId=$an $D --progress --timeout 3600 > run.json         # or: export, run elsewhere, import
-llull explicit_report analysisId=$an $D > report.json
+llull analysis_report analysisId=$an $D > report.json
 python3 -I compare.py report.json expected_results.json VC-EXP-12.a --field probes.mid.plateauPa   # PHY-00 harness
-llull explicit_quick_check check=bar_impact 'inputs={"E_Pa":2e11,"rho_kg_m3":7850,"v_m_s":10,"L_m":0.2}' --json
+llull hand_check check=bar_impact 'inputs={"E_Pa":2e11,"rho_kg_m3":7850,"v_m_s":10,"L_m":0.2}' --json
 ```
 
 ## Re-generating

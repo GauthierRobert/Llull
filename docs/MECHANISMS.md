@@ -26,11 +26,11 @@ reproduces `e cos(theta) + sqrt(R^2 - e^2 sin^2(theta)) - (e + R)` (test `cam fo
 ## Closed loops
 
 Mark the joints whose value is unknown `passive: true` and drive the others (`set_joint_value`, `motion_study`, `drive_joint_to`).
-`evaluate_motion` / `bake_motion` / `motion_study` plan a spanning tree from the instances no joint moves (the ground), then solve the
+`evaluate_motion` (`apply`: false queries, true writes the pose) / `motion_study` plan a spanning tree from the instances no joint moves (the ground), then solve the
 passive values so every joint beyond the tree closes (Levenberg-Marquardt on the pose residual of three reference points; the stored
 values are the initial guess, so the assembly branch is kept; failed starts retry from 40 deterministic restarts).
 `data.loop = { closed, residual, message, loops, passive }`. When the loop cannot close (Grashof violation at that angle) or a solved
-joint leaves its limits, `closed` is false, `bake_motion` refuses (document unchanged) and `drive_joint_to` stops there.
+joint leaves its limits, `closed` is false, `evaluate_motion` with `apply: true` refuses (document unchanged) and `drive_joint_to` stops there.
 
 Verified (`tests/unit/mechanismLoops.test.ts`):
 
@@ -49,7 +49,7 @@ Test: a unit slider and block 10 apart stop at 9 (`contactSets.test.ts`).
 
 `create_exploded_view` stores per-entity offsets (explicit, and/or auto: instance `i` in assembly order moves `i * spacing` along an axis, in
 step `i`) in `doc.explodedViews`; `set_active_exploded_view` (no id = off, optional `step`) selects what the 3D viewport draws. Offsets are
-applied to the drawn positions only; entity placements, `bake_motion` and exports are unaffected. Sheets do not yet reference exploded views.
+applied to the drawn positions only; entity placements, `evaluate_motion` with `apply: true` and exports are unaffected. Sheets do not yet reference exploded views.
 
 ## Limits
 

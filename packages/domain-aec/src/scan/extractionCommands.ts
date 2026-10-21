@@ -3,7 +3,8 @@
  * run through add_pipe_run (L10: composed with execute); the commit holds every value, so replay never reads the cloud (TR-SCN-04).
  */
 
-import type { ExtractionRecord, Mat4 } from '@core/model/pointCloud';
+import type { ExtractionRecord } from '@aec/scan/types';
+import type { Mat4 } from '@core/model/pointCloud';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
@@ -172,8 +173,8 @@ export const extractionPayload = (record: ExtractionRecord): string =>
 export const acceptAsbuiltExtraction = defineCommand({
   name: 'accept_asbuilt_extraction',
   description:
-    'HUMAN-ONLY. Accept a committed as-built extraction for fabrication use (field-verified tie-in): recorded only when the signature verifies ' +
-    'against the signing port. An agent always gets SCN_HUMAN_GATE with the document unchanged: hand it to the reviewer.',
+    'Accept a committed as-built extraction for fabrication use (field-verified tie-in): recorded only when the signature verifies ' +
+    'against the signing port. HUMAN-ONLY. An agent always gets SCN_HUMAN_GATE with the document unchanged: hand it to the reviewer.',
   params: z.object({
     extractionId: z.string().describe('Extraction id (affected[0] of commit_asbuilt_extraction).'),
     signature: z.unknown().describe('Human signature object over the extraction payload; agents cannot produce one.'),

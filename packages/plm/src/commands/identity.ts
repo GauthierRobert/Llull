@@ -3,7 +3,7 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
-import type { PlmPolicy } from '@core/model/plm';
+import type { PlmPolicy } from '@plm/types';
 import { PART_NUMBER } from '../document';
 import { refusePlm } from '../refusal';
 import { DEFAULT_SCHEME, isKnownScheme, isValidCustomList, revisionLabel } from '../schemes';

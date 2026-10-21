@@ -70,18 +70,14 @@ describe('fatigue_field', () => {
     expect(unknown).toMatchObject({ isError: true, data: { code: 'FAT_CASE_NOT_FOUND' } });
   });
 
-  native('damages every node natively, bit-identical to the TypeScript reference (VC-FAT-43), then ranks hot spots', async () => {
+  // Bit-identity to the TypeScript oracle (VC-FAT-43) is checked in tests/unit/native/nativeReference.test.ts.
+  native('damages every node natively, then ranks hot spots', async () => {
     const fixture = fixtureInStore(2);
     const runner = createComputeRunner({}, BINARY);
-    const result = await runFatigueField(fixture.caseId, { verify: true }, hostOf(fixture.doc), { store, runner });
+    const result = await runFatigueField(fixture.caseId, {}, hostOf(fixture.doc), { store, runner });
     expect(result.isError).toBe(false);
     const data = result.data as Json;
-    expect(data).toMatchObject({
-      nodes: 112,
-      engine: 'native-cpu',
-      deterministic: true,
-      verification: { identical: true, largestRelativeDifference: 0 },
-    });
+    expect(data).toMatchObject({ nodes: 112, engine: 'native-cpu', deterministic: true });
     const rows = (data['computeFatigue'] as Json)['rows'] as Json[];
     expect(rows).toHaveLength(3);
     for (const row of rows) expect(row['damagePerBlock']).toBe(row['nativeDamagePerBlock']);

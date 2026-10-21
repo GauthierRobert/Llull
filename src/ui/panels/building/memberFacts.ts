@@ -1,8 +1,7 @@
-import type { SteelMemberElement } from '@core/model/building';
+import { type SteelMemberElement, findProfile } from '@aec/index';
 import type { CadDocument } from '@core/model/types';
 import { fixedNumber } from '@lib/compactNumber';
 import { toMetres, toMm } from '@core/model/units';
-import { findProfile } from '@aec/steel/profiles';
 
 const formatPoint = (point: ReadonlyArray<number>): string => point.map((value) => fixedNumber(value, 1)).join(', ');
 

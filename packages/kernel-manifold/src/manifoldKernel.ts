@@ -19,6 +19,7 @@ import { isCurve3D, isSheet } from '@core/model/curveKinds';
 import { orientOutward, soupIndices } from '@core/geometry/meshVolume';
 import { entityTrianglePositions } from '@core/geometry/entityTriangles';
 import { toCounterClockwise } from '@lib/polygon';
+import { quantizedKey } from '@lib/quantize';
 import { release, withOwned } from '@core/geometry/nativeObject';
 import { toDegrees } from '@lib/angle';
 
@@ -112,7 +113,7 @@ function weldedManifold(
     const x = positions[corner * 3] ?? 0;
     const y = positions[corner * 3 + 1] ?? 0;
     const z = positions[corner * 3 + 2] ?? 0;
-    const key = `${Math.round(x * WELD_SCALE)},${Math.round(y * WELD_SCALE)},${Math.round(z * WELD_SCALE)}`;
+    const key = quantizedKey([x, y, z], WELD_UNIT);
     let vertex = vertexOf.get(key);
     if (vertex === undefined) {
       vertex = vertProperties.length / 3;
@@ -137,8 +138,8 @@ function weldedManifold(
   }
 }
 
-/** Corners closer than 1/WELD_SCALE document units are merged into one vertex. */
-const WELD_SCALE = 1e6;
+/** Corners closer than WELD_UNIT document units are merged into one vertex. */
+const WELD_UNIT = 1e-6;
 
 /** Primitive tessellation never reads components; instances are not boolean operands. */
 const NO_COMPONENTS = createEmptyDocument();

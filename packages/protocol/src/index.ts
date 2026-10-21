@@ -14,6 +14,7 @@ export { buildExchangeToolDefinitions, applyExchangeToolCall, exportStepFile } f
 export type { FeaToolsPort, FeaHost, FeaToolResult, FieldTableInput, FeaExportFormat, ResultsFileInput } from './feaTools';
 export { buildFeaToolDefinitions, FEA_SOLVE_TIMEOUT_S } from './feaTools';
 export { buildLibraryToolDefinitions, type MaterialLibraryStorePort, type LibraryRegistration } from './libraryTools';
+export { buildNativeToolDefinitions } from './nativeTools';
 
 export { buildAllTools, searchTools } from './discovery';
 

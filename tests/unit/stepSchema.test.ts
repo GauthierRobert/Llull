@@ -47,25 +47,29 @@ describe('retargetStepSchema', () => {
   });
 });
 
-describe('export_step_exact schema option', () => {
+describe('export_step_ap242 schema option', () => {
   const doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1], color: '#ff0000' }).document;
   const ctx = { ...defaultContext(), kernel: fakeKernel({ step: AP214_STEP }) };
-  it('defaults to AP214', () => {
-    const result = execute(doc, 'export_step_exact', {}, ctx);
+  it('writes AP214 when asked, and AP242 by default', () => {
+    const byDefault = execute(doc, 'export_step_ap242', { includeValidationProperties: false }, ctx);
+    expect(byDefault.summary).toContain('AP242');
+    const result = execute(doc, 'export_step_ap242', { includeValidationProperties: false, schema: 'ap214' }, ctx);
     expect((result.data as { step: string }).step).toContain('AUTOMOTIVE_DESIGN');
     expect(result.summary).toContain('AP214');
   });
   it('writes the AP242 header and keeps names and colours', () => {
-    const result = execute(doc, 'export_step_exact', { schema: 'ap242' }, ctx);
+    const result = execute(doc, 'export_step_ap242', { includeValidationProperties: false, schema: 'ap242' }, ctx);
     const step = (result.data as { step: string }).step;
     expect(step).toContain('AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF');
     expect(step).toContain(`PRODUCT('${doc.order[0]}'`);
     expect(step).toContain('COLOUR_RGB');
     expect(result.summary).toContain('AP242');
   });
-  it('rejects an unknown schema', () => {
-    const result = execute(doc, 'export_step_exact', { schema: 'ap203' }, ctx);
+  it('refuses AP203 on a kernel without the XDE writer and an unknown schema everywhere', () => {
+    const result = execute(doc, 'export_step_ap242', { includeValidationProperties: false, schema: 'ap203' }, ctx);
     expect(result.affected).toEqual([]);
-    expect(result.summary).toContain('invalid params');
+    expect(result.summary).toContain('cannot write AP203');
+    const unknown = execute(doc, 'export_step_ap242', { includeValidationProperties: false, schema: 'ap999' }, ctx);
+    expect(unknown.summary).toContain('invalid params');
   });
 });

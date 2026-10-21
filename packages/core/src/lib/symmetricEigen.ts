@@ -32,25 +32,27 @@ function signed(v: Vec3): Vec3 {
   return (v[index] ?? 0) < 0 ? [-v[0] + 0, -v[1] + 0, -v[2] + 0] : v;
 }
 
-/** One Jacobi rotation zeroing a[p][q]; accumulates the rotation in `v`. */
-function rotate(a: Matrix, v: Matrix, p: number, q: number): void {
+/** One Jacobi rotation zeroing a[p][q] of a symmetric matrix (in place); accumulates the rotation in `v` when given. A zero a[p][q] is a no-op. */
+export function jacobiRotate(a: Matrix, v: Matrix | null, p: number, q: number): void {
   const apq = at(a, p, q);
   if (apq === 0) return;
   const theta = (at(a, q, q) - at(a, p, p)) / (2 * apq);
   const t = (theta >= 0 ? 1 : -1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
   const c = 1 / Math.sqrt(t * t + 1);
   const s = t * c;
-  for (let k = 0; k < 3; k++) {
+  const n = a.length;
+  for (let k = 0; k < n; k++) {
     const [akp, akq] = [at(a, k, p), at(a, k, q)];
     (a[k] as number[])[p] = c * akp - s * akq;
     (a[k] as number[])[q] = s * akp + c * akq;
   }
-  for (let k = 0; k < 3; k++) {
+  for (let k = 0; k < n; k++) {
     const [apk, aqk] = [at(a, p, k), at(a, q, k)];
     (a[p] as number[])[k] = c * apk - s * aqk;
     (a[q] as number[])[k] = s * apk + c * aqk;
   }
-  for (let k = 0; k < 3; k++) {
+  if (v === null) return;
+  for (let k = 0; k < n; k++) {
     const [vkp, vkq] = [at(v, k, p), at(v, k, q)];
     (v[k] as number[])[p] = c * vkp - s * vkq;
     (v[k] as number[])[q] = s * vkp + c * vkq;
@@ -73,7 +75,7 @@ export function symmetricEigen(matrix: Symmetric3): PrincipalAxes | null {
   const scale = Math.max(Math.abs(matrix[0]), Math.abs(matrix[1]), Math.abs(matrix[2]), 1e-300);
   for (let sweep = 0; sweep < MAX_SWEEPS; sweep++) {
     if (Math.abs(at(a, 0, 1)) + Math.abs(at(a, 0, 2)) + Math.abs(at(a, 1, 2)) <= 1e-17 * scale) break;
-    for (const [p, q] of PAIRS) rotate(a, v, p, q);
+    for (const [p, q] of PAIRS) jacobiRotate(a, v, p, q);
   }
   const order = [0, 1, 2].sort((i, j) => at(a, i, i) - at(a, j, j) || i - j);
   const [i0, i1, i2] = [order[0] ?? 0, order[1] ?? 1, order[2] ?? 2];

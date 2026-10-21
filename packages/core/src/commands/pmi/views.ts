@@ -64,7 +64,7 @@ const findView = (doc: CadDocument, id: string): SavedView | undefined =>
 export const createSavedView = defineCommand({
   name: 'create_saved_view',
   description:
-    'Create a named saved view: a camera (a preset direction framing the scene, or an explicit camera), the set of PMI items shown in it, an ' +
+    'Create a named saved view (for a BCF review camera used by issues, walkthroughs and render_view use save_viewpoint instead): a camera (a preset direction framing the scene, or an explicit camera), the set of PMI items shown in it, an ' +
     'optional entity filter and an optional section. Saved views are what a reviewer opens (activate_saved_view) and what AP242 exchange ' +
     'carries. Give direction (front, back, left, right, top, bottom, iso) OR camera. pmiIds default to none, so list the items to show ' +
     '(e.g. "$holeSize"). Refusals: GDT_VIEW_REF_UNKNOWN, GDT_FIELD_INVALID_FOR_KIND. Returns the saved view id in affected.',

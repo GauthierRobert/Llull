@@ -21,7 +21,7 @@ before any flow simulation. The **flow field** (Mach and pressure maps, shocks, 
 local GPU solvers of [`12 CFD`](../12-cfd-gpu/FUNCTIONAL_SPEC.md) (decided 2026-10-18). This pack keeps three
 links to it:
 
-- CFD results feed the formula-level commands: a CdA or forces from a CFD case can drive `aero_drag` and
+- CFD results feed the formula-level commands: a CdA or forces from a CFD case can drive `compute_aero_drag` and
   `road_load_power` (FR-AER-14);
 - the methods here cross-check CFD: panel / lifting-line with compressibility corrections against the Euler
   solver at the same Mach (FR-AER-15);
@@ -37,7 +37,7 @@ links to it:
 | Wind-tunnel and test preparation       | Reynolds number of a model, blockage area                                            | hand calculation                                                         | `standard_atmosphere`, `frontal_area` on the model                                                       |
 | Road cycling / triathlon               | watts saved by a position or a helmet, speed at a given power on a climb             | Martin 1998 power model in spreadsheets, field "virtual elevation" tests | `road_load_power` `vehicle: bicycle` (Martin 1998) with CdA typed in or measured on a rider + bike model |
 | Track hour record                      | power needed for a distance, effect of altitude                                      | Bassett et al. 1999 model                                                | `road_load_power` `model: bassett_1999`, reproducing the published table                                 |
-| Automotive / wind loads                | drag force and power at speed                                                        | Cd × A from catalogues                                                   | `aero_drag` with the frontal area measured on the model                                                  |
+| Automotive / wind loads                | drag force and power at speed                                                        | Cd × A from catalogues                                                   | `compute_aero_drag` with the frontal area measured on the model                                                  |
 
 ## 3. Personas and user stories
 
@@ -70,8 +70,8 @@ User stories:
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **MVP (built)** | US Standard Atmosphere 1976 to 86 km (+ ISA ΔT), flow quantities (Mach, q, EAS, Re); NACA 4-digit + 230-series 5-digit sections into the sketch; inviscid linear-vortex panel method (cl, cm, Cp) + thin-airfoil theory; Prandtl lifting line (trapezoidal / elliptical, linear twist) + Helmbold check; frontal / wetted area of solids along a flow direction; drag and power from CdA, Cd·A or the model, flat-plate skin friction (4 correlations); cycling power (Martin 1998 road, Bassett 1999 track) |
 | V1              | Viscous section polars via an XFOIL hand-off (host transport like CalculiX, bundled binary, GPL) or a built-in integral boundary layer; drag build-up (form factors, interference) with sourced tables; vortex-lattice method for swept / multi-surface configurations; stability derivatives (neutral point, static margin); drafting / drafting-line positions in cycling from Blocken et al.                                                                                                              |
-| V1 + 12 CFD     | CdA and forces read from a converged, non-stale 12 CFD case in `aero_drag` / `road_load_power` (FR-AER-14)                                                                                                                                                                                                                                                                                                                                                                                                   |
-| V2              | Compressible corrections (Prandtl-Glauert / Kármán-Tsien), cross-checked against the 12 CFD Euler solver (FR-AER-15); propeller blade-element momentum theory; **external-solver export**: write the watertight surface, farfield box and boundary patches prepared by 12 CFD `cfd_prepare` as OpenFOAM or SU2 case files for a solver the user runs locally, and import its forces and surface Cp as 12 CFD result records (05 FEA result pattern)                                                                                                                    |
+| V1 + 12 CFD     | CdA and forces read from a converged, non-stale 12 CFD case in `compute_aero_drag` / `road_load_power` (FR-AER-14)                                                                                                                                                                                                                                                                                                                                                                                                   |
+| V2              | Compressible corrections (Prandtl-Glauert / Kármán-Tsien), cross-checked against the 12 CFD Euler solver (FR-AER-15); propeller blade-element momentum theory; **external-solver export**: write the watertight surface, farfield box and boundary patches prepared by 12 CFD `prepare_cfd_case` as OpenFOAM or SU2 case files for a solver the user runs locally, and import its forces and surface Cp as 12 CFD result records (05 FEA result pattern)                                                                                                                    |
 | Out of scope    | Flow-field solvers in this pack (they live in 12 CFD), aeroelasticity / flutter (physics PHY "not in this list"), certification load cases                                                                                                                                                                                                                                                                                                                                                                  |
 
 ## 5. Functional requirements
@@ -91,7 +91,7 @@ User stories:
 | FR-AER-11 | SHOULD   | Viscous polars (cd, cl_max) by XFOIL hand-off                                                                                                                                                                                                     | profile drag and stall                                   | V1                                             |
 | FR-AER-12 | SHOULD   | Vortex-lattice method for swept wings, tails and canards; neutral point                                                                                                                                                                           | configuration studies                                    | V1                                             |
 | FR-AER-13 | COULD    | Export a case prepared by 12 CFD (surface, farfield, patches, free stream) to OpenFOAM / SU2 case files, and import the external forces and surface Cp as 12 CFD result records; the built-in solvers are 12 CFD                                   | users who already run OpenFOAM / SU2 locally             | V2; [12 CFD](../12-cfd-gpu/FUNCTIONAL_SPEC.md) |
-| FR-AER-14 | SHOULD   | `aero_drag` and `road_load_power` accept a 12 CFD case as the drag-area source (`cfdCaseId`); a stale or non-converged case is refused, and the case's provenance and `unverified` flags propagate into the result                                | measured-on-the-model CdA without retyping               | AF-32; after 12 CFD M2                         |
+| FR-AER-14 | SHOULD   | `compute_aero_drag` and `road_load_power` accept a 12 CFD case as the drag-area source (`cfdCaseId`); a stale or non-converged case is refused, and the case's provenance and `unverified` flags propagate into the result                                | measured-on-the-model CdA without retyping               | AF-32; after 12 CFD M2                         |
 | FR-AER-15 | SHOULD   | Compressibility corrections (Prandtl-Glauert, Kármán-Tsien) on panel and lifting-line results, cross-checked against the 12 CFD Euler solver on the same section / wing at Mach 0.3–0.7                                                          | one model, two methods that must agree                   | Anderson [R7]; V2                              |
 
 ## 6. Workflows
@@ -100,7 +100,7 @@ CLI first (`llull-cli` skill). Typical plan:
 
 ```json
 [
-  { "command": "draw_naca_airfoil", "params": { "naca": "2412", "chord": 1000 }, "as": "section" },
+  { "command": "airfoil_from_naca", "params": { "designation": "2412", "chord": 1000, "points": 121, "trailingEdge": "closed", "as": "polyline" }, "as": "section" },
   { "command": "analyze_airfoil", "params": { "entityId": "$section", "alphasDeg": [0, 4] } },
   { "command": "extrude_profile", "params": { "id": "$section", "depth": 2000 }, "as": "panel" },
   {
@@ -130,16 +130,16 @@ llull road_load_power '{"vehicle":"bicycle","massKg":80,"cfdCaseId":"rider","spe
 | ------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------- | ------------ |
 | the PDAS USSA76 table, −2..86 km by 2 km                | `standard_atmosphere` at each altitude | T within 0.006 K, p / ρ / a / μ within 1e-4 relative                                        | VC-AER-01    |
 | a box 1000 × 600 × 400 mm and a sphere r 0.5 m          | `frontal_area`                         | 0.24 m² within the uncertainty; πr² within the tessellation bound (−1.5 %..+0.1 %)          | VC-AER-02/03 |
-| D = ½ρV²CdA and the four skin-friction correlations     | `aero_drag`                            | exact to 1e-6; Cf within 5e-4 of the check values                                           | VC-AER-04/05 |
+| D = ½ρV²CdA and the four skin-friction correlations     | `compute_aero_drag`                            | exact to 1e-6; Cf within 5e-4 of the check values                                           | VC-AER-04/05 |
 | three Joukowski airfoils with exact potential-flow lift | `analyze_airfoil` on the polyline      | cl within 1 % (300 panels / side)                                                           | VC-AER-10    |
 | NACA 2412                                               | `analyze_airfoil`                      | thin-airfoil α_L0 = −2.077°; panel α_L0 within 0.4° of the measured −2°                     | VC-AER-11    |
 | NACA 0012                                               | `analyze_airfoil`                      | inviscid lift slope 5–15 % above McCroskey's 0.1063 /deg (the documented viscous reduction) | VC-AER-12    |
 | an elliptical wing                                      | `analyze_wing`                         | e = 1, CL_α = a0/(1 + a0/πAR), CDi = CL²/πAR within 1e-6                                    | VC-AER-13    |
 | the 13 rows of Bassett et al. 1999 Table 7              | `road_load_power bassett_1999`         | power within 2 W of the published value (Boardman 1996: the paper's model value 452 W)      | VC-AER-20    |
 | Martin 1998 terms                                       | `road_load_power` bicycle              | each term equals its closed form; speed ↔ power round trip                                  | VC-AER-21/22 |
-| a converged 12 CFD case with CdA 0.25 m², and the same case after a geometry edit | `aero_drag` with `cfdCaseId` | drag equals ½ρV²·0.25 (1e-6); the stale case is refused `AER_CFD_RESULT_UNUSABLE` | VC-AER-30 (planned) |
+| a converged 12 CFD case with CdA 0.25 m², and the same case after a geometry edit | `compute_aero_drag` with `cfdCaseId` | drag equals ½ρV²·0.25 (1e-6); the stale case is refused `AER_CFD_RESULT_UNUSABLE` | VC-AER-30 (planned) |
 | NACA 0012 at Mach 0.5, α 2°                             | panel + Prandtl-Glauert vs 12 CFD Euler | cl agree within 5 % (both inviscid)                                                         | VC-AER-31 (planned) |
-| a case prepared by `cfd_prepare`                        | OpenFOAM export                        | patch names and farfield box equal the 12 CFD case; re-import of a known result round-trips  | VC-AER-32 (planned) |
+| a case prepared by `prepare_cfd_case`                        | OpenFOAM export                        | patch names and farfield box equal the 12 CFD case; re-import of a known result round-trips  | VC-AER-32 (planned) |
 
 ## 8. Standards and regulatory alignment
 

@@ -1,4 +1,4 @@
-import type { SteelMemberElement } from '@core/model/building';
+import type { SteelMemberElement } from '@aec/building/types';
 import { findProfile, sectionProperties } from '../../steel/profiles';
 import { craneActions, CRANE_FACTORS, type CraneModel } from '../frames/frameModelTypes';
 import { lateralTorsionalReduction, sectionResistance, yieldStrength } from '../steelDesign/steelDesign';

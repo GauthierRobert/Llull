@@ -3,7 +3,7 @@
 llull can run a mechanism forward in time with real physics: mass and inertia from the CAD geometry, joints, gear
 trains, engines and propellers, integrated by **MuJoCo** (Google DeepMind's C engine, official WASM build
 `@mujoco/mujoco`, pinned) behind the injected `PhysicsEngine` interface (`@core/dynamics/physicsEngine`, architecture L9).
-The same commands run in the browser (WASM loaded on the first Simulate), in the CLI and on the MCP server.
+The same commands run in the desktop app (WASM loaded on the first Simulate), in the `llull` CLI and on the local backend.
 
 ## The model (document data, `doc.dynamics`)
 
@@ -24,7 +24,7 @@ The same commands run in the browser (WASM loaded on the first Simulate), in the
 UI: **Mechanisms › Physics** lists the bodies, runs _Simulate_, shows the operating point and an rpm chart, and replays
 the motion in the 3D view (play / scrub / slow motion down to 1/100).
 
-Engine layout: `packages/core/src/dynamics/` (engine contract, doc → model, force laws, report),
+Engine layout: `packages/core/src/dynamics/physicsEngine.ts` (the injected port), `packages/domain-dynamics/src/{sim,commands}/` (plugin `dynamics`: doc → model, force laws, report, commands; alias `@dynamics/*`),
 `packages/physics-mujoco/` (MJCF generation + stepping), `packages/core/src/geometry/{massProperties,entityMassProperties}.ts`.
 
 ### Springs, energy and unsettled-run warnings

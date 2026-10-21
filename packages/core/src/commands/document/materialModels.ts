@@ -1,4 +1,4 @@
-/** add_material_model / remove_material_model (PHY-02): constitutive and durability laws on a document material. */
+/** add_material_model / delete_material_model (PHY-02): constitutive and durability laws on a document material. */
 
 import { canonicalJson } from '../../lib/canonicalJson';
 import { sha256Hex } from '../../lib/sha256';
@@ -195,7 +195,7 @@ export const addMaterialModel = defineCommand({
  * @failure unknown material -> MAT_RECORD_NOT_FOUND; library record -> MAT_RECORD_READONLY; unknown id -> MATL_MODEL_NOT_FOUND; a set lists it -> MATL_MODEL_IN_USE
  */
 export const removeMaterialModel = defineCommand({
-  name: 'remove_material_model',
+  name: 'delete_material_model',
   annotations: { destructive: true },
   description: 'Remove one material model from a material. Refused while a constitutive set of the material lists it (MATL_MODEL_IN_USE).',
   params: z.object({
@@ -203,7 +203,7 @@ export const removeMaterialModel = defineCommand({
     id: z.string().describe('Id of the model to remove.'),
   }),
   run: (doc, { material: materialId, id }): CommandResult => {
-    const command = 'remove_material_model';
+    const command = 'delete_material_model';
     const editable = editableMaterial(doc, command, materialId, matlRefusal);
     if ('refusal' in editable) return editable.refusal;
     const { material } = editable;
@@ -229,7 +229,7 @@ export const removeMaterialModel = defineCommand({
         material,
         models.filter((candidate) => candidate.id !== id),
       ),
-      `remove_material_model '${materialId}/${id}': removed.`,
+      `delete_material_model '${materialId}/${id}': removed.`,
       [],
     );
   },

@@ -9,7 +9,8 @@ import { defineCommand, z } from '../schema';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
 import { noop, failer } from '../noop';
-import { commitKernelResult, evaluateRecipe, operandRecipe } from './kernelShape';
+import { commitKernelResult, evaluateRecipe } from '../kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { OCC_KERNEL_HINT } from './modifyTarget';
 
 const MAX_BLEND_OPERANDS = 200;
@@ -30,7 +31,7 @@ export const blendUnion = defineCommand({
     'union are filleted with `radius` (for a radius that varies along one edge, use fillet_edge ' +
     'radiusEnd on the result). The operands are consumed and replaced by one mesh entity that ' +
     'keeps the exact construction (STEP export, further fillets and booleans see true faces). ' +
-    `Requires ${OCC_KERNEL_HINT}; the default Manifold kernel cannot fillet and gracefully no-ops ` +
+    `Needs the exact kernel (check kernel_info): ${OCC_KERNEL_HINT}; with the mesh kernel it cannot fillet and no-ops ` +
     '(use boolean op union there). If the kernel refuses, try another radius: a blend must fit inside ' +
     'the smallest wall it touches, and a crotch where three solids meet can reject specific radii.',
   params: z.object({

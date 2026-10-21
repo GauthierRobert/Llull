@@ -4,8 +4,8 @@
  */
 
 import type { GeometryKernel } from '@core/geometry/kernel';
-import { operandRecipe } from '@core/commands/brep/kernelShape';
-import { isCurvedPart } from './curvedFaces';
+import { operandRecipe } from '@core/geometry/operandRecipe';
+import { isCurvedPart } from '@core/geometry/curvedFaces';
 import { is3D, type CadDocument, type MeshData } from '@core/model/types';
 
 export type PartGeometry =

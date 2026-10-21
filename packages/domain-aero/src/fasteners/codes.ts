@@ -15,7 +15,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   FAST_PROTRUSION_SHORT: 'Use the next grip dash.',
   FAST_PROTRUSION_UNKNOWN: 'Import the nut dimensions (height max) and the bolt threadsPerInch.',
   FAST_LAYER_GAP: 'Close the gap between the plates or select the right solids.',
-  FAST_LAYER_MISSING: 'Select existing 3D solids (list_entities); a stack layer was deleted or replaced.',
+  FAST_LAYER_MISSING: 'Select existing 3D solids (find_entities); a stack layer was deleted or replaced.',
   FAST_INSTANCE_MISSING: 'Delete the stack with delete_fastener_stack and insert it again.',
   FAST_AXIS_MISS: 'Move axisPoint onto the plates or correct axis.',
   FAST_AXIS_ANGLE: 'Angled or countersunk fasteners are out of scope: align axis with the face normal.',

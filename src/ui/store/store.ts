@@ -11,7 +11,7 @@ import { postDispatch, postHistoryStep } from './onlineMode';
 import type { CadStoreState, DispatchOptions, LiveStatus } from './storeTypes';
 import { type LiveCommandEvent, type LiveSnapshotEvent, applyLiveCommand } from '@protocol/liveSync';
 import { reuseUnchanged } from './reuseUnchanged';
-import { toggledInList } from '@ui/toggleMember';
+import { execute } from '@core/commands/registry';
 import { withFailureTracking } from '@ui/report/failureStore';
 
 /** Selection survives a document replacement, minus ids that no longer exist. */
@@ -20,6 +20,7 @@ const withLocalSelection = (doc: CadDocument, selection: readonly EntityId[]): C
   selection: selection.filter((id) => id in doc.entities),
 });
 
+const SET_SELECTION = 'set_selection';
 const REPLACED_LOCAL_EDITS = 'Backend reconnected: edits made while it was offline were replaced by its document.';
 
 export const useStore = create<CadStoreState>()((set, get) => {
@@ -27,7 +28,11 @@ export const useStore = create<CadStoreState>()((set, get) => {
     if (isLocalMode(get())) stepLocalHistory(set, get, direction);
     else postHistoryStep(set, get, direction);
   };
-  const setSelection = (selection: EntityId[]): void => set((state) => ({ document: { ...state.document, selection } }));
+  /** Selection is per-client session state: always run locally (never POSTed), no undo entry, no network round trip. */
+  const runSelection = (params: { ids: readonly EntityId[]; mode?: 'replace' | 'add' | 'remove' | 'toggle' }): void => {
+    const result = execute(get().document, SET_SELECTION, params);
+    if (result.document !== get().document) set({ document: result.document });
+  };
 
   return {
     document: createEmptyDocument(),
@@ -45,6 +50,10 @@ export const useStore = create<CadStoreState>()((set, get) => {
     liveEpoch: null,
 
     dispatch(name: string, params?: unknown, callerOptions?: DispatchOptions): void {
+      if (name === SET_SELECTION) {
+        runSelection(params as Parameters<typeof runSelection>[0]);
+        return;
+      }
       const options = withFailureTracking(name, params, callerOptions);
       if (isLocalMode(get())) runLocally(set, get, name, params, options);
       else postDispatch(set, get, name, params, options);
@@ -57,13 +66,13 @@ export const useStore = create<CadStoreState>()((set, get) => {
     undo: () => stepHistory('undo'),
     redo: () => stepHistory('redo'),
 
-    select: (ids: EntityId[]): void => setSelection([...ids]),
+    select: (ids: EntityId[]): void => runSelection({ ids, mode: 'replace' }),
 
     toggleSelection(id: EntityId): void {
-      setSelection(toggledInList(get().document.selection, id));
+      runSelection({ ids: [id], mode: 'toggle' });
     },
 
-    clearSelection: (): void => setSelection([]),
+    clearSelection: (): void => runSelection({ ids: [], mode: 'replace' }),
 
     setRenderOrigin(origin: [number, number, number]): void {
       set({ renderOrigin: origin });

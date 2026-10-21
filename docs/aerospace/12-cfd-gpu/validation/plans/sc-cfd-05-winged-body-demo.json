@@ -72,7 +72,7 @@
       "as": "fin"
     },
     {
-      "command": "cfd_create_case",
+      "command": "create_cfd_case",
       "params": {
         "id": "demo",
         "entityIds": [
@@ -118,7 +118,7 @@
       }
     },
     {
-      "command": "cfd_prepare",
+      "command": "prepare_cfd_case",
       "params": {
         "caseId": "demo"
       }

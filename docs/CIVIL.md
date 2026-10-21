@@ -3,7 +3,7 @@
 llull's civil workspace covers the site work of a civil engineering office: from the topographic
 survey to the earthworks, the road and the storm drainage, and the exchange files a contractor or a
 Civil 3D / 12d user expects. Like everything in llull, each step is a command: the **Civil / Site**
-panel and MCP agents (toolset `civil`, prompt `design_site`) use the same ones.
+panel and agents driving the `llull` CLI (toolset `civil`: `llull list civil`) use the same ones.
 
 ## Model
 
@@ -14,7 +14,7 @@ panel and MCP agents (toolset `civil`, prompt `design_site`) use the same ones.
 | Platform    | `add_platform`, `update_platform`, `balance_platform`                            | pad, outline, cut / fill batters, daylight line (`C-GRAD`)       |
 | Alignment   | `add_alignment`, `update_alignment`, `set_alignment_profile`, `set_road_section` | centreline, stations, curve data, corridor + batters (`C-ROAD*`) |
 | Manhole     | `add_manhole`, `update_manhole`                                                  | chamber, plan symbol, label (`C-STRM-STRC`)                      |
-| Pipe        | `add_pipe`, `update_pipe`, `size_drainage_pipes`                                 | pipe barrel, plan line, "Ø300 PVC 1.00 %" label (`C-STRM-PIPE`)  |
+| Pipe        | `add_drainage_pipe`, `update_drainage_pipe`, `size_drainage_pipes`                                 | pipe barrel, plan line, "Ø300 PVC 1.00 %" label (`C-STRM-PIPE`)  |
 
 The civil model (`CadDocument.civil`) is the source of truth; generated entities are read-only
 (edit the object, or `delete_civil_object` — `cascade: true` also removes dependents) and are
@@ -39,10 +39,10 @@ m², m³, L/s. Work in metres (`set_units { units: 'm' }`) for real survey coord
    parabolic vertical curves; grades and K values reported), `set_road_section` (lanes, shoulders,
    crossfall, batters). `alignment_report` lists every station (ground, design, cut / fill depth,
    section areas, cumulative volumes by average end areas, mass haul, CSV) and, with
-   `designSpeedKmh`, checks minimum radii and K values. `export_long_section` and
+   `designSpeedKmh`, checks minimum radii and K values. `export_road_long_section` and
    `export_cross_sections` draw the long section (with data band) and the cross-section sheet (SVG).
 5. **Drainage** — `add_manhole` (rim from the surface when omitted, catchment area + runoff
-   coefficient, point inflow) and `add_pipe` (inverts default to the manholes; cycles refused).
+   coefficient, point inflow) and `add_drainage_pipe` (inverts default to the manholes; cycles refused).
    `check_drainage_network` accumulates rational-method flows downstream (Q = C·i·A / 360) and
    checks each pipe: Manning full-bore capacity, part-full depth and velocity, self-cleansing and
    maximum velocity, cover, depth ratio. `size_drainage_pipes` picks the smallest commercial
@@ -71,8 +71,8 @@ conversion; every request uses a private temp dir that is always removed.
 - HTTP: `POST /import/dwg?target=drawing|survey&sourceUnit=m&layers=A,B` with the raw bytes
   (`application/octet-stream`) or JSON `{ "base64": "...", "target": "survey", "name": "..." }`.
   400 not a DWG (`AC10xx` header), 413 too large, 503 no converter installed, 504 timeout.
-- MCP: `import_dwg { dwgBase64 | path, target, sourceUnit, layers, ... }` (toolset `exchange`).
-- UI: Civil / Site panel › DWG file inputs (needs the server).
+- CLI: `llull import_dwg file=site.dwg target=survey …` (toolset `exchange`; every param: `llull describe import_dwg`).
+- UI: Civil / Site panel › DWG file inputs (needs the local backend, i.e. the desktop app).
 
 ## Engineering assumptions (state them in your reports)
 

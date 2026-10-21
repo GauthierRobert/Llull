@@ -5,7 +5,7 @@
  */
 
 import type { GeometryKernel } from '@core/geometry/kernel';
-import { operandRecipe } from '@core/commands/brep/kernelShape';
+import { operandRecipe } from '@core/geometry/operandRecipe';
 import { is3D, type CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 

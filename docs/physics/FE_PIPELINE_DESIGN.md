@@ -32,7 +32,7 @@ set_reference_temperature / set_temperature_field …                       ┘
               → FeMeshArtifact JSON → FeArtifactStore (sha256) → dispatch record_fe_mesh { analysisId, summary }
   ✱ fea_solve (server): writeInp(doc, case, mesh) (pure @cae) → `ccx -i job` → parseFrd / parseDat (pure @cae)
               → FeResultsArtifact JSON → store → dispatch record_fea_results { analysisId, summary }
-  queries:   fea_report, check_analysis, thermal_report, check_thermal, check_temperature_limits, check_thermo_mechanical,
+  queries:   analysis_report, check_analysis, analysis_report, check_thermal, check_temperature_limits, check_thermo_mechanical,
              thermal_distortion_report read the summaries, and the artifacts through ctx.feaArtifacts when they need arrays.
 ```
 

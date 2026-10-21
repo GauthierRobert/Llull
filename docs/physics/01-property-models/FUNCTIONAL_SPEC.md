@@ -99,7 +99,7 @@ User stories:
 
 | Phase | In scope |
 | ----- | -------- |
-| **MVP** | `PropertyModel` type on the 08 record; forms `constant`, `table1d` (linear / loglinear / loglog / step), `polynomial`, `log10Polynomial`, `nistRational`, `arrhenius`, `powerLaw`, `piecewise`; validity ranges with data vs equation range; range guard and codes; units incl. °C/°F/K; `evaluate_property`, `sample_property` (incl. integral and derivative), `define_property_model`, `remove_property_model`, `check_property_models`; 08 temperature tables evaluated through the same command; unverified / reviewRequired propagation |
+| **MVP** | `PropertyModel` type on the 08 record; forms `constant`, `table1d` (linear / loglinear / loglog / step), `polynomial`, `log10Polynomial`, `nistRational`, `arrhenius`, `powerLaw`, `piecewise`; validity ranges with data vs equation range; range guard and codes; units incl. °C/°F/K; `evaluate_property`, `sample_property` (incl. integral and derivative), `define_property_model`, `delete_property_model`, `check_property_models`; 08 temperature tables evaluated through the same command; unverified / reviewRequired propagation |
 | **V1** | Multi-variable: `product` (separable f(T)·g(rate)), `table2d` (bilinear, log axes), rate factors (Johnson-Cook, Cowper-Symonds); `fit_property_model` (linear least squares forms); uncertainty bands; solver tabulation helper; seed library of NIST cryogenic fits re-verified against the primary pages |
 | **V2** | Non-linear fits (Levenberg-Marquardt for forms not linear in parameters); exposure-time families; environment variables (humidity, fluence) once a pack needs them; uncertainty propagation into analyses (with PHY-18) |
 
@@ -160,13 +160,13 @@ llull define_property_model "$(jq '{material:"seal_epdm", model:.data.model}' fi
 llull check_property_models --doc tank.llull.json --json                 # pass / warn / fail with codes (AF-20)
 ```
 
-`--dry-run` works for `define_property_model` and `remove_property_model` (AF-42). Every refusal exits 1 with
+`--dry-run` works for `define_property_model` and `delete_property_model` (AF-42). Every refusal exits 1 with
 `data.code` and `data.remediation`. The agent's report to the owner lists, in order: the value and unit, the
 source, the range status, the uncertainty kind, `unverified` reasons, and what needs a reviewer.
 
 ### 6.2 MCP (cloud)
 
-The `materials` toolset (08) gains `define_property_model`, `remove_property_model`, `evaluate_property`,
+The `materials` toolset (08) gains `define_property_model`, `delete_property_model`, `evaluate_property`,
 `sample_property`, `fit_property_model`, `check_property_models`. Queries are read-only (MCP `readOnlyHint`).
 Private-library models are redacted for cloud clients exactly like 08 values (08 TR-MAT-32).
 

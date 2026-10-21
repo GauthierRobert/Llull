@@ -1,7 +1,7 @@
 /**
- * Host half of native `feature` nodes (RS-1): the WASM kernel's feature walk (core shapeKernel.ts `build` + occtFeatures.ts) up to the
- * OCCT calls. For each feature node of a request's recipes: the source's reach below the face plane (from the sidecar's own display
- * mesh, as the WASM kernel reads its mesh), the core lowering (`lowerFeature`) and the BRepFeat inputs (hole half-sections per position,
+ * Host half of native `feature` nodes (RS-1): the feature walk (core shapeKernel.ts `build` + `lowerFeature`) up to the
+ * OCCT calls, which the sidecar makes. For each feature node of a request's recipes: the source's reach below the face plane (from the sidecar's own display
+ * mesh), the core lowering (`lowerFeature`) and the BRepFeat inputs (hole half-sections per position,
  * pocket outline chain and sketch-face probes). The sidecar then builds `featureCut` (solver/.../recipe/nodes.rs).
  * A pocket floor fillet sends the floor-selection inputs; the sidecar picks the floor edges on the cut's own topology and fillets them.
  * @failure a sidecar that cannot tessellate a source (unsupported node) -> the whole request is unsupported natively
@@ -20,7 +20,7 @@ import { takesShapeFirst, type FeatureLowering, type FeatureLowerings } from './
 
 type FeatureRecipe = Extract<ShapeRecipe, { op: 'feature' }>;
 
-/** occtFeatures.ts NATIVE_MAX_HOLES: more positions are cut by the lowering's one compound boolean. */
+/** NATIVE_MAX_HOLES: more positions are cut by the lowering's one compound boolean. */
 const NATIVE_MAX_HOLES = 8;
 
 /** Display mesh of a source recipe from the sidecar; 'unsupported' when the sidecar cannot build it. */
@@ -30,7 +30,7 @@ type PreparedFeatures = { readonly features: FeatureLowerings } | { readonly uns
 
 const flat = (points: readonly Vec3[]): number[] => points.flat();
 
-/** occtFeatures.ts `nativeHoles` inputs: one revolved half-section per position (world space). */
+/** BRepFeat hole inputs: one revolved half-section per position (world space). */
 function holeInputs(node: Extract<FeatureRecipe, { feature: 'hole' }>, reach: number): FeatureLowering['holes'] {
   if (node.points.length > NATIVE_MAX_HOLES || node.hole.thread?.modelled === true) return undefined;
   const profile = holeToolProfile(node.hole, node.extent, reach);
@@ -42,7 +42,7 @@ function holeInputs(node: Extract<FeatureRecipe, { feature: 'hole' }>, reach: nu
   return { profiles, origins, normal: node.frame.normal };
 }
 
-/** occtFeatures.ts `nativePocket` inputs: the oriented outline chain, the sketch-face probes and the prism length. */
+/** BRepFeat pocket inputs: the oriented outline chain, the sketch-face probes and the prism length. */
 function pocketInputs(node: Extract<FeatureRecipe, { feature: 'pocket' }>, reach: number): FeatureLowering['pocket'] {
   const { pocket, frame } = node;
   if ((pocket.islands?.length ?? 0) > 0) return undefined;
@@ -113,7 +113,7 @@ function requestRecipes(op: string, args: readonly unknown[]): ShapeRecipe[] {
 
 class Unsupported extends Error {}
 
-/** Lowerings of every feature node in the request's recipes, children first; unsupported when a node stays on WASM. */
+/** Lowerings of every feature node in the request's recipes, children first; unsupported when a node has no native lowering. */
 export async function prepareFeatures(op: string, args: readonly unknown[], mesh: SourceMesher): Promise<PreparedFeatures> {
   const features = new Map<FeatureRecipe, FeatureLowering>();
   const visit = async (recipe: ShapeRecipe): Promise<void> => {

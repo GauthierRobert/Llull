@@ -1,6 +1,7 @@
 /** Isotropic hardening curves at a fixed temperature (PHY-02 §3.2, §5.2) resolved to MPa, plus rate factors (§5.8). */
 
 import type { IsotropicHardening } from '../materialModel';
+import { interp1Pairs } from '../../lib/interp1';
 import { failure, isLawFailure, resolveAll, resolveParameter, convertQuantity, type LawFailure, type ResolveEnv } from './resolve';
 
 export interface ResolvedIsotropic {
@@ -16,23 +17,6 @@ export interface ResolvedIsotropic {
 
 /** Plastic modulus from a tangent modulus: H = E·Et / (E − Et); null when Et ≥ E. */
 const plasticFromTangent = (E: number, tangent: number): number | null => (tangent < E ? (E * tangent) / (E - tangent) : null);
-
-/** Piecewise-linear interpolation on increasing x, flat beyond the last point. */
-function interpolateCurve(points: ReadonlyArray<readonly [number, number]>, x: number): number {
-  const first = points[0];
-  const last = points[points.length - 1];
-  if (first === undefined || last === undefined) return 0;
-  if (x <= first[0]) return first[1];
-  if (x >= last[0]) return last[1];
-  for (let i = 1; i < points.length; i += 1) {
-    const right = points[i];
-    const left = points[i - 1];
-    if (right !== undefined && left !== undefined && x <= right[0]) {
-      return left[1] + ((right[1] - left[1]) * (x - left[0])) / (right[0] - left[0]);
-    }
-  }
-  return last[1];
-}
 
 /** Johnson-Cook homologous temperature T* = (T − T_tr)/(T_m − T_tr) clamped to [0, 1]. */
 const homologousTemperature = (T: number, transition: number, melt: number): number =>
@@ -75,7 +59,7 @@ export const multilinearCurve = (
   const weight = (temperature - (lower.temperatureK ?? 0)) / ((upper.temperatureK ?? 0) - (lower.temperatureK ?? 0));
   const strains = [...new Set([...lower.points, ...upper.points].map(([strain]) => strain))].sort((a, b) => a - b);
   return strains.map(
-    (strain) => [strain, (1 - weight) * interpolateCurve(lower.points, strain) + weight * interpolateCurve(upper.points, strain)] as const,
+    (strain) => [strain, (1 - weight) * interp1Pairs(lower.points, strain) + weight * interp1Pairs(upper.points, strain)] as const,
   );
 };
 
@@ -124,7 +108,7 @@ export function resolveIsotropic(
       const first = points[0];
       const last = points[points.length - 1];
       if (first === undefined || last === undefined) return failure('MATL_HARDENING_CURVE_INVALID', `${path}.curves`, 'empty curve');
-      return { y0: first[1], stress: (ep) => interpolateCurve(points, ep), linearSlope: null, lastTabulatedStrain: last[0] };
+      return { y0: first[1], stress: (ep) => interp1Pairs(points, ep), linearSlope: null, lastTabulatedStrain: last[0] };
     }
     case 'voce': {
       const values = resolveAll(

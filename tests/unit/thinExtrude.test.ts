@@ -93,7 +93,7 @@ describe('extrude_profile thin: closed profile -> ring (Manifold)', () => {
   });
 
   it('works on a drawn closed rectangle and keeps the source', () => {
-    const drawn = execute(createEmptyDocument(), 'draw_rectangle', { corner: [0, 0], width: 20, height: 10 });
+    const drawn = execute(createEmptyDocument(), 'draw_rectangle', { position: [0, 0], width: 20, height: 10 });
     const result = execute(drawn.document, 'extrude_profile', { id: idOf(drawn), depth: 4, thin: { thickness: 2, side: 'inside' } });
     expect(result.affected).toHaveLength(1);
     expect(Object.keys(result.document.entities)).toContain(idOf(drawn));

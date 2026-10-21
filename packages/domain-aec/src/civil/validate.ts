@@ -3,7 +3,7 @@
  * regeneration with values it cannot evaluate.
  */
 
-import { type ProfilePvi, CIVIL_CATEGORIES } from '@core/model/civil';
+import { type ProfilePvi, CIVIL_CATEGORIES } from '@aec/civil/types';
 import type { Vec2 } from '@core/model/types';
 import { isFiniteNumber, isPositiveNumber } from '@lib/isFiniteNumber';
 import { isRecord } from '@lib/isRecord';

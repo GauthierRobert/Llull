@@ -15,7 +15,7 @@ import { nextId } from '../../lib/id';
 import { add3, cross3, dot3, normalize3, scale3, sub3 } from '../../lib/vec3';
 import { eulerFromAxes } from '../../lib/eulerRotation';
 import { kernelUnavailable } from '../kernelRefusal';
-import { operandRecipe } from '../brep/kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { validateSolidTarget } from '../brep/modifyTarget';
 import { pickFaces } from '../brep/faceReferences';
 

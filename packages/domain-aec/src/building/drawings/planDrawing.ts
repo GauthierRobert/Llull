@@ -1,4 +1,4 @@
-import type { WallElement } from '@core/model/building';
+import type { WallElement } from '@aec/building/types';
 import { fromMm } from '@core/model/units';
 import { elementsOf, existingLevelId, getBuilding, orderedElements } from '../model';
 import { wallFrame } from '../geometry/wallGeometry';

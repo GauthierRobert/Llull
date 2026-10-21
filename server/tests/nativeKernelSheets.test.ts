@@ -1,7 +1,7 @@
 /**
  * AERO-5 exact sheets and ply slabs on the native `llull-kernel` (02 SRF §13.9, 06 CMP §13.5):
  * - a `nurbs_surface` leaf (capability `nurbsSurface`) is one exact B-spline face, trimmed by its (u, v) loops: OCC area against the closed forms;
- * - `export_step_exact` writes sheets as B-spline faces; the file re-imports with the right face count, and six sheets of a box sew back into a
+ * - `export_step_ap242` writes sheets as B-spline faces; the file re-imports with the right face count, and six sheets of a box sew back into a
  *   solid of the box volume (VC-SRF-16 shape);
  * - `create_ply_solids` attaches a `faceSlab` recipe on plane / cylinder / cone / NURBS tool faces: the exact solid has volume = area x thickness
  *   (plus the curvature term of the offset), matches the triangle solid, and exports to STEP under the ply name.
@@ -73,7 +73,11 @@ const quad = (p00: number[], p01: number[], p10: number[], p11: number[]): Recor
 });
 
 const step = (doc: CadDocument, ids: string[]): { text: string; result: ReturnType<typeof data<Record<string, unknown>>> } => {
-  const result = data<Record<string, unknown>>(doc, 'export_step_exact', { entityIds: ids });
+  const result = data<Record<string, unknown>>(doc, 'export_step_ap242', {
+    entityIds: ids,
+    schema: 'ap214',
+    includeValidationProperties: false,
+  });
   return { text: String(result['step']), result };
 };
 
@@ -161,7 +165,7 @@ describeNative('exact sheets and ply slabs on the native kernel', () => {
       error: 'no_solid',
       detail: expect.stringContaining('2 faces'),
     });
-    const everything = data<Record<string, unknown>>(named, 'export_step_exact', {});
+    const everything = data<Record<string, unknown>>(named, 'export_step_ap242', { schema: 'ap214', includeValidationProperties: false });
     expect(everything['sheetCount'], 'a whole-document export includes the sheets').toBe(2);
   });
 
@@ -322,7 +326,11 @@ describeNative('exact sheets and ply slabs on the native kernel', () => {
     const id = partial.ids[0] as string;
     const moved = apply(partial.doc, 'move_entities', { ids: [id], delta: [30, -20, 5] });
     const turned = apply(moved, 'rotate_entity', { id, delta: [0, 0, 0.7] });
-    const exported = data<{ faceted: string[]; solidCount: number; step: string }>(turned, 'export_step_exact', { entityIds: [id] });
+    const exported = data<{ faceted: string[]; solidCount: number; step: string }>(turned, 'export_step_ap242', {
+      entityIds: [id],
+      schema: 'ap214',
+      includeValidationProperties: false,
+    });
     expect(exported.faceted).toEqual([]);
     const placed = turned.entities[id] as MeshSolidEntity;
     expect(placed.position).not.toEqual([0, 0, 0]);
@@ -336,7 +344,9 @@ describeNative('exact sheets and ply slabs on the native kernel', () => {
 
     // a document holding an instance of the ply solid exports through the assembly path (triangles) without failing
     const withInstance = apply(partial.doc, 'create_component', { name: 'Ply', entityIds: [id] });
-    expect(data<{ solidCount: number }>(withInstance, 'export_step_exact', {}).solidCount).toBeGreaterThan(0);
+    expect(
+      data<{ solidCount: number }>(withInstance, 'export_step_ap242', { schema: 'ap214', includeValidationProperties: false }).solidCount,
+    ).toBeGreaterThan(0);
   });
 
   it('lifts a ply of a cone, away from the apex', () => {

@@ -3,7 +3,7 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop, report } from '@core/commands/noop';
-import { CIVIL_CATEGORIES } from '@core/model/civil';
+import { CIVIL_CATEGORIES } from '@aec/civil/types';
 import { getCivil, withoutObjects } from './model';
 import { dependentsOf, referencesOf } from './integrity';
 import { regenerateCivil } from './evaluate';
@@ -49,7 +49,7 @@ export const describeCivil = defineCommand({
 export const deleteCivilObject = defineCommand({
   name: 'delete_civil_object',
   description:
-    'Delete a civil object (point group, surface, platform, alignment, manhole or pipe) and its generated geometry. Refused when other ' +
+    'Delete a civil object by civil id (use this instead of delete_entities, which would leave the civil model pointing at removed geometry) (point group, surface, platform, alignment, manhole or pipe) and its generated geometry. Refused when other ' +
     'objects reference it unless `cascade` is true, which deletes those dependents too (e.g. the pipes of a manhole).',
   annotations: { destructive: true },
   params: z.object({

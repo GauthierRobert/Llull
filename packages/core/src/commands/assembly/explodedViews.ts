@@ -2,7 +2,7 @@ import type { ExplodeOffset, ExplodedView } from '../../model/joints';
 import type { CadDocument, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
-import { idOrNext, idTaken } from '../entity/explicitId';
+import { idOrNext, idTaken } from '../../lib/explicitId';
 import { isValidAxis } from '../../lib/axis';
 import { unitAxis } from '../motion/rigidMotion';
 import { scale3 } from '../../lib/vec3';

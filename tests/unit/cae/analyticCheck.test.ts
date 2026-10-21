@@ -18,7 +18,7 @@ interface Data {
 }
 const doc = createEmptyDocument();
 const check = (name: string, inputs: Record<string, number>, compare?: Record<string, unknown>): ReturnType<typeof execute> =>
-  execute(doc, 'analytic_check', { check: name, inputs, ...(compare === undefined ? {} : { compare }) });
+  execute(doc, 'hand_check', { check: name, inputs, ...(compare === undefined ? {} : { compare }) });
 const valueOf = (result: ReturnType<typeof execute>, name: string): number =>
   (result.data as Data).results.find((entry) => entry.name === name)?.value ?? Number.NaN;
 
@@ -103,7 +103,7 @@ describe('analytic_check output contract', () => {
     expect(data.assumptions.length).toBeGreaterThan(0);
     expect(data.sources).toEqual(['S20', 'S30']);
     expect(result.summary).toContain('tip_deflection_mm = 0.0877714 mm');
-    expect(execute(doc, 'analytic_check', { check: 'cantilever', inputs: BEAMP }).data).toEqual(result.data);
+    expect(execute(doc, 'hand_check', { check: 'cantilever', inputs: BEAMP }).data).toEqual(result.data);
   });
 
   it('compare reports the relative difference and, with a tolerance, whether it is within', () => {
@@ -154,7 +154,7 @@ describe('analytic_check refusals', () => {
   });
 
   it('rejects an unknown check through the schema', () => {
-    const result = execute(doc, 'analytic_check', { check: 'truss', inputs: {} });
+    const result = execute(doc, 'hand_check', { check: 'truss', inputs: {} });
     expect(result.rejected).toBe(true);
   });
 });

@@ -7,6 +7,7 @@
  */
 
 import { workerData, type MessagePort } from 'node:worker_threads';
+import { debugWarn } from './debugLog';
 import { errorMessage } from '@lib/errorMessage';
 import { isTestHook, runTestHook } from './kernelTestHooks';
 import { STATUS_READY, STATUS_REPLY, type KernelReply, type KernelRequest } from './kernelWorkerProtocol';
@@ -62,6 +63,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error('[occt-native-worker] failed to start:', errorMessage(error));
+  debugWarn('[occt-native-worker] failed to start:', errorMessage(error));
   process.exit(1);
 });

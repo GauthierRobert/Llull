@@ -3,6 +3,7 @@
 // band (shaded strip). Hovering a point gives S, D, E, U_val and the reference. "Hold-out only" hides the calibration points.
 
 import React, { useState } from 'react';
+import { ChartAxes } from '../ChartAxes';
 import type { CheckItem, CheckResult } from './reviewTypes';
 
 const WIDTH = 260;
@@ -74,17 +75,15 @@ export function ReferenceChart({ checks }: { checks: readonly CheckResult[] }): 
         Hold-out points only
       </label>
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label={`Simulated against reference: ${points.length} point(s)`}>
-        <line className="series-chart__axis" x1={PAD.left} y1={HEIGHT - PAD.bottom} x2={WIDTH - PAD.right} y2={HEIGHT - PAD.bottom} />
-        <line className="series-chart__axis" x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={HEIGHT - PAD.bottom} />
-        <text className="series-chart__tick" x={PAD.left - 4} y={y(high) + 4} textAnchor="end">
-          {tick(high)}
-        </text>
-        <text className="series-chart__tick" x={PAD.left - 4} y={y(low) + 4} textAnchor="end">
-          {tick(low)}
-        </text>
-        <text className="series-chart__tick" x={WIDTH - PAD.right} y={HEIGHT - 4} textAnchor="end">
-          {tick(last)} rpm
-        </text>
+        <ChartAxes
+          frame={{ width: WIDTH, height: HEIGHT, pad: PAD }}
+          baselineY={HEIGHT - PAD.bottom}
+          yHigh={y(high)}
+          yLow={y(low)}
+          highLabel={tick(high)}
+          lowLabel={tick(low)}
+          endLabel={`${tick(last)} rpm`}
+        />
         {points.length > 1 && <polygon className="reference-chart__band" points={strip} />}
         {points.length > 1 && (
           <polyline className="reference-chart__simulated" fill="none" points={points.map((p) => `${x(p.rpm)},${y(p.s)}`).join(' ')} />

@@ -16,8 +16,8 @@ import {
   TS_NODAL_WORK_LIMIT,
   withNodalRms,
   type RandomFieldInput,
-} from '@cae/dynamics/nodalField';
-import { isPostProblem } from '@cae/dynamics/randomSetup';
+  isPostProblem,
+} from '@cae/index';
 import { positiveInteger } from '../env';
 import { f64Bytes, f64Values, readOutput, withJobFolder, type ComputeRunner } from './computeJob';
 import { DEFAULT_NATIVE_TIMEOUT_S } from './fatigueField';

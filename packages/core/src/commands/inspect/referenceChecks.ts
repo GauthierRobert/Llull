@@ -9,7 +9,7 @@ import type { GeometryKernel } from '../../geometry/kernel';
 import { referenceProblem, resolveNames, hasNames } from '../../geometry/naming/references';
 import { isRecord } from '../../lib/isRecord';
 import { isStringArray } from '../../lib/isStringArray';
-import { operandRecipe } from '../brep/kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { REPICK_EDGES } from '../brep/edgeReferences';
 
 const EDGE_PICKING_STEPS: ReadonlySet<string> = new Set(['fillet_edge', 'chamfer_edge', 'project_edges_to_sketch']);

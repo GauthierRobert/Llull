@@ -2,7 +2,7 @@
 
 import React from 'react';
 import type { AnalysisCase } from '@core/model/analysis';
-import { lengthUnitName, stressUnitName } from '@cae/decks/units';
+import { lengthUnitName, stressUnitName } from '@cae/index';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { formatQuantities, formatSignificant } from './quantityFormat';
 

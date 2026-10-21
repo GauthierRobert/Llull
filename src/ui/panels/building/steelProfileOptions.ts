@@ -1,6 +1,6 @@
 /** Catalogue section options shared by the steel tool forms and the element inspector. */
 
-import { STEEL_PROFILES } from '@aec/steel/profiles';
+import { STEEL_PROFILES } from '@aec/index';
 
 export type SelectOption = readonly [string, string];
 

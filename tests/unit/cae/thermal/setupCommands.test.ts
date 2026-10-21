@@ -176,16 +176,12 @@ describe('define_amplitude / delete_amplitude', () => {
       { ...fixture, doc: made.document },
       { name: 'q', kind: 'surface_flux', value: 1, unit: 'W/m^2', amplitude: id, target: face(boxId) },
     );
-    expectRefused(run(used.doc, 'delete_amplitude', { analysisId, amplitudeId: id }), used.doc, 'THM_AMPLITUDE_IN_USE');
-    const removed = run(made.document, 'delete_amplitude', { analysisId, amplitudeId: id });
+    expectRefused(run(used.doc, 'delete_analysis_item', { analysisId, itemId: id }), used.doc, 'THM_AMPLITUDE_IN_USE');
+    const removed = run(made.document, 'delete_analysis_item', { analysisId, itemId: id });
     expect(removed.affected).toEqual([id]);
     expect(caseOf(removed.document, analysisId).thermal?.amplitudes).toEqual({});
-    expectRefused(run(made.document, 'delete_amplitude', { analysisId, amplitudeId: 'ghost' }), made.document, 'THM_AMPLITUDE_NOT_FOUND');
-    expectRefused(
-      run(made.document, 'delete_amplitude', { analysisId: 'ghost', amplitudeId: id }),
-      made.document,
-      'FEA_ANALYSIS_NOT_FOUND',
-    );
+    expectRefused(run(made.document, 'delete_analysis_item', { analysisId, itemId: 'ghost' }), made.document, 'FEA_ITEM_NOT_FOUND');
+    expectRefused(run(made.document, 'delete_analysis_item', { analysisId: 'ghost', itemId: id }), made.document, 'FEA_ANALYSIS_NOT_FOUND');
   });
 });
 
@@ -301,11 +297,11 @@ describe('add_temperature_limit / delete_temperature_limit', () => {
         },
       },
     };
-    const removed = run(withDisposition, 'delete_temperature_limit', { analysisId, limitId: id });
+    const removed = run(withDisposition, 'delete_analysis_item', { analysisId, itemId: id });
     expect(removed.affected).toEqual([id]);
     expect(caseOf(removed.document, analysisId).thermal).toMatchObject({ limitOrder: [target.affected[0]], dispositions: {} });
-    expectRefused(run(doc, 'delete_temperature_limit', { analysisId, limitId: 'ghost' }), doc, 'THM_LIMIT_NOT_FOUND');
-    expectRefused(run(doc, 'delete_temperature_limit', { analysisId: 'ghost', limitId: id }), doc, 'FEA_ANALYSIS_NOT_FOUND');
+    expectRefused(run(doc, 'delete_analysis_item', { analysisId, itemId: 'ghost' }), doc, 'FEA_ITEM_NOT_FOUND');
+    expectRefused(run(doc, 'delete_analysis_item', { analysisId: 'ghost', itemId: id }), doc, 'FEA_ANALYSIS_NOT_FOUND');
   });
 
   it('refuses a missing source (THM_LIMIT_SOURCE_REQUIRED) and invalid scopes, bounds and units', () => {

@@ -10,9 +10,16 @@ import { defaultContext } from '@core/commands/context';
 import type { CommandResult } from '@core/commands/types';
 import type { FeaHost, FeaToolResult } from '@protocol/index';
 import { isRecord } from '@lib/isRecord';
-import { fieldPlotLayout } from '@cae/results/fieldPlotSvg';
-import { finishRaster, prepareRaster, rasterPixels, type PreparedRaster, type RasterPixels } from '@cae/results/fieldRaster';
-import { fieldPlotRequest, renderParams } from '@cae/results/plotRequest';
+import {
+  fieldPlotLayout,
+  finishRaster,
+  prepareRaster,
+  rasterPixels,
+  type PreparedRaster,
+  type RasterPixels,
+  fieldPlotRequest,
+  renderParams,
+} from '@cae/index';
 import { feaFailure } from '../fea/feaCommon';
 import { f64Bytes, readOutput, withJobFolder } from './computeJob';
 import type { NativeDeps } from './fatigueField';

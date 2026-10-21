@@ -112,7 +112,7 @@ describe('deck gating on THM_BC_CONFLICT', () => {
     );
     const deck = writeInp(doc, analysisId, mesh, null);
     expect('code' in deck && deck.code).toBe('THM_BC_CONFLICT');
-    expect('message' in deck && deck.message).toContain('delete_thermal_bc');
+    expect('message' in deck && deck.message).toContain('delete_analysis_item');
     expect('ids' in deck && deck.ids).toEqual(ids);
   });
 

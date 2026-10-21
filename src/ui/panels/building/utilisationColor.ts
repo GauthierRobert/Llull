@@ -1,6 +1,6 @@
 // Utilisation → colour on the model: green below 0.7, amber below 1, red from 1 (or when the check reports the row as failing).
 
-import type { BuildingModel } from '@core/model/building';
+import type { BuildingModel } from '@aec/index';
 import type { UtilisationMark } from '@ui/store/structuralOverlayStore';
 import { isFailing, type ReportRow } from './structuralReport';
 

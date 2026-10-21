@@ -1,4 +1,4 @@
-import { idOrNext } from '../entity/explicitId';
+import { idOrNext } from '../../lib/explicitId';
 import type { CadDocument, Vec2, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';

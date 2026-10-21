@@ -6,7 +6,7 @@ create_surface eg name="Existing ground" contourInterval=0.5
 add_platform pad surfaceId=eg boundary=[[15,10],[45,10],[45,30],[15,30]] elevation=fl cutSlope=1.5 fillSlope=2
 add_manhole mh1 location=[50,35] invertElevation=101.7 surfaceId=eg catchmentAreaHa=0.5 name="MH1"
 add_manhole mh2 location=[10,35] invertElevation=99.7 surfaceId=eg name="OUT1"
-add_pipe p1 fromId=mh1 toId=mh2 diameter=0.3 material=PVC
+add_drainage_pipe p1 fromId=mh1 toId=mh2 diameter=0.3 material=PVC
 check surface_report surfaceId=eg path=meanElevationM expect ~= 101.9
 check platform_earthworks platformId=pad path=padAreaM2 expect ~= 600
 check platform_earthworks platformId=pad path=netM3 expect ~= 0 ± 15

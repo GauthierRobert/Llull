@@ -7,7 +7,7 @@ import type { GeometryKernel } from '@core/geometry/kernel';
 import type { ExactMassProperties } from '@core/geometry/kernelPorts';
 import { meshMassProperties } from '@core/geometry/massProperties';
 import { solidTriangles } from '@core/geometry/solidTriangles';
-import { bodyMassProperties } from '@core/dynamics/simulationModel';
+import { bodyMassProperties } from '@core/geometry/bodyMassProperties';
 import { symmetricEigen, type Symmetric3 } from '@lib/symmetricEigen';
 import { fakeKernel, TETRA } from '../helpers/fakeKernel';
 import { expectNoOp, expectPure } from '../helpers/expectNoOp';

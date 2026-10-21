@@ -1,5 +1,5 @@
 /**
- * NAFEMS thermal benchmarks through the real pipeline (plan -> fea_mesh (Gmsh) -> fea_solve (CalculiX) -> thermal_report), judged with the
+ * NAFEMS thermal benchmarks through the real pipeline (plan -> fea_mesh (Gmsh) -> fea_solve (CalculiX) -> analysis_report), judged with the
  * PHY-00 judge against the pack's expected_results.json: VC-THM-03 (T3, transient, sine amplitude) and VC-THM-04 (T4, steady, films).
  * Plans: server/tests/fixtures/thermal (the pack's plans adapted to create_material + define_property_model). Skipped without gmsh / ccx.
  */

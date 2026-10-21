@@ -164,7 +164,7 @@ export function buildUrdfTree(doc: CadDocument, source: 'auto' | 'dynamics' | 'a
         source === 'dynamics'
           ? 'the document has no dynamics bodies (add_rigid_body, add_body_joint)'
           : source === 'assembly'
-            ? 'the document has no assembly joints between instances (create_component, place_instance, add_joint)'
+            ? 'the document has no assembly joints between instances (create_component, insert_instance, add_joint)'
             : 'the document has neither dynamics bodies nor assembly joints (add_rigid_body + add_body_joint, or instances + add_joint)',
     };
   const names = uniqueNames(raw.bodies);

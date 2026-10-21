@@ -12,8 +12,7 @@ import type { CadDocument } from '@core/model/types';
 import { toMetres } from '@core/model/units';
 import { isRecord } from '@lib/isRecord';
 import { sha256Hex } from '@lib/sha256';
-import { analysisLengthMetres } from '@cae/shared/defaults';
-import type { TopologyJob } from '@cae/index';
+import { analysisLengthMetres, type TopologyJob } from '@cae/index';
 import { f64Bytes, f64Values } from './computeJob';
 
 export type TopologyDevice = 'cpu' | 'gpu' | 'auto';

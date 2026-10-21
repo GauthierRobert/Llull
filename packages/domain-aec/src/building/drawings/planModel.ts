@@ -1,5 +1,5 @@
 import type { CadDocument, Vec2 } from '@core/model/types';
-import type { BimCategory, BuildingLevel, OpeningElement, WallElement } from '@core/model/building';
+import type { BimCategory, BuildingLevel, OpeningElement, WallElement } from '@aec/building/types';
 import { pointAlong, wallFrame } from '../geometry/wallGeometry';
 import { CATEGORY_LAYER } from '../evaluate/entities';
 import type { DrawingPrimitive } from '@core/model/drawing';

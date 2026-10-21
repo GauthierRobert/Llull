@@ -1,5 +1,5 @@
 import { unitsToMm } from '../../shared/numeric';
-import type { FootingElement } from '@core/model/building';
+import type { FootingElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import { fromMm, toMetres } from '@core/model/units';
 import type { BaseReaction } from '../frames/frameModelSolve';

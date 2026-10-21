@@ -4,7 +4,7 @@ llull includes a building workspace for construction companies: model a building
 **levels, grids, walls, doors, windows, slabs, columns, beams, stairs and rooms**, get
 **quantities, schedules and cost estimates**, and deliver **plan sheets (PDF via print),
 DXF for AutoCAD users and IFC4 for BIM coordination**. Every action is a command, so the
-same workflow is available in the _Building_ panel and to MCP agents.
+same workflow is available in the _Building_ panel and to agents through the `llull` CLI.
 
 The plan and status of this work: [`CONSTRUCTION_PLAN.md`](CONSTRUCTION_PLAN.md).
 
@@ -52,7 +52,7 @@ The _Building_ panel shows the live takeoff + estimate and downloads CSV files.
 | Output     | Command                                             | Opens in                                                                                                                                                                                                                                            |
 | ---------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Plan sheet | `export_plan_sheet` { levelId, paper A4–A0, scale } | Any browser; print to PDF at 100 % for a true-scale drawing. Title block from `set_project_info`, north arrow, scale bar, dimensions.                                                                                                               |
-| DXF        | `export_dxf` { levelId }                            | AutoCAD, BricsCAD, DraftSight, LibreCAD, QCAD, Revit… (R12 ASCII, AIA layers, cut at 1.2 m; cut walls / concrete columns hatched ANSI31 and steel sections solid on `*-PATT` layers).                                                               |
+| DXF        | `export_building_dxf` { levelId }                            | AutoCAD, BricsCAD, DraftSight, LibreCAD, QCAD, Revit… (R12 ASCII, AIA layers, cut at 1.2 m; cut walls / concrete columns hatched ANSI31 and steel sections solid on `*-PATT` layers).                                                               |
 | IFC4       | `export_ifc`                                        | Revit, ArchiCAD, Tekla, Solibri, BIMcollab, Navisworks, BlenderBIM… Walls with real openings (IfcOpeningElement + fills), slabs, columns, beams, stairs, spaces, materials; stable GlobalIds. Validated with IfcOpenShell (schema + EXPRESS rules). |
 | Native     | Save / Open (JSON)                                  | llull — the building model round-trips.                                                                                                                                                                                                             |
 

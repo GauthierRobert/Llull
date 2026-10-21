@@ -7,7 +7,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import type { AlignmentObject } from '@core/model/civil';
+import type { AlignmentObject } from '@aec/civil/types';
 import { horizontalElements } from '../alignment/alignmentGeometry';
 import { validateProfile, verticalCurves } from '../alignment/profileGeometry';
 import { stationText } from '../model';

@@ -2,7 +2,7 @@
 
 import type { Q, TemperatureScale } from '@core/model/analysis';
 import { convertValue, isUnitFailure } from '@lib/quantity';
-import { toSi, type ThermalKind } from '@lib/thermalUnits';
+import { toSi, type ThermalKind } from './thermalUnits';
 import { MAX_PLAUSIBLE_TEMPERATURE } from '../shared/quantity';
 
 /** Absolute zero written to the deck (`*PHYSICAL CONSTANTS, ABSOLUTE ZERO=`): the scale's value of 0 K. */

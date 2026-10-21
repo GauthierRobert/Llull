@@ -7,7 +7,7 @@ Gap id: **XCH** · Companion of [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md) · Va
 
 | Area | Where | What it does | Limit for aerospace |
 | ---- | ----- | ------------ | ------------------- |
-| Exact STEP export | `packages/core/src/commands/brep/topology.ts` `export_step_exact` (read-only, `requiresKernel`) → `GeometryKernel.exportStep(shapes)` (`packages/core/src/geometry/kernel.ts`) → `packages/kernel-occt/src/occtStep.ts` `writeStep` (`STEPControl_Writer`, `STEPControl_AsIs`) | One STEP product per solid, AP214 (OCC default schema), Emscripten FS scratch path `/out.step` | AP214 only; no XCAF document so no assembly, no GVP, no PMI, no layers/materials; `instance` entities skipped ("explode_instance first") |
+| Exact STEP export | `packages/core/src/commands/brep/topology.ts` `export_step_ap242` (read-only, `requiresKernel`) → `GeometryKernel.exportStep(shapes)` (`packages/core/src/geometry/kernel.ts`) → `packages/kernel-occt/src/occtStep.ts` `writeStep` (`STEPControl_Writer`, `STEPControl_AsIs`) | One STEP product per solid, AP214 (OCC default schema), Emscripten FS scratch path `/out.step` | AP214 only; no XCAF document so no assembly, no GVP, no PMI, no layers/materials; `instance` entities skipped ("explode_instance first") |
 | Names/colours | `packages/core/src/commands/brep/stepLabels.ts` `labelStep` | Regex rewrite of `PRODUCT('Open CASCADE STEP translator …')` and appended `STYLED_ITEM` colour chain | Text-level patching; fragile across OCC versions; not extensible to GVP/PMI (needs entity graph, not regex) |
 | STEP export (code path) | `packages/mcp/src/exchangeTools.ts` `export_step` → Python `server/python/llull_bridge.py` `_export_step` (CadQuery) | Exports the generated CadQuery program as STEP AP214 | Host-level tool (not a registry command); AP214; meshes for non-analytic features |
 | STEP import | `exchangeTools.ts` `import_step` → bridge `op_import_step` (`cq.Assembly.importStep`, then `_triangles`) → `import_mesh` | One mesh entity per solid with world placement, name, colour | Exact B-rep lost; assembly flattened; GVP and PMI ignored (gap 01 KRN owns STEP → B-rep) |
@@ -40,7 +40,7 @@ server/python/llull_bridge.py (OCP STEPCAFControl / IGESCAFControl)             
 
 - **L1/L5**: every capability is a `defineCommand` (snake_case) — no file I/O in core: commands take file **content**
   (`text` for STEP Part 21 / IGES, which are ASCII) and return file content in `data`. Hosts (`server/`, `desktop/`,
-  CLI `file=` / `--save`) do the I/O, exactly like `export_step_exact` / `import_dxf` today.
+  CLI `file=` / `--save`) do the I/O, exactly like `export_step_ap242` / `import_dxf` today.
 - **L9**: STEP/IGES parsing and writing live behind the kernel interface (new methods §2.3). Core never parses
   Part 21 except the **independent verifier** (pure TypeScript port of `validation/extract_validation_properties.py`,
   in `packages/core/src/lib/step21/`), which reads embedded GVP and a census — deliberately *not* through OCC so the
@@ -137,7 +137,7 @@ GVP values written by `writeExchange` come from 01's `massProperties` (volume, a
 | TR-XCH-16 | MUST | Robustness budgets §8: size limit before parse, guarded OCC calls, WASM memory released, no throw out of a command | FR-XCH-15 | VC-XCH-14 |
 | TR-XCH-17 | SHOULD | NIST SFA analysis of every llull-written AP242 gate file (0 syntax errors) | FR-XCH-18 | VC-XCH-17 |
 | TR-XCH-18 | MUST | Independent pure-TS Part 21 reader (`packages/core/src/lib/step21/`): tokenizer, record map, GVP extraction, entity census — port of `validation/extract_validation_properties.py`, tested against its JSON output | FR-XCH-06, -18 | VC-XCH-02, -05, -07 |
-| TR-XCH-19 | MUST | `export_step_exact` stays a registered command delegating to the `export_step_ap242` implementation (AP214, flat, no GVP) so existing plans and tools are unchanged | FR-XCH-21 | VC-XCH-03 |
+| TR-XCH-19 | MUST | `export_step_ap242` stays a registered command delegating to the `export_step_ap242` implementation (AP214, flat, no GVP) so existing plans and tools are unchanged | FR-XCH-21 | VC-XCH-03 |
 
 ## 3. Data model
 
@@ -213,11 +213,11 @@ export interface CadDocument {
 | `export_qif` (V2) | query | aero (plugin) | `{ entityIds?, qifVersion: '3.0' }` | `{ format:'qif', xml }` |
 | `import_jt` (V2) | host tool → `import_mesh` | exchange | `{ jtBase64 | path }` via converter port | as `import_mesh` |
 
-`export_step_exact` stays a registered command that delegates to the `export_step_ap242` implementation with
+`export_step_ap242` stays a registered command that delegates to the `export_step_ap242` implementation with
 `{ schema:'ap214', assembly:'flat', includeValidationProperties:false }`, so existing plans, CLI scripts and MCP agents keep
 working. (The retired-command map of `persistence/retiredCommands.ts` / `retiredEditCommands.ts` is not usable here: it only
 rewrites steps of saved documents in `migrate()`, and a read-only export never enters the feature history, so retiring
-`export_step_exact` would make live calls fail as unknown commands.)
+`export_step_ap242` would make live calls fail as unknown commands.)
 
 Tags (C2) for the two central commands:
 
@@ -499,7 +499,7 @@ Coverage gate 90/85/90/90 applies to `packages/core/src/commands/exchange/**` an
 | --------- | ------- | ---------- | ------------------ |
 | M0 Binding list | XCH's class list (XCAF writer, IGES, GD&T) handed to 01 KRN M2, which owns the single custom OCCT 7.9.x build (TKDESTEP/TKDEIGES/TKXCAF; OCCT ≥ 7.8 names, 7.4 splits them into TKSTEP*/TKXDESTEP/TKIGES/TKXDEIGES); verify the bindings in that build | 01 KRN M2 | 0.5 |
 | M1 GVP (merged with 01 KRN M3, owner of `massProperties`) | `geometric_validation_properties` query over 01's `massProperties`; TS Part 21 verifier (`lib/step21`) | 01 KRN M3 | 1 |
-| M2 AP242 export | `writeExchange` (XDE), `export_step_ap242`, assembly structure, GVP write, self-check; `export_step_exact` delegating; also delivers 01 KRN FR-KRN-13 / TR-KRN-80 | M0, M1 | 3 |
+| M2 AP242 export | `writeExchange` (XDE), `export_step_ap242`, assembly structure, GVP write, self-check; `export_step_ap242` delegating; also delivers 01 KRN FR-KRN-13 / TR-KRN-80 | M0, M1 | 3 |
 | M3 Import verify (merged with 01 KRN M4, owner of `import_step_exact`, `importShapes`, `brep` leaf) | extension of `import_step_exact`: XDE product tree → components / instances, provenance, bands, `verify_exchange_file`; NIST gate | 01 KRN M4 | 2.5 |
 | M4 IGES | `import_iges` (through 01's `importShapes`, `brep` leaf; sewing, census), `export_iges` | M0, 01 KRN M4 | 2 |
 | M5 UI/CLI/MCP | dialogs, badge, report table, CLI exit codes, toolsets | M2–M4 | 2 |
@@ -545,7 +545,7 @@ relies on most:
 
 ## 13. Implementation status (AERO-4 part 2, branch `feat/xch`)
 
-Built: M0 (TKDESTEP/TKXCAF/TKXSBase/TKDEIGES linked; TKDEIGES optional at link, `LLULL_HAS_IGES`), M1 GVP (`geometric_validation_properties`, TS reader `lib/step21`), M2 (`export_step_ap242`, `export_step_exact` delegates to XDE, ply names and merged sheets carried), M3 (`import_step_exact` product tree, provenance, GVP check, `verify_exchange_file`), M4 (`import_iges`, `export_iges`), M5 (UI badge/report table/import-verify-export controls, CLI exit codes, `file=`/`--save`, toolsets, guide section 12). Kernel chain: core `writeExchange`/`importExchange` ports, `llull-kernel` ops, `xde.rs` cxx bridge.
+Built: M0 (TKDESTEP/TKXCAF/TKXSBase/TKDEIGES linked; TKDEIGES optional at link, `LLULL_HAS_IGES`), M1 GVP (`geometric_validation_properties`, TS reader `lib/step21`), M2 (`export_step_ap242` delegates to XDE, ply names and merged sheets carried), M3 (`import_step_exact` product tree, provenance, GVP check, `verify_exchange_file`), M4 (`import_iges`, `export_iges`), M5 (UI badge/report table/import-verify-export controls, CLI exit codes, `file=`/`--save`, toolsets, guide section 12). Kernel chain: core `writeExchange`/`importExchange` ports, `llull-kernel` ops, `xde.rs` cxx bridge.
 
 Deviations: placements are `position` + Euler `rotation` (not a 4x4); `importExchange` also serves IGES (not `importShapes`); `mass_properties`/`measure_solid` expose `data.importUnverified` (not an `unverified` object); OCC writes reals with 13 significant digits (Q5), so byte-identity uses `canonicalizeStep21`; AP242 object identifier is `{1 0 10303 442 1 1 4 }` (Q6); the document unit is written as the file unit (inch documents carry inch numbers); product descriptions are patched by name match.
 
@@ -559,7 +559,7 @@ Deferred: JT (converter port, `XCH_CONVERTER_MISSING`), QIF, LOTAR archive packa
 
 ### 13.1 Review round (2026-10-20)
 
-- **TR-XCH-26 on every path.** The gate is one shared helper (`commands/exchange/unverifiedGate.ts`) called from `export_step_ap242`, `export_step_exact` (XDE and legacy paths) and `export_iges`, each with `acceptUnverified`. It covers imported bodies that are red / not checkable / verify-skipped / non-rigid, assemblies (the worst band of the whole subtree; `importedBodyStatus` walks components recursively), and ply solids written from triangles (reason `faceted_body`, named in the refusal). The confirmation is verified AND spent through the signing port (`humanGate` uses `verifyAndSpend`); a port without `spend` never clears the XCH gate.
+- **TR-XCH-26 on every path.** The gate is one shared helper (`commands/exchange/unverifiedGate.ts`) called from `export_step_ap242` (XDE and legacy paths) and `export_iges`, each with `acceptUnverified`. It covers imported bodies that are red / not checkable / verify-skipped / non-rigid, assemblies (the worst band of the whole subtree; `importedBodyStatus` walks components recursively), and ply solids written from triangles (reason `faceted_body`, named in the refusal). The confirmation is verified AND spent through the signing port (`humanGate` uses `verifyAndSpend`); a port without `spend` never clears the XCH gate.
 - **Length unit per representation context.** `lib/step21` reads the unit of the context of the representation that holds each validation property (`GLOBAL_UNIT_ASSIGNED_CONTEXT`), the global unit being the shape representation's; a conversion unit is its factor times its own unit (0.0254 + METRE = 25.4 mm), never the first SI millimetre record. Corrected in `nist_pmi_gvp_reference.json`: FTC-07 e2, STC-07, STC-09, FTC-07 rd and FTC-08 rc are inch (the reference had mm / cm). FTC-07 e2 is green.
 - **Matching by linkage.** A sender property is chosen by record linkage (the only SHAPE_ASPECT solid-body group with a volume of that product, else its PRODUCT_DEFINITION_SHAPE group), never by nearest value; the same rule drives the export self-check. Re-measured at group scope, no pinned NIST file is red (CTC-02 e2 4.9e-9, STC-08 e3 5.4e-9 volume): see 01 `nist_gvp_vs_occt.json` `groupScopeRemeasure`. VC-XCH-21/23/24 use CTC-01 e1 with every volume multiplied by 1.5.
 - **Hostile input.** The Part 21 reader is linear (no backtracking regex over unbounded runs; census over leading entity names of unquoted text); 1 MB strings and digit runs parse in under a second; `canonicalizeStep21` is iterative and falls back to the input text. Base64 payloads are length-capped; IGES file resolution is clamped to the import ceiling; the XDE reader caps product nesting at 64 levels; `simplifyTree` is linear.

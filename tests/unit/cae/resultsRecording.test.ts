@@ -171,9 +171,9 @@ describe('record_fe_mesh (trust model, 05 §4.1)', () => {
     expect(result.error).toBeUndefined();
     expect(result.summary).toContain('recorded STALE');
     expect(result.summary).toContain('re-run fea_mesh then fea_solve');
-    expect((execute(result.document, 'fea_report', { analysisId: bar.analysisId }, withPort(bar)).data as { state: string }).state).toBe(
-      'stale',
-    );
+    expect(
+      (execute(result.document, 'analysis_report', { analysisId: bar.analysisId }, withPort(bar)).data as { state: string }).state,
+    ).toBe('stale');
   });
 });
 
@@ -242,7 +242,7 @@ describe('record_fea_results (trust model, 05 §4.1)', () => {
     );
     expect(result.error).toBeUndefined();
     expect(result.summary).toContain('recorded STALE');
-    const reported = execute(result.document, 'fea_report', { analysisId: bar.analysisId }, withPort(bar, portOf(bar.mesh, stale)))
+    const reported = execute(result.document, 'analysis_report', { analysisId: bar.analysisId }, withPort(bar, portOf(bar.mesh, stale)))
       .data as { state: string; results: unknown };
     expect(reported.state).toBe('stale');
     expect(reported.results).toBeNull();

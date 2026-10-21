@@ -3,7 +3,7 @@
 import type { CadDocument, DocumentUnit } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { noop } from '@core/commands/noop';
-import { type CivilCategory, type CivilModel, type CivilObject, createEmptyCivil } from '@core/model/civil';
+import { type CivilCategory, type CivilModel, type CivilObject, createEmptyCivil } from '@aec/civil/types';
 import { fromMm, toMetres } from '@core/model/units';
 import { dependentsOf } from './integrity';
 import { MM_PER_UNIT } from '@core/model/units';

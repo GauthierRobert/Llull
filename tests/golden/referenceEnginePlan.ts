@@ -186,7 +186,8 @@ export const referenceEnginePlan: PlanAction[] = [
     params: {
       id: 'rated_point',
       quantity: 'bmep_bar',
-      condition: { throttle: 'full', altitudeM: 0 },
+      throttle: 'full',
+      altitudeM: 0,
       points: [{ rpm: 5800, value: 11.2477 }],
       source: 'Rotax 912 ULS datasheet, 73.5 kW at 5800 rpm [C-R23]',
       grade: 'B',

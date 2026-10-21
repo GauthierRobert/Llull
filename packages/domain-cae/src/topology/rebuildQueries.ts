@@ -7,7 +7,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { toMm } from '@core/model/units';
-import { significantNumber } from '@lib/compactNumber';
+import { round6, significantNumber } from '@lib/compactNumber';
 import { refuseTopology } from './codes';
 import { COMPLIANCE_RATIO_TARGET, IOU_TARGET, MIN_LOOP_AREA_VOXELS } from './defaults';
 import { symmetrise } from './derive';
@@ -17,8 +17,6 @@ import { compareRebuild, contoursOf, mm2PerUnit2, placementOf, sectionOf } from 
 import { widthSamples } from './widthSamples';
 import { studyIdSchema } from './schemas';
 import { trustedTopology, type TrustedTopology } from './trust';
-
-const round = (value: number): number => Math.round(value * 1e6) / 1e6;
 
 /** A solved, trusted study with its field, or the refusal a query returns instead. */
 function solvedStudy(
@@ -105,10 +103,10 @@ export const suggestRebuild = defineCommand({
       lengthUnit: doc.units,
       placement: { ...placementOf(section, depth), depth },
       loops: contours.map((contour) => ({
-        points: contour.points.map((point) => [round(point[0]), round(point[1])]),
+        points: contour.points.map((point) => [round6(point[0]), round6(point[1])]),
         orientation: contour.area > 0 ? 'outer' : 'hole',
-        area: round(Math.abs(contour.area)),
-        areaMm2: round(Math.abs(contour.area) * factor),
+        area: round6(Math.abs(contour.area)),
+        areaMm2: round6(Math.abs(contour.area) * factor),
       })),
       droppedLoops: dropped,
       widthSamples: widthSamples(
@@ -116,9 +114,9 @@ export const suggestRebuild = defineCommand({
         study.settings.threshold.value,
         exact.map((contour) => contour.points),
       ).map((sample) => ({
-        at: [round(sample.at[0]), round(sample.at[1])],
-        width: round(sample.width),
-        widthMm: round(sample.width * toMm(doc, 1)),
+        at: [round6(sample.at[0]), round6(sample.at[1])],
+        width: round6(sample.width),
+        widthMm: round6(sample.width * toMm(doc, 1)),
       })),
       enclosedFraction: section.domainArea > 0 ? (outer - holes) / section.domainArea : 0,
       threshold: study.settings.threshold.value,

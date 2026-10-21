@@ -1,6 +1,6 @@
 /** Base plate design of fixed column bases: lightest catalogue plate + anchor bolts for M + N. */
 
-import type { BasePlateElement, BuildingModel } from '@core/model/building';
+import type { BasePlateElement, BuildingModel } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import { fromMm } from '@core/model/units';
 import { elementsOf, withElement } from '../../building/model';

@@ -54,14 +54,14 @@ qualified reviewer is always in the loop for scenario results.
 
 | Role | Who | Uses | Main need |
 | ---- | --- | ---- | --------- |
-| **Operator (primary)** | AI agent via the `llull` CLI (MCP for cloud agents) | `llull run plan.json`, `llull explicit_quick_check`, `llull export_explicit_deck --save`, `llull explicit_run`, `llull explicit_import_results`, `llull explicit_report --json`, `llull check_explicit` | Deterministic decks, stable codes, results as JSON, health checks it can prove |
+| **Operator (primary)** | AI agent via the `llull` CLI (MCP for cloud agents) | `llull run plan.json`, `llull hand_check`, `llull export_explicit_deck --save`, `llull explicit_run`, `llull explicit_import_results`, `llull analysis_report --json`, `llull check_explicit` | Deterministic decks, stable codes, results as JSON, health checks it can prove |
 | **Owner** | Designer, test engineer, student; **not assumed to be an engineer** | Natural language; may watch the desktop app | "Does the panel survive the bird / the drop?" answered with what was run, what passed, what needs an engineer |
 | **Qualified reviewer** | Impact / crash analyst, design-organisation signatory | Desktop review surfaces, exported decks, the reviewer's own solver | Validates the bird model, the material law, mesh and energy health; dispositions results; signs |
 
 User stories:
 
 - **US-1 (owner → operator).** "Check this avionics box survives a 1.2 m drop onto concrete." The agent builds the plan
-  (box, materials, rigid floor, gravity, 1.2 m height), runs `explicit_quick_check scenario=drop_test` (impact speed
+  (box, materials, rigid floor, gravity, 1.2 m height), runs `hand_check scenario=drop_test` (impact speed
   4.85 m/s), exports and runs the deck, reads the report (peak acceleration at the probe, max plastic strain, failed
   elements, energy error), runs `check_explicit`, and says "computed by llull, not approved — needs a qualified engineer".
 - **US-2 (operator).** For a leading-edge bird-strike screening, the agent asks the owner for VC and the altitude case
@@ -80,7 +80,7 @@ User stories:
 
 | Phase | In scope |
 | ----- | -------- |
-| **MVP (M1–M4)** | `explicit_dynamics` analysis type; controls (end time, animation / history intervals, precision, time-step floor, mass-scaling policy with limit); initial velocity, gravity, rigid walls (planar), imposed velocity; solid hex-dominant / tet meshes from 05 (Gmsh) and shells from 05 midsurfaces; elastic and J–C strength (PHY-02) with J–C failure and erosion; OpenCourant native deck export (`.rad`); run of a user-installed OpenCourant (external process, progress, timeout, cancel); import of the Engine listing, time histories (`th_to_csv`) and animation fields (`anim_to_vtk`); `explicit_report`, `explicit_energy_check`, `check_explicit`; quick checks (wave speeds, CFL, mass scaling, bar impact, Taylor estimate, J–C flow and failure, drop and bird kinematics). |
+| **MVP (M1–M4)** | `explicit_dynamics` analysis type; controls (end time, animation / history intervals, precision, time-step floor, mass-scaling policy with limit); initial velocity, gravity, rigid walls (planar), imposed velocity; solid hex-dominant / tet meshes from 05 (Gmsh) and shells from 05 midsurfaces; elastic and J–C strength (PHY-02) with J–C failure and erosion; OpenCourant native deck export (`.rad`); run of a user-installed OpenCourant (external process, progress, timeout, cancel); import of the Engine listing, time histories (`th_to_csv`) and animation fields (`anim_to_vtk`); `analysis_report`, `explicit_energy_check`, `check_explicit`; quick checks (wave speeds, CFL, mass scaling, bar impact, Taylor estimate, J–C flow and failure, drop and bird kinematics). |
 | **V1 (M5–M6)** | Contacts (self, surface-to-surface, with friction); SPH (and ALE) substitute bird with an EOS model (PHY-02 addition); scenario templates bird strike and drop test; container run (`ghcr.io/opencourant/opencourant`); rigid bodies; shells with J–C. llull-owned solver, first increment (RS1 RS-8a/b): solids, J–C with erosion, rigid walls, GPU with CPU twin. |
 | **V2** | llull-owned solver contact and shells (RS1 RS-8c). LS-DYNA keyword export (COULD) and LS-DYNA results (d3plot via external converters); blade-out templates (rotating part, release, containment ring) for parts; composite failure for impact (with 06 CMP / PHY-08); restart files. |
 | **Out of scope** | Bundling a third-party explicit solver (AGPL); a llull-owned solver before V1 (planned by RS1 RS-8 for V1 / V2); shipping proprietary material data; certification credit; hydrocodes for hypervelocity impact; crash-dummy / occupant models. |
@@ -122,12 +122,12 @@ User stories:
 
 ```bash
 llull search impact explicit bird drop
-llull describe set_explicit_controls set_initial_velocity add_rigid_wall export_explicit_deck explicit_run explicit_report
+llull describe set_explicit_controls set_initial_velocity add_rigid_wall export_explicit_deck explicit_run analysis_report
 llull guide                                      # physics explicit section: units (N-mm-t-s), time step, mass scaling, health checks
 
 # 0. quick checks
-llull explicit_quick_check check=critical_time_step 'inputs={"E_Pa":2e11,"nu":0.3,"rho_kg_m3":7850,"L_e_m":0.002}' --json
-llull explicit_quick_check scenario=drop_test 'inputs={"h":{"value":1.2,"unit":"m"}}' --json
+llull hand_check check=critical_time_step 'inputs={"E_Pa":2e11,"nu":0.3,"rho_kg_m3":7850,"L_e_m":0.002}' --json
+llull hand_check scenario=drop_test 'inputs={"h":{"value":1.2,"unit":"m"}}' --json
 
 # 1. one plan: geometry + materials (08 + PHY-02 J-C) + explicit case + ICs/BCs + outputs
 llull run box_drop.plan.json --validate --doc box.llull.json
@@ -141,7 +141,7 @@ llull explicit_run analysisId=$an threads=8 --progress --timeout 7200 --doc box.
 
 # 3. results (or import a run made elsewhere)
 llull explicit_import_results analysisId=$an dir=out/BOXDROP --doc box.llull.json --json
-llull explicit_report analysisId=$an --doc box.llull.json --json
+llull analysis_report analysisId=$an --doc box.llull.json --json
 llull explicit_energy_check analysisId=$an hourglassLimit=0.1 energyErrorLimit=0.05 addedMassLimit=0.02 --doc box.llull.json --json
 llull check_explicit analysisId=$an --doc box.llull.json --json
 llull render_view view=iso analysisId=$an field=eps_p time=last --save out/epsp.png --doc box.llull.json
@@ -159,17 +159,17 @@ open question TS §11). Otherwise `EXP_TOOL_MISSING`.
 ### 6.3 Desktop UI (review and approval only)
 
 Explicit case panel (read-only view), energy and time-history charts, plastic-strain and failed-element overlays over
-`explicit_report` data, tool provenance card (name, version, licence, source link), 05 disposition dialog.
+`analysis_report` data, tool provenance card (name, version, licence, source link), 05 disposition dialog.
 
 ### 6.4 Surface matrix
 
 | Capability | CLI | MCP | UI |
 | ---------- | --- | --- | -- |
 | Set-up | `llull run`, set-up commands | registry tools | case panel |
-| Quick checks | `llull explicit_quick_check` | same | — |
+| Quick checks | `llull hand_check` | same | — |
 | Export | `llull export_explicit_deck --save` | exchange dir | Export menu |
 | Run | `llull explicit_run` (desktop) | where configured | progress |
-| Import / report / checks | `llull explicit_import_results`, `explicit_report`, `explicit_energy_check`, `check_explicit` | same | charts, overlays |
+| Import / report / checks | `llull explicit_import_results`, `analysis_report`, `explicit_energy_check`, `check_explicit` | same | charts, overlays |
 | Disposition | prepare only | prepare only | **complete** (signature) |
 
 ### 6.5 Error and edge behaviour
@@ -190,9 +190,9 @@ Explicit case panel (read-only view), energy and time-history charts, plastic-st
 
 | # | Given | When (CLI) | Then (JSON) | VC |
 | - | ----- | ---------- | ----------- | -- |
-| AC-1 | steel-like test material | `explicit_quick_check check=wave_speed` | c0 5047.54 m/s, cd 5856.36 m/s (1e-9) | VC-EXP-10 |
+| AC-1 | steel-like test material | `hand_check check=wave_speed` | c0 5047.54 m/s, cd 5856.36 m/s (1e-9) | VC-EXP-10 |
 | AC-2 | L_e = 2 mm, target 1e-6 s | `check=critical_time_step`, `check=mass_scaling` | dt 3.41509e-7 s; added-mass ratio 7.574 | VC-EXP-11 |
-| AC-3 | `plans/exp_bar_rigid_wall.plan.json` | run → export → `explicit_run` → `explicit_report` | wall force plateau 39 623 N ± 3 %, duration 79.2 µs ± 3 % | VC-EXP-50 |
+| AC-3 | `plans/exp_bar_rigid_wall.plan.json` | run → export → `explicit_run` → `analysis_report` | wall force plateau 39 623 N ± 3 %, duration 79.2 µs ± 3 % | VC-EXP-50 |
 | AC-4 | `plans/exp_drop_box.plan.json` | same | first contact 0.4947 s ± 0.5 %; v_z −4851 mm/s ± 0.5 % | VC-EXP-51 |
 | AC-5 | `energy_balance_sample.csv` | `explicit_energy_check` | error −0.002, hourglass 0.05, contact 0.03, status pass; limit named `defaulted: true` | VC-EXP-40, 60 |
 | AC-6 | `engine_listing_sample.txt` | listing parser (import) | error −0.2 %, normal termination | VC-EXP-42 |

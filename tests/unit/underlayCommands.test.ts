@@ -284,7 +284,7 @@ describe('image entity across the core switches', () => {
     expect(code.solidCount).toBe(1);
     expect(code.text).not.toContain('image');
     const onlyImage = execute(createEmptyDocument(), 'add_image_underlay', { dataUrl: PNG2 });
-    expect(execute(onlyImage.document, 'export_dxf', {}).summary).toContain('nothing to export');
+    expect(execute(onlyImage.document, 'export_building_dxf', {}).summary).toContain('nothing to export');
   });
   it('is filterable by kind and replays from history with the same calibration', () => {
     const { doc, imageId } = scene();

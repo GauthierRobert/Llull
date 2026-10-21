@@ -55,7 +55,13 @@ describe('AeroPanel', () => {
     expect(screen.getByTestId('kpi-cl').textContent).toMatch(/Lift Cl/);
     expect(screen.queryByTestId('aero-legend')).toBeNull();
     cleanup();
-    const outline = localDispatch('draw_naca_airfoil', { naca: '2412', chord: 10 }).affected[0] as string;
+    const outline = localDispatch('airfoil_from_naca', {
+      designation: '2412',
+      trailingEdge: 'closed',
+      points: 121,
+      chord: 10,
+      as: 'polyline',
+    }).affected[0] as string;
     act(() => useStore.getState().select([outline]));
     render(<AeroPanel />);
     expect(screen.getByTestId('aero-legend')).toBeDefined();

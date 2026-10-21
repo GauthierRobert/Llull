@@ -4,7 +4,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import type { AlignmentObject, CivilModel } from '@core/model/civil';
+import type { AlignmentObject, CivilModel } from '@aec/civil/types';
 import { endStation, pointAtStation } from '../alignment/alignmentGeometry';
 import { designElevation, validateProfile } from '../alignment/profileGeometry';
 import { crossSectionAt, sectionAreas, type RoadCrossSection, type SectionAreas } from './roadSection';

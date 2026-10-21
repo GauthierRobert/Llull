@@ -25,7 +25,7 @@ export const allowInterference = defineCommand({
     'pair as FPR_PAIR_ALLOWED (pass, with your reason shown) instead of FPR_PAIR_HARD. Welds, threads and press fits also count as rigid ' +
     'connections when check_assembly decides whether a part is attached (FPR_PART_FLOATING). The declaration is stored in the document, ' +
     'is never applied silently and is listed in every check. Refused when a = b, an id is unknown or 2D, the reason is empty, or the ' +
-    'pair already has an intent (remove_interference_intent first). Returns the intent id (fit-<step>.<k>) in affected[0]. Next: ' +
+    'pair already has an intent (delete_interference_intent first). Returns the intent id (fit-<step>.<k>) in affected[0]. Next: ' +
     'check_assembly.',
   params: z.object({
     a: z.string().describe('Entity or instance id of the first part.'),
@@ -48,7 +48,7 @@ export const allowInterference = defineCommand({
     const [first, second] = a < b ? [a, b] : [b, a];
     const existing = Object.values(prototype.intents).find((intent) => intent.a === first && intent.b === second);
     if (existing !== undefined)
-      return fail(`pair ${first} / ${second} already has intent '${existing.id}' (${existing.kind}); remove_interference_intent first`);
+      return fail(`pair ${first} / ${second} already has intent '${existing.id}' (${existing.kind}); delete_interference_intent first`);
     const id = nextId('fit');
     const intent: InterferenceIntent = { id, a: first, b: second, kind, reason: reason.trim(), declaredBy: 'agent' };
     const document = { ...doc, prototype: { ...prototype, intents: { ...prototype.intents, [id]: intent } } };
@@ -61,7 +61,7 @@ export const allowInterference = defineCommand({
  * @failure unknown intent id -> no-op
  */
 export const removeInterferenceIntent = defineCommand({
-  name: 'remove_interference_intent',
+  name: 'delete_interference_intent',
   description:
     'Remove a declared interference intent (fit-<step>.<k>, from allow_interference). The pair is checked as an ordinary overlap again. ' +
     'Unknown id: no-op. Next: check_assembly.',
@@ -69,7 +69,7 @@ export const removeInterferenceIntent = defineCommand({
   run: (doc, { id }): CommandResult => {
     const prototype = doc.prototype;
     const intent = prototype?.intents[id];
-    if (prototype === undefined || intent === undefined) return failer(doc, 'remove_interference_intent')(`no intent '${id}'`);
+    if (prototype === undefined || intent === undefined) return failer(doc, 'delete_interference_intent')(`no intent '${id}'`);
     const intents = Object.fromEntries(Object.entries(prototype.intents).filter(([key]) => key !== id));
     return changed(
       { ...doc, prototype: { ...prototype, intents } },

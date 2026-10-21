@@ -1,6 +1,6 @@
 /** Process equipment (machines with maintenance clearances) and pipe runs. */
 
-import type { EquipmentElement, PipeElement } from '@core/model/building';
+import type { EquipmentElement, PipeElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, looseVec2, vec3, z } from '@core/commands/schema';
 import { fromMm, toMetres } from '@core/model/units';

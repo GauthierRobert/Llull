@@ -2,7 +2,7 @@
 
 import type { FeMeshArtifact, FeResultsArtifact, ThermalResultsSummary } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
-import { systemToSi } from '@lib/thermalUnits';
+import { systemToSi } from './thermalUnits';
 import type { ThermalCase } from './access';
 import { bcFaces, bcFlowW, nodalLoadsW, type FlowInputs, type StepFields } from './bcFlows';
 import { caseTemperatureRange, partMaterials, propertyTable } from './material';

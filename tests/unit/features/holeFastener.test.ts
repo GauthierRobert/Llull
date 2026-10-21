@@ -1,7 +1,7 @@
 /** add_hole with hole.fastener: the clearance diameter comes from the document catalogue (07 FTR M6, VC-FTR-29; regeneration: aero/fasteners/holeRegeneration.test.ts). */
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
-import type { FastenerFamily, FastenerModel } from '@core/model/fasteners';
+import type { FastenerFamily, FastenerModel } from '@aero/fasteners/types';
 import type { CadDocument } from '@core/model/types';
 import { idOf, manifoldSuite, meshOf, plate } from '../../helpers/featureSupport';
 

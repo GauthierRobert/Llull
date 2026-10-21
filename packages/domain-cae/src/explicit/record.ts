@@ -5,13 +5,13 @@ import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { significantNumber } from '@lib/compactNumber';
-import { differingKeys } from '../shared/trust';
+import { fetchArtifact } from '../shared/trust';
+import { verifyAndRecord } from '../shared/verifyRecord';
 import { analysisIdSchema } from '../shared/schemas';
 import { explicitSummary } from './artifact';
 import { refuseExplicit } from './codes';
 import { explicitInputHash } from './hash';
 import { explicitCase, withSpec } from './model';
-import { fetchExplicitArtifact } from './trust';
 
 /**
  * @affects doc.analysis.cases[analysisId].explicit.results (set)
@@ -43,11 +43,21 @@ export const recordExplicitResults = defineCommand({
     if ('code' in found) return fail(found.code, found.message, [analysisId]);
     const { analysisCase, spec } = found;
     if (spec === undefined) return fail('EXP_CONTROLS_MISSING', `analysis '${analysisId}' has no explicit controls`, [analysisId]);
-    const fetched = fetchExplicitArtifact(ctx?.feaArtifacts, artifactHash);
-    if ('code' in fetched) {
-      if (fetched.code === 'EXP_SUMMARY_MISMATCH') return fail(fetched.code, fetched.message);
-      if (summary === undefined || summary.artifactHash !== artifactHash || typeof summary['inputHash'] !== 'string')
-        return fail('EXP_ARTIFACT_NOT_FOUND', fetched.message);
+    const verified = verifyAndRecord({
+      fetched: fetchArtifact(ctx?.feaArtifacts, artifactHash, 'fe_explicit', 'EXP'),
+      summary,
+      keepable: summary !== undefined && summary.artifactHash === artifactHash && typeof summary['inputHash'] === 'string',
+      mismatchCode: 'EXP_SUMMARY_MISMATCH',
+      notFoundCode: 'EXP_ARTIFACT_NOT_FOUND',
+      stale: (artifact) =>
+        artifact.inputHash === explicitInputHash(doc, analysisCase)
+          ? null
+          : { code: 'EXP_RESULT_STALE', message: 'the artifact was built for other inputs than the current set-up' },
+      recompute: (artifact) => explicitSummary(doc, analysisCase, artifact, artifactHash),
+      fail,
+    });
+    if (verified.outcome === 'refused') return verified.result;
+    if (verified.outcome === 'unverified') {
       const flagged = { ...summary, verified: false } as unknown as ExplicitResultsSummary;
       return changed(
         withSpec(doc, analysisCase, { ...spec, results: flagged }),
@@ -55,14 +65,7 @@ export const recordExplicitResults = defineCommand({
         [analysisId],
       );
     }
-    const { artifact } = fetched;
-    if (artifact.inputHash !== explicitInputHash(doc, analysisCase))
-      return fail('EXP_RESULT_STALE', 'the artifact was built for other inputs than the current set-up');
-    const expected = explicitSummary(doc, analysisCase, artifact, artifactHash);
-    if (typeof expected === 'string') return fail('EXP_SUMMARY_MISMATCH', expected);
-    const differing = summary === undefined ? [] : differingKeys(summary, expected);
-    if (differing.length > 0)
-      return fail('EXP_SUMMARY_MISMATCH', `the summary differs from the one recomputed from the artifact in: ${differing.join(', ')}`);
+    const { expected } = verified;
     const { energy } = expected;
     return changed(
       withSpec(doc, analysisCase, { ...spec, results: expected }),

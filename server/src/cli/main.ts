@@ -20,7 +20,7 @@ import { isHealthy } from '../restClient';
 import { withFailureStatus } from '@protocol/commandOutcome';
 import { exchangeOptionsWithDwg } from '../dwgConvert';
 import type { ExchangeOptions } from '../pythonExchange';
-import { USAGE } from './usage';
+import { HELP_TOPICS, USAGE, helpTopic } from './usage';
 import { getGeometryKernel } from '@core/geometry/kernel';
 import { planKernelWarnings } from './planKernelWarning';
 import { benchmarkCli } from './benchmarks';
@@ -108,7 +108,7 @@ function remoteTargetOf(server: string, args: ParsedArgv, io: CliIo): { url: str
   const app = readDesktopDiscovery(llullHome(io.env));
   if (app === null)
     throw new UsageError('the llull desktop app is not running (llull status). Start it, or drop --app to work on a local --doc file.');
-  // $LLULL_TOKEN belongs to --server (often a cloud token); the app has its own per-launch token.
+  // $LLULL_TOKEN belongs to --server; the desktop app has its own per-launch token.
   return { url: app.url, token: flagToken ?? app.token };
 }
 
@@ -390,7 +390,13 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
     const valueless = missingValueFlag(args);
     if (valueless !== undefined) throw new UsageError(`--${valueless} needs a value.`);
     if (subcommand === undefined || subcommand === 'help' || booleanFlag(args, 'help')) {
-      io.stdout(USAGE);
+      const topic = subcommand === 'help' ? args.positionals[1] : undefined;
+      if (topic === undefined) io.stdout(USAGE);
+      else {
+        const text = helpTopic(topic);
+        if (text === null) throw new UsageError(`unknown help topic '${topic}' (${HELP_TOPICS.join(' | ')}).`);
+        io.stdout(text);
+      }
       return EXIT_OK;
     }
     switch (subcommand) {

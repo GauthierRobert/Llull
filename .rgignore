@@ -1,0 +1,6 @@
+# Skipped by ripgrep (and so by Claude Code's Grep/Glob) only; git, tests and the tools still read these files.
+# Bulky third-party / generated validation inputs under the spec packs (STEP, E57, LAS, IFC, DEXPI XML, point-cloud CSV).
+**/validation/data/
+# Large generated reference tables (hundreds of KB of numbers).
+**/validation/nist_occt_solid_faces.json
+**/validation/clt_reference.json

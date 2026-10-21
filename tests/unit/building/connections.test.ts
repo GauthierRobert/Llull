@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { buildingErrors } from '@aec/building/validate';
-import type { BuildingElement, MomentConnectionElement } from '@core/model/building';
+import type { BuildingElement, MomentConnectionElement } from '@aec/building/types';
 import type { TakeoffLine } from '@aec/building/quantities/takeoffBasics';
 import type { IfcExport } from '@aec/building/exchange/ifcBuild';
 import { rawBuilding } from './elementEdits';

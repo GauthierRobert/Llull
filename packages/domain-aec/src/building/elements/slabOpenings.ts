@@ -1,7 +1,7 @@
 /** Voids through slabs: stair wells, shafts, risers. */
 
 import type { Vec2 } from '@core/model/types';
-import type { BuildingModel, SlabElement, StairElement } from '@core/model/building';
+import type { BuildingModel, SlabElement, StairElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { isValidPolygon, pointInPolygon, projectOntoSegment, segmentsIntersect } from '@lib/polygon';

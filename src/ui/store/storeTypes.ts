@@ -37,7 +37,7 @@ export interface CadStoreState {
   liveStatus: LiveStatus;
   /** Distinguishes first connect from reconnect. */
   sseEverConnected: boolean;
-  /** Oldest first, bounded by LOCAL_HISTORY_LIMIT. */
+  /** Oldest first, bounded by the @protocol/history cap. */
   localUndoStack: CadDocument[];
   localRedoStack: CadDocument[];
   /** Client copy of the server document at log position `liveSeq` (-1 before the first snapshot). */

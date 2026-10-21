@@ -26,7 +26,7 @@ src/app  installDefaultPlugins(): cae (05) + thermal (this pack)      packages/m
         ▼
 packages/domain-physics/src (@phys)   CadPlugin "thermal", toolset "analysis"
    thermal/commands/  add_thermal_bc, set_initial_temperature, define_amplitude, set_thermal_step, add_cavity_radiation,
-                      add_thermal_contact, add_temperature_limit, (queries) thermal_report, check_thermal,
+                      add_thermal_contact, add_temperature_limit, (queries) analysis_report, check_thermal,
                       check_temperature_limits, compute_view_factors, thermal_analytic_check, dispose_thermal_limit (human gate)
    thermal/extension.ts  AnalysisTypeExtension for 'heat_steady' | 'heat_transient' (pure):
                       validateCase · inputHashFields · writeDeckSections · summariseResults · checkItems
@@ -241,14 +241,14 @@ document unchanged with a code on failure. Units are in each schema description 
 | Name | Kind | Params sketch | Tags |
 | ---- | ---- | ------------- | ---- |
 | (05) `create_analysis` | mutating | `{ name, analysisType: … \| 'heat_steady' \| 'heat_transient', solver?, unitSystem?, temperatureScale?: 'degC' \| 'K' }` | thermal types create `thermal: ThermalSetup` with empty maps; `temperatureScale` default `degC` named in `data` · @failure scale given for a mechanical type |
-| `add_thermal_bc` / `update_thermal_bc` / `delete_thermal_bc` | mutating | `{ analysisId, name, kind, value?: Q, unit?, filmCoefficient?: Q, sinkTemperature?: Q, emissivity?: number \| 'material', mode?, entityId?, target?, amplitude?, source? }` | @affects case.thermal.bcs · @invariant 0 ≤ ε ≤ 1; h > 0; quantity dimension matches kind; film h and numeric ε carry `source` · @failure `THM_EMISSIVITY_INVALID`, `THM_UNITS_MISMATCH`, `THM_SOURCE_REQUIRED`, `FEA_TARGET_UNRESOLVED` / `_AMBIGUOUS`, non-thermal case `THM_CASE_TYPE` |
+| `add_thermal_bc` / `update_thermal_bc` / `delete_analysis_item` | mutating | `{ analysisId, name, kind, value?: Q, unit?, filmCoefficient?: Q, sinkTemperature?: Q, emissivity?: number \| 'material', mode?, entityId?, target?, amplitude?, source? }` | @affects case.thermal.bcs · @invariant 0 ≤ ε ≤ 1; h > 0; quantity dimension matches kind; film h and numeric ε carry `source` · @failure `THM_EMISSIVITY_INVALID`, `THM_UNITS_MISMATCH`, `THM_SOURCE_REQUIRED`, `FEA_TARGET_UNRESOLVED` / `_AMBIGUOUS`, non-thermal case `THM_CASE_TYPE` |
 | `set_initial_temperature` | mutating | `{ analysisId, value, unit }` | @affects case.thermal.initialTemperature · @failure non-thermal case; unit not a temperature |
-| `define_amplitude` / `delete_amplitude` | mutating | `{ analysisId, name, kind: 'table' \| 'sine' \| 'ramp', points?, amplitude?, periodS?, sampleStepS?, durationS? }` | @affects case.thermal.amplitudes · @invariant times strictly increasing; sine/ramp sampled deterministically at `sampleStepS` from 0 to `durationS` inclusive · @failure `THM_AMPLITUDE_INVALID` |
+| `define_amplitude` / `delete_analysis_item` | mutating | `{ analysisId, name, kind: 'table' \| 'sine' \| 'ramp', points?, amplitude?, periodS?, sampleStepS?, durationS? }` | @affects case.thermal.amplitudes · @invariant times strictly increasing; sine/ramp sampled deterministically at `sampleStepS` from 0 to `durationS` inclusive · @failure `THM_AMPLITUDE_INVALID` |
 | `set_thermal_step` | mutating | `{ analysisId, endTimeS?, initialIncrementS?, maxIncrementS?, minIncrementS?, fixedIncrements?, maxTemperatureChangePerIncrement?: Q, outputTimesS?, outputEveryS? }` | @invariant all times > 0; endTimeS required for transient · @failure `THM_STEP_INVALID` |
 | `add_cavity_radiation` (V1) | mutating | `{ analysisId, name (≤ 3 chars), environmentTemperature?: Q \| 'closed', faces: [{ target, emissivity }] }` | @failure name too long / duplicate, ε invalid, `THM_SCALE_ABSOLUTE` if environment given on a scale without absolute zero handling |
 | `add_thermal_contact` (V1) | mutating | `{ analysisId, name, master: FeaTarget, slave: FeaTarget, conductance: Q \| points }` | @failure targets on the same part; conductance ≤ 0 |
-| `add_temperature_limit` / `delete_temperature_limit` | mutating | `{ analysisId, name, entityId? \| target?, min?: Q, max?: Q, source: { citation, locator? } }` | @invariant at least one of min/max; source mandatory · @failure `THM_LIMIT_SOURCE_REQUIRED` |
-| `thermal_report` | query | `{ analysisId, timeS?, probes? }` → `data { state, temperatureScale, maxT, minT, maxHeatFlux, bcHeatFlows[], heatBalance, probes[], physicalConstants, propertyRangeExceeded[], unverified, unverifiedReasons[] }` | read-only (AF-10); `state` from 05 (`unmeshed`/`meshed`/`solved`/`stale`/`missing`) |
+| `add_temperature_limit` / `delete_analysis_item` | mutating | `{ analysisId, name, entityId? \| target?, min?: Q, max?: Q, source: { citation, locator? } }` | @invariant at least one of min/max; source mandatory · @failure `THM_LIMIT_SOURCE_REQUIRED` |
+| `analysis_report` | query | `{ analysisId, timeS?, probes? }` → `data { state, temperatureScale, maxT, minT, maxHeatFlux, bcHeatFlows[], heatBalance, probes[], physicalConstants, propertyRangeExceeded[], unverified, unverifiedReasons[] }` | read-only (AF-10); `state` from 05 (`unmeshed`/`meshed`/`solved`/`stale`/`missing`) |
 | `check_thermal` | query | `{ analysisId }` → `data { status, items[{ code, severity, ids[], path?, message, remediation }], reviewRequired: true }` | AF-20 readiness + post-solve check (§7.1). 05 `check_analysis` delegates to it for heat types |
 | `check_temperature_limits` | query | `{ analysisId, marginalBandK?: number }` → `data { rows[{ rowId, limitId, scope, bound: 'max'\|'min', limit, computed, marginK, at, timeS, status, code?, provenance, unverified, reviewRequired: true, reviewReason, disposition }], reviewRequired: true, summary }` | @failure `FEA_RESULTS_STALE`, `FEA_RESULTS_MISSING`, `THM_NO_LIMITS`; no default band (`THM_MARGINAL_BAND_UNSET` warning) |
 | `compute_view_factors` (V1) | query, `requiresKernel` | `{ analysisId?, cavity?, faces?: FeaTarget[], obstruction?: boolean, maxFacetSize?: Q }` → `data { faces[], matrix[][], rowSums[], method, facetCounts[], reciprocityMaxError }` | pure geometry over `ctx.kernel.tessellate`; no solver |
@@ -420,7 +420,7 @@ number finite; every limit has a source; quantities parse with the right dimensi
 | AF | Where |
 | -- | ----- |
 | AF-01/02/03/04/05 | registry commands (§4); descriptions with units; `llull guide` thermal section; `{ value, unit }`; plans in `validation/plans/` |
-| AF-10/12/13 | `thermal_report`, `check_temperature_limits` shapes (§3.1, §4); arrays only via artifacts; deterministic writer and summariser |
+| AF-10/12/13 | `analysis_report`, `check_temperature_limits` shapes (§3.1, §4); arrays only via artifacts; deterministic writer and summariser |
 | AF-11 | §7.1 (FR-THM-21, VC-THM-61) |
 | AF-20/21/22/23 | `check_thermal`; numbers first; `render_view field=temperature`; CLI harness in validation/README.md |
 | AF-30/31 | heat-balance rule, physical constants named (VC-THM-60); no default h / ε / sink / T0 / limit |
@@ -458,7 +458,7 @@ Coverage 90/85/90/90 extends to `packages/domain-physics/src/**`.
 | - | ------- | ---------- | ------ |
 | M0 | Decision §2.1 (extension port in core) and the move of 05 artifact read types to core | 05 M1, coordinator | 3 d |
 | M1 | Data model, commands (BCs, initial T, amplitudes, step, limits), `thermal_analytic_check`, units, unit tests | M0, 08 M1–M2, PHY-01 types | 2 w |
-| M2 | Deck sections (steady + transient), summariser, heat balance, `thermal_report`, `check_thermal`, `check_temperature_limits`, `dispose_thermal_limit` | M1, 05 M3, 09 signing port | 2 w |
+| M2 | Deck sections (steady + transient), summariser, heat balance, `analysis_report`, `check_thermal`, `check_temperature_limits`, `dispose_thermal_limit` | M1, 05 M3, 09 signing port | 2 w |
 | M3 | Validation: T2/T3/T4, wall, `oneel8ra`, golden plans, `quality:thermal`, `llull guide` section | M2, PHY-00 runner | 1 w |
 | M4 (V1) | View factors (TS) + cavity deck, contact conductance, h(T) / ε(T) tables, orthotropic k, render_view field | M3, PHY-15 emissivity property | 3 w |
 | RS-6 | Native view factors: `viewFactorBatch` on the PHY-21 port, `llull-compute geomq` kernel + obstruction rays, VC-THM-64 | M4, PHY-21 RS-6 row, RS-0 (`solver/` workspace) | 1 w (share of RS1 RS-6) |
@@ -536,10 +536,10 @@ so no core extension port was needed.
 
 | Item | Where |
 | ---- | ----- |
-| Set-up commands `add/update/delete_thermal_bc`, `set_initial_temperature`, `define/delete_amplitude`, `set_thermal_step`, `add/delete_temperature_limit`, `add_cavity_radiation`, `add_thermal_contact`, `set_thermal_physical_constants` | `packages/domain-cae/src/thermal/{bcCommands,stepCommands,amplitude,limitCommands,radiationCommands,constantsCommand}.ts` (toolset `analysis`) |
+| Set-up commands `add/update/delete_analysis_item`, `set_initial_temperature`, `define/delete_analysis_item`, `set_thermal_step`, `add/delete_analysis_item`, `add_cavity_radiation`, `add_thermal_contact`, `set_thermal_physical_constants` | `packages/domain-cae/src/thermal/{bcCommands,stepCommands,amplitude,limitCommands,radiationCommands,constantsCommand}.ts` (toolset `analysis`) |
 | Deck sections §5.1 (materials tabulated from PHY-01 models, `*HEAT TRANSFER`, BCs, `*FILM`, `*RADIATE` incl. `CAVITY=`, output) | `thermal/{deck,deckMaterial,deckLoads,deckStep,deckNames}.ts`, assembled by the 05 `writeInp` |
 | Summary + heat balance §5.5 | `thermal/{summary,heatBalance,bcFlows,storedEnergy,meshGeometry}.ts` |
-| `thermal_report`, `check_thermal`, `check_temperature_limits`, `dispose_thermal_limit` (human gate) | `thermal/{report,check,limitsCheck,limitRows,dispose}.ts` |
+| `analysis_report`, `check_thermal`, `check_temperature_limits`, `dispose_thermal_limit` (human gate) | `thermal/{report,check,limitsCheck,limitRows,dispose}.ts` |
 | Solve path | server `fea_mesh` (Gmsh 4.15.2) → `fea_solve` (CalculiX `ccx`) → `record_*` validated against the artifact store |
 
 FE benchmarks, real Gmsh + ccx 2.21, judged by the PHY-00 judge (`server/tests/feaThermal*.test.ts`, adapted plans in
@@ -573,7 +573,7 @@ open-cavity case against the exact view-factor network (0.5 %).
 **Still open:** phase change (V2); ε(T) tables (needs PHY-15 emissivity data, absent) and `render_view field=temperature` (M4 V1); h(T) in transient
 cases; a signing implementation (09 PLM); the `llull guide` thermal section.
 
-**V1 additions (2026-10-17), all measured on ccx 2.21 with Gmsh 4.15.2 through plan -> `fea_mesh` -> `fea_solve` -> `thermal_report`:**
+**V1 additions (2026-10-17), all measured on ccx 2.21 with Gmsh 4.15.2 through plan -> `fea_mesh` -> `fea_solve` -> `analysis_report`:**
 
 | Item | Result |
 | ---- | ------ |
@@ -585,7 +585,7 @@ cases; a signing implementation (09 PLM); the `llull guide` thermal section.
 
 **Review fixes (2026-10-17):**
 
-- **Read paths re-verify (05 §4.1).** `thermal_report`, `check_thermal` and `check_temperature_limits` use the results summary recomputed from the
+- **Read paths re-verify (05 §4.1).** `analysis_report`, `check_thermal` and `check_temperature_limits` use the results summary recomputed from the
   artifact (`trustedRecord`): state `untrusted` + `FEA_SUMMARY_MISMATCH` when the recorded one differs, `missing` without an artifact store /
   artifact; numbers are returned only for `solved`. `check_thermal` now reports `state`; post-solve items (`THM_HEAT_BALANCE`,
   `THM_PROPERTY_OUT_OF_RANGE`) come only from a verified summary.

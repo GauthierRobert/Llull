@@ -42,7 +42,7 @@ as pass/fail thresholds in this pack.
 ## Reference data shipped by `add_reference_data` (M3b, §11 Q9)
 
 Every number is a public manufacturer value. Graph values are digitised with a stated reading error; none is data of the user's engine.
-Grades: B = manufacturer document, digitised or re-paired from a table. Code: `packages/core/src/dynamics/engine/referencePresets.ts`.
+Grades: B = manufacturer document, digitised or re-paired from a table. Code: `packages/domain-dynamics/src/sim/engine/referencePresets.ts`.
 
 | Preset | Quantity | Source | Notes |
 | ------ | -------- | ------ | ----- |

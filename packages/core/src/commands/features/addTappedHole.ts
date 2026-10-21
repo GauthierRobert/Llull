@@ -1,5 +1,6 @@
 /** add_tapped_hole (SC-F2): ISO metric tapped holes M3-M20 = a minor-diameter bore with the modelled internal thread, via add_hole. */
 
+import { round6 } from '../../lib/compactNumber';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { currentContext } from '../context';
@@ -10,8 +11,6 @@ import { POINT_FRAMES } from './facePoints';
 import { extentParams } from './holeSpec';
 import { refuse } from './ftr';
 import { sketchPointsSchema } from './sketchPoints';
-
-const round = (value: number): number => Math.round(value * 1e6) / 1e6;
 
 /**
  * @affects replaces `target` by 1 mesh entity: the part with tapped holes (a feature(hole) node with a modelled thread), like add_hole
@@ -77,7 +76,7 @@ export const addTappedHole = defineCommand({
       { target, face, points, ...(pointsFrame === undefined ? {} : { pointsFrame }), hole, extent },
       ctx ?? currentContext(),
     );
-    const summary = `add_tapped_hole: ${iso.designation}${iso.coarse ? ' (coarse)' : ''} d1 Ø${round(basic.minorDiameter)}, d2 Ø${round(basic.pitchDiameter)} — ${inner.summary}`;
+    const summary = `add_tapped_hole: ${iso.designation}${iso.coarse ? ' (coarse)' : ''} d1 Ø${round6(basic.minorDiameter)}, d2 Ø${round6(basic.pitchDiameter)} — ${inner.summary}`;
     if (inner.affected.length === 0) return { ...inner, summary };
     const data = {
       designation: iso.designation,

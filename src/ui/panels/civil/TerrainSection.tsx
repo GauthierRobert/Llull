@@ -1,7 +1,7 @@
 // `create_surface` (TIN + contours) from point groups; per surface its `surface_report` and contour interval (`update_surface`).
 
 import React from 'react';
-import type { SurfaceObject } from '@core/model/civil';
+import type { SurfaceObject } from '@aec/index';
 import { useStore } from '@ui/store';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { useCivilObjects, NumberTextField, TextField, type CivilStepState } from './CivilParts';

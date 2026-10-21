@@ -1,6 +1,6 @@
 /** Sealed M6 records: as-built records and manufacturing BOMs carry a SHA-256 over their other fields, so a hand edit of a saved file is found on load. */
 
-import type { AsBuiltRecord, FaiResultSet, MbomRecord, PlmModel } from '@core/model/plm';
+import type { AsBuiltRecord, FaiResultSet, MbomRecord, PlmModel } from '@plm/types';
 import { jcsJson } from '@lib/jcs';
 import { sha256Hex } from '@lib/sha256';
 

@@ -5,7 +5,7 @@
  */
 
 import type { Vec2 } from '@core/model/types';
-import type { AlignmentObject, RoadSection } from '@core/model/civil';
+import type { AlignmentObject, RoadSection } from '@aec/civil/types';
 import { elevationAt, type Tin } from '../surface/tin';
 import { pointAtStation } from '../alignment/alignmentGeometry';
 import { crossSlopesAt, type CrossSlopes } from '../alignment/superelevation';

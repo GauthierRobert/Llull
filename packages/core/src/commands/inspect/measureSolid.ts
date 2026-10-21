@@ -5,7 +5,7 @@ import { entityBoundsInDoc, mergeBounds } from '../../geometry/bounds';
 import { recipeOf } from '../../geometry/shapeRecipe';
 import { expandInstance } from '../../geometry/instanceExpansion';
 import type { Bounds } from '../../geometry/bounds';
-import { formatLength } from '../document/units';
+import { formatLength } from '../../model/units';
 import { childVolume, solidVolume } from './solidVolume';
 import { commandError, noop, report } from '../noop';
 import {
@@ -58,7 +58,7 @@ export const measureBoundingBox = defineCommand({
   name: 'measure_bounding_box',
   annotations: { readOnly: true },
   description:
-    'Compute the world-space axis-aligned bounding box (AABB). Three modes: (a) entityId — AABB of one entity; ' +
+    'Compute the world-space axis-aligned bounding box (AABB) only; use mass_properties for mass, centroid and inertia. Three modes: (a) entityId — AABB of one entity; ' +
     '(b) useSelection:true — combined AABB of the current document selection; ' +
     '(c) no params (or useSelection:false) — combined AABB of the entire document. ' +
     'Returns data: { min:[x,y,z], max:[x,y,z], size:[w,h,d] }. Does not modify the document. ' +
@@ -259,6 +259,7 @@ export const massProperties = defineCommand({
   annotations: { readOnly: true },
   description:
     'Measure the volume, area, centroid, inertia and (when a density is known) the mass of a 3D solid, in the document unit. ' +
+    'Use measure_bounding_box for the bounding box alone and geometric_validation_properties for the unit-density values a STEP file embeds. ' +
     "Supported entity kinds: 'box', 'cylinder', 'sphere' (closed forms), 'extrusion', 'cone', 'torus', 'wedge', 'pyramid', " +
     "'revolution' (Pappus's centroid theorem; a profile crossing the axis falls back to the bounding-box volume), 'sweep' (round section: " +
     "section area × exact path length), 'loft', 'subdivision', 'mesh' (a kernel result with the OCC kernel: the exact B-rep; otherwise its " +

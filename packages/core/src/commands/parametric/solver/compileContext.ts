@@ -1,4 +1,5 @@
 import type { CadDocument, Constraint, EntityRef } from '../../../model/types';
+import { cross2 } from '../../../lib/vec2';
 import { circleOf, lineOf, pointOf, subKindOf, type Layout, type Pt } from './layout';
 
 /** A constraint turned into scalar residual rows over the variable vector. */
@@ -70,8 +71,5 @@ export function build(ctx: CompileContext, rows: number, evaluate: Compiled['eva
 
 export const signOf = (value: number): 1 | -1 => (value < 0 ? -1 : 1);
 
-export const cross = (u: Pt, v: Pt): number => u[0] * v[1] - u[1] * v[0];
-export const dot = (u: Pt, v: Pt): number => u[0] * v[0] + u[1] * v[1];
-
 /** Signed distance of `p` from the infinite line through `start` along unit `dir` (left of travel positive). */
-export const lineOffset = (start: Pt, dir: Pt, p: Pt): number => cross(dir, [p[0] - start[0], p[1] - start[1]]);
+export const lineOffset = (start: Pt, dir: Pt, p: Pt): number => cross2(dir, [p[0] - start[0], p[1] - start[1]]);

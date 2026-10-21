@@ -54,7 +54,7 @@ describe('FEA constraints', () => {
     );
     expectRefused(run(doc, 'add_fea_constraint', { ...base, target: { entityId: boxId } }), doc, 'FEA_TARGET_UNRESOLVED');
     expectRefused(run(doc, 'add_fea_constraint', { ...base, target: { entityId: boxId, facesNear: [] } }), doc, 'FEA_TARGET_UNRESOLVED');
-    const rect = run(doc, 'draw_rectangle', { corner: [0, 0], width: 5, height: 5 });
+    const rect = run(doc, 'draw_rectangle', { position: [0, 0], width: 5, height: 5 });
     expectRefused(
       run(rect.document, 'add_fea_constraint', { ...base, target: { entityId: rect.affected[0], pointsNear: [[0, 0, 0]] } }),
       rect.document,
@@ -96,7 +96,7 @@ describe('FEA constraints', () => {
       target: { facesNear: [[0, 5, 5]] },
     });
     expectPure(added.document, () => run(added.document, 'update_fea_constraint', { analysisId, constraintId, name: 'q' }));
-    const removed = run(updated.document, 'delete_fea_constraint', { analysisId, constraintId });
+    const removed = run(updated.document, 'delete_analysis_item', { analysisId, itemId: constraintId });
     expect(removed.affected).toEqual([constraintId]);
     expect(caseIn(removed.document, analysisId).constraintOrder).toEqual([]);
     expect(caseIn(removed.document, analysisId).constraints).toEqual({});
@@ -128,15 +128,11 @@ describe('FEA constraints', () => {
       'FEA_CONSTRAINT_INVALID',
     );
     expectRefused(
-      run(withConstraint, 'delete_fea_constraint', { analysisId: 'x', constraintId }),
+      run(withConstraint, 'delete_analysis_item', { analysisId: 'x', itemId: constraintId }),
       withConstraint,
       'FEA_ANALYSIS_NOT_FOUND',
     );
-    expectRefused(
-      run(withConstraint, 'delete_fea_constraint', { analysisId, constraintId: 'nope' }),
-      withConstraint,
-      'FEA_CONSTRAINT_NOT_FOUND',
-    );
+    expectRefused(run(withConstraint, 'delete_analysis_item', { analysisId, itemId: 'nope' }), withConstraint, 'FEA_ITEM_NOT_FOUND');
   });
 });
 
@@ -249,7 +245,7 @@ describe('FEA loads', () => {
     const pressureId = pressure.affected[0] ?? '';
     const changedMagnitude = run(pressure.document, 'update_fea_load', { analysisId, loadId: pressureId, magnitude: 4 });
     expect(caseIn(changedMagnitude.document, analysisId).loads[pressureId]?.magnitude).toBe(4);
-    const removed = run(changedMagnitude.document, 'delete_fea_load', { analysisId, loadId });
+    const removed = run(changedMagnitude.document, 'delete_analysis_item', { analysisId, itemId: loadId });
     expect(removed.affected).toEqual([loadId]);
     expect(caseIn(removed.document, analysisId).loadOrder).toEqual([pressureId]);
     expect(Object.keys(caseIn(removed.document, analysisId).loads)).toEqual([pressureId]);
@@ -266,7 +262,7 @@ describe('FEA loads', () => {
     expectRefused(run(withLoad, 'update_fea_load', { analysisId, loadId, magnitude: 3 }), withLoad, 'FEA_LOAD_INVALID');
     expectRefused(run(withLoad, 'update_fea_load', { analysisId, loadId, loadCase: '' }), withLoad, 'FEA_LOAD_INVALID');
     expectRefused(run(withLoad, 'update_fea_load', { analysisId, loadId, vector: [0, 0, 0] }), withLoad, 'FEA_LOAD_INVALID');
-    expectRefused(run(withLoad, 'delete_fea_load', { analysisId: 'x', loadId }), withLoad, 'FEA_ANALYSIS_NOT_FOUND');
-    expectRefused(run(withLoad, 'delete_fea_load', { analysisId, loadId: 'nope' }), withLoad, 'FEA_LOAD_NOT_FOUND');
+    expectRefused(run(withLoad, 'delete_analysis_item', { analysisId: 'x', itemId: loadId }), withLoad, 'FEA_ANALYSIS_NOT_FOUND');
+    expectRefused(run(withLoad, 'delete_analysis_item', { analysisId, itemId: 'nope' }), withLoad, 'FEA_ITEM_NOT_FOUND');
   });
 });

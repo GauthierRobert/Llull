@@ -1,4 +1,4 @@
-/** add_coil (SC-F2): a round or rectangular section swept along a (optionally conical) helix. */
+/** add_coil (SC-F2): a round or rectangular section swept along a (optionally conical) helix; also the compression spring (closed ends, free length). */
 
 import type { MeshData, Vec3 } from '../../model/types';
 import { catmullRomBeziers, mapSegment } from '../../geometry/curveSegments';
@@ -22,12 +22,26 @@ interface CoilShape {
   readonly pitch: number;
   readonly turns: number;
   readonly left: boolean;
+  /** Round wire only: the first and last turn lie flat (pitch = wire diameter); the middle turns take the pitch that keeps the rise. */
+  readonly closedEnds: boolean;
   /** Half the section extent along the axis: the coil rests on the base plane. */
   readonly halfHeight: number;
 }
 
 /** Centre-line radius at `t` in 0..1 along the coil. */
 const radiusAt = (shape: CoilShape, t: number): number => shape.radius + (shape.endRadius - shape.radius) * t;
+
+/** Centre-line height (above the base plane, before the wire half height) at `t` in 0..1; closed ends use one flat turn at each end. */
+function centerlineZ(shape: CoilShape, t: number): number {
+  const rise = shape.pitch * shape.turns;
+  if (!shape.closedEnds) return rise * t;
+  const flat = shape.halfHeight * 2;
+  const turn = shape.turns * t;
+  const middlePitch = (rise - 2 * flat) / (shape.turns - 2);
+  return (
+    flat * (Math.min(turn, 1) + Math.max(0, turn - (shape.turns - 1))) + middlePitch * Math.max(0, Math.min(turn, shape.turns - 1) - 1)
+  );
+}
 
 /** Centre-line samples in the local frame (axis +Z, base plane z = 0), `SAMPLES_PER_TURN` per turn. */
 function helixPoints(shape: CoilShape): Vec3[] {
@@ -36,7 +50,7 @@ function helixPoints(shape: CoilShape): Vec3[] {
     const t = i / count;
     const phi = 2 * Math.PI * shape.turns * t * (shape.left ? -1 : 1);
     const r = radiusAt(shape, t);
-    return [r * Math.cos(phi), r * Math.sin(phi), shape.pitch * shape.turns * t + shape.halfHeight];
+    return [r * Math.cos(phi), r * Math.sin(phi), centerlineZ(shape, t) + shape.halfHeight];
   });
 }
 
@@ -64,6 +78,21 @@ function flatWire(shape: CoilShape, width: number, height: number): MeshData {
   return { positions: mesh.positions.map((value, index) => (index % 3 === 2 ? value + shape.halfHeight : value)), indices: mesh.indices };
 }
 
+/** `{ turns, rise }` from any two of pitch / turns / length (free length incl. the section extent `extent`: rise = length - extent); pitch + turns win. */
+function resolveRise(
+  extent: number,
+  pitch: number | undefined,
+  turns: number | undefined,
+  length: number | undefined,
+): { turns: number; rise: number } | string {
+  const positive = (v: number | undefined): boolean => v === undefined || (Number.isFinite(v) && v > 0);
+  if (!positive(pitch) || !positive(turns) || !positive(length)) return 'pitch, turns and length must be finite and > 0';
+  if (pitch !== undefined && turns !== undefined) return { turns, rise: pitch * turns };
+  if (turns !== undefined && length !== undefined) return { turns, rise: length - extent };
+  if (pitch !== undefined && length !== undefined) return { turns: (length - extent) / pitch, rise: length - extent };
+  return 'give at least two of pitch, turns, length';
+}
+
 /**
  * @affects creates 1 entity: a sweep (round wire) or a mesh (rectangular wire); position = world start of the wire centre line
  * @invariant section extent along the axis < pitch (turns never touch); section half width < the smallest coil radius; MIN_COIL_TURNS <= turns <= MAX_COIL_TURNS
@@ -80,13 +109,26 @@ export const addCoil = defineCommand({
     '(default; sectionRadius or sectionDiameter) swept as a round tube (a sweep entity: volume = pi r^2 x centre-line length), or "rectangle" ' +
     '(sectionWidth radial x sectionHeight along the axis, kept radial/axial all along: flat wire, a mesh solid, volume = width x height x ' +
     '2 pi x mean radius x turns). The coil is refused when the section is as large as the pitch (sectionDiameter or sectionHeight >= pitch: ' +
-    'neighbouring turns would overlap) or wider than the coil radius. handedness "right" (default) or "left". Returns the entity id and data ' +
-    '{ height, turns, pitch, centreLineLength, sectionArea, analyticVolume } in document units.',
+    'neighbouring turns would overlap) or wider than the coil radius. Give at least two of pitch, turns and length (length = free length along the axis including the wire; pitch and turns win if all three are given). closedEnds=true (round wire, turns > 2) makes a compression spring: the first and last turn lie flat (pitch = wire diameter) and the middle turns take the pitch that keeps the length. handedness "right" (default) or "left". Returns the entity id and data ' +
+    '{ height (= free length), turns, pitch (the middle-turn pitch with closedEnds), centreLineLength, sectionArea, analyticVolume } in document units.',
   params: z.object({
     radius: z.number().describe('Centre-line radius of the helix at its start, document units (> 0).'),
     endRadius: z.number().describe('Centre-line radius at the end for a conical coil (> 0). Omit for a cylindrical coil.').optional(),
-    pitch: z.number().describe('Axial advance per turn, document units (> 0, larger than the section extent along the axis).'),
-    turns: z.number().describe('Number of turns (may be fractional), 0.1 <= turns <= 200.'),
+    pitch: z
+      .number()
+      .describe(
+        'Axial advance per turn, document units (> 0, larger than the section extent along the axis). Give two of pitch, turns, length.',
+      )
+      .optional(),
+    turns: z.number().describe('Number of turns (may be fractional), 0.1 <= turns <= 200. Give two of pitch, turns, length.').optional(),
+    length: z
+      .number()
+      .describe('Free length along the axis including the section extent, document units. Give two of pitch, turns, length.')
+      .optional(),
+    closedEnds: z
+      .boolean()
+      .describe('Round wire: flatten the first and last turn to wire-diameter pitch (spring end coils). Default false. Needs turns > 2.')
+      .optional(),
     sectionShape: z.enum(['circle', 'rectangle']).describe('Wire section: "circle" (default) or "rectangle".').optional(),
     sectionRadius: z.number().describe('Circle section: wire radius (> 0). Alternative: sectionDiameter.').optional(),
     sectionDiameter: z.number().describe('Circle section: wire diameter (> 0). Used when sectionRadius is absent.').optional(),
@@ -106,8 +148,10 @@ export const addCoil = defineCommand({
     {
       radius,
       endRadius = radius,
-      pitch,
-      turns,
+      pitch: pitchIn,
+      turns: turnsIn,
+      length,
+      closedEnds = false,
       sectionShape = 'circle',
       sectionRadius,
       sectionDiameter,
@@ -122,9 +166,7 @@ export const addCoil = defineCommand({
   ): CommandResult => {
     const fail = failedWith(doc, 'add_coil');
     const positive = (value: number): boolean => Number.isFinite(value) && value > 0;
-    if (![radius, endRadius, pitch, turns].every(positive)) return fail('radius, endRadius, pitch and turns must be finite and > 0');
-    if (turns < MIN_COIL_TURNS || turns > MAX_COIL_TURNS)
-      return fail(`turns must be in [${MIN_COIL_TURNS}, ${MAX_COIL_TURNS}], got ${fmt(turns)}`);
+    if (![radius, endRadius].every(positive)) return fail('radius and endRadius must be finite and > 0');
     const round = sectionShape === 'circle';
     const wire = sectionRadius ?? (sectionDiameter === undefined ? undefined : sectionDiameter / 2);
     if (round && (wire === undefined || !positive(wire))) return fail('a circle section needs sectionRadius or sectionDiameter > 0');
@@ -132,6 +174,15 @@ export const addCoil = defineCommand({
       return fail('a rectangle section needs sectionWidth and sectionHeight > 0');
     const halfWidth = round ? (wire as number) : (sectionWidth as number) / 2;
     const halfHeight = round ? (wire as number) : (sectionHeight as number) / 2;
+    const resolved = resolveRise(2 * halfHeight, pitchIn, turnsIn, length);
+    if (typeof resolved === 'string') return fail(resolved);
+    const { turns } = resolved;
+    if (turns < MIN_COIL_TURNS || turns > MAX_COIL_TURNS)
+      return fail(`turns must be in [${MIN_COIL_TURNS}, ${MAX_COIL_TURNS}], got ${fmt(turns)}`);
+    if (closedEnds && (!round || turns <= 2)) return fail('closedEnds needs a circle section and turns > 2');
+    const meanPitch = pitchIn !== undefined && turnsIn !== undefined ? pitchIn : resolved.rise / turns;
+    const pitch = closedEnds ? (resolved.rise - 4 * halfHeight) / (turns - 2) : meanPitch;
+    if (!(resolved.rise > 0) || !positive(pitch)) return fail('pitch must be > 0 (length is too short for this wire)');
     if (2 * halfHeight >= pitch)
       return fail(
         `the section extent along the axis (${fmt(2 * halfHeight)}) must be below the pitch (${fmt(pitch)}), or neighbouring turns overlap (self-intersecting coil)`,
@@ -141,7 +192,7 @@ export const addCoil = defineCommand({
       return fail(`the section half width (${fmt(halfWidth)}) must be below the smallest coil radius (${fmt(smallest)})`);
     const frame = axisFrame(axis, position);
     if (typeof frame === 'string') return fail(frame);
-    const shape: CoilShape = { radius, endRadius, pitch, turns, left: handedness === 'left', halfHeight };
+    const shape: CoilShape = { radius, endRadius, pitch: meanPitch, turns, left: handedness === 'left', closedEnds, halfHeight };
     const id = nextId('coil');
     const sectionArea = round ? Math.PI * halfWidth * halfWidth : 4 * halfWidth * halfHeight;
     const centreLineLength = helixLength(shape);
@@ -164,7 +215,7 @@ export const addCoil = defineCommand({
       ).flat();
       entity = newEntity('mesh', id, { mesh: { positions, indices: local.indices } }, ORIGIN, color, { name });
     }
-    const height = pitch * turns + 2 * halfHeight;
+    const height = resolved.rise + 2 * halfHeight;
     return {
       ...commitSolid(
         doc,

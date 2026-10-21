@@ -1,5 +1,6 @@
 /** joint_capacity (08 MAT FR-MAT-20, M9, VC-MAT-21): single-shear and bearing capacity of one placed fastener stack from sourced allowables. */
 
+import { round6 } from '@lib/compactNumber';
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import { execute } from '@core/commands/registry';
@@ -72,8 +73,7 @@ function lookup(
   };
 }
 
-const round = (value: number): number => Math.round(value * 1e6) / 1e6;
-const capacity = (lbf: number): { lbf: number; N: number } => ({ lbf: round(lbf), N: round(lbf * N_PER_LBF) });
+const capacity = (lbf: number): { lbf: number; N: number } => ({ lbf: round6(lbf), N: round6(lbf * N_PER_LBF) });
 
 interface Mode {
   readonly mode: 'shear' | 'bearing';
@@ -145,7 +145,7 @@ export const jointCapacity = defineCommand({
         property: 'Fbru',
         basis: params.sheetBasis,
         edOverD: params.edOverD,
-        thickness: { value: round(thicknessIn), unit: 'in' },
+        thickness: { value: round6(thicknessIn), unit: 'in' },
         ...(params.sheetDirection !== undefined ? { direction: params.sheetDirection } : {}),
       });
       if (!found.ok) return found.result;
@@ -154,7 +154,7 @@ export const jointCapacity = defineCommand({
         mode: 'bearing',
         entityId: layer.entityId,
         material: materialId,
-        thicknessIn: round(thicknessIn),
+        thicknessIn: round6(thicknessIn),
         ...capacity(found.psi * diameter * thicknessIn),
       });
     }
@@ -168,14 +168,14 @@ export const jointCapacity = defineCommand({
     const perInput = basis === 'mixed' ? ` (${inputs.map((input) => `${input.role}: ${input.basis}`).join('; ')})` : '';
     return report(
       doc,
-      `joint_capacity ${stack.id} (${stack.fastener.partNumber}, D ${round(diameter)} in, e/D ${params.edOverD}): shear ${shearCapacity.lbf} lbf, ` +
+      `joint_capacity ${stack.id} (${stack.fastener.partNumber}, D ${round6(diameter)} in, e/D ${params.edOverD}): shear ${shearCapacity.lbf} lbf, ` +
         `bearing [${bearing.map((entry) => `${entry.entityId} ${entry.lbf} lbf`).join(', ')}], governing ${governing.mode} ${governing.lbf} lbf; ` +
         `basis ${basis}${perInput}${unverified ? '; UNVERIFIED inputs' : ''}; review required.`,
       {
         stackId: stack.id,
-        diameterIn: round(diameter),
+        diameterIn: round6(diameter),
         edOverD: params.edOverD,
-        shear: { ...shearCapacity, planes: 1, areaIn2: round(area) },
+        shear: { ...shearCapacity, planes: 1, areaIn2: round6(area) },
         bearing,
         governing,
         basis,

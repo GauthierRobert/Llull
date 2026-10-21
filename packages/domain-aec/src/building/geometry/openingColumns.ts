@@ -1,6 +1,6 @@
 /** Door / window openings that cut through a column standing in their wall line. */
 
-import type { BuildingModel, ColumnElement, OpeningElement, WallElement } from '@core/model/building';
+import type { BuildingModel, ColumnElement, OpeningElement, WallElement } from '@aec/building/types';
 import { wallFrame } from './wallGeometry';
 
 export interface OpeningColumnOverlap {

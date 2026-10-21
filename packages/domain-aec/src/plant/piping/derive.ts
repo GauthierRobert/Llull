@@ -4,7 +4,7 @@
  */
 
 import type { CadDocument, Entity, MeshData, MeshSolidEntity } from '@core/model/types';
-import type { PipeRun, PipingModel } from '@core/model/plant';
+import type { PipeRun, PipingModel } from '@aec/plant/types';
 import type { Vec3 } from '@core/model/vectors';
 import type { DerivationGuard } from '@core/commands/derivation';
 import type { DocumentExtension } from '@core/plugins/plugin';

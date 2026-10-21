@@ -2,15 +2,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { FeResultsArtifact } from '@core/model/analysis';
 import { isEvaluationFailure } from '@cae/fatigue/evaluate';
-import {
-  fatigueFieldArtifact,
-  fatigueFieldInput,
-  fatigueFieldReference,
-  FIELD_COMPONENTS,
-  readFatigueField,
-  type FatigueFieldInput,
-} from '@cae/fatigue/feField';
+import { fatigueFieldArtifact, fatigueFieldInput, FIELD_COMPONENTS, readFatigueField, type FatigueFieldInput } from '@cae/fatigue/feField';
 import { maxPrincipal, measureOf, nodeSeries, principalExtremes, signedVonMises } from '@cae/fatigue/feStress';
+import { fatigueFieldReference } from '../../../helpers/fatigueFieldOracle';
 import { feFatigue, type FeFatigue } from './feFixtures';
 import { stressTensors } from './stressTensors';
 

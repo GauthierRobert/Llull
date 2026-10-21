@@ -13,8 +13,10 @@ import { analysisErrors } from './model/validate';
 import { nonlinearCommands } from './nonlinear/catalog';
 import { reliabilityCommands } from './reliability/catalog';
 import { reliabilityErrors } from './reliability/model';
+import { vnvCommands } from './vnv/catalog';
 import { thermalCommands } from './thermal/catalog';
 import { thermomechCommands } from './thermomech/catalog';
+import { caeRetiredCommands } from './retired';
 
 /** The analysis slice is pure definition data: nothing is derived, nothing is restored. */
 const analysisDocument: DocumentExtension = {
@@ -28,6 +30,7 @@ export const caePlugin: CadPlugin = {
   toolset: 'analysis',
   commands: [
     ...feaCommands,
+    ...vnvCommands,
     ...analyticCommands,
     ...marginCommands,
     ...thermalCommands,
@@ -40,4 +43,5 @@ export const caePlugin: CadPlugin = {
   ],
   guards: [analysisReferenceGuard, durabilityReferenceGuard],
   document: analysisDocument,
+  retiredCommands: caeRetiredCommands,
 };

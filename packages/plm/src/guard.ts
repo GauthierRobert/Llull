@@ -3,7 +3,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { DerivationGuard, GuardRefusal } from '@core/commands/derivation';
 import { commandError } from '@core/commands/noop';
-import type { Revision } from '@core/model/plm';
+import type { Revision } from '@plm/types';
 import { getCommand } from '@core/commands/registry';
 import { remediationOf } from './refusal';
 

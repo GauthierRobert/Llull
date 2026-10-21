@@ -211,7 +211,7 @@ llull check_surface_quality '{"ids":["wing-3.1"]}' --doc wing.llull.json --kerne
 # 4. look at it (multimodal agents)
 llull render_view view=iso isolate=wing-3.1 --doc wing.llull.json --kernel occt --save out/wing.png
 # 5. deliver
-llull export_step_exact --doc wing.llull.json --kernel occt --save out/wing.step
+llull export_step_ap242 --doc wing.llull.json --kernel occt --save out/wing.step
 llull export_code language=cadquery --doc wing.llull.json --save out/
 ```
 

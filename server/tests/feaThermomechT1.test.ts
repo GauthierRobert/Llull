@@ -83,7 +83,7 @@ const nearest = (nodes: readonly Node[], target: readonly [number, number, numbe
 };
 
 async function probeValues(session: Session, analysisId: string): Promise<Record<string, number>> {
-  const report = await session.cli('fea_report', `analysisId=${analysisId}`);
+  const report = await session.cli('analysis_report', `analysisId=${analysisId}`);
   const list = dataOf(report.json)['probes'];
   const found: Record<string, number> = {};
   for (const probe of Array.isArray(list) ? list : []) {

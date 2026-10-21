@@ -4,7 +4,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import type { AlignmentObject, CivilModel } from '@core/model/civil';
+import type { AlignmentObject, CivilModel } from '@aec/civil/types';
 import { endStation, pointAtStation } from '../alignment/alignmentGeometry';
 import { designElevation, grades, validateProfile, verticalCurves, verticalCurveStations } from '../alignment/profileGeometry';
 import { surfaceTinById } from '../surface/surfaceTin';

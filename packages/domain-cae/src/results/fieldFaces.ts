@@ -7,6 +7,7 @@
 import type { FeMeshArtifact } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
 import { meshSkinOwned } from './fieldSurface';
+import { dot3 } from '@lib/vec3';
 
 export interface FieldVertex {
   readonly u: Vec3;
@@ -21,7 +22,7 @@ export interface FieldFace {
   readonly cap: boolean;
 }
 
-/** Removes the half-space `dot(normal, u) > offset` of the undeformed mesh. `normal` has unit length. */
+/** Removes the half-space `dot3(normal, u) > offset` of the undeformed mesh. `normal` has unit length. */
 export interface CutPlane {
   readonly normal: Vec3;
   readonly offset: number;
@@ -50,7 +51,6 @@ const QUADRATIC_SUBTETS: readonly (readonly [number, number, number, number])[] 
   [4, 9, 8, 5],
 ];
 
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const mix = (a: Vec3, b: Vec3, t: number): Vec3 => [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]), a[2] + t * (b[2] - a[2])];
 const between = (a: FieldVertex, b: FieldVertex, t: number): FieldVertex => ({
   u: mix(a.u, b.u, t),
@@ -87,7 +87,7 @@ function fan(polygon: readonly FieldVertex[]): (readonly [FieldVertex, FieldVert
 
 /** The plane section of a linear tet as a polygon (3 or 4 vertices), or null when the plane misses it. */
 function sectionOf(tet: readonly FieldVertex[], cut: CutPlane, snap: number): FieldVertex[] | null {
-  const distance = tet.map((vertex) => snapped(dot(cut.normal, vertex.u) - cut.offset, snap));
+  const distance = tet.map((vertex) => snapped(dot3(cut.normal, vertex.u) - cut.offset, snap));
   const removed = [0, 1, 2, 3].filter((index) => (distance[index] ?? 0) > 0);
   const kept = [0, 1, 2, 3].filter((index) => (distance[index] ?? 0) <= 0);
   if (removed.length === 0 || kept.length === 0) return null;
@@ -163,7 +163,7 @@ export function fieldFaces(input: FaceInput): FieldFace[] {
   const faces: FieldFace[] = [];
   const snap = 1e-7 * modelSize(coordinates);
   const minArea = 1e-12 * modelSize(coordinates) ** 2;
-  const distance = (vertex: FieldVertex): number => (cut === null ? 0 : snapped(dot(cut.normal, vertex.u) - cut.offset, snap));
+  const distance = (vertex: FieldVertex): number => (cut === null ? 0 : snapped(dot3(cut.normal, vertex.u) - cut.offset, snap));
   for (const { nodes, entityId } of meshSkinOwned(selected, coordinates)) {
     const corners = nodes.map(vertexOf);
     if (corners.some((vertex) => vertex === null)) continue;
@@ -183,7 +183,7 @@ export function fieldFaces(input: FaceInput): FieldFace[] {
         const polygon = sectionOf(tet as FieldVertex[], cut, snap);
         if (polygon === null) continue;
         const area = areaVectorOfU(polygon);
-        const along = dot(area, cut.normal);
+        const along = dot3(area, cut.normal);
         if (!(Math.abs(along) > minArea)) continue;
         for (const corner of fan(along < 0 ? [...polygon].reverse() : polygon))
           faces.push({ corners: corner, entityId: block.entityId, cap: true });

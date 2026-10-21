@@ -1,6 +1,6 @@
 /** Stair layout: flights, landing, solid blocks and side profiles in the stair plan frame (`along` the first flight, `across` it, left positive). */
 
-import type { StairElement } from '@core/model/building';
+import type { StairElement } from '@aec/building/types';
 import type { Vec2 } from '@core/model/types';
 import { polygonArea } from '@lib/polygon';
 

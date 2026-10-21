@@ -3,7 +3,7 @@
  * Objects are immutable (written through a temp file, fsynced, renamed, made read-only); a read re-hashes, so a damaged object reads as absent.
  */
 
-import { createHash } from 'node:crypto';
+import { sha256Hex } from '../../sha256';
 import {
   chmodSync,
   closeSync,
@@ -22,8 +22,6 @@ import type { ObjectStorePort } from '@core/commands/types';
 
 const SHA256 = /^[0-9a-f]{64}$/;
 
-export const sha256Text = (text: string): string => createHash('sha256').update(text, 'utf8').digest('hex');
-
 export interface ObjectStore extends ObjectStorePort {
   /** Store `text` and return its SHA-256 (idempotent: an intact object is kept, a damaged one is replaced). */
   put(text: string): string;
@@ -38,13 +36,13 @@ export function createObjectStore(root: string): ObjectStore {
     const file = fileOf(sha);
     if (file === null || !existsSync(file)) return null;
     const text = readFileSync(file, 'utf8');
-    return sha256Text(text) === sha ? text : null;
+    return sha256Hex(text) === sha ? text : null;
   };
   return {
     has: (sha) => read(sha) !== null,
     get: read,
     put(text) {
-      const sha = sha256Text(text);
+      const sha = sha256Hex(text);
       const file = fileOf(sha) as string;
       if (read(sha) !== null) return sha;
       mkdirSync(path.dirname(file), { recursive: true });

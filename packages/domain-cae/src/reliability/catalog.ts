@@ -2,14 +2,13 @@
 
 import { commandCatalog } from '@core/commands/schema';
 import { defineLimitState, defineRandomVariable, deleteRandomVariable, setCorrelation } from './setupCommands';
-import { propagateUncertainty, reliabilityForm, runReliabilityStudy } from './studyCommands';
+import { propagateUncertainty, runReliabilityStudy } from './studyCommands';
 
 export const reliabilityCommands = commandCatalog(
   defineRandomVariable,
   deleteRandomVariable,
   setCorrelation,
   defineLimitState,
-  reliabilityForm,
   propagateUncertainty,
   runReliabilityStudy,
 );

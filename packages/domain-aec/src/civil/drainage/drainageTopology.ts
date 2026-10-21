@@ -1,6 +1,6 @@
 /** Drainage network topology: plan length, slope, reachability and upstream-to-downstream order. */
 
-import type { CivilModel, ManholeObject, PipeObject } from '@core/model/civil';
+import type { CivilModel, ManholeObject, PipeObject } from '@aec/civil/types';
 import { civilObjectsOf, civilObject } from '../model';
 
 /** Plan distance between a pipe's two structures in document units; null when an end is missing. */

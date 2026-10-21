@@ -1,18 +1,18 @@
 /**
  * The ONLY mutation path of the shared live document (REST /command, /undo, /redo, /exchange, /import): one
- * undo/redo history (mirrors src/ui/store/store.ts) + SSE broadcast. Queries/no-ops skip history and broadcast.
+ * undo/redo history (rule shared with src/ui/store/localMode.ts via @protocol/history) + SSE broadcast. Queries/no-ops skip history and broadcast.
  */
 import type { CadDocument } from '@core/model/types';
 import { withMonotonicStepCounter } from '@core/model/stepCounter';
 import { getCommand } from '@core/commands/registry';
 import { reportServerCrash } from './serverCrash';
 import { getLiveDoc, setLiveDoc } from './liveDocument';
-import { createHash } from 'crypto';
+import { sha256Hex } from './sha256';
+import { emptyHistory, historySummary, recordChange, stepHistory, type History, type HistoryDirection } from '@protocol/history';
 import type { LiveCommandSource } from '@protocol/liveSync';
 import type { CommandResponseBody } from '@protocol/restProtocol';
 import { runHostCommand } from './plm/hostRun';
 
-const MAX_UNDO_DEPTH = 100; // = the UI store's cap
 const MAX_IDEMPOTENCY_ENTRIES = 1000; // commandId -> result LRU
 interface CachedResult {
   readonly requestHash: string;
@@ -20,10 +20,7 @@ interface CachedResult {
 }
 const _resultsByCommandId = new Map<string, CachedResult>();
 
-type HistoryDirection = 'undo' | 'redo';
-const history: Record<HistoryDirection, CadDocument[]> = { undo: [], redo: [] };
-
-const pushCapped = (stack: CadDocument[], doc: CadDocument): CadDocument[] => [...stack, doc].slice(-MAX_UNDO_DEPTH);
+let history: History<CadDocument> = emptyHistory();
 
 function withHistoryFlags(result: Omit<CommandResponseBody, 'canUndo' | 'canRedo'>): CommandResponseBody {
   return { ...result, canUndo: canUndo(), canRedo: canRedo() };
@@ -32,9 +29,7 @@ function withHistoryFlags(result: Omit<CommandResponseBody, 'canUndo' | 'canRedo
 /** SHA-256 hex of `value`'s JSON ('' when it cannot be serialised): the idempotency key of a commandId. */
 export function hashJson(value: unknown): string {
   try {
-    return createHash('sha256')
-      .update(JSON.stringify(value ?? null))
-      .digest('hex');
+    return sha256Hex(JSON.stringify(value ?? null));
   } catch {
     return '';
   }
@@ -91,8 +86,7 @@ function runCommand(name: string, params: unknown, source?: LiveCommandSource, c
     // Session command (resolve_material_libraries): in memory only, no undo entry, no command log; clients get a snapshot.
     setLiveDoc(document);
   } else if (outcome.changed) {
-    history.undo = pushCapped(history.undo, prior);
-    history.redo = [];
+    history = recordChange(history, prior);
     setLiveDoc(document, { name, params: filled, source: source ?? 'rest', ...(commandId !== undefined ? { commandId } : {}) });
   }
   return withHistoryFlags(outcome);
@@ -104,25 +98,22 @@ function reportCommandCrash(thrown: unknown, name: string, params: unknown, prio
   if (report !== null) console.error(`[llull-server] command ${name} threw; crash report: ${report}`);
 }
 
-/** Restore the top of `history[from]`, park the current doc on `history[to]`; empty stack -> no-op result. */
-function travelHistory(from: HistoryDirection, to: HistoryDirection, summary: string, emptySummary: string): CommandResponseBody {
-  const target = history[from].at(-1);
-  if (target === undefined) {
-    return withHistoryFlags({ summary: emptySummary, affected: [], isError: false, changed: false });
-  }
+/** Restore the top of the `direction` stack, park the current doc on the other; empty stack -> no-op result. */
+function travelHistory(direction: HistoryDirection): CommandResponseBody {
   const current = getLiveDoc();
-  history[from] = history[from].slice(0, -1);
-  history[to] = pushCapped(history[to], current);
-  setLiveDoc(withMonotonicStepCounter(target, current));
-  return withHistoryFlags({ summary, affected: [], isError: false, changed: true });
+  const step = stepHistory(history, direction, current);
+  if (step === null) return withHistoryFlags({ summary: historySummary(direction, false), affected: [], isError: false, changed: false });
+  history = step.history;
+  setLiveDoc(withMonotonicStepCounter(step.target, current));
+  return withHistoryFlags({ summary: historySummary(direction, true), affected: [], isError: false, changed: true });
 }
 
 export function undo(): CommandResponseBody {
-  return travelHistory('undo', 'redo', 'Undid last change.', 'Nothing to undo.');
+  return travelHistory('undo');
 }
 
 export function redo(): CommandResponseBody {
-  return travelHistory('redo', 'undo', 'Redid last change.', 'Nothing to redo.');
+  return travelHistory('redo');
 }
 
 export function canUndo(): boolean {
@@ -136,6 +127,5 @@ export function canRedo(): boolean {
 /** @internal tests only */
 export function _resetHistory(): void {
   _resultsByCommandId.clear();
-  history.undo = [];
-  history.redo = [];
+  history = emptyHistory();
 }

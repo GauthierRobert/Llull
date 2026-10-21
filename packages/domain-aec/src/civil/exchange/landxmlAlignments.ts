@@ -6,7 +6,7 @@
 import { toDegrees } from '@lib/angle';
 import { fixedNumber } from '@lib/compactNumber';
 import type { CadDocument, Vec2 } from '@core/model/types';
-import type { AlignmentObject } from '@core/model/civil';
+import type { AlignmentObject } from '@aec/civil/types';
 import { escapeXml } from '@lib/escapeXml';
 import { toMetres } from '@core/model/units';
 import { civilObjectsOf, getCivil } from '../model';

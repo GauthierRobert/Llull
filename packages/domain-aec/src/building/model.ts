@@ -1,8 +1,8 @@
 /** Shared helpers for the building (AEC/BIM) commands. */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
-import type { BimCategory, BuildingElement, BuildingLevel, BuildingModel } from '@core/model/building';
-import { createEmptyBuilding } from '@core/model/building';
+import type { BimCategory, BuildingElement, BuildingLevel, BuildingModel } from '@aec/building/types';
+import { createEmptyBuilding } from '@aec/building/types';
 import { fromMm } from '@core/model/units';
 import { uniqueId } from '@lib/id';
 import { isFiniteNumber } from '@lib/isFiniteNumber';

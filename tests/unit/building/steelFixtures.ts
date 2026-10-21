@@ -1,6 +1,6 @@
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import type { SteelMemberElement } from '@core/model/building';
+import type { SteelMemberElement } from '@aec/building/types';
 import { checkSteelMembers } from '@aec/industrial/steelDesign/steelMembersCheck';
 import type { MemberRow } from '@aec/industrial/steelDesign/steelMemberRows';
 

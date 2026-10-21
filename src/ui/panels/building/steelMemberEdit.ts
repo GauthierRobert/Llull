@@ -1,6 +1,6 @@
 // Steel member inspector form: element → field texts → changed `update_steel_member` params.
 
-import type { SteelMemberElement } from '@core/model/building';
+import type { SteelMemberElement } from '@aec/index';
 import { changedFields, changedText } from '@ui/panels/changedParams';
 
 export type SteelMemberEditKey = 'profile' | 'material' | 'role' | 'note' | 'startJoint' | 'endJoint' | 'baseFixity';

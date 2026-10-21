@@ -14,6 +14,7 @@ document live. You never edit the document file by hand.
 llull status            # desktop app running? -> use --app (the user watches); else --doc part.llull.json
 llull kernel_info       # "occt" = exact B-rep (fillets, chamfers, shells, STEP). "manifold" = mesh only: no fillet/chamfer/shell
 llull guide             # units, axes, id conventions
+llull help              # params syntax (key=value, @file, -), flags, exit codes
 ```
 
 Find commands without guessing: `llull search <words>`, `llull list 3d`, `llull describe <command>` (exact params).

@@ -65,7 +65,7 @@ jq '.data.steps[-1].data.rows' run.json > rows.json                 # AF-14 step
 
 an=$(llull run plans/tmc_restrained_bar.plan.json $D | jq -r '.data.aliases.an[0]')
 llull fea_mesh analysisId=$an $D && llull check_thermo_mechanical analysisId=$an $D && llull fea_solve analysisId=$an $D
-llull fea_report analysisId=$an $D > report.json                    # probe mid stress_xx vs VC-TMC-01.a
+llull analysis_report analysisId=$an $D > report.json                    # probe mid stress_xx vs VC-TMC-01.a
 ```
 
 ## Re-generating

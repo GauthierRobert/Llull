@@ -1,4 +1,4 @@
-// Parsing and formatting of the read-only aerodynamics query results (frontal_area, aero_drag, standard_atmosphere, analyze_airfoil,
+// Parsing and formatting of the read-only aerodynamics query results (frontal_area, compute_aero_drag, standard_atmosphere, analyze_airfoil,
 // analyze_wing) for the Aerodynamics panel. Pure: unknown command data in, typed views out.
 
 import type { Vec3 } from '@core/model/types';

@@ -95,7 +95,7 @@ describe('pipe support plan symbols', () => {
 
 describe('pipe support symbols in the exports', () => {
   it('writes them to the DXF on P-SUPP (fills on P-SUPP-PATT) with the mark as text', () => {
-    const result = execute(plantWithSupports(), 'export_dxf', { levelId: 'level-1' });
+    const result = execute(plantWithSupports(), 'export_building_dxf', { levelId: 'level-1' });
     const data = result.data as DxfExport;
     expect(data.layers).toEqual(expect.arrayContaining(['P-PIPE', 'P-SUPP', 'P-SUPP-PATT']));
     const lines = data.dxf.split('\n');
@@ -112,7 +112,7 @@ describe('pipe support symbols in the exports', () => {
     expect(sheet.svg).toMatch(/<circle [^>]*class="thin"/);
   });
   it('does not draw them on a level without supports', () => {
-    const data = execute(plantWithSupports(), 'export_dxf', { levelId: 'level-2' }).data as DxfExport | undefined;
+    const data = execute(plantWithSupports(), 'export_building_dxf', { levelId: 'level-2' }).data as DxfExport | undefined;
     expect(data?.layers ?? []).not.toContain('P-SUPP');
   });
 });

@@ -1,6 +1,6 @@
 import { clamp } from '@lib/clamp';
 import { toRadians } from '@lib/angle';
-import type { BuildingModel, MomentConnectionElement } from '@core/model/building';
+import type { BuildingModel, MomentConnectionElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import { solveFrame, type FrameResult } from '@lib/frame2d';
 import { toMm } from '@core/model/units';

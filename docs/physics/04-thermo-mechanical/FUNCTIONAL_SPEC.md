@@ -172,13 +172,13 @@ faces; margins table; disposition dialogs (human gate).
 
 | # | Given | When (CLI) | Then (JSON) | VC |
 | - | ----- | ---------- | ----------- | -- |
-| AC-1 | `plans/tmc_nafems_le11.plan.json` | run, `fea_mesh`, `fea_solve`, `fea_report` | probe `A` σzz within 3 % of −105 MPa | VC-TMC-02 |
+| AC-1 | `plans/tmc_nafems_le11.plan.json` | run, `fea_mesh`, `fea_solve`, `analysis_report` | probe `A` σzz within 3 % of −105 MPa | VC-TMC-02 |
 | AC-2 | `plans/tmc_restrained_bar.plan.json` | same | probe `mid` σxx within 0.5 % of −252 MPa | VC-TMC-01 |
 | AC-3 | `plans/tmc_thick_cylinder_sequential.plan.json` | solve `$th`, then `$ms` | hoop stress at bore −209.82 MPa and outer 133.03 MPa within 2 % | VC-TMC-05 |
 | AC-4 | `plans/tmc_fit_al_steel.plan.json` | the plan's `fit_at_temperature` step | rows: −55 °C min clearance −0.0102560 mm `interference_possible` + `TMC_FIT_INTERFERENCE`; 20 °C 0.007/0.041 mm; +85 °C max 0.0559963 mm; every row `reviewRequired: true` | VC-TMC-06, 62 |
 | AC-5 | `thermal_stress_check` with the VC-TMC-03/04/07/08/09 inputs | one call each | equal to the generator to the stated tolerance; `formula`, `inputs` in `data` | VC-TMC-03, 04, 07, 08, 09 |
 | AC-6 | `thermo_static` without `referenceTemperature`; `fit_at_temperature` without `specTemperature` | the call | exit 1, `TMC_REFERENCE_TEMPERATURE_MISSING` / `TMC_SPEC_TEMPERATURE_MISSING` | VC-TMC-60 |
-| AC-7 | solved AC-3, then change the bore temperature of `$th` | `fea_report analysisId=$ms D` | `state: "stale"`; `compute_margins` exits 1 with `FEA_RESULTS_STALE` | VC-TMC-50 |
+| AC-7 | solved AC-3, then change the bore temperature of `$th` | `analysis_report analysisId=$ms D` | `state: "stale"`; `compute_margins` exits 1 with `FEA_RESULTS_STALE` | VC-TMC-50 |
 | AC-8 | the deliberately wrong set-ups of VC-TMC-61 | each call | documented code, remediation, ids | VC-TMC-61 |
 | AC-9 | an `interference_possible` row | agent calls `dispose_fit_result … D` | exit 1, `TMC_HUMAN_GATE`, doc unchanged | VC-TMC-63 |
 

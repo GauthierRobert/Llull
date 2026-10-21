@@ -81,7 +81,7 @@ function rebuild(
 export const meshToSolid = defineCommand({
   name: 'mesh_to_solid',
   description:
-    'Rebuild a mesh solid (from import_mesh / import_step) that is a constant-section prism as an editable extrusion: it looks for an axis ' +
+    'Rebuild a mesh solid (from import_mesh / the CLI tool import_step) that is a constant-section prism as an editable extrusion: it looks for an axis ' +
     'along which every vertex lies on two parallel planes and all side faces are parallel to the axis, extracts the outline polygon of ' +
     'the section (outer loop and holes) and recreates it as an extrude_profile solid (plus a boolean subtract of an extruded tool per hole, ' +
     'which needs the geometry kernel). The mesh is replaced by the new solid, which keeps its colour; use keepSource to keep the mesh too. ' +

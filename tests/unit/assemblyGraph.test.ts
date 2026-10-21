@@ -1,6 +1,6 @@
 /** Grounding and linking rules of the connection graph, read from the document. */
 import { describe, expect, it } from 'vitest';
-import { assemblyLinks, intentOf } from '@core/commands/inspect/assemblyGraph';
+import { assemblyLinks, intentOf } from '@core/geometry/assemblyGraph';
 import { execute } from '@core/commands/registry';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 

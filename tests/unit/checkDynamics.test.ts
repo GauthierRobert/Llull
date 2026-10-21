@@ -5,7 +5,7 @@ import type { CheckItem, CheckResult } from '@core/model/checkResult';
 import { setPhysicsEngine } from '@core/dynamics/physicsEngine';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
-import { type SimulationRun, energyItem, loopDriftItem, timestepItem } from '@core/commands/dynamics/dynamicsSimChecks';
+import { type SimulationRun, energyItem, loopDriftItem, timestepItem } from '@dynamics/commands/dynamicsSimChecks';
 import { sliderCrank } from './sliderCrankFixture';
 
 function step(doc: CadDocument, command: string, params: Record<string, unknown>): { doc: CadDocument; id: string } {

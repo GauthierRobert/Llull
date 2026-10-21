@@ -221,8 +221,6 @@
  {
   "command": "fit_at_temperature",
   "params": {
-   "holePmiId": "$bore",
-   "shaftPmiId": "$pin",
    "specTemperature": {
     "value": 20.0,
     "unit": "degC"

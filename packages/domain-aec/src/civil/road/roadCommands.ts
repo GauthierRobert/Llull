@@ -2,7 +2,7 @@
 
 import { compactNumber } from '@lib/compactNumber';
 import type { CadDocument } from '@core/model/types';
-import type { AlignmentObject, ProfilePvi, RoadSection } from '@core/model/civil';
+import type { AlignmentObject, ProfilePvi, RoadSection } from '@aec/civil/types';
 import type { CommandResult } from '@core/commands/types';
 import { commandCatalog, defineCommand, z, vec2 } from '@core/commands/schema';
 import { newNameParam } from '../commonParams';

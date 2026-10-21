@@ -51,7 +51,7 @@ describe('cylinder flat pattern (VC-CMP-14)', () => {
   const { doc, part } = skin('add_cylinder', { radius: 50, height: 200 }, [50, 0, 0], 45);
 
   it('unrolls to a 2 pi r x L rectangle', () => {
-    const result = data<Export>(doc, 'export_flat_patterns_dxf', { part });
+    const result = data<Export>(doc, 'export_ply_flat_patterns_dxf', { part });
     expect(result.surface).toBe('cylinder');
     expect(result.pieces[0]?.widthMm).toBeCloseTo(2 * Math.PI * 50, 2);
     expect(result.pieces[0]?.heightMm).toBeCloseTo(200, 6);
@@ -70,12 +70,12 @@ describe('cylinder flat pattern (VC-CMP-14)', () => {
   });
 
   it('writes layer, label, arrow and units per the file contract', () => {
-    const text = data<Export>(doc, 'export_flat_patterns_dxf', { part }).files[0]?.content ?? '';
+    const text = data<Export>(doc, 'export_ply_flat_patterns_dxf', { part }).files[0]?.content ?? '';
     expect(text).toContain('$INSUNITS\n70\n4');
     expect(text).toContain('PLY_C1');
     expect(text).toContain('ORIENT');
     expect(text).toContain('C1 / 45deg / S1 / AS4_3501_6');
-    const labelled = data<Export>(doc, 'export_flat_patterns_dxf', { part, labels: ['name'] }).files[0]?.content ?? '';
+    const labelled = data<Export>(doc, 'export_ply_flat_patterns_dxf', { part, labels: ['name'] }).files[0]?.content ?? '';
     expect(labelled).toContain('\nC1\n');
     expect(labelled).not.toContain('AS4_3501_6');
   });
@@ -95,7 +95,7 @@ describe('cone flat pattern (VC-CMP-15)', () => {
   });
 
   it('round-trips through DXF with one closed boundary and the right area (VC-CMP-16)', () => {
-    const result = data<Export>(doc, 'export_flat_patterns_dxf', { part, plies: ['C1'] });
+    const result = data<Export>(doc, 'export_ply_flat_patterns_dxf', { part, plies: ['C1'] });
     expect(result.surface).toBe('cone');
     const polygons = reimported(result.files[0]?.content ?? '').filter((polyline) => polyline.closed);
     expect(polygons).toHaveLength(1);
@@ -104,7 +104,7 @@ describe('cone flat pattern (VC-CMP-15)', () => {
   });
 
   it('keeps meridians as radial lines: the 0 degree arrow points away from the apex', () => {
-    const text = data<Export>(doc, 'export_flat_patterns_dxf', { part }).files[0]?.content ?? '';
+    const text = data<Export>(doc, 'export_ply_flat_patterns_dxf', { part }).files[0]?.content ?? '';
     expect(text).toContain('ORIENT');
   });
 });
@@ -112,10 +112,10 @@ describe('cone flat pattern (VC-CMP-15)', () => {
 describe('planar flat patterns and refusals', () => {
   it('exports every ply piece of the flat panel on its own layer with the 10 mm gap and an allowance', () => {
     const { doc, part } = panel();
-    const result = data<Export>(doc, 'export_flat_patterns_dxf', { part });
+    const result = data<Export>(doc, 'export_ply_flat_patterns_dxf', { part });
     expect(result.pieces).toHaveLength(24);
     expect(result.pieces[0]).toMatchObject({ name: 'S1', widthMm: 600, heightMm: 400 });
-    const grown = data<Export>(doc, 'export_flat_patterns_dxf', { part, plies: ['S1'], allowance: 5 });
+    const grown = data<Export>(doc, 'export_ply_flat_patterns_dxf', { part, plies: ['S1'], allowance: 5 });
     expect(grown.pieces[0]).toMatchObject({ widthMm: 610, heightMm: 410 });
     const text = result.files[0]?.content ?? '';
     for (const name of ['PLY_S1', 'PLY_S24']) expect(text).toContain(name);
@@ -123,16 +123,16 @@ describe('planar flat patterns and refusals', () => {
 
   it('refuses unknown parts / plies, empty parts and a negative allowance', () => {
     const { doc, part } = panel();
-    expectRefusal(doc, 'export_flat_patterns_dxf', { part: 'nope' }, 'CMP_REF_MISSING');
-    expectRefusal(doc, 'export_flat_patterns_dxf', { part, plies: ['nope'] }, 'CMP_REF_MISSING');
-    expectRefusal(doc, 'export_flat_patterns_dxf', { part, allowance: -1 }, 'CMP_PARAM_INVALID');
+    expectRefusal(doc, 'export_ply_flat_patterns_dxf', { part: 'nope' }, 'CMP_REF_MISSING');
+    expectRefusal(doc, 'export_ply_flat_patterns_dxf', { part, plies: ['nope'] }, 'CMP_REF_MISSING');
+    expectRefusal(doc, 'export_ply_flat_patterns_dxf', { part, allowance: -1 }, 'CMP_PARAM_INVALID');
     const empty = skin('add_cylinder', { radius: 10, height: 10 }, [10, 0, 0]);
     const bare = apply(empty.doc, 'delete_ply', { part: empty.part, ply: 'C1' });
-    expectRefusal(bare, 'export_flat_patterns_dxf', { part: empty.part }, 'CMP_NO_PLIES');
+    expectRefusal(bare, 'export_ply_flat_patterns_dxf', { part: empty.part }, 'CMP_NO_PLIES');
   });
 
   it('is pure', () => {
     const { doc, part } = panel();
-    expectPure(doc, () => execute(doc, 'export_flat_patterns_dxf', { part }));
+    expectPure(doc, () => execute(doc, 'export_ply_flat_patterns_dxf', { part }));
   });
 });

@@ -73,6 +73,12 @@ export interface CommandAnnotations {
    */
   readonly metaHistory?: boolean;
   /**
+   * Top-level keys the schema does not declare are tolerated as descriptive metadata instead of rejected with CMD_UNKNOWN_PARAM
+   * (`build_project`: plan files carry id / status / expected / notes …). Validation strips them; `run` never sees them. Not emitted in
+   * tool schemas.
+   */
+  readonly metadataKeys?: boolean;
+  /**
    * Session command (OQ-MAT-09): changes the in-memory document only. `execute` appends no FeatureStep and the host neither logs nor
    * syncs it; its effect is never serialized (private material-library values, TR-MAT-31). Not emitted in tool schemas.
    */

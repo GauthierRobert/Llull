@@ -278,7 +278,7 @@ describe('synthetic forms (VC-PROP-10…12, 17)', () => {
     const { data } = evaluate(d, { material: 'al', property: 'Ftu', at: at(400, 'degF'), derivative: 'T' });
     expectCase(PACK, 'VC-PROP-17/legacy08PercentOfRT/T=400degF', data.value, data.unit);
     expect(data.derivative?.value).toBeCloseTo((60 * -0.3) / 200, 12);
-    expect(execute(d, 'remove_property_model', { material: 'al', modelId: 'ftu.rt' }).error?.code).toBe('PROP_MODEL_IN_USE');
+    expect(execute(d, 'delete_property_model', { material: 'al', modelId: 'ftu.rt' }).error?.code).toBe('PROP_MODEL_IN_USE');
   });
 
   it('evaluates powerLaw, product and polynomial origin with derivatives', () => {

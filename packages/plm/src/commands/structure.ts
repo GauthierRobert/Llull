@@ -1,9 +1,10 @@
 /** Product structure commands (FR-PLM-23/24): bind components to managed items, the EBOM, baselines and their comparison. */
 
+import { nextFreeId } from '@lib/id';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, report } from '@core/commands/noop';
-import type { Baseline, SubItem } from '@core/model/plm';
+import type { Baseline, SubItem } from '@plm/types';
 import { PART_NUMBER } from '../document';
 import { humanAct } from '../gate';
 import { atSchema, bySchema, confirmationSchema } from '../params';
@@ -33,8 +34,8 @@ const HASH = /^[0-9a-f]{64}$/;
 export const bindComponentItem = defineCommand({
   name: 'bind_component_item',
   description:
-    'HUMAN GATE. Bind a component of this assembly (doc.components) to a managed item of another document: part number, revision, lifecycle state and, ' +
-    'for a released / superseded / obsolete child, its release content hash (64 hex). The signer attests these facts; llull cannot read the child ' +
+    'Bind a component of this assembly (doc.components) to a managed item of another document: part number, revision, lifecycle state and, ' +
+    'for a released / superseded / obsolete child, its release content hash (64 hex). HUMAN GATE. The signer attests these facts; llull cannot read the child ' +
     'document from here, and an agent can never declare a child released. Re-binding the same part number replaces its record (e.g. a new revision). ' +
     'Allowed only while this assembly revision is in_work. Needs `confirmation` (plm_act_payload): an agent gets PLM_HUMAN_GATE and hands over.',
   annotations: { metaHistory: true },
@@ -108,7 +109,7 @@ export const bindComponentItem = defineCommand({
 export const unbindComponentItem = defineCommand({
   name: 'unbind_component_item',
   description:
-    'HUMAN GATE. Remove the binding of a sub-item (by part number) from this assembly. Allowed only while the assembly revision is in_work. Needs `confirmation` ' +
+    'Remove the binding of a sub-item (by part number) from this assembly. HUMAN GATE. Allowed only while the assembly revision is in_work. Needs `confirmation` ' +
     '(plm_act_payload): an agent gets PLM_HUMAN_GATE.',
   annotations: { destructive: true, metaHistory: true },
   params: z.object({
@@ -146,7 +147,7 @@ export const unbindComponentItem = defineCommand({
 export const engineeringBom = defineCommand({
   name: 'engineering_bom',
   description:
-    'Engineering bill of materials of the managed assembly: one row per bound sub-item { level, partNumber, revision, state, quantity } where quantity is ' +
+    'Engineering bill of materials of the managed PLM assembly (by part number and revision; for a plain parts/mass count of any document use bill_of_materials, for building quantities quantity_takeoff): one row per bound sub-item { level, partNumber, revision, state, quantity } where quantity is ' +
     'the number of instances of its component placed in this document, the total, how many children are not released and the components with instances ' +
     "that no sub-item covers. Only level 1 is available from one document (a child's own structure is in its own document). For a released revision the " +
     'structure frozen at release is returned. Extends bill_of_materials, which counts components and materials. Read-only.',
@@ -187,11 +188,7 @@ export const engineeringBom = defineCommand({
   },
 });
 
-const nextBaselineId = (ids: readonly string[]): string => {
-  let n = ids.length + 1;
-  while (ids.includes(`BL-${String(n).padStart(4, '0')}`)) n += 1;
-  return `BL-${String(n).padStart(4, '0')}`;
-};
+const nextBaselineId = (ids: readonly string[]): string => nextFreeId('BL', (id) => ids.includes(id), { pad: 4, start: ids.length + 1 });
 
 /**
  * @affects doc.plm.baselines[id] (adds a baseline: the item's latest released revision plus every bound sub-item, sorted by part number, hash = sha256(jcs(members)))

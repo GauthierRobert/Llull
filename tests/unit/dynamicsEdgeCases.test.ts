@@ -6,12 +6,12 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createDynamicsModel, type CylinderPressure, type DynamicsModel } from '@core/model/dynamics';
 import type { CadDocument } from '@core/model/types';
-import { consistentSpeeds, analyseMobility } from '@core/dynamics/mobility';
-import { buildTopology, isRefusal, type Topology } from '@core/dynamics/topology';
-import { engineLayout } from '@core/dynamics/engineGeometry';
-import { prepareCylinders } from '@core/dynamics/cylinderLoads';
-import { buildSimulationModel } from '@core/dynamics/simulationModel';
-import { reactionsData, residualTier } from '@core/dynamics/reactions';
+import { consistentSpeeds, analyseMobility } from '@dynamics/sim/mobility';
+import { buildTopology, isRefusal, type Topology } from '@dynamics/sim/topology';
+import { engineLayout } from '@dynamics/sim/engineGeometry';
+import { prepareCylinders } from '@dynamics/sim/cylinderLoads';
+import { buildSimulationModel } from '@dynamics/sim/simulationModel';
+import { reactionsData, residualTier } from '@dynamics/sim/reactions';
 import type { SimulationTrace } from '@core/dynamics/physicsEngine';
 import { sliderCrank, travelRate } from './sliderCrankFixture';
 
@@ -308,7 +308,7 @@ describe('further dynamics edge cases', () => {
   });
 
   it('cycleAngleSeries is null without a crank series and wraps into the cycle otherwise', async () => {
-    const { cycleAngleSeries } = await import('@core/dynamics/engineReport');
+    const { cycleAngleSeries } = await import('@dynamics/sim/engineReport');
     const { doc } = sliderCrank({ rMm: 30.5, lMm: 130 });
     const added = execute(doc, 'add_cylinder_pressure', {
       piston: 'slide_j',

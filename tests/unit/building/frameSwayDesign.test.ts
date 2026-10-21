@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
-import type { BasePlateElement } from '@core/model/building';
+import type { BasePlateElement } from '@aec/building/types';
 import { execute } from '@core/commands/registry';
 import { framesOf } from '@aec/industrial/frames/frameModelFrames';
 import { solveCombination } from '@aec/industrial/frames/frameModelSolve';

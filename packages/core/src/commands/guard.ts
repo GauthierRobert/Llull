@@ -8,6 +8,7 @@ import { derivationViolation } from './derivation';
 import { pluginGuards } from '../plugins/host';
 import { commandError, rejection } from './noop';
 import { errorMessage } from '../lib/errorMessage';
+import { similarNames } from '../lib/similarNames';
 
 function containsNonFinite(value: unknown, depth = 0): boolean {
   if (typeof value === 'number') return !Number.isFinite(value);
@@ -44,7 +45,12 @@ function hasPrototypeIdKey(value: unknown, keyHint = '', depth = 0): boolean {
   return Object.entries(value).some(([k, v]) => hasPrototypeIdKey(v, k, depth + 1));
 }
 
-const INVALID_PARAMS_FIX = 'Fix the params at `paths`; the schema of the command: `llull describe <command>`.';
+const invalidParamsFix = (command: string, paths: readonly string[]): string =>
+  'Fix the params at ' +
+  paths.map((path) => '`' + path + '`').join(', ') +
+  '; the schema of the command: `llull describe ' +
+  command +
+  '`.';
 
 const POSITION_CONTRACT = ' Format [x, y, z]; [x, y] is accepted and placed at z=0.';
 
@@ -60,13 +66,22 @@ function describePositionContract(schema: ParamsSchema): ParamsSchema {
 
 const MAX_KNOWN_LISTED = 14;
 
-/** " Note: ignored unknown param(s): a, b (known: …)." for top-level keys the command does not declare; empty when none. */
-function unknownParamsNote(schema: ParamsSchema, params: object): string {
-  const known = Object.keys(schema.properties);
+/** Rejection for top-level keys the command does not declare (a typo would otherwise be silently dropped); null when every key is known. */
+function unknownParamsRejection(def: CommandDefinition<unknown>, doc: CadDocument, params: object): CommandResult | null {
+  if (def.annotations?.metadataKeys) return null;
+  const known = Object.keys(def.paramsSchema.properties);
   const unknown = Object.keys(params).filter((key) => !known.includes(key));
-  if (unknown.length === 0) return '';
+  if (unknown.length === 0) return null;
+  const described = unknown.map((key) => {
+    const [closest] = similarNames(key, known, 1);
+    return closest === undefined ? `'${key}'` : `'${key}' — did you mean '${closest}'?`;
+  });
   const listed = known.slice(0, MAX_KNOWN_LISTED).join(', ') + (known.length > MAX_KNOWN_LISTED ? ', …' : '');
-  return ` Note: ignored unknown param(s): ${unknown.join(', ')} (known: ${known.length > 0 ? listed : 'none'}).`;
+  return rejection(
+    doc,
+    `${def.name} rejected: unknown param ${described.join('; unknown param ')} (known: ${known.length > 0 ? listed : 'none'}). Document unchanged.`,
+    commandError('CMD_UNKNOWN_PARAM', invalidParamsFix(def.name, unknown), [], unknown),
+  );
 }
 
 /** Log `message` with the error's stack and return its message for the agent-facing summary. */
@@ -86,7 +101,7 @@ export function corruptionReason(entity: unknown): string | null {
  * @failure run throws (warned with stack), id-like params equal an Object.prototype key
  * (would alias entity-bag lookups), or affected entities contain NaN/Infinity/undefined vector
  * components or a non-Vec3 position -> no-op, affected:[]
- * @invariant top-level param keys the schema does not declare are tolerated but named in the summary ("ignored unknown param(s)")
+ * @failure a top-level param key the schema does not declare -> rejected: unknown param 'k' (closest declared key suggested), CMD_UNKNOWN_PARAM (unless annotations.metadataKeys: tolerated, stripped)
  * @invariant non-object params are coerced to {} so field destructuring cannot throw;
  * a 2-number `position` is padded to [x, y, 0]; free-text params are never rejected
  */
@@ -94,11 +109,7 @@ export function guardCommand(def: CommandDefinition<unknown>): CommandDefinition
   return {
     ...def,
     paramsSchema: describePositionContract(def.paramsSchema),
-    run: (doc, params, ctx): CommandResult => {
-      const result = checkedRun(def, doc, params, ctx);
-      const note = unknownParamsNote(def.paramsSchema, typeof params === 'object' && params !== null ? params : {});
-      return note === '' ? result : { ...result, summary: result.summary + note };
-    },
+    run: (doc, params, ctx): CommandResult => checkedRun(def, doc, params, ctx),
   };
 }
 
@@ -111,19 +122,25 @@ function checkedRun(def: CommandDefinition<unknown>, doc: CadDocument, params: u
       `${def.name} rejected: an id param is a reserved JavaScript property name (e.g. constructor, __proto__, toString). Use a different id.`,
       commandError('CMD_RESERVED_ID', 'Use an id that is not a JavaScript property name (constructor, __proto__, toString, …).'),
     );
+  const unknownKeys = unknownParamsRejection(def, doc, safeParams);
+  if (unknownKeys !== null) return unknownKeys;
   if (def.paramsValidator) {
     let checked: ReturnType<typeof def.paramsValidator.safeParse>;
     try {
       checked = def.paramsValidator.safeParse(safeParams, { reportInput: true });
     } catch (error) {
       const reason = warnAndDescribe(`command '${def.name}' params validation threw:`, error);
-      return rejection(doc, `${def.name} rejected: invalid params — ${reason}`, commandError('CMD_INVALID_PARAMS', INVALID_PARAMS_FIX));
+      return rejection(
+        doc,
+        `${def.name} rejected: invalid params — ${reason}`,
+        commandError('CMD_INVALID_PARAMS', invalidParamsFix(def.name, ['(params)'])),
+      );
     }
     if (!checked.success)
       return rejection(
         doc,
         `${def.name} rejected: invalid params — ${formatIssues(checked.error)}. Document unchanged.`,
-        commandError('CMD_INVALID_PARAMS', INVALID_PARAMS_FIX, [], issuePaths(checked.error)),
+        commandError('CMD_INVALID_PARAMS', invalidParamsFix(def.name, issuePaths(checked.error)), [], issuePaths(checked.error)),
       );
   }
   let result: CommandResult;

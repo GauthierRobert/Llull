@@ -1,6 +1,6 @@
 /** PHY-03 TR-THM-04: thermal unit conversions into the 05 unit systems (TECHNICAL_SPEC 5.3), 1e-12 round trip. */
 import { describe, expect, it } from 'vitest';
-import { fromSi, siToSystem, siUnitOf, systemToSi, toSi, UNIT_SYSTEMS, type ThermalKind } from '@lib/thermalUnits';
+import { fromSi, siToSystem, siUnitOf, systemToSi, toSi, UNIT_SYSTEMS, type ThermalKind } from '@cae/thermal/thermalUnits';
 
 const SIGMA = 5.670374419e-8;
 

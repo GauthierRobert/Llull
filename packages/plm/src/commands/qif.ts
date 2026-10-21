@@ -1,9 +1,10 @@
 /** import_qif_results (M6, VC-PLM-24): QIF 3.0 MeasurementResults to FAI characteristic results. */
 
+import { nextFreeId } from '@lib/id';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
-import type { FaiResult, FaiResultSet } from '@core/model/plm';
+import type { FaiResult, FaiResultSet } from '@plm/types';
 import { sha256Hex } from '@lib/sha256';
 import { humanAct } from '../gate';
 import { atSchema, bySchema, confirmationSchema } from '../params';
@@ -17,11 +18,8 @@ import { NOT_MANAGED } from '../state';
 const MAX_UNMATCHED = 200;
 const BALLOON = /^[1-9]\d{0,8}$/;
 
-const nextSetId = (ids: readonly string[], revision: string): string => {
-  let n = ids.length + 1;
-  while (ids.includes(`FRS-${revision}-${n}`)) n += 1;
-  return `FRS-${revision}-${n}`;
-};
+const nextSetId = (ids: readonly string[], revision: string): string =>
+  nextFreeId(`FRS-${revision}`, (id) => ids.includes(id), { start: ids.length + 1 });
 
 /**
  * @affects doc.plm.faiResults[id] (adds the measured results of one QIF file for one revision, with the SHA-256 of the exact file)
@@ -34,10 +32,10 @@ const nextSetId = (ids: readonly string[], revision: string): string => {
 export const importQifResults = defineCommand({
   name: 'import_qif_results',
   description:
-    'HUMAN GATE. Import the measured results of a QIF 3.0 file (MeasurementResults / MeasuredCharacteristics / CharacteristicMeasurements, ANSI/DMSC QIF 3.0) as the FAI ' +
+    'Import the measured results of a QIF 3.0 file (MeasurementResults / MeasuredCharacteristics / CharacteristicMeasurements, ANSI/DMSC QIF 3.0) as the FAI ' +
     'results of one revision: each characteristic measurement is matched to a characteristic number of the register (assign_characteristic_ids) through the Name of its ' +
     'CharacteristicItem (the balloon number) or, when the file carries no items, its CharacteristicItemId; its Value, unit and Status (PASS, FAIL, ...) are stored as the ' +
-    'measuring system wrote them (llull does not judge them). The file is parsed safely: DOCTYPE and entities are refused, size (8 MB), nesting (48) and element count are ' +
+    'measuring system wrote them (llull does not judge them). HUMAN GATE. The file is parsed safely: DOCTYPE and entities are refused, size (8 MB), nesting (48) and element count are ' +
     'limited. The result set keeps the SHA-256 of the exact file. Read it back with fai_report_skeleton { resultsId }. Matches and gaps are in the summary. Needs ' +
     '`confirmation` (plm_act_payload) over exactly these params, the file included: an agent gets PLM_HUMAN_GATE and hands over.',
   annotations: { metaHistory: true },

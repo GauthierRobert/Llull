@@ -41,7 +41,7 @@ function cameraFromParam(param: CameraParam): ViewpointCamera {
 export const saveViewpoint = defineCommand({
   name: 'save_viewpoint',
   description:
-    'Save a named review viewpoint (a BCF viewpoint camera) in the document: give `camera` (perspective eye / direction / up / fovDeg or ' +
+    'Save a named review viewpoint (a BCF viewpoint camera, for review issues, walkthroughs and render_view; for a drawing view that also shows chosen PMI items or a section use create_saved_view instead) in the document: give `camera` (perspective eye / direction / up / fovDeg or ' +
     'orthographic eye / direction / up / viewHeight), or omit it to save the current document camera (set_camera / fit_view, 45° perspective). ' +
     'Direction and up are normalised and made orthogonal. Returns the id (vp-<n>) in affected[0] and data { id, guid, camera }. Viewpoints ' +
     'feed render_view (viewpointId), create_walkthrough and export_bcf. Does not add a feature step. Error: VIS_CAMERA_INVALID.',

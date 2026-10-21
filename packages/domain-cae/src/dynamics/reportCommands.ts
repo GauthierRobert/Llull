@@ -1,11 +1,11 @@
-/** dynamic_report (query) and equivalent_static_load_case (random rms -> 05 static gravity load): PHY-09 §4 results commands. */
+/** View 'dynamic' of analysis_report, and equivalent_static_load_case (random rms -> 05 static gravity load): PHY-09 §4 results commands. */
 
 import type { AnalysisCase, FeArtifactPort, FeaLoad } from '@core/model/analysis';
 import type { DynamicSummary, EquivalentLoadProvenance } from '@core/model/structuralDynamics';
 import type { CadDocument } from '@core/model/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, report } from '@core/commands/noop';
-import type { CommandResult } from '@core/commands/types';
+import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { significantNumber } from '@lib/compactNumber';
 import { nextId } from '@lib/id';
 import { caseOf, withCase } from '../shared/access';
@@ -47,35 +47,28 @@ function verifiedSummary(
  * @invariant read-only; numbers come only from the summary re-verified against the artifacts (05 §4.1)
  * @failure unknown / non-dynamic -> FEA_ANALYSIS_NOT_FOUND / DYN_CASE_TYPE; stale -> DYN_RESULTS_STALE; unsolved / unverifiable -> DYN_RESULTS_MISSING
  */
-export const dynamicReport = defineCommand({
-  name: 'dynamic_report',
-  description:
-    'Read the results of a solved frequency_response / random_response case: data { summary: { modesKept, highestModeHz, massParticipation ' +
-    '(cumulative effective-mass fraction x/y/z), dampingPerMode [{ mode, fHz, zeta }], probes (frf: peaks fHz / magnitude / phaseDeg / mode, ' +
-    'qHalfPower; random: rms, peak = peakFactor x rms with the named 3-sigma default, zeroUpcrossingHz, spectrumGrms), nodalMax (random: per ' +
-    'field component the largest nodal rms and where), frequencyPointsHz, unverified, unverifiedReasons, reviewRequired }, state }. Units: g ' +
-    '(9.80665 m/s^2) for accelerations, the case length / stress unit otherwise. probes filters by probe name. Report it as "computed by llull, not approved".',
-  annotations: { readOnly: true },
-  params: z.object({ analysisId: analysisIdSchema, probes: z.array(z.string()).optional().describe('Probe names to keep; default all.') }),
-  run: (doc, { analysisId, probes }, ctx): CommandResult => {
-    const verified = verifiedSummary(doc, analysisId, ctx?.feaArtifacts);
-    if ('code' in verified) return refuseDyn(doc, 'dynamic_report', verified.code, verified.message, [analysisId], ['analysisId']);
-    const summary =
-      probes === undefined
-        ? verified.summary
-        : { ...verified.summary, probes: verified.summary.probes.filter((probe) => probes.includes(probe.probe)) };
-    const lines = summary.probes.map((probe) =>
-      probe.kind === 'random'
-        ? `${probe.probe} ${probe.quantity} ${n(probe.rms)} ${probe.unit} rms (3-sigma ${n(probe.peak)})`
-        : `${probe.probe} ${probe.quantity} ${probe.peaks.length} peak(s)${probe.peaks[0] === undefined ? '' : `, first ${n(probe.peaks[0].magnitude)} ${probe.unit} at ${n(probe.peaks[0].fHz)} Hz`}`,
-    );
-    return report(
-      doc,
-      `dynamic_report: '${analysisId}' ${summary.type}, ${summary.modesKept} mode(s) to ${n(summary.highestModeHz)} Hz${lines.length > 0 ? `; ${lines.join('; ')}` : ''}${summary.unverified ? '; UNVERIFIED' : ''}; computed by llull, not approved.`,
-      { summary, state: verified.state },
-    );
-  },
-});
+export function dynamicResultsReport(
+  doc: CadDocument,
+  { analysisId, probes }: { analysisId: string; probes?: readonly string[] | undefined },
+  ctx?: ExecutionContext,
+): CommandResult {
+  const verified = verifiedSummary(doc, analysisId, ctx?.feaArtifacts);
+  if ('code' in verified) return refuseDyn(doc, 'analysis_report', verified.code, verified.message, [analysisId], ['analysisId']);
+  const summary =
+    probes === undefined
+      ? verified.summary
+      : { ...verified.summary, probes: verified.summary.probes.filter((probe) => probes.includes(probe.probe)) };
+  const lines = summary.probes.map((probe) =>
+    probe.kind === 'random'
+      ? `${probe.probe} ${probe.quantity} ${n(probe.rms)} ${probe.unit} rms (3-sigma ${n(probe.peak)})`
+      : `${probe.probe} ${probe.quantity} ${probe.peaks.length} peak(s)${probe.peaks[0] === undefined ? '' : `, first ${n(probe.peaks[0].magnitude)} ${probe.unit} at ${n(probe.peaks[0].fHz)} Hz`}`,
+  );
+  return report(
+    doc,
+    `analysis_report: '${analysisId}' ${summary.type}, ${summary.modesKept} mode(s) to ${n(summary.highestModeHz)} Hz${lines.length > 0 ? `; ${lines.join('; ')}` : ''}${summary.unverified ? '; UNVERIFIED' : ''}; computed by llull, not approved.`,
+    { summary, state: verified.state },
+  );
+}
 
 /**
  * @affects doc.analysis.cases[targetAnalysisId].loads (adds 1 gravity load `fl-<step>.<k>`) and doc.analysis.vibration.equivalentLoads (provenance)

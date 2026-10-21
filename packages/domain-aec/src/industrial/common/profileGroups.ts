@@ -4,7 +4,7 @@
  */
 
 import { z } from '@core/commands/schema';
-import type { BuildingModel, SteelMemberElement } from '@core/model/building';
+import type { BuildingModel, SteelMemberElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { withElement } from '../../building/model';

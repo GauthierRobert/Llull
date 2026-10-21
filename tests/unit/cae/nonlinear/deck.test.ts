@@ -201,10 +201,10 @@ describe('nonlinear_static deck refusals', () => {
 
   it('refuses a probe whose constraint or load was deleted afterwards', () => {
     const bar = pulledBar();
-    const gone = mustRun(bar.doc, 'delete_fea_constraint', { analysisId: bar.analysisId, constraintId: bar.constraints['x0'] });
+    const gone = mustRun(bar.doc, 'delete_analysis_item', { analysisId: bar.analysisId, itemId: bar.constraints['x0'] });
     expect(codeOf(gone, bar.analysisId, meshOf({ ...bar, doc: gone }, gone))).toBe('NLS_PROBE_REFERENCE_UNKNOWN');
     const pressure = pressureBar();
-    const noLoad = mustRun(pressure.doc, 'delete_fea_load', { analysisId: pressure.analysisId, loadId: pressure.loadId });
+    const noLoad = mustRun(pressure.doc, 'delete_analysis_item', { analysisId: pressure.analysisId, itemId: pressure.loadId });
     expect(codeOf(noLoad, pressure.analysisId, { ...pressure.mesh, inputHash: pressure.mesh.inputHash })).toMatch(
       /NLS_PROBE_REFERENCE_UNKNOWN|FEA_MESH_STALE/,
     );

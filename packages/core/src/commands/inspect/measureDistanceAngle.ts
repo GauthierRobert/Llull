@@ -1,7 +1,7 @@
 import type { Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
-import { formatLength } from '../document/units';
+import { formatLength } from '../../model/units';
 import { boundsCenter, entityBoundsInDoc } from '../../geometry/bounds';
 import { dot3, sub3, len3, distance3 } from '../../lib/vec3';
 import { entityOfKind } from '../entity/entityOfKind';

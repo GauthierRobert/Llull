@@ -3,7 +3,7 @@
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
-import type { FastenerFamily, FastenerSize } from '@core/model/fasteners';
+import type { FastenerFamily, FastenerSize } from '@aero/fasteners/types';
 import { CATALOG_FORMAT, catalogFileSchema, checkFamily, type CatalogIssue } from './catalogFile';
 import { fastenerError, refuse, remediationFor } from './codes';
 import { fastenerModel, withFasteners } from './fastenerDoc';

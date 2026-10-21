@@ -143,7 +143,7 @@ describe('licensed values and non-local clients (TR-MAT-32)', () => {
 
   /** Two plates (one open sheet material) and a hand-built stack in the live document; the bolt is the licensed library material. */
   function placeStack(): string {
-    const plates = ['plate_a', 'plate_b'].map((name) => applyCommand('add_box', { size: [10, 10, 2], name }).affected[0] as string);
+    const plates = [0, 1].map(() => applyCommand('add_box', { size: [10, 10, 2] }).affected[0] as string);
     applyCommand('define_material_record', {
       id: 'sheet',
       designation: 'sheet',

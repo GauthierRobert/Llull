@@ -1,6 +1,6 @@
 /** export_drainage_long_section: SVG long section of a pipe run with the hydraulic grade line. */
 
-import type { CivilModel, PipeObject } from '@core/model/civil';
+import type { CivilModel, PipeObject } from '@aec/civil/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, confirmExportControlled } from '@core/commands/schema';
 import { noop, report, exportRefusal } from '@core/commands/noop';
@@ -43,7 +43,7 @@ function runPipes(civil: CivilModel, fromId: string, toId: string | undefined): 
 export const exportDrainageLongSection = defineCommand({
   name: 'export_drainage_long_section',
   description:
-    'Long section of a drainage pipe run as SVG text in `data.svg` (alias `data.text`) (`data.fileName`): ground (rim) line, manholes with labels, pipe ' +
+    'Long section of a drainage pipe run (road alignment profiles: use export_road_long_section) as SVG text in `data.svg` (alias `data.text`) (`data.fileName`): ground (rim) line, manholes with labels, pipe ' +
     'invert and obvert, the hydraulic grade line (same method as check_drainage_network) and a table band of chainage, rim, invert, pipe ' +
     '(diameter, slope, length) and HGL. The run starts at `fromManholeId` and ends at `toManholeId`, or, when omitted, follows the ' +
     'largest pipe at each fork down to the outfall. Returns data { svg, text, fileName, pipeIds, manholeIds }.',

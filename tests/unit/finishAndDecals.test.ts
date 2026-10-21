@@ -207,14 +207,14 @@ describe('text decals', () => {
     const { doc, id } = base();
     expectNoOp(execute(doc, 'add_decal', { id, ...onTop, ...patch }), doc, text);
   });
-  it('add_decal and remove_decal are pure', () => {
+  it('add_decal and delete_decal are pure', () => {
     const { doc, id } = base();
     const before = structuredClone(doc);
     const painted = execute(doc, 'add_decal', { id, ...onTop }).document;
     expect(doc).toEqual(before);
     const decalId = painted.entities[id]?.decals?.[0]?.id as string;
     const paintedBefore = structuredClone(painted);
-    execute(painted, 'remove_decal', { id, decalId });
+    execute(painted, 'delete_decal', { id, decalId });
     expect(painted).toEqual(paintedBefore);
   });
   it('refuses 2D targets, removes decals, scales them and validates saved ones', () => {
@@ -225,12 +225,12 @@ describe('text decals', () => {
     const decalId = painted.entities[id]?.decals?.[0]?.id as string;
     const scaled = execute(painted, 'scale_entity', { id, factor: 2 }).document;
     expect(scaled.entities[id]?.decals?.[0]?.height).toBe(16);
-    const cleared = execute(painted, 'remove_decal', { id, decalId });
+    const cleared = execute(painted, 'delete_decal', { id, decalId });
     expect(cleared.document.entities[id]).not.toHaveProperty('decals');
-    expectNoOp(execute(painted, 'remove_decal', { id, decalId: 'x' }), painted, 'no decal');
-    expectNoOp(execute(painted, 'remove_decal', { id: 'x', decalId }), painted, 'not found');
+    expectNoOp(execute(painted, 'delete_decal', { id, decalId: 'x' }), painted, 'no decal');
+    expectNoOp(execute(painted, 'delete_decal', { id: 'x', decalId }), painted, 'not found');
     const twice = execute(painted, 'add_decal', { id, ...onTop, at: [20, 0, 10] }).document;
-    const one = execute(twice, 'remove_decal', { id, decalId });
+    const one = execute(twice, 'delete_decal', { id, decalId });
     expect(one.document.entities[id]?.decals).toHaveLength(1);
     const loaded = execute(createEmptyDocument(), 'load_document', { json: serializeDocument(painted) }).document;
     expect(loaded.entities[id]).toEqual(painted.entities[id]);

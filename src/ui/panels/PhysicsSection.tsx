@@ -6,7 +6,7 @@ import { useStore } from '@ui/store';
 import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { runSimulation } from '@ui/services/simulationRun';
 import { execute } from '@core/commands/registry';
-import type { SimulationData } from '@core/dynamics/simulationReport';
+import type { SimulationData } from '@dynamics/index';
 import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
 import { ListRow, PanelEmpty, PanelSection, StatusLine } from '@ui/panels/PanelParts';
 import { useFocusItem } from '@ui/hooks/useFocusItem';

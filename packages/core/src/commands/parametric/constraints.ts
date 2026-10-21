@@ -9,7 +9,7 @@
 import { type CadDocument, type Constraint, CONSTRAINT_KINDS, DIMENSION_CONSTRAINT_KINDS } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { idOrNext, idTaken } from '../entity/explicitId';
+import { idOrNext, idTaken } from '../../lib/explicitId';
 import { constraintRefusal } from './constraintGuard';
 import { constraintList, runSolver } from './solver/solve';
 import { changed, noop, report } from '../noop';

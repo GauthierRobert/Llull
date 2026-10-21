@@ -22,8 +22,13 @@ export function getActiveKernelName(): ActiveKernel | null {
   return activeKernel;
 }
 
+let warned = false;
+
+/** One stderr line per process: what is unavailable, why, and where to look (`llull status`); details are under LLULL_DEBUG. */
 function warnUnavailable(label: string, error: unknown): void {
-  console.warn(`[server] ${label}:`, errorMessage(error));
+  if (warned) return;
+  warned = true;
+  console.warn(`[llull] ${label}: ${errorMessage(error)} (details: llull status, LLULL_DEBUG=1)`);
 }
 
 /** One OCC call blocks the whole server (HTTP, SSE keepalives) while it runs, so it is bounded. */
@@ -49,6 +54,7 @@ export interface KernelInstallOptions {
 export async function installGeometryKernel(options: KernelInstallOptions = {}): Promise<boolean> {
   const env = options.env ?? process.env;
   const startNative = options.startNative ?? startNativeKernel;
+  warned = false;
   let fallbackReason: string | undefined;
   if (env['LLULL_KERNEL']?.trim().toLowerCase() !== 'manifold') {
     const native = startNative({ callTimeoutMs: occtCallTimeoutMs(env) }, env);

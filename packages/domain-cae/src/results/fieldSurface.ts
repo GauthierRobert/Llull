@@ -2,6 +2,7 @@
 
 import type { FeMeshArtifact } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
+import { sub3 } from '@lib/vec3';
 
 export type SkinTriangle = readonly [number, number, number];
 
@@ -56,17 +57,15 @@ function facesOfBlock(block: FeMeshArtifact['blocks'][number]): Face[] {
   return faces;
 }
 
-const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-
 /** Orders a corner triple so its normal points away from the element's opposite node (outward). */
 function outward(face: Face, at: (node: number) => Vec3 | undefined): readonly [number, number, number] | null {
   const [a, b, c] = face.corners.map(at);
   const d = at(face.opposite);
   if (a === undefined || b === undefined || c === undefined || d === undefined) return null;
-  const u = sub(b, a);
-  const v = sub(c, a);
+  const u = sub3(b, a);
+  const v = sub3(c, a);
   const normal: Vec3 = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
-  const toOpposite = sub(d, a);
+  const toOpposite = sub3(d, a);
   const side = normal[0] * toOpposite[0] + normal[1] * toOpposite[1] + normal[2] * toOpposite[2];
   return side > 0 ? [face.corners[0], face.corners[2], face.corners[1]] : face.corners;
 }

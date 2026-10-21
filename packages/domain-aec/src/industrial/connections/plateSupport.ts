@@ -1,6 +1,6 @@
 /** Base plate creation, refitting after member edits, and lookup of unplated columns. */
 
-import type { BasePlateElement, BuildingModel, SteelMemberElement } from '@core/model/building';
+import type { BasePlateElement, BuildingModel, SteelMemberElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import { fromMm } from '@core/model/units';
 import { elementsOf, appendElements, withElement, withoutElements } from '../../building/model';

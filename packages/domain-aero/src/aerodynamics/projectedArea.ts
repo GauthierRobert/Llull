@@ -6,6 +6,7 @@
 import type { Vec3 } from '@core/model/types';
 import type { Triangle } from '@core/geometry/triangles';
 import { tupleExtent } from '@lib/extent';
+import { cross3, dot3, sub3 } from '@lib/vec3';
 
 export interface ProjectedArea {
   readonly area: number;
@@ -20,17 +21,13 @@ export interface ProjectedArea {
   readonly cells: number;
 }
 
-const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-
 /** Orthonormal (u, v) spanning the plane normal to the unit `direction`. */
 function planeBasis(direction: Vec3): readonly [Vec3, Vec3] {
   const helper: Vec3 = Math.abs(direction[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
-  const u = cross(helper, direction);
+  const u = cross3(helper, direction);
   const lu = Math.hypot(...u);
   const unit: Vec3 = [u[0] / lu, u[1] / lu, u[2] / lu];
-  return [unit, cross(direction, unit)];
+  return [unit, cross3(direction, unit)];
 }
 
 /**
@@ -42,19 +39,19 @@ export function projectedArea(triangles: readonly Triangle[], rawDirection: Vec3
   const norm = Math.hypot(...rawDirection);
   const direction: Vec3 = [rawDirection[0] / norm, rawDirection[1] / norm, rawDirection[2] / norm];
   const [u, v] = planeBasis(direction);
-  const flat = (point: Vec3): readonly [number, number] => [dot(point, u), dot(point, v)];
+  const flat = (point: Vec3): readonly [number, number] => [dot3(point, u), dot3(point, v)];
   const projected = triangles.map(([p0, p1, p2]) => [flat(p0), flat(p1), flat(p2)] as const);
   const box = tupleExtent(
     projected.flatMap((triangle) => triangle.flatMap(([pu, pv]) => [pu, pv, 0])),
     3,
   );
   const along = tupleExtent(
-    triangles.flatMap((triangle) => triangle.map((point) => dot(point, direction))),
+    triangles.flatMap((triangle) => triangle.map((point) => dot3(point, direction))),
     1,
   );
   const [uMin, vMin] = box.min as [number, number];
   const [uMax, vMax] = box.max as [number, number];
-  const wettedArea = triangles.reduce((sum, [a, b, c]) => sum + Math.hypot(...cross(sub(b, a), sub(c, a))) / 2, 0);
+  const wettedArea = triangles.reduce((sum, [a, b, c]) => sum + Math.hypot(...cross3(sub3(b, a), sub3(c, a))) / 2, 0);
   const span = Math.max(uMax - uMin, vMax - vMin);
   const extents = [uMax - uMin, vMax - vMin] as const;
   const length = (along.max[0] as number) - (along.min[0] as number);

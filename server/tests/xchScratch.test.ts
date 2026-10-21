@@ -16,7 +16,7 @@ describeNative('scratch', () => {
     const componentId = Object.keys(created.document.components)[0] ?? '';
     const second = execute(created.document, 'insert_instance', { componentId, position: [50, 0, 0] });
     const ctx = { ...defaultContext(), kernel: kernels.occt };
-    const result = execute(second.document, 'export_step_exact', {}, ctx);
+    const result = execute(second.document, 'export_step_ap242', { schema: 'ap214', includeValidationProperties: false }, ctx);
     process.stdout.write(`\nSUMMARY ${result.summary}\n${JSON.stringify(result.error)}\n`);
     const step = (result.data as { step?: string } | undefined)?.step ?? '';
     process.stdout.write(
@@ -32,7 +32,7 @@ describeNative('scratch', () => {
     const [a, b] = d2.order;
     d2 = execute(d2, 'set_entity_name', { id: a, name: 'Bearing 1' }).document;
     d2 = execute(d2, 'group_entities', { ids: [a, b], name: 'Pump' }).document;
-    const r2 = execute(d2, 'export_step_exact', {}, ctx);
+    const r2 = execute(d2, 'export_step_ap242', { schema: 'ap214', includeValidationProperties: false }, ctx);
     const s2 = (r2.data as { step: string }).step;
     process.stdout.write(
       s2

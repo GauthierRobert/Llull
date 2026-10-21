@@ -1,5 +1,5 @@
 // Imported material libraries (08 §7): title, version, licence and export-marking badges, the records each one supplies. Selecting a
-// record opens it in the inspector. Read-only: import / remove stay commands (import_material_library, remove_material_library).
+// record opens it in the inspector. Read-only: import / remove stay commands (import_material_library, delete_material_library).
 
 import React from 'react';
 import { PanelSection } from '@ui/panels/PanelParts';

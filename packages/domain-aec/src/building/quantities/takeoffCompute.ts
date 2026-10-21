@@ -1,5 +1,5 @@
 import type { CadDocument } from '@core/model/types';
-import type { BuildingElement } from '@core/model/building';
+import type { BuildingElement } from '@aec/building/types';
 import { distance, polygonArea } from '@lib/polygon';
 import { distance3 } from '@lib/vec3';
 import { toMetres } from '@core/model/units';

@@ -22,8 +22,8 @@ import { connectivityItems } from '../../geometry/assemblyCheck/connectivity';
 import { type GeometryQueryEngine, meshBvhEngine, resolveGeometryQueries } from '../../geometry/geometryQueries';
 import { measureThickness } from '../../geometry/assemblyCheck/thickness';
 import { realiseJoint } from '../../geometry/assemblyCheck/jointRealisation';
-import { type PartScope, candidateIds, collectParts, scopedIds } from './assemblyParts';
-import { assemblyLinks, intentOf } from './assemblyGraph';
+import { type PartScope, candidateIds, collectParts, scopedIds } from '../../geometry/assemblyParts';
+import { assemblyLinks, intentOf } from '../../geometry/assemblyGraph';
 
 export interface AssemblyCheckParams extends PartScope {
   readonly clearanceMm?: number | undefined;
@@ -171,7 +171,7 @@ function staleReferenceItem(doc: CadDocument): CheckItem[] {
           'FPR_STALE_REFERENCE',
           'info',
           stale,
-          'These ids no longer exist: remove their intents with remove_interference_intent or release them with set_part_grounded.',
+          'These ids no longer exist: remove their intents with delete_interference_intent or release them with set_part_grounded.',
           { note: 'prototype intents / grounded parts refer to deleted entities; they were ignored' },
         ),
       ];

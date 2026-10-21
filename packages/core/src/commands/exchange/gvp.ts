@@ -11,7 +11,7 @@ import { noop, report } from '../noop';
 import { resolveMassProperties, type MassContext } from '../../geometry/resolveMassProperties';
 import { entityBoundsInDoc } from '../../geometry/bounds';
 import { expandInstance } from '../../geometry/instanceExpansion';
-import { exactOrMesh } from '../brep/kernelShape';
+import { exactOrMesh } from '../kernelShape';
 
 interface GvpItem {
   readonly id: string;
@@ -127,7 +127,7 @@ export const geometricValidationProperties = defineCommand({
     'Compute the CAx-IF geometric validation properties of 3D solids: volume, surface area, centre of volume (centroid) and bounding box, in document ' +
     'units (volume in units^3, area in units^2). These are the values export_step_ap242 embeds in a STEP file and verify_exchange_file compares with what ' +
     'a sender embedded. method says how each was integrated: brep (exact kernel B-rep), closed-form (analytic primitive) or mesh (triangles; less exact). ' +
-    'Instances are reported under assemblies (all their solids combined, world placement applied). Does not modify the document.',
+    'Use mass_properties for mass and inertia from a material density, measure_bounding_box for the bounding box alone. Instances are reported under assemblies (all their solids combined, world placement applied). Does not modify the document.',
   params: z.object({
     entityIds: z
       .array(z.string())

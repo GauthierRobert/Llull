@@ -18,7 +18,7 @@
     },
     {
       "command": "create_pipeline",
-      "params": { "service": "D", "sequence": "3001", "spec": "CS150", "dn": 50, "slope": { "value": 1, "unit": "percent" } },
+      "params": { "service": "D", "sequence": "3001", "spec": "CS150", "dn": 50 },
       "as": "line"
     },
     {

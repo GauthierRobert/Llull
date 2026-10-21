@@ -204,7 +204,7 @@ describe('modal results recording, report and mode plot', () => {
     expect(solved.rejected).not.toBe(true);
     expect(solved.summary).toContain('2 natural frequencies: 209.728, 1299.41 Hz');
     expect(caseIn(solved.document, bar.analysisId).results).toMatchObject({ frequenciesHz: [209.7284, 1299.41], loadCases: [] });
-    const reported = execute(solved.document, 'fea_report', { analysisId: bar.analysisId }, context);
+    const reported = execute(solved.document, 'analysis_report', { analysisId: bar.analysisId }, context);
     expect(reported.summary).toContain('209.728, 1299.41 Hz');
   });
 

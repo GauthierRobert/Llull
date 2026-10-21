@@ -1,7 +1,7 @@
 /** The TIN of a surface object, memoized on the (immutable) surface and point-group objects. */
 
 import type { Vec3 } from '@core/model/types';
-import type { CivilModel, PointGroupObject, SurfaceObject } from '@core/model/civil';
+import type { CivilModel, PointGroupObject, SurfaceObject } from '@aec/civil/types';
 import { buildTin, type Tin } from './tin';
 import { civilObject } from '../model';
 

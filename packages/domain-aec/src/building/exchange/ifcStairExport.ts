@@ -1,4 +1,4 @@
-import type { StairElement, StairShape } from '@core/model/building';
+import type { StairElement, StairShape } from '@aec/building/types';
 import { type StairBlock, blockCorners, stairBlocks, stairFlights } from '../geometry/stairGeometry';
 import { type Context, extrusion, ifcReal, ifcString, scaledPolygonProfile, shape } from './ifcStep';
 import type { Exported } from './ifcElementExport';

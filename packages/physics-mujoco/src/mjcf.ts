@@ -4,6 +4,8 @@
  * model has no geoms: no contacts, pure multibody dynamics. Loop-closing joints are `connect` equalities (a hinge outside the tree).
  */
 
+import { sub3 } from '@lib/vec3';
+import { escapeXml } from '@lib/escapeXml';
 import type { SimulationBody, SimulationLoop, SimulationModel, SimulationSpring } from '@core/dynamics/physicsEngine';
 import type { Vec3 } from '@core/model/vectors';
 
@@ -29,7 +31,7 @@ function springSites(springs: readonly SimulationSpring[], centers: ReadonlyMap<
     ] as const)
       sites.set(
         body,
-        `${sites.get(body) ?? ''}<site name="${attribute(springSiteName(spring.id, end))}" pos="${numbers(minus(point, centers.get(body) ?? ZERO))}"/>`,
+        `${sites.get(body) ?? ''}<site name="${escapeXml(springSiteName(spring.id, end))}" pos="${numbers(sub3(point, centers.get(body) ?? ZERO))}"/>`,
       );
   return sites;
 }
@@ -41,11 +43,6 @@ export const loopEqualityName = (loopId: string, index: number): string => `loop
 export const loopPinCount = (loop: SimulationLoop): number => (loop.kind === 'spherical' ? 1 : 2);
 
 const numbers = (values: readonly number[]): string => values.map((value) => String(value)).join(' ');
-
-const minus = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-
-/** Names are ids, escaped for an XML attribute. */
-const attribute = (value: string): string => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
 /** Pin points of a loop, world: the anchor, or for a revolute loop anchor ± axis · halfSpan. */
 function loopPins(loop: SimulationLoop): Vec3[] {
@@ -68,8 +65,8 @@ function loopXml(loop: SimulationLoop, centers: ReadonlyMap<string, Vec3>, model
   return loopPins(loop)
     .map(
       (pin, index) =>
-        `<connect name="${attribute(loopEqualityName(loop.id, index))}" body1="${attribute(loop.bodyA)}" body2="${attribute(loop.bodyB)}" ` +
-        `anchor="${numbers(minus(pin, reference))}" solref="${model.solver.loopTimeConstant} 1" solimp="${impedance} ${impedance} 0.001 0.5 2"/>`,
+        `<connect name="${escapeXml(loopEqualityName(loop.id, index))}" body1="${escapeXml(loop.bodyA)}" body2="${escapeXml(loop.bodyB)}" ` +
+        `anchor="${numbers(sub3(pin, reference))}" solref="${model.solver.loopTimeConstant} 1" solimp="${impedance} ${impedance} 0.001 0.5 2"/>`,
     )
     .join('');
 }
@@ -90,13 +87,13 @@ function bodyXml(
   const { joint } = body;
   const jointXml =
     joint !== null
-      ? `<joint name="${attribute(joint.id)}" type="${joint.kind === 'revolute' ? 'hinge' : 'slide'}" pos="${numbers(minus(joint.anchor, body.centerOfMass))}" axis="${numbers(joint.axis)}" damping="${joint.damping}" frictionloss="${joint.friction}"${joint.stiffness !== undefined && joint.stiffness > 0 ? ` stiffness="${joint.stiffness}" springref="${joint.springReference ?? 0}"` : ''}${joint.friction > 0 ? ` solreffriction="${2 * timestep} 1" solimpfriction="${FRICTION_IMPEDANCE}"` : ''}/>`
+      ? `<joint name="${escapeXml(joint.id)}" type="${joint.kind === 'revolute' ? 'hinge' : 'slide'}" pos="${numbers(sub3(joint.anchor, body.centerOfMass))}" axis="${numbers(joint.axis)}" damping="${joint.damping}" frictionloss="${joint.friction}"${joint.stiffness !== undefined && joint.stiffness > 0 ? ` stiffness="${joint.stiffness}" springref="${joint.springReference ?? 0}"` : ''}${joint.friction > 0 ? ` solreffriction="${2 * timestep} 1" solimpfriction="${FRICTION_IMPEDANCE}"` : ''}/>`
       : body.fixed
         ? ''
         : '<freejoint/>';
   const children = (childrenOf.get(body.id) ?? []).map((child) => bodyXml(child, body.centerOfMass, childrenOf, timestep, sites)).join('');
   return (
-    `<body name="${attribute(body.id)}" pos="${numbers(minus(body.centerOfMass, parentCenter))}">` +
+    `<body name="${escapeXml(body.id)}" pos="${numbers(sub3(body.centerOfMass, parentCenter))}">` +
     `<inertial pos="0 0 0" mass="${body.mass}" fullinertia="${numbers(body.inertia)}"/>${jointXml}${sites.get(body.id) ?? ''}${children}</body>`
   );
 }
@@ -129,21 +126,21 @@ export function toMjcf(model: SimulationModel, timestep: number): string {
   const tendons = springs
     .map(
       (spring) =>
-        `<spatial name="${attribute(springTendonName(spring.id))}" stiffness="${spring.stiffness}" damping="${spring.damping}" springlength="${spring.freeLength}">` +
-        `<site site="${attribute(springSiteName(spring.id, 'a'))}"/><site site="${attribute(springSiteName(spring.id, 'b'))}"/></spatial>`,
+        `<spatial name="${escapeXml(springTendonName(spring.id))}" stiffness="${spring.stiffness}" damping="${spring.damping}" springlength="${spring.freeLength}">` +
+        `<site site="${escapeXml(springSiteName(spring.id, 'a'))}"/><site site="${escapeXml(springSiteName(spring.id, 'b'))}"/></spatial>`,
     )
     .join('');
   const gears = model.gears
     .map(
       (gear) =>
-        `<joint name="${attribute(gear.id)}" joint1="${attribute(gear.driven)}" joint2="${attribute(gear.driver)}" polycoef="0 ${gear.ratio} 0 0 0" solref="${2 * timestep} 1" solimp="${GEAR_IMPEDANCE}"/>`,
+        `<joint name="${escapeXml(gear.id)}" joint1="${escapeXml(gear.driven)}" joint2="${escapeXml(gear.driver)}" polycoef="0 ${gear.ratio} 0 0 0" solref="${2 * timestep} 1" solimp="${GEAR_IMPEDANCE}"/>`,
     )
     .join('');
   const loops = model.loops.map((loop) => loopXml(loop, centers, model)).join('');
   const servos = model.servos
     .map(
       (servo) =>
-        `<intvelocity name="${attribute(servo.id)}" joint="${attribute(servo.joint)}" kp="${servo.stiffness}" kv="${servo.damping}" ` +
+        `<intvelocity name="${escapeXml(servo.id)}" joint="${escapeXml(servo.joint)}" kp="${servo.stiffness}" kv="${servo.damping}" ` +
         `actrange="-1e12 1e12" forcelimited="true" forcerange="${-servo.maxForce} ${servo.maxForce}"/>`,
     )
     .join('');

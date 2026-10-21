@@ -22,7 +22,7 @@ describe('heat balance and the trust check', () => {
     const wall = solvedWall();
     const ctx = { ...defaultContext(), feaArtifacts: wall.port };
     const older = withRecordedBalance(wall.solved, wall.analysisId, { residualRel: 0.5, inW: 1 });
-    const result = execute(older, 'thermal_report', { analysisId: wall.analysisId }, ctx);
+    const result = execute(older, 'analysis_report', { view: 'thermal', analysisId: wall.analysisId }, ctx);
     const data = result.data as { state: string; heatBalance: { residualRel: number } };
     expect(data.state).toBe('solved');
     expect(data.heatBalance.residualRel).toBeLessThan(1e-6);
@@ -48,6 +48,8 @@ describe('heat balance and the trust check', () => {
         },
       },
     };
-    expect((execute(tampered, 'thermal_report', { analysisId: wall.analysisId }, ctx).data as { state: string }).state).toBe('untrusted');
+    expect(
+      (execute(tampered, 'analysis_report', { view: 'thermal', analysisId: wall.analysisId }, ctx).data as { state: string }).state,
+    ).toBe('untrusted');
   });
 });

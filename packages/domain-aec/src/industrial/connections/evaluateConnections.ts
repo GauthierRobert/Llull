@@ -2,7 +2,7 @@
 
 import { planPoint } from '@lib/vec2';
 import type { CadDocument, CylinderEntity, Entity, Vec2, Vec3 } from '@core/model/types';
-import type { BasePlateElement, BuildingLevel, BuildingModel, MomentConnectionElement, SteelMemberElement } from '@core/model/building';
+import type { BasePlateElement, BuildingLevel, BuildingModel, MomentConnectionElement, SteelMemberElement } from '@aec/building/types';
 import { fromMm } from '@core/model/units';
 import { base, colorForMaterial, meshEntity, orientedBox } from '../../building/evaluate/entities';
 import { prismMesh, sweepFrame, type SweepFrame } from '../../shared/mesh';

@@ -22,8 +22,8 @@ import { refuseTmc } from './refusal';
 export const disposeFitResult = defineCommand({
   name: 'dispose_fit_result',
   description:
-    "HUMAN-ONLY. Record a qualified person's disposition (accepted, rejected, redesign) of one fit_at_temperature row, identified by its " +
-    'rowKey. It is recorded only when the signature verifies against the signing port; an agent without a human signature always gets ' +
+    "Record a qualified person's disposition (accepted, rejected, redesign) of one fit_at_temperature row, identified by its " +
+    'rowKey. HUMAN-ONLY. It is recorded only when the signature verifies against the signing port; an agent without a human signature always gets ' +
     'TMC_HUMAN_GATE and the document is unchanged, so do not retry: hand the row to the reviewer. inputsHash is the hash of the fit ' +
     'inputs the reviewer saw; pass currentInputsHash (hash of the recomputed inputs) so a changed fit is refused with TMC_FIT_INPUTS_CHANGED.',
   params: z.object({

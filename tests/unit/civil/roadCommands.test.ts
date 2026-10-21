@@ -16,7 +16,7 @@ import {
   type SpiralElement,
 } from '@aec/civil/alignment/alignmentGeometry';
 import { designElevation, grades, validateProfile, verticalCurves, verticalCurveStations } from '@aec/civil/alignment/profileGeometry';
-import type { AlignmentObject } from '@core/model/civil';
+import type { AlignmentObject } from '@aec/civil/types';
 import { clothoidLocal, spiralCurve } from '@aec/civil/alignment/alignmentSpiral';
 import { crossSlopesAt, superelevationRate, superelevationStations } from '@aec/civil/alignment/superelevation';
 import { crossSectionAt } from '@aec/civil/road/roadSection';
@@ -362,23 +362,27 @@ describe('long section and cross sections', () => {
         { station: 200, elevation: 100 },
       ],
     });
-    const result = execute(profile.document, 'export_long_section', { alignmentId: base.id });
+    const result = execute(profile.document, 'export_road_long_section', { alignmentId: base.id });
     const data = result.data as { text: string; fileName: string };
     expect(result.document).toBe(profile.document);
     expect(data.fileName).toBe('Alignment_1_long_section.svg');
     expect(data.text.startsWith('<svg')).toBe(true);
     for (const s of ['Long section - Alignment 1', 'VC L=60.0', '3.00%', 'Cut(-)/Fill(+)', '0+100.00']) expect(data.text).toContain(s);
-    const exaggerated = execute(profile.document, 'export_long_section', { alignmentId: base.id, verticalExaggeration: 1, interval: 100 });
+    const exaggerated = execute(profile.document, 'export_road_long_section', {
+      alignmentId: base.id,
+      verticalExaggeration: 1,
+      interval: 100,
+    });
     expect((exaggerated.data as { text: string }).text).toContain('vertical exaggeration x1');
     const noGround = execute(profile.document, 'update_alignment', { alignmentId: base.id, surfaceId: '' });
-    expect((execute(noGround.document, 'export_long_section', { alignmentId: base.id }).data as { text: string }).text).toContain(
+    expect((execute(noGround.document, 'export_road_long_section', { alignmentId: base.id }).data as { text: string }).text).toContain(
       '<polyline',
     );
   });
   it('refuses a long section without a profile or with bad inputs', () => {
     const { doc, id } = withAlignment(surveyedDocument(flat(100), 21, 20));
     for (const params of [{ alignmentId: id }, { alignmentId: 'nope' }, { alignmentId: id, verticalExaggeration: 0 }]) {
-      const result = execute(doc, 'export_long_section', params);
+      const result = execute(doc, 'export_road_long_section', params);
       expect(result.data).toBeUndefined();
     }
   });

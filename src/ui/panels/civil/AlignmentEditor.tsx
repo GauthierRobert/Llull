@@ -1,7 +1,7 @@
 // One road alignment: profile PVIs, road template, superelevation, deliverables (report CSV, long / cross SVG, sheet).
 
 import React, { useState } from 'react';
-import type { AlignmentObject } from '@core/model/civil';
+import type { AlignmentObject } from '@aec/index';
 import { PAPER_SIZES, type PaperSize } from '@core/model/sheet';
 import { useStore } from '@ui/store';
 import { OptionSelect } from '@ui/panels/OptionSelect';
@@ -125,7 +125,7 @@ export function AlignmentEditor({ alignment }: { alignment: AlignmentObject }): 
             />
             <QueryDownloadButton
               label="Long section SVG"
-              command="export_long_section"
+              command="export_road_long_section"
               params={params}
               field="text"
               fallbackName={`${alignment.id}-long-section.svg`}

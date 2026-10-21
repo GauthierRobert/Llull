@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
-import { createEmptyBuilding, type ProjectInfo } from '@core/model/building';
+import { createEmptyBuilding, type ProjectInfo } from '@aec/index';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { CommandForm } from '@ui/panels/CommandForm';
 import { LabeledInput } from '@ui/panels/LabeledInput';

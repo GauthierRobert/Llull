@@ -26,7 +26,7 @@ import type {
   SlabElement,
   StairElement,
   WallElement,
-} from '@core/model/building';
+} from '@aec/building/types';
 import { polygonCentroid, toCounterClockwise } from '@lib/polygon';
 import { fromMm } from '@core/model/units';
 import { planAreaM2 } from '../../shared/planArea';

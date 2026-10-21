@@ -83,7 +83,7 @@ if (known.length > 0) {
 lines.push(
   '## Cases',
   '',
-  'V = volume. Relative errors are |measured - expected| / expected. `STEP` is the export_step_exact / import_step_exact round trip (OCCT only).',
+  'V = volume. Relative errors are |measured - expected| / expected. `STEP` is the export_step_ap242 / import_step_exact round trip (OCCT only).',
   '',
   '| id | source | V expected | Manifold V | rel err | Manifold | OCCT V | rel err | OCCT | STEP |',
   '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',

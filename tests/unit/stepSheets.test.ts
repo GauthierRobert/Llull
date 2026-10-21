@@ -79,12 +79,12 @@ describe('stepTargets: surface sheets', () => {
   });
 });
 
-describe('export_step_exact: sheets', () => {
+describe('export_step_ap242: sheets', () => {
   it('writes the solids first, then the sheets the kernel builds, each a product named after its entity', () => {
     const { doc, sheet, box } = sheetAndBox();
     const named = execute(doc, 'set_entity_name', { id: sheet, name: 'Skin sheet' }).document;
     const kernel = sheetKernel(['box', 'nurbs_surface']);
-    const result = execute(named, 'export_step_exact', {}, { ...defaultContext(), kernel });
+    const result = execute(named, 'export_step_ap242', { includeValidationProperties: false }, { ...defaultContext(), kernel });
     const data = result.data as { sheetCount: number; solidCount: number; entityIds: string[]; skipped: string[]; step: string };
     expect(data).toMatchObject({ sheetCount: 1, solidCount: 1, skipped: [] });
     expect(data.entityIds).toEqual([box, sheet]);
@@ -93,15 +93,15 @@ describe('export_step_exact: sheets', () => {
     expect(data.step).toContain("PRODUCT('Skin sheet','Skin sheet','',(#21))");
     expect(result.summary).toContain('1 exact solid(s) and 1 surface sheet(s)');
     expect(result.affected).toEqual([]);
-    expectPure(named, () => execute(named, 'export_step_exact', {}, { ...defaultContext(), kernel }));
+    expectPure(named, () => execute(named, 'export_step_ap242', { includeValidationProperties: false }, { ...defaultContext(), kernel }));
   });
 
   it('writes a sheet alone', () => {
     const { doc, sheet } = sheetAndBox();
     const result = execute(
       doc,
-      'export_step_exact',
-      { entityIds: [sheet] },
+      'export_step_ap242',
+      { includeValidationProperties: false, entityIds: [sheet] },
       { ...defaultContext(), kernel: sheetKernel(['nurbs_surface']) },
     );
     expect((result.data as { sheetCount: number; solidCount: number }).sheetCount).toBe(1);
@@ -110,7 +110,12 @@ describe('export_step_exact: sheets', () => {
 
   it('skips a sheet the kernel cannot build and still writes the solids', () => {
     const { doc, sheet, box } = sheetAndBox();
-    const result = execute(doc, 'export_step_exact', {}, { ...defaultContext(), kernel: sheetKernel(['box']) });
+    const result = execute(
+      doc,
+      'export_step_ap242',
+      { includeValidationProperties: false },
+      { ...defaultContext(), kernel: sheetKernel(['box']) },
+    );
     const data = result.data as { sheetCount: number; entityIds: string[]; skipped: string[] };
     expect(data.sheetCount).toBe(0);
     expect(data.entityIds).toEqual([box]);
@@ -121,7 +126,12 @@ describe('export_step_exact: sheets', () => {
 
   it('is a no-op when the only selection is a sheet the kernel cannot build', () => {
     const { doc, sheet } = sheetAndBox();
-    const result = execute(doc, 'export_step_exact', { entityIds: [sheet] }, { ...defaultContext(), kernel: sheetKernel(['box']) });
+    const result = execute(
+      doc,
+      'export_step_ap242',
+      { includeValidationProperties: false, entityIds: [sheet] },
+      { ...defaultContext(), kernel: sheetKernel(['box']) },
+    );
     expect(result.document).toBe(doc);
     expect(result.affected).toEqual([]);
     expect(result.data).toBeUndefined();
@@ -134,7 +144,12 @@ describe('export_step_exact: sheets', () => {
     withInstance = execute(withInstance, 'place_instance', { componentName: 'Peg', position: [10, 0, 0] }).document;
     const kernel = sheetKernel(['box', 'nurbs_surface']);
     const assembly = { ...kernel, exportStepAssembly: () => 'ISO-10303-21;\nEND-ISO-10303-21;\n' };
-    const result = execute(withInstance, 'export_step_exact', {}, { ...defaultContext(), kernel: assembly });
+    const result = execute(
+      withInstance,
+      'export_step_ap242',
+      { includeValidationProperties: false },
+      { ...defaultContext(), kernel: assembly },
+    );
     expect(result.data, result.summary).toBeDefined();
     const data = result.data as { sheetCount: number; skipped: string[] };
     expect(data.sheetCount).toBe(0);

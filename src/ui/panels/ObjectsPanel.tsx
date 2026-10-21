@@ -125,16 +125,36 @@ const EntityRow = memo(function EntityRow({ entity, selected, nested }: { entity
   );
 });
 
-function GroupNode({
-  group,
+interface MemberRowLabels {
+  expand: string;
+  collapse: string;
+  selectAria: string;
+  selectTitle: (count: number) => string;
+  banner: (count: number) => string;
+  show: string;
+  hide: string;
+}
+
+/** Expandable header row (group or layer collection): select all members, toggle their viewport visibility, list members when open. */
+function CollapsibleMemberRow({
+  testId,
+  name,
+  lead,
   members,
   selection,
+  open,
+  onToggle,
+  labels,
 }: {
-  group: EntityGroup;
-  members: Entity[];
+  testId: string;
+  name: string;
+  lead: React.ReactNode;
+  members: readonly Entity[];
   selection: ReadonlySet<string>;
+  open: boolean;
+  onToggle: () => void;
+  labels: MemberRowLabels;
 }): React.ReactElement {
-  const [open, setOpen] = useState(false);
   const onSelect = useRowSelect();
   const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
   const toggleEntityVisibility = useViewportStore((s) => s.toggleEntityVisibility);
@@ -150,24 +170,24 @@ function GroupNode({
           allSelected && 'panel__row--selected',
           allHidden && 'object-row--hidden',
         )}
-        data-testid={`object-group-${group.id}`}
+        data-testid={testId}
       >
         <IconButton
           icon={open ? 'chevronDown' : 'chevronRight'}
           size={12}
           pressed={open}
-          label={open ? `Collapse group ${group.name}` : `Expand group ${group.name}`}
-          onClick={() => setOpen((value) => !value)}
+          label={open ? labels.collapse : labels.expand}
+          onClick={onToggle}
         />
         <button
           type="button"
           className="object-row__main"
-          aria-label={`Select group ${group.name}`}
-          title={`Group ${group.name} — select its ${memberIds.length} members`}
-          onClick={(event) => onSelect(event, memberIds, `Group ${group.name} — ${memberIds.length} members`)}
+          aria-label={labels.selectAria}
+          title={labels.selectTitle(memberIds.length)}
+          onClick={(event) => onSelect(event, memberIds, labels.banner(memberIds.length))}
         >
-          <Icon name="layers" size={14} />
-          <span className="object-row__name">{group.name}</span>
+          {lead}
+          <span className="object-row__name">{name}</span>
           <span className="panel__row-meta">{memberIds.length}</span>
         </button>
         <IconButton
@@ -175,12 +195,45 @@ function GroupNode({
           size={13}
           className={classNames('object-visibility-btn', allHidden && 'object-visibility-btn--hidden')}
           pressed={!allHidden}
-          label={allHidden ? `Show group ${group.name}` : `Hide group ${group.name}`}
+          label={allHidden ? labels.show : labels.hide}
           onClick={() => memberIds.filter((id) => hiddenEntityIds.has(id) === allHidden).forEach(toggleEntityVisibility)}
         />
       </li>
       {open && members.map((member) => <EntityRow key={member.id} entity={member} selected={selection.has(member.id)} nested />)}
     </>
+  );
+}
+
+function GroupNode({
+  group,
+  members,
+  selection,
+}: {
+  group: EntityGroup;
+  members: Entity[];
+  selection: ReadonlySet<string>;
+}): React.ReactElement {
+  const [open, setOpen] = useState(false);
+  const { name } = group;
+  return (
+    <CollapsibleMemberRow
+      testId={`object-group-${group.id}`}
+      name={name}
+      lead={<Icon name="layers" size={14} />}
+      members={members}
+      selection={selection}
+      open={open}
+      onToggle={() => setOpen((value) => !value)}
+      labels={{
+        expand: `Expand group ${name}`,
+        collapse: `Collapse group ${name}`,
+        selectAria: `Select group ${name}`,
+        selectTitle: (count) => `Group ${name} — select its ${count} members`,
+        banner: (count) => `Group ${name} — ${count} members`,
+        show: `Show group ${name}`,
+        hide: `Hide group ${name}`,
+      }}
+    />
   );
 }
 
@@ -221,53 +274,28 @@ function CollectionNode({
   selection: ReadonlySet<string>;
   onToggle: () => void;
 }): React.ReactElement {
-  const onSelect = useRowSelect();
-  const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
-  const toggleEntityVisibility = useViewportStore((s) => s.toggleEntityVisibility);
-  const memberIds = collection.members.map((member) => member.id);
-  const allHidden = memberIds.length > 0 && memberIds.every((id) => hiddenEntityIds.has(id));
-  const allSelected = memberIds.length > 0 && memberIds.every((id) => selection.has(id));
   const { name } = collection;
-
   return (
-    <>
-      <li
-        className={classNames(
-          'panel__row object-row object-group-row',
-          allSelected && 'panel__row--selected',
-          allHidden && 'object-row--hidden',
-        )}
-        data-testid={`object-collection-${collection.id}`}
-      >
-        <IconButton
-          icon={open ? 'chevronDown' : 'chevronRight'}
-          size={12}
-          pressed={open}
-          label={open ? `Collapse ${name}` : `Expand ${name}`}
-          onClick={onToggle}
-        />
-        <button
-          type="button"
-          className="object-row__main"
-          aria-label={`Select all in ${name}`}
-          title={`${name} — select its ${memberIds.length} objects`}
-          onClick={(event) => onSelect(event, memberIds, `${name} — ${memberIds.length} objects`)}
-        >
-          {collection.color !== undefined && <span className="object-swatch" style={{ background: collection.color }} aria-hidden="true" />}
-          <span className="object-row__name">{name}</span>
-          <span className="panel__row-meta">{memberIds.length}</span>
-        </button>
-        <IconButton
-          icon={allHidden ? 'eyeOff' : 'eye'}
-          size={13}
-          className={classNames('object-visibility-btn', allHidden && 'object-visibility-btn--hidden')}
-          pressed={!allHidden}
-          label={allHidden ? `Show ${name}` : `Hide ${name}`}
-          onClick={() => memberIds.filter((id) => hiddenEntityIds.has(id) === allHidden).forEach(toggleEntityVisibility)}
-        />
-      </li>
-      {open && collection.members.map((member) => <EntityRow key={member.id} entity={member} selected={selection.has(member.id)} nested />)}
-    </>
+    <CollapsibleMemberRow
+      testId={`object-collection-${collection.id}`}
+      name={name}
+      lead={
+        collection.color !== undefined && <span className="object-swatch" style={{ background: collection.color }} aria-hidden="true" />
+      }
+      members={collection.members}
+      selection={selection}
+      open={open}
+      onToggle={onToggle}
+      labels={{
+        expand: `Expand ${name}`,
+        collapse: `Collapse ${name}`,
+        selectAria: `Select all in ${name}`,
+        selectTitle: (count) => `${name} — select its ${count} objects`,
+        banner: (count) => `${name} — ${count} objects`,
+        show: `Show ${name}`,
+        hide: `Hide ${name}`,
+      }}
+    />
   );
 }
 

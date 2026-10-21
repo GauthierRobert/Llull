@@ -3,7 +3,7 @@
  * wing frame (x aft, y right, z up). Placement is affine, so it keeps NURBS curves exactly NURBS curves.
  */
 
-import type { WingSection, WingSegment } from '@core/model/aero';
+import type { WingSection, WingSegment } from '@aero/surfacing/types';
 import type { Vec3 } from '@core/model/types';
 import type { NurbsCurveData } from '@lib/nurbs/types';
 import { reverseCurve } from '@lib/nurbs/edit';

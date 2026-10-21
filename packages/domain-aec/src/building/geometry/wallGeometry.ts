@@ -1,5 +1,5 @@
 import type { Vec2 } from '@core/model/types';
-import type { BuildingModel, CurvedWallElement, OpeningElement, WallElement } from '@core/model/building';
+import type { BuildingModel, CurvedWallElement, OpeningElement, WallElement } from '@aec/building/types';
 import { projectOntoSegment, distance } from '@lib/polygon';
 import { arcOffsetOf, curvedWallExtent, tangentWall } from './curvedWallGeometry';
 import type { WallExtent } from './wallExtent';

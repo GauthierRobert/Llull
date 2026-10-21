@@ -1,16 +1,22 @@
-/** explicit_quick_check: closed-form explicit-dynamics estimates (TR-EXP-30…32, TR-EXP-20/21), identical to generate_explicit_reference.py. */
+/** hand_check, explicit part: closed-form explicit-dynamics estimates (TR-EXP-30…32, TR-EXP-20/21), identical to generate_explicit_reference.py. */
 
-import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
 import { refuseExplicit } from './codes';
 
-const CHECKS = ['wave_speed', 'critical_time_step', 'mass_scaling', 'bar_impact', 'johnson_cook_flow', 'johnson_cook_failure'] as const;
-type Check = (typeof CHECKS)[number];
+export const EXPLICIT_CHECKS = [
+  'wave_speed',
+  'critical_time_step',
+  'mass_scaling',
+  'bar_impact',
+  'johnson_cook_flow',
+  'johnson_cook_failure',
+] as const;
+export type ExplicitCheck = (typeof EXPLICIT_CHECKS)[number];
 
 /** Inputs each check needs (SI names of the validation pack). */
-const NEEDS: Readonly<Record<Check, readonly string[]>> = {
+const NEEDS: Readonly<Record<ExplicitCheck, readonly string[]>> = {
   wave_speed: ['E_Pa', 'nu', 'rho_kg_m3'],
   critical_time_step: ['E_Pa', 'nu', 'rho_kg_m3', 'L_e_m'],
   mass_scaling: ['E_Pa', 'nu', 'rho_kg_m3', 'L_e_m', 'dt_target_s'],
@@ -34,7 +40,7 @@ const dilatational = (inputs: Values): number => {
   return Math.sqrt((E * (1 - nu)) / ((1 + nu) * (1 - 2 * nu) * (inputs['rho_kg_m3'] ?? 1)));
 };
 
-function evaluate(check: Check, inputs: Values): Output {
+function evaluate(check: ExplicitCheck, inputs: Values): Output {
   const get = (key: string): number => inputs[key] ?? 0;
   switch (check) {
     case 'wave_speed':
@@ -95,41 +101,30 @@ function evaluate(check: Check, inputs: Values): Output {
  * @invariant read-only; identical to generate_explicit_reference.py (VC-EXP-10, 11, 12, 20, 21); inputs and outputs in SI with unit-suffixed keys
  * @failure a missing or non-finite input -> EXP_INPUT_MISSING (rejected no-op)
  */
-export const explicitQuickCheck = defineCommand({
-  name: 'explicit_quick_check',
-  annotations: { readOnly: true },
-  description:
-    'Closed-form explicit-dynamics estimates in SI: wave_speed (E_Pa, nu, rho_kg_m3 -> c0, cd), critical_time_step (+ L_e_m -> dt = L_e/cd), ' +
-    'mass_scaling (+ dt_target_s -> scaled density and added-mass ratio), bar_impact (E_Pa, rho_kg_m3, v_m_s, L_m, optional sigma_y_Pa -> wall ' +
-    'stress rho c0 v, two-bar stress, contact duration 2L/c0, yield velocity), johnson_cook_flow (A_Pa, B_Pa, n, C, m, eps_p, rate_per_s, ' +
-    'ref_rate_per_s, optional T_K, Tm_K, Tr_K; the rate term is clamped at the reference rate), johnson_cook_failure (D1..D5, triaxiality = mean ' +
-    'stress / von Mises, rate_per_s, ref_rate_per_s, optional temperatures). Returns the values, the formula and the inputs; screening only.',
-  params: z.object({
-    check: z.enum(CHECKS).describe('Which estimate.'),
-    inputs: z.record(z.string(), z.number()).describe('Named SI inputs (keys listed in the description).'),
-  }),
-  run: (doc: CadDocument, { check, inputs }): CommandResult => {
-    const missing = NEEDS[check].filter((key) => inputs[key] === undefined || !Number.isFinite(inputs[key]));
-    if (missing.length > 0)
-      return refuseExplicit(
-        doc,
-        'explicit_quick_check',
-        'EXP_INPUT_MISSING',
-        `${check} needs ${missing.join(', ')}`,
-        [],
-        missing.map((key) => `inputs.${key}`),
-      );
-    const { values, formula } = evaluate(check, inputs);
-    const text = Object.entries(values)
-      .map(([key, value]) => `${key} = ${value.toPrecision(12)}`)
-      .join(', ');
-    return report(doc, `explicit_quick_check ${check}: ${text}.`, {
-      check,
-      values,
-      formula,
-      inputs,
-      provenance: 'closed form, PHY-19 TECHNICAL_SPEC TR-EXP-20/21/30-32',
-      reviewRequired: true,
-    });
-  },
-});
+export function explicitHandCheck(
+  doc: CadDocument,
+  { check, inputs }: { check: ExplicitCheck; inputs: Readonly<Record<string, number>> },
+): CommandResult {
+  const missing = NEEDS[check].filter((key) => inputs[key] === undefined || !Number.isFinite(inputs[key]));
+  if (missing.length > 0)
+    return refuseExplicit(
+      doc,
+      'hand_check',
+      'EXP_INPUT_MISSING',
+      `${check} needs ${missing.join(', ')}`,
+      [],
+      missing.map((key) => `inputs.${key}`),
+    );
+  const { values, formula } = evaluate(check, inputs);
+  const text = Object.entries(values)
+    .map(([key, value]) => `${key} = ${value.toPrecision(12)}`)
+    .join(', ');
+  return report(doc, `hand_check ${check}: ${text}.`, {
+    check,
+    values,
+    formula,
+    inputs,
+    provenance: 'closed form, PHY-19 TECHNICAL_SPEC TR-EXP-20/21/30-32',
+    reviewRequired: true,
+  });
+}

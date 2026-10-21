@@ -3,7 +3,7 @@
  * loads (EN 1991-3). Lengths in mm.
  */
 import { toDegrees } from '@lib/angle';
-import type { SteelMemberElement } from '@core/model/building';
+import type { SteelMemberElement } from '@aec/building/types';
 import { FLAT_ROOF_LIMIT, frameRoofAverage } from '../common/windCoefficients';
 import { DOWNWIND_ROOF_FACTOR, type WindCase, CRANE_FACTORS, type FrameLoads, type NodeCaseLoad, craneActions } from './frameModelTypes';
 

@@ -1,7 +1,7 @@
 import { defineCommand, vec3, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
-import type { TieInPoint } from '@core/model/plant';
+import type { TieInPoint } from '@aec/plant/types';
 import type { Vec3 } from '@core/model/vectors';
 import { nextId } from '@lib/id';
 import { getPiping, refuse, withPiping } from '../model';

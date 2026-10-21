@@ -1,5 +1,6 @@
 import type { Vec2, Vec3 } from '@core/model/types';
 import { toCounterClockwise } from '@lib/polygon';
+import { quoteStepString } from '@lib/step21/encode';
 import { round } from '../../shared/numeric';
 
 const GUID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$';
@@ -23,18 +24,7 @@ export function ifcGuid(seed: string): string {
 }
 
 /** STEP string literal with IFC escapes (\X2\ for non-ASCII). */
-export function ifcString(text: string): string {
-  let out = '';
-  for (const character of text) {
-    const code = character.codePointAt(0) ?? 63;
-    if (character === "'") out += "''";
-    else if (character === '\\') out += '\\\\';
-    else if (code >= 32 && code < 127) out += character;
-    else if (code > 0xffff) out += `\\X4\\${code.toString(16).toUpperCase().padStart(8, '0')}\\X0\\`;
-    else out += `\\X2\\${code.toString(16).toUpperCase().padStart(4, '0')}\\X0\\`;
-  }
-  return `'${out}'`;
-}
+export const ifcString = quoteStepString;
 
 /** STEP REAL: always carries a decimal point. */
 export function ifcReal(value: number): string {

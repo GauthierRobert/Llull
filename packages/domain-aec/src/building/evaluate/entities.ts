@@ -1,7 +1,7 @@
 /** Entity factory shared by the building evaluators: standard layers, material colours and the common fields of every evaluated entity. */
 
 import type { BaseEntity, BoxEntity, MeshData, MeshSolidEntity, Vec3 } from '@core/model/types';
-import type { BimCategory, BuildingElement, MemberRole } from '@core/model/building';
+import type { BimCategory, BuildingElement, MemberRole } from '@aec/building/types';
 
 /** AIA / US National CAD Standard layer per category. */
 // prettier-ignore

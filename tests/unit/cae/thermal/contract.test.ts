@@ -60,14 +60,14 @@ function dependentStateAfterEdit(wall: ReturnType<typeof solvedWall>): string {
     },
   };
   const withStore = machineContext();
-  const before = (run(solved, 'fea_report', { analysisId: dependentId }, withStore).data as { state: string }).state;
+  const before = (run(solved, 'analysis_report', { analysisId: dependentId }, withStore).data as { state: string }).state;
   expect(before).toBe('solved');
   const edited = must(solved, 'update_thermal_bc', {
     analysisId: wall.analysisId,
     bcId: wall.hotId,
     filmCoefficient: { value: 60, unit: 'W/(m^2*K)' },
   }).document;
-  return (run(edited, 'fea_report', { analysisId: dependentId }, withStore).data as { state: string }).state;
+  return (run(edited, 'analysis_report', { analysisId: dependentId }, withStore).data as { state: string }).state;
 }
 
 interface Row {
@@ -114,7 +114,7 @@ describe('PHY-03 agent-first contract', () => {
       max: { value: 150, unit: 'degC' },
       source,
     });
-    const report = run(edited, 'thermal_report', { analysisId: wall.analysisId }).data as { state: string };
+    const report = run(edited, 'analysis_report', { view: 'thermal', analysisId: wall.analysisId }).data as { state: string };
     const limits = run(
       withLimit.document,
       'check_temperature_limits',
@@ -181,7 +181,7 @@ describe('PHY-03 agent-first contract', () => {
       limitId = added.affected[0] ?? '';
       return { doc: added.document };
     });
-    const report = run(wall.solved, 'thermal_report', { analysisId: wall.analysisId }).data as { unverified: boolean };
+    const report = run(wall.solved, 'analysis_report', { view: 'thermal', analysisId: wall.analysisId }).data as { unverified: boolean };
     const rows = rowsOf(
       run(wall.solved, 'check_temperature_limits', { analysisId: wall.analysisId }, { ...defaultContext(), feaArtifacts: wall.port }),
     );

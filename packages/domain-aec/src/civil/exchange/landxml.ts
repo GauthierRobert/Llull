@@ -5,7 +5,7 @@
 
 import { compactNumber, fixedNumber } from '@lib/compactNumber';
 import type { CadDocument } from '@core/model/types';
-import type { CivilModel, ManholeObject, PipeObject, PointGroupObject, SurfaceObject } from '@core/model/civil';
+import type { CivilModel, ManholeObject, PipeObject, PointGroupObject, SurfaceObject } from '@aec/civil/types';
 import { escapeXml } from '@lib/escapeXml';
 import { toMetres } from '@core/model/units';
 import { civilObjectsOf, getCivil } from '../model';

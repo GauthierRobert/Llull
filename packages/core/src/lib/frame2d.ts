@@ -3,6 +3,8 @@
  * uniformly distributed, global components per unit member length.
  */
 
+import { solveDense } from './denseLinalg';
+
 export interface FrameNode {
   readonly x: number;
   readonly y: number;
@@ -46,34 +48,9 @@ export interface FrameResult {
   readonly members: MemberResult[];
 }
 
-/** Gaussian elimination with partial pivoting; null when singular. */
+/** Gaussian elimination with partial pivoting, pivot tolerance 1e-10 of the largest entry; null when singular. */
 function solveLinear(matrix: number[][], rhs: number[]): number[] | null {
-  const n = rhs.length;
-  const a = matrix.map((row, index) => [...row, rhs[index] as number]);
-  const tolerance = 1e-10 * Math.max(...matrix.flat().map(Math.abs), 1e-300);
-  for (let column = 0; column < n; column++) {
-    let pivot = column;
-    for (let row = column + 1; row < n; row++) {
-      if (Math.abs((a[row] as number[])[column] as number) > Math.abs((a[pivot] as number[])[column] as number)) pivot = row;
-    }
-    const pivotRow = a[pivot] as number[];
-    if (Math.abs(pivotRow[column] as number) < tolerance) return null;
-    [a[column], a[pivot]] = [pivotRow, a[column] as number[]];
-    const current = a[column] as number[];
-    for (let row = column + 1; row < n; row++) {
-      const target = a[row] as number[];
-      const factor = (target[column] as number) / (current[column] as number);
-      for (let k = column; k <= n; k++) target[k] = (target[k] as number) - factor * (current[k] as number);
-    }
-  }
-  const x = new Array<number>(n).fill(0);
-  for (let row = n - 1; row >= 0; row--) {
-    const current = a[row] as number[];
-    let sum = current[n] as number;
-    for (let k = row + 1; k < n; k++) sum -= (current[k] as number) * (x[k] as number);
-    x[row] = sum / (current[row] as number);
-  }
-  return x;
+  return solveDense(matrix, rhs, 1e-10 * Math.max(...matrix.flat().map(Math.abs), 1e-300));
 }
 
 interface Local {

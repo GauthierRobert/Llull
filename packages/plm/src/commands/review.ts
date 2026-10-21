@@ -4,7 +4,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, noop } from '@core/commands/noop';
 import type { CadDocument } from '@core/model/types';
-import type { Iteration, PlmModel, Revision } from '@core/model/plm';
+import type { Iteration, PlmModel, Revision } from '@plm/types';
 import type { ExecutionContext } from '@core/commands/types';
 import { refusePlm } from '../refusal';
 import { NOT_MANAGED, currentRevisionOf, revisionText, scopeHash, stateChange } from '../state';
@@ -181,7 +181,7 @@ export const rejectReview = defineCommand({
 export const recordApproval = defineCommand({
   name: 'record_approval',
   description:
-    "HUMAN GATE. Record a role's approval of the in_review revision (roles: policy.requiredApprovalRoles, default design-authority and checker). One " +
+    "Record a role's approval of the in_review revision (roles: policy.requiredApprovalRoles, default design-authority and checker). HUMAN GATE. One " +
     'approval per (role, user). An agent caller gets PLM_HUMAN_GATE: hand over to the responsible person in the desktop app.',
   annotations: { metaHistory: true },
   params: z.object({

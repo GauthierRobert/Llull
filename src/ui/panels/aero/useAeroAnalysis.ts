@@ -1,4 +1,4 @@
-// The Aerodynamics panel's read-only queries (frontal_area, standard_atmosphere, aero_drag, analyze_airfoil) on the live document,
+// The Aerodynamics panel's read-only queries (frontal_area, standard_atmosphere, compute_aero_drag, analyze_airfoil) on the live document,
 // recomputed when the geometry, the selection of solids or an input changes. Nothing here writes to the document.
 
 import { useMemo } from 'react';
@@ -123,7 +123,7 @@ export function useBodyAnalysis(inputs: AeroInputs): BodyAnalysis {
     const areaSource =
       dragMode === 'cda' ? { cdA: coefficient } : frontal === null ? null : { cd: coefficient, referenceAreaM2: frontal.areaM2 };
     if (areaSource === null) return { ...base, problem: 'Select a solid (or tick All solids) to measure its frontal area.' };
-    const dragResult = execute(document, 'aero_drag', {
+    const dragResult = execute(document, 'compute_aero_drag', {
       speed,
       speedUnit,
       altitudeM: Number.isFinite(altitude) ? altitude : 0,

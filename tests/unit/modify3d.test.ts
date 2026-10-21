@@ -243,7 +243,7 @@ describe('modify3d commands', () => {
       const grouped = execute(doc, 'group_entities', { ids: [boxId, boxId2], name: 'Pair' });
       doc = grouped.document;
       const groupId = grouped.affected[0]!;
-      const result = execute(doc, 'fillet_edge', { id: boxId, distance: 0.1, radius: 0.1 });
+      const result = execute(doc, 'fillet_edge', { id: boxId, radius: 0.1 });
       expect(result.document.groups[groupId]).toBeUndefined();
     });
     it('chamfer_edge: keeps a group that retains >= 2 members', () => {

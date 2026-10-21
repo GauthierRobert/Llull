@@ -1,9 +1,10 @@
 /** Manufacturing BOM (M6, FR-PLM-28): the engineering BOM of a product baseline made buildable, frozen with a hash, and its difference from the EBOM. */
 
+import { nextFreeId } from '@lib/id';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, report } from '@core/commands/noop';
-import type { MbomLine, MbomOmission, MbomRecord } from '@core/model/plm';
+import type { MbomLine, MbomOmission, MbomRecord } from '@plm/types';
 import { PART_NUMBER } from '../document';
 import { atSchema, bySchema } from '../params';
 import { refusePlm } from '../refusal';
@@ -12,11 +13,7 @@ import { withPlm } from '../revisions';
 import { NOT_MANAGED } from '../state';
 import { membersHash } from '../structure';
 
-const nextMbomId = (ids: readonly string[]): string => {
-  let n = ids.length + 1;
-  while (ids.includes(`MBOM-${String(n).padStart(4, '0')}`)) n += 1;
-  return `MBOM-${String(n).padStart(4, '0')}`;
-};
+const nextMbomId = (ids: readonly string[]): string => nextFreeId('MBOM', (id) => ids.includes(id), { pad: 4, start: ids.length + 1 });
 
 const reasonSchema = z.string().describe('Why, non-empty: it is kept in the MBOM (e.g. "supplied as a kit", "design-only item").');
 
@@ -181,7 +178,7 @@ export const createMbom = defineCommand({
 export const manufacturingBom = defineCommand({
   name: 'manufacturing_bom',
   description:
-    'Read a manufacturing BOM made by create_mbom: data { id, name, baseline, lines, omitted, differences: { omitted, quantityChanged: [{ partNumber, ebom, mbom }], manufacturingOnly }, ' +
+    'Read a manufacturing BOM made by create_mbom (the as-built, sealed variant of the engineering_bom; not the building quantity_takeoff): data { id, name, baseline, lines, omitted, differences: { omitted, quantityChanged: [{ partNumber, ebom, mbom }], manufacturingOnly }, ' +
     'totalQuantity, sealOk }. Without id: the list of MBOM ids with their baseline and line count. Read-only.',
   annotations: { readOnly: true },
   params: z.object({ id: z.string().optional().describe('MBOM id; omitted = list every MBOM.') }),

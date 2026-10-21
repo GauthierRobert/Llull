@@ -20,7 +20,7 @@ const roundDeep = (value: unknown): unknown =>
 describe('thermal_report', () => {
   it('returns the numbers of a solved case with the heat balance, tolerance, review flag and no unverified input', () => {
     const wall = solvedWall();
-    const result = run(wall.solved, 'thermal_report', { analysisId: wall.analysisId });
+    const result = run(wall.solved, 'analysis_report', { view: 'thermal', analysisId: wall.analysisId });
     const data = result.data as {
       state: string;
       temperatureScale: string;
@@ -43,7 +43,7 @@ describe('thermal_report', () => {
     expect(data.physicalConstants).toBeNull();
     expect(data.reviewRequired).toBe(true);
     expect(result.summary).toContain('heat balance residual');
-    expectPure(wall.solved, () => run(wall.solved, 'thermal_report', { analysisId: wall.analysisId }));
+    expectPure(wall.solved, () => run(wall.solved, 'analysis_report', { view: 'thermal', analysisId: wall.analysisId }));
   });
 
   it('VC-THM-60: radiation cases name the physical constants (sigma, absolute zero) with source and defaulted', () => {
@@ -60,7 +60,7 @@ describe('thermal_report', () => {
     const mesh = twoTetMesh(fixture, { faceSets: { [`B_${rad.id}`]: [[1, 1]] } });
     const results = resultsFor(fixture, mesh, [{ time: 1, temperature: { 1: 100, 2: 100, 3: 100, 4: 100, 5: 100 } }]);
     const doc = recorded(fixture, mesh, results);
-    const data = run(doc, 'thermal_report', { analysisId: base.analysisId }).data as { physicalConstants: unknown };
+    const data = run(doc, 'analysis_report', { view: 'thermal', analysisId: base.analysisId }).data as { physicalConstants: unknown };
     expectCase(PACK, 'VC-THM-60', roundDeep({ physicalConstants: data.physicalConstants }) as never, '-');
   });
 
@@ -71,7 +71,7 @@ describe('thermal_report', () => {
       bcId: wall.hotId,
       filmCoefficient: { value: 60, unit: 'W/(m^2*K)' },
     }).document;
-    const stale = run(changed, 'thermal_report', { analysisId: wall.analysisId });
+    const stale = run(changed, 'analysis_report', { view: 'thermal', analysisId: wall.analysisId });
     const data = stale.data as Record<string, unknown>;
     expect(data['state']).toBe('stale');
     expect(data['maxT']).toBeUndefined();
@@ -84,15 +84,15 @@ describe('thermal_report', () => {
     const wall = solvedWall();
     const missing = run(
       wall.solved,
-      'thermal_report',
-      { analysisId: wall.analysisId },
+      'analysis_report',
+      { view: 'thermal', analysisId: wall.analysisId },
       { ...defaultContext(), feaArtifacts: { get: () => null } },
     );
     expect((missing.data as { state: string }).state).toBe('missing');
     const present = run(
       wall.solved,
-      'thermal_report',
-      { analysisId: wall.analysisId, timeS: 99, probes: [] },
+      'analysis_report',
+      { view: 'thermal', analysisId: wall.analysisId, timeS: 99, probes: [] },
       { ...defaultContext(), feaArtifacts: wall.port },
     );
     expect(present.data).toMatchObject({ state: 'solved', reportedTimeS: 0, probes: [] });
@@ -100,17 +100,17 @@ describe('thermal_report', () => {
 
   it('refuses unknown analyses and non-thermal cases', () => {
     const wall = solvedWall();
-    const ghost = run(wall.solved, 'thermal_report', { analysisId: 'ghost' });
+    const ghost = run(wall.solved, 'analysis_report', { view: 'thermal', analysisId: 'ghost' });
     expectNoOp(ghost, wall.solved);
     expect(ghost.error?.code).toBe('FEA_ANALYSIS_NOT_FOUND');
     const mechanical = must(wall.solved, 'create_analysis', { name: 's', analysisType: 'static' });
-    const refused = run(mechanical.document, 'thermal_report', { analysisId: mechanical.affected[0] });
+    const refused = run(mechanical.document, 'analysis_report', { view: 'thermal', analysisId: mechanical.affected[0] });
     expect(refused.error?.code).toBe('THM_CASE_TYPE');
   });
 
   it('VC-THM-63: an unverified conductivity flags the report and the check', () => {
     const wall = solvedWall({ basis: 'typical' });
-    const report = run(wall.solved, 'thermal_report', { analysisId: wall.analysisId }).data as {
+    const report = run(wall.solved, 'analysis_report', { view: 'thermal', analysisId: wall.analysisId }).data as {
       unverified: boolean;
       unverifiedReasons: string[];
     };

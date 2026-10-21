@@ -10,9 +10,10 @@ import type { Vec3 } from '@core/model/types';
 import { boundsExtent } from '@core/geometry/bounds';
 import { useAeroViewStore, type AeroAirfoilView, type AeroBodyView } from '@ui/store/aeroViewStore';
 import { useDisposable } from '../../useDisposable';
+import { ArrowShape } from '../ArrowShape';
 import { ProjectedLabel } from '../ProjectedLabel';
 import { formatArea } from '@ui/panels/aero/aeroData';
-import { formatSi } from '@ui/siText';
+import { formatSi } from '@lib/siText';
 import { AERO_COLORS, cpColor, dragArrowTip, flowFrame, silhouetteLoop, windArrows } from './aeroGeometry';
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -36,12 +37,7 @@ function Arrow({ origin, direction, length, radius, color, opacity }: ArrowProps
   const head = Math.min(length * 0.4, radius * 7);
   return (
     <group position={origin} quaternion={quaternion}>
-      <mesh material={material} position={[0, (length - head) / 2, 0]} renderOrder={RENDER_ORDER}>
-        <cylinderGeometry args={[radius, radius, length - head, 8]} />
-      </mesh>
-      <mesh material={material} position={[0, length - head / 2, 0]} renderOrder={RENDER_ORDER}>
-        <coneGeometry args={[radius * 3, head, 12]} />
-      </mesh>
+      <ArrowShape material={material} length={length} head={head} radius={radius} renderOrder={RENDER_ORDER} />
     </group>
   );
 }

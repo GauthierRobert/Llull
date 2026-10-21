@@ -1,6 +1,6 @@
 /** Equipment shapes (box, vertical vessel, horizontal vessel) and size normalisation. */
 
-import type { EquipmentElement, EquipmentShape } from '@core/model/building';
+import type { EquipmentElement, EquipmentShape } from '@aec/building/types';
 import type { Vec3 } from '@core/model/types';
 import { z } from '@core/commands/schema';
 import { toVec3 } from '../common/memberSupport';

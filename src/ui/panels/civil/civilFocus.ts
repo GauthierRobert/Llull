@@ -2,7 +2,7 @@
 // (alignment ends, manhole, pipe mid-point, every survey point of a group with its elevation, the high / low point of a surface, the
 // centre of a platform).
 
-import type { CivilModel, CivilObject } from '@core/model/civil';
+import type { CivilModel, CivilObject } from '@aec/index';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { toMetres } from '@core/model/units';
 import { boundsCenter, entityBoundsInDoc, mergeBounds, type Bounds } from '@core/geometry/bounds';

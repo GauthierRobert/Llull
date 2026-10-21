@@ -4,7 +4,7 @@
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
-import type { PlatformObject } from '@core/model/civil';
+import type { PlatformObject } from '@aec/civil/types';
 import type { CommandResult } from '@core/commands/types';
 import { commandCatalog, defineCommand, z, vec2 } from '@core/commands/schema';
 import { newNameParam } from '../commonParams';

@@ -3,7 +3,7 @@
  * cover into its skipped row.
  */
 
-import type { MemberRole } from '@core/model/building';
+import type { MemberRole } from '@aec/building/types';
 import type { SteelProfile } from '../../steel/profiles';
 import { round } from '../../shared/numeric';
 import { highestUtilisation } from '../common/utilisation';

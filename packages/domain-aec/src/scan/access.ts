@@ -1,6 +1,7 @@
 /** The common preamble of every scan query: the cloud reference, the installed port and the asset manifest, or the coded refusal. */
 
-import type { CloudManifest, CloudReference, PointCloudPort } from '@core/model/pointCloud';
+import type { CloudManifest, PointCloudPort } from '@core/model/pointCloud';
+import type { CloudReference } from '@aec/scan/types';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { refuseScan } from './codes';

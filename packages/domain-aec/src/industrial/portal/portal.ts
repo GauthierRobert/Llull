@@ -1,7 +1,7 @@
 /** Pre-engineered steel hall generator (portal frames) and crane runways. */
 import { toRadians } from '@lib/angle';
 import type { CadDocument, Vec2 } from '@core/model/types';
-import type { BuildingModel, SlabElement } from '@core/model/building';
+import type { BuildingModel, SlabElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, vec2, z } from '@core/commands/schema';
 import { fromMm, toMetres } from '@core/model/units';

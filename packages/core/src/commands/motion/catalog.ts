@@ -6,7 +6,7 @@ import { addJoint } from './addJoint';
 import { deleteJoint, setJointValue } from './jointsEdit';
 import { createContactSet, deleteContactSet } from './contactSets';
 import { driveJointTo } from './driveJoint';
-import { addDriveRelation, deleteDriveRelation, evaluateMotion, bakeMotion } from './jointsDrive';
+import { addDriveRelation, deleteDriveRelation, evaluateMotion } from './jointsDrive';
 import { motionStudy } from './motionStudy';
 
 export const motionCommands = commandCatalog(
@@ -18,7 +18,6 @@ export const motionCommands = commandCatalog(
   addDriveRelation,
   deleteDriveRelation,
   evaluateMotion,
-  bakeMotion,
   motionStudy,
   createContactSet,
   deleteContactSet,

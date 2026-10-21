@@ -2,7 +2,7 @@
  * explicit_run end to end with the real `llull-compute` (cargo build --profile compute -p llull-compute in solver/); skipped with a logged reason
  * when it is absent. VC-EXP-67 (bar plan): the 10 x 10 x 200 mm steel-like bar of exp_bar_rigid_wall at 10 m/s on a rigid wall, set up through
  * commands with a structured 2.5 mm hex mesh: wall force plateau rho c0 v A = 39 623 N and contact 2L/c0 = 79.2 us within the pack's 3 %
- * (VC-EXP-50), normal termination, energy error < 2 %, recorded through record_explicit_results and read back by explicit_report; two runs give the
+ * (VC-EXP-50), normal termination, energy error < 2 %, recorded through record_explicit_results and read back by analysis_report; two runs give the
  * same artifact hash (AF-13).
  */
 
@@ -83,7 +83,12 @@ describe('explicit_run with the real llull-compute', () => {
       expect(summary.artifactHash).toBe(first.hash);
       expect(Math.abs(summary.energy.errorMaxAbs)).toBeLessThan(0.02);
       expect(summary.walls['anvil']?.impulse).toBeGreaterThan(0);
-      const report = execute(first.doc, 'explicit_report', { analysisId: model.analysisId }, { ...defaultContext(), feaArtifacts: store });
+      const report = execute(
+        first.doc,
+        'analysis_report',
+        { analysisId: model.analysisId, view: 'explicit' },
+        { ...defaultContext(), feaArtifacts: store },
+      );
       expect((report.data as { state: string }).state).toBe('solved');
       const second = await solveOnce();
       expect(second.hash).toBe(first.hash);
@@ -202,7 +207,7 @@ describe('explicit_run with the real llull-compute', () => {
       const struck = box.affected[0] ?? '';
       let doc = must(box.document, 'assign_material', { materialName: 'steel_like', entityIds: [struck] }).document;
       doc = must(doc, 'set_part_idealization', { analysisId: model.analysisId, entityId: struck }).document;
-      doc = must(doc, 'delete_rigid_wall', { analysisId: model.analysisId, wallId: model.wallId }).document;
+      doc = must(doc, 'delete_analysis_item', { analysisId: model.analysisId, itemId: model.wallId }).document;
       const c0 = Math.sqrt(200_000 / 7.85e-9);
       const end = 0.5 / 10_000 + 200 / c0;
       doc = must(doc, 'set_explicit_controls', {
@@ -329,7 +334,7 @@ describe('explicit_run with the real llull-compute', () => {
     'a bar pulled by add_imposed_motion carries rho c0 v behind the front (RS-8, through commands and the job contract)',
     async () => {
       const model = barModel({ size: 2.5 });
-      let start = must(model.doc, 'delete_rigid_wall', { analysisId: model.analysisId, wallId: model.wallId }).document;
+      let start = must(model.doc, 'delete_analysis_item', { analysisId: model.analysisId, itemId: model.wallId }).document;
       start = must(start, 'set_initial_velocity', {
         analysisId: model.analysisId,
         entityId: model.barId,

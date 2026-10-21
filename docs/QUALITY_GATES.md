@@ -3,8 +3,8 @@
 `npm run check` proves the code is internally consistent. The quality gates prove the **app** does
 the right thing with **real CAD data it did not author**: third-party STEP files (OpenCascade,
 CadQuery, build123d, pythonocc, the FreeCAD parts library), plus synthetic STEP files built to hit
-known CAD failure modes, imported through the same path an MCP agent uses, then opened in the real
-browser app next to complex native 2D/3D documents.
+known CAD failure modes, imported through the same path the `llull` CLI uses, then opened in the app renderer next to complex native
+2D/3D documents (`quality:display` still drives it with browser Playwright: legacy, being retargeted to Electron, LC1).
 
 ```bash
 npm run quality:fetch     # download the pinned corpus → .cache/quality-corpus/ (sha256-verified)
@@ -135,7 +135,7 @@ match the bounding box (2D within 0.2 %, most 3D within 0.5 %). The open defects
 
 | # | defect | evidence | where |
 | - | ------ | -------- | ----- |
-| 1 | **Manifold kernel never loaded in the dev app**: pre-bundling moved `manifold-3d` away from its `.wasm`, which 404'd into `index.html`. Booleans and other kernel commands were unavailable in the browser. **Fixed** (`optimizeDeps.exclude`) | display `errors` | `vite.config.ts` |
+| 1 | **Manifold kernel never loaded in the dev app**: pre-bundling moved `manifold-3d` away from its `.wasm`, which 404'd into `index.html`. Booleans and other kernel commands were unavailable in the renderer. **Fixed** (`optimizeDeps.exclude`) | display `errors` | `vite.config.ts` |
 | 2 | **Large STEP files cannot be imported**: the bridge's JSON reply exceeds the 128 MB cap at ~0.8M triangles (full-precision floats, triangle soup, fixed 0.05 mm chord tolerance whatever the model size) | `kuka-kr600`, `rc-buggy-suspension`: `imports` | `server/python/llull_bridge.py`, `server/src/pythonExchange.ts` |
 | 3 | **STEP colours and part names are dropped**: `as1-oc-214` defines 5 colours and parts `bolt` / `nut` / `plate` / `rod`, and imports as grey `solid_1..18` (the tool description promises both) | `colors`, `part-names` | `llull_bridge.py` `_assembly_bodies` |
 | 4 | **"Fit all" frames entity positions, not geometry** (+ a fixed 3-unit guess) and always switches to iso. Imported parts (all at the origin) are not framed. **Fixed** — passes on the smoke tier | display `fit-all-button` | `src/ui/viewport/3d/ViewPresets.tsx` |
@@ -153,7 +153,7 @@ match the bounding box (2D within 0.2 %, most 3D within 0.5 %). The open defects
 What the complex cases **confirmed works**: inch → mm conversion, skew-rotated three-level nested
 assemblies (exact to the analytic corners), mirrored geometry, sealed cavities, 400 rotated
 instances, 100-hole thin plates, 0.5 mm parts, parts 1 000 km away, correctly encoded unicode names,
-and shell-only parts (the NEMA 17 screws). In the browser: no error on any of the 52 documents,
+and shell-only parts (the NEMA 17 screws). In the renderer: no error on any of the 52 documents,
 including 900 instances, 1 100-entity drawings and documents 2 000 km from the origin.
 
 CadQuery's own STEP writer double-encodes non-ASCII names (`Ã20 Welle`), and llull's

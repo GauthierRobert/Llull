@@ -2,7 +2,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { report } from '@core/commands/noop';
 import { toRadians } from '@lib/angle';
-import { FORMULAS, bendQuantities, dinToAnsiK, faaBendQuantities } from '@lib/sheetMath';
+import { FORMULAS, bendQuantities, dinToAnsiK, faaBendQuantities } from '../sheetMath';
 import type { FtrUnverifiedInput, Named } from '@core/model/manufacturing';
 import { findRadiusRow } from '../rules';
 import { getModel } from '../graph';

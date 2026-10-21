@@ -6,12 +6,12 @@
 
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
+import { sha256Hex } from '../sha256';
 import { execute } from '@core/commands/registry';
 import type { HumanSignaturePort } from '@core/model/analysis';
 import type { ObjectStorePort } from '@core/commands/types';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
-import type { SignatureRecord } from '@core/model/plm';
+import type { SignatureRecord } from '@plm/index';
 import { jcsJson } from '@lib/jcs';
 import { isRecord } from '@lib/isRecord';
 
@@ -26,7 +26,6 @@ interface PackageMember {
 
 type Manifest = Record<string, unknown>;
 
-const sha256 = (data: string | Buffer): string => createHash('sha256').update(data).digest('hex');
 const byteLength = (text: string): number => Buffer.byteLength(text, 'utf8');
 
 /** The fields of the release body a package manifest repeats; the signed body is rebuilt from them. */
@@ -105,7 +104,7 @@ export function buildReleasePackage(
       role: 'native-definition',
       mediaType: 'application/json',
       canonical: true,
-      sha256: sha256(snapshotJson),
+      sha256: sha256Hex(snapshotJson),
       bytes: byteLength(snapshotJson),
     },
   ];
@@ -125,14 +124,14 @@ export function buildReleasePackage(
       role: 'drawing',
       mediaType: 'image/svg+xml',
       canonical: false,
-      sha256: sha256(svg),
+      sha256: sha256Hex(svg),
       bytes: byteLength(svg),
     });
   }
   const bodyTool = isRecord(body['tool']) ? body['tool'] : {};
   const unsealed: Manifest = { ...body, tool: { ...bodyTool, version: toolVersion }, members, documentContentHash: revision.contentHash };
   const signatures = revision.signatures.filter((signature) => signature.target.kind === 'release' && signature.target.ref === label);
-  const manifest: Manifest = { ...unsealed, manifestSha256: sha256(jcsJson(unsealed)), signatures };
+  const manifest: Manifest = { ...unsealed, manifestSha256: sha256Hex(jcsJson(unsealed)), signatures };
   return { manifest, files, notes };
 }
 
@@ -205,7 +204,7 @@ export function verifyReleasePackage(
   for (const member of members) {
     const file = insideOf(root, String(member.path));
     const content = file !== null && existsSync(file) ? readFileSync(file) : null;
-    if (content === null || sha256(content) !== member.sha256 || content.length !== member.bytes)
+    if (content === null || sha256Hex(content) !== member.sha256 || content.length !== member.bytes)
       findings.push({
         code: 'PLM_PACKAGE_MEMBER_MISMATCH',
         message: `${member.path} is missing or differs from the manifest`,
@@ -219,7 +218,7 @@ export function verifyReleasePackage(
       message: 'documentContentHash is not the hash of the canonical definition member',
     });
   const { manifestSha256, signatures, ...unsealed } = manifest;
-  if (sha256(jcsJson(unsealed)) !== manifestSha256)
+  if (sha256Hex(jcsJson(unsealed)) !== manifestSha256)
     findings.push({ code: 'PLM_PACKAGE_MANIFEST_MISMATCH', message: 'manifestSha256 does not match the manifest content' });
   if (anchor === null)
     findings.push({
@@ -242,7 +241,10 @@ export function verifyReleasePackage(
     const signedBody = jcsJson(signedBodyOf(manifest, signature.meaning));
     if (port?.verifyEd25519 === undefined) {
       findings.push({ code: 'PLM_SIGNATURE_UNVERIFIED', message: `signature by ${signature.signer.userId} not verified: no verifier` });
-    } else if (sha256(signedBody) !== signature.signedSha256 || !port.verifyEd25519(signature.publicKey, signedBody, signature.signature)) {
+    } else if (
+      sha256Hex(signedBody) !== signature.signedSha256 ||
+      !port.verifyEd25519(signature.publicKey, signedBody, signature.signature)
+    ) {
       findings.push({
         code: 'PLM_SIGNATURE_INVALID',
         message: `signature by ${signature.signer.userId} (key ${signature.keyId}) does not verify`,

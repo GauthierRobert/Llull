@@ -11,7 +11,8 @@ import type { BooleanOp, ShapeRecipe } from '../../model/types';
 import { currentContext } from '../context';
 import type { ExecutionContext } from '../types';
 import { kernelUnavailable } from '../kernelRefusal';
-import { commitKernelResult, evaluateRecipe, operandRecipe } from './kernelShape';
+import { commitKernelResult, evaluateRecipe } from '../kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { noop } from '../noop';
 import { signedMeshVolume } from '../../geometry/meshVolume';
 

@@ -3,7 +3,8 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { erfc, normalCdf, uniformSumCdf } from '@lib/stackup';
+import { erfc, normalCdf } from '@lib/specialFunctions';
+import { uniformSumCdf } from '@lib/stackup';
 import { programFunction } from '@lib/expressionProgram';
 import { sampleStackup, STACKUP_CHUNK } from '@lib/stackupSampling';
 import reference from '../../../docs/aerospace/03-gdt-mbd-pmi/validation/stackup_reference.json';

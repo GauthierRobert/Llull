@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applied as run } from '../../helpers/runFixtures';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import type { BuildingElement, EquipmentElement, PipeElement } from '@core/model/building';
+import type { BuildingElement, EquipmentElement, PipeElement } from '@aec/building/types';
 import { buildPlanDrawing } from '@aec/building/drawings/planDrawing';
 import { outsideDiameterMm } from '@aec/industrial/piping/pipeSizes';
 import { buildingErrors } from '@aec/building/validate';
@@ -309,12 +309,12 @@ describe('columns on upper-floor plans', () => {
     const upper = twoLevel.building?.levelOrder[1] as string;
     expect(buildPlanDrawing(twoLevel, upper)!.primitives.some((p) => p.layer === 'S-COLS')).toBe(false);
   });
-  it('shows them in export_dxf and export_plan_sheet of the upper level', () => {
-    const dxf = (execute(doc, 'export_dxf', { levelId: second }).data as DxfExport).dxf;
+  it('shows them in export_building_dxf and export_plan_sheet of the upper level', () => {
+    const dxf = (execute(doc, 'export_building_dxf', { levelId: second }).data as DxfExport).dxf;
     expect(dxf).toContain('S-COLS');
     const sheet = (execute(doc, 'export_plan_sheet', { levelId: second }).data as PlanSheet).svg;
     expect(sheet).toContain('class="cut"');
-    const base = (execute(doc, 'export_dxf', { levelId: ground }).data as DxfExport).dxf;
+    const base = (execute(doc, 'export_building_dxf', { levelId: ground }).data as DxfExport).dxf;
     expect(base.length).toBeGreaterThan(dxf.length);
   });
   it('ignores a column whose home level is unknown', () => {

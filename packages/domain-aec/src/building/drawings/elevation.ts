@@ -10,15 +10,8 @@ import { noop, report, exportRefusal } from '@core/commands/noop';
 import { escapeXml } from '@lib/escapeXml';
 import { sub2 } from '@lib/vec2';
 import { ELEVATION_DIRECTIONS, buildElevationDrawing, type ElevationDirection } from './elevationProjection';
-import {
-  PAPER_FIELD,
-  SCALE_FIELD,
-  sheetFitWarning,
-  type Viewport,
-  composeSheetSvg,
-  fitScale,
-  sheetDrawingArea,
-} from '../../shared/sheetFrame';
+import { PAPER_FIELD, SCALE_FIELD, sheetFitWarning, type Viewport, composeSheetSvg, fitScale } from '../../shared/sheetFrame';
+import { sheetDrawingArea } from '@core/geometry/sheetLayout';
 import { PAPER_MM, type PaperSize } from '@core/model/sheet';
 
 export interface ElevationSheet {

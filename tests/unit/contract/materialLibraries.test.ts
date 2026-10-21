@@ -14,7 +14,7 @@ const NEW_COMMANDS = [
   'get_material_allowable',
   'convert_quantity',
   'import_material_library',
-  'remove_material_library',
+  'delete_material_library',
   'diff_material_libraries',
   'resolve_material_libraries',
   'set_export_marking',
@@ -47,7 +47,7 @@ describe('08 MAT M2 / M3 contract', () => {
     for (const name of ['get_material', 'get_material_allowable', 'convert_quantity', 'diff_material_libraries', 'check_materials'])
       expect(getCommand(name)?.annotations?.readOnly, name).toBe(true);
     expect(getCommand('resolve_material_libraries')?.annotations).toMatchObject({ session: true });
-    expect(getCommand('remove_material_library')?.annotations?.destructive).toBe(true);
+    expect(getCommand('delete_material_library')?.annotations?.destructive).toBe(true);
   });
 
   it('ctx.libraries is absent from the default context: no library provider is installed unless a host adds one', () => {

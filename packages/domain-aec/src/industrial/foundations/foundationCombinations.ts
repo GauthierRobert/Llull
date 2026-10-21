@@ -1,4 +1,4 @@
-import type { BasePlateElement, BuildingModel, FootingElement, SteelMemberElement } from '@core/model/building';
+import type { BasePlateElement, BuildingModel, FootingElement, SteelMemberElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import { toMetres } from '@core/model/units';
 import { elementsOf } from '../../building/model';

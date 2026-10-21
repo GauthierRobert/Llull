@@ -145,7 +145,11 @@ describe('update_platform', () => {
     const orphan = { ...doc, civil: { ...civil, objects: { ...civil.objects, 'surface-1': undefined as never } } };
     delete (orphan.civil.objects as Record<string, unknown>)['surface-1'];
     for (const name of ['update_platform', 'platform_earthworks', 'balance_platform']) {
-      const result = execute(orphan, name, { platformId: 'platform-1', elevation: 3 });
+      const result = execute(
+        orphan,
+        name,
+        name === 'update_platform' ? { platformId: 'platform-1', elevation: 3 } : { platformId: 'platform-1' },
+      );
       expect(result.affected).toEqual([]);
       expect(result.summary).toContain('no longer exists');
     }

@@ -1,8 +1,8 @@
 /** PHY-03: the reciprocity warning of compute_view_factors (a deliberately skewed exchange area stands in for a quadrature failure). */
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../../packages/core/src/lib/viewFactorContour', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../packages/core/src/lib/viewFactorContour')>();
+vi.mock('../../../../packages/domain-cae/src/thermal/viewFactorContour', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../packages/domain-cae/src/thermal/viewFactorContour')>();
   return {
     ...actual,
     exchangeArea: (from: Parameters<typeof actual.exchangeArea>[0], to: Parameters<typeof actual.exchangeArea>[1]): number =>
@@ -15,6 +15,9 @@ describe('compute_view_factors reciprocity', () => {
     vi.resetModules();
     const { execute } = await import('@core/commands/registry');
     const { createEmptyDocument } = await import('@core/model/types');
+    const { installPlugin } = await import('@core/plugins/host');
+    const { caePlugin } = await import('@cae/plugin');
+    installPlugin(caePlugin);
     const square = (z: number, flip: boolean): { name: string; vertices: [number, number, number][]; flip: boolean } => ({
       name: flip ? 'top' : 'bottom',
       vertices: [

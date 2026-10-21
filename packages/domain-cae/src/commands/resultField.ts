@@ -42,7 +42,7 @@ export const feaResultField = defineCommand({
       .array(z.number().int())
       .max(MAX_ROWS)
       .optional()
-      .describe('Mesh node ids to read (see describe_analysis / fea_report for positions). At most 500.'),
+      .describe('Mesh node ids to read (see describe_analysis / analysis_report for positions). At most 500.'),
     points: z
       .array(vec3('A point [x, y, z] in document units; the nearest mesh node is read.'))
       .max(MAX_ROWS)

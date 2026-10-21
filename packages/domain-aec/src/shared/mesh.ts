@@ -6,8 +6,7 @@
 import type { MeshData, Vec2, Vec3 } from '@core/model/types';
 import { triangulatePolygon } from '@lib/triangulate';
 import { toCounterClockwise } from '@lib/polygon';
-import { add3, cross3, dot3, scale3, sub3 } from '@lib/vec3';
-import { normalize } from './vec3';
+import { add3, cross3, dot3, normalize3OrZero, scale3, sub3 } from '@lib/vec3';
 
 /**
  * Builds the prism of `outer` minus `holes`. `place(point, side)` maps a local outline point to world space at the start (side 0) or end
@@ -61,7 +60,7 @@ export function sweepFrame(start: Vec3, end: Vec3, roll = 0): SweepFrame | null 
   if (length === 0) return null;
   const d = scale3(delta, 1 / length);
   const reference: Vec3 = Math.abs(d[2]) > 0.999 ? [1, 0, 0] : [0, 0, 1];
-  const up = normalize(add3(reference, scale3(d, -dot3(reference, d))));
+  const up = normalize3OrZero(add3(reference, scale3(d, -dot3(reference, d))));
   const side = cross3(up, d);
   const [cos, sin] = [Math.cos(roll), Math.sin(roll)];
   const u = add3(scale3(side, cos), scale3(up, -sin));

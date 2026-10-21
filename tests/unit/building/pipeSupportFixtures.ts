@@ -1,5 +1,5 @@
 import type { CadDocument } from '@core/model/types';
-import type { PipeSupportElement } from '@core/model/building';
+import type { PipeSupportElement } from '@aec/building/types';
 import { beamOnColumns, step } from './steelFixtures';
 import { xyz } from '../../helpers/xy';
 

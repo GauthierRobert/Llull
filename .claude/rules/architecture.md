@@ -8,15 +8,15 @@ Implementation detail loads on demand: `rules/commands.md` (packages/tests), `ru
 ## L1 — One command layer, two callers
 
 A command is a pure function `(doc, params, ctx?) => { document, summary, affected }` — the ONLY
-unit of change. UI: `store.dispatch(name, params)` → `POST /command` (online) or local `execute`
-(offline). CLI: agent (Claude Code, scripts) → `execute` in-process on a file, or the backend's `POST /command`. `execute(doc, name, params, ctx?)`
+unit of change. UI: `store.dispatch(name, params)` → `POST /command` (backend connected — the desktop app) or local `execute`
+(no backend). CLI: agent (Claude Code, scripts) → `execute` in-process on a file, or the backend's `POST /command`. `execute(doc, name, params, ctx?)`
 (`@core/commands/registry`) validates `params` against the zod schema first; invalid ⇒ unchanged
 doc, summary `<name> rejected: invalid params — <path>: …`. NEVER build a capability for one
 surface that bypasses a command.
 
 ## L2 — Dependency direction is one-way
 
-`src/ui`, `server/` → `src/app` → `packages/{protocol, domain-aec, domain-cae, domain-aero, kernel-*, physics-*}` → `packages/core`
+`src/ui`, `server/` → `src/app` → `packages/{protocol, domain-aec, domain-cae, domain-aero, domain-dynamics, design-lang, plm, kernel-*, physics-*}` → `packages/core`
 (`@lib` inside core). No package imports `src/ui`; `packages/core` imports no other package. No
 `packages/*/src` touches `react`, `window`, `document`, `fetch`, `localStorage`, or the DOM — put
 side effects in `src/ui/`, `server/`, or behind an injected interface. No import cycles (type-only included).
@@ -57,7 +57,7 @@ CLI (`server/src/cli`) is the agent caller of `execute`. There is no MCP server 
 2D shapes (`Shape2DKind`) and 3D solids (`SolidKind`) are both `Entity` kinds in ONE entity bag,
 distinguished by `kind` (`is2D`/`is3D`). A 2D shape is planar: local `Vec2` geometry, `position`
 places the plane (default z=0, +Z normal). The 2D⇄3D bridge is a command (`extrude_profile`,
-`extrude_profile`, `revolve_profile`) — sketch once, never duplicate geometry. The 2D view is
+`revolve_profile`, `sweep_profile`, `loft_sections`) — sketch once, never duplicate geometry. The 2D view is
 orthographic top-down over the same store: presentation, not a second model.
 
 ## L8 — Parametric: the document is a recipe
@@ -72,10 +72,13 @@ guards) and re-derived on load. Keep it incremental — do NOT break the `Comman
 three.js renders; it is NOT a CAD kernel. `GeometryKernel` (`@core/geometry/kernel`) is
 implemented by `packages/kernel-manifold` (in-process mesh kernel) and, for exact B-rep, by the native `llull-kernel` sidecar
 (`solver/`, OCCT 7.9, reached through `server/src/nativeKernel.ts`; no TS package, no WASM OCC). Commands read it
-ONLY from `ctx.kernel` and declare `annotations: { requiresKernel: true }`. The boundary is a SHAPE,
+ONLY from `ctx.kernel` and declare `annotations: { requiresKernel: true }` (no kernel ⇒ `execute` refuses,
+`commands/kernelRefusal.ts`). Kernel-OPTIONAL commands omit the annotation, read `ctx.kernel` when present for the exact
+path and fall back cleanly without it (mesh result, or a named refusal for the kernel-only branch); tag them `@invariant
+kernel-optional: …` and test both paths (e.g. `set_thread`; `add_rigid_body` via `geometry/resolveMassProperties.ts`: exact mass with a kernel, mesh integration without). The boundary is a SHAPE,
 not a mesh: commands pass a `ShapeRecipe` and get an opaque `ShapeHandle`; meshes only come OUT.
 Installing a kernel is the composition root's job, never a command's. Rigid-body physics follows the same pattern:
-`PhysicsEngine` (`@core/dynamics/physicsEngine`), read from `ctx.physics`, implemented by `packages/physics-mujoco`.
+`PhysicsEngine` (`@core/dynamics/physicsEngine`, the only dynamics code kept in core), read from `ctx.physics`, implemented by `packages/physics-mujoco`; the rigid-body commands, model and force laws live in the plugin `packages/domain-dynamics` (`@dynamics/*`).
 
 ## L10 — Domains are plugins
 
@@ -84,6 +87,8 @@ installed by `src/app/plugins.ts` `installDefaultPlugins()`. `packages/core` NEV
 A plugin sees core only through its public API (`model`, `lib`, `geometry`, `plugins/plugin`,
 `commands/{schema,types,noop,derivation,registry}`) and composes other commands via `execute`.
 New domain capability ⇒ a command in its plugin package, not in core.
+Hosts (`server/`, `desktop/`, `src/app`, `src/ui`) use a plugin package ONLY through its `src/index.ts` API (`@cae/index`, `@aec/index`, …):
+export there exactly what hosts need, never import plugin internals. Enforced by `npm run arch` (`hosts-use-plugins-through-their-index`); `tests/**` are exempt.
 
 ## Decision shortcuts
 

@@ -7,7 +7,7 @@ import { codedRejection } from '../noop';
 export const MATL_REMEDIATION: Readonly<Record<string, string>> = {
   MAT_RECORD_NOT_FOUND: 'create the material first with create_material (its name is the material id)',
   MAT_PROVENANCE_MISSING: 'give source.citation (and locator / url / accessed)',
-  MAT_PREFERRED_CONFLICT: 'drop preferred on one of them (remove_material_model or replace)',
+  MAT_PREFERRED_CONFLICT: 'drop preferred on one of them (delete_material_model or replace)',
   PROP_RANGE_INVALID: 'give data min ≤ max, equation ⊇ data, and a unit of the variable dimension (T in K, equivalentPlasticStrain in 1 …)',
   MATL_MODEL_NOT_FOUND: 'list the models of the material (describe_scene) or add the model first with add_material_model',
   MATL_MODEL_EXISTS: 'pass replace: true or a new id',

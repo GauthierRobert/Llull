@@ -77,3 +77,9 @@ export function finiteVec3OrZero(value: unknown, allowExtraComponents = false): 
   if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return [0, 0, 0];
   return [x as number, y as number, z as number];
 }
+
+/** Unit vector (`Math.hypot` length); the zero vector stays zero. */
+export function normalize3OrZero(a: Vec3): Vec3 {
+  const length = Math.hypot(a[0], a[1], a[2]) || 1;
+  return [a[0] / length, a[1] / length, a[2] / length];
+}

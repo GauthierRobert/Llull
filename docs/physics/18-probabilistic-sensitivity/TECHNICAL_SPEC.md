@@ -25,7 +25,7 @@ server/ (host)       run_reliability_study ✱ (V1: 05 mesh+solve per sample / D
         │ dispatch record_reliability_study (validated)
 packages/domain-physics/src (@phys) ── CadPlugin "probabilistic", toolset "analysis"
    probabilistic/commands/: define_random_variable, delete_random_variable, set_correlation, define_response,
-      define_limit_state, propagate_uncertainty, reliability_form, sensitivity_indices, parameter_sensitivity,
+      define_limit_state, propagate_uncertainty, run_reliability_study, sensitivity_indices, parameter_sensitivity,
       basis_tolerance_factor, describe_probabilistic_model, check_probabilistic, accept_reliability_result (human gate)
    probabilistic/evaluate.ts   sample → document overrides → response values (pure, uses execute + ctx.replayCache)
         ▼ public core API (L10)
@@ -150,7 +150,7 @@ Plugin `probabilistic`, toolset `analysis`. All analysis commands are `readOnly`
 | `define_limit_state` | mutating | `{ name, expression, unit, targetBeta?, targetPf? }` | @invariant expression parses (03/parametric grammar), every symbol is a variable or response · @failure `PRB_EXPRESSION_INVALID` |
 | `describe_probabilistic_model` | query | `{}` → variables with resolved distributions (incl. those derived from PHY-01 uncertainty), sources, flags | read-only |
 | `propagate_uncertainty` | query | `{ method?: 'mc'\|'lhs'\|'lhs_centred' (default 'lhs'), samples?: integer (default 10 000; cap 2e6 for expression-only, 2e4 when responses regenerate geometry), seed: integer, quantiles?: number[] }` → `PropagationData` | @invariant deterministic for (model, seed, samples, method) · @failure `PRB_BUDGET_EXCEEDED`, `PRB_MODEL_EMPTY` |
-| `reliability_form` | query | `{ limitState, sorm?: boolean, maxIterations?, tolerance? }` → `FormData` | @failure `PRB_FORM_NOT_CONVERGED` (data has last iterate), `PRB_SORM_INVALID` |
+| `run_reliability_study` | query | `{ limitState, sorm?: boolean, maxIterations?, tolerance? }` → `FormData` | @failure `PRB_FORM_NOT_CONVERGED` (data has last iterate), `PRB_SORM_INVALID` |
 | `sensitivity_indices` | query | `{ response \| limitState, samples: integer (N), seed: integer, bootstrap?: integer }` → `{ S: Record<name, {value, ci95}>, ST: …, variance, unit, evaluations }` | @failure budget |
 | `parameter_sensitivity` | query | `{ parameters: string[], response: string \| { command, params, pointer }, relativeStep? }` → `{ rows: [{ parameter, value, unit, derivative, derivativeUnit, elasticity, forward, backward, smooth }] }` | uses the feature history (TR-PRB-08/09) · @failure unknown parameter, response refused for a perturbed value → `PRB_RESPONSE_FAILED` |
 | `basis_tolerance_factor` | query | `{ n: integer ≥ 2, coverage: 0.90\|0.99\|number, confidence?: number (0.95) }` → `{ k, method: 'non-central t', note }` | never computes an allowable from data (08 MAT V3) |
@@ -323,7 +323,7 @@ density (Simpson, 8000 panels) and bisection; `validation/tolerance_factors.csv`
 | M | Content | Depends on | Effort |
 | - | ------- | ---------- | ------ |
 | M1 | `@lib` normal/distributions/LHS/FORM/SORM/Sobol/tolerance factor, unit tests (VC 01–05, 07–09) | 03 GDT `lib/prng.ts` | 2 w |
-| M2 | Plugin slice, set-up commands, `evaluate.ts`, `propagate_uncertainty`, `parameter_sensitivity`, `sensitivity_indices`, `reliability_form`, `check_probabilistic`, human gate (VC 06, 10–15) | M1, 09 signing port | 2.5 w |
+| M2 | Plugin slice, set-up commands, `evaluate.ts`, `propagate_uncertainty`, `parameter_sensitivity`, `sensitivity_indices`, `run_reliability_study`, `check_probabilistic`, human gate (VC 06, 10–15) | M1, 09 signing port | 2.5 w |
 | M3 | PHY-01 material binding (VC 17), 05 margin responses on fixed results | PHY-01 M2, 05 M3 | 1 w |
 | M4 (V1) | `run_reliability_study`, response surfaces, Nataf, importance sampling, Morris | M2, 05 transports | 3 w |
 

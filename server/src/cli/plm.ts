@@ -13,7 +13,7 @@ import type { CommandOutcome } from '@protocol/restProtocol';
 import { readDocumentFile } from '../documentFile';
 import { auditDir, verifyAuditChain } from '../plm/auditChain';
 import { createKeyStore } from '../plm/keyStore';
-import { isoSeconds } from '../plm/hostRun';
+import { isoSeconds } from '@protocol/hostParams';
 import { buildLotarPackage, verifyLotarPackage } from '../plm/lotarPackage';
 import { buildReleasePackage, verifyReleasePackage, writeReleasePackage } from '../plm/releasePackage';
 import { GATE_CONTEXT, createSignaturePort } from '../plm/signaturePort';

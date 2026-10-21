@@ -1,6 +1,6 @@
 ---
 name: verify-llull
-description: Run llull's full verification loop and confirm a change actually works. Use before declaring any non-trivial change done, when npm run check fails, or to validate viewport/UI behavior in the running app. Covers typecheck + lint + format + test + coverage gate + golden corpus, the server suite, and (for UI) driving the dev server with Playwright.
+description: Run llull's full verification loop and confirm a change actually works. Use before declaring any non-trivial change done, when npm run check fails, or to validate viewport/UI behavior in the running app. Covers typecheck + lint + format + test + coverage gate + golden corpus, the server suite, and (for UI) checking the change in the desktop app through `llull --app` + `render_view`.
 ---
 
 # Skill: verify-llull
@@ -10,9 +10,10 @@ green without running it. For deep coverage work, delegate to `test-verifier`.
 
 ## 1. Static + tests (always)
 ```bash
-npm run check          # typecheck + lint (max-lines 500, no allowlist) + format:check + test
+npm run check          # typecheck + arch + deadcode + lint (max-lines 500) + format:check + native:check (skipped without cargo) + test
 npm run test:coverage  # gate 90 stmts / 85 branch / 90 fn / 90 lines on
-                       # packages/core/src/commands/** and packages/domain-aec/src/**
+                       # packages/core/src/{commands,geometry,dynamics}/** and
+                       # packages/{domain-aec,domain-cae,domain-aero,domain-dynamics,design-lang,plm}/src/** (vite.config.ts)
 ```
 On a constrained machine (few cores / low memory) cap vitest workers:
 `npx vitest run --maxWorkers=2 --minWorkers=1` (also works with `--coverage`).
@@ -35,17 +36,20 @@ npm --prefix desktop test     # the desktop backend + CLI --app
 node server/bin/llull.cjs help && node server/bin/llull.cjs search box
 ```
 
-## 4. Live app (for UI / viewport / interaction changes)
-Start the dev server and drive it with Playwright (MCP browser tools):
+## 4. Desktop app (for UI / viewport / interaction changes)
+The UI ships only in the Electron app (no browser target). Run it, then drive and look at it from the shell:
 ```bash
-npm run dev            # renderer dev server http://localhost:5173 (run in background; Manifold kernel)
+npm --prefix desktop run build && npm --prefix desktop start   # background; after renderer edits: run build:web, restart
+node server/bin/llull.cjs status                                # finds the open app (~/.llull/desktop.json)
+node server/bin/llull.cjs --app exec <command> key=value …      # the window follows over /live
+node server/bin/llull.cjs --app exec render_view view=iso --save shot.png   # PNG of the live document; Read it
 ```
-- `browser_navigate` to the URL.
-- `browser_snapshot` + `browser_take_screenshot` to confirm render.
-- Exercise the actual interaction (click toolbar, drag gizmo, select) via
-  `browser_click` / `browser_drag`.
-- `browser_console_messages` — must be free of errors.
-- `npm run test:e2e` runs the Playwright suite (starts the dev server).
+- `render_view` is the deterministic reference raster of the document (views, `isolate`, `cut`, `showLabels`, `turntable`;
+  `llull describe render_view`), not a screenshot of the viewport. Viewport-only behaviour (gizmos, hover, selection
+  highlight, panels) is covered by `tests/component/` and by asking the user to look at the window; say which you did.
+- `llull crashes list` / `show latest` must show no new report from the run.
+- `npm run test:e2e` (browser Playwright on the Vite dev server) is LEGACY, being retargeted to Electron (LC1): run it if
+  it covers the change, never extend it.
 
 ## 5. AI / CLI changes
 Run the change through the CLI (`llull-cli` skill): `llull exec <tool> …` or `llull run plan.json` on a `--doc` file

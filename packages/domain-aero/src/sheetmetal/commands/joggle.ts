@@ -4,7 +4,7 @@ import { changed } from '@core/commands/noop';
 import type { Vec2 } from '@core/model/types';
 import type { SheetCutout, SheetNode } from '@core/model/sheetMetal';
 import { toRadians } from '@lib/angle';
-import { joggleQuantities, minJoggleOffset } from '@lib/sheetMath';
+import { joggleQuantities, minJoggleOffset } from '../sheetMath';
 import { withFoldedSolid } from '../fold';
 import { EPS, clipHalfPlane, isSimplePolygon, lineBasis, lineCrossings, sideOf, toLineFrame } from '../geometry2d';
 import { childBends, formsOf, nextNodeIds, parentBend, withModel, withNodes, withPart } from '../graph';

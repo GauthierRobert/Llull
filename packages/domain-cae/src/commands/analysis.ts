@@ -1,5 +1,6 @@
 /** create_analysis / delete_analysis / describe_analysis: the lifecycle of an analysis case. */
 
+import { round6 } from '@lib/compactNumber';
 import type { AnalysisCase, AnalysisType, FactorSet, ThermoMechSetup } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -78,7 +79,7 @@ function bandValid(band: { readonly min?: number | undefined; readonly max?: num
   return max === undefined || (Number.isFinite(max) && max > (min ?? 0));
 }
 
-const plain = (value: number): string => String(Math.round(value * 1e6) / 1e6);
+const plain = (value: number): string => String(round6(value));
 
 /**
  * @affects doc.analysis.cases (adds 1 case; affected: [analysisId])
@@ -97,7 +98,7 @@ export const createAnalysis = defineCommand({
     'temperature field; REQUIRES referenceTemperature, the stress-free temperature, no default) or coupled_temperature_displacement ' +
     '(steady-state heat conduction and thermal stress solved together: thermal boundary conditions with add_thermal_bc, mechanical ones with ' +
     'add_fea_constraint / add_fea_load, REQUIRES referenceTemperature; the temperature field is solved, not set), modal (free-vibration natural ' +
-    'frequencies and mode shapes with `modes`, optionally restricted to frequencyRangeHz; needs a material density, loads are ignored; constraints define the supports - a model without supports (free-free) is written with a lower frequency bound of -1 Hz in *FREQUENCY; how ccx treats that bound (it may read it as a shift sigma = (2 pi fmin)^2 rather than a limit below zero) is UNVERIFIED against a real ccx run, and has six rigid-body modes at about 0 Hz, flagged by check_analysis FEA_UNDERCONSTRAINED; results.frequenciesHz, fea_report data.eigen with mass participation) or buckling ' +
+    'frequencies and mode shapes with `modes`, optionally restricted to frequencyRangeHz; needs a material density, loads are ignored; constraints define the supports - a model without supports (free-free) is written with a lower frequency bound of -1 Hz in *FREQUENCY; how ccx treats that bound (it may read it as a shift sigma = (2 pi fmin)^2 rather than a limit below zero) is UNVERIFIED against a real ccx run, and has six rigid-body modes at about 0 Hz, flagged by check_analysis FEA_UNDERCONSTRAINED; results.frequenciesHz, analysis_report data.eigen with mass participation) or buckling ' +
     '(linear eigenvalue buckling of the FIRST load case as reference load, `modes` factors; the critical load is factor x the applied load; ' +
     'results.bucklingFactors; needs constraints and a load) or nonlinear_static (plasticity and/or large displacement with load or displacement steps: set it up with set_nonlinear_controls, set_part_constitutive_set, add_analysis_step and add_curve_probe; results.nonlinear) or frequency_response (harmonic steady-state response to loads or a base acceleration, CalculiX *STEADY STATE DYNAMICS over the modes) or random_response (response to a base acceleration ASD by modal superposition: rms, 3-sigma peaks, nodal rms field); both need modes or fMaxHz, then set_dynamic_damping, set_frequency_sweep and set_base_excitation (check_structural_dynamics lists what is missing). SAFETY FACTORS: without `factors`/`factor` the aerospace defaults apply ' +
     '(ultimate 1.5 per 14 CFR 25.303, yield 1.0) and the summary says so; when the user states a safety factor (e.g. "SF 2") pass `factor: 2` ' +

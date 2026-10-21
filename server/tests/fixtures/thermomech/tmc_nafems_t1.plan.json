@@ -169,6 +169,6 @@
   },
   {
     "command": "set_mesh_controls",
-    "params": { "analysisId": "$an", "mesher": "gmsh", "elementFamily": "tet", "order": 2, "globalSize": 0.2, "bonding": "conformal" }
+    "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 0.2, "bonding": "conformal" }
   }
 ]

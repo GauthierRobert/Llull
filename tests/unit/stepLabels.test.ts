@@ -95,7 +95,7 @@ describe('stepString', () => {
   });
 });
 
-describe('export_step_exact labels', () => {
+describe('export_step_ap242 labels', () => {
   it('stamps entity names, group names and colors on the kernel STEP', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'add_box', { size: [1, 1, 1], color: '#ff0000' }).document;
@@ -104,14 +104,14 @@ describe('export_step_exact labels', () => {
     doc = execute(doc, 'set_entity_name', { id: first, name: 'Housing' }).document;
     doc = execute(doc, 'group_entities', { ids: [first, second], name: 'Pump' }).document;
     const ctx = { ...defaultContext(), kernel: fakeKernel({ step: KERNEL_STEP }) };
-    const step = (execute(doc, 'export_step_exact', {}, ctx).data as { step: string }).step;
+    const step = (execute(doc, 'export_step_ap242', { includeValidationProperties: false }, ctx).data as { step: string }).step;
     expect(step).toContain("PRODUCT('Housing','Housing','Pump',(#8))");
     expect(step).toContain(`PRODUCT('${second}','${second}','Pump',(#356))`);
     expect(step.match(/COLOUR_RGB/g)).toHaveLength(2);
   });
 });
 
-describe('export_step_exact instance labels', () => {
+describe('export_step_ap242 instance labels', () => {
   it('names instance solids after the component names, never internal ids', () => {
     let doc = createEmptyDocument();
     for (const name of ['M6 bolt', 'Plate']) {
@@ -119,7 +119,7 @@ describe('export_step_exact instance labels', () => {
       doc = execute(box.document, 'create_component', { name, entityIds: box.affected }).document;
     }
     const ctx = { ...defaultContext(), kernel: fakeKernel({ step: KERNEL_STEP }) };
-    const step = (execute(doc, 'export_step_exact', {}, ctx).data as { step: string }).step;
+    const step = (execute(doc, 'export_step_ap242', { includeValidationProperties: false }, ctx).data as { step: string }).step;
     expect(step).toContain("PRODUCT('M6 bolt/M6 bolt','M6 bolt/M6 bolt'");
     expect(step).toContain("PRODUCT('Plate/Plate','Plate/Plate'");
     expect(step).not.toContain('expanded::');
@@ -132,7 +132,7 @@ describe('export_step_exact instance labels', () => {
     const componentId = Object.keys(doc.components)[0]!;
     doc = execute(doc, 'insert_instance', { componentId, position: [5, 0, 0] }).document;
     const ctx = { ...defaultContext(), kernel: fakeKernel({ step: KERNEL_STEP }) };
-    const step = (execute(doc, 'export_step_exact', {}, ctx).data as { step: string }).step;
+    const step = (execute(doc, 'export_step_ap242', { includeValidationProperties: false }, ctx).data as { step: string }).step;
     expect(step).toContain("PRODUCT('Tie rod M10 1/Tie rod M10',");
     expect(step).toContain("PRODUCT('Tie rod M10 2/Tie rod M10',");
   });

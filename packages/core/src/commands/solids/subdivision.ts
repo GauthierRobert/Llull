@@ -3,7 +3,7 @@
  * The cage is the definition; the smooth surface is derived (geometry/subdivision).
  */
 
-import { idOrNext } from '../entity/explicitId';
+import { idOrNext } from '../../lib/explicitId';
 import type { SubdivisionEntity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';

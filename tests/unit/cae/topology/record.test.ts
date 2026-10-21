@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { FeTopologyArtifact, TopologyResultSummary, TopologyStudy } from '@core/model/topology';
 import type { CadDocument } from '@core/model/types';
-import { buildTopologyArtifact, runTopologyReference, TS_REFERENCE_MAX_ELEMENTS } from '@cae/index';
+import { buildTopologyArtifact } from '@cae/index';
 import { fieldBytes } from '@cae/topology/artifact';
 import { artifactStore, code, contextWith, data, jobOf, mbbModel, solveAndRecord, studyOf, type Model } from './support';
 
@@ -69,12 +69,6 @@ describe('record_topology_result', () => {
     expect(studyOf(again.document, model.analysisId, model.studyId).derivedEntityId).toBe(derivedId);
     expect(again.document.entities[derivedId]).toEqual(first.document.entities[derivedId]);
     expect(again.document.order.filter((id) => id === derivedId)).toHaveLength(1);
-  });
-
-  it('two identical runs give the identical artifact hash (VC-TOP-27)', () => {
-    const second = solveAndRecord(model, artifactStore(), true);
-    expect(second.hash).toBe(solved.hash);
-    expect(second.result.summary).toBe(solved.result.summary);
   });
 
   it('accepts a summary equal to the recomputed one and rejects one that differs', () => {
@@ -257,12 +251,6 @@ describe('artifact helpers of the transport', () => {
     expect(buildTopologyArtifact(job, fieldBytes(new Float32Array(1200).fill(Number.NaN)), output, 'topopt')).toMatch(/bytes of float32/);
     const ok = buildTopologyArtifact(job, fieldBytes(new Float32Array(1200).fill(1 + 1e-7)), output, 'topopt');
     expect(typeof ok).toBe('object');
-  });
-
-  it('runTopologyReference refuses 3D jobs, large grids and singular systems', () => {
-    expect(runTopologyReference({ ...job, dimension: 3, grid: { ...job.grid, dimension: 3, nz: 2 } })).toMatch(/2D studies only/);
-    expect(runTopologyReference({ ...job, grid: { ...job.grid, nx: 60, ny: 40 } })).toContain(`cap of ${TS_REFERENCE_MAX_ELEMENTS}`);
-    expect(runTopologyReference({ ...job, fixedDofs: [] })).toMatch(/singular/);
   });
 });
 

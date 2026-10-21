@@ -228,7 +228,9 @@ describe('dispose_thermal_limit (human gate)', () => {
     const row = (after.data as Data).rows.find((entry) => entry.rowId === rowId);
     expect(row?.disposition).toMatchObject({ decision: 'accepted', signer: 'alice' });
     expect((after.data as Data).items.map((item) => item.code)).not.toContain('THM_DISPOSITION_PENDING');
-    expect(run(result.document, 'thermal_report', { analysisId: wall.analysisId }).data).toMatchObject({ state: 'solved' });
+    expect(run(result.document, 'analysis_report', { view: 'thermal', analysisId: wall.analysisId }).data).toMatchObject({
+      state: 'solved',
+    });
     // a disposition made on other results is pending again
     const rebound = {
       ...result.document,

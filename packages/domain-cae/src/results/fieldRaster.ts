@@ -14,6 +14,7 @@ import { uint8ArrayToBase64 } from '@lib/base64';
 import { resultColor } from '@lib/isoBands';
 import { encodePng } from '@lib/png';
 import type { FieldFace } from './fieldFaces';
+import { cross3, dot3, sub3 } from '@lib/vec3';
 
 interface PixelRect {
   readonly left: number;
@@ -26,7 +27,7 @@ export interface RasterInput {
   readonly faces: readonly FieldFace[];
   /** Draw a faint silhouette of the undeformed faces where nothing else shows. */
   readonly ghost: boolean;
-  /** Unit vector from the part toward the viewer: depth = dot(point, toViewer), larger = nearer. */
+  /** Unit vector from the part toward the viewer: depth = dot3(point, toViewer), larger = nearer. */
   readonly toViewer: Vec3;
   /** Logical pixel of a plotted point. */
   readonly screen: (p: Vec3) => readonly [number, number];
@@ -89,14 +90,8 @@ const CREASE_COS = Math.cos((30 * Math.PI) / 180);
 const GHOST = [154, 154, 184] as const;
 const GHOST_ALPHA = 0.3;
 
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-
 function unitNormal(a: Vec3, b: Vec3, c: Vec3): Vec3 {
-  const [u, v]: [Vec3, Vec3] = [
-    [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
-    [c[0] - a[0], c[1] - a[1], c[2] - a[2]],
-  ];
-  const n: Vec3 = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+  const n = cross3(sub3(b, a), sub3(c, a));
   const length = Math.hypot(n[0], n[1], n[2]);
   return length > 0 ? [n[0] / length, n[1] / length, n[2] / length] : [0, 0, 0];
 }
@@ -154,13 +149,13 @@ export function prepareRaster(input: RasterInput): PreparedRaster {
     const [a, b, c] = face.corners;
     if (input.ghost && !face.cap) ghostTriangles.push(...xy(a.u), ...xy(b.u), ...xy(c.u));
     const normal = unitNormal(a.p, b.p, c.p);
-    const facing = dot(normal, toViewer);
+    const facing = dot3(normal, toViewer);
     if (facing <= 0) continue;
     light.push(0.62 + 0.38 * facing);
     normals.push(...normal);
     caps.push(face.cap ? 1 : 0);
     owners.push(ownerIds.get(face.entityId) ?? ownerIds.set(face.entityId, ownerIds.size).size - 1);
-    for (const corner of [a, b, c]) triangles.push(...xy(corner.p), dot(corner.p, toViewer), corner.v);
+    for (const corner of [a, b, c]) triangles.push(...xy(corner.p), dot3(corner.p, toViewer), corner.v);
   }
   const bands = Math.max(1, input.levels.length - 1);
   const [low, high] = [input.levels[0] ?? 0, input.levels.at(-1) ?? 1];
@@ -283,7 +278,7 @@ export function finishRaster(input: RasterInput, prepared: PreparedRaster, pixel
     const [sx, sy] = input.screen(point);
     const [ix, iy] = [Math.floor(sx * samples), Math.floor(sy * samples)];
     if (ix < 0 || iy < 0 || ix >= w || iy >= h) return false;
-    const z = dot(point, input.toViewer);
+    const z = dot3(point, input.toViewer);
     const tolerance = (4 / (input.pixelsPerUnit * samples)) * Math.max(1, samples) + input.size * 0.002;
     for (let dy = -1; dy <= 1; dy += 1)
       for (let dx = -1; dx <= 1; dx += 1) {

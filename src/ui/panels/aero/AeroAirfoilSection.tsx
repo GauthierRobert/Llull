@@ -162,12 +162,18 @@ export function AeroAirfoilSection({
         {entityId === null ? (
           <div className="aero__pair">
             <LabeledInput label="NACA" type="text" value={naca} placeholder="2412" testId="aero-naca" onChange={onNaca} />
-            {getCommand('draw_naca_airfoil') !== undefined && (
+            {getCommand('airfoil_from_naca') !== undefined && (
               <button
                 type="button"
                 className="btn btn--sm btn--ghost"
                 disabled={view === null}
-                onClick={() => dispatch('draw_naca_airfoil', { naca: naca.trim(), chord: 1 }, { selectAffected: true })}
+                onClick={() =>
+                  dispatch(
+                    'airfoil_from_naca',
+                    { designation: naca.trim(), trailingEdge: 'closed', points: 121, as: 'polyline' },
+                    { selectAffected: true },
+                  )
+                }
                 title="Draw this section (chord 1 document unit) so it can be shown on the model"
               >
                 Draw it

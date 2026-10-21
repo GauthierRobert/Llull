@@ -1,7 +1,7 @@
 /** Builders of PLM records: a fresh revision and the plm slice updates the commands share. */
 
 import type { CadDocument } from '@core/model/types';
-import type { ManagedItem, PlmModel, Revision } from '@core/model/plm';
+import type { ManagedItem, PlmModel, Revision } from '@plm/types';
 import { stateChange } from './state';
 
 /** A new in_work revision at iteration 1 with the definition hash `contentHash`. */

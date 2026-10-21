@@ -1,7 +1,7 @@
 /** Grid geometry shared by the grid-framing commands. */
 
 import type { Vec2 } from '@core/model/types';
-import type { BuildingModel, GridElement } from '@core/model/building';
+import type { BuildingModel, GridElement } from '@aec/building/types';
 import { elementsOf } from '../../building/model';
 import { distance } from '@lib/polygon';
 

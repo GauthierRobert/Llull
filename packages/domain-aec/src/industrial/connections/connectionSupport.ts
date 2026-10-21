@@ -1,6 +1,6 @@
 /** Moment-connection joint discovery, creation and stale-joint removal. */
 
-import type { BuildingModel, MomentConnectionElement, SteelMemberElement } from '@core/model/building';
+import type { BuildingModel, MomentConnectionElement, SteelMemberElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import { fromMm } from '@core/model/units';
 import { elementsOf, appendElements, withoutElements, levelElementsOf } from '../../building/model';

@@ -5,7 +5,7 @@ import { arcThrough, curvedWallBand, curvedWallLength } from '@aec/building/geom
 import { buildPlanDrawing } from '@aec/building/drawings/planDrawing';
 import { buildingErrors } from '@aec/building/validate';
 import { serializeDocument } from '@core/commands/persistence/serialization';
-import type { CurvedWallElement } from '@core/model/building';
+import type { CurvedWallElement } from '@aec/building/types';
 import type { TakeoffLine } from '@aec/building/quantities/takeoffBasics';
 import type { IfcExport } from '@aec/building/exchange/ifcBuild';
 import type { DxfExport } from '@aec/building/exchange/dxfExport';
@@ -81,7 +81,7 @@ describe('add_curved_wall', () => {
     const plan = buildPlanDrawing(doc, undefined)!;
     const cut = plan.primitives.find((p) => p.type === 'polygon' && p.layer === 'A-WALL');
     expect(cut?.type === 'polygon' && cut.fill).toBe('hatch');
-    expect((execute(doc, 'export_dxf', {}).data as DxfExport).layers).toContain('A-WALL-PATT');
+    expect((execute(doc, 'export_building_dxf', {}).data as DxfExport).layers).toContain('A-WALL-PATT');
     expect((execute(doc, 'export_ifc', {}).data as IfcExport).ifc).toMatch(/IFCWALL\('[^']+',\$,'W1'/);
     doc = execute(doc, 'add_pipe_run', { points: xyz(0, 0, 1000, 0, 8000, 1000) }).document;
     const clashes = (execute(doc, 'check_clashes', {}).data as { clashes: Clash[] }).clashes;

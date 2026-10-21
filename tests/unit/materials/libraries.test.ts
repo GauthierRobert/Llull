@@ -195,17 +195,17 @@ describe('import_material_library', () => {
   });
 });
 
-describe('remove_material_library', () => {
+describe('delete_material_library', () => {
   it('removes the library and its records, refuses while a record is assigned, and refuses an unknown id', () => {
     const imported = step(mmDocument(), 'import_material_library', { library: libraryFile() });
-    const removed = call(imported, 'remove_material_library', { libraryId: 'synthetic-lib' });
+    const removed = call(imported, 'delete_material_library', { libraryId: 'synthetic-lib' });
     expect(removed.document.materials['aa7075_t6']).toBeUndefined();
     expect(removed.document.materialLibraries).toBeUndefined();
     expect(removed.summary).toContain('removed 1 record(s)');
-    expect(call(imported, 'remove_material_library', { libraryId: 'ghost' }).error?.code).toBe('MAT_RECORD_NOT_FOUND');
+    expect(call(imported, 'delete_material_library', { libraryId: 'ghost' }).error?.code).toBe('MAT_RECORD_NOT_FOUND');
     const box = call(imported, 'add_box', { size: [1, 1, 1] });
     const used = step(box.document, 'assign_material', { materialName: 'aa7075_t6', entityIds: [box.affected[0] ?? ''] });
-    const refused = call(used, 'remove_material_library', { libraryId: 'synthetic-lib' });
+    const refused = call(used, 'delete_material_library', { libraryId: 'synthetic-lib' });
     expect(refused.error).toMatchObject({ code: 'MAT_RECORD_IN_USE', ids: [box.affected[0]] });
     expect(refused.document).toBe(used);
   });
@@ -213,7 +213,7 @@ describe('remove_material_library', () => {
   it('keeps the other libraries', () => {
     let doc = step(mmDocument(), 'import_material_library', { library: libraryFile() });
     doc = step(doc, 'import_material_library', { library: libraryFile({ id: 'second', materialId: 'second_m' }) });
-    const removed = call(doc, 'remove_material_library', { libraryId: 'synthetic-lib' });
+    const removed = call(doc, 'delete_material_library', { libraryId: 'synthetic-lib' });
     expect(Object.keys(removed.document.materialLibraries ?? {})).toEqual(['second']);
     expect(Object.keys(removed.document.materials)).toEqual(['second_m']);
   });
@@ -221,7 +221,7 @@ describe('remove_material_library', () => {
   it('is pure', () => {
     const doc = step(mmDocument(), 'import_material_library', { library: libraryFile() });
     const before = JSON.stringify(doc);
-    call(doc, 'remove_material_library', { libraryId: 'synthetic-lib' });
+    call(doc, 'delete_material_library', { libraryId: 'synthetic-lib' });
     expect(JSON.stringify(doc)).toBe(before);
   });
 });

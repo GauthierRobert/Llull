@@ -46,7 +46,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'blend two edges with a gap between them and a regular (non-pole) surface along them; use check_continuity if they already touch',
   SRF_BLEND_FOLD:
     'choose the edges that face each other (each sheet must leave its edge towards the other one), or flip / reorder the sheets',
-  SRF_TRIM_RANGE: 'give u and v intervals [from, to] inside the surface domain (see inspect_surface)',
+  SRF_TRIM_RANGE: 'give u and v intervals [from, to] inside the surface domain (see inspect_nurbs)',
   SRF_SEW_NOT_MERGEABLE: 'the surfaces must share one whole edge within `tolerance`; fill or move the edges, or raise `tolerance`',
   SRF_SEW_FREE_EDGES: 'raise tolerance within the model accuracy, or fill / blend the gap first; the message says where the free edges are',
   SRF_SEW_NONMANIFOLD: 'sew only sheets where each edge is shared by at most two of them',

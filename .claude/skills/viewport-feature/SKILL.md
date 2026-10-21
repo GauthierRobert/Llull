@@ -29,11 +29,12 @@ the `add-command` skill first — do not edit entities in a component.
 3. Wire interactions (toolbar, gizmo drag, click-select) to `dispatch`.
 4. r3f/drei declaratively; map `CameraState` (target/azimuth/polar/distance) to
    `<OrbitControls>`. Memoize geometry/materials; dispose on unmount; no per-frame allocs.
-5. Verify in the running app with the `verify-llull` skill (Playwright): load the page,
-   exercise the interaction, screenshot, confirm a clean console.
+5. Verify in the desktop app with the `verify-llull` skill §4: drive the change through `llull --app`,
+   `render_view … --save shot.png` for the geometry, component tests / the user for viewport-only
+   behaviour, no new `llull crashes` report.
 6. `npm run check` green (component tests cover panels/param-gathering, not geometry math).
 
 ## Done checklist
 - [ ] Renders every entity `kind` from the store; selection/camera/layers consistent
 - [ ] All document changes go through `dispatch` (no inline entity edits)
-- [ ] Verified visually in `npm run dev`; console clean; checks green
+- [ ] Verified in the desktop app (`verify-llull` §4); no new crash report; checks green

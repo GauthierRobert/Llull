@@ -7,8 +7,8 @@ import { appendFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect } from 'vitest';
-import { judgeCase, type Measured } from '@core/commands/vnv/judge';
-import type { JsonValue } from '@core/commands/vnv/expected';
+import { judgeCase, type Measured } from '@cae/vnv/judge';
+import type { JsonValue } from '@cae/vnv/expected';
 import { isRecord } from '@lib/isRecord';
 import { EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 import { FEA_TOOL_ENV } from './feaTestSupport';
@@ -98,7 +98,7 @@ export class Session {
   }
 
   async probes(analysisId: string, maxNodeDistance = 1e-6): Promise<Record<string, number>> {
-    const { code, json } = await this.cli('fea_report', `analysisId=${analysisId}`);
+    const { code, json } = await this.cli('analysis_report', `analysisId=${analysisId}`);
     expect(code, String(json['summary'])).toBe(EXIT_OK);
     const list = dataOf(json)['probes'];
     const found: Record<string, number> = {};

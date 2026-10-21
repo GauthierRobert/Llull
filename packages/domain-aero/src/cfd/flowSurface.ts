@@ -8,7 +8,7 @@ import { soupIndices } from '@core/geometry/meshVolume';
 import { buildMeshBvh, bvhIntersects, type MeshBvh } from '@core/geometry/meshBvh';
 import { recipeOf } from '@core/geometry/shapeRecipe';
 import { is3D, type CadDocument, type Entity, type ShapeRecipe, type Vec3 } from '@core/model/types';
-import type { CfdCase } from '@core/model/cfd';
+import type { CfdCase } from '@aero/cfd/types';
 
 /** One solid of the flow body: a plain 3D entity (instances are expanded), with the case entity it comes from. */
 export interface Leaf {

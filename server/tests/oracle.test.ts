@@ -1,7 +1,7 @@
 /**
  * Oracle reference parts (SC-Q1) on the native OCCT kernel: the same plans and analytic expectations as tests/oracle, with the tight
  * tolerances (exact B-rep: volume/area 1e-3 relative, centroid/bbox 1e-3 of the size, no mesh envelope) and a STEP round trip
- * (export_step_exact then import_step_exact, compared again). Skipped when the llull-kernel binary is not built.
+ * (export_step_ap242 then import_step_exact, compared again). Skipped when the llull-kernel binary is not built.
  */
 
 import { afterAll, beforeAll, expect, it } from 'vitest';

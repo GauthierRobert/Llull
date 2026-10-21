@@ -45,9 +45,9 @@ src/ui (explicit panel, energy chart, eps_p overlay)      server/ (transports: e
 src/app  installDefaultPlugins() + physics explicit plugin
         ▼
 packages/domain-physics/src (@phys) ── CadPlugin "physics-explicit", toolset "analysis"
-   explicit/commands/   set_explicit_controls, set_initial_velocity, add_rigid_wall, delete_rigid_wall, add_imposed_motion,
-                        add_contact (V1), add_time_history, record_explicit_results, explicit_quick_check,
-                        explicit_report, explicit_energy_check, check_explicit
+   explicit/commands/   set_explicit_controls, set_initial_velocity, add_rigid_wall, delete_analysis_item, add_imposed_motion,
+                        add_contact (V1), add_time_history, record_explicit_results, hand_check,
+                        analysis_report, explicit_energy_check, check_explicit
    explicit/decks/      radStarterWriter.ts, radEngineWriter.ts, kWriter.ts (COULD)       (pure: model + mesh → text)
    explicit/results/    listingReader.ts, thCsvReader.ts, vtkLegacyReader.ts, energy.ts  (pure)
    explicit/quick.ts    wave speeds, CFL, mass scaling, bar impact, Taylor, J-C, scenarios (mirrors the generator)
@@ -92,7 +92,7 @@ the cases it covers; the hand-off stays the MVP path and the cross-check (§2.2)
 | TR-EXP-51 | MUST | Each run artifact records `ToolRecord` (name, version / tag, executable sha256, licence, source URL) and the deck sha256; `record_explicit_results` refuses an artifact whose deck sha256 ≠ the current export (`EXP_RESULTS_FOREIGN`) and stores it review-only. |
 | TR-EXP-60 | MUST | Agent-first contract: unit-suffixed fields, `provenance`, `unverified` (OR of law / EOS flags and grade-B sources), `reviewRequired: true`, `certificationEvidence: false`, named defaults with `source` + `defaulted`. |
 | TR-EXP-61 | SHOULD | Scenario rows (failed elements per part, penetration flag, health-check fails) register as a 05 margin provider (criterion `impact_damage`, `run_health`) so `dispose_margin` / `check_analysis` handle them. |
-| TR-EXP-70 | SHOULD (V1) | RS1 RS-8: `FeSolver` gains **`llull_explicit`**. The `explicit_run` transport, when the case selects it, writes a job folder (mesh artifact, `ExplicitSpec`, laws, ICs / BCs) and runs `llull-compute explicit <job-folder>` (crate `llull-explicit`) instead of OpenCourant. Output is the same artifact shape as the hand-off (energies, histories, fields, termination, `ToolRecord` with the `llull-compute` version), so `energy.ts`, `explicit_report`, `explicit_energy_check` and `record_explicit_results` are reused unchanged. |
+| TR-EXP-70 | SHOULD (V1) | RS1 RS-8: `FeSolver` gains **`llull_explicit`**. The `explicit_run` transport, when the case selects it, writes a job folder (mesh artifact, `ExplicitSpec`, laws, ICs / BCs) and runs `llull-compute explicit <job-folder>` (crate `llull-explicit`) instead of OpenCourant. Output is the same artifact shape as the hand-off (energies, histories, fields, termination, `ToolRecord` with the `llull-compute` version), so `energy.ts`, `analysis_report`, `explicit_energy_check` and `record_explicit_results` are reused unchanged. |
 | TR-EXP-71 | SHOULD (V1) | `llull-explicit` core: central-difference time integration, lumped (row-sum) mass, stable time step from the element characteristic length with a named safety factor, 8-node hexahedron with one-point integration and hourglass control, 4-node tetrahedron, elastic and J–C strength (PHY-02, same view as TR-EXP-20), J–C failure with element erosion (TR-EXP-21), planar rigid walls, initial velocity, gravity, imposed velocity, mass scaling as TR-EXP-31. Element formulations and hourglass form are pinned from published references before coding (§11 Q10). |
 | TR-EXP-72 | SHOULD (V2) | Contact in `llull-explicit`: penalty node-to-surface and self contact, broad phase on the shared `llull-bvh`, friction; shells with J–C. |
 | TR-EXP-73 | SHOULD (V1) | Device and determinism (RS1 §2 rule 3): wgpu kernels for element forces and the nodal update, with a Rust-CPU twin for every kernel; nodal force assembly and energy sums use a fixed order, so a recorded run is bit-reproducible on one device and driver; a GPU run without that guarantee says `deterministic: false` and cannot feed dispositions. |
@@ -191,14 +191,14 @@ Plugin `physics-explicit`, toolset `analysis`. ✱ = transport (05 pattern, not 
 | (05) `create_analysis` | mutating (extended) | `analysisType: 'explicit_dynamics'`, `solver: 'opencourant' \| 'ls_dyna'` | @invariant explicit needs one of these solvers → else `EXP_SOLVER_UNSUPPORTED` |
 | `set_explicit_controls` | mutating | `{ analysisId, endTime: {value, unit}, animationInterval, historyInterval, precision?='double', minTimeStep?, timeStepScale?: {value, source}, massScaling?: {mode, targetTimeStep?, maxAddedMassRatio?}, gravity?: {vector, unit} }` | @affects case.explicit · @invariant intervals ≤ end time; selective mass scaling requires `maxAddedMassRatio` · @failure `EXP_CASE_TYPE`, `EXP_TIME_INVALID`, `EXP_MASS_SCALING_LIMIT_MISSING` |
 | `set_initial_velocity` | mutating | `{ analysisId, entityId, velocity: {vector, unit} }` | @affects explicit.initialVelocities · @failure part not in the case → `EXP_TARGET_NOT_IN_CASE` |
-| `add_rigid_wall` / `delete_rigid_wall` | mutating | `{ analysisId, name, point, normal, friction?=0, moving?: {velocity, mass} }` | @failure zero normal → `EXP_RIGID_WALL_INVALID` |
+| `add_rigid_wall` / `delete_analysis_item` | mutating | `{ analysisId, name, point, normal, friction?=0, moving?: {velocity, mass} }` | @failure zero normal → `EXP_RIGID_WALL_INVALID` |
 | `add_imposed_motion` | mutating | `{ analysisId, name, target: FeaTarget, dof, curve: [[tS, value]...], unit }` | @failure non-monotonic time → `EXP_CURVE_INVALID` |
 | `add_contact` (V1) | mutating | `{ analysisId, name, kind, master?, slave, friction?=0 }` | @failure unresolved targets (05 codes) |
 | `add_time_history` | mutating | `{ analysisId, name, kind: 'node'\|'part'\|'rigid_wall', target, quantities[] }` | bounded to 32 per case |
 | `set_explicit_scenario` | mutating | `{ analysisId, kind: 'bird_strike'\|'drop_test', … }` (all inputs with `source`) | @invariant bird mass from rule id or explicit; speed and height always explicit · @failure `EXP_SCENARIO_INPUT_MISSING` |
 | `record_explicit_results` | mutating (validated, 05 §4.1 trust model) | `{ analysisId, summary: ExplicitResultsSummary }` | @invariant artifact exists in the store, sha256 matches, summary recomputed equal, deck sha256 = current export · @failure `EXP_RESULTS_FOREIGN` (review-only) or 05 `FEA_ARTIFACT_NOT_FOUND` / `FEA_SUMMARY_MISMATCH` |
-| `explicit_quick_check` | query | `{ check?: 'wave_speed'\|'critical_time_step'\|'mass_scaling'\|'bar_impact'\|'taylor_dynamic_yield'\|'johnson_cook_flow'\|'johnson_cook_failure', scenario?: 'bird_strike'\|'drop_test', inputs, material? }` → value(s) with units, formula, inputs, provenance, `unverified` | @invariant identical to `generate_explicit_reference.py` within 1e-12 · @failure `EXP_INPUT_MISSING`, `EXP_LAW_OUT_OF_RANGE` |
-| `explicit_report` | query | `{ analysisId, histories?: string[], maxPoints?=500 }` → §5.5 | @invariant refuses stale / missing (05 codes); `reviewRequired`, `certificationEvidence: false` |
+| `hand_check` | query | `{ check?: 'wave_speed'\|'critical_time_step'\|'mass_scaling'\|'bar_impact'\|'taylor_dynamic_yield'\|'johnson_cook_flow'\|'johnson_cook_failure', scenario?: 'bird_strike'\|'drop_test', inputs, material? }` → value(s) with units, formula, inputs, provenance, `unverified` | @invariant identical to `generate_explicit_reference.py` within 1e-12 · @failure `EXP_INPUT_MISSING`, `EXP_LAW_OUT_OF_RANGE` |
+| `analysis_report` | query | `{ analysisId, histories?: string[], maxPoints?=500 }` → §5.5 | @invariant refuses stale / missing (05 codes); `reviewRequired`, `certificationEvidence: false` |
 | `explicit_energy_check` | query | `{ analysisId \| historyCsv?, hourglassLimit?, contactLimit?, energyErrorLimit?, addedMassLimit? }` | @invariant hourglass limit named default 0.10 [R13]; others no default → warnings |
 | `check_explicit` | query | `{ analysisId }` → pass / warn / fail items | AF-20; runs 05 `check_analysis` items first |
 | ✱ `export_explicit_deck` | transport | `{ analysisId, format: 'opencourant'\|'ls_dyna', path? }` → `{ files: [{ path, sha256 }] }` | refuses stale mesh, incomplete materials, unsupported units |
@@ -250,7 +250,7 @@ Status rules: `fail` if termination ≠ normal, |energy error| > `energyErrorLim
 contact ratio > limit, any limit unset, minimum time step < `minTimeStepS`. Each item lists the threshold, its source and
 `defaulted`.
 
-### 5.5 `explicit_report` data shape
+### 5.5 `analysis_report` data shape
 
 ```json
 {
@@ -341,7 +341,7 @@ contact ratio > limit, any limit unset, minimum time step < `minTimeStepS`. Each
 | AF-01/02/03 | registry commands + 05-style transports; descriptions state units; guide section |
 | AF-04 | `{value, unit}` on every time, speed, height, gravity |
 | AF-05 | whole set-up in one plan (`validation/plans/*`) |
-| AF-10/12 | `explicit_report` §5.5; decks and fields only via `--save` / artifact store |
+| AF-10/12 | `analysis_report` §5.5; decks and fields only via `--save` / artifact store |
 | AF-11 | §7.1 |
 | AF-13 | deterministic decks (TR-EXP-12) |
 | AF-20 | `check_explicit` |
@@ -388,9 +388,9 @@ Coverage 90/85/90/90 extends to `packages/domain-physics/src/**`.
 
 | M | Content | Depends on | Effort |
 | - | ------- | ---------- | ------ |
-| M1 | `quick.ts`, `explicit_quick_check`, `energy.ts`, `listingReader.ts`, unit tests | PHY-02 J–C types | 1 w |
+| M1 | `quick.ts`, `hand_check`, `energy.ts`, `listingReader.ts`, unit tests | PHY-02 J–C types | 1 w |
 | M2 | `AnalysisType` / `FeSolver` members, `ExplicitSpec`, set-up commands, `.rad` writers, determinism tests, `export_explicit_deck` | 05 M2 (mesh artifact), PHY-02 | 2.5 w |
-| M3 | `explicit_run` (local + container), converters, readers, `record_explicit_results`, `explicit_report`, `explicit_energy_check`, `check_explicit`, integration VC-50…55 | M2, OpenCourant install on CI | 2.5 w |
+| M3 | `explicit_run` (local + container), converters, readers, `record_explicit_results`, `analysis_report`, `explicit_energy_check`, `check_explicit`, integration VC-50…55 | M2, OpenCourant install on CI | 2.5 w |
 | M4 | plans to golden, CLI harness, guide, MCP prompt, UI review overlays | M3 | 1.5 w |
 | V1 | contacts, SPH bird with EOS (PHY-02 addition), scenario templates, shells with J–C | PHY-02 EOS | 3 w |
 | V2 | LS-DYNA `.k` export + PyDyna check, blade-out templates, composites | 06 CMP, PHY-08 | 3 w |
@@ -508,7 +508,7 @@ the reviewer reads the history.
 | ----- | ----- | ----- |
 | `AnalysisType` `explicit_dynamics`, `FeSolver` `llull_explicit` / `opencourant` | `packages/core/src/model/analysis.ts` | `opencourant` is refused (`EXP_SOLVER_UNSUPPORTED`) |
 | `ExplicitSpec`, `ExplicitResultsSummary`, `FeExplicitArtifact` | `packages/core/src/model/explicit.ts` | spec on `AnalysisCase.explicit`; results on `explicit.results`, not 05 `ResultsSummary` |
-| Plugin `explicit` (toolset `analysis`) | `packages/domain-cae/src/explicit/` | `set_explicit_controls`, `set_initial_velocity`, `add_rigid_wall`, `delete_rigid_wall`, `set_johnson_cook_failure` (D1–D5 + source per material, no default), `record_explicit_results`, `explicit_report`, `explicit_energy_check`, `explicit_quick_check` |
+| Plugin `explicit` (toolset `analysis`) | `packages/domain-cae/src/explicit/` | `set_explicit_controls`, `set_initial_velocity`, `add_rigid_wall`, `delete_analysis_item`, `set_johnson_cook_failure` (D1–D5 + source per material, no default), `record_explicit_results`, `analysis_report`, `explicit_energy_check`, `hand_check` |
 | Laws | `explicit/laws.ts` | E, ν from 05 `elasticConstants`; Johnson–Cook from the default PHY-02 constitutive set (`j2_plasticity` + `johnson_cook` isotropic + optional `rate_johnson_cook`); other plastic laws `EXP_MATERIAL_UNSUPPORTED` |
 | Mesh | `explicit/mesh.ts` | `structured_hex {size}` on unrotated boxes (llull grid, hex8), or `fea_mesh` (C3D4 of the 05 artifact, tet4); other blocks `EXP_MESH_UNSUPPORTED` |
 | Trust | `explicit/trust.ts`, `record.ts` | 05 §4.1 model: summary recomputed from the artifact; input hash `explicitInputHash` (parts, laws, spec, mesh hash) |
@@ -548,7 +548,7 @@ Measured 2026-10-19, Rust CPU path. Closed form: ρc₀vA = 39 623 N, 2L/c₀ = 
 | Mass scaling | `selective_mass_scaling_raises_every_element_to_the_target_step` | 4× step → 15× added mass, step = target | 1e-9 |
 | Determinism | `runs_are_bit_identical_across_repeats_and_thread_counts`; server test (same artifact hash twice) | bit-identical | exact |
 | Job contract | `tests/job.rs` | outputs hashed, events, refusals | exact |
-| VC-EXP-10/11/12/20/21 | `tests/unit/cae/explicit/quickCheck.test.ts` (`explicit_quick_check`) | generator values | 1e-9 |
+| VC-EXP-10/11/12/20/21 | `tests/unit/cae/explicit/quickCheck.test.ts` (`hand_check`) | generator values | 1e-9 |
 
 Test material constants are synthetic (validation pack inputs, Q7): no Johnson–Cook constants are published in any library.
 
@@ -739,7 +739,7 @@ RS-8 is complete with this round: nothing of the RS1 RS-8 row stays open. Source
 | BWC fibers | nodal fibers = the shared nodal normals; z-linear rates `b^c v̂ + b (ω × p)` (Eqs. 9.55–9.59); `b^c` = the exact centre derivative of the fiber-shifted gradients (the printed leading term of Eq. 9.60 over 2A plus the change of the area; the manual leaves "the details" to the Belytschko papers); power-conjugate forces (`S = ∫ẑσ` on `b^c`, moments `p × c`), element stiffness symmetric to 1e-12 | [E2] §9.6 Eqs. 9.55–9.60 |
 | BWC transverse shear | tangential shear per side `(ŵ_J − ŵ_I)/L + ½(θ_I + θ_J)·r(t)` (Eq. 9.65), corners from their two sides solved on the side tangents (Eqs. 9.63–9.64; equal to the printed projection sum on rectangles), centre value with N_I = ¼ (Eqs. 9.61–9.62); signs fixed so a rigid rotation is strain free (the printed ones follow Fig. 9.4) | [E2] §9.6 Eqs. 9.61–9.65 |
 | Symmetry supports | 05 `symmetry`: the translation normal to its plane, plus the two in-plane rotations on shell nodes; the plane is the box face of the target (structured hex) or the axis on which the fea_mesh node set is flat; otherwise `EXP_CONSTRAINT_UNSUPPORTED` | llull mapping of the 05 constraint |
-| Imposed motion | `add_imposed_motion / delete_imposed_motion` (§3 `imposedMotions`, §4): velocity or displacement curve `[[t s, value], …]` of one dof on box-face / near-point nodes, case units, piecewise linear and constant outside, one motion per dof; counts as excitation. Solver: after the fixed dofs, `v^{n+½} = v(t^n + Δt/2)` or `(u(t^{n+1}) − (x^n − x^0))/Δt`; the reaction work `m(v_imposed − v_pred)/(½(Δt_prev + Δt)) · ½(Δt_prev v^{n−½} + Δt v^{n+½})` enters the external work; in the WGSL kick too. A non-zero 05 static displacement is refused with a pointer to it | spec §3 / §4; TR-EXP-71 "imposed velocity" |
+| Imposed motion | `add_imposed_motion / delete_analysis_item` (§3 `imposedMotions`, §4): velocity or displacement curve `[[t s, value], …]` of one dof on box-face / near-point nodes, case units, piecewise linear and constant outside, one motion per dof; counts as excitation. Solver: after the fixed dofs, `v^{n+½} = v(t^n + Δt/2)` or `(u(t^{n+1}) − (x^n − x^0))/Δt`; the reaction work `m(v_imposed − v_pred)/(½(Δt_prev + Δt)) · ½(Δt_prev v^{n−½} + Δt v^{n+½})` enters the external work; in the WGSL kick too. A non-zero 05 static displacement is refused with a pointer to it | spec §3 / §4; TR-EXP-71 "imposed velocity" |
 | c_p(T) | the PHY-01 cp(T) table in K goes to the job (`specificHeatTable`) and is interpolated linearly at each point's temperature every update (clamped at its ends), CPU and WGSL (`cp_table`) | §13.9 heating |
 
 **Not part of RS-8** (decided at close, not open RS-8 work): rounded shell edges in contact ([E2] §29.8.3 describes them as LS-DYNA

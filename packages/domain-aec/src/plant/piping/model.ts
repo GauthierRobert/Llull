@@ -1,7 +1,7 @@
 /** Access to `doc.plant.piping` and the stable refusal codes of the piping commands (02 RTE §7). */
 
 import type { CadDocument } from '@core/model/types';
-import type { PipingModel } from '@core/model/plant';
+import type { PipingModel } from '@aec/plant/types';
 import { tableRejection } from '@core/commands/noop';
 
 export const EMPTY_PIPING: PipingModel = { tieIns: {}, tieInOrder: [], lines: {}, lineOrder: [], runs: {}, runOrder: [] };

@@ -1,6 +1,6 @@
 /**
  * topology_solve transport (PHY-17 RS-2) with an injected fake job runner (no binary): job folder contents and index mapping, artifact + record, the
- * TypeScript reference without llull-compute, TOP_TOOL_MISSING above the cap, native error / timeout mapping, resume. The real binary is
+ * TOP_TOOL_MISSING without llull-compute, native error / timeout mapping, resume. The real binary is
  * `topologySolveNative.test.ts`.
  */
 
@@ -208,33 +208,19 @@ describe('topology_solve with a fake job runner', () => {
     }
   });
 
-  it('runs the TypeScript reference for a small 2D study when llull-compute is missing', async () => {
+  it('answers TOP_TOOL_MISSING (with the NATIVE_TOOL_MISSING hint) when llull-compute is missing, even for a small 2D study, and changes nothing', async () => {
     const model = mbbModel();
-    const host = hostOf(model);
-    const result = await runTopologySolve(model.studyId, {}, host, { store, runner: missingRunner() });
-    expect(result.isError).toBe(false);
-    const data = result.data as { fieldHash: string; solver: { job: string } };
-    expect(data.solver.job).toBe('ts-reference');
-    expect((store.get(data.fieldHash) as FeTopologyArtifact | null)?.solver.job).toBe('ts-reference');
-    expect(studyOf(host.current(), model.analysisId, model.studyId).result?.fieldHash).toBe(data.fieldHash);
-  }, 60_000);
-
-  it('answers TOP_TOOL_MISSING (with the NATIVE_TOOL_MISSING hint) above the TypeScript cap and changes nothing', async () => {
-    const model = mbbModel({}, (action) =>
-      action.command === 'create_topology_study' ? { ...action, params: { ...action.params, voxel: 0.5 } } : action,
-    );
     const host = hostOf(model);
     const result = await runTopologySolve(model.studyId, {}, host, { store, runner: missingRunner() });
     expect(result).toMatchObject({ isError: true, data: { code: 'TOP_TOOL_MISSING', nativeCode: 'NATIVE_TOOL_MISSING' } });
     expect(result.summary).toContain('topology_solve TOP_TOOL_MISSING');
     expect(result.summary).toContain('NATIVE_TOOL_MISSING');
-    expect(result.summary).toContain('4800 voxels exceed the TypeScript reference cap of 2000');
     expect(host.current()).toBe(model.doc);
   });
 
   it('refuses an invalid set-up with the job code', async () => {
     const model = mbbModel();
-    const stripped = execute(model.doc, 'delete_fea_constraint', { analysisId: model.analysisId, constraintId: 'nope' });
+    const stripped = execute(model.doc, 'delete_analysis_item', { analysisId: model.analysisId, itemId: 'nope' });
     expect(stripped.rejected).toBe(true);
     const doc = execute(model.doc, 'create_analysis', { name: 'bare', analysisType: 'static' });
     const bare = doc.affected[0] ?? '';

@@ -5,7 +5,7 @@ import { defineCommand, z } from '../schema';
 import { commandError, noop, rejection, report } from '../noop';
 import { PROCESS_IDS } from '../../model/processRules';
 import { MAX_RAYS_TOTAL, runAssemblyCheck } from './assemblyCheckRun';
-import { scopedIds } from './assemblyParts';
+import { scopedIds } from '../../geometry/assemblyParts';
 
 /**
  * @affects nothing — read-only; returns the CheckResult envelope (+ parts, skipped2D, pairsChecked, geometryQueries provenance when thickness ran) in data

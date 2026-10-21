@@ -36,7 +36,7 @@ type MultiJoint<K extends string> = JointBase<K> & { values: number[] };
  * cylindrical: [angle, displacement] on one axis; pin_slot: [angle about `axis`, displacement along `slotAxis`]; planar: [u, v, angle]
  * in the plane normal to `axis`; ball: [rx, ry, rz] Euler XYZ about `pivot`; cam: slide of `b` along `axis` computed from the angle of
  * joint `camJoint` and the 2D profile entity `profileId` (no DOF of its own).
- * @see add_joint, set_joint_value, evaluate_motion, bake_motion
+ * @see add_joint, set_joint_value, evaluate_motion
  */
 export type Joint =
   | (JointBase<'revolute'> & { angle: number })

@@ -3,7 +3,7 @@
 import React, { memo, useMemo } from 'react';
 import { useStore } from '@ui/store';
 import { useSelectionSet } from '@ui/store/selectionHooks';
-import type { BuildingElement } from '@core/model/building';
+import type { BuildingElement } from '@aec/index';
 import { DeleteButton, ListRow, PanelSection } from '@ui/panels/PanelParts';
 import { CATEGORY_LABEL, describe } from './describeElement';
 import { elementsOnActiveLevel, isElementSelected } from './elementListRules';

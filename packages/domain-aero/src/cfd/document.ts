@@ -4,7 +4,7 @@ import type { DocumentExtension } from '@core/plugins/plugin';
 import { isRecord } from '@lib/isRecord';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { isVec3 } from '@lib/vec3';
-import type { CfdCase } from '@core/model/cfd';
+import type { CfdCase } from '@aero/cfd/types';
 import { semanticProblem } from './caseValidate';
 
 const REGIMES: readonly unknown[] = ['auto', 'low_speed', 'compressible'];

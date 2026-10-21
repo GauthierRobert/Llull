@@ -6,7 +6,7 @@
 import type { CadDocument, NurbsCurveEntity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { failer } from '../noop';
-import { idOrNext } from '../entity/explicitId';
+import { idOrNext } from '../../lib/explicitId';
 import { newEntity } from '../entity/newEntity';
 import { applyEulerXYZ, isZeroRotation } from '../../lib/eulerRotation';
 import { reverseCurve } from '../../lib/nurbs/edit';

@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
-import { normalCdf } from '@cae/reliability/numerics';
+import { normalCdf } from '@lib/specialFunctions';
 import { code, data, lognormal, modelDoc, normal, relative, rMinusS, type Json } from './support';
 
-const form = (doc: Parameters<typeof execute>[0], params: Json = {}): ReturnType<typeof execute> =>
-  execute(doc, 'reliability_form', { limitState: 'g', ...params });
+/** run_reliability_study with FORM (and SORM when sorm is set); data is the FORM study (data.form). */
+const form = (doc: Parameters<typeof execute>[0], params: Json = {}): ReturnType<typeof execute> => {
+  const { sorm, ...rest } = params;
+  const result = execute(doc, 'run_reliability_study', { limitState: 'g', methods: sorm === true ? ['form', 'sorm'] : ['form'], ...rest });
+  const study = data(result)['form'];
+  return study === undefined ? result : { ...result, data: study };
+};
 
-describe('reliability_form: linear limit state in normal variables (VC-PRB-01)', () => {
+describe('run_reliability_study form: linear limit state in normal variables (VC-PRB-01)', () => {
   it('matches beta = (muR - muS) / sqrt(sR^2 + sS^2) = 2, Pf = Φ(-2) and alpha^2 = [0.36, 0.64]', () => {
     const doc = rMinusS();
     const before = JSON.stringify(doc);
@@ -27,7 +32,7 @@ describe('reliability_form: linear limit state in normal variables (VC-PRB-01)',
     expect(d['converged']).toBe(true);
     expect(d['reviewRequired']).toBe(true);
     expect(d['originInFailureDomain']).toBe(false);
-    expect(result.summary).toContain('beta = 2.000000');
+    expect(result.summary).toContain('form 0.0227501');
   });
 
   it('reports PRB_TARGET_UNSET without a target, PRB_TARGET_NOT_MET when beta misses it, and nothing when met', () => {
@@ -68,7 +73,7 @@ describe('reliability_form: linear limit state in normal variables (VC-PRB-01)',
   });
 });
 
-describe('reliability_form: non-normal marginals', () => {
+describe('run_reliability_study form: non-normal marginals', () => {
   it('lognormal R and S: beta equals the exact value because the failure surface is linear in u (VC-PRB-02)', () => {
     const doc = modelDoc([lognormal('R', 300, 30), lognormal('S', 200, 40)], 'R - S');
     const zeta2 = (m: number, s: number): number => Math.log(1 + (s / m) ** 2);
@@ -125,7 +130,7 @@ describe('reliability_form: non-normal marginals', () => {
   });
 });
 
-describe('reliability_form: SORM (VC-PRB-04)', () => {
+describe('run_reliability_study form: SORM (VC-PRB-04)', () => {
   const quadratic = modelDoc([normal('u1', 0, 1), normal('u2', 0, 1)], '3 - u1 + 0.1 * pow(u2, 2)');
 
   it('gives beta 3, curvature 0.2 and the Breitung probability 1.06718809723e-3', () => {
@@ -154,7 +159,7 @@ describe('reliability_form: SORM (VC-PRB-04)', () => {
   });
 });
 
-describe('reliability_form: failure paths', () => {
+describe('run_reliability_study form: failure paths', () => {
   it('returns the last iterate with PRB_FORM_NOT_CONVERGED when the gradient vanishes at the start (VC-PRB-13)', () => {
     const flat = modelDoc([normal('u1', 0, 1), normal('u2', 0, 1)], '1 - pow(u1, 2) - pow(u2, 2)');
     const result = form(flat);
@@ -162,7 +167,6 @@ describe('reliability_form: failure paths', () => {
     expect(d['converged']).toBe(false);
     expect(d['designPointU']).toEqual([0, 0]);
     expect((d['items'] as Array<{ code: string }>).map((i) => i.code)).toContain('PRB_FORM_NOT_CONVERGED');
-    expect(result.summary).toContain('NOT converged');
   });
 
   it('stops without converging when the iteration budget is too small', () => {
@@ -172,7 +176,7 @@ describe('reliability_form: failure paths', () => {
 
   it('refuses an unknown limit state, an empty model, an unknown symbol and unrealisable correlation', () => {
     const doc = rMinusS();
-    const unknown = execute(doc, 'reliability_form', { limitState: 'nope' });
+    const unknown = execute(doc, 'run_reliability_study', { limitState: 'nope', methods: ['form'] });
     expect(code(unknown)).toBe('PRB_LIMIT_STATE_NOT_FOUND');
     expect(unknown.document).toBe(doc);
     expect(unknown.affected).toEqual([]);
@@ -197,7 +201,7 @@ describe('reliability_form: failure paths', () => {
 
   it('rejects invalid params through the schema', () => {
     const doc = rMinusS();
-    expect(execute(doc, 'reliability_form', {}).document).toBe(doc);
-    expect(execute(doc, 'reliability_form', { limitState: 'g', maxIterations: 0 }).summary).toMatch(/rejected/);
+    expect(execute(doc, 'run_reliability_study', {}).document).toBe(doc);
+    expect(execute(doc, 'run_reliability_study', { limitState: 'g', maxIterations: 0 }).summary).toMatch(/rejected/);
   });
 });

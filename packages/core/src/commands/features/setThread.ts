@@ -8,7 +8,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed } from '../noop';
 import { editFeatureNode, featureNodes } from '../../geometry/featureInstances';
-import { evaluateRecipe } from '../brep/kernelShape';
+import { evaluateRecipe } from '../kernelShape';
 import { MAX_THREAD_TURNS } from '../../geometry/threadTool';
 import { refuse } from './ftr';
 import { resolveModelledThread, threadBoreProblem } from './modelledThread';

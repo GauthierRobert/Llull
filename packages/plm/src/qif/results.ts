@@ -1,6 +1,6 @@
 /** QIF 3.0 MeasurementResults reader (M6, VC-PLM-24): the characteristic measurements of a QIF file, from the XSD of QIF 3.0 (ANSI/DMSC QIF 3.0-2018). */
 
-import type { FaiResultStatus } from '@core/model/plm';
+import type { FaiResultStatus } from '@plm/types';
 import { type XmlLimits, type XmlNode, parseXml } from './xml';
 
 const QIF3_NAMESPACE = 'http://qifstandards.org/xsd/qif3';

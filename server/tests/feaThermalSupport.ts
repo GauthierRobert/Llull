@@ -1,10 +1,10 @@
-/** Shared harness of the thermal FE benchmark suites: a temp document driven through the `llull` CLI (plan -> fea_mesh -> fea_solve -> thermal_report). */
+/** Shared harness of the thermal FE benchmark suites: a temp document driven through the `llull` CLI (plan -> fea_mesh -> fea_solve -> analysis_report). */
 
 import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect } from 'vitest';
-import { judgeCase, type Measured } from '@core/commands/vnv/judge';
+import { judgeCase, type Measured } from '@cae/vnv/judge';
 import { deserializeDocument } from '@core/commands/persistence/serialization';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
@@ -76,7 +76,7 @@ export class ThermalCase {
     return result;
   }
 
-  /** Last [timeS, value] of the named probe in a thermal_report `data`. */
+  /** Last [timeS, value] of the named probe in a analysis_report (thermal view) `data`. */
   probe(report: Record<string, unknown>, name: string): readonly [number, number] {
     const probes = this.document().analysis?.cases[this.analysisId]?.probes ?? {};
     const id = Object.keys(probes).find((key) => probes[key]?.name === name);
@@ -96,13 +96,13 @@ export class ThermalCase {
     return value;
   }
 
-  /** fea_mesh + fea_solve + thermal_report; every step must succeed. */
+  /** fea_mesh + fea_solve + analysis_report; every step must succeed. */
   async solve(timeoutS = 300): Promise<Record<string, unknown>> {
     const meshed = await this.cli('fea_mesh', `analysisId=${this.analysisId}`, `timeoutS=${timeoutS}`);
     expect(meshed.code, String(meshed.json['summary'])).toBe(EXIT_OK);
     const solved = await this.cli('fea_solve', `analysisId=${this.analysisId}`, `timeoutS=${timeoutS}`);
     expect(solved.code, String(solved.json['summary'])).toBe(EXIT_OK);
-    const report = await this.cli('thermal_report', `analysisId=${this.analysisId}`);
+    const report = await this.cli('analysis_report', `analysisId=${this.analysisId}`, 'view=thermal');
     expect(report.code, String(report.json['summary'])).toBe(EXIT_OK);
     return dataOf(report.json);
   }

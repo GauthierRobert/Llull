@@ -7,8 +7,8 @@ import { expressionSyntaxError, extractReferences, isBuiltinConstant } from '@li
 import { nextId } from '@lib/id';
 import { distributionIssue, distributionSchema } from './distributions';
 import { refuseReliability } from './codes';
-import { cholesky } from './numerics';
-import type { LimitState, RandomVariable } from '@core/model/probabilistic';
+import { cholesky } from '@lib/denseLinalg';
+import type { LimitState, RandomVariable } from '@cae/reliability/types';
 import { limitStateOf, reliabilityOf, variableOf, withReliability } from './model';
 
 const IDENTIFIER = /^[A-Za-z_]\w*$/;
@@ -37,7 +37,7 @@ export const defineRandomVariable = defineCommand({
     'Distributions: normal {mean, sd}; lognormal {mean, sd} (the mean and sd of X itself, not of ln X); uniform {min, max}; weibull {shape, scale}; gumbel {location, scale}. ' +
     'Give the unit and cite the source of the scatter (`citation`), otherwise every result is marked unverified (PRB_SCATTER_UNSOURCED). `binding` is { kind: "free" } ' +
     '(a symbol used only in expressions, default) or { kind: "parameter", parameter } (links the variable to an existing document parameter). ' +
-    'Returns the variable id (rv-<step>.<k>) in affected[0]. Next: define_limit_state, then reliability_form / propagate_uncertainty / run_reliability_study.',
+    'Returns the variable id (rv-<step>.<k>) in affected[0]. Next: define_limit_state, then propagate_uncertainty / run_reliability_study.',
   params: z.object({
     name: z
       .string()

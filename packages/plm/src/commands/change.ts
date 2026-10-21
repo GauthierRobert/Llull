@@ -1,10 +1,11 @@
 /** Change control (FR-PLM-08/09): change requests (ECR), change orders (ECO), their classification and closing. */
 
+import { nextFreeId } from '@lib/id';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CadDocument } from '@core/model/types';
-import type { ChangeRecord, PlmModel } from '@core/model/plm';
+import type { ChangeRecord, PlmModel } from '@plm/types';
 import { effectivityProblem } from '../effectivity';
 import { refusePlm } from '../refusal';
 import { NOT_MANAGED } from '../state';
@@ -20,9 +21,7 @@ const tagsSchema = z
 /** Next free id `<PREFIX>-nnnn` (4 digits, after every existing id of that prefix). */
 function mintId(plm: PlmModel, prefix: 'ECR' | 'ECO'): string {
   const used = plm.changeOrder.filter((id) => id.startsWith(`${prefix}-`)).length;
-  let n = used + 1;
-  while (Object.hasOwn(plm.changes, `${prefix}-${String(n).padStart(4, '0')}`)) n += 1;
-  return `${prefix}-${String(n).padStart(4, '0')}`;
+  return nextFreeId(prefix, (id) => Object.hasOwn(plm.changes, id), { pad: 4, start: used + 1 });
 }
 
 const addChange = (doc: CadDocument, plm: PlmModel, record: ChangeRecord): CadDocument =>
@@ -217,7 +216,7 @@ export const createChangeOrder = defineCommand({
 export const classifyChangeOrder = defineCommand({
   name: 'classify_change_order',
   description:
-    "HUMAN GATE. Record the minor / major classification (with a justification) of an open ECO. It is the applicant's decision: llull shows nothing " +
+    "Record the minor / major classification (with a justification) of an open ECO. HUMAN GATE. It is the applicant's decision: llull shows nothing " +
     'and infers nothing. An agent caller gets PLM_HUMAN_GATE. A "change" ECO needs it before release_item.',
   annotations: { metaHistory: true },
   params: z.object({
@@ -269,7 +268,7 @@ export const classifyChangeOrder = defineCommand({
 export const setChangeState = defineCommand({
   name: 'set_change_state',
   description:
-    'HUMAN GATE. Close an ECR or ECO as rejected or cancelled, with a reason. Implemented records are terminal. An agent caller gets PLM_HUMAN_GATE.',
+    'Close an ECR or ECO as rejected or cancelled, with a reason. HUMAN GATE. Implemented records are terminal. An agent caller gets PLM_HUMAN_GATE.',
   annotations: { metaHistory: true },
   params: z.object({
     id: z.string().describe('ECR or ECO id.'),

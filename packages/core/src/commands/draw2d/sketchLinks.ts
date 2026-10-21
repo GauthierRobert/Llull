@@ -18,7 +18,7 @@ import { isRecord } from '../../lib/isRecord';
 import { kernelUnavailable } from '../kernelRefusal';
 import { newEntity } from '../entity/newEntity';
 import { withEntities } from '../entity/entityOps';
-import { operandRecipe } from '../brep/kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { validateSolidTarget } from '../brep/modifyTarget';
 import { pickEdges } from '../brep/edgeReferences';
 import { fromPlane, placementOf, toPlane } from './sketchPlanes';

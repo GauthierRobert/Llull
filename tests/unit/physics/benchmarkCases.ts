@@ -4,8 +4,8 @@
  */
 import { appendFileSync, readFileSync } from 'node:fs';
 import { expect } from 'vitest';
-import { judgeCase, type Measured } from '@core/commands/vnv/judge';
-import type { JsonValue } from '@core/commands/vnv/expected';
+import { judgeCase, type Measured } from '@cae/vnv/judge';
+import type { JsonValue } from '@cae/vnv/expected';
 
 type RawCase = { readonly id: string } & Record<string, unknown>;
 

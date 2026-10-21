@@ -5,7 +5,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { noop, report } from '@core/commands/noop';
 import { isFiniteNumber, isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { round } from '../../shared/numeric';
-import { toCsv } from '../../shared/csv';
+import { toCsv } from '@lib/csv';
 import { briefList } from '../../shared/briefList';
 import { highestUtilisation } from '../common/utilisation';
 import { analyseSteelStructure } from './steelStructureAnalysis';

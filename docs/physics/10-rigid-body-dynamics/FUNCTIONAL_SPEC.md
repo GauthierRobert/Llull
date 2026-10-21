@@ -7,7 +7,7 @@ Gap id **RBD** · status: specification · written 2026-10-15 · technical spec:
 
 llull already models mechanisms **kinematically**: revolute and prismatic joints between assembly instances
 (`add_joint`, `set_joint_value`), linear couplings between joints (`add_drive_relation`), a sweep that reports
-instance poses and bounding-box interference (`motion_study`), and `bake_motion` to write a pose back
+instance poses and bounding-box interference (`motion_study`), and `evaluate_motion` with `apply: true` to write a pose back
 (`packages/core/src/commands/motion/*`). There is no time, no mass in motion, no force, no gravity, no spring or
 damper, no friction and no joint reaction. Reading the code also shows kinematic limits that matter for dynamics
 (TECHNICAL_SPEC §1): joints are applied one by one from the anchor instance's **origin**, the `frame` selector is

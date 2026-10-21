@@ -4,7 +4,7 @@
  */
 
 import type { Entity, Vec2 } from '@core/model/types';
-import type { AlignmentObject } from '@core/model/civil';
+import type { AlignmentObject } from '@aec/civil/types';
 import { civilMesh, civilPolyline } from '../entities';
 import { sampleStations } from '../alignment/alignmentGeometry';
 import { designElevation, validateProfile, verticalCurveStations } from '../alignment/profileGeometry';

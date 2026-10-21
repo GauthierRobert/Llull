@@ -28,3 +28,7 @@ solver/target
 # Mutation testing (SC-Q4)
 reports/
 .stryker-tmp/
+
+# CLI default document and stray vendor installers
+/model.llull.json
+*.msi

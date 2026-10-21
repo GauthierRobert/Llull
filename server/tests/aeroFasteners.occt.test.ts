@@ -3,7 +3,7 @@ import { expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
-import type { FastenerStack } from '@core/model/fasteners';
+import type { FastenerStack } from '@aero/fasteners/types';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { describeNative, liveKernels } from './kernelTestSupport';
 

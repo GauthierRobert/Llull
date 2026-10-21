@@ -70,7 +70,7 @@
       "as": "wedge"
     },
     {
-      "command": "cfd_create_case",
+      "command": "create_cfd_case",
       "params": {
         "id": "m2",
         "entityIds": [
@@ -107,7 +107,7 @@
       }
     },
     {
-      "command": "cfd_create_case",
+      "command": "create_cfd_case",
       "params": {
         "id": "m3",
         "entityIds": [

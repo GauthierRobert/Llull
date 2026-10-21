@@ -10,7 +10,7 @@
 
 import type { ThermalBcRecord, ThermalSetup } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
-import { siToSystem } from '@lib/thermalUnits';
+import { siToSystem } from './thermalUnits';
 import { safeName, type DeckContext, type DeckRefusal } from '../decks/context';
 import { commentText, row } from '../decks/format';
 import { faceNodes, indexMesh, type MeshElement, type MeshIndex } from './meshGeometry';

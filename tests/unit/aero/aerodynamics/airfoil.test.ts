@@ -76,9 +76,9 @@ describe('analyze_airfoil (VC-AER-10..12)', () => {
     expect(Math.max(...(fine.surface?.[0]?.points.map((point) => point.cp) ?? []))).toBeCloseTo(1, 1);
   });
 
-  it('draw_naca_airfoil reproduces the 02 SRF NACA 2412 ordinates (validated against UIUC) and is pure', () => {
+  it('airfoil_from_naca as polyline reproduces the 02 SRF NACA 2412 ordinates (validated against UIUC) and is pure', () => {
     const before = structuredClone(doc);
-    const drawn = ok(doc, 'draw_naca_airfoil', { naca: '2412', chord: 1, pointsPerSide: 80, closedTrailingEdge: false });
+    const drawn = ok(doc, 'airfoil_from_naca', { designation: '2412', points: 161, trailingEdge: 'open', as: 'polyline' });
     expect(doc).toEqual(before);
     const entity = drawn.document.entities[drawn.affected[0] as string] as PolylineEntity;
     expect(entity.kind).toBe('polyline');
@@ -102,7 +102,15 @@ describe('analyze_airfoil (VC-AER-10..12)', () => {
   });
 
   it('incidence rotates the section nose-up about the leading edge', () => {
-    const drawn = ok(doc, 'draw_naca_airfoil', { naca: '0012', chord: 100, incidenceDeg: 10, position: [5, 0, 0] });
+    const drawn = ok(doc, 'airfoil_from_naca', {
+      designation: '0012',
+      chord: 100,
+      incidenceDeg: 10,
+      position: [5, 0, 0],
+      as: 'polyline',
+      trailingEdge: 'closed',
+      points: 121,
+    });
     const entity = drawn.document.entities[drawn.affected[0] as string] as PolylineEntity;
     const trailing = entity.points[0] as [number, number];
     expect(trailing[1]).toBeCloseTo(-100 * Math.sin((10 * Math.PI) / 180), 4);
@@ -119,8 +127,8 @@ describe('analyze_airfoil (VC-AER-10..12)', () => {
     expectRefusal(doc, 'analyze_airfoil', { entityId: 'nope' }, 'AER_AIRFOIL_INVALID', 'entityId');
     expectRefusal(doc, 'analyze_airfoil', { naca: '0012', alphasDeg: [30] }, 'AER_PARAM_INVALID', 'alphasDeg');
     expectRefusal(doc, 'analyze_airfoil', { naca: '0012', panelsPerSide: 5 }, 'AER_PARAM_INVALID', 'panelsPerSide');
-    expectRefusal(doc, 'draw_naca_airfoil', { naca: '9', chord: 1 }, 'AER_AIRFOIL_INVALID');
-    expectRefusal(doc, 'draw_naca_airfoil', { naca: '0012', chord: 0 }, 'AER_PARAM_INVALID');
+    expectRefusal(doc, 'airfoil_from_naca', { designation: '9', as: 'polyline' }, 'AERO_NACA_DESIGNATION_UNKNOWN');
+    expectRefusal(doc, 'airfoil_from_naca', { designation: '0012', chord: 0, as: 'polyline' }, 'AERO_PARAM_INVALID');
     const line = ok(doc, 'draw_polyline', {
       points: [
         [0, 0],

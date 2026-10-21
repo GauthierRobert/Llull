@@ -63,7 +63,7 @@ async function report(name: string, plan: Step[]): Promise<{ eigen: Record<strin
     const done = await cli(tool, `analysisId=${analysisId}`);
     expect(done.code, String(done.json['summary'])).toBe(EXIT_OK);
   }
-  const { json } = await cli('fea_report', `analysisId=${analysisId}`);
+  const { json } = await cli('analysis_report', `analysisId=${analysisId}`);
   const eigen = dataOf(json)['eigen'];
   return { eigen: isRecord(eigen) ? eigen : {}, summary: String(json['summary']) };
 }

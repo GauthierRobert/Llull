@@ -14,7 +14,8 @@ import { add3, normalize3, scale3 } from '../../lib/vec3';
 import { meshDiagonal } from '../../geometry/meshExtent';
 import { newEntity } from '../entity/newEntity';
 import { replaceEntities, withEntity } from '../entity/entityOps';
-import { evaluateRecipe, kernelResultEntity, operandRecipe } from './kernelShape';
+import { evaluateRecipe, kernelResultEntity } from '../kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { validateSolidTarget } from './modifyTarget';
 
 /** Euler angles (M = Rx·Ry·Rz, Rz = 0) turning +Z onto unit `n`. */

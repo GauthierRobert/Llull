@@ -8,6 +8,7 @@ import {
   buildExchangeToolDefinitions,
   buildFeaToolDefinitions,
   buildLibraryToolDefinitions,
+  buildNativeToolDefinitions,
   searchTools,
   toolsetOf,
   TOOLSET_NAMES,
@@ -139,16 +140,7 @@ const allToolNames = [
   ...buildExchangeToolDefinitions().map((tool) => tool.name),
   ...buildFeaToolDefinitions().map((tool) => tool.name),
   ...buildLibraryToolDefinitions().map((tool) => tool.name),
-  // server-side native transport listed in the analysis toolset (server/src/native/tools.ts; covered by server/tests/topologySolve.test.ts)
-  'topology_solve',
-  // server-side native transport listed in the piping toolset (server/src/native/autoRoute.ts; covered by server/tests/routeNativeParity.test.ts)
-  'auto_route',
-  // GDT / aero native transports (server/src/native/{stackupMonteCarlo,vortexLattice}.ts; server/tests/{stackupNative,aeroPanelNative}.test.ts)
-  'stackup_monte_carlo',
-  'vortex_lattice_solve',
-  // point-cloud host transports listed in the scan toolset (server/src/scan/scanTools.ts; covered by server/tests/scanImport.test.ts)
-  'scan_import',
-  'scan_list',
+  ...buildNativeToolDefinitions().map((tool) => tool.name),
 ];
 
 describe('TOOLSETS', () => {
@@ -192,5 +184,25 @@ describe('backticked names in the conventions guide', () => {
       .map((match) => match[1] ?? '')
       .filter((word) => !known.has(word) && !explained.has(word));
     expect([...new Set(stale)]).toEqual([]);
+  });
+});
+
+describe('searchTools synonyms', () => {
+  const top = (query: string, count: number): string[] => searchTools(query, count).map((hit) => hit.name);
+  it('maps bolt-circle / hole-pattern phrasing onto the array commands', () => {
+    expect(top('hole pattern bolt circle', 3)).toContain('array_polar');
+    expect(top('bolt circle', 3)).toContain('array_polar');
+    expect(top('circular pattern of holes', 3)).toContain('array_polar');
+    expect(top('linear pattern', 3)).toContain('array_linear');
+    expect(top('pattern along a curve', 5)).toContain('pattern_along_path');
+  });
+  it('maps everyday verbs onto tool vocabulary', () => {
+    expect(top('flip it', 5)).toContain('mirror_entity');
+    expect(top('center of gravity', 5)).toContain('mass_properties');
+    expect(top('subtract', 3)).toContain('boolean');
+  });
+  it('finds the native transports', () => {
+    expect(top('topology optimization solve', 5)).toContain('topology_solve');
+    expect(top('import point cloud scan', 5)).toContain('scan_import');
   });
 });

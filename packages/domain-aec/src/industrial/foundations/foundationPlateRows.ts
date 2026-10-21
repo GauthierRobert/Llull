@@ -1,7 +1,7 @@
 /** Base-plate and anchor check rows (concrete bearing, anchor tension / shear, M+N) of one column. */
 
 import { unitsToMm } from '../../shared/numeric';
-import type { BasePlateElement, BuildingModel } from '@core/model/building';
+import type { BasePlateElement, BuildingModel } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import { findProfile } from '../../steel/profiles';
 import type { BaseReaction } from '../frames/frameModelSolve';

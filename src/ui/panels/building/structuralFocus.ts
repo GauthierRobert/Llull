@@ -1,6 +1,6 @@
 // Pure builders of the model highlight for structural-check and clash rows: the member's parts are selected and a beacon sits on it.
 
-import type { BuildingModel } from '@core/model/building';
+import type { BuildingModel } from '@aec/index';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { boundsCenter, entityBoundsInDoc, mergeBounds, type Bounds } from '@core/geometry/bounds';
 import type { PanelFocus } from '@ui/store/focusStore';

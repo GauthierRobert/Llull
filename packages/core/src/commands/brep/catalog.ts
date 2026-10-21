@@ -3,7 +3,7 @@
 import { commandCatalog } from '../schema';
 import { booleanOperation } from './boolean';
 import { filletEdge, chamferEdge, shellSolid } from './modify3d';
-import { inspectTopology, exportStepExact } from './topology';
+import { inspectTopology } from './topology';
 import { blendUnion } from './blend';
 import { inspectFaces } from './faces';
 import { draftFaces, pushPullFace, replaceFace, splitFace } from './faceOps';
@@ -22,5 +22,4 @@ export const brepCommands = commandCatalog(
   splitBody,
   inspectTopology,
   inspectFaces,
-  exportStepExact,
 );

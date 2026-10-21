@@ -1,10 +1,10 @@
-/** define_constitutive_set and remove_material_model: combination rules (VC-MATL-15), defaults, purity. */
+/** define_constitutive_set and delete_material_model: combination rules (VC-MATL-15), defaults, purity. */
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { GPa, MPa, NL1_ELASTIC, NL1_PERFECT, ONE, addModel, codeOf, defineSet, run, withMaterial } from './materialFixtures';
 
-describe('define_constitutive_set and remove_material_model', () => {
+describe('define_constitutive_set and delete_material_model', () => {
   const rubber = (): CadDocument => {
     let doc = withMaterial(createEmptyDocument(), 'm');
     doc = addModel(doc, 'm', 'elastic', NL1_ELASTIC);
@@ -113,14 +113,14 @@ describe('define_constitutive_set and remove_material_model', () => {
 
   it('removes unused models and refuses models a set lists', () => {
     const doc = defineSet(rubber(), 'm', { id: 's', elastic: 'elastic', plastic: 'plastic' });
-    const removed = run(doc, 'remove_material_model', { material: 'm', id: 'hyper' });
+    const removed = run(doc, 'delete_material_model', { material: 'm', id: 'hyper' });
     expect(removed.document.materials['m']?.materialModels?.some((m) => m.id === 'hyper')).toBe(false);
-    expect(removed.summary).toContain("remove_material_model 'm/hyper': removed.");
-    expect(codeOf(doc, 'remove_material_model', { material: 'm', id: 'plastic' })).toBe('MATL_MODEL_IN_USE');
-    expect(codeOf(doc, 'remove_material_model', { material: 'm', id: 'nope' })).toBe('MATL_MODEL_NOT_FOUND');
-    expect(codeOf(doc, 'remove_material_model', { material: 'nope', id: 'x' })).toBe('MAT_RECORD_NOT_FOUND');
+    expect(removed.summary).toContain("delete_material_model 'm/hyper': removed.");
+    expect(codeOf(doc, 'delete_material_model', { material: 'm', id: 'plastic' })).toBe('MATL_MODEL_IN_USE');
+    expect(codeOf(doc, 'delete_material_model', { material: 'm', id: 'nope' })).toBe('MATL_MODEL_NOT_FOUND');
+    expect(codeOf(doc, 'delete_material_model', { material: 'nope', id: 'x' })).toBe('MAT_RECORD_NOT_FOUND');
     const snapshot = structuredClone(doc);
-    execute(doc, 'remove_material_model', { material: 'm', id: 'hyper' });
+    execute(doc, 'delete_material_model', { material: 'm', id: 'hyper' });
     expect(doc).toEqual(snapshot);
   });
 });

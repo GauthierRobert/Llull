@@ -1,6 +1,7 @@
 // Applies one SpaceMouse CameraMotion to a camera pose (world space, +Z up). Pure; the viewport drives the real camera with the result.
 
 import type { CameraMotion } from './spaceMouseMapping';
+import { cross3 } from '@lib/vec3';
 
 type Vec3 = readonly [number, number, number];
 
@@ -12,8 +13,6 @@ export interface CameraPose {
 const MIN_DISTANCE = 1e-3;
 /** Keep the eye off the exact poles so the azimuth stays defined. */
 const POLE_MARGIN = 0.01;
-
-const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 
 /** @pure */
 export function moveCamera(pose: CameraPose, motion: CameraMotion): CameraPose {
@@ -34,11 +33,11 @@ export function moveCamera(pose: CameraPose, motion: CameraMotion): CameraPose {
 
   // Pan along the pre-orbit view plane, scaled by the view distance (what you see moves by a fixed screen fraction).
   const forward: Vec3 = [-offset[0] / distance, -offset[1] / distance, -offset[2] / distance];
-  const rawRight = cross(forward, [0, 0, 1]);
+  const rawRight = cross3(forward, [0, 0, 1]);
   const rightLength = Math.hypot(rawRight[0], rawRight[1], rawRight[2]);
   const right: Vec3 =
     rightLength > 1e-6 ? [rawRight[0] / rightLength, rawRight[1] / rightLength, 0] : [Math.cos(azimuth), -Math.sin(azimuth), 0];
-  const up = cross(right, forward);
+  const up = cross3(right, forward);
   const shift = (axis: number): number => (right[axis] ?? 0) * motion.panRight * distance + (up[axis] ?? 0) * motion.panUp * distance;
   const target: Vec3 = [pose.target[0] + shift(0), pose.target[1] + shift(1), pose.target[2] + shift(2)];
 

@@ -1,5 +1,5 @@
 import type { CadDocument } from '@core/model/types';
-import type { BuildingElement, BuildingLevel } from '@core/model/building';
+import type { BuildingElement, BuildingLevel } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, confirmExportControlled } from '@core/commands/schema';
 import { toMm } from '@core/model/units';

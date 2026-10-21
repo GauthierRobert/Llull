@@ -1,6 +1,6 @@
 /** Curved wall geometry: arc through three points, plan band, evaluated mesh. */
 
-import type { BuildingModel, CurvedWallElement, WallElement } from '@core/model/building';
+import type { BuildingModel, CurvedWallElement, WallElement } from '@aec/building/types';
 import type { Vec2 } from '@core/model/types';
 import { distance, toCounterClockwise } from '@lib/polygon';
 import { wrapAngle } from '@lib/angle';

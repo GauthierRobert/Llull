@@ -1,6 +1,6 @@
 /** The characteristic register of a revision (FR-PLM-26): which numbered characteristics belong to which revision. */
 
-import type { Characteristic, PlmModel } from '@core/model/plm';
+import type { Characteristic, PlmModel } from '@plm/types';
 
 /** Whether characteristic `c` belongs to revision `label`: introduced at or before it, not retired at or before it. */
 export function inRevision(plm: PlmModel, c: Characteristic, label: string): boolean {

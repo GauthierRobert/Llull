@@ -259,7 +259,7 @@ describeNativeWhen({ capabilities: ['writeExchange', 'importExchange'], label: '
     };
 
     it('round-trips a ply with several exact solids and tool, part and ply names with #, quotes and backslashes', () => {
-      // non-ASCII names are covered by the unit suite: the native reader answers null for any non-ASCII product name (04 XCH / sidecar, also for export_step_exact files)
+      // non-ASCII names are covered by the unit suite: the native reader answers null for any non-ASCII product name (04 XCH / sidecar, also for export_step_ap242 files)
       const names = { tool: "Tool #1 'q' \\ x", part: "Part #7 'z' \\\\", plies: ["P#1 'a' \\ ", 'B #3 \\ y'] as [string, string] };
       const doc = stacked(names.tool, names.part, names.plies);
       const exported = data<ExportData>(doc, 'export_composite_ap242', { part: names.part });

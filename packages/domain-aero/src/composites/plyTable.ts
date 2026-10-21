@@ -2,6 +2,7 @@
 
 import { confirmExportControlled, defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
+import { csvCell } from '@lib/csv';
 import { changed, exportRefusal, report } from '@core/commands/noop';
 import type { Rosette } from '@core/model/composites';
 import { MM_PER_UNIT } from '@core/model/units';
@@ -24,8 +25,6 @@ const FORMULA = /^[=+\-@\t\r]/;
 /** A text cell safe for spreadsheets: a leading formula character is prefixed with an apostrophe (read back by `unguard`). */
 const guard = (cell: string): string => (FORMULA.test(cell) || /^'+[=+\-@\t\r]/.test(cell) ? `'${cell}` : cell);
 const unguard = (cell: string): string => (/^'+[=+\-@\t\r]/.test(cell) ? cell.slice(1) : cell);
-
-const quote = (cell: string): string => (/[",\n\r]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell);
 
 /** Rows of cells of an RFC 4180 CSV text (quotes, doubled quotes, CRLF / LF); null on an unterminated quote. */
 function parseCsv(text: string): string[][] | null {
@@ -101,7 +100,7 @@ export const exportPlyTable = defineCommand({
         String(sig(area * scale)),
         mass,
       ]
-        .map(quote)
+        .map(csvCell)
         .join(',');
     });
     const content = `${COLUMNS.join(',')}\n${lines.join('\n')}\n`;
@@ -239,9 +238,9 @@ export const plyBookData = defineCommand({
   name: 'ply_book_data',
   annotations: { readOnly: true },
   description:
-    'Numeric content of the ply book of a composite part: plies grouped by sequence label (one sheet per sequence), each with its id, name, ' +
-    'material, orientation in degrees, covered area in mm^2, the ids of its flat pieces (the pieces export_flat_patterns_dxf writes) and the ' +
-    'boundary length in mm. The ply book sheets themselves (SVG / PDF) are not generated yet. The result is flagged reviewRequired (a ply book ' +
+    'NUMBERS form of the ply book (the SVG sheets of the same plies come from export_ply_book): numeric content of the ply book of a composite part: plies grouped by sequence label (one sheet per sequence), each with its id, name, ' +
+    'material, orientation in degrees, covered area in mm^2, the ids of its flat pieces (the pieces export_ply_flat_patterns_dxf writes) and the ' +
+    'boundary length in mm. The result is flagged reviewRequired (a ply book ' +
     'is a release document) and unverified when a lamina record is mean / unknown data. Read-only.',
   params: z.object({ part: z.string().describe('Part id or name.') }),
   run: (doc, { part: partRef }): CommandResult => {

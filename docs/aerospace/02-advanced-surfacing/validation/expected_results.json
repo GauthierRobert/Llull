@@ -551,7 +551,7 @@
     "TR-SRF-09"
    ],
    "cli": {
-    "run": "llull run conceptual_wing.plan.json --doc t.llull.json --kernel occt --json; llull export_step_exact --save out/w.step --doc t.llull.json --kernel occt --json; llull import_step file=out/w.step --doc t.llull.json --kernel occt --json; llull mass_properties --doc t.llull.json --kernel occt --json",
+    "run": "llull run conceptual_wing.plan.json --doc t.llull.json --kernel occt --json; llull export_step_ap242 --save out/w.step --doc t.llull.json --kernel occt --json; llull import_step file=out/w.step --doc t.llull.json --kernel occt --json; llull mass_properties --doc t.llull.json --kernel occt --json",
     "assert": "data.volume relative change"
    }
   },

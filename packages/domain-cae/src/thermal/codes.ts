@@ -1,9 +1,7 @@
 /** PHY-03 §7.1 stable codes: remediation texts for refusals and check items. */
 
-import type { CadDocument } from '@core/model/types';
-import type { CommandResult } from '@core/commands/types';
-import { refuseCode } from '../shared/codes';
-import { codedRejection } from '@core/commands/noop';
+import { tableRejection } from '@core/commands/noop';
+import { codeRemediation } from '../shared/codes';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
   THM_CASE_TYPE: 'create a heat_steady / heat_transient analysis with create_analysis and use its id',
@@ -34,7 +32,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   THM_CAVITY_INVALID: 'give a unique cavity name of at most 3 characters and at least 2 faces',
   THM_CONTACT_INVALID: 'give master and slave targets on different parts and a positive conductance in W/(m^2*K)',
   THM_CONTACT_NOT_FOUND: 'list the contacts with describe_analysis (ids are tc-<step>.<k>)',
-  THM_BC_CONFLICT: 'keep one temperature BC per face (delete_thermal_bc), or move one to other faces, then re-mesh',
+  THM_BC_CONFLICT: 'keep one temperature BC per face (delete_analysis_item), or move one to other faces, then re-mesh',
   THM_HEAT_BALANCE: 'refine the mesh or time step and check the boundary conditions; do not report the result as final',
   THM_NO_LIMITS: 'add_temperature_limit with a datasheet or rule citation',
   THM_LIMIT_SOURCE_REQUIRED: 'add source: { citation } (component datasheet, company rule or material record)',
@@ -58,14 +56,4 @@ const REMEDIATION: Readonly<Record<string, string>> = {
 export const remediationOf = (code: string): string => REMEDIATION[code] ?? 'see the command description';
 
 /** `refuse` with the remediation of `code` (THM_* and results codes here, FEA_* set-up codes from the shared table). */
-export function refuseThermal(
-  doc: CadDocument,
-  command: string,
-  code: string,
-  message: string,
-  ids: readonly string[] = [],
-  paths: readonly string[] = [],
-): CommandResult {
-  if (Object.hasOwn(REMEDIATION, code)) return codedRejection(doc, command, code, message, remediationOf(code), ids, paths);
-  return refuseCode(doc, command, code, message, ids, paths);
-}
+export const refuseThermal = tableRejection(REMEDIATION, codeRemediation);

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { formatLength } from '@core/commands/document/units';
+import { formatLength } from '@core/model/units';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
 import { expectNoOp, expectPure } from '../helpers/expectNoOp';
 

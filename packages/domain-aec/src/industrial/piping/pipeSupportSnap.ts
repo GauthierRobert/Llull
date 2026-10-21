@@ -1,7 +1,7 @@
 /** Supports at the steel a pipe crosses: arc lengths where the centreline passes over (or under) a member, and the span check after them. */
 
 import type { SteelBar } from '../steelDesign/steelMemberBars';
-import type { PipeSupportElement } from '@core/model/building';
+import type { PipeSupportElement } from '@aec/building/types';
 import type { Vec3 } from '@core/model/types';
 import { arcLengths, pointAtArc } from './routeSupport';
 import type { EndCarrier, PipeRun } from './pipeSupportLayout';

@@ -7,7 +7,7 @@ import { execute } from '@core/commands/registry';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { signedMeshVolume } from '@core/geometry/meshVolume';
 import type { CadDocument, MeshSolidEntity } from '@core/model/types';
-import type { FastenerStack } from '@core/model/fasteners';
+import type { FastenerStack } from '@aero/fasteners/types';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { expectPure } from '../../../helpers/expectNoOp';
 import { ctxWith, dataOf, docWith, inchDocument, ok, readValidation, sampleCatalogFile } from './fixtures';

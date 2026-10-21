@@ -1,7 +1,7 @@
 // Pure builders of the model highlight for the Fasteners panel: a placed stack (its layers, fastener, washers and nut + a beacon on the axis
 // with size / part number) and a layout finding (the offending stacks with the message).
 
-import type { FastenerStack } from '@core/model/fasteners';
+import type { FastenerStack } from '@aero/index';
 import type { CadDocument } from '@core/model/types';
 import type { PanelFocus } from '@ui/store/focusStore';
 

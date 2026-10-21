@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import type { SimulationData } from '@core/dynamics/simulationReport';
+import type { SimulationData } from '@dynamics/sim/simulationReport';
 import { SeriesChart } from '@ui/panels/SeriesChart';
 import { TimelineDock } from '@ui/components/TimelineDock';
 import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';

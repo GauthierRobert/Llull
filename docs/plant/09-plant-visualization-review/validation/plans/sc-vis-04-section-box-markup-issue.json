@@ -79,8 +79,7 @@
       "command": "save_viewpoint",
       "params": {
         "name": "skid review",
-        "fromDocumentCamera": true,
-        "sectionBoxId": "$box"
+        "fromDocumentCamera": true
       },
       "as": "vp"
     },

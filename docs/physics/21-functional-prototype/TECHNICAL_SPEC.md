@@ -10,8 +10,8 @@ Gap id **PHY-21** · prefix **FPR** · status: specification · written 2026-10-
 | Dynamics model    | `DynamicsModel { gravity, bodies, joints, gears, motors, propellers }`. `RigidBody { entityIds, fixed, density?, massKg? }`. `DynamicJoint { kind: 'revolute' \| 'prismatic', parent, child, anchor, axis, damping, friction, initialVelocity }`                | `packages/core/src/model/dynamics.ts`                                                                                                                                              | Invariant "each body is the child of at most one joint", so no loops; no spherical kind; motors are torque curve or speed governor only |
 | Engine boundary   | `PhysicsEngine.simulate(SimulationModel, SimulationOptions): SimulationTrace`. Bodies ordered parent before child, each with `joint \| null`. `gears` and `servos`. Pure `loads(state)` callback for joint and body forces                                      | `packages/core/src/dynamics/physicsEngine.ts`                                                                                                                                      | Tree only; trace has positions, velocities, poses and servo force, but **no constraint or reaction forces**                             |
 | MuJoCo adapter    | MJCF from the tree, RK4, **no geoms** (no contacts). Gears = `<joint>` equality, `solref = 2·dt`, `solimp 0.9999 0.9999 0.001`. Servos = `intvelocity`. Loads at the step midpoint                                                                              | `packages/physics-mujoco/src/{mjcf,mujocoPhysics}.ts` (`@mujoco/mujoco` 3.14.0)                                                                                                    | No `connect` equalities; `mj_rnePostConstraint`, `efc_*`, `cfrc_int` not read                                                           |
-| Force laws        | `motorForce` (torque curve × throttle, governor), `propellerOutput` (static Ct, Cp)                                                                                                                                                                             | `packages/core/src/dynamics/forceLaws.ts`                                                                                                                                          | No cylinder pressure                                                                                                                    |
-| Report            | Final rpm, settle time, engine and propeller output, measured gear ratios, tip Mach and figure-of-merit warnings; `detail: summary \| series \| poses`                                                                                                          | `packages/core/src/dynamics/simulationReport.ts`                                                                                                                                   | No reactions, no crank-angle axis, no energy closure                                                                                    |
+| Force laws        | `motorForce` (torque curve × throttle, governor), `propellerOutput` (static Ct, Cp)                                                                                                                                                                             | `packages/domain-dynamics/src/sim/forceLaws.ts`                                                                                                                                          | No cylinder pressure                                                                                                                    |
+| Report            | Final rpm, settle time, engine and propeller output, measured gear ratios, tip Mach and figure-of-merit warnings; `detail: summary \| series \| poses`                                                                                                          | `packages/domain-dynamics/src/sim/simulationReport.ts`                                                                                                                                   | No reactions, no crank-angle axis, no energy closure                                                                                    |
 | Kinematic joints  | Separate model `doc.joints` (instances, `add_joint`, `motion_study` sweep, AABB interference)                                                                                                                                                                   | `packages/core/src/commands/motion/*`                                                                                                                                              | AABB only; a second mechanism model next to `doc.dynamics`                                                                              |
 | Model check       | `check_model`: degenerate sizes, open profiles, dangling references, far from origin, parameter errors                                                                                                                                                          | `packages/core/src/commands/inspect/checkModel.ts`                                                                                                                                 | Nothing physical                                                                                                                        |
 | Kernel            | `GeometryKernel { supports, evaluate(ShapeRecipe), tessellate, topology, exportStep }`. Recipes include `boolean` (union / subtract / intersect) and `place`. `ShapeTopology { solids, faces: { index, surface, area }[], edges, vertices, volume }` (OCC only) | `packages/core/src/geometry/kernel.ts`, `model/types.ts` ≈ l. 717                                                                                                                  | No distance query, no validity status, no lump count on Manifold, no face axis or radius (joint realisation needs them)                 |
@@ -41,13 +41,13 @@ packages/core/src/geometry/
                    — the reference and small-case path (RS1 §2 rule 4)
    geometryQueries.ts  GeometryQueryEngine port (batch distance / ray queries); TS default on meshBvh, host-installed
                    native implementation = `llull-compute geomq` (§2.1)
-packages/core/src/dynamics/
+packages/domain-dynamics/src/sim/
    topology.ts (spanning tree + loop closures) · mobility.ts (Gruebler + Jacobian rank) · cylinderPressure.ts ·
    engineReport.ts (crank-angle series, MEP, energy closure, ripple) · reactions.ts (frames, derived engine loads)
    engineLosses.ts (PNH / Chen–Flynn / table FMEP) · singleZone.ts (Wiebe + Woschni) · gearLoss.ts ·
    propellerTable.ts (C_T(J), C_P(J)) · accuracy.ts (Accuracy envelope, validation level) · referenceCompare.ts
 packages/core/src/model/   materials catalogue with sources (al_4032, steel_4340) · reference data sets (Rotax, Lycoming)
-   commands/dynamics/  set_engine_losses · add_reference_data · compare_to_reference (query)
+   packages/domain-dynamics/src/commands/  set_engine_losses · add_reference_data · compare_to_reference (query)
 packages/core/src/geometry/kernel.ts   + analyze · distance  (optional methods; null = unsupported)
 packages/kernel-manifold · packages/kernel-occt        implement them
 packages/physics-mujoco                                  connect equalities, solver settings, reactions in the trace
@@ -350,7 +350,7 @@ interface CheckResult {
 | ----------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `check_assembly`              | query, `requiresKernel`           | `{ scope?: 'all' \| { ids } \| { body } \| { component }, clearanceMm?, touchToleranceMm?, process?: ProcessId, minWallMm?, thickness?: 'off' \| 'ray', raysPerPart? (default 2000, max 20 000), includeJoints?: boolean (default true) }` | `@affects none` · `@invariant same doc back, affected []` · `@failure no kernel ⇒ FPR_KERNEL_UNSUPPORTED; budget ⇒ FPR_BUDGET_EXCEEDED`                                                                                                                                                                                        |
 | `allow_interference`          | mutating                          | `{ a, b, kind, reason }`                                                                                                                                                                                                                   | `@affects doc.prototype.intents` · `@failure a = b, unknown id, empty reason`                                                                                                                                                                                                                                                  |
-| `remove_interference_intent`  | mutating                          | `{ id }`                                                                                                                                                                                                                                   | `@affects doc.prototype.intents`                                                                                                                                                                                                                                                                                               |
+| `delete_interference_intent`  | mutating                          | `{ id }`                                                                                                                                                                                                                                   | `@affects doc.prototype.intents`                                                                                                                                                                                                                                                                                               |
 | `set_part_grounded`           | mutating                          | `{ ids, grounded: boolean }`                                                                                                                                                                                                               | `@affects doc.prototype.grounded`                                                                                                                                                                                                                                                                                              |
 | `add_body_joint` (extended)   | mutating                          | `+ kind: 'spherical'`; child may already have a joint                                                                                                                                                                                      | `@invariant parent ≠ child`; `@failure loop needs a prismatic closure ⇒ FPR_LOOP_PRISMATIC`                                                                                                                                                                                                                                    |
 | `add_cylinder_pressure`       | mutating                          | `{ piston, crank, boreMm, compressionRatio, cycle?, firingOffsetDeg?, tdcCrankAngleDeg?, ambientPressurePa?, model }`                                                                                                                      | `@affects doc.dynamics.cylinders` · `@failure piston not prismatic, crank not revolute, bore ≤ 0, CR ≤ 1, table not covering the cycle, Wiebe a ≤ 0 or duration ≤ 0`                                                                                                                                                           |
@@ -542,7 +542,7 @@ above the gate gives `FPR_LOOP_OPEN`.
    time and angle, max penetration estimate and the volume at the worst pose; the achieved resolution. Pairs joined by
    a joint whose min distance ≈ the realised clearance are `touch` (pin in bore), not a failure.
 
-**As built (FPR-C), deviations from the sketch above** (`commands/dynamics/{checkMotionClearance,motionClearanceRun}.ts`,
+**As built (FPR-C), deviations from the sketch above** (`packages/domain-dynamics/src/commands/{checkMotionClearance,motionClearanceRun}.ts`,
 `dynamics/motionPoses.ts`):
 
 - Source: simulated runs only (`simulate_motion` poses, same `duration` / `timestep` / `sampleRate`); the `motion_study` sweep source
@@ -766,8 +766,8 @@ within its 2.5 w. MVP is about 12 weeks of agent lane time. M1 and M2 run in par
    Proposal: a separate core task after PHY-21.
 3. **Placement. Decided 2026-10-16 (owner): core for now, in its own folder.**
    - The engine-specific parts (`add_cylinder_pressure`, `engine_quick_check`, `set_engine_losses`, reference data,
-     the cylinder-pressure, loss and engine-report laws) live in `packages/core/src/dynamics/engine/` and
-     `packages/core/src/commands/dynamics/engine/`. Generic dynamics code never imports from them.
+     the cylinder-pressure, loss and engine-report laws) live in `packages/domain-dynamics/src/sim/engine/` and
+     `packages/domain-dynamics/src/commands/engine/`. Generic dynamics code never imports from them.
    - A plugin cannot contribute force laws today (`CadPlugin` has commands, guards and document data only), and
      these laws run in `loads(state)`. Extract to a plugin package when a second engine domain appears or a plugin
      force-law extension point exists; with the folder boundary that is a move.
@@ -816,9 +816,9 @@ within its 2.5 w. MVP is about 12 weeks of agent lane time. M1 and M2 run in par
 
 ### M3b realism (FPR-E): as built, 2026-10-19
 
-Files. Core laws in `packages/core/src/dynamics/engine/` (`accuracy`, `engineLosses`, `brakeCalibration`, `gearLoss`, `propellerTable`,
+Files. Core laws in `packages/domain-dynamics/src/sim/engine/` (`accuracy`, `engineLosses`, `brakeCalibration`, `gearLoss`, `propellerTable`,
 `plausibility`, `engineRealism`, `quickBrake`, `combustionOrigin`, `referencePresets`, `referenceComparison`, `sourcedMaterials`),
-commands in `packages/core/src/commands/dynamics/engine/` (`losses`, `reference`, `calibrateCylinder`, `compareReference`,
+commands in `packages/domain-dynamics/src/commands/engine/` (`losses`, `reference`, `calibrateCylinder`, `compareReference`,
 `timestepConvergence`, `operatingPoint`, `engineValidation`); the MuJoCo side of the gear loss is `packages/physics-mujoco/src/gearLoss.ts`.
 
 - **Accuracy envelope (TR-FPR-14).** `Accuracy { band | null, basis, origin, validationLevel, comparison?, warnings }`. It is attached as
@@ -864,7 +864,7 @@ commands in `packages/core/src/commands/dynamics/engine/` (`losses`, `reference`
   `simulate_motion` accepts `timestep` ≥ 5e-6 s so the half of the smallest auto step is reachable. At the pack's rated point the mean brake
   torque changes by far less than 1 %.
 - **Placement (Q3), not yet clean.** The M1–M3 engine files (`cylinderPressure`, `cylinderLoads`, `engineGeometry`, `engineReport`,
-  `singleZone`, `pressureCurve`, `slider`, `commands/dynamics/{cylinders,quickCheck}.ts`) were not moved into the `engine/` folders, and generic
+  `singleZone`, `pressureCurve`, `slider`, `packages/domain-dynamics/src/commands/{cylinders,quickCheck}.ts`) were not moved into the `engine/` folders, and generic
   dynamics code imports the new laws (`simulationModel` → `engineLosses`, `forceLaws` → `propellerTable`). A pure move is deferred.
   _Fixed in FPR-D (review), see below._
 - **Persistence.** Load validation covers `losses`, gear `efficiency` / `teeth`, the propeller extras and `prototype.references`; older documents
@@ -889,13 +889,13 @@ Validation cases automated (`tests/unit/engineRealism.test.ts`, `tests/unit/mujo
 
 **FPR-E review fixes (in the same branch).**
 
-- **Q3 placement.** `propellerTable`, `gearLoss` and `accuracy` moved to `packages/core/src/dynamics/`; `sourcedMaterials` to
+- **Q3 placement.** `propellerTable`, `gearLoss` and `accuracy` moved to `packages/domain-dynamics/src/sim/`; `sourcedMaterials` to
   `commands/document/`; `engineValidation` beside the load validators (`commands/persistence/`). The friction law and the realism report reach
   generic code through injection points: `dynamics/engineLossHook.ts` (`simulationModel`; a model with losses and no installed law is refused,
-  never run lossless) and `commands/dynamics/realismHook.ts` (`simulate_motion`). `commands/dynamics/engine/hooks.ts` installs both.
-  **Remaining edges into the engine folders, listed honestly:** `commands/dynamics/catalog.ts` (registration of the engine commands and the
-  `installEngineLaws()` call: the catalog is the composition point); `commands/dynamics/cylinders.ts` → `engine/calibrateCylinder` and
-  `commands/dynamics/quickCheck.ts` → `engine/quickBrake` (both are themselves engine files not yet moved, see above). `check_prototype` calls
+  never run lossless) and `packages/domain-dynamics/src/commands/realismHook.ts` (`simulate_motion`). `packages/domain-dynamics/src/commands/engine/hooks.ts` installs both.
+  **Remaining edges into the engine folders, listed honestly:** `packages/domain-dynamics/src/commands/catalog.ts` (registration of the engine commands and the
+  `installEngineLaws()` call: the catalog is the composition point); `packages/domain-dynamics/src/commands/cylinders.ts` → `engine/calibrateCylinder` and
+  `packages/domain-dynamics/src/commands/quickCheck.ts` → `engine/quickBrake` (both are themselves engine files not yet moved, see above). `check_prototype` calls
   the engine commands through `ctx.registry`, not by import.
 - **Load validation.** `calibratedRpm` (array of finite numbers > 0), material `source` (non-empty) and `grade` (A / B / C); a body counts as
   sourced only with a non-empty source.
@@ -911,10 +911,10 @@ Validation cases automated (`tests/unit/engineRealism.test.ts`, `tests/unit/mujo
 
 - `check_motion_clearance` completion: poses between samples follow the **screw motion** (a crank stays on its arc; the former COM lerp cut
   the chord and over-stated the clearance by ~2 µm), contact-interval edges are **bisected** to 1e-3 of the sample spacing, and the closest
-  approach is refined by a golden-section search within one sample (`commands/dynamics/motionRefine.ts`). VC-FPR-18 (4.87508 mm at
+  approach is refined by a golden-section search within one sample (`packages/domain-dynamics/src/commands/motionRefine.ts`). VC-FPR-18 (4.87508 mm at
   ±2.8624°) and VC-FPR-19 (contact on ±21.2735°) pass at the spec tolerances (`tests/unit/checkMotionClearance.test.ts`). Still direct
   `meshBvh`, not `ctx.geometryQueries` (RS-6 wiring).
-- `check_prototype` (`commands/dynamics/checkPrototype.ts`, toolset `analysis`): check_assembly → mobility → check_motion_clearance →
+- `check_prototype` (`packages/domain-dynamics/src/commands/checkPrototype.ts`, toolset `analysis`): check_assembly → mobility → check_motion_clearance →
   check_dynamics, plus for engines `check_timestep_convergence` and `compare_to_reference` (the M3b deferral: both are **folded into the
   dynamics check**, their items carry their `accuracy`). The mechanism row uses the **rank DOF of `inspect_dynamics`** (a Gruebler count
   calls every slider-crank locked); `check_mechanism` only for kinematic joints without a dynamics model. Stops before the motion checks on

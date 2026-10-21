@@ -2,6 +2,7 @@
 
 import type { MeshData } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
+import { quantizedKey } from '@lib/quantize';
 import { cross3, dot3, normalize3, sub3 } from '@lib/vec3';
 import { extentOf } from './types';
 
@@ -9,9 +10,6 @@ export interface PlanarLoops {
   readonly outer: readonly Vec3[];
   readonly holes: readonly (readonly Vec3[])[];
 }
-
-/** Welding key of a vertex: coordinates rounded to 1e-9 of the face size. */
-const keyOf = (point: Vec3, grid: number): string => point.map((value) => Math.round(value / grid)).join(',');
 
 /** Signed area of a loop about `normal`. */
 function areaAbout(loop: readonly Vec3[], normal: Vec3): number {
@@ -49,7 +47,7 @@ export function planarLoops(mesh: MeshData, normal: Vec3): PlanarLoops | null {
   const welded: Vec3[] = [];
   const idOf = (index: number): number => {
     const point = points[index] ?? [0, 0, 0];
-    const key = keyOf(point, grid);
+    const key = quantizedKey(point, grid);
     let id = ids.get(key);
     if (id === undefined) {
       id = welded.length;

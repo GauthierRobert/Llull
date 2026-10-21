@@ -150,14 +150,14 @@ describe('native transports through POST /exchange and llull --server', () => {
   it('fatigue_field runs remotely on the live document and answers the local data (VC-FAT-43 field, hot spots)', async () => {
     const fixture = feFatigue({ cells: [6, 3, 3], steps: 200, seed: 5 });
     const { local, store } = stage(fixture.doc, [fixture.mesh, fixture.results]);
-    const params = { caseId: fixture.caseId, verify: true };
+    const params = { caseId: fixture.caseId };
     const remote = (await remoteRun('fatigue_field', params)) as Json;
     expect(remote).toEqual({ ...((await localRun('fatigue_field', params, local, store)) as Json), changed: false });
     if (BINARY !== null) {
-      expect(remote).toMatchObject({ isError: false, data: { nodes: 112, engine: 'native-cpu', verification: { identical: true } } });
+      expect(remote).toMatchObject({ isError: false, data: { nodes: 112, engine: 'native-cpu' } });
       expect(((remote['data'] as Json)['computeFatigue'] as Json)['selection']).toBe('all_nodes');
     } else expect(remote).toMatchObject({ isError: true, data: { code: 'NATIVE_TOOL_MISSING' } });
-    const cli = await cliRun(['fatigue_field', `caseId=${fixture.caseId}`, 'verify=true']);
+    const cli = await cliRun(['fatigue_field', `caseId=${fixture.caseId}`]);
     expect(cli.code).toBe(BINARY !== null ? EXIT_OK : 1);
     expect(stable(cli.json['data'])).toEqual(remote['data']);
   });

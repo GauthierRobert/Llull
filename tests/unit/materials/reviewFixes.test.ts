@@ -190,9 +190,9 @@ describe('review fix 5: material-model commands refuse library records', () => {
         },
       },
     ],
-    ['remove_property_model', { material: 'aa7075_t6', modelId: 'density' }],
+    ['delete_property_model', { material: 'aa7075_t6', modelId: 'density' }],
     ['add_material_model', { material: 'aa7075_t6', id: 'sy', model: { kind: 'elastic' }, basis: 'B', source: { citation: 'c' } }],
-    ['remove_material_model', { material: 'aa7075_t6', id: 'sy' }],
+    ['delete_material_model', { material: 'aa7075_t6', id: 'sy' }],
     ['define_constitutive_set', { material: 'aa7075_t6', set: { id: 'set1' } }],
   ])('%s -> MAT_RECORD_READONLY', (name, params) => {
     const start = imported();

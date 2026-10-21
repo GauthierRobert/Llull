@@ -1,7 +1,7 @@
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
-import type { PipeLine } from '@core/model/plant';
+import type { PipeLine } from '@aec/plant/types';
 import { nextId } from '@lib/id';
 import { getPiping, refuse, withPiping } from '../model';
 import { pipeOutsideDiameter } from '../sizes';

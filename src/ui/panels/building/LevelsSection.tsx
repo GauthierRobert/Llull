@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
-import type { BuildingLevel } from '@core/model/building';
+import type { BuildingLevel } from '@aec/index';
 import { DeleteButton, IconButton, ListRow, PanelSection } from '@ui/panels/PanelParts';
 import { optionalNumber, optionalText } from '@ui/numberText';
 import { CopyLevelForm, LevelEditForm } from './LevelEditors';

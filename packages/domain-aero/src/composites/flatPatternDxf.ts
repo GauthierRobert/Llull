@@ -1,4 +1,4 @@
-/** export_flat_patterns_dxf: ply flat patterns of plane, cylinder and cone tool faces as an R12 DXF in millimetres (FR-CMP-43, FR-CMP-50, VC-CMP-14..16). */
+/** export_ply_flat_patterns_dxf: ply flat patterns of plane, cylinder and cone tool faces as an R12 DXF in millimetres (FR-CMP-43, FR-CMP-50, VC-CMP-14..16). */
 
 import { confirmExportControlled, defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
@@ -21,7 +21,7 @@ const LABEL_FIELDS = ['name', 'orientation', 'sequence', 'material'] as const;
  * @failure unknown part / ply -> CMP_REF_MISSING; no plies -> CMP_NO_PLIES
  */
 export const exportFlatPatternsDxf = defineCommand({
-  name: 'export_flat_patterns_dxf',
+  name: 'export_ply_flat_patterns_dxf',
   annotations: { readOnly: true },
   description:
     'Export the flat patterns of the plies of a composite part as a DXF text file (R12, millimetres, $INSUNITS 4) ready for a ply cutter. ' +
@@ -58,19 +58,20 @@ export const exportFlatPatternsDxf = defineCommand({
     },
     ctx,
   ): CommandResult => {
-    const refused = exportRefusal(doc, 'export_flat_patterns_dxf', 'data', confirmation, ctx);
+    const refused = exportRefusal(doc, 'export_ply_flat_patterns_dxf', 'data', confirmation, ctx);
     if (refused !== null) return refused;
     const model = compositesOf(doc);
     const part = findPart(model, partRef);
-    if (part === null) return refuseCmp(doc, 'export_flat_patterns_dxf', 'CMP_REF_MISSING', `no part '${partRef}'`, [], ['params.part']);
+    if (part === null)
+      return refuseCmp(doc, 'export_ply_flat_patterns_dxf', 'CMP_REF_MISSING', `no part '${partRef}'`, [], ['params.part']);
     if (!(allowance >= 0))
-      return refuseCmp(doc, 'export_flat_patterns_dxf', 'CMP_PARAM_INVALID', 'allowance must be >= 0', [part.id], ['params.allowance']);
+      return refuseCmp(doc, 'export_ply_flat_patterns_dxf', 'CMP_PARAM_INVALID', 'allowance must be >= 0', [part.id], ['params.allowance']);
     const chosen = selection === undefined ? pliesOf(model, part.id) : selection.map((ref) => findPly(model, part.id, ref));
     const missing = (selection ?? []).filter((_, i) => chosen[i] === null);
     if (missing.length > 0)
       return refuseCmp(
         doc,
-        'export_flat_patterns_dxf',
+        'export_ply_flat_patterns_dxf',
         'CMP_REF_MISSING',
         `unknown ply(ies) ${missing.join(', ')}`,
         [part.id],
@@ -80,7 +81,7 @@ export const exportFlatPatternsDxf = defineCommand({
     if (plies.length === 0)
       return refuseCmp(
         doc,
-        'export_flat_patterns_dxf',
+        'export_ply_flat_patterns_dxf',
         'CMP_NO_PLIES',
         `part "${part.name}" has no plies to export`,
         [part.id],
@@ -95,7 +96,7 @@ export const exportFlatPatternsDxf = defineCommand({
       const layer = `PLY_${dxfLayerName(ply.name)}`;
       const material = model.materials[ply.materialName];
       const flat = flatPiecesOf(part, ply, material, allowOverLock);
-      if (!flat.ok) return refuseCmp(doc, 'export_flat_patterns_dxf', flat.code, flat.message, [ply.id], ['params.allowOverLock']);
+      if (!flat.ok) return refuseCmp(doc, 'export_ply_flat_patterns_dxf', flat.code, flat.message, [ply.id], ['params.allowOverLock']);
       methods.add(flat.method);
       for (const { index, polygon: source, fibre } of flat.pieces) {
         const grown = allowance > 0 ? offsetPolygon(toCounterClockwise(source), allowance) : toCounterClockwise(source);
@@ -153,7 +154,7 @@ export const exportFlatPatternsDxf = defineCommand({
     const total = pieces.reduce((sum, piece) => sum + (piece['areaMm2'] as number), 0);
     return report(
       doc,
-      `export_flat_patterns_dxf: part "${part.name}" (${part.surface.type} face): ${pieces.length} piece(s) of ${plies.length} ply(ies), total area ${sig(total)} mm^2, ${content.length} DXF characters (R12, mm).`,
+      `export_ply_flat_patterns_dxf: part "${part.name}" (${part.surface.type} face): ${pieces.length} piece(s) of ${plies.length} ply(ies), total area ${sig(total)} mm^2, ${content.length} DXF characters (R12, mm).`,
       {
         part: part.id,
         surface: part.surface.type,

@@ -4,6 +4,7 @@ import type { AnalysisCase } from '@core/model/analysis';
 import type { ExplicitSpec } from '@core/model/explicit';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
+import { unitSystemFactors } from '../decks/units';
 import { caseOf, withCase } from '../shared/access';
 
 /** The case and its spec when `analysisId` is an explicit case, else a code + message. */
@@ -26,9 +27,8 @@ export const withSpec = (doc: CadDocument, analysisCase: AnalysisCase, spec: Exp
 export function supportedUnits(
   analysisCase: AnalysisCase,
 ): { readonly length: string; readonly stress: string; readonly energy: string; readonly force: string } | null {
-  if (analysisCase.unitSystem === 'N-mm-t-s') return { length: 'mm', stress: 'MPa', energy: 'mJ', force: 'N' };
-  if (analysisCase.unitSystem === 'N-m-kg-s') return { length: 'm', stress: 'Pa', energy: 'J', force: 'N' };
-  return null;
+  const { lengthUnit, stressUnit, energyUnit } = unitSystemFactors(analysisCase.unitSystem);
+  return energyUnit === null ? null : { length: lengthUnit, stress: stressUnit, energy: energyUnit, force: 'N' };
 }
 
 const finite = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value);

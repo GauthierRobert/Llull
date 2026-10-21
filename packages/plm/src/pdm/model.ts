@@ -1,6 +1,6 @@
 /** What the PDM export says about one revision, as plain data: built from `doc.plm`, written to Part 21 (`write.ts`), read back from it (`read.ts`) and compared. */
 
-import type { LifecycleState, PlmModel, Revision } from '@core/model/plm';
+import type { LifecycleState, PlmModel, Revision } from '@plm/types';
 import type { CadDocument } from '@core/model/types';
 import { liveStructure } from '../structure';
 import { isoOf, parseInstant } from './part21';

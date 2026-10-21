@@ -1,6 +1,6 @@
 /** Part-number grammar: decode a part number into its fields and format fields back into a part number. */
 
-import type { PartNumberField } from '@core/model/fasteners';
+import type { PartNumberField } from '@aero/fasteners/types';
 
 export type FieldValues = Readonly<Record<string, string | number>>;
 

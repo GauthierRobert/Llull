@@ -3,7 +3,7 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, report } from '@core/commands/noop';
-import type { AsBuiltDeviation, AsBuiltRecord } from '@core/model/plm';
+import type { AsBuiltDeviation, AsBuiltRecord } from '@plm/types';
 import { PART_NUMBER } from '../document';
 import { humanAct } from '../gate';
 import { atSchema, bySchema, confirmationSchema } from '../params';
@@ -28,9 +28,9 @@ const MAX_DEVIATIONS = 500;
 export const recordAsBuilt = defineCommand({
   name: 'record_as_built',
   description:
-    'HUMAN GATE. Record what was built for one serial number: the product baseline it was designed to (create_baseline) and the deviations from it, each ' +
+    'Record what was built for one serial number: the product baseline it was designed to (create_baseline) and the deviations from it, each ' +
     '{ partNumber (a member of the baseline), installedRevision (a revision label different from the baselined one), authority (the request for variance / waiver ' +
-    'that allowed it, non-empty) }. An empty deviations list records a unit built exactly to the baseline. Optionally names the manufacturing BOM it was built ' +
+    'that allowed it, non-empty) }. HUMAN GATE. An empty deviations list records a unit built exactly to the baseline. Optionally names the manufacturing BOM it was built ' +
     'from (create_mbom, same baseline). The record is sealed with a SHA-256 and never edited. Needs `confirmation` (plm_act_payload) over exactly these params: ' +
     'an agent prepares the data and hands over (PLM_HUMAN_GATE). Compare with as_built_vs_as_designed.',
   annotations: { metaHistory: true },

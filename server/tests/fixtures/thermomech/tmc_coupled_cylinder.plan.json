@@ -138,7 +138,7 @@
   },
   {
     "command": "set_mesh_controls",
-    "params": { "analysisId": "$an", "mesher": "gmsh", "elementFamily": "tet", "order": 2, "globalSize": 2.0 }
+    "params": { "analysisId": "$an", "elementFamily": "tet", "order": 2, "globalSize": 2.0 }
   },
   { "command": "add_result_probe", "params": { "analysisId": "$an", "name": "bore_hoop", "point": [10, 0, 0], "quantity": "s_yy" } },
   { "command": "add_result_probe", "params": { "analysisId": "$an", "name": "outer_hoop", "point": [20, 0, 0], "quantity": "s_yy" } },

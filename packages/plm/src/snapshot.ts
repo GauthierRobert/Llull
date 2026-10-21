@@ -1,7 +1,7 @@
 /** Reading a revision's frozen definition, wherever it is kept: inline in the record, or as an object of the local vault (M3). */
 
 import type { ExecutionContext } from '@core/commands/types';
-import type { Revision } from '@core/model/plm';
+import type { Revision } from '@plm/types';
 
 /**
  * The exact canonical text of the snapshot of `revision`, or null when it is not readable here: no snapshot, or externalized and the vault object is not

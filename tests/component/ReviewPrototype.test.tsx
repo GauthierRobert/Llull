@@ -3,7 +3,7 @@
 // cursor, crank axis with the TDC mark, a collision event seeks), FR-FPR-63 (reference overlay).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import type { SimulationData } from '@core/dynamics/simulationReport';
+import type { SimulationData } from '@dynamics/sim/simulationReport';
 import type { DynamicsModel } from '@core/model/dynamics';
 import { ReviewPanel } from '@ui/panels/review/ReviewPanel';
 import { MechanismGraph } from '@ui/panels/review/MechanismGraph';

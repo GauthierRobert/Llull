@@ -1,8 +1,8 @@
-/** Zod params shared by cfd_create_case / cfd_update_case and the normalisation of parsed params into a `CfdCase` (no `undefined` members). */
+/** Zod params shared by create_cfd_case / update_cfd_case and the normalisation of parsed params into a `CfdCase` (no `undefined` members). */
 
 import { vec3, z } from '@core/commands/schema';
 import type { Vec3 } from '@core/model/types';
-import type { CfdBoundaryTag, CfdCase, CfdFreestream, CfdSlice } from '@core/model/cfd';
+import type { CfdBoundaryTag, CfdCase, CfdFreestream, CfdSlice } from '@aero/cfd/types';
 
 const entityIds = z
   .array(z.string())

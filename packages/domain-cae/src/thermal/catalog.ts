@@ -1,35 +1,33 @@
 /** PHY-03 thermal FE commands. */
 
 import { commandCatalog } from '@core/commands/schema';
-import { defineAmplitude, deleteAmplitude } from './amplitude';
-import { addThermalBc, deleteThermalBc, updateThermalBc } from './bcCommands';
+import { thermalAnalyticCheck } from './analyticCheck';
+import { defineAmplitude } from './amplitude';
+import { addThermalBc, updateThermalBc } from './bcCommands';
+import { computeViewFactors } from './computeViewFactors';
 import { checkThermal } from './check';
 import { setThermalPhysicalConstants } from './constantsCommand';
 import { disposeThermalLimit } from './dispose';
 import { checkTemperatureLimits } from './limitsCheck';
-import { thermalReport } from './report';
-import { addTemperatureLimit, deleteTemperatureLimit } from './limitCommands';
-import { addThermalContact, deleteThermalContact, updateThermalContact } from './contactCommands';
+import { addTemperatureLimit } from './limitCommands';
+import { addThermalContact, updateThermalContact } from './contactCommands';
 import { addCavityRadiation } from './radiationCommands';
 import { setInitialTemperature, setThermalStep } from './stepCommands';
 
 export const thermalCommands = commandCatalog(
   addThermalBc,
   updateThermalBc,
-  deleteThermalBc,
   setInitialTemperature,
   defineAmplitude,
-  deleteAmplitude,
   setThermalStep,
   setThermalPhysicalConstants,
   addTemperatureLimit,
-  deleteTemperatureLimit,
   addCavityRadiation,
   addThermalContact,
   updateThermalContact,
-  deleteThermalContact,
-  thermalReport,
   checkThermal,
   checkTemperatureLimits,
   disposeThermalLimit,
+  thermalAnalyticCheck,
+  computeViewFactors,
 );

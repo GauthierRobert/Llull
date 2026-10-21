@@ -25,7 +25,7 @@ import { jcsJson } from '@lib/jcs';
 import { writeFileAtomic } from '../../writeFileAtomic';
 import { serverContext } from '../../fea/context';
 import { type AuditLog, appendSafely, createAuditLog, paramsHash } from '../auditChain';
-import { isoSeconds } from '../hostRun';
+import { isoSeconds } from '@protocol/hostParams';
 import { type LockHolder, type LockRecord, acquireLock, breakLock, isStale, readLock, releaseLock, sameHolder } from './locks';
 import { type ObjectStore, createObjectStore } from './objectStore';
 

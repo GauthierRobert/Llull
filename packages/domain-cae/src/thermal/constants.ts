@@ -1,7 +1,7 @@
 /** Named physical constants of radiation cases (PHY-03 FR-THM-20, VC-THM-60): value, unit, source, defaulted. */
 
 import type { Named, ThermalSetup } from '@core/model/analysis';
-import { STEFAN_BOLTZMANN } from '@lib/thermalClosedForms';
+import { STEFAN_BOLTZMANN } from './thermalClosedForms';
 import { absoluteZeroOf } from './quantities';
 
 /** Named default: heat-balance residual above which `THM_HEAT_BALANCE` warns. */
@@ -27,4 +27,10 @@ export const physicalConstantsOf = (thermal: ThermalSetup): { stefanBoltzmann: N
     source: 'SI definition of degC',
     defaulted: true,
   },
+});
+
+/** The default (no-case) constants, as returned by `thermal_analytic_check`. */
+export const physicalConstants = (): { stefanBoltzmann: Named; absoluteZero: Named } => ({
+  stefanBoltzmann: { value: STEFAN_BOLTZMANN, unit: 'W/(m^2 K^4)', source: '2019 SI exact constants', defaulted: true },
+  absoluteZero: { value: -273.15, unit: 'degC', source: 'SI definition of degC', defaulted: true },
 });

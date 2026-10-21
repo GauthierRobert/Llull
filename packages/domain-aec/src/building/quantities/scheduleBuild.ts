@@ -1,6 +1,6 @@
 import { shapeOf } from '../../industrial/equipment/equipmentShape';
 import type { CadDocument } from '@core/model/types';
-import type { CurvedWallElement, BuildingModel, OpeningElement, WallElement } from '@core/model/building';
+import type { CurvedWallElement, BuildingModel, OpeningElement, WallElement } from '@aec/building/types';
 import { distance, polygonArea, polygonPerimeter } from '@lib/polygon';
 import { elementsOf, getBuilding } from '../model';
 import { round } from '../../shared/numeric';

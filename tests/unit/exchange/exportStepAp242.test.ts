@@ -1,4 +1,4 @@
-/** export_step_ap242 / export_step_exact (XDE path) / geometric_validation_properties over a scripted XDE kernel (no OpenCascade). */
+/** export_step_ap242 (XDE path) / geometric_validation_properties over a scripted XDE kernel (no OpenCascade). */
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
@@ -312,10 +312,10 @@ describe('export_step_ap242: unverified imported bodies (TR-XCH-26)', () => {
   });
 });
 
-describe('export_step_exact through the XDE writer (TR-XCH-19)', () => {
+describe('export_step_ap242 through the XDE writer (TR-XCH-19)', () => {
   it('keeps the legacy data shape in AP214 without validation properties', () => {
     const { doc } = assemblyDoc();
-    const { result, fake } = run(doc, 'export_step_exact', {});
+    const { result, fake } = run(doc, 'export_step_ap242', { schema: 'ap214', includeValidationProperties: false });
     expect(fake.requests[0]).toMatchObject({ schema: 'ap214' });
     expect(fake.requests[0]?.products.every((product) => product.validation === undefined)).toBe(true);
     const data = dataOf<{
@@ -327,18 +327,18 @@ describe('export_step_exact through the XDE writer (TR-XCH-19)', () => {
       entityIds: string[];
     }>(result);
     expect(data).toMatchObject({ format: 'step', solidCount: 5, sheetCount: 0, assembly: { products: 2, occurrences: 3 } });
-    expect(result.summary).toContain('STEP AP214 assembly, 2 product(s), 3 occurrence(s)');
-    const flat = run(boxes(), 'export_step_exact', {}).result;
+    expect(result.summary).toContain('STEP AP214, 2 product(s), 3 occurrence(s)');
+    const flat = run(boxes(), 'export_step_ap242', { schema: 'ap214', includeValidationProperties: false }).result;
     expect(dataOf<{ assembly?: unknown }>(flat).assembly).toBeUndefined();
     expect(flat.summary).toContain('STEP AP214');
   });
 
   it('reports nothing exportable and a writer that fails as no-ops', () => {
-    const empty = run(createEmptyDocument(), 'export_step_exact', {}).result;
-    expect(empty.summary).toContain('nothing exported');
+    const empty = run(createEmptyDocument(), 'export_step_ap242', {}).result;
+    expect(empty.summary).toContain('nothing was exported');
     expect(empty.data).toBeUndefined();
     const doc = boxes();
-    const failed = run(doc, 'export_step_exact', {}, { writeStep: () => null }).result;
+    const failed = run(doc, 'export_step_ap242', {}, { writeStep: () => null }).result;
     expectNoOp(failed, doc);
   });
 });
@@ -417,7 +417,7 @@ describe('ply solids carrying a stepSlab (step-sheets behaviour through the XDE 
     } as unknown as CadDocument;
     const fake = fakeXdeKernel();
     const ctx: ExecutionContext = { ...ctxOf(fake.kernel), humanSignature: ledgerPort() };
-    const result = execute(doc, 'export_step_exact', { acceptUnverified: { nonce: 'f' } }, ctx);
+    const result = execute(doc, 'export_step_ap242', { acceptUnverified: { nonce: 'f' } }, ctx);
     const data = result.data as { faceted: string[]; solidCount: number } | undefined;
     expect(data?.solidCount).toBe(1);
     expect(data?.faceted).toEqual([id]);
@@ -454,7 +454,7 @@ describe('TR-XCH-26: every export path goes through the unverified gate', () => 
     expect(result.data).toBeUndefined();
   };
 
-  it.each(['export_step_ap242', 'export_step_exact', 'export_iges'])('%s refuses a red imported body without a human signature', (name) => {
+  it.each(['export_step_ap242', 'export_iges'])('%s refuses a red imported body without a human signature', (name) => {
     const { doc, id } = flagged();
     const plain = run(doc, name, {}, {
       igesImport: { solids: [], census: { roots: 0, solids: 0, shells: 0, openShells: 0, faces: 0 } },
@@ -464,14 +464,15 @@ describe('TR-XCH-26: every export path goes through the unverified gate', () => 
     refusedBy(run(doc, name, { acceptUnverified: true }).result, 'XCH_HUMAN_GATE');
   });
 
-  it('export_step_exact on the legacy (non-XDE) path refuses too, and a cleared signature lets it reach the writer', () => {
+  it('export_step_ap242 on the legacy (non-XDE) path refuses too, and a cleared signature lets it reach the writer', () => {
     const { doc } = flagged();
     const kernel = fakeExactKernel().kernel;
-    refusedBy(execute(doc, 'export_step_exact', {}, ctxOf(kernel)), 'XCH_UNVERIFIED_BODIES');
+    refusedBy(execute(doc, 'export_step_ap242', { includeValidationProperties: false }, ctxOf(kernel)), 'XCH_UNVERIFIED_BODIES');
+    refusedBy(execute(doc, 'export_step_ap242', {}, ctxOf(kernel)), 'XCH_WRITER_UNAVAILABLE');
     const cleared = execute(
       doc,
-      'export_step_exact',
-      { acceptUnverified: { nonce: 'n' } },
+      'export_step_ap242',
+      { includeValidationProperties: false, acceptUnverified: { nonce: 'n' } },
       { ...ctxOf(kernel), humanSignature: ledgerPort() },
     );
     expect(cleared.summary).toContain('cannot write exact STEP');
@@ -482,8 +483,8 @@ describe('TR-XCH-26: every export path goes through the unverified gate', () => 
     const fake = fakeXdeKernel();
     const port = ledgerPort();
     const ctx: ExecutionContext = { ...ctxOf(fake.kernel), humanSignature: port };
-    expect(execute(doc, 'export_step_exact', { acceptUnverified: { nonce: 'n1' } }, ctx).data).toBeDefined();
-    refusedBy(execute(doc, 'export_step_exact', { acceptUnverified: { nonce: 'n1' } }, ctx), 'XCH_HUMAN_GATE');
+    expect(execute(doc, 'export_step_ap242', { acceptUnverified: { nonce: 'n1' } }, ctx).data).toBeDefined();
+    refusedBy(execute(doc, 'export_step_ap242', { acceptUnverified: { nonce: 'n1' } }, ctx), 'XCH_HUMAN_GATE');
     const noLedger = { ...ctx, humanSignature: { verify: () => ({ signer: 'r', signatureId: 's' }) } };
     const refused = execute(doc, 'export_step_ap242', { acceptUnverified: { nonce: 'n2' } }, noLedger);
     refusedBy(refused, 'XCH_HUMAN_GATE');
@@ -523,7 +524,7 @@ describe('TR-XCH-26: every export path goes through the unverified gate', () => 
       ...base,
       entities: { ...base.entities, [id]: { ...box, kind: 'mesh', mesh: TETRA, stepSlab: slab } },
     } as unknown as CadDocument;
-    for (const name of ['export_step_ap242', 'export_step_exact']) {
+    for (const name of ['export_step_ap242']) {
       const refused = run(doc, name, {}).result;
       refusedBy(refused, 'XCH_UNVERIFIED_BODIES');
       expect(refused.summary).toContain(id);

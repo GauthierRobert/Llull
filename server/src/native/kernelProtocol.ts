@@ -18,7 +18,7 @@ import { recipeKey } from '@core/geometry/shapeRecipe';
 import { clearTangentContact } from '@core/geometry/tangentGuard';
 import { nativeLeaf, type WireOptions } from './kernelLeaves';
 
-/** The op or recipe node is not native yet: the host answers it with the WASM kernel. */
+/** The sidecar does not implement the op or recipe node: the call returns this error (the command reports a kernel failure). */
 const NATIVE_UNSUPPORTED = 'NATIVE_UNSUPPORTED';
 /** The sidecar process died or could not be reached during a call. */
 export const NATIVE_DIED = 'NATIVE_DIED';
@@ -67,7 +67,7 @@ export function parseNativeInfo(value: unknown): NativeInfo | null {
   return { occtVersion, build, capabilities, ops };
 }
 
-/** `tessellate` reply -> MeshData (plain arrays, like the WASM kernel's); other values pass through (null stays null). */
+/** `tessellate` reply -> MeshData (plain arrays, the `MeshData` shape); other values pass through (null stays null). */
 export function decodeMesh(result: unknown): MeshData | null {
   if (typeof result !== 'object' || result === null) return null;
   const { encoding, positions, indices } = result as Record<string, unknown>;
@@ -85,7 +85,7 @@ export function decodeMesh(result: unknown): MeshData | null {
 const NO_COMPONENTS = createEmptyDocument();
 
 /**
- * Pyramids are sewn from their triangles by the WASM kernel too (occtShapes.ts TRIANGULATED_KINDS): send the same triangles. Curved
+ * Pyramids are sewn from their triangles (core `entityTrianglePositions`): the host sends those triangles. Curved
  * profiles, lofts, sweeps and subdivision solids carry their host-computed geometry (`nativeLeaf`).
  */
 function asNativeLeaf(entity: Entity, wire: WireOptions): Entity {
@@ -103,7 +103,7 @@ function asNativeLeaf(entity: Entity, wire: WireOptions): Entity {
   };
 }
 
-/** The WASM kernel's boolean pre-flight (occtKernel.ts `untangle`): a sphere tangent to a box face is shrunk by a hair. */
+/** Boolean pre-flight (core `clearTangentContact`): a sphere tangent to a box face is shrunk by a hair. */
 function untangle(a: ShapeRecipe, b: ShapeRecipe): [ShapeRecipe, ShapeRecipe] {
   if (a.op !== 'solid' || b.op !== 'solid') return [a, b];
   const [entityA, entityB] = clearTangentContact(a.entity, b.entity);
@@ -114,7 +114,7 @@ type FeatureRecipe = Extract<ShapeRecipe, { op: 'feature' }>;
 
 /**
  * A `feature` node lowered by the host (`kernelFeatures.ts`): the lowered compound `tool` (null = the lowering refused the node), its
- * boolean `mode`, and the inputs of the native BRepFeat cut tried first, like the WASM kernel (occtFeatures.ts).
+ * boolean `mode`, and the inputs of the native BRepFeat cut tried first.
  */
 export interface FeatureLowering {
   readonly tool: ShapeRecipe | null;
@@ -143,7 +143,7 @@ export type FeatureLowerings = ReadonlyMap<FeatureRecipe, FeatureLowering>;
 const NO_LOWERINGS: FeatureLowerings = new Map();
 
 /**
- * The recipe the sidecar builds: the same B-rep inputs the WASM kernel would build from `recipe`. A `feature` node with an entry in
+ * The recipe the sidecar builds: the B-rep inputs the host derives from `recipe` (core helpers + `kernelLeaves.ts` / `kernelFeatures.ts`). A `feature` node with an entry in
  * `features` becomes a `featureCut` node; one without stays a `feature` node, which the sidecar answers NATIVE_UNSUPPORTED.
  */
 export function nativeRecipe(recipe: ShapeRecipe, features: FeatureLowerings = NO_LOWERINGS, wire: WireOptions = {}): ShapeRecipe {

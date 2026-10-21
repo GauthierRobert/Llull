@@ -11,7 +11,8 @@ import type { FeaHost } from '@protocol/index';
 import { createComputeRunner } from '../src/native/computeJob';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { runStackupMonteCarlo } from '../src/native/stackupMonteCarlo';
-import { isNativeTool, nativeToolDefinitions, runNativeTool } from '../src/native/tools';
+import { isNativeTool, runNativeTool } from '../src/native/tools';
+import { buildNativeToolDefinitions } from '@protocol/nativeTools';
 import reference from '../../docs/aerospace/03-gdt-mbd-pmi/validation/stackup_reference.json';
 
 const BINARY = nativeBinaryPath('llull-compute');
@@ -67,7 +68,7 @@ const monteCarloOf = (data: unknown): MonteCarlo => (data as { monteCarlo: Monte
 describe('stackup_monte_carlo transport', () => {
   it('is a native tool whose schema is analyze_stackup plus timeoutS / verify', () => {
     expect(isNativeTool('stackup_monte_carlo')).toBe(true);
-    const tool = nativeToolDefinitions().find((definition) => definition.name === 'stackup_monte_carlo');
+    const tool = buildNativeToolDefinitions().find((definition) => definition.name === 'stackup_monte_carlo');
     expect(Object.keys(tool?.inputSchema.properties ?? {})).toEqual(
       expect.arrayContaining(['contributors', 'expression', 'samples', 'timeoutS', 'verify']),
     );

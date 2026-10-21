@@ -1,5 +1,5 @@
 /**
- * Assembly plan for `export_step_exact`: a component becomes ONE shared STEP part per uniform scale (scale 1 = the component itself; any
+ * Assembly plan for `export_step_ap242`: a component becomes ONE shared STEP part per uniform scale (scale 1 = the component itself; any
  * rotation is a location composed by the kernel; a uniform scale is a kernel `scale` of the part's solids, so every instance with that
  * scale reuses the part). A component's nested instances become sub-assembly occurrences naming the nested part (scales multiply, nested
  * positions scale with the parent), so a component used at several depths is written once. STEP locations cannot express a non-uniform or
@@ -9,7 +9,7 @@
 
 import { type CadDocument, type Component, type Entity, type InstanceEntity, type Vec3, is3D } from '../../model/types';
 import type { GeometryKernel, ShapeHandle, StepAssemblyPart, StepOccurrence } from '../../geometry/kernel';
-import { exactOrMesh, exactRecipe } from './kernelShape';
+import { exactOrMesh, exactRecipe } from '../kernelShape';
 import type { AssemblyStepLabels, NestedOccurrence } from './stepAssemblyLabels';
 import { MAX_INSTANCE_DEPTH, type StepEntry, instanceSolids, stepLabels } from './stepTargets';
 

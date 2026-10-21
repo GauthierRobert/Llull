@@ -1,5 +1,5 @@
 import type { CadDocument } from '@core/model/types';
-import type { BimCategory, BuildingElement, BuildingModel, CurvedWallElement, WallElement } from '@core/model/building';
+import type { BimCategory, BuildingElement, BuildingModel, CurvedWallElement, WallElement } from '@aec/building/types';
 import { polygonArea } from '@lib/polygon';
 import { toMetres } from '@core/model/units';
 import { round } from '../../shared/numeric';

@@ -4,7 +4,7 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { PhysicsEngine, SimulationBody, SimulationModel } from '@core/dynamics/physicsEngine';
-import { speedServoGains } from '@core/dynamics/forceLaws';
+import { speedServoGains } from '@dynamics/sim/forceLaws';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 
 let engine: PhysicsEngine;

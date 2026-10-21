@@ -25,7 +25,7 @@ confirmed.
 
 The plans use **proposed** command names from TECHNICAL_SPEC §4 (`create_lamina_material`,
 `define_rosette`, `create_composite_part`, `define_zone`, `add_ply`, `generate_plies_from_zones`,
-`core_sample`, `analyze_laminate`, `check_laminate_rules`, `check_layup`, `check_producibility`, `export_flat_patterns_dxf`,
+`core_sample`, `analyze_laminate`, `check_laminate_rules`, `check_layup`, `check_producibility`, `export_ply_flat_patterns_dxf`,
 `export_ply_book`). Only `set_units`, `add_box`, `add_sphere` and `add_cone` exist today. The plans become
 golden-corpus entries once the commands land.
 
@@ -192,7 +192,7 @@ For r = 50 and L = 200, the flat pattern is a 314.159265 × 200 rectangle (abs 0
 - Meridians map to radial lines, and geodesic fibres map to straight lines.
 
 **VC-CMP-16: DXF flat pattern round trip.** Proves FR-CMP-50 and TR-CMP-60.
-Export the cone ply with `export_flat_patterns_dxf`, re-import it with the existing `import_dxf`, then run
+Export the cone ply with `export_ply_flat_patterns_dxf`, re-import it with the existing `import_dxf`, then run
 `measure_area`. The closed polyline area must be 44 428.83 mm², rel 2e-3 (arc chord tolerance). The file
 must also satisfy the following:
 
@@ -271,7 +271,7 @@ again: the two CSVs are byte-identical.
 
 **VC-CMP-30: per-ply solids.** Proves FR-CMP-54.
 For the flat panel, each ply solid's volume equals area × 0.125 within 0.5 %, solids stack without
-interference (`check_model` interference = 0), and `export_step_exact` contains one MANIFOLD_SOLID_BREP per
+interference (`check_model` interference = 0), and `export_step_ap242` contains one MANIFOLD_SOLID_BREP per
 ply piece.
 
 **VC-CMP-31: material provenance.** Proves FR-CMP-02 and FR-CMP-03.

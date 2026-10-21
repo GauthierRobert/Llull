@@ -1,8 +1,8 @@
-/** cfd_prepare engine (TECHNICAL_SPEC §5.1): turns a case into a pass / warn / fail report before anything is solved. Pure; the kernel is injected. */
+/** prepare_cfd_case engine (TECHNICAL_SPEC §5.1): turns a case into a pass / warn / fail report before anything is solved. Pure; the kernel is injected. */
 
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { CadDocument, Vec3 } from '@core/model/types';
-import type { CfdCase, CfdQuality, CfdSolver } from '@core/model/cfd';
+import type { CfdCase, CfdQuality, CfdSolver } from '@aero/cfd/types';
 import { caseHashOf } from './caseDoc';
 import type { DefaultNote } from './caseParams';
 import { CFD_REMEDIATION } from './codes';

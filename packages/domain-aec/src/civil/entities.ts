@@ -14,7 +14,7 @@ import type {
   Vec2,
   Vec3,
 } from '@core/model/types';
-import type { CivilObject } from '@core/model/civil';
+import type { CivilObject } from '@aec/civil/types';
 
 /** Civil layer name -> colour (NCS discipline C). */
 // prettier-ignore

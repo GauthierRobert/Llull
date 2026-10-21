@@ -3,7 +3,7 @@
 import type { DerivationGuard } from '@core/commands/derivation';
 import { editedOwners, ownerTag } from '../shared/derived';
 import type { CadDocument } from '@core/model/types';
-import type { CivilModel, CivilObject } from '@core/model/civil';
+import type { CivilModel, CivilObject } from '@aec/civil/types';
 
 /** Ids of civil objects whose generated entities `next` changed, removed or copied directly. */
 function editedCivilObjects(previous: CadDocument, next: CadDocument): string[] {

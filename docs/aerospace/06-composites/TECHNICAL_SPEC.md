@@ -224,7 +224,7 @@ and query commands return `data` without changing the document. Each command fil
 | `request_layup_waiver` | mutating | `{ part, code, ids, reason }` | creates 1 pending `LayupWaiver` / `approvalRef` not settable by params (only the 09 PLM approval link sets it) / no matching current finding → `CMP_WAIVER_NO_FINDING` | MVP |
 | `drape_ply` | query | `{ ply, stepLength? (mm), output?: 'summary'\|'nodes' }` | data `{ maxShearDeg, nodesOverWarning, nodesOverLock, areaOverLockMm2, overLockRegions: [{ id, nodeCount, centroid }], stepLength: NamedDefault, net? }` (`net` only with `output: 'nodes'`, paged or `--save`) / requiresKernel / no OCC → `CMP_KERNEL_REQUIRED`; missing `lockingAngle` → `CMP_DRAPE_LIMIT_MISSING` | V1 |
 | `check_producibility` | query | `{ part, plies? }` | data `{ plies: [{ id, maxShearDeg, nodesOverLock, areaOverLockMm2, findings: [{ code, severity, remediation }], suggestions }] }` | V1 |
-| `export_flat_patterns_dxf` | query (export) | `{ part, plies?, labels?, nest?, allowance?, arcTolerance? }` | data `{ files: [{ name, mime: 'image/vnd.dxf', content }] }` / plies with over-lock nodes refused unless `allowOverLock` | MVP (developable), V1 (draped) |
+| `export_ply_flat_patterns_dxf` | query (export) | `{ part, plies?, labels?, nest?, allowance?, arcTolerance? }` | data `{ files: [{ name, mime: 'image/vnd.dxf', content }] }` / plies with over-lock nodes refused unless `allowOverLock` | MVP (developable), V1 (draped) |
 | `export_laser_projection` | query (export) | `{ part, plies?, spacing?: number, cornerAngle?: number, frame?: 'tool'\|'world' }` | text file per part, §6.3 | V1 |
 | `ply_book_data` | query | `{ part }` | data `{ sequences: [{ sequence, plies: [{ id, name, material, orientationDeg, areaMm2, flatPieceIds, boundaryLengthMm }] }], reviewRequired: true, unverified }` (numeric content of the ply book, AF-21) | V1 |
 | `export_ply_book` | query (export) | `{ part, format: 'svg'\|'pdf', sheetSize? }` | sheets from `ply_book_data` through the drawings renderer **without** mutating the document (in-memory sheet model), written with `--save`; `reviewRequired: true` | V1 |
@@ -503,7 +503,7 @@ software imports point lists.
 - **V1 explicit.** One solid per ply piece: the face region thickened by t at cumulative offset z
   (`BRepOffsetAPI_MakeThickSolid` or offset face + prism, exposed as a new `ShapeRecipe` node `ply_solid`
   so that it stays inside the recipe boundary of KI5). The pieces are exported with the existing
-  `export_step_exact` path (AP214). The CAx-IF practice explicitly allows tessellated or explicit per-ply
+  `export_step_ap242` path (AP214). The CAx-IF practice explicitly allows tessellated or explicit per-ply
   solids for unambiguous visual exchange [R13].
 - **V2 implicit (AP242 composite).** Write the laminate table, plies, ply orientation, ply boundaries and
   cores as specified by the CAx-IF Recommended Practices for Composite Materials v4.x (supplement to the
@@ -569,7 +569,7 @@ shape in `data.findings[]` with `severity` pass / warn / fail (exit 0).
 | `CMP_LAMINATE_SINGULAR` | `analyze_laminate` | ABD condition number > 1e12 | stack | add plies in other directions |
 | `CMP_KERNEL_REQUIRED` | drape, curved flats | no OCC kernel | — | re-run with `--kernel occt` |
 | `CMP_DRAPE_LIMIT_MISSING` | `drape_ply`, `check_producibility` | material has no `lockingAngle` / `warningShear` | material name | enter the fabric's locking angle from a cited source (no default) |
-| `CMP_FLAT_OVER_LOCK` | `export_flat_patterns_dxf` | ply has over-lock nodes and `allowOverLock` is not set | ply id, node count | add darts (`split_ply`) and re-drape; or `allowOverLock` (result `reviewRequired`) |
+| `CMP_FLAT_OVER_LOCK` | `export_ply_flat_patterns_dxf` | ply has over-lock nodes and `allowOverLock` is not set | ply id, node count | add darts (`split_ply`) and re-drape; or `allowOverLock` (result `reviewRequired`) |
 | `CMP_SPLIT_CURVE_INVALID` | `split_ply` | cut curve does not cross the ply boundary twice | `params.curveId` | extend the curve across the ply |
 | `CMP_WAIVER_NO_FINDING` | `request_layup_waiver` | no current finding with that code on those ids | `params.code` | run `check_layup` and copy the code |
 | `CMP_RULE_R1_SYMMETRY`, `CMP_RULE_R2_BALANCE`, `CMP_RULE_R3_MIN_FRACTION`, `CMP_RULE_R4_MAX_CONSECUTIVE`, `CMP_RULE_R5_OUTER_PM45` | `check_laminate_rules`, `check_layup` (fail) | rule R1..R5 violated | zone / point, plies, value, limit | edit the stack (e.g. mirror it, add the missing −θ, split a run) or request a waiver |
@@ -738,7 +738,7 @@ Built in `packages/domain-aero/src/composites/` (plugin `composites`), model in 
 Commands: `create_lamina_material`, `define_rosette`, `create_composite_part`, `define_zone`, `edit_zone`, `delete_zone`,
 `set_ply_drop_rules`, `set_laminate_rules`, `generate_plies_from_zones`, `add_ply`, `edit_ply`, `delete_ply`, `reorder_plies`,
 `core_sample`, `check_laminate_rules`, `analyze_laminate`, `laminate_mass`, `check_layup`, `request_layup_waiver`,
-`export_flat_patterns_dxf`. Validated against `clt_reference.json` (all 14 cases: ABD, constants, FPF ratios) and
+`export_ply_flat_patterns_dxf`. Validated against `clt_reference.json` (all 14 cases: ABD, constants, FPF ratios) and
 `layup_rules_reference.json` (VC-CMP-01..11, 14..16, 18, 25, 31, 34..37 in part).
 
 Deviations from the sketch above:
@@ -826,7 +826,7 @@ diagonal reproduces the reference diagonal) passes at d = 4. A NURBS patch of a 
 Commands: `drape_ply` (query), `check_producibility` (query; over-lock fails, warning shear warns, no `lockingAngle` is a failing finding, dart / splice suggestions),
 `split_ply` (dart / splice cuts on a chart polyline or a line / polyline / nurbs_curve entity; cuts form a planar graph, `piecesOf` returns its faces; a splice overlap
 grows the left piece clipped to a convex neighbour; closed loops that touch nothing are refused; every piece is draped from the ply seed or, when the seed is a vertex of
-the piece, along its bisector), `export_flat_patterns_dxf` on doubly curved faces (net node (i, j) -> (i d, j d), warp along +x, refused over the lock unless `allowOverLock`).
+the piece, along its bisector), `export_ply_flat_patterns_dxf` on doubly curved faces (net node (i, j) -> (i d, j d), warp along +x, refused over the lock unless `allowOverLock`).
 Known limits: the tow step is a CHORD (as in the reference), so shear on a developable face is 0 only along the axis of a cylinder and falls about linearly with d elsewhere
 (1.99x per halving at 45 degrees on r = 50); near a cone apex shear is large whatever d; locking is evaluated on the whole-face net, not per piece; the net spans the
 whole face, so cost does not shrink for small pieces; a lone dart stays a recorded slit (the wedge is not opened); `drape.generators` curves, `projection` flats and
@@ -889,12 +889,12 @@ first loop vertex.
 | NURBS sphere patch R 100, polar 30..90 | 3409.38305 | closed form 3409.38308 (8e-9) | 3408.09 (3.8e-4 low) |
 
 The offset adds the curvature term (t / 2r on the cylinder), so "area x thickness" is the first-order value; the plane case is exactly area x
-thickness. The STEP written by `export_step_exact` holds one `MANIFOLD_SOLID_BREP` per ply solid named "<ply> piece <n>" (entity names become
+thickness. The STEP written by `export_step_ap242` holds one `MANIFOLD_SOLID_BREP` per ply solid named "<ply> piece <n>" (entity names become
 product names as for any solid).
 
 **Only the STEP export reads the slab (review fix).** `stepSlab` is deliberately not `brep`: a `brep` makes the solid an exact operand of booleans, blends,
 fillets, holes, recognition and face queries, and the native kernel reports every op supported, so a refused slab would have broken operations that
-work from the triangles. Every command except `export_step_exact` keeps using `mesh`. The export builds the slab placed like the entity (`place` with
+work from the triangles. Every command except `export_step_ap242` keeps using `mesh`. The export builds the slab placed like the entity (`place` with
 its position / rotation, so a moved ply solid stays exact), and writes the triangles instead when the kernel lacks the op (Manifold) or refuses the slab;
 `data.faceted` and the summary list those solids. A document holding an instance of a ply solid goes through the assembly path, which writes the
 triangles. The sidecar now also refuses an invalid or inside-out slab, a lift through a singular point (pole / apex, cone loop reaching v <= 0), and
@@ -990,4 +990,4 @@ sphere surface back, validation green, ply area 62349.90371 (written, 10 digits)
 **Not done.** The items under "Not written"; a CAx-IF conformance round (needs a second system or the CAx-IF test cases); import of other systems' composite files; regeneration of the ply solids when plies change (snapshot);
 exact slabs on the sphere cap (the explicit solids there are triangle B-reps, hence the file size).
 
-**Review fixes (same day).** Readers are linear (`lex.ts`: no backtracking regular expression on file content; a megabyte of digits, a megabyte of `#` in a string or of blanks reads in under a second, tested); references are scanned outside string literals and names are compared decoded (`#`, `'`, `\`, non-ASCII in tool, part and ply names round-trip; the file is written ASCII only, `\X2\` / `\X4\`, and `\X\hh`, `\S\c`, `\X2\`, `\X4\` are decoded, also by the 04 summary reader `lib/step21/decode.ts`). The imported data is validated with the plugin's `compositesErrors` (now also plane, cylinder and cone records) before it enters the document: a lamina without E1, nu12 out of range, a surface without radius, an unknown rosette method refuse with `CMP_AP242_MALFORMED` and paths; at most 10 000 plies and 50 000 vertices per polygon; the base64 size is checked before decoding. Import red findings: a ply solid the file lists that did not import under its name (`solids_unlinked`), a tool solid that did not import (`tool_not_imported`), a ply solid volume (from the import report) that differs from ply area x thickness (green to 1 %, yellow to 5 %, else red: the offset adds a curvature term, §13.5). A ply with several solids ("B piece 1.1", "B piece 1.2": the names `create_ply_solids` gives to the pieces of a split region) is exported with all of them (they were dropped before). Plies sharing a sequence label keep their stacking order by the usage reference designator. `data.notWritten.cores` counts cores, `reviewRequired` lists `cores_not_written` and `unverified_material_basis`. `import_composite_ap242` no longer declares `requiresKernel` (only `importSolids` needs it). Found on the way, not fixed (04 XCH / sidecar): the native reader answers null for any file with a non-ASCII product name (also files from `export_step_exact`), and the OpenCascade writer does not escape backslashes in names, so a name that contains an escape-like sequence (`\X2\0041\X0\`) is misread.
+**Review fixes (same day).** Readers are linear (`lex.ts`: no backtracking regular expression on file content; a megabyte of digits, a megabyte of `#` in a string or of blanks reads in under a second, tested); references are scanned outside string literals and names are compared decoded (`#`, `'`, `\`, non-ASCII in tool, part and ply names round-trip; the file is written ASCII only, `\X2\` / `\X4\`, and `\X\hh`, `\S\c`, `\X2\`, `\X4\` are decoded, also by the 04 summary reader `lib/step21/decode.ts`). The imported data is validated with the plugin's `compositesErrors` (now also plane, cylinder and cone records) before it enters the document: a lamina without E1, nu12 out of range, a surface without radius, an unknown rosette method refuse with `CMP_AP242_MALFORMED` and paths; at most 10 000 plies and 50 000 vertices per polygon; the base64 size is checked before decoding. Import red findings: a ply solid the file lists that did not import under its name (`solids_unlinked`), a tool solid that did not import (`tool_not_imported`), a ply solid volume (from the import report) that differs from ply area x thickness (green to 1 %, yellow to 5 %, else red: the offset adds a curvature term, §13.5). A ply with several solids ("B piece 1.1", "B piece 1.2": the names `create_ply_solids` gives to the pieces of a split region) is exported with all of them (they were dropped before). Plies sharing a sequence label keep their stacking order by the usage reference designator. `data.notWritten.cores` counts cores, `reviewRequired` lists `cores_not_written` and `unverified_material_basis`. `import_composite_ap242` no longer declares `requiresKernel` (only `importSolids` needs it). Found on the way, not fixed (04 XCH / sidecar): the native reader answers null for any file with a non-ASCII product name (also files from `export_step_ap242`), and the OpenCascade writer does not escape backslashes in names, so a name that contains an escape-like sequence (`\X2\0041\X0\`) is misread.

@@ -1,7 +1,7 @@
 /** Release readiness (FR-PLM-34/35, AF-20): every reason a release would be refused, as coded findings; `release_item` refuses on the first failure. */
 
 import type { CadDocument } from '@core/model/types';
-import type { Approval, ChangeRecord, Effectivity, PlmModel, Revision } from '@core/model/plm';
+import type { Approval, ChangeRecord, Effectivity, PlmModel, Revision } from '@plm/types';
 import { closeForCutIn, effectivityProblem } from './effectivity';
 import { type PlmCode, remediationOf } from './refusal';
 import { currentRevisionOf, revisionText } from './state';

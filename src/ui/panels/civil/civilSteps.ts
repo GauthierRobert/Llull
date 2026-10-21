@@ -1,6 +1,6 @@
 // Start state of the civil workflow sections: a step is done once it holds objects; done steps and the first step not done start expanded.
 
-import type { CivilCategory, CivilModel } from '@core/model/civil';
+import type { CivilCategory, CivilModel } from '@aec/index';
 import type { CivilStepState } from './CivilParts';
 
 const STEP_CATEGORIES = {

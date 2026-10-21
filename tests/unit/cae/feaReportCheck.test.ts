@@ -36,11 +36,11 @@ interface Report {
   probesNote: string;
 }
 
-describe('fea_report', () => {
+describe('analysis_report', () => {
   it('walks unmeshed -> meshed -> solved and reads probes at the nearest node', () => {
     const bar = solvedBar();
     const report = (doc: CadDocument, ctx = ctxOf(bar)): { data: Report; summary: string } => {
-      const result = execute(doc, 'fea_report', { analysisId: bar.analysisId }, ctx);
+      const result = execute(doc, 'analysis_report', { analysisId: bar.analysisId }, ctx);
       expect(result.affected).toEqual([]);
       expect(result.document).toBe(doc);
       return { data: result.data as Report, summary: result.summary };
@@ -71,13 +71,13 @@ describe('fea_report', () => {
   it('is missing when a recorded artifact is not in the store of this machine, and stale after an edit', () => {
     const bar = solvedBar();
     const solved = recorded(bar);
-    const missing = execute(solved, 'fea_report', { analysisId: bar.analysisId }, ctxOf(bar, portOf()));
+    const missing = execute(solved, 'analysis_report', { analysisId: bar.analysisId }, ctxOf(bar, portOf()));
     expect((missing.data as Report).state).toBe('missing');
     expect((missing.data as Report).probes).toEqual([]);
     expect((missing.data as Report).probesNote).toContain('need the results artifact');
-    expect((execute(solved, 'fea_report', { analysisId: bar.analysisId }).data as Report).state).toBe('missing');
+    expect((execute(solved, 'analysis_report', { analysisId: bar.analysisId }).data as Report).state).toBe('missing');
     const edited = mustRun(solved, 'set_mesh_controls', { analysisId: bar.analysisId, globalSize: 3 });
-    expect((execute(edited, 'fea_report', { analysisId: bar.analysisId }, ctxOf(bar)).data as Report).state).toBe('stale');
+    expect((execute(edited, 'analysis_report', { analysisId: bar.analysisId }, ctxOf(bar)).data as Report).state).toBe('stale');
   });
 
   it('falls back to the nearest mesh node when the mesher resolved none, and refuses an unknown analysis', () => {
@@ -89,12 +89,12 @@ describe('fea_report', () => {
     const results = { ...bar.results, meshHash };
     const port = portOf(mesh, results);
     const solved = recorded(bar, { mesh, meshHash, results, resultsHash: hashOf(results), port });
-    const result = execute(solved, 'fea_report', { analysisId: bar.analysisId }, ctxOf(bar, port));
+    const result = execute(solved, 'analysis_report', { analysisId: bar.analysisId }, ctxOf(bar, port));
     const probes = (result.data as Report).probes;
     expect(probes.find((p) => p.quantity === 'u_x')?.nodeId).toBe(2);
     // (1, 0.5, 0.5) is equidistant from several corners: the first nearest node wins
     expect(probes.find((p) => p.quantity === 'von_mises')?.nodeId).toBe(1);
-    const unknown = execute(solved, 'fea_report', { analysisId: 'nope' });
+    const unknown = execute(solved, 'analysis_report', { analysisId: 'nope' });
     expect(unknown.rejected).toBe(true);
     expect(unknown.error?.code).toBe('FEA_ANALYSIS_NOT_FOUND');
   });

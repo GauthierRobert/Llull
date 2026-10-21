@@ -59,7 +59,7 @@ export const exportLandxml = defineCommand({
 export const exportCivilDxf = defineCommand({
   name: 'export_civil_dxf',
   description:
-    'Export every civil-generated entity as DXF (AutoCAD R12) on its C-* layer: survey POINTs, ' +
+    'Export every civil-generated entity as DXF (building floor plans: use export_building_dxf) (AutoCAD R12) on its C-* layer: survey POINTs, ' +
     'contours and linework as POLYLINE / LINE at their elevation, labels as TEXT and the TIN, ' +
     'platforms, corridors and drainage meshes as 3DFACE triangles. data.text holds the file.',
   annotations: { readOnly: true, idempotent: true },

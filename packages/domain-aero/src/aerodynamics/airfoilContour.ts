@@ -36,7 +36,7 @@ export function nacaContour(designation: string, pointsPerSide: number, closedTr
 export function polylineContour(doc: CadDocument, entityId: string): AirfoilContour | string {
   const entity = doc.entities[entityId];
   if (entity?.kind !== 'polyline' || !entity.closed || entity.points.length < 8)
-    return `'${entityId}' is not a closed 2D polyline of at least 8 points (draw_naca_airfoil or draw_polyline closed:true)`;
+    return `'${entityId}' is not a closed 2D polyline of at least 8 points (airfoil_from_naca as "polyline" or draw_polyline closed:true)`;
   if (entity.points.length > MAX_CONTOUR_POINTS)
     return `'${entityId}' has ${entity.points.length} points; at most ${MAX_CONTOUR_POINTS} panels are solved (redraw it with fewer points)`;
   const raw = entity.points.filter((point, index, all) => {

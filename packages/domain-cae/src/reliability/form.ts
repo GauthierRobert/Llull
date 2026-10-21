@@ -1,6 +1,7 @@
 /** FORM (improved Hasofer-Lind / Rackwitz-Fiessler iteration) and SORM (Breitung) in the standard normal space. Pure numerics. */
 
-import { normalCdf, symmetricEigenvalues } from './numerics';
+import { normalCdf } from '@lib/specialFunctions';
+import { symmetricEigenvalues } from './numerics';
 
 export const FD_STEP_U = 1e-6;
 const HESSIAN_STEP = 1e-3;

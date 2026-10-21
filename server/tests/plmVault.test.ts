@@ -13,7 +13,8 @@ import { serverContext } from '../src/fea/context';
 import { verifyAuditChain } from '../src/plm/auditChain';
 import { buildReleasePackage } from '../src/plm/releasePackage';
 import { acquireLock, readLock } from '../src/plm/vault/locks';
-import { createObjectStore, sha256Text } from '../src/plm/vault/objectStore';
+import { createObjectStore } from '../src/plm/vault/objectStore';
+import { sha256Hex } from '../src/sha256';
 import {
   VaultError,
   breakItemLock,
@@ -48,7 +49,7 @@ describe('object store', () => {
   it('stores by SHA-256, is idempotent, read-only, and a damaged object reads as absent', () => {
     const store = createObjectStore(root);
     const sha = store.put('{"a":1}');
-    expect(sha).toBe(sha256Text('{"a":1}'));
+    expect(sha).toBe(sha256Hex('{"a":1}'));
     expect(store.put('{"a":1}')).toBe(sha);
     expect(store.get(sha)).toBe('{"a":1}');
     expect(store.has(sha)).toBe(true);

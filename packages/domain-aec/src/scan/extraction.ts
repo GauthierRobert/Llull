@@ -4,7 +4,7 @@
  * number, so replay never needs the cloud).
  */
 
-import type { CloudReference, ExtractionRecord, RegionSpec, ScanModel } from '@core/model/pointCloud';
+import type { CloudReference, ExtractionRecord, RegionSpec, ScanModel } from '@aec/scan/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { OUTSIDE_DIAMETER_TOLERANCE_MM, PIPE_SIZES } from '../industrial/piping/pipeSizes';

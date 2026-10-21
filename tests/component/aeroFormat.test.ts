@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatArea } from '@ui/panels/aero/aeroData';
-import { formatSi } from '@ui/siText';
+import { formatSi } from '@lib/siText';
 
 describe('aero value formatting reads in natural units', () => {
   it('prefixes SI values so 1-999 leads', () => {

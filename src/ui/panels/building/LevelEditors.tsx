@@ -2,8 +2,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
-import type { BuildingLevel } from '@core/model/building';
-import { COPYABLE } from '@aec/building/elements/elements';
+import { type BuildingLevel, COPYABLE } from '@aec/index';
 import { toggledInList } from '@ui/toggleMember';
 import { CheckboxGroup } from '@ui/panels/CheckboxGroup';
 import { CommandForm } from '@ui/panels/CommandForm';

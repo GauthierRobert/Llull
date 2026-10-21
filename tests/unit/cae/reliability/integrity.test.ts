@@ -12,6 +12,8 @@ const CORRELATION = {
     [0.5, 1],
   ],
 };
+const formData = (doc: CadDocument): Json =>
+  data(execute(doc, 'run_reliability_study', { limitState: 'g', methods: ['form'] }))['form'] as Json;
 const correlated = (): CadDocument => execute(rMinusS(), 'set_correlation', CORRELATION).document;
 
 const COMMANDS: Array<[string, Json, boolean]> = [
@@ -19,7 +21,7 @@ const COMMANDS: Array<[string, Json, boolean]> = [
   ['delete_random_variable', { name: 'U' }, false],
   ['set_correlation', CORRELATION, false],
   ['define_limit_state', { name: 'h', expression: 'R - S', unit: 'MPa' }, false],
-  ['reliability_form', { limitState: 'g', sorm: true }, true],
+  ['run_reliability_study', { limitState: 'g', methods: ['form', 'sorm'] }, true],
   ['propagate_uncertainty', { limitState: 'g', method: 'mc', samples: 200, seed: 1 }, true],
   ['run_reliability_study', { limitState: 'g', seed: 1, samples: 200 }, true],
 ];
@@ -41,7 +43,7 @@ describe('is pure', () => {
   it('refused calls also return the unchanged input', () => {
     const doc = rMinusS();
     for (const [name, params] of [
-      ['reliability_form', { limitState: 'nope' }],
+      ['run_reliability_study', { limitState: 'nope' }],
       ['delete_random_variable', { name: 'nope' }],
     ] as const)
       expect(execute(doc, name, params).document).toBe(doc);
@@ -90,7 +92,7 @@ describe('total sampling budget', () => {
 
 describe('importance factors under correlation', () => {
   it('give [0.36, 0.64] for R - S with rho = 0.5, as for independent normals', () => {
-    const importance = data(execute(correlated(), 'reliability_form', { limitState: 'g' }))['importance'] as Record<string, number>;
+    const importance = formData(correlated())['importance'] as Record<string, number>;
     expect(importance['R']).toBeCloseTo(0.36, 6);
     expect(importance['S']).toBeCloseTo(0.64, 6);
     expect(Object.values(importance).reduce((s, v) => s + v, 0)).toBeCloseTo(1, 12);
@@ -98,7 +100,7 @@ describe('importance factors under correlation', () => {
 
   it('sum to 1 for correlated lognormals and keep the u-space alpha', () => {
     const doc = execute(modelDoc([lognormal('R', 300, 30), lognormal('S', 200, 40)], 'R - S'), 'set_correlation', CORRELATION).document;
-    const d = data(execute(doc, 'reliability_form', { limitState: 'g' }));
+    const d = formData(doc);
     const importance = d['importance'] as Record<string, number>;
     expect(importance['R']! + importance['S']!).toBeCloseTo(1, 10);
     expect((d['alphaU'] as number[]).length).toBe(2);
@@ -119,7 +121,7 @@ describe('parameter bindings', () => {
   };
 
   it('samples the bound parameter: the limit state sees the random value', () => {
-    const d = data(execute(bound(), 'reliability_form', { limitState: 'g' }));
+    const d = formData(bound());
     // g = 38 - w, w ~ N(40, 2): beta = (38 - 40) / 2 = -1, i.e. the origin already fails.
     expect(relative(d['beta'] as number, -1)).toBeLessThan(1e-6);
     expect(d['variables']).toEqual(['width']);
@@ -128,7 +130,7 @@ describe('parameter bindings', () => {
   it('refuses with PRB_BINDING_UNRESOLVED when the parameter has been deleted', () => {
     const doc = bound();
     const parameters = Object.fromEntries(Object.entries(doc.parameters).filter(([name]) => name !== 'w'));
-    const result = execute({ ...doc, parameters }, 'reliability_form', { limitState: 'g' });
+    const result = execute({ ...doc, parameters }, 'run_reliability_study', { limitState: 'g', methods: ['form'] });
     expect(code(result)).toBe('PRB_BINDING_UNRESOLVED');
   });
 });

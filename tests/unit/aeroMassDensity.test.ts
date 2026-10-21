@@ -4,7 +4,7 @@ import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 import { resolveDensity } from '@core/geometry/resolveDensity';
-import { bodyMassProperties } from '@core/dynamics/simulationModel';
+import { bodyMassProperties } from '@core/geometry/bodyMassProperties';
 
 const PACK = 'docs/aerospace/08-materials-standards-libraries/validation/expected_results.json';
 interface Expected {

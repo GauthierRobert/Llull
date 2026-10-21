@@ -140,7 +140,7 @@ export const SIDEBAR_TAB_COUNTS: Readonly<Record<SidebarTab, (doc: CadDocument) 
 /** The Review tab appears once prototype checks can run (check_prototype registered) or a result is loaded. */
 export function isSidebarTabAvailable(tab: SidebarTab, reviewLoaded: boolean): boolean {
   if (tab === 'manufacturing') return getCommand('check_sheet_metal') !== undefined;
-  if (tab === 'aero') return getCommand('aero_drag') !== undefined;
+  if (tab === 'aero') return getCommand('compute_aero_drag') !== undefined;
   if (tab === 'fasteners') return getCommand('select_fastener') !== undefined;
   return tab !== 'review' || reviewLoaded || getCommand('check_prototype') !== undefined || getCommand('check_assembly') !== undefined;
 }

@@ -169,7 +169,7 @@ rebuilt; a handle carries its recipe, so a shape evicted from the cache, or lost
 restarted worker, is simply rebuilt. Meshes only come out of the kernel, for display and mesh
 exports. Each boolean/fillet result is stored as a `mesh` entity whose `brep` field is its
 recipe: the next operation on it resumes the exact tree (a fillet on a boolean result rounds
-a true edge), `inspect_topology` lists its real faces and edges, and `export_step_exact`
+a true edge), `inspect_topology` lists its real faces and edges, and `export_step_ap242`
 writes it as an exact STEP solid. When a kernel cannot rebuild a stored tree (a fillet
 document opened under Manifold) the stored triangles are used instead. See
 `docs/decisions/KI5-shape-kernel-boundary.md`.

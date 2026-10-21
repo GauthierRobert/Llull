@@ -5,11 +5,10 @@
  */
 
 import type { FeaHost, FeaToolResult } from '@protocol/index';
-import type { ToolDefinition } from '@protocol/tools';
-import { getCommand } from '@core/commands/registry';
 import { isRecord } from '@lib/isRecord';
-import { panelCount, solveBasis } from '@aero/aerodynamics/vlmKernel';
 import {
+  panelCount,
+  solveBasis,
   isVlmRefusal,
   resolveVortexLattice,
   VLM_NATIVE_PANEL_CAP,
@@ -17,7 +16,7 @@ import {
   vortexLatticeData,
   vortexLatticeParams,
   type VortexLatticeModel,
-} from '@aero/aerodynamics/vlmModel';
+} from '@aero/index';
 import { feaFailure } from '../fea/feaCommon';
 import { f64Bytes, f64Values, readOutput, withJobFolder, type ComputeRunner } from './computeJob';
 
@@ -33,34 +32,6 @@ export interface PanelNativeOptions {
   readonly timeoutS?: number;
   /** Also solve in TypeScript (lattices up to VLM_TS_PANEL_CAP) and report the largest Γ difference relative to max |Γ|. */
   readonly verify?: boolean;
-}
-
-/** vortex_lattice_solve: the analyze_vortex_lattice params (read from the registry, one schema) plus timeoutS and verify. */
-export function vortexLatticeToolDefinition(): ToolDefinition {
-  const schema = getCommand('analyze_vortex_lattice')?.paramsSchema ?? { type: 'object' as const, properties: {}, required: [] };
-  return {
-    name: TOOL,
-    description:
-      'analyze_vortex_lattice (same params, same data) with the influence matrix and the dense LU solved by the native llull-compute binary ' +
-      `(crate llull-panel, faer, all cores): for lattices above the ${VLM_TS_PANEL_CAP}-panel TypeScript cap, up to ${VLM_NATIVE_PANEL_CAP} ` +
-      'panels (both sides). The influence matrix is bit-identical to the TypeScript one; circulations agree to round-off. data.solver = ' +
-      '{ engine "native", tool, version, threads, buildMs, factorMs, residualX, residualZ }. verify: true also solves in TypeScript (up to ' +
-      `${VLM_TS_PANEL_CAP} panels) and reports the largest circulation difference. Without llull-compute: NATIVE_TOOL_MISSING.`,
-    inputSchema: {
-      ...schema,
-      properties: {
-        ...schema.properties,
-        timeoutS: {
-          type: 'number',
-          minimum: 1,
-          maximum: 86400,
-          description: 'Wall-clock limit of the native job in seconds (default 600).',
-        },
-        verify: { type: 'boolean', description: `Also solve in TypeScript (<= ${VLM_TS_PANEL_CAP} panels) and compare. Default false.` },
-      },
-    },
-    annotations: { readOnlyHint: true, idempotentHint: true },
-  };
 }
 
 function verification(model: VortexLatticeModel, gamma: Float64Array): Record<string, unknown> {

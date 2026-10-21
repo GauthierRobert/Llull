@@ -1,7 +1,7 @@
 /** Read helpers over `doc.plm`, the release-scope hash (via core's document_content_hash) and the human gate. */
 
 import type { CadDocument } from '@core/model/types';
-import type { PlmModel, PlmPolicy, Revision } from '@core/model/plm';
+import type { PlmModel, PlmPolicy, Revision } from '@plm/types';
 import type { ExecutionContext } from '@core/commands/types';
 import { getCommand } from '@core/commands/registry';
 

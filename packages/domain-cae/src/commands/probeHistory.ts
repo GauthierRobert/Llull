@@ -20,7 +20,7 @@ const PANEL_HEIGHT = 260;
 const sig = (value: number): string => significantNumber(value, 5);
 
 /**
- * @invariant read-only; values come from the verified results artifact (trustedRecord), per stored increment, at the same node as fea_report;
+ * @invariant read-only; values come from the verified results artifact (trustedRecord), per stored increment, at the same node as analysis_report;
  *   points are in solver order (time in seconds; 0 for steady / static results); the SVG shares one time axis and is omitted (null) unless
  *   some probe has >= 2 increments
  * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; unknown probeId -> FEA_PROBE_NOT_FOUND; not solved / artifacts unavailable -> FEA_RESULTS_MISSING
@@ -34,7 +34,7 @@ export const probeHistory = defineCommand({
     'without a value), start, end, min, max (each { time, value } | null) }], svg (time-series chart, one panel per unit, or null when ' +
     'no probe has two increments), width, height }. The summary lists start / end / min / max per probe. Probes come from ' +
     'add_result_probe; values are read at the nearest mesh node, in the analysis unit system (temperature in the case scale). Needs ' +
-    'state solved (fea_mesh then fea_solve); fea_report gives the same values inline per load case or time. ' +
+    'state solved (fea_mesh then fea_solve); analysis_report gives the same values inline per load case or time. ' +
     'With the CLI, `--save plot.png` rasterizes data.svg.',
   annotations: { readOnly: true },
   params: z.object({

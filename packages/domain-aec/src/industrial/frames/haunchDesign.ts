@@ -1,5 +1,5 @@
 /** Design step of design_portal_frames that lengthens the eaves haunches before the rafters are up-sized. */
-import type { BuildingModel, MomentConnectionElement } from '@core/model/building';
+import type { BuildingModel, MomentConnectionElement } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import { elementsOf, getBuilding, withElement } from '../../building/model';
 import type { CheckRow } from './frameCheckSolve';

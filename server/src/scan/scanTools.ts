@@ -3,54 +3,12 @@
  * `scan_list` (the assets of this machine's store). Run in-process for a local --doc and through `POST /exchange` for --app / --server.
  */
 
-import type { ToolDefinition } from '@protocol/tools';
 import type { CommandOutcome } from '@protocol/restProtocol';
 import { isRecord } from '@lib/isRecord';
 import { createComputeRunner } from '../native/computeJob';
 import { AssetReader } from './assetReader';
-import { DEFAULT_IMPORT_TIMEOUT_S, importOptionsOf, runScanImport, type ScanDeps } from './scanImport';
+import { importOptionsOf, runScanImport, type ScanDeps } from './scanImport';
 import { assetDir, listAssets, scanCacheDir } from './scanStore';
-
-export function scanToolDefinitions(): ToolDefinition[] {
-  return [
-    {
-      name: 'scan_import',
-      description:
-        "Import a point-cloud file (E57, LAS, LAZ, or ASCII XYZ / PTS / CSV) into this machine's cloud store with the native llull-compute " +
-        '(readers, octree, lossless integer coordinates). Prints the sourceSha256, the content-addressed assetKey and the manifest summary ' +
-        '(points, scans, bounds, attributes, warnings). The document is NOT changed: attach the cloud with attach_point_cloud assetKey=<key>. ' +
-        'Re-importing the same file with the same options is instant (cached). ReCap RCP / RCS, Faro FLS and other closed formats are refused ' +
-        '(SCN_FORMAT_PROPRIETARY): export E57 from the vendor tool. Errors: SCN_E57_CHECKSUM, SCN_CLOUD_EMPTY, SCN_LAS_HEADER, SCN_ASCII_PARSE, ' +
-        'NATIVE_TOOL_MISSING. CLI shorthand: llull scan import <file>.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          path: { type: 'string', description: 'Path of the cloud file on this machine.' },
-          format: { type: 'string', enum: ['xyz', 'pts', 'csv'], description: 'ASCII flavour when the extension does not say it.' },
-          sourceUnit: { type: 'string', enum: ['m', 'mm', 'cm', 'ft', 'in'], description: 'Unit of ASCII coordinates (default m).' },
-          columns: { type: 'string', description: 'ASCII column order with x y z i r g b, _ skips a column (default xyz).' },
-          applyStationPoses: { type: 'boolean', description: 'E57: apply each scan pose (default true).' },
-          checksum: { type: 'string', enum: ['all', 'sparse', 'none'], description: 'E57 page CRC check (default all).' },
-          maxPointsPerNode: { type: 'number', description: 'Octree node capacity (default 20000).' },
-          timeoutS: {
-            type: 'number',
-            minimum: 1,
-            maximum: 86400,
-            description: `Wall-clock limit in seconds (default ${DEFAULT_IMPORT_TIMEOUT_S}).`,
-          },
-        },
-        required: ['path'],
-      },
-      annotations: { readOnlyHint: true, idempotentHint: true },
-    },
-    {
-      name: 'scan_list',
-      description: "List the point-cloud assets in this machine's store (assetKey, source name, format, points). Read-only.",
-      inputSchema: { type: 'object', properties: {}, required: [] },
-      annotations: { readOnlyHint: true, idempotentHint: true },
-    },
-  ];
-}
 
 const NAMES: ReadonlySet<string> = new Set(['scan_import', 'scan_list']);
 

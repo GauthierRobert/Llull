@@ -205,7 +205,7 @@ describe('set_part_idealization', () => {
 
   it('refuses unknown analysis, missing and 2D entities and unbuilt idealizations', () => {
     const { doc, boxId, analysisId } = modelWithAnalysis();
-    const rect = run(doc, 'draw_rectangle', { corner: [0, 0], width: 5, height: 5 });
+    const rect = run(doc, 'draw_rectangle', { position: [0, 0], width: 5, height: 5 });
     const rectId = rect.affected[0] ?? '';
     expect(rectId).not.toBe('');
     expectRefused(run(rect.document, 'set_part_idealization', { analysisId, entityId: rectId }), rect.document, 'FEA_PART_INVALID');
@@ -286,7 +286,7 @@ describe('result probes', () => {
     expect(probeId).toMatch(/^pr-\d+\.1$/);
     expect(caseIn(added.document, analysisId).probes[probeId]).toEqual({ name: 'hot', point: [1, 2, 3], quantity: 'temperature' });
     expectPure(doc, () => run(doc, 'add_result_probe', { analysisId, name: 'hot', point: [1, 2, 3], quantity: 'heat_flux' }));
-    const removed = run(added.document, 'delete_result_probe', { analysisId, probeId });
+    const removed = run(added.document, 'delete_analysis_item', { analysisId, itemId: probeId });
     expect(removed.affected).toEqual([probeId]);
     expect(caseIn(removed.document, analysisId).probes).toEqual({});
   });
@@ -298,8 +298,8 @@ describe('result probes', () => {
       doc,
       'FEA_ANALYSIS_NOT_FOUND',
     );
-    expectRefused(run(doc, 'delete_result_probe', { analysisId: 'x', probeId: 'p' }), doc, 'FEA_ANALYSIS_NOT_FOUND');
-    expectRefused(run(doc, 'delete_result_probe', { analysisId, probeId: 'p' }), doc, 'FEA_PROBE_NOT_FOUND');
+    expectRefused(run(doc, 'delete_analysis_item', { analysisId: 'x', itemId: 'p' }), doc, 'FEA_ANALYSIS_NOT_FOUND');
+    expectRefused(run(doc, 'delete_analysis_item', { analysisId, itemId: 'p' }), doc, 'FEA_ITEM_NOT_FOUND');
     expect(run(doc, 'add_result_probe', { analysisId, name: 'p', point: [0, 0], quantity: 'u_mag' }).summary).toContain('invalid params');
     expect(run(doc, 'add_result_probe', { analysisId, name: 'p', point: [0, 0, 0], quantity: 'speed' }).summary).toContain(
       'invalid params',

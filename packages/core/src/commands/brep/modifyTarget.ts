@@ -5,7 +5,7 @@ import type { GeometryKernel } from '../../geometry/kernel';
 import type { CommandResult } from '../types';
 import { noop } from '../noop';
 
-/** Surface-neutral pointer to the B-rep kernel (browser URL flag or server env var). */
+/** Surface-neutral pointer to the B-rep kernel (server env var). */
 export const OCC_KERNEL_HINT = 'the OCC kernel (the desktop default; LLULL_KERNEL=occt-native or occt for the CLI and server)';
 
 export function validateSolidTarget(doc: CadDocument, opName: string, id: string): { entity: Entity } | CommandResult {

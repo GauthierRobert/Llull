@@ -4,6 +4,7 @@
  */
 
 import type { AnalysisCase, FeArtifactPort, FeMeshArtifact, FeResultsArtifact, MeshSummary, ResultsSummary } from '@core/model/analysis';
+import type { FeExplicitArtifact } from '@core/model/explicit';
 import type { FeTopologyArtifact } from '@core/model/topology';
 import type { CadDocument } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
@@ -49,10 +50,12 @@ function withoutHeatBalance(summary: ResultsSummary): object {
   return { ...summary, thermal };
 }
 
+type StoredArtifact = FeMeshArtifact | FeResultsArtifact | FeTopologyArtifact | FeExplicitArtifact;
+
 const artifactHashes = new WeakMap<object, string>();
 
 /** sha256 of the canonical JSON of an artifact, computed once per artifact object. */
-function hashOfArtifact(artifact: FeMeshArtifact | FeResultsArtifact | FeTopologyArtifact): string {
+function hashOfArtifact(artifact: StoredArtifact): string {
   let hash = artifactHashes.get(artifact);
   if (hash === undefined) {
     hash = sha256Hex(canonicalJson(artifact));
@@ -64,22 +67,24 @@ function hashOfArtifact(artifact: FeMeshArtifact | FeResultsArtifact | FeTopolog
 export type Fetched<T> = { readonly artifact: T } | { readonly code: string; readonly message: string };
 
 /**
- * The artifact of `hash` from the port.
+ * The artifact of `hash` from the port; `codePrefix` names the refusal codes (`<prefix>_ARTIFACT_NOT_FOUND` / `<prefix>_SUMMARY_MISMATCH`).
  * @failure no port / not in the store / other kind -> FEA_ARTIFACT_NOT_FOUND; content not hashing to `hash` -> FEA_SUMMARY_MISMATCH
  */
-export function fetchArtifact<K extends 'fe_mesh' | 'fe_results' | 'fe_topology'>(
+export function fetchArtifact<K extends StoredArtifact['kind']>(
   port: FeArtifactPort | null | undefined,
   hash: string,
   kind: K,
-): Fetched<Extract<FeMeshArtifact | FeResultsArtifact | FeTopologyArtifact, { kind: K }>> {
+  codePrefix: 'FEA' | 'EXP' = 'FEA',
+): Fetched<Extract<StoredArtifact, { kind: K }>> {
   const found = port?.get(hash) ?? null;
   if (found === null || found.kind !== kind)
     return {
-      code: 'FEA_ARTIFACT_NOT_FOUND',
+      code: `${codePrefix}_ARTIFACT_NOT_FOUND`,
       message: port ? `no ${kind} artifact for hash ${hash}` : `no artifact store available for ${kind} ${hash}`,
     };
-  if (hashOfArtifact(found) !== hash) return { code: 'FEA_SUMMARY_MISMATCH', message: `the sha256 of the ${kind} artifact is not ${hash}` };
-  return { artifact: found as Extract<FeMeshArtifact | FeResultsArtifact | FeTopologyArtifact, { kind: K }> };
+  if (hashOfArtifact(found) !== hash)
+    return { code: `${codePrefix}_SUMMARY_MISMATCH`, message: `the sha256 of the ${kind} artifact is not ${hash}` };
+  return { artifact: found as Extract<StoredArtifact, { kind: K }> };
 }
 
 const nothing = (state: AnalysisState, problem: TrustProblem | null): Trust => ({

@@ -1,9 +1,8 @@
 import type { Constraint, EntityRef } from '../../model/types';
-import { directionOf, lineOf, pointOf, subKindOf, type Layout, type Pt } from './solver/layout';
+import { cross2 } from '../../lib/vec2';
+import { directionOf, lineOf, pointOf, subKindOf, type Layout } from './solver/layout';
 
 const key = (ref: EntityRef): string => `${ref.entityId}:${subKindOf(ref) ?? ''}`;
-
-const cross = (u: Pt, v: Pt): number => u[0] * v[1] - u[1] * v[0];
 
 /** Points joined by `coincident` constraints are one node of the triangle graph. */
 function nodeResolver(constraints: readonly Constraint[]): (ref: EntityRef) => string {
@@ -22,7 +21,7 @@ function nodeResolver(constraints: readonly Constraint[]): (ref: EntityRef) => s
 /** Signed area of the triangle (twice), at the layout vector `x`. */
 function area(layout: Layout, x: Float64Array, refs: readonly [EntityRef, EntityRef, EntityRef]): number {
   const [p, q, r] = refs.map((ref) => pointOf(layout, x, ref) ?? ([0, 0] as const));
-  return p && q && r ? cross([q[0] - p[0], q[1] - p[1]], [r[0] - p[0], r[1] - p[1]]) : 0;
+  return p && q && r ? cross2([q[0] - p[0], q[1] - p[1]], [r[0] - p[0], r[1] - p[1]]) : 0;
 }
 
 /** Triangles whose three sides are all fixed by distance/aligned dimensions, as one reference per corner. */
@@ -80,8 +79,8 @@ export function findFlips(
       lineOf(layout, after, c.b.entityId),
     ];
     if (!a0 || !b0 || !a1 || !b1) continue;
-    const turnBefore = cross(directionOf(a0), directionOf(b0));
-    const turnAfter = cross(directionOf(a1), directionOf(b1));
+    const turnBefore = cross2(directionOf(a0), directionOf(b0));
+    const turnAfter = cross2(directionOf(a1), directionOf(b1));
     if (turnBefore * turnAfter < 0 && Math.abs(turnBefore) > 0.05 && Math.abs(turnAfter) > 1e-3)
       flips.push(`lines '${c.a.entityId}' and '${c.b.entityId}' (constraint ${c.id}) would swap which side line b lies on`);
   }

@@ -1,4 +1,4 @@
-/** add_temperature_limit / delete_temperature_limit: sourced temperature limits that check_temperature_limits compares with the results. */
+/** add_temperature_limit: sourced temperature limits that check_temperature_limits compares with the results. */
 
 import type { TemperatureLimit } from '@core/model/analysis';
 import { defineCommand, z } from '@core/commands/schema';
@@ -95,36 +95,5 @@ export const addTemperatureLimit = defineCommand({
       `add_temperature_limit: '${limit.id}' (${name}) ${bounds.join(', ')} [${source.citation}] in '${analysisId}'.`,
       [limit.id],
     );
-  },
-});
-
-/**
- * @affects doc.analysis.cases[analysisId].thermal.limits (removes 1) and the dispositions recorded for its rows
- * @failure unknown analysis / limit -> refusal, unchanged doc
- */
-export const deleteTemperatureLimit = defineCommand({
-  name: 'delete_temperature_limit',
-  description: 'Remove a temperature limit (and any disposition recorded for its rows) from a heat_* analysis.',
-  annotations: { destructive: true },
-  params: z.object({ analysisId: analysisIdSchema, limitId: z.string().describe('Limit id (affected[0] of add_temperature_limit).') }),
-  run: (doc, { analysisId, limitId }): CommandResult => {
-    const found = thermalCaseOf(doc, analysisId);
-    if (isProblem(found)) return refuseThermal(doc, 'delete_temperature_limit', found.code, found.message, found.ids, found.paths);
-    if (!Object.hasOwn(found.thermal.limits, limitId))
-      return refuseThermal(
-        doc,
-        'delete_temperature_limit',
-        'THM_LIMIT_NOT_FOUND',
-        `no limit '${limitId}' in '${analysisId}'`,
-        [analysisId, limitId],
-        ['limitId'],
-      );
-    const thermal = {
-      ...found.thermal,
-      limits: Object.fromEntries(Object.entries(found.thermal.limits).filter(([id]) => id !== limitId)),
-      limitOrder: found.thermal.limitOrder.filter((id) => id !== limitId),
-      dispositions: Object.fromEntries(Object.entries(found.thermal.dispositions).filter(([row]) => !row.startsWith(`${limitId}:`))),
-    };
-    return changed(withThermal(doc, found, thermal), `delete_temperature_limit: removed '${limitId}' from '${analysisId}'.`, [limitId]);
   },
 });

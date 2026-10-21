@@ -25,7 +25,7 @@ const result = (problems: string[], ok: string): CheckOutcome => ({
   detail: problems.length === 0 ? ok : problems.slice(0, 8).join('; '),
 });
 
-/** Cut height of a plan view above FFL (drafting convention, as used by export_dxf). */
+/** Cut height of a plan view above FFL (drafting convention, as used by export_building_dxf). */
 const PLAN_CUT = 1200;
 
 function ifcModelCheck({ document, deliverable }: GradeContext): CheckOutcome {

@@ -3,8 +3,9 @@
  * catalogue, runs the grip / shim / length / protrusion rules and names every defaulted rule (AF-31). Shared by the insert commands.
  */
 
+import { round6 } from '@lib/compactNumber';
 import type { CadDocument, Vec3 } from '@core/model/types';
-import type { FastenerFamily, FastenerSize } from '@core/model/fasteners';
+import type { FastenerFamily, FastenerSize } from '@aero/fasteners/types';
 import { unitAxisOrNull } from '@lib/axisRotation';
 import { familyOf, sizeOf } from './fastenerDoc';
 import { remediationFor } from './codes';
@@ -201,7 +202,7 @@ export function runSelection(doc: CadDocument, p: SelectionParams): SelectionOut
     family.gripIncrement?.unit ?? (family.lengthRule?.kind === 'stack_plus_k_d' ? family.lengthRule.step.unit : size.nominalDiameter.unit);
   const stackTicks = toTicks(stack.stackIn, 'in', work) ?? 0;
   const codes = p.codes ?? {};
-  const common = { family: family.id, kind: family.kind, diameterDash: size.dash, stackIn: Math.round(stack.stackIn * 1e6) / 1e6 };
+  const common = { family: family.id, kind: family.kind, diameterDash: size.dash, stackIn: round6(stack.stackIn) };
   const measuredLayers = stack.measured?.layers ?? [];
   const layout = stack.measured === null ? {} : { stackSource: 'measured', layers: measuredLayers };
   const warnings: Reason[] = [...stack.warnings];

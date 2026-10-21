@@ -1,6 +1,6 @@
 /** Crop boxes (TECHNICAL_SPEC §4.1): named document-frame boxes that clip clouds in views and serve as query regions. */
 
-import type { CropBox } from '@core/model/pointCloud';
+import type { CropBox } from '@aec/scan/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';

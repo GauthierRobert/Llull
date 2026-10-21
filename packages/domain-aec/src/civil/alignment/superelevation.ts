@@ -5,7 +5,7 @@
  * are ratios "falling away from the centreline" (negative = rising).
  */
 
-import type { AlignmentObject } from '@core/model/civil';
+import type { AlignmentObject } from '@aec/civil/types';
 import { horizontalElements, type HorizontalElement } from './alignmentGeometry';
 
 /** Relative gradient of the pavement edge used for the runoff length when no spiral gives one. */

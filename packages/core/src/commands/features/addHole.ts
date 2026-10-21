@@ -3,6 +3,7 @@
  * face of a solid. The result is a `mesh` whose `brep` is a `feature(hole)` node over the target's recipe.
  */
 
+import { round6 } from '../../lib/compactNumber';
 import { type CadDocument, type Entity, type MeshData, type Vec2, is3D } from '../../model/types';
 import type { FeatureFrame, HoleExtent, HoleSpec } from '../../model/features';
 import type { GeometryKernel } from '../../geometry/kernel';
@@ -11,7 +12,8 @@ import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
-import { commitKernelResult, evaluateRecipe, operandRecipe } from '../brep/kernelShape';
+import { commitKernelResult, evaluateRecipe } from '../kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { noop } from '../noop';
 import { frameToWorld, heightAbove } from '../../geometry/featureFrame';
 import { resolveSketchPoints, sketchPointsSchema } from './sketchPoints';
@@ -108,9 +110,7 @@ export const addHole = defineCommand({
       return refuse(doc, 'add_hole', 'FTR_HOLE_POINT_OUTSIDE_FACE', sketch, 'pass existing sketch point ids', [target], ['points']);
     const off = sketch.points.flatMap((point, index) => {
       const distance = heightAbove(resolved.frame, point);
-      return Math.abs(distance) > SKETCH_PLANE_TOLERANCE
-        ? [`${sketch.labels[index]} (${Math.round(distance * 1e6) / 1e6} off the face plane)`]
-        : [];
+      return Math.abs(distance) > SKETCH_PLANE_TOLERANCE ? [`${sketch.labels[index]} (${round6(distance)} off the face plane)`] : [];
     });
     if (off.length > 0)
       return refuse(
@@ -136,7 +136,7 @@ function extentLabel(extents: readonly HoleExtent[], methods: readonly (string |
   if (first === undefined || first.kind === 'through_all') return ', through all';
   if (first.kind === 'blind')
     return `, blind ${first.depth}${first.drillPointAngle === undefined ? ' flat' : ` + ${first.drillPointAngle}° point`}`;
-  const depths = extents.map((extent) => ('depth' in extent ? Math.round(extent.depth * 1e6) / 1e6 : 0)).join(' / ');
+  const depths = extents.map((extent) => ('depth' in extent ? round6(extent.depth) : 0)).join(' / ');
   const method = methods.includes('mesh') ? 'mesh ray cast' : methods.includes('exact') ? 'exact face query' : undefined;
   return `, ${first.kind.replace(/_/g, ' ')} (depth ${depths}${method === undefined ? '' : `, measured by ${method}`})`;
 }
@@ -265,7 +265,7 @@ function drill(
       : `, thread ${hole.thread.designation} (${hole.thread.modelled === true ? 'modelled helical groove, basic profile' : 'cosmetic'})`,
   ].join('');
   const facts = notes.length === 0 ? '' : ` Note: ${notes.join('; ')}.`;
-  const normal = frame.normal.map((c) => Math.round(c * 1e6) / 1e6).join(', ');
+  const normal = frame.normal.map((c) => round6(c)).join(', ');
   const next = commitKernelResult(
     doc,
     kernel,

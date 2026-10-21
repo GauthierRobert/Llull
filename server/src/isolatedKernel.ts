@@ -5,6 +5,7 @@
  * @failure worker died / timed out / failed to start -> null result + console.warn, never a throw
  */
 import { MessageChannel, Worker, receiveMessageOnPort, type MessagePort } from 'node:worker_threads';
+import { debugWarn } from './debugLog';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, StepOccurrence } from '@core/geometry/kernel';
 import type { ExactMassProperties, ImportShapesResult, KernelInfo } from '@core/geometry/kernelPorts';
 import type { ExchangeWriteRequest, ImportExchangeResult } from '@core/geometry/kernelExchange';
@@ -274,7 +275,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
         ensureLive();
         return true;
       } catch (error) {
-        console.warn(`[occt] ${errorMessage(error)}`);
+        debugWarn(`[occt] ${errorMessage(error)}`);
         return false;
       }
     },

@@ -1,4 +1,4 @@
-/** add_imposed_motion / delete_imposed_motion: prescribed velocity or displacement histories of an explicit case (§3 imposedMotions, RS-8). */
+/** add_imposed_motion: prescribed velocity or displacement histories of an explicit case (§3 imposedMotions, RS-8). */
 
 import type { ExplicitImposedMotion, ExplicitSpec } from '@core/model/explicit';
 import { defineCommand, vec3, z } from '@core/commands/schema';
@@ -92,33 +92,6 @@ export const addImposedMotion = defineCommand({
       withSpec(doc, analysisCase, next),
       `add_imposed_motion: ${id} '${name}' ${kind} ${dof} of ${target.entityId}, ${curve.length} point(s) in ${caseUnit} in ${analysisId}.`,
       [analysisId, id],
-    );
-  },
-});
-
-/**
- * @affects doc.analysis.cases[analysisId].explicit.imposedMotions (removes 1 motion)
- * @failure no controls -> EXP_CONTROLS_MISSING; unknown motion -> EXP_IMPOSED_MOTION_NOT_FOUND
- */
-export const deleteImposedMotion = defineCommand({
-  name: 'delete_imposed_motion',
-  description: 'Remove an imposed motion (by id, affected[1] of add_imposed_motion) from an explicit_dynamics case.',
-  params: z.object({ analysisId: analysisIdSchema, motionId: z.string().describe('Imposed motion id, e.g. im-12.1.') }),
-  run: (doc, { analysisId, motionId }): CommandResult => {
-    const fail = (code: string, message: string, paths: readonly string[] = []): CommandResult =>
-      refuseExplicit(doc, 'delete_imposed_motion', code, message, [analysisId], paths);
-    const found = explicitCase(doc, analysisId);
-    if ('code' in found) return fail(found.code, found.message);
-    const { analysisCase, spec } = found;
-    if (spec === undefined) return fail('EXP_CONTROLS_MISSING', `analysis '${analysisId}' has no explicit controls yet`);
-    if (spec.imposedMotions === undefined || !Object.hasOwn(spec.imposedMotions, motionId))
-      return fail('EXP_IMPOSED_MOTION_NOT_FOUND', `no imposed motion '${motionId}' in '${analysisId}'`, ['motionId']);
-    const imposedMotions = Object.fromEntries(Object.entries(spec.imposedMotions).filter(([id]) => id !== motionId));
-    const imposedMotionOrder = (spec.imposedMotionOrder ?? []).filter((id) => id !== motionId);
-    return changed(
-      withSpec(doc, analysisCase, { ...spec, imposedMotions, imposedMotionOrder }),
-      `delete_imposed_motion: ${motionId} removed from ${analysisId}.`,
-      [analysisId],
     );
   },
 });

@@ -1,7 +1,7 @@
 /** Evaluates survey point groups (point markers) and surfaces (TIN mesh, minor / major contours and major-contour elevation labels). */
 
 import type { Entity, Vec2 } from '@core/model/types';
-import type { PointGroupObject, SurfaceObject } from '@core/model/civil';
+import type { PointGroupObject, SurfaceObject } from '@aec/civil/types';
 import { clipPolylineOutside, footprintBoxes, surfaceFootprint, trimmedTinMesh } from '../earthworks/tinTrim';
 import { civilMesh, civilPoint, civilPolyline, civilText } from '../entities';
 import { contourLevels, tinBounds, traceContour, type Tin } from './tin';

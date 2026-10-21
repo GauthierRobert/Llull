@@ -96,7 +96,7 @@ an=$(llull run plans/dyn_cantilever_random_gevs.plan.json $D | jq -r '.data.alia
 llull fea_mesh analysisId=$an $D --timeout 300
 llull check_dynamics analysisId=$an $D > check.json                       # no severity "error"
 llull fea_solve analysisId=$an $D --timeout 900
-llull dynamic_report analysisId=$an $D > report.json                      # probes tip / tip_rel / root_top vs VC-DYN-21
+llull analysis_report analysisId=$an $D > report.json                      # probes tip / tip_rel / root_top vs VC-DYN-21
 python3 -I compare.py report.json expected_results.json VC-DYN-21         # PHY-00 compare_to_expected
 ```
 

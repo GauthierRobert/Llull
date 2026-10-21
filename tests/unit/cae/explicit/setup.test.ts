@@ -176,7 +176,7 @@ describe('set_initial_velocity, add_rigid_wall, delete_rigid_wall', () => {
     expect(model.doc).toEqual(before);
     const wallId = added.affected[1] ?? '';
     expect(specOf(added.document, model.analysisId).rigidWallOrder).toEqual([model.wallId, wallId]);
-    const removed = must(added.document, 'delete_rigid_wall', { analysisId: model.analysisId, wallId });
+    const removed = must(added.document, 'delete_analysis_item', { analysisId: model.analysisId, itemId: wallId });
     expect(specOf(removed.document, model.analysisId).rigidWallOrder).toEqual([model.wallId]);
     expect(
       code(execute(model.doc, 'add_rigid_wall', { analysisId: model.analysisId, name: 'x', point: [0, 0, 0], normal: [0, 0, 0] })),
@@ -184,9 +184,7 @@ describe('set_initial_velocity, add_rigid_wall, delete_rigid_wall', () => {
     expect(
       code(execute(model.doc, 'add_rigid_wall', { analysisId: model.analysisId, name: 'anvil', point: [0, 0, 0], normal: [0, 0, 1] })),
     ).toBe('EXP_RIGID_WALL_INVALID');
-    expect(code(execute(model.doc, 'delete_rigid_wall', { analysisId: model.analysisId, wallId: 'rw-404' }))).toBe(
-      'EXP_RIGID_WALL_NOT_FOUND',
-    );
+    expect(code(execute(model.doc, 'delete_analysis_item', { analysisId: model.analysisId, itemId: 'rw-404' }))).toBe('FEA_ITEM_NOT_FOUND');
   });
 
   it('flags malformed explicit slices on load', () => {

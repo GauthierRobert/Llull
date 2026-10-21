@@ -6,7 +6,7 @@
  * stay in core as the `loads` callback, so every engine integrates the same physics.
  */
 
-import type { Vec3 } from '../model/vectors';
+import type { Quaternion, Vec3 } from '../model/vectors';
 import type { InertiaTensor } from '../geometry/massProperties';
 
 export interface SimulationJoint {
@@ -175,9 +175,6 @@ export interface SimulationOptions {
   /** Record kinetic and potential energy at every sample. Default false. */
   readonly energy?: boolean;
 }
-
-/** Unit quaternion [w, x, y, z]. */
-export type Quaternion = readonly [number, number, number, number];
 
 /** Largest magnitude seen, and when. */
 export interface StepPeak {

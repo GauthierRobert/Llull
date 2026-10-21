@@ -1,7 +1,7 @@
 /** Rooms, and generic edits on any building element (delete, move, copy to levels). */
 
 import type { Vec2, Vec3 } from '@core/model/types';
-import type { BuildingElement, BuildingModel, RoomElement } from '@core/model/building';
+import type { BuildingElement, BuildingModel, RoomElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { planAreaM2 } from '../../shared/planArea';
@@ -91,7 +91,7 @@ export const deleteBuildingElement = defineCommand({
   name: 'delete_building_element',
   annotations: { destructive: true },
   description:
-    'Delete building elements by element id (walls, doors, windows, slabs, columns, beams, stairs, rooms, grid axes). Deleting a wall ' +
+    'Delete building elements by element id; use this instead of delete_entities for anything in the building model, because it cascades to hosted and dependent elements and re-trims joins (delete_entities would leave orphan building data) (walls, doors, windows, slabs, columns, beams, stairs, rooms, grid axes). Deleting a wall ' +
     'also deletes its doors and windows; joined walls are re-trimmed. Deleting a steel member re-attaches the pipe supports bearing on ' +
     'it to the nearest steel in reach, or leaves them unattached (the summary says which).',
   params: z.object({ elementIds: z.array(z.string()).describe('Element ids, e.g. ["wall-2", "door-1"].') }),
@@ -160,7 +160,7 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
 export const moveBuildingElement = defineCommand({
   name: 'move_building_element',
   description:
-    'Move building elements in plan by delta [dx, dy]. Doors/windows travel with their wall (to slide an opening along its wall use ' +
+    'Move building elements in plan by delta [dx, dy]; use this instead of move_entities for building elements, because hosted elements and supports follow and joins are recomputed (move_entities would desync the building model). Doors/windows travel with their wall (to slide an opening along its wall use ' +
     'update_opening). Corner joins are recomputed. A moved pipe takes its pipe supports along and a moved steel member makes its ' +
     'supports re-check their reach: they re-attach to the steel at the new position or become unattached (the summary says which).',
   params: z.object({ elementIds: z.array(z.string()).describe('Element ids to move.'), delta: vec2('Plan translation [dx, dy].') }),

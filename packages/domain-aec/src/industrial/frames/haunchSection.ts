@@ -4,7 +4,7 @@
  * modelled as HAUNCH_PIECES prismatic pieces (stiffness at the piece middle, resistance at its shallower end).
  */
 import type { Vec3 } from '@core/model/types';
-import type { BuildingModel, SteelMemberElement } from '@core/model/building';
+import type { BuildingModel, SteelMemberElement } from '@aec/building/types';
 import { distance3 } from '@lib/vec3';
 import type { SteelProfile } from '../../steel/profiles';
 

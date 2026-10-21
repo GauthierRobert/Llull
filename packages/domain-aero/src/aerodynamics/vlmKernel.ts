@@ -7,7 +7,7 @@
  * Panel layout (PANEL_STRIDE f64 per panel): Ax Ay Az Bx By Bz Cx Cy Cz nx ny nz.
  */
 
-import { luFactor, luSolve } from './denseLu';
+import { luFactor, luSolve } from '@lib/denseLinalg';
 
 export const PANEL_STRIDE = 12;
 const FOUR_PI = 4 * Math.PI;

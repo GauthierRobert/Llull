@@ -215,10 +215,10 @@ describe('inspect_topology', () => {
   });
 });
 
-describe('export_step_exact', () => {
+describe('export_step_ap242', () => {
   it('writes every 3D solid from its exact shape, document untouched', () => {
     const { doc, a, b } = twoBoxes();
-    const result = run(doc, 'export_step_exact', {}, fakeKernel({ step: 'ISO-10303-21;' }));
+    const result = run(doc, 'export_step_ap242', { includeValidationProperties: false }, fakeKernel({ step: 'ISO-10303-21;' }));
     expect(result.document).toBe(doc);
     expect(result.data).toEqual({
       format: 'step',
@@ -233,15 +233,24 @@ describe('export_step_exact', () => {
   });
   it('exports a subset and reports skipped ids', () => {
     const { doc, a, line } = twoBoxes();
-    const result = run(doc, 'export_step_exact', { entityIds: [a, line, 'ghost'] }, fakeKernel({ step: 'S' }));
+    const result = run(
+      doc,
+      'export_step_ap242',
+      { includeValidationProperties: false, entityIds: [a, line, 'ghost'] },
+      fakeKernel({ step: 'S' }),
+    );
     expect(result.data).toMatchObject({ solidCount: 1, skipped: [`${line} (2D)`, 'ghost (not found)'] });
     expect(result.summary).toContain('skipped');
   });
   it('refuses: no kernel, no solids, a solid the kernel cannot build, a kernel without STEP', () => {
     const { doc, line } = twoBoxes();
-    expect(run(doc, 'export_step_exact', {}, null).summary).toMatch(/not available/);
-    expect(run(doc, 'export_step_exact', { entityIds: [line] }, fakeKernel({ step: 'S' })).summary).toMatch(/no 3D solids/);
-    expect(run(doc, 'export_step_exact', {}, fakeKernel({ solid: null, step: 'S' })).summary).toMatch(/could not build/);
-    expect(run(doc, 'export_step_exact', {}, fakeKernel()).summary).toMatch(/cannot write exact STEP/);
+    expect(run(doc, 'export_step_ap242', { includeValidationProperties: false }, null).summary).toMatch(/not available/);
+    expect(
+      run(doc, 'export_step_ap242', { includeValidationProperties: false, entityIds: [line] }, fakeKernel({ step: 'S' })).summary,
+    ).toMatch(/no 3D solids/);
+    expect(run(doc, 'export_step_ap242', { includeValidationProperties: false }, fakeKernel({ solid: null, step: 'S' })).summary).toMatch(
+      /could not build/,
+    );
+    expect(run(doc, 'export_step_ap242', { includeValidationProperties: false }, fakeKernel()).summary).toMatch(/cannot write exact STEP/);
   });
 });

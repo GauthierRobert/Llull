@@ -24,8 +24,8 @@ import { refuseMarginsAs } from './refusal';
 export const disposeMargin = defineCommand({
   name: 'dispose_margin',
   description:
-    "HUMAN GATE. Record a qualified reviewer's decision (accepted | rejected | redesign) on a FAIL or MARGINAL row of compute_margins " +
-    '(rowId "r4"; pass the same criterion / allowable / groupBy / loadCases / marginalBand you used there so the row ids match). Only a human-held ' +
+    "Record a qualified reviewer's decision (accepted | rejected | redesign) on a FAIL or MARGINAL row of compute_margins " +
+    '(rowId "r4"; pass the same criterion / allowable / groupBy / loadCases / marginalBand you used there so the row ids match). HUMAN GATE. Only a human-held ' +
     'signature over the row verifies (09 PLM signing port): an agent has none and always gets FEA_HUMAN_GATE with the document unchanged. Do not ' +
     'retry or work around it: hand the row over to the reviewer, who dispositions it in the desktop app. The decision never turns a FAIL into a ' +
     'PASS (the row reads "FAIL (accepted)", status stays FAIL, check_analysis keeps FEA_MS_NEGATIVE) and ends when the analysis is solved again.',

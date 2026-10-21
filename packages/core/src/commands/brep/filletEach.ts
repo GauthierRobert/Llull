@@ -4,6 +4,7 @@
  * laws use `radii` (a kernel that does not read it refuses).
  */
 
+import { round6 } from '../../lib/compactNumber';
 import type { CadDocument, EdgeRadius, ShapeRecipe, Vec3 } from '../../model/types';
 import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/kernel';
 import type { CommandResult, ExecutionContext } from '../types';
@@ -12,7 +13,8 @@ import { kernelUnavailable } from '../kernelRefusal';
 import { noop } from '../noop';
 import { selectEdges } from './edgeSelection';
 import { type EdgeLawInput, type FilletMode, chordToRadius, lawOf, lawProblem, sameLaw, scaleLaw, wedgeAngle } from './filletSpec';
-import { commitKernelResult, evaluateRecipe, operandRecipe } from './kernelShape';
+import { commitKernelResult, evaluateRecipe } from '../kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { modifyFailure, validateSolidTarget } from './modifyTarget';
 import { hasNames, namesOf, referenceProblem, resolveNames } from '../../geometry/naming/references';
 import { commandError } from '../noop';
@@ -36,8 +38,6 @@ interface Planned {
 }
 
 type Resolution = { readonly planned: Planned[] } | { readonly problem: string };
-
-const fixed = (value: number): number => Math.round(value * 1e6) / 1e6;
 
 /** Edge index of each `edges` entry (index, or the roundable edge nearest `near`) with its law. */
 function resolveEntries(topology: ShapeTopology | null, entries: readonly EdgeLawInput[]): Resolution {
@@ -83,7 +83,7 @@ function chordsToRadii(
 ): { readonly planned: Planned[] } | { readonly problem: string } {
   const graph = kernel.faceQuery?.faceGraph(shape) ?? null;
   if (topology === null || graph === null)
-    return { problem: 'mode "chord" needs the exact face adjacency of an exact kernel (the default Manifold kernel has none)' };
+    return { problem: 'mode "chord" needs the exact face adjacency of an exact kernel (the mesh kernel has none)' };
   const converted: Planned[] = [];
   for (const { edge, law } of planned) {
     const faces = graph.edgeFaces[edge] ?? [];
@@ -120,7 +120,7 @@ function recipeOfPlan(source: ShapeRecipe, planned: readonly Planned[], topology
 }
 
 const lawText = (law: EdgeRadius): string =>
-  `${fixed(law.size)}${law.sizeEnd === undefined ? '' : `>${fixed(law.sizeEnd)}`}${law.sizes === undefined ? '' : ` via ${law.sizes.length} control point(s)`}`;
+  `${round6(law.size)}${law.sizeEnd === undefined ? '' : `>${round6(law.sizeEnd)}`}${law.sizes === undefined ? '' : ` via ${law.sizes.length} control point(s)`}`;
 
 /**
  * `request` with its edges taken from the recorded persistent names (one per planned edge, plan order), or why they no longer resolve;

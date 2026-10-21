@@ -10,19 +10,34 @@ import type {
 } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import type { GeometryKernel } from '@core/geometry/kernel';
-import { partMidsurfaceGeometry, type MidsurfaceGeometry } from '@cae/shell/meshGeometry';
-import { mapShellResults } from '@cae/shell/shellResults';
-import { analysisInputHash, meshRequest, type MeshRequest } from '@cae/index';
-import { writeBdf, type BdfResult } from '@cae/decks/bdfWriter';
-import { writeInp } from '@cae/decks/inpWriter';
-import { firstNonFinite, parseFrd } from '@cae/results/frdReader';
-import { classifyNonlinearStop, parseSta, type NonlinearStopCode } from '@cae/nonlinear/solverLog';
-import { parseDat } from '@cae/results/datReader';
-import { readOp2, type Op2Result, type Op2Tables } from '@cae/results/op2Reader';
-import { op2ToResults, type Op2Import } from '@cae/results/op2Results';
-import { writeVtu, type VtuEncoding } from '@cae/results/vtuWriter';
-import { meshSummary, resultsSummary } from '@cae/results/summary';
-import { parseFieldTable, type TableImport } from '@cae/thermomech/tableImport';
+import {
+  partMidsurfaceGeometry,
+  type MidsurfaceGeometry,
+  mapShellResults,
+  analysisInputHash,
+  meshRequest,
+  type MeshRequest,
+  writeBdf,
+  type BdfResult,
+  writeInp,
+  firstNonFinite,
+  parseFrd,
+  classifyNonlinearStop,
+  parseSta,
+  type NonlinearStopCode,
+  parseDat,
+  readOp2,
+  type Op2Result,
+  type Op2Tables,
+  op2ToResults,
+  type Op2Import,
+  writeVtu,
+  type VtuEncoding,
+  meshSummary,
+  resultsSummary,
+  parseFieldTable,
+  type TableImport,
+} from '@cae/index';
 
 export interface CaeCode {
   readonly code: string;

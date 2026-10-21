@@ -1,5 +1,5 @@
 /**
- * PHY-04 M4b through the real pipeline (plan -> fea_mesh (Gmsh) -> fea_solve (CalculiX) -> fea_report): the bonded two-material strip against
+ * PHY-04 M4b through the real pipeline (plan -> fea_mesh (Gmsh) -> fea_solve (CalculiX) -> analysis_report): the bonded two-material strip against
  * Timoshenko's bimetal curvature (VC-TMC-04.a / .b, conformal mesh, the layers share their interface nodes) and the transient coupled step on
  * the restrained bar (the stress follows the temperature in time and ends at -E alpha dT, VC-TMC-01.a). Skipped with a logged reason without
  * Gmsh, CalculiX or the native kernel; the deck writers and the readers are proved without a solver in tests/unit/cae/thermomech/.
@@ -79,7 +79,7 @@ describe.skipIf(!TRANSIENT_READY)('transient coupled step on the restrained bar 
     expect(deck).toContain('TIME POINTS=TP_OUT');
     expect(deck).toMatch(/\*SPECIFIC HEAT\n/);
     await session.solve(analysisId);
-    const report = await session.cli('fea_report', `analysisId=${analysisId}`);
+    const report = await session.cli('analysis_report', `analysisId=${analysisId}`);
     const results = dataOf(report.json)['results'];
     const transient = isRecord(results) ? results['thermomechTransient'] : undefined;
     expect(isRecord(transient), JSON.stringify(results)).toBe(true);
@@ -118,7 +118,7 @@ describe.skipIf(!TRANSIENT_READY)('transient coupled step on the restrained bar 
     const exported = await session.cli('fea_export', `analysisId=${analysisId}`);
     expect(String(dataOf(exported.json)['text'])).toContain('*STATIC');
     await session.solve(analysisId);
-    const report = await session.cli('fea_report', `analysisId=${analysisId}`);
+    const report = await session.cli('analysis_report', `analysisId=${analysisId}`);
     const results = dataOf(report.json)['results'];
     const transient = isRecord(results) ? results['thermomechTransient'] : undefined;
     const series = isRecord(transient) && Array.isArray(transient['series']) ? transient['series'] : [];

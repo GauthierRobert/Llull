@@ -8,16 +8,10 @@ import { userInfo } from 'node:os';
 import { getCommand } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
 import { type CommandRun, runCommandOutcome } from '@protocol/commandOutcome';
-import { toolsetOf } from '@protocol/toolsets';
-import { isRecord } from '@lib/isRecord';
+import { fillHostParams } from '@protocol/hostParams';
 import { withoutConfirmations } from '@lib/withoutConfirmations';
 import { serverContext } from '../fea/context';
 import { type AuditLog, appendSafely, auditDir, createAuditLog, paramsHash } from './auditChain';
-
-const FILLED = ['at', 'by'] as const;
-
-/** ISO-8601 UTC without milliseconds, e.g. 2026-11-02T09:30:00Z. */
-export const isoSeconds = (date: Date): string => `${date.toISOString().slice(0, 19)}Z`;
 
 function hostUser(env: NodeJS.ProcessEnv): string {
   const configured = env['LLULL_USER'];
@@ -29,16 +23,9 @@ function hostUser(env: NodeJS.ProcessEnv): string {
   }
 }
 
-/** `params` plus the `at` / `by` a plm command declares and the caller left out (`by` is a label for the record, never an authority). */
-export function fillHostParams(name: string, params: unknown, now: Date, env: NodeJS.ProcessEnv = process.env): unknown {
-  // Only the plm toolset: other commands declare their own `at` / `by` params (add_door, edit_nurbs, ...).
-  if (toolsetOf(name) !== 'plm') return params;
-  const properties = getCommand(name)?.paramsSchema.properties;
-  if (properties === undefined || !FILLED.some((key) => key in properties)) return params;
-  const filled: Record<string, unknown> = { ...(isRecord(params) ? params : {}) };
-  if ('at' in properties) filled['at'] = isoSeconds(now); // the host clock always: a caller-supplied time is never trusted on a gated act
-  if ('by' in properties && filled['by'] === undefined) filled['by'] = hostUser(env);
-  return filled;
+/** `fillHostParams` (@protocol/hostParams) with the server clock passed in and the user from `LLULL_USER` or the OS account. */
+export function fillServerParams(name: string, params: unknown, now: Date, env: NodeJS.ProcessEnv = process.env): unknown {
+  return fillHostParams(name, params, { now, user: () => hostUser(env) });
 }
 
 const logs = new Map<string, AuditLog>();
@@ -76,7 +63,7 @@ export function runHostCommand(
 ): CommandRun & { readonly params: unknown } {
   const env = options.env ?? process.env;
   const now = options.now ?? ((): Date => new Date());
-  const filled = fillHostParams(name, params, now(), env);
+  const filled = fillServerParams(name, params, now(), env);
   const run = runCommandOutcome(prior, name, filled, serverContext(options.onStep));
   const loggable = withoutConfirmations(filled);
   const readOnly = getCommand(name)?.annotations?.readOnly === true;

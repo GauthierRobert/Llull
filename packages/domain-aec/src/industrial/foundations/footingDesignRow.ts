@@ -1,6 +1,6 @@
 /** Design of one footing under one analysed column: smallest passing pad + reinforcement (EN 1992-1-1). */
 
-import type { BuildingModel, FootingElement, SteelMemberElement } from '@core/model/building';
+import type { BuildingModel, FootingElement, SteelMemberElement } from '@aec/building/types';
 import { fromMm } from '@core/model/units';
 import { round, unitsToMm } from '../../shared/numeric';
 import { findProfile } from '../../steel/profiles';

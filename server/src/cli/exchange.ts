@@ -7,13 +7,17 @@
 
 import fs from 'fs';
 import type { CadDocument } from '@core/model/types';
-import { buildExchangeToolDefinitions, buildFeaToolDefinitions, buildLibraryToolDefinitions } from '@protocol/index';
+import {
+  buildExchangeToolDefinitions,
+  buildFeaToolDefinitions,
+  buildLibraryToolDefinitions,
+  buildNativeToolDefinitions,
+} from '@protocol/index';
 import type { ToolDefinition } from '@protocol/tools';
 import { isRecord } from '@lib/isRecord';
 import { runExchangeTool } from '../exchangeResult';
 import type { ExchangeOptions } from '../pythonExchange';
 import type { CommandOutcome } from '@protocol/restProtocol';
-import { nativeToolDefinitions } from '../native/tools';
 
 let definitions: readonly ToolDefinition[] | null = null;
 
@@ -22,7 +26,7 @@ export function exchangeToolDefinitions(): readonly ToolDefinition[] {
     ...buildExchangeToolDefinitions(),
     ...buildFeaToolDefinitions(),
     ...buildLibraryToolDefinitions(),
-    ...nativeToolDefinitions(),
+    ...buildNativeToolDefinitions(),
   ];
   return definitions;
 }

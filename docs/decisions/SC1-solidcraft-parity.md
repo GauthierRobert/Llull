@@ -37,7 +37,7 @@ an area llull may already partly cover starts by checking what is there and noti
 - **SC-Q1 Reference parts.** `tests/oracle/<nn-name>/{plan.json, expected.json}`: a `build_project` plan plus expected body count,
   volume, area (rel. 1e-3), centre of mass and bbox (1e-3 of size), face count where fixed. Sources: `analytic` (formulas in
   `tools/oracle-analytic/`, Python) or `freecad <version>` (`tools/freecad-oracle/`, FreeCAD's Python API run as an external
-  program; never a dependency). Each part also exported with `export_step_exact` and re-imported, and compared again. Target: 40
+  program; never a dependency). Each part also exported with `export_step_ap242` and re-imported, and compared again. Target: 40
   cases first (prisms, cylinders, cones, spheres, tori, Pappus revolves, constant and variable fillets, shells, holes, sheet-metal
   bends), then 80+. `npm run oracle` writes `docs/ORACLE.md` (case table + pass count); CI runs it on the native kernel.
 - **SC-Q2 Action matrix.** For each design of a corpus (oracle parts + golden plans + `quality/drawings`), try every applicable

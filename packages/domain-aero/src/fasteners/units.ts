@@ -1,5 +1,6 @@
 /** Length arithmetic of the fastener plugin: integer ticks (1e-6 of a working unit) so grip rules never see float noise. */
 
+import { round6 } from '@lib/compactNumber';
 import { convertValue, isUnitFailure } from '@lib/quantity';
 import { fromMm, toMm } from '@core/model/units';
 import type { CadDocument } from '@core/model/types';
@@ -21,7 +22,7 @@ export function toTicks(value: number, unit: string, work: string): number | nul
 /** Inches of `ticks` of the working unit `work`, rounded to 1e-6 in. */
 export function ticksToInches(ticks: number, work: string): number {
   const inches = convertTo(ticks / TICKS_PER_UNIT, work, 'in') ?? ticks / TICKS_PER_UNIT;
-  return Math.round(inches * 1e6) / 1e6;
+  return round6(inches);
 }
 
 /** Length of `inches` in document units. */

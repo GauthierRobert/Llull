@@ -23,7 +23,7 @@ function produce(doc: CadDocument, id: DeliverableId): string {
     case 'ifc':
       return fromData('export_ifc', {}, 'ifc');
     case 'dxf':
-      return fromData('export_dxf', { levelId: arg }, 'dxf');
+      return fromData('export_building_dxf', { levelId: arg }, 'dxf');
     case 'plan':
       return fromData('export_plan_sheet', { levelId: arg }, 'svg');
     case 'elevation':
