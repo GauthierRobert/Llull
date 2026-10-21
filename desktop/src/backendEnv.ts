@@ -22,7 +22,7 @@ interface BackendEnvInput {
   readonly vaultDir?: string;
 }
 
-const NATIVE_BINARIES = ['llull-compute', 'llull-kernel'] as const;
+const NATIVE_BINARIES = ['llull-compute', 'llull-kernel', 'llull-mesh'] as const;
 
 /** `dir` when it holds at least one native binary (RS1; desktop/scripts/prepare-native.mjs), else null. */
 export function nativeBundleDir(dir: string, platform: NodeJS.Platform, exists: (file: string) => boolean): string | null {
@@ -65,7 +65,7 @@ export function backendEnv(input: BackendEnvInput): Record<string, string> {
     LLULL_BODY_LIMIT: DESKTOP_BODY_LIMIT,
     LLULL_PYTHON: input.layout.python,
     ...(input.vaultDir === undefined ? {} : { LLULL_VAULT: input.vaultDir }),
-    // Native compute jobs and the native kernel binary, only when bundled.
+    // Native compute jobs, the native kernel and the FE mesher (llull-mesh + Gmsh), only when bundled.
     ...(input.nativeDir === undefined || input.nativeDir === null ? {} : { LLULL_NATIVE_DIR: input.nativeDir }),
     // The native OCC kernel is the desktop default (TR-KRN-01, KI7); a bundle without llull-kernel falls back to Manifold with a warning.
     LLULL_KERNEL: desktopKernel(input.baseEnv['LLULL_KERNEL']),

@@ -6,9 +6,13 @@
  *                                      `gpu` feature: raster and topopt use wgpu when an adapter exists and fall back to the bit-exact
  *                                      CPU twin otherwise (topology_solve device cpu is the default)
  *   build/native/llull-kernel[.exe]    native OCCT kernel sidecar (the exact kernel: LLULL_KERNEL=occt-native is the desktop default, KI7)
+ *   build/native/llull-mesh[.exe]      FE mesher sidecar (fea_mesh): Gmsh through its C API, loaded at run time from
+ *   build/native/gmsh/lib/             the shared Gmsh library (GPL-2.0-or-later, its own OpenCASCADE inside; Windows: the DLL sits next to
+ *                                      the executables instead), taken from LLULL_GMSH_LIB or the `pip install gmsh` of the build Python
  *   build/native/occt/lib/             shared OCCT toolkits, LGPL-2.1 dynamic linking (Linux .so.<maj>.<min>, macOS .<maj>.<min>.dylib;
  *                                      Windows: the DLLs sit next to the executables instead, where the loader looks)
- *   build/native/licenses/             OCCT LGPL-2.1 + exception + source/relink notice, fdlibm/V8 notice, Rust crate licences
+ *   build/native/licenses/             OCCT LGPL-2.1 + exception + source/relink notice, Gmsh licence + credits + source notice,
+ *                                      fdlibm/V8 notice, Rust crate licences
  *   build/native/LLULL_NATIVE.json     what was bundled (versions, features, OCCT source sha256)
  *
  * Build each OS on that OS. Env:
@@ -16,6 +20,8 @@
  *   LLULL_NATIVE_GPU=0          build llull-compute without the `gpu` feature (CPU twin only)
  *   LLULL_NATIVE_KERNEL=0       bundle llull-compute only (no llull-kernel, no OCCT)
  *   LLULL_OCCT_DIR              OCCT install prefix (else solver/scripts/build-occt.mjs builds or reuses its default prefix)
+ *   LLULL_NATIVE_MESH=0         bundle no llull-mesh / Gmsh (fea_mesh then needs the Python bridge with gmsh, LLULL_MESHER=python)
+ *   LLULL_GMSH_LIB              the Gmsh shared library to bundle (else asked from LLULL_GMSH_PYTHON / python3: `gmsh.libpath`)
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
@@ -43,6 +49,7 @@ const cargoTarget = path.join(desktop, 'build', 'cargo-target');
 const exe = process.platform === 'win32' ? '.exe' : '';
 const withKernel = process.env.LLULL_NATIVE_KERNEL !== '0';
 const withGpu = process.env.LLULL_NATIVE_GPU !== '0';
+const withMesh = process.env.LLULL_NATIVE_MESH !== '0';
 
 const occt = await import(pathToFileURL(path.join(solver, 'scripts', 'build-occt.mjs')).href);
 
@@ -58,12 +65,13 @@ function cargo(args, env) {
 
 function binaries(occtPrefix) {
   const prebuilt = process.env.LLULL_NATIVE_PREBUILT_DIR;
-  if (prebuilt) return { compute: prebuilt, kernel: prebuilt };
+  if (prebuilt) return { compute: prebuilt, kernel: prebuilt, mesh: prebuilt };
   const rustTarget = { CARGO_TARGET_DIR: cargoTarget };
   cargo(['build', '--profile', 'compute', '-p', 'llull-compute', ...(withGpu ? ['--features', 'gpu'] : [])], rustTarget);
   if (withKernel)
     cargo(['build', '--release', '-p', 'llull-kernel'], { ...rustTarget, LLULL_OCCT_DIR: occtPrefix, LLULL_OCCT_RPATH_BUNDLE_ONLY: '1' });
-  return { compute: path.join(cargoTarget, 'compute'), kernel: path.join(cargoTarget, 'release') };
+  if (withMesh) cargo(['build', '--release', '-p', 'llull-mesh'], rustTarget);
+  return { compute: path.join(cargoTarget, 'compute'), kernel: path.join(cargoTarget, 'release'), mesh: path.join(cargoTarget, 'release') };
 }
 
 /** The toolkit files the loader asks for by name (SONAME / install name / DLL), never the development symlinks. */
@@ -111,6 +119,59 @@ function occtNotice(prefix) {
   ].join('\n');
 }
 
+/** The Gmsh shared library to bundle: LLULL_GMSH_LIB, else the one the build Python's `gmsh` module loads (`pip install gmsh`). */
+function gmshLibrary() {
+  const configured = process.env.LLULL_GMSH_LIB;
+  if (configured) {
+    if (!existsSync(configured)) throw new Error(`LLULL_GMSH_LIB=${configured} does not exist`);
+    return path.resolve(configured);
+  }
+  const python = process.env.LLULL_GMSH_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+  const probe = spawnSync(python, ['-c', 'import gmsh; print(gmsh.libpath or "")'], { encoding: 'utf8' });
+  const library = probe.status === 0 ? probe.stdout.trim() : '';
+  if (library === '' || !existsSync(library))
+    throw new Error(
+      `no Gmsh library to bundle: set LLULL_GMSH_LIB, or \`pip install gmsh\` for ${python} (LLULL_GMSH_PYTHON), or LLULL_NATIVE_MESH=0. ${probe.stderr ?? ''}`,
+    );
+  return library;
+}
+
+/** The Gmsh licence files shipped with the SDK / wheel (`<prefix>/share/doc/gmsh` next to `<prefix>/lib`), when present. */
+function gmshLicenceFiles(library) {
+  const prefix = path.dirname(path.dirname(library));
+  const candidates = [path.join(prefix, 'share', 'doc', 'gmsh'), path.join(prefix, 'doc'), prefix, path.dirname(library)];
+  for (const dir of candidates) {
+    const files = ['LICENSE.txt', 'CREDITS.txt'].map((name) => path.join(dir, name));
+    if (existsSync(files[0])) return files.filter((file) => existsSync(file));
+  }
+  return [];
+}
+
+function stageGmsh(library) {
+  const target = process.platform === 'win32' ? nativeDir : path.join(nativeDir, 'gmsh', 'lib');
+  mkdirSync(target, { recursive: true });
+  copyFileSync(library, path.join(target, path.basename(library)));
+  const licences = gmshLicenceFiles(library);
+  if (licences.length === 0) log(`WARNING: no Gmsh LICENSE.txt found near ${library}; only the notice is bundled`);
+  for (const file of licences) copyFileSync(file, path.join(nativeDir, 'licenses', `Gmsh-${path.basename(file)}`));
+  return path.basename(library);
+}
+
+function gmshNotice(version) {
+  return [
+    `Gmsh ${version}`,
+    'Copyright (C) 1997-2026 C. Geuzaine, J.-F. Remacle. Licensed under the GNU General Public License version 2 or later, with the',
+    'exceptions listed in Gmsh-LICENSE.txt; Gmsh-CREDITS.txt names the contributed code it includes (OpenCASCADE among it).',
+    '',
+    'llull-mesh is a separate executable that loads the unmodified Gmsh shared library (gmsh/lib, Windows: next to llull-mesh.exe)',
+    'at run time through the Gmsh C API. You may replace that library with your own build of Gmsh 4.x (same C API).',
+    '',
+    `Corresponding source: https://gmsh.info/src/gmsh-${version}-source.tgz (the binary is the upstream Gmsh SDK / PyPI wheel).`,
+    'The llull-mesh source is in the llull source tree (solver/bins/llull-mesh, solver/crates/llull-gmsh).',
+    '',
+  ].join('\n');
+}
+
 const FDLIBM_NOTICE = `llull-jsmath (inside llull-compute) transliterates V8's src/base/ieee754.cc, itself derived from fdlibm 5.3.
 
 fdlibm:
@@ -145,7 +206,9 @@ function rustLicences() {
   );
   const packages = new Map(metadata.packages.map((pkg) => [pkg.id, pkg]));
   const nodes = new Map(metadata.resolve.nodes.map((node) => [node.id, node]));
-  const roots = metadata.packages.filter((pkg) => pkg.name === 'llull-compute' || (withKernel && pkg.name === 'llull-kernel'));
+  const roots = metadata.packages.filter(
+    (pkg) => pkg.name === 'llull-compute' || (withKernel && pkg.name === 'llull-kernel') || (withMesh && pkg.name === 'llull-mesh'),
+  );
   const seen = new Set();
   const stack = roots.map((pkg) => pkg.id);
   while (stack.length > 0) {
@@ -181,14 +244,29 @@ function smokeTest() {
     .toString()
     .trim();
   log(compute);
-  if (!withKernel) return { compute };
-  const kernel = execFileSync(path.join(nativeDir, `llull-kernel${exe}`), ['--version'], { env: { ...process.env, LD_LIBRARY_PATH: '' } })
-    .toString()
-    .trim();
-  log(kernel);
-  if (!kernel.includes(`OCCT ${occt.OCCT_VERSION}`))
-    throw new Error(`bundled llull-kernel reports "${kernel}", expected OCCT ${occt.OCCT_VERSION}`);
-  return { compute, kernel };
+  const versions = { compute };
+  if (withKernel) {
+    const kernel = execFileSync(path.join(nativeDir, `llull-kernel${exe}`), ['--version'], { env: { ...process.env, LD_LIBRARY_PATH: '' } })
+      .toString()
+      .trim();
+    log(kernel);
+    if (!kernel.includes(`OCCT ${occt.OCCT_VERSION}`))
+      throw new Error(`bundled llull-kernel reports "${kernel}", expected OCCT ${occt.OCCT_VERSION}`);
+    versions.kernel = kernel;
+  }
+  if (withMesh) {
+    const env = { ...process.env, LD_LIBRARY_PATH: '' };
+    delete env.LLULL_GMSH_LIB;
+    const mesh = execFileSync(path.join(nativeDir, `llull-mesh${exe}`), ['--version'], { env })
+      .toString()
+      .trim();
+    log(mesh);
+    // the bundled library, not one found on the build machine's search path
+    if (!/\(Gmsh \S+, /.test(mesh) || !mesh.includes(nativeDir))
+      throw new Error(`bundled llull-mesh reports "${mesh}", expected the bundled Gmsh`);
+    versions.mesh = mesh;
+  }
+  return versions;
 }
 
 function sizeOf(dir) {
@@ -203,8 +281,9 @@ const occtPrefix = withKernel ? await occt.buildOcct(occt.occtPrefix()) : null;
 const source = binaries(occtPrefix);
 rmSync(nativeDir, { recursive: true, force: true });
 mkdirSync(path.join(nativeDir, 'licenses'), { recursive: true });
-for (const binary of ['llull-compute', ...(withKernel ? ['llull-kernel'] : [])]) {
-  const from = path.join(binary === 'llull-compute' ? source.compute : source.kernel, `${binary}${exe}`);
+const sourceDir = { 'llull-compute': source.compute, 'llull-kernel': source.kernel, 'llull-mesh': source.mesh };
+for (const binary of ['llull-compute', ...(withKernel ? ['llull-kernel'] : []), ...(withMesh ? ['llull-mesh'] : [])]) {
+  const from = path.join(sourceDir[binary], `${binary}${exe}`);
   if (!existsSync(from)) throw new Error(`${from} is missing`);
   cpSync(from, path.join(nativeDir, `${binary}${exe}`));
   if (process.platform !== 'win32') chmodSync(path.join(nativeDir, `${binary}${exe}`), 0o755);
@@ -216,10 +295,13 @@ if (occtPrefix !== null) {
     cpSync(path.join(occtPrefix, notice), path.join(nativeDir, 'licenses', `OCCT-${notice}`));
   writeFileSync(path.join(nativeDir, 'licenses', 'OCCT-NOTICE.txt'), occtNotice(occtPrefix));
 }
+const gmshFile = withMesh ? stageGmsh(gmshLibrary()) : null;
 writeFileSync(path.join(nativeDir, 'licenses', 'fdlibm-V8-NOTICE.txt'), FDLIBM_NOTICE);
 const rust = rustLicences();
 writeFileSync(path.join(nativeDir, 'licenses', 'THIRD-PARTY-RUST.txt'), rust.text);
 const versions = smokeTest();
+const gmshVersion = withMesh ? (/\(Gmsh (\S+),/.exec(versions.mesh)?.[1] ?? 'unknown') : null;
+if (gmshVersion !== null) writeFileSync(path.join(nativeDir, 'licenses', 'Gmsh-NOTICE.txt'), gmshNotice(gmshVersion));
 writeFileSync(
   path.join(nativeDir, 'LLULL_NATIVE.json'),
   `${JSON.stringify(
@@ -229,6 +311,10 @@ writeFileSync(
       gpu: withGpu,
       occt:
         occtPrefix === null ? null : { version: occt.OCCT_VERSION, sha256: occt.SOURCE_SHA256, toolkits, linking: 'dynamic (LGPL-2.1)' },
+      gmsh:
+        gmshVersion === null
+          ? null
+          : { version: gmshVersion, library: gmshFile, linking: 'loaded at run time by llull-mesh (GPL-2.0-or-later)' },
       rustCrates: rust.count,
       prebuilt: Boolean(process.env.LLULL_NATIVE_PREBUILT_DIR),
     },
@@ -236,4 +322,7 @@ writeFileSync(
     2,
   )}\n`,
 );
-log(`staged ${nativeDir} (${(sizeOf(nativeDir) / 1024 / 1024).toFixed(1)} MB, ${toolkits} OCCT toolkits, ${rust.count} Rust crates)`);
+log(
+  `staged ${nativeDir} (${(sizeOf(nativeDir) / 1024 / 1024).toFixed(1)} MB, ${toolkits} OCCT toolkits, ` +
+    `${gmshVersion === null ? 'no Gmsh' : `Gmsh ${gmshVersion}`}, ${rust.count} Rust crates)`,
+);

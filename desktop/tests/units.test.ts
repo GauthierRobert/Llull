@@ -100,6 +100,12 @@ describe('backendEnv native bundle (RS1)', () => {
     writeFileSync(path.join(dir, process.platform === 'win32' ? 'llull-compute.exe' : 'llull-compute'), '');
     expect(nativeBundleDir(dir, process.platform, existsSync)).toBe(dir);
   });
+
+  it('counts a bundle holding only the FE mesher', () => {
+    const dir = scratch();
+    writeFileSync(path.join(dir, process.platform === 'win32' ? 'llull-mesh.exe' : 'llull-mesh'), '');
+    expect(nativeBundleDir(dir, process.platform, existsSync)).toBe(dir);
+  });
 });
 
 describe('backendEnv kernel (TR-KRN-01)', () => {

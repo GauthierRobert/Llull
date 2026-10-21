@@ -1060,6 +1060,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "llull-gmsh"
+version = "0.1.0"
+dependencies = [
+ "libloading",
+]
+
+[[package]]
 name = "llull-gpu"
 version = "0.1.0"
 dependencies = [
@@ -1092,6 +1099,15 @@ dependencies = [
  "cxx-build",
  "serde_json",
  "sha2",
+]
+
+[[package]]
+name = "llull-mesh"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "llull-gmsh",
+ "serde_json",
 ]
 
 [[package]]

@@ -1,5 +1,5 @@
 /**
- * fea_mesh: the analysed solids -> bridge op `mesh` (Gmsh) -> FeMeshArtifact -> store -> `record_fe_mesh`. The server only gathers
+ * fea_mesh: the analysed solids -> mesher (llull-mesh, or the Python bridge op `mesh`; both Gmsh) -> FeMeshArtifact -> store -> `record_fe_mesh`. The server only gathers
  * geometry, forwards the request and records the artifact; target resolution and meshing are the bridge's, summaries are @cae's.
  */
 
@@ -21,7 +21,7 @@ export interface MeshBridgeResponse {
 }
 
 export interface FeaMeshDeps {
-  /** Sends one request to the Python bridge; rejects with an Error when the process cannot run. */
+  /** Sends one request to the mesher (nativeMesher.ts); rejects with an Error when the process cannot run. */
   readonly bridge: (request: Record<string, unknown>) => Promise<MeshBridgeResponse>;
   readonly store: FeArtifactStore;
   readonly hooks: CaeHooks;
@@ -31,7 +31,7 @@ export interface FeaMeshDeps {
 const isCode = (value: object): value is CaeCode => 'code' in value && 'message' in value;
 
 function bridgeFailure(message: string): FeaToolResult {
-  const missing = /No module named '?gmsh|cannot start Python|FEA_TOOL_MISSING/.test(message);
+  const missing = /No module named '?gmsh|cannot start Python|FEA_TOOL_MISSING|Gmsh library was not found/.test(message);
   return missing
     ? feaFailure('fea_mesh', 'FEA_TOOL_MISSING', `${message} ${INSTALL_HINT.gmsh}`)
     : feaFailure('fea_mesh', 'FEA_MESH_FAILED', message);
