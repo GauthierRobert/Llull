@@ -1,0 +1,17 @@
+item,component_id,name,qty,unit_mass_g,total_mass_g
+1,c-cam,Camera module + gimbal-less EIS board,1,9.1,9.1
+2,c-esc,"Dual ESC, 2 x 40 A (FOC)",1,12.3,12.3
+3,c-fc,"Flight controller (H7, IMU x2, baro)",1,3.9,3.9
+4,c-gnss,GNSS + telemetry radio,1,7.1,7.1
+5,c-stator,"Hub-motor stator (36N42P, Cu/Fe)",2,31.1,62.3
+6,c-foot,Landing foot (TPU 95A),4,2.1,8.4
+7,c-cell,Li-ion cell 21700 (5 Ah),8,69.0,552.2
+8,c-servo,Linear micro servo (flap actuator),4,2.3,9.2
+9,c-rotor-lower,Lower rotor: bell + 4 toroidal loops,1,54.5,54.5
+10,c-pod,"Pod shell (CFRP, 0.6 mm)",1,59.1,59.1
+11,c-ring,Ring wing (CFRP thin-ply shell + ribs),1,226.4,226.4
+12,c-dome,"Sensor dome (PC, optical)",1,14.3,14.3
+13,c-rotor-upper,Upper rotor: bell + 3 toroidal loops,1,45.5,45.5
+14,c-flap,"Vane flap (CFRP / foam), hinged",4,1.1,4.4
+15,c-strut,Vane strut (CFRP / foam),4,7.1,28.4
+,,TOTAL,35,,1097.1

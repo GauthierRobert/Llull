@@ -196,7 +196,7 @@ TopoDS_Wire loop_wire(const Handle(Geom_Surface) & surface, const std::vector<gp
     if (points[i].Distance(points[j]) < 1e-12) continue;
     GCE2d_MakeSegment segment(points[i], points[j]);
     if (!segment.IsDone()) throw std::invalid_argument("loop: degenerate segment");
-    const Handle(Geom2d_Curve) curve = segment.Value();
+    const Handle(Geom2d_Curve) curve(segment.Value());
     BRepBuilderAPI_MakeEdge edge(curve, surface, vertices[i], vertices[j], curve->FirstParameter(), curve->LastParameter());
     if (!edge.IsDone()) return TopoDS_Wire();
     BRepLib::BuildCurves3d(edge.Edge(), 1e-7);

@@ -1,0 +1,19 @@
+# HALO v2 — pod barrel laminate: 8 x 75 µm thin-ply T700/epoxy on a Ø58.8 mm mandrel (0.6 mm wall, see halo_v2.lld)
+design pod_barrel_layup units=mm
+param mandrelR = 29.4         # = pod inner radius (podR - 0.6)
+param barrelL = 250           # cylindrical barrel z 60..310
+add_cylinder mandrel radius=mandrelR height=barrelL position=[0, 0, 60] anchor=base-center color="#8a8f96"
+create_lamina_material _ name=T700_thinply_75 form=ud_tape E1=125000 E2=8500 G12=4500 nu12=0.32 Xt=2200 Xc=1200 Yt=50 Yc=200 S=90 plyThickness=0.075 density=0.00155 basis=unknown source="typical T700S/epoxy UD prepreg (Toray T700S datasheet, typical 33 % resin); thin-ply 75 µm areal weight assumed"
+define_rosette _ name=R_axial origin=[0, 0, 60] axis0=[0, 0, 1] normal=[1, 0, 0] method=cylindrical axis=[0, 0, 1]
+create_composite_part _ name=pod_barrel toolSurface.entityId=mandrel toolSurface.faceNear=[mandrelR, 0, 185] rosette=R_axial
+add_ply _ part=pod_barrel name=P1 material=T700_thinply_75 orientation=45 boundary={"kind":"whole_face"}
+add_ply _ part=pod_barrel name=P2 material=T700_thinply_75 orientation=-45 boundary={"kind":"whole_face"}
+add_ply _ part=pod_barrel name=P3 material=T700_thinply_75 orientation=0 boundary={"kind":"whole_face"}
+add_ply _ part=pod_barrel name=P4 material=T700_thinply_75 orientation=90 boundary={"kind":"whole_face"}
+add_ply _ part=pod_barrel name=P5 material=T700_thinply_75 orientation=90 boundary={"kind":"whole_face"}
+add_ply _ part=pod_barrel name=P6 material=T700_thinply_75 orientation=0 boundary={"kind":"whole_face"}
+add_ply _ part=pod_barrel name=P7 material=T700_thinply_75 orientation=-45 boundary={"kind":"whole_face"}
+add_ply _ part=pod_barrel name=P8 material=T700_thinply_75 orientation=45 boundary={"kind":"whole_face"}
+check check_laminate_rules part=pod_barrel path=status expect == "pass"
+check laminate_mass part=pod_barrel path=thickness expect ~= 0.6 ± 0.001
+check laminate_mass part=pod_barrel path=mass expect <= 45            # g (document density unit g/mm³)
