@@ -64,7 +64,7 @@ Files:
 | Rotor loop first mode (root clamped, no spin stiffening) | 74.1 Hz | 2P at peak rpm = 64.4 Hz → 13 % separation; **watch item** | same, modal |
 | Vane strut, 5 g hard landing (pod inertia on 8 struts), cantilever | 18.5 MPa | **MS +2.6** | `fea_strut.lld` |
 | Vane strut first mode, as built (hub + rib) | 399 Hz | ≫ blade-pass 68–111 Hz (3 / 4 loops, hover to peak) | same, modal |
-| Assembly: overlaps, floating parts, intended joints | pass | all joints declared | llull check_assembly |
+| Assembly: overlaps, floating parts, intended joints | pass (mesh and exact OCC kernel) | all joints declared | llull check_assembly |
 | Clearance (all parts) | ≥ 0.35 mm; tightest are 0.4 mm between cells and the 0.5 mm motor air gap | pass | llull check_assembly |
 | Rotor tips to the duct throat | 3.0 mm | ≥ 2.5 mm | check lines 211-212 |
 | Rotor stack / struts / inlet | upper ≥ 121 > lower ≤ 86; lower ≥ 27.5 > struts 22; upper ≤ inlet | pass | check lines 213-217 |
@@ -150,5 +150,7 @@ Not analysed; the tests have to close these gaps:
 - Native OCC kernel: subtracting a fully enclosed cavity gives a voided solid whose volume reads as the outer volume
   (v2's ring read 4.8 kg). The ring cavity is vented, as a real hollow composite part must be anyway, and the TE
   close-out avoids near-tangent surfaces.
-- The 35- to 47-part pairwise `check_assembly` is very slow on the OCC kernel. The design gates run on the mesh
-  kernel; the OCC kernel builds the exact B-rep for the STEP export.
+- The 47-part pairwise `check_assembly` is slow on the OCC kernel. With `LLULL_OCC_TIMEOUT_MS=900000`, v3 passes
+  **all 13 design checks on the exact kernel too**, in ≈ 25 min:
+  - the exact BOM is 1215.4 g (mesh kernel: 1214.9 g)
+  - `test_article/halo_v3.step` is AP242, 16 products, mm, 0 issues (`verify_exchange_file`)
