@@ -1,7 +1,7 @@
 /** Project-name helpers: the display name and the file-name stem derived from it. */
 
 import type { CadDocument } from '@core/model/types';
-import { fileSlug } from '@aec/building/model';
+import { fileSlug } from '@aec/index';
 
 const DEFAULT_PROJECT_NAME = 'Untitled project';
 

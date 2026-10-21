@@ -87,6 +87,8 @@ installed by `src/app/plugins.ts` `installDefaultPlugins()`. `packages/core` NEV
 A plugin sees core only through its public API (`model`, `lib`, `geometry`, `plugins/plugin`,
 `commands/{schema,types,noop,derivation,registry}`) and composes other commands via `execute`.
 New domain capability ⇒ a command in its plugin package, not in core.
+Hosts (`server/`, `desktop/`, `src/app`, `src/ui`) use a plugin package ONLY through its `src/index.ts` API (`@cae/index`, `@aec/index`, …):
+export there exactly what hosts need, never import plugin internals. Enforced by `npm run arch` (`hosts-use-plugins-through-their-index`); `tests/**` are exempt.
 
 ## Decision shortcuts
 

@@ -5,7 +5,7 @@
  */
 
 import type { FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
-import { bindingOf, frdBoundHashes, mismatchMessage, UNBOUND_WARNING } from '@cae/results/inputBinding';
+import { bindingOf, frdBoundHashes, mismatchMessage, UNBOUND_WARNING } from '@cae/index';
 import type { FeaHost, FeaToolResult, ResultsFileInput } from '@protocol/index';
 import type { FeArtifactStore } from './artifactStore';
 import type { CaeHooks } from './caeHooks';

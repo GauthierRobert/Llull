@@ -1,7 +1,7 @@
 // One road alignment: profile PVIs, road template, superelevation, deliverables (report CSV, long / cross SVG, sheet).
 
 import React, { useState } from 'react';
-import type { AlignmentObject } from '@aec/civil/types';
+import type { AlignmentObject } from '@aec/index';
 import { PAPER_SIZES, type PaperSize } from '@core/model/sheet';
 import { useStore } from '@ui/store';
 import { OptionSelect } from '@ui/panels/OptionSelect';

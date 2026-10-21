@@ -14,9 +14,7 @@ import type { HumanSignaturePort } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
 import { jcsJson } from '@lib/jcs';
-import { type ValidationProperties, compareValidation, documentOfSnapshot, validationPropertiesOf } from '@plm/lotar/validation';
-import { readPdm } from '@plm/pdm/read';
-import { isSealed } from '@plm/records';
+import { type ValidationProperties, compareValidation, documentOfSnapshot, validationPropertiesOf, readPdm, isSealed } from '@plm/index';
 import { serverContext } from '../fea/context';
 import { type PackageFiles, type PackageFinding, buildReleasePackage, verifyReleasePackage } from './releasePackage';
 

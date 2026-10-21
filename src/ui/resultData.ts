@@ -1,7 +1,6 @@
 /** A failed guard means the command refused or returned another shape: callers show `summary`. */
 
-import type { CostLine } from '@aec/index';
-import type { Clash } from '@aec/industrial/clash/clash';
+import type { CostLine, Clash } from '@aec/index';
 import { isRecord } from '@lib/isRecord';
 
 type DataRecord = Record<string, unknown>;

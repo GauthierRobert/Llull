@@ -1,7 +1,7 @@
 // Shared civil panel parts: typed object lists, object row (delete_civil_object), object select, status line.
 
 import React, { useMemo, useState } from 'react';
-import type { CivilCategory, CivilObject } from '@aec/civil/types';
+import type { CivilCategory, CivilObject } from '@aec/index';
 import { useStore } from '@ui/store';
 import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { PairSelect } from '@ui/panels/OptionSelect';

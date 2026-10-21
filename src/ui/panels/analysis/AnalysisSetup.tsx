@@ -9,7 +9,7 @@ import { buildSetupItems, loadValueText, type SetupItem } from './analysisItems'
 import { constraintText, factorsText, loadText, stepText, thermalBcText, type NameOf } from './analysisText';
 import { SetupRow } from './SetupRow';
 import { idealizationText, meshControlsText } from './idealizationText';
-import { lengthUnitName } from '@cae/decks/units';
+import { lengthUnitName } from '@cae/index';
 
 interface RowSpec {
   readonly item: SetupItem;

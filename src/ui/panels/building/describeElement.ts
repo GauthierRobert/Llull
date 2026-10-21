@@ -1,8 +1,7 @@
 /** Category labels and one-line descriptors of building elements (element list + inspector). */
 
-import type { BuildingElement } from '@aec/building/types';
+import { type BuildingElement, boltSize } from '@aec/index';
 import type { DocumentUnit } from '@core/model/types';
-import { boltSize } from '@aec/industrial/evaluate';
 
 export const CATEGORY_LABEL: Readonly<Record<BuildingElement['category'], string>> = {
   grid: 'Grid',

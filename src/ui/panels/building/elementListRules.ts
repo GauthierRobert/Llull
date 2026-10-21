@@ -1,4 +1,4 @@
-import type { BuildingElement, BuildingModel } from '@aec/building/types';
+import type { BuildingElement, BuildingModel } from '@aec/index';
 import { orderedValues } from '@ui/panels/orderedValues';
 
 /** Elements of the active level, plus level-less ones (grids) and hosted ones (by their host's level). */

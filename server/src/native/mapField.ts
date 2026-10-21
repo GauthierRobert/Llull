@@ -9,8 +9,7 @@
 import type { FeMeshArtifact } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import type { FeaHost, FeaToolResult } from '@protocol/index';
-import { temperatureMappingRequest } from '@cae/thermomech/field';
-import { mappedFieldArtifact, mappingJobBuffers, readMappedField, type MappingRequest } from '@cae/thermomech/mappedField';
+import { temperatureMappingRequest, mappedFieldArtifact, mappingJobBuffers, readMappedField, type MappingRequest } from '@cae/index';
 import { positiveInteger } from '../env';
 import { caeHooks } from '../fea/caeHooks';
 import { currentMesh, feaFailure, isFailure } from '../fea/feaCommon';

@@ -75,6 +75,15 @@ module.exports = {
       to: { path: '^packages/design-lang/' },
     },
     {
+      name: 'hosts-use-plugins-through-their-index',
+      comment:
+        'L6/L10: hosts (server, desktop, the app and its UI) reach a plugin package only through its src/index.ts API, never its internals, ' +
+        'so a plugin can change its layout or be removed without breaking a host. tests/** are exempt.',
+      severity: 'error',
+      from: { path: '^(server/src|desktop/src|src)/' },
+      to: { path: '^packages/(domain-[^/]+|plm|design-lang)/src/', pathNot: '^packages/[^/]+/src/index\\.ts$' },
+    },
+    {
       name: 'protocol-is-a-view-of-the-registry',
       comment:
         'L5: the host protocol (CLI tools, live sync) exposes the registry; it never depends on a plugin, a concrete kernel or a physics engine.',

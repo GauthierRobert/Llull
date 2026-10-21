@@ -15,8 +15,7 @@ import type {
 import { boundsCenter, boundsExtent, entityBoundsInDoc, mergeBounds, type Bounds } from '@core/geometry/bounds';
 import { toMetres } from '@core/model/units';
 import type { CadDocument, Vec3 } from '@core/model/types';
-import { lengthUnitName, stressUnitName } from '@cae/decks/units';
-import { analysisLengthMetres } from '@cae/shared/defaults';
+import { lengthUnitName, stressUnitName, analysisLengthMetres } from '@cae/index';
 import { formatQuantities, formatSignificant } from './quantityFormat';
 
 type ItemGroup = 'part' | 'constraint' | 'load' | 'thermal' | 'probe' | 'result';

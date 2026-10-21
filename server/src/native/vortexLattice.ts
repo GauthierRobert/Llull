@@ -6,8 +6,9 @@
 
 import type { FeaHost, FeaToolResult } from '@protocol/index';
 import { isRecord } from '@lib/isRecord';
-import { panelCount, solveBasis } from '@aero/aerodynamics/vlmKernel';
 import {
+  panelCount,
+  solveBasis,
   isVlmRefusal,
   resolveVortexLattice,
   VLM_NATIVE_PANEL_CAP,
@@ -15,7 +16,7 @@ import {
   vortexLatticeData,
   vortexLatticeParams,
   type VortexLatticeModel,
-} from '@aero/aerodynamics/vlmModel';
+} from '@aero/index';
 import { feaFailure } from '../fea/feaCommon';
 import { f64Bytes, f64Values, readOutput, withJobFolder, type ComputeRunner } from './computeJob';
 

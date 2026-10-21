@@ -11,7 +11,7 @@ import { execute } from '@core/commands/registry';
 import type { HumanSignaturePort } from '@core/model/analysis';
 import type { ObjectStorePort } from '@core/commands/types';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
-import type { SignatureRecord } from '@plm/types';
+import type { SignatureRecord } from '@plm/index';
 import { jcsJson } from '@lib/jcs';
 import { isRecord } from '@lib/isRecord';
 

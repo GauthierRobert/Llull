@@ -3,7 +3,7 @@
 
 import React from 'react';
 import type { AnalysisCase } from '@core/model/analysis';
-import { lengthUnitName, stressUnitName } from '@cae/decks/units';
+import { lengthUnitName, stressUnitName } from '@cae/index';
 import { KpiStrip, StatusChip, type Kpi, type StatusTone } from '@ui/panels/PanelParts';
 import type { CheckView } from './analysisData';
 import { completeThermal, type SetupItem, type SetupItems } from './analysisItems';

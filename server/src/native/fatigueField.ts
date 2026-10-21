@@ -5,8 +5,7 @@
  */
 
 import type { FeaHost, FeaToolResult } from '@protocol/index';
-import { isEvaluationFailure } from '@cae/fatigue/evaluate';
-import { fatigueFieldArtifact, fatigueFieldInput, FIELD_COMPONENTS, readFatigueField } from '@cae/fatigue/feField';
+import { isEvaluationFailure, fatigueFieldArtifact, fatigueFieldInput, FIELD_COMPONENTS, readFatigueField } from '@cae/index';
 import type { FeArtifactCache } from '../fea/artifactStore';
 import { feaFailure } from '../fea/feaCommon';
 import { f64Bytes, f64Values, readOutput, withJobFolder, type ComputeRunner } from './computeJob';

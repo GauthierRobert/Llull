@@ -7,8 +7,16 @@
 import fs from 'fs';
 import path from 'path';
 import { execute, getCommand } from '@core/commands/registry';
-import { adaptLegacyCase, expectedResultsFileSchema, normaliseGrade, type ExpectedCase, type JsonValue } from '@cae/vnv/expected';
-import { judgeCase, type Measured, type Verdict } from '@cae/vnv/judge';
+import {
+  adaptLegacyCase,
+  expectedResultsFileSchema,
+  normaliseGrade,
+  type ExpectedCase,
+  type JsonValue,
+  judgeCase,
+  type Measured,
+  type Verdict,
+} from '@cae/index';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { paramsSource } from './argv';
 

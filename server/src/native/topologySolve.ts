@@ -9,9 +9,7 @@
 import type { FeTopologyArtifact, TopologyHistoryRow, TopologyStudy } from '@core/model/topology';
 import { FEA_SOLVE_TIMEOUT_S, type FeaHost, type FeaToolResult } from '@protocol/index';
 import { isRecord } from '@lib/isRecord';
-import { buildTopologyArtifact, buildTopologyJob, type TopologyJob } from '@cae/index';
-import { topologySummary } from '@cae/topology/artifact';
-import { findStudy } from '@cae/topology/model';
+import { buildTopologyArtifact, buildTopologyJob, type TopologyJob, topologySummary, findStudy } from '@cae/index';
 import { feaFailure } from '../fea/feaCommon';
 import { f64Values, readOutput, withJobFolder, type JobRun } from './computeJob';
 import { nativeInstallHint } from './nativeBinary';

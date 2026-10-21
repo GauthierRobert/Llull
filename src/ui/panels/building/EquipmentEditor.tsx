@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useStore } from '@ui/store';
-import type { BuildingLevel, EquipmentElement } from '@aec/building/types';
+import type { BuildingLevel, EquipmentElement } from '@aec/index';
 import { CommandForm } from '@ui/panels/CommandForm';
 import { useFormValues } from '@ui/panels/useFormValues';
 import { LabeledInput } from '@ui/panels/LabeledInput';

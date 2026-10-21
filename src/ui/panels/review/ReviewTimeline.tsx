@@ -3,7 +3,7 @@
 // the TDC-firing marks of cylinder 1; collisions from the findings and reaction peaks are clickable events.
 
 import React, { useMemo, useState } from 'react';
-import type { SimulationData } from '@dynamics/sim/simulationReport';
+import { type SimulationData, reactionsOf } from '@dynamics/index';
 import { useStore } from '@ui/store';
 import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
@@ -11,7 +11,6 @@ import { runSimulation } from '@ui/services/simulationRun';
 import { TimelineDock } from '@ui/components/TimelineDock';
 import { SeriesChart } from '@ui/panels/SeriesChart';
 import { StatusLine } from '@ui/panels/PanelParts';
-import { reactionsOf } from '@dynamics/sim/reactionsView';
 import { crankDegrees, crankJointOf, reactionMagnitude, tdcMarks, timelineEvents } from './reviewTimelineModel';
 import type { CheckResult } from './reviewTypes';
 
