@@ -15,11 +15,13 @@ const CCX = process.env['LLULL_CCX'] ?? 'ccx';
 
 /** The built llull-mesh, or null. */
 export const MESH_BIN = nativeBinaryPath('llull-mesh');
+/** The Python bridge mesher can run (the gmsh module and numpy). */
+export const HAS_PYTHON_GMSH = spawnSync(PYTHON, ['-c', 'import gmsh, numpy'], { stdio: 'ignore' }).status === 0;
 const MESHER = chooseMesher(process.env);
+/** llull-mesh with a loadable Gmsh, else (the server's fallback) the Python bridge with the gmsh module. */
 export const HAS_GMSH =
-  MESHER.kind === 'native'
-    ? /\(Gmsh /.test(spawnSync(MESHER.binary, ['--version'], { encoding: 'utf8' }).stdout ?? '')
-    : spawnSync(PYTHON, ['-c', 'import gmsh, numpy'], { stdio: 'ignore' }).status === 0;
+  (MESHER.kind === 'native' && /\(Gmsh /.test(spawnSync(MESHER.binary, ['--version'], { encoding: 'utf8' }).stdout ?? '')) ||
+  HAS_PYTHON_GMSH;
 export const HAS_CCX = spawnSync(CCX, ['-v'], { stdio: 'ignore' }).error === undefined;
 
 /**

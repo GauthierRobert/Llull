@@ -71,11 +71,15 @@ pub fn load() -> std::result::Result<Gmsh, String> {
     for candidate in library_candidates(override_path.as_deref(), executable_dir.as_deref()) {
         // SAFETY: loading libgmsh runs its static initialisers only (C++ globals), no code of ours.
         match unsafe { libloading::Library::new(&candidate) } {
-            Ok(library) => return ffi::Api::resolve(library).map(|api| Gmsh::new(api, candidate)),
+            Ok(library) => match ffi::Api::resolve(library) {
+                Ok(api) => return Ok(Gmsh::new(api, candidate)),
+                // an older Gmsh without a symbol llull-mesh calls: try the next candidate
+                Err(error) => failures.push(format!("{candidate}: {error}")),
+            },
             Err(error) => failures.push(format!("{candidate}: {error}")),
         }
     }
-    Err(format!("the Gmsh library was not found ({}); install Gmsh 4.x or set LLULL_GMSH_LIB", failures.join("; ")))
+    Err(format!("the Gmsh library was not found or could not be loaded ({}); install Gmsh 4.x (it also needs its system libraries) or set LLULL_GMSH_LIB", failures.join("; ")))
 }
 
 #[cfg(test)]

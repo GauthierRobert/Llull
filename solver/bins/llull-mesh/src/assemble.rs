@@ -12,6 +12,14 @@ fn nearest_node(nodes: &[usize], coords: &HashMap<usize, Point>, point: &Point) 
     nodes.iter().filter_map(|n| coords.get(n).map(|c| (*n, dist(c, point)))).min_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)))
 }
 
+fn missing_node(tag: usize) -> MeshError {
+    MeshError::new("FEA_MESH_FAILED", format!("Gmsh node {tag} of an element has no coordinates"))
+}
+
+fn coordinates(coords: &HashMap<usize, Point>, tag: usize) -> MeshResult<Point> {
+    coords.get(&tag).copied().ok_or_else(|| missing_node(tag))
+}
+
 struct PartNodes {
     used: Vec<usize>,
     renumber: HashMap<usize, usize>,
@@ -72,7 +80,7 @@ pub fn mesh(gmsh: &Gmsh, request: &Value, workdir: &Path) -> MeshResult<Value> {
         for tag in all {
             node_counter += 1;
             map.insert(tag, node_counter);
-            let [x, y, z] = raws[0].coords.get(&tag).copied().unwrap_or([0.0; 3]);
+            let [x, y, z] = coordinates(&raws[0].coords, tag)?;
             nodes_out.push(json!([node_counter, x, y, z]));
         }
         Some(map)
@@ -90,7 +98,7 @@ pub fn mesh(gmsh: &Gmsh, request: &Value, workdir: &Path) -> MeshResult<Value> {
                 for &tag in &used {
                     node_counter += 1;
                     map.insert(tag, node_counter);
-                    let [x, y, z] = raw.coords.get(&tag).copied().unwrap_or([0.0; 3]);
+                    let [x, y, z] = coordinates(&raw.coords, tag)?;
                     nodes_out.push(json!([node_counter, x, y, z]));
                 }
                 map
@@ -103,7 +111,9 @@ pub fn mesh(gmsh: &Gmsh, request: &Value, workdir: &Path) -> MeshResult<Value> {
                 element_counter += 1;
                 element_ids.push(element_counter);
                 let mut element = vec![element_counter];
-                element.extend(row.iter().map(|n| renumber.get(n).copied().unwrap_or(0)));
+                for node in row {
+                    element.push(renumber.get(node).copied().ok_or_else(|| missing_node(*node))?);
+                }
                 elements.push(element);
             }
             blocks.push(json!({ "type": block_type, "entityId": entity_id, "elements": elements }));
@@ -151,7 +161,7 @@ pub fn mesh(gmsh: &Gmsh, request: &Value, workdir: &Path) -> MeshResult<Value> {
                 for point in scaled_points(target, "pointsNear", scale)? {
                     if let Some((node, d)) = nearest_node(&nodes.used, &raw.coords, &point) {
                         if best.is_none_or(|(_, residual)| d < residual) {
-                            best = Some((nodes.renumber.get(&node).copied().unwrap_or(0), d));
+                            best = Some((nodes.renumber.get(&node).copied().ok_or_else(|| missing_node(node))?, d));
                         }
                     }
                 }

@@ -43,12 +43,15 @@ fn failure(error: MeshError) -> Value {
     }
 }
 
-/// A private scratch folder for the geometry files Gmsh imports (removed afterwards).
+/// A private scratch folder for the geometry files Gmsh imports (removed afterwards): created new (an existing path is refused, so a
+/// planted folder or link is never used), owner-only on Unix.
 fn scratch_dir() -> Result<std::path::PathBuf, MeshError> {
     let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
     let dir = std::env::temp_dir().join(format!("llull-mesh-{}-{stamp}", std::process::id()));
-    std::fs::create_dir_all(&dir)
-        .map_err(|error| MeshError { code: None, message: format!("cannot create {}: {error}", dir.display()) })?;
+    let mut builder = std::fs::DirBuilder::new();
+    #[cfg(unix)]
+    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+    builder.create(&dir).map_err(|error| MeshError { code: None, message: format!("cannot create {}: {error}", dir.display()) })?;
     Ok(dir)
 }
 

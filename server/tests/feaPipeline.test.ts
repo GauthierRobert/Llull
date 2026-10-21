@@ -15,7 +15,7 @@ import type { FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import { isRecord } from '@lib/isRecord';
 import { EXIT_COMMAND_ERROR, EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 import { defaultFeArtifactStore } from '../src/fea/artifactStore';
-import { FEA_TOOL_ENV, HAS_CCX, HAS_GMSH, MESH_BIN } from './feaTestSupport';
+import { FEA_TOOL_ENV, HAS_CCX, HAS_GMSH, HAS_PYTHON_GMSH, MESH_BIN } from './feaTestSupport';
 
 const AREA = 10 * 10; // mm^2
 const FORCE = 1000; // N
@@ -183,10 +183,20 @@ describe('FE transports without tools', () => {
     const out: string[] = [];
     const code = await runCli(['fea_mesh', `analysisId=${analysisId}`, '--doc', docPath, '--json'], {
       ...io(out),
-      env: { LLULL_MESH_BIN: MESH_BIN ?? '', LLULL_GMSH_LIB: path.join(tmpdir(), 'no-such-libgmsh.so') },
+      env: { LLULL_MESH_BIN: MESH_BIN ?? '', LLULL_GMSH_LIB: path.join(tmpdir(), 'no-such-libgmsh.so'), LLULL_PYTHON: 'off' },
     });
     expect(code).toBe(EXIT_COMMAND_ERROR);
     expect(out.join('')).toContain('FEA_TOOL_MISSING');
     expect(out.join('')).toContain('no-such-libgmsh');
+  });
+
+  it.skipIf(MESH_BIN === null || !HAS_PYTHON_GMSH)('falls back to the Python mesher when llull-mesh finds no Gmsh library', async () => {
+    const out: string[] = [];
+    const code = await runCli(['fea_mesh', `analysisId=${analysisId}`, '--doc', docPath, '--json'], {
+      ...io(out),
+      env: { ...FEA_TOOL_ENV, LLULL_MESH_BIN: MESH_BIN ?? '', LLULL_GMSH_LIB: path.join(tmpdir(), 'no-such-libgmsh.so') },
+    });
+    expect(code).toBe(EXIT_OK);
+    expect(out.join('')).toContain('fea_mesh:');
   });
 });

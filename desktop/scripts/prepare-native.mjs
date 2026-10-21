@@ -16,7 +16,8 @@
  *   build/native/LLULL_NATIVE.json     what was bundled (versions, features, OCCT source sha256)
  *
  * Build each OS on that OS. Env:
- *   LLULL_NATIVE_PREBUILT_DIR   take llull-compute / llull-kernel from this directory instead of building them with cargo
+ *   LLULL_NATIVE_PREBUILT_DIR   take llull-compute / llull-kernel (/ llull-mesh, bundled only when present) from this directory instead of
+ *                               building them with cargo
  *   LLULL_NATIVE_GPU=0          build llull-compute without the `gpu` feature (CPU twin only)
  *   LLULL_NATIVE_KERNEL=0       bundle llull-compute only (no llull-kernel, no OCCT)
  *   LLULL_OCCT_DIR              OCCT install prefix (else solver/scripts/build-occt.mjs builds or reuses its default prefix)
@@ -25,6 +26,7 @@
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
+  realpathSync,
   chmodSync,
   copyFileSync,
   cpSync,
@@ -49,7 +51,9 @@ const cargoTarget = path.join(desktop, 'build', 'cargo-target');
 const exe = process.platform === 'win32' ? '.exe' : '';
 const withKernel = process.env.LLULL_NATIVE_KERNEL !== '0';
 const withGpu = process.env.LLULL_NATIVE_GPU !== '0';
-const withMesh = process.env.LLULL_NATIVE_MESH !== '0';
+const prebuiltDir = process.env.LLULL_NATIVE_PREBUILT_DIR;
+/** A prebuilt folder without llull-mesh bundles no mesher (older prebuilt flows keep working). */
+const withMesh = process.env.LLULL_NATIVE_MESH !== '0' && (!prebuiltDir || existsSync(path.join(prebuiltDir, `llull-mesh${exe}`)));
 
 const occt = await import(pathToFileURL(path.join(solver, 'scripts', 'build-occt.mjs')).href);
 
@@ -64,7 +68,7 @@ function cargo(args, env) {
 }
 
 function binaries(occtPrefix) {
-  const prebuilt = process.env.LLULL_NATIVE_PREBUILT_DIR;
+  const prebuilt = prebuiltDir;
   if (prebuilt) return { compute: prebuilt, kernel: prebuilt, mesh: prebuilt };
   const rustTarget = { CARGO_TARGET_DIR: cargoTarget };
   cargo(['build', '--profile', 'compute', '-p', 'llull-compute', ...(withGpu ? ['--features', 'gpu'] : [])], rustTarget);
@@ -147,10 +151,26 @@ function gmshLicenceFiles(library) {
   return [];
 }
 
+function gmshTargetDir() {
+  return process.platform === 'win32' ? nativeDir : path.join(nativeDir, 'gmsh', 'lib');
+}
+
+/** Linux: the system libraries libgmsh needs that this machine lacks (the bundle ships libgmsh only). */
+function gmshMissingDependencies(library) {
+  if (process.platform !== 'linux') return [];
+  const ldd = spawnSync('ldd', [library], { encoding: 'utf8' });
+  return (ldd.stdout ?? '')
+    .split('\n')
+    .filter((line) => line.includes('not found'))
+    .map((line) => line.trim());
+}
+
 function stageGmsh(library) {
-  const target = process.platform === 'win32' ? nativeDir : path.join(nativeDir, 'gmsh', 'lib');
+  const target = gmshTargetDir();
   mkdirSync(target, { recursive: true });
   copyFileSync(library, path.join(target, path.basename(library)));
+  const missing = gmshMissingDependencies(library);
+  if (missing.length > 0) throw new Error(`libgmsh needs system libraries this machine lacks: ${missing.join('; ')}`);
   const licences = gmshLicenceFiles(library);
   if (licences.length === 0) log(`WARNING: no Gmsh LICENSE.txt found near ${library}; only the notice is bundled`);
   for (const file of licences) copyFileSync(file, path.join(nativeDir, 'licenses', `Gmsh-${path.basename(file)}`));
@@ -262,7 +282,8 @@ function smokeTest() {
       .trim();
     log(mesh);
     // the bundled library, not one found on the build machine's search path
-    if (!/\(Gmsh \S+, /.test(mesh) || !mesh.includes(nativeDir))
+    const library = /\(Gmsh \S+, (.*)\)$/.exec(mesh)?.[1];
+    if (library === undefined || !existsSync(library) || realpathSync(path.dirname(library)) !== realpathSync(gmshTargetDir()))
       throw new Error(`bundled llull-mesh reports "${mesh}", expected the bundled Gmsh`);
     versions.mesh = mesh;
   }
@@ -277,6 +298,8 @@ function sizeOf(dir) {
   }, 0);
 }
 
+// fail before building anything when there is no Gmsh to bundle
+const gmshSource = withMesh ? gmshLibrary() : null;
 const occtPrefix = withKernel ? await occt.buildOcct(occt.occtPrefix()) : null;
 const source = binaries(occtPrefix);
 rmSync(nativeDir, { recursive: true, force: true });
@@ -295,7 +318,7 @@ if (occtPrefix !== null) {
     cpSync(path.join(occtPrefix, notice), path.join(nativeDir, 'licenses', `OCCT-${notice}`));
   writeFileSync(path.join(nativeDir, 'licenses', 'OCCT-NOTICE.txt'), occtNotice(occtPrefix));
 }
-const gmshFile = withMesh ? stageGmsh(gmshLibrary()) : null;
+const gmshFile = gmshSource === null ? null : stageGmsh(gmshSource);
 writeFileSync(path.join(nativeDir, 'licenses', 'fdlibm-V8-NOTICE.txt'), FDLIBM_NOTICE);
 const rust = rustLicences();
 writeFileSync(path.join(nativeDir, 'licenses', 'THIRD-PARTY-RUST.txt'), rust.text);

@@ -7,9 +7,8 @@ import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import { callBridge } from '../src/pythonExchange';
 import { callNativeMesher } from '../src/fea/nativeMesher';
-import { BRIDGE, MESH_BIN, PYTHON } from './feaTestSupport';
+import { BRIDGE, HAS_PYTHON_GMSH, MESH_BIN, PYTHON } from './feaTestSupport';
 
-const HAS_PYTHON_GMSH = spawnSync(PYTHON, ['-c', 'import gmsh, numpy'], { stdio: 'ignore' }).status === 0;
 const HAS_NATIVE = MESH_BIN !== null && /\(Gmsh /.test(spawnSync(MESH_BIN, ['--version'], { encoding: 'utf8' }).stdout ?? '');
 
 /** Binary STL of the box [0, a] x [0, b] x [0, c]. */

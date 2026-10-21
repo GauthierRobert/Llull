@@ -147,7 +147,8 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
   }
   if (!response.ok) {
     const message = response.error ?? 'unknown error';
-    return response.code === undefined || response.code === 'FEA_TOOL_MISSING' || /No module named/.test(message)
+    if (response.code === 'FEA_TOOL_MISSING') return feaFailure('fea_mesh', 'FEA_TOOL_MISSING', `${message} ${INSTALL_HINT.gmsh}`);
+    return response.code === undefined || /No module named/.test(message)
       ? bridgeFailure(message)
       : feaFailure('fea_mesh', response.code, message, [analysisId]);
   }

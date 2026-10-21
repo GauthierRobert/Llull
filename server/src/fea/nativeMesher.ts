@@ -10,7 +10,8 @@ import { nativeBinaryPath } from '../native/nativeBinary';
 import type { MeshBridgeResponse } from './feaMesh';
 
 const MAX_STDERR_BYTES = 64 * 1024;
-const MAX_OUTPUT_BYTES = 512 * 1024 * 1024;
+/** Below V8's longest string (2^29 - 24 UTF-16 units), so the response still decodes. */
+const MAX_OUTPUT_BYTES = 500 * 1024 * 1024;
 
 export type MesherChoice = { readonly kind: 'native'; readonly binary: string } | { readonly kind: 'python' };
 

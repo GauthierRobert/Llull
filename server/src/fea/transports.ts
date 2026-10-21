@@ -32,10 +32,15 @@ export function createFeaToolsPort(env: NodeJS.ProcessEnv = process.env): FeaToo
   const beforeDeck = nativeMappingStep({ store, runner, env }, env);
   const randomPost = randomPostStep(runner, env);
   const mesher = chooseMesher(env);
-  const bridge = async (request: Record<string, unknown>): Promise<MeshBridgeResponse> => {
-    if (mesher.kind === 'native') return callNativeMesher(mesher.binary, request, timeoutMs, env);
+  const viaPython = async (request: Record<string, unknown>): Promise<MeshBridgeResponse> => {
     if (bridgeScript === undefined) throw new Error('cannot start Python: the bridge is disabled (LLULL_PYTHON=off); FEA_TOOL_MISSING');
     return callBridge(python, bridgeScript, request, timeoutMs);
+  };
+  // llull-mesh without a loadable Gmsh library hands over to the bridge (a Python with the gmsh module still meshes)
+  const bridge = async (request: Record<string, unknown>): Promise<MeshBridgeResponse> => {
+    if (mesher.kind === 'python') return viaPython(request);
+    const response = await callNativeMesher(mesher.binary, request, timeoutMs, env);
+    return response.code === 'FEA_TOOL_MISSING' && bridgeScript !== undefined ? viaPython(request) : response;
   };
   return {
     mesh: (analysisId, host) => runFeaMesh(analysisId, host, { bridge, store, hooks: caeHooks, kernel: getGeometryKernel }),
