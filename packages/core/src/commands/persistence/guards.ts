@@ -212,10 +212,11 @@ function loftProblem(v: Record<string, unknown>): string | null {
   return exactSectionsProblem(sections as NurbsCurveData[]);
 }
 
-/** Optional BaseEntity fields (`name`, `tags`, `materialId`) must have their declared types, or null. */
+/** Optional BaseEntity fields (`name`, `tags`, `materialId`, `patternSourceId`) must have their declared types, or null. */
 function baseOptionalProblem(v: Record<string, unknown>): string | null {
   if (v['name'] !== undefined && typeof v['name'] !== 'string') return 'name must be a string';
   if (v['materialId'] !== undefined && typeof v['materialId'] !== 'string') return 'materialId must be a string';
+  if (v['patternSourceId'] !== undefined && typeof v['patternSourceId'] !== 'string') return 'patternSourceId must be a string';
   const tags = v['tags'];
   if (tags !== undefined && !(Array.isArray(tags) && tags.every((t) => typeof t === 'string'))) return 'tags must be an array of strings';
   return null;
@@ -267,6 +268,12 @@ function meshProblem(v: Record<string, unknown>): string | null {
     return `mesh.indices must be a flat array of triangle indices (at most ${MAX_IMPORT_TRIANGLES} triangles)`;
   if (!indices.every((i) => Number.isInteger(i) && (i as number) >= 0 && (i as number) < vertexCount))
     return `mesh.indices must be integers in [0, ${vertexCount})`;
+  const faceColors = v['faceColors'];
+  if (
+    faceColors !== undefined &&
+    (!Array.isArray(faceColors) || !faceColors.every((f) => isRecord(f) && isVec3(f['near']) && isHexColor(f['color'])))
+  )
+    return 'faceColors must be an array of { near: [x, y, z], color: "#rrggbb" }';
   const problem = v['brep'] === undefined ? null : validateShapeRecipe(v['brep'], validateEntityValue);
   if (problem !== null) return `brep recipe invalid — ${problem}`;
   const slab = v['stepSlab'] === undefined ? null : validateShapeRecipe(v['stepSlab'], validateEntityValue);

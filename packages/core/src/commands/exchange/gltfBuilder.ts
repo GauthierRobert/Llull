@@ -57,6 +57,18 @@ export class GltfBuilder {
     return this.accessors.length - 1;
   }
 
+  /** SCALAR index accessor (UNSIGNED_SHORT / UNSIGNED_INT by array type) for indexed triangles. */
+  indexData(indices: Uint16Array | Uint32Array): number {
+    const view = this.view(new Uint8Array(indices.buffer, indices.byteOffset, indices.byteLength), 34963);
+    this.accessors.push({
+      bufferView: view,
+      componentType: indices instanceof Uint16Array ? 5123 : 5125,
+      count: indices.length,
+      type: 'SCALAR',
+    });
+    return this.accessors.length - 1;
+  }
+
   /** Texture index of an embedded PNG image (repeat-wrapped, mipmapped). */
   texture(png: Uint8Array): number {
     this.images.push({ bufferView: this.view(png), mimeType: 'image/png' });
@@ -91,10 +103,20 @@ export class GltfBuilder {
     return this.attach({ name }, parent);
   }
 
+  /** One triangle mesh (indexed when `indices` is an index accessor); returns its index for one or more nodes. */
+  addMesh(name: string, attributes: Record<string, number>, material: number, indices?: number): number {
+    this.meshes.push({ name, primitives: [{ attributes, ...(indices !== undefined ? { indices } : {}), mode: 4, material }] });
+    return this.meshes.length - 1;
+  }
+
+  /** A node showing `mesh` (under `parent`, else a scene root), placed by a column-major `matrix` when given. */
+  meshNode(name: string, mesh: number, extras: Record<string, unknown>, parent?: number, matrix?: readonly number[] | null): void {
+    this.attach({ name, mesh, ...(matrix ? { matrix } : {}), extras }, parent);
+  }
+
   /** One triangle mesh and its node (under `parent`, else a scene root). */
   mesh(name: string, attributes: Record<string, number>, material: number, extras: Record<string, unknown>, parent?: number): void {
-    this.meshes.push({ name, primitives: [{ attributes, mode: 4, material }] });
-    this.attach({ name, mesh: this.meshes.length - 1, extras }, parent);
+    this.meshNode(name, this.addMesh(name, attributes, material), extras, parent);
   }
 
   /** The glTF JSON (no buffer uri; empty lists omitted, as glTF requires) and its BIN payload. */

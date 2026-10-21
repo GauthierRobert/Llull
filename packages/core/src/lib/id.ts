@@ -51,6 +51,12 @@ export function withIdSource<T>(source: IdSource, fn: () => T): T {
   }
 }
 
+/** Prefix an id was minted with (`cyl-3.1` → `cyl`, `box-<time>-<n>` → `box`); `fallback` for ids of another shape. */
+export function idPrefixOf(id: string, fallback: string): string {
+  const match = /^(.+?)-(?:[^-]+\.\d+|[0-9a-z]+-[0-9a-z]+)$/.exec(id);
+  return match?.[1] ?? fallback;
+}
+
 export function nextId(prefix = 'e'): string {
   return (scopedSource ?? counterIdSource).next(prefix);
 }

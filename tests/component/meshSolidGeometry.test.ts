@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildMeshSolidGeometry } from '@ui/viewport/3d/entities/meshSolidGeometry';
+import * as THREE from 'three';
+import { buildFaceColoredGeometry, buildMeshSolidGeometry } from '@ui/viewport/3d/entities/meshSolidGeometry';
 
 /** Unit cube with 8 SHARED vertices, 12 outward-facing triangles. */
 const CUBE = {
@@ -19,5 +20,18 @@ describe('buildMeshSolidGeometry', () => {
   it('keeps the triangle positions', () => {
     const geometry = buildMeshSolidGeometry(CUBE);
     expect(geometry.getAttribute('position').count).toBe(36);
+  });
+});
+
+describe('buildFaceColoredGeometry (set_face_color)', () => {
+  it('paints the picked face in its colour and every other corner in the base colour', () => {
+    const geometry = buildFaceColoredGeometry(CUBE, [{ near: [0.5, 0.5, 1], color: '#ff0000' }], '#0000ff');
+    const colors = geometry.getAttribute('color');
+    const positions = geometry.getAttribute('position');
+    expect(colors.count).toBe(36);
+    const red = new THREE.Color('#ff0000');
+    const redCorners = Array.from({ length: colors.count }, (_, i) => i).filter((i) => colors.getX(i) === red.r && colors.getZ(i) === 0);
+    expect(redCorners).toHaveLength(6);
+    for (const i of redCorners) expect(positions.getZ(i)).toBe(1);
   });
 });

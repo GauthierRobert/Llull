@@ -30,9 +30,23 @@ const COARSE: Array<[number, number]> = [
   [16, 2],
   [18, 2.5],
   [20, 2.5],
+  [22, 2.5],
+  [24, 3],
+  [27, 3],
+  [30, 3.5],
+  [33, 3.5],
+  [36, 4],
+  [39, 4],
+  [42, 4.5],
+  [45, 4.5],
+  [48, 5],
+  [52, 5],
+  [56, 5.5],
+  [60, 5.5],
+  [64, 6],
 ];
 
-describe('ISO metric designations M3-M20 (ISO 261 / 262, ISO 68-1)', () => {
+describe('ISO metric designations M3-M64 (ISO 261 / 262, ISO 68-1)', () => {
   it.each(COARSE)('M%i resolves to the coarse pitch %f', (diameter, pitch) => {
     expect(parseIsoMetric(`M${diameter}`)).toMatchObject({ majorDiameterMm: diameter, pitchMm: pitch, coarse: true });
   });
@@ -42,10 +56,11 @@ describe('ISO metric designations M3-M20 (ISO 261 / 262, ISO 68-1)', () => {
     expect(parseIsoMetric('M8x1-6g')).toMatchObject({ majorDiameterMm: 8, pitchMm: 1 });
   });
 
-  it('refuses sizes outside M3-M20, sizes without a coarse pitch, garbage and impossible pitches', () => {
-    for (const bad of ['M2', 'M2.5', 'M24', 'M30x2', 'M7', 'M9', 'M1.6x0.35', 'nonsense', '1/4-20 UNC', 'M8x0', 'M8x5'])
+  it('refuses sizes outside M3-M64, sizes without a coarse pitch, garbage and impossible pitches', () => {
+    for (const bad of ['M2', 'M2.5', 'M68', 'M80x4', 'M7', 'M9', 'M25', 'M50', 'M1.6x0.35', 'nonsense', '1/4-20 UNC', 'M8x0', 'M8x5'])
       expect(typeof parseIsoMetric(bad)).toBe('string');
-    expect(parseIsoMetric('M24')).toContain('outside the supported range M3-M20');
+    expect(parseIsoMetric('M68')).toContain('outside the supported range M3-M64');
+    expect(parseIsoMetric('M50')).toContain('no ISO 261 coarse pitch');
     expect(parseIsoMetric('M7')).toContain('no ISO 261 coarse pitch');
   });
 
@@ -124,13 +139,35 @@ describe('add_tapped_hole', () => {
     expect(blind.summary).toContain('M5x0.8 (coarse)');
   });
 
+  it.each([
+    [24, 3],
+    [48, 5],
+  ])(
+    'M%i through (LIM-1): coarse pitch %f, d1 bore + modelled thread, volume within 2 percent of the analytic tapped hole',
+    (diameter, pitch) => {
+      const stock = plate();
+      const result = tap({ size: `M${diameter}` }, stock);
+      expect(result.rejected).toBeUndefined();
+      expect(result.affected).toHaveLength(1);
+      expect(result.summary).toContain(`M${diameter}x${pitch} (coarse)`);
+      expect(result.data).toMatchObject({ designation: `M${diameter}x${pitch}`, pitch, majorDiameter: diameter });
+      const data = result.data as { minorDiameter: number; pitchDiameter: number };
+      expect(data.minorDiameter).toBeCloseTo(diameter - 1.082532 * pitch, 5);
+      expect(data.pitchDiameter).toBeCloseTo(diameter - 0.649519 * pitch, 5);
+      const analytic = internalThreadRemovedVolume(internalThreadForm(pitch, diameter), 10);
+      const removed = 60000 - volumeOf(result.document, idOf(result));
+      expect(Math.abs(removed - analytic) / analytic).toBeLessThan(0.02);
+    },
+  );
+
   it('refuses out-of-range and unknown sizes, and surfaces add_hole refusals', () => {
     const stock = plate();
-    for (const size of ['M2', 'M24', 'M7', 'bolt']) {
+    for (const size of ['M2', 'M68', 'M7', 'bolt']) {
       const result = tap({ size }, stock);
       expectNoOp(result, stock.doc);
       expect(result.error?.code).toBe('FTR_THREAD_DESIGNATION_INVALID');
     }
+    expect(tap({ size: 'M68' }, stock).summary).toContain('outside the supported range M3-M64');
     const outside = tap({ points: [[500, 30]] }, stock);
     expectNoOp(outside, stock.doc, 'FTR_HOLE_POINT_OUTSIDE_FACE');
     expect(outside.summary).toContain('add_tapped_hole');
@@ -185,6 +222,26 @@ describe('add_external_thread', () => {
     }
   });
 
+  it.each([
+    [24, 3, 30],
+    [48, 5, 40],
+  ])(
+    'M%i (LIM-1): coarse pitch %f on a cylinder of the major diameter, removed volume within 10 percent of the analytic groove (n-gon cylinder clips the groove crest)',
+    (diameter, pitch, height) => {
+      const stock = cylinder(diameter / 2, height);
+      const result = thread(stock, { size: `M${diameter}` });
+      expect(result.rejected).toBeUndefined();
+      expect(result.affected).toHaveLength(1);
+      expect(result.summary).toContain(`M${diameter}x${pitch} (coarse) right-hand thread`);
+      const data = result.data as { designation: string; pitch: number; minorDiameter: number; analyticRemovedVolume: number };
+      expect(data.designation).toBe(`M${diameter}x${pitch}`);
+      expect(data.pitch).toBe(pitch);
+      expect(data.minorDiameter).toBeCloseTo(diameter - 1.082532 * pitch, 5);
+      const removed = polygonVolume(stock) - volumeOf(result.document, idOf(result));
+      expect(Math.abs(removed - data.analyticRemovedVolume) / data.analyticRemovedVolume).toBeLessThan(0.1);
+    },
+  );
+
   it('the tool mesh runs out through the end face: right and left hand differ', () => {
     const form = externalThreadForm(1, 6);
     const right = externalThreadGroove(form, 5, 10, 1, false);
@@ -203,7 +260,7 @@ describe('add_external_thread', () => {
     const cases: Array<[CadDocument, Record<string, unknown>, string, string]> = [
       [stock.doc, { target: 'missing', size: 'M10' }, 'FTR_PART_NOT_FOUND', 'not found'],
       [box.document, { target: idOf(box), size: 'M10' }, 'FTR_PART_NOT_FOUND', 'not a cylinder'],
-      [stock.doc, { target: stock.id, size: 'M24' }, 'FTR_THREAD_DESIGNATION_INVALID', 'outside the supported range'],
+      [stock.doc, { target: stock.id, size: 'M68' }, 'FTR_THREAD_DESIGNATION_INVALID', 'outside the supported range M3-M64'],
       [stock.doc, { target: stock.id, size: 'M7' }, 'FTR_THREAD_DESIGNATION_INVALID', 'coarse pitch'],
       [stock.doc, { target: stock.id, size: 'M8' }, 'FTR_HOLE_DIAMETERS_INCONSISTENT', 'does not match'],
       [stock.doc, { target: stock.id, size: 'M10', length: 1 }, 'FTR_FEATURE_BUILD_FAILED', 'shorter than one pitch'],

@@ -16,7 +16,7 @@ import { featureError, featureKeyText } from './featureRecipe';
 import { loopsProblem, surfaceDataProblem } from './surfaceWire';
 import { faceOpParamsOf, faceOpProblem } from './faceOpRecipe';
 
-const PRESENTATION_FIELDS = new Set(['id', 'name', 'color', 'layerId', 'tags', 'materialId']);
+const PRESENTATION_FIELDS = new Set(['id', 'name', 'color', 'layerId', 'tags', 'materialId', 'patternSourceId']);
 
 /** Stable key of an entity's geometry (presentation fields dropped, keys sorted). */
 export function geometryKey(entity: Entity): string {

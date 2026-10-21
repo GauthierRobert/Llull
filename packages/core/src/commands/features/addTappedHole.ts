@@ -1,4 +1,4 @@
-/** add_tapped_hole (SC-F2): ISO metric tapped holes M3-M20 = a minor-diameter bore with the modelled internal thread, via add_hole. */
+/** add_tapped_hole (SC-F2): ISO metric tapped holes M3-M64 = a minor-diameter bore with the modelled internal thread, via add_hole. */
 
 import { round6 } from '../../lib/compactNumber';
 import type { CommandResult } from '../types';
@@ -15,7 +15,7 @@ import { sketchPointsSchema } from './sketchPoints';
 /**
  * @affects replaces `target` by 1 mesh entity: the part with tapped holes (a feature(hole) node with a modelled thread), like add_hole
  * @invariant bore diameter = ISO 68-1 basic minor diameter d1 = d - 1.082532 P; thread = basic 60 degree profile, coarse ISO 261 pitch unless "MdxP" is given
- * @failure designation not ISO metric M3-M20, size without a coarse pitch and no explicit pitch, plus every add_hole refusal (face, points, extent, kernel)
+ * @failure designation not ISO metric M3-M64, size without a coarse pitch and no explicit pitch, plus every add_hole refusal (face, points, extent, kernel)
  *   -> rejected no-op
  */
 export const addTappedHole = defineCommand({
@@ -24,8 +24,9 @@ export const addTappedHole = defineCommand({
   description:
     'Drill ISO metric TAPPED holes (modelled internal thread) into a planar face of a 3D solid: a bore at the basic minor diameter ' +
     'd1 = d - 1.082532 P plus a real helical thread groove of the ISO 68-1 basic profile (H = 0.866025 P, pitch diameter d2 = d - 0.649519 P). ' +
-    'size is "M8" (coarse pitch of ISO 261: M3 0.5, M4 0.7, M5 0.8, M6 1, M8 1.25, M10 1.5, M12 1.75, M14 2, M16 2, M18 2.5, M20 2.5) or ' +
-    '"M8x1" (explicit/fine pitch); only M3-M20 are supported (anything else is refused). The face, points (including points taken from ' +
+    'size is "M8" (coarse pitch of ISO 261: M3 0.5, M4 0.7, M5 0.8, M6 1, M8 1.25, M10 1.5, M12 1.75, M14 2, M16 2, M18 2.5, M20 2.5, ' +
+    'M22 2.5, M24 3, M27 3, M30 3.5, M33 3.5, M36 4, M39 4, M42 4.5, M45 4.5, M48 5, M52 5, M56 5.5, M60 5.5, M64 6) or ' +
+    '"M8x1" (explicit/fine pitch); only M3-M64 are supported (anything else is refused). The face, points (including points taken from ' +
     'sketch points) and extent work exactly as in add_hole (through_all or blind; a blind thread length defaults to the full depth, thread.depth ' +
     'shortens it). Sizes are in mm in the designation; the geometry is created in the document unit. The result and refusals are those of add_hole ' +
     '(codes FTR_*); data = { designation, pitch, majorDiameter, pitchDiameter, minorDiameter } in document units.',
@@ -43,7 +44,7 @@ export const addTappedHole = defineCommand({
       .enum(POINT_FRAMES)
       .optional()
       .describe('Coordinates of a points list: "face" (default), "world_xy" or "world" (see add_hole).'),
-    size: z.string().describe('ISO metric size: "M8" (coarse pitch) or "M8x1" (explicit pitch). M3-M20 only.'),
+    size: z.string().describe('ISO metric size: "M8" (coarse pitch) or "M8x1" (explicit pitch). M3-M64 only.'),
     extent: extentParams,
     threadDepth: z
       .number()
@@ -55,7 +56,7 @@ export const addTappedHole = defineCommand({
   run: (doc, { target, face, points, pointsFrame, size, extent, threadDepth, handedness }, ctx): CommandResult => {
     const iso = parseIsoMetric(size);
     if (typeof iso === 'string')
-      return refuse(doc, 'add_tapped_hole', 'FTR_THREAD_DESIGNATION_INVALID', iso, 'use M3..M20, e.g. M6 or M6x0.75', [target], ['size']);
+      return refuse(doc, 'add_tapped_hole', 'FTR_THREAD_DESIGNATION_INVALID', iso, 'use M3..M64, e.g. M6 or M6x0.75', [target], ['size']);
     const major = fromMm(doc, iso.majorDiameterMm);
     const pitch = fromMm(doc, iso.pitchMm);
     const basic = isoBasicDiameters(major, pitch);

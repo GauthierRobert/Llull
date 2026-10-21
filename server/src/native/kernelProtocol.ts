@@ -55,6 +55,21 @@ export function parseReplyLine(line: string): NativeReply | null {
   return typeof error === 'string' ? { id, result, error } : { id, result };
 }
 
+/**
+ * The error of a reply the sidecar could not tie to a request (`id: null`: the request line was unreadable, e.g. a recipe nested past the
+ * JSON parser depth limit), else null. The sidecar answers in request order, so it belongs to the oldest pending request.
+ */
+export function parseUnmatchedError(line: string): string | null {
+  try {
+    const value: unknown = JSON.parse(line);
+    if (typeof value !== 'object' || value === null) return null;
+    const { id, error } = value as { id?: unknown; error?: unknown };
+    return id === null && typeof error === 'string' ? error : null;
+  } catch {
+    return null;
+  }
+}
+
 export function isUnsupported(error: string | undefined): boolean {
   return error?.startsWith(NATIVE_UNSUPPORTED) === true;
 }

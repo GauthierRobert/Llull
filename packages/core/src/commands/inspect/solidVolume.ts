@@ -5,6 +5,7 @@ import { expandInstance } from '../../geometry/instanceExpansion';
 import { closedFormVolume } from '../../geometry/closedFormVolume';
 import { currentContext } from '../context';
 import { recipeOf } from '../../geometry/shapeRecipe';
+import { exactLeafVolume } from '../../geometry/resolveMassProperties';
 
 /** Volume of one solid: how it was computed, or why it could not be. */
 export type SolidVolume =
@@ -54,6 +55,8 @@ export function solidVolume(doc: CadDocument, e: Entity, ctx: ExecutionContext |
     for (const child of expandInstance(e, component)) volume += childVolume(doc, child, ctx);
     return { volume };
   }
+  const exactLeaf = exactLeafVolume(e, (ctx ?? currentContext()).kernel);
+  if (exactLeaf !== null) return { volume: exactLeaf, method: 'exact' };
   const closed = closedFormVolume(e);
   return closed === null
     ? { error: `entity '${e.id}' is kind '${e.kind}'; it has no solid volume.` }

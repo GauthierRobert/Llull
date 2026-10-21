@@ -19,7 +19,8 @@
         "position": [3,0,0],
         "rotation": [0,0,0],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "patternSourceId": "#1"
       },
       "#4": {
         "id": "#4",
@@ -28,7 +29,8 @@
         "position": [6,0,0],
         "rotation": [0,0,0],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "patternSourceId": "#1"
       },
       "#5": {
         "id": "#5",
@@ -37,7 +39,8 @@
         "position": [9,0,0],
         "rotation": [0,0,0],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "patternSourceId": "#1"
       },
       "#6": {
         "id": "#6",
@@ -57,7 +60,8 @@
         "position": [2.5,4.33012702,0],
         "rotation": [0,0,1.04719755],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "patternSourceId": "#6"
       },
       "#8": {
         "id": "#8",
@@ -67,7 +71,8 @@
         "position": [-2.5,4.33012702,0],
         "rotation": [0,0,2.0943951],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "patternSourceId": "#6"
       },
       "#9": {
         "id": "#9",
@@ -77,7 +82,8 @@
         "position": [-5,6.123234e-16,0],
         "rotation": [0,0,3.14159265],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "patternSourceId": "#6"
       },
       "#10": {
         "id": "#10",
@@ -87,7 +93,8 @@
         "position": [-2.5,-4.33012702,0],
         "rotation": [0,0,4.1887902],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "patternSourceId": "#6"
       },
       "#11": {
         "id": "#11",
@@ -97,7 +104,8 @@
         "position": [2.5,-4.33012702,0],
         "rotation": [0,0,5.23598776],
         "layerId": "#2",
-        "color": "#6b8f9c"
+        "color": "#6b8f9c",
+        "patternSourceId": "#6"
       }
     },
     "order": [

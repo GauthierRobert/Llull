@@ -5,6 +5,7 @@ import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
 import { briefNumbers, sig } from '../shared/results';
 import { execute } from '@core/commands/registry';
+import { isHexColor } from '@lib/isHexColor';
 import { refuseFluid } from './codes';
 import { nozzleContour, wallSection, type ContourSpec } from './nozzleContour';
 
@@ -81,6 +82,7 @@ export const designNozzle = defineCommand({
     wallThickness: z.number().describe('Wall thickness in document units, > 0 and < 0.382 R_t.'),
     position: z.array(z.number()).length(3).optional().describe('Throat centre [x, y, z] in document units. Default origin.'),
     segments: z.number().int().optional().describe('Circumferential segments of the revolution, 16..256. Default 96.'),
+    color: z.string().optional().describe('Hex colour "#rrggbb" of the nozzle solid, e.g. "#b87333". Default: the revolve_profile colour.'),
     includeContour: z.boolean().optional().describe('Return the inner wall contour points (axial, radius, angle) in data. Default false.'),
   }),
   run: (doc, params, ctx): CommandResult => {
@@ -95,6 +97,8 @@ export const designNozzle = defineCommand({
       return fail('FLD_PARAM_INVALID', 'throatRadius > 0, expansionRatio 1.5..400, contractionRatio 1.5..20', 'throatRadius');
     if (!(convergent >= 15 && convergent <= 60) || !((params.chamberLength ?? 0) >= 0) || !(segments >= 16 && segments <= 256))
       return fail('FLD_PARAM_INVALID', 'convergentHalfAngleDeg 15..60, chamberLength >= 0, segments 16..256', 'convergentHalfAngleDeg');
+    if (params.color !== undefined && !isHexColor(params.color))
+      return fail('FLD_PARAM_INVALID', `color must be a #rrggbb hex string (got "${params.color}")`, 'color');
     if (!(t > 0 && t < 0.382 * rt))
       return fail(
         'FLD_PARAM_INVALID',
@@ -147,6 +151,10 @@ export const designNozzle = defineCommand({
     );
     if (revolved.affected.length === 0) return fail('FLD_CONTOUR_INVALID', revolved.summary, 'expansionRatio');
     const id = revolved.affected[0] as string;
+    const solidDoc =
+      params.color === undefined
+        ? revolved.document
+        : execute(revolved.document, 'set_entity_color', { entityIds: [id], color: params.color }, ctx).document;
     const data = {
       id,
       shape,
@@ -179,7 +187,7 @@ export const designNozzle = defineCommand({
     const summary = revolved.summary;
     return {
       ...changed(
-        revolved.document,
+        solidDoc,
         briefNumbers(
           `design_nozzle ${shape} ${id}: R_t ${rt}, ε ${eps} (R_e ${data.exitRadius}), ε_c ${contraction}, divergent length ${data.divergentLength}` +
             ` (${sig(contour.divergentLength / contour.referenceConeLength)} of the 15° cone), wall ${t}${defaulted.length > 0 ? `; defaulted: ${defaulted.join(', ')}` : ''}. ${summary}`,

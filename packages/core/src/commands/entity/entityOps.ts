@@ -102,6 +102,12 @@ export function withoutEntities(
 ): { document: CadDocument; dissolvedGroups: string[]; prunedReferences: number } {
   const entities = { ...doc.entities };
   for (const id of removed) delete entities[id];
+  for (const [id, entity] of Object.entries(entities))
+    if (entity.patternSourceId !== undefined && removed.has(entity.patternSourceId)) {
+      const released = { ...entity };
+      delete released.patternSourceId;
+      entities[id] = released;
+    }
   const { nextGroups, dissolvedGroups } = pruneGroupMembers(doc.groups, removed);
   const { references, prunedReferences } = pruneReferences(doc, removed);
   const provenance = doc.exchange?.provenance;

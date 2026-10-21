@@ -101,7 +101,12 @@ function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string
       const positions = e.mesh.positions.map((v) => v * f);
       const brep = e.brep && ({ op: 'scale', source: e.brep, factor: f } as const);
       return {
-        scaled: { ...e, mesh: { ...e.mesh, positions }, ...(brep ? { brep } : {}) },
+        scaled: {
+          ...e,
+          mesh: { ...e.mesh, positions },
+          ...(brep ? { brep } : {}),
+          ...(e.faceColors ? { faceColors: e.faceColors.map((face) => ({ ...face, near: scale3(face.near, f) })) } : {}),
+        },
         dims: `scaled ${positions.length / 3} vertices`,
       };
     }

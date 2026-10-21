@@ -7,6 +7,7 @@ import { align, distribute, stackOn } from './place';
 import { patternAlongPath } from './patternAlongPath';
 import { addDecal, removeDecal } from './decals';
 import { deleteEntities, moveEntities, duplicateEntities } from './batch';
+import { setEntityColor, setFaceColor } from './colors';
 
 export const editCommands = commandCatalog(
   rotateEntity,
@@ -26,4 +27,6 @@ export const editCommands = commandCatalog(
   deleteEntities,
   moveEntities,
   duplicateEntities,
+  setEntityColor,
+  setFaceColor,
 );

@@ -28,14 +28,12 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## Priority
 
-- `[TODO]` **LIM-1** (owner 2026-10-21, next priority) Gaps found building the LLR-845 rocket-engine demo via the CLI, each fix test-first (`fix-bug`):
-  (1) `array_polar` / `array_linear` copies lose the source material → silent low `mass_properties`; (2) copies get an id prefix unlike their source
-  (`cylinder-` vs alias kind); (3) `rotate_entity` rotates about the world origin, not the entity (no `pivot`); (4) `render_view` ignores the active
-  exploded view; (5) no `set_entity_color` command, `design_nozzle` ignores `color`, no per-face color; (6) ~~Windows `llull-kernel.exe` needs
-  `occt-7.9.2/bin` on PATH~~ done 2026-10-21 (`nativeRuntimeEnv` prepends the OCCT bin dir, review cleanup); (7) `mass_properties`
-  of lofts uses the display mesh, not the exact B-rep; (8) `add_external_thread` / `add_tapped_hole` stop at M20; (9) closed hollow sweeps
-  (`sweep_profile` innerRadius on a closed path) give an invalid B-rep; (10) scale untested: measure plan time / glTF size past ~160 parts
-  (v5 = 25 MB .glb), hundreds of patterned booleans (coolant channels). _deps: —_
+- `[REVIEW]` **LIM-1** (owner 2026-10-21) rocket-engine demo gaps (1)–(10) fixed on branch `fix/lim-1` (PR): pattern copies keep the source
+  id prefix + `patternSourceId` (assign_material / set_entity_color on the seed reach following copies), `rotate_entity` `pivot`, render_view
+  exploded, `set_entity_color` / `set_face_color` (mesh solids) / design_nozzle `color`, exact loft mass, ISO threads to M64, native closed
+  hollow sweep, glTF indexed + shared meshes and `boolean` tool lists (`docs/decisions/LIM1-scale.md`). Left: per-face colour on parametric
+  primitives; plan time dominated by one OCCT sweep boolean (13–15 s); native follow-ups in LIM1-scale.md (JSON depth, relative display
+  tolerance, multi-tool cut). _deps: —_
 - `[REVIEW]` **RS** wave RS-3, RS-4, RS-5, RS-7, RS-8 on branch `feat/rs-native-wave`, PR #98 (merged with main 2026-10-20): `docs/decisions/RS1-native-compute.md`. Verified on the owner PC (RTX 4080): TS gates, unit + server suites, native parity suites 67/67, coverage gate (sharded) 97.25 / 88.58 / 98.8 / 98.89, two cad-reviewer passes fixed. `npm run native:check` passes with MSVC (2026-10-21, KRN-MSVC).
 - `[TODO]` **RS-6** clearance / thickness / view factors on `llull-geomq`. _deps: —_
 - `[TODO]` **RS follow-ups** plant 10 M3 viewport, plant 02 V1 (route*pipe, fittings, check_piping), PHY-09 M4/M5, AER 3D panel, PHY-19 hand-off (OpenCourant); physics 19 options outside RS-8 (rounded shell edges in contact §29.8.3, shell thickness change §29.8.2; §13.10). \_deps: RS wave*

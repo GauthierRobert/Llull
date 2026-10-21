@@ -47,6 +47,17 @@ describe('native kernel session', () => {
     expect(await second).toEqual({ result: null, error: 'shape not cached: a' });
   });
 
+  it('settles the oldest pending request with an id-less error (an unreadable request) instead of waiting for the timeout', async () => {
+    const child = fakeChild();
+    const session = createKernelSession(child);
+    const deep = session.request('evaluate', [{ key: 'deep' }]);
+    const next = session.request('info', []);
+    child.emitLine('{"error":"NATIVE_BAD_REQUEST: unreadable request: recursion limit exceeded","id":null,"result":null}');
+    expect(await deep).toEqual({ result: null, error: 'NATIVE_BAD_REQUEST: unreadable request: recursion limit exceeded' });
+    child.emitLine('{"id":2,"result":"ok"}');
+    expect(await next).toEqual({ result: 'ok' });
+  });
+
   it('ignores stray output with one warning', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const child = fakeChild();

@@ -61,7 +61,7 @@ describe('export_gltf per-entity structure', () => {
     const gltf = gltfOf(coloredDoc());
     const end = Math.max(...gltf.bufferViews.map((v) => v.byteOffset + v.byteLength));
     expect(end).toBe(gltf.buffers[0]?.byteLength);
-    expect(gltf.accessors).toHaveLength(gltf.meshes.length * 2);
+    expect(gltf.accessors).toHaveLength(gltf.meshes.length * 3); // POSITION, NORMAL, indices
   });
   it('hangs grouped entities under a node named after the group', () => {
     let doc = coloredDoc();

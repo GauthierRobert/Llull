@@ -39,7 +39,7 @@ BoxEntity        'box'        size: Vec3
 CylinderEntity   'cylinder'   radius; height
 SphereEntity     'sphere'     radius
 ExtrusionEntity  'extrusion'  profile: ReadonlyArray<[number, number]>; depth; curves?: CurveSegment<Vec2>[]  // exact boundary; profile = its tessellation
-MeshSolidEntity  'mesh'       mesh: MeshData; brep?: ShapeRecipe  // kernel result: display mesh + exact construction tree
+MeshSolidEntity  'mesh'       mesh: MeshData; brep?: ShapeRecipe; faceColors?: FaceColor[]  // kernel result: display mesh + exact construction tree; per-face colours (set_face_color)
 ConeEntity       'cone'       radius; height
 TorusEntity      'torus'      ringRadius; tubeRadius
 WedgeEntity      'wedge'      size: Vec3

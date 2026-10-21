@@ -5,7 +5,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, looseVec3, vec3, z } from '../schema';
 import { MAX_BATCH_IDS } from '../limits';
 import { referenceSuffix, withEntities, withoutEntities } from '../entity/entityOps';
-import { nextId } from '../../lib/id';
+import { idPrefixOf, nextId } from '../../lib/id';
 import { ORIGIN } from '../../lib/vec3';
 import { translated } from '../solids/shared';
 import { changed, noop } from '../noop';
@@ -105,7 +105,9 @@ export const duplicateEntities = defineCommand({
     const { existing, label, skipped } = batch;
     const copies = existing.map((id): Entity => {
       const source = doc.entities[id] as Entity;
-      return { ...translated(source, offset), id: nextId(source.kind) };
+      const copy: Entity = { ...translated(source, offset), id: nextId(idPrefixOf(source.id, source.kind)) };
+      delete copy.patternSourceId;
+      return copy;
     });
     const newIds = copies.map((copy) => copy.id);
     return changed(
