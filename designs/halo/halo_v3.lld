@@ -1,0 +1,242 @@
+# HALO v3 — test-article model of the ring-wing toroidal-rotor tail-sitter (optimised from v2, see analysis/)
+# World frame: +Z up in hover; in cruise the craft flies nose-first along +Z. Units mm.
+# Every part is a component (bill_of_materials), every repeated part an instance of one component.
+design halo_v3 units=mm
+
+# --- driving parameters ---------------------------------------------------------------
+param ringLe = 215          # radius of the ring-wing leading edge
+param ringChord = 172       # ring-wing (duct) chord: smallest that contains the rotor stack (sweep, analysis/)
+param ringTe = 10           # height of the ring trailing edge
+param skin = 0.225          # ring skin: 3 plies of 75 µm thin-ply CFRP (+45 / 0 / -45), FEA: analysis/fea_*.lld
+param rib = 1               # eight internal ring ribs at the strut stations
+param tipGap = 3            # rotor tip clearance to the duct throat
+param bellR = 32.5          # hub-motor bell outer radius (2 mm 7075 wall; the loops root on it)
+param bellH = 22            # hub-motor bell height
+param loopChord = 24        # toroidal blade section chord (NACA 0012)
+param loopTilt = 20         # loop-plane tilt, deg (≈ blade arm pitch)
+param zUpper = 151          # upper rotor plane
+param zLower = 57           # lower rotor plane
+param podR = 30             # pod outer radius
+param strutChord = 24       # fixed structural strut, x8 (NACA 0012)
+param statorH = 22          # hub-motor stator stack height (peak torque ~0.65 N·m, analysis/halo_sizing.py)
+param flapChord = 80        # hinged control flap (NACA 0010), hinge 1 mm behind the strut, x8 (sweep: ~4 m/s crosswind)
+param flapIn = 52           # flap root radius: neighbouring flaps clear each other up to ±20° deflection
+param flapDeg = 0           # flap deflection (control input)
+param footZ = -95           # lowest point of the landing feet, 12 mm below the flap trailing edges
+param cellZ = zLower+statorH/2+1   # battery layer 1 (2 x 2 21700 cells) sits between the two stators
+param cellZ2 = 226          # battery layer 2, above the avionics: sets the CG (static margin ~6-7 %)
+
+param throatR = ringLe - 0.098*ringChord              # NACA 4412 upper surface (inward) peak ≈ 0.098 c
+param loopTipR = throatR - tipGap
+param loopRoot = bellR - 1.5                         # loop roots sink 1.5 mm into the bell
+param loopR = (loopTipR - loopRoot)/2 - loopChord/2   # centreline radius of one blade loop
+param loopC = (loopTipR + loopRoot)/2                    # radial position of a loop centre
+param strutTop = ringTe + 12
+
+# --- materials (datasheet densities; the loops and vanes are CFRP over a foam core) ----
+create_material _ name=cfrp_thin_ply density=1.55 densityUnit="g/cm^3" color="#2b3038" metalness=0.2 roughness=0.35 finish=carbon_twill finishScale=12 clearcoat=1
+create_material _ name=cfrp_foam_core density=0.45 densityUnit="g/cm^3" color="#c8553d" roughness=0.45
+create_material _ name=al_7075_t6 density=2.81 densityUnit="g/cm^3" color="#b8bcc2" metalness=0.9 roughness=0.3 finish=brushed
+create_material _ name=li_ion_21700 density=2.82 densityUnit="g/cm^3" color="#2f7d4f" roughness=0.5
+create_material _ name=stator_cu_fe density=1.1 densityUnit="g/cm^3" color="#b06a3a" metalness=0.7 roughness=0.4
+create_material _ name=fr4_pcba density=1.9 densityUnit="g/cm^3" color="#1f6b3a" roughness=0.6
+create_material _ name=servo_eff density=4.0 densityUnit="g/cm^3" color="#2a2d33" roughness=0.6
+create_material _ name=pc_optical density=1.2 densityUnit="g/cm^3" color="#3a6ea5" roughness=0.05
+create_material _ name=cfrp_foam_vane density=0.45 densityUnit="g/cm^3" color="#3a3f47" roughness=0.45
+create_material _ name=cfrp_skin_rohacell density=0.12 densityUnit="g/cm^3" color="#5a6270" roughness=0.45   # 1 x 0.1 mm ply each side on Rohacell 31 IG (derived: 3.1 g per flap)
+create_material _ name=camera_module density=2.0 densityUnit="g/cm^3" color="#2a2d33" roughness=0.5
+create_material _ name=leg_cfrp_tube_tpu density=0.42 densityUnit="g/cm^3" color="#e0a526" roughness=0.8   # Ø10 x 0.5 CFRP tube (solid-equivalent 0.36) + TPU 95A foot
+
+# --- ring wing: hollow thin-ply shell, camber facing the axis, 4 internal ribs ----------
+draw_naca_airfoil sec naca="4412" chord=ringChord incidenceDeg=-90 position=[ringLe, 0, 0] pointsPerSide=50
+offset_2d secIn id=sec distance=skin
+revolve_profile ringOuter profileIds=[sec] axis="z" segments=128 rotation=[180deg, 0, 0] position=[0, 0, ringTe+ringChord] color="#1d2126"
+revolve_profile ringCavity profileIds=[secIn] axis="z" segments=128 rotation=[180deg, 0, 0] position=[0, 0, ringTe+ringChord]
+# one Ø2 mm pressure-equalisation vent per rib bay (outer skin, z 130): a hollow composite part must breathe
+for i in 0..7 {
+  add_cylinder vent{i} radius=1 height=24 position=[212*cos((2*i+1)*pi/8), 212*sin((2*i+1)*pi/8), 130] axis=[cos((2*i+1)*pi/8), sin((2*i+1)*pi/8), 0]
+}
+add_box teCloseout size=[2*ringLe+40, 2*ringLe+40, ringChord] position=[0, 0, ringTe+8+ringChord/2]   # cavity ends 8 mm before the TE: solid laminate close-out
+boolean cavTrim op=intersect a=ringCavity b=teCloseout
+boolean cav1 op=union a=cavTrim b=vent0
+boolean cav2 op=union a=cav1 b=vent1
+boolean cav3 op=union a=cav2 b=vent2
+boolean cav4 op=union a=cav3 b=vent3
+boolean cav5 op=union a=cav4 b=vent4
+boolean cav6 op=union a=cav5 b=vent5
+boolean cav7 op=union a=cav6 b=vent6
+boolean cavVented op=union a=cav7 b=vent7
+boolean ringShell op=subtract a=ringOuter b=cavVented
+revolve_profile ribCore profileIds=[sec] axis="z" segments=128 rotation=[180deg, 0, 0] position=[0, 0, ringTe+ringChord]
+add_box ribX size=[2*ringLe+20, rib, ringChord+10] position=[0, 0, ringTe+ringChord/2]
+add_box ribY size=[rib, 2*ringLe+20, ringChord+10] position=[0, 0, ringTe+ringChord/2]
+add_box ribD1 size=[2*ringLe+20, rib, ringChord+10] position=[0, 0, ringTe+ringChord/2] rotation=[0, 0, 45deg]
+add_box ribD2 size=[2*ringLe+20, rib, ringChord+10] position=[0, 0, ringTe+ringChord/2] rotation=[0, 0, -45deg]
+boolean rib2 op=union a=ribX b=ribY
+boolean rib3 op=union a=rib2 b=ribD1
+boolean ribCross op=union a=rib3 b=ribD2
+boolean ribs op=intersect a=ribCore b=ribCross
+boolean ring op=union a=ringShell b=ribs
+assign_material _ materialName=cfrp_thin_ply entityIds=[ring]
+create_component cRing name="Ring wing (CFRP thin-ply shell + 8 ribs)" componentId=c-ring entityIds=[ring]
+
+# --- pod: 0.6 mm CFRP shell, nose ogive, tail cone (profile = outer up, inner down) -----
+revolve_profile podShell axis="z" segments=96 color="#e8e6e1" profile=[[0,-8],[8,0],[16,12],[22,25],[26,38],[29.5,50],[30,60],[30,310],[28,322],[24,332],[17.5,340],[16.9,340],[23.4,331.5],[27.4,321.5],[29.4,310],[29.4,60],[28.9,50.5],[25.4,38.5],[21.4,25.6],[15.4,12.6],[7.4,0.8],[0,-7.2]]
+assign_material _ materialName=cfrp_thin_ply entityIds=[podShell]
+create_component cPod name="Pod shell (CFRP, 0.6 mm)" componentId=c-pod entityIds=[podShell]
+add_sphere dome radius=18 position=[0, 0, 334] color="#3a6ea5"
+add_box domeCut size=[40, 40, 30] position=[0, 0, 319]
+boolean domeCap op=subtract a=dome b=domeCut
+assign_material _ materialName=pc_optical entityIds=[domeCap]
+create_component cDome name="Sensor dome (PC, optical)" componentId=c-dome entityIds=[domeCap]
+add_box cam size=[18, 18, 14] position=[0, 0, 326] color="#2a2d33"
+assign_material _ materialName=camera_module entityIds=[cam]
+create_component cCam name="Camera module + gimbal-less EIS board" componentId=c-cam entityIds=[cam]
+
+# --- battery: 8 x 21700 Molicel P50B (4S2P, 5.0 Ah / 60 A cells, 144 Wh): one layer between the motors, one above the avionics
+add_cylinder cell radius=10.55 height=70 position=[10.75, 10.75, cellZ] anchor=base-center color="#2f7d4f"
+assign_material _ materialName=li_ion_21700 entityIds=[cell]
+create_component cell0 name="Li-ion cell 21700 Molicel P50B (5.0 Ah, 60 A)" componentId=c-cell entityIds=[cell]
+for i in 1..3 {
+  insert_instance cell{i} componentId=c-cell position=[-21.5*mod(i,2), -21.5*floor(i/2), 0]
+}
+for i in 4..7 {
+  insert_instance cell{i} componentId=c-cell position=[-21.5*mod(i-4,2), -21.5*floor((i-4)/2), cellZ2-cellZ]
+}
+
+# --- hub motors: stator inside the pod skin, bell outside carrying the loops -----------
+add_cylinder stator radius=27 height=statorH position=[0, 0, zUpper-statorH/2] anchor=base-center color="#b06a3a"
+assign_material _ materialName=stator_cu_fe entityIds=[stator]
+create_component stator0 name="Hub-motor stator (36N42P, 22 mm stack, Cu/Fe)" componentId=c-stator entityIds=[stator]
+insert_instance stator1 componentId=c-stator position=[0, 0, zLower-zUpper]
+
+# --- upper rotor: Al bell + three toroidal loops ---------------------------------------
+revolve_profile bellA0 axis="z" segments=96 position=[0, 0, zUpper-bellH/2] color="#b8bcc2" profile=[[30.5,0],[32.5,0],[32.5,22],[30.5,22]]   # bell section: r 30.5-32.5 (= bellR), h 22 (= bellH)
+add_box sockA0 size=[9, 8, 8] position=[35, 0, zUpper]   # 7075 root socket per loop: captures the root section to r = 39.5 (analysis/fea_rotor_loop.lld)
+array_polar sockA id=sockA0 count=3 center=[0, 0, 0]
+boolean bellA1 op=union a=bellA0 b=sockA0
+boolean bellA2 op=union a=bellA1 b=sockA[1]   # consume the copies from the last one: a consumed id leaves the alias
+boolean bellA op=union a=bellA2 b=sockA[0]
+assign_material _ materialName=al_7075_t6 entityIds=[bellA]
+draw_naca_airfoil s1 naca="0012" chord=loopChord position=[loopR-loopChord/2, 0, 0] pointsPerSide=24
+revolve_profile loopA0 profileIds=[s1] axis="z" segments=64 position=[loopC, 0, zUpper] rotation=[loopTilt*pi/180, 0, 0] color="#c8553d"
+assign_material _ materialName=cfrp_foam_core entityIds=[loopA0]
+array_polar loopsA id=loopA0 count=3 center=[0, 0, 0]
+create_component rotorUpper name="Upper rotor: 7075 bell with 3 root sockets + 3 toroidal loops" componentId=c-rotor-upper entityIds=[bellA, loopA0, loopsA[0], loopsA[1]]
+
+# --- lower rotor: opposite hand, four loops (3 vs 4: co-prime interaction tones) -------
+revolve_profile bellB0 axis="z" segments=96 position=[0, 0, zLower-bellH/2] color="#b8bcc2" profile=[[30.5,0],[32.5,0],[32.5,22],[30.5,22]]   # bell section: r 30.5-32.5 (= bellR), h 22 (= bellH)
+add_box sockB0 size=[9, 8, 8] position=[35, 0, zLower]
+array_polar sockB id=sockB0 count=4 center=[0, 0, 0]
+boolean bellB1 op=union a=bellB0 b=sockB0
+boolean bellB2 op=union a=bellB1 b=sockB[2]
+boolean bellB3 op=union a=bellB2 b=sockB[1]
+boolean bellB op=union a=bellB3 b=sockB[0]
+assign_material _ materialName=al_7075_t6 entityIds=[bellB]
+draw_naca_airfoil s2 naca="0012" chord=loopChord position=[loopR-loopChord/2, 0, 0] pointsPerSide=24
+revolve_profile loopB0 profileIds=[s2] axis="z" segments=64 position=[loopC, 0, zLower] rotation=[-loopTilt*pi/180, 0, 0] color="#d98a3a"
+assign_material _ materialName=cfrp_foam_core entityIds=[loopB0]
+array_polar loopsB id=loopB0 count=4 center=[0, 0, 0]
+create_component rotorLower name="Lower rotor: 7075 bell with 4 root sockets + 4 toroidal loops" componentId=c-rotor-lower entityIds=[bellB, loopB0, loopsB[0], loopsB[1], loopsB[2]]
+
+# --- avionics bay above the upper motor ---------------------------------------------------
+add_box esc size=[36, 36, 5] position=[0, 0, 168] color="#1f6b3a"
+assign_material _ materialName=fr4_pcba entityIds=[esc]
+create_component cEsc name="Dual ESC, 2 x 40 A (FOC)" componentId=c-esc entityIds=[esc]
+add_box fc size=[36, 36, 1.6] position=[0, 0, 180] color="#1f6b3a"
+assign_material _ materialName=fr4_pcba entityIds=[fc]
+create_component cFc name="Flight controller (H7, IMU x2, baro)" componentId=c-fc entityIds=[fc]
+add_box gnss size=[25, 25, 6] position=[0, 0, 192] color="#2a5d8a"
+assign_material _ materialName=fr4_pcba entityIds=[gnss]
+create_component cGnss name="GNSS + telemetry radio" componentId=c-gnss entityIds=[gnss]
+
+# --- exit vanes: 8 fixed struts + 8 hinged flaps (v2 had 4 x 16 mm flaps: no crosswind authority) -----------------------------------------
+draw_naca_airfoil vs naca="0012" chord=strutChord pointsPerSide=24
+extrude_profile strut id=vs depth=ringLe axis=[1, 0, 0] color="#4a4f57"
+move_entities _ ids=[strut] delta=[0, 0, strutTop]
+assign_material _ materialName=cfrp_foam_vane entityIds=[strut]
+create_component strutI0 name="Vane strut (CFRP / foam)" componentId=c-strut entityIds=[strut]
+for i in 1..7 {
+  insert_instance strutI{i} componentId=c-strut rotation=[0, 0, i*pi/4]
+}
+draw_naca_airfoil vf naca="0010" chord=flapChord incidenceDeg=flapDeg pointsPerSide=20
+extrude_profile flap id=vf depth=throatR-tipGap-flapIn axis=[1, 0, 0] color="#6b7380"
+move_entities _ ids=[flap] delta=[flapIn, 0, strutTop-strutChord-1]   # hinge line 1 mm behind the strut
+assign_material _ materialName=cfrp_skin_rohacell entityIds=[flap]
+create_component flapI0 name="Control flap (CFRP skin / Rohacell 31), hinged" componentId=c-flap entityIds=[flap]
+for i in 1..7 {
+  insert_instance flapI{i} componentId=c-flap rotation=[0, 0, i*pi/4]
+}
+add_box servo size=[8, 4, 14] position=[11.1, 4.6, 31]   # at 22.5°, between two struts, above them color="#2a2d33"
+assign_material _ materialName=servo_eff entityIds=[servo]
+create_component servoI0 name="Linear micro servo (flap actuator)" componentId=c-servo entityIds=[servo]
+for i in 1..7 {
+  insert_instance servoI{i} componentId=c-servo rotation=[0, 0, i*pi/4]
+}
+
+# --- 4 landing legs under the struts (CFRP tube + TPU foot; the craft stands on them) ----
+add_cylinder footLeg radius=5 height=strutTop-strutChord-footZ-5 position=[204, 0, footZ+5] anchor=base-center
+add_sphere footBall radius=5 position=[204, 0, footZ+5]
+boolean foot op=union a=footLeg b=footBall
+assign_material _ materialName=leg_cfrp_tube_tpu entityIds=[foot]
+create_component footI0 name="Landing leg (CFRP tube Ø10 + TPU 95A foot)" componentId=c-foot entityIds=[foot]
+for i in 1..3 {
+  insert_instance footI{i} componentId=c-foot rotation=[0, 0, i*pi/2]
+}
+
+# --- joints: how the parts are held (brackets, bearings and harness are not modelled) --
+set_part_grounded _ ids=[cRing] grounded=true      # airframe datum
+for i in 0..7 {
+  allow_interference _ a=strutI{i} b=cRing kind=weld reason="strut bonded through the ring rib"
+  allow_interference _ a=strutI{i} b=cPod kind=weld reason="strut root bonded into the pod tail cone"
+  allow_interference _ a=flapI{i} b=strutI{i} kind=weld reason="flap hinge (2 x 1 mm CFRP pins, not modelled)"
+  allow_interference _ a=servoI{i} b=cPod kind=weld reason="servo screwed to the tail-cone bulkhead"
+}
+for i in 0..3 {
+  allow_interference _ a=footI{i} b=strutI{2*i} kind=weld reason="TPU foot bonded on the strut"
+}
+for i in 0..6 {
+  for j in i+1..7 {
+    allow_interference _ a=strutI{i} b=strutI{j} kind=weld reason="eight struts share one bonded root hub"
+  }
+}
+for i in 0..7 {
+  allow_interference _ a=cell{i} b=cPod kind=weld reason="cell held in the moulded battery cradle"
+}
+allow_interference _ a=stator0 b=cPod kind=weld reason="stator bonded on the pod spine"
+allow_interference _ a=stator1 b=cPod kind=weld reason="stator bonded on the pod spine"
+allow_interference _ a=rotorUpper b=cPod kind=press_fit reason="bell on a thin-section bearing pair (not modelled)"
+allow_interference _ a=rotorLower b=cPod kind=press_fit reason="bell on a thin-section bearing pair (not modelled)"
+allow_interference _ a=cEsc b=cPod kind=weld reason="avionics tray"
+allow_interference _ a=cFc b=cPod kind=weld reason="avionics tray, soft-mounted"
+allow_interference _ a=cGnss b=cPod kind=weld reason="avionics tray"
+allow_interference _ a=cCam b=cPod kind=weld reason="camera bracket"
+allow_interference _ a=cDome b=cPod kind=weld reason="dome bonded on the nose ring"
+
+# --- drawing: general arrangement (A2, first-angle) -------------------------------------
+create_sheet ga name="HALO v3 GA" paper=A2 title="HALO v3 - general arrangement (test article)" drawnBy="llull" partNumber="HALO-GA-002" revision="B" date="2026-10-21" views=["front","top","iso"]
+add_section_view _ sheetId=ga direction=front offset=0
+
+# --- part drawings (manufacturing): one sheet per made part ------------------------------
+create_sheet shRing name="HALO-P-001" paper=A2 title="Ring wing - CFRP thin-ply shell, 8 ribs, 8 vents" drawnBy="llull" partNumber="HALO-P-001" revision="B" date="2026-10-21" views=["front","top","right","iso"] entityIds=[cRing]
+create_sheet shPod name="HALO-P-002" paper=A3 title="Pod shell - CFRP 0.6 mm (pod_barrel_layup.lld)" drawnBy="llull" partNumber="HALO-P-002" revision="B" date="2026-10-21" views=["front","top","right","iso"] entityIds=[cPod]
+create_sheet shStrut name="HALO-P-003" paper=A3 title="Vane strut - CFRP / Rohacell 110, x8" drawnBy="llull" partNumber="HALO-P-003" revision="B" date="2026-10-21" views=["front","top","right","iso"] entityIds=[strutI0]
+create_sheet shFlap name="HALO-P-004" paper=A3 title="Control flap - CFRP / Rohacell 31, x8" drawnBy="llull" partNumber="HALO-P-004" revision="B" date="2026-10-21" views=["front","top","right","iso"] entityIds=[flapI0]
+create_sheet shRotU name="HALO-P-005" paper=A3 title="Upper rotor - 7075 bell, 3 root sockets, 3 loops" drawnBy="llull" partNumber="HALO-P-005" revision="B" date="2026-10-21" views=["front","top","right","iso"] entityIds=[rotorUpper]
+create_sheet shRotL name="HALO-P-006" paper=A3 title="Lower rotor - 7075 bell, 4 root sockets, 4 loops" drawnBy="llull" partNumber="HALO-P-006" revision="B" date="2026-10-21" views=["front","top","right","iso"] entityIds=[rotorLower]
+create_sheet shLeg name="HALO-P-007" paper=A4 title="Landing leg - CFRP tube + TPU 95A foot, x4" drawnBy="llull" partNumber="HALO-P-007" revision="B" date="2026-10-21" views=["front","top","right","iso"] entityIds=[footI0]
+
+# --- checks ------------------------------------------------------------------------------
+check check_assembly thickness=off path=status expect == "pass"
+check check_assembly clearanceMm=0.35 thickness=off path=status expect == "pass"   # tightest gaps: 0.4 mm between cells, 0.5 mm motor air gap
+check max of=rotorUpper path=0 expect <= throatR-tipGap+0.5        # tip clearance to the duct throat
+check max of=rotorLower path=0 expect <= throatR-tipGap+0.5
+check min of=rotorUpper path=2 expect >= 110                         # rotor stack: upper loops stay above ...
+check max of=rotorLower path=2 expect <= 100                         # ... the lower loops (>= 10 mm axial gap)
+check min of=rotorLower path=2 expect >= strutTop+5                  # lower loops clear the vane struts
+check max of=rotorUpper path=2 expect <= ringTe+ringChord             # the upper rotor stays inside the duct inlet
+check bill_of_materials path=totalMassKg expect <= 1.25
+check bill_of_materials path=distinctComponents expect == 15
+check bill_of_materials path=totalInstances expect == 47
+check max of=cRing path=2 expect ~= ringTe+ringChord ± 0.1
+check issues expect == 0

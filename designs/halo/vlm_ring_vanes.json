@@ -1,0 +1,313 @@
+{
+ "surfaces": [
+  {
+   "name": "ring",
+   "sections": [
+    {
+     "leadingEdge": [
+      0,
+      215.0,
+      0.0
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      210.8688,
+      41.9444
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      198.6341,
+      82.2769
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      178.766,
+      119.4476
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      152.028,
+      152.028
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      119.4476,
+      178.766
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      82.2769,
+      198.6341
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      41.9444,
+      210.8688
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      0.0,
+      215.0
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      -41.9444,
+      210.8688
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      -82.2769,
+      198.6341
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      -119.4476,
+      178.766
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      -152.028,
+      152.028
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      -178.766,
+      119.4476
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      -198.6341,
+      82.2769
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      -210.8688,
+      41.9444
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      -215.0,
+      0.0
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      -210.8688,
+      -41.9444
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      -198.6341,
+      -82.2769
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      -178.766,
+      -119.4476
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      -152.028,
+      -152.028
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      -119.4476,
+      -178.766
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      -82.2769,
+      -198.6341
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      -41.9444,
+      -210.8688
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      -0.0,
+      -215.0
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      41.9444,
+      -210.8688
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      82.2769,
+      -198.6341
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      119.4476,
+      -178.766
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      152.028,
+      -152.028
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      178.766,
+      -119.4476
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      198.6341,
+      -82.2769
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      210.8688,
+      -41.9444
+     ],
+     "chord": 170
+    },
+    {
+     "leadingEdge": [
+      0,
+      215.0,
+      -0.0
+     ],
+     "chord": 170
+    }
+   ],
+   "mirror": false,
+   "spanwisePanels": 96,
+   "chordwisePanels": 6
+  },
+  {
+   "name": "vanes_pitch",
+   "sections": [
+    {
+     "leadingEdge": [
+      158,
+      0,
+      0
+     ],
+     "chord": 42
+    },
+    {
+     "leadingEdge": [
+      158,
+      215,
+      0
+     ],
+     "chord": 42
+    }
+   ],
+   "mirror": true,
+   "spanwisePanels": 12,
+   "chordwisePanels": 3,
+   "naca": "0010"
+  }
+ ],
+ "alphasDeg": [
+  0,
+  2,
+  4
+ ],
+ "referenceArea": 73100,
+ "referenceChord": 170,
+ "referencePoint": [
+  37.8,
+  0,
+  0
+ ]
+}
