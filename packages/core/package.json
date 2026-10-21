@@ -5,6 +5,6 @@
   "type": "module",
   "description": "Model, command layer, execution context, persistence, plugin host (framework-agnostic).",
   "dependencies": {
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   }
 }
