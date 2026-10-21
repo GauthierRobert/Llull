@@ -5,7 +5,7 @@ Mass, CG and inertia come from llull (`mass_properties` of every part instance o
 reference numbers (static margin, CD0) come from llull's VLM and drag build-up runs. Everything else is textbook
 first-order theory, with every assumption named in ASSUMPTIONS. Run:
 
-    python3 designs/halo/analysis/halo_sizing.py designs/halo/halo_v3.llull.json designs/halo/analysis/geometry_v3.json [--json out.json]
+    python3 designs/halo/analysis/halo_sizing.py designs/halo/halo_v3.llull.json designs/halo/analysis/geometry_v3.json [--json out.json] [--extra-mass-kg 0.06]
 """
 import json
 import math
@@ -175,7 +175,12 @@ def size(geo: dict, asm: dict) -> dict:
 def main() -> None:
     doc = sys.argv[1]
     geo = json.loads(Path(sys.argv[2]).read_text())
-    result = size(geo, assembly(doc))
+    asm = assembly(doc)
+    if "--extra-mass-kg" in sys.argv:  # unmodelled harness / fasteners / adhesive, placed at the CG
+        extra = float(sys.argv[sys.argv.index("--extra-mass-kg") + 1])
+        asm["massKg"] += extra
+        asm["inertiaKgM2"] = [[v * asm["massKg"] / (asm["massKg"] - extra) for v in row] for row in asm["inertiaKgM2"]]
+    result = size(geo, asm)
     text = json.dumps(result, indent=1)
     if "--json" in sys.argv:
         Path(sys.argv[sys.argv.index("--json") + 1]).write_text(text + "\n")

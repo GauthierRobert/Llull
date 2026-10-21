@@ -10,11 +10,11 @@ param loopRoot = 31
 param loopTipR = 195.14
 param loopR = (loopTipR - loopRoot)/2 - loopChord/2
 param loopC = (loopTipR + loopRoot)/2
-# proof spin: 1.2 x the peak rotor speed (1885 rpm, analysis/sizing_v3.json) = 2262 rpm = 236.9 rad/s
-param omega = 236.9
+# proof spin: 1.2 x the peak rotor speed at flight-test mass (1931 rpm, analysis/sizing_v3_flight_mass.json) = 2320 rpm
+param omega = 242.9
 param accR = omega*omega*loopTipR          # centrifugal, taken at the TIP radius for the whole loop (conservative)
-param accZ = 176000                        # 2 x hover thrust / 3 loops / loop mass (1.65 N / 9.4 g), mm/s²
-param accT = -185000                       # peak drag torque 0.198 N·m per loop at r 114 mm, mm/s²
+param accZ = 185000                        # 2 x hover thrust / 3 loops / loop mass (1.74 N / 9.4 g), mm/s²
+param accT = -194000                       # peak drag torque 0.208 N·m per loop at r 114 mm, mm/s²
 
 draw_naca_airfoil s1 naca="0012" chord=loopChord position=[loopR-loopChord/2, 0, 0] pointsPerSide=24
 revolve_profile loopBody profileIds=[s1] axis="z" segments=64 position=[loopC, 0, 0] rotation=[loopTilt*pi/180, 0, 0]
@@ -33,7 +33,7 @@ set_part_grounded _ ids=[loop] grounded=true
 
 # --- static: proof spin + peak thrust + peak drag; the root is clamped at r = 39 mm, the outer end of the 7075
 #     socket face on the bell; the socket captures the whole root section (the TE is the innermost point)
-create_analysis spin name="Loop proof spin 2262 rpm" analysisType=static
+create_analysis spin name="Loop proof spin 2320 rpm" analysisType=static
 set_part_idealization _ analysisId=spin entityId=loop idealization=solid
 set_mesh_controls _ analysisId=spin globalSize=2.5 order=2
 add_fea_constraint root analysisId=spin name=bell_root kind=fixed target.entityId=loop target.facesNear=[[30.5,0,0]]

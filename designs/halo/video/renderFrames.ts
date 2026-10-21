@@ -103,7 +103,8 @@ function run(doc: CadDocument, name: string, params: unknown): CadDocument {
 }
 
 // ---- the flight: vehicle pose, rotor speed, flap deflection, explode, airflow ---------------------
-const GROUND_Z = -32; // the TPU feet touch the ground here (footZ)
+/** Design-specific heights: v2 defaults, v3 via HALO_FOOT_Z=-95 HALO_HINGE_Z=-3 (render.sh sets them per design). */
+const GROUND_Z = Number(process.env['HALO_FOOT_Z'] ?? -32); // the feet touch the ground here (footZ)
 
 interface Pose {
   rotation: M3; // vehicle attitude
@@ -192,7 +193,7 @@ function pose(f: number): Pose {
 /** Vertical explode offsets per component (inside scene): the pod shell slides off, rotors rise. */
 const EXPLODE: Record<string, number> = { 'c-rotor-upper': 250, 'c-rotor-lower': 125, 'c-dome': 60, 'c-cam': 30 };
 
-const HINGE: V3 = [0, 0, -9]; // flap hinge line height (strutTop - strutChord - 1)
+const HINGE: V3 = [0, 0, Number(process.env['HALO_HINGE_Z'] ?? -9)]; // flap hinge line height (strutTop - strutChord - 1)
 
 function partTransform(part: Part, p: Pose): { position: V3; rotation: V3 } {
   let local: M3 = [
@@ -205,8 +206,7 @@ function partTransform(part: Part, p: Pose): { position: V3; rotation: V3 } {
   if (part.component === 'c-rotor-lower') local = rz(p.spinLower);
   if (part.component === 'c-flap') {
     const along = apply(euler(part.rotation), [1, 0, 0]); // hinge axis = the flap's radial direction
-    const onPitchAxis = Math.abs(along[1]) > 0.5; // struts along ±y carry the pitch flaps
-    const delta = onPitchAxis ? p.flapPitch * Math.sign(along[1]) : 0;
+    const delta = p.flapPitch * along[1]; // pitch mixing: each flap deflects with the sine of its strut angle
     local = axisAngle(along, delta);
     offset = sub(HINGE, apply(local, HINGE));
   }

@@ -217,6 +217,15 @@ allow_interference _ a=cDome b=cPod kind=weld reason="dome bonded on the nose ri
 create_sheet ga name="HALO v3 GA" paper=A2 title="HALO v3 - general arrangement (test article)" drawnBy="llull" partNumber="HALO-GA-002" revision="B" date="2026-10-21" views=["front","top","iso"]
 add_section_view _ sheetId=ga direction=front offset=0
 
+# --- part drawings (manufacturing): one sheet per made part ------------------------------
+create_sheet shRing name="HALO-P-001" paper=A2 title="Ring wing - CFRP thin-ply shell, 8 ribs, 8 vents" drawnBy="llull" partNumber="HALO-P-001" revision="B" date="2026-10-21" views=["front","top","right","iso"] entityIds=[cRing]
+create_sheet shPod name="HALO-P-002" paper=A3 title="Pod shell - CFRP 0.6 mm (pod_barrel_layup.lld)" drawnBy="llull" partNumber="HALO-P-002" revision="B" date="2026-10-21" views=["front","top","right","iso"] entityIds=[cPod]
+create_sheet shStrut name="HALO-P-003" paper=A3 title="Vane strut - CFRP / Rohacell 110, x8" drawnBy="llull" partNumber="HALO-P-003" revision="B" date="2026-10-21" views=["front","top","right","iso"] entityIds=[strutI0]
+create_sheet shFlap name="HALO-P-004" paper=A3 title="Control flap - CFRP / Rohacell 31, x8" drawnBy="llull" partNumber="HALO-P-004" revision="B" date="2026-10-21" views=["front","top","right","iso"] entityIds=[flapI0]
+create_sheet shRotU name="HALO-P-005" paper=A3 title="Upper rotor - 7075 bell, 3 root sockets, 3 loops" drawnBy="llull" partNumber="HALO-P-005" revision="B" date="2026-10-21" views=["front","top","right","iso"] entityIds=[rotorUpper]
+create_sheet shRotL name="HALO-P-006" paper=A3 title="Lower rotor - 7075 bell, 4 root sockets, 4 loops" drawnBy="llull" partNumber="HALO-P-006" revision="B" date="2026-10-21" views=["front","top","right","iso"] entityIds=[rotorLower]
+create_sheet shLeg name="HALO-P-007" paper=A4 title="Landing leg - CFRP tube + TPU 95A foot, x4" drawnBy="llull" partNumber="HALO-P-007" revision="B" date="2026-10-21" views=["front","top","right","iso"] entityIds=[footI0]
+
 # --- checks ------------------------------------------------------------------------------
 check check_assembly thickness=off path=status expect == "pass"
 check check_assembly clearanceMm=0.35 thickness=off path=status expect == "pass"   # tightest gaps: 0.4 mm between cells, 0.5 mm motor air gap

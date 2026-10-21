@@ -1,5 +1,34 @@
 # HALO — a ring-wing, toroidal-rotor tail-sitter
 
+## v3: optimised physical test article → **[TEST_READINESS.md](TEST_READINESS.md)**
+
+▶ [video/halo_v3_how_it_works.mp4](video/halo_v3_how_it_works.mp4)
+
+v3 (`halo_v3.lld`, 13 design checks passing) comes out of an engineering audit of v2. The audit (`analysis/halo_sizing.py`
+on llull's mass, CG and inertia) found **no crosswind control authority** and **underweight motors**. v3 fixes both:
+- 8 struts, each with an 80 mm hinged flap (flap chord picked by a 6-variant llull rebuild sweep)
+- 80 g hub motors with 7075 root sockets for the loops
+- a 172 mm duct, the shortest that contains the rotor
+- the CG re-set for a +7 % static margin
+
+| | v2 | v3 |
+| --- | --- | --- |
+| Pitch/roll authority (still air) | 3.2 rad/s² | **26.7 rad/s²** |
+| Crosswind limit (est.) | 0 m/s | **≈ 3.9 m/s** |
+| Flight-test mass | 1.11 kg | 1.28 kg |
+| Hover endurance (est.) | 81 min | 66 min |
+| Static margin | +8.5 % | +7.0 % |
+| Structural margins (CalculiX) | — | loop proof spin MS +0.89, strut 5 g landing MS +2.6 |
+
+The package (`test_article/`) contains:
+- the exact AP242 STEP
+- a GA drawing and 7 part drawings
+- a make/buy BOM with a requirement for every line
+- the pod ply book and flat patterns
+- a mixer and flight-control set-up
+- a 10-phase test plan (mass properties → proof loads → spin test → thrust stand → tether → hover → transition → cruise),
+  each phase with numeric pass/fail gates
+
 ## v2: production model + "how it works" film
 
 ▶ **[video/halo_how_it_works.mp4](video/halo_how_it_works.mp4)** (47 s): the parts, then a cutaway, then hover, transition, cruise and landing.
