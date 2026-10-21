@@ -18,7 +18,7 @@ export const PIPE_SIZES: ReadonlyArray<readonly [number, number, number, number]
 const ASME_OUTSIDE_DIAMETER_MM: Readonly<Record<number, number>> = { 65: 73.0, 125: 141.3 };
 
 /** An outside diameter within this of a tabulated one (mm) is that size. */
-const OUTSIDE_DIAMETER_TOLERANCE_MM = 1.5;
+export const OUTSIDE_DIAMETER_TOLERANCE_MM = 1.5;
 
 /** The tabulated size whose EN 10220 or ASME B36.10M outside diameter is within 1.5 mm of `outsideDiameterMm`, else undefined. */
 export function pipeSizeByOutsideDiameter(outsideDiameterMm: number): (typeof PIPE_SIZES)[number] | undefined {
