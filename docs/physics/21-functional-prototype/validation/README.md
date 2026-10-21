@@ -59,7 +59,7 @@ from this folder, byte-identical on re-run, 12 significant digits). Schema: `../
 | 34 | Every output of `check_prototype` (contract test) | has an `accuracy` with origin; `calibrated` values are never counted as pass evidence; missing bands show "± ?" | exact | — | FR-70, FR-62 |
 | 35 | Synthetic residuals 0.5 / 5 / 20 µm | `FPR_LOOP_DRIFT` none / warn / fail (tiers 1e-6 and 1e-5 m) | exact | A | FR-15 |
 | 36 | A body with no material | `FPR_MASS_DEFAULTED` warn, mass `unverified` | exact | — | FR-73 |
-| 37 | Native vs reference ([RS1](../../../decisions/RS1-native-compute.md) RS-6, planned): `llull-compute geomq` against `meshBvh.ts` on VC-07, 08, 18, 19 and seeded random meshes | same pairs, same collision intervals, min clearance and per-sample thickness equal; max pose × pair count and ray count per device recorded | Rust-CPU twin: 1e-9 × part diagonal (llull choice; both f64 on the same tessellation); GPU: TBD — measure | — (comparison, not in `expected_results.json`) | TR-10, TR-19 |
+| 37 | Native vs reference ([RS1](../../../decisions/RS1-native-compute.md) RS-6, built 2026-10-21: bit-identical on the Rust CPU, crate fixture + `server/tests/geomqNative.test.ts`): `llull-compute geomq` against `meshBvh.ts` on VC-07, 08, 18, 19 and seeded random meshes | same pairs, same collision intervals, min clearance and per-sample thickness equal; max pose × pair count and ray count per device recorded | Rust-CPU twin: 1e-9 × part diagonal (llull choice; both f64 on the same tessellation); GPU: TBD — measure | — (comparison, not in `expected_results.json`) | TR-10, TR-19 |
 
 ## 3. Derivations (generator)
 

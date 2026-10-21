@@ -2,8 +2,9 @@
 
 import { planarFacets } from './planarFacets';
 import { convertValue, isUnitFailure } from '@lib/quantity';
-import { type OcclusionSegment, resolveGeometryQueries } from '@core/geometry/geometryQueries';
-import { exchangeArea, facing, type Facet } from './viewFactorContour';
+import { meshBvhEngine, resolveGeometryQueries } from '@core/geometry/geometryQueries';
+import type { Facet } from './viewFactorContour';
+import { viewFactorExchangeReference } from './viewFactorExchange';
 import type { Vec3 } from '@core/model/vectors';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
@@ -14,6 +15,7 @@ import { toSi } from './thermalUnits';
 const RECIPROCITY_WARNING = 1e-3;
 const ROW_SUM_TOLERANCE = 1e-3;
 const PLANARITY_RELATIVE = 1e-6;
+const TS_REFERENCE_FACETS = meshBvhEngine.limits.maxViewFactorFacets;
 
 interface Finding {
   readonly code: string;
@@ -46,7 +48,7 @@ const scaled = (vertices: readonly Vec3[], factor: number): Vec3[] =>
  * @affects nothing — read-only; data { surfaces[], matrix[][], rowSums[], method, facetCounts[], reciprocityMaxError, findings[], closedCavity?, obstruction, geometryQueries? (engine provenance, obstruction only) }
  * @invariant F[I][J] = sum_i sum_j A_i F_ij / A_I over facets that face each other (centroid test); the diagonal of planar surfaces is 0; no document change
  * @failure bad length unit / maxFacetSize -> THM_UNITS_MISMATCH; < 2 surfaces, duplicate names, non-planar or degenerate polygons -> THM_SURFACE_INVALID;
- *   more than 400 facets (surfaces + blockers) -> THM_FACET_LIMIT (rejections, document unchanged); reciprocity error > 1e-3 -> warning THM_VIEW_FACTOR_RECIPROCITY
+ *   more than the engine's facet limit (400 on TS; surfaces + blockers), or a failed native run above the TS limit -> THM_FACET_LIMIT (rejections, document unchanged); reciprocity error > 1e-3 -> warning THM_VIEW_FACTOR_RECIPROCITY
  */
 export const computeViewFactors = defineCommand({
   name: 'compute_view_factors',
@@ -170,7 +172,6 @@ export const computeViewFactors = defineCommand({
       );
     }
 
-    const owners: { facet: Facet; surface: number }[] = prepared.flatMap((p, surface) => p.facets.map((facet) => ({ facet, surface })));
     const blockerFacets: Facet[] = [];
     if (params.obstruction === true) {
       for (const [index, blocker] of (params.blockers ?? []).entries()) {
@@ -190,37 +191,20 @@ export const computeViewFactors = defineCommand({
         ['maxFacetSize'],
       );
     }
-    const occluders: readonly Facet[] = params.obstruction === true ? [...owners.map((o) => o.facet), ...blockerFacets] : [];
-    const occluderIndex = new Map<Facet, number>(occluders.map((facet, index) => [facet, index]));
-
     const count = prepared.length;
-    const exchange = Array.from({ length: count }, () => new Array<number>(count).fill(0));
-    const candidates: { a: (typeof owners)[number]; b: (typeof owners)[number] }[] = [];
-    for (const a of owners) {
-      for (const b of owners) {
-        if (a.surface !== b.surface && facing(a.facet, b.facet)) candidates.push({ a, b });
-      }
-    }
-    const segments: OcclusionSegment[] =
-      params.obstruction === true
-        ? candidates.map(({ a, b }) => ({
-            start: a.facet.centroid,
-            end: b.facet.centroid,
-            skip: [occluderIndex.get(a.facet) ?? -1, occluderIndex.get(b.facet) ?? -1],
-          }))
-        : [];
-    const blocked =
-      params.obstruction === true
-        ? engine.segmentOcclusionBatch(
-            occluders.map((facet) => facet.corners),
-            segments,
-          )
-        : [];
-    candidates.forEach(({ a, b }, k) => {
-      if (blocked[k] === true) return;
-      const row = exchange[a.surface];
-      if (row !== undefined) row[b.surface] = (row[b.surface] ?? 0) + exchangeArea(a.facet, b.facet);
-    });
+    const groups = prepared.map((p) => p.facets);
+    const blockers = params.obstruction === true ? blockerFacets : null;
+    const native = engine.viewFactorExchange?.(groups, blockers) ?? null;
+    // a native engine that could not answer: its TS reference only runs within the TS cap (above it, hours of brute force)
+    if (native === null && total + blockerFacets.length > TS_REFERENCE_FACETS)
+      return refuse(
+        doc,
+        'THM_FACET_LIMIT',
+        `the native view-factor run failed and ${total + blockerFacets.length} facets exceed the TypeScript limit of ${TS_REFERENCE_FACETS}`,
+        'Retry (see the llull-compute warning), or increase maxFacetSize to stay within the TypeScript limit.',
+        ['maxFacetSize'],
+      );
+    const exchange = native ?? viewFactorExchangeReference(engine, groups, blockers);
     const areas = prepared.map((p) => p.area);
     const matrix = exchange.map((row, i) => row.map((value) => value / (areas[i] ?? 1)));
     const rowSums = matrix.map((row) => row.reduce((a, b) => a + b, 0));

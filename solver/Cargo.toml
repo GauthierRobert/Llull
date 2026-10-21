@@ -18,6 +18,7 @@ default-members = [
   "crates/llull-panel",
   "crates/llull-explicit",
   "crates/llull-cloud",
+  "crates/llull-geomq",
   "bins/llull-compute",
 ]
 
@@ -62,6 +63,10 @@ opt-level = 3
 
 # Plant 10 point clouds: the fit / ICP tests run on the pack's real clouds (bunny 30 571 points, CYL-B 8 000).
 [profile.dev.package.llull-cloud]
+opt-level = 3
+
+# Geometric query batches (RS-6): the parity tests run seeded meshes with thousands of triangles and view-factor cavities.
+[profile.dev.package.llull-geomq]
 opt-level = 3
 
 [profile.dev.package.llull-bvh]

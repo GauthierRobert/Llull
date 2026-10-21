@@ -100,8 +100,8 @@ computes its own cavity view factors in the solve.
 | Item | Before | Now |
 | ---- | ---- | --- |
 | Where | `computeViewFactors.ts` (pure TS), one V8 thread | TS below the cap; above it `llull-compute geomq` (crate `llull-geomq` on the shared `llull-bvh`): contour-integral kernel and obstruction ray casting on wgpu, Rust-CPU twin |
-| How core reaches it | — | the same injected batch port as PHY-21 (`GeometryQueryEngine`, PHY-21 TR-FPR-19), method `viewFactorBatch`; the query stays a pure registry command, nothing in `packages/*` imports native code |
-| Facet cap | 400 facets (`THM_FACET_LIMIT`, built) | unchanged on the TS path; native target ~10⁴ facets (target, TBD — measure, VC-THM-64) |
+| How core reaches it | — | the same injected batch port as PHY-21 (`GeometryQueryEngine`, PHY-21 TR-FPR-19), method `viewFactorBatch` (built as the optional `viewFactorExchange`, §13); the query stays a pure registry command, nothing in `packages/*` imports native code |
+| Facet cap | 400 facets (`THM_FACET_LIMIT`, built) | unchanged on the TS path; native 12 500 facets (measured, VC-THM-64, §13) |
 | Obstruction | centroid-segment test per facet pair | native: same test (used for VC-THM-64) plus an optional multi-ray test per pair (named ray count) |
 | Recorded numbers | TS | Rust-CPU twin or fixed-order GPU reductions (RS1 §2 rule 3); provenance names engine, device, `deterministic` |
 | Reference | `computeViewFactors.ts` + closed forms (VC-THM-09) | unchanged; the native path must match TS (VC-THM-64) |
@@ -434,7 +434,7 @@ number finite; every limit has a source; quantities parse with the right dimensi
 | Steady solve, 50k-node tet10 box with film | ≤ 20 s (TBD: measure, production gate) |
 | Transient, 10k nodes, 200 increments | ≤ 60 s (TBD: measure) |
 | `compute_view_factors`, 2 000 facets, no obstruction | ≤ 2 s in TS (O(n²) edge pairs); obstruction ≤ 10 s (the built TS path caps at 400 facets, §13) |
-| `compute_view_factors` native (`llull-compute geomq`) | ~10⁴ facets with obstruction, wall time recorded — target, TBD measure (VC-THM-64) |
+| `compute_view_factors` native (`llull-compute geomq`) | ~10⁴ facets with obstruction: measured 12 416 facets in 104 s (Rust CPU, 22 threads; cap 12 500, VC-THM-64, §13) |
 | FRD with 200 time points | streamed; summary only stored; full field stays in the artifact |
 | Determinism | same plan ⇒ same deck sha256 and same summary JSON (sorted sets, fixed float formatting `%.12g`) |
 
@@ -528,7 +528,20 @@ Toolset `analysis`.
 **View factors through the PHY-21 port (RS-6 prerequisite, TS only).** `compute_view_factors` reads its obstruction test from
 `ctx.geometryQueries` (`segmentOcclusionBatch`, PHY-21 TR-FPR-19; default `meshBvh` engine, identical results) and its facet cap from
 the engine's `limits.maxViewFactorFacets` (400 on the TS engine); `data.geometryQueries` names engine, device and `deterministic` when
-obstruction ran. The contour-integral batch (`viewFactorBatch`) is not on the port yet: it arrives with the native `geomq` kernel (RS-6).
+obstruction ran.
+
+**Native view factors (RS-6, as built 2026-10-21).** The port gained the optional `viewFactorExchange(surfaces, blockers)` (the §2.2
+`viewFactorBatch`): the whole A_I F_IJ matrix in one call, obstruction included, with a core facet shape (`ViewFacet`). Absent (the TS
+engine) or returning null (a failed native run), `compute_view_factors` runs its TypeScript reference
+(`packages/domain-cae/src/thermal/viewFactorExchange.ts`: the former loop, obstruction through `segmentOcclusionBatch`). The native engine
+(`llull-compute geomq`, crate `llull-geomq`, installed by the CLI and the backend when the binary exists) ports the contour integral
+operation for operation (V8 `Math.log` / `Math.atan` twins in `llull-jsmath`), runs facet pairs in parallel (rayon) and sums them in the
+TS order; the obstruction test walks an AABB tree of the occluders (a conservative box test, the same boolean per pair). Result: the same
+matrix bit for bit (VC-THM-64: crate fixture `tests/unit/native/geomqReference.test.ts` → `cargo test -p llull-geomq`, and
+`server/tests/geomqNative.test.ts` on VC-THM-09 plates and an obstructed cavity), `deterministic: true`, device `cpu`. Native facet cap
+`maxViewFactorFacets` = 12 500. Measured on a Core Ultra 9 185H (22 threads), unit-cube cavity + baffle, obstruction on: 320 facets
+139 ms (TS 3.5 s), 896 facets 0.53 s, 3 200 facets 6.1 s, 12 416 facets 104 s (the ~10⁴ target of §8). Not built: the wgpu kernel
+(the CPU twin meets the target) and the optional multi-ray obstruction test of §2.2.
 
 **FE milestones M0–M3 and the M4 decks: built (2026-10-16, owner decision).** The minimal 05 FEA slice was built first
 (`docs/physics/FE_PIPELINE_DESIGN.md`) and the thermal discipline sits inside it — **Proposal B** of §2.1 (`packages/domain-cae/src/thermal/`),

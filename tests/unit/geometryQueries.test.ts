@@ -1,4 +1,4 @@
-/** PHY-21 TR-FPR-19: GeometryQueryEngine port — default engine vs direct meshBvh, ordering, empty batches, injection into both callers. */
+/** PHY-21 TR-FPR-19 / RS-6: GeometryQueryEngine port — default engine vs direct meshBvh, ordering, empty batches, injection into the callers. */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
@@ -14,6 +14,7 @@ import { type RigidTransform, buildMeshBvh, bvhMinDistance, bvhRayCast } from '@
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { type MeshData, createEmptyDocument } from '@core/model/types';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
+import { viewFactorExchangeReference } from '@cae/thermal/viewFactorExchange';
 
 const box = (min: [number, number, number], size: number): MeshData => {
   const [x, y, z] = min;
@@ -31,7 +32,8 @@ const quarterTurnZ: RigidTransform = { rotation: [0, -1, 0, 1, 0, 0, 0, 0, 1], t
 describe('GeometryQueryEngine default engine (meshBvh)', () => {
   it('names itself and is deterministic', () => {
     expect(meshBvhEngine.provenance).toEqual({ engine: 'meshBvh', device: 'cpu', deterministic: true });
-    expect(meshBvhEngine.limits).toEqual({ maxViewFactorFacets: 400, maxThicknessRays: 200_000 });
+    expect(meshBvhEngine.limits).toEqual({ maxViewFactorFacets: 400, maxThicknessRays: 200_000, motionPrefetchQueries: 0 });
+    expect(meshBvhEngine.viewFactorExchange).toBeUndefined();
   });
 
   it('minDistanceBatch equals direct bvhMinDistance with the relative placement, in [pose][pair] order', () => {
@@ -80,6 +82,23 @@ describe('GeometryQueryEngine default engine (meshBvh)', () => {
     expect(hits.map((hit) => hit?.t ?? null)).toEqual([5, 40, null, 15]);
   });
 
+  it('placedDistanceBatch equals direct bvhMinDistance per query, with its own bound and placement', () => {
+    const queries = [
+      { a: 0, b: 1, placement: null, maxDistance: 100 },
+      { a: 0, b: 1, placement: null, maxDistance: 5 },
+      { a: 1, b: 0, placement: moved([-25, 0, 0]), maxDistance: Infinity },
+      { a: 0, b: 0, placement: quarterTurnZ, maxDistance: 1 },
+    ];
+    const [tNear, tFar] = [buildMeshBvh(near), buildMeshBvh(far)];
+    expect(meshBvhEngine.placedDistanceBatch([near, far], queries)).toEqual([
+      bvhMinDistance(tNear, tFar, 100, null),
+      null,
+      bvhMinDistance(tFar, tNear, Infinity, moved([-25, 0, 0])),
+      bvhMinDistance(tNear, tNear, 1, quarterTurnZ),
+    ]);
+    expect(meshBvhEngine.placedDistanceBatch([near], [])).toEqual([]);
+  });
+
   it('segmentOcclusionBatch tests each open segment and honours skip indices', () => {
     const wall: [[number, number, number], [number, number, number], [number, number, number]] = [
       [0, -10, -10],
@@ -126,8 +145,9 @@ function spyEngine(maxViewFactorFacets: number, maxThicknessRays = 200_000): Spy
   const calls = { rays: 0, occlusion: 0, segments: 0 };
   const engine: GeometryQueryEngine = {
     provenance: { engine: 'fake-native', device: 'test-gpu', deterministic: false },
-    limits: { maxViewFactorFacets, maxThicknessRays },
+    limits: { maxViewFactorFacets, maxThicknessRays, motionPrefetchQueries: 0 },
     minDistanceBatch: (...args) => meshBvhEngine.minDistanceBatch(...args),
+    placedDistanceBatch: (...args) => meshBvhEngine.placedDistanceBatch(...args),
     rayCastBatch: (mesh, rays, maxT) => {
       calls.rays += rays.length;
       return meshBvhEngine.rayCastBatch(mesh, rays, maxT);
@@ -182,6 +202,32 @@ describe('injected engine is used by compute_view_factors', () => {
     expect(data.matrix).toEqual((standard.data as Out).matrix);
     expect((standard.data as Out).geometryQueries).toEqual(meshBvhEngine.provenance);
     expect(data.matrix[0]?.[1]).toBe(0);
+  });
+
+  it('an engine with a native viewFactorExchange answers instead of the reference, with the same matrix', () => {
+    let calls = 0;
+    const native: GeometryQueryEngine = {
+      ...spyEngine(400).engine,
+      viewFactorExchange: (groups, blockers) => {
+        calls += 1;
+        return viewFactorExchangeReference(meshBvhEngine, groups, blockers);
+      },
+    };
+    for (const params of [{}, { obstruction: true, blockers: [blocker] }]) {
+      const viaNative = run(params, native);
+      expect((viaNative.data as Out).matrix).toEqual((run(params).data as Out).matrix);
+    }
+    expect(calls).toBe(2);
+  });
+
+  it('a native viewFactorExchange that returns null: the reference answers within the TS cap, above it THM_FACET_LIMIT', () => {
+    const failing: GeometryQueryEngine = { ...spyEngine(12_500).engine, viewFactorExchange: () => null };
+    const small = run({ obstruction: true, blockers: [blocker] }, failing);
+    expect((small.data as Out).matrix).toEqual((run({ obstruction: true, blockers: [blocker] }).data as Out).matrix);
+    const large = run({ maxFacetSize: { value: 0.05, unit: 'm' } }, failing);
+    expect(large.rejected).toBe(true);
+    expect(large.error?.code).toBe('THM_FACET_LIMIT');
+    expect(large.summary).toContain('native view-factor run failed');
   });
 
   it('without obstruction the engine is not called and no provenance is reported', () => {

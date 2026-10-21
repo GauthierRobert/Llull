@@ -10,6 +10,7 @@ import { setPhysicsEngine } from '@core/dynamics/physicsEngine';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
+import { type GeometryQueryEngine, meshBvhEngine } from '@core/geometry/geometryQueries';
 import { sliderCrank } from './sliderCrankFixture';
 
 let kernel: GeometryKernel;
@@ -79,6 +80,21 @@ function armScene(options: { obstacleY?: number; obstacleZ?: number; rpm?: numbe
 
 const check = (doc: CadDocument, params: Record<string, unknown> = {}, context = ctxOf()): ReturnType<typeof execute> =>
   execute(doc, 'check_motion_clearance', { crankAxis: 'arm_j', duration: 0.5, sampleRate: 360, ...params }, context);
+
+/** The TS engine, but prefetching up to `limit` pose x pair queries; counts the queries it was sent. */
+function prefetching(limit: number): { engine: GeometryQueryEngine; queries: () => number } {
+  let sent = 0;
+  const engine: GeometryQueryEngine = {
+    ...meshBvhEngine,
+    provenance: { engine: 'prefetching-test', device: 'cpu', deterministic: true },
+    limits: { ...meshBvhEngine.limits, motionPrefetchQueries: limit },
+    placedDistanceBatch: (meshes, queries) => {
+      sent += queries.length;
+      return meshBvhEngine.placedDistanceBatch(meshes, queries);
+    },
+  };
+  return { engine, queries: () => sent };
+}
 
 describe('check_motion_clearance on a rotating arm', () => {
   it('flags the obstacle at the analytic crank angle (VC-FPR-19)', () => {
@@ -236,6 +252,36 @@ describe('check_motion_clearance on a rotating arm', () => {
     expect((check(extra.doc, { pairs: 'all' }).data as Data).pairs).toHaveLength(3);
   });
 
+  it('a prefetching engine gives the same result on contact, clean and thinned runs; over its limit it is not called', () => {
+    const scenes = [armScene(), armScene({ obstacleY: 150 }), armScene({ obstacleY: 109 })];
+    for (const [doc, params] of scenes.flatMap(
+      ({ doc }) =>
+        [
+          [doc, {}],
+          [doc, { duration: 0.75, maxSamples: 4 }],
+        ] as const,
+    )) {
+      const spy = prefetching(1_000_000);
+      const viaEngine = check(doc, params, { ...ctxOf(), geometryQueries: spy.engine });
+      expect(JSON.stringify(viaEngine.data)).toBe(JSON.stringify(check(doc, params).data));
+      expect(spy.queries()).toBeGreaterThan(0);
+    }
+    // an engine that throws or answers short is ignored: the sweep queries meshBvh itself
+    for (const broken of [
+      () => {
+        throw new Error('native run failed');
+      },
+      () => [],
+    ]) {
+      const engine: GeometryQueryEngine = { ...prefetching(1_000_000).engine, placedDistanceBatch: broken };
+      const { doc } = armScene();
+      expect(JSON.stringify(check(doc, {}, { ...ctxOf(), geometryQueries: engine }).data)).toBe(JSON.stringify(check(doc).data));
+    }
+    const tight = prefetching(1);
+    check(armScene().doc, {}, { ...ctxOf(), geometryQueries: tight.engine });
+    expect(tight.queries()).toBe(0);
+  });
+
   it('is deterministic', () => {
     const { doc } = armScene();
     expect(JSON.stringify(check(doc).data)).toBe(JSON.stringify(check(doc).data));
@@ -268,6 +314,27 @@ describe('check_motion_clearance against the analytic bar (validation/README §3
     expect(data.status).toBe('pass');
     expect(data.minClearance?.mm).toBeCloseTo(4.8750780275, 3);
     expect(Math.abs(Math.abs(signed(data.minClearance?.crankDeg ?? 0)) - 2.86240522611)).toBeLessThan(0.05);
+  });
+
+  it('a prefetching engine (RS-6) leaves VC-FPR-18 / 19 bit-identical, all samples or anchors only', () => {
+    for (const faceX of [105, 95]) {
+      const doc = barScene(faceX);
+      // every sample fits 1e6 queries; 20 anchors fit 50 queries while the 300+ samples do not
+      for (const [limit, maxSamples] of [
+        [1_000_000, 4000],
+        [50, 20],
+      ] as const) {
+        const params = { crankAxis: 'bar_j', duration: 1, sampleRate: 360, maxSamples };
+        const reference = execute(doc, 'check_motion_clearance', params, ctxOf()).data as Data;
+        const spy = prefetching(limit);
+        const data = execute(doc, 'check_motion_clearance', params, { ...ctxOf(), geometryQueries: spy.engine }).data;
+        expect(JSON.stringify(data)).toBe(JSON.stringify(reference));
+        const anchors = Math.ceil(reference.samples.simulated / reference.samples.stride) + 1;
+        if (limit === 50) expect(spy.queries()).toBeLessThanOrEqual(Math.min(anchors, 50));
+        else expect(spy.queries()).toBe(reference.samples.simulated);
+        expect(spy.queries()).toBeGreaterThan(limit === 50 ? 10 : 300);
+      }
+    }
   });
 
   it('VC-FPR-19: contact on [-21.2735, +21.2735] deg (face at x = 95 mm), edges bisected to the spec tolerance', () => {
