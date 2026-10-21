@@ -38,7 +38,9 @@ describe('export_gltf scene layout', () => {
     expect(gltf.scenes[0]?.nodes).toEqual([0, 1, 2]);
     expect(gltf.nodes[0]?.name).toBe('White block');
     expect(gltf.nodes[0]?.extras.kind).toBe('box');
-    expect(gltf.meshes.map((m) => m.name)).toEqual(gltf.nodes.map((n) => n.name));
+    // the two identical white unit boxes share one mesh (named after its first user), placed by their node matrices
+    expect(gltf.meshes.map((m) => m.name)).toEqual(['White block', gltf.nodes[2]?.name]);
+    expect(gltf.nodes.map((n) => n.mesh)).toEqual([0, 0, 1]);
   });
   it('shares one material per appearance and uses assigned PBR materials', () => {
     const gltf = gltfOf(scene());
@@ -50,7 +52,7 @@ describe('export_gltf scene layout', () => {
     expect(steel?.name).toBe('steel');
     expect(steel?.pbrMetallicRoughness.metallicFactor).toBe(0.9);
     expect(steel?.pbrMetallicRoughness.roughnessFactor).toBe(0.3);
-    expect(gltf.meshes.map((m) => m.primitives[0]?.material)).toEqual([0, 0, 1]);
+    expect(gltf.nodes.map((n) => gltf.meshes[n.mesh]?.primitives[0]?.material)).toEqual([0, 0, 1]);
   });
   it('summary and GLB data report the node and material counts', () => {
     const result = execute(scene(), 'export_gltf', { binary: true });

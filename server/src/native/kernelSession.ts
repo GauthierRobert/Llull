@@ -1,12 +1,13 @@
 /**
  * Asynchronous request/reply session with one `llull-kernel` process over NDJSON stdio (protocol: `kernelProtocol.ts`). Replies are
- * matched by id; anything on stdout that is not a reply is ignored with one warning.
+ * matched by id; an `id: null` error (an unreadable request) settles the oldest pending request at once instead of leaving it to the call
+ * timeout; anything else on stdout that is not a reply is ignored with one warning.
  * @failure the process exits or cannot start -> every pending and later request resolves `{ result: null, error: NATIVE_DIED… }`
  */
 
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { encodeRequest, NATIVE_DIED, parseReplyLine, type NativeReply } from './kernelProtocol';
+import { encodeRequest, NATIVE_DIED, parseReplyLine, parseUnmatchedError, type NativeReply } from './kernelProtocol';
 import { nativeRuntimeEnv } from './nativeBinary';
 
 /** The process as the session sees it (a fake in unit tests). */
@@ -32,6 +33,14 @@ export function createKernelSession(child: KernelChild): NativeKernelSession {
   child.onLine((line) => {
     const reply = parseReplyLine(line);
     const settle = reply === null ? undefined : pending.get(reply.id);
+    const unmatched = reply === null ? parseUnmatchedError(line) : null;
+    const oldest = pending.entries().next();
+    if (unmatched !== null && !oldest.done) {
+      const [oldestId, settleOldest] = oldest.value;
+      pending.delete(oldestId);
+      settleOldest({ result: null, error: unmatched });
+      return;
+    }
     if (reply === null || settle === undefined) {
       if (!warnedNoise && line.trim() !== '') console.warn(`[occt-native] ignoring non-protocol output: ${line.slice(0, 120)}`);
       warnedNoise = true;

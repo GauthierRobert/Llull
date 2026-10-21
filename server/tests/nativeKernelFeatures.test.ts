@@ -114,6 +114,30 @@ const SOLIDS: readonly [string, Entity][] = [
     }),
   ],
   [
+    'hollow ring sweep around a closed circle (LIM-1)',
+    entity('sweep', {
+      path: [
+        {
+          type: 'arc',
+          points: [
+            [0, 0, 0],
+            [-10, 10, 0],
+            [-20, 0, 0],
+          ],
+        },
+        {
+          type: 'arc',
+          points: [
+            [-20, 0, 0],
+            [-10, -10, 0],
+            [0, 0, 0],
+          ],
+        },
+      ],
+      section: { shape: 'circle', radius: 2, innerRadius: 1 },
+    }),
+  ],
+  [
     'profile sweep along a Bezier',
     entity('sweep', {
       path: [
@@ -297,6 +321,7 @@ const rounded = (a: number, b: number, c: number, r: number): number => {
 };
 const CLOSED_VOLUME: Readonly<Record<string, number>> = {
   'extrusion with arc and Bezier': 3 * (10.1 + PI / 2),
+  'hollow ring sweep around a closed circle (LIM-1)': 2 * PI * 10 * PI * (4 - 1),
   'sealed shell of a box': 24 - 3.5 * 2.5 * 1.5,
   'blend of disjoint solids (plain union)': 2,
   'fillet every box edge': rounded(4, 3, 2, 0.2),

@@ -4,7 +4,7 @@ import type { CadDocument, Entity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z, looseVec3 } from '../schema';
 import { changed, noop } from '../noop';
-import { nextId } from '../../lib/id';
+import { idPrefixOf, nextId } from '../../lib/id';
 import { MAX_COPIES_PER_COMMAND } from '../limits';
 import { scaleGeometry } from '../../geometry/scaleGeometry';
 import { add3, isVec3, map3, scale3, sub3 } from '../../lib/vec3';
@@ -12,26 +12,43 @@ import { applyMat3, eulerFromMat, matFromAxisAngle, matFromEulerXYZ, mulMat3, un
 import { replaceEntity } from '../entity/entityOps';
 import { rotateEulerAboutWorldZ } from '../../lib/eulerRotation';
 import { toDegrees } from '../../lib/angle';
+import { boundsCenter, entityBoundsInDoc } from '../../geometry/bounds';
 
 /** Smallest |angle| (radians) that still spreads array_polar copies apart. */
 const MIN_POLAR_ANGLE = 1e-9;
 
 const arrayCountField = z.number().int().describe('Total number of instances including the original. Must be an integer >= 2.');
 
+/** World point a pivoted rotate_entity turns about: the given point, or the entity's bounding-box center for 'center'. */
+function pivotPoint(doc: CadDocument, target: Entity, pivot: readonly number[] | 'center'): Vec3 | null {
+  if (pivot === 'center') return boundsCenter(entityBoundsInDoc(doc, target));
+  return isVec3(pivot) ? pivot : null;
+}
+
 /**
- * @affects updates rotation on 1 entity
- * @invariant rotation is the existing Euler angles plus the delta (radians)
- * @failure missing id -> no-op, affected:[]
+ * @affects updates rotation (and, with a pivot, position) on 1 entity
+ * @invariant no pivot: rotation is the existing Euler angles plus the delta (radians), position unchanged;
+ *   pivot: the entity is rigidly turned by R(delta) (world frame) about the pivot point, so the pivot stays fixed
+ * @failure missing id, non-finite delta or pivot -> no-op, affected:[]
  */
 export const rotateEntity = defineCommand({
   name: 'rotate_entity',
   description:
-    'Add Euler-angle deltas (radians) to an entity rotation. Modifies only the rotation field; position and geometry are unchanged.',
+    'Rotate an entity. Without pivot: add Euler-angle deltas (radians) to its rotation field; it turns about its own origin (position), ' +
+    'which for a solid built off-origin (revolve, sweep, mesh) may not be its middle. With pivot: rigidly turn the entity by the rotation ' +
+    'R(delta) (XYZ Euler, world frame) about the pivot point — a world [x, y, z] or "center" (its bounding-box center) — so position ' +
+    'moves too and the pivot stays fixed.',
   params: z.object({
     id: z.string().describe('Id of the entity to rotate.'),
     delta: looseVec3('Euler-angle increments [dRx, dRy, dRz] in radians to add to the current rotation.'),
+    pivot: z
+      .union([z.array(z.number()), z.literal('center')])
+      .optional()
+      .describe(
+        'Optional world point [x, y, z] to rotate about, or "center" for the entity bounding-box center. Omit to rotate in place about the entity origin.',
+      ),
   }),
-  run: (doc, { id, delta }): CommandResult => {
+  run: (doc, { id, delta, pivot }): CommandResult => {
     const target = doc.entities[id];
     if (!target) return noop(doc, `No entity ${id} to rotate.`);
     if (!isVec3(delta))
@@ -39,10 +56,27 @@ export const rotateEntity = defineCommand({
         doc,
         `rotate_entity: delta must be 3 finite numbers [dRx, dRy, dRz] (got [${(delta as readonly number[]).join(', ')}]); entity ${id} unchanged.`,
       );
-    const rotation = add3(target.rotation, delta);
+    if (pivot === undefined) {
+      const rotation = add3(target.rotation, delta);
+      return changed(
+        replaceEntity(doc, { ...target, rotation }),
+        `Rotated ${id} by [${delta.join(', ')}] rad; new rotation [${rotation.join(', ')}].`,
+        [id],
+      );
+    }
+    const center = pivotPoint(doc, target, pivot);
+    if (center === null)
+      return noop(
+        doc,
+        `rotate_entity: pivot must be 3 finite numbers [x, y, z] or "center" (got ${JSON.stringify(pivot)}); entity ${id} unchanged.`,
+      );
+    const turn = matFromEulerXYZ(delta);
+    const position = add3(center, applyMat3(turn, sub3(target.position, center)));
+    const rotation = eulerFromMat(mulMat3(turn, matFromEulerXYZ(target.rotation)));
+    const fmt = (v: readonly number[]): string => v.map((c) => +c.toFixed(6)).join(', ');
     return changed(
-      replaceEntity(doc, { ...target, rotation }),
-      `Rotated ${id} by [${delta.join(', ')}] rad; new rotation [${rotation.join(', ')}].`,
+      replaceEntity(doc, { ...target, position, rotation }),
+      `Rotated ${id} by [${delta.join(', ')}] rad about [${fmt(center)}]; new position [${fmt(position)}], rotation [${fmt(rotation)}].`,
       [id],
     );
   },
@@ -98,20 +132,24 @@ export const mirrorEntity = defineCommand({
   },
 });
 
-/** `doc` plus a copy of `source` per `{ position, rotation }` (rotation defaults to the source's); copy ids in order. */
+/**
+ * `doc` plus a copy of `source` per `{ position, rotation }` (rotation defaults to the source's); copy ids in order.
+ * @invariant copies share the source id prefix and keep its material; a source in the document becomes their `patternSourceId`
+ */
 export function addCopies(
   doc: CadDocument,
   source: Entity,
   placements: ReadonlyArray<{ position: Vec3; rotation?: Vec3 }>,
-  idPrefix: string = source.kind,
 ): { document: CadDocument; newIds: string[] } {
+  const idPrefix = idPrefixOf(source.id, source.kind);
+  const seed = doc.entities[source.id] === source ? { patternSourceId: source.id } : {};
   // One pass over fresh containers: re-spreading the entity bag per copy would be O(copies²).
   const entities: CadDocument['entities'] = { ...doc.entities };
   const order = [...doc.order];
   const newIds: string[] = [];
   for (const { position, rotation = source.rotation } of placements) {
     const id = nextId(idPrefix);
-    entities[id] = { ...source, id, position, rotation } as Entity;
+    entities[id] = { ...source, ...seed, id, position, rotation } as Entity;
     order.push(id);
     newIds.push(id);
   }

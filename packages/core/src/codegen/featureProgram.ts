@@ -184,7 +184,7 @@ function zero3(): Term3 {
 }
 
 /** Non-geometric entity fields: a change limited to these is metadata, not a new feature. */
-const METADATA_FIELDS = new Set(['name', 'tags', 'layerId', 'materialId', 'color']);
+const METADATA_FIELDS = new Set(['name', 'tags', 'layerId', 'materialId', 'color', 'patternSourceId']);
 
 /** Deep equality with a numeric tolerance (replayed floats may differ in the last bits). */
 function nearlyEqual(left: unknown, right: unknown): boolean {
@@ -350,22 +350,23 @@ function lowerStep(
   const base = (variable: string): FeatureBase => ({ step: stepNumber, command: step.name, variable });
   const booleanKind = step.name === 'boolean' ? BOOLEAN_KINDS[String(child(event.params, 'op'))] : undefined;
   const operandA = String(child(event.params, 'a'));
-  const operandB = String(child(event.params, 'b'));
+  const rawB = child(event.params, 'b');
+  const operandsB = (Array.isArray(rawB) ? rawB : [rawB]).map(String);
   const left = variables.get(operandA);
-  const right = variables.get(operandB);
+  const rights = operandsB.map((operand) => variables.get(operand));
   if (
     booleanKind !== undefined &&
     createdSolid !== undefined &&
     created.length === 1 &&
-    removed.length === 2 &&
+    removed.length === 1 + operandsB.length &&
     changed.length === 0 &&
     left !== undefined &&
-    right !== undefined
+    rights.every((right) => right !== undefined)
   ) {
-    variables.delete(operandB);
+    for (const operand of operandsB) variables.delete(operand);
     variables.delete(operandA);
     variables.set(createdSolid.id, left);
-    return [{ ...base(left), op: 'boolean', kind: booleanKind, left, right }];
+    return rights.map((right) => ({ ...base(left), op: 'boolean' as const, kind: booleanKind, left, right: right as string }));
   }
   const modification = modificationStep(event, created, removed, variables, ctx, base);
   if (modification !== null) return [modification];

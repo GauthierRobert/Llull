@@ -20,6 +20,7 @@ import { reviewRejection } from '../review/reviewModel';
 import { prepareView, viewParams } from './viewRequest';
 import type { CadDocument } from '../../model/types';
 import { clamp } from '../../lib/clamp';
+import { withExplodedPositions } from '../../geometry/explodedOffsets';
 
 /** `doc` without its 2D entities (read-only view for rendering; the input is untouched). */
 function withoutEntities2D(doc: CadDocument): CadDocument {
@@ -55,7 +56,8 @@ export const renderView = defineCommand({
     'and `data.simplifiedEntityIds` / `data.skippedEntityIds` / `data.polygonCount` report what was reduced. ' +
     'Enrichments: turntable (multi-frame strip), isolate (highlight entities), section (cut-plane view), ' +
     'showDimensions (bbox labels), showAxes (world triad, default on), showGrid (ground grid, default on), ' +
-    'showLabels (entity id/name labels + key-point markers, default off). Does NOT modify the document; `affected` is always [].',
+    'showLabels (entity id/name labels + key-point markers, default off). The active exploded view (set_active_exploded_view) is drawn like the viewport: parts at their exploded positions. ' +
+    'Does NOT modify the document; `affected` is always [].',
   params: z.object({
     view: z
       .enum(['top', 'bottom', 'front', 'back', 'left', 'right', 'iso'])
@@ -186,7 +188,8 @@ export const renderView = defineCommand({
     ...viewParams,
   }),
   run: (doc, params, ctx): CommandResult => {
-    const scene = params.hide2D === true ? withoutEntities2D(doc) : doc;
+    const exploded = withExplodedPositions(doc);
+    const scene = params.hide2D === true ? withoutEntities2D(exploded) : exploded;
     const resolved = resolveRenderOptions(scene, params);
     if ('error' in resolved) return { document: doc, summary: `render_view rejected: ${resolved.error}.`, affected: [] };
     const { options } = resolved;

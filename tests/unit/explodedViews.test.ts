@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { activeExplodeOffsets } from '@core/geometry/explodedOffsets';
 import { createEmptyDocument, type CadDocument, type Vec3 } from '@core/model/types';
+import type { RenderViewData } from '@core/commands/render/types';
 
 function instanceAt(doc: CadDocument, position: Vec3): { doc: CadDocument; id: string } {
   const box = execute(doc, 'add_box', { size: [1, 1, 1] });
@@ -102,5 +103,20 @@ describe('exploded views', () => {
     expect(activeExplodeOffsets(undefined, undefined).size).toBe(0);
     expect(activeExplodeOffsets({}, { id: 'ghost' }).size).toBe(0);
     expect(activeExplodeOffsets(undefined, { id: 'ghost' }).size).toBe(0);
+  });
+
+  it('render_view draws parts at their exploded positions while a view is active (LIM-1 #4); the document is untouched', () => {
+    const box = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+    const id = box.affected[0] ?? '';
+    const created = execute(box.document, 'create_exploded_view', { name: 'v', offsets: [{ target: id, vector: [50, 0, 0] }] });
+    const active = execute(created.document, 'set_active_exploded_view', { id: created.affected[0] }).document;
+    const bounds = (doc: CadDocument): RenderViewData['bounds'] =>
+      (execute(doc, 'render_view', { view: 'top', width: 200, height: 200 }).data as RenderViewData).bounds;
+    expect(bounds(created.document)?.max[0]).toBeLessThan(2);
+    expect(bounds(active)?.min[0]).toBeGreaterThan(48);
+    expect(bounds(active)?.max[0]).toBeLessThan(52);
+    const rendered = execute(active, 'render_view', { view: 'top' });
+    expect(rendered.document).toBe(active);
+    expect(active.entities[id]?.position).toEqual([0, 0, 0]);
   });
 });

@@ -1,5 +1,5 @@
 /**
- * export_gltf: read-only glTF 2.0 / GLB export (scene layout: ./gltfScene.ts) — one named node + mesh per entity (each child of an
+ * export_gltf: read-only glTF 2.0 / GLB export (scene layout: ./gltfScene.ts) — one named node per entity, indexed meshes shared by identical copies (each child of an
  * instance), one PBR material per distinct appearance, entity groups as parent nodes, finishes as textures, decals as overlays (document
  * returned unchanged).
  */
@@ -70,7 +70,8 @@ function withInlineBuffer(scene: GltfScene): Record<string, unknown> {
 /**
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data.format matches the binary param; data.triangleCount >= 0
- * @invariant one node + mesh per exported entity (node.name = entity name or id); one material per
+ * @invariant one node per exported entity (node.name = entity name or id); identical local geometry + appearance share one indexed mesh
+ *   (node matrix = entity placement), a unique part keeps a world-space mesh; one material per
  *   distinct entity color; an entity in a group hangs under a node named after the group
  * @invariant glTF JSON is valid 2.0 (asset.version="2.0"); GLB header magic=0x46546C67
  * @failure 2D-only or unknown entities silently skipped; empty → triangleCount:0, nodeCount:0
@@ -87,10 +88,11 @@ export const exportGltf = defineCommand({
     'Returns the UNCHANGED document, affected:[], and a data object with: ' +
     '  format ("gltf" or "glb"), triangleCount, nodeCount, materialCount, ' +
     '  text (glTF 2.0 JSON string — when binary=false, default),   base64 (GLB binary blob base64-encoded — when binary=true). ' +
-    'Structure: one glTF node + mesh per entity (node.name = the entity name from set_entity_name, ' +
+    'Structure: one glTF node per entity (node.name = the entity name from set_entity_name, ' +
     'else its id; each child of an instance is its own node), and entities that belong to a group ' +
     '(group_entities) are children of a node named after the group. Node extras carry the llull ' +
-    'entity id and kind. Meshes carry POSITION and creased smooth NORMAL attributes. One PBR material ' +
+    'entity id and kind. Meshes are indexed and carry POSITION and creased smooth NORMAL attributes; parts with identical geometry ' +
+    'and appearance (pattern copies: array_polar / array_linear bolts, blades) share ONE mesh placed by each node matrix. One PBR material ' +
     'per distinct appearance: the assigned document material (color, metalness, roughness) or else ' +
     'the entity color, converted to linear glTF factors — ready for Blender / Cycles or any viewer. A ' +
     'material finish (create_material finish) embeds procedural albedo / normal / roughness PNG maps ' +

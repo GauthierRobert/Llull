@@ -91,6 +91,8 @@ export interface BaseEntity {
   tags?: readonly string[];
   /** Key into `CadDocument.materials`; set by `assign_material`. */
   materialId?: string;
+  /** Seed entity of a pattern copy (array_linear / array_polar / pattern_along_path); assign_material on the seed reaches its copies. */
+  patternSourceId?: string;
   /** Decals painted on this solid (entity-local frame); set by `add_decal`. */
   decals?: ReadonlyArray<Decal>;
 }
@@ -162,6 +164,18 @@ export interface MeshSolidEntity extends BaseEntity {
   stepSlab?: ShapeRecipe;
   /** Set only on the groove tool of a modelled thread (feature lowering): kernels skip post-boolean face merging on results built from it. */
   threadTool?: true;
+  /** Per-face display colours (`set_face_color`), drawn over `color`; resolved on the current `mesh` by `faceColorTriangles`. */
+  faceColors?: ReadonlyArray<FaceColor>;
+}
+
+/**
+ * Colour of one face of a mesh solid. The face is the smooth patch of `mesh` around `near` (entity-local, before `position` / `rotation`):
+ * the triangles connected to the one closest to `near` without crossing a crease, so it follows the face through regeneration.
+ */
+export interface FaceColor {
+  readonly near: Vec3;
+  /** Hex `#rrggbb`. */
+  readonly color: string;
 }
 
 /** Base circle in XY centered at `position`, apex at +Z. */

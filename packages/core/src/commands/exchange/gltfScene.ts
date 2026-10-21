@@ -2,7 +2,8 @@
  * glTF 2.0 scene of a document: one node + mesh per exported part (an entity, or each child of an instance) and one deduplicated PBR
  * material per appearance (assigned document material, else the entity colour with the viewport's default metalness/roughness; a material
  * finish embeds its procedural albedo / normal / roughness maps with box-projected UVs). Colours are converted from sRGB hex to the linear
- * factors glTF requires; normals are creased (smooth below CREASE_ANGLE) so curved surfaces shade smoothly in external renderers.
+ * factors glTF requires; normals are creased (smooth below CREASE_ANGLE) so curved surfaces shade smoothly in external renderers. A mesh solid's
+ * face colours (set_face_color) split it into one part per colour.
  */
 
 import type { CadDocument, Entity, MaterialFinish, Vec3 } from '../../model/types';
@@ -19,6 +20,8 @@ import { facetNormal } from '../../geometry/tessellation';
 import { expandInstance } from '../../geometry/instanceExpansion';
 import { localTriangles, solidTriangles } from '../../geometry/solidTriangles';
 import { toRadians } from '../../lib/angle';
+import { faceColorTriangles } from '../../geometry/faceColors';
+import { indexedMesh, placementMatrix, positionKey, sharedGeometryGroups } from './gltfMeshData';
 
 /** Metalness / roughness of a solid without an assigned material (matches the viewport). */
 export const DEFAULT_METALNESS = 0.08;
@@ -45,6 +48,8 @@ export interface ScenePart {
   /** The same triangles in the part's own frame: texture UVs follow the part, as in the viewport. */
   readonly localTris: Triangle[];
   readonly appearance: PartAppearance;
+  /** The part frame in world space (local -> world): parts with identical local geometry share one glTF mesh placed by it. */
+  readonly placement?: { readonly position: Vec3; readonly rotation: Vec3 };
 }
 
 function appearanceOf(doc: CadDocument, entity: Entity, inherited?: string): PartAppearance {
@@ -56,12 +61,44 @@ function appearanceOf(doc: CadDocument, entity: Entity, inherited?: string): Par
   return { name: entity.color, color: entity.color, metalness: DEFAULT_METALNESS, roughness: DEFAULT_ROUGHNESS };
 }
 
+/** Triangle indices of a mesh solid grouped by face colour (undefined = the part's own appearance); null without face colours. */
+function faceColorGroups(solid: Entity): Map<string | undefined, number[]> | null {
+  if (solid.kind !== 'mesh' || solid.faceColors === undefined || solid.faceColors.length === 0) return null;
+  const groups = new Map<string | undefined, number[]>();
+  faceColorTriangles(solid.mesh, solid.faceColors).forEach((color, t) => {
+    const group = groups.get(color);
+    if (group === undefined) groups.set(color, [t]);
+    else group.push(t);
+  });
+  return groups;
+}
+
 /** Exported parts of the entities named by `ids` (instances expand into one part per child; 2D and empty parts are dropped). */
 export function collectSceneParts(doc: CadDocument, ids: readonly string[]): ScenePart[] {
   const parts: ScenePart[] = [];
   const add = (name: string, entityId: string, solid: Entity, appearance: PartAppearance): void => {
     const tris = solidTriangles(solid);
-    if (tris.length > 0) parts.push({ name, entityId, kind: solid.kind, tris, localTris: localTriangles(solid), appearance });
+    if (tris.length === 0) return;
+    const localTris = localTriangles(solid);
+    const placement = { position: solid.position, rotation: solid.rotation };
+    const groups = faceColorGroups(solid);
+    if (groups === null) {
+      parts.push({ name, entityId, kind: solid.kind, tris, localTris, appearance, placement });
+      return;
+    }
+    for (const [color, indices] of groups) {
+      const pick = <T>(list: readonly T[]): T[] => indices.map((t) => list[t] as T);
+      const { metalness, roughness } = appearance;
+      parts.push({
+        name: color === undefined ? name : `${name}/face ${color}`,
+        entityId,
+        kind: solid.kind,
+        tris: pick(tris),
+        localTris: pick(localTris),
+        appearance: color === undefined ? appearance : { name: color, color, metalness, roughness },
+        placement,
+      });
+    }
   };
   for (const id of ids) {
     const entity = doc.entities[id];
@@ -129,7 +166,7 @@ export function linearColorFactor(hex: string): [number, number, number, number]
  */
 export function creasedNormals(tris: readonly Triangle[]): Float32Array {
   const faceNormals = tris.map((tri) => facetNormal(...tri));
-  const key = (v: readonly number[]): string => v.map((c) => c.toFixed(5)).join(',');
+  const key = positionKey;
   const facesAt = new Map<string, number[]>();
   tris.forEach((tri, face) =>
     tri.forEach((v) => {
@@ -221,19 +258,35 @@ export function buildGltfScene(
     groupNodes.set(group.id, node);
     return node;
   };
-  for (const part of parts) {
-    const { appearance } = part;
-    const key = JSON.stringify(appearance);
-    const material = builder.material(key, () => materialOf(builder, appearance));
-    const positions = new Float32Array(part.tris.length * 9);
-    part.tris.forEach((tri, t) => tri.forEach((v, k) => positions.set(v, t * 9 + k * 3)));
+  const appearanceKeys = parts.map((part) => JSON.stringify(part.appearance));
+  const shareGroup = sharedGeometryGroups(
+    parts.map((part, p) => ({ localTris: part.localTris, key: appearanceKeys[p] ?? '', placed: part.placement !== undefined })),
+  );
+  const sharedMeshes = new Map<number, number>();
+  /** Indexed mesh of `tris` (world, or local for a shared mesh); UVs always follow the part frame. */
+  const partMesh = (part: ScenePart, tris: readonly Triangle[], material: number): number => {
+    const { finish } = part.appearance;
+    const data = indexedMesh(tris, creasedNormals(tris), finish === undefined ? undefined : boxUvs(part.localTris, finish.scale));
     const attributes: Record<string, number> = {
-      POSITION: builder.vertexData(positions, 3, true),
-      NORMAL: builder.vertexData(creasedNormals(part.tris), 3),
+      POSITION: builder.vertexData(data.positions, 3, true),
+      NORMAL: builder.vertexData(data.normals, 3),
     };
-    if (appearance.finish !== undefined) attributes['TEXCOORD_0'] = builder.vertexData(boxUvs(part.localTris, appearance.finish.scale), 2);
-    builder.mesh(part.name, attributes, material, { llullId: part.entityId, kind: part.kind }, parentOf(part.entityId));
-  }
+    if (data.uvs !== undefined) attributes['TEXCOORD_0'] = builder.vertexData(data.uvs, 2);
+    return builder.addMesh(part.name, attributes, material, builder.indexData(data.indices));
+  };
+  parts.forEach((part, p) => {
+    const { appearance } = part;
+    const material = builder.material(appearanceKeys[p] ?? '', () => materialOf(builder, appearance));
+    const extras = { llullId: part.entityId, kind: part.kind };
+    const group = shareGroup[p];
+    if (group === undefined || part.placement === undefined) {
+      builder.meshNode(part.name, partMesh(part, part.tris, material), extras, parentOf(part.entityId));
+      return;
+    }
+    const mesh = sharedMeshes.get(group) ?? partMesh(part, part.localTris, material);
+    sharedMeshes.set(group, mesh);
+    builder.meshNode(part.name, mesh, extras, parentOf(part.entityId), placementMatrix(part.placement.position, part.placement.rotation));
+  });
   decals.forEach((decal, index) => {
     const material = builder.material(`decal:${index}`, () => ({
       name: decal.name,

@@ -9,7 +9,7 @@ import { loftTriangles } from '@core/geometry/loft';
 import { sweepTriangles } from '@core/geometry/sweep';
 import { subdivisionTriangles } from '@core/geometry/subdivision';
 import { SolidMeshShell, type SolidMeshKindProps, type SolidSurface } from './SolidMeshShell';
-import { buildMeshSolidGeometry, buildTriangleSoupGeometry } from './meshSolidGeometry';
+import { buildFaceColoredGeometry, buildMeshSolidGeometry, buildTriangleSoupGeometry } from './meshSolidGeometry';
 import { pointsKey, useStableByKey } from '../../useStableByKey';
 import {
   buildConeGeometry,
@@ -98,9 +98,17 @@ function ExtrusionMesh({ entity, ...shell }: Props<'extrusion'>): React.ReactEle
 
 /** Boolean results hold world-space meshes (position/rotation zero), still honored so the gizmo can move them. */
 function MeshSolidMesh({ entity, ...shell }: Props<'mesh'>): React.ReactElement {
-  const { mesh } = entity;
-  const geometry = useMemo(() => buildMeshSolidGeometry(mesh), [mesh]);
-  return <SolidMeshShell entity={entity} geometry={geometry} surface={surface(0.5, 0.15, 0.8)} {...shell} />;
+  const { mesh, faceColors } = entity;
+  const baseColor = shell.pbrMaterial?.color ?? entity.color;
+  const geometry = useMemo(
+    () =>
+      faceColors === undefined || faceColors.length === 0
+        ? buildMeshSolidGeometry(mesh)
+        : buildFaceColoredGeometry(mesh, faceColors, baseColor),
+    [mesh, faceColors, baseColor],
+  );
+  const vertexColors = faceColors !== undefined && faceColors.length > 0;
+  return <SolidMeshShell entity={entity} geometry={geometry} surface={surface(0.5, 0.15, 0.8)} vertexColors={vertexColors} {...shell} />;
 }
 
 function RevolutionSolid({ entity, ...shell }: Props<'revolution'>): React.ReactElement {

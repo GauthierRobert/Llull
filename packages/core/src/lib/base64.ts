@@ -1,18 +1,25 @@
 const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
+/** Alphabet as ASCII codes ('=' padding is 61). */
+const B64_CODES: Uint8Array = new TextEncoder().encode(B64_CHARS);
+const PAD = 61;
+
+/** Base64 of `bytes`, encoded into one ASCII byte buffer and decoded once (linear; a 30 MB GLB in well under a second). */
 export function uint8ArrayToBase64(bytes: Uint8Array): string {
-  const out: string[] = [];
   const len = bytes.length;
+  const out = new Uint8Array(Math.ceil(len / 3) * 4);
+  const code = (sextet: number): number => B64_CODES[sextet] ?? PAD;
+  let o = 0;
   for (let i = 0; i < len; i += 3) {
     const b0 = bytes[i] ?? 0;
     const b1 = i + 1 < len ? (bytes[i + 1] ?? 0) : 0;
     const b2 = i + 2 < len ? (bytes[i + 2] ?? 0) : 0;
-    out.push(B64_CHARS.charAt(b0 >> 2));
-    out.push(B64_CHARS.charAt(((b0 & 0x03) << 4) | (b1 >> 4)));
-    out.push(i + 1 < len ? B64_CHARS.charAt(((b1 & 0x0f) << 2) | (b2 >> 6)) : '=');
-    out.push(i + 2 < len ? B64_CHARS.charAt(b2 & 0x3f) : '=');
+    out[o++] = code(b0 >> 2);
+    out[o++] = code(((b0 & 0x03) << 4) | (b1 >> 4));
+    out[o++] = i + 1 < len ? code(((b1 & 0x0f) << 2) | (b2 >> 6)) : PAD;
+    out[o++] = i + 2 < len ? code(b2 & 0x3f) : PAD;
   }
-  return out.join('');
+  return new TextDecoder('latin1').decode(out);
 }
 
 /** char code → sextet value; -1 for characters outside the alphabet. */

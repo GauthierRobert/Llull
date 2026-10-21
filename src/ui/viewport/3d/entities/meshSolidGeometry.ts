@@ -3,7 +3,8 @@
 
 import * as THREE from 'three';
 import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { MeshData } from '@core/model/types';
+import type { FaceColor, MeshData } from '@core/model/types';
+import { faceColorTriangles } from '@core/geometry/faceColors';
 import type { Triangle } from '@core/geometry/triangles';
 import { soupIndices } from '@core/geometry/meshVolume';
 import { toRadians } from '@lib/angle';
@@ -26,4 +27,32 @@ export function buildTriangleSoupGeometry(triangles: readonly Triangle[]): THREE
   const positions = triangles.flat(2);
   if (positions.length === 0) return null;
   return buildMeshSolidGeometry({ positions, indices: soupIndices(positions) });
+}
+
+/**
+ * Unwelded geometry of `mesh` with a per-corner `color` attribute: each triangle in its face colour (`faceColorTriangles`), else in
+ * `baseColor`; unwelded so colours stay sharp at face borders.
+ */
+export function buildFaceColoredGeometry(mesh: MeshData, faceColors: readonly FaceColor[], baseColor: string): THREE.BufferGeometry {
+  const triangleColors = faceColorTriangles(mesh, faceColors);
+  const corners = mesh.indices.length > 0 ? mesh.indices : Array.from({ length: Math.floor(mesh.positions.length / 3) }, (_, i) => i);
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const rgb = new Map<string, THREE.Color>();
+  const colorOf = (hex: string): THREE.Color => {
+    const known = rgb.get(hex);
+    if (known !== undefined) return known;
+    const created = new THREE.Color(hex);
+    rgb.set(hex, created);
+    return created;
+  };
+  for (let n = 0; n + 2 < corners.length; n += 3) {
+    const color = colorOf(triangleColors[n / 3] ?? baseColor);
+    for (let k = 0; k < 3; k++) {
+      const vertex = corners[n + k] ?? 0;
+      positions.push(mesh.positions[vertex * 3] ?? 0, mesh.positions[vertex * 3 + 1] ?? 0, mesh.positions[vertex * 3 + 2] ?? 0);
+      colors.push(color.r, color.g, color.b);
+    }
+  }
+  return buildMeshSolidGeometry({ positions, indices: Array.from({ length: positions.length / 3 }, (_, i) => i) }, colors);
 }

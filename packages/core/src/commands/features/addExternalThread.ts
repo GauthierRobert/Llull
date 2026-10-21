@@ -1,4 +1,4 @@
-/** add_external_thread (SC-F2): modelled ISO metric external thread M3-M20 on a cylinder (bolt / stud / threaded shaft end). */
+/** add_external_thread (SC-F2): modelled ISO metric external thread M3-M64 on a cylinder (bolt / stud / threaded shaft end). */
 
 import { round6 } from '../../lib/compactNumber';
 import type { ShapeRecipe } from '../../model/types';
@@ -22,24 +22,25 @@ const DIAMETER_TOLERANCE = 1e-3;
  * @affects replaces the cylinder `target` by 1 mesh entity: the cylinder with a helical groove (exact B-rep recipe: boolean subtract of the thread tool)
  * @invariant cylinder diameter = thread major diameter; the groove has the ISO 68-1 basic external profile (root flat P/4 at d1 = d - 1.082532 P,
  *   crest flat P/8 at d); removed volume over a length L = groove area x 2 pi r_centroid x L / P (data.analyticRemovedVolume)
- * @failure missing / non-cylinder target, designation not ISO metric M3-M20, cylinder diameter differs from the major diameter, length < 1 pitch or
+ * @failure missing / non-cylinder target, designation not ISO metric M3-M64, cylinder diameter differs from the major diameter, length < 1 pitch or
  *   beyond the cylinder, too many turns, no kernel, kernel refusal -> rejected no-op with an FTR_* code
  */
 export const addExternalThread = defineCommand({
   name: 'add_external_thread',
   annotations: { requiresKernel: true },
   description:
-    'Cut a modelled ISO metric EXTERNAL thread (M3-M20) into a cylinder: a real helical groove of the ISO 68-1 basic profile (H = 0.866025 P, ' +
+    'Cut a modelled ISO metric EXTERNAL thread (M3-M64) into a cylinder: a real helical groove of the ISO 68-1 basic profile (H = 0.866025 P, ' +
     'pitch diameter d2 = d - 0.649519 P, groove bottom at the minor diameter d1 = d - 1.082532 P). target must be a cylinder entity (add_cylinder) ' +
     'whose DIAMETER equals the thread major diameter (within 0.1%). size is "M8" (ISO 261 coarse pitch: M3 0.5, M4 0.7, M5 0.8, M6 1, M8 1.25, ' +
-    'M10 1.5, M12 1.75, M14 2, M16 2, M18 2.5, M20 2.5) or "M8x1" (explicit/fine pitch); sizes are in mm in the designation, the cylinder in ' +
+    'M10 1.5, M12 1.75, M14 2, M16 2, M18 2.5, M20 2.5, M22 2.5, M24 3, M27 3, M30 3.5, M33 3.5, M36 4, M39 4, M42 4.5, ' +
+    'M45 4.5, M48 5, M52 5, M56 5.5, M60 5.5, M64 6) or "M8x1" (explicit/fine pitch); sizes are in mm in the designation, the cylinder in ' +
     'the document unit. The thread covers `length` from the chosen end of the cylinder (end "top" = the +Z end of the cylinder in its own frame, ' +
     '"bottom" = the other); omit length for the whole cylinder. The groove runs out through that end face. Consumes target, creates one mesh ' +
     'entity. data = { designation, pitch, majorDiameter, pitchDiameter, minorDiameter, threadLength, analyticRemovedVolume } in document units. ' +
     'Refusal codes: FTR_PART_NOT_FOUND, FTR_THREAD_DESIGNATION_INVALID, FTR_HOLE_DIAMETERS_INCONSISTENT, FTR_NEEDS_EXACT_KERNEL, FTR_FEATURE_BUILD_FAILED.',
   params: z.object({
     target: z.string().describe('Id of the cylinder entity (kind "cylinder") to thread.'),
-    size: z.string().describe('ISO metric size: "M8" (coarse pitch) or "M8x1" (explicit pitch). M3-M20 only.'),
+    size: z.string().describe('ISO metric size: "M8" (coarse pitch) or "M8x1" (explicit pitch). M3-M64 only.'),
     length: z
       .number()
       .positive()
@@ -67,7 +68,7 @@ export const addExternalThread = defineCommand({
         ['target'],
       );
     const iso = parseIsoMetric(size);
-    if (typeof iso === 'string') return fail('FTR_THREAD_DESIGNATION_INVALID', iso, 'use M3..M20, e.g. M8 or M8x1', ['size']);
+    if (typeof iso === 'string') return fail('FTR_THREAD_DESIGNATION_INVALID', iso, 'use M3..M64, e.g. M8 or M8x1', ['size']);
     const [major, pitch] = [fromMm(doc, iso.majorDiameterMm), fromMm(doc, iso.pitchMm)];
     if (Math.abs(2 * cylinder.radius - major) > DIAMETER_TOLERANCE * major)
       return fail(

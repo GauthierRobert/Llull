@@ -244,6 +244,20 @@ mod tests {
         assert!((volume(&pipe) - std::f64::consts::PI * 0.75 * 3.0).abs() < 1e-6);
     }
 
+    /// LIM-1 (9): an annulus swept around a closed spine is a valid hollow ring (no caps), like the full section.
+    #[test]
+    fn a_hollow_section_around_a_closed_spine_is_a_valid_ring() {
+        let ring = [1.0, 10.0, 0.0, 0.0, 0.0, 10.0, 0.0, -10.0, 0.0, 0.0, 1.0, -10.0, 0.0, 0.0, 0.0, -10.0, 0.0, 10.0, 0.0, 0.0];
+        let pi = std::f64::consts::PI;
+        for (inner_radius, area) in [(None, 4.0), (Some(1.0), 3.0)] {
+            let section = circle_section([10.0, 0.0, 0.0], [0.0, 1.0, 0.0], 2.0, inner_radius).unwrap().unwrap();
+            let pipe = pipe_solid(&ring, &section).unwrap().unwrap();
+            assert!(is_valid(&pipe).unwrap(), "ring with inner radius {inner_radius:?} is a valid solid");
+            let torus = 2.0 * pi * 10.0 * pi * area;
+            assert!((volume(&pipe) - torus).abs() < 1e-6 * torus, "volume {} vs {torus}", volume(&pipe));
+        }
+    }
+
     /// Bilinear sheet over [0, 4] x [0, 3] (degree 1 x 1, one span, 2 x 2 poles).
     fn flat_sheet() -> Vec<f64> {
         let mut data = vec![1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 0.0];

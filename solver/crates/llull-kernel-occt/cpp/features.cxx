@@ -29,6 +29,7 @@
 #include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
+#include <BRepTools.hxx>
 #include <BRep_Tool.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <GeomFill_BSplineCurves.hxx>
@@ -542,12 +543,45 @@ std::unique_ptr<Shape> skinned_solid_bsplines(rust::Slice<const double> curves, 
   return maker.IsDone() ? wrap(maker.Shape()) : nullptr;
 }
 
+namespace {
+
+// MakePipe of one section shape (null when OCC fails).
+TopoDS_Shape pipe_of(const TopoDS_Wire &spine, const TopoDS_Shape &section) {
+  BRepOffsetAPI_MakePipe pipe(spine, section, GeomFill_IsCorrectedFrenet, Standard_False);
+  pipe.Build();
+  return pipe.IsDone() ? pipe.Shape() : TopoDS_Shape();
+}
+
+// A holed section round a CLOSED spine: MakePipe puts the outer tube and the bore tube in ONE shell (BRepCheck_NotConnected, LIM-1), so
+// the ring is the solid of the outer boundary minus the solid of each bore (no caps, disjoint boundaries: a plain cut).
+TopoDS_Shape closed_holed_pipe(const TopoDS_Wire &spine, const TopoDS_Face &section) {
+  const TopoDS_Wire outer = BRepTools::OuterWire(section);
+  const Handle(Geom_Surface) plane = BRep_Tool::Surface(section);
+  TopoDS_Shape result = pipe_of(spine, BRepBuilderAPI_MakeFace(plane, outer, Standard_True).Face());
+  if (result.IsNull()) return result;
+  for (TopExp_Explorer it(section, TopAbs_WIRE); it.More(); it.Next()) {
+    if (it.Current().IsSame(outer)) continue;
+    TopoDS_Wire bore = TopoDS::Wire(it.Current());
+    bore.Reverse();
+    const TopoDS_Shape core = pipe_of(spine, BRepBuilderAPI_MakeFace(plane, bore, Standard_True).Face());
+    if (core.IsNull()) return core;
+    BRepAlgoAPI_Cut cut(result, core);
+    cut.Build();
+    if (!cut.IsDone()) return TopoDS_Shape();
+    result = cut.Shape();
+  }
+  return valid_or_null(result);
+}
+
+}  // namespace
+
 std::unique_ptr<Shape> pipe_solid(rust::Slice<const double> spine, const Shape &section) {
   const TopoDS_Wire wire = chain_wire(spine);
   if (wire.IsNull()) return nullptr;
-  BRepOffsetAPI_MakePipe pipe(wire, section.shape, GeomFill_IsCorrectedFrenet, Standard_False);
-  pipe.Build();
-  return pipe.IsDone() ? wrap(pipe.Shape()) : nullptr;
+  const bool holed = section.shape.ShapeType() == TopAbs_FACE && unique_sub_shapes(section.shape, TopAbs_WIRE).Extent() > 1;
+  const TopoDS_Shape result =
+      holed && BRep_Tool::IsClosed(wire) ? closed_holed_pipe(wire, TopoDS::Face(section.shape)) : pipe_of(wire, section.shape);
+  return result.IsNull() ? nullptr : wrap(result);
 }
 
 std::unique_ptr<Shape> bspline_patch_solid(rust::Slice<const double> poles, double tolerance) {

@@ -36,7 +36,10 @@ export function parseThreadDimensions(designation: string): ThreadDimensions | n
   return valid ? result : null;
 }
 
-/** Coarse pitches (mm) of ISO 261 / ISO 262 for the metric sizes M3-M20 the modelled-thread commands support. */
+/**
+ * Coarse pitches (mm) of ISO 261 / ISO 262 for the metric sizes M3-M64 the modelled-thread commands support (first and second choice
+ * sizes: M22, M27, M33, M39, M45, M52, M60 are ISO 261 second choice). Minor / pitch diameters follow from ISO 68-1 (`isoBasicDiameters`).
+ */
 const ISO_COARSE_PITCH_MM: ReadonlyMap<number, number> = new Map([
   [3, 0.5],
   [4, 0.7],
@@ -49,9 +52,23 @@ const ISO_COARSE_PITCH_MM: ReadonlyMap<number, number> = new Map([
   [16, 2],
   [18, 2.5],
   [20, 2.5],
+  [22, 2.5],
+  [24, 3],
+  [27, 3],
+  [30, 3.5],
+  [33, 3.5],
+  [36, 4],
+  [39, 4],
+  [42, 4.5],
+  [45, 4.5],
+  [48, 5],
+  [52, 5],
+  [56, 5.5],
+  [60, 5.5],
+  [64, 6],
 ]);
 const ISO_METRIC_MIN_MM = 3;
-const ISO_METRIC_MAX_MM = 20;
+const ISO_METRIC_MAX_MM = 64;
 /** H of the ISO 68-1 fundamental triangle per unit pitch: sqrt(3) / 2. */
 const H_PER_PITCH = Math.sqrt(3) / 2;
 
@@ -62,9 +79,9 @@ export interface IsoMetricThread extends ThreadDimensions {
 }
 
 /**
- * Size and pitch of an ISO metric designation "M8" (coarse pitch of ISO 261) or "M8x1" (explicit, e.g. fine), M3-M20 only; any tolerance
+ * Size and pitch of an ISO metric designation "M8" (coarse pitch of ISO 261) or "M8x1" (explicit, e.g. fine), M3-M64 only; any tolerance
  * suffix ("-6H") is ignored.
- * @failure not "M<d>" / "M<d>x<p>", diameter outside M3-M20, a size without a coarse pitch (M7, M9...) and no explicit pitch, pitch <= 0 or
+ * @failure not "M<d>" / "M<d>x<p>", diameter outside M3-M64, a size without a coarse pitch (M7, M9, M25...) and no explicit pitch, pitch <= 0 or
  *   >= d / 2 -> the reason
  */
 export function parseIsoMetric(designation: string): IsoMetricThread | string {

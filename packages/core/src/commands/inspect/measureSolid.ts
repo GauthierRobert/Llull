@@ -262,7 +262,7 @@ export const massProperties = defineCommand({
     'Use measure_bounding_box for the bounding box alone and geometric_validation_properties for the unit-density values a STEP file embeds. ' +
     "Supported entity kinds: 'box', 'cylinder', 'sphere' (closed forms), 'extrusion', 'cone', 'torus', 'wedge', 'pyramid', " +
     "'revolution' (Pappus's centroid theorem; a profile crossing the axis falls back to the bounding-box volume), 'sweep' (round section: " +
-    "section area × exact path length), 'loft', 'subdivision', 'mesh' (a kernel result with the OCC kernel: the exact B-rep; otherwise its " +
+    "section area × exact path length), 'loft' (the exact skinned B-rep with the OCC kernel, else its display triangles), 'subdivision', 'mesh' (a kernel result with the OCC kernel: the exact B-rep; otherwise its " +
     "display triangles), and 'instance' (assembly: the combined mass, centroid and inertia of its component solids, each with its own " +
     'material, else the instance material, else the density param). 2D shape entities are rejected. ' +
     'Density resolution, in order: the assigned material\'s density property model (define_property_model property "density"; the ' +

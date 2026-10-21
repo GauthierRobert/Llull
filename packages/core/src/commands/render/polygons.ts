@@ -31,6 +31,7 @@ import { positiveSweep } from '../../lib/angle';
 import { arcPolyline } from '../../lib/arc';
 import { catmullRomBeziers, segmentPoint } from '../../geometry/curveSegments';
 import { planeToWorld } from '../../geometry/workPlane';
+import { faceColorTriangles } from '../../geometry/faceColors';
 
 // 3D solids
 
@@ -125,8 +126,12 @@ export function tessellateEntity(e: Entity): PreDepthPolygon[] {
       return e.profile.length < 3 ? [] : rotatedPrism(extrusionRings(e));
     case 'revolution':
       return rotated(revolutionPolygons(e.profile, e.axis, e.angle, e.segments, e.position));
-    case 'mesh':
-      return rotated(meshTriangles(e.mesh, e.position));
+    case 'mesh': {
+      const polygons = rotated(meshTriangles(e.mesh, e.position));
+      if (e.faceColors === undefined) return polygons;
+      const colors = faceColorTriangles(e.mesh, e.faceColors);
+      return polygons.map((polygon, t) => ({ ...polygon, color: colors[t] ?? polygon.color }));
+    }
     case 'loft':
       return rotated(loftTriangles(e, e.position).map((triangle) => [...triangle]));
     case 'subdivision':

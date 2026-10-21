@@ -5,7 +5,7 @@
  * @failure unknown material or unknown entity id → no-op per-entity, summary lists failures
  */
 
-import { type CadDocument, type Material, type MaterialFinish, FINISH_PATTERNS } from '../../model/types';
+import { type CadDocument, type Entity, type Material, type MaterialFinish, FINISH_PATTERNS } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { isReservedKey } from '../../lib/reservedKey';
@@ -15,6 +15,7 @@ import { convertValue, isUnitFailure } from '../../lib/quantity';
 import { refuseMaterial } from '../materials/refusal';
 import { describeDensity, densityPlausibilityWarning, kgPerM3FromDocDensity } from '../../geometry/resolveDensity';
 import { sourcedMaterial } from './sourcedMaterials';
+import { patternFollowers } from '../entity/patternCopies';
 
 const DEFAULT_COLOR = '#b0b0b0';
 
@@ -212,7 +213,7 @@ export const createMaterial = defineCommand({
 });
 
 /**
- * @affects sets BaseEntity.materialId on each target entity
+ * @affects sets BaseEntity.materialId on each target entity and on its pattern copies that still follow it (same material as the seed)
  * @invariant material must exist in doc.materials; unknown entity ids → skip + note in summary
  * @failure unknown material name → no-op, affected:[]; empty entityIds → no-op
  */
@@ -227,6 +228,7 @@ export const assignMaterial = defineCommand({
     'The material may be a record (define_material_record or a library record: use its id); an unresolved private record can be assigned, ' +
     'but mass_properties answers MAT_LIBRARY_UNRESOLVED until resolve_material_libraries. ' +
     'Multiple entity ids can be assigned in a single call; unknown ids are skipped with a note. ' +
+    'Pattern copies (array_linear, array_polar, pattern_along_path) of a target that still share its previous material follow it, even when the pattern was made first. ' +
     'Assigning a material is a replayable document edit recorded in featureHistory.',
   params: z.object({
     materialName: z
@@ -269,13 +271,19 @@ export const assignMaterial = defineCommand({
     }
     if (assigned.length === 0)
       return noop(doc, `assign_material '${materialName}': no valid entity ids found — missing: ${missing.join(', ')}.`);
+    const followers = patternFollowers(doc, assigned, 'materialId');
+    for (const id of followers) updatedEntities[id] = { ...(updatedEntities[id] as Entity), materialId: materialName };
     const newDoc: CadDocument = { ...doc, materials, entities: updatedEntities };
     const parts: string[] = [
       `assign_material '${materialName}': assigned to ${assigned.length} ${assigned.length === 1 ? 'entity' : 'entities'} (${assigned.join(', ')}).`,
     ];
+    if (followers.length > 0)
+      parts.push(
+        `Also assigned to ${followers.length} pattern ${followers.length === 1 ? 'copy' : 'copies'} of them (${followers.join(', ')}).`,
+      );
     if (catalogued !== null)
       parts.push(`Created '${materialName}' from the sourced catalogue (grade ${catalogued.grade}): ${catalogued.source}.`);
     if (missing.length > 0) parts.push(`Missing ids skipped: ${missing.join(', ')}.`);
-    return changed(newDoc, parts.join(' '), assigned);
+    return changed(newDoc, parts.join(' '), [...assigned, ...followers]);
   },
 });

@@ -48,8 +48,9 @@ describeNative('NACA 0012 trapezoidal wing on the native kernel (VC-SRF-11, VC-S
     const wing = doc.entities[wingId] as (Entity & { kind: 'loft' }) | undefined;
     expect(wing?.sections).toHaveLength(2);
     const handle = kernel.evaluate({ op: 'solid', entity: wing as Entity }) as ShapeHandle;
-    // the command integrates the display mesh of a loft (method mesh); OCC integrates the exact B-rep (measured 0.9591167, 3e-7 from the closed form)
-    expect(dataOf(mass.json)['method']).toBe('mesh');
+    // the command takes the exact B-rep mass of a loft from OCC (LIM-1 #7; measured 0.9591167, 3e-7 from the closed form)
+    expect(dataOf(mass.json)['method']).toBe('exact');
+    expect(Math.abs(Number(dataOf(mass.json)['volume']) / 0.959117 - 1)).toBeLessThan(1e-5);
     expect(Math.abs((kernel.massProperties?.(handle)?.volume ?? 0) / 0.959117 - 1)).toBeLessThan(1e-5);
     const query = kernel.faceQuery as FaceQueryPort;
     const skin = (query.faceDetails(handle) ?? []).filter((face) => face.surface !== 'plane').map((face) => face.index);

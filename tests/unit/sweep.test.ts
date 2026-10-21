@@ -274,6 +274,20 @@ describe('closed-path sweeps', () => {
     expect(isWatertight(triangles, 9)).toBe(true);
     expect(volumeOf(ring)).toBeCloseTo(2 * Math.PI * Math.PI * 10 * 4, 6);
   });
+  it('a hollow ring (innerRadius on a closed path) is two closed tubes, no caps, the annulus volume (LIM-1)', () => {
+    const doc = docWith({ id: 'ring', kind: 'circle', center: [0, 0], radius: 10 });
+    const ring = sweepOf(doc, { pathId: 'ring', radius: 2, innerRadius: 1 });
+    expect(ring.section).toEqual({ shape: 'circle', radius: 2, innerRadius: 1 });
+    const triangles = solidTriangles(ring);
+    expect(isWatertight(triangles, 9)).toBe(true);
+    const meshVolume = triangles.reduce(
+      (sum, [a, b, c]) =>
+        sum + (a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6,
+      0,
+    );
+    expect(meshVolume / (2 * Math.PI * Math.PI * 10 * 3)).toBeCloseTo(1, 1);
+    expect(volumeOf(ring)).toBeCloseTo(2 * Math.PI * Math.PI * 10 * 3, 6);
+  });
   it('closed: true bends the closing corner of a point loop (and smooth closes a spline)', () => {
     const square = xyz(0, 0, 0, 20, 0, 0, 20, 20, 0, 0, 20, 0);
     const frame = sweepOf(empty, { path: square, closed: true, radius: 1, bendRadius: 4 });

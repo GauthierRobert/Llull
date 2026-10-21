@@ -145,6 +145,20 @@ describe('history lowering', () => {
     expect(p.outputs).toEqual([{ variable: 'box_1', color: '#111111', name: 'Block' }]);
     expect(p.notes).toEqual([]);
   });
+  it('lowers a boolean with a list of tools to one boolean feature per tool (LIM-1)', () => {
+    let doc = run(createEmptyDocument(), 'add_box', { size: [10, 10, 10] });
+    doc = run(doc, 'add_cylinder', { radius: 1, height: 20, position: [-2, 0, 0] });
+    doc = run(doc, 'add_cylinder', { radius: 1, height: 20, position: [2, 0, 0] });
+    const [boxId, first, second] = doc.order as [string, string, string];
+    doc = run(doc, 'boolean', { op: 'subtract', a: boxId, b: [first, second] });
+    const p = program(doc);
+    expect(p.source).toBe('history');
+    const booleans = p.features.filter((f): f is Extract<Feature, { op: 'boolean' }> => f.op === 'boolean');
+    expect(booleans.map((f) => [f.kind, f.left, f.right])).toEqual([
+      ['cut', 'box_1', 'cylinder_1'],
+      ['cut', 'box_1', 'cylinder_2'],
+    ]);
+  });
   it('binds an =expr only when it evaluates to the entity value (binding guard)', () => {
     const doc = project(createEmptyDocument(), [
       { command: 'set_parameter', params: { name: 'width', expression: '80' } },

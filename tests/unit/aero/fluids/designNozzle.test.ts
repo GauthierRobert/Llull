@@ -179,4 +179,16 @@ describe('rocket_delta_v (VC-FLD-30)', () => {
     expectRefusal(doc, 'rocket_delta_v', { ispS: 300, initialMassKg: 10, targetDeltaVMS: -1 }, 'FLD_PARAM_INVALID');
     expectRefusal(doc, 'rocket_delta_v', { ispS: 300, initialMassKg: 10, finalMassKg: 5, thrustN: 0 }, 'FLD_PARAM_INVALID', 'thrustN');
   });
+
+  it('honours color (LIM-1 #5b): the nozzle solid takes it; a malformed colour is refused', () => {
+    const { doc: next, result } = design({ throatRadius: 20, expansionRatio: 9, shape: 'conical', wallThickness: 2, color: '#b87333' });
+    expect(next.entities[result.id]?.color).toBe('#b87333');
+    expectRefusal(
+      doc,
+      'design_nozzle',
+      { throatRadius: 20, expansionRatio: 9, wallThickness: 2, color: 'copper' },
+      'FLD_PARAM_INVALID',
+      'color',
+    );
+  });
 });
