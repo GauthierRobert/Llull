@@ -12,7 +12,7 @@ import { dot3 } from '../../lib/vec3';
 import type { CommandResult } from '../types';
 import { defineCommand, vec2, z } from '../schema';
 import { currentContext } from '../context';
-import { operandRecipe } from '../brep/kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { report } from '../noop';
 import { machinedPart } from './machined';
 import { refuse, resultMeta } from './ftr';

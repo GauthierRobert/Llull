@@ -7,7 +7,7 @@ import type { CommandResult } from '@core/commands/types';
 import { analysisIdSchema } from '../shared/schemas';
 import { isProblem, problem, thermalCaseOf, withThermal, type Problem } from './access';
 import { refuseThermal } from './codes';
-import { STEFAN_BOLTZMANN } from '@lib/thermalClosedForms';
+import { STEFAN_BOLTZMANN } from './thermalClosedForms';
 
 /**
  * @affects doc.analysis.cases[analysisId].thermal.stefanBoltzmann (set, or cleared to the SI default when no value is given)

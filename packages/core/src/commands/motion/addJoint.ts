@@ -2,7 +2,7 @@ import type { Joint, JointMateRef } from '../../model/types';
 import { JOINT_DOF } from '../../model/joints';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
-import { idOrNext, idTaken } from '../entity/explicitId';
+import { idOrNext, idTaken } from '../../lib/explicitId';
 import { instanceFrameRef, instanceRefsProblem } from '../assembly/instanceFrameRef';
 import { isValidAxis } from '../../lib/axis';
 import { changed, noop } from '../noop';

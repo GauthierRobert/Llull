@@ -7,7 +7,7 @@ import { nextId } from '../../lib/id';
 import { makeBlob } from '../../model/blobs';
 import { MM_PER_UNIT } from '../../model/units';
 import { newEntity } from '../entity/newEntity';
-import { evaluateRecipe } from '../brep/kernelShape';
+import { evaluateRecipe } from '../kernelShape';
 import { DEFAULT_MESH_COLOR } from './importMesh';
 
 export interface Body {

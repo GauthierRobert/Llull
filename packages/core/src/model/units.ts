@@ -21,3 +21,12 @@ export function toMm(doc: Pick<CadDocument, 'units'>, value: number): number {
 export function toMetres(doc: Pick<CadDocument, 'units'>, value: number): number {
   return value * metresPerUnit(doc.units);
 }
+
+/**
+ * Format a length value using the document's current units and displayPrecision.
+ *
+ * @example formatLength(doc, 12.5) // "12.500 mm"
+ */
+export function formatLength(doc: CadDocument, value: number): string {
+  return `${value.toFixed(doc.displayPrecision)} ${doc.units}`;
+}

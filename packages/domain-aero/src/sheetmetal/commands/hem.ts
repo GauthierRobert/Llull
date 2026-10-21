@@ -1,6 +1,6 @@
 import { defineCommand, z, vec3 } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
-import { hemQuantities } from '@lib/sheetMath';
+import { hemQuantities } from '../sheetMath';
 import { getModel, nextNodeId, ruleOfPart } from '../graph';
 import { HEM_SOURCE } from '../provenance';
 import { fixed, refuse } from '../result';

@@ -12,11 +12,13 @@ import {
   sheetMetalPlugin,
   surfacingPlugin,
 } from '@aero/index';
+import { dynamicsPlugin } from '@dynamics/index';
 import { designPlugin } from '@design/index';
 import { plmPlugin } from '@plm/index';
 
 /** Install every default domain plugin (idempotent). */
 export function installDefaultPlugins(): void {
+  installPlugin(dynamicsPlugin);
   installPlugin(buildingPlugin);
   installPlugin(industrialPlugin);
   installPlugin(civilPlugin);

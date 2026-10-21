@@ -3,8 +3,8 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
-import { adaptLegacyCase, expectedResultsFileSchema, normaliseGrade } from '@core/commands/vnv/expected';
-import { judgeCase, valuesMatch } from '@core/commands/vnv/judge';
+import { adaptLegacyCase, expectedResultsFileSchema, normaliseGrade } from '@cae/vnv/expected';
+import { judgeCase, valuesMatch } from '@cae/vnv/judge';
 import { expectCase } from './benchmarkCases';
 import { mmsErrors } from './mmsPoisson1d';
 

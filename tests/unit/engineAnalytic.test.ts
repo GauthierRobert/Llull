@@ -6,11 +6,11 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
 import type { CylinderPressure } from '@core/model/dynamics';
-import { engineLayout } from '@core/dynamics/engineGeometry';
-import { modelProblem, pressureCurve } from '@core/dynamics/cylinderPressure';
-import { gaugeAt } from '@core/dynamics/pressureCurve';
-import { buildTopology } from '@core/dynamics/topology';
-import { createSlider, sliderRate, sliderStroke, sliderTravel } from '@core/dynamics/slider';
+import { engineLayout } from '@dynamics/sim/engineGeometry';
+import { modelProblem, pressureCurve } from '@dynamics/sim/cylinderPressure';
+import { gaugeAt } from '@dynamics/sim/pressureCurve';
+import { buildTopology } from '@dynamics/sim/topology';
+import { createSlider, sliderRate, sliderStroke, sliderTravel } from '@dynamics/sim/slider';
 import { sliderCrank, travel, travelRate } from './sliderCrankFixture';
 
 const R = 0.0492125;

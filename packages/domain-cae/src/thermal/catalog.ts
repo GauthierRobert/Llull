@@ -1,8 +1,10 @@
 /** PHY-03 thermal FE commands. */
 
 import { commandCatalog } from '@core/commands/schema';
+import { thermalAnalyticCheck } from './analyticCheck';
 import { defineAmplitude } from './amplitude';
 import { addThermalBc, updateThermalBc } from './bcCommands';
+import { computeViewFactors } from './computeViewFactors';
 import { checkThermal } from './check';
 import { setThermalPhysicalConstants } from './constantsCommand';
 import { disposeThermalLimit } from './dispose';
@@ -26,4 +28,6 @@ export const thermalCommands = commandCatalog(
   checkThermal,
   checkTemperatureLimits,
   disposeThermalLimit,
+  thermalAnalyticCheck,
+  computeViewFactors,
 );

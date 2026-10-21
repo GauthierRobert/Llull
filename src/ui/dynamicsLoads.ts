@@ -1,6 +1,6 @@
-// Presentation of the rigid-body loads (computed by `@core/dynamics/dynamicsLoads`): layer labels and glyph / swatch colours.
+// Presentation of the rigid-body loads (computed by `@dynamics/sim/dynamicsLoads`): layer labels and glyph / swatch colours.
 
-import type { LoadLayer } from '@core/dynamics/dynamicsLoads';
+import type { LoadLayer } from '@dynamics/sim/dynamicsLoads';
 
 export const LOAD_LAYER_LABELS: Readonly<Record<LoadLayer, string>> = {
   gravity: 'Weight',

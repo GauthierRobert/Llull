@@ -542,7 +542,7 @@ Total MVP ≈ 9 weeks of one engineer-equivalent agent lane (Lane 1 core/plugin 
 `define_vibration_spectrum`, **`delete_vibration_spectrum`**, **`define_time_history`** / **`delete_time_history`** (PHY-07 owns
 `define_load_history`), **`describe_vibration_library`**, `sdof_response`, `psd_rms`, `damping_coefficients`, `shock_response_spectrum`,
 `analysis_report`, `equivalent_static_load_case`, **`check_structural_dynamics`** (the rigid-body `check_dynamics` of
-`core/commands/dynamics` owns that name). `create_analysis` takes the two types with `modes` or `fMaxHz` (`DYN_BASIS_MISSING` without
+`domain-dynamics/src/commands` owns that name). `create_analysis` takes the two types with `modes` or `fMaxHz` (`DYN_BASIS_MISSING` without
 either; `fMaxHz` alone extracts 100 modes and keeps those up to fMaxHz — CalculiX computes the requested count, not a range, manual
 `*FREQUENCY`). `add_result_probe` refuses quantities of the wrong case type (`DYN_PROBE_QUANTITY`).
 

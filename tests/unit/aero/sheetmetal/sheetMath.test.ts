@@ -8,7 +8,7 @@ import {
   joggleQuantities,
   kFromTable,
   minJoggleOffset,
-} from '@lib/sheetMath';
+} from '@aero/sheetmetal/sheetMath';
 import expected from '../../../../docs/aerospace/07-sheet-metal-machined-features/validation/data/expected_flat_pattern.json';
 
 const rad = (degrees: number): number => (degrees * Math.PI) / 180;

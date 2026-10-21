@@ -5,7 +5,7 @@ import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
 import { toRadians } from '@lib/angle';
 import { normalize2, sub2 } from '@lib/vec2';
-import { bendQuantities } from '@lib/sheetMath';
+import { bendQuantities } from '../sheetMath';
 import type { SheetNode } from '@core/model/sheetMetal';
 import { bendGeometry, bottomOffset } from '../frames';
 import { withFoldedSolid } from '../fold';

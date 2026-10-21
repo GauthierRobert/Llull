@@ -19,7 +19,7 @@ to the `command-author` agent unless the change is trivial.
 - CAD core op (geometry, 2D, transform, measure, parametric, assembly…) ⇒ its feature folder
   `packages/core/src/commands/<feature>/` (new file if the concern is new or the file nears 500 code lines).
 - Domain op ⇒ that plugin's package: `packages/domain-aec/src/…` (building, industrial, civil, piping, scan),
-  `domain-cae` (analysis), `domain-aero` (aerodynamics, surfacing, sheetmetal, composites, fasteners, fluids, cfd),
+  `domain-cae` (analysis), `domain-aero` (aerodynamics, surfacing, sheetmetal, composites, fasteners, fluids, cfd), `domain-dynamics` (rigid-body dynamics),
   `design-lang`, `plm`. Never put domain commands in `packages/core`.
 
 ### 1. Define (pure) with `defineCommand`

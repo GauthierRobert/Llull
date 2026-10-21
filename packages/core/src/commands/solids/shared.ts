@@ -6,7 +6,7 @@ import { add3, finiteVec3OrZero, sub3 } from '../../lib/vec3';
 import { nextId } from '../../lib/id';
 import { commitEntity } from '../entity/commitEntity';
 import { newEntity } from '../entity/newEntity';
-import { idTaken } from '../entity/explicitId';
+import { idTaken } from '../../lib/explicitId';
 import { noop } from '../noop';
 import { compactNumber } from '../../lib/compactNumber';
 import { isVec2 } from '../../lib/vec2';

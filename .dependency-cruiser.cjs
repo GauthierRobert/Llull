@@ -3,7 +3,7 @@
  * checked by `npm run arch` (part of `npm run check`) for every change, human or agent.
  * The PreToolUse hook gives agents early feedback; this file is the authority.
  *
- * Layers (one-way): desktop → server; src/ui, server → src/app → packages/{protocol, domain-aec, domain-cae, domain-aero, design-lang, plm, kernel-*, physics-*} → packages/core
+ * Layers (one-way): desktop → server; src/ui, server → src/app → packages/{protocol, domain-aec, domain-cae, domain-aero, domain-dynamics, design-lang, plm, kernel-*, physics-*} → packages/core
  * Inside core:      commands, codegen, plugins → dynamics → geometry → model → lib
  */
 

@@ -6,7 +6,7 @@ import { toMetres } from '@core/model/units';
 import type { Vec3 } from '@core/model/vectors';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
-import { systemToSi } from '@lib/thermalUnits';
+import { systemToSi } from './thermalUnits';
 import { evaluateProbes } from '../results/probes';
 import { analysisLengthMetres } from '../shared/defaults';
 import { isProblem, thermalCaseOf, type ThermalCase } from './access';

@@ -13,6 +13,7 @@ import { analysisErrors } from './model/validate';
 import { nonlinearCommands } from './nonlinear/catalog';
 import { reliabilityCommands } from './reliability/catalog';
 import { reliabilityErrors } from './reliability/model';
+import { vnvCommands } from './vnv/catalog';
 import { thermalCommands } from './thermal/catalog';
 import { thermomechCommands } from './thermomech/catalog';
 import { caeRetiredCommands } from './retired';
@@ -29,6 +30,7 @@ export const caePlugin: CadPlugin = {
   toolset: 'analysis',
   commands: [
     ...feaCommands,
+    ...vnvCommands,
     ...analyticCommands,
     ...marginCommands,
     ...thermalCommands,

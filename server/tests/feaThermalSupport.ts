@@ -4,7 +4,7 @@ import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect } from 'vitest';
-import { judgeCase, type Measured } from '@core/commands/vnv/judge';
+import { judgeCase, type Measured } from '@cae/vnv/judge';
 import { deserializeDocument } from '@core/commands/persistence/serialization';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';

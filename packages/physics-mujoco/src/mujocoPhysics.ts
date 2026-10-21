@@ -3,15 +3,8 @@
  * multibody dynamics: joints are exact (no drift between linked parts), gear couplings are equality constraints.
  */
 
-import type {
-  PhysicsEngine,
-  Quaternion,
-  SimulationModel,
-  SimulationOptions,
-  SimulationTrace,
-  StepPeak,
-} from '@core/dynamics/physicsEngine';
-import type { Vec3 } from '@core/model/vectors';
+import type { PhysicsEngine, SimulationModel, SimulationOptions, SimulationTrace, StepPeak } from '@core/dynamics/physicsEngine';
+import type { Quaternion, Vec3 } from '@core/model/vectors';
 import { OBJECT_BODY, OBJECT_JOINT, OBJECT_TENDON, type MjData, type MjModel, type MujocoModule } from './bindings';
 import { jointReaction, loopReader, loopSlots, type ReactionSlot } from './constraintForces';
 import { addGearLoss, gearLossSlots } from './gearLoss';

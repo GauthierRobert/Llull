@@ -1,6 +1,6 @@
 /** Pose interpolation, motion detection and relative transforms of the motion-clearance check. */
 import { describe, expect, it } from 'vitest';
-import { type BodyPoseAt, posesAtSample } from '@core/dynamics/bodyPose';
+import { type BodyPoseAt, posesAtSample } from '@core/geometry/bodyPose';
 import {
   STATIC_POSE,
   isMoving,
@@ -9,8 +9,8 @@ import {
   relativeTravelBound,
   travelBound,
   type PoseTrack,
-} from '@core/dynamics/motionPoses';
-import type { Quaternion } from '@core/dynamics/physicsEngine';
+} from '@dynamics/sim/motionPoses';
+import type { Quaternion } from '@core/model/vectors';
 
 const IDENTITY: Quaternion = [1, 0, 0, 0];
 const QUARTER_Z: Quaternion = [Math.SQRT1_2, 0, 0, Math.SQRT1_2];

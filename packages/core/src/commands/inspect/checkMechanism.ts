@@ -5,7 +5,7 @@ import { GROUND } from '../../model/dynamics';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
-import { type ReviewItem, reviewItem, reviewResult, reviewSummary } from './reviewEnvelope';
+import { type ReviewItem, reviewItem, reviewResult, reviewSummary } from '../../model/reviewEnvelope';
 
 /** Freedoms a joint removes between two rigid bodies (6 minus the joint's own freedoms). */
 const REMOVED_BY_DYNAMIC_JOINT = { revolute: 5, prismatic: 5, spherical: 3 } as const;

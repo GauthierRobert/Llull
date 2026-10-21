@@ -5,7 +5,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { STEFAN_BOLTZMANN as SIGMA, viewFactorParallel } from '@lib/thermalClosedForms';
+import { STEFAN_BOLTZMANN as SIGMA, viewFactorParallel } from '@cae/thermal/thermalClosedForms';
 import { closeCase, expectCase, loadPlan, openCase, type ThermalCase } from './feaThermalSupport';
 import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
 

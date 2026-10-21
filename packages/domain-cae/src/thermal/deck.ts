@@ -4,7 +4,7 @@
  * step with its loads and output requests).
  */
 
-import { siToSystem } from '@lib/thermalUnits';
+import { siToSystem } from './thermalUnits';
 import { analysisInputHash } from '../hash/inputHash';
 import { ALL_NODES, type DeckContext, type DeckRefusal, type DeckSections } from '../decks/context';
 import { linesText, num, row } from '../decks/format';

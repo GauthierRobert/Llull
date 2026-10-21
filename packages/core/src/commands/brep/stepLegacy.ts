@@ -6,7 +6,8 @@
 import type { CadDocument, Entity } from '../../model/types';
 import type { GeometryKernel, ShapeHandle } from '../../geometry/kernel';
 import type { CommandResult, ExecutionContext } from '../types';
-import { exactOrMesh, operandRecipe } from './kernelShape';
+import { exactOrMesh } from '../kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { labelStep } from './stepLabels';
 import { retargetStepSchema, type StepSchema } from './stepSchema';
 import { labelStepAssembly } from './stepAssemblyLabels';

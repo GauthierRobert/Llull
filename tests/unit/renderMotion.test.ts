@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { setPhysicsEngine } from '@core/dynamics/physicsEngine';
-import { documentAtPose, eulerDegOf, matFromQuaternion } from '@core/dynamics/bodyPose';
+import { documentAtPose, eulerDegOf, matFromQuaternion } from '@core/geometry/bodyPose';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 import { sliderCrank } from './sliderCrankFixture';
 

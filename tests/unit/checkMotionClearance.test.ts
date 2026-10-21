@@ -2,7 +2,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
-import { motionClearanceCheck } from '@core/commands/dynamics/checkMotionClearance';
+import { motionClearanceCheck } from '@dynamics/commands/checkMotionClearance';
 import type { CheckItem, CheckResult } from '@core/model/checkResult';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { ExecutionContext } from '@core/commands/types';

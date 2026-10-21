@@ -12,7 +12,7 @@ import { prototypeProblems } from '@core/commands/persistence/prototypeValidatio
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 import { sliderCrank } from './sliderCrankFixture';
-import { ownerSummary, skippedCheck } from '@core/commands/dynamics/prototypeVerdict';
+import { ownerSummary, skippedCheck } from '@dynamics/commands/prototypeVerdict';
 
 let kernel: GeometryKernel;
 beforeAll(async () => {

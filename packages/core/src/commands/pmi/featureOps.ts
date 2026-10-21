@@ -9,7 +9,7 @@ import { is3D } from '../../model/types';
 import type { FaceDetail } from '../../geometry/kernelPorts';
 import { type ResolvedFeature, isFeatureProblem, resolveFeature } from '../../geometry/pmiFeatures';
 import { autoPlacement } from '../../geometry/pmiPlacement';
-import { operandRecipe } from '../brep/kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { currentContext } from '../context';
 import { vec2, vec3, z } from '../schema';
 import type { CommandResult, ExecutionContext } from '../types';

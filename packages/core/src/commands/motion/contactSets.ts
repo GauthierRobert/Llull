@@ -1,7 +1,7 @@
 import type { ContactSet } from '../../model/joints';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { idOrNext, idTaken } from '../entity/explicitId';
+import { idOrNext, idTaken } from '../../lib/explicitId';
 import { entityOfKind } from '../entity/entityOfKind';
 import { changed, noop } from '../noop';
 

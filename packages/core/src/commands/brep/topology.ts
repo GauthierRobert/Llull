@@ -8,7 +8,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
-import { operandRecipe } from './kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { noop, report } from '../noop';
 import { fixedNumber } from '../../lib/compactNumber';
 

@@ -4,7 +4,7 @@ import type { DocumentUnit } from '@core/model/types';
 import type { BendRadiusRow, SheetMetalModel, SheetMetalRule, Verification } from '@core/model/sheetMetal';
 import type { FtrUnverifiedInput } from '@core/model/manufacturing';
 import { MM_PER_UNIT } from '@core/model/units';
-import { FORMULAS, dinToAnsiK, kFromTable } from '@lib/sheetMath';
+import { FORMULAS, dinToAnsiK, kFromTable } from './sheetMath';
 
 export interface ResolvedK {
   /** ANSI K-factor actually used. */

@@ -42,7 +42,7 @@ const PMI_CORE_TOOLS = words(
 );
 
 const ANALYSIS_CORE_TOOLS = words(
-  'check_prototype check_assembly check_mechanism check_motion_clearance check_dynamics engine_quick_check compare_to_reference check_timestep_convergence check_convergence compare_to_expected thermal_analytic_check compute_view_factors fit_at_temperature thermal_stress_check fea_mesh fea_solve fea_export fea_import_field fea_import_results',
+  'check_prototype check_assembly check_mechanism check_motion_clearance check_dynamics engine_quick_check compare_to_reference check_timestep_convergence fea_mesh fea_solve fea_export fea_import_field fea_import_results',
 );
 
 /** Core part-modelling features (07 FTR §4.1); the sheet-metal plugin adds its commands to the same toolset. */

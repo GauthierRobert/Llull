@@ -9,7 +9,7 @@
 
 import { type CadDocument, type Component, type Entity, type InstanceEntity, type Vec3, is3D } from '../../model/types';
 import type { GeometryKernel, ShapeHandle, StepAssemblyPart, StepOccurrence } from '../../geometry/kernel';
-import { exactOrMesh, exactRecipe } from './kernelShape';
+import { exactOrMesh, exactRecipe } from '../kernelShape';
 import type { AssemblyStepLabels, NestedOccurrence } from './stepAssemblyLabels';
 import { MAX_INSTANCE_DEPTH, type StepEntry, instanceSolids, stepLabels } from './stepTargets';
 

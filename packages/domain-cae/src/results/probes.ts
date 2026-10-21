@@ -5,7 +5,7 @@ import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact, ProbeQuantity, Re
 import { loadCasesOf } from '../decks/context';
 import { lengthUnitName, stressUnitName } from '../decks/units';
 import { magnitude, nodeCoordinates, stepOfLoadCase, vonMises, type ResultStep } from './fields';
-import { systemToSi } from '@lib/thermalUnits';
+import { systemToSi } from '../thermal/thermalUnits';
 import { axisFrame, CYLINDRICAL_FIELDS, CYLINDRICAL_QUANTITIES, type AxisFrame, type CylindricalQuantity } from './cylindrical';
 import { locatePoint, type PointWeights } from './probeInterpolation';
 import { isDynamicType, type DynamicProbeQuantity } from '../dynamics/quantities';

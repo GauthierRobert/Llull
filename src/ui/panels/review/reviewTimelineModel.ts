@@ -3,8 +3,8 @@
 // reaction-force magnitude of a chosen joint.
 
 import type { DynamicsModel } from '@core/model/dynamics';
-import type { SimulationData } from '@core/dynamics/simulationReport';
-import type { ReactionsView } from '@core/dynamics/reactionsView';
+import type { SimulationData } from '@dynamics/sim/simulationReport';
+import type { ReactionsView } from '@dynamics/sim/reactionsView';
 import type { CheckResult } from './reviewTypes';
 
 const DEG_PER_RAD = 180 / Math.PI;

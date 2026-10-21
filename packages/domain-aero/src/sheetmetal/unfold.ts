@@ -4,7 +4,7 @@ import type { Vec2 } from '@core/model/types';
 import type { SheetMetalPart, SheetMetalRule } from '@core/model/sheetMetal';
 import { polygonArea } from '@lib/polygon';
 import { add2, scale2 } from '@lib/vec2';
-import { type BendQuantities, type JoggleQuantities, bendQuantities, hemQuantities, joggleQuantities } from '@lib/sheetMath';
+import { type BendQuantities, type JoggleQuantities, bendQuantities, hemQuantities, joggleQuantities } from './sheetMath';
 import { IDENTITY, type Rigid2, applyRigid, circlePolygon, composeRigid, lineBasis } from './geometry2d';
 import { developedHoleRadius, lipGeometry } from './formGeometry';
 import { childBends, flatOf, formsOf, hemsOf, joggleNodes } from './graph';

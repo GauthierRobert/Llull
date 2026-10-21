@@ -7,7 +7,7 @@ import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import { isLoadDrawn, useLoadOverlayStore } from '@ui/store/loadOverlayStore';
 import { useDynamicsLoads } from '@ui/hooks/useDynamicsLoads';
-import { LOAD_LAYERS, formatQuantity, type LoadItem, type LoadLayer } from '@core/dynamics/dynamicsLoads';
+import { LOAD_LAYERS, formatQuantity, type LoadItem, type LoadLayer } from '@dynamics/sim/dynamicsLoads';
 import { LOAD_COLORS, LOAD_LAYER_LABELS } from '@ui/dynamicsLoads';
 import { IconButton, PanelSection } from '@ui/panels/PanelParts';
 import { useFocusItem } from '@ui/hooks/useFocusItem';

@@ -26,12 +26,8 @@ import { exchangeCommands } from './exchange/catalog';
 import { persistenceCommands } from './persistence/catalog';
 import { drawingsCommands } from './drawings/catalog';
 import { pmiCommands } from './pmi/catalog';
-import { dynamicsCommands } from './dynamics/catalog';
 import { reviewCommands } from './review/catalog';
-import { vnvCommands } from './vnv/catalog';
 import { materialLabCommands } from './materiallab/catalog';
-import { thermalCommands } from './thermal/catalog';
-import { thermomechCommands } from './thermomech/catalog';
 import { materialCommands } from './materials/catalog';
 import { surfaceCommands } from './surface/catalog';
 
@@ -54,12 +50,8 @@ registerCommands('core', [
   ...persistenceCommands,
   ...drawingsCommands,
   ...pmiCommands,
-  ...dynamicsCommands,
   ...reviewCommands,
-  ...vnvCommands,
   ...materialLabCommands,
-  ...thermalCommands,
-  ...thermomechCommands,
   ...materialCommands,
   ...surfaceCommands,
 ]);

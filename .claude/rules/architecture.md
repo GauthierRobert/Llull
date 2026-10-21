@@ -16,7 +16,7 @@ surface that bypasses a command.
 
 ## L2 — Dependency direction is one-way
 
-`src/ui`, `server/` → `src/app` → `packages/{protocol, domain-aec, domain-cae, domain-aero, design-lang, plm, kernel-*, physics-*}` → `packages/core`
+`src/ui`, `server/` → `src/app` → `packages/{protocol, domain-aec, domain-cae, domain-aero, domain-dynamics, design-lang, plm, kernel-*, physics-*}` → `packages/core`
 (`@lib` inside core). No package imports `src/ui`; `packages/core` imports no other package. No
 `packages/*/src` touches `react`, `window`, `document`, `fetch`, `localStorage`, or the DOM — put
 side effects in `src/ui/`, `server/`, or behind an injected interface. No import cycles (type-only included).
@@ -78,7 +78,7 @@ path and fall back cleanly without it (mesh result, or a named refusal for the k
 kernel-optional: …` and test both paths (e.g. `set_thread`; `add_rigid_body` via `geometry/resolveMassProperties.ts`: exact mass with a kernel, mesh integration without). The boundary is a SHAPE,
 not a mesh: commands pass a `ShapeRecipe` and get an opaque `ShapeHandle`; meshes only come OUT.
 Installing a kernel is the composition root's job, never a command's. Rigid-body physics follows the same pattern:
-`PhysicsEngine` (`@core/dynamics/physicsEngine`), read from `ctx.physics`, implemented by `packages/physics-mujoco`.
+`PhysicsEngine` (`@core/dynamics/physicsEngine`, the only dynamics code kept in core), read from `ctx.physics`, implemented by `packages/physics-mujoco`; the rigid-body commands, model and force laws live in the plugin `packages/domain-dynamics` (`@dynamics/*`).
 
 ## L10 — Domains are plugins
 

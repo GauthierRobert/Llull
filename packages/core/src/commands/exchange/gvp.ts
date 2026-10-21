@@ -11,7 +11,7 @@ import { noop, report } from '../noop';
 import { resolveMassProperties, type MassContext } from '../../geometry/resolveMassProperties';
 import { entityBoundsInDoc } from '../../geometry/bounds';
 import { expandInstance } from '../../geometry/instanceExpansion';
-import { exactOrMesh } from '../brep/kernelShape';
+import { exactOrMesh } from '../kernelShape';
 
 interface GvpItem {
   readonly id: string;

@@ -5,7 +5,7 @@ import type { CommandResult } from '../types';
 import { currentContext } from '../context';
 import { confirmExportControlled, defineCommand, z } from '../schema';
 import { exportRefusal, noop, report } from '../noop';
-import { bodyMassProperties } from '../../dynamics/simulationModel';
+import { bodyMassProperties } from '../../geometry/bodyMassProperties';
 import { entityToTriangles } from '../../geometry/entityTriangles';
 import type { Triangle } from '../../geometry/triangles';
 import { escapeXml } from '../../lib/escapeXml';

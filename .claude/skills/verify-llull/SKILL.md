@@ -13,7 +13,7 @@ green without running it. For deep coverage work, delegate to `test-verifier`.
 npm run check          # typecheck + arch + deadcode + lint (max-lines 500) + format:check + native:check (skipped without cargo) + test
 npm run test:coverage  # gate 90 stmts / 85 branch / 90 fn / 90 lines on
                        # packages/core/src/{commands,geometry,dynamics}/** and
-                       # packages/{domain-aec,domain-cae,domain-aero,design-lang,plm}/src/** (vite.config.ts)
+                       # packages/{domain-aec,domain-cae,domain-aero,domain-dynamics,design-lang,plm}/src/** (vite.config.ts)
 ```
 On a constrained machine (few cores / low memory) cap vitest workers:
 `npx vitest run --maxWorkers=2 --minWorkers=1` (also works with `--coverage`).

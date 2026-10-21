@@ -5,7 +5,7 @@ import { entityBoundsInDoc, mergeBounds } from '../../geometry/bounds';
 import { recipeOf } from '../../geometry/shapeRecipe';
 import { expandInstance } from '../../geometry/instanceExpansion';
 import type { Bounds } from '../../geometry/bounds';
-import { formatLength } from '../document/units';
+import { formatLength } from '../../model/units';
 import { childVolume, solidVolume } from './solidVolume';
 import { commandError, noop, report } from '../noop';
 import {

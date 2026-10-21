@@ -12,7 +12,8 @@ import type { CommandResult, ExecutionContext } from '../types';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
 import { noop } from '../noop';
-import { commitKernelResult, evaluateRecipe, operandRecipe } from './kernelShape';
+import { commitKernelResult, evaluateRecipe } from '../kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { OCC_KERNEL_HINT, validateSolidTarget } from './modifyTarget';
 import { pickFaces, type FaceRequest } from './faceReferences';
 

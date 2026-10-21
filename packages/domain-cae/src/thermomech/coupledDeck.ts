@@ -5,7 +5,7 @@
  */
 
 import type { ThermoMechSetup } from '@core/model/analysis';
-import { siToSystem } from '@lib/thermalUnits';
+import { siToSystem } from '../thermal/thermalUnits';
 import type { DeckContext, DeckSections } from '../decks/context';
 import { commentText, linesText, num, row } from '../decks/format';
 import { mechanicalStepLines } from '../decks/mechanical';

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { bodyFrameAt, carryEntity, createBodyFrame, sampleAt, type DynamicsPoses } from '@ui/viewport/3d/dynamicsPose';
 import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
-import type { SimulationData } from '@core/dynamics/simulationReport';
+import type { SimulationData } from '@dynamics/sim/simulationReport';
 
 /** A body spinning about +Z through [10, 0, 0] by 90° per sample (quaternion [w, x, y, z]). */
 const spin: DynamicsPoses = {

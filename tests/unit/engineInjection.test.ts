@@ -3,10 +3,10 @@
  * the shared module graph of the other suites never sees a missing law.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { buildSimulationModel } from '@core/dynamics/simulationModel';
-import { setEngineLossLaw } from '@core/dynamics/engineLossHook';
-import { NO_REALISM_LAW, realismOf, setRealismLaw } from '@core/commands/dynamics/realismHook';
-import { installEngineLaws } from '@core/commands/dynamics/engine/hooks';
+import { buildSimulationModel } from '@dynamics/sim/simulationModel';
+import { setEngineLossLaw } from '@dynamics/sim/engineLossHook';
+import { NO_REALISM_LAW, realismOf, setRealismLaw } from '@dynamics/commands/realismHook';
+import { installEngineLaws } from '@dynamics/commands/engine/hooks';
 import { calibratedEngine } from './engineRealismFixture';
 import { sliderCrank } from './sliderCrankFixture';
 

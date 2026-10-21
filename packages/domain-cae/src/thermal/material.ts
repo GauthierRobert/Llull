@@ -6,7 +6,7 @@ import type { PropertyDirection } from '@core/model/propertyModel';
 import { baseEvaluatorOf, evaluatePropertyModel, resolvePropertyModel, type PropertyRecord } from '@core/model/propertyModelEval';
 import { curveOf, SOLVER_TABLE_REL_TOL, tabulateModel } from '@core/model/propertyTabulate';
 import { convertValue, isUnitFailure } from '@lib/quantity';
-import { siToSystem, siUnitOf, type ThermalKind } from '@lib/thermalUnits';
+import { siToSystem, siUnitOf, type ThermalKind } from './thermalUnits';
 import { isTransientCase, problem, type Problem, type ThermalCase } from './access';
 import { interp1Pairs } from '@lib/interp1';
 import { amplitudeRange } from './amplitudeRange';

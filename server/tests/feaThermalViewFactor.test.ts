@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
-import { STEFAN_BOLTZMANN as SIGMA, viewFactorParallel } from '@lib/thermalClosedForms';
+import { STEFAN_BOLTZMANN as SIGMA, viewFactorParallel } from '@cae/thermal/thermalClosedForms';
 import { closeCase, editStep, expectCase, loadPlan, openCase, type PlanStep, type ThermalCase } from './feaThermalSupport';
 import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
 

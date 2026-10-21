@@ -2,7 +2,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { setPhysicsEngine } from '@core/dynamics/physicsEngine';
-import type { SimulationData } from '@core/dynamics/simulationReport';
+import type { SimulationData } from '@dynamics/sim/simulationReport';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 import { sliderCrank, travelRate } from './sliderCrankFixture';
 

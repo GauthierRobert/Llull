@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { setPhysicsEngine } from '@core/dynamics/physicsEngine';
-import type { SimulationData } from '@core/dynamics/simulationReport';
+import type { SimulationData } from '@dynamics/sim/simulationReport';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 
 beforeAll(async () => {

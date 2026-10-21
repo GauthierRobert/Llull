@@ -4,7 +4,7 @@
 import type { CadDocument, Constraint, DriveRelation, Joint, Vec3 } from '@core/model/types';
 import { GROUND, type DynamicsModel } from '@core/model/dynamics';
 import type { PanelFocus } from '@ui/store/focusStore';
-import type { LoadItem } from '@core/dynamics/dynamicsLoads';
+import type { LoadItem } from '@dynamics/sim/dynamicsLoads';
 import { LOAD_COLORS } from '@ui/dynamicsLoads';
 
 export const CONSTRAINT_COLOR = '#ffd740';

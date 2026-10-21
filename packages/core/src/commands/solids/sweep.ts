@@ -1,4 +1,4 @@
-import { idOrNext } from '../entity/explicitId';
+import { idOrNext } from '../../lib/explicitId';
 import type { CurveSegment } from '../../model/curve';
 import type { CadDocument, SweepSection, SweepStation, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';

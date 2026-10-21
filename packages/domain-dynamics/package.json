@@ -1,0 +1,10 @@
+{
+  "name": "@llull/domain-dynamics",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Rigid-body dynamics plugin: bodies, joints, gears, motors, propellers, cylinders, engine laws, simulation, loads and mechanism checks (docs/DYNAMICS.md).",
+  "dependencies": {
+    "@llull/core": "0.1.0"
+  }
+}

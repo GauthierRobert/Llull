@@ -11,7 +11,7 @@ import type { ExchangePmi } from '../../geometry/kernelExchange';
 import type { GeometryKernel } from '../../geometry/kernel';
 import type { FaceDetail } from '../../geometry/kernelPorts';
 import { type SolidFaces, isFeatureProblem, openSolid, resolveIn } from '../../geometry/pmiFeatures';
-import { operandRecipe } from '../brep/kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { type PmiDraft, applyPmiDrafts, withImportRecord } from '../pmi/applySet';
 import { fromExchangePmi } from '../pmi/xcafMapping';
 

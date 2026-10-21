@@ -1,7 +1,7 @@
 import type { CadDocument, DriveRelation } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { idOrNext, idTaken } from '../entity/explicitId';
+import { idOrNext, idTaken } from '../../lib/explicitId';
 import { detectCycleOnAdd, evaluateMotionInternal } from './jointsKinematics';
 import { changed, noop, report } from '../noop';
 /**

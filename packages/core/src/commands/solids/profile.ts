@@ -1,5 +1,5 @@
 import { placementOf } from '../draw2d/sketchPlanes';
-import { idOrNext } from '../entity/explicitId';
+import { idOrNext } from '../../lib/explicitId';
 import type { CadDocument, Vec2, Vec3 } from '../../model/types';
 import type { CurveSegment } from '../../model/curve';
 import type { CommandResult } from '../types';

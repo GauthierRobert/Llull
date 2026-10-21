@@ -11,7 +11,7 @@ import type { PmiFeature, PmiItem } from '../../model/pmi';
 import type { GeometryKernel } from '../../geometry/kernel';
 import type { ExchangeProduct } from '../../geometry/kernelExchange';
 import { isFeatureProblem, openSolid, resolveIn } from '../../geometry/pmiFeatures';
-import { operandRecipe } from '../brep/kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { pmiItems } from '../pmi/pmiOps';
 import { toExchangePmi } from '../pmi/xcafMapping';
 import type { ExchangePlan } from './stepPlan';

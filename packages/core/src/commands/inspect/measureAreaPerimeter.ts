@@ -3,7 +3,7 @@ import { sheetArea } from '../../geometry/sheetArea';
 import { distance, polygonArea, polygonPerimeter } from '../../lib/polygon';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { formatLength } from '../document/units';
+import { formatLength } from '../../model/units';
 import { noop, report } from '../noop';
 import { elementAt } from '../../lib/elementAt';
 import { positiveSweep } from '../../lib/angle';

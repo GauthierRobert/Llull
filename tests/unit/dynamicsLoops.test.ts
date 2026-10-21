@@ -2,8 +2,8 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import { analyseMobility } from '@core/dynamics/mobility';
-import { buildTopology, isRefusal, type Topology } from '@core/dynamics/topology';
+import { analyseMobility } from '@dynamics/sim/mobility';
+import { buildTopology, isRefusal, type Topology } from '@dynamics/sim/topology';
 import { sliderCrank } from './sliderCrankFixture';
 
 function topologyOf(doc: CadDocument): Topology {

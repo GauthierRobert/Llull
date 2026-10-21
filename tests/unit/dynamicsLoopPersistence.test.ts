@@ -4,7 +4,7 @@ import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { dynamicsProblems } from '@core/commands/persistence/dynamicsValidation';
 import { createDynamicsModel } from '@core/model/dynamics';
-import { resolveTimestep } from '@core/dynamics/timestep';
+import { resolveTimestep } from '@dynamics/sim/timestep';
 import { DEFAULT_SOLVER_SETTINGS } from '@core/model/dynamics';
 import { sliderCrank } from './sliderCrankFixture';
 

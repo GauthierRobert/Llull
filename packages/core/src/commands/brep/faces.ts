@@ -7,7 +7,7 @@ import type { FaceDetail, FaceGraph } from '../../geometry/kernelPorts';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { currentContext } from '../context';
-import { operandRecipe } from './kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { commandError, rejection, report } from '../noop';
 import { fixedNumber } from '../../lib/compactNumber';
 

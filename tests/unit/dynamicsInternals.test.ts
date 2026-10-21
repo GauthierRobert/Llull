@@ -3,10 +3,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { createDynamicsModel, type DynamicsModel, type Motor, type PropellerLoad } from '@core/model/dynamics';
-import { appliedLoadsFor, motorForce, propellerOutput, speedServoGains } from '@core/dynamics/forceLaws';
-import { bodyMassProperties, buildSimulationModel } from '@core/dynamics/simulationModel';
+import { appliedLoadsFor, motorForce, propellerOutput, speedServoGains } from '@dynamics/sim/forceLaws';
+import { bodyMassProperties } from '@core/geometry/bodyMassProperties';
+import { buildSimulationModel } from '@dynamics/sim/simulationModel';
 import { setPhysicsEngine, type SimulationTrace } from '@core/dynamics/physicsEngine';
-import { simulationData, simulationSummary, type SimulationData } from '@core/dynamics/simulationReport';
+import { simulationData, simulationSummary, type SimulationData } from '@dynamics/sim/simulationReport';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 
 beforeAll(async () => {

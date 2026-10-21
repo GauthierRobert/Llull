@@ -22,8 +22,8 @@ import { connectivityItems } from '../../geometry/assemblyCheck/connectivity';
 import { type GeometryQueryEngine, meshBvhEngine, resolveGeometryQueries } from '../../geometry/geometryQueries';
 import { measureThickness } from '../../geometry/assemblyCheck/thickness';
 import { realiseJoint } from '../../geometry/assemblyCheck/jointRealisation';
-import { type PartScope, candidateIds, collectParts, scopedIds } from './assemblyParts';
-import { assemblyLinks, intentOf } from './assemblyGraph';
+import { type PartScope, candidateIds, collectParts, scopedIds } from '../../geometry/assemblyParts';
+import { assemblyLinks, intentOf } from '../../geometry/assemblyGraph';
 
 export interface AssemblyCheckParams extends PartScope {
   readonly clearanceMm?: number | undefined;

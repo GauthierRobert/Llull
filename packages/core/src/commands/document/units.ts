@@ -4,7 +4,7 @@
  * @failure invalid unit or negative/non-integer/>20 precision -> no-op, affected:[]
  */
 
-import { type CadDocument, DOCUMENT_UNITS } from '../../model/types';
+import { DOCUMENT_UNITS } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { noop, report } from '../noop';
@@ -40,12 +40,3 @@ export const setUnits = defineCommand({
     return report({ ...doc, units: nextUnits, displayPrecision: nextPrecision }, `Units set to ${nextUnits}, precision ${nextPrecision}.`);
   },
 });
-
-/**
- * Format a length value using the document's current units and displayPrecision.
- *
- * @example formatLength(doc, 12.5) // "12.500 mm"
- */
-export function formatLength(doc: CadDocument, value: number): string {
-  return `${value.toFixed(doc.displayPrecision)} ${doc.units}`;
-}

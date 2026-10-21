@@ -1,7 +1,7 @@
 /** PHY-03 benchmark support: explicit Stefan-Boltzmann constant, cavity-radiation start warning, temperature probes between nodes. */
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
-import { STEFAN_BOLTZMANN } from '@lib/thermalClosedForms';
+import { STEFAN_BOLTZMANN } from '@cae/thermal/thermalClosedForms';
 import { buildDeckContext } from '@cae/decks/context';
 import { thermalSections } from '@cae/thermal/deck';
 import { thermalResultsSummary } from '@cae/thermal/summary';

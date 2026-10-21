@@ -24,7 +24,7 @@ The same commands run in the desktop app (WASM loaded on the first Simulate), in
 UI: **Mechanisms › Physics** lists the bodies, runs _Simulate_, shows the operating point and an rpm chart, and replays
 the motion in the 3D view (play / scrub / slow motion down to 1/100).
 
-Engine layout: `packages/core/src/dynamics/` (engine contract, doc → model, force laws, report),
+Engine layout: `packages/core/src/dynamics/physicsEngine.ts` (the injected port), `packages/domain-dynamics/src/{sim,commands}/` (plugin `dynamics`: doc → model, force laws, report, commands; alias `@dynamics/*`),
 `packages/physics-mujoco/` (MJCF generation + stepping), `packages/core/src/geometry/{massProperties,entityMassProperties}.ts`.
 
 ### Springs, energy and unsettled-run warnings

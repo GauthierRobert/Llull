@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { thermalResultsSummary } from '@cae/thermal/summary';
-import { STEFAN_BOLTZMANN } from '@lib/thermalClosedForms';
+import { STEFAN_BOLTZMANN } from '@cae/thermal/thermalClosedForms';
 import { addBc, must, resultsFor, thermalFixture, twoTetMesh, type ThermalFixture } from './fixtures';
 
 /** Face 1 of element 2 (nodes 2-3-4): the shared face of the two tets counted once. */

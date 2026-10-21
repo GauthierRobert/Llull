@@ -6,7 +6,7 @@ import type { Orientation } from '../../geometry/recognition/model';
 import { type CadDocument, type ShapeRecipe, is3D } from '../../model/types';
 import type { CommandResult, ExecutionContext } from '../types';
 import { currentContext } from '../context';
-import { operandRecipe } from '../brep/kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { refuse } from './ftr';
 import { meshCorners } from '../../geometry/meshExtent';
 import { distance3 } from '../../lib/vec3';

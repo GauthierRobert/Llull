@@ -12,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
-import { operandRecipe } from '@core/commands/brep/kernelShape';
+import { operandRecipe } from '@core/geometry/operandRecipe';
 import { lengthToleranceOf, recognitionOf } from '@core/commands/features/recognition';
 import { buildModel } from '@core/geometry/recognition/model';
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';

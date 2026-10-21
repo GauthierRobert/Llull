@@ -55,7 +55,7 @@ Lanes own disjoint write scopes (`.claude/work/BOARD.md` is the ledger):
 
 | Lane | Agent | Owns |
 | ---- | ----- | ---- |
-| 1 Core | `command-author` | `packages/core/src/**`, `packages/{domain-aec,domain-cae,domain-aero,design-lang,plm}/src/**`, `packages/kernel-*/src/**` |
+| 1 Core | `command-author` | `packages/core/src/**`, `packages/{domain-aec,domain-cae,domain-aero,domain-dynamics,design-lang,plm}/src/**`, `packages/kernel-*/src/**` |
 | 2 3D+Shell | `viewport-engineer` | `src/ui/viewport/3d/**`, `src/ui/{components,panels,store}/**`, `src/app/**` |
 | 3 2D | `viewport-engineer` | `src/ui/viewport/2d/**`, snapping/tracking helpers |
 | 4 CLI | `cli-engineer` | `packages/protocol/src/**`, `server/**` |

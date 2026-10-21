@@ -10,7 +10,7 @@ import { autoPlacement } from '../../geometry/pmiPlacement';
 import { type CadDocument, is3D } from '../../model/types';
 import { type FeatureProblem, type SolidFaces, openSolid, resolveIn } from '../../geometry/pmiFeatures';
 import { featureElement, locate, measureSize } from '../../geometry/pmiMeasure';
-import { operandRecipe } from '../brep/kernelShape';
+import { operandRecipe } from '../../geometry/operandRecipe';
 import { type Finding, finding } from './rules';
 
 const NO_KERNEL: FeatureProblem = { code: 'GDT_KERNEL_NO_TOPOLOGY', message: 'requires the OCC kernel', pointIndices: [] };

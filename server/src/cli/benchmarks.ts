@@ -2,13 +2,13 @@
  * `llull run_benchmarks` (PHY-00 FR-VNV-11): host transport that discovers every physics pack's `expected_results.json` (plus the
  * aerospace files listed in quality/physics-benchmarks.json, read through the 05 adapter), runs each case's harness recipe in-process or
  * takes the value a pack's unit test measured (`.cache/quality-physics/unit-measurements.jsonl`), and judges it with the core judge.
- * No V&V arithmetic here: the judge and the schema are core (`@core/commands/vnv`).
+ * No V&V arithmetic here: the judge and the schema are core (`@cae/vnv`).
  */
 import fs from 'fs';
 import path from 'path';
 import { execute, getCommand } from '@core/commands/registry';
-import { adaptLegacyCase, expectedResultsFileSchema, normaliseGrade, type ExpectedCase, type JsonValue } from '@core/commands/vnv/expected';
-import { judgeCase, type Measured, type Verdict } from '@core/commands/vnv/judge';
+import { adaptLegacyCase, expectedResultsFileSchema, normaliseGrade, type ExpectedCase, type JsonValue } from '@cae/vnv/expected';
+import { judgeCase, type Measured, type Verdict } from '@cae/vnv/judge';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { paramsSource } from './argv';
 
