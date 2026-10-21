@@ -17,7 +17,7 @@ import { candidateIds, collectParts } from '@core/geometry/assemblyParts';
 import { assemblyLinks } from '@core/geometry/assemblyGraph';
 import { dynamicsOf } from './bodies';
 import { simulateMotion } from './simulate';
-import { MAX_CLASSIFIED_TOTAL, MAX_EVALUATIONS, planMotion, runMotion } from './motionClearanceRun';
+import { MAX_CLASSIFIED_TOTAL, MAX_EVALUATIONS, planMotion, runMotion, withPrefetch } from './motionClearanceRun';
 
 const MAX_PARTS = 500;
 const MAX_PAIRS = 2000;
@@ -184,7 +184,7 @@ export function motionClearanceCheck(
       `${plan.pairs.length} pairs x ${Math.ceil(plan.times.length / stride)} samples is over ${MAX_PAIR_SAMPLES} pair-samples`,
     );
 
-  const outcome = runMotion(plan, { evaluations: evaluationBudget, classified: MAX_CLASSIFIED_TOTAL });
+  const outcome = runMotion(withPrefetch(plan, ctx?.geometryQueries), { evaluations: evaluationBudget, classified: MAX_CLASSIFIED_TOTAL });
   if (outcome.exhausted)
     return refuse('FPR_BUDGET_EXCEEDED', `the sweep needs more than ${evaluationBudget} distance evaluations (fast motion, many pairs)`);
   const items: CheckItem[] = [

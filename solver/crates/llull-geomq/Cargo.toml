@@ -1,0 +1,17 @@
+[package]
+name = "llull-geomq"
+description = "Batch geometric queries of llull-compute geomq (RS1 RS-6): mesh clearance, wall-thickness rays, view-factor exchange with obstruction"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+llull-jsmath = { path = "../llull-jsmath" }
+llull-protocol = { path = "../llull-protocol" }
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

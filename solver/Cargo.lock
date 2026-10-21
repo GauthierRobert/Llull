@@ -1038,6 +1038,7 @@ version = "0.1.0"
 dependencies = [
  "llull-cloud",
  "llull-explicit",
+ "llull-geomq",
  "llull-panel",
  "llull-post",
  "llull-protocol",
@@ -1053,6 +1054,17 @@ version = "0.1.0"
 dependencies = [
  "llull-bvh",
  "llull-gpu",
+ "llull-protocol",
+ "rayon",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "llull-geomq"
+version = "0.1.0"
+dependencies = [
+ "llull-jsmath",
  "llull-protocol",
  "rayon",
  "serde",

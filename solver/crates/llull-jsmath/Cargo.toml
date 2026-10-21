@@ -1,6 +1,6 @@
 [package]
 name = "llull-jsmath"
-description = "Bit-exact twins of the JavaScript (V8) Math functions the TypeScript references use: pow, log, log10, hypot, round"
+description = "Bit-exact twins of the JavaScript (V8) Math functions the TypeScript references use: pow, exp, log, log10, atan, hypot, round"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -16,6 +16,8 @@ import { STATIC_POSE, type PoseTrack, isMoving, poseAt, relativeTransform, relat
 import { collectParts } from '@core/geometry/assemblyParts';
 import { intentOf } from '@core/geometry/assemblyGraph';
 import { bisectEdge, goldenMinimum } from './motionRefine';
+import { type MotionPrefetch, prefetchMotion } from './motionPrefetch';
+import type { GeometryQueryEngine } from '@core/geometry/geometryQueries';
 
 /** Most substeps between two recorded samples (pose interpolation against tunnelling). */
 const MAX_SUBSTEPS = 16;
@@ -54,6 +56,8 @@ export interface MotionPlan {
   readonly eps: number;
   readonly clearance: number;
   readonly mmPerUnit: number;
+  /** Pair distances at recorded samples computed up front by the injected engine (RS-6), or null. */
+  readonly prefetched: MotionPrefetch | null;
 }
 
 export interface MotionPlanInput {
@@ -103,7 +107,23 @@ export function planMotion(input: MotionPlanInput): MotionPlan {
       pairs.push([a, b]);
     }
   });
-  return { ...input, parts, pairs, times: poses.times, tracks };
+  return { ...input, parts, pairs, times: poses.times, tracks, prefetched: null };
+}
+
+/** `plan` with its sample distances prefetched by `engine` when the engine prefetches (`limits.motionPrefetchQueries` > 0, RS-6). */
+export function withPrefetch(plan: MotionPlan, engine: GeometryQueryEngine | null | undefined): MotionPlan {
+  if (engine === null || engine === undefined) return plan;
+  const index = new Map(plan.parts.map((part, i) => [part, i]));
+  const prefetched = prefetchMotion({
+    engine,
+    meshes: plan.parts.map((p) => p.part.mesh ?? { positions: [], indices: [] }),
+    pairs: plan.pairs,
+    meshesOf: ([a, b]) => [index.get(a) ?? 0, index.get(b) ?? 0],
+    sampleCount: plan.times.length,
+    stride: plan.stride,
+    placementAt: ([a, b], sample) => relativeTransform(poseOf(plan, a, sample), poseOf(plan, b, sample)),
+  });
+  return prefetched === null ? plan : { ...plan, prefetched };
 }
 
 /** A place on the strided run: `u` = sample index plus fraction. */
@@ -230,7 +250,7 @@ interface Sweep {
  * An interval that is not certified is split down to single recorded samples, which get the substep treatment of the finest step.
  * @invariant no moment is skipped on a guess: a skipped stretch is certified, so thinning never hides a short contact
  */
-function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart, budget: Budget): Sweep {
+function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart, budget: Budget, pairIndex: number): Sweep {
   const lowBound = plan.clearance + plan.eps;
   const limit = Math.max(Math.min(a.thin, b.thin) / 2, 1e-9);
   const state: { best: Closest | null; bound: number } = { best: null, bound: Infinity };
@@ -239,7 +259,13 @@ function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart, budget: Budget): 
     evaluations++;
     budget.evaluations--;
     const poseA = poseOf(plan, a, u);
-    const hit = bvhMinDistance(a.bvh, b.bvh, bound, relativeTransform(poseA, poseOf(plan, b, u)));
+    const cached = Number.isInteger(u) ? plan.prefetched?.(pairIndex, u) : undefined;
+    const hit =
+      cached === undefined
+        ? bvhMinDistance(a.bvh, b.bvh, bound, relativeTransform(poseA, poseOf(plan, b, u)))
+        : cached !== null && cached.distance <= bound
+          ? cached
+          : null;
     return hit === null
       ? null
       : { distance: hit.distance, moment: momentAt(plan, u), witness: [pointAtPose(hit.pointA, poseA), pointAtPose(hit.pointB, poseA)] };
@@ -407,9 +433,9 @@ export function runMotion(plan: MotionPlan, budget: Budget): MotionOutcome {
   const undersampled = new Set<string>();
   let evaluations = 0;
   let maxStepMm = 0;
-  for (const [a, b] of plan.pairs) {
+  for (const [pairIndex, [a, b]] of plan.pairs.entries()) {
     const ids = [a.part.id, b.part.id];
-    const result = sweep(plan, a, b, budget);
+    const result = sweep(plan, a, b, budget, pairIndex);
     evaluations += result.evaluations;
     if (result.exhausted) return { pairs, items, evaluations, exhausted: true };
     maxStepMm = Math.max(maxStepMm, result.maxStepMm);

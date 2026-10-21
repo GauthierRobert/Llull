@@ -1,7 +1,7 @@
 //! Bit-exact twins of the V8 `Math` functions used by the TypeScript references that native jobs must reproduce (RS1 §2 rule 4).
 //!
 //! The platform `f64::powf` / `log10` (glibc) differ from V8 in the last bit for several percent of the inputs, so a native port of a
-//! TypeScript formula would not be bit-identical. `pow`, `exp`, `log` and `log10` transliterate V8's `src/base/ieee754.cc` (fdlibm 5.3);
+//! TypeScript formula would not be bit-identical. `pow`, `exp`, `log`, `log10` and `atan` transliterate V8's `src/base/ieee754.cc` (fdlibm 5.3);
 //! `hypot` is V8's Kahan-compensated `Math.hypot`; `round` is ECMAScript `Math.round`.
 //!
 //! fdlibm notice (kept as its licence requires): Copyright (C) 1993-2004 by Sun Microsystems, Inc. All rights reserved.
@@ -516,6 +516,76 @@ pub fn pow(x: f64, y: f64) -> f64 {
         z = with_high(z, high(z).wrapping_add(((n as u32) << 20) as i32));
     }
     s * z
+}
+
+/// V8 `Math.atan` (fdlibm `atan`, s_atan.c; V8 `ieee754::atan`).
+#[allow(clippy::many_single_char_names)]
+pub fn atan(x: f64) -> f64 {
+    const ATAN_HI: [u64; 4] = [0x3FDD_AC67_0561_BB4F, 0x3FE9_21FB_5444_2D18, 0x3FEF_730B_D281_F69B, 0x3FF9_21FB_5444_2D18];
+    const ATAN_LO: [u64; 4] = [0x3C7A_2B7F_222F_65E2, 0x3C81_A626_3314_5C07, 0x3C70_0788_7AF0_CBBD, 0x3C91_A626_3314_5C07];
+    const AT: [u64; 11] = [
+        0x3FD5_5555_5555_550D,
+        0xBFC9_9999_9998_EBC4,
+        0x3FC2_4924_9200_83FF,
+        0xBFBC_71C6_FE23_1671,
+        0x3FB7_45CD_C54C_206E,
+        0xBFB3_B0F2_AF74_9A6D,
+        0x3FB1_0D66_A0D0_3D51,
+        0xBFAD_DE2D_52DE_FD9A,
+        0x3FA9_7B4B_2476_0DEB,
+        0xBFA2_B444_2C6A_6C2F,
+        0x3F90_AD3A_E322_DA11,
+    ];
+    let hi = |i: usize| f64::from_bits(ATAN_HI[i]);
+    let lo = |i: usize| f64::from_bits(ATAN_LO[i]);
+    let at = |i: usize| f64::from_bits(AT[i]);
+    let hx = high(x);
+    let ix = hx & 0x7fff_ffff;
+    let mut x = x;
+    let id: i32;
+    if ix >= 0x4410_0000 {
+        if ix > 0x7ff0_0000 || (ix == 0x7ff0_0000 && low(x) != 0) {
+            return x + x;
+        }
+        return if hx > 0 { hi(3) + lo(3) } else { -hi(3) - lo(3) };
+    }
+    if ix < 0x3fdc_0000 {
+        if ix < 0x3e40_0000 {
+            return x;
+        }
+        id = -1;
+    } else {
+        x = x.abs();
+        if ix < 0x3ff3_0000 {
+            if ix < 0x3fe6_0000 {
+                id = 0;
+                x = (2.0 * x - 1.0) / (2.0 + x);
+            } else {
+                id = 1;
+                x = (x - 1.0) / (x + 1.0);
+            }
+        } else if ix < 0x4003_8000 {
+            id = 2;
+            x = (x - 1.5) / (1.0 + 1.5 * x);
+        } else {
+            id = 3;
+            x = -1.0 / x;
+        }
+    }
+    let z = x * x;
+    let w = z * z;
+    let s1 = z * (at(0) + w * (at(2) + w * (at(4) + w * (at(6) + w * (at(8) + w * at(10))))));
+    let s2 = w * (at(1) + w * (at(3) + w * (at(5) + w * (at(7) + w * at(9)))));
+    if id < 0 {
+        return x - x * (s1 + s2);
+    }
+    let k = id as usize;
+    let z = hi(k) - ((x * (s1 + s2) - lo(k)) - x);
+    if hx < 0 {
+        -z
+    } else {
+        z
+    }
 }
 
 #[cfg(test)]

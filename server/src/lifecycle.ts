@@ -5,6 +5,7 @@ import type { Express } from 'express';
 import { installGeometryKernel } from './geometryKernel';
 import { installPhysicsEngine } from './physicsEngine';
 import { installRasterPort } from './native/rasterPort';
+import { installGeometryQueryEngine } from './native/geometryQueryEngine';
 import { flushAutosave, stopAutosave, closeAllSubscribers } from './liveDocument';
 import { killAllChildren } from './childProcesses';
 import { checkBindSafety } from './security';
@@ -58,6 +59,7 @@ export async function startServer(app: Express, port: number, host: string): Pro
   const refusal = checkBindSafety(host);
   if (refusal !== null) throw new Error(refusal);
   installRasterPort();
+  installGeometryQueryEngine();
   await Promise.all([installGeometryKernel(), installPhysicsEngine()]);
   const server = app.listen(port, host);
   await new Promise<void>((resolve, reject) => {
