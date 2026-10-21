@@ -91,6 +91,10 @@ describe('span table', () => {
     expect(pipeSpanLimit(dn, od)).toEqual({ dn, spanM: span, approximated: false });
     expect(pipeSpanLimit(undefined, od + 1)).toEqual({ dn, spanM: span, approximated: false });
   });
+  it('recognises the ASME outside diameters of NPS 2½ and NPS 5', () => {
+    expect(pipeSpanLimit(undefined, 73.0)).toEqual({ dn: 65, spanM: 3.4, approximated: false });
+    expect(pipeSpanLimit(undefined, 141.3)).toEqual({ dn: 125, spanM: 4.9, approximated: false });
+  });
   it('never rounds an untabulated size up', () => {
     expect(pipeSpanLimit(undefined, 95)).toEqual({ dn: 80, spanM: 3.7, approximated: true });
     expect(pipeSpanLimit(90, 101.6)).toEqual({ dn: 80, spanM: 3.7, approximated: true });
