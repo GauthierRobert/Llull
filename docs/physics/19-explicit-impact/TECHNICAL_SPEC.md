@@ -596,8 +596,6 @@ eroding front differs locally. Hence the looser bounds for that case.
 **Wall time (VC-EXP-67, measured):** 10 240 hex8, 754 cycles, release build: CPU twin 35.5 s, GPU 4.96 s (including set-up).
 Reproduce with `cargo test --release --features gpu --test gpu -- --ignored --nocapture`.
 
-Build note: on Windows without MSVC the GNU toolchain needs a `dlltool` stand-in (`-C dlltool=…`) for `windows-sys` raw-dylib.
-
 ### 13.7 As built: RS-8c penalty contact (2026-10-20)
 
 Source: [E2] Ch. 29, with every equation read from rendered page images (PDF pages 650–690), plus [E3] for keyword defaults. Code:

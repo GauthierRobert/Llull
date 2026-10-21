@@ -119,7 +119,15 @@ fn main() {
     if compiler.is_like_gnu() && !compiler.is_like_clang() {
         build.flag("-fno-ipa-cp-clone");
     }
-    build.include(&include_dir).std("c++17").define("_USE_MATH_DEFINES", None).flag_if_supported("-w").compile("llull-kernel-occt-facade");
+    // `llull-kernel-occt/cpp/*.hxx` resolves through cxx's crate symlink, which Windows only creates with symlink rights: add the parent too.
+    let crates_dir = Path::new(env!("CARGO_MANIFEST_DIR")).parent().expect("crate has a parent directory");
+    build
+        .include(crates_dir)
+        .include(&include_dir)
+        .std("c++17")
+        .define("_USE_MATH_DEFINES", None)
+        .flag_if_supported("-w")
+        .compile("llull-kernel-occt-facade");
     // After the static facade: a single-pass linker (GNU ld with MinGW import libraries) resolves the facade's OCCT symbols only from libraries
     // named after it.
     for name in OCCT_LIBS.iter().copied().chain(has_iges.then_some(IGES_LIB)) {

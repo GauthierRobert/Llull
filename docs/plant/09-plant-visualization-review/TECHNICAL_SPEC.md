@@ -791,11 +791,9 @@ reference, CLI first; no viewport UI). Everything else in §3–§8 is still pro
 - Perspective strokes are clipped at the near plane only. A stroke ending next to the eye can project far
   off-screen, and `strokeSegment` then walks every pixel step of it. Follow-up: clip to the buffer rectangle in the
   prepare stage (both twins read the same buffers, so parity holds).
-- Windows build of `--features gpu` on a machine without MSVC: `solver/scripts/dlltool-shim` (GNU toolchain) makes
-  wgpu link. With it, the `gpu`-feature scene test intermittently ended with an access violation when run with
-  output capture: about 1 run in 3, 0 of 6 with `--nocapture`, 0 of 4 full workspace runs. The production binary was
-  stable: 12 / 12 renders, the server suite and the CLI. This still has to be reproduced on an MSVC toolchain to rule
-  out the stand-in.
+- The intermittent access violation of the `gpu`-feature scene test under output capture (about 1 run in 3) came from
+  the GNU toolchain's temporary `dlltool` stand-in: with MSVC (VS 2022 Build Tools 14.44, 2026-10-21) the same
+  `cargo test -p llull-raster --features gpu` passed 3 / 3 with capture; the stand-in is removed.
 
 ### 12.5 Not built yet (remaining VIS work)
 

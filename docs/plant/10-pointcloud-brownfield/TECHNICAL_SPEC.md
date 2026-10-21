@@ -738,11 +738,6 @@ parameter per extraction (`insulationThickness`, named default 0). Q6 open (owne
 MIT / Apache-2.0), `wgpu` 25 (MIT / Apache-2.0, feature `gpu`). Nothing GPL. Test data: the pack's files (licences in
 `validation/data/licenses/`) and clouds generated in the tests.
 
-### 13.6 Build note (Windows without MSVC Build Tools)
-
-The crates build with the `1.97.0-x86_64-pc-windows-gnu` toolchain, `RUSTFLAGS=-C link-self-contained=yes` and a MinGW `as` /
-`dlltool` on `PATH` (`windows-link` raw-dylib import libraries); MSVC builds are unchanged.
-
 ## 12. References
 
 - [R1] ASTM E2807-11(2019)e1, 3D Imaging Data Exchange, Version 1.0 — ASTM — https://www.astm.org/e2807-11r19e01.html (catalogue page, not reachable; accessed 2026-10)

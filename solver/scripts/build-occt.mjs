@@ -28,7 +28,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { cpus, homedir, platform } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { pathToFileURL } from 'node:url';
@@ -191,7 +191,8 @@ export async function buildOcct(prefix = occtPrefix()) {
   const tarball = join(work, `opencascade_${OCCT_VERSION}+dfsg.orig.tar.xz`);
   await download(tarball);
   const sourceDir = join(work, SOURCE_DIR_NAME);
-  if (!existsSync(join(sourceDir, 'CMakeLists.txt'))) run('tar', ['-xJf', tarball, '-C', work]);
+  // Relative archive name: GNU tar (Git for Windows) reads `C:\…` as a remote host.
+  if (!existsSync(join(sourceDir, 'CMakeLists.txt'))) run('tar', ['-xJf', basename(tarball)], work);
   const buildDir = join(work, 'build');
   const projectInclude = join(work, 'llull-compiler-workarounds.cmake');
   writeFileSync(projectInclude, GCC_WORKAROUND_CMAKE);
