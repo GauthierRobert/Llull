@@ -798,20 +798,29 @@ std::map<int, std::string> read_pmi(const Handle(XCAFDoc_DimTolTool) & tool, con
 
   // Tolerances read from the STEP side (entities, then text) are paired with the XCAF ones of the same product, characteristic and datums, exact
   // values first: XCAF reports 0 for a magnitude it cannot type and a wrongly scaled value for some modified tolerances, the text is authoritative.
-  // A STEP-side tolerance with no partner is one XCAF dropped.
+  // A STEP-side tolerance with no partner is one XCAF dropped. Partners on the same faces come first (phases 0-1): a part with several
+  // profiles against the same datums would otherwise pair by XCAF's label order, which differs between builds (stc_07: MinGW vs MSVC).
   std::vector<std::pair<int, ToleranceRead>> from_entities, from_text;
+  const auto same_faces = [](const ToleranceRead &a, const ToleranceRead &b) {
+    if (a.faces.empty() || b.faces.empty()) return false;
+    std::vector<int> left = a.faces, right = b.faces;
+    std::sort(left.begin(), left.end());
+    std::sort(right.begin(), right.end());
+    return left == right;
+  };
   const auto reconcile = [&](std::vector<std::pair<int, ToleranceRead>> &incoming, int pass) {
     std::vector<bool> placed(incoming.size(), false);
-    for (int phase = 0; phase < 2; ++phase) {
+    for (int phase = 0; phase < 4; ++phase) {
       for (size_t k = 0; k < incoming.size(); ++k) {
         if (placed[k]) continue;
         const int owner = incoming[k].first;
         const ToleranceRead &read = incoming[k].second;
         for (ToleranceRead &existing : collected[owner].tolerances) {
           if ((existing.paired_by & pass) != 0 || existing.characteristic != read.characteristic) continue;
+          if (phase < 2 && !same_faces(existing, read)) continue;
           if (existing.datums != read.datums && !(pass == 2 && read.datums.empty())) continue;
           const bool equal = std::fabs(existing.value - read.value) <= 1e-9 * std::max(1.0, std::fabs(read.value));
-          if (phase == 0 && !equal && existing.value != 0 && read.value != 0) continue;
+          if (phase % 2 == 0 && !equal && existing.value != 0 && read.value != 0) continue;
           if (existing.value == 0 || (pass == 2 && read.value != 0)) existing.value = read.value;
           existing.paired_by |= pass;
           placed[k] = true;

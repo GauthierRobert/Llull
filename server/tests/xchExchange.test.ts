@@ -399,6 +399,13 @@ describeNativeWhen({ capabilities: XDE, unless: NIST_MISSING ? `${NIST} has no N
       const stc07 = pmiOf('nist_stc_07_asme1_ap242-e3.stp');
       expect(tolerances(stc07)).toHaveLength(22);
       expect(tolerances(stc07).filter((entry) => entry.characteristic === 'position')).toHaveLength(9);
+      // ten surface profiles, most against A|B|C: each value stays on its own faces whatever order XCAF lists them in
+      expect(tolerances(stc07).filter((entry) => entry.value === 0)).toEqual([]);
+      const onFace8 = tolerances(stc07).filter((entry) => entry.characteristic === 'profile_surface' && entry.faces.join() === '8');
+      expect(onFace8.map((entry) => [entry.value, entry.datums.join('')]).sort()).toEqual([
+        [0.01, 'A'],
+        [0.06, 'ABC'],
+      ]);
       // CTC-02: the datum features reach faces through ITEM_IDENTIFIED_REPRESENTATION_USAGE; a modified perpendicularity keeps the file's 0.1 mm
       const ctc02 = pmiOf('nist_ctc_02_asme1_ap242-e2.stp');
       // A..D are datum targets (points), K lies on a sheet product the import folds away: the solid carries the five datum features E, F, G, H, J

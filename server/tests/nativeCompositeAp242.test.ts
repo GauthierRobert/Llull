@@ -206,7 +206,29 @@ describeNativeWhen({ capabilities: ['writeExchange', 'importExchange'], label: '
         .map((finding) => finding.recomputed);
       console.warn(`dome ply areas ${areas.join(', ')} recomputed ${recomputed.join(', ')}; faceted ${exported.solids.faceted.length}`);
       expect(Math.max(...areas.map((area, k) => rel(area, recomputed[k] as number)))).toBeLessThan(1e-9);
-    });
+    }, 120_000);
+
+    it('picks the conical face of a revolved frustum through the kernel face query (06 §13.4, KRN-MSVC)', () => {
+      let doc = withMaterials();
+      const tool = ok(doc, 'revolve_profile', {
+        profile: [
+          [0, 0],
+          [100, 0],
+          [50, 150],
+          [0, 150],
+        ],
+        axis: 'z',
+      });
+      doc = apply(tool.document, 'define_rosette', ROSETTE);
+      const part = ok(doc, 'create_composite_part', {
+        name: 'Frustum',
+        toolSurface: { entityId: tool.affected[0], faceNear: [75, 0, 75] },
+        rosette: 'R0',
+      });
+      const created = part.document.composites?.parts[part.affected[0] as string];
+      if (created?.surface.type !== 'cone') throw new Error(`cone expected, got ${created?.surface.type}`);
+      expect(created.surface.semiAngle).toBeCloseTo(Math.atan2(50, 150), 9);
+    }, 120_000);
 
     /** A panel whose upper ply is split into several exact solids over a smaller lower ply, with names Part 21 has to escape. */
     const stacked = (tool: string, part: string, plies: [string, string]): CadDocument => {
