@@ -1,4 +1,4 @@
-/** The slice of the MuJoCo WASM bindings this adapter uses (the generated typings are `any`). Names verified against 3.14.0. */
+/** The slice of the MuJoCo WASM bindings this adapter uses (the generated typings are `any`). Names verified against 3.16.0. */
 
 export interface MjModel {
   readonly njnt: number;

@@ -784,8 +784,8 @@ within its 2.5 w. MVP is about 12 weeks of agent lane time. M1 and M2 run in par
 6. **Reference engine geometry.** The user's existing propeller model was not found in the repo. Use the
    single-cylinder demonstrator (validation/README §4) for MVP and a Rotax-912-class 4-cylinder for V1? Engine data
    that is not public (rod length, masses, pressure trace) stays stated test input, `unverified`.
-7. **MuJoCo version. Decided 2026-10-16 (owner): migrate to the latest (3.16.0).** Done after FPR-B merges, as its
-   own change (`packages/physics-mujoco` and `server` pins together), re-running VC-FPR-10…17 and the dynamics suite.
+7. **MuJoCo version. Decided 2026-10-16 (owner): migrate to the latest (3.16.0). Done 2026-10-22 (FPR-MJ):** `@mujoco/mujoco`
+   3.16.0 in `packages/physics-mujoco` and `server`; VC-FPR-10…17 and the dynamics suite pass, legacy outputs bit-identical to 3.14.0.
 8. **Friction equations. Decided 2026-10-16 (owner): skipped for now, no source available.**
    - The PNH / Sandoval–Heywood forms in note E were reconstructed from an OCR scan [E-R9] and are unchecked
      against SAE 890836 / 2003-01-0725 or Heywood ch. 13.

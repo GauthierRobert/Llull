@@ -219,7 +219,7 @@ export interface SimulationTrace {
 }
 
 export interface PhysicsEngine {
-  /** Engine name and version, reported with every result (e.g. "MuJoCo 3.14.0"). */
+  /** Engine name and version, reported with every result (e.g. "MuJoCo 3.16.0"). */
   readonly name: string;
   /** Deterministic: the same model and options give the same trace. Throws on a model the engine rejects. */
   simulate(model: SimulationModel, options: SimulationOptions): SimulationTrace;

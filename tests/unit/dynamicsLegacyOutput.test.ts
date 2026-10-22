@@ -8,6 +8,8 @@
  * than maxTorque allows (anti-windup). Hash cd62962de5d04058 -> dbc21a98e45a07af (the gains are now scheduled on the measured effective inertia; for this lone disc it equals the locked one, so against the previous rebaseline a2e9a2593ea063b7 only the last digits move, ~1e-13). Spin-up at 50 samples/s: speed at the first sample
  * 111.95 -> 149.83 rad/s, first torque sample 99.37 -> 68.57 N m (the governor leaves saturation sooner), peak speed 157.0796 -> 157.0796
  * rad/s (no overshoot), final position 154.566 -> 155.501 rad (the speed is reached earlier); the final speed 157.0796 rad/s is unchanged.
+ * Accepted rebaseline (all four hashes, FPR-MJ, MuJoCo 3.14.0 -> 3.16.0, owner decision 2026-10-16): every number of the four runs is
+ * bit-identical between the two versions; only data.engine changed. The hashes now leave the engine label out (checked on its own).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
@@ -59,10 +61,13 @@ function governed(): CadDocument {
   return step(joint.doc, 'add_motor', { joint: joint.id, kind: 'speed', rpm: 1500, maxTorque: 200 }).doc;
 }
 
+/** Hash of the run's data without the engine label, so an engine upgrade that changes no number keeps the baseline. */
 const hashOf = (doc: CadDocument, params: Record<string, unknown>): string => {
   const result = execute(doc, 'simulate_motion', params);
   if (result.data === undefined) throw new Error(result.summary);
-  return hashText(JSON.stringify(result.data));
+  const { engine, ...numbers } = result.data as { engine: string };
+  expect(engine).toMatch(/^MuJoCo \d+\.\d+\.\d+$/);
+  return hashText(JSON.stringify(numbers));
 };
 
 describe('simulate_motion output of models without loops or cylinders (FR-FPR-19)', () => {
@@ -72,11 +77,11 @@ describe('simulate_motion output of models without loops or cylinders (FR-FPR-19
       hashOf(doc, { duration: 2 }),
       hashOf(doc, { duration: 2, detail: 'series', sampleRate: 20 }),
       hashOf(doc, { duration: 1, detail: 'poses', sampleRate: 10, timestep: 0.0005 }),
-    ]).toEqual(['54107e68b34d638a', '5f9c9ea95b27eeaf', '2bed07da2c4f72b0']);
+    ]).toEqual(['4a46aecb5515a636', 'f7de17dc61a16a2a', '0968e683fe0a5d61']);
   });
 
   it('speed-governed flywheel', () => {
-    expect(hashOf(governed(), { duration: 1, detail: 'series' })).toBe('dbc21a98e45a07af');
+    expect(hashOf(governed(), { duration: 1, detail: 'series' })).toBe('0b199e614413c6c3');
   });
 
   it('is deterministic run to run', () => {

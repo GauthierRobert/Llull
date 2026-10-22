@@ -6,6 +6,6 @@
   "description": "MuJoCo (official WASM build) rigid-body physics behind the core PhysicsEngine interface.",
   "dependencies": {
     "@llull/core": "0.1.0",
-    "@mujoco/mujoco": "3.14.0"
+    "@mujoco/mujoco": "3.16.0"
   }
 }
