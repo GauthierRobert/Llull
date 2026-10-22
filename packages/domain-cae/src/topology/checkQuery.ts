@@ -29,7 +29,8 @@ export const checkTopology = defineCommand({
   description:
     'Readiness and review check of a topology study; call it last. Items with stable codes: set-up problems (TOP_SETUP_INVALID, ' +
     'TOP_TARGET_UNMAPPED, TOP_LOAD_OUTSIDE_DOMAIN, TOP_REGION_OUTSIDE_DOMAIN, TOP_KEEPIN_EXCEEDS_BUDGET, TOP_GRID_TOO_LARGE), TOP_FILTER_TOO_SMALL, ' +
-    'result state (TOP_RESULT_MISSING, TOP_RESULT_STALE), TOP_NOT_CONVERGED, TOP_GREY_HIGH, TOP_INPUT_UNVERIFIED (material values not verified), ' +
+    'result state (TOP_RESULT_MISSING, TOP_RESULT_STALE), TOP_NOT_CONVERGED, TOP_GREY_HIGH, TOP_CONSTRAINT_VIOLATED (a volume or compliance limit ' +
+    'not met), TOP_INPUT_UNVERIFIED (material values not verified), ' +
     'and the rebuild: TOP_REBUILD_MISSING when no `rebuildEntityIds` are given for a solved study, TOP_REBUILD_DEVIATION (IoU below the 0.85 target) ' +
     'and, for each rebuilt solid you pass, the compliance ratio F^T u / optimum from its current 05 static result (TOP_REBUILD_DEVIATION above 1.15, TOP_REBUILD_NOT_ANALYSED when there is no such result). `release` lists entity ids about to be released or exported: a topology iso-surface ' +
     'among them is TOP_RESULT_NOT_RELEASABLE (release the rebuilt part instead). status is fail on any error / fail item, warn on a warning, else pass; ' +
@@ -101,6 +102,13 @@ export const checkTopology = defineCommand({
         items.push(
           entry('TOP_GREY_HIGH', 'warning', `grey level ${summary.grey} exceeds the limit ${study.settings.greyLimit.value}`, [studyId]),
         );
+      for (const constraint of summary.constraints)
+        if (!constraint.satisfied)
+          items.push(
+            entry('TOP_CONSTRAINT_VIOLATED', 'fail', `${constraint.name} ${constraint.value} exceeds its limit ${constraint.limit}`, [
+              studyId,
+            ]),
+          );
       const rebuilds = rebuildEntityIds ?? [];
       if (rebuilds.length === 0)
         items.push(entry('TOP_REBUILD_MISSING', 'warning', 'no rebuilt solid was given to compare with the optimum', [studyId]));

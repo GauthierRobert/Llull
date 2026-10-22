@@ -2,6 +2,7 @@
 
 import { commandCatalog } from '@core/commands/schema';
 import { checkTopology } from './checkQuery';
+import { setTopologyObjective } from './objectiveCommand';
 import { recordTopologyResult } from './record';
 import { compareToTopology, suggestRebuild } from './rebuildQueries';
 import { topologyReport } from './reportQuery';
@@ -11,6 +12,7 @@ export const topologyCommands = commandCatalog(
   createTopologyStudy,
   setTopologyRegions,
   setTopologySettings,
+  setTopologyObjective,
   deleteTopologyStudy,
   recordTopologyResult,
   topologyReport,

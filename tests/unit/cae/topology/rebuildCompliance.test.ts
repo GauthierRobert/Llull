@@ -50,10 +50,19 @@ interface Rebuilt {
 
 interface RebuiltOptions {
   readonly unitSystem?: 'N-mm-t-s' | 'N-m-kg-s' | 'lbf-in-slinch-s';
-  readonly loadKind?: 'force' | 'pressure';
+  readonly loadKind?: 'force' | 'pressure' | 'gravity';
   readonly loadCase?: string;
   readonly nodeSet?: readonly number[];
+  /** Tetrahedron faces (element, CalculiX face) of the pressure load's face set. */
+  readonly faceSet?: readonly (readonly [number, number])[];
   readonly displaced?: boolean;
+  /** Nodes that moved, and by what (default nodes 2, 4, 6, 8 by [0, -uy, 0]). */
+  readonly displacedNodes?: readonly number[];
+  readonly displacement?: (uy: number) => readonly number[];
+  /** Assign the MBB material (density 0.001 g/mm^3) to the rebuilt box. */
+  readonly material?: boolean;
+  /** Element type of the one-tetrahedron mesh (a C3D10 lists the same four corners: the compliance ratio rebuilds linear tets only). */
+  readonly elementType?: 'C3D4' | 'C3D10';
   readonly solve?: boolean;
   readonly analysisType?: 'static' | 'modal';
 }
@@ -61,9 +70,14 @@ interface RebuiltOptions {
 /** The 30 x 20 x 1 rebuild with a 05 static analysis: 1000 N pulled over four nodes that moved `uy` each (F^T u = 1000 uy), recorded with its artifacts. */
 function rebuilt(base: CadDocument, topology: ReturnType<typeof artifactStore>, uy: number, options: RebuiltOptions = {}): Rebuilt {
   const { unitSystem = 'N-mm-t-s', loadKind = 'force', loadCase = 'LC1', nodeSet = [2, 4, 6, 8], displaced = true, solve = true } = options;
+  const { displacedNodes = [2, 4, 6, 8], displacement = (value: number) => [0, -value, 0], faceSet = [], elementType = 'C3D4' } = options;
   const added = execute(base, 'add_box', { size: [30, 20, 1], position: [0, 0, 0], anchor: 'min' });
   const entityId = added.affected[0] ?? '';
-  const created = execute(added.document, 'create_analysis', { name: 'rebuild', analysisType: options.analysisType ?? 'static' });
+  const withMaterial =
+    options.material === true
+      ? execute(added.document, 'assign_material', { materialName: 'topo_unit', entityIds: [entityId] }).document
+      : added.document;
+  const created = execute(withMaterial, 'create_analysis', { name: 'rebuild', analysisType: options.analysisType ?? 'static' });
   const analysisId = created.affected[0] ?? '';
   let doc = execute(created.document, 'set_part_idealization', { analysisId, entityId, idealization: 'solid' }).document;
   doc = execute(doc, 'add_fea_constraint', {
@@ -78,8 +92,8 @@ function rebuilt(base: CadDocument, topology: ReturnType<typeof artifactStore>, 
     loadCase,
     category: 'limit',
     kind: loadKind,
-    target: { entityId, facesNear: [[30, 10, 0.5]] },
-    ...(loadKind === 'force' ? { vector: [0, -1000, 0] } : { magnitude: 1 }),
+    ...(loadKind === 'gravity' ? {} : { target: { entityId, facesNear: [[30, 10, 0.5]] } }),
+    ...(loadKind === 'force' ? { vector: [0, -1000, 0] } : loadKind === 'gravity' ? { vector: [0, -9810, 0] } : { magnitude: 1 }),
   });
   doc = load.document;
   const analysis = doc.analysis;
@@ -102,14 +116,14 @@ function rebuilt(base: CadDocument, topology: ReturnType<typeof artifactStore>, 
       [7, 0, 20, 1],
       [8, 30, 20, 1],
     ],
-    blocks: [{ type: 'C3D4', entityId, elements: [[1, 1, 2, 4, 8]] }],
+    blocks: [{ type: elementType, entityId, elements: [[1, 1, 2, 4, 8]] }],
     nodeSets: { [`L_${load.affected[0]}`]: nodeSet },
-    faceSets: {},
+    faceSets: faceSet.length === 0 ? {} : { [`L_${load.affected[0]}`]: faceSet },
     targets: {},
   };
   const meshHash = hashOf(mesh);
   doc = execute(doc, 'record_fe_mesh', { analysisId, summary: meshSummary(mesh, meshHash) }, contextWith({ get: () => mesh })).document;
-  const values = displaced ? Object.fromEntries([2, 4, 6, 8].map((node) => [String(node), [0, -uy, 0]])) : {};
+  const values = displaced ? Object.fromEntries(displacedNodes.map((node) => [String(node), displacement(uy)])) : {};
   const results: FeResultsArtifact = {
     kind: 'fe_results',
     meshHash,
@@ -142,6 +156,7 @@ type Compare = {
   complianceStatus: {
     available: boolean;
     reason?: string;
+    message?: string;
     code?: string;
     analysisId?: string;
     unit?: string;
@@ -210,6 +225,49 @@ describe('compare_to_topology compliance ratio', () => {
     unavailable({ ...stale, doc: moved }, 'stale');
     unavailable({ ...stale, ctx: contextWith(topology.port) }, 'unverified');
     unavailable(rebuilt(doc, topology, 0.01, { analysisType: 'modal' }), 'no_analysis');
+  });
+
+  it('rebuilds F^T u of a pressure from the tetrahedron faces of its face set: -p x area x the mean face displacement along the outward normal', () => {
+    // face S3 of tet (1, 2, 4, 8) = nodes 2, 4, 8 at x = 30: area 10 mm^2, outward +x; p = 1 pushes along -x; the face moved -0.09 along x
+    const rebuild = rebuilt(doc, topology, 0.09, {
+      loadKind: 'pressure',
+      faceSet: [[1, 3]],
+      displacedNodes: [2, 4, 8],
+      displacement: (value) => [-value, 0, 0],
+    });
+    const out = data<Compare>(compare(rebuild));
+    expect(out.complianceRatio).toBeCloseTo(0.1, 10);
+    expect(out.complianceStatus.rebuildCompliance).toBeCloseTo(0.9, 10);
+    // a face moving along the pressure direction does positive work; a face set on an unknown element cannot be rebuilt
+    expect(
+      data<Compare>(compare(rebuilt(doc, topology, 0.09, { loadKind: 'pressure', faceSet: [[1, 3]], displacedNodes: [2, 4, 8] })))
+        .complianceRatio,
+    ).toBe(0);
+    unavailable(rebuilt(doc, topology, 0.09, { loadKind: 'pressure', faceSet: [[7, 1]], displacedNodes: [2, 4, 8] }), 'unsupported');
+  });
+
+  it('rebuilds F^T u of gravity as density x tetrahedron volume x the mean displacement along the acceleration', () => {
+    // one tet of 100 mm^3, density 1e-9 t/mm^3, g = 9810 mm/s^2: weight 9.81e-4 N; every node moved down by uy
+    const uy = 9.9 / (1e-9 * 100 * 9810);
+    const rebuild = rebuilt(doc, topology, uy, { loadKind: 'gravity', material: true, displacedNodes: [1, 2, 4, 8] });
+    const out = data<Compare>(compare(rebuild));
+    expect(out.complianceRatio).toBeCloseTo(1.1, 8);
+    // without a material density, or with a node that did not move, the ratio is unavailable
+    unavailable(rebuilt(doc, topology, uy, { loadKind: 'gravity', displacedNodes: [1, 2, 4, 8] }), 'unsupported');
+    unavailable(rebuilt(doc, topology, uy, { loadKind: 'gravity', material: true }), 'unsupported');
+    // quadratic tetrahedra are not rebuilt (corner means are the linear weights only)
+    const quadratic = rebuilt(doc, topology, uy, {
+      loadKind: 'gravity',
+      material: true,
+      displacedNodes: [1, 2, 4, 8],
+      elementType: 'C3D10',
+    });
+    unavailable(quadratic, 'unsupported');
+    expect(data<Compare>(compare(quadratic)).complianceStatus.message).toContain('C3D4');
+    unavailable(
+      rebuilt(doc, topology, 0.09, { loadKind: 'pressure', faceSet: [[1, 3]], displacedNodes: [2, 4, 8], elementType: 'C3D10' }),
+      'unsupported',
+    );
   });
 
   it('reports the ratio as unavailable for loads and results it cannot read', () => {
