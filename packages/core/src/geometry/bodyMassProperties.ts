@@ -75,7 +75,7 @@ export function bodyMassProperties(
   return {
     mass: combined.mass * scale,
     centerOfMass: scale3(combined.centerOfMass, metres),
-    inertia: combined.inertia.map((value) => value * scale * metres * metres) as unknown as InertiaTensor,
+    inertia: body.inertiaKgM2 ?? (combined.inertia.map((value) => value * scale * metres * metres) as unknown as InertiaTensor),
     densitySources: body.massKg !== undefined ? [`body '${body.id}' massKg ${body.massKg}`, ...sources] : [...sources],
     densityDefaulted: body.massKg === undefined && defaulted,
     unverifiedReasons: [...reasons],

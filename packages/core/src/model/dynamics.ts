@@ -23,6 +23,8 @@ export interface RigidBody {
   density?: number;
   /** Measured mass in kg: the geometry's mass distribution is scaled to it (hollow or lightweight parts). */
   massKg?: number;
+  /** Measured inertia, kg·m², about the centre of mass, world axes at the modelled pose: [Ixx, Iyy, Izz, Ixy, Ixz, Iyz] (tensor components); replaces the geometry's. */
+  inertiaKgM2?: readonly [number, number, number, number, number, number];
 }
 
 /**

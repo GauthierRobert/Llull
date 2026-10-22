@@ -48,8 +48,11 @@ const ENGINE = {
   pistonAcceleration: 1e-3,
   /** piston stroke and speed follow the crank angle; the speed servo lags it by about 1e-5 rad */
   pistonKinematics: 1e-5,
-  /** MuJoCo friction is a near-rigid soft constraint (impedance 0.9999): the sticking instant is late by about 2e-4 relative */
-  coulombStopTime: 1e-3,
+  /**
+   * MuJoCo friction is a near-rigid soft constraint (impedance 0.9999, reference time 2 steps): the block sticks about 2 steps late,
+   * measured 1.27e-5 relative at 1e-5 s (stickTime extrapolates the last sample; interpolating to the next sample read 2e-4)
+   */
+  coulombStopTime: 3e-5,
   /** rest position of the Coulomb oscillator, soft friction row (measured 2e-7 relative at 1e-5 s) */
   coulombRest: 1e-5,
 } as const;
@@ -109,6 +112,17 @@ function turningTimes(times: number[], velocity: number[], floor = 0): number[] 
       found.push((times[i - 1] ?? 0) + ((times[i] ?? 0) - (times[i - 1] ?? 0)) * (a / (a - b)));
   }
   return found;
+}
+
+/**
+ * Instant a Coulomb-damped joint sticks: the last moving sample extrapolated to v = 0 along its last interval (the deceleration is constant
+ * up to the stop: friction keeps its sign). Interpolating to the next, already stuck, sample would place the stop up to one sample late.
+ */
+function stickTime(times: number[], velocity: number[], floor: number): number {
+  let i = velocity.length - 1;
+  while (i > 1 && Math.abs(velocity[i] ?? 0) <= floor) i -= 1;
+  const [t0, t1, v0, v1] = [times[i - 1] ?? 0, times[i] ?? 0, velocity[i - 1] ?? 0, velocity[i] ?? 0];
+  return t1 - v1 * ((t1 - t0) / (v1 - v0));
 }
 
 /** Period = twice the time between two consecutive turning points. */
@@ -317,7 +331,7 @@ describe('VC-RBD-40 — Coulomb oscillator (m 1 kg, k 100 N/m, mu 0.1, x0 0.1 m)
       const turning = turningTimes(times, jointVelocity['slide'] as number[], 1e-6);
       const [halfCycles, stopTime, rest] = expectedOf('VC-RBD-40') as [number, number, number];
       expect(turning.length).toBe(halfCycles);
-      near('stop time', turning[turning.length - 1] as number, stopTime, ENGINE.coulombStopTime);
+      near('stop time', stickTime(times, jointVelocity['slide'] as number[], 1e-6), stopTime, ENGINE.coulombStopTime);
       const position = (index: number): number => (jointPosition['slide']?.[index] ?? 0) + 0.1;
       const last = times.length - 1;
       near('rest position', position(last), rest, ENGINE.coulombRest);

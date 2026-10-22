@@ -22,7 +22,8 @@ export interface EnergyData {
   readonly maxDeviationFraction: number;
   /**
    * Work J put into the mechanism by motors (torque curve and speed governors) and cylinder gas pressure (∫ τ·dθ per driven joint),
-   * plus the propeller work below, which the same joints' load torques took back. Absent when the engine does not report it.
+   * plus the propeller work below, which the same joints' load torques took back, plus the work of the propeller thrust on the bodies it
+   * moves (sampled centre-of-mass displacement). Absent when the engine does not report it.
    */
   readonly inputWorkJ?: number;
   /** Work J absorbed by propellers (∫ Q·|ω| dt), carried away by the air; part of the balance, not of dissipatedJ. */
@@ -80,6 +81,33 @@ function propellerSeries(dynamics: DynamicsModel, trace: SimulationTrace): numbe
   return integrate(trace.times, power);
 }
 
+/**
+ * Cumulative work of the propeller thrust on the bodies it pushes, per sample (0 at the first): Σ ½(F_k + F_k+1)·(x_k+1 - x_k), the thrust
+ * along its world direction on the joint's child body (as `appliedLoadsFor` applies it), x its sampled centre of mass. Zero for a body that
+ * does not translate.
+ */
+function thrustSeries(dynamics: DynamicsModel, trace: SimulationTrace): number[] {
+  const cumulative = trace.times.map(() => 0);
+  for (const propeller of Object.values(dynamics.propellers)) {
+    const positions = trace.bodyPosition[dynamics.joints[propeller.joint]?.child ?? ''];
+    if (positions === undefined) continue;
+    const length = Math.hypot(...propeller.thrustDirection);
+    if (!(length > 0)) continue;
+    const force = trace.times.map((_, i) => {
+      const thrust = propellerOutput(propeller, trace.jointVelocity[propeller.joint]?.[i] ?? 0).thrust / length;
+      return propeller.thrustDirection.map((c) => c * thrust);
+    });
+    let work = 0;
+    for (let i = 1; i < trace.times.length; i += 1) {
+      const [from, to, a, b] = [positions[i - 1], positions[i], force[i - 1], force[i]];
+      if (from !== undefined && to !== undefined && a !== undefined && b !== undefined)
+        work += [0, 1, 2].reduce((sum, k) => sum + 0.5 * ((a[k] ?? 0) + (b[k] ?? 0)) * ((to[k] ?? 0) - (from[k] ?? 0)), 0);
+      cumulative[i] = (cumulative[i] ?? 0) + work;
+    }
+  }
+  return cumulative;
+}
+
 /** The energy balance of a run, or null when the engine recorded no energy. */
 export function energyOf(dynamics: DynamicsModel, trace: SimulationTrace): { data: EnergyData; series: EnergySeries } | null {
   if (trace.energy === undefined || trace.times.length === 0) return null;
@@ -87,7 +115,8 @@ export function energyOf(dynamics: DynamicsModel, trace: SimulationTrace): { dat
   const total = kinetic.map((k, i) => k + (potential[i] ?? 0));
   const dissipated = dissipatedSeries(dynamics, trace);
   const propeller = propellerSeries(dynamics, trace);
-  const input = appliedWork === undefined ? [] : appliedWork.map((w, i) => w + (propeller[i] ?? 0));
+  const thrust = thrustSeries(dynamics, trace);
+  const input = appliedWork === undefined ? [] : appliedWork.map((w, i) => w + (propeller[i] ?? 0) + (thrust[i] ?? 0));
   const initial = total[0] ?? 0;
   const deviation = total.reduce((worst, e) => Math.max(worst, Math.abs(e - initial)), 0);
   const scale = Math.max(0, ...kinetic, ...potential.map(Math.abs));

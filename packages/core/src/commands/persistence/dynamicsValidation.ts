@@ -10,6 +10,7 @@ const isVec3 = (value: unknown): boolean => Array.isArray(value) && value.length
 const isNonNegative = (value: unknown): boolean => isFiniteNumber(value) && value >= 0;
 const isPositive = (value: unknown): boolean => isFiniteNumber(value) && value > 0;
 const isOptional = (value: unknown, check: (v: unknown) => boolean): boolean => value === undefined || check(value);
+const isInertia = (value: unknown): boolean => Array.isArray(value) && value.length === 6 && value.every(isFiniteNumber);
 
 type Check = (record: Record<string, unknown>) => string | null;
 
@@ -20,7 +21,9 @@ const bodyProblem: Check = (body) =>
       ? 'fixed must be a boolean'
       : !isOptional(body['density'], isPositive) || !isOptional(body['massKg'], isPositive)
         ? 'density / massKg must be positive numbers'
-        : null;
+        : !isOptional(body['inertiaKgM2'], isInertia)
+          ? 'inertiaKgM2 must be 6 finite numbers [Ixx, Iyy, Izz, Ixy, Ixz, Iyz]'
+          : null;
 
 const jointProblem: Check = (joint) =>
   joint['kind'] !== 'revolute' && joint['kind'] !== 'prismatic' && joint['kind'] !== 'spherical'

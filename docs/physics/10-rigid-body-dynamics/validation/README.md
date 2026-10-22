@@ -48,7 +48,7 @@ physical case, all documented in `server/tests/packReplay10.test.ts`:
 Measured against `expected_results.json` (`server/tests/packReplay10.test.ts`, relative error / tolerance used): periods of the
 pendulum 8.3e-8 / 1e-5; pivot tension 5e-9…1.3e-7 / 1e-6; compound pendulum 2.6e-13 and 5.3e-8 / 1e-6; spring-mass-damper
 x(0.5 s), x(1 s), decrement 3e-12…3e-11 / 1e-6; slider-crank x(90°) 2.3e-7, v(90°) 1.8e-6 (1e-5), a(0), a(90°) 2.7e-4, 6.5e-5 (1e-3),
-torque 1.4e-4, 1.9e-4 (3e-4); Coulomb stop time 2.1e-4 (1e-3), rest 1.9e-7 (1e-5).
+torque 1.4e-4, 1.9e-4 (3e-4); Coulomb stop time 1.3e-5 (3e-5; was 2.1e-4 read at the next sample), rest 1.9e-7 (1e-5).
 
 ## Real use cases
 

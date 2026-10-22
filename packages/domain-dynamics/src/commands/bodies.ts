@@ -11,6 +11,7 @@ import { bodyMassProperties } from '@core/geometry/bodyMassProperties';
 import { formatLength } from '@core/model/units';
 import { toMetres } from '@core/model/units';
 import { convertValue, isUnitFailure } from '@lib/quantity';
+import { symmetricEigen, type Symmetric3 } from '@lib/symmetricEigen';
 
 /** The document's dynamics model (empty when absent). */
 export function dynamicsOf(doc: CadDocument): DynamicsModel {
@@ -35,11 +36,27 @@ export function dynamicsIdTaken(dynamics: DynamicsModel, id: string): boolean {
   ].some((table) => idTaken(table, id));
 }
 
+/** Relative slack on the triangle inequality of the principal moments (a thin rod or plate sits on the bound). */
+const TRIANGLE_SLACK = 1e-9;
+
+/** Why an inertia tensor is not one a rigid body can have (principal moments > 0, each at most the sum of the other two), or null. */
+function inertiaProblem(tensor: Symmetric3): string | null {
+  const principal = symmetricEigen(tensor);
+  if (principal === null) return 'inertiaKgM2 has a non-finite component';
+  const [a, b, c] = principal.moments;
+  if (!(a > 0))
+    return `inertiaKgM2 is not positive definite (principal moments ${principal.moments.map((m) => m.toPrecision(4)).join(', ')} kg·m²)`;
+  if (c > (a + b) * (1 + TRIANGLE_SLACK))
+    return `inertiaKgM2 breaks the triangle inequality: principal moment ${c.toPrecision(4)} > ${a.toPrecision(4)} + ${b.toPrecision(4)} kg·m² (no mass distribution has it)`;
+  return null;
+}
+
 /**
  * @affects adds 1 rigid body to doc.dynamics (affected: [bodyId])
  * @invariant every entity id exists, is 3D and belongs to no other body
  * @invariant body.density is stored in kg/m³ whatever densityUnit was given
- * @failure empty / unknown / 2D / already-used entity, taken id, non-positive density or mass, unknown densityUnit -> no-op
+ * @failure empty / unknown / 2D / already-used entity, taken id, non-positive density or mass, unknown densityUnit,
+ *          inertiaKgM2 not positive definite or breaking the triangle inequality -> no-op
  */
 export const addRigidBody = defineCommand({
   name: 'add_rigid_body',
@@ -48,7 +65,8 @@ export const addRigidBody = defineCommand({
     "inertia are computed from the entities' real geometry: each entity uses its assigned material (density model, else plain density), else `density` (kg/m³, " +
     'default 7850 steel; aluminium 2700, wood 600, CFRP 1550; or pass densityUnit, e.g. { density: 7.85, densityUnit: "g/cm^3" }: the same ' +
     'densityUnit option as create_material, whose bare density is g/(document unit)³ instead). Give `massKg` when the real part mass is known (hollow parts): the ' +
-    'distribution is scaled to it. `fixed: true` welds the body to the ground (engine block, frame, stand). A non-fixed body with no ' +
+    'distribution is scaled to it. Give `inertiaKgM2` when the inertia is known (a point mass on a rod, a measured part): it replaces ' +
+    'the inertia computed from the geometry (the centre of mass still comes from the geometry). `fixed: true` welds the body to the ground (engine block, frame, stand). A non-fixed body with no ' +
     'joint is a free body that falls under gravity. Next: connect bodies with add_body_joint. Returns the body id in affected[0] and ' +
     'its mass / centre of mass in the summary.',
   params: z.object({
@@ -65,10 +83,20 @@ export const addRigidBody = defineCommand({
       .optional()
       .describe('Optional unit of `density`, e.g. "kg/m^3" (default), "g/cm^3", "lb/in^3"; converted to kg/m³ (the stored unit).'),
     massKg: z.number().positive().optional().describe('Known real mass in kg; the computed mass distribution is scaled to it.'),
+    inertiaKgM2: z
+      .tuple([z.number(), z.number(), z.number(), z.number(), z.number(), z.number()])
+      .optional()
+      .describe(
+        'Known inertia tensor in kg·m² about the centre of mass, world axes at the modelled pose: [Ixx, Iyy, Izz, Ixy, Ixz, Iyz] ' +
+          '(tensor components, so Ixy = -∫xy dm; zeros for principal axes along x, y, z). Replaces the geometry inertia. ' +
+          'A point mass m at distance r from its pivot: give a tiny value such as m·1e-6 on each axis.',
+      ),
     id: z.string().optional().describe('Optional explicit body id (shares the id space of all dynamics records).'),
   }),
-  run: (doc, { entityIds, name, fixed, density: given, densityUnit, massKg, id }, ctx): CommandResult => {
+  run: (doc, { entityIds, name, fixed, density: given, densityUnit, massKg, inertiaKgM2, id }, ctx): CommandResult => {
     const fail = failer(doc, 'add_rigid_body');
+    const badInertia = inertiaKgM2 === undefined ? null : inertiaProblem(inertiaKgM2);
+    if (badInertia !== null) return fail(badInertia);
     if (densityUnit !== undefined && given === undefined) return fail('densityUnit given without density');
     const converted = given === undefined || densityUnit === undefined ? { value: given } : convertValue(given, densityUnit, 'kg/m^3');
     if (isUnitFailure(converted)) return fail(`densityUnit: ${converted.message}`);
@@ -92,6 +120,7 @@ export const addRigidBody = defineCommand({
       ...(name !== undefined ? { name } : {}),
       ...(density !== undefined ? { density } : {}),
       ...(massKg !== undefined ? { massKg } : {}),
+      ...(inertiaKgM2 !== undefined ? { inertiaKgM2 } : {}),
     };
     const props = bodyMassProperties(doc, body, ctx?.kernel);
     if ('error' in props) return fail(props.error);
@@ -100,7 +129,7 @@ export const addRigidBody = defineCommand({
     return changed(
       next,
       `add_rigid_body: '${bodyId}'${name !== undefined ? ` (${name})` : ''} — ${entityIds.length} entit${entityIds.length === 1 ? 'y' : 'ies'}, ` +
-        `${props.mass.toPrecision(4)} kg, centre of mass [${center}]${body.fixed ? ', fixed to ground' : ''}.`,
+        `${props.mass.toPrecision(4)} kg, centre of mass [${center}]${inertiaKgM2 !== undefined ? ', inertia as given' : ''}${body.fixed ? ', fixed to ground' : ''}.`,
       [bodyId],
     );
   },
