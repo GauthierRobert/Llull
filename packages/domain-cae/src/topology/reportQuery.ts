@@ -8,12 +8,15 @@ import type { CommandResult } from '@core/commands/types';
 import { significantNumber } from '@lib/compactNumber';
 import { refuseTopology } from './codes';
 import { findStudy } from './model';
+import { studyRules } from './rules';
 import { studyIdSchema } from './schemas';
 import { trustedTopology } from './trust';
 
 const FORMULATION =
-  'modified SIMP E(x) = Emin + x^p (E0 - Emin), Q4 plane-stress / H8 elements on a voxel grid, optimality-criteria update with bisection on the volume multiplier, ' +
-  'sensitivity or density filter with linear-hat weights (Andreassen et al. 2011, doi:10.1007/s00158-010-0594-7)';
+  'modified SIMP E(x) = Emin + x^p (E0 - Emin), Q4 plane-stress / H8 elements on a voxel grid, optimality-criteria update with bisection on the volume multiplier ' +
+  'or the method of moving asymptotes (Svanberg 1987) for min_volume and several constraints, sensitivity or density filter with linear-hat weights ' +
+  '(Andreassen et al. 2011, doi:10.1007/s00158-010-0594-7), optional Heaviside projection with beta continuation (Wang, Lazarov & Sigmund 2011), ' +
+  'gravity as a design-dependent load (2 u.f term in the sensitivity), extrusion as one design variable per column';
 
 /** The study as the agent should read it: definition without the bulky region geometry. */
 function studyView(doc: CadDocument, study: TopologyStudy): Record<string, unknown> {
@@ -43,8 +46,10 @@ export const topologyReport = defineCommand({
   annotations: { readOnly: true },
   description:
     'Read-only report of a topology study: state (unsolved | solved | stale | missing | untrusted), the study definition, the named settings, ' +
+    'the optimizer, the projection and the rules it runs under (manufacturing constraints, minimum member rule, objective), ' +
     'and - when solved - the verified result: compliance and its unit, iterations, status (converged | max_iterations), volume fraction, grey level ' +
-    '(share of intermediate densities), solid volume, per-load-case compliance, the last `historyRows` iteration rows, the solver and its provenance. ' +
+    '(share of intermediate densities), solid volume, per-load-case compliance, the objective value and each constraint (value, limit, satisfied), ' +
+    'the last `historyRows` iteration rows, the solver and its provenance. ' +
     'A stale result (study or analysis changed since the run) shows no numbers: re-run topology_solve. The result is a concept shape that must be ' +
     'rebuilt with ordinary modelling commands (suggest_rebuild) and reviewed by an engineer; it is never releasable.',
   params: z.object({
@@ -66,6 +71,9 @@ export const topologyReport = defineCommand({
       result: summary === null ? null : { ...summary, history: summary.history.slice(Math.max(0, summary.history.length - rows)) },
       settings: study.settings,
       manufacturing: study.manufacturing,
+      optimizer: study.settings.optimizer,
+      projection: study.settings.projection ?? null,
+      rules: studyRules(doc, study),
       provenance: {
         formulation: FORMULATION,
         solver: summary?.solver ?? null,

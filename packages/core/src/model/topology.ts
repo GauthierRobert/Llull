@@ -27,11 +27,20 @@ export interface TopologyTarget {
   readonly pointsNear?: readonly Vec3[];
 }
 
-type TopologyObjective = {
-  readonly kind: 'min_compliance';
-  /** Load case name -> weight; a case not listed weighs 1. */
-  readonly loadCaseWeights: Readonly<Record<string, number>>;
-};
+export type TopologyObjective =
+  | {
+      readonly kind: 'min_compliance';
+      /** Load case name -> weight; a case not listed weighs 1. */
+      readonly loadCaseWeights: Readonly<Record<string, number>>;
+    }
+  | {
+      /** Least material whose weighted compliance stays at or below `maxCompliance` (MMA only). */
+      readonly kind: 'min_volume';
+      readonly maxCompliance: number;
+      /** Force x length unit of `maxCompliance` (the analysis unit system's, e.g. 'N*mm'). */
+      readonly unit: string;
+      readonly loadCaseWeights: Readonly<Record<string, number>>;
+    };
 
 export type TopologyRegion =
   | { readonly kind: 'target'; readonly target: TopologyTarget; readonly depthVoxels: number }
@@ -40,9 +49,23 @@ export type TopologyRegion =
 
 export type SymmetryPlane = 'XY' | 'XZ' | 'YZ';
 
-interface ManufacturingConstraints {
+export type WorldAxis = 'x' | 'y' | 'z';
+
+export interface ManufacturingConstraints {
   /** Planes through the domain AABB centre the density field is mirrored across (derived geometry only in M2). */
   readonly symmetry: readonly SymmetryPlane[];
+  /** The design is uniform along this world axis (one design variable per column of voxels). */
+  readonly extrusion?: { readonly axis: WorldAxis };
+  /** Smallest member the layout may contain, document length units: the filter radius is raised to at least half of it. */
+  readonly minMemberSize?: number;
+}
+
+/** Heaviside projection of the filtered density (density filter only): β continuation from `betaStart`, doubling every `betaEvery` iterations or on convergence, up to `beta`. */
+export interface TopologyProjection {
+  readonly beta: NamedValue;
+  readonly eta: NamedValue;
+  readonly betaStart: NamedValue;
+  readonly betaEvery: NamedValue;
 }
 
 export interface TopologySettings {
@@ -56,6 +79,7 @@ export interface TopologySettings {
   readonly greyLimit: NamedValue;
   readonly protectLoadSupport: NamedFlag;
   readonly optimizer: 'oc' | 'mma';
+  readonly projection?: TopologyProjection;
 }
 
 interface TopologyGridSummary {
@@ -81,6 +105,14 @@ export interface TopologySolverInfo {
   readonly deterministic: boolean;
 }
 
+/** A constraint of the final design as the solver reports it. */
+export interface TopologyConstraint {
+  readonly name: 'volume' | 'compliance';
+  readonly value: number;
+  readonly limit: number;
+  readonly satisfied: boolean;
+}
+
 export interface TopologyResultSummary {
   /** `false` = recorded WITHOUT its artifact (replay on a machine that lacks the store): state `missing`, never read as numbers. */
   readonly verified?: false;
@@ -101,6 +133,12 @@ export interface TopologyResultSummary {
   readonly volumeUnit: string;
   readonly history: readonly TopologyHistoryRow[];
   readonly solver: TopologySolverInfo;
+  readonly optimizer: 'oc' | 'mma';
+  /** The objective kind of the study and its value in the final design (compliance, or the volume fraction). */
+  readonly objective: { readonly kind: TopologyObjective['kind']; readonly value: number };
+  readonly constraints: readonly TopologyConstraint[];
+  /** Projection β / η of the final design when the study projects. */
+  readonly projection?: { readonly beta: number; readonly eta: number };
   readonly unverified: boolean;
   readonly unverifiedReasons: readonly string[];
   readonly concept: true;
@@ -152,4 +190,8 @@ export interface FeTopologyArtifact {
   readonly status: 'converged' | 'max_iterations';
   readonly history: readonly TopologyHistoryRow[];
   readonly solver: TopologySolverInfo;
+  /** Solver facts of V1 runs (absent on artifacts written before them: OC, the volume constraint alone). */
+  readonly optimizer?: 'oc' | 'mma';
+  readonly constraints?: readonly TopologyConstraint[];
+  readonly projection?: { readonly beta: number; readonly eta: number };
 }

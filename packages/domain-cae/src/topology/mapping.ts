@@ -173,7 +173,11 @@ export interface MappedTarget {
   readonly nodes: number[];
   /** Unit normal of the first face selector (outward), when the target has one. */
   readonly normal?: Vec3;
+  /** Area of the planar faces selected by `facesNear` (document units squared), when the target has any. */
+  readonly faceArea?: number;
 }
+
+const triangleArea = ([a, b, c]: Triangle): number => len3(cross3(sub3(b, a), sub3(c, a))) / 2;
 
 export interface MappingFailure {
   readonly error: string;
@@ -193,6 +197,7 @@ export function mapTarget(
 ): MappedTarget | MappingFailure {
   const found = new Set<number>();
   let normal: Vec3 | undefined;
+  let faceArea: number | undefined;
   const reach = grid.voxel / 2 + 1e-9 * grid.voxel;
   const near = (index: number, distanceOf: (p: Vec3) => number): boolean => distanceOf(position(grid, index)) <= reach;
   for (const point of target.pointsNear ?? []) {
@@ -214,6 +219,7 @@ export function mapTarget(
     const seed = sides[0]?.index ?? 0;
     const group = planarGroup(triangles, seed).map((index) => triangles[index] as Triangle);
     normal ??= normalOf(triangles[seed] as Triangle);
+    faceArea = (faceArea ?? 0) + group.reduce((total, triangle) => total + triangleArea(triangle), 0);
     const before = found.size;
     for (const index of sets.boundary)
       if (near(index, (p) => Math.min(...group.map((t) => distanceToTriangle(grid, p, t))))) found.add(index);
@@ -226,7 +232,11 @@ export function mapTarget(
       if (near(index, (p) => Math.min(...chain.map((e) => distanceToSegment(grid, p, e.a, e.b))))) found.add(index);
     if (found.size === before) return { error: `no domain node lies on the edge nearest to [${point.join(', ')}]` };
   }
-  return { nodes: [...found].sort((a, b) => a - b), ...(normal !== undefined ? { normal } : {}) };
+  return {
+    nodes: [...found].sort((a, b) => a - b),
+    ...(normal !== undefined ? { normal } : {}),
+    ...(faceArea !== undefined ? { faceArea } : {}),
+  };
 }
 
 export const isMappingFailure = (value: MappedTarget | MappingFailure): value is MappingFailure => 'error' in value;

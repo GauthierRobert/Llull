@@ -41,7 +41,7 @@ fn run(dir: &Path, job: &str) -> (Value, Vec<f32>, Vec<u8>) {
     let outputs = llull_topopt::job::run(dir, &mut events).unwrap_or_else(|e| panic!("{}: {}", e.code, e.message));
     assert_eq!(
         outputs.iter().map(|o| o.path.as_str()).collect::<Vec<_>>(),
-        ["field.bin", "design.f64", "displacements.f64", "result.json"]
+        ["field.bin", "design.f64", "displacements.f64", "state.json", "result.json"]
     );
     let result: Value = serde_json::from_slice(&std::fs::read(dir.join("result.json")).unwrap()).unwrap();
     let field: Vec<f32> =
