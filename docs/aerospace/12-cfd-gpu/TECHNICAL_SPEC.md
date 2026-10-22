@@ -460,3 +460,87 @@ transport, no overlay, no `CfdResultPort`, no `record_cfd_results` / `cfd_report
 - **Surfaces.** The Flow panel and overlay (M3) do not exist; `src/ui` only gained the palette label. The tool-schema snapshot,
   `docs/FEATURES.md`, the validation-plan allowlist (`blockedPlanCommands.json`) and the `.lld` example `flow.lld` were updated for the
   new toolset.
+
+### M2 (native `llull-compute flow`, `cfd_solve` transport, `record_cfd_results`, `cfd_report`) — 2026-10-22
+
+Delivered as two Rust crates in `solver/` (workspace default-members, so `npm run native:check` covers them), the `flow` job of
+`llull-compute`, the host transport `server/src/cfd/`, two more commands of the plugin `cfd` and the `cfd_result` artifact. Branch `feat/cfd-m2`.
+
+- **Crates.** `crates/llull-flow-core`: uniform grid in the case frame, binary STL in / out, parity voxeliser (rays along +x, one per cell row,
+  the fixed row shifts of the TypeScript `voxel.ts`; each solid cell attributed to the body whose triangle the ray entered through), fixed-order
+  per-body reductions and extrema (`llull_gpu::reduce` chunking: bit-identical for any thread count), trilinear sampling (probes, surface values
+  taken ½…3 h along each triangle's outward normal). `crates/llull-flow-lbm`: D3Q19 lattice, units, domain flags, the per-cell kernel generic over
+  the precision (`real.rs`: f64 or f32), the CPU twin (`cpu.rs`, AoS buffers, one fused pull-stream-collide pass per step over cell chunks), the
+  wgpu kernels (`gpu.rs` + `lbm.wgsl`, feature `gpu`, SoA buffers), the steady-state run (`solver.rs`) and the job (`job.rs`, `outputs.rs`).
+  `llull-compute --features gpu` includes the kernels (the desktop bundle does); without the feature a GPU request runs the CPU twin with the warning.
+- **Numerics (§5.3).** BGK collision with the Smagorinsky closure `τ_eff = ½(τ + √(τ² + 18√2 C_s² |Π_neq| / ρ))` (C_s 0.1, named default; LES off
+  for the exact-solution tests), Guo forcing (uniform body force; the periodic channel of VC-CFD-20), **two population copies** (pull scheme, one
+  dispatch per step) instead of the AA pattern of §5.3 / §8 — simpler kernels, twice the population memory (172 B / cell); the AA pattern is
+  left for M5 when memory is measured. Boundaries by the neighbour's flag: half-way bounce-back (`SOLID`, `MOVING_WALL` adds the wall velocity
+  term), equilibrium inlet at the cell's own density, zero-gradient outlet at the reference pressure (`f_eq(1, u) + f_neq`), specular reflection on
+  `SLIP_X/Y/Z` (free-slip side walls and the symmetry plane). Domain faces: `far_field` becomes an inlet where `direction · n < 0`, an outlet where
+  `> 0`, a slip wall where tangential (so α, β rotate the free stream without a special inlet); `ground` is a no-slip wall without a body (no
+  force), `moving_ground` moves with the free stream. The lattice Mach of the inflow (named default 0.1) sets `dt`; τ below ½ + 1e-3 is
+  `CFD_UNSTABLE_PARAMS` without LES and a warning with it. Forces: momentum exchange `−c_q (f_x[q̄] + pulled_q)` per wall link, attributed to
+  the body of the cell's first solid neighbour (a cell touching two bodies gives everything to the first: documented bias), reduced per body in a
+  fixed order on the host for both backends; moments about the case moment point.
+- **Steady state.** Drag sampled every `sampleEvery` steps (default one fiftieth of a flow-through of the domain length); window = one
+  flow-through; averaging starts when the window mean changes by < 0.5 %, the run stops at < 0.1 % after two windows of averaging
+  (`converged: true`), or at `maxSteps` (`converged: false`, the forces then are the last window's mean, the fields instantaneous). Time averages
+  accumulate at the sample steps (≤ a few thousand samples, so f32 sums stay accurate on the GPU).
+- **Precision.** The CPU twin runs in **f64** (`precision: "f64"`, `deterministic: true`, the recorded / reference path, like the topopt twin):
+  the f32 forcing increments of a 64-cell Poiseuille channel fall below the population resolution (first measured as a 1e-3 error floor). The GPU
+  kernels are f32 (`deterministic: false`); `CpuSolver<f32>` mirrors them operation for operation for VC-CFD-26.
+- **GPU (§5.6).** `llull_gpu::device::acquire` (best adapter, `LLULL_GPU=off` respected); dispatches are submitted in batches sized to about
+  50 ms of GPU time (adaptive, 1…4096 steps per submit) so the OS watchdog never fires; buffers above the adapter's
+  `max_storage_buffer_binding_size` are refused before allocation (`CFD_MEMORY_EXCEEDED`); the CPU path refuses above `settings.cellCap`
+  (default 5e7 cells). Chunking along z (§5.6) is not built. A `gpu` / `auto` request without a usable adapter runs the CPU twin and emits
+  `CFD_GPU_UNAVAILABLE` (VC-CFD-51).
+- **Job contract** (`llull_flow_lbm::job` module doc): `case.json` + `surface.stl` (binary, metres, case frame, triangles grouped per body with
+  `bodies[].triangles = [start, count]`) in; `result.json` (forces and coefficients, per-body forces, peaks, probes, capped history, grid and
+  lattice facts, provenance, warnings), `surface.bin` (`LLSF`: per-triangle `p` Pa, `cp`, `speed`) and `slice-<k>.bin` (`LLSL`: a square patch of
+  the plane, one sample per cell, NaN in solids) out — the names differ from §6 (`summary.json`, per-vertex `surface.bin`, `forces.csv`,
+  `residuals.csv`, `streamlines.bin`): one JSON result like every other `llull-compute` job, the history inside it, per-triangle fields (M3's
+  overlay colours triangles), streamlines in M3. One `progress` event per drag sample (`cd`, `dragN`, `change`, `phase`). Errors
+  `NATIVE_JOB_IO`, `NATIVE_JOB_INPUT` (unknown fields, a body reaching the domain boundary, bad ranges), `CFD_UNSTABLE_PARAMS`,
+  `CFD_MEMORY_EXCEEDED`, `CFD_SOLVER_FAILED` (non-finite density).
+- **Host transport `cfd_solve`** (`server/src/cfd/flowSolve.ts`, native tool in toolset `flow`; params `caseId`, `timeoutS` 3600, `device`,
+  `deviceMemoryBytes`, `maxSteps`, `latticeMach`, `les`): `buildFlowJob` (@aero, pure) runs `prepare_cfd_case` and refuses on any fail row (first
+  code), refuses compressible cases with `CFD_REGIME_MISMATCH` (the Euler solver is M4, not built) and the memory estimate above
+  `deviceMemoryBytes` with `CFD_MEMORY_EXCEEDED` before anything runs (VC-CFD-50); exports the welded, outward surface of the prepare stage
+  (its `geometryHash`) as STL with per-body ranges (triangle centroid in the smallest containing body box, nearest box otherwise); the domain
+  is the sized box of the report (halved at y = 0 with `symmetryPlane: "xz"`, face `yMin` slip), one cell layer of faces added by the job;
+  probes, slice origins and the moment point are world metres converted to the case frame. `llull-compute flow` runs in a job folder (hard
+  timeout, no checkpoint: a killed run is lost, `CFD_TIMEOUT`); outputs are hash-checked, `result.json` is zod-parsed and the solver's cd / cl / cs
+  and dynamic pressure are cross-checked against its forces and the job reference before the `cfd_result` artifact is stored (content-addressed in
+  the FE artifact store, `kind: "cfd_result"`, the heavy files base64 inside it: `surfaceBase64`, `slices[]`); then `record_cfd_results` runs through
+  the host's `execute`. Native failures map to `CFD_SOLVER_MISSING` (+ `NATIVE_TOOL_MISSING` hint), `CFD_TIMEOUT`, the job's own `CFD_*` code or
+  `CFD_SOLVER_FAILED` (`data.nativeCode` keeps the job code). A step-limited run is recorded with `converged: false` and the warning
+  `CFD_NOT_CONVERGED` (VC-CFD-55). `--progress` prints one line per drag sample.
+- **Artifact and trust (§3, 05 §4.1).** `CfdResultArtifact` (`packages/core/src/model/cfdResult.ts`) + `CfdResultPort` =
+  `ExecutionContext.cfdResults` (server: the FE store filtered to `cfd_result`, `server/src/cfd/resultPort.ts`; option 3 of §11 answered as "one
+  store, a sibling read port"). `record_cfd_results { caseId, resultsHash, summary? }` fetches the bundle, re-hashes it (`CFD_RESULT_HASH_MISMATCH`),
+  checks it belongs to the case, compares its `caseHash` with the current case and its `geometryHash` with the surface the kernel builds now
+  (`CFD_INPUT_STALE`), recomputes the summary (`cfdSummary`: coefficients from the artifact's forces and the **case** reference area / length —
+  the solver's own are never copied) and refuses a differing given summary; without the bundle a given summary is kept with `verified: false`
+  (replay on another machine); no bundle and no summary is `CFD_RESULT_MISSING`. The artifact records the kernel that built the surface
+  (`kernel`, the §13 M1 "M2 item": the geometry hash depends on it) and `elapsedS`, so two identical runs give equal bundles apart from the wall
+  time (the native server test compares them with `elapsedS` zeroed). `cfd_report { caseId, include? }` returns the recorded summary with `stale`
+  / `staleReasons` (warning `CFD_RESULT_STALE`, VC-CFD-52), `trusted` (the recorded summary equals the one recomputed from the bundle on this
+  machine; `CFD_RESULT_MISSING` / `CFD_RESULT_HASH_MISMATCH` warnings otherwise), convergence (history from the bundle), probes, provenance;
+  `reviewRequired` is always false (the case has no `designLoad` tag yet, AF-33 deferred). `check_cfd` already reported staleness from the hashes.
+- **Validation.** Rust (`cargo test -p llull-flow-lbm`): VC-CFD-20 Poiseuille L2 errors 2.78e-3 / 6.95e-4 / 1.74e-4 at 16 / 32 / 64 cells,
+  observed orders **2.000 / 2.000** (τ 0.8; at the "magic" τ = ½ + √(3/16) the discrete profile is exact to 5e-13); VC-CFD-22 Taylor-Green
+  amplitude ratio **0.45229** vs 0.45404 (0.4 %, 64², ν k² t = 0.3948); VC-CFD-26 on an NVIDIA RTX 4080 Laptop (Vulkan): density 5.9e-7,
+  velocity 4.5e-6 of the field range, force 4.9e-7 of |F| (gates 1e-4 / 1e-5; skipped with a logged reason without an adapter); VC-CFD-21: the
+  32-cells-per-diameter gate is the **ignored** test `tests/sphere.rs` (minutes on the CPU twin; run `cargo test --release -- --ignored`, device
+  `auto`), CI runs a Re 20 smoke at 8 cells per diameter in a 4 D box (Cd 3.47 vs Schiller-Naumann 2.61: staircase sphere, 4.9 % blockage; gate
+  0.5…1.8×). Job contract tests (`tests/job.rs`): outputs hashed, step limit recorded not converged, the three refusals. TypeScript:
+  `tests/unit/aero/cfd/{flowJob,record}.test.ts` (job contract, record trust ladder, report staleness VC-CFD-52, coefficient cross-check),
+  `server/tests/cfdSolve.test.ts` (fake runner: VC-CFD-50, 51, 52, 55, error mapping, tool wiring) and `cfdSolveNative.test.ts` (real binary,
+  skipped when absent). VC-CFD-13, 23–25, 54 and the SC plans' GPU numbers stay open (M5).
+- **Deviations noted.** One uniform grid (no nested refinement boxes of §5.2: the cost is the domain volume at the body resolution — the
+  default external-aero domain at 128 cells per reference length is ~10⁸ cells, so real cases need `cellsPerReferenceLength` 16–48 or a custom box
+  until M5 nests the grid); half-way bounce-back staircase walls (interpolated walls V1); τ is not raised automatically when a coarse grid puts it
+  near ½ (only the < 0.501 rule applies; a candidate for raising `latticeMach` in M3); the transports `cfd_streamlines`, `cfd_slice`, `cfd_probe`,
+  `cfd_stop` and the `gridStudy` option are not built (slices and probes come out of the solve itself); no VTK export; no overlay / Flow panel (M3).

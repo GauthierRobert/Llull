@@ -1,6 +1,6 @@
 {
   "id": "SC-CFD-02",
-  "status": "draft — the cfd commands and the llull-compute sidecar are specified, not implemented",
+  "status": "runnable since M2 (cfd_solve, cfd_report); the 32-cell Cd gate is the ignored Rust test llull-flow-lbm/tests/sphere.rs until a GPU run is pinned",
   "validates": ["VC-CFD-21", "VC-CFD-26"],
   "description": "Low-speed flow past a sphere at Re 100 (D = 1 m, U = 1 m/s, nu = 0.01 m2/s): drag coefficient against the Schiller-Naumann correlation, on the GPU and on the CPU backend",
   "actions": [

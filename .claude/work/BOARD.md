@@ -41,7 +41,10 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - `[TODO]` **RS follow-ups** (RS wave PR #98 and RS-6 llull-geomq done) RS-6 options (wgpu BVH traversal for geomq, plant 09 instance BVH / VC-VIS-60 (a), physics 13 broad phase VC-COR-17); plant 10 M3 viewport, plant 02 V1 (route*pipe, fittings, check_piping), PHY-09 M4/M5, AER 3D panel, PHY-19 hand-off (OpenCourant); physics 19 options outside RS-8 (rounded shell edges in contact §29.8.3, shell thickness change §29.8.2; §13.10). _deps: —_
 - `[TODO]` **TOP-V1** Topology V1 (PHY-17 §10 M4): MMA, projection, extrusion / min member size, `min_volume`, pressure / gravity loads in the
   mapping and the compliance ratio, a timeout checkpoint (`deadlineS`) so a killed run resumes, VC-TOP-34 on a hardware GPU (GPU cap): `docs/physics/17-topology-optimization/TECHNICAL_SPEC.md` §13–§14. _deps: —_
-- `[TODO]` **CFD-M2** `llull-compute flow` (LBM, wgpu), `cfd_solve` transport, records: same spec §10. _deps: — (CFD-M1 done 2026-10-20, f58bc668)_
+- `[REVIEW]` **CFD-M2** (PR `feat/cfd-m2`, 2026-10-22) `llull-compute flow` (D3Q19 BGK + LES, CPU f64 reference + wgpu f32), `cfd_solve`
+  transport, `record_cfd_results` / `cfd_report`: spec §13 M2. Left for **CFD-M3+**: nested grid boxes, `cfd_streamlines` / `cfd_slice` /
+  `cfd_probe` / `cfd_stop`, `gridStudy`, overlay + Flow panel, AA-pattern storage, VC-CFD-21 at 32 cells per diameter on a GPU (ignored test),
+  VC-CFD-13 / 23–25 / 54. _deps: —_
 
 ## SolidCraft parity (spec: `docs/decisions/SC1-solidcraft-parity.md`)
 
