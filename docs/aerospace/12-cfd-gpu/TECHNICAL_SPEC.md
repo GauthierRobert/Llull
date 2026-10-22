@@ -494,7 +494,7 @@ Delivered as two Rust crates in `solver/` (workspace default-members, so `npm ru
   the f32 forcing increments of a 64-cell Poiseuille channel fall below the population resolution (first measured as a 1e-3 error floor). The GPU
   kernels are f32 (`deterministic: false`); `CpuSolver<f32>` mirrors them operation for operation for VC-CFD-26. `Backend::force` hands the
   per-cell forces to the fixed-order reductions in f64 (the f64 twin loses nothing); the f64 reference and the GPU agree on the total force
-  to 4.9e-6 of |F| on the equivalence case (stated tolerance 1e-4, tested; the f32 twin sits at 9.4e-6 of the 1e-5 gate since the
+  to 4.9e-6 of |F| on the equivalence case (stated tolerance 1e-4, tested; the f32 twin sits at 9.4e-6 of the 5e-5 gate since the
   edge-aware reflection pulls from neighbours).
 - **GPU (§5.6).** `llull_gpu::device::acquire` (best adapter, `LLULL_GPU=off` respected); dispatches are submitted in batches sized to about
   50 ms of GPU time (adaptive, 1…4096 steps per submit) so the OS watchdog never fires; buffers above the adapter's
@@ -542,7 +542,7 @@ Delivered as two Rust crates in `solver/` (workspace default-members, so `npm ru
   observed orders **2.000 / 2.000** (τ 0.8; at the "magic" τ = ½ + √(3/16) the discrete profile is exact to 5e-13); VC-CFD-22 Taylor-Green
   amplitude ratio **0.45229** vs 0.45404 (0.4 %, 64², ν k² t = 0.3948); VC-CFD-26 on an NVIDIA RTX 4080 Laptop (Vulkan): density 5.9e-7,
   velocity 5.0e-6 of the field range, force 9.4e-6 of |F| against the f32 twin and 4.9e-6 of |F| against the f64 reference (gates 1e-4 /
-  1e-5 / 1e-4; skipped with a logged reason without an adapter); Couette (`tests/couette.rs`): moving-wall profile linear to 1e-9, mass
+  5e-5 / 1e-4; skipped with a logged reason without an adapter); Couette (`tests/couette.rs`): moving-wall profile linear to 1e-9, mass
   conserved; half model (`tests/job.rs`): cube drag equal to the whole model to 1e-13; VC-CFD-21: the
   32-cells-per-diameter gate is the **ignored** test `tests/sphere.rs` (minutes on the CPU twin; run `cargo test --release -- --ignored`, device
   `auto`), CI runs a Re 20 smoke at 8 cells per diameter in a 4 D box (Cd 3.47 vs Schiller-Naumann 2.61: staircase sphere, 4.9 % blockage; gate
