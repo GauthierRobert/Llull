@@ -167,8 +167,8 @@ export function resolveDensity(
         unverified: true,
         unverifiedReasons: [
           material.densityUnit === undefined
-            ? 'density given without a source (unverified)'
-            : `density given in ${material.densityUnit} without a source (unverified)`,
+            ? 'density given without a source'
+            : `density given in ${material.densityUnit} without a source`,
         ],
       },
       material.density,

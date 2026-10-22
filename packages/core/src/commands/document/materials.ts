@@ -50,7 +50,8 @@ export const createMaterial = defineCommand({
     'Records made with define_material_record keep their record; records imported from a library are read-only (MAT_RECORD_READONLY). ' +
     'UNIT TRAP: a bare `density` is in GRAMS per (document unit)³, NOT kg/m³. mm document: steel 0.00785 (g/mm³), aluminium 0.0027, PLA 0.00124. ' +
     'Metre document: steel is 7 850 000 g/m³; passing 7850 meaning kg/m³ makes every mass ~1000× too light. Safest: always pass ' +
-    'densityUnit, e.g. { density: 7850, densityUnit: "kg/m^3" } or { density: 7.85, densityUnit: "g/cm^3" } in any document. ' +
+    'densityUnit, e.g. { density: 7850, densityUnit: "kg/m^3" } or { density: 7.85, densityUnit: "g/cm^3" } in any document ' +
+    '(add_rigid_body takes the same densityUnit; its bare density is kg/m³). ' +
     'A density outside 0.01–25 g/cm³ (0.0005–25 with an explicit densityUnit) is still stored but returns a WARNING in the summary and ' +
     'data.warnings naming the likely intended unit; the summary always prints the density in g/cm³ and kg/m³ — check it. Assign the material to entities with assign_material.',
   params: z.object({

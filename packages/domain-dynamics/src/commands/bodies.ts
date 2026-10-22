@@ -10,6 +10,7 @@ import { changed, failer, report } from '@core/commands/noop';
 import { bodyMassProperties } from '@core/geometry/bodyMassProperties';
 import { formatLength } from '@core/model/units';
 import { toMetres } from '@core/model/units';
+import { convertValue, isUnitFailure } from '@lib/quantity';
 
 /** The document's dynamics model (empty when absent). */
 export function dynamicsOf(doc: CadDocument): DynamicsModel {
@@ -37,14 +38,16 @@ export function dynamicsIdTaken(dynamics: DynamicsModel, id: string): boolean {
 /**
  * @affects adds 1 rigid body to doc.dynamics (affected: [bodyId])
  * @invariant every entity id exists, is 3D and belongs to no other body
- * @failure empty / unknown / 2D / already-used entity, taken id, non-positive density or mass -> no-op
+ * @invariant body.density is stored in kg/m³ whatever densityUnit was given
+ * @failure empty / unknown / 2D / already-used entity, taken id, non-positive density or mass, unknown densityUnit -> no-op
  */
 export const addRigidBody = defineCommand({
   name: 'add_rigid_body',
   description:
     'Make a set of 3D entities move together as ONE rigid body for physics simulation (simulate_motion). Mass, centre of mass and ' +
     "inertia are computed from the entities' real geometry: each entity uses its assigned material (density model, else plain density), else `density` (kg/m³, " +
-    'default 7850 steel; aluminium 2700, wood 600, CFRP 1550). Give `massKg` when the real part mass is known (hollow parts): the ' +
+    'default 7850 steel; aluminium 2700, wood 600, CFRP 1550; or pass densityUnit, e.g. { density: 7.85, densityUnit: "g/cm^3" }: the same ' +
+    'densityUnit option as create_material, whose bare density is g/(document unit)³ instead). Give `massKg` when the real part mass is known (hollow parts): the ' +
     'distribution is scaled to it. `fixed: true` welds the body to the ground (engine block, frame, stand). A non-fixed body with no ' +
     'joint is a free body that falls under gravity. Next: connect bodies with add_body_joint. Returns the body id in affected[0] and ' +
     'its mass / centre of mass in the summary.',
@@ -52,12 +55,24 @@ export const addRigidBody = defineCommand({
     entityIds: z.array(z.string()).min(1).describe('Ids of the 3D entities forming the body (e.g. a propeller: hub + 3 blades + spinner).'),
     name: z.string().optional().describe('Display name, e.g. "propeller", "crankshaft".'),
     fixed: z.boolean().optional().describe('true = welded to the ground (never moves). Default false.'),
-    density: z.number().positive().optional().describe('kg/m³ for entities without a material. Default 7850 (steel).'),
+    density: z
+      .number()
+      .positive()
+      .optional()
+      .describe('Density for entities without a material: kg/m³ unless densityUnit is given. Default 7850 (steel).'),
+    densityUnit: z
+      .string()
+      .optional()
+      .describe('Optional unit of `density`, e.g. "kg/m^3" (default), "g/cm^3", "lb/in^3"; converted to kg/m³ (the stored unit).'),
     massKg: z.number().positive().optional().describe('Known real mass in kg; the computed mass distribution is scaled to it.'),
     id: z.string().optional().describe('Optional explicit body id (shares the id space of all dynamics records).'),
   }),
-  run: (doc, { entityIds, name, fixed, density, massKg, id }, ctx): CommandResult => {
+  run: (doc, { entityIds, name, fixed, density: given, densityUnit, massKg, id }, ctx): CommandResult => {
     const fail = failer(doc, 'add_rigid_body');
+    if (densityUnit !== undefined && given === undefined) return fail('densityUnit given without density');
+    const converted = given === undefined || densityUnit === undefined ? { value: given } : convertValue(given, densityUnit, 'kg/m^3');
+    if (isUnitFailure(converted)) return fail(`densityUnit: ${converted.message}`);
+    const density = converted.value;
     const dynamics = dynamicsOf(doc);
     const owners = new Map(Object.values(dynamics.bodies).flatMap((body) => body.entityIds.map((e) => [e, body.id] as const)));
     for (const entityId of entityIds) {

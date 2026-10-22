@@ -151,7 +151,8 @@ describe('measure commands (read-only)', () => {
     expect(r.data).not.toHaveProperty('unverified');
     expect(r.data).not.toHaveProperty('unverifiedReasons');
     const weighed = execute(b.doc, 'mass_properties', { entityId: b.ids[0], density: 0.5 });
-    expect(weighed.summary).toContain('Unverified density (given by the caller');
+    expect(weighed.summary).toContain('needs a qualified engineer (given by the caller');
+    expect(weighed.summary).not.toContain('Unverified density');
     expect(weighed.data).toMatchObject({
       volume: 48,
       volumeUnit: 'mm³',
