@@ -1,0 +1,79 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    10,
+    10,
+    100
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "base-center"
+  },
+  "as": "bar"
+ },
+ {
+  "command": "twist_body",
+  "params": {
+   "id": "$bar",
+   "angleDeg": 90,
+   "frame": {
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "axis": [
+     0,
+     0,
+     1
+    ],
+    "reference": [
+     1,
+     0,
+     0
+    ]
+   },
+   "region": {
+    "start": 0,
+    "end": 100,
+    "falloff": "linear"
+   },
+   "output": {
+    "mode": "auto",
+    "tolerance": 0.001
+   }
+  },
+  "as": "twisted"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$twisted"
+  }
+ },
+ {
+  "command": "analyze_deformation",
+  "params": {
+   "id": "$twisted"
+  }
+ },
+ {
+  "command": "check_deformation",
+  "params": {
+   "ids": [
+    "$twisted"
+   ]
+  }
+ }
+]

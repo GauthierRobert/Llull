@@ -1,0 +1,956 @@
+{
+ "gap": "SWG",
+ "generated": "2026-10-22",
+ "notes": "Values come from data/*.json (generate_analytic_refs.mjs). Grades per docs/plant/TEMPLATE.md; only grade A gates pass/fail. Tolerances: exactKernelRel applies on the native OCCT kernel (fitted faces at fitTolerance 1e-6 x size), meshKernelRel on Manifold / display meshes. Baseline (today) cases: VC-SWG-01, 11 (smooth), 23 (loft_surface with guides), 38 (round).",
+ "cases": [
+  {
+   "vc": "VC-SWG-01",
+   "what": "circle swept round a circle (torus), TODAY",
+   "metric": "volume",
+   "values": {
+    "torus_sweep": 98696.0440109
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/pappus.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-01",
+    "FR-SWG-03",
+    "TR-SWG-02"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_today_sweeps_lofts.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   }
+  },
+  {
+   "vc": "VC-SWG-02",
+   "what": "quarter torus; square offset 5 toward the centre on a quarter arc",
+   "metric": "volume",
+   "values": {
+    "quarter_torus_sweep": 24674.0110027,
+    "offset_square_on_arc": 7068.58347058
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/pappus.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-01",
+    "TR-SWG-02"
+   ],
+   "cli": {
+    "run": "llull sweep_profile ... --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   }
+  },
+  {
+   "vc": "VC-SWG-03",
+   "what": "square 10 x 10, L 100, twist linear 90 deg / 1 turn / S-curve 180 deg: volume invariant",
+   "metric": "volume",
+   "values": {
+    "linear_0_to_90deg": 10000,
+    "linear_0_to_360deg": 10000,
+    "scurve_0_to_180deg": 10000
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/twist.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-02",
+    "TR-SWG-01",
+    "TR-SWG-03",
+    "TR-SWG-08"
+   ],
+   "cli": {
+    "run": "llull run plans/target_twist_scale_orientation.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   }
+  },
+  {
+   "vc": "VC-SWG-04",
+   "what": "twist of an off-centre rectangle on a straight path; twist 720 deg along a helix",
+   "metric": "volume",
+   "values": {
+    "offset_rect_linear_0_to_180deg": 10000,
+    "helix_linear_0_to_720deg": 37818.2896725
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/twist.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-02",
+    "FR-SWG-13",
+    "TR-SWG-03"
+   ],
+   "cli": {
+    "run": "llull sweep_profile ... --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   }
+  },
+  {
+   "vc": "VC-SWG-05",
+   "what": "linear scale law 1 -> 0.5 (cone frustum)",
+   "metric": "volume",
+   "values": {
+    "linear_1_to_0.5_straight": 18325.9571459
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/scale.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-05",
+    "TR-SWG-01"
+   ],
+   "cli": {
+    "run": "llull run plans/target_twist_scale_orientation.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   }
+  },
+  {
+   "vc": "VC-SWG-06",
+   "what": "S-curve scale law 1 -> 0.5",
+   "metric": "volume",
+   "values": {
+    "smoothstep_1_to_0.5_straight": 18625.1564463
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/scale.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-05",
+    "TR-SWG-01"
+   ],
+   "cli": {
+    "run": "llull sweep_profile scale={type:s_curve} --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   }
+  },
+  {
+   "vc": "VC-SWG-07",
+   "what": "expression scale law 1 + 0.25 sin(2 pi t)",
+   "metric": "volume",
+   "values": {
+    "expression_1_plus_0.25sin2pit": 32397.6742401
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/scale.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-05",
+    "FR-SWG-23",
+    "TR-SWG-01"
+   ],
+   "cli": {
+    "run": "llull run plans/target_twist_scale_orientation.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   }
+  },
+  {
+   "vc": "VC-SWG-08",
+   "what": "helix fidelity: add_coil path today vs exact helix (add_helix / add_coil v2)",
+   "metric": "max distance from the centre line to the exact helix",
+   "valueToday": 0.232332,
+   "valueTodayInterior": 0.0110052,
+   "valueTarget": 0,
+   "tolerance": {
+    "target": 0.00002,
+    "note": "1e-6 x R (R = 20)"
+   },
+   "unit": "mm",
+   "source": "(b) reference script re-implementing coil.ts helixPoints + catmullRomBeziers (data/coilBaseline.json); target is the exact helix",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-13",
+    "FR-SWG-14",
+    "FR-SWG-15",
+    "FR-SWG-31",
+    "TR-SWG-05"
+   ],
+   "cli": {
+    "run": "llull add_helix radius=20 pitch=10 turns=3 --doc t.llull.json --kernel occt --json; llull measure_deviation ...",
+    "assert": "data.fitDeviation (add_helix), data.max (measure_deviation of the swept centre line)"
+   }
+  },
+  {
+   "vc": "VC-SWG-09",
+   "what": "square on a quarter arc R 50, scale 1 -> 0.5",
+   "metric": "volume",
+   "values": {
+    "linear_1_to_0.5_quarter_arc_square": 4581.48928649
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/scale.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-05",
+    "TR-SWG-03"
+   ],
+   "cli": {
+    "run": "llull run plans/target_twist_scale_orientation.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   }
+  },
+  {
+   "vc": "VC-SWG-10",
+   "what": "area law 100 -> 25 (not the scale law value)",
+   "metric": "volume",
+   "values": {
+    "area_law_linear_100_to_25": 6250
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/scale.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-05",
+    "TR-SWG-01"
+   ],
+   "cli": {
+    "run": "llull run plans/target_twist_scale_orientation.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   },
+   "contrast": 5833.33333333
+  },
+  {
+   "vc": "VC-SWG-11",
+   "what": "stations r 10 -> 5: TODAY smooth blend; target stationBlend linear = frustum",
+   "metric": "volume",
+   "values": {
+    "smoothstep_1_to_0.5_straight": 18625.1564463,
+    "linear_1_to_0.5_straight": 18325.9571459
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/scale.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-06",
+    "TR-SWG-03"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_today_sweeps_lofts.json --doc t.llull.json --kernel occt --json (taper step) ; plans/target_twist_scale_orientation.json (linearStations)",
+    "assert": "data.volume of mass_properties per entity"
+   },
+   "note": "measured 2026-10-22 (baseline_today_sweeps_lofts, taper step): 18310.743 mm3 display mesh = frustum -0.083 %, NOT the smoothstep value: stationRingAt (geometry/sweep.ts) is only sampled at path frames, and a straight 1-segment path has frames at its two ends only, so the blend is never evaluated inside the span. The smoothstep shape (+1.63 %) appears only on paths with interior frames, i.e. today the section law depends on the path tessellation (FR-SWG-06). Target: stationBlend linear = frustum, smooth = smoothstep value, independent of the path."
+  },
+  {
+   "vc": "VC-SWG-12",
+   "what": "round tube r 2 on helix R 20, p 10, 3 turns",
+   "metric": "volume",
+   "values": {
+    "round_tube_on_helix": 4752.38644026
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/helical.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-13",
+    "FR-SWG-28",
+    "TR-SWG-05"
+   ],
+   "cli": {
+    "run": "llull run plans/target_helix_spring_thread.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   },
+   "inspect": {
+    "minCurvatureRadius": 20.1266514796,
+    "torsion": 0.00395383562073,
+    "pathLength": 378.182896725,
+    "tolerance": 1e-9,
+    "assert": "inspect_sweep data.samples[*].curvatureRadius (constant), data.pathLength"
+   }
+  },
+  {
+   "vc": "VC-SWG-13",
+   "what": "axial-plane rectangle 4 x 3 at rbar 20, 3 turns: volume independent of pitch (10 and 5)",
+   "metric": "volume",
+   "values": {
+    "screw_rectangle_pitch10": 4523.89342117,
+    "screw_rectangle_pitch5": 4523.89342117
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/helical.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-03",
+    "FR-SWG-15",
+    "FR-SWG-16",
+    "TR-SWG-05"
+   ],
+   "cli": {
+    "run": "llull run plans/target_helix_spring_thread.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   }
+  },
+  {
+   "vc": "VC-SWG-14",
+   "what": "conical helix 20 -> 10, p 10, 5 turns, wire r 1",
+   "metric": "volume",
+   "values": {
+    "conical_helix_tube": 1489.41972867
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/helical.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-13",
+    "TR-SWG-04",
+    "TR-SWG-05"
+   ],
+   "cli": {
+    "run": "llull run plans/target_helix_spring_thread.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   }
+  },
+  {
+   "vc": "VC-SWG-15",
+   "what": "path at 45 deg: orientation minimal vs fixed",
+   "metric": "volume",
+   "values": {
+    "normal_to_path": 31415.9265359,
+    "fixed_plane_oblique": 22214.4146908
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/orientation.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-03",
+    "TR-SWG-02"
+   ],
+   "cli": {
+    "run": "llull run plans/target_twist_scale_orientation.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   }
+  },
+  {
+   "vc": "VC-SWG-16",
+   "what": "two straight rails 20 -> 10 over 100, uniform scale",
+   "metric": "volume",
+   "values": {
+    "two_rails_uniform_scale": 18325.9571459
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/twoRail.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-09",
+    "FR-SWG-11",
+    "TR-SWG-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_rails_and_surface_mode.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   },
+   "railDeviation": {
+    "value": 0,
+    "tolerance": 0.000001,
+    "unit": "mm",
+    "assert": "sweep_profile data.railDeviation[*]"
+   }
+  },
+  {
+   "vc": "VC-SWG-17",
+   "what": "two rails, maintain height (elliptic sections)",
+   "metric": "volume",
+   "values": {
+    "two_rails_maintain_height": 23561.9449019
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/twoRail.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-09",
+    "TR-SWG-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_rails_and_surface_mode.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   }
+  },
+  {
+   "vc": "VC-SWG-18",
+   "what": "segment swept between two opposite helical rails (a = 10, p 20, 2 turns) = helicoid sheet",
+   "metric": "area",
+   "value": 1555.87818223,
+   "tolerance": {
+    "fitted": 0.00001
+   },
+   "unit": "mm^2",
+   "source": "(b) closed form (README 4.10)",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-09",
+    "FR-SWG-12",
+    "TR-SWG-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_rails_and_surface_mode.json --doc t.llull.json --kernel occt --json",
+    "assert": "measure_area data.area of $helicoid"
+   }
+  },
+  {
+   "vc": "VC-SWG-19",
+   "what": "ruled loft of two circles R 10, h 50, seams rotated by phi (alignment none)",
+   "metric": "volume",
+   "values": {
+    "ruled_circles_twist_0deg": 15707.9632679,
+    "ruled_circles_twist_60deg": 13089.96939,
+    "ruled_circles_twist_90deg": 10471.975512,
+    "ruled_circles_twist_120deg": 7853.98163397,
+    "ruled_circles_twist_180deg": 5235.98775598
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/ruled.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-19",
+    "FR-SWG-26",
+    "TR-SWG-10"
+   ],
+   "cli": {
+    "run": "llull run plans/target_loft_conditions_alignment.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   }
+  },
+  {
+   "vc": "VC-SWG-20",
+   "what": "ruled / developable frustum r 10 -> 5, h 50",
+   "metric": "volume, lateral area, max |K|, flat-pattern arc lengths",
+   "value": {
+    "id": "ruled_frustum_developable",
+    "r1": 10,
+    "r2": 5,
+    "h": 50,
+    "formula": "V = pi h (r1^2 + r1 r2 + r2^2) / 3; lateral = pi (r1 + r2) s; s = sqrt(h^2 + (r1 - r2)^2)",
+    "value": 9162.97857297,
+    "lateralArea": 2367.94615656,
+    "gaussianCurvature": 0,
+    "flatPattern": {
+     "innerRadius": 50.2493781056,
+     "outerRadius": 100.498756211,
+     "sectorAngleRad": 0.625200305362,
+     "innerArc": 31.4159265359,
+     "outerArc": 62.8318530718,
+     "innerArcExpected": 31.4159265359,
+     "outerArcExpected": 62.8318530718
+    }
+   },
+   "tolerance": {
+    "volumeRel": 0.000001,
+    "areaRel": 0.00001,
+    "maxAbsK": 1e-9
+   },
+   "unit": "mm, mm^2, mm^3, 1/mm^2",
+   "source": "(b) closed form",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-26",
+    "FR-SWG-27",
+    "TR-SWG-11"
+   ],
+   "cli": {
+    "run": "llull run plans/target_network_ruled.json --doc t.llull.json --kernel occt --json",
+    "assert": "measure_area data.area; ruled_surface data.maxAbsGaussianCurvature"
+   }
+  },
+  {
+   "vc": "VC-SWG-21",
+   "what": "loft circles r 10 -> 5, h 50, normal end conditions magnitude 1",
+   "metric": "volume",
+   "values": {
+    "normal_both_ends_m1": 9312.57822314
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/loftEnds.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-17",
+    "FR-SWG-18",
+    "TR-SWG-09"
+   ],
+   "cli": {
+    "run": "llull run plans/target_loft_conditions_alignment.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   },
+   "endAngle": {
+    "value": 0,
+    "tolerance": 0.000001,
+    "unit": "rad",
+    "assert": "loft_sections data.endConditions[*].angleRad"
+   }
+  },
+  {
+   "vc": "VC-SWG-22",
+   "what": "normal end conditions magnitude 2; centreline loft of two circles on a quarter arc",
+   "metric": "volume",
+   "values": {
+    "normal_both_ends_m2": 9462.17787331,
+    "centreline_quarter_arc": 24674.0110027
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/loftEnds.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-17",
+    "FR-SWG-21",
+    "TR-SWG-09",
+    "TR-SWG-10"
+   ],
+   "cli": {
+    "run": "llull run plans/target_loft_conditions_alignment.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   },
+   "note": "centreline case: tolerance 1e-4 rel (fitted intermediate sections)"
+  },
+  {
+   "vc": "VC-SWG-23",
+   "what": "Gordon / network surface through 3 + 3 curves of z = sin(pi x) + y^3",
+   "metric": "max deviation from the analytic surface at 11 x 11 points",
+   "value": 0,
+   "referenceGordonLagrange": 6.66e-16,
+   "contrastSkinOnly": 0.0560095,
+   "tolerance": 0.00001,
+   "unit": "mm",
+   "source": "(b) theorem README 4.9; reference code data/gordon.json; tolerance covers the 41-point interpolation of the sin guides",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-22",
+    "FR-SWG-24",
+    "TR-SWG-12"
+   ],
+   "cli": {
+    "run": "llull run plans/target_network_ruled.json --doc t.llull.json --kernel occt --json",
+    "assert": "measure_deviation data.max (network_surface; loft_surface with guides runs today)"
+   }
+  },
+  {
+   "vc": "VC-SWG-24",
+   "what": "ruled surface between skew segments = hyperbolic paraboloid z = xy on the unit square",
+   "metric": "area; Gaussian curvature at (0.5, 0.5)",
+   "value": {
+    "area": 1.28078927527,
+    "K": -0.444444444444
+   },
+   "tolerance": {
+    "area": 1e-7,
+    "K": 1e-7
+   },
+   "unit": "mm^2, 1/mm^2",
+   "source": "(b) integral of sqrt(1 + x^2 + y^2) (Gauss-Legendre); K = -1 / (1 + x^2 + y^2)^2",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-26",
+    "TR-SWG-11"
+   ],
+   "cli": {
+    "run": "llull run plans/target_network_ruled.json --doc t.llull.json --kernel occt --json",
+    "assert": "measure_area data.area; analyze_surface_curvature data.samples[0].K"
+   }
+  },
+  {
+   "vc": "VC-SWG-25",
+   "what": "Frenet frame turns relative to the RMF by 2 pi c / sqrt(R^2 + c^2) per helix turn (R 20, p 10)",
+   "metric": "angle",
+   "value": 0.4984243361,
+   "measuredByReferenceScript": -0.4984243361,
+   "tolerance": 0.000001,
+   "unit": "rad",
+   "source": "(b) integral of torsion; double-reflection RMF integrated by the reference script",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-03",
+    "FR-SWG-28",
+    "TR-SWG-02"
+   ],
+   "cli": {
+    "run": "llull inspect_sweep id=$tube --doc t.llull.json --kernel occt --json",
+    "assert": "abs(data.totals.twistVsFrenetRad) per turn"
+   }
+  },
+  {
+   "vc": "VC-SWG-25b",
+   "what": "TODAY: TS mesh frame (RMF) vs OCC MakePipe corrected Frenet for a 10 x 2 rectangle swept along the R 20 / p 10 helix",
+   "metric": "max distance between the mesh and the exact solid",
+   "value": "TBD - measure with llull --kernel occt (measure_deviation of the mesh against the B-rep)",
+   "unit": "mm",
+   "grade": "C",
+   "proves": [
+    "TR-SWG-02",
+    "TR-SWG-15"
+   ]
+  },
+  {
+   "vc": "VC-SWG-26",
+   "what": "edge matching: network / loft boundary G1 to a neighbour sheet (tangent_to_face)",
+   "metric": "G1 angle along the shared edge",
+   "value": 0,
+   "tolerance": 0.01,
+   "unit": "rad",
+   "source": "definition of G1; limit = OCCT TolAngular default 1e-2 [R1]",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-25",
+    "FR-SWG-17",
+    "TR-SWG-09",
+    "TR-SWG-12"
+   ],
+   "cli": {
+    "run": "llull check_continuity pairs=[...] --doc t.llull.json --kernel occt --json",
+    "assert": "data.joints[0].g1Angle"
+   }
+  },
+  {
+   "vc": "VC-SWG-27",
+   "what": "refusal codes",
+   "metric": "exit code + error.code per step of plans/bad_refusals.json",
+   "value": [
+    "SWG_SELF_INTERSECTION_LOCAL",
+    "SWG_CLOSED_TWIST_NOT_PERIODIC",
+    "SWG_FRAME_DEGENERATE",
+    "SWG_SELF_INTERSECTION_GLOBAL",
+    "SWG_LAW_NONPOSITIVE",
+    "SWG_LAW_INVALID"
+   ],
+   "plus": [
+    "SWG_GUIDE_ANCHOR_UNDEFINED (rail sweep without anchors, section off the rail)",
+    "SWG_FIT_TOLERANCE (fitTolerance 1e-12)"
+   ],
+   "tolerance": "exact",
+   "unit": "-",
+   "source": "TECHNICAL_SPEC §7.1",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-02",
+    "FR-SWG-04",
+    "FR-SWG-10",
+    "FR-SWG-16",
+    "FR-SWG-31",
+    "TR-SWG-07"
+   ],
+   "cli": {
+    "run": "each refusal step of plans/bad_refusals.json run as its own call after the set-up steps (a plan aborts at its first failure): llull <command> <params> --doc t.llull.json --kernel occt --json",
+    "assert": "exit 1; error.code, error.paths, error.remediation"
+   }
+  },
+  {
+   "vc": "VC-SWG-28",
+   "what": "check_sweep_loft over every target plan",
+   "metric": "status and tolerances",
+   "value": {
+    "status": "pass",
+    "everyToleranceNamed": true,
+    "defaulted": true
+   },
+   "tolerance": "exact",
+   "unit": "-",
+   "source": "TECHNICAL_SPEC §5.8",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-29",
+    "FR-SWG-30",
+    "TR-SWG-07",
+    "TR-SWG-13"
+   ],
+   "cli": {
+    "run": "llull check_sweep_loft --doc t.llull.json --kernel occt --json",
+    "assert": "data.status, data.tolerances.*.defaulted, data.tolerances.*.source"
+   }
+  },
+  {
+   "vc": "VC-SWG-29",
+   "what": "exact kernel parity: sheetSolid, helixEdge and (M8) pipeShell results equal the evaluator",
+   "metric": "volume vs the VC table; free edges; sampled deviation",
+   "value": {
+    "freeEdges": 0,
+    "volume": "as VC-SWG-01..22",
+    "deviation": 0
+   },
+   "tolerance": {
+    "volumeRel": 0.000001,
+    "deviation": "1e-6 x model size"
+   },
+   "unit": "mm, mm^3",
+   "source": "VC table",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-14",
+    "TR-SWG-08",
+    "TR-SWG-15",
+    "TR-SWG-16"
+   ],
+   "cli": {
+    "run": "npm --prefix server test -- nativeKernelSweeps",
+    "assert": "test assertions"
+   }
+  },
+  {
+   "vc": "VC-SWG-30",
+   "what": "agent surface audit: llull search / describe; every numeric param and result field has a unit",
+   "metric": "count of params without unit",
+   "value": 0,
+   "tolerance": "exact",
+   "unit": "-",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-32",
+    "FR-SWG-34",
+    "FR-SWG-35",
+    "TR-SWG-13"
+   ],
+   "cli": {
+    "run": "llull search sweep twist rail helix loft tangent --json; llull describe <cmd> --json",
+    "assert": "contract test"
+   }
+  },
+  {
+   "vc": "VC-SWG-31",
+   "what": "parametric replay and backward compatibility: edit a law value / rail / pitch in history; replay existing goldens",
+   "metric": "ids stable; existing golden snapshots unchanged",
+   "value": "bit-identical",
+   "tolerance": "exact",
+   "unit": "-",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-33",
+    "FR-SWG-36",
+    "TR-SWG-02",
+    "TR-SWG-14"
+   ],
+   "cli": {
+    "run": "npx vitest run tests/golden",
+    "assert": "snapshots"
+   }
+  },
+  {
+   "vc": "VC-SWG-32",
+   "what": "Manifold (no exact kernel): every volume VC within the mesh tolerance; inspect_sweep / check_sweep_loft work",
+   "metric": "volume rel error",
+   "value": "as VC table",
+   "tolerance": 0.005,
+   "unit": "-",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-37"
+   ],
+   "cli": {
+    "run": "llull run plans/target_*.json --kernel manifold --json",
+    "assert": "data.volume"
+   }
+  },
+  {
+   "vc": "VC-SWG-33",
+   "what": "performance budgets TECHNICAL §8",
+   "metric": "ms",
+   "value": "budgets",
+   "tolerance": "4 x slack (SRF practice)",
+   "unit": "ms",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-38"
+   ],
+   "cli": {
+    "run": "npx vitest run tests/unit/sweep/perfBudget.test.ts",
+    "assert": "durations"
+   }
+  },
+  {
+   "vc": "VC-SWG-34",
+   "what": "orientation surface: a 10 mm segment along the reference-surface normal swept round a circle R 50 (plane -> band, cylinder -> annulus)",
+   "metric": "area",
+   "value": {
+    "plane": 3141.59265359,
+    "cylinder": 3455.75191895
+   },
+   "tolerance": 0.00001,
+   "unit": "mm^2",
+   "source": "(b) closed form",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-03",
+    "FR-SWG-12"
+   ],
+   "cli": {
+    "run": "llull sweep_surface ... orientation={mode:surface} --doc t.llull.json --kernel occt --json; llull measure_area ...",
+    "assert": "data.area"
+   }
+  },
+  {
+   "vc": "VC-SWG-35",
+   "what": "one rail: scale (rail 10 -> 5 along a 100 spine = frustum); orient (helical rail, square, one turn = twist invariance)",
+   "metric": "volume",
+   "values": {
+    "linear_1_to_0.5_straight": 18325.9571459
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/scale.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-08",
+    "TR-SWG-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_rails_and_surface_mode.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   },
+   "orientCase": {
+    "value": 10000,
+    "note": "square 10, rail = helix radius 5 through the mid-edge anchor, pitch 100, 1 turn"
+   }
+  },
+  {
+   "vc": "VC-SWG-36",
+   "what": "square 10, h 50, seams one corner apart: alignment none (2/3 prism) vs auto (prism)",
+   "metric": "volume",
+   "values": {
+    "square_seam_off_by_one_corner": 3333.33333333
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/misc.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-19",
+    "TR-SWG-10"
+   ],
+   "cli": {
+    "run": "llull loft_sections alignment=none|auto --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume of mass_properties per entity"
+   },
+   "alignedValue": 5000
+  },
+  {
+   "vc": "VC-SWG-37",
+   "what": "ruled loft square 20 -> circle r 10, h 50, arc-length coupling (reference code); vertex coupling keeps 4 corner edges",
+   "metric": "volume",
+   "values": {
+    "ruled_square20_to_circle10_arc_length": 17904.7631968
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/misc.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-20",
+    "FR-SWG-26",
+    "TR-SWG-10",
+    "TR-SWG-11"
+   ],
+   "cli": {
+    "run": "llull loft_sections coupling=arc_length ruled --doc t.llull.json --kernel occt --json; llull inspect_topology ...",
+    "assert": "data.volume of mass_properties per entity"
+   },
+   "topology": {
+    "longitudinalCornerEdges": 4
+   },
+   "note": "value is a reference-code integral (Richardson), not a closed form: tolerance 1e-5 rel"
+  },
+  {
+   "vc": "VC-SWG-38",
+   "what": "L-shaped path, circle r 5: round corner (bend 30, TODAY) and mitre corner",
+   "metric": "volume",
+   "values": {
+    "l_path_round_corner": 14696.675938,
+    "l_path_miter_corner": 15707.9632679
+   },
+   "tolerance": {
+    "exactKernelRel": 0.000001,
+    "meshKernelRel": 0.005
+   },
+   "unit": "mm^3",
+   "source": "(b) closed form, data/misc.json (mesh cross-check relErrRichardson in the file); derivation README section 4",
+   "grade": "A",
+   "proves": [
+    "FR-SWG-07",
+    "TR-SWG-03"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_today_sweeps_lofts.json --doc t.llull.json --kernel occt --json (elbow) ; sweep_profile corners=miter",
+    "assert": "data.volume of mass_properties per entity"
+   }
+  }
+ ]
+}

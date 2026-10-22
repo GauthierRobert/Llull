@@ -1,0 +1,23 @@
+{
+ "unit": "mm",
+ "A": "[0,2]^3",
+ "B": "[1,3]^3",
+ "cases": [
+  {
+   "op": "union",
+   "expectedVolume": 15,
+   "expectedArea": 42
+  },
+  {
+   "op": "subtract",
+   "expectedVolume": 7,
+   "expectedArea": 24
+  },
+  {
+   "op": "intersect",
+   "expectedVolume": 1,
+   "expectedArea": 6
+  }
+ ],
+ "derivation": "overlap = [1,2]^3 (volume 1); each cube has 3 unit faces inside the other; union area 48 - 2*3 = 42; A - B keeps 21 of A and gains 3 of B"
+}

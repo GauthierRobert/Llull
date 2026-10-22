@@ -1,0 +1,34 @@
+{
+ "gap": "SWG",
+ "generated": "2026-10-22",
+ "notes": "Two circles r0 = 10 (z = 0), r1 = 5 (z = 50). Condition \"normal\" with magnitude m: dS/dv at the section = m * (distance between section centroids) * section normal; 2 sections, cubic Hermite in v. m = 1 gives z linear and radius smoothstep.",
+ "cases": [
+  {
+   "id": "normal_both_ends_m1",
+   "magnitude": 1,
+   "formula": "pi h (r0^2 + r0 d + 13 d^2 / 35), d = r1 - r0",
+   "value": 9312.57822314,
+   "meshCoarse": 9308.81916011,
+   "meshFine": 9311.63837134,
+   "richardson": 9312.57810841,
+   "relErrRichardson": 1.23e-8,
+   "endAngleToNormalRad": 0,
+   "contrastFreeRuled": 9162.97857297
+  },
+  {
+   "id": "normal_both_ends_m2",
+   "magnitude": 2,
+   "formula": "integral pi r(v)^2 z'(v) dv (Gauss-Legendre 40)",
+   "value": 9462.17787331,
+   "endAngleToNormalRad": 0,
+   "checkM1ByQuadrature": 9312.57822314
+  },
+  {
+   "id": "centreline_quarter_arc",
+   "R": 50,
+   "sectionRadius": 10,
+   "formula": "pi r^2 R pi/2 (sections normal to a circular centreline = quarter torus)",
+   "value": 24674.0110027
+  }
+ ]
+}

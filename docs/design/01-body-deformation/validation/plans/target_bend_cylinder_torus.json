@@ -1,0 +1,87 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 5,
+   "height": 314.159265,
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "base-center"
+  },
+  "as": "rod"
+ },
+ {
+  "command": "bend_body",
+  "params": {
+   "id": "$rod",
+   "radius": 50,
+   "angleDeg": 360,
+   "frame": {
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "axis": [
+     0,
+     0,
+     1
+    ],
+    "reference": [
+     0,
+     1,
+     0
+    ]
+   },
+   "output": {
+    "mode": "exact",
+    "tolerance": 0.0001
+   }
+  },
+  "as": "ring"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$ring"
+  }
+ },
+ {
+  "command": "analyze_deformation",
+  "params": {
+   "id": "$ring",
+   "compareTo": {
+    "kind": "torus",
+    "majorRadius": 50,
+    "minorRadius": 5,
+    "center": [
+     0,
+     50,
+     0
+    ],
+    "axis": [
+     1,
+     0,
+     0
+    ]
+   }
+  }
+ },
+ {
+  "command": "check_deformation",
+  "params": {
+   "ids": [
+    "$ring"
+   ]
+  }
+ }
+]

@@ -1,0 +1,76 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 5,
+   "height": 40,
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "base-center"
+  },
+  "as": "pin"
+ },
+ {
+  "command": "taper_body",
+  "params": {
+   "id": "$pin",
+   "scaleEnd": 0.4,
+   "frame": {
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "axis": [
+     0,
+     0,
+     1
+    ],
+    "reference": [
+     1,
+     0,
+     0
+    ]
+   },
+   "region": {
+    "start": 0,
+    "end": 40,
+    "falloff": "linear"
+   },
+   "output": {
+    "mode": "exact",
+    "tolerance": 0.0001
+   }
+  },
+  "as": "cone"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$cone"
+  }
+ },
+ {
+  "command": "inspect_topology",
+  "params": {
+   "id": "$cone"
+  }
+ },
+ {
+  "command": "check_deformation",
+  "params": {
+   "ids": [
+    "$cone"
+   ]
+  }
+ }
+]

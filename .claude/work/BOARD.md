@@ -12,6 +12,9 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 - Lanes own disjoint write scopes (`.claude/rules/workflow.md` W5); one task per lane at a time, up to 4 lanes + Lane 5 review.
 
 ## NOW (auto-updated by the skill)
+- 2026-10-22 — main: freeform design track specified (owner: "design anything in any shape"): `docs/design/` packs 01 DEF … 07 MSH
+  (266 FR, 111 TR, 278 VC, 50 plans; all 9 baseline plans run on main). Specs only; tasks DES-1 … DES-7 below, target plans in
+  `blockedPlanCommands.json`. Owner decisions per pack: `docs/design/README.md`.
 - 2026-10-22 — main: PR #106 (llull-mesh) + NG1 Netgen mesher merged. Done on main, one commit each: ENG-10 (one density convention:
   add_rigid_body takes densityUnit; unverified density printed once; AF-32 flags kept), ENG-6 (inertiaKgM2, add_spring pointFrame "body",
   thrust work in the energy balance, VC-RBD-40 stop time 1.3e-5), ENG-9 (L-stair well outline; add_hole stays in `manufacturing`, `llull
@@ -44,6 +47,23 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 - All SC tasks done (SC-NATIVE, SC-Q4b closed 2026-10-20: `docs/decisions/SC1-remaining.md`). Follow-up idea: exact helical thread
   groove in the native kernel (oracle 106 known failure).
+
+## Freeform design (spec = `docs/design/README.md`, order = its "Recommended order")
+
+- `[TODO]` **DES-2** 02 SWG M0–M3: sweep twist / scale / area laws, orientation modes, explicit station blend (VC-SWG-11 finding), exact
+  helix: `docs/design/02-sweep-loft-guides/`. _Lane 1 (+ native `sheetSolid`)_ _deps: —_
+- `[TODO]` **DES-6** 06 BLD M0: coded OCCT fillet diagnostics, native `edgeSamples` / `edgeContinuity`, `probe_fillet`, `check_blends`,
+  oracle cases for variable laws: `docs/design/06-variable-blends/`. _Lane 1 + native_ _deps: —_
+- `[TODO]` **DES-7** 07 MSH M0 + M2: STL / OBJ / PLY / 3MF import, `analyze_mesh` / `check_mesh`, Manifold hull / Minkowski / offset /
+  hollow, boolean routing for triangle meshes: `docs/design/07-mesh-modeling/`. _Lane 1 + 4_ _deps: —_
+- `[TODO]` **DES-1** 01 DEF M0–M1: deformation law library, `scale_nonuniform` (exact), twist / taper / stretch / bend on the mesh kernel,
+  `analyze_deformation`, `check_deformation`: `docs/design/01-body-deformation/`. _Lane 1_ _deps: —_
+- `[TODO]` **DES-3** 03 WRP M0–M3: face charts to core, fonts + 3D text, wrap / project / unwrap, emboss / deboss / scribe on developable
+  faces, `check_wrap`: `docs/design/03-wrap-emboss/` (decision D-WRP-1 binary blobs first). _Lane 1_ _deps: —_
+- `[TODO]` **DES-4** 04 DIR MVP: viewport picking, cage / control-net overlays, drag sessions, cage edit v2, creases, symmetry, extrude /
+  inset / loop cut: `docs/design/04-direct-freeform-editing/`. _Lane 2 + 1_ _deps: DES-6 (`edgeContinuity` for checks)_
+- `[TODO]` **DES-5** 05 IMP MVP: field program + engine port, shared `core/lib/isosurface`, SDF / TPMS / strut lattices,
+  `create_implicit_body`, native `llull-field`: `docs/design/05-implicit-lattice/`. _Lane 1 + native_ _deps: DES-7 (mesh assets)_
 
 ## Aerospace + physics (spec = the linked pack)
 - `[TODO]` **AERO-6** Left after AERO-4/5 (each in its spec §13): CAx-IF composite conformance with a second CAD system / CAx-IF test files, JT (deferred by

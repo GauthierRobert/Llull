@@ -1,0 +1,63 @@
+{
+ "gap": "SWG",
+ "generated": "2026-10-22",
+ "notes": "Square 10 x 10 swept with a twist law phi(t). Straight path: Cavalieri (every slice normal to the path is the same square) - true even for an off-centre section. Helix path: centroid on the path.",
+ "cases": [
+  {
+   "id": "linear_0_to_90deg",
+   "path": "line",
+   "pathLength": 100,
+   "formula": "A L (in-plane rotation keeps the section centroid on the path)",
+   "value": 10000,
+   "meshCoarse": 9999.07907747,
+   "meshFine": 9999.76976769,
+   "richardson": 9999.99999777,
+   "relErrRichardson": 2.23e-10
+  },
+  {
+   "id": "linear_0_to_360deg",
+   "path": "line",
+   "pathLength": 100,
+   "formula": "A L (in-plane rotation keeps the section centroid on the path)",
+   "value": 10000,
+   "meshCoarse": 9995.08324715,
+   "meshFine": 9998.7706855,
+   "richardson": 9999.99983161,
+   "relErrRichardson": 1.68e-8
+  },
+  {
+   "id": "scurve_0_to_180deg",
+   "path": "line",
+   "pathLength": 100,
+   "formula": "A L (in-plane rotation keeps the section centroid on the path)",
+   "value": 10000,
+   "meshCoarse": 9997.87040509,
+   "meshFine": 9999.46757662,
+   "richardson": 9999.99996713,
+   "relErrRichardson": 3.29e-9
+  },
+  {
+   "id": "offset_rect_linear_0_to_180deg",
+   "path": "line",
+   "pathLength": 100,
+   "formula": "A L (in-plane rotation keeps the section centroid on the path)",
+   "value": 10000,
+   "meshCoarse": 9994.60372222,
+   "meshFine": 9998.34491895,
+   "richardson": 9999.59198452,
+   "relErrRichardson": 0.0000408,
+   "note": "rect 20 x 5 centred at (6, 0): A = 100, offset section on a straight path"
+  },
+  {
+   "id": "helix_linear_0_to_720deg",
+   "path": "helix",
+   "pathLength": 378.182896725,
+   "formula": "A L (in-plane rotation keeps the section centroid on the path)",
+   "value": 37818.2896725,
+   "meshCoarse": 37799.4169078,
+   "meshFine": 37813.5708602,
+   "richardson": 37818.2888443,
+   "relErrRichardson": 2.19e-8
+  }
+ ]
+}

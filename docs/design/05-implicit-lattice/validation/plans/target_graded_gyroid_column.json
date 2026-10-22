@@ -1,0 +1,90 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "create_scalar_field",
+  "params": {
+   "kind": "coordinate",
+   "axis": "z"
+  },
+  "as": "z"
+ },
+ {
+  "command": "create_scalar_field",
+  "params": {
+   "kind": "ramp",
+   "input": "$z",
+   "inMin": 0,
+   "inMax": 40,
+   "outMin": 0.5,
+   "outMax": 2.5,
+   "clamp": true
+  },
+  "as": "wall"
+ },
+ {
+  "command": "add_field_primitive",
+  "params": {
+   "shape": "box",
+   "size": [
+    10,
+    10,
+    40
+   ],
+   "position": [
+    5,
+    5,
+    20
+   ]
+  },
+  "as": "column"
+ },
+ {
+  "command": "add_tpms_lattice",
+  "params": {
+   "kind": "gyroid",
+   "form": "sheet",
+   "thickness": "$wall",
+   "normalize": "gradient",
+   "cellSize": 10,
+   "origin": [
+    0,
+    0,
+    0
+   ],
+   "region": "$column"
+  },
+  "as": "graded"
+ },
+ {
+  "command": "create_implicit_body",
+  "params": {
+   "field": "$graded",
+   "voxel": 0.1
+  },
+  "as": "body"
+ },
+ {
+  "command": "implicit_properties",
+  "params": {
+   "id": "$body",
+   "region": "$column"
+  }
+ },
+ {
+  "command": "lattice_properties",
+  "params": {
+   "id": "$graded"
+  }
+ },
+ {
+  "command": "check_implicit",
+  "params": {
+   "id": "$body"
+  }
+ }
+]

@@ -1,0 +1,91 @@
+{
+ "derivation": "Quartic Bezier [A, A+k(T-A), T, B+k(T-B), B] between two planes: curvature 0 at both contacts (G2 to planes). Circular fillet with the same tangent distance d (r = d at 90 deg) has curvature 1/r at contact: a G2 jump of 1/r (relative jump 1) - it is G1 only.",
+ "circularReference_90deg": {
+  "removedAreaPerD2": 0.214601836603,
+  "contactCurvatureTimesD": 1,
+  "g2RelativeJump": 1
+ },
+ "quartic90deg": [
+  {
+   "shapeK": 0.2,
+   "removedAreaPerD2_90deg": 0.178857142857,
+   "endCurvatureTimesD": [
+    0,
+    0
+   ],
+   "midCurvatureTimesD": 1.2552191382,
+   "maxCurvatureTimesD": 1.2552191382
+  },
+  {
+   "shapeK": 0.3,
+   "removedAreaPerD2_90deg": 0.150285714286,
+   "endCurvatureTimesD": [
+    0,
+    1.71193772834e-31
+   ],
+   "midCurvatureTimesD": 1.47313912747,
+   "maxCurvatureTimesD": 1.47313912747
+  },
+  {
+   "shapeK": 0.4,
+   "removedAreaPerD2_90deg": 0.124,
+   "endCurvatureTimesD": [
+    0,
+    0
+   ],
+   "midCurvatureTimesD": 1.75315730873,
+   "maxCurvatureTimesD": 1.75315730873
+  },
+  {
+   "shapeK": 0.5,
+   "removedAreaPerD2_90deg": 0.1,
+   "endCurvatureTimesD": [
+    0,
+    0
+   ],
+   "midCurvatureTimesD": 2.12132034356,
+   "maxCurvatureTimesD": 2.12132034356
+  },
+  {
+   "shapeK": 0.6,
+   "removedAreaPerD2_90deg": 0.0782857142857,
+   "endCurvatureTimesD": [
+    0,
+    0
+   ],
+   "midCurvatureTimesD": 2.61891400439,
+   "maxCurvatureTimesD": 2.61891400439
+  },
+  {
+   "shapeK": 0.7,
+   "removedAreaPerD2_90deg": 0.0588571428571,
+   "endCurvatureTimesD": [
+    0,
+    0
+   ],
+   "midCurvatureTimesD": 3.31456303681,
+   "maxCurvatureTimesD": 3.31456303681
+  },
+  {
+   "shapeK": 0.8,
+   "removedAreaPerD2_90deg": 0.0417142857143,
+   "endCurvatureTimesD": [
+    0,
+    0
+   ],
+   "midCurvatureTimesD": 4.32922519094,
+   "maxCurvatureTimesD": 4.32922519094
+  }
+ ],
+ "block20x10x5_topEdge_d1_k05": {
+  "removedVolume": 2,
+  "volumeAfter": 998
+ },
+ "wedge60deg_k05": {
+  "removedAreaPerD2": 0.0866025403784,
+  "endCurvatureTimesD": [
+   0,
+   0
+  ]
+ }
+}

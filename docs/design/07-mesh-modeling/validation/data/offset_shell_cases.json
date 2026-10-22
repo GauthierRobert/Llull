@@ -1,0 +1,39 @@
+{
+ "unit": "mm",
+ "cases": [
+  {
+   "id": "sphere_out",
+   "input": "sphere R 10, offset +1",
+   "expectedVolume": 5575.27976257,
+   "derivation": "parallel body of a sphere is a sphere R + d"
+  },
+  {
+   "id": "sphere_in",
+   "input": "sphere R 10, offset -1",
+   "expectedVolume": 3053.62805929
+  },
+  {
+   "id": "cube_out_round",
+   "input": "cube 10, offset +1, rounded corners",
+   "expectedVolume": 1698.43656981,
+   "derivation": "equals the Minkowski sum with a ball"
+  },
+  {
+   "id": "cube_in_sharp",
+   "input": "cube 10, offset -1",
+   "expectedVolume": 512,
+   "derivation": "(a - 2d)^3"
+  },
+  {
+   "id": "sphere_shell",
+   "input": "sphere R 10, hollow, wall 1 inward, sealed cavity",
+   "expectedVolume": 1135.1621455
+  }
+ ],
+ "tolerance": {
+  "rule": "a level-set result whose vertices lie within eps of the exact offset surface has |dV| <= A_exact * eps",
+  "eps": 0.01,
+  "sphere_out_absBound": 15.2053,
+  "sphere_out_relBound": 0.00272727
+ }
+}

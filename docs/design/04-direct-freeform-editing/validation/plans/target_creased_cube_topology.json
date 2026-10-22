@@ -1,0 +1,180 @@
+[
+ {
+  "command": "add_subdivision_solid",
+  "params": {
+   "box": {
+    "size": [
+     2,
+     2,
+     2
+    ]
+   },
+   "levels": 2,
+   "id": "ext"
+  }
+ },
+ {
+  "command": "extrude_cage_faces",
+  "params": {
+   "id": "ext",
+   "faces": [
+    0
+   ],
+   "distance": 1
+  }
+ },
+ {
+  "command": "edit_subdivision_cage",
+  "params": {
+   "id": "ext",
+   "crease": true
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "ext"
+  }
+ },
+ {
+  "command": "add_subdivision_solid",
+  "params": {
+   "box": {
+    "size": [
+     2,
+     2,
+     2
+    ]
+   },
+   "levels": 2,
+   "id": "ins",
+   "position": [
+    4,
+    0,
+    0
+   ]
+  }
+ },
+ {
+  "command": "inset_cage_faces",
+  "params": {
+   "id": "ins",
+   "faces": [
+    0
+   ],
+   "thickness": 0.5,
+   "depth": -0.5
+  }
+ },
+ {
+  "command": "edit_subdivision_cage",
+  "params": {
+   "id": "ins",
+   "crease": true
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "ins"
+  }
+ },
+ {
+  "command": "add_subdivision_solid",
+  "params": {
+   "box": {
+    "size": [
+     2,
+     2,
+     2
+    ]
+   },
+   "levels": 2,
+   "id": "cut",
+   "position": [
+    8,
+    0,
+    0
+   ]
+  }
+ },
+ {
+  "command": "loop_cut_cage",
+  "params": {
+   "id": "cut",
+   "edge": [
+    0,
+    4
+   ],
+   "cuts": 1
+  }
+ },
+ {
+  "command": "edit_subdivision_cage",
+  "params": {
+   "id": "cut",
+   "crease": true
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "cut"
+  }
+ },
+ {
+  "command": "add_subdivision_solid",
+  "params": {
+   "box": {
+    "size": [
+     3,
+     3,
+     1
+    ],
+    "segments": [
+     3,
+     3,
+     1
+    ]
+   },
+   "levels": 2,
+   "id": "tun",
+   "position": [
+    0,
+    6,
+    0
+   ]
+  }
+ },
+ {
+  "command": "bridge_cage_faces",
+  "params": {
+   "id": "tun",
+   "facesA": [
+    4
+   ],
+   "facesB": [
+    13
+   ]
+  }
+ },
+ {
+  "command": "edit_subdivision_cage",
+  "params": {
+   "id": "tun",
+   "crease": true
+  }
+ },
+ {
+  "command": "check_subdivision",
+  "params": {
+   "id": "tun"
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "tun"
+  }
+ }
+]

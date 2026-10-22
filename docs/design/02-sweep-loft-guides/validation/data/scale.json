@@ -1,0 +1,57 @@
+{
+ "gap": "SWG",
+ "generated": "2026-10-22",
+ "notes": "V = A integral_0^L s(t)^2 ds for a section scaled about its centroid on the path (centroid on the path keeps the first-moment term zero).",
+ "cases": [
+  {
+   "id": "linear_1_to_0.5_straight",
+   "formula": "A L (s0^2 + s0 s1 + s1^2) / 3 (cone frustum)",
+   "integralOfScaleSquared": 0.583333333333,
+   "value": 18325.9571459,
+   "meshCoarse": 18318.5984156,
+   "meshFine": 18324.1172971,
+   "richardson": 18325.9569243,
+   "relErrRichardson": 1.21e-8
+  },
+  {
+   "id": "smoothstep_1_to_0.5_straight",
+   "formula": "A L (s0^2 + s0 d + 13 d^2 / 35), d = s1 - s0; integral w = 1/2, integral w^2 = 13/35",
+   "integralOfScaleSquared": 0.592857142857,
+   "value": 18625.1564463,
+   "meshCoarse": 18617.6383202,
+   "meshFine": 18623.2767427,
+   "richardson": 18625.1562168,
+   "relErrRichardson": 1.23e-8
+  },
+  {
+   "id": "expression_1_plus_0.25sin2pit",
+   "formula": "A L (1 + 0.25^2 / 2)",
+   "integralOfScaleSquared": 1.03125,
+   "value": 32397.6742401,
+   "meshCoarse": 32384.5036432,
+   "meshFine": 32394.3812824,
+   "richardson": 32397.6738288,
+   "relErrRichardson": 1.27e-8
+  },
+  {
+   "id": "linear_1_to_0.5_quarter_arc_square",
+   "formula": "side^2 R theta (s0^2 + s0 s1 + s1^2) / 3",
+   "integralOfScaleSquared": 0.583333333333,
+   "value": 4581.48928649,
+   "meshCoarse": 4581.44218508,
+   "meshFine": 4581.47751111,
+   "richardson": 4581.48928645,
+   "relErrRichardson": 7.66e-12
+  },
+  {
+   "id": "area_law_linear_100_to_25",
+   "formula": "L (A0 + A1) / 2 (area law, not scale law)",
+   "value": 6250,
+   "meshCoarse": 6249.98916959,
+   "meshFine": 6249.99729239,
+   "richardson": 6249.99999999,
+   "relErrRichardson": 1.6e-12,
+   "contrastLinearScaleLaw": 5833.33333333
+  }
+ ]
+}

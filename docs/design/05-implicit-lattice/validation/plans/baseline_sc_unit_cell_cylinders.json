@@ -1,0 +1,65 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 1,
+   "height": 10,
+   "axis": [
+    1,
+    0,
+    0
+   ]
+  },
+  "as": "cx"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 1,
+   "height": 10,
+   "axis": [
+    0,
+    1,
+    0
+   ]
+  },
+  "as": "cy"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 1,
+   "height": 10,
+   "axis": [
+    0,
+    0,
+    1
+   ]
+  },
+  "as": "cz"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "union",
+   "a": "$cx",
+   "b": [
+    "$cy",
+    "$cz"
+   ]
+  },
+  "as": "cell"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$cell"
+  }
+ }
+]

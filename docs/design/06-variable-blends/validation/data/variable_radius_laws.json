@@ -1,0 +1,68 @@
+{
+ "block": {
+  "size": [
+   20,
+   10,
+   5
+  ],
+  "volume": 1000,
+  "topFaceArea": 200,
+  "sideFaceArea": 100,
+  "edgeLength": 20
+ },
+ "linear_r1_to_r2": {
+  "r0": 1,
+  "r1": 2,
+  "L": 20,
+  "removedVolume_section": 10.0147523748,
+  "volume_section": 989.985247625,
+  "topFaceArea": 170,
+  "sideFaceArea": 70,
+  "note": "face areas are construction-independent (grade A); the volume is exact for the normal-section construction, see envelope_vs_section for the rolling-ball envelope"
+ },
+ "controlPoints_1_2_1": {
+  "law": [
+   [
+    0,
+    1
+   ],
+   [
+    0.5,
+    2
+   ],
+   [
+    1,
+    1
+   ]
+  ],
+  "radiusAtControlPoints": [
+   {
+    "t": 0,
+    "radius": 1
+   },
+   {
+    "t": 0.5,
+    "radius": 2
+   },
+   {
+    "t": 1,
+    "radius": 1
+   }
+  ],
+  "removedVolume_piecewiseLinear": 10.0147523748,
+  "faceAreaLost_piecewiseLinear": 30,
+  "note": "OCCT Add(TColgp_Array1OfPnt2d) interpolates (smooth); the piecewise-linear figures are the llull `interpolation: \"linear\"` law only. Radii AT control points are exact for both."
+ },
+ "envelope_vs_section": {
+  "law": "r(z) = 1 + 0.05 z on the 20-long edge (slope dr/ds = 0.05)",
+  "constantRadiusSelfCheck": {
+   "envelope": 0.21460156953,
+   "closedForm": 0.214601836603,
+   "relError": 0.00000124450328893
+  },
+  "midSpanSectionArea_section": 0.482854132356,
+  "midSpanSectionArea_envelope": 0.482455893254,
+  "relativeDifference": -0.000824760677449,
+  "meaning": "the two constructions differ by this fraction of removed area at slope 0.05 (grows ~ slope^2); volume VCs on variable fillets use a tolerance that covers it until the native construction is pinned (open question Q2)"
+ }
+}

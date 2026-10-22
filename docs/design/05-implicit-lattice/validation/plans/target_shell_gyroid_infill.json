@@ -1,0 +1,109 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    40,
+    40,
+    40
+   ]
+  },
+  "as": "box"
+ },
+ {
+  "command": "field_from_solid",
+  "params": {
+   "entityId": "$box"
+  },
+  "as": "fbox"
+ },
+ {
+  "command": "shell_field",
+  "params": {
+   "field": "$fbox",
+   "thickness": 2,
+   "side": "inside"
+  },
+  "as": "skin"
+ },
+ {
+  "command": "add_field_primitive",
+  "params": {
+   "shape": "box",
+   "size": [
+    36,
+    36,
+    36
+   ]
+  },
+  "as": "inner"
+ },
+ {
+  "command": "add_tpms_lattice",
+  "params": {
+   "kind": "gyroid",
+   "form": "network",
+   "level": 0,
+   "cellSize": 12,
+   "origin": [
+    0,
+    0,
+    0
+   ],
+   "region": "$inner"
+  },
+  "as": "infill"
+ },
+ {
+  "command": "combine_fields",
+  "params": {
+   "op": "union",
+   "a": "$skin",
+   "b": "$infill"
+  },
+  "as": "part"
+ },
+ {
+  "command": "create_implicit_body",
+  "params": {
+   "field": "$part",
+   "voxel": 0.2,
+   "hideSource": [
+    "$box"
+   ]
+  },
+  "as": "body"
+ },
+ {
+  "command": "implicit_properties",
+  "params": {
+   "id": "$body"
+  }
+ },
+ {
+  "command": "check_implicit",
+  "params": {
+   "id": "$body",
+   "process": {
+    "minWallMm": 0.4,
+    "minPoreMm": 1,
+    "source": "owner-supplied"
+   }
+  }
+ },
+ {
+  "command": "export_3mf",
+  "params": {
+   "entityIds": [
+    "$body"
+   ],
+   "name": "gyroid_infill_cube"
+  }
+ }
+]

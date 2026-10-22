@@ -1,0 +1,249 @@
+{
+ "generated": "generate_strut_refs.mjs",
+ "method": "quasi-Monte Carlo quadrature (R3 sequence) of the periodic strut-union indicator, 2²² points per cell (\"convergence\" = |2²² − 2²⁰|); struts are cylinders through the nodes (caps are inside neighbouring struts in a periodic lattice: every node lies on a strut that continues through it)",
+ "cubicClosedForm": {
+  "formula": "ρ = 3π x² − 8√2 x³, x = r/a < 1/2",
+  "derivation": "inclusion–exclusion at the node: 3 cylinders of length a (3π r² a) − 3 pairwise bicylinders (3 · 16/3 r³) + 1 tricylinder (8(2 − √2) r³) = 3π r² a − 8√2 r³"
+ },
+ "lattices": {
+  "cubic": {
+   "strutsPerCell": 3,
+   "lengthPerCell": 3,
+   "lengthFormula": "3a",
+   "rho1Formula": "π (r/a)² · 3a",
+   "maxwellStretchDominated": false,
+   "rows": [
+    {
+     "rOverA": 0.02,
+     "rho1": 0.003769911,
+     "rhoQuadrature": 0.003687382,
+     "convergence": 0.000009059906,
+     "overlapLoss": 0.00008252944,
+     "rhoClosedForm": 0.003679402
+    },
+    {
+     "rOverA": 0.05,
+     "rho1": 0.02356194,
+     "rhoQuadrature": 0.02214479,
+     "convergence": 0.00001096725,
+     "overlapLoss": 0.00141715,
+     "rhoClosedForm": 0.02214773
+    },
+    {
+     "rOverA": 0.08,
+     "rho1": 0.06031858,
+     "rhoQuadrature": 0.054528,
+     "convergence": 0.000004529953,
+     "overlapLoss": 0.005790581,
+     "rhoClosedForm": 0.05452596
+    },
+    {
+     "rOverA": 0.1,
+     "rho1": 0.09424778,
+     "rhoQuadrature": 0.08292127,
+     "convergence": 0.00004506111,
+     "overlapLoss": 0.01132651,
+     "rhoClosedForm": 0.08293407
+    },
+    {
+     "rOverA": 0.15,
+     "rho1": 0.2120575,
+     "rhoQuadrature": 0.1738815,
+     "convergence": 0.000005722046,
+     "overlapLoss": 0.03817597,
+     "rhoClosedForm": 0.1738737
+    }
+   ]
+  },
+  "bcc": {
+   "strutsPerCell": 8,
+   "lengthPerCell": 6.928203,
+   "lengthFormula": "4√3 a (8 half body diagonals)",
+   "rho1Formula": "π (r/a)² · 4√3",
+   "maxwellStretchDominated": false,
+   "rows": [
+    {
+     "rOverA": 0.02,
+     "rho1": 0.008706237,
+     "rhoQuadrature": 0.008390427,
+     "convergence": 0.000007629395,
+     "overlapLoss": 0.0003158103
+    },
+    {
+     "rOverA": 0.05,
+     "rho1": 0.05441398,
+     "rhoQuadrature": 0.04951835,
+     "convergence": 0.00001883507,
+     "overlapLoss": 0.004895634
+    },
+    {
+     "rOverA": 0.08,
+     "rho1": 0.1392998,
+     "rhoQuadrature": 0.1192348,
+     "convergence": 0.00002121925,
+     "overlapLoss": 0.02006499
+    },
+    {
+     "rOverA": 0.1,
+     "rho1": 0.2176559,
+     "rhoQuadrature": 0.1784675,
+     "convergence": 0.000006437302,
+     "overlapLoss": 0.03918841
+    },
+    {
+     "rOverA": 0.15,
+     "rho1": 0.4897258,
+     "rhoQuadrature": 0.3574419,
+     "convergence": 0.00001525879,
+     "overlapLoss": 0.1322839
+    }
+   ]
+  },
+  "fcc": {
+   "strutsPerCell": 6,
+   "lengthPerCell": 8.485281,
+   "lengthFormula": "6√2 a (face diagonals, each face shared by 2 cells)",
+   "rho1Formula": "π (r/a)² · 6√2",
+   "maxwellStretchDominated": false,
+   "rows": [
+    {
+     "rOverA": 0.02,
+     "rho1": 0.01066292,
+     "rhoQuadrature": 0.01022959,
+     "convergence": 0.00000333786,
+     "overlapLoss": 0.0004333315
+    },
+    {
+     "rOverA": 0.05,
+     "rho1": 0.06664324,
+     "rhoQuadrature": 0.05981016,
+     "convergence": 0.00001573563,
+     "overlapLoss": 0.006833082
+    },
+    {
+     "rOverA": 0.08,
+     "rho1": 0.1706067,
+     "rhoQuadrature": 0.142622,
+     "convergence": 0.00002002716,
+     "overlapLoss": 0.02798471
+    },
+    {
+     "rOverA": 0.1,
+     "rho1": 0.266573,
+     "rhoQuadrature": 0.2119389,
+     "convergence": 0.00006389618,
+     "overlapLoss": 0.05463412
+    },
+    {
+     "rOverA": 0.15,
+     "rho1": 0.5997892,
+     "rhoQuadrature": 0.4154098,
+     "convergence": 0.00001740456,
+     "overlapLoss": 0.1843794
+    }
+   ]
+  },
+  "octet": {
+   "strutsPerCell": 18,
+   "lengthPerCell": 16.97056,
+   "lengthFormula": "12√2 a (24 struts of a/√2: 12 on face diagonals, 12 octahedron edges)",
+   "rho1Formula": "π (r/a)² · 12√2",
+   "maxwellStretchDominated": true,
+   "rows": [
+    {
+     "rOverA": 0.02,
+     "rho1": 0.02132584,
+     "rhoQuadrature": 0.02009511,
+     "convergence": 0.00000500679,
+     "overlapLoss": 0.001230728
+    },
+    {
+     "rOverA": 0.05,
+     "rho1": 0.1332865,
+     "rhoQuadrature": 0.1139805,
+     "convergence": 7.152557e-7,
+     "overlapLoss": 0.01930596
+    },
+    {
+     "rOverA": 0.08,
+     "rho1": 0.3412134,
+     "rhoQuadrature": 0.2620916,
+     "convergence": 0.00005054474,
+     "overlapLoss": 0.07912177
+    },
+    {
+     "rOverA": 0.1,
+     "rho1": 0.533146,
+     "rhoQuadrature": 0.3786271,
+     "convergence": 0.000004529953,
+     "overlapLoss": 0.1545189
+    },
+    {
+     "rOverA": 0.15,
+     "rho1": 1.199578,
+     "rhoQuadrature": 0.678117,
+     "convergence": 0.00006842613,
+     "overlapLoss": 0.5214614
+    }
+   ]
+  }
+ },
+ "cubicBlocks": [
+  {
+   "n": 1,
+   "nodes": 8,
+   "beams": 12
+  },
+  {
+   "n": 2,
+   "nodes": 27,
+   "beams": 54
+  },
+  {
+   "n": 3,
+   "nodes": 64,
+   "beams": 144
+  },
+  {
+   "n": 4,
+   "nodes": 125,
+   "beams": 300
+  }
+ ],
+ "bccBlocks": [
+  {
+   "n": 1,
+   "nodes": 9,
+   "beams": 8
+  },
+  {
+   "n": 2,
+   "nodes": 35,
+   "beams": 64
+  },
+  {
+   "n": 3,
+   "nodes": 91,
+   "beams": 216
+  },
+  {
+   "n": 4,
+   "nodes": 189,
+   "beams": 512
+  }
+ ],
+ "frustumExamples": [
+  {
+   "h": 10,
+   "r1": 1,
+   "r2": 1,
+   "volume": 31.41593
+  },
+  {
+   "h": 10,
+   "r1": 1,
+   "r2": 0.5,
+   "volume": 18.32596
+  }
+ ]
+}

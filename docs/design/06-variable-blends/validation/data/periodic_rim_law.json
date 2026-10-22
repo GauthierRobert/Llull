@@ -1,0 +1,13 @@
+{
+ "R": 5,
+ "h": 10,
+ "law": "r(t) = 1 + 0.5 cos(2 pi t), t in [0, 1] along the rim (phase-independent: the volume integrates a full period)",
+ "removedVolume": 7.17052483609,
+ "numericCheck": 7.17052483609,
+ "volumeAfter": 778.227638561,
+ "constantR1Check": {
+  "removed": 6.44072997774,
+  "volumeAfter": 778.95743342,
+  "oracle": "tests/oracle/87-fillet-cylinder-rim 778.95743342"
+ }
+}

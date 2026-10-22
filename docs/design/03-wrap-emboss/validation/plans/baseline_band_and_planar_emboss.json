@@ -1,0 +1,126 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 20,
+   "height": 40,
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "body"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 21,
+   "height": 10,
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "band"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "union",
+   "a": "$body",
+   "b": "$band"
+  },
+  "as": "banded"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$banded"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    60,
+    40,
+    10
+   ],
+   "anchor": "min",
+   "position": [
+    100,
+    0,
+    0
+   ]
+  },
+  "as": "plate"
+ },
+ {
+  "command": "draw_rectangle",
+  "params": {
+   "width": 30,
+   "height": 10,
+   "position": [
+    115,
+    15,
+    10
+   ]
+  },
+  "as": "rect"
+ },
+ {
+  "command": "extrude_profile",
+  "params": {
+   "id": "$rect",
+   "depth": 1
+  },
+  "as": "boss"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "union",
+   "a": "$plate",
+   "b": "$boss"
+  },
+  "as": "plateEmbossed"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$plateEmbossed"
+  }
+ },
+ {
+  "command": "add_decal",
+  "params": {
+   "id": "$banded",
+   "text": "LLULL",
+   "at": [
+    21,
+    0,
+    0
+   ],
+   "normal": [
+    1,
+    0,
+    0
+   ],
+   "height": 5
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$banded"
+  }
+ }
+]

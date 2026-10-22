@@ -1,0 +1,73 @@
+{
+ "id": "MSH-CODES",
+ "status": "DRAFT: each step must refuse with the named code (exit 1 on the CLI for a single call)",
+ "unbuilt": [
+  "decimate_mesh",
+  "minkowski_sum",
+  "fill_mesh_holes",
+  "remesh_mesh",
+  "import_mesh_file"
+ ],
+ "validates": [
+  "VC-MSH-26"
+ ],
+ "expect": {
+  "stepIndexBase": 0,
+  "step 0": "MESH_ENTITY_NOT_FOUND",
+  "step 2": "MESH_TARGET_UNREACHABLE",
+  "step 3": "MESH_ENTITY_NOT_FOUND (an unknown id; with a real open sheet: MESH_NOT_CLOSED)",
+  "step 4": "CMD_INVALID_PARAMS (paths targetEdgeLength; zod .positive())",
+  "step 5": "MESH_IMPORT_UNITS_REQUIRED",
+  "runMode": "run each step as its own CLI call, or the plan with --continue-on-error if available; build_project aborts at the first failure (AF-14)"
+ },
+ "actions": [
+  {
+   "command": "decimate_mesh",
+   "params": {
+    "id": "nope",
+    "targetTriangles": 10
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     10,
+     10,
+     10
+    ]
+   },
+   "as": "b"
+  },
+  {
+   "command": "decimate_mesh",
+   "params": {
+    "id": "$b",
+    "targetTriangles": 2,
+    "maxDeviation": 1e-9
+   }
+  },
+  {
+   "command": "minkowski_sum",
+   "params": {
+    "a": "$b",
+    "b": "open-sheet-id",
+    "op": "sum"
+   }
+  },
+  {
+   "command": "remesh_mesh",
+   "params": {
+    "id": "$b",
+    "targetEdgeLength": -1
+   }
+  },
+  {
+   "command": "import_mesh_file",
+   "params": {
+    "format": "stl",
+    "file": "validation/data/icosphere_r10_l1_ascii.stl"
+   }
+  }
+ ]
+}

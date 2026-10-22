@@ -1,0 +1,143 @@
+{
+ "generated": "generate_mesh_convergence.mjs",
+ "mesher": "marching tetrahedra (6 Kuhn tets per cube), linear edge interpolation, no vertex refinement",
+ "note": "second-order convergence expected for volume and area (linear interpolation of a smooth field); the gate uses the exact value with tolerance C·h² taken from these rows (TECHNICAL_SPEC §5.6)",
+ "shapes": [
+  {
+   "name": "sphere_R10",
+   "exactVolume": 4188.7902,
+   "exactArea": 1256.6371,
+   "rows": [
+    {
+     "h": 0.982608695652174,
+     "cells": 23,
+     "triangles": 11736,
+     "closedManifold": true,
+     "volume": 4168.5061,
+     "volumeRelError": -0.0048424781,
+     "area": 1253.5057,
+     "areaRelError": -0.0024918688,
+     "maxVertexDistance": 0.03160315
+    },
+    {
+     "h": 0.5022222222222222,
+     "cells": 45,
+     "triangles": 44640,
+     "closedManifold": true,
+     "volume": 4183.4957,
+     "volumeRelError": -0.001263974,
+     "area": 1255.8205,
+     "areaRelError": -0.00064977612,
+     "maxVertexDistance": 0.0092468755
+    },
+    {
+     "h": 0.2511111111111111,
+     "cells": 90,
+     "triangles": 178656,
+     "closedManifold": true,
+     "volume": 4187.4681,
+     "volumeRelError": -0.000315638,
+     "area": 1256.4332,
+     "areaRelError": -0.00016225473,
+     "maxVertexDistance": 0.0023359443
+    },
+    {
+     "h": 0.12486187845303869,
+     "cells": 181,
+     "triangles": 723600,
+     "closedManifold": true,
+     "volume": 4188.4635,
+     "volumeRelError": -0.000077999192,
+     "area": 1256.5867,
+     "areaRelError": -0.000040110912,
+     "maxVertexDistance": 0.0005809295
+    }
+   ],
+   "observedOrder": {
+    "volume": [
+     2.0012356,
+     2.001624,
+     2.0007483
+    ],
+    "area": [
+     2.0027174,
+     2.0016822,
+     2.0002066
+    ],
+    "vertex": [
+     1.8310923,
+     1.9849601,
+     1.991652
+    ]
+   }
+  },
+  {
+   "name": "torus_5_2",
+   "exactVolume": 394.78418,
+   "exactArea": 394.78418,
+   "rows": [
+    {
+     "h": 1.0133333333333332,
+     "cells": 15,
+     "triangles": 3360,
+     "closedManifold": true,
+     "volume": 377.96226,
+     "volumeRelError": -0.04261042,
+     "area": 390.16366,
+     "areaRelError": -0.011703913,
+     "maxVertexDistance": 0.1797101
+    },
+    {
+     "h": 0.5066666666666666,
+     "cells": 30,
+     "triangles": 13120,
+     "closedManifold": true,
+     "volume": 390.49677,
+     "volumeRelError": -0.010860138,
+     "area": 393.63111,
+     "areaRelError": -0.002920751,
+     "maxVertexDistance": 0.04602665
+    },
+    {
+     "h": 0.24918032786885244,
+     "cells": 61,
+     "triangles": 56600,
+     "closedManifold": true,
+     "volume": 393.76347,
+     "volumeRelError": -0.0025854809,
+     "area": 394.50699,
+     "areaRelError": -0.00070211758,
+     "maxVertexDistance": 0.010997145
+    },
+    {
+     "h": 0.12459016393442622,
+     "cells": 122,
+     "triangles": 228480,
+     "closedManifold": true,
+     "volume": 394.52914,
+     "volumeRelError": -0.0006460153,
+     "area": 394.71483,
+     "areaRelError": -0.00017564921,
+     "maxVertexDistance": 0.0028168214
+    }
+   ],
+   "observedOrder": {
+    "volume": [
+     1.9721638,
+     2.0223123,
+     2.0007924
+    ],
+    "area": [
+     2.0025797,
+     2.0086549,
+     1.9990156
+    ],
+    "vertex": [
+     1.9651301,
+     2.0172359,
+     1.964989
+    ]
+   }
+  }
+ ]
+}

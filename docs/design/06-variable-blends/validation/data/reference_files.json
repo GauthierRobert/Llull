@@ -1,0 +1,68 @@
+{
+ "note": "OCCT headers read 2026-10-22 at tag V7_9_2 (the version llull pins, solver/scripts/build-occt.mjs OCCT_VERSION). Not copied here: URL + sha256 only (LGPL-2.1 with OCCT exception permits redistribution, but the numbers we use are quoted in TECHNICAL_SPEC).",
+ "repository": "https://github.com/Open-Cascade-SAS/OCCT",
+ "tag": "V7_9_2",
+ "commit": "c5f20409c52bf8f658314d205a0e5d6f0be0969c",
+ "files": [
+  {
+   "name": "BRepFilletAPI_MakeFillet.hxx",
+   "url": "https://github.com/Open-Cascade-SAS/OCCT/blob/V7_9_2/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.hxx",
+   "sha256": "74bd7a1218cae8511c83bbbf666a57b793215af6f05fed2407340233f6ffabe7"
+  },
+  {
+   "name": "BRepFilletAPI_MakeChamfer.hxx",
+   "url": "https://github.com/Open-Cascade-SAS/OCCT/blob/V7_9_2/src/BRepFilletAPI/BRepFilletAPI_MakeChamfer.hxx",
+   "sha256": "ff1965f0143b98c7a0631796101660ba002534a8016d7383fb14e5914e737a62"
+  },
+  {
+   "name": "BRepFilletAPI_MakeFillet2d.hxx",
+   "url": "https://github.com/Open-Cascade-SAS/OCCT/blob/V7_9_2/src/BRepFilletAPI/BRepFilletAPI_MakeFillet2d.hxx",
+   "sha256": "4826e0c9e96e7f75d159784fd9acbc120c77170baffa9c87f9c23e42169de985"
+  },
+  {
+   "name": "ChFi3d_FilletShape.hxx",
+   "url": "https://github.com/Open-Cascade-SAS/OCCT/blob/V7_9_2/src/ChFi3d/ChFi3d_FilletShape.hxx",
+   "sha256": "0c81dbec83b069c1bf5348a2d3f29e3312780e9b9d3b114adf0ca093e2af95e7"
+  },
+  {
+   "name": "ChFi3d_FilBuilder.hxx",
+   "url": "https://github.com/Open-Cascade-SAS/OCCT/blob/V7_9_2/src/ChFi3d/ChFi3d_FilBuilder.hxx",
+   "sha256": "c305b0d4a2ecefa37c7c669777418c39cab7e628db3f7bca5de45d210a207fc7"
+  },
+  {
+   "name": "ChFiDS_ErrorStatus.hxx",
+   "url": "https://github.com/Open-Cascade-SAS/OCCT/blob/V7_9_2/src/ChFiDS/ChFiDS_ErrorStatus.hxx",
+   "sha256": "98bb11a9db52585e63056d1ecccd8a88f93ea9182c5f9624efcc1e489549038d"
+  },
+  {
+   "name": "ChFiDS_ChamfMode.hxx",
+   "url": "https://github.com/Open-Cascade-SAS/OCCT/blob/V7_9_2/src/ChFiDS/ChFiDS_ChamfMode.hxx",
+   "sha256": "65736d0e77d2e242dfbccad6668676217a1e20bb0d220131e554e6d8aa714b70"
+  },
+  {
+   "name": "FilletSurf_Builder.hxx",
+   "url": "https://github.com/Open-Cascade-SAS/OCCT/blob/V7_9_2/src/FilletSurf/FilletSurf_Builder.hxx",
+   "sha256": "90ee167e37f11beb5107a9ecb39001d40f45c6cbbb507f4c6019fdd5ef27b66c"
+  },
+  {
+   "name": "GeomFill_Pipe.hxx",
+   "url": "https://github.com/Open-Cascade-SAS/OCCT/blob/V7_9_2/src/GeomFill/GeomFill_Pipe.hxx",
+   "sha256": "7b8891e5fd0b34533b89bd0a1ab887855d3aa9a33ccd78f32a89ac745e3553eb"
+  },
+  {
+   "name": "GeomFill_EvolvedSection.hxx",
+   "url": "https://github.com/Open-Cascade-SAS/OCCT/blob/V7_9_2/src/GeomFill/GeomFill_EvolvedSection.hxx",
+   "sha256": "bb0bce2922b84c08080242bebb01cd88e0814c8adf332ebd4a8cb8a6d946e2ab"
+  },
+  {
+   "name": "BRepOffsetAPI_MakeFilling.hxx",
+   "url": "https://github.com/Open-Cascade-SAS/OCCT/blob/V7_9_2/src/BRepOffsetAPI/BRepOffsetAPI_MakeFilling.hxx",
+   "sha256": "569357f71c6b02c7ebaf265dd47d81a814c8bf21e6b1f552078058119cc90ccb"
+  },
+  {
+   "name": "BlendFunc_Corde.hxx",
+   "url": "https://github.com/Open-Cascade-SAS/OCCT/blob/V7_9_2/src/BlendFunc/BlendFunc_Corde.hxx",
+   "sha256": "1318c2a6e5f7fca161e7e2f9464401c53d2c4576d8922f0defeea40d4f38ccfa"
+  }
+ ]
+}

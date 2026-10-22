@@ -1,0 +1,42 @@
+{
+ "cases": [
+  {
+   "id": "cube_plus_interior",
+   "input": "the 8 corners of [0,10]^3 plus 1000 points from mulberry32(seed 7) uniform in (0.5, 9.5)^3",
+   "expected": {
+    "volume": 1000,
+    "area": 600,
+    "hullVertices": 8,
+    "hullTriangles": 12
+   },
+   "derivation": "interior points cannot be hull vertices; hull = the cube; 6 square faces = 12 triangles"
+  },
+  {
+   "id": "icosahedron_vertices",
+   "input": "12 vertices (0, ±1, ±phi) and cyclic permutations, edge 2",
+   "expected": {
+    "volume": 17.453559925,
+    "area": 34.6410161514,
+    "hullVertices": 12,
+    "hullTriangles": 20
+   },
+   "polyhedralCheck": {
+    "volumeFromTriangles": 17.453559925
+   },
+   "derivation": "V = 5 phi^2 / 6 a^3, A = 5 sqrt(3) a^2, a = 2"
+  },
+  {
+   "id": "torus_hull",
+   "input": "torus R 5, r 2 (continuous); mesh torus 64 x 32 segments for the test",
+   "expected": {
+    "volume": 545.061675019,
+    "torusVolume": 394.784176044
+   },
+   "derivation": "hull = { |z| <= r, rho <= R + sqrt(r^2 - z^2) }; V = pi * int_{-r}^{r} (R + sqrt(r^2 - z^2))^2 dz = 2 pi R^2 r + pi^2 R r^2 + 4/3 pi r^3",
+   "discretisation": {
+    "note": "a mesh torus with nu x nv segments is inscribed; its hull volume is below the continuous value by at most about 2*deficit(nu) + 2*deficit(nv) (relative), deficit(n) = 1 - sin(2 pi / n) / (2 pi / n)",
+    "relBound_64x32": 0.0160375
+   }
+  }
+ ]
+}

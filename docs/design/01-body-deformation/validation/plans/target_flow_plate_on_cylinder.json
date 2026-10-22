@@ -1,0 +1,105 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    60,
+    20,
+    2
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "min"
+  },
+  "as": "plate"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 30,
+   "height": 40,
+   "position": [
+    0,
+    10,
+    -30
+   ],
+   "axis": [
+    0,
+    1,
+    0
+   ]
+  },
+  "as": "drum"
+ },
+ {
+  "command": "flow_on_surface",
+  "params": {
+   "id": "$plate",
+   "base": {
+    "plane": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "normal": [
+      0,
+      0,
+      1
+     ],
+     "uDirection": [
+      1,
+      0,
+      0
+     ]
+    }
+   },
+   "target": {
+    "entityId": "$drum",
+    "faceNear": [
+     0,
+     10,
+     0
+    ]
+   },
+   "targetOrigin": [
+    0,
+    0,
+    0
+   ],
+   "targetUDirection": [
+    1,
+    0,
+    0
+   ],
+   "output": {
+    "mode": "auto",
+    "tolerance": 0.001
+   }
+  },
+  "as": "wrapped"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$wrapped"
+  }
+ },
+ {
+  "command": "check_deformation",
+  "params": {
+   "ids": [
+    "$wrapped"
+   ]
+  }
+ }
+]

@@ -1,0 +1,41 @@
+{
+ "brush": "draw / inflate on the flat grid [-10,10]^2, 80 x 80 cells (h 0.25), two triangles per cell, displacement s*f(r/rho) along +Z at every vertex",
+ "rho": 4,
+ "strength": 0.5,
+ "unit": "mm",
+ "falloff": {
+  "constant": "1",
+  "linear": "1 - t",
+  "smooth": "(1 - t^2)^2",
+  "sphere": "sqrt(1 - t^2)",
+  "t": "distance / radius"
+ },
+ "cases": [
+  {
+   "falloff": "constant",
+   "continuousVolume": 25.1327412287,
+   "discreteVolumeOnGrid": 24.78125,
+   "formula": "2 pi s rho^2 * 1/2"
+  },
+  {
+   "falloff": "linear",
+   "continuousVolume": 8.37758040957,
+   "discreteVolumeOnGrid": 8.37757073057,
+   "formula": "2 pi s rho^2 * 1/6"
+  },
+  {
+   "falloff": "smooth",
+   "continuousVolume": 8.37758040957,
+   "discreteVolumeOnGrid": 8.37768936157,
+   "formula": "2 pi s rho^2 * 1/6"
+  },
+  {
+   "falloff": "sphere",
+   "continuousVolume": 16.7551608191,
+   "discreteVolumeOnGrid": 16.7310889254,
+   "formula": "2 pi s rho^2 * 1/3"
+  }
+ ],
+ "discreteRule": "volume under a piecewise-linear surface = sum over triangles of area * mean vertex height (exact)",
+ "symmetry": "a stroke mirrored about x = 0 must give |z(x,y) - z(-x,y)| <= 1e-12 at every vertex"
+}

@@ -1,0 +1,163 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 20,
+   "height": 40,
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "body"
+ },
+ {
+  "command": "add_sphere",
+  "params": {
+   "radius": 25,
+   "position": [
+    100,
+    0,
+    0
+   ]
+  },
+  "as": "ball"
+ },
+ {
+  "command": "draw_rectangle",
+  "params": {
+   "width": 130,
+   "height": 10,
+   "position": [
+    -65,
+    -5,
+    0
+   ]
+  },
+  "as": "tooWide"
+ },
+ {
+  "command": "draw_polyline",
+  "params": {
+   "points": [
+    [
+     0,
+     0
+    ],
+    [
+     5,
+     5
+    ]
+   ]
+  },
+  "as": "open"
+ },
+ {
+  "command": "draw_rectangle",
+  "params": {
+   "width": 4,
+   "height": 4,
+   "position": [
+    -2,
+    -2,
+    0
+   ]
+  },
+  "as": "small"
+ },
+ {
+  "command": "emboss_on_face",
+  "params": {
+   "id": "$body",
+   "face": {
+    "faceNear": [
+     20,
+     0,
+     0
+    ]
+   },
+   "profileIds": [
+    "$tooWide"
+   ],
+   "mode": "emboss",
+   "depth": 1,
+   "placement": {
+    "method": "develop"
+   }
+  }
+ },
+ {
+  "command": "emboss_on_face",
+  "params": {
+   "id": "$body",
+   "face": {
+    "faceNear": [
+     20,
+     0,
+     0
+    ]
+   },
+   "profileIds": [
+    "$open"
+   ],
+   "mode": "emboss",
+   "depth": 1,
+   "placement": {
+    "method": "develop"
+   }
+  }
+ },
+ {
+  "command": "wrap_to_face",
+  "params": {
+   "id": "$ball",
+   "face": {
+    "faceNear": [
+     100,
+     0,
+     25
+    ]
+   },
+   "entityIds": [
+    "$open"
+   ],
+   "placement": {
+    "method": "develop"
+   }
+  }
+ },
+ {
+  "command": "emboss_on_face",
+  "params": {
+   "id": "$body",
+   "face": {
+    "faceNear": [
+     20,
+     0,
+     0
+    ]
+   },
+   "profileIds": [
+    "$small"
+   ],
+   "mode": "deboss",
+   "depth": 25,
+   "placement": {
+    "method": "develop"
+   }
+  }
+ },
+ {
+  "command": "import_font",
+  "params": {
+   "path": "fixtures/wrp/not-a-font.txt"
+  }
+ }
+]

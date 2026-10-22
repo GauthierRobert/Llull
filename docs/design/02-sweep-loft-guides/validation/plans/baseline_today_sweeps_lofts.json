@@ -1,0 +1,150 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    0,
+    0
+   ],
+   "radius": 50
+  },
+  "as": "torusPath"
+ },
+ {
+  "command": "sweep_profile",
+  "params": {
+   "pathId": "$torusPath",
+   "radius": 10
+  },
+  "as": "torus"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$torus"
+  }
+ },
+ {
+  "command": "sweep_profile",
+  "params": {
+   "path": [
+    [
+     200,
+     0,
+     0
+    ],
+    [
+     200,
+     0,
+     100
+    ]
+   ],
+   "stations": [
+    {
+     "at": 0,
+     "radius": 10
+    },
+    {
+     "at": 1,
+     "radius": 5
+    }
+   ]
+  },
+  "as": "taper"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$taper"
+  }
+ },
+ {
+  "command": "loft_sections",
+  "params": {
+   "sections": [
+    {
+     "center": [
+      400,
+      0,
+      0
+     ],
+     "radius": 10
+    },
+    {
+     "center": [
+      400,
+      0,
+      50
+     ],
+     "radius": 5
+    }
+   ],
+   "ruled": true
+  },
+  "as": "frustum"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$frustum"
+  }
+ },
+ {
+  "command": "add_coil",
+  "params": {
+   "radius": 20,
+   "pitch": 10,
+   "turns": 3,
+   "sectionRadius": 2,
+   "position": [
+    600,
+    0,
+    0
+   ]
+  },
+  "as": "coil"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$coil"
+  }
+ },
+ {
+  "command": "sweep_profile",
+  "params": {
+   "path": [
+    [
+     0,
+     300,
+     0
+    ],
+    [
+     100,
+     300,
+     0
+    ],
+    [
+     100,
+     400,
+     0
+    ]
+   ],
+   "radius": 5,
+   "bendRadius": 30
+  },
+  "as": "elbow"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$elbow"
+  }
+ }
+]

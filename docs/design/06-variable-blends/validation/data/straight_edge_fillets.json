@@ -1,0 +1,65 @@
+{
+ "derivation": "Circular fillet of radius r between two planes meeting at interior angle alpha along a straight edge: tangent distance t = r cot(alpha/2); removed section = kite r*t minus sector (pi-alpha) r^2/2. Chord between tangent points c = 2 r cos(alpha/2).",
+ "box10_one_edge_r1": {
+  "a": 10,
+  "r": 1,
+  "volume": 997.853981634,
+  "area": 595.278759595,
+  "oracle": "tests/oracle/83-fillet-box-one-edge (997.853981634 / 595.278759595)"
+ },
+ "wedgeTable": [
+  {
+   "wedgeDeg": 30,
+   "tangentDistancePerR": 3.73205080757,
+   "chordPerR": 1.93185165258,
+   "removedAreaPerR2": 2.42305386857
+  },
+  {
+   "wedgeDeg": 45,
+   "tangentDistancePerR": 2.41421356237,
+   "chordPerR": 1.84775906502,
+   "removedAreaPerR2": 1.23611631728
+  },
+  {
+   "wedgeDeg": 60,
+   "tangentDistancePerR": 1.73205080757,
+   "chordPerR": 1.73205080757,
+   "removedAreaPerR2": 0.684853256372
+  },
+  {
+   "wedgeDeg": 90,
+   "tangentDistancePerR": 1,
+   "chordPerR": 1.41421356237,
+   "removedAreaPerR2": 0.214601836603
+  },
+  {
+   "wedgeDeg": 120,
+   "tangentDistancePerR": 0.57735026919,
+   "chordPerR": 1,
+   "removedAreaPerR2": 0.0537514935913
+  },
+  {
+   "wedgeDeg": 135,
+   "tangentDistancePerR": 0.414213562373,
+   "chordPerR": 0.76536686473,
+   "removedAreaPerR2": 0.0215144806744
+  },
+  {
+   "wedgeDeg": 150,
+   "tangentDistancePerR": 0.267949192431,
+   "chordPerR": 0.517638090205,
+   "removedAreaPerR2": 0.00614980463197
+  }
+ ],
+ "triPrism_chord2_60deg": {
+  "side": 10,
+  "depth": 10,
+  "wedgeDeg": 60,
+  "chord": 2,
+  "radius": 1.15470053838,
+  "removedVolume": 9.13137675163,
+  "volumeBefore": 433.012701892,
+  "volumeAfter": 423.881325141
+ },
+ "centroidOffsetPerR_90deg": 0.223367938946
+}

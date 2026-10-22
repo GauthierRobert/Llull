@@ -1,0 +1,64 @@
+[
+ {
+  "command": "add_subdivision_solid",
+  "params": {
+   "box": {
+    "size": [
+     2,
+     2,
+     2
+    ]
+   },
+   "levels": 3,
+   "id": "c"
+  }
+ },
+ {
+  "command": "evaluate_subdivision",
+  "params": {
+   "id": "c",
+   "vertices": [
+    2
+   ],
+   "samples": [
+    {
+     "face": 0,
+     "u": 0.5,
+     "v": 0.5
+    }
+   ]
+  }
+ },
+ {
+  "command": "check_subdivision",
+  "params": {
+   "id": "c"
+  }
+ },
+ {
+  "command": "subdivision_to_nurbs",
+  "params": {
+   "id": "c",
+   "output": "sheets",
+   "faces": "unpacked",
+   "extraordinary": "G0",
+   "keep": true
+  }
+ },
+ {
+  "command": "subdivision_to_nurbs",
+  "params": {
+   "id": "c",
+   "output": "solid",
+   "faces": "packed",
+   "extraordinary": "G1",
+   "keep": true
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "c"
+  }
+ }
+]

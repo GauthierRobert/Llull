@@ -1,0 +1,61 @@
+{
+ "mesh": "icosphere R 10 level 4 (2562 vertices, 5120 faces), uniform umbrella operator (mean of the 1-ring minus the vertex)",
+ "lambda": 0.6307,
+ "kPB": 0.1,
+ "mu": -0.6731559455,
+ "clean": {
+  "meanRadius": 10,
+  "volume": 4179.738948,
+  "runs": [
+   {
+    "iterations": 1,
+    "laplacian": {
+     "meanRadius": 9.981972465,
+     "volume": 4157.106098
+    },
+    "taubin": {
+     "meanRadius": 10.00113961,
+     "volume": 4181.17758
+    }
+   },
+   {
+    "iterations": 10,
+    "laplacian": {
+     "meanRadius": 9.822113859,
+     "volume": 3959.755524
+    },
+    "taubin": {
+     "meanRadius": 10.01159566,
+     "volume": 4194.296062
+    }
+   },
+   {
+    "iterations": 50,
+    "laplacian": {
+     "meanRadius": 9.144299233,
+     "volume": 3190.896914
+    },
+    "taubin": {
+     "meanRadius": 10.05841439,
+     "volume": 4253.401743
+    }
+   }
+  ]
+ },
+ "noisy": {
+  "noise": "radial, uniform in [-0.1, 0.1] mm, mulberry32 seed 42",
+  "before": {
+   "meanRadius": 9.999848629,
+   "rmsAboutMean": 0.05803452188
+  },
+  "taubin10": {
+   "meanRadius": 10.01143974,
+   "rmsAboutMean": 0.01996602811
+  },
+  "laplacian10": {
+   "meanRadius": 9.821959819,
+   "rmsAboutMean": 0.01391603557
+  }
+ },
+ "note": "reference code run (this script); an implementation using the same operator and order must match to 1e-9 relative"
+}

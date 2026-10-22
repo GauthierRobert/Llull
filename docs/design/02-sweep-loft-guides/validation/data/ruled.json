@@ -1,0 +1,100 @@
+{
+ "gap": "SWG",
+ "generated": "2026-10-22",
+ "notes": "Ruled loft between two circles of radius R, height h, the top one rotated by phi: |p(t)|^2 = R^2 (1 - 2 t (1 - t)(1 - cos phi)) so V = pi R^2 h (1 - (1 - cos phi)/3) (hyperboloid of one sheet; phi = pi: double cone).",
+ "cases": [
+  {
+   "id": "ruled_circles_twist_0deg",
+   "R": 10,
+   "h": 50,
+   "twistRad": 0,
+   "formula": "pi R^2 h (1 - (1 - cos phi) / 3)",
+   "value": 15707.9632679,
+   "meshCoarse": 15706.3862547,
+   "meshFine": 15707.5690057,
+   "richardson": 15707.9632561,
+   "relErrRichardson": 7.54e-10,
+   "waistRadius": 10
+  },
+  {
+   "id": "ruled_circles_twist_60deg",
+   "R": 10,
+   "h": 50,
+   "twistRad": 1.0471975512,
+   "formula": "pi R^2 h (1 - (1 - cos phi) / 3)",
+   "value": 13089.96939,
+   "meshCoarse": 13088.3769928,
+   "meshFine": 13089.5712806,
+   "richardson": 13089.9693766,
+   "relErrRichardson": 1.02e-9,
+   "waistRadius": 8.66025403784
+  },
+  {
+   "id": "ruled_circles_twist_90deg",
+   "R": 10,
+   "h": 50,
+   "twistRad": 1.57079632679,
+   "formula": "pi R^2 h (1 - (1 - cos phi) / 3)",
+   "value": 10471.975512,
+   "meshCoarse": 10470.6029097,
+   "meshFine": 10471.6323524,
+   "richardson": 10471.9755,
+   "relErrRichardson": 1.14e-9,
+   "waistRadius": 7.07106781187
+  },
+  {
+   "id": "ruled_circles_twist_120deg",
+   "R": 10,
+   "h": 50,
+   "twistRad": 2.09439510239,
+   "formula": "pi R^2 h (1 - (1 - cos phi) / 3)",
+   "value": 7853.98163397,
+   "meshCoarse": 7852.91490796,
+   "meshFine": 7853.7149454,
+   "richardson": 7853.98162455,
+   "relErrRichardson": 1.2e-9,
+   "waistRadius": 5
+  },
+  {
+   "id": "ruled_circles_twist_180deg",
+   "R": 10,
+   "h": 50,
+   "twistRad": 3.14159265359,
+   "formula": "pi R^2 h (1 - (1 - cos phi) / 3)",
+   "value": 5235.98775598,
+   "meshCoarse": 5235.46208489,
+   "meshFine": 5235.85633524,
+   "richardson": 5235.98775202,
+   "relErrRichardson": 7.57e-10,
+   "waistRadius": 6.12323399574e-16
+  },
+  {
+   "id": "ruled_frustum_developable",
+   "r1": 10,
+   "r2": 5,
+   "h": 50,
+   "formula": "V = pi h (r1^2 + r1 r2 + r2^2) / 3; lateral = pi (r1 + r2) s; s = sqrt(h^2 + (r1 - r2)^2)",
+   "value": 9162.97857297,
+   "lateralArea": 2367.94615656,
+   "gaussianCurvature": 0,
+   "flatPattern": {
+    "innerRadius": 50.2493781056,
+    "outerRadius": 100.498756211,
+    "sectorAngleRad": 0.625200305362,
+    "innerArc": 31.4159265359,
+    "outerArc": 62.8318530718,
+    "innerArcExpected": 31.4159265359,
+    "outerArcExpected": 62.8318530718
+   }
+  },
+  {
+   "id": "hyperbolic_paraboloid_unit",
+   "rulings": "segment (0,0,0)-(1,0,0) to segment (0,1,0)-(1,1,1)",
+   "formula": "area = integral over [0,1]^2 of sqrt(1 + x^2 + y^2) (Gauss-Legendre 40 x 40)",
+   "areaValue": 1.28078927527,
+   "gaussianCurvatureAtCentre": -0.444444444444,
+   "gaussianCurvatureFormula": "K = -1 / (1 + x^2 + y^2)^2",
+   "developable": false
+  }
+ ]
+}

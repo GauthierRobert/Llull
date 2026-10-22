@@ -1,0 +1,199 @@
+{
+ "baseline_today_sweeps_lofts": [],
+ "target_twist_scale_orientation": [
+  {
+   "index": 1,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 3,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 5,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 7,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 9,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 11,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 13,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 16,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 18,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 20,
+   "command": "inspect_sweep"
+  },
+  {
+   "index": 21,
+   "command": "check_sweep_loft"
+  }
+ ],
+ "target_helix_spring_thread": [
+  {
+   "index": 1,
+   "command": "add_helix"
+  },
+  {
+   "index": 2,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 4,
+   "command": "inspect_sweep"
+  },
+  {
+   "index": 5,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 7,
+   "command": "add_helix"
+  },
+  {
+   "index": 8,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 10,
+   "command": "add_helix"
+  },
+  {
+   "index": 11,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 13,
+   "command": "add_coil"
+  },
+  {
+   "index": 15,
+   "command": "add_helix"
+  },
+  {
+   "index": 16,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 17,
+   "command": "check_sweep_loft"
+  }
+ ],
+ "target_rails_and_surface_mode": [
+  {
+   "index": 3,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 5,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 9,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 11,
+   "command": "add_helix"
+  },
+  {
+   "index": 12,
+   "command": "add_helix"
+  },
+  {
+   "index": 13,
+   "command": "sweep_surface"
+  },
+  {
+   "index": 15,
+   "command": "check_sweep_loft"
+  }
+ ],
+ "target_loft_conditions_alignment": [
+  {
+   "index": 3,
+   "command": "loft_sections"
+  },
+  {
+   "index": 5,
+   "command": "loft_sections"
+  },
+  {
+   "index": 9,
+   "command": "loft_sections"
+  },
+  {
+   "index": 11,
+   "command": "loft_sections"
+  },
+  {
+   "index": 14,
+   "command": "loft_sections"
+  },
+  {
+   "index": 16,
+   "command": "check_sweep_loft"
+  }
+ ],
+ "target_network_ruled": [
+  {
+   "index": 8,
+   "command": "network_surface"
+  },
+  {
+   "index": 12,
+   "command": "ruled_surface"
+  },
+  {
+   "index": 17,
+   "command": "ruled_surface"
+  },
+  {
+   "index": 19,
+   "command": "check_sweep_loft"
+  }
+ ],
+ "bad_refusals": [
+  {
+   "index": 4,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 5,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 6,
+   "command": "add_helix"
+  },
+  {
+   "index": 7,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 8,
+   "command": "sweep_profile"
+  },
+  {
+   "index": 9,
+   "command": "sweep_profile"
+  }
+ ]
+}

@@ -1,0 +1,74 @@
+{
+ "generated": "generate_wrap_refs.mjs",
+ "derivation": "Projection along the anchor normal maps chart x to the cylinder point with the same x coordinate: arc = 2 r asin(w/2r) > w; wrap keeps w. Projected text is stretched toward the silhouette and cannot reach beyond it (w > 2r).",
+ "radius": 20,
+ "cases": [
+  {
+   "chartWidth": 5,
+   "wrapLength": 5,
+   "projectedArcLength": 5.01311324672,
+   "lengthGainPercent": 0.262264934452,
+   "check": {
+    "numericArc": 5.01311324672,
+    "residual": -2.53130849615e-13
+   }
+  },
+  {
+   "chartWidth": 10,
+   "wrapLength": 10,
+   "projectedArcLength": 10.1072102057,
+   "lengthGainPercent": 1.07210205683,
+   "check": {
+    "numericArc": 10.1072102057,
+    "residual": -2.60236276972e-12
+   }
+  },
+  {
+   "chartWidth": 20,
+   "wrapLength": 20,
+   "projectedArcLength": 20.9439510239,
+   "lengthGainPercent": 4.71975511966,
+   "check": {
+    "numericArc": 20.9439510239,
+    "residual": -2.40341080371e-11
+   }
+  },
+  {
+   "chartWidth": 30,
+   "wrapLength": 30,
+   "projectedArcLength": 33.9224831593,
+   "lengthGainPercent": 13.0749438642,
+   "check": {
+    "numericArc": 33.9224831592,
+    "residual": -1.05984554466e-10
+   }
+  },
+  {
+   "chartWidth": 38,
+   "wrapLength": 38,
+   "projectedArcLength": 50.1294359001,
+   "lengthGainPercent": 31.9195681582,
+   "check": {
+    "numericArc": 50.1294358997,
+    "residual": -4.5731951559e-10
+   }
+  },
+  {
+   "chartWidth": 40,
+   "wrapLength": 40,
+   "projectedArcLength": 62.8318530718,
+   "lengthGainPercent": 57.0796326795,
+   "check": {
+    "numericArc": 62.8318528859,
+    "residual": -1.85939001085e-7
+   }
+  },
+  {
+   "chartWidth": 45,
+   "wrapLength": 45,
+   "projectedArcLength": null,
+   "expectedCode": "WRP_PROJECTION_MISSES_FACE",
+   "lossPercent": null
+  }
+ ]
+}

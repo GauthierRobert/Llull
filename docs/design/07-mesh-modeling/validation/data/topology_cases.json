@@ -1,0 +1,33 @@
+{
+ "cases": [
+  {
+   "id": "icosphere_l3",
+   "vertices": 642,
+   "faces": 1280,
+   "eulerCharacteristic": 2,
+   "genus": 0,
+   "boundaryLoops": 0,
+   "closed": true
+  },
+  {
+   "id": "torus_32x16",
+   "vertices": 512,
+   "faces": 1024,
+   "eulerCharacteristic": 0,
+   "genus": 1,
+   "boundaryLoops": 0,
+   "closed": true,
+   "volumeMesh": 382.248110338,
+   "areaMesh": 390.680247285
+  },
+  {
+   "id": "icosphere_l3_upper_faces",
+   "faces": 624,
+   "boundaryEdges": 48,
+   "boundaryLoops": 1,
+   "closed": false,
+   "note": "faces whose centroid has z > 0"
+  }
+ ],
+ "rule": "closed orientable: chi = V - E + F = 2 - 2g per component"
+}

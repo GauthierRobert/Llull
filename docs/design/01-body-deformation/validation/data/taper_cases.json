@@ -1,0 +1,92 @@
+{
+ "generated": "generate_analytic_refs.mjs",
+ "law": "x' = s(z) x, y' = s(z) y; det J = s^2",
+ "cases": [
+  {
+   "box": {
+    "a": 10,
+    "b": 10,
+    "L": 100
+   },
+   "scaleEnd": 0.5,
+   "falloff": "linear",
+   "flat": false,
+   "volume": 5833.33333333,
+   "numericCheck": {
+    "volumeRel": 1.54e-10
+   }
+  },
+  {
+   "box": {
+    "a": 10,
+    "b": 10,
+    "L": 100
+   },
+   "scaleEnd": 2,
+   "falloff": "linear",
+   "flat": false,
+   "volume": 23333.3333333,
+   "numericCheck": {
+    "volumeRel": 2.49e-10
+   }
+  },
+  {
+   "box": {
+    "a": 10,
+    "b": 10,
+    "L": 100
+   },
+   "scaleEnd": 0.5,
+   "falloff": "linear",
+   "flat": true,
+   "volume": 7500,
+   "numericCheck": {
+    "volumeRel": 1.79e-10
+   }
+  },
+  {
+   "box": {
+    "a": 10,
+    "b": 10,
+    "L": 100
+   },
+   "scaleEnd": 0.5,
+   "falloff": "smooth",
+   "flat": false,
+   "volume": 5928.57142857,
+   "numericCheck": {
+    "volumeRel": 1.44e-10
+   }
+  },
+  {
+   "box": {
+    "a": 10,
+    "b": 10,
+    "L": 100
+   },
+   "scaleEnd": 0,
+   "falloff": "linear",
+   "flat": false,
+   "volume": 3333.33333333,
+   "numericCheck": {
+    "volumeRel": 7.72e-11
+   },
+   "degenerate": true,
+   "expectedCode": "DEF_TAPER_DEGENERATE",
+   "note": "scaleEnd 0 collapses the end face to a point (det J = 0): refused"
+  },
+  {
+   "cylinder": {
+    "r": 5,
+    "L": 40
+   },
+   "scaleEnd": 0.4,
+   "falloff": "linear",
+   "exactShape": "cone frustum r1 5, r2 2, h 40",
+   "volume": 1633.62817987,
+   "lateralArea": 882.116477902,
+   "halfAngleDeg": 4.28915332882,
+   "maxDeviationFromAnalyticCone": 0
+  }
+ ]
+}

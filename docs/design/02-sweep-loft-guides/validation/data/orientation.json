@@ -1,0 +1,25 @@
+{
+ "gap": "SWG",
+ "generated": "2026-10-22",
+ "notes": "Straight path at 45 deg to +Z. \"normal\": section plane normal to the path. \"fixed\": section stays in the start plane z = const (SolidWorks Keep Normal Constant, OCCT fixed trihedron).",
+ "cases": [
+  {
+   "id": "normal_to_path",
+   "formula": "pi r^2 L",
+   "value": 31415.9265359,
+   "meshCoarse": 31403.3115695,
+   "meshFine": 31412.7725093,
+   "richardson": 31415.9261559,
+   "relErrRichardson": 1.21e-8
+  },
+  {
+   "id": "fixed_plane_oblique",
+   "formula": "pi r^2 L cos(alpha) (Cavalieri: oblique cylinder)",
+   "value": 22214.4146908,
+   "meshCoarse": 22205.4945625,
+   "meshFine": 22212.1844572,
+   "richardson": 22214.4144221,
+   "relErrRichardson": 1.21e-8
+  }
+ ]
+}

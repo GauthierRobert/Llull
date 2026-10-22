@@ -1,0 +1,125 @@
+{
+ "id": "MSH-SCULPT-BREP",
+ "status": "DRAFT: needs sculpt_mesh, quad_remesh, fit_subdivision_to_mesh, analyze_mesh; add_subdivision_solid and export_step exist",
+ "unbuilt": [
+  "sculpt_mesh",
+  "quad_remesh",
+  "fit_subdivision_to_mesh",
+  "analyze_mesh",
+  "add_grid_mesh"
+ ],
+ "validates": [
+  "VC-MSH-19",
+  "VC-MSH-21",
+  "VC-MSH-22"
+ ],
+ "description": "Sculpt a symmetric bump on a flat patch (closed-form displaced volume), then quad-remesh an organic mesh, fit a subdivision cage to it and hand it to the exact kernel as B-spline faces.",
+ "expect": {
+  "stepIndexBase": 0,
+  "step 2 data.displacedVolume": {
+   "value": 8.37768936157,
+   "tolerance": 1e-9,
+   "relative": true,
+   "source": "data/sculpt_cases.json smooth (discrete grid)"
+  },
+  "step 2 data.symmetryError": {
+   "value": 0,
+   "tolerance": 1e-12
+  },
+  "step 6 data.maxDeviation": "TBD - measure with fit_subdivision_to_mesh on the icosphere l4 (target <= 0.05 mm)"
+ },
+ "actions": [
+  {
+   "command": "set_units",
+   "params": {
+    "units": "mm"
+   }
+  },
+  {
+   "command": "add_grid_mesh",
+   "params": {
+    "size": [
+     20,
+     20
+    ],
+    "cells": [
+     80,
+     80
+    ],
+    "position": [
+     0,
+     0,
+     0
+    ]
+   },
+   "as": "patch"
+  },
+  {
+   "command": "sculpt_mesh",
+   "params": {
+    "id": "$patch",
+    "brush": "draw",
+    "stamps": [
+     {
+      "center": [
+       0,
+       0,
+       0
+      ]
+     }
+    ],
+    "radius": 4,
+    "strength": 0.5,
+    "falloff": "smooth",
+    "direction": "normal",
+    "symmetry": {
+     "plane": "yz"
+    }
+   }
+  },
+  {
+   "command": "import_mesh_file",
+   "params": {
+    "format": "stl",
+    "file": "validation/data/icosphere_r10_l1_ascii.stl",
+    "units": "mm"
+   },
+   "as": "organic"
+  },
+  {
+   "command": "remesh_mesh",
+   "params": {
+    "id": "$organic",
+    "targetEdgeLength": 1.5,
+    "iterations": 5
+   }
+  },
+  {
+   "command": "quad_remesh",
+   "params": {
+    "id": "$organic",
+    "targetQuadCount": 600,
+    "adaptiveSize": 0,
+    "detectHardEdgesDeg": 30
+   },
+   "as": "quads"
+  },
+  {
+   "command": "fit_subdivision_to_mesh",
+   "params": {
+    "cageId": "$quads",
+    "targetId": "$organic",
+    "levels": 3,
+    "maxDeviation": 0.05,
+    "iterations": 10
+   },
+   "as": "subd"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$subd"
+   }
+  }
+ ]
+}

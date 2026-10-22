@@ -1,0 +1,110 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "import_font",
+  "params": {
+   "path": "fixtures/wrp/FiraSans-Regular.ttf"
+  },
+  "as": "fira"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 20,
+   "height": 40,
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "body"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$body"
+  }
+ },
+ {
+  "command": "add_text",
+  "params": {
+   "content": "LLULL",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "height": 10,
+   "anchor": "center",
+   "font": "$fira"
+  },
+  "as": "label"
+ },
+ {
+  "command": "text_outline",
+  "params": {
+   "id": "$label"
+  }
+ },
+ {
+  "command": "emboss_on_face",
+  "params": {
+   "id": "$body",
+   "face": {
+    "faceNear": [
+     20,
+     0,
+     0
+    ]
+   },
+   "profileIds": [
+    "$label"
+   ],
+   "mode": "emboss",
+   "depth": 1,
+   "placement": {
+    "method": "develop",
+    "anchor": {
+     "chart": [
+      0,
+      0
+     ],
+     "on": [
+      20,
+      0,
+      0
+     ]
+    },
+    "angleDeg": 0
+   }
+  },
+  "as": "embossed"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$embossed"
+  }
+ },
+ {
+  "command": "check_wrap",
+  "params": {
+   "ids": [
+    "$embossed"
+   ]
+  }
+ },
+ {
+  "command": "render_view",
+  "params": {
+   "view": "front",
+   "isolate": "$embossed"
+  }
+ }
+]

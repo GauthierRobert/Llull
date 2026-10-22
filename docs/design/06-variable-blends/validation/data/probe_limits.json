@@ -1,0 +1,11 @@
+{
+ "block20x10x5_topLongEdge": {
+  "geometricUpperBound": 5,
+  "why": "the tangent line on the 5-high side face sits r below the top; r >= 5 leaves no side face (and r >= 10 none of the top face)",
+  "kernelLimit": "TBD - measure with probe_fillet (bisection, tolerance 1e-3)"
+ },
+ "fullRoundRib_t4": {
+  "twoEdgeFilletUpperBound": 2,
+  "why": "two fillets r on both top edges of a 4-wide face meet at r = 2 (the top face vanishes)"
+ }
+}

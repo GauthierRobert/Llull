@@ -1,0 +1,3 @@
+# Keep fixture bytes exact (sha256 pinned in stl_fixtures.json)
+*.stl binary
+*.json text eol=lf

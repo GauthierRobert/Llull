@@ -1,0 +1,132 @@
+{
+ "generated": "2026-10-22",
+ "generator": "generate_subd_refs.mjs",
+ "source": "OpenSubdiv sdc/catmarkScheme.h assignSmoothLimitMask / assignSmoothLimitTangentMasks (S3); lambda = 5/16 + (cos t + cos(t/2) sqrt(2(9 + cos t)))/16, t = 2 pi / n",
+ "check": "lambdaMeasured = ratio of successive mean 1-ring radii (edge-neighbour distance to the mask limit) around the cap-centre vertex on a perturbed n-gon prism (levels 5->6); maskVsLevel6Distance = how far 6 more subdivision steps still are from the mask limit",
+ "regularValence4": {
+  "lambda": 0.5,
+  "limitStencil": "1/36 [[1,4,1],[4,16,4],[1,4,1]]"
+ },
+ "masks": [
+  {
+   "valence": 3,
+   "limitWeights": {
+    "vertex": 0.375,
+    "edgeEach": 0.166666666667,
+    "faceEach": 0.0416666666667,
+    "formula": "(n^2 v + 4 sum e_i + sum f_i) / (n (n + 5))"
+   },
+   "lambdaFormula": 0.410097050801,
+   "lambdaMeasured": 0.409857017548,
+   "maskVsLevel6Distance": 0.0000023298993176
+  },
+  {
+   "valence": 4,
+   "limitWeights": {
+    "vertex": 0.444444444444,
+    "edgeEach": 0.111111111111,
+    "faceEach": 0.0277777777778,
+    "formula": "(n^2 v + 4 sum e_i + sum f_i) / (n (n + 5))"
+   },
+   "lambdaFormula": 0.5,
+   "lambdaMeasured": 0.499963320143,
+   "maskVsLevel6Distance": 0.0000372766937988
+  },
+  {
+   "valence": 5,
+   "limitWeights": {
+    "vertex": 0.5,
+    "edgeEach": 0.08,
+    "faceEach": 0.02,
+    "formula": "(n^2 v + 4 sum e_i + sum f_i) / (n (n + 5))"
+   },
+   "lambdaFormula": 0.549988354518,
+   "lambdaMeasured": 0.54994430233,
+   "maskVsLevel6Distance": 0.000164231602941
+  },
+  {
+   "valence": 6,
+   "limitWeights": {
+    "vertex": 0.545454545455,
+    "edgeEach": 0.0606060606061,
+    "faceEach": 0.0151515151515,
+    "formula": "(n^2 v + 4 sum e_i + sum f_i) / (n (n + 5))"
+   },
+   "lambdaFormula": 0.579682326102,
+   "lambdaMeasured": 0.579576628882,
+   "maskVsLevel6Distance": 0.00037323226628
+  },
+  {
+   "valence": 7,
+   "limitWeights": {
+    "vertex": 0.583333333333,
+    "edgeEach": 0.047619047619,
+    "faceEach": 0.0119047619048,
+    "formula": "(n^2 v + 4 sum e_i + sum f_i) / (n (n + 5))"
+   },
+   "lambdaFormula": 0.598510283482,
+   "lambdaMeasured": 0.598304586894,
+   "maskVsLevel6Distance": 0.000617827927392
+  },
+  {
+   "valence": 8,
+   "limitWeights": {
+    "vertex": 0.615384615385,
+    "edgeEach": 0.0384615384615,
+    "faceEach": 0.00961538461538,
+    "formula": "(n^2 v + 4 sum e_i + sum f_i) / (n (n + 5))"
+   },
+   "lambdaFormula": 0.611116526695,
+   "lambdaMeasured": 0.610783617206,
+   "maskVsLevel6Distance": 0.000861520154233
+  },
+  {
+   "valence": 9,
+   "limitWeights": {
+    "vertex": 0.642857142857,
+    "edgeEach": 0.031746031746,
+    "faceEach": 0.00793650793651,
+    "formula": "(n^2 v + 4 sum e_i + sum f_i) / (n (n + 5))"
+   },
+   "lambdaFormula": 0.619939220626,
+   "lambdaMeasured": 0.619462282206,
+   "maskVsLevel6Distance": 0.00108457471032
+  },
+  {
+   "valence": 10,
+   "limitWeights": {
+    "vertex": 0.666666666667,
+    "edgeEach": 0.0266666666667,
+    "faceEach": 0.00666666666667,
+    "formula": "(n^2 v + 4 sum e_i + sum f_i) / (n (n + 5))"
+   },
+   "lambdaFormula": 0.626341267547,
+   "lambdaMeasured": 0.625712275217,
+   "maskVsLevel6Distance": 0.00127897062151
+  },
+  {
+   "valence": 11,
+   "limitWeights": {
+    "vertex": 0.6875,
+    "edgeEach": 0.0227272727273,
+    "faceEach": 0.00568181818182,
+    "formula": "(n^2 v + 4 sum e_i + sum f_i) / (n (n + 5))"
+   },
+   "lambdaFormula": 0.631127586683,
+   "lambdaMeasured": 0.63034529919,
+   "maskVsLevel6Distance": 0.00144322092569
+  },
+  {
+   "valence": 12,
+   "limitWeights": {
+    "vertex": 0.705882352941,
+    "edgeEach": 0.0196078431373,
+    "faceEach": 0.00490196078431,
+    "formula": "(n^2 v + 4 sum e_i + sum f_i) / (n (n + 5))"
+   },
+   "lambdaFormula": 0.634796412354,
+   "lambdaMeasured": 0.633864459554,
+   "maskVsLevel6Distance": 0.00157902800437
+  }
+ ]
+}

@@ -1,0 +1,51 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_sphere",
+  "params": {
+   "radius": 10,
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "ball"
+ },
+ {
+  "command": "scale_nonuniform",
+  "params": {
+   "id": "$ball",
+   "factors": [
+    1,
+    1,
+    2
+   ],
+   "center": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "egg"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$egg"
+  }
+ },
+ {
+  "command": "check_deformation",
+  "params": {
+   "ids": [
+    "$egg"
+   ]
+  }
+ }
+]

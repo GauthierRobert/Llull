@@ -1,0 +1,155 @@
+{
+ "actions": [
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "e1"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$e1",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ],
+    "radius": 6
+   }
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$e1",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ],
+    "radius": 1,
+    "profile": {
+     "type": "conic",
+     "rho": 1.2
+    }
+   }
+  },
+  {
+   "command": "add_cylinder",
+   "params": {
+    "radius": 5,
+    "height": 10
+   },
+   "as": "e2"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$e2",
+    "edges": [
+     {
+      "near": [
+       5,
+       0,
+       5
+      ],
+      "size": 1,
+      "sizeEnd": 2
+     }
+    ]
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     10,
+     10,
+     10
+    ]
+   },
+   "as": "e3"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$e3",
+    "radius": 1,
+    "corners": [
+     {
+      "near": [
+       5,
+       5,
+       5
+      ],
+      "type": "setback",
+      "setback": 0.5
+     }
+    ]
+   }
+  },
+  {
+   "command": "extrude_profile",
+   "params": {
+    "profile": [
+     [
+      -5,
+      -5
+     ],
+     [
+      5,
+      -5
+     ],
+     [
+      5,
+      4
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      -5,
+      5
+     ]
+    ],
+    "depth": 10
+   },
+   "as": "e4"
+  },
+  {
+   "command": "fillet_faces",
+   "params": {
+    "id": "$e4",
+    "facesA": {
+     "near": [
+      [
+       5,
+       0,
+       5
+      ]
+     ]
+    },
+    "facesB": {
+     "near": [
+      [
+       0,
+       5,
+       5
+      ]
+     ]
+    },
+    "radius": 1.5
+   }
+  }
+ ]
+}

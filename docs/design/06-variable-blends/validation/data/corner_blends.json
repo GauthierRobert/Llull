@@ -1,0 +1,26 @@
+{
+ "derivation": "Steiner decomposition of the all-edge fillet; setback span is exact by definition",
+ "cube_all_edges_r1": {
+  "a": 10,
+  "r": 1,
+  "removedEdges": 20.6017763138,
+  "removedCorners_rollingBall": 3.81120979521,
+  "volume_rollingBall": 975.587013891,
+  "steinerCheck": 975.587013891,
+  "oracle": "tests/oracle/85-fillet-cube-all-edges 975.587013891"
+ },
+ "cube_setback_s2": {
+  "a": 10,
+  "r": 1,
+  "setback": 2,
+  "cylinderFaceSpanPerEdge": 6,
+  "rollingBallSpanPerEdge": 8,
+  "edgeBlendVolumeOutsideCorners": 15.4513322354,
+  "cornerVolume": "TBD - measure with check_blends + mass_properties (N-sided fill has no closed form)",
+  "bound": "the corner patch replaces material only inside the cube of side s at each vertex: volume_after in [a^3 - edgesOutside - 8 s^3, a^3 - edgesOutside]",
+  "volumeBounds": [
+   920.548667765,
+   984.548667765
+  ]
+ }
+}

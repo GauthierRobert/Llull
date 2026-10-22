@@ -1,0 +1,92 @@
+[
+ {
+  "command": "add_subdivision_solid",
+  "params": {
+   "box": {
+    "size": [
+     2,
+     2,
+     2
+    ]
+   },
+   "levels": 3,
+   "id": "cube"
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "cube"
+  }
+ },
+ {
+  "command": "edit_subdivision_cage",
+  "params": {
+   "id": "cube",
+   "crease": true
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "cube"
+  }
+ },
+ {
+  "command": "add_subdivision_solid",
+  "params": {
+   "box": {
+    "size": [
+     2,
+     2,
+     2
+    ],
+    "segments": [
+     2,
+     2,
+     2
+    ]
+   },
+   "levels": 3,
+   "id": "pad",
+   "position": [
+    5,
+    0,
+    0
+   ]
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "pad"
+  }
+ },
+ {
+  "command": "edit_subdivision_cage",
+  "params": {
+   "id": "pad",
+   "vertexIndices": [
+    2
+   ],
+   "falloff": 1.5,
+   "translate": [
+    0,
+    0,
+    0.5
+   ]
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "pad"
+  }
+ },
+ {
+  "command": "measure_bounding_box",
+  "params": {
+   "entityId": "pad"
+  }
+ }
+]

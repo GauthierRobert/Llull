@@ -1,0 +1,28 @@
+{
+ "symmetric_d1_box10": {
+  "d": 1,
+  "volumeAfter": 995,
+  "oracle": "tests/oracle/88-chamfer-box-one-edge 995"
+ },
+ "asymmetric_1x2_box10": {
+  "d1": 1,
+  "d2": 2,
+  "removed": 10,
+  "volumeAfter": 990
+ },
+ "distanceAngle_1_30deg_box10": {
+  "d": 1,
+  "angleDeg": 30,
+  "angleMeasured": "on the face carrying d, between that face and the chamfer face",
+  "leg2": 0.57735026919,
+  "volumeAfter": 997.113248654
+ },
+ "variableLinear_1to2_block20": {
+  "edgeLength": 20,
+  "d0": 1,
+  "d1": 2,
+  "removed": 23.3333333333,
+  "volumeAfter": 976.666666667,
+  "note": "section construction, as for fillets"
+ }
+}

@@ -1,0 +1,565 @@
+{
+ "generated": "generate_tpms_refs.mjs",
+ "definitions": {
+  "gyroid": "sin X cos Y + sin Y cos Z + sin Z cos X",
+  "schwarzP": "cos X + cos Y + cos Z",
+  "diamond": "cos X cos Y cos Z − sin X sin Y sin Z",
+  "X": "2π x / a (a = cell size)",
+  "network": "solid = {F ≤ t}",
+  "sheet": "solid = {|F| ≤ t}",
+  "sheetDistanceNormalised": "solid = {|F|/|∇F| ≤ w/2}, w = wall thickness, here as w/a"
+ },
+ "symmetry": "t = 0 network fraction is exactly 1/2: gyroid G(−x) = −G(x); P(x + a/2·(1,1,1)) = −P(x); D(x + (a/2, 0, 0)) = −D(x) — each a volume-preserving map exchanging {F < 0} and {F > 0}",
+ "method": "midpoint rule on 240³ points per cell; \"convergence\" = |240³ − 120³| difference",
+ "surfaces": {
+  "gyroid": {
+   "fRange": [
+    -1.499829,
+    1.499829
+   ],
+   "network": [
+    {
+     "t": -1.2,
+     "fraction": 0.09896181,
+     "convergence": 0.00015625
+    },
+    {
+     "t": -1,
+     "fraction": 0.1703171,
+     "convergence": 0.0000625
+    },
+    {
+     "t": -0.8,
+     "fraction": 0.2386539,
+     "convergence": 0.000244213
+    },
+    {
+     "t": -0.6,
+     "fraction": 0.3052789,
+     "convergence": 0.0001840278
+    },
+    {
+     "t": -0.4,
+     "fraction": 0.3707269,
+     "convergence": 0.0003101852
+    },
+    {
+     "t": -0.3,
+     "fraction": 0.4032245,
+     "convergence": 0.00003472222
+    },
+    {
+     "t": -0.2,
+     "fraction": 0.4355451,
+     "convergence": 0.0001377315
+    },
+    {
+     "t": -0.1,
+     "fraction": 0.4677037,
+     "convergence": 0.00006481481
+    },
+    {
+     "t": 0,
+     "fraction": 0.5,
+     "convergence": 0
+    },
+    {
+     "t": 0.1,
+     "fraction": 0.5322963,
+     "convergence": 0.00006481481
+    },
+    {
+     "t": 0.2,
+     "fraction": 0.5644549,
+     "convergence": 0.0001377315
+    },
+    {
+     "t": 0.3,
+     "fraction": 0.5967755,
+     "convergence": 0.00003472222
+    },
+    {
+     "t": 0.4,
+     "fraction": 0.6292731,
+     "convergence": 0.0003101852
+    },
+    {
+     "t": 0.6,
+     "fraction": 0.6947211,
+     "convergence": 0.0001840278
+    },
+    {
+     "t": 0.8,
+     "fraction": 0.7613461,
+     "convergence": 0.000244213
+    },
+    {
+     "t": 1,
+     "fraction": 0.8296829,
+     "convergence": 0.0000625
+    },
+    {
+     "t": 1.2,
+     "fraction": 0.9010382,
+     "convergence": 0.00015625
+    }
+   ],
+   "sheet": [
+    {
+     "t": 0.05,
+     "fraction": 0.03222454,
+     "convergence": 0.0002199074
+    },
+    {
+     "t": 0.1,
+     "fraction": 0.06459259,
+     "convergence": 0.0001296296
+    },
+    {
+     "t": 0.2,
+     "fraction": 0.1289097,
+     "convergence": 0.000275463
+    },
+    {
+     "t": 0.3,
+     "fraction": 0.1935509,
+     "convergence": 0.00006944444
+    },
+    {
+     "t": 0.4,
+     "fraction": 0.2585463,
+     "convergence": 0.0006203704
+    },
+    {
+     "t": 0.5,
+     "fraction": 0.3237986,
+     "convergence": 0.0007013889
+    },
+    {
+     "t": 0.6,
+     "fraction": 0.3894421,
+     "convergence": 0.0003680556
+    },
+    {
+     "t": 0.8,
+     "fraction": 0.5226921,
+     "convergence": 0.0004884259
+    },
+    {
+     "t": 1,
+     "fraction": 0.6593657,
+     "convergence": 0.000125
+    }
+   ],
+   "sheetDistanceNormalised": [
+    {
+     "wOverA": 0.02,
+     "fraction": 0.06154398,
+     "convergence": 0.0002476852
+    },
+    {
+     "wOverA": 0.05,
+     "fraction": 0.1524514,
+     "convergence": 0.0001967593
+    },
+    {
+     "wOverA": 0.08,
+     "fraction": 0.239331,
+     "convergence": 0.000224537
+    },
+    {
+     "wOverA": 0.1,
+     "fraction": 0.2943218,
+     "convergence": 0.0002893519
+    },
+    {
+     "wOverA": 0.15,
+     "fraction": 0.4180301,
+     "convergence": 0.0007708333
+    },
+    {
+     "wOverA": 0.2,
+     "fraction": 0.5207917,
+     "convergence": 0.00009722222
+    },
+    {
+     "wOverA": 0.25,
+     "fraction": 0.6039421,
+     "convergence": 0.0001319444
+    },
+    {
+     "wOverA": 0.3,
+     "fraction": 0.6705023,
+     "convergence": 0.0002569444
+    }
+   ],
+   "sheetSlopeAtSmallT": 0.6444908
+  },
+  "schwarzP": {
+   "fRange": [
+    -2.999743,
+    2.999743
+   ],
+   "network": [
+    {
+     "t": -1.2,
+     "fraction": 0.1679543,
+     "convergence": 0.00003298611
+    },
+    {
+     "t": -1,
+     "fraction": 0.213055,
+     "convergence": 0.000541088
+    },
+    {
+     "t": -0.8,
+     "fraction": 0.2711001,
+     "convergence": 0.0002760417
+    },
+    {
+     "t": -0.6,
+     "fraction": 0.328478,
+     "convergence": 0.0001631944
+    },
+    {
+     "t": -0.4,
+     "fraction": 0.3857089,
+     "convergence": 0.00004108796
+    },
+    {
+     "t": -0.3,
+     "fraction": 0.4142164,
+     "convergence": 0.00005902778
+    },
+    {
+     "t": -0.2,
+     "fraction": 0.4428507,
+     "convergence": 0.00006365741
+    },
+    {
+     "t": -0.1,
+     "fraction": 0.4714282,
+     "convergence": 0.00007175926
+    },
+    {
+     "t": 0,
+     "fraction": 0.5000182,
+     "convergence": 0.00005700231
+    },
+    {
+     "t": 0.1,
+     "fraction": 0.5285718,
+     "convergence": 0.00007175926
+    },
+    {
+     "t": 0.2,
+     "fraction": 0.5571493,
+     "convergence": 0.00006365741
+    },
+    {
+     "t": 0.3,
+     "fraction": 0.5857836,
+     "convergence": 0.00005902778
+    },
+    {
+     "t": 0.4,
+     "fraction": 0.6142911,
+     "convergence": 0.00004108796
+    },
+    {
+     "t": 0.6,
+     "fraction": 0.671522,
+     "convergence": 0.0001631944
+    },
+    {
+     "t": 0.8,
+     "fraction": 0.7288999,
+     "convergence": 0.0002760417
+    },
+    {
+     "t": 1,
+     "fraction": 0.786945,
+     "convergence": 0.000541088
+    },
+    {
+     "t": 1.2,
+     "fraction": 0.8320457,
+     "convergence": 0.00003298611
+    }
+   ],
+   "sheet": [
+    {
+     "t": 0.05,
+     "fraction": 0.02859144,
+     "convergence": 0.000130787
+    },
+    {
+     "t": 0.1,
+     "fraction": 0.05714352,
+     "convergence": 0.0001435185
+    },
+    {
+     "t": 0.2,
+     "fraction": 0.1142986,
+     "convergence": 0.0001273148
+    },
+    {
+     "t": 0.3,
+     "fraction": 0.1715671,
+     "convergence": 0.0001180556
+    },
+    {
+     "t": 0.4,
+     "fraction": 0.2285822,
+     "convergence": 0.00008217593
+    },
+    {
+     "t": 0.5,
+     "fraction": 0.2856875,
+     "convergence": 0.0002013889
+    },
+    {
+     "t": 0.6,
+     "fraction": 0.343044,
+     "convergence": 0.0003263889
+    },
+    {
+     "t": 0.8,
+     "fraction": 0.4577998,
+     "convergence": 0.0005520833
+    },
+    {
+     "t": 1,
+     "fraction": 0.57389,
+     "convergence": 0.001082176
+    }
+   ],
+   "sheetDistanceNormalised": [
+    {
+     "wOverA": 0.02,
+     "fraction": 0.04689352,
+     "convergence": 0.0001064815
+    },
+    {
+     "wOverA": 0.05,
+     "fraction": 0.1167569,
+     "convergence": 0.00003935185
+    },
+    {
+     "wOverA": 0.08,
+     "fraction": 0.1856319,
+     "convergence": 0.0001319444
+    },
+    {
+     "wOverA": 0.1,
+     "fraction": 0.2303484,
+     "convergence": 0.0005150463
+    },
+    {
+     "wOverA": 0.15,
+     "fraction": 0.3366296,
+     "convergence": 0.0004166667
+    },
+    {
+     "wOverA": 0.2,
+     "fraction": 0.4344213,
+     "convergence": 0.0002268519
+    },
+    {
+     "wOverA": 0.25,
+     "fraction": 0.5224039,
+     "convergence": 0.0001354167
+    },
+    {
+     "wOverA": 0.3,
+     "fraction": 0.5999977,
+     "convergence": 0.0007337963
+    }
+   ],
+   "sheetSlopeAtSmallT": 0.5718288
+  },
+  "diamond": {
+   "fRange": [
+    -0.9997452,
+    0.9997452
+   ],
+   "network": [
+    {
+     "t": -1.2,
+     "fraction": 0,
+     "convergence": 0
+    },
+    {
+     "t": -1,
+     "fraction": 0,
+     "convergence": 0
+    },
+    {
+     "t": -0.8,
+     "fraction": 0.04000231,
+     "convergence": 0.00007175926
+    },
+    {
+     "t": -0.6,
+     "fraction": 0.1468681,
+     "convergence": 0.0002430556
+    },
+    {
+     "t": -0.4,
+     "fraction": 0.2668032,
+     "convergence": 0.0001550926
+    },
+    {
+     "t": -0.3,
+     "fraction": 0.3255231,
+     "convergence": 0.0005324074
+    },
+    {
+     "t": -0.2,
+     "fraction": 0.3839699,
+     "convergence": 0.0002291667
+    },
+    {
+     "t": -0.1,
+     "fraction": 0.4419884,
+     "convergence": 0.00004861111
+    },
+    {
+     "t": 0,
+     "fraction": 0.5,
+     "convergence": 0
+    },
+    {
+     "t": 0.1,
+     "fraction": 0.5580116,
+     "convergence": 0.00004861111
+    },
+    {
+     "t": 0.2,
+     "fraction": 0.6160301,
+     "convergence": 0.0002291667
+    },
+    {
+     "t": 0.3,
+     "fraction": 0.6744769,
+     "convergence": 0.0005324074
+    },
+    {
+     "t": 0.4,
+     "fraction": 0.7331968,
+     "convergence": 0.0001550926
+    },
+    {
+     "t": 0.6,
+     "fraction": 0.8531319,
+     "convergence": 0.0002430556
+    },
+    {
+     "t": 0.8,
+     "fraction": 0.9599977,
+     "convergence": 0.00007175926
+    },
+    {
+     "t": 1,
+     "fraction": 1,
+     "convergence": 0
+    },
+    {
+     "t": 1.2,
+     "fraction": 1,
+     "convergence": 0
+    }
+   ],
+   "sheet": [
+    {
+     "t": 0.05,
+     "fraction": 0.05794907,
+     "convergence": 0.0003935185
+    },
+    {
+     "t": 0.1,
+     "fraction": 0.1160231,
+     "convergence": 0.00009722222
+    },
+    {
+     "t": 0.2,
+     "fraction": 0.2320602,
+     "convergence": 0.0004583333
+    },
+    {
+     "t": 0.3,
+     "fraction": 0.3489537,
+     "convergence": 0.001064815
+    },
+    {
+     "t": 0.4,
+     "fraction": 0.4663935,
+     "convergence": 0.0003101852
+    },
+    {
+     "t": 0.5,
+     "fraction": 0.5853889,
+     "convergence": 0.0005740741
+    },
+    {
+     "t": 0.6,
+     "fraction": 0.7062639,
+     "convergence": 0.0004861111
+    },
+    {
+     "t": 0.8,
+     "fraction": 0.9199954,
+     "convergence": 0.0001435185
+    },
+    {
+     "t": 1,
+     "fraction": 1,
+     "convergence": 0
+    }
+   ],
+   "sheetDistanceNormalised": [
+    {
+     "wOverA": 0.02,
+     "fraction": 0.0762963,
+     "convergence": 0.00007407407
+    },
+    {
+     "wOverA": 0.05,
+     "fraction": 0.1881944,
+     "convergence": 0.0003240741
+    },
+    {
+     "wOverA": 0.08,
+     "fraction": 0.2930787,
+     "convergence": 0.0002546296
+    },
+    {
+     "wOverA": 0.1,
+     "fraction": 0.3580602,
+     "convergence": 0.0008287037
+    },
+    {
+     "wOverA": 0.15,
+     "fraction": 0.4978472,
+     "convergence": 0.001106481
+    },
+    {
+     "wOverA": 0.2,
+     "fraction": 0.60775,
+     "convergence": 0.0008055556
+    },
+    {
+     "wOverA": 0.25,
+     "fraction": 0.6921898,
+     "convergence": 0.00006944444
+    },
+    {
+     "wOverA": 0.3,
+     "fraction": 0.7568194,
+     "convergence": 0.0009675926
+    }
+   ],
+   "sheetSlopeAtSmallT": 1.158981
+  }
+ }
+}

@@ -1,0 +1,141 @@
+{
+ "generated": "generate_analytic_refs.mjs",
+ "law": "theta = (z - z0)/R; y' = R - (R - y) cos theta; z' = z0 + (R - y) sin theta; det J = (R - y)/R",
+ "cases": [
+  {
+   "bar": {
+    "a": 10,
+    "y0": -5,
+    "y1": 5,
+    "L": 78.5398163397
+   },
+   "radius": 50,
+   "angleDeg": 90,
+   "volume": 7853.98163397,
+   "neutralFibreLength": 78.5398163397,
+   "innerFibreLength": 70.6858347058,
+   "outerFibreLength": 86.3937979737,
+   "jacobianRange": [
+    0.9,
+    1.1
+   ],
+   "numericCheck": {
+    "volumeRel": 2.98e-10
+   }
+  },
+  {
+   "bar": {
+    "a": 10,
+    "y0": -5,
+    "y1": 5,
+    "L": 157.079632679
+   },
+   "radius": 50,
+   "angleDeg": 180,
+   "volume": 15707.9632679,
+   "neutralFibreLength": 157.079632679,
+   "innerFibreLength": 141.371669412,
+   "outerFibreLength": 172.787595947,
+   "jacobianRange": [
+    0.9,
+    1.1
+   ],
+   "numericCheck": {
+    "volumeRel": 3.85e-10
+   }
+  },
+  {
+   "bar": {
+    "a": 10,
+    "y0": 0,
+    "y1": 10,
+    "L": 78.5398163397
+   },
+   "radius": 50,
+   "angleDeg": 90,
+   "volume": 7068.58347058,
+   "neutralFibreLength": 78.5398163397,
+   "innerFibreLength": 62.8318530718,
+   "outerFibreLength": 78.5398163397,
+   "jacobianRange": [
+    0.8,
+    1
+   ],
+   "numericCheck": {
+    "volumeRel": 1.96e-10
+   }
+  },
+  {
+   "bar": {
+    "a": 10,
+    "y0": -10,
+    "y1": 0,
+    "L": 78.5398163397
+   },
+   "radius": 50,
+   "angleDeg": 90,
+   "volume": 8639.37979737,
+   "neutralFibreLength": 78.5398163397,
+   "innerFibreLength": 78.5398163397,
+   "outerFibreLength": 94.2477796077,
+   "jacobianRange": [
+    1,
+    1.2
+   ],
+   "numericCheck": {
+    "volumeRel": 1.9e-10
+   }
+  },
+  {
+   "cylinder": {
+    "r": 5,
+    "L": 314.159265359
+   },
+   "radius": 50,
+   "angleDeg": 360,
+   "exactShape": "torus segment R 50 r 5",
+   "volume": 24674.0110027,
+   "lateralArea": 9869.60440109,
+   "maxDeviationFromAnalyticTorus": 0
+  },
+  {
+   "cylinder": {
+    "r": 5,
+    "L": 78.5398163397
+   },
+   "radius": 50,
+   "angleDeg": 90,
+   "exactShape": "torus segment R 50 r 5",
+   "volume": 6168.50275068,
+   "lateralArea": 2467.40110027,
+   "maxDeviationFromAnalyticTorus": 0
+  },
+  {
+   "bar": {
+    "a": 10,
+    "y0": -5,
+    "y1": 5
+   },
+   "radius": 4,
+   "expectedCode": "DEF_BEND_RADIUS_TOO_SMALL",
+   "limit": "radius must exceed the largest inner-side distance of the body from the neutral fibre (5)",
+   "minJacobian": -0.25
+  },
+  {
+   "rigidContinuation": {
+    "point": [
+     0,
+     0,
+     88.5398163397
+    ],
+    "radius": 50,
+    "angleDeg": 90,
+    "image": [
+     0,
+     60,
+     50
+    ]
+   }
+  }
+ ]
+}

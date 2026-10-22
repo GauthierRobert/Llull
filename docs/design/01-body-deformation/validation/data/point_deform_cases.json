@@ -1,0 +1,23 @@
+{
+ "generated": "generate_analytic_refs.mjs",
+ "falloff": "phi(s) = (1 - s^2)^3, s = |p - c| / r (C2, compact support)",
+ "cases": [
+  {
+   "block": "box 100 x 100 x 50, top face z = 0, push at its centre",
+   "radius": 10,
+   "distance": 2,
+   "deltaVolume": 157.079632679,
+   "peakDisplacement": 2,
+   "numericCheck": {
+    "deltaVolumeRel": 1.12e-7
+   }
+  },
+  {
+   "radius": 10,
+   "foldLimitDistance": 5.82309369141,
+   "maxGradPhi": 0.171730020672,
+   "distanceRefused": 5.88132,
+   "expectedCode": "DEF_FOLDOVER"
+  }
+ ]
+}

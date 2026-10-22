@@ -1,0 +1,438 @@
+# SWG — Advanced sweep & loft — Technical specification
+
+Gap id: **SWG** · Companion: [FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md) · Validation: [validation/README.md](validation/README.md) ·
+Laws: `.claude/rules/architecture.md` L1–L10 · Reuses: aerospace **SRF** (NURBS math, sheets, Gordon, analysis — built, its TECHNICAL_SPEC §13).
+
+---
+
+## 1. Current state in llull
+
+### 1.1 Commands and code nearest to the gap
+
+| Capability | Command | Files | What it does today | What it does NOT do |
+| --- | --- | --- | --- | --- |
+| Sweep | `sweep_profile` | `packages/core/src/commands/solids/sweep.ts` (259 lines), `geometry/sweep.ts` (235), `commands/solids/sectionSpecs.ts`, `sketchCurves.ts` | Closed section (`radius` (+`innerRadius`), polygon, or closed 2D sketch, curves kept exact) along a path of world points (straight runs + circular bends of `bendRadius`, or `smooth` Catmull-Rom), or a **2D** sketch curve (`sketchPath`: line, arc, circle, ellipse, rectangle, polyline, spline). Open or closed paths (closed: RMF holonomy spread linearly, `closeFrames`). Frame: rotation-minimizing by double reflection [R25] starting with section +y toward world +Z. Variable section `stations` (`at` 0..1, rings of `SECTION_RING_POINTS` aligned to their predecessor, **smoothstep** blend `stationRingAt`, evaluated only at path frames — on a straight 1-segment path the result is the linear frustum, measured 2026-10-22, VC-SWG-11). Refuses sharp corners, bends tighter than the section half-size (`minCurvatureRadius ≤ halfSize`). | No 3D curve path (`nurbs_curve` is rejected by `sketchPath`), no twist, no scale / area law, a single orientation mode, no guide / rail, no sheet output, smoothstep is not selectable, stations need an open path. |
+| Sweep, exact kernel | — | `server/src/native/kernelLeaves.ts` (`sweepPayload`, `stationRings`), `solver/crates/llull-kernel-occt/src/recipe/nodes.rs` `sweep`, `cpp/features.cxx` `pipe_solid` | Constant section: `BRepOffsetAPI_MakePipe(spine, section, GeomFill_IsCorrectedFrenet)`; holed section round a closed spine handled as outer − bore (LIM-1); variable section: ThruSections through the station rings sampled along the sweep frame. | No `MakePipeShell` (the native OCCT 7.9 sidecar could use it; it was unusable only in the old opencascade.js build, SRF §1.2); the TS mesh uses an RMF while OCC uses a corrected Frenet trihedron — identical for planar paths, **not proven identical** for non-round sections on non-planar paths (VC-SWG-25b measures it). |
+| Loft (solid) | `loft_sections` | `commands/solids/loft.ts` (132), `loftExact.ts`, `geometry/sectionRing.ts`, `geometry/sectionChain.ts`, native `skinned_solid(_bsplines)` | Sketch / inline sections resampled to 24 points, aligned (no twist), Catmull-Rom rings; all-`nurbs_curve` sections lofted exactly (degree ≤ 3, non-rational, equal Bézier span counts), ThruSections `ruled` or smoothed. | No guides, no start/end conditions, no centreline, no closed loft, **exact sections are not re-seamed or re-aligned** (SRF §13.3), no coupling of different span counts (refused). |
+| Loft (sheet) | `loft_surface` | `commands/surface/loftSurface.ts` (94), `lib/nurbs/surfaceFit.ts` (`compatibleCurves`, `skinCurves`), `lib/nurbs/gordon.ts` | Exact skinning (A10.3) of compatible rational sections, `degreeV` 1..5; with `guideIds` a Gordon surface fitted through the network, guide / seam / section deviations reported, `SRF_LOFT_GUIDE_*` codes. | No end conditions, no unsorted network, no edge matching to neighbours, no alignment control. |
+| Boundary patch | `surface_from_curves` | `commands/solids/surfaceFromCurves.ts` (96) | 2 or 4 curves → thickened Catmull-Clark cage (solid), not interpolating. | Not an exact surface (superseded by SRF `fill_surface` for sheets). |
+| Coil | `add_coil` | `commands/solids/coil.ts` (230) | Round wire: `sweep` entity along `catmullRomBeziers` of 16 helix points per turn; conical (`endRadius`), closed ends, handedness; returns `analyticVolume`. Rectangular wire: a triangle **mesh** (`screwMesh`). | Helix not exact: max 0.232 mm off a R 20 / p 10 helix at the end segments (1.16 % R), 0.011 mm inside, length −0.044 % (`validation/data/coilBaseline.json`); no B-rep for flat wire; no helix curve to reuse. |
+| Pattern along path | `pattern_along_path` | `commands/edit/patternAlongPath.ts` (160) | Copies oriented by the same RMF as sweeps (`frameAtFraction`). | Unaffected; will follow any new orientation mode only if asked (COULD). |
+| Thread | `add_external_thread` | `commands/features/addExternalThread.ts` | ISO metric groove (mesh). | Out of scope; can later reuse `add_helix` + `axis_plane` sweep. |
+| Curves | `create_nurbs_curve`, `interpolate_curve`, `approximate_curve`, `create_conic` | `commands/surface/createCurve.ts`, `lib/nurbs/*` | Exact 3D NURBS curves (SRF). | No helix / spiral generator. |
+| Expressions | parameters, plan `=expr` | `lib/expression.ts`, `lib/expressionProgram.ts` (`compileExpression`) | Pure evaluator (sin, cos, pow, …; radians). | Not yet used as a law of a path parameter. |
+| Code export | `export_code` | `codegen/featureProgram.ts` | `sweep` and `loft` are lowered as **meshes** (`kind: 'mesh'`). | No CadQuery `sweep` / `loft` / `makeHelix`. |
+
+### 1.2 Kernel facts used by this pack
+
+| OCCT facility (7.9, native sidecar) | Fact | Source |
+| --- | --- | --- |
+| `BRepOffsetAPI_MakePipeShell::SetMode` | Corrected Frenet / Frenet (`bool`), discrete trihedron, fixed `gp_Ax2`, constant binormal `gp_Dir`, spine support shape, auxiliary spine `(wire, CurvilinearEquivalence, BRepFill_TypeOfContact)` | [R1] |
+| `MakePipeShell::Add / SetLaw` | sections at vertices of the spine, `WithContact`, `WithCorrection`; `SetLaw(profile, Law_Function)` homothetic law; "not recommended to combine Add and SetLaw" | [R1] |
+| `MakePipeShell` tolerances | `SetTolerance(Tol3d = 1e-4, BoundTol = 1e-4, TolAngular = 1e-2)`; `SetTransitionMode` Transformed / RightCorner / RoundCorner; `SetMaxDegree`, `SetMaxSegments`, `SetForceApproxC1`; `MakeSolid` false for an open profile; status `PlaneNotIntersectGuide`, `ImpossibleContact` | [R1] |
+| `BRepFill_TypeOfContact` | NoContact: normal = vector PQ; Contact: section touches the auxiliary spine, constant width; ContactOnBorder: the auxiliary spine is a boundary, width varies | [R3] |
+| `GeomFill_Trihedron` | IsCorrectedFrenet, IsFixed, IsFrenet, IsConstantNormal, IsDarboux, IsGuideAC, IsGuidePlan, IsGuideACWithContact, IsGuidePlanWithContact, IsDiscreteTrihedron | [R4] |
+| `Law_Interpol` | interpolates (w, value) pairs, optional end derivatives, periodic | [R5] |
+| `BRepOffsetAPI_ThruSections` | `isSolid`, `ruled`, `pres3d = 1e-6`; `AddVertex` only first / last; `CheckCompatibility` "to avoid twisted results"; **no end-tangency API** | [R2] |
+| Exact helix | 2D line in the (u, v) plane of `Geom_CylindricalSurface` / `Geom_ConicalSurface`, `BRepBuilderAPI_MakeEdge(seg2d, surface)`, `BRepLib::BuildCurves3d` (CadQuery `makeHelix`); CadQuery sweeps use `MakePipeShell` with an auxiliary-spine mode | [R28] |
+| Native capabilities already reported in `info` | `bsplineSections`, `nurbsSurface` (B-spline face leaf, trims), `faceSlab` | SRF §13.8–13.9 |
+
+## 2. Target architecture
+
+### 2.1 Layer placement
+
+| Piece | Layer | Why (law) |
+| --- | --- | --- |
+| Law evaluation (`ScalarLaw` → value, derivative, integral) | `packages/core/src/lib/law/{types,evaluate,integrate}.ts` (pure leaf; reuses `lib/expressionProgram.ts`) | pure math, no model types (L2) |
+| Helix / spiral math (point, derivatives, length, curvature, NURBS approximation with error bound) | `packages/core/src/lib/helix/*.ts` | pure |
+| Sweep evaluator: frames per orientation mode, twist / scale / area application, rail solving, S(u, t) | `packages/core/src/geometry/sweepEval/{frames,modes,rails,evaluate}.ts`; `geometry/sweep.ts` keeps today's API (wrappers) so `sweepTriangles`, `frameAtFraction`, `kernelLeaves` callers are unchanged | geometry layer (L2); one evaluator for mesh, display and the exact realisation |
+| Exact realisation planner (analytic MakePipe / native MakePipeShell / fitted faces + sew) | `geometry/sweepEval/realise.ts` → `ShapeRecipe` nodes | the boundary is a recipe (L9) |
+| Fitted swept faces, loft skin with end derivatives, re-seaming, coupling, ruled / developable rulings, network sorting | `lib/nurbs/{sweepFit,skinEnds,reseam,coupling,ruled,network}.ts` | pure NURBS math next to SRF's |
+| Commands | `commands/solids/` (`sweep_profile` v2, `loft_sections` v2, `add_coil` v2, `add_helix`), `commands/surface/` (`sweep_surface`, `loft_surface` v2, `ruled_surface`, `network_surface`, `inspect_sweep`, `check_sweep_loft`); registered in the `solids` and `surface` feature catalogs | domain-neutral ⇒ core (L5, L10); Lane 1 |
+| Native: `sheetSolid` (sew faces → solid), `helixEdge`, `pipeShell` | `solver/crates/llull-kernel-occt/cpp/{surfaces,features}.cxx`, `src/recipe/nodes.rs`, `server/src/native/kernelLeaves.ts`, capability flags | exact kernel only through `ctx.kernel` (L9); native per C7 (OCCT is already the exact kernel) |
+| Overlays (frames, section outlines) | `src/ui/viewport/3d/analysis/` from `inspect_sweep` data | presentation only (COULD) |
+
+### 2.2 Data flow
+
+```
+sweep_profile (params = intent: path id, section, orientation, laws, rails)
+  └─ geometry/sweepEval.evaluate(entity) ── frames (mode) ── twist φ(t) · scale s(t) ── rails ──> S(u, t)
+        ├─ mesh / display / Manifold:  sweepTriangles(S)                (FR-SWG-37)
+        ├─ inspect_sweep / check_sweep_loft: frames + margins + ∫A ds   (core, no kernel)
+        └─ realise(entity) -> ShapeRecipe
+              • analytic: { op:'solid', entity } -> native MakePipe (constant section, minimal/frenet/fixed)  (today)
+              • pipeShell (capability):  MakePipeShell + SetLaw / aux spine / helixEdge                      (M8 fast path)
+              • fitted:  { op:'sheetSolid', faces: [fitted B-spline faces, exact caps], tolerance }          (default for laws/rails)
+```
+
+### 2.3 Laws check
+
+- L1/L5: every capability is a command; `inspect_sweep` and `check_sweep_loft` are read-only queries.
+- L3: commands return new documents; laws and frames are pure functions of the entity.
+- L4: no entity is built outside a command; the UI only edits params.
+- L8: params are design intent: a law, an angle, the id of a rail curve; never sampled frames or result poles. `sweep_surface` /
+  `ruled_surface` / `network_surface` store their fitted sheet (like SRF `loft_surface`) and are re-derived by history replay with
+  the same step-scoped ids; `sweep_profile` / `loft_sections` store the definition and are re-evaluated (as today).
+- L9: the exact kernel is reached only through `ShapeRecipe` (`sheetSolid`, `helixEdge` inside an entity payload, `pipeShell`
+  payload); commands that need it for the exact solid declare nothing new: sweeps and lofts are kernel-OPTIONAL (mesh fallback,
+  `@invariant kernel-optional`), exactly like today.
+- L7: a 2D sketch curve stays a valid path or section (no second model).
+
+### 2.4 Decisions
+
+| Id | Decision | Why |
+| --- | --- | --- |
+| D-SWG-1 | **The TS sweep evaluator is the reference geometry.** The exact solid is realised (a) analytically by `MakePipe` when there is no law, rail or special mode (today's path, unchanged), else (b) by **fitted B-spline faces** (one face per section edge, corners kept as B-rep edges) plus exact planar caps, sewn by a new native `sheetSolid` op; (c) `MakePipeShell` is an optional fast path behind the capability `pipeShell` (M8), accepted only where it passes the same VCs. | OCCT has no twist law and its pipe shell is itself an approximation at `Tol3d = 1e-4` [R1]; one evaluator for mesh, display, checks and exact faces keeps every kernel in agreement and keeps the laws testable in TS. The fit is cheap (≤ 200 × 64 grid per face, A9.4 already in `lib/nurbs`). |
+| D-SWG-2 | **Loft end conditions are built in TS** (skinning with end derivatives, exact NURBS) and closed into a solid by `sheetSolid`; `ThruSections` keeps the unconditioned lofts. | ThruSections has no tangency API [R2]; `interpolate` (A9.1) already takes end derivatives. |
+| D-SWG-3 | **Helices are design-intent entities**: a `nurbs_curve` with `analytic: HelixDefinition`; the NURBS poles (≤ 1e-6 × R) serve display and core math, the native kernel builds the exact pcurve-on-cylinder edge from the definition. | Exact threads / springs [R28]; agents read the intent back. |
+| D-SWG-4 | Default orientation stays `minimal` (RMF) and every existing document / plan is bit-identical (no param ⇒ today's code path). | FR-SWG-36. |
+| D-SWG-5 | No new toolset: the commands are listed in `3d` (SRF D-toolsets: a new toolset needs a design-language example). | consistency with SRF §13.3 |
+
+## 3. Data model
+
+```ts
+// packages/core/src/lib/law/types.ts (pure leaf)
+export type ScalarLaw =
+  | { readonly type: 'constant'; readonly value: number }
+  | { readonly type: 'linear'; readonly start: number; readonly end: number }
+  | { readonly type: 's_curve'; readonly start: number; readonly end: number }          // start + (end - start)(3t² - 2t³)
+  | {
+      readonly type: 'table';                                                             // C2 cubic spline (Law_Interpol semantics [R5])
+      readonly points: ReadonlyArray<readonly [number, number]>;                          // (t, value), t strictly increasing, first 0, last 1
+      readonly startSlope?: number; readonly endSlope?: number; readonly periodic?: boolean;
+    }
+  | { readonly type: 'expression'; readonly expression: string };                        // variables t (0..1), s (arc length), L (length)
+export type LawParameter = 'fraction' | 'arc_length';                                     // default 'fraction' = arc-length fraction
+
+// packages/core/src/model/types.ts — SweepEntity v2 (all new fields optional ⇒ today's documents unchanged)
+export type SweepOrientation =
+  | { readonly mode: 'minimal' }                                                          // RMF, today's default
+  | { readonly mode: 'frenet' }
+  | { readonly mode: 'fixed' }                                                            // section keeps its start plane
+  | { readonly mode: 'binormal'; readonly direction: Vec3 }
+  | { readonly mode: 'axis_plane'; readonly axisPoint: Vec3; readonly direction: Vec3 }   // section in the plane through the axis
+  | { readonly mode: 'surface'; readonly surface: SurfaceRef }                            // SurfaceRef = sheet copy or { entityId, faceIndex }
+  | { readonly mode: 'guide' };                                                           // set by rails (guideMode)
+export interface SweepRail { readonly curve: NurbsCurveData; readonly sourceId: string }  // world copy + provenance id
+export interface SweepEntity extends BaseEntity {
+  readonly kind: 'sweep';
+  path: ReadonlyArray<CurveSegment<Vec3>>;                 // unchanged: display / fallback chain (Bézier extraction of pathCurve)
+  section: SweepSection;
+  stations?: ReadonlyArray<SweepStation>;
+  stationBlend?: 'smooth' | 'linear';                       // absent = 'smooth' (today)
+  pathCurve?: NurbsCurveData;                               // exact path (local), when the path is a nurbs_curve
+  helix?: HelixDefinition;                                  // exact helix path (D-SWG-3)
+  sectionFrame?: 'path' | 'axial';                          // 'axial': section x = radius from the axis, y = axial offset
+  orientation?: SweepOrientation;
+  twist?: ScalarLaw;  scale?: ScalarLaw;  area?: ScalarLaw;  stretch?: { readonly x?: ScalarLaw; readonly y?: ScalarLaw };
+  lawParameter?: LawParameter;
+  rails?: ReadonlyArray<SweepRail>;                         // 1..2
+  guideMode?: 'orient' | 'scale' | 'stretch';
+  maintainHeight?: boolean;  anchors?: ReadonlyArray<Vec2>; // section-coordinate anchor points, one per rail
+  corners?: 'reject' | 'round' | 'miter';
+}
+
+// lib/helix/types.ts
+export interface HelixDefinition {
+  readonly type: 'helix' | 'spiral';
+  readonly origin: Vec3; readonly axis: Vec3;               // unit axis
+  readonly radius: number; readonly endRadius: number;      // conical when different (spiral: start / end radius in the plane)
+  readonly turns: number; readonly pitch: number | ScalarLaw; // pitch per turn (helix) or radial pitch (spiral); law over turn fraction
+  readonly handedness: 'right' | 'left'; readonly startAngle: number;
+}
+
+// LoftEntity v4 and NurbsSurfaceEntity source meta (additive)
+export type LoftEndCondition =
+  | { readonly type: 'free' }
+  | { readonly type: 'normal' | 'direction'; readonly direction?: Vec3; readonly magnitude: number; readonly draftDeg?: number }
+  | { readonly type: 'tangent_to_face' | 'curvature_to_face'; readonly face: SurfaceRef; readonly magnitude: number }
+  | { readonly type: 'point'; readonly at: Vec3 };
+// LoftEntity: startCondition?, endCondition?, closed?, alignment?: 'auto' | 'none' | { seams: number[] }, coupling?, centerline?: NurbsCurveData,
+//             guides?: NurbsCurveData[], skin?: NurbsSurfaceData (the TS skin when D-SWG-2 applies; display + sheetSolid source)
+```
+
+Persistence: schema version stays **3** (additive optional fields, as SRF D3); `commands/persistence` guards gain validation of the new
+fields (law tables increasing, finite values, rails 1..2, helix positive radii). Loading an older document never fills the new fields.
+
+## 4. Commands
+
+Q = query, M = mutating; K = needs the exact kernel for the exact solid (all are kernel-optional with a mesh fallback unless stated).
+
+### 4.1 Changed commands
+
+| Command | New params (sketch, zod, all optional) | @affects | @invariant | @failure (code) |
+| --- | --- | --- | --- | --- |
+| `sweep_profile` (M) | `pathId` also `nurbs_curve` (incl. helix) and `pathIds` (edge / curve chain); `orientation {mode, direction?, axisPoint?, surfaceId?, faceIndex?}`; `twist: Law`, `twistTurns`; `scale: Law` / `area: Law` (exclusive); `stretch {x?, y?}`; `lawParameter`; `stationBlend`; `sectionFrame`; `guideIds` (1..2), `guideMode`, `maintainHeight`, `anchors`, `railTolerance`; `corners`; `fitTolerance` | 1 sweep (unchanged kind) | no new param ⇒ today's entity bit-identical; scale > 0 everywhere; closed path ⇒ total twist ≡ 0 mod 2π / symmetry order | `SWG_PATH_INVALID`, `SWG_PATH_NOT_G1`, `SWG_LAW_INVALID`, `SWG_LAW_NONPOSITIVE`, `SWG_LAW_EXCLUSIVE` (scale + area), `SWG_CLOSED_TWIST_NOT_PERIODIC`, `SWG_FRAME_DEGENERATE`, `SWG_SURFACE_TOO_FAR`, `SWG_GUIDE_COUNT`, `SWG_GUIDE_PLANE_NO_INTERSECTION`, `SWG_GUIDE_ANCHOR_UNDEFINED`, `SWG_RAIL_DEVIATION`, `SWG_SELF_INTERSECTION_LOCAL`, `SWG_SELF_INTERSECTION_GLOBAL`, `SWG_FIT_TOLERANCE` |
+| `loft_sections` (M) | `startCondition`, `endCondition`, `alignment`, `seams`, `coupling`, `vertexPairs`, `closed`, `centerlineId`, `sectionCount`, `guideIds`, `guideTolerance` | 1 loft | no new param ⇒ today; exact sections never resampled; re-seaming exact (knot insertion) | `SWG_LOFT_END_CONDITION_INVALID`, `SWG_LOFT_FACE_NOT_ADJACENT`, `SWG_LOFT_COUPLING_MISMATCH`, `SWG_LOFT_CENTERLINE_MISSES`, `SWG_LOFT_CLOSED_TOO_FEW` (< 3 sections), SRF `SRF_LOFT_GUIDE_*` |
+| `loft_surface` (M) | same conditions / alignment / closed / coupling as above | 1 nurbs_surface | as above | as above |
+| `add_coil` (M) | `exactHelix` (default **true** for new calls; documents keep what they stored) | sweep along `add_helix` geometry; rectangle wire = `axis_plane` sweep (exact) instead of a mesh | `data.analyticVolume` unchanged formula | today's refusals with `SWG_*` codes added |
+
+### 4.2 New commands
+
+| Command | Q/M | Params (sketch) | @affects | @invariant | @failure |
+| --- | --- | --- | --- | --- | --- |
+| `add_helix` | M | `position`, `axis` (default +Z), `radius`, `endRadius?` \| `taperDeg?`, two of `pitch` / `turns` / `height` or `pitchLaw` (+ `turns`), `type: 'helix' \| 'spiral'`, `handedness`, `startAngleRad`, `tolerance?` (display fit, default 1e-6 × radius) | 1 `nurbs_curve` with `analytic` | NURBS within `tolerance` of the definition (reported `data.fitDeviation`); `data {length, curvatureMin, torsion, turns, pitch, height}` | `SWG_HELIX_PARAMS` (not exactly two of pitch/turns/height), `SWG_HELIX_RADIUS` (≤ 0 or cone through the axis), `SWG_LAW_*` |
+| `sweep_surface` | M | as `sweep_profile`, but `sectionId` of an open or closed curve (`nurbs_curve`, 2D sketch curve) or inline `section: {line \| points}`; no caps | 1 `nurbs_surface` (one patch, or one per section span with C0 creases recorded) | fit deviation ≤ `fitTolerance`; rails on the boundary within `railTolerance` | as `sweep_profile` + `SWG_SECTION_INVALID` |
+| `ruled_surface` | M | `curveIds: [a, b]` or `curveId` + `point`, `coupling: 'parameter' \| 'arc_length' \| 'developable'`, `reverse?`, `fitTolerance?` | 1 `nurbs_surface`, degree 1 across | `data {area, maxAbsGaussianCurvature, developable: boolean, rulingTwistMaxRad}` | `SWG_RULED_CURVES`, `SWG_NOT_DEVELOPABLE`, `SWG_FIT_TOLERANCE` |
+| `network_surface` | M | `curveIds` (6..120, any order), `tolerance?`, `edgeMatch?: {boundary: 'u0'\|'u1'\|'v0'\|'v1', neighbourId, continuity: 'G0'\|'G1'\|'G2'}[]` | 1 `nurbs_surface` | families reported (`data.families`), crossing gaps ≤ tolerance, deviation reported | `SWG_NETWORK_UNSORTABLE`, `SWG_NETWORK_NOT_INTERSECTING`, SRF Gordon codes |
+| `inspect_sweep` | Q | `id` (sweep, swept sheet, loft), `samples` (2..2000, default 21) or `at: number[]` | — | `data {pathLength, sectionArea, samples[] {t, s, point, tangent, normal, binormal, twistRad, scale, curvatureRadius, sectionExtent, margin}, totals {twistVsMinimalRad, twistVsFrenetRad, integralAreaDs, analyticVolume?}, realisation, provenance}` | `SWG_ENTITY_NOT_FOUND` |
+| `check_sweep_loft` | Q | `ids?` (default every sweep / loft / swept sheet), tolerances `selfIntersectionMargin` (default 1.0), `railTolerance`, `endAngleRad`, `fitTolerance`, `volumeConsistencyRel` | — | `data {status, findings[] {code, severity, entityId, at?, value, limit, unit, remediation}, tolerances: Record<string, NamedTolerance>, provenance}` | — |
+
+Descriptions (AF-02) state units, which mode to choose ("`minimal` for pipes and anything round; `fixed` for extrusion-like sweeps;
+`axis_plane` for threads and springs with a non-round section; `frenet` only on curves without straight runs"), refusals and the next
+command (`inspect_sweep`, `check_sweep_loft`, `mass_properties`).
+
+## 5. Kernel / algorithms
+
+### 5.1 Laws (`lib/law`)
+
+- `linear`, `s_curve` closed form; `table`: natural or clamped C2 cubic spline through the points (`Law_Interpol` semantics [R5]),
+  periodic when asked (first value = last value enforced, else `SWG_LAW_INVALID`); `expression`: `compileExpression(expr, ['t','s','L'])`
+  once per evaluation, evaluated at samples; non-finite → `SWG_LAW_INVALID` with the sample `t`.
+- `integrate(law, f)`: Gauss–Legendre on each table span / 64-point composite for expressions (relative error ≤ 1e-12 on the VC laws),
+  used for `∫A(s) ds` (analytic volume) and `inspect_sweep` totals.
+- Positivity of scale / area: checked at the table knots and at 256 samples (`SWG_LAW_NONPOSITIVE`).
+
+### 5.2 Frames (`geometry/sweepEval/frames.ts`)
+
+| Mode | Frame (T tangent; section x along n, y along b) | Degenerate case → code |
+| --- | --- | --- |
+| `minimal` | double-reflection RMF [R25] (today's `sweepFrames`, unchanged, closed-path holonomy spread) | — |
+| `frenet` | n = T′/\|T′\|, b = T × n (analytic on `pathCurve` / helix) | \|T′\| < 1e-9 / size or n flips (n_i · n_{i+1} < 0) → `SWG_FRAME_DEGENERATE` |
+| `fixed` | n, b of the start frame, constant; the section stays in its start plane (oblique sections) | \|T · plane normal\| < sin 5° (named default) → `SWG_FRAME_DEGENERATE` |
+| `binormal` | n = normalize(D × T), b = T × n | \|D × T\| < sin 1° → `SWG_FRAME_DEGENERATE` |
+| `axis_plane` | section plane = plane through the axis line and P(t): x = radial unit, y = axis; section coordinates (radius, axial offset) when `sectionFrame: 'axial'` | P(t) on the axis → `SWG_FRAME_DEGENERATE` |
+| `surface` | b = surface normal at the foot point of P(t) (SRF `closestOnSurface`), projected ⟂ T; n = b × T | foot distance > `surfaceTolerance` (default 1e-4 × size) → `SWG_SURFACE_TOO_FAR` |
+
+Twist rotates (n, b) about T by φ(t); scale multiplies section coordinates by s(t) (area law: s = √(A(t)/A₀)); stretch scales x and y
+separately. The frames are sampled adaptively: ≥ 16 per turn of the tangent and ≥ 8 per unit change of φ (rad), capped at 20 000.
+
+Known relation (VC-SWG-25): along a helix the Frenet frame turns relative to the RMF by ∫τ ds = 2πc / √(R² + c²) per turn
+(c = pitch / 2π); `inspect_sweep.totals.twistVsFrenetRad` returns it.
+
+### 5.3 Rails (`geometry/sweepEval/rails.ts`)
+
+- **Station points.** At each path sample P(t), T(t): rail point Q(t) = intersection of the rail with the plane through P ⟂ T, by Newton
+  on the rail parameter with continuation from the previous station (start: closest point). No root within the rail domain →
+  `SWG_GUIDE_PLANE_NO_INTERSECTION` (OCCT `PlaneNotIntersectGuide` [R1]). Two rails without a path: spine = midline of the rails coupled
+  by arc-length fraction; the plane is ⟂ the spine.
+- **Anchors.** Given (`anchors`) or derived: the section points closest to the rails at t = 0 (must be within `railTolerance`, else
+  `SWG_GUIDE_ANCHOR_UNDEFINED`, FR-SWG-10 / CATIA restriction [R23]).
+- **One rail.** `orient`: rotate the section about T so the anchor direction points to Q; `scale`: also uniform scale |Q − P| / |a|;
+  `stretch`: scale along the anchor direction only.
+- **Two rails.** In-plane similarity (scale mode: rotation + uniform scale + translation) mapping (a₁, a₂) → (Q₁, Q₂); `maintainHeight`:
+  affine map stretching only along a₁a₂. The section passes exactly through Q₁, Q₂ at every station; between stations the fitted face
+  deviates ≤ `fitTolerance`; `data.railDeviation[]` = max distance from 200 samples of each rail to the result.
+
+### 5.4 Self-intersection
+
+- **Local**: margin(t) = ρ(t) / e(t), ρ = path curvature radius, e = extent of the (twisted, scaled) section along the curvature normal
+  toward the centre of curvature; margin ≤ `selfIntersectionMargin` (default 1.0, i.e. exactly the envelope fold) → fail. Today's
+  check (`minCurvatureRadius ≤ halfSize`) is the special case of a constant round section.
+- **Global**: helix + `axis_plane`: axial section extent ≥ pitch (min over the pitch law) → fail; other sweeps: station rings sampled
+  every section size along the path, pairwise distance of rings farther apart than 3 section sizes along the path (spatial hash) <
+  `fitTolerance` → fail. Plus the **volume-consistency** check: for sweeps whose section stays normal to the path with its centroid on
+  the path (`minimal`, `frenet`, `binormal`, twist, scale, area, rails in `scale`), V_solid must equal ∫A(s) ds (validation §4.1); a
+  deficit > `volumeConsistencyRel` (1e-4) reveals overlap → `SWG_CHECK_VOLUME_MISMATCH`.
+
+### 5.5 Exact realisation (`geometry/sweepEval/realise.ts`, D-SWG-1)
+
+| Case | Recipe | Native |
+| --- | --- | --- |
+| constant section, no law / rail, mode `minimal` / `frenet` / `fixed` | `{ op: 'solid', entity }` (today) | `MakePipe` with `GeomFill_IsCorrectedFrenet` / `IsFrenet` / `IsFixed` [R6] [R4] |
+| path is a helix | entity payload `native.helix` → `helix_edge` (2D line on cylinder / cone [R28]) as the spine | new `helix_edge` in `features.cxx`; capability `helixEdge` |
+| laws, rails, `binormal`, `axis_plane`, `surface`, stations with `linear` blend | `{ op: 'sheetSolid', faces, tolerance }`: one fitted B-spline face per section edge (S(u, t) sampled on an adaptive grid, `interpolateGrid` A9.4, mid-cell check ≤ `fitTolerance`, refined up to 400 × 200 poles, else `SWG_FIT_TOLERANCE`) + two exact planar caps (the section curve mapped by the end transform) | new `sheet_solid` in `surfaces.cxx`: `nurbsSurface` faces → `BRepBuilderAPI_Sewing(tol)` → `BRepBuilderAPI_MakeSolid` → `ShapeFix_Solid`; free edges > 0 → refusal `SWG_KERNEL_SEW_OPEN` with their count |
+| `pipeShell` fast path (M8, capability) | entity payload `native.pipeShell {spine, section, mode, law?, auxSpine?}` | `MakePipeShell`: `SetMode` per §1.2, `SetLaw(Law_Interpol)` for scale, auxiliary spine for `axis_plane` (the axis segment, NoContact) and for one-rail `orient` (Contact / ContactOnBorder [R3]); `SetTolerance(fitTolerance)`; used only when its result passes the check of the TS evaluator (sampled deviation) |
+
+`sweep_surface` uses the same faces without caps; `nurbs_surface` leaves already exist (SRF §13.9).
+
+### 5.6 Lofts
+
+- **End conditions (D-SWG-2).** Compatible sections (SRF `compatibleCurves`) → for each u-pole column, interpolate across sections in v
+  with end derivatives D₀, D₁ (A9.1 with end tangents, already in `lib/nurbs/interpolate`): `normal`: D = m · d₀₁ · n̂_section
+  (d₀₁ = distance of the first two section centroids, so m = 1 is "natural"); `direction`: given vector; `draftDeg` tilts n̂ toward the
+  section centroid; `tangent_to_face`: D per pole = m · d₀₁ · (face tangent ⟂ section tangent at the pole's Greville point); `curvature_to_face`:
+  adds the second-derivative row (new `interpolateWithSecondDerivatives`); `point`: collapsed pole row. With 2 sections and both ends
+  conditioned the v direction is a cubic Hermite: two circles r₀ → r₁ with `normal`, m = 1 give z linear and r(v) a smoothstep, V = π h
+  (r₀² + r₀ d + 13 d²/35) (validation §4.7). Achieved end angles and G1 / G2 gaps are measured with SRF `check_continuity` math.
+- **Re-seaming / alignment.** Closed clamped section (end pole repeated): insert the seam parameter u* to multiplicity p and rotate the
+  pole / knot arrays (exact); `auto`: u* minimises the distance to the previous section's start in the loft-local frame, orientation from
+  the signed area about the travel direction (today's `ringNormal` rule). `alignment: 'none'` keeps seams: a parameter-coupled ruled
+  loft of a section and its copy rotated by φ has V = A h (1 − (1 − cos φ)/3) for **any** section (det((1 − t)I + tR_φ), validation §4.8).
+- **Coupling.** `vertices`: split each section at its `vertexPairs` points, make each matching segment set compatible, skin per segment
+  (one face per segment, corner edges kept); `arc_length`: re-parameterise by arc length (fit, deviation reported).
+- **Closed loft**: periodic interpolation in v (sections repeated cyclically), ≥ 3 sections.
+- **Centreline**: sections positioned along the centreline RMF; `sectionCount` intermediate sections blended (compatible poles, in the
+  local frame) at equal arc length and placed normal to the centreline, then skinned; deviation from the centreline-normal planes reported.
+- **Guides on solids**: SRF `gordonSurface` → caps → `sheetSolid`.
+
+### 5.7 Ruled, developable, network
+
+- `ruled_surface` `parameter`: both curves on [0, 1], made compatible (degree elevation + knot merge) → poles rows = the two curves
+  (degree 1 in v, exact). `arc_length`: arc-length re-parameterisation fitted. Gaussian curvature reported by SRF `analyze_surface_curvature`
+  math (`K = −(det[S_u, S_v, S_uv])² / |S_u × S_v|⁴` for a ruled surface).
+- `developable`: for samples u on A find v on B with det[A′(u), B′(v), B(v) − A(u)] = 0 (Newton with continuation, monotone v);
+  no root / non-monotone → `SWG_NOT_DEVELOPABLE`; rulings fitted; max |K| reported (expected ≈ 0, frustum K = 0 exactly). Unrolling is 03 WRP.
+- `network_surface`: pairwise curve distances (SRF closest-point) → crossing graph; two-colour it (bipartite ⇒ two families, else
+  `SWG_NETWORK_UNSORTABLE`); every cross pair must meet within `tolerance` (else `SWG_NETWORK_NOT_INTERSECTING` listing the pair);
+  order each family by crossing parameter along one curve of the other family; orient; then SRF `gordonSurface`. Edge matching re-places
+  the second / third pole rows as SRF `fill_surface` `neighbours` already does (`lib/nurbs/fillPatch.ts`). Gordon reproduces any surface
+  of the form g(u) + h(v) exactly for partition-of-unity blending (validation §4.9).
+
+### 5.8 Numerical tolerances (named defaults, AF-31)
+
+| Name | Default | Source |
+| --- | --- | --- |
+| `fitTolerance` | 1e-6 × model size (≥ 1e-7 document units) | llull choice, 100 × tighter than OCCT `MakePipeShell` Tol3d 1e-4 [R1] |
+| `railTolerance` | 1e-6 × model size | same |
+| `surfaceTolerance` | 1e-4 × model size | OCCT BoundTol 1e-4 [R1] |
+| `endAngleRad` | 0.01 | OCCT TolAngular 1e-2 [R1] |
+| `selfIntersectionMargin` | 1.0 | envelope fold condition (§5.4) |
+| `volumeConsistencyRel` | 1e-4 | llull choice (≫ fit error, ≪ any real overlap) |
+| `fixedModeMinAngleDeg` | 5 | llull choice |
+
+## 6. Interop & persistence
+
+| Item | Approach |
+| --- | --- |
+| Document | additive fields on `sweep`, `loft`, `nurbs_curve` (`analytic`), `nurbs_surface` (`source` meta); schema version 3 kept; guards validate |
+| STEP | exact solids export through the existing AP242 path (`sheetSolid` and `helixEdge` results are ordinary B-rep); sheets as SRF §13.9 |
+| Code export (COULD) | CadQuery: `cq.Wire.makeHelix`, `cq.Solid.sweep(…, isFrenet, mode=Vector \| auxSpine, transitionMode)`, `cq.Solid.makeLoft(ruled)` where the definition maps 1:1 [R28]; else the fitted B-spline faces through OCP (`recipeLowering.ts` pattern); today's mesh lowering stays the last resort |
+| Plans | every command expressible in `build_project`; laws are plain JSON, so `=expr` plan expressions can drive their values |
+
+## 7. CLI / UI surfaces + stable error codes
+
+- CLI: nothing special (registry). `llull guide` gains a "sweeps & lofts" section: the orientation-mode table of §5.2 with the vendor
+  names of FUNCTIONAL §2.1, law JSON shapes, the closed-path twist rule, "always end with `check_sweep_loft`".
+- `--dry-run` works for every mutating command (AF-42); long fits report progress through the existing plan progress events.
+- UI: dialogs from schemas; law fields as a type select + values; frames overlay from `inspect_sweep` (COULD).
+
+### 7.1 Error and finding codes (AF-11)
+
+| Code | Raised by | Meaning | Paths / ids | Remediation |
+| --- | --- | --- | --- | --- |
+| `SWG_PATH_INVALID` | sweeps | path id not a curve, < 2 points, disconnected chain | `params.pathId` / `params.path` | give a curve entity id or ≥ 2 points |
+| `SWG_PATH_NOT_G1` | sweeps | sharp corner with `corners: 'reject'` | joint index | `corners: 'round'` with a `bendRadius`, or `'miter'` |
+| `SWG_LAW_INVALID` | laws | non-increasing table, t outside 0..1, unparsable / non-finite expression | `params.twist.points.2` | fix the table / expression |
+| `SWG_LAW_NONPOSITIVE` | scale / area / pitch | law value ≤ 0 somewhere | param, first bad t | keep scale > 0 |
+| `SWG_LAW_EXCLUSIVE` | sweeps | `scale` and `area` both given | both params | give one |
+| `SWG_CLOSED_TWIST_NOT_PERIODIC` | sweeps on closed paths | total twist not a multiple of 2π / k (k = section symmetry order) | `params.twist` | use whole turns (SolidWorks rule [R18]) |
+| `SWG_FRAME_DEGENERATE` | orientation modes | Frenet without curvature / inflection; fixed / binormal tangent ∥ reference | `params.orientation`, sample t | use `minimal`, or another direction |
+| `SWG_SURFACE_TOO_FAR` | `surface` mode | path leaves the reference surface | `params.orientation.surfaceId`, t | project the path onto the surface first |
+| `SWG_GUIDE_COUNT` | rails | not 1 or 2 rails | `params.guideIds` | 1 or 2 rails |
+| `SWG_GUIDE_PLANE_NO_INTERSECTION` | rails | a section plane misses the rail | rail id, t | extend the rail over the path |
+| `SWG_GUIDE_ANCHOR_UNDEFINED` | rails | anchors not given and the section does not touch the rail at the start | `params.anchors` | give `anchors` in section coordinates |
+| `SWG_RAIL_DEVIATION` | rails | rail farther than `railTolerance` from the result | rail id, value | raise `railTolerance` or simplify the rail |
+| `SWG_SELF_INTERSECTION_LOCAL` | sweeps, check | section extent ≥ curvature radius | param (`radius`, `scale`), t, margin | smaller section or larger bend |
+| `SWG_SELF_INTERSECTION_GLOBAL` | sweeps, check | turns / distant rings intersect (helix axial extent ≥ pitch) | param (`pitch`), t pair | larger pitch / smaller section |
+| `SWG_FIT_TOLERANCE` | fitted faces, laws, helix display | fit could not reach the tolerance within the pole budget | entity, achieved value | loosen `fitTolerance` or split the path |
+| `SWG_HELIX_PARAMS` | `add_helix` | not exactly two of pitch / turns / height (or pitchLaw + turns) | params | give two |
+| `SWG_HELIX_RADIUS` | `add_helix` | radius ≤ 0, cone through the axis | `params.radius` / `endRadius` | positive radii |
+| `SWG_SECTION_INVALID` | `sweep_surface` | section curve unusable (degenerate, self-intersecting) | `params.sectionId` | — |
+| `SWG_LOFT_END_CONDITION_INVALID` | lofts | zero direction, magnitude ≤ 0, `point` not first / last | `params.startCondition` | — |
+| `SWG_LOFT_FACE_NOT_ADJACENT` | lofts | the end section does not lie on the referenced face (> tolerance) | face ref, distance | pick the face the section lies on |
+| `SWG_LOFT_COUPLING_MISMATCH` | lofts | vertex pairs inconsistent / counts differ | `params.vertexPairs` | one pair list per section, same length |
+| `SWG_LOFT_CENTERLINE_MISSES` | lofts | a section plane does not cross the centreline | section index | move the section or extend the centreline |
+| `SWG_LOFT_CLOSED_TOO_FEW` | lofts | `closed` with < 3 sections | `params.sectionIds` | ≥ 3 sections |
+| `SWG_RULED_CURVES` | `ruled_surface` | not two curves (or curve + point) | `params.curveIds` | — |
+| `SWG_NOT_DEVELOPABLE` | `ruled_surface` | no developable ruling between the curves | — | use `arc_length`; report max \|K\| |
+| `SWG_NETWORK_UNSORTABLE` / `SWG_NETWORK_NOT_INTERSECTING` | `network_surface` | crossing graph not bipartite / a pair does not meet | curve ids | add / fix the crossing curves (Rhino rule [R9]) |
+| `SWG_KERNEL_SEW_OPEN` | `sheetSolid` realisation | sewing left free edges | entity, count | report; mesh fallback stays |
+| `SWG_ENTITY_NOT_FOUND` | queries | id unknown / not a sweep or loft | `params.id` | — |
+| `SWG_CHECK_*` (findings) | `check_sweep_loft` | `…_SELF_INTERSECTION_LOCAL`, `…_GLOBAL`, `…_FRAME_DEGENERATE`, `…_RAIL_DEVIATION`, `…_END_ANGLE`, `…_LOFT_TWIST` (seam mismatch / ruling twist > `endAngleRad` per section), `…_SECTION_DEVIATION`, `…_VOLUME_MISMATCH`, `…_FIT_APPROXIMATION` (info: fitted faces, deviation) | entity, t / section | per code |
+
+### 7.2 Agent-first compliance
+
+| AF | How |
+| --- | --- |
+| AF-01, 02, 04 | registry commands; descriptions with units per param (`twist` rad, `taperDeg`, lengths document units); FR-SWG-32, 34 |
+| AF-05 | all plans in `validation/plans/` validate with `llull run --validate` |
+| AF-10, 35 | `data` with units and `provenance {method: 'RMF double reflection' \| 'Frenet' \| …, realisation: 'analytic' \| 'pipeShell' \| 'fitted' \| 'mesh', fitDeviation}` |
+| AF-11 | §7.1 |
+| AF-20, 21 | `check_sweep_loft`; `inspect_sweep` numbers instead of a section preview |
+| AF-31 | §5.8 named defaults with `defaulted: true` |
+| AF-32 | fitted / approximated geometry reported (`SWG_CHECK_FIT_APPROXIMATION`), never hidden; no engineering-data inputs, so no `unverified` source flags arise in this pack |
+| AF-33, 34 | not applicable (no release / safety act); SRF / PLM gates apply downstream |
+| AF-41 | all TS + bundled native kernel; offline |
+
+## 8. Performance & robustness budgets (desktop)
+
+| Operation | Budget | Note |
+| --- | --- | --- |
+| frames + laws, 2 000 samples (TS) | ≤ 30 ms | evaluator |
+| `sweep_profile` with laws, mesh realisation | ≤ 300 ms | FR-SWG-38 |
+| fitted faces of a twisted sweep (4 faces, 200 × 32 grid each) | ≤ 500 ms TS | A9.4 banded solves |
+| `sheetSolid` sew of ≤ 20 faces | ≤ 1 s native | BRepBuilderAPI_Sewing |
+| `add_helix` 200 turns, 1e-6 R | ≤ 200 ms | spans per quarter turn |
+| `check_sweep_loft` 10-turn helical sweep | ≤ 1 s | spatial hash |
+| `network_surface` 20 curves | ≤ 1 s | Gordon (SRF: 40 stations 33 ms) |
+
+Robustness: every Newton loop bounded (≤ 50 iterations) and reported as a refusal on non-convergence; adaptive sampling capped
+(20 000 frames, 400 × 200 poles); no exception escapes a command (`CMD_THREW` is a bug).
+
+## 9. Test strategy
+
+| Layer | Tests | VC |
+| --- | --- | --- |
+| `lib/law` unit | each law type: value, derivative, integral vs closed form (1e-12), table spline vs `Law_Interpol` semantics, expression errors | 05, 07, 10, 27 |
+| `lib/helix` unit | point / length / curvature / torsion vs closed form; NURBS fit ≤ 1e-6 R | 08, 12, 14 |
+| `geometry/sweepEval` unit | frames per mode (RMF bit-identical to today, Frenet vs RMF relation), rail stations, self-intersection margins | 15, 16, 25, 27 |
+| Command unit (happy + failure, `is pure`) | every changed / new command; every §7.1 code once | 01–24, 27, 34–37 |
+| Mesh-volume VCs (Manifold) | the analytic volume table within 0.5 % | 32 |
+| Golden plans | `plans/*.json` id-normalised snapshots + replay equality; existing goldens unchanged | 31 |
+| Server / native (`server/tests/nativeKernelSweeps.test.ts`, cargo tests in `llull-kernel-occt`) | exact volumes 1e-6 rel; `sheetSolid` closed (0 free edges); `helixEdge` vs closed-form length | 01–22, 29 |
+| Contract | tool-schema snapshot; `blockedPlanCommands.json` lists `proposed_steps.json` until built | 30 |
+| Perf | budgets of §8 (4 × slack as SRF) | 33 |
+
+### 9.1 Technical requirements
+
+| Id | Requirement | Section | VC |
+| --- | --- | --- | --- |
+| TR-SWG-01 | `lib/law` with the five law types, integrals and positivity checks | §3, §5.1 | 03, 05, 07, 10 |
+| TR-SWG-02 | `geometry/sweepEval` frame modes; `minimal` bit-identical to today's `sweepFrames` | §5.2 | 01, 15, 25, 31 |
+| TR-SWG-03 | Twist / scale / area / stretch application and `stationBlend` | §5.2 | 03–07, 09–11 |
+| TR-SWG-04 | `pathCurve` support: `nurbs_curve` and edge-chain paths (Bézier extraction for display, exact curve kept) | §3 | 12, 14 |
+| TR-SWG-05 | `lib/helix` + `add_helix` + `HelixDefinition` + native `helix_edge` (capability `helixEdge`) | §3, §5.5 | 08, 12–14 |
+| TR-SWG-06 | Rails: station solving, anchors, 1- / 2-rail maps, rail deviation | §5.3 | 16–18, 35 |
+| TR-SWG-07 | Self-intersection (local, global, volume consistency) shared by commands and `check_sweep_loft` | §5.4 | 27, 28 |
+| TR-SWG-08 | Fitted face realisation + native `sheetSolid` op (`ShapeRecipe` node, `recipeKey`, validation, `kernelLeaves`, `nodes.rs`, C++) | §5.5 | 03–07, 16, 21 |
+| TR-SWG-09 | Loft end conditions by TS skinning with end derivatives (incl. second derivatives) | §5.6 | 21, 22, 26 |
+| TR-SWG-10 | Exact re-seaming, alignment, coupling, closed and centreline lofts, guides on solids | §5.6 | 19, 22, 36, 37 |
+| TR-SWG-11 | `ruled_surface` (parameter, arc length, developable) | §5.7 | 20, 24 |
+| TR-SWG-12 | `network_surface` sorting + edge matching | §5.7 | 23, 26 |
+| TR-SWG-13 | `inspect_sweep`, `check_sweep_loft` with named tolerances | §4.2, §5.8 | 28, 30 |
+| TR-SWG-14 | Persistence guards for every new field; schema v3 kept | §3, §6 | 31 |
+| TR-SWG-15 | `pipeShell` native fast path (capability), accepted only when it matches the evaluator | §5.5 | 29 |
+| TR-SWG-16 | CadQuery lowering of helices / sweeps / lofts where 1:1 | §6 | 29 |
+
+## 10. Delivery plan
+
+| Milestone | Content | Depends on | Effort (agent-days) |
+| --- | --- | --- | --- |
+| M0 | `lib/law`, `geometry/sweepEval` refactor (bit-identical), `inspect_sweep` | — | 2 |
+| M1 | `sweep_profile` twist / scale / area / stretch / `stationBlend` / orientation `frenet`, `fixed`, `binormal`; `check_sweep_loft` (sweeps); `SWG_*` codes; mesh realisation | M0 | 3 |
+| M2 | `sheetSolid` native op + fitted face realisation (exact solids of M1) | M1, sidecar toolchain (SV1) | 3 |
+| M3 | `add_helix` + native `helix_edge`; `axis_plane`; `add_coil` v2; 3D `nurbs_curve` paths | M1 | 3 |
+| M4 | Rails (1 / 2), `surface` mode, `sweep_surface` | M2 | 4 |
+| M5 | Loft end conditions, alignment / re-seam, closed loft, guides on solids | M2 | 4 |
+| M6 | `ruled_surface` (parameter, arc length) | M0 | 1 |
+| M7 | `network_surface`, edge matching, vertex coupling, centreline, developable | M5, M6 | 4 |
+| M8 | `pipeShell` fast path, CadQuery export, frames overlay | M2–M4 | 3 |
+
+Headline: **M0–M3 (11 agent-days) give twist / scale / orientation laws and exact helices on today's kernel; M4–M5 bring rails and loft
+end conditions; M6–M8 networks, ruled / developable and the fast path.**
+
+## 11. Open questions / decisions needed
+
+| # | Question | Proposal |
+| --- | --- | --- |
+| Q1 | D-SWG-1: fitted B-spline faces (TS) as the default exact path for law / rail sweeps, MakePipeShell only as a measured fast path? | yes (one reference evaluator) |
+| Q2 | `add_coil` v2 on the exact helix changes new results by up to 1.2 % of R near the ends; existing documents keep their stored path — acceptable? | yes, `exactHelix` default true for new calls only |
+| Q3 | The TS mesh (RMF) and the OCC solid (corrected Frenet) of today's `sweep_profile` may disagree for non-round sections on non-planar paths; switch OCC to the fitted path or `GeomFill_IsDiscreteTrihedron` for those? | measure first (VC-SWG-25b), then decide |
+| Q4 | `sheetSolid` is also what SRF deferred (B-rep sew / thicken of sheets); build it once here and let SRF use it? | yes, SWG M2 owns it |
+| Q5 | Law parameter default: arc-length fraction (proposed) vs curve parameter (OCCT `Law_Function` uses the spine parameter) | arc-length fraction: independent of how the path was built |
+| Q6 | A `sweep` toolset with a design-language example, or keep everything in `3d`? | keep `3d` (D-SWG-5) |
+
+## 12. References
+
+See FUNCTIONAL_SPEC §11 ([R1]–[R29]); same ids. Code references are paths in this repository at branch `docs/freeform-design-specs`.

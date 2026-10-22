@@ -1,0 +1,386 @@
+{
+ "actions": [
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "b3"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$b3",
+    "edges": [
+     {
+      "near": [
+       0,
+       5,
+       2.5
+      ],
+      "size": 1,
+      "sizeEnd": 1,
+      "sizes": [
+       {
+        "t": 0.5,
+        "size": 2
+       }
+      ],
+      "interpolation": "linear"
+     }
+    ]
+   },
+   "as": "f03"
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$f03"
+    ]
+   }
+  },
+  {
+   "command": "inspect_faces",
+   "params": {
+    "entityId": "$f03"
+   }
+  },
+  {
+   "command": "add_cylinder",
+   "params": {
+    "radius": 5,
+    "height": 10
+   },
+   "as": "cyl"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$cyl",
+    "edges": [
+     {
+      "near": [
+       5,
+       0,
+       5
+      ],
+      "law": {
+       "expression": "1 + 0.5*cos(2*pi*t)",
+       "samples": 33
+      }
+     }
+    ]
+   },
+   "as": "f04"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f04"
+   }
+  },
+  {
+   "command": "add_cylinder",
+   "params": {
+    "radius": 5,
+    "height": 10
+   },
+   "as": "cyl6"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$cyl6",
+    "edgesNear": [
+     [
+      5,
+      0,
+      5
+     ]
+    ],
+    "radius": 1.4142135623730951,
+    "mode": "chord"
+   },
+   "as": "f06"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f06"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "bc0"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$bc0",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ],
+    "radius": 1,
+    "profile": {
+     "type": "conic",
+     "rho": 0.25
+    }
+   },
+   "as": "f07_0"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f07_0"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "bc1"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$bc1",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ],
+    "radius": 1,
+    "profile": {
+     "type": "conic",
+     "rho": 0.41421356237309515
+    }
+   },
+   "as": "f07_1"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f07_1"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "bc2"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$bc2",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ],
+    "radius": 1,
+    "profile": {
+     "type": "conic",
+     "rho": 0.5
+    }
+   },
+   "as": "f07_2"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f07_2"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "bc3"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$bc3",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ],
+    "radius": 1,
+    "profile": {
+     "type": "conic",
+     "rho": 0.75
+    }
+   },
+   "as": "f07_3"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f07_3"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "ba"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$ba",
+    "edges": [
+     {
+      "near": [
+       0,
+       5,
+       2.5
+      ],
+      "size": 1,
+      "size2": 2,
+      "side1Near": [
+       0,
+       0,
+       2.5
+      ]
+     }
+    ],
+    "profile": {
+     "type": "conic",
+     "rho": 0.41421356237309515
+    }
+   },
+   "as": "f08"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f08"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "bg"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$bg",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ],
+    "radius": 1,
+    "profile": {
+     "type": "curvature",
+     "shape": 0.5
+    }
+   },
+   "as": "f09"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f09"
+   }
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$f09"
+    ],
+    "require": "G2"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "bk"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$bk",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ],
+    "radius": 1
+   },
+   "as": "f10"
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$f10"
+    ],
+    "require": "G1"
+   }
+  }
+ ]
+}

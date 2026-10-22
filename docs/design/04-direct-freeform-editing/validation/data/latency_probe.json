@@ -1,0 +1,132 @@
+{
+ "generated": "2026-10-22",
+ "machine": {
+  "node": "v24.16.0",
+  "cpu": "Intel(R) Core(TM) Ultra 9 185H",
+  "platform": "win32"
+ },
+ "grade": "C (one machine, reference JS implementation, not llull code); re-measure with the llull bench of TECHNICAL_SPEC section 8",
+ "budgetsFrom": "web.dev RAIL (S10): frame <= 16 ms (aim 10 ms), response to input <= 100 ms",
+ "probe": [
+  {
+   "segments": 1,
+   "cageVertices": 8,
+   "level": 1,
+   "quads": 24,
+   "triangles": 48,
+   "medianMs": 0.02
+  },
+  {
+   "segments": 1,
+   "cageVertices": 8,
+   "level": 2,
+   "quads": 96,
+   "triangles": 192,
+   "medianMs": 0.07
+  },
+  {
+   "segments": 1,
+   "cageVertices": 8,
+   "level": 3,
+   "quads": 384,
+   "triangles": 768,
+   "medianMs": 0.33
+  },
+  {
+   "segments": 2,
+   "cageVertices": 26,
+   "level": 1,
+   "quads": 96,
+   "triangles": 192,
+   "medianMs": 0.05
+  },
+  {
+   "segments": 2,
+   "cageVertices": 26,
+   "level": 2,
+   "quads": 384,
+   "triangles": 768,
+   "medianMs": 0.28
+  },
+  {
+   "segments": 2,
+   "cageVertices": 26,
+   "level": 3,
+   "quads": 1536,
+   "triangles": 3072,
+   "medianMs": 1.57
+  },
+  {
+   "segments": 4,
+   "cageVertices": 98,
+   "level": 1,
+   "quads": 384,
+   "triangles": 768,
+   "medianMs": 0.21
+  },
+  {
+   "segments": 4,
+   "cageVertices": 98,
+   "level": 2,
+   "quads": 1536,
+   "triangles": 3072,
+   "medianMs": 1.49
+  },
+  {
+   "segments": 4,
+   "cageVertices": 98,
+   "level": 3,
+   "quads": 6144,
+   "triangles": 12288,
+   "medianMs": 6.34
+  },
+  {
+   "segments": 6,
+   "cageVertices": 218,
+   "level": 1,
+   "quads": 864,
+   "triangles": 1728,
+   "medianMs": 0.44
+  },
+  {
+   "segments": 6,
+   "cageVertices": 218,
+   "level": 2,
+   "quads": 3456,
+   "triangles": 6912,
+   "medianMs": 2.48
+  },
+  {
+   "segments": 6,
+   "cageVertices": 218,
+   "level": 3,
+   "quads": 13824,
+   "triangles": 27648,
+   "medianMs": 15.34
+  },
+  {
+   "segments": 8,
+   "cageVertices": 386,
+   "level": 1,
+   "quads": 1536,
+   "triangles": 3072,
+   "medianMs": 0.75
+  },
+  {
+   "segments": 8,
+   "cageVertices": 386,
+   "level": 2,
+   "quads": 6144,
+   "triangles": 12288,
+   "medianMs": 6.52
+  },
+  {
+   "segments": 8,
+   "cageVertices": 386,
+   "level": 3,
+   "quads": 24576,
+   "triangles": 49152,
+   "medianMs": 24.23
+  }
+ ]
+}

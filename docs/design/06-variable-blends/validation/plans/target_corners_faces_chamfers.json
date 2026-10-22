@@ -1,0 +1,413 @@
+{
+ "actions": [
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     10,
+     10,
+     10
+    ]
+   },
+   "as": "c12"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$c12",
+    "radius": 1,
+    "corners": [
+     {
+      "all": true,
+      "type": "setback",
+      "setback": 2
+     }
+    ]
+   },
+   "as": "f12"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f12"
+   }
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$f12"
+    ]
+   }
+  },
+  {
+   "command": "add_pyramid",
+   "params": {
+    "baseWidth": 10,
+    "baseDepth": 10,
+    "height": 10
+   },
+   "as": "pyr"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$pyr",
+    "edgesNear": [
+     [
+      2.5,
+      2.5,
+      5
+     ],
+     [
+      -2.5,
+      2.5,
+      5
+     ],
+     [
+      -2.5,
+      -2.5,
+      5
+     ],
+     [
+      2.5,
+      -2.5,
+      5
+     ]
+    ],
+    "radius": 0.5,
+    "corners": [
+     {
+      "near": [
+       0,
+       0,
+       10
+      ],
+      "type": "setback",
+      "setback": 1.5
+     }
+    ]
+   },
+   "as": "f13"
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "ids": [
+     "$f13"
+    ]
+   }
+  },
+  {
+   "command": "extrude_profile",
+   "params": {
+    "profile": [
+     [
+      -5,
+      -5
+     ],
+     [
+      5,
+      -5
+     ],
+     [
+      5,
+      4
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      -5,
+      5
+     ]
+    ],
+    "depth": 10
+   },
+   "as": "sq"
+  },
+  {
+   "command": "fillet_faces",
+   "params": {
+    "id": "$sq",
+    "facesA": {
+     "near": [
+      [
+       5,
+       0,
+       5
+      ]
+     ]
+    },
+    "facesB": {
+     "near": [
+      [
+       0,
+       5,
+       5
+      ]
+     ]
+    },
+    "radius": 2
+   },
+   "as": "f14"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f14"
+   }
+  },
+  {
+   "command": "inspect_faces",
+   "params": {
+    "entityId": "$f14"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "bh"
+  },
+  {
+   "command": "draw_polyline",
+   "params": {
+    "points": [
+     [
+      -10,
+      4
+     ],
+     [
+      10,
+      3
+     ]
+    ],
+    "position": [
+     0,
+     0,
+     2.5
+    ]
+   },
+   "as": "hold"
+  },
+  {
+   "command": "fillet_faces",
+   "params": {
+    "id": "$bh",
+    "facesA": {
+     "near": [
+      [
+       0,
+       0,
+       2.5
+      ]
+     ]
+    },
+    "facesB": {
+     "near": [
+      [
+       0,
+       5,
+       0
+      ]
+     ]
+    },
+    "holdLine": {
+     "id": "$hold",
+     "onFaces": "A"
+    }
+   },
+   "as": "f17"
+  },
+  {
+   "command": "inspect_faces",
+   "params": {
+    "entityId": "$f17"
+   }
+  },
+  {
+   "command": "extrude_profile",
+   "params": {
+    "profile": [
+     [
+      -2,
+      0
+     ],
+     [
+      2,
+      0
+     ],
+     [
+      2,
+      10
+     ],
+     [
+      -2,
+      10
+     ]
+    ],
+    "depth": 20
+   },
+   "as": "rib"
+  },
+  {
+   "command": "fillet_full_round",
+   "params": {
+    "id": "$rib",
+    "side1": {
+     "near": [
+      [
+       -2,
+       5,
+       10
+      ]
+     ]
+    },
+    "center": {
+     "near": [
+      [
+       0,
+       10,
+       10
+      ]
+     ]
+    },
+    "side2": {
+     "near": [
+      [
+       2,
+       5,
+       10
+      ]
+     ]
+    }
+   },
+   "as": "f16"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f16"
+   }
+  },
+  {
+   "command": "inspect_faces",
+   "params": {
+    "entityId": "$f16"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     10,
+     10,
+     10
+    ]
+   },
+   "as": "ca"
+  },
+  {
+   "command": "chamfer_edge",
+   "params": {
+    "id": "$ca",
+    "edgesNear": [
+     [
+      5,
+      5,
+      0
+     ]
+    ],
+    "distance": 1,
+    "distance2": 2,
+    "side1Near": [
+     5,
+     0,
+     0
+    ]
+   },
+   "as": "k18a"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$k18a"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     10,
+     10,
+     10
+    ]
+   },
+   "as": "cb"
+  },
+  {
+   "command": "chamfer_edge",
+   "params": {
+    "id": "$cb",
+    "edgesNear": [
+     [
+      5,
+      5,
+      0
+     ]
+    ],
+    "distance": 1,
+    "angleDeg": 30,
+    "side1Near": [
+     5,
+     0,
+     0
+    ]
+   },
+   "as": "k18b"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$k18b"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "bp"
+  },
+  {
+   "command": "probe_fillet",
+   "params": {
+    "id": "$bp",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ]
+   }
+  },
+  {
+   "command": "check_blends",
+   "params": {
+    "purpose": "release"
+   }
+  }
+ ]
+}

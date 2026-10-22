@@ -1,0 +1,71 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_field_primitive",
+  "params": {
+   "shape": "box",
+   "size": [
+    20,
+    20,
+    20
+   ],
+   "position": [
+    10,
+    10,
+    10
+   ]
+  },
+  "as": "block"
+ },
+ {
+  "command": "add_strut_lattice",
+  "params": {
+   "cell": "octet",
+   "cellSize": 10,
+   "radius": 0.5,
+   "origin": [
+    0,
+    0,
+    0
+   ],
+   "region": "$block"
+  },
+  "as": "octet"
+ },
+ {
+  "command": "lattice_properties",
+  "params": {
+   "id": "$octet"
+  }
+ },
+ {
+  "command": "create_implicit_body",
+  "params": {
+   "field": "$octet",
+   "voxel": 0.05
+  },
+  "as": "body"
+ },
+ {
+  "command": "implicit_properties",
+  "params": {
+   "id": "$body",
+   "region": "$block"
+  }
+ },
+ {
+  "command": "export_3mf",
+  "params": {
+   "entityIds": [
+    "$body"
+   ],
+   "beamLattice": true,
+   "name": "octet_block"
+  }
+ }
+]

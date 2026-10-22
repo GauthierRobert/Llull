@@ -1,0 +1,134 @@
+{
+ "actions": [
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "b20"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$b20",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ],
+    "radius": 6
+   }
+  },
+  {
+   "command": "extrude_profile",
+   "params": {
+    "profile": [
+     [
+      -2,
+      0
+     ],
+     [
+      2,
+      0
+     ],
+     [
+      2,
+      10
+     ],
+     [
+      -2,
+      10
+     ]
+    ],
+    "depth": 20
+   },
+   "as": "rib"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$rib",
+    "edgesNear": [
+     [
+      -2,
+      10,
+      10
+     ],
+     [
+      2,
+      10,
+      10
+     ]
+    ],
+    "radius": 2
+   }
+  },
+  {
+   "command": "add_pyramid",
+   "params": {
+    "baseWidth": 10,
+    "baseDepth": 10,
+    "height": 10
+   },
+   "as": "pyr"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$pyr",
+    "edgesNear": [
+     [
+      2.5,
+      2.5,
+      5
+     ],
+     [
+      -2.5,
+      2.5,
+      5
+     ],
+     [
+      -2.5,
+      -2.5,
+      5
+     ],
+     [
+      2.5,
+      -2.5,
+      5
+     ]
+    ],
+    "radius": 0.5
+   }
+  },
+  {
+   "command": "add_cylinder",
+   "params": {
+    "radius": 5,
+    "height": 10
+   },
+   "as": "cyl"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$cyl",
+    "edgesNear": [
+     [
+      5,
+      0,
+      5
+     ]
+    ],
+    "radius": 1,
+    "mode": "chord"
+   }
+  }
+ ]
+}

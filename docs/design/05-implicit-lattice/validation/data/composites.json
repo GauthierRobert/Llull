@@ -1,0 +1,38 @@
+{
+ "generated": "generate_graded_refs.mjs",
+ "shellInfill": {
+  "side": 40,
+  "wall": 2,
+  "cellSize": 12,
+  "innerSide": 36,
+  "volumeExact": 40672,
+  "infillFractionQuadrature180": 0.5000122,
+  "derivation": "V = s³ − (s − 2w)³ + ½ (s − 2w)³ ; the shell and the infill are disjoint (infill clipped to the inner cube)"
+ },
+ "graded": {
+  "cellSize": 10,
+  "height": 40,
+  "wallLaw": "w(z) = 0.5 + 2 z / 40 (mm), linear ramp",
+  "fraction": 0.4043801,
+  "convergence": 0.000009033203,
+  "volumePerColumn": 1617.521,
+  "note": "relative density of the graded column; the agent-facing check is implicit_properties.relativeDensity of the same plan"
+ },
+ "cylindricalSeam": [
+  {
+   "cellsAround": 6,
+   "maxSeamJump": 1.554312e-15,
+   "continuous": true
+  },
+  {
+   "cellsAround": 6.5,
+   "maxSeamJump": 2,
+   "continuous": false
+  },
+  {
+   "cellsAround": 8,
+   "maxSeamJump": 1.998401e-15,
+   "continuous": true
+  }
+ ]
+}

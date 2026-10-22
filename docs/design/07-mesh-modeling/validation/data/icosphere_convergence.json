@@ -1,0 +1,104 @@
+{
+ "what": "Icosphere (icosahedron + 1-to-4 midpoint subdivision, vertices projected on the sphere) of radius R; inscribed, so A < 4 pi R^2 and V < 4/3 pi R^3",
+ "radius": 10,
+ "unit": "mm",
+ "closedForm": {
+  "area": 1256.63706144,
+  "volume": 4188.79020479,
+  "formula": "A = 4 pi R^2, V = 4/3 pi R^3"
+ },
+ "counts": "V = 10*4^k + 2, E = 30*4^k, F = 20*4^k, chi = 2",
+ "levels": [
+  {
+   "level": 0,
+   "vertices": 12,
+   "edges": 30,
+   "faces": 20,
+   "eulerCharacteristic": 2,
+   "boundaryEdges": 0,
+   "area": 957.454138327,
+   "volume": 2536.15071012,
+   "areaRelError": 0.23808221,
+   "volumeRelError": 0.39453862,
+   "volumeErrorRatioToPrevious": null
+  },
+  {
+   "level": 1,
+   "vertices": 42,
+   "edges": 120,
+   "faces": 80,
+   "eulerCharacteristic": 2,
+   "boundaryEdges": 0,
+   "area": 1166.59313917,
+   "volume": 3658.71220851,
+   "areaRelError": 0.071654677,
+   "volumeRelError": 0.1265468,
+   "volumeErrorRatioToPrevious": 3.11773
+  },
+  {
+   "level": 2,
+   "vertices": 162,
+   "edges": 480,
+   "faces": 320,
+   "eulerCharacteristic": 2,
+   "boundaryEdges": 0,
+   "area": 1232.98485952,
+   "volume": 4047.04467998,
+   "areaRelError": 0.018821824,
+   "volumeRelError": 0.033839251,
+   "volumeErrorRatioToPrevious": 3.73965
+  },
+  {
+   "level": 3,
+   "vertices": 642,
+   "edges": 1920,
+   "faces": 1280,
+   "eulerCharacteristic": 2,
+   "boundaryEdges": 0,
+   "area": 1250.6492734,
+   "volume": 4152.74081709,
+   "areaRelError": 0.0047649303,
+   "volumeRelError": 0.0086061574,
+   "volumeErrorRatioToPrevious": 3.93198
+  },
+  {
+   "level": 4,
+   "vertices": 2562,
+   "edges": 7680,
+   "faces": 5120,
+   "eulerCharacteristic": 2,
+   "boundaryEdges": 0,
+   "area": 1255.13538801,
+   "volume": 4179.73894799,
+   "areaRelError": 0.0011949937,
+   "volumeRelError": 0.0021608284,
+   "volumeErrorRatioToPrevious": 3.9828
+  },
+  {
+   "level": 5,
+   "vertices": 10242,
+   "edges": 30720,
+   "faces": 20480,
+   "eulerCharacteristic": 2,
+   "boundaryEdges": 0,
+   "area": 1256.26134681,
+   "volume": 4186.52494928,
+   "areaRelError": 0.0002989842,
+   "volumeRelError": 0.00054078992,
+   "volumeErrorRatioToPrevious": 3.99569
+  },
+  {
+   "level": 6,
+   "vertices": 40962,
+   "edges": 122880,
+   "faces": 81920,
+   "eulerCharacteristic": 2,
+   "boundaryEdges": 0,
+   "area": 1256.54311425,
+   "volume": 4188.22373818,
+   "areaRelError": 0.000074760797,
+   "volumeRelError": 0.00013523394,
+   "volumeErrorRatioToPrevious": 3.99892
+  }
+ ]
+}

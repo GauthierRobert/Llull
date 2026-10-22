@@ -1,0 +1,25 @@
+{
+ "files": [
+  {
+   "file": "icosphere_r10_l1_ascii.stl",
+   "sha256": "60526c669c945466a3a71e036e68bf322bad248e83b195281351276c15861ead",
+   "bytes": 22211,
+   "triangles": 80,
+   "weldedVertices": 42,
+   "expectedVolume": 3658.71220851,
+   "expectedArea": 1166.59313917
+  },
+  {
+   "file": "icosphere_r10_l1_binary.stl",
+   "sha256": "0d60c7d8b80d575d5fa3bc3b49cafbfe077d854496ebf513d6de063d102154fd",
+   "bytes": 4084,
+   "triangles": 80,
+   "weldedVertices": 42,
+   "expectedVolume": 3658.71216465,
+   "expectedArea": 1166.59312969,
+   "note": "coordinates are float32 in the file"
+  }
+ ],
+ "unit": "unitless in the file; the VCs import with units \"mm\"",
+ "tolerance": "1e-9 relative (ascii, 10 significant digits written) / exact on the float32 values (binary)"
+}

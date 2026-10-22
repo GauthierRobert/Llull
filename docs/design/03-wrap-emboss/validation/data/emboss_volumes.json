@@ -1,0 +1,105 @@
+{
+ "generated": "generate_wrap_refs.mjs",
+ "derivation": "Steiner formula for a normal offset: dV = (1 + 2 H n + K n^2) dA dn (H mean, K Gaussian curvature, n along the emboss normal). Walls are ruled along the face normal (the faceSlab construction), so the region on the offset face is the normal image of the region.",
+ "planar": {
+  "case": "rectangle 30 x 10, depth 1 on a box face",
+  "area": 300,
+  "depth": 1,
+  "volume": 300
+ },
+ "cylinder": {
+  "radius": 20,
+  "region": "chart rectangle 30 (circumferential) x 10 (axial)",
+  "chartArea": 300,
+  "cases": [
+   {
+    "mode": "emboss",
+    "depth": 0.5,
+    "volume": 151.875,
+    "check": {
+     "direct": 151.875,
+     "residual": 0
+    }
+   },
+   {
+    "mode": "deboss",
+    "depth": 0.5,
+    "volume": 148.125,
+    "check": {
+     "direct": 148.125,
+     "residual": 0
+    }
+   },
+   {
+    "mode": "emboss",
+    "depth": 1,
+    "volume": 307.5,
+    "check": {
+     "direct": 307.5,
+     "residual": 0
+    }
+   },
+   {
+    "mode": "deboss",
+    "depth": 1,
+    "volume": 292.5,
+    "check": {
+     "direct": 292.5,
+     "residual": 0
+    }
+   },
+   {
+    "mode": "emboss",
+    "depth": 2,
+    "volume": 630,
+    "check": {
+     "direct": 630,
+     "residual": 0
+    }
+   },
+   {
+    "mode": "deboss",
+    "depth": 2,
+    "volume": 570,
+    "check": {
+     "direct": 570,
+     "residual": 0
+    }
+   }
+  ],
+  "fullBand": {
+   "case": "full-circumference band, axial height 10, emboss depth 1 (baseline plan: union of cylinders r 20 and r 21)",
+   "volume": 1288.05298797,
+   "volumeOverPi": 410,
+   "check": {
+    "annulus": 1288.05298797,
+    "residual": 0
+   }
+  }
+ },
+ "cone": {
+  "cone": "add_cone radius 20 height 40 (semi-angle atan(1/2))",
+  "cases": [
+   {
+    "region": "full band, slant 15..35 from the apex, emboss depth 1",
+    "chartArea": 1404.96294621,
+    "volume": 1461.16146406,
+    "check": {
+     "pappus": 1461.16146406,
+     "quadrature": 1461.16146406,
+     "residual": -2.27373675443e-13
+    }
+   },
+   {
+    "region": "chart sector 0.5 rad, slant 15..35, emboss depth 1",
+    "chartArea": 250,
+    "volume": 260,
+    "check": {
+     "pappus": 260,
+     "quadrature": 260,
+     "residual": 0
+    }
+   }
+  ]
+ }
+}

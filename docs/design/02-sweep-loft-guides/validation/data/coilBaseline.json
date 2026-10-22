@@ -1,0 +1,17 @@
+{
+ "gap": "SWG",
+ "generated": "2026-10-22",
+ "notes": "Indicative measurement of TODAY's add_coil round-wire path: centripetal Catmull-Rom Beziers through 16 helix points per turn (packages/core/src/commands/solids/coil.ts helixPoints + catmullRomBeziers), re-implemented here. Not a llull run.",
+ "R": 20,
+ "pitch": 10,
+ "turns": 3,
+ "samplesPerTurn": 16,
+ "maxDistanceToExactHelix": 0.232332,
+ "maxRadialDeviation": 0.232329,
+ "maxDistanceInteriorSegments": 0.0110052,
+ "endSegmentsNote": "the end segments use the reflected phantom points 2 p0 - p1 of catmullRomBeziers, which bends the end tangent",
+ "relativeMaxDeviation": 0.01162,
+ "chainLength": 378.016519,
+ "exactLength": 378.1828967,
+ "lengthRelErr": -0.0004399
+}

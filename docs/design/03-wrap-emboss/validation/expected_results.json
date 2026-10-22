@@ -1,0 +1,1137 @@
+{
+ "gap": "WRP",
+ "generated": "generate_expected.mjs (2026-10-22)",
+ "notes": "Values: (a) quoted from a cited source, (b) derived analytically (derivation in the data file named in `source`), (c) TBD with the tool to measure. Only grade A values gate pass/fail. `cli.run` uses `$alias` from the plans; D = --doc t.llull.json --json (desktop native kernel). `unbuiltCommands` lists commands proposed by this pack that do not exist yet.",
+ "font": {
+  "file": "FiraSans-Regular.ttf",
+  "sha256": "c29556a2719bf613ef3d5e070e40d903a8965d9c081beca1375dc1e6e0f93c23",
+  "pinnedSha256": "c29556a2719bf613ef3d5e070e40d903a8965d9c081beca1375dc1e6e0f93c23",
+  "sizeBytes": 456996,
+  "licence": "SIL Open Font License 1.1",
+  "unitsPerEm": 1000,
+  "ascender": 935,
+  "descender": -265,
+  "capHeight": 689,
+  "xHeight": 527,
+  "fsType": 0,
+  "embeddingPermission": "installable",
+  "numGlyphs": 2708
+ },
+ "cases": [
+  {
+   "vc": "VC-WRP-01",
+   "what": "wrap_to_face develop: chart line L 30 at 0/30/45/60/90 deg on cylinder r 20 keeps its length; helix pitch 2 pi r tan(beta)",
+   "metric": "data.curves[i].length3d",
+   "value": [
+    {
+     "betaDeg": 0,
+     "length3d": 30,
+     "angularSpanRad": 1.5,
+     "helixPitchPerTurn": null
+    },
+    {
+     "betaDeg": 30,
+     "length3d": 30,
+     "angularSpanRad": 1.29903810568,
+     "helixPitchPerTurn": 72.5519745694
+    },
+    {
+     "betaDeg": 45,
+     "length3d": 30,
+     "angularSpanRad": 1.06066017178,
+     "helixPitchPerTurn": 125.663706144
+    },
+    {
+     "betaDeg": 60,
+     "length3d": 30,
+     "angularSpanRad": 0.75,
+     "helixPitchPerTurn": 217.655923708
+    },
+    {
+     "betaDeg": 90,
+     "length3d": 30,
+     "angularSpanRad": 9.18485099361e-17,
+     "helixPitchPerTurn": null
+    }
+   ],
+   "tolerance": 0.000001,
+   "toleranceKind": "relative",
+   "unit": "mm",
+   "source": "(b) isometry of the developed cylinder; data/cylinder_wrap.json (numeric residual <= 1e-8)",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-01",
+    "FR-WRP-41",
+    "TR-WRP-01",
+    "TR-WRP-03"
+   ],
+   "cli": {
+    "run": "llull run plans/target_projection_vs_wrap.json --doc t.llull.json --json",
+    "assert": "steps[wrapped].data.curves[0].length3d"
+   },
+   "unbuiltCommands": [
+    "wrap_to_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-02",
+   "what": "wrap_to_face develop: chart circles a = 4, 8, 15 on cylinder r 20 -> 3D length 2 pi a, enclosed face area pi a^2",
+   "metric": "data.curves[0].length3d, data.curves[0].enclosedAreaOnFace",
+   "value": [
+    {
+     "chartRadius": 4,
+     "length3d": 25.1327412287,
+     "enclosedArea": 50.2654824574
+    },
+    {
+     "chartRadius": 8,
+     "length3d": 50.2654824574,
+     "enclosedArea": 201.06192983
+    },
+    {
+     "chartRadius": 15,
+     "length3d": 94.2477796077,
+     "enclosedArea": 706.858347058
+    }
+   ],
+   "tolerance": 0.000001,
+   "toleranceKind": "relative",
+   "unit": "mm / mm2",
+   "source": "(b) isometry; data/cylinder_wrap.json",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-01",
+    "TR-WRP-01",
+    "TR-WRP-11"
+   ],
+   "cli": {
+    "run": "llull wrap_to_face '{\"id\":\"$body\",\"face\":{\"faceNear\":[20,0,0]},\"entityIds\":[\"$c\"],\"placement\":{\"method\":\"develop\"}}' --doc t.llull.json --json",
+    "assert": "data.curves[0].length3d"
+   },
+   "unbuiltCommands": [
+    "wrap_to_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-03",
+   "what": "chart width 130 > circumference 125.663706144 on cylinder r 20 overlaps itself -> refusal",
+   "metric": "error.code",
+   "value": "WRP_WRAP_OVERLAP",
+   "tolerance": 0,
+   "unit": null,
+   "source": "(b) 2 pi r; plans/target_bad_inputs.json step 7 (1-based)",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-06",
+    "FR-WRP-42",
+    "TR-WRP-02",
+    "TR-WRP-10"
+   ],
+   "cli": {
+    "run": "llull run plans/target_bad_inputs.json --doc t.llull.json --json",
+    "assert": "steps[6].error.code"
+   },
+   "unbuiltCommands": [
+    "emboss_on_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-04",
+   "what": "full-circumference band (chart 2 pi r x 10) crossing the cylinder seam, emboss 1: volume 410 pi; equals the baseline union of cylinders r 20 / r 21",
+   "metric": "mass_properties data.volume",
+   "value": {
+    "baselineUnion": 51553.5354454,
+    "embossDelta": 1288.05298797
+   },
+   "tolerance": 0.000001,
+   "toleranceKind": "relative",
+   "unit": "mm3",
+   "source": "(b) annulus pi((r+d)^2 - r^2) h = A d (1 + d/2r); data/emboss_volumes.json",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-06",
+    "FR-WRP-10",
+    "TR-WRP-02",
+    "TR-WRP-04"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_band_and_planar_emboss.json --doc t.llull.json --json",
+    "assert": "steps[4].data.volume"
+   },
+   "unbuiltCommands": []
+  },
+  {
+   "vc": "VC-WRP-05",
+   "what": "project_to_face along -x of a 30 mm chord onto cylinder r 20 vs wrap: projected 33.9224831593, wrapped 30; 45 mm misses the face",
+   "metric": "data.curves[0].length3d; error.code",
+   "value": {
+    "projectedLength": 33.9224831593,
+    "wrappedLength": 30,
+    "missCode": "WRP_PROJECTION_MISSES_FACE",
+    "missWidth": 45
+   },
+   "tolerance": 0.000001,
+   "toleranceKind": "relative",
+   "unit": "mm",
+   "source": "(b) 2 r asin(w/2r); data/projection_vs_wrap.json",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-02",
+    "FR-WRP-41",
+    "TR-WRP-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_projection_vs_wrap.json --doc t.llull.json --json",
+    "assert": "steps[projected].data.curves[0].length3d"
+   },
+   "unbuiltCommands": [
+    "project_to_face",
+    "wrap_to_face",
+    "check_wrap"
+   ]
+  },
+  {
+   "vc": "VC-WRP-06",
+   "what": "unwrap_face of the add_cone r 20 h 40 lateral face: developed sector angle, radius, area",
+   "metric": "data.sectorAngleRad, data.outerRadius, data.area",
+   "value": {
+    "sectorAngleRad": 2.80992589242,
+    "outerRadius": 44.72135955,
+    "area": 2809.92589242,
+    "developable": true
+   },
+   "tolerance": 1e-9,
+   "toleranceKind": "relative",
+   "unit": "rad / mm / mm2",
+   "source": "(b) 2 pi sin(alpha), r/sin(alpha), pi r L; data/cone_development.json",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-05",
+    "TR-WRP-01"
+   ],
+   "cli": {
+    "run": "llull run plans/target_cone_wrap_scribe.json --doc t.llull.json --json",
+    "assert": "steps[2].data"
+   },
+   "unbuiltCommands": [
+    "unwrap_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-07",
+   "what": "wrap_to_face develop on the cone: chart segment 20 (along the generator) and chart circle r 4 keep their lengths",
+   "metric": "data.curves[*].length3d",
+   "value": {
+    "segment": 20,
+    "ring": 25.1327412287
+   },
+   "tolerance": 0.000001,
+   "toleranceKind": "relative",
+   "unit": "mm",
+   "source": "(b) cone development is an isometry; numeric check in data/cone_development.json (residual ~1e-9)",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-01",
+    "TR-WRP-01",
+    "TR-WRP-03"
+   ],
+   "cli": {
+    "run": "llull run plans/target_cone_wrap_scribe.json --doc t.llull.json --json",
+    "assert": "steps[onCone].data.curves"
+   },
+   "unbuiltCommands": [
+    "wrap_to_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-08",
+   "what": "wrap_to_face geodesic on sphere R 25, chart disk a 10: boundary length, max length strain, area ratio (honest distortion report)",
+   "metric": "data.curves[0].length3d, data.distortion.maxLengthStrain, data.distortion.areaRatio",
+   "value": {
+    "length3d": 61.1696901685,
+    "maxLengthStrain": -0.0264541442284,
+    "areaRatio": 0.986737574964
+   },
+   "tolerance": 0.000001,
+   "toleranceKind": "absolute (strain), relative (length)",
+   "unit": "mm / 1 / 1",
+   "source": "(b) exponential map on a sphere; data/sphere_geodesic_wrap.json",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-03",
+    "FR-WRP-41",
+    "TR-WRP-01",
+    "TR-WRP-11"
+   ],
+   "cli": {
+    "run": "llull run plans/target_sphere_geodesic_wrap.json --doc t.llull.json --json",
+    "assert": "steps[onBall].data"
+   },
+   "unbuiltCommands": [
+    "wrap_to_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-09",
+   "what": "method develop on a sphere (K != 0) refuses with a remediation naming method geodesic",
+   "metric": "error.code",
+   "value": "WRP_FACE_NOT_DEVELOPABLE",
+   "tolerance": 0,
+   "unit": null,
+   "source": "(b) Gaussian curvature 1/R^2 != 0; plans/target_bad_inputs.json step 9 (1-based)",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-03",
+    "FR-WRP-05",
+    "FR-WRP-42"
+   ],
+   "cli": {
+    "run": "llull wrap_to_face '{\"id\":\"$ball\",\"face\":{\"faceNear\":[100,0,25]},\"entityIds\":[\"$open\"],\"placement\":{\"method\":\"develop\"}}' --doc t.llull.json --json",
+    "assert": "error.code"
+   },
+   "unbuiltCommands": [
+    "wrap_to_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-10",
+   "what": "emboss / deboss a chart rectangle 30 x 10, depth 1, on cylinder r 20 (walls normal to the face)",
+   "metric": "mass_properties data.volume - 16000 pi",
+   "value": {
+    "embossDelta": 307.5,
+    "debossDelta": -292.5,
+    "embossVolume": 50572.9824574,
+    "debossVolume": 49972.9824574
+   },
+   "tolerance": 0.000001,
+   "toleranceKind": "relative (on the delta)",
+   "unit": "mm3",
+   "source": "(b) A d (1 +- d/2r); data/emboss_volumes.json",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-10",
+    "TR-WRP-04",
+    "TR-WRP-05"
+   ],
+   "cli": {
+    "run": "llull run plans/target_cylinder_rect_emboss_deboss.json --doc t.llull.json --json",
+    "assert": "steps[6].data.volume, steps[7].data.volume"
+   },
+   "unbuiltCommands": [
+    "emboss_on_face",
+    "check_wrap"
+   ]
+  },
+  {
+   "vc": "VC-WRP-11",
+   "what": "planar emboss: rectangle 30 x 10 extruded 1 and fused onto a 60 x 40 x 10 plate (exists today) and the same with emboss_on_face",
+   "metric": "mass_properties data.volume",
+   "value": 24300,
+   "tolerance": 1e-9,
+   "toleranceKind": "relative",
+   "unit": "mm3",
+   "source": "(b) A d; data/emboss_volumes.json planar",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-10"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_band_and_planar_emboss.json --doc t.llull.json --json",
+    "assert": "steps[9].data.volume"
+   },
+   "unbuiltCommands": []
+  },
+  {
+   "vc": "VC-WRP-12",
+   "what": "emboss on the cone (semi-angle atan 1/2), depth 1: chart sector 0.5 rad x slant 15..35 -> 260; full band slant 15..35 -> 1461.16146406",
+   "metric": "mass_properties delta",
+   "value": {
+    "sector": 260,
+    "fullBand": 1461.16146406
+   },
+   "tolerance": 0.000001,
+   "toleranceKind": "relative",
+   "unit": "mm3",
+   "source": "(b) Steiner: A d + (d^2/2) cot(alpha) P (s2 - s1); Pappus and quadrature checks in data/emboss_volumes.json",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-10",
+    "TR-WRP-04",
+    "TR-WRP-05"
+   ],
+   "cli": {
+    "run": "llull emboss_on_face '{\"id\":\"$cone\",\"face\":{\"faceNear\":[10,0,20]},\"profileIds\":[\"$sector\"],\"mode\":\"emboss\",\"depth\":1}' --doc t.llull.json --json",
+    "assert": "data.volumeDelta"
+   },
+   "unbuiltCommands": [
+    "emboss_on_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-13",
+   "what": "text_outline of \"LLULL\", Fira Sans Regular (pinned), cap height 10 mm: area and loop count",
+   "metric": "data.area (areaUnit mm2), data.loops",
+   "value": {
+    "areaMm2": 104.8862209,
+    "loops": 5,
+    "outlineLengthMm": 171.25892
+   },
+   "tolerance": 1e-9,
+   "toleranceKind": "relative (area), exact (loops), 1e-6 relative (outline length)",
+   "unit": "mm2",
+   "source": "(b) exact Green area of the TrueType quadratic outlines; nonzero scanline fill agrees within 2e-4 (data/font_firasans_glyphs.json)",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-20",
+    "FR-WRP-22",
+    "TR-WRP-07",
+    "TR-WRP-09"
+   ],
+   "cli": {
+    "run": "llull run plans/target_cylinder_text_emboss.json --doc t.llull.json --json",
+    "assert": "steps[5].data"
+   },
+   "unbuiltCommands": [
+    "import_font",
+    "text_outline"
+   ]
+  },
+  {
+   "vc": "VC-WRP-14",
+   "what": "emboss \"LLULL\" (cap 10 mm, depth 1) wrapped on cylinder r 20: volume delta; deboss counterpart",
+   "metric": "mass_properties data.volume - 16000 pi",
+   "value": {
+    "embossDelta": 107.5083764,
+    "debossDelta": -102.2640654,
+    "embossVolume": 50372.9908338
+   },
+   "tolerance": 0.00001,
+   "toleranceKind": "relative (on the delta; curved pcurves fitted within 1e-6 mm)",
+   "unit": "mm3",
+   "source": "(b) A d (1 + d/2r) with A from VC-WRP-13; data/text_cases.json",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-10",
+    "FR-WRP-22",
+    "TR-WRP-04",
+    "TR-WRP-09"
+   ],
+   "cli": {
+    "run": "llull run plans/target_cylinder_text_emboss.json --doc t.llull.json --json",
+    "assert": "steps[7].data.volume"
+   },
+   "unbuiltCommands": [
+    "import_font",
+    "text_outline",
+    "emboss_on_face",
+    "check_wrap"
+   ]
+  },
+  {
+   "vc": "VC-WRP-15",
+   "what": "glyph topology and areas from the pinned font: contours / holes and exact areas (font units^2) of O, B, 8, %, A, g, L",
+   "metric": "text_outline data.glyphs[*]",
+   "value": [
+    {
+     "char": "O",
+     "contours": 2,
+     "holes": 1,
+     "areaFontUnits2": 161547.25
+    },
+    {
+     "char": "B",
+     "contours": 3,
+     "holes": 2,
+     "areaFontUnits2": 175032.166667
+    },
+    {
+     "char": "8",
+     "contours": 3,
+     "holes": 2,
+     "areaFontUnits2": 151849
+    },
+    {
+     "char": "%",
+     "contours": 5,
+     "holes": 2,
+     "areaFontUnits2": 184029.25
+    },
+    {
+     "char": "A",
+     "contours": 2,
+     "holes": 1,
+     "areaFontUnits2": 141755.5
+    },
+    {
+     "char": "g",
+     "contours": 2,
+     "holes": 1,
+     "areaFontUnits2": 168352.166667
+    },
+    {
+     "char": "L",
+     "contours": 1,
+     "holes": 0,
+     "areaFontUnits2": 88487.5
+    }
+   ],
+   "tolerance": 1e-9,
+   "toleranceKind": "relative (area), exact (counts)",
+   "unit": "font units^2 (unitsPerEm 1000)",
+   "source": "(b) data/font_firasans_glyphs.json",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-20",
+    "TR-WRP-07"
+   ],
+   "cli": {
+    "run": "llull text_outline '{\"id\":\"$t\",\"output\":\"glyphs\"}' --doc t.llull.json --json",
+    "assert": "data.glyphs"
+   },
+   "unbuiltCommands": [
+    "text_outline"
+   ]
+  },
+  {
+   "vc": "VC-WRP-16",
+   "what": "scribe: ring r 4 wrapped on the cone splits the lateral face; face count +1, volume unchanged",
+   "metric": "inspect_faces count, mass_properties volume",
+   "value": {
+    "faceCountDelta": 1,
+    "volumeDelta": 0
+   },
+   "tolerance": 1e-9,
+   "toleranceKind": "exact (count), relative (volume)",
+   "unit": "count / mm3",
+   "source": "(b) split without material change (SolidWorks Scribe [R1], Onshape Split [R5])",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-11",
+    "TR-WRP-04"
+   ],
+   "cli": {
+    "run": "llull run plans/target_cone_wrap_scribe.json --doc t.llull.json --json",
+    "assert": "steps[7].data.faces.length"
+   },
+   "unbuiltCommands": [
+    "emboss_on_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-17",
+   "what": "split_face_by_curves with a projected closed curve on a cylinder: picked face becomes 2 faces; areas sum to the original",
+   "metric": "data.faces[*].area",
+   "value": {
+    "faceCountDelta": 1,
+    "areaSumResidual": 0
+   },
+   "tolerance": 0.000001,
+   "toleranceKind": "relative",
+   "unit": "mm2",
+   "source": "(b) area additivity",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-12",
+    "TR-WRP-06"
+   ],
+   "cli": {
+    "run": "llull split_face_by_curves '{\"id\":\"$body\",\"curveIds\":[\"$projected\"]}' --doc t.llull.json --json",
+    "assert": "data"
+   },
+   "unbuiltCommands": [
+    "split_face_by_curves",
+    "project_to_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-18",
+   "what": "parametric edit: edit_step_params of add_text \"LLULL\" -> \"WRAP\" regenerates the emboss; delta becomes the WRAP value; replay equality",
+   "metric": "mass_properties delta; document JSON equality on replay",
+   "value": {
+    "wrapEmbossDelta": 140.8783659,
+    "replayIdentical": true
+   },
+   "tolerance": 0.00001,
+   "toleranceKind": "relative",
+   "unit": "mm3",
+   "source": "(b) data/text_cases.json",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-16",
+    "FR-WRP-45",
+    "TR-WRP-15"
+   ],
+   "cli": {
+    "run": "llull edit_step_params '{\"stepId\":\"<add_text step>\",\"params\":{\"content\":\"WRAP\"}}' --doc t.llull.json --json; llull mass_properties entityId=$embossed --doc t.llull.json --json",
+    "assert": "data.volume"
+   },
+   "unbuiltCommands": [
+    "emboss_on_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-19",
+   "what": "a document with an imported font reopens without the font file (blob embedded): text_outline and emboss regenerate identically",
+   "metric": "text_outline data.area after load in a clean environment",
+   "value": 104.8862209,
+   "tolerance": 0,
+   "toleranceKind": "exact (bit-identical)",
+   "unit": "mm2",
+   "source": "(b) determinism of the embedded blob path",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-21",
+    "FR-WRP-45",
+    "TR-WRP-08"
+   ],
+   "cli": {
+    "run": "llull text_outline id=$label --doc reopened.llull.json --json",
+    "assert": "data.area"
+   },
+   "unbuiltCommands": [
+    "import_font",
+    "text_outline"
+   ]
+  },
+  {
+   "vc": "VC-WRP-20",
+   "what": "import of a font whose OS/2 fsType = 2 (restricted licence embedding; fixture = copy of the pinned font with fsType patched) is refused",
+   "metric": "error.code",
+   "value": "WRP_FONT_EMBEDDING_RESTRICTED",
+   "tolerance": 0,
+   "unit": null,
+   "source": "(a) OpenType OS/2 fsType: \"2: Restricted License embedding: the font must not be modified, embedded or exchanged\" [R20]",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-21",
+    "FR-WRP-42",
+    "TR-WRP-08"
+   ],
+   "cli": {
+    "run": "llull import_font path=fixtures/wrp/restricted.ttf --doc t.llull.json --json",
+    "assert": "error.code"
+   },
+   "unbuiltCommands": [
+    "import_font"
+   ]
+  },
+  {
+   "vc": "VC-WRP-21",
+   "what": "a character without a glyph (U+1F600 in Fira Sans Regular) gives warning WRP_GLYPH_MISSING with the characters, never a silent blank",
+   "metric": "data.warnings[*].code",
+   "value": "WRP_GLYPH_MISSING",
+   "tolerance": 0,
+   "unit": null,
+   "source": "(c) TBD - confirm the code point is unmapped with the font cmap on first run",
+   "grade": "B",
+   "proves": [
+    "FR-WRP-25"
+   ],
+   "cli": {
+    "run": "llull add_text '{\"content\":\"A\\u{1F600}\",\"position\":[0,0,0],\"height\":10,\"font\":\"$fira\"}' --doc t.llull.json --json",
+    "assert": "data.warnings"
+   },
+   "unbuiltCommands": [
+    "import_font"
+   ]
+  },
+  {
+   "vc": "VC-WRP-22",
+   "what": "single-line (engraving) font: Relief SingleLine strokes engraved as open curves (scribe / engrave), stroke count and total stroke length",
+   "metric": "data.strokes, data.strokeLengthMm",
+   "value": "TBD - measure with generate_font_refs.mjs extended to the pinned Relief SingleLine OTF (CFF outlines) once CFF parsing exists",
+   "tolerance": null,
+   "unit": "mm",
+   "source": "(c) Relief SingleLine (OFL) [R25]",
+   "grade": "C",
+   "proves": [
+    "FR-WRP-24"
+   ],
+   "cli": {
+    "run": "llull emboss_on_face '{\"mode\":\"engrave\",...}' --doc t.llull.json --json",
+    "assert": "data"
+   },
+   "unbuiltCommands": [
+    "import_font",
+    "emboss_on_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-23",
+   "what": "add_decal mapping wrap: a decal of width 30 on cylinder r 20 spans exactly 1.5 rad of azimuth (projection would span 2 asin(15/20) = 1.69612 rad)",
+   "metric": "decal patch azimuth extent",
+   "value": {
+    "wrapExtentRad": 1.5,
+    "projectExtentRad": 1.69612415796
+   },
+   "tolerance": 0.001,
+   "toleranceKind": "absolute (patch is tessellated)",
+   "unit": "rad",
+   "source": "(b) isometry vs projection; data/projection_vs_wrap.json",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-30",
+    "TR-WRP-12"
+   ],
+   "cli": {
+    "run": "llull add_decal '{\"id\":\"$body\",\"text\":\"LLULL\",\"at\":[20,0,0],\"normal\":[1,0,0],\"height\":5,\"width\":30,\"mapping\":\"wrap\"}' --doc t.llull.json --json",
+    "assert": "data.extentRad"
+   },
+   "unbuiltCommands": [],
+   "unbuiltParams": [
+    "add_decal.mapping",
+    "add_decal.font"
+   ]
+  },
+  {
+   "vc": "VC-WRP-24",
+   "what": "add_knurl straight, d 20, pitch 1.0: 62.83 teeth do not close; llull uses 63 teeth, pitch 0.99733100114, warning WRP_KNURL_PITCH_ADJUSTED",
+   "metric": "data.teeth, data.pitch, data.warnings",
+   "value": {
+    "teeth": 63,
+    "pitch": 0.99733100114,
+    "code": "WRP_KNURL_PITCH_ADJUSTED"
+   },
+   "tolerance": 1e-9,
+   "toleranceKind": "relative",
+   "unit": "count / mm",
+   "source": "(b) N p = pi d; data/knurl_cases.json (standard pitch series NOT reproduced: DIN 82 / ISO 13444 paywalled)",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-31",
+    "TR-WRP-13"
+   ],
+   "cli": {
+    "run": "llull add_knurl '{\"id\":\"$body\",\"face\":{\"faceNear\":[20,0,0]},\"pattern\":\"straight\",\"pitch\":1}' --doc t.llull.json --json",
+    "assert": "data"
+   },
+   "unbuiltCommands": [
+    "add_knurl"
+   ]
+  },
+  {
+   "vc": "VC-WRP-25",
+   "what": "emboss rectangle 30 x 10 on cylinder r 20 with walls along pull +x (mould mode) instead of the face normal",
+   "metric": "mass_properties delta",
+   "value": [
+    {
+     "depth": 0.5,
+     "volume": 149.562187619,
+     "normalWallVolume": 151.875
+    },
+    {
+     "depth": 1,
+     "volume": 298.308583135,
+     "normalWallVolume": 307.5
+    },
+    {
+     "depth": 2,
+     "volume": 593.663228951,
+     "normalWallVolume": 630
+    }
+   ],
+   "tolerance": 0.000001,
+   "toleranceKind": "relative",
+   "unit": "mm3",
+   "source": "(b) circular-segment integral; data/pull_and_geodesic.json",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-13",
+    "TR-WRP-05"
+   ],
+   "cli": {
+    "run": "llull emboss_on_face '{\"walls\":\"pull\",\"pullDirection\":[1,0,0],...}' --doc t.llull.json --json",
+    "assert": "data.volumeDelta"
+   },
+   "unbuiltCommands": [
+    "emboss_on_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-26",
+   "what": "emboss with draft on the walls (mould): volume TBD",
+   "metric": "mass_properties delta",
+   "value": "TBD - measure with the native kernel (BRepFeat_MakeDPrism) and cross-check by numeric integration",
+   "tolerance": null,
+   "unit": "mm3",
+   "source": "(c)",
+   "grade": "C",
+   "proves": [
+    "FR-WRP-13"
+   ],
+   "cli": {
+    "run": "llull emboss_on_face '{\"draftDeg\":3,...}' --doc t.llull.json --json",
+    "assert": "data.volumeDelta"
+   },
+   "unbuiltCommands": [
+    "emboss_on_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-27",
+   "what": "wrap / emboss on a B-spline face (method parametric and geodesic): distortion reported; values recorded as golden on first run",
+   "metric": "data.distortion",
+   "value": "TBD - golden on first run (no closed form for a freeform patch)",
+   "tolerance": null,
+   "unit": "1",
+   "source": "(c)",
+   "grade": "C",
+   "proves": [
+    "FR-WRP-03",
+    "FR-WRP-14"
+   ],
+   "cli": {
+    "run": "llull wrap_to_face '{\"placement\":{\"method\":\"parametric\"},...}' --doc t.llull.json --json",
+    "assert": "data.distortion"
+   },
+   "unbuiltCommands": [
+    "wrap_to_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-28",
+   "what": "check_wrap: geodesic disk a 20 on sphere R 25 has strain 0.1033 > limit 0.05 -> fail WRP_CHECK_DISTORTION; a 10 (0.0265) passes",
+   "metric": "data.status, data.findings[*].code",
+   "value": {
+    "disk20": {
+     "status": "fail",
+     "code": "WRP_CHECK_DISTORTION",
+     "strain": -0.103304886376
+    },
+    "disk10": {
+     "status": "pass",
+     "strain": -0.0264541442284
+    }
+   },
+   "tolerance": 0.000001,
+   "toleranceKind": "absolute (strain)",
+   "unit": "1",
+   "source": "(b) data/sphere_geodesic_wrap.json",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-40",
+    "FR-WRP-43",
+    "TR-WRP-10",
+    "TR-WRP-11"
+   ],
+   "cli": {
+    "run": "llull run plans/target_sphere_geodesic_wrap.json --doc t.llull.json --json",
+    "assert": "steps[5].data"
+   },
+   "unbuiltCommands": [
+    "wrap_to_face",
+    "emboss_on_face",
+    "check_wrap"
+   ]
+  },
+  {
+   "vc": "VC-WRP-29",
+   "what": "named defaults and provenance: check_wrap without limits reports maxLengthStrain {value 0.02, defaulted true, source}, fit tolerance {1e-6 mm, defaulted}; a font imported without licence metadata is unverified and the flag propagates to text_outline, emboss data and check_wrap (warn WRP_CHECK_FONT_UNVERIFIED)",
+   "metric": "data.limits, data.unverified, data.provenance",
+   "value": {
+    "defaulted": true,
+    "unverifiedPropagates": true,
+    "provenancePresent": true
+   },
+   "tolerance": 0,
+   "unit": null,
+   "source": "(b) AF-31, AF-32, AF-35 rules (TECHNICAL_SPEC §7.2)",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-43",
+    "FR-WRP-44",
+    "FR-WRP-51",
+    "TR-WRP-16"
+   ],
+   "cli": {
+    "run": "llull check_wrap --doc t.llull.json --json",
+    "assert": "data.limits, data.unverified"
+   },
+   "unbuiltCommands": [
+    "check_wrap",
+    "import_font",
+    "text_outline"
+   ]
+  },
+  {
+   "vc": "VC-WRP-30",
+   "what": "plans/target_bad_inputs.json: each wrong step refuses with its documented code, path and remediation; --validate catches the schema errors first",
+   "metric": "steps[*].error.code",
+   "value": [
+    "WRP_WRAP_OVERLAP",
+    "WRP_PROFILE_OPEN",
+    "WRP_FACE_NOT_DEVELOPABLE",
+    "WRP_DEPTH_EXCEEDS_SOLID",
+    "WRP_FONT_PARSE"
+   ],
+   "tolerance": 0,
+   "unit": null,
+   "source": "(b) TECHNICAL_SPEC §7.1",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-42",
+    "FR-WRP-46",
+    "TR-WRP-10"
+   ],
+   "cli": {
+    "run": "llull run plans/target_bad_inputs.json --doc t.llull.json --json (aborts at step 7 with its code); then steps 8-11 each as its own llull <command> call on the document of steps 1-6",
+    "assert": "error.code of each call"
+   },
+   "unbuiltCommands": [
+    "emboss_on_face",
+    "wrap_to_face",
+    "import_font"
+   ]
+  },
+  {
+   "vc": "VC-WRP-31",
+   "what": "units audit: every numeric WRP param states its unit in llull describe; every number in WRP data has a unit field or suffix",
+   "metric": "count of unit-less numeric params / result fields",
+   "value": 0,
+   "tolerance": 0,
+   "unit": "count",
+   "source": "(b) AF-04, AF-10",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-41",
+    "FR-WRP-47",
+    "TR-WRP-16"
+   ],
+   "cli": {
+    "run": "llull describe emboss_on_face --json (each WRP command)",
+    "assert": "paramsSchema"
+   },
+   "unbuiltCommands": [
+    "emboss_on_face",
+    "wrap_to_face",
+    "project_to_face",
+    "text_outline",
+    "check_wrap",
+    "unwrap_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-32",
+   "what": "STEP round trip of the text-embossed cylinder: faces stay exact (cylinder + offset cylinder + ruled walls), reimported volume equal",
+   "metric": "volume after export_step / import_step_exact",
+   "value": {
+    "volumeChange": 0,
+    "offsetFaceType": "cylinder or offset surface, not bspline triangles"
+   },
+   "tolerance": 0.000001,
+   "toleranceKind": "relative",
+   "unit": "mm3",
+   "source": "(b) exact B-rep round trip",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-48",
+    "TR-WRP-14"
+   ],
+   "cli": {
+    "run": "llull export_step ... --save out/e.step; llull import_step_exact file=out/e.step --doc t.llull.json --json; llull mass_properties ...",
+    "assert": "data.volume"
+   },
+   "unbuiltCommands": [
+    "emboss_on_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-33",
+   "what": "without an exact kernel: wrap_to_face / emboss_on_face / project_to_face refuse with CMD_KERNEL_UNAVAILABLE; import_font, text_outline and planar text extrude still work (core only)",
+   "metric": "error.code; data.area",
+   "value": {
+    "refusal": "CMD_KERNEL_UNAVAILABLE",
+    "textAreaMm2": 104.8862209
+   },
+   "tolerance": 1e-9,
+   "toleranceKind": "relative",
+   "unit": "mm2",
+   "source": "(b) L9 law",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-49",
+    "TR-WRP-07"
+   ],
+   "cli": {
+    "run": "llull emboss_on_face ... --kernel manifold --doc t.llull.json --json",
+    "assert": "error.code"
+   },
+   "unbuiltCommands": [
+    "emboss_on_face",
+    "text_outline"
+   ]
+  },
+  {
+   "vc": "VC-WRP-34",
+   "what": "performance: 100-character text emboss on a cylinder within the TECHNICAL_SPEC §8 budget",
+   "metric": "durationMs",
+   "value": "TBD - measure on the reference desktop with --progress",
+   "tolerance": null,
+   "unit": "ms",
+   "source": "(c)",
+   "grade": "C",
+   "proves": [
+    "FR-WRP-50",
+    "TR-WRP-15"
+   ],
+   "cli": {
+    "run": "llull run plans/perf_text100.json --progress --doc t.llull.json --json",
+    "assert": "steps[*].durationMs"
+   },
+   "unbuiltCommands": [
+    "emboss_on_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-35",
+   "what": "extrude_profile accepts a font text entity: planar 3D text \"LLULL\" cap 10 mm extruded 2 mm",
+   "metric": "mass_properties data.volume",
+   "value": 209.7724418,
+   "tolerance": 0.000001,
+   "toleranceKind": "relative",
+   "unit": "mm3",
+   "source": "(b) A d with A from VC-WRP-13",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-22",
+    "TR-WRP-09"
+   ],
+   "cli": {
+    "run": "llull extrude_profile id=$label depth=2 --doc t.llull.json --json; llull mass_properties entityId=<id> --doc t.llull.json --json",
+    "assert": "data.volume"
+   },
+   "unbuiltCommands": [
+    "import_font"
+   ]
+  },
+  {
+   "vc": "VC-WRP-36",
+   "what": "multi-face wrap across tangent faces (filleted box side): region continuity across the face boundary",
+   "metric": "data.distortion, face count",
+   "value": "TBD - golden on first run",
+   "tolerance": null,
+   "unit": null,
+   "source": "(c)",
+   "grade": "C",
+   "proves": [
+    "FR-WRP-15"
+   ],
+   "cli": {
+    "run": "llull wrap_to_face '{\"faces\":[...]}' --doc t.llull.json --json",
+    "assert": "data"
+   },
+   "unbuiltCommands": [
+    "wrap_to_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-37",
+   "what": "create_curve_on_face geodesic on cylinder r 20 between (theta 0, z 0) and (1 rad, 10), (0.5, 0), (2, 5): lengths = straight chart distances",
+   "metric": "data.length3d",
+   "value": [
+    {
+     "to": {
+      "thetaRad": 1,
+      "z": 10
+     },
+     "length": 22.360679775
+    },
+    {
+     "to": {
+      "thetaRad": 0.5,
+      "z": 0
+     },
+     "length": 10
+    },
+    {
+     "to": {
+      "thetaRad": 2,
+      "z": 5
+     },
+     "length": 40.3112887415
+    }
+   ],
+   "tolerance": 0.000001,
+   "toleranceKind": "relative",
+   "unit": "mm",
+   "source": "(b) geodesics of a developable surface are chart lines; data/pull_and_geodesic.json",
+   "grade": "A",
+   "proves": [
+    "FR-WRP-04",
+    "TR-WRP-01",
+    "TR-WRP-03"
+   ],
+   "cli": {
+    "run": "llull create_curve_on_face '{\"id\":\"$body\",\"face\":{\"faceNear\":[20,0,0]},\"mode\":\"geodesic\",\"from\":[20,0,0],\"to\":[10.806,16.829,10]}' --doc t.llull.json --json",
+    "assert": "data.length3d"
+   },
+   "unbuiltCommands": [
+    "create_curve_on_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-38",
+   "what": "pattern_on_face: 12 x 3 grid of dimples wrapped on a cylinder: count and spacing in chart units",
+   "metric": "data.instances",
+   "value": "TBD - instance count 36 is exact; spacing recorded on first run",
+   "tolerance": null,
+   "unit": "count / mm",
+   "source": "(c)",
+   "grade": "C",
+   "proves": [
+    "FR-WRP-33"
+   ],
+   "cli": {
+    "run": "llull pattern_on_face ... --doc t.llull.json --json",
+    "assert": "data.instances"
+   },
+   "unbuiltCommands": [
+    "pattern_on_face"
+   ]
+  },
+  {
+   "vc": "VC-WRP-39",
+   "what": "modeled knurl geometry (grooves) on d 20, 63 teeth: volume removed",
+   "metric": "mass_properties delta",
+   "value": "TBD - closed form exists for a straight V-groove knurl (63 x groove section area x length); compute when the groove profile is fixed in the spec of pack 02 helical sweep",
+   "tolerance": null,
+   "unit": "mm3",
+   "source": "(c)",
+   "grade": "C",
+   "proves": [
+    "FR-WRP-32"
+   ],
+   "cli": {
+    "run": "llull add_knurl '{\"model\":\"geometry\",...}' --doc t.llull.json --json",
+    "assert": "data"
+   },
+   "unbuiltCommands": [
+    "add_knurl"
+   ]
+  },
+  {
+   "vc": "VC-WRP-40",
+   "what": "text layout with kerning and two lines: advance width of \"LLULL CAD 2026\" with GPOS kerning",
+   "metric": "text_outline data.advanceWidthMm",
+   "value": {
+    "advanceWidthNoKerningMm": 51.1030479,
+    "withKerning": "TBD - measure with a reference shaper (HarfBuzz hb-shape) on the pinned font"
+   },
+   "tolerance": 0.000001,
+   "toleranceKind": "relative",
+   "unit": "mm",
+   "source": "(b) advances from hmtx; (c) kerning",
+   "grade": "B",
+   "proves": [
+    "FR-WRP-23"
+   ],
+   "cli": {
+    "run": "llull text_outline '{\"id\":\"$t\",\"kerning\":false}' --doc t.llull.json --json",
+    "assert": "data.advanceWidthMm"
+   },
+   "unbuiltCommands": [
+    "text_outline"
+   ]
+  }
+ ]
+}

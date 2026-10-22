@@ -1,0 +1,219 @@
+{
+ "id": "MSH-HULL-MINK",
+ "status": "DRAFT: needs the proposed commands in `unbuilt`",
+ "unbuilt": [
+  "convex_hull",
+  "minkowski_sum",
+  "offset_mesh",
+  "add_icosphere_mesh"
+ ],
+ "notes": [
+  "add_icosphere_mesh is a COULD helper (FR-MSH-04); import_mesh of an icosphere r 2 level 2 soup works today instead"
+ ],
+ "validates": [
+  "VC-MSH-11",
+  "VC-MSH-12",
+  "VC-MSH-13",
+  "VC-MSH-14",
+  "VC-MSH-15"
+ ],
+ "description": "Closed-form cases: hull of points, cube (+) ball, cube (+) cube, cube (-) cube, offsets of a sphere and a cube.",
+ "expect": {
+  "convex_hull data.volume": {
+   "value": 1000,
+   "tolerance": 1e-9,
+   "relative": true,
+   "source": "data/convex_hull_cases.json cube_plus_interior"
+  },
+  "minkowski cube+icosphere(l2) volume": {
+   "value": 2601.81399162,
+   "tolerance": 1e-9,
+   "relative": true,
+   "source": "data/minkowski_cases.json polyhedral level 2"
+  },
+  "minkowski cube+cube volume": {
+   "value": 2197,
+   "tolerance": 1e-9,
+   "relative": true
+  },
+  "minkowski difference cube-cube volume": {
+   "value": 343,
+   "tolerance": 1e-9,
+   "relative": true
+  },
+  "offset sphere +1 volume": {
+   "value": 5575.27976257,
+   "tolerance": 0.00272727,
+   "relative": true,
+   "source": "data/offset_shell_cases.json (eps 0.01 bound)"
+  }
+ },
+ "actions": [
+  {
+   "command": "set_units",
+   "params": {
+    "units": "mm"
+   }
+  },
+  {
+   "command": "convex_hull",
+   "params": {
+    "points": [
+     [
+      0,
+      0,
+      0
+     ],
+     [
+      10,
+      0,
+      0
+     ],
+     [
+      0,
+      10,
+      0
+     ],
+     [
+      10,
+      10,
+      0
+     ],
+     [
+      0,
+      0,
+      10
+     ],
+     [
+      10,
+      0,
+      10
+     ],
+     [
+      0,
+      10,
+      10
+     ],
+     [
+      10,
+      10,
+      10
+     ],
+     [
+      5,
+      5,
+      5
+     ],
+     [
+      2,
+      7,
+      3
+     ]
+    ]
+   },
+   "as": "hull"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$hull"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     10,
+     10,
+     10
+    ],
+    "anchor": "min"
+   },
+   "as": "cube"
+  },
+  {
+   "command": "add_icosphere_mesh",
+   "params": {
+    "radius": 2,
+    "level": 2
+   },
+   "as": "ball"
+  },
+  {
+   "command": "minkowski_sum",
+   "params": {
+    "a": "$cube",
+    "b": "$ball",
+    "op": "sum",
+    "keepSources": true
+   },
+   "as": "rounded"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$rounded"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     3,
+     3,
+     3
+    ],
+    "anchor": "center"
+   },
+   "as": "small"
+  },
+  {
+   "command": "minkowski_sum",
+   "params": {
+    "a": "$cube",
+    "b": "$small",
+    "op": "sum",
+    "keepSources": true
+   },
+   "as": "grown"
+  },
+  {
+   "command": "minkowski_sum",
+   "params": {
+    "a": "$cube",
+    "b": "$small",
+    "op": "difference",
+    "keepSources": true
+   },
+   "as": "eroded"
+  },
+  {
+   "command": "add_sphere",
+   "params": {
+    "radius": 10,
+    "position": [
+     40,
+     0,
+     0
+    ]
+   },
+   "as": "sphere"
+  },
+  {
+   "command": "offset_mesh",
+   "params": {
+    "id": "$sphere",
+    "distance": 1,
+    "method": "level_set",
+    "tolerance": 0.01
+   },
+   "as": "grownSphere"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$grownSphere"
+   }
+  }
+ ]
+}

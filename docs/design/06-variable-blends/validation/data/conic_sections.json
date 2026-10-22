@@ -1,0 +1,225 @@
+{
+ "derivation": "w = rho/(1-rho); f(w) = segment/triangle area ratio (affine invariant); removed = Delta (1 - f). Anchors: rho = sqrt2-1 at 90 deg -> (1-pi/4) d^2; rho = 0.5 -> d^2/6.",
+ "anchors": {
+  "circle": {
+   "rho": 0.414213562373,
+   "removedAreaPerD2": 0.214601836603,
+   "closedForm": 0.214601836603
+  },
+  "parabola": {
+   "rho": 0.5,
+   "removedAreaPerD2": 0.166666666667,
+   "closedForm": 0.166666666667
+  }
+ },
+ "table90deg": [
+  {
+   "rho": 0.05,
+   "weight": 0.0526315789474,
+   "type": "ellipse",
+   "segmentRatio_f": 0.0774575061352,
+   "numericCheck_f": 0.0774575061331,
+   "removedAreaPerD2_90deg": 0.461271246932,
+   "shoulderDistanceFromCornerPerD_90deg": 0.671751442127
+  },
+  {
+   "rho": 0.1,
+   "weight": 0.111111111111,
+   "type": "ellipse",
+   "segmentRatio_f": 0.152711715244,
+   "numericCheck_f": 0.152711715241,
+   "removedAreaPerD2_90deg": 0.423644142378,
+   "shoulderDistanceFromCornerPerD_90deg": 0.636396103068
+  },
+  {
+   "rho": 0.15,
+   "weight": 0.176470588235,
+   "type": "ellipse",
+   "segmentRatio_f": 0.225701027207,
+   "numericCheck_f": 0.225701027205,
+   "removedAreaPerD2_90deg": 0.387149486397,
+   "shoulderDistanceFromCornerPerD_90deg": 0.601040764009
+  },
+  {
+   "rho": 0.2,
+   "weight": 0.25,
+   "type": "ellipse",
+   "segmentRatio_f": 0.296358513343,
+   "numericCheck_f": 0.29635851334,
+   "removedAreaPerD2_90deg": 0.351820743329,
+   "shoulderDistanceFromCornerPerD_90deg": 0.565685424949
+  },
+  {
+   "rho": 0.25,
+   "weight": 0.333333333333,
+   "type": "ellipse",
+   "segmentRatio_f": 0.364611110144,
+   "numericCheck_f": 0.364611110142,
+   "removedAreaPerD2_90deg": 0.317694444928,
+   "shoulderDistanceFromCornerPerD_90deg": 0.53033008589
+  },
+  {
+   "rho": 0.3,
+   "weight": 0.428571428571,
+   "type": "ellipse",
+   "segmentRatio_f": 0.430378632024,
+   "numericCheck_f": 0.430378632021,
+   "removedAreaPerD2_90deg": 0.284810683988,
+   "shoulderDistanceFromCornerPerD_90deg": 0.494974746831
+  },
+  {
+   "rho": 0.35,
+   "weight": 0.538461538462,
+   "type": "ellipse",
+   "segmentRatio_f": 0.493572547315,
+   "numericCheck_f": 0.493572547312,
+   "removedAreaPerD2_90deg": 0.253213726343,
+   "shoulderDistanceFromCornerPerD_90deg": 0.459619407771
+  },
+  {
+   "rho": 0.414213562373,
+   "weight": 0.707106781187,
+   "type": "ellipse",
+   "segmentRatio_f": 0.570796326795,
+   "numericCheck_f": 0.570796326792,
+   "removedAreaPerD2_90deg": 0.214601836603,
+   "shoulderDistanceFromCornerPerD_90deg": 0.414213562373
+  },
+  {
+   "rho": 0.45,
+   "weight": 0.818181818182,
+   "type": "ellipse",
+   "segmentRatio_f": 0.611834039172,
+   "numericCheck_f": 0.61183403917,
+   "removedAreaPerD2_90deg": 0.194082980414,
+   "shoulderDistanceFromCornerPerD_90deg": 0.388908729653
+  },
+  {
+   "rho": 0.5,
+   "weight": 1,
+   "type": "parabola",
+   "segmentRatio_f": 0.666666666667,
+   "numericCheck_f": 0.666666666665,
+   "removedAreaPerD2_90deg": 0.166666666667,
+   "shoulderDistanceFromCornerPerD_90deg": 0.353553390593
+  },
+  {
+   "rho": 0.55,
+   "weight": 1.22222222222,
+   "type": "hyperbola",
+   "segmentRatio_f": 0.718449823079,
+   "numericCheck_f": 0.718449823082,
+   "removedAreaPerD2_90deg": 0.140775088461,
+   "shoulderDistanceFromCornerPerD_90deg": 0.318198051534
+  },
+  {
+   "rho": 0.6,
+   "weight": 1.5,
+   "type": "hyperbola",
+   "segmentRatio_f": 0.767018541686,
+   "numericCheck_f": 0.767018541688,
+   "removedAreaPerD2_90deg": 0.116490729157,
+   "shoulderDistanceFromCornerPerD_90deg": 0.282842712475
+  },
+  {
+   "rho": 0.65,
+   "weight": 1.85714285714,
+   "type": "hyperbola",
+   "segmentRatio_f": 0.812178839303,
+   "numericCheck_f": 0.812178839305,
+   "removedAreaPerD2_90deg": 0.0939105803483,
+   "shoulderDistanceFromCornerPerD_90deg": 0.247487373415
+  },
+  {
+   "rho": 0.7,
+   "weight": 2.33333333333,
+   "type": "hyperbola",
+   "segmentRatio_f": 0.853698134853,
+   "numericCheck_f": 0.853698134863,
+   "removedAreaPerD2_90deg": 0.0731509325735,
+   "shoulderDistanceFromCornerPerD_90deg": 0.212132034356
+  },
+  {
+   "rho": 0.75,
+   "weight": 3,
+   "type": "hyperbola",
+   "segmentRatio_f": 0.891290534947,
+   "numericCheck_f": 0.891290534965,
+   "removedAreaPerD2_90deg": 0.0543547325263,
+   "shoulderDistanceFromCornerPerD_90deg": 0.176776695297
+  },
+  {
+   "rho": 0.8,
+   "weight": 4,
+   "type": "hyperbola",
+   "segmentRatio_f": 0.924592757266,
+   "numericCheck_f": 0.924592757302,
+   "removedAreaPerD2_90deg": 0.0377036213669,
+   "shoulderDistanceFromCornerPerD_90deg": 0.141421356237
+  },
+  {
+   "rho": 0.85,
+   "weight": 5.66666666667,
+   "type": "hyperbola",
+   "segmentRatio_f": 0.953121139969,
+   "numericCheck_f": 0.953121140045,
+   "removedAreaPerD2_90deg": 0.0234394300154,
+   "shoulderDistanceFromCornerPerD_90deg": 0.106066017178
+  },
+  {
+   "rho": 0.9,
+   "weight": 9,
+   "type": "hyperbola",
+   "segmentRatio_f": 0.976184245606,
+   "numericCheck_f": 0.976184245811,
+   "removedAreaPerD2_90deg": 0.0119078771969,
+   "shoulderDistanceFromCornerPerD_90deg": 0.0707106781187
+  },
+  {
+   "rho": 0.95,
+   "weight": 19,
+   "type": "hyperbola",
+   "segmentRatio_f": 0.992661275956,
+   "numericCheck_f": 0.992661276894,
+   "removedAreaPerD2_90deg": 0.00366936202179,
+   "shoulderDistanceFromCornerPerD_90deg": 0.0353553390593
+  }
+ ],
+ "block20x10x5_topEdge_r1": [
+  {
+   "rho": 0.25,
+   "removedVolume": 6.35388889856,
+   "volumeAfter": 993.646111101
+  },
+  {
+   "rho": 0.414213562373,
+   "removedVolume": 4.29203673205,
+   "volumeAfter": 995.707963268
+  },
+  {
+   "rho": 0.5,
+   "removedVolume": 3.33333333333,
+   "volumeAfter": 996.666666667
+  },
+  {
+   "rho": 0.75,
+   "removedVolume": 1.08709465053,
+   "volumeAfter": 998.912905349
+  }
+ ],
+ "vendorRhoRange": {
+  "solidworksApi": [
+   0.05,
+   0.95
+  ],
+  "creo": [
+   0.05,
+   0.95
+  ],
+  "onshapeExamples": {
+   "ellipse": 0.25,
+   "parabola": 0.5,
+   "hyperbola": 0.999
+  }
+ }
+}

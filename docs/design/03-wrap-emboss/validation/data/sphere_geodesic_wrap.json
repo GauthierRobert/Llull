@@ -1,0 +1,82 @@
+{
+ "generated": "generate_wrap_refs.mjs",
+ "derivation": "Sphere radius R, exponential map at the anchor: chart polar (a, phi) -> point at geodesic distance a, polar angle a/R. Radial strain 0; circumferential strain sin(a/R)/(a/R) - 1 (the maximum length strain of the map inside the disk); area ratio 2R^2(1-cos(a/R))/(pi a^2). No length-preserving map of a disk onto a sphere exists (Gauss Theorema Egregium), so the strain is the honest distortion report.",
+ "radius": 25,
+ "cases": [
+  {
+   "chartRadius": 2,
+   "polarAngleRad": 0.08,
+   "radialLengthExact": 2,
+   "boundaryLength3d": 12.5529707744,
+   "boundaryLengthChart": 12.5663706144,
+   "circumferentialStrain": -0.00106632538534,
+   "capArea3d": 12.5596699796,
+   "chartArea": 12.5663706144,
+   "areaRatio": 0.999466780431,
+   "check": {
+    "numericBoundary": 12.5529707738,
+    "residual": -5.3417181789e-10
+   }
+  },
+  {
+   "chartRadius": 5,
+   "polarAngleRad": 0.2,
+   "radialLengthExact": 5,
+   "boundaryLength3d": 31.206905506,
+   "boundaryLengthChart": 31.4159265359,
+   "circumferentialStrain": -0.00665334602469,
+   "capArea3d": 78.2783657686,
+   "chartArea": 78.5398163397,
+   "areaRatio": 0.996671107938,
+   "check": {
+    "numericBoundary": 31.2069055047,
+    "residual": -1.25253407646e-9
+   }
+  },
+  {
+   "chartRadius": 10,
+   "polarAngleRad": 0.4,
+   "radialLengthExact": 10,
+   "boundaryLength3d": 61.1696901685,
+   "boundaryLengthChart": 62.8318530718,
+   "circumferentialStrain": -0.0264541442284,
+   "capArea3d": 309.992751653,
+   "chartArea": 314.159265359,
+   "areaRatio": 0.986737574964,
+   "check": {
+    "numericBoundary": 61.169690166,
+    "residual": -2.52492782238e-9
+   }
+  },
+  {
+   "chartRadius": 20,
+   "polarAngleRad": 0.8,
+   "radialLengthExact": 20,
+   "boundaryLength3d": 112.682031259,
+   "boundaryLengthChart": 125.663706144,
+   "circumferentialStrain": -0.103304886376,
+   "capArea3d": 1191.02996725,
+   "chartArea": 1256.63706144,
+   "areaRatio": 0.94779153329,
+   "check": {
+    "numericBoundary": 112.682031254,
+    "residual": -4.44786962817e-9
+   }
+  },
+  {
+   "chartRadius": 30,
+   "polarAngleRad": 1.2,
+   "radialLengthExact": 30,
+   "boundaryLength3d": 146.404357267,
+   "boundaryLengthChart": 188.495559215,
+   "circumferentialStrain": -0.223300761694,
+   "capArea3d": 2504.01524269,
+   "chartArea": 2827.43338823,
+   "areaRatio": 0.885614229894,
+   "check": {
+    "numericBoundary": 146.404357261,
+    "residual": -6.05905370321e-9
+   }
+  }
+ ]
+}

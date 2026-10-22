@@ -1,0 +1,33 @@
+{
+ "generated": "generate_wrap_refs.mjs",
+ "derivation": "Circumferential closure: N p = pi d. llull keeps d and adjusts the pitch to pi d / round(pi d / p), or reports the diameter that closes.",
+ "cases": [
+  {
+   "diameter": 20,
+   "pitch": 1,
+   "teethExact": 62.8318530718,
+   "teethRounded": 63,
+   "diameterForIntegerTeeth": 20.0535228296,
+   "expectedWarning": "WRP_KNURL_PITCH_ADJUSTED",
+   "pitchForIntegerTeeth": 0.99733100114
+  },
+  {
+   "diameter": 12,
+   "pitch": 0.8,
+   "teethExact": 47.1238898038,
+   "teethRounded": 47,
+   "diameterForIntegerTeeth": 11.9684517205,
+   "expectedWarning": "WRP_KNURL_PITCH_ADJUSTED",
+   "pitchForIntegerTeeth": 0.802108762619
+  },
+  {
+   "diameter": 25.4,
+   "pitch": 1.2,
+   "teethExact": 66.497044501,
+   "teethRounded": 66,
+   "diameterForIntegerTeeth": 25.2101429858,
+   "expectedWarning": "WRP_KNURL_PITCH_ADJUSTED",
+   "pitchForIntegerTeeth": 1.20903717275
+  }
+ ]
+}

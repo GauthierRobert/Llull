@@ -1,0 +1,254 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "interpolate_curve",
+  "params": {
+   "points": [
+    [
+     0,
+     10,
+     0
+    ],
+    [
+     100,
+     5,
+     0
+    ]
+   ],
+   "degree": 1
+  },
+  "as": "railA"
+ },
+ {
+  "command": "interpolate_curve",
+  "params": {
+   "points": [
+    [
+     0,
+     -10,
+     0
+    ],
+    [
+     100,
+     -5,
+     0
+    ]
+   ],
+   "degree": 1
+  },
+  "as": "railB"
+ },
+ {
+  "command": "sweep_profile",
+  "params": {
+   "guideIds": [
+    "$railA",
+    "$railB"
+   ],
+   "guideMode": "scale",
+   "radius": 10,
+   "anchors": [
+    [
+     10,
+     0
+    ],
+    [
+     -10,
+     0
+    ]
+   ]
+  },
+  "as": "twoRail"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$twoRail"
+  }
+ },
+ {
+  "command": "sweep_profile",
+  "params": {
+   "guideIds": [
+    "$railA",
+    "$railB"
+   ],
+   "guideMode": "scale",
+   "maintainHeight": true,
+   "radius": 10,
+   "anchors": [
+    [
+     10,
+     0
+    ],
+    [
+     -10,
+     0
+    ]
+   ]
+  },
+  "as": "twoRailHeight"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$twoRailHeight"
+  }
+ },
+ {
+  "command": "interpolate_curve",
+  "params": {
+   "points": [
+    [
+     200,
+     0,
+     0
+    ],
+    [
+     200,
+     0,
+     100
+    ]
+   ],
+   "degree": 1
+  },
+  "as": "spine"
+ },
+ {
+  "command": "interpolate_curve",
+  "params": {
+   "points": [
+    [
+     210,
+     0,
+     0
+    ],
+    [
+     205,
+     0,
+     100
+    ]
+   ],
+   "degree": 1
+  },
+  "as": "rail1"
+ },
+ {
+  "command": "sweep_profile",
+  "params": {
+   "pathId": "$spine",
+   "guideIds": [
+    "$rail1"
+   ],
+   "guideMode": "scale",
+   "radius": 10,
+   "anchors": [
+    [
+     10,
+     0
+    ]
+   ]
+  },
+  "as": "oneRail"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$oneRail"
+  }
+ },
+ {
+  "command": "add_helix",
+  "params": {
+   "position": [
+    0,
+    300,
+    0
+   ],
+   "axis": [
+    0,
+    0,
+    1
+   ],
+   "radius": 10,
+   "pitch": 20,
+   "turns": 2
+  },
+  "as": "h1"
+ },
+ {
+  "command": "add_helix",
+  "params": {
+   "position": [
+    0,
+    300,
+    0
+   ],
+   "axis": [
+    0,
+    0,
+    1
+   ],
+   "radius": 10,
+   "pitch": 20,
+   "turns": 2,
+   "startAngleRad": 3.141592653589793
+  },
+  "as": "h2"
+ },
+ {
+  "command": "sweep_surface",
+  "params": {
+   "guideIds": [
+    "$h1",
+    "$h2"
+   ],
+   "section": {
+    "line": [
+     [
+      10,
+      0
+     ],
+     [
+      -10,
+      0
+     ]
+    ]
+   },
+   "guideMode": "scale",
+   "anchors": [
+    [
+     10,
+     0
+    ],
+    [
+     -10,
+     0
+    ]
+   ]
+  },
+  "as": "helicoid"
+ },
+ {
+  "command": "measure_area",
+  "params": {
+   "entityId": "$helicoid"
+  }
+ },
+ {
+  "command": "check_sweep_loft",
+  "params": {
+   "ids": [
+    "$twoRail",
+    "$twoRailHeight",
+    "$oneRail",
+    "$helicoid"
+   ]
+  }
+ }
+]

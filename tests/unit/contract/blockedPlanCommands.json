@@ -1,6 +1,237 @@
 {
   "_comment": "Plans under docs/**/validation referencing commands that are not registered yet (plan path -> sorted names). Remove entries as commands get built; never add one without a board note. Regenerate: UPDATE_BLOCKED_PLANS=1 npx vitest run tests/unit/contract/validationPlanCommands.test.ts",
   "blocked": {
+    "docs/design/01-body-deformation/validation/plans/target_bad_plan_codes.json": [
+      "bend_body",
+      "deform_lattice",
+      "scale_nonuniform",
+      "twist_body"
+    ],
+    "docs/design/01-body-deformation/validation/plans/target_bend_cylinder_torus.json": [
+      "analyze_deformation",
+      "bend_body",
+      "check_deformation"
+    ],
+    "docs/design/01-body-deformation/validation/plans/target_ffd_barrel.json": [
+      "analyze_deformation",
+      "deform_lattice"
+    ],
+    "docs/design/01-body-deformation/validation/plans/target_flow_plate_on_cylinder.json": [
+      "check_deformation",
+      "flow_on_surface"
+    ],
+    "docs/design/01-body-deformation/validation/plans/target_point_push.json": [
+      "analyze_deformation",
+      "deform_by_point"
+    ],
+    "docs/design/01-body-deformation/validation/plans/target_scale_nonuniform_sphere.json": [
+      "check_deformation",
+      "scale_nonuniform"
+    ],
+    "docs/design/01-body-deformation/validation/plans/target_taper_cylinder_cone.json": [
+      "check_deformation",
+      "taper_body"
+    ],
+    "docs/design/01-body-deformation/validation/plans/target_twist_box.json": [
+      "analyze_deformation",
+      "check_deformation",
+      "twist_body"
+    ],
+    "docs/design/02-sweep-loft-guides/validation/plans/bad_refusals.json": [
+      "add_helix"
+    ],
+    "docs/design/02-sweep-loft-guides/validation/plans/target_helix_spring_thread.json": [
+      "add_helix",
+      "check_sweep_loft",
+      "inspect_sweep"
+    ],
+    "docs/design/02-sweep-loft-guides/validation/plans/target_loft_conditions_alignment.json": [
+      "check_sweep_loft"
+    ],
+    "docs/design/02-sweep-loft-guides/validation/plans/target_network_ruled.json": [
+      "check_sweep_loft",
+      "network_surface",
+      "ruled_surface"
+    ],
+    "docs/design/02-sweep-loft-guides/validation/plans/target_rails_and_surface_mode.json": [
+      "add_helix",
+      "check_sweep_loft",
+      "sweep_surface"
+    ],
+    "docs/design/02-sweep-loft-guides/validation/plans/target_twist_scale_orientation.json": [
+      "check_sweep_loft",
+      "inspect_sweep"
+    ],
+    "docs/design/03-wrap-emboss/validation/plans/target_bad_inputs.json": [
+      "emboss_on_face",
+      "import_font",
+      "wrap_to_face"
+    ],
+    "docs/design/03-wrap-emboss/validation/plans/target_cone_wrap_scribe.json": [
+      "check_wrap",
+      "emboss_on_face",
+      "unwrap_face",
+      "wrap_to_face"
+    ],
+    "docs/design/03-wrap-emboss/validation/plans/target_cylinder_rect_emboss_deboss.json": [
+      "check_wrap",
+      "emboss_on_face"
+    ],
+    "docs/design/03-wrap-emboss/validation/plans/target_cylinder_text_emboss.json": [
+      "check_wrap",
+      "emboss_on_face",
+      "import_font",
+      "text_outline"
+    ],
+    "docs/design/03-wrap-emboss/validation/plans/target_projection_vs_wrap.json": [
+      "check_wrap",
+      "project_to_face",
+      "wrap_to_face"
+    ],
+    "docs/design/03-wrap-emboss/validation/plans/target_sphere_geodesic_wrap.json": [
+      "check_wrap",
+      "emboss_on_face",
+      "wrap_to_face"
+    ],
+    "docs/design/04-direct-freeform-editing/validation/plans/target_brep_face_moves.json": [
+      "delete_faces",
+      "move_faces"
+    ],
+    "docs/design/04-direct-freeform-editing/validation/plans/target_creased_cube_topology.json": [
+      "bridge_cage_faces",
+      "check_subdivision",
+      "extrude_cage_faces",
+      "inset_cage_faces",
+      "loop_cut_cage"
+    ],
+    "docs/design/04-direct-freeform-editing/validation/plans/target_grip_cage_tools.json": [
+      "check_subdivision",
+      "evaluate_subdivision",
+      "extrude_cage_faces",
+      "inset_cage_faces",
+      "loop_cut_cage",
+      "select_cage_elements",
+      "set_cage_crease",
+      "set_cage_symmetry"
+    ],
+    "docs/design/04-direct-freeform-editing/validation/plans/target_nurbs_point_drag.json": [
+      "edit_nurbs_surface"
+    ],
+    "docs/design/04-direct-freeform-editing/validation/plans/target_subd_to_nurbs.json": [
+      "check_subdivision",
+      "evaluate_subdivision",
+      "subdivision_to_nurbs"
+    ],
+    "docs/design/05-implicit-lattice/validation/plans/target_cylindrical_gyroid_sleeve.json": [
+      "add_field_primitive",
+      "add_tpms_lattice",
+      "check_implicit",
+      "combine_fields",
+      "create_implicit_body",
+      "implicit_properties"
+    ],
+    "docs/design/05-implicit-lattice/validation/plans/target_errors.json": [
+      "add_field_primitive",
+      "add_strut_lattice",
+      "add_tpms_lattice",
+      "combine_fields",
+      "create_implicit_body"
+    ],
+    "docs/design/05-implicit-lattice/validation/plans/target_graded_gyroid_column.json": [
+      "add_field_primitive",
+      "add_tpms_lattice",
+      "check_implicit",
+      "create_implicit_body",
+      "create_scalar_field",
+      "implicit_properties",
+      "lattice_properties"
+    ],
+    "docs/design/05-implicit-lattice/validation/plans/target_infill_solid_box.json": [
+      "check_implicit",
+      "implicit_properties",
+      "infill_solid"
+    ],
+    "docs/design/05-implicit-lattice/validation/plans/target_octet_beam_lattice_3mf.json": [
+      "add_field_primitive",
+      "add_strut_lattice",
+      "create_implicit_body",
+      "implicit_properties",
+      "lattice_properties"
+    ],
+    "docs/design/05-implicit-lattice/validation/plans/target_sc_strut_lattice_cell.json": [
+      "add_field_primitive",
+      "add_strut_lattice",
+      "check_implicit",
+      "create_implicit_body",
+      "implicit_properties",
+      "lattice_properties"
+    ],
+    "docs/design/05-implicit-lattice/validation/plans/target_shell_gyroid_infill.json": [
+      "add_field_primitive",
+      "add_tpms_lattice",
+      "check_implicit",
+      "combine_fields",
+      "create_implicit_body",
+      "field_from_solid",
+      "implicit_properties",
+      "shell_field"
+    ],
+    "docs/design/05-implicit-lattice/validation/plans/target_smooth_union_corner.json": [
+      "add_field_primitive",
+      "combine_fields",
+      "create_implicit_body",
+      "evaluate_field",
+      "implicit_properties"
+    ],
+    "docs/design/06-variable-blends/validation/plans/target_corners_faces_chamfers.json": [
+      "check_blends",
+      "fillet_faces",
+      "fillet_full_round",
+      "probe_fillet"
+    ],
+    "docs/design/06-variable-blends/validation/plans/target_error_codes.json": [
+      "fillet_faces"
+    ],
+    "docs/design/06-variable-blends/validation/plans/target_laws_and_profiles.json": [
+      "check_blends"
+    ],
+    "docs/design/07-mesh-modeling/validation/plans/target_bad_plan_codes.json": [
+      "decimate_mesh",
+      "import_mesh_file",
+      "minkowski_sum",
+      "remesh_mesh"
+    ],
+    "docs/design/07-mesh-modeling/validation/plans/target_defect_repair.json": [
+      "analyze_mesh",
+      "fill_mesh_holes",
+      "repair_mesh"
+    ],
+    "docs/design/07-mesh-modeling/validation/plans/target_hull_minkowski_offset.json": [
+      "add_icosphere_mesh",
+      "convex_hull",
+      "minkowski_sum",
+      "offset_mesh"
+    ],
+    "docs/design/07-mesh-modeling/validation/plans/target_scan_cleanup_to_print.json": [
+      "analyze_mesh",
+      "check_mesh",
+      "cut_mesh",
+      "decimate_mesh",
+      "fill_mesh_holes",
+      "hollow_mesh",
+      "import_mesh_file",
+      "remesh_mesh",
+      "repair_mesh",
+      "smooth_mesh"
+    ],
+    "docs/design/07-mesh-modeling/validation/plans/target_sculpt_quad_brep.json": [
+      "add_grid_mesh",
+      "fit_subdivision_to_mesh",
+      "import_mesh_file",
+      "quad_remesh",
+      "remesh_mesh",
+      "sculpt_mesh"
+    ],
     "docs/physics/05-nonlinear-structural/validation/plans/nls_column_imperfection.plan.json": [
       "add_imperfection"
     ],

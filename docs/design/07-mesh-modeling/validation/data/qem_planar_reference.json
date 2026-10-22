@@ -1,0 +1,45 @@
+{
+ "algorithm": "Garland-Heckbert 1997 quadrics, endpoint placement, boundary vertices locked, fold-over and non-manifold collapses rejected, lowest cost first (ties by vertex index)",
+ "input": "12 x 12 cell grid on [0,10]^2 (288 triangles, 169 vertices), target 40 triangles",
+ "claim": "every interior vertex lies on the planes of its faces, so all quadric costs are 0; area and planarity are kept exactly (to round-off)",
+ "cases": [
+  {
+   "id": "flat",
+   "surface": "z = 0",
+   "input": {
+    "faces": 288,
+    "vertices": 169,
+    "area": 100
+   },
+   "expectedArea": 100,
+   "result": {
+    "faces": 46,
+    "verticesUsed": 48,
+    "area": 100,
+    "areaAbsError": 5.115907697472721e-13,
+    "maxDistanceFromPlane": 0,
+    "maxQuadricCost": 0,
+    "boundaryEdges": 48
+   }
+  },
+  {
+   "id": "tilted",
+   "surface": "z = 0.3 x + 0.2 y",
+   "input": {
+    "faces": 288,
+    "vertices": 169,
+    "area": 106.301458127
+   },
+   "expectedArea": 106.301458127,
+   "result": {
+    "faces": 48,
+    "verticesUsed": 49,
+    "area": 106.301458127,
+    "areaAbsError": 2.4158453015843406e-13,
+    "maxDistanceFromPlane": 0,
+    "maxQuadricCost": 0,
+    "boundaryEdges": 48
+   }
+  }
+ ]
+}

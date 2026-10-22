@@ -1,0 +1,110 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_field_primitive",
+  "params": {
+   "shape": "plane",
+   "normal": [
+    1,
+    0,
+    0
+   ],
+   "offset": 0
+  },
+  "as": "px"
+ },
+ {
+  "command": "add_field_primitive",
+  "params": {
+   "shape": "plane",
+   "normal": [
+    0,
+    1,
+    0
+   ],
+   "offset": 0
+  },
+  "as": "py"
+ },
+ {
+  "command": "combine_fields",
+  "params": {
+   "op": "union",
+   "a": "$px",
+   "b": "$py",
+   "blend": {
+    "kind": "quadratic",
+    "radius": 2
+   }
+  },
+  "as": "corner"
+ },
+ {
+  "command": "add_field_primitive",
+  "params": {
+   "shape": "box",
+   "size": [
+    20,
+    20,
+    10
+   ],
+   "position": [
+    6,
+    6,
+    5
+   ]
+  },
+  "as": "bounds"
+ },
+ {
+  "command": "combine_fields",
+  "params": {
+   "op": "intersect",
+   "a": "$corner",
+   "b": "$bounds"
+  },
+  "as": "part"
+ },
+ {
+  "command": "create_implicit_body",
+  "params": {
+   "field": "$part",
+   "voxel": 0.05
+  },
+  "as": "body"
+ },
+ {
+  "command": "implicit_properties",
+  "params": {
+   "id": "$body"
+  }
+ },
+ {
+  "command": "evaluate_field",
+  "params": {
+   "field": "$part",
+   "points": [
+    [
+     0.5,
+     0.5,
+     5
+    ],
+    [
+     2,
+     0,
+     5
+    ],
+    [
+     0,
+     2,
+     5
+    ]
+   ]
+  }
+ }
+]

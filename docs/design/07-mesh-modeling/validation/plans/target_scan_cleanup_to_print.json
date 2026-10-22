@@ -1,0 +1,158 @@
+{
+ "id": "MSH-SCAN-PRINT",
+ "status": "DRAFT: needs the proposed commands in `unbuilt`",
+ "unbuilt": [
+  "import_mesh_file",
+  "analyze_mesh",
+  "repair_mesh",
+  "fill_mesh_holes",
+  "smooth_mesh",
+  "decimate_mesh",
+  "remesh_mesh",
+  "hollow_mesh",
+  "cut_mesh",
+  "check_mesh"
+ ],
+ "validates": [
+  "VC-MSH-03",
+  "VC-MSH-04",
+  "VC-MSH-05",
+  "VC-MSH-07",
+  "VC-MSH-09",
+  "VC-MSH-10",
+  "VC-MSH-16",
+  "VC-MSH-17",
+  "VC-MSH-28"
+ ],
+ "description": "Scanned or downloaded STL -> watertight, smooth, lighter, hollow, flat-bottomed print part, checked and exported as 3MF.",
+ "prerequisites": [
+  "the CLI reads the file and passes base64: llull import_mesh_file file=validation/data/icosphere_r10_l1_binary.stl units=mm"
+ ],
+ "actions": [
+  {
+   "command": "set_units",
+   "params": {
+    "units": "mm"
+   }
+  },
+  {
+   "command": "import_mesh_file",
+   "params": {
+    "format": "stl",
+    "file": "validation/data/icosphere_r10_l1_binary.stl",
+    "units": "mm",
+    "name": "scan"
+   },
+   "as": "scan"
+  },
+  {
+   "command": "analyze_mesh",
+   "params": {
+    "id": "$scan"
+   }
+  },
+  {
+   "command": "repair_mesh",
+   "params": {
+    "id": "$scan",
+    "mode": "stitch",
+    "removeSmallComponents": {
+     "maxFaces": 10
+    }
+   }
+  },
+  {
+   "command": "fill_mesh_holes",
+   "params": {
+    "id": "$scan",
+    "holes": "all",
+    "maxBoundaryEdges": 500,
+    "fairing": "curvature"
+   }
+  },
+  {
+   "command": "smooth_mesh",
+   "params": {
+    "id": "$scan",
+    "method": "taubin",
+    "lambda": 0.6307,
+    "passBand": 0.1,
+    "iterations": 10
+   }
+  },
+  {
+   "command": "remesh_mesh",
+   "params": {
+    "id": "$scan",
+    "targetEdgeLength": 1,
+    "iterations": 5,
+    "preserveFeatureAngleDeg": 40
+   }
+  },
+  {
+   "command": "decimate_mesh",
+   "params": {
+    "id": "$scan",
+    "maxDeviation": 0.05,
+    "preserveBoundary": true
+   }
+  },
+  {
+   "command": "hollow_mesh",
+   "params": {
+    "id": "$scan",
+    "wallThickness": 1.2,
+    "resolution": 0.2,
+    "drainHoles": [
+     {
+      "near": [
+       0,
+       0,
+       -10
+      ],
+      "diameter": 3
+     }
+    ]
+   }
+  },
+  {
+   "command": "cut_mesh",
+   "params": {
+    "id": "$scan",
+    "plane": {
+     "origin": [
+      0,
+      0,
+      -8
+     ],
+     "normal": [
+      0,
+      0,
+      1
+     ]
+    },
+    "keep": "positive",
+    "cap": true
+   }
+  },
+  {
+   "command": "check_mesh",
+   "params": {
+    "ids": [
+     "$scan"
+    ],
+    "purpose": "print",
+    "minWallThickness": 0.8
+   }
+  },
+  {
+   "command": "export_3mf",
+   "params": {
+    "entityIds": [
+     "$scan"
+    ],
+    "name": "print"
+   }
+  }
+ ]
+}

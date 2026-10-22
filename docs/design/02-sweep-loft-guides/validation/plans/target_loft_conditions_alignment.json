@@ -1,0 +1,490 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "create_nurbs_curve",
+  "params": {
+   "degree": 2,
+   "poles": [
+    [
+     10,
+     0,
+     0
+    ],
+    [
+     10,
+     10,
+     0
+    ],
+    [
+     0,
+     10,
+     0
+    ],
+    [
+     -10,
+     10,
+     0
+    ],
+    [
+     -10,
+     0,
+     0
+    ],
+    [
+     -10,
+     -10,
+     0
+    ],
+    [
+     0,
+     -10,
+     0
+    ],
+    [
+     10,
+     -10,
+     0
+    ],
+    [
+     10,
+     0,
+     0
+    ]
+   ],
+   "weights": [
+    1,
+    0.707106781,
+    1,
+    0.707106781,
+    1,
+    0.707106781,
+    1,
+    0.707106781,
+    1
+   ],
+   "knots": [
+    0,
+    0.25,
+    0.5,
+    0.75,
+    1
+   ],
+   "multiplicities": [
+    3,
+    2,
+    2,
+    2,
+    3
+   ]
+  },
+  "as": "c0"
+ },
+ {
+  "command": "create_nurbs_curve",
+  "params": {
+   "degree": 2,
+   "poles": [
+    [
+     5,
+     0,
+     50
+    ],
+    [
+     5,
+     5,
+     50
+    ],
+    [
+     0,
+     5,
+     50
+    ],
+    [
+     -5,
+     5,
+     50
+    ],
+    [
+     -5,
+     0,
+     50
+    ],
+    [
+     -5,
+     -5,
+     50
+    ],
+    [
+     0,
+     -5,
+     50
+    ],
+    [
+     5,
+     -5,
+     50
+    ],
+    [
+     5,
+     0,
+     50
+    ]
+   ],
+   "weights": [
+    1,
+    0.707106781,
+    1,
+    0.707106781,
+    1,
+    0.707106781,
+    1,
+    0.707106781,
+    1
+   ],
+   "knots": [
+    0,
+    0.25,
+    0.5,
+    0.75,
+    1
+   ],
+   "multiplicities": [
+    3,
+    2,
+    2,
+    2,
+    3
+   ]
+  },
+  "as": "c1"
+ },
+ {
+  "command": "loft_sections",
+  "params": {
+   "sectionIds": [
+    "$c0",
+    "$c1"
+   ],
+   "startCondition": {
+    "type": "normal",
+    "magnitude": 1
+   },
+   "endCondition": {
+    "type": "normal",
+    "magnitude": 1
+   }
+  },
+  "as": "bottle"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$bottle"
+  }
+ },
+ {
+  "command": "loft_sections",
+  "params": {
+   "sectionIds": [
+    "$c0",
+    "$c1"
+   ],
+   "startCondition": {
+    "type": "normal",
+    "magnitude": 2
+   },
+   "endCondition": {
+    "type": "normal",
+    "magnitude": 2
+   }
+  },
+  "as": "bottle2"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$bottle2"
+  }
+ },
+ {
+  "command": "create_nurbs_curve",
+  "params": {
+   "degree": 2,
+   "poles": [
+    [
+     10,
+     0,
+     0
+    ],
+    [
+     10,
+     10,
+     0
+    ],
+    [
+     0,
+     10,
+     0
+    ],
+    [
+     -10,
+     10,
+     0
+    ],
+    [
+     -10,
+     0,
+     0
+    ],
+    [
+     -10,
+     -10,
+     0
+    ],
+    [
+     0,
+     -10,
+     0
+    ],
+    [
+     10,
+     -10,
+     0
+    ],
+    [
+     10,
+     0,
+     0
+    ]
+   ],
+   "weights": [
+    1,
+    0.707106781,
+    1,
+    0.707106781,
+    1,
+    0.707106781,
+    1,
+    0.707106781,
+    1
+   ],
+   "knots": [
+    0,
+    0.25,
+    0.5,
+    0.75,
+    1
+   ],
+   "multiplicities": [
+    3,
+    2,
+    2,
+    2,
+    3
+   ],
+   "position": [
+    100,
+    0,
+    0
+   ]
+  },
+  "as": "d0"
+ },
+ {
+  "command": "create_nurbs_curve",
+  "params": {
+   "degree": 2,
+   "poles": [
+    [
+     0,
+     10,
+     50
+    ],
+    [
+     -10,
+     10,
+     50
+    ],
+    [
+     -10,
+     0,
+     50
+    ],
+    [
+     -10,
+     -10,
+     50
+    ],
+    [
+     0,
+     -10,
+     50
+    ],
+    [
+     10,
+     -10,
+     50
+    ],
+    [
+     10,
+     0,
+     50
+    ],
+    [
+     10,
+     10,
+     50
+    ],
+    [
+     0,
+     10,
+     50
+    ]
+   ],
+   "weights": [
+    1,
+    0.707106781,
+    1,
+    0.707106781,
+    1,
+    0.707106781,
+    1,
+    0.707106781,
+    1
+   ],
+   "knots": [
+    0,
+    0.25,
+    0.5,
+    0.75,
+    1
+   ],
+   "multiplicities": [
+    3,
+    2,
+    2,
+    2,
+    3
+   ],
+   "position": [
+    100,
+    0,
+    0
+   ]
+  },
+  "as": "d1"
+ },
+ {
+  "command": "loft_sections",
+  "params": {
+   "sectionIds": [
+    "$d0",
+    "$d1"
+   ],
+   "ruled": true,
+   "alignment": "none"
+  },
+  "as": "hyperboloid90"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$hyperboloid90"
+  }
+ },
+ {
+  "command": "loft_sections",
+  "params": {
+   "sectionIds": [
+    "$d0",
+    "$d1"
+   ],
+   "ruled": true,
+   "alignment": "auto"
+  },
+  "as": "cylinderAligned"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$cylinderAligned"
+  }
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    0,
+    0
+   ],
+   "radius": 50,
+   "startAngle": 0,
+   "endAngle": 1.5707963267948966,
+   "position": [
+    300,
+    0,
+    0
+   ]
+  },
+  "as": "centreline"
+ },
+ {
+  "command": "loft_sections",
+  "params": {
+   "sections": [
+    {
+     "center": [
+      350,
+      0,
+      0
+     ],
+     "rotation": [
+      1.5707963267948966,
+      0,
+      0
+     ],
+     "radius": 10
+    },
+    {
+     "center": [
+      300,
+      50,
+      0
+     ],
+     "rotation": [
+      1.5707963267948966,
+      0,
+      1.5707963267948966
+     ],
+     "radius": 10
+    }
+   ],
+   "centerlineId": "$centreline",
+   "sectionCount": 16
+  },
+  "as": "elbowLoft"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$elbowLoft"
+  }
+ },
+ {
+  "command": "check_sweep_loft",
+  "params": {
+   "ids": [
+    "$bottle",
+    "$bottle2",
+    "$hyperboloid90",
+    "$cylinderAligned",
+    "$elbowLoft"
+   ]
+  }
+ }
+]

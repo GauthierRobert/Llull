@@ -1,0 +1,1024 @@
+{
+ "gap": "DIR",
+ "generated": "2026-10-22",
+ "notes": "Values are (a) quoted from a source, (b) derived analytically or from the reference implementation (derivation in each case), or (c) TBD with the tool to measure. Sources in validation/sources.md. runsToday = the case runs on llull as of 2026-10-22 (plans/baseline_subd_cage_today.json). Plans flag proposed commands in validation/README.md section 4.",
+ "cases": [
+  {
+   "vc": "VC-DIR-01",
+   "what": "Catmull-Clark limit masks and subdominant eigenvalue, valence 3..12",
+   "metric": "lambda formula vs measured ring contraction",
+   "value": [
+    {
+     "n": 3,
+     "lambda": 0.410097050801,
+     "measured": 0.409857017548
+    },
+    {
+     "n": 4,
+     "lambda": 0.5,
+     "measured": 0.499963320143
+    },
+    {
+     "n": 5,
+     "lambda": 0.549988354518,
+     "measured": 0.54994430233
+    },
+    {
+     "n": 6,
+     "lambda": 0.579682326102,
+     "measured": 0.579576628882
+    },
+    {
+     "n": 7,
+     "lambda": 0.598510283482,
+     "measured": 0.598304586894
+    },
+    {
+     "n": 8,
+     "lambda": 0.611116526695,
+     "measured": 0.610783617206
+    },
+    {
+     "n": 9,
+     "lambda": 0.619939220626,
+     "measured": 0.619462282206
+    },
+    {
+     "n": 10,
+     "lambda": 0.626341267547,
+     "measured": 0.625712275217
+    },
+    {
+     "n": 11,
+     "lambda": 0.631127586683,
+     "measured": 0.63034529919
+    },
+    {
+     "n": 12,
+     "lambda": 0.634796412354,
+     "measured": 0.633864459554
+    }
+   ],
+   "tolerance": 0.002,
+   "tolerance_kind": "relative",
+   "unit": "1",
+   "grade": "A",
+   "source": "(a) OpenSubdiv catmarkScheme.h masks [S3]; (b) measured by generate_subd_refs.mjs",
+   "proves": [
+    "FR-DIR-33",
+    "TR-DIR-02"
+   ],
+   "cli": {
+    "run": "llull evaluate_subdivision '{\"id\":\"$c\",\"vertices\":[0]}' --doc t.llull.json --json",
+    "assert": "data.points[0].valence, data.points[0].limit"
+   }
+  },
+  {
+   "vc": "VC-DIR-02",
+   "what": "cube cage +-1: limit of corner, top face centre, top-front edge midpoint",
+   "metric": "limit position",
+   "value": {
+    "corner": [
+     0.5,
+     0.5,
+     0.5
+    ],
+    "faceCentre": [
+     0,
+     0,
+     0.83950617284
+    ],
+    "edgeMid": [
+     0,
+     0.609567901235,
+     0.609567901235
+    ]
+   },
+   "tolerance": 1e-12,
+   "unit": "document length",
+   "grade": "A",
+   "source": "(b) closed form (n^2 v + 4 sum e + sum d)/(n(n+5)), exact rationals 1/2, 68/81, 395/648; deep subdivision agrees (data/subd_cube_cases.json)",
+   "proves": [
+    "FR-DIR-33",
+    "TR-DIR-02"
+   ],
+   "cli": {
+    "run": "llull run plans/target_subd_to_nurbs.json --doc t.llull.json --json",
+    "assert": "steps[1].data.points[*].limit"
+   }
+  },
+  {
+   "vc": "VC-DIR-03",
+   "what": "cube corner limit normal",
+   "metric": "unit normal",
+   "value": [
+    0.57735026919,
+    0.57735026919,
+    0.57735026919
+   ],
+   "tolerance": 1e-12,
+   "unit": "1",
+   "grade": "A",
+   "source": "(b) symmetry; tangent masks reproduce it (data/subd_cube_cases.json)",
+   "proves": [
+    "FR-DIR-33",
+    "TR-DIR-02"
+   ],
+   "cli": {
+    "run": "llull evaluate_subdivision '{\"id\":\"c\",\"vertices\":[2]}' --doc t.llull.json --json",
+    "assert": "data.points[0].normal"
+   }
+  },
+  {
+   "vc": "VC-DIR-04",
+   "what": "TODAY: add_subdivision_solid box [2,2,2] levels 3, mass_properties without kernel (level mesh)",
+   "metric": "volume",
+   "value": 2.66462478968,
+   "tolerance": 1e-9,
+   "tolerance_kind": "relative",
+   "unit": "document length^3",
+   "grade": "A",
+   "source": "(b) reference implementation of the same published rules (ref_catmull_clark.mjs = llull subdivision.ts rules, same fan triangulation); not yet run on llull",
+   "runsToday": true,
+   "proves": [
+    "FR-DIR-35",
+    "TR-DIR-01"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_subd_cage_today.json --doc t.llull.json --json",
+    "assert": "steps[1].data.volume"
+   }
+  },
+  {
+   "vc": "VC-DIR-05",
+   "what": "TODAY: same cube with every edge creased (edit_subdivision_cage crease true, no selection = all)",
+   "metric": "volume",
+   "value": 8,
+   "tolerance": 1e-12,
+   "tolerance_kind": "relative",
+   "unit": "document length^3",
+   "grade": "A",
+   "source": "(b) closed form: all vertices corners, faces planar -> cube; reference levels 0..5 all 8",
+   "runsToday": true,
+   "proves": [
+    "FR-DIR-10",
+    "FR-DIR-11",
+    "TR-DIR-01"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_subd_cage_today.json --doc t.llull.json --json",
+    "assert": "steps[3].data.volume"
+   }
+  },
+  {
+   "vc": "VC-DIR-06",
+   "what": "TODAY: box [2,2,2] seg [2,2,2] at [5,0,0]; edit_subdivision_cage vertexIndices [top] falloff 1.5 translate [0,0,0.5]",
+   "metric": "cage vertices (world) and level-3 volume before / after",
+   "value": {
+    "topVertexIndex": 2,
+    "volumeBefore": 6.31819142235,
+    "volumeAfter": 6.87820179835,
+    "verticesAfterLocal": "data/cage_edit_cases.json verticesAfter (+ [5,0,0] for world)"
+   },
+   "tolerance": {
+    "vertices": 0.000001,
+    "volume": 1e-9
+   },
+   "unit": "document length",
+   "grade": "A",
+   "source": "(b) smoothstep weights of subdivisionCage.ts recomputed; reference subdivision",
+   "runsToday": true,
+   "proves": [
+    "FR-DIR-07",
+    "FR-DIR-10",
+    "TR-DIR-06"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_subd_cage_today.json --doc t.llull.json --json",
+    "assert": "steps[5].data.volume, steps[6].data.vertices, steps[7].data.volume"
+   }
+  },
+  {
+   "vc": "VC-DIR-07",
+   "what": "semi-sharp creases: every cube edge sharpness s, levels 4 (level-mesh volume)",
+   "metric": "volume",
+   "value": {
+    "s1": 6.31819142235,
+    "s2": 7.56419867056,
+    "s0p5": 4.23357576242
+   },
+   "tolerance": 1e-9,
+   "tolerance_kind": "relative",
+   "unit": "document length^3",
+   "grade": "A for s1 (identity: s = 1 equals one sharp step = box seg [2,2,2] smooth level 3, 6.31819142235 both ways); B for s2, s0p5 (reference implementation of OpenSubdiv rules, to confirm against OpenSubdiv)",
+   "source": "(b) generate_subd_refs.mjs",
+   "proves": [
+    "FR-DIR-11",
+    "TR-DIR-01",
+    "TR-DIR-03"
+   ],
+   "cli": {
+    "run": "llull set_cage_crease '{\"id\":\"cube\",\"edges\":\"all\",\"sharpness\":1}' --doc t.llull.json --json; llull mass_properties entityId=cube --doc t.llull.json --json",
+    "assert": "data.volume"
+   }
+  },
+  {
+   "vc": "VC-DIR-08",
+   "what": "fully regular torus cage 8 x 6 -> subdivision_to_nurbs sheets: exact",
+   "metric": "max deviation patches vs limit",
+   "value": 0,
+   "tolerance": 1e-9,
+   "unit": "document length",
+   "grade": "A",
+   "source": "(a) Stam: regular part = bicubic B-spline [S5]; reference B-spline vs mask 8.9e-16 / 1.4e-15",
+   "proves": [
+    "FR-DIR-29",
+    "TR-DIR-10"
+   ],
+   "cli": {
+    "run": "llull subdivision_to_nurbs '{\"id\":\"t\",\"output\":\"sheets\"}' --doc t.llull.json --json",
+    "assert": "data.maxDeviation"
+   }
+  },
+  {
+   "vc": "VC-DIR-09",
+   "what": "cube cage -> subdivision_to_nurbs unpacked G0 / packed G1",
+   "metric": "patch count; deviation at EV patches; G1 angle at EV edges",
+   "value": {
+    "unpackedPatchCount": 24,
+    "maxDeviation": "TBD — measure with subdivision_to_nurbs data.maxDeviation (ACC-type patches near the 8 valence-3 EVs)",
+    "g1AngleDegAtEvEdges": "TBD — 0 required for G1 option, measure with check_continuity"
+   },
+   "tolerance": {
+    "count": 0
+   },
+   "unit": "count / document length / deg",
+   "grade": "A for count (6 faces x 4 refined quads); C for deviation",
+   "source": "(b) once-refined cube = 24 quads; Rhino ToNURBS options [R5]",
+   "proves": [
+    "FR-DIR-29",
+    "FR-DIR-30",
+    "TR-DIR-10"
+   ],
+   "cli": {
+    "run": "llull run plans/target_subd_to_nurbs.json --doc t.llull.json --json --kernel occt",
+    "assert": "steps[3].data.patchCount, steps[3].data.maxDeviation"
+   }
+  },
+  {
+   "vc": "VC-DIR-10",
+   "what": "falloff curves of lib/falloff.ts",
+   "metric": "f(t) at 21 samples per shape",
+   "value": "data/falloff_curves.csv",
+   "tolerance": 1e-12,
+   "unit": "1",
+   "grade": "A",
+   "source": "(a) Blender main 7a8f04b3 source/blender/editors/transform/trans… [S9]",
+   "proves": [
+    "FR-DIR-07",
+    "TR-DIR-06"
+   ],
+   "cli": {
+    "run": "unit test tests/unit/subd/falloff.test.ts (pure library, no CLI surface)",
+    "assert": "table equality"
+   }
+  },
+  {
+   "vc": "VC-DIR-11",
+   "what": "mirror symmetry on box seg [2,1,1]: drag one vertex by (0.3,0.2,0.4)",
+   "metric": "mirror vertex delta; level-2 max asymmetry",
+   "value": {
+    "mirrorDelta": [
+     -0.3,
+     0.2,
+     0.4
+    ],
+    "maxAsymmetry": 0
+   },
+   "tolerance": 1e-12,
+   "unit": "document length",
+   "grade": "A",
+   "source": "(b) reflection; reference asymmetry 1.2e-16",
+   "proves": [
+    "FR-DIR-08",
+    "TR-DIR-07"
+   ],
+   "cli": {
+    "run": "llull set_cage_symmetry '{\"id\":\"s\",\"planes\":[\"x\"]}' --doc t.llull.json --json; llull edit_subdivision_cage '{\"id\":\"s\",\"vertices\":[5],\"translate\":[0.3,0.2,0.4]}' --doc t.llull.json --json; llull check_subdivision id=s --doc t.llull.json --json",
+    "assert": "data.symmetry.maxDeviation"
+   }
+  },
+  {
+   "vc": "VC-DIR-12",
+   "what": "edit_nurbs drag_point on the cubic of point_drag_cases.json, u 0.4, D (0,1,0)",
+   "metric": "achieved displacement; untouched poles; pole deltas",
+   "value": {
+    "achieved": [
+     0,
+     1,
+     0
+    ],
+    "untouchedPoles": [
+     0,
+     5,
+     6
+    ],
+    "poleDeltas": [
+     [
+      0,
+      0,
+      0
+     ],
+     [
+      0,
+      0.0348380803444,
+      0
+     ],
+     [
+      0,
+      0.891274222143,
+      0
+     ],
+     [
+      0,
+      1.17288203826,
+      0
+     ],
+     [
+      0,
+      0.0783856807748,
+      0
+     ],
+     [
+      0,
+      0,
+      0
+     ],
+     [
+      0,
+      0,
+      0
+     ]
+    ]
+   },
+   "tolerance": 1e-12,
+   "unit": "document length",
+   "grade": "A",
+   "source": "(b) least-norm closed form dP_i = N_i(u) D / sum N_j^2 (TECHNICAL_SPEC 5.6)",
+   "proves": [
+    "FR-DIR-21",
+    "FR-DIR-23",
+    "TR-DIR-08"
+   ],
+   "cli": {
+    "run": "llull run plans/target_nurbs_point_drag.json --doc t.llull.json --json",
+    "assert": "steps[2].data.poles"
+   }
+  },
+  {
+   "vc": "VC-DIR-13",
+   "what": "edit_nurbs_surface drag_point on a planar bicubic 5x5, (u,v) = (0.3,0.6), D (0,0,1)",
+   "metric": "achieved displacement",
+   "value": [
+    0,
+    0,
+    1
+   ],
+   "tolerance": 1e-12,
+   "unit": "document length",
+   "grade": "A",
+   "source": "(b) least-norm closed form (tensor basis)",
+   "proves": [
+    "FR-DIR-22",
+    "FR-DIR-23",
+    "TR-DIR-08"
+   ],
+   "cli": {
+    "run": "llull run plans/target_nurbs_point_drag.json --doc t.llull.json --json",
+    "assert": "evaluate S(0.3,0.6) before/after"
+   }
+  },
+  {
+   "vc": "VC-DIR-14",
+   "what": "edit_nurbs_surface insert_knot / elevate_degree; move_poles with U/V falloff",
+   "metric": "shape change of preserving ops; falloff weights of moved poles",
+   "value": {
+    "shapeChange": 0,
+    "weights": "f(t) of falloff_curves.json in index space"
+   },
+   "tolerance": 1e-12,
+   "unit": "document length",
+   "grade": "A",
+   "source": "(b) knot insertion / degree elevation preserve the surface (B-spline property, same invariant as edit_nurbs today)",
+   "proves": [
+    "FR-DIR-22",
+    "TR-DIR-08"
+   ],
+   "cli": {
+    "run": "llull run plans/target_nurbs_point_drag.json --doc t.llull.json --json",
+    "assert": "summary shape change"
+   }
+  },
+  {
+   "vc": "VC-DIR-15",
+   "what": "one gesture = one command (component suite): 60 pointer moves then release; Esc variant; arrow-key nudge; typed value",
+   "metric": "dispatch count and params",
+   "value": {
+    "release": 1,
+    "esc": 0,
+    "nudgePerKey": 1
+   },
+   "tolerance": 0,
+   "unit": "count",
+   "grade": "A",
+   "source": "(b) PRIME DIRECTIVE",
+   "proves": [
+    "FR-DIR-01",
+    "FR-DIR-02",
+    "FR-DIR-04",
+    "FR-DIR-05",
+    "FR-DIR-41",
+    "TR-DIR-11"
+   ],
+   "cli": {
+    "run": "npx vitest run tests/component/direct",
+    "assert": "dispatch spy"
+   }
+  },
+  {
+   "vc": "VC-DIR-16",
+   "what": "UI gesture vs CLI call vs history replay vs --app",
+   "metric": "document deep equality incl. element ids",
+   "value": "equal",
+   "tolerance": 0,
+   "unit": "-",
+   "grade": "A",
+   "source": "(b) L1, L8",
+   "proves": [
+    "FR-DIR-05",
+    "FR-DIR-36",
+    "FR-DIR-42",
+    "TR-DIR-15"
+   ],
+   "cli": {
+    "run": "llull run plans/target_grip_cage_tools.json --doc t.llull.json --json; llull replay_history --doc t.llull.json --json",
+    "assert": "document hash"
+   }
+  },
+  {
+   "vc": "VC-DIR-17",
+   "what": "undo / redo of a committed gesture (local and online store modes)",
+   "metric": "deep equality",
+   "value": "equal",
+   "tolerance": 0,
+   "unit": "-",
+   "grade": "A",
+   "source": "(b) store contract",
+   "proves": [
+    "FR-DIR-03",
+    "TR-DIR-11"
+   ],
+   "cli": {
+    "run": "npx vitest run tests/integration/directEdit.test.ts; llull undo --doc t.llull.json",
+    "assert": "document equality"
+   }
+  },
+  {
+   "vc": "VC-DIR-18",
+   "what": "preview frame time on reference cages (386 vertices preview level 2; 98 vertices level 3)",
+   "metric": "p95 frame ms",
+   "value": {
+    "budgetMs": 16,
+    "referenceProbeMs": "data/latency_probe.json (5.1 ms / 6.4 ms reference JS)"
+   },
+   "tolerance": "value <= budget",
+   "unit": "ms",
+   "grade": "C (probe on one machine); budget from RAIL [S10]",
+   "source": "(c) TBD — measure with tests/bench/directEdit.bench.ts",
+   "proves": [
+    "FR-DIR-06",
+    "TR-DIR-15"
+   ],
+   "cli": {
+    "run": "npx vitest bench tests/bench/directEdit.bench.ts",
+    "assert": "p95"
+   }
+  },
+  {
+   "vc": "VC-DIR-19",
+   "what": "creased cube: extrude top face by 1",
+   "metric": "counts, volume",
+   "value": {
+    "counts": {
+     "V": 12,
+     "E": 20,
+     "F": 10,
+     "euler": 2
+    },
+    "volume": 12,
+    "reference": 12
+   },
+   "tolerance": 1e-12,
+   "unit": "document length^3",
+   "grade": "A",
+   "source": "(b) closed form, reference agrees",
+   "proves": [
+    "FR-DIR-12",
+    "TR-DIR-05"
+   ],
+   "cli": {
+    "run": "llull run plans/target_creased_cube_topology.json --doc t.llull.json --json",
+    "assert": "steps[3].data.volume"
+   }
+  },
+  {
+   "vc": "VC-DIR-20",
+   "what": "creased cube: inset top face thickness 0.5 depth -0.5",
+   "metric": "volume",
+   "value": {
+    "volume": 6.83333333333,
+    "reference": 6.83333333333,
+    "counts": {
+     "V": 12,
+     "E": 20,
+     "F": 10,
+     "euler": 2
+    }
+   },
+   "tolerance": 1e-12,
+   "unit": "document length^3",
+   "grade": "A",
+   "source": "(b) frustum closed form",
+   "proves": [
+    "FR-DIR-13",
+    "TR-DIR-05"
+   ],
+   "cli": {
+    "run": "llull run plans/target_creased_cube_topology.json --doc t.llull.json --json",
+    "assert": "steps[7].data.volume"
+   }
+  },
+  {
+   "vc": "VC-DIR-21",
+   "what": "creased cube: one loop cut at mid-height",
+   "metric": "counts, volume",
+   "value": {
+    "counts": {
+     "V": 12,
+     "E": 20,
+     "F": 10,
+     "euler": 2
+    },
+    "volume": 8,
+    "reference": 8
+   },
+   "tolerance": 1e-12,
+   "unit": "document length^3",
+   "grade": "A",
+   "source": "(b) planar split",
+   "proves": [
+    "FR-DIR-14",
+    "TR-DIR-05"
+   ],
+   "cli": {
+    "run": "llull run plans/target_creased_cube_topology.json --doc t.llull.json --json",
+    "assert": "steps[11].data.volume"
+   }
+  },
+  {
+   "vc": "VC-DIR-22",
+   "what": "creased box 3x3x1 seg [3,3,1]: bridge centre top and bottom faces",
+   "metric": "Euler characteristic, genus, volume",
+   "value": {
+    "euler": 0,
+    "genus": 1,
+    "volume": 8,
+    "reference": 8
+   },
+   "tolerance": 1e-12,
+   "unit": "document length^3",
+   "grade": "A",
+   "source": "(b) 9 - 1",
+   "proves": [
+    "FR-DIR-15",
+    "TR-DIR-05"
+   ],
+   "cli": {
+    "run": "llull run plans/target_creased_cube_topology.json --doc t.llull.json --json",
+    "assert": "steps[15].data.euler, steps[16].data.volume"
+   }
+  },
+  {
+   "vc": "VC-DIR-23",
+   "what": "move_faces offset +1 on the bore of a 20x20x10 plate with a radius-3 through hole (OCC)",
+   "metric": "volume before / after",
+   "value": {
+    "before": 3717.25666118,
+    "after": 3497.34517543
+   },
+   "tolerance": 0.000001,
+   "tolerance_kind": "relative",
+   "unit": "document length^3",
+   "grade": "A",
+   "source": "(b) 20*20*10 - pi r^2 * 10",
+   "proves": [
+    "FR-DIR-25",
+    "TR-DIR-09"
+   ],
+   "cli": {
+    "run": "llull run plans/target_brep_face_moves.json --doc t.llull.json --json --kernel occt",
+    "assert": "steps[3].data.volume, steps[5].data.volume"
+   }
+  },
+  {
+   "vc": "VC-DIR-24",
+   "what": "move_faces translate top face of a 10^3 box by +2 z; rotate the +x face 10 deg about its bottom edge (outward)",
+   "metric": "volume",
+   "value": {
+    "translate": 1200,
+    "rotate": 1088.16349035
+   },
+   "tolerance": 0.000001,
+   "tolerance_kind": "relative",
+   "unit": "document length^3",
+   "grade": "A",
+   "source": "(b) 10*10*12; 1000 + 1/2 * 10 * (10 tan 10deg) * 10",
+   "proves": [
+    "FR-DIR-25",
+    "TR-DIR-09"
+   ],
+   "cli": {
+    "run": "llull run plans/target_brep_face_moves.json --doc t.llull.json --json --kernel occt",
+    "assert": "steps[13].data.volume, steps[16].data.volume"
+   }
+  },
+  {
+   "vc": "VC-DIR-25",
+   "what": "delete_faces on a 1 mm fillet of a 10^3 box (OCC defeaturing)",
+   "metric": "volume before / after",
+   "value": {
+    "before": 997.853981634,
+    "after": 1000
+   },
+   "tolerance": 0.000001,
+   "tolerance_kind": "relative",
+   "unit": "document length^3",
+   "grade": "A",
+   "source": "(b) fillet removes (1 - pi/4) r^2 per unit length",
+   "proves": [
+    "FR-DIR-26",
+    "TR-DIR-09"
+   ],
+   "cli": {
+    "run": "llull run plans/target_brep_face_moves.json --doc t.llull.json --json --kernel occt",
+    "assert": "steps[8].data.volume, steps[10].data.volume"
+   }
+  },
+  {
+   "vc": "VC-DIR-26",
+   "what": "drag handle for the existing push_pull_face on a 10^3 box top face, value 2, through /preview then commit",
+   "metric": "dispatch count; committed command; volume",
+   "value": {
+    "dispatches": 1,
+    "command": "push_pull_face",
+    "volume": 1200,
+    "previewMutatesLiveDoc": false
+   },
+   "tolerance": 0.000001,
+   "unit": "document length^3",
+   "grade": "A",
+   "source": "(b)",
+   "proves": [
+    "FR-DIR-27",
+    "TR-DIR-11",
+    "TR-DIR-12"
+   ],
+   "cli": {
+    "run": "llull push_pull_face '{\"id\":\"$b\",\"faceNear\":[0,0,5],\"distance\":2}' --doc t.llull.json --json --kernel occt",
+    "assert": "mass_properties data.volume"
+   }
+  },
+  {
+   "vc": "VC-DIR-27",
+   "what": "wrong plan: unknown element id, sharpness 12, edge id passed to extrude_cage_faces, loop cut through an n-gon",
+   "metric": "error codes",
+   "value": [
+    "DIR_REF_LOST",
+    "DIR_SHARPNESS_RANGE",
+    "DIR_ELEMENT_KIND",
+    "DIR_LOOP_NOT_QUAD"
+   ],
+   "tolerance": 0,
+   "unit": "-",
+   "grade": "A",
+   "source": "TECHNICAL_SPEC 7.1",
+   "proves": [
+    "FR-DIR-37",
+    "FR-DIR-39",
+    "TR-DIR-14"
+   ],
+   "cli": {
+    "run": "llull run bad.plan.json --validate --doc t.llull.json --json",
+    "assert": "error.code per step, exit 1"
+   }
+  },
+  {
+   "vc": "VC-DIR-28",
+   "what": "check_subdivision on the box [2,2,2] levels 3 cage",
+   "metric": "findings",
+   "value": {
+    "extraordinaryHistogram": {
+     "3": 8
+    },
+    "euler": 2,
+    "genus": 0,
+    "meshVolume": 2.66462478968,
+    "limitVolumeEstimate": 2.62041911579,
+    "finding": "DIR_CHECK_LEVEL_MESH_DEVIATION (warn, ~1.69 % > 0.5 % default)",
+    "provenanceScheme": "Catmull-Clark, OpenSubdiv uniform creases"
+   },
+   "tolerance": {
+    "meshVolume": 1e-9,
+    "limitVolumeEstimate": 0.0001
+   },
+   "unit": "document length^3",
+   "grade": "A for counts / mesh volume; B for the limit estimate (extrapolated)",
+   "source": "(b) data/subd_cube_cases.json",
+   "proves": [
+    "FR-DIR-34",
+    "FR-DIR-44",
+    "TR-DIR-13",
+    "TR-DIR-03"
+   ],
+   "cli": {
+    "run": "llull check_subdivision id=c --doc t.llull.json --json",
+    "assert": "data.findings[*].code, data.extraordinaryHistogram"
+   }
+  },
+  {
+   "vc": "VC-DIR-29",
+   "what": "same subdivision measured with no kernel and with OCC",
+   "metric": "surfaceModel and volumes",
+   "value": {
+    "noKernel": {
+     "surfaceModel": "level_mesh",
+     "volume": 2.66462478968
+    },
+    "occ": {
+     "surfaceModel": "limit_patches",
+     "volume": "TBD — measure (expected near the limit estimate 2.62041911579)"
+    }
+   },
+   "tolerance": {
+    "noKernel": 1e-9
+   },
+   "unit": "document length^3",
+   "grade": "A (no kernel) / C (OCC)",
+   "source": "(b) / (c)",
+   "proves": [
+    "FR-DIR-35",
+    "TR-DIR-10"
+   ],
+   "cli": {
+    "run": "llull mass_properties entityId=c --doc t.llull.json --json; llull mass_properties entityId=c --doc t.llull.json --json --kernel occt",
+    "assert": "data.surfaceModel, data.volume"
+   }
+  },
+  {
+   "vc": "VC-DIR-30",
+   "what": "element ids survive replay: grip plan, then edit_step_params on the extrude distance; later edit still targets f-1.2..f-1.5; deleting a targeted face gives DIR_REF_LOST",
+   "metric": "ids and codes",
+   "value": {
+    "sameTargets": true,
+    "lostCode": "DIR_REF_LOST"
+   },
+   "tolerance": 0,
+   "unit": "-",
+   "grade": "A",
+   "source": "(b) TECHNICAL_SPEC 3.2",
+   "proves": [
+    "FR-DIR-20",
+    "TR-DIR-04"
+   ],
+   "cli": {
+    "run": "llull run plans/target_grip_cage_tools.json --doc t.llull.json --json; llull edit_step_params '{\"stepId\":\"<id of the extrude FeatureStep, doc.featureHistory>\",\"params\":{\"id\":\"grip\",\"faces\":[\"f-1.2\",\"f-1.3\",\"f-1.4\",\"f-1.5\"],\"distance\":12}}' --doc t.llull.json --json",
+    "assert": "history steps params ids"
+   }
+  },
+  {
+   "vc": "VC-DIR-31",
+   "what": "render_view overlay=cage shows the cage",
+   "metric": "file written; cage pixels present",
+   "value": "TBD — pixel check of cage colour in the saved PNG",
+   "tolerance": "n/a",
+   "unit": "-",
+   "grade": "C",
+   "source": "(c)",
+   "proves": [
+    "FR-DIR-40",
+    "TR-DIR-13"
+   ],
+   "cli": {
+    "run": "llull render_view view=iso isolate=c overlay=cage --doc t.llull.json --save out/c.png",
+    "assert": "exists"
+   }
+  },
+  {
+   "vc": "VC-DIR-32",
+   "what": "parity / units audit of every DIR command and UI tool",
+   "metric": "UI tools without command; numeric params without unit",
+   "value": {
+    "uiToolsWithoutCommand": 0,
+    "paramsWithoutUnit": 0,
+    "guideHasFreeformSection": true
+   },
+   "tolerance": 0,
+   "unit": "count",
+   "grade": "A",
+   "source": "AF-01..04",
+   "proves": [
+    "FR-DIR-05",
+    "FR-DIR-38",
+    "FR-DIR-43",
+    "TR-DIR-14"
+   ],
+   "cli": {
+    "run": "llull describe <each command> --json; llull guide",
+    "assert": "audit script"
+   }
+  },
+  {
+   "vc": "VC-DIR-33",
+   "what": "slide_cage_edges factor 0.5 on the mid loop of the creased cut cube; weld refusal",
+   "metric": "volume; code",
+   "value": {
+    "volume": 8,
+    "weldNonManifold": "DIR_WELD_NONMANIFOLD"
+   },
+   "tolerance": 1e-12,
+   "unit": "document length^3",
+   "grade": "A",
+   "source": "(b) loop stays in the planar side faces",
+   "proves": [
+    "FR-DIR-09",
+    "FR-DIR-18",
+    "TR-DIR-05"
+   ],
+   "cli": {
+    "run": "llull slide_cage_edges '{\"id\":\"cut\",\"edges\":{\"loopFrom\":\"<first new edge id from loop_cut_cage data>\"},\"factor\":0.5}' --doc t.llull.json --json",
+    "assert": "mass_properties data.volume"
+   }
+  },
+  {
+   "vc": "VC-DIR-34",
+   "what": "creased cube: bevel edge (1,-1,1)-(-1,-1,1) with setback 0.5",
+   "metric": "counts, volume",
+   "value": {
+    "counts": {
+     "V": 10,
+     "E": 15,
+     "F": 7,
+     "euler": 2
+    },
+    "volume": 7.75,
+    "reference": 7.75
+   },
+   "tolerance": 1e-12,
+   "unit": "document length^3",
+   "grade": "A",
+   "source": "(b) chamfer prism",
+   "proves": [
+    "FR-DIR-16",
+    "TR-DIR-05"
+   ],
+   "cli": {
+    "run": "llull bevel_cage_edges '{\"id\":\"bev\",\"edges\":[[0,1]],\"width\":0.25}' --doc t.llull.json --json",
+    "assert": "mass_properties data.volume"
+   }
+  },
+  {
+   "vc": "VC-DIR-35",
+   "what": "open cage: delete top face of the creased cube, then fill_cage_hole ngon, crease all",
+   "metric": "Euler, volume",
+   "value": {
+    "afterDelete": {
+     "boundaryLoops": 1,
+     "euler": 1
+    },
+    "afterFill": {
+     "euler": 2,
+     "volume": 8
+    }
+   },
+   "tolerance": 1e-12,
+   "unit": "document length^3",
+   "grade": "A",
+   "source": "(b)",
+   "proves": [
+    "FR-DIR-17",
+    "TR-DIR-05"
+   ],
+   "cli": {
+    "run": "llull delete_cage_faces '{\"id\":\"c\",\"faces\":[0],\"boundary\":\"edge_and_corner\"}' --doc t.llull.json --json; llull fill_cage_hole '{\"id\":\"c\",\"edge\":[0,1],\"mode\":\"ngon\"}' --doc t.llull.json --json",
+    "assert": "check_subdivision data.euler"
+   }
+  },
+  {
+   "vc": "VC-DIR-36",
+   "what": "fit_cage_vertices flatten the 4 top vertices of a perturbed cage onto plane z = 1",
+   "metric": "max |z - 1|",
+   "value": 0,
+   "tolerance": 1e-12,
+   "unit": "document length",
+   "grade": "A",
+   "source": "(b) projection",
+   "proves": [
+    "FR-DIR-19",
+    "TR-DIR-05"
+   ],
+   "cli": {
+    "run": "llull fit_cage_vertices '{\"id\":\"c\",\"vertices\":[0,1,2,3],\"to\":{\"plane\":{\"origin\":[0,0,1],\"normal\":[0,0,1]}}}' --doc t.llull.json --json",
+    "assert": "data.vertices"
+   }
+  },
+  {
+   "vc": "VC-DIR-37",
+   "what": "control net overlay of a 5 x 5 surface",
+   "metric": "drawn poles and hull segments",
+   "value": {
+    "poles": 25,
+    "hullSegments": 40
+   },
+   "tolerance": 0,
+   "unit": "count",
+   "grade": "A",
+   "source": "(b) nU(nV-1) + nV(nU-1)",
+   "proves": [
+    "FR-DIR-24",
+    "TR-DIR-11"
+   ],
+   "cli": {
+    "run": "npx vitest run tests/component/direct/netOverlay.test.tsx",
+    "assert": "counts"
+   }
+  },
+  {
+   "vc": "VC-DIR-38",
+   "what": "reapply fillets after move_faces (COULD)",
+   "metric": "fillet faces present, radius",
+   "value": "TBD — define with 06 BLD",
+   "tolerance": "TBD",
+   "unit": "document length",
+   "grade": "C",
+   "source": "(c) Onshape option [R18]",
+   "proves": [
+    "FR-DIR-28"
+   ],
+   "cli": {
+    "run": "TBD",
+    "assert": "TBD"
+   }
+  },
+  {
+   "vc": "VC-DIR-39",
+   "what": "face_to_subdivision on a planar 10 x 10 square face (COULD)",
+   "metric": "limit surface flat",
+   "value": {
+    "maxOutOfPlane": 0
+   },
+   "tolerance": 1e-9,
+   "unit": "document length",
+   "grade": "A",
+   "source": "(b) affine invariance of subdivision on a planar cage",
+   "proves": [
+    "FR-DIR-31"
+   ],
+   "cli": {
+    "run": "llull face_to_subdivision '{\"id\":\"$b\",\"faceNear\":[0,0,5]}' --doc t.llull.json --json --kernel occt",
+    "assert": "evaluate_subdivision z"
+   }
+  },
+  {
+   "vc": "VC-DIR-40",
+   "what": "select_cage_elements on box [2,2,2] seg [2,2,2]: faces with normal +z; edge loop through an equatorial edge",
+   "metric": "counts",
+   "value": {
+    "topFaces": 4,
+    "equatorLoopEdges": 8
+   },
+   "tolerance": 0,
+   "unit": "count",
+   "grade": "A",
+   "source": "(b) cage topology",
+   "proves": [
+    "FR-DIR-32",
+    "FR-DIR-01",
+    "TR-DIR-13"
+   ],
+   "cli": {
+    "run": "llull select_cage_elements '{\"id\":\"pad\",\"faces\":{\"normal\":[0,0,1],\"within\":0.2}}' --doc t.llull.json --json",
+    "assert": "data.faces.length"
+   }
+  }
+ ]
+}

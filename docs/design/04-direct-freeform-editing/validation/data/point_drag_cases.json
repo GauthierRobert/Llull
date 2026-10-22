@@ -1,0 +1,154 @@
+{
+ "generated": "2026-10-22",
+ "method": "least-norm control point update for a prescribed displacement of one curve / surface point; same family as Piegl & Tiller \"control point based shape modification\" (S1) — derivation: minimise sum |dP_i|^2 s.t. sum N_i(u) dP_i = D gives dP_i = N_i(u) D / sum N_j(u)^2",
+ "curve": {
+  "degree": 3,
+  "knots": [
+   0,
+   0,
+   0,
+   0,
+   0.25,
+   0.5,
+   0.75,
+   1,
+   1,
+   1,
+   1
+  ],
+  "poles": [
+   [
+    0,
+    0,
+    0
+   ],
+   [
+    1,
+    1,
+    0
+   ],
+   [
+    2,
+    -1,
+    0
+   ],
+   [
+    3,
+    1,
+    0
+   ],
+   [
+    4,
+    -1,
+    0
+   ],
+   [
+    5,
+    1,
+    0
+   ],
+   [
+    6,
+    0,
+    0
+   ]
+  ],
+  "u": 0.4,
+  "displacement": [
+   0,
+   1,
+   0
+  ],
+  "basisAtU": [
+   0,
+   0.016,
+   0.409333333333,
+   0.538666666667,
+   0.036,
+   0,
+   0
+  ],
+  "poleDeltas": [
+   [
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0.0348380803444,
+    0
+   ],
+   [
+    0,
+    0.891274222143,
+    0
+   ],
+   [
+    0,
+    1.17288203826,
+    0
+   ],
+   [
+    0,
+    0.0783856807748,
+    0
+   ],
+   [
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0
+   ]
+  ],
+  "achievedDisplacement": [
+   0,
+   1,
+   0
+  ],
+  "residual": 5.551115123125783e-16,
+  "untouchedPoles": [
+   0,
+   5,
+   6
+  ]
+ },
+ "surface": {
+  "degree": [
+   3,
+   3
+  ],
+  "knots": [
+   0,
+   0,
+   0,
+   0,
+   0.5,
+   1,
+   1,
+   1,
+   1
+  ],
+  "net": "5 x 5 poles [i, j, 0]",
+  "uv": [
+   0.3,
+   0.6
+  ],
+  "displacement": [
+   0,
+   0,
+   1
+  ],
+  "achievedDisplacement": [
+   0,
+   0,
+   1
+  ],
+  "residual": 0,
+  "maxPoleDelta": 1.51326305096
+ }
+}

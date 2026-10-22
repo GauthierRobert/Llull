@@ -1,0 +1,207 @@
+[
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    20,
+    20,
+    10
+   ]
+  },
+  "as": "plate"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 3,
+   "height": 20
+  },
+  "as": "pin"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$plate",
+   "b": "$pin"
+  },
+  "as": "holed"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$holed"
+  }
+ },
+ {
+  "command": "move_faces",
+  "params": {
+   "id": "$holed",
+   "facesNear": [
+    [
+     3,
+     0,
+     0
+    ]
+   ],
+   "mode": "offset",
+   "distance": 1
+  },
+  "as": "bored"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$bored"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    10,
+    10,
+    10
+   ],
+   "position": [
+    30,
+    0,
+    0
+   ]
+  },
+  "as": "blk"
+ },
+ {
+  "command": "fillet_edge",
+  "params": {
+   "id": "$blk",
+   "edgesNear": [
+    [
+     35,
+     0,
+     5
+    ]
+   ],
+   "radius": 1
+  },
+  "as": "rounded"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$rounded"
+  }
+ },
+ {
+  "command": "delete_faces",
+  "params": {
+   "id": "$rounded",
+   "facesNear": [
+    [
+     34.7071,
+     0,
+     4.7071
+    ]
+   ]
+  },
+  "as": "sharp"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$sharp"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    10,
+    10,
+    10
+   ],
+   "position": [
+    60,
+    0,
+    5
+   ]
+  },
+  "as": "b3"
+ },
+ {
+  "command": "move_faces",
+  "params": {
+   "id": "$b3",
+   "facesNear": [
+    [
+     60,
+     0,
+     10
+    ]
+   ],
+   "mode": "translate",
+   "vector": [
+    0,
+    0,
+    2
+   ]
+  },
+  "as": "taller"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$taller"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    10,
+    10,
+    10
+   ],
+   "position": [
+    90,
+    0,
+    5
+   ]
+  },
+  "as": "b4"
+ },
+ {
+  "command": "move_faces",
+  "params": {
+   "id": "$b4",
+   "facesNear": [
+    [
+     95,
+     0,
+     5
+    ]
+   ],
+   "mode": "rotate",
+   "axis": {
+    "origin": [
+     95,
+     0,
+     0
+    ],
+    "direction": [
+     0,
+     1,
+     0
+    ]
+   },
+   "angleDeg": 10
+  },
+  "as": "leaning"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$leaning"
+  }
+ }
+]

@@ -1,0 +1,1035 @@
+{
+ "gap": "DEF",
+ "generated": "generate_expected.mjs (2026-10-22)",
+ "notes": "Values are (a) quoted from a cited source, (b) derived analytically (generator + derivation in TECHNICAL_SPEC §5), or (c) TBD with the tool. Grades per docs/plant/TEMPLATE.md; only grade A gates pass/fail.",
+ "cases": [
+  {
+   "vc": "VC-DEF-01",
+   "what": "twist volume invariance (det J = 1), boxes at 0/90/120/180/360 deg",
+   "expected": [
+    {
+     "box": {
+      "a": 10,
+      "b": 10,
+      "L": 100
+     },
+     "angleDeg": 90,
+     "volume": 10000
+    },
+    {
+     "box": {
+      "a": 10,
+      "b": 10,
+      "L": 100
+     },
+     "angleDeg": 120,
+     "volume": 10000
+    },
+    {
+     "box": {
+      "a": 10,
+      "b": 10,
+      "L": 100
+     },
+     "angleDeg": 360,
+     "volume": 10000
+    },
+    {
+     "box": {
+      "a": 20,
+      "b": 5,
+      "L": 50
+     },
+     "angleDeg": 180,
+     "volume": 5000
+    },
+    {
+     "box": {
+      "a": 10,
+      "b": 10,
+      "L": 100
+     },
+     "angleDeg": 0,
+     "volume": 10000
+    },
+    {
+     "box": {
+      "a": 10,
+      "b": 10,
+      "L": 100
+     },
+     "angleDeg": 90,
+     "volume": 10000
+    }
+   ],
+   "tolerance": 0.000001,
+   "toleranceKind": "relative",
+   "unit": "mm^3",
+   "grade": "A",
+   "source": "(b) det J = 1, data/twist_cases.json",
+   "proves": [
+    "FR-DEF-02",
+    "FR-DEF-07",
+    "TR-DEF-01",
+    "TR-DEF-03"
+   ],
+   "cli": {
+    "run": "llull run plans/target_twist_box.json --doc t.llull.json --json",
+    "assert": "steps[3].data.volume"
+   }
+  },
+  {
+   "vc": "VC-DEF-02",
+   "what": "twisted box total surface area (asinh closed form)",
+   "expected": [
+    {
+     "angleDeg": 90,
+     "totalArea": 4204.10853848
+    },
+    {
+     "angleDeg": 120,
+     "totalArea": 4207.29883911
+    },
+    {
+     "angleDeg": 360,
+     "totalArea": 4264.85604743
+    }
+   ],
+   "tolerance": 0.00001,
+   "toleranceKind": "relative",
+   "unit": "mm^2",
+   "grade": "A",
+   "source": "(b) TECHNICAL_SPEC §5.2 twist area element; numeric cross-check 1.6e-9",
+   "proves": [
+    "FR-DEF-02",
+    "FR-DEF-07",
+    "TR-DEF-03"
+   ],
+   "cli": {
+    "run": "llull run plans/target_twist_box.json --doc t.llull.json --json",
+    "assert": "steps[3].data.area"
+   }
+  },
+  {
+   "vc": "VC-DEF-03",
+   "what": "cylinder twisted 270 deg about its own axis is unchanged",
+   "value": 0,
+   "tolerance": "output.tolerance",
+   "unit": "mm",
+   "grade": "A",
+   "source": "(b) rotational symmetry",
+   "proves": [
+    "FR-DEF-02",
+    "FR-DEF-07"
+   ],
+   "cli": {
+    "run": "llull add_cylinder radius=5 height=40 anchor=base-center --doc t.llull.json --json; llull twist_body id=$cyl angleDeg=270 --doc t.llull.json --json; llull analyze_deformation id=$out compareTo='{\"kind\":\"cylinder\",\"radius\":5}' --doc t.llull.json --json",
+    "assert": "data.compareTo.maxDeviation"
+   }
+  },
+  {
+   "vc": "VC-DEF-04",
+   "what": "crease angle at a region end: linear vs smooth falloff",
+   "expected": {
+    "linearCreaseMaxRad": 0.15580649997,
+    "smoothCreaseMaxRad": 0
+   },
+   "tolerance": 0.000001,
+   "unit": "rad",
+   "grade": "A",
+   "source": "(b) atan(k b/2), TECHNICAL_SPEC §5.2",
+   "proves": [
+    "FR-DEF-06",
+    "FR-DEF-21",
+    "FR-DEF-22",
+    "TR-DEF-09"
+   ],
+   "cli": {
+    "run": "llull twist_body id=$bar angleDeg=90 region='{\"start\":0,\"end\":50,\"falloff\":\"linear\"}' --doc t.llull.json --json; llull analyze_deformation id=$out --doc t.llull.json --json",
+    "assert": "data.regionCrease[0].angleRad"
+   }
+  },
+  {
+   "vc": "VC-DEF-05",
+   "what": "taper volumes (linear, flat, smooth, scale up)",
+   "expected": [
+    {
+     "scaleEnd": 0.5,
+     "falloff": "linear",
+     "flat": false,
+     "volume": 5833.33333333
+    },
+    {
+     "scaleEnd": 2,
+     "falloff": "linear",
+     "flat": false,
+     "volume": 23333.3333333
+    },
+    {
+     "scaleEnd": 0.5,
+     "falloff": "linear",
+     "flat": true,
+     "volume": 7500
+    },
+    {
+     "scaleEnd": 0.5,
+     "falloff": "smooth",
+     "flat": false,
+     "volume": 5928.57142857
+    }
+   ],
+   "tolerance": 0.000001,
+   "toleranceKind": "relative",
+   "unit": "mm^3",
+   "grade": "A",
+   "source": "(b) det J = s^2, data/taper_cases.json",
+   "proves": [
+    "FR-DEF-03",
+    "TR-DEF-01"
+   ],
+   "cli": {
+    "run": "llull taper_body id=$bar scaleEnd=0.5 --doc t.llull.json --json; llull mass_properties entityId=$out --doc t.llull.json --json",
+    "assert": "data.volume"
+   }
+  },
+  {
+   "vc": "VC-DEF-06",
+   "what": "linear taper of a cylinder = cone frustum r1 5, r2 2, h 40",
+   "expected": {
+    "volume": 1633.62817987,
+    "lateralArea": 882.116477902,
+    "maxDeviationFromAnalyticCone": 0
+   },
+   "tolerance": 0.00001,
+   "toleranceKind": "relative",
+   "unit": "mm^3 / mm^2",
+   "grade": "A",
+   "source": "(b) frustum formulas",
+   "proves": [
+    "FR-DEF-03",
+    "FR-DEF-07",
+    "TR-DEF-03"
+   ],
+   "cli": {
+    "run": "llull run plans/target_taper_cylinder_cone.json --doc t.llull.json --json",
+    "assert": "steps[3].data.volume"
+   }
+  },
+  {
+   "vc": "VC-DEF-07",
+   "what": "bend of a bar: volume (Pappus) and fibre lengths",
+   "expected": [
+    {
+     "bar": {
+      "a": 10,
+      "y0": -5,
+      "y1": 5,
+      "L": 78.5398163397
+     },
+     "radius": 50,
+     "angleDeg": 90,
+     "volume": 7853.98163397,
+     "inner": 70.6858347058,
+     "outer": 86.3937979737,
+     "neutral": 78.5398163397
+    },
+    {
+     "bar": {
+      "a": 10,
+      "y0": -5,
+      "y1": 5,
+      "L": 157.079632679
+     },
+     "radius": 50,
+     "angleDeg": 180,
+     "volume": 15707.9632679,
+     "inner": 141.371669412,
+     "outer": 172.787595947,
+     "neutral": 157.079632679
+    },
+    {
+     "bar": {
+      "a": 10,
+      "y0": 0,
+      "y1": 10,
+      "L": 78.5398163397
+     },
+     "radius": 50,
+     "angleDeg": 90,
+     "volume": 7068.58347058,
+     "inner": 62.8318530718,
+     "outer": 78.5398163397,
+     "neutral": 78.5398163397
+    },
+    {
+     "bar": {
+      "a": 10,
+      "y0": -10,
+      "y1": 0,
+      "L": 78.5398163397
+     },
+     "radius": 50,
+     "angleDeg": 90,
+     "volume": 8639.37979737,
+     "inner": 78.5398163397,
+     "outer": 94.2477796077,
+     "neutral": 78.5398163397
+    }
+   ],
+   "tolerance": 0.000001,
+   "toleranceKind": "relative",
+   "unit": "mm^3 / mm",
+   "grade": "A",
+   "source": "(b) det J = (R - y)/R",
+   "proves": [
+    "FR-DEF-05",
+    "FR-DEF-21",
+    "TR-DEF-01"
+   ],
+   "cli": {
+    "run": "llull bend_body id=$bar radius=50 angleDeg=90 --doc t.llull.json --json; llull analyze_deformation id=$out --doc t.llull.json --json",
+    "assert": "data.volume.measured, data.fibres"
+   }
+  },
+  {
+   "vc": "VC-DEF-08",
+   "what": "cylinder bent 360 / 90 deg = torus (segment)",
+   "expected": [
+    {
+     "angleDeg": 360,
+     "volume": 24674.0110027,
+     "lateralArea": 9869.60440109
+    },
+    {
+     "angleDeg": 90,
+     "volume": 6168.50275068,
+     "lateralArea": 2467.40110027
+    }
+   ],
+   "tolerance": 0.00001,
+   "toleranceKind": "relative",
+   "unit": "mm^3 / mm^2",
+   "grade": "A",
+   "source": "(b) torus 2 pi^2 R r^2, 4 pi^2 R r",
+   "proves": [
+    "FR-DEF-05",
+    "FR-DEF-07",
+    "TR-DEF-03"
+   ],
+   "cli": {
+    "run": "llull run plans/target_bend_cylinder_torus.json --doc t.llull.json --json",
+    "assert": "steps[3].data.volume; steps[4].data.compareTo.maxDeviation <= tolerance"
+   }
+  },
+  {
+   "vc": "VC-DEF-09",
+   "what": "bend radius below the inner-side distance is refused",
+   "expected": {
+    "code": "DEF_BEND_RADIUS_TOO_SMALL",
+    "paths": [
+     "params.radius"
+    ],
+    "minJacobian": -0.25
+   },
+   "grade": "A",
+   "source": "(b) det J <= 0 for y >= R",
+   "proves": [
+    "FR-DEF-05",
+    "FR-DEF-09",
+    "FR-DEF-27",
+    "TR-DEF-06"
+   ],
+   "cli": {
+    "run": "llull bend_body id=$bar radius=4 angleDeg=90 --doc t.llull.json --json",
+    "assert": "exit 1; error.code"
+   }
+  },
+  {
+   "vc": "VC-DEF-10",
+   "what": "stretch in a region; volume-preserving stretch",
+   "expected": [
+    {
+     "factor": 1.5,
+     "region": [
+      20,
+      60
+     ],
+     "volume": 12000,
+     "newLength": 120
+    },
+    {
+     "factor": 2,
+     "region": "whole",
+     "volume": 10000,
+     "newLength": 200
+    }
+   ],
+   "tolerance": 0.000001,
+   "toleranceKind": "relative",
+   "unit": "mm^3 / mm",
+   "grade": "A",
+   "source": "(b) det J = f in the region",
+   "proves": [
+    "FR-DEF-04"
+   ],
+   "cli": {
+    "run": "llull stretch_body id=$bar factor=1.5 region='{\"start\":20,\"end\":60}' --doc t.llull.json --json; llull mass_properties entityId=$out --doc t.llull.json --json",
+    "assert": "data.volume"
+   }
+  },
+  {
+   "vc": "VC-DEF-11",
+   "what": "non-uniform scale of a sphere (spheroids) and of a cylinder (elliptic)",
+   "expected": [
+    {
+     "factors": [
+      1,
+      1,
+      2
+     ],
+     "volume": 8377.58040957,
+     "area": 2147.84353279
+    },
+    {
+     "factors": [
+      2,
+      2,
+      1
+     ],
+     "volume": 16755.1608191,
+     "area": 3468.75308134
+    },
+    {
+     "factors": [
+      1,
+      2,
+      3
+     ],
+     "volume": 25132.7412287,
+     "area": "TBD - numeric (triaxial)"
+    },
+    {
+     "factors": [
+      2,
+      1,
+      1
+     ],
+     "volume": 3141.59265359,
+     "area": 968.84482205
+    }
+   ],
+   "tolerance": {
+    "volume": 1e-9,
+    "area": 0.000001
+   },
+   "toleranceKind": "relative",
+   "unit": "mm^3 / mm^2",
+   "grade": "A",
+   "source": "(b) spheroid closed forms; elliptic perimeter by quadrature",
+   "proves": [
+    "FR-DEF-01",
+    "FR-DEF-07",
+    "TR-DEF-03"
+   ],
+   "cli": {
+    "run": "llull run plans/target_scale_nonuniform_sphere.json --doc t.llull.json --json",
+    "assert": "steps[3].data.volume, steps[3].data.area"
+   }
+  },
+  {
+   "vc": "VC-DEF-12",
+   "what": "negative factor = true mirror; zero factor refused",
+   "expected": {
+    "mirroredVolume": 6000,
+    "mirrored": true,
+    "valid": true,
+    "zeroFactorCode": "DEF_SCALE_SINGULAR"
+   },
+   "grade": "A",
+   "source": "(b) |det| = 1",
+   "proves": [
+    "FR-DEF-01",
+    "FR-DEF-27"
+   ],
+   "cli": {
+    "run": "llull scale_nonuniform id=$box factors=[-1,1,1] --doc t.llull.json --json; llull mass_properties entityId=$out --doc t.llull.json --json",
+    "assert": "data.volume > 0"
+   }
+  },
+  {
+   "vc": "VC-DEF-13",
+   "what": "FFD barrel: volume and Jacobian range / Bernstein bound",
+   "expected": [
+    {
+     "m": 1.5,
+     "volume": 1.36666666667,
+     "jacobianExactRange": [
+      1,
+      1.5625
+     ],
+     "jacobianBernsteinBound": [
+      1,
+      1.83333333333
+     ],
+     "numericCheck": {
+      "volumeRel": 5.14e-12
+     }
+    },
+    {
+     "m": 0.5,
+     "volume": 0.7,
+     "jacobianExactRange": [
+      0.5625,
+      1
+     ],
+     "jacobianBernsteinBound": [
+      0.5,
+      1
+     ],
+     "numericCheck": {
+      "volumeRel": 5.41e-12
+     }
+    },
+    {
+     "m": 2,
+     "volume": 1.8,
+     "jacobianExactRange": [
+      1,
+      2.25
+     ],
+     "jacobianBernsteinBound": [
+      1,
+      3
+     ],
+     "numericCheck": {
+      "volumeRel": 5.18e-12
+     }
+    }
+   ],
+   "tolerance": 0.00001,
+   "toleranceKind": "relative",
+   "unit": "mm^3",
+   "grade": "A",
+   "source": "(b) det J = g(u)^2, Sederberg & Parry §4 bound",
+   "proves": [
+    "FR-DEF-13",
+    "FR-DEF-21",
+    "TR-DEF-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_ffd_barrel.json --doc t.llull.json --json",
+    "assert": "steps[3].data.volume; steps[4].data.jacobian"
+   }
+  },
+  {
+   "vc": "VC-DEF-14",
+   "what": "FFD identity and affine reproduction",
+   "expected": {
+    "identityMaxResidual": 0,
+    "affineMaxResidual": 0,
+    "affineImageVolume": 9884
+   },
+   "tolerance": {
+    "identity": 1e-12,
+    "affine": 1e-9
+   },
+   "unit": "mm",
+   "grade": "A",
+   "source": "(b) linear precision of Bernstein polynomials; reference residuals 7e-15 / 1.4e-14",
+   "proves": [
+    "FR-DEF-13",
+    "TR-DEF-01"
+   ],
+   "cli": {
+    "run": "llull deform_lattice id=$box degrees=[2,3,4] moves=[] --doc t.llull.json --json",
+    "assert": "exit 1 DEF_NO_EFFECT; affine lattice: data.maxDeviation"
+   }
+  },
+  {
+   "vc": "VC-DEF-15",
+   "what": "point push volume change d pi r^2 / 4",
+   "expected": {
+    "block": "box 100 x 100 x 50, top face z = 0, push at its centre",
+    "radius": 10,
+    "distance": 2,
+    "deltaVolume": 157.079632679,
+    "peakDisplacement": 2,
+    "numericCheck": {
+     "deltaVolumeRel": 1.12e-7
+    }
+   },
+   "tolerance": 0.001,
+   "toleranceKind": "relative",
+   "unit": "mm^3",
+   "grade": "A",
+   "source": "(b) divergence theorem",
+   "proves": [
+    "FR-DEF-16"
+   ],
+   "cli": {
+    "run": "llull run plans/target_point_push.json --doc t.llull.json --json",
+    "assert": "steps[3].data.volume - 250000"
+   }
+  },
+  {
+   "vc": "VC-DEF-16",
+   "what": "point push fold limit 25 sqrt5 r / 96",
+   "expected": {
+    "radius": 10,
+    "foldLimitDistance": 5.82309369141,
+    "maxGradPhi": 0.171730020672,
+    "distanceRefused": 5.88132,
+    "expectedCode": "DEF_FOLDOVER"
+   },
+   "grade": "A",
+   "source": "(b) max |grad phi|",
+   "proves": [
+    "FR-DEF-16",
+    "FR-DEF-09",
+    "TR-DEF-06"
+   ],
+   "cli": {
+    "run": "llull deform_by_point id=$block point=[0,0,0] direction=[0,0,1] distance=5.88132 radius=10 --doc t.llull.json --json",
+    "assert": "exit 1; error.code = DEF_FOLDOVER; remediation contains 5.823094"
+   }
+  },
+  {
+   "vc": "VC-DEF-17",
+   "what": "plate wrapped on a drum; overlap refused",
+   "expected": [
+    {
+     "op": "flow_on_surface",
+     "plate": {
+      "W": 60,
+      "H": 20,
+      "t": 2,
+      "side": "outside (w in [0, t])"
+     },
+     "cylinderRadius": 30,
+     "volume": 2480,
+     "wrapAngleDeg": 114.591559026,
+     "baseLineLengthPreserved": 60,
+     "numericCheck": {
+      "volumeRel": 9.01e-11,
+      "lengthRel": 4.17e-8
+     }
+    },
+    {
+     "op": "flow_on_surface",
+     "plate": {
+      "W": 60,
+      "H": 20,
+      "t": 2,
+      "side": "centred (w in [-t/2, t/2])"
+     },
+     "cylinderRadius": 30,
+     "volume": 2400
+    },
+    {
+     "op": "flow_on_surface",
+     "plate": {
+      "W": 200,
+      "H": 20,
+      "t": 2
+     },
+     "cylinderRadius": 30,
+     "expectedCode": "DEF_FLOW_OVERLAP",
+     "note": "W > 2 pi R = 188.4956: the wrapped plate overlaps itself"
+    }
+   ],
+   "tolerance": 0.00001,
+   "toleranceKind": "relative",
+   "unit": "mm^3",
+   "grade": "A",
+   "source": "(b) det J = (R + w)/R",
+   "proves": [
+    "FR-DEF-15",
+    "TR-DEF-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_flow_plate_on_cylinder.json --doc t.llull.json --json",
+    "assert": "steps[4].data.volume"
+   }
+  },
+  {
+   "vc": "VC-DEF-18",
+   "what": "flow along an arc equals bend",
+   "value": 0,
+   "tolerance": 1e-9,
+   "unit": "mm",
+   "grade": "A",
+   "source": "(b) identical maps (data/flow_cases.json)",
+   "proves": [
+    "FR-DEF-14"
+   ],
+   "cli": {
+    "run": "unit test: geometry/deform flowCurve vs bend on point_vectors samples",
+    "assert": "max |difference|"
+   }
+  },
+  {
+   "vc": "VC-DEF-19",
+   "what": "mesh path (Manifold / no kernel) on VC-01, 05, 07, 08, 10, 11, 13: within mesh tolerance; flagged mesh; refinement bound",
+   "expected": {
+    "volumeRelTolerance": 0.005,
+    "representation": "mesh",
+    "maxEdgeLength": [
+     {
+      "what": "twist box 10x10x100, 90 deg (k = pi/200, rho_max = 5 sqrt 2)",
+      "M2": 0.00174471604991,
+      "tolerance": 0.01,
+      "maxEdgeLength": 6.77146
+     },
+     {
+      "what": "bend bar y in [-5, 5], R 50 (M2 = (R + 5) / R^2)",
+      "M2": 0.022,
+      "tolerance": 0.01,
+      "maxEdgeLength": 1.90693
+     }
+    ]
+   },
+   "grade": "A (bound) / TBD measured volumes",
+   "source": "(b) h <= sqrt(8 tol / M2)",
+   "proves": [
+    "FR-DEF-08",
+    "TR-DEF-05"
+   ],
+   "cli": {
+    "run": "llull run plans/target_twist_box.json --doc t.llull.json --kernel manifold --json",
+    "assert": "steps[3].data.method = mesh; volume within 5e-3"
+   }
+  },
+  {
+   "vc": "VC-DEF-20",
+   "what": "topology preserved and persistent names mapped on the exact path",
+   "expected": {
+    "facesBefore": 6,
+    "facesAfter": 6,
+    "edgesAfter": 12,
+    "verticesAfter": 8,
+    "namesKept": true
+   },
+   "grade": "A",
+   "source": "structure of a box; TR-DEF-07",
+   "proves": [
+    "FR-DEF-07",
+    "FR-DEF-10",
+    "TR-DEF-07"
+   ],
+   "cli": {
+    "run": "llull run plans/target_twist_box.json --doc t.llull.json --json",
+    "assert": "steps[4].data.topology"
+   }
+  },
+  {
+   "vc": "VC-DEF-21",
+   "what": "parametric edit 90 -> 120 deg regenerates",
+   "expected": {
+    "volume": 10000,
+    "totalArea": 4207.29883911
+   },
+   "tolerance": 0.00001,
+   "toleranceKind": "relative",
+   "unit": "mm^2",
+   "grade": "A",
+   "source": "(b) closed form at 120 deg",
+   "proves": [
+    "FR-DEF-10"
+   ],
+   "cli": {
+    "run": "llull edit_step_params stepId=<twist step> params='{...,\"angleDeg\":120}' --doc t.llull.json --json; llull mass_properties entityId=$twisted --doc t.llull.json --json",
+    "assert": "data.area"
+   }
+  },
+  {
+   "vc": "VC-DEF-22",
+   "what": "exact result -> STEP -> re-import: B-spline faces, volume unchanged",
+   "value": 0,
+   "tolerance": 0.000001,
+   "toleranceKind": "relative volume change",
+   "grade": "A",
+   "source": "round trip",
+   "proves": [
+    "FR-DEF-34",
+    "FR-DEF-07",
+    "TR-DEF-13"
+   ],
+   "cli": {
+    "run": "llull export_step_ap242 --doc t.llull.json --json --save out/t.step; llull import_step_exact file=out/t.step --doc t.llull.json --json",
+    "assert": "volume equal"
+   }
+  },
+  {
+   "vc": "VC-DEF-23",
+   "what": "preserveAnalytic recognises the cone of VC-06 and the cylinder of VC-03",
+   "expected": {
+    "coneFaces": 1,
+    "cylinderFaces": 1,
+    "halfAngleDeg": 4.28915332882
+   },
+   "tolerance": 0.000001,
+   "unit": "deg",
+   "grade": "A",
+   "source": "(b) atan((r1 - r2)/h)",
+   "proves": [
+    "FR-DEF-12",
+    "TR-DEF-13"
+   ],
+   "cli": {
+    "run": "llull taper_body ... output='{\"preserveAnalytic\":true}' --doc t.llull.json --json; llull inspect_topology id=$out --doc t.llull.json --json",
+    "assert": "data.faces[*].surface"
+   }
+  },
+  {
+   "vc": "VC-DEF-24",
+   "what": "nurbs_curve straight segment of length 78.5398 bent R 50 / 90 deg = quarter circle; nurbs_surface sheet twisted keeps its trims",
+   "expected": {
+    "curveLength": 78.5398163397,
+    "maxDeviationFromArc": 0
+   },
+   "tolerance": "output.tolerance",
+   "unit": "mm",
+   "grade": "A",
+   "source": "(b) neutral fibre",
+   "proves": [
+    "FR-DEF-17",
+    "TR-DEF-08"
+   ],
+   "cli": {
+    "run": "llull bend_body id=$curve radius=50 angleDeg=90 --doc t.llull.json --json; llull analyze_curve_curvature id=$out --doc t.llull.json --json",
+    "assert": "curvature = 0.02 everywhere"
+   }
+  },
+  {
+   "vc": "VC-DEF-25",
+   "what": "determinism, purity, replay equality, schema snapshot",
+   "value": "identical",
+   "grade": "A",
+   "source": "W3 contract",
+   "proves": [
+    "FR-DEF-25",
+    "FR-DEF-10",
+    "TR-DEF-02",
+    "TR-DEF-12"
+   ],
+   "cli": {
+    "run": "golden plans deform_* twice",
+    "assert": "documents equal"
+   }
+  },
+  {
+   "vc": "VC-DEF-26",
+   "what": "check_deformation: named default tolerance, unverified propagation, reviewRequired for mesh + release",
+   "expected": {
+    "tolerances.approx.defaulted": true,
+    "tolerances.approx.source": "llull DEF default, TECHNICAL_SPEC §5.9",
+    "unverifiedFromImportedStl": true,
+    "reviewRequiredMeshRelease": true,
+    "warnCodes": [
+     "DEF_CHECK_TOLERANCE_DEFAULTED",
+     "DEF_CHECK_INPUT_UNVERIFIED",
+     "DEF_CHECK_MESH_RESULT"
+    ]
+   },
+   "grade": "A",
+   "source": "AGENT_FIRST AF-31..33",
+   "proves": [
+    "FR-DEF-22",
+    "FR-DEF-29",
+    "FR-DEF-30",
+    "FR-DEF-31",
+    "TR-DEF-09",
+    "TR-DEF-11"
+   ],
+   "cli": {
+    "run": "llull check_deformation '{\"purpose\":\"release\"}' --doc t.llull.json --json",
+    "assert": "data.tolerances, data.unverified, data.reviewRequired"
+   }
+  },
+  {
+   "vc": "VC-DEF-27",
+   "what": "wrong plan returns the stable codes",
+   "expected": [
+    "DEF_BEND_RADIUS_TOO_SMALL",
+    "DEF_FOLDOVER",
+    "DEF_SCALE_SINGULAR",
+    "DEF_ENTITY_NOT_FOUND"
+   ],
+   "grade": "A",
+   "source": "TECHNICAL_SPEC §7.1",
+   "proves": [
+    "FR-DEF-27",
+    "FR-DEF-28",
+    "FR-DEF-09",
+    "TR-DEF-10"
+   ],
+   "cli": {
+    "run": "llull run plans/target_bad_plan_codes.json --doc t.llull.json --json",
+    "assert": "each failed step error.code, paths, remediation"
+   }
+  },
+  {
+   "vc": "VC-DEF-28",
+   "what": "units audit of every DEF command and result; guide section",
+   "value": 0,
+   "unit": "count of numeric params / result fields without unit",
+   "grade": "A",
+   "source": "AF-04, AF-10",
+   "proves": [
+    "FR-DEF-26",
+    "FR-DEF-33"
+   ],
+   "cli": {
+    "run": "llull describe <each DEF command> --json",
+    "assert": "every numeric param description names its unit"
+   }
+  },
+  {
+   "vc": "VC-DEF-29",
+   "what": "performance budgets",
+   "expected": "TECHNICAL_SPEC §8",
+   "value": "TBD - measure with tests/unit/deform/perfBudget.test.ts and server perf",
+   "grade": "C",
+   "proves": [
+    "FR-DEF-32",
+    "TR-DEF-12"
+   ]
+  },
+  {
+   "vc": "VC-DEF-30",
+   "what": "TS <-> C++ law parity",
+   "tolerance": 1e-9,
+   "unit": "mm",
+   "grade": "A",
+   "source": "data/point_vectors.json (generated by deformLaws.mjs)",
+   "proves": [
+    "TR-DEF-04",
+    "TR-DEF-01"
+   ],
+   "cli": {
+    "run": "cargo test -p llull-kernel-occt deform_laws_match_vectors; vitest tests/unit/deform/laws.test.ts",
+    "assert": "max abs difference"
+   }
+  },
+  {
+   "vc": "VC-DEF-31",
+   "what": "keepSource keeps the original; ids bends two bodies with one frame in one feature step",
+   "expected": {
+    "entitiesAfterKeepSource": 2,
+    "featureSteps": 1,
+    "volumes": "each as VC-07"
+   },
+   "grade": "A",
+   "source": "FR definitions",
+   "proves": [
+    "FR-DEF-11",
+    "FR-DEF-20"
+   ],
+   "cli": {
+    "run": "llull bend_body ids=[$a,$b] radius=50 angleDeg=90 keepSource=true --doc t.llull.json --json",
+    "assert": "affected ids"
+   }
+  },
+  {
+   "vc": "VC-DEF-32",
+   "what": "--dry-run returns analyze numbers without writing",
+   "expected": {
+    "documentUnchanged": true,
+    "hasJacobian": true
+   },
+   "grade": "A",
+   "source": "AF-42",
+   "proves": [
+    "FR-DEF-23"
+   ],
+   "cli": {
+    "run": "llull twist_body id=$bar angleDeg=90 --dry-run --doc t.llull.json --json",
+    "assert": "file hash unchanged"
+   }
+  },
+  {
+   "vc": "VC-DEF-33",
+   "what": "curve-to-curve residual",
+   "value": "TBD - define with the V2 implementation (residual <= tolerance per pair; far field unchanged)",
+   "grade": "C",
+   "proves": [
+    "FR-DEF-18"
+   ]
+  },
+  {
+   "vc": "VC-DEF-34",
+   "what": "morph of two planar sheets z = 0 and z = 10 at t = 0.3 is the plane z = 3; incompatible pair refused",
+   "expected": {
+    "maxDeviationFromPlaneZ3": 0,
+    "incompatibleCode": "DEF_MORPH_INCOMPATIBLE"
+   },
+   "tolerance": 1e-12,
+   "unit": "mm",
+   "grade": "A",
+   "source": "(b) linear interpolation of poles",
+   "proves": [
+    "FR-DEF-19"
+   ]
+  },
+  {
+   "vc": "VC-DEF-35",
+   "what": "review overlays toggle without document change",
+   "expected": {
+    "documentUnchanged": true
+   },
+   "grade": "A",
+   "source": "L1/L4",
+   "proves": [
+    "FR-DEF-24"
+   ],
+   "cli": {
+    "run": "tests/component/DeformOverlay.test.tsx"
+   }
+  },
+  {
+   "vc": "VC-DEF-36",
+   "what": "bend beyond 360 deg of a thick bar is refused as self-intersecting",
+   "expected": {
+    "code": "DEF_SELF_INTERSECTION"
+   },
+   "grade": "A",
+   "source": "(b) images of z and z + 2 pi R coincide",
+   "proves": [
+    "FR-DEF-09",
+    "TR-DEF-05"
+   ],
+   "cli": {
+    "run": "llull bend_body id=$bar radius=10 angleDeg=400 --doc t.llull.json --json",
+    "assert": "exit 1"
+   }
+  },
+  {
+   "vc": "VC-DEF-37",
+   "what": "baseline (today): twisted bar by loft and bent bar by sweep",
+   "measuredToday": {
+    "twistedLoft": {
+     "volume": 9995.93126,
+     "area": 4122.90344,
+     "method": "exact"
+    },
+    "bentSweep": {
+     "volume": 7803.61128,
+     "method": "mesh"
+    }
+   },
+   "closedForm": {
+    "twistedVolume": 10000,
+    "twistedArea": 4204.10853848,
+    "bentVolume": 7853.98163397
+   },
+   "grade": "A (closed forms) / measured 2026-10-22 on the native kernel",
+   "proves": [
+    "context: TECHNICAL_SPEC §1.2"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_twisted_bar_loft.json --doc t.llull.json --json; llull run plans/baseline_bent_bar_sweep.json --doc t.llull.json --json",
+    "assert": "record, not gate"
+   }
+  }
+ ]
+}

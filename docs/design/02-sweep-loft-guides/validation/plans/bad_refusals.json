@@ -1,0 +1,187 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    0,
+    0
+   ],
+   "radius": 5
+  },
+  "as": "tight"
+ },
+ {
+  "command": "sweep_profile",
+  "params": {
+   "pathId": "$tight",
+   "radius": 6
+  }
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    0,
+    0
+   ],
+   "radius": 50
+  },
+  "as": "ring"
+ },
+ {
+  "command": "sweep_profile",
+  "params": {
+   "pathId": "$ring",
+   "section": [
+    [
+     -5,
+     -5
+    ],
+    [
+     5,
+     -5
+    ],
+    [
+     5,
+     5
+    ],
+    [
+     -5,
+     5
+    ]
+   ],
+   "twist": {
+    "type": "linear",
+    "start": 0,
+    "end": 1.745329252
+   }
+  }
+ },
+ {
+  "command": "sweep_profile",
+  "params": {
+   "path": [
+    [
+     0,
+     0,
+     0
+    ],
+    [
+     0,
+     0,
+     100
+    ]
+   ],
+   "radius": 5,
+   "orientation": {
+    "mode": "frenet"
+   }
+  }
+ },
+ {
+  "command": "add_helix",
+  "params": {
+   "radius": 10,
+   "pitch": 3,
+   "turns": 4
+  },
+  "as": "hx"
+ },
+ {
+  "command": "sweep_profile",
+  "params": {
+   "pathId": "$hx",
+   "section": [
+    [
+     8,
+     -2
+    ],
+    [
+     12,
+     -2
+    ],
+    [
+     12,
+     2
+    ],
+    [
+     8,
+     2
+    ]
+   ],
+   "sectionFrame": "axial",
+   "orientation": {
+    "mode": "axis_plane",
+    "direction": [
+     0,
+     0,
+     1
+    ]
+   }
+  }
+ },
+ {
+  "command": "sweep_profile",
+  "params": {
+   "path": [
+    [
+     0,
+     0,
+     0
+    ],
+    [
+     0,
+     0,
+     100
+    ]
+   ],
+   "radius": 5,
+   "scale": {
+    "type": "linear",
+    "start": 1,
+    "end": -0.5
+   }
+  }
+ },
+ {
+  "command": "sweep_profile",
+  "params": {
+   "path": [
+    [
+     0,
+     0,
+     0
+    ],
+    [
+     0,
+     0,
+     100
+    ]
+   ],
+   "radius": 5,
+   "twist": {
+    "type": "table",
+    "points": [
+     [
+      0,
+      0
+     ],
+     [
+      0.5,
+      1
+     ],
+     [
+      0.4,
+      2
+     ]
+    ]
+   }
+  }
+ }
+]

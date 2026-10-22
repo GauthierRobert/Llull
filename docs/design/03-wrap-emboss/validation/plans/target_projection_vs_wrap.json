@@ -1,0 +1,114 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 20,
+   "height": 40,
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "axis": [
+    0,
+    0,
+    1
+   ]
+  },
+  "as": "body"
+ },
+ {
+  "command": "create_sketch_plane",
+  "params": {
+   "plane": "yz",
+   "offset": 30
+  },
+  "as": "side"
+ },
+ {
+  "command": "draw_polyline",
+  "params": {
+   "points": [
+    [
+     -15,
+     0
+    ],
+    [
+     15,
+     0
+    ]
+   ]
+  },
+  "as": "seg"
+ },
+ {
+  "command": "place_on_sketch_plane",
+  "params": {
+   "ids": [
+    "$seg"
+   ],
+   "plane": "$side"
+  }
+ },
+ {
+  "command": "project_to_face",
+  "params": {
+   "id": "$body",
+   "entityIds": [
+    "$seg"
+   ],
+   "direction": [
+    -1,
+    0,
+    0
+   ]
+  },
+  "as": "projected"
+ },
+ {
+  "command": "wrap_to_face",
+  "params": {
+   "id": "$body",
+   "face": {
+    "faceNear": [
+     20,
+     0,
+     0
+    ]
+   },
+   "entityIds": [
+    "$seg"
+   ],
+   "placement": {
+    "method": "develop",
+    "anchor": {
+     "chart": [
+      0,
+      0
+     ],
+     "on": [
+      20,
+      0,
+      0
+     ]
+    }
+   }
+  },
+  "as": "wrapped"
+ },
+ {
+  "command": "check_wrap",
+  "params": {
+   "ids": [
+    "$projected",
+    "$wrapped"
+   ]
+  }
+ }
+]

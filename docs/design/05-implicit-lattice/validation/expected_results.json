@@ -1,0 +1,1086 @@
+{
+ "gap": "IMP",
+ "generated": "2026-10-22 by generate_expected.mjs from validation/data/*.json",
+ "notes": "Values are (a) quoted from a cited source, (b) derived analytically or by the pack reference scripts (derivation in \"source\"), or (c) TBD with the tool to measure. Only grade A gates pass/fail. Source ids refer to validation/sources.md and FUNCTIONAL_SPEC §11.",
+ "cases": [
+  {
+   "vc": "VC-IMP-01",
+   "what": "exact SDF values of sphere R10, torus 5/2, box half 3/2/1, capsule (12 points each)",
+   "metric": "|evaluate_field − closed form|",
+   "value": 0,
+   "tolerance": 1e-9,
+   "unit": "mm",
+   "reference": "data/sdf_primitives.json cases[*].samples",
+   "bruteForceCrossCheck": {
+    "sphere": 0.000522927933435,
+    "torus": 0.000731684468579,
+    "box": 0.000196329702323,
+    "capsule": 0.000518394547939
+   },
+   "source": "(b) closed forms, cross-checked against brute-force distance to sampled surfaces",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-02",
+    "FR-IMP-03",
+    "TR-IMP-01",
+    "TR-IMP-04"
+   ],
+   "cli": {
+    "run": "llull evaluate_field '{\"field\":\"$f\",\"points\":[…]}' --doc t.llull.json --json",
+    "assert": "data.values[i]"
+   }
+  },
+  {
+   "vc": "VC-IMP-02",
+   "what": "exact primitives are unit-gradient and report distanceQuality = exact",
+   "metric": "max ||∇f| − 1|",
+   "value": 0,
+   "tolerance": 0.000001,
+   "measured_by_reference_script": {
+    "sphere": 3.09491210437e-10,
+    "torus": 6.51923837136e-9,
+    "box": 5.31549249061e-11,
+    "capsule": 4.43725056698e-11
+   },
+   "unit": "1",
+   "source": "(b) derived",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-02",
+    "TR-IMP-01",
+    "TR-IMP-04"
+   ],
+   "cli": {
+    "run": "llull evaluate_field '{\"field\":\"$f\",\"points\":[…],\"gradient\":true}' --doc t.llull.json --json",
+    "assert": "data.gradients, data.distanceQuality"
+   }
+  },
+  {
+   "vc": "VC-IMP-03",
+   "what": "quadratic smooth union: max deviation from min = k/4 (k = 1); 1-Lipschitz",
+   "metric": "max(min − smin)",
+   "value": 0.25,
+   "tolerance": 1e-12,
+   "unit": "mm per mm of k",
+   "source": "(b) derived; data/smooth_min.json",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-04",
+    "FR-IMP-05",
+    "TR-IMP-04"
+   ],
+   "cli": {
+    "run": "llull combine_fields '{\"op\":\"union\",\"a\":\"$a\",\"b\":\"$b\",\"blend\":{\"kind\":\"quadratic\",\"radius\":1}}' --doc t.llull.json --json",
+    "assert": "data.blend.maxDeviation"
+   }
+  },
+  {
+   "vc": "VC-IMP-04",
+   "what": "exponential smooth union: max deviation = k ln 2 (k = 1)",
+   "metric": "max(min − smin)",
+   "value": 0.69314718056,
+   "tolerance": 1e-9,
+   "unit": "mm per mm of k",
+   "source": "(b) derived",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-04",
+    "TR-IMP-04"
+   ],
+   "cli": {
+    "run": "llull combine_fields '{\"op\":\"union\",\"a\":\"$a\",\"b\":\"$b\",\"blend\":{\"kind\":\"exponential\",\"radius\":1}}' --doc t.llull.json --json",
+    "assert": "data.blend.maxDeviation"
+   }
+  },
+  {
+   "vc": "VC-IMP-05",
+   "what": "smooth (quadratic, k = 2) union of half-spaces x<0, y<0 clipped to [−4,16]²×[0,10]",
+   "metric": "volume; field value at the tangent setback points (2,0,5), (0,2,5) and the bisector point (0.5,0.5,5)",
+   "value": 1446.6667,
+   "tolerance_rel": 0.001,
+   "pointValues": {
+    "[2,0,5]": 0,
+    "[0,2,5]": 0,
+    "[0.5,0.5,5]": 0
+   },
+   "pointTolerance": 1e-9,
+   "unit": "mm³ / mm",
+   "source": "(b) V = 4000 − 2560 + 10·k²/6; setback k, bisector k/4 (data/smooth_min.json, quadrature 0.666677 vs 0.666667)",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-04",
+    "FR-IMP-05",
+    "FR-IMP-20",
+    "TR-IMP-04",
+    "TR-IMP-08"
+   ],
+   "cli": {
+    "run": "llull run plans/target_smooth_union_corner.json --doc t.llull.json --json",
+    "assert": "steps[implicit_properties].data.volume; steps[evaluate_field].data.values"
+   }
+  },
+  {
+   "vc": "VC-IMP-06",
+   "what": "shells of the exact sphere R10, t = 2: centred (radii 9..11) and inside (8..10)",
+   "metric": "volume (field quadrature)",
+   "value": {
+    "centred": 2521.65170328,
+    "inside": 2044.12961994
+   },
+   "tolerance_rel": 0.002,
+   "unit": "mm³",
+   "source": "(b) 4/3 π (R₂³ − R₁³)",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-07",
+    "TR-IMP-04",
+    "TR-IMP-09"
+   ],
+   "cli": {
+    "run": "llull shell_field '{\"field\":\"$s\",\"thickness\":2,\"side\":\"centred\"}' --doc t.llull.json --json; llull implicit_properties id=$shell --doc t.llull.json --json",
+    "assert": "data.volume"
+   }
+  },
+  {
+   "vc": "VC-IMP-07",
+   "what": "offset of the exact sphere by +1.5 is the sphere R 11.5 (exact); offset of a smooth union warns IMP_OFFSET_NOT_EXACT",
+   "metric": "evaluate_field at (11.5,0,0); warning code",
+   "value": 0,
+   "tolerance": 1e-12,
+   "expectedCode": "IMP_OFFSET_NOT_EXACT",
+   "unit": "mm",
+   "source": "(b) derived",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-07",
+    "FR-IMP-43",
+    "TR-IMP-04",
+    "TR-IMP-14"
+   ],
+   "cli": {
+    "run": "llull offset_field '{\"field\":\"$s\",\"distance\":1.5}' --doc t.llull.json --json",
+    "assert": "data.distanceQuality, warnings[*].code"
+   }
+  },
+  {
+   "vc": "VC-IMP-08",
+   "what": "field_from_solid of add_box [40,40,40] equals the exact box SDF (flat faces: tessellation exact); open mesh refused",
+   "metric": "max |f − box SDF| at 1000 R3 points in [−30,30]³",
+   "value": 0,
+   "tolerance": 1e-9,
+   "expectedCodeOpenMesh": "IMP_SOLID_NOT_CLOSED",
+   "unit": "mm",
+   "source": "(b) closed form of the box SDF",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-06",
+    "TR-IMP-10",
+    "TR-IMP-14"
+   ],
+   "cli": {
+    "run": "llull add_box size=[40,40,40] --doc t.llull.json --json; llull field_from_solid entityId=$box --doc t.llull.json --json; llull evaluate_field … --doc t.llull.json --json",
+    "assert": "data.values"
+   }
+  },
+  {
+   "vc": "VC-IMP-09",
+   "what": "uniform scale 2 of sphere R5 = sphere R10 exactly; non-uniform map reports approximate",
+   "metric": "evaluate_field vs |p| − 10",
+   "value": 0,
+   "tolerance": 1e-12,
+   "unit": "mm",
+   "source": "(b) derived",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-08",
+    "TR-IMP-04"
+   ],
+   "cli": {
+    "run": "llull transform_field '{\"field\":\"$s5\",\"scale\":2}' --doc t.llull.json --json",
+    "assert": "data.distanceQuality = exact"
+   }
+  },
+  {
+   "vc": "VC-IMP-10",
+   "what": "TPMS network at level 0 in an integer number of cells: relative density 1/2 (gyroid, schwarz_p, diamond)",
+   "metric": "implicit_properties.data.relativeDensity",
+   "value": 0.5,
+   "tolerance": {
+    "fieldQuadrature": 0.0001,
+    "mesh": 0.002
+   },
+   "measured_by_reference_script": {
+    "gyroid": 0.5,
+    "schwarzP": 0.5000182,
+    "diamond": 0.5
+   },
+   "unit": "1",
+   "source": "(b) symmetry: t = 0 network fraction is exactly 1/2: gyroid G(−x) = −G(x); P(x + a/2·(1,1,1)) = −P(x); D(x + (a/2, 0, 0)) = −D(x) — each a volume-preserving map exchanging {F < 0} and {F > 0}; [R22] \"two congruent labyrinths\"",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-10",
+    "FR-IMP-12",
+    "TR-IMP-05"
+   ],
+   "cli": {
+    "run": "llull add_tpms_lattice '{\"kind\":\"gyroid\",\"form\":\"network\",\"level\":0,\"cellSize\":10,\"region\":\"$cube30\"}' --doc t.llull.json --json; llull create_implicit_body … ; llull implicit_properties …",
+    "assert": "data.relativeDensity"
+   }
+  },
+  {
+   "vc": "VC-IMP-11",
+   "what": "TPMS fractions vs level / raw sheet t (table)",
+   "metric": "relative density",
+   "value": {
+    "gyroid_network_t0p4": 0.6292731,
+    "schwarzP_network_t1": 0.786945,
+    "diamond_network_tm0p4": 0.2668032,
+    "gyroid_sheet_t0p3": 0.1935509,
+    "schwarzP_sheet_t0p3": 0.1715671,
+    "diamond_sheet_t0p3": 0.3489537
+   },
+   "tolerance": 0.002,
+   "unit": "1",
+   "source": "(b) 240³ midpoint quadrature, data/tpms_volume_fraction.json (|240³ − 120³| ≤ 1.1e-3)",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-10",
+    "TR-IMP-05"
+   ],
+   "cli": {
+    "run": "llull add_tpms_lattice '{\"kind\":\"gyroid\",\"form\":\"network\",\"level\":0.4,…}' --doc t.llull.json --json; … implicit_properties",
+    "assert": "data.relativeDensity"
+   }
+  },
+  {
+   "vc": "VC-IMP-12",
+   "what": "relativeDensity control: gyroid sheet (normalised) target 0.30, cell 10 mm",
+   "metric": "measured relative density; resolved thickness",
+   "value": 0.3,
+   "tolerance": 0.005,
+   "resolvedThicknessExpected_mm": "between w/a = 0.1 (0.2943) and 0.15 (table): ≈ 1.0–1.5 mm; exact value recorded on first run (TBD — measure with implicit_properties)",
+   "unit": "1",
+   "source": "(b) inversion of data/tpms_volume_fraction.json sheetDistanceNormalised",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-10",
+    "TR-IMP-05"
+   ],
+   "cli": {
+    "run": "llull add_tpms_lattice '{\"kind\":\"gyroid\",\"form\":\"sheet\",\"relativeDensity\":0.3,\"cellSize\":10,\"region\":\"$cube\"}' --doc t.llull.json --json",
+    "assert": "data.control.thickness; implicit_properties.data.relativeDensity"
+   }
+  },
+  {
+   "vc": "VC-IMP-13",
+   "what": "normalised sheet walls are uniform; raw walls vary by max/min |∇F|",
+   "metric": "lattice_properties thicknessMax / thicknessMin",
+   "value": {
+    "normalised": 1,
+    "rawGyroid": 1.224745,
+    "rawSchwarzP": 1.732051,
+    "rawDiamond": 1.224745
+   },
+   "tolerance": {
+    "normalised": 0.05,
+    "raw": 0.02
+   },
+   "unit": "1",
+   "source": "(b) data/tpms_surface.json gradientOnSurface (ratios √1.5 / √3 to 7 digits)",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-11",
+    "FR-IMP-31",
+    "TR-IMP-05",
+    "TR-IMP-09"
+   ],
+   "cli": {
+    "run": "llull lattice_properties id=$tpms --doc t.llull.json --json",
+    "assert": "data.thicknessMax / data.thicknessMin"
+   }
+  },
+  {
+   "vc": "VC-IMP-14",
+   "what": "specific surface of the nodal TPMS (area per cell, a = 1)",
+   "metric": "lattice_properties.specificSurface × a",
+   "value": {
+    "gyroid": 3.091646,
+    "schwarzP": 2.352567,
+    "diamond": 3.838038
+   },
+   "tolerance_rel": 0.002,
+   "unit": "mm²/mm³ × mm",
+   "source": "(b) reference mesher 96³ / 192³, Richardson",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-31",
+    "TR-IMP-05",
+    "TR-IMP-09"
+   ],
+   "cli": {
+    "run": "llull lattice_properties id=$tpms --doc t.llull.json --json",
+    "assert": "data.specificSurface"
+   }
+  },
+  {
+   "vc": "VC-IMP-15",
+   "what": "simple-cubic cell a = 10, r = 1: baseline plan (3 cylinders, boolean union) and target strut lattice",
+   "metric": "volume",
+   "value": 82.93407,
+   "tolerance": {
+    "exactKernel_rel": 0.000001,
+    "meshKernel_rel": 0.005,
+    "implicit_rel": 0.005
+   },
+   "unit": "mm³",
+   "source": "(b) ρ = 3πx² − 8√2x³ (Steinmetz [R24]); R3 quadrature 0.08292127 vs 0.08293407",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-13",
+    "FR-IMP-22",
+    "FR-IMP-31",
+    "TR-IMP-06",
+    "TR-IMP-09"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_sc_unit_cell_cylinders.json --doc t.llull.json --json; llull run plans/target_sc_strut_lattice_cell.json --doc t.llull.json --json",
+    "assert": "mass_properties.data.volume; implicit_properties.data.volume"
+   }
+  },
+  {
+   "vc": "VC-IMP-16",
+   "what": "first-order relative density ρ1 = π x² L/a (x = 0.1)",
+   "metric": "lattice_properties.data.rho1",
+   "value": {
+    "cubic": 0.09424778,
+    "bcc": 0.2176559,
+    "fcc": 0.266573,
+    "octet": 0.533146
+   },
+   "tolerance": 0.000001,
+   "unit": "1",
+   "source": "(b) strut length per cell 3a, 4√3a, 6√2a, 12√2a",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-31",
+    "TR-IMP-06"
+   ],
+   "cli": {
+    "run": "llull lattice_properties id=$lat --doc t.llull.json --json",
+    "assert": "data.rho1"
+   }
+  },
+  {
+   "vc": "VC-IMP-17",
+   "what": "measured relative density of periodic BCC / FCC / octet lattices; octet 2×2×2 block (a 10, r 0.5) volume",
+   "metric": "implicit_properties.data.relativeDensity; volume",
+   "value": {
+    "bcc_x0p1": 0.1784675,
+    "fcc_x0p1": 0.2119389,
+    "octet_x0p1": 0.3786271,
+    "octet_x0p05": 0.1139805,
+    "octetBlockVolume_mm3": 911.844
+   },
+   "tolerance_rel": 0.005,
+   "unit": "1 / mm³",
+   "source": "(b) R3 quasi-Monte Carlo, 2²² points (|2²² − 2²⁰| ≤ 7e-5); method validated on the cubic closed form (1.3e-5)",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-13",
+    "FR-IMP-14",
+    "TR-IMP-06",
+    "TR-IMP-09"
+   ],
+   "cli": {
+    "run": "llull run plans/target_octet_beam_lattice_3mf.json --doc t.llull.json --json",
+    "assert": "steps[implicit_properties].data.volume"
+   }
+  },
+  {
+   "vc": "VC-IMP-18",
+   "what": "region clipping: lattice clipped by a box not aligned with the cells reports danglingStruts and keeps the region exactly",
+   "metric": "bounds of the body = region bounds; danglingStruts > 0",
+   "value": "bounds equal within voxel; danglingStruts count TBD — measure with lattice_properties on first run",
+   "unit": "mm / count",
+   "source": "(c) TBD",
+   "grade": "C",
+   "proves": [
+    "FR-IMP-14",
+    "TR-IMP-06"
+   ],
+   "cli": {
+    "run": "llull add_strut_lattice '{\"cell\":\"cubic\",\"cellSize\":10,\"radius\":1,\"region\":\"$box25\"}' --doc t.llull.json --json; llull lattice_properties …",
+    "assert": "data.danglingStruts"
+   }
+  },
+  {
+   "vc": "VC-IMP-19",
+   "what": "Maxwell classification reported (informative, not gating): octet stretch, cubic / BCC / FCC bending",
+   "metric": "lattice_properties.data.maxwell.class",
+   "value": {
+    "cubic": "bending",
+    "bcc": "bending",
+    "fcc": "bending",
+    "octet": "stretch"
+   },
+   "unit": "-",
+   "source": "(c) Maxwell rule as used by Deshpande, Ashby & Fleck (secondary extracts only)",
+   "grade": "C",
+   "gate": false,
+   "proves": [
+    "FR-IMP-31",
+    "TR-IMP-06"
+   ],
+   "cli": {
+    "run": "llull lattice_properties id=$lat --doc t.llull.json --json",
+    "assert": "data.maxwell.class"
+   }
+  },
+  {
+   "vc": "VC-IMP-20",
+   "what": "field → mesh convergence, sphere R 10 (and Manifold levelSet oracle within the same bound)",
+   "metric": "relative volume error at voxel h",
+   "value": {
+    "h0.983": -0.0048424781,
+    "h0.502": -0.001263974,
+    "h0.251": -0.000315638,
+    "h0.125": -0.000077999192
+   },
+   "tolerance": "error ≤ 0.6 (h/R)² and closed manifold; observed order ≥ 1.9",
+   "observedOrder": {
+    "volume": [
+     2.0012356,
+     2.001624,
+     2.0007483
+    ],
+    "area": [
+     2.0027174,
+     2.0016822,
+     2.0002066
+    ],
+    "vertex": [
+     1.8310923,
+     1.9849601,
+     1.991652
+    ]
+   },
+   "unit": "1",
+   "source": "(b) reference mesher (isosurface_lib.mjs) vs 4/3 π R³",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-20",
+    "FR-IMP-21",
+    "TR-IMP-08"
+   ],
+   "cli": {
+    "run": "llull create_implicit_body '{\"field\":\"$s\",\"voxel\":0.5}' --doc t.llull.json --json; llull implicit_properties id=$b --doc t.llull.json --json",
+    "assert": "data.volumeMesh, data.errorEstimate"
+   }
+  },
+  {
+   "vc": "VC-IMP-21",
+   "what": "torus convergence and closed-manifold output on every shape and plan (F6 regressions: > 2e6 nodes, node-exact zeros)",
+   "metric": "relative volume error; closedManifold",
+   "value": {
+    "h1.013": -0.04261042,
+    "h0.507": -0.010860138,
+    "h0.249": -0.0025854809,
+    "h0.125": -0.0006460153
+   },
+   "tolerance": "error ≤ 0.2 (h/r)²; closedManifold = true for all",
+   "unit": "1",
+   "source": "(b) reference mesher vs 2π²Rr²",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-20",
+    "FR-IMP-21",
+    "TR-IMP-08"
+   ],
+   "cli": {
+    "run": "llull create_implicit_body … --doc t.llull.json --json",
+    "assert": "data.closedManifold"
+   }
+  },
+  {
+   "vc": "VC-IMP-22",
+   "what": "cube 40, 2 mm skin, gyroid network infill level 0, a = 12, inner cube 36",
+   "metric": "implicit_properties.data.volume",
+   "value": 40672,
+   "tolerance_rel": 0.002,
+   "unit": "mm³",
+   "source": "(b) V = s³ − (s − 2w)³ + ½ (s − 2w)³ ; the shell and the infill are disjoint (infill clipped to the inner cube); infill quadrature 180³ = 0.5000122",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-06",
+    "FR-IMP-07",
+    "FR-IMP-10",
+    "FR-IMP-14",
+    "FR-IMP-20",
+    "TR-IMP-03",
+    "TR-IMP-05",
+    "TR-IMP-08"
+   ],
+   "cli": {
+    "run": "llull run plans/target_shell_gyroid_infill.json --doc t.llull.json --json",
+    "assert": "steps[implicit_properties].data.volume"
+   }
+  },
+  {
+   "vc": "VC-IMP-23",
+   "what": "infill_solid convenience command gives the same part",
+   "metric": "volume",
+   "value": 40672,
+   "tolerance_rel": 0.002,
+   "unit": "mm³",
+   "source": "(b) same as VC-IMP-22",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-23",
+    "TR-IMP-03"
+   ],
+   "cli": {
+    "run": "llull run plans/target_infill_solid_box.json --doc t.llull.json --json",
+    "assert": "steps[implicit_properties].data.volume"
+   }
+  },
+  {
+   "vc": "VC-IMP-24",
+   "what": "graded normalised gyroid sheet, wall 0.5 → 2.5 mm over z 0..40, column 10 × 10 × 40, a = 10",
+   "metric": "relative density; wall min / max",
+   "value": {
+    "relativeDensity": 0.4043801,
+    "thicknessMin": 0.5,
+    "thicknessMax": 2.5
+   },
+   "tolerance": {
+    "relativeDensity": 0.005,
+    "thickness": 0.02
+   },
+   "unit": "1 / mm",
+   "source": "(b) quadrature 160²×640 (|Δ| = 0.000009033203)",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-15",
+    "FR-IMP-16",
+    "TR-IMP-05"
+   ],
+   "cli": {
+    "run": "llull run plans/target_graded_gyroid_column.json --doc t.llull.json --json",
+    "assert": "steps[implicit_properties].data.relativeDensity; steps[lattice_properties].data.thicknessMin/Max"
+   }
+  },
+  {
+   "vc": "VC-IMP-25",
+   "what": "cylindrical cell map: integer cells around are seamless; 6.5 cells refused",
+   "metric": "seam jump; refusal code",
+   "value": {
+    "cells6": 1.554312e-15,
+    "cells6.5": 2,
+    "cells8": 1.998401e-15
+   },
+   "expectedCode": "IMP_MAP_SEAM",
+   "tolerance": 1e-12,
+   "unit": "field units",
+   "source": "(b) data/composites.json",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-17",
+    "TR-IMP-07",
+    "TR-IMP-14"
+   ],
+   "cli": {
+    "run": "llull run plans/target_cylindrical_gyroid_sleeve.json --doc t.llull.json --json",
+    "assert": "no IMP_MAP_SEAM; target_errors step 3 → IMP_MAP_SEAM"
+   }
+  },
+  {
+   "vc": "VC-IMP-26",
+   "what": "graph lattice: one beam (line of 10 mm), r 1 → 0.5, cap butt = conical frustum",
+   "metric": "volume",
+   "value": 18.32596,
+   "tolerance_rel": 0.002,
+   "unit": "mm³",
+   "source": "(b) π h (r1² + r1 r2 + r2²)/3 (3MF beam geometry [R17])",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-18",
+    "TR-IMP-06"
+   ],
+   "cli": {
+    "run": "llull draw_polyline … ; llull add_graph_lattice '{\"sourceIds\":[\"$line\"],\"radiusStart\":1,\"radiusEnd\":0.5,\"cap\":\"butt\"}' --doc t.llull.json --json; … implicit_properties",
+    "assert": "data.volume"
+   }
+  },
+  {
+   "vc": "VC-IMP-27",
+   "what": "Neovius network level 0 relative density 1/2 (V1 cell)",
+   "metric": "relative density",
+   "value": 0.5,
+   "tolerance": 0.002,
+   "unit": "1",
+   "source": "(b) symmetry: shift by a/2·(1,1,1) flips every cosine, F → −F",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-18",
+    "TR-IMP-05"
+   ],
+   "cli": {
+    "run": "llull add_tpms_lattice '{\"kind\":\"neovius\",\"form\":\"network\",\"level\":0,…}' --doc t.llull.json --json",
+    "assert": "implicit_properties.data.relativeDensity"
+   }
+  },
+  {
+   "vc": "VC-IMP-28",
+   "what": "noise field determinism: same seed → identical values; different seed → different",
+   "metric": "evaluate_field values equality",
+   "value": "bitwise equal for the same seed on both engines",
+   "unit": "-",
+   "source": "(b) counter-based hash",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-16",
+    "FR-IMP-64",
+    "TR-IMP-01",
+    "TR-IMP-11"
+   ],
+   "cli": {
+    "run": "llull create_scalar_field '{\"kind\":\"noise\",\"seed\":7,\"frequency\":0.1}' --doc t.llull.json --json; llull evaluate_field …",
+    "assert": "data.values"
+   }
+  },
+  {
+   "vc": "VC-IMP-29",
+   "what": "topology density field as a grading input (17 TOP study) drives strut radius",
+   "metric": "radiusMin / radiusMax follow the ramp of the recorded density",
+   "value": "TBD — measure on the 17 TOP MBB golden study",
+   "unit": "mm",
+   "source": "(c) TBD",
+   "grade": "C",
+   "proves": [
+    "FR-IMP-16",
+    "TR-IMP-03"
+   ],
+   "cli": {
+    "run": "llull create_scalar_field '{\"kind\":\"topology_density\",\"studyId\":\"$st\"}' --doc t.llull.json --json",
+    "assert": "lattice_properties.data.radiusMin/Max"
+   }
+  },
+  {
+   "vc": "VC-IMP-30",
+   "what": "octet 2×2×2 block as 3MF beam lattice",
+   "metric": "nodes, beams, namespace, minlength",
+   "value": {
+    "nodes": 63,
+    "beams": 240,
+    "namespace": "http://schemas.microsoft.com/3dmanufacturing/beamlattice/2017/02",
+    "minlengthPositive": true
+   },
+   "tolerance": 0,
+   "unit": "count",
+   "source": "(b) data/beam_block_counts.json; [R17]",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-31",
+    "FR-IMP-51",
+    "FR-IMP-54",
+    "TR-IMP-06",
+    "TR-IMP-12"
+   ],
+   "cli": {
+    "run": "llull run plans/target_octet_beam_lattice_3mf.json --doc t.llull.json --json",
+    "assert": "steps[lattice_properties].data.beams/nodes; steps[export_3mf].data.beamCount"
+   }
+  },
+  {
+   "vc": "VC-IMP-31",
+   "what": "3MF implicit levelset export validates against the pinned implicit.xsd (sha256 e88ce8d5…)",
+   "metric": "schema validation",
+   "value": "valid",
+   "unit": "-",
+   "source": "(a) [R18] XSD",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-52",
+    "TR-IMP-12"
+   ],
+   "cli": {
+    "run": "llull export_3mf '{\"entityIds\":[\"$body\"],\"implicit\":\"levelset\"}' --doc t.llull.json --json --save out.3mf",
+    "assert": "xsd validation in server/tests"
+   }
+  },
+  {
+   "vc": "VC-IMP-32",
+   "what": "STEP export skips implicit bodies with IMP_STEP_NOT_EXACT; STL / 3MF report triangles",
+   "metric": "skipped[*].code; data.triangleCount",
+   "value": "IMP_STEP_NOT_EXACT",
+   "unit": "-",
+   "source": "(b) KI5",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-24",
+    "FR-IMP-50",
+    "FR-IMP-53",
+    "TR-IMP-13"
+   ],
+   "cli": {
+    "run": "llull export_step_ap242 --doc t.llull.json --json",
+    "assert": "data.skipped[*].code"
+   }
+  },
+  {
+   "vc": "VC-IMP-33",
+   "what": "trapped void: sphere R10 shelled inside by 2 (sealed cavity R8)",
+   "metric": "check_implicit finding and void volume",
+   "value": 2144.6606,
+   "expectedCode": "IMP_TRAPPED_VOID",
+   "tolerance_rel": 0.01,
+   "unit": "mm³",
+   "source": "(b) 4/3 π 8³",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-40",
+    "FR-IMP-42",
+    "TR-IMP-09",
+    "TR-IMP-15"
+   ],
+   "cli": {
+    "run": "llull check_implicit id=$hollow --doc t.llull.json --json",
+    "assert": "data.findings[code=IMP_TRAPPED_VOID].value"
+   }
+  },
+  {
+   "vc": "VC-IMP-34",
+   "what": "two disjoint spheres in one field → 2 components, IMP_DISCONNECTED",
+   "metric": "implicit_properties.data.components; finding",
+   "value": 2,
+   "expectedCode": "IMP_DISCONNECTED",
+   "unit": "count",
+   "source": "(b) construction",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-30",
+    "FR-IMP-40",
+    "TR-IMP-09",
+    "TR-IMP-15"
+   ],
+   "cli": {
+    "run": "llull check_implicit id=$two --doc t.llull.json --json",
+    "assert": "data.findings"
+   }
+  },
+  {
+   "vc": "VC-IMP-35",
+   "what": "resolution adequacy: sheet wall 0.3 mm realised at voxel 0.2 → warn",
+   "metric": "finding",
+   "value": "IMP_CHECK_RESOLUTION_COARSE",
+   "unit": "-",
+   "source": "(b) rule: smallest feature < 2 voxels",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-40",
+    "TR-IMP-15"
+   ],
+   "cli": {
+    "run": "llull check_implicit id=$thin --doc t.llull.json --json",
+    "assert": "data.findings[*].code"
+   }
+  },
+  {
+   "vc": "VC-IMP-36",
+   "what": "process limits: absent → IMP_CHECK_NO_PROCESS_LIMITS warn (not suppressible); given → limits echoed with source and compared; skin of the shell plan measured 2.0 mm",
+   "metric": "findings; data.limits; measured min wall of the skin",
+   "value": {
+    "skinWall": 2,
+    "noLimitsCode": "IMP_CHECK_NO_PROCESS_LIMITS"
+   },
+   "tolerance": {
+    "skinWall": 0.2
+   },
+   "unit": "mm",
+   "source": "(b) construction; AF-31",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-41",
+    "TR-IMP-15"
+   ],
+   "cli": {
+    "run": "llull check_implicit id=$body --doc t.llull.json --json",
+    "assert": "data.limits.minWallMm.source; data.findings"
+   }
+  },
+  {
+   "vc": "VC-IMP-37",
+   "what": "overhang area of sphere R10, build +Z, critical angle 45°: downward cap within 45° of −Z",
+   "metric": "area below critical angle",
+   "value": 184.03024,
+   "tolerance_rel": 0.01,
+   "unit": "mm²",
+   "source": "(b) spherical cap area 2πR²(1 − cos 45°)",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-44",
+    "TR-IMP-09"
+   ],
+   "cli": {
+    "run": "llull check_implicit '{\"id\":\"$sph\",\"process\":{\"buildDirection\":[0,0,1],\"criticalAngleDeg\":45,\"source\":\"test\"}}' --doc t.llull.json --json",
+    "assert": "data.findings[code=IMP_CHECK_OVERHANG].value"
+   }
+  },
+  {
+   "vc": "VC-IMP-38",
+   "what": "section_field: gyroid network level 0 cut by z = 0 over whole cells → solid fraction 1/2; sphere R10 cut by z = 0 → area 100π",
+   "metric": "solidFraction; solidArea",
+   "value": {
+    "gyroidSectionFraction": 0.5,
+    "sphereSectionArea": 314.15927
+   },
+   "tolerance": {
+    "fraction": 0.002,
+    "area_rel": 0.002
+   },
+   "unit": "1 / mm²",
+   "source": "(b) at z = 0, G = sin X cos Y + sin Y is odd under (X,Y) → (−X,−Y)",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-32",
+    "TR-IMP-09"
+   ],
+   "cli": {
+    "run": "llull section_field '{\"field\":\"$g\",\"plane\":{\"origin\":[0,0,0],\"normal\":[0,0,1]},\"size\":[30,30]}' --doc t.llull.json --json",
+    "assert": "data.solidFraction"
+   }
+  },
+  {
+   "vc": "VC-IMP-39",
+   "what": "evaluate_field bounded (10 000 points max), units and quality present",
+   "metric": "refusal above the cap (CMD_INVALID_PARAMS); data.unit",
+   "value": "mm",
+   "unit": "-",
+   "source": "(b) AF-12",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-33",
+    "TR-IMP-17"
+   ],
+   "cli": {
+    "run": "llull evaluate_field … --doc t.llull.json --json",
+    "assert": "data.unit, data.distanceQuality"
+   }
+  },
+  {
+   "vc": "VC-IMP-40",
+   "what": "each step of plans/target_errors.json run as its own call is refused with its code",
+   "metric": "exit code 1 and error.code",
+   "value": [
+    "IMP_TPMS_CONTROL_RANGE",
+    "IMP_STRUT_RADIUS_RANGE",
+    "IMP_MAP_SEAM",
+    null,
+    "IMP_GRID_BUDGET",
+    "IMP_FIELD_NOT_FOUND"
+   ],
+   "unit": "-",
+   "source": "(b) TECHNICAL_SPEC §7.1 (step 4 succeeds and binds $big)",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-61",
+    "TR-IMP-14",
+    "TR-IMP-16"
+   ],
+   "cli": {
+    "run": "for each step: llull <command> '<params>' --doc t.llull.json --json",
+    "assert": "error.code"
+   }
+  },
+  {
+   "vc": "VC-IMP-41",
+   "what": "llull search / describe: every IMP command found by keyword, every numeric param states its unit",
+   "metric": "audit",
+   "value": "all",
+   "unit": "-",
+   "source": "(b) AF-01..04",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-60",
+    "TR-IMP-17"
+   ],
+   "cli": {
+    "run": "llull search lattice gyroid infill blend --json; llull describe <each> --json",
+    "assert": "unit present in every numeric param description"
+   }
+  },
+  {
+   "vc": "VC-IMP-42",
+   "what": "plain-language summary and provenance (method, engine, device, deterministic, voxel)",
+   "metric": "presence",
+   "value": "present on every IMP result",
+   "unit": "-",
+   "source": "(b) AF-35, AF-36",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-62",
+    "TR-IMP-17"
+   ],
+   "cli": {
+    "run": "llull implicit_properties id=$b --doc t.llull.json --json",
+    "assert": "data.provenance.engine"
+   }
+  },
+  {
+   "vc": "VC-IMP-43",
+   "what": "unverified propagation (imported mesh without pinned hash → field_from_solid → body) and reviewRequired on purpose=release",
+   "metric": "data.unverified; IMP_CHECK_INPUT_UNVERIFIED; reviewRequired",
+   "value": {
+    "unverified": true,
+    "reviewRequired": true
+   },
+   "unit": "-",
+   "source": "(b) AF-32, AF-33",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-45",
+    "FR-IMP-63",
+    "TR-IMP-15"
+   ],
+   "cli": {
+    "run": "llull check_implicit '{\"id\":\"$b\",\"purpose\":\"release\"}' --doc t.llull.json --json",
+    "assert": "data.reviewRequired, data.findings"
+   }
+  },
+  {
+   "vc": "VC-IMP-44",
+   "what": "determinism: two runs and the TS vs native engine on the shell + infill plan",
+   "metric": "mesh hash per engine; |Δ volume| across engines; tape values",
+   "value": {
+    "sameEngineMeshHashEqual": true,
+    "tapeRelDiff": 0
+   },
+   "tolerance": {
+    "tapeRel": 1e-12,
+    "volumeRel": 1e-9
+   },
+   "unit": "-",
+   "source": "(b) AF-13, RS1 rule 3",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-01",
+    "FR-IMP-64",
+    "TR-IMP-01",
+    "TR-IMP-02",
+    "TR-IMP-11"
+   ],
+   "cli": {
+    "run": "llull run plans/target_shell_gyroid_infill.json --doc t.llull.json --json (twice; LLULL_NATIVE_DIR unset / set)",
+    "assert": "steps[create_implicit_body].data.meshSha256"
+   }
+  },
+  {
+   "vc": "VC-IMP-45",
+   "what": "offline: all plans run with the network disabled; without llull-compute the TS engine answers below its cap and refuses above with the native hint",
+   "metric": "success / IMP_GRID_BUDGET",
+   "value": "pass",
+   "unit": "-",
+   "source": "(b) AF-41, LC1",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-65",
+    "TR-IMP-11"
+   ],
+   "cli": {
+    "run": "llull run plans/target_sc_strut_lattice_cell.json --doc t.llull.json --json",
+    "assert": "exit 0"
+   }
+  },
+  {
+   "vc": "VC-IMP-46",
+   "what": "budget refusal before work: sphere R1000 at voxel 0.001",
+   "metric": "IMP_GRID_BUDGET within 100 ms",
+   "value": "IMP_GRID_BUDGET",
+   "unit": "-",
+   "source": "(b) FR-IMP-66",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-66",
+    "TR-IMP-16"
+   ],
+   "cli": {
+    "run": "llull create_implicit_body '{\"field\":\"$big\",\"voxel\":0.001}' --doc t.llull.json --json",
+    "assert": "error.code; durationMs < 100"
+   }
+  },
+  {
+   "vc": "VC-IMP-47",
+   "what": "mechanical estimate opt-in flagged unverified + reviewRequired",
+   "metric": "lattice_properties.data.mechanics.unverified",
+   "value": true,
+   "unit": "-",
+   "source": "(b) AF-32, AF-33; [R25] catalogue only",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-34",
+    "TR-IMP-15"
+   ],
+   "cli": {
+    "run": "llull lattice_properties '{\"id\":\"$lat\",\"estimateMechanics\":true}' --doc t.llull.json --json",
+    "assert": "data.mechanics.unverified"
+   }
+  },
+  {
+   "vc": "VC-IMP-48",
+   "what": "document size and re-derivation: the saved shell + infill document is ≤ 20 kB larger than the box-only one; load re-derives the same mesh hash",
+   "metric": "bytes; meshSha256 after load",
+   "value": {
+    "maxExtraBytes": 20480,
+    "meshHashEqual": true
+   },
+   "unit": "B",
+   "source": "(b) KPI; D3",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-01",
+    "FR-IMP-20",
+    "TR-IMP-03",
+    "TR-IMP-13"
+   ],
+   "cli": {
+    "run": "llull run plans/target_shell_gyroid_infill.json --doc t.llull.json; stat; llull implicit_properties … (fresh process)",
+    "assert": "file size, data.meshSha256"
+   }
+  },
+  {
+   "vc": "VC-IMP-49",
+   "what": "interoperability: mass_properties of the realised SC cell and a mesh-kernel boolean with another solid work",
+   "metric": "mass_properties.data.volume",
+   "value": 82.93407,
+   "tolerance_rel": 0.005,
+   "unit": "mm³",
+   "source": "(b) as VC-IMP-15",
+   "grade": "A",
+   "proves": [
+    "FR-IMP-22",
+    "TR-IMP-13"
+   ],
+   "cli": {
+    "run": "llull mass_properties entityId=$body --doc t.llull.json --json",
+    "assert": "data.volume"
+   }
+  },
+  {
+   "vc": "VC-IMP-50",
+   "what": "Voronoi lattice (V2): same seed → same graph; measured density follows the density law",
+   "metric": "beam count equality; density",
+   "value": "TBD — measure on first implementation",
+   "unit": "-",
+   "source": "(c) TBD",
+   "grade": "C",
+   "proves": [
+    "FR-IMP-19",
+    "TR-IMP-06"
+   ],
+   "cli": {
+    "run": "llull add_voronoi_lattice '{\"region\":\"$cube\",\"seed\":3,\"density\":0.01,\"radius\":0.4}' --doc t.llull.json --json",
+    "assert": "lattice_properties.data.beams"
+   }
+  }
+ ]
+}

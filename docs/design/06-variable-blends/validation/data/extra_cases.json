@@ -1,0 +1,22 @@
+{
+ "asymmetricConic_1x2_block20": {
+  "d1": 1,
+  "d2": 2,
+  "rho": 0.414213562373,
+  "removedVolume": 8.5840734641,
+  "closedForm": 8.5840734641,
+  "volumeAfter": 991.415926536
+ },
+ "constructionProbe_r1to3": {
+  "law": "r(z) = 1 + 0.1 z, z in [0, 20] (block 20 x 10 x 5, top long edge)",
+  "removed_section": 18.5988258389,
+  "removed_envelope": 18.5377656005,
+  "volume_section": 981.401174161,
+  "volume_envelope": 981.4622344,
+  "relativeDifferenceOfRemoved": -0.00328301576331,
+  "faceAreasExact": {
+   "top": 160,
+   "side": 60
+  }
+ }
+}

@@ -1,0 +1,281 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_helix",
+  "params": {
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "axis": [
+    0,
+    0,
+    1
+   ],
+   "radius": 20,
+   "pitch": 10,
+   "turns": 3
+  },
+  "as": "helix"
+ },
+ {
+  "command": "sweep_profile",
+  "params": {
+   "pathId": "$helix",
+   "radius": 2
+  },
+  "as": "tube"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$tube"
+  }
+ },
+ {
+  "command": "inspect_sweep",
+  "params": {
+   "id": "$tube",
+   "samples": 31
+  }
+ },
+ {
+  "command": "sweep_profile",
+  "params": {
+   "pathId": "$helix",
+   "section": [
+    [
+     18,
+     -1.5
+    ],
+    [
+     22,
+     -1.5
+    ],
+    [
+     22,
+     1.5
+    ],
+    [
+     18,
+     1.5
+    ]
+   ],
+   "sectionFrame": "axial",
+   "orientation": {
+    "mode": "axis_plane",
+    "axisPoint": [
+     0,
+     0,
+     0
+    ],
+    "direction": [
+     0,
+     0,
+     1
+    ]
+   }
+  },
+  "as": "screw10"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$screw10"
+  }
+ },
+ {
+  "command": "add_helix",
+  "params": {
+   "position": [
+    100,
+    0,
+    0
+   ],
+   "axis": [
+    0,
+    0,
+    1
+   ],
+   "radius": 20,
+   "pitch": 5,
+   "turns": 3
+  },
+  "as": "helix5"
+ },
+ {
+  "command": "sweep_profile",
+  "params": {
+   "pathId": "$helix5",
+   "section": [
+    [
+     18,
+     -1.5
+    ],
+    [
+     22,
+     -1.5
+    ],
+    [
+     22,
+     1.5
+    ],
+    [
+     18,
+     1.5
+    ]
+   ],
+   "sectionFrame": "axial",
+   "orientation": {
+    "mode": "axis_plane",
+    "axisPoint": [
+     100,
+     0,
+     0
+    ],
+    "direction": [
+     0,
+     0,
+     1
+    ]
+   }
+  },
+  "as": "screw5"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$screw5"
+  }
+ },
+ {
+  "command": "add_helix",
+  "params": {
+   "position": [
+    200,
+    0,
+    0
+   ],
+   "axis": [
+    0,
+    0,
+    1
+   ],
+   "radius": 20,
+   "endRadius": 10,
+   "pitch": 10,
+   "turns": 5
+  },
+  "as": "cone"
+ },
+ {
+  "command": "sweep_profile",
+  "params": {
+   "pathId": "$cone",
+   "radius": 1
+  },
+  "as": "conicalTube"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$conicalTube"
+  }
+ },
+ {
+  "command": "add_coil",
+  "params": {
+   "radius": 20,
+   "pitch": 10,
+   "turns": 3,
+   "sectionRadius": 2,
+   "position": [
+    300,
+    0,
+    0
+   ],
+   "exactHelix": true
+  },
+  "as": "coil"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$coil"
+  }
+ },
+ {
+  "command": "add_helix",
+  "params": {
+   "position": [
+    400,
+    0,
+    0
+   ],
+   "axis": [
+    0,
+    0,
+    1
+   ],
+   "radius": 15,
+   "turns": 8,
+   "pitchLaw": {
+    "type": "table",
+    "points": [
+     [
+      0,
+      2
+     ],
+     [
+      0.125,
+      2
+     ],
+     [
+      0.2,
+      6
+     ],
+     [
+      0.8,
+      6
+     ],
+     [
+      0.875,
+      2
+     ],
+     [
+      1,
+      2
+     ]
+    ]
+   }
+  },
+  "as": "springPath"
+ },
+ {
+  "command": "sweep_profile",
+  "params": {
+   "pathId": "$springPath",
+   "radius": 0.9
+  },
+  "as": "spring"
+ },
+ {
+  "command": "check_sweep_loft",
+  "params": {
+   "ids": [
+    "$tube",
+    "$screw10",
+    "$screw5",
+    "$conicalTube",
+    "$coil",
+    "$spring"
+   ]
+  }
+ }
+]

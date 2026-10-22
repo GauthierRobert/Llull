@@ -1,0 +1,67 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_field_primitive",
+  "params": {
+   "shape": "box",
+   "size": [
+    10,
+    10,
+    10
+   ],
+   "position": [
+    5,
+    5,
+    5
+   ]
+  },
+  "as": "cellBox"
+ },
+ {
+  "command": "add_strut_lattice",
+  "params": {
+   "cell": "cubic",
+   "cellSize": 10,
+   "radius": 1,
+   "origin": [
+    0,
+    0,
+    0
+   ],
+   "region": "$cellBox"
+  },
+  "as": "sc"
+ },
+ {
+  "command": "create_implicit_body",
+  "params": {
+   "field": "$sc",
+   "voxel": 0.1
+  },
+  "as": "body"
+ },
+ {
+  "command": "implicit_properties",
+  "params": {
+   "id": "$body",
+   "region": "$cellBox"
+  }
+ },
+ {
+  "command": "lattice_properties",
+  "params": {
+   "id": "$sc"
+  }
+ },
+ {
+  "command": "check_implicit",
+  "params": {
+   "id": "$body"
+  }
+ }
+]

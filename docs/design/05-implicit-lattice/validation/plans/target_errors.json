@@ -1,0 +1,66 @@
+[
+ {
+  "command": "add_tpms_lattice",
+  "params": {
+   "kind": "gyroid",
+   "form": "sheet",
+   "thickness": 6,
+   "cellSize": 10
+  }
+ },
+ {
+  "command": "add_strut_lattice",
+  "params": {
+   "cell": "bcc",
+   "cellSize": 10,
+   "radius": 5.5
+  }
+ },
+ {
+  "command": "add_tpms_lattice",
+  "params": {
+   "kind": "gyroid",
+   "form": "sheet",
+   "thickness": 1,
+   "cellSize": 10,
+   "map": {
+    "kind": "cylindrical",
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "axis": [
+     0,
+     0,
+     1
+    ],
+    "cellsAround": 6.5,
+    "radialCellSize": 10
+   }
+  }
+ },
+ {
+  "command": "add_field_primitive",
+  "params": {
+   "shape": "sphere",
+   "radius": 1000
+  },
+  "as": "big"
+ },
+ {
+  "command": "create_implicit_body",
+  "params": {
+   "field": "$big",
+   "voxel": 0.001
+  }
+ },
+ {
+  "command": "combine_fields",
+  "params": {
+   "op": "union",
+   "a": "no-such-field",
+   "b": "$big"
+  }
+ }
+]

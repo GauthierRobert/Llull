@@ -1,0 +1,223 @@
+{
+ "generated": "2026-10-22",
+ "source": "Blender main 7a8f04b3 source/blender/editors/transform/transform_generics.cc (PROP_SHARP dist^2, PROP_SMOOTH 3d^2-2d^3, PROP_ROOT sqrt, PROP_LIN, PROP_CONST, PROP_SPHERE sqrt(2d-d^2), PROP_INVSQUARE d(2-d)), with dist = (R - d)/R; selected elements weight 1; d >= R weight 0",
+ "llullToday": "edit_subdivision_cage uses smooth (t*t*(3-2t)) on Euclidean distance to the nearest fully selected vertex (packages/core/src/commands/solids/subdivisionCage.ts selectionWeights)",
+ "invariants": [
+  "f(0)=0 except constant (=1)",
+  "f(1)=1",
+  "monotone non-decreasing in t",
+  "smooth and inverse_square have f'(1)=0 (no kink at the selection)"
+ ],
+ "table": [
+  {
+   "dOverR": 0,
+   "constant": 1,
+   "linear": 1,
+   "sharp": 1,
+   "root": 1,
+   "sphere": 1,
+   "smooth": 1,
+   "inverse_square": 1
+  },
+  {
+   "dOverR": 0.05,
+   "constant": 1,
+   "linear": 0.95,
+   "sharp": 0.9025,
+   "root": 0.974679434481,
+   "sphere": 0.998749217772,
+   "smooth": 0.99275,
+   "inverse_square": 0.9975
+  },
+  {
+   "dOverR": 0.1,
+   "constant": 1,
+   "linear": 0.9,
+   "sharp": 0.81,
+   "root": 0.948683298051,
+   "sphere": 0.994987437107,
+   "smooth": 0.972,
+   "inverse_square": 0.99
+  },
+  {
+   "dOverR": 0.15,
+   "constant": 1,
+   "linear": 0.85,
+   "sharp": 0.7225,
+   "root": 0.921954445729,
+   "sphere": 0.988685996664,
+   "smooth": 0.93925,
+   "inverse_square": 0.9775
+  },
+  {
+   "dOverR": 0.2,
+   "constant": 1,
+   "linear": 0.8,
+   "sharp": 0.64,
+   "root": 0.894427191,
+   "sphere": 0.979795897113,
+   "smooth": 0.896,
+   "inverse_square": 0.96
+  },
+  {
+   "dOverR": 0.25,
+   "constant": 1,
+   "linear": 0.75,
+   "sharp": 0.5625,
+   "root": 0.866025403784,
+   "sphere": 0.968245836552,
+   "smooth": 0.84375,
+   "inverse_square": 0.9375
+  },
+  {
+   "dOverR": 0.3,
+   "constant": 1,
+   "linear": 0.7,
+   "sharp": 0.49,
+   "root": 0.836660026534,
+   "sphere": 0.953939201417,
+   "smooth": 0.784,
+   "inverse_square": 0.91
+  },
+  {
+   "dOverR": 0.35,
+   "constant": 1,
+   "linear": 0.65,
+   "sharp": 0.4225,
+   "root": 0.80622577483,
+   "sphere": 0.93674969976,
+   "smooth": 0.71825,
+   "inverse_square": 0.8775
+  },
+  {
+   "dOverR": 0.4,
+   "constant": 1,
+   "linear": 0.6,
+   "sharp": 0.36,
+   "root": 0.774596669241,
+   "sphere": 0.916515138991,
+   "smooth": 0.648,
+   "inverse_square": 0.84
+  },
+  {
+   "dOverR": 0.45,
+   "constant": 1,
+   "linear": 0.55,
+   "sharp": 0.3025,
+   "root": 0.74161984871,
+   "sphere": 0.893028554975,
+   "smooth": 0.57475,
+   "inverse_square": 0.7975
+  },
+  {
+   "dOverR": 0.5,
+   "constant": 1,
+   "linear": 0.5,
+   "sharp": 0.25,
+   "root": 0.707106781187,
+   "sphere": 0.866025403784,
+   "smooth": 0.5,
+   "inverse_square": 0.75
+  },
+  {
+   "dOverR": 0.55,
+   "constant": 1,
+   "linear": 0.45,
+   "sharp": 0.2025,
+   "root": 0.67082039325,
+   "sphere": 0.835164654425,
+   "smooth": 0.42525,
+   "inverse_square": 0.6975
+  },
+  {
+   "dOverR": 0.6,
+   "constant": 1,
+   "linear": 0.4,
+   "sharp": 0.16,
+   "root": 0.632455532034,
+   "sphere": 0.8,
+   "smooth": 0.352,
+   "inverse_square": 0.64
+  },
+  {
+   "dOverR": 0.65,
+   "constant": 1,
+   "linear": 0.35,
+   "sharp": 0.1225,
+   "root": 0.59160797831,
+   "sphere": 0.759934207679,
+   "smooth": 0.28175,
+   "inverse_square": 0.5775
+  },
+  {
+   "dOverR": 0.7,
+   "constant": 1,
+   "linear": 0.3,
+   "sharp": 0.09,
+   "root": 0.547722557505,
+   "sphere": 0.714142842854,
+   "smooth": 0.216,
+   "inverse_square": 0.51
+  },
+  {
+   "dOverR": 0.75,
+   "constant": 1,
+   "linear": 0.25,
+   "sharp": 0.0625,
+   "root": 0.5,
+   "sphere": 0.661437827766,
+   "smooth": 0.15625,
+   "inverse_square": 0.4375
+  },
+  {
+   "dOverR": 0.8,
+   "constant": 1,
+   "linear": 0.2,
+   "sharp": 0.04,
+   "root": 0.4472135955,
+   "sphere": 0.6,
+   "smooth": 0.104,
+   "inverse_square": 0.36
+  },
+  {
+   "dOverR": 0.85,
+   "constant": 1,
+   "linear": 0.15,
+   "sharp": 0.0225,
+   "root": 0.387298334621,
+   "sphere": 0.526782687643,
+   "smooth": 0.06075,
+   "inverse_square": 0.2775
+  },
+  {
+   "dOverR": 0.9,
+   "constant": 1,
+   "linear": 0.1,
+   "sharp": 0.01,
+   "root": 0.316227766017,
+   "sphere": 0.435889894354,
+   "smooth": 0.028,
+   "inverse_square": 0.19
+  },
+  {
+   "dOverR": 0.95,
+   "constant": 1,
+   "linear": 0.05,
+   "sharp": 0.0025,
+   "root": 0.22360679775,
+   "sphere": 0.31224989992,
+   "smooth": 0.00725,
+   "inverse_square": 0.0975
+  },
+  {
+   "dOverR": 1,
+   "constant": 0,
+   "linear": 0,
+   "sharp": 0,
+   "root": 0,
+   "sphere": 0,
+   "smooth": 0,
+   "inverse_square": 0
+  }
+ ]
+}

@@ -1,0 +1,630 @@
+{
+ "generated": "generate_sdf_refs.mjs",
+ "definitions": {
+  "quadratic": "h = max(k − |a − b|, 0)/k ; smin = min(a, b) − h²·k/4",
+  "exponential": "smin = −k·ln(exp(−a/k) + exp(−b/k))",
+  "smoothUnion": "union(f, g) = smin(f, g, k) ; smoothIntersect(f, g) = −smin(−f, −g, k) ; smoothSubtract(f, g) = −smin(−f, g, k)"
+ },
+ "bounds": {
+  "quadraticMaxDeviation": {
+   "value": 0.25,
+   "measured": 0.25,
+   "k": 1,
+   "derivation": "h ≤ 1 so min − smin = h²k/4 ≤ k/4, equality at a = b"
+  },
+  "exponentialMaxDeviation": {
+   "value": 0.69314718056,
+   "measured": 0.69314718056,
+   "k": 1,
+   "derivation": "at a = b: min − smin = k ln 2 (maximum of k ln(1 + e^{−|a−b|/k}))"
+  },
+  "quadraticLipschitzSum": {
+   "value": 1,
+   "measured": 1.00000000014,
+   "derivation": "∂smin/∂a = 1 − w, ∂smin/∂b = w with w ∈ [0,1] ⇒ smooth union of 1-Lipschitz fields stays 1-Lipschitz (a valid distance BOUND, not exact)"
+  }
+ },
+ "orthogonalHalfSpaces": {
+  "k": 2,
+  "tangentSetback": 2,
+  "bisectorDistance": 0.5,
+  "circularFilletSameSetbackBisectorDistance": 0.585786437627,
+  "addedAreaPerUnitLength": 0.666666666667,
+  "addedAreaDerivation": "corner x>0, y>0; by symmetry 2× the half x ≤ y; with u = y − x (unit Jacobian) the region is 0 < x < (k − u)²/(4k), u ∈ [0, k]: A = 2∫₀^k (k − u)²/(4k) du = k²/6",
+  "profile": [
+   {
+    "x": 0.5,
+    "y": 0.5,
+    "residual": 0
+   },
+   {
+    "x": 0.45125,
+    "y": 0.55125,
+    "residual": 0
+   },
+   {
+    "x": 0.405,
+    "y": 0.605,
+    "residual": 0
+   },
+   {
+    "x": 0.36125,
+    "y": 0.66125,
+    "residual": -1.11022302463e-16
+   },
+   {
+    "x": 0.32,
+    "y": 0.72,
+    "residual": 0
+   },
+   {
+    "x": 0.28125,
+    "y": 0.78125,
+    "residual": 0
+   },
+   {
+    "x": 0.245,
+    "y": 0.845,
+    "residual": 0
+   },
+   {
+    "x": 0.21125,
+    "y": 0.91125,
+    "residual": 0
+   },
+   {
+    "x": 0.18,
+    "y": 0.98,
+    "residual": 0
+   },
+   {
+    "x": 0.15125,
+    "y": 1.05125,
+    "residual": 0
+   },
+   {
+    "x": 0.125,
+    "y": 1.125,
+    "residual": 0
+   },
+   {
+    "x": 0.10125,
+    "y": 1.20125,
+    "residual": 0
+   },
+   {
+    "x": 0.08,
+    "y": 1.28,
+    "residual": 0
+   },
+   {
+    "x": 0.06125,
+    "y": 1.36125,
+    "residual": 0
+   },
+   {
+    "x": 0.045,
+    "y": 1.445,
+    "residual": 0
+   },
+   {
+    "x": 0.03125,
+    "y": 1.53125,
+    "residual": 0
+   },
+   {
+    "x": 0.02,
+    "y": 1.62,
+    "residual": 0
+   },
+   {
+    "x": 0.01125,
+    "y": 1.71125,
+    "residual": 0
+   },
+   {
+    "x": 0.005,
+    "y": 1.805,
+    "residual": 0
+   },
+   {
+    "x": 0.00125,
+    "y": 1.90125,
+    "residual": 0
+   },
+   {
+    "x": 0,
+    "y": 2,
+    "residual": 0
+   }
+  ]
+ },
+ "grid": [
+  {
+   "a": -2,
+   "b": -2,
+   "quadratic": -2.25,
+   "exponential": -2.69314718056
+  },
+  {
+   "a": -2,
+   "b": -1.5,
+   "quadratic": -2.0625,
+   "exponential": -2.47407698418
+  },
+  {
+   "a": -2,
+   "b": -1,
+   "quadratic": -2,
+   "exponential": -2.31326168752
+  },
+  {
+   "a": -2,
+   "b": -0.5,
+   "quadratic": -2,
+   "exponential": -2.20141327798
+  },
+  {
+   "a": -2,
+   "b": 0,
+   "quadratic": -2,
+   "exponential": -2.12692801104
+  },
+  {
+   "a": -2,
+   "b": 0.5,
+   "quadratic": -2,
+   "exponential": -2.07888973429
+  },
+  {
+   "a": -2,
+   "b": 1,
+   "quadratic": -2,
+   "exponential": -2.04858735157
+  },
+  {
+   "a": -2,
+   "b": 1.5,
+   "quadratic": -2,
+   "exponential": -2.02975041827
+  },
+  {
+   "a": -2,
+   "b": 2,
+   "quadratic": -2,
+   "exponential": -2.01814992792
+  },
+  {
+   "a": -1.5,
+   "b": -2,
+   "quadratic": -2.0625,
+   "exponential": -2.47407698418
+  },
+  {
+   "a": -1.5,
+   "b": -1.5,
+   "quadratic": -1.75,
+   "exponential": -2.19314718056
+  },
+  {
+   "a": -1.5,
+   "b": -1,
+   "quadratic": -1.5625,
+   "exponential": -1.97407698418
+  },
+  {
+   "a": -1.5,
+   "b": -0.5,
+   "quadratic": -1.5,
+   "exponential": -1.81326168752
+  },
+  {
+   "a": -1.5,
+   "b": 0,
+   "quadratic": -1.5,
+   "exponential": -1.70141327798
+  },
+  {
+   "a": -1.5,
+   "b": 0.5,
+   "quadratic": -1.5,
+   "exponential": -1.62692801104
+  },
+  {
+   "a": -1.5,
+   "b": 1,
+   "quadratic": -1.5,
+   "exponential": -1.57888973429
+  },
+  {
+   "a": -1.5,
+   "b": 1.5,
+   "quadratic": -1.5,
+   "exponential": -1.54858735157
+  },
+  {
+   "a": -1.5,
+   "b": 2,
+   "quadratic": -1.5,
+   "exponential": -1.52975041827
+  },
+  {
+   "a": -1,
+   "b": -2,
+   "quadratic": -2,
+   "exponential": -2.31326168752
+  },
+  {
+   "a": -1,
+   "b": -1.5,
+   "quadratic": -1.5625,
+   "exponential": -1.97407698418
+  },
+  {
+   "a": -1,
+   "b": -1,
+   "quadratic": -1.25,
+   "exponential": -1.69314718056
+  },
+  {
+   "a": -1,
+   "b": -0.5,
+   "quadratic": -1.0625,
+   "exponential": -1.47407698418
+  },
+  {
+   "a": -1,
+   "b": 0,
+   "quadratic": -1,
+   "exponential": -1.31326168752
+  },
+  {
+   "a": -1,
+   "b": 0.5,
+   "quadratic": -1,
+   "exponential": -1.20141327798
+  },
+  {
+   "a": -1,
+   "b": 1,
+   "quadratic": -1,
+   "exponential": -1.12692801104
+  },
+  {
+   "a": -1,
+   "b": 1.5,
+   "quadratic": -1,
+   "exponential": -1.07888973429
+  },
+  {
+   "a": -1,
+   "b": 2,
+   "quadratic": -1,
+   "exponential": -1.04858735157
+  },
+  {
+   "a": -0.5,
+   "b": -2,
+   "quadratic": -2,
+   "exponential": -2.20141327798
+  },
+  {
+   "a": -0.5,
+   "b": -1.5,
+   "quadratic": -1.5,
+   "exponential": -1.81326168752
+  },
+  {
+   "a": -0.5,
+   "b": -1,
+   "quadratic": -1.0625,
+   "exponential": -1.47407698418
+  },
+  {
+   "a": -0.5,
+   "b": -0.5,
+   "quadratic": -0.75,
+   "exponential": -1.19314718056
+  },
+  {
+   "a": -0.5,
+   "b": 0,
+   "quadratic": -0.5625,
+   "exponential": -0.97407698418
+  },
+  {
+   "a": -0.5,
+   "b": 0.5,
+   "quadratic": -0.5,
+   "exponential": -0.813261687518
+  },
+  {
+   "a": -0.5,
+   "b": 1,
+   "quadratic": -0.5,
+   "exponential": -0.701413277983
+  },
+  {
+   "a": -0.5,
+   "b": 1.5,
+   "quadratic": -0.5,
+   "exponential": -0.626928011043
+  },
+  {
+   "a": -0.5,
+   "b": 2,
+   "quadratic": -0.5,
+   "exponential": -0.578889734293
+  },
+  {
+   "a": 0,
+   "b": -2,
+   "quadratic": -2,
+   "exponential": -2.12692801104
+  },
+  {
+   "a": 0,
+   "b": -1.5,
+   "quadratic": -1.5,
+   "exponential": -1.70141327798
+  },
+  {
+   "a": 0,
+   "b": -1,
+   "quadratic": -1,
+   "exponential": -1.31326168752
+  },
+  {
+   "a": 0,
+   "b": -0.5,
+   "quadratic": -0.5625,
+   "exponential": -0.97407698418
+  },
+  {
+   "a": 0,
+   "b": 0,
+   "quadratic": -0.25,
+   "exponential": -0.69314718056
+  },
+  {
+   "a": 0,
+   "b": 0.5,
+   "quadratic": -0.0625,
+   "exponential": -0.47407698418
+  },
+  {
+   "a": 0,
+   "b": 1,
+   "quadratic": 0,
+   "exponential": -0.313261687518
+  },
+  {
+   "a": 0,
+   "b": 1.5,
+   "quadratic": 0,
+   "exponential": -0.201413277983
+  },
+  {
+   "a": 0,
+   "b": 2,
+   "quadratic": 0,
+   "exponential": -0.126928011043
+  },
+  {
+   "a": 0.5,
+   "b": -2,
+   "quadratic": -2,
+   "exponential": -2.07888973429
+  },
+  {
+   "a": 0.5,
+   "b": -1.5,
+   "quadratic": -1.5,
+   "exponential": -1.62692801104
+  },
+  {
+   "a": 0.5,
+   "b": -1,
+   "quadratic": -1,
+   "exponential": -1.20141327798
+  },
+  {
+   "a": 0.5,
+   "b": -0.5,
+   "quadratic": -0.5,
+   "exponential": -0.813261687518
+  },
+  {
+   "a": 0.5,
+   "b": 0,
+   "quadratic": -0.0625,
+   "exponential": -0.47407698418
+  },
+  {
+   "a": 0.5,
+   "b": 0.5,
+   "quadratic": 0.25,
+   "exponential": -0.19314718056
+  },
+  {
+   "a": 0.5,
+   "b": 1,
+   "quadratic": 0.4375,
+   "exponential": 0.0259230158199
+  },
+  {
+   "a": 0.5,
+   "b": 1.5,
+   "quadratic": 0.5,
+   "exponential": 0.186738312482
+  },
+  {
+   "a": 0.5,
+   "b": 2,
+   "quadratic": 0.5,
+   "exponential": 0.298586722017
+  },
+  {
+   "a": 1,
+   "b": -2,
+   "quadratic": -2,
+   "exponential": -2.04858735157
+  },
+  {
+   "a": 1,
+   "b": -1.5,
+   "quadratic": -1.5,
+   "exponential": -1.57888973429
+  },
+  {
+   "a": 1,
+   "b": -1,
+   "quadratic": -1,
+   "exponential": -1.12692801104
+  },
+  {
+   "a": 1,
+   "b": -0.5,
+   "quadratic": -0.5,
+   "exponential": -0.701413277983
+  },
+  {
+   "a": 1,
+   "b": 0,
+   "quadratic": 0,
+   "exponential": -0.313261687518
+  },
+  {
+   "a": 1,
+   "b": 0.5,
+   "quadratic": 0.4375,
+   "exponential": 0.0259230158199
+  },
+  {
+   "a": 1,
+   "b": 1,
+   "quadratic": 0.75,
+   "exponential": 0.30685281944
+  },
+  {
+   "a": 1,
+   "b": 1.5,
+   "quadratic": 0.9375,
+   "exponential": 0.52592301582
+  },
+  {
+   "a": 1,
+   "b": 2,
+   "quadratic": 1,
+   "exponential": 0.686738312482
+  },
+  {
+   "a": 1.5,
+   "b": -2,
+   "quadratic": -2,
+   "exponential": -2.02975041827
+  },
+  {
+   "a": 1.5,
+   "b": -1.5,
+   "quadratic": -1.5,
+   "exponential": -1.54858735157
+  },
+  {
+   "a": 1.5,
+   "b": -1,
+   "quadratic": -1,
+   "exponential": -1.07888973429
+  },
+  {
+   "a": 1.5,
+   "b": -0.5,
+   "quadratic": -0.5,
+   "exponential": -0.626928011043
+  },
+  {
+   "a": 1.5,
+   "b": 0,
+   "quadratic": 0,
+   "exponential": -0.201413277983
+  },
+  {
+   "a": 1.5,
+   "b": 0.5,
+   "quadratic": 0.5,
+   "exponential": 0.186738312482
+  },
+  {
+   "a": 1.5,
+   "b": 1,
+   "quadratic": 0.9375,
+   "exponential": 0.52592301582
+  },
+  {
+   "a": 1.5,
+   "b": 1.5,
+   "quadratic": 1.25,
+   "exponential": 0.80685281944
+  },
+  {
+   "a": 1.5,
+   "b": 2,
+   "quadratic": 1.4375,
+   "exponential": 1.02592301582
+  },
+  {
+   "a": 2,
+   "b": -2,
+   "quadratic": -2,
+   "exponential": -2.01814992792
+  },
+  {
+   "a": 2,
+   "b": -1.5,
+   "quadratic": -1.5,
+   "exponential": -1.52975041827
+  },
+  {
+   "a": 2,
+   "b": -1,
+   "quadratic": -1,
+   "exponential": -1.04858735157
+  },
+  {
+   "a": 2,
+   "b": -0.5,
+   "quadratic": -0.5,
+   "exponential": -0.578889734293
+  },
+  {
+   "a": 2,
+   "b": 0,
+   "quadratic": 0,
+   "exponential": -0.126928011043
+  },
+  {
+   "a": 2,
+   "b": 0.5,
+   "quadratic": 0.5,
+   "exponential": 0.298586722017
+  },
+  {
+   "a": 2,
+   "b": 1,
+   "quadratic": 1,
+   "exponential": 0.686738312482
+  },
+  {
+   "a": 2,
+   "b": 1.5,
+   "quadratic": 1.4375,
+   "exponential": 1.02592301582
+  },
+  {
+   "a": 2,
+   "b": 2,
+   "quadratic": 1.75,
+   "exponential": 1.30685281944
+  }
+ ]
+}

@@ -1,0 +1,68 @@
+{
+ "generated": "2026-10-22",
+ "generator": "generate_subd_refs.mjs",
+ "cage": "torus cage 8 x 6 quads, R = 3, r = 1, every vertex valence 4 (fully regular)",
+ "claim": "limit surface = periodic uniform bicubic B-spline with the cage vertices as poles (Stam 1998: on the regular part the eigenbasis is the power basis of bicubic B-splines)",
+ "maxCornerDeviation_bsplineVsMask": 8.899114524108741e-16,
+ "maxCentreDeviation_bsplineVsFacePointMask": 1.3551999096e-15,
+ "meshVolumeLevel4": 33.3379678762,
+ "samples": [
+  {
+   "i": 0,
+   "j": 0,
+   "bsplineCorner": [
+    3.45908088707,
+    -1.52655665886e-16,
+    0
+   ],
+   "maskLimit": [
+    3.45908088707,
+    -1.52655665886e-16,
+    1.38777878078e-17
+   ],
+   "bsplineCentre": [
+    3.09667771294,
+    1.282685907,
+    0.41497050598
+   ]
+  },
+  {
+   "i": 0,
+   "j": 1,
+   "bsplineCorner": [
+    3.08309383413,
+    -1.73472347598e-16,
+    0.721687836487
+   ],
+   "maskLimit": [
+    3.08309383413,
+    -1.66533453694e-16,
+    0.721687836487
+   ],
+   "bsplineCentre": [
+    2.49816017178,
+    1.03477182413,
+    0.82994101196
+   ]
+  },
+  {
+   "i": 0,
+   "j": 2,
+   "bsplineCorner": [
+    2.33111972824,
+    -7.6327832943e-17,
+    0.721687836487
+   ],
+   "maskLimit": [
+    2.33111972824,
+    -5.55111512313e-17,
+    0.721687836487
+   ],
+   "bsplineCentre": [
+    1.89964263062,
+    0.786857741267,
+    0.41497050598
+   ]
+  }
+ ]
+}

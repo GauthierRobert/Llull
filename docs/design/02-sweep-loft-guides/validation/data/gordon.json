@@ -1,0 +1,10 @@
+{
+ "gap": "SWG",
+ "generated": "2026-10-22",
+ "surface": "z = sin(pi x) + y^3 on [0,1]^2",
+ "sections": "x = 0, 0.5, 1 (curves along y: exact cubics)",
+ "guides": "y = 0, 0.5, 1 (curves along x: sin, fitted)",
+ "gordonMaxDeviation": 6.66e-16,
+ "skinThroughSectionsOnlyMaxDeviation": 0.0560095,
+ "theorem": "For f = g(u) + h(v) and cardinal blending functions that sum to 1 in each direction, L_sections + L_guides - tensor = g + h exactly (README section 4.9)."
+}

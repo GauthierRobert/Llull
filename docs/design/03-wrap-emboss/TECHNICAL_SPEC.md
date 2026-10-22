@@ -1,0 +1,507 @@
+# WRP — Curves and features on curved faces, 3D text — Technical specification
+
+Gap id: **WRP** · Companion: [FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md) · Validation: [validation/README.md](validation/README.md) ·
+Laws: `.claude/rules/architecture.md` L1–L10 · Directive: LC1 local-only (native kernel is the target path) · Status: specification
+(2026-10-22), nothing built.
+
+---
+
+## 1. Current state in llull
+
+### 1.1 Commands and code nearest to this gap
+
+| Capability                | Command                                                        | Files                                                                                                                                                                                                                                                     | What it really does                                                                                                                                                                                                                                                                         | What it does not do                                                                                                                                                                                                                      |
+| ------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Annotation text           | `add_text`                                                     | `packages/core/src/commands/draw2d/annotate.ts`, `model/types.ts` `TextEntity`                                                                                                                                                                            | 2D entity `{ content, height (cap height), anchor left/center/right }` placed on the work plane by `position` / `rotation`                                                                                                                                                                  | No font, no outline, no area; `extrude_profile` refuses kind `text` (`commands/solids/profile.ts`, `CLOSED_SHAPE_KINDS`); not usable by any 3D command                                                                                   |
+| Text decal                | `add_decal`, `delete_decal`                                    | `commands/edit/decals.ts`, `lib/blockFont.ts` (108 lines), `geometry/decal.ts`                                                                                                                                                                            | Paints a ≤ 64-character line onto a solid: built-in **5×7 block raster font** (A–Z, 0–9, `- . , : / + & ! ? ' #`, lower case as capitals, unknown characters blank with a note), projected along −`normal` onto faces within a box, stored in the entity-local frame, exported to glTF only | Not geometry (never in STL / STEP); projection, not wrap; no outline font                                                                                                                                                                |
+| Surface roughness PMI     | `add_surface_texture`                                          | `commands/pmi/annotation.ts`                                                                                                                                                                                                                              | Ra / Rz / … requirement on faces (OCC topology), `review: REVIEW_REQUIRED`                                                                                                                                                                                                                  | No knurl, no pattern, no geometry                                                                                                                                                                                                        |
+| Sketch plane              | `create_sketch_plane`, `place_on_sketch_plane`                 | `commands/draw2d/sketchPlanes.ts`, `model/sketchPlanes.ts`                                                                                                                                                                                                | Named plane from a world plane or a **planar** face (persistent face name, `REF_LOST` when gone), offset and spin; places 2D entities on it                                                                                                                                                 | Refuses non-planar faces ("face N is cylinder, not planar")                                                                                                                                                                              |
+| Edges into a sketch       | `project_edges_to_sketch`, `break_sketch_link`                 | `commands/draw2d/sketchLinks.ts`                                                                                                                                                                                                                          | Projects solid **edges onto a plane** (or their crossing points), linked by persistent edge names                                                                                                                                                                                           | The opposite direction of this gap (3D → plane, never plane → face)                                                                                                                                                                      |
+| Face split                | `split_face`                                                   | `commands/brep/faceOps.ts` (`FaceOpParams.kind 'splitFace'`, `model/faceOps.ts`)                                                                                                                                                                          | Cuts picked faces by a **plane**; the body stays one solid                                                                                                                                                                                                                                  | No split by curves (no split line, no scribe)                                                                                                                                                                                            |
+| Sheet trim by curves      | `trim_surface`                                                 | `commands/surface/trimSurface.ts`, `lib/nurbs/trimLoops.ts`                                                                                                                                                                                               | Projects `nurbs_curve`s onto a **`nurbs_surface` sheet** (closest point or `projectAlong`) and stores (u, v) trim loops                                                                                                                                                                     | Sheets only, not faces of solids; no wrap                                                                                                                                                                                                |
+| Sheet-metal bead          | `add_bead`                                                     | `packages/domain-aero/src/sheetmetal/commands/bead.ts`                                                                                                                                                                                                    | Straight formed rib on one flat of a sheet-metal part                                                                                                                                                                                                                                       | Flat faces only, straight path                                                                                                                                                                                                           |
+| Developed chart of a face | (internal, 06 CMP)                                             | `packages/domain-aero/src/composites/surface.ts` (`toFlat`, `fromFlat`, `isDoublyCurved`), `curved.ts`                                                                                                                                                    | Plane: face frame; **cylinder: (r·azimuth, axial)**; **cone: polar development, angle = azimuth · sin(semi-angle)**; sphere: azimuthal equidistant; NURBS: scaled (u, v)                                                                                                                    | Lives in a **plugin** (core cannot use it); sphere / NURBS charts are not isometric (plies use drape there)                                                                                                                              |
+| Exact region slab         | `faceSlab` recipe node                                         | `model/faceSlab.ts`, `geometry/surfaceWire.ts` (`encodeSurface`, `encodeLoops`, `loopsProblem`), `domain-aero/src/composites/plySlab.ts`, native `face_slab` in `solver/crates/llull-kernel-occt/cpp/surfaces.cxx`, `server/src/native/kernelFeatures.ts` | A plane / cylinder / cone / B-spline face bounded by (u, v) loops, lifted along its normal from `from` to `to`: base face, face on `Geom_OffsetSurface`, one ruled wall per loop edge (`BRepFill::Face`), sewn into a solid                                                                 | Loops are **polygons** (no curved pcurves; cone edges are cut into 24 pieces by `plySlab.ts`); **exactly one outer loop** + holes (`loopsProblem`); Manifold does not support it (`kernel-manifold/src/manifoldKernel.ts` `unsupported`) |
+| Face queries              | `FaceQueryPort` (`ctx.kernel.faceQuery`)                       | `packages/core/src/geometry/kernelPorts.ts`                                                                                                                                                                                                               | `faceGeometry` (plane / cylinder / cone / sphere / torus / other params + uv bounds), `evaluateFace`, `projectOnFace`, `tessellateFace` (+ uv), `faceSamples`, `bspline`, `distance`                                                                                                        | No curve projection, no curve-on-face construction, no split by edges                                                                                                                                                                    |
+| Curves                    | `create_nurbs_curve`, `interpolate_curve`, `approximate_curve` | `commands/surface/createCurve.ts`, `lib/nurbs/`                                                                                                                                                                                                           | Exact 3D NURBS curve entity (`nurbs_curve`)                                                                                                                                                                                                                                                 | No "lies on face" link, no pcurve                                                                                                                                                                                                        |
+| Patterns, threads         | `pattern_along_path`, `set_thread`, `add_external_thread`      | `commands/edit/patternAlongPath.ts`, `commands/features/*`                                                                                                                                                                                                | Pattern along a path; cosmetic / modeled threads                                                                                                                                                                                                                                            | No pattern in a face chart, no knurl                                                                                                                                                                                                     |
+
+`git grep -n "name: '<name>'" -- packages` returns nothing for every command this pack proposes (§4): `wrap_to_face`,
+`project_to_face`, `create_curve_on_face`, `unwrap_face`, `emboss_on_face`, `split_face_by_curves`, `import_font`, `list_fonts`,
+`text_outline`, `explode_text`, `check_wrap`, `add_knurl`, `pattern_on_face` (checked 2026-10-22 on `origin/main`, 696 command names).
+
+### 1.2 Kernel facts
+
+| Fact                                                                                                                                                                                 | Consequence                                                                                                                                                             | Source                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| The OCCT 7.9.2 prefix is built with `USE_FREETYPE` OFF and the Visualization module off ("built without any windowing or font backend")                                              | `Font_BRepFont` (an alias of `StdPrs_BRepFont`, TKV3d, FreeType-based) cannot render glyphs; enabling it means bundling FreeType and rebuilding the prefix (~45–60 min) | [R17] [R18]                                       |
+| `BRepProj_Projection` gives cylindrical (along a direction) and conical projections of edges / wires on a shape                                                                      | `project_to_face` along a direction                                                                                                                                     | [R17]                                             |
+| `BRepOffsetAPI_NormalProjection`: projection "according to the normal from each point"; defaults Tol3D 1e-4, Tol2D √Tol3D, C2, MaxDegree 14, MaxSeg 16; `SetMaxDistance`, `SetLimit` | `project_to_face` closest-point mode; llull sets Tol3D explicitly (§5.9)                                                                                                | [R17]                                             |
+| `BRepFeat_SplitShape`: add wires / edges **on** a face, rebuild the shape with the split faces; `BRepAlgoAPI_Splitter` splits arbitrary shapes by tools (General Fuse)               | Scribe and split line                                                                                                                                                   | [R17]                                             |
+| `BRepFeat_MakePrism` / `BRepFeat_MakeDPrism`: local prism / draft prism protrusions or depressions from a face                                                                       | Pull-direction walls and draft (FR-WRP-13)                                                                                                                              | [R17]                                             |
+| The native `face_slab` builds exact walls and offset faces for plane / cylinder / cone / B-spline faces and is unit-tested in `features.rs`                                          | The MVP emboss is an extension, not a new algorithm                                                                                                                     | `solver/crates/llull-kernel-occt/src/features.rs` |
+
+## 2. Target architecture
+
+### 2.1 Layer placement
+
+| Piece                                                                                                        | Layer                                                                                                                                                                      | Why (law)                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Face charts (develop, geodesic polar, parametric), seam handling, distortion metrics                         | `packages/core/src/geometry/surfaceChart.ts` (+ `geodesicChart.ts`), promoted from `domain-aero/src/composites/surface.ts`; composites then imports the core module        | Pure math used by core commands and by the composites plugin; core never imports a plugin (L2, L10)                                    |
+| Font reader (TrueType `glyf`, later CFF), layout (advances, kerning), nonzero union of outlines              | `packages/core/src/lib/font/*` (pure leaf: `sfnt.ts`, `cmap.ts`, `glyf.ts`, `cff.ts`, `layout.ts`, `fill.ts`), each ≤ 500 lines                                            | Pure, deterministic, no DOM / no native dependency; replay must not depend on a host library version (L3, FR-WRP-45); decision D-WRP-2 |
+| Text outline of a `TextEntity`                                                                               | `packages/core/src/geometry/textOutline.ts`                                                                                                                                | Entity-aware wrapper (same split as `lib/nurbs` / `geometry/nurbsCurve.ts`)                                                            |
+| Font bytes for bundled / system fonts                                                                        | injected `FontProvider` port `ctx.fonts` (`packages/core/src/geometry/fontPort.ts`), implemented in `server/` (bundled OFL fonts shipped with the desktop app and the CLI) | Commands never read files (L2); same injection pattern as `ctx.kernel` (L9)                                                            |
+| Commands (`wrap_to_face` … `check_wrap`, `add_knurl`)                                                        | new core feature catalog `packages/core/src/commands/wrap/catalog.ts` (toolset `3d`, plus a `wrap` view in `@protocol/toolsets`)                                           | Domain-neutral design capability (L5); not a plugin (every domain wraps text)                                                          |
+| Exact construction (curve projection, curves on face, emboss / deboss / scribe, split by curves, pull walls) | `GeometryKernel` / `FaceQueryPort` additions + native `llull-kernel-occt` (`cpp/wrap.cxx`, `src/wrap.rs`), reached through `server/src/native/*`                           | Kernel only via `ctx.kernel`, `requiresKernel: true` (L9); native C++ because the operations are OCCT algorithms (C7)                  |
+| Visual review (curves on face, distortion overlay, knurl texture)                                            | `src/ui/viewport/3d/*` render branches fed by entities and `check_wrap` data                                                                                               | Presentation only (L1, L4)                                                                                                             |
+
+### 2.2 Data flow
+
+```
+CLI / UI ──execute──> add_text { font } ─────────────> TextEntity (font id) ─ geometry/textOutline (lib/font, doc.blobs) ─> loops
+                     import_font { path } ─(host)─────> doc.fonts[id] + doc.blobs[sha256] (font bytes)
+                     emboss_on_face { id, face, profileIds, mode, depth, placement }
+                        ├─ face pick (persistent name) ─ ctx.kernel.faceQuery.faceGeometry -> SurfaceParams
+                        ├─ geometry/surfaceChart: sketch loops (chart) -> (u, v) pcurve loops (exact for plane / cylinder, fitted for cone)
+                        └─ recipe { op: 'emboss', source, face, surface, regions, from, to, boolean } -> native: face_slab per region + fuse / cut
+                     check_wrap ──────────────────────> reads steps' recorded data + recomputes limits -> findings
+```
+
+### 2.3 Laws check
+
+- L1 / L5: every operation is a `defineCommand`; queries (`text_outline`, `unwrap_face`, `check_wrap`, `list_fonts`) return `data`.
+- L3 / L8: params are design intent (entity ids, face reference by persistent name, anchor, angle, depth, mode, method) — never
+  agent-computed point lists; ids step-scoped; the emboss recipe is re-derived on replay from the step params.
+- L4: wrapped curves are `nurbs_curve` entities created by the command; the emboss result is the solid's recipe (`MeshSolidEntity.brep`).
+- L7: the sketch stays 2D (one model); the wrap is the 2D ⇄ 3D bridge for faces, like `extrude_profile` for planes.
+- L9: chart math and fonts are core (no B-rep); exact curves, splits and solids go through `ctx.kernel` with `requiresKernel`.
+  Manifold: `supports('emboss') = false`, the face commands refuse with `CMD_KERNEL_UNAVAILABLE`.
+- **Tension to surface (D-WRP-1):** `DocumentBlob` is defined for UTF-8 text payloads (`sha256` of the decoded text, media types
+  `model/*`); fonts are binary. Proposed: add `font/ttf` and `font/otf` media types with `sha256` of the raw bytes (base64 stays the
+  transport). This touches the blob invariant in `model/types.ts` and the persistence guard — a core contract change, so it is an
+  owner decision, not done silently.
+
+## 3. Data model
+
+```ts
+// packages/core/src/model/fonts.ts (new) — CadDocument.fonts?: Readonly<Record<string, FontRecord>>
+export interface FontRecord {
+  readonly id: string; // step-scoped id, e.g. "font-3.1"
+  readonly family: string; // name table ID 1 / 16
+  readonly style: string; // name table ID 2 / 17
+  readonly blob: string; // sha256 key in CadDocument.blobs (mediaType 'font/ttf' | 'font/otf', D-WRP-1)
+  readonly format: 'truetype' | 'cff';
+  readonly unitsPerEm: number;
+  readonly capHeight: number; // OS/2 sCapHeight (font units); fallback: height of 'H' outline, reported
+  readonly embedding: 'installable' | 'editable' | 'preview_print'; // OS/2 fsType; 'restricted' is never stored (refused)
+  readonly licence?: string; // e.g. "SIL OFL 1.1" (name table ID 13 / caller-supplied)
+  readonly provenance: { readonly verified: boolean; readonly source?: string }; // bundled fonts: verified (pinned sha256)
+  readonly singleLine?: boolean; // open-stroke engraving font (FR-WRP-24)
+}
+
+// packages/core/src/model/types.ts — TextEntity v2 (additive, optional fields)
+export interface TextEntity extends BaseEntity {
+  readonly kind: 'text';
+  content: string;
+  height: number; // cap height (unchanged meaning)
+  anchor?: 'left' | 'center' | 'right';
+  font?: string; // FontRecord id or a bundled family name resolved by import on first use
+  verticalAnchor?: 'baseline' | 'cap_middle' | 'cap_top'; // default baseline (today's behaviour)
+  letterSpacing?: number; // document units added after each glyph (default 0)
+  kerning?: boolean; // default true (SHOULD; MVP ignores)
+  lineSpacing?: number; // multiple of the font line gap (SHOULD)
+}
+// Without `font` a text entity is an annotation as today (not a profile). With `font` it is a closed profile: loops = nonzero union of the
+// glyph outlines, placed by anchor / position / rotation (geometry/textOutline.ts).
+
+// packages/core/src/model/wrap.ts (new) — the placement shared by wrap_to_face / emboss_on_face / add_decal(mapping 'wrap')
+export type ChartMethod = 'develop' | 'geodesic' | 'parametric' | 'project';
+export interface WrapPlacement {
+  readonly method: ChartMethod; // 'develop' only on plane / cylinder / cone (K = 0)
+  readonly anchor: { readonly chart: Vec2; readonly on: Vec3 }; // sketch-local point <-> point on (near) the face
+  readonly angleDeg: number; // sketch +x vs the face reference direction (cylinder / cone: circumferential, +azimuth)
+  readonly mirror: boolean; // flip the sketch y axis (wrap seen from inside)
+  readonly direction?: Vec3; // method 'project' only (default: sketch plane normal, toward the face)
+}
+export interface FaceRef {
+  readonly faceIndex?: number;
+  readonly faceNear?: Vec3;
+  readonly faceName?: string;
+}
+
+// nurbs_curve entities made by wrap / project / curve-on-face carry where they lie (render, split, check, regeneration)
+export interface CurveOnFace {
+  readonly entityId: string; // the solid
+  readonly faceName: string; // persistent face name (SC-N1)
+  readonly pcurve: NurbsCurve2Data; // (u, v) curve; exact for affine charts, fitted within `fitTolerance` otherwise
+  readonly fitTolerance: number; // document units (3D), 0 when exact
+  readonly chartLength: number; // length in the sketch (chart) frame
+}
+// NurbsCurveEntity gains `onFace?: CurveOnFace` (optional, additive).
+
+// ShapeRecipe — one new node (exact kernels only), lowered by the native kernel to face_slab per region + fuse / cut / split
+export interface EmbossRecipe {
+  readonly op: 'emboss';
+  readonly source: ShapeRecipe;
+  readonly face: number; // unique face index of `source` at evaluation (resolved from the persistent name by the command)
+  readonly surface: FaceSlabRecipe['surface']; // wire form (plane / cylinder / cone / bspline), as faceSlab
+  readonly regions: ReadonlyArray<UvRegion>; // one outer loop + its holes per region (a text = one region per outer contour)
+  readonly mode: 'emboss' | 'deboss' | 'scribe' | 'engrave';
+  readonly depth: number; // > 0, document units (0 for scribe)
+  readonly walls: { readonly kind: 'normal' } | { readonly kind: 'pull'; readonly direction: Vec3; readonly draftDeg: number };
+  readonly toolWidth?: number; // engrave only (V2)
+  readonly tolerance: number; // sewing / fit tolerance, document units
+}
+export interface UvRegion {
+  readonly outer: UvLoop;
+  readonly holes: ReadonlyArray<UvLoop>;
+}
+/** A closed (u, v) loop of segments: polygon edges (today's encoding) or 2D NURBS pcurves (new, TR-WRP-05). */
+export type UvLoop = ReadonlyArray<
+  { readonly kind: 'line'; readonly to: Vec2 } | { readonly kind: 'nurbs'; readonly curve: NurbsCurve2Data }
+>;
+
+// Knurl (cosmetic), stored with the PMI model so drawings, STEP AP242 PMI and check_pmi see it
+export interface KnurlPmi {
+  readonly id: string;
+  readonly kind: 'knurl';
+  readonly pattern: 'straight' | 'diagonal' | 'diamond';
+  readonly pitch: number; // circular pitch actually used, document units
+  readonly requestedPitch: number;
+  readonly teeth: number; // integer, closes around the circumference
+  readonly helixAngleDeg?: number; // diagonal / diamond (default 30, named, D-WRP-8)
+  readonly feature: PmiFeatureRef; // faces (existing PMI feature reference)
+  readonly review: PmiReview; // REVIEW_REQUIRED like add_surface_texture
+}
+```
+
+Document version / migration: all fields are optional and additive (`fonts?`, `TextEntity.font?`, `NurbsCurveEntity.onFace?`, new
+recipe node, new PMI kind); persistence stays at the current version unless D-WRP-1 (binary blobs) needs a bump; old readers already
+reject unknown recipe ops and kinds. `recipeKey` (`geometry/shapeRecipe.ts`) gets an `emboss` case (all non-presentation fields).
+
+## 4. Commands
+
+Notation: Q = query, M = mutating (feature step). K = `annotations.requiresKernel: true`. Toolset `3d` (CLI view `wrap`).
+Face references use the existing pattern `{ faceIndex | faceNear | faceName }` + recorded `faceNames` (as `create_sketch_plane`).
+
+| Command                   | Q/M | K           | Params (sketch)                                                                                                                                                                                                                                                                      | @affects                                                                        | @invariant                                                                                                                                                   | @failure (code)                                                                                                                                                                                                                                                                                             |
+| ------------------------- | --- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `import_font`             | M   | –           | `path` (CLI / desktop exchange, read by the host) or `base64`; `name?`; `licence?` (text, e.g. "SIL OFL 1.1")                                                                                                                                                                        | `doc.fonts[id]` + `doc.blobs[sha256]`                                           | parsed fully before storing; `fsType` allows embedding; ≤ 4 MB                                                                                               | not a font / truncated → `WRP_FONT_PARSE`; CFF before V1 → `WRP_FONT_FORMAT_UNSUPPORTED`; fsType 2 → `WRP_FONT_EMBEDDING_RESTRICTED`; too big → `WRP_FONT_TOO_LARGE`                                                                                                                                        |
+| `list_fonts`              | Q   | –           | —                                                                                                                                                                                                                                                                                    | —                                                                               | bundled (provider) + document fonts with family, style, format, licence, `verified`                                                                          | —                                                                                                                                                                                                                                                                                                           |
+| `add_text` (extended)     | M   | –           | existing + `font?`, `verticalAnchor?`, `letterSpacing?`, `kerning?`, `lineSpacing?`                                                                                                                                                                                                  | 1 text entity                                                                   | with `font`: outline resolvable; missing glyphs listed                                                                                                       | unknown font → `WRP_FONT_UNAVAILABLE` (remediation: `list_fonts` / `import_font`); missing glyphs → warning `WRP_GLYPH_MISSING` (step succeeds)                                                                                                                                                             |
+| `text_outline`            | Q   | –           | `id` (text with font), `output?: 'summary' \| 'glyphs' \| 'loops'`, `kerning?`                                                                                                                                                                                                       | —                                                                               | `data { loops, outerLoops, holes, area, areaUnit, outlineLength, advanceWidth, lengthUnit, bbox, glyphs[]?, font {family, sha256}, unverified, provenance }` | not a font text → `WRP_TEXT_NO_FONT`                                                                                                                                                                                                                                                                        |
+| `explode_text` (COULD)    | M   | –           | `id`                                                                                                                                                                                                                                                                                 | replaces the text by closed `nurbs_curve` 2D loops (quadratic B-splines, exact) | area unchanged                                                                                                                                               | —                                                                                                                                                                                                                                                                                                           |
+| `unwrap_face`             | Q   | K           | `id`, `face`, `includeCurves?` (curves on face)                                                                                                                                                                                                                                      | —                                                                               | `data { developable, surfaceKind, sectorAngleRad?, innerRadius?, outerRadius?, radius?, area, outline: chart polylines (bounded), curves[] }`                | K ≠ 0 → `WRP_FACE_NOT_DEVELOPABLE`                                                                                                                                                                                                                                                                          |
+| `wrap_to_face`            | M   | K           | `id`, `face`, `entityIds` (2D entities incl. font text), `placement: WrapPlacement` (method default `develop` on K = 0 faces, else required), `fitTolerance?`                                                                                                                        | N `nurbs_curve` entities with `onFace`                                          | develop: chart length = 3D length (≤ 1e-9 rel); `data.curves[] {id, chartLength, length3d, maxLengthStrain}`, `data.distortion`, `data.exact`                | region leaves face → `WRP_OUTSIDE_FACE`; overlap → `WRP_WRAP_OVERLAP`; anchor not on face → `WRP_ANCHOR_OFF_FACE`; develop on K ≠ 0 → `WRP_FACE_NOT_DEVELOPABLE`                                                                                                                                            |
+| `project_to_face`         | M   | K           | `id`, `faces?` (default all), `entityIds`, `direction?: vec3` (default sketch normal toward the solid) **or** `mode: 'closest'`, `maxDistance?`                                                                                                                                      | N `nurbs_curve` with `onFace`                                                   | `data.curves[] {id, faceName, length3d}`, `data.missed[] {entityId, fraction}`                                                                               | nothing lands → `WRP_PROJECTION_MISSES_FACE`                                                                                                                                                                                                                                                                |
+| `create_curve_on_face`    | M   | K           | `id`, `face`, `mode: 'geodesic' \| 'isoparametric' \| 'uv'`; geodesic: `from`, `to` (points on face); iso: `through` + `direction: 'u'\|'v'`; uv: `uv: [u,v][]`                                                                                                                      | 1 `nurbs_curve` with `onFace`                                                   | geodesic on K = 0 faces = chart segment (exact)                                                                                                              | endpoints off face → `WRP_ANCHOR_OFF_FACE`; no geodesic found → `WRP_GEODESIC_FAILED`                                                                                                                                                                                                                       |
+| `emboss_on_face`          | M   | K           | `id`, `face`, `profileIds` (closed 2D profiles, font texts), `mode: 'emboss' \| 'deboss' \| 'scribe' \| 'engrave'`, `depth` (> 0 except scribe), `placement: WrapPlacement`, `walls?: 'normal' \| 'pull'`, `pullDirection?`, `draftDeg?`, `toolWidth?` (engrave), `maxLengthStrain?` | replaces the solid (same id, recipe `emboss`)                                   | `data { volumeDelta, volumeUnit, regionArea, regions, loops, method, exact, distortion, faceKind, angularSpanRad?, unverified, provenance }`                 | open profile (emboss / deboss) → `WRP_PROFILE_OPEN`; self-intersection → `WRP_PROFILE_SELF_INTERSECT`; depth ≤ 0 → `WRP_DEPTH_INVALID`; deboss deeper than the material (radius / wall) → `WRP_DEPTH_EXCEEDS_SOLID`; strain > limit → `WRP_DISTORTION_EXCEEDED`; kernel failure → `WRP_KERNEL_BUILD_FAILED` |
+| `split_face_by_curves`    | M   | K           | `id`, `curveIds` (`nurbs_curve` with `onFace` on this solid), `mode?: 'curves' \| 'silhouette'` (+ `pullDirection` for silhouette, COULD)                                                                                                                                            | replaces the solid; split faces get new persistent names                        | `data { facesBefore, facesAfter, faces[] {name, area} }`                                                                                                     | curve not on a face of `id` → `WRP_SPLIT_CURVE_NOT_ON_FACE`; nothing split → `WRP_SPLIT_NO_EFFECT`                                                                                                                                                                                                          |
+| `check_wrap`              | Q   | K for faces | `ids?` (default every WRP result), `maxLengthStrain?`, `minFeatureSize?`, `fitTolerance?`                                                                                                                                                                                            | —                                                                               | `data { status, findings[] {code, severity, ids, value, limit, unit, remediation}, limits: Record<string, NamedTolerance>, unverified, provenance }`         | unknown id → `WRP_ENTITY_NOT_FOUND`                                                                                                                                                                                                                                                                         |
+| `add_decal` (extended)    | M   | –           | existing + `font?`, `mapping?: 'project' \| 'wrap'`                                                                                                                                                                                                                                  | appends 1 decal                                                                 | wrap: the decal width is an arc length on the face                                                                                                           | `WRP_FONT_UNAVAILABLE`, `WRP_FACE_NOT_DEVELOPABLE` (wrap on K ≠ 0)                                                                                                                                                                                                                                          |
+| `add_knurl`               | M   | K           | `id`, `face` (cylindrical), `pattern`, `pitch`, `helixAngleDeg?`, `model?: 'cosmetic' \| 'geometry'` (geometry COULD, 02 SWG)                                                                                                                                                        | 1 `KnurlPmi` (+ geometry when asked)                                            | teeth integer; `data { teeth, pitch, requestedPitch }`                                                                                                       | not a cylinder → `WRP_KNURL_FACE_NOT_CYLINDER`; adjusted pitch → warning `WRP_KNURL_PITCH_ADJUSTED`                                                                                                                                                                                                         |
+| `pattern_on_face` (COULD) | M   | K           | `id`, `face`, `seedProfileIds`, `mode`, `depth`, `grid { countX, countY, pitchX, pitchY }` in chart units, `placement`                                                                                                                                                               | replaces the solid                                                              | instances fully inside the face or refused                                                                                                                   | `WRP_OUTSIDE_FACE`                                                                                                                                                                                                                                                                                          |
+
+Descriptions (AF-02) state for each: what it does, units, the face kinds per method, what it refuses, and the next command
+(`check_wrap`, `mass_properties`, `render_view`).
+
+## 5. Kernel / algorithms
+
+### 5.1 Developed charts (core `geometry/surfaceChart.ts`)
+
+Chart = the sketch's own 2D frame after placement: `c = R(angleDeg) · M(mirror) · (p − anchor.chart)`, then mapped by the face kind.
+The anchor face point `on` is projected to the face (`faceQuery.projectOnFace`) to get its parameters (θ₀, z₀) / (s₀, θ₀).
+
+| Face                              | Chart (x, y) → face                                                                    | (u, v) of the OCC surface                                                             | Exact?                                                                      |
+| --------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Plane (origin O, xDir, yDir)      | O + x·xDir + y·yDir                                                                    | affine                                                                                | yes, pcurves = sketch curves                                                |
+| Cylinder (axis A, xDir, radius r) | azimuth θ = θ₀ + x / r, axial z = z₀ + y                                               | u = θ, v = z: **affine**                                                              | yes: lines → helices, arcs / B-splines keep their (affine) form in (u, v)   |
+| Cone (apex, axis, semi-angle α)   | polar chart about the apex image: ρ = slant distance s, chart angle φ = (θ − θ₀) sin α | u = azimuth, v = s (as `plySlab.ts`: `[-θ/ sin α, ρ]` with the kernel's azimuth sign) | lengths exact; pcurves **fitted** (map is not affine) within `fitTolerance` |
+
+Isometry: plane, cylinder and cone have K = 0; the chart preserves every length and area (VC-WRP-01, 02, 06, 07 cross-check this
+numerically to ≤ 1e-8). Cone development: sector angle 2π sin α, radii s₁ = r_top / sin α, s₂ = r_base / sin α
+(`validation/data/cone_development.json`).
+
+Seam and wrap-around (FR-WRP-06): the chart x range is unwrapped continuously (no modulo) from the anchor; a region spanning
+Δθ = Δx / r > 2π (cylinder) or Δφ > 2π sin α (cone) overlaps itself → `WRP_WRAP_OVERLAP`; a region crossing θ = 0 of the periodic
+surface is split along the seam into pcurves on both sides (OCC periodic surface, u ∈ [0, 2π)) and re-joined by the kernel. A
+region outside the face's trimmed (u, v) domain (`uvBounds` + `faceContains`) → `WRP_OUTSIDE_FACE` with the offending loop.
+
+### 5.2 Doubly curved faces (V1)
+
+- **Geodesic polar (exponential) map** at the anchor: a chart point at polar (ρ, ψ) maps to the end of the geodesic of length ρ
+  leaving the anchor in direction ψ (measured from the reference direction). Geodesics are integrated on the face
+  (`d²x/dt² + Γ(x)(ẋ, ẋ) = 0` in (u, v), RK4 with step ≤ fitTolerance-driven, Christoffel symbols from `faceSamples` derivatives —
+  native, §5.8). Radial lengths are exact by construction; circumferential lengths scale by the Jacobi field; on a sphere of radius
+  R the strain is sin(ρ/R)/(ρ/R) − 1 and the area ratio 2R²(1 − cos(ρ/R))/(πρ²) (`sphere_geodesic_wrap.json`, VC-WRP-08).
+- **Parametric map** (Rhino ApplyCrv / FlowAlongSrf style [R6] [R7]): (u, v) = (u₀ + x / L_u, v₀ + y / L_v), with L_u, L_v the
+  arc-length rates of the iso curves through the anchor. Cheap and covers the whole face, distortion grows with uneven
+  parameterisation — reported, never hidden.
+- **Distortion metrics** (TR-WRP-11): for each mapped curve, the max relative length strain over its chart segments sampled at ≤
+  0.5 mm (or 1/200 of the chart size); for each region, the area ratio (3D face area of the image ÷ chart area, by
+  `tessellateFace` + uv quadrature). `data.distortion = { maxLengthStrain, meanLengthStrain, areaRatio, worst {chart, point} }`.
+- Limit: `maxLengthStrain` given, else the named default **0.02** (2 %, `source: "llull WRP default (D-WRP-4)"`, `defaulted:
+true`); above it `emboss_on_face` refuses (`WRP_DISTORTION_EXCEEDED`) and `check_wrap` fails (`WRP_CHECK_DISTORTION`).
+
+### 5.3 Emboss / deboss / scribe construction (native)
+
+1. Collect closed loops of the profiles (text: §5.4 union), orient (outer CCW, holes CW), group into regions (one outer + holes).
+2. Map every loop through the chart to (u, v) pcurves (exact for plane / cylinder, fitted for cone / doubly curved, §5.1–5.2).
+3. **Normal walls** (MVP): per region `face_slab(surface, region, from, to)` — emboss `[0, d]` outward, deboss `[−d, 0]` — with the
+   loop encoding extended to B-spline pcurve segments (TR-WRP-05); then one fuse (emboss) or cut (deboss) of all slabs with the
+   source in a single boolean (`BRepAlgoAPI_Fuse` / `Cut` with a tool list, as `boolean` does). Deboss slabs start 1e-6 × size outside
+   the face so the cut does not leave coincident faces (named tolerance).
+4. **Pull walls** (V1): extrude the wrapped wire along `pullDirection` (`BRepFeat_MakePrism`, or `BRepFeat_MakeDPrism` with
+   `draftDeg`) from the face up to the offset face, as a local operation on the picked face [R17].
+5. **Scribe**: build edges from the pcurves on the face (`BRepBuilderAPI_MakeEdge(pcurve, surface)` + `BRepLib::BuildCurves3d`) and
+   split with `BRepFeat_SplitShape::Add(wire, face)`; new faces get persistent names from the history (SC-N1).
+6. Validity: `BRepCheck_Analyzer` on the result; failure → `WRP_KERNEL_BUILD_FAILED` with the region index.
+
+Volume references (Steiner formula of a normal offset, dV = (1 + 2Hn + Kn²) dA dn): plane V = A d; cylinder emboss
+V = A d (1 + d/2r), deboss A d (1 − d/2r); cone V = A d + (d²/2) cot α · Φ (s₂ − s₁) for an annular chart sector
+(`emboss_volumes.json`, cross-checked by Pappus and quadrature to ≤ 1e-12). `emboss_on_face` reports `volumeDelta` from the kernel
+mass properties; `check_wrap` compares it with the closed form when the face is analytic and flags a mismatch above 1e-6 relative
+(`WRP_CHECK_VOLUME_MISMATCH`, an internal-consistency guard).
+
+Depth guard: deboss depth must be < the face's minimum radius of curvature (cylinder: r) and < the local wall thickness (distance
+from the face to the opposite side, `faceQuery.distance` along −normal at region samples) → else `WRP_DEPTH_EXCEEDS_SOLID`.
+
+### 5.4 Fonts and text outlines (core `lib/font/`)
+
+| Step                                                                                            | Rule                                                                                                                                                                                                                                                  | Source                              |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Table directory, `head`, `maxp`, `hhea`, `hmtx`, `OS/2`, `name`, `cmap` (4, 12), `loca`, `glyf` | Bounded reads (every offset checked against the table length), depth limit 8 for composites, glyph count ≤ maxp                                                                                                                                       | [R19] [R20]                         |
+| Simple glyphs                                                                                   | Flags (on-curve, short vectors, repeat), delta-coded coordinates; implied on-curve midpoint between two off-curve points; segments = lines and quadratic Béziers                                                                                      | [R19]                               |
+| Composite glyphs                                                                                | Component offsets (`ARGS_ARE_XY_VALUES`), scale / x-y scale / 2×2 (`x′ = xscale·x + scale10·y`, `y′ = scale01·x + yscale·y`); point-matching placement refused (`WRP_FONT_PARSE`, rare)                                                               | [R19]                               |
+| Fill rule                                                                                       | Nonzero winding; overlapping contours (`OVERLAP_SIMPLE`, `OVERLAP_COMPOUND`, common in variable fonts) are united with an exact-curve 2D boolean of the loops before use (polygonal union at 1e-6 em, then the original curve pieces are re-attached) | [R19] [R12]                         |
+| Area / length                                                                                   | Exact Green area per quadratic segment: ∮(x dy − y dx) = (2/3)(P₀×C + C×P₁) + (1/3)(P₀×P₁); outline length by adaptive Gauss                                                                                                                          | `validation/generate_font_refs.mjs` |
+| Scale                                                                                           | `height` = cap height → scale = height / `OS/2.sCapHeight` (fallback: top of 'H', reported in provenance)                                                                                                                                             | [R20]                               |
+| Layout                                                                                          | Advance widths (`hmtx`), pair kerning from `kern` / GPOS PairPos (V1), letter spacing, anchors, lines                                                                                                                                                 | —                                   |
+| CFF (V1)                                                                                        | Type 2 charstrings (cubic) in a separate `cff.ts`; same outputs                                                                                                                                                                                       | D-WRP-2                             |
+| Embedding                                                                                       | `fsType & 0xF`: 0 installable, 2 restricted → refuse, 4 preview & print, 8 editable; bit 0x0200 "bitmap embedding only" → refuse                                                                                                                      | [R20]                               |
+
+Exactness: TrueType outlines are quadratic, i.e. degree-2 B-splines — represented exactly as `NurbsCurve2Data` (degree 2) in the
+(u, v) pcurves on plane and cylinder faces (affine map), so the embossed letters are exact to the font's own geometry.
+
+Bundled default font (D-WRP-3): Fira Sans Regular (OFL 1.1, pinned sha256 `c29556a2…0f93c23`, 456 996 bytes, unitsPerEm 1000,
+cap height 689, fsType 0 = installable) [R24] — measured by the reference script; plus a single-line font for engraving in V2
+(Relief SingleLine, OFL) [R25].
+
+### 5.5 Projection (native)
+
+`project_to_face` along a direction: `BRepProj_Projection(wire, shape, direction)` (cylindrical projection) restricted to the picked
+faces; closest point: `BRepOffsetAPI_NormalProjection` with `SetParams(Tol3D = fitTolerance (default 1e-6 × model size), …,
+GeomAbs_C2, 14, 16)`, `SetMaxDistance(maxDistance)`, `SetLimit(true)` [R17]. Each result edge yields a `nurbs_curve` (3D curve) and its
+pcurve. Missed parts are reported per source entity as a covered fraction.
+
+### 5.6 Curves on face (native)
+
+Geodesic between two points: shooting on the face (initial direction from the chart line on K = 0 faces — exact; Newton on the
+initial angle elsewhere), result approximated by `GeomAPI_PointsToBSpline` within `fitTolerance`. Isoparametric: `Geom_Surface::UIso
+/ VIso` through the projected point, trimmed to the face. uv spline: interpolate (u, v) points (core `lib/nurbs` interpolation in
+2D) → pcurve → 3D curve.
+
+### 5.7 Decals and knurls
+
+- `add_decal mapping: 'wrap'`: `geometry/decal.ts` maps the decal rectangle through the chart instead of projecting: the patch
+  spans `width / r` radians on a cylinder (VC-WRP-23); outline-font decals rasterise the text outline (`lib/font`) instead of the
+  5×7 block font; still paint.
+- `add_knurl`: teeth N = round(π d / p), pitch used = π d / N, warning when it differs from the request
+  (`knurl_cases.json`); rendered as a procedural normal map on the face; drawing note text from the pattern and pitch. No standard
+  table is shipped (D-WRP-8).
+
+### 5.8 GeometryKernel / FaceQueryPort additions (`packages/core/src/geometry/kernelPorts.ts`)
+
+```ts
+export interface WrapPort {
+  // ctx.kernel.wrap (absent on Manifold)
+  projectCurves(
+    shape: ShapeHandle,
+    request: {
+      readonly faces: readonly number[];
+      readonly curves: readonly NurbsCurveData[];
+      readonly direction?: Vec3;
+      readonly closest?: { readonly maxDistance: number };
+      readonly tolerance: number;
+    },
+  ): readonly { readonly source: number; readonly face: number; readonly curve: NurbsCurveData; readonly pcurve: NurbsCurve2Data }[] | null;
+  geodesic(shape: ShapeHandle, face: number, from: Vec2, direction: number, length: number, tolerance: number): NurbsCurve2Data | null;
+  geodesicBetween(shape: ShapeHandle, face: number, from: Vec2, to: Vec2, tolerance: number): NurbsCurve2Data | null;
+  curvesOnFace(shape: ShapeHandle, face: number, pcurves: readonly NurbsCurve2Data[]): readonly NurbsCurveData[] | null; // 3D curves of pcurves
+}
+// ShapeRecipe gains { op: 'emboss' } (§3); FaceOpParams gains { kind: 'splitByCurves'; faces: number[]; pcurves: NurbsCurve2Data[][] }.
+```
+
+Native side: `cpp/wrap.cxx` (projection, curves on face, geodesics), `surfaces.cxx` `face_slab` extended to curved loops and to many
+regions, `face_ops.cxx` split by curves; Rust bindings in `src/features.rs` / `src/wrap.rs`; request plumbing in
+`server/src/native/kernelFeatures.ts`. Every OCCT class used gets an integration test (`server/tests/`) — "bound ≠ works".
+
+### 5.9 Numerical tolerances (named defaults, AF-31)
+
+| Name                                          | Default                                                                    | Unit            | Source                                                                                |
+| --------------------------------------------- | -------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------- |
+| `fitTolerance` (pcurve fit, projection Tol3D) | 1e-6 × model bounding-box diagonal, ≥ 1e-7 mm                              | document length | llull (D-WRP-4); OCCT NormalProjection default 1e-4 is too coarse for lettering [R17] |
+| `maxLengthStrain`                             | 0.02                                                                       | 1               | llull (D-WRP-4)                                                                       |
+| `minFeatureSize`                              | none unless the owner names a process (then e.g. FDM 0.4 mm nozzle, given) | document length | AF-31: never invented                                                                 |
+| Deboss start offset                           | 1e-6 × diagonal                                                            | document length | llull                                                                                 |
+| Sewing tolerance of slabs                     | as `faceSlab` today                                                        | document length | `plySlab.ts` callers                                                                  |
+
+## 6. Interop & persistence
+
+| Item                | Format / rule                                                                                                                                                                                                                                                                                 |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Document            | `fonts` + `blobs` (font bytes, D-WRP-1); `TextEntity.font`; `NurbsCurveEntity.onFace`; recipe `emboss`; `KnurlPmi` in `pmi`                                                                                                                                                                   |
+| STEP                | Embossed solids export through the existing exact path (cylinder / offset / ruled faces); knurl as an AP242 PMI note (04 XCH writer)                                                                                                                                                          |
+| DXF                 | Font text and `unwrap_face` outlines export as SPLINE (degree 2, exact) or LWPOLYLINE (flattened, tolerance stated) through the existing DXF writer                                                                                                                                           |
+| glTF                | Decals as today; knurl texture baked as a normal map                                                                                                                                                                                                                                          |
+| Code export         | `export_code language=cadquery`: planar font text → `Workplane.text(...)` (CadQuery has a text primitive; font file passed by path); wraps / embosses on curved faces have no CadQuery equivalent → lowered as an exact B-rep blob import or refused with `WRP_CODEGEN_UNSUPPORTED` (D-WRP-7) |
+| Font files in plans | `import_font path=…` reads through the host exchange path (CLI / desktop), like `import_airfoil`                                                                                                                                                                                              |
+
+## 7. CLI / UI surfaces and error codes
+
+- CLI: nothing special — registry → `llull search wrap emboss text font`, `llull describe <cmd>`, plans; `llull guide` gains a WRP
+  section (chart axes per face kind, anchor + angle, the minimal emboss plan, how to read `distortion`) (AF-03).
+- UI: render branch for `nurbs_curve` with `onFace` (draw on the face, depth-offset), emboss is a normal solid; distortion overlay
+  (COULD) from `check_wrap` data; anchor drag = 04 DIR gesture committing one step.
+
+### 7.1 Stable error and finding codes (AF-11)
+
+| Code                                                                                                                           | Raised by                                                    | When                                                                                                       | Ids / path                         | Remediation                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------- |
+| `WRP_ENTITY_NOT_FOUND`                                                                                                         | all                                                          | unknown id                                                                                                 | `params.id`                        | `llull describe_scene` lists ids                                          |
+| `WRP_FACE_NOT_FOUND` / `REF_LOST`                                                                                              | face commands                                                | face pick resolves to nothing / recorded name gone                                                         | `params.face`                      | re-pick with `faceNear` on the intended face (`inspect_faces`)            |
+| `WRP_FACE_NOT_DEVELOPABLE`                                                                                                     | `wrap_to_face`, `emboss_on_face`, `unwrap_face`, `add_decal` | method `develop` on a face with K ≠ 0                                                                      | `params.placement.method`          | use `method: "geodesic"` or `"parametric"` and read `data.distortion`     |
+| `WRP_ANCHOR_OFF_FACE`                                                                                                          | wrap / curve-on-face                                         | anchor point farther than 1e-3 × size from the face                                                        | `params.placement.anchor.on`       | give a point on the face (`inspect_faces` samples)                        |
+| `WRP_OUTSIDE_FACE`                                                                                                             | wrap / emboss / pattern                                      | a mapped loop leaves the trimmed face                                                                      | `params.profileIds[i]`, loop index | move the anchor, rotate, or scale the sketch                              |
+| `WRP_WRAP_OVERLAP`                                                                                                             | wrap / emboss                                                | chart extent > circumference (cylinder) or > sector (cone)                                                 | `params.profileIds[i]`             | shrink the sketch below `data.fullWrapChartWidth`                         |
+| `WRP_PROFILE_OPEN`                                                                                                             | `emboss_on_face` (emboss / deboss)                           | a profile is not closed                                                                                    | `params.profileIds[i]`             | close it, or use `mode: "scribe"` for open curves                         |
+| `WRP_PROFILE_SELF_INTERSECT`                                                                                                   | `emboss_on_face`                                             | a loop crosses itself (after the font union)                                                               | profile id, loop index             | fix the sketch; text loops are united automatically                       |
+| `WRP_DEPTH_INVALID`                                                                                                            | `emboss_on_face`                                             | depth ≤ 0 or not finite (non-scribe)                                                                       | `params.depth`                     | give depth > 0 in document units                                          |
+| `WRP_DEPTH_EXCEEDS_SOLID`                                                                                                      | `emboss_on_face` (deboss / engrave)                          | depth ≥ face radius or ≥ local wall thickness                                                              | `params.depth`, region             | reduce depth below `data.maxDepth`                                        |
+| `WRP_DISTORTION_EXCEEDED`                                                                                                      | `emboss_on_face`, `wrap_to_face`                             | max length strain > limit                                                                                  | `params.maxLengthStrain`           | smaller sketch, other anchor, or raise the limit with the owner's consent |
+| `WRP_PROJECTION_MISSES_FACE`                                                                                                   | `project_to_face`                                            | nothing (or less than all, with `requireAll`) lands on the faces                                           | `params.entityIds[i]`              | change `direction` or move the sketch plane                               |
+| `WRP_SPLIT_CURVE_NOT_ON_FACE` / `WRP_SPLIT_NO_EFFECT`                                                                          | `split_face_by_curves`                                       | curve has no `onFace` on this solid / splits nothing                                                       | `params.curveIds[i]`               | make curves with `project_to_face` / `wrap_to_face` on this solid         |
+| `WRP_GEODESIC_FAILED`                                                                                                          | `create_curve_on_face`                                       | shooting did not converge                                                                                  | `params.from`, `params.to`         | pick closer points or `mode: "uv"`                                        |
+| `WRP_FONT_UNAVAILABLE`                                                                                                         | `add_text`, `add_decal`                                      | font id / family not in the document nor the provider                                                      | `params.font`                      | `list_fonts`, then `import_font`                                          |
+| `WRP_FONT_PARSE`                                                                                                               | `import_font`                                                | not an sfnt font, truncated or out-of-range table                                                          | `params.path`                      | give a .ttf / .otf file                                                   |
+| `WRP_FONT_FORMAT_UNSUPPORTED`                                                                                                  | `import_font`                                                | CFF / CFF2 before V1, WOFF / WOFF2                                                                         | `params.path`                      | use a TrueType-outline (.ttf) font                                        |
+| `WRP_FONT_EMBEDDING_RESTRICTED`                                                                                                | `import_font`                                                | OS/2 fsType = 2 or bitmap-only                                                                             | `params.path`                      | use a font licensed for embedding (bundled fonts are OFL)                 |
+| `WRP_FONT_TOO_LARGE`                                                                                                           | `import_font`                                                | > 4 MB                                                                                                     | `params.path`                      | subset the font or use a bundled one                                      |
+| `WRP_GLYPH_MISSING` (warning)                                                                                                  | `add_text`, `text_outline`, `add_decal`                      | characters with no glyph                                                                                   | characters                         | choose a font that covers them                                            |
+| `WRP_TEXT_NO_FONT`                                                                                                             | `text_outline`, `emboss_on_face`, `extrude_profile`          | text entity without `font`                                                                                 | `params.id`                        | set `font` (`edit_step_params` on `add_text`)                             |
+| `WRP_KNURL_FACE_NOT_CYLINDER`                                                                                                  | `add_knurl`                                                  | face not cylindrical                                                                                       | `params.face`                      | pick the cylindrical face                                                 |
+| `WRP_KNURL_PITCH_ADJUSTED` (warning)                                                                                           | `add_knurl`                                                  | π d / p not an integer                                                                                     | `params.pitch`                     | none; the pitch used is in `data.pitch`                                   |
+| `WRP_KERNEL_BUILD_FAILED`                                                                                                      | kernel commands                                              | OCCT result invalid / failed                                                                               | region index                       | simplify the profile, increase depth / tolerance, report                  |
+| `WRP_CODEGEN_UNSUPPORTED`                                                                                                      | `export_code`                                                | wrap on a curved face in a language without it                                                             | step id                            | export STEP instead                                                       |
+| `WRP_CHECK_DISTORTION` · `WRP_CHECK_OUTSIDE_FACE` · `WRP_CHECK_THIN_FEATURE` · `WRP_CHECK_DEPTH` · `WRP_CHECK_VOLUME_MISMATCH` | `check_wrap` (fail)                                          | limit exceeded / region leaves face / stroke width < `minFeatureSize` / depth guard / kernel ≠ closed form | ids, value, limit, unit            | as the matching refusal                                                   |
+| `WRP_CHECK_GLYPH_MISSING` · `WRP_CHECK_FONT_UNVERIFIED` · `WRP_CHECK_LIMIT_DEFAULTED`                                          | `check_wrap` (warn; unverified not suppressible)             | as named                                                                                                   | font / text ids                    | pin the font source or confirm with the owner                             |
+
+### 7.2 Result conventions (AF-10, AF-31..35)
+
+- Every number has a unit field or suffix (`length3d` + `unit`, `regionArea` + `areaUnit`, `angleDeg`, `angularSpanRad`). Chart
+  quantities are in document units.
+- `unverified` on every result that depends on an unverified font; `provenance { method, font? {family, sha256}, inputs }`.
+- Named defaults as `NamedTolerance` (`{ value, unit, source, defaulted }`), same type as SRF.
+- `reviewRequired` only on `add_knurl` (PMI on parts) and on `check_wrap` when `purpose: "release"` is passed (marking on a released
+  part); approval is the existing 09 PLM human gate (AF-34).
+- Bounded output: `unwrap_face` outlines ≤ 2 000 points per loop unless `--save`; `text_outline output: "glyphs"` paged by `limit`.
+
+### 7.3 Agent-first compliance
+
+| AF            | Where                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------- |
+| AF-01, 02, 03 | registry commands, agent-written descriptions (§4), `llull guide` WRP section                           |
+| AF-04         | FR-WRP-47; `depth`, `pitch`, `letterSpacing` in document units; `angleDeg`, `draftDeg`, `helixAngleDeg` |
+| AF-05         | FR-WRP-46; `validation/plans/*.json`                                                                    |
+| AF-10, 12     | §7.2                                                                                                    |
+| AF-11         | §7.1                                                                                                    |
+| AF-13         | FR-WRP-45; pure chart + font code, step-scoped ids                                                      |
+| AF-20, 30     | `check_wrap`                                                                                            |
+| AF-21         | lengths, strain, area ratio, volume delta instead of looking at the render                              |
+| AF-22         | `render_view isolate=<id> --save`                                                                       |
+| AF-31         | §5.9 named defaults                                                                                     |
+| AF-32         | font provenance → `unverified` propagation                                                              |
+| AF-33, 34     | knurl / release marking `reviewRequired`; 09 PLM approval                                               |
+| AF-35, 36     | `provenance`; one-sentence summaries                                                                    |
+| AF-40, 41, 42 | budgets §8, bundled fonts, no network; `--dry-run`                                                      |
+
+## 8. Performance & robustness budgets (desktop, native kernel)
+
+| Operation                                          | Budget                                                                                          | Notes                                     |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `import_font` 500 KB TrueType                      | ≤ 150 ms                                                                                        | full parse + validation, once             |
+| `text_outline` 100 characters                      | ≤ 30 ms                                                                                         | cached per (font sha256, content, layout) |
+| `wrap_to_face` 50 curves on a cylinder             | ≤ 300 ms                                                                                        | exact pcurves                             |
+| `emboss_on_face` 20-character text on a cylinder   | ≤ 1.5 s                                                                                         | one fuse with a tool list                 |
+| `emboss_on_face` 100-character text on a cylinder  | ≤ 3 s                                                                                           | VC-WRP-34                                 |
+| geodesic wrap of a 30-loop logo on a B-spline face | ≤ 5 s                                                                                           | geodesic shooting native                  |
+| Robustness                                         | no crash on malformed fonts (fuzzed parser: truncated tables, loops in composites, huge counts) | every parse error → `WRP_FONT_PARSE`      |
+
+## 9. Test strategy
+
+| Level              | Location                                                                                                 | Content                                                                                                                                                                                                  | VC                                 |
+| ------------------ | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| Unit (core math)   | `tests/unit/wrap/surfaceChart.test.ts`                                                                   | chart maps vs `data/cylinder_wrap.json`, `cone_development.json`, `sphere_geodesic_wrap.json`, `pull_and_geodesic.json`                                                                                  | 01, 02, 06, 07, 08, 37             |
+| Unit (fonts)       | `tests/unit/wrap/font*.test.ts`                                                                          | the pinned Fira Sans fixture (downloaded by a fixture script, sha256-checked; skipped offline with a notice) vs `data/font_firasans_glyphs.json` and `text_cases.json`; a fuzz corpus of truncated fonts | 13, 15, 19, 20, 21                 |
+| Unit (commands)    | `tests/unit/wrap/*.test.ts`                                                                              | happy + failure per command, `is pure`, error codes of §7.1, schema snapshot                                                                                                                             | 03, 09, 30, 31                     |
+| Agent-first        | `tests/unit/wrap/agentFirst.test.ts`                                                                     | named defaults, `unverified` propagation, provenance, units audit                                                                                                                                        | 28, 29, 31                         |
+| Golden             | `tests/golden/` plans from `validation/plans/target_*.json`                                              | id-normalised snapshots + replay equality                                                                                                                                                                | 10, 14, 16, 18                     |
+| Kernel integration | `server/tests/nativeWrap.test.ts`                                                                        | every OCCT class used (§1.2, §5.3, §5.5); volumes vs `emboss_volumes.json`                                                                                                                               | 04, 05, 10, 12, 14, 16, 17, 25, 32 |
+| Manifold path      | `tests/unit/wrap/noKernel.test.ts`                                                                       | refusals + core-only commands                                                                                                                                                                            | 33                                 |
+| Production gate    | scenario "branded bottle": revolve a bottle, wrap + emboss text, deboss a serial, check, STEP round trip | 32                                                                                                                                                                                                       |
+
+### 9.1 Technical requirements
+
+| Id        | Requirement                                                                                                                                                            | Spec             | VCs                    |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ---------------------- |
+| TR-WRP-01 | Core `geometry/surfaceChart.ts` (+ geodesic chart): develop / geodesic / parametric maps, promoted from `domain-aero/src/composites/surface.ts`; composites re-uses it | §2.1, §5.1, §5.2 | 01, 02, 06, 07, 08, 37 |
+| TR-WRP-02 | Face references by persistent name; seam splitting and wrap-around on periodic faces; overlap / outside-face detection                                                 | §5.1             | 03, 04                 |
+| TR-WRP-03 | `NurbsCurveEntity.onFace` (`CurveOnFace` with exact or fitted pcurve) and its render branch                                                                            | §3               | 01, 07, 37             |
+| TR-WRP-04 | Recipe node `emboss` (normal walls, regions, modes), lowering and `recipeKey`; scribe via split                                                                        | §3, §5.3         | 04, 10, 12, 14, 16     |
+| TR-WRP-05 | Native `face_slab` with B-spline pcurve loops and several regions; pull walls with `BRepFeat_MakePrism` / `MakeDPrism`                                                 | §5.3             | 10, 12, 25             |
+| TR-WRP-06 | Native projection (`BRepProj_Projection`, `BRepOffsetAPI_NormalProjection`) and split by curves (`BRepFeat_SplitShape`) behind `WrapPort`                              | §5.5, §5.8       | 05, 17                 |
+| TR-WRP-07 | `lib/font`: bounded TrueType parser, composites, nonzero union, exact areas; CFF in V1; fuzz tests                                                                     | §5.4             | 13, 15, 33             |
+| TR-WRP-08 | Fonts in the document (`fonts`, binary blobs D-WRP-1), `FontProvider` port with bundled OFL fonts, fsType enforcement                                                  | §2.1, §3         | 19, 20                 |
+| TR-WRP-09 | `TextEntity` v2 + `geometry/textOutline.ts`; `extrude_profile` and `emboss_on_face` accept font text                                                                   | §3, §4           | 13, 14, 35             |
+| TR-WRP-10 | Commands of §4 with `WRP_*` codes and `check_wrap`                                                                                                                     | §4, §7.1         | 03, 28, 30             |
+| TR-WRP-11 | Distortion metrics and the named limit                                                                                                                                 | §5.2, §5.9       | 02, 08, 28             |
+| TR-WRP-12 | Decal `mapping: 'wrap'` and outline-font raster                                                                                                                        | §5.7             | 23                     |
+| TR-WRP-13 | `KnurlPmi`, closure rule, texture; modeled knurl via 02 SWG                                                                                                            | §3, §5.7         | 24                     |
+| TR-WRP-14 | Interop: STEP exact, DXF outlines, CadQuery text lowering, codegen refusal                                                                                             | §6               | 32                     |
+| TR-WRP-15 | Purity, determinism, budgets                                                                                                                                           | §2.3, §8         | 18, 34                 |
+| TR-WRP-16 | Units, `unverified`, provenance, bounded output                                                                                                                        | §7.2             | 29, 31                 |
+
+## 10. Delivery plan
+
+| Milestone | Content                                                                                                                                                                                                                           | Depends on  | Effort (eng-weeks) |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------ |
+| M0        | Decisions D-WRP-1..4; promote the chart to core (`surfaceChart.ts`), composites switched to it (no behaviour change, its tests green)                                                                                             | —           | 1                  |
+| M1        | `lib/font` TrueType + `import_font`, `list_fonts`, `FontProvider` with bundled Fira Sans, `TextEntity.font`, `text_outline`, `extrude_profile` of font text (planar 3D text works on Manifold too)                                | M0, D-WRP-1 | 3                  |
+| M2        | `unwrap_face`, `wrap_to_face` (develop), `NurbsCurveEntity.onFace` + render branch, `project_to_face` (native projection)                                                                                                         | M0          | 3                  |
+| M3        | `emboss_on_face` emboss / deboss / scribe on plane / cylinder / cone: recipe `emboss`, native `face_slab` with curved loops + regions, `check_wrap`                                                                               | M1, M2      | 4                  |
+| M4 (V1)   | Geodesic + parametric charts (native geodesics), emboss on doubly curved faces, `split_face_by_curves`, `create_curve_on_face`, pull walls + draft, CFF fonts, kerning, multi-line, `add_decal` font + wrap, `add_knurl` cosmetic | M3          | 6                  |
+| M5 (V2)   | Single-line fonts + engrave, multi-face wraps, text on curve, `pattern_on_face`, modeled knurl (02 SWG helical sweep), silhouette split, variable-font instances                                                                  | M4, 02 SWG  | 5                  |
+
+Total ≈ 22 eng-weeks. Cross-pack: **01 DEF** owns body deformation (no overlap: WRP never moves the solid's existing faces),
+**02 SWG** helical sweep for a modeled knurl and on-face guide curves (FR-WRP-04 is an input to it), **04 DIR** anchor-drag gesture,
+**06 BLD** fillets on emboss edges (the emboss edges get persistent names so 06 can pick them), **07 MSH** mesh emboss / displacement.
+
+## 11. Open questions / decisions needed
+
+| #       | Question                                                                                                                                                                                                                                           | Proposal                                                                                                                                                                                                      |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D-WRP-1 | Binary payloads in `CadDocument.blobs` (today UTF-8 text, `model/*` media types)                                                                                                                                                                   | Add `font/ttf`, `font/otf` with sha256 of raw bytes; bump persistence only if old readers would misread                                                                                                       |
+| D-WRP-2 | Font engine: TypeScript in core vs native `skrifa` (fontations, MIT / Apache, fuzzed, replaces FreeType in Chrome [R22]) vs OCCT `Font_BRepFont` (needs FreeType, rebuild) vs `ttf-parser` (maintenance mode [R21]) vs opentype.js (MIT, JS [R23]) | **TS in core** for MVP (pure, deterministic, testable in node, no host dependency); keep skrifa as the V1 option for CFF2 / variable fonts if the TS CFF reader proves costly; do not enable FreeType in OCCT |
+| D-WRP-3 | Bundled fonts and their size in the desktop / CLI bundle                                                                                                                                                                                           | Fira Sans Regular (457 KB, OFL) + one single-line OFL font in V2; more families as user imports                                                                                                               |
+| D-WRP-4 | Default distortion limit and fit tolerance                                                                                                                                                                                                         | 2 % length strain, 1e-6 × diagonal; always reported `defaulted: true`                                                                                                                                         |
+| D-WRP-5 | Command catalog placement: new `commands/wrap/` core catalog vs extending `edit` / `brep`                                                                                                                                                          | New `wrap` catalog (one concern, ≤ 500 lines per file)                                                                                                                                                        |
+| D-WRP-6 | Shaping (ligatures, complex scripts)                                                                                                                                                                                                               | Out of scope; one character → one glyph + pair kerning; revisit with a shaping library if owners need it                                                                                                      |
+| D-WRP-7 | Code export of curved-face embosses                                                                                                                                                                                                                | Exact B-rep blob import in the generated script, or refuse — owner choice                                                                                                                                     |
+| D-WRP-8 | Knurl standard tables (DIN 82 / ISO 13444, paywalled)                                                                                                                                                                                              | Ship none; user gives pitch / angle; transcribe a table only from a readable source with two-source agreement                                                                                                 |
+| D-WRP-9 | Should `add_text` without `font` become a profile by default (bundled font)?                                                                                                                                                                       | No: keep annotations as they are (backward compatible); `font` opts in                                                                                                                                        |
+
+## 12. References
+
+Same numbering as FUNCTIONAL_SPEC §11 ([R1]–[R27]). llull internal: `.claude/rules/architecture.md`, `docs/aerospace/AGENT_FIRST.md`,
+`docs/decisions/LC1-local-only.md`, `docs/decisions/SV1-solver-toolchain-windows.md` (cited by `surfaces.cxx` for the
+`MakeThickSolid` crash that made `face_slab` build walls itself).

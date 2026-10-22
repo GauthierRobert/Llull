@@ -1,0 +1,1626 @@
+{
+ "generated": "generate_font_refs.mjs",
+ "font": {
+  "file": "FiraSans-Regular.ttf",
+  "sha256": "c29556a2719bf613ef3d5e070e40d903a8965d9c081beca1375dc1e6e0f93c23",
+  "pinnedSha256": "c29556a2719bf613ef3d5e070e40d903a8965d9c081beca1375dc1e6e0f93c23",
+  "sizeBytes": 456996,
+  "licence": "SIL Open Font License 1.1",
+  "unitsPerEm": 1000,
+  "ascender": 935,
+  "descender": -265,
+  "capHeight": 689,
+  "xHeight": 527,
+  "fsType": 0,
+  "embeddingPermission": "installable",
+  "numGlyphs": 2708
+ },
+ "method": "exact Green area of TrueType quadratic outlines; nonzero scanline fill as independent check (6000 lines, 32 pieces per quadratic)",
+ "glyphs": [
+  {
+   "char": "A",
+   "codePoint": 65,
+   "glyphId": 3,
+   "advance": 573,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 0,
+   "lineSegments": 11,
+   "bbox": [
+    6,
+    0,
+    567,
+    689
+   ],
+   "areaFontUnits2": 141755.5,
+   "outlineLengthFontUnits": 3351.555,
+   "check": {
+    "nonzeroFillArea": 141739.766,
+    "relativeDifference": -0.000111
+   }
+  },
+  {
+   "char": "B",
+   "codePoint": 66,
+   "glyphId": 37,
+   "advance": 608,
+   "contours": 3,
+   "outerContours": 1,
+   "holes": 2,
+   "quadraticSegments": 15,
+   "lineSegments": 9,
+   "bbox": [
+    100,
+    0,
+    563,
+    689
+   ],
+   "areaFontUnits2": 175032.166667,
+   "outlineLengthFontUnits": 4009.7192,
+   "check": {
+    "nonzeroFillArea": 175018.736,
+    "relativeDifference": -0.00007673
+   }
+  },
+  {
+   "char": "C",
+   "codePoint": 67,
+   "glyphId": 45,
+   "advance": 560,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 17,
+   "lineSegments": 2,
+   "bbox": [
+    55,
+    -12,
+    540,
+    701
+   ],
+   "areaFontUnits2": 110518.166667,
+   "outlineLengthFontUnits": 2678.2265,
+   "check": {
+    "nonzeroFillArea": 110519.966,
+    "relativeDifference": 0.00001628
+   }
+  },
+  {
+   "char": "D",
+   "codePoint": 68,
+   "glyphId": 55,
+   "advance": 644,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 9,
+   "lineSegments": 6,
+   "bbox": [
+    100,
+    0,
+    589,
+    689
+   ],
+   "areaFontUnits2": 159634.166667,
+   "outlineLengthFontUnits": 3585.7108,
+   "check": {
+    "nonzeroFillArea": 159622.649,
+    "relativeDifference": -0.00007215
+   }
+  },
+  {
+   "char": "E",
+   "codePoint": 69,
+   "glyphId": 70,
+   "advance": 535,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 12,
+   "bbox": [
+    100,
+    0,
+    481,
+    689
+   ],
+   "areaFontUnits2": 125533,
+   "outlineLengthFontUnits": 3149.7919,
+   "check": {
+    "nonzeroFillArea": 125548.438,
+    "relativeDifference": 0.000123
+   }
+  },
+  {
+   "char": "F",
+   "codePoint": 70,
+   "glyphId": 98,
+   "advance": 491,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 10,
+   "bbox": [
+    100,
+    0,
+    466,
+    689
+   ],
+   "areaFontUnits2": 102508,
+   "outlineLengthFontUnits": 2549.7919,
+   "check": {
+    "nonzeroFillArea": 102510.001,
+    "relativeDifference": 0.00001952
+   }
+  },
+  {
+   "char": "G",
+   "codePoint": 71,
+   "glyphId": 101,
+   "advance": 631,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 16,
+   "lineSegments": 6,
+   "bbox": [
+    55,
+    -12,
+    569,
+    701
+   ],
+   "areaFontUnits2": 151154.875,
+   "outlineLengthFontUnits": 3620.0119,
+   "check": {
+    "nonzeroFillArea": 151153.353,
+    "relativeDifference": -0.00001007
+   }
+  },
+  {
+   "char": "H",
+   "codePoint": 72,
+   "glyphId": 113,
+   "advance": 680,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 12,
+   "bbox": [
+    100,
+    0,
+    580,
+    689
+   ],
+   "areaFontUnits2": 153530,
+   "outlineLengthFontUnits": 3560,
+   "check": {
+    "nonzeroFillArea": 153521.832,
+    "relativeDifference": -0.0000532
+   }
+  },
+  {
+   "char": "I",
+   "codePoint": 73,
+   "glyphId": 122,
+   "advance": 295,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 4,
+   "bbox": [
+    100,
+    0,
+    195,
+    689
+   ],
+   "areaFontUnits2": 65455,
+   "outlineLengthFontUnits": 1568,
+   "check": {
+    "nonzeroFillArea": 65455,
+    "relativeDifference": -6.836e-14
+   }
+  },
+  {
+   "char": "J",
+   "codePoint": 74,
+   "glyphId": 141,
+   "advance": 305,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 5,
+   "lineSegments": 4,
+   "bbox": [
+    5,
+    -137,
+    210,
+    689
+   ],
+   "areaFontUnits2": 79518.583333,
+   "outlineLengthFontUnits": 1891.8757,
+   "check": {
+    "nonzeroFillArea": 79516.5,
+    "relativeDifference": -0.0000262
+   }
+  },
+  {
+   "char": "K",
+   "codePoint": 75,
+   "glyphId": 145,
+   "advance": 589,
+   "contours": 2,
+   "outerContours": 2,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 10,
+   "bbox": [
+    100,
+    0,
+    589,
+    689
+   ],
+   "areaFontUnits2": 141924.5,
+   "outlineLengthFontUnits": 3541.2397,
+   "check": {
+    "nonzeroFillArea": 141924.501,
+    "relativeDifference": 8.314e-9
+   }
+  },
+  {
+   "char": "L",
+   "codePoint": 76,
+   "glyphId": 149,
+   "advance": 498,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 6,
+   "bbox": [
+    100,
+    0,
+    478,
+    689
+   ],
+   "areaFontUnits2": 88487.5,
+   "outlineLengthFontUnits": 2123.7257,
+   "check": {
+    "nonzeroFillArea": 88494.434,
+    "relativeDifference": 0.00007836
+   }
+  },
+  {
+   "char": "M",
+   "codePoint": 77,
+   "glyphId": 161,
+   "advance": 778,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 2,
+   "lineSegments": 13,
+   "bbox": [
+    62,
+    0,
+    716,
+    689
+   ],
+   "areaFontUnits2": 211086.666667,
+   "outlineLengthFontUnits": 5213.199,
+   "check": {
+    "nonzeroFillArea": 211088.285,
+    "relativeDifference": 0.000007668
+   }
+  },
+  {
+   "char": "N",
+   "codePoint": 78,
+   "glyphId": 165,
+   "advance": 683,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 4,
+   "lineSegments": 10,
+   "bbox": [
+    100,
+    0,
+    583,
+    689
+   ],
+   "areaFontUnits2": 181020,
+   "outlineLengthFontUnits": 4278.2231,
+   "check": {
+    "nonzeroFillArea": 181019.761,
+    "relativeDifference": -0.000001319
+   }
+  },
+  {
+   "char": "O",
+   "codePoint": 79,
+   "glyphId": 182,
+   "advance": 692,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 18,
+   "lineSegments": 0,
+   "bbox": [
+    55,
+    -12,
+    637,
+    701
+   ],
+   "areaFontUnits2": 161547.25,
+   "outlineLengthFontUnits": 3606.6395,
+   "check": {
+    "nonzeroFillArea": 161575.963,
+    "relativeDifference": 0.0001777
+   }
+  },
+  {
+   "char": "P",
+   "codePoint": 80,
+   "glyphId": 225,
+   "advance": 581,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 8,
+   "lineSegments": 8,
+   "bbox": [
+    100,
+    0,
+    549,
+    689
+   ],
+   "areaFontUnits2": 134487.416667,
+   "outlineLengthFontUnits": 3056.5507,
+   "check": {
+    "nonzeroFillArea": 134477.014,
+    "relativeDifference": -0.00007735
+   }
+  },
+  {
+   "char": "Q",
+   "codePoint": 81,
+   "glyphId": 230,
+   "advance": 691,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 21,
+   "lineSegments": 1,
+   "bbox": [
+    55,
+    -103,
+    666,
+    701
+   ],
+   "areaFontUnits2": 175649.541667,
+   "outlineLengthFontUnits": 4034.6567,
+   "check": {
+    "nonzeroFillArea": 175679.36,
+    "relativeDifference": 0.0001698
+   }
+  },
+  {
+   "char": "R",
+   "codePoint": 82,
+   "glyphId": 232,
+   "advance": 605,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 8,
+   "lineSegments": 11,
+   "bbox": [
+    100,
+    0,
+    580,
+    689
+   ],
+   "areaFontUnits2": 161573.083333,
+   "outlineLengthFontUnits": 3695.4938,
+   "check": {
+    "nonzeroFillArea": 161569.813,
+    "relativeDifference": -0.00002024
+   }
+  },
+  {
+   "char": "S",
+   "codePoint": 83,
+   "glyphId": 242,
+   "advance": 545,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 28,
+   "lineSegments": 2,
+   "bbox": [
+    25,
+    -12,
+    505,
+    701
+   ],
+   "areaFontUnits2": 130286,
+   "outlineLengthFontUnits": 3146.4974,
+   "check": {
+    "nonzeroFillArea": 130278.945,
+    "relativeDifference": -0.00005415
+   }
+  },
+  {
+   "char": "T",
+   "codePoint": 84,
+   "glyphId": 254,
+   "advance": 517,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 8,
+   "bbox": [
+    15,
+    0,
+    507,
+    689
+   ],
+   "areaFontUnits2": 97207,
+   "outlineLengthFontUnits": 2352.6149,
+   "check": {
+    "nonzeroFillArea": 97190.552,
+    "relativeDifference": -0.0001692
+   }
+  },
+  {
+   "char": "U",
+   "codePoint": 85,
+   "glyphId": 269,
+   "advance": 662,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 9,
+   "lineSegments": 6,
+   "bbox": [
+    90,
+    -12,
+    572,
+    689
+   ],
+   "areaFontUnits2": 143966.916667,
+   "outlineLengthFontUnits": 3304.8367,
+   "check": {
+    "nonzeroFillArea": 143964.418,
+    "relativeDifference": -0.00001736
+   }
+  },
+  {
+   "char": "V",
+   "codePoint": 86,
+   "glyphId": 298,
+   "advance": 556,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 7,
+   "bbox": [
+    6,
+    0,
+    550,
+    689
+   ],
+   "areaFontUnits2": 121169,
+   "outlineLengthFontUnits": 2969.1595,
+   "check": {
+    "nonzeroFillArea": 121169,
+    "relativeDifference": 7.37e-11
+   }
+  },
+  {
+   "char": "W",
+   "codePoint": 87,
+   "glyphId": 301,
+   "advance": 826,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 13,
+   "bbox": [
+    25,
+    0,
+    801,
+    689
+   ],
+   "areaFontUnits2": 214651.5,
+   "outlineLengthFontUnits": 5584.3914,
+   "check": {
+    "nonzeroFillArea": 214651.501,
+    "relativeDifference": 2.59e-9
+   }
+  },
+  {
+   "char": "X",
+   "codePoint": 88,
+   "glyphId": 308,
+   "advance": 540,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 12,
+   "bbox": [
+    5,
+    0,
+    535,
+    689
+   ],
+   "areaFontUnits2": 130039.5,
+   "outlineLengthFontUnits": 3287.1505,
+   "check": {
+    "nonzeroFillArea": 130039.5,
+    "relativeDifference": -2.852e-9
+   }
+  },
+  {
+   "char": "Y",
+   "codePoint": 89,
+   "glyphId": 309,
+   "advance": 550,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 9,
+   "bbox": [
+    5,
+    0,
+    545,
+    689
+   ],
+   "areaFontUnits2": 103095,
+   "outlineLengthFontUnits": 2547.3667,
+   "check": {
+    "nonzeroFillArea": 103095.001,
+    "relativeDifference": 1.128e-8
+   }
+  },
+  {
+   "char": "Z",
+   "codePoint": 90,
+   "glyphId": 321,
+   "advance": 522,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 10,
+   "bbox": [
+    30,
+    0,
+    477,
+    689
+   ],
+   "areaFontUnits2": 122446,
+   "outlineLengthFontUnits": 3076.1774,
+   "check": {
+    "nonzeroFillArea": 122443.468,
+    "relativeDifference": -0.00002068
+   }
+  },
+  {
+   "char": "a",
+   "codePoint": 97,
+   "glyphId": 340,
+   "advance": 544,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 19,
+   "lineSegments": 7,
+   "bbox": [
+    45,
+    -12,
+    494,
+    539
+   ],
+   "areaFontUnits2": 119207.75,
+   "outlineLengthFontUnits": 3005.1397,
+   "check": {
+    "nonzeroFillArea": 119203.885,
+    "relativeDifference": -0.00003242
+   }
+  },
+  {
+   "char": "b",
+   "codePoint": 98,
+   "glyphId": 377,
+   "advance": 594,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 14,
+   "lineSegments": 6,
+   "bbox": [
+    95,
+    -12,
+    532,
+    750
+   ],
+   "areaFontUnits2": 145787.666667,
+   "outlineLengthFontUnits": 3452.2729,
+   "check": {
+    "nonzeroFillArea": 145788.43,
+    "relativeDifference": 0.000005236
+   }
+  },
+  {
+   "char": "c",
+   "codePoint": 99,
+   "glyphId": 387,
+   "advance": 478,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 16,
+   "lineSegments": 2,
+   "bbox": [
+    57,
+    -12,
+    448,
+    539
+   ],
+   "areaFontUnits2": 83082.75,
+   "outlineLengthFontUnits": 2094.4078,
+   "check": {
+    "nonzeroFillArea": 83078.336,
+    "relativeDifference": -0.00005313
+   }
+  },
+  {
+   "char": "d",
+   "codePoint": 100,
+   "glyphId": 398,
+   "advance": 598,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 16,
+   "lineSegments": 6,
+   "bbox": [
+    62,
+    -12,
+    503,
+    750
+   ],
+   "areaFontUnits2": 145717.083333,
+   "outlineLengthFontUnits": 3470.1878,
+   "check": {
+    "nonzeroFillArea": 145718.095,
+    "relativeDifference": 0.000006943
+   }
+  },
+  {
+   "char": "e",
+   "codePoint": 101,
+   "glyphId": 417,
+   "advance": 545,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 16,
+   "lineSegments": 4,
+   "bbox": [
+    57,
+    -12,
+    493,
+    539
+   ],
+   "areaFontUnits2": 118248.625,
+   "outlineLengthFontUnits": 2948.6766,
+   "check": {
+    "nonzeroFillArea": 118233.699,
+    "relativeDifference": -0.0001262
+   }
+  },
+  {
+   "char": "f",
+   "codePoint": 102,
+   "glyphId": 457,
+   "advance": 335,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 7,
+   "lineSegments": 12,
+   "bbox": [
+    10,
+    0,
+    395,
+    750
+   ],
+   "areaFontUnits2": 94517.416667,
+   "outlineLengthFontUnits": 2402.6072,
+   "check": {
+    "nonzeroFillArea": 94516.08,
+    "relativeDifference": -0.00001414
+   }
+  },
+  {
+   "char": "g",
+   "codePoint": 103,
+   "glyphId": 460,
+   "advance": 520,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 43,
+   "lineSegments": 4,
+   "bbox": [
+    25,
+    -213,
+    520,
+    586
+   ],
+   "areaFontUnits2": 168352.166667,
+   "outlineLengthFontUnits": 4412.9243,
+   "check": {
+    "nonzeroFillArea": 168351.389,
+    "relativeDifference": -0.000004621
+   }
+  },
+  {
+   "char": "h",
+   "codePoint": 104,
+   "glyphId": 480,
+   "advance": 586,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 7,
+   "lineSegments": 8,
+   "bbox": [
+    95,
+    0,
+    496,
+    748
+   ],
+   "areaFontUnits2": 130225.583333,
+   "outlineLengthFontUnits": 3185.1476,
+   "check": {
+    "nonzeroFillArea": 130221.917,
+    "relativeDifference": -0.00002816
+   }
+  },
+  {
+   "char": "i",
+   "codePoint": 105,
+   "glyphId": 491,
+   "advance": 282,
+   "contours": 2,
+   "outerContours": 2,
+   "holes": 0,
+   "quadraticSegments": 8,
+   "lineSegments": 4,
+   "bbox": [
+    76,
+    0,
+    205,
+    780
+   ],
+   "areaFontUnits2": 61391.75,
+   "outlineLengthFontUnits": 1640.9281,
+   "check": {
+    "nonzeroFillArea": 61392.249,
+    "relativeDifference": 0.000008126
+   }
+  },
+  {
+   "char": "j",
+   "codePoint": 106,
+   "glyphId": 511,
+   "advance": 280,
+   "contours": 2,
+   "outerContours": 2,
+   "holes": 0,
+   "quadraticSegments": 14,
+   "lineSegments": 4,
+   "bbox": [
+    -9,
+    -212,
+    204,
+    780
+   ],
+   "areaFontUnits2": 80886.208333,
+   "outlineLengthFontUnits": 2099.9416,
+   "check": {
+    "nonzeroFillArea": 80888.262,
+    "relativeDifference": 0.00002539
+   }
+  },
+  {
+   "char": "k",
+   "codePoint": 107,
+   "glyphId": 519,
+   "advance": 512,
+   "contours": 2,
+   "outerContours": 2,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 10,
+   "bbox": [
+    95,
+    0,
+    512,
+    750
+   ],
+   "areaFontUnits2": 123849,
+   "outlineLengthFontUnits": 3218.3347,
+   "check": {
+    "nonzeroFillArea": 123849,
+    "relativeDifference": -3.525e-16
+   }
+  },
+  {
+   "char": "l",
+   "codePoint": 108,
+   "glyphId": 525,
+   "advance": 293,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 6,
+   "lineSegments": 4,
+   "bbox": [
+    90,
+    -12,
+    273,
+    750
+   ],
+   "areaFontUnits2": 73415.333333,
+   "outlineLengthFontUnits": 1793.9251,
+   "check": {
+    "nonzeroFillArea": 73414.318,
+    "relativeDifference": -0.00001382
+   }
+  },
+  {
+   "char": "m",
+   "codePoint": 109,
+   "glyphId": 543,
+   "advance": 857,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 13,
+   "lineSegments": 11,
+   "bbox": [
+    95,
+    0,
+    767,
+    539
+   ],
+   "areaFontUnits2": 169615,
+   "outlineLengthFontUnits": 4223.5471,
+   "check": {
+    "nonzeroFillArea": 169612.149,
+    "relativeDifference": -0.00001681
+   }
+  },
+  {
+   "char": "n",
+   "codePoint": 110,
+   "glyphId": 549,
+   "advance": 586,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 8,
+   "lineSegments": 8,
+   "bbox": [
+    95,
+    0,
+    496,
+    539
+   ],
+   "areaFontUnits2": 109761.416667,
+   "outlineLengthFontUnits": 2752.5682,
+   "check": {
+    "nonzeroFillArea": 109757.206,
+    "relativeDifference": -0.00003836
+   }
+  },
+  {
+   "char": "o",
+   "codePoint": 111,
+   "glyphId": 566,
+   "advance": 584,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 14,
+   "lineSegments": 0,
+   "bbox": [
+    57,
+    -12,
+    527,
+    539
+   ],
+   "areaFontUnits2": 119558.666667,
+   "outlineLengthFontUnits": 2741.1147,
+   "check": {
+    "nonzeroFillArea": 119579.418,
+    "relativeDifference": 0.0001736
+   }
+  },
+  {
+   "char": "p",
+   "codePoint": 112,
+   "glyphId": 610,
+   "advance": 594,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 13,
+   "lineSegments": 6,
+   "bbox": [
+    95,
+    -213,
+    532,
+    539
+   ],
+   "areaFontUnits2": 146247.5,
+   "outlineLengthFontUnits": 3432.6387,
+   "check": {
+    "nonzeroFillArea": 146251.007,
+    "relativeDifference": 0.00002398
+   }
+  },
+  {
+   "char": "q",
+   "codePoint": 113,
+   "glyphId": 617,
+   "advance": 598,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 16,
+   "lineSegments": 6,
+   "bbox": [
+    62,
+    -213,
+    503,
+    539
+   ],
+   "areaFontUnits2": 144742.583333,
+   "outlineLengthFontUnits": 3456.0004,
+   "check": {
+    "nonzeroFillArea": 144736.106,
+    "relativeDifference": -0.00004475
+   }
+  },
+  {
+   "char": "r",
+   "codePoint": 114,
+   "glyphId": 621,
+   "advance": 386,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 6,
+   "lineSegments": 6,
+   "bbox": [
+    95,
+    0,
+    376,
+    539
+   ],
+   "areaFontUnits2": 64465,
+   "outlineLengthFontUnits": 1707.4341,
+   "check": {
+    "nonzeroFillArea": 64462.222,
+    "relativeDifference": -0.00004309
+   }
+  },
+  {
+   "char": "s",
+   "codePoint": 115,
+   "glyphId": 637,
+   "advance": 467,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 24,
+   "lineSegments": 2,
+   "bbox": [
+    25,
+    -12,
+    432,
+    539
+   ],
+   "areaFontUnits2": 98799,
+   "outlineLengthFontUnits": 2542.4381,
+   "check": {
+    "nonzeroFillArea": 98792.766,
+    "relativeDifference": -0.0000631
+   }
+  },
+  {
+   "char": "t",
+   "codePoint": 116,
+   "glyphId": 651,
+   "advance": 361,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 6,
+   "lineSegments": 12,
+   "bbox": [
+    9,
+    -12,
+    361,
+    657
+   ],
+   "areaFontUnits2": 84682.25,
+   "outlineLengthFontUnits": 2161.1476,
+   "check": {
+    "nonzeroFillArea": 84685.808,
+    "relativeDifference": 0.00004202
+   }
+  },
+  {
+   "char": "u",
+   "codePoint": 117,
+   "glyphId": 672,
+   "advance": 582,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 7,
+   "lineSegments": 8,
+   "bbox": [
+    90,
+    -12,
+    487,
+    527
+   ],
+   "areaFontUnits2": 109535.083333,
+   "outlineLengthFontUnits": 2757.6988,
+   "check": {
+    "nonzeroFillArea": 109532.477,
+    "relativeDifference": -0.00002379
+   }
+  },
+  {
+   "char": "v",
+   "codePoint": 118,
+   "glyphId": 701,
+   "advance": 492,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 7,
+   "bbox": [
+    10,
+    0,
+    482,
+    527
+   ],
+   "areaFontUnits2": 92433,
+   "outlineLengthFontUnits": 2353.6298,
+   "check": {
+    "nonzeroFillArea": 92433,
+    "relativeDifference": 4.413e-9
+   }
+  },
+  {
+   "char": "w",
+   "codePoint": 119,
+   "glyphId": 705,
+   "advance": 717,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 13,
+   "bbox": [
+    20,
+    0,
+    697,
+    527
+   ],
+   "areaFontUnits2": 160023.5,
+   "outlineLengthFontUnits": 4412.6301,
+   "check": {
+    "nonzeroFillArea": 160023.5,
+    "relativeDifference": 2.482e-9
+   }
+  },
+  {
+   "char": "x",
+   "codePoint": 120,
+   "glyphId": 713,
+   "advance": 485,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 12,
+   "bbox": [
+    5,
+    0,
+    480,
+    527
+   ],
+   "areaFontUnits2": 98117,
+   "outlineLengthFontUnits": 2648.918,
+   "check": {
+    "nonzeroFillArea": 98117,
+    "relativeDifference": -1.801e-9
+   }
+  },
+  {
+   "char": "y",
+   "codePoint": 121,
+   "glyphId": 714,
+   "advance": 492,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 5,
+   "lineSegments": 8,
+   "bbox": [
+    10,
+    -213,
+    482,
+    527
+   ],
+   "areaFontUnits2": 114596.166667,
+   "outlineLengthFontUnits": 2951.1362,
+   "check": {
+    "nonzeroFillArea": 114594.054,
+    "relativeDifference": -0.00001844
+   }
+  },
+  {
+   "char": "z",
+   "codePoint": 122,
+   "glyphId": 726,
+   "advance": 437,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 10,
+   "bbox": [
+    25,
+    0,
+    407,
+    527
+   ],
+   "areaFontUnits2": 93436.5,
+   "outlineLengthFontUnits": 2488.3326,
+   "check": {
+    "nonzeroFillArea": 93443.79,
+    "relativeDifference": 0.00007802
+   }
+  },
+  {
+   "char": "0",
+   "codePoint": 48,
+   "glyphId": 2047,
+   "advance": 558,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 16,
+   "lineSegments": 0,
+   "bbox": [
+    55,
+    -12,
+    503,
+    679
+   ],
+   "areaFontUnits2": 139199.75,
+   "outlineLengthFontUnits": 3199.6733,
+   "check": {
+    "nonzeroFillArea": 139185.821,
+    "relativeDifference": -0.0001001
+   }
+  },
+  {
+   "char": "1",
+   "codePoint": 49,
+   "glyphId": 2048,
+   "advance": 433,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 7,
+   "bbox": [
+    35,
+    0,
+    323,
+    669
+   ],
+   "areaFontUnits2": 77418,
+   "outlineLengthFontUnits": 1915.3499,
+   "check": {
+    "nonzeroFillArea": 77418,
+    "relativeDifference": 2.08e-10
+   }
+  },
+  {
+   "char": "2",
+   "codePoint": 50,
+   "glyphId": 2049,
+   "advance": 495,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 15,
+   "lineSegments": 5,
+   "bbox": [
+    25,
+    0,
+    445,
+    679
+   ],
+   "areaFontUnits2": 108970.791667,
+   "outlineLengthFontUnits": 2845.4758,
+   "check": {
+    "nonzeroFillArea": 108955.924,
+    "relativeDifference": -0.0001364
+   }
+  },
+  {
+   "char": "3",
+   "codePoint": 51,
+   "glyphId": 2050,
+   "advance": 499,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 25,
+   "lineSegments": 5,
+   "bbox": [
+    15,
+    -12,
+    444,
+    679
+   ],
+   "areaFontUnits2": 108047.916667,
+   "outlineLengthFontUnits": 2944.0844,
+   "check": {
+    "nonzeroFillArea": 108041.433,
+    "relativeDifference": -0.00006001
+   }
+  },
+  {
+   "char": "4",
+   "codePoint": 52,
+   "glyphId": 2051,
+   "advance": 532,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 15,
+   "bbox": [
+    40,
+    0,
+    502,
+    679
+   ],
+   "areaFontUnits2": 102858.5,
+   "outlineLengthFontUnits": 2669.8473,
+   "check": {
+    "nonzeroFillArea": 102859.725,
+    "relativeDifference": 0.00001191
+   }
+  },
+  {
+   "char": "5",
+   "codePoint": 53,
+   "glyphId": 2052,
+   "advance": 501,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 16,
+   "lineSegments": 7,
+   "bbox": [
+    26,
+    -12,
+    456,
+    669
+   ],
+   "areaFontUnits2": 118255.625,
+   "outlineLengthFontUnits": 3100.959,
+   "check": {
+    "nonzeroFillArea": 118241.323,
+    "relativeDifference": -0.0001209
+   }
+  },
+  {
+   "char": "6",
+   "codePoint": 54,
+   "glyphId": 2053,
+   "advance": 533,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 23,
+   "lineSegments": 1,
+   "bbox": [
+    55,
+    -12,
+    493,
+    679
+   ],
+   "areaFontUnits2": 135080.291667,
+   "outlineLengthFontUnits": 3367.555,
+   "check": {
+    "nonzeroFillArea": 135077.158,
+    "relativeDifference": -0.0000232
+   }
+  },
+  {
+   "char": "7",
+   "codePoint": 55,
+   "glyphId": 2054,
+   "advance": 444,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 7,
+   "bbox": [
+    25,
+    -10,
+    414,
+    669
+   ],
+   "areaFontUnits2": 84077,
+   "outlineLengthFontUnits": 2201.1711,
+   "check": {
+    "nonzeroFillArea": 84085.736,
+    "relativeDifference": 0.0001039
+   }
+  },
+  {
+   "char": "8",
+   "codePoint": 56,
+   "glyphId": 2055,
+   "advance": 551,
+   "contours": 3,
+   "outerContours": 1,
+   "holes": 2,
+   "quadraticSegments": 36,
+   "lineSegments": 2,
+   "bbox": [
+    45,
+    -12,
+    506,
+    679
+   ],
+   "areaFontUnits2": 151849,
+   "outlineLengthFontUnits": 3695.1582,
+   "check": {
+    "nonzeroFillArea": 151841.882,
+    "relativeDifference": -0.00004688
+   }
+  },
+  {
+   "char": "9",
+   "codePoint": 57,
+   "glyphId": 2056,
+   "advance": 525,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 22,
+   "lineSegments": 1,
+   "bbox": [
+    45,
+    -22,
+    475,
+    679
+   ],
+   "areaFontUnits2": 128951.541667,
+   "outlineLengthFontUnits": 3211.6808,
+   "check": {
+    "nonzeroFillArea": 128950.736,
+    "relativeDifference": -0.00000625
+   }
+  },
+  {
+   "char": ".",
+   "codePoint": 46,
+   "glyphId": 2163,
+   "advance": 240,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 8,
+   "lineSegments": 0,
+   "bbox": [
+    50,
+    -12,
+    189,
+    127
+   ],
+   "areaFontUnits2": 15296.083333,
+   "outlineLengthFontUnits": 438.4543,
+   "check": {
+    "nonzeroFillArea": 15294.556,
+    "relativeDifference": -0.00009985
+   }
+  },
+  {
+   "char": "-",
+   "codePoint": 45,
+   "glyphId": 2203,
+   "advance": 403,
+   "contours": 1,
+   "outerContours": 1,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 4,
+   "bbox": [
+    60,
+    274,
+    343,
+    352
+   ],
+   "areaFontUnits2": 22074,
+   "outlineLengthFontUnits": 722,
+   "check": {
+    "nonzeroFillArea": 22074,
+    "relativeDifference": 2.225e-14
+   }
+  },
+  {
+   "char": "%",
+   "codePoint": 37,
+   "glyphId": 2363,
+   "advance": 826,
+   "contours": 5,
+   "outerContours": 3,
+   "holes": 2,
+   "quadraticSegments": 30,
+   "lineSegments": 4,
+   "bbox": [
+    45,
+    -31,
+    781,
+    711
+   ],
+   "areaFontUnits2": 184029.25,
+   "outlineLengthFontUnits": 5166.1456,
+   "check": {
+    "nonzeroFillArea": 184021.736,
+    "relativeDifference": -0.00004083
+   }
+  },
+  {
+   "char": "&",
+   "codePoint": 38,
+   "glyphId": 2425,
+   "advance": 729,
+   "contours": 3,
+   "outerContours": 1,
+   "holes": 2,
+   "quadraticSegments": 32,
+   "lineSegments": 6,
+   "bbox": [
+    81,
+    -12,
+    689,
+    701
+   ],
+   "areaFontUnits2": 181357.458333,
+   "outlineLengthFontUnits": 4374.9236,
+   "check": {
+    "nonzeroFillArea": 181352.897,
+    "relativeDifference": -0.00002515
+   }
+  },
+  {
+   "char": "#",
+   "codePoint": 35,
+   "glyphId": 2161,
+   "advance": 518,
+   "contours": 2,
+   "outerContours": 1,
+   "holes": 1,
+   "quadraticSegments": 0,
+   "lineSegments": 32,
+   "bbox": [
+    15,
+    0,
+    503,
+    669
+   ],
+   "areaFontUnits2": 145369,
+   "outlineLengthFontUnits": 3907.8917,
+   "check": {
+    "nonzeroFillArea": 145380.947,
+    "relativeDifference": 0.00008219
+   }
+  },
+  {
+   "char": "?",
+   "codePoint": 63,
+   "glyphId": 2164,
+   "advance": 459,
+   "contours": 2,
+   "outerContours": 2,
+   "holes": 0,
+   "quadraticSegments": 25,
+   "lineSegments": 4,
+   "bbox": [
+    30,
+    -12,
+    429,
+    701
+   ],
+   "areaFontUnits2": 82927.333333,
+   "outlineLengthFontUnits": 2203.0877,
+   "check": {
+    "nonzeroFillArea": 82928.856,
+    "relativeDifference": 0.00001837
+   }
+  },
+  {
+   "char": "!",
+   "codePoint": 33,
+   "glyphId": 2159,
+   "advance": 241,
+   "contours": 2,
+   "outerContours": 2,
+   "holes": 0,
+   "quadraticSegments": 8,
+   "lineSegments": 4,
+   "bbox": [
+    51,
+    -12,
+    190,
+    689
+   ],
+   "areaFontUnits2": 57294.583333,
+   "outlineLengthFontUnits": 1539.695,
+   "check": {
+    "nonzeroFillArea": 57296.301,
+    "relativeDifference": 0.00002999
+   }
+  },
+  {
+   "char": " ",
+   "codePoint": 32,
+   "glyphId": 2,
+   "advance": 265,
+   "contours": 0,
+   "outerContours": 0,
+   "holes": 0,
+   "quadraticSegments": 0,
+   "lineSegments": 0,
+   "bbox": null,
+   "areaFontUnits2": 0,
+   "outlineLengthFontUnits": 0,
+   "check": {
+    "nonzeroFillArea": 0,
+    "relativeDifference": 0
+   }
+  }
+ ]
+}

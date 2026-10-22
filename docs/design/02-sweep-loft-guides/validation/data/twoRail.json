@@ -1,0 +1,43 @@
+{
+ "gap": "SWG",
+ "generated": "2026-10-22",
+ "notes": "Rails y = +-(d(x)/2), z = 0, x in [0, L], d linear d0 -> d1. Section: a circle of diameter equal to the rail spacing (uniform scale) or with its height kept (stretch in the rail direction only).",
+ "cases": [
+  {
+   "id": "two_rails_uniform_scale",
+   "L": 100,
+   "d0": 20,
+   "d1": 10,
+   "formula": "pi L (d0^2 + d0 d1 + d1^2) / 12 (cone frustum)",
+   "value": 18325.9571459,
+   "meshCoarse": 18318.5984156,
+   "meshFine": 18324.1172971,
+   "richardson": 18325.9569243,
+   "relErrRichardson": 1.21e-8
+  },
+  {
+   "id": "two_rails_maintain_height",
+   "L": 100,
+   "d0": 20,
+   "d1": 10,
+   "heightKept": 20,
+   "formula": "pi d0 L (d0 + d1) / 8 (elliptic sections)",
+   "value": 23561.9449019,
+   "meshCoarse": 23552.4836772,
+   "meshFine": 23559.579382,
+   "richardson": 23561.9446169,
+   "relErrRichardson": 1.21e-8
+  },
+  {
+   "id": "helicoid_between_two_helical_rails",
+   "railRadius": 10,
+   "pitch": 20,
+   "turns": 2,
+   "formula": "area = 2 pi n integral_{-a}^{a} sqrt(u^2 + c^2) du, c = p / 2 pi",
+   "areaValue": 1555.87818223,
+   "developable": false,
+   "gaussianCurvatureAtAxis": -0.0986960440109,
+   "gaussianCurvatureFormula": "K(u) = -c^2 / (u^2 + c^2)^2"
+  }
+ ]
+}

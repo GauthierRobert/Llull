@@ -1,0 +1,104 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    1,
+    1,
+    1
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "min"
+  },
+  "as": "cube"
+ },
+ {
+  "command": "deform_lattice",
+  "params": {
+   "id": "$cube",
+   "degrees": [
+    1,
+    1,
+    2
+   ],
+   "box": "bounds",
+   "moves": [
+    {
+     "index": [
+      0,
+      0,
+      1
+     ],
+     "delta": [
+      -0.25,
+      -0.25,
+      0
+     ]
+    },
+    {
+     "index": [
+      1,
+      0,
+      1
+     ],
+     "delta": [
+      0.25,
+      -0.25,
+      0
+     ]
+    },
+    {
+     "index": [
+      0,
+      1,
+      1
+     ],
+     "delta": [
+      -0.25,
+      0.25,
+      0
+     ]
+    },
+    {
+     "index": [
+      1,
+      1,
+      1
+     ],
+     "delta": [
+      0.25,
+      0.25,
+      0
+     ]
+    }
+   ],
+   "output": {
+    "mode": "auto",
+    "tolerance": 0.0001
+   }
+  },
+  "as": "barrel"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$barrel"
+  }
+ },
+ {
+  "command": "analyze_deformation",
+  "params": {
+   "id": "$barrel"
+  }
+ }
+]

@@ -1,0 +1,119 @@
+{
+ "generated": "generate_wrap_refs.mjs",
+ "derivation": "Developable surface: the chart (x = r*theta arc length, y = axial) is an isometry, so every chart length and area is preserved exactly. A chart line at angle beta to the circumferential direction becomes a helix with pitch 2*pi*r*tan(beta) (circle for beta=0, axial line for 90).",
+ "radius": 20,
+ "fullWrapChartWidth": 125.663706144,
+ "lines": [
+  {
+   "case": "line L=30 at 0 deg to the circumferential direction",
+   "chartLength": 30,
+   "betaDeg": 0,
+   "expectedLength3d": 30,
+   "angularSpanRad": 1.5,
+   "axialSpan": 0,
+   "helixPitchPerTurn": null,
+   "curveType3d": "circular arc",
+   "check": {
+    "numericLength3d": 29.9999999999,
+    "residual": -8.89350815214e-11
+   }
+  },
+  {
+   "case": "line L=30 at 30 deg to the circumferential direction",
+   "chartLength": 30,
+   "betaDeg": 30,
+   "expectedLength3d": 30,
+   "angularSpanRad": 1.29903810568,
+   "axialSpan": 15,
+   "helixPitchPerTurn": 72.5519745694,
+   "curveType3d": "helix",
+   "check": {
+    "numericLength3d": 30,
+    "residual": -4.9883652764e-11
+   }
+  },
+  {
+   "case": "line L=30 at 45 deg to the circumferential direction",
+   "chartLength": 30,
+   "betaDeg": 45,
+   "expectedLength3d": 30,
+   "angularSpanRad": 1.06066017178,
+   "axialSpan": 21.2132034356,
+   "helixPitchPerTurn": 125.663706144,
+   "curveType3d": "helix",
+   "check": {
+    "numericLength3d": 30,
+    "residual": -8.39506242301e-12
+   }
+  },
+  {
+   "case": "line L=30 at 60 deg to the circumferential direction",
+   "chartLength": 30,
+   "betaDeg": 60,
+   "expectedLength3d": 30,
+   "angularSpanRad": 0.75,
+   "axialSpan": 25.9807621135,
+   "helixPitchPerTurn": 217.655923708,
+   "curveType3d": "helix",
+   "check": {
+    "numericLength3d": 30,
+    "residual": -4.37694325228e-12
+   }
+  },
+  {
+   "case": "line L=30 at 90 deg to the circumferential direction",
+   "chartLength": 30,
+   "betaDeg": 90,
+   "expectedLength3d": 30,
+   "angularSpanRad": 9.18485099361e-17,
+   "axialSpan": 30,
+   "helixPitchPerTurn": null,
+   "curveType3d": "line (axial)",
+   "check": {
+    "numericLength3d": 30,
+    "residual": 0
+   }
+  }
+ ],
+ "circles": [
+  {
+   "case": "chart circle radius 4 centred on the anchor",
+   "chartRadius": 4,
+   "expectedLength3d": 25.1327412287,
+   "expectedEnclosedSurfaceArea": 50.2654824574,
+   "angularSpanRad": 0.4,
+   "check": {
+    "numericLength3d": 25.1327412277,
+    "residual": -1.0426361996e-9
+   }
+  },
+  {
+   "case": "chart circle radius 8 centred on the anchor",
+   "chartRadius": 8,
+   "expectedLength3d": 50.2654824574,
+   "expectedEnclosedSurfaceArea": 201.06192983,
+   "angularSpanRad": 0.8,
+   "check": {
+    "numericLength3d": 50.2654824552,
+    "residual": -2.26022933703e-9
+   }
+  },
+  {
+   "case": "chart circle radius 15 centred on the anchor",
+   "chartRadius": 15,
+   "expectedLength3d": 94.2477796077,
+   "expectedEnclosedSurfaceArea": 706.858347058,
+   "angularSpanRad": 1.5,
+   "check": {
+    "numericLength3d": 94.2477796029,
+    "residual": -4.80746109588e-9
+   }
+  }
+ ],
+ "overlap": {
+  "case": "chart width larger than the circumference overlaps itself",
+  "chartWidth": 130,
+  "circumference": 125.663706144,
+  "expectedCode": "WRP_WRAP_OVERLAP"
+ }
+}

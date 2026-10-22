@@ -1,0 +1,19 @@
+{
+ "generated": "2026-10-22",
+ "cage": "box size [2,2,2] segments [2,1,1] (plane x = 0 holds 4 cage vertices)",
+ "draggedVertex": 5,
+ "mirrorVertex": 3,
+ "displacement": [
+  0.3,
+  0.2,
+  0.4
+ ],
+ "mirroredDisplacement": [
+  -0.3,
+  0.2,
+  0.4
+ ],
+ "everyVertexHasMirror": true,
+ "level2MaxAsymmetry": 1.2412670766236366e-16,
+ "level2Volume": 4.76285015937
+}

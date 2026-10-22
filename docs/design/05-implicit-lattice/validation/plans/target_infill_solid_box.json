@@ -1,0 +1,52 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    40,
+    40,
+    40
+   ]
+  },
+  "as": "box"
+ },
+ {
+  "command": "infill_solid",
+  "params": {
+   "entityId": "$box",
+   "wall": 2,
+   "lattice": {
+    "type": "tpms",
+    "kind": "gyroid",
+    "form": "network",
+    "level": 0,
+    "cellSize": 12,
+    "origin": [
+     0,
+     0,
+     0
+    ]
+   },
+   "voxel": 0.2
+  },
+  "as": "body"
+ },
+ {
+  "command": "implicit_properties",
+  "params": {
+   "id": "$body"
+  }
+ },
+ {
+  "command": "check_implicit",
+  "params": {
+   "id": "$body"
+  }
+ }
+]

@@ -1,0 +1,23 @@
+{
+ "generated": "make_plans.mjs",
+ "octet": [
+  {
+   "n": 1,
+   "nodes": 14,
+   "beams": 36,
+   "directionsPerNode": 12
+  },
+  {
+   "n": 2,
+   "nodes": 63,
+   "beams": 240,
+   "directionsPerNode": 12
+  },
+  {
+   "n": 3,
+   "nodes": 172,
+   "beams": 756,
+   "directionsPerNode": 12
+  }
+ ]
+}

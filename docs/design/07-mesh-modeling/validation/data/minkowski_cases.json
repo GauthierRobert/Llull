@@ -1,0 +1,77 @@
+{
+ "formula": "V(P + [0,a]^3) = V(P) + a*(Ax+Ay+Az) + a^2*(wx+wy+wz) + a^3 (P convex; derivation in validation/README.md section 4.3)",
+ "cube_plus_ball": {
+  "a": 10,
+  "r": 2,
+  "continuousVolume": 2610.50144007,
+  "continuousFormula": "a^3 + 6 a^2 r + 3 pi a r^2 + 4/3 pi r^3 (Steiner formula of the cube)",
+  "polyhedral": [
+   {
+    "structuringElement": "icosphere r 2 level 1 (42 vertices)",
+    "ballVolume": 29.2696976681,
+    "projectedAreas": [
+     11.6084521304,
+     11.6084521304,
+     11.6084521304
+    ],
+    "widths": [
+     4,
+     4,
+     4
+    ],
+    "expectedVolumeExactPolyhedral": 2577.52326158,
+    "relDiffToContinuous": 0.0126329
+   },
+   {
+    "structuringElement": "icosphere r 2 level 2 (162 vertices)",
+    "ballVolume": 32.3763574398,
+    "projectedAreas": [
+     12.3145878059,
+     12.3145878059,
+     12.3145878059
+    ],
+    "widths": [
+     4,
+     4,
+     4
+    ],
+    "expectedVolumeExactPolyhedral": 2601.81399162,
+    "relDiffToContinuous": 0.00332788
+   },
+   {
+    "structuringElement": "icosphere r 2 level 3 (642 vertices)",
+    "ballVolume": 33.2219265367,
+    "projectedAreas": [
+     12.5026119326,
+     12.5026119326,
+     12.5026119326
+    ],
+    "widths": [
+     4,
+     4,
+     4
+    ],
+    "expectedVolumeExactPolyhedral": 2608.30028452,
+    "relDiffToContinuous": 0.000843193
+   }
+  ]
+ },
+ "cube_plus_cube": {
+  "a": 10,
+  "b": 3,
+  "expectedVolume": 2197,
+  "derivation": "[0,a]^3 + [0,b]^3 = [0,a+b]^3"
+ },
+ "cube_minus_cube": {
+  "a": 10,
+  "b": 3,
+  "expectedVolume": 343,
+  "derivation": "erosion of [0,a]^3 by the centred cube of side b is a cube of side a - b"
+ },
+ "cube_minus_ball": {
+  "a": 10,
+  "r": 2,
+  "expectedVolume": 216,
+  "derivation": "erosion of a convex box by a ball of radius r is the box shrunk by r on every face (flat faces: the support function of the ball is r in every direction)"
+ }
+}

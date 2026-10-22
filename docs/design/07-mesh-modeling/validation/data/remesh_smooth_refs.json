@@ -1,0 +1,27 @@
+{
+ "remesh": {
+  "algorithm": "Botsch-Kobbelt 2004: split > 4/3 L, collapse < 4/5 L, flip toward valence 6 (4 on boundary), tangential relaxation, project",
+  "sphereRadius": 10,
+  "targetEdge": 1,
+  "edgeBand": [
+   0.8,
+   1.33333333333
+  ],
+  "chordDeviationBound": 0.0296736559,
+  "derivation": "Jung (plane): a triangle with all edges <= l lies in a disc of radius l/sqrt(3); with its vertices on the sphere it is within R - sqrt(R^2 - l^2/3) of it"
+ },
+ "taubin": {
+  "lambda": 0.6307,
+  "kPB": 0.1,
+  "mu": -0.6731559455,
+  "relation": "kPB = 1/lambda + 1/mu (Taubin 1995 eq. 9); f(k) = (1 - lambda k)(1 - mu k)",
+  "transfer": {
+   "f(0)": 1,
+   "f(kPB)": 1,
+   "f(0.5)": 0.915088109,
+   "f(1)": 0.617896491,
+   "f(2)": -0.613325928
+  },
+  "paperValues": "kPB = 0.1 and lambda = 0.6307 (figures 3, 4); kPB from 0.01 to 0.1 recommended"
+ }
+}

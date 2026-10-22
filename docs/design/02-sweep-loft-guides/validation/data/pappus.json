@@ -1,0 +1,44 @@
+{
+ "gap": "SWG",
+ "generated": "2026-10-22",
+ "notes": "Pappus second theorem V = A * 2 pi * (centroid distance) * (angle / 2 pi). Mesh check = divergence-theorem volume of a quad grid, Richardson-extrapolated.",
+ "cases": [
+  {
+   "id": "torus_sweep",
+   "R": 50,
+   "r": 10,
+   "formula": "2 pi^2 R r^2",
+   "value": 98696.0440109,
+   "meshCoarse": 98640.1853966,
+   "meshFine": 98682.0770896,
+   "richardson": 98696.0409873,
+   "relErrRichardson": 3.06e-8
+  },
+  {
+   "id": "quarter_torus_sweep",
+   "R": 50,
+   "r": 10,
+   "angleRad": 1.5707963267948966,
+   "formula": "pi r^2 R theta",
+   "value": 24674.0110027,
+   "meshCoarse": 24663.8496645,
+   "meshFine": 24671.4704251,
+   "richardson": 24674.0106786,
+   "relErrRichardson": 1.31e-8
+  },
+  {
+   "id": "offset_square_on_arc",
+   "R": 50,
+   "side": 10,
+   "centroidOffsetTowardCentre": 5,
+   "angleRad": 1.5707963267948966,
+   "formula": "side^2 theta (R - d)",
+   "value": 7068.58347058,
+   "meshCoarse": 7068.51079984,
+   "meshFine": 7068.56530285,
+   "richardson": 7068.58347052,
+   "relErrRichardson": 8.07e-12,
+   "centredValueForContrast": 7853.98163397
+  }
+ ]
+}

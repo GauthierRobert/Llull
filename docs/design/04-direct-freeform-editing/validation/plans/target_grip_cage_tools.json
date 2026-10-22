@@ -1,0 +1,136 @@
+[
+ {
+  "command": "add_subdivision_solid",
+  "params": {
+   "box": {
+    "size": [
+     40,
+     20,
+     10
+    ],
+    "segments": [
+     4,
+     2,
+     1
+    ]
+   },
+   "levels": 3,
+   "id": "grip"
+  }
+ },
+ {
+  "command": "set_cage_symmetry",
+  "params": {
+   "id": "grip",
+   "planes": [
+    "x"
+   ]
+  }
+ },
+ {
+  "command": "select_cage_elements",
+  "params": {
+   "id": "grip",
+   "faces": {
+    "normal": [
+     0,
+     0,
+     1
+    ],
+    "within": 0.2
+   }
+  }
+ },
+ {
+  "command": "extrude_cage_faces",
+  "params": {
+   "id": "grip",
+   "faces": [
+    "f-1.2",
+    "f-1.3",
+    "f-1.4",
+    "f-1.5"
+   ],
+   "distance": 8
+  }
+ },
+ {
+  "command": "inset_cage_faces",
+  "params": {
+   "id": "grip",
+   "faces": [
+    "f-1.2",
+    "f-1.3",
+    "f-1.4",
+    "f-1.5"
+   ],
+   "thickness": 2,
+   "depth": -1
+  }
+ },
+ {
+  "command": "loop_cut_cage",
+  "params": {
+   "id": "grip",
+   "edge": [
+    0,
+    15
+   ],
+   "cuts": 2
+  }
+ },
+ {
+  "command": "set_cage_crease",
+  "params": {
+   "id": "grip",
+   "edges": {
+    "loopFrom": [
+     0,
+     15
+    ]
+   },
+   "sharpness": 2
+  }
+ },
+ {
+  "command": "edit_subdivision_cage",
+  "params": {
+   "id": "grip",
+   "faces": [
+    "f-1.2",
+    "f-1.3"
+   ],
+   "translate": [
+    0,
+    0,
+    3
+   ],
+   "falloff": {
+    "radius": 12,
+    "shape": "smooth",
+    "metric": "topological"
+   }
+  }
+ },
+ {
+  "command": "evaluate_subdivision",
+  "params": {
+   "id": "grip",
+   "vertices": [
+    "v-1.0"
+   ]
+  }
+ },
+ {
+  "command": "check_subdivision",
+  "params": {
+   "id": "grip"
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "grip"
+  }
+ }
+]

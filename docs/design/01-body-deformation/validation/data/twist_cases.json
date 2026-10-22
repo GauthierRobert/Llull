@@ -1,0 +1,129 @@
+{
+ "generated": "generate_analytic_refs.mjs",
+ "law": "x' = R(theta(z)) x; det J = 1",
+ "cases": [
+  {
+   "box": {
+    "a": 10,
+    "b": 10,
+    "L": 100
+   },
+   "angleDeg": 90,
+   "law": "linear over the whole length",
+   "ratePerLength": 0.0157079632679,
+   "volume": 10000,
+   "lateralArea": 4004.10853848,
+   "totalArea": 4204.10853848,
+   "maxDisplacement": 10,
+   "numericCheck": {
+    "volumeRel": 2.04e-10,
+    "lateralAreaRel": 1.56e-9
+   }
+  },
+  {
+   "box": {
+    "a": 10,
+    "b": 10,
+    "L": 100
+   },
+   "angleDeg": 120,
+   "law": "linear over the whole length",
+   "ratePerLength": 0.0209439510239,
+   "volume": 10000,
+   "lateralArea": 4007.29883911,
+   "totalArea": 4207.29883911,
+   "maxDisplacement": 12.2474487139,
+   "numericCheck": {
+    "volumeRel": 2.05e-10,
+    "lateralAreaRel": 1.56e-9
+   }
+  },
+  {
+   "box": {
+    "a": 10,
+    "b": 10,
+    "L": 100
+   },
+   "angleDeg": 360,
+   "law": "linear over the whole length",
+   "ratePerLength": 0.0628318530718,
+   "volume": 10000,
+   "lateralArea": 4064.85604743,
+   "totalArea": 4264.85604743,
+   "maxDisplacement": 1.73191211247e-15,
+   "numericCheck": {
+    "volumeRel": 2.02e-10,
+    "lateralAreaRel": 1.55e-9
+   }
+  },
+  {
+   "box": {
+    "a": 20,
+    "b": 5,
+    "L": 50
+   },
+   "angleDeg": 180,
+   "law": "linear over the whole length",
+   "ratePerLength": 0.0628318530718,
+   "volume": 5000,
+   "lateralArea": 2626.77673477,
+   "totalArea": 2826.77673477,
+   "maxDisplacement": 20.6155281281,
+   "numericCheck": {
+    "volumeRel": 7.23e-11,
+    "lateralAreaRel": 7.28e-10
+   }
+  },
+  {
+   "box": {
+    "a": 10,
+    "b": 10,
+    "L": 100
+   },
+   "angleDeg": 0,
+   "law": "linear over the whole length",
+   "ratePerLength": 0,
+   "volume": 10000,
+   "lateralArea": 4000,
+   "totalArea": 4200,
+   "maxDisplacement": 0,
+   "numericCheck": {
+    "volumeRel": 2.04e-10,
+    "lateralAreaRel": 1.56e-9
+   }
+  },
+  {
+   "cylinder": {
+    "r": 5,
+    "L": 40
+   },
+   "angleDeg": 270,
+   "identityShape": true,
+   "maxDeviationFromSource": 0,
+   "volume": 3141.59265359
+  },
+  {
+   "box": {
+    "a": 10,
+    "b": 10,
+    "L": 100
+   },
+   "angleDeg": 90,
+   "law": "smooth (3t^2 - 2t^3) over the whole length",
+   "volume": 10000,
+   "lateralAreaNumeric": 4004.927,
+   "grade": "numeric quadrature (b)"
+  }
+ ],
+ "regionBoundaryCrease": {
+  "box": {
+   "a": 10,
+   "b": 10
+  },
+  "regionLength": 50,
+  "angleDeg": 90,
+  "k": 0.0314159265359,
+  "linearCreaseMaxRad": 0.15580649997,
+  "smoothCreaseMaxRad": 0
+ }
+}

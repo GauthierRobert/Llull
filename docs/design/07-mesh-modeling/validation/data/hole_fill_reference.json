@@ -1,0 +1,25 @@
+{
+ "algorithm": "Liepa 2003 stage 2 (triangulation) as minimum-area dynamic programming over the boundary loop (O(n^3)); refinement and fairing not applied here",
+ "planar": {
+  "input": "10 x 10 cell grid on [0,10]^2 with the 2 x 2 centre cells removed (192 triangles, one 8-edge inner loop)",
+  "boundaryLoopsBefore": 2,
+  "innerLoopEdges": 8,
+  "patchTriangles": 6,
+  "expectedPatchTriangles": 6,
+  "areaAfter": 100,
+  "expectedArea": 100,
+  "boundaryEdgesAfter": 40,
+  "expectedBoundaryEdgesAfter": 40
+ },
+ "sphere": {
+  "input": "icosphere R 10 level 3 with the faces near the +Z pole removed (all vertices within 2.5 mm of the axis, z > 0)",
+  "removedFaces": 6,
+  "loops": 1,
+  "loopEdges": 6,
+  "patchTriangles": 4,
+  "closedAfter": true,
+  "volumeOriginal": 4152.74081709,
+  "volumeAfterFlatFill": 4152.55404669,
+  "note": "without refinement + fairing the patch is flat; with Liepa refinement + fairing the volume must move back toward the original (VC-MSH-05 sphere tolerance TBD — measure with fill_mesh_holes fairing \"curvature\")"
+ }
+}

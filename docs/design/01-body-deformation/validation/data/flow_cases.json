@@ -1,0 +1,49 @@
+{
+ "generated": "generate_analytic_refs.mjs",
+ "cases": [
+  {
+   "op": "flow_on_surface",
+   "plate": {
+    "W": 60,
+    "H": 20,
+    "t": 2,
+    "side": "outside (w in [0, t])"
+   },
+   "cylinderRadius": 30,
+   "volume": 2480,
+   "wrapAngleDeg": 114.591559026,
+   "baseLineLengthPreserved": 60,
+   "numericCheck": {
+    "volumeRel": 9.01e-11,
+    "lengthRel": 4.17e-8
+   }
+  },
+  {
+   "op": "flow_on_surface",
+   "plate": {
+    "W": 60,
+    "H": 20,
+    "t": 2,
+    "side": "centred (w in [-t/2, t/2])"
+   },
+   "cylinderRadius": 30,
+   "volume": 2400
+  },
+  {
+   "op": "flow_on_surface",
+   "plate": {
+    "W": 200,
+    "H": 20,
+    "t": 2
+   },
+   "cylinderRadius": 30,
+   "expectedCode": "DEF_FLOW_OVERLAP",
+   "note": "W > 2 pi R = 188.4956: the wrapped plate overlaps itself"
+  },
+  {
+   "op": "flow_along_curve",
+   "note": "straight base curve onto a circular arc of radius 50 without stretch = bend_body with the neutral fibre on the base curve",
+   "maxDifferenceToBend": 0
+  }
+ ]
+}

@@ -1,0 +1,18 @@
+{
+ "generated": "generate_analytic_refs.mjs",
+ "rule": "h_max = sqrt(8 tol / M2)",
+ "cases": [
+  {
+   "what": "twist box 10x10x100, 90 deg (k = pi/200, rho_max = 5 sqrt 2)",
+   "M2": 0.00174471604991,
+   "tolerance": 0.01,
+   "maxEdgeLength": 6.77146
+  },
+  {
+   "what": "bend bar y in [-5, 5], R 50 (M2 = (R + 5) / R^2)",
+   "M2": 0.022,
+   "tolerance": 0.01,
+   "maxEdgeLength": 1.90693
+  }
+ ]
+}

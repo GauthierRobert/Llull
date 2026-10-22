@@ -1,0 +1,105 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_sphere",
+  "params": {
+   "radius": 25,
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "ball"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    0,
+    0
+   ],
+   "radius": 10
+  },
+  "as": "disk"
+ },
+ {
+  "command": "wrap_to_face",
+  "params": {
+   "id": "$ball",
+   "face": {
+    "faceNear": [
+     0,
+     0,
+     25
+    ]
+   },
+   "entityIds": [
+    "$disk"
+   ],
+   "placement": {
+    "method": "geodesic",
+    "anchor": {
+     "chart": [
+      0,
+      0
+     ],
+     "on": [
+      0,
+      0,
+      25
+     ]
+    }
+   }
+  },
+  "as": "onBall"
+ },
+ {
+  "command": "emboss_on_face",
+  "params": {
+   "id": "$ball",
+   "face": {
+    "faceNear": [
+     0,
+     0,
+     25
+    ]
+   },
+   "profileIds": [
+    "$disk"
+   ],
+   "mode": "emboss",
+   "depth": 0.5,
+   "placement": {
+    "method": "geodesic",
+    "anchor": {
+     "chart": [
+      0,
+      0
+     ],
+     "on": [
+      0,
+      0,
+      25
+     ]
+    }
+   }
+  },
+  "as": "badge"
+ },
+ {
+  "command": "check_wrap",
+  "params": {
+   "ids": [
+    "$onBall",
+    "$badge"
+   ],
+   "maxLengthStrain": 0.05
+  }
+ }
+]

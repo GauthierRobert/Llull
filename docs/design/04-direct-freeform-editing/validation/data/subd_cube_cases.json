@@ -1,0 +1,125 @@
+{
+ "generated": "2026-10-22",
+ "generator": "generate_subd_refs.mjs",
+ "cage": "cube, vertices (+-1, +-1, +-1) = llull add_subdivision_solid box size [2,2,2] segments [1,1,1] at position [0,0,0]",
+ "cornerLimit": {
+  "closedForm": [
+   0.5,
+   0.5,
+   0.5
+  ],
+  "derivation": "valence 3: (9 v + 4 sum e + sum f) / 24 with v = (1,1,1), sum e = (1,1,1), sum f = (-1,-1,-1) -> 12/24 = 0.5 per axis",
+  "maskOnLevel0": [
+   0.5,
+   0.5,
+   0.5
+  ],
+  "maskOnLevel1": [
+   0.5,
+   0.5,
+   0.5
+  ],
+  "level7Vertex": [
+   0.500001190748,
+   0.500001190748,
+   0.500001190748
+  ]
+ },
+ "cornerLimitNormal": {
+  "expected": [
+   0.57735026919,
+   0.57735026919,
+   0.57735026919
+  ],
+  "tangentMask": [
+   0.57735026919,
+   0.57735026919,
+   0.57735026919
+  ]
+ },
+ "faceCentreLimit": {
+  "maskOnLevel1": [
+   1.73472347598e-18,
+   0,
+   0.83950617284
+  ],
+  "level7Vertex": [
+   0,
+   0,
+   0.83954384923
+  ]
+ },
+ "edgeMidLimit": {
+  "maskOnLevel1": [
+   0,
+   0.609567901235,
+   0.609567901235
+  ],
+  "level7Vertex": [
+   0,
+   0.609600303074,
+   0.609600303074
+  ]
+ },
+ "smoothMeshVolumeByLevel": [
+  8,
+  3.33333333333,
+  2.80093764736,
+  2.66462478968,
+  2.63141035627,
+  2.62316294568,
+  2.6211047606,
+  2.62059044886
+ ],
+ "smoothLimitVolumeEstimate": {
+  "value": 2.62041911579,
+  "method": "geometric (Aitken) extrapolation of levels 5-7",
+  "observedRatio": 0.249886050092,
+  "grade": "B (numerical)"
+ },
+ "allEdgesInfinitelySharpVolumeByLevel": {
+  "values": [
+   8,
+   8,
+   8,
+   8,
+   8,
+   8
+  ],
+  "closedForm": 8,
+  "why": "every crease vertex has 3 sharp edges (corner rule) and crease edges are midpoints; all new points are affine combinations of coplanar face points, so each face stays its planar square"
+ },
+ "allEdgesSharpness1VolumeByLevel": [
+  8,
+  8,
+  6.66666666667,
+  6.38858936451,
+  6.31819142235,
+  6.30067485193
+ ],
+ "allEdgesSharpness2VolumeByLevel": [
+  8,
+  8,
+  8,
+  7.64583333333,
+  7.56419867056,
+  7.54368017779
+ ],
+ "allEdgesSharpness0p5VolumeByLevel": [
+  8,
+  5.44444444444,
+  4.48833395457,
+  4.2843929971,
+  4.23357576242,
+  4.22094707039
+ ],
+ "oneInfiniteCreaseEdge67": {
+  "note": "edge between (1,1,1) and (-1,1,1) infinitely sharp; its two end vertices have 1 sharp edge (dart = smooth rule)",
+  "level3MidpointOfCrease": [
+   0,
+   0.861111111111,
+   0.861111111111
+  ],
+  "level3Volume": 2.81832862357
+ }
+}

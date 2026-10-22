@@ -1,0 +1,86 @@
+{
+ "generated": "generate_wrap_refs.mjs",
+ "radius": 20,
+ "pullDirectionEmboss": {
+  "region": "chart rectangle 30 x 10 centred on azimuth 0, pull +x",
+  "cases": [
+   {
+    "depth": 0.5,
+    "halfWidthY0": 13.6327752005,
+    "volume": 149.562187619,
+    "normalWallVolume": 151.875,
+    "check": {
+     "numericSection": 14.9562187619,
+     "residual": -3.5527136788e-15
+    }
+   },
+   {
+    "depth": 1,
+    "halfWidthY0": 13.6327752005,
+    "volume": 298.308583135,
+    "normalWallVolume": 307.5,
+    "check": {
+     "numericSection": 29.8308583135,
+     "residual": 4.61852778244e-14
+    }
+   },
+   {
+    "depth": 2,
+    "halfWidthY0": 13.6327752005,
+    "volume": 593.663228951,
+    "normalWallVolume": 630,
+    "check": {
+     "numericSection": 59.3663228951,
+     "residual": -1.27897692437e-13
+    }
+   }
+  ]
+ },
+ "cylinderGeodesics": [
+  {
+   "from": {
+    "thetaRad": 0,
+    "z": 0
+   },
+   "to": {
+    "thetaRad": 1,
+    "z": 10
+   },
+   "length": 22.360679775,
+   "check": {
+    "numeric": 22.360679775,
+    "residual": -1.69748659573e-11
+   }
+  },
+  {
+   "from": {
+    "thetaRad": 0,
+    "z": 0
+   },
+   "to": {
+    "thetaRad": 0.5,
+    "z": 0
+   },
+   "length": 10,
+   "check": {
+    "numeric": 10,
+    "residual": -3.01803027014e-12
+   }
+  },
+  {
+   "from": {
+    "thetaRad": 0,
+    "z": 0
+   },
+   "to": {
+    "thetaRad": 2,
+    "z": 5
+   },
+   "length": 40.3112887415,
+   "check": {
+    "numeric": 40.3112887413,
+    "residual": -1.49569245878e-10
+   }
+  }
+ ]
+}

@@ -1,0 +1,65 @@
+{
+ "gap": "SWG",
+ "generated": "2026-10-22",
+ "notes": "Closed forms: corner handling (Pappus on the bend + straight legs; a mitre joint of a round section keeps V = A (L1 + L2) by symmetry about the mitre plane), surface-orientation sheets, seam mis-alignment (det((1-t) I + t R_phi) = 1 - 2 t (1 - t)(1 - cos phi) for ANY section under parameter coupling); plus a numeric (reference-code) square-to-circle ruled loft.",
+ "cases": [
+  {
+   "id": "l_path_round_corner",
+   "sectionRadius": 5,
+   "bendRadius": 30,
+   "legs": [
+    100,
+    100
+   ],
+   "formula": "A (2 (100 - Rb) + Rb pi / 2)",
+   "value": 14696.675938
+  },
+  {
+   "id": "l_path_miter_corner",
+   "sectionRadius": 5,
+   "legs": [
+    100,
+    100
+   ],
+   "formula": "A (L1 + L2)",
+   "value": 15707.9632679
+  },
+  {
+   "id": "surface_mode_plane_band",
+   "pathRadius": 50,
+   "segment": 10,
+   "surface": "plane z = 0 (normal +Z)",
+   "formula": "2 pi R w",
+   "areaValue": 3141.59265359
+  },
+  {
+   "id": "surface_mode_cylinder_annulus",
+   "pathRadius": 50,
+   "segment": 10,
+   "surface": "cylinder r 50 (normal radial)",
+   "formula": "pi ((R + w)^2 - R^2)",
+   "areaValue": 3455.75191895
+  },
+  {
+   "id": "square_seam_off_by_one_corner",
+   "side": 10,
+   "h": 50,
+   "formula": "side^2 h (1 - (1 - cos(pi/2)) / 3) = 2/3 of the prism",
+   "value": 3333.33333333,
+   "meshCoarse": 3332.8125,
+   "meshFine": 3333.203125,
+   "richardson": 3333.33333333,
+   "relErrRichardson": 1e-12,
+   "alignedValue": 5000
+  },
+  {
+   "id": "ruled_square20_to_circle10_arc_length",
+   "h": 50,
+   "method": "reference code: ruled grid, arc-length coupling, Richardson",
+   "value": 17904.7631968,
+   "meshCoarse": 17904.5564505,
+   "meshFine": 17904.7115103,
+   "richardson": 17904.7631968
+  }
+ ]
+}

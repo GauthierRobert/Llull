@@ -1,0 +1,851 @@
+{
+ "gap": "BLD",
+ "generated": "2026-10-22",
+ "notes": "Values: (a) quoted, (b) derived (generate_blend_refs.mjs, data/*.json) or (c) TBD with the tool to measure. Only grade A gates pass/fail. Units: the plans use the default document unit (mm).",
+ "plans": [
+  {
+   "file": "plans/baseline_variable_radius_laws.json",
+   "description": "Runs on today's llull with the native kernel: constant, linear (radiusEnd), control-point (edges[].sizes) and chord fillets, each followed by the queries the VCs read.",
+   "unbuilt": []
+  },
+  {
+   "file": "plans/baseline_limits_today.json",
+   "description": "Runs on today's llull and records how it handles blend limits (measured 2026-10-22: steps 2, 4 and 8 are refused with generic summaries; the 4-edge pyramid apex, step 6, succeeds). Run steps one by one (build_project aborts at the first failure): llull run --continue.",
+   "unbuilt": []
+  },
+  {
+   "file": "plans/target_laws_and_profiles.json",
+   "description": "Radius laws (linear interpolation, periodic expression), conic and curvature-continuous profiles, asymmetric legs; closes with check_blends.",
+   "unbuilt": [
+    "fillet_edge.edges[].interpolation",
+    "fillet_edge.edges[].law",
+    "fillet_edge.profile",
+    "fillet_edge.edges[].size2",
+    "fillet_edge.edges[].side1Near",
+    "check_blends"
+   ]
+  },
+  {
+   "file": "plans/target_corners_faces_chamfers.json",
+   "description": "Setback corners, a 4-edge apex, face-face fillet across a chamfer, hold line, full round, chamfer variants, probe; closes with check_blends.",
+   "unbuilt": [
+    "fillet_edge.corners",
+    "fillet_faces",
+    "fillet_full_round",
+    "chamfer_edge.distance2",
+    "chamfer_edge.angleDeg",
+    "chamfer_edge.side1Near",
+    "probe_fillet",
+    "check_blends"
+   ]
+  },
+  {
+   "file": "plans/target_error_codes.json",
+   "description": "Deliberately wrong requests; run each step alone (llull run --continue --json). Every step must exit 1 with the listed code, ids/paths and a remediation.",
+   "unbuilt": [
+    "fillet_edge.profile",
+    "fillet_edge.edges[].law",
+    "fillet_edge.corners",
+    "fillet_faces",
+    "BLD_* codes"
+   ],
+   "expectedCodesInOrder": [
+    "BLD_RADIUS_TOO_LARGE",
+    "BLD_RHO_RANGE",
+    "BLD_LAW_NOT_PERIODIC",
+    "BLD_SETBACK_TOO_SHORT",
+    "BLD_FACE_FILLET_NO_SOLUTION"
+   ]
+  }
+ ],
+ "cases": [
+  {
+   "vc": "VC-BLD-01",
+   "what": "constant r = 1 fillet, one edge of a 10-cube (regression anchor = oracle 83)",
+   "value": 997.853981634,
+   "tolerance": 0.001,
+   "unit": "mm3",
+   "grade": "A",
+   "source": "(b) V = a^3 - (1 - pi/4) r^2 L",
+   "plan": "baseline_variable_radius_laws",
+   "assert": "mass_properties($f01).data.volume",
+   "proves": [
+    "FR-BLD-01",
+    "TR-BLD-17"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_variable_radius_laws.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($f01).data.volume"
+   }
+  },
+  {
+   "vc": "VC-BLD-02",
+   "what": "linear law r 1 -> 2 on the 20-long top edge of the 20x10x5 block: planar face areas (construction-independent) and volume (section construction)",
+   "value": {
+    "topFaceArea": 170,
+    "sideFaceArea": 70,
+    "volume": 989.985247625
+   },
+   "tolerance": {
+    "faceArea": 0.000001,
+    "volume": 0.02
+   },
+   "unit": "mm2 / mm3",
+   "grade": "A (face areas); A within the construction band (volume)",
+   "source": "(b) contact line at distance r(s) on each plane; Cavalieri; envelope band data/variable_radius_laws.json",
+   "plan": "baseline_variable_radius_laws",
+   "assert": "inspect_faces($f02) faces named <b2>:top / <b2>:side areas; mass_properties($f02).data.volume",
+   "proves": [
+    "FR-BLD-01",
+    "FR-BLD-05",
+    "TR-BLD-02"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_variable_radius_laws.json --doc t.llull.json --kernel occt --json",
+    "assert": "inspect_faces($f02) faces named <b2>:top / <b2>:side areas; mass_properties($f02).data.volume"
+   }
+  },
+  {
+   "vc": "VC-BLD-03",
+   "what": "control-point law 1 / 2 at t = 0.5 / 1: radius at the control points; with interpolation \"linear\" the face areas",
+   "value": {
+    "radiusAtHalf": 2,
+    "topFaceArea_linear": 170
+   },
+   "tolerance": {
+    "radius": 0.000001,
+    "faceArea": 0.000001
+   },
+   "unit": "mm / mm2",
+   "grade": "A",
+   "source": "(b) law definition; smooth (OCCT Law_Interpol) face area TBD - measure with inspect_faces",
+   "plan": "baseline_variable_radius_laws (smooth) + target_laws_and_profiles (linear)",
+   "assert": "check_blends($f03).data.blends[0].radius.at[t=0.5]; inspect_faces($f03)",
+   "proves": [
+    "FR-BLD-01",
+    "FR-BLD-05",
+    "FR-BLD-12",
+    "TR-BLD-01",
+    "TR-BLD-05"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_variable_radius_laws.json --doc t.llull.json --kernel occt --json",
+    "assert": "check_blends($f03).data.blends[0].radius.at[t=0.5]; inspect_faces($f03)"
+   }
+  },
+  {
+   "vc": "VC-BLD-04",
+   "what": "periodic expression law r(t) = 1 + 0.5 cos(2 pi t) around the top rim of a cylinder R 5 h 10",
+   "value": 778.227638561,
+   "tolerance": 0.01,
+   "unit": "mm3",
+   "grade": "A (closed form); tolerance covers the 33-sample interpolation (TBD tighten after first run)",
+   "source": "(b) generalised Pappus over meridian sections",
+   "plan": "target_laws_and_profiles",
+   "assert": "mass_properties($f04).data.volume",
+   "proves": [
+    "FR-BLD-02",
+    "FR-BLD-03",
+    "TR-BLD-01",
+    "TR-BLD-02"
+   ],
+   "cli": {
+    "run": "llull run plans/target_laws_and_profiles.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($f04).data.volume"
+   }
+  },
+  {
+   "vc": "VC-BLD-05",
+   "what": "chord 2 fillet on a 60 deg edge of an equilateral prism (side 10, depth 10)",
+   "value": 423.881325141,
+   "tolerance": 0.001,
+   "unit": "mm3",
+   "grade": "A",
+   "source": "(b) r = c / (2 cos(alpha/2)); A = r^2 [cot(alpha/2) - (pi - alpha)/2]",
+   "plan": "baseline_variable_radius_laws",
+   "assert": "mass_properties($f05).data.volume",
+   "proves": [
+    "FR-BLD-04"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_variable_radius_laws.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($f05).data.volume"
+   }
+  },
+  {
+   "vc": "VC-BLD-06",
+   "what": "chord sqrt2 fillet on the cylinder rim (plane meets cylinder at 90 deg; meridian section = two perpendicular lines) => r = 1",
+   "value": 778.95743342,
+   "tolerance": 0.001,
+   "unit": "mm3",
+   "grade": "A",
+   "source": "(b) Pappus (oracle 87 value); today refused: chord needs two planar faces (baseline_limits_today step 8)",
+   "plan": "target_laws_and_profiles",
+   "assert": "mass_properties($f06).data.volume",
+   "proves": [
+    "FR-BLD-04",
+    "TR-BLD-10"
+   ],
+   "cli": {
+    "run": "llull run plans/target_laws_and_profiles.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($f06).data.volume"
+   }
+  },
+  {
+   "vc": "VC-BLD-07a",
+   "what": "conic profile rho 0.25 sized by r = 1 on the block top edge",
+   "value": 993.646111101,
+   "tolerance": 0.001,
+   "unit": "mm3",
+   "grade": "A",
+   "source": "(b) removed = Delta (1 - f(w)), w = rho/(1-rho), data/conic_sections.json; rho = sqrt2-1 equals the circular value",
+   "plan": "target_laws_and_profiles",
+   "assert": "mass_properties($f07_0).data.volume",
+   "proves": [
+    "FR-BLD-06",
+    "TR-BLD-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_laws_and_profiles.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($f07_0).data.volume"
+   }
+  },
+  {
+   "vc": "VC-BLD-07b",
+   "what": "conic profile rho 0.414213562373 sized by r = 1 on the block top edge",
+   "value": 995.707963268,
+   "tolerance": 0.001,
+   "unit": "mm3",
+   "grade": "A",
+   "source": "(b) removed = Delta (1 - f(w)), w = rho/(1-rho), data/conic_sections.json; rho = sqrt2-1 equals the circular value",
+   "plan": "target_laws_and_profiles",
+   "assert": "mass_properties($f07_1).data.volume",
+   "proves": [
+    "FR-BLD-06",
+    "TR-BLD-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_laws_and_profiles.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($f07_1).data.volume"
+   }
+  },
+  {
+   "vc": "VC-BLD-07c",
+   "what": "conic profile rho 0.5 sized by r = 1 on the block top edge",
+   "value": 996.666666667,
+   "tolerance": 0.001,
+   "unit": "mm3",
+   "grade": "A",
+   "source": "(b) removed = Delta (1 - f(w)), w = rho/(1-rho), data/conic_sections.json; rho = sqrt2-1 equals the circular value",
+   "plan": "target_laws_and_profiles",
+   "assert": "mass_properties($f07_2).data.volume",
+   "proves": [
+    "FR-BLD-06",
+    "TR-BLD-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_laws_and_profiles.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($f07_2).data.volume"
+   }
+  },
+  {
+   "vc": "VC-BLD-07d",
+   "what": "conic profile rho 0.75 sized by r = 1 on the block top edge",
+   "value": 998.912905349,
+   "tolerance": 0.001,
+   "unit": "mm3",
+   "grade": "A",
+   "source": "(b) removed = Delta (1 - f(w)), w = rho/(1-rho), data/conic_sections.json; rho = sqrt2-1 equals the circular value",
+   "plan": "target_laws_and_profiles",
+   "assert": "mass_properties($f07_3).data.volume",
+   "proves": [
+    "FR-BLD-06",
+    "TR-BLD-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_laws_and_profiles.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($f07_3).data.volume"
+   }
+  },
+  {
+   "vc": "VC-BLD-08",
+   "what": "asymmetric legs 1 (top) x 2 (side), rho = sqrt2 - 1 (elliptic quarter)",
+   "value": 991.415926536,
+   "tolerance": 0.001,
+   "unit": "mm3",
+   "grade": "A",
+   "source": "(b) affine image of the circle: (1 - pi/4) d1 d2 L",
+   "plan": "target_laws_and_profiles",
+   "assert": "mass_properties($f08).data.volume",
+   "proves": [
+    "FR-BLD-06",
+    "FR-BLD-08",
+    "TR-BLD-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_laws_and_profiles.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($f08).data.volume"
+   }
+  },
+  {
+   "vc": "VC-BLD-09",
+   "what": "curvature-continuous profile, tangent distance 1, shape 0.5 (quartic) on the block top edge: volume and measured G2 at both contacts",
+   "value": {
+    "volume": 998,
+    "contactCurvature": 0,
+    "order": "G2"
+   },
+   "tolerance": {
+    "volume": 0.001,
+    "contactCurvature": 0.000001
+   },
+   "unit": "mm3 / 1/mm",
+   "grade": "A",
+   "source": "(b) quartic Bezier area 0.1 d^2 at k = 0.5, data/g2_sections.json",
+   "plan": "target_laws_and_profiles",
+   "assert": "mass_properties($f09).data.volume; check_blends($f09).data.blends[0].contacts[*].order",
+   "proves": [
+    "FR-BLD-07",
+    "FR-BLD-21",
+    "TR-BLD-04",
+    "TR-BLD-06"
+   ],
+   "cli": {
+    "run": "llull run plans/target_laws_and_profiles.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($f09).data.volume; check_blends($f09).data.blends[0].contacts[*].order"
+   }
+  },
+  {
+   "vc": "VC-BLD-10",
+   "what": "a circular fillet is G1, not G2: contact curvature jump 1/r",
+   "value": {
+    "g2Gap": 1,
+    "g2Rel": 1,
+    "order": "G1"
+   },
+   "tolerance": {
+    "g2Gap": 0.000001
+   },
+   "unit": "1/mm",
+   "grade": "A",
+   "source": "(b) plane curvature 0, cylinder normal curvature 1/r",
+   "plan": "target_laws_and_profiles",
+   "assert": "check_blends($f10).data.blends[0].contacts[*]",
+   "proves": [
+    "FR-BLD-21",
+    "TR-BLD-04"
+   ],
+   "cli": {
+    "run": "llull run plans/target_laws_and_profiles.json --doc t.llull.json --kernel occt --json",
+    "assert": "check_blends($f10).data.blends[0].contacts[*]"
+   }
+  },
+  {
+   "vc": "VC-BLD-11",
+   "what": "rolling-ball corners: all 12 edges of a 10-cube r = 1 (oracle 85)",
+   "value": 975.587013891,
+   "tolerance": 0.001,
+   "unit": "mm3",
+   "grade": "A",
+   "source": "(b) Steiner",
+   "plan": "baseline_variable_radius_laws",
+   "assert": "mass_properties($f11).data.volume",
+   "proves": [
+    "FR-BLD-09"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_variable_radius_laws.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($f11).data.volume"
+   }
+  },
+  {
+   "vc": "VC-BLD-12",
+   "what": "setback s = 2 at all 8 corners, r = 1: edge blend span, patch G1, volume bounds",
+   "value": {
+    "cylinderSpan": 6,
+    "volumeBounds": [
+     920.548667765,
+     984.548667765
+    ],
+    "patchG1AngleRadMax": 0.01,
+    "volume": "TBD - measure (record as golden)"
+   },
+   "tolerance": {
+    "span": 0.000001
+   },
+   "unit": "mm / mm3 / rad",
+   "grade": "A (span, bounds); C (volume)",
+   "source": "(b) definition of setback; bounds data/corner_blends.json",
+   "plan": "target_corners_faces_chamfers",
+   "assert": "inspect_faces($f12) cylinder axis.span; mass_properties($f12); check_blends($f12)",
+   "proves": [
+    "FR-BLD-09",
+    "TR-BLD-07"
+   ],
+   "cli": {
+    "run": "llull run plans/target_corners_faces_chamfers.json --doc t.llull.json --kernel occt --json",
+    "assert": "inspect_faces($f12) cylinder axis.span; mass_properties($f12); check_blends($f12)"
+   }
+  },
+  {
+   "vc": "VC-BLD-13",
+   "what": "4 edges meeting at the apex of a pyramid. OCCT documents >= 4-edge contour ends as not handled, but llull-kernel (OCCT 7.9.2) completes this symmetric apex today (measured 2026-10-22: valid B-rep, 11 faces, 23 edges). Target: same without corners, setback 1.5 gives a valid solid; BLD_CORNER_UNSUPPORTED only when OCCT itself reports the vertex faulty",
+   "value": {
+    "today": {
+     "valid": true,
+     "faces": 11,
+     "edges": 23
+    },
+    "targetValid": true,
+    "targetValid_setback": true
+   },
+   "tolerance": "exact",
+   "unit": "-",
+   "grade": "A (measured on llull-kernel 2026-10-22; OCCT header text)",
+   "source": "[R1] BRepFilletAPI_MakeFillet::Build warning; baseline_limits_today step 6 run on the native kernel",
+   "plan": "baseline_limits_today + target_corners_faces_chamfers + target_error_codes",
+   "assert": "check_blends($f13).data.status != fail; error.code",
+   "proves": [
+    "FR-BLD-10",
+    "FR-BLD-19",
+    "TR-BLD-03",
+    "TR-BLD-07"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_limits_today.json --doc t.llull.json --kernel occt --json",
+    "assert": "check_blends($f13).data.status != fail; error.code"
+   }
+  },
+  {
+   "vc": "VC-BLD-14",
+   "what": "face-face fillet r = 2 between the two faces of a chamfered corner (chamfer face consumed)",
+   "value": {
+    "volume": 991.415926536,
+    "chamferFacePresent": false
+   },
+   "tolerance": {
+    "volume": 0.001
+   },
+   "unit": "mm3",
+   "grade": "A",
+   "source": "(b) 1000 - (1 - pi/4) r^2 L",
+   "plan": "target_corners_faces_chamfers",
+   "assert": "mass_properties($f14); inspect_faces($f14)",
+   "proves": [
+    "FR-BLD-13",
+    "TR-BLD-08"
+   ],
+   "cli": {
+    "run": "llull run plans/target_corners_faces_chamfers.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($f14); inspect_faces($f14)"
+   }
+  },
+  {
+   "vc": "VC-BLD-15",
+   "what": "face-face fillet r = 1.5 < c/(2 - sqrt2) = 1.70711 across the chamfer is refused",
+   "value": "BLD_FACE_FILLET_NO_SOLUTION",
+   "tolerance": "exact",
+   "unit": "-",
+   "grade": "A",
+   "source": "(b) r (sqrt2 - 1) >= c / sqrt2",
+   "plan": "target_error_codes",
+   "assert": "error.code, error.paths includes params.radius, remediation names 1.70711",
+   "proves": [
+    "FR-BLD-13",
+    "FR-BLD-19",
+    "TR-BLD-15"
+   ],
+   "cli": {
+    "run": "llull run plans/target_error_codes.json --doc t.llull.json --kernel occt --json",
+    "assert": "error.code, error.paths includes params.radius, remediation names 1.70711"
+   }
+  },
+  {
+   "vc": "VC-BLD-16",
+   "what": "full round of a 4-wide rib top (r = 2), top face consumed; today two r = 2 fillets fail (record)",
+   "value": {
+    "volume": 765.663706144,
+    "cylinderRadius": 2,
+    "cylinderArea": 125.663706144
+   },
+   "tolerance": {
+    "volume": 0.001,
+    "radius": 0.000001,
+    "area": 0.001
+   },
+   "unit": "mm3 / mm / mm2",
+   "grade": "A",
+   "source": "(b) (t^2/2)(1 - pi/4) L",
+   "plan": "target_corners_faces_chamfers (+ baseline_limits_today step 4)",
+   "assert": "mass_properties($f16); inspect_faces($f16)",
+   "proves": [
+    "FR-BLD-15",
+    "TR-BLD-09"
+   ],
+   "cli": {
+    "run": "llull run plans/target_corners_faces_chamfers.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($f16); inspect_faces($f16)"
+   }
+  },
+  {
+   "vc": "VC-BLD-17",
+   "what": "hold line from 1 to 2 mm off the top edge on the top face => linear radius 1 -> 2 (90 deg): face areas",
+   "value": {
+    "topFaceArea": 170,
+    "sideFaceArea": 70
+   },
+   "tolerance": 0.000001,
+   "unit": "mm2",
+   "grade": "A",
+   "source": "(b) r = h tan(alpha/2)",
+   "plan": "target_corners_faces_chamfers",
+   "assert": "inspect_faces($f17)",
+   "proves": [
+    "FR-BLD-14",
+    "TR-BLD-10"
+   ],
+   "cli": {
+    "run": "llull run plans/target_corners_faces_chamfers.json --doc t.llull.json --kernel occt --json",
+    "assert": "inspect_faces($f17)"
+   }
+  },
+  {
+   "vc": "VC-BLD-18",
+   "what": "chamfers on one edge of a 10-cube: symmetric d 1 (oracle 88), asymmetric 1 x 2, distance-angle 1 / 30 deg",
+   "value": {
+    "symmetric": 995,
+    "asymmetric": 990,
+    "distanceAngle": 997.113248654
+   },
+   "tolerance": 0.001,
+   "unit": "mm3",
+   "grade": "A",
+   "source": "(b) triangle area d1 d2 sin(alpha) / 2",
+   "plan": "baseline_variable_radius_laws (symmetric) + target_corners_faces_chamfers",
+   "assert": "mass_properties($k18*)",
+   "proves": [
+    "FR-BLD-18",
+    "TR-BLD-11"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_variable_radius_laws.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($k18*)"
+   }
+  },
+  {
+   "vc": "VC-BLD-19",
+   "what": "variable chamfer 1 -> 2 along the block top edge (COULD)",
+   "value": 976.666666667,
+   "tolerance": 0.02,
+   "unit": "mm3",
+   "grade": "A (section construction)",
+   "source": "(b) (1/2) integral d^2",
+   "plan": "-",
+   "assert": "mass_properties",
+   "proves": [
+    "FR-BLD-18"
+   ],
+   "cli": {
+    "run": "llull run plans/-.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties"
+   }
+  },
+  {
+   "vc": "VC-BLD-20",
+   "what": "probe_fillet on the block top edge: max feasible radius below the geometric bound 5; r = 0.99 rMax succeeds, r = 1.01 rMax fails",
+   "value": {
+    "upperBound": 5,
+    "rMax": "TBD - measure (record as golden)"
+   },
+   "tolerance": {
+    "rMax": 0.001
+   },
+   "unit": "mm",
+   "grade": "A (bound); C (value)",
+   "source": "(b) face height; data/probe_limits.json",
+   "plan": "target_corners_faces_chamfers",
+   "assert": "probe_fillet.data.edges[0].maxRadius < 5",
+   "proves": [
+    "FR-BLD-20",
+    "TR-BLD-14",
+    "TR-BLD-18"
+   ],
+   "cli": {
+    "run": "llull run plans/target_corners_faces_chamfers.json --doc t.llull.json --kernel occt --json",
+    "assert": "probe_fillet.data.edges[0].maxRadius < 5"
+   }
+  },
+  {
+   "vc": "VC-BLD-21",
+   "what": "error-code plan: each refusal has the stable code, ids/paths and a remediation; document unchanged",
+   "value": [
+    "BLD_RADIUS_TOO_LARGE",
+    "BLD_RHO_RANGE",
+    "BLD_LAW_NOT_PERIODIC",
+    "BLD_SETBACK_TOO_SHORT",
+    "BLD_FACE_FILLET_NO_SOLUTION",
+    "BLD_CORNER_UNSUPPORTED"
+   ],
+   "tolerance": "exact",
+   "unit": "-",
+   "grade": "A",
+   "source": "TECHNICAL_SPEC §7.1",
+   "plan": "target_error_codes",
+   "assert": "error.code per step, exit 1",
+   "proves": [
+    "FR-BLD-19",
+    "TR-BLD-03",
+    "TR-BLD-15"
+   ],
+   "cli": {
+    "run": "llull run plans/target_error_codes.json --doc t.llull.json --kernel occt --json",
+    "assert": "error.code per step, exit 1"
+   }
+  },
+  {
+   "vc": "VC-BLD-22",
+   "what": "persistent references: fillet by edge name survives an upstream box resize; a deleted edge gives REF_LOST; a setback corner and a face set re-resolve by name",
+   "value": {
+    "sameEdge": true,
+    "lostCode": "REF_LOST"
+   },
+   "tolerance": "exact",
+   "unit": "-",
+   "grade": "A",
+   "source": "SC-N1 naming (packages/core/src/geometry/naming/references.ts)",
+   "plan": "unit + golden (edit_step_params)",
+   "assert": "face names blend(<edge>) after replay",
+   "proves": [
+    "FR-BLD-22",
+    "TR-BLD-13"
+   ],
+   "cli": {
+    "run": "llull run plans/unit.json --doc t.llull.json --kernel occt --json",
+    "assert": "face names blend(<edge>) after replay"
+   }
+  },
+  {
+   "vc": "VC-BLD-23",
+   "what": "check_blends on the target plan: named defaulted tolerances, unverified for positional picks on a kernel without names, reviewRequired with purpose release",
+   "value": {
+    "tolerancesDefaulted": true,
+    "reviewRequired": true
+   },
+   "tolerance": "exact",
+   "unit": "-",
+   "grade": "A",
+   "source": "AF-20, AF-31, AF-32, AF-33",
+   "plan": "target_corners_faces_chamfers (last step)",
+   "assert": "data.tolerances.*.defaulted, data.reviewRequired, data.findings[*].code",
+   "proves": [
+    "FR-BLD-21",
+    "FR-BLD-26",
+    "TR-BLD-15"
+   ],
+   "cli": {
+    "run": "llull run plans/target_corners_faces_chamfers.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.tolerances.*.defaulted, data.reviewRequired, data.findings[*].code"
+   }
+  },
+  {
+   "vc": "VC-BLD-24",
+   "what": "mesh kernel: every mutating BLD command refuses with CMD_KERNEL_UNAVAILABLE / BLD_KERNEL_UNSUPPORTED, document unchanged; check_blends returns not_run",
+   "value": "refused",
+   "tolerance": "exact",
+   "unit": "-",
+   "grade": "A",
+   "source": "L9",
+   "plan": "any target plan with --kernel manifold",
+   "assert": "error.code",
+   "proves": [
+    "FR-BLD-28"
+   ],
+   "cli": {
+    "run": "llull run plans/any.json --doc t.llull.json --kernel occt --json",
+    "assert": "error.code"
+   }
+  },
+  {
+   "vc": "VC-BLD-25",
+   "what": "purity and replay: is-pure tests, golden replay equality, tool-schema snapshot",
+   "value": "identical",
+   "tolerance": "exact",
+   "unit": "-",
+   "grade": "A",
+   "source": "W3",
+   "plan": "all target plans",
+   "assert": "golden",
+   "proves": [
+    "FR-BLD-23",
+    "TR-BLD-12",
+    "TR-BLD-14"
+   ],
+   "cli": {
+    "run": "llull run plans/all.json --doc t.llull.json --kernel occt --json",
+    "assert": "golden"
+   }
+  },
+  {
+   "vc": "VC-BLD-26",
+   "what": "export_code cadquery of the linear-law fillet runs with bundled OCP and gives the same volume; a conic fillet export carries BLD_CODEGEN_UNSUPPORTED in notes (never silently constant)",
+   "value": 989.985247625,
+   "tolerance": 0.02,
+   "unit": "mm3",
+   "grade": "A (band as VC-02)",
+   "source": "(b) as VC-02",
+   "plan": "baseline_variable_radius_laws + export_code",
+   "assert": "python oracle volume; export notes",
+   "proves": [
+    "FR-BLD-25",
+    "TR-BLD-16"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_variable_radius_laws.json --doc t.llull.json --kernel occt --json",
+    "assert": "python oracle volume; export notes"
+   }
+  },
+  {
+   "vc": "VC-BLD-27",
+   "what": "STEP round trip of conic and G2 blends: blend faces exported as B-spline surfaces, volume unchanged",
+   "value": "volume change 0",
+   "tolerance": 0.000001,
+   "unit": "relative",
+   "grade": "A",
+   "source": "-",
+   "plan": "target_laws_and_profiles + export_step + import_step_exact",
+   "assert": "mass_properties before / after",
+   "proves": [
+    "FR-BLD-27"
+   ],
+   "cli": {
+    "run": "llull run plans/target_laws_and_profiles.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties before / after"
+   }
+  },
+  {
+   "vc": "VC-BLD-28",
+   "what": "describe / result audit: every numeric param of fillet_edge, chamfer_edge, fillet_faces, fillet_full_round, probe_fillet, check_blends states its unit; every result number has a unit",
+   "value": 0,
+   "tolerance": "exact",
+   "unit": "count of violations",
+   "grade": "A",
+   "source": "AF-04, AF-10",
+   "plan": "contract test",
+   "assert": "llull describe --json",
+   "proves": [
+    "FR-BLD-24",
+    "FR-BLD-30"
+   ],
+   "cli": {
+    "run": "llull run plans/contract.json --doc t.llull.json --kernel occt --json",
+    "assert": "llull describe --json"
+   }
+  },
+  {
+   "vc": "VC-BLD-29",
+   "what": "partial fillet t in [0.25, 0.75] on the block top edge (COULD): blend face lies within x in [-5 - runout, 5 + runout]; volume recorded",
+   "value": "TBD - measure",
+   "tolerance": "TBD",
+   "unit": "mm",
+   "grade": "C",
+   "source": "Onshape partial fillet [R13]",
+   "plan": "-",
+   "assert": "inspect_faces",
+   "proves": [
+    "FR-BLD-11"
+   ],
+   "cli": {
+    "run": "llull run plans/-.json --doc t.llull.json --kernel occt --json",
+    "assert": "inspect_faces"
+   }
+  },
+  {
+   "vc": "VC-BLD-30",
+   "what": "construction probe: linear law r 1 -> 3; the exact volume tells which construction the native kernel builds (section 981.401174 vs envelope 981.462234); face areas 160 / 60 exact either way",
+   "value": {
+    "faceAreas": {
+     "top": 160,
+     "side": 60
+    },
+    "volume_section": 981.401174161,
+    "volume_envelope": 981.4622344
+   },
+   "tolerance": {
+    "faceArea": 0.000001,
+    "classify": "nearest of the two within 0.01"
+   },
+   "unit": "mm2 / mm3",
+   "grade": "A (face areas); B (envelope number, numerical integration)",
+   "source": "(b) generate_blend_refs.mjs constructionProbe",
+   "plan": "baseline_variable_radius_laws",
+   "assert": "mass_properties($f30); inspect_faces($f30)",
+   "proves": [
+    "FR-BLD-01",
+    "FR-BLD-05",
+    "TR-BLD-02"
+   ],
+   "cli": {
+    "run": "llull run plans/baseline_variable_radius_laws.json --doc t.llull.json --kernel occt --json",
+    "assert": "mass_properties($f30); inspect_faces($f30)"
+   }
+  },
+  {
+   "vc": "VC-BLD-31",
+   "what": "face blend cliff edge and trim modes (COULD): blend clamped to a chosen edge; trim none keeps the full blend sheet",
+   "value": "TBD - measure",
+   "tolerance": "TBD",
+   "unit": "-",
+   "grade": "C",
+   "source": "Onshape Face Blend [R6]",
+   "plan": "-",
+   "assert": "check_blends",
+   "proves": [
+    "FR-BLD-16"
+   ],
+   "cli": {
+    "run": "llull run plans/-.json --doc t.llull.json --kernel occt --json",
+    "assert": "check_blends"
+   }
+  },
+  {
+   "vc": "VC-BLD-32",
+   "what": "blend_union with per-joint radii (COULD): two crossing cylinders and a plate, each joint its own radius; check_blends lists one blend chain per joint with its radius",
+   "value": {
+    "radiiMatch": true
+   },
+   "tolerance": {
+    "radius": 0.000001
+   },
+   "unit": "mm",
+   "grade": "A (radius readback)",
+   "source": "definition",
+   "plan": "-",
+   "assert": "check_blends.data.blends[*].radius",
+   "proves": [
+    "FR-BLD-17"
+   ],
+   "cli": {
+    "run": "llull run plans/-.json --doc t.llull.json --kernel occt --json",
+    "assert": "check_blends.data.blends[*].radius"
+   }
+  },
+  {
+   "vc": "VC-BLD-33",
+   "what": "review overlays (COULD): toggling radius labels / section combs never changes the document; legend values equal check_blends data",
+   "value": "document unchanged",
+   "tolerance": "exact",
+   "unit": "-",
+   "grade": "A",
+   "source": "L1, AF-21",
+   "plan": "component test",
+   "assert": "store snapshot",
+   "proves": [
+    "FR-BLD-29"
+   ],
+   "cli": {
+    "run": "llull run plans/component.json --doc t.llull.json --kernel occt --json",
+    "assert": "store snapshot"
+   }
+  }
+ ]
+}

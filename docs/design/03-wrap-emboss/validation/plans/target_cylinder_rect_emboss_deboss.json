@@ -1,0 +1,112 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 20,
+   "height": 40,
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "a"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 20,
+   "height": 40,
+   "position": [
+    100,
+    0,
+    0
+   ]
+  },
+  "as": "b"
+ },
+ {
+  "command": "draw_rectangle",
+  "params": {
+   "width": 30,
+   "height": 10,
+   "position": [
+    -15,
+    -5,
+    0
+   ]
+  },
+  "as": "rect"
+ },
+ {
+  "command": "emboss_on_face",
+  "params": {
+   "id": "$a",
+   "face": {
+    "faceNear": [
+     20,
+     0,
+     0
+    ]
+   },
+   "profileIds": [
+    "$rect"
+   ],
+   "mode": "emboss",
+   "depth": 1,
+   "placement": {
+    "method": "develop"
+   }
+  },
+  "as": "raised"
+ },
+ {
+  "command": "emboss_on_face",
+  "params": {
+   "id": "$b",
+   "face": {
+    "faceNear": [
+     120,
+     0,
+     0
+    ]
+   },
+   "profileIds": [
+    "$rect"
+   ],
+   "mode": "deboss",
+   "depth": 1,
+   "placement": {
+    "method": "develop"
+   }
+  },
+  "as": "sunk"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$raised"
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$sunk"
+  }
+ },
+ {
+  "command": "check_wrap",
+  "params": {
+   "ids": [
+    "$raised",
+    "$sunk"
+   ]
+  }
+ }
+]

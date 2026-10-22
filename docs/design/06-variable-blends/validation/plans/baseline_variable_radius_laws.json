@@ -1,0 +1,261 @@
+{
+ "actions": [
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     10,
+     10,
+     10
+    ]
+   },
+   "as": "c10"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$c10",
+    "edgesNear": [
+     [
+      5,
+      5,
+      0
+     ]
+    ],
+    "radius": 1
+   },
+   "as": "f01"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f01"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "b2"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$b2",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ],
+    "radius": 1,
+    "radiusEnd": 2
+   },
+   "as": "f02"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f02"
+   }
+  },
+  {
+   "command": "inspect_faces",
+   "params": {
+    "entityId": "$f02"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "b3"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$b3",
+    "edges": [
+     {
+      "near": [
+       0,
+       5,
+       2.5
+      ],
+      "size": 1,
+      "sizeEnd": 1,
+      "sizes": [
+       {
+        "t": 0.5,
+        "size": 2
+       }
+      ]
+     }
+    ]
+   },
+   "as": "f03"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f03"
+   }
+  },
+  {
+   "command": "inspect_faces",
+   "params": {
+    "entityId": "$f03"
+   }
+  },
+  {
+   "command": "extrude_profile",
+   "params": {
+    "profile": [
+     [
+      0,
+      0
+     ],
+     [
+      10,
+      0
+     ],
+     [
+      5,
+      8.660254037844386
+     ]
+    ],
+    "depth": 10
+   },
+   "as": "tri"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$tri",
+    "edgesNear": [
+     [
+      0,
+      0,
+      5
+     ]
+    ],
+    "radius": 2,
+    "mode": "chord"
+   },
+   "as": "f05"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f05"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     20,
+     10,
+     5
+    ]
+   },
+   "as": "b30"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$b30",
+    "edgesNear": [
+     [
+      0,
+      5,
+      2.5
+     ]
+    ],
+    "radius": 1,
+    "radiusEnd": 3
+   },
+   "as": "f30"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f30"
+   }
+  },
+  {
+   "command": "inspect_faces",
+   "params": {
+    "entityId": "$f30"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     10,
+     10,
+     10
+    ]
+   },
+   "as": "c11"
+  },
+  {
+   "command": "fillet_edge",
+   "params": {
+    "id": "$c11",
+    "radius": 1
+   },
+   "as": "f11"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$f11"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     10,
+     10,
+     10
+    ]
+   },
+   "as": "c18"
+  },
+  {
+   "command": "chamfer_edge",
+   "params": {
+    "id": "$c18",
+    "edgesNear": [
+     [
+      5,
+      5,
+      0
+     ]
+    ],
+    "distance": 1
+   },
+   "as": "k18"
+  },
+  {
+   "command": "mass_properties",
+   "params": {
+    "entityId": "$k18"
+   }
+  }
+ ]
+}

@@ -1,0 +1,141 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_cone",
+  "params": {
+   "radius": 20,
+   "height": 40,
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "cone"
+ },
+ {
+  "command": "unwrap_face",
+  "params": {
+   "id": "$cone",
+   "face": {
+    "faceNear": [
+     10,
+     0,
+     20
+    ]
+   }
+  }
+ },
+ {
+  "command": "draw_polyline",
+  "params": {
+   "points": [
+    [
+     -10,
+     0
+    ],
+    [
+     10,
+     0
+    ]
+   ]
+  },
+  "as": "seg"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    0,
+    0
+   ],
+   "radius": 4
+  },
+  "as": "ring"
+ },
+ {
+  "command": "wrap_to_face",
+  "params": {
+   "id": "$cone",
+   "face": {
+    "faceNear": [
+     10,
+     0,
+     20
+    ]
+   },
+   "entityIds": [
+    "$seg",
+    "$ring"
+   ],
+   "placement": {
+    "method": "develop",
+    "anchor": {
+     "chart": [
+      0,
+      0
+     ],
+     "on": [
+      10,
+      0,
+      20
+     ]
+    },
+    "angleDeg": 90
+   }
+  },
+  "as": "onCone"
+ },
+ {
+  "command": "emboss_on_face",
+  "params": {
+   "id": "$cone",
+   "face": {
+    "faceNear": [
+     10,
+     0,
+     20
+    ]
+   },
+   "profileIds": [
+    "$ring"
+   ],
+   "mode": "scribe",
+   "placement": {
+    "method": "develop",
+    "anchor": {
+     "chart": [
+      0,
+      0
+     ],
+     "on": [
+      10,
+      0,
+      20
+     ]
+    }
+   }
+  },
+  "as": "scribed"
+ },
+ {
+  "command": "inspect_faces",
+  "params": {
+   "id": "$scribed"
+  }
+ },
+ {
+  "command": "check_wrap",
+  "params": {
+   "ids": [
+    "$onCone",
+    "$scribed"
+   ]
+  }
+ }
+]

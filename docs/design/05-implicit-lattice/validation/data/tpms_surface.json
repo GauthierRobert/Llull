@@ -1,0 +1,50 @@
+{
+ "generated": "generate_tpms_refs.mjs",
+ "surfaces": {
+  "gyroid": {
+   "areaPerCell_a1": {
+    "n96": 3.092289,
+    "n192": 3.091807,
+    "extrapolated": 3.091646,
+    "unit": "a² per cell of volume a³ (specific surface a⁻¹)"
+   },
+   "gradientOnSurface_a1": {
+    "min": 8.885766,
+    "max": 10.8828,
+    "ratio": 1.224745
+   },
+   "rawSheetThicknessRatio": 1.224745,
+   "note": "raw sheet {|F| ≤ t} has local wall thickness ≈ 2t/|∇F|: it varies by the ratio max|∇F|/min|∇F| over the surface; the distance-normalised sheet removes this to first order"
+  },
+  "schwarzP": {
+   "areaPerCell_a1": {
+    "n96": 2.352845,
+    "n192": 2.352636,
+    "extrapolated": 2.352567,
+    "unit": "a² per cell of volume a³ (specific surface a⁻¹)"
+   },
+   "gradientOnSurface_a1": {
+    "min": 6.283185,
+    "max": 10.8828,
+    "ratio": 1.732051
+   },
+   "rawSheetThicknessRatio": 1.732051,
+   "note": "raw sheet {|F| ≤ t} has local wall thickness ≈ 2t/|∇F|: it varies by the ratio max|∇F|/min|∇F| over the surface; the distance-normalised sheet removes this to first order"
+  },
+  "diamond": {
+   "areaPerCell_a1": {
+    "n96": 3.838957,
+    "n192": 3.838268,
+    "extrapolated": 3.838038,
+    "unit": "a² per cell of volume a³ (specific surface a⁻¹)"
+   },
+   "gradientOnSurface_a1": {
+    "min": 6.283185,
+    "max": 7.695299,
+    "ratio": 1.224745
+   },
+   "rawSheetThicknessRatio": 1.224745,
+   "note": "raw sheet {|F| ≤ t} has local wall thickness ≈ 2t/|∇F|: it varies by the ratio max|∇F|/min|∇F| over the surface; the distance-normalised sheet removes this to first order"
+  }
+ }
+}

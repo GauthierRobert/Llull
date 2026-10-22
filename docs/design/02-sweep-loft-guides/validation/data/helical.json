@@ -1,0 +1,73 @@
+{
+ "gap": "SWG",
+ "generated": "2026-10-22",
+ "notes": "Helix x = R cos a, y = R sin a, z = c a, c = pitch / 2 pi. Curvature R/(R^2+c^2), torsion c/(R^2+c^2).",
+ "cases": [
+  {
+   "id": "round_tube_on_helix",
+   "R": 20,
+   "pitch": 10,
+   "turns": 3,
+   "sectionRadius": 2,
+   "centreLineLength": 378.182896725,
+   "formula": "pi r^2 n sqrt((2 pi R)^2 + p^2)",
+   "value": 4752.38644026,
+   "meshCoarse": 4743.78192341,
+   "meshFine": 4750.23434521,
+   "richardson": 4752.38515248,
+   "relErrRichardson": 2.71e-7,
+   "curvature": 0.0496853637584,
+   "minRadiusOfCurvature": 20.1266514796,
+   "torsion": 0.00395383562073,
+   "localSelfIntersectionLimit": "sectionRadius < 1/curvature"
+  },
+  {
+   "id": "screw_rectangle_pitch10",
+   "pitch": 10,
+   "radialWidth": 4,
+   "axialHeight": 3,
+   "centroidRadius": 20,
+   "turns": 3,
+   "formula": "2 pi n A rbar (pitch-independent)",
+   "value": 4523.89342117,
+   "meshCoarse": 4519.60424726,
+   "meshFine": 4522.63709473,
+   "richardson": 4523.64804388,
+   "relErrRichardson": 0.0000542
+  },
+  {
+   "id": "screw_rectangle_pitch5",
+   "pitch": 5,
+   "radialWidth": 4,
+   "axialHeight": 3,
+   "centroidRadius": 20,
+   "turns": 3,
+   "formula": "2 pi n A rbar (pitch-independent)",
+   "value": 4523.89342117,
+   "meshCoarse": 4519.53630309,
+   "meshFine": 4522.62002989,
+   "richardson": 4523.64793882,
+   "relErrRichardson": 0.0000543
+  },
+  {
+   "id": "conical_helix_tube",
+   "R0": 20,
+   "R1": 10,
+   "pitch": 10,
+   "turns": 5,
+   "wireRadius": 1,
+   "centreLineLength": 474.097024311,
+   "formula": "pi r^2 L, L = integral sqrt(r(phi)^2 + r_phi^2 + c^2) dphi (Simpson 20000)",
+   "value": 1489.41972867
+  },
+  {
+   "id": "rmf_vs_frenet_one_turn",
+   "R": 20,
+   "pitch": 10,
+   "measuredAngleRad": -0.4984243361,
+   "formula": "Frenet frame turns by integral of torsion = 2 pi c / sqrt(R^2 + c^2) relative to the RMF per turn",
+   "value": 0.4984243361,
+   "sign": "the RMF normal lags the Frenet normal (measured angle = -value: rotation about +tangent from Frenet n to RMF n)"
+  }
+ ]
+}

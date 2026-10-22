@@ -1,0 +1,69 @@
+{
+ "generated": "generate_wrap_refs.mjs",
+ "derivation": "Cone / frustum lateral face, semi-angle alpha = asin((r_base - r_top)/slant). Development = annular sector, angle 2 pi sin(alpha), radii s1 = r_top/sin(alpha), s2 = r_base/sin(alpha); area = pi (r_base + r_top) slant. Chart (rho, phi) <-> surface (slant s = rho, azimuth = phi/sin(alpha)).",
+ "cases": [
+  {
+   "case": "cone r 20 h 40 (add_cone)",
+   "baseRadius": 20,
+   "topRadius": 0,
+   "height": 40,
+   "slantLength": 44.72135955,
+   "semiAngleDeg": 26.5650511771,
+   "developedSectorAngleRad": 2.80992589242,
+   "developedSectorAngleDeg": 160.99689438,
+   "developedInnerRadius": 0,
+   "developedOuterRadius": 44.72135955,
+   "lateralArea": 2809.92589242,
+   "check": {
+    "chartArea": 2809.92589242,
+    "areaResidual": 4.54747350886e-13,
+    "chartCircleRadius": 4,
+    "chartCircleCentreRho": 22.360679775,
+    "numericCircleLength3d": 25.1327412276,
+    "circleLengthResidual": -1.08894226969e-9
+   }
+  },
+  {
+   "case": "frustum r 30 -> 15, h 40",
+   "baseRadius": 30,
+   "topRadius": 15,
+   "height": 40,
+   "slantLength": 42.7200187266,
+   "semiAngleDeg": 20.5560452196,
+   "developedSectorAngleRad": 2.20617364919,
+   "developedSectorAngleDeg": 126.404438972,
+   "developedInnerRadius": 42.7200187266,
+   "developedOuterRadius": 85.4400374532,
+   "lateralArea": 6039.40036467,
+   "check": {
+    "chartArea": 6039.40036467,
+    "areaResidual": -9.09494701773e-13,
+    "chartCircleRadius": 4,
+    "chartCircleCentreRho": 64.0800280899,
+    "numericCircleLength3d": 25.1327412277,
+    "circleLengthResidual": -1.04384412225e-9
+   }
+  },
+  {
+   "case": "45 deg cone r 10 h 10",
+   "baseRadius": 10,
+   "topRadius": 0,
+   "height": 10,
+   "slantLength": 14.1421356237,
+   "semiAngleDeg": 45,
+   "developedSectorAngleRad": 4.44288293816,
+   "developedSectorAngleDeg": 254.558441227,
+   "developedInnerRadius": 0,
+   "developedOuterRadius": 14.1421356237,
+   "lateralArea": 444.288293816,
+   "check": {
+    "chartArea": 444.288293816,
+    "areaResidual": 5.68434188608e-14,
+    "chartCircleRadius": 2.8284271247461903,
+    "chartCircleCentreRho": 7.07106781187,
+    "numericCircleLength3d": 17.7715317519,
+    "circleLengthResidual": -7.75461472813e-10
+   }
+  }
+ ]
+}

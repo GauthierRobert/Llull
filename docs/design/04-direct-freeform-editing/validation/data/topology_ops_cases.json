@@ -1,0 +1,63 @@
+{
+ "generated": "2026-10-22",
+ "generator": "generate_expected_and_plans.mjs",
+ "method": "result cages built by hand for each operation, every edge infinitely sharp; the reference subdivision (level 2) must equal the closed-form polyhedron volume because all faces are planar and all vertices are corners",
+ "cases": {
+  "extrudeTopFace1": {
+   "counts": {
+    "V": 12,
+    "E": 20,
+    "F": 10,
+    "euler": 2
+   },
+   "closedForm": 12,
+   "derivation": "8 + 2 x 2 x 1",
+   "referenceLevel2": 12
+  },
+  "insetTop_t0p5_dm0p5": {
+   "counts": {
+    "V": 12,
+    "E": 20,
+    "F": 10,
+    "euler": 2
+   },
+   "closedForm": 6.83333333333,
+   "derivation": "8 - frustum h/3 (A1 + A2 + sqrt(A1 A2)) = 8 - 0.5/3 (4 + 1 + 2)",
+   "referenceLevel2": 6.83333333333
+  },
+  "loopCutMidHeight": {
+   "counts": {
+    "V": 12,
+    "E": 20,
+    "F": 10,
+    "euler": 2
+   },
+   "closedForm": 8,
+   "referenceLevel2": 8
+  },
+  "bevelEdge45_setback0p5": {
+   "counts": {
+    "V": 10,
+    "E": 15,
+    "F": 7,
+    "euler": 2
+   },
+   "closedForm": 7.75,
+   "derivation": "8 - (0.5 x 0.5 / 2) x 2",
+   "referenceLevel2": 7.75
+  },
+  "bridgeBox3x3x1Centre": {
+   "counts": {
+    "V": 32,
+    "E": 64,
+    "F": 32,
+    "euler": 0
+   },
+   "genus": 1,
+   "closedForm": 8,
+   "derivation": "3 x 3 x 1 - 1 x 1 x 1",
+   "referenceLevel2": 8,
+   "bottomMatches": true
+  }
+ }
+}

@@ -1,0 +1,138 @@
+{
+ "generated": "generate_font_refs.mjs",
+ "derivation": "area = sum of glyph outline areas x (capHeightMm / OS2.sCapHeight)^2 (glyphs of a line do not overlap); emboss on a cylinder of radius r with walls normal to the face: V = A d (1 + d/2r), deboss A d (1 - d/2r) (isometric wrap keeps A; data/emboss_volumes.json). Width uses advances only (no GPOS kerning: not parsed here) and is a property of the layout, not of the area.",
+ "cases": [
+  {
+   "text": "LLULL",
+   "font": "Fira Sans Regular (pinned sha256)",
+   "capHeightMm": 10,
+   "scaleMmPerFontUnit": 0.0145137880987,
+   "loops": 5,
+   "areaMm2": 104.8862209,
+   "outlineLengthMm": 171.25892,
+   "advanceWidthNoKerningMm": 38.51959361,
+   "emboss": {
+    "depthMm": 1,
+    "planarVolumeMm3": 104.8862209,
+    "cylinderRadiusMm": 20,
+    "cylinderEmbossVolumeMm3": 107.5083764,
+    "cylinderDebossVolumeMm3": 102.2640654,
+    "angularSpanRad": 1.925979681,
+    "fitsAround": true
+   },
+   "check": {
+    "fillAreaMm2": 104.89154
+   }
+  },
+  {
+   "text": "WRAP",
+   "font": "Fira Sans Regular (pinned sha256)",
+   "capHeightMm": 10,
+   "scaleMmPerFontUnit": 0.0145137880987,
+   "loops": 7,
+   "areaMm2": 137.4423082,
+   "outlineLengthMm": 227.69218,
+   "advanceWidthNoKerningMm": 37.51814224,
+   "emboss": {
+    "depthMm": 1,
+    "planarVolumeMm3": 137.4423082,
+    "cylinderRadiusMm": 20,
+    "cylinderEmbossVolumeMm3": 140.8783659,
+    "cylinderDebossVolumeMm3": 134.0062505,
+    "angularSpanRad": 1.875907112,
+    "fitsAround": true
+   },
+   "check": {
+    "fillAreaMm2": 137.43611
+   }
+  },
+  {
+   "text": "O",
+   "font": "Fira Sans Regular (pinned sha256)",
+   "capHeightMm": 10,
+   "scaleMmPerFontUnit": 0.0145137880987,
+   "loops": 2,
+   "areaMm2": 34.02993548,
+   "outlineLengthMm": 52.346001,
+   "advanceWidthNoKerningMm": 10.04354136,
+   "emboss": {
+    "depthMm": 1,
+    "planarVolumeMm3": 34.02993548,
+    "cylinderRadiusMm": 20,
+    "cylinderEmbossVolumeMm3": 34.88068386,
+    "cylinderDebossVolumeMm3": 33.17918709,
+    "angularSpanRad": 0.5021770682,
+    "fitsAround": true
+   },
+   "check": {
+    "fillAreaMm2": 34.035984
+   }
+  },
+  {
+   "text": "B8%",
+   "font": "Fira Sans Regular (pinned sha256)",
+   "capHeightMm": 10,
+   "scaleMmPerFontUnit": 0.0145137880987,
+   "loops": 11,
+   "areaMm2": 107.6233022,
+   "outlineLengthMm": 186.8073,
+   "advanceWidthNoKerningMm": 28.80986938,
+   "emboss": {
+    "depthMm": 0.5,
+    "planarVolumeMm3": 53.81165112,
+    "cylinderRadiusMm": 20,
+    "cylinderEmbossVolumeMm3": 54.48429676,
+    "cylinderDebossVolumeMm3": 53.13900549,
+    "angularSpanRad": 1.440493469,
+    "fitsAround": true
+   },
+   "check": {
+    "fillAreaMm2": 107.61739
+   }
+  },
+  {
+   "text": "Ag",
+   "font": "Fira Sans Regular (pinned sha256)",
+   "capHeightMm": 10,
+   "scaleMmPerFontUnit": 0.0145137880987,
+   "loops": 4,
+   "areaMm2": 65.32419393,
+   "outlineLengthMm": 112.69201,
+   "advanceWidthNoKerningMm": 15.86357039,
+   "emboss": {
+    "depthMm": 1,
+    "planarVolumeMm3": 65.32419393,
+    "cylinderRadiusMm": 20,
+    "cylinderEmbossVolumeMm3": 66.95729878,
+    "cylinderDebossVolumeMm3": 63.69108908,
+    "angularSpanRad": 0.7931785196,
+    "fitsAround": true
+   },
+   "check": {
+    "fillAreaMm2": 65.320716
+   }
+  },
+  {
+   "text": "LLULL CAD 2026",
+   "font": "Fira Sans Regular (pinned sha256)",
+   "capHeightMm": 5,
+   "scaleMmPerFontUnit": 0.00725689404935,
+   "loops": 16,
+   "areaMm2": 73.83528299,
+   "outlineLengthMm": 244.36438,
+   "advanceWidthNoKerningMm": 51.1030479,
+   "emboss": {
+    "depthMm": 0.3,
+    "planarVolumeMm3": 22.1505849,
+    "cylinderRadiusMm": 12,
+    "cylinderEmbossVolumeMm3": 22.42746721,
+    "cylinderDebossVolumeMm3": 21.87370259,
+    "angularSpanRad": 4.258587325,
+    "fitsAround": true
+   },
+   "check": {
+    "fillAreaMm2": 73.832807
+   }
+  }
+ ]
+}

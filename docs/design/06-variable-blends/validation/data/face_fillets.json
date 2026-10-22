@@ -1,0 +1,53 @@
+{
+ "faceFaceAcrossChamfer": {
+  "part": "extrude_profile square 10 x 10 (centred) with the (+5, +5) corner chamfered by c = 1, depth 10",
+  "chamferLeg": 1,
+  "radius": 2,
+  "depth": 10,
+  "volumeChamfered": 995,
+  "volumeAfterFaceFillet": 991.415926536,
+  "removedFromChamfered": 3.5840734641,
+  "minimumRadius": 1.70710678119,
+  "refusalExample": {
+   "radius": 1.5,
+   "expected": "refused: arc would cut the chamfer face (r < c/(2-sqrt2) = 1.70711)"
+  }
+ },
+ "fullRoundRib": {
+  "part": "extrude_profile rectangle x in [-2, 2], y in [0, 10], depth 20: full round of the top face y = 10 between the faces x = -2 and x = +2",
+  "thickness": 4,
+  "height": 10,
+  "length": 20,
+  "radius": 2,
+  "volumeBefore": 800,
+  "removedVolume": 34.3362938564,
+  "volumeAfter": 765.663706144,
+  "topFaceAfter": "consumed (0 faces named <rib>:top remain)",
+  "cylinderFace": {
+   "radius": 2,
+   "area": 125.663706144
+  }
+ },
+ "holdLineRadius": [
+  {
+   "wedgeDeg": 30,
+   "radiusPerHoldDistance": 0.267949192431,
+   "derivation": "hold line at distance h from the edge on one face = tangent distance t = r cot(alpha/2) => r = h tan(alpha/2)"
+  },
+  {
+   "wedgeDeg": 60,
+   "radiusPerHoldDistance": 0.57735026919,
+   "derivation": "hold line at distance h from the edge on one face = tangent distance t = r cot(alpha/2) => r = h tan(alpha/2)"
+  },
+  {
+   "wedgeDeg": 90,
+   "radiusPerHoldDistance": 1,
+   "derivation": "hold line at distance h from the edge on one face = tangent distance t = r cot(alpha/2) => r = h tan(alpha/2)"
+  },
+  {
+   "wedgeDeg": 120,
+   "radiusPerHoldDistance": 1.73205080757,
+   "derivation": "hold line at distance h from the edge on one face = tangent distance t = r cot(alpha/2) => r = h tan(alpha/2)"
+  }
+ ]
+}

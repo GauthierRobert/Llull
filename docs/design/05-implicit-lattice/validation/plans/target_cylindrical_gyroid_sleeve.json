@@ -1,0 +1,96 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_field_primitive",
+  "params": {
+   "shape": "cylinder",
+   "radius": 30,
+   "height": 40,
+   "position": [
+    0,
+    0,
+    20
+   ]
+  },
+  "as": "outer"
+ },
+ {
+  "command": "add_field_primitive",
+  "params": {
+   "shape": "cylinder",
+   "radius": 20,
+   "height": 42,
+   "position": [
+    0,
+    0,
+    20
+   ]
+  },
+  "as": "bore"
+ },
+ {
+  "command": "combine_fields",
+  "params": {
+   "op": "subtract",
+   "a": "$outer",
+   "b": "$bore"
+  },
+  "as": "sleeve"
+ },
+ {
+  "command": "add_tpms_lattice",
+  "params": {
+   "kind": "gyroid",
+   "form": "sheet",
+   "thickness": 1,
+   "cellSize": [
+    10,
+    10,
+    10
+   ],
+   "map": {
+    "kind": "cylindrical",
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "axis": [
+     0,
+     0,
+     1
+    ],
+    "cellsAround": 16,
+    "radialCellSize": 10
+   },
+   "region": "$sleeve"
+  },
+  "as": "lat"
+ },
+ {
+  "command": "create_implicit_body",
+  "params": {
+   "field": "$lat",
+   "voxel": 0.2
+  },
+  "as": "body"
+ },
+ {
+  "command": "check_implicit",
+  "params": {
+   "id": "$body"
+  }
+ },
+ {
+  "command": "implicit_properties",
+  "params": {
+   "id": "$body",
+   "region": "$sleeve"
+  }
+ }
+]
